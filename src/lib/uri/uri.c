@@ -399,6 +399,31 @@ fail:
 	return -1;
 }
 
+void
+uri_set_copy(struct uri_set *dst, const struct uri_set *src)
+{
+	dst->uri_count = src->uri_count;
+	if (src->uris == NULL) {
+		dst->uris = NULL;
+		return;
+	}
+	dst->uris = xmalloc(sizeof(*dst->uris) * dst->uri_count);
+	for (int i = 0; i < dst->uri_count; i++)
+		uri_copy(&dst->uris[i], &src->uris[i]);
+}
+
+bool
+uri_set_is_equal(const struct uri_set *a, const struct uri_set *b)
+{
+	if (a->uri_count != b->uri_count)
+		return false;
+	for (int i = 0; i < a->uri_count; i++) {
+		if (!uri_is_equal(&a->uris[i], &b->uris[i]))
+			return false;
+	}
+	return true;
+}
+
 /**
  * String percent-encoding.
  */
@@ -478,6 +503,31 @@ uri_addr_is_equal(const struct uri *a, const struct uri *b)
 	return fields_are_equal(a->host, b->host) &&
 	       fields_are_equal(a->path, b->path) &&
 	       fields_are_equal(a->service, b->service);
+}
+
+bool
+uri_is_equal(const struct uri *a, const struct uri *b)
+{
+	if (!fields_are_equal(a->scheme, b->scheme) ||
+	    !fields_are_equal(a->login, b->login) ||
+	    !fields_are_equal(a->password, b->password) ||
+	    !fields_are_equal(a->fragment, b->fragment) ||
+	    !uri_addr_is_equal(a, b))
+		return false;
+	if (a->param_count != b->param_count)
+		return false;
+	for (int i = 0; i < a->param_count; i++) {
+		struct uri_param *a_param = &a->params[i];
+		struct uri_param *b_param = uri_find_param(b, a_param->name);
+		if (b_param == NULL ||
+		    a_param->value_count != b_param->value_count)
+			return false;
+		for (int j = 0; j < a_param->value_count; j++) {
+			if (strcmp(a_param->values[j], b_param->values[j]) != 0)
+				return false;
+		}
+	}
+	return true;
 }
 
 bool

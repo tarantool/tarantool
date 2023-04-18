@@ -167,7 +167,7 @@ test_addr_is_equal(void)
 		{"unix/:/path/to/file", "/path/to/file", true},
 	};
 	header();
-	plan(3 * lengthof(test_pairs));
+	plan(4 * lengthof(test_pairs));
 	for (unsigned i = 0; i < lengthof(test_pairs); i++) {
 		struct uri uri_a, uri_b;
 		const char *src_a = test_pairs[i].src_a;
@@ -180,7 +180,137 @@ test_addr_is_equal(void)
 		is(uri_addr_is_equal(&uri_a, &uri_b), is_equal,
 		   "%s %s equal to %s", src_a ? src_a : "NULL",
 		   is_equal ? "is" : "isn't", src_b ? src_b : "NULL");
+		is(uri_addr_is_equal(&uri_b, &uri_a), is_equal,
+		   "%s %s equal to %s", src_b ? src_b : "NULL",
+		   is_equal ? "is" : "isn't", src_a ? src_a : "NULL");
+		uri_destroy(&uri_a);
+		uri_destroy(&uri_b);
 	}
+	check_plan();
+	footer();
+}
+
+static void
+test_uri_is_equal(void)
+{
+	struct uri_equal_expected test_pairs[] = {
+		{NULL, NULL, true},
+		{"localhost", "localhost", true},
+		{"user@localhost", "localhost", false},
+		{"user@localhost", "user@localhost", true},
+		{"user:pass@localhost", "user@localhost", false},
+		{"user:pass@localhost", "user:pass@localhost", true},
+		{"localhost:3301", "localhost:3302", false},
+		{"localhost:3301", "localhost:3301", true},
+		{"host_a", "host_b", false},
+		{"scheme://localhost", "localhost", false},
+		{"scheme://localhost", "scheme://localhost", true},
+		{"scheme1://host:port", "scheme2://host:port", false},
+		{"localhost/path/to/file", "localhost", false},
+		{"/path/to/file", "/path/to/file", true},
+		{"/path/to/file", "localhost/path/to/file", false},
+		{"unix/path/to/file", "/path/to/file", false},
+		{"unix/:/path/to/file", "/path/to/file", true},
+		{"localhost#foo", "localhost#bar", false},
+		{"localhost#foo", "localhost#foo", true},
+		{"localhost?foo", "localhost", false},
+		{"localhost?foo", "localhost?foo", true},
+		{"localhost?foo=1", "localhost?foo", false},
+		{"localhost?foo=1", "localhost?foo&foo=1", true},
+		{"localhost?foo&bar", "localhost?foo", false},
+		{"localhost?foo&bar", "localhost?foo&bar", true},
+		{"localhost?foo&bar", "localhost?bar&foo", true},
+		{"localhost?foo=1", "localhost", false},
+		{"localhost?foo=1", "localhost?bar=1", false},
+		{"localhost?foo=1", "localhost?foo=2", false},
+		{"localhost?foo=1", "localhost?foo=1", true},
+		{"localhost?foo=1", "localhost?foo=1&foo=2", false},
+		{"localhost?foo=1&foo=2", "localhost?foo=2&foo=1", false},
+		{"localhost?foo=1&bar=1", "localhost?foo=1&bar=2", false},
+		{"localhost?foo=1&bar=3&foo=2",
+		 "localhost?foo=1&foo=2&bar=3", true},
+		{"localhost?foo=1&bar=3&foo=2",
+		 "localhost?bar=3&foo=1&foo=2", true},
+	};
+	header();
+	plan(4 * lengthof(test_pairs));
+	for (unsigned i = 0; i < lengthof(test_pairs); i++) {
+		struct uri uri_a, uri_b;
+		const char *src_a = test_pairs[i].src_a;
+		const char *src_b = test_pairs[i].src_b;
+		bool is_equal = test_pairs[i].is_equal;
+		ok(uri_create(&uri_a, src_a) == 0, "uri_create(%s)",
+		   src_a ? src_a : "NULL");
+		ok(uri_create(&uri_b, src_b) == 0, "uri_create(%s)",
+		   src_b ? src_b : "NULL");
+		is(uri_is_equal(&uri_a, &uri_b), is_equal,
+		   "%s %s equal to %s", src_a ? src_a : "NULL",
+		   is_equal ? "is" : "isn't", src_b ? src_b : "NULL");
+		is(uri_is_equal(&uri_b, &uri_a), is_equal,
+		   "%s %s equal to %s", src_b ? src_b : "NULL",
+		   is_equal ? "is" : "isn't", src_a ? src_a : "NULL");
+		uri_destroy(&uri_a);
+		uri_destroy(&uri_b);
+	}
+	check_plan();
+	footer();
+}
+
+static void
+test_uri_set_is_equal(void)
+{
+	struct uri_equal_expected test_pairs[] = {
+		{NULL, NULL, true},
+		{NULL, "localhost", false},
+		{NULL, "", true},
+		{"", "", true},
+		{"", "localhost", false},
+		{"localhost", "localhost", true},
+		{"host1,host2", "host1", false},
+		{"host1,host2", "host2", false},
+		{"host1,host2", "host2,host1", false},
+		{"host1,host2", "host1,host2", true},
+	};
+	header();
+	plan(4 * lengthof(test_pairs));
+	for (unsigned i = 0; i < lengthof(test_pairs); i++) {
+		struct uri_set uri_a, uri_b;
+		const char *src_a = test_pairs[i].src_a;
+		const char *src_b = test_pairs[i].src_b;
+		bool is_equal = test_pairs[i].is_equal;
+		ok(uri_set_create(&uri_a, src_a) == 0, "uri_create(%s)",
+		   src_a ? src_a : "NULL");
+		ok(uri_set_create(&uri_b, src_b) == 0, "uri_create(%s)",
+		   src_b ? src_b : "NULL");
+		is(uri_set_is_equal(&uri_a, &uri_b), is_equal,
+		   "%s %s equal to %s", src_a ? src_a : "NULL",
+		   is_equal ? "is" : "isn't", src_b ? src_b : "NULL");
+		is(uri_set_is_equal(&uri_b, &uri_a), is_equal,
+		   "%s %s equal to %s", src_b ? src_b : "NULL",
+		   is_equal ? "is" : "isn't", src_a ? src_a : "NULL");
+		uri_set_destroy(&uri_a);
+		uri_set_destroy(&uri_b);
+	}
+	check_plan();
+	footer();
+}
+
+static void
+test_uri_set_copy(void)
+{
+	header();
+	plan(2);
+	struct uri_set src, dst;
+	uri_set_create(&src, NULL);
+	uri_set_copy(&dst, &src);
+	ok(uri_set_is_equal(&src, &dst), "empty");
+	uri_set_destroy(&src);
+	uri_set_destroy(&dst);
+	uri_set_create(&src, "host1,host2");
+	uri_set_copy(&dst, &src);
+	ok(uri_set_is_equal(&src, &dst), "non-empty");
+	uri_set_destroy(&src);
+	uri_set_destroy(&dst);
 	check_plan();
 	footer();
 }
@@ -828,12 +958,15 @@ test_unescape_special_cases(void)
 int
 main(void)
 {
-	plan(11);
+	plan(14);
 	test_copy_sample();
 	test_copy_empty();
 	test_move_sample();
 	test_move_empty();
 	test_addr_is_equal();
+	test_uri_is_equal();
+	test_uri_set_is_equal();
+	test_uri_set_copy();
 	test_string_uri_with_query_params_parse();
 	test_string_uri_set_with_query_params_parse();
 	test_invalid_string_uri_set();

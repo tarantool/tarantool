@@ -123,6 +123,18 @@ uri_set_destroy(struct uri_set *uri_set);
 void
 uri_set_add(struct uri_set *uri_set, struct uri *uri);
 
+/**
+ * Copies all URIs from @a src to @dst.
+ */
+void
+uri_set_copy(struct uri_set *dst, const struct uri_set *src);
+
+/**
+ * Return true if the two sets contain the same URIs in the same order.
+ */
+bool
+uri_set_is_equal(const struct uri_set *a, const struct uri_set *b);
+
 int
 uri_format(char *str, int len, const struct uri *uri, bool write_password);
 
@@ -157,6 +169,15 @@ uri_unescape(const char *src, size_t src_size, char *dst, bool decode_plus);
 /** Determine if uris refer to the same host:service or unix socket path. */
 bool
 uri_addr_is_equal(const struct uri *a, const struct uri *b);
+
+/**
+ * Return true if the two uris are equivalent, i.e. they have the same scheme,
+ * credentials, address, query parameters, and fragment.
+ *
+ * Note, query strings are not compared. We compare query parameters instead.
+ */
+bool
+uri_is_equal(const struct uri *a, const struct uri *b);
 
 /** Check if a uri is empty. */
 bool
