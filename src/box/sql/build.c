@@ -209,13 +209,13 @@ sqlStartTable(Parse *pParse, Token *pName)
 	sqlVdbeCountChanges(v);
 
 	zName = sql_name_from_token(pName);
-	if (sqlCheckIdentifierName(pParse, zName) != 0)
-		goto cleanup;
+	if (sqlCheckIdentifierName(pParse, zName) != 0) {
+		sql_xfree(zName);
+		return NULL;
+	}
 
 	new_space = sql_template_space_new(pParse, zName);
-	if (new_space == NULL)
-		goto cleanup;
-
+	sql_xfree(zName);
 	strlcpy(new_space->def->engine_name,
 		sql_storage_engine_strs[current_session()->sql_default_engine],
 		ENGINE_NAME_MAX + 1);
@@ -223,9 +223,6 @@ sqlStartTable(Parse *pParse, Token *pName)
 	assert(v == sqlGetVdbe(pParse));
 	if (!sql_get()->init.busy)
 		sql_set_multi_write(pParse, true);
-
- cleanup:
-	sql_xfree(zName);
 	return new_space;
 }
 
@@ -236,10 +233,8 @@ sqlStartTable(Parse *pParse, Token *pName)
  * @param parser SQL Parser object.
  * @param space_def Space definition.
  * @param id column identifier.
- * @retval not NULL on success.
- * @retval NULL on out of memory.
  */
-static struct field_def *
+static void
 sql_field_retrieve(Parse *parser, struct space_def *space_def, uint32_t id)
 {
 	struct field_def *field;
@@ -250,16 +245,8 @@ sql_field_retrieve(Parse *parser, struct space_def *space_def, uint32_t id)
 		uint32_t columns_new = space_def->exact_field_count;
 		columns_new = (columns_new > 0) ? 2 * columns_new : 1;
 		struct region *region = &parser->region;
-		size_t size;
-		field = region_alloc_array(region, typeof(field[0]),
-					   columns_new, &size);
-		if (field == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc_array",
-				 "field");
-			parser->is_aborted = true;
-			return NULL;
-		}
-
+		field = xregion_alloc_array(region, typeof(field[0]),
+					    columns_new);
 		memcpy(field, space_def->fields,
 		       sizeof(*field) * space_def->exact_field_count);
 		for (uint32_t i = columns_new / 2; i < columns_new; i++) {
@@ -270,9 +257,6 @@ sql_field_retrieve(Parse *parser, struct space_def *space_def, uint32_t id)
 		space_def->fields = field;
 		space_def->exact_field_count = columns_new;
 	}
-
-	field = &space_def->fields[id];
-	return field;
 }
 
 /**
@@ -290,39 +274,24 @@ sql_shallow_space_copy(struct Parse *parse, struct space *space)
 {
 	assert(space->def != NULL);
 	struct space *ret = sql_template_space_new(parse, space->def->name);
-	if (ret == NULL)
-		goto error;
 	ret->index_count = space->index_count;
 	ret->index_id_max = space->index_id_max;
-	size_t size = 0;
-	ret->index = region_alloc_array(&parse->region, typeof(struct index *),
-					ret->index_count, &size);
-	if (ret->index == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "ret->index");
-		goto error;
-	}
-	memcpy(ret->index, space->index, size);
+	ret->index = xregion_alloc_array(&parse->region, typeof(struct index *),
+					 space->index_count);
+	memcpy(ret->index, space->index,
+	       sizeof(struct index *) * space->index_count);
 	memcpy(ret->def, space->def, sizeof(struct space_def));
 	ret->def->opts.is_temporary = true;
 	ret->def->opts.is_ephemeral = true;
 	if (ret->def->field_count != 0) {
-		uint32_t fields_size = 0;
 		ret->def->fields =
-			region_alloc_array(&parse->region,
-					   typeof(struct field_def),
-					   ret->def->field_count, &fields_size);
-		if (ret->def->fields == NULL) {
-			diag_set(OutOfMemory, fields_size, "region_alloc",
-				 "ret->def->fields");
-			goto error;
-		}
-		memcpy(ret->def->fields, space->def->fields, fields_size);
+			xregion_alloc_array(&parse->region,
+					    typeof(struct field_def),
+					    space->def->field_count);
+		memcpy(ret->def->fields, space->def->fields,
+		       sizeof(struct field_def) * space->def->field_count);
 	}
-
 	return ret;
-error:
-	parse->is_aborted = true;
-	return NULL;
 }
 
 void
@@ -344,8 +313,6 @@ sql_create_column_start(struct Parse *parse)
 			goto tnt_error;
 		}
 		space = sql_shallow_space_copy(parse, space);
-		if (space == NULL)
-			goto tnt_error;
 	}
 	create_column_def->space = space;
 	struct space_def *def = space->def;
@@ -363,8 +330,6 @@ sql_create_column_start(struct Parse *parse)
 	struct Token *name = &create_column_def->base.name;
 	char *column_name =
 		sql_normalized_name_region_new(region, name->z, name->n);
-	if (column_name == NULL)
-		goto tnt_error;
 
 	/*
 	 * Format can be set in Lua, then exact_field_count can be
@@ -372,8 +337,7 @@ sql_create_column_start(struct Parse *parse)
 	 */
 	if (def->exact_field_count == 0)
 		def->exact_field_count = def->field_count;
-	if (sql_field_retrieve(parse, def, def->field_count) == NULL)
-		return;
+	sql_field_retrieve(parse, def, def->field_count);
 
 	struct field_def *column_def = &def->fields[def->field_count];
 	memcpy(column_def, &field_def_default, sizeof(field_def_default));
@@ -513,19 +477,9 @@ sqlAddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 			struct field_def *field =
 				&def->fields[def->field_count - 1];
 			struct region *region = &pParse->region;
-			uint32_t default_length = (int)(pSpan->zEnd -
-							pSpan->zStart);
-			field->sql_default_value =
-				region_alloc(region, default_length + 1);
-			if (field->sql_default_value == NULL) {
-				diag_set(OutOfMemory, default_length + 1,
-					 "region_alloc",
-					 "field->sql_default_value");
-				pParse->is_aborted = true;
-				return;
-			}
-			strlcpy(field->sql_default_value, pSpan->zStart,
-				default_length + 1);
+			size_t len = pSpan->zEnd - pSpan->zStart + 1;
+			field->sql_default_value = xregion_alloc(region, len);
+			strlcpy(field->sql_default_value, pSpan->zStart, len);
 		}
 	}
 	sql_expr_delete(pSpan->pExpr);
@@ -727,15 +681,7 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 	struct region *region = &parser->region;
 	struct ck_constraint_parse *ck_parse;
 	size_t total = sizeof(*ck_parse) + ck_def_sz;
-	ck_parse = (struct ck_constraint_parse *)
-		region_aligned_alloc(region, total, alignof(*ck_parse));
-	if (ck_parse == NULL) {
-		sql_xfree(name);
-		diag_set(OutOfMemory, total, "region_aligned_alloc",
-			 "ck_parse");
-		parser->is_aborted = true;
-		return;
-	}
+	ck_parse = xregion_aligned_alloc(region, total, alignof(*ck_parse));
 	struct ck_constraint_def *ck_def =
 		(struct ck_constraint_def *)((char *)ck_parse +
 					     sizeof(*ck_parse));
@@ -1926,15 +1872,9 @@ sql_create_foreign_key(struct Parse *parse_context)
 			goto tnt_error;
 		}
 	} else {
-		size_t size;
 		struct fk_constraint_parse *fk_parse =
-			region_alloc_object(&parse_context->region,
-					    typeof(*fk_parse), &size);
-		if (fk_parse == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc_object",
-				 "fk_parse");
-			goto tnt_error;
-		}
+			xregion_alloc_object(&parse_context->region,
+					     typeof(*fk_parse));
 		memset(fk_parse, 0, sizeof(*fk_parse));
 		/*
 		 * Child space already exists if it is
@@ -2006,14 +1946,9 @@ sql_create_foreign_key(struct Parse *parse_context)
 	uint32_t links_offset;
 	size_t fk_def_sz = fk_constraint_def_sizeof(child_cols_count, name_len,
 						    &links_offset);
-	struct fk_constraint_def *fk_def = (struct fk_constraint_def *)
-		region_aligned_alloc(&parse_context->region, fk_def_sz,
-				     alignof(*fk_def));
-	if (fk_def == NULL) {
-		diag_set(OutOfMemory, fk_def_sz, "region_aligned_alloc",
-			 "fk_def");
-		goto tnt_error;
-	}
+	struct fk_constraint_def *fk_def =
+		xregion_aligned_alloc(&parse_context->region, fk_def_sz,
+				      alignof(*fk_def));
 	fk_def->is_field_fk = child_cols == NULL;
 	fk_def->field_count = child_cols_count;
 	fk_def->child_id = child_space != NULL ? child_space->def->id : 0;
@@ -2113,10 +2048,6 @@ sql_drop_constraint(struct Parse *parse_context)
 	char *name = sql_normalized_name_region_new(&parse_context->region,
 						    drop_def->name.z,
 						    drop_def->name.n);
-	if (name == NULL) {
-		parse_context->is_aborted = true;
-		return;
-	}
 	struct Vdbe *v = sqlGetVdbe(parse_context);
 	assert(v != NULL);
 	struct constraint_id *id = space_find_constraint_id(space, name);
@@ -2225,28 +2156,22 @@ vdbe_emit_new_sec_index_id(struct Parse *parse, uint32_t space_id,
  * @param space Space to which belongs given index.
  * @param index Index to be added to list.
  */
-static int
+static void
 sql_space_add_index(struct Parse *parse, struct space *space,
 		    struct index *index)
 {
 	uint32_t idx_count = space->index_count;
-	size_t size = 0;
 	struct index **idx = NULL;
 	struct region *region = &parse->region;
 	if (idx_count == 0) {
-		idx = region_alloc_array(region, typeof(struct index *), 1,
-					 &size);
-		if (idx == NULL)
-			goto alloc_error;
+		idx = xregion_alloc_object(region, typeof(struct index *));
 	/*
 	 * Reallocate each time the idx_count becomes equal to the
 	 * power of two.
 	 */
 	} else if ((idx_count & (idx_count - 1)) == 0) {
-		idx = region_alloc_array(region, typeof(struct index *),
-					 idx_count * 2, &size);
-		if (idx == NULL)
-			goto alloc_error;
+		idx = xregion_alloc_array(region, typeof(struct index *),
+					  idx_count * 2);
 		memcpy(idx, space->index, idx_count * sizeof(struct index *));
 	}
 	if (idx != NULL)
@@ -2256,12 +2181,6 @@ sql_space_add_index(struct Parse *parse, struct space *space,
 		SWAP(space->index[0], index);
 	space->index[space->index_count++] = index;
 	space->index_id_max =  MAX(space->index_id_max, index->def->iid);;
-	return 0;
-
-alloc_error:
-	diag_set(OutOfMemory, size, "region_alloc_array", "idx");
-	parse->is_aborted = true;
-	return -1;
 }
 
 int
@@ -2308,16 +2227,10 @@ index_fill_def(struct Parse *parse, struct index *index,
 	int rc = -1;
 
 	struct key_def *key_def = NULL;
-	size_t size;
 	size_t region_svp = region_used(&fiber()->gc);
 	struct key_part_def *key_parts =
-		region_alloc_array(&fiber()->gc, typeof(key_parts[0]),
-				   expr_list->nExpr, &size);
-	if (key_parts == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array",
-			 "key_parts");
-		goto tnt_error;
-	}
+		xregion_alloc_array(&fiber()->gc, typeof(key_parts[0]),
+				    expr_list->nExpr);
 	for (int i = 0; i < expr_list->nExpr; i++) {
 		struct Expr *expr = expr_list->a[i].pExpr;
 		sql_resolve_self_reference(parse, space_def, expr);
@@ -2548,13 +2461,7 @@ sql_create_index(struct Parse *parse) {
 			parse->is_aborted = true;
 		}
 	}
-	size_t size;
-	index = region_alloc_object(&parse->region, typeof(*index), &size);
-	if (index == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_object", "index");
-		parse->is_aborted = true;
-		goto exit_create_index;
-	}
+	index = xregion_alloc_object(&parse->region, typeof(*index));
 	memset(index, 0, sizeof(*index));
 
 	/*
@@ -2711,9 +2618,9 @@ sql_create_index(struct Parse *parse) {
 		sqlVdbeAddOp0(vdbe, OP_Expire);
 	}
 
-	if (!is_create_table_or_add_col ||
-	    sql_space_add_index(parse, space, index) != 0)
+	if (!is_create_table_or_add_col)
 		goto exit_create_index;
+	sql_space_add_index(parse, space, index);
 	index = NULL;
 
 	/* Clean up before exiting. */

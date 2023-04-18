@@ -3234,13 +3234,7 @@ mem_to_mp(const struct Mem *mem, uint32_t *size, struct region *region)
 		return NULL;
 	}
 	*size = region_used(region) - used;
-	char *data = region_join(region, *size);
-	if (data == NULL) {
-		region_truncate(region, used);
-		diag_set(OutOfMemory, *size, "region_join", "data");
-		return NULL;
-	}
-	return data;
+	return xregion_join(region, *size);
 }
 
 char *
@@ -3263,12 +3257,7 @@ mem_encode_array(const struct Mem *mems, uint32_t count, uint32_t *size,
 		return NULL;
 	}
 	*size = region_used(region) - used;
-	char *array = region_join(region, *size);
-	if (array == NULL) {
-		region_truncate(region, used);
-		diag_set(OutOfMemory, *size, "region_join", "array");
-		return NULL;
-	}
+	char *array = xregion_join(region, *size);
 	mp_tuple_assert(array, array + *size);
 	return array;
 }
@@ -3303,10 +3292,7 @@ mem_encode_map(const struct Mem *mems, uint32_t count, uint32_t *size,
 		goto error;
 	}
 	*size = region_used(region) - used;
-	char *map = region_join(region, *size);
-	if (map != NULL)
-		return map;
-	diag_set(OutOfMemory, *size, "region_join", "map");
+	return xregion_join(region, *size);
 error:
 	region_truncate(region, used);
 	return NULL;
@@ -3379,13 +3365,7 @@ static struct Mem *
 vdbemem_alloc_on_region(uint32_t count)
 {
 	struct region *region = &fiber()->gc;
-	size_t size;
-	struct Mem *ret = region_alloc_array(region, typeof(*ret), count,
-					     &size);
-	if (ret == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "ret");
-		return NULL;
-	}
+	struct Mem *ret = xregion_alloc_array(region, struct Mem, count);
 	memset(ret, 0, count * sizeof(*ret));
 	for (uint32_t i = 0; i < count; i++) {
 		mem_create(&ret[i]);
@@ -3460,15 +3440,11 @@ port_vdbemem_get_msgpack(struct port *base, uint32_t *size)
 		mem_to_mpstream((struct Mem *)port->mem + i, &stream);
 	mpstream_flush(&stream);
 	*size = region_used(region) - region_svp;
-	if (is_error)
-		goto error;
-	const char *ret = (char *)region_join(region, *size);
-	if (ret == NULL)
-		goto error;
-	return ret;
-error:
-	diag_set(OutOfMemory, *size, "region", "ret");
-	return NULL;
+	if (is_error) {
+		diag_set(OutOfMemory, *size, "region", "ret");
+		return NULL;
+	}
+	return xregion_join(region, *size);
 }
 
 static const struct port_vtab port_vdbemem_vtab;
@@ -3518,8 +3494,6 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	struct Mem *val = vdbemem_alloc_on_region(argc);
-	if (val == NULL)
-		return NULL;
 	for (int i = 0; i < argc; i++) {
 		struct luaL_field field;
 		int index = -1 - i;
@@ -3587,12 +3561,7 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 				goto error;
 			}
 			uint32_t size = region_used(region) - used;
-			char *raw = region_join(region, size);
-			if (raw == NULL) {
-				diag_set(OutOfMemory, size, "region_join",
-					 "raw");
-				goto error;
-			}
+			char *raw = xregion_join(region, size);
 			rc = is_map ? mem_copy_map(&val[i], raw, size) :
 			     mem_copy_array(&val[i], raw, size);
 			if (rc != 0)
@@ -3646,8 +3615,6 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	struct Mem *val = vdbemem_alloc_on_region(port->size);
-	if (val == NULL)
-		return NULL;
 	int i = 0;
 	const char *data;
 	struct port_c_entry *pe;

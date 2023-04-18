@@ -156,30 +156,18 @@ char *
 sql_normalized_name_region_new(struct region *r, const char *name, int len)
 {
 	int size = len + 1;
-	ERROR_INJECT(ERRINJ_SQL_NAME_NORMALIZATION, {
-		diag_set(OutOfMemory, size, "region_alloc", "res");
-		return NULL;
-	});
 	size_t region_svp = region_used(r);
-	char *res = region_alloc(r, size);
-	if (res == NULL)
-		goto oom_error;
+	char *res = xregion_alloc(r, size);
 	int rc = sql_normalize_name(res, size, name, len);
 	if (rc <= size)
 		return res;
 
 	size = rc;
 	region_truncate(r, region_svp);
-	res = region_alloc(r, size);
-	if (res == NULL)
-		goto oom_error;
+	res = xregion_alloc(r, size);
 	if (sql_normalize_name(res, size, name, len) > size)
 		unreachable();
 	return res;
-
-oom_error:
-	diag_set(OutOfMemory, size, "region_alloc", "res");
-	return NULL;
 }
 
 /* Convenient short-hand */

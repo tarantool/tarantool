@@ -81,9 +81,6 @@ struct func;
  *
  * @param expr Expression to parse.
  * @param expr_len Length of @an expr.
- *
- * @retval NULL on error.
- * @retval not NULL Expr AST pointer on success.
  */
 struct Expr *
 sql_expr_compile(const char *expr, int expr_len);

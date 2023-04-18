@@ -1934,14 +1934,9 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 	if (pParse->colNamesSet)
 		return;
 	assert(v != 0);
-	size_t size;
 	uint32_t *var_pos =
-		region_alloc_array(&pParse->region, typeof(var_pos[0]),
-				   pParse->nVar, &size);
-	if (var_pos == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "var_pos");
-		return;
-	}
+		xregion_alloc_array(&pParse->region, typeof(var_pos[0]),
+				    pParse->nVar);
 	assert(pTabList != 0);
 	pParse->colNamesSet = 1;
 	bool is_full_meta = (pParse->sql_flags & SQL_FullMetadata) != 0;
@@ -2191,8 +2186,6 @@ sqlResultSetOfSelect(Parse * pParse, Select * pSelect)
 		pSelect = pSelect->pPrior;
 	pParse->sql_flags = saved_flags;
 	struct space *space = sql_template_space_new(pParse, NULL);
-	if (space == NULL)
-		return NULL;
 	/* The sqlResultSetOfSelect() is only used in contexts where lookaside
 	 * is disabled
 	 */
@@ -4717,8 +4710,6 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 
 		assert(pFrom->space == NULL);
 		pFrom->space = sql_template_space_new(pParse, pCte->zName);
-		if (pFrom->space == NULL)
-			return WRC_Abort;
 		pFrom->pSelect = sqlSelectDup(pCte->pSelect, 0);
 		assert(pFrom->pSelect);
 
@@ -4912,8 +4903,6 @@ selectExpander(Walker * pWalker, Select * p)
 			struct space *space =
 				sql_template_space_new(sqlParseToplevel(pParse),
 						       name);
-			if (space == NULL)
-				return WRC_Abort;
 			pFrom->space = space;
 			/*
 			 * Rewrite old name with correct pointer.
