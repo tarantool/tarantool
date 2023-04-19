@@ -457,12 +457,6 @@ replica_set_id(struct replica *replica, uint32_t id);
 void
 replica_clear_id(struct replica *replica);
 
-void
-replica_clear_applier(struct replica *replica);
-
-void
-replica_set_applier(struct replica * replica, struct applier * applier);
-
 /**
  * Check if there are enough "healthy" connections, and fire the appropriate
  * triggers. A replica connection is considered "healthy", when:
@@ -574,9 +568,8 @@ replicaset_add_anon(const struct tt_uuid *replica_uuid);
  * \post appliers are connected to remote hosts and paused.
  * Use replicaset_follow() to resume appliers.
  *
- * \param appliers the array of appliers
- * \param count size of appliers array
- * \param timeout connection timeout
+ * \param uris           remote peer URIs
+ * \param timeout        connection timeout
  * \param connect_quorum if this flag is set, fail unless at
  *                       least replication_connect_quorum
  *                       appliers have successfully connected.
@@ -584,7 +577,7 @@ replicaset_add_anon(const struct tt_uuid *replica_uuid);
  *                       old connection to the replica is fine.
  */
 void
-replicaset_connect(struct applier **appliers, int count,
+replicaset_connect(const struct uri_set *uris,
 		   bool connect_quorum, bool keep_connect);
 
 /**
