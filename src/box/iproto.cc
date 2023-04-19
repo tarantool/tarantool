@@ -212,6 +212,11 @@ struct iproto_thread {
 	} tx;
 };
 
+/**
+ * IPROTO listen URIs. Set by box.cfg.listen.
+ */
+static struct uri_set iproto_uris;
+
 static struct iproto_thread *iproto_threads;
 int iproto_threads_count;
 /**
@@ -3398,6 +3403,20 @@ iproto_send_start_msg(void)
 int
 iproto_listen(const struct uri_set *uri_set)
 {
+	/*
+	 * No need to rebind IPROTO ports in case the configuration is
+	 * the same.
+	 */
+	if (uri_set_is_equal(uri_set, &iproto_uris))
+		return 0;
+	/*
+	 * Note that we set iproto_uris before trying to bind so even if
+	 * we fail, iproto_uris will still contain the new configuration.
+	 * It's okay because box.cfg.listen is reverted on failure at
+	 * the box.cfg level.
+	 */
+	uri_set_destroy(&iproto_uris);
+	uri_set_copy(&iproto_uris, uri_set);
 	iproto_send_stop_msg();
 	evio_service_stop(&tx_binary);
 	struct errinj *inj = errinj(ERRINJ_IPROTO_CFG_LISTEN, ERRINJ_INT);

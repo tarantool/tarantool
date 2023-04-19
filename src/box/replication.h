@@ -133,6 +133,11 @@ extern struct uri cfg_bootstrap_leader_uri;
 extern enum replicaset_state replicaset_state;
 
 /**
+ * Remote peer URIs. Set by box.cfg.replication_uris.
+ */
+extern struct uri_set replication_uris;
+
+/**
  * Network timeout. Determines how often master and slave exchange
  * heartbeat messages. Set by box.cfg.replication_timeout.
  */

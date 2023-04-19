@@ -1775,7 +1775,15 @@ box_set_replication(void)
 	struct uri_set uri_set;
 	if (box_check_replication(&uri_set) != 0)
 		diag_raise();
+	bool unchanged = uri_set_is_equal(&uri_set, &replication_uris);
 	uri_set_destroy(&uri_set);
+	if (unchanged) {
+		/*
+		 * No need to reconnect or sync in case the configuration is
+		 * the same.
+		 */
+		return;
+	}
 	/*
 	 * Try to connect to all replicas within the timeout period.
 	 * Stay in orphan mode in case we fail to connect to at least

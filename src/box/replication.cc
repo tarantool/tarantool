@@ -47,6 +47,7 @@ uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
 struct tt_uuid REPLICASET_UUID;
 
+struct uri_set replication_uris;
 double replication_timeout = 1.0; /* seconds */
 double replication_connect_timeout = 30.0; /* seconds */
 int replication_connect_quorum = REPLICATION_CONNECT_QUORUM_ALL;
@@ -979,6 +980,9 @@ replicaset_connect(const struct uri_set *uris,
 	if (uris->uri_count == 0) {
 		/* Cleanup the replica set. */
 		replicaset_update(NULL, 0, false);
+		uri_set_destroy(&replication_uris);
+		if (uri_set_create(&replication_uris, NULL) != 0)
+			unreachable();
 		return;
 	}
 	if (uris->uri_count >= VCLOCK_MAX) {
@@ -1083,6 +1087,8 @@ replicaset_connect(const struct uri_set *uris,
 	/* Now all the appliers are connected, update the replica set. */
 	replicaset_update(appliers, count, keep_connect);
 	appliers_guard.is_active = false;
+	uri_set_destroy(&replication_uris);
+	uri_set_copy(&replication_uris, uris);
 }
 
 bool
