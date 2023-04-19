@@ -910,11 +910,12 @@ local function reload_cfg(oldcfg, cfg)
     local module_keys = {}
     -- iterate over original table because prepare_cfg() may store NILs
     for key in pairs(cfg) do
-        if not compare_cfg(oldcfg[key], newcfg[key]) then
-            local name = option2module_name[key]
-            if name == nil then
+        local name = option2module_name[key]
+        if name == nil then
+            if not compare_cfg(oldcfg[key], newcfg[key]) then
                 box.error(box.error.RELOAD_CFG, key);
             end
+        else
             if module_keys[name] == nil then
                 module_keys[name] = {}
             end
