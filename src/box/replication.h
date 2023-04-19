@@ -586,6 +586,19 @@ replicaset_connect(const struct uri_set *uris,
 		   bool connect_quorum, bool keep_connect);
 
 /**
+ * Reload replica URIs.
+ *
+ * Called on reconfiguration in case the remote peer URIs are the same.
+ * A URI parameter may store a path to a file (for example, an SSL
+ * certificate), which could change, so we need to recreate appliers'
+ * IO stream contexts in this case.
+ *
+ * Throws an exception on failure.
+ */
+void
+replicaset_reload_uris(void);
+
+/**
  * Check if the current instance fell too much behind its
  * peers in the replica set and needs to be rebootstrapped.
  * If it does, return true and set @master to the instance

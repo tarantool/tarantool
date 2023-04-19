@@ -98,15 +98,14 @@ iostream_ctx_create(struct iostream_ctx *ctx, enum iostream_mode mode,
 {
 	assert(mode == IOSTREAM_SERVER || mode == IOSTREAM_CLIENT);
 	ctx->mode = mode;
+	ctx->ssl = NULL;
 	const char *transport = uri_param(uri, "transport", 0);
 	if (transport != NULL) {
 		if (strcmp(transport, "ssl") == 0) {
 			ctx->ssl = ssl_iostream_ctx_new(mode, uri);
 			if (ctx->ssl == NULL)
 				goto err;
-		} else if (strcmp(transport, "plain") == 0) {
-			ctx->ssl = NULL;
-		} else {
+		} else if (strcmp(transport, "plain") != 0) {
 			diag_set(IllegalParams, "Invalid transport: %s",
 				 transport);
 			goto err;
