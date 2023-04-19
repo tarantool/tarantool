@@ -308,7 +308,7 @@ applier_stop(struct applier *applier);
  * @error   throws exception
  */
 struct applier *
-applier_new(struct uri *uri);
+applier_new(const struct uri *uri);
 
 /**
  * Destroy and delete a applier.

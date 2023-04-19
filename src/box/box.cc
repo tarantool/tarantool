@@ -1728,21 +1728,7 @@ box_sync_replication(bool do_quorum, bool do_reuse)
 	auto uri_set_guard = make_scoped_guard([&]{
 		uri_set_destroy(&uri_set);
 	});
-	if (uri_set.uri_count >= VCLOCK_MAX) {
-		tnt_raise(ClientError, ER_CFG, "replication",
-			  "too many replicas");
-	}
-	int count = 0;
-	struct applier *appliers[VCLOCK_MAX] = {};
-	auto appliers_guard = make_scoped_guard([&]{
-		for (int i = 0; i < count; i++)
-			applier_delete(appliers[i]); /* doesn't affect diag */
-	});
-	for (; count < uri_set.uri_count; count++) {
-		appliers[count] = applier_new(&uri_set.uris[count]);
-	}
-	replicaset_connect(appliers, count, do_quorum, do_reuse);
-	appliers_guard.is_active = false;
+	replicaset_connect(&uri_set, do_quorum, do_reuse);
 }
 
 static inline void
