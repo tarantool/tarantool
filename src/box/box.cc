@@ -1008,7 +1008,10 @@ bad_uri:;
 	return -1;
 }
 
-/** Check validity of a uri passed in configuration option. */
+/**
+ * Check validity of a uri passed in a configuration option.
+ * On success stores the uri in @a uri.
+ */
 static int
 box_check_uri(struct uri *uri, const char *option_name, bool set_diag)
 {
@@ -1027,31 +1030,32 @@ box_check_uri(struct uri *uri, const char *option_name, bool set_diag)
 	return -1;
 }
 
+/**
+ * Check validity of a uri set passed in a configuration option.
+ * On success stores the uri set in @a uri_set.
+ */
 static int
-box_check_uri_set(const char *option_name)
+box_check_uri_set(struct uri_set *uri_set, const char *option_name)
 {
-	struct uri_set uri_set;
-	if (cfg_get_uri_set(option_name, &uri_set) != 0) {
+	if (cfg_get_uri_set(option_name, uri_set) != 0) {
 		diag_set(ClientError, ER_CFG, option_name,
 			 diag_last_error(diag_get())->errmsg);
 		return -1;
 	}
-	int rc = 0;
-	for (int i = 0; i < uri_set.uri_count; i++) {
-		const struct uri *uri = &uri_set.uris[i];
+	for (int i = 0; i < uri_set->uri_count; i++) {
+		const struct uri *uri = &uri_set->uris[i];
 		if (check_uri(uri, option_name, true) != 0) {
-			rc = -1;
-			break;
+			uri_set_destroy(uri_set);
+			return -1;
 		}
 	}
-	uri_set_destroy(&uri_set);
-	return rc;
+	return 0;
 }
 
 static int
-box_check_replication(void)
+box_check_replication(struct uri_set *uri_set)
 {
-	return box_check_uri_set("replication");
+	return box_check_uri_set(uri_set, "replication");
 }
 
 static int
@@ -1085,9 +1089,9 @@ box_check_bootstrap_strategy(void)
 }
 
 static int
-box_check_listen(void)
+box_check_listen(struct uri_set *uri_set)
 {
-	return box_check_uri_set("listen");
+	return box_check_uri_set(uri_set, "listen");
 }
 
 static double
@@ -1613,12 +1617,14 @@ box_check_config(void)
 {
 	struct tt_uuid uuid;
 	struct uri uri;
+	struct uri_set uri_set;
 	box_check_say();
 	box_check_audit();
 	if (box_check_flightrec() != 0)
 		diag_raise();
-	if (box_check_listen() != 0)
+	if (box_check_listen(&uri_set) != 0)
 		diag_raise();
+	uri_set_destroy(&uri_set);
 	if (box_check_auth_type() == NULL)
 		diag_raise();
 	if (box_check_instance_uuid(&uuid) != 0)
@@ -1631,8 +1637,9 @@ box_check_config(void)
 		diag_raise();
 	if (box_check_election_fencing_mode() == ELECTION_FENCING_MODE_INVALID)
 		diag_raise();
-	if (box_check_replication() != 0)
+	if (box_check_replication(&uri_set) != 0)
 		diag_raise();
+	uri_set_destroy(&uri_set);
 	box_check_replication_timeout();
 	box_check_replication_connect_timeout();
 	box_check_replication_connect_quorum();
@@ -1648,6 +1655,7 @@ box_check_config(void)
 		diag_raise();
 	if (box_check_bootstrap_leader(&uri, &uuid) != 0)
 		diag_raise();
+	uri_destroy(&uri);
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_checkpoint_count(cfg_geti("checkpoint_count"));
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
@@ -1764,9 +1772,10 @@ box_set_replication(void)
 		 */
 		return;
 	}
-
-	if (box_check_replication() != 0)
+	struct uri_set uri_set;
+	if (box_check_replication(&uri_set) != 0)
 		diag_raise();
+	uri_set_destroy(&uri_set);
 	/*
 	 * Try to connect to all replicas within the timeout period.
 	 * Stay in orphan mode in case we fail to connect to at least
@@ -2586,12 +2595,10 @@ box_demote(void)
 int
 box_listen(void)
 {
-	if (box_check_listen() != 0)
-		return -1;
 	struct uri_set uri_set;
-	int rc = cfg_get_uri_set("listen", &uri_set);
-	assert(rc == 0);
-	rc = iproto_listen(&uri_set);
+	if (box_check_listen(&uri_set) != 0)
+		return -1;
+	int rc = iproto_listen(&uri_set);
 	uri_set_destroy(&uri_set);
 	return rc;
 }
