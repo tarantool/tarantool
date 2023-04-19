@@ -2695,6 +2695,16 @@ applier_delete(struct applier *applier)
 }
 
 void
+applier_reload_uri(struct applier *applier)
+{
+	struct iostream_ctx io_ctx;
+	if (iostream_ctx_create(&io_ctx, IOSTREAM_CLIENT, &applier->uri) != 0)
+		diag_raise();
+	iostream_ctx_destroy(&applier->io_ctx);
+	iostream_ctx_move(&applier->io_ctx, &io_ctx);
+}
+
+void
 applier_resume(struct applier *applier)
 {
 	assert(!fiber_is_dead(applier->fiber));

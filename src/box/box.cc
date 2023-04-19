@@ -1780,8 +1780,11 @@ box_set_replication(void)
 	if (unchanged) {
 		/*
 		 * No need to reconnect or sync in case the configuration is
-		 * the same.
+		 * the same. However, we should still reload the URIs because
+		 * a URI parameter may store a path to a file (for example,
+		 * an SSL certificate), which could change.
 		 */
+		replicaset_reload_uris();
 		return;
 	}
 	/*

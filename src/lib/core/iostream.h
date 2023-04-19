@@ -266,6 +266,17 @@ iostream_ctx_clear(struct iostream_ctx *ctx)
 }
 
 /**
+ * Move constructor: copies src to dst and clears src.
+ */
+static inline void
+iostream_ctx_move(struct iostream_ctx *dst, struct iostream_ctx *src)
+{
+	assert(src->mode == IOSTREAM_CLIENT || src->mode == IOSTREAM_SERVER);
+	*dst = *src;
+	iostream_ctx_clear(src);
+}
+
+/**
  * Creates an IO stream context for the given mode and URI.
  * On success returns 0. On failure returns -1, sets diag,
  * and clears the context struct (see iostream_ctx_clear).

@@ -1091,6 +1091,16 @@ replicaset_connect(const struct uri_set *uris,
 	uri_set_copy(&replication_uris, uris);
 }
 
+void
+replicaset_reload_uris(void)
+{
+	replicaset_foreach(replica) {
+		struct applier *applier = replica->applier;
+		if (applier != NULL)
+			applier_reload_uri(applier);
+	}
+}
+
 bool
 replicaset_needs_rejoin(struct replica **master)
 {

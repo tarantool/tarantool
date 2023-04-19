@@ -316,6 +316,14 @@ applier_new(const struct uri *uri);
 void
 applier_delete(struct applier *applier);
 
+/**
+ * Recreates the IO stream context from the applier's URI.
+ *
+ * Throws an exception on failure.
+ */
+void
+applier_reload_uri(struct applier *applier);
+
 /*
  * Resume execution of applier until \a state.
  */
