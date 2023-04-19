@@ -17,8 +17,9 @@ for _, prefix in pairs({"BEFORE", "AFTER"}) do
                      BEGIN INSERT INTO t2 VALUES (1,1); END')
 
     test:do_catchsql_test(prefix..'_insert1',
-                          'INSERT INTO t1 VALUES(1, 2)',
-                          {1, "Duplicate key exists in unique index \"pk_unnamed_T2_2\" in space \"T2\" with old tuple - [1, 1] and new tuple - [1, 1]"})
+        'INSERT INTO t1 VALUES(1, 2)',
+        {1, "Duplicate key exists in unique index \"pk_unnamed_T2_1\" in "..
+            "space \"T2\" with old tuple - [1, 1] and new tuple - [1, 1]"})
 
     test:do_execsql_test(prefix..'_insert1_check1',
                          'SELECT *  FROM t1',
@@ -33,8 +34,9 @@ for _, prefix in pairs({"BEFORE", "AFTER"}) do
                      BEGIN INSERT INTO t2 VALUES (1,1); END')
 
     test:do_catchsql_test(prefix..'_update1',
-                          'UPDATE t1 SET s1=1',
-                          {1, "Duplicate key exists in unique index \"pk_unnamed_T2_2\" in space \"T2\" with old tuple - [1, 1] and new tuple - [1, 1]"})
+        'UPDATE t1 SET s1=1',
+        {1, "Duplicate key exists in unique index \"pk_unnamed_T2_1\" in "..
+            "space \"T2\" with old tuple - [1, 1] and new tuple - [1, 1]"})
 
     test:do_execsql_test(prefix..'_update1_check1',
                          'SELECT *  FROM t1',
@@ -51,8 +53,9 @@ for _, prefix in pairs({"BEFORE", "AFTER"}) do
                              INSERT INTO t2 VALUES (2,2); END')
 
     test:do_catchsql_test(prefix..'delete1',
-                          'DELETE FROM t1;',
-                          {1, "Duplicate key exists in unique index \"pk_unnamed_T2_2\" in space \"T2\" with old tuple - [2, 2] and new tuple - [2, 2]"})
+        'DELETE FROM t1;',
+        {1, "Duplicate key exists in unique index \"pk_unnamed_T2_1\" in "..
+            "space \"T2\" with old tuple - [2, 2] and new tuple - [2, 2]"})
 
     -- Nothing should be inserted due to abort
     test:do_execsql_test('delete1_check1',
@@ -68,8 +71,9 @@ end
 
 -- Check multi-insert
 test:do_catchsql_test('insert2',
-                      'INSERT INTO t1 VALUES (5, 6), (6, 7)',
-                      {1, "Duplicate key exists in unique index \"pk_unnamed_T2_2\" in space \"T2\" with old tuple - [1, 1] and new tuple - [1, 1]"})
+    'INSERT INTO t1 VALUES (5, 6), (6, 7)',
+    {1, "Duplicate key exists in unique index \"pk_unnamed_T2_1\" in "..
+        "space \"T2\" with old tuple - [1, 1] and new tuple - [1, 1]"})
 test:do_execsql_test('insert2_check',
                      'SELECT * FROM t1;',
                      {3, 3})

@@ -1529,9 +1529,9 @@ sql_resolve_self_reference(struct Parse *parser, struct space_def *def,
 		return;
 	}
 
-	/* Fake SrcList for parser->create_table_def */
+	/* Fake SrcList for CREATE TABLE */
 	SrcList sSrc;
-	/* Name context for parser->create_table_def  */
+	/* Name context for CREATE TABLE */
 	NameContext sNC;
 
 	memset(&sNC, 0, sizeof(sNC));

@@ -71,7 +71,8 @@ box.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, a INTEGER CHECK (a > 5) ON 
 box.execute("CREATE TABLE te17 (s1 INT NULL PRIMARY KEY NOT NULL);")
 ---
 - null
-- Primary index of space 'TE17' can not contain nullable parts
+- 'Failed to execute SQL statement: NULL declaration for column ''S1'' of table ''TE17''
+  has been already set to ''none'''
 ...
 box.execute("CREATE TABLE te17 (s1 INT NULL PRIMARY KEY);")
 ---

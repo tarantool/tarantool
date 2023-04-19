@@ -948,7 +948,7 @@ test:do_execsql_test(
         SELECT "_index"."name" FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T7';
     ]], {
         -- <index-17.1>
-        "pk_unnamed_T7_3","unique_unnamed_T7_1","unique_unnamed_T7_2"
+        "pk_unnamed_T7_1","unique_unnamed_T7_2","unique_unnamed_T7_3"
         -- </index-17.1>
     })
 

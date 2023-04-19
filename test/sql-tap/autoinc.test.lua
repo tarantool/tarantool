@@ -890,12 +890,14 @@ test:do_catchsql_test(
         1, "Syntax error at line 1 at or near position 87: table must feature at most one AUTOINCREMENT field"
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "autoinc-11.9",
     [[
         CREATE TABLE t11_9 (i INT, PRIMARY KEY(a AUTOINCREMENT), a INT);
+        INSERT INTO t11_9 VALUES (1, NULL), (2, NULL), (3, NULL);
+        SELECT * FROM t11_9;
     ]], {
-        1, "Can’t resolve field 'A'"
+        1, 1, 2, 2, 3, 3
     })
 
 test:do_catchsql_test(

@@ -475,6 +475,186 @@ new_xmalloc(size_t n)
 }
 
 /**
+ * Finish processing table properties for CREATE TABLE or ALTER TABLE ADD COLUMN
+ * statement.
+ */
+static int
+sql_finish_table_properties(struct Parse *parse)
+{
+	assert(!parse->is_aborted);
+	parse->initiateTTrans = true;
+	create_ck_constraint_parse_def_init(
+		&parse->create_ck_constraint_parse_def);
+	create_fk_constraint_parse_def_init(
+		&parse->create_fk_constraint_parse_def);
+	for (uint32_t i = 0; i < parse->column_list.n; ++i) {
+		struct sql_parse_column *c = &parse->column_list.a[i];
+		sql_create_column_start(parse, &c->name, c->type);
+		if (parse->is_aborted)
+			return -1;
+		if (c->is_action_set)
+			sql_column_add_nullable_action(parse, c->action);
+		if (c->collate_name.n != 0)
+			sqlAddCollateType(parse, &c->collate_name);
+		if (c->default_expr.pExpr != NULL)
+			sqlAddDefaultValue(parse, &c->default_expr);
+	}
+	if (parse->autoinc_name != NULL) {
+		if (sql_fieldno_by_name(parse, parse->autoinc_name,
+					&parse->autoinc_fieldno) != 0)
+			return -1;
+	}
+	if (parse->primary_key.cols != NULL) {
+		sqlAddPrimaryKey(parse);
+		if (parse->is_aborted)
+			return -1;
+	}
+	for (uint32_t i = 0; i < parse->unique_list.n; ++i) {
+		struct sql_parse_unique *c = &parse->unique_list.a[i];
+		sql_create_index(parse, &c->name, c->cols,
+				 SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, false);
+		if (parse->is_aborted)
+			return -1;
+	}
+	for (uint32_t i = 0; i < parse->check_list.n; ++i) {
+		sql_create_check_contraint(parse, &parse->check_list.a[i]);
+		if (parse->is_aborted)
+			return -1;
+	}
+	for (uint32_t i = 0; i < parse->foreign_key_list.n; ++i) {
+		sql_create_foreign_key(parse, &parse->foreign_key_list.a[i]);
+		if (parse->is_aborted)
+			return -1;
+	}
+	return 0;
+}
+
+/** Finish processing of CREATE INDEX statement. */
+static void
+sql_finish_create_index(struct Parse *parse)
+{
+	parse->initiateTTrans = true;
+	struct sql_parse_index *stmt = &parse->create_index;
+	enum sql_index_type type = stmt->is_unique ? SQL_INDEX_TYPE_UNIQUE :
+				   SQL_INDEX_TYPE_NON_UNIQUE;
+	sql_create_index(parse, &stmt->name, stmt->cols, type,
+			 stmt->if_not_exists);
+}
+
+/** Finish parsing by processing saved statements or their parts. */
+static void
+sql_finish_parsing(struct Parse *parse)
+{
+	if (parse->is_aborted)
+		return;
+	switch (parse->type) {
+	case PARSE_TYPE_START_TRANSACTION:
+		sql_transaction_begin(parse);
+		break;
+	case PARSE_TYPE_COMMIT:
+		sql_transaction_commit(parse);
+		break;
+	case PARSE_TYPE_ROLLBACK:
+		sql_transaction_rollback(parse);
+		break;
+	case PARSE_TYPE_SAVEPOINT:
+		sqlSavepoint(parse, SAVEPOINT_BEGIN, &parse->savepoint.name);
+		break;
+	case PARSE_TYPE_RELEASE_SAVEPOINT:
+		sqlSavepoint(parse, SAVEPOINT_RELEASE, &parse->savepoint.name);
+		break;
+	case PARSE_TYPE_ROLLBACK_TO_SAVEPOINT:
+		sqlSavepoint(parse, SAVEPOINT_ROLLBACK, &parse->savepoint.name);
+		break;
+	case PARSE_TYPE_CREATE_TABLE:
+		parse->space = sqlStartTable(parse, &parse->create_table.name,
+					     &parse->create_table.engine_name);
+		if (parse->is_aborted)
+			return;
+		if (sql_finish_table_properties(parse) != 0)
+			return;
+		sqlEndTable(parse);
+		break;
+	case PARSE_TYPE_CREATE_VIEW:
+		parse->initiateTTrans = true;
+		sql_create_view(parse);
+		if (parse->is_aborted)
+			return;
+		break;
+	case PARSE_TYPE_CREATE_TRIGGER:
+		parse->initiateTTrans = true;
+		sql_trigger_begin(parse);
+		if (parse->is_aborted)
+			return;
+		sql_trigger_finish(parse, parse->create_trigger.step,
+				   &parse->create_trigger.all);
+		if (parse->is_aborted)
+			return;
+		break;
+	case PARSE_TYPE_ADD_COLUMN:
+		if (sql_finish_table_properties(parse) != 0)
+			return;
+		sql_create_column_end(parse);
+		break;
+	case PARSE_TYPE_ADD_FOREIGN_KEY:
+		assert(parse->foreign_key_list.n == 1);
+		sql_create_foreign_key(parse, &parse->foreign_key_list.a[0]);
+		break;
+	case PARSE_TYPE_ADD_CHECK:
+		assert(parse->check_list.n == 1);
+		sql_create_check_contraint(parse, &parse->check_list.a[0]);
+		break;
+	case PARSE_TYPE_ADD_UNIQUE:
+		assert(parse->unique_list.n == 1);
+		sql_create_index(parse, &parse->unique_list.a[0].name,
+				 parse->unique_list.a[0].cols,
+				 SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, false);
+		break;
+	case PARSE_TYPE_ADD_PRIMARY_KEY:
+		sqlAddPrimaryKey(parse);
+		break;
+	case PARSE_TYPE_CREATE_INDEX:
+		sql_finish_create_index(parse);
+		break;
+	case PARSE_TYPE_RENAME_TABLE:
+		parse->initiateTTrans = true;
+		sql_alter_table_rename(parse);
+		if (parse->is_aborted)
+			return;
+		break;
+	case PARSE_TYPE_DROP_CONSTRAINT:
+		parse->initiateTTrans = true;
+		sql_drop_constraint(parse);
+		if (parse->is_aborted)
+			return;
+		break;
+	case PARSE_TYPE_DROP_INDEX:
+		parse->initiateTTrans = true;
+		sql_drop_index(parse);
+		if (parse->is_aborted)
+			return;
+		break;
+	case PARSE_TYPE_DROP_VIEW:
+	case PARSE_TYPE_DROP_TABLE:
+		parse->initiateTTrans = true;
+		sql_drop_table(parse);
+		if (parse->is_aborted)
+			return;
+		break;
+	case PARSE_TYPE_DROP_TRIGGER:
+		parse->initiateTTrans = true;
+		sql_drop_trigger(parse);
+		if (parse->is_aborted)
+			return;
+		break;
+	default:
+		assert(parse->type == PARSE_TYPE_UNKNOWN);
+	}
+	if (!parse->is_aborted && !parse->parse_only)
+		sql_finish_coding(parse);
+}
+
+/**
  * Run the parser on the given SQL string.
  *
  * @param pParse Parser context.
@@ -495,7 +675,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	i = 0;
 	/* sqlParserTrace(stdout, "parser: "); */
 	pEngine = sqlParserAlloc(new_xmalloc);
-	assert(pParse->create_table_def.new_space == NULL);
+	assert(pParse->space == NULL);
 	assert(pParse->parsed_ast.trigger == NULL);
 	assert(pParse->nVar == 0);
 	assert(pParse->pVList == 0);
@@ -550,13 +730,14 @@ sqlRunParser(Parse * pParse, const char *zSql)
 		}
 		pParse->line_pos += pParse->sLastToken.n;
 	}
+	sql_finish_parsing(pParse);
 	pParse->zTail = &zSql[i];
 	sqlParserFree(pEngine, free);
 	if (pParse->pVdbe != NULL && pParse->is_aborted) {
 		sqlVdbeDelete(pParse->pVdbe);
 		pParse->pVdbe = 0;
 	}
-	parser_space_delete(pParse->create_column_def.space);
+	parser_space_delete(pParse->space);
 
 	if (pParse->pWithToFree)
 		sqlWithDelete(pParse->pWithToFree);

@@ -1511,17 +1511,6 @@ struct ExprList {
 };
 
 /*
- * An instance of this structure is used by the parser to record both
- * the parse tree for an expression and the span of input text for an
- * expression.
- */
-struct ExprSpan {
-	Expr *pExpr;		/* The expression parse tree */
-	const char *zStart;	/* First character of input text */
-	const char *zEnd;	/* One character past the end of input text */
-};
-
-/*
  * An instance of this structure can hold a simple list of identifiers,
  * such as the list "a,b,c" in the following statements:
  *
@@ -2034,34 +2023,41 @@ struct Parse {
 	uint32_t autoname_i;
 	/** Space triggers are being coded for. */
 	struct space *triggered_space;
+	/** Parsed statement type. */
+	enum parse_type type;
+	/** Savepoint description for savepoint-related statements. */
+	struct sql_parse_savepoint savepoint;
+	/** Description of created FOREIGN KEY constraints. */
+	struct sql_parse_column_list column_list;
+	/** Description of created columns. */
+	struct sql_parse_foreign_key_list foreign_key_list;
+	/** Description of created CHECK constraints. */
+	struct sql_parse_check_list check_list;
+	/** Description of created UNIQUE constraints. */
+	struct sql_parse_unique_list unique_list;
+	/** Description of created PRIMARY KEY constraint. */
+	struct sql_parse_unique primary_key;
+	/** Description of created index. */
+	struct sql_parse_index create_index;
+	/** Description of created table. */
+	struct sql_parse_table create_table;
+	/** Description of created view. */
+	struct sql_parse_view create_view;
+	/** Description of created trigger. */
+	struct sql_parse_trigger create_trigger;
 	/**
-	 * One of parse_def structures which are used to
-	 * assemble and carry arguments of DDL routines
-	 * from parse.y
+	 * Description of the object to drop from ALTER TABLE DROP CONSTRAINT,
+	 * DROP INDEX, DROP VIEW, DROP TABLE or DROP TRIGGER statement.
 	 */
-	union {
-		struct create_ck_def create_ck_def;
-		struct create_fk_def create_fk_def;
-		struct create_index_def create_index_def;
-		struct create_trigger_def create_trigger_def;
-		struct create_view_def create_view_def;
-		struct rename_entity_def rename_entity_def;
-		struct drop_constraint_def drop_constraint_def;
-		struct drop_index_def drop_index_def;
-		struct drop_table_def drop_table_def;
-		struct drop_trigger_def drop_trigger_def;
-		struct drop_view_def drop_view_def;
-		struct enable_entity_def enable_entity_def;
-	};
-	/**
-	 * Table def or column def is not part of union since
-	 * information being held must survive till the end of
-	 * parsing of whole <CREATE TABLE> or
-	 * <ALTER TABLE ADD COLUMN> statement (to pass it to
-	 * sqlEndTable() sql_create_column_end() function).
-	 */
-	struct create_table_def create_table_def;
-	struct create_column_def create_column_def;
+	struct sql_parse_drop drop_object;
+	/** Name of the column with AUTOINCREMENT. */
+	struct Expr *autoinc_name;
+	/** Source list for the statement. */
+	struct SrcList *src_list;
+	/** Descriptions of the space used in column creation. */
+	struct space *space;
+	/** New name of the table. */
+	struct Token table_new_name;
 	/*
 	 * FK and CK constraints appeared in a <CREATE TABLE> or
 	 * an <ALTER TABLE ADD COLUMN> statement.
@@ -2702,16 +2698,33 @@ void
 sqlSelectAddColumnTypeAndCollation(Parse *, struct space_def *, Select *);
 struct space *sqlResultSetOfSelect(Parse *, Select *);
 
+/*
+ * Begin constructing a new table representation in memory.  This is
+ * the first of several action routines that get called in response
+ * to a CREATE TABLE statement.  In particular, this routine is called
+ * after seeing tokens "CREATE" and "TABLE" and the table name. The isTemp
+ * flag is true if the table should be stored in the auxiliary database
+ * file instead of in the main database file.  This is normally the case
+ * when the "TEMP" or "TEMPORARY" keyword occurs in between
+ * CREATE and TABLE.
+ *
+ * The new table record is initialized and put in pParse->space.
+ * As more of the CREATE TABLE statement is parsed, additional action
+ * routines will be called to add more information to this record.
+ * At the end of the CREATE TABLE statement, the sqlEndTable() routine
+ * is called to complete the construction of the new table record.
+ */
 struct space *
-sqlStartTable(Parse *, Token *);
+sqlStartTable(struct Parse *parse, struct Token *name,
+	      struct Token *engine_name);
 
 /**
- * Add new field to the format of ephemeral space in
- * create_column_def. If it is <ALTER TABLE> create shallow copy
- * of the existing space and add field to its format.
+ * Add new field to the format of ephemeral space. If it is <ALTER TABLE> create
+ * shallow copy of the existing space and add field to its format.
  */
 void
-sql_create_column_start(struct Parse *parse);
+sql_create_column_start(struct Parse *parse, struct Token *name,
+			enum field_type type);
 
 /**
  * Emit code to update entry in _space and code to create
@@ -2746,7 +2759,7 @@ sqlAddPrimaryKey(struct Parse *parse);
  * @param is_field_ck True if this is a field constraint, false otherwise.
  */
 void
-sql_create_check_contraint(struct Parse *parser, bool is_field_ck);
+sql_create_check_contraint(struct Parse *parser, struct sql_parse_check *cdef);
 
 void sqlAddDefaultValue(Parse *, ExprSpan *);
 void sqlAddCollateType(Parse *, Token *);
@@ -2946,7 +2959,9 @@ sqlIdListDelete(struct IdList *pList);
  * @param parse All information about this parse.
  */
 void
-sql_create_index(struct Parse *parse);
+sql_create_index(struct Parse *parse, struct Token *index_name,
+		 struct ExprList *col_list, enum sql_index_type idx_type,
+		 bool if_not_exist);
 
 /**
  * This routine will drop an existing named index.  This routine
@@ -3598,7 +3613,8 @@ int sqlJoinType(Parse *, Token *, Token *, Token *);
  * @param parse_context Parsing context.
  */
 void
-sql_create_foreign_key(struct Parse *parse_context);
+sql_create_foreign_key(struct Parse *parse_context,
+		       struct sql_parse_foreign_key *cdef);
 
 /**
  * Emit code to drop the entry from _index or _ck_contstraint or

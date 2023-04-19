@@ -381,7 +381,7 @@ test:do_catchsql_test(
                 "_index"."id" = "_space"."id" AND
                 "_space"."name"='TEST7';
         ]],
-        {0, {"unique_unnamed_TEST7_1",0}})
+        {0, {"pk_unnamed_TEST7_1",0}})
 
 
 -- This test is the same as previous, but with named UNIQUE
@@ -396,6 +396,6 @@ test:do_catchsql_test(
                 "_index"."id" = "_space"."id" AND
                 "_space"."name"='TEST8';
         ]],
-        {0, {"pk_unnamed_TEST8_2",0,"C1",1}})
+        {0, {"pk_unnamed_TEST8_1",0,"C1",1}})
 
 test:finish_test()
