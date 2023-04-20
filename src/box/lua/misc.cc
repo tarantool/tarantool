@@ -397,13 +397,10 @@ lbox_tuple_format_new(struct lua_State *L)
 	uint32_t count = lua_objlen(L, 1);
 	if (count == 0)
 		return lbox_push_tuple_format(L, tuple_format_runtime);
-	size_t size;
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	struct field_def *fields =
-		(struct field_def *)xregion_alloc_array(region,
-							struct field_def, count,
-							&size);
+	struct field_def *fields = xregion_alloc_array(region,
+						       struct field_def, count);
 	for (uint32_t i = 0; i < count; ++i) {
 		size_t len;
 		fields[i] = field_def_default;
