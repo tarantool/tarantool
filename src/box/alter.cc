@@ -1854,7 +1854,7 @@ update_view_references(struct Select *select, int update_value,
 		 */
 		if (sql_select_constains_cte(select, space_name))
 			continue;
-		struct space *space = space_by_name(space_name);
+		struct space *space = space_by_name0(space_name);
 		if (space == NULL) {
 			if (! suppress_error) {
 				assert(not_found_space != NULL);

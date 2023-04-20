@@ -100,7 +100,7 @@ sql_pragma_table_info(struct Parse *parse, const char *tbl_name)
 {
 	if (tbl_name == NULL)
 		return;
-	struct space *space = space_by_name(tbl_name);
+	struct space *space = space_by_name0(tbl_name);
 	if (space == NULL)
 		return;
 	struct index *pk = space_index(space, 0);
@@ -187,10 +187,10 @@ sql_pragma_index_info(struct Parse *parse,
 {
 	if (idx_name == NULL || tbl_name == NULL)
 		return;
-	struct space *space = space_by_name(tbl_name);
+	struct space *space = space_by_name0(tbl_name);
 	if (space == NULL)
 		return;
-	struct index *idx = space_index_by_name(space, idx_name);
+	struct index *idx = space_index_by_name0(space, idx_name);
 	if (idx == NULL)
 		return;
 	parse->nMem = 6;
@@ -267,7 +267,7 @@ sql_pragma_index_list(struct Parse *parse, const char *tbl_name)
 {
 	if (tbl_name == NULL)
 		return;
-	struct space *space = space_by_name(tbl_name);
+	struct space *space = space_by_name0(tbl_name);
 	if (space == NULL)
 		return;
 	parse->nMem = 3;

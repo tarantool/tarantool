@@ -364,18 +364,31 @@ space_index(struct space *space, uint32_t id)
  *
  * @param space Space index belongs to.
  * @param index_name Name of index to be found.
+ * @param index_name_len Length of index name.
  *
  * @retval NULL if the index is not found.
  */
 static inline struct index *
-space_index_by_name(struct space *space, const char *index_name)
+space_index_by_name(struct space *space, const char *index_name,
+		    uint32_t index_name_len)
 {
 	for(uint32_t i = 0; i < space->index_count; i++) {
 		struct index *index = space->index[i];
-		if (strcmp(index_name, index->def->name) == 0)
+		if (strlen(index->def->name) != index_name_len)
+			continue;
+		if (strncmp(index_name, index->def->name, index_name_len) == 0)
 			return index;
 	}
 	return NULL;
+}
+
+/**
+ * `space_index_by_name` for NULL-terminated index names.
+ */
+static inline struct index *
+space_index_by_name0(struct space *space, const char *index_name)
+{
+	return space_index_by_name(space, index_name, strlen(index_name));
 }
 
 /**
