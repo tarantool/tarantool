@@ -376,7 +376,7 @@ evio_service_entry_bind(struct evio_service_entry *entry, const struct uri *u)
 static void
 evio_service_entry_detach(struct evio_service_entry *entry)
 {
-	iostream_ctx_clear(&entry->io_ctx);
+	iostream_ctx_destroy(&entry->io_ctx);
 	if (ev_is_active(&entry->ev)) {
 		ev_io_stop(entry->service->loop, &entry->ev);
 		entry->addr_len = 0;
@@ -389,8 +389,6 @@ evio_service_entry_detach(struct evio_service_entry *entry)
 static void
 evio_service_entry_stop(struct evio_service_entry *entry)
 {
-	iostream_ctx_destroy(&entry->io_ctx);
-
 	int service_fd = entry->ev.fd;
 	evio_service_entry_detach(entry);
 	if (service_fd < 0)
@@ -417,9 +415,21 @@ evio_service_entry_attach(struct evio_service_entry *dst,
 	uri_copy(&dst->uri, &src->uri);
 	dst->addrstorage = src->addrstorage;
 	dst->addr_len = src->addr_len;
-	dst->io_ctx = src->io_ctx;
+	iostream_ctx_copy(&dst->io_ctx, &src->io_ctx);
 	ev_io_set(&dst->ev, src->ev.fd, EV_READ);
 	ev_io_start(dst->service->loop, &dst->ev);
+}
+
+/** Recreate the IO stream contexts from the service entry URI. */
+static int
+evio_service_entry_reload_uri(struct evio_service_entry *entry)
+{
+	struct iostream_ctx io_ctx;
+	if (iostream_ctx_create(&io_ctx, IOSTREAM_SERVER, &entry->uri) != 0)
+		return -1;
+	iostream_ctx_destroy(&entry->io_ctx);
+	iostream_ctx_move(&entry->io_ctx, &io_ctx);
+	return 0;
 }
 
 static inline int
@@ -537,5 +547,15 @@ evio_service_start(struct evio_service *service, const struct uri_set *uri_set)
 		return -1;
 	if (evio_service_listen(service) != 0)
 		return -1;
+	return 0;
+}
+
+int
+evio_service_reload_uris(struct evio_service *service)
+{
+	for (int i = 0; i < service->entry_count; i++) {
+		if (evio_service_entry_reload_uri(&service->entries[i]) != 0)
+			return -1;
+	}
 	return 0;
 }

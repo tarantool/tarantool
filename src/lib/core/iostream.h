@@ -266,6 +266,12 @@ iostream_ctx_clear(struct iostream_ctx *ctx)
 }
 
 /**
+ * Copy constructor: copies src to dst.
+ */
+void
+iostream_ctx_copy(struct iostream_ctx *dst, const struct iostream_ctx *src);
+
+/**
  * Move constructor: copies src to dst and clears src.
  */
 static inline void

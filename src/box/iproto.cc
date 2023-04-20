@@ -3248,6 +3248,10 @@ enum iproto_cfg_op {
 	 */
 	IPROTO_CFG_STOP,
 	/**
+	 * Equivalent to IPROTO_CFG_STOP followed by IPROTO_CFG_START.
+	 */
+	IPROTO_CFG_RESTART,
+	/**
 	 * Command code do get statistic from iproto thread
 	 */
 	IPROTO_CFG_STAT,
@@ -3333,6 +3337,10 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		case IPROTO_CFG_STOP:
 			evio_service_detach(binary);
 			break;
+		case IPROTO_CFG_RESTART:
+			evio_service_detach(binary);
+			evio_service_attach(binary, &tx_binary);
+			break;
 		case IPROTO_CFG_STAT:
 			iproto_fill_stat(iproto_thread, cfg_msg);
 			break;
@@ -3400,15 +3408,31 @@ iproto_send_start_msg(void)
 		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
 }
 
+/** Send IPROTO_CFG_RESTART to all threads. */
+static void
+iproto_send_restart_msg(void)
+{
+	struct iproto_cfg_msg cfg_msg;
+	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_RESTART);
+	for (int i = 0; i < iproto_threads_count; i++)
+		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
+}
+
 int
 iproto_listen(const struct uri_set *uri_set)
 {
 	/*
 	 * No need to rebind IPROTO ports in case the configuration is
-	 * the same.
+	 * the same. However, we should still reload the URIs because
+	 * a URI parameter may store a path to a file (for example,
+	 * an SSL certificate), which could change.
 	 */
-	if (uri_set_is_equal(uri_set, &iproto_uris))
+	if (uri_set_is_equal(uri_set, &iproto_uris)) {
+		if (evio_service_reload_uris(&tx_binary) != 0)
+			return -1;
+		iproto_send_restart_msg();
 		return 0;
+	}
 	/*
 	 * Note that we set iproto_uris before trying to bind so even if
 	 * we fail, iproto_uris will still contain the new configuration.
