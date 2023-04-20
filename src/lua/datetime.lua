@@ -1090,11 +1090,17 @@ local function datetime_set(self, obj)
         -- otherwise - use nsec, usec, or msec
         if count_usec == 0 then
             nsec = fraction * 1e9
-        else
+        elseif fraction ~= 0 then
             error('only integer values allowed in timestamp '..
                   'if nsec, usec, or msecs provided', 2)
         end
 
+        if msec ~= nil then
+            nsec = msec * 1e6
+        end
+        if usec ~= nil then
+            nsec = usec * 1e3
+        end
         if tzname ~= nil then
             offset, self.tzindex = parse_tzname(sec_int, tzname)
         end
