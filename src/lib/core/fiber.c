@@ -1306,10 +1306,9 @@ fiber_gc_checker_init(struct fiber *fiber)
 		return;
 	}
 
-	size_t size;
 	fiber->first_alloc_bt =
 		xregion_alloc_object(&fiber->gc,
-				     typeof(*fiber->first_alloc_bt), &size);
+				     typeof(*fiber->first_alloc_bt));
 	fiber->gc_initial_size = region_used(&fiber->gc);
 	region_set_callbacks(&fiber->gc,
 			     fiber_on_gc_alloc, fiber_on_gc_truncate,

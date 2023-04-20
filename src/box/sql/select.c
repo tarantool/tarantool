@@ -2065,10 +2065,9 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 	 */
 	assert(space_def->fields == NULL);
 	struct region *region = &parse->region;
-	size_t size;
 	space_def->fields =
 		xregion_alloc_array(region, typeof(space_def->fields[0]),
-				    column_count, &size);
+				    column_count);
 	for (uint32_t i = 0; i < column_count; i++) {
 		memcpy(&space_def->fields[i], &field_def_default,
 		       sizeof(field_def_default));

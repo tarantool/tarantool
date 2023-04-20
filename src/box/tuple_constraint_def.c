@@ -103,9 +103,7 @@ tuple_constraint_def_decode(const char **data,
 	if (*count == 0)
 		return 0;
 
-	size_t bytes;
-	*def = xregion_alloc_array(region, struct tuple_constraint_def,
-				   *count, &bytes);
+	*def = xregion_alloc_array(region, struct tuple_constraint_def, *count);
 	for (uint32_t i = 0; i < old_count; i++)
 		(*def)[i] = old_def[i];
 	struct tuple_constraint_def *new_def = *def + old_count;
@@ -212,10 +210,9 @@ field_mapping_decode(const char **data,
 		return -1;
 	}
 	fkey->field_mapping_size = mapping_size;
-	size_t sz;
 	fkey->field_mapping = xregion_alloc_array(
 		region, struct tuple_constraint_fkey_field_mapping,
-		mapping_size, &sz);
+		mapping_size);
 	for (uint32_t i = 0 ; i < 2 * mapping_size; i++) {
 		struct tuple_constraint_field_id *def = i % 2 == 0 ?
 			&fkey->field_mapping[i / 2].local_field :
@@ -250,9 +247,8 @@ tuple_constraint_def_decode_fkey(const char **data,
 	if (*count == 0)
 		return 0;
 
-	size_t bytes;
 	*def = xregion_alloc_array(region, struct tuple_constraint_def,
-				   *count, &bytes);
+				   *count);
 	for (uint32_t i = 0; i < old_count; i++)
 		(*def)[i] = old_def[i];
 	struct tuple_constraint_def *new_def = *def + old_count;
