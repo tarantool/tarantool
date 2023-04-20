@@ -95,7 +95,16 @@ space_by_id(uint32_t id);
  * @return NULL if space not found, otherwise space object.
  */
 struct space *
-space_by_name(const char *name);
+space_by_name(const char *name, uint32_t len);
+
+/**
+ * `space_by_name` for NULL-terminated names.
+ */
+static inline struct space *
+space_by_name0(const char *name)
+{
+	return space_by_name(name, strlen(name));
+}
 
 /**
  * Find minimal unused id, which is greater than cur_id.

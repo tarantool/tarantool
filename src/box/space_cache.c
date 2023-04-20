@@ -58,12 +58,10 @@ space_by_id(uint32_t id)
 	return (struct space *)mh_i32ptr_node(spaces, space)->val;
 }
 
-/** Return space by its name */
 struct space *
-space_by_name(const char *name)
+space_by_name(const char *name, uint32_t len)
 {
-	mh_int_t space = mh_strnptr_find_str(spaces_by_name, name,
-					     strlen(name));
+	mh_int_t space = mh_strnptr_find_str(spaces_by_name, name, len);
 	if (space == mh_end(spaces_by_name))
 		return NULL;
 	return (struct space *)mh_strnptr_node(spaces_by_name, space)->val;

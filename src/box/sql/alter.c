@@ -47,12 +47,12 @@ sql_alter_table_rename(struct Parse *parse)
 	assert(src_tab->nSrc == 1);
 	char *new_name = sql_name_from_token(&rename_def->new_name);
 	/* Check that new name isn't occupied by another table. */
-	if (space_by_name(new_name) != NULL) {
+	if (space_by_name0(new_name) != NULL) {
 		diag_set(ClientError, ER_SPACE_EXISTS, new_name);
 		goto tnt_error;
 	}
 	const char *tbl_name = src_tab->a[0].zName;
-	struct space *space = space_by_name(tbl_name);
+	struct space *space = space_by_name0(tbl_name);
 	if (space == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, tbl_name);
 		goto tnt_error;

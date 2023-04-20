@@ -456,7 +456,7 @@ parser_space_delete(struct space *space)
 	if (space == NULL)
 		return;
 	assert(space->def->opts.is_ephemeral);
-	struct space *altered_space = space_by_name(space->def->name);
+	struct space *altered_space = space_by_name0(space->def->name);
 	uint32_t i = 0;
 	/*
 	 * Don't delete already existing defs and start from new

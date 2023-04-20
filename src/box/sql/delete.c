@@ -39,7 +39,7 @@ sql_lookup_space(struct Parse *parse, struct SrcList_item *space_name)
 {
 	assert(space_name != NULL);
 	assert(space_name->space == NULL);
-	struct space *space = space_by_name(space_name->zName);
+	struct space *space = space_by_name0(space_name->zName);
 	if (space == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, space_name->zName);
 		parse->is_aborted = true;
@@ -87,7 +87,7 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 
 	struct Vdbe *v = sqlGetVdbe(parse);
 	const char *tab_name = tab_list->a->zName;
-	struct space *space = space_by_name(tab_name);
+	struct space *space = space_by_name0(tab_name);
 	if (space == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, tab_name);
 		goto tarantool_error;
