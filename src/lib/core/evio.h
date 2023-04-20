@@ -127,6 +127,19 @@ evio_service_stop(struct evio_service *service);
 void
 evio_service_attach(struct evio_service *dst, const struct evio_service *src);
 
+/**
+ * Reload service URIs.
+ *
+ * Called on reconfiguration in case the new listen URIs are the same.
+ * A URI parameter may store a path to a file (for example, an SSL
+ * certificate), which could change, so we need to recreate service entries'
+ * IO stream contexts in this case.
+ *
+ * Returns -1 on failure.
+ */
+int
+evio_service_reload_uris(struct evio_service *service);
+
 static inline void
 evio_timeout_init(ev_loop *loop, ev_tstamp *start, ev_tstamp *delay,
 		  ev_tstamp timeout)

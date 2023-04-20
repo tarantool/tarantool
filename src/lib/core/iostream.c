@@ -125,6 +125,14 @@ iostream_ctx_destroy(struct iostream_ctx *ctx)
 	iostream_ctx_clear(ctx);
 }
 
+void
+iostream_ctx_copy(struct iostream_ctx *dst, const struct iostream_ctx *src)
+{
+	assert(src->mode == IOSTREAM_CLIENT || src->mode == IOSTREAM_SERVER);
+	dst->mode = src->mode;
+	dst->ssl = ssl_iostream_ctx_dup(src->ssl);
+}
+
 int
 iostream_create(struct iostream *io, int fd, const struct iostream_ctx *ctx)
 {

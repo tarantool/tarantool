@@ -11,6 +11,8 @@
 # include "ssl_impl.h"
 #else /* !defined(ENABLE_SSL) */
 
+#include <assert.h>
+
 #include "iostream.h"
 #include "trivia/util.h"
 
@@ -29,6 +31,13 @@ ssl_free(void);
 
 struct ssl_iostream_ctx *
 ssl_iostream_ctx_new(enum iostream_mode mode, const struct uri *uri);
+
+static inline struct ssl_iostream_ctx *
+ssl_iostream_ctx_dup(struct ssl_iostream_ctx *ctx)
+{
+	assert(ctx == NULL);
+	return ctx;
+}
 
 static inline void
 ssl_iostream_ctx_delete(struct ssl_iostream_ctx *ctx)
