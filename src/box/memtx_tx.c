@@ -496,7 +496,8 @@ memtx_tx_xregion_alloc_object(struct txn *txn,
 	switch (alloc_obj) {
 	case MEMTX_TX_OBJECT_READ_TRACKER:
 		alloc = xregion_alloc_object(&txn->region,
-					     struct tx_read_tracker, &size);
+					     struct tx_read_tracker);
+		size = sizeof(struct tx_read_tracker);
 		break;
 	default:
 		unreachable();
@@ -665,11 +666,10 @@ memtx_tx_statistics_collect(struct memtx_tx_statistics *stats)
 void
 memtx_tx_register_txn(struct txn *tx)
 {
-	size_t bytes;
 	tx->memtx_tx_alloc_stats =
 		xregion_alloc_array(&tx->region,
 				    typeof(*tx->memtx_tx_alloc_stats),
-				    MEMTX_TX_ALLOC_TYPE_MAX, &bytes);
+				    MEMTX_TX_ALLOC_TYPE_MAX);
 	memset(tx->memtx_tx_alloc_stats, 0,
 	       sizeof(*tx->memtx_tx_alloc_stats) * MEMTX_TX_ALLOC_TYPE_MAX);
 	rlist_add_tail(&txm.all_txs, &tx->in_all_txs);
