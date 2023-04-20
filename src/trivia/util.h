@@ -128,11 +128,8 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
 #define xstrndup(s, n)		xalloc_impl((n) + 1, strndup, (s), (n))
 #define xmempool_alloc(p)	xalloc_impl((p)->objsize, mempool_alloc, (p))
 #define xregion_alloc(p, size)	xalloc_impl((size), region_alloc, (p), (size))
-#define xregion_alloc_object(region, T, size) \
-		xalloc_impl(size, region_alloc_object, region, T, size)
-#define xregion_alloc_array(p, T, count, size)				\
-	xalloc_impl(sizeof(T) * (count), region_alloc_array, (p), T,	\
-		    (count), (size))
+#define xregion_aligned_alloc(p, size, align) \
+		xalloc_impl((size), region_aligned_alloc, (p), (size), (align))
 #define xregion_join(p, size)	xalloc_impl((size), region_join, (p), (size))
 #define xibuf_alloc(p, size)	xalloc_impl((size), ibuf_alloc, (p), (size))
 #define xibuf_reserve(p, size)	xalloc_impl((size), ibuf_reserve, (p), (size))
@@ -142,6 +139,13 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
 	xalloc_impl((size), lsregion_aligned_alloc, (p), (size), (align), (id))
 #define xlsregion_alloc_object(lsregion, id, T) ({				\
 	(T *)xlsregion_aligned_alloc((lsregion), sizeof(T), alignof(T), (id));	\
+})
+
+#define xregion_alloc_object(region, T) ({					\
+	(T *)xregion_aligned_alloc((region), sizeof(T), alignof(T));		\
+})
+#define xregion_alloc_array(region, T, count) ({				\
+	(T *)xregion_aligned_alloc((region), sizeof(T) * (count), alignof(T));\
 })
 
 /** \cond public */
