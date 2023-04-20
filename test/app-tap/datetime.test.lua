@@ -1773,7 +1773,7 @@ test:test("totable{}", function(test)
 end)
 
 test:test("Time :set{} operations", function(test)
-    test:plan(12)
+    test:plan(15)
 
     local ts = date.new{ year = 2021, month = 8, day = 31,
                   hour = 0, min = 31, sec = 11, tzoffset = '+0300'}
@@ -1801,6 +1801,12 @@ test:test("Time :set{} operations", function(test)
             'usec = 123')
     test:is(tostring(ts:set{ nsec = 123}), '2021-08-30T21:31:11.000000123+0800',
             'nsec = 123')
+    test:is(tostring(ts:set{timestamp = 1630359071, msec = 123}),
+            '2021-08-30T21:31:11.123+0800', 'timestamp + msec')
+    test:is(tostring(ts:set{timestamp = 1630359071, usec = 123}),
+            '2021-08-30T21:31:11.000123+0800', 'timestamp + usec')
+    test:is(tostring(ts:set{timestamp = 1630359071, nsec = 123}),
+            '2021-08-30T21:31:11.000000123+0800', 'timestamp + nsec')
 end)
 
 test:test("Check :set{} and .new{} equal for all attributes", function(test)
