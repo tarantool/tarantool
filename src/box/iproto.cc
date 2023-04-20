@@ -3234,7 +3234,7 @@ enum iproto_cfg_op {
 	 * Command code to start listen socket contained
 	 * in evio_service object
 	 */
-	IPROTO_CFG_LISTEN,
+	IPROTO_CFG_START,
 	/**
 	 * Command code to stop listen socket contained
 	 * in evio_service object. In case when user sets
@@ -3266,8 +3266,6 @@ struct iproto_cfg_msg: public cbus_call_msg
 	union {
 		/** Pointer to the statistic stucture. */
 		struct iproto_stats *stats;
-		/** Pointer to evio_service, used for bind */
-		struct evio_service *binary;
 		/** New iproto max message count. */
 		int iproto_msg_max;
 		struct {
@@ -3313,7 +3311,6 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 	struct iproto_thread *iproto_thread = cfg_msg->iproto_thread;
 	struct mh_i32_t *req_handlers = iproto_thread->req_handlers;
 	struct evio_service *binary = &iproto_thread->binary;
-	struct errinj *inj;
 
 	try {
 		switch (cfg_msg->op) {
@@ -3325,24 +3322,8 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			if (old < iproto_msg_max)
 				iproto_resume(iproto_thread);
 			break;
-		case IPROTO_CFG_LISTEN:
-			inj = errinj(ERRINJ_IPROTO_CFG_LISTEN, ERRINJ_INT);
-			if (inj != NULL && inj->iparam > 0) {
-				inj->iparam--;
-				diag_set(ClientError, ER_INJECTION,
-					 "iproto listen");
-				diag_raise();
-			}
-			if (evio_service_is_active(binary)) {
-				diag_set(ClientError, ER_UNSUPPORTED, "Iproto",
-					 "listen if service already active");
-				diag_raise();
-			}
-			evio_service_create(loop(), binary, "binary",
-					    iproto_on_accept, iproto_thread);
-			evio_service_attach(binary, cfg_msg->binary);
-			if (evio_service_listen(binary) != 0)
-				diag_raise();
+		case IPROTO_CFG_START:
+			evio_service_attach(binary, &tx_binary);
 			break;
 		case IPROTO_CFG_STOP:
 			evio_service_detach(binary);
@@ -3394,6 +3375,7 @@ iproto_do_cfg_crit(struct iproto_thread *iproto_thread,
 	assert(rc == 0);
 }
 
+/** Send IPROTO_CFG_STOP to all threads. */
 static void
 iproto_send_stop_msg(void)
 {
@@ -3403,16 +3385,14 @@ iproto_send_stop_msg(void)
 		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
 }
 
-static int
-iproto_send_listen_msg(struct evio_service *binary)
+/** Send IPROTO_CFG_START to all threads. */
+static void
+iproto_send_start_msg(void)
 {
 	struct iproto_cfg_msg cfg_msg;
-	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_LISTEN);
-	cfg_msg.binary = binary;
+	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_START);
 	for (int i = 0; i < iproto_threads_count; i++)
-		if (iproto_do_cfg(&iproto_threads[i], &cfg_msg) != 0)
-			return -1;
-	return 0;
+		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
 }
 
 int
@@ -3420,17 +3400,21 @@ iproto_listen(const struct uri_set *uri_set)
 {
 	iproto_send_stop_msg();
 	evio_service_stop(&tx_binary);
-	evio_service_create(loop(), &tx_binary, "tx_binary", NULL, NULL);
+	struct errinj *inj = errinj(ERRINJ_IPROTO_CFG_LISTEN, ERRINJ_INT);
+	if (inj != NULL && inj->iparam > 0) {
+		inj->iparam--;
+		diag_set(ClientError, ER_INJECTION, "iproto listen");
+		return -1;
+	}
 	/*
 	 * Please note, we bind sockets in main thread, and then
 	 * listen these sockets in all iproto threads! With this
 	 * implementation, we rely on the Linux kernel to distribute
 	 * incoming connections across iproto threads.
 	 */
-	if (evio_service_bind(&tx_binary, uri_set) != 0)
+	if (evio_service_start(&tx_binary, uri_set) != 0)
 		return -1;
-	if (iproto_send_listen_msg(&tx_binary) != 0)
-		return -1;
+	iproto_send_start_msg();
 	return 0;
 }
 

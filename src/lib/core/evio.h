@@ -109,17 +109,9 @@ evio_service_create(struct ev_loop *loop, struct evio_service *service,
                     const char *name, evio_accept_f on_accept,
                     void *on_accept_param);
 
-/** Bind service to specified uri */
+/** Bind service to specified URI and start listening on it. */
 int
-evio_service_bind(struct evio_service *service, const struct uri_set *uri_set);
-
-/**
- * Listen on bounded socket
- *
- * @retval 0 for success
- */
-int
-evio_service_listen(struct evio_service *service);
+evio_service_start(struct evio_service *service, const struct uri_set *uri_set);
 
 /** If started, stop event flow, without closing the acceptor socket. */
 void
@@ -134,9 +126,6 @@ evio_service_stop(struct evio_service *service);
  */
 void
 evio_service_attach(struct evio_service *dst, const struct evio_service *src);
-
-bool
-evio_service_is_active(const struct evio_service *service);
 
 static inline void
 evio_timeout_init(ev_loop *loop, ev_tstamp *start, ev_tstamp *delay,
