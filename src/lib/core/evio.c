@@ -59,12 +59,6 @@ struct evio_service_entry {
 	struct evio_service *service;
 };
 
-static inline bool
-evio_service_entry_is_active(const struct evio_service_entry *entry)
-{
-	return entry->ev.fd >= 0;
-}
-
 static int
 evio_setsockopt_keepalive(int fd)
 {
@@ -301,7 +295,8 @@ evio_service_entry_listen(struct evio_service_entry *entry)
 	int fd = entry->ev.fd;
 	if (sio_listen(fd))
 		return -1;
-	ev_io_start(entry->service->loop, &entry->ev);
+	if (entry->service->on_accept != NULL)
+		ev_io_start(entry->service->loop, &entry->ev);
 	return 0;
 }
 
@@ -424,6 +419,7 @@ evio_service_entry_attach(struct evio_service_entry *dst,
 	dst->addr_len = src->addr_len;
 	dst->io_ctx = src->io_ctx;
 	ev_io_set(&dst->ev, src->ev.fd, EV_READ);
+	ev_io_start(dst->service->loop, &dst->ev);
 }
 
 static inline int
@@ -495,17 +491,8 @@ evio_service_detach(struct evio_service *service)
 	service->entries = NULL;
 }
 
-bool
-evio_service_is_active(const struct evio_service *service)
-{
-	for (int i = 0; i < service->entry_count; i++) {
-		if (evio_service_entry_is_active(&service->entries[i]))
-			return true;
-	}
-	return false;
-}
-
-int
+/** Listen on bound socket. */
+static int
 evio_service_listen(struct evio_service *service)
 {
 	for (int i = 0; i < service->entry_count; i++) {
@@ -528,7 +515,8 @@ evio_service_stop(struct evio_service *service)
 	service->entries = NULL;
 }
 
-int
+/** Bind service to specified URI. */
+static int
 evio_service_bind(struct evio_service *service, const struct uri_set *uri_set)
 {
 	if (evio_service_reuse_addr(uri_set) != 0)
@@ -539,5 +527,15 @@ evio_service_bind(struct evio_service *service, const struct uri_set *uri_set)
 		if (evio_service_entry_bind(&service->entries[i], uri) != 0)
 			return -1;
 	}
+	return 0;
+}
+
+int
+evio_service_start(struct evio_service *service, const struct uri_set *uri_set)
+{
+	if (evio_service_bind(service, uri_set) != 0)
+		return -1;
+	if (evio_service_listen(service) != 0)
+		return -1;
 	return 0;
 }
