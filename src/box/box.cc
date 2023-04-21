@@ -1462,7 +1462,7 @@ box_sync_replication(bool do_quorum, bool do_reuse)
 	}
 	int count = 0;
 	struct applier *appliers[VCLOCK_MAX] = {};
-	auto appliers_guard = make_scoped_guard([=]{
+	auto appliers_guard = make_scoped_guard([&]{
 		for (int i = 0; i < count; i++)
 			applier_delete(appliers[i]); /* doesn't affect diag */
 	});
