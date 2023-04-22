@@ -588,6 +588,13 @@ local function datetime_new(obj)
         end
         local fraction
         s, fraction = math_modf(ts)
+        -- In case of negative fraction part we should
+        -- make it positive at the expense of the integer part.
+        -- Code below expects that "nsec" value is always positive.
+        if fraction < 0 then
+            s = s - 1
+            fraction = fraction + 1
+        end
         -- if there are separate nsec, usec, or msec provided then
         -- timestamp should be integer
         if count_usec == 0 then
@@ -1085,6 +1092,13 @@ local function datetime_set(self, obj)
         end
         local sec_int, fraction
         sec_int, fraction = math_modf(ts)
+        -- In case of negative fraction part we should
+        -- make it positive at the expense of the integer part.
+        -- Code below expects that "nsec" value is always positive.
+        if fraction < 0 then
+            sec_int = sec_int - 1
+            fraction = fraction + 1
+        end
         -- if there is one of nsec, usec, msec provided
         -- then ignore fraction in timestamp
         -- otherwise - use nsec, usec, or msec
