@@ -1551,16 +1551,18 @@ Matrix of subtraction operands eligibility and their result type
 | table           |          |          |          |
 ]]
 test:test("Matrix of allowed time and interval subtractions", function(test)
-    test:plan(29)
+    test:plan(31)
 
     -- check arithmetic with leap dates
     local T1970 = date.new{year = 1970, month = 1, day = 1}
     local T2000 = date.new{year = 2000, month = 1, day = 1}
+    local T1970S1 = date.new{year = 1970, month = 1, day = 1, sec = 1}
     local I1 = date.interval.new{day = 1}
     local M2 = date.interval.new{month = 2}
     local M10 = date.interval.new{month = 10}
     local Y1 = date.interval.new{year = 1}
     local Y5 = date.interval.new{year = 5}
+    local NS1000 = date.interval.new{nsec = 1000}
 
     test:is(catchsub_status(T1970, I1), true, "status: T - I")
     test:is(catchsub_status(T1970, M2), true, "status: T - M")
@@ -1579,6 +1581,10 @@ test:test("Matrix of allowed time and interval subtractions", function(test)
     test:is(tostring(T1970 - I1), "1969-12-31T00:00:00Z", "value: T - I")
     test:is(tostring(T1970 - M2), "1969-11-01T00:00:00Z", "value: T - M")
     test:is(tostring(T1970 - Y1), "1969-01-01T00:00:00Z", "value: T - Y")
+    test:is(tostring(T1970 - NS1000), "1969-12-31T23:59:59.999999Z",
+        "value: T - NS1000")
+    test:is(tostring(T1970S1 - NS1000), "1970-01-01T00:00:00.999999Z",
+        "value: T1970S1 - NS1000")
     test:is(tostring(T1970 - T2000), "-30 years", "value: T - T")
     test:is(tostring(Y5 - Y1), "+4 years", "value: Y - Y")
 
