@@ -192,7 +192,7 @@ test:test("Default date creation and comparison", function(test)
 end)
 
 test:test("Simple date creation by attributes", function(test)
-    test:plan(14)
+    test:plan(15)
     local ts
     local obj = {}
     local attribs = {
@@ -222,6 +222,8 @@ test:test("Simple date creation by attributes", function(test)
             '2021-08-30T21:31:11.000123Z', '{timestamp.usec}')
     test:is(tostring(date.new{timestamp = 1630359071, nsec = 123}),
             '2021-08-30T21:31:11.000000123Z', '{timestamp.nsec}')
+    test:is(tostring(date.new{timestamp = -0.1}),
+            '1969-12-31T23:59:59.900Z', '{negative timestamp}')
 end)
 
 test:test("Simple date creation by attributes - check failed", function(test)
@@ -1779,7 +1781,7 @@ test:test("totable{}", function(test)
 end)
 
 test:test("Time :set{} operations", function(test)
-    test:plan(15)
+    test:plan(16)
 
     local ts = date.new{ year = 2021, month = 8, day = 31,
                   hour = 0, min = 31, sec = 11, tzoffset = '+0300'}
@@ -1813,10 +1815,12 @@ test:test("Time :set{} operations", function(test)
             '2021-08-30T21:31:11.000123+0800', 'timestamp + usec')
     test:is(tostring(ts:set{timestamp = 1630359071, nsec = 123}),
             '2021-08-30T21:31:11.000000123+0800', 'timestamp + nsec')
+    test:is(tostring(ts:set{timestamp = -0.1}),
+            '1969-12-31T23:59:59.900+0800', 'negative timestamp')
 end)
 
 test:test("Check :set{} and .new{} equal for all attributes", function(test)
-    test:plan(11)
+    test:plan(12)
     local ts, ts2
     local obj = {}
     local attribs = {
@@ -1844,6 +1848,12 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
     ts = date.new(obj)
     ts2 = date.new():set(obj)
     test:is(ts, ts2, ('timestamp+tzoffset (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+
+    obj = {timestamp = -0.1, tzoffset = '+0800'}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:is(ts, ts2, ('negative timestamp+tzoffset (%s = %s)'):
             format(tostring(ts), tostring(ts2)))
 end)
 
