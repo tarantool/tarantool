@@ -647,6 +647,10 @@ normalize_nsec(int64_t *psecs, int *pnsec)
 	if (nsec < 0 || nsec >= NANOS_PER_SEC) {
 		secs += nsec / NANOS_PER_SEC;
 		nsec %= NANOS_PER_SEC;
+		if (nsec < 0) {
+			secs -= 1;
+			nsec += NANOS_PER_SEC;
+		}
 	}
 	*psecs = secs;
 	*pnsec = nsec;
