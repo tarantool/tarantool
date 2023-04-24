@@ -15,6 +15,11 @@ disable_sync_mode = function()
     local new_s = s:update({{'=', 6, {is_sync=false}}})
     box.space._space:replace(new_s)
 end;
+enable_sync_mode = function()
+    local s = box.space._space:get(box.space.sync.id)
+    local new_s = s:update({{'=', 6, {is_sync=true}}})
+    box.space._space:replace(new_s)
+end;
 test_run:cmd("setopt delimiter ''");
 
 box.schema.user.grant('guest', 'replication')
@@ -33,8 +38,9 @@ _ = box.space.sync:create_index('pk')
 box.ctl.promote()
 -- Testcase body.
 box.space.sync:insert{1} -- success
-test_run:cmd('switch replica')
-box.space.sync:select{} -- 1
+test_run:switch('replica')
+box.begin{txn_isolation='read-committed'} t = box.space.sync:select{} box.commit()
+t
 -- Testcase cleanup.
 test_run:switch('default')
 box.space.sync:drop()
@@ -47,6 +53,7 @@ _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
 -- Testcase body.
 box.space.sync:insert{1}
+test_run:wait_lsn('replica', 'default')
 test_run:switch('replica')
 box.space.sync:select{} -- none
 -- Testcase cleanup.
@@ -66,7 +73,8 @@ box.space.sync:insert{2}
 box.space.sync:insert{3}
 box.space.sync:select{} -- 1, 2, 3
 test_run:switch('replica')
-box.space.sync:select{} -- 1, 2, 3
+box.begin{txn_isolation='read-committed'} t = box.space.sync:select{} box.commit()
+t
 -- Testcase cleanup.
 test_run:switch('default')
 box.space.sync:drop()
@@ -143,6 +151,7 @@ box.space.sync:insert{4} -- success
 box.cfg{replication_synchro_quorum=NUM_INSTANCES}
 box.space.sync:insert{5} -- success
 box.space.sync:select{} -- 1, 2, 3, 4, 5
+test_run:wait_lsn('replica', 'default')
 test_run:cmd('switch replica')
 box.space.sync:select{} -- 1, 2, 3, 4, 5
 -- Testcase cleanup.
@@ -163,6 +172,7 @@ box.cfg{                                                                        
     replication_synchro_timeout = 1000,                                         \
     replication = replica_url,                                                  \
 }
+test_run:wait_fullmesh({'default', 'replica'})
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
 -- Testcase body.
@@ -179,7 +189,8 @@ box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 1000}
 box.space.sync:insert{2}
 box.space.sync:select{} -- 1, 2
 test_run:switch('default')
-box.space.sync:select{} -- 1, 2
+box.begin{txn_isolation='read-committed'} t = box.space.sync:select{} box.commit()
+t
 -- Revert cluster configuration.
 test_run:switch('default')
 box.cfg{read_only=false}
@@ -205,7 +216,8 @@ box.space.sync:insert{2}
 box.error.injection.set('ERRINJ_WAL_IO', false)
 box.space.sync:select{} -- 1
 test_run:switch('replica')
-box.space.sync:select{} -- 1
+box.begin{txn_isolation='read-committed'} t = box.space.sync:select{} box.commit()
+t
 -- Testcase cleanup.
 test_run:switch('default')
 box.space.sync:drop()
@@ -222,6 +234,7 @@ _ = box.space.sync:create_index('pk')
 box.space.sync:insert{1}
 box.space.sync:select{} -- 1
 test_run:switch('replica')
+box.space.sync:select{} -- 1
 box.error.injection.set('ERRINJ_WAL_IO', true)
 test_run:switch('default')
 box.space.sync:insert{2}
@@ -255,19 +268,21 @@ test_run:cmd('start server replica with wait=True, wait_load=True')
 _ = box.schema.space.create('sync', {engine=engine})
 _ = box.space.sync:create_index('pk')
 box.space.sync:insert{1} -- success
+test_run:wait_lsn('replica', 'default')
 test_run:cmd('switch replica')
 box.space.sync:select{} -- 1
 test_run:switch('default')
 -- Enable synchronous mode.
-disable_sync_mode()
+enable_sync_mode()
 -- Space is in sync mode now.
 box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 box.space.sync:insert{2} -- success
-box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=1000}
-box.space.sync:insert{3} -- success
-box.space.sync:select{} -- 1, 2, 3
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.01}
+box.space.sync:insert{3} -- fail
+box.space.sync:select{} -- 1, 2
+test_run:wait_lsn('replica', 'default') -- needed to propagate ROLLBACK
 test_run:cmd('switch replica')
-box.space.sync:select{} -- 1, 2, 3
+box.space.sync:select{} -- 1, 2
 -- Testcase cleanup.
 test_run:switch('default')
 box.space.sync:drop()
