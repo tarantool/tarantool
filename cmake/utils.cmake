@@ -69,6 +69,24 @@ function(lua_source varname filename symbolname)
     set(${varname} ${var} ${dstfile} PARENT_SCOPE)
 endfunction()
 
+# A helper function to unpack list with filenames and variable names
+# and compile *.lua source into *.lua.c sources using lua_source() function.
+# Function expects a list 'source_list' with pairs of paths to a Lua source file
+# and a symbol names that should be used in C source code for that file.
+function(lua_multi_source var_name source_list)
+    set(source_list ${source_list} ${ARGN})
+    list(LENGTH source_list len)
+    math(EXPR len "${len} - 1")
+    set(_sources)
+    foreach(filename_idx RANGE 0 ${len} 2)
+        list(GET source_list ${filename_idx} filename)
+        math(EXPR symbolname_idx "${filename_idx} + 1")
+        list(GET source_list ${symbolname_idx} symbolname)
+        lua_source(_sources ${filename} ${symbolname})
+    endforeach()
+    set(${var_name} ${${var_name}};${_sources} PARENT_SCOPE)
+endfunction()
+
 function(bin_source varname srcfile dstfile symbolname)
     set(var ${${varname}})
     set (srcfile "${CMAKE_CURRENT_SOURCE_DIR}/${srcfile}")

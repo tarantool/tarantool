@@ -69,40 +69,16 @@
 #include "box/lua/merger.h"
 #include "box/lua/watcher.h"
 #include "box/lua/iproto.h"
+#include "box/lua/audit.h"
+#include "box/lua/flight_recorder.h"
+#include "box/lua/read_view.h"
+#include "box/lua/security.h"
+#include "box/lua/space_upgrade.h"
+#include "box/lua/wal_ext.h"
 
 #include "mpstream/mpstream.h"
 
 static uint32_t CTID_STRUCT_TXN_SAVEPOINT_PTR = 0;
-
-#if ENABLE_SPACE_UPGRADE
-void
-box_lua_space_upgrade_init(struct lua_State *L);
-#endif
-
-#if ENABLE_AUDIT_LOG
-void
-box_lua_audit_init(struct lua_State *L);
-#endif
-
-#if ENABLE_WAL_EXT
-void
-box_lua_wal_ext_init(struct lua_State *L);
-#endif
-
-#if ENABLE_READ_VIEW
-void
-box_lua_read_view_init(struct lua_State *L);
-#endif
-
-#ifdef ENABLE_SECURITY
-void
-box_lua_security_init(struct lua_State *L);
-#endif
-
-#if ENABLE_FLIGHT_RECORDER
-void
-box_lua_flightrec_init(struct lua_State *L);
-#endif
 
 extern char session_lua[],
 	tuple_lua[],
@@ -112,21 +88,6 @@ extern char session_lua[],
 	xlog_lua[],
 #if ENABLE_FEEDBACK_DAEMON
 	feedback_daemon_lua[],
-#endif
-#if ENABLE_SPACE_UPGRADE
-	space_upgrade_lua[],
-#endif
-#if ENABLE_AUDIT_LOG
-	audit_lua[],
-#endif
-#if ENABLE_FLIGHT_RECORDER
-	flightrec_lua[],
-#endif
-#if ENABLE_READ_VIEW
-	read_view_lua[],
-#endif
-#if ENABLE_SECURITY
-	security_lua[],
 #endif
 	net_box_lua[],
 	upgrade_lua[],
@@ -204,25 +165,15 @@ static const char *lua_sources[] = {
 	 */
 	"box/feedback_daemon", NULL, feedback_daemon_lua,
 #endif
-#if ENABLE_SPACE_UPGRADE
 	/*
 	 * Must be loaded after schema_lua, because it redefines
 	 * box.schema.space.upgrade.
 	 */
-	"box/space_upgrade", NULL, space_upgrade_lua,
-#endif
-#if ENABLE_AUDIT_LOG
-	"box/audit", "audit", audit_lua,
-#endif
-#if ENABLE_FLIGHT_RECORDER
-	"box/flightrec", "flightrec", flightrec_lua,
-#endif
-#if ENABLE_READ_VIEW
-	"box/read_view", NULL, read_view_lua,
-#endif
-#if ENABLE_SECURITY
-	"box/security", NULL, security_lua,
-#endif
+	SPACE_UPGRADE_BOX_LUA_MODULES
+	AUDIT_BOX_LUA_MODULES
+	FLIGHT_RECORDER_BOX_LUA_MODULES
+	READ_VIEW_BOX_LUA_MODULES
+	SECURITY_BOX_LUA_MODULES
 	"box/xlog", "xlog", xlog_lua,
 	"box/upgrade", NULL, upgrade_lua,
 	"box/net_box", "net.box", net_box_lua,
@@ -702,24 +653,12 @@ box_lua_init(struct lua_State *L)
 	box_lua_sql_init(L);
 	box_lua_watcher_init(L);
 	box_lua_iproto_init(L);
-#ifdef ENABLE_SPACE_UPGRADE
 	box_lua_space_upgrade_init(L);
-#endif
-#ifdef ENABLE_AUDIT_LOG
 	box_lua_audit_init(L);
-#endif
-#ifdef ENABLE_WAL_EXT
 	box_lua_wal_ext_init(L);
-#endif
-#ifdef ENABLE_READ_VIEW
 	box_lua_read_view_init(L);
-#endif
-#ifdef ENABLE_SECURITY
 	box_lua_security_init(L);
-#endif
-#ifdef ENABLE_FLIGHT_RECORDER
 	box_lua_flightrec_init(L);
-#endif
 	luaopen_net_box(L);
 	lua_pop(L, 1);
 	tarantool_lua_console_init(L);
