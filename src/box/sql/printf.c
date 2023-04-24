@@ -183,7 +183,8 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 {
 	int c;			/* Next character in the format string */
 	char *bufpt;		/* Pointer to the conversion buffer */
-	int precision;		/* Precision of the current field */
+	/* Precision of the current field. */
+	int64_t precision;
 	int length;		/* Length of the field */
 	int idx;		/* A general purpose loop counter */
 	int width;		/* Width of the current field */
@@ -204,7 +205,8 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 	LONGDOUBLE_TYPE realvalue;	/* Value for real types */
 	const et_info *infop;	/* Pointer to the appropriate info structure */
 	char *zOut;		/* Rendering buffer */
-	int nOut;		/* Size of the rendering buffer */
+	/* Size of the rendering buffer. */
+	size_t nOut;
 	char *zExtra = 0;	/* Malloced memory used by some conversion */
 	int exp, e2;		/* exponent of real numbers */
 	int nsd;		/* Number of significant digits returned */

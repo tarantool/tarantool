@@ -943,6 +943,12 @@ func_printf(struct sql_context *ctx, int argc, const struct Mem *argv)
 	sqlStrAccumInit(&acc, db, 0, 0, db->aLimit[SQL_LIMIT_LENGTH]);
 	acc.printfFlags = SQL_PRINTF_SQLFUNC;
 	sqlXPrintf(&acc, format, &pargs);
+	assert(acc.accError == 0 || acc.accError == STRACCUM_TOOBIG);
+	if (acc.accError == STRACCUM_TOOBIG) {
+		ctx->is_aborted = true;
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		return;
+	}
 	mem_set_str_allocated(ctx->pOut, sqlStrAccumFinish(&acc), acc.nChar);
 }
 
