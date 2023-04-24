@@ -17,7 +17,6 @@ end
 local num_servers = 3
 
 g.before_all(function(cg)
-    t.skip('Skipped until tarantool/tarantool-qa#277 is resolved')
     cg.cluster = cluster:new({})
     cg.servers = {}
     cg.box_cfg = {
@@ -193,6 +192,10 @@ g.test_leader_change = function(cg)
     end)
     cg.servers[2]:wait_for_vclock_of(cg.servers[1])
     cg.servers[3]:wait_for_vclock_of(cg.servers[1])
+    t.helpers.retrying({}, function()
+        cg.servers[2]:assert_follows_upstream(cg.servers[1]:get_instance_id())
+        cg.servers[2]:assert_follows_upstream(cg.servers[3]:get_instance_id())
+    end)
     for i = 1, num_servers do
         cg.proxies[i]:pause()
     end
