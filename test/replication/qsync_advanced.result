@@ -37,6 +37,13 @@ disable_sync_mode = function()
 end;
  | ---
  | ...
+enable_sync_mode = function()
+    local s = box.space._space:get(box.space.sync.id)
+    local new_s = s:update({{'=', 6, {is_sync=true}}})
+    box.space._space:replace(new_s)
+end;
+ | ---
+ | ...
 test_run:cmd("setopt delimiter ''");
  | ---
  | - true
@@ -80,11 +87,14 @@ box.space.sync:insert{1} -- success
  | ---
  | - [1]
  | ...
-test_run:cmd('switch replica')
+test_run:switch('replica')
  | ---
  | - true
  | ...
-box.space.sync:select{} -- 1
+box.begin{txn_isolation='read-committed'} t = box.space.sync:select{} box.commit()
+ | ---
+ | ...
+t
  | ---
  | - - [1]
  | ...
@@ -116,6 +126,9 @@ _ = box.space.sync:create_index('pk')
 box.space.sync:insert{1}
  | ---
  | - error: Quorum collection for a synchronous transaction is timed out
+ | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
  | ...
 test_run:switch('replica')
  | ---
@@ -173,7 +186,10 @@ test_run:switch('replica')
  | ---
  | - true
  | ...
-box.space.sync:select{} -- 1, 2, 3
+box.begin{txn_isolation='read-committed'} t = box.space.sync:select{} box.commit()
+ | ---
+ | ...
+t
  | ---
  | - - [1]
  |   - [2]
@@ -400,6 +416,9 @@ box.space.sync:select{} -- 1, 2, 3, 4, 5
  |   - [4]
  |   - [5]
  | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
+ | ...
 test_run:cmd('switch replica')
  | ---
  | - true
@@ -443,6 +462,9 @@ box.cfg{                                                                        
     replication_synchro_timeout = 1000,                                         \
     replication = replica_url,                                                  \
 }
+ | ---
+ | ...
+test_run:wait_fullmesh({'default', 'replica'})
  | ---
  | ...
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
@@ -501,7 +523,10 @@ test_run:switch('default')
  | ---
  | - true
  | ...
-box.space.sync:select{} -- 1, 2
+box.begin{txn_isolation='read-committed'} t = box.space.sync:select{} box.commit()
+ | ---
+ | ...
+t
  | ---
  | - - [1]
  |   - [2]
@@ -580,7 +605,10 @@ test_run:switch('replica')
  | ---
  | - true
  | ...
-box.space.sync:select{} -- 1
+box.begin{txn_isolation='read-committed'} t = box.space.sync:select{} box.commit()
+ | ---
+ | ...
+t
  | ---
  | - - [1]
  | ...
@@ -622,6 +650,10 @@ box.space.sync:select{} -- 1
 test_run:switch('replica')
  | ---
  | - true
+ | ...
+box.space.sync:select{} -- 1
+ | ---
+ | - - [1]
  | ...
 box.error.injection.set('ERRINJ_WAL_IO', true)
  | ---
@@ -709,6 +741,9 @@ box.space.sync:insert{1} -- success
  | ---
  | - [1]
  | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
+ | ...
 test_run:cmd('switch replica')
  | ---
  | - true
@@ -722,7 +757,7 @@ test_run:switch('default')
  | - true
  | ...
 -- Enable synchronous mode.
-disable_sync_mode()
+enable_sync_mode()
  | ---
  | ...
 -- Space is in sync mode now.
@@ -733,28 +768,29 @@ box.space.sync:insert{2} -- success
  | ---
  | - [2]
  | ...
-box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=1000}
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.01}
  | ---
  | ...
-box.space.sync:insert{3} -- success
+box.space.sync:insert{3} -- fail
  | ---
- | - [3]
+ | - error: Quorum collection for a synchronous transaction is timed out
  | ...
-box.space.sync:select{} -- 1, 2, 3
+box.space.sync:select{} -- 1, 2
  | ---
  | - - [1]
  |   - [2]
- |   - [3]
+ | ...
+test_run:wait_lsn('replica', 'default') -- needed to propagate ROLLBACK
+ | ---
  | ...
 test_run:cmd('switch replica')
  | ---
  | - true
  | ...
-box.space.sync:select{} -- 1, 2, 3
+box.space.sync:select{} -- 1, 2
  | ---
  | - - [1]
  |   - [2]
- |   - [3]
  | ...
 -- Testcase cleanup.
 test_run:switch('default')
