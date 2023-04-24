@@ -1117,8 +1117,14 @@ netbox_transport_send_and_recv(struct netbox_transport *transport,
 		} else {
 			const char *bufpos = transport->recv_buf.rpos;
 			const char *rpos = bufpos;
-			size_t len = mp_decode_uint(&rpos);
-			required = (rpos - bufpos) + len;
+			uint64_t len = mp_decode_uint(&rpos);
+			size_t size = rpos - bufpos;
+			if (len > SIZE_MAX - size) {
+				box_error_raise(ER_NO_CONNECTION,
+						"Response size too large");
+				return -1;
+			}
+			required = size + len;
 			if (data_len >= required) {
 				const char *body_end = rpos + len;
 				transport->recv_buf.rpos = (char *)body_end;
