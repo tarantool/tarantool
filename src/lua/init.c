@@ -71,6 +71,8 @@
 #include "lua/builtin_modcache.h"
 #include "lua/tweaks.h"
 #include "lua/xml.h"
+#include "lua/etcd_client.h"
+#include "lua/compress.h"
 #include "digest.h"
 #include "errinj.h"
 
@@ -92,11 +94,6 @@ luaopen_zlib(lua_State *L);
 #if defined(EMBED_LUAZIP)
 LUALIB_API int
 luaopen_zip(lua_State *L);
-#endif
-
-#if defined(ENABLE_COMPRESS_MODULE)
-void
-tarantool_lua_compress_init(lua_State *L);
 #endif
 
 #define MAX_MODNAME 64
@@ -175,9 +172,6 @@ extern char minifio_lua[],
 	print_lua[],
 	pairs_lua[],
 	luadebug_lua[]
-#if defined(ENABLE_COMPRESS_MODULE)
-	, compress_lua[]
-#endif
 #if defined(EMBED_LUAROCKS)
 	, luarocks_core_hardcoded_lua[],
 	luarocks_admin_cache_lua[],
@@ -271,23 +265,6 @@ extern char minifio_lua[],
 	luarocks_util_lua[],
 	luarocks_core_util_lua[]
 #endif /* defined(EMBED_LUAROCKS) */
-#if ENABLE_ETCD_CLIENT
-	, etcd_client_client_auth_http_lua[],
-	etcd_client_client_http_lua[],
-	etcd_client_client_jsstream_lua[],
-	etcd_client_client_pool_lua[],
-	etcd_client_error_etcd_lua[],
-	etcd_client_error_http_lua[],
-	etcd_client_grpc_json_lua[],
-	etcd_client_init_lua[],
-	etcd_client_math_lua[],
-	etcd_client_protocol_lua[],
-	etcd_client_subscribe_auto_lua[],
-	etcd_client_subscribe_once_lua[],
-	etcd_client_txn_lua[],
-	etcd_client_utils_lua[],
-	etcd_client_version_lua[]
-#endif
 ;
 
 static const char *lua_modules[] = {
@@ -324,9 +301,7 @@ static const char *lua_modules[] = {
 	"http.client", httpc_lua,
 	"iconv", iconv_lua,
 	"swim", swim_lua,
-#if defined(ENABLE_COMPRESS_MODULE)
-	"compress", compress_lua,
-#endif
+	COMPRESS_LUA_MODULES
 	/* jit.* library */
 	"jit.vmdef", jit_vmdef_lua,
 	"jit.bc", jit_bc_lua,
@@ -357,27 +332,7 @@ static const char *lua_modules[] = {
 	"internal.print", print_lua,
 	"internal.pairs", pairs_lua,
 	"luadebug", luadebug_lua,
-#if ENABLE_ETCD_CLIENT
-	/*
-	 * Module components order is important here: components that required
-	 * other modules must be loaded first.
-	 */
-	"etcd-client.version", etcd_client_version_lua,
-	"etcd-client.utils", etcd_client_utils_lua,
-	"etcd-client.math", etcd_client_math_lua,
-	"etcd-client.txn", etcd_client_txn_lua,
-	"etcd-client.grpc_json", etcd_client_grpc_json_lua,
-	"etcd-client.protocol", etcd_client_protocol_lua,
-	"etcd-client.subscribe.auto", etcd_client_subscribe_auto_lua,
-	"etcd-client.subscribe.once", etcd_client_subscribe_once_lua,
-	"etcd-client.error.etcd", etcd_client_error_etcd_lua,
-	"etcd-client.error.http", etcd_client_error_http_lua,
-	"etcd-client.client.pool", etcd_client_client_pool_lua,
-	"etcd-client.client.jsstream", etcd_client_client_jsstream_lua,
-	"etcd-client.client.http", etcd_client_client_http_lua,
-	"etcd-client.client.auth_http", etcd_client_client_auth_http_lua,
-	"etcd-client", etcd_client_init_lua,
-#endif
+	ETCD_CLIENT_LUA_MODULES
 	NULL
 };
 
@@ -942,9 +897,7 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_lua_serializer_init(L);
 	tarantool_lua_swim_init(L);
 	tarantool_lua_decimal_init(L);
-#if defined(ENABLE_COMPRESS_MODULE)
 	tarantool_lua_compress_init(L);
-#endif
 #ifdef ENABLE_BACKTRACE
 	luaM_sysprof_set_backtracer(fiber_backtracer);
 #endif
