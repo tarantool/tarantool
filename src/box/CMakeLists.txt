@@ -95,8 +95,10 @@ include_directories(${EXTRA_BOX_INCLUDE_DIRS})
 add_library(box_error STATIC error.cc errcode.c mp_error.cc)
 target_link_libraries(box_error core stat mpstream vclock)
 
+add_library(node_name STATIC node_name.c)
+
 add_library(xrow STATIC xrow.c iproto_constants.c iproto_features.c)
-target_link_libraries(xrow server core small vclock misc box_error
+target_link_libraries(xrow server core small vclock misc box_error node_name
                       ${MSGPUCK_LIBRARIES})
 
 set(tuple_sources
@@ -324,6 +326,6 @@ add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.c
         ${SQL_BIN_DIR}/opcodes.h)
 
 target_link_libraries(box box_error tuple stat xrow xlog vclock crc32 raft
-                      ${common_libraries})
+                      node_name ${common_libraries})
 
 add_dependencies(box build_bundled_libs generate_sql_files)
