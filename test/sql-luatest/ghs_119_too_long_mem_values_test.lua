@@ -68,7 +68,8 @@ g.test_group_concat = function()
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY, s VARBINARY);]])
         box.execute([[INSERT INTO t VALUES(1, randomblob(10000));]])
         box.execute([[INSERT INTO t VALUES(2, randomblob(10000));]])
-        local sql = [[SELECT group_concat(s, randomblob(999999999)) FROM t;]]
+        local sql = [[SELECT group_concat(s, randomblob(999999999))]] ..
+                    [[ FROM SEQSCAN t;]]
         local ret, err = box.execute(sql)
         t.assert(ret == nil)
         local msg = [[Failed to execute SQL statement: string or blob too big]]

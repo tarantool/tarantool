@@ -21,6 +21,7 @@ g.before_all = function(lg)
         },
         replication_timeout = 0.1,
         instance_name = 'master-name',
+        replication_sync_timeout = 300,
     }
     lg.master = lg.replica_set:build_and_add_server({
         alias = 'master',

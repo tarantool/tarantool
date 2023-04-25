@@ -21,6 +21,7 @@ g.before_all = function(lg)
         },
         replication_timeout = 0.1,
         cluster_name = 'test-name',
+        replication_sync_timeout = 300,
     }
     lg.master = lg.replica_set:build_and_add_server({
         alias = 'master',
@@ -150,7 +151,7 @@ g.test_cluster_rename = function(lg)
         -- The name is converted to the proper form automatically.
         box.cfg{
             force_recovery = true,
-            cluster_name = 'TEST2'
+            cluster_name = 'TEST2',
         }
         t.assert_equals(box.cfg.cluster_name, 'test2')
         t.assert_equals(_G.last_event.cluster_name, 'test2')
@@ -221,7 +222,7 @@ g.test_cluster_name_bootstrap_mismatch = function(lg)
     lg.master:exec(function()
         box.cfg{
             force_recovery = true,
-            cluster_name = box.NULL
+            cluster_name = box.NULL,
         }
         t.assert_equals(box.info.cluster.name, 'test-name')
         box.space._schema:delete{'cluster_name'}

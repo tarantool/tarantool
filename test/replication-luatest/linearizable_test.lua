@@ -182,6 +182,7 @@ g.test_reconnect_while_waiting = function(cg)
             box.cfg{replication = repl}
         end, {cg.box_cfg.replication})
     end
+    cg.cluster:wait_for_fullmesh()
     local success, ok, _ = f:join()
     t.assert(success, 'fiber joined successfully')
     t.assert(ok, 'reconnect while begin() waits for vclocks is tolerated')

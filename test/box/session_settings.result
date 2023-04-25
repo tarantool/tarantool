@@ -59,7 +59,7 @@ s:select()
  |   - ['sql_recursive_triggers', true]
  |   - ['sql_reverse_unordered_selects', false]
  |   - ['sql_select_debug', false]
- |   - ['sql_seq_scan', true]
+ |   - ['sql_seq_scan', false]
  |   - ['sql_vdbe_debug', false]
  | ...
 

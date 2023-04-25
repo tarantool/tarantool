@@ -57,7 +57,7 @@ struct ipc_wait_pad {
  * is emptied by recipient, the channel is finally destroyed.
  */
 static enum fiber_channel_close_mode fiber_channel_close_mode =
-	FIBER_CHANNEL_CLOSE_FORCEFUL;
+	FIBER_CHANNEL_CLOSE_GRACEFUL;
 
 static const char *const fiber_channel_close_mode_strs[] = {
 	"forceful",

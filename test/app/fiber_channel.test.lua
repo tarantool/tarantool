@@ -214,4 +214,11 @@ refs
 -- close the channel and check the number of objects
 ch:close()
 collectgarbage('collect')
-refs -- must be zero
+-- must be non-zero due to compat.fiber_channel_close_mode (graceful close)
+refs == 8 or refs
+ch = nil
+collectgarbage('collect')
+collectgarbage('collect')
+-- must be zero as all references to the channel are lost; need two gc calls
+-- due to resurrection
+refs == 0 or refs

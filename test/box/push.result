@@ -637,13 +637,10 @@ _ = client:write("box.func['function1.test_push']:call({1, 2, 3, s})\n")
 ...
 client:read("\n...\n")
 ---
-- '%TAG !push! tag:tarantool.io/push,2018
-
+- |
+  %TAG !push! tag:tarantool.io/push,2018
   --- [1, 2, 3, "A\0C"]
-
   ...
-
-  '
 ...
 _ = client:read("\n...\n")
 ---
@@ -660,9 +657,9 @@ _ = client:write("box.func['function1.test_push']:call({1, 2, 3, s})\n")
 ...
 client:read(";")
 ---
-- '-- Push
-
-  {1, 2, 3, "A\0C"};'
+- |-
+  -- Push
+  {1, 2, 3, "A\0C"};
 ...
 _ = client:read(";")
 ---

@@ -20,6 +20,7 @@ g.before_all = function(lg)
             server.build_listen_uri('replica', lg.replica_set.id),
         },
         replication_timeout = 0.1,
+        replication_sync_timeout = 300,
         replicaset_name = 'test-name',
     }
     lg.master = lg.replica_set:build_and_add_server({
@@ -122,7 +123,7 @@ g.test_replicaset_rename = function(lg)
     lg.master:exec(function()
         box.cfg{
             force_recovery = false,
-            replicaset_name = 'test'
+            replicaset_name = 'test',
         }
         t.assert_equals(_G.last_event.replicaset_name, 'test')
         t.assert_equals(box.info.replicaset.name, box.cfg.replicaset_name)
@@ -149,7 +150,7 @@ g.test_replicaset_rename = function(lg)
         -- The name is converted to a proper form automatically.
         box.cfg{
             force_recovery = true,
-            replicaset_name = 'TEST2'
+            replicaset_name = 'TEST2',
         }
         t.assert_equals(box.cfg.replicaset_name, 'test2')
         t.assert_equals(_G.last_event.replicaset_name, 'test2')
@@ -218,7 +219,7 @@ g.test_replicaset_name_bootstrap_mismatch = function(lg)
     lg.master:exec(function()
         box.cfg{
             force_recovery = true,
-            replicaset_name = box.NULL
+            replicaset_name = box.NULL,
         }
         t.assert_equals(box.info.replicaset.name, 'test-name')
         box.space._schema:delete{'replicaset_name'}

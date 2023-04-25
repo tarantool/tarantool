@@ -441,7 +441,7 @@ passed
 ...
 ch:get()
 ---
-- null
+- true
 ...
 ch:get()
 ---
@@ -594,7 +594,25 @@ collectgarbage('collect')
 ---
 - 0
 ...
-refs -- must be zero
+-- must be non-zero due to compat.fiber_channel_close_mode (graceful close)
+refs == 8 or refs
+---
+- true
+...
+ch = nil
+---
+...
+collectgarbage('collect')
 ---
 - 0
+...
+collectgarbage('collect')
+---
+- 0
+...
+-- must be zero as all references to the channel are lost; need two gc calls
+-- due to resurrection
+refs == 0 or refs
+---
+- true
 ...

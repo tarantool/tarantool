@@ -49,13 +49,11 @@ sql_tokenizer.split_sql('create trigger begin\n'..
 				'create table a (b,c,d);\n'..
 			'end;');
 ---
-- - 'create trigger begin
-
+- - |-
+    create trigger begin
     select 1; select 2;
-
     create table a (b,c,d);
-
-    end;'
+    end;
 ...
 test_run:cmd("setopt delimiter ''");
 ---
@@ -84,13 +82,11 @@ sql_tokenizer.split_sql('create temp trigger begin\n'..
 				'insert into tst values v a l u e s;\n'..
 			'end;\n\n\n\t\t\n\n select 200..";select1000";');
 ---
-- - 'create temp trigger begin
-
+- - |-
+    create temp trigger begin
     select case cond when a 100 else 200 end;
-
     insert into tst values v a l u e s;
-
-    end;'
+    end;
   - "\n\n\n\t\t\n\n select 200..\";select1000\";"
 ...
 test_run:cmd("setopt delimiter ''");
