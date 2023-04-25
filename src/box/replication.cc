@@ -1107,6 +1107,9 @@ replicaset_reload_uris(void)
 		if (applier != NULL)
 			applier_reload_uri(applier);
 	}
+	struct replica *replica;
+	rlist_foreach_entry(replica, &replicaset.anon, in_anon)
+		applier_reload_uri(replica->applier);
 }
 
 bool
