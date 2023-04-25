@@ -26,7 +26,7 @@ https://tarantool.io/compat/fiber_slice_default
 
 compat.add_option({
     name = 'fiber_slice_default',
-    default = 'old',
+    default = 'new',
     obsolete = nil,
     brief = FIBER_SLICE_DEFAULT_BRIEF,
     action = function(is_new)

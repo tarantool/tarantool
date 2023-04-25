@@ -95,7 +95,9 @@ g.test_replication = function(cg)
             box.cfg, {replication = uri})
         parsed_uri.params.auth_type = {'chap-sha1'}
         uri = urilib.format(parsed_uri, true)
+        box.cfg({replication_sync_timeout = 300})
         box.cfg({replication = uri})
+        box.ctl.wait_rw()
         t.assert_equals(box.info.replication[1].upstream.status, 'follow')
     end, {cg.server.net_box_uri})
 end

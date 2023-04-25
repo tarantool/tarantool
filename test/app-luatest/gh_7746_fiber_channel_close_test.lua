@@ -4,7 +4,7 @@ local t = require('luatest')
 local function server_test_channel_close_default()
     local fiber = require('fiber')
 
-    -- No graceful close (old) by default.
+    -- Graceful close (new) by default.
     local ch = fiber.channel(10)
     ch:put('one')
     ch:put('two')
@@ -12,7 +12,7 @@ local function server_test_channel_close_default()
     ch:close()
     t.assert(ch:is_closed())
     t.assert_not(ch:put('three'))
-    t.assert_equals(ch:get(), nil)
+    t.assert_equals(ch:get(), 'two')
 end
 
 local function server_test_channel_close(mode)

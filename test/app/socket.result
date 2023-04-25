@@ -2094,9 +2094,8 @@ sc:close()
 ...
 c:receive("*a", "Message: ")
 ---
-- 'Message: Pong
-
-  '
+- |
+  Message: Pong
 ...
 c:receive("*a", "Message: ")
 ---

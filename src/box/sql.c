@@ -62,7 +62,7 @@ static sql *db = NULL;
 
 static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
 
-static bool sql_seq_scan_default = true;
+static bool sql_seq_scan_default = false;
 TWEAK_BOOL(sql_seq_scan_default);
 
 static Expr *

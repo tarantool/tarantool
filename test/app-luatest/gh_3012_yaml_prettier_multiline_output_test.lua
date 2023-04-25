@@ -11,7 +11,7 @@ local function server_test_encode()
     local old_res = '--- "Title: xxx\\n - Item 1\\n - Item 2\\n"\n...\n'
     local new_res = '--- |\n  Title: xxx\n   - Item 1\n   - Item 2\n...\n'
 
-    t.assert_equals(yaml.encode(str), old_res)
+    t.assert_equals(yaml.encode(str), new_res)
     compat.yaml_pretty_multiline = 'new'
     t.assert_equals(yaml.encode(str), new_res)
     compat.yaml_pretty_multiline = 'old'

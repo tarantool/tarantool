@@ -32,15 +32,10 @@ json.encode(v)
  | ...
 yaml.encode(v)
  | ---
- | - '---
- | 
+ | - |
+ |   ---
  |   - 123
- | 
  |   - Illegal parameters, test
- | 
  |   - abc
- | 
  |   ...
- | 
- |   '
  | ...

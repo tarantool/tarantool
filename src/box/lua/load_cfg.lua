@@ -172,7 +172,7 @@ local default_cfg = {
     election_fencing_mode = 'soft',
     replication_timeout = 1,
     replication_sync_lag = 10,
-    replication_sync_timeout = 300,
+    replication_sync_timeout = 0,
     replication_synchro_quorum = "N / 2 + 1",
     replication_synchro_timeout = 5,
     replication_connect_timeout = 30,
@@ -243,7 +243,7 @@ local compat_options = {
         oldval = 300,
         newval = 0,
         obsolete = nil,
-        default = 'old',
+        default = 'new',
     },
 }
 

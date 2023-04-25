@@ -5,11 +5,11 @@ local function server_test_json_encode()
     local compat = require('compat')
     local json = require('json')
 
-    -- Test that '/' is escaped with default setting.
+    -- Test that '/' is not escaped with default setting.
     t.assert_equals(json.encode({url = 'https://srv:7777'}),
-                    '{"url":"https:\\/\\/srv:7777"}')
+                    '{"url":"https://srv:7777"}')
     t.assert_equals(json.encode('/home/user/tarantool'),
-                                [["\/home\/user\/tarantool"]])
+                                [["/home/user/tarantool"]])
     -- Test that other escape symbols are not affected by the setting.
     t.assert_equals(json.encode('\t'), [["\t"]])
     t.assert_equals(json.encode('\\'), [["\\"]])
@@ -38,9 +38,9 @@ local function server_test_json_encode()
     compat.json_escape_forward_slash = 'default'
     -- Test that default is restored.
     t.assert_equals(json.encode({url = 'https://srv:7777'}),
-                    '{"url":"https:\\/\\/srv:7777"}')
+                    '{"url":"https://srv:7777"}')
     t.assert_equals(json.encode('/home/user/tarantool'),
-                    [["\/home\/user\/tarantool"]])
+                    [["/home/user/tarantool"]])
 end
 
 local function server_test_json_new_encode()

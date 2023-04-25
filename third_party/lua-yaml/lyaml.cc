@@ -102,11 +102,12 @@ struct lua_yaml_dumper {
 };
 
 /**
- * By default, only strings that contain a '\n\n' substring are encoded in
- * the block scalar style. Setting this flag, makes the encoder use the block
- * scalar style for all multiline strings.
+ * By default, all strings that contain '\n' are encoded in the block scalar
+ * style. Setting this flag to false, makes the encoder use default yaml style
+ * with excessive newlines for all strins without "\n\n" substring. This is a
+ * compatibility-only feature.
  */
-static bool yaml_pretty_multiline;
+static bool yaml_pretty_multiline = true;
 TWEAK_BOOL(yaml_pretty_multiline);
 
 /**

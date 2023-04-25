@@ -78,27 +78,27 @@ end
 -- * action   (function)
 local options = {
     json_escape_forward_slash = {
-        default = 'old',
+        default = 'new',
         obsolete = nil,
         brief = JSON_ESCAPE_BRIEF,
         run_action_now = true,
         action = tweak_action('json_escape_forward_slash', true, false),
     },
     yaml_pretty_multiline = {
-        default = 'old',
+        default = 'new',
         obsolete = nil,
         brief = YAML_PRETTY_MULTILINE_BRIEF,
         action = tweak_action('yaml_pretty_multiline', false, true),
     },
     fiber_channel_close_mode = {
-        default = 'old',
+        default = 'new',
         obsolete = nil,
         brief = FIBER_CHANNEL_GRACEFUL_CLOSE_BRIEF,
         action = tweak_action('fiber_channel_close_mode',
                               'forceful', 'graceful'),
     },
     sql_seq_scan_default = {
-        default = 'old',
+        default = 'new',
         obsolete = nil,
         brief = SQL_SEQ_SCAN_DEFAULT_BRIEF,
         action = tweak_action('sql_seq_scan_default', true, false),
