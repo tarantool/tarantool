@@ -3630,7 +3630,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				return pCol->iMem;
 			} else if (pAggInfo->useSortingIdx) {
 				sqlVdbeAddOp3(v, OP_Column,
-						  pAggInfo->sortingIdxPTab,
+					      pAggInfo->sortingIdx,
 						  pCol->iSorterColumn, target);
 				return target;
 			}

@@ -1905,7 +1905,6 @@ case OP_Column: {
 	assert(pC!=0);
 	assert(p2<pC->nField);
 	assert(pC->eCurType!=CURTYPE_PSEUDO || pC->nullRow);
-	assert(pC->eCurType!=CURTYPE_SORTER);
 
 	if (pC->cacheStatus!=p->cacheCtr) {                /*OPTIMIZATION-IF-FALSE*/
 		if (pC->nullRow) {
@@ -1919,9 +1918,8 @@ case OP_Column: {
 			} else {
 				goto op_column_out;
 			}
-		} else {
+		} else if (pC->eCurType == CURTYPE_TARANTOOL) {
 			pCrsr = pC->uc.pCursor;
-			assert(pC->eCurType==CURTYPE_TARANTOOL);
 			assert(pCrsr);
 			assert(sqlCursorIsValid(pCrsr));
 			assert(pCrsr->curFlags & BTCF_TaCursor ||
@@ -1931,8 +1929,6 @@ case OP_Column: {
 		}
 		pC->cacheStatus = p->cacheCtr;
 	}
-	assert(pC->eCurType == CURTYPE_TARANTOOL ||
-	       pC->eCurType == CURTYPE_PSEUDO);
 	struct Mem *default_val_mem =
 		pOp->p4type == P4_MEM ? pOp->p4.pMem : NULL;
 	if (vdbe_field_ref_fetch(&pC->field_ref, p2, pDest) != 0)
@@ -3088,29 +3084,17 @@ case OP_SorterCompare: {
 			break;
 		};
 
-/* Opcode: SorterData P1 P2 P3 * *
- * Synopsis: r[P2]=data
+/**
+ * Opcode: SorterData P1 * * * *
+ * Synopsis: Prepare data for sorter cursor P1
  *
- * Write into register P2 the current sorter data for sorter cursor P1.
- * Then clear the column header cache on cursor P3.
- *
- * This opcode is normally use to move a record out of the sorter and into
- * a register that is the source for a pseudo-table cursor created using
- * OpenPseudo.  That pseudo-table cursor is the one that is identified by
- * parameter P3.  Clearing the P3 column cache as part of this opcode saves
- * us from having to issue a separate NullRow instruction to clear that cache.
+ * Prepare field_ref from sorter cursor P1 using data from sorter.
  */
 case OP_SorterData: {
-	VdbeCursor *pC;
-
-	pOut = vdbe_prepare_null_out(p, pOp->p2);
-	pC = p->apCsr[pOp->p1];
+	struct VdbeCursor *pC = p->apCsr[pOp->p1];
 	assert(isSorter(pC));
-	if (sqlVdbeSorterRowkey(pC, pOut) != 0)
-		goto abort_due_to_error;
-	assert(mem_is_bin(pOut));
-	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
-	p->apCsr[pOp->p3]->cacheStatus = CACHE_STALE;
+	sqlVdbeSorterRowkey(pC);
+	pC->cacheStatus = CACHE_STALE;
 	break;
 }
 

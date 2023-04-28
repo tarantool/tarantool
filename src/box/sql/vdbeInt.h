@@ -368,7 +368,9 @@ sqlVdbeSorterReset(struct VdbeSorter *pSorter);
 void
 sqlVdbeSorterClose(struct VdbeCursor *pCsr);
 
-int sqlVdbeSorterRowkey(const VdbeCursor *, Mem *);
+/** Prepare the current sorter key. */
+void
+sqlVdbeSorterRowkey(struct VdbeCursor *pCsr);
 
 /** Advance to the next element in the sorter. */
 int
