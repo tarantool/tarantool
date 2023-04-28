@@ -1355,6 +1355,55 @@ netbox_encode_method(struct lua_State *L, int idx, enum netbox_method method,
 	return 0;
 }
 
+/*
+ * Decoded parts of response body.
+ */
+struct response_body {
+	/* IPROTO_DATA */
+	const char *data;
+	/* IPROTO_DATA end. */
+	const char *data_end;
+	/* IPROTO_POSITION */
+	const char *pos;
+	/* IPROTO_POSITION length */
+	uint32_t pos_len;
+};
+
+/*
+ * Decode response body from a given MsgPack map.
+ */
+static void
+response_body_decode(struct response_body *response_body, const char **data,
+		     const char *data_end)
+{
+	(void)data_end;
+	memset(response_body, 0, sizeof(*response_body));
+	assert(mp_typeof(**data) == MP_MAP);
+	uint32_t sz = mp_decode_map(data);
+	for (uint32_t i = 0; i < sz; ++i) {
+		assert(mp_typeof(**data) == MP_UINT);
+		uint32_t key = mp_decode_uint(data);
+		const char *value = *data;
+		mp_next(data);
+		switch (key) {
+		case IPROTO_DATA:
+			assert(mp_typeof(*value) == MP_ARRAY);
+			response_body->data = value;
+			response_body->data_end = *data;
+			break;
+		case IPROTO_POSITION:
+			assert(mp_typeof(*value) == MP_STR);
+			response_body->pos =
+				mp_decode_str(&value, &response_body->pos_len);
+			assert(response_body->pos_len != 0);
+			break;
+		default:
+			unreachable();
+		}
+	}
+	assert(*data == data_end);
+}
+
 /**
  * This function handles a response that is supposed to have an empty body
  * (e.g. IPROTO_PING result). It doesn't decode anything per se. Instead it
@@ -1372,23 +1421,6 @@ netbox_decode_nil(struct lua_State *L, const char **data,
 }
 
 /**
- * This helper skips a MessagePack map header and IPROTO_DATA key so that
- * *data points to the actual response content.
- */
-static void
-netbox_skip_to_data(const char **data)
-{
-	assert(mp_typeof(**data) == MP_MAP);
-	uint32_t map_size = mp_decode_map(data);
-	/* Until 2.0 body has no keys except DATA. */
-	assert(map_size == 1);
-	(void)map_size;
-	uint32_t key = mp_decode_uint(data);
-	assert(key == IPROTO_DATA);
-	(void)key;
-}
-
-/**
  * Decodes Tarantool response body consisting of single IPROTO_DATA key into
  * a Lua table and pushes the table to Lua stack.
  */
@@ -1397,14 +1429,13 @@ netbox_decode_table(struct lua_State *L, const char **data,
 		    const char *data_end, bool return_raw,
 		    struct tuple_format *format)
 {
-	(void)data_end;
 	(void)format;
-	netbox_skip_to_data(data);
+	struct response_body response_body;
+	response_body_decode(&response_body, data, data_end);
 	if (return_raw) {
-		luamp_push(L, *data, data_end);
-		*data = data_end;
+		luamp_push(L, response_body.data, response_body.data_end);
 	} else {
-		luamp_decode(L, cfg, data);
+		luamp_decode(L, cfg, &response_body.data);
 	}
 }
 
@@ -1417,21 +1448,19 @@ netbox_decode_value(struct lua_State *L, const char **data,
 		    const char *data_end, bool return_raw,
 		    struct tuple_format *format)
 {
-	(void)data_end;
 	(void)format;
-	netbox_skip_to_data(data);
-	uint32_t count = mp_decode_array(data);
-	if (count == 0)
-		return lua_pushnil(L);
-	if (return_raw) {
-		const char *begin = *data;
-		mp_next(data);
-		luamp_push(L, begin, *data);
-	} else {
-		luamp_decode(L, cfg, data);
+	struct response_body response_body;
+	response_body_decode(&response_body, data, data_end);
+	uint32_t count = mp_decode_array(&response_body.data);
+	if (count == 0) {
+		lua_pushnil(L);
+		return;
 	}
-	for (uint32_t i = 1; i < count; ++i)
-		mp_next(data);
+	if (return_raw) {
+		luamp_push(L, response_body.data, response_body.data_end);
+	} else {
+		luamp_decode(L, cfg, &response_body.data);
+	}
 }
 
 /**
@@ -1477,13 +1506,12 @@ netbox_decode_select(struct lua_State *L, const char **data,
 		     const char *data_end, bool return_raw,
 		     struct tuple_format *format)
 {
-	(void)data_end;
-	netbox_skip_to_data(data);
+	struct response_body response_body;
+	response_body_decode(&response_body, data, data_end);
 	if (return_raw) {
-		luamp_push(L, *data, data_end);
-		*data = data_end;
+		luamp_push(L, response_body.data, response_body.data_end);
 	} else {
-		netbox_decode_data(L, data, format);
+		netbox_decode_data(L, &response_body.data, format);
 	}
 }
 
@@ -1497,42 +1525,20 @@ netbox_decode_select_with_pos(struct lua_State *L, const char **data,
 			      const char *data_end, bool return_raw,
 			      struct tuple_format *format)
 {
-	(void)data_end;
-	assert(mp_typeof(**data) == MP_MAP);
-	uint32_t map_size = mp_decode_map(data);
-	/* Possible keys are DATA and POSITION. */
-	assert(map_size <= 2);
-	lua_createtable(L, map_size, 0);
-	uint32_t table_idx = lua_gettop(L);
-	bool has_iproto_data = false;
-	for (uint32_t i = 0; i < map_size; ++i) {
-		uint32_t key = mp_decode_uint(data);
-		switch (key) {
-		case IPROTO_DATA:
-			has_iproto_data = true;
-			if (return_raw) {
-				const char *data_begin = *data;
-				mp_next(data);
-				luamp_push(L, data_begin, *data);
-			} else {
-				netbox_decode_data(L, data, format);
-			}
-			lua_rawseti(L, table_idx, 1);
-			break;
-		case IPROTO_POSITION:
-			assert(mp_typeof(**data) == MP_STR);
-			uint32_t str_len;
-			const char *pos = mp_decode_str(data, &str_len);
-			assert(str_len != 0);
-			lua_pushlstring(L, pos, str_len);
-			lua_rawseti(L, table_idx, 2);
-			break;
-		default:
-			unreachable();
-		}
+	struct response_body response_body;
+	response_body_decode(&response_body, data, data_end);
+	lua_createtable(L, response_body.pos != NULL ? 2 : 1, 0);
+	int table_idx = lua_gettop(L);
+	if (return_raw) {
+		luamp_push(L, response_body.data, response_body.data_end);
+	} else {
+		netbox_decode_data(L, &response_body.data, format);
 	}
-	assert(has_iproto_data);
-	(void)has_iproto_data;
+	lua_rawseti(L, table_idx, 1);
+	if (response_body.pos != NULL) {
+		lua_pushlstring(L, response_body.pos, response_body.pos_len);
+		lua_rawseti(L, table_idx, 2);
+	}
 }
 
 /**
@@ -1544,23 +1550,23 @@ netbox_decode_tuple(struct lua_State *L, const char **data,
 		    const char *data_end, bool return_raw,
 		    struct tuple_format *format)
 {
-	(void)data_end;
-	netbox_skip_to_data(data);
-	uint32_t count = mp_decode_array(data);
-	if (count == 0)
-		return lua_pushnil(L);
-	const char *begin = *data;
-	mp_next(data);
+	struct response_body response_body;
+	response_body_decode(&response_body, data, data_end);
+	uint32_t count = mp_decode_array(&response_body.data);
+	if (count == 0) {
+		lua_pushnil(L);
+		return;
+	}
 	if (return_raw) {
-		luamp_push(L, begin, *data);
+		luamp_push(L, response_body.data, response_body.data_end);
 	} else {
-		struct tuple *tuple = box_tuple_new(format, begin, *data);
+		struct tuple *tuple =
+			box_tuple_new(format, response_body.data,
+				      response_body.data_end);
 		if (tuple == NULL)
 			luaT_error(L);
 		luaT_pushtuple(L, tuple);
 	}
-	for (uint32_t i = 1; i < count; ++i)
-		mp_next(data);
 }
 
 /** Decode optional (i.e. may be present in response) metadata fields. */
