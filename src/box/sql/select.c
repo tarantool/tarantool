@@ -2560,7 +2560,7 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 
 	/* Allocate cursors for Current, Queue, and Distinct. */
 	regCurrent = ++pParse->nMem;
-	sqlVdbeAddOp3(v, OP_OpenPseudo, iCurrent, regCurrent, nCol);
+	sqlVdbeAddOp2(v, OP_OpenPseudo, iCurrent, nCol);
 	struct sql_space_info *info;
 	if (pOrderBy) {
 		VdbeComment((v, "Orderby table"));
@@ -2599,13 +2599,13 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 	addrTop = sqlVdbeAddOp2(v, OP_Rewind, iQueue, addrBreak);
 
 	/* Transfer the next row in Queue over to Current */
-	sqlVdbeAddOp1(v, OP_NullRow, iCurrent);	/* To reset column cache */
 	if (pOrderBy) {
 		sqlVdbeAddOp3(v, OP_Column, iQueue, pOrderBy->nExpr + 1,
 				  regCurrent);
 	} else {
 		sqlVdbeAddOp2(v, OP_RowData, iQueue, regCurrent);
 	}
+	sqlVdbeAddOp2(v, OP_PseudoData, iCurrent, regCurrent);
 	sqlVdbeAddOp1(v, OP_Delete, iQueue);
 
 	/* Output the single row in Current */

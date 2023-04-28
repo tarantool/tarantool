@@ -1894,7 +1894,6 @@ case OP_Column: {
 	VdbeCursor *pC;    /* The VDBE cursor */
 	BtCursor *pCrsr = NULL; /* The BTree cursor */
 	Mem *pDest;        /* Where to write the extracted value */
-	Mem *pReg;         /* PseudoTable input register */
 
 	pC = p->apCsr[pOp->p1];
 	p2 = pOp->p2;
@@ -1904,21 +1903,11 @@ case OP_Column: {
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
 	assert(pC!=0);
 	assert(p2<pC->nField);
-	assert(pC->eCurType!=CURTYPE_PSEUDO || pC->nullRow);
 
 	if (pC->cacheStatus!=p->cacheCtr) {                /*OPTIMIZATION-IF-FALSE*/
-		if (pC->nullRow) {
-			if (pC->eCurType==CURTYPE_PSEUDO) {
-				assert(pC->uc.pseudoTableReg>0);
-				pReg = &aMem[pC->uc.pseudoTableReg];
-				assert(mem_is_bin(pReg));
-				assert(memIsValid(pReg));
-				vdbe_field_ref_prepare_data(&pC->field_ref,
-							    pReg->z, pReg->n);
-			} else {
-				goto op_column_out;
-			}
-		} else if (pC->eCurType == CURTYPE_TARANTOOL) {
+		if (pC->nullRow)
+			goto op_column_out;
+		if (pC->eCurType == CURTYPE_TARANTOOL) {
 			pCrsr = pC->uc.pCursor;
 			assert(pCrsr);
 			assert(sqlCursorIsValid(pCrsr));
@@ -2491,33 +2480,37 @@ case OP_SequenceTest: {
 	break;
 }
 
-/* Opcode: OpenPseudo P1 P2 P3 * *
- * Synopsis: P3 columns in r[P2]
+/**
+ * Opcode: OpenPseudo P1 P2 * * *
+ * Synopsis: Create pseudo cursor P1 with P2 columns
  *
- * Open a new cursor that points to a fake table that contains a single
- * row of data.  The content of that one row is the content of memory
- * register P2.  In other words, cursor P1 becomes an alias for the
- * MEM with binary content contained in register P2.
- *
- * A pseudo-table created by this opcode is used to hold a single
- * row output from the sorter so that the row can be decomposed into
- * individual columns using the OP_Column opcode.  The OP_Column opcode
- * is the only cursor opcode that works with a pseudo-table.
- *
- * P3 is the number of fields in the records that will be stored by
- * the pseudo-table.
+ * Open a new cursor that points to a fake table that contains a single row of
+ * data. P2 is the number of fields in the record that will be stored in the
+ * pseudo-table.
  */
 case OP_OpenPseudo: {
 	VdbeCursor *pCx;
 
 	assert(pOp->p1>=0);
-	assert(pOp->p3>=0);
-	pCx = allocateCursor(p, pOp->p1, pOp->p3, CURTYPE_PSEUDO);
+	assert(pOp->p2 >= 0);
+	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_PSEUDO);
 	if (pCx == NULL)
 		goto abort_due_to_error;
-	pCx->nullRow = 1;
-	pCx->uc.pseudoTableReg = pOp->p2;
-	assert(pOp->p5==0);
+	break;
+}
+
+/**
+ * Opcode: PseudoData P1 P2 * * *
+ * Synopsis: Prepare data from r[P2] for pseudo cursor P1
+ *
+ * Prepare field_ref from pseudo cursor P1 using data from register P2.
+ */
+case OP_PseudoData: {
+	struct VdbeCursor *cur = p->apCsr[pOp->p1];
+	cur->cacheStatus = CACHE_STALE;
+	struct Mem *data = &aMem[pOp->p2];
+	assert(memIsValid(data) && mem_is_bin(data));
+	vdbe_field_ref_prepare_data(&cur->field_ref, data->z, data->n);
 	break;
 }
 
