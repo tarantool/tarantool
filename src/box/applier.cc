@@ -387,10 +387,10 @@ applier_check_join(const struct applier *applier)
 }
 
 static void
-applier_run_ballot_triggers(struct applier *applier, bool success)
+applier_run_ballot_triggers(struct applier *applier)
 {
 	applier_check_join(applier);
-	trigger_run(&applier->on_ballot_update, &success);
+	trigger_run(&applier->on_ballot_update, NULL);
 }
 
 /**
@@ -485,7 +485,8 @@ applier_watch_ballot(struct applier *applier)
 			 */
 			if (is_empty)
 				continue;
-			applier_run_ballot_triggers(applier, true);
+			diag_clear(diag_get());
+			applier_run_ballot_triggers(applier);
 		}
 	} catch (ClientError *e) {
 		if (e->errcode() != ER_NO_SUCH_EVENT)
@@ -494,7 +495,8 @@ applier_watch_ballot(struct applier *applier)
 try_vote:
 	applier_get_ballot_from_vote(&io, &row, &ibuf,
 				     &applier->ballot);
-	applier_run_ballot_triggers(applier, true);
+	diag_clear(diag_get());
+	applier_run_ballot_triggers(applier);
 }
 
 static int
@@ -514,7 +516,7 @@ applier_ballot_watcher_f(va_list ap)
 			return 0;
 		} catch (Exception *) {
 			diag_log();
-			applier_run_ballot_triggers(applier, false);
+			applier_run_ballot_triggers(applier);
 			diag_clear(diag_get());
 			break;
 		}
@@ -548,11 +550,11 @@ applier_ballot_data_create(struct applier_ballot_data *data,
 static int
 applier_on_first_ballot_update_f(struct trigger *trigger, void *event)
 {
+	(void)event;
 	struct applier_ballot_data *data =
 		(struct applier_ballot_data *)trigger->data;
-	bool success = *(bool *)event;
 	data->done = true;
-	if (!success)
+	if (!diag_is_empty(diag_get()))
 		diag_move(diag_get(), &data->diag);
 	fiber_wakeup(data->fiber);
 	return 0;
@@ -584,11 +586,11 @@ applier_wait_first_ballot(struct applier *applier)
 static int
 applier_on_bootstrap_leader_uuid_set_f(struct trigger *trigger, void *event)
 {
+	(void)event;
 	struct applier_ballot_data *data =
 		(struct applier_ballot_data *)trigger->data;
 	const struct applier *applier = data->applier;
-	bool success = *(bool *)event;
-	if (!success)
+	if (!diag_is_empty(diag_get()))
 		diag_move(diag_get(), &data->diag);
 	else if (tt_uuid_is_nil(&applier->ballot.bootstrap_leader_uuid))
 		return 0;
