@@ -390,7 +390,7 @@ static void
 applier_run_ballot_triggers(struct applier *applier)
 {
 	applier_check_join(applier);
-	trigger_run(&applier->on_ballot_update, NULL);
+	trigger_run(&applier->on_ballot_update, applier);
 }
 
 /**
@@ -531,19 +531,15 @@ struct applier_ballot_data {
 	struct diag diag;
 	/** The fiber waiting for the ballot update. */
 	struct fiber *fiber;
-	/** The applier this trigger is for. */
-	const struct applier *applier;
 	/** Whether the ballot was updated. */
 	bool done;
 };
 
 static void
-applier_ballot_data_create(struct applier_ballot_data *data,
-			   const struct applier *applier)
+applier_ballot_data_create(struct applier_ballot_data *data)
 {
 	diag_create(&data->diag);
 	data->fiber = fiber();
-	data->applier = applier;
 	data->done = false;
 }
 
@@ -566,7 +562,7 @@ applier_wait_first_ballot(struct applier *applier)
 {
 	struct trigger on_ballot_update;
 	struct applier_ballot_data data;
-	applier_ballot_data_create(&data, applier);
+	applier_ballot_data_create(&data);
 	trigger_create(&on_ballot_update, applier_on_first_ballot_update_f,
 		       &data, NULL);
 	trigger_add(&applier->on_ballot_update, &on_ballot_update);
@@ -586,10 +582,9 @@ applier_wait_first_ballot(struct applier *applier)
 static int
 applier_on_bootstrap_leader_uuid_set_f(struct trigger *trigger, void *event)
 {
-	(void)event;
+	struct applier *applier = (struct applier *)event;
 	struct applier_ballot_data *data =
 		(struct applier_ballot_data *)trigger->data;
-	const struct applier *applier = data->applier;
 	if (!diag_is_empty(diag_get()))
 		diag_move(diag_get(), &data->diag);
 	else if (tt_uuid_is_nil(&applier->ballot.bootstrap_leader_uuid))
@@ -607,7 +602,7 @@ applier_wait_bootstrap_leader_uuid_is_set(struct applier *applier)
 		goto err;
 	struct trigger trigger;
 	struct applier_ballot_data data;
-	applier_ballot_data_create(&data, applier);
+	applier_ballot_data_create(&data);
 	trigger_create(&trigger, applier_on_bootstrap_leader_uuid_set_f,
 		       &data, NULL);
 	trigger_add(&applier->on_ballot_update, &trigger);
