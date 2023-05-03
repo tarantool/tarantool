@@ -503,6 +503,8 @@ replica_clear_applier(struct replica *replica)
 static void
 replica_on_applier_sync(struct replica *replica)
 {
+	if (replica->applier_sync_state == APPLIER_SYNC)
+		return;
 	assert(replica->applier_sync_state == APPLIER_CONNECTED);
 
 	replica->applier_sync_state = APPLIER_SYNC;
@@ -514,6 +516,8 @@ replica_on_applier_sync(struct replica *replica)
 static void
 replica_on_applier_connect(struct replica *replica)
 {
+	if (replica->applier_sync_state == APPLIER_CONNECTED)
+		return;
 	struct applier *applier = replica->applier;
 
 	assert(tt_uuid_is_nil(&replica->uuid));
@@ -560,6 +564,8 @@ replica_on_applier_connect(struct replica *replica)
 static void
 replica_on_applier_reconnect(struct replica *replica)
 {
+	if (replica->applier_sync_state == APPLIER_CONNECTED)
+		return;
 	struct applier *applier = replica->applier;
 
 	assert(!tt_uuid_is_nil(&replica->uuid));
@@ -605,6 +611,8 @@ replica_on_applier_reconnect(struct replica *replica)
 static void
 replica_on_applier_disconnect(struct replica *replica)
 {
+	if (replica->applier_sync_state == replica->applier->state)
+		return;
 	switch (replica->applier_sync_state) {
 	case APPLIER_SYNC:
 		assert(replicaset.applier.synced > 0);
@@ -718,12 +726,14 @@ replicaset_update(struct applier **appliers, int count, bool keep_connect)
 			 * when it is finally connected.
 			 */
 			rlist_add_entry(&anon_replicas, replica, in_anon);
+			replica->applier_sync_state = APPLIER_DISCONNECTED;
 			continue;
 		}
 
 		assert(!tt_uuid_is_nil(&applier->uuid));
 		replica->uuid = applier->uuid;
 		replica->anon = applier->ballot.is_anon;
+		replica->applier_sync_state = APPLIER_CONNECTED;
 
 		if (replica_hash_search(&uniq, replica) != NULL) {
 			replica_clear_applier(replica);
@@ -888,6 +898,8 @@ struct replicaset_connect_state {
 struct applier_on_connect {
 	struct trigger base;
 	struct replicaset_connect_state *state;
+	/** Previously seen applier state. */
+	enum applier_state seen_state;
 };
 
 static int
@@ -898,6 +910,9 @@ applier_on_connect_f(struct trigger *trigger, void *event)
 	struct replicaset_connect_state *state = on_connect->state;
 	struct applier *applier = (struct applier *)event;
 
+	if (on_connect->seen_state == applier->state)
+		return 0;
+	on_connect->seen_state = applier->state;
 	if (applier->state != APPLIER_OFF &&
 	    applier->state != APPLIER_STOPPED &&
 	    applier->state != APPLIER_CONNECTED) {
@@ -1060,6 +1075,7 @@ replicaset_connect(const struct uri_set *uris,
 		/* Register a trigger to wake us up when peer is connected */
 		trigger_create(&trigger->base, applier_on_connect_f, NULL, NULL);
 		trigger->state = &state;
+		trigger->seen_state = APPLIER_CONNECT;
 		trigger_add(&applier->on_state, &trigger->base);
 		/* Start background connection */
 		applier_start(applier);
