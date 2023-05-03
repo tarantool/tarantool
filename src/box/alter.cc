@@ -2136,6 +2136,13 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		/* Check whether old_space is used somewhere. */
 		if (space_check_pinned(old_space) != 0)
 			return -1;
+		/* One can't just remove a system space. */
+		if (space_is_system(old_space)) {
+			diag_set(ClientError, ER_DROP_SPACE,
+				 space_name(old_space),
+				 "the space is a system space");
+			return -1;
+		}
 		/**
 		 * We need to unpin spaces that are referenced by deleted one.
 		 * Let's detach space constraints - they will be deleted

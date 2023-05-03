@@ -71,7 +71,7 @@ _space:insert{_index.id, ADMIN, '_index', 'memtx', 0, EMPTY_MAP, {}}
     "type": "array"}]] and new tuple - [288, 1, "_index", "memtx", 0, {}, []]'
 ...
 --
--- Can't drop a system space
+-- Can't drop a space with an index
 --
 _space:delete{_space.id}
 ---
@@ -80,6 +80,13 @@ _space:delete{_space.id}
 _space:delete{_index.id}
 ---
 - error: 'Can''t drop space ''_index'': the space has indexes'
+...
+--
+-- Can't drop a system space
+--
+_space:delete{box.schema.VINYL_DEFERRED_DELETE_ID}
+---
+- error: 'Can''t drop space ''_vinyl_deferred_delete'': the space is a system space'
 ...
 --
 -- Can't change properties of a space
@@ -95,7 +102,7 @@ _space:update({_space.id}, {{'-', 1, 2}})
 --
 -- Create a space
 --
-t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0, EMPTY_MAP, {}}
+t = _space:insert{box.internal.generate_space_id(), ADMIN, 'hello', 'memtx', 0, EMPTY_MAP, {}}
 ---
 ...
 -- Check that a space exists
@@ -104,7 +111,7 @@ space = box.space[t[1]]
 ...
 space.id
 ---
-- 381
+- 512
 ...
 space.field_count
 ---
@@ -149,7 +156,7 @@ space_deleted
 ...
 space:replace{0}
 ---
-- error: Space '381' does not exist
+- error: Space '512' does not exist
 ...
 err, res = pcall(function() return _index:insert{_space.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}} end)
 ---
