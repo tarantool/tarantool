@@ -390,7 +390,7 @@ static void
 applier_run_ballot_triggers(struct applier *applier)
 {
 	applier_check_join(applier);
-	trigger_run(&applier->on_ballot_update, applier);
+	trigger_run(&applier->on_state, applier);
 }
 
 /**
@@ -546,12 +546,19 @@ applier_ballot_data_create(struct applier_ballot_data *data)
 static int
 applier_on_first_ballot_update_f(struct trigger *trigger, void *event)
 {
-	(void)event;
+	struct applier *applier = (struct applier *)event;
 	struct applier_ballot_data *data =
 		(struct applier_ballot_data *)trigger->data;
-	data->done = true;
 	if (!diag_is_empty(diag_get()))
 		diag_move(diag_get(), &data->diag);
+	else if (!applier->ballot.is_booted && !applier->ballot.is_ro) {
+		/*
+		 * In a real ballot is_booted and is_ro can't both be false at
+		 * the same time.
+		 */
+		return 0;
+	}
+	data->done = true;
 	fiber_wakeup(data->fiber);
 	return 0;
 }
@@ -565,7 +572,7 @@ applier_wait_first_ballot(struct applier *applier)
 	applier_ballot_data_create(&data);
 	trigger_create(&on_ballot_update, applier_on_first_ballot_update_f,
 		       &data, NULL);
-	trigger_add(&applier->on_ballot_update, &on_ballot_update);
+	trigger_add(&applier->on_state, &on_ballot_update);
 	while (!data.done && !fiber_is_cancelled()) {
 		fiber_yield();
 	}
@@ -605,7 +612,7 @@ applier_wait_bootstrap_leader_uuid_is_set(struct applier *applier)
 	applier_ballot_data_create(&data);
 	trigger_create(&trigger, applier_on_bootstrap_leader_uuid_set_f,
 		       &data, NULL);
-	trigger_add(&applier->on_ballot_update, &trigger);
+	trigger_add(&applier->on_state, &trigger);
 	while (!data.done && !fiber_is_cancelled())
 		fiber_yield();
 	trigger_clear(&trigger);
@@ -2670,7 +2677,6 @@ applier_new(const struct uri *uri)
 	uri_copy(&applier->uri, uri);
 	applier->last_row_time = ev_monotonic_now(loop());
 	rlist_create(&applier->on_state);
-	rlist_create(&applier->on_ballot_update);
 	fiber_cond_create(&applier->resume_cond);
 	diag_create(&applier->diag);
 
@@ -2686,7 +2692,6 @@ applier_delete(struct applier *applier)
 	ibuf_destroy(&applier->ibuf);
 	uri_destroy(&applier->uri);
 	trigger_destroy(&applier->on_state);
-	trigger_destroy(&applier->on_ballot_update);
 	diag_destroy(&applier->diag);
 	free(applier);
 }
@@ -2724,6 +2729,8 @@ struct applier_on_state {
 	struct trigger base;
 	struct applier *applier;
 	enum applier_state desired_state;
+	/** Previously seen applier state. */
+	enum applier_state seen_state;
 	struct fiber_cond wakeup;
 };
 
@@ -2736,6 +2743,9 @@ applier_on_state_f(struct trigger *trigger, void *event)
 
 	struct applier *applier = on_state->applier;
 
+	if (applier->state == on_state->seen_state)
+		return 0;
+	on_state->seen_state = applier->state;
 	if (applier->state != APPLIER_OFF &&
 	    applier->state != APPLIER_STOPPED &&
 	    applier->state != on_state->desired_state)
@@ -2757,6 +2767,7 @@ applier_add_on_state(struct applier *applier,
 	trigger->applier = applier;
 	fiber_cond_create(&trigger->wakeup);
 	trigger->desired_state = desired_state;
+	trigger->seen_state = applier->state;
 	trigger_add(&applier->on_state, &trigger->base);
 }
 

@@ -182,10 +182,8 @@ struct applier {
 	struct iostream io;
 	/** Input buffer */
 	struct ibuf ibuf;
-	/** Triggers invoked on state change */
+	/** Triggers invoked on state change or ballot update. */
 	struct rlist on_state;
-	/** Triggers invoked on ballot update. */
-	struct rlist on_ballot_update;
 	/**
 	 * Set if the applier was paused (see applier_pause()) and is now
 	 * waiting on resume_cond to be resumed (see applier_resume()).
