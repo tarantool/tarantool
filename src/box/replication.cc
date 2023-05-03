@@ -898,15 +898,9 @@ applier_on_connect_f(struct trigger *trigger, void *event)
 	struct replicaset_connect_state *state = on_connect->state;
 	struct applier *applier = (struct applier *)event;
 
-	switch (applier->state) {
-	case APPLIER_OFF:
-	case APPLIER_STOPPED:
-		state->failed++;
-		break;
-	case APPLIER_CONNECTED:
-		state->connected++;
-		break;
-	default:
+	if (applier->state != APPLIER_OFF &&
+	    applier->state != APPLIER_STOPPED &&
+	    applier->state != APPLIER_CONNECTED) {
 		return 0;
 	}
 	fiber_cond_signal(&state->wakeup);
@@ -959,6 +953,18 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 		if (bootstrap_strategy == BOOTSTRAP_STRATEGY_CONFIG &&
 		    bootstrap_leader_is_connected(appliers, count)) {
 			return true;
+		}
+	}
+	/* Update connected and failed counters. */
+	state->connected = 0;
+	state->failed = 0;
+	for (int i = 0; i < count; i++) {
+		struct applier *applier = appliers[i];
+		if (applier->state == APPLIER_CONNECTED) {
+			state->connected++;
+		} else if (applier->state == APPLIER_STOPPED ||
+			   applier->state == APPLIER_OFF) {
+			state->failed++;
 		}
 	}
 	if (state->connected == count)
