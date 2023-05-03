@@ -29,10 +29,14 @@ err, res = pcall(function() return _space:insert{_space.id, ADMIN, '_space', 'me
 assert(res.code == box.error.TUPLE_FOUND)
 _space:insert{_index.id, ADMIN, '_index', 'memtx', 0, EMPTY_MAP, {}}
 --
--- Can't drop a system space
+-- Can't drop a space with an index
 --
 _space:delete{_space.id}
 _space:delete{_index.id}
+--
+-- Can't drop a system space
+--
+_space:delete{box.schema.VINYL_DEFERRED_DELETE_ID}
 --
 -- Can't change properties of a space
 --
@@ -41,7 +45,7 @@ _space:update({_space.id}, {{'-', 1, 2}})
 --
 -- Create a space
 --
-t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0, EMPTY_MAP, {}}
+t = _space:insert{box.internal.generate_space_id(), ADMIN, 'hello', 'memtx', 0, EMPTY_MAP, {}}
 -- Check that a space exists
 space = box.space[t[1]]
 space.id
