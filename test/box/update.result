@@ -1813,11 +1813,12 @@ t:upsert(ops)
 --
 t:update({{'=', '[3]', {a = 33}}, {'+', '[3].a', 1}})
 ---
-- error: 'Field ''[3].a'' UPDATE error: double update of the same field'
+- error: 'Tuple field 3 (g) type does not match one required by operation: expected
+    array, got map'
 ...
 t:update({{'=', '[4]', {1}}, {'+', '[4][1]', 1}})
 ---
-- error: 'Field ''[4][1]'' UPDATE error: double update of the same field'
+- [1, {}, [], [2]]
 ...
 -- Same about updating internals of a newly created bar field.
 t:update({{'=', '[4][6]', {a = 33}}, {'+', '[4][6].aa', 1}})
@@ -2313,4 +2314,119 @@ s:drop()
 box.tuple.new({1}):update({{'=', 4, 4}, {'=', 3, 3}})
 ---
 - [1, null, 3, 4]
+...
+--
+-- gh-8226: allow several updates of the same field
+--
+-- Allow to set scalar to array field and then do scalar operation
+-- on the same field.
+t = box.tuple.new({7, 1, 11})
+---
+...
+t:update({{'=', 2, 2}, {'+', 2, 2}})
+---
+- [7, 4, 11]
+...
+-- Allow to set map/array to array field and then do update inside it.
+t:update({{'=', 2, {a = 2}}, {'+', '[2].a', 2}})
+---
+- [7, {'a': 4}, 11]
+...
+t:update({{'=', 2, {a = 2}}, {'!', '[2].b', 3}})
+---
+- [7, {'b': 3, 'a': 2}, 11]
+...
+t:update({{'=', 2, {a = 2, b = 3}}, {'#', '[2].b', 1}})
+---
+- [7, {'a': 2}, 11]
+...
+t:update({{'=', 2, {a = 2, b = 3}}, {'=', '[2].b', 4}})
+---
+- [7, {'a': 2, 'b': 4}, 11]
+...
+--
+-- Below first update will become a bar so we need second update to create map
+-- node.
+--
+-- Allow to set scalar to map field and then do scalar operation
+-- on the same field.
+t = box.tuple.new({7, {a = 1, b = 1}, 11})
+---
+...
+t:update({{'+', '[2].a', 1}, {'=', '[2].b', 2}, {'+', '[2].b', 2}})
+---
+- [7, {'b': 4, 'a': 2}, 11]
+...
+-- Allow to set map/array to map field and then do update inside it.
+t:update({{'+', '[2].a', 1}, {'=', '[2].b', {x = 2}}, {'+', '[2].b.x', 2}})
+---
+- [7, {'b': {'x': 4}, 'a': 2}, 11]
+...
+t:update({{'+', '[2].a', 1}, {'=', '[2].b', {x = 2}}, {'!', '[2].b.y', 3}})
+---
+- [7, {'b': {'y': 3, 'x': 2}, 'a': 2}, 11]
+...
+t:update({{'+', '[2].a', 1}, {'=', '[2].b', {x = 2, y = 3}}, {'#', '[2].b.y', 1}})
+---
+- [7, {'b': {'x': 2}, 'a': 2}, 11]
+...
+t:update({{'+', '[2].a', 1}, {'=', '[2].b', {x = 2, y = 3}}, {'=', '[2].b.y', 4}})
+---
+- [7, {'b': {'y': 4, 'x': 2}, 'a': 2}, 11]
+...
+-- Allow to set scalar to array field and then do scalar operation
+-- on the same field.
+t = box.tuple.new({7, 11})
+---
+...
+t:update({{'!', 2, 2}, {'+', 2, 2}})
+---
+- [7, 4, 11]
+...
+-- Allow to set map/array to array field and then do update inside it.
+t:update({{'!', 2, {a = 2}}, {'+', '[2].a', 2}})
+---
+- [7, {'a': 4}, 11]
+...
+t:update({{'!', 2, {a = 2}}, {'!', '[2].b', 3}})
+---
+- [7, {'b': 3, 'a': 2}, 11]
+...
+t:update({{'!', 2, {a = 2, b = 3}}, {'#', '[2].b', 1}})
+---
+- [7, {'a': 2}, 11]
+...
+t:update({{'!', 2, {a = 2, b = 3}}, {'=', '[2].b', 4}})
+---
+- [7, {'a': 2, 'b': 4}, 11]
+...
+--
+-- Below first update will become a bar so we need second update to create map
+-- node.
+--
+-- Allow to set scalar to map field and then do scalar operation
+-- on the same field.
+t = box.tuple.new({7, {a = 1}, 11})
+---
+...
+t:update({{'+', '[2].a', 1}, {'!', '[2].b', 2}, {'+', '[2].b', 2}})
+---
+- [7, {'b': 4, 'a': 2}, 11]
+...
+-- Allow to set map/array to map field and then do update inside it.
+t:update({{'+', '[2].a', 1}, {'!', '[2].b', {x = 2}}, {'+', '[2].b.x', 2}})
+---
+- [7, {'b': {'x': 4}, 'a': 2}, 11]
+...
+t:update({{'+', '[2].a', 1}, {'!', '[2].b', {x = 2}}, {'!', '[2].b.y', 3}})
+---
+- [7, {'b': {'y': 3, 'x': 2}, 'a': 2}, 11]
+...
+t:update({{'+', '[2].a', 1}, {'!', '[2].b', {x = 2, y = 3}}, {'#', '[2].b.y', 1}})
+---
+- [7, {'b': {'x': 2}, 'a': 2}, 11]
+...
+t:update({{'+', '[2].a', 1}, {'!', '[2].b', {x = 2, y = 3}}, {'=', '[2].b.y', 4}})
+---
+- [7, {'b': {'y': 4, 'x': 2}, 'a': 2}, 11]
 ...

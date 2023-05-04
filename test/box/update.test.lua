@@ -848,3 +848,51 @@ s:drop()
 -- reversed order both on not specified fields.
 --
 box.tuple.new({1}):update({{'=', 4, 4}, {'=', 3, 3}})
+
+--
+-- gh-8226: allow several updates of the same field
+--
+-- Allow to set scalar to array field and then do scalar operation
+-- on the same field.
+t = box.tuple.new({7, 1, 11})
+t:update({{'=', 2, 2}, {'+', 2, 2}})
+-- Allow to set map/array to array field and then do update inside it.
+t:update({{'=', 2, {a = 2}}, {'+', '[2].a', 2}})
+t:update({{'=', 2, {a = 2}}, {'!', '[2].b', 3}})
+t:update({{'=', 2, {a = 2, b = 3}}, {'#', '[2].b', 1}})
+t:update({{'=', 2, {a = 2, b = 3}}, {'=', '[2].b', 4}})
+--
+-- Below first update will become a bar so we need second update to create map
+-- node.
+--
+-- Allow to set scalar to map field and then do scalar operation
+-- on the same field.
+t = box.tuple.new({7, {a = 1, b = 1}, 11})
+t:update({{'+', '[2].a', 1}, {'=', '[2].b', 2}, {'+', '[2].b', 2}})
+-- Allow to set map/array to map field and then do update inside it.
+t:update({{'+', '[2].a', 1}, {'=', '[2].b', {x = 2}}, {'+', '[2].b.x', 2}})
+t:update({{'+', '[2].a', 1}, {'=', '[2].b', {x = 2}}, {'!', '[2].b.y', 3}})
+t:update({{'+', '[2].a', 1}, {'=', '[2].b', {x = 2, y = 3}}, {'#', '[2].b.y', 1}})
+t:update({{'+', '[2].a', 1}, {'=', '[2].b', {x = 2, y = 3}}, {'=', '[2].b.y', 4}})
+-- Allow to set scalar to array field and then do scalar operation
+-- on the same field.
+t = box.tuple.new({7, 11})
+t:update({{'!', 2, 2}, {'+', 2, 2}})
+-- Allow to set map/array to array field and then do update inside it.
+t:update({{'!', 2, {a = 2}}, {'+', '[2].a', 2}})
+t:update({{'!', 2, {a = 2}}, {'!', '[2].b', 3}})
+t:update({{'!', 2, {a = 2, b = 3}}, {'#', '[2].b', 1}})
+t:update({{'!', 2, {a = 2, b = 3}}, {'=', '[2].b', 4}})
+--
+-- Below first update will become a bar so we need second update to create map
+-- node.
+--
+-- Allow to set scalar to map field and then do scalar operation
+-- on the same field.
+t = box.tuple.new({7, {a = 1}, 11})
+t:update({{'+', '[2].a', 1}, {'!', '[2].b', 2}, {'+', '[2].b', 2}})
+-- Allow to set map/array to map field and then do update inside it.
+t:update({{'+', '[2].a', 1}, {'!', '[2].b', {x = 2}}, {'+', '[2].b.x', 2}})
+t:update({{'+', '[2].a', 1}, {'!', '[2].b', {x = 2}}, {'!', '[2].b.y', 3}})
+t:update({{'+', '[2].a', 1}, {'!', '[2].b', {x = 2, y = 3}}, {'#', '[2].b.y', 1}})
+t:update({{'+', '[2].a', 1}, {'!', '[2].b', {x = 2, y = 3}}, {'=', '[2].b.y', 4}})

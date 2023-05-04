@@ -53,10 +53,9 @@ struct xrow_update_map_item {
 	struct xrow_update_field field;
 	/** Link in the list of updated map keys. */
 	struct stailq_entry in_items;
-	/**
-	 * Size in bytes of unchanged tail data. It goes right
-	 * after @a field.data.
-	 */
+	/** Pointer to unchanged tail data. */
+	const char *tail_data;
+	/** Size in bytes of unchanged tail data. */
 	uint32_t tail_size;
 };
 
@@ -78,7 +77,8 @@ xrow_update_map_create_item(struct xrow_update_field *field,
 	item->key_len = key_len;
 	item->field.type = type;
 	item->field.data = data;
-	item->field.size = data_size,
+	item->field.size = data_size;
+	item->tail_data = data + data_size;
 	item->tail_size = tail_size;
 	/*
 	 * Each time a new item it created it is stored in the
@@ -143,7 +143,7 @@ xrow_update_map_extract_opt_item(struct xrow_update_field *field,
 	uint32_t key_len, i_tail_size;
 	const char *pos, *key, *end, *tmp, *begin;
 	stailq_foreach_entry(i, items, in_items) {
-		begin = i->field.data + i->field.size;
+		begin = i->tail_data;
 		pos = begin;
 		end = begin + i->tail_size;
 		i_tail_size = 0;
@@ -178,6 +178,7 @@ key_is_found:
 		i->key_len = op->key_len;
 		i->field.data = pos;
 		i->field.size = tmp - pos;
+		i->tail_data = tmp;
 		i->tail_size = end - tmp;
 		new_item = i;
 	} else {
@@ -246,10 +247,9 @@ xrow_update_op_do_map_set(struct xrow_update_op *op,
 		return xrow_update_op_do_field_set(op, &item->field);
 	}
 	if (item != NULL) {
-		op->new_field_len = op->arg.set.length;
-		/* Ignore the previous op, if any. */
-		item->field.type = XUPDATE_SCALAR;
-		item->field.scalar.op = op;
+		item->field.type = XUPDATE_NOP;
+		item->field.data = op->arg.set.value;
+		item->field.size = op->arg.set.length;
 		return 0;
 	}
 	++field->map.size;
@@ -293,7 +293,6 @@ xrow_update_op_do_map_delete(struct xrow_update_op *op,
 	 */
 	item->key = NULL;
 	item->key_len = 0;
-	item->field.data += item->field.size;
 	item->field.size = 0;
 	item->field.type = XUPDATE_NOP;
 	--field->map.size;
@@ -454,7 +453,7 @@ xrow_update_map_store(struct xrow_update_field *field,
 		}
 	}
 	stailq_foreach_entry(i, &field->map.items, in_items) {
-		memcpy(out, i->field.data + i->field.size, i->tail_size);
+		memcpy(out, i->tail_data, i->tail_size);
 		out += i->tail_size;
 	}
 	assert(out <= out_end);
