@@ -50,7 +50,7 @@ test_iproto_constants()
 	 * accessed by an index out of the range
 	 * [0, IPROTO_KEY_MAX).
 	 */
-	for (int i = 0; i < IPROTO_KEY_MAX; ++i)
+	for (int i = 0; i < iproto_key_MAX; ++i)
 		(void) iproto_key_name((enum iproto_key) i);
 
 	/* Same for iproto_type. */
