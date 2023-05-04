@@ -185,7 +185,7 @@ enum iproto_key {
 	 * 0x7f, and we rely on this in some places by allocating a uint8_t to
 	 * hold a msgpack-encoded key value.
 	 */
-	IPROTO_KEY_MAX
+	iproto_key_MAX
 };
 
 /**
@@ -224,7 +224,7 @@ iproto_key_bit(unsigned char key)
 	return 1ULL << key;
 }
 
-extern const unsigned char iproto_key_type[IPROTO_KEY_MAX];
+extern const unsigned char iproto_key_type[iproto_key_MAX];
 
 /**
  * IPROTO command codes.
@@ -427,7 +427,7 @@ static inline const char *
 iproto_key_name(enum iproto_key key)
 {
 	extern const char *iproto_key_strs[];
-	if (key >= IPROTO_KEY_MAX)
+	if (key >= iproto_key_MAX)
 		return NULL;
 	return iproto_key_strs[key];
 }
