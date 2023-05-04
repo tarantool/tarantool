@@ -72,6 +72,7 @@ replica_join_cancel(struct cord *replica_join_cord);
 enum {
 	OBJSIZE_MIN = 16,
 	SLAB_SIZE = 16 * 1024 * 1024,
+	MIN_MEMORY_QUOTA = SLAB_SIZE * 4,
 	MAX_TUPLE_SIZE = 1 * 1024 * 1024,
 };
 
@@ -1464,6 +1465,31 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	if (memtx->gc_fiber == NULL)
 		goto fail;
 
+	/*
+	 * Currently we have two quota consumers: tuple and index allocators.
+	 * The first one uses either SystemAlloc or memtx->slab_cache (in case
+	 * of "system" and "small" allocator respectively), the second one uses
+	 * the memtx->index_slab_cache.
+	 *
+	 * In "small" allocator mode the quota smaller than SLAB_SIZE * 2 will
+	 * be exceeded on the first tuple insertion because both slab_cache and
+	 * index_slab_cache will request a new SLAB_SIZE-sized slab from the
+	 * memtx->arena on the DDL operation. SLAB_SIZE * 2 is also enough for
+	 * bootstrap.snap, but this is a subject to change. All the information
+	 * is given with assumption SLAB_SIZE > MAX_TUPLE_SIZE + `new tuple
+	 * allocation overhead`.
+	 *
+	 * In "system" allocator mode the required amount of memory for
+	 * performing the first insert equals to SLAB_SIZE + `the size required
+	 * to store the tuple including MemtxAllocator<SystemAlloc> overhead`.
+	 *
+	 * To avoid unnecessary complexity of the code we have introduced a
+	 * lower bound of memtx memory we request in any case. The check is not
+	 * 100% future-proof, but it's not very important so we keep it simple.
+	 */
+	if (tuple_arena_max_size < MIN_MEMORY_QUOTA)
+		tuple_arena_max_size = MIN_MEMORY_QUOTA;
+
 	/* Apply lowest allowed objsize bound. */
 	if (objsize_min < OBJSIZE_MIN)
 		objsize_min = OBJSIZE_MIN;
@@ -1622,6 +1648,9 @@ memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit)
 int
 memtx_engine_set_memory(struct memtx_engine *memtx, size_t size)
 {
+	if (size < MIN_MEMORY_QUOTA)
+		size = MIN_MEMORY_QUOTA;
+
 	if (size < quota_total(&memtx->quota)) {
 		diag_set(ClientError, ER_CFG, "memtx_memory",
 			 "cannot decrease memory size at runtime");
