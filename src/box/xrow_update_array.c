@@ -84,6 +84,8 @@ xrow_update_op_adjust_field_no(struct xrow_update_op *op, int32_t field_count)
 struct xrow_update_array_item {
 	/** First field in the range, contains an update. */
 	struct xrow_update_field field;
+	/** Pointer to other fields in the range. */
+	const char *tail_data;
 	/** Size of other fields in the range. */
 	uint32_t tail_size;
 };
@@ -97,6 +99,7 @@ xrow_update_array_item_create(struct xrow_update_array_item *item,
 	item->field.type = type;
 	item->field.data = data;
 	item->field.size = size;
+	item->tail_data = data + size;
 	item->tail_size = tail_size;
 }
 
@@ -118,14 +121,13 @@ xrow_update_array_item_split(struct region *region,
 		xrow_update_alloc(region, sizeof(*next));
 	assert(offset > 0 && prev->tail_size > 0);
 
-	const char *tail = prev->field.data + prev->field.size;
-	const char *field = tail;
-	const char *range_end = tail + prev->tail_size;
+	const char *field = prev->tail_data;
+	const char *range_end = prev->tail_data + prev->tail_size;
 
 	for (uint32_t i = 1; i < offset; ++i)
 		mp_next(&field);
 
-	prev->tail_size = field - tail;
+	prev->tail_size = field - prev->tail_data;
 	const char *field_end = field;
 	mp_next(&field_end);
 	xrow_update_array_item_create(next, XUPDATE_NOP, field,
@@ -270,8 +272,7 @@ xrow_update_array_store(struct xrow_update_field *field,
 			out += xrow_update_field_store(&item->field, NULL, NULL,
 						       out, out_end);
 			assert(item->tail_size == 0 || field_count > 1);
-			memcpy(out, item->field.data + item->field.size,
-			       item->tail_size);
+			memcpy(out, item->tail_data, item->tail_size);
 			out += item->tail_size;
 			total_field_count += field_count;
 		}
@@ -288,8 +289,7 @@ xrow_update_array_store(struct xrow_update_field *field,
 			out += xrow_update_field_store(&item->field, format_tree,
 						       next_node, out, out_end);
 			assert(item->tail_size == 0 || field_count > 1);
-			memcpy(out, item->field.data + item->field.size,
-			       item->tail_size);
+			memcpy(out, item->tail_data, item->tail_size);
 			out += item->tail_size;
 			token.num += field_count;
 			total_field_count += field_count;
@@ -400,15 +400,9 @@ xrow_update_op_do_array_set(struct xrow_update_op *op,
 		op->is_token_consumed = true;
 		return xrow_update_op_do_field_set(op, &item->field);
 	}
-	op->new_field_len = op->arg.set.length;
-	/*
-	 * Ignore the previous op, if any. It is not correct,
-	 * strictly speaking, since only one update is allowed per
-	 * field. But it was allowed since the beginning, and
-	 * should be supported now for compatibility.
-	 */
-	item->field.type = XUPDATE_SCALAR;
-	item->field.scalar.op = op;
+	item->field.type = XUPDATE_NOP;
+	item->field.data = op->arg.set.value;
+	item->field.size = op->arg.set.length;
 	return 0;
 }
 
