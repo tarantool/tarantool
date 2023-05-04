@@ -140,7 +140,7 @@ test_run:cmd("switch test")
 ...
 box.slab.info().quota_size
 ---
-- 50331648
+- 67108864
 ...
 s = box.schema.space.create('test')
 ---
@@ -156,7 +156,7 @@ pad = string.rep('x', 100 * 1024)
 ...
 for i = 1, count do s:replace{i, pad} end -- error: not enough memory
 ---
-- error: Failed to allocate 102417 bytes in slab allocator for memtx_tuple
+- error: Failed to allocate 102418 bytes in slab allocator for memtx_tuple
 ...
 s:count() < count
 ---
