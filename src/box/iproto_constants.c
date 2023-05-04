@@ -30,7 +30,7 @@
  */
 #include "iproto_constants.h"
 
-const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
+const unsigned char iproto_key_type[iproto_key_MAX] =
 {
 	/* {{{ header */
 		/* 0x00 */	MP_UINT,   /* IPROTO_REQUEST_TYPE */
@@ -198,7 +198,7 @@ const uint64_t iproto_body_key_map[IPROTO_TYPE_STAT_MAX] = {
 };
 #undef bit
 
-const char *iproto_key_strs[IPROTO_KEY_MAX] = {
+const char *iproto_key_strs[iproto_key_MAX] = {
 	"type",             /* 0x00 */
 	"sync",             /* 0x01 */
 	"replica id",       /* 0x02 */
