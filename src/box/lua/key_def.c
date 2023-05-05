@@ -397,7 +397,7 @@ luaT_key_def_merge(struct lua_State *L, int idx_a, int idx_b)
 	if (new_key_def == NULL)
 		return luaT_error(L);
 
-	luaT_push_key_def(L, new_key_def);
+	luaT_push_key_def_nodup(L, new_key_def);
 	return 1;
 }
 
@@ -522,7 +522,7 @@ lbox_key_def_new(struct lua_State *L)
 	 */
 	key_def_update_optionality(key_def, 0);
 
-	luaT_push_key_def(L, key_def);
+	luaT_push_key_def_nodup(L, key_def);
 	return 1;
 }
 
