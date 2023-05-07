@@ -290,8 +290,8 @@ if (ENABLE_BUNDLED_MSGPUCK)
 endif ()
 
 create_unit_test(PREFIX mp_print_unknown_ext
-                 SOURCES mp_print_unknown_ext.c
-                 LIBRARIES core unit box core
+                 SOURCES mp_print_unknown_ext.c core_test_utils.c
+                 LIBRARIES unit core server box
 )
 
 create_unit_test(PREFIX guava

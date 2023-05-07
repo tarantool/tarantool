@@ -32,6 +32,7 @@
 /**
  * Mock function to resolve circular dependencies in unit tests
  */
-void cord_on_yield(void)
+void __attribute__((weak))
+cord_on_yield(void)
 {
 }
