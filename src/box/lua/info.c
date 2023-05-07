@@ -46,7 +46,6 @@
 #include "box/engine.h"
 #include "box/vinyl.h"
 #include "box/sql_stmt_cache.h"
-#include "main.h"
 #include "version.h"
 #include "box/box.h"
 #include "box/raft.h"

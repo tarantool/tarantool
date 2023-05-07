@@ -92,6 +92,28 @@ extern double txn_timeout_default;
 extern const char *box_ballot_event_key;
 
 /**
+ * Path to Tarantool binary of the process.
+ */
+extern char tarantool_path[];
+
+/**
+ * Application start time on monotonic clocks.
+ */
+extern long tarantool_start_time;
+
+double
+tarantool_uptime(void);
+
+/* The type of sigint callback's pointer. */
+struct ev_loop;
+struct ev_signal;
+typedef void
+(*sigint_cb_t)(struct ev_loop *loop, struct ev_signal *w, int revents);
+
+sigint_cb_t __attribute__((weak))
+set_sigint_cb(sigint_cb_t new_sigint_cb);
+
+/**
  * UUID of the node this instance considers the bootstrap leader. Is broadcast
  * to replicas via the ballot and influences the replica's choice of the
  * bootstrap leader.
@@ -103,7 +125,7 @@ extern struct tt_uuid bootstrap_leader_uuid;
  * @throws C++ exception
  */
 void
-box_init(void);
+box_init(const char *tarantool_bin);
 
 /**
  * Cleanup box library
