@@ -90,27 +90,26 @@ static struct iproto_features NETBOX_IPROTO_FEATURES;
 
 enum netbox_method {
 	NETBOX_PING        = 0,
-	NETBOX_CALL_16     = 1,
-	NETBOX_CALL_17     = 2,
-	NETBOX_EVAL        = 3,
-	NETBOX_INSERT      = 4,
-	NETBOX_REPLACE     = 5,
-	NETBOX_DELETE      = 6,
-	NETBOX_UPDATE      = 7,
-	NETBOX_UPSERT      = 8,
-	NETBOX_SELECT      = 9,
-	NETBOX_EXECUTE     = 10,
-	NETBOX_PREPARE     = 11,
-	NETBOX_UNPREPARE   = 12,
-	NETBOX_GET         = 13,
-	NETBOX_MIN         = 14,
-	NETBOX_MAX         = 15,
-	NETBOX_COUNT       = 16,
-	NETBOX_BEGIN       = 17,
-	NETBOX_COMMIT      = 18,
-	NETBOX_ROLLBACK    = 19,
-	NETBOX_SELECT_WITH_POS = 20,
-	NETBOX_INJECT      = 21,
+	NETBOX_CALL        = 1,
+	NETBOX_EVAL        = 2,
+	NETBOX_INSERT      = 3,
+	NETBOX_REPLACE     = 4,
+	NETBOX_DELETE      = 5,
+	NETBOX_UPDATE      = 6,
+	NETBOX_UPSERT      = 7,
+	NETBOX_SELECT      = 8,
+	NETBOX_EXECUTE     = 9,
+	NETBOX_PREPARE     = 10,
+	NETBOX_UNPREPARE   = 11,
+	NETBOX_GET         = 12,
+	NETBOX_MIN         = 13,
+	NETBOX_MAX         = 14,
+	NETBOX_COUNT       = 15,
+	NETBOX_BEGIN       = 16,
+	NETBOX_COMMIT      = 17,
+	NETBOX_ROLLBACK    = 18,
+	NETBOX_SELECT_WITH_POS = 19,
+	NETBOX_INJECT      = 20,
 	netbox_method_MAX
 };
 
@@ -739,11 +738,11 @@ netbox_encode_select_all(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
 }
 
 static void
-netbox_encode_call_impl(lua_State *L, int idx, struct mpstream *stream,
-			uint64_t sync, enum iproto_type type, uint64_t stream_id)
+netbox_encode_call(lua_State *L, int idx, struct mpstream *stream,
+		   uint64_t sync, uint64_t stream_id)
 {
 	/* Lua stack at idx: function_name, args */
-	size_t svp = netbox_begin_encode(stream, sync, type, stream_id);
+	size_t svp = netbox_begin_encode(stream, sync, IPROTO_CALL, stream_id);
 
 	mpstream_encode_map(stream, 2);
 
@@ -758,21 +757,6 @@ netbox_encode_call_impl(lua_State *L, int idx, struct mpstream *stream,
 	luamp_encode_tuple(L, cfg, stream, idx + 1);
 
 	netbox_end_encode(stream, svp);
-}
-
-static void
-netbox_encode_call_16(lua_State *L, int idx, struct mpstream *stream,
-		      uint64_t sync, uint64_t stream_id)
-{
-	netbox_encode_call_impl(L, idx, stream, sync,
-				IPROTO_CALL_16, stream_id);
-}
-
-static void
-netbox_encode_call(lua_State *L, int idx, struct mpstream *stream,
-		   uint64_t sync, uint64_t stream_id)
-{
-	netbox_encode_call_impl(L, idx, stream, sync, IPROTO_CALL, stream_id);
 }
 
 static void
@@ -1326,8 +1310,7 @@ netbox_encode_method(struct lua_State *L, int idx, enum netbox_method method,
 					 uint64_t sync, uint64_t stream_id);
 	static method_encoder_f method_encoder[] = {
 		[NETBOX_PING]		= netbox_encode_ping,
-		[NETBOX_CALL_16]	= netbox_encode_call_16,
-		[NETBOX_CALL_17]	= netbox_encode_call,
+		[NETBOX_CALL]		= netbox_encode_call,
 		[NETBOX_EVAL]		= netbox_encode_eval,
 		[NETBOX_INSERT]		= netbox_encode_insert,
 		[NETBOX_REPLACE]	= netbox_encode_replace,
@@ -1805,8 +1788,7 @@ netbox_decode_method(struct lua_State *L, enum netbox_method method,
 					 struct tuple_format *format);
 	static method_decoder_f method_decoder[] = {
 		[NETBOX_PING]		= netbox_decode_nil,
-		[NETBOX_CALL_16]	= netbox_decode_select,
-		[NETBOX_CALL_17]	= netbox_decode_table,
+		[NETBOX_CALL]		= netbox_decode_table,
 		[NETBOX_EVAL]		= netbox_decode_table,
 		[NETBOX_INSERT]		= netbox_decode_tuple,
 		[NETBOX_REPLACE]	= netbox_decode_tuple,

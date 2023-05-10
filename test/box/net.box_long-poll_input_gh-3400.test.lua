@@ -18,7 +18,7 @@ c:ping()
 result = nil
 test_run:cmd("setopt delimiter ';'")
 f = fiber.create(function()
-    _, result = pcall(c._request, c, net._method.call_17,
+    _, result = pcall(c._request, c, net._method.call,
                       nil, nil, nil, 'long', {})
 end)
 pcall(c._request, c, net._method.inject, nil, nil, nil, '\x80')

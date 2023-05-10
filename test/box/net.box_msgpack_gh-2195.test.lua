@@ -3,22 +3,6 @@ test_run = require('test_run').new()
 test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 net = require('net.box')
 
--- CALL vs CALL_16 in connect options
-function echo(...) return ... end
-box.schema.user.grant('guest', 'execute', 'universe')
-c = net.connect(box.cfg.listen)
-c:call('echo', {42})
-c:eval('return echo(...)', {42})
--- invalid arguments
-c:call('echo', 42)
-c:eval('return echo(...)', 42)
-c:close()
-c = net.connect(box.cfg.listen, {call_16 = true})
-c:call('echo', 42)
-c:eval('return echo(...)', 42)
-c:close()
-box.schema.user.revoke('guest', 'execute', 'universe')
-
 --
 -- gh-2195 export pure msgpack from net.box
 --
@@ -119,6 +103,7 @@ len
 result
 
 -- call
+function echo(...) return ... end
 c:call("echo", {1, 2, 3}, {buffer = ibuf})
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result

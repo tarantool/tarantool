@@ -32,7 +32,7 @@ box.schema.func.drop('forbidden_function')
 box.session.su(user)
 
 local test = tap.test('Error marshaling')
-test:plan(21)
+test:plan(14)
 
 function error_new(...)
     return box.error.new(...)
@@ -153,24 +153,6 @@ err2 = err.prev
 test:isnt(err2, nil, 'Stack is received via iproto fields')
 test:ok(check_error(err1, checks1), "First error in the stack in iproto fields")
 test:ok(check_error(err2, checks2), "Second error in the stack in iproto fields")
-
--- Check that call_16 encodes errors in the extended format.
-local err = box.error.new(box.error.UNKNOWN)
--- luacheck: globals func
-function func() return err end
-test:is(type(c:call_16('func')[1][1]), 'cdata', 'call_16 - case 1')
-function func() return 1, err end
-test:is(type(c:call_16('func')[2][1]), 'cdata', 'call_16 - case 2')
-function func() return 1, {err} end
-test:is(type(c:call_16('func')[2][1]), 'cdata', 'call_16 - case 3')
-function func() return {err} end
-test:is(type(c:call_16('func')[1][1]), 'cdata', 'call_16 - case 4')
-function func() return {1, err} end
-test:is(type(c:call_16('func')[1][2]), 'cdata', 'call_16 - case 5')
-function func() return {{1}, err} end
-test:is(type(c:call_16('func')[2][1]), 'cdata', 'call_16 - case 6')
-function func() return {{1}, {err}} end
-test:is(type(c:call_16('func')[2][1]), 'cdata', 'call_16 - case 7')
 
 c:close()
 box.schema.user.revoke('guest', 'super')
