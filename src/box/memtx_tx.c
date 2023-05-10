@@ -3344,7 +3344,8 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 				 struct space *space)
 {
 	cleaner->ht = NULL;
-	if (space == NULL || rlist_empty(&space->memtx_stories))
+	if (rlist_empty(&space->memtx_stories) &&
+	    rlist_empty(&space->alter_stmts))
 		return;
 	struct mh_snapshot_cleaner_t *ht = mh_snapshot_cleaner_new();
 	struct memtx_story *story;
@@ -3361,7 +3362,13 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 		entry.to = clean;
 		mh_snapshot_cleaner_put(ht,  &entry, NULL, 0);
 	}
-
+	struct space_alter_stmt *alter_stmt;
+	rlist_foreach_entry(alter_stmt, &space->alter_stmts, link) {
+		struct memtx_tx_snapshot_cleaner_entry entry;
+		entry.from = alter_stmt->new_tuple;
+		entry.to = alter_stmt->old_tuple;
+		mh_snapshot_cleaner_put(ht, &entry, NULL, 0);
+	}
 	cleaner->ht = ht;
 }
 

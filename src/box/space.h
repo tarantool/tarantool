@@ -230,6 +230,17 @@ struct space {
 	 * List of all tx stories in the space.
 	 */
 	struct rlist memtx_stories;
+	/**
+	 * List of currently running long (yielding) space alter operations
+	 * triggered by statements applied to this space (see alter_space_do),
+	 * linked by space_alter_stmt::link.
+	 *
+	 * We must exclude such statements from snapshot because they haven't
+	 * reached WAL yet and may actually fail. With MVCC off, such
+	 * statements would be visible from a read view so we have to keep
+	 * track of them separately.
+	 */
+	struct rlist alter_stmts;
 	/** Space upgrade state or NULL. */
 	struct space_upgrade *upgrade;
 	/**
@@ -237,6 +248,16 @@ struct space {
 	 * (i.e. if not NULL WAL entries may contain extra fields).
 	 */
 	struct space_wal_ext *wal_ext;
+};
+
+/** Space alter statement. */
+struct space_alter_stmt {
+	/** Link in space::alter_stmts. */
+	struct rlist link;
+	/** Old tuple. */
+	struct tuple *old_tuple;
+	/** New tuple. */
+	struct tuple *new_tuple;
 };
 
 /**
