@@ -578,11 +578,8 @@ xrow_update_##type##_store(struct xrow_update_field *field,			\
  * @param data MessagePack data of the array to update.
  * @param data_end End of @a data.
  * @param field_count Field count in @data.
- *
- * @retval  0 Success.
- * @retval -1 Error.
  */
-int
+void
 xrow_update_array_create(struct xrow_update_field *field, const char *header,
 			 const char *data, const char *data_end,
 			 uint32_t field_count);
@@ -604,11 +601,8 @@ xrow_update_array_create(struct xrow_update_field *field, const char *header,
  * @param child A child subtree. The child is copied by value into
  *        the created array.
  * @param field_no Field number of @a child.
- *
- * @retval  0 Success.
- * @retval -1 Error.
  */
-int
+void
 xrow_update_array_create_with_child(struct xrow_update_field *field,
 				    const char *header,
 				    const struct xrow_update_field *child,
@@ -627,11 +621,8 @@ OP_DECL_GENERIC(array)
  * @param data MessagePack data of the map to update.
  * @param data_end End of @a data.
  * @param field_count Key-value pair count in @data.
- *
- * @retval  0 Success.
- * @retval -1 Error.
  */
-int
+void
 xrow_update_map_create(struct xrow_update_field *field, const char *header,
 		       const char *data, const char *data_end, int field_count);
 
@@ -640,7 +631,7 @@ xrow_update_map_create(struct xrow_update_field *field, const char *header,
  * exactly the same as with a similar array constructor. It allows
  * to avoid unnecessary MessagePack decoding.
  */
-int
+void
 xrow_update_map_create_with_child(struct xrow_update_field *field,
 				  const char *header,
 				  const struct xrow_update_field *child,

@@ -169,13 +169,8 @@ xrow_update_read_ops(struct xrow_update *update, const char *expr,
 
 	int size = update->op_count * sizeof(update->ops[0]);
 	update->ops = (struct xrow_update_op *)
-		region_aligned_alloc(&fiber()->gc, size,
-				     alignof(struct xrow_update_op));
-	if (update->ops == NULL) {
-		diag_set(OutOfMemory, size, "region_aligned_alloc",
-			 "update->ops");
-		return -1;
-	}
+		xregion_aligned_alloc(&fiber()->gc, size,
+				      alignof(struct xrow_update_op));
 	struct xrow_update_op *op = update->ops;
 	struct xrow_update_op *ops_end = op + update->op_count;
 	for (int i = 1; op < ops_end; op++, i++) {
@@ -296,9 +291,8 @@ xrow_update_do_ops(struct xrow_update *update, const char *header,
 		   const char *old_data, const char *old_data_end,
 		   uint32_t part_count)
 {
-	if (xrow_update_array_create(&update->root, header, old_data,
-				     old_data_end, part_count) != 0)
-		return -1;
+	xrow_update_array_create(&update->root, header, old_data,
+				 old_data_end, part_count);
 	struct xrow_update_op *op = update->ops;
 	struct xrow_update_op *ops_end = op + update->op_count;
 	for (; op < ops_end; op++) {
@@ -318,9 +312,8 @@ xrow_upsert_do_ops(struct xrow_update *update, const char *header,
 		   const char *old_data, const char *old_data_end,
 		   uint32_t part_count, bool suppress_error)
 {
-	if (xrow_update_array_create(&update->root, header, old_data,
-				     old_data_end, part_count) != 0)
-		return -1;
+	xrow_update_array_create(&update->root, header, old_data,
+				 old_data_end, part_count);
 	struct xrow_update_op *op = update->ops;
 	struct xrow_update_op *ops_end = op + update->op_count;
 	for (; op < ops_end; op++) {
@@ -349,11 +342,7 @@ xrow_update_finish(struct xrow_update *update, struct tuple_format *format,
 		   uint32_t *p_tuple_len)
 {
 	uint32_t tuple_len = xrow_update_array_sizeof(&update->root);
-	char *buffer = (char *) region_alloc(&fiber()->gc, tuple_len);
-	if (buffer == NULL) {
-		diag_set(OutOfMemory, tuple_len, "region_alloc", "buffer");
-		return NULL;
-	}
+	char *buffer = (char *)xregion_alloc(&fiber()->gc, tuple_len);
 	*p_tuple_len = xrow_update_array_store(&update->root, &format->fields,
 					       &format->fields.root, buffer,
 					       buffer + tuple_len);
@@ -395,11 +384,7 @@ xrow_update_execute(const char *expr,const char *expr_end,
 	if (column_mask)
 		*column_mask = update.column_mask;
 
-	const char *ret = xrow_update_finish(&update, format, p_tuple_len);
-	if (ret == NULL)
-		goto error;
-
-	return ret;
+	return xrow_update_finish(&update, format, p_tuple_len);
 
 error:
 	region_truncate(&fiber()->gc, region_svp);
