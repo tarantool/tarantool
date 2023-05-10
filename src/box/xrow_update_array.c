@@ -104,12 +104,7 @@ xrow_update_array_item_create(struct xrow_update_array_item *item,
 static inline void *
 xrow_update_alloc(struct region *region, size_t size)
 {
-	void *ptr = region_aligned_alloc(region, size, alignof(uint64_t));
-	if (ptr == NULL) {
-		diag_set(OutOfMemory, size, "region_aligned_alloc",
-			 "xrow update internals");
-	}
-	return ptr;
+	return xregion_aligned_alloc(region, size, alignof(uint64_t));
 }
 
 /** Split a range of fields in two. */
@@ -121,8 +116,6 @@ xrow_update_array_item_split(struct region *region,
 	(void) size;
 	struct xrow_update_array_item *next = (struct xrow_update_array_item *)
 		xrow_update_alloc(region, sizeof(*next));
-	if (next == NULL)
-		return NULL;
 	assert(offset > 0 && prev->tail_size > 0);
 
 	const char *tail = prev->field.data + prev->field.size;
@@ -164,7 +157,7 @@ xrow_update_array_extract_item(struct xrow_update_field *field,
 	return NULL;
 }
 
-int
+void
 xrow_update_array_create(struct xrow_update_field *field, const char *header,
 			 const char *data, const char *data_end,
 			 uint32_t field_count)
@@ -174,14 +167,11 @@ xrow_update_array_create(struct xrow_update_field *field, const char *header,
 	field->size = data_end - header;
 	struct region *region = &fiber()->gc;
 	field->array.rope = xrow_update_rope_new(region);
-	if (field->array.rope == NULL)
-		return -1;
+	assert(field->array.rope != NULL);
 	struct xrow_update_array_item *item = (struct xrow_update_array_item *)
 		xrow_update_alloc(region, sizeof(*item));
-	if (item == NULL)
-		return -1;
 	if (data == data_end)
-		return 0;
+		return;
 	/*
 	 * Initial item consists of one range - the whole array.
 	 */
@@ -189,10 +179,12 @@ xrow_update_array_create(struct xrow_update_field *field, const char *header,
 	mp_next(&data);
 	xrow_update_array_item_create(item, XUPDATE_NOP, begin, data - begin,
 				      data_end - data);
-	return xrow_update_rope_append(field->array.rope, item, field_count);
+	int rc = xrow_update_rope_append(field->array.rope, item, field_count);
+	assert(rc == 0);
+	(void)rc;
 }
 
-int
+void
 xrow_update_array_create_with_child(struct xrow_update_field *field,
 				    const char *header,
 				    const struct xrow_update_field *child,
@@ -205,12 +197,9 @@ xrow_update_array_create_with_child(struct xrow_update_field *field,
 	mp_next(&first_field_end);
 	struct region *region = &fiber()->gc;
 	struct xrow_update_rope *rope = xrow_update_rope_new(region);
-	if (rope == NULL)
-		return -1;
+	assert(rope != NULL);
 	struct xrow_update_array_item *item = (struct xrow_update_array_item *)
 		xrow_update_alloc(region, sizeof(*item));
-	if (item == NULL)
-		return -1;
 	const char *end = first_field_end;
 	if (field_no > 0) {
 		for (int32_t i = 1; i < field_no; ++i)
@@ -218,12 +207,11 @@ xrow_update_array_create_with_child(struct xrow_update_field *field,
 		xrow_update_array_item_create(item, XUPDATE_NOP, first_field,
 					      first_field_end - first_field,
 					      end - first_field_end);
-		if (xrow_update_rope_append(rope, item, field_no) != 0)
-			return -1;
+		int rc = xrow_update_rope_append(rope, item, field_no);
+		assert(rc == 0);
+		(void)rc;
 		item = (struct xrow_update_array_item *)
 			xrow_update_alloc(region, sizeof(*item));
-		if (item == NULL)
-			return -1;
 		first_field = end;
 		first_field_end = first_field;
 		mp_next(&first_field_end);
@@ -239,7 +227,9 @@ xrow_update_array_create_with_child(struct xrow_update_field *field,
 	field->data = header;
 	field->size = end - header;
 	field->array.rope = rope;
-	return xrow_update_rope_append(rope, item, field_count - field_no);
+	int rc = xrow_update_rope_append(rope, item, field_count - field_no);
+	assert(rc == 0);
+	(void)rc;
 }
 
 uint32_t
@@ -315,37 +305,33 @@ xrow_update_array_store(struct xrow_update_field *field,
  * Helper function that appends nils in the end so that op will insert
  * without gaps
  */
-static int
+static void
 xrow_update_array_append_nils(struct xrow_update_field *field,
 			      struct xrow_update_op *op)
 {
 	struct xrow_update_rope *rope = field->array.rope;
 	uint32_t size = xrow_update_rope_size(rope);
 	if (op->field_no < 0 || (uint32_t)op->field_no <= size)
-		return 0;
+		return;
 	/*
 	 * Do not allow autofill of nested arrays with nulls. It is not
 	 * supported only because there is no an easy way how to apply that to
 	 * bar updates which can also affect arrays.
 	 */
 	if (!op->is_for_root)
-		return 0;
+		return;
 	uint32_t nil_count = op->field_no - size;
 	struct xrow_update_array_item *item =
 		(struct xrow_update_array_item *)
 		xrow_update_alloc(rope->ctx, sizeof(*item));
-	if (item == NULL)
-		return -1;
 	assert(mp_sizeof_nil() == 1);
-	char *item_data = (char *)region_alloc(rope->ctx, nil_count);
-	if (item_data == NULL) {
-		diag_set(OutOfMemory, nil_count, "region", "item_data");
-		return -1;
-	}
+	char *item_data = (char *)xregion_alloc(rope->ctx, nil_count);
 	memset(item_data, 0xc0, nil_count);
 	xrow_update_array_item_create(item, XUPDATE_NOP, item_data, 1,
 				      nil_count - 1);
-	return xrow_update_rope_insert(rope, op->field_no, item, nil_count);
+	int rc = xrow_update_rope_insert(rope, op->field_no, item, nil_count);
+	assert(rc == 0);
+	(void)rc;
 }
 
 int
@@ -365,8 +351,7 @@ xrow_update_op_do_array_insert(struct xrow_update_op *op,
 		return xrow_update_op_do_field_insert(op, &item->field);
 	}
 
-	if (xrow_update_array_append_nils(field, op) != 0)
-		return -1;
+	xrow_update_array_append_nils(field, op);
 
 	struct xrow_update_rope *rope = field->array.rope;
 	uint32_t size = xrow_update_rope_size(rope);
@@ -386,11 +371,12 @@ xrow_update_op_do_array_insert(struct xrow_update_op *op,
 
 	item = (struct xrow_update_array_item *)
 		xrow_update_alloc(rope->ctx, sizeof(*item));
-	if (item == NULL)
-		return -1;
 	xrow_update_array_item_create(item, XUPDATE_NOP, op->arg.set.value,
 				      op->arg.set.length, 0);
-	return xrow_update_rope_insert(rope, op->field_no, item, 1);
+	int rc = xrow_update_rope_insert(rope, op->field_no, item, 1);
+	assert(rc == 0);
+	(void)rc;
+	return 0;
 }
 
 int
