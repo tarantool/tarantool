@@ -29,28 +29,27 @@ local E_PROC_LUA             = box.error.PROC_LUA
 
 -- Method types used internally by net.box.
 local M_PING        = 0
-local M_CALL_16     = 1
-local M_CALL_17     = 2
-local M_EVAL        = 3
-local M_INSERT      = 4
-local M_REPLACE     = 5
-local M_DELETE      = 6
-local M_UPDATE      = 7
-local M_UPSERT      = 8
-local M_SELECT      = 9
-local M_EXECUTE     = 10
-local M_PREPARE     = 11
-local M_UNPREPARE   = 12
-local M_GET         = 13
-local M_MIN         = 14
-local M_MAX         = 15
-local M_COUNT       = 16
-local M_BEGIN       = 17
-local M_COMMIT      = 18
-local M_ROLLBACK    = 19
-local M_SELECT_FETCH_POS  = 20
+local M_CALL        = 1
+local M_EVAL        = 2
+local M_INSERT      = 3
+local M_REPLACE     = 4
+local M_DELETE      = 5
+local M_UPDATE      = 6
+local M_UPSERT      = 7
+local M_SELECT      = 8
+local M_EXECUTE     = 9
+local M_PREPARE     = 10
+local M_UNPREPARE   = 11
+local M_GET         = 12
+local M_MIN         = 13
+local M_MAX         = 14
+local M_COUNT       = 15
+local M_BEGIN       = 16
+local M_COMMIT      = 17
+local M_ROLLBACK    = 18
+local M_SELECT_FETCH_POS  = 19
 -- Injects raw data into connection. Used by tests.
-local M_INJECT      = 21
+local M_INJECT      = 20
 
 -- IPROTO feature id -> name
 local IPROTO_FEATURE_NAMES = {
@@ -92,7 +91,6 @@ local CONNECT_OPTION_TYPES = {
     password                    = "string",
     wait_connected              = "number, boolean",
     reconnect_after             = "number",
-    call_16                     = "boolean",
     console                     = "boolean",
     connect_timeout             = "number",
     fetch_schema                = "boolean",
@@ -416,10 +414,6 @@ local function new_sm(uri, opts)
         setmetatable(remote, remote_mt)
         remote._space_mt = space_metatable(remote)
         remote._index_mt = index_metatable(remote)
-        if opts.call_16 then
-            remote.call = remote.call_16
-            remote.eval = remote.eval_16
-        end
     end
     remote._on_schema_reload = trigger.new("on_schema_reload")
     remote._on_shutdown = trigger.new("on_shutdown")
@@ -848,31 +842,17 @@ function remote_methods:reload_schema()
     self:ping()
 end
 
--- @deprecated since 1.7.4
-function remote_methods:call_16(func_name, ...)
-    check_remote_arg(self, 'call')
-    return (self:_request(M_CALL_16, nil, nil, self._stream_id,
-                          tostring(func_name), {...}))
-end
-
 function remote_methods:call(func_name, args, opts)
     check_remote_arg(self, 'call')
     check_call_args(args)
     check_param_table(opts, REQUEST_OPTION_TYPES)
     args = args or {}
-    local res = self:_request(M_CALL_17, opts, nil, self._stream_id,
+    local res = self:_request(M_CALL, opts, nil, self._stream_id,
                               tostring(func_name), args)
     if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
     return unpack(res)
-end
-
--- @deprecated since 1.7.4
-function remote_methods:eval_16(code, ...)
-    check_remote_arg(self, 'eval')
-    return unpack((self:_request(M_EVAL, nil, nil, self._stream_id,
-                                 code, {...})))
 end
 
 function remote_methods:eval(code, args, opts)
@@ -1233,8 +1213,7 @@ this_module = {
     new = connect, -- Tarantool < 1.7.1 compatibility,
     _method = { -- for tests
         ping        = M_PING,
-        call_16     = M_CALL_16,
-        call_17     = M_CALL_17,
+        call        = M_CALL,
         eval        = M_EVAL,
         insert      = M_INSERT,
         replace     = M_REPLACE,

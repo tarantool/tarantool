@@ -29,14 +29,12 @@ g.test_autocomplete = function()
     -- connection should provide all functions available
     local r = tabcomplete('conn1:')
     t.assert_items_equals(r, {'conn1:',
-                              'conn1:eval_16(',
                               'conn1:call(',
                               'conn1:reload_schema(',
                               'conn1:on_disconnect(',
                               'conn1:on_shutdown(',
                               'conn1:wait_connected(',
                               'conn1:watch(',
-                              'conn1:call_16(',
                               'conn1:execute(',
                               'conn1:wait_state(',
                               'conn1:ping(',

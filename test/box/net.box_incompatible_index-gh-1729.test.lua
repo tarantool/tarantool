@@ -15,19 +15,3 @@ c.space.test.index.primary.parts
 c.space.test.index.covering.parts
 
 box.space.test:drop()
-
--- CALL vs CALL_16 in connect options
-function echo(...) return ... end
-box.schema.user.grant('guest', 'execute', 'universe')
-c = net.connect(box.cfg.listen)
-c:call('echo', {42})
-c:eval('return echo(...)', {42})
--- invalid arguments
-c:call('echo', 42)
-c:eval('return echo(...)', 42)
-c:close()
-c = net.connect(box.cfg.listen, {call_16 = true})
-c:call('echo', 42)
-c:eval('return echo(...)', 42)
-c:close()
-box.schema.user.revoke('guest', 'execute', 'universe')
