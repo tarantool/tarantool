@@ -63,12 +63,7 @@ struct xrow_update_map_item {
 static inline struct xrow_update_map_item *
 xrow_update_map_item_alloc(void)
 {
-	size_t size;
-	struct xrow_update_map_item *item =
-		region_alloc_object(&fiber()->gc, typeof(*item), &size);
-	if (item == NULL)
-		diag_set(OutOfMemory, size, "region_alloc_object", "item");
-	return item;
+	return xregion_alloc_object(&fiber()->gc, struct xrow_update_map_item);
 }
 
 static void
@@ -102,10 +97,8 @@ xrow_update_map_new_item(struct xrow_update_field *field,
 			 uint32_t tail_size)
 {
 	struct xrow_update_map_item *item = xrow_update_map_item_alloc();
-	if (item != NULL) {
-		xrow_update_map_create_item(field, item, type, key, key_len,
-					    data, data_size, tail_size);
-	}
+	xrow_update_map_create_item(field, item, type, key, key_len,
+				    data, data_size, tail_size);
 	return item;
 }
 
@@ -191,8 +184,6 @@ key_is_found:
 		new_item = xrow_update_map_new_item(field, XUPDATE_NOP, op->key,
 						    op->key_len, pos, tmp - pos,
 						    end - tmp);
-		if (new_item == NULL)
-			return -1;
 		i->tail_size = i_tail_size;
 	}
 	*res = new_item;
@@ -237,7 +228,7 @@ xrow_update_op_do_map_insert(struct xrow_update_op *op,
 	item = xrow_update_map_new_item(field, XUPDATE_NOP, op->key,
 					op->key_len, op->arg.set.value,
 					op->arg.set.length, 0);
-	return item != NULL ? 0 : -1;
+	return 0;
 }
 
 int
@@ -265,7 +256,7 @@ xrow_update_op_do_map_set(struct xrow_update_op *op,
 	item = xrow_update_map_new_item(field, XUPDATE_NOP, op->key,
 					op->key_len, op->arg.set.value,
 					op->arg.set.length, 0);
-	return item != NULL ? 0 : -1;
+	return 0;
 }
 
 int
@@ -338,7 +329,7 @@ DO_SCALAR_OP_GENERIC(bit)
 
 DO_SCALAR_OP_GENERIC(splice)
 
-int
+void
 xrow_update_map_create(struct xrow_update_field *field, const char *header,
 		       const char *data, const char *data_end, int field_count)
 {
@@ -348,14 +339,12 @@ xrow_update_map_create(struct xrow_update_field *field, const char *header,
 	field->map.size = field_count;
 	stailq_create(&field->map.items);
 	if (field_count == 0)
-		return 0;
-	struct xrow_update_map_item *first =
-		xrow_update_map_new_item(field, XUPDATE_NOP, NULL, 0, data, 0,
-					 data_end - data);
-	return first != NULL ? 0 : -1;
+		return;
+	xrow_update_map_new_item(field, XUPDATE_NOP, NULL, 0, data, 0,
+				 data_end - data);
 }
 
-int
+void
 xrow_update_map_create_with_child(struct xrow_update_field *field,
 				  const char *header,
 				  const struct xrow_update_field *child,
@@ -381,8 +370,6 @@ xrow_update_map_create_with_child(struct xrow_update_field *field,
 			item = xrow_update_map_new_item(field, XUPDATE_NOP,
 							NULL, 0, begin, 0,
 							before_key - begin);
-			if (item == NULL)
-				return -1;
 			++i;
 			break;
 		}
@@ -402,14 +389,11 @@ xrow_update_map_create_with_child(struct xrow_update_field *field,
 		mp_next(&pos);
 	}
 	item = xrow_update_map_item_alloc();
-	if (item == NULL)
-		return -1;
 	item->field = *child;
 	xrow_update_map_create_item(field, item, child->type, key, key_len,
 				    data, data_size, pos - data - data_size);
 	field->map.size = field_count;
 	field->size = pos - header;
-	return 0;
 }
 
 uint32_t
