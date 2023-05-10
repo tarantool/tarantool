@@ -903,6 +903,13 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 static void
 alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 {
+	struct space_alter_stmt alter_stmt;
+	alter_stmt.old_tuple = stmt->old_tuple;
+	alter_stmt.new_tuple = stmt->new_tuple;
+	rlist_add_entry(&stmt->space->alter_stmts, &alter_stmt, link);
+	auto alter_stmt_guard = make_scoped_guard([&] {
+		rlist_del_entry(&alter_stmt, link);
+	});
 	/**
 	 * AlterSpaceOp::prepare() may perform a potentially long
 	 * lasting operation that may yield, e.g. building of a new
