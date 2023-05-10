@@ -3198,7 +3198,12 @@ expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
 			return;
 		}
 	}
-	if (is_neg)
+
+	/*
+	 * We don't need to negate INT64_MIN value because it's negation is
+	 * equal to it.
+	 */
+	if (is_neg && value != INT64_MIN)
 		value = -value;
 	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, mem, 0, (u8 *) &value,
 			  is_neg ? P4_INT64 : P4_UINT64);
