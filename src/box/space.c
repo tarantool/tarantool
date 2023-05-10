@@ -330,6 +330,7 @@ space_create(struct space *space, struct engine *engine,
 	}
 	space->constraint_ids = mh_strnptr_new();
 	rlist_create(&space->memtx_stories);
+	rlist_create(&space->alter_stmts);
 	return 0;
 
 fail_free_indexes:
@@ -389,6 +390,7 @@ space_new_ephemeral(struct space_def *def, struct rlist *key_list)
 void
 space_delete(struct space *space)
 {
+	assert(rlist_empty(&space->alter_stmts));
 	memtx_tx_on_space_delete(space);
 	for (uint32_t j = 0; j <= space->index_id_max; j++) {
 		struct index *index = space->index_map[j];
