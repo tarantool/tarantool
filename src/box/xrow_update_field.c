@@ -104,6 +104,37 @@ xrow_update_err(const struct xrow_update_op *op, const char *reason)
 
 /* }}} Error helpers. */
 
+/**
+ * Return size of the string in bytes.
+ */
+static int
+xrow_update_string_size(const struct xrow_update_string *str)
+{
+	uint32_t length = 0;
+	for (size_t i = 0; i < lengthof(str->array); i++)
+		length += str->array[i].length;
+	return length;
+}
+
+/**
+ * Return whether scalar is number or not.
+ */
+static bool
+xrow_update_scalar_is_number(const struct xrow_update_scalar *scalar)
+{
+	switch (scalar->type) {
+	case XUPDATE_TYPE_DECIMAL:
+	case XUPDATE_TYPE_DOUBLE:
+	case XUPDATE_TYPE_FLOAT:
+	case XUPDATE_TYPE_INT:
+		return true;
+	case XUPDATE_TYPE_NONE:
+	case XUPDATE_TYPE_STR:
+	default:
+		return false;
+	}
+}
+
 uint32_t
 xrow_update_field_sizeof(struct xrow_update_field *field)
 {
@@ -111,7 +142,7 @@ xrow_update_field_sizeof(struct xrow_update_field *field)
 	case XUPDATE_NOP:
 		return field->size;
 	case XUPDATE_SCALAR:
-		return field->scalar.op->new_field_len;
+		return xrow_update_scalar_sizeof(&field->scalar);
 	case XUPDATE_ARRAY:
 		return xrow_update_array_sizeof(field);
 	case XUPDATE_BAR:
@@ -131,17 +162,14 @@ xrow_update_field_store(struct xrow_update_field *field,
 			struct json_tree *format_tree,
 			struct json_token *this_node, char *out, char *out_end)
 {
-	struct xrow_update_op *op;
 	switch(field->type) {
 	case XUPDATE_NOP:
 		assert(out_end - out >= field->size);
 		memcpy(out, field->data, field->size);
 		return field->size;
 	case XUPDATE_SCALAR:
-		op = field->scalar.op;
-		assert(out_end - out >= op->new_field_len);
-		return op->meta->store(op, format_tree, this_node, field->data,
-				       out);
+		return xrow_update_store_scalar(&field->scalar, this_node, out,
+						out_end);
 	case XUPDATE_ARRAY:
 		return xrow_update_array_store(field, format_tree, this_node,
 					       out, out_end);
@@ -182,9 +210,9 @@ xrow_update_mp_read_uint(struct xrow_update_op *op, const char **expr,
 	return xrow_update_err_arg_type(op, "a positive integer");
 }
 
-int
-xrow_mp_read_arg_arith(struct xrow_update_op *op, const char **expr,
-		       struct xrow_update_arg_arith *ret)
+void
+xrow_update_mp_read_scalar(const char **expr,
+			   struct xrow_update_scalar *ret)
 {
 	int8_t ext_type;
 	uint32_t len;
@@ -192,29 +220,36 @@ xrow_mp_read_arg_arith(struct xrow_update_op *op, const char **expr,
 	case MP_UINT:
 		ret->type = XUPDATE_TYPE_INT;
 		int96_set_unsigned(&ret->int96, mp_decode_uint(expr));
-		return 0;
+		break;
 	case MP_INT:
 		ret->type = XUPDATE_TYPE_INT;
 		int96_set_signed(&ret->int96, mp_decode_int(expr));
-		return 0;
+		break;
 	case MP_DOUBLE:
 		ret->type = XUPDATE_TYPE_DOUBLE;
 		ret->dbl = mp_decode_double(expr);
-		return 0;
+		break;
 	case MP_FLOAT:
 		ret->type = XUPDATE_TYPE_FLOAT;
 		ret->flt = mp_decode_float(expr);
-		return 0;
+		break;
+	case MP_STR: {
+		ret->type = XUPDATE_TYPE_STR;
+		struct xrow_update_string *str = &ret->str;
+		str->array[0].data = mp_decode_str(expr, &str->array[0].length);
+		memset(&str->array[1], 0, sizeof(str->array[1]) * 2);
+		break;
+		}
 	case MP_EXT:
 		len = mp_decode_extl(expr, &ext_type);
 		if (ext_type == MP_DECIMAL) {
 			ret->type = XUPDATE_TYPE_DECIMAL;
 			decimal_unpack(expr, len, &ret->dec);
-			return 0;
+			break;
 		}
 		FALLTHROUGH;
 	default:
-		return xrow_update_err_arg_type(op, "a number");
+		ret->type = XUPDATE_TYPE_NONE;
 	}
 }
 
@@ -263,7 +298,10 @@ xrow_update_read_arg_arith(struct xrow_update_op *op, const char **expr,
 			   int index_base)
 {
 	(void) index_base;
-	return xrow_mp_read_arg_arith(op, expr, &op->arg.arith);
+	xrow_update_mp_read_scalar(expr, &op->arg.arith.value);
+	if (!xrow_update_scalar_is_number(&op->arg.arith.value))
+		return xrow_update_err_arg_type(op, "a number");
+	return 0;
 }
 
 static int
@@ -296,102 +334,133 @@ xrow_update_read_arg_splice(struct xrow_update_op *op, const char **expr,
 
 /* {{{ do_op helpers. */
 
+/**
+ * Convert scalar to double.
+ */
 static inline double
-xrow_update_arg_arith_to_double(struct xrow_update_arg_arith arg)
+xrow_update_scalar_to_double(const struct xrow_update_scalar *scalar)
 {
-	if (arg.type == XUPDATE_TYPE_DOUBLE) {
-		return arg.dbl;
-	} else if (arg.type == XUPDATE_TYPE_FLOAT) {
-		return arg.flt;
-	} else {
-		assert(arg.type == XUPDATE_TYPE_INT);
-		if (int96_is_uint64(&arg.int96)) {
-			return int96_extract_uint64(&arg.int96);
+	switch (scalar->type) {
+	case XUPDATE_TYPE_DOUBLE:
+		return scalar->dbl;
+	case XUPDATE_TYPE_FLOAT:
+		return scalar->flt;
+	case XUPDATE_TYPE_INT:
+		if (int96_is_uint64(&scalar->int96)) {
+			return int96_extract_uint64(&scalar->int96);
 		} else {
-			assert(int96_is_neg_int64(&arg.int96));
-			return int96_extract_neg_int64(&arg.int96);
+			assert(int96_is_neg_int64(&scalar->int96));
+			return int96_extract_neg_int64(&scalar->int96);
 		}
+	case XUPDATE_TYPE_DECIMAL:
+	case XUPDATE_TYPE_STR:
+	case XUPDATE_TYPE_NONE:
+	default:
+		unreachable();
 	}
+	return 0;
 }
 
+/**
+ * Convert scalar to decimal.
+ *
+ * @param scalar A scalar value.
+ * @param dec Output argument holding the result.
+ *
+ * @retval NULL Conversion is not possible.
+ * @retval not NULL Conversion is successful.
+ */
 static inline decimal_t *
-xrow_update_arg_arith_to_decimal(struct xrow_update_arg_arith arg,
-				 decimal_t *dec)
+xrow_update_scalar_to_decimal(const struct xrow_update_scalar *scalar,
+			      decimal_t *dec)
 {
-	if (arg.type == XUPDATE_TYPE_DECIMAL) {
-		*dec = arg.dec;
+	switch (scalar->type) {
+	case XUPDATE_TYPE_DECIMAL:
+		*dec = scalar->dec;
 		return dec;
-	} else if (arg.type == XUPDATE_TYPE_DOUBLE) {
-		return decimal_from_double(dec, arg.dbl);
-	} else if (arg.type == XUPDATE_TYPE_FLOAT) {
-		return decimal_from_double(dec, arg.flt);
-	} else {
-		assert(arg.type == XUPDATE_TYPE_INT);
-		if (int96_is_uint64(&arg.int96)) {
-			uint64_t val = int96_extract_uint64(&arg.int96);
+	case XUPDATE_TYPE_DOUBLE:
+		return decimal_from_double(dec, scalar->dbl);
+	case XUPDATE_TYPE_FLOAT:
+		return decimal_from_double(dec, scalar->flt);
+	case XUPDATE_TYPE_INT:
+		if (int96_is_uint64(&scalar->int96)) {
+			uint64_t val = int96_extract_uint64(&scalar->int96);
 			return decimal_from_uint64(dec, val);
 		} else {
-			assert(int96_is_neg_int64(&arg.int96));
-			int64_t val = int96_extract_neg_int64(&arg.int96);
+			assert(int96_is_neg_int64(&scalar->int96));
+			int64_t val = int96_extract_neg_int64(&scalar->int96);
 			return decimal_from_int64(dec, val);
 		}
+	case XUPDATE_TYPE_STR:
+	case XUPDATE_TYPE_NONE:
+	default:
+		unreachable();
 	}
+	return NULL;
 }
 
 uint32_t
-xrow_update_arg_arith_sizeof(const struct xrow_update_arg_arith *arg)
+xrow_update_scalar_sizeof(const struct xrow_update_scalar *scalar)
 {
-	switch (arg->type) {
+	switch (scalar->type) {
 	case XUPDATE_TYPE_INT:
-		if (int96_is_uint64(&arg->int96)) {
-			uint64_t val = int96_extract_uint64(&arg->int96);
+		if (int96_is_uint64(&scalar->int96)) {
+			uint64_t val = int96_extract_uint64(&scalar->int96);
 			return mp_sizeof_uint(val);
 		} else {
-			int64_t val = int96_extract_neg_int64(&arg->int96);
+			int64_t val = int96_extract_neg_int64(&scalar->int96);
 			return mp_sizeof_int(val);
 		}
 		break;
 	case XUPDATE_TYPE_DOUBLE:
 	case XUPDATE_TYPE_FLOAT:
-		return mp_sizeof_double(arg->dbl);
+		return mp_sizeof_double(scalar->dbl);
+	case XUPDATE_TYPE_DECIMAL:
+		return mp_sizeof_decimal(&scalar->dec);
+	case XUPDATE_TYPE_STR:
+		return mp_sizeof_str(xrow_update_string_size(&scalar->str));
+	case XUPDATE_TYPE_NONE:
 	default:
-		assert(arg->type == XUPDATE_TYPE_DECIMAL);
-		return mp_sizeof_decimal(&arg->dec);
+		unreachable();
 	}
+	return 0;
 }
 
 int
-xrow_update_arith_make(struct xrow_update_op *op,
-		       struct xrow_update_arg_arith arg,
-		       struct xrow_update_arg_arith *ret)
+xrow_update_op_do_arith(struct xrow_update_op *op,
+			struct xrow_update_scalar *ret)
 {
-	struct xrow_update_arg_arith arg1 = arg;
-	struct xrow_update_arg_arith arg2 = op->arg.arith;
-	enum xrow_update_arith_type lowest_type = arg1.type;
+	assert(xrow_update_scalar_is_number(&op->arg.arith.value));
+	if (!xrow_update_scalar_is_number(ret))
+		return xrow_update_err_arg_type(op, "a number");
+
+	struct xrow_update_scalar *arg1 = ret;
+	struct xrow_update_scalar *arg2 = &op->arg.arith.value;
+	enum xrow_update_scalar_type lowest_type = arg1->type;
 	char opcode = op->opcode;
-	if (arg1.type > arg2.type)
-		lowest_type = arg2.type;
+
+	if (arg1->type > arg2->type)
+		lowest_type = arg2->type;
 
 	if (lowest_type == XUPDATE_TYPE_INT) {
 		switch(opcode) {
 		case '+':
-			int96_add(&arg1.int96, &arg2.int96);
+			int96_add(&arg1->int96, &arg2->int96);
 			break;
 		case '-':
-			int96_invert(&arg2.int96);
-			int96_add(&arg1.int96, &arg2.int96);
+			int96_invert(&arg2->int96);
+			int96_add(&arg1->int96, &arg2->int96);
 			break;
 		default:
 			unreachable();
 			break;
 		}
-		if (!int96_is_uint64(&arg1.int96) &&
-		    !int96_is_neg_int64(&arg1.int96))
+		if (!int96_is_uint64(&arg1->int96) &&
+		    !int96_is_neg_int64(&arg1->int96))
 			return xrow_update_err_int_overflow(op);
-		*ret = arg1;
 	} else if (lowest_type >= XUPDATE_TYPE_DOUBLE) {
-		double a = xrow_update_arg_arith_to_double(arg1);
-		double b = xrow_update_arg_arith_to_double(arg2);
+		double a = xrow_update_scalar_to_double(arg1);
+		double b = xrow_update_scalar_to_double(arg2);
 		double c;
 		switch(opcode) {
 		case '+':
@@ -417,8 +486,8 @@ xrow_update_arith_make(struct xrow_update_op *op,
 		return 0;
 	} else {
 		decimal_t a, b, c;
-		if (! xrow_update_arg_arith_to_decimal(arg1, &a) ||
-		    ! xrow_update_arg_arith_to_decimal(arg2, &b)) {
+		if (xrow_update_scalar_to_decimal(arg1, &a) == NULL ||
+		    xrow_update_scalar_to_decimal(arg2, &b) == NULL) {
 			return xrow_update_err_arg_type(op, "a number "\
 							"convertible to "\
 							"decimal");
@@ -443,47 +512,42 @@ xrow_update_arith_make(struct xrow_update_op *op,
 }
 
 int
-xrow_update_op_do_arith(struct xrow_update_op *op, const char *old)
+xrow_update_op_do_bit(struct xrow_update_op *op,
+		      struct xrow_update_scalar *scalar)
 {
-	struct xrow_update_arg_arith left_arg;
-	if (xrow_mp_read_arg_arith(op, &old, &left_arg) != 0 ||
-	    xrow_update_arith_make(op, left_arg, &op->arg.arith) != 0)
-		return -1;
-	op->new_field_len = xrow_update_arg_arith_sizeof(&op->arg.arith);
-	return 0;
-}
-
-int
-xrow_update_op_do_bit(struct xrow_update_op *op, const char *old)
-{
-	uint64_t val = 0;
-	if (xrow_update_mp_read_uint(op, &old, &val) != 0)
-		return -1;
+	if (scalar->type != XUPDATE_TYPE_INT ||
+	    !int96_is_uint64(&scalar->int96))
+		return xrow_update_err_arg_type(op, "a positive integer");
+	uint64_t val = int96_extract_uint64(&scalar->int96);
 	struct xrow_update_arg_bit *arg = &op->arg.bit;
 	switch (op->opcode) {
 	case '&':
-		arg->val &= val;
+		val &= arg->val;
 		break;
 	case '^':
-		arg->val ^= val;
+		val ^= arg->val;
 		break;
 	case '|':
-		arg->val |= val;
+		val |= arg->val;
 		break;
 	default:
 		unreachable();
 	}
-	op->new_field_len = mp_sizeof_uint(arg->val);
+	int96_set_unsigned(&scalar->int96, val);
 	return 0;
 }
 
 int
-xrow_update_op_do_splice(struct xrow_update_op *op, const char *old)
+xrow_update_op_do_splice(struct xrow_update_op *op,
+			 struct xrow_update_scalar *scalar)
 {
 	struct xrow_update_arg_splice *arg = &op->arg.splice;
-	int32_t str_len = 0;
-	if (xrow_update_mp_read_str(op, &old, (uint32_t *) &str_len, &old) != 0)
-		return -1;
+
+	if (scalar->type != XUPDATE_TYPE_STR)
+		return xrow_update_err_arg_type(op, "a string");
+
+	struct xrow_update_string *str = &scalar->str;
+	int32_t str_len = xrow_update_string_size(str);
 
 	if (arg->offset < 0) {
 		if (-arg->offset > str_len + 1)
@@ -501,12 +565,15 @@ xrow_update_op_do_splice(struct xrow_update_op *op, const char *old)
 	} else if (arg->cut_length > str_len - arg->offset) {
 		arg->cut_length = str_len - arg->offset;
 	}
-	assert(arg->offset <= str_len);
+	assert(arg->offset + arg->cut_length <= str_len);
 
-	arg->tail_offset = arg->offset + arg->cut_length;
-	arg->tail_length = str_len - arg->tail_offset;
-	op->new_field_len = mp_sizeof_str(arg->offset + arg->paste_length +
-					  arg->tail_length);
+	uint32_t tail_offset = arg->offset + arg->cut_length;
+	str->array[0].length = arg->offset;
+	str->array[1].data = arg->paste;
+	str->array[1].length = arg->paste_length;
+	str->array[2].data = str->array[0].data + tail_offset;
+	str->array[2].length = str_len - tail_offset;
+
 	return 0;
 }
 
@@ -514,42 +581,37 @@ xrow_update_op_do_splice(struct xrow_update_op *op, const char *old)
 
 /* {{{ store_op */
 
-static uint32_t
-xrow_update_op_store_set(struct xrow_update_op *op,
-			 struct json_tree *format_tree,
-			 struct json_token *this_node, const char *in,
-			 char *out)
-{
-	(void) format_tree;
-	(void) this_node;
-	(void) in;
-	memcpy(out, op->arg.set.value, op->arg.set.length);
-	return op->arg.set.length;
-}
+/**
+ * Store string rope representation as MsgPack.
+ *
+ * @param str A string.
+ * @param out A pointer to output buffer.
+ *
+ * @return Output buffer position after encoded string.
+ */
+static char *
+xrow_update_store_string(const struct xrow_update_string *str, char *out);
 
 uint32_t
-xrow_update_op_store_arith(struct xrow_update_op *op,
-			   struct json_tree *format_tree,
-			   struct json_token *this_node, const char *in,
-			   char *out)
+xrow_update_store_scalar(const struct xrow_update_scalar *scalar,
+			 struct json_token *this_node, char *out, char *out_end)
 {
-	(void) format_tree;
-	(void) in;
+	(void)out_end;
+	assert(out_end - out >= xrow_update_scalar_sizeof(scalar));
 	char *begin = out;
-	struct xrow_update_arg_arith *arg = &op->arg.arith;
-	switch (arg->type) {
+	switch (scalar->type) {
 	case XUPDATE_TYPE_INT:
-		if (int96_is_uint64(&arg->int96)) {
+		if (int96_is_uint64(&scalar->int96)) {
 			out = mp_encode_uint(
-				out, int96_extract_uint64(&arg->int96));
+				out, int96_extract_uint64(&scalar->int96));
 		} else {
-			assert(int96_is_neg_int64(&arg->int96));
+			assert(int96_is_neg_int64(&scalar->int96));
 			out = mp_encode_int(
-				out, int96_extract_neg_int64( &arg->int96));
+				out, int96_extract_neg_int64(&scalar->int96));
 		}
 		break;
 	case XUPDATE_TYPE_DOUBLE:
-		out = mp_encode_double(out, arg->dbl);
+		out = mp_encode_double(out, scalar->dbl);
 		break;
 	case XUPDATE_TYPE_FLOAT:
 		if (this_node != NULL) {
@@ -557,84 +619,55 @@ xrow_update_op_store_arith(struct xrow_update_op *op,
 				json_tree_entry(this_node, struct tuple_field,
 						token)->type;
 			if (type == FIELD_TYPE_DOUBLE) {
-				out = mp_encode_double(out, arg->flt);
+				out = mp_encode_double(out, scalar->flt);
 				break;
 			}
 		}
-		out = mp_encode_float(out, arg->flt);
+		out = mp_encode_float(out, scalar->flt);
 		break;
+	case XUPDATE_TYPE_DECIMAL:
+		out = mp_encode_decimal(out, &scalar->dec);
+		break;
+	case XUPDATE_TYPE_STR:
+		out = xrow_update_store_string(&scalar->str, out);
+		break;
+	case XUPDATE_TYPE_NONE:
 	default:
-		assert(arg->type == XUPDATE_TYPE_DECIMAL);
-		out = mp_encode_decimal(out, &arg->dec);
-		break;
+		unreachable();
 	}
 	return out - begin;
 }
 
-static uint32_t
-xrow_update_op_store_bit(struct xrow_update_op *op,
-			 struct json_tree *format_tree,
-			 struct json_token *this_node, const char *in,
-			 char *out)
+static char *
+xrow_update_store_string(const struct xrow_update_string *str, char *out)
 {
-	(void) format_tree;
-	(void) this_node;
-	(void) in;
-	char *end = mp_encode_uint(out, op->arg.bit.val);
-	return end - out;
-}
-
-static uint32_t
-xrow_update_op_store_splice(struct xrow_update_op *op,
-			    struct json_tree *format_tree,
-			    struct json_token *this_node, const char *in,
-			    char *out)
-{
-	(void) format_tree;
-	(void) this_node;
-	struct xrow_update_arg_splice *arg = &op->arg.splice;
-	uint32_t new_str_len = arg->offset + arg->paste_length +
-			       arg->tail_length;
-	char *begin = out;
-	(void) mp_decode_strl(&in);
-	out = mp_encode_strl(out, new_str_len);
-	/* Copy field head. */
-	memcpy(out, in, arg->offset);
-	out = out + arg->offset;
-	/* Copy the paste. */
-	memcpy(out, arg->paste, arg->paste_length);
-	out = out + arg->paste_length;
-	/* Copy tail. */
-	memcpy(out, in + arg->tail_offset, arg->tail_length);
-	out = out + arg->tail_length;
-	return out - begin;
+	out = mp_encode_strl(out, xrow_update_string_size(str));
+	for (size_t i = 0; i < lengthof(str->array); i++) {
+		memcpy(out, str->array[i].data, str->array[i].length);
+		out += str->array[i].length;
+	}
+	return out;
 }
 
 /* }}} store_op */
 
 static const struct xrow_update_op_meta op_set = {
-	xrow_update_read_arg_set, xrow_update_op_do_field_set,
-	(xrow_update_op_store_f) xrow_update_op_store_set, 3
+	xrow_update_read_arg_set, xrow_update_op_do_field_set, 3
 };
 static const struct xrow_update_op_meta op_insert = {
-	xrow_update_read_arg_set, xrow_update_op_do_field_insert,
-	(xrow_update_op_store_f) xrow_update_op_store_set, 3
+	xrow_update_read_arg_set, xrow_update_op_do_field_insert, 3
 };
 static const struct xrow_update_op_meta op_arith = {
-	xrow_update_read_arg_arith, xrow_update_op_do_field_arith,
-	(xrow_update_op_store_f) xrow_update_op_store_arith, 3
+	xrow_update_read_arg_arith, xrow_update_op_do_field_arith, 3
 };
 static const struct xrow_update_op_meta op_bit = {
-	xrow_update_read_arg_bit, xrow_update_op_do_field_bit,
-	(xrow_update_op_store_f) xrow_update_op_store_bit, 3
+	xrow_update_read_arg_bit, xrow_update_op_do_field_bit, 3
 };
 static const struct xrow_update_op_meta op_splice = {
-	xrow_update_read_arg_splice, xrow_update_op_do_field_splice,
-	(xrow_update_op_store_f) xrow_update_op_store_splice, 5
+	xrow_update_read_arg_splice, xrow_update_op_do_field_splice, 5
 };
 static const struct xrow_update_op_meta op_delete = {
-	xrow_update_read_arg_delete, xrow_update_op_do_field_delete,
-	(xrow_update_op_store_f) NULL, 3
+	xrow_update_read_arg_delete, xrow_update_op_do_field_delete, 3
 };
 
 static inline const struct xrow_update_op_meta *
