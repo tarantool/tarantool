@@ -793,6 +793,7 @@ iproto_reply_chunk(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 /**
  * Encode IPROTO_EVENT packet.
  * @param out Encode to.
+ * @param sync Sync number.
  * @param key Notification key name.
  * @param key_len Length of the notification key name.
  * @param data Notification data (MsgPack).
@@ -802,7 +803,8 @@ iproto_reply_chunk(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
  * @retval -1 Memory error.
  */
 int
-iproto_send_event(struct obuf *out, const char *key, size_t key_len,
+iproto_send_event(struct obuf *out, uint64_t sync,
+		  const char *key, size_t key_len,
 		  const char *data, const char *data_end);
 
 /** Write error directly to a socket. */

@@ -499,25 +499,27 @@ print("""
 # gh-6257 Watchers
 #
 """)
-def watch(key):
-    print("# Watch key '{}'".format(key))
-    send_request({IPROTO_CODE: REQUEST_TYPE_WATCH}, {IPROTO_EVENT_KEY: key})
+def watch(key, sync):
+    print("# Watch key '{}', sync={}".format(key, sync))
+    send_request({IPROTO_CODE: REQUEST_TYPE_WATCH, IPROTO_SYNC: sync},
+                 {IPROTO_EVENT_KEY: key})
 
 def unwatch(key):
     print("# Unwatch key '{}'".format(key))
     send_request({IPROTO_CODE: REQUEST_TYPE_UNWATCH}, {IPROTO_EVENT_KEY: key})
 
 def receive_event():
-    print("# Recieve event")
+    print("# Receive event")
     resp = receive_response()
     code = resp["header"].get(IPROTO_CODE)
     if code is None:
         print("<no event received>")
         return
     if code == REQUEST_TYPE_EVENT:
-        print("key='{}', value={}".format(
+        print("key='{}', value={}, sync={}".format(
             resp["body"].get(IPROTO_EVENT_KEY, '').decode('utf-8'),
-            resp["body"].get(IPROTO_EVENT_DATA)))
+            resp["body"].get(IPROTO_EVENT_DATA),
+            resp["header"].get(IPROTO_SYNC)))
     else:
         print("Unexpected packet: {}".format(resp))
 
@@ -540,16 +542,16 @@ resp = test_request({IPROTO_CODE: REQUEST_TYPE_WATCH},
 print(resp_status(resp))
 
 # Register a watcher
-watch("foo")
+watch("foo", 1)
 receive_event()
 
 # Register a watcher for another key
-watch("bar")
+watch("bar", 2)
 receive_event()
 
 # Unregister and register watcher
 unwatch("bar")
-watch("bar")
+watch("bar", 3)
 receive_event()
 
 # No notification without ack
@@ -557,9 +559,9 @@ admin("box.broadcast('foo', {1, 2, 3})")
 check_no_event()
 
 # Notification after ack
-watch("foo")
+watch("foo", 4)
 receive_event()
-watch("bar")
+watch("bar", 5)
 admin("box.broadcast('bar', 123)")
 receive_event()
 

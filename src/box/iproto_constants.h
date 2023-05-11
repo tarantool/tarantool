@@ -278,8 +278,9 @@ enum iproto_type {
 	 *     it unsubscribes by sending an IPROTO_UNWATCH packet.
 	 *
 	 * All the three request types are fully asynchronous - a receiving end
-	 * doesn't send a packet in reply to any of them (therefore neither of
-	 * them has a sync number).
+	 * doesn't send a packet in reply to any of them. Still, the server
+	 * sends the same sync number in an IPROTO_EVENT packet as the one sent
+	 * by the client in the last corresponding IPROTO_WATCH request.
 	 */
 	IPROTO_WATCH = 74,
 	IPROTO_UNWATCH = 75,

@@ -220,36 +220,36 @@ version=3, features=[0, 1, 2, 3]
 error: Missing mandatory field 'event key' in request
 # Invalid key type
 error: Invalid MsgPack - packet body
-# Watch key 'foo'
-# Recieve event
-key='foo', value=None
-# Watch key 'bar'
-# Recieve event
-key='bar', value=None
+# Watch key 'foo', sync=1
+# Receive event
+key='foo', value=None, sync=1
+# Watch key 'bar', sync=2
+# Receive event
+key='bar', value=None, sync=2
 # Unwatch key 'bar'
-# Watch key 'bar'
-# Recieve event
-key='bar', value=None
+# Watch key 'bar', sync=3
+# Receive event
+key='bar', value=None, sync=3
 box.broadcast('foo', {1, 2, 3})
 ---
 ...
-# Recieve event
+# Receive event
    =>  Failed to recv response
 <no event received>
-# Watch key 'foo'
-# Recieve event
-key='foo', value=[1, 2, 3]
-# Watch key 'bar'
+# Watch key 'foo', sync=4
+# Receive event
+key='foo', value=[1, 2, 3], sync=4
+# Watch key 'bar', sync=5
 box.broadcast('bar', 123)
 ---
 ...
-# Recieve event
-key='bar', value=123
+# Receive event
+key='bar', value=123, sync=5
 box.broadcast('bar', 456)
 ---
 ...
 # Unwatch key 'bar'
-# Recieve event
+# Receive event
    =>  Failed to recv response
 <no event received>
 box.broadcast('foo', nil)

@@ -112,8 +112,13 @@ session_on_stop(struct trigger *trigger, void * /* event */)
  * Watcher registered for a session. Unregistered when the session is closed.
  */
 struct session_watcher {
+	/** Base class. */
 	struct watcher base;
+	/** Session that registered this watcher. */
 	struct session *session;
+	/** Request sync number used on watch. */
+	uint64_t sync;
+	/** Watcher callback. */
 	session_notify_f cb;
 };
 
@@ -125,12 +130,13 @@ session_watcher_run_f(struct watcher *base)
 	const char *key = watcher_key(base, &key_len);
 	const char *data_end;
 	const char *data = watcher_data(base, &data_end);
-	watcher->cb(watcher->session, key, key_len, data, data_end);
+	watcher->cb(watcher->session, watcher->sync, key, key_len,
+		    data, data_end);
 }
 
 void
-session_watch(struct session *session, const char *key,
-	      size_t key_len, session_notify_f cb)
+session_watch(struct session *session, uint64_t sync,
+	      const char *key, size_t key_len, session_notify_f cb)
 {
 	/* Look up a watcher for the specified key in this session. */
 	struct mh_strnptr_t *h = session->watchers;
@@ -143,6 +149,7 @@ session_watch(struct session *session, const char *key,
 	if (i != mh_end(h)) {
 		struct session_watcher *watcher =
 			(struct session_watcher *)mh_strnptr_node(h, i)->val;
+		watcher->sync = sync;
 		watcher_ack(&watcher->base);
 		return;
 	}
@@ -150,6 +157,7 @@ session_watch(struct session *session, const char *key,
 	struct session_watcher *watcher =
 		(struct session_watcher *)xmalloc(sizeof(*watcher));
 	watcher->session = session;
+	watcher->sync = sync;
 	watcher->cb = cb;
 	box_register_watcher(key, key_len, session_watcher_run_f,
 			     (watcher_destroy_f)free, WATCHER_EXPLICIT_ACK,
