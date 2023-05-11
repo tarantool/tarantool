@@ -826,15 +826,18 @@ iproto_reply_chunk(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 }
 
 int
-iproto_send_event(struct obuf *out, const char *key, size_t key_len,
+iproto_send_event(struct obuf *out, uint64_t sync,
+		  const char *key, size_t key_len,
 		  const char *data, const char *data_end)
 {
 	/* Calculate the packet size. */
 	size_t size = 5;
-	/* Packet header. Note: no sync and schema version. */
-	size += mp_sizeof_map(1);
+	/* Packet header. Note: no schema version. */
+	size += mp_sizeof_map(2);
 	size += mp_sizeof_uint(IPROTO_REQUEST_TYPE);
 	size += mp_sizeof_uint(IPROTO_EVENT);
+	size += mp_sizeof_uint(IPROTO_SYNC);
+	size += mp_sizeof_uint(sync);
 	/* Packet body. */
 	size += mp_sizeof_map(data != NULL ? 2 : 1);
 	size += mp_sizeof_uint(IPROTO_EVENT_KEY);
@@ -855,9 +858,11 @@ iproto_send_event(struct obuf *out, const char *key, size_t key_len,
 	mp_store_u32(p, size - 5);
 	p += 4;
 	/* Packet header. */
-	p = mp_encode_map(p, 1);
+	p = mp_encode_map(p, 2);
 	p = mp_encode_uint(p, IPROTO_REQUEST_TYPE);
 	p = mp_encode_uint(p, IPROTO_EVENT);
+	p = mp_encode_uint(p, IPROTO_SYNC);
+	p = mp_encode_uint(p, sync);
 	/* Packet body. */
 	p = mp_encode_map(p, data != NULL ? 2 : 1);
 	p = mp_encode_uint(p, IPROTO_EVENT_KEY);
