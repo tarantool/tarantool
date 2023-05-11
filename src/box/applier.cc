@@ -485,6 +485,8 @@ applier_watch_ballot(struct applier *applier)
 			 */
 			if (is_empty)
 				continue;
+			/* Get rid of leftover diagnostics. */
+			diag_clear(diag_get());
 			applier_run_ballot_triggers(applier);
 		}
 	} catch (ClientError *e) {
@@ -494,6 +496,8 @@ applier_watch_ballot(struct applier *applier)
 try_vote:
 	applier_get_ballot_from_vote(&io, &row, &ibuf,
 				     &applier->ballot);
+	/* Get rid of leftover diagnostics. */
+	diag_clear(diag_get());
 	applier_run_ballot_triggers(applier);
 }
 
@@ -514,6 +518,7 @@ applier_ballot_watcher_f(va_list ap)
 			return 0;
 		} catch (Exception *) {
 			diag_log();
+			assert(!diag_is_empty(diag_get()));
 			applier_run_ballot_triggers(applier);
 			diag_clear(diag_get());
 			break;
