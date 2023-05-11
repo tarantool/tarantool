@@ -355,7 +355,8 @@ int
 session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result);
 
 typedef void
-(*session_notify_f)(struct session *session, const char *key, size_t key_len,
+(*session_notify_f)(struct session *session, uint64_t sync,
+		    const char *key, size_t key_len,
 		    const char *data, const char *data_end);
 
 /**
@@ -365,10 +366,12 @@ typedef void
  * The callback will be called unconditionally right after registration and
  * then every time the key is updated provided the last notification was
  * acknowledged.
+ *
+ * The given sync number will be passed to the callback on each invocation.
  */
 void
-session_watch(struct session *session, const char *key, size_t key_len,
-	      session_notify_f cb);
+session_watch(struct session *session, uint64_t sync,
+	      const char *key, size_t key_len, session_notify_f cb);
 
 /**
  * Unregisters a watcher registered for the given session and notification key.

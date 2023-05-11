@@ -2360,8 +2360,9 @@ tx_process_id(struct iproto_connection *con, const struct id_request *id)
 	con->session->meta.features = id->features;
 }
 
+/** Callback passed to session_watch. */
 static void
-iproto_session_notify(struct session *session,
+iproto_session_notify(struct session *session, uint64_t sync,
 		      const char *key, size_t key_len,
 		      const char *data, const char *data_end);
 
@@ -2406,8 +2407,8 @@ tx_process_misc(struct cmsg *m)
 					     ::schema_version);
 			break;
 		case IPROTO_WATCH:
-			session_watch(con->session, msg->watch.key,
-				      msg->watch.key_len,
+			session_watch(con->session, msg->header.sync,
+				      msg->watch.key, msg->watch.key_len,
 				      iproto_session_notify);
 			/* Sic: no reply. */
 			break;
@@ -3024,7 +3025,7 @@ iproto_session_push(struct session *session, struct port *port)
  * about new data.
  */
 static void
-iproto_session_notify(struct session *session,
+iproto_session_notify(struct session *session, uint64_t sync,
 		      const char *key, size_t key_len,
 		      const char *data, const char *data_end)
 {
@@ -3032,7 +3033,7 @@ iproto_session_notify(struct session *session,
 		(struct iproto_connection *)session->meta.connection;
 	struct obuf *out = con->tx.p_obuf;
 	struct obuf_svp svp = obuf_create_svp(out);
-	if (iproto_send_event(out, key, key_len,
+	if (iproto_send_event(out, sync, key, key_len,
 			      data, data_end) != 0) {
 		/* Nothing we can do on error but log the error. */
 		diag_log();
