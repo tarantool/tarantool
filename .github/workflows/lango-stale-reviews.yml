@@ -2,11 +2,12 @@ name: lango-stale-reviews
 on:
   schedule:
     - cron:  '* */1 * * *'    # At every hour.
+  workflow_dispatch:
 
 jobs:
   update-last-activity-dates:
     env:
-      LANGO_REVIEW_BOARD_TOKEN: ${{ github.token }}
+      LANGO_REVIEW_BOARD_TOKEN: ${{ secrets.LANGO_REVIEW_BOARD_TOKEN }}
       ORGANIZATION: Tarantool
       PROJECT_ID: 83
     runs-on: ubuntu-latest
