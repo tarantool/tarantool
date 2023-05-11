@@ -85,12 +85,6 @@ xrow_update_route_branch_array(struct xrow_update_field *next_hop,
 	 * operations, not one. A subtree just can't be
 	 * 're-applied'.
 	 *
-	 * If the operation is scalar and a leaf, then its result
-	 * has already overridden its arguments. This is because
-	 * scalar operations save result into the arguments, to
-	 * save memory. A second operation appliance would lead
-	 * to very surprising results.
-	 *
 	 * Another reason - performance. This path should be
 	 * quite hot, and to copy a struct is for sure much faster
 	 * than to reapply an operation using a virtual function.

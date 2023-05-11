@@ -125,8 +125,7 @@ xrow_update_bar_locate(struct xrow_update_op *op,
  */
 static inline int
 xrow_update_bar_locate_opt(struct xrow_update_op *op,
-			   struct xrow_update_field *field, bool *is_found,
-			   int *key_len_or_index)
+			   struct xrow_update_field *field, bool *is_found)
 {
 	/*
 	 * Bar update is not flat by definition. It always has a
@@ -159,12 +158,10 @@ xrow_update_bar_locate_opt(struct xrow_update_op *op,
 			return 0;
 		case JSON_TOKEN_NUM:
 			field->bar.parent = pos;
-			*key_len_or_index = token.num;
 			rc = tuple_field_go_to_index(&pos, token.num);
 			break;
 		case JSON_TOKEN_STR:
 			field->bar.parent = pos;
-			*key_len_or_index = token.len;
 			rc = tuple_field_go_to_key(&pos, token.str, token.len);
 			break;
 		default:
@@ -242,19 +239,10 @@ xrow_update_op_do_nop_insert(struct xrow_update_op *op,
 	assert(op->opcode == '!');
 	assert(field->type == XUPDATE_NOP);
 	bool is_found = false;
-	int key_len = 0;
-	if (xrow_update_bar_locate_opt(op, field, &is_found, &key_len) != 0)
+	if (xrow_update_bar_locate_opt(op, field, &is_found) != 0)
 		return -1;
-	op->new_field_len = op->arg.set.length;
-	if (mp_typeof(*field->bar.parent) == MP_MAP) {
-		if (is_found)
-			return xrow_update_err_duplicate(op);
-		/*
-		 * Don't forget, that map element is a pair. So
-		 * key length also should be accounted.
-		 */
-		op->new_field_len += mp_sizeof_str(key_len);
-	}
+	if (mp_typeof(*field->bar.parent) == MP_MAP && is_found)
+		return xrow_update_err_duplicate(op);
 	return xrow_update_bar_finish(field);
 }
 
@@ -265,15 +253,10 @@ xrow_update_op_do_nop_set(struct xrow_update_op *op,
 	assert(op->opcode == '=');
 	assert(field->type == XUPDATE_NOP);
 	bool is_found = false;
-	int key_len = 0;
-	if (xrow_update_bar_locate_opt(op, field, &is_found, &key_len) != 0)
+	if (xrow_update_bar_locate_opt(op, field, &is_found) != 0)
 		return -1;
-	op->new_field_len = op->arg.set.length;
-	if (!is_found) {
+	if (!is_found)
 		op->opcode = '!';
-		if (mp_typeof(*field->bar.parent) == MP_MAP)
-			op->new_field_len += mp_sizeof_str(key_len);
-	}
 	return xrow_update_bar_finish(field);
 }
 
@@ -315,7 +298,9 @@ xrow_update_op_do_nop_##op_type(struct xrow_update_op *op,			\
 	int key_len_or_index;							\
 	if (xrow_update_bar_locate(op, field, &key_len_or_index) != 0)		\
 		return -1;							\
-	if (xrow_update_op_do_##op_type(op, field->bar.point) != 0)		\
+	const char *data = field->bar.point;					\
+	xrow_update_mp_read_scalar(&data, &field->bar.scalar);			\
+	if (xrow_update_op_do_##op_type(op, &field->bar.scalar) != 0)		\
 		return -1;							\
 	return xrow_update_bar_finish(field);					\
 }
@@ -361,7 +346,7 @@ xrow_update_bar_sizeof(struct xrow_update_field *field)
 	switch(field->bar.op->opcode) {
 	case '!': {
 		const char *parent = field->bar.parent;
-		uint32_t size = field->size + field->bar.op->new_field_len;
+		uint32_t size = field->size + field->bar.op->arg.set.length;
 		if (mp_typeof(*parent) == MP_ARRAY) {
 			uint32_t array_size = mp_decode_array(&parent);
 			return size + mp_sizeof_array(array_size + 1) -
@@ -369,7 +354,8 @@ xrow_update_bar_sizeof(struct xrow_update_field *field)
 		} else {
 			uint32_t map_size = mp_decode_map(&parent);
 			return size + mp_sizeof_map(map_size + 1) -
-			       mp_sizeof_map(map_size);
+			       mp_sizeof_map(map_size) +
+			       mp_sizeof_str(field->bar.new_key_len);
 		}
 	}
 	case '#': {
@@ -388,9 +374,13 @@ xrow_update_bar_sizeof(struct xrow_update_field *field)
 			       mp_sizeof_map(map_size - 1);
 		}
 	}
+	case '=': {
+		return field->size - field->bar.point_size +
+		       field->bar.op->arg.set.length;
+	}
 	default: {
 		return field->size - field->bar.point_size +
-		       field->bar.op->new_field_len;
+		       xrow_update_scalar_sizeof(&field->bar.scalar);
 	}
 	}
 }
@@ -459,7 +449,7 @@ xrow_update_bar_store(struct xrow_update_field *field,
 		return out + size - out_saved;
 	}
 	default: {
-		if (this_node != NULL) {
+		if (this_node != NULL && op->opcode != '=') {
 			this_node = json_tree_lookup_path(
 				format_tree, this_node, field->bar.path,
 				field->bar.path_len, 0);
@@ -472,8 +462,14 @@ xrow_update_bar_store(struct xrow_update_field *field,
 
 		memcpy(out, field->data, before_point);
 		out += before_point;
-		out += op->meta->store(op, format_tree, this_node,
-				       field->bar.point, out);
+		if (op->opcode == '=') {
+			memcpy(out, op->arg.set.value, op->arg.set.length);
+			out += op->arg.set.length;
+		} else {
+			out += xrow_update_store_scalar(&field->bar.scalar,
+							this_node, out,
+							out_end);
+		}
 		memcpy(out, point_end, after_point);
 		return out + after_point - out_saved;
 	}

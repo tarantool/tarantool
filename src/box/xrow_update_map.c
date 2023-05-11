@@ -315,10 +315,11 @@ xrow_update_op_do_map_##op_type(struct xrow_update_op *op,			\
 	}									\
 	if (item->field.type != XUPDATE_NOP)					\
 		return xrow_update_err_double(op);				\
-	if (xrow_update_op_do_##op_type(op, item->field.data) != 0)		\
+	const char *data = item->field.data;					\
+	xrow_update_mp_read_scalar(&data, &item->field.scalar);			\
+	if (xrow_update_op_do_##op_type(op, &item->field.scalar) != 0)		\
 		return -1;							\
 	item->field.type = XUPDATE_SCALAR;					\
-	item->field.scalar.op = op;						\
 	return 0;								\
 }
 

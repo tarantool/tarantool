@@ -202,7 +202,7 @@ struct rope_iter {
 };
 
 static inline rope_size_t
-rope_node_size(struct rope_node *node)
+rope_node_size(const struct rope_node *node)
 {
 	return node ? node->tree_size : 0;
 }
@@ -220,7 +220,7 @@ rope_leaf_data(struct rope_node *node)
 }
 
 static inline rope_size_t
-rope_size(struct rope *rope)
+rope_size(const struct rope *rope)
 {
 	return rope_node_size(rope->root);
 }
