@@ -31,6 +31,7 @@
 #include "lua/info.h"
 
 #include <ctype.h> /* tolower() */
+#include <unistd.h>
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -68,6 +69,18 @@
  */
 static bool box_info_cluster_new_meaning = true;
 TWEAK_BOOL(box_info_cluster_new_meaning);
+
+/**
+ * Known upper limits for a hostname (without a zero-terminating
+ * byte):
+ *
+ * sysconf(_SC_HOST_NAME_MAX) == 64 on Linux.
+ * sysconf(_SC_HOST_NAME_MAX) == 255 on macOS.
+ * sysconf(_SC_HOST_NAME_MAX) == 255 on BSD.
+ *
+ * The constant value is used to simplify the code.
+ */
+enum { TT_HOST_NAME_MAX = 255 };
 
 static inline void
 lbox_push_replication_error_message(struct lua_State *L, struct error *e,
@@ -701,6 +714,22 @@ lbox_schema_version(struct lua_State *L)
 	return 1;
 }
 
+/** gethostname() Lua interface inside box.info. */
+static int
+lbox_info_hostname(struct lua_State *L)
+{
+	char buffer[TT_HOST_NAME_MAX + 1];
+	int rc = gethostname(buffer, sizeof(buffer));
+	if (rc != 0) {
+		say_warn_ratelimited("failed to get hostname: %s",
+				     tt_strerror(errno));
+		lua_pushnil(L);
+		return 1;
+	}
+	lua_pushstring(L, buffer);
+	return 1;
+}
+
 static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"id", lbox_info_id},
 	{"uuid", lbox_info_uuid},
@@ -725,6 +754,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"election", lbox_info_election},
 	{"synchro", lbox_info_synchro},
 	{"schema_version", lbox_schema_version},
+	{"hostname", lbox_info_hostname},
 	{NULL, NULL}
 };
 

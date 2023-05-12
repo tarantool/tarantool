@@ -63,6 +63,10 @@ box.info.replicaset.uuid == box.space._schema:get{'replicaset_uuid'}[2]
 ---
 - true
 ...
+type(box.info.hostname) == 'string'
+---
+- true
+...
 t = {}
 ---
 ...
@@ -77,6 +81,7 @@ t
 - - cluster
   - election
   - gc
+  - hostname
   - id
   - listen
   - lsn
