@@ -98,6 +98,10 @@ end
 --   msgpackffi, strict, tarantool, yaml -- used during
 --   tarantool's initialization in a way that doesn't allow to
 --   replace them with an arbitrary table
+-- - msgpack -- box.NULL is used in config/instance_config.lua
+--   at initialization of the module. If msgpack.NULL is nil, then
+--   access to box.NULL leads to the 'Please call box.cfg{} first'
+--   error.
 local override_cases = {
     'clock',
     'console',
@@ -113,7 +117,6 @@ local override_cases = {
     'key_def',
     'luadebug',
     'memprof',
-    'msgpack',
     'net.box',
     'pickle',
     'popen',
