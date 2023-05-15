@@ -93,74 +93,86 @@ get_call_serializer(void)
 }
 
 /**
- * A helper to find a Lua function by name and put it
- * on top of the stack.
+ * A helper to resolve a Lua function by full name, for example like:
+ * foo.bar['biz']["baz"][3].object:function
+ * Puts the function on top of the stack, followed by an object (if present).
+ * Returns number of items pushed (1 or 2) or -1 in case of error (diag is set).
  */
 static int
 box_lua_find(lua_State *L, const char *name, const char *name_end)
 {
-	int index = LUA_GLOBALSINDEX;
-	int objstack = 0, top = lua_gettop(L);
-	const char *start = name, *end;
+	lua_checkstack(L, 2); /* No more than 2 entries are needed. */
+	int top = lua_gettop(L);
 
-	while ((end = (const char *) memchr(start, '.', name_end - start))) {
-		lua_checkstack(L, 3);
-		lua_pushlstring(L, start, end - start);
-		lua_gettable(L, index);
-		if (! lua_istable(L, -1)) {
-			diag_set(ClientError, ER_NO_SUCH_PROC,
-				 name_end - name, name);
-			return -1;
+	/* Take the first token. */
+	const char *start = name;
+	while (start != name_end && *start != '.' &&
+	       *start != ':' && *start != '[')
+		start++;
+	lua_pushlstring(L, name, start - name);
+	lua_gettable(L, LUA_GLOBALSINDEX);
+
+	/* Take the rest tokens. */
+	while (start != name_end) {
+		if (!lua_istable(L, -1) &&
+		    !lua_islightuserdata(L, -1) && !lua_isuserdata(L, -1))
+			goto no_such_proc;
+
+		char delim = *start++; /* skip delimiter. */
+		if (delim == '.') {
+			/* Look for the next token. */
+			const char *end = start;
+			while (end != name_end && *end != '.' &&
+			       *end != ':' && *end != '[')
+				end++;
+			lua_pushlstring(L, start, end - start);
+			start = end;
+		} else if (delim == ':') {
+			lua_pushlstring(L, start, name_end - start);
+			lua_gettable(L, -2); /* get function from object. */
+			lua_insert(L, -2); /* swap function and object. */
+			break;
+		} else if (delim == '[') {
+			const char *end = memchr(start, ']', name_end - start);
+			if (end == NULL)
+				goto no_such_proc;
+
+			if (end - start >= 2 && start[0] == end[-1] &&
+			    (start[0] == '"' || start[0] == '\'')) {
+				/* Quoted string, just extract it. */
+				lua_pushlstring(L, start + 1, end - start - 2);
+			} else {
+				/* Must be a number, convert from string. */
+				lua_pushlstring(L, start, end - start);
+				int success;
+				lua_Number num = lua_tonumberx(L, -1, &success);
+				if (!success)
+					goto no_such_proc;
+				lua_pop(L, 1);
+				lua_pushnumber(L, num);
+			}
+			start = end + 1; /* skip closing bracket. */
+		} else {
+			goto no_such_proc;
 		}
-		start = end + 1; /* next piece of a.b.c */
-		index = lua_gettop(L); /* top of the stack */
+
+		lua_gettable(L, -2); /* get child object from parent object. */
+		lua_remove(L, -2); /* drop previous parent object. */
 	}
 
-	/* box.something:method */
-	if ((end = (const char *) memchr(start, ':', name_end - start))) {
-		lua_checkstack(L, 3);
-		lua_pushlstring(L, start, end - start);
-		lua_gettable(L, index);
-		if (! (lua_istable(L, -1) ||
-			lua_islightuserdata(L, -1) || lua_isuserdata(L, -1) )) {
-				diag_set(ClientError, ER_NO_SUCH_PROC,
-					  name_end - name, name);
-				return -1;
-		}
-
-		start = end + 1; /* next piece of a.b.c */
-		index = lua_gettop(L); /* top of the stack */
-		objstack = index - top;
-	}
-
-
-	lua_pushlstring(L, start, name_end - start);
-	lua_gettable(L, index);
-	if (!lua_isfunction(L, -1) && !lua_istable(L, -1)) {
+	/* Now at top+1 must be the function, and at top+2 may be the object. */
+	assert(lua_gettop(L) - top >= 1 && lua_gettop(L) - top <= 2);
+	if (!lua_isfunction(L, top + 1) && !lua_istable(L, top + 1)) {
 		/* lua_call or lua_gettable would raise a type error
 		 * for us, but our own message is more verbose. */
-		diag_set(ClientError, ER_NO_SUCH_PROC,
-			  name_end - name, name);
-		return -1;
+		goto no_such_proc;
 	}
 
-	/* setting stack that it would contain only
-	 * the function pointer. */
-	if (index != LUA_GLOBALSINDEX) {
-		if (objstack == 0) {        /* no object, only a function */
-			lua_replace(L, top + 1);
-			lua_pop(L, lua_gettop(L) - top - 1);
-		} else if (objstack == 1) { /* just two values, swap them */
-			lua_insert(L, -2);
-			lua_pop(L, lua_gettop(L) - top - 2);
-		} else {		    /* long path */
-			lua_insert(L, top + 1);
-			lua_insert(L, top + 2);
-			lua_pop(L, objstack - 1);
-			objstack = 1;
-		}
-	}
-	return 1 + objstack;
+	return lua_gettop(L) - top;
+
+no_such_proc:
+	diag_set(ClientError, ER_NO_SUCH_PROC, name_end - name, name);
+	return -1;
 }
 
 /**
