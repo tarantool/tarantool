@@ -744,6 +744,21 @@ memtx_tx_adjust_position_in_read_view_list(struct txn *txn)
 }
 
 /**
+ * Mark @a victim as conflicted and abort it.
+ * Does nothing if the transaction is already aborted.
+ */
+static void
+memtx_tx_abort_with_conflict(struct txn *victim)
+{
+	if (victim->status == TXN_ABORTED)
+		return;
+	if (victim->status == TXN_IN_READ_VIEW)
+		rlist_del(&victim->in_read_view_txs);
+	victim->status = TXN_ABORTED;
+	txn_set_flags(victim, TXN_IS_CONFLICTED);
+}
+
+/**
  * Handle conflict when @a victim has read and @a breaker has written the same
  * key, and @a breaker is prepared. The functions must be called in two cases:
  * 1. @a breaker becomes prepared for every victim with non-empty intersection
@@ -793,10 +808,7 @@ memtx_tx_handle_conflict(struct txn *breaker, struct txn *victim)
 		memtx_tx_adjust_position_in_read_view_list(victim);
 	} else {
 		/* Mark as conflicted. */
-		if (victim->status == TXN_IN_READ_VIEW)
-			rlist_del(&victim->in_read_view_txs);
-		victim->status = TXN_ABORTED;
-		txn_set_flags(victim, TXN_IS_CONFLICTED);
+		memtx_tx_abort_with_conflict(victim);
 	}
 }
 
@@ -2186,6 +2198,18 @@ memtx_tx_history_remove_story_del_stmts(struct memtx_story *story)
 }
 
 /*
+ * Abort with conflict all transactions that have read @a story.
+ */
+static void
+memtx_tx_abort_story_readers(struct memtx_story *story)
+{
+	struct tx_read_tracker *tracker, *tmp;
+	rlist_foreach_entry_safe(tracker, &story->reader_list,
+				 in_reader_list, tmp)
+		memtx_tx_abort_with_conflict(tracker->reader);
+}
+
+/*
  * Rollback addition of story by statement.
  */
 static void
@@ -2196,7 +2220,8 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 
 	/*
 	 * In case of rollback of prepared statement we need to rollback
-	 * preparation actions.
+	 * preparation actions and abort other transactions that managed
+	 * to read this prepared state.
 	 */
 	if (stmt->txn->psn != 0) {
 		/*
@@ -2236,6 +2261,12 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 		add_story->add_psn = 0;
 		if (del_story != NULL)
 			del_story->del_psn = 0;
+
+		/*
+		 * If a transaction managed to read this story it must
+		 * be aborted.
+		 */
+		memtx_tx_abort_story_readers(add_story);
 	}
 
 	/* Unlink stories from the statement. */
@@ -2262,6 +2293,28 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 }
 
 /*
+ * Abort with conflict all transactions that have read absence of @a story.
+ */
+static void
+memtx_tx_abort_gap_readers(struct memtx_story *story)
+{
+	for (uint32_t i = 0; i < story->index_count; i++) {
+		/*
+		 * We rely on the fact that all gap trackers are stored in the
+		 * top story of history chain.
+		 */
+		struct memtx_story *top = memtx_tx_story_find_top(story, i);
+		struct gap_item_base *item, *tmp;
+		rlist_foreach_entry_safe(item, &top->link[i].read_gaps,
+					 in_read_gaps, tmp) {
+			if (item->type != GAP_INPLACE)
+				continue;
+			memtx_tx_abort_with_conflict(item->txn);
+		}
+	}
+}
+
+/*
  * Rollback deletion of story by statement.
  */
 static void
@@ -2271,7 +2324,8 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 
 	/*
 	 * In case of rollback of prepared statement we need to rollback
-	 * preparation actions.
+	 * preparation actions and abort other transactions that managed
+	 * to read this prepared state.
 	 */
 	if (stmt->txn->psn != 0) {
 		/*
@@ -2299,6 +2353,12 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 
 		/* Revert psn assignment. */
 		del_story->del_psn = 0;
+
+		/*
+		 * If a transaction managed to read absence this story it must
+		 * be aborted.
+		 */
+		memtx_tx_abort_gap_readers(del_story);
 	}
 
 	/* Unlink the story from the statement. */
