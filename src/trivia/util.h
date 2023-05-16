@@ -135,7 +135,13 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
 #define xibuf_reserve(p, size)	xalloc_impl((size), ibuf_reserve, (p), (size))
 #define xruntime_memory_alloc(size) \
 	xalloc_impl((size), runtime_memory_alloc, (size))
-
+#define xlsregion_alloc(p, size, id) \
+	xalloc_impl((size), lsregion_alloc, (p), (size), (id))
+#define xlsregion_aligned_alloc(p, size, align, id) \
+	xalloc_impl((size), lsregion_aligned_alloc, (p), (size), (align), (id))
+#define xlsregion_alloc_object(lsregion, id, T) ({				\
+	(T *)xlsregion_aligned_alloc((lsregion), sizeof(T), alignof(T), (id));	\
+})
 #define xregion_alloc_object(region, T) ({					\
 	(T *)xregion_aligned_alloc((region), sizeof(T), alignof(T));		\
 })
