@@ -3849,7 +3849,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	 * (req.vclock, stop_vclock) so that it gets its
 	 * registration.
 	 */
-	relay_final_join(io, header->sync, &req.vclock, &stop_vclock);
+	relay_final_join(io, header->sync, &req.vclock, &stop_vclock, replica->relay);
 	say_info("final data sent.");
 
 	RegionGuard region_guard(&fiber()->gc);
@@ -4004,7 +4004,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * Final stage: feed replica with WALs in range
 	 * (start_vclock, stop_vclock).
 	 */
-	relay_final_join(io, header->sync, &start_vclock, &stop_vclock);
+	relay_final_join(io, header->sync, &start_vclock, &stop_vclock, replica->relay);
 	say_info("final data sent.");
 
 	/* Send end of WAL stream marker */
