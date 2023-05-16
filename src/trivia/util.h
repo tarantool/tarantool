@@ -130,6 +130,13 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
 #define xregion_alloc_array(p, T, count, size)				\
 	xalloc_impl(sizeof(T) * (count), region_alloc_array, (p), T,	\
 		    (count), (size))
+#define xlsregion_alloc(p, size, id) \
+	xalloc_impl((size), lsregion_alloc, (p), (size), (id))
+#define xlsregion_aligned_alloc(p, size, align, id) \
+	xalloc_impl((size), lsregion_aligned_alloc, (p), (size), (align), (id))
+#define xlsregion_alloc_object(lsregion, id, T) ({				\
+	(T *)xlsregion_aligned_alloc((lsregion), sizeof(T), alignof(T), (id));	\
+})
 
 /** \cond public */
 
