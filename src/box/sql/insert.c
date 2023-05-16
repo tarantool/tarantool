@@ -1081,6 +1081,9 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	/* Src may not be a view. */
 	if (src->def->opts.is_view)
 		return 0;
+	/* Src should have at least one index. */
+	if (src->index_count < 1)
+		return 0;
 	/* Number of columns must be the same in src and dst. */
 	if (dest->def->field_count != src->def->field_count)
 		return 0;
@@ -1113,14 +1116,14 @@ xferOptimization(Parse * pParse,	/* Parser context */
 
 	for (uint32_t i = 0; i < dest->index_count; ++i) {
 		pDestIdx = dest->index[i];
-		for (uint32_t j = 0; j < src->index_count; ++j) {
+		bool is_compat = false;
+		for (uint32_t j = 0; j < src->index_count && !is_compat; ++j) {
 			pSrcIdx = src->index[j];
-			if (sql_index_is_xfer_compatible(pDestIdx->def,
-							 pSrcIdx->def))
-				break;
+			is_compat = sql_index_is_xfer_compatible(pDestIdx->def,
+								 pSrcIdx->def);
 		}
 		/* pDestIdx has no corresponding index in pSrc. */
-		if (pSrcIdx == NULL)
+		if (!is_compat)
 			return 0;
 	}
 
