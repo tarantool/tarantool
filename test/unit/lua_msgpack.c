@@ -50,7 +50,7 @@ test_translation_in_encoding(lua_State *L)
 	lua_pushboolean(L, true);
 	lua_setfield(L, 1, alias);
 	luamp_encode_with_translation(L, luaL_msgpack_default, &stream, 1,
-				      translation);
+				      translation, NULL);
 	lua_pop(L, 1);
 	mpstream_flush(&stream);
 	ok(strncmp(ibuf->buf, "\x81\x00\xc3", ibuf_used(ibuf)) == 0,
@@ -64,7 +64,7 @@ test_translation_in_encoding(lua_State *L)
 	lua_setfield(L, -2, alias);
 	lua_setfield(L, -2, "k");
 	luamp_encode_with_translation(L, luaL_msgpack_default, &stream, 1,
-				      translation);
+				      translation, NULL);
 	lua_pop(L, 1);
 	mpstream_flush(&stream);
 	ok(strncmp(ibuf->buf, "\x81\xa1k\x81\xa1x\xc3", ibuf_used(ibuf)) == 0,
@@ -77,7 +77,7 @@ test_translation_in_encoding(lua_State *L)
 	lua_pushboolean(L, true);
 	lua_settable(L, -3);
 	luamp_encode_with_translation(L, luaL_msgpack_default, &stream, 1,
-				      translation);
+				      translation, NULL);
 	mpstream_flush(&stream);
 	ok(strncmp(ibuf->buf, "\x81\x00\xc3", ibuf_used(ibuf)) == 0,
 	   "only keys with MP_STRING type are translated");
@@ -91,7 +91,7 @@ test_translation_in_encoding(lua_State *L)
 	lua_pushboolean(L, false);
 	lua_settable(L, -3);
 	luamp_encode_with_translation(L, luaL_msgpack_default, &stream, 1,
-				      translation);
+				      translation, NULL);
 	lua_pop(L, 1);
 	mpstream_flush(&stream);
 	ok(strncmp(ibuf->buf, "\x82\x00\xc2\x00\xc3", ibuf_used(ibuf)) == 0,

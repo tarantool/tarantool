@@ -297,8 +297,11 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
  * @param cfg configuration
  * @param idx stack index
  * @param field conversion result
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
  */
-void
+int
 luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 		  struct luaL_field *field);
 
@@ -329,7 +332,8 @@ luaL_checkfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 		luaT_error(L);
 	if (field->type != MP_EXT || field->ext_type != MP_UNKNOWN_EXTENSION)
 		return;
-	luaL_convertfield(L, cfg, idx, field);
+	if (luaL_convertfield(L, cfg, idx, field) != 0)
+		luaT_error(L);
 }
 
 /* }}} Fill luaL_field */

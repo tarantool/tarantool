@@ -91,39 +91,45 @@ luamp_get(struct lua_State *L, int idx, size_t *data_len);
 /**
  * Recursive version of `luamp_encode_with_translation`.
  */
-enum mp_type
+int
 luamp_encode_with_translation_r(struct lua_State *L,
 				struct luaL_serializer *cfg,
 				struct mpstream *stream,
 				struct luaL_field *field, int level,
-				struct mh_strnu32_t *translation);
+				struct mh_strnu32_t *translation,
+				enum mp_type *type_out);
 
-static inline enum mp_type
+static inline int
 luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg,
 	       struct mpstream *stream, struct luaL_field *field, int level)
 {
 	return luamp_encode_with_translation_r(L, cfg, stream, field,
-					       level, NULL);
+					       level, NULL, NULL);
 }
 
 /**
- * Recursion base for `luamp_encode_with_tranlsation_r`: recursively encodes Lua
+ * Recursion base for `luamp_encode_with_translation_r`: recursively encodes Lua
  * value at the top of the stack, using a translation table: if a  first-level
  * `MP_MAP` key has `MP_STRING` type, tries to look it up in the translation
  * table and replace it with the translation, if found.
  *
  * The translation table must use `lua_hash` as the hash function.
+ *
+ * Return:
+ *  0 - on success
+ * -1 - on error (diag is set)
  */
-enum mp_type
+int
 luamp_encode_with_translation(struct lua_State *L, struct luaL_serializer *cfg,
 			      struct mpstream *stream, int index,
-			      struct mh_strnu32_t *translation);
+			      struct mh_strnu32_t *translation,
+			      enum mp_type *type);
 
-static inline enum mp_type
+static inline int
 luamp_encode(struct lua_State *L, struct luaL_serializer *cfg,
 	     struct mpstream *stream, int index)
 {
-	return luamp_encode_with_translation(L, cfg, stream, index, NULL);
+	return luamp_encode_with_translation(L, cfg, stream, index, NULL, NULL);
 }
 
 void
