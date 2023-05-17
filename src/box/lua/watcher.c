@@ -180,18 +180,22 @@ lbox_broadcast(struct lua_State *L)
 	struct ibuf *ibuf = cord_ibuf_take();
 	const char *data = NULL;
 	const char *data_end = NULL;
+	int rc = -1;
 	if (!lua_isnoneornil(L, 2)) {
 		struct mpstream stream;
 		mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
 			      luamp_error, L);
-		luamp_encode(L, luaL_msgpack_default, &stream, 2);
+		if (luamp_encode(L, luaL_msgpack_default, &stream, 2) != 0)
+			goto cleanup;
 		mpstream_flush(&stream);
 		data = ibuf->rpos;
 		data_end = data + ibuf_used(ibuf);
 	}
 	box_broadcast(key, key_len, data, data_end);
+	rc = 0;
+cleanup:
 	cord_ibuf_put(ibuf);
-	return 0;
+	return rc == 0 ? 0 : luaT_error(L);
 }
 
 void

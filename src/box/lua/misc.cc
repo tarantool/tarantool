@@ -67,10 +67,13 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 	struct mpstream stream;
 	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
 			luamp_error, L);
-	luamp_encode_tuple(L, luaL_msgpack_default, &stream, idx);
+	if (luamp_encode_tuple(L, luaL_msgpack_default, &stream, idx) != 0) {
+		region_truncate(gc, used);
+		return NULL;
+	}
 	mpstream_flush(&stream);
 	*p_len = region_used(gc) - used;
-	return (char *) region_join_xc(gc, *p_len);
+	return (char *)xregion_join(gc, *p_len);
 }
 
 int
@@ -86,11 +89,16 @@ lbox_normalize_position(lua_State *L, int idx, int space_id, int index_id,
 		*packed_pos_end = *packed_pos + size;
 	} else if (lua_istable(L, idx) || luaT_istuple(L, idx) != NULL) {
 		size_t size;
+		size_t svp = region_used(&fiber()->gc);
 		const char *tuple = lbox_encode_tuple_on_gc(L, idx, &size);
+		if (tuple == NULL)
+			return -1;
 		if (box_index_tuple_position(space_id, index_id, tuple,
 					     tuple + size, packed_pos,
-					     packed_pos_end) != 0)
+					     packed_pos_end) != 0) {
+			region_truncate(&fiber()->gc, svp);
 			return -1;
+		}
 	} else {
 		diag_set(ClientError, ER_ITERATOR_POSITION);
 		return -1;
@@ -282,11 +290,13 @@ lbox_select(lua_State *L)
 	int iterator = lua_tonumber(L, 3);
 	uint32_t offset = lua_tonumber(L, 4);
 	uint32_t limit = lua_tonumber(L, 5);
+	bool fetch_pos = lua_toboolean(L, 8);
 
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 6, &key_len);
+	if (key == NULL)
+		goto fail;
 	const char *packed_pos, *packed_pos_end;
-	bool fetch_pos = lua_toboolean(L, 8);
 	if (lbox_normalize_position(L, 7, space_id, index_id, &packed_pos,
 				    &packed_pos_end) != 0)
 		goto fail;

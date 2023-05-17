@@ -130,11 +130,11 @@ luaT_pushtupleornil(struct lua_State *L, struct tuple *tuple)
 	return 1;
 }
 
-void
+int
 luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
 		  struct mpstream *stream, int index);
 
-void
+int
 luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 		   struct mpstream *stream, int index);
 

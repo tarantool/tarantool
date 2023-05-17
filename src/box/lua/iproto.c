@@ -191,6 +191,8 @@ push_iproto_protocol_features(struct lua_State *L)
  * table. The Lua table is encoded to MsgPack using IPROTO key translation
  * table.
  * In both cases, the result is stored on the fiber region.
+ *
+ * Return encoded packet or NULL on encoding error with diag set.
  */
 static const char *
 encode_packet(struct lua_State *L, int idx, size_t *mp_len)
@@ -203,17 +205,15 @@ encode_packet(struct lua_State *L, int idx, size_t *mp_len)
 		return memcpy(mp, arg, *mp_len);
 	}
 	assert(packet_part_type == LUA_TTABLE);
-	/*
-	 * FIXME(gh-7939): `luamp_error` and `luamp_encode_with_translation` can
-	 * throw a Lua exception, which we cannot catch, and cause the fiber
-	 * region to leak.
-	 */
 	struct mpstream stream;
 	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
 		      luamp_error, L);
 	size_t used = region_used(gc);
-	luamp_encode_with_translation(L, luaL_msgpack_default, &stream, idx,
-				      iproto_key_translation);
+	if (luamp_encode_with_translation(L, luaL_msgpack_default, &stream, idx,
+					  iproto_key_translation, NULL) != 0) {
+		region_truncate(gc, used);
+		return NULL;
+	}
 	mpstream_flush(&stream);
 	*mp_len = region_used(gc) - used;
 	return xregion_join(gc, *mp_len);
@@ -245,14 +245,20 @@ lbox_iproto_send(struct lua_State *L)
 	struct region *gc = &fiber()->gc;
 	size_t used = region_used(gc);
 	size_t header_len;
+	int rc = -1;
 	const char *header = encode_packet(L, 2, &header_len);
+	if (header == NULL)
+		goto cleanup;
 	size_t body_len = 0;
 	const char *body = NULL;
-	if (n_args == 3)
+	if (n_args == 3) {
 		body = encode_packet(L, 3, &body_len);
-	int rc = box_iproto_send(sid,
-				 header, header + header_len,
-				 body, body + body_len);
+		if (body == NULL)
+			goto cleanup;
+	}
+	rc = box_iproto_send(sid, header, header + header_len, body,
+			     body + body_len);
+cleanup:
 	region_truncate(gc, used);
 	return (rc == 0) ? 0 : luaT_error(L);
 }

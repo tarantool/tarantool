@@ -3578,14 +3578,16 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 				      region_alloc_cb, set_encode_error,
 				      &is_error);
 			lua_pushvalue(L, index);
-			luamp_encode_r(L, luaL_msgpack_default, &stream,
-				       &field, 0);
+			int rc = luamp_encode_r(L, luaL_msgpack_default,
+						&stream, &field, 0);
 			lua_pop(L, 1);
+			if (rc != 0)
+				goto error;
 			mpstream_flush(&stream);
 			if (is_error) {
 				diag_set(OutOfMemory, stream.pos - stream.buf,
 					 "mpstream_flush", "stream");
-				return NULL;
+				goto error;
 			}
 			uint32_t size = region_used(region) - used;
 			char *raw = region_join(region, size);
@@ -3594,8 +3596,8 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 					 "raw");
 				goto error;
 			}
-			int rc = is_map ? mem_copy_map(&val[i], raw, size) :
-				 mem_copy_array(&val[i], raw, size);
+			rc = is_map ? mem_copy_map(&val[i], raw, size) :
+			     mem_copy_array(&val[i], raw, size);
 			if (rc != 0)
 				goto error;
 			region_truncate(region, used);
