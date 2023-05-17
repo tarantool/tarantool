@@ -45,6 +45,7 @@
 #include "trivia/util.h"
 #include "diag.h"
 #include "lua/utils.h"
+#include "tt_static.h"
 
 int luaL_map_metatable_ref = LUA_REFNIL;
 int luaL_array_metatable_ref = LUA_REFNIL;
@@ -249,12 +250,12 @@ lua_gettable_wrapper(lua_State *L)
 	return 1;
 }
 
-static void
+static int
 lua_field_inspect_ucdata(struct lua_State *L, struct luaL_serializer *cfg,
 			int idx, struct luaL_field *field)
 {
 	if (!cfg->encode_load_metatables)
-		return;
+		return 0;
 
 	/*
 	 * Try to call LUAL_SERIALIZE method on udata/cdata
@@ -266,17 +267,21 @@ lua_field_inspect_ucdata(struct lua_State *L, struct luaL_serializer *cfg,
 	lua_pushvalue(L, idx);
 	lua_pushliteral(L, LUAL_SERIALIZE);
 	if (lua_pcall(L, 2, 1, 0) == 0  && !lua_isnil(L, -1)) {
-		if (!lua_isfunction(L, -1))
-			luaL_error(L, "invalid " LUAL_SERIALIZE  " value");
+		if (!lua_isfunction(L, -1)) {
+			diag_set(LuajitError,
+				 "invalid " LUAL_SERIALIZE " value");
+			return -1;
+		}
 		/* copy object itself */
 		lua_pushvalue(L, idx);
 		lua_pcall(L, 1, 1, 0);
 		/* replace obj with the unpacked value */
 		lua_replace(L, idx);
 		if (luaL_tofield(L, cfg, idx, field) < 0)
-			luaT_error(L);
+			return -1;
 	} /* else ignore lua_gettable exceptions */
 	lua_settop(L, top); /* remove temporary objects */
+	return 0;
 }
 
 /**
@@ -413,7 +418,7 @@ lua_field_inspect_table(struct lua_State *L, struct luaL_serializer *cfg,
 	return 0;
 }
 
-static void
+static int
 lua_field_tostring(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 		   struct luaL_field *field)
 {
@@ -423,8 +428,7 @@ lua_field_tostring(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 	lua_call(L, 1, 1);
 	lua_replace(L, idx);
 	lua_settop(L, top);
-	if (luaL_tofield(L, cfg, idx, field) < 0)
-		luaT_error(L);
+	return luaL_tofield(L, cfg, idx, field);
 }
 
 int
@@ -589,7 +593,7 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 	return 0;
 }
 
-void
+int
 luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 		  struct luaL_field *field)
 {
@@ -606,10 +610,12 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 			 */
 			uint32_t ctypeid;
 			luaL_tocpointer(L, idx, &ctypeid);
-			if (ctypeid > CTID_CTYPEID)
-				lua_field_inspect_ucdata(L, cfg, idx, field);
+			if (ctypeid > CTID_CTYPEID &&
+			    lua_field_inspect_ucdata(L, cfg, idx, field) != 0)
+				return -1;
 		} else if (type == LUA_TUSERDATA) {
-			lua_field_inspect_ucdata(L, cfg, idx, field);
+			if (lua_field_inspect_ucdata(L, cfg, idx, field) != 0)
+				return -1;
 		}
 	}
 
@@ -618,15 +624,17 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 		lua_field_tostring(L, cfg, idx, field);
 
 	if (field->type != MP_EXT || field->ext_type != MP_UNKNOWN_EXTENSION)
-		return;
+		return 0;
 
 	if (cfg->encode_invalid_as_nil) {
 		field->type = MP_NIL;
-		return;
+		return 0;
 	}
 
-	luaL_error(L, "unsupported Lua type '%s'",
-		   lua_typename(L, lua_type(L, idx)));
+	diag_set(LuajitError,
+		 tt_sprintf("unsupported Lua type '%s'",
+			    lua_typename(L, lua_type(L, idx))));
+	return -1;
 }
 
 /* }}} Fill luaL_field */

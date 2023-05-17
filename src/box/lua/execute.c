@@ -400,9 +400,11 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		bool is_error = false;
 		mpstream_init(&stream, region, region_reserve_cb,
 			      region_alloc_cb, set_encode_error, &is_error);
-		lua_pushvalue(L, -1);
-		luamp_encode_r(L, luaL_msgpack_default, &stream, &field, 0);
-		lua_pop(L, 1);
+		if (luamp_encode_r(L, luaL_msgpack_default, &stream,
+				   &field, 0) != 0) {
+			region_truncate(region, used);
+			return -1;
+		}
 		mpstream_flush(&stream);
 		if (is_error) {
 			region_truncate(region, used);

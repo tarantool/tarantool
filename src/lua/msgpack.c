@@ -49,6 +49,7 @@
 #include "mp_uuid.h" /* mp_decode_uuid() */
 #include "mp_datetime.h"
 #include "mp_interval.h"
+#include "tt_static.h"
 
 #include "cord_buf.h"
 #include <fiber.h>
@@ -197,13 +198,14 @@ translate_map_key_field(struct luaL_field *field, uint32_t hash,
 	}
 }
 
-enum mp_type
+int
 luamp_encode_with_translation_r(struct lua_State *L,
 				struct luaL_serializer *cfg,
 				struct mpstream *stream,
 				struct luaL_field *field,
 				int level,
-				struct mh_strnu32_t *translation)
+				struct mh_strnu32_t *translation,
+				enum mp_type *type_out)
 {
 	int top = lua_gettop(L);
 	enum mp_type type;
@@ -214,82 +216,104 @@ restart: /* used by MP_EXT of unidentified subtype */
 	switch (field->type) {
 	case MP_UINT:
 		mpstream_encode_uint(stream, field->ival);
-		return MP_UINT;
+		type = MP_UINT;
+		break;
 	case MP_STR:
 		mpstream_encode_strn(stream, field->sval.data, field->sval.len);
-		return MP_STR;
+		type = MP_STR;
+		break;
 	case MP_BIN:
 		mpstream_encode_strn(stream, field->sval.data, field->sval.len);
-		return MP_BIN;
+		type = MP_BIN;
+		break;
 	case MP_INT:
 		mpstream_encode_int(stream, field->ival);
-		return MP_INT;
+		type = MP_INT;
+		break;
 	case MP_FLOAT:
 		mpstream_encode_float(stream, field->fval);
-		return MP_FLOAT;
+		type = MP_FLOAT;
+		break;
 	case MP_DOUBLE:
 		mpstream_encode_double(stream, field->dval);
-		return MP_DOUBLE;
+		type = MP_DOUBLE;
+		break;
 	case MP_BOOL:
 		mpstream_encode_bool(stream, field->bval);
-		return MP_BOOL;
+		type = MP_BOOL;
+		break;
 	case MP_NIL:
 		mpstream_encode_nil(stream);
-		return MP_NIL;
+		type = MP_NIL;
+		break;
 	case MP_MAP:
 		/* Map */
 		if (level >= cfg->encode_max_depth) {
 			if (! cfg->encode_deep_as_nil) {
-				return luaL_error(L, "Too high nest level - %d",
-						  level + 1);
+				diag_set(LuajitError,
+					 tt_sprintf("Too high nest level - %d",
+						    level + 1));
+				return -1;
 			}
 			mpstream_encode_nil(stream); /* Limit nested maps */
-			return MP_NIL;
+			type = MP_NIL;
+			break;
 		}
 		mpstream_encode_map(stream, field->size);
 		lua_pushnil(L);  /* first key */
 		while (lua_next(L, top) != 0) {
 			lua_pushvalue(L, -2); /* push a copy of key to top */
 			if (luaL_tofield(L, cfg, lua_gettop(L), field) < 0)
-				return luaT_error(L);
+				goto error;
 			if (translation != NULL && level == 0 &&
 			    field->type == MP_STR)
 				translate_map_key_field(field,
 							lua_hashstring(L, -1),
 							translation);
-			luamp_encode_with_translation_r(L, cfg, stream, field,
-							level + 1, translation);
+			if (luamp_encode_with_translation_r(
+					L, cfg, stream, field, level + 1,
+					translation, NULL) != 0)
+				goto error;
 			lua_pop(L, 1); /* pop a copy of key */
 			if (luaL_tofield(L, cfg, lua_gettop(L), field) < 0)
-				return luaT_error(L);
-			luamp_encode_with_translation_r(L, cfg, stream, field,
-							level + 1, translation);
+				goto error;
+			if (luamp_encode_with_translation_r(
+					L, cfg, stream, field, level + 1,
+					translation, NULL) != 0)
+				goto error;
 			lua_pop(L, 1); /* pop value */
 		}
 		assert(lua_gettop(L) == top);
-		return MP_MAP;
+		type = MP_MAP;
+		break;
 	case MP_ARRAY:
 		/* Array */
 		if (level >= cfg->encode_max_depth) {
 			if (! cfg->encode_deep_as_nil) {
-				return luaL_error(L, "Too high nest level - %d",
-						  level + 1);
+				diag_set(LuajitError,
+					 tt_sprintf("Too high nest level - %d",
+						    level + 1));
+				return -1;
 			}
 			mpstream_encode_nil(stream); /* Limit nested arrays */
-			return MP_NIL;
+			type = MP_NIL;
+			break;
 		}
 		uint32_t size = field->size;
 		mpstream_encode_array(stream, size);
 		for (uint32_t i = 0; i < size; i++) {
 			lua_rawgeti(L, top, i + 1);
 			if (luaL_tofield(L, cfg, top + 1, field) < 0)
-				return luaT_error(L);
-			luamp_encode_with_translation_r(L, cfg, stream, field,
-							level + 1, translation);
+				goto error;
+			if (luamp_encode_with_translation_r(
+					L, cfg, stream, field, level + 1,
+					translation, NULL) != 0)
+				goto error;
 			lua_pop(L, 1);
 		}
 		assert(lua_gettop(L) == top);
-		return MP_ARRAY;
+		type = MP_ARRAY;
+		break;
 	case MP_EXT:
 		switch (field->ext_type) {
 		case MP_DECIMAL:
@@ -303,7 +327,8 @@ restart: /* used by MP_EXT of unidentified subtype */
 				field->ext_type = MP_UNKNOWN_EXTENSION;
 				goto convert;
 			}
-			return luamp_encode_extension(L, top, stream);
+			type = luamp_encode_extension(L, top, stream);
+			break;
 		case MP_DATETIME:
 			mpstream_encode_datetime(stream, field->dateval);
 			break;
@@ -314,30 +339,38 @@ restart: /* used by MP_EXT of unidentified subtype */
 			data = luamp_get(L, top, &data_len);
 			if (data != NULL) {
 				mpstream_memcpy(stream, data, data_len);
-				return mp_typeof(*data);
+				type = mp_typeof(*data);
+				break;
 			}
 			/* Run trigger if type can't be encoded */
 			type = luamp_encode_extension(L, top, stream);
 			if (type != MP_EXT) {
 				/* Value has been packed by the trigger */
-				return type;
+				break;
 			}
 convert:
 			/* Try to convert value to serializable type */
-			luaL_convertfield(L, cfg, top, field);
+			if (luaL_convertfield(L, cfg, top, field) != 0)
+				goto error;
 			/* handled by luaL_convertfield */
 			assert(field->type != MP_EXT);
 			assert(lua_gettop(L) == top);
 			goto restart;
 		}
 	}
-	return MP_EXT;
+	if (type_out != NULL)
+		*type_out = type;
+	return 0;
+error:
+	lua_settop(L, top);
+	return -1;
 }
 
-enum mp_type
+int
 luamp_encode_with_translation(struct lua_State *L, struct luaL_serializer *cfg,
 			      struct mpstream *stream, int index,
-			      struct mh_strnu32_t *translation)
+			      struct mh_strnu32_t *translation,
+			      enum mp_type *type)
 {
 	int top = lua_gettop(L);
 	if (index < 0)
@@ -349,17 +382,19 @@ luamp_encode_with_translation(struct lua_State *L, struct luaL_serializer *cfg,
 	}
 
 	struct luaL_field field;
+	int rc = -1;
 	if (luaL_tofield(L, cfg, lua_gettop(L), &field) < 0)
-		return luaT_error(L);
-	enum mp_type top_type =
-		luamp_encode_with_translation_r(L, cfg, stream, &field, 0,
-						translation);
-
+		goto cleanup;
+	if (luamp_encode_with_translation_r(L, cfg, stream, &field, 0,
+					    translation, type) != 0)
+		goto cleanup;
+	rc = 0;
+cleanup:
 	if (!on_top) {
 		lua_remove(L, top + 1); /* remove a value copy */
 	}
 
-	return top_type;
+	return rc;
 }
 
 void
@@ -510,7 +545,13 @@ lua_msgpack_encode(lua_State *L)
 	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
 		      luamp_error, L);
 
-	luamp_encode(L, cfg, &stream, 1);
+	if (luamp_encode(L, cfg, &stream, 1) != 0) {
+		if (index > 1)
+			ibuf_truncate(buf, used);
+		else
+			cord_ibuf_drop(buf);
+		luaT_error(L);
+	}
 	mpstream_flush(&stream);
 
 	if (index > 1) {
@@ -748,7 +789,10 @@ lua_msgpack_object(struct lua_State *L)
 	struct mpstream stream;
 	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
 		      luamp_error, L);
-	luamp_encode(L, cfg, &stream, 1);
+	if (luamp_encode(L, cfg, &stream, 1) != 0) {
+		cord_ibuf_put(buf);
+		luaT_error(L);
+	}
 	mpstream_flush(&stream);
 	struct luamp_object *obj = luamp_new_object(L, ibuf_used(buf));
 	memcpy((char *)obj->data, buf->buf, obj->data_end - obj->data);

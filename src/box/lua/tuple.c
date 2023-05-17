@@ -145,7 +145,8 @@ luaT_tuple_encode_values(struct lua_State *L, struct ibuf *buf)
 	int argc = lua_gettop(L);
 	mpstream_encode_array(&stream, argc);
 	for (int k = 1; k <= argc; ++k) {
-		luamp_encode(L, luaL_msgpack_default, &stream, k);
+		if (luamp_encode(L, luaL_msgpack_default, &stream, k) != 0)
+			return -1;
 	}
 	mpstream_flush(&stream);
 	return 0;
@@ -189,7 +190,8 @@ luaT_tuple_encode_table(struct lua_State *L)
 	struct mpstream stream;
 	const struct luaT_tuple_encode_ctx *ctx = lua_topointer(L, 1);
 	ctx->mpstream_init_f(&stream, L, ctx->buffer);
-	luamp_encode_tuple(L, &tuple_serializer, &stream, 2);
+	if (luamp_encode_tuple(L, &tuple_serializer, &stream, 2) != 0)
+		luaT_error(L);
 	mpstream_flush(&stream);
 	return 0;
 }
@@ -313,9 +315,12 @@ lbox_tuple_new(lua_State *L)
 	box_tuple_format_t *fmt = box_tuple_format_default();
 	if (argc != 1 || (!lua_istable(L, 1) && !luaT_istuple(L, 1))) {
 		struct ibuf *buf = cord_ibuf_take();
-		luaT_tuple_encode_values(L, buf); /* may raise */
-		struct tuple *tuple = box_tuple_new(fmt, buf->buf,
-						    buf->buf + ibuf_used(buf));
+		struct tuple *tuple = NULL;
+
+		if (luaT_tuple_encode_values(L, buf) != 0)
+			goto cleanup;
+		tuple = box_tuple_new(fmt, buf->buf, buf->buf + ibuf_used(buf));
+cleanup:
 		cord_ibuf_drop(buf);
 		if (tuple == NULL)
 			return luaT_error(L);
@@ -417,49 +422,65 @@ lbox_tuple_slice(struct lua_State *L)
 	return end - start;
 }
 
-void
+int
 luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
 		  struct mpstream *stream, int index)
 {
 	/* Performs keyfy() logic */
 
 	struct tuple *tuple = luaT_istuple(L, index);
-	if (tuple != NULL)
-		return tuple_to_mpstream(tuple, stream);
+	if (tuple != NULL) {
+		tuple_to_mpstream(tuple, stream);
+		return 0;
+	}
 
 	size_t data_len;
 	const char *data = luamp_get(L, index, &data_len);
-	if (data != NULL)
-		return mpstream_memcpy(stream, data, data_len);
+	if (data != NULL) {
+		mpstream_memcpy(stream, data, data_len);
+		return 0;
+	}
 
 	struct luaL_field field;
 	if (luaL_tofield(L, cfg, index, &field) < 0)
-		luaT_error(L);
+		return -1;
+	int rc = -1;
 	if (field.type == MP_ARRAY) {
 		lua_pushvalue(L, index);
-		luamp_encode_r(L, cfg, stream, &field, 0);
+		rc = luamp_encode_r(L, cfg, stream, &field, 0);
 		lua_pop(L, 1);
 	} else if (field.type == MP_NIL) {
 		mpstream_encode_array(stream, 0);
+		rc = 0;
 	} else {
 		mpstream_encode_array(stream, 1);
 		lua_pushvalue(L, index);
-		luamp_encode_r(L, cfg, stream, &field, 0);
+		rc = luamp_encode_r(L, cfg, stream, &field, 0);
 		lua_pop(L, 1);
 	}
+	return rc;
 }
 
-void
+int
 luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 		   struct mpstream *stream, int index)
 {
 	struct tuple *tuple = luaT_istuple(L, index);
 	if (tuple != NULL) {
-		return tuple_to_mpstream(tuple, stream);
-	} else if (luamp_encode(L, cfg, stream, index) != MP_ARRAY) {
-		diag_set(ClientError, ER_TUPLE_NOT_ARRAY);
-		luaT_error(L);
+		tuple_to_mpstream(tuple, stream);
+		return 0;
 	}
+
+	enum mp_type type;
+	if (luamp_encode_with_translation(L, cfg, stream, index, NULL,
+					  &type) != 0)
+		return -1;
+	if (type != MP_ARRAY) {
+		diag_set(ClientError, ER_TUPLE_NOT_ARRAY);
+		return -1;
+	}
+
+	return 0;
 }
 
 void
@@ -581,6 +602,7 @@ lbox_tuple_transform(struct lua_State *L)
 		return 1;
 	}
 
+	struct tuple *new_tuple = NULL;
 	struct ibuf *buf = cord_ibuf_take();
 	struct mpstream stream;
 	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
@@ -601,7 +623,8 @@ lbox_tuple_transform(struct lua_State *L)
 		mpstream_encode_array(&stream, 3);
 		mpstream_encode_str(&stream, "!");
 		mpstream_encode_uint(&stream, offset);
-		luamp_encode(L, luaL_msgpack_default, &stream, i);
+		if (luamp_encode(L, luaL_msgpack_default, &stream, i) != 0)
+			goto cleanup;
 	}
 	mpstream_flush(&stream);
 
@@ -610,7 +633,6 @@ lbox_tuple_transform(struct lua_State *L)
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
 	struct tuple_format *format = tuple_format(tuple);
-	struct tuple *new_tuple = NULL;
 	/*
 	 * Can't use box_tuple_update() since transform must reset
 	 * the tuple format to default. The new tuple most likely
@@ -626,6 +648,7 @@ lbox_tuple_transform(struct lua_State *L)
 		new_tuple = tuple_new(box_tuple_format_default(),
 				      new_data, new_data + new_size);
 	region_truncate(region, used);
+cleanup:
 	cord_ibuf_put(buf);
 	if (new_tuple == NULL)
 		luaT_error(L);

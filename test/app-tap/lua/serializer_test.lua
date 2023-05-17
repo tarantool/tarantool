@@ -441,6 +441,12 @@ local function test_depth(test, s)
     for _ = 1, max_depth + 1 do t = {t} end
     local ok = pcall(s.encode, t)
     test:ok(not ok, "too deep encode depth")
+    -- In our CI normally LSAN do not report as a leak the memory allocated
+    -- using malloc due to suppression 'leak:libc.so*' in asan/lsan.supp.
+    -- But unexpectedly if stack trace depth is large as in this case
+    -- (>128 frames) then suppression does not work and CI breaks. Let's
+    -- run garbage collector to avoid this particular leak.
+    collectgarbage()
 
     s.cfg({encode_max_depth = max_depth + 1})
     ok = pcall(s.encode, t)
