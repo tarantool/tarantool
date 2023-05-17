@@ -135,6 +135,114 @@ test_key_def_new_func(const char *format, ...)
 }
 
 /**
+ * Checks that tuple_compare() -> func_index_compare() return value equals
+ * `expected`.
+ */
+static void
+test_check_tuple_compare_func(struct key_def *cmp_def,
+			      struct tuple *tuple_a, struct tuple *func_key_a,
+			      struct tuple *tuple_b, struct tuple *func_key_b,
+			      int expected)
+{
+	int r = tuple_compare(tuple_a, (hint_t)func_key_a,
+			      tuple_b, (hint_t)func_key_b, cmp_def);
+	r = r > 0 ? 1 : r < 0 ? -1 : 0;
+	is(r, expected, "func_index_compare(%s/%s, %s/%s) = %d, expected %d",
+	   tuple_str(tuple_a), tuple_str(func_key_a),
+	   tuple_str(tuple_b), tuple_str(func_key_b), r, expected);
+}
+
+static void
+test_func_compare(void)
+{
+	plan(6);
+	header();
+
+	struct key_def *func_def = test_key_def_new_func(
+		"[{%s%u%s%s%s%b}{%s%u%s%s%s%b}]",
+		"field", 0, "type", "string", "is_nullable", 1,
+		"field", 1, "type", "string", "is_nullable", 1);
+
+	struct key_def *pk_def = test_key_def_new(
+		"[{%s%u%s%s}]",
+		"field", 1, "type", "unsigned");
+
+	struct key_def *cmp_def = key_def_merge(func_def, pk_def);
+	/* Just like when `opts->is_unique == true`, see index_def_new(). */
+	cmp_def->unique_part_count = func_def->part_count;
+
+	struct testcase {
+		int expected_result;
+		struct tuple *tuple_a;
+		struct tuple *tuple_b;
+		struct tuple *func_key_a;
+		struct tuple *func_key_b;
+	};
+
+	struct testcase testcases[] = {
+		{
+			-1, /* func_key_a < func_key_b */
+			test_tuple_new("[%s%u%s]", "--", 0, "--"),
+			test_tuple_new("[%s%u%s]", "--", 0, "--"),
+			test_tuple_new("[%sNIL]", "aa"),
+			test_tuple_new("[%s%s]", "aa", "bb"),
+		}, {
+			1, /* func_key_a > func_key_b */
+			test_tuple_new("[%s%u%s]", "--", 0, "--"),
+			test_tuple_new("[%s%u%s]", "--", 0, "--"),
+			test_tuple_new("[%s%s]", "aa", "bb"),
+			test_tuple_new("[%sNIL]", "aa"),
+		}, {
+			0, /* func_key_a == func_key_b, pk not compared */
+			test_tuple_new("[%s%u%s]", "--", 10, "--"),
+			test_tuple_new("[%s%u%s]", "--", 20, "--"),
+			test_tuple_new("[%s%s]", "aa", "bb"),
+			test_tuple_new("[%s%s]", "aa", "bb"),
+		}, {
+			-1, /* func_key_a == func_key_b, pk_a < pk_b */
+			test_tuple_new("[%s%u%s]", "--", 30, "--"),
+			test_tuple_new("[%s%u%s]", "--", 40, "--"),
+			test_tuple_new("[%sNIL]", "aa"),
+			test_tuple_new("[%sNIL]", "aa"),
+		}, {
+			1, /* func_key_a == func_key_b, pk_a > pk_b */
+			test_tuple_new("[%s%u%s]", "--", 60, "--"),
+			test_tuple_new("[%s%u%s]", "--", 50, "--"),
+			test_tuple_new("[%sNIL]", "aa"),
+			test_tuple_new("[%sNIL]", "aa"),
+		}, {
+			0, /* func_key_a == func_key_b, pk_a == pk_b */
+			test_tuple_new("[%s%u%s]", "--", 70, "--"),
+			test_tuple_new("[%s%u%s]", "--", 70, "--"),
+			test_tuple_new("[%sNIL]", "aa"),
+			test_tuple_new("[%sNIL]", "aa"),
+		}
+	};
+
+	for (size_t i = 0; i < lengthof(testcases); i++) {
+		struct testcase *t = &testcases[i];
+		test_check_tuple_compare_func(cmp_def,
+					      t->tuple_a, t->func_key_a,
+					      t->tuple_b, t->func_key_b,
+					      t->expected_result);
+	}
+
+	for (size_t i = 0; i < lengthof(testcases); i++) {
+		struct testcase *t = &testcases[i];
+		tuple_delete(t->tuple_a);
+		tuple_delete(t->tuple_b);
+		tuple_delete(t->func_key_a);
+		tuple_delete(t->func_key_b);
+	}
+	key_def_delete(func_def);
+	key_def_delete(pk_def);
+	key_def_delete(cmp_def);
+
+	footer();
+	check_plan();
+}
+
+/**
  * Checks that tuple_compare_with_key with cmp_def of functional index
  * returns the same result as comparison of concatenated func and primary keys.
  */
@@ -217,6 +325,8 @@ test_func_compare_with_key(void)
 	for (unsigned int i = 0; i < lengthof(keys); i++)
 		free(keys[i]);
 	tuple_delete(func_key);
+	tuple_delete(tuple);
+	tuple_delete(model);
 	key_def_delete(def);
 	key_def_delete(pk_def);
 	key_def_delete(cmp_def);
@@ -341,9 +451,10 @@ test_tuple_validate_key_parts_raw(void)
 static int
 test_main(void)
 {
-	plan(3);
+	plan(4);
 	header();
 
+	test_func_compare();
 	test_func_compare_with_key();
 	test_tuple_extract_key_raw_slowpath_nullable();
 	test_tuple_validate_key_parts_raw();
