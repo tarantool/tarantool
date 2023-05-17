@@ -674,7 +674,7 @@ tuple_compare_slowpath(struct tuple *tuple_a, hint_t tuple_a_hint,
 	if (!is_nullable || !was_null_met)
 		return 0;
 	/*
-	 * Inxex parts are equal and contain NULLs. So use
+	 * Index parts are equal and contain NULLs. So use
 	 * extended parts only.
 	 */
 	end = key_def->parts + key_def->part_count;
@@ -819,17 +819,21 @@ tuple_compare_with_key_slowpath(struct tuple *tuple, hint_t tuple_hint,
  * will point to the first field that differ or to the end of key or
  * part_count + 1 field in order.
  * Key arguments must not be NULL, allowed to be NULL if dereferenced.
+ * Set was_null_met to true if at least one part is NULL, to false otherwise.
  */
 template<bool is_nullable>
 static inline int
 key_compare_and_skip_parts(const char **key_a, const char **key_b,
-			   uint32_t part_count, struct key_def *key_def)
+			   uint32_t part_count, struct key_def *key_def,
+			   bool *was_null_met)
 {
 	assert(is_nullable == key_def->is_nullable);
 	assert(key_a != NULL && key_b != NULL);
 	assert((*key_a != NULL && *key_b != NULL) || part_count == 0);
 	struct key_part *part = key_def->parts;
 	int rc;
+	*was_null_met = false;
+
 	if (likely(part_count == 1)) {
 		enum mp_type a_type = mp_typeof(**key_a);
 		enum mp_type b_type = mp_typeof(**key_b);
@@ -838,8 +842,10 @@ key_compare_and_skip_parts(const char **key_a, const char **key_b,
 						 part->coll);
 		} else if (a_type == MP_NIL) {
 			rc = b_type == MP_NIL ? 0 : -1;
+			*was_null_met = true;
 		} else if (b_type == MP_NIL) {
 			rc = 1;
+			*was_null_met = true;
 		} else {
 			rc = tuple_compare_field_with_type(*key_a, a_type,
 							   *key_b, b_type,
@@ -867,9 +873,11 @@ key_compare_and_skip_parts(const char **key_a, const char **key_b,
 		enum mp_type a_type = mp_typeof(**key_a);
 		enum mp_type b_type = mp_typeof(**key_b);
 		if (a_type == MP_NIL) {
+			*was_null_met = true;
 			if (b_type != MP_NIL)
 				return -1;
 		} else if (b_type == MP_NIL) {
+			*was_null_met = true;
 			return 1;
 		} else {
 			rc = tuple_compare_field_with_type(*key_a, a_type,
@@ -886,10 +894,11 @@ key_compare_and_skip_parts(const char **key_a, const char **key_b,
 template<bool is_nullable>
 static inline int
 key_compare_parts(const char *key_a, const char *key_b, uint32_t part_count,
-		  struct key_def *key_def)
+		  struct key_def *key_def, bool *was_null_met)
 {
 	return key_compare_and_skip_parts<is_nullable>(&key_a, &key_b,
-						       part_count, key_def);
+						       part_count, key_def,
+						       was_null_met);
 }
 
 template<bool is_nullable, bool has_optional_parts>
@@ -914,8 +923,9 @@ tuple_compare_with_key_sequential(struct tuple *tuple, hint_t tuple_hint,
 		assert(field_count >= part_count);
 		cmp_part_count = part_count;
 	}
+	bool unused;
 	rc = key_compare_parts<is_nullable>(tuple_key, key, cmp_part_count,
-					    key_def);
+					    key_def, &unused);
 	if (!has_optional_parts || rc != 0)
 		return rc;
 	/*
@@ -949,12 +959,13 @@ key_compare(const char *key_a, uint32_t part_count_a, hint_t key_a_hint,
 	assert(part_count_b <= key_def->part_count);
 	uint32_t part_count = MIN(part_count_a, part_count_b);
 	assert(part_count <= key_def->part_count);
+	bool unused;
 	if (! key_def->is_nullable) {
 		return key_compare_parts<false>(key_a, key_b, part_count,
-						key_def);
+						key_def, &unused);
 	} else {
 		return key_compare_parts<true>(key_a, key_b, part_count,
-					       key_def);
+					       key_def, &unused);
 	}
 }
 
@@ -978,8 +989,10 @@ tuple_compare_sequential(struct tuple *tuple_a, hint_t tuple_a_hint,
 	if (!has_optional_parts && !is_nullable) {
 		assert(fc_a >= key_def->part_count);
 		assert(fc_b >= key_def->part_count);
+		bool unused;
 		return key_compare_parts<false>(key_a, key_b,
-						key_def->part_count, key_def);
+						key_def->part_count, key_def,
+						&unused);
 	}
 	bool was_null_met = false;
 	struct key_part *part = key_def->parts;
@@ -1400,13 +1413,17 @@ static const comparator_with_key_signature cmp_wk_arr[] = {
 
 /**
  * A functional index tuple compare.
- * tuple_a_hint and tuple_b_hint are expected to be valid
- * pointers to functional key memory. These keys have been already
- * validated and are represented as a MsgPack array with exactly
- * func_index_part_count parts. The cmp_def has part_count > func_index_part_count,
- * since it was  produced by key_def_merge() of the functional key part
- * and the primary key. So its tail parts are taken from primary
- * index key definition.
+ * tuple_a_hint and tuple_b_hint are expected to be valid pointers to functional
+ * key memory. These keys are represented as a MsgPack array with the number of
+ * elements equal to the functional index definition part_count (let's denote
+ * it as func_index_part_count). The keys have been already validated by
+ * key_list_iterator_next().
+ *
+ * In case of unique non-nullable index, the non-extended key_def is used as a
+ * cmp_def (see memtx_tree_index_new_tpl()). Otherwise, the extended cmp_def has
+ * part_count > func_index_part_count, since it was produced by key_def_merge()
+ * of the functional key part and the primary key. So its tail parts are taken
+ * from primary index key definition.
  */
 template<bool is_nullable>
 static inline int
@@ -1423,12 +1440,24 @@ func_index_compare(struct tuple *tuple_a, hint_t tuple_a_hint,
 	uint32_t part_count_a = mp_decode_array(&key_a);
 	assert(mp_typeof(*key_b) == MP_ARRAY);
 	uint32_t part_count_b = mp_decode_array(&key_b);
+	assert(part_count_a == part_count_b);
+	uint32_t key_part_count = part_count_a;
+	(void)part_count_b;
 
-	uint32_t key_part_count = MIN(part_count_a, part_count_b);
+	bool was_null_met;
 	int rc = key_compare_parts<is_nullable>(key_a, key_b, key_part_count,
-						cmp_def);
+						cmp_def, &was_null_met);
 	if (rc != 0)
 		return rc;
+	/*
+	 * Tuples with nullified fields may violate the uniqueness constraint
+	 * so if we encountered a nullified field while comparing the secondary
+	 * key parts we must proceed with comparing the primary key parts even
+	 * if the secondary index is unique.
+	 */
+	if (key_part_count == cmp_def->unique_part_count &&
+	    (!is_nullable || !was_null_met))
+		return 0;
 	/*
 	 * Primary index definition key compare.
 	 * It cannot contain nullable parts so the code is
@@ -1481,9 +1510,10 @@ func_index_compare_with_key(struct tuple *tuple, hint_t tuple_hint,
 	uint32_t tuple_key_count = mp_decode_array(&tuple_key);
 	uint32_t cmp_part_count = MIN(part_count, tuple_key_count);
 	cmp_part_count = MIN(cmp_part_count, key_def->part_count);
+	bool unused;
 	int rc = key_compare_and_skip_parts<is_nullable>(&tuple_key, &key,
 							 cmp_part_count,
-							 key_def);
+							 key_def, &unused);
 	if (rc != 0)
 		return rc;
 	/* Equals if nothing to compare. */
