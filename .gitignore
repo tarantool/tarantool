@@ -95,8 +95,8 @@ src/module.h
 tarantool-*.tar.gz
 perf/*.perftest
 test/enterprise-luatest
-test/enterprise-tap
 test/enterprise-unit
+test/etcd-client
 test/lib/
 test/unit/*.test
 test/unit/fiob
