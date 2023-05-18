@@ -1,7 +1,7 @@
 name: lango-stale-reviews
 on:
   schedule:
-    - cron:  '* */1 * * *'    # At every hour.
+    - cron:  '0 */1 * * *'    # At every hour.
   workflow_dispatch:
 
 jobs:
@@ -18,7 +18,7 @@ jobs:
       - name: Set up Python3
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.11'
       - name: Install dependencies
         run: pip install requests
       - name: Update dates
