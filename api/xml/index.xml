@@ -434,6 +434,10 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaaf3680ad4d7c8dd8baf2343835f5a57c" kind="enumvalue"><name>ER_NIL_UUID</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea239a05101944323ad6fcaf7ca5b7fa5d" kind="enumvalue"><name>ER_WRONG_FUNCTION_OPTIONS</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcead171fb352f7ef7a0af8ca47239c19a54" kind="enumvalue"><name>ER_MISSING_SYSTEM_SPACES</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa5d4077b86e6854e0a9d2bcd6c5044c4" kind="enumvalue"><name>ER_CLUSTER_NAME_MISMATCH</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcead7297ca7c91b50ce3fcc8b3007a19ea4" kind="enumvalue"><name>ER_REPLICASET_NAME_MISMATCH</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac9569e7aade2c60f8b8ef8b4952c510d" kind="enumvalue"><name>ER_INSTANCE_NAME_DUPLICATE</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaae80c04fbbd48c9e8d93fe46e2cbd0ee" kind="enumvalue"><name>ER_INSTANCE_NAME_MISMATCH</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
