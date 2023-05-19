@@ -144,37 +144,35 @@ _ = box.ctl.on_election(trig)
 box.cfg{replication_synchro_quorum=2}
 box.cfg{election_mode='candidate'}
 
-test_run:wait_cond(function() return #election_tbl == 4 end)
+test_run:wait_cond(function() return #election_tbl == 3 end)
 assert(election_tbl[1].state == 'follower')
-assert(election_tbl[2].state == 'follower')
 assert(election_tbl[2].term > election_tbl[1].term)
--- Vote is visible here already, but it is volatile.
 assert(election_tbl[2].vote == 1)
-assert(election_tbl[3].state == 'candidate')
-assert(election_tbl[3].vote == 1)
-assert(election_tbl[4].state == 'leader')
+assert(election_tbl[2].state == 'candidate')
+assert(election_tbl[2].vote == 1)
+assert(election_tbl[3].state == 'leader')
 
 box.cfg{election_mode='voter'}
-test_run:wait_cond(function() return #election_tbl == 5 end)
-assert(election_tbl[5].state == 'follower')
+test_run:wait_cond(function() return #election_tbl == 4 end)
+assert(election_tbl[4].state == 'follower')
 
 box.cfg{election_mode='off'}
-test_run:wait_cond(function() return #election_tbl == 6 end)
+test_run:wait_cond(function() return #election_tbl == 5 end)
 
 box.cfg{election_mode='manual'}
-test_run:wait_cond(function() return #election_tbl == 7 end)
-assert(election_tbl[7].state == 'follower')
+test_run:wait_cond(function() return #election_tbl == 6 end)
+assert(election_tbl[6].state == 'follower')
 
 box.ctl.promote()
 
-test_run:wait_cond(function() return #election_tbl == 10 end)
-assert(election_tbl[8].state == 'follower')
-assert(election_tbl[8].term == election_tbl[7].term + 1)
+test_run:wait_cond(function() return #election_tbl == 9 end)
+assert(election_tbl[7].state == 'follower')
+assert(election_tbl[7].term == election_tbl[6].term + 1)
 -- Vote is visible here already, but it is volatile.
+assert(election_tbl[7].vote == 1)
+assert(election_tbl[8].state == 'candidate')
 assert(election_tbl[8].vote == 1)
-assert(election_tbl[9].state == 'candidate')
-assert(election_tbl[9].vote == 1)
-assert(election_tbl[10].state == 'leader')
+assert(election_tbl[9].state == 'leader')
 
 test_run:cmd('stop server replica')
 test_run:cmd('delete server replica')
