@@ -40,7 +40,7 @@ static int test_result;
 static void
 raft_test_leader_election(void)
 {
-	raft_start_test(26);
+	raft_start_test(24);
 	struct raft_node node;
 	raft_node_create(&node);
 
@@ -68,7 +68,7 @@ raft_test_leader_election(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "elections with a new term");
 	is(raft_vote_count(&node.raft), 1, "single vote for self");
 	ok(node.update_count > 0, "trigger worked");
@@ -76,36 +76,22 @@ raft_test_leader_election(void)
 
 	/* Check if all async work is done properly. */
 
-	is(node.journal.size, 2, "2 records in the journal");
+	is(node.journal.size, 1, "1 record in the journal");
 	ok(raft_node_journal_check_row(
 		&node,
 		0 /* Index. */,
-		2 /* Term. */,
-		0 /* Vote. */
-	), "term is on disk");
-	ok(raft_node_journal_check_row(
-		&node,
-		1 /* Index. */,
 		2 /* Term. */,
 		1 /* Vote. */
-	), "vote is on disk");
+	), "term and vote are on disk");
 
-	is(node.net.count, 2, "2 pending messages");
+	is(node.net.count, 1, "1 pending message");
 	ok(raft_node_net_check_msg(&node,
 		0 /* Index. */,
-		RAFT_STATE_FOLLOWER /* State. */,
-		2 /* Term. */,
-		0 /* Vote. */,
-		NULL /* Vclock. */
-	), "term bump is sent");
-	ok(raft_node_net_check_msg(
-		&node,
-		1 /* Index. */,
 		RAFT_STATE_CANDIDATE /* State. */,
 		2 /* Term. */,
 		1 /* Vote. */,
-		"{0: 2}" /* Vclock. */
-	), "vote request is sent");
+		"{0: 1}" /* Vclock. */
+	), "term bump and vote are sent");
 	raft_node_net_drop(&node);
 
 	/* Simulate first response. Nothing should happen, quorum is 3. */
@@ -138,7 +124,7 @@ raft_test_leader_election(void)
 	/* New leader should do a broadcast when elected. */
 
 	ok(!node.has_work, "no work - broadcast should be done");
-	is(node.journal.size, 2, "no new rows in the journal - state change "
+	is(node.journal.size, 1, "no new rows in the journal - state change "
 	   "is not persisted");
 	is(node.net.count, 1, "1 pending message");
 	ok(raft_node_net_check_msg(&node,
@@ -172,7 +158,7 @@ raft_test_recovery(void)
 		RAFT_STATE_CANDIDATE /* State. */,
 		2 /* Term. */,
 		1 /* Vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "remote checkpoint of a candidate");
 
 	raft_checkpoint_local(&node.raft, &msg);
@@ -203,7 +189,7 @@ raft_test_recovery(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "election is finished");
 
 	/* Leader's checkpoint. */
@@ -236,7 +222,7 @@ raft_test_recovery(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "restart always as a follower");
 
 	is(raft_vote_count(&node.raft), 1, "vote count is restored correctly");
@@ -375,7 +361,7 @@ raft_test_vote(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 3}" /* Vclock. */
 	), "became candidate");
 
 	raft_node_destroy(&node);
@@ -428,7 +414,7 @@ raft_test_vote_skip(void)
 		0 /* Vote. */,
 		3 /* Volatile term. */,
 		0 /* Volatile vote. */,
-		"{0: 3}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "term bump to be able to vote again");
 	is(raft_node_send_vote_request(&node,
 		3 /* Term. */,
@@ -451,7 +437,7 @@ raft_test_vote_skip(void)
 		0 /* Vote. */,
 		4 /* Volatile term. */,
 		0 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 3}" /* Vclock. */
 	), "term is bumped, but vote request is ignored");
 
 	raft_node_cfg_is_enabled(&node, true);
@@ -508,7 +494,7 @@ raft_test_vote_skip(void)
 		0 /* Vote. */,
 		4 /* Volatile term. */,
 		0 /* Volatile vote. */,
-		"{0: 4, 1: 5, 2: 5}" /* Vclock. */
+		"{0: 3, 1: 5, 2: 5}" /* Vclock. */
 	), "vclock is bumped");
 
 	is(raft_node_send_vote_request(&node,
@@ -588,7 +574,7 @@ raft_test_vote_skip(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 3}" /* Vclock. */
 	), "term is bumped and became candidate");
 
 	raft_node_destroy(&node);
@@ -634,7 +620,7 @@ raft_test_vote_during_wal_write(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2, 1: 3, 2: 5}" /* Vclock. */
+		"{0: 1, 1: 3, 2: 5}" /* Vclock. */
 	), "became leader");
 	/*
 	 * Server1 WAL is blocked and it gets a vote request with a matching
@@ -664,7 +650,7 @@ raft_test_vote_during_wal_write(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 4, 1: 4, 2: 5}" /* Vclock. */
+		"{0: 3, 1: 4, 2: 5}" /* Vclock. */
 	), "canceled the vote for other node and voted for self");
 
 	raft_node_destroy(&node);
@@ -694,7 +680,7 @@ raft_test_vote_during_wal_write(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 4, 1: 10}" /* Vclock. */
+		"{0: 2, 1: 10}" /* Vclock. */
 	), "vote for self worked even though the WAL had non-empty queue");
 
 	raft_node_destroy(&node);
@@ -728,7 +714,7 @@ raft_test_leader_resign(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "became candidate");
 
 	raft_node_destroy(&node);
@@ -785,7 +771,7 @@ raft_test_leader_resign(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "became leader");
 
 	raft_node_net_drop(&node);
@@ -797,7 +783,7 @@ raft_test_leader_resign(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "the leader has resigned");
 	ok(raft_node_net_check_msg(&node,
 		0 /* Index. */,
@@ -824,7 +810,7 @@ raft_test_leader_resign(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "new election is waiting for WAL write");
 
 	/* Now another node wins the election earlier. */
@@ -839,7 +825,7 @@ raft_test_leader_resign(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "the leader is accepted");
 
 	/*
@@ -859,7 +845,7 @@ raft_test_leader_resign(void)
 		1 /* Vote. */,
 		4 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "the leader has resigned, new election is scheduled");
 	raft_node_unblock(&node);
 
@@ -882,7 +868,7 @@ raft_test_leader_resign(void)
 		1 /* Vote. */,
 		4 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "the leader is elected");
 
 	raft_node_destroy(&node);
@@ -1001,7 +987,7 @@ raft_test_heartbeat(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 3}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "enter candidate state when no heartbeats from the leader");
 
 	/* Non-candidate ignores heartbeats. */
@@ -1044,7 +1030,7 @@ raft_test_heartbeat(void)
 		1 /* Vote. */,
 		5 /* Volatile term. */,
 		0 /* Volatile vote. */,
-		"{0: 5}" /* Vclock. */
+		"{0: 4}" /* Vclock. */
 	), "nothing changed - waiting for WAL write");
 	raft_node_unblock(&node);
 
@@ -1073,7 +1059,7 @@ raft_test_election_timeout(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "enter candidate state");
 
 	ts = raft_time();
@@ -1087,7 +1073,7 @@ raft_test_election_timeout(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "re-enter candidate state");
 
 	/* Reconfiguration works when done during election. */
@@ -1105,7 +1091,7 @@ raft_test_election_timeout(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "still in the same term - new election timeout didn't expire");
 
 	raft_run_next_event();
@@ -1124,7 +1110,7 @@ raft_test_election_timeout(void)
 		1 /* Vote. */,
 		4 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 6}" /* Vclock. */
+		"{0: 3}" /* Vclock. */
 	), "re-enter candidate state");
 
 	/* Decrease election timeout to earlier than now. */
@@ -1142,7 +1128,7 @@ raft_test_election_timeout(void)
 		1 /* Vote. */,
 		5 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 8}" /* Vclock. */
+		"{0: 4}" /* Vclock. */
 	), "re-enter candidate state");
 
 	/*
@@ -1187,7 +1173,7 @@ raft_test_election_quorum(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "enter candidate state");
 
 	raft_node_cfg_election_quorum(&node, 3);
@@ -1209,7 +1195,7 @@ raft_test_election_quorum(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "enter leader state after another quorum lowering");
 
 	/* Quorum 1 allows to become leader right after WAL write. */
@@ -1223,7 +1209,7 @@ raft_test_election_quorum(void)
 	    1 /* Vote. */,
 	    3 /* Volatile term. */,
 	    1 /* Volatile vote. */,
-	    "{0: 4}" /* Vclock. */
+	    "{0: 3}" /* Vclock. */
 	), "became leader again immediately with 1 self vote");
 
 	raft_node_destroy(&node);
@@ -1277,7 +1263,7 @@ raft_test_death_timeout(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 3}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "enter candidate state when the new death timeout expires");
 
 	/* Decrease timeout to earlier than now. */
@@ -1301,7 +1287,7 @@ raft_test_death_timeout(void)
 		1 /* Vote. */,
 		4 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 5}" /* Vclock. */
+		"{0: 3}" /* Vclock. */
 	), "enter candidate state");
 
 	raft_node_destroy(&node);
@@ -1345,7 +1331,7 @@ raft_test_enable_disable(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 3}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "became candidate");
 
 	/* Multiple enabling does not break anything. */
@@ -1359,7 +1345,7 @@ raft_test_enable_disable(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 3}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "nothing changed");
 
 	/* Leader disable makes it forget he was a leader. */
@@ -1385,7 +1371,7 @@ raft_test_enable_disable(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 3}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "resigned from leader state");
 
 	/* Multiple disabling does not break anything. */
@@ -1400,7 +1386,7 @@ raft_test_enable_disable(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 3}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "nothing changed");
 
 	/* Disabled node still bumps the term when needed. */
@@ -1413,7 +1399,7 @@ raft_test_enable_disable(void)
 		0 /* Vote. */,
 		4 /* Volatile term. */,
 		0 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 3}" /* Vclock. */
 	), "term bump when disabled");
 	raft_node_destroy(&node);
 
@@ -1528,7 +1514,7 @@ raft_test_too_long_wal_write(void)
 		1 /* Vote. */,
 		4 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 6}" /* Vclock. */
+		"{0: 4}" /* Vclock. */
 	), "new term is started with vote for self");
 
 	/*
@@ -1559,7 +1545,7 @@ raft_test_too_long_wal_write(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "new term is started with vote for self");
 
 	raft_node_destroy(&node);
@@ -1674,7 +1660,7 @@ raft_test_bump_term_before_cfg()
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "new term is started with vote for self");
 
 	raft_node_stop(&node);
@@ -1714,7 +1700,7 @@ raft_test_bump_term_before_cfg()
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 3}" /* Vclock. */
 	), "started new term");
 
 	raft_node_destroy(&node);
@@ -1742,7 +1728,7 @@ raft_test_split_vote(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "elections with a new term");
 
 	/* Make so node 1 has votes 1 and 2. Node 3 has votes 3 and 4. */
@@ -1777,7 +1763,7 @@ raft_test_split_vote(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "a new term");
 
 	ok(node.raft.timer.repeat >= node.raft.election_timeout, "timeout is "
@@ -1814,7 +1800,7 @@ raft_test_split_vote(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "a new term");
 
 	/*
@@ -2165,7 +2151,7 @@ raft_test_pre_vote(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 3}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "elections once no one sees the leader");
 
 	raft_node_cfg_election_quorum(&node, 1);
@@ -2178,7 +2164,7 @@ raft_test_pre_vote(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 3}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "become leader on quorum change");
 
 	raft_cfg_is_candidate_later(&node.raft, false);
@@ -2191,7 +2177,7 @@ raft_test_pre_vote(void)
 		1 /* Vote. */,
 		3 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 3}" /* Vclock. */
+		"{0: 2}" /* Vclock. */
 	), "cfg_is_candidate_later doesn't disrupt leader");
 
 	is(raft_node_send_follower(
@@ -2210,7 +2196,7 @@ raft_test_pre_vote(void)
 		0 /* Vote. */,
 		4 /* Volatile term. */,
 		0 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 3}" /* Vclock. */
 	), "term bump after cfg_is_candidate_later makes node a voter.");
 
 	raft_cfg_is_candidate_later(&node.raft, true);
@@ -2223,7 +2209,7 @@ raft_test_pre_vote(void)
 		0 /* Vote. */,
 		4 /* Volatile term. */,
 		0 /* Volatile vote. */,
-		"{0: 4}" /* Vclock. */
+		"{0: 3}" /* Vclock. */
 	), "cfg_is_candidate_later doesn't transfer voter to a candidate");
 
 	is(raft_node_send_follower(
@@ -2242,7 +2228,7 @@ raft_test_pre_vote(void)
 		1 /* Vote. */,
 		5 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 6}" /* Vclock. */
+		"{0: 5}" /* Vclock. */
 	), "Term bump with cfg_is_candidate_later transfers voter to candiate");
 
 	is(raft_leader_idle(&node.raft), 0,
@@ -2280,7 +2266,7 @@ raft_test_pre_vote(void)
 		0 /* Vote. */,
 		6 /* Volatile term. */,
 		0 /* Volatile vote. */,
-		"{0: 7}" /* Vclock. */
+		"{0: 6}" /* Vclock. */
 	), "no elections on start when someone sees the leader");
 
 	ok(!raft_ev_is_active(&node.raft.timer),
@@ -2297,7 +2283,7 @@ raft_test_pre_vote(void)
 		0 /* Vote. */,
 		6 /* Volatile term. */,
 		0 /* Volatile vote. */,
-		"{0: 7}" /* Vclock. */
+		"{0: 6}" /* Vclock. */
 	), "no elections on becoming candidate when someone sees the leader");
 
 	ok(!raft_ev_is_active(&node.raft.timer),
