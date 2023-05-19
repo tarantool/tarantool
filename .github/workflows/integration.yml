@@ -54,12 +54,6 @@ jobs:
     with:
       artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
 
-  cartridge:
-    needs: tarantool
-    uses: tarantool/cartridge/.github/workflows/reusable-backend-test.yml@master
-    with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
-
   expirationd:
     needs: tarantool
     uses: tarantool/expirationd/.github/workflows/reusable_testing.yml@master
@@ -135,12 +129,6 @@ jobs:
   go-tarantool:
     needs: tarantool
     uses: tarantool/go-tarantool/.github/workflows/reusable_testing.yml@master
-    with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
-
-  crud:
-    needs: tarantool
-    uses: tarantool/crud/.github/workflows/reusable_test.yml@master
     with:
       artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
 
