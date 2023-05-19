@@ -1211,6 +1211,7 @@ raft_promote(struct raft *raft)
 		return;
 	raft_sm_schedule_new_term(raft, raft->volatile_term + 1);
 	raft_start_candidate(raft);
+	raft_sm_schedule_new_vote(raft, raft->self, raft->vclock);
 }
 
 void
