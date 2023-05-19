@@ -165,14 +165,11 @@ assert(election_tbl[6].state == 'follower')
 
 box.ctl.promote()
 
-test_run:wait_cond(function() return #election_tbl == 9 end)
-assert(election_tbl[7].state == 'follower')
+test_run:wait_cond(function() return #election_tbl == 8 end)
+assert(election_tbl[7].state == 'candidate')
 assert(election_tbl[7].term == election_tbl[6].term + 1)
--- Vote is visible here already, but it is volatile.
 assert(election_tbl[7].vote == 1)
-assert(election_tbl[8].state == 'candidate')
-assert(election_tbl[8].vote == 1)
-assert(election_tbl[9].state == 'leader')
+assert(election_tbl[8].state == 'leader')
 
 test_run:cmd('stop server replica')
 test_run:cmd('delete server replica')

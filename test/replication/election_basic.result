@@ -403,11 +403,11 @@ box.ctl.promote()
  | ---
  | ...
 
-test_run:wait_cond(function() return #election_tbl == 9 end)
+test_run:wait_cond(function() return #election_tbl == 8 end)
  | ---
  | - true
  | ...
-assert(election_tbl[7].state == 'follower')
+assert(election_tbl[7].state == 'candidate')
  | ---
  | - true
  | ...
@@ -415,20 +415,11 @@ assert(election_tbl[7].term == election_tbl[6].term + 1)
  | ---
  | - true
  | ...
--- Vote is visible here already, but it is volatile.
 assert(election_tbl[7].vote == 1)
  | ---
  | - true
  | ...
-assert(election_tbl[8].state == 'candidate')
- | ---
- | - true
- | ...
-assert(election_tbl[8].vote == 1)
- | ---
- | - true
- | ...
-assert(election_tbl[9].state == 'leader')
+assert(election_tbl[8].state == 'leader')
  | ---
  | - true
  | ...
