@@ -742,6 +742,15 @@ end_dump:
 		if (raft->volatile_vote == 0)
 			goto do_dump;
 		/*
+		 * Skip self. When vote is issued, own vclock can be smaller,
+		 * but that doesn't matter. Can always vote for self. Not having
+		 * this special case still works if the node is configured as a
+		 * candidate, but the node might log that it canceled a vote for
+		 * self, which is confusing.
+		 */
+		if (raft->volatile_vote == raft->self)
+			goto do_dump_with_vote;
+		/*
 		 * Vote and term bumps are persisted separately. This serves as
 		 * a flush of all transactions going to WAL right now so as the
 		 * current node could correctly compare its own vclock vs
@@ -751,15 +760,6 @@ end_dump:
 		 */
 		if (raft->volatile_term > raft->term)
 			goto do_dump;
-		/*
-		 * Skip self. When vote was issued, own vclock could be smaller,
-		 * but that doesn't matter. Can always vote for self. Not having
-		 * this special case still works if the node is configured as a
-		 * candidate, but the node might log that it canceled a vote for
-		 * self, which is confusing.
-		 */
-		if (raft->volatile_vote == raft->self)
-			goto do_dump_with_vote;
 		if (!raft_can_vote_for(raft, &raft->candidate_vclock)) {
 			say_info("RAFT: vote request for %u is canceled - the "
 				 "vclock is not acceptable anymore",

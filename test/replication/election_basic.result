@@ -338,7 +338,7 @@ box.cfg{election_mode='candidate'}
  | ---
  | ...
 
-test_run:wait_cond(function() return #election_tbl == 4 end)
+test_run:wait_cond(function() return #election_tbl == 3 end)
  | ---
  | - true
  | ...
@@ -346,28 +346,23 @@ assert(election_tbl[1].state == 'follower')
  | ---
  | - true
  | ...
-assert(election_tbl[2].state == 'follower')
- | ---
- | - true
- | ...
 assert(election_tbl[2].term > election_tbl[1].term)
  | ---
  | - true
  | ...
--- Vote is visible here already, but it is volatile.
 assert(election_tbl[2].vote == 1)
  | ---
  | - true
  | ...
-assert(election_tbl[3].state == 'candidate')
+assert(election_tbl[2].state == 'candidate')
  | ---
  | - true
  | ...
-assert(election_tbl[3].vote == 1)
+assert(election_tbl[2].vote == 1)
  | ---
  | - true
  | ...
-assert(election_tbl[4].state == 'leader')
+assert(election_tbl[3].state == 'leader')
  | ---
  | - true
  | ...
@@ -375,11 +370,11 @@ assert(election_tbl[4].state == 'leader')
 box.cfg{election_mode='voter'}
  | ---
  | ...
-test_run:wait_cond(function() return #election_tbl == 5 end)
+test_run:wait_cond(function() return #election_tbl == 4 end)
  | ---
  | - true
  | ...
-assert(election_tbl[5].state == 'follower')
+assert(election_tbl[4].state == 'follower')
  | ---
  | - true
  | ...
@@ -387,7 +382,7 @@ assert(election_tbl[5].state == 'follower')
 box.cfg{election_mode='off'}
  | ---
  | ...
-test_run:wait_cond(function() return #election_tbl == 6 end)
+test_run:wait_cond(function() return #election_tbl == 5 end)
  | ---
  | - true
  | ...
@@ -395,11 +390,11 @@ test_run:wait_cond(function() return #election_tbl == 6 end)
 box.cfg{election_mode='manual'}
  | ---
  | ...
-test_run:wait_cond(function() return #election_tbl == 7 end)
+test_run:wait_cond(function() return #election_tbl == 6 end)
  | ---
  | - true
  | ...
-assert(election_tbl[7].state == 'follower')
+assert(election_tbl[6].state == 'follower')
  | ---
  | - true
  | ...
@@ -408,32 +403,32 @@ box.ctl.promote()
  | ---
  | ...
 
-test_run:wait_cond(function() return #election_tbl == 10 end)
+test_run:wait_cond(function() return #election_tbl == 9 end)
  | ---
  | - true
  | ...
-assert(election_tbl[8].state == 'follower')
+assert(election_tbl[7].state == 'follower')
  | ---
  | - true
  | ...
-assert(election_tbl[8].term == election_tbl[7].term + 1)
+assert(election_tbl[7].term == election_tbl[6].term + 1)
  | ---
  | - true
  | ...
 -- Vote is visible here already, but it is volatile.
+assert(election_tbl[7].vote == 1)
+ | ---
+ | - true
+ | ...
+assert(election_tbl[8].state == 'candidate')
+ | ---
+ | - true
+ | ...
 assert(election_tbl[8].vote == 1)
  | ---
  | - true
  | ...
-assert(election_tbl[9].state == 'candidate')
- | ---
- | - true
- | ...
-assert(election_tbl[9].vote == 1)
- | ---
- | - true
- | ...
-assert(election_tbl[10].state == 'leader')
+assert(election_tbl[9].state == 'leader')
  | ---
  | - true
  | ...

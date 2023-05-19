@@ -1,7 +1,7 @@
 	*** main_f ***
 1..20
 	*** raft_test_leader_election ***
-    1..26
+    1..24
     ok 1 - 1 pending message at start
     ok 2 - trigger worked
     ok 3 - broadcast at start
@@ -9,25 +9,23 @@
     ok 5 - elections with a new term
     ok 6 - single vote for self
     ok 7 - trigger worked
-    ok 8 - 2 records in the journal
-    ok 9 - term is on disk
-    ok 10 - vote is on disk
-    ok 11 - 2 pending messages
-    ok 12 - term bump is sent
-    ok 13 - vote request is sent
-    ok 14 - vote response from 2
-    ok 15 - 2 votes - 1 self and 1 foreign
-    ok 16 - no work to do - not enough votes yet
-    ok 17 - still candidate, waiting for elections
-    ok 18 - trigger is the same
-    ok 19 - vote response from 3
-    ok 20 - 2 votes - 1 self and 2 foreign
-    ok 21 - became leader
-    ok 22 - trigger worked
-    ok 23 - no work - broadcast should be done
-    ok 24 - no new rows in the journal - state change is not persisted
-    ok 25 - 1 pending message
-    ok 26 - sent new-leader notification
+    ok 8 - 1 record in the journal
+    ok 9 - term and vote are on disk
+    ok 10 - 1 pending message
+    ok 11 - term bump and vote are sent
+    ok 12 - vote response from 2
+    ok 13 - 2 votes - 1 self and 1 foreign
+    ok 14 - no work to do - not enough votes yet
+    ok 15 - still candidate, waiting for elections
+    ok 16 - trigger is the same
+    ok 17 - vote response from 3
+    ok 18 - 2 votes - 1 self and 2 foreign
+    ok 19 - became leader
+    ok 20 - trigger worked
+    ok 21 - no work - broadcast should be done
+    ok 22 - no new rows in the journal - state change is not persisted
+    ok 23 - 1 pending message
+    ok 24 - sent new-leader notification
 ok 1 - subtests
 	*** raft_test_leader_election: done ***
 	*** raft_test_recovery ***
