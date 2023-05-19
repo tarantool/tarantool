@@ -185,7 +185,7 @@ g.test_promote_order = function(cg)
     -- insert{4}.
     cg.r1:exec(function() box.cfg{replication=""} end)
     cg.r2:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 2)
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 1)
         require('fiber').create(function() box.ctl.promote() end)
     end)
     t.helpers.retrying({}, function()

@@ -2348,7 +2348,7 @@ raft_test_resign(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "became leader");
 
 	raft_node_resign(&node);
@@ -2361,7 +2361,7 @@ raft_test_resign(void)
 		1 /* Vote. */,
 		2 /* Volatile term. */,
 		1 /* Volatile vote. */,
-		"{0: 2}" /* Vclock. */
+		"{0: 1}" /* Vclock. */
 	), "resigned from leader state");
 
 	raft_node_destroy(&node);
