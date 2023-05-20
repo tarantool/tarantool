@@ -90,6 +90,18 @@ enum sql_ast_type {
 	SQL_AST_TYPE_RELEASE_SAVEPOINT,
 	/** ROLLBACK TO SAVEPOINT statement. */
 	SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT,
+	/** ALTER TABLE RENAME statement. */
+	SQL_AST_TYPE_TABLE_RENAME,
+	/** ALTER TABLE DROP CONSTRAINT statement. */
+	SQL_AST_TYPE_DROP_CONSTRAINT,
+	/** DROP INDEX statement. */
+	SQL_AST_TYPE_DROP_INDEX,
+	/** DROP TRIGGER statement. */
+	SQL_AST_TYPE_DROP_TRIGGER,
+	/** DROP VIEW statement. */
+	SQL_AST_TYPE_DROP_VIEW,
+	/** DROP TABLE statement. */
+	SQL_AST_TYPE_DROP_TABLE,
 };
 
 /**
@@ -110,12 +122,76 @@ struct sql_ast_savepoint {
 	struct Token name;
 };
 
+/** Description of ALTER TABLE RENAME statement. */
+struct sql_ast_table_rename {
+	/** Name of the table to rename. */
+	struct Token old_name;
+	/** New name of the table. */
+	struct Token new_name;
+};
+
+/** Description of ALTER TABLE DROP CONSTRAINT statement. */
+struct sql_ast_drop_constraint {
+	/** The name of the table which constraint will be dropped. */
+	struct Token table_name;
+	/** Name of the constraint to drop. */
+	struct Token name;
+};
+
+/** Description of DROP INDEX statement. */
+struct sql_ast_drop_index {
+	/** The name of the table which index will be dropped. */
+	struct Token table_name;
+	/** Name of the index to drop. */
+	struct Token index_name;
+	/** IF EXISTS flag. */
+	bool if_exists;
+};
+
+/** Description of DROP TRIGGER statement. */
+struct sql_ast_drop_trigger {
+	/** Name of the trigger to drop. */
+	struct Token name;
+	/** IF EXISTS flag. */
+	bool if_exists;
+};
+
+/** Description of DROP VIEW statement. */
+struct sql_ast_drop_view {
+	/** Name of the VIEW to drop. */
+	struct Token name;
+	/** IF EXISTS flag. */
+	bool if_exists;
+};
+
+/** Description of DROP TABLE statement. */
+struct sql_ast_drop_table {
+	/** Name of the TABLE to drop. */
+	struct Token name;
+	/** IF EXISTS flag. */
+	bool if_exists;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
 	enum sql_ast_type type;
-	/** Savepoint description for savepoint-related statements. */
-	struct sql_ast_savepoint savepoint;
+	union {
+		/** Savepoint description for savepoint-related statements. */
+		struct sql_ast_savepoint savepoint;
+		/** Description of ALTER TABLE RENAME statement. */
+		struct sql_ast_table_rename rename;
+		/** Description of ALTER TABLE DROP CONSTRAINT statement. */
+		struct sql_ast_drop_constraint drop_constraint;
+		/** Description of DROP INDEX statement. */
+		struct sql_ast_drop_index drop_index;
+		/** Description of DROP TRIGGER statement. */
+		struct sql_ast_drop_trigger drop_trigger;
+		/** Description of DROP VIEW statement. */
+		struct sql_ast_drop_view drop_view;
+		/** Description of DROP TABLE statement. */
+		struct sql_ast_drop_table drop_table;
+	};
 };
 
 /** Constant tokens for integer values. */
@@ -223,11 +299,6 @@ struct enable_entity_def {
 	bool is_enabled;
 };
 
-struct rename_entity_def {
-	struct alter_entity_def base;
-	struct Token new_name;
-};
-
 struct create_entity_def {
 	struct alter_entity_def base;
 	struct Token name;
@@ -274,39 +345,6 @@ struct create_view_def {
 	/** List of column aliases (SELECT x AS y ...). */
 	struct ExprList *aliases;
 	struct Select *select;
-};
-
-struct drop_entity_def {
-	struct alter_entity_def base;
-	/** Name of index/trigger/constraint to be dropped. */
-	struct Token name;
-	/** Statement comes with IF EXISTS clause. */
-	bool if_exist;
-};
-
-/**
- * Identical wrappers around drop_entity_def to make hierarchy of
- * structures be consistent. Arguments for drop procedures are
- * the same.
- */
-struct drop_table_def {
-	struct drop_entity_def base;
-};
-
-struct drop_view_def {
-	struct drop_entity_def base;
-};
-
-struct drop_trigger_def {
-	struct drop_entity_def base;
-};
-
-struct drop_constraint_def {
-	struct drop_entity_def base;
-};
-
-struct drop_index_def {
-	struct drop_entity_def base;
 };
 
 struct create_trigger_def {
@@ -359,15 +397,6 @@ alter_entity_def_init(struct alter_entity_def *alter_def,
 }
 
 static inline void
-rename_entity_def_init(struct rename_entity_def *rename_def,
-		       struct SrcList *table_name, struct Token *new_name)
-{
-	alter_entity_def_init(&rename_def->base, table_name, ENTITY_TYPE_TABLE,
-			      ALTER_ACTION_RENAME);
-	rename_def->new_name = *new_name;
-}
-
-static inline void
 enable_entity_def_init(struct enable_entity_def *enable_def,
 		       enum entity_type type, struct SrcList *parent_name,
 		       struct Token *name, bool is_enabled)
@@ -396,62 +425,6 @@ create_constraint_def_init(struct create_constraint_def *constr_def,
 {
 	create_entity_def_init(&constr_def->base, entity_type,
 			       parent_name, name, if_not_exists);
-}
-
-static inline void
-drop_entity_def_init(struct drop_entity_def *drop_def,
-		     struct SrcList *parent_name, struct Token *name,
-		     bool if_exist, enum entity_type entity_type)
-{
-	alter_entity_def_init(&drop_def->base, parent_name, entity_type,
-			      ALTER_ACTION_DROP);
-	drop_def->name = *name;
-	drop_def->if_exist = if_exist;
-}
-
-static inline void
-drop_table_def_init(struct drop_table_def *drop_table_def,
-		    struct SrcList *parent_name, struct Token *name,
-		    bool if_exist)
-{
-	drop_entity_def_init(&drop_table_def->base, parent_name, name, if_exist,
-			     ENTITY_TYPE_TABLE);
-}
-
-static inline void
-drop_view_def_init(struct drop_view_def *drop_view_def,
-		   struct SrcList *parent_name, struct Token *name,
-		   bool if_exist)
-{
-	drop_entity_def_init(&drop_view_def->base, parent_name, name, if_exist,
-			     ENTITY_TYPE_VIEW);
-}
-
-static inline void
-drop_trigger_def_init(struct drop_trigger_def *drop_trigger_def,
-		      struct SrcList *parent_name, struct Token *name,
-		      bool if_exist)
-{
-	drop_entity_def_init(&drop_trigger_def->base, parent_name, name,
-			     if_exist, ENTITY_TYPE_TRIGGER);
-}
-
-static inline void
-drop_constraint_def_init(struct drop_constraint_def *drop_constraint_def,
-			 struct SrcList *parent_name, struct Token *name,
-			 bool if_exist)
-{
-	drop_entity_def_init(&drop_constraint_def->base, parent_name, name,
-			     if_exist, ENTITY_TYPE_CONSTRAINT);
-}
-
-static inline void
-drop_index_def_init(struct drop_index_def *drop_index_def,
-		    struct SrcList *parent_name, struct Token *name,
-		    bool if_exist)
-{
-	drop_entity_def_init(&drop_index_def->base, parent_name, name, if_exist,
-			     ENTITY_TYPE_INDEX);
 }
 
 static inline void
@@ -579,5 +552,36 @@ sql_ast_init_release_savepoint(struct Parse *parse, const struct Token *name);
 void
 sql_ast_init_rollback_to_savepoint(struct Parse *parse,
 				   const struct Token *name);
+
+/** Save parsed ALTER TABLE RENAME statement. */
+void
+sql_ast_init_table_rename(struct Parse *parse, const struct Token *old_name,
+			  const struct Token *new_name);
+
+/** Save parsed ALTER TABLE DROP CONSTRAINT statement. */
+void
+sql_ast_init_constraint_drop(struct Parse *parse,
+			     const struct Token *table_name,
+			     const struct Token *name);
+
+/** Save parsed DROP INDEX statement. */
+void
+sql_ast_init_index_drop(struct Parse *parse, const struct Token *table_name,
+			const struct Token *index_name, bool if_exists);
+
+/** Save parsed DROP TRIGGER statement. */
+void
+sql_ast_init_trigger_drop(struct Parse *parse, const struct Token *name,
+			  bool if_exists);
+
+/** Save parsed DROP VIEW statement. */
+void
+sql_ast_init_view_drop(struct Parse *parse, const struct Token *name,
+		       bool if_exists);
+
+/** Save parsed DROP TABLE statement. */
+void
+sql_ast_init_table_drop(struct Parse *parse, const struct Token *name,
+			bool if_exists);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

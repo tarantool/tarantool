@@ -1739,53 +1739,56 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	VdbeComment((v, "Delete entry from _space"));
 }
 
-/**
- * This routine is called to do the work of a DROP TABLE and
- * DROP VIEW statements.
- *
- * @param parse_context Current parsing context.
- */
 void
-sql_drop_table(struct Parse *parse_context)
+sql_drop_table(struct Parse *parse_context, struct Token *name, bool if_exists)
 {
-	struct drop_entity_def drop_def = parse_context->drop_table_def.base;
-	assert(drop_def.base.alter_action == ALTER_ACTION_DROP);
-	struct SrcList *table_name_list = drop_def.base.entity_name;
-	struct Vdbe *v = sqlGetVdbe(parse_context);
-	bool is_view = drop_def.base.entity_type == ENTITY_TYPE_VIEW;
-	assert(is_view || drop_def.base.entity_type == ENTITY_TYPE_TABLE);
-	sqlVdbeCountChanges(v);
 	assert(!parse_context->is_aborted);
-	assert(table_name_list->nSrc == 1);
-	const char *space_name = table_name_list->a[0].zName;
+	char *space_name = sql_name_from_token(name);
 	struct space *space = space_by_name(space_name);
 	if (space == NULL) {
-		if (!drop_def.if_exist) {
+		if (!if_exists) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
 			parse_context->is_aborted = true;
 		}
-		goto exit_drop_table;
+		sql_xfree(space_name);
+		return;
 	}
-	/*
-	 * Ensure DROP TABLE is not used on a view,
-	 * and DROP VIEW is not used on a table.
-	 */
-	if (is_view && !space->def->opts.is_view) {
-		diag_set(ClientError, ER_DROP_SPACE, space_name,
-			 "use DROP TABLE");
-		parse_context->is_aborted = true;
-		goto exit_drop_table;
-	}
-	if (!is_view && space->def->opts.is_view) {
-		diag_set(ClientError, ER_DROP_SPACE, space_name,
+	sql_xfree(space_name);
+	if (space->def->opts.is_view) {
+		diag_set(ClientError, ER_DROP_SPACE, space->def->name,
 			 "use DROP VIEW");
 		parse_context->is_aborted = true;
-		goto exit_drop_table;
+		return;
 	}
-	sql_code_drop_table(parse_context, space, is_view);
+	struct Vdbe *v = sqlGetVdbe(parse_context);
+	sqlVdbeCountChanges(v);
+	sql_code_drop_table(parse_context, space, false);
+}
 
- exit_drop_table:
-	sqlSrcListDelete(table_name_list);
+void
+sql_drop_view(struct Parse *parse, struct Token *name, bool if_exists)
+{
+	assert(!parse->is_aborted);
+	char *space_name = sql_name_from_token(name);
+	struct space *space = space_by_name(space_name);
+	if (space == NULL) {
+		if (!if_exists) {
+			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
+			parse->is_aborted = true;
+		}
+		sql_xfree(space_name);
+		return;
+	}
+	sql_xfree(space_name);
+	if (!space->def->opts.is_view) {
+		diag_set(ClientError, ER_DROP_SPACE, space->def->name,
+			 "use DROP TABLE");
+		parse->is_aborted = true;
+		return;
+	}
+	struct Vdbe *v = sqlGetVdbe(parse);
+	sqlVdbeCountChanges(v);
+	sql_code_drop_table(parse, space, true);
 }
 
 /**
@@ -2095,34 +2098,26 @@ tnt_error:
  * _fk_constraint space corresponding with the constraint type.
  */
 void
-sql_drop_constraint(struct Parse *parse_context)
+sql_drop_constraint(struct Parse *parse_context, struct Token *table_name,
+		    struct Token *name)
 {
-	struct drop_entity_def *drop_def =
-		&parse_context->drop_constraint_def.base;
-	assert(drop_def->base.entity_type == ENTITY_TYPE_CONSTRAINT);
-	assert(drop_def->base.alter_action == ALTER_ACTION_DROP);
-	const char *table_name = drop_def->base.entity_name->a[0].zName;
-	assert(table_name != NULL);
-	struct space *space = space_by_name(table_name);
+	char *table_name_str = sql_name_from_token(table_name);
+	struct space *space = space_by_name(table_name_str);
 	if (space == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
+		sql_xfree(table_name_str);
+		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name_str);
 		parse_context->is_aborted = true;
 		return;
 	}
-	char *name = sql_normalized_name_region_new(&parse_context->region,
-						    drop_def->name.z,
-						    drop_def->name.n);
-	if (name == NULL) {
-		parse_context->is_aborted = true;
-		return;
-	}
+	sql_xfree(table_name_str);
+	char *name_str = sql_name_from_token(name);
 	struct Vdbe *v = sqlGetVdbe(parse_context);
 	assert(v != NULL);
-	struct constraint_id *id = space_find_constraint_id(space, name);
+	struct constraint_id *id = space_find_constraint_id(space, name_str);
 	if (id == NULL) {
 		sqlVdbeCountChanges(v);
 		sqlVdbeAddOp4(v, OP_DropTupleConstraint, space->def->id, 0, 0,
-			      sql_xstrdup(name), P4_DYNAMIC);
+			      name_str, P4_DYNAMIC);
 		return;
 	}
 	/*
@@ -2133,8 +2128,9 @@ sql_drop_constraint(struct Parse *parse_context)
 	 */
 	assert(id->type == CONSTRAINT_TYPE_PK ||
 	       id->type == CONSTRAINT_TYPE_UNIQUE);
-	vdbe_emit_index_drop(parse_context, name, space->def,
+	vdbe_emit_index_drop(parse_context, name_str, space->def,
 			     ER_NO_SUCH_CONSTRAINT, false);
+	sql_xfree(name_str);
 	sqlVdbeCountChanges(v);
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 }
@@ -2725,37 +2721,28 @@ sql_create_index(struct Parse *parse) {
 }
 
 void
-sql_drop_index(struct Parse *parse_context)
+sql_drop_index(struct Parse *parse_context, struct Token *table_name,
+	       struct Token *index_name, bool if_exists)
 {
-	struct drop_entity_def *drop_def = &parse_context->drop_index_def.base;
-	assert(drop_def->base.entity_type == ENTITY_TYPE_INDEX);
-	assert(drop_def->base.alter_action == ALTER_ACTION_DROP);
-	struct Vdbe *v = sqlGetVdbe(parse_context);
-	assert(v != NULL);
-	/* Never called with prior errors. */
 	assert(!parse_context->is_aborted);
-	struct SrcList *table_list = drop_def->base.entity_name;
-	assert(table_list->nSrc == 1);
-	char *table_name = table_list->a[0].zName;
-	char *index_name = NULL;
-	sqlVdbeCountChanges(v);
-	struct space *space = space_by_name(table_name);
-	bool if_exists = drop_def->if_exist;
+	char *table_name_str = sql_name_from_token(table_name);
+	struct space *space = space_by_name(table_name_str);
 	if (space == NULL) {
 		if (!if_exists) {
-			diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
+			diag_set(ClientError, ER_NO_SUCH_SPACE, table_name_str);
 			parse_context->is_aborted = true;
 		}
-		goto exit_drop_index;
+		sql_xfree(table_name_str);
+		return;
 	}
-	index_name = sql_name_from_token(&drop_def->name);
-
-	vdbe_emit_index_drop(parse_context, index_name, space->def,
+	sql_xfree(table_name_str);
+	struct Vdbe *v = sqlGetVdbe(parse_context);
+	sqlVdbeCountChanges(v);
+	char *index_name_str = sql_name_from_token(index_name);
+	vdbe_emit_index_drop(parse_context, index_name_str, space->def,
 			     ER_NO_SUCH_INDEX_NAME, if_exists);
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
- exit_drop_index:
-	sqlSrcListDelete(table_list);
-	sql_xfree(index_name);
+	sql_xfree(index_name_str);
 }
 
 void *

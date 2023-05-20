@@ -91,3 +91,65 @@ sql_ast_init_rollback_to_savepoint(struct Parse *parse,
 	parse->ast.type = SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT;
 	parse->ast.savepoint.name = *name;
 }
+
+void
+sql_ast_init_table_rename(struct Parse *parse, const struct Token *old_name,
+			  const struct Token *new_name)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_TABLE_RENAME;
+	parse->ast.rename.old_name = *old_name;
+	parse->ast.rename.new_name = *new_name;
+}
+
+void
+sql_ast_init_constraint_drop(struct Parse *parse,
+			     const struct Token *table_name,
+			     const struct Token *name)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_DROP_CONSTRAINT;
+	parse->ast.drop_constraint.table_name = *table_name;
+	parse->ast.drop_constraint.name = *name;
+}
+
+void
+sql_ast_init_index_drop(struct Parse *parse, const struct Token *table_name,
+			const struct Token *index_name, bool if_exists)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_DROP_INDEX;
+	parse->ast.drop_index.table_name = *table_name;
+	parse->ast.drop_index.index_name = *index_name;
+	parse->ast.drop_index.if_exists = if_exists;
+}
+
+void
+sql_ast_init_trigger_drop(struct Parse *parse, const struct Token *name,
+			  bool if_exists)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_DROP_TRIGGER;
+	parse->ast.drop_trigger.name = *name;
+	parse->ast.drop_trigger.if_exists = if_exists;
+}
+
+void
+sql_ast_init_view_drop(struct Parse *parse, const struct Token *name,
+		       bool if_exists)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_DROP_VIEW;
+	parse->ast.drop_view.name = *name;
+	parse->ast.drop_view.if_exists = if_exists;
+}
+
+void
+sql_ast_init_table_drop(struct Parse *parse, const struct Token *name,
+			bool if_exists)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_DROP_TABLE;
+	parse->ast.drop_table.name = *name;
+	parse->ast.drop_table.if_exists = if_exists;
+}

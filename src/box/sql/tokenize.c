@@ -499,6 +499,55 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 	case SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT:
 		sqlSavepoint(parse, SAVEPOINT_ROLLBACK, &ast->savepoint.name);
 		break;
+	case SQL_AST_TYPE_TABLE_RENAME: {
+		parse->initiateTTrans = true;
+		struct sql_ast_table_rename *stmt = &ast->rename;
+		sql_alter_table_rename(parse, &stmt->old_name, &stmt->new_name);
+		if (parse->is_aborted)
+			return;
+		break;
+	}
+	case SQL_AST_TYPE_DROP_CONSTRAINT: {
+		parse->initiateTTrans = true;
+		struct sql_ast_drop_constraint *stmt = &ast->drop_constraint;
+		sql_drop_constraint(parse, &stmt->table_name, &stmt->name);
+		if (parse->is_aborted)
+			return;
+		break;
+	}
+	case SQL_AST_TYPE_DROP_INDEX: {
+		parse->initiateTTrans = true;
+		struct sql_ast_drop_index *stmt = &ast->drop_index;
+		sql_drop_index(parse, &stmt->table_name, &stmt->index_name,
+			       stmt->if_exists);
+		if (parse->is_aborted)
+			return;
+		break;
+	}
+	case SQL_AST_TYPE_DROP_TRIGGER: {
+		parse->initiateTTrans = true;
+		struct sql_ast_drop_trigger *stmt = &ast->drop_trigger;
+		sql_drop_trigger(parse, &stmt->name, stmt->if_exists);
+		if (parse->is_aborted)
+			return;
+		break;
+	}
+	case SQL_AST_TYPE_DROP_VIEW: {
+		parse->initiateTTrans = true;
+		struct sql_ast_drop_view *stmt = &ast->drop_view;
+		sql_drop_view(parse, &stmt->name, stmt->if_exists);
+		if (parse->is_aborted)
+			return;
+		break;
+	}
+	case SQL_AST_TYPE_DROP_TABLE: {
+		parse->initiateTTrans = true;
+		struct sql_ast_drop_table *stmt = &ast->drop_table;
+		sql_drop_table(parse, &stmt->name, stmt->if_exists);
+		if (parse->is_aborted)
+			return;
+		break;
+	}
 	default:
 		assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
 	}

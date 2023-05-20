@@ -925,7 +925,7 @@ test:do_catchsql_test(
         DROP VIEW main.nosuchview
     ]], {
         -- <view-17.2>
-        1, "Space 'MAIN' does not exist"
+        1, "Syntax error at line 1 near '.'"
         -- </view-17.2>
     })
 

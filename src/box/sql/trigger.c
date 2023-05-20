@@ -324,31 +324,21 @@ vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name,
 }
 
 void
-sql_drop_trigger(struct Parse *parser)
+sql_drop_trigger(struct Parse *parser, struct Token *name, bool is_exists)
 {
-	struct drop_entity_def *drop_def = &parser->drop_trigger_def.base;
-	struct alter_entity_def *alter_def = &drop_def->base;
-	assert(alter_def->entity_type == ENTITY_TYPE_TRIGGER);
-	assert(alter_def->alter_action == ALTER_ACTION_DROP);
-	struct SrcList *name = alter_def->entity_name;
-	bool no_err = drop_def->if_exist;
-
 	struct Vdbe *v = sqlGetVdbe(parser);
 	sqlVdbeCountChanges(v);
 
-	assert(name->nSrc == 1);
-	const char *trigger_name = name->a[0].zName;
+	const char *trigger_name = sql_name_from_token(name);
 	const char *error_msg =
 		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_TRIGGER),
 			   trigger_name);
 	int name_reg = ++parser->nMem;
-	sqlVdbeAddOp4(v, OP_String8, 0, name_reg, 0, sql_xstrdup(trigger_name),
-		      P4_DYNAMIC);
+	sqlVdbeAddOp4(v, OP_String8, 0, name_reg, 0, trigger_name, P4_DYNAMIC);
 	vdbe_emit_halt_with_presence_test(parser, BOX_TRIGGER_ID, 0, name_reg,
 					  1, ER_NO_SUCH_TRIGGER, error_msg,
-					  no_err, OP_Found);
+					  is_exists, OP_Found);
 	vdbe_code_drop_trigger(parser, trigger_name, true);
-	sqlSrcListDelete(name);
 }
 
 int

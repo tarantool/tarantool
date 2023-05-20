@@ -2045,12 +2045,6 @@ struct Parse {
 		struct create_index_def create_index_def;
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
-		struct rename_entity_def rename_entity_def;
-		struct drop_constraint_def drop_constraint_def;
-		struct drop_index_def drop_index_def;
-		struct drop_table_def drop_table_def;
-		struct drop_trigger_def drop_trigger_def;
-		struct drop_view_def drop_view_def;
 		struct enable_entity_def enable_entity_def;
 	};
 	/**
@@ -2811,8 +2805,14 @@ sql_view_assign_cursors(struct Parse *parse, const char *view_stmt);
 void
 sql_store_select(struct Parse *parse_context, struct Select *select);
 
+/** Code DROP VIEW statement. */
 void
-sql_drop_table(struct Parse *);
+sql_drop_view(struct Parse *parse, struct Token *name, bool is_exists);
+
+/** Code DROP TABLE statement. */
+void
+sql_drop_table(struct Parse *parse, struct Token *name, bool is_exists);
+
 void sqlInsert(Parse *, SrcList *, Select *, IdList *,
 	       enum on_conflict_action);
 
@@ -2952,11 +2952,10 @@ sql_create_index(struct Parse *parse);
 /**
  * This routine will drop an existing named index.  This routine
  * implements the DROP INDEX statement.
- *
- * @param parse_context Current parsing context.
  */
 void
-sql_drop_index(struct Parse *parse_context);
+sql_drop_index(struct Parse *parse_context, struct Token *table_name,
+	       struct Token *index_name, bool if_exists);
 
 int sqlSelect(Parse *, Select *, SelectDest *);
 Select *sqlSelectNew(Parse *, ExprList *, SrcList *, Expr *, ExprList *,
@@ -3366,11 +3365,9 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 /**
  * This function is called from parser to generate drop trigger
  * VDBE code.
- *
- * @param parser Parser context.
  */
 void
-sql_drop_trigger(struct Parse *parser);
+sql_drop_trigger(struct Parse *parser, struct Token *name, bool is_exists);
 
 /**
  * Drop a trigger given a pointer to that trigger.
@@ -3602,16 +3599,15 @@ void
 sql_create_foreign_key(struct Parse *parse_context);
 
 /**
- * Emit code to drop the entry from _index or _ck_contstraint or
- * _fk_constraint space corresponding with the constraint type.
+ * Emit code to drop the entry from _index or drop FOREIGN KEY or CHECK
+ * constraint.
  *
  * Function called from parser to handle
  * <ALTER TABLE table DROP CONSTRAINT constraint> SQL statement.
- *
- * @param parse_context Parsing context.
  */
 void
-sql_drop_constraint(struct Parse *parse_context);
+sql_drop_constraint(struct Parse *parse_context, struct Token *table_name,
+		    struct Token *name);
 
 /**
  * Now our SQL implementation can't operate on spaces which
@@ -3910,14 +3906,10 @@ extern const Token sqlIntTokens[];
 extern SQL_WSD struct sqlConfig sqlConfig;
 extern int sqlPendingByte;
 
-/**
- * Generate code to implement the "ALTER TABLE xxx RENAME TO yyy"
- * command.
- *
- * @param parse Current parsing context.
- */
+/** Generate code to implement the "ALTER TABLE xxx RENAME TO yyy" command. */
 void
-sql_alter_table_rename(struct Parse *parse);
+sql_alter_table_rename(struct Parse *parse, struct Token *old_name,
+		       struct Token *new_name);
 
 /**
  * Return the length (in bytes) of the token that begins at z[0].

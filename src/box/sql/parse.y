@@ -377,18 +377,12 @@ resolvetype(A) ::= REPLACE.                  {A = ON_CONFLICT_ACTION_REPLACE;}
 ////////////////////////// The DROP TABLE /////////////////////////////////////
 //
 
-cmd ::= DROP TABLE ifexists(E) fullname(X) . {
-  struct Token t = Token_nil;
-  drop_table_def_init(&pParse->drop_table_def, X, &t, E);
-  pParse->initiateTTrans = true;
-  sql_drop_table(pParse);
+cmd ::= DROP TABLE ifexists(E) nm(X) . {
+  sql_ast_init_table_drop(pParse, &X, E);
 }
 
-cmd ::= DROP VIEW ifexists(E) fullname(X) . {
-  struct Token t = Token_nil;
-  drop_view_def_init(&pParse->drop_view_def, X, &t, E);
-  pParse->initiateTTrans = true;
-  sql_drop_table(pParse);
+cmd ::= DROP VIEW ifexists(E) nm(X) . {
+  sql_ast_init_view_drop(pParse, &X, E);
 }
 
 %type ifexists {int}
@@ -1468,10 +1462,8 @@ eidlist(A) ::= nm(Y). {
 
 ///////////////////////////// The DROP INDEX command /////////////////////////
 //
-cmd ::= DROP INDEX ifexists(E) nm(X) ON fullname(Y).   {
-  drop_index_def_init(&pParse->drop_index_def, Y, &X, E);
-  pParse->initiateTTrans = true;
-  sql_drop_index(pParse);
+cmd ::= DROP INDEX ifexists(E) nm(X) ON nm(Y).   {
+  sql_ast_init_index_drop(pParse, &Y, &X, E);
 }
 
 ///////////////////////////// The SET SESSION command ////////////////////////
@@ -1650,11 +1642,8 @@ raisetype(A) ::= FAIL.      {A = ON_CONFLICT_ACTION_FAIL;}
 
 
 ////////////////////////  DROP TRIGGER statement //////////////////////////////
-cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
-  struct Token t = Token_nil;
-  drop_trigger_def_init(&pParse->drop_trigger_def, X, &t, NOERR);
-  pParse->initiateTTrans = true;
-  sql_drop_trigger(pParse);
+cmd ::= DROP TRIGGER ifexists(NOERR) nm(X). {
+  sql_ast_init_trigger_drop(pParse, &X, NOERR);
 }
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
@@ -1716,16 +1705,12 @@ cmd ::= alter_add_constraint(N) unique_spec(U) LP sortlist(X) RP. {
 unique_spec(U) ::= UNIQUE.      { U = SQL_INDEX_TYPE_CONSTRAINT_UNIQUE; }
 unique_spec(U) ::= PRIMARY KEY. { U = SQL_INDEX_TYPE_CONSTRAINT_PK; }
 
-cmd ::= alter_table_start(A) RENAME TO nm(N). {
-    rename_entity_def_init(&pParse->rename_entity_def, A, &N);
-    pParse->initiateTTrans = true;
-    sql_alter_table_rename(pParse);
+cmd ::= ALTER TABLE nm(A) RENAME TO nm(N). {
+  sql_ast_init_table_rename(pParse, &A, &N);
 }
 
-cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {
-  drop_constraint_def_init(&pParse->drop_constraint_def, X, &Z, false);
-  pParse->initiateTTrans = true;
-  sql_drop_constraint(pParse);
+cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z). {
+  sql_ast_init_constraint_drop(pParse, &X, &Z);
 }
 
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////

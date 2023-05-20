@@ -38,37 +38,32 @@
 #include "box/schema.h"
 
 void
-sql_alter_table_rename(struct Parse *parse)
+sql_alter_table_rename(struct Parse *parse, struct Token *old_name,
+		       struct Token *new_name)
 {
-	struct rename_entity_def *rename_def = &parse->rename_entity_def;
-	struct SrcList *src_tab = rename_def->base.entity_name;
-	assert(rename_def->base.entity_type == ENTITY_TYPE_TABLE);
-	assert(rename_def->base.alter_action == ALTER_ACTION_RENAME);
-	assert(src_tab->nSrc == 1);
-	char *new_name = sql_name_from_token(&rename_def->new_name);
+	char *old_name_str = sql_name_from_token(old_name);
+	char *new_name_str = sql_name_from_token(new_name);
 	/* Check that new name isn't occupied by another table. */
-	if (space_by_name(new_name) != NULL) {
-		diag_set(ClientError, ER_SPACE_EXISTS, new_name);
+	if (space_by_name(new_name_str) != NULL) {
+		diag_set(ClientError, ER_SPACE_EXISTS, new_name_str);
 		goto tnt_error;
 	}
-	const char *tbl_name = src_tab->a[0].zName;
-	struct space *space = space_by_name(tbl_name);
+	struct space *space = space_by_name(old_name_str);
 	if (space == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_SPACE, tbl_name);
+		diag_set(ClientError, ER_NO_SUCH_SPACE, old_name_str);
 		goto tnt_error;
 	}
+	sql_xfree(old_name_str);
 	sql_set_multi_write(parse, false);
 	/* Drop and reload the internal table schema. */
 	struct Vdbe *v = sqlGetVdbe(parse);
-	sqlVdbeAddOp4(v, OP_RenameTable, space->def->id, 0, 0, new_name,
-			  P4_DYNAMIC);
-exit_rename_table:
-	sqlSrcListDelete(src_tab);
+	sqlVdbeAddOp4(v, OP_RenameTable, space->def->id, 0, 0, new_name_str,
+		      P4_DYNAMIC);
 	return;
 tnt_error:
-	sql_xfree(new_name);
+	sql_xfree(old_name_str);
+	sql_xfree(new_name_str);
 	parse->is_aborted = true;
-	goto exit_rename_table;
 }
 
 char *
