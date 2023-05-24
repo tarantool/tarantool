@@ -1710,7 +1710,7 @@ raft_test_bump_term_before_cfg()
 static void
 raft_test_split_vote(void)
 {
-	raft_start_test(64);
+	raft_start_test(67);
 	struct raft_node node;
 	raft_node_create(&node);
 
@@ -2031,6 +2031,35 @@ raft_test_split_vote(void)
 	), 0, "vote response for 3 from 3");
 
 	is(node.raft.timer.repeat, 0, "still waiting for yield");
+
+	/*
+	 * gh-8698: a candidate might erroneously discover a split vote when
+	 * simply voting for another node.
+	 */
+	raft_node_destroy(&node);
+	raft_node_create(&node);
+	raft_node_cfg_cluster_size(&node, 2);
+	raft_node_cfg_election_quorum(&node, 2);
+
+	is(raft_node_send_vote_request(
+		&node,
+		2 /* Term. */,
+		"{}" /* Vclock. */,
+		2 /* Source. */
+	), 0, "vote for 2");
+
+	ok(raft_node_check_full_state(
+		&node,
+		RAFT_STATE_FOLLOWER /* State. */,
+		0 /* Leader. */,
+		2 /* Term. */,
+		2 /* Vote. */,
+		2 /* Volatile term. */,
+		2 /* Volatile vote. */,
+		"{0: 2}" /* Vclock. */
+	), "term and vote are persisted");
+	ok(node.raft.timer.repeat >= node.raft.election_timeout,
+	   "no split vote");
 
 	raft_node_destroy(&node);
 	raft_finish_test();

@@ -935,7 +935,7 @@ raft_sm_schedule_new_vote(struct raft *raft, uint32_t candidate_id,
 	assert(!raft->votes[raft->self].did_vote);
 	raft->volatile_vote = candidate_id;
 	vclock_copy(&raft->candidate_vclock, candidate_vclock);
-	raft_add_vote(raft, raft->self, raft->self);
+	raft_add_vote(raft, raft->self, candidate_id);
 	raft_sm_pause_and_dump(raft);
 	/* Nothing visible is changed - no broadcast. */
 }
