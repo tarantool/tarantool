@@ -8,3 +8,5 @@ were fixed as part of this activity:
 * Fixed `pcall()` call without arguments on arm64.
 * Fixed assembling of IR_{AHUV}LOAD specialized to boolean for aarch64.
 * Fixed constant rematerialization on arm64.
+* Fixed `emit_rma()` for x64/GC64 mode for non-`mov` instructions.
+* Limited Lua C library path with the default `PATH_MAX` value of 4096 bytes.
