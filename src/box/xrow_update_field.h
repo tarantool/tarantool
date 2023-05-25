@@ -318,6 +318,29 @@ struct xrow_update_op {
 };
 
 /**
+ * Return whether operation is scalar (all other than insert/delete/set).
+ */
+static inline bool
+xrow_update_op_is_scalar(const struct xrow_update_op *op)
+{
+	switch (op->opcode) {
+	case '+':
+	case '-':
+	case '&':
+	case '|':
+	case '^':
+	case ':':
+		return true;
+	case '=':
+	case '#':
+	case '!':
+		return false;
+	default:
+		unreachable();
+	};
+}
+
+/**
  * Extract a next token from the operation path lexer. The result
  * is used to decide to which child of a current map/array the
  * operation should be forwarded. It is not just a synonym to

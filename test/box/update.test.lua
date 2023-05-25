@@ -579,12 +579,9 @@ ops = {{'=', '[4][4][1]', 1}, {'=', '[4][4][1]', 2}}
 t:update(ops)
 t:upsert(ops)
 
--- First two operations produce zero length bar update in field
--- [4][4][5][4]. The third operation should raise an error.
+-- First two operations produce zero length bar update in field [4][4][5][4].
 ops = {{'+', '[4][4][5][4]', 13000}, {'=', '[4][4][5][1]', 8000}, {'+', '[4][4][5][4]', 1}}
--- Currently result is not correct. It is temporary and will be fixed later.
 t:update(ops)
--- Currently result is not correct. It is temporary and will be fixed later.
 t:upsert(ops)
 
 --
@@ -908,6 +905,9 @@ t = box.tuple.new({7, {a = {x = 2}, b = 3}, 11})
 ops = {{'+', '[2].b', 2}, {'+', '[2].a.x', 2}, {'+', '[2].a', 2}}
 t:update(ops)
 t:upsert(ops)
+-- Update into leaf scalar bar
+t = box.tuple.new({7, {a = 1}, 11})
+t:update({{'+', '[2].a', 2}, {'+', '[2].a', 3}})
 -- Allow to set scalar to array field and then do scalar operation
 -- on the same field.
 t = box.tuple.new({7, 1, 11})
