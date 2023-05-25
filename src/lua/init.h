@@ -46,6 +46,7 @@ extern struct lua_State *tarantool_L;
 #define O_INTERACTIVE 0x1
 #define O_BYTECODE    0x2
 #define O_DEBUGGING   0x4
+#define O_EXECUTE     0x8
 
 /**
  * Create tarantool_L and initialize built-in Lua modules.

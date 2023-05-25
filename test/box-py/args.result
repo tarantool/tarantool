@@ -1,41 +1,69 @@
 tarantool --help
-Tarantool - a Lua application server
+Tarantool 3.<minor>.<patch>-<suffix>
 
-Usage: tarantool script.lua [OPTIONS] [SCRIPT [ARGS]]
+Connect to an instance:
 
-All command line options are passed to the interpreted script.
-When no script name is provided, the server responds to:
-  -h, --help			display this help and exit
-  -v, --version			print program version and exit
-  -e EXPR			execute string 'EXPR'
-  -l NAME			require library 'NAME'
-  -j cmd			perform LuaJIT control command
-  -b ...			save or list bytecode
-  -d				activate debugging session for 'SCRIPT'
-  -i				enter interactive mode after executing 'SCRIPT'
-  --				stop handling options
-  -				execute stdin and stop handling options
+  tt connect <uri>
+
+Execute Lua script with bundled LuaJIT:
+
+  tarantool old-style-script.lua [OPTIONS] [ARGS]
+
+Run interactive LuaJIT interpreter:
+
+  tarantool -i
+
+Usage:
+
+  tarantool [OPTIONS] [SCRIPT [ARGS]]
+
+Options:
+
+ -h, --help             display this help and exit
+ -v, --version          print program version and exit
+ -i                     enter interactive mode
+ -e EXPR                execute string 'EXPR'
+ -l NAME                require library 'NAME'
+ -j cmd                 perform LuaJIT control command
+ -b ...                 save or list bytecode
+ -d                     activate debugging session for script
+ --                     stop handling options
+ -                      execute stdin and stop handling options
 
 Please visit project home page at https://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
 
 tarantool -h
-Tarantool - a Lua application server
+Tarantool 3.<minor>.<patch>-<suffix>
 
-Usage: tarantool script.lua [OPTIONS] [SCRIPT [ARGS]]
+Connect to an instance:
 
-All command line options are passed to the interpreted script.
-When no script name is provided, the server responds to:
-  -h, --help			display this help and exit
-  -v, --version			print program version and exit
-  -e EXPR			execute string 'EXPR'
-  -l NAME			require library 'NAME'
-  -j cmd			perform LuaJIT control command
-  -b ...			save or list bytecode
-  -d				activate debugging session for 'SCRIPT'
-  -i				enter interactive mode after executing 'SCRIPT'
-  --				stop handling options
-  -				execute stdin and stop handling options
+  tt connect <uri>
+
+Execute Lua script with bundled LuaJIT:
+
+  tarantool old-style-script.lua [OPTIONS] [ARGS]
+
+Run interactive LuaJIT interpreter:
+
+  tarantool -i
+
+Usage:
+
+  tarantool [OPTIONS] [SCRIPT [ARGS]]
+
+Options:
+
+ -h, --help             display this help and exit
+ -v, --version          print program version and exit
+ -i                     enter interactive mode
+ -e EXPR                execute string 'EXPR'
+ -l NAME                require library 'NAME'
+ -j cmd                 perform LuaJIT control command
+ -b ...                 save or list bytecode
+ -d                     activate debugging session for script
+ --                     stop handling options
+ -                      execute stdin and stop handling options
 
 Please visit project home page at https://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
