@@ -878,6 +878,19 @@ t = box.tuple.new({7, 0x0, 11})
 t:update({{'^', 2, 0x1}, {'^', 2, 0x10}})
 t = box.tuple.new({7, 0x101, 11})
 t:update({{'|', 2, 0x10}, {'&', 2, 0x110}})
+t = box.tuple.new({7,'aa11bbb222zzzzz', 11})
+-- test some double update into the string field
+t:update({{':', 2, 3, 2, '!'}, {':', 2, 7, 3, '^'}})
+-- test conversion with empty chunk and insertion of empty chunk into rope
+t:update({{':', 2, 3, 2, ''}, {':', 2, 6, 3, ''}})
+-- test erasure of zero characters from rope
+t:update({{':', 2, 3, 2, ''}, {':', 2, 9, 0, '++'}})
+-- test conversion with first empty chunk
+t:update({{':', 2, 1, 2, 'AA'}, {':', 2, 8, 3, '333'}})
+-- test conversion with last empty chunk
+t:update({{':', 2, 11, 5, 'ZZZZZ'}, {':', 2, 8, 3, '333'}})
+-- test triple update into the string field (skipping conversion)
+t:update({{':', 2, 3, 2, '!'}, {':', 2, 7, 3, '^'}, {':', 2, 2, 10, '+'}})
 -- Fail to apply scalar op to non scalar/nop field in array
 t = box.tuple.new({7, {x = 2}, 11})
 ops = {{'+', '[2].x', 2}, {'+', 2, 2}}

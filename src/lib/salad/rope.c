@@ -262,7 +262,7 @@ avl_iter_down_to_leaf(struct avl_iter *it)
 	}
 }
 
-struct avl_node *
+const struct avl_node *
 avl_iter_start(struct avl_iter *it)
 {
 	it->top = it->path;
@@ -273,7 +273,7 @@ avl_iter_start(struct avl_iter *it)
 	return it->top[0];
 }
 
-struct avl_node *
+const struct avl_node *
 avl_iter_next(struct avl_iter *it)
 {
 	if (it->top[0]->link[1] != NULL) {
@@ -311,7 +311,7 @@ avl_iter_next(struct avl_iter *it)
 void
 avl_iter_check(struct avl_iter *iter)
 {
-	for (struct avl_node *node = avl_iter_start(iter); node != NULL;
+	for (const struct avl_node *node = avl_iter_start(iter); node != NULL;
 	     node = avl_iter_next(iter)) {
 
 		assert(node->leaf_size != 0);

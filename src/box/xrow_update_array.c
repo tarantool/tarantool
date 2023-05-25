@@ -103,13 +103,6 @@ xrow_update_array_item_create(struct xrow_update_array_item *item,
 	item->tail_size = tail_size;
 }
 
-/** Rope allocator for nodes, paths, items etc. */
-static inline void *
-xrow_update_alloc(struct region *region, size_t size)
-{
-	return xregion_aligned_alloc(region, size, alignof(uint64_t));
-}
-
 /** Split a range of fields in two. */
 static struct xrow_update_array_item *
 xrow_update_array_item_split(struct region *region,
@@ -243,7 +236,8 @@ xrow_update_array_sizeof(struct xrow_update_field *field)
 
 	uint32_t size = xrow_update_rope_size(field->array.rope);
 	uint32_t res = mp_sizeof_array(size);
-	struct xrow_update_rope_node *node = xrow_update_rope_iter_start(&it);
+	const struct xrow_update_rope_node *node =
+					xrow_update_rope_iter_start(&it);
 	for (; node != NULL; node = xrow_update_rope_iter_next(&it)) {
 		struct xrow_update_array_item *item =
 			xrow_update_rope_leaf_data(node);
@@ -262,7 +256,8 @@ xrow_update_array_store(struct xrow_update_field *field,
 	out = mp_encode_array(out, xrow_update_rope_size(field->array.rope));
 	struct xrow_update_rope_iter it;
 	xrow_update_rope_iter_create(&it, field->array.rope);
-	struct xrow_update_rope_node *node = xrow_update_rope_iter_start(&it);
+	const struct xrow_update_rope_node *node =
+					xrow_update_rope_iter_start(&it);
 	uint32_t total_field_count = 0;
 	if (this_node == NULL) {
 		for (; node != NULL; node = xrow_update_rope_iter_next(&it)) {

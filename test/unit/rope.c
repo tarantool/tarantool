@@ -7,7 +7,7 @@ test_rope_extract(struct rope *rope, rope_size_t pos)
 	printf("extract pos = %zu: ", (size_t) pos);
 	struct rope_node *node = rope_extract_node(rope, pos);
 	rope_check(rope);
-	str_print(node->data, node->leaf_size);
+	str_print(node->data, node->leaf_size, NULL);
 	printf("\n");
 }
 
@@ -16,7 +16,7 @@ test_rope_cut(struct rope *rope, rope_size_t offset, rope_size_t size)
 {
 	printf("erase offset = %zu, size = %zu \n", (size_t) offset, (size_t) size);
 	rope_erase(rope, offset, size);
-	rope_pretty_print(rope, str_print);
+	rope_pretty_print(rope, str_print, NULL);
 	rope_check(rope);
 }
 

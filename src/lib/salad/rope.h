@@ -92,10 +92,10 @@ struct avl_node ***
 avl_route_to_next(struct avl_node ***path, int dir,
 		  int32_t adjust_size);
 
-struct avl_node *
+const struct avl_node *
 avl_iter_start(struct avl_iter *it);
 
-struct avl_node *
+const struct avl_node *
 avl_iter_next(struct avl_iter *it);
 
 void
@@ -158,6 +158,7 @@ avl_iter_check(struct avl_iter *iter);
 #define rope_iter_start rope_api(iter_start)
 #define rope_iter_next rope_api(iter_next)
 #define rope_iter_delete rope_api(iter_delete)
+#define rope_visit_f rope_api(visit_f)
 #define rope_traverse rope_api(traverse)
 #define rope_check rope_api(check)
 #define rope_node_print rope_api(node_print)
@@ -194,11 +195,11 @@ struct rope {
 
 struct rope_iter {
 	/** rope->free is used to free the iterator. */
-	struct rope *rope;
+	const struct rope *rope;
 	/** End of the traversal path. */
-	struct rope_node **top;
+	const struct rope_node **top;
 	/** Traversal path */
-	struct rope_node *path[ROPE_HEIGHT_MAX];
+	const struct rope_node *path[ROPE_HEIGHT_MAX];
 };
 
 static inline rope_size_t
@@ -208,13 +209,13 @@ rope_node_size(const struct rope_node *node)
 }
 
 static inline rope_size_t
-rope_leaf_size(struct rope_node *node)
+rope_leaf_size(const struct rope_node *node)
 {
 	return node->leaf_size;
 }
 
 static inline rope_data_t
-rope_leaf_data(struct rope_node *node)
+rope_leaf_data(const struct rope_node *node)
 {
 	return node->data;
 }
@@ -620,14 +621,14 @@ rope_erase(struct rope *rope, rope_size_t offset, rope_size_t size)
 
 /** Initialize an iterator. */
 static inline void
-rope_iter_create(struct rope_iter *it, struct rope *rope)
+rope_iter_create(struct rope_iter *it, const struct rope *rope)
 {
 	it->rope = rope;
 }
 
 /** Create an iterator. */
 static inline struct rope_iter *
-rope_iter_new(struct rope *rope)
+rope_iter_new(const struct rope *rope)
 {
 	struct rope_iter *it =
 		(struct rope_iter *) ROPE_ALLOC_F(rope->ctx, sizeof(*it));
@@ -640,7 +641,7 @@ rope_iter_new(struct rope *rope)
  * Begin iteration.
  * @retval NULL the rope is empty
  */
-static inline struct rope_node *
+static inline const struct rope_node *
 rope_iter_start(struct rope_iter *it)
 {
 	return (struct rope_node *) avl_iter_start((struct avl_iter *) it);
@@ -653,10 +654,10 @@ rope_iter_start(struct rope_iter *it)
  *          has advanced beyond the last
  *          node.
  */
-static struct rope_node *
+static const struct rope_node *
 rope_iter_next(struct rope_iter *it)
 {
-	return (struct rope_node *) avl_iter_next((struct avl_iter *) it);
+	return (const struct rope_node *)avl_iter_next((struct avl_iter *)it);
 }
 
 /** Free iterator. */
@@ -666,26 +667,28 @@ rope_iter_delete(struct rope_iter *it)
 	ROPE_FREE(it->rope->ctx, it);
 }
 
+typedef void (*rope_visit_f)(rope_data_t data, size_t size, void *cb_arg);
+
 /** Apply visit_leaf function to every rope leaf. */
 static void
-rope_traverse(struct rope *rope, void (*visit_leaf)(rope_data_t, size_t))
+rope_traverse(const struct rope *rope, rope_visit_f visit_leaf, void *cb_arg)
 {
 	struct rope_iter iter;
 	rope_iter_create(&iter, rope);
 
-	struct rope_node *leaf;
+	const struct rope_node *leaf;
 
 	for (leaf = rope_iter_start(&iter);
 	     leaf != NULL;
 	     leaf = rope_iter_next(&iter)) {
 
-		visit_leaf(leaf->data, leaf->leaf_size);
+		visit_leaf(leaf->data, leaf->leaf_size, cb_arg);
 	}
 }
 
 /** Check AVL tree consistency. */
 static inline void
-rope_check(struct rope *rope)
+rope_check(const struct rope *rope)
 {
 	struct rope_iter iter;
 	rope_iter_create(&iter, rope);
@@ -693,7 +696,7 @@ rope_check(struct rope *rope)
 }
 
 static void
-rope_node_print(struct rope_node *node, void (*print)(rope_data_t, size_t),
+rope_node_print(const struct rope_node *node, rope_visit_f print, void *cb_arg,
 		const char *prefix, int dir)
 {
 	const char *conn[] = { "┌──", "└──" };
@@ -706,7 +709,7 @@ rope_node_print(struct rope_node *node, void (*print)(rope_data_t, size_t),
 	if (node && (node->link[0] || node->link[1])) {
 		snprintf(child_prefix, child_prefix_len - 1,
 			 "%s%s", prefix, padding[!dir]);
-		rope_node_print(node->link[0], print, child_prefix, 0);
+		rope_node_print(node->link[0], print, cb_arg, child_prefix, 0);
 	}
 
 	snprintf(child_prefix, child_prefix_len - 1, "%s%s",
@@ -719,11 +722,12 @@ rope_node_print(struct rope_node *node, void (*print)(rope_data_t, size_t),
 
 		printf("{ len = %zu, height = %d, data = '",
 		       (size_t) node->leaf_size, node->height);
-		print(node->data, node->leaf_size);
+		print(node->data, node->leaf_size, cb_arg);
 		printf("'}\n");
 
 		if (node->link[0] || node->link[1])
-			rope_node_print(node->link[1], print, child_prefix, 1);
+			rope_node_print(node->link[1], print, cb_arg,
+					child_prefix, 1);
 	}
 
 	free(child_prefix);
@@ -731,12 +735,13 @@ rope_node_print(struct rope_node *node, void (*print)(rope_data_t, size_t),
 
 /** Pretty print a rope. */
 static inline void
-rope_pretty_print(struct rope *rope, void (*print_leaf)(rope_data_t, size_t))
+rope_pretty_print(const struct rope *rope, rope_visit_f print_leaf,
+		  void *cb_arg)
 {
 	printf("size = %zu\nstring = '", (size_t) rope_size(rope));
-	rope_traverse(rope, print_leaf);
+	rope_traverse(rope, print_leaf, cb_arg);
 	printf("'\n");
-	rope_node_print(rope->root, print_leaf, "", true);
+	rope_node_print(rope->root, print_leaf, cb_arg, "", true);
 	printf("\n");
 }
 
@@ -771,6 +776,7 @@ rope_pretty_print(struct rope *rope, void (*print_leaf)(rope_data_t, size_t))
 #undef rope_iter_start
 #undef rope_iter_next
 #undef rope_iter_delete
+#undef rope_visit_f
 #undef rope_traverse
 #undef rope_check
 #undef rope_node_print
