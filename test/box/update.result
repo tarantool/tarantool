@@ -1824,11 +1824,11 @@ t:update({{'=', '[4]', {1}}, {'+', '[4][1]', 1}})
 -- Same about updating internals of a newly created bar field.
 t:update({{'=', '[4][6]', {a = 33}}, {'+', '[4][6].aa', 1}})
 ---
-- error: 'Field ''[4][6].aa'' UPDATE error: double update of the same field'
+- error: Field ''[4][6].aa'' was not found in the tuple
 ...
 t:update({{'=', '[4][4]', {3}}, {'+', '[4][4][1]', 1}})
 ---
-- error: 'Field ''[4][4][1]'' UPDATE error: double update of the same field'
+- [1, {}, [], [1, 2, 3, [4], 20, {'b': 22, 'a': 21, 'c': {'d': 23, 'e': 24}}, 25]]
 ...
 -- Try more than 2 levels of nested insertions.
 ops = {{'=', '[2].key1', {key11 = 1}}, {'=', '[2].key1.key12', {key21 = 2}},    \
@@ -2482,6 +2482,18 @@ t = box.tuple.new({7, {a = 1}, 11})
 t:update({{'+', '[2].a', 2}, {'+', '[2].a', 3}})
 ---
 - [7, {'a': 6}, 11]
+...
+-- Update into bar set
+t = box.tuple.new({7, {b = 1}, 11})
+---
+...
+t:update({{'=', '[2].b', 2}, {'+', '[2].b', 2}})
+---
+- [7, {'b': 4}, 11]
+...
+t:update({{'=', '[2].b', {x = 2}}, {'+', '[2].b.x', 2}})
+---
+- [7, {'b': {'x': 4}}, 11]
 ...
 -- Allow to set scalar to array field and then do scalar operation
 -- on the same field.
