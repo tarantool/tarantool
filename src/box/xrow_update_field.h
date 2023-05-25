@@ -36,6 +36,8 @@
 #include "json/json.h"
 #include "bit/int96.h"
 #include "mp_decimal.h"
+#include "small/region.h"
+#include "diag.h"
 #include <stdint.h>
 
 /**
@@ -51,6 +53,45 @@
  * functions, doing the routing, are
  * xrow_update_op_do_field_<operation_type>(), see them below.
  */
+
+/** Rope allocator for nodes, paths, items etc. */
+static inline void *
+xrow_update_alloc(struct region *region, size_t size)
+{
+	return xregion_aligned_alloc(region, size, alignof(uint64_t));
+}
+
+/**
+ * Split string rope leaf data into two pieces.
+ *
+ * @param data Leaf data pointer.
+ * @param size Leaf data size.
+ * @param offset Offset at which split should be done.
+ *
+ * @return Pointer to the tail part.
+ */
+static inline const char *
+xrow_update_string_split(struct region *region, const char *data, size_t size,
+			 size_t offset)
+{
+	(void)region;
+	(void)size;
+	return data + offset;
+}
+
+#define ROPE_SPLIT_F xrow_update_string_split
+#define ROPE_ALLOC_F xrow_update_alloc
+#define rope_data_t const char *
+#define rope_ctx_t struct region *
+#define rope_name xrow_update_string
+
+#include "salad/rope.h"
+
+#undef rope_name
+#undef rope_ctx_t
+#undef rope_data_t
+#undef ROPE_ALLOC_F
+#undef ROPE_SPLIT_F
 
 struct xrow_update_rope;
 struct xrow_update_field;
@@ -76,6 +117,24 @@ enum xrow_update_scalar_type {
 };
 
 /**
+ * xrow_update_string_type representation type.
+ */
+enum xrow_update_string_type {
+	/**
+	 * String consists of only one chunk. Array representation is used.
+	 * Chunk is stored in the first element.
+	 */
+	XROW_UPDATE_STRING_SINGLE = 0,
+	/**
+	 * String consists of three chunks. Array representation is used.
+	 * Note that any chunk can be of zero length.
+	 */
+	XROW_UPDATE_STRING_THREE = 1,
+	/** Rope representation is used. */
+	XROW_UPDATE_STRING_ROPE = 2,
+};
+
+/**
  * A continuous chunk of string data. String value is an array of such
  * chunks in case of chunks count is small.
  */
@@ -98,7 +157,15 @@ struct xrow_update_string {
 		 * Note that after update any chunk can be empty.
 		 */
 		struct xrow_update_string_chunk array[3];
+		/**
+		 * Representation for string consisting of arbitrary
+		 * number of chunks. Used for more then a single update
+		 * into the same string field.
+		 */
+		struct xrow_update_string_rope rope;
 	};
+	/** String value type. See enum definition for details. */
+	enum xrow_update_string_type type;
 };
 
 /**

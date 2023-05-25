@@ -17,9 +17,9 @@ test_empty_rope()
 	fail_unless(rope_iter_start(iter) == NULL);
 	fail_unless(rope_iter_start(iter) == NULL);
 
-	rope_traverse(rope, str_print);
+	rope_traverse(rope, str_print, NULL);
 	rope_check(rope);
-	rope_pretty_print(rope, str_print);
+	rope_pretty_print(rope, str_print, NULL);
 
 	/* rope_erase(), rope_extract() expect a non-empty rope */
 

@@ -110,10 +110,14 @@ xrow_update_err(const struct xrow_update_op *op, const char *reason)
 static int
 xrow_update_string_size(const struct xrow_update_string *str)
 {
-	uint32_t length = 0;
-	for (size_t i = 0; i < lengthof(str->array); i++)
-		length += str->array[i].length;
-	return length;
+	if (str->type < XROW_UPDATE_STRING_ROPE) {
+		uint32_t length = 0;
+		for (size_t i = 0; i < lengthof(str->array); i++)
+			length += str->array[i].length;
+		return length;
+	} else {
+		return xrow_update_string_rope_size(&str->rope);
+	}
 }
 
 /**
@@ -238,6 +242,7 @@ xrow_update_mp_read_scalar(const char **expr,
 		struct xrow_update_string *str = &ret->str;
 		str->array[0].data = mp_decode_str(expr, &str->array[0].length);
 		memset(&str->array[1], 0, sizeof(str->array[1]) * 2);
+		ret->str.type = XROW_UPDATE_STRING_SINGLE;
 		break;
 		}
 	case MP_EXT:
@@ -537,6 +542,25 @@ xrow_update_op_do_bit(struct xrow_update_op *op,
 	return 0;
 }
 
+/**
+ * Convert from string from array to rope representation.
+ */
+static void
+xrow_update_convert_string(struct xrow_update_string *str)
+{
+	struct xrow_update_string_chunk array[3];
+	memcpy(array, str->array, sizeof(array));
+
+	xrow_update_string_rope_create(&str->rope, &fiber()->gc);
+	for (int i = (int)lengthof(array) - 1; i >= 0; i--) {
+		if (array[i].length == 0)
+			continue;
+		xrow_update_string_rope_insert(&str->rope, 0, array[i].data,
+					       array[i].length);
+	}
+	str->type = XROW_UPDATE_STRING_ROPE;
+}
+
 int
 xrow_update_op_do_splice(struct xrow_update_op *op,
 			 struct xrow_update_scalar *scalar)
@@ -567,12 +591,26 @@ xrow_update_op_do_splice(struct xrow_update_op *op,
 	}
 	assert(arg->offset + arg->cut_length <= str_len);
 
-	uint32_t tail_offset = arg->offset + arg->cut_length;
-	str->array[0].length = arg->offset;
-	str->array[1].data = arg->paste;
-	str->array[1].length = arg->paste_length;
-	str->array[2].data = str->array[0].data + tail_offset;
-	str->array[2].length = str_len - tail_offset;
+	if (str->type == XROW_UPDATE_STRING_SINGLE) {
+		uint32_t tail_offset = arg->offset + arg->cut_length;
+		str->array[0].length = arg->offset;
+		str->array[1].data = arg->paste;
+		str->array[1].length = arg->paste_length;
+		str->array[2].data = str->array[0].data + tail_offset;
+		str->array[2].length = str_len - tail_offset;
+		str->type = XROW_UPDATE_STRING_THREE;
+	} else {
+		if (str->type == XROW_UPDATE_STRING_THREE)
+			xrow_update_convert_string(str);
+
+		if (arg->cut_length > 0)
+			xrow_update_string_rope_erase(&str->rope, arg->offset,
+						      arg->cut_length);
+		if (arg->paste_length > 0)
+			xrow_update_string_rope_insert(&str->rope, arg->offset,
+						       arg->paste,
+						       arg->paste_length);
+	}
 
 	return 0;
 }
@@ -638,13 +676,34 @@ xrow_update_store_scalar(const struct xrow_update_scalar *scalar,
 	return out - begin;
 }
 
+/**
+ * Copy string rope leaf data to the output buffer. Output buffer pointer
+ * is updated to the point after the copied data.
+ *
+ * @param data Leaf data pointer.
+ * @param size Leaf data size.
+ * @param cb_arg Pointer to the output buffer pointer.
+ */
+static void
+xrow_update_string_store_leaf(const char *data, size_t size, void *cb_arg)
+{
+	char **out = cb_arg;
+	memcpy(*out, data, size);
+	*out += size;
+}
+
 static char *
 xrow_update_store_string(const struct xrow_update_string *str, char *out)
 {
 	out = mp_encode_strl(out, xrow_update_string_size(str));
-	for (size_t i = 0; i < lengthof(str->array); i++) {
-		memcpy(out, str->array[i].data, str->array[i].length);
-		out += str->array[i].length;
+	if (str->type < XROW_UPDATE_STRING_ROPE) {
+		for (size_t i = 0; i < lengthof(str->array); i++) {
+			memcpy(out, str->array[i].data, str->array[i].length);
+			out += str->array[i].length;
+		}
+	} else {
+		xrow_update_string_rope_traverse(
+			&str->rope, xrow_update_string_store_leaf, &out);
 	}
 	return out;
 }

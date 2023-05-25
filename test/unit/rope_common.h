@@ -3,16 +3,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-static inline char *
-str_getn(void *ctx, char *data, size_t size, size_t offset)
+static inline const char *
+str_getn(void *ctx, const char *data, size_t size, size_t offset)
 {
 	(void) ctx;
 	return data + offset;
 }
 
 static inline void
-str_print(char *data, size_t n)
+str_print(const char *data, size_t n, void *cb_arg)
 {
+	(void)cb_arg;
 	printf("%.*s", (int) n, data);
 }
 
@@ -33,7 +34,7 @@ mem_free(void *data, void *ptr)
 #define ROPE_ALLOC_F mem_alloc
 #define ROPE_FREE_F mem_free
 #define ROPE_SPLIT_F str_getn
-#define rope_data_t char *
+#define rope_data_t const char *
 #define rope_ctx_t void *
 
 #include "salad/rope.h"
@@ -70,7 +71,7 @@ test_rope_insert(struct rope *rope, rope_size_t offset, char *str)
 {
 	printf("insert offset = %zu, str = '%s'\n", (size_t) offset, str);
 	rope_insert(rope, offset, str, strlen(str));
-	rope_pretty_print(rope, str_print);
+	rope_pretty_print(rope, str_print, NULL);
 	rope_check(rope);
 }
 
@@ -79,7 +80,7 @@ test_rope_erase(struct rope *rope, rope_size_t offset, rope_size_t size)
 {
 	printf("erase offset = %u, size = %u\n", offset, size);
 	rope_erase(rope, offset, size);
-	rope_pretty_print(rope, str_print);
+	rope_pretty_print(rope, str_print, NULL);
 	rope_check(rope);
 }
 
