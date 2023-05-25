@@ -1,6 +1,10 @@
 tarantool --help
 Tarantool 3.<minor>.<patch>-<suffix>
 
+Run Tarantool instance:
+
+  tarantool --name example-name --config ./config.yaml
+
 Connect to an instance:
 
   tt connect <uri>
@@ -21,6 +25,8 @@ Options:
 
  -h, --help             display this help and exit
  -v, --version          print program version and exit
+ -c, --config PATH      set a path to yaml config file as 'PATH'
+ -n, --name INSTANCE    set an instance name as 'INSTANCE'
  -i                     enter interactive mode
  -e EXPR                execute string 'EXPR'
  -l NAME                require library 'NAME'
@@ -36,6 +42,10 @@ to see online documentation, submit bugs or contribute a patch.
 tarantool -h
 Tarantool 3.<minor>.<patch>-<suffix>
 
+Run Tarantool instance:
+
+  tarantool --name example-name --config ./config.yaml
+
 Connect to an instance:
 
   tt connect <uri>
@@ -56,6 +66,8 @@ Options:
 
  -h, --help             display this help and exit
  -v, --version          print program version and exit
+ -c, --config PATH      set a path to yaml config file as 'PATH'
+ -n, --name INSTANCE    set an instance name as 'INSTANCE'
  -i                     enter interactive mode
  -e EXPR                execute string 'EXPR'
  -l NAME                require library 'NAME'

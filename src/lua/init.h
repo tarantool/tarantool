@@ -43,6 +43,14 @@ extern bool start_loop;
 
 extern struct lua_State *tarantool_L;
 
+/* Struct with the information for instance configuration. */
+struct instance_state {
+	/* Instance name to be started. */
+	const char *name;
+	/* Path to configuration file. */
+	const char *config;
+};
+
 #define O_INTERACTIVE 0x1
 #define O_BYTECODE    0x2
 #define O_DEBUGGING   0x4
@@ -80,8 +88,8 @@ tarantool_lua_free();
  *        error is set.
  */
 int
-tarantool_lua_run_script(char *path, uint32_t opt_mask,
-			 int optc, const char **optv,
+tarantool_lua_run_script(char *path, struct instance_state *instance,
+			 uint32_t opt_mask, int optc, const char **optv,
 			 int argc, char **argv);
 
 extern char *history;
