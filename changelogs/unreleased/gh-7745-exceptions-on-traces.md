@@ -1,3 +1,3 @@
 ## feature/luajit
 
-* Now the LuaJIT can handle exceptions on traces (gh-7745).
+* LuaJIT now can handle exceptions on traces (gh-7745).
