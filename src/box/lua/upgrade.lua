@@ -6,7 +6,14 @@ local xlog = require('xlog')
 local ffi = require('ffi')
 local fun = require('fun')
 
-ffi.cdef('uint32_t box_dd_version_id(void);')
+ffi.cdef([[
+    uint32_t box_dd_version_id(void);
+    void box_init_latest_dd_version_id(uint32_t version_id);
+    bool box_schema_needs_upgrade(void);
+    int box_schema_upgrade_begin(void);
+    void box_schema_upgrade_end(void);
+]])
+local builtin = ffi.C
 
 -- Guest user id - the default user
 local GUEST = 0
@@ -1458,27 +1465,15 @@ local handlers = {
     {version = mkversion(2, 11, 1), func = upgrade_to_2_11_1},
     {version = mkversion(3, 0, 0), func = upgrade_to_3_0_0},
 }
+builtin.box_init_latest_dd_version_id(handlers[#handlers].version.id)
 
 -- Schema version of the snapshot.
 local function get_version()
-    local version = ffi.C.box_dd_version_id()
+    local version = builtin.box_dd_version_id()
     local major = bit.band(bit.rshift(version, 16), 0xff)
     local minor = bit.band(bit.rshift(version, 8), 0xff)
     local patch = bit.band(version, 0xff)
-
-    return mkversion(major, minor, patch),
-           string.format("%s.%s.%s", major, minor, patch)
-end
-
-local function schema_needs_upgrade()
-    -- Schema needs upgrade if current schema version is greater
-    -- than schema version of the snapshot.
-    local schema_version, schema_version_str = get_version()
-    if schema_version ~= nil and
-        handlers[#handlers].version > schema_version then
-        return true, schema_version_str
-    end
-    return false
+    return mkversion(major, minor, patch)
 end
 
 local trig_oldest_version = nil
@@ -1584,8 +1579,22 @@ local function upgrade_from(version)
     end
 end
 
+-- Runs the given function with the permission to execute DDL operations
+-- with an old schema. Used by upgrade/downgrade scripts.
+local function run_upgrade(func, ...)
+    if builtin.box_schema_upgrade_begin() ~= 0 then
+        box.error()
+    end
+    local ok, err = pcall(func, ...)
+    builtin.box_schema_upgrade_end()
+    if not ok then
+        error(err)
+    end
+end
+
 local function upgrade()
-    upgrade_from(get_version())
+    local version = get_version()
+    run_upgrade(upgrade_from, version)
 end
 
 --------------------------------------------------------------------------------
@@ -2173,12 +2182,18 @@ box.schema.upgrade = upgrade
 box.schema.downgrade_versions = function()
     return table.copy(downgrade_versions)
 end
-box.schema.downgrade = function(version) downgrade_impl(version, false) end
+box.schema.downgrade = function(version)
+    run_upgrade(downgrade_impl, version, false)
+end
 box.schema.downgrade_issues = function(version)
     return downgrade_impl(version, true)
 end
 box.internal.bootstrap = bootstrap;
-box.internal.schema_needs_upgrade = schema_needs_upgrade;
+box.internal.schema_needs_upgrade = builtin.box_schema_needs_upgrade
 box.internal.get_snapshot_version = get_snapshot_version;
 box.internal.set_recovery_triggers = set_recovery_triggers;
 box.internal.clear_recovery_triggers = clear_recovery_triggers;
+
+-- Export the run_upgrade() helper to let users perform schema upgrade
+-- manually in case box.schema.upgrade() failed.
+box.internal.run_schema_upgrade = run_upgrade

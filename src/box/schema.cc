@@ -38,6 +38,8 @@
 #include "fiber.h"
 #include "memtx_tx.h"
 #include "txn.h"
+#include "engine.h"
+#include "version.h"
 
 /**
  * @module Data Dictionary
@@ -62,6 +64,12 @@ uint64_t schema_version = 0;
 /** Persistent version of the schema, stored in _schema["version"]. */
 uint32_t dd_version_id = 0;
 
+/** Most recent dd_version_id known to this build. */
+static uint32_t latest_dd_version_id = 0;
+
+/** Fiber that is currently running a schema upgrade. */
+static struct fiber *schema_upgrade_fiber;
+
 struct rlist on_schema_init = RLIST_HEAD_INITIALIZER(on_schema_init);
 struct rlist on_alter_space = RLIST_HEAD_INITIALIZER(on_alter_space);
 struct rlist on_alter_sequence = RLIST_HEAD_INITIALIZER(on_alter_sequence);
@@ -75,10 +83,73 @@ box_schema_version(void)
 	return schema_version;
 }
 
-uint32_t
+/** Called from Lua via FFI to get the current schema version. */
+extern "C" uint32_t
 box_dd_version_id(void)
 {
 	return dd_version_id;
+}
+
+/** Called from Lua via FFI to init latest_dd_version_id. */
+extern "C" void
+box_init_latest_dd_version_id(uint32_t version_id)
+{
+	assert(version_id != 0);
+	assert(latest_dd_version_id == 0);
+	latest_dd_version_id = version_id;
+}
+
+/**
+ * Returns true and sets diag if the schema needs upgrade.
+ * Called from Lua via FFI.
+ */
+extern "C" bool
+box_schema_needs_upgrade(void)
+{
+	assert(latest_dd_version_id != 0);
+	if (dd_version_id < latest_dd_version_id) {
+		diag_set(ClientError, ER_SCHEMA_NEEDS_UPGRADE,
+			 version_id_major(dd_version_id),
+			 version_id_minor(dd_version_id),
+			 version_id_patch(dd_version_id),
+			 tarantool_version());
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Should be called before starting a schema upgrade in the current fiber.
+ * Returns 0 on success. Sets diag and returns -1 if a schema upgrade is
+ * already running in another fiber.
+ *
+ * This function is required to enable DDL operations with an old schema,
+ * which is necessary to perform a schema upgrade. The calling fiber must
+ * call box_schema_upgrade_end() upon the schema upgrade completion.
+ *
+ * Called from Lua via FFI.
+ */
+extern "C" int
+box_schema_upgrade_begin(void)
+{
+	if (schema_upgrade_fiber != NULL) {
+		assert(schema_upgrade_fiber != fiber());
+		diag_set(ClientError, ER_SCHEMA_UPGRADE_IN_PROGRESS);
+		return -1;
+	}
+	schema_upgrade_fiber = fiber();
+	return 0;
+}
+
+/**
+ * Called from Lua via FFI upon completion of a schema upgrade.
+ * See box_schema_upgrade_begin().
+ */
+extern "C" void
+box_schema_upgrade_end(void)
+{
+	assert(schema_upgrade_fiber == fiber());
+	schema_upgrade_fiber = NULL;
 }
 
 static int
@@ -91,6 +162,18 @@ on_replace_dd_system_space(struct trigger *trigger, void *event)
 			 "Space on_replace trigger", "DDL operations");
 		return -1;
 	}
+	/*
+	 * In general it's unsafe to execute a DDL operation with an old schema
+	 * so we only allow it
+	 *  - in the fiber that is currently running a schema upgrade because
+	 *    a schema upgrade implies DDL;
+	 *  - during recovery so that DDL records written to the WAL can be
+	 *    replayed.
+	 */
+	if (recovery_state == FINISHED_RECOVERY &&
+	    fiber() != schema_upgrade_fiber &&
+	    box_schema_needs_upgrade())
+		return -1;
 	memtx_tx_acquire_ddl(txn);
 	return 0;
 }

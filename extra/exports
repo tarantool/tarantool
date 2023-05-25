@@ -69,6 +69,7 @@ box_index_max
 box_index_min
 box_index_random
 box_index_tuple_position
+box_init_latest_dd_version_id
 box_insert
 box_iproto_override
 box_iproto_send
@@ -100,6 +101,9 @@ box_region_used
 box_replace
 box_return_mp
 box_return_tuple
+box_schema_needs_upgrade
+box_schema_upgrade_begin
+box_schema_upgrade_end
 box_schema_version
 box_select_ffi
 box_sequence_current

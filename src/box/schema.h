@@ -65,10 +65,6 @@ box_schema_version(void);
 
 /** \endcond public */
 
-/** Return current persistent schema version. */
-uint32_t
-box_dd_version_id(void);
-
 /**
  * Try to look up object name by id and type of object.
  *
