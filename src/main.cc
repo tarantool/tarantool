@@ -619,30 +619,32 @@ print_version(void)
 static void
 print_help(FILE *stream, const char *program)
 {
-	fputs("Tarantool - a Lua application server", stream);
-	fputs("", stream);
-	fprintf(stream, "Usage: %s script.lua [OPTIONS] [SCRIPT [ARGS]]\n",
-		program);
-	fputs("", stream);
-	fputs("All command line options are passed to the interpreted script.",
-	      stream);
-	fputs("When no script name is provided, the server responds to:",
-	      stream);
-	fputs("  -h, --help\t\t\tdisplay this help and exit", stream);
-	fputs("  -v, --version\t\t\tprint program version and exit", stream);
-	fputs("  -e EXPR\t\t\texecute string 'EXPR'", stream);
-	fputs("  -l NAME\t\t\trequire library 'NAME'", stream);
-	fputs("  -j cmd\t\t\tperform LuaJIT control command", stream);
-	fputs("  -b ...\t\t\tsave or list bytecode", stream);
-	fputs("  -d\t\t\t\tactivate debugging session for 'SCRIPT'", stream);
-	fputs("  -i\t\t\t\tenter interactive mode after executing 'SCRIPT'",
-	      stream);
-	fputs("  --\t\t\t\tstop handling options", stream);
-	fputs("  -\t\t\t\texecute stdin and stop handling options", stream);
-	fputs("", stream);
-	fputs("Please visit project home page at https://tarantool.org", stream);
-	fputs("to see online documentation, submit bugs or contribute a patch.",
-	      stream);
+	static const char help_msg[] = "Tarantool %s\n\n"
+		"Connect to an instance:\n\n"
+		"  tt connect <uri>\n\n"
+		"Execute Lua script with bundled LuaJIT:\n\n"
+		"  %s old-style-script.lua [OPTIONS] [ARGS]\n\n"
+		"Run interactive LuaJIT interpreter:\n\n"
+		"  %s -i\n\n"
+		"Usage:\n\n"
+		"  %s [OPTIONS] [SCRIPT [ARGS]]\n\n"
+		"Options:\n\n"
+		" -h, --help             display this help and exit\n"
+		" -v, --version          print program version and exit\n"
+		" -i                     enter interactive mode\n"
+		" -e EXPR                execute string 'EXPR'\n"
+		" -l NAME                require library 'NAME'\n"
+		" -j cmd                 perform LuaJIT control command\n"
+		" -b ...                 save or list bytecode\n"
+		" -d                     activate debugging session for script\n"
+		" --                     stop handling options\n"
+		" -                      execute stdin and stop handling options\n"
+		"\n"
+		"Please visit project home page at https://tarantool.org\n"
+		"to see online documentation, submit bugs or contribute a patch.\n"
+		;
+	fprintf(stream, help_msg, tarantool_version(),
+		program, program, program);
 }
 
 int
@@ -699,9 +701,11 @@ main(int argc, char **argv)
 			lj_arg = true;
 			optind--;
 			break;
+		case 'e':
+			opt_mask |= O_EXECUTE;
+			FALLTHROUGH;
 		case 'j':
 		case 'l':
-		case 'e':
 			/* Save Lua interepter options to optv as is */
 			if (optc == 0)
 				optv = (const char **)xcalloc(optc_max,
@@ -773,6 +777,16 @@ main(int argc, char **argv)
 	strlcpy(tarantool_path, tarantool_bin, sizeof(tarantool_path));
 	if (strlen(tarantool_path) < strlen(tarantool_bin))
 		panic("executable path is trimmed");
+
+	if (script == NULL && (opt_mask & (O_INTERACTIVE | O_EXECUTE)) == 0) {
+		static const char misuse_msg[] = "Invalid usage: "
+			"please either provide a Lua script name\n"
+			"or set -i CLI flag to spawn Lua REPL.\n\n"
+			;
+		fputs(misuse_msg, stderr);
+		print_help(stderr, basename(argv[0]));
+		return EXIT_FAILURE;
+	}
 
 	struct timespec ts;
 	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)

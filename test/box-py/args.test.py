@@ -10,6 +10,8 @@ if platform.system() == "OpenBSD":
 
 # mask BFD warnings: https://bugs.launchpad.net/tarantool/+bug/1018356
 sys.stdout.push_filter("unable to read unknown load command 0x2\d+", "")
+sys.stdout.push_filter("Tarantool (\d+)\.\d+\.\d+(-\w+)*",
+                       "Tarantool \\1.<minor>.<patch>-<suffix>")
 server.test_option("--help")
 server.test_option("-h")
 # Replace with the same value for case when builddir inside source dir

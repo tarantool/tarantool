@@ -32,7 +32,7 @@ local testcases = {
         interactive = true
     },
     {
-        cmd_args = '',
+        cmd_args = ' -',
         stdin = '/dev/null',
         interactive = false,
         empty_output = true

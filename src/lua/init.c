@@ -1047,7 +1047,6 @@ run_script_f(va_list ap)
 	 */
 	struct diag *diag = va_arg(ap, struct diag *);
 	bool aux_loop_is_run = false;
-	bool is_option_e_ran = false;
 
 	/*
 	 * Execute scripts or modules pointed by TT_PRELOAD
@@ -1100,7 +1099,6 @@ run_script_f(va_list ap)
 			if (luaT_call(L, 0, 0) != 0)
 				goto error;
 			lua_settop(L, 0);
-			is_option_e_ran = true;
 			break;
 		default:
 			unreachable(); /* checked by getopt() in main() */
@@ -1148,8 +1146,6 @@ run_script_f(va_list ap)
 			goto luajit_error;
 		if (lua_main(L, false, argc, argv) != 0)
 			goto error;
-	} else if (!is_option_e_ran) {
-		interactive = true;
 	}
 
 	/*
