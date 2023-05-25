@@ -908,6 +908,10 @@ t:upsert(ops)
 -- Update into leaf scalar bar
 t = box.tuple.new({7, {a = 1}, 11})
 t:update({{'+', '[2].a', 2}, {'+', '[2].a', 3}})
+-- Update into bar set
+t = box.tuple.new({7, {b = 1}, 11})
+t:update({{'=', '[2].b', 2}, {'+', '[2].b', 2}})
+t:update({{'=', '[2].b', {x = 2}}, {'+', '[2].b.x', 2}})
 -- Allow to set scalar to array field and then do scalar operation
 -- on the same field.
 t = box.tuple.new({7, 1, 11})

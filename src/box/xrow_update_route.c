@@ -79,24 +79,23 @@ xrow_update_route_branch_array(struct xrow_update_field *next_hop,
 	 * There is a tricky thing though - why not to just redo
 	 * all operations here, for the sake of code simplicity?
 	 * It would allow to remove 'create_with_child' crutch.
-	 * The answer is - it is not possible. If a field is
-	 * copyable, it is not re-applicable. And vice-versa. For
-	 * example, if it is not a leaf, then there may be many
-	 * operations, not one. A subtree just can't be
-	 * 're-applied'.
+	 * The reason is it is not easy to reapply a subtree in
+	 * case child is route.
 	 *
 	 * Another reason - performance. This path should be
 	 * quite hot, and to copy a struct is for sure much faster
 	 * than to reapply an operation using a virtual function.
 	 * Operations '!' and '#' are quite rare, so their
 	 * optimization is not a critical goal.
+	 *
+	 * '=' is reapplied though for the sake of code simplicity.
 	 */
 	if (/* (1) Not a bar. */
 	    child->type != XUPDATE_BAR ||
 	    /* (2) Bar, but not a leaf. */
 	    child->bar.path_len > 0 ||
 	    /* (3) Leaf, bar, but a scalar operation. */
-	    (op->opcode != '!' && op->opcode != '#')) {
+	    xrow_update_op_is_scalar(op)) {
 		return xrow_update_array_create_with_child(next_hop, parent,
 							   child, field_no);
 	}
@@ -131,7 +130,7 @@ xrow_update_route_branch_map(struct xrow_update_field *next_hop,
 {
 	struct xrow_update_op *op = child->bar.op;
 	if (child->type != XUPDATE_BAR || child->bar.path_len > 0 ||
-	    (op->opcode != '!' && op->opcode != '#')) {
+	    xrow_update_op_is_scalar(op)) {
 		return xrow_update_map_create_with_child(next_hop, parent,
 							 child, key, key_len);
 	}
@@ -201,15 +200,6 @@ xrow_update_route_branch(struct xrow_update_field *field,
 		rc = json_lexer_next_token(&new_op->lexer, &new_token);
 		if (rc != 0) {
 			xrow_update_err_bad_json(new_op, rc);
-			return NULL;
-		}
-		if (old_token.type == JSON_TOKEN_END) {
-			/*
-			 * The bar path ended. It means the new operation either
-			 * is trying to update exactly the same field, or go
-			 * even deeper.
-			 */
-			xrow_update_err_double(new_op);
 			return NULL;
 		}
 		if (json_token_cmp(&old_token, &new_token) != 0 ||
