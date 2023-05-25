@@ -212,7 +212,9 @@ xrow_update_route_branch(struct xrow_update_field *field,
 			xrow_update_err_double(new_op);
 			return NULL;
 		}
-		if (json_token_cmp(&old_token, &new_token) != 0)
+		if (json_token_cmp(&old_token, &new_token) != 0 ||
+		    json_lexer_is_eof(&old_path_lexer) ||
+		    json_lexer_is_eof(&new_op->lexer))
 			break;
 		const char *next_pos = parent;
 		switch(new_token.type) {

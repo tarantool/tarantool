@@ -313,11 +313,16 @@ xrow_update_op_do_map_##op_type(struct xrow_update_op *op,			\
 		op->is_token_consumed = true;					\
 		return xrow_update_op_do_field_##op_type(op, &item->field);	\
 	}									\
-	if (item->field.type != XUPDATE_NOP)					\
-		return xrow_update_err_double(op);				\
-	const char *data = item->field.data;					\
-	xrow_update_mp_read_scalar(&data, &item->field.scalar);			\
-	if (xrow_update_op_do_##op_type(op, &item->field.scalar) != 0)		\
+	struct xrow_update_scalar *scalar = &item->field.scalar;		\
+	/* Just stub for non scalar field. op_do_ * will fail on it. */		\
+	struct xrow_update_scalar na = { .type = XUPDATE_TYPE_NONE };		\
+	if (item->field.type == XUPDATE_NOP) {					\
+		const char *data = item->field.data;				\
+		xrow_update_mp_read_scalar(&data, &item->field.scalar);		\
+	} else if (item->field.type != XUPDATE_SCALAR) {			\
+		scalar = &na;							\
+	}									\
+	if (xrow_update_op_do_##op_type(op, scalar) != 0)			\
 		return -1;							\
 	item->field.type = XUPDATE_SCALAR;					\
 	return 0;								\
