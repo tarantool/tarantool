@@ -620,6 +620,8 @@ static void
 print_help(FILE *stream, const char *program)
 {
 	static const char help_msg[] = "Tarantool %s\n\n"
+		"Run Tarantool instance:\n\n"
+		"  %s --name example-name --config ./config.yaml\n\n"
 		"Connect to an instance:\n\n"
 		"  tt connect <uri>\n\n"
 		"Execute Lua script with bundled LuaJIT:\n\n"
@@ -631,6 +633,8 @@ print_help(FILE *stream, const char *program)
 		"Options:\n\n"
 		" -h, --help             display this help and exit\n"
 		" -v, --version          print program version and exit\n"
+		" -c, --config PATH      set a path to yaml config file as 'PATH'\n"
+		" -n, --name INSTANCE    set an instance name as 'INSTANCE'\n"
 		" -i                     enter interactive mode\n"
 		" -e EXPR                execute string 'EXPR'\n"
 		" -l NAME                require library 'NAME'\n"
@@ -644,7 +648,7 @@ print_help(FILE *stream, const char *program)
 		"to see online documentation, submit bugs or contribute a patch.\n"
 		;
 	fprintf(stream, help_msg, tarantool_version(),
-		program, program, program);
+		program, program, program, program);
 }
 
 int
@@ -662,6 +666,8 @@ main(int argc, char **argv)
 	/* Lua interpeter options, e.g. -e and -l */
 	int optc = 0;
 	const char **optv = NULL;
+	/* Instance configuration data. */
+	static instance_state instance;
 	/* The maximum possible number of Lua interpeter options */
 	int optc_max = (argc - 1) * 2;
 	auto guard = make_scoped_guard([&optc, &optv]{ if (optc) free(optv); });
@@ -669,14 +675,30 @@ main(int argc, char **argv)
 	static struct option longopts[] = {
 		{"help", no_argument, 0, 'h'},
 		{"version", no_argument, 0, 'v'},
+		{"config", required_argument, 0, 'c'},
+		{"name", required_argument, 0, 'n'},
 		{NULL, 0, 0, 0},
 	};
-	static const char *opts = "+hVvb::ij:e:l:d";
+	static const char *opts = "+hVvb::ij:e:l:dc:n:";
 
 	int ch;
 	bool lj_arg = false;
 	while ((ch = getopt_long(argc, argv, opts, longopts, NULL)) != -1) {
 		switch (ch) {
+		case 'n':
+			/*
+			 * XXX: The given argument is copied to be
+			 * consistent with <getenv_safe> results.
+			 */
+			instance.name = (const char *)xstrdup(optarg);
+			break;
+		case 'c':
+			/*
+			 * XXX: The given argument is copied to be
+			 * consistent with <getenv_safe> results.
+			 */
+			instance.config = (const char *)xstrdup(optarg);
+			break;
 		case 'V':
 		case 'v':
 			print_version();
@@ -728,6 +750,11 @@ main(int argc, char **argv)
 			break;
 	}
 
+	if (instance.name == NULL)
+		instance.name = getenv_safe("TT_INSTANCE_NAME", NULL, 0);
+	if (instance.config == NULL)
+		instance.config = getenv_safe("TT_CONFIG", NULL, 0);
+
 	/* Shift arguments */
 	argc = 1 + (argc - optind);
 	for (int i = 1; i < argc; i++)
@@ -778,9 +805,11 @@ main(int argc, char **argv)
 	if (strlen(tarantool_path) < strlen(tarantool_bin))
 		panic("executable path is trimmed");
 
-	if (script == NULL && (opt_mask & (O_INTERACTIVE | O_EXECUTE)) == 0) {
+	if (script == NULL && (opt_mask & (O_INTERACTIVE | O_EXECUTE)) == 0 &&
+	    instance.name == NULL) {
 		static const char misuse_msg[] = "Invalid usage: "
 			"please either provide a Lua script name\n"
+			"or specify an instance name to be started\n"
 			"or set -i CLI flag to spawn Lua REPL.\n\n"
 			;
 		fputs(misuse_msg, stderr);
@@ -856,8 +885,8 @@ main(int argc, char **argv)
 		 * is why script must run only after the server was fully
 		 * initialized.
 		 */
-		if (tarantool_lua_run_script(script, opt_mask, optc, optv,
-					     main_argc, main_argv) != 0)
+		if (tarantool_lua_run_script(script, &instance, opt_mask, optc,
+					     optv, main_argc, main_argv) != 0)
 			diag_raise();
 		/*
 		 * Start event loop after executing Lua script if signal_cb()
@@ -894,6 +923,8 @@ main(int argc, char **argv)
 		ev_run(loop(), 0);
 	}
 	/* freeing resources */
+	free((void *)instance.name);
+	free((void *)instance.config);
 	tarantool_free();
 	ERROR_INJECT(ERRINJ_MAIN_MAKE_FILE_ON_RETURN, do {
 		int fd = open("tt_exit_file.txt.inprogress",

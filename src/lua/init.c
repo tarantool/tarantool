@@ -1031,6 +1031,7 @@ run_script_f(va_list ap)
 {
 	struct lua_State *L = va_arg(ap, struct lua_State *);
 	const char *path = va_arg(ap, const char *);
+	struct instance_state *instance = va_arg(ap, struct instance_state *);
 	uint32_t opt_mask = va_arg(ap, uint32_t);
 	int optc = va_arg(ap, int);
 	const char **optv = va_arg(ap, const char **);
@@ -1104,6 +1105,12 @@ run_script_f(va_list ap)
 			unreachable(); /* checked by getopt() in main() */
 		}
 	}
+
+	/*
+	 * TODO: Remove the stub below and introduce configuration
+	 * setup by using instance->name and instance->config.
+	 */
+	UNUSED(instance);
 
 	/*
 	 * Return control to tarantool_lua_run_script.
@@ -1192,8 +1199,9 @@ error:
 }
 
 int
-tarantool_lua_run_script(char *path, uint32_t opt_mask,
-			 int optc, const char **optv, int argc, char **argv)
+tarantool_lua_run_script(char *path, struct instance_state *instance,
+			 uint32_t opt_mask, int optc, const char **optv,
+			 int argc, char **argv)
 {
 	const char *title = path ? basename(path) : "interactive";
 	/*
@@ -1216,7 +1224,7 @@ tarantool_lua_run_script(char *path, uint32_t opt_mask,
 	 */
 	struct diag script_diag;
 	diag_create(&script_diag);
-	fiber_start(script_fiber, tarantool_L, path, opt_mask,
+	fiber_start(script_fiber, tarantool_L, path, instance, opt_mask,
 		    optc, optv, argc, argv, &script_diag);
 
 	/*

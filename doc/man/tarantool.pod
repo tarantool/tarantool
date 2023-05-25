@@ -112,6 +112,14 @@ Display the help screen and exit.
 
 Print the program version and exit.
 
+=item -c, --config
+
+Set a path to yaml config file as 'PATH'.
+
+=item -n, --name
+
+Set an instance name as 'INSTANCE'.
+
 =item -e EXRP
 
 Execute the string 'EXPR'.
