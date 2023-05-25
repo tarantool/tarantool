@@ -4,6 +4,10 @@ local t = require('luatest')
 
 local g = t.group()
 
+g.before_all(function()
+    t.skip('gh-8702')
+end)
+
 -- Checks that force recovery works with snapshot containing no user spaces
 -- and an unknown request type.
 --

@@ -7,7 +7,7 @@ g.before_all(function()
     g.cluster = cluster:new({})
     g.bootstrap = g.cluster:build_and_add_server({alias = 'bootstrap'})
 
-    local data_dir = 'test/box-luatest/upgrade/2.9.1'
+    local data_dir = 'test/box-luatest/upgrade/2.10.0'
     g.upgrade = g.cluster:build_and_add_server({alias   = 'upgrade',
                                                 datadir = data_dir})
 

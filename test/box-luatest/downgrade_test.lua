@@ -864,8 +864,12 @@ g.test_downgrade_schema_max_id = function(cg)
         check_max_id(nil)
 
         -- Max id must be maximal non-system space id.
+        --
+        -- Note that DDL is disabled if the schema is old, see gh-7149,
+        -- so we have to use the box.internal.run_schema_upgrade() helper.
         local space_id = 734
-        box.schema.space.create('test', {id = space_id})
+        box.internal.run_schema_upgrade(box.schema.space.create,
+                                        'test', {id = space_id})
         check_max_id(nil)
         box.schema.downgrade(prev_version)
         check_max_id(space_id)

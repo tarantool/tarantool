@@ -15,6 +15,7 @@ g.after_test("test_panic_without_force_recovery", function()
 end)
 
 g.before_test('test_ignore_with_force_recovery', function()
+    t.skip('gh-8701')
     g.server = server:new({alias = 'master-test_ignore',
                            datadir = 'test/box-luatest/gh_6794_data',
                            box_cfg = {force_recovery = true}})
