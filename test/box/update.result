@@ -1695,21 +1695,18 @@ t:upsert(ops)
 - [1, {}, [], [1, 2, 3, [2, 5, 6, 7, [8, 9, [10, 11, 12], 13, 14], 15, 16, [17, 18,
         19]], 20, {'b': 22, 'a': 21, 'c': {'d': 23, 'e': 24}}, 25]]
 ...
--- First two operations produce zero length bar update in field
--- [4][4][5][4]. The third operation should raise an error.
+-- First two operations produce zero length bar update in field [4][4][5][4].
 ops = {{'+', '[4][4][5][4]', 13000}, {'=', '[4][4][5][1]', 8000}, {'+', '[4][4][5][4]', 1}}
 ---
 ...
--- Currently result is not correct. It is temporary and will be fixed later.
 t:update(ops)
 ---
-- error: 'Argument type in operation ''+'' on field ''[4][4][5][4]'' does not match
-    field type: expected a number'
+- [1, {}, [], [1, 2, 3, [4, 5, 6, 7, [8000, 9, [10, 11, 12], 13014, 14], 15, 16, [
+        17, 18, 19]], 20, {'b': 22, 'a': 21, 'c': {'d': 23, 'e': 24}}, 25]]
 ...
--- Currently result is not correct. It is temporary and will be fixed later.
 t:upsert(ops)
 ---
-- [1, {}, [], [1, 2, 3, [4, 5, 6, 7, [8000, 9, [10, 11, 12], 13013, 14], 15, 16, [
+- [1, {}, [], [1, 2, 3, [4, 5, 6, 7, [8000, 9, [10, 11, 12], 13014, 14], 15, 16, [
         17, 18, 19]], 20, {'b': 22, 'a': 21, 'c': {'d': 23, 'e': 24}}, 25]]
 ...
 --
@@ -2477,6 +2474,14 @@ t:update(ops)
 t:upsert(ops)
 ---
 - [7, {'b': 5, 'a': {'x': 4}}, 11]
+...
+-- Update into leaf scalar bar
+t = box.tuple.new({7, {a = 1}, 11})
+---
+...
+t:update({{'+', '[2].a', 2}, {'+', '[2].a', 3}})
+---
+- [7, {'a': 6}, 11]
 ...
 -- Allow to set scalar to array field and then do scalar operation
 -- on the same field.

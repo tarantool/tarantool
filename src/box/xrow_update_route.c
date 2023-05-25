@@ -269,15 +269,16 @@ xrow_update_route_branch(struct xrow_update_field *field,
 		assert(child.type == XUPDATE_BAR);
 		child.bar.path += path_offset;
 		child.bar.path_len -= path_offset;
+		/* Turn leaf scalar bar to scalar. */
+		if (child.bar.path_len == 0 &&
+		    xrow_update_op_is_scalar(child.bar.op)) {
+			struct xrow_update_scalar s = child.bar.scalar;
+			child.type = XUPDATE_SCALAR;
+			child.scalar = s;
+		}
 		/*
-		 * Yeah, bar length can become 0 here, but it is
-		 * ok as long as it is a scalar operation (not '!'
-		 * and not '#'). When a bar is scalar, it operates
-		 * on one concrete field and works even if its
-		 * path len is 0. Talking of '#' and '!' - they
-		 * are handled by array and map 'branchers'
-		 * internally, below. They reapply such
-		 * operations.
+		 * Non scalar leaf bar (path length is 0) will be
+		 * reapplied in array and map 'branchers'.
 		 */
 	}
 
