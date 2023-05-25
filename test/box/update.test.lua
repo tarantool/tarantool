@@ -582,7 +582,9 @@ t:upsert(ops)
 -- First two operations produce zero length bar update in field
 -- [4][4][5][4]. The third operation should raise an error.
 ops = {{'+', '[4][4][5][4]', 13000}, {'=', '[4][4][5][1]', 8000}, {'+', '[4][4][5][4]', 1}}
+-- Currently result is not correct. It is temporary and will be fixed later.
 t:update(ops)
+-- Currently result is not correct. It is temporary and will be fixed later.
 t:upsert(ops)
 
 --
@@ -852,6 +854,47 @@ box.tuple.new({1}):update({{'=', 4, 4}, {'=', 3, 3}})
 --
 -- gh-8226: allow several updates of the same field
 --
+-- Test deep bar update and then set somewhere in the middle
+t = box.tuple.new({7, {a = {b = {c = {d = 2}}}}, 11})
+t:update({{'+', '[2].a.b.c.d', 2}, {'=', '[2].a.b.c', 7}})
+-- Double update of a field inside an array.
+t = box.tuple.new({7, 1, 11})
+t:update({{'+', 2, 1}, {'+', 2, 2}})
+t = box.tuple.new({7, 1, 11})
+t:update({{'+', 2, 2}, {'+', 2, 3}, {'-', 2, 7}})
+t = box.tuple.new({7, 1.1, 11})
+t:update({{'+', 2, 0.1}, {'+', 2, 0.2}})
+t = box.tuple.new({7, 0.9, 11})
+t:update({{'+', 2, 0.2}, {'-', 2, 0.3}})
+t = box.tuple.new({7, decimal.new('1.1000000000000001'), 11})
+t:update({{'+', 2, 0.1}, {'+', 2, 0.2}})
+t = box.tuple.new({7, decimal.new('0.9000000000000001'), 11})
+t:update({{'+', 2, 0.2}, {'-', 2, 0.3}})
+t = box.tuple.new({7, 0x1, 11})
+t:update({{'|', 2, 0x10}, {'|', 2, 0x100}})
+t = box.tuple.new({7, 0x111, 11})
+t:update({{'&', 2, 0x110}, {'&', 2, 0x101}})
+t = box.tuple.new({7, 0x0, 11})
+t:update({{'^', 2, 0x1}, {'^', 2, 0x10}})
+t = box.tuple.new({7, 0x101, 11})
+t:update({{'|', 2, 0x10}, {'&', 2, 0x110}})
+-- Fail to apply scalar op to non scalar/nop field in array
+t = box.tuple.new({7, {x = 2}, 11})
+ops = {{'+', '[2].x', 2}, {'+', 2, 2}}
+t:update(ops)
+t:upsert(ops)
+--
+-- Below first update will become a bar so we need second update to create map
+-- node.
+--
+-- Double update of a field inside a map.
+t = box.tuple.new({7, {a = 1, b = 3}, 11})
+t:update({{'+', '[2].b', 2}, {'+', '[2].a', 2}, {'+', '[2].a', 3}})
+-- Fail to apply scalar op to non scalar/nop field in map
+t = box.tuple.new({7, {a = {x = 2}, b = 3}, 11})
+ops = {{'+', '[2].b', 2}, {'+', '[2].a.x', 2}, {'+', '[2].a', 2}}
+t:update(ops)
+t:upsert(ops)
 -- Allow to set scalar to array field and then do scalar operation
 -- on the same field.
 t = box.tuple.new({7, 1, 11})
