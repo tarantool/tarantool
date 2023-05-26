@@ -11,21 +11,13 @@
 
 #include "lua/utils.h"
 
-/* CTypeID of `struct tuple_format *`. */
-static uint32_t CTID_STRUCT_TUPLE_FORMAT_PTR;
+static const char *tuple_format_typename = "box.tuple.format";
 
 struct tuple_format *
 luaT_check_tuple_format(struct lua_State *L, int narg)
 {
-	uint32_t ctypeid;
-	struct tuple_format *format =
-		*(struct tuple_format **)luaL_checkcdata(L, narg, &ctypeid);
-	if (ctypeid != CTID_STRUCT_TUPLE_FORMAT_PTR) {
-		luaL_error(L, "Invalid argument: 'struct tuple_format *' "
-			   "expected, got %s)",
-			   lua_typename(L, lua_type(L, narg)));
-	}
-	return format;
+	return *(struct tuple_format **)luaL_checkudata(L, narg,
+							tuple_format_typename);
 }
 
 static int
@@ -42,12 +34,11 @@ lbox_tuple_format_gc(struct lua_State *L)
 static int
 luaT_push_tuple_format(struct lua_State *L, struct tuple_format *format)
 {
-	struct tuple_format **ptr = (struct tuple_format **)
-		luaL_pushcdata(L, CTID_STRUCT_TUPLE_FORMAT_PTR);
+	struct tuple_format **ptr = lua_newuserdata(L, sizeof(*ptr));
 	*ptr = format;
 	tuple_format_ref(format);
-	lua_pushcfunction(L, lbox_tuple_format_gc);
-	luaL_setcdatagc(L, -2);
+	luaL_getmetatable(L, tuple_format_typename);
+	lua_setmetatable(L, -2);
 	return 1;
 }
 
@@ -58,7 +49,6 @@ luaT_push_tuple_format(struct lua_State *L, struct tuple_format *format)
 static int
 lbox_tuple_format_new(struct lua_State *L)
 {
-	assert(CTID_STRUCT_TUPLE_FORMAT_PTR != 0);
 	int top = lua_gettop(L);
 	if (top == 0)
 		return luaT_push_tuple_format(L, tuple_format_runtime);
@@ -102,11 +92,11 @@ lbox_tuple_format_new(struct lua_State *L)
 void
 box_lua_tuple_format_init(struct lua_State *L)
 {
-	int rc = luaL_cdef(L, "struct tuple_format;");
-	assert(rc == 0);
-	(void)rc;
-	CTID_STRUCT_TUPLE_FORMAT_PTR = luaL_ctypeid(L, "struct tuple_format *");
-	assert(CTID_STRUCT_TUPLE_FORMAT_PTR != 0);
+	const struct luaL_Reg lbox_tuple_format_meta[] = {
+		{"__gc", lbox_tuple_format_gc},
+		{NULL, NULL}
+	};
+	luaL_register_type(L, tuple_format_typename, lbox_tuple_format_meta);
 
 	const struct luaL_Reg box_tuple_formatlib_internal[] = {
 		{"new", lbox_tuple_format_new},
