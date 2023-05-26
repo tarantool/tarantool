@@ -28,6 +28,8 @@ end)
 
 g.before_each(function()
     g.server:exec(function()
+        -- Replace module metrics with empty table to avoid metrics collection.
+        package.loaded["metrics"] = {}
         -- Daemon is reloaded when cfg option is updated.
         box.cfg{
             feedback_send_metrics = true,
@@ -54,24 +56,22 @@ g.test_metrics = function()
         end
         m._VERSION = "0.16.0"
         package.loaded["metrics"] = m
-        fiber.sleep(0.3)
+        fiber.sleep(0.5)
         local daemon = box.internal.feedback_daemon
         local fb = daemon.generate_feedback()
         -- This check may fail because of assertion failure in collect method.
         t.assert_type(fb.metrics, 'table')
-        -- Huge margin to prevent flakiness.
-        --
-        -- ASAN and GCOV builds looks very affected and macOS too.
-        --
-        -- In fact, this check verifies that *some* samples are collected. It
-        -- doesn't attempt to ensure correct timings, which is nearly
-        -- impossible in the general case, when many processes performs its own
-        -- workloads in parallel.
-        t.assert_almost_equals(#fb.metrics, 30, 25)
+        -- This check verifies that *some* samples are collected and that there
+        -- are not too many of them. It doesn't attempt to ensure correct
+        -- timings, which is nearly impossible in the general case, when many
+        -- processes performs its own workloads in parallel.
+        t.assert_gt(#fb.metrics, 0)
+        t.assert_lt(#fb.metrics, 60)
+
         fb = daemon.generate_feedback()
         -- Check is metrics were reset. Fiber yields on feedback generation, so
         -- metrics may be not empty.
-        t.assert(fb.metrics == nil or #fb.metrics < 5)
+        t.assert(fb.metrics == nil or #fb.metrics < 10)
     end)
 end
 
@@ -149,13 +149,13 @@ g.test_memory_limit = function()
         end
         m._VERSION = "0.16.0"
         package.loaded["metrics"] = m
-        fiber.sleep(0.2)
+        fiber.sleep(0.5)
         local daemon = box.internal.feedback_daemon
         local fb = daemon.generate_feedback()
         t.assert_type(fb.metrics, 'table')
         t.assert_equals(#fb.metrics, 5)
         box.cfg{feedback_metrics_limit = 1}
-        fiber.sleep(0.1)
+        fiber.sleep(0.3)
         fb = daemon.generate_feedback()
         t.assert_equals(fb.metrics, nil)
     end)
