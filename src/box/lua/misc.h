@@ -68,9 +68,6 @@ lbox_push_read_view(struct lua_State *L, const struct read_view *rv);
 void
 box_lua_misc_init(struct lua_State *L);
 
-struct tuple_format *
-lbox_check_tuple_format(struct lua_State *L, int narg);
-
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

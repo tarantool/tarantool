@@ -43,6 +43,7 @@
 #include "box/iproto_constants.h"
 #include "box/iproto_features.h"
 #include "box/lua/tuple.h" /* luamp_convert_tuple() / luamp_convert_key() */
+#include "box/lua/tuple_format.h"
 #include "box/xrow.h"
 #include "box/tuple.h"
 #include "box/execute.h"
@@ -62,7 +63,6 @@
 #include "small/ibuf.h"
 #include "small/region.h"
 #include "mpstream/mpstream.h"
-#include "misc.h" /* lbox_check_tuple_format() */
 #include "uri/uri.h"
 #include "version.h"
 
@@ -2331,7 +2331,7 @@ luaT_netbox_transport_make_request(struct lua_State *L, int idx,
 	lua_pushvalue(L, arg++);
 	request->on_push_ctx_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	if (!lua_isnil(L, arg))
-		request->format = lbox_check_tuple_format(L, arg++);
+		request->format = luaT_check_tuple_format(L, arg++);
 	else
 		request->format = tuple_format_runtime;
 	tuple_format_ref(request->format);
