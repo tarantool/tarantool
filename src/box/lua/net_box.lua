@@ -948,7 +948,7 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
         s.temporary = false
         s.is_sync = false
         s._format = format
-        s._format_cdata = box.internal.new_tuple_format(format)
+        s._format_cdata = box.internal.tuple_format.new(format)
         s.connection = self
         if #space > 5 then
             local opts = space[6]
