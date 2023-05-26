@@ -902,6 +902,8 @@ int
 relay_trigger_vclock_sync(struct relay *relay, uint64_t *vclock_sync,
 			  double deadline)
 {
+	if (!relay->tx.is_paired)
+		return 0;
 	struct relay_trigger_vclock_sync_msg *msg =
 		(struct relay_trigger_vclock_sync_msg *)xmalloc(sizeof(*msg));
 	msg->relay = relay;
