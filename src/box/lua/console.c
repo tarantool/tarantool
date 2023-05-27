@@ -30,6 +30,7 @@
  */
 
 #include "box/lua/console.h"
+#include "box/box.h"
 #include "box/session.h"
 #include "box/port.h"
 #include "box/error.h"
@@ -41,7 +42,6 @@
 #include "iostream.h"
 #include "lua/msgpack.h"
 #include "lua-yaml/lyaml.h"
-#include "main.h"
 #include "serialize_lua.h"
 #include "say.h"
 #include <lua.h>

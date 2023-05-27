@@ -47,7 +47,6 @@
 #include "relay.h"
 #include "applier.h"
 #include <rmean.h>
-#include "main.h"
 #include "tuple.h"
 #include "tuple_format.h"
 #include "session.h"
@@ -114,6 +113,15 @@ const struct vclock *box_vclock = &replicaset.vclock;
 const char *box_auth_type;
 
 const char *box_ballot_event_key = "internal.ballot";
+
+char tarantool_path[PATH_MAX];
+
+/**
+ * We need to keep clock data locally to report uptime without binding
+ * to libev and etc. Because we're reporting information at the moment
+ * when crash happens and we are to be independent as much as we can.
+ */
+long tarantool_start_time;
 
 struct tt_uuid bootstrap_leader_uuid;
 
@@ -237,6 +245,18 @@ static char box_feedback_host[BOX_FEEDBACK_HOST_MAX];
 
 /** Whether sending crash info to feedback URL is enabled. */
 static bool box_feedback_crash_enabled;
+
+double
+tarantool_uptime(void)
+{
+	return ev_monotonic_now(loop()) - (ev_tstamp)tarantool_start_time;
+}
+
+sigint_cb_t __attribute__((weak))
+set_sigint_cb(sigint_cb_t new_sigint_cb)
+{
+	return new_sigint_cb;
+}
 
 static int
 box_run_on_recovery_state(enum box_recovery_state state)
@@ -5568,8 +5588,16 @@ box_storage_free(void)
 }
 
 void
-box_init(void)
+box_init(const char *tarantool_bin)
 {
+	strlcpy(tarantool_path, tarantool_bin, sizeof(tarantool_path));
+	if (strlen(tarantool_path) < strlen(tarantool_bin))
+		panic("executable path is trimmed");
+	struct timespec ts;
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+		tarantool_start_time = ts.tv_sec;
+	else
+		say_syserror("failed to get start time, ignore");
 	msgpack_init();
 	fiber_cond_create(&ro_cond);
 	auth_init();

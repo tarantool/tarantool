@@ -1,8 +1,7 @@
 add_executable(sql_fuzzer
                sql_fuzzer.cc
                sql_query_proto_to_string.cc
-               sql_query_proto_to_string.h
-               ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c)
+               sql_query_proto_to_string.h)
 
 add_library(sql-query-proto)
 

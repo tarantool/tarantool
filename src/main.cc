@@ -107,21 +107,6 @@ static struct fiber *on_shutdown_fiber = NULL;
 static bool is_shutting_down = false;
 static int exit_code = 0;
 
-char tarantool_path[PATH_MAX];
-
-/**
- * We need to keep clock data locally to report uptime without binding
- * to libev and etc. Because we're reporting information at the moment
- * when crash happens and we are to be independent as much as we can.
- */
-long tarantool_start_time;
-
-double
-tarantool_uptime(void)
-{
-	return ev_monotonic_now(loop()) - start_time;
-}
-
 /**
  * Create a checkpoint from signal handler (SIGUSR1)
  */
@@ -762,15 +747,6 @@ main(int argc, char **argv)
 		script = argv[0];
 		title_set_script_name(argv[0]);
 	}
-	strlcpy(tarantool_path, tarantool_bin, sizeof(tarantool_path));
-	if (strlen(tarantool_path) < strlen(tarantool_bin))
-		panic("executable path is trimmed");
-
-	struct timespec ts;
-	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
-		tarantool_start_time = ts.tv_sec;
-	else
-		say_syserror("failed to get start time, ignore");
 
 	random_init();
 
@@ -807,7 +783,7 @@ main(int argc, char **argv)
 	start_time = ev_monotonic_time();
 
 	try {
-		box_init();
+		box_init(tarantool_bin);
 		box_lua_init(tarantool_L);
 		tarantool_lua_postinit(tarantool_L);
 		/*

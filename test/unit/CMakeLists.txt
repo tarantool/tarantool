@@ -205,7 +205,7 @@ if(NOT ${CMAKE_BUILD_TYPE} EQUAL "Release")
 endif()
 
 create_unit_test(PREFIX func_cache
-                 SOURCES func_cache.c box_test_utils.c
+                 SOURCES func_cache.c
                  LIBRARIES box unit
 )
 create_unit_test(PREFIX prbuf
@@ -290,8 +290,8 @@ if (ENABLE_BUNDLED_MSGPUCK)
 endif ()
 
 create_unit_test(PREFIX mp_print_unknown_ext
-                 SOURCES mp_print_unknown_ext.c box_test_utils.c
-                 LIBRARIES core unit box core
+                 SOURCES mp_print_unknown_ext.c core_test_utils.c
+                 LIBRARIES unit core server box
 )
 
 create_unit_test(PREFIX guava
@@ -353,7 +353,7 @@ create_unit_test(PREFIX ratelimit
 )
 
 create_unit_test(PREFIX luaT_tuple_new
-                 SOURCES luaT_tuple_new.c box_test_utils.c
+                 SOURCES luaT_tuple_new.c
                  LIBRARIES unit box server core misc
                            ${CURL_LIBRARIES}
                            ${LIBYAML_LIBRARIES}
@@ -490,12 +490,12 @@ if(NOT ${CMAKE_BUILD_TYPE} EQUAL "Release")
 endif()
 
 create_unit_test(PREFIX merger
-                 SOURCES merger.test.c box_test_utils.c
+                 SOURCES merger.test.c
                  LIBRARIES unit core box
 )
 
 create_unit_test(PREFIX snap_quorum_delay
-                 SOURCES snap_quorum_delay.cc box_test_utils.c
+                 SOURCES snap_quorum_delay.cc
                  LIBRARIES box core unit
 )
 
@@ -515,17 +515,17 @@ create_unit_test(PREFIX popen
 add_dependencies(popen.test popen-child)
 
 create_unit_test(PREFIX serializer
-                 SOURCES serializer.c box_test_utils.c
+                 SOURCES serializer.c
                  LIBRARIES unit box ${LUAJIT_LIBRARIES}
 )
 
 create_unit_test(PREFIX watcher
-                 SOURCES watcher.c box_test_utils.c
+                 SOURCES watcher.c
                  LIBRARIES unit box
 )
 
 create_unit_test(PREFIX grp_alloc
-                 SOURCES grp_alloc.c box_test_utils.c
+                 SOURCES grp_alloc.c
                  LIBRARIES unit
 )
 
@@ -535,7 +535,7 @@ create_unit_test(PREFIX latch
 )
 
 create_unit_test(PREFIX memtx_allocator
-                 SOURCES memtx_allocator.cc box_test_utils.c
+                 SOURCES memtx_allocator.cc
                  LIBRARIES unit core box
 )
 
@@ -555,12 +555,12 @@ create_unit_test(PREFIX qsort_arg
 )
 
 create_unit_test(PREFIX iterator_position
-                 SOURCES iterator_position.c box_test_utils.c
+                 SOURCES iterator_position.c
                  LIBRARIES unit box core
 )
 
 create_unit_test(PREFIX key_def
-                 SOURCES key_def.c box_test_utils.c
+                 SOURCES key_def.c
                  LIBRARIES unit box core
 )
 
@@ -580,7 +580,7 @@ create_unit_test(PREFIX lua_utils
 
 create_unit_test(PREFIX lua_msgpack
                  SOURCES lua_msgpack.c
-                 LIBRARIES unit core server
+                 LIBRARIES unit core server box
                            ${LUAJIT_LIBRARIES}
                            ${CURL_LIBRARIES}
                            ${LIBYAML_LIBRARIES}

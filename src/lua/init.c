@@ -30,7 +30,6 @@
  */
 #include "lua/init.h"
 #include "lua/utils.h"
-#include "main.h"
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__APPLE__) || defined(__OpenBSD__)
 #include <libgen.h>
 #endif

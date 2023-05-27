@@ -25,11 +25,11 @@ function(create_perf_test)
 endfunction()
 
 create_perf_test(PREFIX tuple
-                 SOURCES tuple.cc ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
+                 SOURCES tuple.cc
                  LIBRARIES core box tuple benchmark::benchmark
 )
 
 create_perf_test(PREFIX light
-                 SOURCES light.cc ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
+                 SOURCES light.cc
                  LIBRARIES small benchmark::benchmark
 )
