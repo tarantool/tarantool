@@ -669,12 +669,12 @@ vy_run_info_decode(struct vy_run_info *run_info,
 		case VY_RUN_INFO_PAGE_COUNT:
 			run_info->page_count = mp_decode_uint(&pos);
 			break;
-		case VY_RUN_INFO_BLOOM_LEGACY:
+		case VY_RUN_INFO_BLOOM_FILTER_LEGACY:
 			run_info->bloom = tuple_bloom_decode_legacy(&pos);
 			if (run_info->bloom == NULL)
 				return -1;
 			break;
-		case VY_RUN_INFO_BLOOM:
+		case VY_RUN_INFO_BLOOM_FILTER:
 			run_info->bloom = tuple_bloom_decode(&pos);
 			if (run_info->bloom == NULL)
 				return -1;
@@ -1997,7 +1997,7 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	size += mp_sizeof_uint(VY_RUN_INFO_PAGE_COUNT) +
 		mp_sizeof_uint(run_info->page_count);
 	if (run_info->bloom != NULL)
-		size += mp_sizeof_uint(VY_RUN_INFO_BLOOM) +
+		size += mp_sizeof_uint(VY_RUN_INFO_BLOOM_FILTER) +
 			tuple_bloom_size(run_info->bloom);
 	size += mp_sizeof_uint(VY_RUN_INFO_STMT_STAT) +
 		vy_stmt_stat_sizeof(&run_info->stmt_stat);
@@ -2024,7 +2024,7 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	pos = mp_encode_uint(pos, VY_RUN_INFO_PAGE_COUNT);
 	pos = mp_encode_uint(pos, run_info->page_count);
 	if (run_info->bloom != NULL) {
-		pos = mp_encode_uint(pos, VY_RUN_INFO_BLOOM);
+		pos = mp_encode_uint(pos, VY_RUN_INFO_BLOOM_FILTER);
 		pos = tuple_bloom_encode(run_info->bloom, pos);
 	}
 	pos = mp_encode_uint(pos, VY_RUN_INFO_STMT_STAT);
