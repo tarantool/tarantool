@@ -216,11 +216,8 @@ enum iproto_key {
  */
 static_assert(iproto_key_MAX <= 0x80, "iproto_key_MAX must be <= 0x80");
 
-/** Constants generated from IPROTO_KEYS. */
-extern const struct iproto_constant iproto_key_constants[];
-
-/** Size of iproto_key_constants. */
-extern const size_t iproto_key_constants_size;
+/** IPROTO key name by code. */
+extern const char *iproto_key_strs[];
 
 /** MsgPack value type by IPROTO key. */
 extern const unsigned char iproto_key_type[];
@@ -508,7 +505,6 @@ enum {
 static inline const char *
 iproto_key_name(enum iproto_key key)
 {
-	extern const char *iproto_key_strs[];
 	if (key >= iproto_key_MAX)
 		return NULL;
 	return iproto_key_strs[key];

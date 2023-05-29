@@ -170,7 +170,7 @@ box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 # an error code and do not close connection
 
 sync=0, Invalid MsgPack - packet header
-sync=1234, Missing mandatory field 'space id' in request
+sync=1234, Missing mandatory field 'SPACE_ID' in request
 sync=5678, Read access to space '_user' is denied for user 'guest'
 space = box.schema.space.create('test_index_base', { id = 568 })
 ---
@@ -219,7 +219,7 @@ version=4, features=[0, 1, 2, 3, 4], auth_type=chap-sha1
 #
 
 # Missing key
-error: Missing mandatory field 'event key' in request
+error: Missing mandatory field 'EVENT_KEY' in request
 # Invalid key type
 error: Invalid MsgPack - packet body
 # Watch key 'foo', sync=1
