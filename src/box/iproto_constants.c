@@ -73,99 +73,6 @@ const uint64_t iproto_body_key_map[IPROTO_TYPE_STAT_MAX] = {
 };
 #undef bit
 
-const char *iproto_key_strs[iproto_key_MAX] = {
-	"type",             /* 0x00 */
-	"sync",             /* 0x01 */
-	"replica id",       /* 0x02 */
-	"lsn",              /* 0x03 */
-	"timestamp",        /* 0x04 */
-	"schema version",   /* 0x05 */
-	"server version",   /* 0x06 */
-	"group id",         /* 0x07 */
-	"tsn",              /* 0x08 */
-	"flags",            /* 0x09 */
-	"stream_id",        /* 0x0a */
-	NULL,               /* 0x0b */
-	NULL,               /* 0x0c */
-	NULL,               /* 0x0d */
-	NULL,               /* 0x0e */
-	NULL,               /* 0x0f */
-	"space id",         /* 0x10 */
-	"index id",         /* 0x11 */
-	"limit",            /* 0x12 */
-	"offset",           /* 0x13 */
-	"iterator",         /* 0x14 */
-	"index base",       /* 0x15 */
-	NULL,               /* 0x16 */
-	NULL,               /* 0x17 */
-	NULL,               /* 0x18 */
-	NULL,               /* 0x19 */
-	NULL,               /* 0x1a */
-	NULL,               /* 0x1b */
-	NULL,               /* 0x1c */
-	NULL,               /* 0x1d */
-	NULL,               /* 0x1e */
-	NULL,               /* 0x1f */
-	"key",              /* 0x20 */
-	"tuple",            /* 0x21 */
-	"function name",    /* 0x22 */
-	"user name",        /* 0x23 */
-	"instance uuid",    /* 0x24 */
-	"replicaset uuid",  /* 0x25 */
-	"vector clock",     /* 0x26 */
-	"expression",       /* 0x27 */
-	"operations",       /* 0x28 */
-	"ballot",           /* 0x29 */
-	"tuple meta",       /* 0x2a */
-	"options",          /* 0x2b */
-	"old tuple",        /* 0x2c */
-	"new tuple",        /* 0x2d */
-	NULL,               /* 0x2e */
-	NULL,               /* 0x2f */
-	"data",             /* 0x30 */
-	"error_24",         /* 0x31 */
-	"metadata",         /* 0x32 */
-	"bind meta",        /* 0x33 */
-	"bind count",       /* 0x34 */
-	NULL,               /* 0x35 */
-	NULL,               /* 0x36 */
-	NULL,               /* 0x37 */
-	NULL,               /* 0x38 */
-	NULL,               /* 0x39 */
-	NULL,               /* 0x3a */
-	NULL,               /* 0x3b */
-	NULL,               /* 0x3c */
-	NULL,               /* 0x3d */
-	NULL,               /* 0x3e */
-	NULL,               /* 0x3f */
-	"SQL text",         /* 0x40 */
-	"SQL bind",         /* 0x41 */
-	"SQL info",         /* 0x42 */
-	"stmt id",          /* 0x43 */
-	NULL,               /* 0x44 */
-	NULL,               /* 0x45 */
-	NULL,               /* 0x46 */
-	NULL,               /* 0x47 */
-	NULL,               /* 0x48 */
-	NULL,               /* 0x49 */
-	NULL,               /* 0x4a */
-	NULL,               /* 0x4b */
-	NULL,               /* 0x4c */
-	NULL,               /* 0x4d */
-	NULL,               /* 0x4e */
-	NULL,               /* 0x4f */
-	"replica anon",     /* 0x50 */
-	"id filter",        /* 0x51 */
-	"error",            /* 0x52 */
-	"term",             /* 0x53 */
-	"version",          /* 0x54 */
-	"features",         /* 0x55 */
-	"timeout",          /* 0x56 */
-	"event key",        /* 0x57 */
-	"event data",       /* 0x58 */
-	"txn isolation",    /* 0x59 */
-};
-
 const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {
 	NULL,
 	"offset",
@@ -199,17 +106,18 @@ const struct iproto_constant iproto_flag_constants[] = {
 
 const size_t iproto_flag_constants_size = lengthof(iproto_flag_constants);
 
-const struct iproto_constant iproto_key_constants[] = {
-	IPROTO_KEYS(IPROTO_CONSTANT_MEMBER)
-};
-
-const size_t iproto_key_constants_size = lengthof(iproto_key_constants);
-
 #define IPROTO_KEY_TYPE_MEMBER(s, v, t) \
 	[IPROTO_ ## s] = t,
 
 const unsigned char iproto_key_type[iproto_key_MAX] = {
 	IPROTO_KEYS(IPROTO_KEY_TYPE_MEMBER)
+};
+
+#define IPROTO_KEY_STRS_MEMBER(s, ...) \
+	[IPROTO_ ## s] = #s,
+
+const char *iproto_key_strs[iproto_key_MAX] = {
+	IPROTO_KEYS(IPROTO_KEY_STRS_MEMBER)
 };
 
 const struct iproto_constant iproto_metadata_key_constants[] = {
