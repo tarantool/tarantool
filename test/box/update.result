@@ -1754,7 +1754,7 @@ ops = {{'+', '[4][3]', 0.5}, {'+', '[4][3][2]', 0.5}}
 ...
 t:update(ops)
 ---
-- error: 'Field ''[4][3][2]'' UPDATE error: double update of the same field'
+- error: Field ''[4][3][2]'' was not found in the tuple
 ...
 t:upsert(ops)
 ---
