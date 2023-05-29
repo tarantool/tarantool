@@ -48,7 +48,7 @@ struct iproto_constant {
 	int value;
 };
 
-#define IPROTO_CONSTANT_MEMBER(s, v) {.name = #s, .value = v},
+#define IPROTO_CONSTANT_MEMBER(s, v, ...) {.name = #s, .value = v},
 
 enum {
 	/** Maximal iproto package body length (2GiB) */
@@ -80,37 +80,40 @@ extern const struct iproto_constant iproto_flag_constants[];
 /** Size of iproto_flag_constants. */
 extern const size_t iproto_flag_constants_size;
 
+/**
+ * IPROTO key name, code, and MsgPack value type.
+ */
 #define IPROTO_KEYS(_)							\
-	_(REQUEST_TYPE, 0x00)						\
-	_(SYNC, 0x01)							\
+	_(REQUEST_TYPE, 0x00, MP_UINT)					\
+	_(SYNC, 0x01, MP_UINT)						\
 									\
 	/* Replication keys (header) */					\
-	_(REPLICA_ID, 0x02)						\
-	_(LSN, 0x03)							\
-	_(TIMESTAMP, 0x04)						\
-	_(SCHEMA_VERSION, 0x05)						\
-	_(SERVER_VERSION, 0x06)						\
-	_(GROUP_ID, 0x07)						\
-	_(TSN, 0x08)							\
-	_(FLAGS, 0x09)							\
-	_(STREAM_ID, 0x0a)						\
+	_(REPLICA_ID, 0x02, MP_UINT)					\
+	_(LSN, 0x03, MP_UINT)						\
+	_(TIMESTAMP, 0x04, MP_DOUBLE)					\
+	_(SCHEMA_VERSION, 0x05, MP_UINT)				\
+	_(SERVER_VERSION, 0x06, MP_UINT)				\
+	_(GROUP_ID, 0x07, MP_UINT)					\
+	_(TSN, 0x08, MP_UINT)						\
+	_(FLAGS, 0x09, MP_UINT)						\
+	_(STREAM_ID, 0x0a, MP_UINT)					\
 	/* Leave a gap for other keys in the header. */			\
-	_(SPACE_ID, 0x10)						\
-	_(INDEX_ID, 0x11)						\
-	_(LIMIT, 0x12)							\
-	_(OFFSET, 0x13)							\
-	_(ITERATOR, 0x14)						\
-	_(INDEX_BASE, 0x15)						\
+	_(SPACE_ID, 0x10, MP_UINT)					\
+	_(INDEX_ID, 0x11, MP_UINT)					\
+	_(LIMIT, 0x12, MP_UINT)						\
+	_(OFFSET, 0x13, MP_UINT)					\
+	_(ITERATOR, 0x14, MP_UINT)					\
+	_(INDEX_BASE, 0x15, MP_UINT)					\
 	/* Leave a gap between integer values and other keys */		\
 	/**
 	 * Flag indicating the need to send position of
 	 * last selected tuple in response.
 	 */								\
-	_(FETCH_POSITION, 0x1f)						\
-	_(KEY, 0x20)							\
-	_(TUPLE, 0x21)							\
-	_(FUNCTION_NAME, 0x22)						\
-	_(USER_NAME, 0x23)						\
+	_(FETCH_POSITION, 0x1f, MP_BOOL)				\
+	_(KEY, 0x20, MP_ARRAY)						\
+	_(TUPLE, 0x21, MP_ARRAY)					\
+	_(FUNCTION_NAME, 0x22, MP_STR)					\
+	_(USER_NAME, 0x23, MP_STR)					\
 									\
 	/*
 	 * Replication keys (body).
@@ -119,31 +122,31 @@ extern const size_t iproto_flag_constants_size;
 	 * So imagine, that OPS, EXPR and FIELD_NAME keys follows
 	 * the USER_NAME key.
 	 */								\
-	_(INSTANCE_UUID, 0x24)						\
-	_(REPLICASET_UUID, 0x25)					\
-	_(VCLOCK, 0x26)							\
+	_(INSTANCE_UUID, 0x24, MP_STR)					\
+	_(REPLICASET_UUID, 0x25, MP_STR)				\
+	_(VCLOCK, 0x26, MP_MAP)						\
 									\
 	/* Also request keys. See the comment above. */			\
-	_(EXPR,  0x27) /* EVAL */					\
+	_(EXPR,  0x27, MP_STR) /* EVAL */				\
 	/* UPSERT but not UPDATE ops, because of legacy */		\
-	_(OPS, 0x28)							\
-	_(BALLOT, 0x29)							\
-	_(TUPLE_META, 0x2a)						\
-	_(OPTIONS, 0x2b)						\
+	_(OPS, 0x28, MP_ARRAY)						\
+	_(BALLOT, 0x29, MP_MAP)						\
+	_(TUPLE_META, 0x2a, MP_MAP)					\
+	_(OPTIONS, 0x2b, MP_MAP)					\
 	/** Old tuple (i.e. before DML request is applied). */		\
-	_(OLD_TUPLE, 0x2c)						\
+	_(OLD_TUPLE, 0x2c, MP_ARRAY)					\
 	/** New tuple (i.e. result of DML request). */			\
-	_(NEW_TUPLE, 0x2d)						\
+	_(NEW_TUPLE, 0x2d, MP_ARRAY)					\
 	/**
 	 * Position of last selected tuple to start iteration after it.
 	 */								\
-	_(AFTER_POSITION, 0x2e)						\
+	_(AFTER_POSITION, 0x2e, MP_STR)					\
 	/** Last selected tuple to start iteration after it. */		\
-	_(AFTER_TUPLE, 0x2f)						\
+	_(AFTER_TUPLE, 0x2f, MP_ARRAY)					\
 									\
 	/** Response keys. */						\
-	_(DATA, 0x30)							\
-	_(ERROR_24, 0x31)						\
+	_(DATA, 0x30, MP_ARRAY)						\
+	_(ERROR_24, 0x31, MP_STR)					\
 	/**
 	 * IPROTO_METADATA: [
 	 *      { IPROTO_FIELD_NAME: name },
@@ -151,68 +154,68 @@ extern const size_t iproto_flag_constants_size;
 	 *      ...
 	 * ]
 	 */								\
-	_(METADATA, 0x32)						\
-	_(BIND_METADATA, 0x33)						\
-	_(BIND_COUNT, 0x34)						\
+	_(METADATA, 0x32, MP_ARRAY)					\
+	_(BIND_METADATA, 0x33, MP_ARRAY)				\
+	_(BIND_COUNT, 0x34, MP_UINT)					\
 	/** Position of last selected tuple in response. */		\
-	_(POSITION, 0x35)						\
+	_(POSITION, 0x35, MP_STR)					\
 									\
 	/* Leave a gap between response keys and SQL keys. */		\
-	_(SQL_TEXT, 0x40)						\
-	_(SQL_BIND, 0x41)						\
+	_(SQL_TEXT, 0x40, MP_STR)					\
+	_(SQL_BIND, 0x41, MP_ARRAY)					\
 	/**
 	 * IPROTO_SQL_INFO: {
 	 *      SQL_INFO_ROW_COUNT: number
 	 * }
 	 */								\
-	_(SQL_INFO, 0x42)						\
-	_(STMT_ID, 0x43)						\
+	_(SQL_INFO, 0x42, MP_MAP)					\
+	_(STMT_ID, 0x43, MP_UINT)					\
 	/* Leave a gap between SQL keys and additional request keys */	\
-	_(REPLICA_ANON, 0x50)						\
-	_(ID_FILTER, 0x51)						\
-	_(ERROR, 0x52)							\
+	_(REPLICA_ANON, 0x50, MP_BOOL)					\
+	_(ID_FILTER, 0x51, MP_ARRAY)					\
+	_(ERROR, 0x52, MP_MAP)						\
 	/**
 	 * Term. Has the same meaning as IPROTO_RAFT_TERM, but is an iproto
 	 * key, rather than a raft key. Used for PROMOTE request, which needs
 	 * both iproto (e.g. REPLICA_ID) and raft (RAFT_TERM) keys.
 	 */								\
-	_(TERM, 0x53)							\
+	_(TERM, 0x53, MP_UINT)						\
 	/** Protocol version. */					\
-	_(VERSION, 0x54)						\
+	_(VERSION, 0x54, MP_UINT)					\
 	/** Protocol features. */					\
-	_(FEATURES, 0x55)						\
+	_(FEATURES, 0x55, MP_ARRAY)					\
 	/** Operation timeout. Specific to request type. */		\
-	_(TIMEOUT, 0x56)						\
+	_(TIMEOUT, 0x56, MP_DOUBLE)					\
 	/** Key name and data sent to a remote watcher. */		\
-	_(EVENT_KEY, 0x57)						\
-	_(EVENT_DATA, 0x58)						\
+	_(EVENT_KEY, 0x57, MP_STR)					\
+	_(EVENT_DATA, 0x58, MP_NIL)					\
 	/** Isolation level, is used only by IPROTO_BEGIN request. */	\
-	_(TXN_ISOLATION, 0x59)						\
+	_(TXN_ISOLATION, 0x59, MP_UINT)					\
 	/** A vclock synchronisation request identifier. */		\
-	_(VCLOCK_SYNC, 0x5a)						\
+	_(VCLOCK_SYNC, 0x5a, MP_UINT)					\
 	/**
 	 * Name of the authentication method that is currently used on
 	 * the server (value of box.cfg.auth_type). It's sent in reply
 	 * to IPROTO_ID request. A client can use it as the default
 	 * authentication method.
 	 */								\
-	_(AUTH_TYPE, 0x5b)						\
-	_(REPLICASET_NAME, 0x5c)					\
-	_(INSTANCE_NAME, 0x5d)						\
+	_(AUTH_TYPE, 0x5b, MP_STR)					\
+	_(REPLICASET_NAME, 0x5c, MP_STR)				\
+	_(INSTANCE_NAME, 0x5d, MP_STR)					\
 	/**
 	 * Space name used instead of identifier (IPROTO_SPACE_ID) in DML
 	 * requests. Preferred when identifier is present (i.e., the identifier
 	 * is ignored).
 	 */								\
-	_(SPACE_NAME, 0x5e)						\
+	_(SPACE_NAME, 0x5e, MP_STR)					\
 	/**
 	 * Index name used instead of identifier (IPROTO_INDEX_ID) in
 	 * IPROTO_SELECT, IPROTO_UPDATE, and IPROTO_DELETE requests. Preferred
 	 * when identifier is present (i.e., the identifier is ignored).
 	 */								\
-	_(INDEX_NAME, 0x5f)						\
+	_(INDEX_NAME, 0x5f, MP_STR)					\
 
-#define IPROTO_KEY_MEMBER(s, v) IPROTO_ ## s = v,
+#define IPROTO_KEY_MEMBER(s, v, ...) IPROTO_ ## s = v,
 
 enum iproto_key {
 	IPROTO_KEYS(IPROTO_KEY_MEMBER)
@@ -232,6 +235,9 @@ extern const struct iproto_constant iproto_key_constants[];
 
 /** Size of iproto_key_constants. */
 extern const size_t iproto_key_constants_size;
+
+/** MsgPack value type by IPROTO key. */
+extern const unsigned char iproto_key_type[];
 
 /**
  * Keys, stored in IPROTO_METADATA. They can not be received
@@ -286,8 +292,6 @@ iproto_key_bit(unsigned char key)
 {
 	return 1ULL << key;
 }
-
-extern const unsigned char iproto_key_type[iproto_key_MAX];
 
 /** IPROTO command codes. */
 #define IPROTO_TYPES(_)							\
