@@ -209,11 +209,9 @@ struct relay {
 		/** Known vclock sync received in response from replica. */
 		uint64_t vclock_sync;
 		/**
-		 * True if the relay needs Raft updates. It can live fine
-		 * without sending Raft updates, if it is a relay to an
-		 * anonymous replica, for example.
+		 * True if the relay is ready to accept messages via the cbus.
 		 */
-		bool is_raft_enabled;
+		bool is_paired;
 		/**
 		 * A pair of raft messages travelling between tx and relay
 		 * threads. While one is en route, the other is ready to save
@@ -835,7 +833,9 @@ relay_send_heartbeat_on_timeout(struct relay *relay)
 static void
 relay_push_raft_msg(struct relay *relay)
 {
-	if (!relay->tx.is_raft_enabled || relay->tx.is_raft_push_sent)
+	bool is_raft_enabled = relay->tx.is_paired && !relay->replica->anon &&
+			       relay->version_id >= version_id(2, 6, 0);
+	if (!is_raft_enabled || relay->tx.is_raft_push_sent)
 		return;
 	struct relay_raft_msg *msg =
 		&relay->tx.raft_msgs[relay->tx.raft_ready_msg];
@@ -850,8 +850,8 @@ static void
 relay_thread_on_start(void *arg)
 {
 	struct relay *relay = (struct relay *)arg;
+	relay->tx.is_paired = true;
 	if (!relay->replica->anon && relay->version_id >= version_id(2, 6, 0)) {
-		relay->tx.is_raft_enabled = true;
 		/*
 		 * Send saved raft message as soon as relay becomes operational.
 		 */
@@ -866,7 +866,7 @@ static void
 relay_thread_on_stop(void *arg)
 {
 	struct relay *relay = (struct relay *)arg;
-	relay->tx.is_raft_enabled = false;
+	relay->tx.is_paired = false;
 }
 
 /** The trigger_vclock_sync call message. */
