@@ -400,12 +400,6 @@ int
 xrow_update_err(const struct xrow_update_op *op, const char *reason);
 
 static inline int
-xrow_update_err_double(const struct xrow_update_op *op)
-{
-	return xrow_update_err(op, "double update of the same field");
-}
-
-static inline int
 xrow_update_err_bad_json(const struct xrow_update_op *op, int pos)
 {
 	return xrow_update_err(
@@ -833,7 +827,7 @@ xrow_update_op_do_field_##op_type(struct xrow_update_op *op,			\
 {										\
 	switch (field->type) {							\
 	case XUPDATE_SCALAR:							\
-		return xrow_update_err_double(op);				\
+		return xrow_update_err_no_such_field(op);			\
 	case XUPDATE_ARRAY:							\
 		return xrow_update_op_do_array_##op_type(op, field);		\
 	case XUPDATE_NOP:							\
