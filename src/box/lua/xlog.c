@@ -77,10 +77,8 @@ lbox_checkcursor(struct lua_State *L, int narg, const char *src)
 /* {{{ Xlog Parser */
 
 /**
- * Converts xlog key names to lower case and replaces whitespaces with
- * underscores, for example:
+ * Converts xlog key names to lower case, for example:
  * "SPACE_ID" => "space_id"
- * "row index offset" => "row_index_offset"
  */
 static void
 lbox_xlog_pushkey(lua_State *L, const char *key)
@@ -88,7 +86,7 @@ lbox_xlog_pushkey(lua_State *L, const char *key)
 	luaL_Buffer b;
 	luaL_buffinit(L, &b);
 	for (const char *pos = key; *pos; pos++)
-		luaL_addchar(&b, (*pos != ' ') ? tolower(*pos) : '_');
+		luaL_addchar(&b, tolower(*pos));
 	luaL_pushresult(&b);
 }
 

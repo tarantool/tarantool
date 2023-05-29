@@ -73,33 +73,6 @@ const uint64_t iproto_body_key_map[IPROTO_TYPE_STAT_MAX] = {
 };
 #undef bit
 
-const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {
-	NULL,
-	"offset",
-	"size",
-	"unpacked size",
-	"row count",
-	"min key",
-	"row index offset"
-};
-
-const char *vy_run_info_key_strs[VY_RUN_INFO_KEY_MAX] = {
-	NULL,
-	"min key",
-	"max key",
-	"min lsn",
-	"max lsn",
-	"page count",
-	"bloom filter legacy",
-	"bloom filter",
-	"stmt stat",
-};
-
-const char *vy_row_index_key_strs[VY_ROW_INDEX_KEY_MAX] = {
-	NULL,
-	"row index",
-};
-
 const struct iproto_constant iproto_flag_constants[] = {
 	IPROTO_FLAGS(IPROTO_CONSTANT_MEMBER)
 };
@@ -146,3 +119,24 @@ const struct iproto_constant iproto_raft_keys_constants[] = {
 
 const size_t iproto_raft_keys_constants_size =
 	lengthof(iproto_raft_keys_constants);
+
+#define VY_RUN_INFO_KEY_STRS_MEMBER(s, ...) \
+	[VY_RUN_INFO_ ## s] = #s,
+
+const char *vy_run_info_key_strs[vy_run_info_key_MAX] = {
+	VY_RUN_INFO_KEYS(VY_RUN_INFO_KEY_STRS_MEMBER)
+};
+
+#define VY_PAGE_INFO_KEY_STRS_MEMBER(s, ...) \
+	[VY_PAGE_INFO_ ## s] = #s,
+
+const char *vy_page_info_key_strs[vy_page_info_key_MAX] = {
+	VY_PAGE_INFO_KEYS(VY_PAGE_INFO_KEY_STRS_MEMBER)
+};
+
+#define VY_ROW_INDEX_KEY_STRS_MEMBER(s, ...) \
+	[VY_ROW_INDEX_ ## s] = #s,
+
+const char *vy_row_index_key_strs[vy_row_index_key_MAX] = {
+	VY_ROW_INDEX_KEYS(VY_ROW_INDEX_KEY_STRS_MEMBER)
+};

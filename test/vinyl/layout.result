@@ -324,7 +324,7 @@ result
       - HEADER:
           type: ROWINDEX
         BODY:
-          row_index: !!binary AAAAAAAAABAAAAAgAAAAMAAAAEAAAABQAAAAYAAAAHAAAACAAAAAkAAAAKAAAACwAAAAwA==
+          data: !!binary AAAAAAAAABAAAAAgAAAAMAAAAEAAAABQAAAAYAAAAHAAAACAAAAAkAAAAKAAAACwAAAAwA==
   - - 00000000000000000012.index
     - - HEADER:
           type: RUNINFO
@@ -367,7 +367,7 @@ result
       - HEADER:
           type: ROWINDEX
         BODY:
-          row_index: "\0\0\0\0\0\0\0\x14\0\0\0*"
+          data: "\0\0\0\0\0\0\0\x14\0\0\0*"
   - - 00000000000000000006.index
     - - HEADER:
           type: RUNINFO
@@ -457,7 +457,7 @@ result
       - HEADER:
           type: ROWINDEX
         BODY:
-          row_index: !!binary AAAAAAAAABAAAAAgAAAAMAAAAEAAAABQAAAAYAAAAHAAAACAAAAAkAAAAKAAAACwAAAAwA==
+          data: !!binary AAAAAAAAABAAAAAgAAAAMAAAAEAAAABQAAAAYAAAAHAAAACAAAAAkAAAAKAAAACwAAAAwA==
   - - 00000000000000000010.index
     - - HEADER:
           type: RUNINFO
@@ -497,7 +497,7 @@ result
       - HEADER:
           type: ROWINDEX
         BODY:
-          row_index: "\0\0\0\0\0\0\0\x10\0\0\0\""
+          data: "\0\0\0\0\0\0\0\x10\0\0\0\""
 ...
 test_run:cmd("clear filter")
 ---

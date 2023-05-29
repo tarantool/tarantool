@@ -583,25 +583,29 @@ request_replace_body_create(struct request_replace_body *body,
  * Xrow keys for Vinyl run information.
  * @sa struct vy_run_info.
  */
+#define VY_RUN_INFO_KEYS(_)						\
+	/** Min key in the run. */					\
+	_(MIN_KEY, 1)							\
+	/** Max key in the run. */					\
+	_(MAX_KEY, 2)							\
+	/** Min LSN over all statements in the run. */			\
+	_(MIN_LSN, 3)							\
+	/** Max LSN over all statements in the run. */			\
+	_(MAX_LSN, 4)							\
+	/** Number of pages in the run. */				\
+	_(PAGE_COUNT, 5)						\
+	/** Legacy bloom filter implementation. */			\
+	_(BLOOM_FILTER_LEGACY, 6)					\
+	/** Bloom filter for keys. */					\
+	_(BLOOM_FILTER, 7)						\
+	/** Number of statements of each type (map). */			\
+	_(STMT_STAT, 8)							\
+
+#define VY_RUN_INFO_KEY_MEMBER(s, v) VY_RUN_INFO_ ## s = v,
+
 enum vy_run_info_key {
-	/** Min key in the run. */
-	VY_RUN_INFO_MIN_KEY = 1,
-	/** Max key in the run. */
-	VY_RUN_INFO_MAX_KEY = 2,
-	/** Min LSN over all statements in the run. */
-	VY_RUN_INFO_MIN_LSN = 3,
-	/** Max LSN over all statements in the run. */
-	VY_RUN_INFO_MAX_LSN = 4,
-	/** Number of pages in the run. */
-	VY_RUN_INFO_PAGE_COUNT = 5,
-	/** Legacy bloom filter implementation. */
-	VY_RUN_INFO_BLOOM_LEGACY = 6,
-	/** Bloom filter for keys. */
-	VY_RUN_INFO_BLOOM = 7,
-	/** Number of statements of each type (map). */
-	VY_RUN_INFO_STMT_STAT = 8,
-	/** The last key in this enum + 1 */
-	VY_RUN_INFO_KEY_MAX
+	VY_RUN_INFO_KEYS(VY_RUN_INFO_KEY_MEMBER)
+	vy_run_info_key_MAX
 };
 
 /**
@@ -611,7 +615,7 @@ enum vy_run_info_key {
 static inline const char *
 vy_run_info_key_name(enum vy_run_info_key key)
 {
-	if (key <= 0 || key >= VY_RUN_INFO_KEY_MAX)
+	if (key <= 0 || key >= vy_run_info_key_MAX)
 		return NULL;
 	extern const char *vy_run_info_key_strs[];
 	return vy_run_info_key_strs[key];
@@ -621,21 +625,25 @@ vy_run_info_key_name(enum vy_run_info_key key)
  * Xrow keys for Vinyl page information.
  * @sa struct vy_run_info.
  */
+#define VY_PAGE_INFO_KEYS(_)						\
+	/** Offset of page data in the run file. */			\
+	_(OFFSET, 1)							\
+	/** Size of page data in the run file. */			\
+	_(SIZE, 2)							\
+	/** Size of page data in memory, i.e. unpacked. */		\
+	_(UNPACKED_SIZE, 3)						\
+	/* Number of statements in the page. */				\
+	_(ROW_COUNT, 4)							\
+	/* Minimal key stored in the page. */				\
+	_(MIN_KEY, 5)							\
+	/** Offset of the row index in the page. */			\
+	_(ROW_INDEX_OFFSET, 6)						\
+
+#define VY_PAGE_INFO_KEY_MEMBER(s, v) VY_PAGE_INFO_ ## s = v,
+
 enum vy_page_info_key {
-	/** Offset of page data in the run file. */
-	VY_PAGE_INFO_OFFSET = 1,
-	/** Size of page data in the run file. */
-	VY_PAGE_INFO_SIZE = 2,
-	/** Size of page data in memory, i.e. unpacked. */
-	VY_PAGE_INFO_UNPACKED_SIZE = 3,
-	/* Number of statements in the page. */
-	VY_PAGE_INFO_ROW_COUNT = 4,
-	/* Minimal key stored in the page. */
-	VY_PAGE_INFO_MIN_KEY = 5,
-	/** Offset of the row index in the page. */
-	VY_PAGE_INFO_ROW_INDEX_OFFSET = 6,
-	/** The last key in this enum + 1 */
-	VY_PAGE_INFO_KEY_MAX
+	VY_PAGE_INFO_KEYS(VY_PAGE_INFO_KEY_MEMBER)
+	vy_page_info_key_MAX
 };
 
 /**
@@ -645,7 +653,7 @@ enum vy_page_info_key {
 static inline const char *
 vy_page_info_key_name(enum vy_page_info_key key)
 {
-	if (key <= 0 || key >= VY_PAGE_INFO_KEY_MAX)
+	if (key <= 0 || key >= vy_page_info_key_MAX)
 		return NULL;
 	extern const char *vy_page_info_key_strs[];
 	return vy_page_info_key_strs[key];
@@ -655,11 +663,15 @@ vy_page_info_key_name(enum vy_page_info_key key)
  * Xrow keys for Vinyl row index.
  * @sa struct vy_page_info.
  */
+#define VY_ROW_INDEX_KEYS(_)						\
+	/** Array of row offsets. */					\
+	_(DATA, 1)							\
+
+#define VY_ROW_INDEX_KEY_MEMBER(s, v) VY_ROW_INDEX_ ## s = v,
+
 enum vy_row_index_key {
-	/** Array of row offsets. */
-	VY_ROW_INDEX_DATA = 1,
-	/** The last key in this enum + 1 */
-	VY_ROW_INDEX_KEY_MAX
+	VY_ROW_INDEX_KEYS(VY_ROW_INDEX_KEY_MEMBER)
+	vy_row_index_key_MAX
 };
 
 /**
@@ -669,7 +681,7 @@ enum vy_row_index_key {
 static inline const char *
 vy_row_index_key_name(enum vy_row_index_key key)
 {
-	if (key <= 0 || key >= VY_ROW_INDEX_KEY_MAX)
+	if (key <= 0 || key >= vy_row_index_key_MAX)
 		return NULL;
 	extern const char *vy_row_index_key_strs[];
 	return vy_row_index_key_strs[key];
