@@ -36,24 +36,18 @@ static struct mh_strnu32_t *iproto_key_translation;
  * Pushes an array of IPROTO constants onto Lua stack.
  */
 static void
-push_iproto_constant_subnamespace(
-	struct lua_State *L, const char *subnamespace,
-	const struct iproto_constant *constants, int constants_len,
-	const char *strip_prefix)
+push_iproto_constant_subnamespace(struct lua_State *L, const char *subnamespace,
+				  const struct iproto_constant *constants,
+				  int constants_len)
 {
-	size_t prefix_len = 0;
-	if (strip_prefix != NULL)
-		prefix_len = strlen(strip_prefix);
 	lua_createtable(L, 0, constants_len);
 	for (int i = 0; i < constants_len; ++i) {
 		const char *name = constants[i].name;
 		int value = constants[i].value;
 		if (strstr(name, "RESERVED"))
 			continue;
-		assert(prefix_len == 0 ||
-		       strncmp(name, strip_prefix, prefix_len) == 0);
 		lua_pushinteger(L, value);
-		lua_setfield(L, -2, name + prefix_len);
+		lua_setfield(L, -2, name);
 	}
 	lua_setfield(L, -2, subnamespace);
 }
@@ -64,9 +58,8 @@ push_iproto_constant_subnamespace(
 static void
 push_iproto_flag_constants(struct lua_State *L)
 {
-	push_iproto_constant_subnamespace(
-		L, "flag", iproto_flag_constants, iproto_flag_constants_size,
-		"IPROTO_FLAG_");
+	push_iproto_constant_subnamespace(L, "flag", iproto_flag_constants,
+					  iproto_flag_constants_size);
 }
 
 /**
@@ -75,13 +68,10 @@ push_iproto_flag_constants(struct lua_State *L)
 static void
 push_iproto_key_enum(struct lua_State *L)
 {
-	const char *prefix = "IPROTO_";
-	size_t prefix_size = strlen(prefix);
-	push_iproto_constant_subnamespace(
-		L, "key", iproto_key_constants, iproto_key_constants_size,
-		prefix);
+	push_iproto_constant_subnamespace(L, "key", iproto_key_constants,
+					  iproto_key_constants_size);
 	for (size_t i = 0; i < iproto_key_constants_size; ++i) {
-		const char *name = iproto_key_constants[i].name + prefix_size;
+		const char *name = iproto_key_constants[i].name;
 		size_t len = strlen(name);
 		char *lowercase = strtolowerdup(name);
 		struct mh_strnu32_node_t translation = {
@@ -105,9 +95,9 @@ push_iproto_key_enum(struct lua_State *L)
 static void
 push_iproto_metadata_key_enum(struct lua_State *L)
 {
-	push_iproto_constant_subnamespace(
-		L, "metadata_key", iproto_metadata_key_constants,
-		iproto_metadata_key_constants_size, "IPROTO_FIELD_");
+	push_iproto_constant_subnamespace(L, "metadata_key",
+					  iproto_metadata_key_constants,
+					  iproto_metadata_key_constants_size);
 }
 
 /**
@@ -116,9 +106,9 @@ push_iproto_metadata_key_enum(struct lua_State *L)
 static void
 push_iproto_ballot_key_enum(struct lua_State *L)
 {
-	push_iproto_constant_subnamespace(
-		L, "ballot_key", iproto_ballot_key_constants,
-		iproto_ballot_key_constants_size, "IPROTO_BALLOT_");
+	push_iproto_constant_subnamespace(L, "ballot_key",
+					  iproto_ballot_key_constants,
+					  iproto_ballot_key_constants_size);
 }
 
 /**
@@ -127,9 +117,8 @@ push_iproto_ballot_key_enum(struct lua_State *L)
 static void
 push_iproto_type_enum(struct lua_State *L)
 {
-	push_iproto_constant_subnamespace(
-		L, "type", iproto_type_constants, iproto_type_constants_size,
-		"IPROTO_");
+	push_iproto_constant_subnamespace(L, "type", iproto_type_constants,
+					  iproto_type_constants_size);
 }
 
 /**
@@ -138,9 +127,9 @@ push_iproto_type_enum(struct lua_State *L)
 static void
 push_iproto_raft_keys_enum(struct lua_State *L)
 {
-	push_iproto_constant_subnamespace(
-		L, "raft_key", iproto_raft_keys_constants,
-		iproto_raft_keys_constants_size, "IPROTO_RAFT_");
+	push_iproto_constant_subnamespace(L, "raft_key",
+					  iproto_raft_keys_constants,
+					  iproto_raft_keys_constants_size);
 }
 
 /**
@@ -166,15 +155,12 @@ push_iproto_protocol_features(struct lua_State *L)
 	lua_pushinteger(L, IPROTO_CURRENT_VERSION);
 	lua_setfield(L, -2, "protocol_version");
 
-	const char *prefix = "IPROTO_FEATURE_";
-	size_t prefix_len = strlen(prefix);
 	for (size_t i = 0; i < 2; ++i)
 		lua_createtable(L, 0, iproto_feature_id_constants_size);
 	for (size_t i = 0; i < iproto_feature_id_constants_size; ++i) {
 		struct iproto_constant constant =
 			iproto_feature_id_constants[i];
-		assert(strncmp(prefix, constant.name, prefix_len) == 0);
-		char *name = strtolowerdup(constant.name + prefix_len);
+		char *name = strtolowerdup(constant.name);
 		lua_pushboolean(L, true);
 		lua_setfield(L, -2, name);
 		lua_pushinteger(L, iproto_feature_id_constants[i].value);

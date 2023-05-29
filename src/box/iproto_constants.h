@@ -62,13 +62,17 @@ enum {
 /** IPROTO_FLAGS bitfield constants. */
 #define IPROTO_FLAGS(_)							\
 	/** Set for the last xrow in a transaction. */			\
-	_(IPROTO_FLAG_COMMIT, 0x01)					\
+	_(COMMIT, 0x01)							\
 	/** Set for the last row of a tx residing in limbo. */		\
-	_(IPROTO_FLAG_WAIT_SYNC, 0x02)					\
+	_(WAIT_SYNC, 0x02)						\
 	/** Set for the last row of a synchronous tx. */		\
-	_(IPROTO_FLAG_WAIT_ACK, 0x04)					\
+	_(WAIT_ACK, 0x04)						\
 
-ENUM(iproto_flag, IPROTO_FLAGS);
+#define IPROTO_FLAG_MEMBER(s, v) IPROTO_FLAG_ ## s = v,
+
+enum iproto_flag {
+	IPROTO_FLAGS(IPROTO_FLAG_MEMBER)
+};
 
 /** Constants generated from IPROTO_FLAGS. */
 extern const struct iproto_constant iproto_flag_constants[];
@@ -77,36 +81,36 @@ extern const struct iproto_constant iproto_flag_constants[];
 extern const size_t iproto_flag_constants_size;
 
 #define IPROTO_KEYS(_)							\
-	_(IPROTO_REQUEST_TYPE, 0x00)					\
-	_(IPROTO_SYNC, 0x01)						\
+	_(REQUEST_TYPE, 0x00)						\
+	_(SYNC, 0x01)							\
 									\
 	/* Replication keys (header) */					\
-	_(IPROTO_REPLICA_ID, 0x02)					\
-	_(IPROTO_LSN, 0x03)						\
-	_(IPROTO_TIMESTAMP, 0x04)					\
-	_(IPROTO_SCHEMA_VERSION, 0x05)					\
-	_(IPROTO_SERVER_VERSION, 0x06)					\
-	_(IPROTO_GROUP_ID, 0x07)					\
-	_(IPROTO_TSN, 0x08)						\
-	_(IPROTO_FLAGS, 0x09)						\
-	_(IPROTO_STREAM_ID, 0x0a)					\
+	_(REPLICA_ID, 0x02)						\
+	_(LSN, 0x03)							\
+	_(TIMESTAMP, 0x04)						\
+	_(SCHEMA_VERSION, 0x05)						\
+	_(SERVER_VERSION, 0x06)						\
+	_(GROUP_ID, 0x07)						\
+	_(TSN, 0x08)							\
+	_(FLAGS, 0x09)							\
+	_(STREAM_ID, 0x0a)						\
 	/* Leave a gap for other keys in the header. */			\
-	_(IPROTO_SPACE_ID, 0x10)					\
-	_(IPROTO_INDEX_ID, 0x11)					\
-	_(IPROTO_LIMIT, 0x12)						\
-	_(IPROTO_OFFSET, 0x13)						\
-	_(IPROTO_ITERATOR, 0x14)					\
-	_(IPROTO_INDEX_BASE, 0x15)					\
+	_(SPACE_ID, 0x10)						\
+	_(INDEX_ID, 0x11)						\
+	_(LIMIT, 0x12)							\
+	_(OFFSET, 0x13)							\
+	_(ITERATOR, 0x14)						\
+	_(INDEX_BASE, 0x15)						\
 	/* Leave a gap between integer values and other keys */		\
 	/**
 	 * Flag indicating the need to send position of
 	 * last selected tuple in response.
 	 */								\
-	_(IPROTO_FETCH_POSITION, 0x1f)					\
-	_(IPROTO_KEY, 0x20)						\
-	_(IPROTO_TUPLE, 0x21)						\
-	_(IPROTO_FUNCTION_NAME, 0x22)					\
-	_(IPROTO_USER_NAME, 0x23)					\
+	_(FETCH_POSITION, 0x1f)						\
+	_(KEY, 0x20)							\
+	_(TUPLE, 0x21)							\
+	_(FUNCTION_NAME, 0x22)						\
+	_(USER_NAME, 0x23)						\
 									\
 	/*
 	 * Replication keys (body).
@@ -115,31 +119,31 @@ extern const size_t iproto_flag_constants_size;
 	 * So imagine, that OPS, EXPR and FIELD_NAME keys follows
 	 * the USER_NAME key.
 	 */								\
-	_(IPROTO_INSTANCE_UUID, 0x24)					\
-	_(IPROTO_REPLICASET_UUID, 0x25)					\
-	_(IPROTO_VCLOCK, 0x26)						\
+	_(INSTANCE_UUID, 0x24)						\
+	_(REPLICASET_UUID, 0x25)					\
+	_(VCLOCK, 0x26)							\
 									\
 	/* Also request keys. See the comment above. */			\
-	_(IPROTO_EXPR,  0x27) /* EVAL */				\
+	_(EXPR,  0x27) /* EVAL */					\
 	/* UPSERT but not UPDATE ops, because of legacy */		\
-	_(IPROTO_OPS, 0x28)						\
-	_(IPROTO_BALLOT, 0x29)						\
-	_(IPROTO_TUPLE_META, 0x2a)					\
-	_(IPROTO_OPTIONS, 0x2b)						\
+	_(OPS, 0x28)							\
+	_(BALLOT, 0x29)							\
+	_(TUPLE_META, 0x2a)						\
+	_(OPTIONS, 0x2b)						\
 	/** Old tuple (i.e. before DML request is applied). */		\
-	_(IPROTO_OLD_TUPLE, 0x2c)					\
+	_(OLD_TUPLE, 0x2c)						\
 	/** New tuple (i.e. result of DML request). */			\
-	_(IPROTO_NEW_TUPLE, 0x2d)					\
+	_(NEW_TUPLE, 0x2d)						\
 	/**
 	 * Position of last selected tuple to start iteration after it.
 	 */								\
-	_(IPROTO_AFTER_POSITION, 0x2e)					\
+	_(AFTER_POSITION, 0x2e)						\
 	/** Last selected tuple to start iteration after it. */		\
-	_(IPROTO_AFTER_TUPLE, 0x2f)					\
+	_(AFTER_TUPLE, 0x2f)						\
 									\
 	/** Response keys. */						\
-	_(IPROTO_DATA, 0x30)						\
-	_(IPROTO_ERROR_24, 0x31)					\
+	_(DATA, 0x30)							\
+	_(ERROR_24, 0x31)						\
 	/**
 	 * IPROTO_METADATA: [
 	 *      { IPROTO_FIELD_NAME: name },
@@ -147,54 +151,60 @@ extern const size_t iproto_flag_constants_size;
 	 *      ...
 	 * ]
 	 */								\
-	_(IPROTO_METADATA, 0x32)					\
-	_(IPROTO_BIND_METADATA, 0x33)					\
-	_(IPROTO_BIND_COUNT, 0x34)					\
+	_(METADATA, 0x32)						\
+	_(BIND_METADATA, 0x33)						\
+	_(BIND_COUNT, 0x34)						\
 	/** Position of last selected tuple in response. */		\
-	_(IPROTO_POSITION, 0x35)					\
+	_(POSITION, 0x35)						\
 									\
 	/* Leave a gap between response keys and SQL keys. */		\
-	_(IPROTO_SQL_TEXT, 0x40)					\
-	_(IPROTO_SQL_BIND, 0x41)					\
+	_(SQL_TEXT, 0x40)						\
+	_(SQL_BIND, 0x41)						\
 	/**
 	 * IPROTO_SQL_INFO: {
 	 *      SQL_INFO_ROW_COUNT: number
 	 * }
 	 */								\
-	_(IPROTO_SQL_INFO, 0x42)					\
-	_(IPROTO_STMT_ID, 0x43)						\
+	_(SQL_INFO, 0x42)						\
+	_(STMT_ID, 0x43)						\
 	/* Leave a gap between SQL keys and additional request keys */	\
-	_(IPROTO_REPLICA_ANON, 0x50)					\
-	_(IPROTO_ID_FILTER, 0x51)					\
-	_(IPROTO_ERROR, 0x52)						\
+	_(REPLICA_ANON, 0x50)						\
+	_(ID_FILTER, 0x51)						\
+	_(ERROR, 0x52)							\
 	/**
 	 * Term. Has the same meaning as IPROTO_RAFT_TERM, but is an iproto
 	 * key, rather than a raft key. Used for PROMOTE request, which needs
 	 * both iproto (e.g. REPLICA_ID) and raft (RAFT_TERM) keys.
 	 */								\
-	_(IPROTO_TERM, 0x53)						\
+	_(TERM, 0x53)							\
 	/** Protocol version. */					\
-	_(IPROTO_VERSION, 0x54)						\
+	_(VERSION, 0x54)						\
 	/** Protocol features. */					\
-	_(IPROTO_FEATURES, 0x55)					\
+	_(FEATURES, 0x55)						\
 	/** Operation timeout. Specific to request type. */		\
-	_(IPROTO_TIMEOUT, 0x56)						\
+	_(TIMEOUT, 0x56)						\
 	/** Key name and data sent to a remote watcher. */		\
-	_(IPROTO_EVENT_KEY, 0x57)					\
-	_(IPROTO_EVENT_DATA, 0x58)					\
+	_(EVENT_KEY, 0x57)						\
+	_(EVENT_DATA, 0x58)						\
 	/** Isolation level, is used only by IPROTO_BEGIN request. */	\
-	_(IPROTO_TXN_ISOLATION, 0x59)					\
+	_(TXN_ISOLATION, 0x59)						\
 	/** A vclock synchronisation request identifier. */		\
-	_(IPROTO_VCLOCK_SYNC, 0x5a)					\
+	_(VCLOCK_SYNC, 0x5a)						\
 	/**
 	 * Name of the authentication method that is currently used on
 	 * the server (value of box.cfg.auth_type). It's sent in reply
 	 * to IPROTO_ID request. A client can use it as the default
 	 * authentication method.
 	 */								\
-	_(IPROTO_AUTH_TYPE, 0x5b)					\
+	_(AUTH_TYPE, 0x5b)						\
 
-ENUM(iproto_key, IPROTO_KEYS);
+#define IPROTO_KEY_MEMBER(s, v) IPROTO_ ## s = v,
+
+enum iproto_key {
+	IPROTO_KEYS(IPROTO_KEY_MEMBER)
+	iproto_key_MAX
+};
+
 /**
  * Be careful not to extend iproto_key values over 0x7f.
  * iproto_keys are encoded in msgpack as positive fixnum, which ends at
@@ -215,14 +225,18 @@ extern const size_t iproto_key_constants_size;
  * or _key_type arrays.
  */
 #define IPROTO_METADATA_KEYS(_)						\
-	_(IPROTO_FIELD_NAME, 0)						\
-	_(IPROTO_FIELD_TYPE, 1)						\
-	_(IPROTO_FIELD_COLL, 2)						\
-	_(IPROTO_FIELD_IS_NULLABLE, 3)					\
-	_(IPROTO_FIELD_IS_AUTOINCREMENT, 4)				\
-	_(IPROTO_FIELD_SPAN, 5)						\
+	_(NAME, 0)							\
+	_(TYPE, 1)							\
+	_(COLL, 2)							\
+	_(IS_NULLABLE, 3)						\
+	_(IS_AUTOINCREMENT, 4)						\
+	_(SPAN, 5)							\
 
-ENUM(iproto_metadata_key, IPROTO_METADATA_KEYS);
+#define IPROTO_METADATA_KEY_MEMBER(s, v) IPROTO_FIELD_ ## s = v,
+
+enum iproto_metadata_key {
+	IPROTO_METADATA_KEYS(IPROTO_METADATA_KEY_MEMBER)
+};
 
 /** Constants generated from IPROTO_METADATA_KEYS. */
 extern const struct iproto_constant iproto_metadata_key_constants[];
@@ -231,17 +245,21 @@ extern const struct iproto_constant iproto_metadata_key_constants[];
 extern const size_t iproto_metadata_key_constants_size;
 
 #define IPROTO_BALLOT_KEYS(_)						\
-	_(IPROTO_BALLOT_IS_RO_CFG, 0x01)				\
-	_(IPROTO_BALLOT_VCLOCK, 0x02)					\
-	_(IPROTO_BALLOT_GC_VCLOCK, 0x03)				\
-	_(IPROTO_BALLOT_IS_RO, 0x04)					\
-	_(IPROTO_BALLOT_IS_ANON, 0x05)					\
-	_(IPROTO_BALLOT_IS_BOOTED, 0x06)				\
-	_(IPROTO_BALLOT_CAN_LEAD, 0x07)					\
-	_(IPROTO_BALLOT_BOOTSTRAP_LEADER_UUID, 0x08)			\
-	_(IPROTO_BALLOT_REGISTERED_REPLICA_UUIDS, 0x09)			\
+	_(IS_RO_CFG, 0x01)						\
+	_(VCLOCK, 0x02)							\
+	_(GC_VCLOCK, 0x03)						\
+	_(IS_RO, 0x04)							\
+	_(IS_ANON, 0x05)						\
+	_(IS_BOOTED, 0x06)						\
+	_(CAN_LEAD, 0x07)						\
+	_(BOOTSTRAP_LEADER_UUID, 0x08)					\
+	_(REGISTERED_REPLICA_UUIDS, 0x09)				\
 
-ENUM(iproto_ballot_key, IPROTO_BALLOT_KEYS);
+#define IPROTO_BALLOT_KEY_MEMBER(s, v) IPROTO_BALLOT_ ## s = v,
+
+enum iproto_ballot_key {
+	IPROTO_BALLOT_KEYS(IPROTO_BALLOT_KEY_MEMBER)
+};
 
 /** Constants generated from IPROTO_BALLOT_KEYS. */
 extern const struct iproto_constant iproto_ballot_key_constants[];
@@ -260,74 +278,74 @@ extern const unsigned char iproto_key_type[iproto_key_MAX];
 /** IPROTO command codes. */
 #define IPROTO_TYPES(_)							\
 	/** Acknowledgement that request or command is successful */	\
-	_(IPROTO_OK, 0)							\
+	_(OK, 0)							\
 									\
 	/** SELECT request */						\
-	_(IPROTO_SELECT, 1)						\
+	_(SELECT, 1)							\
 	/** INSERT request */						\
-	_(IPROTO_INSERT, 2)						\
+	_(INSERT, 2)							\
 	/** REPLACE request */						\
-	_(IPROTO_REPLACE, 3)						\
+	_(REPLACE, 3)							\
 	/** UPDATE request */						\
-	_(IPROTO_UPDATE, 4)						\
+	_(UPDATE, 4)							\
 	/** DELETE request */						\
-	_(IPROTO_DELETE, 5)						\
+	_(DELETE, 5)							\
 	/**
 	 * CALL request - wraps result into [tuple, tuple, ...] format
 	 */								\
-	_(IPROTO_CALL_16, 6)						\
+	_(CALL_16, 6)							\
 	/** AUTH request */						\
-	_(IPROTO_AUTH, 7)						\
+	_(AUTH, 7)							\
 	/** EVAL request */						\
-	_(IPROTO_EVAL, 8)						\
+	_(EVAL, 8)							\
 	/** UPSERT request */						\
-	_(IPROTO_UPSERT, 9)						\
+	_(UPSERT, 9)							\
 	/** CALL request - returns arbitrary MessagePack */		\
-	_(IPROTO_CALL, 10)						\
+	_(CALL, 10)							\
 	/** Execute an SQL statement. */				\
-	_(IPROTO_EXECUTE, 11)						\
+	_(EXECUTE, 11)							\
 	/** No operation. Treated as DML, used to bump LSN. */		\
-	_(IPROTO_NOP, 12)						\
+	_(NOP, 12)							\
 	/** Prepare SQL statement. */					\
-	_(IPROTO_PREPARE, 13)						\
+	_(PREPARE, 13)							\
 	/* Begin transaction */						\
-	_(IPROTO_BEGIN, 14)						\
+	_(BEGIN, 14)							\
 	/* Commit transaction */					\
-	_(IPROTO_COMMIT, 15)						\
+	_(COMMIT, 15)							\
 	/* Rollback transaction */					\
-	_(IPROTO_ROLLBACK, 16)						\
+	_(ROLLBACK, 16)							\
 	/** The maximum typecode used for box.stat() */			\
-	_(IPROTO_RESERVED_TYPE_STAT_MAX, 17)				\
+	_(RESERVED_TYPE_STAT_MAX, 17)					\
 									\
-	_(IPROTO_RAFT, 30)						\
+	_(RAFT, 30)							\
 	/** PROMOTE request. */						\
-	_(IPROTO_RAFT_PROMOTE, 31)					\
+	_(RAFT_PROMOTE, 31)						\
 	/** DEMOTE request. */						\
-	_(IPROTO_RAFT_DEMOTE, 32)					\
+	_(RAFT_DEMOTE, 32)						\
 									\
 	/** A confirmation message for synchronous transactions. */	\
-	_(IPROTO_RAFT_CONFIRM, 40)					\
+	_(RAFT_CONFIRM, 40)						\
 	/** A rollback message for synchronous transactions. */		\
-	_(IPROTO_RAFT_ROLLBACK, 41)					\
+	_(RAFT_ROLLBACK, 41)						\
 									\
 	/** PING request */						\
-	_(IPROTO_PING, 64)						\
+	_(PING, 64)							\
 	/** Replication JOIN command */					\
-	_(IPROTO_JOIN, 65)						\
+	_(JOIN, 65)							\
 	/** Replication SUBSCRIBE command */				\
-	_(IPROTO_SUBSCRIBE, 66)						\
+	_(SUBSCRIBE, 66)						\
 	/** DEPRECATED: use IPROTO_VOTE instead */			\
-	_(IPROTO_VOTE_DEPRECATED, 67)					\
+	_(VOTE_DEPRECATED, 67)						\
 	/** Vote request command for master election */			\
-	_(IPROTO_VOTE, 68)						\
+	_(VOTE, 68)							\
 	/** Anonymous replication FETCH SNAPSHOT. */			\
-	_(IPROTO_FETCH_SNAPSHOT, 69)					\
+	_(FETCH_SNAPSHOT, 69)						\
 	/** REGISTER request to leave anonymous replication. */		\
-	_(IPROTO_REGISTER, 70)						\
-	_(IPROTO_JOIN_META, 71)						\
-	_(IPROTO_JOIN_SNAPSHOT, 72)					\
+	_(REGISTER, 70)							\
+	_(JOIN_META, 71)						\
+	_(JOIN_SNAPSHOT, 72)						\
 	/** Protocol features request. */				\
-	_(IPROTO_ID, 73)						\
+	_(ID, 73)							\
 	/**
 	 * The following three request types are used by the remote watcher
 	 * protocol (box.watch over network), which operates as follows:
@@ -348,30 +366,34 @@ extern const unsigned char iproto_key_type[iproto_key_MAX];
 	 * sends the same sync number in an IPROTO_EVENT packet as the one sent
 	 * by the client in the last corresponding IPROTO_WATCH request.
 	 */								\
-	_(IPROTO_WATCH, 74)						\
-	_(IPROTO_UNWATCH, 75)						\
-	_(IPROTO_EVENT, 76)						\
+	_(WATCH, 74)							\
+	_(UNWATCH, 75)							\
+	_(EVENT, 76)							\
 	/**
 	 * The following three requests are reserved for vinyl types.
 	 */								\
-	_(IPROTO_RESERVED_VY_INDEX_RUN_INFO, 100)			\
-	_(IPROTO_RESERVED_VY_INDEX_PAGE_INFO, 101)			\
-	_(IPROTO_RESERVED_VY_RUN_ROW_INDEX, 102)			\
+	_(RESERVED_VY_INDEX_RUN_INFO, 100)				\
+	_(RESERVED_VY_INDEX_PAGE_INFO, 101)				\
+	_(RESERVED_VY_RUN_ROW_INDEX, 102)				\
 									\
 	/** Non-final response type. */					\
-	_(IPROTO_CHUNK, 128)						\
+	_(CHUNK, 128)							\
 									\
 	/**
 	 * Error codes = (IPROTO_TYPE_ERROR | ER_XXX from errcode.h)
 	 */								\
-	_(IPROTO_TYPE_ERROR, 1 << 15)					\
+	_(TYPE_ERROR, 1 << 15)						\
 									\
 	/**
 	 * Used for overriding the unknown request handler.
 	 */								\
-	_(IPROTO_UNKNOWN, -1)						\
+	_(UNKNOWN, -1)							\
 
-ENUM(iproto_type, IPROTO_TYPES);
+#define IPROTO_TYPE_MEMBER(s, v) IPROTO_ ## s = v,
+
+enum iproto_type {
+	IPROTO_TYPES(IPROTO_TYPE_MEMBER)
+};
 
 /** Constants generated from IPROTO_TYPES. */
 extern const struct iproto_constant iproto_type_constants[];
@@ -394,15 +416,19 @@ enum {
 /** IPROTO type name by code */
 extern const char *iproto_type_strs[];
 
-#define IPROTO_RAFT_KEYS(_)			\
-	_(IPROTO_RAFT_TERM, 0)			\
-	_(IPROTO_RAFT_VOTE, 1)			\
-	_(IPROTO_RAFT_STATE, 2)			\
-	_(IPROTO_RAFT_VCLOCK, 3)		\
-	_(IPROTO_RAFT_LEADER_ID, 4)		\
-	_(IPROTO_RAFT_IS_LEADER_SEEN, 5)	\
+#define IPROTO_RAFT_KEYS(_)						\
+	_(TERM, 0)							\
+	_(VOTE, 1)							\
+	_(STATE, 2)							\
+	_(VCLOCK, 3)							\
+	_(LEADER_ID, 4)							\
+	_(IS_LEADER_SEEN, 5)						\
 
-ENUM(iproto_raft_keys, IPROTO_RAFT_KEYS);
+#define IPROTO_RAFT_KEY_MEMBER(s, v) IPROTO_RAFT_ ## s = v,
+
+enum iproto_raft_key {
+	IPROTO_RAFT_KEYS(IPROTO_RAFT_KEY_MEMBER)
+};
 
 /** Constants generated from IPROTO_RAFT_KEYS. */
 extern const struct iproto_constant iproto_raft_keys_constants[];

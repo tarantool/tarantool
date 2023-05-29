@@ -17,16 +17,16 @@ extern "C" {
 #endif
 
 /** IPROTO protocol feature ids returned by the IPROTO_ID command. */
-#define IPROTO_FEATURES(_)			\
+#define IPROTO_FEATURES(_)						\
 	/**
 	 * Streams support: IPROTO_STREAM_ID header key.
 	 */								\
-	_(IPROTO_FEATURE_STREAMS, 0)					\
+	_(STREAMS, 0)							\
 	/**
 	 * Transactions in the protocol:
 	 * IPROTO_BEGIN, IPROTO_COMMIT, IPROTO_ROLLBACK commands.
 	 */								\
-	_(IPROTO_FEATURE_TRANSACTIONS, 1)				\
+	_(TRANSACTIONS, 1)						\
 	/**
 	 * MP_ERROR MsgPack extension support.
 	 *
@@ -38,20 +38,25 @@ extern "C" {
 	 * encode_errors_as_ext is true, errors will be encoded as MP_ERROR
 	 * MsgPack extension.
 	 */								\
-	_(IPROTO_FEATURE_ERROR_EXTENSION, 2)				\
+	_(ERROR_EXTENSION, 2)						\
 	/**
 	 * Remote watchers support:
 	 * IPROTO_WATCH, IPROTO_UNWATCH, IPROTO_EVENT commands.
 	 */								\
-	_(IPROTO_FEATURE_WATCHERS, 3)					\
+	_(WATCHERS, 3)							\
 	/**
 	 * Pagination support:
 	 * IPROTO_AFTER_POSITION, IPROTO_AFTER_TUPLE, IPROTO_FETCH_POSITION
 	 * request fields and IPROTO_POSITION response field.
 	 */								\
-	_(IPROTO_FEATURE_PAGINATION, 4)					\
+	_(PAGINATION, 4)						\
 
-ENUM(iproto_feature_id, IPROTO_FEATURES);
+#define IPROTO_FEATURE_MEMBER(s, v) IPROTO_FEATURE_ ## s = v,
+
+enum iproto_feature_id {
+	IPROTO_FEATURES(IPROTO_FEATURE_MEMBER)
+	iproto_feature_id_MAX
+};
 
 /** Constants generated from IPROTO_FEATURES. */
 extern const struct iproto_constant iproto_feature_id_constants[];
