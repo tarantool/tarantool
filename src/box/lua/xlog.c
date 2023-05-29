@@ -31,6 +31,8 @@
 
 #include "xlog.h"
 
+#include <ctype.h>
+
 #include <say.h>
 #include <diag.h>
 #include <msgpuck/msgpuck.h>
@@ -75,8 +77,10 @@ lbox_checkcursor(struct lua_State *L, int narg, const char *src)
 /* {{{ Xlog Parser */
 
 /**
- * Replaces whitespace with underscore for xlog key names, e.g.
- * "row index offset" => "row_index_offset".
+ * Converts xlog key names to lower case and replaces whitespaces with
+ * underscores, for example:
+ * "SPACE_ID" => "space_id"
+ * "row index offset" => "row_index_offset"
  */
 static void
 lbox_xlog_pushkey(lua_State *L, const char *key)
@@ -84,7 +88,7 @@ lbox_xlog_pushkey(lua_State *L, const char *key)
 	luaL_Buffer b;
 	luaL_buffinit(L, &b);
 	for (const char *pos = key; *pos; pos++)
-		luaL_addchar(&b, (*pos != ' ') ? *pos : '_');
+		luaL_addchar(&b, (*pos != ' ') ? tolower(*pos) : '_');
 	luaL_pushresult(&b);
 }
 
@@ -95,7 +99,12 @@ lbox_xlog_parse_body_kv(struct lua_State *L, int type, const char **beg, const c
 		luaL_error(L, "Broken type of body key");
 	uint32_t v = mp_decode_uint(beg);
 	if (iproto_type_is_dml(type) && iproto_key_name(v)) {
-		lbox_xlog_pushkey(L, iproto_key_name(v));
+		/*
+		 * Historically, the xlog reader outputs IPROTO_OPS as
+		 * "operations", not "ops".
+		 */
+		lbox_xlog_pushkey(L, (v == IPROTO_OPS ? "operations" :
+				      iproto_key_name(v)));
 	} else if (type == VY_INDEX_RUN_INFO && vy_run_info_key_name(v)) {
 		lbox_xlog_pushkey(L, vy_run_info_key_name(v));
 	} else if (type == VY_INDEX_PAGE_INFO && vy_page_info_key_name(v)) {
@@ -187,7 +196,7 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 	lua_pushstring(L, "HEADER");
 
 	lua_createtable(L, 0, 8);
-	lua_pushstring(L, iproto_key_name(IPROTO_REQUEST_TYPE));
+	lua_pushstring(L, "type");
 	const char *typename = iproto_type_name(row.type);
 	if (typename != NULL) {
 		lua_pushstring(L, typename);

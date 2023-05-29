@@ -64,17 +64,20 @@ push_iproto_flag_constants(struct lua_State *L)
 static void
 push_iproto_key_enum(struct lua_State *L)
 {
-	push_iproto_constant_subnamespace(L, "key", iproto_key_constants,
-					  iproto_key_constants_size);
-	for (size_t i = 0; i < iproto_key_constants_size; ++i) {
-		const char *name = iproto_key_constants[i].name;
+	lua_newtable(L);
+	for (int i = 0; i < iproto_key_MAX; i++) {
+		const char *name = iproto_key_strs[i];
+		if (name == NULL)
+			continue;
+		lua_pushinteger(L, i);
+		lua_setfield(L, -2, name);
 		size_t len = strlen(name);
 		char *lowercase = strtolowerdup(name);
 		struct mh_strnu32_node_t translation = {
 			.str = lowercase,
 			.len = len,
 			.hash = lua_hash(lowercase, len),
-			.val = iproto_key_constants[i].value,
+			.val = i,
 		};
 		mh_strnu32_put(iproto_key_translation, &translation,
 			       NULL, NULL);
@@ -83,6 +86,7 @@ push_iproto_key_enum(struct lua_State *L)
 		mh_strnu32_put(iproto_key_translation, &translation,
 			       NULL, NULL);
 	}
+	lua_setfield(L, -2, "key");
 }
 
 /**

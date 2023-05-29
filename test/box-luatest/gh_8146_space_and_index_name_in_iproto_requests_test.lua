@@ -296,7 +296,7 @@ g.test_space_name_in_snapshot = function(cg)
     local log = fio.pathjoin(s.workdir, s.alias .. '.log')
     t.helpers.retrying({}, function()
         t.assert_not_equals(s:grep_log("can't initialize storage: " ..
-                                       "Missing mandatory field 'space id' " ..
+                                       "Missing mandatory field 'SPACE_ID' " ..
                                        "in request", nil,
                                        {filename = log}), nil)
     end)
