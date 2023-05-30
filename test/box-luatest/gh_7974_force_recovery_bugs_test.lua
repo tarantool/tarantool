@@ -4,17 +4,13 @@ local t = require('luatest')
 
 local g = t.group()
 
-g.before_all(function()
-    t.skip('gh-8702')
-end)
-
 -- Checks that force recovery works with snapshot containing no user spaces
 -- and an unknown request type.
 --
 -- Snapshot generation instruction:
 -- 1. Patch this line to encode an unknown request type (e.g., 777):
 -- luacheck: no max comment line length
--- https://github.com/tarantool/tarantool/blob/cba4e20aa2600713b55bdaad6fd84396257835f2/src/box/xrow.c#L1218;
+-- https://github.com/tarantool/tarantool/blob/3e0229fbce3cc10412a4cc95673d74e107452cc7/src/box/xrow.c#L1116;
 -- 2. Build and run Tarantool, call `box.cfg`;
 -- 3. Bump LSN, e.g., `box.space._schema:insert{'foo', 'bar'}`;
 -- 4. Call `box.snapshot`.
@@ -49,9 +45,9 @@ end
 -- space requests and an invalid non-insert (raft) request type.
 --
 -- Snapshot generation instruction:
--- 1. Patch this line to make the encoding invalid (e.g., just drop it):
+-- 1. Comment out these lines:
 -- luacheck: no max comment line length
--- https://github.com/tarantool/tarantool/blob/cba4e20aa2600713b55bdaad6fd84396257835f2/src/box/xrow.c#L1324;
+-- https://github.com/tarantool/tarantool/blob/3e0229fbce3cc10412a4cc95673d74e107452cc7/src/box/xrow.c#L1173-L1174;
 -- 2. Build and run Tarantool, call `box.cfg`;
 -- 3. Bump LSN, e.g., `box.space._schema:insert{'foo', 'bar'}`;
 -- 4. Call `box.snapshot`.
@@ -89,9 +85,9 @@ end
 -- 1. Patch this place to change the user space's ID to an invalid one (e.g.,
 --    777):
 -- luacheck: no max comment line length
--- https://github.com/tarantool/tarantool/blob/cba4e20aa2600713b55bdaad6fd84396257835f2/src/box/memtx_engine.cc#L856.
+-- https://github.com/tarantool/tarantool/blob/3e0229fbce3cc10412a4cc95673d74e107452cc7/src/box/memtx_engine.cc#L913.
 -- For instance, add this snippet:
--- `if (space_rv->id == 512) space_rv->id = 777;`;
+-- `if (entry->space_id == 512) entry->space_id = 777;`;
 -- 2. Build and run Tarantool, call `box.cfg`;
 -- 3. Create a user space, a primary index for it and insert a tuple into it.
 -- 4. Call `box.snapshot`.
@@ -128,7 +124,7 @@ end
 -- Snapshot generation instruction:
 -- 1. Patch this place to corrupt the replace request body:
 -- luacheck: no max comment line length
--- https://github.com/tarantool/tarantool/blob/263d422af33d9cf100ca648b6ca3e00a0f6452cb/src/box/memtx_engine.cc#L683-L684
+-- https://github.com/tarantool/tarantool/blob/2afde5b1d23d126eef18838988ac24b5b653cd4c/src/box/iproto_constants.h#L563.
 -- For instance, add this snippet:
 -- `if (space_id == 512) body.m_body = 0x8F;`;
 -- 2. Build and run Tarantool, call `box.cfg`;
@@ -158,7 +154,7 @@ end
 -- Snapshot generation instruction:
 -- 1. Patch this place to corrupt the replace request body:
 -- luacheck: no max comment line length
--- https://github.com/tarantool/tarantool/blob/263d422af33d9cf100ca648b6ca3e00a0f6452cb/src/box/memtx_engine.cc#L683-L684
+-- https://github.com/tarantool/tarantool/blob/2afde5b1d23d126eef18838988ac24b5b653cd4c/src/box/iproto_constants.h#L563.
 -- For instance, add this snippet:
 -- `if (space_id == 513) body.m_body = 0x8F;`;
 -- 2. Build and run Tarantool, call `box.cfg`;
@@ -195,12 +191,9 @@ end
 -- Checks that force recovery does not work with empty snapshot.
 --
 -- Snapshot generation instruction:
--- 1. Patch this place to skip writing anything to snapshot (i.e., comment out
--- the whole block of code):
+-- 1. Comment out this block of code:
 -- luacheck: no max comment line length
--- https://github.com/tarantool/tarantool/blob/263d422af33d9cf100ca648b6ca3e00a0f6452cb/src/box/memtx_engine.cc#L845-L880
--- For instance, add this snippet:
--- `if (space_id_is_system(space_rv->id) continue;`;
+-- https://github.com/tarantool/tarantool/blob/3e0229fbce3cc10412a4cc95673d74e107452cc7/src/box/memtx_engine.cc#L907-L925;
 -- 2. Build and run Tarantool, call `box.cfg`;
 -- 3. Create one user spaces, create a primary index and insert a tuple into it;
 -- 4. Call `box.snapshot`.
@@ -228,9 +221,10 @@ end
 -- Snapshot generation instruction:
 -- 1. Patch this place to skip writing system space requests:
 -- luacheck: no max comment line length
--- https://github.com/tarantool/tarantool/blob/263d422af33d9cf100ca648b6ca3e00a0f6452cb/src/box/memtx_engine.cc#L847
+-- https://github.com/tarantool/tarantool/blob/3e0229fbce3cc10412a4cc95673d74e107452cc7/src/box/memtx_engine.cc#L913.
 -- For instance, add this snippet:
--- `if (space_id_is_system(space_rv->id) continue;`;
+-- `if (entry->space_id > BOX_SYSTEM_ID_MIN &&
+--      entry->space_id < BOX_SYSTEM_ID_MAX) continue;`;
 -- 2. Build and run Tarantool, call `box.cfg`;
 -- 3. Create one user spaces, create a primary index and insert a tuple into it;
 -- 4. Call `box.snapshot`.
