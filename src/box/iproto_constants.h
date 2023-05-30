@@ -40,16 +40,6 @@
 extern "C" {
 #endif
 
-/** Named IPROTO constant. */
-struct iproto_constant {
-	/** NULL-terminated name of constant. */
-	const char *name;
-	/** Value of constant. */
-	int value;
-};
-
-#define IPROTO_CONSTANT_MEMBER(s, v, ...) {.name = #s, .value = v},
-
 enum {
 	/** Maximal iproto package body length (2GiB) */
 	IPROTO_BODY_LEN_MAX = 2147483648UL,
@@ -62,23 +52,27 @@ enum {
 /** IPROTO_FLAGS bitfield constants. */
 #define IPROTO_FLAGS(_)							\
 	/** Set for the last xrow in a transaction. */			\
-	_(COMMIT, 0x01)							\
+	_(COMMIT, 0)							\
 	/** Set for the last row of a tx residing in limbo. */		\
-	_(WAIT_SYNC, 0x02)						\
+	_(WAIT_SYNC, 1)							\
 	/** Set for the last row of a synchronous tx. */		\
-	_(WAIT_ACK, 0x04)						\
+	_(WAIT_ACK, 2)							\
 
-#define IPROTO_FLAG_MEMBER(s, v) IPROTO_FLAG_ ## s = v,
+#define IPROTO_FLAG_MEMBER(s, v) IPROTO_FLAG_ ## s = 1ULL << (v),
 
 enum iproto_flag {
 	IPROTO_FLAGS(IPROTO_FLAG_MEMBER)
 };
 
-/** Constants generated from IPROTO_FLAGS. */
-extern const struct iproto_constant iproto_flag_constants[];
+#define IPROTO_FLAG_BIT_MEMBER(s, v) IPROTO_FLAG_BIT_ ## s = v,
 
-/** Size of iproto_flag_constants. */
-extern const size_t iproto_flag_constants_size;
+enum iproto_flag_bit {
+	IPROTO_FLAGS(IPROTO_FLAG_BIT_MEMBER)
+	iproto_flag_bit_MAX,
+};
+
+/** IPROTO flag name by bit number. */
+extern const char *iproto_flag_bit_strs[];
 
 /**
  * IPROTO key name, code, and MsgPack value type.
@@ -239,13 +233,11 @@ extern const unsigned char iproto_key_type[];
 
 enum iproto_metadata_key {
 	IPROTO_METADATA_KEYS(IPROTO_METADATA_KEY_MEMBER)
+	iproto_metadata_key_MAX
 };
 
-/** Constants generated from IPROTO_METADATA_KEYS. */
-extern const struct iproto_constant iproto_metadata_key_constants[];
-
-/** Size of iproto_metadata_key_constants. */
-extern const size_t iproto_metadata_key_constants_size;
+/** IPROTO metadata key name by code */
+extern const char *iproto_metadata_key_strs[];
 
 #define IPROTO_BALLOT_KEYS(_)						\
 	_(IS_RO_CFG, 0x01)						\
@@ -262,13 +254,11 @@ extern const size_t iproto_metadata_key_constants_size;
 
 enum iproto_ballot_key {
 	IPROTO_BALLOT_KEYS(IPROTO_BALLOT_KEY_MEMBER)
+	iproto_ballot_key_MAX
 };
 
-/** Constants generated from IPROTO_BALLOT_KEYS. */
-extern const struct iproto_constant iproto_ballot_key_constants[];
-
-/** Size of iproto_ballot_key_constants. */
-extern const size_t iproto_ballot_key_constants_size;
+/** IPROTO ballot key name by code */
+extern const char *iproto_ballot_key_strs[];
 
 static inline uint64_t
 iproto_key_bit(unsigned char key)
@@ -418,13 +408,11 @@ extern const char *iproto_type_strs[];
 
 enum iproto_raft_key {
 	IPROTO_RAFT_KEYS(IPROTO_RAFT_KEY_MEMBER)
+	iproto_raft_key_MAX
 };
 
-/** Constants generated from IPROTO_RAFT_KEYS. */
-extern const struct iproto_constant iproto_raft_keys_constants[];
-
-/** Size of iproto_raft_keys_constants. */
-extern const size_t iproto_raft_keys_constants_size;
+/** IPROTO raft key name by code */
+extern const char *iproto_raft_key_strs[];
 
 /**
  * Returns IPROTO type name by @a type code.

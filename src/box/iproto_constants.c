@@ -52,11 +52,12 @@ const uint64_t iproto_body_key_map[IPROTO_TYPE_STAT_MAX] = {
 };
 #undef bit
 
-const struct iproto_constant iproto_flag_constants[] = {
-	IPROTO_FLAGS(IPROTO_CONSTANT_MEMBER)
-};
+#define IPROTO_FLAG_BIT_STRS_MEMBER(s, ...) \
+	[IPROTO_FLAG_BIT_ ## s] = #s,
 
-const size_t iproto_flag_constants_size = lengthof(iproto_flag_constants);
+const char *iproto_flag_bit_strs[iproto_flag_bit_MAX] = {
+	IPROTO_FLAGS(IPROTO_FLAG_BIT_STRS_MEMBER)
+};
 
 #define IPROTO_KEY_TYPE_MEMBER(s, v, t) \
 	[IPROTO_ ## s] = t,
@@ -72,19 +73,19 @@ const char *iproto_key_strs[iproto_key_MAX] = {
 	IPROTO_KEYS(IPROTO_KEY_STRS_MEMBER)
 };
 
-const struct iproto_constant iproto_metadata_key_constants[] = {
-	IPROTO_METADATA_KEYS(IPROTO_CONSTANT_MEMBER)
+#define IPROTO_METADATA_KEY_STRS_MEMBER(s, ...) \
+	[IPROTO_FIELD_ ## s] = #s,
+
+const char *iproto_metadata_key_strs[iproto_metadata_key_MAX] = {
+	IPROTO_METADATA_KEYS(IPROTO_METADATA_KEY_STRS_MEMBER)
 };
 
-const size_t iproto_metadata_key_constants_size =
-	lengthof(iproto_metadata_key_constants);
+#define IPROTO_BALLOT_KEY_STRS_MEMBER(s, ...) \
+	[IPROTO_BALLOT_ ## s] = #s,
 
-const struct iproto_constant iproto_ballot_key_constants[] = {
-	IPROTO_BALLOT_KEYS(IPROTO_CONSTANT_MEMBER)
+const char *iproto_ballot_key_strs[iproto_ballot_key_MAX] = {
+	IPROTO_BALLOT_KEYS(IPROTO_BALLOT_KEY_STRS_MEMBER)
 };
-
-const size_t iproto_ballot_key_constants_size =
-	lengthof(iproto_ballot_key_constants);
 
 #define IPROTO_TYPE_STRS_MEMBER(s, ...) \
 	[IPROTO_ ## s] = #s,
@@ -93,12 +94,12 @@ const char *iproto_type_strs[iproto_type_MAX] = {
 	IPROTO_TYPES(IPROTO_TYPE_STRS_MEMBER)
 };
 
-const struct iproto_constant iproto_raft_keys_constants[] = {
-	IPROTO_RAFT_KEYS(IPROTO_CONSTANT_MEMBER)
-};
+#define IPROTO_RAFT_KEY_STRS_MEMBER(s, ...) \
+	[IPROTO_RAFT_ ## s] = #s,
 
-const size_t iproto_raft_keys_constants_size =
-	lengthof(iproto_raft_keys_constants);
+const char *iproto_raft_key_strs[iproto_raft_key_MAX] = {
+	IPROTO_RAFT_KEYS(IPROTO_RAFT_KEY_STRS_MEMBER)
+};
 
 #define VY_RUN_INFO_KEY_STRS_MEMBER(s, ...) \
 	[VY_RUN_INFO_ ## s] = #s,

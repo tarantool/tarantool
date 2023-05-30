@@ -33,31 +33,17 @@
 static struct mh_strnu32_t *iproto_key_translation;
 
 /**
- * Pushes an array of IPROTO constants onto Lua stack.
- */
-static void
-push_iproto_constant_subnamespace(struct lua_State *L, const char *subnamespace,
-				  const struct iproto_constant *constants,
-				  int constants_len)
-{
-	lua_createtable(L, 0, constants_len);
-	for (int i = 0; i < constants_len; ++i) {
-		const char *name = constants[i].name;
-		int value = constants[i].value;
-		lua_pushinteger(L, value);
-		lua_setfield(L, -2, name);
-	}
-	lua_setfield(L, -2, subnamespace);
-}
-
-/**
  * Pushes IPROTO constants generated from `IPROTO_FLAGS` onto Lua stack.
  */
 static void
-push_iproto_flag_constants(struct lua_State *L)
+push_iproto_flag_enum(struct lua_State *L)
 {
-	push_iproto_constant_subnamespace(L, "flag", iproto_flag_constants,
-					  iproto_flag_constants_size);
+	lua_newtable(L);
+	for (int i = 0; i < iproto_flag_bit_MAX; i++) {
+		lua_pushinteger(L, 1ULL << i);
+		lua_setfield(L, -2, iproto_flag_bit_strs[i]);
+	}
+	lua_setfield(L, -2, "flag");
 }
 
 /**
@@ -97,9 +83,13 @@ push_iproto_key_enum(struct lua_State *L)
 static void
 push_iproto_metadata_key_enum(struct lua_State *L)
 {
-	push_iproto_constant_subnamespace(L, "metadata_key",
-					  iproto_metadata_key_constants,
-					  iproto_metadata_key_constants_size);
+	lua_newtable(L);
+	for (int i = 0; i < iproto_metadata_key_MAX; i++) {
+		const char *name = iproto_metadata_key_strs[i];
+		lua_pushinteger(L, i);
+		lua_setfield(L, -2, name);
+	}
+	lua_setfield(L, -2, "metadata_key");
 }
 
 /**
@@ -108,9 +98,15 @@ push_iproto_metadata_key_enum(struct lua_State *L)
 static void
 push_iproto_ballot_key_enum(struct lua_State *L)
 {
-	push_iproto_constant_subnamespace(L, "ballot_key",
-					  iproto_ballot_key_constants,
-					  iproto_ballot_key_constants_size);
+	lua_newtable(L);
+	for (int i = 0; i < iproto_ballot_key_MAX; i++) {
+		const char *name = iproto_ballot_key_strs[i];
+		if (name == NULL)
+			continue;
+		lua_pushinteger(L, i);
+		lua_setfield(L, -2, name);
+	}
+	lua_setfield(L, -2, "ballot_key");
 }
 
 /**
@@ -140,9 +136,13 @@ push_iproto_type_enum(struct lua_State *L)
 static void
 push_iproto_raft_keys_enum(struct lua_State *L)
 {
-	push_iproto_constant_subnamespace(L, "raft_key",
-					  iproto_raft_keys_constants,
-					  iproto_raft_keys_constants_size);
+	lua_newtable(L);
+	for (int i = 0; i < iproto_raft_key_MAX; i++) {
+		const char *name = iproto_raft_key_strs[i];
+		lua_pushinteger(L, i);
+		lua_setfield(L, -2, name);
+	}
+	lua_setfield(L, -2, "raft_key");
 }
 
 /**
@@ -151,7 +151,7 @@ push_iproto_raft_keys_enum(struct lua_State *L)
 static void
 push_iproto_constants(struct lua_State *L)
 {
-	push_iproto_flag_constants(L);
+	push_iproto_flag_enum(L);
 	push_iproto_key_enum(L);
 	push_iproto_metadata_key_enum(L);
 	push_iproto_ballot_key_enum(L);
@@ -168,15 +168,13 @@ push_iproto_protocol_features(struct lua_State *L)
 	lua_pushinteger(L, IPROTO_CURRENT_VERSION);
 	lua_setfield(L, -2, "protocol_version");
 
-	for (size_t i = 0; i < 2; ++i)
-		lua_createtable(L, 0, iproto_feature_id_constants_size);
-	for (size_t i = 0; i < iproto_feature_id_constants_size; ++i) {
-		struct iproto_constant constant =
-			iproto_feature_id_constants[i];
-		char *name = strtolowerdup(constant.name);
+	for (int i = 0; i < 2; i++)
+		lua_newtable(L);
+	for (int i = 0; i < iproto_feature_id_MAX; i++) {
+		char *name = strtolowerdup(iproto_feature_id_strs[i]);
 		lua_pushboolean(L, true);
 		lua_setfield(L, -2, name);
-		lua_pushinteger(L, iproto_feature_id_constants[i].value);
+		lua_pushinteger(L, i);
 		lua_setfield(L, -3, name);
 		free(name);
 	}

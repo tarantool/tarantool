@@ -10,7 +10,6 @@
 #include <string.h>
 
 #include "bit/bit.h"
-#include "iproto_constants.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -58,11 +57,8 @@ enum iproto_feature_id {
 	iproto_feature_id_MAX
 };
 
-/** Constants generated from IPROTO_FEATURES. */
-extern const struct iproto_constant iproto_feature_id_constants[];
-
-/** Size of iproto_feature_id_constants. */
-extern const size_t iproto_feature_id_constants_size;
+/** IPROTO feature name by id. */
+extern const char *iproto_feature_id_strs[];
 
 /**
  * IPROTO protocol feature bit map.

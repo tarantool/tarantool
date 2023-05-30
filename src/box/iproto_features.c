@@ -9,6 +9,13 @@
 
 #include "msgpuck.h"
 
+#define IPROTO_FEATURE_ID_STRS_MEMBER(s, ...) \
+	[IPROTO_FEATURE_ ## s] = #s,
+
+const char *iproto_feature_id_strs[iproto_feature_id_MAX] = {
+	IPROTO_FEATURES(IPROTO_FEATURE_ID_STRS_MEMBER)
+};
+
 struct iproto_features IPROTO_CURRENT_FEATURES;
 
 uint32_t
@@ -53,13 +60,6 @@ mp_decode_iproto_features(const char **data, struct iproto_features *features)
 	}
 	return 0;
 }
-
-const struct iproto_constant iproto_feature_id_constants[] = {
-	IPROTO_FEATURES(IPROTO_CONSTANT_MEMBER)
-};
-
-const size_t iproto_feature_id_constants_size =
-	lengthof(iproto_feature_id_constants);
 
 void
 iproto_features_init(void)
