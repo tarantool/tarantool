@@ -109,4 +109,12 @@ local function workaround_requires(path)
 end
 
 workaround_requires('test.utils')
-workaround_requires('test.psutils_linux_test_payload')
+
+require('test.utils')
+local test_root = fio.dirname(
+    fio.dirname(fio.abspath(
+        package.search('third_party.metrics.test.utils')))) -- luacheck: ignore
+
+package.loaded['test.utils'].LUA_PATH = os.getenv('LUA_PATH') ..
+    test_root .. '/?.lua;' ..
+    test_root .. '/?/init.lua;'
