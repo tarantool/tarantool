@@ -69,8 +69,6 @@ int
 rmean_foreach(struct rmean *rmean, rmean_cb cb, void *cb_ctx)
 {
 	for (size_t i = 0; i < rmean->stats_n; i++) {
-		if (rmean->stats[i].name == NULL)
-			continue;
 		int res = cb(rmean->stats[i].name,
 			     rmean_mean(rmean, i),
 			     rmean_total(rmean, i),

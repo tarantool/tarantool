@@ -315,8 +315,6 @@ iproto_key_bit(unsigned char key)
 	_(COMMIT, 15)							\
 	/* Rollback transaction */					\
 	_(ROLLBACK, 16)							\
-	/** The maximum typecode used for box.stat() */			\
-	_(RESERVED_TYPE_STAT_MAX, 17)					\
 									\
 	_(RAFT, 30)							\
 	/** PROMOTE request. */						\
@@ -370,48 +368,39 @@ iproto_key_bit(unsigned char key)
 	_(WATCH, 74)							\
 	_(UNWATCH, 75)							\
 	_(EVENT, 76)							\
+									\
 	/**
 	 * The following three requests are reserved for vinyl types.
+	 *
+	 * VY_INDEX_RUN_INFO = 100
+	 * VY_INDEX_PAGE_INFO = 101
+	 * VY_RUN_ROW_INDEX = 102
 	 */								\
-	_(RESERVED_VY_INDEX_RUN_INFO, 100)				\
-	_(RESERVED_VY_INDEX_PAGE_INFO, 101)				\
-	_(RESERVED_VY_RUN_ROW_INDEX, 102)				\
 									\
 	/** Non-final response type. */					\
 	_(CHUNK, 128)							\
-									\
-	/**
-	 * Error codes = (IPROTO_TYPE_ERROR | ER_XXX from errcode.h)
-	 */								\
-	_(TYPE_ERROR, 1 << 15)						\
-									\
-	/**
-	 * Used for overriding the unknown request handler.
-	 */								\
-	_(UNKNOWN, -1)							\
 
 #define IPROTO_TYPE_MEMBER(s, v) IPROTO_ ## s = v,
 
 enum iproto_type {
 	IPROTO_TYPES(IPROTO_TYPE_MEMBER)
-};
+	iproto_type_MAX,
 
-/** Constants generated from IPROTO_TYPES. */
-extern const struct iproto_constant iproto_type_constants[];
+	/** Error codes = (IPROTO_TYPE_ERROR | ER_XXX from errcode.h) */
+	IPROTO_TYPE_ERROR = 1 << 15,
 
-/** Size of iproto_type_constants. */
-extern const size_t iproto_type_constants_size;
+	/** Used for overriding the unknown request handler */
+	IPROTO_UNKNOWN = -1,
 
-/** Convenient synonims for reserved members of iproto_type. */
-enum {
 	/** The maximum typecode used for box.stat() */
-	IPROTO_TYPE_STAT_MAX = IPROTO_RESERVED_TYPE_STAT_MAX,
+	IPROTO_TYPE_STAT_MAX = IPROTO_ROLLBACK + 1,
+
 	/** Vinyl run info stored in .index file */
-	VY_INDEX_RUN_INFO = IPROTO_RESERVED_VY_INDEX_RUN_INFO,
+	VY_INDEX_RUN_INFO = 100,
 	/** Vinyl page info stored in .index file */
-	VY_INDEX_PAGE_INFO = IPROTO_RESERVED_VY_INDEX_PAGE_INFO,
+	VY_INDEX_PAGE_INFO = 101,
 	/** Vinyl row index stored in .run file */
-	VY_RUN_ROW_INDEX = IPROTO_RESERVED_VY_RUN_ROW_INDEX,
+	VY_RUN_ROW_INDEX = 102,
 };
 
 /** IPROTO type name by code */
@@ -444,35 +433,10 @@ extern const size_t iproto_raft_keys_constants_size;
 static inline const char *
 iproto_type_name(uint16_t type)
 {
-	/*
-	 * Sic: iptoto_type_strs[IPROTO_NOP] is NULL
-	 * to suppress box.stat() output.
-	 */
-	if (type == IPROTO_NOP)
-		return "NOP";
-
-	if (type < IPROTO_TYPE_STAT_MAX)
+	if (type < iproto_type_MAX &&
+	    iproto_type_strs[type] != NULL)
 		return iproto_type_strs[type];
-
 	switch (type) {
-	case IPROTO_JOIN:
-		return "JOIN";
-	case IPROTO_FETCH_SNAPSHOT:
-		return "FETCH_SNAPSHOT";
-	case IPROTO_REGISTER:
-		return "REGISTER";
-	case IPROTO_SUBSCRIBE:
-		return "SUBSCRIBE";
-	case IPROTO_RAFT:
-		return "RAFT";
-	case IPROTO_RAFT_PROMOTE:
-		return "PROMOTE";
-	case IPROTO_RAFT_DEMOTE:
-		return "DEMOTE";
-	case IPROTO_RAFT_CONFIRM:
-		return "CONFIRM";
-	case IPROTO_RAFT_ROLLBACK:
-		return "ROLLBACK";
 	case VY_INDEX_RUN_INFO:
 		return "RUNINFO";
 	case VY_INDEX_PAGE_INFO:

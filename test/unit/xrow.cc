@@ -54,7 +54,7 @@ test_iproto_constants()
 		(void) iproto_key_name((enum iproto_key) i);
 
 	/* Same for iproto_type. */
-	for (uint32_t i = 0; i < IPROTO_TYPE_STAT_MAX; ++i)
+	for (uint32_t i = 0; i < iproto_type_MAX; ++i)
 		(void) iproto_type_name(i);
 	return 0;
 }

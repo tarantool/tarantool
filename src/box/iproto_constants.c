@@ -30,27 +30,6 @@
  */
 #include "iproto_constants.h"
 
-const char *iproto_type_strs[] =
-{
-	NULL,
-	"SELECT",
-	"INSERT",
-	"REPLACE",
-	"UPDATE",
-	"DELETE",
-	NULL, /* CALL_16 */
-	"AUTH",
-	"EVAL",
-	"UPSERT",
-	"CALL",
-	"EXECUTE",
-	NULL, /* NOP */
-	"PREPARE",
-	"BEGIN",
-	"COMMIT",
-	"ROLLBACK",
-};
-
 #define bit(c) (1ULL<<IPROTO_##c)
 const uint64_t iproto_body_key_map[IPROTO_TYPE_STAT_MAX] = {
 	0,                                                     /* unused */
@@ -107,11 +86,12 @@ const struct iproto_constant iproto_ballot_key_constants[] = {
 const size_t iproto_ballot_key_constants_size =
 	lengthof(iproto_ballot_key_constants);
 
-const struct iproto_constant iproto_type_constants[] = {
-	IPROTO_TYPES(IPROTO_CONSTANT_MEMBER)
-};
+#define IPROTO_TYPE_STRS_MEMBER(s, ...) \
+	[IPROTO_ ## s] = #s,
 
-const size_t iproto_type_constants_size = lengthof(iproto_type_constants);
+const char *iproto_type_strs[iproto_type_MAX] = {
+	IPROTO_TYPES(IPROTO_TYPE_STRS_MEMBER)
+};
 
 const struct iproto_constant iproto_raft_keys_constants[] = {
 	IPROTO_RAFT_KEYS(IPROTO_CONSTANT_MEMBER)
