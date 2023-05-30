@@ -446,13 +446,15 @@ local log_cfg_option = {
 
 
 local function check_instance_uuid()
-    if box.cfg.instance_uuid ~= box.info.uuid then
+    if box.cfg.instance_uuid ~= box.NULL and
+       box.cfg.instance_uuid ~= box.info.uuid then
         box.error(box.error.RELOAD_CFG, 'instance_uuid')
     end
 end
 
 local function check_replicaset_uuid()
-    if box.cfg.replicaset_uuid ~= box.info.replicaset.uuid then
+    if box.cfg.replicaset_uuid ~= box.NULL and
+       box.cfg.replicaset_uuid ~= box.info.replicaset.uuid then
         box.error(box.error.RELOAD_CFG, 'replicaset_uuid')
     end
 end
