@@ -124,11 +124,36 @@ seek_stat_item(const char *name, int rps, int64_t total, void *cb_ctx)
 	return 1;
 }
 
+/**
+ * Returns false if a box.stat item should be excluded from the output.
+ */
+static bool
+filter_box_stat_item(const char *name)
+{
+	return strcmp(name, "OK") != 0 &&
+	       strcmp(name, "CALL_16") != 0 &&
+	       strcmp(name, "NOP") != 0;
+}
+
+static int
+set_box_stat_item(const char *name, int rps, int64_t total, void *cb_ctx)
+{
+	return filter_box_stat_item(name) ?
+	       set_stat_item(name, rps, total, cb_ctx) : 0;
+}
+
+static int
+seek_box_stat_item(const char *name, int rps, int64_t total, void *cb_ctx)
+{
+	return filter_box_stat_item(name) ?
+	       seek_stat_item(name, rps, total, cb_ctx) : 0;
+}
+
 static int
 lbox_stat_index(struct lua_State *L)
 {
 	luaL_checkstring(L, -1);
-	int res = rmean_foreach(rmean_box, seek_stat_item, L);
+	int res = rmean_foreach(rmean_box, seek_box_stat_item, L);
 	if (res)
 		return res;
 	return rmean_foreach(rmean_error, seek_stat_item, L);
@@ -138,7 +163,7 @@ static int
 lbox_stat_call(struct lua_State *L)
 {
 	lua_newtable(L);
-	rmean_foreach(rmean_box, set_stat_item, L);
+	rmean_foreach(rmean_box, set_box_stat_item, L);
 	rmean_foreach(rmean_error, set_stat_item, L);
 	return 1;
 }

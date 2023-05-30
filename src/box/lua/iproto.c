@@ -40,8 +40,6 @@ push_iproto_constant_subnamespace(struct lua_State *L, const char *subnamespace,
 	for (int i = 0; i < constants_len; ++i) {
 		const char *name = constants[i].name;
 		int value = constants[i].value;
-		if (strstr(name, "RESERVED"))
-			continue;
 		lua_pushinteger(L, value);
 		lua_setfield(L, -2, name);
 	}
@@ -117,8 +115,19 @@ push_iproto_ballot_key_enum(struct lua_State *L)
 static void
 push_iproto_type_enum(struct lua_State *L)
 {
-	push_iproto_constant_subnamespace(L, "type", iproto_type_constants,
-					  iproto_type_constants_size);
+	lua_newtable(L);
+	for (int i = 0; i < iproto_type_MAX; i++) {
+		const char *name = iproto_type_strs[i];
+		if (name == NULL)
+			continue;
+		lua_pushinteger(L, i);
+		lua_setfield(L, -2, name);
+	}
+	lua_pushinteger(L, IPROTO_TYPE_ERROR);
+	lua_setfield(L, -2, "TYPE_ERROR");
+	lua_pushinteger(L, IPROTO_UNKNOWN);
+	lua_setfield(L, -2, "UNKNOWN");
+	lua_setfield(L, -2, "type");
 }
 
 /**
