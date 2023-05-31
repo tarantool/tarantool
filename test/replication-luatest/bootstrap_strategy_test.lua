@@ -432,7 +432,20 @@ end
 
 local g_config_fail = t.group('gh-7999-bootstrap-strategy-config-fail')
 
-g_config_fail.test_bad_uri_or_uuid = function()
+g_config_fail.before_each(function(cg)
+    cg.replica_set = replica_set:new{}
+end)
+
+g_config_fail.after_each(function(cg)
+    cg.replica_set:drop()
+end)
+
+g_config_fail.test_bad_uri_or_uuid = function(cg)
+    local cfg_failure = cg.replica_set:build_and_add_server{
+        alias = 'cfg_failure',
+        box_cfg = {bootstrap_strategy = 'config'},
+        env = {['TARANTOOL_RUN_BEFORE_BOX_CFG'] = set_log_before_cfg},
+    }
     local bad_config = {
         {}, -- empty table.
         {'a'}, -- non-empty table.
@@ -441,11 +454,18 @@ g_config_fail.test_bad_uri_or_uuid = function()
         'z2345678-1234-1234-1234-12345678', -- not a UUID.
     }
     local errmsg = "Incorrect value for option 'bootstrap_leader':"
+    local logfile = fio.pathjoin(cfg_failure.workdir, 'cfg_failure.log')
     for _, leader in pairs(bad_config) do
-        t.assert_error_msg_contains(errmsg, box.cfg, {
-            bootstrap_strategy = 'config',
-            bootstrap_leader = leader
-        })
+        cfg_failure.box_cfg.bootstrap_leader = leader
+        -- The server will be dropped by after_all.
+        cfg_failure:start{wait_until_ready = false}
+        t.helpers.retrying({}, function()
+            t.assert(cfg_failure:grep_log(errmsg, nil, {filename = logfile}),
+                     'Incorrect option')
+            t.assert(cfg_failure:grep_log('fatal error, exiting the event loop',
+                                          nil, {filename = logfile}),
+                     'Fatal error')
+        end)
     end
 end
 

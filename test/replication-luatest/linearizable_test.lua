@@ -3,6 +3,7 @@ local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 local proxy = require('luatest.replica_proxy')
 local fiber = require('fiber')
+local fio = require('fio')
 
 local g = t.group('linearizable-read')
 
@@ -291,14 +292,36 @@ local function test_linearizable_access(node, spacename, is_ok, msg)
     end
 end
 
-g_basic.test_basic = function(cg)
-    local ok, err = pcall(box.cfg, {txn_isolation = 'linearizable'})
-    t.assert(not ok, 'Cannot set default isolation level to linearizable')
-    local msg = "Incorrect value for option 'txn_isolation': cannot set " ..
+local set_log_before_cfg = [[
+    local logfile = require('fio').pathjoin(
+        os.getenv('TARANTOOL_WORKDIR'),
+        os.getenv('TARANTOOL_ALIAS') .. '.log'
+    )
+    require('log').cfg{log = logfile}
+]]
+
+g_basic.test_cfg_failure = function(cg)
+    local cfg_failure = cg.cluster:build_and_add_server{
+        alias = 'cfg_failure',
+        box_cfg = {txn_isolation = 'linearizable'},
+        env = {['TARANTOOL_RUN_BEFORE_BOX_CFG'] = set_log_before_cfg},
+    }
+    -- The server will be dropped by after_all.
+    cfg_failure:start{wait_until_ready = false}
+    local logfile = fio.pathjoin(cfg_failure.workdir, 'cfg_failure.log')
+    local err = "Incorrect value for option 'txn_isolation': cannot set " ..
                 "default transaction isolation to 'linearizable'"
-    t.assert_equals(err.message, msg,
-                    'Correct error when trying to set default isolation')
-    ok, err = cg.nomvcc:exec(begin, {{txn_isolation = 'linearizable'}})
+    t.helpers.retrying({}, function()
+        t.assert(cfg_failure:grep_log(err, nil, {filename = logfile}),
+                 'Cannot set default isolation level to linearizable')
+        t.assert(cfg_failure:grep_log('fatal error, exiting the event loop',
+                                      nil, {filename = logfile}),
+                 'Fatal error')
+    end)
+end
+
+g_basic.test_basic = function(cg)
+    local ok, err = cg.nomvcc:exec(begin, {{txn_isolation = 'linearizable'}})
     t.assert(not ok, 'Error without mvcc enabled')
     t.assert_equals(err.message, 'Linearizable transaction does not support ' ..
                                  'disabled memtx mvcc engine',
