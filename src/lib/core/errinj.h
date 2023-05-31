@@ -123,7 +123,13 @@ struct errinj {
 	_(ERRINJ_SIO_READ_MAX, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_SNAP_COMMIT_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_COMMIT_FAIL, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_SNAP_SKIP_ALL_ROWS, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_SNAP_SKIP_DDL_ROWS, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_WRITE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_SNAP_WRITE_CORRUPTED_INSERT_ROW, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_SNAP_WRITE_INVALID_SYSTEM_ROW, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_SNAP_WRITE_MISSING_SPACE_ROW, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_SNAP_WRITE_UNKNOWN_ROW_TYPE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SPACE_UPGRADE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SQL_NAME_NORMALIZATION, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_STDIN_ISATTY, ERRINJ_INT, {.iparam = -1}) \

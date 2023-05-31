@@ -883,6 +883,73 @@ checkpoint_write_synchro(struct xlog *l, const struct synchro_request *req)
 	return checkpoint_write_row(l, &row);
 }
 
+#ifndef NDEBUG
+/*
+ * The functions defined below are used in tests to write a corrupted
+ * snapshot file.
+ */
+
+/** Writes an INSERT row with a corrupted body to the snapshot. */
+static int
+checkpoint_write_corrupted_insert_row(struct xlog *l)
+{
+	/* Sic: Array of ten elements but only one is encoded. */
+	char buf[8];
+	char *p = mp_encode_array(buf, 10);
+	p = mp_encode_uint(p, 0);
+	assert((size_t)(p - buf) <= sizeof(buf));
+	return checkpoint_write_tuple(l, /*space_id=*/512, GROUP_DEFAULT,
+				      buf, p - buf);
+}
+
+/** Writes an INSERT row for a missing space to the snapshot. */
+static int
+checkpoint_write_missing_space_row(struct xlog *l)
+{
+	char buf[8];
+	char *p = mp_encode_array(buf, 1);
+	p = mp_encode_uint(p, 0);
+	assert((size_t)(p - buf) <= sizeof(buf));
+	return checkpoint_write_tuple(l, /*space_id=*/777, GROUP_DEFAULT,
+				      buf, p - buf);
+}
+
+/** Writes a row with an unknown type to the snapshot. */
+static int
+checkpoint_write_unknown_row_type(struct xlog *l)
+{
+	struct xrow_header row;
+	memset(&row, 0, sizeof(row));
+	row.type = 777;
+	row.bodycnt = 1;
+	char buf[8];
+	char *p = mp_encode_map(buf, 0);
+	assert((size_t)(p - buf) <= sizeof(buf));
+	row.body[0].iov_base = buf;
+	row.body[0].iov_len = p - buf;
+	return checkpoint_write_row(l, &row);
+}
+
+/** Writes an invalid system row (not INSERT) to the snapshot. */
+static int
+checkpoint_write_invalid_system_row(struct xlog *l)
+{
+	struct xrow_header row;
+	memset(&row, 0, sizeof(row));
+	row.type = IPROTO_RAFT;
+	row.group_id = GROUP_LOCAL;
+	row.bodycnt = 1;
+	char buf[8];
+	char *p = mp_encode_map(buf, 1);
+	p = mp_encode_uint(p, IPROTO_RAFT_TERM);
+	p = mp_encode_nil(p);
+	assert((size_t)(p - buf) <= sizeof(buf));
+	row.body[0].iov_base = buf;
+	row.body[0].iov_len = p - buf;
+	return checkpoint_write_row(l, &row);
+}
+#endif /* NDEBUG */
+
 static int
 checkpoint_f(va_list ap)
 {
@@ -904,8 +971,15 @@ checkpoint_f(va_list ap)
 
 	say_info("saving snapshot `%s'", snap.filename);
 	ERROR_INJECT_SLEEP(ERRINJ_SNAP_WRITE_DELAY);
+	ERROR_INJECT(ERRINJ_SNAP_SKIP_ALL_ROWS, goto done);
 	struct checkpoint_entry *entry;
 	rlist_foreach_entry(entry, &ckpt->entries, link) {
+		bool skip = false;
+		ERROR_INJECT(ERRINJ_SNAP_SKIP_DDL_ROWS, {
+			skip = space_id_is_system(entry->space_id);
+		});
+		if (skip)
+			continue;
 		int rc;
 		uint32_t size;
 		const char *data;
@@ -919,10 +993,28 @@ checkpoint_f(va_list ap)
 		if (rc != 0)
 			goto fail;
 	}
+	ERROR_INJECT(ERRINJ_SNAP_WRITE_CORRUPTED_INSERT_ROW, {
+		if (checkpoint_write_corrupted_insert_row(&snap) != 0)
+			goto fail;
+	});
+	ERROR_INJECT(ERRINJ_SNAP_WRITE_MISSING_SPACE_ROW, {
+		if (checkpoint_write_missing_space_row(&snap) != 0)
+			goto fail;
+	});
+	ERROR_INJECT(ERRINJ_SNAP_WRITE_UNKNOWN_ROW_TYPE, {
+		if (checkpoint_write_unknown_row_type(&snap) != 0)
+			goto fail;
+	});
+	ERROR_INJECT(ERRINJ_SNAP_WRITE_INVALID_SYSTEM_ROW, {
+		if (checkpoint_write_invalid_system_row(&snap) != 0)
+			goto fail;
+	});
 	if (checkpoint_write_raft(&snap, &ckpt->raft) != 0)
 		goto fail;
 	if (checkpoint_write_synchro(&snap, &ckpt->synchro_state) != 0)
 		goto fail;
+	goto done;
+done:
 	if (xlog_flush(&snap) < 0)
 		goto fail;
 
