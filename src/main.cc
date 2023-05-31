@@ -613,28 +613,36 @@ print_version(void)
 	printf("CXX_FLAGS:%s\n", TARANTOOL_CXX_FLAGS);
 }
 
+/**
+ * Yield Tarantool help message to the given stream.
+ */
 static void
-print_help(const char *program)
+print_help(FILE *stream, const char *program)
 {
-	puts("Tarantool - a Lua application server");
-	puts("");
-	printf("Usage: %s script.lua [OPTIONS] [SCRIPT [ARGS]]\n", program);
-	puts("");
-	puts("All command line options are passed to the interpreted script.");
-	puts("When no script name is provided, the server responds to:");
-	puts("  -h, --help\t\t\tdisplay this help and exit");
-	puts("  -v, --version\t\t\tprint program version and exit");
-	puts("  -e EXPR\t\t\texecute string 'EXPR'");
-	puts("  -l NAME\t\t\trequire library 'NAME'");
-	puts("  -j cmd\t\t\tperform LuaJIT control command");
-	puts("  -b ...\t\t\tsave or list bytecode");
-	puts("  -d\t\t\t\tactivate debugging session for 'SCRIPT'");
-	puts("  -i\t\t\t\tenter interactive mode after executing 'SCRIPT'");
-	puts("  --\t\t\t\tstop handling options");
-	puts("  -\t\t\t\texecute stdin and stop handling options");
-	puts("");
-	puts("Please visit project home page at https://tarantool.org");
-	puts("to see online documentation, submit bugs or contribute a patch.");
+	fputs("Tarantool - a Lua application server", stream);
+	fputs("", stream);
+	fprintf(stream, "Usage: %s script.lua [OPTIONS] [SCRIPT [ARGS]]\n",
+		program);
+	fputs("", stream);
+	fputs("All command line options are passed to the interpreted script.",
+	      stream);
+	fputs("When no script name is provided, the server responds to:",
+	      stream);
+	fputs("  -h, --help\t\t\tdisplay this help and exit", stream);
+	fputs("  -v, --version\t\t\tprint program version and exit", stream);
+	fputs("  -e EXPR\t\t\texecute string 'EXPR'", stream);
+	fputs("  -l NAME\t\t\trequire library 'NAME'", stream);
+	fputs("  -j cmd\t\t\tperform LuaJIT control command", stream);
+	fputs("  -b ...\t\t\tsave or list bytecode", stream);
+	fputs("  -d\t\t\t\tactivate debugging session for 'SCRIPT'", stream);
+	fputs("  -i\t\t\t\tenter interactive mode after executing 'SCRIPT'",
+	      stream);
+	fputs("  --\t\t\t\tstop handling options", stream);
+	fputs("  -\t\t\t\texecute stdin and stop handling options", stream);
+	fputs("", stream);
+	fputs("Please visit project home page at https://tarantool.org", stream);
+	fputs("to see online documentation, submit bugs or contribute a patch.",
+	      stream);
 }
 
 int
@@ -672,7 +680,7 @@ main(int argc, char **argv)
 			print_version();
 			return 0;
 		case 'h':
-			print_help(basename(argv[0]));
+			print_help(stdout, basename(argv[0]));
 			return 0;
 		case 'i':
 			/* Force interactive mode */
