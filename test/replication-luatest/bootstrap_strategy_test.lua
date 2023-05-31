@@ -234,9 +234,25 @@ g_config.test_uuid = function(cg)
     end)
 end
 
-g_config.after_test('test_uuid', function(cg)
-    cg.server1:stop()
+g_config.before_test('test_name', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.server1 = cg.replica_set:build_and_add_server{
+        alias = 'server1',
+        box_cfg = {
+            bootstrap_strategy = 'config',
+            bootstrap_leader = 'server1name',
+            instance_name = 'server1name',
+            replication = nil,
+        },
+    }
 end)
+
+g_config.test_name = function(cg)
+    cg.replica_set:start()
+    t.helpers.retrying({}, cg.server1.exec, cg.server1, function()
+        t.assert_equals(box.info.status, 'running', 'The server is running')
+    end)
+end
 
 g_config.before_test('test_replication_without_bootstrap_leader', function(cg)
     cg.replica_set = replica_set:new{}
@@ -335,6 +351,7 @@ end)
 local g_config_success = t.group('gh-7999-bootstrap-strategy-config-success', {
      {leader = 'server3'},
      {leader = uuid3},
+     {leader = 'server3name'},
 })
 
 g_config_success.after_each(function(cg)
@@ -354,6 +371,7 @@ g_config_success.before_test('test_correct_bootstrap_leader', function(cg)
             bootstrap_strategy = 'config',
             bootstrap_leader = bootstrap_leader,
             instance_uuid = uuid1,
+            instance_name = 'server1name',
             replication = {
                 server.build_listen_uri('server1', cg.replica_set.id),
                 server.build_listen_uri('server2', cg.replica_set_a.id),
@@ -367,6 +385,7 @@ g_config_success.before_test('test_correct_bootstrap_leader', function(cg)
         box_cfg = {
             replicaset_uuid = uuida,
             instance_uuid = uuid2,
+            instance_name = 'server2name',
         }
     }
     cg.server3 = cg.replica_set_b:build_and_add_server{
@@ -374,6 +393,7 @@ g_config_success.before_test('test_correct_bootstrap_leader', function(cg)
         box_cfg = {
             replicaset_uuid = uuidb,
             instance_uuid = uuid3,
+            instance_name = 'server3name',
         },
     }
 end)
@@ -418,6 +438,7 @@ g_config_success.before_test('test_wait_only_for_leader', function(cg)
         box_cfg = {
             replicaset_uuid = uuidb,
             instance_uuid = uuid3,
+            instance_name = 'server3name',
         },
     }
 end)
@@ -450,8 +471,7 @@ g_config_fail.test_bad_uri_or_uuid = function(cg)
         {}, -- empty table.
         {'a'}, -- non-empty table.
         {3301},
-        'abracadabra', -- neither a URI or a UUID.
-        'z2345678-1234-1234-1234-12345678', -- not a UUID.
+        '1z345678-1234-1234-1234-12345678', -- not a UUID or a name.
     }
     local errmsg = "Incorrect value for option 'bootstrap_leader':"
     local logfile = fio.pathjoin(cfg_failure.workdir, 'cfg_failure.log')

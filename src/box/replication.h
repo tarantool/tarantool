@@ -138,6 +138,12 @@ extern struct tt_uuid cfg_bootstrap_leader_uuid;
 extern struct uri cfg_bootstrap_leader_uri;
 
 /**
+ * The name of the bootstrap leader configured via the bootstrap_leader
+ * configuration option.
+ */
+extern char cfg_bootstrap_leader_name[];
+
+/**
  * Configured name of this instance. Might be different from the actual name if
  * the configuration is not fully applied yet.
  */
