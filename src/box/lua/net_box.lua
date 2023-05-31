@@ -52,15 +52,6 @@ local M_SELECT_FETCH_POS  = 20
 -- Injects raw data into connection. Used by tests.
 local M_INJECT      = 21
 
--- IPROTO feature id -> name
-local IPROTO_FEATURE_NAMES = {
-    [0]     = 'streams',
-    [1]     = 'transactions',
-    [2]     = 'error_extension',
-    [3]     = 'watchers',
-    [4]     = 'pagination',
-}
-
 local REQUEST_OPTION_TYPES = {
     is_async    = "boolean",
     iterator    = "string",
@@ -105,13 +96,15 @@ local CONNECT_OPTION_TYPES = {
 -- Given an array of IPROTO feature ids, returns a map {feature_name: bool}.
 local function iproto_features_resolve(feature_ids)
     local features = {}
-    for _, feature_name in pairs(IPROTO_FEATURE_NAMES) do
-        features[feature_name] = false
+    local feature_names = {}
+    for name, id in pairs(box.iproto.feature) do
+        features[name] = false
+        feature_names[id] = name
     end
-    for _, feature_id in ipairs(feature_ids) do
-        local feature_name = IPROTO_FEATURE_NAMES[feature_id]
-        assert(feature_name ~= nil)
-        features[feature_name] = true
+    for _, id in ipairs(feature_ids) do
+        local name = feature_names[id]
+        assert(name ~= nil)
+        features[name] = true
     end
     return features
 end
