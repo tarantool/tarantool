@@ -65,6 +65,7 @@ int replication_threads = 1;
 bool cfg_replication_anon = true;
 struct tt_uuid cfg_bootstrap_leader_uuid;
 struct uri cfg_bootstrap_leader_uri;
+char cfg_bootstrap_leader_name[NODE_NAME_SIZE_MAX];
 char cfg_instance_name[NODE_NAME_SIZE_MAX];
 
 struct replicaset replicaset;
@@ -948,6 +949,10 @@ applier_is_bootstrap_leader(const struct applier *applier)
 {
 	assert(!tt_uuid_is_nil(&applier->uuid));
 	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_CONFIG) {
+		if (*cfg_bootstrap_leader_name != '\0') {
+			return strcmp(applier->ballot.instance_name,
+				      cfg_bootstrap_leader_name) == 0;
+		}
 		if (!tt_uuid_is_nil(&cfg_bootstrap_leader_uuid)) {
 			return tt_uuid_is_equal(&applier->uuid,
 						&cfg_bootstrap_leader_uuid);
@@ -1459,8 +1464,10 @@ replicaset_find_join_master_cfg(void)
 		if (applier_is_bootstrap_leader(applier))
 			leader = replica;
 	}
-	if (leader == NULL && !tt_uuid_is_equal(&cfg_bootstrap_leader_uuid,
-						&INSTANCE_UUID)) {
+	if (leader == NULL &&
+	    !tt_uuid_is_equal(&cfg_bootstrap_leader_uuid, &INSTANCE_UUID) &&
+	    (strcmp(cfg_bootstrap_leader_name, cfg_instance_name) != 0 ||
+	     *cfg_bootstrap_leader_name == '\0')) {
 		tnt_raise(ClientError, ER_CFG, "bootstrap_leader",
 			  "failed to connect to the bootstrap leader");
 	}

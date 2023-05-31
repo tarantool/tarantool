@@ -1326,7 +1326,7 @@ box_check_instance_uuid(struct tt_uuid *uuid)
 
 /** Fetch an optional node name from the config. */
 static int
-box_check_node_name(const char *cfg_name, char *out)
+box_check_node_name(char *out, const char *cfg_name, bool set_diag)
 {
 	const char *name = cfg_gets(cfg_name);
 	if (name == NULL) {
@@ -1335,8 +1335,10 @@ box_check_node_name(const char *cfg_name, char *out)
 	}
 	/* Nil name is allowed as Lua box.NULL or nil. Not as "". */
 	if (!node_name_is_valid(name)) {
-		diag_set(ClientError, ER_CFG, cfg_name,
-			 "expected a valid name");
+		if (set_diag) {
+			diag_set(ClientError, ER_CFG, cfg_name,
+				 "expected a valid name");
+		}
 		return -1;
 	}
 	strlcpy(out, name, NODE_NAME_SIZE_MAX);
@@ -1346,7 +1348,7 @@ box_check_node_name(const char *cfg_name, char *out)
 static int
 box_check_instance_name(char *out)
 {
-	return box_check_node_name("instance_name", out);
+	return box_check_node_name(out, "instance_name", true);
 }
 
 static int
@@ -1357,10 +1359,11 @@ box_check_replicaset_uuid(struct tt_uuid *uuid)
 
 /** Check bootstrap_leader option validity. */
 static int
-box_check_bootstrap_leader(struct uri *uri, struct tt_uuid *uuid)
+box_check_bootstrap_leader(struct uri *uri, struct tt_uuid *uuid, char *name)
 {
 	*uuid = uuid_nil;
 	uri_create(uri, NULL);
+	*name = '\0';
 	const char *source = cfg_gets("bootstrap_leader");
 	enum bootstrap_strategy strategy = box_check_bootstrap_strategy();
 	if (strategy != BOOTSTRAP_STRATEGY_CONFIG) {
@@ -1383,21 +1386,23 @@ box_check_bootstrap_leader(struct uri *uri, struct tt_uuid *uuid)
 	/* Not a uri. Try uuid then. */
 	if (box_check_uuid(uuid, "bootstrap_leader", false) == 0)
 		return 0;
+	if (box_check_node_name(name, "bootstrap_leader", false) == 0)
+		return 0;
 	diag_set(ClientError, ER_CFG, "bootstrap_leader",
-		 "the value must be either a uri or a uuid");
+		 "the value must be either a uri, a uuid or a name");
 	return -1;
 }
 
 static int
 box_check_replicaset_name(char *out)
 {
-	return box_check_node_name("replicaset_name", out);
+	return box_check_node_name(out, "replicaset_name", true);
 }
 
 static int
 box_check_cluster_name(char *out)
 {
-	return box_check_node_name("cluster_name", out);
+	return box_check_node_name(out, "cluster_name", true);
 }
 
 static enum wal_mode
@@ -1661,6 +1666,7 @@ box_check_config(void)
 	struct tt_uuid uuid;
 	struct uri uri;
 	struct uri_set uri_set;
+	char name[NODE_NAME_SIZE_MAX];
 	box_check_say();
 	box_check_audit();
 	if (box_check_flightrec() != 0)
@@ -1696,7 +1702,7 @@ box_check_config(void)
 	box_check_replication_sync_timeout();
 	if (box_check_bootstrap_strategy() == BOOTSTRAP_STRATEGY_INVALID)
 		diag_raise();
-	if (box_check_bootstrap_leader(&uri, &uuid) != 0)
+	if (box_check_bootstrap_leader(&uri, &uuid, name) != 0)
 		diag_raise();
 	uri_destroy(&uri);
 	box_check_readahead(cfg_geti("readahead"));
@@ -1878,7 +1884,8 @@ static int
 box_set_bootstrap_leader(void)
 {
 	return box_check_bootstrap_leader(&cfg_bootstrap_leader_uri,
-					  &cfg_bootstrap_leader_uuid);
+					  &cfg_bootstrap_leader_uuid,
+					  cfg_bootstrap_leader_name);
 }
 
 /** Persist this instance as the bootstrap leader in _schema space. */
