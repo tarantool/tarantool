@@ -87,8 +87,8 @@ src/trivia/config.h
 install_manifest.txt
 lcov
 src/box/bootstrap.h
-src/lua/*.lua.c
-src/box/lua/*.lua.c
+src/lua/**/*.lua.c
+src/box/lua/**/*.lua.c
 third_party/lua/*.lua.c
 src/tarantool
 src/module.h
