@@ -5,6 +5,10 @@ local uri = require('uri')
 local os = require('os')
 local t = require('luatest')
 
+-- FIXME(gh-8718): The test fails if Lua JIT is enabled.
+jit.off()
+jit.flush()
+
 local g = t.group('http_client', {
     {sock_family = 'AF_INET'},
     {sock_family = 'AF_UNIX'},
