@@ -263,6 +263,7 @@ extern const char *iproto_metadata_key_strs[];
 	_(CAN_LEAD, 0x07)						\
 	_(BOOTSTRAP_LEADER_UUID, 0x08)					\
 	_(REGISTERED_REPLICA_UUIDS, 0x09)				\
+	_(INSTANCE_NAME, 0x0a)						\
 
 #define IPROTO_BALLOT_KEY_MEMBER(s, v) IPROTO_BALLOT_ ## s = v,
 

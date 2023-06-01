@@ -4426,6 +4426,15 @@ box_process_vote(struct ballot *ballot)
 	vclock_copy(&ballot->vclock, &replicaset.vclock);
 	vclock_copy(&ballot->gc_vclock, &gc.vclock);
 	ballot->bootstrap_leader_uuid = bootstrap_leader_uuid;
+	if (*INSTANCE_NAME != '\0') {
+		strlcpy(ballot->instance_name, INSTANCE_NAME,
+			NODE_NAME_SIZE_MAX);
+	} else if (*cfg_instance_name != '\0') {
+		strlcpy(ballot->instance_name, cfg_instance_name,
+			NODE_NAME_SIZE_MAX);
+	} else {
+		*ballot->instance_name = '\0';
+	}
 	int i = 0;
 	replicaset_foreach(replica) {
 		if (replica->id != 0)

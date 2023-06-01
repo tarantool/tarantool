@@ -414,4 +414,8 @@ g.test_internal_ballot = function(cg)
     expected[ballot_key.CAN_LEAD] = true
     expected[ballot_key.IS_RO] = true
     cg.replica:exec(wait_ballot_updated_to, {expected})
+    cg.replica:update_box_cfg{instance_name='replica-name'}
+    expected[ballot_key.INSTANCE_NAME] = 'replica-name'
+    expected[ballot_key.VCLOCK] = cg.master:get_vclock()
+    cg.replica:exec(wait_ballot_updated_to, {expected})
 end
