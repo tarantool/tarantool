@@ -107,6 +107,7 @@ local reference_table = {
         CAN_LEAD = 0x07,
         BOOTSTRAP_LEADER_UUID = 0x08,
         REGISTERED_REPLICA_UUIDS = 0x09,
+        INSTANCE_NAME = 0x0a,
     },
 
     -- `iproto_type` enumeration.
