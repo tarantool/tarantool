@@ -133,7 +133,10 @@ extern char session_lua[],
 	metrics_tarantool_vinyl_lua[],
 	metrics_tarantool_lua[],
 	metrics_utils_lua[],
-	metrics_version_lua[];
+	metrics_version_lua[],
+	/* {{{ config */
+	config_utils_log_lua[];
+	/* }}} config */
 
 /**
  * List of box's built-in modules written using Lua.
@@ -272,6 +275,15 @@ static const char *lua_sources[] = {
 	"metrics.plugins.prometheus", metrics_plugins_prometheus_lua,
 	"third_party/metrics/metrics/plugins/json",
 	"metrics.plugins.json", metrics_plugins_json_lua,
+
+	/* {{{ config */
+
+	"config/utils/log",
+	"internal.config.utils.log",
+	config_utils_log_lua,
+
+	/* }}} config */
+
 	NULL
 };
 
