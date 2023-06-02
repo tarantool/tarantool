@@ -135,7 +135,8 @@ extern char session_lua[],
 	metrics_utils_lua[],
 	metrics_version_lua[],
 	/* {{{ config */
-	config_utils_log_lua[];
+	config_utils_log_lua[],
+	config_utils_schema_lua[];
 	/* }}} config */
 
 /**
@@ -281,6 +282,10 @@ static const char *lua_sources[] = {
 	"config/utils/log",
 	"internal.config.utils.log",
 	config_utils_log_lua,
+
+	"config/utils/schema",
+	"internal.config.utils.schema",
+	config_utils_schema_lua,
 
 	/* }}} config */
 
