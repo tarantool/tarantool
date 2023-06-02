@@ -1,7 +1,14 @@
+local ffi = require('ffi')
 local schema = require('internal.config.utils.schema')
 local t = require('luatest')
 
 local g = t.group()
+
+ffi.cdef([[
+    struct mycdata {
+        int x;
+    };
+]])
 
 -- {{{ Schema node constructors: scalar, record, map, array
 
@@ -269,3 +276,243 @@ g.test_schema_new = function()
 end
 
 -- }}} Schema object constructor: new
+
+-- {{{ Testing helpers for <schema object>:validate()
+
+local samples = {
+    nil,
+    'foo',
+    5,
+    true,
+    {},
+    function() end,
+    newproxy(),
+    box.NULL,
+    1LL,
+    1ULL,
+    ffi.new('struct mycdata', {x = 5}),
+}
+
+-- Verify that :validate() raises the given error on the given
+-- data.
+local function assert_validate_error(s, data, exp_err_msg)
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:validate(data)
+    end)
+end
+
+-- Verify that :validate() on a scalar schema raises the given
+-- error prefixed with a context information on the given data.
+local function assert_validate_scalar_error(s, data, exp_err_msg)
+    local prefix = ('[%s] Unexpected data for scalar "%s": '):format(s.name,
+        s.schema.type)
+    assert_validate_error(s, data, prefix .. exp_err_msg)
+end
+
+-- Verify that :validate() on a scalar schema raises the error
+-- regarding a type mismatch on the given data.
+local function assert_validate_scalar_type_mismatch(s, data, exp_type)
+    local exp_err_msg = ('Expected "%s", got "%s"'):format(exp_type, type(data))
+    assert_validate_scalar_error(s, data, exp_err_msg)
+end
+
+-- Verify that :validate() on a scalar schema raises the error
+-- regarding a type mismatch on all data samples except ones of
+-- the given type.
+local function assert_validate_scalar_expects_only_given_type(s, exp_type)
+    for i = 1, table.maxn(samples) do
+        local data = samples[i]
+        if type(data) ~= exp_type then
+            assert_validate_scalar_type_mismatch(s, data, exp_type)
+        end
+    end
+end
+
+-- Verify that :validate() on a record/a map/an array schema
+-- raises the error regarding a type mismatch on the given data.
+local function assert_validate_compound_type_mismatch(s, data)
+    local schema_str = s.schema.type == 'record' and 'a record' or
+        s.schema.type == 'map' and 'a map' or
+        s.schema.type == 'array' and 'an array'
+    assert(type(schema_str) == 'string')
+    local exp_err_msg = ('[%s] Unexpected data type for %s: "%s"'):format(
+        s.name, schema_str, type(data))
+    assert_validate_error(s, data, exp_err_msg)
+end
+
+-- Verify that :validate() on a record/a map/an array schema
+-- raises the error regarding a type mismatch on all data samples
+-- except ones of the table type.
+local function assert_validate_compound_type_expects_only_table(s)
+    for i = 1, table.maxn(samples) do
+        local data = samples[i]
+        if type(data) ~= 'table' then
+            assert_validate_compound_type_mismatch(s, data)
+        end
+    end
+end
+
+-- }}} Testing helpers for <schema object>:validate()
+
+-- {{{ <schema object>:validate()
+
+g.test_validate_string = function()
+    local s = schema.new('myschema', schema.scalar({type = 'string'}))
+
+    -- Good cases.
+    s:validate('')
+    s:validate('foo')
+
+    -- Bad cases.
+    assert_validate_scalar_expects_only_given_type(s, 'string')
+end
+
+g.test_validate_number = function()
+    local s = schema.new('myschema', schema.scalar({type = 'number'}))
+
+    -- Good cases.
+    s:validate(-5.3)
+    s:validate(-5)
+    s:validate(0)
+    s:validate(5)
+    s:validate(5.3)
+
+    -- Bad cases.
+    assert_validate_scalar_expects_only_given_type(s, 'number')
+
+    -- TODO: +inf, -inf, NaN.
+end
+
+g.test_validate_integer = function()
+    local s = schema.new('myschema', schema.scalar({type = 'integer'}))
+
+    -- Good cases.
+    s:validate(-5)
+    s:validate(0)
+    s:validate(5)
+
+    -- Bad cases.
+    assert_validate_scalar_expects_only_given_type(s, 'number')
+    assert_validate_scalar_error(s, 5.5,
+        'Expected number without a fractional part, got 5.5')
+
+    -- TODO: +inf, -inf, NaN.
+end
+
+g.test_validate_boolean = function()
+    local s = schema.new('myschema', schema.scalar({type = 'boolean'}))
+
+    -- Good cases.
+    s:validate(false)
+    s:validate(true)
+
+    -- Bad cases.
+    assert_validate_scalar_expects_only_given_type(s, 'boolean')
+end
+
+g.test_validate_any = function()
+    local s = schema.new('myschema', schema.scalar({type = 'any'}))
+
+    -- Accepts anything.
+    for i = 1, table.maxn(samples) do
+        local data = samples[i]
+        s:validate(data)
+    end
+
+    -- TODO: +inf, -inf, NaN.
+end
+
+g.test_validate_record = function()
+    local scalar = schema.scalar({type = 'string'})
+    local s = schema.new('myschema', schema.record({foo = scalar}))
+
+    -- Good cases.
+    --
+    -- All the fields are taken as optional, so an empty table is
+    -- OK.
+    s:validate({foo = 'bar'})
+    s:validate({})
+
+    -- Bad cases: data of a wrong type is passed as a record.
+    assert_validate_compound_type_expects_only_table(s)
+
+    -- Bad case: unknown field.
+    assert_validate_error(s, {bar = true}, '[myschema] Unexpected field "bar"')
+
+    -- Bad case: data of a wrong type is passed to a field of the
+    -- record.
+    assert_validate_error(s, {foo = true}, table.concat({
+        '[myschema] foo: Unexpected data for scalar "string"',
+        'Expected "string", got "boolean"',
+    }, ': '))
+end
+
+g.test_validate_map = function()
+    local scalar_1 = schema.scalar({type = 'string'})
+    local scalar_2 = schema.scalar({type = 'number'})
+    local s = schema.new('myschema', schema.map({
+        key = scalar_1,
+        value = scalar_2,
+    }))
+
+    -- Good cases.
+    s:validate({})
+    s:validate({foo = 5})
+    s:validate({foo = 5, bar = 6})
+
+    -- Bad case: data of a wrong type is passed as a map.
+    assert_validate_compound_type_expects_only_table(s)
+
+    -- Bad case: data of a wrong type is passed to a key.
+    assert_validate_error(s, {[1] = true}, table.concat({
+        '[myschema] [1]: Unexpected data for scalar "string"',
+        'Expected "string", got "number"',
+    }, ': '))
+
+    -- Bad case: data of a wrong type is passed to a field value.
+    assert_validate_error(s, {foo = true}, table.concat({
+        '[myschema] foo: Unexpected data for scalar "number"',
+        'Expected "number", got "boolean"',
+    }, ': '))
+end
+
+g.test_validate_array = function()
+    local scalar = schema.scalar({type = 'string'})
+    local s = schema.new('myschema', schema.array({
+        items = scalar,
+    }))
+
+    -- Good cases.
+    s:validate({})
+    s:validate({'foo'})
+    s:validate({'foo', 'bar'})
+    s:validate({'foo', 'bar', 'baz'})
+
+    -- Bad cases: data of a wrong type is passed as a record.
+    assert_validate_compound_type_expects_only_table(s)
+
+    -- Bad case: non-numeric key.
+    assert_validate_error(s, {foo = 'bar'},
+        '[myschema] An array contains a non-numeric key: "foo"')
+
+    -- Bad case: floating-point key.
+    assert_validate_error(s, {[1] = 'foo', [1.5] = 'bar', [3] = 'baz'},
+        '[myschema] An array contains a non-integral numeric key: 1.5')
+
+    -- Bad case: minimal index is not 1.
+    assert_validate_error(s, {[2] = 'foo', [3] = 'bar'},
+        '[myschema] An array must start from index 1, got min index 2')
+
+    -- Bad case: an array with holes.
+    assert_validate_error(s, {[1] = 'foo', [3] = 'bar'},
+        '[myschema] An array must not have holes, got a table with 2 ' ..
+        'integer fields with max index 3')
+
+    -- Bad case: data of a wrong type is passed to an items.
+    assert_validate_error(s, {true}, table.concat({
+        '[myschema] [1]: Unexpected data for scalar "string"',
+        'Expected "string", got "boolean"',
+    }, ': '))
+end
+
+-- }}} <schema object>:validate()
