@@ -515,4 +515,40 @@ g.test_validate_array = function()
     }, ': '))
 end
 
+g.test_validate_by_allowed_values = function()
+    local allowed_values = {
+        0, 'fatal',
+        1, 'syserror',
+        2, 'error',
+        3, 'crit',
+        4, 'warn',
+        5, 'info',
+        6, 'verbose',
+        7, 'debug',
+    }
+
+    local s = schema.new('log_level', schema.scalar({
+        type = 'any',
+        allowed_values = allowed_values,
+    }))
+
+    -- Good cases: all the allowed values are actually allowed.
+    for _, level in ipairs(allowed_values) do
+        s:validate(level)
+    end
+
+    -- Bad cases: other values are not allowed.
+    assert_validate_error(s, -1, ('[log_level] Got %s, but only the ' ..
+        'following values are allowed: %s'):format(-1,
+        table.concat(allowed_values, ', ')))
+
+    -- Verify that a type validation occurs before the allowed
+    -- values validation.
+    local s = schema.new('fruits', schema.scalar({
+        type = 'string',
+        allowed_values = {'orange', 'banana'},
+    }))
+    assert_validate_scalar_type_mismatch(s, 1, 'string')
+end
+
 -- }}} <schema object>:validate()
