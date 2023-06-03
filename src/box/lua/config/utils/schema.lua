@@ -1,4 +1,11 @@
 -- Schema-aware data manipulations.
+--
+-- The following annotations have some meaning for the module
+-- itself (affects work of the schema methods):
+--
+-- * allowed_values
+--
+-- Others are just stored.
 
 local methods = {}
 local schema_mt = {}
@@ -318,6 +325,27 @@ local function validate_table_is_array(data, ctx)
     end
 end
 
+-- Verify the given data against the `allowed_values` annotation
+-- in the schema node (if present).
+local function validate_by_allowed_values(schema, data, ctx)
+    if schema.allowed_values == nil then
+        return
+    end
+
+    assert(type(schema.allowed_values) == 'table')
+    local found = false
+    for _, v in ipairs(schema.allowed_values) do
+        if data == v then
+            found = true
+            break
+        end
+    end
+    if not found then
+        walkthrough_error(ctx, 'Got %s, but only the following values ' ..
+            'are allowed: %s', data, table.concat(schema.allowed_values, ', '))
+    end
+end
+
 local function validate_impl(schema, data, ctx)
     if is_scalar(schema) then
         local scalar_def = scalars[schema.type]
@@ -369,6 +397,8 @@ local function validate_impl(schema, data, ctx)
     else
         assert(false)
     end
+
+    validate_by_allowed_values(schema, data, ctx)
 end
 
 -- Validate the given data against the given schema.
@@ -382,6 +412,10 @@ end
 -- * The record/map/array determination is purely schema based.
 --   mt.__serialize marks in the data are not involved anyhow.
 -- * An array shouldn't have any holes (nil values in a middle).
+--
+-- Annotations taken into accounts:
+--
+-- * allowed_values (table) -- whitelist of values
 function methods.validate(self, data)
     local ctx = walkthrough_start(self)
     validate_impl(rawget(self, 'schema'), data, ctx)
