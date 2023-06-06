@@ -20,6 +20,7 @@ g.test_no_box_cfg = function()
     box.broadcast('foo')
     t.helpers.retrying({}, function() t.assert_equals(count, 2) end)
     w:unregister()
+    t.assert_equals(box.watch_once('foo'), nil)
 end
 
 -- Invalid arguments.
@@ -42,6 +43,13 @@ g.test_invalid_args = function(cg)
         t.assert_error_msg_equals(
             "bad argument #1 to '?' (string expected, got table)",
             box.broadcast, {})
+        t.assert_error_msg_equals("Usage: box.watch_once(key)",
+                                  box.watch_once)
+        t.assert_error_msg_equals("Usage: box.watch_once(key)",
+                                  box.watch_once, 'a', 'b')
+        t.assert_error_msg_equals(
+            "bad argument #1 to '?' (string expected, got table)",
+            box.watch_once, {})
     end)
 end
 
@@ -93,6 +101,29 @@ end
 g.after_test('test_basic', function(cg)
     cg.server:exec(function()
         box.broadcast('foo')
+    end)
+end)
+
+g.test_once = function(cg)
+    cg.server:exec(function()
+        t.assert_equals(box.watch_once('foo'), nil)
+        t.assert_equals(box.watch_once('bar'), nil)
+        box.broadcast('foo', {1, 2, 3})
+        t.assert_equals(box.watch_once('foo'), {1, 2, 3})
+        t.assert_equals(box.watch_once('bar'), nil)
+        box.broadcast('bar', 'baz')
+        t.assert_equals(box.watch_once('foo'), {1, 2, 3})
+        t.assert_equals(box.watch_once('bar'), 'baz')
+        box.broadcast('foo')
+        t.assert_equals(box.watch_once('foo'), nil)
+        t.assert_equals(box.watch_once('bar'), 'baz')
+    end)
+end
+
+g.after_test('test_once', function(cg)
+    cg.server:exec(function()
+        box.broadcast('foo')
+        box.broadcast('bar')
     end)
 end)
 

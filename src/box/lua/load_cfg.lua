@@ -988,6 +988,7 @@ local box_cfg_guard_whitelist = {
     malloc = true;
     ctl = true;
     watch = true;
+    watch_once = true;
     broadcast = true;
     txn_isolation_level = true;
     NULL = true;
