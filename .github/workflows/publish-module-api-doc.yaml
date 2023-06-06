@@ -1,10 +1,10 @@
-name: Build and publish module API documentation
+name: publish-module-api-doc
 
 on:
   push:
-    branches: [master]
+    branches:
+      - 'master'
   pull_request:
-    types: [opened, reopened, synchronize]
   workflow_dispatch:
 
 concurrency:
@@ -30,6 +30,14 @@ concurrency:
 jobs:
   build-api-doc:
     runs-on: ubuntu-latest
+
+    # Run on push to the tarantool/tarantool repository or on pull request
+    # if the 'notest' label is not set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          ( github.event_name == 'pull_request' &&
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
+
     steps:
       - name: Prepare checkout
         uses: tarantool/actions/prepare-checkout@master
@@ -52,9 +60,7 @@ jobs:
         uses: JamesIves/github-pages-deploy-action@v4.4.0
         with:
           folder: doc/
-        if: github.repository == 'tarantool/tarantool' &&
-            github.ref == 'refs/heads/master' &&
-            github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/master'
 
       - name: Send VK Teams message on failure
         if: failure()
