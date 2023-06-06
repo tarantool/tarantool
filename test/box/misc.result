@@ -111,6 +111,7 @@ t
   - txn_isolation_level
   - unprepare
   - watch
+  - watch_once
 ...
 t = nil
 ---

@@ -69,6 +69,25 @@ watchable_node_delete(struct watchable_node *node)
 }
 
 /**
+ * Looks up an returns a node by key name. Returns NULL if not found.
+ */
+static struct watchable_node *
+watchable_find_node(struct watchable *watchable,
+		    const char *key, size_t key_len)
+{
+	struct mh_strnptr_t *h = watchable->node_by_key;
+	uint32_t key_hash = mh_strn_hash(key, key_len);
+	struct mh_strnptr_key_t k = {key, key_len, key_hash};
+	mh_int_t i = mh_strnptr_find(h, &k, NULL);
+	if (i != mh_end(h)) {
+		struct watchable_node *node = mh_strnptr_node(h, i)->val;
+		assert(strncmp(node->key, key, key_len) == 0);
+		return node;
+	}
+	return NULL;
+}
+
+/**
  * Looks up and returns a node by key name. Creates a new node if not found.
  */
 static struct watchable_node *
@@ -431,6 +450,19 @@ box_broadcast_fmt(const char *key, const char *format, ...)
 		unreachable();
 	va_end(ap);
 	box_broadcast(key, strlen(key), data, data + size);
+}
+
+const char *
+box_watch_once(const char *key, size_t key_len, const char **end)
+{
+	struct watchable_node *node = watchable_find_node(&box_watchable,
+							  key, key_len);
+	if (node == NULL) {
+		*end = NULL;
+		return NULL;
+	}
+	*end = node->data_end;
+	return node->data;
 }
 
 void

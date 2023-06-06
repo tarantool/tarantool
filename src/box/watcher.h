@@ -259,6 +259,25 @@ box_broadcast(const char *key, size_t key_len,
 void
 box_broadcast_fmt(const char *key, const char *format, ...);
 
+/**
+ * Returns the data attached to a notification key.
+ *
+ * @param key Name of the notification key
+ * @param key_len Length of the key name
+ * @param[out] end End of the key data
+ * @retval Key data
+ *
+ * The function never fails.
+ *
+ * If there's no data attached to the given notification key (box_broadcast()
+ * has never been called for this key), the function returns NULL.
+ *
+ * Note that the data returned by this function may be updated by a concurrent
+ * call to box_broadcast() so the caller must copy it if it intends to yield.
+ */
+const char *
+box_watch_once(const char *key, size_t key_len, const char **end);
+
 void
 box_watcher_init(void);
 
