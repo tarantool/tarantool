@@ -35,6 +35,7 @@ g.test_autocomplete = function()
                               'conn1:on_shutdown(',
                               'conn1:wait_connected(',
                               'conn1:watch(',
+                              'conn1:watch_once(',
                               'conn1:execute(',
                               'conn1:wait_state(',
                               'conn1:ping(',

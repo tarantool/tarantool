@@ -80,7 +80,7 @@ enum {
 	/**
 	 * IPROTO protocol version supported by the netbox connector.
 	 */
-	NETBOX_IPROTO_VERSION = 5,
+	NETBOX_IPROTO_VERSION = 6,
 };
 
 /**
@@ -109,6 +109,7 @@ static struct iproto_features NETBOX_IPROTO_FEATURES;
 	_(BEGIN)							\
 	_(COMMIT)							\
 	_(ROLLBACK)							\
+	_(WATCH_ONCE)							\
 	_(INJECT)							\
 
 #define NETBOX_METHOD_MEMBER(s) \
@@ -1334,6 +1335,25 @@ netbox_encode_rollback(struct lua_State *L, int idx, struct mpstream *stream,
 						sync, stream_id);
 }
 
+/**
+ * Encodes an IPROTO_WATCH_ONCE request for the notification key stored in
+ * the Lua stack at the index idx.
+ */
+static int
+netbox_encode_watch_once(struct lua_State *L, int idx, struct mpstream *stream,
+			 uint64_t sync, uint64_t stream_id)
+{
+	size_t key_len;
+	const char *key = lua_tolstring(L, idx, &key_len);
+	size_t svp = netbox_begin_encode(stream, sync, IPROTO_WATCH_ONCE,
+					 stream_id);
+	mpstream_encode_map(stream, 1);
+	mpstream_encode_uint(stream, IPROTO_EVENT_KEY);
+	mpstream_encode_strn(stream, key, key_len);
+	netbox_end_encode(stream, svp);
+	return 0;
+}
+
 static int
 netbox_encode_inject(struct lua_State *L, int idx, struct mpstream *stream,
 		     uint64_t sync, uint64_t stream_id)
@@ -1385,6 +1405,7 @@ netbox_encode_method(struct lua_State *L, int idx, enum netbox_method method,
 		[NETBOX_BEGIN]		= netbox_encode_begin,
 		[NETBOX_COMMIT]		= netbox_encode_commit,
 		[NETBOX_ROLLBACK]	= netbox_encode_rollback,
+		[NETBOX_WATCH_ONCE]	= netbox_encode_watch_once,
 		[NETBOX_INJECT]		= netbox_encode_inject,
 	};
 	struct mpstream stream;
@@ -1862,6 +1883,7 @@ netbox_decode_method(struct lua_State *L, enum netbox_method method,
 		[NETBOX_BEGIN]		= netbox_decode_nil,
 		[NETBOX_COMMIT]		= netbox_decode_nil,
 		[NETBOX_ROLLBACK]	= netbox_decode_nil,
+		[NETBOX_WATCH_ONCE]	= netbox_decode_value,
 		[NETBOX_INJECT]		= netbox_decode_table,
 	};
 	method_decoder[method](L, data, data_end, return_raw, format);
@@ -3054,6 +3076,8 @@ luaopen_net_box(struct lua_State *L)
 			    IPROTO_FEATURE_PAGINATION);
 	iproto_features_set(&NETBOX_IPROTO_FEATURES,
 			    IPROTO_FEATURE_SPACE_AND_INDEX_NAMES);
+	iproto_features_set(&NETBOX_IPROTO_FEATURES,
+			    IPROTO_FEATURE_WATCH_ONCE);
 
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);

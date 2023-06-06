@@ -734,6 +734,15 @@ function remote_methods:watch(key, func)
     return watcher
 end
 
+function remote_methods:watch_once(key, opts)
+    check_remote_arg(self, 'watch_once')
+    if type(key) ~= 'string' then
+        box.error(E_PROC_LUA, 'key must be a string')
+    end
+    check_param_table(opts, REQUEST_OPTION_TYPES)
+    return self:_request('WATCH_ONCE', opts, nil, nil, key)
+end
+
 function remote_methods:close()
     check_remote_arg(self, 'close')
     self._transport:stop(true)
