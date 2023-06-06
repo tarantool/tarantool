@@ -18,10 +18,9 @@ c:ping()
 result = nil
 test_run:cmd("setopt delimiter ';'")
 f = fiber.create(function()
-    _, result = pcall(c._request, c, net._method.call,
-                      nil, nil, nil, 'long', {})
+    _, result = pcall(c._request, c, 'CALL', nil, nil, nil, 'long', {})
 end)
-pcall(c._request, c, net._method.inject, nil, nil, nil, '\x80')
+pcall(c._request, c, 'INJECT', nil, nil, nil, '\x80')
 test_run:cmd("setopt delimiter ''");
 test_run:wait_cond(function() return f:status() == 'dead' end)
 assert(tostring(result) == 'Peer closed')

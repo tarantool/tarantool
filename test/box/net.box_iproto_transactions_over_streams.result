@@ -186,15 +186,15 @@ assert(conn:ping())
 - true
 ...
 -- Begin, commit and rollback supported only for streams
-conn:_request(net_box._method.begin, nil, nil, nil)
+conn:_request('BEGIN')
 ---
 - error: Unable to process BEGIN request out of stream
 ...
-conn:_request(net_box._method.commit, nil, nil, nil)
+conn:_request('COMMIT')
 ---
 - error: Unable to process COMMIT request out of stream
 ...
-conn:_request(net_box._method.rollback, nil, nil, nil)
+conn:_request('ROLLBACK')
 ---
 - error: Unable to process ROLLBACK request out of stream
 ...
@@ -236,7 +236,7 @@ body = msgpack.encode({nil});
 size = msgpack.encode(header:len() + body:len());
 ---
 ...
-conn:_request(net_box._method.inject, nil, nil, nil, size .. header .. body);
+conn:_request('INJECT', nil, nil, nil, size .. header .. body);
 ---
 - error: Unable to process AUTH request in stream
 ...

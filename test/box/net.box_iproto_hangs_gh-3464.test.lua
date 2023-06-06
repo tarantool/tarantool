@@ -8,6 +8,6 @@ net = require('net.box')
 --
 c = net:connect(box.cfg.listen)
 data = msgpack.encode(18400000000000000000)..'aaaaaaa'
-c:_request(net._method.inject, nil, nil, nil, data)
+c:_request('INJECT', nil, nil, nil, data)
 c:close()
 test_run:grep_log('default', 'too big packet size in the header') ~= nil

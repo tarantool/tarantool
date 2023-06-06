@@ -88,29 +88,42 @@ enum {
  */
 static struct iproto_features NETBOX_IPROTO_FEATURES;
 
+#define NETBOX_METHODS(_)						\
+	_(PING)								\
+	_(CALL)								\
+	_(EVAL)								\
+	_(INSERT)							\
+	_(REPLACE)							\
+	_(DELETE)							\
+	_(UPDATE)							\
+	_(UPSERT)							\
+	_(SELECT)							\
+	_(SELECT_WITH_POS)						\
+	_(EXECUTE)							\
+	_(PREPARE)							\
+	_(UNPREPARE)							\
+	_(GET)								\
+	_(MIN)								\
+	_(MAX)								\
+	_(COUNT)							\
+	_(BEGIN)							\
+	_(COMMIT)							\
+	_(ROLLBACK)							\
+	_(INJECT)							\
+
+#define NETBOX_METHOD_MEMBER(s) \
+	NETBOX_ ## s,
+
 enum netbox_method {
-	NETBOX_PING        = 0,
-	NETBOX_CALL        = 1,
-	NETBOX_EVAL        = 2,
-	NETBOX_INSERT      = 3,
-	NETBOX_REPLACE     = 4,
-	NETBOX_DELETE      = 5,
-	NETBOX_UPDATE      = 6,
-	NETBOX_UPSERT      = 7,
-	NETBOX_SELECT      = 8,
-	NETBOX_EXECUTE     = 9,
-	NETBOX_PREPARE     = 10,
-	NETBOX_UNPREPARE   = 11,
-	NETBOX_GET         = 12,
-	NETBOX_MIN         = 13,
-	NETBOX_MAX         = 14,
-	NETBOX_COUNT       = 15,
-	NETBOX_BEGIN       = 16,
-	NETBOX_COMMIT      = 17,
-	NETBOX_ROLLBACK    = 18,
-	NETBOX_SELECT_WITH_POS = 19,
-	NETBOX_INJECT      = 20,
+	NETBOX_METHODS(NETBOX_METHOD_MEMBER)
 	netbox_method_MAX
+};
+
+#define NETBOX_METHOD_STRS_MEMBER(s) \
+	[NETBOX_ ## s] = #s,
+
+static const char *netbox_method_strs[netbox_method_MAX] = {
+	NETBOX_METHODS(NETBOX_METHOD_STRS_MEMBER)
 };
 
 enum netbox_state {
@@ -1361,6 +1374,7 @@ netbox_encode_method(struct lua_State *L, int idx, enum netbox_method method,
 		[NETBOX_UPDATE]		= netbox_encode_update,
 		[NETBOX_UPSERT]		= netbox_encode_upsert,
 		[NETBOX_SELECT]		= netbox_encode_select,
+		[NETBOX_SELECT_WITH_POS] = netbox_encode_select,
 		[NETBOX_EXECUTE]	= netbox_encode_execute,
 		[NETBOX_PREPARE]	= netbox_encode_prepare,
 		[NETBOX_UNPREPARE]	= netbox_encode_unprepare,
@@ -1368,10 +1382,9 @@ netbox_encode_method(struct lua_State *L, int idx, enum netbox_method method,
 		[NETBOX_MIN]		= netbox_encode_select,
 		[NETBOX_MAX]		= netbox_encode_select,
 		[NETBOX_COUNT]		= netbox_encode_call,
-		[NETBOX_BEGIN]          = netbox_encode_begin,
-		[NETBOX_COMMIT]         = netbox_encode_commit,
-		[NETBOX_ROLLBACK]       = netbox_encode_rollback,
-		[NETBOX_SELECT_WITH_POS] = netbox_encode_select,
+		[NETBOX_BEGIN]		= netbox_encode_begin,
+		[NETBOX_COMMIT]		= netbox_encode_commit,
+		[NETBOX_ROLLBACK]	= netbox_encode_rollback,
 		[NETBOX_INJECT]		= netbox_encode_inject,
 	};
 	struct mpstream stream;
@@ -1838,6 +1851,7 @@ netbox_decode_method(struct lua_State *L, enum netbox_method method,
 		[NETBOX_UPDATE]		= netbox_decode_tuple,
 		[NETBOX_UPSERT]		= netbox_decode_nil,
 		[NETBOX_SELECT]		= netbox_decode_select,
+		[NETBOX_SELECT_WITH_POS] = netbox_decode_select_with_pos,
 		[NETBOX_EXECUTE]	= netbox_decode_execute,
 		[NETBOX_PREPARE]	= netbox_decode_prepare,
 		[NETBOX_UNPREPARE]	= netbox_decode_nil,
@@ -1845,10 +1859,9 @@ netbox_decode_method(struct lua_State *L, enum netbox_method method,
 		[NETBOX_MIN]		= netbox_decode_tuple,
 		[NETBOX_MAX]		= netbox_decode_tuple,
 		[NETBOX_COUNT]		= netbox_decode_count,
-		[NETBOX_BEGIN]          = netbox_decode_nil,
-		[NETBOX_COMMIT]         = netbox_decode_nil,
-		[NETBOX_ROLLBACK]       = netbox_decode_nil,
-		[NETBOX_SELECT_WITH_POS] = netbox_decode_select_with_pos,
+		[NETBOX_BEGIN]		= netbox_decode_nil,
+		[NETBOX_COMMIT]		= netbox_decode_nil,
+		[NETBOX_ROLLBACK]	= netbox_decode_nil,
 		[NETBOX_INJECT]		= netbox_decode_table,
 	};
 	method_decoder[method](L, data, data_end, return_raw, format);
@@ -3083,5 +3096,13 @@ luaopen_net_box(struct lua_State *L)
 		{ NULL, NULL}
 	};
 	luaT_newmodule(L, "net.box.lib", net_box_lib);
+
+	lua_newtable(L);
+	for (int i = 0; i < netbox_method_MAX; i++) {
+		lua_pushinteger(L, i);
+		lua_setfield(L, -2, netbox_method_strs[i]);
+	}
+	lua_setfield(L, -2, "method");
+
 	return 1;
 }

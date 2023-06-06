@@ -108,9 +108,9 @@ stream_2:commit()
 conn = net_box.connect(server_addr)
 assert(conn:ping())
 -- Begin, commit and rollback supported only for streams
-conn:_request(net_box._method.begin, nil, nil, nil)
-conn:_request(net_box._method.commit, nil, nil, nil)
-conn:_request(net_box._method.rollback, nil, nil, nil)
+conn:_request('BEGIN')
+conn:_request('COMMIT')
+conn:_request('ROLLBACK')
 -- Not all requests supported by stream.
 stream = conn:new_stream()
 -- Start transaction to allocate stream object on the
@@ -128,7 +128,7 @@ header = msgpack.encode({
 });
 body = msgpack.encode({nil});
 size = msgpack.encode(header:len() + body:len());
-conn:_request(net_box._method.inject, nil, nil, nil, size .. header .. body);
+conn:_request('INJECT', nil, nil, nil, size .. header .. body);
 test_run:cmd("setopt delimiter ''");
 conn:close()
 test_run:cmd("stop server test")
