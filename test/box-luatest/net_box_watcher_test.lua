@@ -1,4 +1,5 @@
 local fiber = require('fiber')
+local msgpack = require('msgpack')
 local net = require('net.box')
 local server = require('luatest.server')
 local t = require('luatest')
@@ -29,6 +30,15 @@ g.test_invalid_args = function(cg)
                               conn.watch, conn, 123, function() end)
     t.assert_error_msg_equals("func must be a function",
                               conn.watch, conn, 'abc', 123)
+    t.assert_error_msg_equals(
+        "Use remote:watch_once(...) instead of remote.watch_once(...):",
+        conn.watch_once)
+    t.assert_error_msg_equals("key must be a string",
+                              conn.watch_once, conn, 123)
+    t.assert_error_msg_equals("Illegal parameters, options should be a table",
+                              conn.watch_once, conn, 'abc', 123)
+    t.assert_error_msg_equals("Illegal parameters, unexpected option 'foo'",
+                              conn.watch_once, conn, 'abc', {foo = 'bar'})
     conn:close()
 end
 
@@ -303,5 +313,118 @@ g.after_test('test_reconnect', function(cg)
     cg.server:exec(function()
         box.error.injection.set('ERRINJ_NETBOX_IO_ERROR', false)
         box.broadcast('foo')
+    end)
+end)
+
+-- Check peer protocol features reported by net.box connection.
+g.test_features = function(cg)
+    local conn = net.connect(cg.server.net_box_uri)
+    t.assert_ge(conn.peer_protocol_version, 6)
+    t.assert(conn.peer_protocol_features.watchers)
+    t.assert(conn.peer_protocol_features.watch_once)
+    conn:close()
+end
+
+-- Check that conn.watch_once returns the actual state value.
+g.test_watch_once = function(cg)
+    local conn = net.connect(cg.server.net_box_uri)
+    t.assert_equals(conn:watch_once('foo'), nil)
+    t.assert_equals(conn:watch_once('bar'), nil)
+    cg.broadcast('foo', {1, 2, 3})
+    t.assert_equals(conn:watch_once('foo'), {1, 2, 3})
+    t.assert_equals(conn:watch_once('bar'), nil)
+    cg.broadcast('bar', 'test')
+    t.assert_equals(conn:watch_once('foo'), {1, 2, 3})
+    t.assert_equals(conn:watch_once('bar'), 'test')
+    cg.broadcast('foo', nil)
+    t.assert_equals(conn:watch_once('foo'), nil)
+    t.assert_equals(conn:watch_once('bar'), 'test')
+    conn:close()
+end
+
+g.after_test('test_watch_once', function(cg)
+    cg.broadcast('foo', nil)
+    cg.broadcast('bar', nil)
+end)
+
+-- Check that conn.watch_once may be used with return_raw.
+g.test_watch_once_raw = function(cg)
+    local conn = net.connect(cg.server.net_box_uri)
+    cg.broadcast('foo', {a = 1, b = 2})
+    local o = conn:watch_once('foo', {return_raw = true})
+    t.assert(msgpack.is_object(o))
+    t.assert_equals(o:decode(), {a = 1, b = 2})
+    conn:close()
+end
+
+g.after_test('test_watch_once_raw', function(cg)
+    cg.broadcast('foo', nil)
+end)
+
+-- Check that conn.watch_once may be used with is_async.
+g.test_watch_once_async = function(cg)
+    local conn = net.connect(cg.server.net_box_uri)
+    cg.broadcast('foo', {'foo', 'bar'})
+    local f = conn:watch_once('foo', {is_async = true})
+    t.assert(f:wait_result(), {'foo', 'bar'})
+    conn:close()
+end
+
+g.after_test('test_watch_once_async', function(cg)
+    cg.broadcast('foo', nil)
+end)
+
+-- Check that conn.watch and conn.watch_once may be used in a stream but
+-- they do not participate in request streamlining.
+g.before_test('test_streams', function(cg)
+    cg.server:exec(function()
+        local ch = require('fiber').channel()
+        rawset(_G, 'wait', function() return ch:get() end)
+        rawset(_G, 'wakeup', function() ch:put(true) end)
+    end)
+end)
+
+g.test_streams = function(cg)
+    local conn = net.connect(cg.server.net_box_uri)
+    local stream = conn:new_stream()
+
+    -- Block the stream.
+    local f1 = stream:call('wait', {}, {is_async = true})
+    local f2 = stream:eval('return true', {}, {is_async = true})
+    t.assert_not(f1:wait_result(0.01)) -- blocked until woken up
+    t.assert_not(f2:wait_result(0.01)) -- blocked by f1
+
+    -- Check that watch and watch_once still work.
+    local f = stream:watch_once('foo', {is_async = true})
+    t.assert_equals(f:wait_result(60), nil)
+    local count = 0
+    local key, value
+    stream:watch('foo', function(k, v)
+        count = count + 1
+        key = k
+        value = v
+    end)
+    t.helpers.retrying({}, function() t.assert_equals(count, 1) end)
+    t.assert_equals(key, 'foo')
+    t.assert_equals(value, nil)
+    cg.broadcast('foo', 'bar')
+    f = stream:watch_once('foo', {is_async = true})
+    t.assert_equals(f:wait_result(60), 'bar')
+    t.helpers.retrying({}, function() t.assert_equals(count, 2) end)
+    t.assert_equals(key, 'foo')
+    t.assert_equals(value, 'bar')
+
+    -- Unblock the stream.
+    conn:call('wakeup')
+    t.assert(f1:wait_result(60))
+    t.assert(f2:wait_result(60))
+    conn:close()
+end
+
+g.after_test('test_streams', function(cg)
+    cg.server:exec(function()
+        rawset(_G, 'wait', nil)
+        rawset(_G, 'wakeup', nil)
+        box.broadcast('foo', nil)
     end)
 end)
