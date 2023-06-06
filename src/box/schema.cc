@@ -203,7 +203,8 @@ sc_space_new(uint32_t id, const char *name,
 		make_scoped_guard([=] { index_def_delete(index_def); });
 	struct space_def *def =
 		space_def_new_xc(id, ADMIN, 0, name, strlen(name), "memtx",
-				 strlen("memtx"), &space_opts_default, NULL, 0);
+				 strlen("memtx"), &space_opts_default, NULL, 0,
+				 NULL, 0);
 	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	struct rlist key_list;
 	rlist_create(&key_list);
@@ -412,7 +413,7 @@ schema_init(void)
 		struct space_def *def;
 		def = space_def_new_xc(BOX_VINYL_DEFERRED_DELETE_ID, ADMIN, 0,
 				       name, strlen(name), engine,
-				       strlen(engine), &opts, NULL, 0);
+				       strlen(engine), &opts, NULL, 0, NULL, 0);
 		auto def_guard = make_scoped_guard([=] {
 			space_def_delete(def);
 		});

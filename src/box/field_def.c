@@ -39,6 +39,7 @@
 #include "tt_uuid.h"
 #include "tt_static.h"
 #include "tuple_constraint_def.h"
+#include "tuple_dictionary.h"
 #include "tuple_format.h"
 #include "salad/grp_alloc.h"
 #include "small/region.h"
@@ -208,6 +209,11 @@ static const struct opt_def field_def_reg[] = {
 	OPT_END,
 };
 
+static const struct opt_def field_def_reg_names_only[] = {
+	OPT_DEF("name", OPT_STRPTR, struct field_def, name),
+	OPT_END,
+};
+
 const struct field_def field_def_default = {
 	.type = FIELD_TYPE_ANY,
 	.name = NULL,
@@ -313,10 +319,11 @@ field_def_parse_foreign_key(const char **data, void *opts,
  * @param data MessagePack map to decode.
  * @param fieldno Field number to decode. Used in error messages.
  * @param region Region to allocate field name.
+ * @param names_only Only decode 'name' field, ignore the rest.
  */
 static int
 field_def_decode(struct field_def *field, const char **data,
-		 uint32_t fieldno, struct region *region)
+		 uint32_t fieldno, struct region *region, bool names_only)
 {
 	if (mp_typeof(**data) != MP_MAP) {
 		field_def_error(fieldno, "expected a map");
@@ -334,7 +341,9 @@ field_def_decode(struct field_def *field, const char **data,
 		}
 		uint32_t key_len;
 		const char *key = mp_decode_str(data, &key_len);
-		if (opts_parse_key(field, field_def_reg, key, key_len, data,
+		const struct opt_def *reg =
+			names_only ? field_def_reg_names_only : field_def_reg;
+		if (opts_parse_key(field, reg, key, key_len, data,
 				   region, true) != 0) {
 			field_def_error(fieldno,
 					diag_last_error(diag_get())->errmsg);
@@ -394,7 +403,8 @@ field_def_decode(struct field_def *field, const char **data,
 
 int
 field_def_array_decode(const char **data, struct field_def **fields,
-		       uint32_t *field_count, struct region *region)
+		       uint32_t *field_count, struct region *region,
+		       bool names_only)
 {
 	assert(mp_typeof(**data) == MP_ARRAY);
 	uint32_t count = mp_decode_array(data);
@@ -413,7 +423,8 @@ field_def_array_decode(const char **data, struct field_def **fields,
 		return -1;
 	}
 	for (uint32_t i = 0; i < count; ++i) {
-		if (field_def_decode(&region_defs[i], data, i, region) != 0)
+		if (field_def_decode(&region_defs[i], data, i, region,
+				     names_only) != 0)
 			return -1;
 	}
 	*fields = region_defs;

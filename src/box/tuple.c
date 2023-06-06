@@ -285,14 +285,48 @@ tuple_bigref_tuple_count()
 }
 
 struct tuple_format *
-runtime_tuple_format_new(struct tuple_dictionary *dict)
+runtime_tuple_format_new(const char *format_data, size_t format_data_len,
+			 bool names_only)
 {
-	return tuple_format_new(&tuple_format_runtime_vtab, /*engine=*/NULL,
-				/*keys=*/NULL, /*key_count=*/0,
-				/*space_field_count=*/NULL,
-				/*exact_field_count=*/0, 0, dict,
-				/*is_temporary=*/false, /*is_reusable=*/true,
-				/*contraint_def=*/NULL, /*constraint_count=*/0);
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	const char *p = format_data;
+	struct field_def *fields = NULL;
+	uint32_t field_count = 0;
+	if (format_data != NULL &&
+	    field_def_array_decode(&p, &fields, &field_count, region,
+				   /*names_only=*/names_only) != 0)
+		goto error;
+	struct tuple_dictionary *dict =
+		tuple_dictionary_new(fields, field_count);
+	if (dict == NULL)
+		goto error;
+	if (names_only) {
+		fields = NULL;
+		field_count = 0;
+	}
+	struct tuple_format *format =
+		tuple_format_new(/*vtab=*/&tuple_format_runtime_vtab,
+				 /*engine=*/NULL, /*keys=*/NULL,
+				 /*key_count=*/0, /*space_fields=*/fields,
+				 /*space_field_count=*/field_count,
+				 /*exact_field_count=*/0,  /*dict=*/dict,
+				 /*is_temporary=*/false, /*is_reusable=*/true,
+				 /*constraint_def=*/NULL,
+				 /*constraint_count=*/0,
+				 /*format_data=*/format_data,
+				 /*format_data_len=*/format_data_len);
+	region_truncate(region, region_svp);
+	/*
+	 * Since dictionary reference counter is 1 from the
+	 * beginning and after creation of the tuple_format
+	 * increases by one, we must decrease it once.
+	 */
+	tuple_dictionary_unref(dict);
+	return format;
+error:
+	region_truncate(region, region_svp);
+	return NULL;
 }
 
 int
@@ -303,7 +337,8 @@ tuple_init(field_name_hash_f hash)
 	/*
 	 * Create a format for runtime tuples
 	 */
-	tuple_format_runtime = runtime_tuple_format_new(/*dict=*/NULL);
+	tuple_format_runtime = runtime_tuple_format_new(NULL, 0,
+							/*names_only=*/false);
 	if (tuple_format_runtime == NULL)
 		return -1;
 

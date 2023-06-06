@@ -78,13 +78,19 @@ tuple_arena_destroy(struct slab_arena *arena);
 /**
  * Creates a new format for standalone tuples.
  * Tuples created with the new format are allocated from the runtime arena.
- * In contrast to the preallocated tuple_format_runtime, which has no field
- * names, the new format uses the provided field name dictionary.
+ * In contrast to the preallocated tuple_format_runtime, which has no
+ * information about fields, the new format uses the field definitions from the
+ * Msgpack encoded format clause.
+ *
+ * In some cases (formats received over IPROTO or formats for read views) we
+ * only need to get the 'name' field options and ignore the rest, hence the
+ * `names_only` flag is provided.
  *
  * On success, returns the new format. On error, returns NULL and sets diag.
  */
 struct tuple_format *
-runtime_tuple_format_new(struct tuple_dictionary *dict);
+runtime_tuple_format_new(const char *format_data, size_t format_data_len,
+			 bool names_only);
 
 /** \cond public */
 

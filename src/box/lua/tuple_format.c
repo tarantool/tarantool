@@ -9,7 +9,10 @@
 #include "box/tuple.h"
 #include "box/tuple_format.h"
 
+#include "lua/msgpack.h"
 #include "lua/utils.h"
+
+#include "mpstream/mpstream.h"
 
 static const char *tuple_format_typename = "box.tuple.format";
 
@@ -43,47 +46,39 @@ luaT_push_tuple_format(struct lua_State *L, struct tuple_format *format)
 }
 
 /*
- * Create a tuple format using a format clause with an external source (IPROTO):
- * all format clause fields except for 'name' are ignored.
+ * Creates a new tuple format from a format clause (can be omitted). The format
+ * clause is a Lua table (the same as the one passed to `format`
+ * method of space objects): it is encoded into MsgPack to reuse existing
+ * field definition decoding (see also `space_def_new_from_tuple`). Throws a Lua
+ * exception on failure.
+ *
+ * In some cases (formats received over IPROTO or formats for read views) we
+ * only need to get the 'name' field options and ignore the rest, hence the
+ * `names_only` flag is provided.
  */
 static int
 lbox_tuple_format_new(struct lua_State *L)
 {
 	int top = lua_gettop(L);
-	if (top == 0)
-		return luaT_push_tuple_format(L, tuple_format_runtime);
-	assert(top == 1 && lua_istable(L, 1));
-	uint32_t count = lua_objlen(L, 1);
+	(void)top;
+	assert((1 <= top && 2 >= top) && lua_istable(L, 1));
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	struct field_def *fields = xregion_alloc_array(region,
-						       struct field_def, count);
-	for (uint32_t i = 0; i < count; ++i) {
-		size_t len;
-		fields[i] = field_def_default;
-		lua_pushinteger(L, i + 1);
-		lua_gettable(L, 1);
-		lua_pushstring(L, "name");
-		lua_gettable(L, -2);
-		assert(!lua_isnil(L, -1));
-		const char *name = lua_tolstring(L, -1, &len);
-		fields[i].name = (char *)xregion_alloc(region, len + 1);
-		memcpy(fields[i].name, name, len);
-		fields[i].name[len] = '\0';
-		lua_pop(L, 1);
-		lua_pop(L, 1);
-	}
-	struct tuple_dictionary *dict = tuple_dictionary_new(fields, count);
-	region_truncate(region, region_svp);
-	if (dict == NULL)
+	struct mpstream stream;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      luamp_error, L);
+	if (luamp_encode(L, luaL_msgpack_default, &stream, 1) != 0) {
+		region_truncate(region, region_svp);
 		return luaT_error(L);
-	struct tuple_format *format = runtime_tuple_format_new(dict);
-	/*
-	 * Since dictionary reference counter is 1 from the
-	 * beginning and after creation of the tuple_format
-	 * increases by one, we must decrease it once.
-	 */
-	tuple_dictionary_unref(dict);
+	}
+	mpstream_flush(&stream);
+	size_t format_data_len = region_used(region) - region_svp;
+	const char *format_data = xregion_join(region, format_data_len);
+	bool names_only = lua_toboolean(L, 2);
+	struct tuple_format *format =
+		runtime_tuple_format_new(format_data, format_data_len,
+					 names_only);
+	region_truncate(region, region_svp);
 	if (format == NULL)
 		return luaT_error(L);
 	return luaT_push_tuple_format(L, format);

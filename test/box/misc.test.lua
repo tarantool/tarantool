@@ -325,21 +325,18 @@ s:drop()
 -- no errors.
 --
 
--- Without argument it is equivalent to new_tuple_format({})
-tuple_format = box.internal.tuple_format.new()
-
 -- If no type that type == "any":
 format = {}
 format[1] = {}
 format[1].name = 'aaa'
-tuple_format = box.internal.tuple_format.new(format)
+tuple_format = box.internal.tuple_format.new(format, true)
 
 -- Function space:format() without arguments returns valid format:
-tuple_format = box.internal.tuple_format.new(box.space._space:format())
+tuple_format = box.internal.tuple_format.new(box.space._space:format(), true)
 
 -- Check is_nullable option fo field
 format[1].is_nullable = true
-tuple_format = box.internal.tuple_format.new(format)
+tuple_format = box.internal.tuple_format.new(format, true)
 
 --
 -- Test that calling _say using FFI w/ null filepointer doesn't

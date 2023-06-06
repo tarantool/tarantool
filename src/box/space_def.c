@@ -99,7 +99,8 @@ space_tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 				def->exact_field_count, def->dict,
 				def->opts.is_temporary, def->opts.is_ephemeral,
 				def->opts.constraint_def,
-				def->opts.constraint_count);
+				def->opts.constraint_count, def->format_data,
+				def->format_data_len);
 }
 
 /**
@@ -130,6 +131,15 @@ space_def_dup(const struct space_def *src)
 	ret->fields = field_def_array_dup(src->fields, src->field_count);
 	tuple_dictionary_ref(ret->dict);
 	space_def_dup_opts(ret, &src->opts);
+	if (src->format_data != NULL) {
+		ret->format_data = xmalloc(src->format_data_len);
+		memcpy(ret->format_data, src->format_data,
+		       src->format_data_len);
+		ret->format_data_len = src->format_data_len;
+	} else {
+		ret->format_data = NULL;
+		ret->format_data_len = 0;
+	}
 	return ret;
 }
 
@@ -138,7 +148,8 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	      const char *name, uint32_t name_len,
 	      const char *engine_name, uint32_t engine_len,
 	      const struct space_opts *opts, const struct field_def *fields,
-	      uint32_t field_count)
+	      uint32_t field_count, const char *format_data,
+	      size_t format_data_len)
 {
 	size_t size = sizeof(struct space_def) + name_len + 1;
 	struct space_def *def = xmalloc(size);
@@ -161,6 +172,14 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	def->field_count = field_count;
 	def->fields = field_def_array_dup(fields, field_count);
 	space_def_dup_opts(def, opts);
+	if (format_data != NULL) {
+		def->format_data = xmalloc(format_data_len);
+		memcpy(def->format_data, format_data, format_data_len);
+		def->format_data_len = format_data_len;
+	} else {
+		def->format_data = NULL;
+		def->format_data_len = 0;
+	}
 	return def;
 }
 
@@ -179,7 +198,8 @@ space_def_new_ephemeral(uint32_t exact_field_count, struct field_def *fields)
 						    "ephemeral",
 						    strlen("ephemeral"),
 						    "memtx", strlen("memtx"),
-						    &opts, fields, field_count);
+						    &opts, fields, field_count,
+						    NULL, 0);
 	return space_def;
 }
 
@@ -191,6 +211,7 @@ space_def_delete(struct space_def *def)
 	free(def->opts.sql);
 	free(def->opts.constraint_def);
 	space_upgrade_def_delete(def->opts.upgrade_def);
+	free(def->format_data);
 	TRASH(def);
 	free(def);
 }

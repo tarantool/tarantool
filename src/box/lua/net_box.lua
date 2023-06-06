@@ -948,7 +948,10 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
         s.temporary = false
         s.is_sync = false
         s._format = format
-        s._format_cdata = box.internal.tuple_format.new(format)
+        -- We pass `names_only=true` because format clauses received from IPROTO
+        -- can be incompatible with, for instance, the data types known on the
+        -- client.
+        s._format_cdata = box.internal.tuple_format.new(format, true)
         s.connection = self
         if #space > 5 then
             local opts = space[6]
