@@ -4,6 +4,7 @@
 -- itself (affects work of the schema methods):
 --
 -- * allowed_values
+-- * validate
 --
 -- Others are just stored.
 
@@ -63,6 +64,17 @@ end
 local function walkthrough_error(ctx, message, ...)
     local error_prefix = walkthrough_error_prefix(ctx)
     error(('%s%s'):format(error_prefix, message:format(...)), 0)
+end
+
+-- Return a function that raises an error with a prefix formed
+-- from the given context.
+--
+-- The context information is gathered before the capturing.
+local function walkthrough_error_capture(ctx)
+    local error_prefix = walkthrough_error_prefix(ctx)
+    return function(message, ...)
+        error(('%s%s'):format(error_prefix, message:format(...)), 0)
+    end
 end
 
 -- Verify that the data is a table and, if it is not so, produce a
@@ -346,6 +358,25 @@ local function validate_by_allowed_values(schema, data, ctx)
     end
 end
 
+-- Call schema node specific validation function.
+local function validate_by_node_function(schema, data, ctx)
+    if schema.validate == nil then
+        return
+    end
+
+    assert(type(schema.validate) == 'function')
+    local w = {
+        schema = schema,
+        -- ctx.path is modified during the traversal, so an
+        -- attempt to store it and use later would give
+        -- an unexpected result. Let's copy it to avoid the
+        -- confusion.
+        path = table.copy(ctx.path),
+        error = walkthrough_error_capture(ctx),
+    }
+    schema.validate(data, w)
+end
+
 local function validate_impl(schema, data, ctx)
     if is_scalar(schema) then
         local scalar_def = scalars[schema.type]
@@ -399,6 +430,12 @@ local function validate_impl(schema, data, ctx)
     end
 
     validate_by_allowed_values(schema, data, ctx)
+
+    -- Call schema node specific validation function.
+    --
+    -- Important: it is called when all the type validation is
+    -- already done, including nested nodes.
+    validate_by_node_function(schema, data, ctx)
 end
 
 -- Validate the given data against the given schema.
@@ -416,6 +453,15 @@ end
 -- Annotations taken into accounts:
 --
 -- * allowed_values (table) -- whitelist of values
+-- * validate (function) -- schema node specific validator
+--
+--   validate = function(data, w)
+--       -- w.schema -- current schema node
+--       -- w.path -- path to the node
+--       -- w.error -- function that prepends a caller provided
+--       --            error message with context information;
+--       --            use it for nice error messages
+--   end
 function methods.validate(self, data)
     local ctx = walkthrough_start(self)
     validate_impl(rawget(self, 'schema'), data, ctx)

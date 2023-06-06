@@ -551,4 +551,58 @@ g.test_validate_by_allowed_values = function()
     assert_validate_scalar_type_mismatch(s, 1, 'string')
 end
 
+g.test_validate_by_node_function = function()
+    local schema_saved
+    local path_saved
+    local error_saved
+
+    local scalar = schema.scalar({
+        type = 'integer',
+        validate = function(data, w)
+            schema_saved = w.schema
+            path_saved = w.path
+            error_saved = w.error
+            if data < 0 then
+                w.error('The value should be positive, got %d', data)
+            end
+        end,
+    })
+
+    local s = schema.new('positive', schema.record({
+        foo = schema.record({
+            bar = scalar,
+        }),
+    }))
+
+    -- Good case.
+    s:validate({foo = {bar = 1}})
+
+    -- Verify that the schema node is the one that contains the
+    -- `validate` annotation.
+    t.assert_equals(schema_saved, scalar)
+
+    -- Verify that the path is not changed during the traversal
+    -- and still points to the given schema node.
+    t.assert_equals(path_saved, {'foo', 'bar'})
+
+    -- Verify that the error function works just like before even
+    -- after the traversal. The main point here is that the
+    -- foo.bar path is present in the message.
+    local exp_err_msg = '[positive] foo.bar: call after the traversal'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        error_saved('call after the %s', 'traversal')
+    end)
+
+    -- Bad case.
+    assert_validate_error(s, {foo = {bar = -1}},
+        '[positive] foo.bar: The value should be positive, got -1')
+
+    -- Verify that a type validation occurs before the schema node
+    -- function call.
+    assert_validate_error(s, {foo = {bar = false}}, table.concat({
+        '[positive] foo.bar: Unexpected data for scalar "integer"',
+        'Expected "number", got "boolean"',
+    }, ': '))
+end
+
 -- }}} <schema object>:validate()
