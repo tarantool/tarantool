@@ -213,11 +213,13 @@ action_is_nullable(enum on_conflict_action nullable_action)
  * @param[out] fields Array of fields.
  * @param[out] field_count Length of a result array.
  * @param region Region to allocate result array.
+ * @param names_only Only decode 'name' options, ignore the rest.
  * @retval Error code.
  */
 int
 field_def_array_decode(const char **data, struct field_def **fields,
-		       uint32_t *field_count, struct region *region);
+		       uint32_t *field_count, struct region *region,
+		       bool names_only);
 
 /**
  * Duplicates array of fields using malloc. Never fails.

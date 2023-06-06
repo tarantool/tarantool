@@ -298,6 +298,13 @@ struct tuple_format {
 	struct tuple_constraint *constraint;
 	/** Number of constraints. */
 	uint32_t constraint_count;
+	/**
+	 * Encoding of original (i.e., user-provided) format clause to MsgPack,
+	 * allocated via malloc.
+	 */
+	char *data;
+	/** Length of MsgPack encoding. */
+	size_t data_len;
 };
 
 /**
@@ -391,6 +398,8 @@ tuple_format_unref(struct tuple_format *format)
  * @param is_reusable Set if format may be reused.
  * @param constraint_def - Array of constraint definitions.
  * @param constraint_count - Number of constraints above.
+ * @param format_data Original format clause encoded to Msgpack (may be NULL).
+ * @param format_data_len Length of MsgPack encoded format clause (may be 0).
  *
  * @retval not NULL Tuple format.
  * @retval     NULL Memory error.
@@ -402,7 +411,8 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		 uint32_t space_field_count, uint32_t exact_field_count,
 		 struct tuple_dictionary *dict, bool is_temporary,
 		 bool is_reusable, struct tuple_constraint_def *constraint_def,
-		 uint32_t constraint_count);
+		 uint32_t constraint_count, const char *format_data,
+		 size_t format_data_len);
 
 /**
  * Check, if tuple @a format is compatible with @a key_def.
@@ -422,7 +432,8 @@ simple_tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 			struct key_def * const *keys, uint16_t key_count)
 {
 	return tuple_format_new(vtab, engine, keys, key_count,
-				NULL, 0, 0, NULL, false, false, NULL, 0);
+				NULL, 0, 0, NULL, false, false, NULL, 0, NULL,
+				0);
 }
 
 /**

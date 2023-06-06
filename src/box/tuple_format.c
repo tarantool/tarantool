@@ -776,6 +776,7 @@ tuple_format_destroy(struct tuple_format *format)
 	tuple_format_destroy_fields(format);
 	tuple_dictionary_unref(format->dict);
 	free(format->constraint);
+	free(format->data);
 }
 
 /**
@@ -838,7 +839,8 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		 uint32_t space_field_count, uint32_t exact_field_count,
 		 struct tuple_dictionary *dict, bool is_temporary,
 		 bool is_reusable, struct tuple_constraint_def *constraint_def,
-		 uint32_t constraint_count)
+		 uint32_t constraint_count, const char *format_data,
+		 size_t format_data_len)
 {
 	struct tuple_format *format =
 		tuple_format_alloc(keys, key_count, space_field_count, dict);
@@ -855,6 +857,14 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 	format->is_compressed = false;
 	format->exact_field_count = exact_field_count;
 	format->epoch = ++formats_epoch;
+	if (format_data != NULL) {
+		format->data = xmalloc(format_data_len);
+		memcpy(format->data, format_data, format_data_len);
+		format->data_len = format_data_len;
+	} else {
+		format->data = NULL;
+		format->data_len = 0;
+	}
 	if (tuple_format_create(format, keys, key_count, space_fields,
 				space_field_count,
 				constraint_def, constraint_count) < 0)

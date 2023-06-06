@@ -130,6 +130,13 @@ struct space_def {
 	/** Number of SQL views which refer to this space. */
 	uint32_t view_ref_count;
 	struct space_opts opts;
+	/**
+	 * Encoding of original (i.e., user-provided) format clause to MsgPack,
+	 * allocated via malloc.
+	 */
+	char *format_data;
+	/** Length of MsgPack encoded format clause. */
+	size_t format_data_len;
 	char name[0];
 };
 
@@ -171,7 +178,8 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	      const char *name, uint32_t name_len,
 	      const char *engine_name, uint32_t engine_len,
 	      const struct space_opts *opts, const struct field_def *fields,
-	      uint32_t field_count);
+	      uint32_t field_count, const char *format_data,
+	      size_t format_data_len);
 
 /**
  * Create a new ephemeral space definition.
@@ -209,11 +217,13 @@ space_def_new_xc(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 		 const char *name, uint32_t name_len,
 		 const char *engine_name, uint32_t engine_len,
 		 const struct space_opts *opts, const struct field_def *fields,
-		 uint32_t field_count)
+		 uint32_t field_count, const char *format_data,
+		 size_t format_data_len)
 {
 	struct space_def *ret = space_def_new(id, uid, exact_field_count, name,
 					      name_len, engine_name, engine_len,
-					      opts, fields, field_count);
+					      opts, fields, field_count,
+					      format_data, format_data_len);
 	if (ret == NULL)
 		diag_raise();
 	return ret;
