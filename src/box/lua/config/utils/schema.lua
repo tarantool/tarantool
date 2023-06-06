@@ -469,6 +469,150 @@ end
 
 -- }}} <schema object>:validate()
 
+-- {{{ :get()/:set() helpers
+
+-- The path can be passed as a string in the dot notation or as a
+-- table representing an array of components. This function
+-- converts the path into the array if necessary.
+local function normalize_path(path, error_f)
+    if type(path) ~= 'string' and type(path) ~= 'table' then
+        return error_f()
+    end
+
+    -- Dot notation/JSON path alike.
+    --
+    -- TODO: Support numeric indexing: 'foo[1]' and `{'foo', 1}`.
+    if type(path) == 'string' then
+        -- NB: string.split('') returns {''}.
+        if path == '' then
+            path = {}
+        else
+            path = path:split('.')
+        end
+    end
+
+    return path
+end
+
+-- }}} :get()/:set() helpers
+
+-- {{{ <schema object>:get()
+
+local function get_usage()
+    error('Usage: schema:get(data: <as defined by the schema>, ' ..
+        'path: nil/string/table)', 0)
+end
+
+local function get_impl(schema, data, ctx)
+    -- The journey is finished. Return what is under the feet.
+    if #ctx.journey == 0 then
+        return data
+    end
+
+    -- There are more steps in the journey (at least one).
+    -- Let's dive deeper and process it per schema node type.
+
+    local requested_field = ctx.journey[1]
+    assert(requested_field ~= nil)
+
+    if is_scalar(schema) then
+        walkthrough_error(ctx, 'Attempt to index a scalar value of type %s ' ..
+            'by field %q', schema.type, requested_field)
+    elseif schema.type == 'record' then
+        walkthrough_enter(ctx, requested_field)
+        local field_def = schema.fields[requested_field]
+        if field_def == nil then
+            walkthrough_error(ctx, 'No such field in the schema')
+        end
+
+        -- Even if there is no such field in the data, continue
+        -- the descending to validate the path against the schema.
+        local field_value
+        if data ~= nil then
+            field_value = data[requested_field]
+        end
+
+        table.remove(ctx.journey, 1)
+        return get_impl(field_def, field_value, ctx)
+    elseif schema.type == 'map' then
+        walkthrough_enter(ctx, requested_field)
+        local field_def = schema.value
+
+        -- Even if there is no such field in the data, continue
+        -- the descending to validate the path against the schema.
+        local field_value
+        if data ~= nil then
+            field_value = data[requested_field]
+        end
+
+        table.remove(ctx.journey, 1)
+        return get_impl(field_def, field_value, ctx)
+    elseif schema.type == 'array' then
+        -- TODO: Support 'foo[1]' and `{'foo', 1}` paths. See the
+        -- normalize_path() function.
+        walkthrough_error(ctx, 'Indexing an array is not supported yet')
+    else
+        assert(false)
+    end
+end
+
+-- Get nested data that is pointed by the given path.
+--
+-- Important: the data is assumed as already validated against
+-- the given schema.
+--
+-- The indexing is performed in the optional chaining manner
+-- ('foo.bar' works like foo?.bar in TypeScript).
+--
+-- The function checks the path against the schema: it doesn't
+-- allow to use a non-existing field or index a scalar value.
+--
+-- The path is either array-like table or a string in the dot
+-- notation.
+--
+-- local data = {foo = {bar = 'x'}}
+-- schema:get(data, 'foo.bar') -> 'x'
+-- schema:get(data, {'foo', 'bar'}) -> 'x'
+--
+-- local data = {}
+-- schema:get(data, 'foo.bar') -> nil
+--
+-- Nuances:
+--
+-- * Array indexing is not supported yet.
+-- * A scalar of the 'any' type can't be indexed, even when it is
+--   a table. It is OK to acquire the whole value of the 'any'
+--   type.
+function methods.get(self, data, path)
+    local schema = rawget(self, 'schema')
+
+    -- It is easy to forget about the `data` argument or misorder
+    -- the `data` and the `path` arguments. Let's add a fast check
+    -- for the most common scenario: a record schema and a string
+    -- path.
+    if schema.type == 'record' and type(data) ~= 'table' then
+        return get_usage()
+    end
+
+    if path ~= nil then
+        path = normalize_path(path, get_usage)
+    end
+
+    if path == nil or next(path) == nil then
+        return data
+    end
+
+    local ctx = walkthrough_start(self, {
+        -- The `path` field is already in the context and it means
+        -- the passed path. Let's name the remaining path as
+        -- `journey`.
+        journey = path,
+    })
+    return get_impl(schema, data, ctx)
+end
+
+-- }}} <schema object>:get()
+
 -- {{{ Schema object constructor: new
 
 -- Define a field lookup function on a schema object.

@@ -606,3 +606,238 @@ g.test_validate_by_node_function = function()
 end
 
 -- }}} <schema object>:validate()
+
+-- {{{ <schema object>:get()
+
+-- A schema with the record on the top level.
+g.test_get_no_path_record = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    -- nil, '' and {} mean the root node.
+    local data = {foo = {bar = 'baz'}}
+    t.assert_equals(s:get(data), data)
+    t.assert_equals(s:get(data, ''), data)
+    t.assert_equals(s:get(data, {}), data)
+end
+
+-- Same for a map.
+g.test_get_no_path_map = function()
+    local s = schema.new('myschema', schema.map({
+        key = schema.scalar({type = 'string'}),
+        value = schema.scalar({type = 'string'}),
+    }))
+
+    -- nil, '' and {} mean the root node.
+    local data = {foo = 'baz'}
+    t.assert_equals(s:get(data), data)
+    t.assert_equals(s:get(data, ''), data)
+    t.assert_equals(s:get(data, {}), data)
+end
+
+-- Same for an array.
+g.test_get_no_path_array = function()
+    local s = schema.new('myschema', schema.array({
+        items = schema.scalar({type = 'string'}),
+    }))
+
+    -- nil, '' and {} mean the root node.
+    local data = {'foo', 'bar', 'baz'}
+    t.assert_equals(s:get(data), data)
+    t.assert_equals(s:get(data, ''), data)
+    t.assert_equals(s:get(data, {}), data)
+end
+
+-- Scalar on the top level.
+--
+-- This is a kind of a corner case and, it seems, there is no
+-- much sense in calling :get() on a scalar schema.
+--
+-- OTOH, there is no reason to forbid this case and reduce the
+-- applicability of the method.
+g.test_get_no_path_scalar = function()
+    local s = schema.new('myschema', schema.scalar({type = 'string'}))
+
+    local data = 'mydata'
+    t.assert_equals(s:get(data), data)
+    t.assert_equals(s:get(data, ''), data)
+    t.assert_equals(s:get(data, {}), data)
+end
+
+-- Quite same, but for a scalar of the any type.
+g.test_get_no_path_scalar_any = function()
+    local s = schema.new('myschema', schema.scalar({type = 'any'}))
+
+    local data = {foo = {bar = 'baz'}}
+    t.assert_equals(s:get(data), data)
+    t.assert_equals(s:get(data, ''), data)
+    t.assert_equals(s:get(data, {}), data)
+end
+
+-- Index a record.
+g.test_get_nested_in_record = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    -- Existing data.
+    local data = {foo = {bar = 'baz'}}
+    t.assert_equals(s:get(data, 'foo'), {bar = 'baz'})
+    t.assert_equals(s:get(data, 'foo.bar'), 'baz')
+
+    -- Non-existing data. Verify that :get() works in the optional
+    -- chaining way.
+    local data = {}
+    t.assert_equals(s:get(data, 'foo'), nil)
+    t.assert_equals(s:get(data, 'foo.bar'), nil)
+end
+
+-- Verify that there are no problems with composite data in a
+-- scalar of the any type.
+g.test_get_nested_any_in_record = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'any'}),
+        }),
+    }))
+
+    local scalar_data = {baz = {fiz = 'mydata'}}
+    local data = {foo = {bar = scalar_data}}
+    t.assert_equals(s:get(data, 'foo'), {bar = scalar_data})
+    t.assert_equals(s:get(data, 'foo.bar'), scalar_data)
+end
+
+-- Index a map.
+g.test_get_nested_in_map = function()
+    local s = schema.new('myschema', schema.map({
+        key = schema.scalar({type = 'string'}),
+        value = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    -- Existing data.
+    local data = {foo = {bar = 'baz'}}
+    t.assert_equals(s:get(data, 'foo'), {bar = 'baz'})
+    t.assert_equals(s:get(data, 'foo.bar'), 'baz')
+
+    -- The same using array-like table paths.
+    local data = {foo = {bar = 'baz'}}
+    t.assert_equals(s:get(data, {'foo'}), {bar = 'baz'})
+    t.assert_equals(s:get(data, {'foo', 'bar'}), 'baz')
+
+    -- Non-existing data. Verify that :get() works in the optional
+    -- chaining way.
+    local data = {}
+    t.assert_equals(s:get(data, 'foo'), nil)
+    t.assert_equals(s:get(data, 'foo.bar'), nil)
+
+    -- The same using array-like table paths.
+    local data = {}
+    t.assert_equals(s:get(data, {'foo'}), nil)
+    t.assert_equals(s:get(data, {'foo', 'bar'}), nil)
+end
+
+-- Trigger improper API usage errors.
+g.test_get_usage = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    local exp_err_msg = 'Usage: schema:get(data: <as defined by the ' ..
+        'schema>, path: nil/string/table)'
+
+    -- A top level record `data` can't be nil.
+    --
+    -- This case looks like a mistake, so the usage error is
+    -- raised.
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:get()
+    end)
+
+    -- A top level record `data` can't be a string.
+    --
+    -- This case looks like the `data` argument is forgotten, so
+    -- the usage error is raised.
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:get('foo')
+    end)
+
+    -- A top level record `data` can't be a string.
+    --
+    -- This case looks like the `data` and the `path` arguments
+    -- are misordered, so the usage error is raised.
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:get('foo.bar', {foo = {bar = 'baz'}})
+    end)
+
+    -- The `path` is not a table and not a string.
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:get({foo = {bar = 'baz'}}, 5)
+    end)
+end
+
+-- Attempt to get an unknown record's field.
+--
+-- The path is verified against the schema. It is impossible to
+-- get a field that doesn't exist in the record.
+g.test_get_unknown_record_field = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    local exp_err_msg = '[myschema] unknown: No such field in the schema'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:get({}, 'unknown')
+    end)
+
+    local exp_err_msg = '[myschema] foo.unknown: No such field in the schema'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:get({}, 'foo.unknown')
+    end)
+end
+
+-- Attempt to index an array.
+g.test_get_index_array = function()
+    local s = schema.new('myschema', schema.array({
+        items = schema.scalar({type = 'string'}),
+    }))
+
+    local exp_err_msg = '[myschema] Indexing an array is not supported yet'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:get({}, '[1]')
+    end)
+end
+
+-- Attempt to index a scalar value.
+g.test_get_index_scalar = function()
+    -- Indexing a scalar is forbidden.
+    local s = schema.new('myschema', schema.scalar({type = 'string'}))
+    local exp_err_msg = '[myschema] Attempt to index a scalar value of type ' ..
+        'string by field "foo"'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = 5
+        s:get(data, 'foo')
+    end)
+
+    -- The scalar of the 'any' type is the same in this regard.
+    local s = schema.new('myschema', schema.scalar({type = 'any'}))
+    local exp_err_msg = '[myschema] Attempt to index a scalar value of type ' ..
+        'any by field "foo"'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = {foo = {bar = 'baz'}}
+        s:get(data, 'foo')
+    end)
+end
+
+-- }}} <schema object>:get()
