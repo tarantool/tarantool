@@ -210,9 +210,9 @@ Invalid MsgPack - request body
 # Invalid auth_type
 Invalid MsgPack - request body
 # Empty request body
-version=5, features=[0, 1, 2, 3, 4, 5], auth_type=chap-sha1
+version=6, features=[0, 1, 2, 3, 4, 5, 6], auth_type=chap-sha1
 # Unknown version and features
-version=5, features=[0, 1, 2, 3, 4, 5], auth_type=chap-sha1
+version=6, features=[0, 1, 2, 3, 4, 5, 6], auth_type=chap-sha1
 
 #
 # gh-6257 Watchers
@@ -260,6 +260,40 @@ box.broadcast('foo', nil)
 box.broadcast('bar', nil)
 ---
 ...
+
+#
+# gh-6493 IPROTO_WATCH_ONCE
+#
+
+# Schema version
+sync=1001
+Error on invalid schema_id: True
+Got schema_id: True
+sync=1002
+Success on valid schema_id: True
+Same schema_id: True
+# Streaming unsupported
+sync=1003, error: Unable to process WATCH_ONCE request in stream
+# Invalid key
+sync=1004, error: Missing mandatory field 'EVENT_KEY' in request
+sync=1005, error: Invalid MsgPack - packet body
+# Missing key
+sync=1006, ok
+Data: []
+ Existing key
+box.broadcast('foo', {1, 2, 3})
+---
+...
+sync=1007, ok
+Data: [[1, 2, 3]]
+box.broadcast('foo', nil)
+---
+...
+
+#
+# gh-7639 Pagination
+#
+
 space = box.schema.space.create('test', { id = 567 })
 ---
 ...

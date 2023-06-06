@@ -15,6 +15,8 @@ from tarantool.error import DatabaseError
 # FIXME: Remove after the new constants are added to the Python connector.
 if not 'REQUEST_TYPE_ID' in locals():
     REQUEST_TYPE_ID = 73
+    IPROTO_SCHEMA_VERSION = 0x05
+    IPROTO_STREAM_ID = 0x0a
     IPROTO_VERSION = 0x54
     IPROTO_FEATURES = 0x55
     IPROTO_AUTH_TYPE = 0x5b
@@ -23,6 +25,7 @@ if not 'REQUEST_TYPE_WATCH' in locals():
     REQUEST_TYPE_WATCH = 74
     REQUEST_TYPE_UNWATCH = 75
     REQUEST_TYPE_EVENT = 76
+    REQUEST_TYPE_WATCH_ONCE = 77
     IPROTO_EVENT_KEY = 0x57
     IPROTO_EVENT_DATA = 0x58
 
@@ -301,30 +304,34 @@ body = { IPROTO_SPACE_ID: space_id,
     IPROTO_LIMIT: 1 }
 resp = test_request(header, body)
 print("Normal connect done w/o errors:", resp["header"][0] == 0)
-print("Got schema_id:", resp["header"][5] > 0)
-schema_id = resp["header"][5]
+print("Got schema_id:", resp["header"][IPROTO_SCHEMA_VERSION] > 0)
+schema_id = resp["header"][IPROTO_SCHEMA_VERSION]
 
-header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : 0 }
+header = { IPROTO_CODE : REQUEST_TYPE_SELECT, IPROTO_SCHEMA_VERSION : 0 }
 resp = test_request(header, body)
 print("Zero-schema_id connect done w/o errors:", resp["header"][0] == 0)
-print("Same schema_id:", resp["header"][5] == schema_id)
+print("Same schema_id:", resp["header"][IPROTO_SCHEMA_VERSION] == schema_id)
 
-header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id }
+header = { IPROTO_CODE : REQUEST_TYPE_SELECT,
+           IPROTO_SCHEMA_VERSION : schema_id }
 resp = test_request(header, body)
 print("Normal connect done w/o errors:", resp["header"][0] == 0)
-print("Same schema_id:", resp["header"][5] == schema_id)
+print("Same schema_id:", resp["header"][IPROTO_SCHEMA_VERSION] == schema_id)
 
-header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id + 1 }
+header = { IPROTO_CODE : REQUEST_TYPE_SELECT,
+           IPROTO_SCHEMA_VERSION : schema_id + 1 }
 resp = test_request(header, body)
 print("Wrong schema_id leads to error:", resp["header"][0] != 0)
-print("Same schema_id:", resp["header"][5] == schema_id)
+print("Same schema_id:", resp["header"][IPROTO_SCHEMA_VERSION] == schema_id)
 
 admin("space2 = box.schema.create_space('test2')")
 
-header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id }
+header = { IPROTO_CODE : REQUEST_TYPE_SELECT,
+           IPROTO_SCHEMA_VERSION : schema_id }
 resp = test_request(header, body)
 print("Schema changed -> error:", resp["header"][0] != 0)
-print("Got another schema_id:", resp["header"][5] != schema_id)
+print("Got another schema_id:",
+      resp["header"][IPROTO_SCHEMA_VERSION] != schema_id)
 
 #
 # gh-2334 Lost SYNC in JOIN response.
@@ -592,7 +599,80 @@ c.close()
 admin("box.broadcast('foo', nil)")
 admin("box.broadcast('bar', nil)")
 
-# Pagination
+print("""
+#
+# gh-6493 IPROTO_WATCH_ONCE
+#
+""")
+c = Connection(None, server.iproto.port)
+c.connect()
+s = c._socket
+sync = 1000
+
+print("# Schema version")
+sync += 1
+header = { IPROTO_CODE: REQUEST_TYPE_WATCH_ONCE, IPROTO_SYNC: sync,
+           IPROTO_SCHEMA_VERSION: 9999 }
+body = { IPROTO_EVENT_KEY: 'foo' }
+resp = test_request(header, body)
+print("sync={}".format(resp["header"][IPROTO_SYNC]))
+print("Error on invalid schema_id:", resp["header"][IPROTO_CODE] != 0)
+schema_id = resp["header"][IPROTO_SCHEMA_VERSION]
+print("Got schema_id:", schema_id > 0)
+sync += 1
+header[IPROTO_SYNC] = sync
+header[IPROTO_SCHEMA_VERSION] = schema_id
+resp = test_request(header, body)
+print("sync={}".format(resp["header"][IPROTO_SYNC]))
+print("Success on valid schema_id:", resp["header"][IPROTO_CODE] == 0)
+print("Same schema_id:", resp["header"][IPROTO_SCHEMA_VERSION] == schema_id)
+
+print("# Streaming unsupported")
+sync += 1
+header = { IPROTO_CODE: REQUEST_TYPE_WATCH_ONCE, IPROTO_SYNC: sync,
+           IPROTO_STREAM_ID: 555 }
+body = { IPROTO_EVENT_KEY: 'foo' }
+resp = test_request(header, body)
+print("sync={}, {}".format(resp["header"][IPROTO_SYNC], resp_status(resp)))
+
+print("# Invalid key")
+sync += 1
+header = { IPROTO_CODE: REQUEST_TYPE_WATCH_ONCE, IPROTO_SYNC: sync }
+body = {}
+resp = test_request(header, body)
+print("sync={}, {}".format(resp["header"][IPROTO_SYNC], resp_status(resp)))
+sync += 1
+header[IPROTO_SYNC] = sync
+body[IPROTO_EVENT_KEY] = 123
+resp = test_request(header, body)
+print("sync={}, {}".format(resp["header"][IPROTO_SYNC], resp_status(resp)))
+
+print("# Missing key")
+sync += 1
+header = { IPROTO_CODE: REQUEST_TYPE_WATCH_ONCE, IPROTO_SYNC: sync }
+body = { IPROTO_EVENT_KEY: 'foo' }
+resp = test_request(header, body)
+print("sync={}, {}".format(resp["header"][IPROTO_SYNC], resp_status(resp)))
+print("Data:", resp["body"][IPROTO_DATA])
+
+print(" Existing key")
+admin("box.broadcast('foo', {1, 2, 3})")
+sync += 1
+header = { IPROTO_CODE: REQUEST_TYPE_WATCH_ONCE, IPROTO_SYNC: sync }
+body = { IPROTO_EVENT_KEY: 'foo' }
+resp = test_request(header, body)
+print("sync={}, {}".format(resp["header"][IPROTO_SYNC], resp_status(resp)))
+print("Data:", resp["body"][IPROTO_DATA])
+admin("box.broadcast('foo', nil)")
+
+# Cleanup
+c.close()
+
+print("""
+#
+# gh-7639 Pagination
+#
+""")
 admin("space = box.schema.space.create('test', { id = 567 })")
 admin("index = space:create_index('primary', { type = 'tree' })")
 admin("box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')")

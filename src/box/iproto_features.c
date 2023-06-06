@@ -77,4 +77,6 @@ iproto_features_init(void)
 			    IPROTO_FEATURE_PAGINATION);
 	iproto_features_set(&IPROTO_CURRENT_FEATURES,
 			    IPROTO_FEATURE_SPACE_AND_INDEX_NAMES);
+	iproto_features_set(&IPROTO_CURRENT_FEATURES,
+			    IPROTO_FEATURE_WATCH_ONCE);
 }
