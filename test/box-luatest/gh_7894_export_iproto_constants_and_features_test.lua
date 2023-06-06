@@ -146,6 +146,7 @@ local reference_table = {
         WATCH = 74,
         UNWATCH = 75,
         EVENT = 76,
+        WATCH_ONCE = 77,
         CHUNK = 128,
         TYPE_ERROR = bit.lshift(1, 15),
         UNKNOWN = -1,
@@ -162,7 +163,7 @@ local reference_table = {
     },
 
     -- `IPROTO_CURRENT_VERSION` constant
-    protocol_version = 5,
+    protocol_version = 6,
 
     -- `feature_id` enumeration
     protocol_features = {
@@ -172,6 +173,7 @@ local reference_table = {
         watchers = true,
         pagination = true,
         space_and_index_names = true,
+        watch_once = true,
     },
     feature = {
         streams = 0,
@@ -180,6 +182,7 @@ local reference_table = {
         watchers = 3,
         pagination = 4,
         space_and_index_names = 5,
+        watch_once = 6,
     },
 }
 

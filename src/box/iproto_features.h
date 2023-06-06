@@ -57,6 +57,8 @@ extern "C" {
 	 * IPROTO_UPDATE and IPROTO_UPSERT request body.
 	 */								\
 	_(SPACE_AND_INDEX_NAMES,  5)					\
+	/** IPROTO_WATCH_ONCE request support. */			\
+	_(WATCH_ONCE,  6)						\
 
 #define IPROTO_FEATURE_MEMBER(s, v) IPROTO_FEATURE_ ## s = v,
 
@@ -81,7 +83,7 @@ struct iproto_features {
  * `box.iproto.protocol_version` needs to be updated correspondingly.
  */
 enum {
-	IPROTO_CURRENT_VERSION = 5,
+	IPROTO_CURRENT_VERSION = 6,
 };
 
 /**

@@ -72,6 +72,7 @@
 #include "on_shutdown.h"
 #include "flightrec.h"
 #include "security.h"
+#include "watcher.h"
 
 enum {
 	IPROTO_SALT_SIZE = 32,
@@ -1696,6 +1697,7 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 		return 0;
 	case IPROTO_WATCH:
 	case IPROTO_UNWATCH:
+	case IPROTO_WATCH_ONCE:
 		*route = iproto_thread->misc_route;
 		ERROR_INJECT(ERRINJ_IPROTO_DISABLE_WATCH, {
 			*route = NULL;
@@ -2457,6 +2459,18 @@ tx_process_misc(struct cmsg *m)
 					msg->watch.key_len);
 			/* Sic: no reply. */
 			break;
+		case IPROTO_WATCH_ONCE: {
+			const char *data, *data_end;
+			data = box_watch_once(msg->watch.key,
+					      msg->watch.key_len, &data_end);
+			if (iproto_prepare_select(out, &header) != 0)
+				diag_raise();
+			obuf_dup_xc(out, data, data_end - data);
+			iproto_reply_select(out, &header, msg->header.sync,
+					    ::schema_version,
+					    data != NULL ? 1 : 0);
+			break;
+		}
 		default:
 			unreachable();
 		}

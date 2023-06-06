@@ -372,6 +372,11 @@ iproto_key_bit(unsigned char key)
 	_(WATCH, 74)							\
 	_(UNWATCH, 75)							\
 	_(EVENT, 76)							\
+	/**
+	 * Synchronous request to fetch the data that is currently attached to
+	 * a notification key without subscribing to changes.
+	 */								\
+	_(WATCH_ONCE, 77)						\
 									\
 	/**
 	 * The following three requests are reserved for vinyl types.
