@@ -86,10 +86,10 @@ runs:
         git clean -xffd
         git submodule foreach --recursive 'git clean -xffd'
 
-        # A temporary workaround that should be removed after the corresponding
-        # issue is fixed. See for details:
-        #   https://github.com/tarantool/tarantool/issues/7472.
-        if ${{ runner.os == 'Linux' && github.workflow == 'coverage' }}; then
+        # See for details: https://github.com/tarantool/tarantool/issues/7472.
+        # Do nothing on GitHub-hosted runners.
+        if ${{ runner.os == 'Linux' &&
+               !contains(runner.name, 'GitHub Actions') }}; then
             LUAJIT_TEST_VARDIR=/tmp/luajit-test-vardir
             LUAJIT_TEST_VARDIR_DISK=/tmp/luajit-test-vardir-disk/disk.ext4
 
