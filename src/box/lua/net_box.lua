@@ -27,30 +27,6 @@ local TIMEOUT_INFINITY = 500 * 365 * 86400
 local E_NO_CONNECTION        = box.error.NO_CONNECTION
 local E_PROC_LUA             = box.error.PROC_LUA
 
--- Method types used internally by net.box.
-local M_PING        = 0
-local M_CALL        = 1
-local M_EVAL        = 2
-local M_INSERT      = 3
-local M_REPLACE     = 4
-local M_DELETE      = 5
-local M_UPDATE      = 6
-local M_UPSERT      = 7
-local M_SELECT      = 8
-local M_EXECUTE     = 9
-local M_PREPARE     = 10
-local M_UNPREPARE   = 11
-local M_GET         = 12
-local M_MIN         = 13
-local M_MAX         = 14
-local M_COUNT       = 15
-local M_BEGIN       = 16
-local M_COMMIT      = 17
-local M_ROLLBACK    = 18
-local M_SELECT_FETCH_POS  = 19
--- Injects raw data into connection. Used by tests.
-local M_INJECT      = 20
-
 local REQUEST_OPTION_TYPES = {
     is_async    = "boolean",
     iterator    = "string",
@@ -569,7 +545,7 @@ local function stream_begin(stream, txn_opts, netbox_opts)
                 box.internal.normalize_txn_isolation_level(txn_isolation)
         end
     end
-    local res = stream:_request(M_BEGIN, netbox_opts, nil,
+    local res = stream:_request('BEGIN', netbox_opts, nil,
                                 stream._stream_id, timeout, txn_isolation)
     if netbox_opts and netbox_opts.is_async then
         return res
@@ -579,7 +555,7 @@ end
 local function stream_commit(stream, opts)
     check_remote_arg(stream, 'commit')
     check_param_table(opts, REQUEST_OPTION_TYPES)
-    local res = stream:_request(M_COMMIT, opts, nil, stream._stream_id)
+    local res = stream:_request('COMMIT', opts, nil, stream._stream_id)
     if opts and opts.is_async then
         return res
     end
@@ -588,7 +564,7 @@ end
 local function stream_rollback(stream, opts)
     check_remote_arg(stream, 'rollback')
     check_param_table(opts, REQUEST_OPTION_TYPES)
-    local res = stream:_request(M_ROLLBACK, opts, nil, stream._stream_id)
+    local res = stream:_request('ROLLBACK', opts, nil, stream._stream_id)
     if opts and opts.is_async then
         return res
     end
@@ -799,6 +775,8 @@ end
 -- issues.
 --
 function remote_methods:_request_impl(method, opts, format, stream_id, ...)
+    method = internal.method[method]
+    assert(method ~= nil)
     local transport = self._transport
     local on_push, on_push_ctx, buffer, skip_header, return_raw, deadline
     -- Extract options, set defaults, check if the request is
@@ -856,7 +834,7 @@ end
 
 function remote_methods:_inject(str, opts)
     check_param_table(opts, REQUEST_OPTION_TYPES)
-    return self:_request(M_INJECT, opts, nil, nil, str)
+    return self:_request('INJECT', opts, nil, nil, str)
 end
 
 function remote_methods:_next_sync()
@@ -869,7 +847,7 @@ function remote_methods:ping(opts)
     if opts and opts.is_async then
         error("conn:ping() doesn't support `is_async` argument")
     end
-    local _, err = self:_request_impl(M_PING, opts, nil, self._stream_id)
+    local _, err = self:_request_impl('PING', opts, nil, self._stream_id)
     return err == nil
 end
 
@@ -883,7 +861,7 @@ function remote_methods:call(func_name, args, opts)
     check_call_args(args)
     check_param_table(opts, REQUEST_OPTION_TYPES)
     args = args or {}
-    local res = self:_request(M_CALL, opts, nil, self._stream_id,
+    local res = self:_request('CALL', opts, nil, self._stream_id,
                               tostring(func_name), args)
     if type(res) ~= 'table' or opts and opts.is_async then
         return res
@@ -896,7 +874,7 @@ function remote_methods:eval(code, args, opts)
     check_eval_args(args)
     check_param_table(opts, REQUEST_OPTION_TYPES)
     args = args or {}
-    local res = self:_request(M_EVAL, opts, nil, self._stream_id, code, args)
+    local res = self:_request('EVAL', opts, nil, self._stream_id, code, args)
     if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
@@ -909,7 +887,7 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
         box.error(box.error.UNSUPPORTED, "execute", "options")
     end
     check_param_table(netbox_opts, REQUEST_OPTION_TYPES)
-    return self:_request(M_EXECUTE, netbox_opts, nil, self._stream_id,
+    return self:_request('EXECUTE', netbox_opts, nil, self._stream_id,
                          query, parameters or {}, sql_opts or {})
 end
 
@@ -922,7 +900,7 @@ function remote_methods:prepare(query, parameters, sql_opts, netbox_opts) -- lua
         box.error(box.error.UNSUPPORTED, "prepare", "options")
     end
     check_param_table(netbox_opts, REQUEST_OPTION_TYPES)
-    return self:_request(M_PREPARE, netbox_opts, nil, self._stream_id, query)
+    return self:_request('PREPARE', netbox_opts, nil, self._stream_id, query)
 end
 
 function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
@@ -935,7 +913,7 @@ function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
         box.error(box.error.UNSUPPORTED, "unprepare", "options")
     end
     check_param_table(netbox_opts, REQUEST_OPTION_TYPES)
-    return self:_request(M_UNPREPARE, netbox_opts, nil, self._stream_id,
+    return self:_request('UNPREPARE', netbox_opts, nil, self._stream_id,
                          query, parameters or {}, sql_opts or {})
 end
 
@@ -1094,14 +1072,14 @@ space_metatable = function(remote)
     function methods:insert(tuple, opts)
         check_space_arg(self, 'insert')
         check_param_table(opts, REQUEST_OPTION_TYPES)
-        return remote:_request(M_INSERT, opts, self._format_cdata,
+        return remote:_request('INSERT', opts, self._format_cdata,
                                self._stream_id, self._id_or_name, tuple)
     end
 
     function methods:replace(tuple, opts)
         check_space_arg(self, 'replace')
         check_param_table(opts, REQUEST_OPTION_TYPES)
-        return remote:_request(M_REPLACE, opts, self._format_cdata,
+        return remote:_request('REPLACE', opts, self._format_cdata,
                                self._stream_id, self._id_or_name, tuple)
     end
 
@@ -1123,7 +1101,7 @@ space_metatable = function(remote)
     function methods:upsert(key, oplist, opts)
         check_space_arg(self, 'upsert')
         check_param_table(opts, REQUEST_OPTION_TYPES)
-        return nothing_or_data(remote:_request(M_UPSERT, opts, nil,
+        return nothing_or_data(remote:_request('UPSERT', opts, nil,
                                                self._stream_id,
                                                self._id_or_name,
                                                key, oplist))
@@ -1162,7 +1140,7 @@ index_metatable = function(remote)
         end
 
         local res
-        local method = fetch_pos and M_SELECT_FETCH_POS or M_SELECT
+        local method = fetch_pos and 'SELECT_WITH_POS' or 'SELECT'
         res = (remote:_request(method, opts, self.space._format_cdata,
                                self._stream_id, self.space._id_or_name,
                                self._id_or_name, iterator, offset, limit, key,
@@ -1179,7 +1157,7 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:get() doesn't support `buffer` argument")
         end
-        return nothing_or_data(remote:_request(M_GET, opts,
+        return nothing_or_data(remote:_request('GET', opts,
                                                self.space._format_cdata,
                                                self._stream_id,
                                                self.space._id_or_name,
@@ -1193,7 +1171,7 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:min() doesn't support `buffer` argument")
         end
-        return nothing_or_data(remote:_request(M_MIN, opts,
+        return nothing_or_data(remote:_request('MIN', opts,
                                                self.space._format_cdata,
                                                self._stream_id,
                                                self.space._id_or_name,
@@ -1207,7 +1185,7 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:max() doesn't support `buffer` argument")
         end
-        return nothing_or_data(remote:_request(M_MAX, opts,
+        return nothing_or_data(remote:_request('MAX', opts,
                                                self.space._format_cdata,
                                                self._stream_id,
                                                self.space._id_or_name,
@@ -1227,14 +1205,14 @@ index_metatable = function(remote)
                      '].index[' .. (self.name ~= nil and
                                     '"' .. self.name .. '"' or self.id) ..
                      ']:count'
-        return remote:_request(M_COUNT, opts, nil, self._stream_id,
+        return remote:_request('COUNT', opts, nil, self._stream_id,
                                code, { key, opts })
     end
 
     function methods:delete(key, opts)
         check_index_arg(self, 'delete')
         check_param_table(opts, REQUEST_OPTION_TYPES)
-        return nothing_or_data(remote:_request(M_DELETE, opts,
+        return nothing_or_data(remote:_request('DELETE', opts,
                                                self.space._format_cdata,
                                                self._stream_id,
                                                self.space._id_or_name,
@@ -1244,7 +1222,7 @@ index_metatable = function(remote)
     function methods:update(key, oplist, opts)
         check_index_arg(self, 'update')
         check_param_table(opts, REQUEST_OPTION_TYPES)
-        return nothing_or_data(remote:_request(M_UPDATE, opts,
+        return nothing_or_data(remote:_request('UPDATE', opts,
                                                self.space._format_cdata,
                                                self._stream_id,
                                                self.space._id_or_name,
@@ -1257,28 +1235,6 @@ end
 this_module = {
     connect = connect,
     new = connect, -- Tarantool < 1.7.1 compatibility,
-    _method = { -- for tests
-        ping        = M_PING,
-        call        = M_CALL,
-        eval        = M_EVAL,
-        insert      = M_INSERT,
-        replace     = M_REPLACE,
-        delete      = M_DELETE,
-        update      = M_UPDATE,
-        upsert      = M_UPSERT,
-        select      = M_SELECT,
-        execute     = M_EXECUTE,
-        prepare     = M_PREPARE,
-        unprepare   = M_UNPREPARE,
-        get         = M_GET,
-        min         = M_MIN,
-        max         = M_MAX,
-        count       = M_COUNT,
-        begin       = M_BEGIN,
-        commit      = M_COMMIT,
-        rollback    = M_ROLLBACK,
-        inject      = M_INJECT,
-    }
 }
 
 function this_module.timeout(timeout, ...)

@@ -24,7 +24,7 @@ stream = conn:new_stream()
 space = stream.space.test
 
 -- Check invalid timeout for transaction using raw request
-conn:_request(net_box._method.begin, nil, nil, stream._stream_id, -1)
+conn:_request('BEGIN', nil, nil, stream._stream_id, -1)
 
 -- Check arguments for 'stream:begin'
 stream:begin(1)
