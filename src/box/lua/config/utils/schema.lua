@@ -613,6 +613,114 @@ end
 
 -- }}} <schema object>:get()
 
+-- {{{ <schema object>:set()
+
+local function set_usage()
+    error('Usage: schema:set(data: <as defined by the schema>, ' ..
+        'path: string/table, rhs: <as defined by the schema>)', 0)
+end
+
+local function set_impl(schema, data, rhs, ctx)
+    -- The journey is finished. Validate and return the new value.
+    if #ctx.journey == 0 then
+        -- Call validate_impl() directly to don't construct a
+        -- schema object.
+        validate_impl(schema, rhs, ctx)
+        return rhs
+    end
+
+    local requested_field = ctx.journey[1]
+    assert(requested_field ~= nil)
+
+    if is_scalar(schema) then
+        walkthrough_error(ctx, 'Attempt to index a scalar value of type %s ' ..
+            'by field %q', schema.type, requested_field)
+    elseif schema.type == 'record' then
+        walkthrough_enter(ctx, requested_field)
+        local field_def = schema.fields[requested_field]
+        if field_def == nil then
+            walkthrough_error(ctx, 'No such field in the schema')
+        end
+
+        walkthrough_assert_table(ctx, schema, data)
+        local field_value = data[requested_field] or {}
+        table.remove(ctx.journey, 1)
+        data[requested_field] = set_impl(field_def, field_value, rhs, ctx)
+        return data
+    elseif schema.type == 'map' then
+        walkthrough_enter(ctx, requested_field)
+        local field_def = schema.value
+
+        walkthrough_assert_table(ctx, schema, data)
+        local field_value = data[requested_field] or {}
+        table.remove(ctx.journey, 1)
+        data[requested_field] = set_impl(field_def, field_value, rhs, ctx)
+        return data
+    elseif schema.type == 'array' then
+        -- TODO: Support 'foo[1]' and `{'foo', 1}` paths. See the
+        -- normalize_path() function.
+        walkthrough_error(ctx, 'Indexing an array is not supported yet')
+    else
+        assert(false)
+    end
+end
+
+-- Set the given `rhs` value at the given path in the `data`.
+--
+-- Important: `data` is assumed as already validated against the
+-- given schema, but `rhs` is validated by the method before the
+-- assignment.
+--
+-- The function checks the path against the schema: it doesn't
+-- allow to use a non-existing field or index a scalar value.
+--
+-- The path is either array-like table or a string in the dot
+-- notation.
+--
+-- local data = {}
+-- schema:set(data, 'foo.bar', 42)
+-- print(data.foo.bar) -- 42
+--
+-- local data = {}
+-- schema:set(data, {'foo', 'bar'}, 42)
+-- print(data.foo.bar) -- 42
+--
+-- Nuances:
+--
+-- * A root node (pointed by the empty path) can't be set using
+--   this method.
+-- * Array indexing is not supported yet.
+-- * A scalar of the 'any' type can't be indexed, even when it is
+--   a table. It is OK to set the whole value of the 'any'
+--   type.
+function methods.set(self, data, path, rhs)
+    local schema = rawget(self, 'schema')
+
+    -- Detect `data` and `path` misordering for the most common
+    -- scenario: a record schema and a string path.
+    if schema.type == 'record' and type(data) ~= 'table' then
+        return set_usage()
+    end
+
+    if path ~= nil then
+        path = normalize_path(path, set_usage)
+    end
+
+    if path == nil or next(path) == nil then
+        error('schema:set: empty path', 0)
+    end
+
+    local ctx = walkthrough_start(self, {
+        -- The `path` field is already in the context and it means
+        -- the passed path. Let's name the remaining path as
+        -- `journey`.
+        journey = path,
+    })
+    return set_impl(schema, data, rhs, ctx)
+end
+
+-- }}} <schema object>:set()
+
 -- {{{ Schema object constructor: new
 
 -- Define a field lookup function on a schema object.
