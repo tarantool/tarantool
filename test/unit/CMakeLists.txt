@@ -569,6 +569,11 @@ create_unit_test(PREFIX key_def
                  LIBRARIES unit box core
 )
 
+create_unit_test(PREFIX tuple_builder
+                 SOURCES tuple_builder.c box_test_utils.c
+                 LIBRARIES unit box core
+)
+
 create_unit_test(PREFIX getenv_safe
                  SOURCES getenv_safe.c core_test_utils.c
                  LIBRARIES unit core
