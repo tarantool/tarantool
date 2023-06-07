@@ -841,3 +841,299 @@ g.test_get_index_scalar = function()
 end
 
 -- }}} <schema object>:get()
+
+-- {{{ <schema object>:set()
+
+-- Set a record's field.
+g.test_set_record_field = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+        }),
+        goo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+            baz = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    -- <data>.foo = <...>
+    local data = {}
+    s:set(data, 'foo', {bar = 'mydata'})
+    t.assert_equals(data, {foo = {bar = 'mydata'}})
+
+    -- Subsequent :set() calls are cumulative: existing data is
+    -- kept, the only changed field is one pointed by `path`.
+    s:set(data, 'goo', {bar = 'mydata'})
+    t.assert_equals(data, {
+        foo = {bar = 'mydata'},
+        goo = {bar = 'mydata'},
+    })
+    s:set(data, 'goo.baz', 'mydata')
+    t.assert_equals(data, {
+        foo = {bar = 'mydata'},
+        goo = {bar = 'mydata', baz = 'mydata'},
+    })
+
+    -- The same using array-like table paths.
+    local data = {}
+    s:set(data, {'foo'}, {bar = 'mydata'})
+    t.assert_equals(data, {foo = {bar = 'mydata'}})
+
+    -- <data>.foo.bar = <...>
+    local data = {}
+    s:set(data, 'foo.bar', 'mydata')
+    t.assert_equals(data, {foo = {bar = 'mydata'}})
+
+    -- The same using array-like table paths.
+    local data = {}
+    s:set(data, {'foo', 'bar'}, 'mydata')
+    t.assert_equals(data, {foo = {bar = 'mydata'}})
+end
+
+-- Verify that there are no problems with composite data in a
+-- scalar of the any type.
+g.test_set_record_field_any = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'any'}),
+        }),
+    }))
+
+    -- <data>.foo = <...>
+    local data = {}
+    local any = {baz = {fiz = 'mydata'}}
+    s:set(data, 'foo', {bar = any})
+    t.assert_equals(data, {foo = {bar = any}})
+
+    -- <data>.foo.bar = <...>
+    local data = {}
+    local any = {baz = {fiz = 'mydata'}}
+    s:set(data, 'foo.bar', any)
+    t.assert_equals(data, {foo = {bar = any}})
+end
+
+-- Set a map's field.
+g.test_set_map_field = function()
+    local s = schema.new('myschema', schema.map({
+        key = schema.scalar({type = 'string'}),
+        value = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    -- <data>.foo = <...>
+    local data = {}
+    s:set(data, 'foo', {bar = 'mydata'})
+    t.assert_equals(data, {foo = {bar = 'mydata'}})
+
+    -- Subsequent :set() calls are cumulative: existing data is
+    -- kept, the only changed field is one pointed by `path`.
+    s:set(data, 'goo', {bar = 'mydata'})
+    t.assert_equals(data, {
+        foo = {bar = 'mydata'},
+        goo = {bar = 'mydata'},
+    })
+    s:set(data, 'goo.baz', 'mydata')
+    t.assert_equals(data, {
+        foo = {bar = 'mydata'},
+        goo = {bar = 'mydata', baz = 'mydata'},
+    })
+
+    -- The same using array-like table paths.
+    local data = {}
+    s:set(data, {'foo'}, {bar = 'mydata'})
+    t.assert_equals(data, {foo = {bar = 'mydata'}})
+
+    -- <data>.foo.bar = <...>
+    local data = {}
+    s:set(data, 'foo.bar', 'mydata')
+    t.assert_equals(data, {foo = {bar = 'mydata'}})
+
+    -- The same using array-like table paths.
+    local data = {}
+    s:set(data, {'foo', 'bar'}, 'mydata')
+    t.assert_equals(data, {foo = {bar = 'mydata'}})
+end
+
+-- Trigger improper API usage error.
+g.test_set_usage = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    local exp_err_msg = 'Usage: schema:set(data: <as defined by the ' ..
+        'schema>, path: string/table, rhs: <as defined by the schema>)'
+
+    -- A top level record `data` can't be nil.
+    --
+    -- This case looks like a mistake, so the usage error is
+    -- raised.
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:set()
+    end)
+
+    -- A top level record `data` can't be a string.
+    --
+    -- This case looks like the `data` argument is forgotten, so
+    -- the usage error is raised.
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:set('foo')
+    end)
+
+    -- A top level record `data` can't be a string.
+    --
+    -- This case looks like the `data` and the `path` arguments
+    -- are misordered, so the usage error is raised.
+    --
+    -- Verify it with and without the `rhs` argument.
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = {}
+        s:set('foo.bar', data)
+    end)
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = {}
+        s:set('foo.bar', data, 'mydata')
+    end)
+
+    -- The `path` is not a table and not a string.
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = {}
+        s:set(data, 5, 'mydata')
+    end)
+end
+
+-- :set() can't be used with nil or empty `path`.
+g.test_set_empty_path = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    local exp_err_msg = 'schema:set: empty path'
+
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = {}
+        s:set(data)
+    end)
+
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = {}
+        s:set(data, '')
+    end)
+
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = {}
+        s:set(data, {})
+    end)
+end
+
+-- Attempt to set an unknown record's field.
+--
+-- The path is verified against the schema. It is impossible to
+-- set a field that doesn't exist in the record.
+g.test_set_unknown_field = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    local exp_err_msg = '[myschema] unknown: No such field in the schema'
+    local data = {}
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:set(data, 'unknown', 'mydata')
+    end)
+
+    -- Verify that the data remains unchanged after an error.
+    t.assert_equals(data, {})
+
+    local exp_err_msg = '[myschema] foo.unknown: No such field in the schema'
+    local data = {}
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:set(data, 'foo.unknown', 'mydata')
+    end)
+
+    -- Verify that the data remains unchanged after an error.
+    t.assert_equals(data, {})
+end
+
+-- Attempt to set an item in an array.
+g.test_set_index_array = function()
+    local s = schema.new('myschema', schema.array({
+        items = schema.scalar({type = 'string'}),
+    }))
+
+    local exp_err_msg = '[myschema] Indexing an array is not supported yet'
+    local data = {}
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:set(data, '[1]', 'mydata')
+    end)
+
+    -- Verify that the data remains unchanged after an error.
+    t.assert_equals(data, {})
+end
+
+-- Attempt to index a scalar.
+g.test_set_index_scalar = function()
+    -- Indexing a scalar is forbidden.
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+        }),
+    }))
+    local exp_err_msg = '[myschema] foo.bar: Attempt to index a scalar ' ..
+        'value of type string by field "baz"'
+    local data = {}
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:set(data, 'foo.bar.baz', 'mydata')
+    end)
+
+    -- Verify that the data remains unchanged after an error.
+    t.assert_equals(data, {})
+
+    -- The scalar of the 'any' type is the same in this regard.
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'any'}),
+        }),
+    }))
+    local exp_err_msg = '[myschema] foo.bar: Attempt to index a scalar ' ..
+        'value of type any by field "baz"'
+    local data = {}
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local rhs = {fiz = 'giz'}
+        s:set(data, 'foo.bar.baz', rhs)
+    end)
+
+    -- Verify that the data remains unchanged after an error.
+    t.assert_equals(data, {})
+end
+
+-- Attempt to set a value that doesn't correspond to the given
+-- schema.
+g.test_set_invalid_rhs = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    local exp_err_msg = table.concat({
+        '[myschema] foo.bar',
+        'Unexpected data for scalar "string"',
+        'Expected "string", got "number"',
+    }, ': ')
+    local data = {}
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:set(data, 'foo.bar', 5)
+    end)
+
+    -- Verify that the data remains unchanged after an error.
+    t.assert_equals(data, {})
+end
+
+-- }}} <schema object>:set()
