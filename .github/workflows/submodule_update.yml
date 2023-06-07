@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - 'master'
-      - '[2-9].\d+'
+      - 'release/**'
 
 env:
   EE_FEATURE_BRANCH: 'TarantoolBot/update-tarantool-${{ github.ref_name }}'
