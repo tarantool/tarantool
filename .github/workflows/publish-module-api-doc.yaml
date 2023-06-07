@@ -9,8 +9,8 @@ on:
 
 concurrency:
   # Update of a developer branch cancels the previously scheduled workflow
-  # run for this branch. However, the 'master' branch, release branch (1.10,
-  # 2.8, etc.), and tag workflow runs are never canceled.
+  # run for this branch. However, the 'master' branch, release branch, and
+  # tag workflow runs are never canceled.
   #
   # We use a trick here: define the concurrency group as 'workflow run ID' +
   # 'workflow run attempt' because it is a unique combination for any run.
@@ -20,8 +20,6 @@ concurrency:
   # pushing a tag may cancel a run that works on a branch push event.
   group: ${{ (
     github.ref == 'refs/heads/master' ||
-    startsWith(github.ref, 'refs/heads/2.') ||
-    startsWith(github.ref, 'refs/heads/3.') ||
     startsWith(github.ref, 'refs/tags/')) &&
     format('{0}-{1}', github.run_id, github.run_attempt) ||
     format('{0}-{1}', github.workflow, github.ref) }}
