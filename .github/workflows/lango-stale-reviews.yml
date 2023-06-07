@@ -6,6 +6,8 @@ on:
 
 jobs:
   update-last-activity-dates:
+    # Do this activity only for main repo.
+    if: github.repository == 'tarantool/tarantool'
     env:
       LANGO_REVIEW_BOARD_TOKEN: ${{ secrets.LANGO_REVIEW_BOARD_TOKEN }}
       ORGANIZATION: Tarantool
