@@ -78,8 +78,7 @@ jobs:
       - name: Upload artifacts to S3
         uses: ./.github/actions/s3-upload-artifact
         if: ( success() || failure() ) && ( github.ref == 'refs/heads/master' ||
-          startsWith(github.ref, 'refs/heads/2.') ||
-          startsWith(github.ref, 'refs/heads/3.') ||
+          startsWith(github.ref, 'refs/heads/release/') ||
           startsWith(github.ref, 'refs/tags/') )
         with:
           job-name: ${{ github.job }} (${{ join(matrix.*, ', ') }})
