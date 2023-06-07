@@ -4,7 +4,7 @@ This action selects the corresponding chat for the notification on failure and
 uses [report-job-status action](https://github.com/tarantool/actions/tree/master/report-job-status)
 for sending it to:
 * the team chat (Tarantool CI/CD reports) - if the job started on any event in
-the `master` or release branch (`1.10`, `2.10`, etc);
+the `master` or release branch;
 * a personal chat, created by the committer – if the job started on
 creating/updating a pull request or any event in other branches.
 
