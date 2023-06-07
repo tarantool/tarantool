@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - 'master'
-      - 'release/**'
-      - '[0-9].[0-9]+'  # release branches
+      - 'release/**'  # release branches
     tags:
       - '*'
   pull_request:
