@@ -381,9 +381,18 @@ class MsgPack(object):
                 cls.next_slowpath(data, k)
                 return
 
-    def to_string_data(cls, data, depth):
+    @classmethod
+    def to_string_data(cls, data, depth, expected_type=None):
         s = str()
         mp_type = cls.typeof(data)
+        if expected_type is not None and mp_type != expected_type:
+            gdb.write('Invalid msgpack: unexpected type {actual_type} at pos {data_pos} (expected {expected_type})\n'.format(
+                actual_type = mp_type,
+                data_pos = data.pos,
+                expected_type = expected_type,
+            ))
+            cls.next(data)
+            return '!error'
 
         if mp_type == cls.MP_NIL:
             cls.decode_nil(data)
@@ -491,6 +500,7 @@ class TtMsgPack(MsgPack):
     MP_ERROR = find_value('MP_ERROR')
     MP_COMPRESSION = find_value('MP_COMPRESSION')
     MP_INTERVAL = find_value('MP_INTERVAL')
+    MP_TUPLE = find_value('MP_TUPLE')
 
     UUID_PACKED_LEN = find_value('UUID_PACKED_LEN')
 
@@ -732,6 +742,12 @@ class TtMsgPack(MsgPack):
         return str(itv)
 
     @classmethod
+    def to_string_tuple(cls, data, depth):
+        format_id = cls.to_string_data(data, depth, cls.MP_UINT)
+        payload = cls.to_string_data(data, depth, cls.MP_ARRAY)
+        return 'tuple(format_id={}):{}'.format(format_id, payload)
+
+    @classmethod
     def to_string_ext(cls, data, depth, ext_len, ext_type): # msgpack_snprint_ext
         pos = data.pos
 
@@ -747,6 +763,8 @@ class TtMsgPack(MsgPack):
             s = cls.to_string_compression(data, ext_len)
         elif ext_type == cls.MP_INTERVAL:
             s = cls.to_string_interval(data, ext_len)
+        elif ext_type == cls.MP_TUPLE:
+            s = cls.to_string_tuple(data, depth)
         else:
             return super(TtMsgPack, cls).to_string_ext(data, depth, ext_len, ext_type)
 
