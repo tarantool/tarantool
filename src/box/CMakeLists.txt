@@ -258,6 +258,7 @@ set(box_sources
     lua/merger.c
     lua/watcher.c
     lua/iproto.c
+    lua/func_adapter.c
     ${bin_sources})
 
 if(ENABLE_AUDIT_LOG)
