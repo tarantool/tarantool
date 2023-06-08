@@ -454,8 +454,7 @@ xrow_update_op_do_array_delete(struct xrow_update_op *op,
 	if ((uint64_t) op->field_no + delete_count > size)
 		delete_count = size - op->field_no;
 	assert(delete_count > 0);
-	for (uint32_t u = delete_count; u != 0; --u)
-		xrow_update_rope_erase(rope, op->field_no);
+	xrow_update_rope_erase(rope, op->field_no, delete_count);
 	return 0;
 }
 

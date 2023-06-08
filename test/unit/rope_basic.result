@@ -126,14 +126,35 @@ string = '    *abc*    '
 
 	*** test_insert: done ***
 	*** test_erase ***
-erase offset = 0
+erase offset = 4, size = 1
+size = 9
+string = 'abcdfjhij'
+│  ┌──nil
+└──{ len = 4, height = 2, data = 'abcd'}
+   └──{ len = 5, height = 1, data = 'fjhij'}
+
+erase offset = 3, size = 2
+size = 7
+string = 'abcjhij'
+│  ┌──nil
+└──{ len = 3, height = 2, data = 'abc'}
+   └──{ len = 4, height = 1, data = 'jhij'}
+
+erase offset = 4, size = 1
+size = 6
+string = 'abcjij'
+│  ┌──{ len = 3, height = 1, data = 'abc'}
+└──{ len = 1, height = 2, data = 'j'}
+   └──{ len = 2, height = 1, data = 'ij'}
+
+erase offset = 2, size = 4
+size = 2
+string = 'ab'
+└──{ len = 2, height = 1, data = 'ab'}
+
+erase offset = 0, size = 2
 size = 0
 string = ''
 └──nil
-
-erase offset = 0
-size = 1
-string = 'b'
-└──{ len = 1, height = 1, data = 'b'}
 
 	*** test_erase: done ***

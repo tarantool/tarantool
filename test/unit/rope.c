@@ -15,8 +15,7 @@ static inline void
 test_rope_cut(struct rope *rope, rope_size_t offset, rope_size_t size)
 {
 	printf("erase offset = %zu, size = %zu \n", (size_t) offset, (size_t) size);
-	while (size-- > 0)
-		rope_erase(rope, offset);
+	rope_erase(rope, offset, size);
 	rope_pretty_print(rope, str_print);
 	rope_check(rope);
 }

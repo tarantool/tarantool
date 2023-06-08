@@ -1,6 +1,10 @@
 #include <time.h>
-#include "unit.h"
+
 #include "rope_common.h"
+#include "trivia/util.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 static char *data[] = {"a", "bc", "def", "ghij", "klmno"};
 
@@ -22,10 +26,10 @@ test_rope_stress_small()
 		rope_check(rope);
 		size = rope_size(rope);
 		offset = ((rope_size_t) rand()) % size;
-		if (offset == size)
-			offset--;
-		rope_erase(rope, offset);
-		fail_unless(size == rope_size(rope) + 1);
+		rope_size_t del_size = (rope_size_t)1 + rand() % 4;
+		del_size = MIN(del_size, size - offset);
+		rope_erase(rope, offset, del_size);
+		fail_unless(size == rope_size(rope) + del_size);
 		rope_check(rope);
 	}
 	rope_delete(rope);
@@ -50,10 +54,10 @@ test_rope_stress_large()
 		fail_unless(size + len == rope_size(rope));
 		size = rope_size(rope);
 		offset = ((rope_size_t) rand()) % size;
-		if (offset == size)
-			offset--;
-		rope_erase(rope, offset);
-		fail_unless(size == rope_size(rope) + 1);
+		rope_size_t del_size = (rope_size_t)1 + rand() % 4;
+		del_size = MIN(del_size, size - offset);
+		rope_erase(rope, offset, del_size);
+		fail_unless(size == rope_size(rope) + del_size);
 		if (i % 1000 == 0)
 			rope_check(rope);
 	}
@@ -64,8 +68,12 @@ test_rope_stress_large()
 int
 main()
 {
+	plan(0);
+
 	srand(time(NULL));
 	test_rope_stress_small();
 	test_rope_stress_large();
-	return 0;
+
+	footer();
+	return check_plan();
 }
