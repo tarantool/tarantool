@@ -396,6 +396,8 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	 */
 	struct func *func = NULL;
 	if (for_func_index && (func = func_by_id(opts.func_id)) != NULL) {
+		if (func_access_check(func) != 0)
+			return NULL;
 		if (func_index_check_func(func) != 0)
 			return NULL;
 		index_def_set_func(index_def, func);
@@ -5228,6 +5230,15 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 			diag_set(ClientError, ER_NO_SUCH_FUNCTION, int2str(fid));
 			return -1;
 		}
+		/*
+		 * These checks are duplicated from the _index's on_replace
+		 * trigger in order to perform required checks during recovery.
+		 *
+		 * See the comment above the same checks in the
+		 * index_def_new_from_tuple function.
+		 */
+		if (func_access_check(func) != 0)
+			return -1;
 		if (func_index_check_func(func) != 0)
 			return -1;
 		if (index->def->opts.func_id != func->def->fid) {
