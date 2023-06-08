@@ -83,11 +83,16 @@ test_erase()
 	header();
 
 	struct rope *rope = test_rope_new();
-	rope_insert(rope, rope_size(rope), "a", 1);
-	test_rope_erase(rope, 0);
-	rope_insert(rope, rope_size(rope), "a", 1);
-	rope_insert(rope, rope_size(rope), "b", 1);
-	test_rope_erase(rope, 0);
+	rope_insert(rope, rope_size(rope), "abcdefjhij", 10);
+	test_rope_erase(rope, 4, 1);
+	/* Rope nodes are "abcd" "fjhij". */
+	test_rope_erase(rope, 3, 2);
+	/* Rope nodes are "abc" "jhij". */
+	test_rope_erase(rope, 4, 1);
+	/* Rope nodes are "abc" "j" "ij". */
+	test_rope_erase(rope, 2, 4);
+	/* Rope nodes are "ab". */
+	test_rope_erase(rope, 0, 2);
 
 	rope_delete(rope);
 

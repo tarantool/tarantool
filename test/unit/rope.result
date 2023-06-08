@@ -178,9 +178,9 @@ string = 'You got four of guys all five fighting over who's gonna be<Mr.X>, Mr. 
    └──{ len = 30, height = 4, data = 'special> don't know each other'}
       │  ┌──{ len = 25, height = 1, data = ', so nobody wants to back'}
       └──{ len = 5, height = 3, data = ' down'}
-         │  ┌──{ len = 1, height = 1, data = '.'}
-         └──{ len = 6, height = 2, data = '<point'}
-            └──nil
+         │  ┌──nil
+         └──{ len = 1, height = 2, data = '.'}
+            └──{ len = 6, height = 1, data = '<point'}
 
 erase offset = 173, size = 1 
 size = 178
@@ -197,9 +197,9 @@ string = 'You got four of guys all five fighting over who's gonna be<Mr.X>, Mr. 
    └──{ len = 30, height = 4, data = 'special> don't know each other'}
       │  ┌──{ len = 25, height = 1, data = ', so nobody wants to back'}
       └──{ len = 5, height = 3, data = ' down'}
-         │  ┌──{ len = 1, height = 1, data = '.'}
-         └──{ len = 5, height = 2, data = 'point'}
-            └──nil
+         │  ┌──nil
+         └──{ len = 1, height = 2, data = '.'}
+            └──{ len = 5, height = 1, data = 'point'}
 
 erase offset = 58, size = 7 
 size = 171
@@ -214,9 +214,9 @@ string = 'You got four of guys all five fighting over who's gonna be Mr. <black!
    │  ┌──{ len = 30, height = 2, data = 'special> don't know each other'}
    │  │  └──{ len = 25, height = 1, data = ', so nobody wants to back'}
    └──{ len = 5, height = 3, data = ' down'}
-      │  ┌──{ len = 1, height = 1, data = '.'}
-      └──{ len = 5, height = 2, data = 'point'}
-         └──nil
+      │  ┌──nil
+      └──{ len = 1, height = 2, data = '.'}
+         └──{ len = 5, height = 1, data = 'point'}
 
 erase offset = 63, size = 10 
 size = 161
@@ -233,9 +233,9 @@ string = 'You got four of guys all five fighting over who's gonna be Mr. Black, 
    │  ┌──{ len = 30, height = 3, data = 'special> don't know each other'}
    │  │  └──{ len = 25, height = 1, data = ', so nobody wants to back'}
    └──{ len = 5, height = 4, data = ' down'}
-      │  ┌──{ len = 1, height = 1, data = '.'}
-      └──{ len = 5, height = 2, data = 'point'}
-         └──nil
+      │  ┌──nil
+      └──{ len = 1, height = 2, data = '.'}
+         └──{ len = 5, height = 1, data = 'point'}
 
 erase offset = 79, size = 25 
 size = 136
@@ -252,9 +252,9 @@ string = 'You got four of guys all five fighting over who's gonna be Mr. Black, 
    │  ┌──{ len = 21, height = 3, data = 'don't know each other'}
    │  │  └──{ len = 25, height = 1, data = ', so nobody wants to back'}
    └──{ len = 5, height = 4, data = ' down'}
-      │  ┌──{ len = 1, height = 1, data = '.'}
-      └──{ len = 5, height = 2, data = 'point'}
-         └──nil
+      │  ┌──nil
+      └──{ len = 1, height = 2, data = '.'}
+         └──{ len = 5, height = 1, data = 'point'}
 
 erase offset = 25, size = 5 
 size = 131
@@ -271,9 +271,9 @@ string = 'You got four of guys all fighting over who's gonna be Mr. Black, but t
    │  ┌──{ len = 21, height = 3, data = 'don't know each other'}
    │  │  └──{ len = 25, height = 1, data = ', so nobody wants to back'}
    └──{ len = 5, height = 4, data = ' down'}
-      │  ┌──{ len = 1, height = 1, data = '.'}
-      └──{ len = 5, height = 2, data = 'point'}
-         └──nil
+      │  ┌──nil
+      └──{ len = 1, height = 2, data = '.'}
+         └──{ len = 5, height = 1, data = 'point'}
 
 erase offset = 126, size = 5 
 size = 126

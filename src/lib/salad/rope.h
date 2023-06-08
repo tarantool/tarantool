@@ -150,6 +150,8 @@ avl_iter_check(struct avl_iter *iter);
 #define rope_append rope_api(append)
 #define rope_extract_node rope_api(extract_node)
 #define rope_extract rope_api(extract)
+#define rope_adjust_size rope_api(adjust_size)
+#define rope_erase_step rope_api(erase_step)
 #define rope_erase rope_api(erase)
 #define rope_iter_create rope_api(iter_create)
 #define rope_iter_new rope_api(iter_new)
@@ -280,6 +282,23 @@ rope_clear(struct rope *rope)
 	}
 #endif /* ROPE_FREE_F */
 	rope->root = NULL;
+}
+
+/**
+ * Add @a size to subtree size of every node in nodes path.
+ *
+ * @param path Path begin.
+ * @param end Path end.
+ * @param size Size to adjust subtree size of nodes to (addition).
+ */
+static inline void
+rope_adjust_size(struct rope_node ***path, struct rope_node ***end,
+		 ssize_t size)
+{
+	for (; path <= end; path++) {
+		struct rope_node *node = **path;
+		node->tree_size += size;
+	}
 }
 
 /** Delete a rope allocated with rope_new() */
@@ -440,74 +459,95 @@ rope_extract(struct rope *rope, rope_size_t offset)
 }
 
 /**
- * Erase a single element from the rope. This is a straightforward
- * implementation for a single-element deletion from a rope. A
- * generic cut from a rope involves 2 tree splits and one merge.
+ * Erase @a p_size elements from the rope if it fits into single node.
+ * Otherwise erase as many elements as fits into the node which holds data
+ * at @a offset. Upon return @a p_size is decreased to the number of
+ * deleted elements.
  *
- * When deleting a single element, 3 cases are possible:
- * - offset falls at a node with a single element. In this case we
- *   perform a normal AVL tree delete.
- * - offset falls at the end or the beginning of an existing node
- *   with leaf_size > 1. In that case we trim the existing node
- *   and return.
- * - offset falls inside an existing node. In that case we split
+ * When deleting, 3 cases are possible:
+ * - offset is at the beginning of the node and number of deleted elements
+ *   is more than or equal to the number elements in the node. In this
+ *   case delete the entire node.
+ * - deleted elements reside at the beginning or at the end of the node.
+ *   In that case trim the existing node and return.
+ * - deleted elements reside inside the node. In that case split
  *   the existing node at offset, and insert the tail.
  *
  * The implementation is a copycat of rope_insert(). If you're
  * trying to understand the code, it's recommended to start from
  * rope_insert().
+ *
+ * @param rope A rope.
+ * @param offset Offset at which to start erasure at.
+ * @param[out] p_size Size of data to be erased.
+ *
+ * @retval 0 Success.
+ * @retval -1 OOM.
  */
 static inline int
-rope_erase(struct rope *rope, rope_size_t offset)
+rope_erase_step(struct rope *rope, rope_size_t offset, rope_size_t *p_size)
 {
-	assert(offset < rope_size(rope));
+	size_t size = *p_size;
 
 	struct rope_node **path[ROPE_HEIGHT_MAX];
 	path[0] = &rope->root;
 
+	/*
+	 * Optimistically adjust subtree size to -size along the route. If
+	 * erasion fits into single node then we are good. Otherwise we
+	 * fix the adjustion to correct size when we know it.
+	 */
 	struct rope_node ***p_end = (struct rope_node ***)
-		avl_route_to_offset((struct avl_node ***) path, &offset, -1);
+		avl_route_to_offset((struct avl_node ***)path, &offset, -size);
 
 	struct rope_node *node = **p_end;
 
-	if (node->leaf_size > 1) {
+	if (offset > 0 || size < node->leaf_size) {
 		/* Check if we can simply trim the node. */
 		if (offset == 0) {
 			/* Cut the head. */
 			node->data = ROPE_SPLIT_F(rope->ctx, node->data,
-						  node->leaf_size, 1);
-			node->leaf_size -= 1;
+						  node->leaf_size, size);
+			node->leaf_size -= size;
+			*p_size = 0;
 			return 0;
 		}
-		rope_size_t size = node->leaf_size;
 		/* Cut the tail */
+		rope_size_t leaf_size = node->leaf_size;
 		rope_data_t next = ROPE_SPLIT_F(rope->ctx, node->data,
 						node->leaf_size, offset);
 		node->leaf_size = offset;
-		if (offset == size - 1)
+		rope_size_t tail_size = leaf_size - offset;
+		if (size >= tail_size) {
+			rope_adjust_size(path, p_end, size - tail_size);
+			*p_size -= tail_size;
 			return 0; /* Trimmed the tail, nothing else to do */
+		}
 		/*
 		 * Offset falls inside a substring. Erase the
 		 * first field and insert the tail.
 		 */
-		next = ROPE_SPLIT_F(rope->ctx, next, size - offset, 1);
+		next = ROPE_SPLIT_F(rope->ctx, next, tail_size, size);
 		struct rope_node *new_node =
-			rope_node_new(rope, next, size - offset - 1);
+			rope_node_new(rope, next, tail_size - size);
 		if (new_node == NULL)
 			return -1;
 		/* Trim the old node. */
 		p_end = (struct rope_node ***)
-			avl_route_to_next((struct avl_node ***) p_end, 1,
+			avl_route_to_next((struct avl_node ***)p_end, 1,
 					  new_node->tree_size);
 		**p_end = new_node;
-		avl_rebalance_after_insert((struct avl_node ***) path,
-					   (struct avl_node ***) p_end,
+		avl_rebalance_after_insert((struct avl_node ***)path,
+					   (struct avl_node ***)p_end,
 					   new_node->height);
+		*p_size = 0;
 		return 0;
 	}
 	/* We need to delete the node. */
 	assert(offset == 0);
 	int direction;
+	rope_adjust_size(path, p_end, size - node->leaf_size);
+	*p_size -= node->leaf_size;
 	if (node->link[0] != NULL && node->link[1] != NULL) {
 		/*
 		 * The node has two non-NULL leaves. We can't
@@ -522,7 +562,7 @@ rope_erase(struct rope *rope, rope_size_t offset)
 		struct rope_node *save = node;
 		direction = node->link[1]->height > node->link[0]->height;
 		p_end = (struct rope_node ***)
-			avl_route_to_next((struct avl_node ***) p_end,
+			avl_route_to_next((struct avl_node ***)p_end,
 					  direction, 0) - 1;
 		node = **p_end;
 		/* Move the data pointers. */
@@ -547,8 +587,34 @@ rope_erase(struct rope *rope, rope_size_t offset)
 	}
 	**p_end = node->link[direction];
 	ROPE_FREE(rope->ctx, node);
-	avl_rebalance_after_delete((struct avl_node ***) path,
-				   (struct avl_node ***) p_end);
+	avl_rebalance_after_delete((struct avl_node ***)path,
+				   (struct avl_node ***)p_end);
+	return 0;
+}
+
+/**
+ * Erase @a size elements from the @a rope at given @a offset. Rope size,
+ * @a size and @a offset must satisfy the assertions at the beginning of
+ * the function.
+ *
+ * @param rope A rope.
+ * @param offset Offset at which to start erasure at.
+ * @param size Size of data to be erased in bytes.
+ *
+ * @retval 0 Success.
+ * @retval -1 OOM.
+ */
+static inline int
+rope_erase(struct rope *rope, rope_size_t offset, rope_size_t size)
+{
+	assert(size > 0);
+	assert(offset < rope_size(rope));
+	assert(offset + size <= rope_size(rope));
+
+	do {
+		if (rope_erase_step(rope, offset, &size) != 0)
+			return -1;
+	} while (size > 0);
 	return 0;
 }
 
@@ -697,6 +763,8 @@ rope_pretty_print(struct rope *rope, void (*print_leaf)(rope_data_t, size_t))
 #undef rope_append
 #undef rope_extract_node
 #undef rope_extract
+#undef rope_adjust_size
+#undef rope_erase_step
 #undef rope_erase
 #undef rope_iter_create
 #undef rope_iter_new
