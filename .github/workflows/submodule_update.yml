@@ -69,7 +69,10 @@ jobs:
       EE_SHA: ${{ needs.update-ee.outputs.commit-sha }}
 
     steps:
-      - name: Update submodule tarantool-${{ github.ref_name }} in tarantool/sdk@${{ env.SDK_FEATURE_BRANCH }}
+      - name: Set sdk submodule name
+        run: echo "SDK_SUBMODULE=tarantool-$(basename ${{ github.ref_name }})" >> $GITHUB_ENV
+
+      - name: Update submodule ${{ env.SDK_SUBMODULE }} in tarantool/sdk@${{ env.SDK_FEATURE_BRANCH }}
         uses: tarantool/actions/update-submodule@master
         id: test-sdk
         with:
@@ -78,18 +81,18 @@ jobs:
           checkout_branch: 'master'
           # Same branch name pattern as used in sdk_test workflow
           feature_branch: ${{ env.SDK_FEATURE_BRANCH }}
-          submodule: 'tarantool-${{ github.ref_name }}'
+          submodule: ${{ env.SDK_SUBMODULE }}
           update_to: ${{ env.EE_SHA }}
           create_pr: 'false'
           commit_message: |
-            integration-test: tarantool-${{ github.ref_name }}@${{ github.ref_name }}
+            test: ee@${{ github.ref_name }} -> sdk:${{ env.SDK_SUBMODULE }}
 
-            bump submodule tarantool-${{ github.ref_name }} to commit
+            bump submodule ${{ env.SDK_SUBMODULE }} to commit
             tarantool/tarantool-ee@${{ env.EE_SHA }},
             which is the HEAD of branch
             tarantool/tarantool-ee@${{ env.EE_FEATURE_BRANCH }},
             just updated with commit
-            tarantool/tarantool@${{ github.sha }}
+            tarantool/tarantool@${{ github.sha }},
             which is the HEAD of branch
             tarantool/tarantool@${{ github.ref_name }}.
 
