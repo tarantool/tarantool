@@ -149,16 +149,8 @@ local function stream_serialize(self)
     return t
 end
 
-local function stream_spaces_serialize(self)
-    return self._stream._conn.space
-end
-
 local function stream_space_serialize(self)
     return self._src
-end
-
-local function stream_indexes_serialize(self)
-    return self._space._src.index
 end
 
 local function stream_index_serialize(self)
@@ -184,76 +176,45 @@ local function stream_wrap_index(stream_id, src)
     })
 end
 
--- Metatable for stream space indexes. When stream space being
--- created there are no indexes in it. When accessing the space
--- index, we look for corresponding space index in corresponding
--- connection space. If it is found we create same index for the
--- stream space but with corresponding stream ID. We do not need
--- to compare stream _schema_version and connection schema_version,
--- because all access to index  is carried out through it's space.
--- So we update schema_version when we access space.
-local stream_indexes_mt = {
-    __index = function(self, key)
-        local _space = self._space
-        local src = _space._src.index[key]
-        if not src then
-            return nil
-        end
-        local res = stream_wrap_index(_space._stream_id, src)
-        self[key] = res
-        return res
-    end,
-    __serialize = stream_indexes_serialize,
-    __autocomplete = stream_indexes_serialize
-}
-
 -- Create stream space, which is same as connection space,
 -- but have non zero stream ID.
 local function stream_wrap_space(stream, src)
-    local res = setmetatable({
+    local space = setmetatable({
         _stream_id = stream._stream_id,
         _src = src,
-        index = setmetatable({
-            _space = nil,
-        }, stream_indexes_mt)
     }, {
         __index = src,
         __serialize = stream_space_serialize,
         __autocomplete = stream_space_serialize
     })
-    res.index._space = res
-    return res
+    local space_index_cache = {}
+    local stream_indexes_serialize = function() return space._src.index end
+    -- Metatable for stream space indexes. When stream space being
+    -- created there are no indexes in it. When accessing the space
+    -- index, we look for corresponding space index in corresponding
+    -- connection space. If it is found we create same index for the
+    -- stream space but with corresponding stream ID. We do not need
+    -- to compare stream _schema_version and connection schema_version,
+    -- because all access to index  is carried out through it's space.
+    -- So we update schema_version when we access space.
+    space.index = setmetatable({}, {
+        __index = function(_, key)
+            if space_index_cache[key] then
+                return space_index_cache[key]
+            end
+            local src = space._src.index[key]
+            if not src then
+                return nil
+            end
+            local res = stream_wrap_index(space._stream_id, src)
+            space_index_cache[key] = res
+            return res
+        end,
+        __serialize = stream_indexes_serialize,
+        __autocomplete = stream_indexes_serialize
+    })
+    return space
 end
-
--- Metatable for stream spaces. When stream being created there
--- are no spaces in it. When user try to access some space in
--- stream, we first of all compare _schema_version of stream with
--- schema_version from connection and if they are not equal, we
--- clear stream space cache and update it's schema_version. Then
--- we look for corresponding space in the connection. If it is
--- found we create same space for the stream but with corresponding
--- stream ID.
-local stream_spaces_mt = {
-    __index = function(self, key)
-        local stream = self._stream
-        if stream._schema_version ~= stream._conn.schema_version then
-            stream._schema_version = stream._conn.schema_version
-            self._stream_space_cache = {}
-        end
-        if self._stream_space_cache[key] then
-            return self._stream_space_cache[key]
-        end
-        local src = stream._conn.space[key]
-        if not src then
-            return nil
-        end
-        local res = stream_wrap_space(stream, src)
-        self._stream_space_cache[key] = res
-        return res
-    end,
-    __serialize = stream_spaces_serialize,
-    __autocomplete = stream_spaces_serialize
-}
 
 -- This callback is invoked in a new fiber upon receiving 'box.shutdown' event
 -- from a remote host. It runs on_shutdown triggers and then gracefully
@@ -579,14 +540,38 @@ function remote_methods:new_stream()
         commit = stream_commit,
         rollback = stream_rollback,
         _stream_id = self._last_stream_id,
-        space = setmetatable({
-            _stream_space_cache = {},
-            _stream = nil,
-        }, stream_spaces_mt),
         _conn = self,
         _schema_version = self.schema_version,
     }, { __index = self, __serialize = stream_serialize })
-    stream.space._stream = stream
+    local stream_space_cache = {}
+    local stream_spaces_serialize = function() return stream._conn.space end
+    -- When stream being created there are no spaces in it. When user try to
+    -- access some space in stream, we first of all compare _schema_version of
+    -- stream with schema_version from connection and if they are not equal, we
+    -- clear stream space cache and update it's schema_version. Then
+    -- we look for corresponding space in the connection. If it is
+    -- found we create same space for the stream but with corresponding
+    -- stream ID.
+    stream.space = setmetatable({}, {
+        __index = function(_, key)
+            if stream._schema_version ~= stream._conn.schema_version then
+                stream._schema_version = stream._conn.schema_version
+                stream_space_cache = {}
+            end
+            if stream_space_cache[key] then
+                return stream_space_cache[key]
+            end
+            local src = stream._conn.space[key]
+            if not src then
+                return nil
+            end
+            local res = stream_wrap_space(stream, src)
+            stream_space_cache[key] = res
+            return res
+        end,
+        __serialize = stream_spaces_serialize,
+        __autocomplete = stream_spaces_serialize,
+    })
     return stream
 end
 
