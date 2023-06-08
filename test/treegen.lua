@@ -58,6 +58,7 @@ function treegen.write_script(dir, script, body)
     local fh = fio.open(script_abspath, flags, mode)
     fh:write(body)
     fh:close()
+    return script_abspath
 end
 
 -- Generate a script that follows a template and write it at the
