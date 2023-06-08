@@ -610,3 +610,13 @@ create_unit_test(PREFIX node_name
                  SOURCES node_name.c core_test_utils.c
                  LIBRARIES core unit node_name
 )
+
+create_unit_test(PREFIX lua_func_adapter
+                 SOURCES lua_func_adapter.c box_test_utils.c
+                 LIBRARIES unit box server core misc
+                           ${CURL_LIBRARIES}
+                           ${LIBYAML_LIBRARIES}
+                           ${READLINE_LIBRARIES}
+                           ${ICU_LIBRARIES}
+                           ${LUAJIT_LIBRARIES}
+)
