@@ -97,7 +97,8 @@ tuple_constraint_call_func(const struct tuple_constraint *constr,
 					constr->space->format);
 	port_c_add_str(&in_port, constr->def.name, constr->def.name_len);
 
-	int rc = func_call(constr->func_cache_holder.func, &in_port, &out_port);
+	int rc = func_call_no_access_check(constr->func_cache_holder.func,
+					   &in_port, &out_port);
 	port_destroy(&in_port);
 	if (rc == 0) {
 		uint32_t ret_size;
@@ -189,7 +190,7 @@ tuple_constraint_func_init(struct tuple_constraint *constr,
 		assert(constr->check == tuple_constraint_noop_check);
 		return 0;
 	}
-	if (func == NULL ||
+	if (func == NULL || func_access_check(func) != 0 ||
 	    tuple_constraint_func_verify(constr, func, is_field) != 0) {
 		constr->space = NULL;
 		return -1;
