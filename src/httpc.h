@@ -133,11 +133,11 @@ struct httpc_request {
 	 */
 	bool set_keep_alive_header;
 	/**
-	 * True when Transfer-Encoding: chunked must be
-	 * set before execution automatically if chunked
-	 * io enabled.
+	 * It's the number of bytes of data in the body of the
+	 * request. The value is equal to "Content-Length"
+	 * header or -1 otherwise.
 	 */
-	bool set_chunked_header;
+	long content_length;
 	/** True when chunked io is enabled. */
 	bool io;
 	/**

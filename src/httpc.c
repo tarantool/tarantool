@@ -164,6 +164,7 @@ httpc_request_new(struct httpc_env *env, const char *method,
 	req->env = env;
 	req->set_connection_header = true;
 	req->set_keep_alive_header = true;
+	req->content_length = -1;
 
 	region_create(&req->resp_headers, &cord()->slabc);
 	region_create(&req->recv, &cord()->slabc);
@@ -255,10 +256,19 @@ httpc_set_header(struct httpc_request *req, const char *fmt, ...)
 		 strlen(HTTP_CONNECTION_HEADER)) == 0)
 		req->set_connection_header = false;
 	else if (strncasecmp(header, HTTP_CONTENT_LENGTH_HEADER,
-			     strlen(HTTP_CONTENT_LENGTH_HEADER)) == 0)
-		req->set_chunked_header = false;
-	else if (strncasecmp(header, HTTP_KEEP_ALIVE_HEADER,
-			     strlen(HTTP_KEEP_ALIVE_HEADER)) == 0)
+			     strlen(HTTP_CONTENT_LENGTH_HEADER)) == 0) {
+		const char *len = header + strlen(HTTP_CONTENT_LENGTH_HEADER);
+		char *end = NULL;
+		long length = strtol(len, &end, 10);
+		if (*end != '\0' || length < 0) {
+			diag_set(IllegalParams,
+				 "Content-Length header value "
+				 "must be a non-negative integer");
+			return -1;
+		}
+		req->content_length = length;
+	} else if (strncasecmp(header, HTTP_KEEP_ALIVE_HEADER,
+			       strlen(HTTP_KEEP_ALIVE_HEADER)) == 0)
 		req->set_keep_alive_header = false;
 
 	struct curl_slist *l = curl_slist_append(req->headers, header);
@@ -287,7 +297,6 @@ httpc_set_body(struct httpc_request *req, const char *body, size_t size)
 
 	if (httpc_set_header(req, "Content-Length: %zu", size) != 0)
 		return -1;
-	req->set_chunked_header = false;
 
 	return 0;
 }
@@ -468,11 +477,15 @@ httpc_set_io(struct httpc_request *req, const char *method)
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_READFUNCTION,
 				 curl_easy_io_read_cb);
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_UPLOAD, 1L);
+		if (req->content_length >= 0) {
+			curl_easy_setopt(req->curl_request.easy,
+					 CURLOPT_INFILESIZE,
+					 req->content_length);
+		}
 		req->io_send = true;
 		req->io_send_closed = false;
 		req->io_headers_cond = &req->io_send_cond;
 	} else {
-		req->set_chunked_header = false;
 		req->io_send = false;
 		req->io_send_closed = true;
 		req->io_headers_cond = &req->io_recv_cond;
@@ -649,9 +662,6 @@ httpc_request_start(struct httpc_request *req, double timeout)
 	if (req->set_keep_alive_header && req->keep_alive_timeout > 0 &&
 	    httpc_set_header(req, "Keep-Alive: timeout=%ld",
 			     req->keep_alive_timeout) != 0)
-		return -1;
-	if (req->io && req->set_chunked_header &&
-	    httpc_set_header(req, "Transfer-Encoding: chunked") != 0)
 		return -1;
 
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_WRITEDATA, (void *) req);

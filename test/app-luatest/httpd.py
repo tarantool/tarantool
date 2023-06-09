@@ -64,7 +64,7 @@ def json_body():
     headers = [("Content-Type", "application/json; charset=utf-8")]
     return code, body, headers
 
-paths = {
+read_paths = {
         "/": hello,
         "/abc": hello1,
         "/absent": absent,
@@ -75,12 +75,25 @@ paths = {
         "/lango_body": lango_body,
         }
 
+def encoding(env):
+    code = "200 OK"
+    if "HTTP_TRANSFER_ENCODING" in env:
+        body = [str.encode(env["HTTP_TRANSFER_ENCODING"])]
+    else:
+        body = [b'none']
+    headers = []
+    return code, body, headers
+
+post_paths = {
+        "/encoding": encoding,
+        }
+
 def read_handle(env, response):
     code = "404 Not Found"
     headers = []
     body = [b'Not Found']
-    if env["PATH_INFO"] in paths:
-        code, body, headers = paths[env["PATH_INFO"]]()
+    if env["PATH_INFO"] in read_paths:
+        code, body, headers = read_paths[env["PATH_INFO"]]()
     for key,value in iter(env.items()):
         if "HTTP_" in key:
             headers.append((key[5:].lower(), value))
@@ -91,6 +104,8 @@ def post_handle(env, response):
     code = "200 OK"
     body = [env["wsgi.input"].read()]
     headers = []
+    if env["PATH_INFO"] in post_paths:
+        code, body, headers = post_paths[env["PATH_INFO"]](env)
     for key,value in iter(env.items()):
         if "HTTP_" in key:
             headers.append((key[5:].lower(), value))
