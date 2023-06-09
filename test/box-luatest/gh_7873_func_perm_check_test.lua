@@ -66,6 +66,68 @@ local function test_func_indexes()
     box.schema.func.drop(fname)
 end
 
+local function test_constraints()
+    local prefix = 'test_constraints_'
+    local uname = prefix .. 'user'
+    local fname = prefix .. 'func'
+    local s_test = box.schema.space.create(prefix .. 's_test')
+    local err = "Execute access to function '" .. fname .. "'"
+                .. " is denied for user '" .. uname .. "'"
+
+    -- Fill spaces to invoke format/constraint check.
+    s_test:create_index('pk')
+    for i = 1, 10 do s_test:insert({i}) end
+
+    -- Create a function by 'admin'.
+    box.schema.func.create(fname, {
+        body = 'function(a, b) return true end',
+        is_deterministic = true,
+        is_sandboxed = true
+    })
+
+    -- Set the function as tuple and field constraint.
+    s_test:alter({constraint = fname})
+    s_test:format({{'id', 'unsigned', constraint = fname}})
+
+    -- Create a restricted user.
+    box.session.su('admin')
+    box.schema.user.create(uname)
+    box.schema.user.grant(uname, 'read,write,alter,create,drop', 'universe')
+
+    -- Switch to the restricted user.
+    box.session.su(uname)
+
+    ----------------------------------------------------------------------------
+    -- The restricted user should be able to use the space with a constraint
+    -- that was set by 'admin'.
+
+    s_test:insert({42})
+
+    ----------------------------------------------------------------------------
+    -- The restricted user should not be able to specify the function that was
+    -- created by 'admin' as a constraint without 'execute' permission.
+
+    -- Attempt to set admin's function as a tuple constraint.
+    t.assert_error_msg_equals(err, s_test.alter, s_test, {constraint = fname})
+
+    -- Attempt to set admin's function as a field constraint.
+    t.assert_error_msg_equals(err, s_test.format, s_test, {
+        {'id', 'unsigned', constraint = fname}
+    })
+
+    ----------------------------------------------------------------------------
+    -- Cleanup.
+
+    box.session.su('admin')
+    s_test:drop()
+    box.schema.user.drop(uname)
+    box.schema.func.drop(fname)
+end
+
 g.test_func_indexes = function(cg)
     cg.server:exec(test_func_indexes)
+end
+
+g.test_constraints = function(cg)
+    cg.server:exec(test_constraints)
 end
