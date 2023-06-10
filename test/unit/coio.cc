@@ -95,7 +95,8 @@ test_getaddrinfo(void)
 	rc = coio_getaddrinfo("non_exists_hostname", port, NULL, &i,
 			      15768000000);
 	isnt(rc, 0, "getaddrinfo retval");
-	const char *errmsg = diag_get()->last->errmsg;
+	const error *last_err = diag_get()->last;
+	const char *errmsg = last_err == NULL ? "" : last_err->errmsg;
 	bool is_match_with_exp = strstr(errmsg, "getaddrinfo") == errmsg;
 	is(is_match_with_exp, true, "getaddrinfo error message");
 
