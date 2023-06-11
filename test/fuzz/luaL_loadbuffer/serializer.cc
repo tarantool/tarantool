@@ -5,6 +5,157 @@
  */
 #include "serializer.h"
 
+#include <stack>
+#include <string>
+
+namespace {
+
+const std::string kCounterNamePrefix = "counter_";
+
+/**
+ * Class that controls id creation for counters. Basically, a
+ * variable wrapper that guarantees variable to be incremented.
+ */
+class CounterIdProvider {
+public:
+	/** Returns number of id provided. */
+	std::size_t count()
+	{
+		return id_;
+	}
+
+	/** Returns a new id that was not used after last clean(). */
+	std::size_t next()
+	{
+		return id_++;
+	}
+
+	/**
+	 * Cleans history. Should be used to make fuzzer starts
+	 * independent.
+	 */
+	void clean()
+	{
+		id_ = 0;
+	}
+
+private:
+	std::size_t id_ = 0;
+};
+
+/** A singleton for counter id provider. */
+CounterIdProvider&
+GetCounterIdProvider()
+{
+	static CounterIdProvider provider;
+	return provider;
+}
+
+std::string
+GetCounterName(std::size_t id)
+{
+	return kCounterNamePrefix + std::to_string(id);
+}
+
+/** Returns `<counter_name> = <counter_name> + 1`. */
+std::string
+GetCounterIncrement(const std::string &counter_name)
+{
+	std::string retval = counter_name;
+	retval += " = ";
+	retval += counter_name;
+	retval += " + 1\n";
+	return retval;
+}
+
+/**
+ * Returns `if <counter_name> > kMaxCounterValue then
+ * <then_block> end`.
+ */
+std::string
+GetCondition(const std::string &counter_name, const std::string &then_block)
+{
+	std::string retval = "if ";
+	retval += counter_name;
+	retval += " > ";
+	retval += std::to_string(kMaxCounterValue);
+	retval += " then ";
+	retval += then_block;
+	retval += " end\n";
+	return retval;
+}
+
+/**
+ * Block may be placed not only in a cycle, so specially for cycles
+ * there is a function that will add a break condition and a
+ * counter increment.
+ */
+std::string
+BlockToStringCycleProtected(const Block &block, const std::string &counter_name)
+{
+	std::string retval = GetCondition(counter_name, "break");
+	retval += GetCounterIncrement(counter_name);
+	retval += ChunkToString(block.chunk());
+	return retval;
+}
+
+/**
+ * DoBlock may be placed not only in a cycle, so specially for
+ * cycles there is a function that will call
+ * BlockToStringCycleProtected().
+ */
+std::string
+DoBlockToStringCycleProtected(const DoBlock &block,
+			      const std::string &counter_name)
+{
+	std::string retval = "do\n";
+	retval += BlockToStringCycleProtected(block.block(), counter_name);
+	retval += "end\n";
+	return retval;
+}
+
+/**
+ * FuncBody may contain recursive calls, so for all function bodies,
+ * there is a function that adds a return condition and a counter
+ * increment.
+ */
+std::string
+FuncBodyToStringReqProtected(const FuncBody &body,
+			     const std::string &counter_name)
+{
+	std::string body_str = "( ";
+	if (body.has_parlist()) {
+		body_str += ParListToString(body.parlist());
+	}
+	body_str += " )\n\t";
+
+	body_str += GetCondition(counter_name, "return");
+	body_str += GetCounterIncrement(counter_name);
+
+	body_str += BlockToString(body.block());
+	body_str += "end\n";
+	return body_str;
+}
+
+} /* namespace */
+
+std::string
+MainBlockToString(const Block &block)
+{
+	GetCounterIdProvider().clean();
+
+	std::string block_str = BlockToString(block);
+	std::string retval;
+
+	for (size_t i = 0; i < GetCounterIdProvider().count(); ++i) {
+		retval += GetCounterName(i);
+		retval += " = 0\n";
+	}
+	retval += block_str;
+
+	return retval;
+}
+
 static inline std::string
 RemoveLeadingNumbers(const std::string &s)
 {
@@ -126,18 +277,12 @@ PROTO_TOSTRING(Statement, stat)
 	case StatType::kBlock:
 		stat_str = DoBlockToString(stat.block());
 		break;
-	/**
-	 * TODO:
-	 * Commented due to possible generation of infinite loops.
-	 * In that case, fuzzer will drop only by timeout.
-	 * Example: 'while true do end'.
-	 */
-	/*
-	 * case StatType::kWhilecycle:
-	 *      stat_str = WhileCycleToString(stat.whilecycle());
-	 * case StatType::kRepeatcycle:
-	 *	stat_str = RepeatCycleToString(stat.repeatcycle());
-	 */
+	case StatType::kWhilecycle:
+		stat_str = WhileCycleToString(stat.whilecycle());
+		break;
+	case StatType::kRepeatcycle:
+		stat_str = RepeatCycleToString(stat.repeatcycle());
+		break;
 	case StatType::kIfstat:
 		stat_str = IfStatementToString(stat.ifstat());
 		break;
@@ -255,9 +400,15 @@ PROTO_TOSTRING(DoBlock, block)
  */
 PROTO_TOSTRING(WhileCycle, whilecycle)
 {
-	std::string whilecycle_str = "while " + ExpressionToString(
-		whilecycle.condition());
-	whilecycle_str += " " + DoBlockToString(whilecycle.doblock());
+	const auto id = GetCounterIdProvider().next();
+	auto counter_name = GetCounterName(id);
+
+	std::string whilecycle_str = "while ";
+	whilecycle_str += ExpressionToString(whilecycle.condition());
+	whilecycle_str += " ";
+	whilecycle_str += DoBlockToStringCycleProtected(whilecycle.doblock(),
+							counter_name);
+
 	return whilecycle_str;
 }
 
@@ -266,10 +417,15 @@ PROTO_TOSTRING(WhileCycle, whilecycle)
  */
 PROTO_TOSTRING(RepeatCycle, repeatcycle)
 {
-	std::string repeatcycle_str = "repeat " + BlockToString(
-		repeatcycle.block());
-	repeatcycle_str += "until " + ExpressionToString(
-		repeatcycle.condition());
+	const auto id = GetCounterIdProvider().next();
+	auto counter_name = GetCounterName(id);
+
+	std::string repeatcycle_str = "repeat\n";
+	repeatcycle_str += BlockToStringCycleProtected(repeatcycle.block(),
+						       counter_name);
+	repeatcycle_str += "until ";
+	repeatcycle_str += ExpressionToString(repeatcycle.condition());
+
 	return repeatcycle_str;
 }
 
@@ -309,16 +465,23 @@ NESTED_PROTO_TOSTRING(ElseIfBlock, elseifblock, IfStatement)
  */
 PROTO_TOSTRING(ForCycleName, forcyclename)
 {
-	std::string forcyclename_str = "for " + NameToString(
-		forcyclename.name());
-	forcyclename_str += " = " + ExpressionToString(forcyclename.startexp());
-	forcyclename_str += ", " + ExpressionToString(forcyclename.stopexp());
+	const auto id = GetCounterIdProvider().next();
+	auto counter_name = GetCounterName(id);
+
+	std::string forcyclename_str = "for ";
+	forcyclename_str += NameToString(forcyclename.name());
+	forcyclename_str += " = ";
+	forcyclename_str += ExpressionToString(forcyclename.startexp());
+	forcyclename_str += ", ";
+	forcyclename_str += ExpressionToString(forcyclename.stopexp());
 
 	if (forcyclename.has_stepexp())
 		forcyclename_str += ", " + ExpressionToString(
 			forcyclename.stepexp());
 
-	forcyclename_str += " " + DoBlockToString(forcyclename.doblock());
+	forcyclename_str += " ";
+	forcyclename_str += DoBlockToStringCycleProtected(
+		forcyclename.doblock(), counter_name);
 	return forcyclename_str;
 }
 
@@ -327,11 +490,16 @@ PROTO_TOSTRING(ForCycleName, forcyclename)
  */
 PROTO_TOSTRING(ForCycleList, forcyclelist)
 {
-	std::string forcyclelist_str = "for " + NameListToString(
-		forcyclelist.names());
-	forcyclelist_str += " in " + ExpressionListToString(
-		forcyclelist.expressions());
-	forcyclelist_str += " " + DoBlockToString(forcyclelist.doblock());
+	const auto id = GetCounterIdProvider().next();
+	auto counter_name = GetCounterName(id);
+
+	std::string forcyclelist_str = "for ";
+	forcyclelist_str += NameListToString(forcyclelist.names());
+	forcyclelist_str += " in ";
+	forcyclelist_str += ExpressionListToString(forcyclelist.expressions());
+	forcyclelist_str += " ";
+	forcyclelist_str += DoBlockToStringCycleProtected(
+		forcyclelist.doblock(), counter_name);
 	return forcyclelist_str;
 }
 
@@ -340,8 +508,13 @@ PROTO_TOSTRING(ForCycleList, forcyclelist)
  */
 PROTO_TOSTRING(Function, func)
 {
-	std::string func_str = "function " + FuncNameToString(func.name());
-	func_str += FuncBodyToString(func.body());
+	const auto id = GetCounterIdProvider().next();
+	auto counter_name = GetCounterName(id);
+
+	std::string func_str = "function ";
+	func_str += FuncNameToString(func.name());
+	func_str += FuncBodyToStringReqProtected(func.body(), counter_name);
+
 	return func_str;
 }
 
@@ -364,17 +537,6 @@ PROTO_TOSTRING(NameList, namelist)
 	for (int i = 0; i < namelist.names_size(); ++i)
 		namelist_str += ", " + NameToString(namelist.names(i));
 	return namelist_str;
-}
-
-PROTO_TOSTRING(FuncBody, body)
-{
-	std::string body_str = "( ";
-	if (body.has_parlist())
-		body_str += ParListToString(body.parlist());
-	body_str += " )\n\t";
-	body_str += BlockToString(body.block());
-	body_str += "end\n";
-	return body_str;
 }
 
 NESTED_PROTO_TOSTRING(NameListWithEllipsis, namelist, FuncBody)
@@ -404,9 +566,15 @@ NESTED_PROTO_TOSTRING(ParList, parlist, FuncBody)
  */
 PROTO_TOSTRING(LocalFunc, localfunc)
 {
-	std::string localfunc_str = "local function " + NameToString(
-		localfunc.name());
-	localfunc_str += " " + FuncBodyToString(localfunc.funcbody());
+	const auto id = GetCounterIdProvider().next();
+	auto counter_name = GetCounterName(id);
+
+	std::string localfunc_str = "local function ";
+	localfunc_str += NameToString(localfunc.name());
+	localfunc_str += " ";
+	localfunc_str += FuncBodyToStringReqProtected(localfunc.funcbody(),
+						      counter_name);
+
 	return localfunc_str;
 }
 
@@ -548,7 +716,13 @@ PROTO_TOSTRING(Expression, expr)
 
 NESTED_PROTO_TOSTRING(AnonFunc, func, Expression)
 {
-	return "function " + FuncBodyToString(func.body());
+	const auto id = GetCounterIdProvider().next();
+	auto counter_name = GetCounterName(id);
+
+	std::string retval = "function ";
+	retval += FuncBodyToStringReqProtected(func.body(), counter_name);
+
+	return retval;
 }
 
 NESTED_PROTO_TOSTRING(ExpBinaryOpExp, binary, Expression)
