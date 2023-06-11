@@ -1,0 +1,895 @@
+chunk {
+  stat {
+    whilecycle {
+      condition {
+      }
+      doblock {
+        block {
+          chunk {
+            stat {
+              list {
+                varlist {
+                  var {
+                  }
+                }
+                explist {
+                  expressions {
+                    tableconstructor {
+                      fieldlist {
+                        firstField {
+                          namedassign {
+                            name {
+                              name: ""
+                              num: 0
+                            }
+                            value {
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                  explast {
+                    binary {
+                      leftexp {
+                        prefixexp {
+                          exp {
+                            ellipsis: "\326"
+                          }
+                        }
+                      }
+                      binop {
+                      }
+                      rightexp {
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  stat {
+    semicolon: true
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+    block {
+      block {
+        chunk {
+        }
+      }
+    }
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+    whilecycle {
+      condition {
+        tableconstructor {
+        }
+      }
+      doblock {
+        block {
+          chunk {
+          }
+        }
+      }
+    }
+    semicolon: false
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+    semicolon: true
+  }
+  stat {
+    list {
+      varlist {
+        var {
+          name {
+            name: "select"
+            num: 0
+          }
+        }
+      }
+      explist {
+        explast {
+        }
+      }
+    }
+  }
+  stat {
+    semicolon: true
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+    semicolon: true
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+    whilecycle {
+      condition {
+      }
+      doblock {
+        block {
+          chunk {
+            stat {
+              whilecycle {
+                condition {
+                }
+                doblock {
+                  block {
+                    chunk {
+                      stat {
+                        whilecycle {
+                          condition {
+                          }
+                          doblock {
+                            block {
+                              chunk {
+                                stat {
+                                  whilecycle {
+                                    condition {
+                                    }
+                                    doblock {
+                                      block {
+                                        chunk {
+                                          stat {
+                                            list {
+                                              varlist {
+                                                var {
+                                                }
+                                              }
+                                              explist {
+                                                expressions {
+                                                  tableconstructor {
+                                                    fieldlist {
+                                                      firstField {
+                                                        exprassign {
+                                                          key {
+                                                          }
+                                                          value {
+                                                            prefixexp {
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                                explast {
+                                                  binary {
+                                                    leftexp {
+                                                      prefixexp {
+                                                        exp {
+                                                          ellipsis: "\326"
+                                                        }
+                                                      }
+                                                    }
+                                                    binop {
+                                                    }
+                                                    rightexp {
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                                stat {
+                                  whilecycle {
+                                    condition {
+                                    }
+                                    doblock {
+                                      block {
+                                        chunk {
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                                stat {
+                                  whilecycle {
+                                    condition {
+                                    }
+                                    doblock {
+                                      block {
+                                        chunk {
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                      stat {
+                        whilecycle {
+                          condition {
+                          }
+                          doblock {
+                            block {
+                              chunk {
+                                stat {
+                                  whilecycle {
+                                    condition {
+                                    }
+                                    doblock {
+                                      block {
+                                        chunk {
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                    stat {
+                                                      whilecycle {
+                                                        condition {
+                                                        }
+                                                        doblock {
+                                                          block {
+                                                            chunk {
+                                                              stat {
+                                                                list {
+                                                                  varlist {
+                                                                    var {
+                                                                    }
+                                                                  }
+                                                                  explist {
+                                                                    expressions {
+                                                                      tableconstructor {
+                                                                        fieldlist {
+                                                                          firstField {
+                                                                            exprassign {
+                                                                              key {
+                                                                              }
+                                                                              value {
+                                                                                prefixexp {
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                    explast {
+                                                                      binary {
+                                                                        leftexp {
+                                                                          prefixexp {
+                                                                            exp {
+                                                                              ellipsis: "\326"
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                        binop {
+                                                                        }
+                                                                        rightexp {
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                    stat {
+                                                      whilecycle {
+                                                        condition {
+                                                        }
+                                                        doblock {
+                                                          block {
+                                                            chunk {
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                    stat {
+                                                      whilecycle {
+                                                        condition {
+                                                        }
+                                                        doblock {
+                                                          block {
+                                                            chunk {
+                                                              stat {
+                                                                whilecycle {
+                                                                  condition {
+                                                                  }
+                                                                  doblock {
+                                                                    block {
+                                                                      chunk {
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                  }
+                                                }
+                                              }
+                                            }
+                                            semicolon: true
+                                          }
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                    stat {
+                                                      whilecycle {
+                                                        condition {
+                                                        }
+                                                        doblock {
+                                                          block {
+                                                            chunk {
+                                                              stat {
+                                                                whilecycle {
+                                                                  condition {
+                                                                  }
+                                                                  doblock {
+                                                                    block {
+                                                                      chunk {
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                              stat {
+                                                                whilecycle {
+                                                                  condition {
+                                                                  }
+                                                                  doblock {
+                                                                    block {
+                                                                      chunk {
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                              stat {
+                                                                whilecycle {
+                                                                  condition {
+                                                                  }
+                                                                  doblock {
+                                                                    block {
+                                                                      chunk {
+                                                                        stat {
+                                                                          whilecycle {
+                                                                            condition {
+                                                                            }
+                                                                            doblock {
+                                                                              block {
+                                                                                chunk {
+                                                                                  stat {
+                                                                                    list {
+                                                                                      varlist {
+                                                                                        var {
+                                                                                          name {
+                                                                                            name: "select"
+                                                                                            num: 0
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                      explist {
+                                                                                        expressions {
+                                                                                          tableconstructor {
+                                                                                            fieldlist {
+                                                                                              firstField {
+                                                                                                exprassign {
+                                                                                                  key {
+                                                                                                  }
+                                                                                                  value {
+                                                                                                    prefixexp {
+                                                                                                    }
+                                                                                                  }
+                                                                                                }
+                                                                                              }
+                                                                                            }
+                                                                                          }
+                                                                                        }
+                                                                                        explast {
+                                                                                          binary {
+                                                                                            leftexp {
+                                                                                              prefixexp {
+                                                                                                exp {
+                                                                                                  ellipsis: "\326"
+                                                                                                }
+                                                                                              }
+                                                                                            }
+                                                                                            binop {
+                                                                                            }
+                                                                                            rightexp {
+                                                                                            }
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                    }
+                                                                                  }
+                                                                                  stat {
+                                                                                    whilecycle {
+                                                                                      condition {
+                                                                                      }
+                                                                                      doblock {
+                                                                                        block {
+                                                                                          chunk {
+                                                                                            stat {
+                                                                                              whilecycle {
+                                                                                                condition {
+                                                                                                }
+                                                                                                doblock {
+                                                                                                  block {
+                                                                                                    chunk {
+                                                                                                    }
+                                                                                                  }
+                                                                                                }
+                                                                                              }
+                                                                                            }
+                                                                                            stat {
+                                                                                              whilecycle {
+                                                                                                condition {
+                                                                                                }
+                                                                                                doblock {
+                                                                                                  block {
+                                                                                                    chunk {
+                                                                                                    }
+                                                                                                  }
+                                                                                                }
+                                                                                              }
+                                                                                            }
+                                                                                            stat {
+                                                                                              whilecycle {
+                                                                                                condition {
+                                                                                                }
+                                                                                                doblock {
+                                                                                                  block {
+                                                                                                    chunk {
+                                                                                                      stat {
+                                                                                                        whilecycle {
+                                                                                                          condition {
+                                                                                                          }
+                                                                                                          doblock {
+                                                                                                            block {
+                                                                                                              chunk {
+                                                                                                                stat {
+                                                                                                                  list {
+                                                                                                                    varlist {
+                                                                                                                      var {
+                                                                                                                      }
+                                                                                                                    }
+                                                                                                                    explist {
+                                                                                                                      expressions {
+                                                                                                                        tableconstructor {
+                                                                                                                          fieldlist {
+                                                                                                                            firstField {
+                                                                                                                              exprassign {
+                                                                                                                                key {
+                                                                                                                                }
+                                                                                                                                value {
+                                                                                                                                  prefixexp {
+                                                                                                                                  }
+                                                                                                                                }
+                                                                                                                              }
+                                                                                                                            }
+                                                                                                                          }
+                                                                                                                        }
+                                                                                                                      }
+                                                                                                                      explast {
+                                                                                                                        binary {
+                                                                                                                          leftexp {
+                                                                                                                            prefixexp {
+                                                                                                                              exp {
+                                                                                                                                ellipsis: "\326"
+                                                                                                                              }
+                                                                                                                            }
+                                                                                                                          }
+                                                                                                                          binop {
+                                                                                                                          }
+                                                                                                                          rightexp {
+                                                                                                                          }
+                                                                                                                        }
+                                                                                                                      }
+                                                                                                                    }
+                                                                                                                  }
+                                                                                                                }
+                                                                                                              }
+                                                                                                            }
+                                                                                                          }
+                                                                                                        }
+                                                                                                      }
+                                                                                                    }
+                                                                                                  }
+                                                                                                }
+                                                                                              }
+                                                                                            }
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                    }
+                                                                                  }
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                                stat {
+                                  list {
+                                    varlist {
+                                      var {
+                                      }
+                                    }
+                                    explist {
+                                      expressions {
+                                        tableconstructor {
+                                        }
+                                      }
+                                      explast {
+                                        binary {
+                                          leftexp {
+                                            prefixexp {
+                                              exp {
+                                                ellipsis: "\326"
+                                              }
+                                            }
+                                          }
+                                          binop {
+                                          }
+                                          rightexp {
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                        semicolon: true
+                      }
+                      stat {
+                        whilecycle {
+                          condition {
+                          }
+                          doblock {
+                            block {
+                              chunk {
+                                stat {
+                                  whilecycle {
+                                    condition {
+                                    }
+                                    doblock {
+                                      block {
+                                        chunk {
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                    stat {
+                                                      whilecycle {
+                                                        condition {
+                                                        }
+                                                        doblock {
+                                                          block {
+                                                            chunk {
+                                                              stat {
+                                                                list {
+                                                                  varlist {
+                                                                    var {
+                                                                    }
+                                                                  }
+                                                                  explist {
+                                                                    expressions {
+                                                                      tableconstructor {
+                                                                        fieldlist {
+                                                                          firstField {
+                                                                            exprassign {
+                                                                              key {
+                                                                              }
+                                                                              value {
+                                                                                prefixexp {
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                    explast {
+                                                                      binary {
+                                                                        leftexp {
+                                                                          prefixexp {
+                                                                            exp {
+                                                                              ellipsis: "\326"
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                        binop {
+                                                                        }
+                                                                        rightexp {
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            stat {
+              list {
+                varlist {
+                  var {
+                  }
+                }
+                explist {
+                  expressions {
+                    tableconstructor {
+                      fieldlist {
+                        firstField {
+                          exprassign {
+                            key {
+                            }
+                            value {
+                              prefixexp {
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                  explast {
+                    binary {
+                      leftexp {
+                        prefixexp {
+                          exp {
+                            ellipsis: "\326"
+                          }
+                        }
+                      }
+                      binop {
+                      }
+                      rightexp {
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  stat {
+    localnames {
+      namelist {
+        firstname {
+          name: ""
+          num: 0
+        }
+      }
+    }
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+    semicolon: true
+  }
+  stat {
+  }
+  stat {
+  }
+  stat {
+    semicolon: false
+  }
+  stat {
+  }
+  stat {
+    semicolon: true
+  }
+  stat {
+  }
+  stat {
+    semicolon: true
+  }
+  stat {
+  }
+  stat {
+    block {
+      block {
+        chunk {
+          stat {
+            list {
+              varlist {
+                var {
+                  indexname {
+                    prefixexp {
+                    }
+                    Name: "\000\000\000\000"
+                  }
+                }
+              }
+              explist {
+                expressions {
+                  tableconstructor {
+                    fieldlist {
+                      firstField {
+                        namedassign {
+                          name {
+                            name: "."
+                            num: 0
+                          }
+                          value {
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                explast {
+                  binary {
+                    leftexp {
+                      prefixexp {
+                        exp {
+                          ellipsis: "\326"
+                        }
+                      }
+                    }
+                    binop {
+                    }
+                    rightexp {
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  stat {
+  }
+}
