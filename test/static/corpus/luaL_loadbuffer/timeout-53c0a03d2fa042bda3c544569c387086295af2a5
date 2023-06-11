@@ -1,0 +1,863 @@
+chunk {
+  stat {
+    whilecycle {
+      condition {
+      }
+      doblock {
+        block {
+          chunk {
+            stat {
+              whilecycle {
+                condition {
+                }
+                doblock {
+                  block {
+                    chunk {
+                      stat {
+                        whilecycle {
+                          condition {
+                            str: "\000\000\000\000\000\000\000\000\000\000"
+                          }
+                          doblock {
+                            block {
+                              chunk {
+                                stat {
+                                  whilecycle {
+                                    condition {
+                                    }
+                                    doblock {
+                                      block {
+                                        chunk {
+                                        }
+                                      }
+                                    }
+                                  }
+                                  semicolon: true
+                                }
+                                stat {
+                                  whilecycle {
+                                    condition {
+                                    }
+                                    doblock {
+                                      block {
+                                        chunk {
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                                stat {
+                                  whilecycle {
+                                    condition {
+                                      function {
+                                        body {
+                                          parlist {
+                                          }
+                                          block {
+                                            chunk {
+                                              stat {
+                                                forcyclelist {
+                                                  names {
+                                                    firstname {
+                                                      name: "\000\000\000\000\000\000\000\000\000\000"
+                                                      num: 0
+                                                    }
+                                                  }
+                                                  expressions {
+                                                    explast {
+                                                    }
+                                                  }
+                                                  doblock {
+                                                    block {
+                                                      chunk {
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                    doblock {
+                                      block {
+                                        chunk {
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                    stat {
+                                                      whilecycle {
+                                                        condition {
+                                                        }
+                                                        doblock {
+                                                          block {
+                                                            chunk {
+                                                              stat {
+                                                                whilecycle {
+                                                                  condition {
+                                                                  }
+                                                                  doblock {
+                                                                    block {
+                                                                      chunk {
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                                semicolon: true
+                                                              }
+                                                              stat {
+                                                                whilecycle {
+                                                                  condition {
+                                                                  }
+                                                                  doblock {
+                                                                    block {
+                                                                      chunk {
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                              stat {
+                                                                whilecycle {
+                                                                  condition {
+                                                                    function {
+                                                                      body {
+                                                                        parlist {
+                                                                        }
+                                                                        block {
+                                                                          chunk {
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                  doblock {
+                                                                    block {
+                                                                      chunk {
+                                                                        stat {
+                                                                          whilecycle {
+                                                                            condition {
+                                                                            }
+                                                                            doblock {
+                                                                              block {
+                                                                                chunk {
+                                                                                  stat {
+                                                                                    whilecycle {
+                                                                                      condition {
+                                                                                      }
+                                                                                      doblock {
+                                                                                        block {
+                                                                                          chunk {
+                                                                                            stat {
+                                                                                              whilecycle {
+                                                                                                condition {
+                                                                                                }
+                                                                                                doblock {
+                                                                                                  block {
+                                                                                                    chunk {
+                                                                                                      stat {
+                                                                                                        whilecycle {
+                                                                                                          condition {
+                                                                                                          }
+                                                                                                          doblock {
+                                                                                                            block {
+                                                                                                              chunk {
+                                                                                                              }
+                                                                                                            }
+                                                                                                          }
+                                                                                                        }
+                                                                                                        semicolon: true
+                                                                                                      }
+                                                                                                      stat {
+                                                                                                        whilecycle {
+                                                                                                          condition {
+                                                                                                          }
+                                                                                                          doblock {
+                                                                                                            block {
+                                                                                                              chunk {
+                                                                                                              }
+                                                                                                            }
+                                                                                                          }
+                                                                                                        }
+                                                                                                      }
+                                                                                                      stat {
+                                                                                                        whilecycle {
+                                                                                                          condition {
+                                                                                                            function {
+                                                                                                              body {
+                                                                                                                parlist {
+                                                                                                                }
+                                                                                                                block {
+                                                                                                                  chunk {
+                                                                                                                  }
+                                                                                                                }
+                                                                                                              }
+                                                                                                            }
+                                                                                                          }
+                                                                                                          doblock {
+                                                                                                            block {
+                                                                                                              chunk {
+                                                                                                              }
+                                                                                                            }
+                                                                                                          }
+                                                                                                        }
+                                                                                                      }
+                                                                                                    }
+                                                                                                  }
+                                                                                                }
+                                                                                              }
+                                                                                            }
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                    }
+                                                                                    semicolon: true
+                                                                                  }
+                                                                                  stat {
+                                                                                  }
+                                                                                  stat {
+                                                                                    whilecycle {
+                                                                                      condition {
+                                                                                      }
+                                                                                      doblock {
+                                                                                        block {
+                                                                                          chunk {
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                    }
+                                                                                    semicolon: true
+                                                                                  }
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                          semicolon: true
+                                                                        }
+                                                                        stat {
+                                                                          whilecycle {
+                                                                            condition {
+                                                                            }
+                                                                            doblock {
+                                                                              block {
+                                                                                chunk {
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                        stat {
+                                                                          whilecycle {
+                                                                            condition {
+                                                                            }
+                                                                            doblock {
+                                                                              block {
+                                                                                chunk {
+                                                                                  stat {
+                                                                                    whilecycle {
+                                                                                      condition {
+                                                                                      }
+                                                                                      doblock {
+                                                                                        block {
+                                                                                          chunk {
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                    }
+                                                                                    semicolon: true
+                                                                                  }
+                                                                                  stat {
+                                                                                  }
+                                                                                  stat {
+                                                                                    whilecycle {
+                                                                                      condition {
+                                                                                        function {
+                                                                                          body {
+                                                                                            block {
+                                                                                              chunk {
+                                                                                                stat {
+                                                                                                  semicolon: true
+                                                                                                }
+                                                                                                stat {
+                                                                                                  semicolon: true
+                                                                                                }
+                                                                                                stat {
+                                                                                                  semicolon: false
+                                                                                                }
+                                                                                                stat {
+                                                                                                }
+                                                                                                stat {
+                                                                                                }
+                                                                                                stat {
+                                                                                                  forcyclelist {
+                                                                                                    names {
+                                                                                                      firstname {
+                                                                                                        name: ""
+                                                                                                        num: 0
+                                                                                                      }
+                                                                                                    }
+                                                                                                    expressions {
+                                                                                                      explast {
+                                                                                                      }
+                                                                                                    }
+                                                                                                    doblock {
+                                                                                                      block {
+                                                                                                        chunk {
+                                                                                                          stat {
+                                                                                                            ifstat {
+                                                                                                              condition {
+                                                                                                              }
+                                                                                                              first {
+                                                                                                                chunk {
+                                                                                                                }
+                                                                                                              }
+                                                                                                              last {
+                                                                                                                chunk {
+                                                                                                                  laststat {
+                                                                                                                    semicolon: true
+                                                                                                                  }
+                                                                                                                }
+                                                                                                              }
+                                                                                                            }
+                                                                                                          }
+                                                                                                        }
+                                                                                                      }
+                                                                                                    }
+                                                                                                  }
+                                                                                                  semicolon: true
+                                                                                                }
+                                                                                                stat {
+                                                                                                }
+                                                                                              }
+                                                                                            }
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                      doblock {
+                                                                                        block {
+                                                                                          chunk {
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                    }
+                                                                                  }
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                        stat {
+                                                                        }
+                                                                        stat {
+                                                                          ifstat {
+                                                                            condition {
+                                                                            }
+                                                                            first {
+                                                                              chunk {
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              semicolon: true
+            }
+            stat {
+            }
+            stat {
+              whilecycle {
+                condition {
+                  function {
+                    body {
+                      block {
+                        chunk {
+                          stat {
+                            semicolon: true
+                          }
+                          stat {
+                            semicolon: true
+                          }
+                          stat {
+                            semicolon: false
+                          }
+                          stat {
+                          }
+                          stat {
+                          }
+                          stat {
+                            semicolon: true
+                          }
+                          stat {
+                            semicolon: true
+                          }
+                          stat {
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                doblock {
+                  block {
+                    chunk {
+                      stat {
+                        localnames {
+                          namelist {
+                            firstname {
+                              name: ""
+                              num: 0
+                            }
+                          }
+                          explist {
+                            expressions {
+                              false: 0
+                            }
+                            explast {
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              semicolon: true
+            }
+          }
+        }
+      }
+    }
+    semicolon: true
+  }
+  stat {
+    whilecycle {
+      condition {
+      }
+      doblock {
+        block {
+          chunk {
+          }
+        }
+      }
+    }
+  }
+  stat {
+    whilecycle {
+      condition {
+      }
+      doblock {
+        block {
+          chunk {
+            stat {
+              whilecycle {
+                condition {
+                }
+                doblock {
+                  block {
+                    chunk {
+                    }
+                  }
+                }
+              }
+              semicolon: true
+            }
+            stat {
+            }
+            stat {
+              whilecycle {
+                condition {
+                  function {
+                    body {
+                      block {
+                        chunk {
+                          stat {
+                            semicolon: true
+                          }
+                          stat {
+                            semicolon: true
+                          }
+                          stat {
+                            semicolon: false
+                          }
+                          stat {
+                          }
+                          stat {
+                          }
+                          stat {
+                            semicolon: true
+                          }
+                          stat {
+                            forcyclelist {
+                              names {
+                                firstname {
+                                  name: ""
+                                  num: 0
+                                }
+                                names {
+                                  name: ""
+                                  num: 0
+                                }
+                              }
+                              expressions {
+                                explast {
+                                }
+                              }
+                              doblock {
+                                block {
+                                  chunk {
+                                  }
+                                }
+                              }
+                            }
+                          }
+                          laststat {
+                            semicolon: true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                doblock {
+                  block {
+                    chunk {
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  stat {
+  }
+  stat {
+    whilecycle {
+      condition {
+      }
+      doblock {
+        block {
+          chunk {
+            stat {
+              whilecycle {
+                condition {
+                }
+                doblock {
+                  block {
+                    chunk {
+                      stat {
+                        whilecycle {
+                          condition {
+                          }
+                          doblock {
+                            block {
+                              chunk {
+                              }
+                            }
+                          }
+                        }
+                        semicolon: true
+                      }
+                      stat {
+                        whilecycle {
+                          condition {
+                          }
+                          doblock {
+                            block {
+                              chunk {
+                              }
+                            }
+                          }
+                        }
+                      }
+                      stat {
+                        whilecycle {
+                          condition {
+                            function {
+                              body {
+                                parlist {
+                                }
+                                block {
+                                  chunk {
+                                  }
+                                }
+                              }
+                            }
+                          }
+                          doblock {
+                            block {
+                              chunk {
+                                stat {
+                                  whilecycle {
+                                    condition {
+                                    }
+                                    doblock {
+                                      block {
+                                        chunk {
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                    stat {
+                                                      whilecycle {
+                                                        condition {
+                                                        }
+                                                        doblock {
+                                                          block {
+                                                            chunk {
+                                                              stat {
+                                                                whilecycle {
+                                                                  condition {
+                                                                  }
+                                                                  doblock {
+                                                                    block {
+                                                                      chunk {
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                                semicolon: true
+                                                              }
+                                                              stat {
+                                                                whilecycle {
+                                                                  condition {
+                                                                  }
+                                                                  doblock {
+                                                                    block {
+                                                                      chunk {
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                              stat {
+                                                                whilecycle {
+                                                                  condition {
+                                                                    function {
+                                                                      body {
+                                                                        parlist {
+                                                                        }
+                                                                        block {
+                                                                          chunk {
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                  doblock {
+                                                                    block {
+                                                                      chunk {
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                            semicolon: true
+                                          }
+                                          stat {
+                                          }
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                  }
+                                                }
+                                              }
+                                            }
+                                            semicolon: true
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                  semicolon: true
+                                }
+                                stat {
+                                  whilecycle {
+                                    condition {
+                                    }
+                                    doblock {
+                                      block {
+                                        chunk {
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                                stat {
+                                  whilecycle {
+                                    condition {
+                                    }
+                                    doblock {
+                                      block {
+                                        chunk {
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                  }
+                                                }
+                                              }
+                                            }
+                                            semicolon: true
+                                          }
+                                          stat {
+                                          }
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                                function {
+                                                  body {
+                                                    block {
+                                                      chunk {
+                                                        stat {
+                                                          semicolon: true
+                                                        }
+                                                        stat {
+                                                          semicolon: true
+                                                        }
+                                                        stat {
+                                                          semicolon: false
+                                                        }
+                                                        stat {
+                                                        }
+                                                        stat {
+                                                        }
+                                                        stat {
+                                                          forcyclelist {
+                                                            names {
+                                                              firstname {
+                                                                name: ""
+                                                                num: 0
+                                                              }
+                                                            }
+                                                            expressions {
+                                                              explast {
+                                                              }
+                                                            }
+                                                            doblock {
+                                                              block {
+                                                                chunk {
+                                                                  stat {
+                                                                    ifstat {
+                                                                      condition {
+                                                                      }
+                                                                      first {
+                                                                        chunk {
+                                                                        }
+                                                                      }
+                                                                      last {
+                                                                        chunk {
+                                                                          laststat {
+                                                                            semicolon: true
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                          semicolon: true
+                                                        }
+                                                        stat {
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                                stat {
+                                }
+                                stat {
+                                  ifstat {
+                                    condition {
+                                    }
+                                    first {
+                                      chunk {
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
