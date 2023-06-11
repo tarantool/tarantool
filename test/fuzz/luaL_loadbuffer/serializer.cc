@@ -82,12 +82,15 @@ PROTO_TOSTRING(LastStatement, laststat)
 	case LastStatType::kExplist:
 		laststat_str = ReturnOptionalExpressionListToString(
 			laststat.explist());
+		break;
 	case LastStatType::kBreak:
 		laststat_str = "break";
+		break;
 	default:
 		/* Chosen as default in order to decrease number of 'break's. */
 		laststat_str = ReturnOptionalExpressionListToString(
 			laststat.explist());
+		break;
 	}
 
 	if (laststat.has_semicolon())
@@ -116,10 +119,13 @@ PROTO_TOSTRING(Statement, stat)
 	switch (stat.stat_oneof_case()) {
 	case StatType::kList:
 		stat_str = AssignmentListToString(stat.list());
+		break;
 	case StatType::kCall:
 		stat_str = FunctionCallToString(stat.call());
+		break;
 	case StatType::kBlock:
 		stat_str = DoBlockToString(stat.block());
+		break;
 	/**
 	 * TODO:
 	 * Commented due to possible generation of infinite loops.
@@ -134,22 +140,29 @@ PROTO_TOSTRING(Statement, stat)
 	 */
 	case StatType::kIfstat:
 		stat_str = IfStatementToString(stat.ifstat());
+		break;
 	case StatType::kForcyclename:
 		stat_str = ForCycleNameToString(stat.forcyclename());
+		break;
 	case StatType::kForcyclelist:
 		stat_str = ForCycleListToString(stat.forcyclelist());
+		break;
 	case StatType::kFunc:
 		stat_str = FunctionToString(stat.func());
+		break;
 	case StatType::kLocalfunc:
 		stat_str = LocalFuncToString(stat.localfunc());
+		break;
 	case StatType::kLocalnames:
 		stat_str = LocalNamesToString(stat.localnames());
+		break;
 	default:
 		/**
 		 * Chosen arbitrarily more for simplicity.
 		 * TODO: Choose "more interesting" defaults.
 		 */
 		stat_str = AssignmentListToString(stat.list());
+		break;
 	}
 
 	if (stat.has_semicolon())
