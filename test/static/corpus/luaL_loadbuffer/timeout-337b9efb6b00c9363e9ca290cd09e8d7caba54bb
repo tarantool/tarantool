@@ -1,0 +1,398 @@
+chunk {
+  stat {
+    whilecycle {
+      condition {
+        number: 0
+      }
+      doblock {
+        block {
+          chunk {
+            stat {
+              whilecycle {
+                condition {
+                  tableconstructor {
+                  }
+                }
+                doblock {
+                  block {
+                    chunk {
+                      stat {
+                        whilecycle {
+                          condition {
+                            tableconstructor {
+                              fieldlist {
+                                firstField {
+                                  exprassign {
+                                    key {
+                                      unary {
+                                        unop {
+                                        }
+                                        exp {
+                                          unary {
+                                            unop {
+                                            }
+                                            exp {
+                                              tableconstructor {
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                    value {
+                                      false: 10240
+                                    }
+                                  }
+                                }
+                                fields {
+                                  field {
+                                    exprassign {
+                                      key {
+                                        unary {
+                                          unop {
+                                            length: 4
+                                          }
+                                          exp {
+                                            tableconstructor {
+                                            }
+                                          }
+                                        }
+                                      }
+                                      value {
+                                        unary {
+                                          unop {
+                                            length: 4
+                                          }
+                                          exp {
+                                            tableconstructor {
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                  sep {
+                                    comma: 256
+                                  }
+                                }
+                              }
+                            }
+                          }
+                          doblock {
+                            block {
+                              chunk {
+                                stat {
+                                  whilecycle {
+                                    condition {
+                                      tableconstructor {
+                                      }
+                                    }
+                                    doblock {
+                                      block {
+                                        chunk {
+                                          stat {
+                                            whilecycle {
+                                              condition {
+                                                tableconstructor {
+                                                  fieldlist {
+                                                    firstField {
+                                                      exprassign {
+                                                        key {
+                                                          unary {
+                                                            unop {
+                                                            }
+                                                            exp {
+                                                              unary {
+                                                                unop {
+                                                                }
+                                                                exp {
+                                                                  tableconstructor {
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                        value {
+                                                          false: 10240
+                                                        }
+                                                      }
+                                                    }
+                                                    fields {
+                                                      field {
+                                                        exprassign {
+                                                          key {
+                                                            unary {
+                                                              unop {
+                                                                length: 4
+                                                              }
+                                                              exp {
+                                                                tableconstructor {
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                          value {
+                                                            unary {
+                                                              unop {
+                                                                length: 4
+                                                              }
+                                                              exp {
+                                                                tableconstructor {
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                      sep {
+                                                        comma: 256
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                              doblock {
+                                                block {
+                                                  chunk {
+                                                    stat {
+                                                      whilecycle {
+                                                        condition {
+                                                          tableconstructor {
+                                                          }
+                                                        }
+                                                        doblock {
+                                                          block {
+                                                            chunk {
+                                                              stat {
+                                                                whilecycle {
+                                                                  condition {
+                                                                    number: 0
+                                                                  }
+                                                                  doblock {
+                                                                    block {
+                                                                      chunk {
+                                                                        stat {
+                                                                          whilecycle {
+                                                                            condition {
+                                                                              tableconstructor {
+                                                                              }
+                                                                            }
+                                                                            doblock {
+                                                                              block {
+                                                                                chunk {
+                                                                                  stat {
+                                                                                    whilecycle {
+                                                                                      condition {
+                                                                                        tableconstructor {
+                                                                                          fieldlist {
+                                                                                            firstField {
+                                                                                              exprassign {
+                                                                                                key {
+                                                                                                  unary {
+                                                                                                    unop {
+                                                                                                    }
+                                                                                                    exp {
+                                                                                                      function {
+                                                                                                        body {
+                                                                                                          parlist {
+                                                                                                            namelist {
+                                                                                                              namelist {
+                                                                                                                firstname {
+                                                                                                                  name: ""
+                                                                                                                  num: 0
+                                                                                                                }
+                                                                                                                names {
+                                                                                                                  name: "\001"
+                                                                                                                  num: 0
+                                                                                                                }
+                                                                                                              }
+                                                                                                            }
+                                                                                                          }
+                                                                                                          block {
+                                                                                                            chunk {
+                                                                                                            }
+                                                                                                          }
+                                                                                                        }
+                                                                                                      }
+                                                                                                    }
+                                                                                                  }
+                                                                                                }
+                                                                                                value {
+                                                                                                  false: 10240
+                                                                                                }
+                                                                                              }
+                                                                                            }
+                                                                                            fields {
+                                                                                              field {
+                                                                                                exprassign {
+                                                                                                  key {
+                                                                                                    unary {
+                                                                                                      unop {
+                                                                                                        length: 4
+                                                                                                      }
+                                                                                                      exp {
+                                                                                                        tableconstructor {
+                                                                                                        }
+                                                                                                      }
+                                                                                                    }
+                                                                                                  }
+                                                                                                  value {
+                                                                                                    unary {
+                                                                                                      unop {
+                                                                                                        length: 4
+                                                                                                      }
+                                                                                                      exp {
+                                                                                                        tableconstructor {
+                                                                                                        }
+                                                                                                      }
+                                                                                                    }
+                                                                                                  }
+                                                                                                }
+                                                                                              }
+                                                                                              sep {
+                                                                                                comma: 256
+                                                                                              }
+                                                                                            }
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                      doblock {
+                                                                                        block {
+                                                                                          chunk {
+                                                                                            stat {
+                                                                                              whilecycle {
+                                                                                                condition {
+                                                                                                  tableconstructor {
+                                                                                                  }
+                                                                                                }
+                                                                                                doblock {
+                                                                                                  block {
+                                                                                                    chunk {
+                                                                                                      stat {
+                                                                                                        whilecycle {
+                                                                                                          condition {
+                                                                                                            tableconstructor {
+                                                                                                              fieldlist {
+                                                                                                                firstField {
+                                                                                                                  exprassign {
+                                                                                                                    key {
+                                                                                                                      unary {
+                                                                                                                        unop {
+                                                                                                                          length: 4
+                                                                                                                        }
+                                                                                                                        exp {
+                                                                                                                          tableconstructor {
+                                                                                                                          }
+                                                                                                                        }
+                                                                                                                      }
+                                                                                                                    }
+                                                                                                                    value {
+                                                                                                                      false: 10240
+                                                                                                                    }
+                                                                                                                  }
+                                                                                                                }
+                                                                                                                fields {
+                                                                                                                  field {
+                                                                                                                    exprassign {
+                                                                                                                      key {
+                                                                                                                        unary {
+                                                                                                                          unop {
+                                                                                                                            length: 4
+                                                                                                                          }
+                                                                                                                          exp {
+                                                                                                                            tableconstructor {
+                                                                                                                            }
+                                                                                                                          }
+                                                                                                                        }
+                                                                                                                      }
+                                                                                                                      value {
+                                                                                                                        unary {
+                                                                                                                          unop {
+                                                                                                                            length: 4
+                                                                                                                          }
+                                                                                                                          exp {
+                                                                                                                            tableconstructor {
+                                                                                                                            }
+                                                                                                                          }
+                                                                                                                        }
+                                                                                                                      }
+                                                                                                                    }
+                                                                                                                  }
+                                                                                                                  sep {
+                                                                                                                    comma: 256
+                                                                                                                  }
+                                                                                                                }
+                                                                                                              }
+                                                                                                            }
+                                                                                                          }
+                                                                                                          doblock {
+                                                                                                            block {
+                                                                                                              chunk {
+                                                                                                              }
+                                                                                                            }
+                                                                                                          }
+                                                                                                        }
+                                                                                                        semicolon: true
+                                                                                                      }
+                                                                                                    }
+                                                                                                  }
+                                                                                                }
+                                                                                              }
+                                                                                              semicolon: true
+                                                                                            }
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                    }
+                                                                                    semicolon: true
+                                                                                  }
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                          semicolon: true
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                                semicolon: true
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                      semicolon: true
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                            semicolon: true
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                  semicolon: true
+                                }
+                              }
+                            }
+                          }
+                        }
+                        semicolon: true
+                      }
+                    }
+                  }
+                }
+              }
+              semicolon: true
+            }
+          }
+        }
+      }
+    }
+    semicolon: true
+  }
+}
