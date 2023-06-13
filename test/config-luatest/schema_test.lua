@@ -1,4 +1,5 @@
 local ffi = require('ffi')
+local fun = require('fun')
 local schema = require('internal.config.utils.schema')
 local t = require('luatest')
 
@@ -1137,3 +1138,432 @@ g.test_set_invalid_rhs = function()
 end
 
 -- }}} <schema object>:set()
+
+-- {{{ Testing helpers for <schema object>:filter()
+
+-- Run the <schema object>:filter() function and verify its return
+-- value.
+local function assert_filter_result(s, data, f, exp_res)
+    local res = s:filter(data, f):totable()
+    t.assert_equals(res, exp_res)
+end
+
+-- Run the <schema object>:filter() function and verify its
+-- visited and returned list of nodes.
+local function assert_filter_visited_nodes_and_result(s, data, f,
+        exp_visited_nodes)
+    local exp_res = fun.iter(exp_visited_nodes):filter(f):totable()
+
+    local visited_nodes = {}
+    local res = s:filter(data, function(w)
+        table.insert(visited_nodes, w)
+        return f(w)
+    end):totable()
+
+    t.assert_equals(visited_nodes, exp_visited_nodes)
+    t.assert_equals(res, exp_res)
+end
+
+-- Generate a list of expected walkthrough nodes.
+local function gen_walkthrough_node_list(gen_walkthrough_node, data, paths)
+    return fun.iter(paths):map(function(path)
+        return gen_walkthrough_node(data, path)
+    end):totable()
+end
+
+-- }}} Testing helpers for <schema object>:filter()
+
+-- {{{ <schema object>:filter()
+
+-- Verify :filter() method against a schema with records.
+--
+-- Actually a set of test cases with a common schema and test
+-- oracle generators.
+g.test_filter_record = function()
+    -- Put something unique into each schema node to ensure that
+    -- the :filter() function passes correct nodes into its
+    -- callback.
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({
+                type = 'string',
+                description = 'this is scalar bar',
+            }),
+        }, {
+            description = 'this is inner record foo',
+        }),
+        goo = schema.record({
+            car = schema.scalar({
+                type = 'integer',
+                description = 'this is scalar car',
+            }),
+        }, {
+            description = 'this is inner record goo',
+        }),
+    }, {
+        description = 'this is the outmost record',
+    }))
+
+    -- Generate expected walkthrough node by the given data and path.
+    --
+    -- This simple generator assumes that all the nodes in the
+    -- path are record's fields.
+    local function gen_walkthrough_node(data, path)
+        local path = path == '' and {} or string.split(path, '.')
+        return {
+            path = path,
+            schema = fun.iter(path):foldl(function(schema, field_name)
+                return schema.fields[field_name]
+            end, s.schema),
+            data = fun.iter(path):foldl(function(data, field_name)
+                return data[field_name]
+            end, data),
+        }
+    end
+
+    -- Run the 'accept all' filter function on different data to
+    -- verify that it is called on all the expected schema nodes
+    -- with expected argument.
+    local cases = {
+        -- All the fields are present and are not box.NULL.
+        {
+            data = {foo = {bar = 'baz'}, goo = {car = 'caz'}},
+            exp_visited_paths = {'', 'foo', 'foo.bar', 'goo', 'goo.car'},
+        },
+        -- The data is nil.
+        {
+            data = nil,
+            exp_visited_paths = {''},
+        },
+        -- The data is box.NULL.
+        {
+            data = box.NULL,
+            exp_visited_paths = {''},
+        },
+        -- One field is box.NULL, another is missed.
+        {
+            data = {foo = box.NULL},
+            exp_visited_paths = {'', 'foo'},
+        },
+        -- The same, but on the deeper level.
+        {
+            data = {foo = {bar = box.NULL}, goo = {}},
+            exp_visited_paths = {'', 'foo', 'foo.bar', 'goo'},
+        },
+    }
+
+    for _, case in ipairs(cases) do
+        local exp_visited_nodes = gen_walkthrough_node_list(
+            gen_walkthrough_node, case.data, case.exp_visited_paths)
+        assert_filter_visited_nodes_and_result(s, case.data, function(_w)
+            return true
+        end, exp_visited_nodes)
+    end
+
+    -- Run different filter functions to verify that :filter()
+    -- actually follows the return value of the filter function.
+    local cases = {
+        {
+            func = function(_w)
+                return true
+            end,
+            exp_res_paths = {'', 'foo', 'foo.bar', 'goo', 'goo.car'},
+        }, {
+            func = function(_w)
+                return false
+            end,
+            exp_res_paths = {},
+        }, {
+            func = function(w)
+                return w.path[1] == 'foo'
+            end,
+            exp_res_paths = {'foo', 'foo.bar'},
+        }, {
+            func = function(w)
+                return w.schema.description ~= nil and
+                    w.schema.description:find('inner') ~= nil
+            end,
+            exp_res_paths = {'foo', 'goo'},
+        }, {
+            func = function(w)
+                return w.schema.type == 'string' or w.schema.type == 'integer'
+            end,
+            exp_res_paths = {'foo.bar', 'goo.car'},
+        }
+    }
+
+    local data = {
+        foo = {bar = 'baz'},
+        goo = {car = 'caz'},
+    }
+
+    for _, case in ipairs(cases) do
+        local exp_res = gen_walkthrough_node_list(
+            gen_walkthrough_node, data, case.exp_res_paths)
+        assert_filter_result(s, data, case.func, exp_res)
+    end
+end
+
+-- Verify :filter() method against a schema with maps.
+--
+-- Actually a set of test cases with the common schema and
+-- test oracle generators.
+--
+-- The test cases are adopted from the record's test case, but
+-- the schema, expected node generation function, expected nodes
+-- are different.
+g.test_filter_map = function()
+    local s = schema.new('myschema', schema.map({
+        key = schema.scalar({
+            type = 'string',
+            description = 'a key in the outer map',
+        }),
+        value = schema.map({
+            key = schema.scalar({
+                type = 'string',
+                description = 'a key in the inner map',
+            }),
+            value = schema.scalar({
+                type = 'string',
+                description = 'a value in the inner map',
+            }),
+            description = 'the inner map',
+        }),
+        description = 'the outmost map',
+    }))
+
+    -- Generate expected walkthrough node by the given data and path.
+    --
+    -- This simple generator assumes that all the nodes in the
+    -- path are map's fields.
+    local function gen_walkthrough_node(data, path)
+        local path = path == '' and {} or string.split(path, '.')
+        return {
+            path = fun.iter(path):map(function(field_name)
+                if field_name:startswith('key-') then
+                    return field_name:sub(5)
+                else
+                    return field_name
+                end
+            end):totable(),
+            schema = fun.iter(path):foldl(function(schema, field_name)
+                if field_name:startswith('key-') then
+                    return schema.key
+                else
+                    return schema.value
+                end
+            end, s.schema),
+            data = fun.iter(path):foldl(function(data, field_name)
+                if field_name:startswith('key-') then
+                    return field_name:sub(5)
+                else
+                    return data[field_name]
+                end
+            end, data),
+        }
+    end
+
+    -- Run the 'accept all' filter function on different data to
+    -- verify that it is called on all the expected schema nodes
+    -- with expected argument.
+    local cases = {
+        -- All the fields are present and are not box.NULL.
+        {
+            data = {foo = {bar = 'baz'}, goo = {car = 'caz'}},
+            exp_visited_paths = {'', 'key-foo', 'foo', 'foo.key-bar', 'foo.bar',
+                'key-goo', 'goo', 'goo.key-car', 'goo.car'},
+        },
+        -- The data is nil.
+        {
+            data = nil,
+            exp_visited_paths = {''},
+        },
+        -- The data is box.NULL.
+        {
+            data = box.NULL,
+            exp_visited_paths = {''},
+        },
+        -- One field is box.NULL, another is missed.
+        {
+            data = {foo = box.NULL},
+            exp_visited_paths = {'', 'key-foo', 'foo'},
+        },
+        -- The same, but on the deeper level.
+        {
+            data = {foo = {bar = box.NULL}, goo = {}},
+            exp_visited_paths = {'', 'key-foo', 'foo', 'foo.key-bar', 'foo.bar',
+                'key-goo', 'goo'},
+        },
+    }
+
+    for _, case in ipairs(cases) do
+        local exp_visited_nodes = gen_walkthrough_node_list(
+            gen_walkthrough_node, case.data, case.exp_visited_paths)
+        assert_filter_visited_nodes_and_result(s, case.data, function(_w)
+            return true
+        end, exp_visited_nodes)
+    end
+
+    -- Run different filter functions to verify that :filter()
+    -- actually follows the return value of the filter function.
+    local cases = {
+        {
+            func = function(_w)
+                return true
+            end,
+            exp_res_paths = {'', 'key-foo', 'foo', 'foo.key-bar', 'foo.bar',
+                'key-goo', 'goo', 'goo.key-car', 'goo.car'},
+        }, {
+            func = function(_w)
+                return false
+            end,
+            exp_res_paths = {},
+        }, {
+            func = function(w)
+                return w.path[1] == 'foo'
+            end,
+            exp_res_paths = {'key-foo', 'foo', 'foo.key-bar', 'foo.bar'},
+        }, {
+            func = function(w)
+                return w.schema.description ~= nil and
+                    w.schema.description:find('inner') ~= nil
+            end,
+            exp_res_paths = {'foo', 'foo.key-bar', 'foo.bar', 'goo',
+                'goo.key-car', 'goo.car'},
+        }, {
+            func = function(w)
+                return w.schema.type == 'string'
+            end,
+            exp_res_paths = {'key-foo', 'foo.key-bar', 'foo.bar', 'key-goo',
+                'goo.key-car', 'goo.car'},
+        }
+    }
+
+    local data = {
+        foo = {bar = 'baz'},
+        goo = {car = 'caz'},
+    }
+
+    for _, case in ipairs(cases) do
+        local exp_res = gen_walkthrough_node_list(
+            gen_walkthrough_node, data, case.exp_res_paths)
+        assert_filter_result(s, data, case.func, exp_res)
+    end
+end
+
+-- Verify :filter() method against a schema with an array.
+--
+-- Actually a set of test cases with a common schema and test
+-- oracle generators.
+--
+-- Follows record and map test cases by the structure, but
+-- simplified.
+g.test_filter_array = function()
+    local s = schema.new('myschema', schema.array({
+        items = schema.scalar({
+            type = 'string',
+        }),
+    }))
+
+    -- Generate expected walkthrough node by the given data and path.
+    --
+    -- This simple generator assumes that all the nodes in the
+    -- path are array's items.
+    local function gen_walkthrough_node(data, path)
+        if path == '' then
+            return {
+                path = {},
+                schema = s.schema,
+                data = data,
+            }
+        elseif type(path) == 'number' then
+            return {
+                path = {path},
+                schema = s.schema.items,
+                data = data[path],
+            }
+        else
+            assert(false)
+        end
+    end
+
+    -- Run the 'accept all' filter function on different data to
+    -- verify that it is called on all the expected schema nodes
+    -- with expected argument.
+    local cases = {
+        -- Usual array.
+        {
+            data = {'foo', 'bar'},
+            exp_visited_paths = {'', 1, 2},
+        },
+        -- The data is nil.
+        {
+            data = nil,
+            exp_visited_paths = {''},
+        },
+        -- The data is box.NULL.
+        {
+            data = box.NULL,
+            exp_visited_paths = {''},
+        },
+        -- One item is box.NULL.
+        {
+            data = {'foo', box.NULL},
+            exp_visited_paths = {'', 1, 2},
+        }
+    }
+
+    for _, case in ipairs(cases) do
+        local exp_visited_nodes = gen_walkthrough_node_list(
+            gen_walkthrough_node, case.data, case.exp_visited_paths)
+        assert_filter_visited_nodes_and_result(s, case.data, function(_w)
+            return true
+        end, exp_visited_nodes)
+    end
+
+    -- Run different filter functions to verify that :filter()
+    -- actually follows the return value of the filter function.
+    local cases = {
+        {
+            func = function(_w)
+                return true
+            end,
+            exp_res_paths = {'', 1, 2},
+        }, {
+            func = function(_w)
+                return false
+            end,
+            exp_res_paths = {},
+        }, {
+            func = function(w)
+                return next(w.path) ~= nil
+            end,
+            exp_res_paths = {1, 2},
+        }, {
+            func = function(w)
+                return w.path[1] == 2
+            end,
+            exp_res_paths = {2},
+        }, {
+            func = function(w)
+                return w.schema.type == 'string'
+            end,
+            exp_res_paths = {1, 2},
+        }, {
+            func = function(w)
+                return w.data == 'foo'
+            end,
+            exp_res_paths = {1},
+        }
+    }
+
+    local data = {'foo', 'bar'}
+
+    for _, case in ipairs(cases) do
+        local exp_res = gen_walkthrough_node_list(
+            gen_walkthrough_node, data, case.exp_res_paths)
+        assert_filter_result(s, data, case.func, exp_res)
+    end
+end
+
+-- }}} <schema object>:filter()
