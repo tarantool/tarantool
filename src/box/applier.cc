@@ -592,29 +592,28 @@ applier_on_bootstrap_leader_uuid_set_f(struct trigger *trigger, void *event)
 		(struct applier_ballot_data *)trigger->data;
 	const struct applier *applier = data->applier;
 	bool success = *(bool *)event;
+	fiber_wakeup(data->fiber);
 	if (!success)
 		diag_move(diag_get(), &data->diag);
 	else if (tt_uuid_is_nil(&applier->ballot.bootstrap_leader_uuid))
 		return 0;
 	data->done = true;
-	fiber_wakeup(data->fiber);
 	return 0;
 }
 
 void
 applier_wait_bootstrap_leader_uuid_is_set(struct applier *applier)
 {
-	/* The ballot watcher is dead and we aren't going to revive it. */
-	if (applier->ballot_watcher == NULL)
-		goto err;
 	struct trigger trigger;
 	struct applier_ballot_data data;
 	applier_ballot_data_create(&data, applier);
 	trigger_create(&trigger, applier_on_bootstrap_leader_uuid_set_f,
 		       &data, NULL);
 	trigger_add(&applier->on_ballot_update, &trigger);
-	while (!data.done && !fiber_is_cancelled())
+	while (!data.done && !fiber_is_cancelled() &&
+	       applier->ballot_watcher != NULL) {
 		fiber_yield();
+	}
 	trigger_clear(&trigger);
 	if (fiber_is_cancelled()) {
 		diag_set(FiberIsCancelled);
@@ -622,6 +621,11 @@ applier_wait_bootstrap_leader_uuid_is_set(struct applier *applier)
 	}
 	if (!diag_is_empty(&data.diag)) {
 		diag_move(&data.diag, diag_get());
+		goto err;
+	}
+	/* The ballot watcher is dead and we aren't going to revive it. */
+	if (!data.done) {
+		diag_set(ClientError, ER_UNKNOWN);
 		goto err;
 	}
 	return;
