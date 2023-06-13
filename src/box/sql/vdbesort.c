@@ -316,12 +316,8 @@ struct VdbeSorter {
 	int iMemory;		/* Offset of free space in list.aMemory */
 	int nMemory;		/* Size of list.aMemory allocation in bytes */
 	u8 bUsePMA;		/* True if one or more PMAs created */
-	u8 typeMask;
 	SortSubtask aTask;	/* A single subtask */
 };
-
-#define SORTER_TYPE_INTEGER 0x01
-#define SORTER_TYPE_TEXT    0x02
 
 /*
  * An instance of the following object is used to read records out of a
@@ -808,10 +804,6 @@ sqlVdbeSorterInit(struct VdbeCursor *pCsr)
 	assert(pSorter->iMemory == 0);
 	pSorter->nMemory = pgsz;
 	pSorter->list.aMemory = xmalloc(pgsz);
-
-	if (pCsr->key_def->part_count < 13 &&
-	    pCsr->key_def->parts[0].coll == NULL)
-		pSorter->typeMask = SORTER_TYPE_INTEGER | SORTER_TYPE_TEXT;
 
 	return rc;
 }
@@ -1390,19 +1382,9 @@ sqlVdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 	int bFlush;		/* True to flush contents of memory to PMA */
 	int nReq;		/* Bytes of memory required */
 	int nPMA;		/* Bytes of PMA space required */
-	int t;			/* serial type of first record field */
 
 	assert(pCsr->eCurType == CURTYPE_SORTER);
 	pSorter = pCsr->uc.pSorter;
-	getVarint32((const u8 *)&pVal->z[1], t);
-	if (t > 0 && t < 10 && t != 7) {
-		pSorter->typeMask &= SORTER_TYPE_INTEGER;
-	} else if (t > 10 && (t & 0x01)) {
-		pSorter->typeMask &= SORTER_TYPE_TEXT;
-	} else {
-		pSorter->typeMask = 0;
-	}
-
 	assert(pSorter);
 
 	/* Figure out whether or not the current contents of memory should be
