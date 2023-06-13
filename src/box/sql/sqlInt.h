@@ -3708,21 +3708,7 @@ int sqlVListNameToNum(VList *, const char *, int);
  */
 int sqlPutVarint(unsigned char *, u64);
 u8 sqlGetVarint(const unsigned char *, u64 *);
-u8 sqlGetVarint32(const unsigned char *, u32 *);
 int sqlVarintLen(u64 v);
-
-/*
- * The common case is for a varint to be a single byte.  They following
- * macros handle the common case without a procedure call, but then call
- * the procedure for larger varints.
- */
-#define getVarint32(A,B)  \
-  (u8)((*(A)<(u8)0x80)?((B)=(u32)*(A)),1:sqlGetVarint32((A),(u32 *)&(B)))
-#define putVarint32(A,B)  \
-  (u8)(((u32)(B)<(u32)0x80)?(*(A)=(unsigned char)(B)),1:\
-  sqlPutVarint((A),(B)))
-#define getVarint    sqlGetVarint
-#define putVarint    sqlPutVarint
 
 /**
  * Code an OP_ApplyType opcode that will force types
