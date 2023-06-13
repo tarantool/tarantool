@@ -163,7 +163,7 @@ xrow_header_decode(struct xrow_header *header, const char **pos,
 		if (mp_typeof(**pos) != MP_UINT)
 			goto bad_header;
 		uint64_t key = mp_decode_uint(pos);
-		if (key >= iproto_key_MAX ||
+		if (key < iproto_key_MAX &&
 		    iproto_key_type[key] != mp_typeof(**pos))
 			goto bad_header;
 		switch (key) {
@@ -906,7 +906,7 @@ error:
 		uint64_t key = mp_decode_uint(&data);
 		const char *value = data;
 		mp_next(&data);
-		if (key >= iproto_key_MAX ||
+		if (key < iproto_key_MAX &&
 		    iproto_key_type[key] != mp_typeof(*value))
 			goto error;
 		key_map &= ~iproto_key_bit(key);
@@ -1144,7 +1144,7 @@ xrow_decode_id(const struct xrow_header *row, struct id_request *request)
 		if (mp_typeof(*p) != MP_UINT)
 			goto error;
 		uint64_t key = mp_decode_uint(&p);
-		if (key >= iproto_key_MAX ||
+		if (key < iproto_key_MAX &&
 		    iproto_key_type[key] != mp_typeof(*p))
 			goto error;
 		switch (key) {
@@ -1252,7 +1252,7 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 			continue;
 		}
 		uint8_t key = mp_decode_uint(&d);
-		if (key >= iproto_key_MAX || iproto_key_type[key] != type) {
+		if (key < iproto_key_MAX && iproto_key_type[key] != type) {
 			xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 					   "request body");
 			return -1;
@@ -1720,7 +1720,7 @@ xrow_decode_begin(const struct xrow_header *row, struct begin_request *request)
 		if (mp_typeof(*d) != MP_UINT)
 			goto bad_msgpack;
 		uint64_t key = mp_decode_uint(&d);
-		if (key >= iproto_key_MAX ||
+		if (key < iproto_key_MAX &&
 		    mp_typeof(*d) != iproto_key_type[key])
 			goto bad_msgpack;
 		switch (key) {
@@ -2324,57 +2324,6 @@ xrow_decode_applier_heartbeat(const struct xrow_header *row,
 			req->term = mp_decode_uint(&d);
 			break;
 		default:
-			mp_next(&d);
-		}
-	}
-	return 0;
-}
-
-int
-xrow_decode_heartbeat(const struct xrow_header *row, struct vclock *vclock,
-		      uint64_t *vclock_sync)
-{
-	if (vclock != NULL)
-		vclock_create(vclock);
-	if (vclock_sync != NULL)
-		*vclock_sync = 0;
-	if (row->bodycnt == 0)
-		return 0;
-	const char *d = (const char *)row->body[0].iov_base;
-	if (mp_typeof(*d) != MP_MAP) {
-		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "request body");
-		return -1;
-	}
-	uint32_t map_size = mp_decode_map(&d);
-	for (uint32_t i = 0; i < map_size; i++) {
-		if (mp_typeof(*d) != MP_UINT) {
-			mp_next(&d);
-			mp_next(&d);
-			continue;
-		}
-		uint64_t key = mp_decode_uint(&d);
-		switch (key) {
-		case IPROTO_VCLOCK:
-			if (vclock == NULL)
-				goto skip;
-			if (mp_decode_vclock_ignore0(&d, vclock) != 0) {
-				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
-						   "invalid vclock");
-				return -1;
-			}
-			break;
-		case IPROTO_VCLOCK_SYNC:
-			if (vclock_sync == NULL)
-				goto skip;
-			if (mp_typeof(*d) != MP_UINT) {
-				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
-						   "invalid vclock sync");
-				return -1;
-			}
-			*vclock_sync = mp_decode_uint(&d);
-			break;
-		default:
-skip:
 			mp_next(&d);
 		}
 	}
