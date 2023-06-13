@@ -8,6 +8,8 @@
 --
 -- Others are just stored.
 
+local fun = require('fun')
+
 local methods = {}
 local schema_mt = {}
 
@@ -720,6 +722,145 @@ function methods.set(self, data, path, rhs)
 end
 
 -- }}} <schema object>:set()
+
+-- {{{ <schema object>:filter()
+
+local function filter_impl(schema, data, f, ctx)
+    local w = {
+        path = table.copy(ctx.path),
+        schema = schema,
+        data = data,
+    }
+    if f(w) then
+        table.insert(ctx.acc, w)
+    end
+
+    -- The exit condition is after the table.insert(), because a
+    -- caller may want to handle box.NULL values somehow.
+    if data == nil then
+        return
+    end
+
+    -- luacheck: ignore 542 empty if branch
+    if is_scalar(schema) then
+        -- Nothing to do.
+    elseif schema.type == 'record' then
+        walkthrough_assert_table(ctx, schema, data)
+
+        for field_name, field_def in pairs(schema.fields) do
+            walkthrough_enter(ctx, field_name)
+            local field_value = data[field_name]
+            -- Step down if the field exists in the data. box.NULL
+            -- field value is interpreted here as an existing
+            -- field.
+            if type(field_value) ~= 'nil' then
+                filter_impl(field_def, field_value, f, ctx)
+            end
+            walkthrough_leave(ctx)
+        end
+    elseif schema.type == 'map' then
+        walkthrough_assert_table(ctx, schema, data)
+
+        for field_name, field_value in pairs(data) do
+            walkthrough_enter(ctx, field_name)
+            filter_impl(schema.key, field_name, f, ctx)
+            filter_impl(schema.value, field_value, f, ctx)
+            walkthrough_leave(ctx)
+        end
+    elseif schema.type == 'array' then
+        walkthrough_assert_table(ctx, schema, data)
+
+        for i, v in ipairs(data) do
+            walkthrough_enter(ctx, i)
+            filter_impl(schema.items, v, f, ctx)
+            walkthrough_leave(ctx)
+        end
+    else
+        assert(false)
+    end
+end
+
+-- Filter data based on the schema annotations.
+--
+-- Important: the data is assumed as already validated against
+-- the given schema. (A fast type check is performed on composite
+-- types, but it is not recommended to lean on it.)
+--
+-- The user-provided filter function `f` receives the following
+-- table as the argument:
+--
+-- w = {
+--     path = <array-like table>,
+--     schema = <schema node>,
+--     data = <data at the given path>,
+-- }
+--
+-- And returns a boolean value that is interpreted as 'accepted'
+-- or 'not accepted'.
+--
+-- The user-provided function `f` is called for each schema node,
+-- including ones that have box.NULL value (but not nil). A node
+-- of a composite type (record/map/array) is not traversed down
+-- if it has nil or box.NULL value.
+--
+-- The `:filter()` function returns a luafun iterator by all `w`
+-- values accepted by the `f` function.
+--
+-- A composite node that is not accepted still traversed down.
+--
+-- Examples:
+--
+-- -- Do something for each piece of data that is marked by the
+-- -- given annotation.
+-- s:filter(function(w)
+--     return w.schema.my_annotation ~= nil
+-- end):each(function(w)
+--     do_something(w.data)
+-- end)
+--
+-- -- Group data by a value of an annotation.
+-- local group_by_my_annotation = s:filter(function(w)
+--     return w.schema.my_annotation ~= nil
+-- end):map(function(w)
+--     return w.schema.my_annotation, w.data
+-- end):tomap()
+--
+-- Nuances:
+--
+-- * box.NULL is assumed as an existing value, so the
+--   user-provided filter function `f` is called for it. However,
+--   it is not called for `nil` values. See details below.
+-- * While it is technically possible to pass information about
+--   a field name for record/map field values and about an item
+--   index for an array item value, it is not implemented for
+--   simplicity (and because it is not needed in config's code).
+-- * `w.path` for a map key and a map value are the same. It
+--   seems, we should introduce some syntax to point a key in a
+--   map, but the config module doesn't need it, so it is not
+--   implemented.
+--
+-- nil/box.NULL nuances explanation
+-- --------------------------------
+--
+-- Let's assume that a record defines three scalar fields: 'foo',
+-- 'bar' and 'baz'. Let's name a schema object that wraps the
+-- record as `s`.
+--
+-- * `s:filter(nil, f)` calls `f` only for the record itself.
+-- * `s:filter(box.NULL, f` works in the same way.
+-- * `s:filter({foo = box.NULL, bar = nil}, f)` calls `f` two
+--   times: for the record and for the 'foo' field.
+--
+-- This behavior is needed to provide ability to handle box.NULL
+-- values in the data somehow. It reflects the pairs() behavior on
+-- a usual table, so it looks quite natural.
+function methods.filter(self, data, f)
+    local ctx = walkthrough_start(self, {acc = {}})
+    filter_impl(rawget(self, 'schema'), data, f, ctx)
+    return fun.iter(ctx.acc)
+end
+
+-- }}} <schema object>:filter()
 
 -- {{{ Schema object constructor: new
 
