@@ -213,6 +213,8 @@ Invalid MsgPack - request body
 version=6, features=[0, 1, 2, 3, 4, 5, 6], auth_type=chap-sha1
 # Unknown version and features
 version=6, features=[0, 1, 2, 3, 4, 5, 6], auth_type=chap-sha1
+# Unknown request key
+version=6, features=[0, 1, 2, 3, 4, 5, 6], auth_type=chap-sha1
 
 #
 # gh-6257 Watchers
