@@ -1,4 +1,6 @@
 TAP version 13
+1..1
+TAP version 13
 1..6
 ok - box.cfg is successful
 ok - listen
@@ -28,6 +30,4 @@ TAP version 13
 1..2
 ok - box.cfg is not successful
 ok - bad strip_core value
-TAP version 13
-1..1
 ok - exit status list
