@@ -473,6 +473,13 @@ print("""
 # gh-6253 IPROTO_ID
 #
 """)
+def print_id_response(resp):
+    if resp["header"][IPROTO_CODE] == REQUEST_TYPE_OK:
+        print("version={}, features={}".format(
+            resp["body"][IPROTO_VERSION], resp["body"][IPROTO_FEATURES]))
+    else:
+        print(str(resp["body"][IPROTO_ERROR].decode("utf-8")))
+
 c = Connection(None, server.iproto.port)
 c.connect()
 s = c._socket
@@ -490,8 +497,10 @@ print("version={}, features={}".format(
 print("# Unknown version and features")
 resp = test_request(header, { IPROTO_VERSION: 99999999,
                               IPROTO_FEATURES: [99999999] })
-print("version={}, features={}".format(
-    resp["body"][IPROTO_VERSION], resp["body"][IPROTO_FEATURES]))
+print_id_response(resp)
+print("# Unknown request key")
+resp = test_request(header, { 0xdead: 'foobar' })
+print_id_response(resp)
 c.close()
 
 print("""

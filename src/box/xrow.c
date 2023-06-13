@@ -158,7 +158,7 @@ xrow_header_decode(struct xrow_header *header, const char **pos,
 		if (mp_typeof(**pos) != MP_UINT)
 			goto bad_header;
 		uint64_t key = mp_decode_uint(pos);
-		if (key >= IPROTO_KEY_MAX ||
+		if (key < IPROTO_KEY_MAX &&
 		    iproto_key_type[key] != mp_typeof(**pos))
 			goto bad_header;
 		switch (key) {
@@ -832,7 +832,7 @@ error:
 		uint64_t key = mp_decode_uint(&data);
 		const char *value = data;
 		mp_next(&data);
-		if (key >= IPROTO_KEY_MAX ||
+		if (key < IPROTO_KEY_MAX &&
 		    iproto_key_type[key] != mp_typeof(*value))
 			goto error;
 		key_map &= ~iproto_key_bit(key);
@@ -1013,7 +1013,7 @@ xrow_decode_id(const struct xrow_header *row, struct id_request *request)
 		if (mp_typeof(*p) != MP_UINT)
 			goto error;
 		uint64_t key = mp_decode_uint(&p);
-		if (key >= IPROTO_KEY_MAX ||
+		if (key < IPROTO_KEY_MAX &&
 		    iproto_key_type[key] != mp_typeof(*p))
 			goto error;
 		switch (key) {
@@ -1093,7 +1093,7 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 			continue;
 		}
 		uint8_t key = mp_decode_uint(&d);
-		if (key >= IPROTO_KEY_MAX || iproto_key_type[key] != type) {
+		if (key < IPROTO_KEY_MAX && iproto_key_type[key] != type) {
 			xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 					   "request body");
 			return -1;
@@ -1562,7 +1562,7 @@ xrow_decode_begin(const struct xrow_header *row, struct begin_request *request)
 		if (mp_typeof(*d) != MP_UINT)
 			goto bad_msgpack;
 		uint64_t key = mp_decode_uint(&d);
-		if (key >= IPROTO_KEY_MAX ||
+		if (key < IPROTO_KEY_MAX &&
 		    mp_typeof(*d) != iproto_key_type[key])
 			goto bad_msgpack;
 		switch (key) {

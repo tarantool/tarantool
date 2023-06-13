@@ -211,6 +211,8 @@ Invalid MsgPack - request body
 version=3, features=[0, 1, 2, 3]
 # Unknown version and features
 version=3, features=[0, 1, 2, 3]
+# Unknown request key
+version=3, features=[0, 1, 2, 3]
 
 #
 # gh-6257 Watchers
