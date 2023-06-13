@@ -1457,7 +1457,7 @@ response_body_decode(struct response_body *response_body, const char **data,
 			assert(response_body->pos_len != 0);
 			break;
 		default:
-			unreachable();
+			break;
 		}
 	}
 	assert(*data == data_end);
@@ -1491,6 +1491,10 @@ netbox_decode_table(struct lua_State *L, const char **data,
 	(void)format;
 	struct response_body response_body;
 	response_body_decode(&response_body, data, data_end);
+	if (response_body.data == NULL) {
+		lua_pushnil(L);
+		return;
+	}
 	if (return_raw) {
 		luamp_push(L, response_body.data, response_body.data_end);
 	} else {

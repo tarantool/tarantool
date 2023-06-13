@@ -516,6 +516,9 @@ print("# Unknown version and features")
 resp = test_request(header, { IPROTO_VERSION: 99999999,
                               IPROTO_FEATURES: [99999999] })
 print_id_response(resp)
+print("# Unknown request key")
+resp = test_request(header, { 0xdead: 'foobar' })
+print_id_response(resp)
 c.close()
 
 print("""
