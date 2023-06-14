@@ -399,6 +399,21 @@ return schema.new('instance_config', schema.record({
             default = 1024 * 1024,
         }),
     }),
+    vinyl = schema.record({
+        -- TODO: vinyl options.
+        dir = schema.scalar({
+            type = 'string',
+            box_cfg = 'vinyl_dir',
+            box_cfg_nondynamic = true,
+            mkdir = true,
+            default = '{{ instance_name }}',
+        }),
+        max_tuple_size = schema.scalar({
+            type = 'integer',
+            box_cfg = 'vinyl_max_tuple_size',
+            default = 1024 * 1024,
+        }),
+    }),
 }, {
     -- Any configuration data should contain a version of the
     -- config schema for which it is written.
