@@ -6,14 +6,6 @@ local g = t.group('gh-8675-applier-pause')
 
 local fio = require('fio')
 
-local set_log_before_cfg = [[
-    local logfile = require('fio').pathjoin(
-        os.getenv('TARANTOOL_WORKDIR'),
-        os.getenv('TARANTOOL_ALIAS') .. '.log'
-    )
-    require('log').cfg{log = logfile}
-]]
-
 g.before_each(function(cg)
     cg.replica_set = replica_set:new{}
     cg.server = cg.replica_set:build_and_add_server{
@@ -22,7 +14,6 @@ g.before_each(function(cg)
             replication_connect_timeout = 0.1,
             replication_timeout = 0.01,
         },
-        env = {['TARANTOOL_RUN_BEFORE_BOX_CFG'] = set_log_before_cfg},
     }
 end)
 
