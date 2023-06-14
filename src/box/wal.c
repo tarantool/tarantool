@@ -1206,7 +1206,7 @@ wal_writer_f(va_list ap)
 	 * have to rescan the last WAL to find the instance vclock.
 	 * Don't create a WAL if the last one is empty.
 	 */
-	if (writer->wal_mode != WAL_NONE &&
+	if (writer->wal_mode != WAL_NONE && vclock_sum(&writer->vclock) > 0 &&
 	    (!xlog_is_open(&writer->current_wal) ||
 	     vclock_compare(&writer->vclock,
 			    &writer->current_wal.meta.vclock) > 0)) {
