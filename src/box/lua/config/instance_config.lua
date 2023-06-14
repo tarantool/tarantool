@@ -1,4 +1,5 @@
 local schema = require('internal.config.utils.schema')
+local uuid = require('uuid')
 
 -- List of annotations:
 --
@@ -67,6 +68,15 @@ local function validate_config_version(data, w)
         if data.config ~= nil and data.config.version ~= nil then
             w.error('config.version must not be present in the %s scope', scope)
         end
+    end
+end
+
+local function validate_uuid_str(data, w)
+    if uuid.fromstr(data) == nil then
+        w.error('Unable to parse the value as a UUID: %q', data)
+    end
+    if data == uuid.NULL:str() then
+        w.error('nil UUID is reserved')
     end
 end
 
@@ -298,6 +308,50 @@ return schema.new('instance_config', schema.record({
             type = 'integer',
             box_cfg = 'readahead',
             default = 16320,
+        }),
+    }),
+    database = schema.record({
+        instance_uuid = schema.scalar({
+            type = 'string',
+            box_cfg = 'instance_uuid',
+            default = box.NULL,
+            validate = validate_uuid_str,
+        }),
+        replicaset_uuid = schema.scalar({
+            type = 'string',
+            box_cfg = 'replicaset_uuid',
+            default = box.NULL,
+            validate = validate_uuid_str,
+        }),
+        hot_standby = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'hot_standby',
+            box_cfg_nondynamic = true,
+            default = false,
+        }),
+        -- Reversed and applied to box_cfg.read_only.
+        rw = schema.scalar({
+            type = 'boolean',
+            default = false,
+        }),
+        txn_timeout = schema.scalar({
+            type = 'number',
+            box_cfg = 'txn_timeout',
+            default = 365 * 100 * 86400,
+        }),
+        txn_isolation = schema.enum({
+            'read-committed',
+            'read-confirmed',
+            'best-effort',
+        }, {
+            box_cfg = 'txn_isolation',
+            default = 'best-effort',
+        }),
+        use_mvcc_engine = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'memtx_use_mvcc_engine',
+            box_cfg_nondynamic = true,
+            default = false,
         }),
     }),
 }, {
