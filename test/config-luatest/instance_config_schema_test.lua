@@ -282,3 +282,29 @@ g.test_sql = function()
     local res = instance_config:apply_default({}).sql
     t.assert_equals(res, exp)
 end
+
+g.test_memtx = function()
+    local iconfig = {
+        memtx = {
+            memory = 1,
+            allocator = 'small',
+            slab_alloc_granularity = 1,
+            slab_alloc_factor = 1,
+            min_tuple_size = 1,
+            max_tuple_size = 1,
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.memtx, instance_config.schema.fields.memtx)
+
+    local exp = {
+        memory = 268435456,
+        allocator = 'small',
+        slab_alloc_granularity = 8,
+        slab_alloc_factor = 1.05,
+        min_tuple_size = 16,
+        max_tuple_size = 1048576,
+    }
+    local res = instance_config:apply_default({}).memtx
+    t.assert_equals(res, exp)
+end

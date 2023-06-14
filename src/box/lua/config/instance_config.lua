@@ -361,6 +361,44 @@ return schema.new('instance_config', schema.record({
             default = 5 * 1024 * 1024,
         }),
     }),
+    memtx = schema.record({
+        memory = schema.scalar({
+            type = 'integer',
+            box_cfg = 'memtx_memory',
+            default = 256 * 1024 * 1024,
+        }),
+        allocator = schema.enum({
+            'small',
+            'system',
+        }, {
+            box_cfg = 'memtx_allocator',
+            box_cfg_nondynamic = true,
+            default = 'small',
+        }),
+        slab_alloc_granularity = schema.scalar({
+            type = 'integer',
+            box_cfg = 'slab_alloc_granularity',
+            box_cfg_nondynamic = true,
+            default = 8,
+        }),
+        slab_alloc_factor = schema.scalar({
+            type = 'number',
+            box_cfg = 'slab_alloc_factor',
+            box_cfg_nondynamic = true,
+            default = 1.05,
+        }),
+        min_tuple_size = schema.scalar({
+            type = 'integer',
+            box_cfg = 'memtx_min_tuple_size',
+            box_cfg_nondynamic = true,
+            default = 16,
+        }),
+        max_tuple_size = schema.scalar({
+            type = 'integer',
+            box_cfg = 'memtx_max_tuple_size',
+            default = 1024 * 1024,
+        }),
+    }),
 }, {
     -- Any configuration data should contain a version of the
     -- config schema for which it is written.
