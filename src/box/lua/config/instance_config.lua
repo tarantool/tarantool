@@ -126,6 +126,16 @@ return schema.new('instance_config', schema.record({
             default = '{{ instance_name }}.pid',
         }),
     }),
+    console = schema.record({
+        enabled = schema.scalar({
+            type = 'boolean',
+            default = true,
+        }),
+        socket = schema.scalar({
+            type = 'string',
+            default = '{{ instance_name }}.control',
+        }),
+    }),
 }, {
     -- Any configuration data should contain a version of the
     -- config schema for which it is written.
