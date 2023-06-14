@@ -136,6 +136,39 @@ return schema.new('instance_config', schema.record({
             default = '{{ instance_name }}.control',
         }),
     }),
+    fiber = schema.record({
+        io_collect_interval = schema.scalar({
+            type = 'number',
+            box_cfg = 'io_collect_interval',
+            default = box.NULL,
+        }),
+        too_long_threshold = schema.scalar({
+            type = 'number',
+            box_cfg = 'too_long_threshold',
+            default = 0.5,
+        }),
+        worker_pool_threads = schema.scalar({
+            type = 'number',
+            box_cfg = 'worker_pool_threads',
+            default = 4,
+        }),
+        slice = schema.record({
+            warn = schema.scalar({
+                type = 'number',
+                default = 0.5,
+            }),
+            err = schema.scalar({
+                type = 'number',
+                default = 1,
+            }),
+        }),
+        top = schema.record({
+            enabled = schema.scalar({
+                type = 'boolean',
+                default = false,
+            }),
+        }),
+    }),
 }, {
     -- Any configuration data should contain a version of the
     -- config schema for which it is written.
