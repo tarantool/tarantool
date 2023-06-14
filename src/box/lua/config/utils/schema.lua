@@ -862,6 +862,165 @@ end
 
 -- }}} <schema object>:filter()
 
+-- {{{ <schema object>:map()
+
+local function map_impl(schema, data, f, ctx)
+    if is_scalar(schema) then
+        -- We're reached a scalar: let's call the user-provided
+        -- transformation function.
+        local w = {
+            schema = schema,
+            path = table.copy(ctx.path),
+            error = walkthrough_error_capture(ctx),
+        }
+        return f(data, w, ctx.f_ctx)
+    elseif schema.type == 'record' then
+        -- Traverse record's fields unconditionally: if the record
+        -- itself is nil/box.NULL, if the fields are nil/box.NULL.
+        --
+        -- Missed values may be transformed to something non-nil.
+        if data ~= nil then
+            walkthrough_assert_table(ctx, schema, data)
+        end
+
+        -- Collect the new field values.
+        local res = {}
+        for field_name, field_def in pairs(schema.fields) do
+            walkthrough_enter(ctx, field_name)
+
+            local field
+            if data ~= nil then
+                field = data[field_name]
+            end
+            res[field_name] = map_impl(field_def, field, f, ctx)
+
+            walkthrough_leave(ctx)
+        end
+
+        -- If the original value is nil/box.NULL and all the new
+        -- fields are nil, let's preserve the original value as
+        -- is: return nil/box.NULL instead of an empty table.
+        if next(res) == nil and data == nil then
+            return data -- nil or box.NULL
+        end
+        return res
+    elseif schema.type == 'map' then
+        -- If a map is nil/box.NULL, there is nothing to traverse.
+        --
+        -- Let's just return the original value.
+        if data == nil then
+            return data -- nil or box.NULL
+        end
+
+        walkthrough_assert_table(ctx, schema, data)
+
+        local res = {}
+        for field_name, field_value in pairs(data) do
+            walkthrough_enter(ctx, field_name)
+            local new_field_name = map_impl(schema.key, field_name, f, ctx)
+            local new_field_value = map_impl(schema.value, field_value, f, ctx)
+            res[new_field_name] = new_field_value
+            walkthrough_leave(ctx)
+        end
+        return res
+    elseif schema.type == 'array' then
+        -- If an array is nil/box.NULL, there is nothing to
+        -- traverse.
+        --
+        -- Just return the original value.
+        if data == nil then
+            return data -- nil or box.NULL
+        end
+
+        walkthrough_assert_table(ctx, schema, data)
+
+        local res = {}
+        for i, v in ipairs(data) do
+            walkthrough_enter(ctx, i)
+            local new_item_value = map_impl(schema.items, v, f, ctx)
+            res[i] = new_item_value
+            walkthrough_leave(ctx)
+        end
+        return res
+    else
+        assert(false)
+    end
+end
+
+-- Transform data by the given function.
+--
+-- Leave the shape of the data unchanged.
+--
+-- Important: the data is assumed as already validated against
+-- the given schema. (A fast type check is performed on composite
+-- types, but it is not recommended to lean on it.)
+--
+-- The user-provided transformation function receives the
+-- following three arguments in the given order:
+--
+-- * data -- value at the given path
+-- * w -- walkthrough node, described below
+-- * ctx -- user-provided context for the transformation function
+--
+-- The walkthrough node `w` has the following fields:
+--
+-- * w.schema -- schema node at the given path
+-- * w.path -- path to the schema node
+-- * w.error -- function that prepends a caller provided error
+--   message with context information; use it for nice error
+--   messages
+--
+-- An example of the mapping function:
+--
+-- local function f(data, w, ctx)
+--     if w.schema.type == 'string' and data ~= nil then
+--         return data:gsub('{{ *foo *}}', ctx.foo)
+--     end
+--     return data
+-- end
+--
+-- The :map() method is recursive with certain rules:
+--
+-- * All record fields are traversed unconditionally, including
+--   ones with nil/box.NULL values. Even if the record itself is
+--   nil/box.NULL, its fields are traversed down (assuming their
+--   values as nil).
+--
+--   It is important when the original data should be extended
+--   using some information from the schema: say, default values.
+-- * It is not the case for a map and an array: nil/box.NULL
+--   fields and items are preserved as is, they're not traversed
+--   down. If the map/the array itself is nil/box.NULL, it is
+--   preserved as well.
+--
+--   A map has no list of fields in the schema, so it is not
+--   possible to traverse it down. Similarly, an array has no
+--   items count in the schema.
+--
+-- The method attempts to preserve the original shape of values
+-- of a composite type:
+--
+-- * nil/box.NULL record is traversed down, but if all the new
+--   field values are nil, the return value is the original one
+--   (nil/box.NULL), not an empty table.
+-- * nil/box.NULL values for a map and an array are preserved.
+--
+-- Nuances:
+--
+-- * The user-provided transformation function is called only for
+--   scalars.
+-- * nil/box.NULL handling for composite types. Described above.
+-- * `w.path` for a map key and a map value are the same. It
+--   seems, we should introduce some syntax to point a key in a
+--   map, but the config module doesn't need it, so it is not
+--   implemented.
+function methods.map(self, data, f, f_ctx)
+    local ctx = walkthrough_start(self, {f_ctx = f_ctx})
+    return map_impl(rawget(self, 'schema'), data, f, ctx)
+end
+
+-- }}} <schema object>:map()
+
 -- {{{ Schema object constructor: new
 
 -- Define a field lookup function on a schema object.

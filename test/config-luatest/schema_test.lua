@@ -1567,3 +1567,357 @@ g.test_filter_array = function()
 end
 
 -- }}} <schema object>:filter()
+
+-- {{{ Testing helpers for <schema object>:map()
+
+-- A simple function to pass into <schema object>:map().
+--
+-- It substitutes ${x} patterns in string values with given
+-- variables.
+local function apply_vars(data, w, vars)
+    if w.schema.no_transform then
+        return data
+    end
+
+    if w.schema.type == 'string' and data ~= nil then
+        assert(type(data) ~= nil)
+        return (data:gsub('%${(.-)}', function(var_name)
+            if vars[var_name] ~= nil then
+                return vars[var_name]
+            end
+            w.error(('Unknown variable %q'):format(var_name))
+        end))
+    end
+    return data
+end
+
+-- Another function to pass into <schema object>:map().
+--
+-- Substitutes each scalar value with the path from the root
+-- schema node.
+local function value2path(data, w)
+    if w.schema.no_transform then
+        return data
+    end
+
+    return table.concat(w.path, '.')
+end
+
+-- Yet another function to pass into <schema object>:map().
+--
+-- Substitutes each scalar value with its Lua type.
+local function value2type(data, w)
+    if w.schema.no_transform then
+        return data
+    end
+
+    return type(data)
+end
+
+-- Compare types deeply.
+--
+-- The main motivation is to differentiate nil and box.NULL.
+--
+-- The following calls do not raise an error:
+--
+-- * t.assert_equals(nil, box.NULL)
+-- * t.assert_equals(box.NULL, nil) too.
+-- * t.assert_equals({foo = box.NULL}, {foo = nil})
+--
+-- However, the following does:
+--
+-- * t.assert_equals({foo = nil}, {foo = box.NULL})
+--
+-- See also https://github.com/tarantool/luatest/issues/310
+local function assert_type_equals(a, b)
+    t.assert_equals(type(a), type(b))
+    if type(a) ~= 'table' then
+        return
+    end
+    assert(type(b) == 'table')
+
+    for k, v in pairs(a) do
+        assert_type_equals(v, b[k])
+    end
+    for k, v in pairs(b) do
+        assert_type_equals(v, a[k])
+    end
+end
+
+-- }}} Testing helpers for <schema object>:map()
+
+-- {{{ <schema object>:map()
+
+-- Verify :map() method on a schema with a record.
+g.test_map_record = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.scalar({type = 'string'}),
+        bar = schema.scalar({type = 'string'}),
+        baz = schema.scalar({type = 'number'}),
+    }))
+
+    -- Several simple successful cases.
+    --
+    -- The apply_vars function verifies most of the logic.
+    --
+    -- value2path verifies that w.path is correct and that
+    -- the record is always fully traversed (including
+    -- nil/box.NULL fields and when the record itself is
+    -- nil/box.NULL).
+    --
+    -- value2type verifies that the original nil/cdata type
+    -- is preserved for nil/box.NULL values.
+    local cases = {
+        -- All the fields are exist.
+        {
+            data = {foo = 'a${b}c', bar = 'd${e}f', baz = 5},
+            vars = {b = 'B', e = 'E'},
+            exp_apply_vars = {foo = 'aBc', bar = 'dEf', baz = 5},
+            exp_value2path = {foo = 'foo', bar = 'bar', baz = 'baz'},
+            exp_value2type = {foo = 'string', bar = 'string', baz = 'number'},
+        },
+        -- One field is box.NULL, others are missed.
+        {
+            data = {foo = box.NULL},
+            vars = {},
+            exp_apply_vars = {foo = box.NULL},
+            exp_value2path = {foo = 'foo', bar = 'bar', baz = 'baz'},
+            exp_value2type = {foo = 'cdata', bar = 'nil', baz = 'nil'},
+        },
+        -- The record is an empty table.
+        {
+            data = {},
+            vars = {},
+            exp_apply_vars = {},
+            exp_value2path = {foo = 'foo', bar = 'bar', baz = 'baz'},
+            exp_value2type = {foo = 'nil', bar = 'nil', baz = 'nil'},
+        },
+        -- The record is box.NULL.
+        {
+            data = box.NULL,
+            vars = {},
+            exp_apply_vars = box.NULL,
+            exp_value2path = {foo = 'foo', bar = 'bar', baz = 'baz'},
+            exp_value2type = {foo = 'nil', bar = 'nil', baz = 'nil'},
+        },
+        -- The record is nil.
+        {
+            data = nil,
+            vars = {},
+            exp_apply_vars = nil,
+            exp_value2path = {foo = 'foo', bar = 'bar', baz = 'baz'},
+            exp_value2type = {foo = 'nil', bar = 'nil', baz = 'nil'},
+        },
+    }
+
+    for _, case in ipairs(cases) do
+        local res = s:map(case.data, apply_vars, case.vars)
+        t.assert_equals(res, case.exp_apply_vars)
+        assert_type_equals(res, case.exp_apply_vars)
+
+        local res = s:map(case.data, value2path)
+        t.assert_equals(res, case.exp_value2path)
+        assert_type_equals(res, case.exp_value2path)
+
+        local res = s:map(case.data, value2type)
+        t.assert_equals(res, case.exp_value2type)
+        assert_type_equals(res, case.exp_value2type)
+    end
+
+    -- Verify that an error that is raised using w.error() has the
+    -- context information: the schema name and the path.
+    local exp_err_msg = '[myschema] foo: Unknown variable "x"'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = {foo = '${x}'}
+        local vars = {} -- no variable 'x'
+        s:map(data, apply_vars, vars)
+    end)
+end
+
+-- Verify :map() method on a schema with a map.
+g.test_map_map = function()
+    local s = schema.new('myschema', schema.map({
+        key = schema.scalar({type = 'string', no_transform = true}),
+        value = schema.map({
+            key = schema.scalar({type = 'string', no_transform = true}),
+            value = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    -- apply_vars verifies most of the logic.
+    --
+    -- value2path shows that w.path is correct.
+    --
+    -- value2type here is just for completeness.
+    local cases = {
+        -- The innermost value is present.
+        {
+            data = {foo = {bar = 'a${b}c'}},
+            vars = {b = 'B'},
+            exp_apply_vars = {foo = {bar = 'aBc'}},
+            exp_value2path = {foo = {bar = 'foo.bar'}},
+            exp_value2type = {foo = {bar = 'string'}},
+        },
+        -- The innermost value is box.NULL.
+        {
+            data = {foo = {bar = box.NULL}},
+            vars = {},
+            exp_apply_vars = {foo = {bar = box.NULL}},
+            exp_value2path = {foo = {bar = 'foo.bar'}},
+            exp_value2type = {foo = {bar = 'cdata'}},
+        },
+        -- The innermost value is nil.
+        {
+            data = {foo = {}},
+            vars = {},
+            exp_apply_vars = {foo = {}},
+            exp_value2path = {foo = {}},
+            exp_value2type = {foo = {}},
+        },
+        -- The outermost map field is box.NULL.
+        {
+            data = {foo = box.NULL},
+            vars = {},
+            exp_apply_vars = {foo = box.NULL},
+            exp_value2path = {foo = box.NULL},
+            exp_value2type = {foo = box.NULL},
+        },
+        -- The data is box.NULL.
+        {
+            data = box.NULL,
+            vars = {},
+            exp_apply_vars = box.NULL,
+            exp_value2path = box.NULL,
+            exp_value2type = box.NULL,
+        },
+        -- The data is nil.
+        {
+            data = nil,
+            vars = {},
+            exp_apply_vars = nil,
+            exp_value2path = nil,
+            exp_value2type = nil,
+        },
+    }
+
+    for _, case in ipairs(cases) do
+        local res = s:map(case.data, apply_vars, case.vars)
+        t.assert_equals(res, case.exp_apply_vars)
+        assert_type_equals(res, case.exp_apply_vars)
+
+        local res = s:map(case.data, value2path)
+        t.assert_equals(res, case.exp_value2path)
+        assert_type_equals(res, case.exp_value2path)
+
+        local res = s:map(case.data, value2type)
+        t.assert_equals(res, case.exp_value2type)
+        assert_type_equals(res, case.exp_value2type)
+    end
+end
+
+-- The :map() method applies the transformation function to map
+-- keys as well as for any other schema node.
+--
+-- Maybe it is not very obvious behavior. Moreover, there is no
+-- simple way to differentiate a key and a value if the schema
+-- nodes do contain specific annotations, because w.path is the
+-- same for both.
+--
+-- For a while, hold the current behavior in the test case.
+g.test_map_map_keys = function()
+    local s = schema.new('myschema', schema.map({
+        key = schema.scalar({type = 'string'}),
+        value = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    local data = {foo = {bar = 'abc'}}
+
+    -- 'foo' is replaced with 'foo', 'bar' is replaced with
+    -- 'foo.bar'.
+    local exp = {foo = {['foo.bar'] = 'foo.bar'}}
+    local res = s:map(data, value2path)
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+
+    -- 'foo' and 'bar' are replaced with 'string'.
+    local exp = {string = {string = 'string'}}
+    local res = s:map(data, value2type)
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+end
+
+-- Verify :map() method on a schema with an array.
+g.test_map_array = function()
+    local s = schema.new('myschema', schema.array({
+        items = schema.scalar({
+            type = 'string',
+        }),
+    }))
+
+    -- apply_vars verifies most of the logic.
+    --
+    -- value2path shows that w.path is correct.
+    --
+    -- value2type here is just for completeness.
+    local cases = {
+        -- There is a string item in the array.
+        {
+            data = {'a${b}c'},
+            vars = {b = 'B'},
+            exp_apply_vars = {'aBc'},
+            exp_value2path = {'1'},
+            exp_value2type = {'string'},
+        },
+        -- There is a box.NULL item in the array.
+        {
+            data = {box.NULL},
+            vars = {},
+            exp_apply_vars = {box.NULL},
+            exp_value2path = {'1'},
+            exp_value2type = {'cdata'},
+        },
+        -- The empty array.
+        {
+            data = {},
+            vars = {},
+            exp_apply_vars = {},
+            exp_value2path = {},
+            exp_value2type = {},
+        },
+        -- box.NULL as an array value.
+        {
+            data = box.NULL,
+            vars = {},
+            exp_apply_vars = box.NULL,
+            exp_value2path = box.NULL,
+            exp_value2type = box.NULL,
+        },
+        -- nil as an array value.
+        {
+            data = nil,
+            vars = {},
+            exp_apply_vars = nil,
+            exp_value2path = nil,
+            exp_value2type = nil,
+        },
+    }
+
+    for _, case in ipairs(cases) do
+        local res = s:map(case.data, apply_vars, case.vars)
+        t.assert_equals(res, case.exp_apply_vars)
+        assert_type_equals(res, case.exp_apply_vars)
+
+        local res = s:map(case.data, value2path)
+        t.assert_equals(res, case.exp_value2path)
+        assert_type_equals(res, case.exp_value2path)
+
+        local res = s:map(case.data, value2type)
+        t.assert_equals(res, case.exp_value2type)
+        assert_type_equals(res, case.exp_value2type)
+    end
+end
+
+-- }}} <schema object>:map()
