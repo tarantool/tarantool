@@ -5,6 +5,8 @@
 --
 -- * allowed_values
 -- * validate
+-- * default
+-- * apply_default_if
 --
 -- Others are just stored.
 
@@ -1020,6 +1022,70 @@ function methods.map(self, data, f, f_ctx)
 end
 
 -- }}} <schema object>:map()
+
+-- {{{ <schema object>:apply_default()
+
+local function apply_default_f(data, w)
+    -- The value is present, keep it.
+    --
+    -- box.NULL is assumed as a missed value.
+    if data ~= nil then
+        return data
+    end
+
+    -- Don't replace box.NULL in the original data with nil if
+    -- there is no 'default' annotation.
+    if type(w.schema.default) == 'nil' then
+        return data
+    end
+
+    -- Determine whether to apply the default.
+    --
+    -- Perform the apply if the apply_default_if annotation
+    -- returns true or if there is no such an annotation.
+    --
+    -- Keep the original value otherwise.
+    local apply_default = true
+    if w.schema.apply_default_if ~= nil then
+        assert(type(w.schema.apply_default_if) == 'function')
+        apply_default = w.schema.apply_default_if(data, w)
+    end
+
+    if apply_default then
+        return w.schema.default
+    end
+
+    return data
+end
+
+-- Apply default values from the schema.
+--
+-- Important: the data is assumed as already validated against
+-- the given schema. (A fast type check is performed on composite
+-- types, but it is not recommended to lean on it.)
+--
+-- Nuances:
+--
+-- * Defaults are taken into account only for scalars.
+--
+-- Annotations taken into accounts:
+--
+-- * default -- the value to be placed instead of a missed one
+-- * apply_default_if (function) -- whether to apply the default
+--
+--   apply_default_if = function(data, w)
+--       -- w.schema -- current schema node
+--       -- w.path -- path to the node
+--       -- w.error -- for nice error messages
+--   end
+--
+--   If there is no apply_default_if annotation, the default is
+--   assumed as to be applied.
+function methods.apply_default(self, data)
+    return self:map(data, apply_default_f)
+end
+
+-- }}} <schema object>:apply_default()
 
 -- {{{ Schema object constructor: new
 

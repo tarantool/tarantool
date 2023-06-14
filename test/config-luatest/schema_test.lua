@@ -1921,3 +1921,241 @@ g.test_map_array = function()
 end
 
 -- }}} <schema object>:map()
+
+-- {{{ <schema object>:apply_default()
+
+-- Basic scenario for the :apply_default() method.
+g.test_apply_default = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.scalar({
+            type = 'string',
+            default = 'def',
+        }),
+    }))
+
+    -- The value exists and shouldn't be replaced by the default.
+    local data = {foo = 'bar'}
+    local res = s:apply_default(data)
+    local exp = {foo = 'bar'}
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+
+    -- No field -> replace with the default.
+    local data = {}
+    local res = s:apply_default(data)
+    local exp = {foo = 'def'}
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+
+    -- box.NULL -> replace with the default (if the default
+    -- exists). See also the test_apply_default_nil_default
+    -- test case.
+    local data = {foo = box.NULL}
+    local res = s:apply_default(data)
+    local exp = {foo = 'def'}
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+
+    -- No parent record -> create it and set the field to the
+    -- default.
+    local data = nil
+    local res = s:apply_default(data)
+    local exp = {foo = 'def'}
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+
+    -- Same, but with box.NULL as the marker of the missed record.
+    local data = box.NULL
+    local res = s:apply_default(data)
+    local exp = {foo = 'def'}
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+end
+
+-- Verify :apply_default() without the 'default' annotation.
+g.test_apply_default_nil_default = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.scalar({
+            type = 'string',
+            -- no default annotation
+        }),
+    }))
+
+    -- Keep box.NULL from the original data if the default is not
+    -- provided.
+    local data = {foo = box.NULL}
+    local res = s:apply_default(data)
+    local exp = {foo = box.NULL}
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+
+    -- If both the original data and the default are missed (nil),
+    -- the result should be nil.
+    local data = {}
+    local res = s:apply_default(data)
+    local exp = {}
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+end
+
+-- Verify :apply_default() without the 'default' annotation.
+g.test_apply_default_box_null_default = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.scalar({
+            type = 'string',
+            default = box.NULL,
+        }),
+    }))
+
+    -- Replace nil in the original data with box.NULL from the
+    -- default.
+    local data = {}
+    local res = s:apply_default(data)
+    local exp = {foo = box.NULL}
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+
+    -- If the original value and the default are box.NULL both,
+    -- the result should be box.NULL.
+    local data = {foo = box.NULL}
+    local res = s:apply_default(data)
+    local exp = {foo = box.NULL}
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+end
+
+-- Verify the apply_default_if annotation (do not apply cases).
+g.test_apply_default_if_false = function()
+    local apply_default_if_calls = {}
+    local s = schema.new('myschema', schema.record({
+        foo = schema.scalar({
+            type = 'string',
+            default = 'def',
+            apply_default_if = function(data, w)
+                table.insert(apply_default_if_calls, {
+                    data = data,
+                    schema = w.schema,
+                    path = w.path,
+                })
+                return false
+            end,
+        }),
+    }))
+
+    -- The callback is not called, because the field exists.
+    t.assert_equals(s:apply_default({foo = 'bar'}), {foo = 'bar'})
+    t.assert_equals(apply_default_if_calls, {})
+
+    -- The field is box.NULL, the callback is called.
+    --
+    -- However, the default is not applied, because the function
+    -- returns false.
+    t.assert_equals(s:apply_default({foo = box.NULL}), {foo = box.NULL})
+    local exp = {
+        {
+            data = box.NULL,
+            schema = s.schema.fields.foo,
+            path = {'foo'},
+        }
+    }
+    t.assert_equals(apply_default_if_calls, exp)
+    assert_type_equals(apply_default_if_calls, exp)
+    table.clear(apply_default_if_calls)
+
+    -- The field is missed, the callback is called.
+    --
+    -- However, the default is not applied, because the function
+    -- returns false.
+    t.assert_equals(s:apply_default({}), {})
+    local exp = {
+        {
+            data = nil,
+            schema = s.schema.fields.foo,
+            path = {'foo'},
+        }
+    }
+    t.assert_equals(apply_default_if_calls, exp)
+    assert_type_equals(apply_default_if_calls, exp)
+    table.clear(apply_default_if_calls)
+end
+
+-- Verify the apply_default_if annotation (perform the apply
+-- cases).
+g.test_apply_default_if_true = function()
+    local apply_default_if_calls = {}
+    local s = schema.new('myschema', schema.record({
+        foo = schema.scalar({
+            type = 'string',
+            default = 'def',
+            apply_default_if = function(data, w)
+                table.insert(apply_default_if_calls, {
+                    data = data,
+                    schema = w.schema,
+                    path = w.path,
+                })
+                return true
+            end,
+        }),
+    }))
+
+    -- box.NULL field -> replace with the default.
+    t.assert_equals(s:apply_default({foo = box.NULL}), {foo = 'def'})
+    local exp = {
+        {
+            data = box.NULL,
+            schema = s.schema.fields.foo,
+            path = {'foo'},
+        }
+    }
+    t.assert_equals(apply_default_if_calls, exp)
+    assert_type_equals(apply_default_if_calls, exp)
+    table.clear(apply_default_if_calls)
+
+    -- Missed field -> replace with the default.
+    t.assert_equals(s:apply_default({}), {foo = 'def'})
+    local exp = {
+        {
+            data = nil,
+            schema = s.schema.fields.foo,
+            path = {'foo'},
+        }
+    }
+    t.assert_equals(apply_default_if_calls, exp)
+    assert_type_equals(apply_default_if_calls, exp)
+    table.clear(apply_default_if_calls)
+
+    -- Missed parent record -> create it and set the field to its
+    -- default.
+    t.assert_equals(s:apply_default(nil), {foo = 'def'})
+    local exp = {
+        {
+            data = nil,
+            schema = s.schema.fields.foo,
+            path = {'foo'},
+        }
+    }
+    t.assert_equals(apply_default_if_calls, exp)
+    assert_type_equals(apply_default_if_calls, exp)
+    table.clear(apply_default_if_calls)
+end
+
+-- Verify w.error() in the apply_default_if callback.
+g.test_apply_default_if_error = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.scalar({
+            type = 'string',
+            default = 'def',
+            apply_default_if = function(_data, w)
+                w.error('Something went wrong in %q', 'my apply if')
+            end,
+        }),
+    }))
+
+    local exp_err_msg = '[myschema] foo: Something went wrong in "my apply if"'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = {}
+        s:apply_default(data)
+    end)
+end
+
+-- }}} <schema object>:apply_default()
