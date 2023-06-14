@@ -169,6 +169,104 @@ return schema.new('instance_config', schema.record({
             }),
         }),
     }),
+    log = schema.record({
+        -- The logger destination is handled separately in the
+        -- box_cfg applier, so there are no explicit box_cfg and
+        -- box_cfg_nondynamic annotations.
+        --
+        -- The reason is that there is no direct-no-transform
+        -- mapping from, say, `log.file` to `box_cfg.log`.
+        -- The applier should add the `file:` prefix.
+        to = schema.enum({
+            'stderr',
+            'file',
+            'pipe',
+            'syslog',
+        }, {
+            default = 'stderr',
+        }),
+        file = schema.scalar({
+            type = 'string',
+            default = '{{ instance_name }}.log',
+        }),
+        pipe = schema.scalar({
+            type = 'string',
+            default = box.NULL,
+        }),
+        syslog = schema.record({
+            identity = schema.scalar({
+                type = 'string',
+                default = 'tarantool',
+            }),
+            facility = schema.scalar({
+                type = 'string',
+                default = 'local7',
+            }),
+            server = schema.scalar({
+                type = 'string',
+                -- The logger tries /dev/log and then
+                -- /var/run/syslog if no server is provided.
+                default = box.NULL,
+            }),
+        }),
+        nonblock = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'log_nonblock',
+            box_cfg_nondynamic = true,
+            default = false,
+        }),
+        level = schema.scalar({
+            type = 'number, string',
+            box_cfg = 'log_level',
+            default = 5,
+            allowed_values = {
+                0, 'fatal',
+                1, 'syserror',
+                2, 'error',
+                3, 'crit',
+                4, 'warn',
+                5, 'info',
+                6, 'verbose',
+                7, 'debug',
+            },
+        }),
+        format = schema.enum({
+            'plain',
+            'json',
+        }, {
+            box_cfg = 'log_format',
+            default = 'plain',
+        }),
+        -- box.cfg({log_modules = <...>}) replaces the previous
+        -- value without any merging.
+        --
+        -- If a key in this map is removed in the provided
+        -- configuration, then it will be removed in the actually
+        -- applied configuration.
+        --
+        -- It is exactly what we need there to make the
+        -- configuration independent of previously applied values.
+        modules = schema.map({
+            key = schema.scalar({
+                type = 'string',
+            }),
+            value = schema.scalar({
+                type = 'number, string',
+            }),
+            box_cfg = 'log_modules',
+            -- TODO: This default doesn't work now. It needs
+            -- support of non-scalar schema nodes in
+            -- <schema object>:map().
+            default = box.NULL,
+        }),
+    }, {
+        validate = function(log, w)
+            if log.to == 'pipe' and log.pipe == nil then
+                w.error('The pipe logger is set by the log.to parameter but ' ..
+                    'the command is not set (log.pipe parameter)')
+            end
+        end,
+    }),
 }, {
     -- Any configuration data should contain a version of the
     -- config schema for which it is written.
