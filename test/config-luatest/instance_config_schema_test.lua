@@ -380,3 +380,45 @@ g.test_snapshot = function()
     local res = instance_config:apply_default({}).snapshot
     t.assert_equals(res, exp)
 end
+
+g.test_replication = function()
+    local iconfig = {
+        replication = {
+            peers = {'one', 'two'},
+            anon = true,
+            threads = 1,
+            timeout = 1,
+            synchro_timeout = 1,
+            connect_timeout = 1,
+            sync_timeout = 1,
+            sync_lag = 1,
+            synchro_quorum = 1,
+            skip_conflict = true,
+            election_mode = 'off',
+            election_timeout = 1,
+            election_fencing_mode = 'off',
+            bootstrap_strategy = 'auto',
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.replication,
+                    instance_config.schema.fields.replication)
+
+    local exp = {
+        anon = false,
+        threads = 1,
+        timeout = 1,
+        synchro_timeout = 5,
+        connect_timeout = 30,
+        sync_timeout = 0,
+        sync_lag = 10,
+        synchro_quorum = 'N / 2 + 1',
+        skip_conflict = false,
+        election_mode = 'off',
+        election_timeout = 5,
+        election_fencing_mode = 'soft',
+        bootstrap_strategy = 'auto',
+    }
+    local res = instance_config:apply_default({}).replication
+    t.assert_equals(res, exp)
+end

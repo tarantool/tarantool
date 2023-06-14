@@ -1,4 +1,5 @@
 local schema = require('internal.config.utils.schema')
+local compat = require('compat')
 local uuid = require('uuid')
 
 -- List of annotations:
@@ -482,6 +483,94 @@ return schema.new('instance_config', schema.record({
             type = 'number',
             box_cfg = 'snap_io_rate_limit',
             default = box.NULL,
+        }),
+    }),
+    replication = schema.record({
+        -- XXX: needs more validation
+        peers = schema.array({
+            items = schema.scalar({
+                type = 'string',
+            }),
+            box_cfg = 'replication',
+            default = box.NULL,
+        }),
+        anon = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'replication_anon',
+            default = false,
+        }),
+        threads = schema.scalar({
+            type = 'integer',
+            box_cfg = 'replication_threads',
+            box_cfg_nondynamic = true,
+            default = 1,
+        }),
+        timeout = schema.scalar({
+            type = 'number',
+            box_cfg = 'replication_timeout',
+            default = 1,
+        }),
+        synchro_timeout = schema.scalar({
+            type = 'number',
+            box_cfg = 'replication_synchro_timeout',
+            default = 5,
+        }),
+        connect_timeout = schema.scalar({
+            type = 'number',
+            box_cfg = 'replication_connect_timeout',
+            default = 30,
+        }),
+        sync_timeout = schema.scalar({
+            type = 'number',
+            box_cfg = 'replication_sync_timeout',
+            default = compat.box_cfg_replication_sync_timeout.default == 'old'
+                and 300 or 0,
+        }),
+        sync_lag = schema.scalar({
+            type = 'number',
+            box_cfg = 'replication_sync_lag',
+            default = 10,
+        }),
+        synchro_quorum = schema.scalar({
+            type = 'string, number',
+            box_cfg = 'replication_synchro_quorum',
+            default = 'N / 2 + 1',
+        }),
+        skip_conflict = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'replication_skip_conflict',
+            default = false,
+        }),
+        election_mode = schema.enum({
+            'off',
+            'voter',
+            'manual',
+            'candidate',
+        }, {
+            box_cfg = 'election_mode',
+            default = 'off',
+        }),
+        election_timeout = schema.scalar({
+            type = 'number',
+            box_cfg = 'election_timeout',
+            default = 5,
+        }),
+        election_fencing_mode = schema.enum({
+            'off',
+            'soft',
+            'strict',
+        }, {
+            box_cfg = 'election_fencing_mode',
+            default = 'soft',
+        }),
+        bootstrap_strategy = schema.enum({
+            'auto',
+            'config',
+            'supervised',
+            'legacy',
+        }, {
+            box_cfg = 'bootstrap_strategy',
+            default = 'auto',
         }),
     }),
 }, {
