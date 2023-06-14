@@ -354,6 +354,13 @@ return schema.new('instance_config', schema.record({
             default = false,
         }),
     }),
+    sql = schema.record({
+        cache_size = schema.scalar({
+            type = 'integer',
+            box_cfg = 'sql_cache_size',
+            default = 5 * 1024 * 1024,
+        }),
+    }),
 }, {
     -- Any configuration data should contain a version of the
     -- config schema for which it is written.
