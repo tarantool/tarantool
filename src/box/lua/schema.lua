@@ -1943,7 +1943,7 @@ local function check_pairs_opts(opts, key_is_nil)
             after = opts.after
             if after ~= nil and type(after) ~= "string" and type(after) ~= "table"
               and not is_tuple(after) then
-                box.error(box.error.INVALID_POSITION)
+                box.error(box.error.ITERATOR_POSITION)
             end
         end
     end
@@ -2467,7 +2467,7 @@ local function check_select_opts(opts, key_is_nil)
             after = opts.after
             if type(after) ~= "string" and type(after) ~= "table" and
                     not is_tuple(after) then
-                box.error(box.error.INVALID_POSITION)
+                box.error(box.error.ITERATOR_POSITION)
             end
         end
         if opts.fetch_pos ~= nil then
