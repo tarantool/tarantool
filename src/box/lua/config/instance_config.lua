@@ -267,6 +267,39 @@ return schema.new('instance_config', schema.record({
             end
         end,
     }),
+    iproto = schema.record({
+        -- XXX: listen/advertise are specific: accept a string of
+        -- a particular format, a number (port), a table of a
+        -- particular format.
+        --
+        -- Only a string (without further validation) is accepted
+        -- for now.
+        listen = schema.scalar({
+            type = 'string',
+            box_cfg = 'listen',
+            default = box.NULL,
+        }),
+        advertise = schema.scalar({
+            type = 'string',
+            default = box.NULL,
+        }),
+        threads = schema.scalar({
+            type = 'integer',
+            box_cfg = 'iproto_threads',
+            box_cfg_nondynamic = true,
+            default = 1,
+        }),
+        net_msg_max = schema.scalar({
+            type = 'integer',
+            box_cfg = 'net_msg_max',
+            default = 768,
+        }),
+        readahead = schema.scalar({
+            type = 'integer',
+            box_cfg = 'readahead',
+            default = 16320,
+        }),
+    }),
 }, {
     -- Any configuration data should contain a version of the
     -- config schema for which it is written.

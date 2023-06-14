@@ -192,3 +192,27 @@ g.test_log = function()
     local res = instance_config:apply_default({}).log
     t.assert_equals(res, exp)
 end
+
+g.test_iproto = function()
+    local iconfig = {
+        iproto = {
+            listen = 'one',
+            advertise = 'two',
+            threads = 1,
+            net_msg_max = 1,
+            readahead = 1,
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.iproto, instance_config.schema.fields.iproto)
+
+    local exp = {
+        listen = box.NULL,
+        advertise = box.NULL,
+        threads = 1,
+        net_msg_max = 768,
+        readahead = 16320,
+    }
+    local res = instance_config:apply_default({}).iproto
+    t.assert_equals(res, exp)
+end
