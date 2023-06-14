@@ -266,3 +266,19 @@ g.test_database = function()
     local res = instance_config:apply_default({}).database
     t.assert_equals(res, exp)
 end
+
+g.test_sql = function()
+    local iconfig = {
+        sql = {
+            cache_size = 1,
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.sql, instance_config.schema.fields.sql)
+
+    local exp = {
+        cache_size = 5242880,
+    }
+    local res = instance_config:apply_default({}).sql
+    t.assert_equals(res, exp)
+end
