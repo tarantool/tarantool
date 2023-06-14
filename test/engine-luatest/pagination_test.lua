@@ -382,6 +382,18 @@ tree_g.test_invalid_positions = function(cg)
         end)
         t.assert_equals(flag, false)
         t.assert_equals(err.code, box.error.ITERATOR_POSITION)
+
+        flag, err = pcall(function()
+            s:select(nil, {fullscan=true, limit=1, after=777})
+        end)
+        t.assert_equals(flag, false)
+        t.assert_equals(err.code, box.error.ITERATOR_POSITION)
+
+        flag, err = pcall(function()
+            s:pairs(nil, {fullscan=true, limit=1, after=777})
+        end)
+        t.assert_equals(flag, false)
+        t.assert_equals(err.code, box.error.ITERATOR_POSITION)
     end)
 end
 
