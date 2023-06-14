@@ -114,3 +114,21 @@ function(file_is_in_directory varname file dir)
         set(${varname} TRUE PARENT_SCOPE)
     endif()
 endfunction()
+
+# string() has JOIN option but only since 3.12.
+function(string_join
+    glue
+    string_out
+)
+    set(result "")
+    set(is_first_item TRUE)
+    foreach(item IN LISTS ARGN)
+        if(is_first_item)
+            set(result "${item}")
+            set(is_first_item FALSE)
+        else()
+            set(result "${result}${glue}${item}")
+        endif()
+    endforeach()
+    set(${string_out} ${result} PARENT_SCOPE)
+endfunction()
