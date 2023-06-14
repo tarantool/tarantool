@@ -453,6 +453,37 @@ return schema.new('instance_config', schema.record({
             default = 4 * 3600,
         }),
     }),
+    snapshot = schema.record({
+        dir = schema.scalar({
+            type = 'string',
+            box_cfg = 'memtx_dir',
+            box_cfg_nondynamic = true,
+            mkdir = true,
+            default = '{{ instance_name }}',
+        }),
+        by = schema.record({
+            interval = schema.scalar({
+                type = 'number',
+                box_cfg = 'checkpoint_interval',
+                default = 3600,
+            }),
+            wal_size = schema.scalar({
+                type = 'integer',
+                box_cfg = 'checkpoint_wal_threshold',
+                default = 1e18,
+            }),
+        }),
+        count = schema.scalar({
+            type = 'integer',
+            box_cfg = 'checkpoint_count',
+            default = 2,
+        }),
+        snap_io_rate_limit = schema.scalar({
+            type = 'number',
+            box_cfg = 'snap_io_rate_limit',
+            default = box.NULL,
+        }),
+    }),
 }, {
     -- Any configuration data should contain a version of the
     -- config schema for which it is written.
