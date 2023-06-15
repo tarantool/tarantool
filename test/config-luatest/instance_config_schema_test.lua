@@ -3,8 +3,13 @@ local instance_config = require('internal.config.instance_config')
 
 local g = t.group()
 
+local is_enterprise = require('tarantool').package == 'Tarantool Enterprise'
+
 -- Check that all record element names can be found in the table and vice versa.
 local function validate_fields(config, record)
+    if record.enterprise_edition and not is_enterprise then
+        return
+    end
     local config_fields = {}
     if type(config) == 'table' then
         for k in pairs(config) do
@@ -53,7 +58,9 @@ local function validate_fields(config, record)
                 validate_fields(v1, v.items)
             end
         end
-        table.insert(record_fields, k)
+        if v.type ~= 'record' or not v.enterprise_edition or is_enterprise then
+            table.insert(record_fields, k)
+        end
     end
 
     t.assert_items_equals(config_fields, record_fields)
@@ -64,10 +71,60 @@ g.test_general = function()
 end
 
 g.test_config = function()
+    t.tarantool.skip_if_enterprise()
     local iconfig = {
         config = {
             version = 'dev',
             reload = 'auto',
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.config, instance_config.schema.fields.config)
+
+    iconfig = {
+        config = {
+            version = '0.0.0',
+            reload = 'auto',
+        },
+    }
+    local err = '[instance_config] config.version: Got 0.0.0, but only the '..
+                'following values are allowed: dev'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+
+    local exp = {
+        reload = 'auto',
+    }
+    local res = instance_config:apply_default({}).config
+    t.assert_equals(res, exp)
+end
+
+g.test_config_enterprise = function()
+    t.tarantool.skip_if_not_enterprise()
+    local iconfig = {
+        config = {
+            version = 'dev',
+            reload = 'auto',
+            etcd = {
+                prefix = '/one',
+                endpoints = {'two', 'three'},
+                username = 'four',
+                password = 'five',
+                http = {
+                    request = {
+                        timeout = 1,
+                        unix_socket = 'six',
+                    }
+                },
+                ssl = {
+                    ssl_key = 'seven',
+                    ca_path = 'eight',
+                    ca_file = 'nine',
+                    verify_peer = true,
+                    verify_host = false,
+                },
+            }
         },
     }
     instance_config:validate(iconfig)
@@ -364,6 +421,7 @@ g.test_vinyl = function()
 end
 
 g.test_wal = function()
+    t.tarantool.skip_if_enterprise()
     local iconfig = {
         wal = {
             dir = 'one',
@@ -372,6 +430,43 @@ g.test_wal = function()
             dir_rescan_delay = 1,
             queue_max_size = 1,
             cleanup_delay = 1,
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.wal, instance_config.schema.fields.wal)
+
+    local exp = {
+        dir = '{{ instance_name }}',
+        mode = 'write',
+        max_size = 268435456,
+        dir_rescan_delay = 2,
+        queue_max_size = 16777216,
+        cleanup_delay = 14400,
+    }
+    local res = instance_config:apply_default({}).wal
+    t.assert_equals(res, exp)
+end
+
+g.test_wal_enterprise = function()
+    t.tarantool.skip_if_not_enterprise()
+    local iconfig = {
+        wal = {
+            dir = 'one',
+            mode = 'none',
+            max_size = 1,
+            dir_rescan_delay = 1,
+            queue_max_size = 1,
+            cleanup_delay = 1,
+            ext = {
+                old = true,
+                new = false,
+                spaces = {
+                    one = {
+                        old = false,
+                        new = true,
+                    },
+                },
+            },
         },
     }
     instance_config:validate(iconfig)

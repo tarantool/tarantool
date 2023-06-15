@@ -1,4 +1,5 @@
 local schema = require('internal.config.utils.schema')
+local tarantool = require('tarantool')
 local compat = require('compat')
 local uuid = require('uuid')
 
@@ -72,6 +73,42 @@ local function validate_config_version(data, w)
     end
 end
 
+local function enterprise_edition_validate(data, w)
+    -- OK if we're on Tarantool EE.
+    if tarantool.package == 'Tarantool Enterprise' then
+        return
+    end
+
+    assert(tarantool.package == 'Tarantool')
+
+    -- OK, if the value is nil or box.NULL.
+    if data == nil then
+        return
+    end
+
+    -- NB: Let's fail the validation for an empty table, because
+    -- otherwise we will get a less descriptive error from a lower
+    -- level API. For example, box.cfg({wal_ext = {}}) on Tarantool
+    -- Community Edition says the following:
+    --
+    -- > Incorrect value for option 'wal_ext': unexpected option
+
+    w.error('This configuration parameter is available only in Tarantool ' ..
+        'Enterprise Edition')
+end
+
+local function enterprise_edition_apply_default_if(_data, _w)
+    return tarantool.package == 'Tarantool Enterprise'
+end
+
+-- Available only in Tarantool Enterprise Edition.
+local function enterprise_edition(schema_node)
+    schema_node.enterprise_edition = true
+    schema_node.validate = enterprise_edition_validate
+    schema_node.apply_default_if = enterprise_edition_apply_default_if
+    return schema_node
+end
+
 local function validate_uuid_str(data, w)
     if uuid.fromstr(data) == nil then
         w.error('Unable to parse the value as a UUID: %q', data)
@@ -92,6 +129,74 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'auto',
         }),
+        -- Defaults can't be set there, because the `validate`
+        -- annotation expects either no data or data with existing
+        -- prefix field. The prefix field has no default. So,
+        -- applying defaults to an empty data would make the data
+        -- invalid.
+        etcd = enterprise_edition(schema.record({
+            prefix = schema.scalar({
+                type = 'string',
+                validate = function(data, w)
+                    if not data:startswith('/') then
+                        w.error(('config.etcd.prefix should be a path alike ' ..
+                            'value, got %q'):format(data))
+                    end
+                end,
+            }),
+            endpoints = schema.array({
+                items = schema.scalar({
+                    type = 'string',
+                }),
+            }),
+            username = schema.scalar({
+                type = 'string',
+            }),
+            password = schema.scalar({
+                type = 'string',
+            }),
+            http = schema.record({
+                request = schema.record({
+                    timeout = schema.scalar({
+                        type = 'number',
+                        -- default = 0.3 is applied right in the
+                        -- etcd source. See a comment above
+                        -- regarding defaults in config.etcd.
+                    }),
+                    unix_socket = schema.scalar({
+                        type = 'string',
+                    }),
+                }),
+            }),
+            ssl = schema.record({
+                ssl_key = schema.scalar({
+                    type = 'string',
+                }),
+                ca_path = schema.scalar({
+                    type = 'string',
+                }),
+                ca_file = schema.scalar({
+                    type = 'string',
+                }),
+                verify_peer = schema.scalar({
+                    type = 'boolean',
+                }),
+                verify_host = schema.scalar({
+                    type = 'boolean',
+                }),
+            }),
+        }, {
+            validate = function(data, w)
+                -- No config.etcd section at all -- OK.
+                if data == nil or next(data) == nil then
+                    return
+                end
+                -- There is some data -- the prefix should be there.
+                if data.prefix == nil then
+                    w.error('No config.etcd.prefix provided')
+                end
+            end,
+        })),
     }),
     process = schema.record({
         strip_core = schema.scalar({
@@ -453,6 +558,48 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'wal_cleanup_delay',
             default = 4 * 3600,
         }),
+        -- box.cfg({wal_ext = <...>}) replaces the previous
+        -- value without any merging. See explanation why it is
+        -- important in the log.modules description.
+        ext = enterprise_edition(schema.record({
+            old = schema.scalar({
+                type = 'boolean',
+                -- TODO: This default is applied despite the outer
+                -- apply_default_if, because the annotation has no
+                -- effect on child schema nodes.
+                --
+                -- This default is purely informational: lack of the
+                -- value doesn't break configuration applying
+                -- idempotence.
+                -- default = false,
+            }),
+            new = schema.scalar({
+                type = 'boolean',
+                -- TODO: See wal.ext.old.
+                -- default = false,
+            }),
+            spaces = schema.map({
+                key = schema.scalar({
+                    type = 'string',
+                }),
+                value = schema.record({
+                    old = schema.scalar({
+                        type = 'boolean',
+                        default = false,
+                    }),
+                    new = schema.scalar({
+                        type = 'boolean',
+                        default = false,
+                    }),
+                }),
+            }),
+        }, {
+            box_cfg = 'wal_ext',
+            -- TODO: This default doesn't work now. It needs
+            -- support of non-scalar schema nodes in
+            -- <schema object>:map().
+            default = box.NULL,
+        })),
     }),
     snapshot = schema.record({
         dir = schema.scalar({
