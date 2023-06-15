@@ -415,7 +415,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6f4b88c5868e6ccb1124d51de716cb31" kind="enumvalue"><name>ER_OLD_TERM</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9b5f44b8d3958e8334ae8c34b9d05598" kind="enumvalue"><name>ER_INTERFERING_ELECTIONS</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6afc6c264922421724fdb61d5844a35d" kind="enumvalue"><name>ER_ITERATOR_POSITION</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1132a4648a76ba8f23d55fac0d17a3e3" kind="enumvalue"><name>ER_UNUSED</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0028cf36d083fe2c4ca0060aaae04254" kind="enumvalue"><name>ER_DEFAULT_VALUE_TYPE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea39764ddc62dfb5284c74f8dc6fa936c7" kind="enumvalue"><name>ER_UNKNOWN_AUTH_METHOD</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceab7e5aaead63564d8ea582774ca74d551" kind="enumvalue"><name>ER_INVALID_AUTH_DATA</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac486e673abf714f37a4e4b8a7fcbd591" kind="enumvalue"><name>ER_INVALID_AUTH_REQUEST</name></member>
