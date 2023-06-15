@@ -82,6 +82,50 @@ return schema.new('instance_config', schema.record({
             default = 'auto',
         }),
     }),
+    process = schema.record({
+        strip_core = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'strip_core',
+            box_cfg_nondynamic = true,
+            default = true,
+        }),
+        coredump = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'coredump',
+            box_cfg_nondynamic = true,
+            default = false,
+        }),
+        background = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'background',
+            box_cfg_nondynamic = true,
+            default = false,
+        }),
+        title = schema.scalar({
+            type = 'string',
+            box_cfg = 'custom_proc_title',
+            default = 'tarantool - {{ instance_name }}',
+        }),
+        username = schema.scalar({
+            type = 'string',
+            box_cfg = 'username',
+            box_cfg_nondynamic = true,
+            default = box.NULL,
+        }),
+        work_dir = schema.scalar({
+            type = 'string',
+            box_cfg = 'work_dir',
+            box_cfg_nondynamic = true,
+            default = box.NULL,
+        }),
+        pid_file = schema.scalar({
+            type = 'string',
+            box_cfg = 'pid_file',
+            box_cfg_nondynamic = true,
+            mk_parent_dir = true,
+            default = '{{ instance_name }}.pid',
+        }),
+    }),
 }, {
     -- Any configuration data should contain a version of the
     -- config schema for which it is written.

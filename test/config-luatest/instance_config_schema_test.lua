@@ -52,3 +52,31 @@ g.test_config = function()
     local res = instance_config:apply_default({}).config
     t.assert_equals(res, exp)
 end
+
+g.test_process = function()
+    local iconfig = {
+        process = {
+            strip_core = true,
+            coredump = true,
+            background = true,
+            title = 'one',
+            username = 'two',
+            work_dir = 'three',
+            pid_file = 'four',
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.process, instance_config.schema.fields.process)
+
+    local exp = {
+        strip_core = true,
+        coredump = false,
+        background = false,
+        title = 'tarantool - {{ instance_name }}',
+        username = box.NULL,
+        work_dir = box.NULL,
+        pid_file = '{{ instance_name }}.pid',
+    }
+    local res = instance_config:apply_default({}).process
+    t.assert_equals(res, exp)
+end
