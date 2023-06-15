@@ -1087,6 +1087,125 @@ end
 
 -- }}} <schema object>:apply_default()
 
+-- {{{ <schema object>:merge()
+
+local function merge_impl(schema, a, b, ctx)
+    -- Prefer box.NULL over nil.
+    if a == nil and b == nil then
+        if type(a) == 'nil' then
+            return b
+        else
+            return a
+        end
+    end
+
+    -- Prefer X ~= nil over nil/box.NULL.
+    if a == nil then
+        return b
+    elseif b == nil then
+        return a
+    end
+
+    assert(a ~= nil and b ~= nil)
+
+    -- Scalars and arrays are not to be merged.
+    --
+    -- At this point neither a == nil, nor b == nil, so return the
+    -- preferred value, `b`.
+    if is_scalar(schema) then
+        return b
+    elseif schema.type == 'array' then
+        walkthrough_assert_table(ctx, schema, a)
+        walkthrough_assert_table(ctx, schema, b)
+
+        return b
+    end
+
+    -- `a` and `b` are both non-nil non-box.NULL records or maps.
+    -- Perform the deep merge.
+    if schema.type == 'record' then
+        walkthrough_assert_table(ctx, schema, a)
+        walkthrough_assert_table(ctx, schema, b)
+
+        local res = {}
+        for field_name, field_def in pairs(schema.fields) do
+            walkthrough_enter(ctx, field_name)
+            local a_field = a[field_name]
+            local b_field = b[field_name]
+            res[field_name] = merge_impl(field_def, a_field, b_field, ctx)
+            walkthrough_leave(ctx)
+        end
+        return res
+    elseif schema.type == 'map' then
+        walkthrough_assert_table(ctx, schema, a)
+        walkthrough_assert_table(ctx, schema, b)
+
+        local res = {}
+        for field_name, a_field in pairs(a) do
+            walkthrough_enter(ctx, field_name)
+            local b_field = b[field_name]
+            res[field_name] = merge_impl(schema.value, a_field, b_field, ctx)
+            walkthrough_leave(ctx)
+        end
+        -- NB: No error is possible, so let's skip
+        -- walkthrough_enter()/walkthrough_leave().
+        for field_name, b_field in pairs(b) do
+            if type(a[field_name]) == 'nil' then
+                res[field_name] = b_field
+            end
+        end
+        return res
+    else
+        assert(false)
+    end
+end
+
+-- Merge two hierarical values (prefer the latter).
+--
+-- Important: the data is assumed as already validated against
+-- the given schema. (A fast type check is performed on composite
+-- types, but it is not recommended to lean on it.)
+--
+-- box.NULL is preferred over nil, any X where X ~= nil is
+-- preferred over nil/box.NULL.
+--
+-- Records and maps are deeply merged. Scalars and arrays are
+-- all-or-nothing: the right hand one is chosen if both are
+-- not nil/box.NULL.
+--
+-- The formal rules are below.
+--
+-- Let's define the merge result for nil and box.NULL values:
+--
+-- 1. merge(nil, nil) -> nil
+-- 2. merge(nil, box.NULL) -> box.NULL
+-- 3. merge(box.NULL, nil) -> box.NULL
+-- 4. merge(box.NULL, box.NULL) -> box.NULL
+--
+-- Let's define X as a value that is not nil and is not box.NULL.
+--
+-- 5. merge(X, nil) -> X
+-- 6. merge(X, box.NULL) -> X
+-- 7. merge(nil, X) -> X
+-- 8. merge(box.NULL, X) -> X
+--
+-- If the above conditions are not meet, the following type
+-- specific rules are is effect.
+--
+-- 9. merge(<scalar A>, <scalar B>) -> <scalar B>
+-- 10. merge(<array A>, <array B>) -> <array B>
+-- 11. merge(<record A>, <record B>) -> deep-merge(A, B)
+-- 12. merge(<map A>, <map B>) -> deep-merge(A, B)
+--
+-- For each key K in A and each key K in B: deep-merge(A, B)[K] is
+-- merge(A[K], B[K]).
+function methods.merge(self, a, b)
+    local ctx = walkthrough_start(self)
+    return merge_impl(rawget(self, 'schema'), a, b, ctx)
+end
+
+-- }}} <schema object>:merge()
+
 -- {{{ Schema object constructor: new
 
 -- Define a field lookup function on a schema object.

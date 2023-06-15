@@ -2159,3 +2159,194 @@ g.test_apply_default_if_error = function()
 end
 
 -- }}} <schema object>:apply_default()
+
+-- {{{ Testing helpers for <schema object>:merge()
+
+-- Verify basic rules of the merge for a two-level schema, where
+-- a record or a map is on the outmost level and a scalar or an
+-- array is on the inner level.
+local function verify_merge(s)
+    -- Determine appropriate testing values for the inner level.
+    local av
+    local bv
+    if s.schema.type == 'record' then
+        if s.schema.fields.foo.type == 'array' then
+            av = {'aaa'}
+            bv = {'bbb'}
+        else
+            av = 'aaa'
+            bv = 'bbb'
+        end
+    elseif s.schema.type == 'map' then
+        if s.schema.value.type == 'array' then
+            av = {'aaa'}
+            bv = {'bbb'}
+        else
+            av = 'aaa'
+            bv = 'bbb'
+        end
+    else
+        assert(false)
+    end
+
+    -- 1. A scalar/array field is present only in record/map A.
+    -- 2. A scalar/array field is present only in record/map B.
+    -- 3. A scalar/array field is present in the both
+    --    records/maps.
+    local a = {
+        foo = av,
+        bar = av,
+        -- no baz
+    }
+    local b = {
+        foo = bv,
+        -- no bar
+        baz = bv,
+    }
+    local exp = {
+        foo = bv,
+        bar = av,
+        baz = bv,
+    }
+    local res = s:merge(a, b)
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+
+    -- nil vs box.NULL cases.
+    --
+    -- |     | a        | b        | res      |
+    -- | --- | -------- | -------- | -------- |
+    -- | foo | nil      | nil      | nil      |
+    -- | bar | box.NULL | nil      | box.NULL |
+    -- | baz | nil      | box.NULL | box.NULL |
+    -- | fiz | box.NULL | box.NULL | box.NULL |
+    local a = {
+        -- no foo
+        bar = box.NULL,
+        -- no baz
+        fiz = box.NULL,
+    }
+    local b = {
+        -- no foo
+        -- no bar
+        baz = box.NULL,
+        fiz = box.NULL,
+    }
+    local exp = {
+        -- no foo
+        bar = box.NULL,
+        baz = box.NULL,
+        fiz = box.NULL,
+    }
+    local res = s:merge(a, b)
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+
+    -- nil/box.NULL vs X ~= nil cases.
+    --
+    -- |     | a        | b        | res |
+    -- | --- | -------- | -------- | --- |
+    -- | foo | nil      | X ~= nil | X   |
+    -- | bar | box.NULL | X ~= nil | X   |
+    -- | baz | X ~= nil | nil      | X   |
+    -- | fiz | X ~= nil | box.NULL | X   |
+    local a = {
+        -- no foo
+        bar = box.NULL,
+        baz = av,
+        fiz = av,
+    }
+    local b = {
+        foo = bv,
+        bar = bv,
+        -- no baz
+        fiz = box.NULL,
+    }
+    local exp = {
+        foo = bv,
+        bar = bv,
+        baz = av,
+        fiz = av,
+    }
+    local res = s:merge(a, b)
+    t.assert_equals(res, exp)
+    assert_type_equals(res, exp)
+end
+
+-- }}} Testing helpers for <schema object>:merge()
+
+-- {{{ <schema object>:merge()
+
+g.test_merge_record_and_scalar = function()
+    local scalar = schema.scalar({type = 'string'})
+    verify_merge(schema.new('myschema', schema.record({
+        foo = scalar,
+        bar = scalar,
+        baz = scalar,
+        fiz = scalar,
+    })))
+end
+
+g.test_merge_map_and_scalar = function()
+    local scalar = schema.scalar({type = 'string'})
+    verify_merge(schema.new('myschema', schema.map({
+        key = scalar,
+        value = scalar,
+    })))
+end
+
+g.test_merge_record_and_array = function()
+    local array = schema.array({items = schema.scalar({type = 'string'})})
+    verify_merge(schema.new('myschema', schema.record({
+        foo = array,
+        bar = array,
+        baz = array,
+        fiz = array,
+    })))
+end
+
+g.test_merge_map_and_array = function()
+    local array = schema.array({items = schema.scalar({type = 'string'})})
+    verify_merge(schema.new('myschema', schema.map({
+        key = array,
+        value = array,
+    })))
+end
+
+-- Verify that arrays are NOT deeply merged.
+--
+-- We need arrays of different sizes for that.
+g.test_merge_array = function()
+    local s = schema.new('myschema', schema.array({
+        items = schema.scalar({type = 'string'}),
+    }))
+
+    local a = {'aaa'}
+    local b = {'bbb', 'ccc', 'ddd'}
+
+    t.assert_equals(s:merge(a, b), b)
+    t.assert_equals(s:merge(b, a), a)
+end
+
+-- Verify that scalars of type 'any' are NOT deeply merged.
+--
+-- We need table values for the scalars for that.
+g.test_merge_any = function()
+    local s = schema.new('myschema', schema.scalar({
+        type = 'any',
+    }))
+
+    local a = {foo = 'aaa'}
+    local b = {bar = 'bbb'}
+
+    t.assert_equals(s:merge(a, b), b)
+    t.assert_equals(s:merge(b, a), a)
+
+    local a = {1, 2, 3}
+    local b = {4, 5, 6}
+
+    t.assert_equals(s:merge(a, b), b)
+    t.assert_equals(s:merge(b, a), a)
+end
+
+-- }}} <schema object>:merge()
