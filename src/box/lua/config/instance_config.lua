@@ -704,6 +704,28 @@ return schema.new('instance_config', schema.record({
             }),
         }),
     }),
+    app = schema.record({
+        file = schema.scalar({
+            type = 'string',
+        }),
+        module = schema.scalar({
+            type = 'string',
+        }),
+        cfg = schema.map({
+            key = schema.scalar({
+                type = 'string',
+            }),
+            value = schema.scalar({
+                type = 'any',
+            }),
+        }),
+    }, {
+        validate = function(app, w)
+            if app.file ~= nil and app.module ~= nil then
+                w.error('Fields file and module cannot appear at the same time')
+            end
+        end,
+    }),
 }, {
     -- Any configuration data should contain a version of the
     -- config schema for which it is written.

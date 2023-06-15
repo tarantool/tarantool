@@ -29,6 +29,17 @@ local function validate_fields(config, record)
         end
     end
 
+    -- Only one of file, and module fields can appear at the same time.
+    if record.validate == instance_config.schema.fields.app.validate then
+        if type(config) == 'table' then
+            if config.file ~= nil then
+                table.insert(config_fields, 'module')
+            elseif config.module ~= nil then
+                table.insert(config_fields, 'file')
+            end
+        end
+    end
+
     local record_fields = {}
     for k, v in pairs(record.fields) do
         if v.type == 'record' then
@@ -507,5 +518,32 @@ g.test_credentials = function()
     end)
 
     local res = instance_config:apply_default({}).credentials
+    t.assert_equals(res, nil)
+end
+
+g.test_app = function()
+    local iconfig = {
+        app = {
+            file = 'one',
+            cfg = {three = 'four'},
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.app, instance_config.schema.fields.app)
+
+    iconfig = {
+        app = {
+            file = 'one',
+            module = 'two',
+            cfg = {two = 'three'},
+        },
+    }
+    local err = '[instance_config] app: Fields file and module cannot appear '..
+                'at the same time'
+    t.assert_error_msg_content_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+
+    local res = instance_config:apply_default({}).app
     t.assert_equals(res, nil)
 end
