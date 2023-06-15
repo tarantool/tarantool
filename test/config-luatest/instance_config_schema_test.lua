@@ -12,10 +12,35 @@ local function validate_fields(config, record)
         end
     end
 
+    -- Only one of plain, sha1, and sha256 fields can appear at the same time.
+    local users = instance_config.schema.fields.credentials.fields.users
+    if record.validate == users.value.fields.password.validate then
+        if type(config) == 'table' then
+            if config.plain ~= nil then
+                table.insert(config_fields, 'sha1')
+                table.insert(config_fields, 'sha256')
+            elseif config.sha1 ~= nil then
+                table.insert(config_fields, 'plain')
+                table.insert(config_fields, 'sha256')
+            elseif config.sha256 ~= nil then
+                table.insert(config_fields, 'sha1')
+                table.insert(config_fields, 'plain')
+            end
+        end
+    end
+
     local record_fields = {}
     for k, v in pairs(record.fields) do
         if v.type == 'record' then
             validate_fields(config[k], v)
+        elseif v.type == 'map' and v.value.type == 'record' then
+            for _, v1 in pairs(config[k]) do
+                validate_fields(v1, v.value)
+            end
+        elseif v.type == 'array' and v.items.type == 'record' then
+            for _, v1 in pairs(config[k]) do
+                validate_fields(v1, v.items)
+            end
         end
         table.insert(record_fields, k)
     end
@@ -421,4 +446,66 @@ g.test_replication = function()
     }
     local res = instance_config:apply_default({}).replication
     t.assert_equals(res, exp)
+end
+
+g.test_credentials = function()
+    local iconfig = {
+        credentials = {
+            roles = {
+                one = {
+                    privileges = {
+                        {
+                            permissions = {
+                                'create',
+                                'drop',
+                            },
+                            universe = false,
+                        },
+                    },
+                    roles = {'one', 'two'},
+                },
+            },
+            users = {
+                two = {
+                    password = {
+                        plain = 'one',
+                    },
+                    privileges = {
+                        {
+                            permissions = {
+                                'write',
+                                'read',
+                            },
+                            universe = true,
+                        },
+                    },
+                    roles = {'one', 'two'},
+                },
+            },
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.credentials,
+                    instance_config.schema.fields.credentials)
+
+    iconfig = {
+        credentials = {
+            users = {
+                one = {
+                    password = {
+                        plain = 'one',
+                        sha1 = 'two',
+                    },
+                },
+            },
+        },
+    }
+    local err = '[instance_config] credentials.users.one.password: Only one '..
+                'of plain, sha1, and sha256 can appear at the same time.'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+
+    local res = instance_config:apply_default({}).credentials
+    t.assert_equals(res, nil)
 end
