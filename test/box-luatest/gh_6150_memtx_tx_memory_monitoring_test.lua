@@ -15,7 +15,8 @@ local SIZE_OF_XROW = 147
 -- Tracker can allocate additional memory, be careful!
 local SIZE_OF_READ_TRACKER = 48
 local SIZE_OF_POINT_TRACKER = 88
-local SIZE_OF_GAP_TRACKER = 80
+local SIZE_OF_INPLACE_GAP_TRACKER = 48
+local SIZE_OF_NEARBY_GAP_TRACKER = 88
 
 local current_stat = {}
 
@@ -327,7 +328,7 @@ g.test_tracker = function()
     g.server:eval('tx1 = txn_proxy.new()')
     g.server:eval('tx1:begin()')
     g.server:eval('tx1("s:select{2}")')
-    local trackers_used = 2 * SIZE_OF_GAP_TRACKER + SIZE_OF_READ_TRACKER
+    local trackers_used = 2 * SIZE_OF_NEARBY_GAP_TRACKER + SIZE_OF_READ_TRACKER
     local diff = {
         ["mvcc"] = {
             ["trackers"] = {
@@ -408,7 +409,7 @@ g.test_conflict = function()
     g.server:eval("box.internal.memtx_tx_gc(10)")
     -- Note that we have subtract the previous value of trackers_used
     -- because point trackers are freed and we need negative diff for them.
-    trackers_used = SIZE_OF_GAP_TRACKER - trackers_used
+    trackers_used = SIZE_OF_INPLACE_GAP_TRACKER - trackers_used
     local diff = {
         ["txn"] = {
             ["statements"] = {
