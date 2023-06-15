@@ -909,7 +909,8 @@ error:
 		if (key < iproto_key_MAX &&
 		    iproto_key_type[key] != mp_typeof(*value))
 			goto error;
-		key_map &= ~iproto_key_bit(key);
+		if (key < 64)
+			key_map &= ~iproto_key_bit(key);
 		switch (key) {
 		case IPROTO_SPACE_ID:
 			request->space_id = mp_decode_uint(&value);
