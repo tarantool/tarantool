@@ -511,10 +511,8 @@ struct txn {
 	struct rlist read_set;
 	/** List of point hole reads. @sa struct point_hole_item. */
 	struct rlist point_holes_list;
-	/** List of gap reads. @sa struct gap_item. */
+	/** List of gap reads. @sa struct inplace_gap_item / nearby_gap_item. */
 	struct rlist gap_list;
-	/** List of full scans. @sa struct full_scan_item. */
-	struct rlist full_scan_list;
 	/** Link in tx_manager::all_txs. */
 	struct rlist in_all_txs;
 	/** True in case transaction provides any DDL change. */
