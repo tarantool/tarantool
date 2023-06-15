@@ -645,13 +645,14 @@ struct index {
 	uint32_t dense_id;
 	/**
 	 * List of gap_item's describing gap reads in the index with NULL
-	 * successor. Those gap reads happen when reading from empty index,
+	 * successor OR full scan gaps.
+	 * The first type happens when reading from empty index,
 	 * or when reading from rightmost part of ordered index (TREE).
-	 * @sa struct gap_item.
+	 * The second type happens when a full scan was finished for
+	 * unordered index (HASH).
+	 * @sa struct gap_item_base.
 	 */
 	struct rlist read_gaps;
-	/** List of full scans of the index. @sa struct full_scan_item. */
-	struct rlist full_scans;
 };
 
 /**
