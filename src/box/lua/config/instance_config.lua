@@ -414,6 +414,45 @@ return schema.new('instance_config', schema.record({
             default = 1024 * 1024,
         }),
     }),
+    wal = schema.record({
+        dir = schema.scalar({
+            type = 'string',
+            box_cfg = 'wal_dir',
+            box_cfg_nondynamic = true,
+            mkdir = true,
+            default = '{{ instance_name }}',
+        }),
+        mode = schema.enum({
+            'none',
+            'write',
+            'fsync',
+        }, {
+            box_cfg = 'wal_mode',
+            box_cfg_nondynamic = true,
+            default = 'write',
+        }),
+        max_size = schema.scalar({
+            type = 'integer',
+            box_cfg = 'wal_max_size',
+            box_cfg_nondynamic = true,
+            default = 256 * 1024 * 1024,
+        }),
+        dir_rescan_delay = schema.scalar({
+            type = 'number',
+            box_cfg = 'wal_dir_rescan_delay',
+            default = 2,
+        }),
+        queue_max_size = schema.scalar({
+            type = 'integer',
+            box_cfg = 'wal_queue_max_size',
+            default = 16 * 1024 * 1024,
+        }),
+        cleanup_delay = schema.scalar({
+            type = 'number',
+            box_cfg = 'wal_cleanup_delay',
+            default = 4 * 3600,
+        }),
+    }),
 }, {
     -- Any configuration data should contain a version of the
     -- config schema for which it is written.
