@@ -58,7 +58,7 @@ struct memtx_story_link {
 	struct memtx_story *newer_story;
 	/** Story that was happened before that story was started. */
 	struct memtx_story *older_story;
-	/** List of interval items @sa gap_item. */
+	/** List of gap items @sa gap_item. */
 	struct rlist read_gaps;
 	/**
 	 * If the tuple of story is physically in index, here the pointer
@@ -195,49 +195,111 @@ struct point_hole_item {
 	bool is_head;
 };
 
+/** Type of gap item. */
+enum gap_item_type {
+	/**
+	 * The transaction have read some tuple that is not committed and thus
+	 * not visible. In this case the further commit of that tuple can cause
+	 * a conflict, as well as any overwrite of that tuple.
+	 */
+	GAP_INPLACE,
+	/**
+	 * The transaction made a select or range scan, reading a key or range
+	 * between two adjacent tuples of the index. For that case a consequent
+	 * write to that range can cause a conflict. Such an item will be stored
+	 * in successor's story, or index->read_gaps if there's no successor.
+	 */
+	GAP_NEARBY,
+	/**
+	 * A transaction completed a full scan of unordered index. After that
+	 * any consequent write to any new place of the index must lead to
+	 * conflict. Such an item will be store in index->read_gaps.
+	 */
+	GAP_FULL_SCAN,
+};
+
 /**
- * An element that stores the fact that some transaction have read a key and
- * found nothing. There are two cases of such a fact:
- * 1. The tx have read some tuple that is not committed and thus not visible.
- * In this case the further commit of that tuple can cause a conflict, as well
- * as any overwrite of that tuple. Such an item will be stored in the tuple's
- * story and called as 'not nearby'.
- * 2. The tx made a select or range scan, reading a key or range between two
- * adjacent tuples of the index. For that case a consequent write to that range
- * can cause a conflict. Such an item will be stored in successor's story and
- * called as 'nearby'.
+ * Common base of elements that store the fact that some transaction have read
+ * something and found nothing. There are three cases of such a fact, described
+ * by enum @sa gap_item_type.
  */
-struct gap_item {
+struct gap_item_base {
+	/** Type of gap record. */
+	enum gap_item_type type;
 	/** A link in memtx_story_link::read_gaps OR index::read_gaps. */
 	struct rlist in_read_gaps;
 	/** Link in txn->gap_list. */
 	struct rlist in_gap_list;
 	/** The transaction that read it. */
 	struct txn *txn;
+};
+
+/**
+ * Derived class for inplace gap, @sa GAP_INPLACE.
+ */
+struct inplace_gap_item {
+	/** Base class. */
+	struct gap_item_base base;
+};
+
+/**
+ * Derived class for nearby gap, @sa GAP_NEARBY.
+ */
+struct nearby_gap_item {
+	/** Base class. */
+	struct gap_item_base base;
 	/** The key. Can be NULL. */
 	const char *key;
 	uint32_t key_len;
 	uint32_t part_count;
 	/** Search mode. */
 	enum iterator_type type;
-	/** Is it nearby or not, see the structure's description. */
-	bool is_nearby;
 	/** Storage for short key. @key may point here. */
 	char short_key[16];
 };
 
 /**
- * An element that stores the fact that some transaction have read
- * a full index.
+ * Derived class for full scan gap, @sa GAP_FULL_SCAN.
  */
-struct full_scan_item {
-	/** A link in index::full_scans. */
-	struct rlist in_full_scans;
-	/** Link in txn->full_scan_list. */
-	struct rlist in_full_scan_list;
-	/** The transaction that read it. */
-	struct txn *txn;
+struct full_scan_gap_item {
+	/** Base class. */
+	struct gap_item_base base;
 };
+
+/**
+ * Initialize common part of gap item, except for in_read_gaps member,
+ * which initialization is specific for gap item type.
+ */
+static void
+gap_item_base_create(struct gap_item_base *item, enum gap_item_type type,
+		     struct txn *txn)
+{
+	item->type = type;
+	item->txn = txn;
+	rlist_add(&txn->gap_list, &item->in_gap_list);
+}
+
+/**
+ * Allocate and create inplace gap item.
+ * Note that in_read_gaps base member must be initialized later.
+ */
+static struct inplace_gap_item *
+memtx_tx_inplace_gap_item_new(struct txn *txn);
+
+/**
+ * Allocate and create nearby gap item.
+ * Note that in_read_gaps base member must be initialized later.
+ */
+static struct nearby_gap_item *
+memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
+			     const char *key, uint32_t part_count);
+
+/**
+ * Allocate and create full scan gap item.
+ * Note that in_read_gaps base member must be initialized later.
+ */
+static struct full_scan_gap_item *
+memtx_tx_full_scan_gap_item_new(struct txn *txn);
 
 /**
  * Helper structure for searching for point_hole_item in the hash table,
@@ -492,10 +554,12 @@ struct tx_manager
 	struct memtx_tx_mempool point_hole_item_pool;
 	/** Hash table that hold point selects with empty result. */
 	struct mh_point_holes_t *point_holes;
-	/** Mempool for gap_item objects. */
-	struct memtx_tx_mempool gap_item_mempoool;
-	/** Mempool for full_scan_item objects. */
-	struct memtx_tx_mempool full_scan_item_mempool;
+	/** Mempool for inplace_gap_item objects. */
+	struct memtx_tx_mempool inplace_gap_item_mempoool;
+	/** Mempool for nearby_gap_item objects. */
+	struct memtx_tx_mempool nearby_gap_item_mempoool;
+	/** Mempool for full_scan_gap_item objects. */
+	struct memtx_tx_mempool full_scan_gap_item_mempool;
 	/** List of all memtx_story objects. */
 	struct rlist all_stories;
 	struct memtx_tx_stats story_stats[MEMTX_TX_STORY_STATUS_MAX];
@@ -538,11 +602,14 @@ memtx_tx_manager_init()
 				sizeof(struct point_hole_item),
 				MEMTX_TX_ALLOC_TRACKER);
 	txm.point_holes = mh_point_holes_new();
-	memtx_tx_mempool_create(&txm.gap_item_mempoool,
-				sizeof(struct gap_item),
+	memtx_tx_mempool_create(&txm.inplace_gap_item_mempoool,
+				sizeof(struct inplace_gap_item),
 				MEMTX_TX_ALLOC_TRACKER);
-	memtx_tx_mempool_create(&txm.full_scan_item_mempool,
-				sizeof(struct full_scan_item),
+	memtx_tx_mempool_create(&txm.nearby_gap_item_mempoool,
+				sizeof(struct nearby_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	memtx_tx_mempool_create(&txm.full_scan_gap_item_mempool,
+				sizeof(struct full_scan_gap_item),
 				MEMTX_TX_ALLOC_TRACKER);
 	rlist_create(&txm.all_stories);
 	rlist_create(&txm.all_txs);
@@ -559,8 +626,9 @@ memtx_tx_manager_free()
 	mh_history_delete(txm.history);
 	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
 	mh_point_holes_delete(txm.point_holes);
-	memtx_tx_mempool_destroy(&txm.gap_item_mempoool);
-	memtx_tx_mempool_destroy(&txm.full_scan_item_mempool);
+	memtx_tx_mempool_destroy(&txm.inplace_gap_item_mempoool);
+	memtx_tx_mempool_destroy(&txm.nearby_gap_item_mempoool);
+	memtx_tx_mempool_destroy(&txm.full_scan_gap_item_mempool);
 }
 
 void
@@ -1781,19 +1849,14 @@ check_dup(struct txn_stmt *stmt, struct tuple *new_tuple,
 	return 0;
 }
 
-static struct gap_item *
-memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
-		      const char *key, uint32_t part_count, bool is_nearby);
-
 static void
 memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
 			 uint32_t ind)
 {
 	assert(story->link[ind].newer_story == NULL);
 	assert(txn != NULL);
-	struct gap_item *item;
-	item = memtx_tx_gap_item_new(txn, ITER_EQ, NULL, 0, false);
-	rlist_add(&story->link[ind].read_gaps, &item->in_read_gaps);
+	struct inplace_gap_item *item = memtx_tx_inplace_gap_item_new(txn);
+	rlist_add(&story->link[ind].read_gaps, &item->base.in_read_gaps);
 }
 
 /**
@@ -1807,10 +1870,12 @@ memtx_tx_handle_gap_write(struct space *space,
 {
 	assert(story->link[ind].newer_story == NULL);
 	struct index *index = space->index[ind];
-	struct full_scan_item *fsc_item, *fsc_tmp;
-	struct rlist *fsc_list = &index->full_scans;
-	rlist_foreach_entry_safe(fsc_item, fsc_list, in_full_scans, fsc_tmp) {
-		memtx_tx_track_story_gap(fsc_item->txn, story, ind);
+	struct gap_item_base *item_base, *tmp;
+	rlist_foreach_entry_safe(item_base, &index->read_gaps,
+				 in_read_gaps, tmp) {
+		if (item_base->type != GAP_FULL_SCAN)
+			continue;
+		memtx_tx_track_story_gap(item_base->txn, story, ind);
 	}
 	if (successor != NULL && !tuple_has_flag(successor, TUPLE_IS_DIRTY))
 		return; /* no gap records */
@@ -1823,10 +1888,11 @@ memtx_tx_handle_gap_write(struct space *space,
 		list = &succ_story->link[ind].read_gaps;
 		assert(list->next != NULL && list->prev != NULL);
 	}
-	struct gap_item *item, *tmp;
-	rlist_foreach_entry_safe(item, list, in_read_gaps, tmp) {
-		if (!item->is_nearby)
+	rlist_foreach_entry_safe(item_base, list, in_read_gaps, tmp) {
+		if (item_base->type != GAP_NEARBY)
 			continue;
+		struct nearby_gap_item *item =
+			(struct nearby_gap_item *)item_base;
 		int cmp = 0;
 		if (item->key != NULL) {
 			struct key_def *def = index->def->key_def;
@@ -1853,25 +1919,26 @@ memtx_tx_handle_gap_write(struct space *space,
 		bool need_track = need_split ||
 				  (is_full_key && cmp == 0 && is_e);
 		if (need_track)
-			memtx_tx_track_story_gap(item->txn, story, ind);
+			memtx_tx_track_story_gap(item_base->txn, story, ind);
 		if (need_split) {
 			/*
 			 * The insertion divided the gap into two parts.
 			 * Old tracker is left in one gap, let's copy tracker
 			 * to another.
 			 */
-			struct gap_item *copy =
-				memtx_tx_gap_item_new(item->txn, item->type,
-						      item->key,
-						      item->part_count, true);
+			struct nearby_gap_item *copy =
+				memtx_tx_nearby_gap_item_new(item_base->txn,
+							     item->type,
+							     item->key,
+							     item->part_count);
 
 			rlist_add(&story->link[ind].read_gaps,
-				  &copy->in_read_gaps);
+				  &copy->base.in_read_gaps);
 		} else if (need_move) {
 			/* The tracker must be moved to the left gap. */
-			rlist_del(&item->in_read_gaps);
+			rlist_del(&item->base.in_read_gaps);
 			rlist_add(&story->link[ind].read_gaps,
-				  &item->in_read_gaps);
+				  &item->base.in_read_gaps);
 		} else {
 			assert((dir > 0 && cmp < 0) ||
 			       (cmp < 0 && item->type == ITER_REQ) ||
@@ -2250,12 +2317,13 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			memtx_tx_story_link_deleted_by(story, test_stmt);
 		}
 		/* Now link is in top of chain, where gap records are stored. */
-		struct gap_item *item, *tmp;
-		rlist_foreach_entry_safe(item, &link->read_gaps,
+		struct gap_item_base *item_base, *tmp;
+		rlist_foreach_entry_safe(item_base, &link->read_gaps,
 					 in_read_gaps, tmp) {
-			if (item->txn == stmt->txn || item->is_nearby)
+			if (item_base->txn == stmt->txn ||
+			    item_base->type != GAP_INPLACE)
 				continue;
-			memtx_tx_handle_conflict(stmt->txn, item->txn);
+			memtx_tx_handle_conflict(stmt->txn, item_base->txn);
 		}
 	}
 
@@ -2329,12 +2397,13 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			 */
 		}
 		/* Now link is in top of chain, where gap records are stored. */
-		struct gap_item *item, *tmp;
-		rlist_foreach_entry_safe(item, &link->read_gaps,
+		struct gap_item_base *item_base, *tmp;
+		rlist_foreach_entry_safe(item_base, &link->read_gaps,
 					 in_read_gaps, tmp) {
-			if (item->txn == stmt->txn || item->is_nearby)
+			if (item_base->txn == stmt->txn ||
+			    item_base->type != GAP_INPLACE)
 				continue;
-			memtx_tx_handle_conflict(stmt->txn, item->txn);
+			memtx_tx_handle_conflict(stmt->txn, item_base->txn);
 		}
 	}
 
@@ -2612,38 +2681,40 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 	return res;
 }
 
+/**
+ * Destroy and free any kind of gap item.
+ */
 static void
-memtx_tx_delete_gap(struct gap_item *item)
+memtx_tx_delete_gap(struct gap_item_base *item)
 {
 	rlist_del(&item->in_gap_list);
 	rlist_del(&item->in_read_gaps);
-	memtx_tx_mempool_free(item->txn, &txm.gap_item_mempoool, item);
-}
-
-static void
-memtx_tx_full_scan_item_delete(struct full_scan_item *item)
-{
-	rlist_del(&item->in_full_scan_list);
-	rlist_del(&item->in_full_scans);
-	memtx_tx_mempool_free(item->txn, &txm.full_scan_item_mempool, item);
+	struct memtx_tx_mempool *pool;
+	switch (item->type) {
+	case GAP_INPLACE:
+		pool = &txm.inplace_gap_item_mempoool;
+		break;
+	case GAP_NEARBY:
+		pool = &txm.nearby_gap_item_mempoool;
+		break;
+	case GAP_FULL_SCAN:
+		pool = &txm.full_scan_gap_item_mempool;
+		break;
+	default:
+		unreachable();
+	}
+	memtx_tx_mempool_free(item->txn, pool, item);
 }
 
 void
 memtx_tx_on_index_delete(struct index *index)
 {
 	while (!rlist_empty(&index->read_gaps)) {
-		struct gap_item *item =
+		struct gap_item_base *item =
 			rlist_first_entry(&index->read_gaps,
-					  struct gap_item,
+					  struct gap_item_base,
 					  in_read_gaps);
 		memtx_tx_delete_gap(item);
-	}
-	while (!rlist_empty(&index->full_scans)) {
-		struct full_scan_item *item =
-			rlist_first_entry(&index->full_scans,
-					  struct full_scan_item,
-					  in_full_scans);
-		memtx_tx_full_scan_item_delete(item);
 	}
 	memtx_tx_story_gc();
 }
@@ -2865,16 +2936,32 @@ memtx_tx_track_point_slow(struct txn *txn, struct index *index, const char *key)
 	point_hole_storage_new(index, key, key_len, txn);
 }
 
-static struct gap_item *
-memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
-		      const char *key, uint32_t part_count, bool is_nearby)
+/**
+ * Allocate and create inplace gap item.
+ * Note that in_read_gaps base member must be initialized later.
+ */
+static struct inplace_gap_item *
+memtx_tx_inplace_gap_item_new(struct txn *txn)
 {
-	struct gap_item *item =
-		memtx_tx_xmempool_alloc(txn, &txm.gap_item_mempoool);
+	struct memtx_tx_mempool *pool = &txm.inplace_gap_item_mempoool;
+	struct inplace_gap_item *item = memtx_tx_xmempool_alloc(txn, pool);
+	gap_item_base_create(&item->base, GAP_INPLACE, txn);
+	return item;
+}
 
-	item->txn = txn;
+/**
+ * Allocate and create nearby gap item.
+ * Note that in_read_gaps base member must be initialized later.
+ */
+static struct nearby_gap_item *
+memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
+			     const char *key, uint32_t part_count)
+{
+	struct memtx_tx_mempool *pool = &txm.nearby_gap_item_mempoool;
+	struct nearby_gap_item *item = memtx_tx_xmempool_alloc(txn, pool);
+	gap_item_base_create(&item->base, GAP_NEARBY, txn);
+
 	item->type = type;
-	item->is_nearby = is_nearby;
 	item->part_count = part_count;
 	const char *tmp = key;
 	for (uint32_t i = 0; i < part_count; i++)
@@ -2889,7 +2976,19 @@ memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
 						   MEMTX_TX_ALLOC_TRACKER);
 	}
 	memcpy((char *)item->key, key, item->key_len);
-	rlist_add(&txn->gap_list, &item->in_gap_list);
+	return item;
+}
+
+/**
+ * Allocate and create full scan gap item.
+ * Note that in_read_gaps base member must be initialized later.
+ */
+static struct full_scan_gap_item *
+memtx_tx_full_scan_gap_item_new(struct txn *txn)
+{
+	struct memtx_tx_mempool *pool = &txm.full_scan_gap_item_mempool;
+	struct full_scan_gap_item *item = memtx_tx_xmempool_alloc(txn, pool);
+	gap_item_base_create(&item->base, GAP_FULL_SCAN, txn);
 	return item;
 }
 
@@ -2909,8 +3008,8 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 	if (txn->status != TXN_INPROGRESS)
 		return;
 
-	struct gap_item *item = memtx_tx_gap_item_new(txn, type, key,
-						      part_count, true);
+	struct nearby_gap_item *item =
+		memtx_tx_nearby_gap_item_new(txn, type, key, part_count);
 
 	if (successor != NULL) {
 		struct memtx_story *story;
@@ -2922,21 +3021,11 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 		assert(index->dense_id < story->index_count);
 		assert(story->link[index->dense_id].in_index != NULL);
 		rlist_add(&story->link[index->dense_id].read_gaps,
-			  &item->in_read_gaps);
+			  &item->base.in_read_gaps);
 	} else {
-		rlist_add(&index->read_gaps, &item->in_read_gaps);
+		rlist_add(&index->read_gaps, &item->base.in_read_gaps);
 	}
 	memtx_tx_story_gc();
-}
-
-static struct full_scan_item *
-memtx_tx_full_scan_item_new(struct txn *txn)
-{
-	struct full_scan_item *item =
-		memtx_tx_xmempool_alloc(txn, &txm.full_scan_item_mempool);
-	item->txn = txn;
-	rlist_add(&txn->full_scan_list, &item->in_full_scan_list);
-	return item;
 }
 
 /**
@@ -2950,8 +3039,8 @@ memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index)
 	if (txn->status != TXN_INPROGRESS)
 		return;
 
-	struct full_scan_item *item = memtx_tx_full_scan_item_new(txn);
-	rlist_add(&index->full_scans, &item->in_full_scans);
+	struct full_scan_gap_item *item = memtx_tx_full_scan_gap_item_new(txn);
+	rlist_add(&index->read_gaps, &item->base.in_read_gaps);
 	memtx_tx_story_gc();
 }
 
@@ -2969,18 +3058,11 @@ memtx_tx_clear_txn_read_lists(struct txn *txn)
 		point_hole_storage_delete(object);
 	}
 	while (!rlist_empty(&txn->gap_list)) {
-		struct gap_item *item =
+		struct gap_item_base *item =
 			rlist_first_entry(&txn->gap_list,
-					  struct gap_item,
+					  struct gap_item_base,
 					  in_gap_list);
 		memtx_tx_delete_gap(item);
-	}
-	while (!rlist_empty(&txn->full_scan_list)) {
-		struct full_scan_item *item =
-			rlist_first_entry(&txn->full_scan_list,
-					  struct full_scan_item,
-					  in_full_scan_list);
-		memtx_tx_full_scan_item_delete(item);
 	}
 
 	struct tx_read_tracker *tracker, *tmp;
