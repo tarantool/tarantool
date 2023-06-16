@@ -2350,3 +2350,54 @@ g.test_merge_any = function()
 end
 
 -- }}} <schema object>:merge()
+
+-- {{{ <schema object>:pairs()
+
+g.test_pairs = function()
+    local str = schema.scalar({type = 'string'})
+    local map = schema.map({
+        key = schema.scalar({type = 'string'}),
+        value = schema.record({
+            foo = schema.scalar({type = 'number'}),
+        }),
+    })
+    local arr = schema.array({
+        items = schema.record({
+            foo = schema.scalar({type = 'number'}),
+        }),
+    })
+    local s = schema.new('myschema', schema.record({
+        str = str,
+        map = map,
+        arr = arr,
+        rec = schema.record({
+            str = str,
+            map = map,
+            arr = arr,
+            rec = schema.record({
+                str = str,
+                map = map,
+                arr = arr,
+            }),
+        }),
+    }))
+
+    local res = s:pairs():map(function(w)
+        return {w.schema, w.path}
+    end):totable()
+    t.assert_items_equals(res, {
+        {str, {'str'}},
+        {map, {'map'}},
+        {arr, {'arr'}},
+
+        {str, {'rec', 'str'}},
+        {map, {'rec', 'map'}},
+        {arr, {'rec', 'arr'}},
+
+        {str, {'rec', 'rec', 'str'}},
+        {map, {'rec', 'rec', 'map'}},
+        {arr, {'rec', 'rec', 'arr'}},
+    })
+end
+
+-- }}} <schema object>:pairs()
