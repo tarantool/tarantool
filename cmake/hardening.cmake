@@ -1,9 +1,8 @@
 # Depends on os.cmake and profile.cmake modules.
-# Uses `ENABLE_FUZZER` option and `TARGET_OS_FREEBSD` variable.
+# Uses `ENABLE_FUZZER` option and `TARGET_OS_DARWIN` variable.
 
-# LuaJIT in FreeBSD doesn't work with PIC (gh-7640),
 # ligomp.a for AArch64 CentOS is compiled without PIC support.
-if (ENABLE_FUZZER OR TARGET_OS_FREEBSD OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
+if (ENABLE_FUZZER OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
     set(ENABLE_HARDENING_DEFAULT FALSE)
 else()
     set(ENABLE_HARDENING_DEFAULT TRUE)
