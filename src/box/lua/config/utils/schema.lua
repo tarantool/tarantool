@@ -11,6 +11,7 @@
 -- Others are just stored.
 
 local fun = require('fun')
+local json = require('json')
 
 local methods = {}
 local schema_mt = {}
@@ -115,6 +116,15 @@ end
 --     -> true (means the data is valid)
 --     -> false, err (otherwise)
 --     validate_noexc = <function>,
+--
+--     -- Parse data originated from an environment variable.
+--     --
+--     -- Should raise an error it is not possible to interpret
+--     -- the data as a value of the given scalar type.
+--     --
+--     -- Return a parsed/typecasted value of the given scalar
+--     -- type otherwise.
+--     fromenv = <function>,
 -- }
 
 -- Verify whether the given value (data) has expected type and
@@ -134,6 +144,9 @@ scalars.string = {
     validate_noexc = function(data)
         return validate_type_noexc(data, 'string')
     end,
+    fromenv = function(_env_var_name, raw_value)
+        return raw_value
+    end,
 }
 
 scalars.number = {
@@ -142,6 +155,16 @@ scalars.number = {
         -- TODO: Should we accept cdata<int64_t> and
         -- cdata<uint64_t> here?
         return validate_type_noexc(data, 'number')
+    end,
+    fromenv = function(env_var_name, raw_value)
+        -- TODO: Accept large integers and return cdata<int64_t>
+        -- or cdata<uint64_t>?
+        local res = tonumber(raw_value)
+        if res == nil then
+            error(('Unable to decode a number value from environment ' ..
+                'variable %q, got %q'):format(env_var_name, raw_value), 0)
+        end
+        return res
     end,
 }
 
@@ -163,12 +186,34 @@ scalars.integer = {
         end
         return true
     end,
+    fromenv = function(env_var_name, raw_value)
+        local res = tonumber64(raw_value)
+        if res == nil then
+            error(('Unable to decode an integer value from environment ' ..
+                'variable %q, got %q'):format(env_var_name, raw_value), 0)
+        end
+        return res
+    end,
 }
 
 scalars.boolean = {
     type = 'boolean',
     validate_noexc = function(data)
         return validate_type_noexc(data, 'boolean')
+    end,
+    fromenv = function(env_var_name, raw_value)
+        -- Accept false/true case insensitively.
+        --
+        -- Accept 0/1 as boolean values.
+        if raw_value:lower() == 'false' or raw_value == '0' then
+            return false
+        end
+        if raw_value:lower() == 'true' or raw_value == '1' then
+            return true
+        end
+
+        error(('Unable to decode a boolean value from environment ' ..
+            'variable %q, got %q'):format(env_var_name, raw_value), 0)
     end,
 }
 
@@ -177,6 +222,15 @@ scalars.any = {
     validate_noexc = function(_data)
         -- No validation.
         return true
+    end,
+    fromenv = function(env_var_name, raw_value)
+        -- Don't autoguess type. Accept JSON only.
+        local ok, res = pcall(json.decode, raw_value)
+        if not ok then
+            error(('Unable to decode JSON data in environment ' ..
+                'variable %q: %s'):format(env_var_name, res), 0)
+        end
+        return res
     end,
 }
 
@@ -1294,6 +1348,202 @@ end
 
 -- }}} Schema object constructor: new
 
+-- {{{ schema.fromenv()
+
+-- Forward declaration.
+local fromenv
+
+-- Decode a map value from an environment variable data.
+--
+-- Accepts two formats:
+--
+-- 1. JSON format (if data starts from "{").
+-- 2. Simple foo=bar,baz=fiz object format (otherwise).
+--
+-- The simple format is applicable for a map with string keys and
+-- scalar values of any type except 'any'.
+local function map_from_env(env_var_name, raw_value, schema)
+    local can_have_simple_format = schema.key.type == 'string' and
+        is_scalar(schema.value) and schema.value.type ~= 'any'
+
+    local recommendation = can_have_simple_format and
+        'Use either the simple "foo=bar,baz=fiz" object format or the JSON ' ..
+        'object format (starts from "{").' or
+        'Use the JSON object format (starts from "{").'
+
+    -- JSON object -> try to decode.
+    if raw_value:startswith('{') then
+        local ok, res = pcall(json.decode, raw_value)
+        if not ok then
+            error(('Unable to decode JSON data in environment ' ..
+                'variable %q: %s'):format(env_var_name, res), 0)
+        end
+        return res
+    end
+
+    -- JSON array -> error.
+    if raw_value:startswith('[') then
+        error(('A JSON array is provided for environment variable %q of ' ..
+            'type map, an object is expected. %s'):format(env_var_name,
+            recommendation), 0)
+    end
+
+    -- Check several prerequisites for the simple foo=bar,baz=fiz
+    -- object format. If any check is not passed, suggest to use
+    -- the JSON object format and describe why.
+
+    -- Allow only string keys.
+    if schema.key.type ~= 'string' then
+        error(('Use the JSON object format for environment variable %q: the ' ..
+            'keys are supposed to have a non-string type (%q) that is not ' ..
+            'supported by the simple "foo=bar,baz=fiz" object format. ' ..
+            'A JSON object value starts from "{".'):format(env_var_name,
+            schema.key.type), 0)
+    end
+
+    -- Allow only scalar field values. Forbid composite ones.
+    if not is_scalar(schema.value) then
+        error(('Use the JSON object format for environment variable %q: the ' ..
+            'field values are supposed to have a composite type (%q) that ' ..
+            'is not supported by the simple "foo=bar,baz=fiz" object ' ..
+            'format. A JSON object value starts from "{".'):format(env_var_name,
+            schema.value.type), 0)
+    end
+
+    -- Forbid scalar field values of the 'any' type.
+    if schema.value.type == 'any' then
+        error(('Use the JSON object format for environment variable %q: the ' ..
+            'field values are supposed to have an arbitrary type ("any") ' ..
+            'that is not supported by the simple "foo=bar,baz=fiz" object ' ..
+            'format. A JSON object value starts from "{".'):format(
+            env_var_name), 0)
+    end
+
+    -- Assume the simple foo=bar,baz=fiz object format.
+    local err_msg_prefix = ('Unable to decode data in environment variable ' ..
+        '%q assuming the simple "foo=bar,baz=fiz" object format'):format(
+        env_var_name)
+    local res = {}
+    for _, v in ipairs(raw_value:split(',')) do
+        local eq = v:find('=')
+        if eq == nil then
+            error(('%s: no "=" is found in a key-value pair. %s'):format(
+                err_msg_prefix, recommendation), 0)
+        end
+        local lhs = string.sub(v, 1, eq - 1)
+        local rhs = string.sub(v, eq + 1)
+
+        if lhs == '' then
+            error(('%s: no value before "=" is found in a key-value pair. ' ..
+                '%s'):format(err_msg_prefix, recommendation), 0)
+        end
+        local subname = ('%s.%s'):format(env_var_name, lhs)
+        res[lhs] = fromenv(subname, rhs, schema.value)
+    end
+    return res
+end
+
+-- Decode an array from an environment variable data.
+--
+-- Accepts two formats:
+--
+-- 1. JSON format (if data starts from "[").
+-- 2. Simple foo,bar,baz array format (otherwise).
+--
+-- The simple format is applicable for an array with scalar item
+-- values of any type except 'any'.
+local function array_from_env(env_var_name, raw_value, schema)
+    local can_have_simple_format = is_scalar(schema.items) and
+        schema.items.type ~= 'any'
+
+    local recommendation = can_have_simple_format and
+        'Use either the simple "foo,bar,baz" array format or the JSON ' ..
+        'array format (starts from "[").' or
+        'Use the JSON array format (starts from "[").'
+
+    -- JSON array -> try to decode.
+    if raw_value:startswith('[') then
+        local ok, res = pcall(json.decode, raw_value)
+        if not ok then
+            error(('Unable to decode JSON data in environment ' ..
+                'variable %q: %s'):format(env_var_name, res), 0)
+        end
+        return res
+    end
+
+    -- JSON object -> error.
+    if raw_value:startswith('{') then
+        error(('A JSON object is provided for environment variable %q of ' ..
+            'type array, an array is expected. %s'):format(env_var_name,
+            recommendation), 0)
+    end
+
+    -- Check several prerequisites for the simple foo,bar,baz
+    -- array format. If any check is not passed, suggest to use
+    -- the JSON array format and describe why.
+
+    -- Allow only scalar item values. Forbid composite ones.
+    if not is_scalar(schema.items) then
+        error(('Use the JSON array format for environment variable %q: the ' ..
+            'item values are supposed to have a composite type (%q) that ' ..
+            'is not supported by the simple "foo,bar,baz" array format. ' ..
+            'A JSON array value starts from "[".'):format(env_var_name,
+            schema.items.type), 0)
+    end
+
+    -- Forbid scalar field values of the 'any' type.
+    if schema.items.type == 'any' then
+        error(('Use the JSON array format for environment variable %q: the ' ..
+            'item values are supposed to have an arbitrary type ("any") ' ..
+            'that is not supported by the simple "foo,bar,baz" array ' ..
+            'format. A JSON array value starts from "[".'):format(
+            env_var_name), 0)
+    end
+
+    -- Assume the simple foo,bar,baz array format.
+    local res = {}
+    for i, v in ipairs(raw_value:split(',')) do
+        local subname = ('%s[%d]'):format(env_var_name, i)
+        res[i] = fromenv(subname, v, schema.items)
+    end
+    return res
+end
+
+-- Parse data from an environment variable as a value of the given
+-- type.
+--
+-- Important: the result is not necessarily valid against the given
+-- schema node. It should be validated using the
+-- <schema object>:validate() method before further processing.
+fromenv = function(env_var_name, raw_value, schema)
+    if raw_value == nil or raw_value == '' then
+        return nil
+    end
+
+    if is_scalar(schema) then
+        local scalar_def = scalars[schema.type]
+        assert(scalar_def ~= nil)
+        return scalar_def.fromenv(env_var_name, raw_value)
+    elseif schema.type == 'record' then
+        -- TODO: It is technically possible to implement parsing
+        -- of records similarly how it is done for maps, but it is
+        -- not needed for the config module and left unimplemented
+        -- for now.
+        error(('Attempt to parse environment variable %q as a ' ..
+            'record value: this is not supported yet and likely ' ..
+            'caused by an internal error in the config module'):format(
+            env_var_name), 0)
+    elseif schema.type == 'map' then
+        return map_from_env(env_var_name, raw_value, schema)
+    elseif schema.type == 'array' then
+        return array_from_env(env_var_name, raw_value, schema)
+    else
+        assert(false)
+    end
+end
+
+-- }}} schema.fromenv()
+
 return {
     -- Schema node constructors.
     scalar = scalar,
@@ -1303,4 +1553,7 @@ return {
 
     -- Schema object constructor.
     new = new,
+
+    -- Parse data from an environment variable.
+    fromenv = fromenv,
 }

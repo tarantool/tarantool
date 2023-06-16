@@ -2401,3 +2401,397 @@ g.test_pairs = function()
 end
 
 -- }}} <schema object>:pairs()
+
+-- {{{ schema.fromenv()
+
+local fromenv_cases = {
+    -- No value/empty value cases.
+    no_value = {
+        -- No schema is set to ensure that the function doesn't
+        -- access the schema argument to return the result in the
+        -- case. This way we're sure that it works this way for
+        -- any schema.
+        raw_value = nil,
+        exp_value = nil,
+    },
+    box_null_value = {
+        -- No schema is set, see above.
+        raw_value = box.NULL,
+        exp_value = nil,
+    },
+    empty_value = {
+        -- No schema is set, see above.
+        raw_value = '',
+        exp_value = nil,
+    },
+    -- Scalars.
+    string = {
+        schema = schema.scalar({type = 'string'}),
+        raw_value = 'foo',
+        exp_value = 'foo',
+    },
+    number = {
+        schema = schema.scalar({type = 'number'}),
+        raw_value = '5.5',
+        exp_value = 5.5,
+    },
+    number_negative = {
+        schema = schema.scalar({type = 'number'}),
+        raw_value = '-5.5',
+        exp_value = -5.5,
+    },
+    number_error = {
+        schema = schema.scalar({type = 'number'}),
+        raw_value = 'foo',
+        exp_err_msg = 'Unable to decode a number value from environment ' ..
+            'variable "MYVAR", got "foo"',
+    },
+    integer = {
+        schema = schema.scalar({type = 'integer'}),
+        raw_value = '5',
+        exp_value = 5,
+    },
+    integer_negative = {
+        schema = schema.scalar({type = 'integer'}),
+        raw_value = '-5',
+        exp_value = -5,
+    },
+    integer_error = {
+        schema = schema.scalar({type = 'integer'}),
+        raw_value = '5.5',
+        exp_err_msg = 'Unable to decode an integer value from environment ' ..
+            'variable "MYVAR", got "5.5"',
+    },
+    boolean_0 = {
+        schema = schema.scalar({type = 'boolean'}),
+        raw_value = '0',
+        exp_value = false,
+    },
+    boolean_false = {
+        schema = schema.scalar({type = 'boolean'}),
+        raw_value = 'false',
+        exp_value = false,
+    },
+    boolean_false_uppercase = {
+        schema = schema.scalar({type = 'boolean'}),
+        raw_value = 'FALSE',
+        exp_value = false,
+    },
+    boolean_1 = {
+        schema = schema.scalar({type = 'boolean'}),
+        raw_value = '1',
+        exp_value = true,
+    },
+    boolean_true = {
+        schema = schema.scalar({type = 'boolean'}),
+        raw_value = 'true',
+        exp_value = true,
+    },
+    boolean_true_uppercase = {
+        schema = schema.scalar({type = 'boolean'}),
+        raw_value = 'TRUE',
+        exp_value = true,
+    },
+    any_string = {
+        schema = schema.scalar({type = 'any'}),
+        raw_value = '"foo"',
+        exp_value = 'foo',
+    },
+    any_number = {
+        schema = schema.scalar({type = 'any'}),
+        raw_value = '5.5',
+        exp_value = 5.5,
+    },
+    any_object = {
+        schema = schema.scalar({type = 'any'}),
+        raw_value = '{"foo": "bar"}',
+        exp_value = {foo = 'bar'},
+    },
+    any_array = {
+        schema = schema.scalar({type = 'any'}),
+        raw_value = '[1, 2, 3]',
+        exp_value = {1, 2, 3},
+    },
+    any_error = {
+        schema = schema.scalar({type = 'any'}),
+        raw_value = 'foo',
+        exp_err_msg = 'Unable to decode JSON data in environment variable ' ..
+            '"MYVAR": Expected value but found invalid token on line 1 at ' ..
+            'character 1 here \' >> foo\'',
+    },
+    -- Composite types.
+    record_error = {
+        schema = schema.record({foo = schema.scalar({type = 'string'})}),
+        raw_value = '{"foo": "bar"}',
+        exp_err_msg = 'Attempt to parse environment variable "MYVAR" as a ' ..
+            'record value: this is not supported yet and likely caused by ' ..
+            'an internal error in the config module',
+    },
+    map_simple_string = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+        raw_value = 'foo=bar,baz=fiz',
+        exp_value = {foo = 'bar', baz = 'fiz'},
+    },
+    map_simple_number = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'number'}),
+        }),
+        raw_value = 'foo=5.5,baz=-4.7',
+        exp_value = {foo = 5.5, baz = -4.7},
+    },
+    map_simple_integer = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'integer'}),
+        }),
+        raw_value = 'foo=5,baz=-4',
+        exp_value = {foo = 5, baz = -4},
+    },
+    map_simple_boolean = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'boolean'}),
+        }),
+        raw_value = 'foo=true,baz=0',
+        exp_value = {foo = true, baz = false},
+    },
+    map_simple_any_error = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'any'}),
+        }),
+        raw_value = 'foo="bar",baz="fiz"',
+        exp_err_msg = 'Use the JSON object format for environment variable ' ..
+            '"MYVAR": the field values are supposed to have an arbitrary ' ..
+            'type ("any") that is not supported by the simple ' ..
+            '"foo=bar,baz=fiz" object format. A JSON object value starts ' ..
+            'from "{".',
+    },
+    map_simple_composite_value_error = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.record({}),
+        }),
+        raw_value = 'foo={},bar={}',
+        exp_err_msg = 'Use the JSON object format for environment variable ' ..
+            '"MYVAR": the field values are supposed to have a composite ' ..
+            'type ("record") that is not supported by the simple ' ..
+            '"foo=bar,baz=fiz" object format. A JSON object value starts ' ..
+            'from "{".',
+    },
+    map_simple_nonstring_key_error = {
+        schema = schema.map({
+            key = schema.scalar({type = 'number'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+        raw_value = '1=foo,2=bar',
+        exp_err_msg = 'Use the JSON object format for environment variable ' ..
+            '"MYVAR": the keys are supposed to have a non-string type ' ..
+            '("number") that is not supported by the simple ' ..
+            '"foo=bar,baz=fiz" object format. A JSON object value starts ' ..
+            'from "{".',
+    },
+    map_simple_noeq_error = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+        raw_value = 'foo=bar,baz',
+        exp_err_msg = 'Unable to decode data in environment variable ' ..
+            '"MYVAR" assuming the simple "foo=bar,baz=fiz" object format: ' ..
+            'no "=" is found in a key-value pair. Use either the simple ' ..
+            '"foo=bar,baz=fiz" object format or the JSON object format ' ..
+            '(starts from "{").',
+    },
+    map_simple_lhs_error = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+        raw_value = 'foo=bar,=baz',
+        exp_err_msg = 'Unable to decode data in environment variable ' ..
+            '"MYVAR" assuming the simple "foo=bar,baz=fiz" object format: ' ..
+            'no value before "=" is found in a key-value pair. Use either ' ..
+            'the simple "foo=bar,baz=fiz" object format or the JSON object ' ..
+            'format (starts from "{").',
+    },
+    map_json_string = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+        raw_value = '{"foo": "bar", "baz": "fiz"}',
+        exp_value = {foo = 'bar', baz = 'fiz'},
+    },
+    map_json_any = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'any'}),
+        }),
+        raw_value = '{"foo": ["bar", 42], "baz": "fiz"}',
+        exp_value = {foo = {'bar', 42}, baz = 'fiz'},
+    },
+    map_json_record = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.record({
+                bar = schema.scalar({type = 'string'}),
+            }),
+        }),
+        raw_value = '{"foo": {"bar": "baz"}}',
+        exp_value = {foo = {bar = 'baz'}},
+    },
+    map_json_array_error_1 = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+        raw_value = '[]',
+        exp_err_msg = 'A JSON array is provided for environment variable ' ..
+            '"MYVAR" of type map, an object is expected. Use either the ' ..
+            'simple "foo=bar,baz=fiz" object format or the JSON object ' ..
+            'format (starts from "{").',
+    },
+    map_json_array_error_2 = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'any'}),
+        }),
+        raw_value = '[]',
+        exp_err_msg = 'A JSON array is provided for environment variable ' ..
+            '"MYVAR" of type map, an object is expected. Use the JSON ' ..
+            'object format (starts from "{").',
+    },
+    map_json_invalid = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+        raw_value = '{"foo": "bar"',
+        exp_err_msg = 'Unable to decode JSON data in environment variable ' ..
+            '"MYVAR": Expected comma or \'}\' but found end on line 1 at ' ..
+            'character 14 here \'": "bar" >> \'',
+    },
+    array_simple_string = {
+        schema = schema.array({
+            items = schema.scalar({type = 'string'}),
+        }),
+        raw_value = 'foo,bar,baz',
+        exp_value = {'foo', 'bar', 'baz'},
+    },
+    array_simple_number = {
+        schema = schema.array({
+            items = schema.scalar({type = 'number'}),
+        }),
+        raw_value = '5.5,-4.7,0',
+        exp_value = {5.5, -4.7, 0},
+    },
+    array_simple_integer = {
+        schema = schema.array({
+            items = schema.scalar({type = 'integer'}),
+        }),
+        raw_value = '5,-4,0',
+        exp_value = {5, -4, 0},
+    },
+    array_simple_boolean = {
+        schema = schema.array({
+            items = schema.scalar({type = 'boolean'}),
+        }),
+        raw_value = 'true,false,1,0',
+        exp_value = {true, false, true, false},
+    },
+    array_simple_any_error = {
+        schema = schema.array({
+            items = schema.scalar({type = 'any'}),
+        }),
+        raw_value = '"foo","bar","baz"',
+        exp_err_msg = 'Use the JSON array format for environment variable ' ..
+            '"MYVAR": the item values are supposed to have an arbitrary ' ..
+            'type ("any") that is not supported by the simple ' ..
+            '"foo,bar,baz" array format. A JSON array value starts ' ..
+            'from "[".',
+    },
+    array_simple_composite_items_error = {
+        schema = schema.array({
+            items = schema.record({}),
+        }),
+        raw_value = 'foo',
+        exp_err_msg = 'Use the JSON array format for environment variable ' ..
+            '"MYVAR": the item values are supposed to have a composite ' ..
+            'type ("record") that is not supported by the simple ' ..
+            '"foo,bar,baz" array format. A JSON array value starts ' ..
+            'from "[".',
+    },
+    array_json_string = {
+        schema = schema.array({
+            items = schema.scalar({type = 'string'}),
+        }),
+        raw_value = '["foo", "bar", "baz"]',
+        exp_value = {'foo', 'bar', 'baz'},
+    },
+    array_json_any = {
+        schema = schema.array({
+            items = schema.scalar({type = 'any'}),
+        }),
+        raw_value = '[{"foo": 42}, ["bar", 42], "baz", 43]',
+        exp_value = {{foo = 42}, {'bar', 42}, 'baz', 43},
+    },
+    arrap_json_record = {
+        schema = schema.array({
+            items = schema.record({
+                foo = schema.scalar({type = 'string'}),
+            }),
+        }),
+        raw_value = '[{"foo": "bar"}]',
+        exp_value = {{foo = 'bar'}},
+    },
+    array_json_map_error_1 = {
+        schema = schema.array({
+            items = schema.scalar({type = 'string'}),
+        }),
+        raw_value = '{}',
+        exp_err_msg = 'A JSON object is provided for environment variable ' ..
+            '"MYVAR" of type array, an array is expected. Use either the ' ..
+            'simple "foo,bar,baz" array format or the JSON array ' ..
+            'format (starts from "[").',
+    },
+    array_json_map_error_2 = {
+        schema = schema.array({
+            items = schema.scalar({type = 'any'}),
+        }),
+        raw_value = '{}',
+        exp_err_msg = 'A JSON object is provided for environment variable ' ..
+            '"MYVAR" of type array, an array is expected. Use the JSON ' ..
+            'array format (starts from "[").',
+    },
+    array_json_invalid = {
+        schema = schema.array({
+            items = schema.scalar({type = 'string'}),
+        }),
+        raw_value = '["foo", "bar"',
+        exp_err_msg = 'Unable to decode JSON data in environment variable ' ..
+            '"MYVAR": Expected comma or \']\' but found end on line 1 at ' ..
+            'character 14 here \'", "bar" >> \'',
+    },
+}
+
+for case_name, case in pairs(fromenv_cases) do
+    g['test_fromenv_' .. case_name] = function()
+        if case.exp_err_msg == nil then
+            local res = schema.fromenv('MYVAR', case.raw_value, case.schema)
+            t.assert_equals(res, case.exp_value)
+            assert_type_equals(res, case.exp_value)
+        else
+            assert(case.exp_value == nil)
+            t.assert_error_msg_equals(case.exp_err_msg, function()
+                schema.fromenv('MYVAR', case.raw_value, case.schema)
+            end)
+        end
+    end
+end
+
+-- }}} schema.fromenv()
