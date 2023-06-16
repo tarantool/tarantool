@@ -1206,6 +1206,53 @@ end
 
 -- }}} <schema object>:merge()
 
+-- {{{ <schema object>:pairs()
+
+local function schema_pairs_append_node(schema, ctx)
+    table.insert(ctx.acc, {
+        path = table.copy(ctx.path),
+        schema = schema,
+    })
+end
+
+local function schema_pairs_impl(schema, ctx)
+    if is_scalar(schema) then
+        schema_pairs_append_node(schema, ctx)
+    elseif schema.type == 'record' then
+        for k, v in pairs(schema.fields) do
+            walkthrough_enter(ctx, k)
+            schema_pairs_impl(v, ctx)
+            walkthrough_leave(ctx)
+        end
+    elseif schema.type == 'map' then
+        schema_pairs_append_node(schema, ctx)
+    elseif schema.type == 'array' then
+        schema_pairs_append_node(schema, ctx)
+    else
+        assert(false)
+    end
+end
+
+-- Walk over the schema and return scalar, array and map schema
+-- nodes.
+--
+-- Usage example:
+--
+-- for _, w in schema:pairs() do
+--     local path = w.path
+--     local schema = w.schema
+--     <...>
+-- end
+--
+-- TODO: Rewrite it without collecting a list beforehand.
+function methods.pairs(self)
+    local ctx = walkthrough_start(self, {acc = {}})
+    schema_pairs_impl(rawget(self, 'schema'), ctx)
+    return fun.iter(ctx.acc)
+end
+
+-- }}} <schema object>:pairs()
+
 -- {{{ Schema object constructor: new
 
 -- Define a field lookup function on a schema object.
