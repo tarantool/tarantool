@@ -47,7 +47,7 @@ str = digest.urandom(size)
  | ---
  | ...
 -- insert tuples, until we get error due to no enough of memory
-for i = 1, 1024 do s:insert({i, str}) end
+for i = 1, 1049 do s:insert({i, str}) end
  | ---
  | - error: Failed to allocate 512019 bytes in slab allocator for memtx_tuple
  | ...
