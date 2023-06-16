@@ -17,7 +17,7 @@ test_run:cmd("setopt delimiter ''");
 size = 500 * 1024
 str = digest.urandom(size)
 -- insert tuples, until we get error due to no enough of memory
-for i = 1, 1024 do s:insert({i, str}) end
+for i = 1, 1049 do s:insert({i, str}) end
 -- truncate space, and collect garbage (free previous allocated memory)
 s:truncate()
 collectgarbage('collect')
