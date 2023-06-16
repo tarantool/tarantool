@@ -72,6 +72,22 @@ txn_limbo_is_ro(struct txn_limbo *limbo)
 	       (limbo->owner_id != instance_id || txn_limbo_is_frozen(limbo));
 }
 
+void
+txn_limbo_complete(struct txn *txn, bool is_success)
+{
+	/*
+	 * Some rollback/commit triggers require the in_txn fiber
+	 * variable to be set.
+	 */
+	assert(in_txn() == NULL);
+	fiber_set_txn(fiber(), txn);
+	if (is_success)
+		txn_complete_success(txn);
+	else
+		txn_complete_fail(txn);
+	fiber_set_txn(fiber(), NULL);
+}
+
 struct txn_limbo_entry *
 txn_limbo_last_synchro_entry(struct txn_limbo *limbo)
 {
@@ -287,7 +303,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		e->txn->limbo_entry = NULL;
 		txn_limbo_abort(limbo, e);
 		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
-		txn_complete_fail(e->txn);
+		txn_limbo_complete(e->txn, false);
 		if (e == entry)
 			break;
 		fiber_wakeup(e->txn->fiber);
@@ -461,7 +477,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		 * after the affected transactions.
 		 */
 		assert(e->txn->signature >= 0);
-		txn_complete_success(e->txn);
+		txn_limbo_complete(e->txn, true);
 	}
 	/*
 	 * Track CONFIRM lsn on replica in order to detect split-brain by
@@ -514,7 +530,7 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 		assert(e->txn->signature >= 0);
 		e->txn->signature = TXN_SIGNATURE_SYNC_ROLLBACK;
 		e->txn->limbo_entry = NULL;
-		txn_complete_fail(e->txn);
+		txn_limbo_complete(e->txn, false);
 		if (e == last_rollback)
 			break;
 	}
