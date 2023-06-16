@@ -36,6 +36,7 @@
 #include "box.h"
 #include "raft.h"
 #include "tt_static.h"
+#include "session.h"
 
 struct txn_limbo txn_limbo;
 
@@ -81,11 +82,29 @@ txn_limbo_complete(struct txn *txn, bool is_success)
 	 */
 	assert(in_txn() == NULL);
 	fiber_set_txn(fiber(), txn);
+	/*
+	 * Use session and credentials of the original fiber for
+	 * commit/rollback triggers.
+	 */
+	struct session *orig_session = fiber_get_session(fiber());
+	struct session *session = (txn->fiber != NULL ?
+				   fiber_get_session(txn->fiber) : NULL);
+	if (session != NULL)
+		fiber_set_session(fiber(), session);
+	struct credentials *orig_creds = fiber_get_user(fiber());
+	struct credentials *creds = (txn->fiber != NULL ?
+				     fiber_get_user(txn->fiber) : NULL);
+	if (creds != NULL)
+		fiber_set_user(fiber(), creds);
+
 	if (is_success)
 		txn_complete_success(txn);
 	else
 		txn_complete_fail(txn);
+
 	fiber_set_txn(fiber(), NULL);
+	fiber_set_user(fiber(), orig_creds);
+	fiber_set_session(fiber(), orig_session);
 }
 
 struct txn_limbo_entry *
