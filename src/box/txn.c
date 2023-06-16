@@ -751,6 +751,7 @@ txn_complete_fail(struct txn *txn)
 	assert(!txn_has_flag(txn, TXN_IS_DONE));
 	assert(txn->signature < 0);
 	assert(txn->signature != TXN_SIGNATURE_UNKNOWN);
+	assert(in_txn() == txn);
 	if (txn->limbo_entry != NULL) {
 		assert(txn_has_flag(txn, TXN_WAIT_SYNC));
 		txn_limbo_abort(&txn_limbo, txn->limbo_entry);
@@ -783,6 +784,7 @@ txn_complete_success(struct txn *txn)
 	assert(!txn_has_flag(txn, TXN_IS_DONE));
 	assert(!txn_has_flag(txn, TXN_WAIT_SYNC));
 	assert(txn->signature >= 0);
+	assert(in_txn() == txn);
 	txn->status = TXN_COMMITTED;
 	if (txn->engine != NULL)
 		engine_commit(txn->engine, txn);
