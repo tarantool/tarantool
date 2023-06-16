@@ -72,7 +72,7 @@ Description: Tarantool in-memory database - common files
 Package: tarantool
 Architecture: i386 amd64 armhf arm64
 Priority: optional
-Depends: ${shlibs:Depends}, ${misc:Depends}, netbase, libgomp1,
+Depends: ${shlibs:Depends}, ${misc:Depends}, netbase,
   openssl, tarantool-common (>= 2.2.1), tzdata,
 # libcurl dependencies (except ones we have already)
  zlib1g

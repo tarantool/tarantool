@@ -8,7 +8,7 @@ arch="all"
 source=""
 giturl="https://github.com/tarantool/tarantool.git"
 url="https://github.com/tarantool/tarantool"
-depends="g++ libstdc++ readline openssl yaml lz4 binutils ncurses libgomp lua tar zip zlib libunwind icu ca-certificates"
+depends="g++ libstdc++ readline openssl yaml lz4 binutils ncurses lua tar zip zlib libunwind icu ca-certificates"
 makedepends="gcc cmake file readline-dev openssl-dev yaml-dev bsd-compat-headers lz4-dev zlib-dev binutils-dev ncurses-dev lua-dev musl-dev make git libunwind-dev autoconf automake libtool linux-headers icu-dev"
 
 subpackages="$pkgname-dev $pkgname-dbg $pkgname-doc"
