@@ -1,8 +1,7 @@
 # Depends on os.cmake and profile.cmake modules.
 # Uses `ENABLE_FUZZER` option and `TARGET_OS_DARWIN` variable.
 
-# ligomp.a for AArch64 CentOS is compiled without PIC support.
-if (ENABLE_FUZZER OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
+if (ENABLE_FUZZER)
     set(ENABLE_HARDENING_DEFAULT FALSE)
 else()
     set(ENABLE_HARDENING_DEFAULT TRUE)
