@@ -78,3 +78,36 @@ g.test_on_rollback_trigger = function(g)
     g.server1:update_box_cfg({ replication_synchro_timeout = 5 })
     g.server1:wait_for_election_leader()
 end
+
+g.before_test('test_session_on_commit', function()
+    g.server1:exec(function()
+        box.schema.user.create('eve')
+        box.schema.user.grant('eve', 'write', 'space', 'test')
+    end)
+end)
+
+g.test_session_on_commit = function(g)
+    g.server1:exec(function()
+        box.session.su('eve', function()
+            t.assert_equals(box.session.effective_user(), 'eve')
+            local id, user
+
+            box.begin()
+            box.space.test:upsert({1}, {{'=', 1, 1}})
+            box.on_commit(function()
+                id = box.session.id()
+                user = box.session.effective_user()
+            end)
+            box.commit()
+
+            t.assert_equals(id, box.session.id())
+            t.assert_equals(user, box.session.effective_user())
+        end)
+    end)
+end
+
+g.after_test('test_session_on_commit', function()
+    g.server1:exec(function()
+        box.schema.user.drop('eve')
+    end)
+end)
