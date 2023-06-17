@@ -220,7 +220,25 @@ end
 
 -- }}} Schema node constructors: scalar, record, map, array
 
--- {{{ Derived schema node type constructors: enum
+-- {{{ Testing helpers for derived schema node type constructors
+
+local function mask_functions(data)
+    if type(data) == 'function' then
+        return '<function>'
+    elseif type(data) == 'table' then
+        local res = {}
+        for k, v in pairs(data) do
+            res[k] = mask_functions(v)
+        end
+        return res
+    else
+        return data
+    end
+end
+
+-- }}} Testing helpers for derived schema node type constructors
+
+-- {{{ Derived schema node type constructors: enum, set
 
 -- schema.enum() must return a table of the following shape.
 --
@@ -256,7 +274,56 @@ g.test_enum_constructor = function()
     t.assert_equals(pcall(schema.enum, def, {allowed_values = {'foo'}}), false)
 end
 
--- }}} Derived schema node type constructors: enum
+-- schema.set() must return a table of the following shape.
+--
+-- {
+--     type = 'array',
+--     items = schema.scalar({
+--         type = 'string',
+--         allowed_values = <...>,
+--     }),
+--     validate = <...>,
+--     <..annotations..>
+-- }
+g.test_set_constructor = function()
+    -- A simple good case.
+    t.assert_equals(mask_functions(schema.set({'foo', 'bar'})), {
+        type = 'array',
+        items = {
+            type = 'string',
+            allowed_values = {'foo', 'bar'},
+        },
+        validate = '<function>',
+    })
+
+    -- A simple good case with an annotation.
+    t.assert_equals(mask_functions(schema.set({'foo', 'bar'}, {
+        my_annotation = 'info',
+    })), {
+        type = 'array',
+        items = {
+            type = 'string',
+            allowed_values = {'foo', 'bar'},
+        },
+        validate = '<function>',
+        my_annotation = 'info',
+    })
+
+    -- Simple bad cases.
+    --
+    -- 'type', 'items' or 'validate' annotation.
+    --
+    -- Ignore error messages. They are just 'assertion failed at
+    -- line X', purely for the schema creator.
+    local scalar = schema.scalar({type = 'string'})
+    local nop = function() end
+    local def = {'foo', 'bar'}
+    t.assert_equals(pcall(schema.set, def, {type = 'number'}), false)
+    t.assert_equals(pcall(schema.set, def, {items = scalar}), false)
+    t.assert_equals(pcall(schema.set, def, {validate = nop}), false)
+end
+
+-- }}} Derived schema node type constructors: enum, set
 
 -- {{{ Schema object constructor: new
 
@@ -671,6 +738,65 @@ g.test_validate_enum = function()
     -- Verify that a type validation occurs before the allowed
     -- values validation.
     assert_validate_scalar_type_mismatch(s, 1, 'string')
+end
+
+g.test_validate_set = function()
+    local allowed_values = {
+        'read',
+        'write',
+        'execute',
+    }
+
+    local s = schema.new('permissions', schema.set(allowed_values))
+
+    -- Good cases: all the allowed values are actually allowed.
+    s:validate({'read'})
+    s:validate({'write'})
+    s:validate({'execute'})
+
+    -- Good cases: two different allowed values are allowed.
+    s:validate({'read', 'write'})
+    s:validate({'write', 'read'})
+    s:validate({'read', 'execute'})
+    s:validate({'execute', 'read'})
+    s:validate({'write', 'execute'})
+    s:validate({'execute', 'write'})
+
+    -- Good cases: three different allowed values are allowed.
+    s:validate({'read', 'write', 'execute'})
+    s:validate({'write', 'read', 'execute'})
+    s:validate({'read', 'execute', 'write'})
+    s:validate({'execute', 'read', 'write'})
+    s:validate({'write', 'execute', 'read'})
+    s:validate({'execute', 'write', 'read'})
+
+    -- Bad cases: duplicates are not allowed.
+    local exp_err_fmt = '[permissions] Values should be unique, but "%s" ' ..
+        'appears at least twice'
+    assert_validate_error(s, {'read', 'read'}, exp_err_fmt:format('read'))
+    assert_validate_error(s, {'write', 'write'}, exp_err_fmt:format('write'))
+    assert_validate_error(s, {'execute', 'execute'},
+        exp_err_fmt:format('execute'))
+    assert_validate_error(s, {'read', 'execute', 'read'},
+        exp_err_fmt:format('read'))
+    assert_validate_error(s, {'execute', 'write', 'write'},
+        exp_err_fmt:format('write'))
+    assert_validate_error(s, {'execute', 'execute', 'execute'},
+        exp_err_fmt:format('execute'))
+
+    -- Bad cases: other values are not allowed.
+    assert_validate_error(s, {'foo'}, ('[permissions] [1]: Got %s, but only ' ..
+        'the following values are allowed: %s'):format('foo',
+        table.concat(allowed_values, ', ')))
+
+    -- Verify that a type validation occurs before the allowed
+    -- values validation.
+    assert_validate_error(s, 1, '[permissions] Unexpected data type for an ' ..
+        'array: "number"')
+    assert_validate_error(s, {1}, table.concat({
+        '[permissions] [1]: Unexpected data for scalar "string"',
+        'Expected "string", got "number"',
+    }, ': '))
 end
 
 -- }}} <schema object>:validate()
