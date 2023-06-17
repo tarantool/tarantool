@@ -220,6 +220,44 @@ end
 
 -- }}} Schema node constructors: scalar, record, map, array
 
+-- {{{ Derived schema node type constructors: enum
+
+-- schema.enum() must return a table of the following shape.
+--
+-- {
+--     type = 'string',
+--     allowed_values = <...>,
+--     <..annnotations..>
+-- }
+g.test_enum_constructor = function()
+    -- A simple good case.
+    t.assert_equals(schema.enum({'foo', 'bar'}), {
+        type = 'string',
+        allowed_values = {'foo', 'bar'},
+    })
+
+    -- A good case with an annotation.
+    t.assert_equals(schema.enum({'foo', 'bar'}, {
+        my_annotation = 'info',
+    }), {
+        type = 'string',
+        allowed_values = {'foo', 'bar'},
+        my_annotation = 'info',
+    })
+
+    -- Simple bad cases.
+    --
+    -- 'type' or 'allowed_values' annotation.
+    --
+    -- Ignore error messages. They are just 'assertion failed at
+    -- line X', purely for the schema creator.
+    local def = {'foo', 'bar'}
+    t.assert_equals(pcall(schema.enum, def, {type = 'number'}), false)
+    t.assert_equals(pcall(schema.enum, def, {allowed_values = {'foo'}}), false)
+end
+
+-- }}} Derived schema node type constructors: enum
+
 -- {{{ Schema object constructor: new
 
 -- schema.new() must return a table of the following shape.
@@ -604,6 +642,35 @@ g.test_validate_by_node_function = function()
         '[positive] foo.bar: Unexpected data for scalar "integer"',
         'Expected "number", got "boolean"',
     }, ': '))
+end
+
+g.test_validate_enum = function()
+    local allowed_values = {
+        'fatal',
+        'syserror',
+        'error',
+        'crit',
+        'warn',
+        'info',
+        'verbose',
+        'debug',
+    }
+
+    local s = schema.new('log_level', schema.enum(allowed_values))
+
+    -- Good cases: all the allowed values are actually allowed.
+    for _, level in ipairs(allowed_values) do
+        s:validate(level)
+    end
+
+    -- Bad cases: other values are not allowed.
+    assert_validate_error(s, 'foo', ('[log_level] Got %s, but only the ' ..
+        'following values are allowed: %s'):format('foo',
+        table.concat(allowed_values, ', ')))
+
+    -- Verify that a type validation occurs before the allowed
+    -- values validation.
+    assert_validate_scalar_type_mismatch(s, 1, 'string')
 end
 
 -- }}} <schema object>:validate()

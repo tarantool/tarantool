@@ -342,6 +342,23 @@ end
 
 -- }}} Schema node constructors: scalar, record, map, array
 
+-- {{{ Derived schema node type constructors: enum
+
+-- Shortcut for a string scalar with given allowed values.
+local function enum(allowed_values, annotations)
+    local scalar_def = {
+        type = 'string',
+        allowed_values = allowed_values,
+    }
+    for k, v in pairs(annotations or {}) do
+        assert(k ~= 'type' and k ~= 'allowed_values')
+        scalar_def[k] = v
+    end
+    return scalar(scalar_def)
+end
+
+-- }}} Derived schema node type constructors: enum
+
 -- {{{ <schema object>:validate()
 
 -- Verify that the given table adheres array requirements.
@@ -1550,6 +1567,13 @@ return {
     record = record,
     map = map,
     array = array,
+
+    -- Constructors for 'derived types'.
+    --
+    -- It produces a scalar, record, map or array, but annotates
+    -- it in some specific way to, say, impose extra constraint
+    -- rules at validation.
+    enum = enum,
 
     -- Schema object constructor.
     new = new,
