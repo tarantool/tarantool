@@ -27,6 +27,10 @@ g.test_scalar_constructor = function()
         'integer',
         'boolean',
         'any',
+
+        -- TODO: Remove when a union node will be implemented.
+        'string, number',
+        'number, string',
     }
     for _, scalar_type in ipairs(types) do
         local def = {type = scalar_type}
@@ -487,6 +491,35 @@ g.test_validate_number = function()
     assert_validate_scalar_expects_only_given_type(s, 'number')
 
     -- TODO: +inf, -inf, NaN.
+end
+
+-- TODO: Remove when a union node will be implemented.
+g.test_validate_string_number = function()
+    local s1 = schema.new('myschema', schema.scalar({type = 'string, number'}))
+    local s2 = schema.new('myschema', schema.scalar({type = 'number, string'}))
+
+    -- Good cases.
+    for _, s in ipairs({s1, s2}) do
+        s:validate('')
+        s:validate('foo')
+        s:validate(-5.3)
+        s:validate(-5)
+        s:validate(0)
+        s:validate(5)
+        s:validate(5.3)
+    end
+
+    -- Bad cases.
+    for _, s in ipairs({s1, s2}) do
+        local exp_err_fmt = 'Expected one of "string", "number", got %q'
+        for i = 1, table.maxn(samples) do
+            local data = samples[i]
+            if type(data) ~= 'string' and type(data) ~= 'number' then
+                local exp_err_msg = exp_err_fmt:format(type(data))
+                assert_validate_scalar_error(s, data, exp_err_msg)
+            end
+        end
+    end
 end
 
 g.test_validate_integer = function()
@@ -2711,6 +2744,27 @@ local fromenv_cases = {
         exp_err_msg = 'Unable to decode JSON data in environment variable ' ..
             '"MYVAR": Expected value but found invalid token on line 1 at ' ..
             'character 1 here \' >> foo\'',
+    },
+    -- TODO: Remove when a union node will be implemented.
+    number_string_pass_number = {
+        schema = schema.scalar({type = 'number, string'}),
+        raw_value = '-4.7',
+        exp_value = -4.7,
+    },
+    number_string_pass_string = {
+        schema = schema.scalar({type = 'number, string'}),
+        raw_value = 'foo',
+        exp_value = 'foo',
+    },
+    string_number_pass_number = {
+        schema = schema.scalar({type = 'string, number'}),
+        raw_value = '-4.7',
+        exp_value = -4.7,
+    },
+    string_number_pass_string = {
+        schema = schema.scalar({type = 'string, number'}),
+        raw_value = 'foo',
+        exp_value = 'foo',
     },
     -- Composite types.
     record_error = {
