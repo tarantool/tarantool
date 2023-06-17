@@ -130,6 +130,24 @@ end
 -- Verify whether the given value (data) has expected type and
 -- produce a human readable error message otherwise.
 local function validate_type_noexc(data, exp_type)
+    -- exp_type is like {'string', 'number'}.
+    if type(exp_type) == 'table' then
+        local found = false
+        for _, exp_t in ipairs(exp_type) do
+            if type(data) == exp_t then
+                found = true
+                break
+            end
+        end
+        if not found then
+            local exp_type_str = ('"%s"'):format(table.concat(exp_type, '", "'))
+            local err = ('Expected one of %s, got %q'):format(exp_type_str,
+                type(data))
+            return false, err
+        end
+        return true
+    end
+
     -- exp_type is a Lua type like 'string'.
     assert(type(exp_type) == 'string')
     if type(data) ~= exp_type then
@@ -165,6 +183,27 @@ scalars.number = {
                 'variable %q, got %q'):format(env_var_name, raw_value), 0)
         end
         return res
+    end,
+}
+
+-- TODO: This hack is needed until a union schema node will be
+-- implemented.
+scalars['string, number'] = {
+    type = 'string, number',
+    validate_noexc = function(data)
+        return validate_type_noexc(data, {'string', 'number'})
+    end,
+    fromenv = function(_env_var_name, raw_value)
+        return tonumber(raw_value) or raw_value
+    end,
+}
+scalars['number, string'] = {
+    type = 'number, string',
+    validate_noexc = function(data)
+        return validate_type_noexc(data, {'string', 'number'})
+    end,
+    fromenv = function(_env_var_name, raw_value)
+        return tonumber(raw_value) or raw_value
     end,
 }
 
