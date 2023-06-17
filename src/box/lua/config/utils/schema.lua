@@ -342,7 +342,19 @@ end
 
 -- }}} Schema node constructors: scalar, record, map, array
 
--- {{{ Derived schema node type constructors: enum
+-- {{{ Derived schema node type constructors: enum, set
+
+local function validate_no_repeat(data, w)
+    local visited = {}
+    for _, item in ipairs(data) do
+        assert(type(item) == 'string')
+        if visited[item] then
+            w.error('Values should be unique, but %q appears at ' ..
+                'least twice', item)
+        end
+        visited[item] = true
+    end
+end
 
 -- Shortcut for a string scalar with given allowed values.
 local function enum(allowed_values, annotations)
@@ -357,7 +369,21 @@ local function enum(allowed_values, annotations)
     return scalar(scalar_def)
 end
 
--- }}} Derived schema node type constructors: enum
+-- Shortcut for array of unique string values from the given list
+-- of allowed values.
+local function set(allowed_values, annotations)
+    local array_def = {
+        items = enum(allowed_values),
+        validate = validate_no_repeat,
+    }
+    for k, v in pairs(annotations or {}) do
+        assert(k ~= 'type' and k ~= 'items' and k ~= 'validate')
+        array_def[k] = v
+    end
+    return array(array_def)
+end
+
+-- }}} Derived schema node type constructors: enum, set
 
 -- {{{ <schema object>:validate()
 
@@ -1574,6 +1600,7 @@ return {
     -- it in some specific way to, say, impose extra constraint
     -- rules at validation.
     enum = enum,
+    set = set,
 
     -- Schema object constructor.
     new = new,
