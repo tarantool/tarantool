@@ -47,11 +47,14 @@ local function test_output(test, s)
     test:is(s.decode("---\nno\n..."), false, "decode for 'no'")
     test:is(s.encode({s.NULL}), '---\n- null\n...\n', "encode for nil")
     test:is(s.decode("---\n~\n..."), s.NULL, "decode for ~")
-    test:is(s.encode("\x80\x92\xe8s\x16"), '--- !!binary gJLocxY=\n...\n',
+    test:is(s.encode("\x80\x92\xe8s\x16"),
+        '--- "\\x80\\x92\\xE8s\\x16"\n...\n',
         "encode for binary")
-    test:is(s.encode("\x08\x5c\xc2\x80\x12\x2f"), '--- !!binary CFzCgBIv\n...\n',
+    test:is(s.encode("\x08\x5c\xc2\x80\x12\x2f"),
+        '--- "\\b\\\\\\u0080\\x12/"\n...\n',
         "encode for binary (2) - gh-354")
-    test:is(s.encode("\xe0\x82\x85\x00"), '--- !!binary 4IKFAA==\n...\n',
+    test:is(s.encode("\xe0\x82\x85\x00"),
+        '--- "\\xE0\\x82\\x85\\0"\n...\n',
         "encode for binary (3) - gh-1302")
     -- gh-4090: some printable unicode characters displayed as byte sequences.
     -- The following tests ensures that various 4-byte encoded unicode characters
@@ -66,8 +69,7 @@ local function test_output(test, s)
     for i=0x8000,0xffff,1 do
         table.insert(t, require('pickle').pack( 'i', i ));
     end
-    local _, count = string.gsub(s.encode(t), "!!binary", "")
-    test:is(count, 30880, "encode for binary (4) - gh-883")
+    test:is(#s.decode(s.encode(t)), #t, "encode for binary (4) - gh-883")
     test:is(s.encode("фЫр!"), '--- фЫр!\n...\n',
         "encode for utf-8")
 

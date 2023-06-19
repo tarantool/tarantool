@@ -108,33 +108,33 @@ digest.sha512(12345LL)
 --
 -- Empty string
 --
-digest.md4('')
+string.hex(digest.md4(''))
 ---
-- !!binary MdbP4NFq6TG3PFnX4MCJwA==
+- 31d6cfe0d16ae931b73c59d7e0c089c0
 ...
-digest.md5('')
+string.hex(digest.md5(''))
 ---
-- !!binary 1B2M2Y8AsgTpgAmY7PhCfg==
+- d41d8cd98f00b204e9800998ecf8427e
 ...
-digest.sha1('')
+string.hex(digest.sha1(''))
 ---
-- !!binary 2jmj7l5rSw0yVb/vlWAYkK/YBwk=
+- da39a3ee5e6b4b0d3255bfef95601890afd80709
 ...
-digest.sha224('')
+string.hex(digest.sha224(''))
 ---
-- !!binary 0UoCjCo6K8lHYQK7KII0xBWisB+CjqYqxbPkLw==
+- d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f
 ...
-digest.sha256('')
+string.hex(digest.sha256(''))
 ---
-- !!binary 47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
+- e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 ...
-digest.sha384('')
+string.hex(digest.sha384(''))
 ---
-- !!binary OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb
+- 38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b
 ...
-digest.sha512('')
+string.hex(digest.sha512(''))
 ---
-- !!binary z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==
+- cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e
 ...
 digest.md4_hex('')
 ---
@@ -167,33 +167,33 @@ digest.sha512_hex('')
 --
 -- Non-empty string
 --
-digest.md4('tarantool')
+string.hex(digest.md4('tarantool'))
 ---
-- !!binary x+tS5t7XznGO6NpI2d5cSQ==
+- c7eb52e6ded7ce718ee8da48d9de5c49
 ...
-digest.md5('tarantool')
+string.hex(digest.md5('tarantool'))
 ---
-- !!binary nGmFYyNwcg5O9nMw42PD+w==
+- 9c6985632370720e4ef67330e363c3fb
 ...
-digest.sha1('tarantool')
+string.hex(digest.sha1('tarantool'))
 ---
-- !!binary 0g7s+pB5mf+fu7NCqXJEg+z2x94=
+- d20eecfa907999ff9fbbb342a9724483ecf6c7de
 ...
-digest.sha224('tarantool')
+string.hex(digest.sha224('tarantool'))
 ---
-- !!binary gzVFDH9GRbhgAH1F/YJWaWX/KWy7SGsELk8hbQ==
+- 8335450c7f4645b860007d45fd82566965ff296cbb486b042e4f216d
 ...
-digest.sha256('tarantool')
+string.hex(digest.sha256('tarantool'))
 ---
-- !!binary 2TqjwZwQz+V10Y7RlpTVE90LNrzuU5NP9FT7ptKvxC0=
+- d93aa3c19c10cfe575d18ed19694d513dd0b36bcee53934ff454fba6d2afc42d
 ...
-digest.sha384('tarantool')
+string.hex(digest.sha384('tarantool'))
 ---
-- !!binary yiixxVa4HJTDQecIhiFiB2S0VeAKO0X5AurR5UeVVtArv7Ymt0/WCiGEQ0VYO62L
+- ca28b1c556b81c94c341e7088621620764b455e00a3b45f902ead1e5479556d02bbfb626b74fd60a21844345583bad8b
 ...
-digest.sha512('tarantool')
+string.hex(digest.sha512('tarantool'))
 ---
-- !!binary 3YAs+oTeL2V3n8mEVDLy8+GylBX65B0219kFEES9Tku4x7G8+W0Eh3QfGolEtMSJVne7k082Exxpk4Ggf5vNug==
+- dd802cfa84de2f65779fc9845432f2f3e1b29415fae41d36d7d9051044bd4e4bb8c7b1bcf96d0487741f1a8944b4c4895677bb934f36131c699381a07f9bcdba
 ...
 digest.md4_hex('tarantool')
 ---
@@ -436,9 +436,9 @@ mur:result()
 mur, mur_new, nulldigest = nil, nil, nil
 ---
 ...
-digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh')
+string.hex(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'))
 ---
-- !!binary ynO0qTTrTLNpNm3GrTnjng==
+- ca73b4a934eb4cb369366dc6ad39e39e
 ...
 digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh')
 ---
@@ -524,9 +524,9 @@ s:find('+') ~= nil
 ---
 - true
 ...
-digest.pbkdf2("password", "salt", 4096, 32)
+string.hex(digest.pbkdf2("password", "salt", 4096, 32))
 ---
-- !!binary xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=
+- c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a
 ...
 digest.pbkdf2_hex("password", "salt", 4096, 32)
 ---

@@ -48,9 +48,9 @@ crypto.hmac.nodigest
 - error: '[string "return crypto.hmac.nodigest "]:1: HMAC method "nodigest" is not
     supported'
 ...
-crypto.hmac.sha1('012345678', 'fred')
+string.hex(crypto.hmac.sha1('012345678', 'fred'))
 ---
-- !!binary H35BJij7GZ0Rag9c+HvsTFden3c=
+- 1f7e412628fb199d116a0f5cf87bec4c575e9f77
 ...
 key = '012345678'
 ---
@@ -70,33 +70,33 @@ crypto.hmac.sha1(nil, nil)
 ---
 - error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha1(key, string)'
 ...
-crypto.hmac.md4(key, message)
+string.hex(crypto.hmac.md4(key, message))
 ---
-- !!binary O62dNTQcfTuiyXfa/MKlig==
+- 3bad9d35341c7d3ba2c977dafcc2a58a
 ...
-crypto.hmac.md5(key, message)
+string.hex(crypto.hmac.md5(key, message))
 ---
-- !!binary s5FptfcQK37Bfh0R40qDPw==
+- b39169b5f7102b7ec17e1d11e34a833f
 ...
-crypto.hmac.sha1(key, message)
+string.hex(crypto.hmac.sha1(key, message))
 ---
-- !!binary H35BJij7GZ0Rag9c+HvsTFden3c=
+- 1f7e412628fb199d116a0f5cf87bec4c575e9f77
 ...
-crypto.hmac.sha224(key, message)
+string.hex(crypto.hmac.sha224(key, message))
 ---
-- !!binary JjzvWsIRDqIdEKKaDCILc3ybETuxj6LSkBJudw==
+- 263cef5ac2110ea21d10a29a0c220b737c9b113bb18fa2d290126e77
 ...
-crypto.hmac.sha256(key, message)
+string.hex(crypto.hmac.sha256(key, message))
 ---
-- !!binary cIBSEwca3aliz6WGAYXiKK1+kU1ldzUk49s/b86AVxQ=
+- 70805213071adda962cfa5860185e228ad7e914d65773524e3db3f6fce805714
 ...
-crypto.hmac.sha384(key, message)
+string.hex(crypto.hmac.sha384(key, message))
 ---
-- !!binary 1LC7zV1riyvdAjxUAhSYRXVLGUjsEZvLbvnbqJCqJPq3X117YfklFki++JWPUB8G
+- d4b0bbcd5d6b8b2bdd023c5402149845754b1948ec119bcb6ef9dba890aa24fab75f5d7b61f9251648bef8958f501f06
 ...
-crypto.hmac.sha512(key, message)
+string.hex(crypto.hmac.sha512(key, message))
 ---
-- !!binary Q4PL+6f9bpLtXmGBaoq2aT4arwCoA0YmcOZ612jzZ0FgZ63CRMIa6JZ92t4cj+PQ8wojXj8jbo658ir/5BvPOg==
+- 4383cbfba7fd6e92ed5e61816a8ab6693e1aaf00a803462670e67ad768f367416067adc244c21ae8967ddade1c8fe3d0f30a235e3f236e8eb9f22affe41bcf3a
 ...
 --
 -- Incremental update
@@ -117,33 +117,33 @@ hmac_sha1:result() == crypto.hmac.sha1(key, 'abccde')
 --
 -- Empty string
 --
-crypto.hmac.md4(key, '')
+string.hex(crypto.hmac.md4(key, ''))
 ---
-- !!binary JntcBTt7gh45TdtdxuS6Fw==
+- 267b5c053b7b821e394ddb5dc6e4ba17
 ...
-crypto.hmac.md5(key, '')
+string.hex(crypto.hmac.md5(key, ''))
 ---
-- !!binary dIgsXw3Q8VV7D3I+s3kOPg==
+- 74882c5f0dd0f1557b0f723eb3790e3e
 ...
-crypto.hmac.sha1(key, '')
+string.hex(crypto.hmac.sha1(key, ''))
 ---
-- !!binary eM9i/oncUFbfzncL5OQ2ZnUpWCY=
+- 78cf62fe89dc5056dfce770be4e4366675295826
 ...
-crypto.hmac.sha224(key, '')
+string.hex(crypto.hmac.sha224(key, ''))
 ---
-- !!binary WC5mv2A+l1Y5/CEkxLMrRbmb/5temFsNXQ3xoQ==
+- 582e66bf603e975639fc2124c4b32b45b99bff9b5e985b0d5d0df1a1
 ...
-crypto.hmac.sha256(key, '')
+string.hex(crypto.hmac.sha256(key, ''))
 ---
-- !!binary lJeYNw6OtpHZCw0WUd+XvfwLcZM6za2O8/LJ48YQ+tQ=
+- 949798370e8eb691d90b0d1651df97bdfc0b71933acdad8ef3f2c9e3c610fad4
 ...
-crypto.hmac.sha384(key, '')
+string.hex(crypto.hmac.sha384(key, ''))
 ---
-- !!binary z7E/+NqRq/Kkzk9+ijvCuyo8KgU57LoEJIx3ysgJfUDxJtCAWsHDqY/6GmJO1Slo
+- cfb13ff8da91abf2a4ce4f7e8a3bc2bb2a3c2a0539ecba04248c77cac8097d40f126d0805ac1c3a98ffa1a624ed52968
 ...
-crypto.hmac.sha512(key, '')
+string.hex(crypto.hmac.sha512(key, ''))
 ---
-- !!binary yqXDqloZTz1F312gTvXxod+2Rdd1O48FPI2h/2tux90XIemkz5xGMRs2sKajmAe7817TFWjnjHfvToDQ0Pvq3w==
+- caa5c3aa5a194f3d45df5da04ef5f1a1dfb645d7753b8f053c8da1ff6b6ec7dd1721e9a4cf9c46311b36b0a6a39807bbf35ed31568e78c77ef4e80d0d0fbeadf
 ...
 test_run:cmd("clear filter")
 ---

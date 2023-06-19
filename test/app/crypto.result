@@ -24,9 +24,9 @@ iv = 'abcdefghijklmnop'
 enc = ciph.encrypt('test', pass, iv)
 ---
 ...
-enc
+string.hex(enc)
 ---
-- !!binary WpJJu6l6oziZcyvND8KueA==
+- 5a9249bba97aa33899732bcd0fc2ae78
 ...
 ciph.decrypt(enc, pass, iv)
 ---
