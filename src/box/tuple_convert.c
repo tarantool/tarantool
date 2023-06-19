@@ -166,16 +166,16 @@ encode_node(yaml_emitter_t *emitter, const char **data)
 	case MP_MAP:
 		return encode_table(emitter, data);
 	case MP_STR:
-	case MP_BIN:
-		len = mp_decode_strbinl(data);
+		len = mp_decode_strl(data);
 		str = *data;
 		*data += len;
-		if (type == MP_STR && utf8_check_printable(str, len)) {
-			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-			break;
-		}
+		style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+		break;
+	case MP_BIN:
+		len = mp_decode_binl(data);
+		str = *data;
+		*data += len;
 		style = YAML_ANY_SCALAR_STYLE;
-		/* Binary or not UTF8 */
 		binlen = base64_bufsize(len, 0);
 		bin = (char *) malloc(binlen);
 		if (bin == NULL) {

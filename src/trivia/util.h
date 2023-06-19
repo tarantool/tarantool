@@ -551,15 +551,6 @@ size_t
 strlcat(char *dst, const char *src, size_t size);
 #endif
 
-/**
- * Check that @a str is valid utf-8 sequence and can be printed
- * unescaped.
- * @param str string
- * @param length string length
- */
-int
-utf8_check_printable(const char *str, size_t length);
-
 #ifndef HAVE_MEMMEM
 /* Declare memmem(). */
 void *
