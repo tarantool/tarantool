@@ -931,14 +931,13 @@ fiber_recycle(struct fiber *fiber)
 	fiber->storage.lua.fid_ref = FIBER_LUA_NOREF;
 	unregister_fid(fiber);
 	fiber->fid = 0;
-	/* Set before free to disable truncation system area check. */
 	fiber->gc_initial_size = 0;
-	region_free(&fiber->gc);
 #ifdef ENABLE_BACKTRACE
 	fiber->parent_bt = NULL;
 	fiber->first_alloc_bt = NULL;
 	region_set_callbacks(&fiber->gc, NULL, NULL, NULL);
 #endif
+	region_free(&fiber->gc);
 	if (fiber_is_reusable(fiber->flags)) {
 		rlist_move_entry(&cord()->dead, fiber, link);
 	} else {
@@ -1458,8 +1457,9 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 	trigger_destroy(&f->on_stop);
 	rlist_del(&f->state);
 	rlist_del(&f->link);
-	/* Set before free to disable truncation system area check. */
-	f->gc_initial_size = 0;
+#ifdef ENABLE_BACKTRACE
+	region_set_callbacks(&f->gc, NULL, NULL, NULL);
+#endif
 	region_destroy(&f->gc);
 	fiber_stack_destroy(f, &cord->slabc);
 	diag_destroy(&f->diag);
