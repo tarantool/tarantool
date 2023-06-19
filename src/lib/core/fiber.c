@@ -200,19 +200,27 @@ fiber_madvise(void *addr, size_t len, int advice)
 static inline int
 fiber_mprotect(void *addr, size_t len, int prot)
 {
-	int rc = 0;
-
+	(void)addr;
+	(void)len;
+	(void)prot;
 	struct errinj *inj = errinj(ERRINJ_FIBER_MPROTECT, ERRINJ_INT);
 	if (inj != NULL && inj->iparam == prot) {
 		errno = ENOMEM;
-		rc = -1;
+		goto error;
 	}
-
-	if (rc != 0 || mprotect(addr, len, prot) != 0) {
-		diag_set(SystemError, "fiber mprotect failed");
-		return -1;
-	}
+/*
+ * TODO(gh-8423) Disable mprotect temporarily. Leak sanitizer does not work
+ * well if memory is protected. We fail to remove protection due to the use of
+ * `cord_cancel_and_join` to cancel cords.
+ */
+#ifndef ENABLE_ASAN
+	if (mprotect(addr, len, prot) != 0)
+		goto error;
+#endif
 	return 0;
+error:
+	diag_set(SystemError, "fiber mprotect failed");
+	return -1;
 }
 
 static __thread bool fiber_top_enabled = false;
