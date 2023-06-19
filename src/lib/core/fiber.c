@@ -1128,6 +1128,21 @@ page_align_up(void *ptr)
 	return page_align_down(ptr + page_size - 1);
 }
 
+/**
+ * Call madvise(2) on given range but align start on page up and
+ * end on page down.
+ *
+ * This way madvise(2) requirement on alignment of start address is met.
+ * Also we won't touch memory after end due to rounding up of range length.
+ */
+static inline int
+fiber_madvise_unaligned(void *start, void *end, int advice)
+{
+	start = page_align_up(start);
+	end = page_align_down(end);
+	return fiber_madvise(start, (char *)end - (char *)start, advice);
+}
+
 #ifdef HAVE_MADV_DONTNEED
 /**
  * Check if stack poison values are present starting from
@@ -1184,9 +1199,9 @@ fiber_stack_recycle(struct fiber *fiber)
 	void *start, *end;
 	if (stack_direction < 0) {
 		start = fiber->stack;
-		end = page_align_down(fiber->stack_watermark);
+		end = fiber->stack_watermark;
 	} else {
-		start = page_align_up(fiber->stack_watermark);
+		start = fiber->stack_watermark;
 		end = fiber->stack + fiber->stack_size;
 	}
 
@@ -1195,7 +1210,7 @@ fiber_stack_recycle(struct fiber *fiber)
 	 * just a hint for OS and not critical for
 	 * functionality.
 	 */
-	fiber_madvise(start, end - start, MADV_DONTNEED);
+	fiber_madvise_unaligned(start, end, MADV_DONTNEED);
 	stack_put_watermark(fiber->stack_watermark);
 }
 
@@ -1218,8 +1233,8 @@ fiber_stack_watermark_create(struct fiber *fiber,
 	 * not exit if MADV_DONTNEED failed, it is just a hint
 	 * for OS, not critical one.
 	 */
-	fiber_madvise(fiber->stack, fiber->stack_size, MADV_DONTNEED);
-
+	fiber_madvise_unaligned(fiber->stack, fiber->stack + fiber->stack_size,
+				MADV_DONTNEED);
 	/*
 	 * To increase probability of stack overflow detection
 	 * we put the first mark at a random position.
