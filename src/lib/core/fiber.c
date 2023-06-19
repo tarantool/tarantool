@@ -1112,12 +1112,13 @@ fiber_stack_recycle(struct fiber *fiber)
  * Initialize fiber stack watermark.
  */
 static void
-fiber_stack_watermark_create(struct fiber *fiber)
+fiber_stack_watermark_create(struct fiber *fiber,
+			     const struct fiber_attr *fiber_attr)
 {
 	assert(fiber->stack_watermark == NULL);
 
 	/* No tracking on custom stacks for simplicity. */
-	if (fiber->flags & FIBER_CUSTOM_STACK)
+	if (fiber_attr->flags & FIBER_CUSTOM_STACK)
 		return;
 
 	/*
@@ -1153,9 +1154,11 @@ fiber_stack_recycle(struct fiber *fiber)
 }
 
 static void
-fiber_stack_watermark_create(struct fiber *fiber)
+fiber_stack_watermark_create(struct fiber *fiber,
+			     const struct fiber_attr *fiber_attr)
 {
 	(void)fiber;
+	(void)fiber_attr;
 }
 #endif /* HAVE_MADV_DONTNEED */
 
@@ -1202,10 +1205,10 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 }
 
 static int
-fiber_stack_create(struct fiber *fiber, struct slab_cache *slabc,
-		   size_t stack_size)
+fiber_stack_create(struct fiber *fiber, const struct fiber_attr *fiber_attr,
+		   struct slab_cache *slabc)
 {
-	stack_size -= slab_sizeof();
+	size_t stack_size = fiber_attr->stack_size - slab_sizeof();
 	fiber->stack_slab = slab_get(slabc, stack_size);
 
 	if (fiber->stack_slab == NULL) {
@@ -1252,7 +1255,7 @@ fiber_stack_create(struct fiber *fiber, struct slab_cache *slabc,
 		return -1;
 	}
 
-	fiber_stack_watermark_create(fiber);
+	fiber_stack_watermark_create(fiber, fiber_attr);
 	return 0;
 }
 
@@ -1281,8 +1284,7 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 		fiber->storage.lua.storage_ref = FIBER_LUA_NOREF;
 		fiber->storage.lua.fid_ref = FIBER_LUA_NOREF;
 
-		if (fiber_stack_create(fiber, &cord()->slabc,
-				       fiber_attr->stack_size)) {
+		if (fiber_stack_create(fiber, fiber_attr, &cord()->slabc)) {
 			mempool_free(&cord->fiber_mempool, fiber);
 			return NULL;
 		}

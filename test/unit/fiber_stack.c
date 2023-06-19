@@ -29,18 +29,41 @@ main_f(va_list ap)
 	struct errinj *inj;
 	struct fiber *fiber;
 	int fiber_count = fiber_count_total();
-	struct fiber_attr *fiber_attr = fiber_attr_new();
+	struct fiber_attr *fiber_attr;
 
 	header();
+#ifdef NDEBUG
+	plan(1);
+#else
 	plan(11);
+#endif
+
+	/*
+	 * gh-9026. Stack size crafted to be close to 64k so we should
+	 * hit red zone around stack when writing watermark if bug is not
+	 * fixed.
+	 *
+	 * The test is placed at the beginning because stderr is redirected
+	 * to /dev/null at the end of the test and ASAN diagnostic will
+	 * not be visible if the test will be placed at the end.
+	 */
+	fiber_attr = fiber_attr_new();
+	fiber_attr_setstacksize(fiber_attr, (64 << 10) - 128);
+	fiber = fiber_new_ex("gh-9026", fiber_attr, noop_f);
+	fiber_set_joinable(fiber, true);
+	fiber_start(fiber);
+	fiber_join(fiber);
+	fiber_attr_delete(fiber_attr);
 
 	/*
 	 * Check the default fiber stack size value.
 	 */
+	fiber_attr = fiber_attr_new();
 	ok(default_attr.stack_size == FIBER_STACK_SIZE_DEFAULT,
 	   "fiber_attr: the default stack size is %ld, but %d is set via CMake",
 	   default_attr.stack_size, FIBER_STACK_SIZE_DEFAULT);
 
+#ifndef NDEBUG
 	/*
 	 * Set non-default stack size to prevent reusing of an
 	 * existing fiber.
@@ -122,12 +145,13 @@ main_f(va_list ap)
 
 	cord_collect_garbage(cord());
 	ok(fiber_count_total() == fiber_count, "fiber is deleted");
+#endif /* ifndef NDEBUG */
 
 	fiber_attr_delete(fiber_attr);
-	footer();
-
 	ev_break(loop(), EVBREAK_ALL);
-	return check_plan();
+
+	footer();
+	return 0;
 }
 
 int main()
@@ -140,5 +164,5 @@ int main()
 	ev_run(loop(), 0);
 	fiber_free();
 	memory_free();
-	return 0;
+	return check_plan();
 }
