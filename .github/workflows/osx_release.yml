@@ -8,7 +8,6 @@ on:
     tags:
       - '**'
   pull_request:
-    types: [opened, reopened, synchronize, labeled]
   workflow_dispatch:
 
 concurrency:
@@ -33,10 +32,11 @@ concurrency:
 jobs:
   osx_release:
     # Run on push to the 'master' and release branches of tarantool/tarantool
-    # or on pull request if the 'full-ci' label is set.
+    # or on pull request if the 'notest' label is not set.
     if: github.repository == 'tarantool/tarantool' &&
         ( github.event_name != 'pull_request' ||
-          contains(github.event.pull_request.labels.*.name, 'full-ci') )
+          ( github.event_name == 'pull_request' &&
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
 
     runs-on: [ 'macos-${{ matrix.version }}-self-hosted', '${{ matrix.arch }}' ]
 
