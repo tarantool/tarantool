@@ -2030,9 +2030,6 @@ end
 -- widths: array with desired widths of columns.
 -- max_width: limit entire length of a row string, longest fields will be cut.
 --  Set to 0 (default) to detect and use screen width. Set to -1 for no limit.
--- print: (default - false) - print each line instead of adding to result.
--- use_nbsp: (default - true) - add invisible spaces to improve readability
---  in YAML output. Not applicabble when print=true.
 base_index_mt.fselect = function(index, key, opts, fselect_opts)
     -- Options.
     if type(opts) == 'string' and fselect_opts == nil then
@@ -2093,11 +2090,8 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     local default_max_width = 0
     if #widths > 0 then default_max_width = -1 end
     local max_width = get_opt('max_width', default_max_width, 'number')
-    local use_print = get_opt('print', false, 'boolean')
-    local use_nbsp = get_opt('use_nbsp', true, 'boolean')
     local min_col_width = 5
     local max_col_width = 1000
-    if use_print then use_nbsp = false end
 
     -- Convert comma separated columns into array, to numbers if possible
     if type(columns) == 'string' then
@@ -2126,7 +2120,7 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     if max_width == 0 then
         max_width = detect_width()
         -- YAML uses several additinal symbols in output, we should shink line.
-        local waste_size = use_print and 0 or 5
+        local waste_size = 3
         if max_width > waste_size then
             max_width = max_width - waste_size
         else
@@ -2217,17 +2211,11 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
         real_width = real_width - 1
     end
 
-    -- Yaml wraps all strings that contain spaces with single quotes, and
-    -- does not wrap otherwise. Let's add some invisible spaces to every line
-    -- in order to make them similar in output.
-    local prefix = string.char(0xE2) .. string.char(0x80) .. string.char(0x8B)
-    if not use_nbsp then prefix = '' end
-
     local header_row_delim = fselect_type == 'jira' and '||' or '|'
     local result_row_delim = '|'
     local delim_row_delim = fselect_type == 'sql' and '+' or '|'
 
-    local delim_row = prefix .. delim_row_delim
+    local delim_row = delim_row_delim
     for j = 1,num_cols do
         delim_row = delim_row .. string.rep('-', widths[j]) .. delim_row_delim
     end
@@ -2246,12 +2234,7 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
         else
             str = x:sub(1, n)
         end
-        if use_nbsp then
-            -- replace spaces with &nbsp
-            return str:gsub("%s", string.char(0xC2) .. string.char(0xA0))
-        else
-            return str
-        end
+        return str
     end
 
     local res = {}
@@ -2259,7 +2242,7 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     -- insert into res a string with formatted row.
     local res_insert = function(row, is_header)
         local delim = is_header and header_row_delim or result_row_delim
-        local str_row = prefix .. delim
+        local str_row = delim
         local shrink = fselect_type == 'jira' and is_header and 1 or 0
         for j = 1,num_cols do
             str_row = str_row .. fmt_str(row[j], widths[j] - shrink) .. delim
@@ -2281,13 +2264,7 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     if fselect_type == 'sql' then
         table.insert(res, delim_row)
     end
-    if use_print then
-        for _,line in ipairs(res) do
-            print(line)
-        end
-        return {}
-    end
-    return res
+    return table.concat(res, '\n')
 end
 base_index_mt.gselect = function(index, key, opts, fselect_opts)
     if type(fselect_opts) ~= 'table' then fselect_opts = {} end
