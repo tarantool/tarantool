@@ -1260,9 +1260,6 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 
 	if (fiber->stack != NULL) {
 		VALGRIND_STACK_DEREGISTER(fiber->stack_id);
-#if ENABLE_ASAN
-		ASAN_UNPOISON_MEMORY_REGION(fiber->stack, fiber->stack_size);
-#endif
 		void *guard;
 		if (stack_direction < 0)
 			guard = page_align_down(fiber->stack - page_size);
