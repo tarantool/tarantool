@@ -128,6 +128,10 @@ test_run:cmd("push filter 'offset: .*' to 'offset: <offset>'")
 ---
 - true
 ...
+test_run:cmd("push filter 'data: .*' to 'data: <data>'")
+---
+- true
+...
 result
 ---
 - - - 00000000000000000019.vylog
@@ -324,7 +328,7 @@ result
       - HEADER:
           type: ROWINDEX
         BODY:
-          data: !!binary AAAAAAAAABAAAAAgAAAAMAAAAEAAAABQAAAAYAAAAHAAAACAAAAAkAAAAKAAAACwAAAAwA==
+          data: <data>
   - - 00000000000000000012.index
     - - HEADER:
           type: RUNINFO
@@ -367,7 +371,7 @@ result
       - HEADER:
           type: ROWINDEX
         BODY:
-          data: "\0\0\0\0\0\0\0\x14\0\0\0*"
+          data: <data>
   - - 00000000000000000006.index
     - - HEADER:
           type: RUNINFO
@@ -457,7 +461,7 @@ result
       - HEADER:
           type: ROWINDEX
         BODY:
-          data: !!binary AAAAAAAAABAAAAAgAAAAMAAAAEAAAABQAAAAYAAAAHAAAACAAAAAkAAAAKAAAACwAAAAwA==
+          data: <data>
   - - 00000000000000000010.index
     - - HEADER:
           type: RUNINFO
@@ -497,7 +501,7 @@ result
       - HEADER:
           type: ROWINDEX
         BODY:
-          data: "\0\0\0\0\0\0\0\x10\0\0\0\""
+          data: <data>
 ...
 test_run:cmd("clear filter")
 ---

@@ -66,8 +66,8 @@ uu == uuid.frombin(uu:bin('b'), 'b')
 uu == uuid.frombin(uu:bin('l'), 'l')
 
 uu = uuid.fromstr('adf9d02e-0756-11e4-b5cf-525400123456')
-uu:bin('l')
-uu:bin('b')
+string.hex(uu:bin('l'))
+string.hex(uu:bin('b'))
 
 -- aliases
 #uuid.bin()

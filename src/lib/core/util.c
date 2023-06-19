@@ -202,67 +202,6 @@ strlcat(char *dst, const char *src, size_t size)
 }
 #endif
 
-int
-utf8_check_printable(const char *start, size_t length)
-{
-	const unsigned char *end = (const unsigned char *) start + length;
-	const unsigned char *pointer = (const unsigned char *) start;
-
-	while (pointer < end) {
-		unsigned char octet;
-		unsigned int width;
-		unsigned int value;
-		size_t k;
-
-		octet = pointer[0];
-		width = (octet & 0x80) == 0x00 ? 1 :
-			(octet & 0xE0) == 0xC0 ? 2 :
-			(octet & 0xF0) == 0xE0 ? 3 :
-			(octet & 0xF8) == 0xF0 ? 4 : 0;
-		value = (octet & 0x80) == 0x00 ? octet & 0x7F :
-			(octet & 0xE0) == 0xC0 ? octet & 0x1F :
-			(octet & 0xF0) == 0xE0 ? octet & 0x0F :
-			(octet & 0xF8) == 0xF0 ? octet & 0x07 : 0;
-		if (!width)
-			return 0;
-		if (pointer + width > end)
-			return 0;
-		for (k = 1; k < width; k++) {
-			octet = pointer[k];
-			if ((octet & 0xC0) != 0x80) return 0;
-			value = (value << 6) + (octet & 0x3F);
-		}
-		if (!((width == 1) ||
-		      (width == 2 && value >= 0x80) ||
-		      (width == 3 && value >= 0x800) ||
-		      (width == 4 && value >= 0x10000)))
-			return 0;
-
-		/*
-		 * gh-354: yaml incorrectly escapes special characters in a string
-		 * Check that the string can be actually printed unescaped.
-		 */
-		if (*pointer > 0x7F &&
-		    !((pointer[0] == 0x0A) ||
-		      (pointer[0] >= 0x20 && pointer[0] <= 0x7E) ||
-		      (pointer[0] == 0xC2 && pointer[1] >= 0xA0) ||
-		      (pointer[0]  > 0xC2 && pointer[0]  < 0xED) ||
-		      (pointer[0] == 0xED && pointer[1]  < 0xA0) ||
-		      (pointer[0] == 0xEE) ||
-		      (pointer[0] == 0xEF &&
-		       !(pointer[1] == 0xBB && pointer[2] == 0xBF) &&
-		       !(pointer[1] == 0xBF &&
-			 (pointer[2] == 0xBE || pointer[2] == 0xBF))) ||
-		      (u_isprint(value))
-		      )
-		    ) {
-			return 0;
-		}
-		pointer += width;
-	}
-	return 1;
-}
-
 /**
  * Maps a character code to an escaped string or NULL if the character
  * doesn't need to be escaped when encoded in JSON.

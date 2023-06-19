@@ -5,6 +5,7 @@ fiber = require('fiber')
 digest = require('digest')
 type(digest)
 
+
 --
 -- Invalid arguments
 --
@@ -38,13 +39,13 @@ digest.sha512(12345LL)
 --
 -- Empty string
 --
-digest.md4('')
-digest.md5('')
-digest.sha1('')
-digest.sha224('')
-digest.sha256('')
-digest.sha384('')
-digest.sha512('')
+string.hex(digest.md4(''))
+string.hex(digest.md5(''))
+string.hex(digest.sha1(''))
+string.hex(digest.sha224(''))
+string.hex(digest.sha256(''))
+string.hex(digest.sha384(''))
+string.hex(digest.sha512(''))
 
 digest.md4_hex('')
 digest.md5_hex('')
@@ -57,13 +58,13 @@ digest.sha512_hex('')
 --
 -- Non-empty string
 --
-digest.md4('tarantool')
-digest.md5('tarantool')
-digest.sha1('tarantool')
-digest.sha224('tarantool')
-digest.sha256('tarantool')
-digest.sha384('tarantool')
-digest.sha512('tarantool')
+string.hex(digest.md4('tarantool'))
+string.hex(digest.md5('tarantool'))
+string.hex(digest.sha1('tarantool'))
+string.hex(digest.sha224('tarantool'))
+string.hex(digest.sha256('tarantool'))
+string.hex(digest.sha384('tarantool'))
+string.hex(digest.sha512('tarantool'))
 
 digest.md4_hex('tarantool')
 digest.md5_hex('tarantool')
@@ -139,7 +140,7 @@ mur:update('1234')
 mur:result()
 mur, mur_new, nulldigest = nil, nil, nil
 
-digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh')
+string.hex(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'))
 digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh')
 digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'nosspasspasspasspasspasspasspass', 'iv12tras8712cvbh')
 
@@ -171,7 +172,7 @@ s:find('+') ~= nil
 s = digest.base64_encode('?>>>', {nopad = true})
 s:find('+') ~= nil
 
-digest.pbkdf2("password", "salt", 4096, 32)
+string.hex(digest.pbkdf2("password", "salt", 4096, 32))
 digest.pbkdf2_hex("password", "salt", 4096, 32)
 digest.pbkdf2_hex("password", "salt")
 s, err = pcall(digest.pbkdf2, 12, "salt")

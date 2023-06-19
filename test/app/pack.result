@@ -28,11 +28,11 @@ pickle.pack('s', 0x4d)
 ...
 pickle.pack('i', -1)
 ---
-- !!binary /////w==
+- "\xFF\xFF\xFF\xFF"
 ...
 pickle.pack('N', -1)
 ---
-- !!binary /////w==
+- "\xFF\xFF\xFF\xFF"
 ...
 pickle.pack('ssss', 25940, 29811, 28448, 11883)
 ---

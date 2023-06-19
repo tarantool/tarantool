@@ -19,7 +19,7 @@ crypto.hmac.sha512()
 crypto.hmac.nodigest
 
 
-crypto.hmac.sha1('012345678', 'fred')
+string.hex(crypto.hmac.sha1('012345678', 'fred'))
 
 key = '012345678'
 message = 'fred'
@@ -29,13 +29,13 @@ crypto.hmac.sha1(nil, message)
 crypto.hmac.sha1(nil, nil)
 
 
-crypto.hmac.md4(key, message)
-crypto.hmac.md5(key, message)
-crypto.hmac.sha1(key, message)
-crypto.hmac.sha224(key, message)
-crypto.hmac.sha256(key, message)
-crypto.hmac.sha384(key, message)
-crypto.hmac.sha512(key, message)
+string.hex(crypto.hmac.md4(key, message))
+string.hex(crypto.hmac.md5(key, message))
+string.hex(crypto.hmac.sha1(key, message))
+string.hex(crypto.hmac.sha224(key, message))
+string.hex(crypto.hmac.sha256(key, message))
+string.hex(crypto.hmac.sha384(key, message))
+string.hex(crypto.hmac.sha512(key, message))
 
 
 --
@@ -50,13 +50,13 @@ hmac_sha1:result() == crypto.hmac.sha1(key, 'abccde')
 --
 -- Empty string
 --
-crypto.hmac.md4(key, '')
-crypto.hmac.md5(key, '')
-crypto.hmac.sha1(key, '')
-crypto.hmac.sha224(key, '')
-crypto.hmac.sha256(key, '')
-crypto.hmac.sha384(key, '')
-crypto.hmac.sha512(key, '')
+string.hex(crypto.hmac.md4(key, ''))
+string.hex(crypto.hmac.md5(key, ''))
+string.hex(crypto.hmac.sha1(key, ''))
+string.hex(crypto.hmac.sha224(key, ''))
+string.hex(crypto.hmac.sha256(key, ''))
+string.hex(crypto.hmac.sha384(key, ''))
+string.hex(crypto.hmac.sha512(key, ''))
 
 
 
