@@ -584,7 +584,7 @@ p = self:payload_str()
 ...
 p
 ---
-- !!binary wg==
+- "\xC2"
 ...
 (msgpack.decode(p))
 ---

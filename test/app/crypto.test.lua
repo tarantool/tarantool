@@ -8,7 +8,7 @@ ciph = crypto.cipher.aes128.cbc
 pass = '1234567887654321'
 iv = 'abcdefghijklmnop'
 enc = ciph.encrypt('test', pass, iv)
-enc
+string.hex(enc)
 ciph.decrypt(enc, pass, iv)
 
 

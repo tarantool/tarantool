@@ -192,13 +192,13 @@ uu == uuid.frombin(uu:bin('l'), 'l')
 uu = uuid.fromstr('adf9d02e-0756-11e4-b5cf-525400123456')
 ---
 ...
-uu:bin('l')
+string.hex(uu:bin('l'))
 ---
-- !!binary LtD5rVYH5BG1z1JUABI0Vg==
+- 2ed0f9ad5607e411b5cf525400123456
 ...
-uu:bin('b')
+string.hex(uu:bin('b'))
 ---
-- !!binary rfnQLgdWEeS1z1JUABI0Vg==
+- adf9d02e075611e4b5cf525400123456
 ...
 -- aliases
 #uuid.bin()

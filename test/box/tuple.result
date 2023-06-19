@@ -1014,13 +1014,13 @@ t = box.tuple.new({1, -2, 1.2, -1.2}, 'x', 'y', 'z', null, true, false,
 tostring(t);
 ---
 - '[[1, -2, 1.2, -1.2], ''x'', ''y'', ''z'', null, true, false, {''big_num'': 18446744073709551615,
-  ''double'': 1.0000000001, ''utf8'': ''Кудыкины горы'', ''bin'': !!binary CFzCgBIv,
+  ''double'': 1.0000000001, ''utf8'': ''Кудыкины горы'', ''bin'': "\b\\\u0080\x12/",
   ''map'': {''key'': ''value''}}]'
 ...
 t;
 ---
 - [[1, -2, 1.2, -1.2], 'x', 'y', 'z', null, true, false, {'big_num': 18446744073709551615,
-    'double': 1.0000000001, 'utf8': 'Кудыкины горы', 'bin': !!binary CFzCgBIv, 'map': {
+    'double': 1.0000000001, 'utf8': 'Кудыкины горы', 'bin': "\b\\\u0080\x12/", 'map': {
       'key': 'value'}}]
 ...
 test_run:cmd("setopt delimiter ''");

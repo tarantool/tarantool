@@ -73,8 +73,8 @@ bintuple_insert(s, {0xFE, 0xED, 0xFA, 0xCE})
 ...
 s:select()
 ---
-- - [!!binary 3q2+rw==]
-  - [!!binary /u36zg==]
+- - ["ޭ\xBE\xAF"]
+  - ["\xFE\xED\xFA\xCE"]
 ...
 box.execute("SELECT * FROM \"withdata\" WHERE \"b\" < x'FEEDFACE';")
 ---
@@ -82,7 +82,7 @@ box.execute("SELECT * FROM \"withdata\" WHERE \"b\" < x'FEEDFACE';")
   - name: b
     type: varbinary
   rows:
-  - [!!binary 3q2+rw==]
+  - ["ޭ\xBE\xAF"]
 ...
 pk:alter({parts = {1, "scalar"}})
 ---
@@ -112,8 +112,8 @@ s:select()
   - [22]
   - ['11']
   - ['22']
-  - [!!binary 3q2+rw==]
-  - [!!binary /u36zg==]
+  - ["ޭ\xBE\xAF"]
+  - ["\xFE\xED\xFA\xCE"]
 ...
 box.execute("SELECT * FROM \"withdata\" WHERE \"b\" <= x'DEADBEAF';")
 ---
@@ -125,7 +125,7 @@ box.execute("SELECT * FROM \"withdata\" WHERE \"b\" <= x'DEADBEAF';")
   - [22]
   - ['11']
   - ['22']
-  - [!!binary 3q2+rw==]
+  - ["ޭ\xBE\xAF"]
 ...
 pk:alter({parts = {1, "varbinary"}})
 ---
@@ -156,9 +156,9 @@ pk:alter({parts = {1, "varbinary"}})
 ...
 s:select()
 ---
-- - [!!binary 3q2+rw==]
-  - [!!binary +t7erQ==]
-  - [!!binary /u36zg==]
+- - ["ޭ\xBE\xAF"]
+  - ["\xFA\xDEޭ"]
+  - ["\xFE\xED\xFA\xCE"]
 ...
 --
 -- gh-5071: bitset index for binary fields

@@ -623,6 +623,7 @@ static int dump_node(struct lua_yaml_dumper *dumper)
 {
    size_t len = 0;
    const char *str = "";
+   const char *force_literal_substring = yaml_pretty_multiline ? "\n" : "\n\n";
    yaml_char_t *tag = NULL;
    yaml_event_t ev;
    yaml_scalar_style_t style = YAML_PLAIN_SCALAR_STYLE;
@@ -679,22 +680,18 @@ static int dump_node(struct lua_yaml_dumper *dumper)
          break;
       }
       style = YAML_ANY_SCALAR_STYLE; // analyze_string(dumper, str, len, &is_binary);
-      if (utf8_check_printable(str, len)) {
-         const char *force_literal_substring = yaml_pretty_multiline ? "\n" : "\n\n";
-         if (yaml_is_flow_mode(dumper)) {
-            style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-         } else if (strstr(str, force_literal_substring) != NULL) {
-            /*
-             * Tarantool-specific: use literal block style for either every
-             * multiline string or string containing "\n\n" depending on compat
-             * setup.
-             * Useful for tutorial().
-             */
-            style = YAML_LITERAL_SCALAR_STYLE;
-         }
-         break;
+      if (yaml_is_flow_mode(dumper)) {
+         style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+      } else if (strstr(str, force_literal_substring) != NULL) {
+         /*
+          * Tarantool-specific: use literal block style for either every
+          * multiline string or string containing "\n\n" depending on compat
+          * setup.
+          * Useful for tutorial().
+          */
+         style = YAML_LITERAL_SCALAR_STYLE;
       }
-      /* Fall through */
+      break;
    case MP_BIN:
       is_binary = 1;
       tobase64(dumper->L, -1);
@@ -728,14 +725,6 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       case MP_ERROR:
          str = field.errorval->errmsg;
          len = strlen(str);
-         if (!utf8_check_printable(str, len)) {
-            is_binary = 1;
-            lua_pop(dumper->L, 1);
-            lua_pushlstring(dumper->L, str, len);
-            tobase64(dumper->L, -1);
-            str = lua_tolstring(dumper->L, -1, &len);
-            tag = (yaml_char_t *) LUAYAML_TAG_PREFIX "binary";
-         }
          break;
       case MP_DATETIME:
          len = datetime_to_string(field.dateval, buf, sizeof(buf));

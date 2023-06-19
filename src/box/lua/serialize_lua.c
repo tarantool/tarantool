@@ -816,9 +816,7 @@ dump_node(struct lua_dumper *d, struct node *nd, int indent)
 	case MP_STR:
 		nd->mask |= NODE_QUOTE;
 		str = lua_tolstring(d->L, -1, &len);
-		if (utf8_check_printable(str, len) == 1)
-			break;
-		/* fallthrough */
+		break;
 	case MP_BIN:
 		nd->mask |= NODE_QUOTE;
 		tobase64(d->L, -1);
