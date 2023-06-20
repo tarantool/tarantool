@@ -40,18 +40,17 @@ public:
 	}
 
 	mh_i64ptr_t *proc_name_cache;
-	region proc_name_cache_entry_region;
 
 private:
-	ProcNameCache() noexcept : proc_name_cache{mh_i64ptr_new()},
-				   proc_name_cache_entry_region{}
+	ProcNameCache() noexcept : proc_name_cache{mh_i64ptr_new()}
 	{
-		region_create(&proc_name_cache_entry_region, &cord()->slabc);
 	}
 
 	~ProcNameCache()
 	{
-		region_destroy(&proc_name_cache_entry_region);
+		mh_int_t i;
+		mh_foreach(proc_name_cache, i)
+			free(mh_i64ptr_node(proc_name_cache, i)->val);
 		mh_i64ptr_delete(proc_name_cache);
 	}
 };
@@ -73,14 +72,8 @@ proc_name_cache_find(void *ip, uintptr_t *offs)
 void
 proc_name_cache_insert(void *ip, const char *name, uintptr_t offs)
 {
-	region *proc_name_cache_entry_region =
-		&ProcNameCache::instance().proc_name_cache_entry_region;
-	size_t sz;
-	proc_name_cache_entry *entry =
-		region_alloc_object(proc_name_cache_entry_region,
-				    typeof(*entry), &sz);
-	if (unlikely(entry == nullptr))
-		return;
+	auto entry = static_cast<proc_name_cache_entry *>(xmalloc(
+		sizeof(proc_name_cache_entry)));
 	entry->offset = offs;
 	strlcpy(entry->name, name, PROC_NAME_MAX);
 	mh_i64ptr_node_t node = {(uintptr_t)ip, entry};
