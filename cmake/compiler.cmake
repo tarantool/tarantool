@@ -148,8 +148,9 @@ check_c_source_compiles(
 set(ENABLE_BACKTRACE_DEFAULT OFF)
 # Disabled backtraces support on FreeBSD by default, because of
 # gh-4278.
-if(NOT TARGET_OS_FREEBSD AND HAVE_FORCE_ALIGN_ARG_POINTER_ATTR
-    AND HAVE_CFI_ASM)
+# Disabled backtraces support on AArch64 Linux by default, because of gh-8791.
+if(NOT TARGET_OS_FREEBSD AND HAVE_FORCE_ALIGN_ARG_POINTER_ATTR AND HAVE_CFI_ASM
+        AND NOT (TARGET_OS_LINUX AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64"))
     set(ENABLE_BACKTRACE_DEFAULT ON)
 endif()
 
