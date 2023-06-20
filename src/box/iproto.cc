@@ -2735,8 +2735,9 @@ net_end_join(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
+	struct ibuf *ibuf = msg->p_ibuf;
 
-	msg->p_ibuf->rpos += msg->len;
+	ibuf->rpos += msg->len;
 	iproto_msg_delete(msg);
 
 	assert(! ev_is_active(&con->input));
@@ -2744,7 +2745,7 @@ net_end_join(struct cmsg *m)
 	 * Enqueue any messages if they are in the readahead
 	 * queue. Will simply start input otherwise.
 	 */
-	if (iproto_enqueue_batch(con, msg->p_ibuf) != 0)
+	if (iproto_enqueue_batch(con, ibuf) != 0)
 		iproto_connection_close(con);
 }
 
