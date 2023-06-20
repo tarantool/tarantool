@@ -574,6 +574,11 @@ create_unit_test(PREFIX tuple_builder
                  LIBRARIES unit box core
 )
 
+create_unit_test(PREFIX tuple_format
+                 SOURCES tuple_format.c box_test_utils.c
+                 LIBRARIES unit box core
+)
+
 create_unit_test(PREFIX getenv_safe
                  SOURCES getenv_safe.c core_test_utils.c
                  LIBRARIES unit core

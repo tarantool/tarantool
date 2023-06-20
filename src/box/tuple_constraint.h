@@ -164,6 +164,14 @@ tuple_constraint_cmp(const struct tuple_constraint *constr1,
 		     bool ignore_name);
 
 /**
+ * Compute the tuple constraint's hash with `PMurHash32_Process` and return the
+ * size of the data processed.
+ */
+uint32_t
+tuple_constraint_hash_process(const struct tuple_constraint *constr,
+			      uint32_t *ph, uint32_t *pcarry);
+
+/**
  * Allocate a single memory block needed for given @a count of constraints by
  * given definitions @a def, including strings in them.
  * Fill the block with strings and construct constraints using new strings.
