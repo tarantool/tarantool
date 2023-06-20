@@ -81,6 +81,11 @@ tuple_format_cmp(const struct tuple_format *format1,
 {
 	struct tuple_format *a = (struct tuple_format *)format1;
 	struct tuple_format *b = (struct tuple_format *)format2;
+	/*
+	 * FIXME(gh-8099): We cannot compare MsgPack data of formats, since
+	 * formats of ephemeral spaces don't have MsgPack data.
+	 */
+
 	if (a->exact_field_count != b->exact_field_count)
 		return a->exact_field_count - b->exact_field_count;
 	if (a->total_field_count != b->total_field_count)
@@ -111,12 +116,44 @@ tuple_format_cmp(const struct tuple_format *format1,
 		if (field_a->is_key_part != field_b->is_key_part)
 			return (int)field_a->is_key_part -
 				(int)field_b->is_key_part;
-		/*
-		 * Format comparison is used for non-space formats only,
-		 * so there must be no constraints in both formats.
-		 */
-		assert(field_a->constraint_count == 0);
-		assert(field_b->constraint_count == 0);
+		if (field_a->sql_default_value_expr !=
+		    field_b->sql_default_value_expr) {
+			/*
+			 * We cannot compare SQL expression ASTs, so as a
+			 * workaround we compare pointers (which are actually
+			 * never equal): since we need to provide some total
+			 * order, we compare pointer values.
+			 */
+			uintptr_t ptr_a =
+				(uintptr_t)field_a->sql_default_value_expr;
+			uintptr_t ptr_b =
+				(uintptr_t)field_b->sql_default_value_expr;
+			intptr_t cmp = (intptr_t)(ptr_a - ptr_b);
+			return cmp < 0 ? -1 : 1;
+		}
+		if (field_a->compression_type != field_b->compression_type)
+			return (int)field_a->compression_type -
+			       (int)field_b->compression_type;
+		if (field_a->constraint_count != field_b->constraint_count)
+			return (int)field_a->constraint_count -
+			       (int)field_b->constraint_count;
+		for (uint32_t i = 0; i < field_a->constraint_count; ++i) {
+			int cmp = tuple_constraint_cmp(&field_a->constraint[i],
+						       &field_b->constraint[i],
+						       false);
+			if (cmp != 0)
+				return cmp;
+		}
+		if (field_a->default_value_size != field_b->default_value_size)
+			return (int)field_a->default_value_size -
+			       (int)field_b->default_value_size;
+		if (field_a->default_value_size != 0) {
+			int cmp = memcmp(field_a->default_value,
+					 field_b->default_value,
+					 field_a->default_value_size);
+			if (cmp != 0)
+				return cmp;
+		}
 	}
 
 	return tuple_dictionary_cmp(format1->dict, format2->dict);
@@ -140,11 +177,15 @@ tuple_format_hash(struct tuple_format *format)
 		TUPLE_FIELD_MEMBER_HASH(f, coll_id, h, carry, size)
 		TUPLE_FIELD_MEMBER_HASH(f, nullable_action, h, carry, size)
 		TUPLE_FIELD_MEMBER_HASH(f, is_key_part, h, carry, size)
-		/*
-		 * We could calculate hash sum of constraints, but on the other
-		 * hand the hash is used only for non-space formats which are
-		 * never has constraints.
-		 */
+		TUPLE_FIELD_MEMBER_HASH(f, sql_default_value_expr, h, carry,
+					size)
+		TUPLE_FIELD_MEMBER_HASH(f, compression_type, h, carry, size);
+		for (uint32_t i = 0; i < f->constraint_count; ++i)
+			size += tuple_constraint_hash_process(&f->constraint[i],
+							      &h, &carry);
+		PMurHash32_Process(&h, &carry, f->default_value,
+				   (int)f->default_value_size);
+		size += f->default_value_size;
 	}
 #undef TUPLE_FIELD_MEMBER_HASH
 	size += tuple_dictionary_hash_process(format->dict, &h, &carry);

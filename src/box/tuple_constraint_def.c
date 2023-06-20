@@ -14,6 +14,8 @@
 #include "small/region.h"
 #include "msgpuck.h"
 
+#include <PMurHash.h>
+
 const char *tuple_constraint_type_strs[] = {
 	/* [CONSTR_FUNC]        = */ "constraint",
 	/* [CONSTR_FKEY]        = */ "foreign_key",
@@ -83,6 +85,69 @@ tuple_constraint_def_cmp(const struct tuple_constraint_def *def1,
 	assert(def1->type == CONSTR_FKEY);
 	return tuple_constraint_def_cmp_fkey(&def1->fkey, &def2->fkey);
 }
+
+#define CONSTRAINT_DEF_MEMBER_HASH(member)				   \
+do {									   \
+	PMurHash32_Process(ph, pcarry, &def->member, sizeof(def->member)); \
+	size += sizeof(def->member);					   \
+} while (0)
+
+/**
+ * Compute the field identifier's hash with `PMurHash32_Process` and return the
+ * size of the data processed.
+ */
+static uint32_t
+field_id_hash_process(const struct tuple_constraint_field_id *def,
+		      uint32_t *ph, uint32_t *pcarry)
+{
+	uint32_t size = 0;
+	CONSTRAINT_DEF_MEMBER_HASH(id);
+	PMurHash32_Process(ph, pcarry, def->name, (int)def->name_len);
+	size += def->name_len;
+	return size;
+}
+
+/**
+ * Compute the foreign key definition's hash with `PMurHash32_Process` and
+ * return the size of the data processed.
+ */
+static uint32_t
+tuple_constraint_def_hash_fkey_process(
+	const struct tuple_constraint_fkey_def *def,
+	uint32_t *ph, uint32_t *pcarry)
+{
+	uint32_t size = 0;
+	CONSTRAINT_DEF_MEMBER_HASH(space_id);
+	if (def->field_mapping_size == 0)
+		return size + field_id_hash_process(&def->field, ph, pcarry);
+
+	for (uint32_t i = 0; i < def->field_mapping_size; ++i) {
+		size += field_id_hash_process(
+			&def->field_mapping[i].local_field, ph, pcarry);
+		size += field_id_hash_process(
+			&def->field_mapping[i].foreign_field, ph, pcarry);
+	}
+	return size;
+}
+
+uint32_t
+tuple_constraint_def_hash_process(const struct tuple_constraint_def *def,
+				  uint32_t *ph, uint32_t *pcarry)
+{
+	uint32_t size = 0;
+	PMurHash32_Process(ph, pcarry, def->name, (int)def->name_len);
+	size += def->name_len;
+	CONSTRAINT_DEF_MEMBER_HASH(type);
+	if (def->type == CONSTR_FUNC) {
+		CONSTRAINT_DEF_MEMBER_HASH(func.id);
+		return size;
+	}
+	assert(def->type == CONSTR_FKEY);
+	return size +
+	       tuple_constraint_def_hash_fkey_process(&def->fkey, ph, pcarry);
+}
+
+#undef CONSTRAINT_DEF_MEMBER_HASH
 
 int
 tuple_constraint_def_decode(const char **data,

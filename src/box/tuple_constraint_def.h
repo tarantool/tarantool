@@ -104,6 +104,14 @@ tuple_constraint_def_cmp(const struct tuple_constraint_def *def1,
 			 bool ignore_name);
 
 /**
+ * Compute the tuple constraint definition's hash with `PMurHash32_Process` and
+ * return the size of the data processed.
+ */
+uint32_t
+tuple_constraint_def_hash_process(const struct tuple_constraint_def *def,
+				  uint32_t *ph, uint32_t *pcarry);
+
+/**
  * Parse constraint array from msgpack @a *data with the following format:
  * {constraint_name=function_name,...}
  * Allocate a temporary constraint array on @a region and save it in @a def.

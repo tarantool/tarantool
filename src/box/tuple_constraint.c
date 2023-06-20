@@ -35,6 +35,13 @@ tuple_constraint_cmp(const struct tuple_constraint *constr1,
 					ignore_name);
 }
 
+uint32_t
+tuple_constraint_hash_process(const struct tuple_constraint *constr,
+			      uint32_t *ph, uint32_t *pcarry)
+{
+	return tuple_constraint_def_hash_process(&constr->def, ph, pcarry);
+}
+
 struct tuple_constraint *
 tuple_constraint_array_new(const struct tuple_constraint_def *defs,
 			   size_t count)
