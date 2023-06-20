@@ -987,11 +987,11 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	if (index_size(pk) == 0)
 		return 0;
 
-	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
-	if (it == NULL)
+	if (txn_check_singlestatement(txn, "space format check") != 0)
 		return -1;
 
-	if (txn_check_singlestatement(txn, "space format check") != 0)
+	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
+	if (it == NULL)
 		return -1;
 
 	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
@@ -1237,6 +1237,9 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		return -1;
 	}
 
+	if (txn_check_singlestatement(txn, "index build") != 0)
+		return -1;
+
 	/* Now deal with any kind of add index during normal operation. */
 	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
 	if (it == NULL)
@@ -1249,9 +1252,6 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	 * build will not work properly if primary key is HASH index.
 	 */
 	bool can_yield = pk->def->type != HASH;
-
-	if (txn_check_singlestatement(txn, "index build") != 0)
-		return -1;
 
 	struct memtx_engine *memtx = (struct memtx_engine *)src_space->engine;
 	struct memtx_ddl_state state;
