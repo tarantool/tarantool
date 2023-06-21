@@ -27,7 +27,6 @@ build() {
     fi
 
     cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DENABLE_BACKTRACE:BOOL=ON \
           -DENABLE_DIST:BOOL=ON \
           -DLUAJIT_DISABLE_SYSPROF:BOOL=ON \
           -DLUAJIT_ENABLE_GC64:BOOL=${GC64:-OFF} \
