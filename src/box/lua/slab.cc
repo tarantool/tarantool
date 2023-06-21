@@ -202,7 +202,7 @@ lbox_slab_info(struct lua_State *L)
 	lua_settable(L, -3);
 
 	ratio = 100 * ((double) (stats.small.used + index_stats.totals.used)
-		       / (double) arena_size);
+		       / (double)(arena_size + 1));
 	snprintf(ratio_buf, sizeof(ratio_buf), "%0.1lf%%", ratio);
 
 	lua_pushstring(L, "arena_used_ratio");
@@ -271,7 +271,7 @@ lbox_runtime_info(struct lua_State *L)
 static int
 lbox_slab_check(MAYBE_UNUSED struct lua_State *L)
 {
-	slab_cache_check(SmallAlloc::get_alloc()->cache);
+	small_alloc_check(SmallAlloc::get_alloc());
 	return 0;
 }
 
