@@ -176,7 +176,7 @@ encode_node(yaml_emitter_t *emitter, const char **data)
 		str = *data;
 		*data += len;
 		style = YAML_ANY_SCALAR_STYLE;
-		binlen = base64_bufsize(len, 0);
+		binlen = base64_encode_bufsize(len, 0);
 		bin = (char *) malloc(binlen);
 		if (bin == NULL) {
 			diag_set(OutOfMemory, binlen, "malloc",

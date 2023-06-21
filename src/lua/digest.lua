@@ -17,8 +17,9 @@ ffi.cdef[[
     extern crc32_func crc32_calc;
 
     /* base64 */
-    int base64_bufsize(int binsize, int options);
+    int base64_decode_bufsize(int base64_len);
     int base64_decode(const char *in_base64, int in_len, char *out_bin, int out_len);
+    int base64_encode_bufsize(int bin_len, int options);
     int base64_encode(const char *in_bin, int in_len, char *out_base64, int out_len, int options);
 
     /* random */
@@ -217,7 +218,7 @@ local m = {
             end
         end
         local blen = #bin
-        local slen = builtin.base64_bufsize(blen, mask)
+        local slen = builtin.base64_encode_bufsize(blen, mask)
         local ibuf = cord_ibuf_take()
         local str = ibuf:alloc(slen)
         local len = builtin.base64_encode(bin, blen, str, slen, mask)
@@ -231,7 +232,7 @@ local m = {
             error('Usage: digest.base64_decode(string)')
         end
         local slen = #str
-        local blen = math.ceil(slen * 3 / 4)
+        local blen = builtin.base64_decode_bufsize(slen);
         local ibuf = cord_ibuf_take()
         local bin = ibuf:alloc(blen)
         local len = builtin.base64_decode(str, slen, bin, blen)

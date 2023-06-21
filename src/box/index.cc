@@ -672,7 +672,7 @@ size_t
 iterator_position_pack_bufsize(const char *pos, const char *pos_end)
 {
 	assert(pos != NULL);
-	return base64_bufsize(pos_end - pos, ITERATOR_POS_B64_OPTS);
+	return base64_encode_bufsize(pos_end - pos, ITERATOR_POS_B64_OPTS);
 }
 
 void
@@ -699,8 +699,7 @@ iterator_position_unpack_bufsize(const char *packed_pos,
 	assert(packed_pos != NULL);
 	assert(packed_pos_end != NULL);
 	assert(packed_pos < packed_pos_end);
-	/* See description of base64_decode. */
-	return 3 * (packed_pos_end - packed_pos) / 4 + 1;
+	return base64_decode_bufsize(packed_pos_end - packed_pos);
 }
 
 int
