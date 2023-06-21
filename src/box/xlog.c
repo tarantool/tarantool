@@ -1065,7 +1065,7 @@ xlog_tx_write_plain(struct xlog *log)
 	 * now populate it with data.
 	 */
 	char *fixheader = (char *)log->obuf.iov[0].iov_base;
-	*(log_magic_t *)fixheader = row_marker;
+	memcpy(fixheader, &row_marker, sizeof(log_magic_t));
 	char *data = fixheader + sizeof(log_magic_t);
 
 	data = mp_encode_uint(data,
@@ -1168,7 +1168,7 @@ xlog_tx_write_zstd(struct xlog *log)
 		offset = 0;
 	}
 
-	*(log_magic_t *)fixheader = zrow_marker;
+	memcpy(fixheader, &zrow_marker, sizeof(log_magic_t));
 	char *data;
 	data = fixheader + sizeof(log_magic_t);
 	data = mp_encode_uint(data,

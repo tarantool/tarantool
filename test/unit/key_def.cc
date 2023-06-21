@@ -97,8 +97,11 @@ test_key_def_new_va(const char *format, va_list ap, bool for_func_index)
 	/* Decode the key parts. */
 	const char *parts = mp_buf;
 	uint32_t part_count = mp_decode_array(&parts);
-	struct key_part_def *part_def = (struct key_part_def *)region_alloc(
-		region, sizeof(*part_def) * part_count);
+	size_t stub;
+	struct key_part_def *part_def =
+		(struct key_part_def *)region_alloc_array(region,
+							  struct key_part_def,
+							  part_count, &stub);
 	fail_if(part_def == NULL);
 	fail_if(key_def_decode_parts(part_def, part_count, &parts,
 				     /*fields=*/NULL, /*field_count=*/0,
