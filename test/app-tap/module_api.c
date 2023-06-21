@@ -181,48 +181,50 @@ test_checkint64(lua_State *L)
 	return 1;
 }
 
+/* {{{ Helpers for `box_ibuf` C API test cases */
+
 static int
 test_box_ibuf(lua_State *L)
 {
-	struct slab_cache *slabc = cord_slab_cache();
-	fail_unless(slabc != NULL);
-	box_ibuf_t ibuf;
+	box_ibuf_t *ibuf;
+	ibuf = luaT_toibuf(L, -1);
 
-	ibuf_create(&ibuf, slabc, 16320);
-	fail_unless(ibuf_used(&ibuf) == 0);
-	void *ptr = box_ibuf_reserve(&ibuf, 65536);
+	fail_unless(ibuf_used(ibuf) == 0);
+	void *ptr = box_ibuf_reserve(ibuf, 65536);
 	fail_unless(ptr != NULL);
 	char **rpos;
 	char **wpos;
-	box_ibuf_read_range(&ibuf, &rpos, &wpos);
+	box_ibuf_read_range(ibuf, &rpos, &wpos);
 
-	ptr = ibuf_alloc(&ibuf, 10);
+	ptr = ibuf_alloc(ibuf, 10);
 	fail_unless(ptr != NULL);
 
-	fail_unless(ibuf_used(&ibuf) == 10);
+	fail_unless(ibuf_used(ibuf) == 10);
 	fail_unless((*wpos - *rpos) == 10);
 
 	/* let be a little bit paranoid and double check */
-	box_ibuf_read_range(&ibuf, &rpos, &wpos);
+	box_ibuf_read_range(ibuf, &rpos, &wpos);
 	fail_unless((*wpos - *rpos) == 10);
 
-	ptr = ibuf_alloc(&ibuf, 10000);
+	ptr = ibuf_alloc(ibuf, 10000);
 	fail_unless(ptr != NULL);
-	fail_unless(ibuf_used(&ibuf) == 10010);
+	fail_unless(ibuf_used(ibuf) == 10010);
 	fail_unless((*wpos - *rpos) == 10010);
 
-	size_t unused = ibuf_unused(&ibuf);
+	size_t unused = ibuf_unused(ibuf);
 	char **end;
-	box_ibuf_write_range(&ibuf, &wpos, &end);
+	box_ibuf_write_range(ibuf, &wpos, &end);
 	fail_unless((*end - *wpos) == (ptrdiff_t)unused);
 
-	ibuf_reset(&ibuf);
-	fail_unless(ibuf_used(&ibuf) == 0);
+	ibuf_reset(ibuf);
+	fail_unless(ibuf_used(ibuf) == 0);
 	fail_unless(*rpos == *wpos);
 
 	lua_pushboolean(L, 1);
 	return 1;
 }
+
+/* }}} Helpers for `box_ibuf` C API test cases */
 
 static int
 test_toibuf(lua_State *L)
@@ -331,19 +333,6 @@ test_fiber_set_ctx(lua_State *L)
 	fiber_wakeup(fiber);
 	int ret = fiber_join(fiber);
 	lua_pushboolean(L, (int)(ret == 0 && (strcmp(&data[0], "ok") == 0)));
-	return 1;
-}
-
-static int
-test_cord(lua_State *L)
-{
-	struct slab_cache *slabc = cord_slab_cache();
-	fail_unless(slabc != NULL);
-	struct ibuf ibuf;
-	ibuf_create(&ibuf, slabc, 16320);
-	ibuf_destroy(&ibuf);
-
-	lua_pushboolean(L, 1);
 	return 1;
 }
 
@@ -3172,7 +3161,6 @@ luaopen_module_api(lua_State *L)
 		{"test_toint64", test_toint64 },
 		{"test_fiber", test_fiber },
 		{"test_fiber_set_ctx", test_fiber_set_ctx },
-		{"test_cord", test_cord },
 		{"pushcdata", test_pushcdata },
 		{"checkcdata", test_checkcdata },
 		{"test_clock", test_clock },
@@ -3195,7 +3183,7 @@ luaopen_module_api(lua_State *L)
 		{"test_key_def_merge", test_key_def_merge},
 		{"test_key_def_extract_key", test_key_def_extract_key},
 		{"test_key_def_validate_key", test_key_def_validate_key},
-		{"test_box_ibuf", test_box_ibuf},
+		{"box_ibuf", test_box_ibuf},
 		{"tuple_validate_def", test_tuple_validate_default},
 		{"tuple_validate_fmt", test_tuple_validate_formatted},
 		{"test_key_def_dup", test_key_def_dup},

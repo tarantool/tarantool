@@ -663,8 +663,15 @@ local function test_box_iproto_override(test, module)
     module.box_iproto_override_reset(box.iproto.type.PING)
 end
 
+-- Wrapper for passing an `ibuf` to the `box_ibuf` C API test.
+local function test_box_ibuf(test, module)
+    test:plan(1)
+
+    test:ok(module.box_ibuf(require('buffer').ibuf()), "box_ibuf API")
+end
+
 require('tap').test("module_api", function(test)
-    test:plan(49)
+    test:plan(48)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -701,6 +708,7 @@ require('tap').test("module_api", function(test)
     test:test("box_session_id_matches", test_box_session_id_matches, module)
     test:test("box_iproto_send", test_box_iproto_send, module)
     test:test("box_iproto_override", test_box_iproto_override, module)
+    test:test("box_ibuf", test_box_ibuf, module)
 
     space:drop()
 end)

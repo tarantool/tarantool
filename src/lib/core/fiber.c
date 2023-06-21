@@ -1983,12 +1983,6 @@ cord_is_main(void)
 	return cord() == &main_cord;
 }
 
-struct slab_cache *
-cord_slab_cache(void)
-{
-	return &cord()->slabc;
-}
-
 void
 cord_cancel_and_join(struct cord *cord)
 {
