@@ -46,13 +46,12 @@ extern "C" {
 #include <lj_state.h>
 
 #include "yaml.h"
-#include "b64.h"
 } /* extern "C" */
+
+#include "base64.h"
 #include "lua/utils.h"
 #include "lua/serializer.h"
 #include "lib/core/decimal.h"
-#include "diag.h"
-#include "tt_static.h"
 #include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
 #include "tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
 #include "tweaks.h"
@@ -279,7 +278,11 @@ static void load_scalar(struct lua_yaml_loader *loader) {
          lua_pushboolean(loader->L, value);
          return;
       } else if (!strcmp(tag, "binary")) {
-         frombase64(loader->L, (const unsigned char *)str, length);
+         int bufsize = base64_decode_bufsize(length);
+         char *buf = (char *)xmalloc(bufsize);
+         int size = base64_decode(str, length, buf, bufsize);
+         lua_pushlstring(loader->L, buf, size);
+         free(buf);
          return;
       }
    }
@@ -669,7 +672,8 @@ static int dump_node(struct lua_yaml_dumper *dumper)
    case MP_MAP:
       return dump_table(dumper, &field, anchor);
    case MP_STR:
-      str = lua_tolstring(dumper->L, -1, &len);
+      str = field.sval.data;
+      len = field.sval.len;
       if (yaml_is_null(str, len) || yaml_is_bool(str, len, &unused) ||
           lua_isnumber(dumper->L, -1)) {
          /*
@@ -694,8 +698,10 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       break;
    case MP_BIN:
       is_binary = 1;
-      tobase64(dumper->L, -1);
-      str = lua_tolstring(dumper->L, -1, &len);
+      len = base64_encode_bufsize(field.sval.len, BASE64_NOWRAP);
+      str = (char *)xmalloc(len);
+      len = base64_encode(field.sval.data, field.sval.len, (char *)str, len,
+                          BASE64_NOWRAP);
       tag = (yaml_char_t *) LUAYAML_TAG_PREFIX "binary";
       break;
    case MP_BOOL:
@@ -740,15 +746,16 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       break;
     }
 
+   int rc = 1;
    if (!yaml_scalar_event_initialize(&ev, NULL, tag, (unsigned char *)str, len,
                                      !is_binary, !is_binary, style) ||
        !yaml_emitter_emit(&dumper->emitter, &ev))
-      return 0;
+      rc = 0;
 
    if (is_binary)
-      lua_pop(dumper->L, 1);
+      free((void *)str);
 
-   return 1;
+   return rc;
 }
 
 static void dump_document(struct lua_yaml_dumper *dumper) {

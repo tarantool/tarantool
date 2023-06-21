@@ -41,8 +41,6 @@
 #include "mp_extension_types.h"
 #include "tt_uuid.h"
 
-#include "lua-yaml/b64.h"
-
 #include "serialize_lua.h"
 
 #if 0
@@ -814,14 +812,10 @@ dump_node(struct lua_dumper *d, struct node *nd, int indent)
 		str = buf;
 		break;
 	case MP_STR:
-		nd->mask |= NODE_QUOTE;
-		str = lua_tolstring(d->L, -1, &len);
-		break;
 	case MP_BIN:
 		nd->mask |= NODE_QUOTE;
-		tobase64(d->L, -1);
-		str = lua_tolstring(d->L, -1, &len);
-		lua_pop(d->L, 1);
+		str = field->sval.data;
+		len = field->sval.len;
 		break;
 	case MP_ARRAY:
 		dump_array(d, nd, indent);
