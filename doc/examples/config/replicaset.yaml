@@ -1,0 +1,28 @@
+credentials:
+  users:
+    replicator:
+      password:
+        plain: 'topsecret'
+      roles: [replication]
+    client:
+      password:
+        plain: 'secret'
+      roles: [super]
+
+iproto:
+  listen: 'unix/:./{{ instance_name }}.iproto'
+  advertise: 'replicator:topsecret@unix/:./{{ instance_name }}.iproto'
+
+log:
+ to: file
+
+groups:
+  group-001:
+    replicasets:
+      replicaset-001:
+        instances:
+          instance-001:
+            database:
+              rw: true
+          instance-002: {}
+          instance-003: {}

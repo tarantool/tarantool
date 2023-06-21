@@ -1,0 +1,9 @@
+config:
+  etcd:
+    prefix: /foo
+    endpoints:
+    - http://localhost:2379
+
+iproto:
+  listen: 'unix/:./{{ instance_name }}.iproto'
+  advertise: 'replicator:topsecret@unix/:./{{ instance_name }}.iproto'

@@ -1,3 +1,5 @@
+local yaml = require('yaml')
+local fio = require('fio')
 local t = require('luatest')
 local cluster_config = require('internal.config.cluster_config')
 
@@ -207,4 +209,20 @@ g.test_defaults = function()
     }
     local res = cluster_config:apply_default({})
     t.assert_equals(res, exp)
+end
+
+g.test_example_single = function()
+    local config_file = fio.abspath('doc/examples/config/single.yaml')
+    local fh = fio.open(config_file, {'O_RDONLY'})
+    local config = yaml.decode(fh:read())
+    fh:close()
+    cluster_config:validate(config)
+end
+
+g.test_example_replicaset = function()
+    local config_file = fio.abspath('doc/examples/config/replicaset.yaml')
+    local fh = fio.open(config_file, {'O_RDONLY'})
+    local config = yaml.decode(fh:read())
+    fh:close()
+    cluster_config:validate(config)
 end
