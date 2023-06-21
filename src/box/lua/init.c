@@ -136,6 +136,7 @@ extern char session_lua[],
 	metrics_version_lua[],
 	/* {{{ config */
 	config_cluster_config_lua[],
+	config_configdata_lua[],
 	config_instance_config_lua[],
 	config_utils_log_lua[],
 	config_utils_schema_lua[];
@@ -281,6 +282,20 @@ static const char *lua_sources[] = {
 
 	/* {{{ config */
 
+	/*
+	 * The order is important: we should load base modules
+	 * first and then load ones that use them. Otherwise the
+	 * require() call fails.
+	 *
+	 * General speaking the order here is the following:
+	 *
+	 * - utility functions
+	 * - parts of the general logic
+	 * - configuration sources
+	 * - configuration appliers
+	 * - the entrypoint
+	 */
+
 	"config/utils/log",
 	"internal.config.utils.log",
 	config_utils_log_lua,
@@ -296,6 +311,10 @@ static const char *lua_sources[] = {
 	"config/cluster_config",
 	"internal.config.cluster_config",
 	config_cluster_config_lua,
+
+	"config/configdata",
+	"internal.config.configdata",
+	config_configdata_lua,
 
 	/* }}} config */
 
