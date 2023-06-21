@@ -425,14 +425,6 @@ fiber_clock64(void);
 API_EXPORT void
 fiber_reschedule(void);
 
-struct slab_cache;
-
-/**
- * Return slab_cache suitable to use with tarantool/small library
- */
-API_EXPORT struct slab_cache *
-cord_slab_cache(void);
-
 /**
  * box region allocator
  *
@@ -909,6 +901,15 @@ cord_collect_garbage(struct cord *cord);
  */
 void
 cord_cancel_and_join(struct cord *cord);
+
+/**
+ * Return slab_cache suitable to use with tarantool/small library
+ */
+static inline struct slab_cache *
+cord_slab_cache(void)
+{
+	return &cord()->slabc;
+}
 
 /**
  * @brief Create a new system fiber.
