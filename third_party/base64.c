@@ -37,8 +37,21 @@
 
 /* {{{ encode */
 
-extern inline int
-base64_bufsize(int binsize, int options);
+int
+base64_encode_bufsize(int bin_len, int options)
+{
+	int base64_len = bin_len * 4 / 3;
+	if ((options & BASE64_NOWRAP) == 0) {
+		/* Account '\n' symbols. */
+		base64_len += ((base64_len + BASE64_CHARS_PER_LINE - 1)/
+			       BASE64_CHARS_PER_LINE);
+	} else if (bin_len % 3 != 0) {
+		base64_len++;
+	}
+	if ((options & BASE64_NOPAD) == 0)
+		base64_len += 4;
+	return base64_len;
+}
 
 enum base64_encodestep { step_A, step_B, step_C };
 
@@ -201,6 +214,12 @@ base64_encode(const char *in_bin, int in_len,
 /* }}} */
 
 /* {{{ decode */
+
+int
+base64_decode_bufsize(int base64_len)
+{
+	return 3 * base64_len / 4 + 1;
+}
 
 static int
 base64_decode_value(int value)

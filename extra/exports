@@ -9,9 +9,10 @@
 #
 # To sort symbols use `LC_COLLATE="C" sort -f`.
 
-base64_bufsize
 base64_decode
+base64_decode_bufsize
 base64_encode
+base64_encode_bufsize
 box_dd_version_id
 box_decimal_abs
 box_decimal_add

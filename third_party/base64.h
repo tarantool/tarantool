@@ -52,39 +52,43 @@ enum base64_options {
 	BASE64_URLSAFE = 7, /* 1 1 1 */
 };
 
-inline int
-base64_bufsize(int binsize, int options)
-{
-	int datasize = binsize * 4/3;
-	if ((options & BASE64_NOWRAP) == 0) {
-		/* Account '\n' symbols. */
-		datasize += ((datasize + BASE64_CHARS_PER_LINE - 1)/
-			     BASE64_CHARS_PER_LINE);
-	} else if (binsize % 3 != 0) {
-		datasize++;
-	}
-	if ((options & BASE64_NOPAD) == 0)
-		datasize += 4;
-	return datasize;
-}
+/**
+ * Size of a buffer needed to encode a binary into BASE64 text.
+ *
+ * @param[in]  bin_len          size of the input
+ * @param[in]  options          encoder options, see base64_options
+ *
+ * @return the max size of encoded output
+ */
+int
+base64_encode_bufsize(int bin_len, int options);
 
 /**
  * Encode a binary stream into BASE64 text.
  *
- * @pre the buffer size is at least 4/3 of the stream
- * size + stream_size/72 (newlines) + 4
- *
  * @param[in]  in_bin           the binary input stream to decode
  * @param[in]  in_len		size of the input
  * @param[out] out_base64       output buffer for the encoded data
- * @param[in]  out_len          buffer size, must be at least
- *				4/3 of the input size
+ * @param[in]  out_len          buffer size
+ * @param[in]  options          encoder options, see base64_options
+ *
+ * @pre the buffer size must be >= base64_encode_bufsize(in_len, options)
  *
  * @return the size of encoded output
  */
 int
 base64_encode(const char *in_bin, int in_len,
 	      char *out_base64, int out_len, int options);
+
+/**
+ * Size of a buffer needed to decode a BASE64 text.
+ *
+ * @param[in]  base64_len       size of the input
+ *
+ * @return the max size of decoded output
+ */
+int
+base64_decode_bufsize(int base64_len);
 
 /**
  * Decode a BASE64 text into a binary
@@ -94,8 +98,7 @@ base64_encode(const char *in_bin, int in_len,
  * @param[out] out_bin		output buffer size
  * @param[in]  out_len		buffer size
  *
- * @pre the output buffer size must be at least
- * 3/4 + 1 of the size of the input
+ * @pre buffer size must be >= base64_decode_bufsize(in_len)
  *
  * @return the size of decoded output
  */
