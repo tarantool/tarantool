@@ -1,10 +1,10 @@
 # Symbols exported by the main Tarantool executable.
 #
 # Keep the symbols sorted by name for search and addition
-# simplicity, to avoid duplicates. Makes no much sense to
-# split them into any sections. Anyway some symbols will
-# end-up belonging to several of them at once, and it
-# would require moving lines here when a symbol goes from
+# simplicity, to avoid duplicates. LuaJIT symbols are grouped
+# within a separate section. Others are not grouped at all since
+# some symbols will end-up belonging to several of them at once,
+# and it would require moving lines here when a symbol goes from
 # privately exported to the public C API.
 #
 # To sort symbols use `LC_COLLATE="C" sort -f`.
@@ -247,86 +247,19 @@ log_level
 log_level_flightrec
 log_pid
 log_write_flightrec_from_lua
-luaJIT_profile_dumpstack
-luaJIT_profile_start
-luaJIT_profile_stop
-luaJIT_setmode
-luaL_addlstring
-luaL_addstring
-luaL_addvalue
-luaL_argerror
-luaL_buffinit
-luaL_callmeta
 luaL_cdef
-luaL_checkany
 luaL_checkcdata
 luaL_checkint64
-luaL_checkinteger
-luaL_checklstring
-luaL_checknumber
-luaL_checkoption
-luaL_checkstack
-luaL_checktype
-luaL_checkudata
 luaL_checkuint64
 luaL_ctypeid
-luaL_error
-luaL_execresult
-luaL_fileresult
-luaL_findtable
-luaL_getmetafield
-luaL_gsub
 luaL_iscallable
 luaL_iscdata
-luaL_loadbuffer
-luaL_loadbufferx
-luaL_loadfile
-luaL_loadfilex
-luaL_loadstring
-luaL_newmetatable
-luaL_newstate
-luaL_openlib
-luaL_openlibs
-luaL_optinteger
-luaL_optlstring
-luaL_optnumber
-luaL_prepbuffer
 luaL_pushcdata
 luaL_pushint64
-luaL_pushmodule
-luaL_pushresult
 luaL_pushuint64
-luaL_ref
-luaL_register
 luaL_setcdatagc
-luaL_setfuncs
-luaL_setmetatable
-luaL_testudata
 luaL_toint64
 luaL_touint64
-luaL_traceback
-luaL_typerror
-luaL_unref
-luaL_where
-luaM_metrics
-luaM_sysprof_report
-luaM_sysprof_set_backtracer
-luaM_sysprof_set_on_stop
-luaM_sysprof_set_writer
-luaM_sysprof_start
-luaM_sysprof_stop
-luaopen_base
-luaopen_bit
-luaopen_debug
-luaopen_ffi
-luaopen_io
-luaopen_jit
-luaopen_math
-luaopen_misc
-luaopen_os
-luaopen_package
-luaopen_string
-luaopen_table
 luaT_call
 luaT_checktuple
 luaT_cpcall
@@ -341,88 +274,6 @@ luaT_toibuf
 luaT_tolstring
 luaT_tuple_encode
 luaT_tuple_new
-lua_atpanic
-lua_call
-lua_checkstack
-lua_close
-lua_concat
-lua_cpcall
-lua_createtable
-lua_dump
-lua_equal
-lua_error
-lua_gc
-lua_getallocf
-lua_getfenv
-lua_getfield
-lua_gethook
-lua_gethookcount
-lua_gethookmask
-lua_getinfo
-lua_getlocal
-lua_getmetatable
-lua_getstack
-lua_gettable
-lua_gettop
-lua_getupvalue
-lua_insert
-lua_iscfunction
-lua_isnumber
-lua_isstring
-lua_isuserdata
-lua_lessthan
-lua_load
-lua_loadx
-lua_newstate
-lua_newthread
-lua_newuserdata
-lua_next
-lua_objlen
-lua_pcall
-lua_pushboolean
-lua_pushcclosure
-lua_pushfstring
-lua_pushinteger
-lua_pushlightuserdata
-lua_pushlstring
-lua_pushnil
-lua_pushnumber
-lua_pushstring
-lua_pushthread
-lua_pushvalue
-lua_pushvfstring
-lua_rawequal
-lua_rawget
-lua_rawgeti
-lua_rawset
-lua_rawseti
-lua_remove
-lua_replace
-lua_resume
-lua_setallocf
-lua_setfenv
-lua_setfield
-lua_sethook
-lua_setlocal
-lua_setmetatable
-lua_settable
-lua_settop
-lua_setupvalue
-lua_status
-lua_toboolean
-lua_tocfunction
-lua_tointeger
-lua_tolstring
-lua_tonumber
-lua_topointer
-lua_tothread
-lua_touserdata
-lua_type
-lua_typename
-lua_upvalueid
-lua_upvaluejoin
-lua_xmove
-lua_yield
 memtx_tx_story_gc_step
 PMurHash32
 PMurHash32_Process
@@ -557,3 +408,267 @@ uuid_nil
 uuid_unpack
 _say
 _say_strerror
+
+# LuaJIT API {{{
+
+# Interfaces from the Lua 5.0 Reference Manual (i.e. Lua C API
+# function from lua.h). Mostly deprecated or substituted by
+# something new. Left only for compatibility.
+# XXX: Interfaces implemented via C macros are also listed below
+# only for consistency.
+# <lua_getgccount> is a macro to <lua_gc>
+# <lua_getregistry> is a macro to <lua_pushvalue>
+# <lua_open> is a macro to <luaL_newstate>
+# <lua_strlen> is a macro to <lua_objlen>
+
+# Auxiliary interfaces from the Lua 5.0 Reference Manual (i.e. Lua
+# auxiliary library functions from lauxlib.h). Mostly deprecated
+# or substituted by something new. Left only for compatibility.
+# XXX: Interfaces implemented via C macros are also listed below
+# only for consistency.
+# <luaL_putchar> is a macro to <luaL_addchar>
+
+# Interfaces to load particular Lua builtin module (i.e. Lua
+# library loaders from lualib.h). Use <lua_openlibs> in favor to
+# any of them.
+luaopen_base
+luaopen_debug
+luaopen_io
+luaopen_math
+luaopen_os
+luaopen_package
+luaopen_string
+luaopen_table
+
+# Interfaces from the Lua 5.1 Reference Manual (i.e. Lua C API
+# functions from lua.h).
+# XXX: Interfaces implemented via C macros are also listed below
+# only for consistency.
+lua_atpanic
+lua_call
+lua_checkstack
+lua_close
+lua_concat
+lua_cpcall
+lua_createtable
+lua_dump
+lua_equal
+lua_error
+lua_gc
+lua_getallocf
+lua_getfenv
+lua_getfield
+# <lua_getglobal> is a macro to <lua_getfield>.
+lua_gethook
+lua_gethookcount
+lua_gethookmask
+lua_getinfo
+lua_getlocal
+lua_getmetatable
+lua_getstack
+lua_gettable
+lua_gettop
+lua_getupvalue
+lua_insert
+# <lua_isboolean> is a macro to <lua_type>.
+lua_iscfunction
+# <lua_isfunction> is a macro to <lua_type>.
+# <lua_islightuserdata> is a macro to <lua_type>.
+# <lua_isnil> is a macro to <lua_type>.
+# <lua_isnone> is a macro to <lua_type>.
+# <lua_isnoneornil> is a macro to <lua_type>.
+lua_isnumber
+lua_isstring
+# <lua_istable> is a macro to <lua_type>.
+# <lua_isthread> is a macro to <lua_type>.
+lua_isuserdata
+lua_lessthan
+lua_load
+lua_newstate
+# <lua_newtable> is a macro to <lua_createtable>.
+lua_newthread
+lua_newuserdata
+lua_next
+lua_objlen
+lua_pcall
+# <lua_pop> is a macro to <lua_settop>.
+lua_pushboolean
+lua_pushcclosure
+# <lua_pushcfunction> is a macro to <lua_pushcclosure>.
+lua_pushfstring
+lua_pushinteger
+lua_pushlightuserdata
+# <lua_pushliteral> is a macro to <lua_pushlstring>.
+lua_pushlstring
+lua_pushnil
+lua_pushnumber
+lua_pushstring
+lua_pushthread
+lua_pushvalue
+lua_pushvfstring
+lua_rawequal
+lua_rawget
+lua_rawgeti
+lua_rawset
+lua_rawseti
+# <lua_register> is a macro to <lua_pushcfunction> + <lua_setglobal>.
+lua_remove
+lua_replace
+lua_resume
+lua_setallocf
+lua_setfenv
+lua_setfield
+# <lua_setglobal> is a macro to <lua_setfield>.
+lua_sethook
+lua_setlocal
+lua_setmetatable
+lua_settable
+lua_settop
+lua_setupvalue
+lua_status
+lua_toboolean
+lua_tocfunction
+lua_tointeger
+lua_tolstring
+lua_tonumber
+lua_topointer
+# <lua_tostring> is a macro to <lua_tolstring>.
+lua_tothread
+lua_touserdata
+lua_type
+lua_typename
+# <lua_upvalueindex> is a macro to LUA_GLOBALSINDEX.
+lua_xmove
+lua_yield
+
+# Auxiliary interfaces from the Lua 5.1 Reference Manual (i.e. Lua
+# auxiliary library functions from lauxlib.h).
+# XXX: Interfaces implemented via C macros are also listed below
+# only for consistency.
+# <luaL_addchar> is a macro.
+luaL_addlstring
+# <luaL_addsize> is a macro.
+luaL_addstring
+luaL_addvalue
+# <luaL_argcheck> is a macro to <luaL_argerror>.
+luaL_argerror
+luaL_buffinit
+luaL_callmeta
+luaL_checkany
+# <luaL_checkint> is a macro to <luaL_checkinteger>.
+luaL_checkinteger
+# <luaL_checklong> is a macro to <luaL_checkinteger>.
+luaL_checklstring
+luaL_checknumber
+luaL_checkoption
+luaL_checkstack
+# <luaL_checkstring> is a macro to <luaL_checklstring>.
+luaL_checktype
+luaL_checkudata
+# <luaL_dofile> is a macro to <luaL_loadfile> + <lua_pcall>.
+# <luaL_dostring> is a macro to <luaL_loadstring> + <lua_pcall>.
+luaL_error
+luaL_getmetafield
+# <luaL_getmetatable> is a macro to <lua_getfield> + LUA_REGISTRYINDEX.
+luaL_gsub
+luaL_loadbuffer
+luaL_loadfile
+luaL_loadstring
+luaL_newmetatable
+luaL_newstate
+luaL_openlibs
+# <luaL_optint> is a macro to <luaL_optinteger>.
+luaL_optinteger
+# <luaL_optlong> is a macro to <luaL_optinteger>.
+luaL_optlstring
+luaL_optnumber
+# <luaL_optstring> is a macro to <luaL_optlstring>.
+luaL_prepbuffer
+luaL_pushresult
+luaL_ref
+luaL_register
+# <luaL_typename> is a macro to <lua_typename>.
+luaL_typerror
+luaL_unref
+luaL_where
+
+# Interfaces from the Lua 5.2 Reference Manual (i.e. Lua C API
+# functions from lua.h).
+# XXX: Interfaces implemented via C macros are also listed below
+# only for consistency.
+lua_copy
+lua_loadx
+lua_tointegerx
+lua_tonumberx
+lua_upvalueid
+lua_upvaluejoin
+lua_version
+
+# Auxiliary interfaces from the Lua 5.2 Reference Manual (i.e. Lua
+# auxiliary library functions from lauxlib.h).
+# XXX: Interfaces implemented via C macros are also listed below
+# only for consistency.
+luaL_execresult
+luaL_fileresult
+luaL_loadbufferx
+luaL_loadfilex
+# <luaL_newlibtable> is a macro to <lua_createtable>.
+# <luaL_newlib> is a macro to <luaL_newlibtable> + <luaL_setfuncs>.
+# XXX: Interface to provide compatibility with old module system.
+# Not listed in Reference Manual, but is introduced in Lua 5.2.
+luaL_openlib
+# XXX: Interface to provide compatibility with old module system.
+# Not listed in Reference Manual, but is introduced in Lua 5.2.
+luaL_pushmodule
+luaL_setfuncs
+luaL_setmetatable
+luaL_testudata
+luaL_traceback
+
+# Interfaces from the Lua 5.3 Reference Manual (i.e. Lua C API
+# functions from lua.h).
+# XXX: Interfaces implemented via C macros are also listed below
+# only for consistency.
+lua_isyieldable
+
+# Auxiliary interfaces from the Lua 5.3 Reference Manual (i.e. Lua
+# auxiliary library functions from lauxlib.h).
+# XXX: Interfaces implemented via C macros are also listed below
+# only for consistency.
+# <luaL_opt> is a macro to <lua_isnoneornil>.
+
+# Interfaces provided by LuaJIT (i.e. public functions from
+# luajit.h).
+luaJIT_profile_dumpstack
+luaJIT_profile_start
+luaJIT_profile_stop
+luaJIT_setmode
+luaJIT_version_2_1_0_beta3
+
+# Auxiliary interfaces provided by LuaJIT (i.e. public
+# functions from lauxlib.h, which are neither listed in any Lua
+# Reference Manual, nor found in Lua source code).
+luaL_findtable
+
+# Interfaces to load particular LuaJIT builtin module (listed in
+# lualib.h for consistency). # Use <lua_openlibs> in favor to any
+# of them.
+luaopen_bit
+luaopen_ffi
+luaopen_jit
+
+# Interfaces provided by Tarantool LuaJIT fork (i.e. public
+# functions from lmisclib.h)
+luaM_metrics
+luaM_sysprof_report
+luaM_sysprof_set_backtracer
+luaM_sysprof_set_on_stop
+luaM_sysprof_set_writer
+luaM_sysprof_start
+luaM_sysprof_stop
+
+# Interface to load misc builtin module. Use <lua_openlibs> in
+# favor to it.
+luaopen_misc
+
+# }}} LuaJIT API
