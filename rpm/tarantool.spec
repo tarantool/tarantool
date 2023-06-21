@@ -61,20 +61,6 @@ Requires(preun): chkconfig
 Requires(preun): initscripts
 %endif
 
-# Enable backtraces everywhere, except ancient GCC versions, which
-# lack compiler features required for backtrace.
-%define __cc "%{getenv:CC}"
-%if %{__cc} == ""
-%define __cc "cc"
-%endif
-%if "%(printf '%%s\n' "5.3.0" "$(%{__cc} -dumpfullversion -dumpversion)" | sort -V | head -n1)" == "5.3.0"
-%bcond_without backtrace
-%else
-%bcond_with backtrace
-%endif
-%undefine __cc
-
-%if %{with backtrace}
 #
 # Disable stripping of /usr/bin/tarantool to allow the debug symbols
 # in runtime. Tarantool uses the debug symbols to display fiber's stack
@@ -84,7 +70,6 @@ Requires(preun): initscripts
 %global debug_package %{nil}
 %global __os_install_post /usr/lib/rpm/brp-compress %{nil}
 %global __strip /bin/true
-%endif
 
 # Set dependences for tests.
 BuildRequires: python3
@@ -177,11 +162,6 @@ C and Lua/C modules.
          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
          -DCMAKE_INSTALL_LOCALSTATEDIR:PATH=%{_localstatedir} \
          -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
-%if %{with backtrace}
-         -DENABLE_BACKTRACE:BOOL=ON \
-%else
-         -DENABLE_BACKTRACE:BOOL=OFF \
-%endif
 %if %{with systemd}
          -DWITH_SYSTEMD:BOOL=ON \
          -DSYSTEMD_UNIT_DIR:PATH=%{_unitdir} \
