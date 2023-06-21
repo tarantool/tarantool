@@ -116,7 +116,7 @@ main_f(va_list ap)
 
 	diag_clear(diag_get());
 
-	used_before = slabc->allocated.stats.used;
+	used_before = slab_cache_used(slabc);
 
 	fiber = fiber_new_ex("test_madvise", fiber_attr, noop_f);
 	ok(fiber != NULL, "fiber with custom stack");
@@ -130,7 +130,7 @@ main_f(va_list ap)
 	fiber_join(fiber);
 	inj->iparam = -1;
 
-	used_after = slabc->allocated.stats.used;
+	used_after = slab_cache_used(slabc);
 	ok(used_after > used_before, "expected leak detected");
 
 	cord_collect_garbage(cord());

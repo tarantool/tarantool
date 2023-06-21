@@ -216,7 +216,7 @@ fiber_stack_test()
 	 * Test a fiber with a custom stack size.
 	 */
 	int fiber_count = fiber_count_total();
-	size_t used1 = slabc->allocated.stats.used;
+	size_t used1 = slab_cache_used(slabc);
 	fiber_attr = fiber_attr_new();
 	fiber_attr_setstacksize(fiber_attr, default_attr.stack_size * 2);
 	stack_expand_limit = default_attr.stack_size * 3 / 2;
@@ -229,7 +229,7 @@ fiber_stack_test()
 	fiber_sleep(0);
 	cord_collect_garbage(cord());
 	fail_unless(fiber_count == fiber_count_total());
-	size_t used2 = slabc->allocated.stats.used;
+	size_t used2 = slab_cache_used(slabc);
 	fail_unless(used2 == used1);
 	note("big-stack fiber not crashed");
 
