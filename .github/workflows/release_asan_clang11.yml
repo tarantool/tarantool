@@ -50,6 +50,7 @@ jobs:
         with:
           version: 14
           cc: 0
+      - run: ls -la /usr/local/bin/
       - name: test
         env:
           CC: clang
