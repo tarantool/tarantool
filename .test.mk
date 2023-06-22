@@ -72,7 +72,6 @@ test-release: build run-luajit-test run-test
 # Release ASAN build
 
 .PHONY: test-release-asan
-test-release-asan: CMAKE_ENV = CC=clang CXX=clang++
 test-release-asan: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
                                   -DENABLE_WERROR=ON \
                                   -DENABLE_ASAN=ON \

@@ -33,7 +33,7 @@ jobs:
         ( github.event_name != 'pull_request' ||
           contains(github.event.pull_request.labels.*.name, 'full-ci') )
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04-self-hosted
 
     steps:
       - name: Prepare checkout
@@ -50,8 +50,10 @@ jobs:
         with:
           version: 16
           cc: 0
-      - run: ls -la /usr/local/bin/
       - name: test
+        env:
+          CC: clang-16
+          CXX: clang++-16
         run: make -f .test.mk test-release-asan
       - name: Send VK Teams message on failure
         if: failure()
