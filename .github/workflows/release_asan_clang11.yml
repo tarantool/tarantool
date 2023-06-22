@@ -53,8 +53,8 @@ jobs:
       - run: ls -la /usr/local/bin/
       - name: test
         env:
-          CC: clang
-          CXX: clang++
+          CC: clang-15
+          CXX: clang++-15
         run: make -f .test.mk test-release-asan
       - name: Send VK Teams message on failure
         if: failure()
