@@ -33,7 +33,7 @@ jobs:
         ( github.event_name != 'pull_request' ||
           contains(github.event.pull_request.labels.*.name, 'full-ci') )
 
-    runs-on: ubuntu-20.04-self-hosted
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Prepare checkout
