@@ -33,7 +33,7 @@ jobs:
         ( github.event_name != 'pull_request' ||
           contains(github.event.pull_request.labels.*.name, 'full-ci') )
 
-    runs-on: ubuntu-20.04-self-hosted
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Prepare checkout
@@ -48,7 +48,9 @@ jobs:
       - name: Set up Clang
         uses: egor-tensin/setup-clang@v1
         with:
-          version: 14
+          version: 16
+          cc: 0
+      - run: ls -la /usr/local/bin/
       - name: test
         run: make -f .test.mk test-release-asan
       - name: Send VK Teams message on failure

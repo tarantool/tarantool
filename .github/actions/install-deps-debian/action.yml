@@ -6,8 +6,8 @@ runs:
   using: composite
   steps:
     - run: |
-        apt-get --allow-releaseinfo-change update
-        apt-get -y -f install \
+        sudo apt-get --allow-releaseinfo-change update
+        sudo apt-get -y -f install \
           build-essential \
           ninja-build \
           cmake \
@@ -21,7 +21,7 @@ runs:
           libtool \
           snap snapd
 
-        luarocks install luacheck 0.26.1
-        gem install coveralls-lcov
-        snap install powershell --classic
+        sudo luarocks install luacheck 0.26.1
+        sudo gem install coveralls-lcov
+        sudo snap install powershell --classic
       shell: bash
