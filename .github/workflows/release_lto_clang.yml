@@ -1,4 +1,4 @@
-name: release_lto_clang11
+name: release_lto_clang
 
 on:
   push:
@@ -31,7 +31,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  release_lto_clang11:
+  release_lto_clang:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'full-ci' label is set.
     if: github.repository == 'tarantool/tarantool' &&
@@ -39,6 +39,19 @@ jobs:
           contains(github.event.pull_request.labels.*.name, 'full-ci') )
 
     runs-on: ubuntu-20.04-self-hosted
+
+    container:
+      image: docker.io/tarantool/testing:ubuntu-jammy-clang16
+      # Mount /dev to the container to be able to mount a disk image inside it
+      # for successful run of the .github/actions/environment action.
+      volumes:
+        - /dev:/dev
+      # Our testing expects that the init process (PID 1) will
+      # reap orphan processes. At least the following test leans
+      # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
+      # Add extra privileges to the container for successful run
+      # of the .github/actions/environment action.
+      options: '--init --privileged'
 
     steps:
       - name: Prepare checkout
@@ -52,8 +65,8 @@ jobs:
         uses: ./.github/actions/install-deps-debian
       - name: test
         env:
-          CC: clang-11
-          CXX: clang++-11
+          CC: clang-16
+          CXX: clang++-16
           CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
         run: make -f .test.mk test-release
       - name: Send VK Teams message on failure
