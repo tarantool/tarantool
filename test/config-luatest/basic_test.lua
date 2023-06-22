@@ -3,6 +3,7 @@ local yaml = require('yaml')
 local fio = require('fio')
 local t = require('luatest')
 local treegen = require('test.treegen')
+local justrun = require('test.justrun')
 local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
 
@@ -74,4 +75,53 @@ g.test_example_replicaset = function(g)
     local dir = treegen.prepare_directory(g, {}, {})
     local config_file = fio.abspath('doc/examples/config/replicaset.yaml')
     helpers.start_example_replicaset(g, dir, config_file)
+end
+
+g.test_no_advertise_no_listen = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = {
+        credentials = {
+            users = {
+                guest = {
+                    roles = {'super'},
+                },
+            },
+        },
+        groups = {
+            ['group-001'] = {
+                replicasets = {
+                    ['replicaset-001'] = {
+                        instances = {
+                            ['instance-001'] = {
+                                database = {
+                                    rw = true,
+                                },
+                                iproto = {
+                                    listen =
+                                        'unix/:./{{ instance_name }}.iproto',
+                                },
+                            },
+                            -- No iproto.advertise or iproto.listen.
+                            ['instance-002'] = {},
+                            ['instance-003'] = {},
+                        },
+                    },
+                },
+            },
+        },
+    }
+    local config_file = treegen.write_script(dir, 'config.yaml',
+        yaml.encode(config))
+
+    local env = {}
+    local args = {'--name', 'instance-001', '--config', config_file}
+    local opts = {nojson = true, stderr = true}
+    local res = justrun.tarantool(dir, env, args, opts)
+    t.assert_equals(res, {
+        exit_code = 1,
+        stderr = 'LuajitError: box_cfg.apply: unable to build replicaset ' ..
+            '"replicaset-001" of group "group-001": instance "instance-002" ' ..
+            'has neither iproto.advertise nor iproto.listen options\n' ..
+            'fatal error, exiting the event loop',
+    })
 end

@@ -1,6 +1,8 @@
 local log = require('internal.config.utils.log')
 
 local function peer_uris(configdata)
+    local names = configdata:names()
+
     local peers = configdata:peers()
     if #peers <= 1 then
         return nil
@@ -11,11 +13,10 @@ local function peer_uris(configdata)
         local iproto = configdata:get('iproto', {peer = peer_name}) or {}
         local uri = iproto.advertise or iproto.listen
         if uri == nil then
-            -- XXX: Raise an error in the case?
-            log.warn('box_cfg.apply: neither iproto.advertise nor ' ..
-                'iproto.listen provided for peer %q; do not construct ' ..
-                'box.cfg.replication', peer_name)
-            return nil
+            error(('box_cfg.apply: unable to build replicaset %q of group ' ..
+                '%q: instance %q has neither iproto.advertise nor ' ..
+                'iproto.listen options'):format(names.replicaset_name,
+                names.group_name, peer_name), 0)
         end
         table.insert(uris, uri)
     end
