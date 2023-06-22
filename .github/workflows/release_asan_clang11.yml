@@ -48,12 +48,12 @@ jobs:
       - name: Set up Clang
         uses: egor-tensin/setup-clang@v1
         with:
-          version: 15
+          version: 14
           cc: 0
       - name: test
         env:
-          CC: clang-15
-          CXX: clang++-15
+          CC: clang
+          CXX: clang++
         run: make -f .test.mk test-release-asan
       - name: Send VK Teams message on failure
         if: failure()
