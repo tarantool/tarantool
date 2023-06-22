@@ -18,8 +18,10 @@ runs:
           liblz4-dev \
           autoconf \
           automake \
-          libtool
+          libtool \
+          snap snapd
 
         luarocks install luacheck 0.26.1
         gem install coveralls-lcov
+        snap install powershell --classic
       shell: bash
