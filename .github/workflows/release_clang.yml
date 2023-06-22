@@ -54,6 +54,7 @@ jobs:
         uses: egor-tensin/setup-clang@v1
         with:
           version: 15
+          cc: 1
       - name: test
         env:
           CC: clang
