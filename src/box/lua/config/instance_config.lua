@@ -2,6 +2,7 @@ local schema = require('internal.config.utils.schema')
 local tarantool = require('tarantool')
 local compat = require('compat')
 local uuid = require('uuid')
+local urilib = require('uri')
 
 -- List of annotations:
 --
@@ -116,6 +117,47 @@ local function validate_uuid_str(data, w)
     if data == uuid.NULL:str() then
         w.error('nil UUID is reserved')
     end
+end
+
+-- Accepts an uri object (one produced by urilib.parse()).
+--
+-- Performs several checks regarding ability to use the URI to
+-- create a client socket. IOW, to call connect() on it.
+--
+-- The function returns `true` if the URI is OK to connect and
+-- `false, err` otherwise.
+--
+-- If the URI doesn't fit the given criteria an error is raised.
+-- The function returns nothing otherwise.
+--
+-- The following checks are performed:
+--
+-- * INADDR_ANY IPv4 address (0.0.0.0) or in6addr_any IPv6 address
+--   (::) in the host part of the URI.
+--
+--   It means 'bind to all interfaces' for the bind() call, but it
+--   has no meaning at the connect() call on a client.
+-- * Zero TCP port (service part of the URI).
+--
+--   It means 'bind to a random free port' for the bind() call,
+--   but it has no meaning at the connect() call on a client.
+local function uri_is_suitable_to_connect(uri)
+    assert(uri ~= nil)
+
+    if uri.ipv4 == '0.0.0.0' then
+        return false, 'INADDR_ANY (0.0.0.0) cannot be used to create ' ..
+            'a client socket'
+    end
+    if uri.ipv6 == '::' then
+        return false, 'in6addr_any (::) cannot be used to create a client ' ..
+            'socket'
+    end
+    if uri.service == '0' then
+        return false, 'An URI with zero port cannot be used to create ' ..
+            'a client socket'
+    end
+
+    return true
 end
 
 return schema.new('instance_config', schema.record({
@@ -398,6 +440,23 @@ return schema.new('instance_config', schema.record({
         advertise = schema.scalar({
             type = 'string',
             default = box.NULL,
+            validate = function(data, w)
+                -- Substitute variables with placeholders to don't
+                -- confuse the URI parser with the curly brackets.
+                data = data:gsub('{{ *.- *}}', 'placeholder')
+
+                local uri, err = urilib.parse(data)
+                if uri == nil then
+                    if data:find(',') then
+                        w.error('A single URI is expected, not a list of URIs')
+                    end
+                    w.error('Unable to parse an URI: %s', err)
+                end
+                local ok, err = uri_is_suitable_to_connect(uri)
+                if not ok then
+                    w.error(err)
+                end
+            end,
         }),
         threads = schema.scalar({
             type = 'integer',

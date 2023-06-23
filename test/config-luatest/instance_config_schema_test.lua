@@ -310,6 +310,130 @@ g.test_iproto = function()
     t.assert_equals(res, exp)
 end
 
+-- Verify iproto.advertise validation, bad cases.
+for case_name, case in pairs({
+    incorrect_uri = {
+        advertise = ':3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise',
+            'Unable to parse an URI',
+            'Incorrect URI',
+            'expected host:service or /unix.socket'
+        }, ': '),
+    },
+    multiple_uris = {
+        advertise = 'localhost:3301,localhost:3302',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise',
+            'A single URI is expected, not a list of URIs',
+        }, ': '),
+    },
+    inaddr_any_ipv4 = {
+        advertise = '0.0.0.0:3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise',
+            'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
+        }, ': '),
+    },
+    inaddr_any_ipv4_user = {
+        advertise = 'user@0.0.0.0:3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise',
+            'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
+        }, ': '),
+    },
+    inaddr_any_ipv4_user_pass = {
+        advertise = 'user:pass@0.0.0.0:3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise',
+            'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
+        }, ': '),
+    },
+    inaddr_any_ipv6 = {
+        advertise = '[::]:3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise',
+            'in6addr_any (::) cannot be used to create a client socket',
+        }, ': '),
+    },
+    inaddr_any_ipv6_user = {
+        advertise = 'user@[::]:3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise',
+            'in6addr_any (::) cannot be used to create a client socket',
+        }, ': '),
+    },
+    inaddr_any_ipv6_user_pass = {
+        advertise = 'user:pass@[::]:3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise',
+            'in6addr_any (::) cannot be used to create a client socket',
+        }, ': '),
+    },
+    zero_port = {
+        advertise = 'localhost:0',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise',
+            'An URI with zero port cannot be used to create a client socket',
+        }, ': '),
+    },
+    zero_port_user = {
+        advertise = 'user@localhost:0',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise',
+            'An URI with zero port cannot be used to create a client socket',
+        }, ': '),
+    },
+    zero_port_user_pass = {
+        advertise = 'user:pass@localhost:0',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise',
+            'An URI with zero port cannot be used to create a client socket',
+        }, ': '),
+    },
+}) do
+    g[('test_bad_iproto_advertise_%s'):format(case_name)] = function()
+        t.assert_error_msg_equals(case.exp_err_msg, function()
+            instance_config:validate({
+                iproto = {
+                    advertise = case.advertise,
+                },
+            })
+        end)
+    end
+end
+
+-- Successful cases for iproto.advertise.
+for case_name, case in pairs({
+    inet_socket = {
+        advertise = 'localhost:3301',
+    },
+    inet_socket_user = {
+        advertise = 'user@localhost:3301',
+    },
+    inet_socket_user_pass = {
+        advertise = 'user:pass@localhost:3301',
+    },
+    unix_socket = {
+        advertise = 'unix/:/foo/bar.iproto',
+    },
+    unix_socket_user = {
+        advertise = 'user@unix/:/foo/bar.iproto',
+    },
+    unix_socket_user_pass = {
+        advertise = 'user:pass@unix/:/foo/bar.iproto',
+    },
+}) do
+    g[('test_good_iproto_advertise_%s'):format(case_name)] = function()
+        assert(case.advertise ~= nil)
+        instance_config:validate({
+            iproto = {
+                advertise = case.advertise,
+            },
+        })
+    end
+end
+
 g.test_database = function()
     local iconfig = {
         database = {
