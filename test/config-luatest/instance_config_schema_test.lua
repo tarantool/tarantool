@@ -434,6 +434,99 @@ for case_name, case in pairs({
     end
 end
 
+-- Verify iproto.listen validation, bad cases.
+for case_name, case in pairs({
+    incorrect_uri = {
+        listen = ':3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.listen',
+            'Unable to parse an URI/a list of URIs',
+            'Incorrect URI',
+            'expected host:service or /unix.socket'
+        }, ': '),
+    },
+}) do
+    g[('test_bad_iproto_listen_%s'):format(case_name)] = function()
+        t.assert_error_msg_equals(case.exp_err_msg, function()
+            instance_config:validate({
+                iproto = {
+                    listen = case.listen,
+                },
+            })
+        end)
+    end
+end
+
+-- Successful cases for iproto.listen.
+for case_name, case in pairs({
+    inet_socket = {
+        listen = 'localhost:3301',
+    },
+    -- A username and a password have no sense in the listen URI,
+    -- but it is accepted by box.cfg() for some reason and
+    -- accepted by the instance config validation. Let's test
+    -- the existing behavior and adopt the test if it'll be
+    -- changed later.
+    inet_socket_user = {
+        listen = 'user@localhost:3301',
+    },
+    inet_socket_user_pass = {
+        listen = 'user:pass@localhost:3301',
+    },
+    unix_socket = {
+        listen = 'unix/:/foo/bar.iproto',
+    },
+    -- See the comment above re user@<...> and user:pass@<...>.
+    unix_socket_user = {
+        listen = 'user@unix/:/foo/bar.iproto',
+    },
+    unix_socket_user_pass = {
+        listen = 'user:pass@unix/:/foo/bar.iproto',
+    },
+    multiple_uris = {
+        listen = 'localhost:3301,localhost:3302',
+    },
+    inaddr_any_ipv4 = {
+        listen = '0.0.0.0:3301',
+    },
+    -- See the comment above re user@<...> and user:pass@<...>.
+    inaddr_any_ipv4_user = {
+        listen = 'user@0.0.0.0:3301',
+    },
+    inaddr_any_ipv4_user_pass = {
+        listen = 'user:pass@0.0.0.0:3301',
+    },
+    inaddr_any_ipv6 = {
+        listen = '[::]:3301',
+    },
+    -- See the comment above re user@<...> and user:pass@<...>.
+    inaddr_any_ipv6_user = {
+        listen = 'user@[::]:3301',
+    },
+    inaddr_any_ipv6_user_pass = {
+        listen = 'user:pass@[::]:3301',
+    },
+    zero_port = {
+        listen = 'localhost:0',
+    },
+    -- See the comment above re user@<...> and user:pass@<...>.
+    zero_port_user = {
+        listen = 'user@localhost:0',
+    },
+    zero_port_user_pass = {
+        listen = 'user:pass@localhost:0',
+    },
+}) do
+    g[('test_good_iproto_listen_%s'):format(case_name)] = function()
+        assert(case.listen ~= nil)
+        instance_config:validate({
+            iproto = {
+                listen = case.listen,
+            },
+        })
+    end
+end
+
 g.test_database = function()
     local iconfig = {
         database = {

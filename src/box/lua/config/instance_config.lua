@@ -430,12 +430,21 @@ return schema.new('instance_config', schema.record({
         -- a particular format, a number (port), a table of a
         -- particular format.
         --
-        -- Only a string (without further validation) is accepted
-        -- for now.
+        -- Only a string is accepted for now.
         listen = schema.scalar({
             type = 'string',
             box_cfg = 'listen',
             default = box.NULL,
+            validate = function(data, w)
+                -- Substitute variables with placeholders to don't
+                -- confuse the URI parser with the curly brackets.
+                data = data:gsub('{{ *.- *}}', 'placeholder')
+
+                local uris, err = urilib.parse_many(data)
+                if uris == nil then
+                    w.error('Unable to parse an URI/a list of URIs: %s', err)
+                end
+            end,
         }),
         advertise = schema.scalar({
             type = 'string',
