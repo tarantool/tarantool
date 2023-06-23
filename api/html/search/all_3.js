@@ -17,6 +17,5 @@ var searchData=
   ['coio_5fwrite_195',['COIO_WRITE',['../module_8h.html#a06fc87d81c62e9abb8790b6e5713c55ba9ccd504861956d107f717efa66b3f1b7',1,'module.h']]],
   ['collation_196',['collation',['../unionPACKED.html#abe5b199132aa0fc5215b5933e8b7c8c6',1,'PACKED']]],
   ['compiler_5finfo_197',['COMPILER_INFO',['../module_8h.html#a835dbb7b4216a8258c588d9781a3b66b',1,'module.h']]],
-  ['container_5fof_198',['container_of',['../module_8h.html#af8c317a42292b61c93aae91e59118a46',1,'module.h']]],
-  ['cord_5fslab_5fcache_199',['cord_slab_cache',['../module_8h.html#a8f1439a55742e08aed110099945d6eb8',1,'module.h']]]
+  ['container_5fof_198',['container_of',['../module_8h.html#af8c317a42292b61c93aae91e59118a46',1,'module.h']]]
 ];

@@ -486,7 +486,6 @@
     <member refid="module_8h_1a0e1c835fac5180f57e01c388a95440d5" kind="function"><name>fiber_clock</name></member>
     <member refid="module_8h_1a8ed4eb4281eaa96a74c6e052995af645" kind="function"><name>fiber_clock64</name></member>
     <member refid="module_8h_1a1d0122a4705796fd32c2a54e218c2ff8" kind="function"><name>fiber_reschedule</name></member>
-    <member refid="module_8h_1a8f1439a55742e08aed110099945d6eb8" kind="function"><name>cord_slab_cache</name></member>
     <member refid="module_8h_1a113af82955ade6d52b5a03fc327b266f" kind="function"><name>box_region_used</name></member>
     <member refid="module_8h_1ac8e7d6a912f5f8230bd8c8035735ef2f" kind="function"><name>box_region_alloc</name></member>
     <member refid="module_8h_1a541b6608e37fc392112a9aee229432fa" kind="function"><name>box_region_aligned_alloc</name></member>
