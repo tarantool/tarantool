@@ -43,6 +43,8 @@ local appliers_script = [[
     box_cfg.apply(config)
     local credentials = require('internal.config.applier.credentials')
     credentials.apply(config)
+    local console = require('internal.config.applier.console')
+    console.apply(config)
     %s
     os.exit(0)
 ]]
@@ -98,4 +100,24 @@ g.test_applier_credentials = function()
     local res = justrun.tarantool(dir, env, {'main.lua'}, opts)
     t.assert_equals(res.exit_code, 0)
     t.assert_equals(res.stdout, 'true')
+end
+
+g.test_applier_console = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local injection = [[
+        local socket = require('socket')
+        local data = config._configdata
+        local path = data:get('console.socket', {use_default = true})
+        local s = socket.tcp_connect('unix/', path)
+        local greeting = s:read(128)
+        local expr = '(%a+) %d.%d.%d (%(%a+ %a+%))'
+        print(table.concat({greeting:gmatch(expr)()}, ' '))
+    ]]
+    treegen.write_script(dir, 'main.lua', appliers_script:format(injection))
+
+    local env = {}
+    local opts = {nojson = true, stderr = false}
+    local res = justrun.tarantool(dir, env, {'main.lua'}, opts)
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.stdout, 'Tarantool (Lua console)')
 end
