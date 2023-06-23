@@ -9,6 +9,9 @@ local appliers_script = [[
     local configdata = require('internal.config.configdata')
     local cluster_config = require('internal.config.cluster_config')
     local cconfig = {
+        memtx = {
+            memory = 100000000,
+        },
         groups = {
             ['group-001'] = {
                 replicasets = {
@@ -29,6 +32,8 @@ local appliers_script = [[
     config = {_configdata = configdata.new(iconfig, cconfig, 'instance-001')}
     local mkdir = require('internal.config.applier.mkdir')
     mkdir.apply(config)
+    local box_cfg = require('internal.config.applier.box_cfg')
+    box_cfg.apply(config)
     %s
     os.exit(0)
 ]]
@@ -54,4 +59,18 @@ g.test_applier_mkdir = function()
     t.assert_equals(res.exit_code, 0)
     t.assert_equals(res.stdout, 'instance-001')
     t.assert(fio.path.is_dir(fio.pathjoin(dir, 'instance-001')))
+end
+
+g.test_applier_box_cfg = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local injection = [[
+        print(box.cfg.memtx_memory)
+    ]]
+    treegen.write_script(dir, 'main.lua', appliers_script:format(injection))
+
+    local env = {}
+    local opts = {nojson = true, stderr = false}
+    local res = justrun.tarantool(dir, env, {'main.lua'}, opts)
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.stdout, '100000000')
 end
