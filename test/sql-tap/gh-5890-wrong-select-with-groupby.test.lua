@@ -14,7 +14,8 @@ test:do_execsql_test(
         INSERT INTO t VALUES(1, x'6178'), (2, x'6278'), (3, x'6379');
         SELECT count(*), substr(v,2,1) AS m FROM t GROUP BY m;
     ]], {
-        2, 'x', 1, 'y'
+        2, require('varbinary').new('x'),
+        1, require('varbinary').new('y')
     })
 
 test:do_execsql_test(
@@ -22,7 +23,9 @@ test:do_execsql_test(
     [[
         SELECT count(*), v || v AS m FROM t GROUP BY m;
     ]], {
-        1, 'axax', 1, 'bxbx', 1, 'cycy'
+        1, require('varbinary').new('axax'),
+        1, require('varbinary').new('bxbx'),
+        1, require('varbinary').new('cycy')
     })
 
 test:finish_test()

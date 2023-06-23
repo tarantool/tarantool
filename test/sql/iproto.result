@@ -744,7 +744,7 @@ cn:execute("SELECT zeroblob(1);")
   - name: COLUMN_1
     type: varbinary
   rows:
-  - ["\0"]
+  - [!!binary AA==]
 ...
 -- randomblob() returns different results each time, so check only
 -- type in meta.

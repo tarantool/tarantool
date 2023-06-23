@@ -21,6 +21,7 @@ test:plan(20)
 
 
 local function bin_to_hex(blob)
+    blob = tostring(blob)
     local bytes2 = {  }
     for i = 1, string.len(blob), 1 do
         string.byte("ABCDE")

@@ -17,6 +17,7 @@ box.execute([[INSERT INTO t1(id) VALUES(NULL);]])
 local uuid_str = [[11111111-1111-1111-1111-111111111111]]
 local uuid = require('uuid').fromstr(uuid_str)
 local dec = require('decimal').new(1.5)
+local bin = require('varbinary').new("5")
 test:do_execsql_test(
     "metatypes-1.1",
     [[
@@ -38,11 +39,11 @@ test:do_execsql_test(
         2, 2, 2, 2,
         3, "3", "", "",
         4, true, "", "",
-        5, "5", "", "",
+        5, bin, "", "",
         6, uuid, "", "",
         7, "", "", "3",
         8, "", "", true,
-        9, "", "", "5",
+        9, "", "", bin,
         10, "", "", uuid,
         11, "", "", 3,
         12, "", "", dec
@@ -447,7 +448,7 @@ test:do_execsql_test(
     [[
         SELECT COALESCE(s, a) FROM t;
     ]], {
-        1, 2, "3", true, "5", uuid, "3", true, "5", uuid, 3, dec
+        1, 2, "3", true, bin, uuid, "3", true, bin, uuid, 3, dec
     })
 
 test:do_execsql_test(
@@ -487,7 +488,7 @@ test:do_execsql_test(
     [[
         SELECT IFNULL(s, a) FROM t;
     ]], {
-        1, 2, "3", true, "5", uuid, "3", true, "5", uuid, 3, dec
+        1, 2, "3", true, bin, uuid, "3", true, bin, uuid, 3, dec
     })
 
 test:do_catchsql_test(
@@ -520,7 +521,7 @@ test:do_execsql_test(
     [[
         SELECT LIKELIHOOD(a, 0.5e0) FROM t;
     ]], {
-        1, 2, "", "", "", "", "3", true, "5", uuid, 3, dec
+        1, 2, "", "", "", "", "3", true, bin, uuid, 3, dec
     })
 
 test:do_execsql_test(
@@ -528,7 +529,7 @@ test:do_execsql_test(
     [[
         SELECT LIKELY(a) FROM t;
     ]], {
-        1, 2, "", "", "", "", "3", true, "5", uuid, 3, dec
+        1, 2, "", "", "", "", "3", true, bin, uuid, 3, dec
     })
 
 test:do_catchsql_test(
@@ -677,7 +678,7 @@ test:do_execsql_test(
     [[
         SELECT UNLIKELY(a) FROM t;
     ]], {
-        1, 2, "", "", "", "", "3", true, "5", uuid, 3, dec
+        1, 2, "", "", "", "", "3", true, bin, uuid, 3, dec
     })
 
 test:do_catchsql_test(

@@ -30,7 +30,7 @@ test:do_execsql_test(
         SELECT x'616263'
     ]], {
         -- <cast-1.1>
-        "abc"
+        require('varbinary').new("abc")
         -- </cast-1.1>
     })
 
@@ -80,7 +80,7 @@ test:do_execsql_test(
         SELECT CAST(x'616263' AS SCALAR)
     ]], {
         -- <cast-1.7>
-        "abc"
+        require('varbinary').new("abc")
         -- </cast-1.7>
     })
 

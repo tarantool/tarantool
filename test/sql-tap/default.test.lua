@@ -34,7 +34,7 @@ test:do_execsql_test(
 		SELECT a, b from t1;
 	]], {
 	-- <default-1.1>
-	1, "hi"
+       1, require('varbinary').new("hi")
 	-- </default-1.1>
 })
 

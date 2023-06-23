@@ -44,6 +44,7 @@
 
 #include "core/assoc.h"
 #include "core/decimal.h" /* decimal_unpack() */
+#include "core/tweaks.h"
 #include "lua/decimal.h" /* luaT_newdecimal() */
 #include "mp_extension_types.h"
 #include "mp_uuid.h" /* mp_decode_uuid() */
@@ -105,6 +106,13 @@ struct luamp_iterator {
 };
 
 static const char luamp_iterator_typename[] = "msgpack.iterator";
+
+/**
+ * If this flag is set, a binary data field will be decoded to a plain Lua
+ * string, not a varbinary object.
+ */
+static bool msgpack_decode_binary_as_string = false;
+TWEAK_BOOL(msgpack_decode_binary_as_string);
 
 void
 luamp_error(void *error_ctx)
@@ -223,7 +231,8 @@ restart: /* used by MP_EXT of unidentified subtype */
 		type = MP_STR;
 		break;
 	case MP_BIN:
-		mpstream_encode_strn(stream, field->sval.data, field->sval.len);
+		mpstream_encode_binl(stream, field->sval.len);
+		mpstream_memcpy(stream, field->sval.data, field->sval.len);
 		type = MP_BIN;
 		break;
 	case MP_INT:
@@ -430,7 +439,10 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 	{
 		uint32_t len = 0;
 		const char *str = mp_decode_bin(data, &len);
-		lua_pushlstring(L, str, len);
+		if (msgpack_decode_binary_as_string)
+			lua_pushlstring(L, str, len);
+		else
+			luaT_pushvarbinary(L, str, len);
 		return;
 	}
 	case MP_BOOL:

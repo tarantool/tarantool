@@ -1128,7 +1128,7 @@ box.execute("SELECT CASE 1 WHEN 1 THEN x'0000000000' WHEN 2 THEN 'str' END")
   - name: COLUMN_1
     type: scalar
   rows:
-  - ["\0\0\0\0\0"]
+  - [!!binary AAAAAAA=]
 ...
 box.execute("SELECT CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 END")
 ---
@@ -1239,7 +1239,7 @@ box.execute("SELECT * FROM t WHERE v = x'616263'")
   - name: V
     type: varbinary
   rows:
-  - [1, 'abc']
+  - [1, !!binary YWJj]
 ...
 box.execute("SELECT sum(v) FROM t;")
 ---
@@ -1262,7 +1262,7 @@ box.execute("SELECT min(v) FROM t;")
   - name: COLUMN_1
     type: varbinary
   rows:
-  - ['abc']
+  - [!!binary YWJj]
 ...
 box.execute("SELECT max(v) FROM t;")
 ---
@@ -1270,7 +1270,7 @@ box.execute("SELECT max(v) FROM t;")
   - name: COLUMN_1
     type: varbinary
   rows:
-  - ['abc']
+  - [!!binary YWJj]
 ...
 box.execute("SELECT count(v) FROM t;")
 ---
@@ -1286,7 +1286,7 @@ box.execute("SELECT group_concat(v) FROM t;")
   - name: COLUMN_1
     type: varbinary
   rows:
-  - ['abc']
+  - [!!binary YWJj]
 ...
 box.execute("SELECT lower(v) FROM t;")
 ---
@@ -1325,7 +1325,7 @@ box.execute("SELECT LEAST(v, x'') FROM t;")
   - name: COLUMN_1
     type: varbinary
   rows:
-  - ['']
+  - [!!binary '']
 ...
 box.execute("CREATE INDEX iv ON t(v);")
 ---
@@ -1337,7 +1337,7 @@ box.execute("SELECT v FROM t WHERE v = x'616263';")
   - name: V
     type: varbinary
   rows:
-  - ['abc']
+  - [!!binary YWJj]
 ...
 box.execute("SELECT v FROM t ORDER BY v;")
 ---
@@ -1345,7 +1345,7 @@ box.execute("SELECT v FROM t ORDER BY v;")
   - name: V
     type: varbinary
   rows:
-  - ['abc']
+  - [!!binary YWJj]
 ...
 box.execute("UPDATE t SET v = x'636261' WHERE v = x'616263';")
 ---
@@ -1357,7 +1357,7 @@ box.execute("SELECT v FROM t;")
   - name: V
     type: varbinary
   rows:
-  - ['cba']
+  - [!!binary Y2Jh]
 ...
 box.execute("CREATE TABLE parent (id INT PRIMARY KEY, a VARBINARY UNIQUE);")
 ---
@@ -1422,7 +1422,7 @@ box.execute("INSERT INTO t1 (id) VALUES (1);")
 ...
 box.space.T1:select()
 ---
-- - [1, 'abc']
+- - [1, !!binary YWJj]
 ...
 box.space.T1:drop()
 ---
@@ -1448,7 +1448,7 @@ box.execute("SELECT CAST('asd' AS VARBINARY);")
   - name: COLUMN_1
     type: varbinary
   rows:
-  - ['asd']
+  - [!!binary YXNk]
 ...
 box.execute("SELECT CAST(x'' AS VARBINARY);")
 ---
@@ -1456,7 +1456,7 @@ box.execute("SELECT CAST(x'' AS VARBINARY);")
   - name: COLUMN_1
     type: varbinary
   rows:
-  - ['']
+  - [!!binary '']
 ...
 -- gh-4148: make sure that typeof() returns origin type of column
 -- even if value is null.
@@ -2376,7 +2376,7 @@ box.execute([[SELECT * FROM tv;]])
     type: varbinary
   rows:
   - [1, null]
-  - [2, '44']
+  - [2, !!binary NDQ=]
 ...
 box.execute([[INSERT INTO ts(s) VALUES (NULL);]])
 ---
@@ -2427,7 +2427,7 @@ box.execute([[SELECT * FROM ts;]])
   - [3, 22.2]
   - [4, true]
   - [5, '33']
-  - [6, '44']
+  - [6, !!binary NDQ=]
 ...
 -- Check for UPDATE.
 box.execute([[DELETE FROM ti;]])
@@ -2704,7 +2704,7 @@ box.execute([[SELECT * FROM tv;]])
   - name: V
     type: varbinary
   rows:
-  - [1, '44']
+  - [1, !!binary NDQ=]
 ...
 box.execute([[UPDATE ts SET s = NULL WHERE a = 1;]])
 ---
@@ -2738,7 +2738,7 @@ box.execute([[SELECT * FROM ts;]])
   - name: S
     type: scalar
   rows:
-  - [1, '44']
+  - [1, !!binary NDQ=]
 ...
 box.execute([[DROP TABLE ti;]])
 ---

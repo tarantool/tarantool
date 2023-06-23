@@ -62,7 +62,7 @@ box.execute('SELECT X\'507265766564\'')
   - name: COLUMN_1
     type: varbinary
   rows:
-  - ['Preved']
+  - [!!binary UHJldmVk]
 ...
 -- check 'SELECT' well-formed expression  (return value)
 box.execute('SELECT 3.14')
@@ -79,5 +79,5 @@ box.execute('SELECT X\'4D6564766564\'')
   - name: COLUMN_1
     type: varbinary
   rows:
-  - ['Medved']
+  - [!!binary TWVkdmVk]
 ...
