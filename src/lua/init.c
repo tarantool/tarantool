@@ -153,6 +153,7 @@ extern char minifio_lua[],
 	table_lua[],
 	trigger_lua[],
 	string_lua[],
+	varbinary_lua[],
 	swim_lua[],
 	jit_p_lua[], /* LuaJIT 2.1 profiler */
 	jit_zone_lua[], /* LuaJIT 2.1 profiler */
@@ -279,6 +280,7 @@ static const char *lua_modules[] = {
 	"env", env_lua,
 	"buffer", buffer_lua,
 	"string", string_lua,
+	"varbinary", varbinary_lua,
 	"table", table_lua,
 	"msgpackffi", msgpackffi_lua,
 	"crypto", crypto_lua,

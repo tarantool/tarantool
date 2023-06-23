@@ -72,10 +72,25 @@ extern struct lua_State *tarantool_L;
 
 extern uint32_t CTID_CHAR_PTR;
 extern uint32_t CTID_CONST_CHAR_PTR;
+/** Type ID of struct varbinary. */
+extern uint32_t CTID_VARBINARY;
 extern uint32_t CTID_UUID;
 extern uint32_t CTID_DATETIME;
 /** Type ID of struct interval. */
 extern uint32_t CTID_INTERVAL;
+
+/**
+ * Pushes a new varbinary object with the given content to the Lua stack.
+ */
+void
+luaT_pushvarbinary(struct lua_State *L, const char *data, uint32_t len);
+
+/**
+ * If the value stored in the Lua stack at the given index is a varbinary
+ * object, returns its content, otherwise returns NULL.
+ */
+const char *
+luaT_tovarbinary(struct lua_State *L, int index, uint32_t *len);
 
 /**
  * Push vclock to the Lua stack as a plain Lua table.

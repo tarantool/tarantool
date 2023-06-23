@@ -1284,7 +1284,7 @@ test:do_execsql_test(
         SELECT * FROM v;
     ]], {
         -- <view-24.5>
-        "aaaaaaaa\naaaaaaaa\naaaaaaaa\naaaaaaaa\naaaaaaaa"
+        require('varbinary').new("aaaaaaaa\naaaaaaaa\naaaaaaaa\naaaaaaaa\naaaaaaaa")
         -- </view-24.5>
     })
 

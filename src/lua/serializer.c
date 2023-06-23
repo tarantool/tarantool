@@ -538,8 +538,17 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 				field->type = MP_NIL;
 				return 0;
 			}
-			/* Fall through */
+			field->type = MP_EXT;
+			field->ext_type = MP_UNKNOWN_EXTENSION;
+			return 0;
 		default:
+			if (ctypeid == CTID_VARBINARY) {
+				field->type = MP_BIN;
+				field->sval.data = luaT_tovarbinary(
+					L, index, &field->sval.len);
+				assert(field->sval.data != NULL);
+				return 0;
+			}
 			field->type = MP_EXT;
 			if (ctypeid == CTID_DECIMAL) {
 				field->ext_type = MP_DECIMAL;

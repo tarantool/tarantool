@@ -133,7 +133,7 @@ box.execute('SELECT X\'4D6564766564\'')
   - name: COLUMN_1
     type: varbinary
   rows:
-  - ['Medved']
+  - [!!binary TWVkdmVk]
 ...
 --
 -- gh-4139: assertion when reading a temporary space.
@@ -301,7 +301,7 @@ box.execute([[SELECT * FROM j;]])
     type: varbinary
   rows:
   - [1, null, null]
-  - [2, '', "\0"]
+  - [2, '', !!binary AA==]
 ...
 box.execute([[SELECT * FROM j INDEXED BY I3;]])
 ---
@@ -313,7 +313,7 @@ box.execute([[SELECT * FROM j INDEXED BY I3;]])
   - name: S3
     type: varbinary
   rows:
-  - [2, '', "\0"]
+  - [2, '', !!binary AA==]
 ...
 box.execute([[SELECT COUNT(*) FROM j GROUP BY s2;]])
 ---
@@ -351,8 +351,8 @@ box.execute([[SELECT * FROM j;]])
     type: varbinary
   rows:
   - [1, null, null]
-  - [2, null, "\0"]
-  - [3, 'a', '3']
+  - [2, null, !!binary AA==]
+  - [3, 'a', !!binary Mw==]
 ...
 box.execute([[SELECT * FROM j INDEXED BY I3;]])
 ---
@@ -364,7 +364,7 @@ box.execute([[SELECT * FROM j INDEXED BY I3;]])
   - name: S3
     type: varbinary
   rows:
-  - [3, 'a', '3']
+  - [3, 'a', !!binary Mw==]
 ...
 box.execute([[UPDATE j INDEXED BY i3 SET s3 = NULL;]])
 ---
@@ -373,7 +373,7 @@ box.execute([[UPDATE j INDEXED BY i3 SET s3 = NULL;]])
 s:select{}
 ---
 - - [1, null, null]
-  - [2, null, "\0"]
+  - [2, null, !!binary AA==]
   - [3, 'a', null]
 ...
 s:drop()

@@ -25,6 +25,7 @@ test:plan(130)
 --   func2-3.*: substr implementation (blob)
 --
 local function bin_to_hex(blob)
+    blob = tostring(blob)
     return (blob:gsub('.', function (c)
         return string.format('%02X', string.byte(c))
     end))

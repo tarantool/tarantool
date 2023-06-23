@@ -54,6 +54,7 @@ static uint32_t CTID_STRUCT_IBUF;
 static uint32_t CTID_STRUCT_IBUF_PTR;
 uint32_t CTID_CHAR_PTR;
 uint32_t CTID_CONST_CHAR_PTR;
+uint32_t CTID_VARBINARY;
 uint32_t CTID_UUID;
 uint32_t CTID_DATETIME = 0;
 uint32_t CTID_INTERVAL = 0;
@@ -154,6 +155,48 @@ luaT_pushvclock(struct lua_State *L, const struct vclock *vclock)
 		lua_settable(L, -3);
 	}
 	luaL_setmaphint(L, -1); /* compact flow */
+}
+
+/*
+ * Note: varbinary is a VLS object so we can't use luaL_pushcdata and
+ * luaL_checkcdata helpers.
+ */
+void
+luaT_pushvarbinary(struct lua_State *L, const char *data, uint32_t len)
+{
+	assert(CTID_VARBINARY != 0);
+	/* Calculate the cdata size. */
+	CTState *cts = ctype_cts(L);
+	CType *ct = ctype_raw(cts, CTID_VARBINARY);
+	CTSize size;
+	CTInfo info = lj_ctype_info(cts, CTID_VARBINARY, &size);
+	size = lj_ctype_vlsize(cts, ct, (CTSize)len);
+	assert(size != CTSIZE_INVALID);
+	/* Allocate a new cdata. */
+	GCcdata *cd = lj_cdata_newx(cts, CTID_VARBINARY, size, info);
+	/* Anchor the uninitialized cdata with the stack. */
+	TValue *o = L->top;
+	setcdataV(L, o, cd);
+	incr_top(L);
+	/* Initialize the cdata. */
+	memcpy(cdataptr(cd), data, len);
+	lj_gc_check(L);
+}
+
+const char *
+luaT_tovarbinary(struct lua_State *L, int index, uint32_t *len)
+{
+	assert(CTID_VARBINARY != 0);
+	TValue *o = index2adr(L, index);
+	if (!tviscdata(o))
+		return NULL;
+	GCcdata *cd = cdataV(o);
+	if (cd->ctypeid != CTID_VARBINARY)
+		return NULL;
+	CTSize size = cdatavlen(cd);
+	assert(size != CTSIZE_INVALID);
+	*len = size;
+	return cdataptr(cd);
 }
 
 struct tt_uuid *
@@ -909,6 +952,10 @@ tarantool_lua_utils_init(struct lua_State *L)
 	assert(CTID_CHAR_PTR != 0);
 	CTID_CONST_CHAR_PTR = luaL_ctypeid(L, "const char *");
 	assert(CTID_CONST_CHAR_PTR != 0);
+	rc = luaL_cdef(L, "struct varbinary { char data[?]; };");
+	assert(rc == 0);
+	CTID_VARBINARY = luaL_ctypeid(L, "struct varbinary");
+	assert(CTID_VARBINARY != 0);
 	rc = luaL_cdef(L, "struct tt_uuid {"
 				  "uint32_t time_low;"
 				  "uint16_t time_mid;"

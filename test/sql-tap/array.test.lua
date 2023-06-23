@@ -984,7 +984,8 @@ test:do_execsql_test(
     [[
         SELECT [a, g, t, n, f, i, b, v, s, d, u] FROM t1 WHERE id = 1;
     ]], {
-        {{1}, 1, '1', 1, 1, 1, true, '1', 1, require('decimal').new(1),
+        {{1}, 1, '1', 1, 1, 1, true, require('varbinary').new('1'), 1,
+         require('decimal').new(1),
          require('uuid').fromstr('11111111-1111-1111-1111-111111111111')}
     })
 
@@ -993,7 +994,8 @@ test:do_execsql_test(
     [[
         SELECT [1, true, 1.5e0, ['asd', x'32'], 1234.0];
     ]], {
-        {1, true, 1.5, {'asd', '2'}, require('decimal').new(1234)}
+        {1, true, 1.5, {'asd', require('varbinary').new('2')},
+         require('decimal').new(1234)}
     })
 
 test:do_execsql_test(

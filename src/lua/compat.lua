@@ -58,6 +58,13 @@ with all its replicasets.
 https://tarantool.io/compat/box_info_cluster_meaning
 ]]
 
+local BINARY_DATA_DECODING_BRIEF = [[
+Whether a binary data field should be stored in a varbinary object or a plain
+string when decoded in Lua.
+
+https://tarantool.io/compat/binary_data_decoding
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -108,6 +115,15 @@ local options = {
         obsolete = nil,
         brief = BOX_INFO_CLUSTER_MEANING_BRIEF,
         action = tweak_action('box_info_cluster_new_meaning', false, true),
+    },
+    binary_data_decoding = {
+        default = 'new',
+        obsolete = nil,
+        brief = BINARY_DATA_DECODING_BRIEF,
+        action = function(is_new)
+            tweaks.yaml_decode_binary_as_string = not is_new
+            tweaks.msgpack_decode_binary_as_string = not is_new
+        end,
     },
 }
 

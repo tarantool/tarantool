@@ -1946,7 +1946,7 @@ test:do_execsql_test(
         SELECT TRIM(X'00' FROM X'004100');
     ]], {
         -- <func-22.23>
-        "A"
+        require('varbinary').new("A")
         -- </func-22.23>
     })
 
@@ -1956,7 +1956,7 @@ test:do_execsql_test(
         SELECT TRIM(X'0000' FROM X'004100');
     ]], {
         -- <func-22.24>
-        "A"
+        require('varbinary').new("A")
         -- </func-22.24>
     })
 
@@ -1966,7 +1966,7 @@ test:do_execsql_test(
         SELECT TRIM(X'0042' FROM X'004100');
     ]], {
         -- <func-22.25>
-        "A"
+        require('varbinary').new("A")
         -- </func-22.25>
     })
 
@@ -1976,7 +1976,7 @@ test:do_execsql_test(
         SELECT TRIM(X'00' FROM X'00004100420000');
     ]], {
         -- <func-22.26>
-        "A\0B"
+        require('varbinary').new("A\0B")
         -- </func-22.26>
     })
 
@@ -1986,7 +1986,7 @@ test:do_execsql_test(
         SELECT TRIM(LEADING X'00' FROM X'004100');
     ]], {
         -- <func-22.27>
-        "A\0"
+        require('varbinary').new("A\0")
         -- </func-22.27>
     })
 
@@ -1996,7 +1996,7 @@ test:do_execsql_test(
         SELECT TRIM(LEADING X'0000' FROM X'004100');
     ]], {
         -- <func-22.28>
-        "A\0"
+        require('varbinary').new("A\0")
         -- </func-22.28>
     })
 
@@ -2006,7 +2006,7 @@ test:do_execsql_test(
         SELECT TRIM(LEADING X'0042' FROM X'004100');
     ]], {
         -- <func-22.29>
-        "A\0"
+        require('varbinary').new("A\0")
         -- </func-22.29>
     })
 
@@ -2016,7 +2016,7 @@ test:do_execsql_test(
         SELECT TRIM(LEADING X'00' FROM X'00004100420000');
     ]], {
         -- <func-22.30>
-        "A\0B\0\0"
+        require('varbinary').new("A\0B\0\0")
         -- </func-22.30>
     })
 
@@ -2026,7 +2026,7 @@ test:do_execsql_test(
         SELECT TRIM(TRAILING X'00' FROM X'004100');
     ]], {
         -- <func-22.31>
-        "\0A"
+        require('varbinary').new("\0A")
         -- </func-22.31>
     })
 
@@ -2036,7 +2036,7 @@ test:do_execsql_test(
         SELECT TRIM(TRAILING X'0000' FROM X'004100');
     ]], {
         -- <func-22.32>
-        "\0A"
+        require('varbinary').new("\0A")
         -- </func-22.32>
     })
 
@@ -2046,7 +2046,7 @@ test:do_execsql_test(
         SELECT TRIM(TRAILING X'0042' FROM X'004100');
     ]], {
         -- <func-22.33>
-        "\0A"
+        require('varbinary').new("\0A")
         -- </func-22.33>
     })
 
@@ -2056,7 +2056,7 @@ test:do_execsql_test(
         SELECT TRIM(TRAILING X'00' FROM X'00004100420000');
     ]], {
         -- <func-22.34>
-        "\0\0A\0B"
+        require('varbinary').new("\0\0A\0B")
         -- </func-22.34>
     })
 
@@ -2546,7 +2546,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-36",
     [[VALUES (RANDOMBLOB(0))]],
-    {''})
+    {require('varbinary').new('')})
 
 -- gh-3542
 -- In SQL '\0' is NOT a end-of-string signal. Tests below ensures
