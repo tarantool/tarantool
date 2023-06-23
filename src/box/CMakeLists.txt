@@ -37,6 +37,7 @@ lua_source(lua_sources lua/key_def.lua key_def_lua)
 lua_source(lua_sources lua/merger.lua merger_lua)
 
 # {{{ config
+lua_source(lua_sources lua/config/applier/app.lua         config_applier_app_lua)
 lua_source(lua_sources lua/config/applier/box_cfg.lua     config_applier_box_cfg_lua)
 lua_source(lua_sources lua/config/applier/console.lua     config_applier_console_lua)
 lua_source(lua_sources lua/config/applier/credentials.lua config_applier_credentials_lua)
