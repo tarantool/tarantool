@@ -19,6 +19,11 @@ local appliers_script = [[
         memtx = {
             memory = 100000000,
         },
+        fiber = {
+            top = {
+                enabled = true,
+            },
+        },
         groups = {
             ['group-001'] = {
                 replicasets = {
@@ -45,6 +50,8 @@ local appliers_script = [[
     credentials.apply(config)
     local console = require('internal.config.applier.console')
     console.apply(config)
+    local fiber = require('internal.config.applier.fiber')
+    fiber.apply(config)
     %s
     os.exit(0)
 ]]
@@ -120,4 +127,19 @@ g.test_applier_console = function()
     local res = justrun.tarantool(dir, env, {'main.lua'}, opts)
     t.assert_equals(res.exit_code, 0)
     t.assert_equals(res.stdout, 'Tarantool (Lua console)')
+end
+
+g.test_applier_fiber = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local injection = [[
+        fiber = require('fiber')
+        print(fiber.top() ~= nil)
+    ]]
+    treegen.write_script(dir, 'main.lua', appliers_script:format(injection))
+
+    local env = {}
+    local opts = {nojson = true, stderr = false}
+    local res = justrun.tarantool(dir, env, {'main.lua'}, opts)
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.stdout, 'true')
 end
