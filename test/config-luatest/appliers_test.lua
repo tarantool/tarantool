@@ -9,6 +9,13 @@ local appliers_script = [[
     local configdata = require('internal.config.configdata')
     local cluster_config = require('internal.config.cluster_config')
     local cconfig = {
+        credentials = {
+            users = {
+                guest = {
+                    roles = {'super'},
+                },
+            },
+        },
         memtx = {
             memory = 100000000,
         },
@@ -34,6 +41,8 @@ local appliers_script = [[
     mkdir.apply(config)
     local box_cfg = require('internal.config.applier.box_cfg')
     box_cfg.apply(config)
+    local credentials = require('internal.config.applier.credentials')
+    credentials.apply(config)
     %s
     os.exit(0)
 ]]
@@ -73,4 +82,20 @@ g.test_applier_box_cfg = function()
     local res = justrun.tarantool(dir, env, {'main.lua'}, opts)
     t.assert_equals(res.exit_code, 0)
     t.assert_equals(res.stdout, '100000000')
+end
+
+g.test_applier_credentials = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local injection = [[
+        local guest_id = box.space._user.index.name:get{'guest'}.id
+        local super_id = box.space._user.index.name:get{'super'}.id
+        print(box.space._priv:get{guest_id, 'role', super_id} ~= nil)
+    ]]
+    treegen.write_script(dir, 'main.lua', appliers_script:format(injection))
+
+    local env = {}
+    local opts = {nojson = true, stderr = false}
+    local res = justrun.tarantool(dir, env, {'main.lua'}, opts)
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.stdout, 'true')
 end
