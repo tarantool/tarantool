@@ -1,5 +1,6 @@
 local fun = require('fun')
 local yaml = require('yaml')
+local urilib = require('uri')
 local fio = require('fio')
 local luatest = require('luatest')
 
@@ -50,7 +51,19 @@ local function find_advertise_uri(config, instance_name, dir)
         uri = uri:gsub('unix/:%./', ('unix/:%s/'):format(dir))
     end
 
-    return uri
+    local uris, err = urilib.parse_many(uri)
+    if uris == nil then
+        error(err)
+    end
+    for _, u in ipairs(uris) do
+        local suitable = u.ipv4 ~= '0.0.0.0' and u.ipv6 ~= '::' and
+            u.service ~= '0'
+        if suitable then
+            return urilib.format(u, true)
+        end
+    end
+
+    error(('No suitable URIs to connect found in %s'):format(uri))
 end
 
 local Server = luatest.Server:inherit({})

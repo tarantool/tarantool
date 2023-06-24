@@ -141,7 +141,7 @@ end
 --
 --   It means 'bind to a random free port' for the bind() call,
 --   but it has no meaning at the connect() call on a client.
-local function uri_is_suitable_to_connect(uri)
+local function uri_is_suitable_to_connect(_, uri)
     assert(uri ~= nil)
 
     if uri.ipv4 == '0.0.0.0' then
@@ -461,7 +461,7 @@ return schema.new('instance_config', schema.record({
                     end
                     w.error('Unable to parse an URI: %s', err)
                 end
-                local ok, err = uri_is_suitable_to_connect(uri)
+                local ok, err = uri_is_suitable_to_connect(nil, uri)
                 if not ok then
                     w.error(err)
                 end
@@ -953,4 +953,8 @@ return schema.new('instance_config', schema.record({
     -- node as an annotation. It simplifies accesses from other
     -- code.
     config_version = CONFIG_VERSION,
-}))
+}), {
+    methods = {
+        uri_is_suitable_to_connect = uri_is_suitable_to_connect,
+    },
+})
