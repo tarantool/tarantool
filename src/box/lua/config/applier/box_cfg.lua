@@ -1,7 +1,11 @@
+local urilib = require('uri')
 local log = require('internal.config.utils.log')
+local instance_config = require('internal.config.instance_config')
 
 local function peer_uris(configdata)
     local names = configdata:names()
+    local err_msg_prefix = ('box_cfg.apply: unable to build replicaset %q ' ..
+        'of group %q'):format(names.replicaset_name, names.group_name)
 
     local peers = configdata:peers()
     if #peers <= 1 then
@@ -11,12 +15,29 @@ local function peer_uris(configdata)
     local uris = {}
     for _, peer_name in ipairs(peers) do
         local iproto = configdata:get('iproto', {peer = peer_name}) or {}
-        local uri = iproto.advertise or iproto.listen
+
+        local uri
+        if iproto.advertise ~= nil then
+            uri = iproto.advertise
+        elseif iproto.listen ~= nil then
+            for _, u in ipairs(urilib.parse_many(iproto.listen)) do
+                if instance_config:uri_is_suitable_to_connect(u) then
+                    uri = urilib.format(u)
+                    break
+                end
+            end
+
+            if uri == nil then
+                error(('%s: instance %q has no iproto.advertise option and ' ..
+                    'neither of the iproto.listen URIs are suitable to ' ..
+                    'create a client socket'):format(err_msg_prefix,
+                    peer_name), 0)
+            end
+        end
+
         if uri == nil then
-            error(('box_cfg.apply: unable to build replicaset %q of group ' ..
-                '%q: instance %q has neither iproto.advertise nor ' ..
-                'iproto.listen options'):format(names.replicaset_name,
-                names.group_name, peer_name), 0)
+            error(('%s: instance %q has neither iproto.advertise nor ' ..
+                'iproto.listen options'):format(err_msg_prefix, peer_name), 0)
         end
         table.insert(uris, uri)
     end
