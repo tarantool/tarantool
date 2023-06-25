@@ -2,39 +2,138 @@ local urilib = require('uri')
 local log = require('internal.config.utils.log')
 local instance_config = require('internal.config.instance_config')
 
-local function peer_uris(configdata)
+-- Accept a comma separated list of URIs and return the first one
+-- that is suitable to create a client socket (not just to listen
+-- on the server as, say, 0.0.0.0:3301 or localhost:0).
+--
+-- See the uri_is_suitable_to_connect() method in the instance
+-- schema object for details.
+local function find_suitable_uri_to_connect(uris)
+    for _, u in ipairs(urilib.parse_many(uris)) do
+        if instance_config:uri_is_suitable_to_connect(u) then
+            -- The urilib.format() call has the second optional
+            -- argument `write_password`. Let's assume that the
+            -- given URIs are to listen on them and so have no
+            -- user/password.
+            return urilib.format(u)
+        end
+    end
+    return nil
+end
+
+local function find_password(configdata, username)
+    -- The guest user can't have a password.
+    if username == 'guest' then
+        return nil
+    end
+
+    -- Find a user definition in the config.
+    local user_def = configdata:get('credentials.users.' .. username,
+        {use_default = true})
+    if user_def == nil then
+        error(('box_cfg.apply: cannot find user %s in the config to use its ' ..
+            'password in a replication peer URI'):format(username), 0)
+    end
+
+    -- There is a user definition without a password. Let's assume
+    -- that the user has no password.
+    if user_def.password ~= nil then
+        return user_def.password.plain
+    end
+    return nil
+end
+
+local function peer_uri(configdata, peer_name)
     local names = configdata:names()
     local err_msg_prefix = ('box_cfg.apply: unable to build replicaset %q ' ..
         'of group %q'):format(names.replicaset_name, names.group_name)
 
+    local iproto = configdata:get('iproto', {peer = peer_name}) or {}
+
+    if iproto.advertise ~= nil and not iproto.advertise:endswith('@') then
+        -- The iproto.advertise option contains an URI.
+        --
+        -- There are the following cases.
+        --
+        -- * host:port
+        -- * user@host:port
+        -- * user:pass@host:port
+        --
+        -- Note: the host:port part may represent a Unix domain
+        -- socket: host = 'unix/', port = '/path/to/socket'.
+        --
+        -- The second case needs additional handling: we should
+        -- find password for the given user in the 'credential'
+        -- section of the config.
+        --
+        -- Otherwise, the URI is returned as is.
+        local u, err = urilib.parse(iproto.advertise)
+        -- NB: The URI is validated, so the parsing can't fail.
+        assert(u ~= nil, err)
+        if u.login ~= nil and u.password == nil then
+            u.password = find_password(configdata, u.login)
+            return urilib.format(u, true)
+        end
+        return iproto.advertise
+    elseif iproto.listen ~= nil then
+        -- The iproto.advertise option has no URI.
+        --
+        -- There are the following cases.
+        --
+        -- * <no iproto.advertise>
+        -- * user@
+        -- * user:pass@
+        --
+        -- In any case we should find an URI suitable to create a
+        -- client socket in iproto.listen option. After this, add
+        -- the auth information if any.
+        local uri = find_suitable_uri_to_connect(iproto.listen)
+        if uri == nil then
+            error(('%s: instance %q has no iproto.advertise or ' ..
+                'iproto.listen URI suitable to create a client socket'):format(
+                err_msg_prefix, peer_name), 0)
+        end
+
+        -- No additional auth information in iproto.advertise:
+        -- return the listen URI as is.
+        if iproto.advertise == nil then
+            return uri
+        end
+
+        -- Extract user and password from the iproto.advertise
+        -- option. If no password given, find it in the
+        -- 'credentials' section of the config.
+        assert(iproto.advertise:endswith('@'))
+        local auth = iproto.advertise:sub(1, -2):split(':', 1)
+        local username = auth[1]
+        local password = auth[2] or find_password(configdata, username)
+
+        -- Rebuild the listen URI with the given username and
+        -- password,
+        local u, err = urilib.parse(uri)
+        -- NB: The URI is validated, so the parsing can't fail.
+        assert(u ~= nil, err)
+        u.login = username
+        u.password = password
+        return urilib.format(u, true)
+    end
+
+    return nil
+end
+
+local function peer_uris(configdata)
     local peers = configdata:peers()
     if #peers <= 1 then
         return nil
     end
 
+    local names = configdata:names()
+    local err_msg_prefix = ('box_cfg.apply: unable to build replicaset %q ' ..
+        'of group %q'):format(names.replicaset_name, names.group_name)
+
     local uris = {}
     for _, peer_name in ipairs(peers) do
-        local iproto = configdata:get('iproto', {peer = peer_name}) or {}
-
-        local uri
-        if iproto.advertise ~= nil then
-            uri = iproto.advertise
-        elseif iproto.listen ~= nil then
-            for _, u in ipairs(urilib.parse_many(iproto.listen)) do
-                if instance_config:uri_is_suitable_to_connect(u) then
-                    uri = urilib.format(u)
-                    break
-                end
-            end
-
-            if uri == nil then
-                error(('%s: instance %q has no iproto.advertise option and ' ..
-                    'neither of the iproto.listen URIs are suitable to ' ..
-                    'create a client socket'):format(err_msg_prefix,
-                    peer_name), 0)
-            end
-        end
-
+        local uri = peer_uri(configdata, peer_name)
         if uri == nil then
             error(('%s: instance %q has neither iproto.advertise nor ' ..
                 'iproto.listen options'):format(err_msg_prefix, peer_name), 0)

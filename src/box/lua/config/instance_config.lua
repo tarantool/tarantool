@@ -450,6 +450,17 @@ return schema.new('instance_config', schema.record({
             type = 'string',
             default = box.NULL,
             validate = function(data, w)
+                -- Accept the special syntax user@ or user:pass@.
+                --
+                -- It means using iproto.listen value to connect
+                -- and using the given user and password.
+                --
+                -- If the password is not given, it is extracted
+                -- from the `credentials` section of the config.
+                if data:endswith('@') then
+                    return
+                end
+
                 -- Substitute variables with placeholders to don't
                 -- confuse the URI parser with the curly brackets.
                 data = data:gsub('{{ *.- *}}', 'placeholder')

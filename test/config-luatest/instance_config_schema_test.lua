@@ -423,6 +423,12 @@ for case_name, case in pairs({
     unix_socket_user_pass = {
         advertise = 'user:pass@unix/:/foo/bar.iproto',
     },
+    user = {
+        advertise = 'user@',
+    },
+    user_pass = {
+        advertise = 'user:pass@',
+    },
 }) do
     g[('test_good_iproto_advertise_%s'):format(case_name)] = function()
         assert(case.advertise ~= nil)
