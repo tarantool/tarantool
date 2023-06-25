@@ -144,6 +144,7 @@ extern char session_lua[],
 	config_cluster_config_lua[],
 	config_configdata_lua[],
 	config_instance_config_lua[],
+	config_source_file_lua[],
 	config_utils_log_lua[],
 	config_utils_schema_lua[];
 	/* }}} config */
@@ -321,6 +322,10 @@ static const char *lua_sources[] = {
 	"config/configdata",
 	"internal.config.configdata",
 	config_configdata_lua,
+
+	"config/source/file",
+	"internal.config.source.file",
+	config_source_file_lua,
 
 	"config/applier/app",
 	"internal.config.applier.app",
