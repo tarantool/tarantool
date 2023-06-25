@@ -251,3 +251,41 @@ g.test_config_broadcast = function()
     local exp = {'startup_in_progress', 'ready', 'reload_in_progress', 'ready'}
     t.assert_equals(res.stdout, table.concat(exp, "\n"))
 end
+
+g.test_config_option = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local file_config = [[
+        log:
+          level: 7
+
+        memtx:
+          min_tuple_size: 16
+          memory: 100000000
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001:
+                    database:
+                      rw: true
+    ]]
+    treegen.write_script(dir, 'config.yaml', file_config)
+
+    local script = [[
+        print(box.cfg.memtx_min_tuple_size)
+        print(box.cfg.memtx_memory)
+        print(box.cfg.log_level)
+        os.exit(0)
+    ]]
+    treegen.write_script(dir, 'main.lua', script)
+
+    local env = {TT_LOG_LEVEL = 0}
+    local opts = {nojson = true, stderr = false}
+    local args = {'--name', 'instance-001', '--config', 'config.yaml',
+                  'main.lua'}
+    local res = justrun.tarantool(dir, env, args, opts)
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.stdout, table.concat({16, 100000000, 0}, "\n"))
+end

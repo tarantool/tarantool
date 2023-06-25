@@ -1107,10 +1107,22 @@ run_script_f(va_list ap)
 	}
 
 	/*
-	 * TODO: Remove the stub below and introduce configuration
-	 * setup by using instance->name and instance->config.
+	 * Start an instance using an externally provided
+	 * configuration if the --name option is passed.
 	 */
-	UNUSED(instance);
+	if (instance->name != NULL) {
+		/* require('config'):_startup(name, config) */
+		if (lua_require_lib(L, "config") != 0)
+			goto error;
+		lua_pushstring(L, "_startup");
+		lua_gettable(L, -2);
+		lua_pushvalue(L, -2);
+		lua_pushstring(L, instance->name);
+		lua_pushstring(L, instance->config);
+		if (luaT_call(L, 3, 0) != 0)
+			goto error;
+		lua_settop(L, 0);
+	}
 
 	/*
 	 * Return control to tarantool_lua_run_script.
