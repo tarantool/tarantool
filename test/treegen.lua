@@ -125,6 +125,39 @@ function treegen.prepare_directory(g, scripts, replacements)
     assert(type(replacements) == 'table')
 
     local dir = fio.tempdir()
+
+    -- fio.tempdir() follows the TMPDIR environment variable.
+    -- If it ends with a slash, the return value contains a double
+    -- slash in the middle: for example, if TMPDIR=/tmp/, the
+    -- result is like `/tmp//rfbWOJ`.
+    --
+    -- It looks harmless on the first glance, but this directory
+    -- path may be used later to form an URI for a Unix domain
+    -- socket. As result the URI looks like
+    -- `unix/:/tmp//rfbWOJ/instance-001.iproto`.
+    --
+    -- It confuses net_box.connect(): it reports EAI_NONAME error
+    -- from getaddrinfo().
+    --
+    -- It seems, the reason is a peculiar of the URI parsing:
+    --
+    -- tarantool> uri.parse('unix/:/foo/bar.iproto')
+    -- ---
+    -- - host: unix/
+    --   service: /foo/bar.iproto
+    --   unix: /foo/bar.iproto
+    -- ...
+    --
+    -- tarantool> uri.parse('unix/:/foo//bar.iproto')
+    -- ---
+    -- - host: unix
+    --   path: /foo//bar.iproto
+    -- ...
+    --
+    -- Let's normalize the path using fio.abspath(), which
+    -- eliminates the double slashes.
+    dir = fio.abspath(dir)
+
     table.insert(g.tempdirs, dir)
 
     for _, script in ipairs(scripts) do
