@@ -195,3 +195,59 @@ g.test_config_general = function()
                 "not be set until the instance is restarted"
     t.assert_equals(info.new[1].message, exp)
 end
+
+g.test_config_broadcast = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local file_config = [[
+        app:
+          file: 'script.lua'
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001:
+                    database:
+                      rw: true
+    ]]
+    treegen.write_script(dir, 'config.yaml', file_config)
+
+    local main = [[
+        local fiber = require('fiber')
+        local config = require('config')
+        local status = ''
+        box.watch('config.info', function(_, v) status = v.status end)
+        config:_startup('instance-001', 'config.yaml')
+        while status ~= 'ready' do
+            fiber.sleep(0.1)
+        end
+        print(status)
+        config:reload()
+        while status ~= 'ready' do
+            fiber.sleep(0.1)
+        end
+        print(status)
+        os.exit(0)
+    ]]
+    treegen.write_script(dir, 'main.lua', main)
+
+    local script = [[
+        local fiber = require('fiber')
+        local status = ''
+        box.watch('config.info', function(_, v) status = v.status end)
+        while status ~= 'startup_in_progress' and
+              status ~= 'reload_in_progress' do
+            fiber.sleep(0.1)
+        end
+        print(status)
+    ]]
+    treegen.write_script(dir, 'script.lua', script)
+
+    local opts = {nojson = true, stderr = false}
+    local args = {'main.lua'}
+    local res = justrun.tarantool(dir, {}, args, opts)
+    t.assert_equals(res.exit_code, 0)
+    local exp = {'startup_in_progress', 'ready', 'reload_in_progress', 'ready'}
+    t.assert_equals(res.stdout, table.concat(exp, "\n"))
+end
