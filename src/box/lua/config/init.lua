@@ -59,6 +59,10 @@ local function selfcheck(self, method_name)
     end
 end
 
+local function broadcast(self)
+    box.broadcast('config.info', self:info())
+end
+
 function methods._alert(self, alert)
     assert(alert.type == 'error' or alert.type == 'warn')
     if alert.type == 'error' then
@@ -233,11 +237,13 @@ function methods._startup(self, instance_name, config_file)
     self._status = 'startup_in_progress'
     self._instance_name = instance_name
     self._config_file = config_file
+    broadcast(self)
 
     self:_initialize()
     self:_collect({sync_source = 'all'})
     self:_apply()
     self._status = 'ready'
+    broadcast(self)
 end
 
 function methods.get(self, path)
@@ -260,6 +266,7 @@ function methods._reload_noexc(self, opts)
                       'progress'
     end
     self._status = 'reload_in_progress'
+    broadcast(self)
 
     self._alerts = {}
     local ok, err = pcall(self._collect, self, opts)
@@ -282,6 +289,7 @@ function methods._reload_noexc(self, opts)
         status = 'check_warnings'
     end
     self._status = status
+    broadcast(self)
     return ok, err
 end
 
