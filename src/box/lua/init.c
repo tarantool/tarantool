@@ -148,7 +148,13 @@ extern char session_lua[],
 	config_source_env_lua[],
 	config_source_file_lua[],
 	config_utils_log_lua[],
-	config_utils_schema_lua[];
+	config_utils_schema_lua[]
+#if ENABLE_CONFIG_EXTRAS
+	,
+	config_source_etcd_lua[],
+	config_extras_lua[]
+#endif
+	;
 	/* }}} config */
 
 /**
@@ -336,6 +342,16 @@ static const char *lua_sources[] = {
 	"config/applier/app",
 	"internal.config.applier.app",
 	config_applier_app_lua,
+
+#if ENABLE_CONFIG_EXTRAS
+	"config/source/etcd",
+	"internal.config.source.etcd",
+	config_source_etcd_lua,
+
+	"config/extras",
+	"internal.config.extras",
+	config_extras_lua,
+#endif
 
 	"config/applier/box_cfg",
 	"internal.config.applier.box_cfg",
