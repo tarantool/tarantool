@@ -185,6 +185,14 @@ struct errinj {
 	_(ERRINJ_XLOG_META, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_XLOG_READ, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_XLOG_RENAME_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_XLOG_WRITE_CORRUPTED_BODY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_XLOG_WRITE_CORRUPTED_HEADER, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_XLOG_WRITE_INVALID_BODY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_XLOG_WRITE_INVALID_HEADER, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_XLOG_WRITE_INVALID_KEY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_XLOG_WRITE_INVALID_VALUE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_XLOG_WRITE_UNKNOWN_KEY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_XLOG_WRITE_UNKNOWN_TYPE, ERRINJ_BOOL, {.bparam = false}) \
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];

@@ -595,10 +595,29 @@ xlog_tx_cursor_destroy(struct xlog_tx_cursor *tx_cursor);
  * Fetch next xrow from xlog tx cursor
  *
  * @retval 0 for Ok
+ * @retval 1 if current tx is done
  * @retval -1 for error
  */
 int
 xlog_tx_cursor_next_row(struct xlog_tx_cursor *tx_cursor, struct xrow_header *xrow);
+
+/**
+ * Fetch next xrow from current xlog tx cursor.
+ *
+ * This function is similar to xlog_tx_cursor_next_row() except it doesn't
+ * parse the xrow nor does it advance the data pointer.
+ *
+ * @param cursor cursor
+ * @param[out] data pointer to the position in the internal buffer where
+ *                  the next xrow is stored
+ * @param[out] end end of the buffer
+ *
+ * @retval 0 for Ok
+ * @retval 1 if current tx is done
+ */
+int
+xlog_tx_cursor_next_row_raw(struct xlog_tx_cursor *cursor,
+			    const char ***data, const char **end);
 
 /**
  * Return current tx cursor position
@@ -752,6 +771,24 @@ xlog_cursor_next_tx(struct xlog_cursor *cursor);
  */
 int
 xlog_cursor_next_row(struct xlog_cursor *cursor, struct xrow_header *xrow);
+
+/**
+ * Fetch next xrow from current xlog tx.
+ *
+ * This function is similar to xlog_cursor_next_row() except it doesn't
+ * parse the xrow nor does it advance the data pointer.
+ *
+ * @param cursor cursor
+ * @param[out] data pointer to the position in the internal buffer where
+ *                  the next xrow is stored
+ * @param[out] end end of the buffer
+ *
+ * @retval 0 for Ok
+ * @retval 1 if current tx is done
+ */
+int
+xlog_cursor_next_row_raw(struct xlog_cursor *cursor,
+			 const char ***data, const char **end);
 
 /**
  * Fetch next row from cursor, ignores xlog tx boundary,
