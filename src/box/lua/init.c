@@ -143,6 +143,7 @@ extern char session_lua[],
 	config_applier_mkdir_lua[],
 	config_cluster_config_lua[],
 	config_configdata_lua[],
+	config_init_lua[],
 	config_instance_config_lua[],
 	config_source_env_lua[],
 	config_source_file_lua[],
@@ -355,6 +356,10 @@ static const char *lua_sources[] = {
 	"config/applier/mkdir",
 	"internal.config.applier.mkdir",
 	config_applier_mkdir_lua,
+
+	"config/init",
+	"config",
+	config_init_lua,
 
 	/* }}} config */
 
