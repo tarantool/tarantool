@@ -264,9 +264,30 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 	/* Header */
 	char *d = data + 1; /* Skip 1 byte for MP_MAP */
 	int map_size = 0;
+
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_INVALID_KEY, {
+		d = mp_encode_bool(d, true);
+		d = mp_encode_uint(d, 1);
+		map_size++;
+	});
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_INVALID_VALUE, {
+		d = mp_encode_uint(d, IPROTO_KEY);
+		d = mp_encode_uint(d, 1);
+		map_size++;
+	});
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_UNKNOWN_KEY, {
+		d = mp_encode_uint(d, 666);
+		d = mp_encode_uint(d, 1);
+		map_size++;
+	});
+
+	uint32_t type = header->type;
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_UNKNOWN_TYPE, {
+		type = 777;
+	});
 	if (true) {
 		d = mp_encode_uint(d, IPROTO_REQUEST_TYPE);
-		d = mp_encode_uint(d, header->type);
+		d = mp_encode_uint(d, type);
 		map_size++;
 	}
 
@@ -343,6 +364,12 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 	}
 	assert(d <= data + XROW_HEADER_LEN_MAX);
 	mp_encode_map(data, map_size);
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_INVALID_HEADER, {
+		mp_encode_array(data, 0);
+	});
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_CORRUPTED_HEADER, {
+		*data = 0xc1;
+	});
 	out->iov_len = d - (char *) out->iov_base;
 	out++;
 
@@ -1058,6 +1085,21 @@ xrow_encode_dml(const struct request *request, struct region *region,
 	char *begin = xregion_alloc(region, len);
 	char *pos = begin + 1;     /* skip 1 byte for MP_MAP */
 	int map_size = 0;
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_INVALID_KEY, {
+		pos = mp_encode_bool(pos, true);
+		pos = mp_encode_uint(pos, 2);
+		map_size++;
+	});
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_INVALID_VALUE, {
+		pos = mp_encode_uint(pos, IPROTO_KEY);
+		pos = mp_encode_uint(pos, 2);
+		map_size++;
+	});
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_UNKNOWN_KEY, {
+		pos = mp_encode_uint(pos, 666);
+		pos = mp_encode_uint(pos, 2);
+		map_size++;
+	});
 	if (request->space_id) {
 		pos = mp_encode_uint(pos, IPROTO_SPACE_ID);
 		pos = mp_encode_uint(pos, request->space_id);
@@ -1117,6 +1159,12 @@ xrow_encode_dml(const struct request *request, struct region *region,
 
 	assert(pos <= begin + len);
 	mp_encode_map(begin, map_size);
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_INVALID_BODY, {
+		mp_encode_array(begin, 0);
+	});
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_CORRUPTED_BODY, {
+		*begin = 0xc1;
+	});
 	iov[0].iov_base = begin;
 	iov[0].iov_len = pos - begin;
 	*iovcnt = 1;
