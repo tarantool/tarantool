@@ -75,7 +75,7 @@ local function test_unsigned(test, s)
     rt(test, s, 4294967297LL, "number")
     rt(test, s, 4294967297ULL, "number")
 
-    -- 1e52 - maximum int that can be stored to double without losing precision
+    -- 2^53 - maximum int that can be stored to double without losing precision
     -- decrease double capacity to fit .14g output format
     rt(test, s, 99999999999999, "number")
     rt(test, s, 99999999999999LL, "number")
@@ -131,7 +131,7 @@ local function test_signed(test, s)
     rt(test, s, -2147483648, 'number')
     rt(test, s, -2147483648LL, 'number')
 
-    -- 1e52 - maximum int that can be stored to double without losing precision
+    -- 2^53 - maximum int that can be stored to double without losing precision
     -- decrease double capacity to fit .14g output format
     rt(test, s, -99999999999999, "number")
     rt(test, s, -99999999999999LL, "number")
