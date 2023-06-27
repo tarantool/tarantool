@@ -915,6 +915,7 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	space_swap_constraint_ids(alter->new_space, alter->old_space);
 	space_reattach_constraints(alter->old_space);
 	space_pin_collations(alter->old_space);
+	space_pin_defaults(alter->old_space);
 	space_cache_replace(alter->new_space, alter->old_space);
 	alter_space_delete(alter);
 	return 0;
@@ -1043,6 +1044,7 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	space_cache_replace(alter->old_space, alter->new_space);
 	space_detach_constraints(alter->old_space);
 	space_unpin_collations(alter->old_space);
+	space_unpin_defaults(alter->old_space);
 	/*
 	 * Install transaction commit/rollback triggers to either
 	 * finish or rollback the DDL depending on the results of
@@ -1751,6 +1753,7 @@ on_drop_space_rollback(struct trigger *trigger, void *event)
 	space_cache_replace(NULL, space);
 	space_reattach_constraints(space);
 	space_pin_collations(space);
+	space_pin_defaults(space);
 	return 0;
 }
 
@@ -2254,6 +2257,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 */
 		space_detach_constraints(old_space);
 		space_unpin_collations(old_space);
+		space_unpin_defaults(old_space);
 		/**
 		 * The space must be deleted from the space
 		 * cache right away to achieve linearisable

@@ -695,6 +695,22 @@ local function normalize_foreign_key(space_id, space_name, fkey, error_prefix,
     return result
 end
 
+-- Check and normalize field default function.
+local function normalize_default_func(func_name, error_prefix)
+    if type(func_name) ~= 'string' then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  error_prefix .. "field default function name is expected " ..
+                  "to be a string, but got " .. type(func_name))
+    end
+    local found = box.space._func.index.name:get(func_name)
+    if not found then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  error_prefix .. "field default function was not found by " ..
+                  "name '" .. func_name .. "'")
+    end
+    return found.id
+end
+
 local function normalize_format(space_id, space_name, format)
     local result = {}
     for i, given in ipairs(format) do
@@ -728,6 +744,9 @@ local function normalize_format(space_id, space_name, format)
                 elseif k == 'foreign_key' then
                     field[k] = normalize_foreign_key(space_id, space_name,
                                                      v, "format[" .. i .. "]: ")
+                elseif k == 'default_func' then
+                    field[k] = normalize_default_func(v,
+                                                      "format[" .. i .. "]: ")
                 else
                     field[k] = v
                 end

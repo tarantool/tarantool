@@ -38,7 +38,7 @@ tuple_constraint_func_find(struct tuple_constraint *constr)
 
 /**
  * Verify function @a func comply function rules for constraint @a constr.
- * Return nonzero in case on some problems, diag is set (@a space_name is
+ * Return nonzero in case of some problems, diag is set (@a space_name is
  * used for better error message).
  */
 static int
@@ -185,7 +185,7 @@ tuple_constraint_func_init(struct tuple_constraint *constr,
 	if (func == NULL && recovery_state <= INITIAL_RECOVERY) {
 		/*
 		 * That's an initial recovery and func space is not loaded yet,
-		 * we heave to leave it a return to it after.
+		 * we have to leave it and return to it after.
 		 */
 		assert(constr->check == tuple_constraint_noop_check);
 		return 0;

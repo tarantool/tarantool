@@ -214,6 +214,7 @@ set(box_sources
     func.c
     func_cache.c
     func_def.c
+    field_default_func.c
     tuple_constraint_func.c
     tuple_constraint_fkey.c
     key_list.c

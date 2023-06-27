@@ -36,6 +36,7 @@
 #include "trivia/util.h"
 #include "tuple_builder.h"
 #include "tuple_constraint.h"
+#include "field_default_func.h"
 #include "tt_static.h"
 
 #include <PMurHash.h>
@@ -154,6 +155,11 @@ tuple_format_cmp(const struct tuple_format *format1,
 			if (cmp != 0)
 				return cmp;
 		}
+		if (field_a->default_value.func.id !=
+		    field_b->default_value.func.id) {
+			return (int)field_a->default_value.func.id -
+			       (int)field_b->default_value.func.id;
+		}
 	}
 
 	return tuple_dictionary_cmp(format1->dict, format2->dict);
@@ -186,6 +192,7 @@ tuple_format_hash(struct tuple_format *format)
 		PMurHash32_Process(&h, &carry, f->default_value.data,
 				   (int)f->default_value.size);
 		size += f->default_value.size;
+		TUPLE_FIELD_MEMBER_HASH(f, default_value.func.id, h, carry, size)
 	}
 #undef TUPLE_FIELD_MEMBER_HASH
 	size += tuple_dictionary_hash_process(format->dict, &h, &carry);
@@ -229,10 +236,13 @@ tuple_field_new(void)
 static void
 tuple_field_delete(struct tuple_field *field)
 {
+	/* Ensure that constraint and default value functions are not pinned. */
 	for (uint32_t i = 0; i < field->constraint_count; i++) {
 		assert(field->constraint[i].destroy ==
 		       tuple_constraint_noop_alter);
 	}
+	assert(field->default_value.func.holder.func == NULL);
+
 	free(field->multikey_required_fields);
 	free(field->constraint);
 	if (field->sql_default_value_expr != NULL)
@@ -555,8 +565,14 @@ tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 			if (field->sql_default_value_expr == NULL)
 				return -1;
 		}
+		if (fields[i].default_func_id > 0) {
+			field->default_value.func.id =
+				fields[i].default_func_id;
+			format->default_field_count = i + 1;
+		}
 		char *default_value = fields[i].default_value;
-		if (default_value != NULL) {
+		if (default_value != NULL &&
+		    !tuple_field_has_default_func(field)) {
 			bool is_compatible = field_mp_type_is_compatible(
 				field->type, default_value, false);
 			if (!is_compatible) {
@@ -567,6 +583,8 @@ tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 					 mp_type_strs[type]);
 				return -1;
 			}
+		}
+		if (default_value != NULL) {
 			size_t size = fields[i].default_value_size;
 			char *buf = xmalloc(size);
 			memcpy(buf, default_value, size);
@@ -1497,12 +1515,13 @@ eof:
 	return 0;
 }
 
-bool
+int
 tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 			    const char **data_end)
 {
 	struct tuple_builder builder;
 	tuple_builder_new(&builder, &fiber()->gc);
+	size_t region_svp = region_used(&fiber()->gc);
 	bool is_tuple_changed = false;
 	/*
 	 * Process fields that are present in both the format and the tuple.
@@ -1521,7 +1540,19 @@ tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 		if (is_null)
 			field = tuple_format_field(format, i);
 
-		if (is_null && tuple_field_has_default(field)) {
+		if (is_null && tuple_field_has_default_func(field)) {
+			struct field_default_value *d = &field->default_value;
+			const char *ret_data;
+			uint32_t ret_size;
+			if (field_default_func_call(&d->func, d->data,
+						    d->size, &ret_data,
+						    &ret_size) != 0) {
+				region_truncate(&fiber()->gc, region_svp);
+				return -1;
+			}
+			tuple_builder_add(&builder, ret_data, ret_size, 1);
+			is_tuple_changed = true;
+		} else if (is_null && field->default_value.data != NULL) {
 			tuple_builder_add(&builder, field->default_value.data,
 					  field->default_value.size, 1);
 			is_tuple_changed = true;
@@ -1536,7 +1567,19 @@ tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 	 */
 	for ( ; i < format->default_field_count; i++) {
 		struct tuple_field *field = tuple_format_field(format, i);
-		if (tuple_field_has_default(field)) {
+		if (tuple_field_has_default_func(field)) {
+			struct field_default_value *d = &field->default_value;
+			const char *ret_data;
+			uint32_t ret_size;
+			if (field_default_func_call(&d->func, d->data,
+						    d->size, &ret_data,
+						    &ret_size) != 0) {
+				region_truncate(&fiber()->gc, region_svp);
+				return -1;
+			}
+			tuple_builder_add(&builder, ret_data, ret_size, 1);
+			is_tuple_changed = true;
+		} else if (field->default_value.data != NULL) {
 			tuple_builder_add(&builder, field->default_value.data,
 					  field->default_value.size, 1);
 			is_tuple_changed = true;
@@ -1547,8 +1590,10 @@ tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 	/*
 	 * Return if no fields were changed.
 	 */
-	if (!is_tuple_changed)
-		return false;
+	if (!is_tuple_changed) {
+		region_truncate(&fiber()->gc, region_svp);
+		return 0;
+	}
 	/*
 	 * If the tuple has more fields, append them as is.
 	 */
@@ -1560,5 +1605,5 @@ tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 	 * Allocate a buffer and encode all elements into the new MsgPack array.
 	 */
 	tuple_builder_finalize(&builder, data, data_end);
-	return true;
+	return 0;
 }

@@ -205,6 +205,7 @@ static const struct opt_def field_def_reg[] = {
 	OPT_DEF_ENUM("compression", compression_type, struct field_def,
 		     compression_type, NULL),
 	OPT_DEF_CUSTOM("default", field_def_parse_default_value),
+	OPT_DEF("default_func", OPT_UINT32, struct field_def, default_func_id),
 	OPT_DEF_CUSTOM("constraint", field_def_parse_constraint),
 	OPT_DEF_CUSTOM("foreign_key", field_def_parse_foreign_key),
 	OPT_END,
@@ -224,6 +225,7 @@ const struct field_def field_def_default = {
 	.sql_default_value = NULL,
 	.default_value = NULL,
 	.default_value_size = 0,
+	.default_func_id = 0,
 	.constraint_count = 0,
 	.constraint_def = NULL,
 };

@@ -155,6 +155,8 @@ struct field_def {
 	char *default_value;
 	/** Size of the default value. */
 	size_t default_value_size;
+	/** ID of the field default function. */
+	uint32_t default_func_id;
 	/** Compression type for this field. */
 	enum compression_type compression_type;
 	/** Array of constraints. Can be NULL if constraints_count == 0. */
