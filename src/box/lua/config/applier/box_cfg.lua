@@ -191,7 +191,29 @@ local function apply(config)
     -- they're already added to `box_cfg`.
     box_cfg.log = log_destination(configdata)
 
-    box_cfg.read_only = not configdata:get('database.rw', {use_default = true})
+    -- Read-only or read-write?
+    --
+    -- 'rw' and 'ro' mean itself.
+    --
+    -- The default is determined depending of amount of instances
+    -- in the given replicaset.
+    --
+    -- * 1 instance: read-write.
+    -- * >1 instances: read-only.
+    local mode = configdata:get('database.mode', {use_default = true})
+    if mode == 'ro' then
+        box_cfg.read_only = true
+    elseif mode == 'rw' then
+        box_cfg.read_only = false
+    elseif #configdata:peers() == 1 then
+        assert(mode == nil)
+        box_cfg.read_only = false
+    elseif #configdata:peers() > 1 then
+        assert(mode == nil)
+        box_cfg.read_only = true
+    else
+        assert(false)
+    end
 
     assert(type(box.cfg) == 'function' or type(box.cfg) == 'table')
     if type(box.cfg) == 'table' then

@@ -30,7 +30,7 @@ g.test_cluster_config = function()
                         instances = {
                             ['instance-001'] = {
                                 database = {
-                                    rw = true,
+                                    mode = 'rw',
                                 },
                             },
                         },
@@ -58,7 +58,7 @@ g.test_cluster_config = function()
             cache_size = 2000,
         },
         database = {
-            rw = true,
+            mode = 'rw',
         },
         iproto = {
             listen = 'unix/:./{{ instance_name }}.iproto',
@@ -71,7 +71,7 @@ g.test_cluster_config = function()
     local result = cluster_config:find_instance(config, 'instance-001')
     local expected_instance = {
         database = {
-            rw = true,
+            mode = 'rw',
         },
     }
     local expected_replicaset = {
@@ -167,7 +167,7 @@ g.test_defaults = function()
             instance_uuid = box.NULL,
             replicaset_uuid = box.NULL,
             hot_standby = false,
-            rw = false,
+            mode = box.NULL,
             txn_timeout = 3153600000,
             txn_isolation = 'best-effort',
             use_mvcc_engine = false,

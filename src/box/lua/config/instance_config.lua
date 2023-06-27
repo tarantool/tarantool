@@ -569,10 +569,21 @@ return schema.new('instance_config', schema.record({
             box_cfg_nondynamic = true,
             default = false,
         }),
-        -- Reversed and applied to box_cfg.read_only.
-        rw = schema.scalar({
-            type = 'boolean',
-            default = false,
+        -- Applied to box_cfg.read_only.
+        --
+        -- The effective default depends on amount of instances in
+        -- a replicaset.
+        --
+        -- A singleton instance (the only instance in the
+        -- replicaset) is in the 'rw' mode by default.
+        --
+        -- If the replicaset contains several (more than one)
+        -- instances, the default is 'ro'.
+        mode = schema.enum({
+            'ro',
+            'rw',
+        }, {
+            default = box.NULL,
         }),
         txn_timeout = schema.scalar({
             type = 'number',
