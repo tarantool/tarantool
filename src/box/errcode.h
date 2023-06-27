@@ -327,6 +327,8 @@ struct errcode_record {
 	/*272 */_(ER_SCHEMA_UPGRADE_IN_PROGRESS, "Schema upgrade is already in progress") \
 	/*273 */_(ER_DEPRECATED,		"%s is deprecated") \
 	/*274 */_(ER_UNCONFIGURED,		"Please call box.cfg{} first") \
+	/*275 */_(ER_CREATE_DEFAULT_FUNC,	"Failed to create field default function '%s': %s") \
+	/*276 */_(ER_DEFAULT_FUNC_FAILED,	"Error calling field default function '%s': %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

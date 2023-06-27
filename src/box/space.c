@@ -52,6 +52,7 @@
 #include "tuple_constraint.h"
 #include "tuple_constraint_func.h"
 #include "tuple_constraint_fkey.h"
+#include "field_default_func.h"
 #include "wal_ext.h"
 #include "coll_id_cache.h"
 
@@ -285,6 +286,45 @@ space_unpin_collations(struct space *space)
 	rlist_create(&space->coll_id_holders);
 }
 
+/**
+ * Initialize functional default field values that are defined in space format.
+ * Can return nonzero in case of error (diag is set).
+ */
+static int
+space_init_defaults(struct space *space)
+{
+	struct tuple_format *format = space->format;
+	for (uint32_t i = 0; i < format->default_field_count; i++) {
+		struct tuple_field *field = tuple_format_field(format, i);
+		if (tuple_field_has_default_func(field) &&
+		    field_default_func_init(&field->default_value.func) != 0)
+			return -1;
+	}
+	return 0;
+}
+
+void
+space_pin_defaults(struct space *space)
+{
+	struct tuple_format *format = space->format;
+	for (uint32_t i = 0; i < format->default_field_count; i++) {
+		struct tuple_field *field = tuple_format_field(format, i);
+		if (tuple_field_has_default_func(field))
+			field_default_func_pin(&field->default_value.func);
+	}
+}
+
+void
+space_unpin_defaults(struct space *space)
+{
+	struct tuple_format *format = space->format;
+	for (uint32_t i = 0; i < format->default_field_count; i++) {
+		struct tuple_field *field = tuple_format_field(format, i);
+		if (tuple_field_has_default_func(field))
+			field_default_func_unpin(&field->default_value.func);
+	}
+}
+
 int
 space_create(struct space *space, struct engine *engine,
 	     const struct space_vtab *vtab, struct space_def *def,
@@ -353,6 +393,8 @@ space_create(struct space *space, struct engine *engine,
 	if (space_init_constraints(space) != 0)
 		goto fail_free_indexes;
 	space_pin_collations(space);
+	if (space_init_defaults(space) != 0)
+		goto fail_free_indexes;
 
 	/*
 	 * Check if there are unique indexes that are contained
@@ -396,6 +438,7 @@ fail:
 		space_def_delete(space->def);
 	if (space->format != NULL) {
 		space_cleanup_constraints(space);
+		space_unpin_defaults(space);
 		tuple_format_unref(space->format);
 	}
 	space_unpin_collations(space);
@@ -406,7 +449,11 @@ int
 space_on_initial_recovery_complete(struct space *space, void *nothing)
 {
 	(void)nothing;
-	return space_init_constraints(space);
+	if (space_init_constraints(space) != 0)
+		return -1;
+	if (space_init_defaults(space) != 0)
+		return -1;
+	return 0;
 }
 
 int
@@ -452,6 +499,7 @@ space_delete(struct space *space)
 	free(space->check_unique_constraint_map);
 	if (space->format != NULL) {
 		space_cleanup_constraints(space);
+		space_unpin_defaults(space);
 		tuple_format_unref(space->format);
 	}
 	space_unpin_collations(space);
@@ -602,12 +650,13 @@ space_apply_defaults(struct space *space, struct txn *txn,
 	const char *new_data_end = request->tuple_end;
 	size_t region_svp = region_used(&fiber()->gc);
 
-	bool changed = tuple_format_apply_defaults(space->format, &new_data,
-						   &new_data_end);
-	if (!changed) {
-		region_truncate(&fiber()->gc, region_svp);
+	if (tuple_format_apply_defaults(space->format, &new_data,
+					&new_data_end) != 0)
+		return -1;
+
+	bool is_tuple_changed = new_data != request->tuple;
+	if (!is_tuple_changed)
 		return 0;
-	}
 	/*
 	 * Field defaults changed the resulting tuple.
 	 * Fix the request to conform.

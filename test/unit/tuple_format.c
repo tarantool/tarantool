@@ -22,7 +22,7 @@
 static int
 test_tuple_format_cmp(void)
 {
-	plan(17);
+	plan(19);
 	header();
 
 	char buf[1024];
@@ -173,6 +173,30 @@ test_tuple_format_cmp(void)
 			 "name", "f", "default", "\x01");
 	f2 = runtime_tuple_format_new(buf, size, false);
 	ok(f1 != f2, "tuple formats with different MsgPacks of 'default' "
+	   "definitions are not equal");
+	tuple_format_delete(f1);
+	tuple_format_delete(f2);
+
+	size = mp_format(buf, lengthof(buf), "[{%s%s}]", "name", "f");
+	f1 = runtime_tuple_format_new(buf, size, false);
+	size = mp_format(buf, lengthof(buf), "[{%s%s %s%d}]",
+			 "name", "f", "default_func", 66);
+	f2 = runtime_tuple_format_new(buf, size, false);
+	fail_if(f1 == NULL);
+	fail_if(f2 == NULL);
+	ok(f1 != f2, "tuple formats with/without 'default_func' are not equal");
+	tuple_format_delete(f1);
+	tuple_format_delete(f2);
+
+	size = mp_format(buf, lengthof(buf), "[{%s%s %s%d}]",
+			 "name", "f", "default_func", 66);
+	f1 = runtime_tuple_format_new(buf, size, false);
+	size = mp_format(buf, lengthof(buf), "[{%s%s %s%d}]",
+			 "name", "f", "default_func", 67);
+	f2 = runtime_tuple_format_new(buf, size, false);
+	fail_if(f1 == NULL);
+	fail_if(f2 == NULL);
+	ok(f1 != f2, "tuple formats with different MsgPacks of 'default_func' "
 	   "definitions are not equal");
 	tuple_format_delete(f1);
 	tuple_format_delete(f2);

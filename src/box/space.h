@@ -290,6 +290,18 @@ space_pin_collations(struct space *space);
 void
 space_unpin_collations(struct space *space);
 
+/**
+ * Pin functional default field values in cache, so that they can't be deleted.
+ */
+void
+space_pin_defaults(struct space *space);
+
+/**
+ * Unpin functional default field values.
+ */
+void
+space_unpin_defaults(struct space *space);
+
 /** Initialize a base space instance. */
 int
 space_create(struct space *space, struct engine *engine,

@@ -493,6 +493,8 @@ t;
  |   272: box.error.SCHEMA_UPGRADE_IN_PROGRESS
  |   273: box.error.DEPRECATED
  |   274: box.error.UNCONFIGURED
+ |   275: box.error.CREATE_DEFAULT_FUNC
+ |   276: box.error.DEFAULT_FUNC_FAILED
  | ...
 
 test_run:cmd("setopt delimiter ''");

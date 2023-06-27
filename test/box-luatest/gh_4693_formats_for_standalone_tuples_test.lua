@@ -114,9 +114,12 @@ g.test_box_tuple_format_serialization = function(cg)
         test_tuple_format_contents(f, contents)
         f = box.tuple.format.new{{name = 'field', type = 'string'}}
         test_tuple_format_contents(f, contents)
+
+        box.schema.func.create('foo', {body = "function() return '' end"})
+
         contents = {{name = 'field1', type = 'string', is_nullable = true,
                      nullable_action = 'none', collation = 'unicode_uk_s2',
-                     default = 'UPPER("string")',
+                     default = 'UPPER("string")', default_func = 'foo',
                      constraint = {ck = 'box.schema.user.info'},
                      foreign_key = {fk = {space = '_space', field = 'name'}}},
                      {name = 'field2', type = 'any', nullable_action = 'ignore',
@@ -126,6 +129,7 @@ g.test_box_tuple_format_serialization = function(cg)
             box.space._collation.index.name:get{contents[1].collation}.id
         contents[1].constraint =
             {ck = box.space._func.index.name:get{contents[1].constraint.ck}.id}
+        contents[1].default_func = box.func.foo.id
         local sid =
             box.space._space.index.name:get{contents[1].foreign_key.fk.space}.id
         contents[1].foreign_key.fk.space = sid
@@ -136,6 +140,7 @@ g.test_box_tuple_format_serialization = function(cg)
         f = box.tuple.format.new(contents)
         contents[1].foreign_key = {unknown = fk}
         test_tuple_format_contents(f, contents)
+        box.func.foo:drop()
     end)
 end
 
@@ -199,6 +204,11 @@ g.test_box_tuple_new_with_format = function(cg)
             box.tuple.format.new{{'field', foreign_key = {space = 'nonexistent',
                                                           field = 1}}}
         end)
+
+        -- Checks that field default function is not pinned.
+        box.schema.func.create('foo', {body = "function() return '' end"})
+        box.tuple.format.new{{name = 'field', default_func = 'foo'}}
+        box.func.foo:drop()
     end)
 end
 
