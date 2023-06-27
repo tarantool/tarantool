@@ -45,6 +45,7 @@ lua_source(lua_sources lua/config/applier/fiber.lua       config_applier_fiber_l
 lua_source(lua_sources lua/config/applier/mkdir.lua       config_applier_mkdir_lua)
 lua_source(lua_sources lua/config/cluster_config.lua      config_cluster_config_lua)
 lua_source(lua_sources lua/config/configdata.lua          config_configdata_lua)
+lua_source(lua_sources lua/config/init.lua                config_init_lua)
 lua_source(lua_sources lua/config/instance_config.lua     config_instance_config_lua)
 lua_source(lua_sources lua/config/source/env.lua          config_source_env_lua)
 lua_source(lua_sources lua/config/source/file.lua         config_source_file_lua)

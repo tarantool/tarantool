@@ -1,8 +1,19 @@
 local t = require('luatest')
 local cluster_config = require('internal.config.cluster_config')
 local configdata = require('internal.config.configdata')
+local treegen = require('test.treegen')
+local justrun = require('test.justrun')
+local json = require('json')
 
 local g = t.group()
+
+g.before_all(function()
+    treegen.init(g)
+end)
+
+g.after_all(function()
+    treegen.clean(g)
+end)
 
 g.test_configdata = function()
     local cconfig = {
@@ -111,4 +122,76 @@ g.test_configdata = function()
     t.assert_equals(data:names(), expected_names)
 
     t.assert_equals(data:peers(), {'instance-001', 'instance-002'})
+end
+
+g.test_config_general = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local script = [[
+        local json = require('json')
+        local config = require('config')
+        local file_config = "\
+            log:\
+              level: 7\
+            memtx:\
+              min_tuple_size: 16\
+              memory: 100000000\
+            groups:\
+              group-001:\
+                replicasets:\
+                  replicaset-001:\
+                    instances:\
+                      instance-001:\
+                        database:\
+                          rw: true\
+        "
+        file = io.open('config.yaml', 'w')
+        file:write(file_config)
+        file:close()
+        assert(config:info().status == 'uninitialized')
+        config:_startup('instance-001', 'config.yaml')
+        assert(config:info().status == 'ready')
+        assert(box.cfg.memtx_min_tuple_size == 16)
+        assert(box.cfg.memtx_memory == 100000000)
+        assert(box.cfg.log_level == 0)
+        local res = {old = config:info().alerts}
+
+        file_config = "\
+            log:\
+              level: 7\
+            memtx:\
+              min_tuple_size: 32\
+              memory: 100000001\
+            groups:\
+              group-001:\
+                replicasets:\
+                  replicaset-001:\
+                    instances:\
+                      instance-001:\
+                        database:\
+                          rw: true\
+        "
+        file = io.open('config.yaml', 'w')
+        file:write(file_config)
+        file:close()
+        config:reload()
+        assert(box.cfg.memtx_min_tuple_size == 16)
+        assert(box.cfg.memtx_memory == 100000001)
+        assert(box.cfg.log_level == 0)
+        res.new = config:info().alerts
+        print(json.encode(res))
+        os.exit(0)
+    ]]
+    treegen.write_script(dir, 'main.lua', script)
+
+    local env = {TT_LOG_LEVEL = 0}
+    local opts = {nojson = true, stderr = false}
+    local res = justrun.tarantool(dir, env, {'main.lua'}, opts)
+    t.assert_equals(res.exit_code, 0)
+    local info = json.decode(res.stdout)
+    t.assert_equals(info.old, {})
+    t.assert_equals(#info.new, 1)
+    t.assert_equals(info.new[1].type, 'warn')
+    local exp = "box_cfg.apply: non-dynamic option memtx_min_tuple_size will "..
+                "not be set until the instance is restarted"
+    t.assert_equals(info.new[1].message, exp)
 end
