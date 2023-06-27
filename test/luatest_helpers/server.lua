@@ -58,22 +58,30 @@ local function find_advertise_uri(config, instance_name, dir)
                 break
             end
             if instance.iproto ~= nil then
-                advertise = advertise or instance.iproto.advertise
+                if instance.iproto.advertise ~= nil then
+                    advertise = advertise or instance.iproto.advertise.client
+                end
                 listen = listen or instance.iproto.listen
             end
             if replicaset.iproto ~= nil then
-                advertise = advertise or replicaset.iproto.advertise
+                if replicaset.iproto.advertise ~= nil then
+                    advertise = advertise or replicaset.iproto.advertise.client
+                end
                 listen = listen or replicaset.iproto.listen
             end
             if group.iproto ~= nil then
-                advertise = advertise or group.iproto.advertise
+                if group.iproto.advertise ~= nil then
+                    advertise = advertise or group.iproto.advertise.client
+                end
                 listen = listen or group.iproto.listen
             end
         end
     end
 
     if config.iproto ~= nil then
-        advertise = advertise or config.iproto.advertise
+        if config.iproto.advertise ~= nil then
+            advertise = advertise or config.iproto.advertise.client
+        end
         listen = listen or config.iproto.listen
     end
 

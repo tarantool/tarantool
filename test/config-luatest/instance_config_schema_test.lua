@@ -290,7 +290,11 @@ g.test_iproto = function()
     local iconfig = {
         iproto = {
             listen = 'one',
-            advertise = 'two',
+            advertise = {
+                client = 'two',
+                peer = 'three',
+                sharding = 'four',
+            },
             threads = 1,
             net_msg_max = 1,
             readahead = 1,
@@ -301,7 +305,11 @@ g.test_iproto = function()
 
     local exp = {
         listen = box.NULL,
-        advertise = box.NULL,
+        advertise = {
+            client = box.NULL,
+            peer = box.NULL,
+            sharding = box.NULL,
+        },
         threads = 1,
         net_msg_max = 768,
         readahead = 16320,
@@ -315,7 +323,7 @@ for case_name, case in pairs({
     incorrect_uri = {
         advertise = ':3301',
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise',
+            '[instance_config] iproto.advertise.%s',
             'Unable to parse an URI',
             'Incorrect URI',
             'expected host:service or /unix.socket'
@@ -324,82 +332,87 @@ for case_name, case in pairs({
     multiple_uris = {
         advertise = 'localhost:3301,localhost:3302',
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise',
+            '[instance_config] iproto.advertise.%s',
             'A single URI is expected, not a list of URIs',
         }, ': '),
     },
     inaddr_any_ipv4 = {
         advertise = '0.0.0.0:3301',
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise',
+            '[instance_config] iproto.advertise.%s',
             'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
         }, ': '),
     },
     inaddr_any_ipv4_user = {
         advertise = 'user@0.0.0.0:3301',
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise',
+            '[instance_config] iproto.advertise.%s',
             'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
         }, ': '),
     },
     inaddr_any_ipv4_user_pass = {
         advertise = 'user:pass@0.0.0.0:3301',
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise',
+            '[instance_config] iproto.advertise.%s',
             'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
         }, ': '),
     },
     inaddr_any_ipv6 = {
         advertise = '[::]:3301',
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise',
+            '[instance_config] iproto.advertise.%s',
             'in6addr_any (::) cannot be used to create a client socket',
         }, ': '),
     },
     inaddr_any_ipv6_user = {
         advertise = 'user@[::]:3301',
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise',
+            '[instance_config] iproto.advertise.%s',
             'in6addr_any (::) cannot be used to create a client socket',
         }, ': '),
     },
     inaddr_any_ipv6_user_pass = {
         advertise = 'user:pass@[::]:3301',
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise',
+            '[instance_config] iproto.advertise.%s',
             'in6addr_any (::) cannot be used to create a client socket',
         }, ': '),
     },
     zero_port = {
         advertise = 'localhost:0',
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise',
+            '[instance_config] iproto.advertise.%s',
             'An URI with zero port cannot be used to create a client socket',
         }, ': '),
     },
     zero_port_user = {
         advertise = 'user@localhost:0',
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise',
+            '[instance_config] iproto.advertise.%s',
             'An URI with zero port cannot be used to create a client socket',
         }, ': '),
     },
     zero_port_user_pass = {
         advertise = 'user:pass@localhost:0',
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise',
+            '[instance_config] iproto.advertise.%s',
             'An URI with zero port cannot be used to create a client socket',
         }, ': '),
     },
 }) do
     g[('test_bad_iproto_advertise_%s'):format(case_name)] = function()
-        t.assert_error_msg_equals(case.exp_err_msg, function()
-            instance_config:validate({
-                iproto = {
-                    advertise = case.advertise,
-                },
-            })
-        end)
+        for _, option_name in ipairs({'client', 'peer', 'sharding'}) do
+            local exp_err_msg = case.exp_err_msg:format(option_name)
+            t.assert_error_msg_equals(exp_err_msg, function()
+                instance_config:validate({
+                    iproto = {
+                        advertise = {
+                            [option_name] = case.advertise,
+                        },
+                    },
+                })
+            end)
+        end
     end
 end
 
@@ -432,11 +445,15 @@ for case_name, case in pairs({
 }) do
     g[('test_good_iproto_advertise_%s'):format(case_name)] = function()
         assert(case.advertise ~= nil)
-        instance_config:validate({
-            iproto = {
-                advertise = case.advertise,
-            },
-        })
+        for _, option_name in ipairs({'client', 'peer', 'sharding'}) do
+            instance_config:validate({
+                iproto = {
+                    advertise = {
+                        [option_name] = case.advertise,
+                    },
+                },
+            })
+        end
     end
 end
 
