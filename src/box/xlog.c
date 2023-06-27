@@ -1869,6 +1869,17 @@ xlog_tx_cursor_next_row(struct xlog_tx_cursor *tx_cursor,
 }
 
 int
+xlog_tx_cursor_next_row_raw(struct xlog_tx_cursor *tx_cursor,
+			    const char ***data, const char **end)
+{
+	if (ibuf_used(&tx_cursor->rows) == 0)
+		return 1;
+	*data = (const char **)&tx_cursor->rows.rpos;
+	*end = (const char *)tx_cursor->rows.wpos;
+	return 0;
+}
+
+int
 xlog_tx_cursor_destroy(struct xlog_tx_cursor *tx_cursor)
 {
 	assert(tx_cursor->rows.slabc == &cord()->slabc);
@@ -1908,7 +1919,10 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 {
 	int rc;
 	assert(xlog_cursor_is_open(i));
-
+	if (i->state == XLOG_CURSOR_TX) {
+		i->state = XLOG_CURSOR_ACTIVE;
+		xlog_tx_cursor_destroy(&i->tx_cursor);
+	}
 	/* load at least magic to check eof */
 	rc = xlog_cursor_ensure(i, sizeof(log_magic_t));
 	if (rc < 0)
@@ -1961,12 +1975,17 @@ xlog_cursor_next_row(struct xlog_cursor *cursor, struct xrow_header *xrow)
 	assert(xlog_cursor_is_open(cursor));
 	if (cursor->state != XLOG_CURSOR_TX)
 		return 1;
-	int rc = xlog_tx_cursor_next_row(&cursor->tx_cursor, xrow);
-	if (rc != 0) {
-		cursor->state = XLOG_CURSOR_ACTIVE;
-		xlog_tx_cursor_destroy(&cursor->tx_cursor);
-	}
-	return rc;
+	return xlog_tx_cursor_next_row(&cursor->tx_cursor, xrow);
+}
+
+int
+xlog_cursor_next_row_raw(struct xlog_cursor *cursor,
+			 const char ***data, const char **end)
+{
+	assert(xlog_cursor_is_open(cursor));
+	if (cursor->state != XLOG_CURSOR_TX)
+		return 1;
+	return xlog_tx_cursor_next_row_raw(&cursor->tx_cursor, data, end);
 }
 
 int
