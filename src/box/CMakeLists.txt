@@ -51,6 +51,11 @@ lua_source(lua_sources lua/config/source/env.lua          config_source_env_lua)
 lua_source(lua_sources lua/config/source/file.lua         config_source_file_lua)
 lua_source(lua_sources lua/config/utils/log.lua           config_utils_log_lua)
 lua_source(lua_sources lua/config/utils/schema.lua        config_utils_schema_lua)
+
+if (ENABLE_CONFIG_EXTRAS)
+    lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/source/etcd.lua config_source_etcd_lua)
+    lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/extras.lua config_extras_lua)
+endif()
 # }}} config
 
 set(bin_sources)

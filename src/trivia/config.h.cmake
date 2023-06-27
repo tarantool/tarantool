@@ -288,6 +288,7 @@
 #cmakedefine ENABLE_SECURITY 1
 #cmakedefine ENABLE_COMPRESS_MODULE 1
 #cmakedefine ENABLE_ETCD_CLIENT 1
+#cmakedefine ENABLE_CONFIG_EXTRAS 1
 
 #cmakedefine EXPORT_LIBCURL_SYMBOLS 1
 

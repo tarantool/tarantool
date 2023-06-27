@@ -2,7 +2,13 @@ local instance_config = require('internal.config.instance_config')
 local cluster_config = require('internal.config.cluster_config')
 local configdata = require('internal.config.configdata')
 local log = require('internal.config.utils.log')
+local tarantool = require('tarantool')
 local datetime = require('datetime')
+
+local extras = nil
+if tarantool.package == 'Tarantool Enterprise' then
+    extras = require('internal.config.extras')
+end
 
 -- {{{ Helpers
 
@@ -111,6 +117,12 @@ function methods._initialize(self)
     self:_register_applier(require('internal.config.applier.console'))
     self:_register_applier(require('internal.config.applier.fiber'))
     self:_register_applier(require('internal.config.applier.app'))
+
+    -- Tarantool Enterprise Edition has its own additions
+    -- for this module.
+    if extras ~= nil then
+        extras.initialize(self)
+    end
 end
 
 function methods._collect(self, opts)
@@ -230,6 +242,10 @@ function methods._apply(self)
     end
 
     self._configdata_applied = self._configdata
+
+    if extras ~= nil then
+        extras.post_apply(self)
+    end
 end
 
 function methods._startup(self, instance_name, config_file)
