@@ -81,7 +81,8 @@ local err_msg_cannot_find_user = 'box_cfg.apply: cannot find user unknown ' ..
     'in the config to use its password in a replication peer URI'
 local err_msg_no_suitable_uris = 'box_cfg.apply: unable to build replicaset ' ..
     '"replicaset-001" of group "group-001": instance "instance-002" has no ' ..
-    'iproto.advertise or iproto.listen URI suitable to create a client socket'
+    'iproto.advertise.peer or iproto.listen URI suitable to create a client ' ..
+    'socket'
 
 -- Bad cases for building replicaset URIs from iproto.advertise
 -- and iproto.listen parameters.
@@ -124,7 +125,9 @@ for case_name, case in pairs({
         local instance_002 = {
             iproto = {
                 listen = case.listen,
-                advertise = case.advertise,
+                advertise = {
+                    peer = case.advertise,
+                },
             },
         }
         local good_listen = 'unix/:./{{ instance_name }}.iproto'
@@ -153,14 +156,18 @@ for case_name, case in pairs({
                                     },
                                     iproto = {
                                         listen = good_listen,
-                                        advertise = 'replicator@',
+                                        advertise = {
+                                            peer = 'replicator@',
+                                        },
                                     },
                                 },
                                 ['instance-002'] = instance_002,
                                 ['instance-003'] = {
                                     iproto = {
                                         listen = good_listen,
-                                        advertise = 'replicator@',
+                                        advertise = {
+                                            peer = 'replicator@',
+                                        },
                                     },
                                 },
                             },
@@ -250,7 +257,9 @@ for case_name, case in pairs({
             },
             iproto = {
                 listen = case.listen,
-                advertise = case.advertise,
+                advertise = {
+                    peer = case.advertise,
+                },
             },
             groups = {
                 ['group-001'] = {

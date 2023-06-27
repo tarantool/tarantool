@@ -6,4 +6,6 @@ config:
 
 iproto:
   listen: 'unix/:./{{ instance_name }}.iproto'
-  advertise: 'replicator@'
+  advertise:
+    client: client@
+    peer: replicator@

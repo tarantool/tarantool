@@ -48,10 +48,12 @@ local function peer_uri(configdata, peer_name)
     local err_msg_prefix = ('box_cfg.apply: unable to build replicaset %q ' ..
         'of group %q'):format(names.replicaset_name, names.group_name)
 
-    local iproto = configdata:get('iproto', {peer = peer_name}) or {}
+    local opts = {peer = peer_name, use_default = true}
+    local listen = configdata:get('iproto.listen', opts)
+    local advertise = configdata:get('iproto.advertise.peer', opts)
 
-    if iproto.advertise ~= nil and not iproto.advertise:endswith('@') then
-        -- The iproto.advertise option contains an URI.
+    if advertise ~= nil and not advertise:endswith('@') then
+        -- The iproto.advertise.peer option contains an URI.
         --
         -- There are the following cases.
         --
@@ -67,44 +69,44 @@ local function peer_uri(configdata, peer_name)
         -- section of the config.
         --
         -- Otherwise, the URI is returned as is.
-        local u, err = urilib.parse(iproto.advertise)
+        local u, err = urilib.parse(advertise)
         -- NB: The URI is validated, so the parsing can't fail.
         assert(u ~= nil, err)
         if u.login ~= nil and u.password == nil then
             u.password = find_password(configdata, u.login)
             return urilib.format(u, true)
         end
-        return iproto.advertise
-    elseif iproto.listen ~= nil then
-        -- The iproto.advertise option has no URI.
+        return advertise
+    elseif listen ~= nil then
+        -- The iproto.advertise.peer option has no URI.
         --
         -- There are the following cases.
         --
-        -- * <no iproto.advertise>
+        -- * <no iproto.advertise.peer>
         -- * user@
         -- * user:pass@
         --
         -- In any case we should find an URI suitable to create a
         -- client socket in iproto.listen option. After this, add
         -- the auth information if any.
-        local uri = find_suitable_uri_to_connect(iproto.listen)
+        local uri = find_suitable_uri_to_connect(listen)
         if uri == nil then
-            error(('%s: instance %q has no iproto.advertise or ' ..
+            error(('%s: instance %q has no iproto.advertise.peer or ' ..
                 'iproto.listen URI suitable to create a client socket'):format(
                 err_msg_prefix, peer_name), 0)
         end
 
-        -- No additional auth information in iproto.advertise:
+        -- No additional auth information in iproto.advertise.peer:
         -- return the listen URI as is.
-        if iproto.advertise == nil then
+        if advertise == nil then
             return uri
         end
 
         -- Extract user and password from the iproto.advertise
         -- option. If no password given, find it in the
         -- 'credentials' section of the config.
-        assert(iproto.advertise:endswith('@'))
-        local auth = iproto.advertise:sub(1, -2):split(':', 1)
+        assert(advertise:endswith('@'))
+        local auth = advertise:sub(1, -2):split(':', 1)
         local username = auth[1]
         local password = auth[2] or find_password(configdata, username)
 

@@ -160,6 +160,35 @@ local function uri_is_suitable_to_connect(_, uri)
     return true
 end
 
+local function advertise_uri_validate(data, w)
+    -- Accept the special syntax user@ or user:pass@.
+    --
+    -- It means using iproto.listen value to connect and using the
+    -- given user and password.
+    --
+    -- If the password is not given, it is extracted from the
+    -- `credentials` section of the config.
+    if data:endswith('@') then
+        return
+    end
+
+    -- Substitute variables with placeholders to don't confuse the
+    -- URI parser with the curly brackets.
+    data = data:gsub('{{ *.- *}}', 'placeholder')
+
+    local uri, err = urilib.parse(data)
+    if uri == nil then
+        if data:find(',') then
+            w.error('A single URI is expected, not a list of URIs')
+        end
+        w.error('Unable to parse an URI: %s', err)
+    end
+    local ok, err = uri_is_suitable_to_connect(nil, uri)
+    if not ok then
+        w.error(err)
+    end
+end
+
 return schema.new('instance_config', schema.record({
     config = schema.record({
         version = schema.enum({
@@ -446,37 +475,63 @@ return schema.new('instance_config', schema.record({
                 end
             end,
         }),
-        advertise = schema.scalar({
-            type = 'string',
-            default = box.NULL,
-            validate = function(data, w)
-                -- Accept the special syntax user@ or user:pass@.
-                --
-                -- It means using iproto.listen value to connect
-                -- and using the given user and password.
-                --
-                -- If the password is not given, it is extracted
-                -- from the `credentials` section of the config.
-                if data:endswith('@') then
-                    return
-                end
-
-                -- Substitute variables with placeholders to don't
-                -- confuse the URI parser with the curly brackets.
-                data = data:gsub('{{ *.- *}}', 'placeholder')
-
-                local uri, err = urilib.parse(data)
-                if uri == nil then
-                    if data:find(',') then
-                        w.error('A single URI is expected, not a list of URIs')
-                    end
-                    w.error('Unable to parse an URI: %s', err)
-                end
-                local ok, err = uri_is_suitable_to_connect(nil, uri)
-                if not ok then
-                    w.error(err)
-                end
-            end,
+        -- URIs for clients to let them know where to connect.
+        --
+        -- There are several possibly different URIs:
+        --
+        -- * client
+        --
+        --   The general purpose client URI, usually points to a
+        --   restricted user with access to particular functions.
+        --
+        -- * peer
+        --
+        --   The general purpose peer URI, used for connections
+        --   within the cluster (replica -> master, router ->
+        --   storage, rebalancer -> storage).
+        --
+        --   Usually points to a user with the 'replication' role.
+        --
+        -- * sharding
+        --
+        --   The URI for router and rebalancer.
+        --
+        --   If unset, the general peer URI should be used.
+        --
+        -- All the iproto.advertise.* options have the following
+        -- syntax variants:
+        --
+        -- 1. user@
+        -- 2. user:pass@
+        -- 3. user@host:port
+        -- 4. host:port
+        --
+        -- Note: the host:port part may represent a Unix domain
+        -- socket: host = 'unix/', port = '/path/to/socket'.
+        --
+        -- If there is no host:port (1, 2), it is to be looked in
+        -- iproto.listen.
+        --
+        -- If there is a user, but no password (1, 3), the
+        -- password is to be looked in the `credentials` section
+        -- of the configuration (except user 'guest', which can't
+        -- have a password).
+        advertise = schema.record({
+            client = schema.scalar({
+                type = 'string',
+                default = box.NULL,
+                validate = advertise_uri_validate,
+            }),
+            peer = schema.scalar({
+                type = 'string',
+                default = box.NULL,
+                validate = advertise_uri_validate,
+            }),
+            sharding = schema.scalar({
+                type = 'string',
+                default = box.NULL,
+                validate = advertise_uri_validate,
+            }),
         }),
         threads = schema.scalar({
             type = 'integer',
