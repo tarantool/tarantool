@@ -16,6 +16,6 @@ groups:
         instances:
           instance-001:
             database:
-              rw: true
+              mode: 'rw'
           instance-002: {}
           instance-003: {}

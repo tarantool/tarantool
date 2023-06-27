@@ -556,7 +556,7 @@ g.test_database = function()
             instance_uuid = '11111111-1111-1111-1111-111111111111',
             replicaset_uuid = '11111111-1111-1111-1111-111111111111',
             hot_standby = true,
-            rw = true,
+            mode = 'ro',
             txn_timeout = 1,
             txn_isolation = 'best-effort',
             use_mvcc_engine = true,
@@ -587,11 +587,22 @@ g.test_database = function()
         instance_config:validate(iconfig)
     end)
 
+    iconfig = {
+        database = {
+            mode = 'none',
+        },
+    }
+    err = '[instance_config] database.mode: Got none, but only the ' ..
+        'following values are allowed: ro, rw'
+    t.assert_error_msg_content_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+
     local exp = {
         instance_uuid = box.NULL,
         replicaset_uuid = box.NULL,
         hot_standby = false,
-        rw = false,
+        mode = box.NULL,
         txn_timeout = 3153600000,
         txn_isolation = 'best-effort',
         use_mvcc_engine = false,

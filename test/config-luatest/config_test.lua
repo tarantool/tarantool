@@ -40,12 +40,12 @@ g.test_configdata = function()
                         instances = {
                             ['instance-001'] = {
                                 database = {
-                                    rw = true,
+                                    mode = 'rw',
                                 },
                             },
                             ['instance-002'] = {
                                 database = {
-                                    rw = false,
+                                    mode = 'ro',
                                 },
                             },
                         },
@@ -72,7 +72,7 @@ g.test_configdata = function()
             cache_size = 2000,
         },
         database = {
-            rw = true,
+            mode = 'rw',
         },
         memtx = {
             memory = 1000000,
@@ -140,9 +140,7 @@ g.test_config_general = function()
                 replicasets:\
                   replicaset-001:\
                     instances:\
-                      instance-001:\
-                        database:\
-                          rw: true\
+                      instance-001: {}\
         "
         file = io.open('config.yaml', 'w')
         file:write(file_config)
@@ -166,9 +164,7 @@ g.test_config_general = function()
                 replicasets:\
                   replicaset-001:\
                     instances:\
-                      instance-001:\
-                        database:\
-                          rw: true\
+                      instance-001: {}\
         "
         file = io.open('config.yaml', 'w')
         file:write(file_config)
@@ -207,9 +203,7 @@ g.test_config_broadcast = function()
             replicasets:
               replicaset-001:
                 instances:
-                  instance-001:
-                    database:
-                      rw: true
+                  instance-001: {}
     ]]
     treegen.write_script(dir, 'config.yaml', file_config)
 
@@ -267,9 +261,7 @@ g.test_config_option = function()
             replicasets:
               replicaset-001:
                 instances:
-                  instance-001:
-                    database:
-                      rw: true
+                  instance-001: {}
     ]]
     treegen.write_script(dir, 'config.yaml', file_config)
 

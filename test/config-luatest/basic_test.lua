@@ -43,11 +43,7 @@ g.test_basic = function(g)
                 replicasets = {
                     ['replicaset-001'] = {
                         instances = {
-                            ['instance-001'] = {
-                                database = {
-                                    rw = true,
-                                },
-                            },
+                            ['instance-001'] = {},
                         },
                     },
                 },
@@ -60,6 +56,10 @@ g.test_basic = function(g)
     g.server = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
     g.server:start()
     t.assert_equals(g.server:eval('return box.info.name'), g.server.alias)
+
+    -- Verify that the default database mode for a singleton
+    -- instance (the only one in its replicaset) is read-write.
+    t.assert_equals(g.server:eval('return box.info.ro'), false)
 end
 
 g.test_example_single = function(g)
@@ -75,6 +75,12 @@ g.test_example_replicaset = function(g)
     local dir = treegen.prepare_directory(g, {}, {})
     local config_file = fio.abspath('doc/examples/config/replicaset.yaml')
     helpers.start_example_replicaset(g, dir, config_file)
+
+    -- Verify that the default database mode for a replicaset with
+    -- several instances (more than one) is read-only.
+    t.assert_equals(g.server_1:eval('return box.info.ro'), false)
+    t.assert_equals(g.server_2:eval('return box.info.ro'), true)
+    t.assert_equals(g.server_3:eval('return box.info.ro'), true)
 end
 
 local err_msg_cannot_find_user = 'box_cfg.apply: cannot find user unknown ' ..
@@ -152,7 +158,7 @@ for case_name, case in pairs({
                             instances = {
                                 ['instance-001'] = {
                                     database = {
-                                        rw = true,
+                                        mode = 'rw',
                                     },
                                     iproto = {
                                         listen = good_listen,
@@ -268,7 +274,7 @@ for case_name, case in pairs({
                             instances = {
                                 ['instance-001'] = {
                                     database = {
-                                        rw = true,
+                                        mode = 'rw',
                                     },
                                 },
                                 ['instance-002'] = {},

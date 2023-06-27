@@ -32,11 +32,7 @@ local appliers_script = [[
                 replicasets = {
                     ['replicaset-001'] = {
                         instances = {
-                            ['instance-001'] = {
-                                database = {
-                                    rw = true,
-                                },
-                            },
+                            ['instance-001'] = {},
                         },
                     },
                 },
