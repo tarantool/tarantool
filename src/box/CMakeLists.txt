@@ -278,6 +278,7 @@ set(box_sources
     lua/iproto.c
     lua/func_adapter.c
     lua/tuple_format.c
+    lua/trigger.c
     ${bin_sources})
 
 if(ENABLE_AUDIT_LOG)
