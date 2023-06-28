@@ -4,8 +4,6 @@ local t = require('luatest')
 local g = t.group()
 
 g.before_all(function()
-    t.skip_if(jit.arch == 'arm64' and jit.os == 'OSX',
-              'Disabled on macOS/M1 due to tarantool/tarantool-qa#309')
     g.dflt = server:new({alias = 'dflt'})
     g.dflt:start()
     g.dflt:exec(function()
