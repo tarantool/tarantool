@@ -83,6 +83,13 @@ collect_current_stack(struct backtrace *bt, void *stack)
 				  "status: %d", rc);
 			return stack;
 		}
+#ifdef __aarch64__
+		/*
+		 * Apple's libunwind for AArch64 returns the IP with the Pointer
+		 * Authentication Codes (bits 47-63). Strip them out.
+		 */
+		ip &= 0x7fffffffffffull;
+#endif /* __aarch64__ */
 		append_frame(bt, (void *)ip);
 		rc = unw_step(&unw_cur);
 		if (rc <= 0) {
