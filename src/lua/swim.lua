@@ -674,10 +674,16 @@ local function swim_set_payload(s, payload)
         rc = capi.swim_set_payload(ptr, nil, 0)
     else
         local buf = cord_ibuf_take()
-        local payload_size = msgpack.encode(payload, buf)
-        payload = buf.rpos
-        rc = capi.swim_set_payload(ptr, payload, payload_size)
+        local ok
+        ok, rc = pcall(function()
+            local payload_size = msgpack.encode(payload, buf)
+            payload = buf.rpos
+            return capi.swim_set_payload(ptr, payload, payload_size)
+        end)
         cord_ibuf_put(buf)
+        if not ok then
+            rc = -1
+        end
     end
     if rc ~= 0 then
         return nil, box.error.last()

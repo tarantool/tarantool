@@ -1967,12 +1967,19 @@ local function normalize_position(index, pos, ret_pos, ret_pos_end)
         ret_pos_end[0] = ret_pos[0] + #pos
     else
         local tuple_ibuf = cord_ibuf_take()
-        local tuple, tuple_end = tuple_encode(tuple_ibuf, pos)
-        local nok = builtin.box_index_tuple_position(index.space_id, index.id,
-                                                     tuple, tuple_end,
-                                                     ret_pos, ret_pos_end) ~= 0
+        box.error.clear()
+        local ok, res = pcall(function()
+            local tuple, tuple_end = tuple_encode(tuple_ibuf, pos)
+            return builtin.box_index_tuple_position(index.space_id, index.id,
+                                                    tuple, tuple_end,
+                                                    ret_pos, ret_pos_end) == 0
+        end)
         cord_ibuf_put(tuple_ibuf)
-        if nok then
+        ok = ok and res
+        if not ok then
+            if box.error.last() == nil then
+                error(res)
+            end
             box.error()
         end
     end
@@ -2285,11 +2292,18 @@ base_index_mt.min_ffi = function(index, key)
     end
     check_index_arg(index, 'min')
     local ibuf = cord_ibuf_take()
-    local pkey, pkey_end = tuple_encode(ibuf, key)
-    local nok = builtin.box_index_min(index.space_id, index.id, pkey, pkey_end,
-                                      ptuple) ~= 0
+    box.error.clear()
+    local ok, res = pcall(function()
+        local pkey, pkey_end = tuple_encode(ibuf, key)
+        return builtin.box_index_min(index.space_id, index.id, pkey, pkey_end,
+                                     ptuple) == 0
+    end)
     cord_ibuf_put(ibuf)
-    if nok then
+    ok = ok and res
+    if not ok then
+        if box.error.last() == nil then
+            error(res)
+        end
         box.error() -- error
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
@@ -2308,11 +2322,18 @@ base_index_mt.max_ffi = function(index, key)
     end
     check_index_arg(index, 'max')
     local ibuf = cord_ibuf_take()
-    local pkey, pkey_end = tuple_encode(ibuf, key)
-    local nok = builtin.box_index_max(index.space_id, index.id, pkey, pkey_end,
-                                      ptuple) ~= 0
+    box.error.clear()
+    local ok, res = pcall(function()
+        local pkey, pkey_end = tuple_encode(ibuf, key)
+        return builtin.box_index_max(index.space_id, index.id, pkey, pkey_end,
+                                     ptuple) == 0
+    end)
     cord_ibuf_put(ibuf)
-    if nok then
+    ok = ok and res
+    if not ok then
+        if box.error.last() == nil then
+            error(res)
+        end
         box.error() -- error
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
@@ -2349,18 +2370,29 @@ end
 base_index_mt.pairs_ffi = function(index, key, opts)
     check_index_arg(index, 'pairs')
     local ibuf = cord_ibuf_take()
-    local pkey, pkey_end = tuple_encode(ibuf, key)
-    local svp = builtin.box_region_used()
-    local itype, after = check_pairs_opts(opts, pkey + 1 >= pkey_end)
-    normalize_position(index, after, iterator_pos, iterator_pos_end)
-
-    local keybuf = ffi.string(pkey, pkey_end - pkey)
+    box.error.clear()
+    local ok, keybuf, cdata = pcall(function()
+        local pkey, pkey_end = tuple_encode(ibuf, key)
+        local svp = builtin.box_region_used()
+        local itype, after = check_pairs_opts(opts, pkey + 1 >= pkey_end)
+        normalize_position(index, after, iterator_pos, iterator_pos_end)
+        local keybuf = ffi.string(pkey, pkey_end - pkey)
+        local pkeybuf = ffi.cast('const char *', keybuf)
+        local cdata = builtin.box_index_iterator_after(index.space_id, index.id,
+                                                       itype, pkeybuf,
+                                                       pkeybuf + #keybuf,
+                                                       iterator_pos[0],
+                                                       iterator_pos_end[0]);
+        builtin.box_region_truncate(svp)
+        return keybuf, cdata
+    end)
     cord_ibuf_put(ibuf)
-    local pkeybuf = ffi.cast('const char *', keybuf)
-    local cdata = builtin.box_index_iterator_after(index.space_id, index.id,
-        itype, pkeybuf, pkeybuf + #keybuf, iterator_pos[0], iterator_pos_end[0]);
-    builtin.box_region_truncate(svp)
-    if cdata == nil then
+    ok = ok and cdata ~= nil
+    if not ok then
+        log.info("box.error.last=%s", box.error.last())
+        if box.error.last() == nil then
+            error(keybuf)
+        end
         box.error()
     end
     return fun.wrap(iterator_gen, keybuf,
@@ -2382,12 +2414,19 @@ end
 base_index_mt.count_ffi = function(index, key, opts)
     check_index_arg(index, 'count')
     local ibuf = cord_ibuf_take()
-    local pkey, pkey_end = tuple_encode(ibuf, key)
-    local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
-    local count = builtin.box_index_count(index.space_id, index.id,
-        itype, pkey, pkey_end);
+    box.error.clear()
+    local ok, count = pcall(function()
+        local pkey, pkey_end = tuple_encode(ibuf, key)
+        local itype = check_iterator_type(opts, pkey + 1 >= pkey_end)
+        return builtin.box_index_count(index.space_id, index.id, itype,
+                                       pkey, pkey_end)
+    end)
     cord_ibuf_put(ibuf)
-    if count == -1 then
+    ok = ok and count ~= -1
+    if not ok then
+        if box.error.last() == nil then
+            error(count)
+        end
         box.error()
     end
     return tonumber(count)
@@ -2405,11 +2444,18 @@ base_index_mt.get_ffi = function(index, key)
     end
     check_index_arg(index, 'get')
     local ibuf = cord_ibuf_take()
-    local key, key_end = tuple_encode(ibuf, key)
-    local nok = builtin.box_index_get(index.space_id, index.id, key, key_end,
-                                      ptuple) ~= 0
+    box.error.clear()
+    local ok, res = pcall(function()
+        local key, key_end = tuple_encode(ibuf, key)
+        return builtin.box_index_get(index.space_id, index.id, key, key_end,
+                                     ptuple) == 0
+    end)
     cord_ibuf_put(ibuf)
-    if nok then
+    ok = ok and res
+    if not ok then
+        if box.error.last() == nil then
+            error(res)
+        end
         return box.error() -- error
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
@@ -2478,31 +2524,39 @@ base_index_mt.select_ffi = function(index, key, opts)
     if builtin.box_read_ffi_is_disabled then
         return base_index_mt.select_luac(index, key, opts)
     end
-    local nok
     check_index_arg(index, 'select')
     local ibuf = cord_ibuf_take()
-    local key, key_end = tuple_encode(ibuf, key)
-    local key_is_nil = key + 1 >= key_end
-    local new_position = nil
-    local iterator, offset, limit, fullscan, after, fetch_pos =
-        check_select_opts(opts, key_is_nil)
-    local sid = index.space_id
-    if is_select_long(sid, key_is_nil, iterator, limit, offset,
-                      fullscan) then
-        log_long_select(box.space[sid])
-    end
-    local region_svp = builtin.box_region_used()
-    normalize_position(index, after, iterator_pos, iterator_pos_end)
-    nok = builtin.box_select_ffi(sid, index.id, key, key_end,
-                                 iterator_pos, iterator_pos_end, fetch_pos,
-                                 port, iterator, offset, limit) ~= 0
-    if not nok and fetch_pos and iterator_pos[0] ~= nil then
-        new_position = ffi.string(iterator_pos[0],
-                                  iterator_pos_end[0] - iterator_pos[0])
-    end
-    builtin.box_region_truncate(region_svp)
+    box.error.clear()
+    local ok, res, new_position, fetch_pos = pcall(function()
+        local key, key_end = tuple_encode(ibuf, key)
+        local key_is_nil = key + 1 >= key_end
+        local new_position = nil
+        local iterator, offset, limit, fullscan, after, fetch_pos =
+            check_select_opts(opts, key_is_nil)
+        local sid = index.space_id
+        if is_select_long(sid, key_is_nil, iterator, limit, offset,
+                          fullscan) then
+            log_long_select(box.space[sid])
+        end
+        local region_svp = builtin.box_region_used()
+        normalize_position(index, after, iterator_pos, iterator_pos_end)
+        local ok = builtin.box_select_ffi(sid, index.id, key, key_end,
+                                          iterator_pos, iterator_pos_end,
+                                          fetch_pos, port, iterator, offset,
+                                          limit) == 0
+        if ok and fetch_pos and iterator_pos[0] ~= nil then
+            new_position = ffi.string(iterator_pos[0],
+                                      iterator_pos_end[0] - iterator_pos[0])
+        end
+        builtin.box_region_truncate(region_svp)
+        return ok, new_position, fetch_pos
+    end)
     cord_ibuf_put(ibuf)
-    if nok then
+    ok = ok and res
+    if not ok then
+        if box.error.last() == nil then
+            error(res)
+        end
         return box.error()
     end
 
@@ -2570,12 +2624,19 @@ base_index_mt.tuple_pos = function(index, tuple)
     check_index_arg(index, 'tuple_pos')
     local region_svp = builtin.box_region_used()
     local ibuf = cord_ibuf_take()
-    local data, data_end = tuple_encode(ibuf, tuple)
-    local nok = builtin.box_index_tuple_position(index.space_id, index.id,
-                                                 data, data_end, iterator_pos,
-                                                 iterator_pos_end) ~= 0
+    box.error.clear()
+    local ok, res = pcall(function()
+        local data, data_end = tuple_encode(ibuf, tuple)
+        return builtin.box_index_tuple_position(index.space_id, index.id,
+                                                data, data_end, iterator_pos,
+                                                iterator_pos_end) == 0
+    end)
     cord_ibuf_put(ibuf)
-    if nok then
+    ok = ok and res
+    if not ok then
+        if box.error.last() == nil then
+            error(res)
+        end
         box.error()
     end
     local ret = ffi.string(iterator_pos[0],
