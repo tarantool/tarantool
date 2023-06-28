@@ -224,6 +224,16 @@ func_adapter_lua_destroy(struct func_adapter *func_base)
 	free(func);
 }
 
+void
+func_adapter_lua_get_func(struct func_adapter *func, lua_State *L)
+{
+	assert(func != NULL);
+	assert(func->vtab->destroy == func_adapter_lua_destroy);
+	struct func_adapter_lua *lua_func =
+		(struct func_adapter_lua *)func;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, lua_func->func_ref);
+}
+
 struct func_adapter *
 func_adapter_lua_create(lua_State *L, int idx)
 {

@@ -231,9 +231,30 @@ test_error(void)
 }
 
 static void
+test_get_func(void)
+{
+	plan(1);
+	header();
+
+	struct lua_State *L = tarantool_L;
+	int idx = generate_function("function(a) return a end");
+	struct func_adapter *func = func_adapter_lua_create(L, idx);
+
+	func_adapter_lua_get_func(func, L);
+	is(lua_equal(L, -1, idx), 1, "Actual function must be returned");
+
+	func_adapter_destroy(func);
+
+	lua_settop(L, 0);
+
+	footer();
+	check_plan();
+}
+
+static void
 test_callable(void)
 {
-	plan(3);
+	plan(4);
 	header();
 
 	const int table_value = 42;
@@ -246,8 +267,9 @@ test_callable(void)
 	generate_function("function(self, a) return self[1] - a end");
 	lua_setfield(L, -2, "__call");
 	lua_setmetatable(L, -2);
+	int idx = lua_gettop(L);
 
-	struct func_adapter *func = func_adapter_lua_create(L, lua_gettop(L));
+	struct func_adapter *func = func_adapter_lua_create(L, idx);
 	struct func_adapter_ctx ctx;
 	func_adapter_begin(func, &ctx);
 	func_adapter_push_double(func, &ctx, argument);
@@ -259,6 +281,8 @@ test_callable(void)
 	ok(number_eq(retval, table_value - argument),
 	   "Returned value must be as expected");
 	func_adapter_end(func, &ctx);
+	func_adapter_lua_get_func(func, L);
+	is(lua_equal(L, -1, idx), 1, "Actual table must be returned");
 	func_adapter_destroy(func);
 	lua_settop(L, 0);
 
@@ -269,7 +293,7 @@ test_callable(void)
 static int
 test_lua_func_adapter(void)
 {
-	plan(6);
+	plan(7);
 	header();
 
 	test_numeric();
@@ -277,6 +301,7 @@ test_lua_func_adapter(void)
 	test_string();
 	test_null();
 	test_error();
+	test_get_func();
 	test_callable();
 
 	footer();
