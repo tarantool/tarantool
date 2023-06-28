@@ -46,6 +46,7 @@ set(core_sources
     cord_on_demand.cc
     tweaks.c
     tt_sort.c
+    event.c
 )
 
 if (ENABLE_BACKTRACE)

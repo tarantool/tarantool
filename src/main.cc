@@ -88,6 +88,7 @@
 #include "core/errinj.h"
 #include "core/clock_lowres.h"
 #include "lua/utils.h"
+#include "core/event.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -592,6 +593,7 @@ tarantool_free(void)
 	session_free();
 	user_cache_free();
 #endif
+	event_free();
 	ssl_free();
 	memtx_tx_manager_free();
 	coll_free();
@@ -875,6 +877,7 @@ main(int argc, char **argv)
 	memtx_tx_manager_init();
 	module_init();
 	ssl_init();
+	event_init();
 	systemd_init();
 
 	const int override_cert_paths_env_vars = 0;

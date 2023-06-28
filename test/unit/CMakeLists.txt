@@ -630,3 +630,8 @@ create_unit_test(PREFIX lua_func_adapter
                            ${ICU_LIBRARIES}
                            ${LUAJIT_LIBRARIES}
 )
+
+create_unit_test(PREFIX event
+                 SOURCES event.c core_test_utils.c
+                 LIBRARIES core unit
+)
