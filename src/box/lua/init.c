@@ -76,6 +76,7 @@
 #include "box/lua/security.h"
 #include "box/lua/space_upgrade.h"
 #include "box/lua/wal_ext.h"
+#include "box/lua/trigger.h"
 
 #include "mpstream/mpstream.h"
 
@@ -780,6 +781,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_read_view_init(L);
 	box_lua_security_init(L);
 	box_lua_flightrec_init(L);
+	box_lua_trigger_init(L);
 	luaopen_net_box(L);
 	lua_pop(L, 1);
 	tarantool_lua_console_init(L);
