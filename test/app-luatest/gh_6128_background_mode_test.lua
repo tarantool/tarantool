@@ -12,10 +12,16 @@ local function tarantool_path(arg)
     return arg[index + 1]
 end
 
+-- Check presence of string 'msg' in file 'file'.
+-- Returns true when string is found and false otherwise.
+-- Function is not as smart as grep_log in a luatest (luatest/server.lua)
+-- and reads the whole log file every time, but this log file has a small
+-- size so it is ok.
+-- https://github.com/tarantool/luatest/blob/89da427f8bb3bb66e01d2a7b5a9370d0428d8c52/luatest/server.lua#L660-L727
 local function check_err_msg(file, msg)
-    local f = io.open(file, "rb")
+    local f = fio.open(file, {'O_RDONLY', 'O_NONBLOCK'})
     t.assert_not_equals(f, nil)
-    local content = f:read("*all")
+    local content = f:read(2048)
     f:close()
     return (string.match(content, msg) and true) or false
 end
@@ -31,7 +37,7 @@ g.before_test("test_background_mode_box_cfg", function()
     t.assert_equals(fio.path.exists(g.pid_path), false)
 
     local box_cfg = string.format([[-e box.cfg{
-pid_file='%s', background=true, work_dir='%s', log='%s', log_level=7,
+pid_file='%s', background=true, work_dir='%s', log='%s',
 }]], g.pid_path, g.work_dir, g.log_path)
     local cmd = {
         TARANTOOL_PATH, box_cfg,
