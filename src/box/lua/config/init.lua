@@ -239,6 +239,45 @@ function methods._collect(self, opts)
     self._configdata = configdata.new(iconfig, cconfig, self._instance_name)
 end
 
+-- Invoke mkdir and box_cfg appliers at the first phase. Invoke
+-- all the other ones at the second phase.
+function methods._apply_on_startup(self, opts)
+    local first_phase_appliers = {
+        mkdir = true,
+        box_cfg = true,
+    }
+
+    assert(type(opts) == 'table')
+    local phase = opts.phase
+
+    if phase == 1 then
+        local needs_retry = false
+        for _, applier in ipairs(self._appliers) do
+            if first_phase_appliers[applier.name] then
+                local res = applier.apply(self)
+                if res ~= nil and res.needs_retry then
+                    needs_retry = true
+                end
+            end
+        end
+        return needs_retry
+    elseif phase == 2 then
+        for _, applier in ipairs(self._appliers) do
+            if not first_phase_appliers[applier.name] then
+                applier.apply(self)
+            end
+        end
+
+        self._configdata_applied = self._configdata
+
+        if extras ~= nil then
+            extras.post_apply(self)
+        end
+    else
+        assert(false)
+    end
+end
+
 function methods._apply(self)
     for _, applier in ipairs(self._appliers) do
         applier.apply(self)
@@ -259,8 +298,30 @@ function methods._startup(self, instance_name, config_file)
     broadcast(self)
 
     self:_initialize()
+
+    -- Startup phase 1/2.
+    --
+    -- Start mkdir and box_cfg appliers. The latter may force the
+    -- read-only mode on this phase.
+    --
+    -- This phase may take a long time.
     self:_collect({sync_source = 'all'})
-    self:_apply()
+    local needs_retry = self:_apply_on_startup({phase = 1})
+
+    -- Startup phase 2/2.
+    --
+    -- If the previous phase is considered as potentially taking a
+    -- long time, re-read the configuration and apply the fresh
+    -- one.
+    --
+    -- Otherwise finish applying the existing configuration.
+    if needs_retry then
+        self:_collect({sync_source = 'all'})
+        self:_apply()
+    else
+        self:_apply_on_startup({phase = 2})
+    end
+
     self._status = 'ready'
     broadcast(self)
 end
