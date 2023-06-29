@@ -248,6 +248,11 @@ struct space {
 	 * (i.e. if not NULL WAL entries may contain extra fields).
 	 */
 	struct space_wal_ext *wal_ext;
+	/**
+	 * List of collation identifier holders.
+	 * Linked by `coll_id_cache_holder::in_space`.
+	 */
+	struct rlist coll_id_holders;
 };
 
 /** Space alter statement. */
@@ -271,6 +276,19 @@ space_detach_constraints(struct space *space);
  */
 void
 space_reattach_constraints(struct space *space);
+
+/**
+ * Pin in cache the collation identifiers that are referenced by space format
+ * and/or indexes, so that they can't be deleted.
+ */
+void
+space_pin_collations(struct space *space);
+
+/**
+ * Unpin collation identifiers.
+ */
+void
+space_unpin_collations(struct space *space);
 
 /** Initialize a base space instance. */
 int

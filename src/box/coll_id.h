@@ -32,6 +32,7 @@
  */
 #include <stddef.h>
 #include <stdint.h>
+#include "small/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -56,6 +57,11 @@ struct coll_id {
 	uint32_t owner_id;
 	/** Collation object. */
 	struct coll *coll;
+	/**
+	 * Holders of the same collation identifier are linked into ring list by
+	 * `coll_id_cache_holder::in_coll_id`.
+	 */
+	struct rlist cache_pin_list;
 	/** Collation name. */
 	size_t name_len;
 	char name[0];

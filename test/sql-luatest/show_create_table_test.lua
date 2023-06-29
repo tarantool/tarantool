@@ -412,14 +412,6 @@ g.test_wrong_collation = function()
                      "WITH ENGINE = 'memtx';"}
         _G.check('"a"', res)
 
-        -- Collations does not exists.
-        box.space._collation:delete(col.id)
-        res = {'CREATE TABLE "a"(\n"i" STRING NOT NULL,\n'..
-               'CONSTRAINT "i" PRIMARY KEY("i"))\nWITH ENGINE = \'memtx\';'}
-        local err = {"Problem with collation '277': collation does not exist."}
-        _G.check('"a"', res, err)
-
-        box.space._collation:insert(col)
         box.space.a:drop()
         box.space._collation:delete(col.id)
 

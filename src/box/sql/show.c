@@ -278,14 +278,9 @@ sql_describe_field(struct sql_desc *desc, const struct field_def *field)
 
 	if (field->coll_id != 0) {
 		struct coll_id *coll_id = coll_by_id(field->coll_id);
-		if (coll_id == NULL) {
-			sql_desc_error(desc, "collation",
-				       tt_sprintf("%d", field->coll_id),
-				       "collation does not exist");
-		} else {
-			sql_desc_append(desc, " COLLATE ");
-			sql_desc_append_name(desc, coll_id->name);
-		}
+		assert(coll_id != NULL);
+		sql_desc_append(desc, " COLLATE ");
+		sql_desc_append_name(desc, coll_id->name);
 	}
 	if (!field->is_nullable)
 		sql_desc_append(desc, " NOT NULL");
