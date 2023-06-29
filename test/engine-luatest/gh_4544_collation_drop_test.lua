@@ -60,3 +60,294 @@ g1.test_keydef_replace_coll_different = function(cg)
         box.internal.collation.drop(new_name)
     end)
 end
+
+local g2 = t.group('gh-4544-2', {{engine = 'memtx'}, {engine = 'vinyl'}})
+g2.before_all(before_all)
+g2.after_all(after_all)
+
+-- Pin/unpin collation by the space format, but not by the index.
+g2.test_coll_pin_format = function(cg)
+    local coll_name = 'my coll 1'
+
+    local function init()
+        cg.server:exec(function(engine, coll_name)
+            box.internal.collation.create(coll_name, 'ICU', 'ru-RU', {})
+            local s = box.schema.space.create('test', {engine = engine})
+            s:format({{name = 'p'},
+                      {name = 's', type = 'string', collation = coll_name}})
+            s:create_index('pk')
+        end, {cg.params.engine, coll_name})
+    end
+
+    local function check_references()
+        cg.server:exec(function(coll_name)
+            t.assert_error_msg_equals(
+                "Can't drop collation '" .. coll_name .. "': collation is " ..
+                "referenced by space format",
+                box.internal.collation.drop, coll_name)
+        end, {coll_name})
+    end
+
+    -- Check that collation can not be dropped.
+    init()
+    check_references()
+
+    cg.server:restart()
+    check_references()
+
+    cg.server:eval('box.snapshot()')
+    cg.server:restart()
+    check_references()
+
+    -- Check that collation is unpinned on space drop.
+    cg.server:exec(function(coll_name)
+        box.space.test:drop()
+        box.internal.collation.drop(coll_name)
+    end, {coll_name})
+
+    -- Check that collation can be dropped in one transaction with space drop.
+    init()
+    check_references()
+    cg.server:exec(function(coll_name)
+        box.begin()
+        box.space.test:drop()
+        box.internal.collation.drop(coll_name)
+        box.commit()
+    end, {coll_name})
+
+    -- Check that collation is still pinned after rollback.
+    init()
+    check_references()
+    cg.server:exec(function(coll_name)
+        box.begin()
+        box.space.test:drop()
+        box.internal.collation.drop(coll_name)
+        box.rollback()
+    end, {coll_name})
+    check_references()
+
+    -- Check that collation is unpinned on space alter.
+    cg.server:exec(function(coll_name)
+        box.space.test:alter({format = {{name = 'p'}, {name = 's'}}})
+        box.internal.collation.drop(coll_name)
+        box.space.test:drop()
+    end, {coll_name})
+
+    -- Check that collation can be dropped in one transaction with space alter.
+    init()
+    check_references()
+    cg.server:exec(function(coll_name)
+        box.begin()
+        box.space.test:alter({format = {{name = 'p'}, {name = 's'}}})
+        box.internal.collation.drop(coll_name)
+        box.commit()
+        box.space.test:drop()
+    end, {coll_name})
+
+    -- Check that collation is still pinned after rollback.
+    init()
+    check_references()
+    cg.server:exec(function(coll_name)
+        box.begin()
+        box.space.test:alter({format = {{name = 'p'}, {name = 's'}}})
+        box.internal.collation.drop(coll_name)
+        box.rollback()
+    end, {coll_name})
+    check_references()
+
+    -- Cleanup.
+    cg.server:exec(function(coll_name)
+        box.space.test:drop()
+        box.internal.collation.drop(coll_name)
+    end, {coll_name})
+end
+
+-- Pin/unpin collation by the index, but not by the space format.
+g2.test_coll_pin_index = function(cg)
+    local coll_name = 'my coll 2'
+
+    local function init()
+        cg.server:exec(function(engine, coll_name)
+            box.internal.collation.create(coll_name, 'ICU', 'ru-RU', {})
+            local s = box.schema.space.create('test', {engine = engine})
+            s:create_index('pk')
+            s:create_index('sk', {parts = {2, 'string',
+                                           collation = coll_name}})
+        end, {cg.params.engine, coll_name})
+    end
+
+    local function check_references()
+        cg.server:exec(function(coll_name)
+            t.assert_error_msg_equals(
+                "Can't drop collation '" .. coll_name .. "': collation is " ..
+                "referenced by index",
+                box.internal.collation.drop, coll_name)
+        end, {coll_name})
+    end
+
+    -- Check that collation can not be dropped.
+    init()
+    check_references()
+
+    cg.server:restart()
+    check_references()
+
+    cg.server:eval('box.snapshot()')
+    cg.server:restart()
+    check_references()
+
+    -- Check that collation is unpinned on space drop.
+    cg.server:exec(function(coll_name)
+        box.space.test:drop()
+        box.internal.collation.drop(coll_name)
+    end, {coll_name})
+
+    -- Check that collation can be dropped in one transaction with space drop.
+    init()
+    check_references()
+    cg.server:exec(function(coll_name)
+        box.begin()
+        box.space.test:drop()
+        box.internal.collation.drop(coll_name)
+        box.commit()
+    end, {coll_name})
+
+    -- Check that collation is still pinned after rollback.
+    init()
+    check_references()
+    cg.server:exec(function(coll_name)
+        box.begin()
+        box.space.test:drop()
+        box.internal.collation.drop(coll_name)
+        box.rollback()
+    end, {coll_name})
+    check_references()
+
+    -- Check that collation is unpinned on index drop.
+    cg.server:exec(function(coll_name)
+        box.space.test.index.sk:drop()
+        box.internal.collation.drop(coll_name)
+        box.space.test:drop()
+    end, {coll_name})
+
+    -- Check that collation can be dropped in one transaction with index drop.
+    init()
+    check_references()
+    cg.server:exec(function(coll_name)
+        box.begin()
+        box.space.test.index.sk:drop()
+        box.internal.collation.drop(coll_name)
+        box.commit()
+        box.space.test:drop()
+    end, {coll_name})
+
+    -- Check that collation is still pinned after rollback.
+    init()
+    check_references()
+    cg.server:exec(function(coll_name)
+        box.begin()
+        box.space.test.index.sk:drop()
+        box.internal.collation.drop(coll_name)
+        box.rollback()
+    end, {coll_name})
+    check_references()
+
+    -- Cleanup.
+    cg.server:exec(function(coll_name)
+        box.space.test:drop()
+        box.internal.collation.drop(coll_name)
+    end, {coll_name})
+end
+
+-- Pin/unpin collation by both: space format and the index.
+g2.test_coll_pin_format_index = function(cg)
+    local coll_name = 'my coll 3'
+
+    local function init()
+        cg.server:exec(function(engine, coll_name)
+            box.internal.collation.create(coll_name, 'ICU', 'ru-RU', {})
+            local s = box.schema.space.create('test', {engine = engine})
+            s:format({{name = 'p'},
+                      {name = 's', type = 'string', collation = coll_name}})
+            s:create_index('pk')
+            s:create_index('sk', {parts = {'s'}})
+        end, {cg.params.engine, coll_name})
+    end
+
+    local function check_references()
+        cg.server:exec(function(coll_name)
+            t.assert_error_msg_equals(
+                "Can't drop collation '" .. coll_name .. "': collation is " ..
+                "referenced by space format",
+                box.internal.collation.drop, coll_name)
+        end, {coll_name})
+    end
+
+    -- Check that collation can not be dropped.
+    init()
+    check_references()
+
+    cg.server:restart()
+    check_references()
+
+    cg.server:eval('box.snapshot()')
+    cg.server:restart()
+    check_references()
+
+    -- Check that collation is unpinned on space drop.
+    cg.server:exec(function(coll_name)
+        box.space.test:drop()
+        box.internal.collation.drop(coll_name)
+    end, {coll_name})
+
+    -- Check that collation can be dropped in one transaction with space drop.
+    init()
+    check_references()
+    cg.server:exec(function(coll_name)
+        box.begin()
+        box.space.test:drop()
+        box.internal.collation.drop(coll_name)
+        box.commit()
+    end, {coll_name})
+
+    -- Check that collation is still pinned after rollback.
+    init()
+    check_references()
+    cg.server:exec(function(coll_name)
+        box.begin()
+        box.space.test:drop()
+        box.internal.collation.drop(coll_name)
+        box.rollback()
+    end, {coll_name})
+    check_references()
+
+    -- Check that collation is still pinned after index drop.
+    cg.server:exec(function()
+        box.space.test.index.sk:drop()
+    end)
+    check_references()
+
+    -- Cleanup.
+    cg.server:exec(function(coll_name)
+        box.space.test:drop()
+        box.internal.collation.drop(coll_name)
+    end, {coll_name})
+end
+
+-- Check that collation is pinned from SQL.
+g2.test_sql = function(cg)
+    cg.server:exec(function(engine)
+        local coll_name = 'unicode_af_s2'
+        local sql = [[CREATE TABLE test (id STRING COLLATE "%s" PRIMARY KEY)
+                      WITH ENGINE = '%s']]
+        box.execute(string.format(sql, coll_name, engine))
+        t.assert_error_msg_equals(
+            "Can't drop collation 'unicode_af_s2': collation is referenced " ..
+            "by space format",
+            box.internal.collation.drop, coll_name)
+
+        -- Check that collation is unpinned on table drop.
+        box.execute("DROP TABLE test")
+        box.internal.collation.drop(coll_name)
+    end, {cg.params.engine})
+end

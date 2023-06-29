@@ -53,12 +53,14 @@ coll_id_new(const struct coll_id_def *def)
 	coll_id->name_len = def->name_len;
 	memcpy(coll_id->name, def->name, def->name_len);
 	coll_id->name[coll_id->name_len] = 0;
+	rlist_create(&coll_id->cache_pin_list);
 	return coll_id;
 }
 
 void
 coll_id_delete(struct coll_id *coll_id)
 {
+	assert(rlist_empty(&coll_id->cache_pin_list));
 	coll_unref(coll_id->coll);
 	free(coll_id);
 }

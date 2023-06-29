@@ -225,7 +225,7 @@ box.space._collation:select{0}
 ...
 box.space._collation:delete{0}
 ---
-- error: 'Can''t drop collation none : system collation'
+- error: 'Can''t drop collation ''none'': system collation'
 ...
 -- gh-3185: collations of LHS and RHS must be compatible.
 --

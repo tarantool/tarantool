@@ -362,7 +362,7 @@ index_def_list_add(struct rlist *index_def_list, struct index_def *index_def)
 }
 
 /**
- * Create a new index definition definition.
+ * Create a new index definition.
  *
  * @param key_def  key definition, must be fully built
  * @param pk_def   primary key definition, pass non-NULL

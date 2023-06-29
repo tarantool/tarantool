@@ -225,7 +225,7 @@ struct errcode_record {
 	/*170 */_(ER_CONSTRAINT_EXISTS,		"%s constraint '%s' already exists in space '%s'") \
 	/*171 */_(ER_SQL_TYPE_MISMATCH,		"Type mismatch: can not convert %s to %s") \
 	/*172 */_(ER_ROWID_OVERFLOW,            "Rowid is overflowed: too many entries in ephemeral space") \
-	/*173 */_(ER_DROP_COLLATION,		"Can't drop collation %s : %s") \
+	/*173 */_(ER_DROP_COLLATION,		"Can't drop collation '%s': %s") \
 	/*174 */_(ER_ILLEGAL_COLLATION_MIX,	"Illegal mix of collations") \
 	/*175 */_(ER_SQL_NO_SUCH_PRAGMA,	"Pragma '%s' does not exist") \
 	/*176 */_(ER_SQL_CANT_RESOLVE_FIELD,	"Can’t resolve field '%s'") \

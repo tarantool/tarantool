@@ -53,6 +53,7 @@
 #include "tuple_constraint_func.h"
 #include "tuple_constraint_fkey.h"
 #include "wal_ext.h"
+#include "coll_id_cache.h"
 
 int
 access_check_space(struct space *space, user_access_t access)
@@ -237,6 +238,53 @@ space_cleanup_constraints(struct space *space)
 	return 0;
 }
 
+/**
+ * Pin collation identifier with `id` in the cache, so that it can't be deleted.
+ */
+static void
+space_pin_collations_helper(struct space *space, uint32_t id,
+			    enum coll_id_holder_type holder_type)
+{
+	if (id == COLL_NONE)
+		return;
+	struct coll_id *coll_id = coll_by_id(id);
+	assert(coll_id != NULL);
+	struct coll_id_cache_holder *h = xmalloc(sizeof(*h));
+	rlist_add_tail_entry(&space->coll_id_holders, h, in_space);
+	coll_id_pin(coll_id, h, holder_type);
+}
+
+void
+space_pin_collations(struct space *space)
+{
+	struct tuple_format *format = space->format;
+	for (uint32_t i = 0; i < tuple_format_field_count(format); i++) {
+		struct tuple_field *field = tuple_format_field(format, i);
+		space_pin_collations_helper(space, field->coll_id,
+					    COLL_ID_HOLDER_SPACE_FORMAT);
+	}
+
+	for (uint32_t i = 0; i < space->index_count; i++) {
+		struct key_def *key_def = space->index[i]->def->key_def;
+		for (uint32_t i = 0; i < key_def->part_count; i++) {
+			struct key_part *part = &key_def->parts[i];
+			space_pin_collations_helper(space, part->coll_id,
+						    COLL_ID_HOLDER_INDEX);
+		}
+	}
+}
+
+void
+space_unpin_collations(struct space *space)
+{
+	struct coll_id_cache_holder *h, *tmp;
+	rlist_foreach_entry_safe(h, &space->coll_id_holders, in_space, tmp) {
+		coll_id_unpin(h);
+		free(h);
+	}
+	rlist_create(&space->coll_id_holders);
+}
+
 int
 space_create(struct space *space, struct engine *engine,
 	     const struct space_vtab *vtab, struct space_def *def,
@@ -265,6 +313,7 @@ space_create(struct space *space, struct engine *engine,
 	space->index_id_max = index_id_max;
 	rlist_create(&space->before_replace);
 	rlist_create(&space->on_replace);
+	rlist_create(&space->coll_id_holders);
 	space->run_triggers = true;
 
 	space->format = format;
@@ -303,6 +352,7 @@ space_create(struct space *space, struct engine *engine,
 	rlist_create(&space->space_cache_pin_list);
 	if (space_init_constraints(space) != 0)
 		goto fail_free_indexes;
+	space_pin_collations(space);
 
 	/*
 	 * Check if there are unique indexes that are contained
@@ -348,6 +398,7 @@ fail:
 		space_cleanup_constraints(space);
 		tuple_format_unref(space->format);
 	}
+	space_unpin_collations(space);
 	return -1;
 }
 
@@ -403,6 +454,7 @@ space_delete(struct space *space)
 		space_cleanup_constraints(space);
 		tuple_format_unref(space->format);
 	}
+	space_unpin_collations(space);
 	trigger_destroy(&space->before_replace);
 	trigger_destroy(&space->on_replace);
 	if (space->upgrade != NULL)

@@ -868,6 +868,7 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	space_swap_triggers(alter->new_space, alter->old_space);
 	space_swap_constraint_ids(alter->new_space, alter->old_space);
 	space_reattach_constraints(alter->old_space);
+	space_pin_collations(alter->old_space);
 	space_cache_replace(alter->new_space, alter->old_space);
 	alter_space_delete(alter);
 	return 0;
@@ -995,6 +996,7 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 */
 	space_cache_replace(alter->old_space, alter->new_space);
 	space_detach_constraints(alter->old_space);
+	space_unpin_collations(alter->old_space);
 	/*
 	 * Install transaction commit/rollback triggers to either
 	 * finish or rollback the DDL depending on the results of
@@ -1702,6 +1704,7 @@ on_drop_space_rollback(struct trigger *trigger, void *event)
 	struct space *space = (struct space *)trigger->data;
 	space_cache_replace(NULL, space);
 	space_reattach_constraints(space);
+	space_pin_collations(space);
 	return 0;
 }
 
@@ -2197,6 +2200,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * on commit or reattached on rollback.
 		 */
 		space_detach_constraints(old_space);
+		space_unpin_collations(old_space);
 		/**
 		 * The space must be deleted from the space
 		 * cache right away to achieve linearisable
@@ -3578,10 +3582,6 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 			txn_alter_trigger_new(on_drop_collation_rollback, NULL);
 		if (on_commit == NULL || on_rollback == NULL)
 			return -1;
-		/*
-		 * TODO: Check that no index uses the collation
-		 * identifier.
-		 */
 		uint32_t out;
 		if (tuple_field_u32(old_tuple, BOX_COLLATION_FIELD_ID, &out) != 0)
 			return -1;
@@ -3603,6 +3603,20 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 				 old_coll_id->owner_id, SC_COLLATION,
 				 PRIV_D) != 0)
 			return -1;
+		/*
+		 * Don't allow user to drop a collation identifier that is
+		 * currently used.
+		 */
+		enum coll_id_holder_type pinned_type;
+		if (coll_id_is_pinned(old_coll_id, &pinned_type)) {
+			const char *type_str =
+				coll_id_holder_type_strs[pinned_type];
+			diag_set(ClientError, ER_DROP_COLLATION,
+				 old_coll_id->name,
+				 tt_sprintf("collation is referenced by %s",
+					    type_str));
+			return -1;
+		}
 		/*
 		 * Set on_commit/on_rollback triggers after
 		 * deletion from the cache to make trigger logic

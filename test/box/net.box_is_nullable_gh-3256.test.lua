@@ -26,7 +26,7 @@ parts[1].type == 'string'
 parts[1].is_nullable == false
 parts[1].collation == 'test'
 c:close()
-box.internal.collation.drop('test')
 space:drop()
+box.internal.collation.drop('test')
 c.state
 c = nil
