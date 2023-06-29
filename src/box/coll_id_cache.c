@@ -38,6 +38,11 @@ static struct mh_strnptr_t *coll_cache_name = NULL;
 /** mhash table (id -> collation) */
 static struct mh_i32ptr_t *coll_id_cache = NULL;
 
+const char *coll_id_holder_type_strs[COLL_ID_HOLDER_MAX] = {
+	[COLL_ID_HOLDER_SPACE_FORMAT] = "space format",
+	[COLL_ID_HOLDER_INDEX] = "index",
+};
+
 void
 coll_id_cache_init(void)
 {
@@ -73,8 +78,9 @@ coll_id_cache_replace(struct coll_id *coll_id, struct coll_id **replaced_id)
 }
 
 void
-coll_id_cache_delete(const struct coll_id *coll_id)
+coll_id_cache_delete(struct coll_id *coll_id)
 {
+	assert(rlist_empty(&coll_id->cache_pin_list));
 	mh_int_t id_i = mh_i32ptr_find(coll_id_cache, coll_id->id, NULL);
 	mh_i32ptr_del(coll_id_cache, id_i, NULL);
 	mh_int_t name_i = mh_strnptr_find_str(coll_cache_name, coll_id->name,
@@ -101,4 +107,44 @@ coll_by_name(const char *name, uint32_t len)
 	if (pos == mh_end(coll_cache_name))
 		return NULL;
 	return mh_strnptr_node(coll_cache_name, pos)->val;
+}
+
+void
+coll_id_pin(struct coll_id *coll_id, struct coll_id_cache_holder *holder,
+	    enum coll_id_holder_type type)
+{
+	assert(coll_by_id(coll_id->id) != NULL);
+	holder->coll_id = coll_id;
+	holder->type = type;
+	rlist_add_tail(&coll_id->cache_pin_list, &holder->in_coll_id);
+}
+
+void
+coll_id_unpin(struct coll_id_cache_holder *holder)
+{
+	assert(coll_by_id(holder->coll_id->id) != NULL);
+#ifndef NDEBUG
+	/* Paranoid check that the coll_id is pinned by holder. */
+	bool is_in_list = false;
+	struct rlist *tmp;
+	rlist_foreach(tmp, &holder->coll_id->cache_pin_list) {
+		is_in_list = is_in_list || tmp == &holder->in_coll_id;
+	}
+	assert(is_in_list);
+#endif
+	rlist_del(&holder->in_coll_id);
+	holder->coll_id = NULL;
+}
+
+bool
+coll_id_is_pinned(struct coll_id *coll_id, enum coll_id_holder_type *type)
+{
+	assert(coll_by_id(coll_id->id) != NULL);
+	if (rlist_empty(&coll_id->cache_pin_list))
+		return false;
+	struct coll_id_cache_holder *h =
+		rlist_first_entry(&coll_id->cache_pin_list,
+				  struct coll_id_cache_holder, in_coll_id);
+	*type = h->type;
+	return true;
 }
