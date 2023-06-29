@@ -72,6 +72,10 @@ function justrun.tarantool(dir, env, args, opts)
     local opts = opts or {}
     assert(type(opts) == 'table')
 
+    -- Prevent system/user inputrc configuration file from
+    -- influencing testing code.
+    env['INPUTRC'] = '/dev/null'
+
     local tarantool_exe = arg[-1]
     -- Use popen.shell() instead of popen.new() due to lack of
     -- cwd option in popen (gh-5633).
