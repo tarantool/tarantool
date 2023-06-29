@@ -45,6 +45,7 @@
 #include "salad/stailq.h"
 #include "clock_lowres.h"
 #include "backtrace.h"
+#include "exception.h"
 
 #include <coro/coro.h>
 

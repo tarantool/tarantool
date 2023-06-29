@@ -106,6 +106,14 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
 #define lengthof(array) (sizeof (array) / sizeof ((array)[0]))
 #endif
 
+static inline void
+alloc_failure(const char *filename, int line, size_t size)
+{
+	fprintf(stderr, "Can't allocate %zu bytes at %s:%d",
+		size, filename, line);
+	exit(EXIT_FAILURE);
+}
+
 /**
  * An x* variant of a memory allocation function calls the original function
  * and panics if it fails (i.e. it should never return NULL).
@@ -113,11 +121,8 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
 #define xalloc_impl(size, func, args...)					\
 	({									\
 		void *ret = func(args);						\
-		if (unlikely(ret == NULL)) {					\
-			fprintf(stderr, "Can't allocate %zu bytes at %s:%d",	\
-				(size_t)(size), __FILE__, __LINE__);		\
-			exit(EXIT_FAILURE);					\
-		}								\
+		if (unlikely(ret == NULL))					\
+			alloc_failure(__FILE__, __LINE__, (size));		\
 		ret;								\
 	})
 
@@ -148,6 +153,13 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
 #define xregion_alloc_array(region, T, count) ({				\
 	(T *)xregion_aligned_alloc((region), sizeof(T) * (count), alignof(T));\
 })
+
+#define xobuf_dup(p, src, size)							\
+	({									\
+		size_t ret = obuf_dup((p), (src), (size));			\
+		if (unlikely(ret != (size_t)(size)))				\
+			alloc_failure(__FILE__, __LINE__, (size));		\
+	})
 
 /** \cond public */
 

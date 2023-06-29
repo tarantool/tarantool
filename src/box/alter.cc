@@ -655,8 +655,10 @@ public:
 
 	void *operator new(size_t size)
 	{
-		return region_aligned_calloc_xc(&in_txn()->region, size,
-						alignof(uint64_t));
+		void *ptr = xregion_aligned_alloc(&in_txn()->region, size,
+						  alignof(uint64_t));
+		memset(ptr, 0, size);
+		return ptr;
 	}
 	void operator delete(void * /* ptr */) {}
 };

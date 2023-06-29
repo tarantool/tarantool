@@ -3841,7 +3841,7 @@ space_truncate(struct space *space)
 	size_t buf_size = 3 * mp_sizeof_array(UINT32_MAX) +
 			  4 * mp_sizeof_uint(UINT64_MAX) + mp_sizeof_str(1);
 	RegionGuard region_guard(&fiber()->gc);
-	char *buf = (char *)region_alloc_xc(&fiber()->gc, buf_size);
+	char *buf = (char *)xregion_alloc(&fiber()->gc, buf_size);
 
 	char *tuple_buf = buf;
 	char *tuple_buf_end = tuple_buf;
