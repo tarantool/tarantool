@@ -946,15 +946,18 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	return story;
 }
 
+/**
+ * Deletes a story. Expects the story to be fully unlinked.
+ */
 static void
 memtx_tx_story_delete(struct memtx_story *story)
 {
-	/* Expecting to delete fully unlinked story. */
 	assert(story->add_stmt == NULL);
 	assert(story->del_stmt == NULL);
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		assert(story->link[i].newer_story == NULL);
 		assert(story->link[i].older_story == NULL);
+		assert(rlist_empty(&story->link[i].read_gaps));
 	}
 
 	memtx_tx_stats_discard(&txm.story_stats[story->status],
@@ -2943,6 +2946,16 @@ memtx_tx_on_space_delete(struct space *space)
 		if (story->del_stmt != NULL)
 			memtx_tx_history_remove_stmt(story->del_stmt);
 		memtx_tx_story_full_unlink_on_space_delete(story);
+		for (uint32_t i = 0; i < story->index_count; i++) {
+			struct rlist *read_gaps = &story->link[i].read_gaps;
+			while (!rlist_empty(&story->link[i].read_gaps)) {
+				struct gap_item_base *item =
+					rlist_first_entry(read_gaps,
+							  struct gap_item_base,
+							  in_read_gaps);
+				memtx_tx_delete_gap(item);
+			}
+		}
 		memtx_tx_story_delete(story);
 	}
 }
