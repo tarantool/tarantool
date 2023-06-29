@@ -47,6 +47,15 @@ package: prepare
 	PRESERVE_ENVVARS="TARBALL_EXTRA_ARGS,${PRESERVE_ENVVARS}" \
 	./packpack/packpack
 
+package-static:
+	if [ -n "${GIT_TAG}" ]; then \
+		export VERSION="$$(echo ${GIT_TAG} | sed 's/-/~/')"; \
+	else \
+		export VERSION="$$(echo ${GIT_DESCRIBE} | sed ${SED_REPLACE_VERSION_REGEX} | sed 's/-/~/').dev"; \
+	fi; \
+	echo VERSION=$${VERSION}; \
+	./static-build/make_packages.sh
+
 deploy:
 	if [ -z "${REPO_TYPE}" ]; then \
 		echo "Env variable 'REPO_TYPE' must be defined!"; \
