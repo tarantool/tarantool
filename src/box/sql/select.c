@@ -1932,14 +1932,6 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 	if (pParse->colNamesSet)
 		return;
 	assert(v != 0);
-	size_t size;
-	uint32_t *var_pos =
-		region_alloc_array(&pParse->region, typeof(var_pos[0]),
-				   pParse->nVar, &size);
-	if (var_pos == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "var_pos");
-		return;
-	}
 	assert(pTabList != 0);
 	pParse->colNamesSet = 1;
 	bool is_full_meta = (pParse->sql_flags & SQL_FullMetadata) != 0;
@@ -1951,7 +1943,7 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 		if (NEVER(p == 0))
 			continue;
 		if (p->op == TK_VARIABLE)
-			var_pos[var_count++] = i;
+			var_count++;
 		enum field_type type = sql_expr_type(p);
 		vdbe_metadata_set_col_type(v, i, field_type_strs[type]);
 		if (is_full_meta && (type == FIELD_TYPE_STRING ||
@@ -2026,13 +2018,14 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 	}
 	if (var_count == 0)
 		return;
-	v->var_pos = (uint32_t *) malloc(var_count * sizeof(uint32_t));
-	if (v->var_pos ==  NULL) {
-		diag_set(OutOfMemory, var_count * sizeof(uint32_t),
-			 "malloc", "v->var_pos");
-		return;
+	uint32_t *var_pos = xmalloc(var_count * sizeof(*var_pos));
+	for (int i = 0, j = 0; i < pEList->nExpr; i++) {
+		struct Expr *e = pEList->a[i].pExpr;
+		assert(e != NULL);
+		if (e->op == TK_VARIABLE)
+			var_pos[j++] = i;
 	}
-	memcpy(v->var_pos, var_pos, var_count * sizeof(uint32_t));
+	v->var_pos = var_pos;
 	v->res_var_count = var_count;
 }
 
