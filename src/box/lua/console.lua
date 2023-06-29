@@ -429,7 +429,7 @@ local function local_eval(storage, line)
 end
 
 local function eval(line)
-    return local_eval(box.session, line)
+    return local_eval(box.session.storage, line)
 end
 
 local text_connection_mt = {
