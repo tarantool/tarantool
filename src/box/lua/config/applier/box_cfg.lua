@@ -1,4 +1,5 @@
 local urilib = require('uri')
+local fio = require('fio')
 local log = require('internal.config.utils.log')
 local instance_config = require('internal.config.instance_config')
 
@@ -171,6 +172,56 @@ local function log_destination(configdata)
     end
 end
 
+-- Determine where snapshot should reside based on the given
+-- configuration.
+--
+-- To be called before first box.cfg().
+local function effective_snapshot_dir(configdata)
+    -- The snapshot directory has a default value in the schema
+    -- (it is a string). So, it can't be nil or box.NULL.
+    local snap_dir = configdata:get('snapshot.dir', {use_default = true})
+    assert(snap_dir ~= nil)
+
+    -- If the path is absolute, just return it.
+    --
+    -- This check is necessary due to fio.pathjoin() peculiars,
+    -- see gh-8816.
+    if snap_dir:startswith('/') then
+        return snap_dir
+    end
+
+    -- We assume that the startup working directory is the current
+    -- working directory. IOW, that this function is called before
+    -- first box.cfg() call. Let's verify it.
+    assert(type(box.cfg) == 'function')
+
+    -- If the snapshot directory is not absolute, it is relative
+    -- to the working directory.
+    --
+    -- Determine an absolute path to the configured working
+    -- directory considering that it may be relative to the
+    -- working directory at the startup moment.
+    local work_dir = configdata:get('process.work_dir', {use_default = true})
+    if work_dir == nil then
+        work_dir = '.'
+    end
+    work_dir = fio.abspath(work_dir)
+
+    -- Now we know the absolute path to the configured working
+    -- directory. Let's determine the snapshot directory path.
+    return fio.abspath(fio.pathjoin(work_dir, snap_dir))
+end
+
+-- Determine whether the instance will be started from an existing
+-- snapshot.
+--
+-- To be called before first box.cfg().
+local function has_snapshot(configdata)
+    local pattern = fio.pathjoin(effective_snapshot_dir(configdata), '*.snap')
+    return #fio.glob(pattern) > 0
+end
+
+-- Returns nothing or {needs_retry = true}.
 local function apply(config)
     local configdata = config._configdata
     local box_cfg = configdata:filter(function(w)
@@ -239,8 +290,80 @@ local function apply(config)
     box_cfg.replicaset_name = names.replicaset_name
     box_cfg.instance_name = names.instance_name
 
-    log.debug('box_cfg.apply: %s', box_cfg)
+    -- The startup process may need a special handling and differs
+    -- from the configuration reloading process.
+    local is_startup = type(box.cfg) == 'function'
 
+    -- First box.cfg() call.
+    --
+    -- Force the read-only mode if:
+    --
+    -- * the startup may take a long time, and
+    -- * the instance is not the only one in its replicaset, and
+    -- * there is an existing snapshot (otherwise we wouldn't able
+    --   to assign a bootstrap leader).
+    --
+    -- The reason is that the configured master may be switched
+    -- while it is starting. In this case it is undesirable to set
+    -- RW mode if the actual configuration marks the instance as
+    -- RO.
+    --
+    -- The main startup code calls this applier second time if
+    -- {needs_retry = true} is returned after re-reading of the
+    -- configuration.
+    --
+    -- Automatic reapplying of the post-startup configuration is
+    -- performed for all the cases, when the startup may take a
+    -- long time.
+    if is_startup then
+        local configured_as_rw = not box_cfg.read_only
+        local in_replicaset = #configdata:peers() > 1
+        local has_snap = has_snapshot(configdata)
+
+        -- Reading a snapshot may take a long time, fetching it
+        -- from a remote master is even longer.
+        local startup_may_be_long = has_snap or
+            (not has_snap and in_replicaset)
+
+        -- Start to construct the force read-only mode condition.
+        local force_read_only = configured_as_rw
+
+        -- It only has sense to force RO if we expect that the
+        -- configured RO/RW mode has a good chance to change
+        -- during the startup.
+        force_read_only = force_read_only and startup_may_be_long
+
+        -- If the instance is the only one in its replicaset,
+        -- there is no another one that would take the leadership.
+        --
+        -- It is OK to just start in RW.
+        force_read_only = force_read_only and in_replicaset
+
+        -- Can't set RO for an instance in a replicaset without an
+        -- existing snapshot, because one of the cases is when the
+        -- replicaset is to be created from scratch. There should
+        -- be at least one RW instance to act as a bootstrap
+        -- leader.
+        --
+        -- We don't know, whether other instances have snapshots,
+        -- so the best that we can do is to lean on the user
+        -- provided configuration regarding RO/RW.
+        force_read_only = force_read_only and has_snap
+
+        if force_read_only then
+            box_cfg.read_only = true
+        end
+
+        log.debug('box_cfg.apply (startup): %s', box_cfg)
+        box.cfg(box_cfg)
+
+        -- NB: needs_retry should be true when force_read_only is
+        -- true. It is so by construction.
+        return {needs_retry = startup_may_be_long}
+    end
+
+    -- If it is reload, just apply the new configuration.
+    log.debug('box_cfg.apply (reload): %s', box_cfg)
     box.cfg(box_cfg)
 end
 
