@@ -1043,7 +1043,7 @@ iproto_connection_input_buffer(struct iproto_connection *con)
 	 * (in only has unparsed content).
 	 */
 	if (ibuf_used(old_ibuf) == con->parse_size) {
-		ibuf_reserve_xc(old_ibuf, to_read);
+		xibuf_reserve(old_ibuf, to_read);
 		return old_ibuf;
 	}
 
@@ -1061,7 +1061,7 @@ iproto_connection_input_buffer(struct iproto_connection *con)
 		ibuf_create(new_ibuf, cord_slab_cache(), iproto_readahead);
 	}
 
-	ibuf_reserve_xc(new_ibuf, to_read + con->parse_size);
+	xibuf_reserve(new_ibuf, to_read + con->parse_size);
 	/*
 	 * Discard unparsed data in the old buffer, otherwise it
 	 * won't be recycled when all parsed requests are processed.
@@ -2465,7 +2465,7 @@ tx_process_misc(struct cmsg *m)
 					      msg->watch.key_len, &data_end);
 			if (iproto_prepare_select(out, &header) != 0)
 				diag_raise();
-			obuf_dup_xc(out, data, data_end - data);
+			xobuf_dup(out, data, data_end - data);
 			iproto_reply_select(out, &header, msg->header.sync,
 					    ::schema_version,
 					    data != NULL ? 1 : 0);
@@ -2845,7 +2845,7 @@ tx_process_connect(struct cmsg *m)
 		random_bytes(con->salt, IPROTO_SALT_SIZE);
 		greeting_encode(greeting, tarantool_version_id(), &uuid,
 				con->salt, IPROTO_SALT_SIZE);
-		obuf_dup_xc(out, greeting, IPROTO_GREETING_SIZE);
+		xobuf_dup(out, greeting, IPROTO_GREETING_SIZE);
 		if (! rlist_empty(&session_on_connect)) {
 			if (session_run_on_connect_triggers(con->session) != 0)
 				diag_raise();
