@@ -320,6 +320,44 @@ local function apply(config)
         local in_replicaset = #configdata:peers() > 1
         local has_snap = has_snapshot(configdata)
 
+        -- Require at least one writable instance in the
+        -- replicaset if the instance is to be bootstrapped (has
+        -- no existing snapshot). Otherwise there is no one who
+        -- would register the instance in the _cluster system
+        -- space.
+        --
+        -- TODO: If an instance is configured with known
+        -- instance_uuid that is already in _cluster, it may be
+        -- re-bootstrapped. But we don't know from the
+        -- configuration whether the given instance_uuid is
+        -- already registered. We should decide what to do in the
+        -- case.
+        --
+        -- TODO: An anonymous replica is not to be registered in
+        -- _cluster. So, it can subscribe to such a replicaset.
+        -- We should decide what to do in the case.
+        if in_replicaset and not has_snap then
+            local has_rw = false
+            for _, peer_name in ipairs(configdata:peers()) do
+                local opts = {peer = peer_name, use_default = true}
+                local mode = configdata:get('database.mode', opts)
+                -- NB: The default is box.NULL that is interpreted
+                -- as 'ro' for a replicaset with more than one
+                -- instance.
+                if mode == 'rw' then
+                    has_rw = true
+                    break
+                end
+            end
+            if not has_rw then
+                error(('Startup failure.\nNo leader to register new ' ..
+                    'instance %q. All the instances in replicaset %q of ' ..
+                    'group %q are configured to the read-only mode.'):format(
+                    names.instance_name, names.replicaset_name,
+                    names.group_name), 0)
+            end
+        end
+
         -- Reading a snapshot may take a long time, fetching it
         -- from a remote master is even longer.
         local startup_may_be_long = has_snap or
