@@ -90,8 +90,7 @@ local err_msg_no_suitable_uris = 'box_cfg.apply: unable to build replicaset ' ..
     'iproto.advertise.peer or iproto.listen URI suitable to create a client ' ..
     'socket'
 
--- Bad cases for building replicaset URIs from iproto.advertise
--- and iproto.listen parameters.
+-- Bad cases for building replicaset.
 for case_name, case in pairs({
     no_advertise_no_listen = {
         listen = nil,
@@ -124,6 +123,18 @@ for case_name, case in pairs({
         listen = 'unix/:./{{ instance_name }}.iproto',
         advertise = 'unknown@',
         exp_err = err_msg_cannot_find_user,
+    },
+    all_ro = {
+        -- The URIs here are good. But all the instances are
+        -- configured to the read-only mode (and instance-001
+        -- has no existing snapshot).
+        listen = 'unix/:./{{ instance_name }}.iproto',
+        advertise = 'replicator@',
+        mode = 'ro',
+        exp_err = 'Startup failure.\nNo leader to register new instance ' ..
+            '"instance-001". All the instances in replicaset ' ..
+            '"replicaset-001" of group "group-001" are configured to the ' ..
+            'read-only mode.',
     },
 }) do
     g[('test_bad_replicaset_build_%s'):format(case_name)] = function()
@@ -158,7 +169,7 @@ for case_name, case in pairs({
                             instances = {
                                 ['instance-001'] = {
                                     database = {
-                                        mode = 'rw',
+                                        mode = case.mode or 'rw',
                                     },
                                     iproto = {
                                         listen = good_listen,
