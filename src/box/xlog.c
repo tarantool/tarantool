@@ -817,6 +817,14 @@ xlog_init(struct xlog *xlog, const struct xlog_opts *opts)
 				 "failed to create context");
 			return -1;
 		}
+		size_t rc = ZSTD_CCtx_setParameter(xlog->zctx,
+						   ZSTD_c_compressionLevel, 3);
+		if (ZSTD_isError(rc)) {
+			ZSTD_freeCCtx(xlog->zctx);
+			diag_set(ClientError, ER_COMPRESSION,
+				 ZSTD_getErrorName(rc));
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -1142,6 +1150,68 @@ xlog_tx_write_plain(struct xlog *log)
 }
 
 /**
+ * Compute required size of ZSTD output buffer based on size of zstd input
+ * buffer.
+ */
+static size_t
+zobuf_size(size_t zibuf_size)
+{
+	/*
+	 * `ZSTD_compressBound` fails, if  provided
+	 * size > `ZSTD_MAX_INPUT_SIZE`.
+	 */
+	return MIN(ZSTD_MAX_INPUT_SIZE,
+		   /*
+		    * The output buffer can be fully processed (hence,
+		    * `zibuf_size == 0`), whilst the zstd's internal buffers
+		    * still need to be flushed, so we need to guarantee progress
+		    * by rounding up the output buffer size to some reasonable
+		    * value (current return value of `ZSTD_compressBound(0)`).
+		    */
+		   MAX(64, ZSTD_compressBound(zibuf_size)));
+}
+
+/**
+ * Compress the given ZSTD input buffer @a zibuf into the provided output buffer
+ * @a zbuf, in addition to updating @a crc32c with the compressed data.
+ *
+ * Returns 0 on success, -1 otherwise also setting a diagnostic.
+ */
+static int
+zstd_compress_zibuf(ZSTD_CCtx *zctx, ZSTD_EndDirective mode,
+		    ZSTD_inBuffer *zibuf, struct obuf *zbuf, uint32_t *crc32c)
+{
+	ZSTD_outBuffer zobuf;
+	size_t zsize;
+	do {
+		size_t remaining = zibuf->size - zibuf->pos;
+		zobuf.size = zobuf_size(remaining);
+		zobuf.dst = obuf_reserve(zbuf, zobuf.size);
+		if (zobuf.dst == NULL) {
+			diag_set(OutOfMemory, zobuf.size, "runtime arena",
+				 "compression buffer");
+			return -1;
+		}
+		zobuf.pos = 0;
+		zsize = ZSTD_compressStream2(zctx, &zobuf, zibuf, mode);
+		if (ZSTD_isError(zsize)) {
+			diag_set(ClientError, ER_COMPRESSION,
+				 ZSTD_getErrorName(zsize));
+			return -1;
+		}
+		/*
+		 * Advance output buffer to the end of
+		 * compressed data.
+		 */
+		obuf_alloc(zbuf, zobuf.pos);
+		/* Update crc32c */
+		*crc32c = crc32_calc(*crc32c, zobuf.dst, zobuf.pos);
+	} while ((mode != ZSTD_e_end || zsize != 0) &&
+		 (mode != ZSTD_e_continue || zibuf->pos != zibuf->size));
+	return 0;
+}
+
+/**
  * Write a compressed block of xrow objects.
  * @retval -1  error
  * @retval >= 0 the number of bytes written
@@ -1158,43 +1228,23 @@ xlog_tx_write_zstd(struct xlog *log)
 	}
 	uint32_t crc32c = 0;
 	struct iovec *iov;
-	/* 3 is compression level. */
-	ZSTD_compressBegin(log->zctx, 3);
 	size_t offset = XLOG_FIXHEADER_SIZE;
 	for (iov = log->obuf.iov; iov->iov_len; ++iov) {
-		/* Estimate max output buffer size. */
-		size_t zmax_size = ZSTD_compressBound(iov->iov_len - offset);
-		/* Allocate a destination buffer. */
-		void *zdst = obuf_reserve(&log->zbuf, zmax_size);
-		if (!zdst) {
-			diag_set(OutOfMemory, zmax_size, "runtime arena",
-				  "compression buffer");
-			goto error;
-		}
-		size_t (*fcompress)(ZSTD_CCtx *, void *, size_t,
-				    const void *, size_t);
+		ZSTD_inBuffer zibuf = {
+			.src = (char *)iov->iov_base + offset,
+			.size = iov->iov_len - offset,
+			.pos = 0,
+		};
 		/*
 		 * If it's the last iov or the last
 		 * log has 0 bytes, end the stream.
 		 */
-		if (iov == log->obuf.iov + log->obuf.pos ||
-		    !(iov + 1)->iov_len) {
-			fcompress = ZSTD_compressEnd;
-		} else {
-			fcompress = ZSTD_compressContinue;
-		}
-		size_t zsize = fcompress(log->zctx, zdst, zmax_size,
-					 (char *)iov->iov_base + offset,
-					 iov->iov_len - offset);
-		if (ZSTD_isError(zsize)) {
-			diag_set(ClientError, ER_COMPRESSION,
-				 ZSTD_getErrorName(zsize));
+		ZSTD_EndDirective mode =
+			iov == log->obuf.iov + log->obuf.pos ||
+			(iov + 1)->iov_len == 0 ? ZSTD_e_end : ZSTD_e_continue;
+		if (zstd_compress_zibuf(log->zctx, mode, &zibuf, &log->zbuf,
+					&crc32c) != 0)
 			goto error;
-		}
-		/* Advance output buffer to the end of compressed data. */
-		obuf_alloc(&log->zbuf, zsize);
-		/* Update crc32c */
-		crc32c = crc32_calc(crc32c, (char *)zdst, zsize);
 		/* Discount fixheader size for all iovs after first. */
 		offset = 0;
 	}
