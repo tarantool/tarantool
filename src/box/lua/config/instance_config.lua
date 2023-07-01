@@ -42,6 +42,12 @@ local urilib = require('uri')
 
 local CONFIG_VERSION = 'dev'
 
+-- Any configuration data should contain a version of the config
+-- schema for which it is written.
+--
+-- However, it is allowed only in the global scope of the cluster
+-- config and in the instance config.
+--
 -- * In the instance config: must be present.
 --
 --   TODO: This check is disabled for the early config schema
@@ -72,6 +78,39 @@ local function validate_config_version(data, w)
             w.error('config.version must not be present in the %s scope', scope)
         end
     end
+end
+
+-- Verify that replication.failover option is not present in the
+-- instance scope of the cluster config.
+local function validate_replication_failover(data, w)
+    -- scope == nil means that it is the instance config.
+    local scope = w.schema.scope
+
+    -- There is no much sense to set the failover option for a
+    -- particular instance, not the whole replicaset. So, the
+    -- option is forbidden for the instance scope of the cluster
+    -- config.
+    --
+    -- However, it is allowed for the instance config to accept an
+    -- instantiated cluster config as valid.
+    if scope ~= 'instance' then
+        return
+    end
+
+    if data.replication ~= nil and data.replication.failover ~= nil then
+        w.error('replication.failover must not be present in the %s scope',
+            scope)
+    end
+end
+
+local function validate_outmost_record(data, w)
+    -- Ensure that the function is called for the outmost record
+    -- of the instance_config schema, where the scope is present
+    -- in the cluster config.
+    assert(w.schema.config_version ~= nil)
+
+    validate_config_version(data, w)
+    validate_replication_failover(data, w)
 end
 
 local function enterprise_edition_validate(data, w)
@@ -778,6 +817,21 @@ return schema.new('instance_config', schema.record({
         }),
     }),
     replication = schema.record({
+        failover = schema.enum({
+            -- No failover ('off').
+            --
+            -- The leadership in replicasets is controlled using
+            -- the database.mode options. It is allowed to have
+            -- several writable instances in a replicaset.
+            --
+            -- The default database.mode is determined as follows.
+            --
+            -- * 1 instance in a replicaset: 'rw'.
+            -- * >1 instances in a replicaset: 'ro'.
+            'off',
+        }, {
+            default = 'off',
+        }),
         -- XXX: needs more validation
         peers = schema.array({
             items = schema.scalar({
@@ -1019,13 +1073,17 @@ return schema.new('instance_config', schema.record({
         end,
     }),
 }, {
-    -- Any configuration data should contain a version of the
-    -- config schema for which it is written.
+    -- This kind of validation cannot be implemented as the
+    -- 'validate' annotation of a particular schema node. There
+    -- are two reasons:
     --
-    -- This annotation cannot be placed right into the
-    -- config.version field, because missed fields are not
-    -- validated.
-    validate = validate_config_version,
+    -- * Missed fields are not validated.
+    -- * The outmost instance config record is marked with the
+    --   'scope' annotation (when the instance config is part of
+    --   the cluster config), but this annotation is not easy to
+    --   reach from the 'validate' function of a nested schema
+    --   node.
+    validate = validate_outmost_record,
     -- Store the config schema version right in the outmost schema
     -- node as an annotation. It simplifies accesses from other
     -- code.
