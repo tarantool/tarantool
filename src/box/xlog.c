@@ -1158,43 +1158,73 @@ xlog_tx_write_zstd(struct xlog *log)
 	}
 	uint32_t crc32c = 0;
 	struct iovec *iov;
-	/* 3 is compression level. */
-	ZSTD_compressBegin(log->zctx, 3);
+	size_t rc =
+		ZSTD_CCtx_setParameter(log->zctx, ZSTD_c_compressionLevel, 3);
+	if (ZSTD_isError(rc)) {
+		diag_set(ClientError, ER_COMPRESSION, ZSTD_getErrorName(rc));
+		goto error;
+	}
 	size_t offset = XLOG_FIXHEADER_SIZE;
 	for (iov = log->obuf.iov; iov->iov_len; ++iov) {
-		/* Estimate max output buffer size. */
-		size_t zmax_size = ZSTD_compressBound(iov->iov_len - offset);
-		/* Allocate a destination buffer. */
-		void *zdst = obuf_reserve(&log->zbuf, zmax_size);
-		if (!zdst) {
-			diag_set(OutOfMemory, zmax_size, "runtime arena",
-				  "compression buffer");
-			goto error;
-		}
-		size_t (*fcompress)(ZSTD_CCtx *, void *, size_t,
-				    const void *, size_t);
+		ZSTD_outBuffer zobuf = {
+			.dst = NULL,
+			.size = 0,
+			.pos = 0,
+		};
+		ZSTD_inBuffer zibuf = {
+			.src = (char *)iov->iov_base + offset,
+			.size = iov->iov_len - offset,
+			.pos = 0,
+		};
 		/*
 		 * If it's the last iov or the last
 		 * log has 0 bytes, end the stream.
 		 */
-		if (iov == log->obuf.iov + log->obuf.pos ||
-		    !(iov + 1)->iov_len) {
-			fcompress = ZSTD_compressEnd;
-		} else {
-			fcompress = ZSTD_compressContinue;
-		}
-		size_t zsize = fcompress(log->zctx, zdst, zmax_size,
-					 (char *)iov->iov_base + offset,
-					 iov->iov_len - offset);
-		if (ZSTD_isError(zsize)) {
-			diag_set(ClientError, ER_COMPRESSION,
-				 ZSTD_getErrorName(zsize));
-			goto error;
+		ZSTD_EndDirective mode =
+			iov == log->obuf.iov + log->obuf.pos ||
+			(iov + 1)->iov_len == 0 ? ZSTD_e_end : ZSTD_e_continue;
+		while (true) {
+			if (zobuf.pos == zobuf.size) {
+				if (zobuf.dst != NULL) {
+					/*
+					 * Advance output buffer to the end of
+					 * compressed data.
+					 */
+					obuf_alloc(&log->zbuf, zobuf.size);
+					/* Update crc32c */
+					crc32c = crc32_calc(crc32c, zobuf.dst,
+							    zobuf.size);
+				}
+				size_t remaining = zibuf.size - zibuf.pos;
+				zobuf.size =
+					MIN(ZSTD_CStreamOutSize(),
+					    ZSTD_compressBound(remaining));
+				zobuf.dst =
+					obuf_reserve(&log->zbuf, zobuf.size);
+				if (zobuf.dst == NULL) {
+					diag_set(OutOfMemory, zobuf.size,
+						 "runtime arena",
+						 "compression buffer");
+					goto error;
+				}
+				zobuf.pos = 0;
+			}
+			size_t zsize = ZSTD_compressStream2(log->zctx, &zobuf,
+							    &zibuf, mode);
+			if (ZSTD_isError(zsize)) {
+				diag_set(ClientError, ER_COMPRESSION,
+					 ZSTD_getErrorName(zsize));
+				goto error;
+			}
+			if ((mode == ZSTD_e_end && zsize == 0) ||
+			    (mode == ZSTD_e_continue &&
+			     zibuf.pos == zibuf.size))
+				break;
 		}
 		/* Advance output buffer to the end of compressed data. */
-		obuf_alloc(&log->zbuf, zsize);
+		obuf_alloc(&log->zbuf, zobuf.pos);
 		/* Update crc32c */
-		crc32c = crc32_calc(crc32c, (char *)zdst, zsize);
+		crc32c = crc32_calc(crc32c, zobuf.dst, zobuf.pos);
 		/* Discount fixheader size for all iovs after first. */
 		offset = 0;
 	}
