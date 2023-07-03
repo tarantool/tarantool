@@ -1187,12 +1187,12 @@ box.snapshot()
 ---
 - ok
 ...
--- Can't assign integer to float field. First operation is still applied.
+-- Can assign integer to float field.
 --
-s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 4, 4}})
+s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'=', 4, 4}})
 ---
 ...
-s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'=', 4, 4}})
+s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 4, 4}})
 ---
 ...
 -- Can't add floating point to integer (result is floating point).
@@ -1209,7 +1209,7 @@ box.snapshot()
 ...
 s:select()
 ---
-- - [1, 1, 1, 5.1, 1.1]
+- - [1, 1, 1, 8, 1.1]
   - [2, 6, 1, 1.1, 1.1]
 ...
 -- Integer overflow check.
@@ -1234,7 +1234,7 @@ box.snapshot()
 ...
 s:select()
 ---
-- - [1, 1, 9223372036854775809, 5.1, 1.1]
+- - [1, 1, 9223372036854775809, 8, 1.1]
   - [2, 8, 1, 1.1, 1.1]
 ...
 -- Decimals do not fit into numerics and vice versa.
@@ -1257,7 +1257,7 @@ box.snapshot()
 ...
 s:select()
 ---
-- - [1, 1, 9223372036854775809, 5.1, 2.1]
+- - [1, 1, 9223372036854775809, 8, 2.1]
   - [2, 8, 1, 1.1, 1.1]
 ...
 s:drop()

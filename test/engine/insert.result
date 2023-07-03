@@ -746,8 +746,7 @@ _ = s:create_index('ii')
 ---
 ...
 --
--- If number of Lua type NUMBER is not integer, than it could be
--- inserted in DOUBLE field.
+-- A number of Lua type NUMBER can be inserted in DOUBLE field.
 --
 s:insert({1, 1.1})
 ---
@@ -762,33 +761,31 @@ s:insert({3, -3.0009})
 - [3, -3.0009]
 ...
 --
--- Integers of Lua type NUMBER and CDATA of type int64 or uint64
--- cannot be inserted into this field.
+-- Integers of Lua type NUMBER and CDATA of type int64 or uint64 can
+-- also be inserted even if they can't be loselessly converted to
+-- double. They're stored in the space "as is".
 --
 s:insert({4, 1})
 ---
-- error: 'Tuple field 2 (d) type does not match one required by operation: expected
-    double, got unsigned'
+- [4, 1]
 ...
-s:insert({5, -9223372036854775800ULL})
+s:insert({5, 9223372036854775800ULL})
 ---
-- error: 'Tuple field 2 (d) type does not match one required by operation: expected
-    double, got unsigned'
+- [5, 9223372036854775800]
 ...
 s:insert({6, 18000000000000000000ULL})
 ---
-- error: 'Tuple field 2 (d) type does not match one required by operation: expected
-    double, got unsigned'
+- [6, 18000000000000000000]
 ...
 --
--- To insert an integer, we must cast it to a CDATA of type DOUBLE
--- using ffi.cast(). Non-integers can also be inserted this way.
+-- One can also cast a value to CDATA of type DOUBLE using ffi.cast().
+-- Non-integers can also be inserted this way.
 --
 s:insert({7, ffi.cast('double', 1)})
 ---
 - [7, 1]
 ...
-s:insert({8, ffi.cast('double', -9223372036854775808)})
+s:insert({8, ffi.cast('double', -9223372036854775800LL)})
 ---
 - [8, -9223372036854775808]
 ...
@@ -813,6 +810,9 @@ s:select()
 - - [1, 1.1]
   - [2, 2.5]
   - [3, -3.0009]
+  - [4, 1]
+  - [5, 9223372036854775800]
+  - [6, 18000000000000000000]
   - [7, 1]
   - [8, -9223372036854775808]
   - [9, 123]
@@ -829,13 +829,13 @@ dd:select(1.1)
 - - [1, 1.1]
   - [11, 1.1]
 ...
-dd:select(1)
+dd:select(-9223372036854775800LL)
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected double'
+- - [8, -9223372036854775808]
 ...
-dd:select(ffi.cast('double', 1))
+dd:select(ffi.cast('double', -9223372036854775800LL))
 ---
-- - [7, 1]
+- - [8, -9223372036854775808]
 ...
 -- Make sure the comparisons work correctly.
 dd:select(1.1, {iterator = 'ge'})
@@ -844,6 +844,8 @@ dd:select(1.1, {iterator = 'ge'})
   - [11, 1.1]
   - [2, 2.5]
   - [9, 123]
+  - [5, 9223372036854775800]
+  - [6, 18000000000000000000]
   - [10, 18000000000000000000]
 ...
 dd:select(1.1, {iterator = 'le'})
@@ -851,6 +853,7 @@ dd:select(1.1, {iterator = 'le'})
 - - [11, 1.1]
   - [1, 1.1]
   - [7, 1]
+  - [4, 1]
   - [12, -3.0009]
   - [3, -3.0009]
   - [8, -9223372036854775808]
@@ -859,11 +862,14 @@ dd:select(ffi.cast('double', 1.1), {iterator = 'gt'})
 ---
 - - [2, 2.5]
   - [9, 123]
+  - [5, 9223372036854775800]
+  - [6, 18000000000000000000]
   - [10, 18000000000000000000]
 ...
 dd:select(ffi.cast('double', 1.1), {iterator = 'lt'})
 ---
 - - [7, 1]
+  - [4, 1]
   - [12, -3.0009]
   - [3, -3.0009]
   - [8, -9223372036854775808]
@@ -874,6 +880,8 @@ dd:select(1.1, {iterator = 'all'})
   - [11, 1.1]
   - [2, 2.5]
   - [9, 123]
+  - [5, 9223372036854775800]
+  - [6, 18000000000000000000]
   - [10, 18000000000000000000]
 ...
 dd:select(1.1, {iterator = 'eq'})
@@ -885,6 +893,14 @@ dd:select(1.1, {iterator = 'req'})
 ---
 - - [11, 1.1]
   - [1, 1.1]
+...
+s:delete(4)
+---
+- [4, 1]
+...
+s:delete(6)
+---
+- [6, 18000000000000000000]
 ...
 s:delete(11)
 ---
@@ -900,31 +916,27 @@ ddd = s:create_index('ddd', {parts = {{2, 'double'}}})
 ...
 s:update(1, {{'=', 2, 2}})
 ---
-- error: 'Tuple field 2 (d) type does not match one required by operation: expected
-    double, got unsigned'
+- [1, 2]
 ...
 s:insert({22, 22})
 ---
-- error: 'Tuple field 2 (d) type does not match one required by operation: expected
-    double, got unsigned'
+- [22, 22]
 ...
 s:upsert({10, 100}, {{'=', 2, 2}})
 ---
-- error: 'Tuple field 2 (d) type does not match one required by operation: expected
-    double, got unsigned'
+- error: Duplicate key exists in unique index "ddd" in space "s" with old tuple -
+    [1, 2] and new tuple - [10, 2]
 ...
-s:upsert({100, 100}, {{'=', 2, 2}})
+s:upsert({101, 100}, {{'=', 2, 11}})
 ---
-- error: 'Tuple field 2 (d) type does not match one required by operation: expected
-    double, got unsigned'
 ...
 ddd:update(1, {{'=', 1, 70}})
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected double'
+- error: Attempt to modify a tuple field which is part of primary index in space 's'
 ...
 ddd:delete(1)
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected double'
+- [7, 1]
 ...
 s:update(2, {{'=', 2, 2.55}})
 ---
@@ -948,13 +960,13 @@ s:get(10)
 ---
 - [10, 2.2]
 ...
-ddd:update(1.1, {{'=', 3, 111}})
+ddd:update(2, {{'=', 3, 111}})
 ---
-- [1, 1.1, 111]
+- [1, 2, 111]
 ...
-ddd:delete(1.1)
+ddd:delete(2)
 ---
-- [1, 1.1, 111]
+- [1, 2, 111]
 ...
 s:update(2, {{'=', 2, ffi.cast('double', 255)}})
 ---
@@ -978,9 +990,9 @@ s:get(200)
 ---
 - [200, 222]
 ...
-ddd:update(ffi.cast('double', 1), {{'=', 3, 7}})
+ddd:update(22, {{'=', 3, 7}})
 ---
-- [7, 1, 7]
+- [22, 22, 7]
 ...
 ddd:delete(ffi.cast('double', 123))
 ---
@@ -990,11 +1002,12 @@ s:select()
 ---
 - - [2, 255]
   - [3, -3.0009]
-  - [7, 1, 7]
+  - [5, 9223372036854775800]
   - [8, -9223372036854775808]
   - [10, 2.2]
-  - [22, 22]
+  - [22, 22, 7]
   - [100, 100.5]
+  - [101, 100]
   - [200, 222]
 ...
 s:drop()

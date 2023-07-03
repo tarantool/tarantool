@@ -130,27 +130,27 @@ s = box.schema.space.create('s', {format = {{'i', 'integer'}, {'d', 'double'}}})
 _ = s:create_index('ii')
 
 --
--- If number of Lua type NUMBER is not integer, than it could be
--- inserted in DOUBLE field.
+-- A number of Lua type NUMBER can be inserted in DOUBLE field.
 --
 s:insert({1, 1.1})
 s:insert({2, 2.5})
 s:insert({3, -3.0009})
 
 --
--- Integers of Lua type NUMBER and CDATA of type int64 or uint64
--- cannot be inserted into this field.
+-- Integers of Lua type NUMBER and CDATA of type int64 or uint64 can
+-- also be inserted even if they can't be loselessly converted to
+-- double. They're stored in the space "as is".
 --
 s:insert({4, 1})
-s:insert({5, -9223372036854775800ULL})
+s:insert({5, 9223372036854775800ULL})
 s:insert({6, 18000000000000000000ULL})
 
 --
--- To insert an integer, we must cast it to a CDATA of type DOUBLE
--- using ffi.cast(). Non-integers can also be inserted this way.
+-- One can also cast a value to CDATA of type DOUBLE using ffi.cast().
+-- Non-integers can also be inserted this way.
 --
 s:insert({7, ffi.cast('double', 1)})
-s:insert({8, ffi.cast('double', -9223372036854775808)})
+s:insert({8, ffi.cast('double', -9223372036854775800LL)})
 s:insert({9, ffi.cast('double', tonumber('123'))})
 s:insert({10, ffi.cast('double', tonumber64('18000000000000000000'))})
 s:insert({11, ffi.cast('double', 1.1)})
@@ -161,8 +161,8 @@ s:select()
 -- The same rules apply to the key of this field:
 dd = s:create_index('dd', {unique = false, parts = {{2, 'double'}}})
 dd:select(1.1)
-dd:select(1)
-dd:select(ffi.cast('double', 1))
+dd:select(-9223372036854775800LL)
+dd:select(ffi.cast('double', -9223372036854775800LL))
 
 -- Make sure the comparisons work correctly.
 dd:select(1.1, {iterator = 'ge'})
@@ -173,6 +173,8 @@ dd:select(1.1, {iterator = 'all'})
 dd:select(1.1, {iterator = 'eq'})
 dd:select(1.1, {iterator = 'req'})
 
+s:delete(4)
+s:delete(6)
 s:delete(11)
 s:delete(12)
 
@@ -182,7 +184,7 @@ ddd = s:create_index('ddd', {parts = {{2, 'double'}}})
 s:update(1, {{'=', 2, 2}})
 s:insert({22, 22})
 s:upsert({10, 100}, {{'=', 2, 2}})
-s:upsert({100, 100}, {{'=', 2, 2}})
+s:upsert({101, 100}, {{'=', 2, 11}})
 
 ddd:update(1, {{'=', 1, 70}})
 ddd:delete(1)
@@ -194,8 +196,8 @@ s:get(100)
 s:upsert({10, 100.5}, {{'=', 2, 2.2}})
 s:get(10)
 
-ddd:update(1.1, {{'=', 3, 111}})
-ddd:delete(1.1)
+ddd:update(2, {{'=', 3, 111}})
+ddd:delete(2)
 
 s:update(2, {{'=', 2, ffi.cast('double', 255)}})
 s:replace({22, ffi.cast('double', 22)})
@@ -204,7 +206,7 @@ s:get(200)
 s:upsert({200, ffi.cast('double', 200)}, {{'=', 2, ffi.cast('double', 222)}})
 s:get(200)
 
-ddd:update(ffi.cast('double', 1), {{'=', 3, 7}})
+ddd:update(22, {{'=', 3, 7}})
 ddd:delete(ffi.cast('double', 123))
 
 s:select()

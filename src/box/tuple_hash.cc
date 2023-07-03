@@ -47,6 +47,17 @@ static inline uint32_t
 field_hash(uint32_t *ph, uint32_t *pcarry, const char **field)
 {
 	/*
+	 * For string key field we should hash the string contents excluding
+	 * MsgPack format identifier. The overload is defined below.
+	 */
+	static_assert(TYPE != FIELD_TYPE_STRING, "See the comment above.");
+	/*
+	 * For double key field we should cast the MsgPack value (whatever it
+	 * is: int, uint, float or double) to double, encode it as msgpack
+	 * double and hash it. No overload for it now.
+	 */
+	static_assert(TYPE != FIELD_TYPE_DOUBLE, "See the comment above.");
+	/*
 	* (!) All fields, except TYPE_STRING hashed **including** MsgPack format
 	* identifier (e.g. 0xcc). This was done **intentionally**
 	* for performance reasons. Please follow MsgPack specification
@@ -221,7 +232,7 @@ template <bool has_optional_parts, bool has_json_paths>
 uint32_t
 tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def);
 
-uint32_t
+static uint32_t
 key_hash_slowpath(const char *key, struct key_def *key_def);
 
 void
@@ -276,11 +287,40 @@ slowpath:
 
 uint32_t
 tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
-		 struct coll *coll)
+		 enum field_type type, struct coll *coll)
 {
-	char buf[9]; /* enough to store MP_INT/MP_UINT */
+	char buf[9]; /* enough to store MP_INT/MP_UINT/MP_DOUBLE */
 	const char *f = *field;
 	uint32_t size;
+
+	/*
+	 * MsgPack values of double key field are casted to double, encoded
+	 * as msgpack double and hashed. This assures the same value being
+	 * written as int, uint, float or double has the same hash for this
+	 * type of key.
+	 *
+	 * We create and hash msgpack instead of just hashing the double itself
+	 * for backward compatibility: so a user having a vinyl database with
+	 * double-key index won't have to rebuild it after tarantool update.
+	 *
+	 * XXX: It looks like something like this should also be done for
+	 * number key fields so that e. g. zero given as int, uint, float,
+	 * double and decimal have the same hash.
+	 */
+	if (type == FIELD_TYPE_DOUBLE) {
+		double value;
+		/*
+		 * This will only fail if the mp_type is not numeric, which is
+		 * impossible here (see field_mp_plain_type_is_compatible).
+		 */
+		if (mp_read_double_lossy(&f, &value) == -1)
+			unreachable();
+		char *double_msgpack_end = mp_encode_double(buf, value);
+		size = double_msgpack_end - buf;
+		assert(size <= sizeof(buf));
+		PMurHash32_Process(ph1, pcarry, buf, size);
+		return size;
+	}
 
 	switch (mp_typeof(**field)) {
 	case MP_STR:
@@ -355,7 +395,7 @@ tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
 	const char *field = tuple_field_by_part(tuple, part, multikey_idx);
 	if (field == NULL)
 		return tuple_hash_null(ph1, pcarry);
-	return tuple_hash_field(ph1, pcarry, &field, part->coll);
+	return tuple_hash_field(ph1, pcarry, &field, part->type, part->coll);
 }
 
 template <bool has_optional_parts, bool has_json_paths>
@@ -386,6 +426,7 @@ tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
 		total_size += tuple_hash_null(&h, &carry);
 	} else {
 		total_size += tuple_hash_field(&h, &carry, &field,
+					       key_def->parts[0].type,
 					       key_def->parts[0].coll);
 	}
 	for (uint32_t part_id = 1; part_id < key_def->part_count; part_id++) {
@@ -409,6 +450,7 @@ tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
 		} else {
 			total_size +=
 				tuple_hash_field(&h, &carry, &field,
+						 key_def->parts[part_id].type,
 						 key_def->parts[part_id].coll);
 		}
 		prev_fieldno = key_def->parts[part_id].fieldno;
@@ -417,7 +459,7 @@ tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
 	return PMurHash32_Result(h, carry, total_size);
 }
 
-uint32_t
+static uint32_t
 key_hash_slowpath(const char *key, struct key_def *key_def)
 {
 	uint32_t h = HASH_SEED;
@@ -426,7 +468,8 @@ key_hash_slowpath(const char *key, struct key_def *key_def)
 
 	for (struct key_part *part = key_def->parts;
 	     part < key_def->parts + key_def->part_count; part++) {
-		total_size += tuple_hash_field(&h, &carry, &key, part->coll);
+		total_size += tuple_hash_field(&h, &carry, &key, part->type,
+					       part->coll);
 	}
 
 	return PMurHash32_Result(h, carry, total_size);
