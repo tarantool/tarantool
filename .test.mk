@@ -70,10 +70,19 @@ test-release: build run-luajit-test run-test
 
 .PHONY: test-release-asan
 test-release-asan: CMAKE_ENV = CC=clang-11 CXX=clang++-11
+# FIBER_STACK_SIZE=640Kb: The default value of fiber stack size
+# is 512Kb, but several tests in test/PUC-Rio-Lua-5.1-test suite
+# in the LuaJIT repo (e.g. some cases with deep recursion in
+# errors.lua or pm.lua) have already been tweaked according to the
+# limitations mentioned in #5782, but the crashes still occur
+# while running LuaJIT tests with ASan support enabled.
+# Experiments once again confirm the notorious quote that "640 Kb
+# ought to be enough for anybody".
 test-release-asan: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
                                   -DENABLE_WERROR=ON \
                                   -DENABLE_ASAN=ON \
                                   -DENABLE_UB_SANITIZER=ON \
+                                  -DFIBER_STACK_SIZE=640Kb \
                                   -DENABLE_FUZZER=ON
 # Some checks are temporary suppressed in the scope of the issue
 # https://github.com/tarantool/tarantool/issues/4360:
@@ -88,7 +97,15 @@ test-release-asan: TEST_RUN_ENV = ASAN=ON \
                                                detect_invalid_pointer_pairs=1:symbolize=1:$\
                                                detect_leaks=1:dump_instruction_bytes=1:$\
                                                print_suppressions=0
-test-release-asan: build run-test
+test-release-asan: LUAJIT_TEST_ENV = LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
+                                     ASAN_OPTIONS=detect_invalid_pointer_pairs=1:$\
+                                                  detect_leaks=1:$\
+                                                  dump_instruction_bytes=1:$\
+                                                  heap_profile=0:$\
+                                                  print_suppressions=0:$\
+                                                  symbolize=1:$\
+                                                  unmap_shadow_on_exit=1
+test-release-asan: build run-luajit-test run-test
 
 # Debug build
 
