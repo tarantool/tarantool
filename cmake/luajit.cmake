@@ -66,13 +66,19 @@ if(ENABLE_VALGRIND)
         "Valgrind support" FORCE)
 endif()
 
-# FIXME: ASAN support is badly implemented in LuaJIT and there is
-# not a specific build options for this. At the same time there
-# are several places wrapped with LUAJIT_USE_ASAN define.
-# Just enable it here if needed and patiently wait until ASAN
-# support is implemented properly in LuaJIT.
+# Enable LuaJIT ASan support. The internal LuaJIT memory allocator
+# is not instrumented yet unfortunately, so to find any memory
+# faults it's worth building LuaJIT with system provided memory
+# allocator (i.e. enable LUAJIT_USE_SYSMALLOC option). However,
+# Tarantool doesn't finalize Lua universe the right way (see the
+# comments near <tarantool_lua_free>), so running Tarantool
+# testing routine with LUAJIT_USE_SYSMALLOC enabled generates
+# false-positive LSan leaks. Return back here to enable
+# LUAJIT_USE_SYSMALLOC, when the issue below is resolved.
+# https://github.com/tarantool/tarantool/issues/3071
 if(ENABLE_ASAN)
-    add_definitions(-DLUAJIT_USE_ASAN=1)
+    set(LUAJIT_USE_ASAN ON CACHE BOOL
+        "Build LuaJIT with AddressSanitizer" FORCE)
 endif()
 
 if(TARGET_OS_DARWIN AND NOT LUAJIT_ENABLE_GC64)
