@@ -3,9 +3,14 @@ local t = require('luatest')
 local server = require('test.luatest_helpers.server')
 
 local function start_example_replicaset(g, dir, config_file, opts)
+    local credentials = {
+        user = 'client',
+        password = 'secret',
+    }
     local opts = fun.chain({
         config_file = config_file,
         chdir = dir,
+        net_box_credentials = credentials,
     }, opts or {}):tomap()
     g.server_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
     g.server_2 = server:new(fun.chain(opts, {alias = 'instance-002'}):tomap())
