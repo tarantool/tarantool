@@ -1145,12 +1145,15 @@ test:do_catchsql_test(
     })
 
 -- Make sure that search using index in field type number work right.
+-- NOTE: Both 9999999999999999 and 10000000000000001 become the same value
+-- in index comparison because of double-cast, so we use -or-equal variants
+-- of iterators. Don't expect to have precise comparisons in double indexes.
 test:do_execsql_test(
     "cast-11",
     [[
         CREATE TABLE t6(d DOUBLE PRIMARY KEY);
         INSERT INTO t6 VALUES(10000000000000000);
-        SELECT d FROM t6 WHERE d < 10000000000000001 and d > 9999999999999999;
+        SELECT d FROM t6 WHERE d <= 10000000000000001 and d >= 9999999999999999;
         DROP TABLE t6;
     ]], {
         10000000000000000

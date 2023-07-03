@@ -105,6 +105,23 @@ mp_extension_class(const char *data)
 	return mp_ext_classes[type];
 }
 
+/*
+ * @brief Read the msgpack value at \p field (whatever it is: int, uint, float
+ *        or double) as double.
+ * @param field the field to read the value from
+ * @retval the read-and-cast result
+ */
+static double
+mp_read_as_double(const char *field)
+{
+	double result = NAN;
+	assert(mp_classof(mp_typeof(*field)) == MP_CLASS_NUMBER);
+	/* This can only fail on non-numeric msgpack field, so it shouldn't. */
+	if (mp_read_double_lossy(&field, &result) == -1)
+		unreachable();
+	return result;
+}
+
 static int
 mp_compare_bool(const char *field_a, const char *field_b)
 {
@@ -114,10 +131,10 @@ mp_compare_bool(const char *field_a, const char *field_b)
 }
 
 static int
-mp_compare_double(const char *field_a, const char *field_b)
+mp_compare_as_double(const char *field_a, const char *field_b)
 {
-	double a_val = mp_decode_double(&field_a);
-	double b_val = mp_decode_double(&field_b);
+	double a_val = mp_read_as_double(field_a);
+	double b_val = mp_read_as_double(field_b);
 	return COMPARE_RESULT(a_val, b_val);
 }
 
@@ -492,7 +509,7 @@ tuple_compare_field(const char *field_a, const char *field_b,
 	case FIELD_TYPE_NUMBER:
 		return mp_compare_number(field_a, field_b);
 	case FIELD_TYPE_DOUBLE:
-		return mp_compare_double(field_a, field_b);
+		return mp_compare_as_double(field_a, field_b);
 	case FIELD_TYPE_BOOLEAN:
 		return mp_compare_bool(field_a, field_b);
 	case FIELD_TYPE_VARBINARY:
@@ -532,7 +549,7 @@ tuple_compare_field_with_type(const char *field_a, enum mp_type a_type,
 		return mp_compare_number_with_type(field_a, a_type,
 						   field_b, b_type);
 	case FIELD_TYPE_DOUBLE:
-		return mp_compare_double(field_a, field_b);
+		return mp_compare_as_double(field_a, field_b);
 	case FIELD_TYPE_BOOLEAN:
 		return mp_compare_bool(field_a, field_b);
 	case FIELD_TYPE_VARBINARY:
@@ -1837,8 +1854,7 @@ field_hint_integer(const char *field)
 static inline hint_t
 field_hint_double(const char *field)
 {
-	assert(mp_typeof(*field) == MP_DOUBLE);
-	return hint_double(mp_decode_double(&field));
+	return hint_double(mp_read_as_double(field));
 }
 
 static inline hint_t
