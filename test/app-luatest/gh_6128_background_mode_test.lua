@@ -14,16 +14,13 @@ end
 
 -- Check presence of string 'msg' in file 'file'.
 -- Returns true when string is found and false otherwise.
--- Function is not as smart as grep_log in a luatest (luatest/server.lua)
--- and reads the whole log file every time, but this log file has a small
--- size so it is ok.
+-- Function uses grep_log() defined in a luatest (luatest/server.lua).
+-- grep_log is a class method, so it is required to create a Server instance.
 -- https://github.com/tarantool/luatest/blob/89da427f8bb3bb66e01d2a7b5a9370d0428d8c52/luatest/server.lua#L660-L727
-local function check_err_msg(file, msg)
-    local f = fio.open(file, {'O_RDONLY', 'O_NONBLOCK'})
-    t.assert_not_equals(f, nil)
-    local content = f:read(2048)
-    f:close()
-    return (string.match(content, msg) and true) or false
+local function check_msg(file, msg)
+    local server = t.Server:new({})
+    local res = server:grep_log(msg, 1024, {filename = file})
+    return (res == msg_opt_processing and true) or false
 end
 
 local TARANTOOL_PATH = tarantool_path(arg)
@@ -67,7 +64,7 @@ end)
 
 g.test_background_mode_box_cfg = function(cg)
     t.helpers.retrying({timeout = 2, delay = 0.01}, function()
-        assert(check_err_msg(cg.log_path, msg_opt_processing) == true)
+        assert(check_msg(cg.log_path, msg_opt_processing) == true)
     end, cg.log_path, cg.ph)
 end
 
@@ -108,7 +105,7 @@ end)
 
 g.test_background_mode_env_vars = function(cg)
     t.helpers.retrying({timeout = 2, delay = 0.01}, function()
-        assert(check_err_msg(cg.log_path, msg_opt_processing) == true)
+        assert(check_msg(cg.log_path, msg_opt_processing) == true)
     end, cg.log_path, cg.ph)
-    check_err_msg(cg.log_path, msg_opt_processing)
+    check_msg(cg.log_path, msg_opt_processing)
 end
