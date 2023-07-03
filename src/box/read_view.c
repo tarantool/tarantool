@@ -75,8 +75,7 @@ static void
 space_read_view_delete(struct space_read_view *space_rv)
 {
 	assert(space_rv->format == NULL);
-	if (space_rv->field_count > 0)
-		field_def_array_delete(space_rv->fields, space_rv->field_count);
+	free(space_rv->format_data);
 	for (uint32_t i = 0; i <= space_rv->index_id_max; i++) {
 		struct index_read_view *index_rv = space_rv->index_map[i];
 		if (index_rv != NULL) {
@@ -108,14 +107,15 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 
 	space_rv->id = space_id(space);
 	space_rv->group_id = space_group_id(space);
-	if (opts->enable_field_names && space->def->field_count > 0) {
-		space_rv->fields = field_def_array_dup(space->def->fields,
-						       space->def->field_count);
-		assert(space_rv->fields != NULL);
-		space_rv->field_count = space->def->field_count;
+	if (opts->enable_field_names &&
+	    space->def->format_data != NULL) {
+		space_rv->format_data = xmalloc(space->def->format_data_len);
+		memcpy(space_rv->format_data, space->def->format_data,
+		       space->def->format_data_len);
+		space_rv->format_data_len = space->def->format_data_len;
 	} else {
-		space_rv->fields = NULL;
-		space_rv->field_count = 0;
+		space_rv->format_data = NULL;
+		space_rv->format_data_len = 0;
 	}
 	space_rv->format = NULL;
 	if (opts->enable_space_upgrade && space->upgrade != NULL) {
