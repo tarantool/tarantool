@@ -12,7 +12,6 @@ credentials:
 iproto:
   listen: 'unix/:./{{ instance_name }}.iproto'
   advertise:
-    client: client@
     peer: replicator@
 
 log:

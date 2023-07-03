@@ -416,7 +416,55 @@ for case_name, case in pairs({
     end
 end
 
--- Successful cases for iproto.advertise.
+local err_advertise_client_uri_with_user = '[instance_config] ' ..
+    'iproto.advertise.client: user@host:port and user:pass@host:port syntax ' ..
+    'is not accepted by iproto.advertise.client option: only host:port is ' ..
+    'considered valid'
+local err_advertise_client_user_syntax = '[instance_config] ' ..
+    'iproto.advertise.client: user@ and user:pass@ syntax is not accepted ' ..
+    'by iproto.advertise.client option: only host:port is considered valid'
+
+-- Extra bad cases specific for iproto.advertise.client.
+for case_name, case in pairs({
+    inet_socket_user = {
+        advertise = 'user@localhost:3301',
+        exp_err_msg = err_advertise_client_uri_with_user,
+    },
+    inet_socket_user_pass = {
+        advertise = 'user:pass@localhost:3301',
+        exp_err_msg = err_advertise_client_uri_with_user,
+    },
+    unix_socket_user = {
+        advertise = 'user@unix/:/foo/bar.iproto',
+        exp_err_msg = err_advertise_client_uri_with_user,
+    },
+    unix_socket_user_pass = {
+        advertise = 'user:pass@unix/:/foo/bar.iproto',
+        exp_err_msg = err_advertise_client_uri_with_user,
+    },
+    user = {
+        advertise = 'user@',
+        exp_err_msg = err_advertise_client_user_syntax,
+    },
+    user_pass = {
+        advertise = 'user:pass@',
+        exp_err_msg = err_advertise_client_user_syntax,
+    },
+}) do
+    g[('test_bad_iproto_advertise_client_%s'):format(case_name)] = function()
+        t.assert_error_msg_equals(case.exp_err_msg, function()
+            instance_config:validate({
+                iproto = {
+                    advertise = {
+                        client = case.advertise,
+                    },
+                },
+            })
+        end)
+    end
+end
+
+-- Successful cases for iproto.advertise.{peer,sharding}.
 for case_name, case in pairs({
     inet_socket = {
         advertise = 'localhost:3301',
@@ -443,9 +491,9 @@ for case_name, case in pairs({
         advertise = 'user:pass@',
     },
 }) do
-    g[('test_good_iproto_advertise_%s'):format(case_name)] = function()
+    g[('test_good_iproto_advertise_peer_%s'):format(case_name)] = function()
         assert(case.advertise ~= nil)
-        for _, option_name in ipairs({'client', 'peer', 'sharding'}) do
+        for _, option_name in ipairs({'peer', 'sharding'}) do
             instance_config:validate({
                 iproto = {
                     advertise = {
@@ -454,6 +502,30 @@ for case_name, case in pairs({
                 },
             })
         end
+    end
+end
+
+-- Successful cases for iproto.advertise.client.
+for case_name, case in pairs({
+    inet_socket = {
+        advertise = 'localhost:3301',
+    },
+    unix_socket = {
+        advertise = 'unix/:/foo/bar.iproto',
+    },
+    unix_socket_instance_name = {
+        advertise = 'unix/:/foo/{{ instance_name }}.iproto',
+    },
+}) do
+    g[('test_good_iproto_advertise_client_%s'):format(case_name)] = function()
+        assert(case.advertise ~= nil)
+        instance_config:validate({
+            iproto = {
+                advertise = {
+                    client = case.advertise,
+                },
+            },
+        })
     end
 end
 

@@ -199,7 +199,7 @@ local function uri_is_suitable_to_connect(_, uri)
     return true
 end
 
-local function advertise_uri_validate(data, w)
+local function advertise_peer_uri_validate(data, w)
     -- Accept the special syntax user@ or user:pass@.
     --
     -- It means using iproto.listen value to connect and using the
@@ -226,6 +226,10 @@ local function advertise_uri_validate(data, w)
     if not ok then
         w.error(err)
     end
+
+    -- The return value is ignored by schema.lua, but useful in
+    -- iproto.advertise.client validation.
+    return uri
 end
 
 return schema.new('instance_config', schema.record({
@@ -520,8 +524,15 @@ return schema.new('instance_config', schema.record({
         --
         -- * client
         --
-        --   The general purpose client URI, usually points to a
-        --   restricted user with access to particular functions.
+        --   The informational value for clients. It is not used
+        --   in tarantool anyhow (only validated). Contains only
+        --   host:port: no user, no password.
+        --
+        --   Must be suitable to connect (no INADDR_ANY, no
+        --   in6addr_any, no zero port).
+        --
+        --   Note: the host:port part may represent a Unix domain
+        --   socket: host = 'unix/', port = '/path/to/socket'.
         --
         -- * peer
         --
@@ -537,8 +548,8 @@ return schema.new('instance_config', schema.record({
         --
         --   If unset, the general peer URI should be used.
         --
-        -- All the iproto.advertise.* options have the following
-        -- syntax variants:
+        -- The iproto.advertise.{peer,sharding} options have the
+        -- following syntax variants:
         --
         -- 1. user@
         -- 2. user:pass@
@@ -559,17 +570,33 @@ return schema.new('instance_config', schema.record({
             client = schema.scalar({
                 type = 'string',
                 default = box.NULL,
-                validate = advertise_uri_validate,
+                validate = function(data, w)
+                    -- Re-use peer URI validation code, but add
+                    -- several extra constraints.
+                    local uri = advertise_peer_uri_validate(data, w)
+
+                    if data:endswith('@') then
+                        w.error('user@ and user:pass@ syntax is not ' ..
+                            'accepted by iproto.advertise.client option: ' ..
+                            'only host:port is considered valid')
+                    end
+
+                    if uri.login ~= nil or uri.password ~= nil then
+                        w.error('user@host:port and user:pass@host:port ' ..
+                            'syntax is not accepted by iproto.advertise.' ..
+                            'client option: only host:port is considered valid')
+                    end
+                end,
             }),
             peer = schema.scalar({
                 type = 'string',
                 default = box.NULL,
-                validate = advertise_uri_validate,
+                validate = advertise_peer_uri_validate,
             }),
             sharding = schema.scalar({
                 type = 'string',
                 default = box.NULL,
-                validate = advertise_uri_validate,
+                validate = advertise_peer_uri_validate,
             }),
         }),
         threads = schema.scalar({

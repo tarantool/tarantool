@@ -4,41 +4,6 @@ local urilib = require('uri')
 local fio = require('fio')
 local luatest = require('luatest')
 
--- Extract a password of the given user from the given config.
---
--- If the user is 'guest', there is no password (nil is returned)
--- disregarding of the config content. The 'guest' user cannot
--- have a password.
---
--- If the user is not found, an error is raised. This is incorrect
--- configuration.
---
--- If the user is found, but has no plain text password, assume
--- that it is OK to connect without a password.
---
--- If the plain text password is found for the given user, return
--- it.
-local function find_password(config, username)
-    if username == nil or username == 'guest' then
-        return nil
-    end
-
-    local err_msg = ('Unable to find user %s to read its password'):format(
-        username)
-    if config.credentials == nil or config.credentials.users == nil then
-        error(err_msg)
-    end
-    local user_def = config.credentials.users[username]
-    if user_def == nil then
-        error(err_msg)
-    end
-
-    if user_def.password ~= nil then
-        return user_def.password.plain
-    end
-    return nil
-end
-
 -- Determine advertise URI for given instance from a cluster
 -- configuration.
 local function find_advertise_uri(config, instance_name, dir)
@@ -85,50 +50,7 @@ local function find_advertise_uri(config, instance_name, dir)
         listen = listen or config.iproto.listen
     end
 
-    -- The advertise option has one of the following formats:
-    --
-    -- * user@
-    --
-    --   Get password from the 'credentials' section.
-    --   Get host:port from the  listen option.
-    -- * user:pass@
-    --
-    --   Get host:port from the listen option.
-    -- * user:pass@host:port
-    --
-    --   Just use this URI.
-    -- * user@host:port
-    --
-    --   Get password from the 'credentials' section.
-    --
-    -- Note: the host:port part may represent a Unix domain
-    -- socket: host = 'unix/', port = '/path/to/socket'.
-    local login
-    local password
-    local uri
-
-    if advertise ~= nil and advertise:endswith('@') then
-        if advertise:find(':') then
-            -- user:pass@ -> set login and password
-            local login_password = advertise:sub(1, -2):split(':', 1)
-            login = login_password[1]
-            password = login_password[2]
-        else
-            -- user@ -> set login
-            --
-            -- The password is set in the code below.
-            login = advertise:sub(1, -2)
-        end
-        -- Use listen as the host:port part.
-        --
-        -- The listen option can contain several URIs, it is
-        -- handled below.
-        uri = listen
-    else
-        -- The advertise parameter is either nil or contains
-        -- an URI.
-        uri = advertise or listen
-    end
+    local uri = advertise or listen
 
     -- Neither advertise, nor listen contain an URI.
     if uri == nil then
@@ -151,16 +73,7 @@ local function find_advertise_uri(config, instance_name, dir)
         local suitable = u.ipv4 ~= '0.0.0.0' and u.ipv6 ~= '::' and
             u.service ~= '0'
         if suitable then
-            -- Assume that if a login or a password is part of the
-            -- URI, it comes from the advertise option.
-            -- box.cfg({listen = <...>}) accepts an URI with user
-            -- or user:pass, but it has no sense.
-            --
-            -- So, prefer login/password from the URI if present.
-            u.login = u.login or login
-            u.password = u.password or password or
-                find_password(config, u.login)
-            return urilib.format(u, true)
+            return urilib.format(u)
         end
     end
 
