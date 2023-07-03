@@ -153,18 +153,20 @@ local function new(iconfig, cconfig, instance_name)
     local failover = instance_config:get(iconfig_def, 'replication.failover')
     local leader = found.replicaset.leader
 
-    if failover == 'off' then
-        -- Verify that no leader is set in this mode.
+    if failover ~= 'manual' then
+        -- Verify that no leader is set in the "off" or "election"
+        -- failover mode.
         if leader ~= nil then
             error(('"leader" = %q option is set for replicaset %q of group ' ..
                 '%q, but this option cannot be used together with ' ..
-                'replication.failover = "off"'):format(leader,
-                found.replicaset_name, found.group_name), 0)
+                'replication.failover = %q'):format(leader,
+                found.replicaset_name, found.group_name, failover), 0)
         end
-    elseif failover == 'manual' then
+    end
+    if failover ~= 'off' then
         -- Verify that peers in the given replicaset have no direct
         -- database.mode option set if the replicaset is configured
-        -- with the manual failover mode.
+        -- with the "manual" or "election" failover mode.
         --
         -- This check doesn't verify the whole cluster config, only
         -- the given replicaset.
@@ -173,12 +175,13 @@ local function new(iconfig, cconfig, instance_name)
             if mode ~= nil then
                 error(('database.mode = %q is set for instance %q of ' ..
                     'replicaset %q of group %q, but this option cannot be ' ..
-                    'used together with replication.failover = ' ..
-                    '"manual"'):format(mode, peer_name, found.replicaset_name,
-                    found.group_name), 0)
+                    'used together with replication.failover = %q'):format(mode,
+                    peer_name, found.replicaset_name, found.group_name,
+                    failover), 0)
             end
         end
-
+    end
+    if failover == 'manual' then
         -- Verify that the 'leader' option is set to a name of an
         -- existing instance from the given replicaset (or unset).
         if leader ~= nil and peers[leader] == nil then
