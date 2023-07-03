@@ -83,6 +83,19 @@ g.test_example_replicaset = function(g)
     t.assert_equals(g.server_3:eval('return box.info.ro'), true)
 end
 
+g.test_example_replicaset_manual_failover = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config_file = fio.abspath('doc/examples/config/' ..
+        'replicaset_manual_failover.yaml')
+    helpers.start_example_replicaset(g, dir, config_file)
+
+    -- Verify that the only read-write instance is one that is set
+    -- as the leader.
+    t.assert_equals(g.server_1:eval('return box.info.ro'), false)
+    t.assert_equals(g.server_2:eval('return box.info.ro'), true)
+    t.assert_equals(g.server_3:eval('return box.info.ro'), true)
+end
+
 local err_msg_cannot_find_user = 'box_cfg.apply: cannot find user unknown ' ..
     'in the config to use its password in a replication peer URI'
 local err_msg_no_suitable_uris = 'box_cfg.apply: unable to build replicaset ' ..
@@ -136,6 +149,43 @@ for case_name, case in pairs({
             '"replicaset-001" of group "group-001" are configured to the ' ..
             'read-only mode.',
     },
+    failover_off_leader_is_set = {
+        -- The URIs here are good. But the leader option is set
+        -- together with failover = "off". This configuration
+        -- is forbidden.
+        listen = 'unix/:./{{ instance_name }}.iproto',
+        advertise = 'replicator@',
+        failover = 'off',
+        leader = 'instance-001',
+        exp_err = '"leader" = "instance-001" option is set for replicaset ' ..
+            '"replicaset-001" of group "group-001", but this option cannot ' ..
+            'be used together with replication.failover = "off"',
+    },
+    failover_manual_mode_is_set = {
+        -- The URIs here are good. But the database.mode option is
+        -- set together with failover = "manual". This
+        -- configuration is forbidden.
+        listen = 'unix/:./{{ instance_name }}.iproto',
+        advertise = 'replicator@',
+        failover = 'manual',
+        mode = 'rw',
+        exp_err = 'database.mode = "rw" is set for instance "instance-001" ' ..
+            'of replicaset "replicaset-001" of group "group-001", but this ' ..
+            'option cannot be used together with replication.failover = ' ..
+            '"manual"',
+    },
+    failover_manual_unknown_instance = {
+        -- The URIs here are good. But the leader option points
+        -- to an unknown instance.
+        listen = 'unix/:./{{ instance_name }}.iproto',
+        advertise = 'replicator@',
+        failover = 'manual',
+        leader = 'unknown',
+        mode = box.NULL,
+        exp_err = '"leader" = "unknown" option is set for replicaset ' ..
+            '"replicaset-001" of group "group-001", but instance "unknown" ' ..
+            'is not found in this replicaset',
+    },
 }) do
     g[('test_bad_replicaset_build_%s'):format(case_name)] = function()
         local dir = treegen.prepare_directory(g, {}, {})
@@ -162,10 +212,14 @@ for case_name, case in pairs({
                     },
                 },
             },
+            replication = {
+                failover = case.failover,
+            },
             groups = {
                 ['group-001'] = {
                     replicasets = {
                         ['replicaset-001'] = {
+                            leader = case.leader,
                             instances = {
                                 ['instance-001'] = {
                                     database = {

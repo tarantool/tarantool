@@ -242,26 +242,38 @@ local function apply(config)
     -- they're already added to `box_cfg`.
     box_cfg.log = log_destination(configdata)
 
+    local failover = configdata:get('replication.failover',
+        {use_default = true})
+
     -- Read-only or read-write?
-    --
-    -- 'rw' and 'ro' mean itself.
-    --
-    -- The default is determined depending of amount of instances
-    -- in the given replicaset.
-    --
-    -- * 1 instance: read-write.
-    -- * >1 instances: read-only.
-    local mode = configdata:get('database.mode', {use_default = true})
-    if mode == 'ro' then
-        box_cfg.read_only = true
-    elseif mode == 'rw' then
-        box_cfg.read_only = false
-    elseif #configdata:peers() == 1 then
-        assert(mode == nil)
-        box_cfg.read_only = false
-    elseif #configdata:peers() > 1 then
-        assert(mode == nil)
-        box_cfg.read_only = true
+    if failover == 'off' then
+        -- 'rw' and 'ro' mean itself.
+        --
+        -- The default is determined depending of amount of
+        -- instances in the given replicaset.
+        --
+        -- * 1 instance: read-write.
+        -- * >1 instances: read-only.
+        local mode = configdata:get('database.mode', {use_default = true})
+        if mode == 'ro' then
+            box_cfg.read_only = true
+        elseif mode == 'rw' then
+            box_cfg.read_only = false
+        elseif #configdata:peers() == 1 then
+            assert(mode == nil)
+            box_cfg.read_only = false
+        elseif #configdata:peers() > 1 then
+            assert(mode == nil)
+            box_cfg.read_only = true
+        else
+            assert(false)
+        end
+    elseif failover == 'manual' then
+        -- Set RO/RW based on the 'leader' replicaset option.
+        --
+        -- NB: If there is no configured leader, all the instances
+        -- of the given replicaset are configured as read-only.
+        box_cfg.read_only = not configdata:is_leader()
     else
         assert(false)
     end
@@ -338,16 +350,22 @@ local function apply(config)
         -- We should decide what to do in the case.
         if in_replicaset and not has_snap then
             local has_rw = false
-            for _, peer_name in ipairs(configdata:peers()) do
-                local opts = {peer = peer_name, use_default = true}
-                local mode = configdata:get('database.mode', opts)
-                -- NB: The default is box.NULL that is interpreted
-                -- as 'ro' for a replicaset with more than one
-                -- instance.
-                if mode == 'rw' then
-                    has_rw = true
-                    break
+            if failover == 'off' then
+                for _, peer_name in ipairs(configdata:peers()) do
+                    local opts = {peer = peer_name, use_default = true}
+                    local mode = configdata:get('database.mode', opts)
+                    -- NB: The default is box.NULL that is
+                    -- interpreted as 'ro' for a replicaset with
+                    -- more than one instance.
+                    if mode == 'rw' then
+                        has_rw = true
+                        break
+                    end
                 end
+            elseif failover == 'manual' then
+                has_rw = configdata:leader() ~= nil
+            else
+                assert(false)
             end
             if not has_rw then
                 error(('Startup failure.\nNo leader to register new ' ..

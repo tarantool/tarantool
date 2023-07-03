@@ -829,6 +829,17 @@ return schema.new('instance_config', schema.record({
             -- * 1 instance in a replicaset: 'rw'.
             -- * >1 instances in a replicaset: 'ro'.
             'off',
+            -- Manual failover ('manual').
+            --
+            -- The leadership is controlled using the 'leader'
+            -- option of a replicaset. Master-master configuration
+            -- is forbidden.
+            --
+            -- The database.mode option can't be set directly in
+            -- the manual failover mode. The leader is configured
+            -- in the read-write mode, all the other instances are
+            -- read-only.
+            'manual',
         }, {
             default = 'off',
         }),

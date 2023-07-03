@@ -65,6 +65,20 @@ function methods.names(self)
     }
 end
 
+-- Should be called only if the 'manual' failover method is
+-- configured.
+function methods.leader(self)
+    assert(self._failover == 'manual')
+    return self._leader
+end
+
+-- Should be called only if the 'manual' failover method is
+-- configured.
+function methods.is_leader(self)
+    assert(self._failover == 'manual')
+    return self._leader == self._instance_name
+end
+
 local mt = {
     __index = methods,
 }
@@ -126,6 +140,54 @@ local function new(iconfig, cconfig, instance_name)
     local peer_names = fun.iter(peers):totable()
     table.sort(peer_names)
 
+    -- The replication.failover option is forbidden for the
+    -- instance scope of the cluster config, so it is common for
+    -- the whole replicaset. We can extract it from the
+    -- configuration of the given instance.
+    --
+    -- There is a nuance: the option still can be set using an
+    -- environment variable. We can't detect incorrect usage in
+    -- this case (say, different failover modes for different
+    -- instances in the same replicaset), because we have no
+    -- access to environment of other instances.
+    local failover = instance_config:get(iconfig_def, 'replication.failover')
+    local leader = found.replicaset.leader
+
+    if failover == 'off' then
+        -- Verify that no leader is set in this mode.
+        if leader ~= nil then
+            error(('"leader" = %q option is set for replicaset %q of group ' ..
+                '%q, but this option cannot be used together with ' ..
+                'replication.failover = "off"'):format(leader,
+                found.replicaset_name, found.group_name), 0)
+        end
+    elseif failover == 'manual' then
+        -- Verify that peers in the given replicaset have no direct
+        -- database.mode option set if the replicaset is configured
+        -- with the manual failover mode.
+        --
+        -- This check doesn't verify the whole cluster config, only
+        -- the given replicaset.
+        for peer_name, peer in pairs(peers) do
+            local mode = instance_config:get(peer.iconfig, 'database.mode')
+            if mode ~= nil then
+                error(('database.mode = %q is set for instance %q of ' ..
+                    'replicaset %q of group %q, but this option cannot be ' ..
+                    'used together with replication.failover = ' ..
+                    '"manual"'):format(mode, peer_name, found.replicaset_name,
+                    found.group_name), 0)
+            end
+        end
+
+        -- Verify that the 'leader' option is set to a name of an
+        -- existing instance from the given replicaset (or unset).
+        if leader ~= nil and peers[leader] == nil then
+            error(('"leader" = %q option is set for replicaset %q of group ' ..
+                '%q, but instance %q is not found in this replicaset'):format(
+                leader, found.replicaset_name, found.group_name, leader), 0)
+        end
+    end
+
     return setmetatable({
         _iconfig = iconfig,
         _iconfig_def = iconfig_def,
@@ -135,6 +197,8 @@ local function new(iconfig, cconfig, instance_name)
         _group_name = found.group_name,
         _replicaset_name = found.replicaset_name,
         _instance_name = instance_name,
+        _failover = failover,
+        _leader = leader,
     }, mt)
 end
 
