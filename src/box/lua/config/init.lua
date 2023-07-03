@@ -80,13 +80,18 @@ function methods._alert(self, alert)
     table.insert(self._alerts, alert)
 end
 
+function methods._meta(self, source_name, key, value)
+    local data = self._metadata[source_name] or {}
+    data[key] = value
+    self._metadata[source_name] = data
+end
+
 function methods._register_source(self, source)
     assert(type(source) == 'table')
     assert(source.name ~= nil)
     assert(source.type == 'instance' or source.type == 'cluster')
     assert(source.sync ~= nil)
     assert(source.get ~= nil)
-    assert(source.meta ~= nil)
     table.insert(self._sources, source)
 end
 
@@ -134,7 +139,6 @@ function methods._collect(self, opts)
 
     -- For error reporting.
     local source_info = {}
-    self._meta = {}
 
     for _, source in ipairs(self._sources) do
         -- Gather config values.
@@ -146,7 +150,6 @@ function methods._collect(self, opts)
         if sync_source == source.name or sync_source == 'all' then
             source.sync(self, iconfig)
         end
-        self._meta[source.name] = source.meta()
 
         -- Validate configurations gathered from the sources.
         if source.type == 'instance' then
@@ -285,6 +288,7 @@ function methods._reload_noexc(self, opts)
     broadcast(self)
 
     self._alerts = {}
+    self._metadata = {}
     local ok, err = pcall(self._collect, self, opts)
     if ok then
         ok, err = pcall(self._apply, self)
@@ -321,7 +325,7 @@ function methods.info(self)
     selfcheck(self, 'info')
     return {
         alerts = self._alerts,
-        meta = self._meta,
+        meta = self._metadata,
         status = self._status,
     }
 end
@@ -343,7 +347,7 @@ local function new()
         -- Track situations when something is going wrong.
         _alerts = {},
         -- Metadata from sources.
-        _meta = {},
+        _metadata = {},
         -- Current status.
         _status = 'uninitialized',
     }, mt)
