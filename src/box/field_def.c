@@ -68,7 +68,8 @@ const uint32_t field_mp_type[] = {
 	/* [FIELD_TYPE_STRING]   =  */ 1U << MP_STR,
 	/* [FIELD_TYPE_NUMBER]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
 		(1U << MP_FLOAT) | (1U << MP_DOUBLE),
-	/* [FIELD_TYPE_DOUBLE]   =  */ 1U << MP_DOUBLE,
+	/* [FIELD_TYPE_DOUBLE]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
+		(1U << MP_FLOAT) | (1U << MP_DOUBLE),
 	/* [FIELD_TYPE_INTEGER]  =  */ (1U << MP_UINT) | (1U << MP_INT),
 	/* [FIELD_TYPE_BOOLEAN]  =  */ 1U << MP_BOOL,
 	/* [FIELD_TYPE_VARBINARY] =  */ 1U << MP_BIN,
