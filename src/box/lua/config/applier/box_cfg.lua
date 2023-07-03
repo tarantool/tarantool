@@ -274,6 +274,48 @@ local function apply(config)
         -- NB: If there is no configured leader, all the instances
         -- of the given replicaset are configured as read-only.
         box_cfg.read_only = not configdata:is_leader()
+    elseif failover == 'election' then
+        -- Enable leader election.
+        if box_cfg.election_mode == nil then
+            box_cfg.election_mode = 'candidate'
+        end
+
+        -- A particular instance may participate in the replicaset
+        -- in different roles.
+        --
+        -- The default role is 'candidate' -- it votes and may be
+        -- elected as a leader. The RO/RW mode is determined by
+        -- the election results. box.cfg({read_only = false})
+        -- means that we don't impose any extra restrictions.
+        --
+        -- 'voter' only votes for a new leader, but can't be
+        -- elected. The actual database mode is RO (it is
+        -- controlled by the underneath logic, so we pass
+        -- read_only = false here).
+        --
+        -- An instance in the 'off' election mode neither votes,
+        -- nor can be elected. It just fetches all the data.
+        -- This is the only election mode, where the read-only
+        -- database mode is forced by the configuration applying
+        -- code.
+        --
+        -- An instance in the 'manual' election mode acts as a
+        -- voter until box.ctl.promote() is called on it. After
+        -- that it starts a new election round and acts as a
+        -- candidate during this (and only this) round. No extra
+        -- RO/RW restriction is performed there (controlled by the
+        -- underneath logic).
+        if box_cfg.election_mode == 'off' then
+            box_cfg.read_only = true  -- forced RO
+        elseif box_cfg.election_mode == 'voter' then
+            box_cfg.read_only = false -- means no restrictions
+        elseif box_cfg.election_mode == 'manual' then
+            box_cfg.read_only = false -- means no restrictions
+        elseif box_cfg.election_mode == 'candidate' then
+            box_cfg.read_only = false -- means no restrictions
+        else
+            assert(false)
+        end
     else
         assert(false)
     end
@@ -327,7 +369,12 @@ local function apply(config)
     -- Automatic reapplying of the post-startup configuration is
     -- performed for all the cases, when the startup may take a
     -- long time.
-    if is_startup then
+    --
+    -- This logic is disabled if the automatic leader election is
+    -- in effect. The configuration has no leadership information,
+    -- in this case, so there is no much sense to re-read it after
+    -- startup.
+    if is_startup and failover ~= 'election' then
         local configured_as_rw = not box_cfg.read_only
         local in_replicaset = #configdata:peers() > 1
         local has_snap = has_snapshot(configdata)
@@ -419,7 +466,7 @@ local function apply(config)
     end
 
     -- If it is reload, just apply the new configuration.
-    log.debug('box_cfg.apply (reload): %s', box_cfg)
+    log.debug('box_cfg.apply: %s', box_cfg)
     box.cfg(box_cfg)
 end
 

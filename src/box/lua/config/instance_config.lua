@@ -840,6 +840,12 @@ return schema.new('instance_config', schema.record({
             -- in the read-write mode, all the other instances are
             -- read-only.
             'manual',
+            -- Automatic leader election ('election').
+            --
+            -- Uses a RAFT based algorithm for the leader election.
+            --
+            -- No database.mode or 'leader' options should be set.
+            'election',
         }, {
             default = 'off',
         }),
@@ -905,7 +911,9 @@ return schema.new('instance_config', schema.record({
             'candidate',
         }, {
             box_cfg = 'election_mode',
-            default = 'off',
+            -- The effective default is determined depending of
+            -- the replication.failover option.
+            default = box.NULL,
         }),
         election_timeout = schema.scalar({
             type = 'number',

@@ -96,6 +96,23 @@ g.test_example_replicaset_manual_failover = function(g)
     t.assert_equals(g.server_3:eval('return box.info.ro'), true)
 end
 
+g.test_example_replicaset_election_failover = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config_file = fio.abspath('doc/examples/config/' ..
+        'replicaset_election_failover.yaml')
+    helpers.start_example_replicaset(g, dir, config_file)
+
+    -- Verify that one of the instances is elected as leader.
+    local rw_count = fun.iter({
+        g.server_1:eval('return box.info.ro'),
+        g.server_2:eval('return box.info.ro'),
+        g.server_3:eval('return box.info.ro'),
+    }):filter(function(ro)
+        return not ro
+    end):length()
+    t.assert_equals(rw_count, 1)
+end
+
 local err_msg_cannot_find_user = 'box_cfg.apply: cannot find user unknown ' ..
     'in the config to use its password in a replication peer URI'
 local err_msg_no_suitable_uris = 'box_cfg.apply: unable to build replicaset ' ..
@@ -161,6 +178,18 @@ for case_name, case in pairs({
             '"replicaset-001" of group "group-001", but this option cannot ' ..
             'be used together with replication.failover = "off"',
     },
+    failover_election_leader_is_set = {
+        -- The URIs here are good. But the leader option is set
+        -- together with failover = "election". This configuration
+        -- is forbidden.
+        listen = 'unix/:./{{ instance_name }}.iproto',
+        advertise = 'replicator@',
+        failover = 'election',
+        leader = 'instance-001',
+        exp_err = '"leader" = "instance-001" option is set for replicaset ' ..
+            '"replicaset-001" of group "group-001", but this option cannot ' ..
+            'be used together with replication.failover = "election"',
+    },
     failover_manual_mode_is_set = {
         -- The URIs here are good. But the database.mode option is
         -- set together with failover = "manual". This
@@ -173,6 +202,19 @@ for case_name, case in pairs({
             'of replicaset "replicaset-001" of group "group-001", but this ' ..
             'option cannot be used together with replication.failover = ' ..
             '"manual"',
+    },
+    failover_election_mode_is_set = {
+        -- The URIs here are good. But the database.mode option is
+        -- set together with failover = "election". This
+        -- configuration is forbidden.
+        listen = 'unix/:./{{ instance_name }}.iproto',
+        advertise = 'replicator@',
+        failover = 'election',
+        mode = 'rw',
+        exp_err = 'database.mode = "rw" is set for instance "instance-001" ' ..
+            'of replicaset "replicaset-001" of group "group-001", but this ' ..
+            'option cannot be used together with replication.failover = ' ..
+            '"election"',
     },
     failover_manual_unknown_instance = {
         -- The URIs here are good. But the leader option points
@@ -265,8 +307,7 @@ for case_name, case in pairs({
     end
 end
 
--- Successful cases for building replicaset URIs from
--- iproto.advertise and iproto.listen parameters.
+-- Successful cases for building replicaset.
 for case_name, case in pairs({
     advertise_user_pass_uri = {
         listen = 'unix/:./{{ instance_name }}.iproto',
@@ -304,8 +345,22 @@ for case_name, case in pairs({
         listen = 'unix/:./{{ instance_name }}.iproto',
         advertise = 'guest@unix/:./{{ instance_name }}.iproto',
     },
+    election_mode = {
+        listen = 'unix/:./{{ instance_name }}.iproto',
+        advertise = 'replicator@',
+        failover = 'election',
+        database_mode = {box.NULL, box.NULL, box.NULL},
+        election_mode = {'off', 'voter', 'candidate'},
+        check = function(g)
+            t.assert_equals(g.server_1:eval('return box.info.ro'), true)
+            t.assert_equals(g.server_2:eval('return box.info.ro'), true)
+            t.assert_equals(g.server_3:eval('return box.info.ro'), false)
+        end,
+    },
 }) do
-    g[('test_good_replicaset_build_%s'):format(case_name)] = function()
+    g[('test_good_replicaset_build_%s'):format(case_name)] = function(g)
+        local database_mode = case.database_mode or {'rw', nil, nil}
+        local election_mode = case.election_mode or {}
         local config = {
             credentials = {
                 users = {
@@ -332,6 +387,9 @@ for case_name, case in pairs({
                     peer = case.advertise,
                 },
             },
+            replication = {
+                failover = case.failover,
+            },
             groups = {
                 ['group-001'] = {
                     replicasets = {
@@ -339,11 +397,28 @@ for case_name, case in pairs({
                             instances = {
                                 ['instance-001'] = {
                                     database = {
-                                        mode = 'rw',
+                                        mode = database_mode[1],
+                                    },
+                                    replication = {
+                                        election_mode = election_mode[1],
                                     },
                                 },
-                                ['instance-002'] = {},
-                                ['instance-003'] = {},
+                                ['instance-002'] = {
+                                    database = {
+                                        mode = database_mode[2],
+                                    },
+                                    replication = {
+                                        election_mode = election_mode[2],
+                                    },
+                                },
+                                ['instance-003'] = {
+                                    database = {
+                                        mode = database_mode[3],
+                                    },
+                                    replication = {
+                                        election_mode = election_mode[3],
+                                    },
+                                },
                             },
                         },
                     },
@@ -355,5 +430,8 @@ for case_name, case in pairs({
         local config_file = treegen.write_script(dir, 'config.yaml',
             yaml.encode(config))
         helpers.start_example_replicaset(g, dir, config_file)
+        if case.check ~= nil then
+            case.check(g)
+        end
     end
 end
