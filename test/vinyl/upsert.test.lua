@@ -495,10 +495,10 @@ pk = s:create_index('pk')
 s:replace{1, 1, 1, 1.1, decimal.new(1.1) }
 s:replace{2, 1, 1, 1.1, decimal.new(1.1)}
 box.snapshot()
--- Can't assign integer to float field. First operation is still applied.
+-- Can assign integer to float field.
 --
-s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 4, 4}})
 s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'=', 4, 4}})
+s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 4, 4}})
 -- Can't add floating point to integer (result is floating point).
 --
 s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 2, 5}})
