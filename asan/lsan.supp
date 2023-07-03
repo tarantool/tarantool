@@ -31,12 +31,17 @@ leak:Curl_resolver_init
 # source: /usr/lib/x86_64-linux-gnu/gconv/UTF-16.so
 leak:gconv_init
 
-# XXX: All warnings reported for LuaJIT runtime are considered
-# false positive until sanitizers support is not introduced in
-# LuaJIT. See the issue below for more info.
-# https://github.com/tarantool/tarantool/issues/5878
-# source: third_party/luajit
-leak:lj_*
+# XXX: As a result of introducing ASan support in LuaJIT, in scope
+# of https://github.com/tarantool/tarantool/issues/5878 all lj_*
+# suppressions can be removed. Unfortunately, Lua global state
+# is not closed properly at Tarantool instance exit, so the
+# suppression for lj_BC_FUNCC is returned back (it was removed in
+# the scope of the commit 985548e4815a4cd73beb33acc60cf354e6eadd01
+# ("asan: suppress all LSAN warnings related to LuaJIT"). For more
+# info, see https://github.com/tarantool/tarantool/issues/3071.
+# source: src/main.cc (see <tarantool_free>)
+# source: src/lua/init.c (see <tarantool_lua_free>)
+leak:lj_BC_FUNCC
 
 # test: box/access.test.lua
 # test: box/access_bin.test.lua
