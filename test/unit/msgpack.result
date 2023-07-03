@@ -2375,7 +2375,7 @@ ok 22 - subtests
     ok 24 - valid fixext128
     # *** test_mp_check_ext_data: done ***
 ok 23 - subtests
-    1..96
+    1..134
     # *** test_numbers ***
     ok 1 - mp_read_int32(mp_encode_uint(123)) check success
     ok 2 - mp_read_int32(mp_encode_uint(123)) check pos advanced
@@ -2473,6 +2473,44 @@ ok 23 - subtests
     ok 94 - mp_read_double(mp_encode_double(-5.555)) check result
     ok 95 - mp_read_double(mp_encode_strl(100)) check fail
     ok 96 - mp_read_double(mp_encode_strl(100)) check pos unchanged
+    ok 97 - mp_read_double_lossy(mp_encode_uint(123)) check success
+    ok 98 - mp_read_double_lossy(mp_encode_uint(123)) check pos advanced
+    ok 99 - mp_read_double_lossy(mp_encode_uint(123)) check result
+    ok 100 - mp_read_double_lossy(mp_encode_uint(12345)) check success
+    ok 101 - mp_read_double_lossy(mp_encode_uint(12345)) check pos advanced
+    ok 102 - mp_read_double_lossy(mp_encode_uint(12345)) check result
+    ok 103 - mp_read_double_lossy(mp_encode_uint(123456789)) check success
+    ok 104 - mp_read_double_lossy(mp_encode_uint(123456789)) check pos advanced
+    ok 105 - mp_read_double_lossy(mp_encode_uint(123456789)) check result
+    ok 106 - mp_read_double_lossy(mp_encode_uint(1234567890000ULL)) check success
+    ok 107 - mp_read_double_lossy(mp_encode_uint(1234567890000ULL)) check pos advanced
+    ok 108 - mp_read_double_lossy(mp_encode_uint(1234567890000ULL)) check result
+    ok 109 - mp_read_double_lossy(mp_encode_uint(123456789123456789ULL)) check success
+    ok 110 - mp_read_double_lossy(mp_encode_uint(123456789123456789ULL)) check pos advanced
+    ok 111 - mp_read_double_lossy(mp_encode_uint(123456789123456789ULL)) check result
+    ok 112 - mp_read_double_lossy(mp_encode_int(-123)) check success
+    ok 113 - mp_read_double_lossy(mp_encode_int(-123)) check pos advanced
+    ok 114 - mp_read_double_lossy(mp_encode_int(-123)) check result
+    ok 115 - mp_read_double_lossy(mp_encode_int(-12345)) check success
+    ok 116 - mp_read_double_lossy(mp_encode_int(-12345)) check pos advanced
+    ok 117 - mp_read_double_lossy(mp_encode_int(-12345)) check result
+    ok 118 - mp_read_double_lossy(mp_encode_int(-123456789)) check success
+    ok 119 - mp_read_double_lossy(mp_encode_int(-123456789)) check pos advanced
+    ok 120 - mp_read_double_lossy(mp_encode_int(-123456789)) check result
+    ok 121 - mp_read_double_lossy(mp_encode_int(-1234567890000LL)) check success
+    ok 122 - mp_read_double_lossy(mp_encode_int(-1234567890000LL)) check pos advanced
+    ok 123 - mp_read_double_lossy(mp_encode_int(-1234567890000LL)) check result
+    ok 124 - mp_read_double_lossy(mp_encode_int(-123456789123456789LL)) check success
+    ok 125 - mp_read_double_lossy(mp_encode_int(-123456789123456789LL)) check pos advanced
+    ok 126 - mp_read_double_lossy(mp_encode_int(-123456789123456789LL)) check result
+    ok 127 - mp_read_double_lossy(mp_encode_float(6.565e6)) check success
+    ok 128 - mp_read_double_lossy(mp_encode_float(6.565e6)) check pos advanced
+    ok 129 - mp_read_double_lossy(mp_encode_float(6.565e6)) check result
+    ok 130 - mp_read_double_lossy(mp_encode_double(-5.555)) check success
+    ok 131 - mp_read_double_lossy(mp_encode_double(-5.555)) check pos advanced
+    ok 132 - mp_read_double_lossy(mp_encode_double(-5.555)) check result
+    ok 133 - mp_read_double_lossy(mp_encode_strl(100)) check fail
+    ok 134 - mp_read_double_lossy(mp_encode_strl(100)) check pos unchanged
     # *** test_numbers: done ***
 ok 24 - subtests
     1..5
