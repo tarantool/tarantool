@@ -1,0 +1,32 @@
+credentials:
+  users:
+    replicator:
+      password:
+        plain: 'topsecret'
+      roles: [replication]
+    client:
+      password:
+        plain: 'secret'
+      roles: [super]
+
+iproto:
+  listen: 'unix/:./{{ instance_name }}.iproto'
+  advertise:
+    client: client@
+    peer: replicator@
+
+log:
+  to: file
+
+replication:
+  failover: manual
+
+groups:
+  group-001:
+    replicasets:
+      replicaset-001:
+        leader: instance-001
+        instances:
+          instance-001: {}
+          instance-002: {}
+          instance-003: {}

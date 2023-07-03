@@ -126,6 +126,7 @@ return schema.new('cluster_config', record_from_fields({
             replicasets = schema.map({
                 key = schema.scalar({type = 'string'}),
                 value = record_from_fields({
+                    leader = schema.scalar({type = 'string'}),
                     instance_config_with_scope('replicaset'),
                     instances = schema.map({
                         key = schema.scalar({type = 'string'}),
