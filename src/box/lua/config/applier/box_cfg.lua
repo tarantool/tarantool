@@ -45,10 +45,6 @@ local function find_password(configdata, username)
 end
 
 local function peer_uri(configdata, peer_name)
-    local names = configdata:names()
-    local err_msg_prefix = ('box_cfg.apply: unable to build replicaset %q ' ..
-        'of group %q'):format(names.replicaset_name, names.group_name)
-
     local opts = {peer = peer_name, use_default = true}
     local listen = configdata:get('iproto.listen', opts)
     local advertise = configdata:get('iproto.advertise.peer', opts)
@@ -92,9 +88,7 @@ local function peer_uri(configdata, peer_name)
         -- the auth information if any.
         local uri = find_suitable_uri_to_connect(listen)
         if uri == nil then
-            error(('%s: instance %q has no iproto.advertise.peer or ' ..
-                'iproto.listen URI suitable to create a client socket'):format(
-                err_msg_prefix, peer_name), 0)
+            return nil
         end
 
         -- No additional auth information in iproto.advertise.peer:
@@ -131,18 +125,32 @@ local function peer_uris(configdata)
     end
 
     local names = configdata:names()
-    local err_msg_prefix = ('box_cfg.apply: unable to build replicaset %q ' ..
-        'of group %q'):format(names.replicaset_name, names.group_name)
+    local err_msg_prefix = ('replication.peers construction for instance %q ' ..
+        'of replicaset %q of group %q'):format(names.instance_name,
+        names.replicaset_name, names.group_name)
+
+    -- Is there a peer in our replicaset with an URI suitable to
+    -- connect (except ourself)?
+    local has_upstream = false
 
     local uris = {}
     for _, peer_name in ipairs(peers) do
         local uri = peer_uri(configdata, peer_name)
         if uri == nil then
-            error(('%s: instance %q has neither iproto.advertise nor ' ..
-                'iproto.listen options'):format(err_msg_prefix, peer_name), 0)
+            log.info('%s: instance %q has no iproto.advertise.peer or ' ..
+                'iproto.listen URI suitable to create a client socket',
+                err_msg_prefix, peer_name)
+        end
+        if uri ~= nil and peer_name ~= names.instance_name then
+            has_upstream = true
         end
         table.insert(uris, uri)
     end
+
+    if not has_upstream then
+        error(('%s: no suitable peer URIs found'):format(err_msg_prefix), 0)
+    end
+
     return uris
 end
 

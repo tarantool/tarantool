@@ -25,6 +25,19 @@ g.after_each(function(g)
     end
 end)
 
+local function count_lines(s)
+    return #s:split('\n')
+end
+
+local function last_n_lines(s, n)
+    local lines = s:split('\n')
+    local res = {}
+    for i = #lines - n + 1, #lines do
+        table.insert(res, lines[i])
+    end
+    return table.concat(res, '\n')
+end
+
 g.test_basic = function(g)
     local dir = treegen.prepare_directory(g, {}, {})
     local config = {
@@ -115,51 +128,53 @@ end
 
 local err_msg_cannot_find_user = 'box_cfg.apply: cannot find user unknown ' ..
     'in the config to use its password in a replication peer URI'
-local err_msg_no_suitable_uris = 'box_cfg.apply: unable to build replicaset ' ..
-    '"replicaset-001" of group "group-001": instance "instance-002" has no ' ..
-    'iproto.advertise.peer or iproto.listen URI suitable to create a client ' ..
-    'socket'
+local err_msg_no_suitable_uris = 'replication.peers construction for ' ..
+    'instance "instance-001" of replicaset "replicaset-001" of group ' ..
+    '"group-001": no suitable peer URIs found'
 
 -- Bad cases for building replicaset.
 for case_name, case in pairs({
-    no_advertise_no_listen = {
-        listen = nil,
-        advertise = nil,
-        exp_err = 'box_cfg.apply: unable to build replicaset ' ..
-            '"replicaset-001" of group "group-001": instance "instance-002" ' ..
-            'has neither iproto.advertise nor iproto.listen options',
-    },
-    advertise_unknown_user_uri = {
-        listen = 'unix/:./{{ instance_name }}.iproto',
-        advertise = 'unknown@unix/:./{{ instance_name }}.iproto',
+    advertise_unknown_user = {
+        listen_2 = 'unix/:./{{ instance_name }}.iproto',
+        advertise_2 = 'unknown@',
         exp_err = err_msg_cannot_find_user,
     },
+    advertise_unknown_user_uri = {
+        listen_2 = 'unix/:./{{ instance_name }}.iproto',
+        advertise_2 = 'unknown@unix/:./{{ instance_name }}.iproto',
+        exp_err = err_msg_cannot_find_user,
+    },
+    no_advertise_no_listen = {
+        listen_2 = box.NULL,
+        listen_3 = box.NULL,
+        advertise_2 = box.NULL,
+        advertise_3 = box.NULL,
+        exp_err = err_msg_no_suitable_uris,
+    },
     no_advertise_no_suitable_listen = {
-        listen = 'localhost:0,0.0.0.0:3301,[::]:3301',
-        advertise = nil,
+        listen_2 = 'localhost:0,0.0.0.0:3301,[::]:3301',
+        listen_3 = 'localhost:0,0.0.0.0:3301,[::]:3301',
+        advertise_2 = box.NULL,
+        advertise_3 = box.NULL,
         exp_err = err_msg_no_suitable_uris,
     },
     advertise_user_no_suitable_listen = {
-        listen = 'localhost:0,0.0.0.0:3301,[::]:3301',
-        advertise = 'replicator@',
+        listen_2 = 'localhost:0,0.0.0.0:3301,[::]:3301',
+        listen_3 = 'localhost:0,0.0.0.0:3301,[::]:3301',
+        advertise_2 = 'replicator@',
+        advertise_3 = 'replicator@',
         exp_err = err_msg_no_suitable_uris,
     },
     advertise_user_pass_no_suitable_listen = {
-        listen = 'localhost:0,0.0.0.0:3301,[::]:3301',
-        advertise = 'replicator:topsecret@',
+        listen_2 = 'localhost:0,0.0.0.0:3301,[::]:3301',
+        listen_3 = 'localhost:0,0.0.0.0:3301,[::]:3301',
+        advertise_2 = 'replicator:topsecret@',
+        advertise_3 = 'replicator:topsecret@',
         exp_err = err_msg_no_suitable_uris,
     },
-    advertise_unknown_user = {
-        listen = 'unix/:./{{ instance_name }}.iproto',
-        advertise = 'unknown@',
-        exp_err = err_msg_cannot_find_user,
-    },
     all_ro = {
-        -- The URIs here are good. But all the instances are
-        -- configured to the read-only mode (and instance-001
-        -- has no existing snapshot).
-        listen = 'unix/:./{{ instance_name }}.iproto',
-        advertise = 'replicator@',
+        -- All the instances are  configured to the read-only mode
+        -- (and instance-001 has no existing snapshot).
         mode = 'ro',
         exp_err = 'Startup failure.\nNo leader to register new instance ' ..
             '"instance-001". All the instances in replicaset ' ..
@@ -167,11 +182,8 @@ for case_name, case in pairs({
             'read-only mode.',
     },
     failover_off_leader_is_set = {
-        -- The URIs here are good. But the leader option is set
-        -- together with failover = "off". This configuration
-        -- is forbidden.
-        listen = 'unix/:./{{ instance_name }}.iproto',
-        advertise = 'replicator@',
+        -- The leader option is set together with failover =
+        -- "off". This configuration is forbidden.
         failover = 'off',
         leader = 'instance-001',
         exp_err = '"leader" = "instance-001" option is set for replicaset ' ..
@@ -179,11 +191,8 @@ for case_name, case in pairs({
             'be used together with replication.failover = "off"',
     },
     failover_election_leader_is_set = {
-        -- The URIs here are good. But the leader option is set
-        -- together with failover = "election". This configuration
-        -- is forbidden.
-        listen = 'unix/:./{{ instance_name }}.iproto',
-        advertise = 'replicator@',
+        -- The leader option is set together with failover =
+        -- "election". This configuration is forbidden.
         failover = 'election',
         leader = 'instance-001',
         exp_err = '"leader" = "instance-001" option is set for replicaset ' ..
@@ -191,11 +200,8 @@ for case_name, case in pairs({
             'be used together with replication.failover = "election"',
     },
     failover_manual_mode_is_set = {
-        -- The URIs here are good. But the database.mode option is
-        -- set together with failover = "manual". This
-        -- configuration is forbidden.
-        listen = 'unix/:./{{ instance_name }}.iproto',
-        advertise = 'replicator@',
+        -- The database.mode option is set together with
+        -- failover = "manual". This configuration is forbidden.
         failover = 'manual',
         mode = 'rw',
         exp_err = 'database.mode = "rw" is set for instance "instance-001" ' ..
@@ -204,11 +210,8 @@ for case_name, case in pairs({
             '"manual"',
     },
     failover_election_mode_is_set = {
-        -- The URIs here are good. But the database.mode option is
-        -- set together with failover = "election". This
-        -- configuration is forbidden.
-        listen = 'unix/:./{{ instance_name }}.iproto',
-        advertise = 'replicator@',
+        -- The database.mode option is set together with
+        -- failover = "election". This configuration is forbidden.
         failover = 'election',
         mode = 'rw',
         exp_err = 'database.mode = "rw" is set for instance "instance-001" ' ..
@@ -217,10 +220,7 @@ for case_name, case in pairs({
             '"election"',
     },
     failover_manual_unknown_instance = {
-        -- The URIs here are good. But the leader option points
-        -- to an unknown instance.
-        listen = 'unix/:./{{ instance_name }}.iproto',
-        advertise = 'replicator@',
+        -- The leader option points to an unknown instance.
         failover = 'manual',
         leader = 'unknown',
         mode = box.NULL,
@@ -229,17 +229,41 @@ for case_name, case in pairs({
             'is not found in this replicaset',
     },
 }) do
-    g[('test_bad_replicaset_build_%s'):format(case_name)] = function()
+    g[('test_bad_replicaset_build_%s'):format(case_name)] = function(g)
         local dir = treegen.prepare_directory(g, {}, {})
+
+        local good_listen = 'unix/:./{{ instance_name }}.iproto'
+        local good_advertise = 'replicator@'
+
+        local instance_001 = {
+            database = {
+                mode = case.mode or 'rw',
+            },
+            iproto = {
+                listen = case.listen_1 or good_listen,
+                advertise = {
+                    peer = case.advertise_1 or good_advertise,
+                },
+            },
+
+        }
         local instance_002 = {
             iproto = {
-                listen = case.listen,
+                listen = case.listen_2 or good_listen,
                 advertise = {
-                    peer = case.advertise,
+                    peer = case.advertise_2 or good_advertise,
                 },
             },
         }
-        local good_listen = 'unix/:./{{ instance_name }}.iproto'
+        local instance_003 = {
+            iproto = {
+                listen = case.listen_3 or good_listen,
+                advertise = {
+                    peer = case.advertise_3 or good_advertise,
+                },
+            },
+        }
+
         local config = {
             credentials = {
                 users = {
@@ -263,26 +287,9 @@ for case_name, case in pairs({
                         ['replicaset-001'] = {
                             leader = case.leader,
                             instances = {
-                                ['instance-001'] = {
-                                    database = {
-                                        mode = case.mode or 'rw',
-                                    },
-                                    iproto = {
-                                        listen = good_listen,
-                                        advertise = {
-                                            peer = 'replicator@',
-                                        },
-                                    },
-                                },
+                                ['instance-001'] = instance_001,
                                 ['instance-002'] = instance_002,
-                                ['instance-003'] = {
-                                    iproto = {
-                                        listen = good_listen,
-                                        advertise = {
-                                            peer = 'replicator@',
-                                        },
-                                    },
-                                },
+                                ['instance-003'] = instance_003,
                             },
                         },
                     },
@@ -296,11 +303,15 @@ for case_name, case in pairs({
         local args = {'--name', 'instance-001', '--config', config_file}
         local opts = {nojson = true, stderr = true}
         local res = justrun.tarantool(dir, env, args, opts)
+
         local exp_stderr = table.concat({
             ('LuajitError: %s'):format(case.exp_err),
             'fatal error, exiting the event loop',
         }, '\n')
-        t.assert_equals(res, {
+        t.assert_equals({
+            exit_code = res.exit_code,
+            stderr = last_n_lines(res.stderr, count_lines(exp_stderr)),
+        }, {
             exit_code = 1,
             stderr = exp_stderr,
         })
@@ -344,6 +355,14 @@ for case_name, case in pairs({
     advertise_guest_uri = {
         listen = 'unix/:./{{ instance_name }}.iproto',
         advertise = 'guest@unix/:./{{ instance_name }}.iproto',
+    },
+    some_peers_have_no_suitable_uri = {
+        -- It is OK to have a peer with iproto.listen unsuitable
+        -- to connect if there is at least one suitable to
+        -- replicate from.
+        listen = 'unix/:./{{ instance_name }}.iproto',
+        advertise = 'replicator@',
+        listen_4 = 'localhost:0',
     },
     election_mode = {
         listen = 'unix/:./{{ instance_name }}.iproto',
@@ -425,6 +444,21 @@ for case_name, case in pairs({
                 },
             },
         }
+
+        -- Add fourth instance into the config if it is requested
+        -- by the test case.
+        --
+        -- This instance is not started, just present in the
+        -- configuration.
+        if case.listen_4 ~= nil then
+            local group = config.groups['group-001']
+            local replicaset = group.replicasets['replicaset-001']
+            replicaset.instances['instance-004'] = {
+                iproto = {
+                    listen = case.listen_4,
+                },
+            }
+        end
 
         local dir = treegen.prepare_directory(g, {}, {})
         local config_file = treegen.write_script(dir, 'config.yaml',
