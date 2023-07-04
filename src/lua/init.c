@@ -275,6 +275,7 @@ static const char *lua_modules[] = {
 	/* Make it first to affect load of all other modules */
 	"strict", strict_lua,
 	"compat", compat_lua,
+	"internal.utils", utils_lua,
 	"fun", fun_lua,
 	"debug", debug_lua,
 	"tarantool", init_lua,
@@ -300,7 +301,6 @@ static const char *lua_modules[] = {
 	"tap", tap_lua,
 	"help.en_US", help_en_US_lua,
 	"help", help_lua,
-	"internal.utils", utils_lua,
 	"internal.argparse", argparse_lua,
 	"internal.trigger", trigger_lua,
 	"pwd", pwd_lua,
