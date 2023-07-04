@@ -36,6 +36,7 @@
 #include <small/obuf.h>
 #include "fiber.h"
 #include <trivia/util.h>
+#include <box/mp_tuple.h>
 
 int
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
@@ -46,6 +47,19 @@ tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 		diag_set(OutOfMemory, bsize, "tuple_to_obuf", "dup");
 		return -1;
 	}
+	return 0;
+}
+
+int
+tuple_to_obuf_as_ext(struct tuple *tuple, struct obuf *buf)
+{
+	uint32_t tuple_sz = mp_sizeof_tuple(tuple);
+	char *data = obuf_alloc(buf, tuple_sz);
+	if (data == NULL) {
+		diag_set(OutOfMemory, tuple_sz, "obuf_alloc", "buf");
+		return -1;
+	}
+	mp_encode_tuple(data, tuple);
 	return 0;
 }
 

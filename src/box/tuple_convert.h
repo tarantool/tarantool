@@ -43,6 +43,10 @@ struct tuple;
 int
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
 
+/* Serialize tuple to output buffer as MP_TUPLE extension. */
+int
+tuple_to_obuf_as_ext(struct tuple *tuple, struct obuf *buf);
+
 /**
  * Convert tuple to yaml string
  *

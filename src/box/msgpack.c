@@ -38,6 +38,7 @@
 #include "mp_datetime.h"
 #include "mp_interval.h"
 #include "mp_compression.h"
+#include "mp_tuple.h"
 
 #include "diag.h"
 #include "error.h"
@@ -132,6 +133,13 @@ msgpack_check_ext_data(int8_t type, const char *data, uint32_t len)
 		if (mp_validate_interval(data, len) != 0) {
 			diag_set(ClientError, ER_INVALID_MSGPACK,
 				 "cannot unpack interval");
+			return -1;
+		}
+		return 0;
+	case MP_TUPLE:
+		if (mp_validate_tuple(data, len) != 0) {
+			diag_set(ClientError, ER_INVALID_MSGPACK,
+				 "cannot unpack tuple");
 			return -1;
 		}
 		return 0;

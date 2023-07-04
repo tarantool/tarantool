@@ -158,6 +158,7 @@ set(tuple_sources
     field_def.c
     opt_def.c
     identifier.c
+    mp_tuple.c
 )
 
 if(ENABLE_TUPLE_COMPRESSION)
