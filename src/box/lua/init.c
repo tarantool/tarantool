@@ -706,23 +706,28 @@ static const struct luaL_Reg boxlib_backup[] = {
 };
 
 /**
- * A MsgPack extensions handler, for types defined in box.
+ * A MsgPack extensions handler, for types defined in box. The return value
+ * indicates encoding success.
  */
-static enum mp_type
+static bool
 luamp_encode_extension_box(struct lua_State *L, int idx,
-			   struct mpstream *stream, struct mp_ctx *ctx)
+			   struct mpstream *stream, struct mp_ctx *ctx,
+			   enum mp_type *type)
 {
 	(void)ctx;
 	struct tuple *tuple = luaT_istuple(L, idx);
 	if (tuple != NULL) {
 		tuple_to_mpstream(tuple, stream);
-		return MP_ARRAY;
+		*type = MP_ARRAY;
+		return true;
 	}
 	struct error *err = luaL_iserror(L, idx);
-	if (err != NULL)
+	if (err != NULL) {
 		error_to_mpstream(err, stream);
-
-	return MP_EXT;
+		*type = MP_EXT;
+		return true;
+	}
+	return false;
 }
 
 /**
