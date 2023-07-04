@@ -42,7 +42,7 @@ generate_function(const char *function)
 static void
 test_numeric(void)
 {
-	plan(5);
+	plan(6);
 	header();
 
 	int idx = generate_function(
@@ -67,7 +67,8 @@ test_numeric(void)
 		   "Returned value must be as expected");
 	}
 
-	ok(func_adapter_is_null(func, &ctx), "Expected null - no values left");
+	ok(func_adapter_is_empty(func, &ctx), "No values left");
+	ok(!func_adapter_is_null(func, &ctx), "NULL is not absence");
 	func_adapter_end(func, &ctx);
 	func_adapter_destroy(func);
 	lua_settop(tarantool_L, 0);
@@ -105,7 +106,7 @@ test_tuple(void)
 		func_adapter_pop_tuple(func, &ctx, tuples + i);
 		isnt(tuples[i], NULL, "Returned tuple must not be NULL");
 	}
-	ok(func_adapter_is_null(func, &ctx), "Expected null - no values left");
+	ok(func_adapter_is_empty(func, &ctx), "No values left");
 	func_adapter_end(func, &ctx);
 	func_adapter_destroy(func);
 	lua_settop(tarantool_L, 0);
@@ -159,7 +160,7 @@ test_string(void)
 	strncpy(buf, s1, s1_len);
 	strcpy(buf + s1_len, s2);
 	is(strcmp(retval, buf), 0, "Expected %s", buf);
-	ok(func_adapter_is_null(func, &ctx), "Expected null - no values left");
+	ok(func_adapter_is_empty(func, &ctx), "No values left");
 	func_adapter_end(func, &ctx);
 	func_adapter_destroy(func);
 	lua_settop(tarantool_L, 0);
@@ -198,7 +199,7 @@ test_bool(void)
 	}
 
 	ok(!func_adapter_is_bool(func, &ctx), "No values left - no bool");
-	ok(func_adapter_is_null(func, &ctx), "No values left");
+	ok(func_adapter_is_empty(func, &ctx), "No values left");
 	func_adapter_end(func, &ctx);
 	func_adapter_destroy(func);
 	lua_settop(tarantool_L, 0);
@@ -231,7 +232,7 @@ test_null(void)
 	ok(func_adapter_is_double(func, &ctx), "Expected double");
 	double double_retval = 0;
 	func_adapter_pop_double(func, &ctx, &double_retval);
-	ok(func_adapter_is_null(func, &ctx), "Expected null - no values left");
+	ok(func_adapter_is_empty(func, &ctx), "No values left");
 	func_adapter_end(func, &ctx);
 	func_adapter_destroy(func);
 	lua_settop(tarantool_L, 0);

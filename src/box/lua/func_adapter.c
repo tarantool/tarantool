@@ -205,10 +205,6 @@ func_adapter_lua_pop_tuple(struct func_adapter_ctx *base, struct tuple **out)
 	tuple_ref(*out);
 }
 
-/**
- * Null in Lua can be represented in three ways: nil, box.NULL or just absence
- * of an object. The function checks all the cases.
- */
 static bool
 func_adapter_lua_is_bool(struct func_adapter_ctx *base)
 {
@@ -232,20 +228,22 @@ static bool
 func_adapter_lua_is_null(struct func_adapter_ctx *base)
 {
 	struct func_adapter_lua_ctx *ctx = (struct func_adapter_lua_ctx *)base;
-	return lua_gettop(ctx->L) < ctx->idx || lua_isnil(ctx->L, ctx->idx) ||
-	       luaL_isnull(ctx->L, ctx->idx);
+	return lua_gettop(ctx->L) >= ctx->idx &&
+	       (lua_isnil(ctx->L, ctx->idx) || luaL_isnull(ctx->L, ctx->idx));
 }
 
-/**
- * Pops null value. Since it can be used when all the values were popped, index
- * is advanced only when we are in the scope of the Lua stack.
- */
 static void
 func_adapter_lua_pop_null(struct func_adapter_ctx *base)
 {
 	struct func_adapter_lua_ctx *ctx = (struct func_adapter_lua_ctx *)base;
-	if (lua_gettop(ctx->L) >= ctx->idx)
-		ctx->idx++;
+	ctx->idx++;
+}
+
+static bool
+func_adapter_lua_is_empty(struct func_adapter_ctx *base)
+{
+	struct func_adapter_lua_ctx *ctx = (struct func_adapter_lua_ctx *)base;
+	return lua_gettop(ctx->L) < ctx->idx;
 }
 
 /**
@@ -294,6 +292,7 @@ func_adapter_lua_create(lua_State *L, int idx)
 		.pop_bool = func_adapter_lua_pop_bool,
 		.is_null = func_adapter_lua_is_null,
 		.pop_null = func_adapter_lua_pop_null,
+		.is_empty = func_adapter_lua_is_empty,
 
 		.destroy = func_adapter_lua_destroy,
 	};
