@@ -136,6 +136,7 @@ set(tuple_sources
     tuple.c
     field_map.c
     tuple_format.c
+    tuple_format_map.c
     tuple_constraint_def.c
     tuple_constraint.c
     tuple_builder.c

@@ -38,6 +38,7 @@
 #include "tuple_constraint.h"
 #include "field_default_func.h"
 #include "tt_static.h"
+#include "mpstream/mpstream.h"
 
 #include <PMurHash.h>
 
@@ -1610,4 +1611,17 @@ tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 	 */
 	tuple_builder_finalize(&builder, data, data_end);
 	return 0;
+}
+
+void
+tuple_format_to_mpstream(struct tuple_format *format, struct mpstream *stream)
+{
+	mpstream_encode_uint(stream, format->id);
+	if (format->data != NULL) {
+		mpstream_memcpy(stream, format->data, format->data_len);
+	} else {
+		/* Empty array code. */
+		char dflt_fmt = '\x90';
+		mpstream_memcpy(stream, &dflt_fmt, 1);
+	}
 }

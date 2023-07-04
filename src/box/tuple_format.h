@@ -69,6 +69,7 @@ struct tuple;
 struct tuple_format;
 struct coll;
 struct Expr;
+struct mpstream;
 
 typedef struct Expr *
 (*tuple_format_expr_compile_f)(const char *expr, int expr_len);
@@ -713,6 +714,12 @@ tuple_format_iterator_next(struct tuple_format_iterator *it,
 int
 tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 			    const char **data_end);
+
+/**
+ * Serialize a tuple format to a MsgPack stream.
+ */
+void
+tuple_format_to_mpstream(struct tuple_format *format, struct mpstream *stream);
 
 #if defined(__cplusplus)
 } /* extern "C" */
