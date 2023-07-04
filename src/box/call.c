@@ -44,7 +44,7 @@
 #include "small/obuf.h"
 #include "small/rlist.h"
 #include "tt_static.h"
-#include "core/mp_ctx.h"
+#include "box/mp_box_ctx.h"
 
 struct rlist box_on_call = RLIST_HEAD_INITIALIZER(box_on_call);
 
@@ -209,24 +209,39 @@ box_process_call(struct call_request *request, struct port *port)
 	const char *name = request->name;
 	assert(name != NULL);
 	uint32_t name_len = mp_decode_strl(&name);
+	struct mp_box_ctx ctx;
+	if (mp_box_ctx_create(&ctx, NULL, request->tuple_formats) != 0)
+		return -1;
 	struct port args;
-	port_msgpack_create(&args, request->args,
-			    request->args_end - request->args);
+	port_msgpack_create_with_ctx(&args, request->args,
+				     request->args_end - request->args,
+				     (struct mp_ctx *)&ctx);
 	struct func *func = func_by_name(name, name_len);
+	int rc = 0;
 	if (func != NULL) {
-		if (func_access_check(func) != 0)
-			return -1;
+		if (func_access_check(func) != 0) {
+			rc = -1;
+			goto cleanup;
+		}
 		box_run_on_call(IPROTO_CALL, name, name_len, request->args);
-		if (func_call_no_access_check(func, &args, port) != 0)
-			return -1;
+		if (func_call_no_access_check(func, &args, port) != 0) {
+			rc = -1;
+			goto cleanup;
+		}
 	} else {
-		if (access_check_call(name, name_len) != 0)
-			return -1;
+		if (access_check_call(name, name_len) != 0) {
+			rc = -1;
+			goto cleanup;
+		}
 		box_run_on_call(IPROTO_CALL, name, name_len, request->args);
-		if (box_lua_call(name, name_len, &args, port) != 0)
-			return -1;
+		if (box_lua_call(name, name_len, &args, port) != 0) {
+			rc = -1;
+			goto cleanup;
+		}
 	}
-	return 0;
+cleanup:
+	port_msgpack_destroy(&args);
+	return rc;
 }
 
 int
@@ -236,13 +251,17 @@ box_process_eval(struct call_request *request, struct port *port)
 	/* Check permissions */
 	if (access_check_eval() != 0)
 		return -1;
+	struct mp_box_ctx ctx;
+	if (mp_box_ctx_create(&ctx, NULL, request->tuple_formats) != 0)
+		return -1;
 	struct port args;
-	port_msgpack_create(&args, request->args,
-			    request->args_end - request->args);
+	port_msgpack_create_with_ctx(&args, request->args,
+				     request->args_end - request->args,
+				     (struct mp_ctx *)&ctx);
 	const char *expr = request->expr;
 	uint32_t expr_len = mp_decode_strl(&expr);
 	box_run_on_call(IPROTO_EVAL, expr, expr_len, request->args);
-	if (box_lua_eval(expr, expr_len, &args, port) != 0)
-		return -1;
-	return 0;
+	int rc = box_lua_eval(expr, expr_len, &args, port);
+	port_msgpack_destroy(&args);
+	return rc;
 }

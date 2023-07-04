@@ -97,7 +97,8 @@ https://tarantool.io/compat/c_func_iproto_multireturn
 ]]
 
 local BOX_TUPLE_EXTENSION_BRIEF = [[
-Controls IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION feature bit.
+Controls IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION and
+IPROTO_FEATURE_CALL_ARG_TUPLE_EXTENSION feature bits.
 
 https://tarantool.io/compat/box_tuple_extension
 ]]

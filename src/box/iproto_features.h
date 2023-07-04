@@ -71,6 +71,12 @@ extern "C" {
 	 * tuple formats are sent in IPROTO_TUPLE_FORMATS field.
 	 */								\
 	_(CALL_RET_TUPLE_EXTENSION, 8)					\
+	/**
+	 * Tuple format in call and eval request arguments support:
+	 * Tuples in IPROTO_TUPLE request field are encoded as MP_TUPLE and
+	 * tuple formats are received in IPROTO_TUPLE_FORMATS field.
+	 */								\
+	_(CALL_ARG_TUPLE_EXTENSION, 9)					\
 
 #define IPROTO_FEATURE_MEMBER(s, v) IPROTO_FEATURE_ ## s = v,
 
@@ -95,7 +101,7 @@ struct iproto_features {
  * `box.iproto.protocol_version` needs to be updated correspondingly.
  */
 enum {
-	IPROTO_CURRENT_VERSION = 6,
+	IPROTO_CURRENT_VERSION = 7,
 };
 
 /**

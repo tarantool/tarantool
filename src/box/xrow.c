@@ -492,9 +492,12 @@ iproto_reply_id(struct obuf *out, const char *auth_type,
 	uint32_t auth_type_len = strlen(auth_type);
 	unsigned version = IPROTO_CURRENT_VERSION;
 	struct iproto_features features = IPROTO_CURRENT_FEATURES;
-	if (!box_tuple_extension)
+	if (!box_tuple_extension) {
 		iproto_features_clear(&features,
 				      IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION);
+		iproto_features_clear(&features,
+				      IPROTO_FEATURE_CALL_ARG_TUPLE_EXTENSION);
+	}
 #ifndef NDEBUG
 	struct errinj *errinj;
 	errinj = errinj(ERRINJ_IPROTO_SET_VERSION, ERRINJ_INT);
@@ -1516,6 +1519,11 @@ error:
 			request->args = value;
 			request->args_end = data;
 			break;
+		case IPROTO_TUPLE_FORMATS:
+			if (mp_typeof(*value) != MP_MAP)
+				goto error;
+			request->tuple_formats = value;
+			request->tuple_formats_end = data;
 		default:
 			continue; /* unknown key */
 		}

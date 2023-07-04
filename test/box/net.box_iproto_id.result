@@ -15,13 +15,14 @@ c = net.connect(box.cfg.listen)
  | ...
 c.peer_protocol_version
  | ---
- | - 6
+ | - 7
  | ...
 c.peer_protocol_features
  | ---
  | - transactions: true
  |   watchers: true
  |   error_extension: true
+ |   call_arg_tuple_extension: true
  |   pagination: true
  |   space_and_index_names: true
  |   streams: true
@@ -54,6 +55,7 @@ c.peer_protocol_features
  | - transactions: false
  |   watchers: false
  |   error_extension: false
+ |   call_arg_tuple_extension: false
  |   pagination: false
  |   space_and_index_names: false
  |   streams: false
@@ -107,6 +109,7 @@ c.peer_protocol_features
  | - transactions: true
  |   watchers: true
  |   error_extension: true
+ |   call_arg_tuple_extension: true
  |   pagination: true
  |   space_and_index_names: true
  |   streams: true
@@ -158,13 +161,14 @@ c.error -- error
  | ...
 c.peer_protocol_version
  | ---
- | - 6
+ | - 7
  | ...
 c.peer_protocol_features
  | ---
  | - transactions: false
  |   watchers: true
  |   error_extension: true
+ |   call_arg_tuple_extension: true
  |   pagination: true
  |   space_and_index_names: true
  |   streams: true
@@ -189,13 +193,14 @@ c.error -- error
  | ...
 c.peer_protocol_version
  | ---
- | - 6
+ | - 7
  | ...
 c.peer_protocol_features
  | ---
  | - transactions: true
  |   watchers: true
  |   error_extension: true
+ |   call_arg_tuple_extension: true
  |   pagination: true
  |   space_and_index_names: true
  |   streams: true
