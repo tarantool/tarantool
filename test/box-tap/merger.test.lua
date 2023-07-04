@@ -44,10 +44,10 @@ local function truncated_msgpack_buffer(data, trunc)
     local len = data:len()
     local buf = buffer.ibuf()
     -- Ensure we have enough buffer to write len + trunc bytes.
-    buf:reserve(len + trunc)
-    local p = buf:alloc(len)
+    local p = buf:reserve(len + trunc)
     -- Ensure len bytes follows with trunc zero bytes.
     ffi.copy(p, data .. string.rep('\0', trunc), len + trunc)
+    buf:alloc(len)
     return buf
 end
 
