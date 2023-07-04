@@ -412,6 +412,10 @@ struct call_request {
 	/** CALL/EVAL parameters. MessagePack Array. */
 	const char *args;
 	const char *args_end;
+	/** Tuple formats of CALL/EVAL parameters. MessagePack Map. */
+	const char *tuple_formats;
+	/** End of tuple formats of CALL/EVAL parameters. */
+	const char *tuple_formats_end;
 };
 
 /**

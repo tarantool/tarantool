@@ -82,7 +82,7 @@ enum {
 	/**
 	 * IPROTO protocol version supported by the netbox connector.
 	 */
-	NETBOX_IPROTO_VERSION = 6,
+	NETBOX_IPROTO_VERSION = 7,
 };
 
 /**
@@ -362,6 +362,11 @@ struct netbox_method_encode_ctx {
 	uint64_t sync;
 	/* Current transport's IPROTO stream identifier. */
 	uint64_t stream_id;
+	/*
+	 * Whether box tuples should be encoded to MsgPack as MP_TUPLE
+	 * extension.
+	 */
+	bool box_tuple_arg_as_ext;
 };
 
 static const char netbox_transport_typename[] = "net.box.transport";
@@ -778,6 +783,28 @@ netbox_encode_select_all(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
 	netbox_end_encode(&stream, svp);
 }
 
+/*
+ * Encode the arguments of call or eval netbox methods.
+ */
+static int
+netbox_encode_call_or_eval_args(lua_State *L, int idx, struct mpstream *stream,
+				bool box_tuple_arg_as_ext)
+{
+	mpstream_encode_uint(stream, IPROTO_TUPLE);
+	struct mp_box_ctx ctx;
+	mp_box_ctx_create(&ctx, NULL, NULL);
+	if (luamp_encode_tuple_with_ctx(L, cfg, stream, idx,
+					box_tuple_arg_as_ext ?
+					(struct mp_ctx *)&ctx : NULL) != 0) {
+		mp_ctx_destroy((struct mp_ctx *)&ctx);
+		return -1;
+	}
+	mpstream_encode_uint(stream, IPROTO_TUPLE_FORMATS);
+	tuple_format_map_to_mpstream(&ctx.tuple_format_map, stream);
+	mp_ctx_destroy((struct mp_ctx *)&ctx);
+	return 0;
+}
+
 /**
  * Encode an `IPROTO_CALL` request and write it to the provided MsgPack stream.
  */
@@ -788,7 +815,7 @@ netbox_encode_call(lua_State *L, int idx, struct netbox_method_encode_ctx *ctx)
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_CALL,
 					 ctx->stream_id);
 
-	mpstream_encode_map(ctx->stream, 2);
+	mpstream_encode_map(ctx->stream, 3);
 
 	/* encode proc name */
 	size_t name_len;
@@ -796,9 +823,8 @@ netbox_encode_call(lua_State *L, int idx, struct netbox_method_encode_ctx *ctx)
 	mpstream_encode_uint(ctx->stream, IPROTO_FUNCTION_NAME);
 	mpstream_encode_strn(ctx->stream, name, name_len);
 
-	/* encode args */
-	mpstream_encode_uint(ctx->stream, IPROTO_TUPLE);
-	if (luamp_encode_tuple(L, cfg, ctx->stream, idx + 1) != 0)
+	if (netbox_encode_call_or_eval_args(L, idx + 1, ctx->stream,
+					    ctx->box_tuple_arg_as_ext) != 0)
 		return -1;
 
 	netbox_end_encode(ctx->stream, svp);
@@ -815,7 +841,7 @@ netbox_encode_eval(lua_State *L, int idx, struct netbox_method_encode_ctx *ctx)
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_EVAL,
 					 ctx->stream_id);
 
-	mpstream_encode_map(ctx->stream, 2);
+	mpstream_encode_map(ctx->stream, 3);
 
 	/* encode expr */
 	size_t expr_len;
@@ -823,9 +849,8 @@ netbox_encode_eval(lua_State *L, int idx, struct netbox_method_encode_ctx *ctx)
 	mpstream_encode_uint(ctx->stream, IPROTO_EXPR);
 	mpstream_encode_strn(ctx->stream, expr, expr_len);
 
-	/* encode args */
-	mpstream_encode_uint(ctx->stream, IPROTO_TUPLE);
-	if (luamp_encode_tuple(L, cfg, ctx->stream, idx + 1) != 0)
+	if (netbox_encode_call_or_eval_args(L, idx + 1, ctx->stream,
+					    ctx->box_tuple_arg_as_ext) != 0)
 		return -1;
 
 	netbox_end_encode(ctx->stream, svp);
@@ -1444,7 +1469,8 @@ netbox_encode_inject(struct lua_State *L, int idx,
  */
 static int
 netbox_encode_method(struct lua_State *L, int idx, enum netbox_method method,
-		     struct ibuf *ibuf, uint64_t sync, uint64_t stream_id)
+		     struct ibuf *ibuf, uint64_t sync, uint64_t stream_id,
+		     bool box_tuple_arg_as_ext)
 {
 	typedef int (*method_encoder_f)(struct lua_State *L, int idx,
 					struct netbox_method_encode_ctx *ctx);
@@ -1479,6 +1505,7 @@ netbox_encode_method(struct lua_State *L, int idx, enum netbox_method method,
 		.stream = &stream,
 		.stream_id = stream_id,
 		.sync = sync,
+		.box_tuple_arg_as_ext = box_tuple_arg_as_ext,
 	};
 	return method_encoder[method](L, idx, &ctx);
 }
@@ -2441,8 +2468,11 @@ luaT_netbox_transport_make_request(struct lua_State *L, int idx,
 	enum netbox_method method = lua_tointeger(L, arg++);
 	assert(method < netbox_method_MAX);
 	size_t svp = ibuf_used(&transport->send_buf);
+	bool box_tuple_arg_as_ext =
+		iproto_features_test(&transport->features,
+				     IPROTO_FEATURE_CALL_ARG_TUPLE_EXTENSION);
 	if (netbox_encode_method(L, arg++, method, &transport->send_buf, sync,
-				 stream_id) != 0) {
+				 stream_id, box_tuple_arg_as_ext) != 0) {
 		ibuf_truncate(&transport->send_buf, svp);
 		return -1;
 	}
@@ -3212,6 +3242,8 @@ luaopen_net_box(struct lua_State *L)
 			    IPROTO_FEATURE_DML_TUPLE_EXTENSION);
 	iproto_features_set(&NETBOX_IPROTO_FEATURES,
 			    IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION);
+	iproto_features_set(&NETBOX_IPROTO_FEATURES,
+			    IPROTO_FEATURE_CALL_ARG_TUPLE_EXTENSION);
 
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);
