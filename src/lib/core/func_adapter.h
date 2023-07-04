@@ -119,13 +119,17 @@ struct func_adapter_vtab {
 	 */
 	void (*pop_bool)(struct func_adapter_ctx *ctx, bool *val);
 	/**
-	 * Checks if the next returned value is null or nothing.
+	 * Checks if the next returned value is null.
 	 */
 	bool (*is_null)(struct func_adapter_ctx *ctx);
 	/**
 	 * Pops null.
 	 */
 	void (*pop_null)(struct func_adapter_ctx *ctx);
+	/**
+	 * Checks if there are no more returned values.
+	 */
+	bool (*is_empty)(struct func_adapter_ctx *ctx);
 	/**
 	 * Virtual destructor of the class.
 	 */
@@ -294,6 +298,12 @@ func_adapter_pop_null(struct func_adapter *func, struct func_adapter_ctx *ctx)
 {
 	assert(func_adapter_is_null(func, ctx));
 	func->vtab->pop_null(ctx);
+}
+
+static inline bool
+func_adapter_is_empty(struct func_adapter *func, struct func_adapter_ctx *ctx)
+{
+	return func->vtab->is_empty(ctx);
 }
 
 static inline void
