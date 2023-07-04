@@ -136,9 +136,10 @@ luamp_get(struct lua_State *L, int idx, size_t *data_len)
 	return NULL;
 }
 
-static enum mp_type
+static bool
 luamp_encode_extension_default(struct lua_State *L, int idx,
-			       struct mpstream *stream, struct mp_ctx *ctx);
+			       struct mpstream *stream, struct mp_ctx *ctx,
+			       enum mp_type *type);
 
 /**
  * Default extension decoder, always throws an error.
@@ -152,15 +153,17 @@ static luamp_encode_extension_f luamp_encode_extension =
 static luamp_decode_extension_f luamp_decode_extension =
 		luamp_decode_extension_default;
 
-static enum mp_type
+static bool
 luamp_encode_extension_default(struct lua_State *L, int idx,
-			       struct mpstream *stream, struct mp_ctx *ctx)
+			       struct mpstream *stream, struct mp_ctx *ctx,
+			       enum mp_type *type)
 {
 	(void) L;
 	(void) idx;
 	(void) stream;
 	(void)ctx;
-	return MP_EXT;
+	(void)type;
+	return false;
 }
 
 void
@@ -345,7 +348,10 @@ restart: /* used by MP_EXT of unidentified subtype */
 				field->ext_type = MP_UNKNOWN_EXTENSION;
 				goto convert;
 			}
-			type = luamp_encode_extension(L, top, stream, ctx);
+			bool is_encoded = luamp_encode_extension(L, top, stream,
+								 ctx, &type);
+			assert(is_encoded);
+			(void)is_encoded;
 			break;
 		case MP_DATETIME:
 			mpstream_encode_datetime(stream, field->dateval);
@@ -353,7 +359,7 @@ restart: /* used by MP_EXT of unidentified subtype */
 		case MP_INTERVAL:
 			mpstream_encode_interval(stream, field->interval);
 			break;
-		default:
+		default: {
 			data = luamp_get(L, top, &data_len);
 			if (data != NULL) {
 				mpstream_memcpy(stream, data, data_len);
@@ -361,8 +367,9 @@ restart: /* used by MP_EXT of unidentified subtype */
 				break;
 			}
 			/* Run trigger if type can't be encoded */
-			type = luamp_encode_extension(L, top, stream, ctx);
-			if (type != MP_EXT) {
+			bool is_encoded = luamp_encode_extension(L, top, stream,
+								 ctx, &type);
+			if (is_encoded) {
 				/* Value has been packed by the trigger */
 				break;
 			}
@@ -374,7 +381,7 @@ convert:
 			assert(field->type != MP_EXT);
 			assert(lua_gettop(L) == top);
 			goto restart;
-		}
+		}}
 	}
 	if (type_out != NULL)
 		*type_out = type;

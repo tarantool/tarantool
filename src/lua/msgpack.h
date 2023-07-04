@@ -142,9 +142,12 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 	luamp_decode_with_ctx(L, cfg, data, NULL);
 }
 
-typedef enum mp_type
+/**
+ * A MsgPack extensions handler. The return value indicates encoding success.
+ */
+typedef bool
 (*luamp_encode_extension_f)(struct lua_State *, int, struct mpstream *,
-			    struct mp_ctx *);
+			    struct mp_ctx *, enum mp_type *);
 
 /**
  * @brief Set a callback that executed by encoder on unsupported Lua type
