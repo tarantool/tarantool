@@ -11,10 +11,18 @@
 #include "core/fiber.h"
 #include "core/memory.h"
 
+#include "mpstream/mpstream.h"
+
 #include "msgpuck/msgpuck.h"
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
+
+static void
+mpstream_error(void *is_err)
+{
+	*(bool *)is_err = true;
+}
 
 /*
  * Checks that tuple format comparison for runtime tuple formats works
@@ -207,12 +215,42 @@ test_tuple_format_cmp(void)
 }
 
 static int
-test_tuple_format(void)
+test_tuple_format_to_mpstream(void)
 {
 	plan(1);
 	header();
 
+	struct mpstream stream;
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	bool is_err = false;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      mpstream_error, &is_err);
+	tuple_format_to_mpstream(tuple_format_runtime, &stream);
+	mpstream_flush(&stream);
+	fail_if(is_err);
+	size_t data_len = region_used(region) - region_svp;
+	const char *data = xregion_join(region, data_len);
+	char buf[1024];
+	char *w = mp_encode_uint(buf, tuple_format_runtime->id);
+	w = mp_encode_array(w, 0);
+	size_t expected_len = w - buf;
+	is(memcmp(data, buf, MIN(data_len, expected_len)), 0,
+	   "tuple format serialization works correctly");
+	region_truncate(region, region_svp);
+
+	footer();
+	return check_plan();
+}
+
+static int
+test_tuple_format(void)
+{
+	plan(2);
+	header();
+
 	test_tuple_format_cmp();
+	test_tuple_format_to_mpstream();
 
 	footer();
 	return check_plan();
