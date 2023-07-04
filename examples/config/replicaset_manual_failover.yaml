@@ -9,13 +9,23 @@ credentials:
         plain: 'secret'
       roles: [super]
 
+iproto:
+  listen: 'unix/:./{{ instance_name }}.iproto'
+  advertise:
+    peer: replicator@
+
+log:
+  to: file
+
+replication:
+  failover: manual
+
 groups:
   group-001:
     replicasets:
       replicaset-001:
+        leader: instance-001
         instances:
-          instance-001:
-            database:
-              mode: 'rw'
+          instance-001: {}
           instance-002: {}
           instance-003: {}

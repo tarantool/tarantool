@@ -11,7 +11,8 @@ credentials:
 
 iproto:
   listen: 'unix/:./{{ instance_name }}.iproto'
-  advertise: 'replicator:topsecret@unix/:./{{ instance_name }}.iproto'
+  advertise:
+    peer: replicator@
 
 log:
  to: file
@@ -23,6 +24,6 @@ groups:
         instances:
           instance-001:
             database:
-              rw: true
+              mode: rw
           instance-002: {}
           instance-003: {}
