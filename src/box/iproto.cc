@@ -1322,6 +1322,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 			return;
 		}
 		/* Read input. */
+		ibuf_reserve(in, ibuf_unused(in));
 		ssize_t nrd = iostream_read(io, in->wpos, ibuf_unused(in));
 		if (nrd < 0) {                  /* Socket is not ready. */
 			if (nrd == IOSTREAM_ERROR)
@@ -1343,7 +1344,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 			      IPROTO_RECEIVED, nrd);
 
 		/* Update the read position and connection state. */
-		in->wpos += nrd;
+		ibuf_alloc(in, nrd);
 		con->parse_size += nrd;
 		/* Enqueue all requests which are fully read up. */
 		if (iproto_enqueue_batch(con, in) != 0)
