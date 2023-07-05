@@ -2774,9 +2774,6 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 			 *
 			 * If this is an EXISTS, write an integer 0 (not exists) or 1 (exists)
 			 * into a register and return that register number.
-			 *
-			 * In both cases, the query is augmented with "LIMIT 1".  Any
-			 * preexisting limit is discarded in place of the new LIMIT 1.
 			 */
 			Select *pSel;	/* SELECT statement to encode */
 			SelectDest dest;	/* How to deal with SELECT result */
@@ -2802,12 +2799,22 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 				sqlVdbeAddOp2(v, OP_Bool, false, dest.iSDParm);
 				VdbeComment((v, "Init EXISTS result"));
 			}
-			if (pSel->pLimit == NULL) {
-				pSel->pLimit = sql_expr_new(TK_INTEGER,
-							    &sqlIntTokens[1]);
-				ExprSetProperty(pSel->pLimit, EP_System);
+			if (pExpr->op == TK_SELECT) {
+				if (pSel->pLimit == NULL) {
+					pSel->pLimit = sql_expr_new_int(1);
+					ExprSetProperty(pSel->pLimit,
+							EP_System);
+				}
+				pSel->selFlags |= SF_SingleRow;
+			} else {
+				/*
+				 * For EXISTS it doesn't matter whether we
+				 * return one or more results, so just replace
+				 * limit with 1.
+				 */
+				sql_expr_delete(pSel->pLimit);
+				pSel->pLimit = sql_expr_new_int(1);
 			}
-			pSel->selFlags |= SF_SingleRow;
 			pSel->iLimit = 0;
 			pSel->selFlags &= ~SF_MultiValue;
 			if (sqlSelect(pParse, pSel, &dest)) {
