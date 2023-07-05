@@ -10,7 +10,16 @@ runs:
         export PACKPACK_EXTRA_DOCKER_RUN_PARAMS='--init'
 
         # Create packages.
-        make -f .pack.mk package
+        PACKAGE_TARGET=package-static
+        DEPLOY_TARGET=deploy-static
+        if ${{ startsWith(github.base_ref, 'release/2.') ||
+               startsWith(github.ref, 'refs/heads/release/2.') ||
+               startsWith(github.ref, 'refs/tags/2.') }}; then
+          PACKAGE_TARGET=${PACKAGE_TARGET%-static}
+          DEPLOY_TARGET=${DEPLOY_TARGET%-static}
+        fi
+
+        make -f .pack.mk ${PACKAGE_TARGET}
 
         # Deploy pre-release (since 2.10) and release packages. It's expected
         # that no one will push tags are used for pre-releases and releases.
@@ -20,10 +29,10 @@ runs:
           case ${{ github.ref }} in
             # It's relevant since 2.10 only.
             refs/tags/*-alpha*|refs/tags/*-beta*|refs/tags/*-rc*)
-              REPO_TYPE=pre-release make -f .pack.mk deploy
+              REPO_TYPE=pre-release make -f .pack.mk ${DEPLOY_TARGET}
               ;;
             refs/tags/*)
-              REPO_TYPE=release make -f .pack.mk deploy
+              REPO_TYPE=release make -f .pack.mk ${DEPLOY_TARGET}
               ;;
           esac
         fi

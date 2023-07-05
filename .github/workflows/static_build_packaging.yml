@@ -63,7 +63,9 @@ jobs:
       - name: Install deps
         uses: ./.github/actions/install-deps-debian
       - name: Build static packages
-        run: make -f .pack.mk package-static
+        uses: ./.github/actions/pack-and-deploy
+        env:
+          RWS_AUTH: ${{ secrets.RWS_AUTH }}
       - name: Upload build artifacts
         if: github.ref == 'refs/heads/master' ||
             startsWith(github.ref, 'refs/heads/release/') ||
