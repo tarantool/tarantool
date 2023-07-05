@@ -7,6 +7,7 @@ RWS_BASE_URL = https://rws.tarantool.org
 PRODUCT_NAME = tarantool
 
 VARDIR ?=/tmp/t
+OUTPUT_DIR ?=${PWD}/build
 
 GIT_DESCRIBE = $(shell git describe HEAD)
 GIT_TAG = $(shell git tag --points-at HEAD)
@@ -53,7 +54,9 @@ package-static:
 	else \
 		export VERSION="$$(echo ${GIT_DESCRIBE} | sed ${SED_REPLACE_VERSION_REGEX} | sed 's/-/~/').dev"; \
 	fi; \
+	export OUTPUT_DIR=${OUTPUT_DIR}; \
 	echo VERSION=$${VERSION}; \
+	echo OUTPUT_DIR=${OUTPUT_DIR}; \
 	./static-build/make_packages.sh
 
 deploy:
@@ -83,6 +86,31 @@ deploy:
 	done; \
 	echo $${CURL_CMD}; \
 	$${CURL_CMD}
+
+deploy-static:
+	if [ -z "${REPO_TYPE}" ]; then \
+		echo "Env variable 'REPO_TYPE' must be defined!"; \
+		exit 1; \
+	fi
+
+	for pkg_type in rpm deb; do \
+		RWS_ENDPOINT=${RWS_BASE_URL}/${REPO_TYPE}/${TARANTOOL_SERIES}/linux-$${pkg_type}/static; \
+		CURL_CMD="curl \
+			--location \
+			--fail \
+			--silent \
+			--show-error \
+			--retry 5 \
+			--retry-delay 5 \
+			--request PUT $${RWS_ENDPOINT} \
+			--user $${RWS_AUTH} \
+			--form product=${PRODUCT_NAME}"; \
+		for f in $$(ls -I '_CPack_Packages' ${OUTPUT_DIR}/*.$${pkg_type}); do \
+			CURL_CMD="$${CURL_CMD} --form $$(basename $${f})=@$${f}"; \
+		done; \
+		echo $${CURL_CMD}; \
+		$${CURL_CMD}; \
+	done;
 
 source: prepare
 	if [ -n "${GIT_TAG}" ]; then \
