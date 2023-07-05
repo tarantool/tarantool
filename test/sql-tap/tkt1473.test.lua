@@ -199,14 +199,14 @@ test:do_execsql_test(
         -- </tkt1473-2.9>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "tkt1473-3.2",
     [[
         SELECT EXISTS
           (SELECT 1 FROM t1 WHERE a=1 UNION ALL SELECT 2 FROM t1 WHERE b=0)
     ]], {
         -- <tkt1473-3.2>
-        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
+        true
         -- </tkt1473-3.2>
     })
 
@@ -221,36 +221,36 @@ test:do_execsql_test(
         -- </tkt1473-3.3>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "tkt1473-3.4",
     [[
         SELECT EXISTS
           (SELECT 1 FROM t1 WHERE a=1 UNION ALL SELECT 2 FROM t1 WHERE b=4)
     ]], {
         -- <tkt1473-3.4>
-        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
+        true
         -- </tkt1473-3.4>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "tkt1473-3.5",
     [[
         SELECT EXISTS
           (SELECT 1 FROM t1 WHERE a=1 UNION SELECT 2 FROM t1 WHERE b=4)
     ]], {
         -- <tkt1473-3.5>
-        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
+        true
         -- </tkt1473-3.5>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "tkt1473-3.6",
     [[
         SELECT EXISTS
           (SELECT 1 FROM t1 WHERE a=0 UNION ALL SELECT 2 FROM t1 WHERE b=4)
     ]], {
         -- <tkt1473-3.6>
-        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
+        true
         -- </tkt1473-3.6>
     })
 
@@ -483,7 +483,7 @@ test:do_execsql_test(
         -- </tkt1473-4.7>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "tkt1473-5.3",
     [[
         SELECT EXISTS (
@@ -509,11 +509,11 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-5.3>
-        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
+        true
         -- </tkt1473-5.3>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "tkt1473-5.4",
     [[
         SELECT EXISTS (
@@ -539,11 +539,11 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-5.4>
-        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
+        true
         -- </tkt1473-5.4>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "tkt1473-5.5",
     [[
         SELECT EXISTS (
@@ -569,11 +569,11 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-5.5>
-        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
+        true
         -- </tkt1473-5.5>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "tkt1473-5.6",
     [[
         SELECT EXISTS (
@@ -599,7 +599,7 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-5.6>
-        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
+        true
         -- </tkt1473-5.6>
     })
 
@@ -633,7 +633,7 @@ test:do_execsql_test(
         -- </tkt1473-5.7>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "tkt1473-6.3",
     [[
         SELECT EXISTS (
@@ -659,11 +659,11 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-6.3>
-        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
+        true
         -- </tkt1473-6.3>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "tkt1473-6.4",
     [[
         SELECT EXISTS (
@@ -689,7 +689,7 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-6.4>
-        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
+        true
         -- </tkt1473-6.4>
     })
 
