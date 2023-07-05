@@ -99,9 +99,20 @@ luaT_push_key_def_parts(struct lua_State *L, const struct key_def *key_def)
 		}
 
 		if (part->coll_id != COLL_NONE) {
+			const char *name;
 			struct coll_id *coll_id = coll_by_id(part->coll_id);
-			assert(coll_id != NULL);
-			lua_pushstring(L, coll_id->name);
+			/*
+			 * It is possible that the original collation with
+			 * `id == part->coll_id` was replaced by the new one
+			 * with the same id, but a different fingerprint.
+			 * However, it their fingerprints match, then coll_new()
+			 * reuses `struct coll` and this condition is met:
+			 */
+			if (coll_id != NULL && coll_id->coll == part->coll)
+				name = coll_id->name;
+			else
+				name = "<deleted>";
+			lua_pushstring(L, name);
 			lua_setfield(L, -2, "collation");
 		}
 		lua_rawseti(L, -2, i + 1);
