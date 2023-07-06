@@ -20,21 +20,22 @@ sec = space:create_index('sec', { parts = {2, 'unsigned'} })
 
 space:insert({1, 1})
 
-box.stat.vinyl().memory.level0
+mem = box.stat.vinyl().memory.level0
 
 space:insert({1, 1})
 
-box.stat.vinyl().memory.level0
+box.stat.vinyl().memory.level0 == mem
 
 space:update({1}, {{'!', 1, 100}}) -- try to modify the primary key
 
-box.stat.vinyl().memory.level0
+box.stat.vinyl().memory.level0 == mem
 
 space:insert({2, 2})
 space:insert({3, 3})
 space:insert({4, 4})
 
-box.stat.vinyl().memory.level0
+delta = box.stat.vinyl().memory.level0 - mem
+delta > 50 and delta < 200
 
 box.snapshot()
 
@@ -46,7 +47,8 @@ box.stat.vinyl().memory.level0
 
 _ = space:replace{1, 1, string.rep('a', 1024 * 1024 * 5)}
 
-box.stat.vinyl().memory.level0
+box.stat.vinyl().memory.level0 > 5000000
+box.stat.vinyl().memory.level0 < 6000000
 
 space:drop()
 
