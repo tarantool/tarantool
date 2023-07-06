@@ -192,8 +192,11 @@ function methods._collect(self, opts)
     end
 
     if next(cconfig) == nil then
+        local is_reload = self._status == 'reload_in_progress'
+        local action = is_reload and 'Reload' or 'Startup'
+        local source_info_str = table.concat(source_info, '\n')
         error(dedent([[
-            Startup failure.
+            %s failure.
 
             No cluster config received from the given configuration sources.
 
@@ -208,12 +211,15 @@ function methods._collect(self, opts)
             * Use --config <file> command line option.
             * Use TT_CONFIG_ETCD_* environment variables (available on Tarantool
               Enterprise Edition).
-        ]]):format(table.concat(source_info, '\n'), self._instance_name), 0)
+        ]]):format(action, source_info_str, self._instance_name), 0)
     end
 
     if cluster_config:find_instance(cconfig, self._instance_name) == nil then
+        local is_reload = self._status == 'reload_in_progress'
+        local action = is_reload and 'Reload' or 'Startup'
+        local source_info_str = table.concat(source_info, '\n')
         error(dedent([[
-            Startup failure.
+            %s failure.
 
             Unable to find instance %q in the group/replicaset/instance
             topology provided by the given cluster configuration sources.
@@ -233,7 +239,7 @@ function methods._collect(self, opts)
                       instance-001:
                         database:
                           rw: true
-        ]]):format(self._instance_name, table.concat(source_info, '\n')), 0)
+        ]]):format(action, self._instance_name, source_info_str), 0)
     end
 
     self._configdata = configdata.new(iconfig, cconfig, self._instance_name)
