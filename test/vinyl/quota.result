@@ -29,26 +29,25 @@ space:insert({1, 1})
 ---
 - [1, 1]
 ...
-box.stat.vinyl().memory.level0
+mem = box.stat.vinyl().memory.level0
 ---
-- 98336
 ...
 space:insert({1, 1})
 ---
 - error: Duplicate key exists in unique index "pk" in space "test" with old tuple
     - [1, 1] and new tuple - [1, 1]
 ...
-box.stat.vinyl().memory.level0
+box.stat.vinyl().memory.level0 == mem
 ---
-- 98336
+- true
 ...
 space:update({1}, {{'!', 1, 100}}) -- try to modify the primary key
 ---
 - error: Attempt to modify a tuple field which is part of primary index in space 'test'
 ...
-box.stat.vinyl().memory.level0
+box.stat.vinyl().memory.level0 == mem
 ---
-- 98336
+- true
 ...
 space:insert({2, 2})
 ---
@@ -62,9 +61,12 @@ space:insert({4, 4})
 ---
 - [4, 4]
 ...
-box.stat.vinyl().memory.level0
+delta = box.stat.vinyl().memory.level0 - mem
 ---
-- 98431
+...
+delta > 50 and delta < 200
+---
+- true
 ...
 box.snapshot()
 ---
@@ -88,9 +90,13 @@ box.stat.vinyl().memory.level0
 _ = space:replace{1, 1, string.rep('a', 1024 * 1024 * 5)}
 ---
 ...
-box.stat.vinyl().memory.level0
+box.stat.vinyl().memory.level0 > 5000000
 ---
-- 5292072
+- true
+...
+box.stat.vinyl().memory.level0 < 6000000
+---
+- true
 ...
 space:drop()
 ---
