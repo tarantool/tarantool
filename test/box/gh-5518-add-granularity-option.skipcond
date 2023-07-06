@@ -1,0 +1,8 @@
+import os
+
+# The test does not make sense with ASAN. In this case we use special
+# ASAN-friendly small implementation that does not have granularity.
+if os.getenv("ASAN") == 'ON':
+    self.skip = 1
+
+# vim: set ft=python:

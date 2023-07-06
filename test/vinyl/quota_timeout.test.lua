@@ -21,13 +21,14 @@ _ = s:create_index('pk')
 pad = string.rep('x', 2 * box.cfg.vinyl_memory / 3)
 _ = s:auto_increment{pad}
 s:count()
-box.stat.vinyl().memory.level0
+mem = box.stat.vinyl().memory.level0
+mem < 1000000
 
 -- Since the following operation requires more memory than configured
 -- and dump is disabled, it should fail with ER_VY_QUOTA_TIMEOUT.
 _ = s:auto_increment{pad}
 s:count()
-box.stat.vinyl().memory.level0
+box.stat.vinyl().memory.level0 == mem
 
 --
 -- Check that increasing box.cfg.vinyl_memory wakes up fibers

@@ -8,6 +8,9 @@ test_run:cmd("push filter 'table: .*' to 'table: <address>'")
 ---
 - true
 ...
+is_asan = require('tarantool').build.asan
+---
+...
 -- gh-266: box.info() crash on uncofigured box
 package.loaded['box.space'] == nil
 ---
@@ -198,7 +201,7 @@ box.slab.info().arena_used >= 0;
 ---
 - true
 ...
-box.slab.info().arena_size > 0;
+is_asan or box.slab.info().arena_size > 0;
 ---
 - true
 ...
@@ -226,7 +229,7 @@ t;
   - arena_size
   - arena_used
 ...
-box.runtime.info().used > 0;
+is_asan or box.runtime.info().used > 0;
 ---
 - true
 ...

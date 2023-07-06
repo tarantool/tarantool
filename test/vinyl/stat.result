@@ -110,6 +110,7 @@ function gstat()
     st.regulator = nil
     st.scheduler.dump_time = nil
     st.scheduler.compaction_time = nil
+    st.memory.level0 = nil
     return st
 end;
 ---
@@ -255,7 +256,6 @@ gstat()
   memory:
     tuple_cache: 0
     tx: 0
-    level0: 0
     page_index: 0
     bloom_filter: 0
   disk:
@@ -272,6 +272,10 @@ gstat()
     tasks_completed: 0
     dump_input: 0
     compaction_input: 0
+...
+box.stat.vinyl().memory.level0 == 0
+---
+- true
 ...
 --
 -- Index statistics.
@@ -762,15 +766,18 @@ gstat().scheduler.compaction_output == istat().disk.compaction.output.bytes
 - true
 ...
 -- use memory
-st = gstat()
+st = box.stat.vinyl().memory.level0
 ---
 ...
 put(1)
 ---
 ...
-stat_diff(gstat(), st, 'memory.level0')
+diff = box.stat.vinyl().memory.level0 - st
 ---
-- 1056
+...
+diff > 1000 and diff < 1100
+---
+- true
 ...
 -- use cache
 st = gstat()
@@ -1139,7 +1146,6 @@ gstat()
   memory:
     tuple_cache: 14313
     tx: 0
-    level0: 261562
     page_index: 1250
     bloom_filter: 140
   disk:
