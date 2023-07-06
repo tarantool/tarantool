@@ -216,6 +216,26 @@ g.test_help = function()
     t.assert(compat.help())
 end
 
+g.test_is_new_is_old = function()
+    for _, option_def in pairs(definitions) do
+        local name = option_def.name
+        t.assert(compat[name])
+
+        compat[name] = 'new'
+        t.assert(compat[name]:is_new())
+        t.assert_not(compat[name]:is_old())
+
+        compat[name] = 'old'
+        t.assert_not(compat[name]:is_new())
+        t.assert(compat[name]:is_old())
+
+        compat[name] = 'default'
+        local is_new = option_def.default == 'new'
+        t.assert_equals(compat[name]:is_new(), is_new)
+        t.assert_equals(compat[name]:is_old(), not is_new)
+    end
+end
+
 g.test_hot_reload = function()
     local hot_reload_option_def_1 = {
         name = 'hot_reload_option',
