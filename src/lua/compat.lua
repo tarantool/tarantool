@@ -403,6 +403,28 @@ function compat_mt.__index(_, key)
         result.current = 'old'
     end
 
+    -- Whether the effective value of the option is `new`.
+    function result.is_new(option)
+        if type(option) ~= 'table' then
+            error('usage: compat.<option_name>:is_new()')
+        end
+        if option.current == 'new' then
+            return true
+        end
+        if option.current == 'old' then
+            return false
+        end
+        return option.default == 'new'
+    end
+
+    -- Whether the effective value of the option is `old`.
+    function result.is_old(option)
+        if type(option) ~= 'table' then
+            error(('usage: compat.%s:is_old()'):format(key))
+        end
+        return not option:is_new()
+    end
+
     return result
 end
 
