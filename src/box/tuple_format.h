@@ -106,6 +106,14 @@ struct tuple_format_vtab {
 
 struct tuple_constraint;
 
+/** Tuple field default value. */
+struct field_default_value {
+	/** MsgPack with the default value. */
+	char *data;
+	/** Size of the data. */
+	size_t size;
+};
+
 /** Tuple field meta information for tuple_format. */
 struct tuple_field {
 	/** Unique field identifier. */
@@ -162,10 +170,8 @@ struct tuple_field {
 	uint32_t constraint_count;
 	/** AST for parsed SQL default value. */
 	struct Expr *sql_default_value_expr;
-	/** MsgPack with the default value. */
-	char *default_value;
-	/** Size of the default value. */
-	size_t default_value_size;
+	/** Tuple field default value. */
+	struct field_default_value default_value;
 };
 
 /**
@@ -186,7 +192,7 @@ tuple_field_is_nullable(const struct tuple_field *tuple_field)
 static inline bool
 tuple_field_has_default(const struct tuple_field *tuple_field)
 {
-	return tuple_field->default_value != NULL;
+	return tuple_field->default_value.data != NULL;
 }
 
 /**
