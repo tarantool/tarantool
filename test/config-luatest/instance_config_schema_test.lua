@@ -730,6 +730,17 @@ g.test_vinyl = function()
         vinyl = {
             dir = 'one',
             max_tuple_size = 1,
+            bloom_fpr = 0.1,
+            page_size = 123,
+            range_size = 321,
+            run_count_per_level = 11,
+            run_size_ratio = 1.15,
+            read_threads = 7,
+            write_threads = 9,
+            cache = 10,
+            defer_deletes = true,
+            memory = 11,
+            timeout = 5.5,
         },
     }
     instance_config:validate(iconfig)
@@ -738,6 +749,17 @@ g.test_vinyl = function()
     local exp = {
         dir = '{{ instance_name }}',
         max_tuple_size = 1048576,
+        bloom_fpr = 0.05,
+        page_size = 8192,
+        range_size = box.NULL,
+        run_count_per_level = 2,
+        run_size_ratio = 3.5,
+        read_threads = 1,
+        write_threads = 2,
+        cache = 134217728,
+        defer_deletes = false,
+        memory = 134217728,
+        timeout = 60,
     }
     local res = instance_config:apply_default({}).vinyl
     t.assert_equals(res, exp)

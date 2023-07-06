@@ -1,4 +1,5 @@
 local t = require('luatest')
+local server = require('test.luatest_helpers.server')
 local cluster_config = require('internal.config.cluster_config')
 local configdata = require('internal.config.configdata')
 local treegen = require('test.treegen')
@@ -13,6 +14,12 @@ end)
 
 g.after_all(function()
     treegen.clean(g)
+end)
+
+g.after_each(function()
+    if g.server ~= nil then
+        g.server:stop()
+    end
 end)
 
 g.test_configdata = function()
@@ -280,4 +287,59 @@ g.test_config_option = function()
     local res = justrun.tarantool(dir, env, args, opts)
     t.assert_equals(res.exit_code, 0)
     t.assert_equals(res.stdout, table.concat({16, 100000000, 0}, "\n"))
+end
+
+g.test_remaining_vinyl_options = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        vinyl:
+          bloom_fpr: 0.37
+          page_size: 777
+          range_size: 5555
+          run_count_per_level: 3
+          run_size_ratio: 1.63
+          read_threads: 11
+          write_threads: 22
+          cache: 111111111
+          defer_deletes: true
+          memory: 222222222
+          timeout: 7.5
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local opts = {
+        config_file = config_file,
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+    g.server:exec(function()
+        t.assert_equals(box.cfg.vinyl_bloom_fpr, 0.37)
+        t.assert_equals(box.cfg.vinyl_page_size, 777)
+        t.assert_equals(box.cfg.vinyl_range_size, 5555)
+        t.assert_equals(box.cfg.vinyl_run_count_per_level, 3)
+        t.assert_equals(box.cfg.vinyl_run_size_ratio, 1.63)
+        t.assert_equals(box.cfg.vinyl_read_threads, 11)
+        t.assert_equals(box.cfg.vinyl_write_threads, 22)
+        t.assert_equals(box.cfg.vinyl_cache, 111111111)
+        t.assert_equals(box.cfg.vinyl_defer_deletes, true)
+        t.assert_equals(box.cfg.vinyl_memory, 222222222)
+        t.assert_equals(box.cfg.vinyl_timeout, 7.5)
+    end)
 end

@@ -717,7 +717,22 @@ return schema.new('instance_config', schema.record({
         }),
     }),
     vinyl = schema.record({
-        -- TODO: vinyl options.
+        bloom_fpr = schema.scalar({
+            type = 'number',
+            box_cfg = 'vinyl_bloom_fpr',
+            box_cfg_nondynamic = true,
+            default = 0.05,
+        }),
+        cache = schema.scalar({
+            type = 'integer',
+            box_cfg = 'vinyl_cache',
+            default = 128 * 1024 * 1024,
+        }),
+        defer_deletes = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'vinyl_defer_deletes',
+            default = false,
+        }),
         dir = schema.scalar({
             type = 'string',
             box_cfg = 'vinyl_dir',
@@ -729,6 +744,52 @@ return schema.new('instance_config', schema.record({
             type = 'integer',
             box_cfg = 'vinyl_max_tuple_size',
             default = 1024 * 1024,
+        }),
+        memory = schema.scalar({
+            type = 'integer',
+            box_cfg = 'vinyl_memory',
+            default = 128 * 1024 * 1024,
+        }),
+        page_size = schema.scalar({
+            type = 'integer',
+            box_cfg = 'vinyl_page_size',
+            box_cfg_nondynamic = true,
+            default = 8 * 1024,
+        }),
+        range_size = schema.scalar({
+            type = 'integer',
+            box_cfg = 'vinyl_range_size',
+            box_cfg_nondynamic = true,
+            default = box.NULL,
+        }),
+        read_threads = schema.scalar({
+            type = 'integer',
+            box_cfg = 'vinyl_read_threads',
+            box_cfg_nondynamic = true,
+            default = 1,
+        }),
+        run_count_per_level = schema.scalar({
+            type = 'integer',
+            box_cfg = 'vinyl_run_count_per_level',
+            box_cfg_nondynamic = true,
+            default = 2,
+        }),
+        run_size_ratio = schema.scalar({
+            type = 'number',
+            box_cfg = 'vinyl_run_size_ratio',
+            box_cfg_nondynamic = true,
+            default = 3.5,
+        }),
+        timeout = schema.scalar({
+            type = 'number',
+            box_cfg = 'vinyl_timeout',
+            default = 60,
+        }),
+        write_threads = schema.scalar({
+            type = 'integer',
+            box_cfg = 'vinyl_write_threads',
+            box_cfg_nondynamic = true,
+            default = 2,
         }),
     }),
     wal = schema.record({

@@ -162,6 +162,17 @@ g.test_defaults = function()
         vinyl = {
             dir = '{{ instance_name }}',
             max_tuple_size = 1048576,
+            bloom_fpr = 0.05,
+            page_size = 8192,
+            range_size = box.NULL,
+            run_count_per_level = 2,
+            run_size_ratio = 3.5,
+            read_threads = 1,
+            write_threads = 2,
+            cache = 134217728,
+            defer_deletes = false,
+            memory = 134217728,
+            timeout = 60,
         },
         database = {
             instance_uuid = box.NULL,
