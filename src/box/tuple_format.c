@@ -144,13 +144,13 @@ tuple_format_cmp(const struct tuple_format *format1,
 			if (cmp != 0)
 				return cmp;
 		}
-		if (field_a->default_value_size != field_b->default_value_size)
-			return (int)field_a->default_value_size -
-			       (int)field_b->default_value_size;
-		if (field_a->default_value_size != 0) {
-			int cmp = memcmp(field_a->default_value,
-					 field_b->default_value,
-					 field_a->default_value_size);
+		if (field_a->default_value.size != field_b->default_value.size)
+			return (int)field_a->default_value.size -
+			       (int)field_b->default_value.size;
+		if (field_a->default_value.size != 0) {
+			int cmp = memcmp(field_a->default_value.data,
+					 field_b->default_value.data,
+					 field_a->default_value.size);
 			if (cmp != 0)
 				return cmp;
 		}
@@ -183,9 +183,9 @@ tuple_format_hash(struct tuple_format *format)
 		for (uint32_t i = 0; i < f->constraint_count; ++i)
 			size += tuple_constraint_hash_process(&f->constraint[i],
 							      &h, &carry);
-		PMurHash32_Process(&h, &carry, f->default_value,
-				   (int)f->default_value_size);
-		size += f->default_value_size;
+		PMurHash32_Process(&h, &carry, f->default_value.data,
+				   (int)f->default_value.size);
+		size += f->default_value.size;
 	}
 #undef TUPLE_FIELD_MEMBER_HASH
 	size += tuple_dictionary_hash_process(format->dict, &h, &carry);
@@ -223,8 +223,6 @@ tuple_field_new(void)
 	field->multikey_required_fields = NULL;
 	field->constraint_count = 0;
 	field->constraint = NULL;
-	field->default_value = NULL;
-	field->default_value_size = 0;
 	return field;
 }
 
@@ -239,7 +237,7 @@ tuple_field_delete(struct tuple_field *field)
 	free(field->constraint);
 	if (field->sql_default_value_expr != NULL)
 		tuple_format_expr_delete(field->sql_default_value_expr);
-	free(field->default_value);
+	free(field->default_value.data);
 	free(field);
 }
 
@@ -572,8 +570,8 @@ tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 			size_t size = fields[i].default_value_size;
 			char *buf = xmalloc(size);
 			memcpy(buf, default_value, size);
-			field->default_value = buf;
-			field->default_value_size = size;
+			field->default_value.data = buf;
+			field->default_value.size = size;
 			format->default_field_count = i + 1;
 		}
 	}
@@ -1524,8 +1522,8 @@ tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 			field = tuple_format_field(format, i);
 
 		if (is_null && tuple_field_has_default(field)) {
-			tuple_builder_add(&builder, field->default_value,
-					  field->default_value_size, 1);
+			tuple_builder_add(&builder, field->default_value.data,
+					  field->default_value.size, 1);
 			is_tuple_changed = true;
 		} else {
 			tuple_builder_add(&builder, p, p_next - p, 1);
@@ -1539,8 +1537,8 @@ tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 	for ( ; i < format->default_field_count; i++) {
 		struct tuple_field *field = tuple_format_field(format, i);
 		if (tuple_field_has_default(field)) {
-			tuple_builder_add(&builder, field->default_value,
-					  field->default_value_size, 1);
+			tuple_builder_add(&builder, field->default_value.data,
+					  field->default_value.size, 1);
 			is_tuple_changed = true;
 		} else {
 			tuple_builder_add_nil(&builder);
