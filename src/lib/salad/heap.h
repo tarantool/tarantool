@@ -37,7 +37,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
-#include <memory.h>
 
 /**
  * Additional user defined name that appended to prefix 'heap'
@@ -175,6 +174,10 @@ struct heap_iterator {
 #endif /* HEAP_STRUCTURES */
 
 #ifndef HEAP_FORWARD_DECLARATION
+
+#ifndef typeof
+#define typeof __typeof__
+#endif
 
 #ifndef container_of
 #define container_of(ptr, type, member) ({ \
