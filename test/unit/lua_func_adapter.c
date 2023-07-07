@@ -168,6 +168,45 @@ test_string(void)
 }
 
 static void
+test_bool(void)
+{
+	plan(10);
+	header();
+
+	int idx = generate_function(
+		"function(a, b, c, d) "
+		"return a, not b, c, not d end");
+	bool arguments[4];
+	for (size_t i = 0; i < lengthof(arguments); ++i)
+		arguments[i] = rand() % 2 == 0;
+	struct func_adapter *func = func_adapter_lua_create(tarantool_L, idx);
+	struct func_adapter_ctx ctx;
+	func_adapter_begin(func, &ctx);
+	for (size_t i = 0; i < lengthof(arguments); ++i)
+		func_adapter_push_bool(func, &ctx, arguments[i]);
+	int rc = func_adapter_call(func, &ctx);
+	fail_if(rc != 0);
+
+	for (size_t i = 0; i < lengthof(arguments); ++i) {
+		ok(func_adapter_is_bool(func, &ctx), "Expected double");
+		bool retval = false;
+		func_adapter_pop_bool(func, &ctx, &retval);
+		bool is_odd = i % 2 == 0;
+		bool equal = arguments[i] == retval;
+		is(is_odd, equal, "Only odd elements are equal");
+	}
+
+	ok(!func_adapter_is_bool(func, &ctx), "No values left - no bool");
+	ok(func_adapter_is_null(func, &ctx), "No values left");
+	func_adapter_end(func, &ctx);
+	func_adapter_destroy(func);
+	lua_settop(tarantool_L, 0);
+
+	footer();
+	check_plan();
+}
+
+static void
 test_null(void)
 {
 	plan(7);
@@ -293,12 +332,13 @@ test_callable(void)
 static int
 test_lua_func_adapter(void)
 {
-	plan(7);
+	plan(8);
 	header();
 
 	test_numeric();
 	test_tuple();
 	test_string();
+	test_bool();
 	test_null();
 	test_error();
 	test_get_func();
