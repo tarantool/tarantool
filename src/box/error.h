@@ -184,6 +184,28 @@ extern const struct type_info type_XlogGapError;
 extern const struct type_info type_AccessDeniedError;
 extern const struct type_info type_CustomError;
 
+/**
+ * Internal triggers fired after access denied error is created.
+ */
+extern struct rlist on_access_denied;
+
+/**
+ * User-definded triggers fired after access denied error is created.
+ */
+extern struct event *on_access_denied_event;
+
+/**
+ * Context passed to on_access_denied trigger.
+ */
+struct on_access_denied_ctx {
+	/** Type of declined access */
+	const char *access_type;
+	/** Type of object the required access was denied to */
+	const char *object_type;
+	/** Name of object the required access was denied to */
+	const char *object_name;
+};
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #include "exception.h"

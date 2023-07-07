@@ -4,6 +4,7 @@
 #include <lualib.h>           /* luaL_openlibs() */
 #include "memory.h"           /* memory_init() */
 #include "fiber.h"            /* fiber_init() */
+#include "event.h"            /* event_init() */
 #include "small/ibuf.h"       /* struct ibuf */
 #include "box/box.h"          /* box_init() */
 #include "box/tuple.h"        /* box_tuple_format_default() */
@@ -187,6 +188,7 @@ main()
 
 	struct lua_State *L = luaT_newteststate();
 
+	event_init();
 	box_init();
 	tarantool_lua_error_init(L);
 	luaopen_msgpack(L);
