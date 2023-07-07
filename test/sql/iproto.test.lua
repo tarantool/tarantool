@@ -169,6 +169,7 @@ box.execute('create table test3 (id int primary key autoincrement)')
 box.schema.sequence.alter('TEST3', {min=-10000, step=-10})
 cn:execute('insert into TEST3 values (null), (null), (null), (null)')
 
+_ = box.space.TEST:on_replace(nil, push_id)
 box.execute('drop table test')
 s:drop()
 sq:drop()

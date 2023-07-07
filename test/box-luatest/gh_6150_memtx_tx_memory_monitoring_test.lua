@@ -11,7 +11,7 @@ local SIZE_OF_STORY = 144
 -- Size of tuple with 2 number fields
 local SIZE_OF_TUPLE = 9
 -- Size of xrow for tuples with 2 number fields
-local SIZE_OF_XROW = 147
+local SIZE_OF_XROW = 163
 -- Tracker can allocate additional memory, be careful!
 local SIZE_OF_READ_TRACKER = 48
 local SIZE_OF_POINT_TRACKER = 88

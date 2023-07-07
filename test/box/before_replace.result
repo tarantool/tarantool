@@ -305,7 +305,7 @@ s:before_replace(ret_invalid) == ret_invalid
 s:insert{1, 1}
 ---
 - error: 'Invalid return value of space:before_replace trigger: expected tuple or
-    nil, got string'
+    nil'
 ...
 s:select()
 ---
@@ -359,6 +359,9 @@ s2.index.sk:update(1, {{'+', 4, 1}})
 s2:select()
 ---
 - - [1, 1, 2, 2]
+...
+s2:before_replace(nil, ret_update)
+---
 ...
 s2:drop()
 ---
@@ -830,6 +833,9 @@ save_type
 ---
 - UPSERT
 ...
+s:before_replace(nil, find_type)
+---
+...
 s:drop()
 ---
 ...
@@ -845,7 +851,7 @@ _ = s:create_index('pk')
 save_type = ''
 ---
 ...
-_ = s:before_replace(function(old,new, name, type) save_type = type return new end)
+tid = s:before_replace(function(old,new, name, type) save_type = type return new end)
 ---
 ...
 _ = s:insert{1}
@@ -854,6 +860,9 @@ _ = s:insert{1}
 save_type
 ---
 - INSERT
+...
+s:before_replace(nil, tid)
+---
 ...
 s:drop()
 ---

@@ -574,6 +574,9 @@ cn:execute('insert into TEST3 values (null), (null), (null), (null)')
   - -29
   row_count: 4
 ...
+_ = box.space.TEST:on_replace(nil, push_id)
+---
+...
 box.execute('drop table test')
 ---
 - row_count: 1

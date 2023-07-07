@@ -639,9 +639,9 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 */
 	if (stmt->space != NULL && stmt->space->run_triggers &&
 	    (stmt->old_tuple || stmt->new_tuple)) {
-		if (!rlist_empty(&stmt->space->on_replace)) {
+		if (space_has_on_replace_triggers(stmt->space)) {
 			txn->space_on_replace_triggers_depth++;
-			int rc = trigger_run(&stmt->space->on_replace, txn);
+			int rc = space_on_replace(stmt->space, txn);
 			txn->space_on_replace_triggers_depth--;
 			if (rc != 0)
 				goto fail;

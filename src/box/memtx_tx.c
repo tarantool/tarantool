@@ -2083,8 +2083,8 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	 */
 	if (!is_own_change &&
 	    (mode == DUP_INSERT ||
-	     !rlist_empty(&stmt->space->before_replace) ||
-	     !rlist_empty(&stmt->space->on_replace))) {
+	     space_has_before_replace_triggers(stmt->space) ||
+	     space_has_on_replace_triggers(stmt->space))) {
 		assert(mode != DUP_INSERT || del_story == NULL);
 		if (del_story == NULL)
 			memtx_tx_track_story_gap(stmt->txn, add_story, 0);

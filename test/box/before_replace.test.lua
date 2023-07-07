@@ -116,6 +116,7 @@ s2:insert{1, 1, 1, 1}
 s2:before_replace(ret_update) == ret_update
 s2.index.sk:update(1, {{'+', 4, 1}})
 s2:select()
+s2:before_replace(nil, ret_update)
 s2:drop()
 
 -- Stacking triggers.
@@ -290,6 +291,7 @@ save_type
 _ = s:upsert({3,4,5}, {{'+', 2, 1}})
 save_type
 
+s:before_replace(nil, find_type)
 s:drop()
 
 --
@@ -301,10 +303,11 @@ _ = s:create_index('pk')
 
 save_type = ''
 
-_ = s:before_replace(function(old,new, name, type) save_type = type return new end)
+tid = s:before_replace(function(old,new, name, type) save_type = type return new end)
 _ = s:insert{1}
 save_type
 
+s:before_replace(nil, tid)
 s:drop()
 
 --

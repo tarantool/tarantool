@@ -55,6 +55,7 @@
 #include "field_default_func.h"
 #include "wal_ext.h"
 #include "coll_id_cache.h"
+#include "func_adapter.h"
 
 int
 access_check_space(struct space *space, user_access_t access)
@@ -325,6 +326,103 @@ space_unpin_defaults(struct space *space)
 	}
 }
 
+/**
+ * Set all the events associated with space: on_replace and before_replace,
+ * bound by name and by id. If argument is_on_recovery is true, recovery events
+ * are set instead of regular ones.
+ */
+static void
+space_set_events(struct space *space, bool is_on_recovery)
+{
+	assert(space->def != NULL);
+	/*
+	 * Space events - on_replace and before_replace events, associated with
+	 * space by id and by name. All format strings for event names must be
+	 * declared in the same order.
+	 */
+	struct space_event *space_events[] = {
+		&space->on_replace_event,
+		&space->before_replace_event,
+	};
+	/*
+	 * Format strings for names of events associated with the space by id
+	 * and by name. Since space has several versions of each replace trigger
+	 * (for example, on_recovery_replace which is fired only on recovery and
+	 * on_replace which is fired after recovery), name of replace operation
+	 * is an argument for format string.
+	 */
+	static const char * const event_by_id_fmt[] = {
+		"box.space[%u].on_%s",
+		"box.space[%u].before_%s",
+	};
+	static const char * const event_by_name_fmt[] = {
+		"box.space.%s.on_%s",
+		"box.space.%s.before_%s",
+	};
+	static_assert(lengthof(space_events) == lengthof(event_by_id_fmt),
+		      "Every space event must be covered with name");
+	static_assert(lengthof(space_events) == lengthof(event_by_name_fmt),
+		      "Every space event must be covered with name");
+
+	const char *replace_name =
+		is_on_recovery ? "recovery_replace" : "replace";
+	space->run_recovery_triggers = is_on_recovery;
+	/*
+	 * Allocate buffer for event names. We make an assumption that all
+	 * format strings for event names are limited by the constant below.
+	 * This assumption is tested in the loop at the end of the function.
+	 * Another assumption is that string representation of space id is
+	 * limited by another constant below.
+	 */
+	const size_t event_fmt_max_len = 30;
+	const size_t space_id_max_len = 10;
+	const size_t buf_size = event_fmt_max_len + strlen(replace_name) + 1 +
+		MAX(space_id_max_len, strlen(space->def->name)) + 1;
+	size_t region_svp = region_used(&fiber()->gc);
+	char *event_name = xregion_alloc(&fiber()->gc, buf_size);
+	for (size_t i = 0; i < lengthof(space_events); ++i) {
+		/* Test our assumption made during buf_size calculation. */
+		assert(strlen(event_by_name_fmt[i]) <= event_fmt_max_len);
+		assert(strlen(event_by_id_fmt[i]) <= event_fmt_max_len);
+
+		/* Set event by id. */
+		snprintf(event_name, buf_size, event_by_id_fmt[i],
+			 space->def->id, replace_name);
+		struct event **event = &space_events[i]->by_id;
+		assert(*event == NULL);
+		*event = event_get(event_name, true);
+		event_ref(*event);
+
+		/* Set event by name. */
+		snprintf(event_name, buf_size, event_by_name_fmt[i],
+			 space->def->name, replace_name);
+		event = &space_events[i]->by_name;
+		assert(*event == NULL);
+		*event = event_get(event_name, true);
+		event_ref(*event);
+	}
+	region_truncate(&fiber()->gc, region_svp);
+}
+
+/**
+ * Reset space events.
+ */
+static void
+space_reset_events(struct space *space)
+{
+	struct space_event *space_events[] = {
+		&space->on_replace_event,
+		&space->before_replace_event,
+	};
+	for (size_t i = 0; i < lengthof(space_events); ++i) {
+		event_unref(space_events[i]->by_id);
+		space_events[i]->by_id = NULL;
+		event_unref(space_events[i]->by_name);
+		space_events[i]->by_name = NULL;
+	}
+	space->run_recovery_triggers = false;
+}
+
 int
 space_create(struct space *space, struct engine *engine,
 	     const struct space_vtab *vtab, struct space_def *def,
@@ -361,6 +459,8 @@ space_create(struct space *space, struct engine *engine,
 		tuple_format_ref(format);
 
 	space->def = space_def_dup(def);
+	bool is_on_recovery = recovery_state < FINISHED_RECOVERY;
+	space_set_events(space, is_on_recovery);
 
 	/* Create indexes and fill the index map. */
 	space->index_map = (struct index **)
@@ -460,7 +560,18 @@ int
 space_on_final_recovery_complete(struct space *space, void *nothing)
 {
 	(void)nothing;
+	space_reset_events(space);
+	space_set_events(space, false);
 	space_upgrade_run(space);
+	return 0;
+}
+
+int
+space_on_bootstrap_complete(struct space *space, void *nothing)
+{
+	(void)nothing;
+	space_reset_events(space);
+	space_set_events(space, false);
 	return 0;
 }
 
@@ -505,6 +616,7 @@ space_delete(struct space *space)
 	space_unpin_collations(space);
 	trigger_destroy(&space->before_replace);
 	trigger_destroy(&space->on_replace);
+	space_reset_events(space);
 	if (space->upgrade != NULL)
 		space_upgrade_unref(space->upgrade);
 	space_def_delete(space->def);
@@ -632,6 +744,146 @@ index_name_by_id(struct space *space, uint32_t id)
 	if (index != NULL)
 		return index->def->name;
 	return NULL;
+}
+
+/**
+ * Run replace triggers from passed event. If argument update_tuple is true,
+ * new tuple in current statement is updated after each trigger:
+ * 1. the tuple is set to returned tuple,
+ * 2. the tuple is set to NULL if a trigger returned NULL,
+ * 3. the tuple is not updated if a trigger returned nothing,
+ * 4. an error is thrown otherwise.
+ * Updated tuple is validated against the space format.
+ */
+static int
+space_run_replace_triggers(struct event *event, struct txn *txn,
+			   bool update_tuple)
+{
+	struct event_trigger_iterator it;
+	event_trigger_iterator_create(&it, event);
+	struct func_adapter *trigger = NULL;
+	const char *name = NULL;
+	struct func_adapter_ctx ctx;
+	int rc = 0;
+	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
+		func_adapter_begin(trigger, &ctx);
+
+		/*
+		 * The transaction could be aborted while the previous trigger
+		 * was running (e.g. if the trigger callback yielded).
+		 */
+		rc = txn_check_can_continue(txn);
+		if (rc != 0)
+			goto out;
+		struct txn_stmt *stmt = txn_current_stmt(txn);
+		assert(stmt != NULL);
+
+		/* Push arguments to a trigger. */
+		if (stmt->old_tuple != NULL)
+			func_adapter_push_tuple(trigger, &ctx, stmt->old_tuple);
+		else
+			func_adapter_push_null(trigger, &ctx);
+		if (stmt->new_tuple != NULL)
+			func_adapter_push_tuple(trigger, &ctx, stmt->new_tuple);
+		else
+			func_adapter_push_null(trigger, &ctx);
+		/* TODO: maybe the space object has to be here */
+		func_adapter_push_str0(trigger, &ctx, stmt->space->def->name);
+		/* Operation type: INSERT/UPDATE/UPSERT/REPLACE/DELETE */
+		func_adapter_push_str0(trigger, &ctx,
+				       iproto_type_name(stmt->type));
+		/* Pass xrow header and body to recovery triggers. */
+		if (stmt->space->run_recovery_triggers) {
+			struct xrow_header *row = stmt->row;
+			assert(row != NULL && row->header != NULL);
+			func_adapter_push_msgpack(trigger, &ctx, row->header,
+						  row->header_end);
+			assert(row->bodycnt == 1);
+			const char *body = row->body[0].iov_base;
+			const char *body_end = body + row->body[0].iov_len;
+			func_adapter_push_msgpack(trigger, &ctx, body,
+						  body_end);
+		}
+
+		rc = func_adapter_call(trigger, &ctx);
+		if (rc != 0 || !update_tuple)
+			goto out;
+
+		/*
+		 * The transaction could be aborted while the trigger was
+		 * running (e.g. if the trigger callback yielded).
+		 */
+		rc = txn_check_can_continue(txn);
+		if (rc != 0)
+			goto out;
+		stmt = txn_current_stmt(txn);
+		assert(stmt != NULL);
+
+		/*
+		 * Pop the returned value.
+		 * See the function description for details.
+		 */
+		struct tuple *result = NULL;
+		if (func_adapter_is_tuple(trigger, &ctx)) {
+			func_adapter_pop_tuple(trigger, &ctx, &result);
+		} else if (func_adapter_is_empty(trigger, &ctx)) {
+			rc = 0;
+			goto out;
+		} else if (!func_adapter_is_null(trigger, &ctx)) {
+			diag_set(ClientError, ER_BEFORE_REPLACE_RET);
+			rc = -1;
+			goto out;
+		}
+
+		/*
+		 * Tuple returned by a before_replace trigger callback must
+		 * match the space format.
+		 *
+		 * Since upgrade from pre-1.7.5 versions passes tuple with not
+		 * suitable format to before_recovery_replace triggers,
+		 * we need to disable format validation on recovery triggers.
+		 */
+		if (!stmt->space->run_recovery_triggers &&
+		    result != NULL &&
+		    tuple_validate(stmt->space->format, result) != 0) {
+			rc = -1;
+			goto out;
+		}
+
+		/* Update the new tuple. */
+		if (result != NULL)
+			tuple_ref(result);
+		if (stmt->new_tuple != NULL)
+			tuple_unref(stmt->new_tuple);
+		stmt->new_tuple = result;
+
+out:
+		func_adapter_end(trigger, &ctx);
+	}
+	event_trigger_iterator_destroy(&it);
+	return rc;
+}
+
+int
+space_on_replace(struct space *space, struct txn *txn)
+{
+	/*
+	 * Since the triggers can yield, a space can be dropped
+	 * while executing one of the trigger lists and all the events will be
+	 * unreferenced - reference them to prevent use-after-free.
+	 */
+	struct event *events[] = {
+		space->on_replace_event.by_id,
+		space->on_replace_event.by_name,
+	};
+	for (size_t i = 0; i < lengthof(events); ++i)
+		event_ref(events[i]);
+	int rc = trigger_run(&space->on_replace, txn);
+	for (size_t i = 0; i < lengthof(events) && rc == 0; ++i)
+		rc = space_run_replace_triggers(events[i], txn, false);
+	for (size_t i = 0; i < lengthof(events); ++i)
+		event_unref(events[i]);
+	return rc;
 }
 
 /**
@@ -841,21 +1093,37 @@ after_old_tuple_lookup:;
 	/*
 	 * Execute all registered BEFORE triggers.
 	 *
-	 * We pass the old and new tuples to the triggers in
-	 * txn_current_stmt(), which should be empty, because
-	 * the engine method (execute_replace or similar) has
-	 * not been called yet. Triggers may update new_tuple
-	 * in place so the next trigger sees the result of the
-	 * previous one. After we are done, we clear old_tuple
-	 * and new_tuple in txn_current_stmt() to be set by
-	 * the engine.
+	 * We pass the log row, old and new tuples to the triggers
+	 * in txn_current_stmt(), which should be empty, because
+	 * the engine method (execute_replace or similar) has not
+	 * been called yet. Triggers may update new_tuple in place
+	 * so the next trigger sees the result of the previous one.
+	 * After we are done, we clear row, old_tuple and new_tuple
+	 * in txn_current_stmt() to be set by the engine.
 	 */
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	assert(stmt->old_tuple == NULL && stmt->new_tuple == NULL);
+	assert(stmt->row == NULL);
 	stmt->old_tuple = old_tuple;
 	stmt->new_tuple = new_tuple;
+	stmt->row = request->header;
 
+	struct event *events[] = {
+		space->before_replace_event.by_id,
+		space->before_replace_event.by_name,
+	};
+	/*
+	 * Since the triggers can yield, a space can be dropped
+	 * while executing one of the trigger lists and all the events will be
+	 * unreferenced - reference them to prevent use-after-free.
+	 */
+	for (size_t i = 0; i < lengthof(events); ++i)
+		event_ref(events[i]);
 	int rc = trigger_run(&space->before_replace, txn);
+	for (size_t i = 0; i < lengthof(events) && rc == 0; ++i)
+		rc = space_run_replace_triggers(events[i], txn, true);
+	for (size_t i = 0; i < lengthof(events); ++i)
+		event_unref(events[i]);
 
 	/*
 	 * BEFORE triggers cannot change the old tuple,
@@ -866,6 +1134,7 @@ after_old_tuple_lookup:;
 	assert(stmt->old_tuple == old_tuple);
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
+	stmt->row = NULL;
 
 	if (rc != 0)
 		goto out;
@@ -945,7 +1214,7 @@ space_execute_dml(struct space *space, struct txn *txn,
 			return -1;
 	}
 
-	if (unlikely((!rlist_empty(&space->before_replace) &&
+	if (unlikely((space_has_before_replace_triggers(space) &&
 		      space->run_triggers) || need_foreign_key_check)) {
 		/*
 		 * Call BEFORE triggers if any before dispatching
