@@ -147,26 +147,9 @@ sequence_cache_delete(uint32_t id);
 extern struct rlist on_alter_sequence;
 
 /**
- * Triggers fired after access denied error is created.
- */
-extern struct rlist on_access_denied;
-
-/**
  * Triggers fired after committing a change in _func space.
  */
 extern struct rlist on_alter_func;
-
-/**
- * Context passed to on_access_denied trigger.
- */
-struct on_access_denied_ctx {
-	/** Type of declined access */
-	const char *access_type;
-	/** Type of object the required access was denied to */
-	const char *object_type;
-	/** Name of object the required access was denied to */
-	const char *object_name;
-};
 
 /** Global grants to classes of objects. */
 struct entity_access {

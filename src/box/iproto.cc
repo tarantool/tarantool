@@ -40,6 +40,7 @@
 #include <base64.h>
 
 #include "version.h"
+#include "event.h"
 #include "fiber.h"
 #include "fiber_cond.h"
 #include "cbus.h"
@@ -1777,10 +1778,8 @@ tx_process_disconnect(struct cmsg *m)
 		 * closed, its push() method is replaced with a stub.
 		 */
 		con->tx.is_push_pending = false;
-		if (! rlist_empty(&session_on_disconnect)) {
-			tx_fiber_init(con->session, 0);
-			session_run_on_disconnect_triggers(con->session);
-		}
+		tx_fiber_init(con->session, 0);
+		session_run_on_disconnect_triggers(con->session);
 	}
 }
 
@@ -2726,8 +2725,7 @@ tx_process_connect(struct cmsg *m)
 	greeting_encode(greeting, tarantool_version_id(), &uuid,
 			con->salt, IPROTO_SALT_SIZE);
 	xobuf_dup(out, greeting, IPROTO_GREETING_SIZE);
-	if (!rlist_empty(&session_on_connect) &&
-	    session_run_on_connect_triggers(con->session) != 0)
+	if (session_run_on_connect_triggers(con->session) != 0)
 		goto error;
 	iproto_wpos_create(&msg->wpos, out);
 	return;

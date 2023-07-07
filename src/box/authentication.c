@@ -17,6 +17,7 @@
 #include "diag.h"
 #include "errcode.h"
 #include "error.h"
+#include "event.h"
 #include "fiber.h"
 #include "iostream.h"
 #include "msgpuck.h"
@@ -121,9 +122,8 @@ authenticate(const char *user_name, uint32_t user_name_len,
 	if (access_check_session(user) != 0)
 		return -1;
 ok:
-	/* check and run auth triggers on success */
-	if (! rlist_empty(&session_on_auth) &&
-	    session_run_on_auth_triggers(&auth_res) != 0)
+	/* run auth triggers on success */
+	if (session_run_on_auth_triggers(&auth_res) != 0)
 		return -1;
 	credentials_reset(&current_session()->credentials, user);
 	return 0;

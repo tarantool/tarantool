@@ -30,6 +30,7 @@
  */
 #include "session.h"
 #include "fiber.h"
+#include "func_adapter.h"
 #include "fiber_cond.h"
 #include "sio.h"
 #include "memory.h"
@@ -43,6 +44,8 @@
 #include "on_shutdown.h"
 #include "sql.h"
 #include "tweaks.h"
+#include "event.h"
+#include "schema.h"
 
 const char *session_type_strs[] = {
 	"background",
@@ -77,6 +80,9 @@ static struct fiber_cond shutdown_list_empty_cond;
 RLIST_HEAD(session_on_connect);
 RLIST_HEAD(session_on_disconnect);
 RLIST_HEAD(session_on_auth);
+struct event *session_on_connect_event;
+struct event *session_on_disconnect_event;
+struct event *session_on_auth_event;
 
 static inline uint64_t
 sid_max(void)
@@ -321,8 +327,13 @@ session_remove_stmt_id(struct session *session, uint32_t stmt_id)
  */
 struct credentials admin_credentials;
 
+/**
+ * Runs on_connect or on_disconnect triggers. Argument triggers is for internal
+ * triggers and argument event is for user-defined ones.
+ */
 static int
-session_run_triggers(struct session *session, struct rlist *triggers)
+session_run_triggers(struct session *session, struct rlist *triggers,
+		     struct event *event)
 {
 	struct fiber *fiber = fiber();
 	assert(session == current_session());
@@ -331,7 +342,21 @@ session_run_triggers(struct session *session, struct rlist *triggers)
 	fiber_set_user(fiber, &admin_credentials);
 
 	int rc = trigger_run(triggers, NULL);
+	if (rc != 0)
+		goto out;
 
+	const char *name = NULL;
+	struct func_adapter *trigger = NULL;
+	struct func_adapter_ctx ctx;
+	struct event_trigger_iterator it;
+	event_trigger_iterator_create(&it, event);
+	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
+		func_adapter_begin(trigger, &ctx);
+		rc = func_adapter_call(trigger, &ctx);
+		func_adapter_end(trigger, &ctx);
+	}
+	event_trigger_iterator_destroy(&it);
+out:
 	/* Restore original credentials */
 	fiber_set_user(fiber, &session->credentials);
 
@@ -341,20 +366,40 @@ session_run_triggers(struct session *session, struct rlist *triggers)
 void
 session_run_on_disconnect_triggers(struct session *session)
 {
-	if (session_run_triggers(session, &session_on_disconnect) != 0)
+	if (session_run_triggers(session, &session_on_disconnect,
+				 session_on_disconnect_event) != 0)
 		diag_log();
 }
 
 int
 session_run_on_connect_triggers(struct session *session)
 {
-	return session_run_triggers(session, &session_on_connect);
+	return session_run_triggers(session, &session_on_connect,
+				    session_on_connect_event);
 }
 
 int
 session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result)
 {
-	return trigger_run(&session_on_auth, (void *)result);
+	if (trigger_run(&session_on_auth, (void *)result) != 0)
+		return -1;
+
+	const char *name = NULL;
+	struct func_adapter *trigger = NULL;
+	struct func_adapter_ctx ctx;
+	struct event_trigger_iterator it;
+	int rc = 0;
+	event_trigger_iterator_create(&it, session_on_auth_event);
+	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
+		func_adapter_begin(trigger, &ctx);
+		func_adapter_push_str(trigger, &ctx, result->user_name,
+				      result->user_name_len);
+		func_adapter_push_bool(trigger, &ctx, result->is_authenticated);
+		rc = func_adapter_call(trigger, &ctx);
+		func_adapter_end(trigger, &ctx);
+	}
+	event_trigger_iterator_destroy(&it);
+	return rc;
 }
 
 void
@@ -421,6 +466,16 @@ session_init(void)
 {
 	for (int type = 0; type < session_type_MAX; type++)
 		session_vtab_registry[type] = generic_session_vtab;
+	session_on_connect_event = event_get("box.session.on_connect", true);
+	event_ref(session_on_connect_event);
+	session_on_disconnect_event =
+		event_get("box.session.on_disconnect", true);
+	event_ref(session_on_disconnect_event);
+	session_on_auth_event = event_get("box.session.on_auth", true);
+	event_ref(session_on_auth_event);
+	on_access_denied_event =
+		event_get("box.session.on_access_denied", true);
+	event_ref(on_access_denied_event);
 	session_registry = mh_i64ptr_new();
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
 	credentials_create(&admin_credentials, admin_user);
@@ -433,6 +488,14 @@ session_init(void)
 void
 session_free(void)
 {
+	event_unref(session_on_connect_event);
+	session_on_connect_event = NULL;
+	event_unref(session_on_disconnect_event);
+	session_on_disconnect_event = NULL;
+	event_unref(session_on_auth_event);
+	session_on_auth_event = NULL;
+	event_unref(on_access_denied_event);
+	on_access_denied_event = NULL;
 	if (session_registry)
 		mh_i64ptr_delete(session_registry);
 	credentials_destroy(&admin_credentials);

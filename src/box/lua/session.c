@@ -36,8 +36,10 @@
 #include <lauxlib.h>
 #include <lualib.h>
 #include <sio.h>
+#include "box/lua/trigger.h"
 
 #include "box/box.h"
+#include "box/error.h"
 #include "box/session.h"
 #include "box/user.h"
 #include "box/schema.h"
@@ -274,31 +276,10 @@ lbox_session_peer(struct lua_State *L)
 	return 1;
 }
 
-/**
- * run on_connect|on_disconnect trigger
- */
-static int
-lbox_push_on_connect_event(struct lua_State *L, void *event)
-{
-	(void) L;
-	(void) event;
-	return 0;
-}
-
-static int
-lbox_push_on_auth_event(struct lua_State *L, void *event)
-{
-	struct on_auth_trigger_ctx *ctx = (struct on_auth_trigger_ctx *)event;
-	lua_pushlstring(L, ctx->user_name, ctx->user_name_len);
-	lua_pushboolean(L, ctx->is_authenticated);
-	return 2;
-}
-
 static int
 lbox_session_on_connect(struct lua_State *L)
 {
-	return lbox_trigger_reset(L, 2, &session_on_connect,
-				  lbox_push_on_connect_event, NULL);
+	return luaT_event_reset_trigger(L, 1, session_on_connect_event);
 }
 
 static int
@@ -313,8 +294,7 @@ lbox_session_run_on_connect(struct lua_State *L)
 static int
 lbox_session_on_disconnect(struct lua_State *L)
 {
-	return lbox_trigger_reset(L, 2, &session_on_disconnect,
-				  lbox_push_on_connect_event, NULL);
+	return luaT_event_reset_trigger(L, 1, session_on_disconnect_event);
 }
 
 static int
@@ -329,8 +309,7 @@ lbox_session_run_on_disconnect(struct lua_State *L)
 static int
 lbox_session_on_auth(struct lua_State *L)
 {
-	return lbox_trigger_reset(L, 2, &session_on_auth,
-				  lbox_push_on_auth_event, NULL);
+	return luaT_event_reset_trigger(L, 1, session_on_auth_event);
 }
 
 static int
@@ -349,16 +328,6 @@ lbox_session_run_on_auth(struct lua_State *L)
 	if (session_run_on_auth_triggers(&ctx) != 0)
 		return luaT_error(L);
 	return 0;
-}
-
-static int
-lbox_push_on_access_denied_event(struct lua_State *L, void *event)
-{
-	struct on_access_denied_ctx *ctx = (struct on_access_denied_ctx *) event;
-	lua_pushstring(L, ctx->access_type);
-	lua_pushstring(L, ctx->object_type);
-	lua_pushstring(L, ctx->object_name);
-	return 3;
 }
 
 /**
@@ -391,8 +360,7 @@ lbox_session_push(struct lua_State *L)
 static int
 lbox_session_on_access_denied(struct lua_State *L)
 {
-	return lbox_trigger_reset(L, 2, &on_access_denied,
-				  lbox_push_on_access_denied_event, NULL);
+	return luaT_event_reset_trigger(L, 1, on_access_denied_event);
 }
 
 static int
