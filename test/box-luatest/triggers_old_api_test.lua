@@ -7,6 +7,13 @@ g.before_all(function()
     g.server = server:new({alias = 'master'})
     g.server:start()
     g.server:exec(function()
+        box.schema.space.create('test', {id = 512})
+        local function space_on_replace(...)
+            return box.space.test:on_replace(...)
+        end
+        local function space_before_replace(...)
+            return box.space.test:before_replace(...)
+        end
         -- Every element of this table is an array of 2 elements. The first
         -- one is a function that sets triggers, and the second one is the name
         -- of the associated event in the trigger registry. The second element
@@ -15,6 +22,8 @@ g.before_all(function()
             {box.session.on_connect, 'box.session.on_connect'},
             {box.session.on_disconnect, 'box.session.on_disconnect'},
             {box.session.on_auth, 'box.session.on_auth'},
+            {space_on_replace, 'box.space[512].on_replace'},
+            {space_before_replace, 'box.space[512].before_replace'},
         })
 
         rawset(_G, 'ffi_monotonic_id', 0)

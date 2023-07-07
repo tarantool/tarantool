@@ -1778,7 +1778,7 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 * - CDC is enabled.
 	 */
 	if ((space->index_count > 1 && !vy_defer_deletes(space, pk)) ||
-	    lsm->index_id > 0 || !rlist_empty(&space->on_replace) ||
+	    lsm->index_id > 0 || space_has_on_replace_triggers(space) ||
 	    space->wal_ext != NULL) {
 		if (vy_get_by_raw_key(lsm, tx, vy_tx_read_view(tx),
 				      key, part_count, &stmt->old_tuple) != 0)
@@ -2152,7 +2152,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (tuple_validate_raw(pk->mem_format, tuple))
 		return -1;
 
-	if (space->index_count == 1 && rlist_empty(&space->on_replace) &&
+	if (space->index_count == 1 && !space_has_on_replace_triggers(space) &&
 	    !space->has_foreign_keys && space->wal_ext == NULL)
 		return vy_lsm_upsert(tx, pk, tuple, tuple_end, ops, ops_end);
 
@@ -2318,7 +2318,7 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 * - if the space has WAL extensions.
 	 */
 	if ((space->index_count > 1 && !vy_defer_deletes(space, pk)) ||
-	    !rlist_empty(&space->on_replace) || space->wal_ext != NULL) {
+	    space_has_on_replace_triggers(space) || space->wal_ext != NULL) {
 		if (vy_get(pk, tx, vy_tx_read_view(tx),
 			   stmt->new_tuple, &stmt->old_tuple) != 0)
 			return -1;

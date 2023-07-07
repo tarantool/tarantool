@@ -42,8 +42,11 @@ ts:replace{2, 'd', 'e', 'f'}
 o
 n
 
-type(ts:on_replace(function() test = 1 end))
+trigger_id = ts:on_replace(function() test = 1 end)
+type(trigger_id)
 #ts:on_replace()
+ts:on_replace(nil, trigger_id)
+ts:on_replace(nil, save_out)
 ts:drop()
 
 -- test garbage in lua stack
@@ -201,6 +204,7 @@ s:replace({8, 9})
 t = s:on_replace(function () s.index.pk:rename('newname') end, t)
 s:replace({9, 10})
 s:select()
+s:on_replace(nil, t)
 s:drop() -- test_on_repl_ddl
 
 --
@@ -218,7 +222,7 @@ test_run:cmd("setopt delimiter ';'");
 x1 = 1;
 x2 = 1;
 
-_ = s1:on_replace(function(old, new)
+s1_t = s1:on_replace(function(old, new)
     for i = 1, 3 do
         s2:insert{x1}
         x1 = x1 + 1
@@ -229,7 +233,7 @@ _ = s1:on_replace(function(old, new)
     pcall(s2.insert, s2, {123, 'fail'})
 end);
 
-_ = s2:on_replace(function(old, new)
+s2_t = s2:on_replace(function(old, new)
     for i = 1, 3 do
         s3:insert{x2}
         x2 = x2 + 1
@@ -250,7 +254,9 @@ s1:select()
 s2:select()
 s3:select()
 
+s1:on_replace(nil, s1_t)
 s1:drop()
+s2:on_replace(nil, s2_t)
 s2:drop()
 s3:drop()
 
@@ -266,8 +272,8 @@ _ = s3:create_index('pk')
 
 x = 1
 
-_ = s1:on_replace(function(old, new) s2:insert(new:update{{'!', 2, x}}) x = x + 1 end)
-_ = s1:on_replace(function(old, new) s3:insert(new:update{{'!', 2, x}}) x = x + 1 end)
+t1 = s1:on_replace(function(old, new) s2:insert(new:update{{'!', 2, x}}) x = x + 1 end)
+t2 = s1:on_replace(function(old, new) s3:insert(new:update{{'!', 2, x}}) x = x + 1 end)
 
 box.begin() s1:insert{1} s1:insert{2} s1:insert{3} box.commit()
 
@@ -275,6 +281,8 @@ s1:select()
 s2:select()
 s3:select()
 
+s1:on_replace(nil, t1)
+s1:on_replace(nil, t2)
 s1:drop()
 s2:drop()
 s3:drop()

@@ -121,7 +121,13 @@ memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
 			       enum dup_replace_mode mode,
 			       struct tuple **result)
 {
-	assert(old_tuple == NULL && mode == DUP_INSERT);
+	assert(old_tuple == NULL);
+	/*
+	 * If before_replace trigger changes tuple, the request is updated
+	 * and request type is changed to REPLACE, so we can meet
+	 * DUP_REPLACE_OR_INSERT here.
+	 */
+	assert(mode == DUP_INSERT || mode == DUP_REPLACE_OR_INSERT);
 	(void)mode;
 	*result = NULL;
 	if (old_tuple) {

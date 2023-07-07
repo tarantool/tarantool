@@ -704,6 +704,13 @@ memtx_engine_bootstrap(struct engine *engine)
 	if (rc < 0)
 		return -1;
 	memtx->on_indexes_built_cb();
+
+	/* Complete space initialization. */
+	rc = space_foreach(space_on_bootstrap_complete, NULL);
+	if (rc != 0) {
+		diag_log();
+		panic("Failed to complete bootstrap!");
+	}
 	return 0;
 }
 

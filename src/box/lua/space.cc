@@ -28,6 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "box/lua/func_adapter.h"
+#include "box/lua/trigger.h"
 #include "box/lua/space.h"
 #include "box/lua/tuple.h"
 #include "box/lua/key_def.h"
@@ -57,129 +59,72 @@ extern "C" {
 #include "vclock/vclock.h"
 
 /**
- * Function invoked before execution of a before_replace or on_replace trigger.
- * It pushes the current transaction statement to Lua stack to be passed to
- * the trigger callback.
+ * Set/Reset/Get a trigger to an event associated with space by id. Argument
+ * event_fmt is a format string for the event name - it must expect one uint32_t
+ * value as an argument.
  */
 static int
-lbox_push_txn_stmt(struct lua_State *L, void *event)
+lbox_space_reset_trigger(struct lua_State *L, uint32_t space_id,
+			 const char *event_fmt)
 {
-	struct txn *txn = (struct txn *)event;
-	/*
-	 * The transaction could be aborted while the previous trigger was
-	 * running (e.g. if the trigger callback yielded).
-	 */
-	if (txn_check_can_continue(txn) != 0)
-		return -1;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
-	assert(stmt != NULL);
-	if (stmt->old_tuple) {
-		luaT_pushtuple(L, stmt->old_tuple);
-	} else {
-		lua_pushnil(L);
-	}
-	if (stmt->new_tuple) {
-		luaT_pushtuple(L, stmt->new_tuple);
-	} else {
-		lua_pushnil(L);
-	}
-	/* @todo: maybe the space object has to be here */
-	lua_pushstring(L, stmt->space->def->name);
-	/* operation type: INSERT/UPDATE/UPSERT/REPLACE/DELETE */
-	lua_pushstring(L, iproto_type_name(stmt->type));
-	return 4;
+	const char *event_name = tt_sprintf(event_fmt, space_id);
+	struct event *event = event_get(event_name, true);
+	assert(event != NULL);
+	return luaT_event_reset_trigger(L, 2, event);
 }
 
 /**
- * Function invoked upon successful execution of a before_replace trigger.
- * It resets the current transaction statement to the tuple returned by
- * the trigger callback.
- */
-static int
-lbox_pop_txn_stmt(struct lua_State *L, int nret, void *event)
-{
-	struct txn *txn = (struct txn *)event;
-	/*
-	 * The transaction could be aborted while the trigger was running
-	 * (e.g. if the trigger callback yielded).
-	 */
-	if (txn_check_can_continue(txn) != 0)
-		return -1;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
-	assert(stmt != NULL);
-	/*
-	 * Tuple returned by a before_replace trigger callback must
-	 * match the space format.
-	 *
-	 * Since upgrade from pre-1.7.5 versions passes tuple with not
-	 * suitable format to before_replace triggers during recovery,
-	 * we need to disable format validation until box is configured.
-	 */
-	if (box_is_configured() && stmt->new_tuple != NULL &&
-	    tuple_validate(stmt->space->format, stmt->new_tuple) != 0)
-		return -1;
-	if (nret < 1) {
-		/* No return value - nothing to do. */
-		return 0;
-	}
-	int top = lua_gettop(L) - nret + 1;
-	struct tuple *result = luaT_istuple(L, top);
-	if (result == NULL && !lua_isnil(L, top) && !luaL_isnull(L, top)) {
-		/* Invalid return value - raise error. */
-		diag_set(ClientError, ER_BEFORE_REPLACE_RET,
-			 lua_typename(L, lua_type(L, top)));
-		return -1;
-	}
-
-	/* Update the new tuple. */
-	if (result != NULL)
-		tuple_ref(result);
-	if (stmt->new_tuple != NULL)
-		tuple_unref(stmt->new_tuple);
-	stmt->new_tuple = result;
-	return 0;
-}
-
-/**
- * Set/Reset/Get space.on_replace trigger
+ * Set/Reset/Get space on_replace trigger. If space runs recovery triggers,
+ * associated recovery trigger is set as well but it does not affect returned
+ * value. The new trigger is bound by id.
  */
 static int
 lbox_space_on_replace(struct lua_State *L)
 {
 	int top = lua_gettop(L);
-
 	if (top < 1 || !lua_istable(L, 1)) {
-		luaL_error(L,
-	   "usage: space:on_replace(function | nil, [function | nil])");
+		luaL_error(L, "usage: space:on_replace(function | nil, "
+			   "[function | nil], [string])");
 	}
 	lua_getfield(L, 1, "id"); /* Get space id. */
 	uint32_t id = lua_tonumber(L, lua_gettop(L));
 	struct space *space = space_cache_find_xc(id);
 	lua_pop(L, 1);
 
-	return lbox_trigger_reset(L, 3, &space->on_replace,
-				  lbox_push_txn_stmt, NULL);
+	if (space->run_recovery_triggers) {
+		const char *fmt = "box.space[%u].on_recovery_replace";
+		lbox_space_reset_trigger(L, id, fmt);
+		lua_settop(L, top);
+	}
+	const char *fmt = "box.space[%u].on_replace";
+	return lbox_space_reset_trigger(L, id, fmt);
 }
 
 /**
- * Set/Reset/Get space.before_replace trigger
+ * Set/Reset/Get space before_replace trigger. If space runs recovery triggers,
+ * associated recovery trigger is set as well but it does not affect returned
+ * value. The new trigger is bound by id.
  */
 static int
 lbox_space_before_replace(struct lua_State *L)
 {
 	int top = lua_gettop(L);
-
 	if (top < 1 || !lua_istable(L, 1)) {
-		luaL_error(L,
-	   "usage: space:before_replace(function | nil, [function | nil])");
+		luaL_error(L, "usage: space:before_replace(function | nil, "
+			   "[function | nil], [string])");
 	}
 	lua_getfield(L, 1, "id"); /* Get space id. */
 	uint32_t id = lua_tonumber(L, lua_gettop(L));
 	struct space *space = space_cache_find_xc(id);
 	lua_pop(L, 1);
 
-	return lbox_trigger_reset(L, 3, &space->before_replace,
-				  lbox_push_txn_stmt, lbox_pop_txn_stmt);
+	if (space->run_recovery_triggers) {
+		const char *fmt = "box.space[%u].before_recovery_replace";
+		lbox_space_reset_trigger(L, id, fmt);
+		lua_settop(L, top);
+	}
+	const char *fmt = "box.space[%u].before_replace";
+	return lbox_space_reset_trigger(L, id, fmt);
 }
 
 /**

@@ -37,6 +37,8 @@ g.test_recursive_trigger_invocation = function(cg)
         s:on_replace(f2)
         s:on_replace(f1)
         s:replace{1}
+        s:on_replace(nil, f2)
+        s:on_replace(nil, f1)
         return order
     end)
     t.assert_equals(order, {11, 21, 31, 32, 22, 12},

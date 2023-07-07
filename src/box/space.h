@@ -39,6 +39,7 @@
 #include "error.h"
 #include "diag.h"
 #include "iproto_constants.h"
+#include "core/event.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -157,6 +158,17 @@ struct space_vtab {
 	void (*invalidate)(struct space *space);
 };
 
+/**
+ * Every event associated with a particular space is divided into two parts:
+ * event, bound to the space by name, and event, bound by id.
+ */
+struct space_event {
+	/** Event, bound by id. */
+	struct event *by_id;
+	/** Event, bound by name. */
+	struct event *by_name;
+};
+
 struct space {
 	/** Virtual function table. */
 	const struct space_vtab *vtab;
@@ -168,6 +180,10 @@ struct space {
 	struct rlist before_replace;
 	/** Triggers fired after space_replace() -- see txn_commit_stmt(). */
 	struct rlist on_replace;
+	/** User-defined before_replace triggers. */
+	struct space_event before_replace_event;
+	/** User-defined on_replace triggers. */
+	struct space_event on_replace_event;
 	/** SQL Trigger list. */
 	struct sql_trigger *sql_triggers;
 	/**
@@ -194,6 +210,11 @@ struct space {
 	char *sequence_path;
 	/** Enable/disable triggers. */
 	bool run_triggers;
+	/**
+	 * When the flag is set, the space executes recovery triggers
+	 * (e.g. before_recovery_replace instead of before_replace).
+	 */
+	bool run_recovery_triggers;
 	/** This space has foreign key constraints in its format. */
 	bool has_foreign_keys;
 	/**
@@ -331,6 +352,14 @@ space_on_initial_recovery_complete(struct space *space, void *nothing);
  */
 int
 space_on_final_recovery_complete(struct space *space, void *nothing);
+
+/**
+ * Finish space initialization after finishing bootstrap.
+ * See the comment to space_on_initial_recovery_complete() for
+ * the function semantics and rationale.
+ */
+int
+space_on_bootstrap_complete(struct space *space, void *nothing);
 
 /** Get space ordinal number. */
 static inline uint32_t
@@ -504,6 +533,34 @@ index_name_by_id(struct space *space, uint32_t id);
  */
 int
 access_check_space(struct space *space, user_access_t access);
+
+/**
+ * Check if the space has registered on_replace triggers.
+ */
+static inline bool
+space_has_on_replace_triggers(struct space *space)
+{
+	return !rlist_empty(&space->on_replace) ||
+	       event_has_triggers(space->on_replace_event.by_id) ||
+	       event_has_triggers(space->on_replace_event.by_name);
+}
+
+/**
+ * Check if the space has registered before_replace triggers.
+ */
+static inline bool
+space_has_before_replace_triggers(struct space *space)
+{
+	return !rlist_empty(&space->before_replace) ||
+	       event_has_triggers(space->before_replace_event.by_id) ||
+	       event_has_triggers(space->before_replace_event.by_name);
+}
+
+/**
+ * Run on_replace triggers registered for a space.
+ */
+int
+space_on_replace(struct space *space, struct txn *txn);
 
 /**
  * Execute a DML request on the given space.
