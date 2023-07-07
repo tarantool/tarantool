@@ -70,6 +70,10 @@ struct func_adapter_vtab {
 	void (*push_str)(struct func_adapter_ctx *ctx, const char *str,
 			 size_t len);
 	/**
+	 * Pushes boolean argument.
+	 */
+	void (*push_bool)(struct func_adapter_ctx *ctx, bool val);
+	/**
 	 * Pushes null argument.
 	 */
 	void (*push_null)(struct func_adapter_ctx *ctx);
@@ -101,6 +105,14 @@ struct func_adapter_vtab {
 	 */
 	void (*pop_str)(struct func_adapter_ctx *ctx, const char **str,
 			size_t *len);
+	/**
+	 * Checks if the next returned value is a boolean.
+	 */
+	bool (*is_bool)(struct func_adapter_ctx *ctx);
+	/**
+	 * Pops boolean value.
+	 */
+	void (*pop_bool)(struct func_adapter_ctx *ctx, bool *val);
 	/**
 	 * Checks if the next returned value is null or nothing.
 	 */
@@ -190,6 +202,13 @@ func_adapter_push_tuple(struct func_adapter *func,
 }
 
 static inline void
+func_adapter_push_bool(struct func_adapter *func, struct func_adapter_ctx *ctx,
+		       bool val)
+{
+	func->vtab->push_bool(ctx, val);
+}
+
+static inline void
 func_adapter_push_null(struct func_adapter *func, struct func_adapter_ctx *ctx)
 {
 	func->vtab->push_null(ctx);
@@ -235,6 +254,20 @@ func_adapter_pop_tuple(struct func_adapter *func,
 {
 	assert(func_adapter_is_tuple(func, ctx));
 	func->vtab->pop_tuple(ctx, tuple);
+}
+
+static inline bool
+func_adapter_is_bool(struct func_adapter *func, struct func_adapter_ctx *ctx)
+{
+	return func->vtab->is_bool(ctx);
+}
+
+static inline void
+func_adapter_pop_bool(struct func_adapter *func, struct func_adapter_ctx *ctx,
+		      bool *val)
+{
+	assert(func_adapter_is_bool(func, ctx));
+	func->vtab->pop_bool(ctx, val);
 }
 
 static inline bool

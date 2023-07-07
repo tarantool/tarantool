@@ -125,6 +125,13 @@ func_adapter_lua_push_tuple(struct func_adapter_ctx *base, struct tuple *tuple)
 }
 
 static void
+func_adapter_lua_push_bool(struct func_adapter_ctx *base, bool val)
+{
+	struct func_adapter_lua_ctx *ctx = (struct func_adapter_lua_ctx *)base;
+	lua_pushboolean(ctx->L, val);
+}
+
+static void
 func_adapter_lua_push_null(struct func_adapter_ctx *base)
 {
 	struct func_adapter_lua_ctx *ctx = (struct func_adapter_lua_ctx *)base;
@@ -194,6 +201,25 @@ func_adapter_lua_pop_tuple(struct func_adapter_ctx *base, struct tuple **out)
  * of an object. The function checks all the cases.
  */
 static bool
+func_adapter_lua_is_bool(struct func_adapter_ctx *base)
+{
+	struct func_adapter_lua_ctx *ctx = (struct func_adapter_lua_ctx *)base;
+	return lua_gettop(ctx->L) >= ctx->idx &&
+	       lua_isboolean(ctx->L, ctx->idx);
+}
+
+static void
+func_adapter_lua_pop_bool(struct func_adapter_ctx *base, bool *val)
+{
+	struct func_adapter_lua_ctx *ctx = (struct func_adapter_lua_ctx *)base;
+	*val = lua_toboolean(ctx->L, ctx->idx++);
+}
+
+/**
+ * Null in Lua can be represented in two ways: nil or box.NULL.
+ * The function checks both cases.
+ */
+static bool
 func_adapter_lua_is_null(struct func_adapter_ctx *base)
 {
 	struct func_adapter_lua_ctx *ctx = (struct func_adapter_lua_ctx *)base;
@@ -245,6 +271,7 @@ func_adapter_lua_create(lua_State *L, int idx)
 		.push_double = func_adapter_lua_push_double,
 		.push_str = func_adapter_lua_push_str,
 		.push_tuple = func_adapter_lua_push_tuple,
+		.push_bool = func_adapter_lua_push_bool,
 		.push_null = func_adapter_lua_push_null,
 
 		.is_double = func_adapter_lua_is_double,
@@ -253,6 +280,8 @@ func_adapter_lua_create(lua_State *L, int idx)
 		.pop_str = func_adapter_lua_pop_str,
 		.is_tuple = func_adapter_lua_is_tuple,
 		.pop_tuple = func_adapter_lua_pop_tuple,
+		.is_bool = func_adapter_lua_is_bool,
+		.pop_bool = func_adapter_lua_pop_bool,
 		.is_null = func_adapter_lua_is_null,
 		.pop_null = func_adapter_lua_pop_null,
 
