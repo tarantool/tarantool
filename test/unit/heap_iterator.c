@@ -2,7 +2,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <memory.h>
+#include <string.h>
 
 #include "unit.h"
 
