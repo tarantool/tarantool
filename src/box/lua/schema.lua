@@ -1960,25 +1960,32 @@ box.internal.check_pairs_opts = check_pairs_opts
 local iterator_pos = ffi.new('const char *[1]')
 local iterator_pos_end = ffi.new('const char *[1]')
 
--- Argument pos must be a string, table or tuple, returns two C pointers:
--- begin and end of position.
-local function normalize_position(index, pos, ret_pos, ret_pos_end)
+--
+-- Sets iterator_pos and iterator_pos_end to a user-supplied position.
+--
+-- The input position may be nil, string, table, or tuple. If the input
+-- position is given as string, iterator_pos is set to point to its data,
+-- otherwise the iterator_pos data is allocated from the fiber region.
+--
+-- The ibuf is used to encode a position given as table or tuple.
+--
+-- Returns true on success. On failure, sets box.error and returns false.
+--
+local function iterator_pos_set(index, pos, ibuf)
     if pos == nil then
-        ret_pos[0] = nil
-        ret_pos_end[0] = nil
-    elseif type(pos) == "string" then
-        ret_pos[0] = pos
-        ret_pos_end[0] = ret_pos[0] + #pos
+        iterator_pos[0] = nil
+        iterator_pos_end[0] = nil
+        return true
+    elseif type(pos) == 'string' then
+        iterator_pos[0] = pos
+        iterator_pos_end[0] = iterator_pos[0] + #pos
+        return true
     else
-        local tuple_ibuf = cord_ibuf_take()
-        local tuple, tuple_end = tuple_encode(tuple_ibuf, pos)
-        local nok = builtin.box_index_tuple_position(index.space_id, index.id,
-                                                     tuple, tuple_end,
-                                                     ret_pos, ret_pos_end) ~= 0
-        cord_ibuf_put(tuple_ibuf)
-        if nok then
-            box.error()
-        end
+        ibuf.rpos = ibuf.wpos
+        local tuple, tuple_end = tuple_encode(ibuf, pos)
+        return builtin.box_index_tuple_position(
+                index.space_id, index.id, tuple, tuple_end,
+                iterator_pos, iterator_pos_end) == 0
     end
 end
 
@@ -2356,13 +2363,16 @@ base_index_mt.pairs_ffi = function(index, key, opts)
     local pkey, pkey_end = tuple_encode(ibuf, key)
     local svp = builtin.box_region_used()
     local itype, after = check_pairs_opts(opts, pkey + 1 >= pkey_end)
-    normalize_position(index, after, iterator_pos, iterator_pos_end)
-
+    local ok = iterator_pos_set(index, after, ibuf)
     local keybuf = ffi.string(pkey, pkey_end - pkey)
     cord_ibuf_put(ibuf)
-    local pkeybuf = ffi.cast('const char *', keybuf)
-    local cdata = builtin.box_index_iterator_after(index.space_id, index.id,
-        itype, pkeybuf, pkeybuf + #keybuf, iterator_pos[0], iterator_pos_end[0]);
+    local cdata
+    if ok then
+        local pkeybuf = ffi.cast('const char *', keybuf)
+        cdata = builtin.box_index_iterator_after(
+                index.space_id, index.id, itype, pkeybuf, pkeybuf + #keybuf,
+                iterator_pos[0], iterator_pos_end[0])
+    end
     builtin.box_region_truncate(svp)
     if cdata == nil then
         box.error()
@@ -2482,7 +2492,6 @@ base_index_mt.select_ffi = function(index, key, opts)
     if builtin.box_read_ffi_is_disabled then
         return base_index_mt.select_luac(index, key, opts)
     end
-    local nok
     check_index_arg(index, 'select')
     local ibuf = cord_ibuf_take()
     local key, key_end = tuple_encode(ibuf, key)
@@ -2496,10 +2505,12 @@ base_index_mt.select_ffi = function(index, key, opts)
         log_long_select(box.space[sid])
     end
     local region_svp = builtin.box_region_used()
-    normalize_position(index, after, iterator_pos, iterator_pos_end)
-    nok = builtin.box_select_ffi(sid, index.id, key, key_end,
-                                 iterator_pos, iterator_pos_end, fetch_pos,
-                                 port, iterator, offset, limit) ~= 0
+    local nok = not iterator_pos_set(index, after, ibuf)
+    if not nok then
+        nok = builtin.box_select_ffi(sid, index.id, key, key_end,
+                                     iterator_pos, iterator_pos_end, fetch_pos,
+                                     port, iterator, offset, limit) ~= 0
+    end
     if not nok and fetch_pos and iterator_pos[0] ~= nil then
         new_position = ffi.string(iterator_pos[0],
                                   iterator_pos_end[0] - iterator_pos[0])
