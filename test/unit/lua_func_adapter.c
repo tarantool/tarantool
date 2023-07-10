@@ -1,6 +1,7 @@
 #include "diag.h"
 #include "fiber.h"
 #include "memory.h"
+#include "msgpuck.h"
 #include "lua/init.h"
 #include "lua/error.h"
 #include "lua/utils.h"
@@ -242,6 +243,51 @@ test_null(void)
 }
 
 static void
+test_msgpack(void)
+{
+	plan(6);
+	header();
+
+	#define MP_BUF_LEN 64
+	char mp_buf[MP_BUF_LEN];
+	char *mp = mp_buf;
+	mp = mp_encode_map(mp, 2);
+	mp = mp_encode_str0(mp, "key");
+	mp = mp_encode_str0(mp, "value");
+	mp = mp_encode_uint(mp, 42);
+	mp = mp_encode_uint(mp, 64);
+	fail_unless(mp < mp_buf + MP_BUF_LEN);
+	#undef MP_BUF_LEN
+
+	int idx = generate_function(
+		"function(a) "
+		"  local mp = require('msgpack') "
+		"  assert(mp.is_object(a)) "
+		"  return a.key, a[42] "
+		"end");
+
+	struct func_adapter *func = func_adapter_lua_create(tarantool_L, idx);
+	struct func_adapter_ctx ctx;
+	func_adapter_begin(func, &ctx);
+	func_adapter_push_msgpack(func, &ctx, mp_buf, mp);
+	int rc = func_adapter_call(func, &ctx);
+	is(rc, 0, "Function must return successfully");
+	ok(func_adapter_is_str(func, &ctx), "A string must be returned");
+	const char *str = NULL;
+	func_adapter_pop_str(func, &ctx, &str, NULL);
+	is(strcmp(str, "value"), 0, "Returned value must be as expected");
+	ok(func_adapter_is_double(func, &ctx), "A double must be returned");
+	double val = 0.0;
+	func_adapter_pop_double(func, &ctx, &val);
+	ok(number_eq(64, val), "Returned value must be as expected");
+	ok(func_adapter_is_empty(func, &ctx), "No values left");
+	func_adapter_end(func, &ctx);
+
+	footer();
+	check_plan();
+}
+
+static void
 test_error(void)
 {
 	plan(2);
@@ -332,7 +378,7 @@ test_callable(void)
 static int
 test_lua_func_adapter(void)
 {
-	plan(8);
+	plan(9);
 	header();
 
 	test_numeric();
@@ -340,6 +386,7 @@ test_lua_func_adapter(void)
 	test_string();
 	test_bool();
 	test_null();
+	test_msgpack();
 	test_error();
 	test_get_func();
 	test_callable();
@@ -359,9 +406,32 @@ main(void)
 	tarantool_L = L;
 
 	tarantool_lua_error_init(L);
+	tarantool_lua_error_init(L);
 	tarantool_lua_utils_init(L);
 	luaopen_msgpack(L);
 	box_lua_tuple_init(L);
+	/*
+	 * luaT_newmodule() assumes that tarantool has a special
+	 * loader for built-in modules. That's true, when all the
+	 * initialization code is executed. However, in the unit
+	 * test we don't do that.
+	 *
+	 * In particular, tarantool_lua_init() function is not
+	 * called in a unit test.
+	 *
+	 * Assign the module into package.loaded directly instead.
+	 *
+	 *  | local mod = loaders.builtin['msgpack']
+	 *  | package.loaded['msgpack'] = mod
+	 */
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+	lua_getfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
+	lua_getfield(L, -1, "msgpack");
+	lua_setfield(L, -3, "msgpack");
+	lua_pop(L, 2);
+
+	fail_unless(luaT_dostring(
+			L, "mp = require('msgpack')") == 0);
 
 	int rc = test_lua_func_adapter();
 

@@ -7,6 +7,7 @@
 #include "box/lua/tuple.h"
 #include "box/tuple.h"
 #include "core/func_adapter.h"
+#include "lua/msgpack.h"
 #include "lua/utils.h"
 
 /**
@@ -136,6 +137,14 @@ func_adapter_lua_push_null(struct func_adapter_ctx *base)
 {
 	struct func_adapter_lua_ctx *ctx = (struct func_adapter_lua_ctx *)base;
 	lua_pushnil(ctx->L);
+}
+
+static void
+func_adapter_lua_push_msgpack(struct func_adapter_ctx *base, const char *data,
+			      const char *data_end)
+{
+	struct func_adapter_lua_ctx *ctx = (struct func_adapter_lua_ctx *)base;
+	luamp_push(ctx->L, data, data_end);
 }
 
 /**
@@ -273,6 +282,7 @@ func_adapter_lua_create(lua_State *L, int idx)
 		.push_tuple = func_adapter_lua_push_tuple,
 		.push_bool = func_adapter_lua_push_bool,
 		.push_null = func_adapter_lua_push_null,
+		.push_msgpack = func_adapter_lua_push_msgpack,
 
 		.is_double = func_adapter_lua_is_double,
 		.pop_double = func_adapter_lua_pop_double,

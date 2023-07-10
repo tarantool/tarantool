@@ -78,6 +78,11 @@ struct func_adapter_vtab {
 	 */
 	void (*push_null)(struct func_adapter_ctx *ctx);
 	/**
+	 * Pushes MsgPack argument.
+	 */
+	void (*push_msgpack)(struct func_adapter_ctx *ctx, const char *data,
+			     const char *data_end);
+	/**
 	 * Checks if the next returned value is a tuple.
 	 */
 	bool (*is_tuple)(struct func_adapter_ctx *ctx);
@@ -212,6 +217,14 @@ static inline void
 func_adapter_push_null(struct func_adapter *func, struct func_adapter_ctx *ctx)
 {
 	func->vtab->push_null(ctx);
+}
+
+static inline void
+func_adapter_push_msgpack(struct func_adapter *func,
+			  struct func_adapter_ctx *ctx,
+			  const char *data, const char *data_end)
+{
+	func->vtab->push_msgpack(ctx, data, data_end);
 }
 
 static inline bool
