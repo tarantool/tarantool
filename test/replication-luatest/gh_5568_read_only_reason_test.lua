@@ -35,6 +35,7 @@ local function make_create_cluster(g) return function()
     g.cluster:add_server(g.master)
     g.cluster:add_server(g.replica)
     g.cluster:start()
+    g.cluster:wait_for_fullmesh()
 end end
 
 local function make_destroy_cluster(g) return function()
