@@ -8,9 +8,108 @@
 #include <stack>
 #include <string>
 
+using namespace lua_grammar;
+
+#define PROTO_TOSTRING(TYPE, VAR_NAME) \
+	std::string TYPE##ToString(const TYPE & (VAR_NAME))
+
+/* PROTO_TOSTRING version for nested (depth=2) protobuf messages. */
+#define NESTED_PROTO_TOSTRING(TYPE, VAR_NAME, PARENT_MESSAGE) \
+	std::string TYPE##ToString \
+	(const PARENT_MESSAGE::TYPE & (VAR_NAME))
+
+namespace luajit_fuzzer {
 namespace {
 
 const std::string kCounterNamePrefix = "counter_";
+
+PROTO_TOSTRING(Block, block);
+PROTO_TOSTRING(Chunk, chunk);
+
+PROTO_TOSTRING(Statement, stat);
+
+/** LastStatement and nested types. */
+PROTO_TOSTRING(LastStatement, laststat);
+NESTED_PROTO_TOSTRING(ReturnOptionalExpressionList, explist, LastStatement);
+
+/**
+ * Statement options.
+ */
+
+/** AssignmentList and nested types. */
+PROTO_TOSTRING(AssignmentList, assignmentlist);
+NESTED_PROTO_TOSTRING(VariableList, varlist, AssignmentList);
+
+/** FunctionCall and nested types. */
+PROTO_TOSTRING(FunctionCall, call);
+NESTED_PROTO_TOSTRING(Args, args, FunctionCall);
+NESTED_PROTO_TOSTRING(PrefixArgs, prefixargs, FunctionCall);
+NESTED_PROTO_TOSTRING(PrefixNamedArgs, prefixnamedargs, FunctionCall);
+
+/** DoBlock, WhileCycle and RepeatCycle clauses. */
+PROTO_TOSTRING(DoBlock, block);
+PROTO_TOSTRING(WhileCycle, whilecycle);
+PROTO_TOSTRING(RepeatCycle, repeatcycle);
+
+/** IfStatement and nested types. */
+PROTO_TOSTRING(IfStatement, statement);
+NESTED_PROTO_TOSTRING(ElseIfBlock, elseifblock, IfStatement);
+
+/** ForCycleName and ForCycleList clauses. */
+PROTO_TOSTRING(ForCycleName, forcyclename);
+PROTO_TOSTRING(ForCycleList, forcyclelist);
+
+/** Function and nested types. */
+PROTO_TOSTRING(Function, func);
+NESTED_PROTO_TOSTRING(FuncName, funcname, Function);
+
+PROTO_TOSTRING(NameList, namelist);
+NESTED_PROTO_TOSTRING(NameListWithEllipsis, namelist, FuncBody);
+NESTED_PROTO_TOSTRING(ParList, parlist, FuncBody);
+
+/** LocalFunc and LocalNames clauses. */
+PROTO_TOSTRING(LocalFunc, localfunc);
+PROTO_TOSTRING(LocalNames, localnames);
+
+/**
+ * Expressions and variables.
+ */
+
+/** Expressions clauses. */
+PROTO_TOSTRING(ExpressionList, explist);
+PROTO_TOSTRING(OptionalExpressionList, explist);
+PROTO_TOSTRING(PrefixExpression, prefExpr);
+
+/* Variable and nested types. */
+PROTO_TOSTRING(Variable, var);
+NESTED_PROTO_TOSTRING(IndexWithExpression, indexexpr, Variable);
+NESTED_PROTO_TOSTRING(IndexWithName, indexname, Variable);
+
+/** Expression and nested types. */
+PROTO_TOSTRING(Expression, expr);
+NESTED_PROTO_TOSTRING(AnonFunc, function, Expression);
+NESTED_PROTO_TOSTRING(ExpBinaryOpExp, binary, Expression);
+NESTED_PROTO_TOSTRING(UnaryOpExp, unary, Expression);
+
+/**
+ * Tables and fields.
+ */
+PROTO_TOSTRING(TableConstructor, table);
+PROTO_TOSTRING(FieldList, fieldlist);
+NESTED_PROTO_TOSTRING(FieldWithFieldSep, field, FieldList);
+
+/** Field and nested types. */
+PROTO_TOSTRING(Field, field);
+NESTED_PROTO_TOSTRING(ExpressionAssignment, assignment, Field);
+NESTED_PROTO_TOSTRING(NameAssignment, assignment, Field);
+PROTO_TOSTRING(FieldSep, sep);
+
+/** Operators. */
+PROTO_TOSTRING(BinaryOperator, op);
+PROTO_TOSTRING(UnaryOperator, op);
+
+/** Identifier (Name). */
+PROTO_TOSTRING(Name, name);
 
 /**
  * Class that controls id creation for counters. Basically, a
@@ -137,50 +236,24 @@ FuncBodyToStringReqProtected(const FuncBody &body,
 	return body_str;
 }
 
-} /* namespace */
-
 std::string
-MainBlockToString(const Block &block)
-{
-	GetCounterIdProvider().clean();
-
-	std::string block_str = BlockToString(block);
-	std::string retval;
-
-	for (size_t i = 0; i < GetCounterIdProvider().count(); ++i) {
-		retval += GetCounterName(i);
-		retval += " = 0\n";
-	}
-	retval += block_str;
-
-	return retval;
-}
-
-static inline std::string
-RemoveLeadingNumbers(const std::string &s)
-{
-	for (size_t i = 0; i < s.length(); ++i)
-		if (!std::isdigit(s[i]))
-			return s.substr(i);
-	return "";
-}
-
-static inline std::string
-ClearNonIdentifierSymbols(const std::string &s)
+ClearIdentifier(const std::string &identifier)
 {
 	std::string cleared;
 
-	if (std::isalpha(s[0]) || s[0] == '_')
-		cleared += s[0];
-
-	for (size_t i = 1; i < s.length(); ++i)
-		if (std::iswalnum(s[i]) || s[i] == '_')
-			cleared += s[i];
-
+	bool has_first_not_digit = false;
+	for (char c : identifier) {
+		if (has_first_not_digit && (std::iswalnum(c) || c == '_')) {
+			cleared += c;
+		} else if (std::isalpha(c) || c == '_') {
+			has_first_not_digit = true;
+			cleared += c;
+		}
+	}
 	return cleared;
 }
 
-static inline std::string
+inline std::string
 clamp(std::string s, size_t maxSize = kMaxStrLength)
 {
 	if (s.size() > maxSize)
@@ -188,18 +261,18 @@ clamp(std::string s, size_t maxSize = kMaxStrLength)
 	return s;
 }
 
-static inline double
+inline double
 clamp(double number, double upper, double lower)
 {
 	return number <= lower ? lower :
 	       number >= upper ? upper : number;
 }
 
-static inline std::string
+inline std::string
 ConvertToStringDefault(const std::string &s)
 {
-	std::string ident = RemoveLeadingNumbers(s);
-	ident = clamp(ClearNonIdentifierSymbols(ident));
+	std::string ident = ClearIdentifier(s);
+	ident = clamp(ident);
 	if (ident.empty())
 		return std::string(kDefaultIdent);
 	return ident;
@@ -885,3 +958,24 @@ PROTO_TOSTRING(Name, name)
 	std::string ident = ConvertToStringDefault(name.name());
 	return ident + std::to_string(name.num() % kMaxIdentifiers);
 }
+
+} /* namespace */
+
+std::string
+MainBlockToString(const Block &block)
+{
+	GetCounterIdProvider().clean();
+
+	std::string block_str = BlockToString(block);
+	std::string retval;
+
+	for (size_t i = 0; i < GetCounterIdProvider().count(); ++i) {
+		retval += GetCounterName(i);
+		retval += " = 0\n";
+	}
+	retval += block_str;
+
+	return retval;
+}
+
+} /* namespace luajit_fuzzer */
