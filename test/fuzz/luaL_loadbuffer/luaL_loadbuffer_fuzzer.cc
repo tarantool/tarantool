@@ -34,7 +34,7 @@ DEFINE_PROTO_FUZZER(const lua_grammar::Block &message)
 	if (!L)
 		return;
 
-	std::string code = MainBlockToString(message);
+	std::string code = luajit_fuzzer::MainBlockToString(message);
 
 	if (::getenv("LPM_DUMP_NATIVE_INPUT") && code.size() != 0) {
 		std::cout << "-------------------------" << std::endl;
