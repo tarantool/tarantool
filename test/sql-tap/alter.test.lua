@@ -22,7 +22,7 @@ test:do_execsql_test(
         "Space_Table", 1, 5, 6, 7
         -- </alter-1.1>
     })
-
+assert(false) -- For debug
 test:do_execsql_test(
     "alter-1.2",
     [[

@@ -17,7 +17,7 @@
 	ignore = dirty
 [submodule "test-run"]
 	path = test-run
-	url = https://github.com/tarantool/test-run.git
+	url = https://github.com/i-cod/test-run.git
 	ignore = dirty
 [submodule "src/lib/small"]
 	path = src/lib/small

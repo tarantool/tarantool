@@ -5,6 +5,7 @@ on:
     branches:
       - 'master'
       - 'release/**'
+      - 'i-cod/**'
     tags:
       - '**'
   pull_request:
