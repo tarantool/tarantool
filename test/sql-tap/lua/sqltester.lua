@@ -425,7 +425,7 @@ box.cfg{
 }
 
 -- A lot of tests from sql-tap are very long and not designed to be limited
-require('fiber').set_max_slice(300)
+require('fiber').set_max_slice(100500)
 local engine = test_run and test_run:get_cfg('engine') or 'memtx'
 box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 box.space._session_settings:update('sql_seq_scan', {{'=', 2, true}})

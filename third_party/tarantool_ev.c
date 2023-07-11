@@ -29,13 +29,3 @@
 
 #include "tarantool_ev.h"
 #include <libev/ev.c>
-
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
-
-const ev_tstamp TIMEOUT_INFINITY = 365*86400*100.0;
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
