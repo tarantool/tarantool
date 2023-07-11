@@ -31,15 +31,22 @@ main_f(va_list ap)
 	struct errinj *inj;
 	struct fiber *fiber;
 	int fiber_count = fiber_count_total();
+	struct fiber_attr *fiber_attr = fiber_attr_new();
 
 	header();
-	plan(10);
+	plan(11);
+
+	/*
+	 * Check the default fiber stack size value.
+	 */
+	ok(default_attr.stack_size == FIBER_STACK_SIZE_DEFAULT,
+	   "fiber_attr: the default stack size is %ld, but %d is set via CMake",
+	   default_attr.stack_size, FIBER_STACK_SIZE_DEFAULT);
 
 	/*
 	 * Set non-default stack size to prevent reusing of an
 	 * existing fiber.
 	 */
-	struct fiber_attr *fiber_attr = fiber_attr_new();
 	fiber_attr_setstacksize(fiber_attr, default_attr.stack_size * 2);
 
 	/*
