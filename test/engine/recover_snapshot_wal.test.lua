@@ -37,7 +37,7 @@ test_run:cmd("restart server default")
 -- The next thing we do is iterate over a large space
 -- so extend slice on a few seconds to pass this test
 fiber = require('fiber')
-fiber.set_max_slice(15)
+fiber.set_max_slice(100500)
 
 space = box.space['test']
 index = space.index['primary']

@@ -185,12 +185,17 @@ g.test_compat = function()
     g.server:exec(function()
         local compat = require('compat')
         local fiber = require('fiber')
+        local tarantool = require('tarantool')
         t.assert_equals(compat.fiber_slice_default.current, 'default')
         t.assert_equals(compat.fiber_slice_default.default, 'new')
-        t.assert_equals(fiber.self():info().max_slice, {warn = 0.5, err = 1.0})
+        local max_slice
+        if not tarantool.build.asan then
+            max_slice = {warn = 0.5, err = 1.0}
+        end
+        t.assert_equals(fiber.self():info().max_slice, max_slice)
         compat.fiber_slice_default = 'old'
         t.assert_equals(fiber.self():info().max_slice, nil)
         compat.fiber_slice_default = 'new'
-        t.assert_equals(fiber.self():info().max_slice, {warn = 0.5, err = 1.0})
+        t.assert_equals(fiber.self():info().max_slice, max_slice)
     end)
 end

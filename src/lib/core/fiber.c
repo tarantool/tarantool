@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pmatomic.h>
+#include <tarantool_ev.h>
 
 #include "assoc.h"
 #include "memory.h"
@@ -49,7 +50,20 @@
 extern void cord_on_yield(void);
 
 static struct fiber_slice zero_slice = {.warn = 0.0, .err = 0.0};
+
+/**
+ * ASAN build is slow. Turn slice check off to suppress noisy failures
+ * on exceeding slice limit in this case.
+ */
+#if ENABLE_ASAN
+static struct fiber_slice default_slice = {
+	.warn = TIMEOUT_INFINITY,
+	.err = TIMEOUT_INFINITY,
+};
+#else
 static struct fiber_slice default_slice = {.warn = 0.5, .err = 1.0};
+#endif
+
 /** Number of cord-threads still running right now. */
 static int cord_count = 0;
 
