@@ -251,11 +251,13 @@ pthread_t main_thread_id;
 static size_t page_size;
 static int stack_direction;
 
+#ifndef FIBER_STACK_SIZE_DEFAULT
+#error "Default fiber stack size is not set"
+#endif
+
 enum {
 	/* The minimum allowable fiber stack size in bytes */
 	FIBER_STACK_SIZE_MINIMAL = 16384,
-	/* Default fiber stack size in bytes */
-	FIBER_STACK_SIZE_DEFAULT = 524288,
 	/* Stack size watermark in bytes. */
 	FIBER_STACK_SIZE_WATERMARK = 65536,
 };
