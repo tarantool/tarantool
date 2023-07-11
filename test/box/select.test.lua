@@ -3,7 +3,7 @@ env = require('test_run')
 test_run = env.new()
 
 fiber = require('fiber')
-fiber.set_max_slice(15)
+fiber.set_max_slice(100500)
 
 s = box.schema.space.create('select', { temporary = true })
 index1 = s:create_index('primary', { type = 'tree' })
