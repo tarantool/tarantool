@@ -59,22 +59,8 @@ struct vy_history {
 struct vy_history_node {
 	/** Link in a history list. */
 	struct rlist link;
-	/** History statement. Referenced if @is_refable is set. */
+	/** History statement. Always referenced. */
 	struct vy_entry entry;
-	/**
-	 * Set if the statement stored in this node is refable,
-	 * i.e. has a reference counter that can be incremented
-	 * to pin the statement in memory. Refable statements are
-	 * referenced by the history. It is a responsibility of
-	 * the user of the history to track lifetime of unrefable
-	 * statements.
-	 *
-	 * Note, we need to store this flag here, because by the
-	 * time we clean up a history list, unrefable statements
-	 * stored in it might have been deleted, thus making
-	 * vy_stmt_is_refable() unusable.
-	 */
-	bool is_refable;
 };
 
 /**
