@@ -3259,6 +3259,29 @@ func_def_new_from_tuple(struct tuple *tuple)
 		/* By default export to Lua, but not other frontends. */
 		def->exports.lua = true;
 	}
+	if (field_count > BOX_FUNC_FIELD_TRIGGER) {
+		const char *triggers =
+			tuple_field_with_type(tuple, BOX_FUNC_FIELD_TRIGGER,
+					      MP_ARRAY);
+		if (triggers == NULL)
+			return NULL;
+		const char *triggers_begin = triggers;
+		uint32_t trigger_count = mp_decode_array(&triggers);
+		for (uint32_t i = 0; i < trigger_count; i++) {
+			enum mp_type actual_type = mp_typeof(*triggers);
+			if (actual_type != MP_STR) {
+				diag_set(ClientError, ER_FIELD_TYPE,
+					 int2str(BOX_FUNC_FIELD_TRIGGER + 1),
+					 mp_type_strs[MP_STR],
+					 mp_type_strs[actual_type]);
+				return NULL;
+			}
+			mp_next(&triggers);
+		};
+		/** Set a field only if array is not empty. */
+		if (trigger_count > 0)
+			def->triggers = triggers_begin;
+	}
 	if (func_def_check(def) != 0)
 		return NULL;
 	def_guard.is_active = false;

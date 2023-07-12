@@ -1394,9 +1394,25 @@ local function add_instance_names()
     box.space._space:update({box.schema.CLUSTER_ID}, {{'=', 7, format}})
 end
 
+local function add_trigger_to_func()
+    log.info('add trigger to _func')
+    local _space = box.space[box.schema.SPACE_ID]
+    local _func = box.space[box.schema.FUNC_ID]
+    local _vfunc = box.space[box.schema.VFUNC_ID]
+    for _, v in _func:pairs() do
+        if #v == 19 then
+            _func:update(v[1], {{'=', 20, {}}})
+        end
+    end
+    local ops = {{'=', '[7][20]', {name = 'trigger', type = 'array'}}}
+    _space:update({_func.id}, ops)
+    _space:update({_vfunc.id}, ops)
+end
+
 local function upgrade_to_3_0_0()
     store_replicaset_uuid_in_new_way()
     add_instance_names()
+    add_trigger_to_func()
 end
 
 --------------------------------------------------------------------------------
@@ -1942,10 +1958,38 @@ local function drop_instance_names(issue_handler)
     box.space._space:update({box.schema.CLUSTER_ID}, {{'=', 7, format}})
 end
 
+local function drop_trigger_from_func(issue_handler)
+    local _space = box.space[box.schema.SPACE_ID]
+    local _func = box.space[box.schema.FUNC_ID]
+    local _vfunc = box.space[box.schema.VFUNC_ID]
+    local msg_suffix = 'has trigger option. It is supported from version 3.0.0'
+    if #_func:format() == 19 then
+        return
+    end
+    if issue_handler.dry_run then
+        for _, v in _func:pairs() do
+            -- Non-empty trigger option cannot be dropped because
+            -- func does not support alter.
+            if #v > 19 and not table.equals(v[20], {}) then
+                issue_handler('Func %s %s', v.name, msg_suffix)
+            end
+        end
+        return
+    end
+    log.info('drop trigger from _func')
+    local ops = {{'#', '[7][20]', 1}}
+    _space:update({_func.id}, ops)
+    _space:update({_vfunc.id}, ops)
+    for _, v in _func:pairs() do
+        _func:update(v[1], {{'#', 20, 1}})
+    end
+end
+
 local function downgrade_from_3_0_0(issue_handler)
     store_replicaset_uuid_in_old_way(issue_handler)
     check_names_are_not_set(issue_handler)
     drop_instance_names(issue_handler)
+    drop_trigger_from_func(issue_handler)
 end
 
 -- Versions should be ordered from newer to older.

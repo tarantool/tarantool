@@ -90,6 +90,7 @@ func_def_new(uint32_t fid, uint32_t uid, const char *name, uint32_t name_len,
 	def->aggregate = FUNC_AGGREGATE_NONE;
 	def->language = language;
 	def->exports.all = 0;
+	def->triggers = NULL;
 	func_opts_create(&def->opts);
 	return def;
 }
@@ -143,6 +144,35 @@ func_def_cmp(const struct func_def *def1, const struct func_def *def2)
 		return def1->comment - def2->comment;
 	if (def1->comment != NULL && strcmp(def1->comment, def2->comment) != 0)
 		return strcmp(def1->comment, def2->comment);
+	/*
+	 * The field is set only if underlying array is not empty. So an empty
+	 * array is equivalent to the field absence (NULL) here.
+	 */
+	if ((def1->triggers != NULL) != (def2->triggers != NULL))
+		return def1->triggers - def2->triggers;
+	/* See the function description for equality definition. */
+	if (def1->triggers != NULL) {
+		const char *triggers1 = def1->triggers;
+		const char *triggers2 = def2->triggers;
+		const char **ptr1 = &triggers1;
+		const char **ptr2 = &triggers2;
+		uint32_t trigger_count1 = mp_decode_array(ptr1);
+		uint32_t trigger_count2 = mp_decode_array(ptr2);
+		assert(trigger_count1 != 0 && trigger_count2 != 0);
+		if (trigger_count1 != trigger_count2)
+			return trigger_count1 - trigger_count2;
+		for (uint32_t i = 0; i < trigger_count1; i++) {
+			uint32_t len1;
+			const char *trigger1 = mp_decode_str(ptr1, &len1);
+			uint32_t len2;
+			const char *trigger2 = mp_decode_str(ptr2, &len2);
+			if (len1 != len2)
+				return len1 - len2;
+			int trigger_cmp = memcmp(trigger1, trigger2, len1);
+			if (trigger_cmp != 0)
+				return trigger_cmp;
+		}
+	}
 	return func_opts_cmp(&def1->opts, &def2->opts);
 }
 
@@ -161,6 +191,7 @@ func_def_dup(const struct func_def *def)
 	copy->aggregate = def->aggregate;
 	copy->exports.all = def->exports.all;
 	copy->opts = def->opts;
+	copy->triggers = def->triggers;
 	return copy;
 }
 
