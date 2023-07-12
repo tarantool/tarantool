@@ -2332,7 +2332,7 @@ sql_built_in_functions_cache_init(void)
 		uint32_t len = strlen(name);
 		struct func_def *def = func_def_new(i, ADMIN, name, len,
 						    FUNC_LANGUAGE_SQL_BUILTIN,
-						    NULL, 0, NULL, 0);
+						    NULL, 0, NULL, 0, NULL);
 		def->setuid = true;
 		def->is_deterministic = dict->is_deterministic;
 		assert(desc->argc != -1 || dict->argc_min != dict->argc_max);

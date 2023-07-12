@@ -199,7 +199,8 @@ enum {
 	BOX_FUNC_FIELD_COMMENT = 16,
 	BOX_FUNC_FIELD_CREATED = 17,
 	BOX_FUNC_FIELD_LAST_ALTERED = 18,
-	box_func_field_MAX = 19,
+	BOX_FUNC_FIELD_TRIGGER = 19,
+	box_func_field_MAX = 20,
 };
 
 /** _collation fields. */
