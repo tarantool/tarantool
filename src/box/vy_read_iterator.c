@@ -418,13 +418,24 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr,
 	int cmp;
 	struct vy_read_src *src = &itr->src[itr->mem_src];
 
+	/*
+	 * 'next' may refer to a statement in the memory source history,
+	 * which may be cleaned up by vy_mem_iterator_restore(), so we need
+	 * to take a reference to it.
+	 */
+	struct tuple *next_stmt_ref = next->stmt;
+	if (next_stmt_ref != NULL)
+		tuple_ref(next_stmt_ref);
+
 	rc = vy_mem_iterator_restore(&src->mem_iterator,
 				     itr->last, &src->history);
 	if (rc < 0)
-		return -1; /* memory allocation error */
+		goto out; /* memory allocation error */
 	if (rc == 0)
-		return 0; /* nothing changed */
+		goto out; /* nothing changed */
 
+	/* The memory source was updated. Reevaluate it for 'next'. */
+	rc = 0;
 	struct vy_entry entry = vy_history_last_stmt(&src->history);
 	cmp = vy_read_iterator_cmp_stmt(itr, entry, *next);
 	if (cmp > 0) {
@@ -439,14 +450,15 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr,
 		 */
 		if (src->front_id == itr->front_id)
 			vy_read_iterator_reevaluate_srcs(itr, next);
-		return 0;
+		goto out;
 	}
+	/* The new statement is a better candidate for 'next'. */
+	*next = entry;
 	if (cmp < 0) {
 		/*
 		 * The new statement precedes the current
 		 * candidate for the next key.
 		 */
-		*next = entry;
 		itr->front_id++;
 	} else {
 		/*
@@ -459,7 +471,10 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr,
 			vy_history_cleanup(&cache_src->history);
 	}
 	src->front_id = itr->front_id;
-	return 0;
+out:
+	if (next_stmt_ref != NULL)
+		tuple_unref(next_stmt_ref);
+	return rc;
 }
 
 static void
