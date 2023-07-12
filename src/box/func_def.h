@@ -105,6 +105,11 @@ struct func_def {
 	/** User-defined comment for a function. */
 	char *comment;
 	/**
+	 * MsgPack array of strings - names of events in trigger registry.
+	 * If it is set, underlying array is not empty.
+	 */
+	const char *triggers;
+	/**
 	 * True if the function requires change of user id before
 	 * invocation.
 	 */
@@ -156,7 +161,12 @@ func_def_new(uint32_t fid, uint32_t uid, const char *name, uint32_t name_len,
 void
 func_def_delete(struct func_def *def);
 
-/** Compare two given function definitions. */
+/**
+ * Compare two given function definitions.
+ * Two triggers fields (which are pointers to a MsgPack array) are considered
+ * equal only if they contain the same amount of elements and all the elements
+ * are equal and in the same order.
+ */
 int
 func_def_cmp(const struct func_def *def1, const struct func_def *def2);
 

@@ -706,7 +706,7 @@ g.test_downgrade_sql_expr_function = function(cg)
             box.space._func:auto_increment{
                 1, name, 1, 'SQL_EXPR', body, 'function', {},
                 'any', 'none', 'none', true, true, true, {'LUA'},
-                empty, '', datetime, datetime
+                empty, '', datetime, datetime, {}
             }
         end
 
@@ -971,5 +971,35 @@ g.test_downgrade_global_names = function(cg)
         t.assert_equals(format[3].name, 'name')
         box.schema.downgrade(prev_version)
         t.assert_equals(#box.space._cluster:format(), 2)
+    end)
+end
+
+g.test_downgrade_func_trigger = function(cg)
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+        local trigger = require('trigger')
+        local _func = box.space._func
+        local prev_version = helper.prev_version(helper.app_version('3.0.0'))
+        local lua_code = 'function(a, b) return a + b end'
+        t.assert_equals(trigger.info('test'), {})
+        box.schema.func.create('trigger_func',
+            {body = lua_code, trigger = 'test'})
+        t.assert_equals(box.schema.downgrade_issues(prev_version),
+            {"Func trigger_func has trigger option. " ..
+             "It is supported from version 3.0.0"})
+        box.schema.func.drop('trigger_func')
+        box.schema.func.create('non_trigger_func',
+            {body = lua_code, trigger = {}})
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {})
+        t.assert_equals(#_func:format(), 20)
+        t.assert_equals(_func:format()[20].name, 'trigger')
+        -- 2 for idempotence.
+        for _ = 1, 2 do
+            box.schema.downgrade(prev_version)
+            t.assert_equals(#_func:format(), 19)
+            t.assert_equals(trigger.info('test'), {})
+            local func_tuple = _func.index.name:get('non_trigger_func')
+            t.assert_equals(#func_tuple, 19)
+        end
     end)
 end

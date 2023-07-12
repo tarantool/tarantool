@@ -25,31 +25,31 @@ function setmap(tab) return setmetatable(tab, { __serialize = 'map' }) end
 datetime = os.date("%Y-%m-%d %H:%M:%S")
 ---
 ...
-box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'procedure', {}, 'any', 'none', 'none', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime}
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'procedure', {}, 'any', 'none', 'none', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime, {}}
 ---
 - error: 'Failed to create function ''function1'': unsupported routine_type value'
 ...
-box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'none', 'reads', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime}
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'none', 'reads', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime, {}}
 ---
 - error: 'Failed to create function ''function1'': unsupported sql_data_access value'
 ...
-box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'none', 'none', false, false, false, {"LUA"}, setmap({}), '', datetime, datetime}
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'none', 'none', false, false, false, {"LUA"}, setmap({}), '', datetime, datetime, {}}
 ---
 - error: 'Failed to create function ''function1'': unsupported is_null_call value'
 ...
-box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'data', 'none', 'none', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime}
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'data', 'none', 'none', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime, {}}
 ---
 - error: 'Failed to create function ''function1'': invalid returns value'
 ...
-box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'none', 'none', false, false, true, {"LUA", "C"}, setmap({}), '', datetime, datetime}
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'none', 'none', false, false, true, {"LUA", "C"}, setmap({}), '', datetime, datetime, {}}
 ---
 - error: 'Failed to create function ''function1'': invalid exports value'
 ...
-box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'aggregate', 'none', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime}
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'aggregate', 'none', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime, {}}
 ---
 - error: 'Failed to create function ''function1'': invalid aggregate value'
 ...
-box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'none', 'none', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime}
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'none', 'none', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime, {}}
 ---
 - error: function does not support alter
 ...
