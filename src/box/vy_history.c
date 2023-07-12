@@ -52,9 +52,15 @@ vy_history_append_stmt(struct vy_history *history, struct vy_entry entry)
 			 "struct vy_history_node");
 		return -1;
 	}
-	node->is_refable = vy_stmt_is_refable(entry.stmt);
-	if (node->is_refable)
+	if (vy_stmt_is_refable(entry.stmt)) {
 		tuple_ref(entry.stmt);
+	} else {
+		entry.stmt = vy_stmt_dup(entry.stmt);
+		if (entry.stmt == NULL) {
+			mempool_free(history->pool, node);
+			return -1;
+		}
+	}
 	node->entry = entry;
 	rlist_add_tail_entry(&history->stmts, node, link);
 	return 0;
@@ -65,8 +71,7 @@ vy_history_cleanup(struct vy_history *history)
 {
 	struct vy_history_node *node, *tmp;
 	rlist_foreach_entry_safe(node, &history->stmts, link, tmp) {
-		if (node->is_refable)
-			tuple_unref(node->entry.stmt);
+		tuple_unref(node->entry.stmt);
 		mempool_free(history->pool, node);
 	}
 	rlist_create(&history->stmts);
@@ -91,11 +96,6 @@ vy_history_apply(struct vy_history *history, struct key_def *cmp_def,
 			 * Ignore terminal delete unless the caller
 			 * explicitly asked to keep it.
 			 */
-		} else if (!node->is_refable) {
-			curr.hint = node->entry.hint;
-			curr.stmt = vy_stmt_dup(node->entry.stmt);
-			if (curr.stmt == NULL)
-				return -1;
 		} else {
 			curr = node->entry;
 			tuple_ref(curr.stmt);
