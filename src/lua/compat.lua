@@ -449,7 +449,7 @@ function compat_mt.__index(_, key)
     -- Whether the effective value of the option is `new`.
     function result.is_new(option)
         if type(option) ~= 'table' then
-            error('usage: compat.<option_name>:is_new()')
+            error(('usage: compat.%s:is_new()'):format(key))
         end
         if option.current == 'new' then
             return true
