@@ -706,7 +706,7 @@ g.test_downgrade_sql_expr_function = function(cg)
             box.space._func:auto_increment{
                 1, name, 1, 'SQL_EXPR', body, 'function', {},
                 'any', 'none', 'none', true, true, true, {'LUA'},
-                empty, '', datetime, datetime
+                empty, '', datetime, datetime, {}
             }
         end
 
@@ -971,5 +971,74 @@ g.test_downgrade_global_names = function(cg)
         t.assert_equals(format[3].name, 'name')
         box.schema.downgrade(prev_version)
         t.assert_equals(#box.space._cluster:format(), 2)
+    end)
+end
+
+-----------------------------
+-- Check downgrade from 3.1.0
+-----------------------------
+
+g.test_downgrade_func_trigger = function(cg)
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+        local _func = box.space._func
+
+        local function check_before_downgrade(has_trigger_funcs)
+            t.assert_equals(#_func:format(), 20)
+            t.assert_equals(_func:format()[20].name, 'trigger')
+            t.assert_equals(#_func:get(box.func.not_trigger.id), 20)
+            t.assert_equals(_func:get(box.func.not_trigger.id).trigger, {})
+            if not has_trigger_funcs then
+                return
+            end
+            t.assert_equals(#_func:get(box.func.trigger1.id), 20)
+            t.assert_equals(_func:get(box.func.trigger1.id).trigger, {'trg'})
+            t.assert_equals(#_func:get(box.func.trigger2.id), 20)
+            t.assert_equals(_func:get(box.func.trigger2.id).trigger, {'trg'})
+        end
+
+        local function check_after_downgrade()
+            t.assert_equals(#_func:format(), 19)
+            t.assert_equals(#_func:get(box.func.not_trigger.id), 19)
+        end
+
+        local lua_code = 'function(a, b) return a + b end'
+        box.schema.func.create('trigger1', {body = lua_code, trigger = 'trg'})
+        box.schema.func.create('trigger2', {body = lua_code, trigger = 'trg'})
+        box.schema.func.create('not_trigger', {body = lua_code})
+
+        -- Check if nothing changes after downgrade to version that supports
+        -- the feature
+        local app_version = helper.app_version('3.1.0')
+        t.assert_equals(box.schema.downgrade_issues(app_version), {})
+        box.schema.downgrade(app_version)
+        check_before_downgrade(true)
+
+        -- Check if downgrade_issues are collected correctly and downgrade
+        -- actually doesn't happen
+        local fmt = 'Function %s is registered as ' ..
+                    'event trigger. It is supported starting from version 3.1.0'
+        local expected_issues = {
+            string.format(fmt, 'trigger1'),
+            string.format(fmt, 'trigger2')
+        }
+        local prev_version = helper.prev_version('3.1.0')
+        t.assert_equals(box.schema.downgrade_issues(prev_version),
+                        expected_issues)
+        t.assert_error_msg_contains(expected_issues[1],
+                                    box.schema.downgrade, prev_version)
+        check_before_downgrade(true)
+
+        -- Drop the functions with trigger and check if downgrade collects
+        -- no issues and works correctly
+        box.func.trigger1:drop()
+        box.func.trigger2:drop()
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {})
+        check_before_downgrade(false)
+        -- 2 for idempotence.
+        for _ = 1, 2 do
+            box.schema.downgrade(prev_version)
+            check_after_downgrade()
+        end
     end)
 end

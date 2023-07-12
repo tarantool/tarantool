@@ -105,6 +105,11 @@ struct func_def {
 	/** User-defined comment for a function. */
 	char *comment;
 	/**
+	 * MsgPack array of strings - names of events in trigger registry.
+	 * If it is set, underlying array is not empty.
+	 */
+	char *triggers;
+	/**
 	 * True if the function requires change of user id before
 	 * invocation.
 	 */
@@ -145,12 +150,13 @@ struct func_def {
 /**
  * Allocates and initializes a function definition.
  * Fields unspecified in the arguments are set to their default values.
+ * Argument triggers must be a MsgPack array.
  * This function never fails (never returns NULL).
  */
 struct func_def *
 func_def_new(uint32_t fid, uint32_t uid, const char *name, uint32_t name_len,
 	     enum func_language language, const char *body, uint32_t body_len,
-	     const char *comment, uint32_t comment_len);
+	     const char *comment, uint32_t comment_len, const char *triggers);
 
 /** Frees a function definition object. */
 void

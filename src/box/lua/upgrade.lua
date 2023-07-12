@@ -1400,6 +1400,27 @@ local function upgrade_to_3_0_0()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 3.1.0
+--------------------------------------------------------------------------------
+
+local function add_trigger_to_func()
+    log.info('add trigger to _func')
+    local _space = box.space[box.schema.SPACE_ID]
+    local _func = box.space[box.schema.FUNC_ID]
+    local _vfunc = box.space[box.schema.VFUNC_ID]
+    for _, v in _func:pairs() do
+        _func:update(v[1], {{'=', 20, {}}})
+    end
+    local ops = {{'=', '[7][20]', {name = 'trigger', type = 'array'}}}
+    _space:update({_func.id}, ops)
+    _space:update({_vfunc.id}, ops)
+end
+
+local function upgrade_to_3_1_0()
+    add_trigger_to_func()
+end
+
+--------------------------------------------------------------------------------
 
 local handlers = {
     {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5},
@@ -1422,6 +1443,7 @@ local handlers = {
     {version = mkversion(2, 11, 0), func = upgrade_to_2_11_0},
     {version = mkversion(2, 11, 1), func = upgrade_to_2_11_1},
     {version = mkversion(3, 0, 0), func = upgrade_to_3_0_0},
+    {version = mkversion(3, 1, 0), func = upgrade_to_3_1_0},
 }
 builtin.box_init_latest_dd_version_id(handlers[#handlers].version.id)
 
@@ -1948,6 +1970,39 @@ local function downgrade_from_3_0_0(issue_handler)
     drop_instance_names(issue_handler)
 end
 
+--------------------------------------------------------------------------------
+-- Tarantool 3.1.0
+--------------------------------------------------------------------------------
+
+local function drop_trigger_from_func(issue_handler)
+    local _space = box.space[box.schema.SPACE_ID]
+    local _func = box.space[box.schema.FUNC_ID]
+    local _vfunc = box.space[box.schema.VFUNC_ID]
+    local fmt = 'Function %s is registered as event trigger. ' ..
+                'It is supported starting from version 3.1.0'
+    if #_func:format() == 19 then
+        return
+    end
+    if not issue_handler.dry_run then
+        log.info('drop trigger from _func')
+        local ops = {{'#', '[7][20]', 1}}
+        _space:update({_func.id}, ops)
+        _space:update({_vfunc.id}, ops)
+    end
+    for _, v in _func:pairs() do
+        if #v > 19 and not table.equals(v[20], {}) then
+            issue_handler(fmt, v.name)
+        end
+        if not issue_handler.dry_run then
+            _func:update(v[1], {{'#', 20, 1}})
+        end
+    end
+end
+
+local function downgrade_from_3_1_0(issue_handler)
+    drop_trigger_from_func(issue_handler)
+end
+
 -- Versions should be ordered from newer to older.
 --
 -- Every step can be called in 2 modes. In dry_run mode (issue_handler.dry_run
@@ -1965,6 +2020,7 @@ end
 -- if schema version is 2.10.0.
 --
 local downgrade_handlers = {
+    {version = mkversion(3, 1, 0), func = downgrade_from_3_1_0},
     {version = mkversion(3, 0, 0), func = downgrade_from_3_0_0},
     {version = mkversion(2, 11, 1), func = downgrade_from_2_11_1},
     {version = mkversion(2, 11, 0), func = downgrade_from_2_11_0},
@@ -2048,6 +2104,7 @@ local downgrade_versions = {
     "2.11.0",
     "2.11.1",
     "3.0.0",
+    "3.1.0",
 }
 
 -- Downgrade or list downgrade issues depending of dry_run argument value.

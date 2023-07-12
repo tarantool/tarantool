@@ -25,7 +25,7 @@ test_func_new(uint32_t id, const char *name, const char *body)
 	uint32_t body_len = strlen(body);
 	struct func_def *def = func_def_new(id, ADMIN, name, name_len,
 					    FUNC_LANGUAGE_LUA,
-					    body, body_len, NULL, 0);
+					    body, body_len, NULL, 0, NULL);
 	struct func *func = func_new(def);
 	func->def = def;
 	func_cache_insert(func);

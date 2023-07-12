@@ -13,7 +13,7 @@ test_func_new(uint32_t id, const char *name)
 	uint32_t name_len = strlen(name);
 	struct func_def *def = func_def_new(id, ADMIN, name, name_len,
 					    FUNC_LANGUAGE_LUA,
-					    NULL, 0, NULL, 0);
+					    NULL, 0, NULL, 0, NULL);
 	struct func *f = xmalloc(sizeof(*f));
 	f->def = def;
 	rlist_create(&f->func_cache_pin_list);

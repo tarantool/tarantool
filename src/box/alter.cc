@@ -60,6 +60,7 @@
 #include "box.h"
 #include "authentication.h"
 #include "node_name.h"
+#include "core/func_adapter.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -3147,9 +3148,31 @@ func_def_new_from_tuple(struct tuple *tuple)
 			  tt_cstr(name, name_len), "function id is too big");
 		return NULL;
 	}
+	const char *triggers = NULL;
+	if (field_count > BOX_FUNC_FIELD_TRIGGER) {
+		triggers = tuple_field_with_type(tuple, BOX_FUNC_FIELD_TRIGGER,
+						 MP_ARRAY);
+		if (triggers == NULL)
+			return NULL;
+		const char *triggers_cursor = triggers;
+		uint32_t trigger_count = mp_decode_array(&triggers_cursor);
+		for (uint32_t i = 0; i < trigger_count; i++) {
+			enum mp_type actual_type = mp_typeof(*triggers_cursor);
+			if (actual_type != MP_STR) {
+				diag_set(ClientError, ER_CREATE_FUNCTION,
+					 name, "trigger name must be a string");
+				return NULL;
+			}
+			mp_next(&triggers_cursor);
+		};
+		/** Do not set the field if the array is empty. */
+		if (trigger_count == 0)
+			triggers = NULL;
+	}
+
 	struct func_def *def = func_def_new(fid, uid, name, name_len,
 					    language, body, body_len,
-					    comment, comment_len);
+					    comment, comment_len, triggers);
 	auto def_guard = make_scoped_guard([=] { func_def_delete(def); });
 	if (field_count > BOX_FUNC_FIELD_SETUID) {
 		uint32_t out;
@@ -3228,10 +3251,9 @@ func_def_new_from_tuple(struct tuple *tuple)
 		for (uint32_t i = 0; i < argc; i++) {
 			enum mp_type actual_type = mp_typeof(*param_list);
 			if (actual_type != MP_STR) {
-				diag_set(ClientError, ER_FIELD_TYPE,
-					 int2str(BOX_FUNC_FIELD_PARAM_LIST + 1),
-					 mp_type_strs[MP_STR],
-					 mp_type_strs[actual_type]);
+				diag_set(ClientError, ER_CREATE_FUNCTION,
+					 def->name,
+					 "parameter type must be a string");
 				return NULL;
 			}
 			uint32_t len;
