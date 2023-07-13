@@ -1274,6 +1274,11 @@ box.internal.cfg = setmetatable({}, {
     end,
 })
 
+-- Expose list of all available box.cfg() options and their
+-- default values for testing purposes.
+box.internal.template_cfg = template_cfg
+box.internal.default_cfg = default_cfg
+
 -- gh-810:
 -- hack luajit default cpath
 -- commented out because we fixed luajit to build properly, see
