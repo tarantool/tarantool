@@ -789,7 +789,7 @@ return schema.new('instance_config', schema.record({
             type = 'integer',
             box_cfg = 'vinyl_write_threads',
             box_cfg_nondynamic = true,
-            default = 2,
+            default = 4,
         }),
     }),
     wal = schema.record({
