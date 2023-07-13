@@ -1,3 +1,5 @@
+local fun = require('fun')
+local log = require('log')
 local t = require('luatest')
 local instance_config = require('internal.config.instance_config')
 
@@ -988,4 +990,182 @@ g.test_app = function()
 
     local res = instance_config:apply_default({}).app
     t.assert_equals(res, nil)
+end
+
+-- Whether all box.cfg() options can be set using the declarative
+-- configuration.
+--
+-- The test also verifies that all the box_cfg annotations are
+-- point to existing box.cfg() options.
+--
+-- And also compares default values in the schema against ones set
+-- by the box.cfg() call.
+g.test_box_cfg_coverage = function()
+    -- There are box.cfg() options that are set by the box_cfg
+    -- applier on its own and cannot be set directly in the
+    -- declarative config.
+    --
+    -- Also, there are some options to be added into the declarative
+    -- config soon.
+    local ignore = {
+        -- Handled by box_cfg applier without the box_cfg schema
+        -- node annotation.
+        instance_name = true,
+        replicaset_name = true,
+        cluster_name = true,
+        log = true,
+
+        -- Controlled by the leader and database.mode options,
+        -- handled by the box_cfg applier.
+        read_only = true,
+
+        -- Deliberately moved out of the config, because the
+        -- box.cfg() options is deprecated.
+        replication_connect_quorum = true,
+
+        -- Moved to the CLI options (see gh-8876).
+        force_recovery = true,
+
+        -- TODO: Will be added in the scope of gh-8861.
+        audit_log = true,
+        audit_nonblock = true,
+        audit_format = true,
+        audit_filter = true,
+
+        -- TODO: Will be added in the scope of gh-8861.
+        auth_type = true,
+        auth_delay = true,
+        disable_guest = true,
+        password_lifetime_days = true,
+        password_min_length = true,
+        password_enforce_uppercase = true,
+        password_enforce_lowercase = true,
+        password_enforce_digits = true,
+        password_enforce_specialchars = true,
+        password_history_length = true,
+
+        -- TODO: Will be added in the scope of gh-8861.
+        feedback_enabled = true,
+        feedback_crashinfo = true,
+        feedback_host = true,
+        feedback_interval = true,
+        feedback_send_metrics = true,
+        feedback_metrics_collect_interval = true,
+        feedback_metrics_limit = true,
+
+        -- TODO: Will be added in the scope of gh-8861.
+        flightrec_enabled = true,
+        flightrec_logs_size = true,
+        flightrec_logs_max_msg_size = true,
+        flightrec_logs_log_level = true,
+        flightrec_metrics_interval = true,
+        flightrec_metrics_period = true,
+        flightrec_requests_size = true,
+        flightrec_requests_max_req_size = true,
+        flightrec_requests_max_res_size = true,
+
+        -- TODO: Will be added in the scope of gh-8861.
+        metrics = true,
+
+        -- TODO: Will be added in the scope of gh-8861.
+        bootstrap_leader = true,
+        memtx_sort_threads = true,
+    }
+
+    -- There are options, where defaults are changed deliberately.
+    local ignore_default = {
+        -- box.cfg.log_nonblock is set to nil by default, but
+        -- actually it means false.
+        log_nonblock = true,
+
+        -- Adjusted to use {{ instance_name }}.
+        custom_proc_title = true,
+        memtx_dir = true,
+        pid_file = true,
+        wal_dir = true,
+        vinyl_dir = true,
+
+        -- The effective default is determined depending of
+        -- the replication.failover option.
+        election_mode = true,
+    }
+
+    local log_prefix = 'test_box_cfg_coverage'
+    local ljust = 33
+
+    -- Collect box_cfg annotations from the schema.
+    local box_cfg_options_in_schema = instance_config:pairs():filter(function(w)
+        -- Skip EE options on CE.
+        if w.schema.enterprise_edition and not is_enterprise then
+            return false
+        end
+        return w.schema.box_cfg ~= nil
+    end):map(function(w)
+        return w.schema.box_cfg, {
+            path = table.concat(w.path, '.'),
+            default = w.schema.default,
+        }
+    end):tomap()
+
+    -- <schema>:pairs() iterates over scalar, array and map schema
+    -- nodes. It expands records on its own and don't add them
+    -- into the iterator.
+    --
+    -- However, wal.ext schema node is a record. Let's add it
+    -- manually.
+    local records_to_traverse = {
+        ['wal.ext'] = instance_config.schema.fields.wal.fields.ext,
+    }
+    fun.iter(records_to_traverse):each(function(path, schema)
+        if schema.enterprise_edition and not is_enterprise then
+            return
+        end
+        if schema.box_cfg ~= nil then
+            box_cfg_options_in_schema[schema.box_cfg] = {
+                path = path,
+                default = schema.default,
+            }
+        end
+    end)
+
+    -- Verify box_cfg annotations in the instance config schema:
+    -- they must correspond to existing box.cfg() options.
+    for option_name, in_schema in pairs(box_cfg_options_in_schema) do
+        log.info('%s: verify existence of box.cfg.%s that is pointed by %s...',
+            log_prefix, option_name:ljust(ljust), in_schema.path)
+        t.assert(box.internal.template_cfg[option_name] ~= nil,
+            ('%s points to non-existing box.cfg.%s'):format(in_schema.path,
+            option_name))
+    end
+
+    -- Verify that all box.cfg() option are present in the
+    -- instance config schema (with known exceptions).
+    for option_name, _ in pairs(box.internal.template_cfg) do
+        if ignore[option_name] then
+            log.info('%s: box.cfg.%s skip', log_prefix,
+                option_name:ljust(ljust))
+        else
+            log.info('%s: box.cfg.%s find...', log_prefix,
+                option_name:ljust(ljust))
+            t.assert(box_cfg_options_in_schema[option_name] ~= nil,
+                ('box.cfg.%s is not found in the instance config ' ..
+                'schema'):format(option_name))
+        end
+    end
+
+    -- Compare defaults.
+    for option_name, in_schema in pairs(box_cfg_options_in_schema) do
+        if not ignore_default[option_name] then
+            t.assert_equals(in_schema.default,
+                box.internal.default_cfg[option_name],
+                ('defaults for box.cfg.%s are different'):format(option_name))
+        end
+    end
+    for option_name, _ in pairs(box.internal.template_cfg) do
+        if not ignore[option_name] and not ignore_default[option_name] then
+            t.assert_equals(box_cfg_options_in_schema[option_name].default,
+                box.internal.default_cfg[option_name],
+                ('defaults for box.cfg.%s are different'):format(option_name))
+        end
+    end
 end
