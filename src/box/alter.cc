@@ -2584,6 +2584,10 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 		/* Space drop - nothing to do. */
 		return 0;
 	}
+	if (recovery_state == INITIAL_RECOVERY) {
+		/* Space creation during initial recovery - nothing to do. */
+		return 0;
+	}
 
 	uint32_t space_id;
 	if (tuple_field_u32(new_tuple, BOX_TRUNCATE_FIELD_SPACE_ID, &space_id) != 0)
@@ -2593,20 +2597,24 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 		return -1;
 
 	/*
+	 * box_process1() bypasses the read-only check for the _truncate system
+	 * space because there the space that is going to be truncated isn't yet
+	 * known. Perform the check here if this statement was issued by this
+	 * replica and the space isn't temporary or local.
+	 */
+	bool is_temp = space_is_temporary(old_space) ||
+		       space_is_local(old_space);
+	if (!is_temp && stmt->row->replica_id == 0 &&
+	    box_check_writable() != 0)
+		return -1;
+
+	/*
 	 * Check if a write privilege was given, return an error if not.
 	 * The check should precede initial recovery check to correctly
 	 * handle direct insert into _truncate systable.
 	 */
 	if (access_check_space(old_space, PRIV_W) != 0)
 		return -1;
-
-	if (stmt->row->type == IPROTO_INSERT) {
-		/*
-		 * Space creation during initial recovery -
-		 * nothing to do.
-		 */
-		return 0;
-	}
 
 	/*
 	 * System spaces use triggers to keep records in sync
@@ -2633,8 +2641,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	 * replication of local & temporary
 	 * spaces truncation.
 	 */
-	if (space_is_temporary(old_space) ||
-	    space_is_local(old_space)) {
+	if (is_temp) {
 		stmt->row->group_id = GROUP_LOCAL;
 		/*
 		 * The trigger is invoked after txn->n_local_rows

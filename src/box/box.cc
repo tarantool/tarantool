@@ -350,7 +350,7 @@ box_check_slice_slow(void)
 	return fiber_check_slice();
 }
 
-static int
+int
 box_check_writable(void)
 {
 	if (!is_ro_summary)
@@ -3243,11 +3243,17 @@ box_process1(struct request *request, box_tuple_t **result)
 {
 	if (box_check_slice() != 0)
 		return -1;
-	/* Allow to write to temporary spaces in read-only mode. */
 	struct space *space = space_cache_find(request->space_id);
 	if (space == NULL)
 		return -1;
-	if (!space_is_temporary(space) &&
+	/*
+	 * Allow to write to temporary and local spaces in the read-only mode.
+	 * To handle space truncation, we postpone the read-only check for the
+	 * _truncate system space till the on_replace trigger is called, when
+	 * we know which space is truncated.
+	 */
+	if (space_id(space) != BOX_TRUNCATE_ID &&
+	    !space_is_temporary(space) &&
 	    !space_is_local(space) &&
 	    box_check_writable() != 0)
 		return -1;
