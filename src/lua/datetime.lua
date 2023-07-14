@@ -294,7 +294,7 @@ local function checked_max_value(v, max, txt, def)
         error(('numeric value expected, but received %s'):
               format(type(v)), 2)
     end
-    if v > -max and v < max then
+    if v >= -max and v <= max then
         return v
     end
     error(('value %s of %s is out of allowed range [%s, %s]'):

@@ -4,6 +4,7 @@ local tap = require('tap')
 local test = tap.test('errno')
 local date = require('datetime')
 local ffi = require('ffi')
+local json = require('json')
 local TZ = date.TZ
 
 --[[
@@ -16,6 +17,8 @@ if jit.arch == 'arm64' then
 end
 
 test:plan(39)
+
+local INT_MAX = 2147483647
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -32,6 +35,9 @@ local MAX_DAY_RANGE = MAX_YEAR_RANGE * AVERAGE_DAYS_YEAR
 local MAX_HOUR_RANGE = MAX_DAY_RANGE * 24
 local MAX_MIN_RANGE = MAX_HOUR_RANGE * 60
 local MAX_SEC_RANGE = MAX_DAY_RANGE * SECS_PER_DAY
+local MAX_NSEC_RANGE = INT_MAX
+local MAX_USEC_RANGE = math.floor(MAX_NSEC_RANGE / 1e3)
+local MAX_MSEC_RANGE = math.floor(MAX_NSEC_RANGE / 1e6)
 
 local incompat_types = 'incompatible types for datetime comparison'
 local only_integer_ts = 'only integer values allowed in timestamp'..
@@ -103,6 +109,43 @@ local function assert_raises_like(test, error_msg, func, ...)
     local err_tail = err and err:gsub("^.+:%d+: ", "") or ''
     return test:like(not ok and err_tail, error_msg,
                    ('"%s" received, "%s" expected'):format(err_tail, error_msg))
+end
+
+-- Basic interval string representation generator for interval arguments.
+local fields_str = {
+    { 'year', 'years' },
+    { 'month', 'months' },
+    { 'week', 'weeks' },
+    { 'day', 'days' },
+    { 'hour', 'hours' },
+    { 'min', 'minutes' },
+    { 'sec', 'seconds' },
+    { 'msec', 'nanoseconds', 1e6 },
+    { 'usec', 'nanoseconds', 1e3 },
+    { 'nsec', 'nanoseconds' },
+}
+
+local function iv_str_repr(tab_iv)
+    local iv_repr = ''
+
+    for _, field in ipairs(fields_str) do
+        local name, field_repr, mult = unpack(field)
+        local value = tab_iv[name]
+        if value ~= nil then
+            if mult ~= nil then
+                value = value * mult
+            end
+            if iv_repr == '' then
+                iv_repr = ('%+d %s'):format(value, field_repr)
+            else
+                iv_repr = iv_repr .. (', %d %s'):format(value, field_repr)
+            end
+        elseif (name == 'sec') and (iv_repr == '') then
+            iv_repr = ('%+d %s'):format(0, field_repr)
+        end
+    end
+
+    return iv_repr
 end
 
 test:test("Datetime API checks", function(test)
@@ -1278,7 +1321,7 @@ test:test("Time interval operations - different timezones", function(test)
 end)
 
 test:test("Time intervals creation - range checks", function(test)
-    test:plan(23)
+    test:plan(63)
 
     local inew = date.interval.new
 
@@ -1324,6 +1367,43 @@ test:test("Time intervals creation - range checks", function(test)
     for _, row in pairs(specific_errors) do
         local err_msg, attribs = unpack(row)
         assert_raises(test, err_msg, function() return inew(attribs) end)
+    end
+
+    local range_boundary = {
+        year = MAX_YEAR_RANGE,
+        month = MAX_MONTH_RANGE,
+        week = MAX_WEEK_RANGE,
+        day =  MAX_DAY_RANGE,
+        hour = MAX_HOUR_RANGE,
+        min = MAX_MIN_RANGE,
+        sec = MAX_SEC_RANGE,
+        msec = MAX_MSEC_RANGE,
+        usec = MAX_USEC_RANGE,
+        nsec = MAX_NSEC_RANGE,
+    }
+
+    for name, range_max in pairs(range_boundary) do
+        local val_max = math.floor(range_max)
+
+        local attrib_min = {[name] = -val_max}
+        test:is(tostring(inew(attrib_min)), iv_str_repr(attrib_min),
+                ('interval %s is allowed'):format(json.encode(attrib_min)))
+
+        local attrib_max = {[name] = val_max}
+        test:is(tostring(inew(attrib_max)), iv_str_repr(attrib_max),
+                ('interval %s is allowed'):format(json.encode(attrib_max)))
+
+        local attrib_over_min = {[name] = -val_max - 1}
+        assert_raises(
+            test,
+            range_check_error(name, attrib_over_min[name], {-range_max, range_max}),
+            function() inew(attrib_over_min) end)
+
+        local attrib_over_max = {[name] = val_max + 1}
+        assert_raises(
+            test,
+            range_check_error(name, attrib_over_max[name], {-range_max, range_max}),
+            function() inew(attrib_over_max) end)
     end
 end)
 
