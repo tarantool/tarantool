@@ -632,3 +632,59 @@ g.test_flightrec_options = function()
         t.assert_equals(box.cfg.flightrec_requests_size, 2000000)
     end)
 end
+
+g.test_security_options = function()
+    t.tarantool.skip_if_not_enterprise()
+    local dir = treegen.prepare_directory(g, {}, {})
+    -- guest user is required for luatest.server helper to function properly,
+    -- so it is enabled (`disable_guest: false`) unlike other options.
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        security:
+            auth_type: pap-sha256
+            auth_delay: 5
+            disable_guest: false
+            password_lifetime_days: 90
+            password_min_length: 14
+            password_enforce_uppercase: true
+            password_enforce_lowercase: true
+            password_enforce_digits: true
+            password_enforce_specialchars: true
+            password_history_length: 3
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local opts = {
+        config_file = config_file,
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+    g.server:exec(function()
+        t.assert_equals(box.cfg.auth_type, 'pap-sha256')
+        t.assert_equals(box.cfg.auth_delay, 5)
+        t.assert_equals(box.cfg.disable_guest, false)
+        t.assert_equals(box.cfg.password_lifetime_days, 90)
+        t.assert_equals(box.cfg.password_min_length, 14)
+        t.assert_equals(box.cfg.password_enforce_uppercase, true)
+        t.assert_equals(box.cfg.password_enforce_lowercase, true)
+        t.assert_equals(box.cfg.password_enforce_digits, true)
+        t.assert_equals(box.cfg.password_enforce_specialchars, true)
+        t.assert_equals(box.cfg.password_history_length, 3)
+    end)
+end

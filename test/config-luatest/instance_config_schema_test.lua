@@ -1038,18 +1038,6 @@ g.test_box_cfg_coverage = function()
         audit_filter = true,
 
         -- TODO: Will be added in the scope of gh-8861.
-        auth_type = true,
-        auth_delay = true,
-        disable_guest = true,
-        password_lifetime_days = true,
-        password_min_length = true,
-        password_enforce_uppercase = true,
-        password_enforce_lowercase = true,
-        password_enforce_digits = true,
-        password_enforce_specialchars = true,
-        password_history_length = true,
-
-        -- TODO: Will be added in the scope of gh-8861.
         metrics = true,
     }
 
@@ -1232,4 +1220,63 @@ g.test_flightrec = function()
     }
     local res = instance_config:apply_default({}).flightrec
     t.assert_equals(res, exp)
+end
+
+g.test_security_enterprise = function()
+    t.tarantool.skip_if_not_enterprise()
+
+    local iconfig = {
+        security = {
+            auth_type = 'pap-sha256',
+            auth_delay = 5,
+            disable_guest = true,
+            password_lifetime_days = 90,
+            password_min_length = 10,
+            password_enforce_uppercase = true,
+            password_enforce_lowercase = true,
+            password_enforce_digits = true,
+            password_enforce_specialchars = true,
+            password_history_length = 3,
+        }
+    }
+
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.security, instance_config.schema.fields.security)
+end
+
+g.test_security_community = function()
+    t.tarantool.skip_if_enterprise()
+    local iconfig = {
+        security = {
+            auth_type = 'pap-sha256',
+        }
+    }
+
+    local ok, err = pcall(instance_config.validate, instance_config, iconfig)
+    t.assert_not(ok)
+    local exp = '[instance_config] security.auth_type: "chap-sha1" is the ' ..
+                'only authentication method (auth_type) available in ' ..
+                'Tarantool Community Edition (\"pap-sha256\" requested)'
+    t.assert_equals(err, exp)
+
+    iconfig = {
+        security = {
+            auth_type = 'chap-sha1',
+            auth_delay = 5,
+        }
+    }
+
+    ok, err = pcall(instance_config.validate, instance_config, iconfig)
+    t.assert_not(ok)
+    exp = '[instance_config] security.auth_delay: This configuration ' ..
+          'parameter is available only in Tarantool Enterprise Edition'
+    t.assert_equals(err, exp)
+
+    iconfig = {
+        security = {
+            auth_type = 'chap-sha1',
+        }
+    }
+
+    instance_config:validate(iconfig)
 end
