@@ -1295,6 +1295,68 @@ return schema.new('instance_config', schema.record({
             default = 16384,
         })),
     }),
+    security = schema.record({
+        auth_type = schema.enum({
+            'chap-sha1',
+            'pap-sha256',
+        }, {
+            box_cfg = 'auth_type',
+            default = 'chap-sha1',
+            validate = function(auth_type, w)
+                if auth_type ~= 'chap-sha1' and
+                        tarantool.package ~= 'Tarantool Enterprise' then
+                    w.error('"chap-sha1" is the only authentication method ' ..
+                            '(auth_type) available in Tarantool Community ' ..
+                            'Edition (%q requested)', auth_type)
+                end
+            end,
+        }),
+        auth_delay = enterprise_edition(schema.scalar({
+            type = 'number',
+            default = 0,
+            box_cfg = 'auth_delay',
+        })),
+        disable_guest = enterprise_edition(schema.scalar({
+            type = 'boolean',
+            default = false,
+            box_cfg = 'disable_guest',
+        })),
+        password_lifetime_days = enterprise_edition(schema.scalar({
+            type = 'integer',
+            default = 0,
+            box_cfg = 'password_lifetime_days',
+        })),
+        password_min_length = enterprise_edition(schema.scalar({
+            type = 'integer',
+            default = 0,
+            box_cfg = 'password_min_length',
+        })),
+        password_enforce_uppercase = enterprise_edition(schema.scalar({
+            type = 'boolean',
+            default = false,
+            box_cfg = 'password_enforce_uppercase',
+        })),
+        password_enforce_lowercase = enterprise_edition(schema.scalar({
+            type = 'boolean',
+            default = false,
+            box_cfg = 'password_enforce_lowercase',
+        })),
+        password_enforce_digits = enterprise_edition(schema.scalar({
+            type = 'boolean',
+            default = false,
+            box_cfg = 'password_enforce_digits',
+        })),
+        password_enforce_specialchars = enterprise_edition(schema.scalar({
+            type = 'boolean',
+            default = false,
+            box_cfg = 'password_enforce_specialchars',
+        })),
+        password_history_length = enterprise_edition(schema.scalar({
+            type = 'integer',
+            default = 0,
+            box_cfg = 'password_history_length',
+        })),
+    }),
 }, {
     -- This kind of validation cannot be implemented as the
     -- 'validate' annotation of a particular schema node. There

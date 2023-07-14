@@ -245,6 +245,20 @@ g.test_defaults = function()
             interval = 3600,
             metrics_limit = 1024*1024,
         } or nil,
+        security = is_enterprise and {
+            auth_delay = 0,
+            auth_type = "chap-sha1",
+            disable_guest = false,
+            password_enforce_digits = false,
+            password_enforce_lowercase = false,
+            password_enforce_specialchars = false,
+            password_enforce_uppercase = false,
+            password_history_length = 0,
+            password_lifetime_days = 0,
+            password_min_length = 0,
+        } or {
+            auth_type = "chap-sha1"
+        },
     }
     local res = cluster_config:apply_default({})
     t.assert_equals(res, exp)
