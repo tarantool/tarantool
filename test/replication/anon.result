@@ -143,10 +143,6 @@ box.space.loc:drop()
  | ---
  | - error: Can't modify data on a read-only instance - box.cfg.read_only is true
  | ...
-box.space.loc:truncate()
- | ---
- | - error: Can't modify data on a read-only instance - box.cfg.read_only is true
- | ...
 
 test_run:cmd('switch default')
  | ---

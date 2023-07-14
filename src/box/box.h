@@ -146,6 +146,13 @@ box_check_slice(void)
 	}
 }
 
+/**
+ * Check if a write operation can be performed on this instance.
+ * Returns 0 on success. On error, sets diag and returns -1.
+ */
+int
+box_check_writable(void);
+
 void
 box_set_ro(void);
 

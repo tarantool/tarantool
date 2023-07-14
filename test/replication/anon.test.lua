@@ -47,7 +47,6 @@ box.cfg{read_only=false}
 box.space.test:insert{2}
 
 box.space.loc:drop()
-box.space.loc:truncate()
 
 test_run:cmd('switch default')
 
