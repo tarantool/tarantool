@@ -30,11 +30,13 @@
  */
 #include "box/box.h"
 #include "box/lua/call.h"
+#include "box/lua/func_adapter.h"
 #include "box/call.h"
 #include "box/error.h"
 #include "box/func.h"
 #include "box/func_def.h"
 #include "box/schema.h"
+#include "event.h"
 #include "fiber.h"
 #include "tt_static.h"
 
@@ -989,22 +991,9 @@ lbox_module_reload(lua_State *L)
 }
 
 int
-lbox_func_call(struct lua_State *L)
+lbox_func_call_impl(struct lua_State *L, int bottom, struct func *func)
 {
-	if (box_check_configured() != 0)
-		return luaT_error(L);
-	if (lua_gettop(L) < 1 || !lua_isstring(L, 1))
-		return luaL_error(L, "Use func:call(...)");
-
-	size_t name_len;
-	const char *name = lua_tolstring(L, 1, &name_len);
-	struct func *func = func_by_name(name, name_len);
-	if (func == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_FUNCTION,
-			 tt_cstr(name, name_len));
-		return luaT_error(L);
-	}
-
+	assert(func != NULL);
 	/*
 	 * Prepare a new Lua stack for input arguments
 	 * before the function call to pass it into the
@@ -1014,7 +1003,7 @@ lbox_func_call(struct lua_State *L)
 	if (args_L == NULL)
 		return luaT_error(L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-	lua_xmove(L, args_L, lua_gettop(L) - 1);
+	lua_xmove(L, args_L, lua_gettop(L) - bottom + 1);
 	struct port args;
 	port_lua_create(&args, args_L);
 	((struct port_lua *) &args)->ref = coro_ref;
@@ -1032,6 +1021,25 @@ lbox_func_call(struct lua_State *L)
 	port_destroy(&ret);
 	port_destroy(&args);
 	return cnt;
+}
+
+int
+lbox_func_call(struct lua_State *L)
+{
+	if (box_check_configured() != 0)
+		return luaT_error(L);
+	if (lua_gettop(L) < 1 || !lua_isstring(L, 1))
+		return luaL_error(L, "Use func:call(...)");
+
+	size_t name_len;
+	const char *name = lua_tolstring(L, 1, &name_len);
+	struct func *func = func_by_name(name, name_len);
+	if (func == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_FUNCTION,
+			 tt_cstr(name, name_len));
+		return luaT_error(L);
+	}
+	return lbox_func_call_impl(L, 2, func);
 }
 
 static void
@@ -1189,6 +1197,70 @@ on_msgpack_serializer_update(struct trigger *trigger, void *event)
 
 static TRIGGER(on_alter_func_in_lua, lbox_func_new_or_delete);
 
+/**
+ * A closure that calls func by name, passed as upvalue.
+ */
+static int
+lbox_func_trigger_call(struct lua_State *L)
+{
+	size_t name_len;
+	const char *name = lua_tolstring(L, lua_upvalueindex(1), &name_len);
+	assert(name != NULL);
+	struct func *func = func_by_name(name, name_len);
+	assert(func != NULL);
+	return lbox_func_call_impl(L, 1, func);
+}
+
+/**
+ * Creates a Lua trigger from func.
+ */
+static struct func_adapter *
+lbox_func_trigger_create(struct lua_State *L, struct func *func)
+{
+	lua_pushlstring(L, func->def->name, func->def->name_len);
+	lua_pushcclosure(L, lbox_func_trigger_call, 1);
+	return func_adapter_lua_create(L, -1);
+}
+
+/**
+ * Sets or deletes Lua triggers, created from func, depending on whether it's
+ * in func_cache. A trigger is added to each event from func->def->triggers.
+ * Does not check anything - it can replace an existing trigger when sets a new
+ * one or delete a trigger it hasn't set (it can happen when user manually
+ * replaces a persistent trigger).
+ */
+static int
+lbox_func_trigger_set_or_del(struct trigger *trigger, void *arg)
+{
+	struct lua_State *L = (struct lua_State *)trigger->data;
+	struct func *func = (struct func *)arg;
+	const char *triggers = func->def->triggers;
+	if (triggers == NULL)
+		return 0;
+	const char **ptr = &triggers;
+	uint32_t trigger_count = mp_decode_array(ptr);
+	for (uint32_t i = 0; i < trigger_count; i++) {
+		uint32_t event_name_len = 0;
+		const char *event_name = mp_decode_str(ptr, &event_name_len);
+		const char *event_name_cstr =
+			tt_cstr(event_name, event_name_len);
+		struct event *event = event_get(event_name_cstr, true);
+		assert(event != NULL);
+		event_ref(event);
+		if (func_by_id(func->def->fid) != NULL) {
+			struct func_adapter *trigger =
+				lbox_func_trigger_create(L, func);
+			event_reset_trigger(event, func->def->name, trigger);
+		} else {
+			event_reset_trigger(event, func->def->name, NULL);
+		}
+		event_unref(event);
+	}
+	return 0;
+}
+
+static TRIGGER(on_alter_func_in_trigger, lbox_func_trigger_set_or_del);
+
 static const struct luaL_Reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},
 	{"module_reload", lbox_module_reload},
@@ -1214,6 +1286,11 @@ box_lua_call_init(struct lua_State *L)
 	 */
 	on_alter_func_in_lua.data = L;
 	trigger_add(&on_alter_func, &on_alter_func_in_lua);
+	/*
+	 * Register the trigger that will push functions to trigger registry.
+	 */
+	on_alter_func_in_trigger.data = L;
+	trigger_add(&on_alter_func, &on_alter_func_in_trigger);
 
 	lua_CFunction handles[] = {
 		[HANDLER_CALL] = execute_lua_call,
