@@ -5,6 +5,7 @@ local test = tap.test('errno')
 local date = require('datetime')
 local ffi = require('ffi')
 local json = require('json')
+local msgpack = require('msgpack')
 local TZ = date.TZ
 
 test:plan(39)
@@ -1312,7 +1313,7 @@ test:test("Time interval operations - different timezones", function(test)
 end)
 
 test:test("Time intervals creation - range checks", function(test)
-    test:plan(63)
+    test:plan(83)
 
     local inew = date.interval.new
 
@@ -1377,12 +1378,18 @@ test:test("Time intervals creation - range checks", function(test)
         local val_max = math.floor(range_max)
 
         local attrib_min = {[name] = -val_max}
-        test:is(tostring(inew(attrib_min)), iv_str_repr(attrib_min),
+        local iv_min = inew(attrib_min)
+        test:is(tostring(iv_min), iv_str_repr(attrib_min),
                 ('interval %s is allowed'):format(json.encode(attrib_min)))
+        test:is(msgpack.decode(msgpack.encode(iv_min)), iv_min,
+                ('msgpack can process interval %s'):format(json.encode(attrib_min)))
 
         local attrib_max = {[name] = val_max}
-        test:is(tostring(inew(attrib_max)), iv_str_repr(attrib_max),
+        local iv_max = inew(attrib_max)
+        test:is(tostring(iv_max), iv_str_repr(attrib_max),
                 ('interval %s is allowed'):format(json.encode(attrib_max)))
+        test:is(msgpack.decode(msgpack.encode(iv_max)), iv_max,
+                ('msgpack can process interval %s'):format(json.encode(attrib_max)))
 
         local attrib_over_min = {[name] = -val_max - 1}
         assert_raises(
