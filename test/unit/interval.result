@@ -1,4 +1,4 @@
-1..21
+1..30
 ok 1 - Size of interval is 3
 ok 2 - Size of interval is 6
 ok 3 - Size of interval is 9
@@ -20,3 +20,12 @@ ok 18 - Minute value is right
 ok 19 - Second value is right
 ok 20 - Nanosecond value is right
 ok 21 - Adjust value is right
+ok 22 - Intervals are equal.
+ok 23 - Intervals are equal.
+ok 24 - Intervals are equal.
+ok 25 - Intervals are equal.
+ok 26 - Intervals are equal.
+ok 27 - Intervals are equal.
+ok 28 - Intervals are equal.
+ok 29 - Intervals are equal.
+ok 30 - Intervals are equal.

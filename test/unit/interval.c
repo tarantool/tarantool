@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <assert.h>
+#include <limits.h>
 
 #include "unit.h"
 #include "string.h"
@@ -94,11 +95,54 @@ test_interval_encode_decode(void)
 	is(result.adjust, DT_EXCESS, "Adjust value is right");
 }
 
+static void
+test_interval_encode_decode_values_outside_int32_limits(void)
+{
+	struct interval itv;
+	memset(&itv, 0, sizeof(itv));
+	struct interval result;
+	interval_mp_recode(&itv, &result);
+	ok(is_interval_equal(&itv, &result), "Intervals are equal.");
+
+	itv.day = (double)INT32_MIN - 1;
+	interval_mp_recode(&itv, &result);
+	ok(is_interval_equal(&itv, &result), "Intervals are equal.");
+
+	itv.day = (double)INT32_MAX + 1;
+	interval_mp_recode(&itv, &result);
+	ok(is_interval_equal(&itv, &result), "Intervals are equal.");
+
+	itv.hour = (double)INT32_MIN - 1;
+	interval_mp_recode(&itv, &result);
+	ok(is_interval_equal(&itv, &result), "Intervals are equal.");
+
+	itv.hour = (double)INT32_MAX + 1;
+	interval_mp_recode(&itv, &result);
+	ok(is_interval_equal(&itv, &result), "Intervals are equal.");
+
+	itv.min = (double)INT32_MIN - 1;
+	interval_mp_recode(&itv, &result);
+	ok(is_interval_equal(&itv, &result), "Intervals are equal.");
+
+	itv.min = (double)INT32_MAX + 1;
+	interval_mp_recode(&itv, &result);
+	ok(is_interval_equal(&itv, &result), "Intervals are equal.");
+
+	itv.sec = (double)INT32_MIN - 1;
+	interval_mp_recode(&itv, &result);
+	ok(is_interval_equal(&itv, &result), "Intervals are equal.");
+
+	itv.sec = (double)INT32_MAX + 1;
+	interval_mp_recode(&itv, &result);
+	ok(is_interval_equal(&itv, &result), "Intervals are equal.");
+}
+
 int
 main(void)
 {
-	plan(21);
+	plan(30);
 	test_interval_sizeof();
 	test_interval_encode_decode();
+	test_interval_encode_decode_values_outside_int32_limits();
 	return check_plan();
 }

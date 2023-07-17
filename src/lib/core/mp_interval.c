@@ -116,7 +116,7 @@ interval_unpack(const char **data, uint32_t len, struct interval *itv)
 	memset(itv, 0, sizeof(*itv));
 	for (uint32_t i = 0; i < count; ++i) {
 		uint32_t field = mp_load_u8(data);
-		int32_t value;
+		int64_t value;
 		enum mp_type type = mp_typeof(**data);
 		if (type == MP_UINT) {
 			if (mp_check_uint(*data, end) > 0)
@@ -127,7 +127,7 @@ interval_unpack(const char **data, uint32_t len, struct interval *itv)
 		} else {
 			return NULL;
 		}
-		if (mp_read_int32(data, &value) != 0)
+		if (mp_read_int64(data, &value) != 0)
 			return NULL;
 		switch (field) {
 		case FIELD_YEAR:
@@ -155,7 +155,7 @@ interval_unpack(const char **data, uint32_t len, struct interval *itv)
 			itv->nsec = value;
 			break;
 		case FIELD_ADJUST:
-			if (value > (int32_t)DT_SNAP)
+			if (value > (int64_t)DT_SNAP)
 				return NULL;
 			itv->adjust = (dt_adjust_t)value;
 			break;
