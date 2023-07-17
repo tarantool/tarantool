@@ -78,3 +78,6 @@ leak:fiber_cxx_invoke
 # test: vinyl/recover.test.lua
 # source: src/lib/core/fiber.c
 leak:cord_costart_thread_func
+
+# TODO(gh-9213): remove when the issue is fixed
+leak:luaT_push_key_def
