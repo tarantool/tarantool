@@ -81,3 +81,9 @@ leak:cord_costart_thread_func
 
 # TODO(gh-9213): remove when the issue is fixed
 leak:luaT_push_key_def
+
+# TODO(gh-8890): remove when the issue is fixed
+leak:box_tuple_update
+leak:box_tuple_iterator
+leak:box_index_iterator_after
+leak:ibuf_reserve_slow
