@@ -66,14 +66,6 @@ box_schema_version(void);
 /** \endcond public */
 
 /**
- * Try to look up object name by id and type of object.
- *
- * @return NULL if object of type not found, otherwise name of object.
- */
-const char *
-schema_find_name(enum schema_object_type type, uint32_t object_id);
-
-/**
  * Find a sequence by id. Return NULL if the sequence was
  * not found.
  */
