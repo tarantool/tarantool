@@ -211,7 +211,7 @@ user_grant_priv(struct user *user, struct priv_def *def)
  * Find the corresponding access structure
  * given object type and object id.
  */
-struct access *
+static struct access *
 access_find(enum schema_object_type object_type, uint32_t object_id)
 {
 	struct access *access = NULL;

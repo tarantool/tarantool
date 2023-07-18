@@ -99,9 +99,6 @@ struct user
 	struct access access[BOX_USER_MAX];
 };
 
-struct access *
-access_find(enum schema_object_type object_type, uint32_t object_id);
-
 /** Find user by id. */
 struct user *
 user_by_id(uint32_t uid);
