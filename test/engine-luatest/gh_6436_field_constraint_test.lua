@@ -490,12 +490,9 @@ g.test_field_constraint_integrity = function(cg)
 
     local function check_references()
         cg.server:exec(function()
-            t.assert_error_msg_contains(
-                "Can't drop function",
-                function() box.func.field_constr1:drop() end
-            )
-            t.assert_error_msg_contains(
-                "function is referenced by constraint",
+            t.assert_error_msg_content_equals(
+                "Can't drop function " .. box.func.field_constr1.id ..
+                ": function is referenced by constraint",
                 function() box.func.field_constr1:drop() end
             )
         end)

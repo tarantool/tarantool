@@ -102,7 +102,7 @@ idx = s:create_index('idx', {unique = true, func = box.func.s.id, parts = {{1, '
  | ...
 box.schema.func.drop('s')
  | ---
- | - error: 'Can''t drop function 1: function has references'
+ | - error: 'Can''t drop function 69: function has references'
  | ...
 box.snapshot()
  | ---
@@ -112,7 +112,7 @@ test_run:cmd("restart server default")
  | 
 box.schema.func.drop('s')
  | ---
- | - error: 'Can''t drop function 1: function has references'
+ | - error: 'Can''t drop function 69: function has references'
  | ...
 s = box.space.withdata
  | ---
