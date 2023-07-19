@@ -444,12 +444,9 @@ g.test_tuple_constraint_integrity = function(cg)
 
     local function check_references()
         cg.server:exec(function()
-            t.assert_error_msg_contains(
-                "Can't drop function",
-                function() box.func.tuple_constr1:drop() end
-            )
-            t.assert_error_msg_contains(
-                "function is referenced by constraint",
+            t.assert_error_msg_content_equals(
+                "Can't drop function " .. box.func.tuple_constr1.id ..
+                ": function is referenced by constraint",
                 function() box.func.tuple_constr1:drop() end
             )
         end)
@@ -471,12 +468,9 @@ g.test_tuple_constraint_integrity = function(cg)
         s:alter{constraint={check2='tuple_constr2'}}
         t.assert_equals(s.constraint, {check2 = box.func.tuple_constr2.id})
         box.func.tuple_constr1:drop()
-        t.assert_error_msg_contains(
-            "Can't drop function",
-            function() box.func.tuple_constr2:drop() end
-        )
-        t.assert_error_msg_contains(
-            "function is referenced by constraint",
+        t.assert_error_msg_content_equals(
+            "Can't drop function " .. box.func.tuple_constr2.id ..
+            ": function is referenced by constraint",
             function() box.func.tuple_constr2:drop() end
         )
 

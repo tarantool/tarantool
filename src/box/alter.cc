@@ -3415,16 +3415,16 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		}
 		if (out) {
 			diag_set(ClientError, ER_DROP_FUNCTION,
-				  (unsigned) old_func->def->uid,
-				  "function has grants");
+				 (unsigned)old_func->def->fid,
+				 "function has grants");
 			return -1;
 		}
 		if (space_has_data(BOX_FUNC_INDEX_ID, 1, old_func->def->fid, &out) != 0)
 			return -1;
 		if (old_func != NULL && out) {
 			diag_set(ClientError, ER_DROP_FUNCTION,
-				  (unsigned) old_func->def->uid,
-				  "function has references");
+				 (unsigned)old_func->def->fid,
+				 "function has references");
 			return -1;
 		}
 		/* Check whether old_func is used somewhere. */
@@ -3433,7 +3433,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 			const char *type_str =
 				func_cache_holder_type_strs[pinned_type];
 			diag_set(ClientError, ER_DROP_FUNCTION,
-				 (unsigned int)old_func->def->uid,
+				 (unsigned)old_func->def->fid,
 				 tt_sprintf("function is referenced by %s",
 					    type_str));
 			return -1;
