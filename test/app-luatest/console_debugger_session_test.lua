@@ -1,7 +1,6 @@
 local t = require('luatest')
-local popen = require('popen')
-local tnt = require('tarantool')
 local fio = require('fio')
+local it = require('test.interactive_tarantool')
 
 local function unescape(s)
     return s and s:gsub('[\27\155][][()#;?%d]*[A-PRZcf-ntqry=><~]', '') or ''
@@ -11,17 +10,7 @@ local function trim(s)
     return s and s:gsub('%s+$', '') or ''
 end
 
-local function tarantool_path(arg)
-    local index = -2
-    -- arg[-1] is guaranteed to be non-null
-    while arg[index] do index = index - 1 end
-    return arg[index + 1]
-end
-
-local TARANTOOL_PATH = tarantool_path(arg)
-
 local DEBUGGER = 'luadebug'
-local dbg_header = tnt.package .. " debugger " .. tnt.version
 local dbg_prompt = DEBUGGER .. '>'
 local dbg_failed_bp = 'command expects argument in format filename:NN or ' ..
                       'filename+NN, where NN should be a positive number.'
@@ -146,17 +135,17 @@ local sequences = {
     12 | os.exit(0)
 ]],
         { ['\t'] = '' }, -- \t is a special value for start
-        { ['n'] = dbg_prompt },
-        { ['s'] = dbg_prompt },
-        { ['n'] = dbg_prompt },
-        { ['n'] = dbg_prompt },
+        { ['n'] = '' },
+        { ['s'] = '' },
+        { ['n'] = '' },
+        { ['n'] = '' },
         { ['p'] = 'expects argument, but none received' },
         { ['p obj'] = 'obj => {"tzoffset" = "+0300", "hour" = 3}' },
-        { ['n'] = dbg_prompt },
+        { ['n'] = '' },
         { ['p ymd'] = 'ymd => false' },
         { ['w'] = 'local hms = false' },
         { ['bogus;'] = 'is not recognized.' },
-        { ['h'] = dbg_prompt },
+        { ['h'] = '' },
         { ['t'] = '=> builtin/datetime.lua' },
         { ['u'] = '{file}:3 in chunk at' },
         -- FIXME (gh-8190) - we should not show calling side at luadebug.lua
@@ -165,15 +154,15 @@ local sequences = {
         { ['d'] = '{file}:3 in chunk at' },
         { ['d'] = 'Inspecting frame: builtin/datetime.lua' },
         { ['l'] = 'obj => {"tzoffset" = "+0300", "hour" = 3}' },
-        { ['f'] = dbg_prompt },
-        { ['n'] = dbg_prompt },
+        { ['f'] = '' },
+        { ['n'] = '' },
         { ['p T'] = 'T => 1970-01-01T03:00:00+0300' },
-        { ['n'] = dbg_prompt },
-        { [''] = dbg_prompt },
-        { [''] = dbg_prompt },
-        { [''] = dbg_prompt },
+        { ['n'] = '' },
+        { [''] = '' },
+        { [''] = '' },
+        { [''] = '' },
         { ['p S'] = 'S => "1970-01-01T0300+0300"' },
-        { ['c'] = '' },
+        { ['c'] = '<END_OF_EXECUTION>' },
     },
 
     -- partial sequence with successful breakpoints added
@@ -193,12 +182,12 @@ local sequences = {
     12 | os.exit(0)
 ]],
         { ['\t'] = '' }, -- \t is a special value for start
-        { ['b +9'] = dbg_prompt },
+        { ['b +9'] = '' },
         { ['c'] = '{file}:9' },
-        { ['n'] = dbg_prompt },
+        { ['n'] = '' },
         { ['p S'] = 'S => "1970-01-01T0300+0300"' },
         { ['p T'] = 'T => 1970-01-01T03:00:00+0300' },
-        { ['c'] = '' },
+        { ['c'] = '<END_OF_EXECUTION>' },
     },
 
     -- partial sequence with failed breakpoint addsitions
@@ -267,21 +256,23 @@ local sequences = {
     },
 }
 
-local function run_debug_session(cmdline, sequence, tmpfile, header)
+local function run_debug_session(sequence, tmpfile, flags)
     local short_src = fio.basename(tmpfile)
     --[[
         repeat multiple times to check all command aliases
     ]]
     for i = 1, MAX_ALIASES_COUNT do
-        local fh = popen.new(cmdline, {
-            stdout = popen.opts.PIPE,
-            stderr = popen.opts.PIPE,
-            stdin = popen.opts.PIPE,
-        })
-        t.assert_is_not(fh, nil)
-        -- for -d option we expect debugger banner in the stderr,
-        -- but for self invoke debugger there is no extra header.
-        local first = header ~= nil
+        local args
+        if flags then
+            args = {flags, tmpfile}
+        else
+            args = {tmpfile}
+        end
+        local expect_header = type(flags) == 'string' and flags:find("-d")
+        local child = it.new_debugger({args = args,
+                                       expect_header = expect_header})
+
+        debuglog(child:read_until_prompt(dbg_prompt))
         for _, row in pairs(sequence) do
             local cmd, expected = next(row)
             -- interpret template strings {file}
@@ -290,36 +281,22 @@ local function run_debug_session(cmdline, sequence, tmpfile, header)
                 if cmd ~= '' then
                     local key, arg = get_key_arg_pair(cmd)
                     arg = arg and (' ' .. arg) or ''
-                    cmd = get_cmd_alias(key, i) .. arg .. '\n'
-                else -- '' empty command - repeat prior one
-                    cmd = cmd .. '\n'
+                    cmd = get_cmd_alias(key, i) .. arg
                 end
-                fh:write(cmd)
-                debuglog('Execute command: "'..trim(cmd)..'"')
+                debuglog('Execute command: "' .. trim(cmd) .. '"')
+                child:execute_command(cmd)
             end
 
-            local result
-            local clean_cmd = trim(cmd)
-            -- there should be empty stderr - check it before stdout
-            local errout = fh:read({ timeout = 0.05, stderr = true})
-            debuglog('stderr output: ', trim(errout))
-            if first and errout then
-                -- we do not expect anything on stderr
-                -- with exception of initial debugger header
-                t.assert_str_contains(trim(errout), header, false)
-                first = false
+            if expected == '<END_OF_EXECUTION>' then
+                t.assert_error_msg_contains('Unexpected EOF',
+                    child.read_until_prompt, child)
             else
-                t.assert(errout == nil or trim(errout) == '')
-            end
-            repeat
-                result = trim(unescape(fh:read({ timeout = 0.5 })))
-                debuglog('stdout output:', result)
-            until result ~= '' or result ~= clean_cmd
-            if expected ~= '' then
-                t.assert_str_contains(result, expected, false)
+                local res = trim(unescape(child:read_until_prompt(dbg_prompt)))
+                debuglog(res)
+                t.assert_str_contains(res, expected)
             end
         end
-        fh:close()
+        child:close()
     end
     debuglog('Delete temporary file ', tmpfile)
     os.remove(tmpfile)
@@ -334,8 +311,7 @@ g.test_debugger = function(cg)
     local tmpfile = table.remove(sequence, 1)
     t.assert(type(tmpfile) == 'string')
 
-    local cmd = { TARANTOOL_PATH, '-d', tmpfile }
-    run_debug_session(cmd, sequences[scenario_name], tmpfile, dbg_header)
+    run_debug_session(sequences[scenario_name], tmpfile, '-d')
 end
 
 local g_self = t.group('self-debug')
@@ -352,10 +328,10 @@ local shorter_sequence = {
     8 | os.exit(0)
 ]],
     { ['\t'] = '' }, -- \t is a special value for start
-    { ['n'] = dbg_prompt },
-    { ['s'] = dbg_prompt },
-    { ['n'] = dbg_prompt },
-    { ['n'] = dbg_prompt },
+    { ['n'] = '' },
+    { ['s'] = '' },
+    { ['n'] = '' },
+    { ['n'] = '' },
     { ['p'] = 'expects argument, but none received' },
     { ['p obj'] = 'obj => {"tzoffset" = "+0300", "hour" = 3}' },
     { ['u'] = '{file}:5 in chunk at' },
@@ -363,7 +339,7 @@ local shorter_sequence = {
     { ['d'] = 'Inspecting frame: builtin/datetime.lua' },
     { ['l'] = 'obj => {"tzoffset" = "+0300", "hour" = 3}' },
     { ['f'] = '{file}:6 in chunk at' },
-    { ['c'] = '' },
+    { ['c'] = '<END_OF_EXECUTION>' },
 }
 
 -- `tarantool debug-self-target.lua`, where
@@ -372,6 +348,5 @@ g_self.test_debug_self_invoke = function()
     local tmpfile = table.remove(shorter_sequence, 1)
     t.assert(type(tmpfile) == 'string')
 
-    local cmd = { TARANTOOL_PATH, tmpfile }
-    run_debug_session(cmd, shorter_sequence, tmpfile)
+    run_debug_session(shorter_sequence, tmpfile)
 end
