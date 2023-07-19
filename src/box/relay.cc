@@ -526,17 +526,21 @@ relay_final_join_f(va_list ap)
 }
 
 void
-relay_final_join(struct iostream *io, uint64_t sync,
+relay_final_join(struct replica *replica, struct iostream *io, uint64_t sync,
 		 struct vclock *start_vclock, struct vclock *stop_vclock)
 {
-	struct relay *relay = relay_new(NULL);
-	if (relay == NULL)
-		diag_raise();
+	/*
+	 * As a new thread is started for the final join stage, its cancellation
+	 * should be handled properly during an unexpected shutdown, so, we
+	 * reuse the subscribe relay in order to cancel the final join thread
+	 * during replication_free().
+	 */
+	struct relay *relay = replica->relay;
+	assert(relay->state != RELAY_FOLLOW);
 
 	relay_start(relay, io, sync, relay_send_row, relay_yield, UINT64_MAX);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
-		relay_delete(relay);
 	});
 	/*
 	 * Save the first vclock as 'received'. Because it was really received.
@@ -1211,8 +1215,12 @@ static void
 relay_send_row(struct xstream *stream, struct xrow_header *packet)
 {
 	struct relay *relay = container_of(stream, struct relay, stream);
+	assert(cord() == &relay->cord);
+	assert(fiber()->f == relay_subscribe_f ||
+	       fiber()->f == relay_final_join_f);
+	bool is_subscribe = fiber()->f == relay_subscribe_f;
 	/* Do not send heartbeats during a final join. */
-	if (relay->replica != NULL)
+	if (is_subscribe)
 		relay_send_heartbeat_on_timeout(relay);
 	if (packet->group_id == GROUP_LOCAL) {
 		/*
@@ -1247,8 +1255,7 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 	 * it). In the latter case packet's LSN is less than or equal to
 	 * local master's LSN at the moment it received 'SUBSCRIBE' request.
 	 */
-	if (relay->replica == NULL ||
-	    packet->replica_id != relay->replica->id ||
+	if (!is_subscribe || packet->replica_id != relay->replica->id ||
 	    packet->lsn <= vclock_get(&relay->local_vclock_at_subscribe,
 				      packet->replica_id)) {
 		struct errinj *inj = errinj(ERRINJ_RELAY_BREAK_LSN,

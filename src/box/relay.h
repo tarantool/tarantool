@@ -138,7 +138,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
  * @param sync      sync from incoming JOIN request
  */
 void
-relay_final_join(struct iostream *io, uint64_t sync,
+relay_final_join(struct replica *replica, struct iostream *io, uint64_t sync,
 		 struct vclock *start_vclock, struct vclock *stop_vclock);
 
 /**
