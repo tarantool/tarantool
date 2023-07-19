@@ -831,6 +831,8 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 
 /** EXECUTE/PREPARE request. */
 struct sql_request {
+	/** True for EXECUTE, false for PREPARE. */
+	bool execute;
 	/** SQL statement text. */
 	const char *sql_text;
 	/** MessagePack array of parameters. */

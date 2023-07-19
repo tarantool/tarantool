@@ -2432,11 +2432,6 @@ tx_process_sql(struct cmsg *m)
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct obuf *out;
 	struct port port;
-	struct sql_bind *bind = NULL;
-	int bind_count = 0;
-	const char *sql;
-	uint32_t len;
-	bool is_unprepare = false;
 	RegionGuard region_guard(&fiber()->gc);
 
 	if (tx_check_msg(msg) != 0)
@@ -2444,68 +2439,14 @@ tx_process_sql(struct cmsg *m)
 	assert(msg->header.type == IPROTO_EXECUTE ||
 	       msg->header.type == IPROTO_PREPARE);
 	tx_inject_delay();
-	if (msg->sql.bind != NULL) {
-		bind_count = sql_bind_list_decode(msg->sql.bind, &bind);
-		if (bind_count < 0)
-			goto error;
-	}
-	/*
-	 * There are four options:
-	 * 1. Prepare SQL query (IPROTO_PREPARE + SQL string);
-	 * 2. Unprepare SQL query (IPROTO_PREPARE + stmt id);
-	 * 3. Execute SQL query (IPROTO_EXECUTE + SQL string);
-	 * 4. Execute prepared query (IPROTO_EXECUTE + stmt id).
-	 */
-	if (msg->header.type == IPROTO_EXECUTE) {
-		if (msg->sql.sql_text != NULL) {
-			assert(msg->sql.stmt_id == NULL);
-			sql = msg->sql.sql_text;
-			sql = mp_decode_str(&sql, &len);
-			if (sql_prepare_and_execute(sql, len, bind, bind_count,
-						    &port, &fiber()->gc) != 0)
-				goto error;
-		} else {
-			assert(msg->sql.sql_text == NULL);
-			assert(msg->sql.stmt_id != NULL);
-			sql = msg->sql.stmt_id;
-			uint32_t stmt_id = mp_decode_uint(&sql);
-			if (sql_execute_prepared(stmt_id, bind, bind_count,
-						 &port, &fiber()->gc) != 0)
-				goto error;
-		}
-	} else {
-		/* IPROTO_PREPARE */
-		if (msg->sql.sql_text != NULL) {
-			assert(msg->sql.stmt_id == NULL);
-			sql = msg->sql.sql_text;
-			sql = mp_decode_str(&sql, &len);
-			if (sql_prepare(sql, len, &port) != 0)
-				goto error;
-		} else {
-			/* UNPREPARE */
-			assert(msg->sql.sql_text == NULL);
-			assert(msg->sql.stmt_id != NULL);
-			sql = msg->sql.stmt_id;
-			uint32_t stmt_id = mp_decode_uint(&sql);
-			if (sql_unprepare(stmt_id) != 0)
-				goto error;
-			is_unprepare = true;
-		}
-	}
-
+	if (box_process_sql(&msg->sql, &port) != 0)
+		goto error;
 	/*
 	 * Take an obuf only after execute(). Else the buffer can
 	 * become out of date during yield.
 	 */
 	out = msg->connection->tx.p_obuf;
 	struct obuf_svp header_svp;
-	if (is_unprepare) {
-		header_svp = obuf_create_svp(out);
-		iproto_reply_ok(out, msg->header.sync, schema_version);
-		iproto_wpos_create(&msg->wpos, out);
-		tx_end_msg(msg, &header_svp);
-		return;
-	}
 	iproto_prepare_header(out, &header_svp, IPROTO_HEADER_LEN);
 	if (port_dump_msgpack(&port, out) != 0) {
 		port_destroy(&port);

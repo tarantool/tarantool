@@ -21,6 +21,7 @@ enum sql_serialization_format {
 	DML_EXECUTE = 1,
 	DQL_PREPARE = 2,
 	DML_PREPARE = 3,
+	UNPREPARE = 4,
 };
 
 /** Methods of struct port_sql. */

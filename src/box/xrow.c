@@ -753,6 +753,7 @@ iproto_reply_select_with_position(struct obuf *buf, struct obuf_svp *svp,
 int
 xrow_decode_sql(const struct xrow_header *row, struct sql_request *request)
 {
+	assert(row->type == IPROTO_EXECUTE || row->type == IPROTO_PREPARE);
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "missing request body");
 		return 1;
@@ -765,6 +766,7 @@ xrow_decode_sql(const struct xrow_header *row, struct sql_request *request)
 	}
 
 	uint32_t map_size = mp_decode_map(&data);
+	request->execute = row->type == IPROTO_EXECUTE;
 	request->sql_text = NULL;
 	request->bind = NULL;
 	request->stmt_id = NULL;

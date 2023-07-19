@@ -35,6 +35,7 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	body.iov_len = size;
 
 	struct xrow_header row = {0};
+	row.type = IPROTO_EXECUTE;
 	row.body[0] = body;
 	row.bodycnt = 1;
 
