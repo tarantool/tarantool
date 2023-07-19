@@ -391,3 +391,69 @@ g.test_feedback_options = function()
         t.assert_equals(box.cfg.feedback_metrics_limit, 1000000)
     end)
 end
+
+g.test_memtx_sort_threads = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        memtx:
+            sort_threads: 11
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local opts = {
+        config_file = config_file,
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+    g.server:exec(function()
+        t.assert_equals(box.cfg.memtx_sort_threads, 11)
+    end)
+
+    config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        memtx:
+            sort_threads: 12
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+    g.server:exec(function()
+        local config = require('config')
+        config:reload()
+        t.assert_equals(box.cfg.memtx_sort_threads, 11)
+        t.assert_equals(#config:info().alerts, 1)
+        local exp = "box_cfg.apply: non-dynamic option memtx_sort_threads "..
+                    "will not be set until the instance is restarted"
+        t.assert_equals(config:info().alerts[1].message, exp)
+    end)
+end

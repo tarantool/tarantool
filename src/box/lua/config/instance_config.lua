@@ -726,6 +726,12 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'memtx_max_tuple_size',
             default = 1024 * 1024,
         }),
+        sort_threads = schema.scalar({
+            type = 'integer',
+            box_cfg = 'memtx_sort_threads',
+            box_cfg_nondynamic = true,
+            default = box.NULL,
+        }),
     }),
     vinyl = schema.record({
         bloom_fpr = schema.scalar({

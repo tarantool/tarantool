@@ -710,6 +710,7 @@ g.test_memtx = function()
             slab_alloc_factor = 1,
             min_tuple_size = 1,
             max_tuple_size = 1,
+            sort_threads = 1,
         },
     }
     instance_config:validate(iconfig)
@@ -722,6 +723,7 @@ g.test_memtx = function()
         slab_alloc_factor = 1.05,
         min_tuple_size = 16,
         max_tuple_size = 1048576,
+        sort_threads = box.NULL,
     }
     local res = instance_config:apply_default({}).memtx
     t.assert_equals(res, exp)
@@ -1060,7 +1062,6 @@ g.test_box_cfg_coverage = function()
 
         -- TODO: Will be added in the scope of gh-8861.
         bootstrap_leader = true,
-        memtx_sort_threads = true,
     }
 
     -- There are options, where defaults are changed deliberately.
