@@ -32,7 +32,7 @@ box.space.test:insert{2}
 
 test_run:switch('replica')
 test_run:wait_lsn('replica', 'default')
-f:status()
+test_run:wait_cond(function() return f:status() == 'dead' end)
 box.space.test:select{}
 
 -- Cleanup

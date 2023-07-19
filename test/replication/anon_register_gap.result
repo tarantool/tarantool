@@ -85,9 +85,9 @@ test_run:switch('replica')
 test_run:wait_lsn('replica', 'default')
  | ---
  | ...
-f:status()
+test_run:wait_cond(function() return f:status() == 'dead' end)
  | ---
- | - dead
+ | - true
  | ...
 box.space.test:select{}
  | ---
