@@ -232,6 +232,17 @@ local function advertise_peer_uri_validate(data, w)
     return uri
 end
 
+local function feedback_apply_default_if(_data, _w)
+    return box.internal.feedback_daemon ~= nil
+end
+
+local function feedback_validate(data, w)
+    if data == nil or box.internal.feedback_daemon ~= nil then
+        return
+    end
+    w.error('Tarantool is built without feedback reports sending support')
+end
+
 return schema.new('instance_config', schema.record({
     config = schema.record({
         version = schema.enum({
@@ -1178,6 +1189,57 @@ return schema.new('instance_config', schema.record({
                 w.error('Fields file and module cannot appear at the same time')
             end
         end,
+    }),
+    feedback = schema.record({
+        enabled = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'feedback_enabled',
+            default = true,
+            apply_default_if = feedback_apply_default_if,
+            validate = feedback_validate,
+        }),
+        crashinfo = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'feedback_crashinfo',
+            default = true,
+            apply_default_if = feedback_apply_default_if,
+            validate = feedback_validate,
+        }),
+        host = schema.scalar({
+            type = 'string',
+            box_cfg = 'feedback_host',
+            default = 'https://feedback.tarantool.io',
+            apply_default_if = feedback_apply_default_if,
+            validate = feedback_validate,
+        }),
+        metrics_collect_interval = schema.scalar({
+            type = 'number',
+            box_cfg = 'feedback_metrics_collect_interval',
+            default = 60,
+            apply_default_if = feedback_apply_default_if,
+            validate = feedback_validate,
+        }),
+        send_metrics = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'feedback_send_metrics',
+            default = true,
+            apply_default_if = feedback_apply_default_if,
+            validate = feedback_validate,
+        }),
+        interval = schema.scalar({
+            type = 'number',
+            box_cfg = 'feedback_interval',
+            default = 3600,
+            apply_default_if = feedback_apply_default_if,
+            validate = feedback_validate,
+        }),
+        metrics_limit = schema.scalar({
+            type = 'integer',
+            box_cfg = 'feedback_metrics_limit',
+            default = 1024 * 1024,
+            apply_default_if = feedback_apply_default_if,
+            validate = feedback_validate,
+        }),
     }),
 }, {
     -- This kind of validation cannot be implemented as the

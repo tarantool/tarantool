@@ -1045,15 +1045,6 @@ g.test_box_cfg_coverage = function()
         password_history_length = true,
 
         -- TODO: Will be added in the scope of gh-8861.
-        feedback_enabled = true,
-        feedback_crashinfo = true,
-        feedback_host = true,
-        feedback_interval = true,
-        feedback_send_metrics = true,
-        feedback_metrics_collect_interval = true,
-        feedback_metrics_limit = true,
-
-        -- TODO: Will be added in the scope of gh-8861.
         flightrec_enabled = true,
         flightrec_logs_size = true,
         flightrec_logs_max_msg_size = true,
@@ -1095,11 +1086,18 @@ g.test_box_cfg_coverage = function()
 
     -- Collect box_cfg annotations from the schema.
     local box_cfg_options_in_schema = instance_config:pairs():filter(function(w)
+        if w.schema.box_cfg == nil then
+            return false
+        end
         -- Skip EE options on CE.
         if w.schema.enterprise_edition and not is_enterprise then
             return false
         end
-        return w.schema.box_cfg ~= nil
+        -- Skip feedback options if feedback is disabled.
+        if w.schema.box_cfg:startswith('feedback') then
+            return box.internal.feedback_daemon ~= nil
+        end
+        return true
     end):map(function(w)
         return w.schema.box_cfg, {
             path = table.concat(w.path, '.'),
@@ -1168,4 +1166,47 @@ g.test_box_cfg_coverage = function()
                 ('defaults for box.cfg.%s are different'):format(option_name))
         end
     end
+end
+
+g.test_feedback_enabled = function()
+    t.skip_if(box.internal.feedback_daemon == nil, 'Feedback is disabled')
+    local iconfig = {
+        feedback = {
+            crashinfo = false,
+            host = 'one',
+            metrics_collect_interval = 1,
+            send_metrics = false,
+            enabled = true,
+            interval = 2,
+            metrics_limit = 3,
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.feedback, instance_config.schema.fields.feedback)
+
+    local exp = {
+        crashinfo = true,
+        host = 'https://feedback.tarantool.io',
+        metrics_collect_interval = 60,
+        send_metrics = true,
+        enabled = true,
+        interval = 3600,
+        metrics_limit = 1024*1024,
+    }
+    local res = instance_config:apply_default({}).feedback
+    t.assert_equals(res, exp)
+end
+
+g.test_feedback_disabled = function()
+    t.skip_if(box.internal.feedback_daemon ~= nil, 'Feedback is enabled')
+    local iconfig = {
+        feedback = {
+            enabled = true,
+        },
+    }
+    local ok, err = pcall(instance_config.validate, instance_config, iconfig)
+    t.assert(not ok)
+    local exp = '[instance_config] feedback.enabled: Tarantool is built '..
+                'without feedback reports sending support'
+    t.assert_equals(err, exp)
 end

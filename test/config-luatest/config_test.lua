@@ -343,3 +343,51 @@ g.test_remaining_vinyl_options = function()
         t.assert_equals(box.cfg.vinyl_timeout, 7.5)
     end)
 end
+
+g.test_feedback_options = function()
+    t.skip_if(box.internal.feedback_daemon == nil, 'Feedback is disabled')
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        feedback:
+          crashinfo: false
+          host: 'https://feedback.tarantool.io'
+          metrics_collect_interval: 120
+          send_metrics: false
+          enabled: false
+          interval: 7200
+          metrics_limit: 1000000
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local opts = {
+        config_file = config_file,
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+    g.server:exec(function()
+        t.assert_equals(box.cfg.feedback_crashinfo, false)
+        t.assert_equals(box.cfg.feedback_host, 'https://feedback.tarantool.io')
+        t.assert_equals(box.cfg.feedback_metrics_collect_interval, 120)
+        t.assert_equals(box.cfg.feedback_send_metrics, false)
+        t.assert_equals(box.cfg.feedback_enabled, false)
+        t.assert_equals(box.cfg.feedback_interval, 7200)
+        t.assert_equals(box.cfg.feedback_metrics_limit, 1000000)
+    end)
+end
