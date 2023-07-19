@@ -208,83 +208,52 @@ user_grant_priv(struct user *user, struct priv_def *def)
 }
 
 /**
- * Find the corresponding access structure
- * given object type and object id.
+ * Find the corresponding access structure for the given privilege.
  */
 static struct access *
-access_find(enum schema_object_type object_type, uint32_t object_id)
+access_find(const struct priv_def *priv)
 {
-	struct access *access = NULL;
-	switch (object_type) {
+	switch (priv->object_type) {
 	case SC_UNIVERSE:
-	{
-		access = universe.access;
-		break;
-	}
-	case SC_ENTITY_SPACE:
-	{
-		access = entity_access.space;
-		break;
-	}
-	case SC_ENTITY_FUNCTION:
-	{
-		access = entity_access.function;
-		break;
-	}
-	case SC_ENTITY_USER:
-	{
-		access = entity_access.user;
-		break;
-	}
-	case SC_ENTITY_ROLE:
-	{
-		access = entity_access.role;
-		break;
-	}
-	case SC_ENTITY_SEQUENCE:
-	{
-		access = entity_access.sequence;
-		break;
-	}
+		return universe.access;
 	case SC_SPACE:
 	{
-		struct space *space = space_by_id(object_id);
-		if (space)
-			access = space->access;
-		break;
+		if (priv->is_entity_access)
+			return entity_access.space;
+		struct space *space = space_by_id(priv->object_id);
+		return space != NULL ? space->access : NULL;
 	}
 	case SC_FUNCTION:
 	{
-		struct func *func = func_by_id(object_id);
-		if (func)
-			access = func->access;
-		break;
+		if (priv->is_entity_access)
+			return entity_access.function;
+		struct func *func = func_by_id(priv->object_id);
+		return func != NULL ? func->access : NULL;
 	}
 	case SC_USER:
 	{
-		struct user *user = user_by_id(object_id);
-		if (user)
-			access = user->access;
-		break;
+		if (priv->is_entity_access)
+			return entity_access.user;
+		struct user *user = user_by_id(priv->object_id);
+		return user != NULL ? user->access : NULL;
 	}
 	case SC_ROLE:
 	{
-		struct user *role = user_by_id(object_id);
-		if (role)
-			access = role->access;
-		break;
+		if (priv->is_entity_access)
+			return entity_access.role;
+		struct user *role = user_by_id(priv->object_id);
+		return role != NULL ? role->access : NULL;
 	}
 	case SC_SEQUENCE:
 	{
-		struct sequence *seq = sequence_by_id(object_id);
-		if (seq)
-			access = seq->access;
-		break;
+		if (priv->is_entity_access)
+			return entity_access.sequence;
+		struct sequence *seq = sequence_by_id(priv->object_id);
+		return seq != NULL ? seq->access : NULL;
 	}
 	default:
-		break;
+		return NULL;
 	}
-	return access;
 }
 
 
@@ -299,8 +268,7 @@ user_set_effective_access(struct user *user)
 	privset_ifirst(&user->privs, &it);
 	struct priv_def *priv;
 	while ((priv = privset_inext(&it)) != NULL) {
-		struct access *object = access_find(priv->object_type,
-						    priv->object_id);
+		struct access *object = access_find(priv);
 		 /* Protect against a concurrent drop. */
 		if (object == NULL)
 			continue;
@@ -759,7 +727,7 @@ role_revoke(struct user *grantee, struct user *role)
 int
 priv_grant(struct user *grantee, struct priv_def *priv)
 {
-	struct access *object = access_find(priv->object_type, priv->object_id);
+	struct access *object = access_find(priv);
 	if (object == NULL)
 		return 0;
 	if (grantee->auth_token == ADMIN && priv->object_type == SC_UNIVERSE &&

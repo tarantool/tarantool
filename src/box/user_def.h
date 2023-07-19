@@ -88,6 +88,11 @@ struct priv_def {
 	uint32_t grantee_id;
 	/* Object id - is only defined for object type */
 	uint32_t object_id;
+	/**
+	 * If this flag is set, the object id is unused and the privilege
+	 * should be applied to the whole object class.
+	 */
+	bool is_entity_access;
 	/* Object type - function, space, universe */
 	enum schema_object_type object_type;
 	/**

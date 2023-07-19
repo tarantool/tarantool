@@ -3751,12 +3751,13 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 	case MP_STR:
 		if (mp_decode_strl(&data) == 0) {
 			/* Entity-wide privilege. */
+			priv->is_entity_access = true;
 			priv->object_id = 0;
-			priv->object_type = schema_entity_type(priv->object_type);
 			break;
 		}
 		FALLTHROUGH;
 	default:
+		priv->is_entity_access = false;
 		if (tuple_field_u32(tuple,
 		    BOX_PRIV_FIELD_OBJECT_ID, &(priv->object_id)) != 0)
 			return -1;
@@ -3799,18 +3800,10 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	const char *name = "";
 	struct access *object = NULL;
 	switch (priv->object_type) {
-	case SC_UNIVERSE:
-		if (grantor->def->uid != ADMIN) {
-			diag_set(AccessDeniedError,
-				  priv_name(priv_type),
-				  schema_object_name(SC_UNIVERSE),
-				  name,
-				  grantor->def->name);
-			return -1;
-		}
-		break;
 	case SC_SPACE:
 	{
+		if (priv->is_entity_access)
+			break;
 		struct space *space = space_cache_find(priv->object_id);
 		if (space == NULL)
 			return -1;
@@ -3828,6 +3821,8 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	}
 	case SC_FUNCTION:
 	{
+		if (priv->is_entity_access)
+			break;
 		struct func *func = func_by_id(priv->object_id);
 		if (func == NULL) {
 			diag_set(ClientError, ER_NO_SUCH_FUNCTION, int2str(priv->object_id));
@@ -3847,6 +3842,8 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	}
 	case SC_SEQUENCE:
 	{
+		if (priv->is_entity_access)
+			break;
 		struct sequence *seq = sequence_by_id(priv->object_id);
 		if (seq == NULL) {
 			diag_set(ClientError, ER_NO_SUCH_SEQUENCE, int2str(priv->object_id));
@@ -3866,6 +3863,8 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	}
 	case SC_ROLE:
 	{
+		if (priv->is_entity_access)
+			break;
 		struct user *role = user_by_id(priv->object_id);
 		if (role == NULL || role->def->type != SC_ROLE) {
 			diag_set(ClientError, ER_NO_SUCH_ROLE,
@@ -3895,6 +3894,8 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	}
 	case SC_USER:
 	{
+		if (priv->is_entity_access)
+			break;
 		struct user *user = user_by_id(priv->object_id);
 		if (user == NULL || user->def->type != SC_USER) {
 			diag_set(ClientError, ER_NO_SUCH_USER,
@@ -3914,22 +3915,15 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		}
 		break;
 	}
-	case SC_ENTITY_SPACE:
-	case SC_ENTITY_FUNCTION:
-	case SC_ENTITY_SEQUENCE:
-	case SC_ENTITY_ROLE:
-	case SC_ENTITY_USER:
-	{
-		/* Only admin may grant privileges on an entire entity. */
-		if (grantor->def->uid != ADMIN) {
-			diag_set(AccessDeniedError, priv_name(priv_type),
-				 schema_entity_name(priv->object_type), name,
-				  grantor->def->name);
-			return -1;
-		}
-	}
 	default:
 		break;
+	}
+	/* Only admin may grant privileges on an entire entity. */
+	if (object == NULL && grantor->def->uid != ADMIN) {
+		diag_set(AccessDeniedError, priv_name(priv_type),
+			 schema_object_name(priv->object_type), name,
+			 grantor->def->name);
+		return -1;
 	}
 	if (access_check_ddl(name, grantor->def->uid, object,
 			     priv->object_type, priv_type) != 0)

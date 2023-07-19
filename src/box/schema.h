@@ -177,19 +177,14 @@ entity_access_get(enum schema_object_type type)
 {
 	switch (type) {
 	case SC_SPACE:
-	case SC_ENTITY_SPACE:
 		return entity_access.space;
 	case SC_FUNCTION:
-	case SC_ENTITY_FUNCTION:
 		return entity_access.function;
 	case SC_USER:
-	case SC_ENTITY_USER:
 		return entity_access.user;
 	case SC_ROLE:
-	case SC_ENTITY_ROLE:
 		return entity_access.role;
 	case SC_SEQUENCE:
-	case SC_ENTITY_SEQUENCE:
 		return entity_access.sequence;
 	default:
 		return NULL;
