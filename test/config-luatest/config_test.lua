@@ -580,3 +580,55 @@ g.test_bootstrap_leader = function(g)
         t.assert_equals(box.cfg.bootstrap_strategy, 'config')
     end)
 end
+
+g.test_flightrec_options = function()
+    t.tarantool.skip_if_not_enterprise()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        flightrec:
+            enabled: false
+            logs_log_level: 5
+            logs_max_msg_size: 8192
+            logs_size: 1000000
+            metrics_interval: 5
+            metrics_period: 240
+            requests_max_req_size: 10000
+            requests_max_res_size: 20000
+            requests_size: 2000000
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local opts = {
+        config_file = config_file,
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+    g.server:exec(function()
+        t.assert_equals(box.cfg.flightrec_enabled, false)
+        t.assert_equals(box.cfg.flightrec_logs_log_level, 5)
+        t.assert_equals(box.cfg.flightrec_logs_max_msg_size, 8192)
+        t.assert_equals(box.cfg.flightrec_logs_size, 1000000)
+        t.assert_equals(box.cfg.flightrec_metrics_interval, 5)
+        t.assert_equals(box.cfg.flightrec_metrics_period, 240)
+        t.assert_equals(box.cfg.flightrec_requests_max_req_size, 10000)
+        t.assert_equals(box.cfg.flightrec_requests_max_res_size, 20000)
+        t.assert_equals(box.cfg.flightrec_requests_size, 2000000)
+    end)
+end

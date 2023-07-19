@@ -1247,6 +1247,54 @@ return schema.new('instance_config', schema.record({
             validate = feedback_validate,
         }),
     }),
+    flightrec = schema.record({
+        enabled = enterprise_edition(schema.scalar({
+            type = 'boolean',
+            box_cfg = 'flightrec_enabled',
+            default = false,
+        })),
+        logs_size = enterprise_edition(schema.scalar({
+            type = 'integer',
+            box_cfg = 'flightrec_logs_size',
+            default = 10485760,
+        })),
+        logs_max_msg_size = enterprise_edition(schema.scalar({
+            type = 'integer',
+            box_cfg = 'flightrec_logs_max_msg_size',
+            default = 4096,
+        })),
+        logs_log_level = enterprise_edition(schema.scalar({
+            type = 'integer',
+            box_cfg = 'flightrec_logs_log_level',
+            default = 6,
+            allowed_values = {0, 1, 2, 3, 4, 5, 6, 7},
+        })),
+        metrics_interval = enterprise_edition(schema.scalar({
+            type = 'number',
+            box_cfg = 'flightrec_metrics_interval',
+            default = 1.0,
+        })),
+        metrics_period = enterprise_edition(schema.scalar({
+            type = 'number',
+            box_cfg = 'flightrec_metrics_period',
+            default = 60 * 3,
+        })),
+        requests_size = enterprise_edition(schema.scalar({
+            type = 'integer',
+            box_cfg = 'flightrec_requests_size',
+            default = 10485760,
+        })),
+        requests_max_req_size = enterprise_edition(schema.scalar({
+            type = 'integer',
+            box_cfg = 'flightrec_requests_max_req_size',
+            default = 16384,
+        })),
+        requests_max_res_size = enterprise_edition(schema.scalar({
+            type = 'integer',
+            box_cfg = 'flightrec_requests_max_res_size',
+            default = 16384,
+        })),
+    }),
 }, {
     -- This kind of validation cannot be implemented as the
     -- 'validate' annotation of a particular schema node. There
