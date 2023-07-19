@@ -218,6 +218,7 @@ g.test_defaults = function()
             slab_alloc_factor = 1.05,
             min_tuple_size = 16,
             max_tuple_size = 1048576,
+            sort_threads = box.NULL,
         },
         config = {
             reload = 'auto',
