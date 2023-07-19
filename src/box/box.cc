@@ -4209,6 +4209,13 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 			  "registration of non-anonymous nodes.");
 	}
 
+	/* Don't allow multiple relays for the same replica */
+	if (replica != NULL &&
+	    relay_get_state(replica->relay) == RELAY_FOLLOW) {
+		tnt_raise(ClientError, ER_CFG, "replication",
+			  "duplicate connection with the same replica UUID");
+	}
+
 	/* See box_process_join() */
 	box_check_writable_xc();
 	struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
@@ -4246,7 +4253,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	 * (req.vclock, stop_vclock) so that it gets its
 	 * registration.
 	 */
-	relay_final_join(io, header->sync, &req.vclock, &stop_vclock);
+	relay_final_join(replica, io, header->sync, &req.vclock, &stop_vclock);
 	say_info("final data sent.");
 
 	RegionGuard region_guard(&fiber()->gc);
@@ -4409,7 +4416,8 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * Final stage: feed replica with WALs in range
 	 * (start_vclock, stop_vclock).
 	 */
-	relay_final_join(io, header->sync, &start_vclock, &stop_vclock);
+	relay_final_join(replica, io, header->sync, &start_vclock,
+			 &stop_vclock);
 	say_info("final data sent.");
 
 	/* Send end of WAL stream marker */
