@@ -302,25 +302,14 @@ enum {
  */
 enum schema_object_type {
 	SC_UNKNOWN = 0,
-	SC_UNIVERSE = 1,
-	SC_SPACE = 2,
-	SC_FUNCTION = 3,
-	SC_USER = 4,
-	SC_ROLE = 5,
-	SC_SEQUENCE = 6,
-	SC_COLLATION = 7,
-	/*
-	 * All object types are supposed to be above this point,
-	 * all entity types - below.
-	 */
-	schema_object_type_MAX = 8,
-	SC_ENTITY_SPACE,
-	SC_ENTITY_FUNCTION,
-	SC_ENTITY_USER,
-	SC_ENTITY_ROLE,
-	SC_ENTITY_SEQUENCE,
-	SC_ENTITY_COLLATION,
-	schema_entity_type_MAX = 15
+	SC_UNIVERSE,
+	SC_SPACE,
+	SC_FUNCTION,
+	SC_USER,
+	SC_ROLE,
+	SC_SEQUENCE,
+	SC_COLLATION,
+	schema_object_type_MAX,
 };
 
 /** SQL Storage engine. */
@@ -332,20 +321,11 @@ enum sql_storage_engine {
 
 extern const char *sql_storage_engine_strs[];
 
-/**
- * Given a object type, return an entity type it belongs to.
- */
-enum schema_object_type
-schema_entity_type(enum schema_object_type type);
-
 enum schema_object_type
 schema_object_type(const char *name);
 
 const char *
 schema_object_name(enum schema_object_type type);
-
-const char *
-schema_entity_name(enum schema_object_type type);
 
 /**
  * Check that the space id corresponds to a system space, which means that is
