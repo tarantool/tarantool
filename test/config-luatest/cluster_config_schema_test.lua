@@ -222,6 +222,15 @@ g.test_defaults = function()
         config = {
             reload = 'auto',
         },
+        feedback = box.internal.feedback_daemon ~= nil and {
+            crashinfo = true,
+            host = 'https://feedback.tarantool.io',
+            metrics_collect_interval = 60,
+            send_metrics = true,
+            enabled = true,
+            interval = 3600,
+            metrics_limit = 1024*1024,
+        } or nil,
     }
     local res = cluster_config:apply_default({})
     t.assert_equals(res, exp)
