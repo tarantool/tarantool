@@ -51,6 +51,7 @@ extern const char *sql_info_key_strs[];
 struct Vdbe;
 struct region;
 struct sql_bind;
+struct sql_request;
 
 int
 sql_unprepare(uint32_t stmt_id);
@@ -112,6 +113,22 @@ sql_stmt_busy(const struct Vdbe *stmt);
  */
 int
 sql_prepare(const char *sql, int len, struct port *port);
+
+/**
+ * Process an SQL request received over IPROTO.
+ *
+ * @param request SQL request.
+ * @param port Port to store request response.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error, see diag.
+ *
+ * NOTE: The port may refer to data allocated from the fiber region.
+ * The caller is responsible for truncating the region after using
+ * the port.
+ */
+int
+box_process_sql(const struct sql_request *request, struct port *port);
 
 #if defined(__cplusplus)
 } /* extern "C" { */

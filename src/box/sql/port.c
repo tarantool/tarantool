@@ -345,7 +345,17 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 		 */
 		int keys = 3;
 		return sql_get_prepare_common_keys(stmt, out, keys);
+	}
+	case UNPREPARE: {
+		int size = mp_sizeof_map(0);
+		char *pos = obuf_alloc(out, size);
+		if (pos == NULL) {
+			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
+			return -1;
 		}
+		mp_encode_map(pos, 0);
+		break;
+	}
 	default: {
 		unreachable();
 	}

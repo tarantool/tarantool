@@ -257,3 +257,56 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 	port_destroy(port);
 	return -1;
 }
+
+int
+box_process_sql(const struct sql_request *request, struct port *port)
+{
+	struct region *region = &fiber()->gc;
+	struct sql_bind *bind = NULL;
+	int bind_count = 0;
+	if (request->bind != NULL) {
+		bind_count = sql_bind_list_decode(request->bind, &bind);
+		if (bind_count < 0)
+			return -1;
+	}
+	/*
+	 * There are four options:
+	 * 1. Prepare SQL query (IPROTO_PREPARE + SQL string);
+	 * 2. Unprepare SQL query (IPROTO_PREPARE + stmt id);
+	 * 3. Execute SQL query (IPROTO_EXECUTE + SQL string);
+	 * 4. Execute prepared query (IPROTO_EXECUTE + stmt id).
+	 */
+	if (request->execute) {
+		if (request->sql_text != NULL) {
+			assert(request->stmt_id == NULL);
+			const char *sql = request->sql_text;
+			uint32_t len;
+			sql = mp_decode_str(&sql, &len);
+			return sql_prepare_and_execute(sql, len,
+						       bind, bind_count,
+						       port, region);
+		} else {
+			assert(request->stmt_id != NULL);
+			const char *data = request->stmt_id;
+			uint32_t stmt_id = mp_decode_uint(&data);
+			return sql_execute_prepared(stmt_id, bind, bind_count,
+						    port, region);
+		}
+	} else {
+		if (request->sql_text != NULL) {
+			assert(request->stmt_id == NULL);
+			const char *sql = request->sql_text;
+			uint32_t len;
+			sql = mp_decode_str(&sql, &len);
+			return sql_prepare(sql, len, port);
+		} else {
+			assert(request->stmt_id != NULL);
+			const char *data = request->stmt_id;
+			uint32_t stmt_id = mp_decode_uint(&data);
+			if (sql_unprepare(stmt_id) != 0)
+				return -1;
+			port_sql_create(port, NULL, UNPREPARE, false);
+			return 0;
+		}
+	}
+}
