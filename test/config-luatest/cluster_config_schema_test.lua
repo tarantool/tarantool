@@ -5,6 +5,8 @@ local cluster_config = require('internal.config.cluster_config')
 
 local g = t.group()
 
+local is_enterprise = require('tarantool').package == 'Tarantool Enterprise'
+
 g.test_cluster_config = function()
     local config = {
         credentials = {
@@ -114,6 +116,17 @@ g.test_defaults = function()
                 enabled = false,
             },
         },
+        flightrec = is_enterprise and {
+            enabled = false,
+            logs_log_level = 6,
+            logs_max_msg_size = 4096,
+            logs_size = 10485760,
+            metrics_interval = 1,
+            metrics_period = 180,
+            requests_max_req_size = 16384,
+            requests_max_res_size = 16384,
+            requests_size = 10485760,
+        } or nil,
         sql = {
             cache_size = 5242880,
         },

@@ -1050,17 +1050,6 @@ g.test_box_cfg_coverage = function()
         password_history_length = true,
 
         -- TODO: Will be added in the scope of gh-8861.
-        flightrec_enabled = true,
-        flightrec_logs_size = true,
-        flightrec_logs_max_msg_size = true,
-        flightrec_logs_log_level = true,
-        flightrec_metrics_interval = true,
-        flightrec_metrics_period = true,
-        flightrec_requests_size = true,
-        flightrec_requests_max_req_size = true,
-        flightrec_requests_max_res_size = true,
-
-        -- TODO: Will be added in the scope of gh-8861.
         metrics = true,
     }
 
@@ -1210,4 +1199,37 @@ g.test_feedback_disabled = function()
     local exp = '[instance_config] feedback.enabled: Tarantool is built '..
                 'without feedback reports sending support'
     t.assert_equals(err, exp)
+end
+
+g.test_flightrec = function()
+    t.tarantool.skip_if_not_enterprise()
+    local iconfig = {
+        flightrec = {
+            enabled = false,
+            logs_log_level = 1,
+            logs_max_msg_size = 2,
+            logs_size = 3,
+            metrics_interval = 4,
+            metrics_period = 5,
+            requests_max_req_size = 6,
+            requests_max_res_size = 7,
+            requests_size = 8,
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.flightrec, instance_config.schema.fields.flightrec)
+
+    local exp = {
+        enabled = false,
+        logs_log_level = 6,
+        logs_max_msg_size = 4096,
+        logs_size = 10485760,
+        metrics_interval = 1,
+        metrics_period = 180,
+        requests_max_req_size = 16384,
+        requests_max_res_size = 16384,
+        requests_size = 10485760,
+    }
+    local res = instance_config:apply_default({}).flightrec
+    t.assert_equals(res, exp)
 end
