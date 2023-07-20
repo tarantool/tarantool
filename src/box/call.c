@@ -31,6 +31,7 @@
 
 #include "box/call.h"
 #include "lua/call.h"
+#include "../lua/init.h" /* tarantool_lua_is_builtin_global */
 #include "schema.h"
 #include "session.h"
 #include "func.h"
@@ -151,6 +152,45 @@ box_run_on_call(enum iproto_type type, const char *expr, int expr_len,
 	trigger_run(&box_on_call, &ctx);
 }
 
+/** Checks if the current user may execute any global Lua function. */
+static int
+access_check_call(const char *name, uint32_t name_len)
+{
+	struct credentials *cr = effective_user();
+	user_access_t access = PRIV_X | PRIV_U;
+	access &= ~cr->universal_access;
+	if (access == 0)
+		return 0;
+	access &= ~universe.access_lua_call[cr->auth_token].effective;
+	if (access == 0 && !tarantool_lua_is_builtin_global(name, name_len))
+		return 0;
+	struct user *user = user_find(cr->uid);
+	if (user != NULL)
+		diag_set(AccessDeniedError, priv_name(PRIV_X),
+			 schema_object_name(SC_FUNCTION),
+			 tt_cstr(name, name_len), user->def->name);
+	return -1;
+}
+
+/** Checks if the current user may execute an arbitrary Lua expression. */
+static int
+access_check_eval(void)
+{
+	struct credentials *cr = effective_user();
+	user_access_t access = PRIV_X | PRIV_U;
+	access &= ~cr->universal_access;
+	if (access == 0)
+		return 0;
+	access &= ~universe.access_lua_eval[cr->auth_token].effective;
+	if (access == 0)
+		return 0;
+	struct user *user = user_find(cr->uid);
+	if (user != NULL)
+		diag_set(AccessDeniedError, priv_name(PRIV_X),
+			 schema_object_name(SC_UNIVERSE), "", user->def->name);
+	return -1;
+}
+
 int
 box_process_call(struct call_request *request, struct port *port)
 {
@@ -172,9 +212,7 @@ box_process_call(struct call_request *request, struct port *port)
 		if (func_call_no_access_check(func, &args, port) != 0)
 			return -1;
 	} else {
-		if (access_check_universe_object(PRIV_X | PRIV_U,
-						 SC_FUNCTION,
-						 tt_cstr(name, name_len)) != 0)
+		if (access_check_call(name, name_len) != 0)
 			return -1;
 		box_run_on_call(IPROTO_CALL, name, name_len, request->args);
 		if (box_lua_call(name, name_len, &args, port) != 0)
@@ -188,7 +226,7 @@ box_process_eval(struct call_request *request, struct port *port)
 {
 	rmean_collect(rmean_box, IPROTO_EVAL, 1);
 	/* Check permissions */
-	if (access_check_universe(PRIV_X) != 0)
+	if (access_check_eval() != 0)
 		return -1;
 	struct port args;
 	port_msgpack_create(&args, request->args,

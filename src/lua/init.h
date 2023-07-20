@@ -57,6 +57,10 @@ struct instance_state {
 #define O_EXECUTE     0x8
 #define O_HELP_ENV_LIST 0x10
 
+/** Returns true if the name refers to a built-in global Lua object. */
+bool
+tarantool_lua_is_builtin_global(const char *name, uint32_t name_len);
+
 /**
  * Create tarantool_L and initialize built-in Lua modules.
  */

@@ -2873,6 +2873,8 @@ end
 -- allowed combination of privilege bits for object
 local priv_object_combo = {
     ["universe"] = box.priv.ALL,
+    ["lua_call"] = bit.bor(box.priv.X, box.priv.U),
+    ["lua_eval"] = bit.bor(box.priv.X, box.priv.U),
 -- sic: we allow to grant 'execute' on space. This is a legacy
 -- bug, please fix it in 2.0
     ["space"]    = bit.bxor(box.priv.ALL, box.priv.S,
@@ -2946,12 +2948,23 @@ local function privilege_name(privilege)
     return table.concat(names, ",")
 end
 
+-- Set of object types that have a single global instance.
+local singleton_object_types = {
+    ['universe'] = true,
+    ['lua_call'] = true,
+    ['lua_eval'] = true,
+}
+
+local function is_singleton_object_type(object_type)
+    return singleton_object_types[object_type]
+end
+
 local function object_resolve(object_type, object_name)
     if object_name ~= nil and type(object_name) ~= 'string'
             and type(object_name) ~= 'number' then
         box.error(box.error.ILLEGAL_PARAMS, "wrong object name type")
     end
-    if object_type == 'universe' then
+    if is_singleton_object_type(object_type) then
         return 0
     end
     if object_type == 'space' then
@@ -3015,7 +3028,7 @@ local function object_resolve(object_type, object_name)
 end
 
 local function object_name(object_type, object_id)
-    if object_type == 'universe' or object_id == '' then
+    if is_singleton_object_type(object_type) or object_id == '' then
         return ""
     end
     local space
@@ -3350,7 +3363,7 @@ local function grant(uid, name, privilege, object_type,
                privilege == 'execute' then
                 box.error(box.error.ROLE_GRANTED, name, object_name)
             else
-                if object_type ~= 'universe' then
+                if not is_singleton_object_type(object_type) then
                     object_name = string.format(" '%s'", object_name)
                 end
                 box.error(box.error.PRIV_GRANTED, name, privilege,
