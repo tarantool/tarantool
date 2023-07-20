@@ -394,16 +394,6 @@ int
 access_check_universe(user_access_t access);
 
 /**
- * Same as access_check_universe(), but in case the current user
- * doesn't have universal access, set AccessDeniedError for the
- * given object type and name.
- */
-int
-access_check_universe_object(user_access_t access,
-			     enum schema_object_type object_type,
-			     const char *object_name);
-
-/**
  * This function is called by public API wrappers around session push.
  * It logs a deprecation warning. If session push is disabled, it also
  * sets diag and returns -1.

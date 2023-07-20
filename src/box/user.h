@@ -43,6 +43,10 @@ extern "C" {
 struct universe {
 	/** Global privileges this user has on the universe. */
 	struct access access[BOX_USER_MAX];
+	/** Privileges to execute any global Lua function with IPROTO_CALL. */
+	struct access access_lua_call[BOX_USER_MAX];
+	/** Privileges to execute any Lua expression with IPROTO_EVAL. */
+	struct access access_lua_eval[BOX_USER_MAX];
 };
 
 /** A single instance of the universe. */

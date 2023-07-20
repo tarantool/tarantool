@@ -45,6 +45,7 @@
 
 #include <fiber.h>
 #include "version.h"
+#include "assoc.h"
 #include "coio.h"
 #include "core/backtrace.h"
 #include "core/tt_static.h"
@@ -444,6 +445,62 @@ static const char *lua_modules_preload[] = {
 #endif /* defined(EMBED_LUAROCKS) */
 	NULL
 };
+
+/**
+ * Names of all global built-in objects. Note that this is a set, not a map,
+ * i.e. only keys are used while values are NULL.
+ *
+ * We consider a global key (from _G) to be built-in if it exists after
+ * initializing all Tarantool modules but before executing the user script.
+ */
+static struct mh_strnptr_t *builtin_globals = NULL;
+
+static void
+builtin_globals_init(struct lua_State *L)
+{
+	struct mh_strnptr_t *h = mh_strnptr_new();
+	lua_pushnil(L);
+	while (lua_next(L, LUA_GLOBALSINDEX) != 0) {
+		lua_pop(L, 1); /* pop the value, leave the key */
+		if (lua_type(L, -1) == LUA_TSTRING) {
+			size_t len;
+			const char *s = xstrdup(lua_tolstring(L, -1, &len));
+			uint32_t hash = mh_strn_hash(s, len);
+			struct mh_strnptr_node_t n = {s, len, hash, NULL};
+			struct mh_strnptr_node_t prev;
+			struct mh_strnptr_node_t *prev_ptr = &prev;
+			mh_strnptr_put(h, &n, &prev_ptr, NULL);
+			assert(prev_ptr == NULL);
+		}
+	}
+	builtin_globals = h;
+}
+
+static void
+builtin_globals_free(void)
+{
+	struct mh_strnptr_t *h = builtin_globals;
+	if (h != NULL) {
+		builtin_globals = NULL;
+		mh_int_t i;
+		mh_foreach(h, i)
+			free((void *)mh_strnptr_node(h, i)->str);
+		mh_strnptr_delete(h);
+	}
+}
+
+bool
+tarantool_lua_is_builtin_global(const char *name, uint32_t name_len)
+{
+	/* Extract the top-level namespace prefix. */
+	uint32_t len = 0;
+	for (const char *s = name; len < name_len; s++, len++) {
+		if (*s == ' ' || *s == '.' || *s == ':' || *s == '[')
+			break;
+	}
+	struct mh_strnptr_t *h = builtin_globals;
+	return h != NULL && mh_strnptr_find_str(h, name, len) != mh_end(h);
+}
 
 /*
  * {{{ box Lua library: common functions
@@ -970,6 +1027,7 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 int
 tarantool_lua_postinit(struct lua_State *L)
 {
+	builtin_globals_init(L);
 	/*
 	 * loaders.initializing = nil
 	 *
@@ -1282,6 +1340,7 @@ tarantool_lua_run_script(char *path, struct instance_state *instance,
 void
 tarantool_lua_free()
 {
+	builtin_globals_free();
 	builtin_modcache_free();
 	tarantool_lua_utf8_free();
 	/*

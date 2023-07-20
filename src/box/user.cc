@@ -216,6 +216,10 @@ access_find(const struct priv_def *priv)
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
 		return universe.access;
+	case SC_LUA_CALL:
+		return universe.access_lua_call;
+	case SC_LUA_EVAL:
+		return universe.access_lua_eval;
 	case SC_SPACE:
 	{
 		if (priv->is_entity_access)
