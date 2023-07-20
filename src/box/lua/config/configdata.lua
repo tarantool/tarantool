@@ -79,6 +79,10 @@ function methods.is_leader(self)
     return self._leader == self._instance_name
 end
 
+function methods.bootstrap_leader(self)
+    return self._bootstrap_leader
+end
+
 local mt = {
     __index = methods,
 }
@@ -191,6 +195,28 @@ local function new(iconfig, cconfig, instance_name)
         end
     end
 
+    local bootstrap_strategy = instance_config:get(iconfig_def,
+        'replication.bootstrap_strategy')
+    local bootstrap_leader = found.replicaset.bootstrap_leader
+    if bootstrap_strategy ~= 'config' then
+        if bootstrap_leader ~= nil then
+            error(('The "bootstrap_leader" option cannot be set for '..
+                   'replicaset %q because "bootstrap_strategy" for instance '..
+                   '%q is not "config"'):format(found.replicaset_name,
+                                                instance_name), 0)
+        end
+    elseif bootstrap_leader == nil then
+        error(('The "bootstrap_leader" option cannot be empty for replicaset '..
+               '%q because "bootstrap_strategy" for instance %q is '..
+               '"config"'):format(found.replicaset_name, instance_name), 0)
+    else
+        if peers[bootstrap_leader] == nil then
+            error(('"bootstrap_leader" = %q option is set for replicaset %q '..
+                   'of group %q, but instance %q is not found in this '..
+                   'replicaset'):format(bootstrap_leader, found.replicaset_name,
+                                        found.group_name, bootstrap_leader), 0)
+        end
+    end
     return setmetatable({
         _iconfig = iconfig,
         _iconfig_def = iconfig_def,
@@ -202,6 +228,7 @@ local function new(iconfig, cconfig, instance_name)
         _instance_name = instance_name,
         _failover = failover,
         _leader = leader,
+        _bootstrap_leader = bootstrap_leader,
     }, mt)
 end
 

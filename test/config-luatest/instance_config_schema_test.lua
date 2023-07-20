@@ -1025,6 +1025,9 @@ g.test_box_cfg_coverage = function()
         -- box.cfg() options is deprecated.
         replication_connect_quorum = true,
 
+        -- Cluster options that are not in the instance options.
+        bootstrap_leader = true,
+
         -- Moved to the CLI options (see gh-8876).
         force_recovery = true,
 
@@ -1059,9 +1062,6 @@ g.test_box_cfg_coverage = function()
 
         -- TODO: Will be added in the scope of gh-8861.
         metrics = true,
-
-        -- TODO: Will be added in the scope of gh-8861.
-        bootstrap_leader = true,
     }
 
     -- There are options, where defaults are changed deliberately.

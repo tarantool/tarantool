@@ -457,3 +457,126 @@ g.test_memtx_sort_threads = function()
         t.assert_equals(config:info().alerts[1].message, exp)
     end)
 end
+
+g.test_bootstrap_leader = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                bootstrap_leader: 'instance-001'
+                instances:
+                  instance-001: {}
+    ]]
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local env = {TT_LOG_LEVEL = 0}
+    local args = {'--name', 'instance-001', '--config', config_file}
+    local opts = {nojson = true, stderr = true}
+    local res = justrun.tarantool(dir, env, args, opts)
+    local exp = 'LuajitError: The "bootstrap_leader" option cannot be set '..
+                'for replicaset "replicaset-001" because '..
+                '"bootstrap_strategy" for instance "instance-001" is not '..
+                '"config"\nfatal error, exiting the event loop'
+    t.assert_equals(res.exit_code, 1)
+    t.assert_equals(res.stderr, exp)
+
+    config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        replication:
+          bootstrap_strategy: 'config'
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+    res = justrun.tarantool(dir, env, args, opts)
+    exp = 'LuajitError: The \"bootstrap_leader\" option cannot be empty for '..
+          'replicaset "replicaset-001" because "bootstrap_strategy" for '..
+          'instance "instance-001" is "config"'..
+          '\nfatal error, exiting the event loop'
+    t.assert_equals(res.exit_code, 1)
+    t.assert_equals(res.stderr, exp)
+
+    config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        replication:
+          bootstrap_strategy: 'config'
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                bootstrap_leader: 'instance-002'
+                instances:
+                  instance-001: {}
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+    res = justrun.tarantool(dir, env, args, opts)
+    exp = 'LuajitError: "bootstrap_leader" = "instance-002" option is set '..
+          'for replicaset "replicaset-001" of group "group-001", but '..
+          'instance "instance-002" is not found in this replicaset'..
+          '\nfatal error, exiting the event loop'
+    t.assert_equals(res.exit_code, 1)
+    t.assert_equals(res.stderr, exp)
+
+    config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        replication:
+          bootstrap_strategy: 'config'
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                bootstrap_leader: 'instance-001'
+                instances:
+                  instance-001: {}
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+
+    opts = {config_file = config_file, alias = 'instance-001', chdir = dir}
+    g.server = server:new(opts)
+    g.server:start()
+    g.server:exec(function()
+        t.assert_equals(box.cfg.bootstrap_leader, 'instance-001')
+        t.assert_equals(box.cfg.bootstrap_strategy, 'config')
+    end)
+end

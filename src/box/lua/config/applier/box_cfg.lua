@@ -352,6 +352,9 @@ local function apply(config)
     box_cfg.replicaset_name = names.replicaset_name
     box_cfg.instance_name = names.instance_name
 
+    -- Set bootstrap_leader option.
+    box_cfg.bootstrap_leader = configdata:bootstrap_leader()
+
     -- The startup process may need a special handling and differs
     -- from the configuration reloading process.
     local is_startup = type(box.cfg) == 'function'
