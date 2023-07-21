@@ -3,7 +3,7 @@ local server = require('luatest.server')
 local t = require('luatest')
 
 local g_common = t.group('gh_8803_exec_priv.common', t.helpers.matrix({
-    obj_type = {'lua_call', 'lua_eval'},
+    obj_type = {'lua_call', 'lua_eval', 'sql'},
 }))
 
 g_common.before_all(function(cg)
@@ -169,4 +169,50 @@ g.test_lua_call_builtin = function(cg)
     for _, func in ipairs(func_list) do
         t.assert_error_msg_equals(errfmt:format(func), c.call, c, func)
     end
+end
+
+-- Checks that execute privilege granted on sql grants access to
+-- executing SQL expressions.
+g.test_sql = function(cg)
+    local c = cg.conn
+    local expr = 'SELECT 1'
+    local errmsg = "Execute access to sql '' is denied for user 'test'"
+    t.assert_error_msg_equals(errmsg, c.execute, c, expr)
+    t.assert_error_msg_equals(errmsg, c.prepare, c, expr)
+    t.assert_error_msg_equals(errmsg, c.unprepare, c, 0)
+    cg.grant('test', 'execute', 'sql')
+    t.assert(pcall(c.execute, c, expr))
+    cg.revoke('test', 'usage', 'universe')
+    t.assert_error_msg_equals(errmsg, c.execute, c, expr)
+    t.assert_error_msg_equals(errmsg, c.prepare, c, expr)
+    t.assert_error_msg_equals(errmsg, c.unprepare, c, 0)
+    cg.grant('test', 'usage', 'sql')
+    t.assert(pcall(c.execute, c, expr))
+end
+
+g.after_test('test_sql_compat', function(cg)
+    cg.server:exec(function()
+        local compat = require('compat')
+        compat.sql_priv = 'default'
+    end)
+end)
+
+-- Checks the sql_priv compat option.
+g.test_sql_compat = function(cg)
+    local c = cg.conn
+    local expr = 'SELECT 1'
+    local errmsg = "Execute access to sql '' is denied for user 'test'"
+    t.assert_error_msg_equals(errmsg, c.execute, c, expr)
+    cg.server:exec(function()
+        local compat = require('compat')
+        t.assert_equals(compat.sql_priv.default, 'new')
+        t.assert_equals(compat.sql_priv.current, 'default')
+        compat.sql_priv = 'old'
+    end)
+    t.assert(pcall(c.execute, c, expr))
+    cg.server:exec(function()
+        local compat = require('compat')
+        compat.sql_priv = 'new'
+    end)
+    t.assert_error_msg_equals(errmsg, c.execute, c, expr)
 end

@@ -26,6 +26,9 @@ box.execute("INSERT INTO t2 VALUES (1);")
 ---
 - row_count: 1
 ...
+box.schema.user.grant('guest', 'execute', 'sql')
+---
+...
 box.schema.user.grant('guest','read', 'space', 'T1')
 ---
 ...
@@ -81,6 +84,9 @@ box.schema.user.revoke('guest','read','space', 'V')
 ---
 ...
 box.schema.user.revoke('guest','read','space', 'T2')
+---
+...
+box.schema.user.revoke('guest', 'execute', 'sql')
 ---
 ...
 box.execute('DROP VIEW v')

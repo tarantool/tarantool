@@ -6,3 +6,8 @@
   `IPROTO_EVAL` request. Granting the `'execute'` privilege on `lua_call`
   allows the user to execute any global user-defined Lua function with
   the `IPROTO_CALL` request (gh-8803).
+* **[Breaking change]** Introduced the new `sql` object type for
+  `box.schema.user.grant`. Now only users with the `'execute'` privilege
+  granted on `sql` or `universe` can execute SQL expressions with the
+  `IPROTO_EXECUTE` or `IPROTO_PREPARE` requests. To revert to the old behavior
+  (no SQL access checks), use the `sql_priv` compat option (gh-8803).

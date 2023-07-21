@@ -40,6 +40,7 @@ static const char *object_type_strs[] = {
 	/* [SC_UNIVERSE]        = */ "universe",
 	/* [SC_LUA_CALL]        = */ "lua_call",
 	/* [SC_LUA_EVAL]        = */ "lua_eval",
+	/* [SC_SQL]             = */ "sql",
 	/* [SC_SPACE]           = */ "space",
 	/* [SC_FUNCTION]        = */ "function",
 	/* [SC_USER]            = */ "user",

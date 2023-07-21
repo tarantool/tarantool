@@ -780,6 +780,7 @@ box.space.t:drop()
 
 -- https://github.com/tarantool/tarantool/issues/5892
 box.execute([[CREATE TABLE u (column1 INT PRIMARY KEY, column2 INT);]])
+box.schema.user.grant('guest', 'execute', 'sql')
 box.schema.user.grant('guest', 'read,write', 'space', 'U')
 conn = require('net.box').connect(box.cfg.listen)
 

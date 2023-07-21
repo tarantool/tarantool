@@ -2875,6 +2875,7 @@ local priv_object_combo = {
     ["universe"] = box.priv.ALL,
     ["lua_call"] = bit.bor(box.priv.X, box.priv.U),
     ["lua_eval"] = bit.bor(box.priv.X, box.priv.U),
+    ["sql"]      = bit.bor(box.priv.X, box.priv.U),
 -- sic: we allow to grant 'execute' on space. This is a legacy
 -- bug, please fix it in 2.0
     ["space"]    = bit.bxor(box.priv.ALL, box.priv.S,
@@ -2953,6 +2954,7 @@ local singleton_object_types = {
     ['universe'] = true,
     ['lua_call'] = true,
     ['lua_eval'] = true,
+    ['sql'] = true,
 }
 
 local function is_singleton_object_type(object_type)

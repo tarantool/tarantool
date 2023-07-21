@@ -2458,6 +2458,9 @@ box.execute([[CREATE TABLE u (column1 INT PRIMARY KEY, column2 INT);]])
  | ---
  | - row_count: 1
  | ...
+box.schema.user.grant('guest', 'execute', 'sql')
+ | ---
+ | ...
 box.schema.user.grant('guest', 'read,write', 'space', 'U')
  | ---
  | ...

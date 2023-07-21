@@ -993,6 +993,7 @@ test:do_test(
 
 local remote = require('net.box')
 box.cfg{listen = os.getenv('LISTEN')}
+box.schema.user.grant('guest', 'execute', 'sql')
 local cn = remote.connect(box.cfg.listen)
 test:do_test(
     "builtins-13.2",
@@ -1003,6 +1004,7 @@ test:do_test(
         {abc = 2, [1] = 3}
     })
 cn:close()
+box.schema.user.revoke('guest', 'execute', 'sql')
 
 box.execute([[DROP TABLE t1;]])
 box.execute([[DROP TABLE t;]])
