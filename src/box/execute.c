@@ -49,11 +49,37 @@
 #include "session.h"
 #include "rmean.h"
 #include "box/sql/port.h"
+#include "tweaks.h"
 
 const char *sql_info_key_strs[] = {
 	"row_count",
 	"autoincrement_ids",
 };
+
+/** Whether to enable access checks for SQL requests. */
+static bool sql_access_check_is_enabled = true;
+TWEAK_BOOL(sql_access_check_is_enabled);
+
+/** Checks if the current user may execute an SQL request. */
+static int
+access_check_sql(void)
+{
+	if (!sql_access_check_is_enabled)
+		return 0;
+	struct credentials *cr = effective_user();
+	user_access_t access = PRIV_X | PRIV_U;
+	access &= ~cr->universal_access;
+	if (access == 0)
+		return 0;
+	access &= ~universe.access_sql[cr->auth_token].effective;
+	if (access == 0)
+		return 0;
+	struct user *user = user_find(cr->uid);
+	if (user != NULL)
+		diag_set(AccessDeniedError, priv_name(PRIV_X),
+			 schema_object_name(SC_SQL), "", user->def->name);
+	return -1;
+}
 
 /**
  * Convert sql row into a tuple and append to a port.
@@ -261,6 +287,8 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 int
 box_process_sql(const struct sql_request *request, struct port *port)
 {
+	if (access_check_sql() != 0)
+		return -1;
 	struct region *region = &fiber()->gc;
 	struct sql_bind *bind = NULL;
 	int bind_count = 0;

@@ -305,6 +305,7 @@ enum schema_object_type {
 	SC_UNIVERSE,
 	SC_LUA_CALL,
 	SC_LUA_EVAL,
+	SC_SQL,
 	SC_SPACE,
 	SC_FUNCTION,
 	SC_USER,

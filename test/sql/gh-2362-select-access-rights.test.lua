@@ -8,6 +8,7 @@ box.execute("CREATE TABLE t2 (s1 INT PRIMARY KEY);")
 box.execute("INSERT INTO t1 VALUES (1, 1);")
 box.execute("INSERT INTO t2 VALUES (1);")
 
+box.schema.user.grant('guest', 'execute', 'sql')
 box.schema.user.grant('guest','read', 'space', 'T1')
 c = nb.connect(box.cfg.listen)
 c:execute("SELECT * FROM SEQSCAN t1;")
@@ -29,6 +30,7 @@ c:execute('SELECT * FROM v')
 -- Cleanup
 box.schema.user.revoke('guest','read','space', 'V')
 box.schema.user.revoke('guest','read','space', 'T2')
+box.schema.user.revoke('guest', 'execute', 'sql')
 
 box.execute('DROP VIEW v')
 box.execute('DROP TABLE t2')

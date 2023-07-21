@@ -44,6 +44,15 @@ channel close.
 https://tarantool.io/compat/fiber_channel_close_mode
 ]]
 
+local SQL_PRIV_BRIEF = [[
+Whether to enable access checks for SQL requests. The old behavior is to let
+any user execute an arbitrary SQL request over IPROTO. With the new behavior,
+only users that were granted the 'execute' privilege on 'sql' or 'universe'
+have access to SQL.
+
+https://tarantool.io/compat/sql_priv
+]]
+
 local SQL_SEQ_SCAN_DEFAULT_BRIEF = [[
 Whether seq_seq_scan session setting should be set to true or false during
 initialization or new session creation.
@@ -118,6 +127,12 @@ local options = {
         brief = FIBER_CHANNEL_GRACEFUL_CLOSE_BRIEF,
         action = tweak_action('fiber_channel_close_mode',
                               'forceful', 'graceful'),
+    },
+    sql_priv = {
+        default = 'new',
+        obsolete = nil,
+        brief = SQL_PRIV_BRIEF,
+        action = tweak_action('sql_access_check_is_enabled', false, true)
     },
     sql_seq_scan_default = {
         default = 'new',

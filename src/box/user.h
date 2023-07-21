@@ -47,6 +47,8 @@ struct universe {
 	struct access access_lua_call[BOX_USER_MAX];
 	/** Privileges to execute any Lua expression with IPROTO_EVAL. */
 	struct access access_lua_eval[BOX_USER_MAX];
+	/** Privileges to execute SQL requests with IPROTO_EXECUTE. */
+	struct access access_sql[BOX_USER_MAX];
 };
 
 /** A single instance of the universe. */

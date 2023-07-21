@@ -18,6 +18,9 @@ box.execute("CREATE VIEW supersecret_leak AS  SELECT * FROM supersecret, superse
 ---
 - row_count: 1
 ...
+box.schema.user.grant('guest', 'execute', 'sql')
+---
+...
 remote = require 'net.box'
 ---
 ...
@@ -46,6 +49,9 @@ box.schema.user.revoke('guest','read', 'space', 'SUPERSECRET')
 ---
 ...
 box.schema.user.revoke('guest','read', 'space', 'SUPERSECRET_LEAK')
+---
+...
+box.schema.user.revoke('guest', 'execute', 'sql')
 ---
 ...
 box.execute("DROP VIEW supersecret_leak")

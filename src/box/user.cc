@@ -220,6 +220,8 @@ access_find(const struct priv_def *priv)
 		return universe.access_lua_call;
 	case SC_LUA_EVAL:
 		return universe.access_lua_eval;
+	case SC_SQL:
+		return universe.access_sql;
 	case SC_SPACE:
 	{
 		if (priv->is_entity_access)
