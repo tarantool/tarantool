@@ -38,33 +38,36 @@ local function iconv_convert(iconv, data)
     local buf      = cord_ibuf_take();
     local buf_ptr  = char_ptr_arr_t()
     local buf_left = size_t_arr_t()
-
-    while data_left[0] > 0 do
-        buf_ptr[0]  = buf:reserve(output_len)
-        buf_left[0] = buf:unused()
-        local res = ffi.C.tnt_iconv(iconv, data_ptr, data_left,
-                                buf_ptr, buf_left)
-        if res == ffi.cast('size_t', -1) then
-            local err = errno()
-            if err ~= E2BIG then
-                cord_ibuf_put(buf)
-                ffi.C.tnt_iconv(iconv, nil, nil, nil, nil)
-                if err == EINVAL then
-                    error('Invalid multibyte sequence')
+    local ok, result = pcall(function()
+        while data_left[0] > 0 do
+            buf_ptr[0]  = buf:reserve(output_len)
+            buf_left[0] = buf:unused()
+            local res = ffi.C.tnt_iconv(iconv, data_ptr, data_left,
+                                    buf_ptr, buf_left)
+            if res == ffi.cast('size_t', -1) then
+                local err = errno()
+                if err ~= E2BIG then
+                    ffi.C.tnt_iconv(iconv, nil, nil, nil, nil)
+                    if err == EINVAL then
+                        error('Invalid multibyte sequence')
+                    end
+                    if err == EILSEQ then
+                        error('Incomplete multibyte sequence')
+                    end
+                    error('Unknown conversion error: ' .. errno.strerror(err))
                 end
-                if err == EILSEQ then
-                    error('Incomplete multibyte sequence')
-                end
-                error('Unknown conversion error: ' .. errno.strerror(err))
             end
+            buf:alloc(buf:unused() - buf_left[0])
         end
-        buf:alloc(buf:unused() - buf_left[0])
-    end
 
-    -- iconv function sets cd's conversion state to the initial state
-    ffi.C.tnt_iconv(iconv, nil, nil, nil, nil)
-    local result = ffi.string(buf.rpos, buf:size())
+        -- iconv function sets cd's conversion state to the initial state
+        ffi.C.tnt_iconv(iconv, nil, nil, nil, nil)
+        return ffi.string(buf.rpos, buf:size())
+    end)
     cord_ibuf_put(buf)
+    if not ok then
+        error(result)
+    end
     return result
 end
 

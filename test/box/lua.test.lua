@@ -151,7 +151,9 @@ space.index['i1']:count({3, 3})
 -- https://github.com/tarantool/tarantool/issues/46
 space.index['i1']:count()
 -- Test cases for #123: box.index.count does not check arguments properly
-space.index['i1']:count(function() end)
+status, msg = pcall(function() space.index['i1']:count(function() end) end)
+status
+msg:match("can not encode Lua type: 'function'")
 space:drop()
 
 --

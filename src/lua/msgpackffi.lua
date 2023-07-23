@@ -352,9 +352,14 @@ end
 
 local function encode(obj)
     local tmpbuf = cord_ibuf_take()
-    encode_r(tmpbuf, obj, 0)
-    local r = ffi.string(tmpbuf.rpos, tmpbuf:size())
+    local ok, r = pcall(function()
+        encode_r(tmpbuf, obj, 0)
+        return ffi.string(tmpbuf.rpos, tmpbuf:size())
+    end)
     cord_ibuf_drop(tmpbuf)
+    if not ok then
+        error(r)
+    end
     return r
 end
 

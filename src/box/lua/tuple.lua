@@ -273,10 +273,17 @@ local function tuple_update(tuple, expr)
         error("Usage: tuple:update({ { op, field, arg}+ })")
     end
     local ibuf = cord_ibuf_take()
-    local pexpr, pexpr_end = tuple_encode(ibuf, expr)
-    local tuple = builtin.box_tuple_update(tuple, pexpr, pexpr_end)
+    box.error.clear()
+    local ok, tuple = pcall(function()
+        local pexpr, pexpr_end = tuple_encode(ibuf, expr)
+        return builtin.box_tuple_update(tuple, pexpr, pexpr_end)
+    end)
     cord_ibuf_put(ibuf)
-    if tuple == nil then
+    ok = ok and tuple ~= nil
+    if not ok then
+        if box.error.last() == nil then
+            error(tuple)
+        end
         return box.error()
     end
     return tuple_bless(tuple)
@@ -288,10 +295,17 @@ local function tuple_upsert(tuple, expr)
         error("Usage: tuple:upsert({ { op, field, arg}+ })")
     end
     local ibuf = cord_ibuf_take()
-    local pexpr, pexpr_end = tuple_encode(ibuf, expr)
-    local tuple = builtin.box_tuple_upsert(tuple, pexpr, pexpr_end)
+    box.error.clear()
+    local ok, tuple = pcall(function()
+        local pexpr, pexpr_end = tuple_encode(ibuf, expr)
+        return builtin.box_tuple_upsert(tuple, pexpr, pexpr_end)
+    end)
     cord_ibuf_put(ibuf)
-    if tuple == nil then
+    ok = ok and tuple ~= nil
+    if not ok then
+        if box.error.last() == nil then
+            error(tuple)
+        end
         return box.error()
     end
     return tuple_bless(tuple)
