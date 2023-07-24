@@ -1755,6 +1755,7 @@ xrow_decode_begin(const struct xrow_header *row, struct begin_request *request)
 	if (row->type != IPROTO_BEGIN)
 		goto bad_msgpack;
 	memset(request, 0, sizeof(*request));
+	request->is_sync = false;
 
 	/** Request without extra options. */
 	if (row->bodycnt == 0)
@@ -1778,6 +1779,61 @@ xrow_decode_begin(const struct xrow_header *row, struct begin_request *request)
 			break;
 		case IPROTO_TXN_ISOLATION:
 			request->txn_isolation = mp_decode_uint(&d);
+			break;
+		case IPROTO_IS_SYNC:
+			if (mp_decode_bool(&d)) {
+				request->is_sync = true;
+				break;
+			} else {
+				xrow_on_decode_err(row, ER_ILLEGAL_PARAMS,
+						   "is_sync can only be true");
+				return -1;
+			}
+			break;
+		default:
+			mp_next(&d);
+			break;
+		}
+	}
+	return 0;
+
+bad_msgpack:
+	xrow_on_decode_err(row, ER_INVALID_MSGPACK, "request body");
+	return -1;
+}
+
+int
+xrow_decode_commit(const struct xrow_header *row, struct commit_request *request)
+{
+	assert(row->type == IPROTO_COMMIT);
+	memset(request, 0, sizeof(*request));
+
+	/** Request without extra options. */
+	if (row->bodycnt == 0)
+		return 0;
+
+	const char *d = row->body[0].iov_base;
+	if (mp_typeof(*d) != MP_MAP)
+		goto bad_msgpack;
+
+	uint32_t map_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < map_size; ++i) {
+		if (mp_typeof(*d) != MP_UINT)
+			goto bad_msgpack;
+		uint64_t key = mp_decode_uint(&d);
+		if (key < iproto_key_MAX &&
+		    mp_typeof(*d) != iproto_key_type[key])
+			goto bad_msgpack;
+		switch (key) {
+		case IPROTO_IS_SYNC:
+			if (mp_decode_bool(&d)) {
+				request->is_sync = true;
+				break;
+			} else {
+				xrow_on_decode_err(row, ER_ILLEGAL_PARAMS,
+						   "is_sync can only be true");
+				return -1;
+			}
 			break;
 		default:
 			mp_next(&d);

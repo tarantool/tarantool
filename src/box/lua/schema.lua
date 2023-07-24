@@ -85,6 +85,8 @@ ffi.cdef[[
     int
     box_txn_set_timeout(double timeout);
     void
+    box_txn_make_sync();
+    void
     memtx_tx_story_gc_step();
     int
     box_sequence_current(uint32_t seq_id, int64_t *result);
@@ -297,16 +299,27 @@ local begin_options = {
         return true
     end,
     txn_isolation = normalize_txn_isolation_level,
+    is_sync = function(is_sync)
+        if type(is_sync) ~= "boolean" then
+            box.error(box.error.ILLEGAL_PARAMS, "is_sync must be a boolean")
+        end
+        if is_sync == false then
+            box.error(box.error.ILLEGAL_PARAMS, "is_sync can only be true")
+        end
+        return true
+    end,
 }
 
 box.begin = function(options)
     local timeout
     local txn_isolation
+    local is_sync
+    check_param_table(options, begin_options)
     if options then
-        check_param_table(options, begin_options)
         timeout = options.timeout
         txn_isolation = options.txn_isolation and
                         normalize_txn_isolation_level(options.txn_isolation)
+        is_sync = options.is_sync
     end
     if builtin.box_txn_begin() == -1 then
         box.error()
@@ -318,6 +331,9 @@ box.begin = function(options)
        internal.txn_set_isolation(txn_isolation) ~= 0 then
         box.rollback()
         box.error()
+    end
+    if is_sync then
+        builtin.box_txn_make_sync()
     end
 end
 
@@ -358,9 +374,9 @@ local function atomic_tail(status, ...)
     if not status then
         box.rollback()
         error((...), 2)
-     end
-     box.commit()
-     return ...
+    end
+    box.commit()
+    return ...
 end
 
 box.atomic = function(arg0, arg1, ...)

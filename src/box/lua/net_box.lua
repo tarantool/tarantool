@@ -523,6 +523,7 @@ local function stream_begin(stream, txn_opts, netbox_opts)
     check_param_table(netbox_opts, REQUEST_OPTION_TYPES)
     local timeout
     local txn_isolation
+    local is_sync
     if txn_opts then
         if type(txn_opts) ~= 'table' then
             error("txn_opts should be a table")
@@ -536,19 +537,94 @@ local function stream_begin(stream, txn_opts, netbox_opts)
             txn_isolation =
                 box.internal.normalize_txn_isolation_level(txn_isolation)
         end
+        is_sync = txn_opts.is_sync
+        if is_sync ~= nil and type(is_sync) ~= "boolean" then
+            error("is_sync must be a boolean")
+        end
+        if is_sync == false then
+            error("is_sync can only be true")
+        end
     end
     local res = stream:_request('BEGIN', netbox_opts, nil,
-                                stream._stream_id, timeout, txn_isolation)
+                                stream._stream_id, timeout, txn_isolation,
+                                is_sync)
     if netbox_opts and netbox_opts.is_async then
         return res
     end
 end
 
-local function stream_commit(stream, opts)
+-- A function that correctly orders commit options. This is done so that
+-- txn_opts is the second parameter (as in begin), and opts is the third
+-- parameter. This is done for backward compatibility.
+local function order_opts_commit(opts_1, opts_2)
+    if opts_1 == nil and opts_2 == nil then
+        return opts_1, opts_2
+    end
+    if type(opts_1) ~= 'table' and type(opts_2) ~= 'table' then
+        box.error(box.error.ILLEGAL_PARAMS, "options should be a table")
+    end
+
+    local new_opts_1 = opts_1
+    local new_opts_2 = opts_2
+
+    if opts_1 ~= nil and type(opts_1) == 'table' then
+        for i, _ in pairs(opts_1) do
+            for k, _ in pairs(REQUEST_OPTION_TYPES) do
+                if i == k then
+                    new_opts_1, new_opts_2 = opts_2, opts_1
+                    break
+                end
+            end
+        end
+    end
+
+    if opts_2 ~= nil and type(opts_2) == 'table' then
+        for i, _ in pairs(opts_2) do
+            for k, _ in pairs(REQUEST_OPTION_TYPES) do
+                if i == k then
+                    new_opts_1, new_opts_2 = opts_1, opts_2
+                    break
+                end
+            end
+        end
+    end
+    return new_opts_1, new_opts_2
+end
+
+local function stream_commit(stream, txn_opts, opts)
     check_remote_arg(stream, 'commit')
-    check_param_table(opts, REQUEST_OPTION_TYPES)
-    local res = stream:_request('COMMIT', opts, nil, stream._stream_id)
-    if opts and opts.is_async then
+    local new_txn_opts, new_opts = order_opts_commit(txn_opts, opts)
+    check_param_table(new_opts, REQUEST_OPTION_TYPES)
+
+    -- The options are in the wrong order or mixed up. Example:
+    -- stream:commit({opts})                => ok
+    -- stream:commit({txn_opts})            => ok
+    -- stream:commit({txn_opts}, {opts})    => ok
+    -- stream:commit({opts}, {txn_opts})    => error
+    -- stream:commit({txn_opts, opts})      => error
+    -- stream:commit({opts, txn_opts})      => error
+    -- The opts is netbox options. The txn_opts is transaction options.
+    if new_txn_opts and new_opts and new_txn_opts ~= txn_opts then
+        box.error(box.error.ILLEGAL_PARAMS, "options are either in the " ..
+                  "wrong order or mixed up")
+    end
+
+    local is_sync
+    if new_txn_opts then
+        if type(new_txn_opts) ~= 'table' then
+            box.error(box.error.ILLEGAL_PARAMS, "options should be a table")
+        end
+        is_sync = new_txn_opts.is_sync
+        if type(is_sync) ~= "boolean" and is_sync ~= nil then
+            box.error(box.error.ILLEGAL_PARAMS, "is_sync must be a boolean")
+        end
+        if is_sync == false then
+            box.error(box.error.ILLEGAL_PARAMS, "is_sync can only be true")
+        end
+    end
+    local res = stream:_request('COMMIT', new_opts, nil, stream._stream_id,
+                                is_sync)
+    if new_opts and new_opts.is_async then
         return res
     end
 end

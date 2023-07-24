@@ -1433,6 +1433,19 @@ apply_plain_tx(uint32_t replica_id, struct stailq *rows,
 		goto fail;
 	}
 
+	item = stailq_last_entry(rows, struct applier_tx_row, next);
+
+	/*
+	 * Look at the flags item->row->flags. If the transaction
+	 * is synchronous, then set is_sync = true (txn.c). This
+	 * should only be done on replicas. The master sets these
+	 * flags and independently decides whether the transaction
+	 * is synchronous or not. All txn meta flags are set only
+	 * for the last txn row.
+	 */
+	if ((item->row.flags & IPROTO_FLAG_WAIT_ACK) != 0)
+		box_txn_make_sync();
+
 	if (use_triggers) {
 		/* We are ready to submit txn to wal. */
 		struct trigger *on_rollback, *on_wal_write;
@@ -1464,7 +1477,6 @@ apply_plain_tx(uint32_t replica_id, struct stailq *rows,
 		 * transaction traversed network + remote WAL bundle before
 		 * ack get received.
 		 */
-		item = stailq_last_entry(rows, struct applier_tx_row, next);
 		rcb->replica_id = replica_id;
 		rcb->txn_last_tm = item->row.tm;
 

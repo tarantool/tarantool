@@ -85,6 +85,7 @@ local reference_table = {
         SPACE_NAME = 0x5e,
         INDEX_NAME = 0x5f,
         TUPLE_FORMATS = 0x60,
+        IS_SYNC = 0x61,
     },
 
     -- `iproto_metadata_key` enumeration.

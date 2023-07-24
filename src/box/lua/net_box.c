@@ -1361,19 +1361,6 @@ netbox_encode_unprepare(lua_State *L, int idx,
 	return netbox_encode_prepare(L, idx, ctx);
 }
 
-static inline int
-netbox_encode_commit_or_rollback(lua_State *L, enum iproto_type type, int idx,
-				 struct mpstream *stream, uint64_t sync,
-				 uint64_t stream_id)
-{
-	(void)L;
-	(void) idx;
-	assert(type == IPROTO_COMMIT || type == IPROTO_ROLLBACK);
-	size_t svp = netbox_begin_encode(stream, sync, type, stream_id);
-	netbox_end_encode(stream, svp);
-	return 0;
-}
-
 /**
  * Encode an `IPROTO_BEGIN` request and write it to the provided MsgPack stream.
  */
@@ -1385,9 +1372,11 @@ netbox_encode_begin(struct lua_State *L, int idx,
 					 ctx->stream_id);
 	bool has_timeout = !lua_isnoneornil(L, idx);
 	bool has_txn_isolation = !lua_isnoneornil(L, idx + 1);
-	if (has_timeout || has_txn_isolation) {
+	bool has_is_sync = !lua_isnoneornil(L, idx + 2);
+	if (has_timeout || has_txn_isolation || has_is_sync) {
 		uint32_t map_size = (has_timeout ? 1 : 0) +
-				    (has_txn_isolation ? 1 : 0);
+				    (has_txn_isolation ? 1 : 0) +
+				    (has_is_sync ? 1 : 0);
 		mpstream_encode_map(ctx->stream, map_size);
 	}
 	if (has_timeout) {
@@ -1402,6 +1391,13 @@ netbox_encode_begin(struct lua_State *L, int idx,
 		mpstream_encode_uint(ctx->stream, IPROTO_TXN_ISOLATION);
 		mpstream_encode_uint(ctx->stream, txn_isolation);
 	}
+	if (has_is_sync) {
+		if (lua_type(L, idx + 2) == LUA_TBOOLEAN) {
+			bool is_sync = lua_toboolean(L, idx + 2);
+			mpstream_encode_uint(ctx->stream, IPROTO_IS_SYNC);
+			mpstream_encode_bool(ctx->stream, is_sync);
+		}
+	}
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -1410,18 +1406,32 @@ static int
 netbox_encode_commit(struct lua_State *L, int idx,
 		     struct netbox_method_encode_ctx *ctx)
 {
-	return netbox_encode_commit_or_rollback(L, IPROTO_COMMIT, idx,
-						ctx->stream, ctx->sync,
-						ctx->stream_id);
+	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_COMMIT,
+					 ctx->stream_id);
+	bool has_is_sync = !lua_isnoneornil(L, idx);
+	if (has_is_sync) {
+		uint32_t map_size = 1;
+		mpstream_encode_map(ctx->stream, map_size);
+		if (lua_type(L, idx) == LUA_TBOOLEAN) {
+			bool is_sync = lua_toboolean(L, idx);
+			mpstream_encode_uint(ctx->stream, IPROTO_IS_SYNC);
+			mpstream_encode_bool(ctx->stream, is_sync);
+		}
+	}
+	netbox_end_encode(ctx->stream, svp);
+	return 0;
 }
 
 static int
 netbox_encode_rollback(struct lua_State *L, int idx,
 		       struct netbox_method_encode_ctx *ctx)
 {
-	return netbox_encode_commit_or_rollback(L, IPROTO_ROLLBACK, idx,
-						ctx->stream, ctx->sync,
-						ctx->stream_id);
+	(void)L;
+	(void)idx;
+	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync,
+					 IPROTO_ROLLBACK, ctx->stream_id);
+	netbox_end_encode(ctx->stream, svp);
+	return 0;
 }
 
 /**

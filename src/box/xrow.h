@@ -862,7 +862,7 @@ struct sql_request {
  * @param row Encoded data.
  * @param[out] request Request to decode to.
  *
- * @retval  0 Sucess.
+ * @retval  0 Success.
  * @retval -1 Format or memory error.
  */
 int
@@ -1000,6 +1000,10 @@ struct begin_request {
 	 * Must be ono of enum txn_isolation_level values.
 	 */
 	uint32_t txn_isolation;
+	/**
+	 * is_sync that determines the synchronism of transactions.
+	 */
+	bool is_sync;
 };
 
 /**
@@ -1007,11 +1011,33 @@ struct begin_request {
  * @param row Encoded data.
  * @param[out] request Request to decode to.
  *
- * @retval  0 Sucess.
+ * @retval  0 Success.
  * @retval -1 Format error.
  */
 int
 xrow_decode_begin(const struct xrow_header *row, struct begin_request *request);
+
+/**
+ * COMMIT request.
+ */
+struct commit_request {
+	/**
+	 * is_sync that determines the synchronism of transactions.
+	 */
+	bool is_sync;
+};
+
+/**
+ * Parse the COMMIT request.
+ * @param row Encoded data.
+ * @param[out] request Request to decode to.
+ *
+ * @retval  0 Success.
+ * @retval -1 Format error.
+ */
+int
+xrow_decode_commit(const struct xrow_header *row,
+		   struct commit_request *request);
 
 /**
  * Update vclock with the next LSN value for given replica id.

@@ -864,7 +864,8 @@ txn_journal_entry_new(struct txn *txn)
 
 	struct xrow_header **remote_row = req->rows;
 	struct xrow_header **local_row = req->rows + txn->n_applier_rows;
-	bool is_sync = false;
+	bool is_sync = txn_has_flag(txn, TXN_WAIT_ACK);
+
 	/*
 	 * A transaction which consists of NOPs solely should pass through the
 	 * limbo without waiting. Even when the limbo is not empty. This is
@@ -906,6 +907,15 @@ txn_journal_entry_new(struct txn *txn)
 	 */
 	if (!txn_has_flag(txn, TXN_FORCE_ASYNC) && !is_fully_nop) {
 		if (is_sync) {
+			/*
+			 * Can't commit a fully local transaction synchronously.
+			 */
+			if (txn_is_fully_local(txn)) {
+				diag_set(IllegalParams,
+					 "An attempt to commit a fully local "
+					 "transaction synchronously");
+				return NULL;
+			}
 			txn_set_flags(txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
 		} else if (!txn_limbo_is_empty(&txn_limbo)) {
 			/*
@@ -1287,6 +1297,20 @@ box_txn_set_timeout(double timeout)
 	}
 	txn_set_timeout(txn, timeout);
 	return 0;
+}
+
+void
+box_txn_make_sync(void)
+{
+	struct txn *txn = in_txn();
+	/*
+	 * Do nothing if transaction is not started,
+	 * it's the same as BEGIN + COMMIT.
+	 */
+	if (!txn)
+		return;
+
+	txn_set_flags(txn, TXN_WAIT_ACK);
 }
 
 /** Wait for a linearization point for a transaction. */

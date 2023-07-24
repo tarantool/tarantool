@@ -214,7 +214,11 @@ extern const char *iproto_flag_bit_strs[];
 	 * Mapping of format identifier to format clause consisting of field
 	 * names and field types.
 	 */								\
-	_(TUPLE_FORMATS, 0x60, MP_MAP)
+	_(TUPLE_FORMATS, 0x60, MP_MAP)					\
+	/**
+	 * Flag indicating whether the transaction is synchronous.
+	 */								\
+	 _(IS_SYNC, 0x61, MP_BOOL)
 
 #define IPROTO_KEY_MEMBER(s, v, ...) IPROTO_ ## s = v,
 
