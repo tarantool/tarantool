@@ -1042,6 +1042,11 @@ box_txn_set_timeout(double timeout);
 API_EXPORT int
 box_txn_set_isolation(uint32_t level);
 
+/**
+ * Make the transaction synchronous.
+ */
+API_EXPORT void
+box_txn_make_sync(void);
 /** \endcond public */
 
 typedef struct txn_savepoint box_txn_savepoint_t;

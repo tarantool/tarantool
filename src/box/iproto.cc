@@ -377,10 +377,12 @@ struct iproto_msg
 		struct auth_request auth;
 		/** Features request. */
 		struct id_request id;
-		/* SQL request, if this is the EXECUTE/PREPARE request. */
+		/** SQL request, if this is the EXECUTE/PREPARE request. */
 		struct sql_request sql;
-		/* BEGIN request */
+		/** BEGIN request */
 		struct begin_request begin;
+		/** COMMIT request */
+		struct commit_request commit;
 		/** In case of iproto parse error, saved diagnostics. */
 		struct diag diag;
 	};
@@ -1653,6 +1655,8 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 		return 0;
 	case IPROTO_COMMIT:
 		*route = iproto_thread->commit_route;
+		if (xrow_decode_commit(&msg->header, &msg->commit) != 0)
+			return -1;
 		return 0;
 	case IPROTO_ROLLBACK:
 		*route = iproto_thread->rollback_route;
@@ -2048,6 +2052,7 @@ tx_process_begin(struct cmsg *m)
 	struct obuf *out;
 	struct obuf_svp header;
 	uint32_t txn_isolation = msg->begin.txn_isolation;
+	bool is_sync = msg->begin.is_sync;
 
 	if (tx_check_msg(msg) != 0)
 		goto error;
@@ -2068,6 +2073,9 @@ tx_process_begin(struct cmsg *m)
 		(void)rc;
 		goto error;
 	}
+	if (is_sync)
+		box_txn_make_sync();
+
 	out = msg->connection->tx.p_obuf;
 	header = obuf_create_svp(out);
 	iproto_reply_ok(out, msg->header.sync, ::schema_version);
@@ -2087,9 +2095,13 @@ tx_process_commit(struct cmsg *m)
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct obuf *out;
 	struct obuf_svp header;
+	bool is_sync = msg->commit.is_sync;
 
 	if (tx_check_msg(msg) != 0)
 		goto error;
+
+	if (is_sync)
+		box_txn_make_sync();
 
 	if (box_txn_commit() != 0)
 		goto error;
