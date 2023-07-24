@@ -16,7 +16,7 @@
 # Set default values for variables for successful run on the local machine.
 CMAKE_TARANTOOL_ARGS="${CMAKE_TARANTOOL_ARGS:--DLUAJIT_ENABLE_GC64=ON;-DCMAKE_BUILD_TYPE=RelWithDebInfo}"
 VERSION="${VERSION:-0.0.1}"
-OUTPUT_DIR="${OUTPUT_DIR:-build}"
+OUTPUT_DIR="${OUTPUT_DIR:-$(pwd)/build}"
 
 USER_ID=$(id -u)
 
@@ -25,6 +25,8 @@ echo "CMake args: ${CMAKE_TARANTOOL_ARGS}"
 echo "Package version: ${VERSION}"
 echo "Output dir: ${OUTPUT_DIR}"
 
+mkdir -p ${OUTPUT_DIR}
+
 # Run building in a Docker container with the proper user to get artifacts
 # with the correct permissions. If USER_ID is 0, then run as root. If USER_ID
 # is not 0, then create the 'tarantool' user with the same user's ID as on the
@@ -32,8 +34,9 @@ echo "Output dir: ${OUTPUT_DIR}"
 if [ "${USER_ID}" = "0" ]; then
     docker run --rm --pull=always \
         --env VERSION=${VERSION} \
-        --env OUTPUT_DIR=${OUTPUT_DIR} \
+        --env OUTPUT_DIR=/tarantool/build \
         --volume $(pwd):/tarantool \
+        --volume ${OUTPUT_DIR}:/tarantool/build \
         --workdir /tarantool/static-build/ \
         packpack/packpack:centos-7 sh -c "
             cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" &&
@@ -42,8 +45,9 @@ if [ "${USER_ID}" = "0" ]; then
 else
     docker run --rm --pull=always \
         --env VERSION=${VERSION} \
-        --env OUTPUT_DIR=${OUTPUT_DIR} \
+        --env OUTPUT_DIR=/tarantool/build \
         --volume $(pwd):/tarantool \
+        --volume ${OUTPUT_DIR}:/tarantool/build \
         --workdir /tarantool/static-build/ \
         packpack/packpack:centos-7 sh -c "
             useradd -u ${USER_ID} tarantool;
