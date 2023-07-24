@@ -73,8 +73,8 @@ jobs:
           name: tarantool-deb-rpm-x86_64-aarch64
           retention-days: 21
           path: |
-            static-build/build/tarantool*.deb
-            static-build/build/tarantool*.rpm
+            build/tarantool*.deb
+            build/tarantool*.rpm
           if-no-files-found: error
       - name: Send VK Teams message on failure
         if: failure()
