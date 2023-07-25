@@ -110,10 +110,10 @@ function methods._initialize(self)
     -- priority. The menthal rule here is the following: values
     -- closer to the process are preferred: env first, then file,
     -- then etcd (if available).
-    self:_register_source(require('internal.config.source.env'))
+    self:_register_source(require('internal.config.source.env').new())
 
     if self._config_file ~= nil then
-        self:_register_source(require('internal.config.source.file'))
+        self:_register_source(require('internal.config.source.file').new())
     end
 
     self:_register_applier(require('internal.config.applier.mkdir'))
@@ -148,14 +148,14 @@ function methods._collect(self, opts)
         -- argument. The 'config' section of the config may
         -- contain a configuration needed for a source.
         if sync_source == source.name or sync_source == 'all' then
-            source.sync(self, iconfig)
+            source:sync(self, iconfig)
         end
 
         -- Validate configurations gathered from the sources.
         if source.type == 'instance' then
-            instance_config:validate(source.get())
+            instance_config:validate(source:get())
         elseif source.type == 'cluster' then
-            cluster_config:validate(source.get())
+            cluster_config:validate(source:get())
         else
             assert(false)
         end
@@ -173,12 +173,12 @@ function methods._collect(self, opts)
         -- accumulator is passed as the second.
         local source_iconfig
         if source.type == 'cluster' then
-            local source_cconfig = source.get()
+            local source_cconfig = source:get()
             cconfig = cluster_config:merge(source_cconfig, cconfig)
             source_iconfig = cluster_config:instantiate(cconfig,
                 self._instance_name)
         elseif source.type == 'instance' then
-            source_iconfig = source.get()
+            source_iconfig = source:get()
         else
             assert(false)
         end
@@ -186,7 +186,7 @@ function methods._collect(self, opts)
 
         -- If a source returns an empty table, mark it as ones
         -- that provide no data.
-        local has_data = next(source.get()) ~= nil
+        local has_data = next(source:get()) ~= nil
         table.insert(source_info, ('* %q [type: %s]%s'):format(source.name,
             source.type, has_data and '' or ' (no data)'))
     end

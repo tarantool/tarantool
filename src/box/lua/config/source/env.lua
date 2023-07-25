@@ -1,9 +1,15 @@
 local schema = require('internal.config.utils.schema')
 local instance_config = require('internal.config.instance_config')
 
-local values = {}
+local methods = {}
+local mt = {
+    __index = methods,
+}
 
-local function sync(_config_module, _iconfig)
+-- Gather most actual config values.
+function methods.sync(self, _config_module, _iconfig)
+    local values = {}
+
     for _, w in instance_config:pairs() do
         local env_var_name = 'TT_' .. table.concat(w.path, '_'):upper()
         local raw_value = os.getenv(env_var_name)
@@ -20,20 +26,23 @@ local function sync(_config_module, _iconfig)
         assert(latest_version ~= nil)
         instance_config:set(values, 'config.version', latest_version)
     end
+
+    self._values = values
 end
 
-local function get()
-    return values
+-- Access the configuration after source:sync().
+function methods.get(self)
+    return self._values
+end
+
+local function new()
+    return setmetatable({
+        name = 'env',
+        type = 'instance',
+        _values = {},
+    }, mt)
 end
 
 return {
-    name = 'env',
-    -- The type is either 'instance' or 'cluster'.
-    type = 'instance',
-    -- Gather most actual config values.
-    sync = sync,
-    -- Access the configuration after source.sync().
-    --
-    -- source.get()
-    get = get,
+    new = new,
 }
