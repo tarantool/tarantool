@@ -1,2 +1,10 @@
 *.snap binary
 *.xlog binary
+*.c diff=cpp
+*.h diff=cpp
+*.cc diff=cpp
+*.hh diff=cpp
+*.cpp diff=cpp
+*.hpp diff=cpp
+*.c++ diff=cpp
+*.h++ diff=cpp
