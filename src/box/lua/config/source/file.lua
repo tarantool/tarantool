@@ -3,7 +3,12 @@ local buffer = require('buffer')
 local fio = require('fio')
 local yaml = require('yaml')
 
-local values = {}
+local methods = {}
+local mt = {
+    __index = methods,
+}
+
+-- {{{ Helpers
 
 -- Read the file block by block till EOF.
 local function stream_read(fh)
@@ -58,7 +63,9 @@ local function universal_read(file_name, file_kind)
     return data
 end
 
-local function sync(config_module, _iconfig)
+-- }}} Helpers
+
+function methods.sync(self, config_module, _iconfig)
     assert(config_module._config_file ~= nil)
 
     local data = universal_read(config_module._config_file, 'config file')
@@ -68,21 +75,21 @@ local function sync(config_module, _iconfig)
             config_module._config_file, res))
     end
 
-    values = res
+    self._values = res
 end
 
-local function get()
-    return values
+function methods.get(self)
+    return self._values
+end
+
+local function new()
+    return setmetatable({
+        name = 'file',
+        type = 'cluster',
+        _values = {},
+    }, mt)
 end
 
 return {
-    name = 'file',
-    -- The type is either 'instance' or 'cluster'.
-    type = 'cluster',
-    -- Gather most actual config values.
-    sync = sync,
-    -- Access the configuration after source.sync().
-    --
-    -- source.get()
-    get = get,
+    new = new,
 }

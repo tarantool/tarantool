@@ -2,7 +2,7 @@ local t = require('luatest')
 local json = require('json')
 local treegen = require('test.treegen')
 local justrun = require('test.justrun')
-local source_file = require('internal.config.source.file')
+local source_file = require('internal.config.source.file').new()
 
 local g = t.group()
 
@@ -16,8 +16,8 @@ end)
 
 g.test_source_file = function()
     local config = {_config_file = 'doc/examples/config/single.yaml'}
-    source_file.sync(config, {})
-    local res = source_file.get()
+    source_file:sync(config, {})
+    local res = source_file:get()
     local exp = {
         credentials = {
             users = {
@@ -49,9 +49,9 @@ g.test_source_env = function()
     local dir = treegen.prepare_directory(g, {}, {})
     local script = [[
         local json = require('json')
-        local source_env = require('internal.config.source.env')
-        source_env.sync({}, {})
-        print(json.encode(source_env.get()))
+        local source_env = require('internal.config.source.env').new()
+        source_env:sync({}, {})
+        print(json.encode(source_env:get()))
     ]]
     treegen.write_script(dir, 'main.lua', script)
 
