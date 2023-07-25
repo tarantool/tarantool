@@ -6,12 +6,20 @@ local mt = {
     __index = methods,
 }
 
+function methods._env_var_name(self, path_in_schema)
+    local env_var_name = 'TT_' .. table.concat(path_in_schema, '_'):upper()
+    if self._env_var_suffix ~= nil then
+        return env_var_name .. self._env_var_suffix
+    end
+    return env_var_name
+end
+
 -- Gather most actual config values.
 function methods.sync(self, _config_module, _iconfig)
     local values = {}
 
     for _, w in instance_config:pairs() do
-        local env_var_name = 'TT_' .. table.concat(w.path, '_'):upper()
+        local env_var_name = self:_env_var_name(w.path)
         local raw_value = os.getenv(env_var_name)
         local value = schema.fromenv(env_var_name, raw_value, w.schema)
         if value ~= nil then
@@ -35,11 +43,23 @@ function methods.get(self)
     return self._values
 end
 
-local function new()
+local function new(opts)
+    local opts = opts or {}
+    local env_var_suffix = opts.env_var_suffix
+
+    local name = 'env'
+
+    if env_var_suffix ~= nil then
+        name = ('%s (%s)'):format(name, env_var_suffix)
+        env_var_suffix = '_' .. env_var_suffix:upper()
+    end
+
     return setmetatable({
-        name = 'env',
+        name = name,
         type = 'instance',
+
         _values = {},
+        _env_var_suffix = env_var_suffix,
     }, mt)
 end
 

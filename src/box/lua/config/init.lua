@@ -104,12 +104,14 @@ end
 
 function methods._initialize(self)
     -- The sources are synchronized in the order of registration:
-    -- env, file, etcd (the latter is present in Tarantool EE).
+    -- env, file, etcd (present in Tarantool EE), env for
+    -- defaults.
     --
     -- The configuration values from the first source has highest
     -- priority. The menthal rule here is the following: values
     -- closer to the process are preferred: env first, then file,
-    -- then etcd (if available).
+    -- then etcd (if available). And only then the env source with
+    -- defaults.
     self:_register_source(require('internal.config.source.env').new())
 
     if self._config_file ~= nil then
@@ -128,6 +130,10 @@ function methods._initialize(self)
     if extras ~= nil then
         extras.initialize(self)
     end
+
+    self:_register_source(require('internal.config.source.env').new({
+        env_var_suffix = 'default',
+    }))
 end
 
 function methods._collect(self, opts)
