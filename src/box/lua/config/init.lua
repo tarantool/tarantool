@@ -236,9 +236,7 @@ function methods._collect(self, opts)
                 replicasets:
                   replicaset-001:
                     instances:
-                      instance-001:
-                        database:
-                          rw: true
+                      instance-001: {}
         ]]):format(action, self._instance_name, source_info_str), 0)
     end
 
