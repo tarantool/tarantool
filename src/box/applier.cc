@@ -1665,7 +1665,7 @@ applier_thread_reader_f(va_list ap)
 				 TIMEOUT_INFINITY :
 				 replication_disconnect_timeout();
 		struct applier_tx *tx;
-		tx = lsregion_alloc_object(lsr, applier->thread.lsr_id++,
+		tx = lsregion_alloc_object(lsr, ++applier->thread.lsr_id,
 					   struct applier_tx);
 		if (tx == NULL) {
 			diag_set(OutOfMemory, sizeof(*tx),
