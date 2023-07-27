@@ -569,7 +569,7 @@ s1.index.pk:alter({sequence = 'seq1'}) -- error
 box.space._space_sequence:replace{s1.id, sq1.id, false, 0, ''} -- error
 box.space._space_sequence:replace{s1.id, sq2.id, false, 0, ''} -- error
 box.space._space_sequence:replace{s2.id, sq1.id, false, 0, ''} -- error
-s2.index.pk:alter({sequence = 'seq2'}) -- ok
+_ = s2:create_index('pk', {sequence = 'seq2'}) -- ok
 box.session.su('admin')
 
 -- If the user owns a sequence attached to a space,

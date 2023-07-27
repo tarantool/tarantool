@@ -11,14 +11,3 @@ box.execute("DELETE FROM \"test\";")
 box.execute("UPDATE \"test\" SET id = 3;")
 
 s:drop()
-
--- Notorious artefact: check of view referencing counter occurs
--- after drop of indexes. So, if space:drop() fails due to being
--- referenced by a view, space becomes unusable in SQL terms.
---
-box.execute("CREATE TABLE t1 (id INT PRIMARY KEY);")
-box.execute("CREATE VIEW v1 AS SELECT * FROM t1;")
-box.space.T1:drop()
-box.execute("SELECT * FROM v1;")
-box.space.V1:drop()
-box.space.T1:drop()

@@ -382,6 +382,18 @@ box.atomic = function(arg0, arg1, ...)
     end
 end
 
+-- Wrap a function into transaction if none is active.
+local function atomic_wrapper(func)
+    return function(...)
+        -- No reason to start a transaction if one is active already.
+        if box.is_in_txn() then
+            return func(...)
+        else
+            return box.atomic(func, ...)
+        end
+    end
+end
+
 -- box.commit yields, so it's defined as Lua/C binding
 -- box.rollback and box.rollback_to_savepoint yields as well
 
@@ -820,7 +832,7 @@ end
 
 box.schema.create_space = box.schema.space.create
 
-box.schema.space.drop = function(space_id, space_name, opts)
+box.schema.space.drop = atomic_wrapper(function(space_id, space_name, opts)
     check_param(space_id, 'space_id', 'number')
     opts = opts or {}
     check_param_table(opts, { if_exists = 'boolean' })
@@ -872,7 +884,7 @@ box.schema.space.drop = function(space_id, space_name, opts)
     end
 
     feedback_save_event('drop_space')
-end
+end)
 
 box.schema.space.rename = function(space_id, space_name)
     check_param(space_id, 'space_id', 'number')
@@ -1252,10 +1264,9 @@ local function space_sequence_check(sequence, parts, space_name, index_name)
 end
 
 --
--- The first stage of a space sequence modification operation.
--- Called before altering the space definition. Checks sequence
--- options and detaches the old sequence from the space.
--- Returns a proxy object that is supposed to be passed to
+-- The first stage of a space sequence modification operation. Called
+-- before altering the space definition. Checks sequence options and
+-- returns a proxy object that is supposed to be passed to the
 -- space_sequence_alter_commit() to complete the operation.
 --
 local function space_sequence_alter_prepare(format, parts, options,
@@ -1361,11 +1372,6 @@ local function space_sequence_alter_prepare(format, parts, options,
         new_sequence.is_generated = new_sequence.is_generated or false
     end
 
-    if old_sequence ~= nil then
-        -- Detach the old sequence before altering the space.
-        _space_sequence:delete(space_id)
-    end
-
     return {
         space_id = space_id,
         new_sequence = new_sequence,
@@ -1374,9 +1380,9 @@ local function space_sequence_alter_prepare(format, parts, options,
 end
 
 --
--- The second stage of a space sequence modification operation.
--- Called after altering the space definition. Attaches the sequence
--- to the space and drops the old sequence if required. 'proxy' is
+-- The second stage of a space sequence modification operation. Called after
+-- altering the space definition. Detaches the old sequence from the space and
+-- attaches the new one to it. Drops the old sequence if required. 'proxy' is
 -- an object returned by space_sequence_alter_prepare().
 --
 local function space_sequence_alter_commit(proxy)
@@ -1390,6 +1396,10 @@ local function space_sequence_alter_commit(proxy)
     local space_id = proxy.space_id
     local old_sequence = proxy.old_sequence
     local new_sequence = proxy.new_sequence
+
+    if old_sequence ~= nil then
+        _space_sequence:delete(space_id)
+    end
 
     if new_sequence ~= nil then
         -- Attach the new sequence.
@@ -1476,7 +1486,7 @@ local function func_id_by_name(func_name)
 end
 box.internal.func_id_by_name = func_id_by_name -- for space.upgrade
 
-box.schema.index.create = function(space_id, name, options)
+box.schema.index.create = atomic_wrapper(function(space_id, name, options)
     check_param(space_id, 'space_id', 'number')
     check_param(name, 'name', 'string')
     check_param_table(options, create_index_template)
@@ -1599,9 +1609,9 @@ box.schema.index.create = function(space_id, name, options)
 
     feedback_save_event('create_index')
     return space.index[name]
-end
+end)
 
-box.schema.index.drop = function(space_id, index_id)
+box.schema.index.drop = atomic_wrapper(function(space_id, index_id)
     check_param(space_id, 'space_id', 'number')
     check_param(index_id, 'index_id', 'number')
     if index_id == 0 then
@@ -1625,7 +1635,7 @@ box.schema.index.drop = function(space_id, index_id)
     _index:delete{space_id, index_id}
 
     feedback_save_event('drop_index')
-end
+end)
 
 box.schema.index.rename = function(space_id, index_id, name)
     check_param(space_id, 'space_id', 'number')
@@ -1636,7 +1646,7 @@ box.schema.index.rename = function(space_id, index_id, name)
     _index:update({space_id, index_id}, {{"=", 3, name}})
 end
 
-box.schema.index.alter = function(space_id, index_id, options)
+box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
     local space = box.space[space_id]
     if space == nil then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
@@ -1739,7 +1749,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         _func_index:insert{space_id, index_id, index_opts.func}
     end
     space_sequence_alter_commit(sequence_proxy)
-end
+end)
 
 -- a static box_tuple_t ** instance for calling box_index_* API
 local ptuple = ffi.new('box_tuple_t *[1]')
@@ -2850,7 +2860,7 @@ box.schema.sequence.alter = function(name, opts)
                       opts.max, opts.start, opts.cache, opts.cycle}
 end
 
-box.schema.sequence.drop = function(name, opts)
+box.schema.sequence.drop = atomic_wrapper(function(name, opts)
     opts = opts or {}
     check_param_table(opts, {if_exists = 'boolean'})
     local id = sequence_resolve(name)
@@ -2865,7 +2875,7 @@ box.schema.sequence.drop = function(name, opts)
     local _sequence_data = box.space[box.schema.SEQUENCE_DATA_ID]
     _sequence_data:delete{id}
     _sequence:delete{id}
-end
+end)
 
 local function privilege_parse(privs)
     -- TODO: introduce a global privilege -> bit mapping?
@@ -3142,7 +3152,7 @@ box.schema.func.create = function(name, opts)
                          opts.comment, opts.created, opts.last_altered}
 end
 
-box.schema.func.drop = function(name, opts)
+box.schema.func.drop = atomic_wrapper(function(name, opts)
     opts = opts or {}
     check_param_table(opts, { if_exists = 'boolean' })
     local _func = box.space[box.schema.FUNC_ID]
@@ -3165,7 +3175,7 @@ box.schema.func.drop = function(name, opts)
     end
     revoke_object_privs('function', fid)
     _func:delete{fid}
-end
+end)
 
 function box.schema.func.exists(name_or_id)
     local _vfunc = box.space[box.schema.VFUNC_ID]
@@ -3326,7 +3336,7 @@ box.schema.user.passwd = function(name, new_password)
     end
 end
 
-box.schema.user.create = function(name, opts)
+box.schema.user.create = atomic_wrapper(function(name, opts)
     local uid = user_or_role_resolve(name)
     opts = opts or {}
     check_param_table(opts, { password = 'string', if_not_exists = 'boolean' })
@@ -3356,7 +3366,7 @@ box.schema.user.create = function(name, opts)
     -- grant option
     box.session.su('admin', box.schema.user.grant, uid, 'session,usage', 'universe',
                    nil, {if_not_exists=true})
-end
+end)
 
 box.schema.user.exists = function(name)
     if user_resolve(name) then
@@ -3542,7 +3552,7 @@ box.schema.user.disable = function(user)
                             {if_exists = true})
 end
 
-box.schema.user.drop = function(name, opts)
+box.schema.user.drop = atomic_wrapper(function(name, opts)
     opts = opts or {}
     check_param_table(opts, { if_exists = 'boolean' })
     local uid = user_resolve(name)
@@ -3563,7 +3573,7 @@ box.schema.user.drop = function(name, opts)
         box.error(box.error.NO_SUCH_USER, name)
     end
     return
-end
+end)
 
 local function info(id)
     local _priv = box.space._vpriv
@@ -3616,7 +3626,7 @@ box.schema.role.create = function(name, opts)
                          math.floor(fiber.time())}
 end
 
-box.schema.role.drop = function(name, opts)
+box.schema.role.drop = atomic_wrapper(function(name, opts)
     opts = opts or {}
     check_param_table(opts, { if_exists = 'boolean' })
     local uid = role_resolve(name)
@@ -3632,7 +3642,7 @@ box.schema.role.drop = function(name, opts)
         box.error(box.error.DROP_USER, name, "the user or the role is a system")
     end
     return drop(uid)
-end
+end)
 
 local function role_check_grant_revoke_of_sys_priv(priv)
     priv = string.lower(priv)

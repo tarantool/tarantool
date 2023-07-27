@@ -100,6 +100,9 @@ s_withindex.index.secondary
 s_withdata.index.secondary:drop()
 s_withdata.index.secondary.unique
 s_withdata:drop()
+-- FIXME(gh-9120): The space is recreated, so the s_withdata object is not
+-- valid anymore.
+s_withdata = box.space.withdata
 box.space['withdata'].enabled
 index4 = s_withdata:create_index('another', { type = 'tree', parts = { 5, 'unsigned' }, unique = false})
 s_withdata.index.another
@@ -447,6 +450,9 @@ errinj.set('ERRINJ_WAL_IO', true)
 s:drop()
 s:truncate()
 s:drop()
+-- FIXME(gh-9120): The space object is invalidated on reverted drop, so we set
+-- it to the current one.
+s = box.space.test
 s:truncate()
 errinj.set('ERRINJ_WAL_IO', false)
 for i = 1, 10 do s:replace{i + 10} end
