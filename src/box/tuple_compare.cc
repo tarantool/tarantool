@@ -941,8 +941,9 @@ tuple_compare_with_key_sequential(struct tuple *tuple, hint_t tuple_hint,
 		cmp_part_count = part_count;
 	}
 	bool unused;
-	rc = key_compare_parts<is_nullable>(tuple_key, key, cmp_part_count,
-					    key_def, &unused);
+	rc = key_compare_and_skip_parts<is_nullable>(&tuple_key, &key,
+						     cmp_part_count,
+						     key_def, &unused);
 	if (!has_optional_parts || rc != 0)
 		return rc;
 	/*
@@ -950,11 +951,6 @@ tuple_compare_with_key_sequential(struct tuple *tuple, hint_t tuple_hint,
 	 * corresponding key fields to be equal to NULL.
 	 */
 	if (field_count < part_count) {
-		/*
-		 * Key's and tuple's first field_count fields are
-		 * equal, and their bsize too.
-		 */
-		key += tuple_bsize(tuple) - mp_sizeof_array(field_count);
 		for (uint32_t i = field_count; i < part_count;
 		     ++i, mp_next(&key)) {
 			if (mp_typeof(*key) != MP_NIL)
