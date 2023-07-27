@@ -965,10 +965,10 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 {
 	int64_t tsn = 0;
 	struct xrow_header **start = entry->rows;
-	struct xrow_header **end = entry->rows + entry->n_rows;
+	struct xrow_header **end = entry->rows + entry->n_rows - 1;
 	struct xrow_header **first_glob_row = entry->rows;
 	/** Assign LSN to all local rows. */
-	for (struct xrow_header **row = start; row < end; row++) {
+	for (struct xrow_header **row = start; row <= end; row++) {
 		if ((*row)->replica_id == 0) {
 			/*
 			 * All rows representing local space data
@@ -983,23 +983,6 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 
 			(*row)->lsn = vclock_inc(vclock_diff, (*row)->replica_id) +
 				      vclock_get(base, (*row)->replica_id);
-			/*
-			 * Use lsn of the first global row as
-			 * transaction id.
-			 */
-			if ((*row)->group_id != GROUP_LOCAL && tsn == 0) {
-				tsn = (*row)->lsn;
-				/*
-				 * Remember the tail being processed.
-				 */
-				first_glob_row = row;
-			}
-			(*row)->tsn = tsn == 0 ? (*start)->lsn : tsn;
-			/* Tx meta is stored in the last tx row. */
-			if (row == end - 1) {
-				(*row)->flags = entry->flags;
-				(*row)->is_commit = true;
-			}
 		} else {
 			int64_t diff = (*row)->lsn - vclock_get(base, (*row)->replica_id);
 			if (diff <= vclock_get(vclock_diff,
@@ -1016,7 +999,21 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 			} else {
 				vclock_follow(vclock_diff, (*row)->replica_id, diff);
 			}
+			/* Reset row flags taken from the remote instance. */
+			(*row)->flags = 0;
 		}
+		/*
+		 * Use lsn of the first global row as
+		 * transaction id.
+		 */
+		if (tsn == 0 && (*row)->group_id != GROUP_LOCAL) {
+			tsn = (*row)->lsn;
+			/*
+			 * Remember the tail being processed.
+			 */
+			first_glob_row = row;
+		}
+		(*row)->tsn = tsn == 0 ? (*start)->lsn : tsn;
 	}
 
 	/*
@@ -1026,6 +1023,9 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 	 */
 	for (struct xrow_header **row = start; row < first_glob_row; row++)
 		(*row)->tsn = tsn;
+	/* Tx meta is stored in the last tx row. */
+	(*end)->flags = entry->flags;
+	(*end)->is_commit = true;
 }
 
 static void
