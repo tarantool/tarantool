@@ -231,9 +231,11 @@ tuple_field_new(void)
 static void
 tuple_field_delete(struct tuple_field *field)
 {
+	for (uint32_t i = 0; i < field->constraint_count; i++) {
+		assert(field->constraint[i].destroy ==
+		       tuple_constraint_noop_alter);
+	}
 	free(field->multikey_required_fields);
-	for (uint32_t i = 0; i < field->constraint_count; i++)
-		field->constraint[i].destroy(&field->constraint[i]);
 	free(field->constraint);
 	if (field->sql_default_value_expr != NULL)
 		tuple_format_expr_delete(field->sql_default_value_expr);
@@ -813,6 +815,10 @@ error:
 static inline void
 tuple_format_destroy(struct tuple_format *format)
 {
+	for (uint32_t i = 0; i < format->constraint_count; i++) {
+		assert(format->constraint[i].destroy ==
+		       tuple_constraint_noop_alter);
+	}
 	free(format->required_fields);
 	tuple_format_destroy_fields(format);
 	tuple_dictionary_unref(format->dict);
