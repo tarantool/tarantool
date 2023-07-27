@@ -109,7 +109,7 @@ g.test_complex_foreign_key_primary = function(cg)
         t.assert_equals(country:select{}, {{1, 11, 'Russia'}, {1, 12, 'France'}})
         t.assert_error_msg_content_equals(
             "Can't modify space 'country': space is referenced by foreign key",
-            box.atomic, country.drop, country
+            country.drop, country
         )
         t.assert_error_msg_content_equals(
             "Foreign key 'country' integrity check failed: wrong foreign field name",
@@ -198,7 +198,7 @@ g.test_complex_foreign_key_secondary = function(cg)
                                            {101, 1, 'earth', 'rf', 'France'}})
         t.assert_error_msg_content_equals(
             "Can't modify space 'country': space is referenced by foreign key",
-            box.atomic, country.drop, country
+            country.drop, country
         )
         t.assert_equals(country:select{}, {{100, 1, 'earth', 'ru', 'Russia'},
                                            {101, 1, 'earth', 'rf', 'France'}})
@@ -293,7 +293,7 @@ g.test_complex_foreign_key_numeric = function(cg)
                                            {101, 1, 'earth', 'rf', 'France'}})
         t.assert_error_msg_content_equals(
             "Can't modify space 'country': space is referenced by foreign key",
-            box.atomic, country.drop, country
+            country.drop, country
         )
         t.assert_equals(country:select{}, {{100, 1, 'earth', 'ru', 'Russia'},
                                            {101, 1, 'earth', 'rf', 'France'}})

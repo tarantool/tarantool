@@ -1722,7 +1722,7 @@ box.space._space_sequence:replace{s2.id, sq1.id, false, 0, ''} -- error
 ---
 - error: Read access to sequence 'seq1' is denied for user 'user'
 ...
-s2.index.pk:alter({sequence = 'seq2'}) -- ok
+_ = s2:create_index('pk', {sequence = 'seq2'}) -- ok
 ---
 ...
 box.session.su('admin')

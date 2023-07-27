@@ -278,7 +278,7 @@ g.test_box_schema = function(cg)
 
     version_n = 0
     cg.master:exec(function() box.space.p:drop() end)
-    t.helpers.retrying({}, function() t.assert_equals(version_n, 2) end)
+    t.helpers.retrying({}, function() t.assert_equals(version_n, 1) end)
     -- there'll be 2 changes - index and space
     t.assert_equals(version, init_version + 4)
 

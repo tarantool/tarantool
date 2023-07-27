@@ -57,9 +57,6 @@ _ = s:create_index('idx', {func = 6666, parts = {{1, 'unsigned'}}})
  | ---
  | - error: Function '6666' does not exist
  | ...
-s.index.idx:drop()
- | ---
- | ...
 -- Can't use non-persistent function in functional index.
 _ = s:create_index('idx', {func = box.func.s_nonpersistent.id, parts = {{1, 'unsigned'}}})
  | ---

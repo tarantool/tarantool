@@ -21,7 +21,6 @@ _ = s:create_index('idx', {func = box.func.s.id, parts = {{1, 'unsigned'}}})
 pk = s:create_index('pk')
 -- Invalid fid.
 _ = s:create_index('idx', {func = 6666, parts = {{1, 'unsigned'}}})
-s.index.idx:drop()
 -- Can't use non-persistent function in functional index.
 _ = s:create_index('idx', {func = box.func.s_nonpersistent.id, parts = {{1, 'unsigned'}}})
 -- Can't use non-deterministic function in functional index.
