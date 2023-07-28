@@ -5,13 +5,14 @@ local g = helpers.group()
 
 -- Start a script that is pointed by app.file or app.module.
 --
--- TODO: Verify that the script has access to config:get() values.
+-- Verify that the script has access to config:get() values.
 g.test_startup_success = function(g)
     local script = [[
-        -- TODO: Verify that the script has access to config:get()
-        -- values.
-        -- local config = require('config')
-        -- assert(config:get('app.cfg.foo') == 42)
+        local config = require('config')
+        assert(config:get('app.cfg.foo') == 42)
+        local info = config:info()
+        assert(info.status == 'ready')
+        assert(#info.alerts == 0)
 
         _G.foo = 42
     ]]

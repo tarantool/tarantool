@@ -237,8 +237,7 @@ g.test_config_broadcast = function()
         local fiber = require('fiber')
         local status = ''
         box.watch('config.info', function(_, v) status = v.status end)
-        while status ~= 'startup_in_progress' and
-              status ~= 'reload_in_progress' do
+        while status ~= 'ready' do
             fiber.sleep(0.1)
         end
         print(status)
@@ -249,7 +248,7 @@ g.test_config_broadcast = function()
     local args = {'main.lua'}
     local res = justrun.tarantool(dir, {}, args, opts)
     t.assert_equals(res.exit_code, 0)
-    local exp = {'startup_in_progress', 'ready', 'reload_in_progress', 'ready'}
+    local exp = {'ready', 'ready', 'ready', 'ready'}
     t.assert_equals(res.stdout, table.concat(exp, "\n"))
 end
 

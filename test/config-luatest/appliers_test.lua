@@ -52,7 +52,7 @@ local appliers_script = [[
     local fiber = require('internal.config.applier.fiber')
     fiber.apply(config)
     local app = require('internal.config.applier.app')
-    local ok, err = pcall(app.apply, config)
+    local ok, err = pcall(app.post_apply, config)
     %s
     os.exit(0)
 ]]
