@@ -1,6 +1,30 @@
 local fun = require('fun')
+local yaml = require('yaml')
+local fio = require('fio')
+local cluster_config = require('internal.config.cluster_config')
 local t = require('luatest')
+local treegen = require('test.treegen')
+local justrun = require('test.justrun')
 local server = require('test.luatest_helpers.server')
+
+local function group(name, params)
+    local g = t.group(name, params)
+
+    g.before_all(treegen.init)
+
+    g.after_each(function(g)
+        for k, v in pairs(table.copy(g)) do
+            if k == 'server' or k:match('^server_%d+$') then
+                v:stop()
+                g[k] = nil
+            end
+        end
+    end)
+
+    g.after_all(treegen.clean)
+
+    return g
+end
 
 local function start_example_replicaset(g, dir, config_file, opts)
     local credentials = {
@@ -40,6 +64,217 @@ local function start_example_replicaset(g, dir, config_file, opts)
     t.assert_equals(info.cluster.name, 'group-001')
 end
 
+-- A simple single instance configuration.
+local simple_config = {
+    credentials = {
+        users = {
+            guest = {
+                roles = {'super'},
+            },
+        },
+    },
+    iproto = {
+        listen = 'unix/:./{{ instance_name }}.iproto',
+    },
+    groups = {
+        ['group-001'] = {
+            replicasets = {
+                ['replicaset-001'] = {
+                    instances = {
+                        ['instance-001'] = {},
+                    },
+                },
+            },
+        },
+    },
+}
+
+local function prepare_case(g, opts)
+    local dir = opts.dir
+    local script = opts.script
+    local options = opts.options
+
+    if dir == nil then
+        dir = treegen.prepare_directory(g, {}, {})
+    end
+
+    if script ~= nil then
+        treegen.write_script(dir, 'main.lua', script)
+    end
+
+    if options ~= nil then
+        local config = table.deepcopy(simple_config)
+        for path, value in pairs(options) do
+            cluster_config:set(config, path, value)
+        end
+        treegen.write_script(dir, 'config.yaml', yaml.encode(config))
+    end
+
+    local config_file = fio.pathjoin(dir, 'config.yaml')
+    local server = {
+        config_file = config_file,
+        chdir = dir,
+        alias = 'instance-001',
+    }
+    local justrun = {
+        -- dir
+        dir,
+        -- env
+        {},
+        -- args
+        {'--name', 'instance-001', '--config', config_file},
+        -- opts
+        {nojson = true, stderr = true},
+    }
+    return {
+        dir = dir,
+        server = server,
+        justrun = justrun,
+    }
+end
+
+-- Start a server with the given script and the given
+-- configuration, run a verification function on it.
+--
+-- * opts.script
+--
+--   Code write into the main.lua file.
+--
+-- * opts.options
+--
+--   The configuration is expressed as a set of path:value pairs.
+--   It is merged into the simple config above.
+--
+-- * opts.verify
+--
+--   Function to run on the started server to verify some
+--   invariants.
+local function success_case(g, opts)
+    local verify = assert(opts.verify)
+    local prepared = prepare_case(g, opts)
+    g.server = server:new(prepared.server)
+    g.server:start()
+    g.server:exec(verify)
+    return prepared
+end
+
+-- Start tarantool process with the given script/config and check
+-- the error.
+--
+-- * opts.script
+-- * opts.options
+--
+--   Same as in success_case().
+--
+-- * opts.exp_err
+--
+--   An error that must be written into stderr by tarantool
+--   process.
+local function failure_case(g, opts)
+    local exp_err = assert(opts.exp_err)
+
+    local prepared = prepare_case(g, opts)
+    local res = justrun.tarantool(unpack(prepared.justrun))
+    t.assert_equals(res.exit_code, 1)
+    t.assert_str_contains(res.stderr, exp_err)
+end
+
+-- Start a server, write a new script/config, reload, run a
+-- verification function.
+--
+-- * opts.script
+-- * opts.options
+-- * opts.verify
+--
+--   Same as in success_case().
+--
+-- * opts.script_2
+--
+--   A new script to write into the main.lua file before
+--   config:reload().
+--
+-- * opts.verify_2
+--
+--   Verify test invariants after config:reload().
+local function reload_success_case(g, opts)
+    local script_2 = assert(opts.script_2)
+    local verify_2 = assert(opts.verify_2)
+
+    local prepared = success_case(g, opts)
+
+    prepare_case(g, {
+        dir = prepared.dir,
+        script = script_2,
+    })
+    g.server:exec(function()
+        local config = require('config')
+        config:reload()
+    end)
+    g.server:exec(verify_2)
+end
+
+-- Start a server, write a new script/config, reload, run a
+-- verification function.
+--
+-- * opts.script
+-- * opts.options
+-- * opts.verify
+--
+--   Same as in success_case().
+--
+-- * opts.script_2
+--
+--   A new script to write into the main.lua file before
+--   config:reload().
+--
+-- * opts.exp_err
+--
+--   An error that config:reload() must raise.
+local function reload_failure_case(g, opts)
+    local script_2 = assert(opts.script_2)
+    local exp_err = assert(opts.exp_err)
+
+    local prepared = success_case(g, opts)
+
+    prepare_case(g, {
+        dir = prepared.dir,
+        script = script_2,
+    })
+    t.assert_error_msg_equals(exp_err, g.server.exec, g.server, function()
+        local config = require('config')
+        config:reload()
+    end)
+    g.server:exec(function(exp_err)
+        local config = require('config')
+        local info = config:info()
+        t.assert_equals(info.status, 'check_errors')
+        t.assert_equals(#info.alerts, 1)
+        t.assert_equals(info.alerts[1].type, 'error')
+        t.assert(info.alerts[1].timestamp ~= nil)
+        t.assert_equals(info.alerts[1].message, exp_err)
+    end, {exp_err})
+end
+
 return {
+    -- Setup a group of tests that are prepended/postpones with
+    -- hooks to stop servers between tests and to remove temporary
+    -- files after the testing.
+    group = group,
+
+    -- Start a three instance replicaset with the given config
+    -- file.
+    --
+    -- It assumes specific instance/replicaset/group names and
+    -- net.box credentials.
     start_example_replicaset = start_example_replicaset,
+
+    -- Run a single instance and verify some invariants.
+    --
+    -- All the runs are based on the given simple config,
+    -- but the options can be adjusted.
+    simple_config = simple_config,
+    success_case = success_case,
+    failure_case = failure_case,
+    reload_success_case = reload_success_case,
+    reload_failure_case = reload_failure_case,
 }
