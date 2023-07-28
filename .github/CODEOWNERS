@@ -1,5 +1,7 @@
 # Documentation team is in charge of changelogs.
 # No changes should go w/o approval by doc team
 /changelogs/ @tarantool/doc
+/.github/    @tarantool/devx
 /test/       @tarantool/devx
+/.test.mk    @tarantool/devx
 /test-run/   @tarantool/devx
