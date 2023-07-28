@@ -279,10 +279,6 @@ function methods._apply_on_startup(self, opts)
         end
 
         self._configdata_applied = self._configdata
-
-        if extras ~= nil then
-            extras.post_apply(self)
-        end
     else
         assert(false)
     end
@@ -294,10 +290,33 @@ function methods._apply(self)
     end
 
     self._configdata_applied = self._configdata
+end
+
+function methods._post_apply(self)
+    for _, applier in ipairs(self._appliers) do
+        if applier.post_apply ~= nil then
+            applier.post_apply(self)
+        end
+    end
 
     if extras ~= nil then
         extras.post_apply(self)
     end
+end
+
+-- Set proper status depending on received alerts.
+function methods._set_status_based_on_alerts(self)
+    local status = 'ready'
+    for _, alert in pairs(self._alerts) do
+        assert(alert.type == 'error' or alert.type == 'warn')
+        if alert.type == 'error' then
+            status = 'check_errors'
+            break
+        end
+        status = 'check_warnings'
+    end
+    self._status = status
+    broadcast(self)
 end
 
 function methods._startup(self, instance_name, config_file)
@@ -331,9 +350,10 @@ function methods._startup(self, instance_name, config_file)
     else
         self:_apply_on_startup({phase = 2})
     end
+    self:_set_status_based_on_alerts()
 
-    self._status = 'ready'
-    broadcast(self)
+    self:_post_apply()
+    self:_set_status_based_on_alerts()
 end
 
 function methods.get(self, path)
@@ -360,27 +380,21 @@ function methods._reload_noexc(self, opts)
 
     self._alerts = {}
     self._metadata = {}
-    local ok, err = pcall(self._collect, self, opts)
-    if ok then
-        ok, err = pcall(self._apply, self)
-    end
+
+    local ok, err = pcall(function(opts)
+        self:_collect(opts)
+        self:_apply()
+        self:_set_status_based_on_alerts()
+        self:_post_apply()
+    end, opts)
+
     assert(not ok or err == nil)
     if not ok then
         self:_alert({type = 'error', message = err})
     end
 
-    -- Set proper status depending on received alerts.
-    local status = 'ready'
-    for _, alert in pairs(self._alerts) do
-        assert(alert.type == 'error' or alert.type == 'warn')
-        if alert.type == 'error' then
-            status = 'check_errors'
-            break
-        end
-        status = 'check_warnings'
-    end
-    self._status = status
-    broadcast(self)
+    self:_set_status_based_on_alerts()
+
     return ok, err
 end
 
