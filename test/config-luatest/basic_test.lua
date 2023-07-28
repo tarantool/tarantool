@@ -7,23 +7,7 @@ local justrun = require('test.justrun')
 local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
 
-local g = t.group()
-
-g.before_all(function(g)
-    treegen.init(g)
-end)
-
-g.after_all(function(g)
-    treegen.clean(g)
-end)
-
-g.after_each(function(g)
-    for k, v in pairs(g) do
-        if k == 'server' or k:match('^server_%d+$') then
-            v:stop()
-        end
-    end
-end)
+local g = helpers.group()
 
 local function count_lines(s)
     return #s:split('\n')
