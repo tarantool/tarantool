@@ -1016,6 +1016,7 @@ g.test_box_cfg_coverage = function()
         replicaset_name = true,
         cluster_name = true,
         log = true,
+        metrics = true,
 
         -- Controlled by the leader and database.mode options,
         -- handled by the box_cfg applier.
@@ -1036,9 +1037,6 @@ g.test_box_cfg_coverage = function()
         audit_nonblock = true,
         audit_format = true,
         audit_filter = true,
-
-        -- TODO: Will be added in the scope of gh-8861.
-        metrics = true,
     }
 
     -- There are options, where defaults are changed deliberately.
@@ -1279,4 +1277,17 @@ g.test_security_community = function()
     }
 
     instance_config:validate(iconfig)
+end
+
+g.test_metrics = function()
+    local iconfig = {
+        metrics = {
+            include = {'network', 'info', 'cpu'},
+            exclude = {'info'},
+            labels = {foo = 'bar'},
+        }
+    }
+
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.metrics, instance_config.schema.fields.metrics)
 end

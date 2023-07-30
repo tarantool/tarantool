@@ -1357,6 +1357,52 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'password_history_length',
         })),
     }),
+    metrics = schema.record({
+        -- Metrics doesn't have box_cfg annotation, because currently nested
+        -- options and maps/arrays defaults are not supported.
+        include = schema.set({
+            'all',
+            'network',
+            'operations',
+            'system',
+            'replicas',
+            'info',
+            'slab',
+            'runtime',
+            'memory',
+            'spaces',
+            'fibers',
+            'cpu',
+            'vinyl',
+            'memtx',
+            'luajit',
+            'clock',
+            'event_loop',
+        }),
+        exclude = schema.set({
+            'all',
+            'network',
+            'operations',
+            'system',
+            'replicas',
+            'info',
+            'slab',
+            'runtime',
+            'memory',
+            'spaces',
+            'fibers',
+            'cpu',
+            'vinyl',
+            'memtx',
+            'luajit',
+            'clock',
+            'event_loop',
+        }),
+        labels = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+    }),
 }, {
     -- This kind of validation cannot be implemented as the
     -- 'validate' annotation of a particular schema node. There

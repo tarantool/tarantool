@@ -687,3 +687,80 @@ g.test_security_options = function()
         t.assert_equals(box.cfg.password_history_length, 3)
     end)
 end
+
+g.test_metrics_options_default = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+
+    -- Test defaults.
+    local config_file = treegen.write_script(dir, 'base_config.yaml', config)
+    local opts = {
+        config_file = config_file,
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+    g.server:exec(function()
+        t.assert_equals(box.cfg.metrics.include, {'all'})
+        t.assert_equals(box.cfg.metrics.exclude, { })
+        t.assert_equals(box.cfg.metrics.labels, {alias = 'instance-001'})
+    end)
+end
+
+g.test_metrics_options = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        metrics:
+          include: [cpu]
+          exclude: [all]
+          labels:
+            foo: bar
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+
+    local config_file = treegen.write_script(dir, 'base_config.yaml', config)
+    local opts = {
+        config_file = config_file,
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+    g.server:exec(function()
+        t.assert_equals(box.cfg.metrics.include, {'cpu'})
+        t.assert_equals(box.cfg.metrics.exclude, {'all'})
+        t.assert_equals(box.cfg.metrics.labels, {foo = 'bar'})
+    end)
+end
