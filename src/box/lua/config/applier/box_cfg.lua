@@ -355,6 +355,17 @@ local function apply(config)
     -- Set bootstrap_leader option.
     box_cfg.bootstrap_leader = configdata:bootstrap_leader()
 
+    -- Set metrics option.
+    local include = configdata:get('metrics.include', {use_default = true})
+    local exclude = configdata:get('metrics.exclude', {use_default = true})
+    local labels = configdata:get('metrics.labels', {use_default = true})
+
+    box_cfg.metrics = {
+        include = include or { 'all' },
+        exclude = exclude or { },
+        labels = labels or { alias = names.instance_name },
+    }
+
     -- The startup process may need a special handling and differs
     -- from the configuration reloading process.
     local is_startup = type(box.cfg) == 'function'
