@@ -150,7 +150,8 @@ extern char session_lua[],
 	config_source_env_lua[],
 	config_source_file_lua[],
 	config_utils_log_lua[],
-	config_utils_schema_lua[]
+	config_utils_schema_lua[],
+	config_utils_tabulate_lua[]
 #if ENABLE_CONFIG_EXTRAS
 	,
 	config_source_etcd_lua[],
@@ -321,6 +322,10 @@ static const char *lua_sources[] = {
 	"config/utils/schema",
 	"internal.config.utils.schema",
 	config_utils_schema_lua,
+
+	"config/utils/tabulate",
+	"internal.config.utils.tabulate",
+	config_utils_tabulate_lua,
 
 	"config/instance_config",
 	"internal.config.instance_config",
