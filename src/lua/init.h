@@ -55,6 +55,7 @@ struct instance_state {
 #define O_BYTECODE    0x2
 #define O_DEBUGGING   0x4
 #define O_EXECUTE     0x8
+#define O_HELP_ENV_LIST 0x10
 
 /**
  * Create tarantool_L and initialize built-in Lua modules.

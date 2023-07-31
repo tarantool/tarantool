@@ -1042,6 +1042,7 @@ run_script_f(va_list ap)
 	bool interactive = opt_mask & O_INTERACTIVE;
 	bool bytecode = opt_mask & O_BYTECODE;
 	bool debugging = opt_mask & O_DEBUGGING;
+	bool help_env_list = opt_mask & O_HELP_ENV_LIST;
 	/*
 	 * An error is returned via an external diag. A caller
 	 * can't use fiber_join(), because the script can call
@@ -1106,6 +1107,23 @@ run_script_f(va_list ap)
 		default:
 			unreachable(); /* checked by getopt() in main() */
 		}
+	}
+
+	/*
+	 * Show a list of environment variables that are
+	 * considered by tarantool and exit.
+	 */
+	if (help_env_list) {
+		/* require('config'):_print_env_list() */
+		if (lua_require_lib(L, "config") != 0)
+			goto error;
+		lua_pushstring(L, "_print_env_list");
+		lua_gettable(L, -2);
+		lua_pushvalue(L, -2);
+		if (luaT_call(L, 1, 0) != 0)
+			goto error;
+		lua_settop(L, 0);
+		goto end;
 	}
 
 	/*
