@@ -356,6 +356,11 @@ function methods._startup(self, instance_name, config_file)
     self:_set_status_based_on_alerts()
 end
 
+function methods._print_env_list(self)
+    local env_source = require('internal.config.source.env').new()
+    io.stdout:write(env_source:_env_list())
+end
+
 function methods.get(self, path)
     selfcheck(self, 'get')
     if self._status == 'uninitialized' then

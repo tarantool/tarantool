@@ -632,6 +632,7 @@ print_help(FILE *stream, const char *program)
 		"  %s [OPTIONS] [SCRIPT [ARGS]]\n\n"
 		"Options:\n\n"
 		" -h, --help             display this help and exit\n"
+		" --help-env-list        display env variables taken into account\n"
 		" -v, --version          print program version and exit\n"
 		" -c, --config PATH      set a path to yaml config file as 'PATH'\n"
 		" -n, --name INSTANCE    set an instance name as 'INSTANCE'\n"
@@ -677,6 +678,18 @@ main(int argc, char **argv)
 		{"version", no_argument, 0, 'v'},
 		{"config", required_argument, 0, 'c'},
 		{"name", required_argument, 0, 'n'},
+		/*
+		 * Use 'E' character as an indicator of the
+		 * --help-env-list option.
+		 *
+		 * Note: there is no -E short option, see the
+		 * `opts` variable below.
+		 *
+		 * An arbitrary `int` value that is not used for
+		 * another option may be used here. Feel free to
+		 * change it if -E short option should be added.
+		 */
+		{"help-env-list", no_argument, 0, 'E'},
 		{NULL, 0, 0, 0},
 	};
 	static const char *opts = "+hVvb::ij:e:l:dc:n:";
@@ -706,6 +719,9 @@ main(int argc, char **argv)
 		case 'h':
 			print_help(stdout, basename(argv[0]));
 			return 0;
+		case 'E':
+			opt_mask |= O_HELP_ENV_LIST;
+			break;
 		case 'i':
 			/* Force interactive mode */
 			opt_mask |= O_INTERACTIVE;
@@ -805,7 +821,23 @@ main(int argc, char **argv)
 	if (strlen(tarantool_path) < strlen(tarantool_bin))
 		panic("executable path is trimmed");
 
-	if (script == NULL && (opt_mask & (O_INTERACTIVE | O_EXECUTE)) == 0 &&
+	/*
+	 * The idea of the check below is that we can't run
+	 * tarantool without any action: there should be at least
+	 * one.
+	 *
+	 * There are the following actions.
+	 *
+	 * * Print a help message or a version (--help, --version;
+	 *   these actions are handled above).
+	 * * Print environment variables list (--help-env-list).
+	 * * Start an instance (with a name and a config).
+	 * * Run a script pointed by a positional argument or
+	 *   written using -e option.
+	 * * Start interactive REPL (-i).
+	 */
+	uint32_t action_opt_mask = O_INTERACTIVE | O_EXECUTE | O_HELP_ENV_LIST;
+	if (script == NULL && (opt_mask & action_opt_mask) == 0 &&
 	    instance.name == NULL) {
 		static const char misuse_msg[] = "Invalid usage: "
 			"please either provide a Lua script name\n"

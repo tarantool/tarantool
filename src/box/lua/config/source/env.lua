@@ -1,4 +1,5 @@
 local schema = require('internal.config.utils.schema')
+local tabulate = require('internal.config.utils.tabulate')
 local instance_config = require('internal.config.instance_config')
 
 local methods = {}
@@ -12,6 +13,62 @@ function methods._env_var_name(self, path_in_schema)
         return env_var_name .. self._env_var_suffix
     end
     return env_var_name
+end
+
+function methods._env_list(self)
+    local rows = {}
+
+    local ce = 'Community Edition'
+    local ee = 'Enterprise Edition'
+
+    -- A header of the table.
+    table.insert(rows, {
+        'ENVIRONMENT VARIABLE',
+        'TYPE',
+        'DEFAULT',
+        'AVAILABILITY',
+    })
+    table.insert(rows, tabulate.SPACER)
+
+    -- Environment variables that duplicate CLI options.
+    table.insert(rows, {
+        'TT_INSTANCE_NAME',
+        'string',
+        'N/A',
+        ce,
+    })
+    table.insert(rows, {
+        'TT_CONFIG',
+        'string',
+        'nil',
+        ce,
+    })
+    table.insert(rows, tabulate.SPACER)
+
+    -- Collect the options from the schema and sort them
+    -- lexicographically.
+    local options = instance_config:pairs():totable()
+    table.sort(options, function(a, b)
+        return table.concat(a.path, '_') < table.concat(b.path, '_')
+    end)
+
+    -- Transform the schema nodes (options) into the environment
+    -- variables description.
+    for _, w in ipairs(options) do
+        local default = w.schema.default
+        if default == nil and type(default) == 'cdata' then
+            default = 'box.NULL'
+        end
+
+        table.insert(rows, {
+            self._env_var_name(self, w.path),
+            w.schema.type,
+            tostring(default),
+            w.schema.computed.annotations.enterprise_edition and ee or ce,
+        })
+    end
+
+    return tabulate.encode(rows)
 end
 
 -- Gather most actual config values.
