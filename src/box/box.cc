@@ -4000,6 +4000,8 @@ box_session_push(const char *data, const char *data_end)
 	struct session *session = current_session();
 	if (session == NULL)
 		return -1;
+	if (session_push_check_deprecation() != 0)
+		return -1;
 	struct port_msgpack port;
 	struct port *base = (struct port *)&port;
 	port_msgpack_create(base, data, data_end - data);

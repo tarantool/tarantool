@@ -491,6 +491,7 @@ t;
  |   270: box.error.INSTANCE_NAME_MISMATCH
  |   271: box.error.SCHEMA_NEEDS_UPGRADE
  |   272: box.error.SCHEMA_UPGRADE_IN_PROGRESS
+ |   273: box.error.DEPRECATED
  | ...
 
 test_run:cmd("setopt delimiter ''");

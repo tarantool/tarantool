@@ -420,6 +420,20 @@ _say_strerror(int errnum);
 	exit(EXIT_FAILURE); \
 })
 
+/**
+ * Log a message once.
+ */
+#define say_once(level, error, format, ...) ({				\
+	static bool done = false;					\
+	if (!done) {							\
+		say(level, error, format, ##__VA_ARGS__);		\
+		done = true;						\
+	}								\
+})
+
+#define say_warn_once(format, ...) \
+	say_once(S_WARN, NULL, format, ##__VA_ARGS__)
+
 enum {
 	/* 10 messages per 5 seconds. */
 	SAY_RATELIMIT_INTERVAL = 5,
