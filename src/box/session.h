@@ -403,6 +403,14 @@ access_check_universe_object(user_access_t access,
 			     enum schema_object_type object_type,
 			     const char *object_name);
 
+/**
+ * This function is called by public API wrappers around session push.
+ * It logs a deprecation warning. If session push is disabled, it also
+ * sets diag and returns -1.
+ */
+int
+session_push_check_deprecation(void);
+
 static inline int
 session_push(struct session *session, struct port *port)
 {

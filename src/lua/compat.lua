@@ -73,6 +73,13 @@ argument.
 https://tarantool.io/compat/box_tuple_new_vararg
 ]]
 
+local BOX_SESSION_PUSH_DEPRECATION_BRIEF = [[
+Function `box.session.push` is deprecated. The new behavior is to raise
+an error on any attempt to use it.
+
+https://tarantool.io/compat/box_session_push_deprecation
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -138,6 +145,13 @@ local options = {
         obsolete = nil,
         brief = BOX_TUPLE_NEW_VARARG_BRIEF,
         action = function() end,
+    },
+    box_session_push_deprecation = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_SESSION_PUSH_DEPRECATION_BRIEF,
+        run_action_now = true,
+        action = tweak_action('box_session_push_is_disabled', false, true),
     },
 }
 

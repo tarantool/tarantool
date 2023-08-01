@@ -374,6 +374,8 @@ lbox_session_push(struct lua_State *L)
 	struct session *session = current_session();
 	if (lua_gettop(L) != 1)
 		return luaL_error(L, "Usage: box.session.push(data)");
+	if (session_push_check_deprecation() != 0)
+		return luaT_error(L);
 	struct port port;
 	port_lua_create(&port, L);
 	if (session_push(session, &port) != 0)

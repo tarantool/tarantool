@@ -42,6 +42,7 @@
 #include "watcher.h"
 #include "on_shutdown.h"
 #include "sql.h"
+#include "tweaks.h"
 
 const char *session_type_strs[] = {
 	"background",
@@ -491,6 +492,24 @@ int
 access_check_universe(user_access_t access)
 {
 	return access_check_universe_object(access, SC_UNIVERSE, "");
+}
+
+/**
+ * If set, raise an error on any attempt to use box.session.push.
+ */
+static bool box_session_push_is_disabled = true;
+TWEAK_BOOL(box_session_push_is_disabled);
+
+int
+session_push_check_deprecation(void)
+{
+	say_warn_once("box.session.push is deprecated. "
+		      "Consider using box.broadcast instead.");
+	if (box_session_push_is_disabled) {
+		diag_set(ClientError, ER_DEPRECATED, "box.session.push");
+		return -1;
+	}
+	return 0;
 }
 
 int
