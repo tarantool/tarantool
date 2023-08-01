@@ -991,7 +991,7 @@ return schema.new('instance_config', schema.record({
         sync_timeout = schema.scalar({
             type = 'number',
             box_cfg = 'replication_sync_timeout',
-            default = compat.box_cfg_replication_sync_timeout.default == 'old'
+            default = compat.box_cfg_replication_sync_timeout:is_old()
                 and 300 or 0,
         }),
         sync_lag = schema.scalar({

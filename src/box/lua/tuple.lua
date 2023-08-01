@@ -76,7 +76,7 @@ local NEW_OPTION_TYPES = {
 }
 
 local new_tuple = function(...)
-    if compat.box_tuple_new_vararg.current == 'old' then
+    if compat.box_tuple_new_vararg:is_old() then
         return internal.tuple.new{...}
     end
     local tuple, options = ...
