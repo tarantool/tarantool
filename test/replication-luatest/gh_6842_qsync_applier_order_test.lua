@@ -52,6 +52,10 @@ g.after_each(function(g)
         }
         box.ctl.demote()
     end)
+    -- If server-1 started demote but it is not delivered to server-2 yet, then
+    -- server-2 might start a concurrent one and fail to finish it due to term
+    -- clash. Need to wait.
+    g.server2:wait_for_vclock_of(g.server1)
     g.server2:exec(function()
         box.cfg{
             replication_synchro_quorum = 2,
@@ -63,7 +67,6 @@ g.after_each(function(g)
         end
     end)
     g.server1:wait_for_vclock_of(g.server2)
-    g.server2:wait_for_vclock_of(g.server1)
 end)
 
 --
