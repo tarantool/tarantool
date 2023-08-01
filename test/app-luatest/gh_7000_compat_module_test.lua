@@ -234,11 +234,12 @@ g.test_is_new_is_old = function()
         t.assert_equals(compat[name]:is_new(), is_new)
         t.assert_equals(compat[name]:is_old(), not is_new)
 
-        local err_pattern = 'usage: compat.%s:%s'
-        t.assert_error_msg_contains(err_pattern:format(name, 'is_new'),
-                                    compat[name].is_new, nil)
-        t.assert_error_msg_contains(err_pattern:format(name, 'is_old'),
-                                    compat[name].is_old, nil)
+        t.assert_error_msg_content_equals(
+            'usage: compat.<option_name>:is_new()',
+            compat[name].is_new)
+        t.assert_error_msg_content_equals(
+            'usage: compat.<option_name>:is_old()',
+            compat[name].is_old)
     end
 end
 

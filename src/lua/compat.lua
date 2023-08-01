@@ -385,6 +385,37 @@ function compat_mt.__newindex(_, key, val)
     set_option(key, val)
 end
 
+local compat_option_methods = {}
+
+-- Returns the effective compat option value - 'old' or 'new'.
+local function option_value(option)
+    if option.current == 'default' then
+        return option.default
+    else
+        return option.current
+    end
+end
+
+-- Whether the effective value of the option is `new`.
+function compat_option_methods.is_new(option)
+    if type(option) ~= 'table' then
+        error('usage: compat.<option_name>:is_new()')
+    end
+    return option_value(option) == 'new'
+end
+
+-- Whether the effective value of the option is `old`.
+function compat_option_methods.is_old(option)
+    if type(option) ~= 'table' then
+        error('usage: compat.<option_name>:is_old()')
+    end
+    return option_value(option) == 'old'
+end
+
+local compat_option_mt = {
+    __index = compat_option_methods,
+}
+
 function compat_mt.__index(_, key)
     if not options[key] then
         error(('Invalid option %s'):format(key))
@@ -403,29 +434,7 @@ function compat_mt.__index(_, key)
         result.current = 'old'
     end
 
-    -- Whether the effective value of the option is `new`.
-    function result.is_new(option)
-        if type(option) ~= 'table' then
-            error(('usage: compat.%s:is_new()'):format(key))
-        end
-        if option.current == 'new' then
-            return true
-        end
-        if option.current == 'old' then
-            return false
-        end
-        return option.default == 'new'
-    end
-
-    -- Whether the effective value of the option is `old`.
-    function result.is_old(option)
-        if type(option) ~= 'table' then
-            error(('usage: compat.%s:is_old()'):format(key))
-        end
-        return not option:is_new()
-    end
-
-    return result
+    return setmetatable(result, compat_option_mt)
 end
 
 compat_mt.__serialize = serialize_compat
