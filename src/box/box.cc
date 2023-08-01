@@ -2958,13 +2958,33 @@ box_demote(void)
 	if (!is_box_configured)
 		return 0;
 
-	/* Currently active leader is the only one who can issue a DEMOTE. */
-	bool is_leader = txn_limbo_replica_term(&txn_limbo, instance_id) ==
-			 box_raft()->term && txn_limbo.owner_id == instance_id;
-	if (box_election_mode != ELECTION_MODE_OFF)
-		is_leader = is_leader && box_raft()->state == RAFT_STATE_LEADER;
-	if (!is_leader)
-		return 0;
+	const struct raft *raft = box_raft();
+	if (box_election_mode == ELECTION_MODE_OFF) {
+		assert(raft->state == RAFT_STATE_FOLLOWER);
+		if (raft->leader != REPLICA_ID_NIL) {
+			diag_set(ClientError, ER_NOT_LEADER, raft->leader);
+			return -1;
+		}
+		if (txn_limbo.owner_id == REPLICA_ID_NIL)
+			return 0;
+		/*
+		 * If the limbo term is up to date with Raft, then it might have
+		 * a valid owner right now. Demotion would disrupt it. In this
+		 * case the user has to explicitly overthrow the old owner with
+		 * local promote(), or call demote() on the actual owner.
+		 */
+		if (txn_limbo.promote_greatest_term == raft->term &&
+		    txn_limbo.owner_id != instance_id)
+			return 0;
+	} else {
+		if (txn_limbo_replica_term(&txn_limbo, instance_id) !=
+		    raft->term)
+			return 0;
+		if (txn_limbo.owner_id != instance_id)
+			return 0;
+		if (raft->state != RAFT_STATE_LEADER)
+			return 0;
+	}
 	if (box_trigger_elections() != 0)
 		return -1;
 	if (box_election_mode != ELECTION_MODE_OFF)
