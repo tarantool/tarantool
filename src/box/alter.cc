@@ -1956,6 +1956,52 @@ space_check_truncate(struct space *space)
 }
 
 /**
+ * Check whether @a old_space holders prohibit alter to @a new_space_def.
+ * For example if the space becomes temporary, there can be foreign keys
+ * from non-temporary space, so this alter must not be allowed.
+ * Return 0 if allowed, or -1 if not allowed (diag is set).
+ */
+static int
+space_check_alter(struct space *old_space, struct space_def *new_space_def)
+{
+	/*
+	 * group_id, which is currently used for defining local spaces, is
+	 * now can't be changed; if it could, an additional check would be
+	 * required below.
+	 */
+	assert(old_space->def->opts.group_id == new_space_def->opts.group_id);
+	/* Only alter from non-temporary to temporary can cause problems. */
+	if (old_space->def->opts.is_temporary ||
+	    !new_space_def->opts.is_temporary)
+		return 0;
+	/* Check for foreign keys that refers to this space. */
+	struct space_cache_holder *h;
+	rlist_foreach_entry(h, &old_space->space_cache_pin_list, link) {
+		if (h->selfpin)
+			continue;
+		if (h->type != SPACE_HOLDER_FOREIGN_KEY)
+			continue;
+		struct tuple_constraint *constr =
+			container_of(h, struct tuple_constraint,
+				     space_cache_holder);
+		struct space *other_space = constr->space;
+		/*
+		 * If the referring space is temporary too then the alter
+		 * can't break foreign key consistency after restart.
+		 */
+		if (other_space->def->opts.is_temporary)
+			continue;
+		diag_set(ClientError, ER_ALTER_SPACE,
+			 space_name(old_space),
+			 tt_sprintf("foreign key '%s' from non-temporary space"
+				    " '%s' can't refer to temporary space",
+				    constr->def.name, space_name(other_space)));
+		return -1;
+	}
+	return 0;
+}
+
+/**
  * A trigger which is invoked on replace in a data dictionary
  * space _space.
  *
@@ -2247,6 +2293,10 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  "view");
 			return -1;
 		}
+
+		if (space_check_alter(old_space, def) != 0)
+			return -1;
+
 		/*
 		 * Allow change of space properties, but do it
 		 * in WAL-error-safe mode.
