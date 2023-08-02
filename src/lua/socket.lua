@@ -952,6 +952,22 @@ local function socket_new(domain, stype, proto)
     end
 end
 
+local function socket_from_fd(fd)
+    if type(fd) ~= 'number' then
+        error('fd must be a number')
+    end
+    -- Try to determine the socket type. Ignore errors.
+    local itype = 0
+    local level = internal.SOL_SOCKET
+    local opt = internal.SO_OPT[level].SO_TYPE.iname
+    local value = ffi.new('int[1]')
+    local len = ffi.new('size_t[1]', ffi.sizeof('int'))
+    if ffi.C.getsockopt(fd, level, opt, value, len) == 0 and len[0] == 4 then
+        itype = tonumber(value[0])
+    end
+    return make_socket(fd, itype)
+end
+
 local function getaddrinfo(host, port, timeout, opts)
     if type(timeout) == 'table' and opts == nil then
         opts = timeout
@@ -1594,6 +1610,7 @@ end
 --------------------------------------------------------------------------------
 
 return setmetatable({
+    from_fd = socket_from_fd;
     getaddrinfo = getaddrinfo,
     tcp_connect = tcp_connect,
     tcp_server = tcp_server,
