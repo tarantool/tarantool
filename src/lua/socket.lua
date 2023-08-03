@@ -105,17 +105,27 @@ end
 
 local gc_socket_sentinel = ffi.new(gc_socket_t, { fd = -1 })
 
+local function do_detach(socket)
+    -- .fd is const to prevent tampering
+    ffi.copy(socket._gc_socket, gc_socket_sentinel, ffi.sizeof(gc_socket_t))
+end
+
 local function socket_close(socket)
     local fd = check_socket(socket)
     socket._errno = nil
     local r = ffi.C.coio_close(fd)
-    -- .fd is const to prevent tampering
-    ffi.copy(socket._gc_socket, gc_socket_sentinel, ffi.sizeof(gc_socket_t))
+    do_detach(socket)
     if r ~= 0 then
         socket._errno = boxerrno()
         return false
     end
     return true
+end
+
+local function socket_detach(socket)
+    check_socket(socket)
+    socket._errno = nil
+    do_detach(socket)
 end
 
 local soname_mt = {
@@ -1256,6 +1266,7 @@ end
 socket_mt   = {
     __index = {
         close = socket_close;
+        detach = socket_detach;
         errno = socket_errno;
         error = socket_error;
         sysconnect = socket_sysconnect;
