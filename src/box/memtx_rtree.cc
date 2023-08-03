@@ -439,17 +439,9 @@ memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 	}
 
 	struct memtx_rtree_index *index =
-		(struct memtx_rtree_index *)calloc(1, sizeof(*index));
-	if (index == NULL) {
-		diag_set(OutOfMemory, sizeof(*index),
-			 "malloc", "struct memtx_rtree_index");
-		return NULL;
-	}
-	if (index_create(&index->base, (struct engine *)memtx,
-			 &memtx_rtree_index_vtab, def) != 0) {
-		free(index);
-		return NULL;
-	}
+		(struct memtx_rtree_index *)xcalloc(1, sizeof(*index));
+	index_create(&index->base, (struct engine *)memtx,
+		     &memtx_rtree_index_vtab, def);
 
 	index->dimension = def->opts.dimension;
 	rtree_init(&index->tree, index->dimension, distance_type,

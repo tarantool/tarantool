@@ -647,10 +647,7 @@ memtx_hash_index_create_read_view(struct index *base)
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct hash_read_view *rv =
 		(struct hash_read_view *)xmalloc(sizeof(*rv));
-	if (index_read_view_create(&rv->base, &vtab, base->def) != 0) {
-		free(rv);
-		return NULL;
-	}
+	index_read_view_create(&rv->base, &vtab, base->def);
 	struct space *space = space_by_id(base->def->space_id);
 	assert(space != NULL);
 	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space);
@@ -695,17 +692,9 @@ struct index *
 memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	struct memtx_hash_index *index =
-		(struct memtx_hash_index *)calloc(1, sizeof(*index));
-	if (index == NULL) {
-		diag_set(OutOfMemory, sizeof(*index),
-			 "malloc", "struct memtx_hash_index");
-		return NULL;
-	}
-	if (index_create(&index->base, (struct engine *)memtx,
-			 &memtx_hash_index_vtab, def) != 0) {
-		free(index);
-		return NULL;
-	}
+		(struct memtx_hash_index *)xcalloc(1, sizeof(*index));
+	index_create(&index->base, (struct engine *)memtx,
+		     &memtx_hash_index_vtab, def);
 
 	light_index_create(&index->hash_table, index->base.def->key_def,
 			   MEMTX_EXTENT_SIZE, memtx_index_extent_alloc,

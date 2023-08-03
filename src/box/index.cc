@@ -772,14 +772,11 @@ iterator_delete(struct iterator *it)
 	it->free(it);
 }
 
-int
+void
 index_create(struct index *index, struct engine *engine,
 	     const struct index_vtab *vtab, struct index_def *def)
 {
 	def = index_def_dup(def);
-	if (def == NULL)
-		return -1;
-
 	index->vtab = vtab;
 	index->engine = engine;
 	index->def = def;
@@ -790,7 +787,6 @@ index_create(struct index *index, struct engine *engine,
 	/* Unusable until set to proper value during space creation. */
 	index->dense_id = UINT32_MAX;
 	rlist_create(&index->read_gaps);
-	return 0;
 }
 
 void
@@ -808,17 +804,14 @@ index_delete(struct index *index)
 	index_def_delete(def);
 }
 
-int
+void
 index_read_view_create(struct index_read_view *rv,
 		       const struct index_read_view_vtab *vtab,
 		       struct index_def *def)
 {
 	rv->vtab = vtab;
 	rv->def = index_def_dup(def);
-	if (rv->def == NULL)
-		return -1;
 	rv->space = NULL;
-	return 0;
 }
 
 void

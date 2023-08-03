@@ -475,18 +475,9 @@ sysview_space_create_index(struct space *space, struct index_def *def)
 		return NULL;
 	}
 
-	struct sysview_index *index =
-		(struct sysview_index *)calloc(1, sizeof(*index));
-	if (index == NULL) {
-		diag_set(OutOfMemory, sizeof(*index),
-			 "malloc", "struct sysview_index");
-		return NULL;
-	}
-	if (index_create(&index->base, (struct engine *)sysview,
-			 &sysview_index_vtab, def) != 0) {
-		free(index);
-		return NULL;
-	}
+	struct sysview_index *index = xcalloc(1, sizeof(*index));
+	index_create(&index->base, (struct engine *)sysview,
+		     &sysview_index_vtab, def);
 
 	index->source_space_id = source_space_id;
 	index->source_index_id = source_index_id;

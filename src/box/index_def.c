@@ -122,32 +122,16 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 struct index_def *
 index_def_dup(const struct index_def *def)
 {
-	struct index_def *dup = (struct index_def *) malloc(sizeof(*dup));
-	if (dup == NULL) {
-		diag_set(OutOfMemory, sizeof(*dup), "malloc",
-			 "struct index_def");
-		return NULL;
-	}
+	struct index_def *dup = xmalloc(sizeof(*dup));
 	*dup = *def;
-	dup->name = strdup(def->name);
-	if (dup->name == NULL) {
-		free(dup);
-		diag_set(OutOfMemory, strlen(def->name) + 1, "malloc",
-			 "index_def name");
-		return NULL;
-	}
+	dup->name = xstrdup(def->name);
 	dup->key_def = key_def_dup(def->key_def);
 	dup->cmp_def = key_def_dup(def->cmp_def);
 	dup->pk_def = key_def_dup(def->pk_def);
 	rlist_create(&dup->link);
 	dup->opts = def->opts;
-	if (def->opts.stat != NULL) {
+	if (def->opts.stat != NULL)
 		dup->opts.stat = index_stat_dup(def->opts.stat);
-		if (dup->opts.stat == NULL) {
-			index_def_delete(dup);
-			return NULL;
-		}
-	}
 	return dup;
 }
 
@@ -178,11 +162,7 @@ index_stat_dup(const struct index_stat *src)
 {
 	size_t size = index_stat_sizeof(src->samples, src->sample_count,
 					src->sample_field_count);
-	struct index_stat *dup = (struct index_stat *) malloc(size);
-	if (dup == NULL) {
-		diag_set(OutOfMemory, size, "malloc", "index stat");
-		return NULL;
-	}
+	struct index_stat *dup = xmalloc(size);
 	memcpy(dup, src, size);
 	uint32_t array_size = src->sample_field_count * sizeof(uint32_t);
 	uint32_t stat1_offset = sizeof(struct index_stat);

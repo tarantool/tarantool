@@ -2069,10 +2069,7 @@ memtx_tree_index_create_read_view(struct index *base)
 		(struct memtx_tree_index<USE_HINT> *)base;
 	struct tree_read_view<USE_HINT> *rv =
 		(struct tree_read_view<USE_HINT> *)xmalloc(sizeof(*rv));
-	if (index_read_view_create(&rv->base, &vtab, base->def) != 0) {
-		free(rv);
-		return NULL;
-	}
+	index_read_view_create(&rv->base, &vtab, base->def);
 	struct space *space = space_by_id(base->def->space_id);
 	assert(space != NULL);
 	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space);
@@ -2194,17 +2191,8 @@ memtx_tree_index_new_tpl(struct memtx_engine *memtx, struct index_def *def,
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)
-		calloc(1, sizeof(*index));
-	if (index == NULL) {
-		diag_set(OutOfMemory, sizeof(*index),
-			 "malloc", "struct memtx_tree_index");
-		return NULL;
-	}
-	if (index_create(&index->base, (struct engine *)memtx,
-			 vtab, def) != 0) {
-		free(index);
-		return NULL;
-	}
+		xcalloc(1, sizeof(*index));
+	index_create(&index->base, (struct engine *)memtx, vtab, def);
 
 	/* See comment to memtx_tree_index_update_def(). */
 	struct key_def *cmp_def;
