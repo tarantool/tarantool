@@ -49,6 +49,13 @@ enum index_type {
 
 extern const char *index_type_strs[];
 
+/** Settings for the hint config option. */
+enum index_hint_cfg {
+	INDEX_HINT_DEFAULT = 0,
+	INDEX_HINT_ON,
+	INDEX_HINT_OFF
+};
+
 enum rtree_index_distance_type {
 	 /* Euclid distance, sqrt(dx*dx + dy*dy) */
 	RTREE_INDEX_DISTANCE_TYPE_EUCLID,
@@ -168,7 +175,7 @@ struct index_opts {
 	/**
 	 * Use hint optimization for tree index.
 	 */
-	bool hint;
+	enum index_hint_cfg hint;
 };
 
 extern const struct index_opts index_opts_default;

@@ -533,7 +533,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 			lua_setfield(L, -2, "dimension");
 		}
 		if (space_is_memtx(space) && index_def->type == TREE) {
-			lua_pushboolean(L, index_opts->hint);
+			lua_pushboolean(L, index_opts->hint == INDEX_HINT_ON);
 			lua_setfield(L, -2, "hint");
 		} else {
 			lua_pushnil(L);
