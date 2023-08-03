@@ -1503,7 +1503,7 @@ class RebuildFuncIndex: public RebuildIndex
 	static struct index_def *
 	func_index_def_new(struct index_def *index_def, struct func *func)
 	{
-		struct index_def *new_index_def = index_def_dup_xc(index_def);
+		struct index_def *new_index_def = index_def_dup(index_def);
 		index_def_set_func(new_index_def, func);
 		return new_index_def;
 	}
