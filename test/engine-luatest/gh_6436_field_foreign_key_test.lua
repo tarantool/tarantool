@@ -137,7 +137,7 @@ g.test_foreign_key_primary = function(cg)
         t.assert_equals(country:select{}, {{1, 'ru', 'Russia'}, {2, 'fr', 'France'}})
         t.assert_error_msg_content_equals(
             "Can't modify space 'country': space is referenced by foreign key",
-            function() country:drop() end
+            box.atomic, country.drop, country
         )
         t.assert_equals(country:select{}, {{1, 'ru', 'Russia'}, {2, 'fr', 'France'}})
         t.assert_error_msg_content_equals(
@@ -215,7 +215,7 @@ g.test_foreign_key_secondary = function(cg)
         t.assert_equals(country:select{}, {{1, 'ru', 'Russia'}, {2, 'fr', 'France'}})
         t.assert_error_msg_content_equals(
             "Can't modify space 'country': space is referenced by foreign key",
-            function() country:drop() end
+            box.atomic, country.drop, country
         )
         t.assert_equals(country:select{}, {{1, 'ru', 'Russia'}, {2, 'fr', 'France'}})
         t.assert_error_msg_content_equals(
@@ -297,7 +297,7 @@ g.test_foreign_key_numeric = function(cg)
         t.assert_equals(country:select{}, {{1, 'ru', 'Russia'}, {2, 'fr', 'France'}})
         t.assert_error_msg_content_equals(
             "Can't modify space 'country': space is referenced by foreign key",
-            function() country:drop() end
+            box.atomic, country.drop, country
         )
         t.assert_equals(country:select{}, {{1, 'ru', 'Russia'}, {2, 'fr', 'France'}})
         t.assert_error_msg_content_equals(

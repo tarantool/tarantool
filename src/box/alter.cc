@@ -42,6 +42,7 @@
 #include "coll_id_def.h"
 #include "txn.h"
 #include "tuple.h"
+#include "tuple_constraint.h"
 #include "fiber.h" /* for gc_pool */
 #include "scoped_guard.h"
 #include <base64.h>
@@ -2049,6 +2050,42 @@ space_check_pinned(struct space *space)
 }
 
 /**
+ * Check whether @a space holders prohibit truncate of the space.
+ * For example truncation in not allowed if another non-empty space refers
+ * to this space via foreign key link.
+ * Return 0 if allowed, or -1 if not allowed (diag is set).
+ */
+static int
+space_check_truncate(struct space *space)
+{
+	/* Check for foreign keys that refers to this space. */
+	struct space_cache_holder *h;
+	rlist_foreach_entry(h, &space->space_cache_pin_list, link) {
+		if (h->selfpin)
+			continue;
+		if (h->type != SPACE_HOLDER_FOREIGN_KEY)
+			continue;
+		struct tuple_constraint *constr =
+			container_of(h, struct tuple_constraint,
+				     space_cache_holder);
+		struct space *other_space = constr->space;
+		/*
+		 * If the referring space is empty then the truncate can't
+		 * break foreign key consistency.
+		 */
+		if (space_bsize(other_space) == 0)
+			continue;
+		const char *type_str =
+			space_cache_holder_type_strs[h->type];
+		diag_set(ClientError, ER_ALTER_SPACE,
+			 space_name(space),
+			 tt_sprintf("space is referenced by %s", type_str));
+		return -1;
+	}
+	return 0;
+}
+
+/**
  * A trigger which is invoked on replace in a data dictionary
  * space _space.
  *
@@ -2537,11 +2574,10 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 				  "space sequence exists");
 			return -1;
 		}
-
 		/*
-		 * Must not truncate pinned space.
+		 * Check space's holders.
 		 */
-		if (space_check_pinned(old_space) != 0)
+		if (space_check_truncate(old_space) != 0)
 			return -1;
 	}
 
@@ -2810,7 +2846,8 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 		return -1;
 	}
 
-	if (space_check_pinned(old_space) != 0)
+	/* Check space's holders. */
+	if (space_check_truncate(old_space) != 0)
 		return -1;
 
 	struct alter_space *alter = alter_space_new(old_space);
