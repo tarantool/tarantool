@@ -1,5 +1,7 @@
 set(CMAKE_CXX_STANDARD 14)
 
+add_subdirectory(lua)
+
 find_package(benchmark QUIET)
 if (NOT ${benchmark_FOUND})
     message(AUTHOR_WARNING "Google Benchmark library was not found")
