@@ -199,12 +199,7 @@ handle_new(struct popen_opts *opts)
 		size += strlen(opts->argv[i]) + 3;
 	}
 
-	handle = malloc(sizeof(*handle) + size);
-	if (!handle) {
-		diag_set(OutOfMemory, sizeof(*handle) + size,
-			 "malloc", "popen_handle");
-		return NULL;
-	}
+	handle = xmalloc(sizeof(*handle) + size);
 
 	pos = handle->command = (void *)handle + sizeof(*handle);
 	pos_max = pos + size;
@@ -1134,7 +1129,6 @@ popen_wait_group_leadership(pid_t pid)
  *   getpgid() fails in the parent process.
  * - SystemError: (temporary restriction) one of std{in,out,err}
  *   is closed in the parent process.
- * - OutOfMemory: unable to allocate handle.
  */
 struct popen_handle *
 popen_new(struct popen_opts *opts)

@@ -42,6 +42,7 @@
 #include "core/fiber.h"
 #include "core/exception.h"
 #include "tarantool_ev.h"
+#include "trivia/util.h"
 
 #include "lua/utils.h"
 #include "lua/fiber.h"
@@ -701,9 +702,6 @@ luaT_popen_parse_stdX(struct lua_State *L, int idx, int fd,
  * Glue key and value on the Lua stack into "key=value" entry.
  *
  * Raise an error in case of the incorrect parameter.
- *
- * Return NULL in case of an allocation error and set a diag
- * (OutOfMemory).
  */
 static char *
 luaT_popen_parse_env_entry(struct lua_State *L, int key_idx, int value_idx,
@@ -729,11 +727,7 @@ luaT_popen_parse_env_entry(struct lua_State *L, int key_idx, int value_idx,
 
 	/* entry = "${key}=${value}" */
 	size_t entry_size = key_len + value_len + 2;
-	char *entry = region_alloc(region, entry_size);
-	if (entry == NULL) {
-		diag_set(OutOfMemory, entry_size, "region_alloc", "env entry");
-		return NULL;
-	}
+	char *entry = xregion_alloc(region, entry_size);
 	memcpy(entry, key, key_len);
 	size_t pos = key_len;
 	entry[pos++] = '=';
@@ -757,9 +751,6 @@ luaT_popen_parse_env_entry(struct lua_State *L, int key_idx, int value_idx,
  * is not needed anymore.
  *
  * Raise an error in case of the incorrect parameter.
- *
- * Return NULL in case of an allocation error and set a diag
- * (OutOfMemory).
  */
 static char **
 luaT_popen_parse_env(struct lua_State *L, int idx, struct region *region)
@@ -777,13 +768,7 @@ luaT_popen_parse_env(struct lua_State *L, int idx, struct region *region)
 
 	size_t capacity = POPEN_LUA_ENV_CAPACITY_DEFAULT;
 	size_t region_svp = region_used(region);
-	size_t size;
-	char **env = region_alloc_array(region, typeof(env[0]), capacity,
-					&size);
-	if (env == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "env");
-		return NULL;
-	}
+	char **env = xregion_alloc_array(region, typeof(env[0]), capacity);
 	size_t nr_env = 0;
 
 	bool only_count = false;
@@ -809,10 +794,6 @@ luaT_popen_parse_env(struct lua_State *L, int idx, struct region *region)
 			continue;
 		}
 		char *entry = luaT_popen_parse_env_entry(L, -2, -1, region);
-		if (entry == NULL) {
-			region_truncate(region, region_svp);
-			return NULL;
-		}
 		env[nr_env++] = entry;
 		lua_pop(L, 1);
 	}
@@ -828,20 +809,11 @@ luaT_popen_parse_env(struct lua_State *L, int idx, struct region *region)
 	 * the traverse again and fill `env` array.
 	 */
 	capacity = nr_env + 1;
-	env = region_alloc_array(region, typeof(env[0]), capacity, &size);
-	if (env == NULL) {
-		region_truncate(region, region_svp);
-		diag_set(OutOfMemory, size, "region_alloc_array", "env");
-		return NULL;
-	}
+	env = xregion_alloc_array(region, typeof(env[0]), capacity);
 	nr_env = 0;
 	lua_pushnil(L);
 	while (lua_next(L, idx) != 0) {
 		char *entry = luaT_popen_parse_env_entry(L, -2, -1, region);
-		if (entry == NULL) {
-			region_truncate(region, region_svp);
-			return NULL;
-		}
 		assert(nr_env < capacity - 1);
 		env[nr_env++] = entry;
 		lua_pop(L, 1);
@@ -860,14 +832,11 @@ luaT_popen_parse_env(struct lua_State *L, int idx, struct region *region)
  *
  * Raise an error in case of the incorrect parameter.
  *
- * Return 0 at success. Allocates opts->env on @a region if
+ * Allocates opts->env on @a region if
  * needed. @see luaT_popen_parse_env() for details how to
  * free it.
- *
- * Return -1 in case of an allocation error and set a diag
- * (OutOfMemory).
  */
-static int
+static void
 luaT_popen_parse_opts(struct lua_State *L, int idx, struct popen_opts *opts,
 		      struct region *region)
 {
@@ -906,11 +875,8 @@ luaT_popen_parse_opts(struct lua_State *L, int idx, struct popen_opts *opts,
 		lua_pop(L, 1);
 
 		lua_getfield(L, idx, "env");
-		if (! lua_isnil(L, -1)) {
+		if (!lua_isnil(L, -1))
 			opts->env = luaT_popen_parse_env(L, -1, region);
-			if (opts->env == NULL)
-				return -1;
-		}
 		lua_pop(L, 1);
 
 		/*
@@ -997,8 +963,6 @@ luaT_popen_parse_opts(struct lua_State *L, int idx, struct popen_opts *opts,
 		}
 		lua_pop(L, 1);
 	}
-
-	return 0;
 }
 
 /**
@@ -1010,14 +974,11 @@ luaT_popen_parse_opts(struct lua_State *L, int idx, struct popen_opts *opts,
  *
  * Raise an error in case of the incorrect parameter.
  *
- * Return 0 at success. Sets opts->argv and opts->nr_argv.
+ * Sets opts->argv and opts->nr_argv.
  * Allocates opts->argv on @a region (@see
  * luaT_popen_parse_env() for details how to free it).
- *
- * Return -1 in case of an allocation error and set a diag
- * (OutOfMemory).
  */
-static int
+static void
 luaT_popen_parse_argv(struct lua_State *L, int idx, struct popen_opts *opts,
 		      struct region *region)
 {
@@ -1037,14 +998,8 @@ luaT_popen_parse_argv(struct lua_State *L, int idx, struct popen_opts *opts,
 	opts->nr_argv = argv_len + 1;
 	if (opts->flags & POPEN_FLAG_SHELL)
 		opts->nr_argv += 2;
-
-	size_t size;
-	opts->argv = region_alloc_array(region, typeof(opts->argv[0]),
-					opts->nr_argv, &size);
-	if (opts->argv == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "opts->argv");
-		return -1;
-	}
+	opts->argv = xregion_alloc_array(region, typeof(opts->argv[0]),
+					 opts->nr_argv);
 
 	/* Keep place for "sh", "-c" as popen_new() expects. */
 	const char **to = (const char **)opts->argv;
@@ -1059,7 +1014,7 @@ luaT_popen_parse_argv(struct lua_State *L, int idx, struct popen_opts *opts,
 		const char *arg = luaL_tolstring_strict(L, -1, NULL);
 		if (arg == NULL) {
 			region_truncate(region, region_svp);
-			return luaT_popen_array_elem_type_error(
+			luaT_popen_array_elem_type_error(
 				L, -1, "popen.new", "argv", i + 1, "string");
 		}
 		*to++ = arg;
@@ -1067,8 +1022,6 @@ luaT_popen_parse_argv(struct lua_State *L, int idx, struct popen_opts *opts,
 	}
 	*to++ = NULL;
 	assert((const char **)opts->argv + opts->nr_argv == to);
-
-	return 0;
 }
 
 /**
@@ -1250,8 +1203,6 @@ luaT_popen_parse_mode(struct lua_State *L, int idx)
  *                getpgrp() fails in the parent process.
  * - SystemError: (temporary restriction) the parent process
  *                has closed stdin, stdout or stderr.
- * - OutOfMemory: unable to allocate the handle or a temporary
- *                buffer.
  *
  * Example 1:
  *
@@ -1371,28 +1322,22 @@ lbox_popen_new(struct lua_State *L)
 
 	/* Parse opts and argv. */
 	struct popen_opts opts = { .argv = NULL, };
-	int rc = luaT_popen_parse_opts(L, 2, &opts, region);
-	if (rc != 0)
-		goto err;
-	rc = luaT_popen_parse_argv(L, 1, &opts, region);
-	if (rc != 0)
-		goto err;
+	luaT_popen_parse_opts(L, 2, &opts, region);
+	luaT_popen_parse_argv(L, 1, &opts, region);
 
 	struct popen_handle *handle = popen_new(&opts);
 
-	if (handle == NULL)
-		goto err;
-
 	region_truncate(region, region_svp);
+
+	if (handle == NULL) {
+		struct error *e = diag_last_error(diag_get());
+		if (e->type == &type_IllegalParams)
+			return luaT_error(L);
+		return luaT_push_nil_and_error(L);
+	}
+
 	luaT_push_popen_handle(L, handle);
 	return 1;
-
-err:
-	region_truncate(region, region_svp);
-	struct error *e = diag_last_error(diag_get());
-	if (e->type == &type_IllegalParams)
-		return luaT_error(L);
-	return luaT_push_nil_and_error(L);
 }
 
 /**
@@ -1712,7 +1657,6 @@ lbox_popen_wait(struct lua_State *L)
  *
  * - SocketError: an IO error occurs at read().
  * - TimedOut:    @a timeout quota is exceeded.
- * - OutOfMemory: no memory space for a buffer to read into.
  * - LuajitError: ("not enough memory"): no memory space for
  *                the Lua string.
  */
@@ -1779,11 +1723,7 @@ lbox_popen_read(struct lua_State *L)
 		flags |= POPEN_FLAG_FD_STDOUT;
 
 	size_t size = POPEN_LUA_READ_BUF_SIZE;
-	char *buf = region_alloc(region, size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "read buffer");
-		return luaT_push_nil_and_error(L);
-	}
+	char *buf = xregion_alloc(region, size);
 
 	static_assert(POPEN_LUA_READ_BUF_SIZE <= SSIZE_MAX,
 		      "popen: read buffer is too big");
