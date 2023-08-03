@@ -32,6 +32,7 @@ ffi.cdef[[
     ssize_t read(int fd, void *buf, size_t count);
     int listen(int fd, int backlog);
     int socket(int domain, int type, int protocol);
+    int socketpair(int domain, int type, int protocol, int sv[2]);
     int coio_close(int s);
     int shutdown(int s, int how);
     ssize_t send(int sockfd, const void *buf, size_t len, int flags);
@@ -933,7 +934,7 @@ local function socket_sendto(self, host, port, octets, flags)
     return tonumber(res)
 end
 
-local function socket_new(domain, stype, proto)
+local function check_socket_args(domain, stype, proto)
     local idomain = get_ivalue(internal.DOMAIN, domain)
     if idomain == nil then
         boxerrno(boxerrno.EINVAL)
@@ -951,6 +952,14 @@ local function socket_new(domain, stype, proto)
         return nil
     end
 
+    return idomain, itype, iproto
+end
+
+local function socket_new(domain, stype, proto)
+    local idomain, itype, iproto = check_socket_args(domain, stype, proto)
+    if idomain == nil then
+        return nil
+    end
     local fd = ffi.C.socket(idomain, itype, iproto)
     if fd >= 0 then
         local socket = make_socket(fd, itype)
@@ -960,6 +969,25 @@ local function socket_new(domain, stype, proto)
             return socket
         end
     end
+end
+
+local function socket_socketpair(domain, stype, proto)
+    local idomain, itype, iproto = check_socket_args(domain, stype, proto)
+    if idomain == nil then
+        return nil
+    end
+    local sv = ffi.new('int[2]')
+    if ffi.C.socketpair(idomain, itype, iproto, sv) ~= 0 then
+        return nil
+    end
+    local s1 = make_socket(sv[0], itype)
+    local s2 = make_socket(sv[1], itype)
+    if not s1:nonblock(true) or not s2:nonblock(true) then
+        s1:close()
+        s2:close()
+        return nil
+    end
+    return s1, s2
 end
 
 local function socket_from_fd(fd)
@@ -1622,6 +1650,7 @@ end
 
 return setmetatable({
     from_fd = socket_from_fd;
+    socketpair = socket_socketpair;
     getaddrinfo = getaddrinfo,
     tcp_connect = tcp_connect,
     tcp_server = tcp_server,
