@@ -286,7 +286,7 @@ index_stat_sizeof(const struct index_sample *samples, uint32_t sample_count,
  * To understand memory layout see index_stat_sizeof() function.
  *
  * @param src Stat to duplicate.
- * @retval Copy of the @src or NULL on OOM.
+ * @retval Copy of the @src.
  */
 struct index_stat *
 index_stat_dup(const struct index_stat *src);
@@ -410,23 +410,6 @@ index_def_check(struct index_def *index_def, const char *space_name);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-static inline struct index_def *
-index_def_dup_xc(const struct index_def *def)
-{
-	struct index_def *ret = index_def_dup(def);
-	if (ret == NULL)
-		diag_raise();
-	return ret;
-}
-
-static inline void
-index_def_check_xc(struct index_def *index_def, const char *space_name)
-{
-	if (index_def_check(index_def, space_name) != 0)
-		diag_raise();
-}
-
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_INDEX_DEF_H_INCLUDED */

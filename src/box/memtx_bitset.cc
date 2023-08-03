@@ -529,17 +529,9 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 	assert(!def->opts.is_unique);
 
 	struct memtx_bitset_index *index =
-		(struct memtx_bitset_index *)calloc(1, sizeof(*index));
-	if (index == NULL) {
-		diag_set(OutOfMemory, sizeof(*index),
-			 "malloc", "struct memtx_bitset_index");
-		return NULL;
-	}
-	if (index_create(&index->base, (struct engine *)memtx,
-			 &memtx_bitset_index_vtab, def) != 0) {
-		free(index);
-		return NULL;
-	}
+		(struct memtx_bitset_index *)xcalloc(1, sizeof(*index));
+	index_create(&index->base, (struct engine *)memtx,
+		     &memtx_bitset_index_vtab, def);
 
 #ifndef OLD_GOOD_BITSET
 	index->spare_id = SPARE_ID_END;

@@ -810,7 +810,7 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
  * Initialize an index instance.
  * Note, this function copies the given index definition.
  */
-int
+void
 index_create(struct index *index, struct engine *engine,
 	     const struct index_vtab *vtab, struct index_def *def);
 
@@ -1015,7 +1015,7 @@ index_end_build(struct index *index)
  * Initialize an index read view instance.
  * Note, this function copies the given index definition.
  */
-int
+void
 index_read_view_create(struct index_read_view *rv,
 		       const struct index_read_view_vtab *vtab,
 		       struct index_def *def);

@@ -713,11 +713,7 @@ vinyl_space_create_index(struct space *space, struct index_def *index_def)
 	if (lsm == NULL)
 		return NULL;
 
-	if (index_create(&lsm->base, &env->base,
-			 &vinyl_index_vtab, index_def) != 0) {
-		vy_lsm_delete(lsm);
-		return NULL;
-	}
+	index_create(&lsm->base, &env->base, &vinyl_index_vtab, index_def);
 	return &lsm->base;
 }
 

@@ -409,17 +409,9 @@ session_settings_space_create_index(struct space *space, struct index_def *def)
 		return NULL;
 	}
 
-	struct session_settings_index *index =
-		(struct session_settings_index *)calloc(1, sizeof(*index));
-	if (index == NULL) {
-		diag_set(OutOfMemory, sizeof(*index), "calloc", "index");
-		return NULL;
-	}
-	if (index_create(&index->base, space->engine,
-			 &session_settings_index_vtab, def) != 0) {
-		free(index);
-		return NULL;
-	}
+	struct session_settings_index *index = xcalloc(1, sizeof(*index));
+	index_create(&index->base, space->engine, &session_settings_index_vtab,
+		     def);
 
 	index->format = space->format;
 	return &index->base;
