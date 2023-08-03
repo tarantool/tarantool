@@ -1,3 +1,4 @@
+local errno = require('errno')
 local socket = require('socket')
 local t = require('luatest')
 
@@ -56,5 +57,28 @@ g.test_detach = function()
     s1 = nil -- luacheck: ignore
     collectgarbage('collect')
     t.assert_is_not(s2:name(), nil)
+    t.assert(s2:close())
+end
+
+g.test_socketpair = function()
+    t.assert_is(socket.socketpair(), nil)
+    t.assert_equals(errno(), errno.EINVAL)
+    t.assert_is(socket.socketpair('foo'), nil)
+    t.assert_equals(errno(), errno.EINVAL)
+    t.assert_is(socket.socketpair('AF_UNIX', 'bar'), nil)
+    t.assert_equals(errno(), errno.EINVAL)
+    t.assert_is(socket.socketpair('AF_UNIX', 'SOCK_STREAM', 'baz'), nil)
+    t.assert_equals(errno(), errno.EPROTOTYPE)
+    t.assert_is(socket.socketpair('AF_INET', 'SOCK_STREAM', 0), nil)
+    t.assert_equals(errno(), errno.EOPNOTSUPP)
+
+    local s1, s2 = socket.socketpair('AF_UNIX', 'SOCK_STREAM', 0)
+    t.assert(s1)
+    t.assert(s2)
+    t.assert(s1:nonblock())
+    t.assert(s2:nonblock())
+    t.assert_equals(s1:send('foo'), 3)
+    t.assert_equals(s2:recv(), 'foo')
+    t.assert(s1:close())
     t.assert(s2:close())
 end
