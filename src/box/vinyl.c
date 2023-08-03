@@ -670,6 +670,17 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 			 index_def->name, space_name(space));
 		return -1;
 	}
+	if (index_def->opts.hint == INDEX_HINT_ON &&
+	    recovery_state == FINISHED_RECOVERY) {
+		/*
+		 * The error is silenced during recovery to be able to recover
+		 * the indexes with incorrect hint options.
+		 */
+		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
+			 space_name(space),
+			 "hint is only reasonable with memtx tree index");
+		return -1;
+	}
 
 	struct key_def *key_def = index_def->key_def;
 
