@@ -176,7 +176,7 @@ space_cache_unpin(struct space_cache_holder *holder);
 /**
  * Check whether the @a space has holders or not.
  * If it has, @a type argument is set to the first holder's type.
- * The function must be in cache (asserted).
+ * The space must be in cache (asserted).
  * If a space has holders, it must not be deleted (asserted).
  */
 bool

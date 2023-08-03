@@ -60,6 +60,7 @@ box.execute("TRUNCATE TABLE v1;")
 
 -- Can't truncate table with FK.
 box.execute("CREATE TABLE t2(x INT PRIMARY KEY REFERENCES t1(id));")
+box.execute("INSERT INTO t2 VALUES(1);")
 box.execute("TRUNCATE TABLE t1;")
 
 -- Table triggers should be ignored.
