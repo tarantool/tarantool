@@ -137,6 +137,10 @@ box.execute("CREATE TABLE t2(x INT PRIMARY KEY REFERENCES t1(id));")
 ---
 - row_count: 1
 ...
+box.execute("INSERT INTO t2 VALUES(1);")
+---
+- row_count: 1
+...
 box.execute("TRUNCATE TABLE t1;")
 ---
 - null
