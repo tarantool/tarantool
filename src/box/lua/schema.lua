@@ -1559,11 +1559,6 @@ box.schema.index.create = function(space_id, name, options)
         options_defaults = {}
     end
     options = update_param_table(options, options_defaults)
-    if options.hint and
-            (options.type ~= 'tree' or box.space[space_id].engine ~= 'memtx') then
-        box.error(box.error.MODIFY_INDEX, name, space.name,
-                "hint is only reasonable with memtx tree index")
-    end
     if options.hint and options.func then
         box.error(box.error.MODIFY_INDEX, name, space.name,
                 "functional index can't use hints")
@@ -1750,12 +1745,6 @@ box.schema.index.alter = function(space_id, index_id, options)
         if options[k] ~= nil then
             index_opts[k] = options[k]
         end
-    end
-    if options.hint and
-       (options.type ~= 'tree' or box.space[space_id].engine ~= 'memtx') then
-        box.error(box.error.MODIFY_INDEX, space.index[index_id].name,
-                                          space.name,
-            "hint is only reasonable with memtx tree index")
     end
     if options.hint and options.func then
         box.error(box.error.MODIFY_INDEX, space.index[index_id].name,

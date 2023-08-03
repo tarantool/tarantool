@@ -818,6 +818,19 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 			 index_def->name, space_name(space));
 		return -1;
 	}
+
+	if (index_def->type != TREE && index_def->opts.hint == INDEX_HINT_ON &&
+	    recovery_state == FINISHED_RECOVERY) {
+		/*
+		 * The error is silenced during recovery to be able to recover
+		 * the indexes with incorrect hint options.
+		 */
+		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
+			 space_name(space),
+			 "hint is only reasonable with memtx tree index");
+		return -1;
+	}
+
 	/* Only HASH and TREE indexes checks parts there */
 	/* Check that there are no ANY, ARRAY, MAP parts */
 	for (uint32_t i = 0; i < key_def->part_count; i++) {

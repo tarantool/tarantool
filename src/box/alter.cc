@@ -351,6 +351,17 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	if (space_check_index_def(space, index_def) != 0)
 		return NULL;
 	/*
+	 * Set opts.hint to the unambiguous ON or OFF value. This
+	 * allows to compare opts.hint like in index_opts_cmp()
+	 * or memtx_index_def_change_requires_rebuild().
+	 */
+	if (index_def->opts.hint == INDEX_HINT_DEFAULT) {
+		if (space_is_memtx(space) && type == TREE)
+			index_def->opts.hint = INDEX_HINT_ON;
+		else
+			index_def->opts.hint = INDEX_HINT_OFF;
+	}
+	/*
 	 * In case of functional index definition, resolve a
 	 * function pointer to perform a complete index build
 	 * (istead of initializing it in inactive state) in

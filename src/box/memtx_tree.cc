@@ -2156,7 +2156,7 @@ memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 	} else if (def->key_def->is_multikey) {
 		vtab = get_memtx_tree_index_vtab<MEMTX_TREE_VTAB_MULTIKEY>();
 		use_hint = true;
-	} else if (def->opts.hint) {
+	} else if (def->opts.hint == INDEX_HINT_ON) {
 		vtab = get_memtx_tree_index_vtab
 			<MEMTX_TREE_VTAB_GENERAL, true>();
 		use_hint = true;

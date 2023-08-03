@@ -51,8 +51,29 @@ const struct index_opts index_opts_default = {
 	/* .lsn                 = */ 0,
 	/* .stat                = */ NULL,
 	/* .func                = */ 0,
-	/* .hint                = */ true,
+	/* .hint                = */ INDEX_HINT_DEFAULT,
 };
+
+/**
+ * Parse index hint option from msgpack.
+ * Used as callback to parse a boolean value with 'hint' key in index options.
+ * Move @a data msgpack pointer to the end of msgpack value.
+ * By convention @a opts must point to corresponding struct index_opts.
+ * Return 0 on success or -1 on error (diag is set to IllegalParams).
+ */
+static int
+index_opts_parse_hint(const char **data, void *opts, struct region *region)
+{
+	(void)region;
+	struct index_opts *index_opts = (struct index_opts *)opts;
+	if (mp_typeof(**data) != MP_BOOL) {
+		diag_set(IllegalParams, "'hint' must be boolean");
+		return -1;
+	}
+	bool hint = mp_decode_bool(data);
+	index_opts->hint = hint ? INDEX_HINT_ON : INDEX_HINT_OFF;
+	return 0;
+}
 
 const struct opt_def index_opts_reg[] = {
 	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
@@ -67,7 +88,7 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF("lsn", OPT_INT64, struct index_opts, lsn),
 	OPT_DEF("func", OPT_UINT32, struct index_opts, func_id),
 	OPT_DEF_LEGACY("sql"),
-	OPT_DEF("hint", OPT_BOOL, struct index_opts, hint),
+	OPT_DEF_CUSTOM("hint", index_opts_parse_hint),
 	OPT_END,
 };
 
