@@ -51,6 +51,9 @@ jobs:
       - name: Install deps
         uses: ./.github/actions/install-deps-debian
       - name: test
+        env:
+          CC: clang-11
+          CXX: clang++-11
         run: make -f .test.mk test-release-asan
       - name: Send VK Teams message on failure
         if: failure()

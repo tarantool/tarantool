@@ -69,7 +69,6 @@ test-release: build run-luajit-test run-test
 # Release ASAN build
 
 .PHONY: test-release-asan
-test-release-asan: CMAKE_ENV = CC=clang-11 CXX=clang++-11
 # FIBER_STACK_SIZE=640Kb: The default value of fiber stack size
 # is 512Kb, but several tests in test/PUC-Rio-Lua-5.1-test suite
 # in the LuaJIT repo (e.g. some cases with deep recursion in
