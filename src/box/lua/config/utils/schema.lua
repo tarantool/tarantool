@@ -1389,6 +1389,157 @@ end
 
 -- }}} <schema object>:pairs()
 
+-- {{{ Schema preprocessing
+
+-- Step down to a schema node.
+--
+-- The function performs annotations tracking.
+--
+-- The annotations are tracked for all the nodes up to the root
+-- forming a stack of annotations. It allows to step down to a
+-- child node using preprocess_enter(), step up to the original
+-- node using preprocess_leave() and step down again into another
+-- child node.
+--
+-- At each given point the top annotation frame represents
+-- annotations merged from the root node down to the given one.
+-- If there are same named annotations on the path, then one from
+-- a descendant node is preferred.
+local function preprocess_enter(ctx, schema)
+    assert(ctx.annotation_stack ~= nil)
+
+    -- These keys are part of the schema node tree structure
+    -- itself. See the 'Schema nodes constructors' section in this
+    -- file for details about the schema node structure.
+    local non_annotation_keys = {
+        type = true,
+        fields = true,
+        key = true,
+        value = true,
+        items = true,
+    }
+
+    -- There are known annotations that barely has any sense in
+    -- context of descendant schema nodes. Don't track them.
+    local ignored_annotations = {
+        allowed_values = true,
+        validate = true,
+        default = true,
+        apply_default_if = true,
+    }
+
+    local frame = table.copy(ctx.annotation_stack[#ctx.annotation_stack] or {})
+    for k, v in pairs(schema) do
+        if not non_annotation_keys[k] and not ignored_annotations[k] then
+            frame[k] = v
+        end
+    end
+    table.insert(ctx.annotation_stack, frame)
+end
+
+-- Step up from a schema node.
+--
+-- Returns the computed fields for the node that we're leaving.
+--
+-- See preprocess_enter() for details.
+local function preprocess_leave(ctx)
+    return {
+        annotations = table.remove(ctx.annotation_stack),
+    }
+end
+
+-- The function prepares the given schema node tree in the
+-- following way.
+--
+-- * The schema node is copied.
+-- * All its descendant nodes are prepared using this algorithm
+--   (recursively).
+-- * Computed fields are calculated and stored in the copied node.
+-- * The copied node is the result.
+--
+-- The sketchy structure of the returned schema node is the
+-- following.
+--
+-- {
+--     <..fields..>
+--     computed = {
+--         annotations = <...>,
+--     },
+-- }
+--
+-- At now there is only one computed field: `annotations`.
+--
+-- The `annotations` field contains all the annotations merged
+-- from the root schema node down to the given one. If the same
+-- annotation is present in an ancestor node and in an descendant
+-- node, the latter is preferred.
+--
+-- Design details
+-- --------------
+--
+-- The copying is performed to decouple schema node definitions
+-- provided by a caller from the schema nodes stored in the schema
+-- object. It allows to modify them without modifying caller's own
+-- objects.
+--
+-- It is especially important if parts of one schema are passed
+-- as schema node definitions to create another schema.
+--
+-- This case also motivates to store all the computed fields in
+-- the `computed` field. This way it is easier to guarantee that
+-- all the computed fields are stripped down from the original
+-- schema nodes and don't affect the new schema anyhow.
+local function preprocess_schema(schema, ctx)
+    -- A schema node from another (already constructed) schema may
+    -- be used in the schema that is currently under construction.
+    --
+    -- Since we're going to modify the schema node, we should copy
+    -- it beforehand. Our modifications must not affect another
+    -- schema.
+    local res = table.copy(schema)
+
+    -- Eliminate previously computed values if any.
+    --
+    -- The past values were computed against node's place in
+    -- another schema, so it must not influence the node in its
+    -- current place in the given schema.
+    --
+    -- This field is rewritten at end of the function, but it
+    -- anyway should be stripped before going to
+    -- preprocess_enter(). Otherwise it would be taken as an
+    -- annotation.
+    --
+    -- (It can be just ignored in preprocess_enter(), but dropping
+    -- it beforehand looks less error-prone.)
+    res.computed = nil
+
+    preprocess_enter(ctx, res)
+
+    -- luacheck: ignore 542 empty if branch
+    if is_scalar(schema) then
+        -- Nothing to do.
+    elseif schema.type == 'record' then
+        local fields = {}
+        for field_name, field_def in pairs(schema.fields) do
+            fields[field_name] = preprocess_schema(field_def, ctx)
+        end
+        res.fields = fields
+    elseif schema.type == 'map' then
+        res.key = preprocess_schema(schema.key, ctx)
+        res.value = preprocess_schema(schema.value, ctx)
+    elseif schema.type == 'array' then
+        res.items = preprocess_schema(schema.items, ctx)
+    else
+        assert(false)
+    end
+
+    res.computed = preprocess_leave(ctx)
+
+    return res
+end
+
+-- }}} Schema preprocessing
+
 -- {{{ Schema object constructor: new
 
 -- Define a field lookup function on a schema object.
@@ -1421,9 +1572,14 @@ local function new(name, schema, opts)
     assert(type(name) == 'string')
     assert(type(schema) == 'table')
 
+    local ctx = {
+        annotation_stack = {},
+    }
+    local preprocessed_schema = preprocess_schema(schema, ctx)
+
     return setmetatable({
         name = name,
-        schema = schema,
+        schema = preprocessed_schema,
         methods = instance_methods,
     }, schema_mt)
 end

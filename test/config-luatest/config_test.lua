@@ -99,6 +99,12 @@ g.test_configdata = function()
                 box_cfg = "sql_cache_size",
                 default = 5242880,
                 type = "integer",
+                computed = {
+                    annotations = {
+                        config_version = "dev",
+                        box_cfg = "sql_cache_size",
+                    },
+                },
             },
         },
         {
@@ -108,6 +114,12 @@ g.test_configdata = function()
                 box_cfg = "memtx_memory",
                 default = 268435456,
                 type = "integer",
+                computed = {
+                    annotations = {
+                        config_version = "dev",
+                        box_cfg = "memtx_memory",
+                    },
+                },
             },
         },
     }
