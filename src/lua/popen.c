@@ -302,6 +302,28 @@ luaL_tolstring_strict(struct lua_State *L, int idx, size_t *len_ptr)
 }
 
 /**
+ * Extract an integer number from the Lua stack.
+ *
+ * Return true for an integer number and store its value in @a value.
+ *
+ * Unlike lua_tointeger() it accepts only an integer number and
+ * does not accept a string.
+ */
+static bool
+luaL_tointeger_strict(struct lua_State *L, int idx, int *value)
+{
+	if (lua_type(L, idx) != LUA_TNUMBER)
+		return false;
+	double num = lua_tonumber(L, idx);
+	if (num < INT_MIN || num > INT_MAX)
+		return false;
+	*value = num;
+	if (*value != num)
+		return false;
+	return true;
+}
+
+/**
  * Extract a timeout value from the Lua stack.
  *
  * Return -1.0 when error occurs.
@@ -824,6 +846,43 @@ luaT_popen_parse_env(struct lua_State *L, int idx, struct region *region)
 }
 
 /**
+ * Parse popen.new() "opts.inherit_fds" parameter.
+ *
+ * Return a new array of file descriptors on success.
+ * The size of the array is stored in @a len.
+ *
+ * The array is allocated on the provided region. A caller
+ * should call region_used() before invoking this function
+ * and call region_truncate() when the result is not needed
+ * anymore.
+ *
+ * Raise an error in case of the incorrect parameter.
+ */
+static int *
+luaT_popen_parse_inherit_fds(struct lua_State *L, int idx, size_t *len,
+			     struct region *region)
+{
+	if (lua_type(L, idx) != LUA_TTABLE)
+		luaT_popen_param_type_error(L, idx, "popen.new",
+					    "opts.inherit_fds", "table or nil");
+
+	*len = lua_objlen(L, idx);
+	if (*len == 0)
+		return NULL;
+
+	int *fds = xregion_alloc_array(region, typeof(fds[0]), *len);
+	for (size_t i = 0; i < *len; ++i) {
+		lua_rawgeti(L, idx, i + 1);
+		if (!luaL_tointeger_strict(L, -1, &fds[i]) || fds[i] < 0)
+			luaT_popen_array_elem_type_error(
+				L, -1, "popen.new", "opts.inherit_fds", i + 1,
+				"nonnegative integer");
+		lua_pop(L, 1);
+	}
+	return fds;
+}
+
+/**
  * Parse popen.new() "opts" parameter.
  *
  * Prerequisite: @a opts should be zero filled.
@@ -832,7 +891,7 @@ luaT_popen_parse_env(struct lua_State *L, int idx, struct region *region)
  *
  * Raise an error in case of the incorrect parameter.
  *
- * Allocates opts->env on @a region if
+ * Allocates opts->env and opts->inherit_fds on @a region if
  * needed. @see luaT_popen_parse_env() for details how to
  * free it.
  */
@@ -921,6 +980,12 @@ luaT_popen_parse_opts(struct lua_State *L, int idx, struct popen_opts *opts,
 			else
 				opts->flags |= POPEN_FLAG_CLOSE_FDS;
 		}
+		lua_pop(L, 1);
+
+		lua_getfield(L, idx, "inherit_fds");
+		if (!lua_isnil(L, -1))
+			opts->inherit_fds = luaT_popen_parse_inherit_fds(
+					L, -1, &opts->nr_inherit_fds, region);
 		lua_pop(L, 1);
 
 		lua_getfield(L, idx, "restore_signals");
@@ -1145,8 +1210,12 @@ luaT_popen_parse_mode(struct lua_State *L, int idx)
  *
  * @param opts.close_fds        (boolean, default: true)
  *        true                  close all inherited fds from a
- *                              parent
+ *                              parent except @a opts.inherit_fds
  *        false                 don't do that
+ *
+ * @param opts.inherit_fds      an array of fds that should be
+ *                              left open in the child process
+ *                              if @a opts.close_fds is set
  *
  * @param opts.restore_signals  (boolean, default: true)
  *        true                  reset all signal actions
