@@ -329,6 +329,30 @@ end
 
 -- }}} Derived schema node type constructors: enum, set
 
+-- {{{ Testing helpers for comparing schema nodes
+
+local function remove_computed_fields(schema)
+    local res = table.copy(schema)
+    res.computed = nil
+
+    if schema.type == 'record' then
+        local fields = {}
+        for k, v in pairs(res.fields) do
+            fields[k] = remove_computed_fields(v)
+        end
+        res.fields = fields
+    elseif schema.type == 'array' then
+        res.items = remove_computed_fields(res.items)
+    elseif schema.type == 'map' then
+        res.key = remove_computed_fields(res.key)
+        res.value = remove_computed_fields(res.value)
+    end
+
+    return res
+end
+
+-- }}} Testing helpers for comparing schema nodes
+
 -- {{{ Schema object constructor: new
 
 -- schema.new() must return a table of the following shape.
@@ -357,7 +381,7 @@ g.test_schema_new = function()
         local name = 'myschema'
         local s = schema.new(name, schema_node)
         t.assert_equals(s.name, name)
-        t.assert_equals(s.schema, schema_node)
+        t.assert_equals(remove_computed_fields(s.schema), schema_node)
         t.assert_equals(s.methods, {})
         t.assert(getmetatable(s) ~= nil)
 
@@ -383,6 +407,145 @@ g.test_schema_new = function()
     t.assert_equals((pcall(schema.new, nil, scalar_1)), false)
     t.assert_equals((pcall(schema.new, 5, scalar_1)), false)
     t.assert_equals((pcall(schema.new, {}, scalar_1)), false)
+end
+
+-- Verify that if a schema node from one schema is used in another
+-- schema, computed fields from the former schema don't affect
+-- computed fields from the latter one.
+g.test_schema_node_reuse = function()
+    local s1 = schema.new('s1', schema.record({
+        foo = schema.scalar({
+            type = 'string',
+            my_annotation_2 = 2,
+        }),
+    }, {
+        my_annotation_1 = 1,
+    }))
+
+    local s2 = schema.new('s2', schema.record({
+        bar = s1.schema.fields.foo,
+    }, {
+        my_annotation_3 = 3,
+    }))
+
+    t.assert_equals(s2.schema.fields.bar.computed.annotations, {
+        -- Key property: there is no my_annotation_1 here.
+        my_annotation_2 = 2,
+        my_annotation_3 = 3,
+    })
+end
+
+-- Verify computed annotations in schema nodes.
+g.test_computed_annotations = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.map({
+            key = schema.scalar({
+                type = 'string',
+                level_3 = 3,
+                clash = 'c',
+            }),
+            value = schema.array({
+                items = schema.scalar({
+                    type = 'integer',
+                    level_4 = 4,
+                    clash = 'd',
+                }),
+                level_3 = 3,
+                clash = 'c',
+            }),
+            level_2 = 2,
+            clash = 'b',
+        }),
+    }, {
+        level_1 = 1,
+        clash = 'a',
+    }))
+
+    t.assert_equals(s.schema, schema.record({
+        foo = schema.map({
+            key = schema.scalar({
+                type = 'string',
+                level_3 = 3,
+                clash = 'c',
+                computed = {
+                    annotations = {
+                        level_1 = 1,
+                        level_2 = 2,
+                        level_3 = 3,
+                        clash = 'c',
+                    },
+                },
+            }),
+            value = schema.array({
+                items = schema.scalar({
+                    type = 'integer',
+                    level_4 = 4,
+                    clash = 'd',
+                    computed = {
+                        annotations = {
+                            level_1 = 1,
+                            level_2 = 2,
+                            level_3 = 3,
+                            level_4 = 4,
+                            clash = 'd',
+                        },
+                    },
+                }),
+                level_3 = 3,
+                clash = 'c',
+                computed = {
+                    annotations = {
+                        level_1 = 1,
+                        level_2 = 2,
+                        level_3 = 3,
+                        clash = 'c',
+                    },
+                },
+            }),
+            level_2 = 2,
+            clash = 'b',
+            computed = {
+                annotations = {
+                    level_1 = 1,
+                    level_2 = 2,
+                    clash = 'b',
+                },
+            },
+        }),
+    }, {
+        level_1 = 1,
+        clash = 'a',
+        computed = {
+            annotations = {
+                level_1 = 1,
+                clash = 'a',
+            },
+        },
+    }))
+end
+
+-- Verify that the following fields are ignored when collecting
+-- computed annotations.
+--
+-- * allowed_values
+-- * validate
+-- * default
+-- * apply_default_if
+g.test_computed_annotations_ignore = function()
+    local s = schema.new('myschema', schema.scalar({
+        type = 'string',
+        allowed_values = {'x'},
+        validate = function() end,
+        default = 'x',
+        apply_default_if = function() return true end,
+        my_annotation = 'my annotation',
+    }))
+
+    t.assert_equals(s.schema.computed, {
+        annotations = {
+            my_annotation = 'my annotation',
+        },
+    })
 end
 
 -- }}} Schema object constructor: new
@@ -718,7 +881,7 @@ g.test_validate_by_node_function = function()
 
     -- Verify that the schema node is the one that contains the
     -- `validate` annotation.
-    t.assert_equals(schema_saved, scalar)
+    t.assert_equals(remove_computed_fields(schema_saved), scalar)
 
     -- Verify that the path is not changed during the traversal
     -- and still points to the given schema node.
@@ -2609,7 +2772,7 @@ g.test_pairs = function()
     }))
 
     local res = s:pairs():map(function(w)
-        return {w.schema, w.path}
+        return {remove_computed_fields(w.schema), w.path}
     end):totable()
     t.assert_items_equals(res, {
         {str, {'str'}},
