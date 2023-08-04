@@ -12,6 +12,7 @@
 
 #include "popen.h"
 #include "trivia/util.h"
+#include "small/region.h"
 #include "fiber.h"
 #include "assoc.h"
 #include "coio.h"
@@ -1149,13 +1150,6 @@ popen_new(struct popen_opts *opts)
 	size_t i;
 
 	/*
-	 * At max we could be skipping each pipe end
-	 * plus dev/null variants and logfd
-	 */
-	int skip_fds[POPEN_FLAG_FD_STDEND_BIT * 2 + 2 + 1];
-	size_t nr_skip_fds = 0;
-
-	/*
 	 * We must decouple log file descriptor from stderr in order to
 	 * close or redirect stderr, but keep logging as is until
 	 * execve() call.
@@ -1209,11 +1203,25 @@ popen_new(struct popen_opts *opts)
 		return NULL;
 	}
 
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	/*
+	 * Beside the fds configured to be inherited by the caller,
+	 * at max we could be skipping each pipe end plus dev/null
+	 * variants and logfd.
+	 */
+	const size_t nr_skip_fds_max = opts->nr_inherit_fds +
+				       POPEN_FLAG_FD_STDEND_BIT * 2 + 2 + 1;
+	int *skip_fds = xregion_alloc_array(region, typeof(skip_fds[0]),
+					    nr_skip_fds_max);
+	size_t nr_skip_fds = opts->nr_inherit_fds;
+	memcpy(skip_fds, opts->inherit_fds, nr_skip_fds * sizeof(*skip_fds));
+
 	if (log_fd >= 0)
 		skip_fds[nr_skip_fds++] = log_fd;
 	skip_fds[nr_skip_fds++] = dev_null_fd_ro;
 	skip_fds[nr_skip_fds++] = dev_null_fd_wr;
-	assert(nr_skip_fds <= lengthof(skip_fds));
+	assert(nr_skip_fds <= nr_skip_fds_max);
 
 	for (i = 0; i < lengthof(pfd_map); i++) {
 		if (opts->flags & pfd_map[i].mask) {
@@ -1237,7 +1245,7 @@ popen_new(struct popen_opts *opts)
 
 			skip_fds[nr_skip_fds++] = pfd[i][0];
 			skip_fds[nr_skip_fds++] = pfd[i][1];
-			assert(nr_skip_fds <= lengthof(skip_fds));
+			assert(nr_skip_fds <= nr_skip_fds_max);
 
 			say_debug("popen: created pipe [%s:%d:%d]",
 				  stdX_str(i), pfd[i][0], pfd[i][1]);
@@ -1470,6 +1478,7 @@ exit_child:
 		log_fd = -1;
 		goto out_err;
 	}
+	region_truncate(region, region_svp);
 
 	/*
 	 * Link it into global list for force
@@ -1514,6 +1523,7 @@ out_err:
 	}
 	if (log_fd >= 0)
 		close(log_fd);
+	region_truncate(region, region_svp);
 
 	/* Restore the diagnostics area entry. */
 	diag_set_error(diag, e);

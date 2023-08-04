@@ -145,6 +145,10 @@ struct popen_opts {
 	size_t			nr_argv;
 	char			**env;
 	unsigned int		flags;
+	/** File descriptors that should be left open in the child. */
+	int *inherit_fds;
+	/** Size of the inherit_fds array. */
+	size_t nr_inherit_fds;
 };
 
 /**
