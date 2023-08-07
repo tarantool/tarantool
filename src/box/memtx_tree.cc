@@ -2073,7 +2073,8 @@ memtx_tree_index_create_read_view(struct index *base)
 		free(rv);
 		return NULL;
 	}
-	struct space *space = space_cache_find(base->def->space_id);
+	struct space *space = space_by_id(base->def->space_id);
+	assert(space != NULL);
 	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space);
 	rv->index = index;
 	index_ref(base);
