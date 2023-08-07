@@ -874,6 +874,9 @@ test_run:cmd('switch test')
 ---
 - true
 ...
+require('fiber').set_max_slice(15)
+---
+...
 s = box.schema.space.create('test_on_schema_init')
 ---
 ...
