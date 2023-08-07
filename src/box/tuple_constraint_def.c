@@ -13,6 +13,7 @@
 #include "salad/grp_alloc.h"
 #include "small/region.h"
 #include "msgpuck.h"
+#include "tt_static.h"
 
 #include <PMurHash.h>
 
@@ -563,4 +564,23 @@ tuple_constraint_def_array_dup_raw(const struct tuple_constraint_def *defs,
 	/* If we did it correctly then there is no more space for strings. */
 	assert(grp_alloc_size(&all) == 0);
 	return res;
+}
+
+int
+tuple_constraint_def_array_check(const struct tuple_constraint_def *defs,
+				 size_t count)
+{
+	for (uint32_t i = 0; i < count; i++) {
+		const struct tuple_constraint_def *c1 = &defs[i];
+		for (uint32_t j = i + 1; j < count; j++) {
+			const struct tuple_constraint_def *c2 = &defs[j];
+			if (strcmp(c1->name, c2->name) == 0) {
+				diag_set(IllegalParams, tt_sprintf(
+					"duplicate constraint name '%s'",
+					c1->name));
+				return -1;
+			}
+		}
+	}
+	return 0;
 }

@@ -399,6 +399,11 @@ field_def_decode(struct field_def *field, const char **data,
 		field_def_error(fieldno, "unknown compression type");
 		return -1;
 	}
+	if (tuple_constraint_def_array_check(field->constraint_def,
+					     field->constraint_count) != 0) {
+		field_def_error(fieldno, diag_last_error(diag_get())->errmsg);
+		return -1;
+	}
 	return 0;
 }
 

@@ -185,6 +185,17 @@ tuple_constraint_def_array_dup_raw(const struct tuple_constraint_def *defs,
 				   size_t count, size_t object_size,
 				   size_t additional_size);
 
+/**
+ * Check that all constraints in the `defs` array have unique names.
+ *
+ * Return:
+ *   0 - success.
+ *  -1 - failure, diag is set (IllegalParams).
+ */
+int
+tuple_constraint_def_array_check(const struct tuple_constraint_def *defs,
+				 size_t count);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

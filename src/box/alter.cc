@@ -428,6 +428,12 @@ space_opts_decode(struct space_opts *opts, const char *map,
 			 diag_last_error(diag_get())->errmsg);
 		return -1;
 	}
+	if (tuple_constraint_def_array_check(opts->constraint_def,
+					     opts->constraint_count) != 0) {
+		diag_set(ClientError, ER_WRONG_SPACE_OPTIONS,
+			 diag_last_error(diag_get())->errmsg);
+		return -1;
+	}
 	return 0;
 }
 
