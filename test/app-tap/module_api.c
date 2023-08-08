@@ -536,7 +536,9 @@ key_part_padding_offset(void)
 static uint32_t
 key_part_def_known_flags(void)
 {
-	return BOX_KEY_PART_DEF_IS_NULLABLE | BOX_KEY_PART_DEF_EXCLUDE_NULL;
+	return BOX_KEY_PART_DEF_IS_NULLABLE |
+	       BOX_KEY_PART_DEF_EXCLUDE_NULL |
+	       BOX_KEY_PART_DEF_SORT_ORDER_DESC;
 }
 
 /**
@@ -968,8 +970,8 @@ test_key_def_merge(struct lua_State *L)
 	 *
 	 * For any given kd1 and kd2, kd3 = merge(kd1, kd2) should
 	 * impose the same order of tuples as if they would be
-	 * ordered by kd1, but all kd1-equal tuples would be
-	 * ordered by kd2.
+	 * ordered by kd1, but tuples inside groups of kd1-equal
+	 * tuples would be ordered by kd2.
 	 *
 	 * We could just add all key parts of kd2 to kd1 parts.
 	 * However in some cases we can skip some of kd2 parts
@@ -1099,13 +1101,15 @@ test_key_def_merge(struct lua_State *L)
 	/* Non-conventional prerequisite: list of known flags. */
 	uint32_t known_flags = key_part_def_known_flags();
 	fail_unless(known_flags == (BOX_KEY_PART_DEF_IS_NULLABLE |
-				    BOX_KEY_PART_DEF_EXCLUDE_NULL));
+				    BOX_KEY_PART_DEF_EXCLUDE_NULL |
+				    BOX_KEY_PART_DEF_SORT_ORDER_DESC));
 
 	/* Non-conventional prerequisite: certain defaults. */
 	box_key_part_def_t tmp;
 	box_key_part_def_create(&tmp);
 	fail_unless((tmp.flags & BOX_KEY_PART_DEF_IS_NULLABLE) == 0);
 	fail_unless((tmp.flags & BOX_KEY_PART_DEF_EXCLUDE_NULL) == 0);
+	fail_unless((tmp.flags & BOX_KEY_PART_DEF_SORT_ORDER_DESC) == 0);
 	fail_unless(tmp.collation == NULL);
 	fail_unless(tmp.path == NULL);
 
@@ -1711,6 +1715,99 @@ test_key_def_merge(struct lua_State *L)
 	key_def_check_merge(a_27, lengthof(a_27), b_27, lengthof(b_27),
 			    exp_27, lengthof(exp_27));
 
+	/*
+	 * Case 28: sort_order = 'asc' + sort_order = 'desc'.
+	 *
+	 * Interpretation: the same as for the case 3, because the sort order
+	 * (which is a field of <flags>) is ignored when it's decided whether to
+	 * merge the part or not. The sort order of the first key def's part is
+	 * preserved in case of coalescing.
+	 */
+	box_key_part_def_t a_28[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}}, /* clash */
+	};
+	box_key_part_def_t b_28[] = {
+		{{1, 4, "unsigned", NULL, NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	box_key_part_def_t exp_28[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	key_def_check_merge(a_28, lengthof(a_28), b_28, lengthof(b_28),
+			    exp_28, lengthof(exp_28));
+
+	/*
+	 * Case 29: sort_order = 'desc' + sort_order = 'asc'.
+	 *
+	 * Interpretation: the same as for the case 28.
+	 */
+	box_key_part_def_t a_29[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 4, "unsigned", NULL, NULL}}, /* clash */
+	};
+	box_key_part_def_t b_29[] = {
+		{{1, 0, "unsigned", NULL, NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	box_key_part_def_t exp_29[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 4, "unsigned", NULL, NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	key_def_check_merge(a_29, lengthof(a_29), b_29, lengthof(b_29),
+			    exp_29, lengthof(exp_29));
+
+	/*
+	 * Case 30: ascending with unicode collation and descending with
+	 * binary collation.
+	 *
+	 * Interpretation: in this case if we have different by binary
+	 * but the same by unicode_ci strings, the same by unicode strings
+	 * will be grouped together and the groups are sorted in ascending
+	 * order, but the different by binary collation strings in these
+	 * groups will be sorted in descending order. Example:
+	 *
+	 * The possible tuple order by the unicode_ci collation (note, that
+	 * according to the unicode_ci, 'a' == 'A', and 'b' == 'B', so they
+	 * may be stored in the index in any order relative to each other):
+	 *
+	 *  ['a'], ['A'], ['b'], ['B']
+	 *  \__________/  \__________/ - unicode_ci-equal groups
+	 *
+	 * The tuple order by the binary collation:
+	 *
+	 *  ['A'], ['B'], ['a'], ['b']
+	 *
+	 * Tuple order for the merged key_def, the strings are grouped as per
+	 * unicode_ci collation, but sorted by the binary collation inside
+	 * these groups:
+	 *
+	 *  ['A'], ['a'], ['B'], ['b']
+	 *  \__________/  \__________/ - unicode_ci-equal groups
+	 *
+	 * Technically this case is identical to the case 17, it just assures
+	 * that the merged part of <b> preserves its sort order.
+	 */
+	box_key_part_def_t a_30[] = {
+		{{3, 0, "unsigned", NULL,         NULL}},
+		{{1, 0, "string",   "unicode_ci", NULL}}, /* clash */
+	};
+	box_key_part_def_t b_30[] = {
+		{{1, 4, "string",   "binary",     NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL,         NULL}},
+	};
+	box_key_part_def_t exp_30[] = {
+		{{3, 0, "unsigned", NULL,         NULL}},
+		{{1, 0, "string",   "unicode_ci", NULL}}, /* from <a> */
+		{{1, 4, "string",   "binary",     NULL}}, /* from <b> */
+		{{2, 0, "unsigned", NULL,         NULL}},
+	};
+	key_def_check_merge(a_30, lengthof(a_30), b_30, lengthof(b_30),
+			    exp_30, lengthof(exp_30));
+
 	/* Clean up. */
 	box_region_truncate(region_svp);
 
@@ -1955,6 +2052,62 @@ test_key_def_validate_key(struct lua_State *L)
 
 	/* Clean up. */
 	box_key_def_delete(key_def);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+/*
+ * Tests if the sort order specification flag affects comparison functions.
+ *
+ * The sort order itself is tested in box-luatest/gh_5529_sort_order_test.lua.
+ */
+static int
+test_key_def_sort_order(lua_State *L)
+{
+	box_key_part_def_t parts[1];
+
+	/* Create a key_def with a single ascending unsigned part. */
+	box_key_part_def_create(&parts[0]);
+	parts[0].fieldno = 0;
+	parts[0].field_type = "unsigned";
+	box_key_def_t *key_def_asc = box_key_def_new_v2(parts, 1);
+	fail_unless(key_def_asc != NULL);
+
+	/* Create a key_def with a single descending unsigned part. */
+	box_key_part_def_create(&parts[0]);
+	parts[0].fieldno = 0;
+	parts[0].field_type = "unsigned";
+	parts[0].flags |= BOX_KEY_PART_DEF_SORT_ORDER_DESC;
+	box_key_def_t *key_def_desc = box_key_def_new_v2(parts, 1);
+	fail_unless(key_def_desc != NULL);
+
+	/* tuple_0 = [0], tuple_1 = [1] */
+	box_tuple_t *tuple_0 = new_runtime_tuple("\x91\x00", 2);
+	box_tuple_t *tuple_1 = new_runtime_tuple("\x91\x01", 2);
+
+	int rc_asc, rc_desc;
+
+	rc_asc = box_tuple_compare(tuple_0, tuple_1, key_def_asc);
+	rc_desc = box_tuple_compare(tuple_0, tuple_1, key_def_desc);
+	fail_unless(rc_asc < 0);
+	fail_unless(rc_desc == -rc_asc);
+
+	rc_asc = box_tuple_compare(tuple_1, tuple_0, key_def_asc);
+	rc_desc = box_tuple_compare(tuple_1, tuple_0, key_def_desc);
+	fail_unless(rc_asc > 0);
+	fail_unless(rc_desc == -rc_asc);
+
+	rc_asc = box_tuple_compare(tuple_0, tuple_0, key_def_asc);
+	rc_desc = box_tuple_compare(tuple_0, tuple_0, key_def_desc);
+	fail_unless(rc_asc == 0);
+	fail_unless(rc_desc == 0);
+
+	/* Clean up. */
+	box_tuple_unref(tuple_0);
+	box_tuple_unref(tuple_1);
+	box_key_def_delete(key_def_asc);
+	box_key_def_delete(key_def_desc);
 
 	lua_pushboolean(L, 1);
 	return 1;
@@ -3183,6 +3336,7 @@ luaopen_module_api(lua_State *L)
 		{"test_key_def_merge", test_key_def_merge},
 		{"test_key_def_extract_key", test_key_def_extract_key},
 		{"test_key_def_validate_key", test_key_def_validate_key},
+		{"test_key_def_sort_order", test_key_def_sort_order},
 		{"box_ibuf", test_box_ibuf},
 		{"tuple_validate_def", test_tuple_validate_default},
 		{"tuple_validate_fmt", test_tuple_validate_formatted},
