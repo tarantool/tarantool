@@ -31,6 +31,7 @@
 #include "rmean.h"
 
 #include "fiber.h"
+#include "trivia/util.h"
 
 void
 rmean_roll(int64_t *value, double dt)
@@ -103,9 +104,7 @@ struct rmean *
 rmean_new(const char **name, size_t n)
 {
 	struct rmean *rmean = (struct rmean *)
-		malloc(sizeof(struct rmean) + sizeof(struct stats) * n);
-	if (rmean == NULL)
-		return NULL;
+		xmalloc(sizeof(struct rmean) + sizeof(struct stats) * n);
 	memset(rmean, 0, sizeof(struct rmean) + sizeof(struct stats) * n);
 	rmean->stats_n = n;
 	rmean->timer.data = (void *)rmean;

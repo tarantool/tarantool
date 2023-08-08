@@ -3205,7 +3205,7 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 	iproto_thread->override_route[1] = { net_send_msg, NULL };
 };
 
-static inline int
+static inline void
 iproto_thread_init(struct iproto_thread *iproto_thread)
 {
 	iproto_thread_init_routes(iproto_thread);
@@ -3213,22 +3213,10 @@ iproto_thread_init(struct iproto_thread *iproto_thread)
 	slab_cache_create(&iproto_thread->net_slabc, &runtime);
 	/* Init statistics counter */
 	iproto_thread->rmean = rmean_new(rmean_net_strings, RMEAN_NET_LAST);
-	if (iproto_thread->rmean == NULL)
-		goto fail;
 	iproto_thread->tx.rmean = rmean_new(rmean_tx_strings, RMEAN_TX_LAST);
-	if (iproto_thread->tx.rmean == NULL)
-		goto fail;
 	rlist_create(&iproto_thread->stopped_connections);
 	iproto_thread->tx.requests_in_progress = 0;
 	iproto_thread->requests_in_stream_queue = 0;
-	return 0;
-fail:
-	if (iproto_thread->rmean != NULL)
-		rmean_delete(iproto_thread->rmean);
-	slab_cache_destroy(&iproto_thread->net_slabc);
-	diag_set(OutOfMemory, sizeof(struct rmean),
-		 "rmean_new", "struct rmean");
-	return -1;
 }
 
 /** Initialize the iproto subsystem and start network io thread */
@@ -3254,9 +3242,7 @@ iproto_init(int threads_count)
 	for (int i = 0; i < threads_count; i++, iproto_threads_count++) {
 		struct iproto_thread *iproto_thread = &iproto_threads[i];
 		iproto_thread->id = i;
-		if (iproto_thread_init(iproto_thread) != 0)
-			goto fail;
-
+		iproto_thread_init(iproto_thread);
 		if (cord_costart(&iproto_thread->net_cord, "iproto",
 				 net_cord_f, iproto_thread)) {
 			mh_i32_delete(iproto_thread->req_handlers);

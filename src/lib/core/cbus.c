@@ -181,8 +181,6 @@ static void
 cbus_create(struct cbus *bus)
 {
 	bus->stats = rmean_new(cbus_stat_strings, CBUS_STAT_LAST);
-	if (bus->stats == NULL)
-		panic_syserror("cbus_create");
 
 	/* Initialize queue lock mutex. */
 	(void) tt_pthread_mutex_init(&bus->mutex, NULL);
