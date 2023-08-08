@@ -611,7 +611,7 @@ PROTO_TOSTRING(IfStatement, statement)
 
 NESTED_PROTO_TOSTRING(ElseIfBlock, elseifblock, IfStatement)
 {
-	std::string elseifblock_str = "else if ";
+	std::string elseifblock_str = "elseif ";
 	elseifblock_str += ExpressionToString(elseifblock.condition());
 	elseifblock_str += " then\n\t";
 	elseifblock_str += BlockToString(elseifblock.block());
