@@ -400,6 +400,10 @@ key_def_set_internal_part(struct key_part_def *internal_part,
 	internal_part->exclude_null =
 		(part->flags & BOX_KEY_PART_DEF_EXCLUDE_NULL)
 		== BOX_KEY_PART_DEF_EXCLUDE_NULL;
+	internal_part->sort_order =
+		(part->flags & BOX_KEY_PART_DEF_SORT_ORDER_DESC) ==
+		BOX_KEY_PART_DEF_SORT_ORDER_DESC ?
+		SORT_ORDER_DESC : SORT_ORDER_ASC;
 
 	/* Set internal_part->coll_id. */
 	if (part->collation != NULL) {
@@ -570,6 +574,8 @@ box_key_def_dump_parts(const box_key_def_t *key_def, uint32_t *part_count_ptr)
 			part_def->flags |= BOX_KEY_PART_DEF_IS_NULLABLE;
 		if (part->exclude_null)
 			part_def->flags |= BOX_KEY_PART_DEF_EXCLUDE_NULL;
+		if (part->sort_order == SORT_ORDER_DESC)
+			part_def->flags |= BOX_KEY_PART_DEF_SORT_ORDER_DESC;
 		assert(part->type >= 0 && part->type < field_type_MAX);
 		part_def->field_type = field_type_strs[part->type];
 

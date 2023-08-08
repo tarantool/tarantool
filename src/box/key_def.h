@@ -314,6 +314,7 @@ typedef struct key_def box_key_def_t;
 enum {
 	BOX_KEY_PART_DEF_IS_NULLABLE = 1 << 0,
 	BOX_KEY_PART_DEF_EXCLUDE_NULL = 1 << 1,
+	BOX_KEY_PART_DEF_SORT_ORDER_DESC = 1 << 2,
 };
 
 /**
@@ -437,10 +438,11 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count);
  *
  * Default flag values are the following:
  *
- *  | Flag                          | Default value |
- *  | ----------------------------- | ------------- |
- *  | BOX_KEY_PART_DEF_IS_NULLABLE  | 0 (unset)     |
- *  | BOX_KEY_PART_DEF_EXCLUDE_NULL | 0 (unset)     |
+ *  | Flag                             | Default value |
+ *  | -------------------------------- | ------------- |
+ *  | BOX_KEY_PART_DEF_IS_NULLABLE     | 0 (unset)     |
+ *  | BOX_KEY_PART_DEF_EXCLUDE_NULL    | 0 (unset)     |
+ *  | BOX_KEY_PART_DEF_SORT_ORDER_DESC | 0 (unset)     |
  *
  * Default values of fields and flags are permitted to be changed
  * in future tarantool versions. However we should be VERY
