@@ -66,7 +66,7 @@ struct evio_service;
 struct iostream;
 struct uri_set;
 
-typedef int
+typedef void
 (*evio_accept_f)(struct evio_service *service, struct iostream *io,
 		 struct sockaddr *addr, socklen_t addrlen);
 
