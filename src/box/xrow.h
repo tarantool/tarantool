@@ -737,21 +737,18 @@ struct obuf_svp;
  * Reserve obuf space for the header, which depends on the
  * response size.
  */
-int
+void
 iproto_prepare_header(struct obuf *buf, struct obuf_svp *svp, size_t size);
 
 /**
  * Prepare the iproto header for a select result set.
  * @param buf Out buffer.
  * @param svp Savepoint of the header beginning.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
  */
-static inline int
+static inline void
 iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
 {
-	return iproto_prepare_header(buf, svp, IPROTO_SELECT_HEADER_LEN);
+	iproto_prepare_header(buf, svp, IPROTO_SELECT_HEADER_LEN);
 }
 
 /**
@@ -760,19 +757,15 @@ iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
  * code readability.
  * @param buf Out buffer.
  * @param svp Savepoint of the header beginning.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
  */
-static inline int
+static inline void
 iproto_prepare_select_with_position(struct obuf *buf, struct obuf_svp *svp)
 {
-	return iproto_prepare_select(buf, svp);
+	iproto_prepare_select(buf, svp);
 }
 
 /**
  * Write select header to a preallocated buffer.
- * This function doesn't throw (and we rely on this in iproto.cc).
  */
 void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
@@ -781,7 +774,7 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 /**
  * Write extended select header to a preallocated buffer.
  */
-int
+void
 iproto_reply_select_with_position(struct obuf *buf, struct obuf_svp *svp,
 				  uint64_t sync, uint32_t schema_version,
 				  uint32_t count, const char *packed_pos,
@@ -792,11 +785,8 @@ iproto_reply_select_with_position(struct obuf *buf, struct obuf_svp *svp,
  * @param out Encode to.
  * @param sync Request sync.
  * @param schema_version.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
  */
-int
+void
 iproto_reply_ok(struct obuf *out, uint64_t sync, uint64_t schema_version);
 
 /**
@@ -806,11 +796,8 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint64_t schema_version);
  * @param auth_type Authentication type.
  * @param sync Request sync.
  * @param schema_version.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
  */
-int
+void
 iproto_reply_id(struct obuf *out, const char *auth_type,
 		uint64_t sync, uint64_t schema_version);
 
@@ -821,11 +808,8 @@ iproto_reply_id(struct obuf *out, const char *auth_type,
  * @param vclock Vclock to encode.
  * @param sync Request sync.
  * @param schema_version.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
  */
-int
+void
 iproto_reply_vclock(struct obuf *out, const struct vclock *vclock,
 		    uint64_t sync, uint64_t schema_version);
 
@@ -835,19 +819,13 @@ iproto_reply_vclock(struct obuf *out, const struct vclock *vclock,
  * @param ballot Ballot to encode.
  * @param sync Request sync.
  * @param schema_version Actual schema version.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
  */
-int
+void
 iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 		  uint64_t sync, uint64_t schema_version);
 
-/**
- * Write an error packet int output buffer. Doesn't throw if out
- * of memory
- */
-int
+/** Write an error packet int output buffer. */
+void
 iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 		   uint64_t schema_version);
 
@@ -903,11 +881,8 @@ iproto_reply_chunk(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
  * @param key_len Length of the notification key name.
  * @param data Notification data (MsgPack).
  * @param data_end End of notification data.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
  */
-int
+void
 iproto_send_event(struct obuf *out, uint64_t sync,
 		  const char *key, size_t key_len,
 		  const char *data, const char *data_end);
@@ -1190,41 +1165,6 @@ xrow_decode_subscribe_response_xc(const struct xrow_header *row,
 				  struct subscribe_response *rsp)
 {
 	if (xrow_decode_subscribe_response(row, rsp) != 0)
-		diag_raise();
-}
-
-/** @copydoc iproto_reply_ok. */
-static inline void
-iproto_reply_ok_xc(struct obuf *out, uint64_t sync, uint64_t schema_version)
-{
-	if (iproto_reply_ok(out, sync, schema_version) != 0)
-		diag_raise();
-}
-
-/** @copydoc iproto_reply_id. */
-static inline void
-iproto_reply_id_xc(struct obuf *out, const char *auth_type,
-		   uint64_t sync, uint64_t schema_version)
-{
-	if (iproto_reply_id(out, auth_type, sync, schema_version) != 0)
-		diag_raise();
-}
-
-/** @copydoc iproto_reply_vclock. */
-static inline void
-iproto_reply_vclock_xc(struct obuf *out, const struct vclock *vclock,
-		       uint64_t sync, uint64_t schema_version)
-{
-	if (iproto_reply_vclock(out, vclock, sync, schema_version) != 0)
-		diag_raise();
-}
-
-/** @copydoc iproto_reply_vote. */
-static inline void
-iproto_reply_vote_xc(struct obuf *out, const struct ballot *ballot,
-		       uint64_t sync, uint64_t schema_version)
-{
-	if (iproto_reply_vote(out, ballot, sync, schema_version) != 0)
 		diag_raise();
 }
 

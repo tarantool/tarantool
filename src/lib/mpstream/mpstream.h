@@ -47,6 +47,13 @@ struct mpstream {
 	void *error_ctx;
 };
 
+/**
+ * Implementation of mpstream_error_f that logs the error and panics.
+ * Supposed to be used when allocation failures are not expected.
+ */
+void
+mpstream_panic_cb(void *error_ctx);
+
 void
 mpstream_reserve_slow(struct mpstream *stream, size_t size);
 

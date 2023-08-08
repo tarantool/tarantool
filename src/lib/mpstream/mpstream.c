@@ -19,6 +19,14 @@
 #include "mp_interval.h"
 
 void
+mpstream_panic_cb(void *error_ctx)
+{
+	(void)error_ctx;
+	diag_log();
+	panic("Out of memory");
+}
+
+void
 mpstream_reserve_slow(struct mpstream *stream, size_t size)
 {
 	stream->alloc(stream->ctx, stream->pos - stream->buf);

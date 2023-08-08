@@ -39,6 +39,7 @@
 #include "iostream.h"
 #include "version.h"
 #include "tt_static.h"
+#include "trivia/util.h"
 #include "error.h"
 #include "mp_error.h"
 #include "iproto_constants.h"
@@ -465,21 +466,15 @@ iproto_encode_error(uint32_t error)
 	return error | IPROTO_TYPE_ERROR;
 }
 
-int
+void
 iproto_reply_ok(struct obuf *out, uint64_t sync, uint64_t schema_version)
 {
-	char *buf = (char *)obuf_alloc(out, IPROTO_HEADER_LEN + 1);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, IPROTO_HEADER_LEN + 1, "obuf_alloc",
-			 "buf");
-		return -1;
-	}
+	char *buf = xobuf_alloc(out, IPROTO_HEADER_LEN + 1);
 	iproto_header_encode(buf, IPROTO_OK, sync, schema_version, 1);
 	buf[IPROTO_HEADER_LEN] = 0x80; /* empty MessagePack Map */
-	return 0;
 }
 
-int
+void
 iproto_reply_id(struct obuf *out, const char *auth_type,
 		uint64_t sync, uint64_t schema_version)
 {
@@ -515,12 +510,7 @@ iproto_reply_id(struct obuf *out, const char *auth_type,
 	size += mp_sizeof_uint(IPROTO_AUTH_TYPE);
 	size += mp_sizeof_str(auth_type_len);
 
-	char *buf = obuf_alloc(out, size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "obuf_alloc", "buf");
-		return -1;
-	}
-
+	char *buf = xobuf_alloc(out, size);
 	char *data = buf + IPROTO_HEADER_LEN;
 	data = mp_encode_map(data, 3);
 	data = mp_encode_uint(data, IPROTO_VERSION);
@@ -533,23 +523,16 @@ iproto_reply_id(struct obuf *out, const char *auth_type,
 
 	iproto_header_encode(buf, IPROTO_OK, sync, schema_version,
 			     size - IPROTO_HEADER_LEN);
-	return 0;
 }
 
-int
+void
 iproto_reply_vclock(struct obuf *out, const struct vclock *vclock,
 		    uint64_t sync, uint64_t schema_version)
 {
 	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(1) +
 		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock_ignore0(vclock);
 
-	char *buf = obuf_reserve(out, max_size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, max_size,
-			 "obuf_alloc", "buf");
-		return -1;
-	}
-
+	char *buf = xobuf_reserve(out, max_size);
 	char *data = buf + IPROTO_HEADER_LEN;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
@@ -563,7 +546,6 @@ iproto_reply_vclock(struct obuf *out, const struct vclock *vclock,
 	char *ptr = obuf_alloc(out, size);
 	(void) ptr;
 	assert(ptr == buf);
-	return 0;
 }
 
 size_t
@@ -631,18 +613,13 @@ mp_encode_ballot(char *data, const struct ballot *ballot)
 	return data;
 }
 
-int
+void
 iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 		  uint64_t sync, uint64_t schema_version)
 {
 	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_ballot_max(ballot);
 
-	char *buf = obuf_reserve(out, max_size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, max_size, "obuf_alloc", "buf");
-		return -1;
-	}
-
+	char *buf = xobuf_reserve(out, max_size);
 	char *data = buf + IPROTO_HEADER_LEN;
 	data = mp_encode_ballot(data, ballot);
 	size_t size = data - buf;
@@ -654,13 +631,6 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 	char *ptr = obuf_alloc(out, size);
 	(void) ptr;
 	assert(ptr == buf);
-	return 0;
-}
-
-static void
-mpstream_error_handler(void *error_ctx)
-{
-	*(bool *)error_ctx = true;
 }
 
 static void
@@ -673,18 +643,15 @@ mpstream_iproto_encode_error(struct mpstream *stream, const struct error *error)
 	error_to_mpstream_noext(error, stream);
 }
 
-int
+void
 iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 		   uint64_t schema_version)
 {
-	char *header = (char *)obuf_alloc(out, IPROTO_HEADER_LEN);
-	if (header == NULL)
-		return -1;
+	char *header = xobuf_alloc(out, IPROTO_HEADER_LEN);
 
-	bool is_error = false;
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
-		      mpstream_error_handler, &is_error);
+		      mpstream_panic_cb, NULL);
 
 	uint32_t used = obuf_size(out);
 	mpstream_iproto_encode_error(&stream, e);
@@ -693,31 +660,23 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 	uint32_t errcode = box_error_code(e);
 	iproto_header_encode(header, iproto_encode_error(errcode), sync,
 			     schema_version, obuf_size(out) - used);
-
-	/* Malformed packet appears to be a lesser evil than abort. */
-	return is_error ? -1 : 0;
 }
 
 void
 iproto_do_write_error(struct iostream *io, const struct error *e,
 		      uint64_t schema_version, uint64_t sync)
 {
-	bool is_error = false;
 	struct mpstream stream;
 	struct region *region = &fiber()->gc;
 	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
-		      mpstream_error_handler, &is_error);
+		      mpstream_panic_cb, NULL);
 
 	size_t region_svp = region_used(region);
 	mpstream_iproto_encode_error(&stream, e);
 	mpstream_flush(&stream);
-	if (is_error)
-		goto cleanup;
 
 	size_t payload_size = region_used(region) - region_svp;
-	char *payload = region_join(region, payload_size);
-	if (payload == NULL)
-		goto cleanup;
+	char *payload = xregion_join(region, payload_size);
 
 	uint32_t errcode = box_error_code(e);
 	char header[IPROTO_HEADER_LEN];
@@ -730,11 +689,11 @@ iproto_do_write_error(struct iostream *io, const struct error *e,
 	unused = iostream_write(io, header, sizeof(header));
 	unused = iostream_write(io, payload, payload_size);
 	(void) unused;
-cleanup:
+
 	region_truncate(region, region_svp);
 }
 
-int
+void
 iproto_prepare_header(struct obuf *buf, struct obuf_svp *svp, size_t size)
 {
 	/**
@@ -742,15 +701,11 @@ iproto_prepare_header(struct obuf *buf, struct obuf_svp *svp, size_t size)
 	 * This ensures that we get a contiguous chunk of memory
 	 * and the savepoint is pointing at the beginning of it.
 	 */
-	void *ptr = obuf_reserve(buf, size);
-	if (ptr == NULL) {
-		diag_set(OutOfMemory, size, "obuf_reserve", "ptr");
-		return -1;
-	}
+	xobuf_reserve(buf, size);
 	*svp = obuf_create_svp(buf);
-	ptr = obuf_alloc(buf, size);
-	assert(ptr !=  NULL);
-	return 0;
+	void *ptr = obuf_alloc(buf, size);
+	assert(ptr != NULL);
+	(void)ptr;
 }
 
 /** Reply select with IPROTO_DATA. */
@@ -770,7 +725,7 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 }
 
 /** Reply select with IPROTO_DATA and IPROTO_POSITION. */
-int
+void
 iproto_reply_select_with_position(struct obuf *buf, struct obuf_svp *svp,
 				  uint64_t sync, uint32_t schema_version,
 				  uint32_t count, const char *packed_pos,
@@ -779,17 +734,10 @@ iproto_reply_select_with_position(struct obuf *buf, struct obuf_svp *svp,
 	size_t packed_pos_size = packed_pos_end - packed_pos;
 	size_t key_size = mp_sizeof_uint(IPROTO_POSITION);
 	size_t alloc_size = key_size + mp_sizeof_strl(packed_pos_size);
-	char *ptr = obuf_alloc(buf, alloc_size);
-	if (ptr == NULL) {
-		diag_set(OutOfMemory, alloc_size, "obuf_alloc", "ptr");
-		return -1;
-	}
+	char *ptr = xobuf_alloc(buf, alloc_size);
 	ptr = mp_encode_uint(ptr, IPROTO_POSITION);
 	mp_encode_strl(ptr, packed_pos_size);
-	if (obuf_dup(buf, packed_pos,
-		     packed_pos_size) != packed_pos_size) {
-		return -1;
-	}
+	xobuf_dup(buf, packed_pos, packed_pos_size);
 
 	char *pos = (char *)obuf_svp_to_ptr(buf, svp);
 	iproto_header_encode(pos, IPROTO_OK, sync, schema_version,
@@ -800,7 +748,6 @@ iproto_reply_select_with_position(struct obuf *buf, struct obuf_svp *svp,
 	body.v_data_len = mp_bswap_u32(count);
 
 	memcpy(pos + IPROTO_HEADER_LEN, &body, sizeof(body));
-	return 0;
 }
 
 int
@@ -875,7 +822,7 @@ iproto_reply_chunk(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 	memcpy(pos + IPROTO_HEADER_LEN, &body, sizeof(body));
 }
 
-int
+void
 iproto_send_event(struct obuf *out, uint64_t sync,
 		  const char *key, size_t key_len,
 		  const char *data, const char *data_end)
@@ -897,11 +844,7 @@ iproto_send_event(struct obuf *out, uint64_t sync,
 		size += data_end - data;
 	}
 	/* Encode the packet. */
-	char *buf = obuf_alloc(out, size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "obuf_alloc", "buf");
-		return -1;
-	}
+	char *buf = xobuf_alloc(out, size);
 	char *p = buf;
 	/* Fix header. */
 	*(p++) = 0xce;
@@ -924,7 +867,6 @@ iproto_send_event(struct obuf *out, uint64_t sync,
 	}
 	assert(size == (size_t)(p - buf));
 	(void)p;
-	return 0;
 }
 
 int

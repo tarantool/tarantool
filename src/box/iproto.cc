@@ -2151,8 +2151,7 @@ tx_process1(struct cmsg *m)
 	if (box_process1(&msg->dml, &tuple) != 0)
 		goto error;
 	out = msg->connection->tx.p_obuf;
-	if (iproto_prepare_select(out, &svp) != 0)
-		goto error;
+	iproto_prepare_select(out, &svp);
 	if (tuple && tuple_to_obuf(tuple, out))
 		goto error;
 	iproto_reply_select(out, &svp, msg->header.sync, ::schema_version,
@@ -2208,13 +2207,9 @@ tx_process_select(struct cmsg *m)
 	out = msg->connection->tx.p_obuf;
 	reply_position = req->fetch_position && packed_pos != NULL;
 	if (reply_position)
-		rc = iproto_prepare_select_with_position(out, &svp);
+		iproto_prepare_select_with_position(out, &svp);
 	else
-		rc = iproto_prepare_select(out, &svp);
-	if (rc != 0) {
-		port_destroy(&port);
-		goto error;
-	}
+		iproto_prepare_select(out, &svp);
 	/*
 	 * SELECT output format has not changed since Tarantool 1.6
 	 */
@@ -2225,12 +2220,9 @@ tx_process_select(struct cmsg *m)
 	}
 	if (reply_position) {
 		assert(packed_pos != NULL);
-		if (iproto_reply_select_with_position(out, &svp,
-						      msg->header.sync,
-						      ::schema_version, count,
-						      packed_pos,
-						      packed_pos_end) != 0)
-			goto discard;
+		iproto_reply_select_with_position(out, &svp, msg->header.sync,
+						  ::schema_version, count,
+						  packed_pos, packed_pos_end);
 	} else {
 		iproto_reply_select(out, &svp, msg->header.sync,
 				    ::schema_version, count);
@@ -2323,10 +2315,7 @@ tx_process_call(struct cmsg *m)
 	struct obuf_svp svp;
 
 	out = msg->connection->tx.p_obuf;
-	if (iproto_prepare_select(out, &svp) != 0) {
-		port_destroy(&port);
-		goto error;
-	}
+	iproto_prepare_select(out, &svp);
 
 	if (msg->header.type == IPROTO_CALL_16)
 		count = port_dump_msgpack_16(&port, out);
@@ -2380,27 +2369,27 @@ tx_process_misc(struct cmsg *m)
 		case IPROTO_AUTH:
 			box_process_auth(&msg->auth, con->salt,
 					 IPROTO_SALT_SIZE);
-			iproto_reply_ok_xc(out, msg->header.sync,
-					   ::schema_version);
+			iproto_reply_ok(out, msg->header.sync,
+					::schema_version);
 			break;
 		case IPROTO_PING:
-			iproto_reply_ok_xc(out, msg->header.sync,
-					   ::schema_version);
+			iproto_reply_ok(out, msg->header.sync,
+					::schema_version);
 			break;
 		case IPROTO_ID:
 			tx_process_id(con, &msg->id);
-			iproto_reply_id_xc(out, box_auth_type, msg->header.sync,
-					   ::schema_version);
+			iproto_reply_id(out, box_auth_type, msg->header.sync,
+					::schema_version);
 			break;
 		case IPROTO_VOTE_DEPRECATED:
-			iproto_reply_vclock_xc(out, &replicaset.vclock,
-					       msg->header.sync,
-					       ::schema_version);
+			iproto_reply_vclock(out, &replicaset.vclock,
+					    msg->header.sync,
+					    ::schema_version);
 			break;
 		case IPROTO_VOTE:
 			box_process_vote(&ballot);
-			iproto_reply_vote_xc(out, &ballot, msg->header.sync,
-					     ::schema_version);
+			iproto_reply_vote(out, &ballot, msg->header.sync,
+					  ::schema_version);
 			break;
 		case IPROTO_WATCH:
 			session_watch(con->session, msg->header.sync,
@@ -2417,8 +2406,7 @@ tx_process_misc(struct cmsg *m)
 			const char *data, *data_end;
 			data = box_watch_once(msg->watch.key,
 					      msg->watch.key_len, &data_end);
-			if (iproto_prepare_select(out, &header) != 0)
-				diag_raise();
+			iproto_prepare_select(out, &header);
 			xobuf_dup(out, data, data_end - data);
 			iproto_reply_select(out, &header, msg->header.sync,
 					    ::schema_version,
@@ -2516,17 +2504,12 @@ tx_process_sql(struct cmsg *m)
 	struct obuf_svp header_svp;
 	if (is_unprepare) {
 		header_svp = obuf_create_svp(out);
-		if (iproto_reply_ok(out, msg->header.sync, schema_version) != 0)
-			goto error;
+		iproto_reply_ok(out, msg->header.sync, schema_version);
 		iproto_wpos_create(&msg->wpos, out);
 		tx_end_msg(msg, &header_svp);
 		return;
 	}
-	/* Prepare memory for the iproto header. */
-	if (iproto_prepare_header(out, &header_svp, IPROTO_HEADER_LEN) != 0) {
-		port_destroy(&port);
-		goto error;
-	}
+	iproto_prepare_header(out, &header_svp, IPROTO_HEADER_LEN);
 	if (port_dump_msgpack(&port, out) != 0) {
 		port_destroy(&port);
 		obuf_rollback_to_svp(out, &header_svp);
@@ -3003,8 +2986,7 @@ iproto_session_push(struct session *session, struct port *port)
 	struct iproto_connection *con =
 		(struct iproto_connection *) session->meta.connection;
 	struct obuf_svp svp;
-	if (iproto_prepare_select(con->tx.p_obuf, &svp) != 0)
-		return -1;
+	iproto_prepare_select(con->tx.p_obuf, &svp);
 	if (port_dump_msgpack(port, con->tx.p_obuf) < 0) {
 		obuf_rollback_to_svp(con->tx.p_obuf, &svp);
 		return -1;
@@ -3029,12 +3011,7 @@ iproto_session_notify(struct session *session, uint64_t sync,
 		(struct iproto_connection *)session->meta.connection;
 	struct obuf *out = con->tx.p_obuf;
 	struct obuf_svp svp = obuf_create_svp(out);
-	if (iproto_send_event(out, sync, key, key_len,
-			      data, data_end) != 0) {
-		/* Nothing we can do on error but log the error. */
-		diag_log();
-		return;
-	}
+	iproto_send_event(out, sync, key, key_len, data, data_end);
 	tx_push(con, &svp);
 }
 
@@ -3541,12 +3518,7 @@ iproto_session_send(struct session *session,
 	ptrdiff_t header_size = header_end - header;
 	ptrdiff_t body_size = body_end - body;
 	ptrdiff_t packet_size = 5 + header_size + body_size;
-	char *buf = (char *)obuf_alloc(out, packet_size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, packet_size, "obuf_alloc", "buf");
-		return -1;
-	}
-	char *p = buf;
+	char *p = (char *)xobuf_alloc(out, packet_size);
 	*(p++) = INT8_C(0xce);
 	p = mp_store_u32(p, packet_size - 5);
 	memcpy(p, header, header_size);
