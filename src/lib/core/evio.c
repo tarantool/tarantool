@@ -189,12 +189,8 @@ evio_service_entry_accept_cb(ev_loop *loop, ev_io *watcher, int events)
 		struct iostream io;
 		if (iostream_create(&io, fd, &entry->io_ctx) != 0)
 			break;
-		if (entry->service->on_accept(entry->service, &io,
-					      (struct sockaddr *)&addr,
-					      addrlen) != 0) {
-			iostream_destroy(&io);
-			break;
-		}
+		entry->service->on_accept(entry->service, &io,
+					  (struct sockaddr *)&addr, addrlen);
 		/* Must be moved by the callback. */
 		assert(!iostream_is_initialized(&io));
 	}

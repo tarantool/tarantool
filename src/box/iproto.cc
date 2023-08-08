@@ -66,6 +66,7 @@
 #include "execute.h"
 #include "errinj.h"
 #include "tt_static.h"
+#include "trivia/util.h"
 #include "salad/stailq.h"
 #include "assoc.h"
 #include "txn.h"
@@ -428,9 +429,6 @@ struct iproto_msg
 	struct iproto_stream *stream;
 };
 
-static struct iproto_msg *
-iproto_msg_new(struct iproto_connection *con);
-
 /**
  * Resume stopped connections, if any.
  */
@@ -740,12 +738,7 @@ iproto_stream_new(struct iproto_connection *connection, uint64_t stream_id)
 {
 	struct iproto_thread *iproto_thread = connection->iproto_thread;
 	struct iproto_stream *stream = (struct iproto_stream *)
-		mempool_alloc(&iproto_thread->iproto_stream_pool);
-	if (stream == NULL) {
-		diag_set(OutOfMemory, sizeof(*stream),
-			 "mempool_alloc", "stream");
-		return NULL;
-	}
+		xmempool_alloc(&iproto_thread->iproto_stream_pool);
 	rmean_collect(connection->iproto_thread->rmean, IPROTO_STREAMS, 1);
 	stream->txn = NULL;
 	stream->current = NULL;
@@ -799,17 +792,7 @@ iproto_msg_new(struct iproto_connection *con)
 {
 	struct mempool *iproto_msg_pool = &con->iproto_thread->iproto_msg_pool;
 	struct iproto_msg *msg =
-		(struct iproto_msg *) mempool_alloc(iproto_msg_pool);
-	ERROR_INJECT(ERRINJ_TESTING, {
-		mempool_free(&con->iproto_thread->iproto_msg_pool, msg);
-		msg = NULL;
-	});
-	if (msg == NULL) {
-		diag_set(OutOfMemory, sizeof(*msg), "mempool_alloc", "msg");
-		say_warn("can not allocate memory for a new message, "
-			 "connection %s", iproto_connection_name(con));
-		return NULL;
-	}
+		(struct iproto_msg *)xmempool_alloc(iproto_msg_pool);
 	msg->close_connection = false;
 	msg->connection = con;
 	msg->stream = NULL;
@@ -1091,27 +1074,24 @@ iproto_connection_input_buffer(struct iproto_connection *con)
  * Check if message belongs to stream (stream_id != 0), and if it
  * is so create new stream or get stream from connection streams
  * hash table. Put message to stream pending messages list.
- * @retval 0 - the message is ready to push to TX thread (either if
- *             stream_id is not set (is zero) or the stream is not
- *             processing other messages).
- *         1 - the message is postponed because its stream is busy
- *             processing previous message(s).
- *        -1 - memory error.
+ * @retval true  - the message is ready to push to TX thread (either if
+ *                 stream_id is not set (is zero) or the stream is not
+ *                 processing other messages).
+ *         false - the message is postponed because its stream is busy
+ *                 processing previous message(s).
  */
-static int
+static bool
 iproto_msg_start_processing_in_stream(struct iproto_msg *msg)
 {
 	uint64_t stream_id = msg->header.stream_id;
 	if (stream_id == 0)
-		return 0;
+		return true;
 
 	struct iproto_connection *con = msg->connection;
 	struct iproto_stream *stream = NULL;
 	mh_int_t pos = mh_i64ptr_find(con->streams, stream_id, 0);
 	if (pos == mh_end(con->streams)) {
 		stream = iproto_stream_new(msg->connection, msg->header.stream_id);
-		if (stream == NULL)
-			return -1;
 		struct mh_i64ptr_node_t node;
 		node.key = stream_id;
 		node.val = stream;
@@ -1122,12 +1102,12 @@ iproto_msg_start_processing_in_stream(struct iproto_msg *msg)
 	msg->stream = stream;
 	if (stream->current == NULL) {
 		stream->current = msg;
-		return 0;
+		return true;
 	}
 	con->iproto_thread->requests_in_stream_queue++;
 	rmean_collect(con->iproto_thread->rmean, REQUESTS_IN_STREAM_QUEUE, 1);
 	stailq_add_tail_entry(&stream->pending_requests, msg, in_stream);
-	return 1;
+	return false;
 }
 
 /**
@@ -1139,7 +1119,7 @@ iproto_msg_start_processing_in_stream(struct iproto_msg *msg)
  * @param in Buffer to parse.
  *
  * @retval  0 Success.
- * @retval -1 Invalid MessagePack or memory error.
+ * @retval -1 Invalid MessagePack.
  */
 static inline int
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
@@ -1178,14 +1158,6 @@ err_msgpack:
 		if (reqend > in->wpos)
 			break;
 		struct iproto_msg *msg = iproto_msg_new(con);
-		if (msg == NULL) {
-			/*
-			 * Do not treat it as an error - just wait
-			 * until some of requests are finished.
-			 */
-			iproto_connection_stop_msg_max_limit(con);
-			return 0;
-		}
 		msg->p_ibuf = con->p_ibuf;
 		msg->reqstart = reqstart;
 		msg->wpos = con->wpos;
@@ -1193,21 +1165,7 @@ err_msgpack:
 		msg->len = reqend - reqstart; /* total request length */
 
 		iproto_msg_prepare(msg, &pos, reqend, &stop_input);
-
-		int rc = iproto_msg_start_processing_in_stream(msg);
-		if (rc < 0) {
-			iproto_msg_delete(msg);
-			return -1;
-		}
-		/*
-		 * rc > 0, means that stream pending requests queue is not
-		 * empty, skip push.
-		 */
-		if (rc == 0) {
-			/*
-			 * This can't throw, but should not be
-			 * done in case of exception.
-			 */
+		if (iproto_msg_start_processing_in_stream(msg)) {
 			cpipe_push_input(&con->iproto_thread->tx_pipe, &msg->base);
 			n_requests++;
 		}
@@ -1468,11 +1426,7 @@ static struct iproto_connection *
 iproto_connection_new(struct iproto_thread *iproto_thread)
 {
 	struct iproto_connection *con = (struct iproto_connection *)
-		mempool_alloc(&iproto_thread->iproto_connection_pool);
-	if (con == NULL) {
-		diag_set(OutOfMemory, sizeof(*con), "mempool_alloc", "con");
-		return NULL;
-	}
+		xmempool_alloc(&iproto_thread->iproto_connection_pool);
 	con->streams = mh_i64ptr_new();
 	con->iproto_thread = iproto_thread;
 	con->input.data = con->output.data = con;
@@ -2899,25 +2853,14 @@ net_send_greeting(struct cmsg *m)
 /**
  * Create a connection and start input.
  */
-static int
+static void
 iproto_on_accept(struct evio_service *service, struct iostream *io,
 		 struct sockaddr *addr, socklen_t addrlen)
 {
 	struct iproto_thread *iproto_thread =
 		(struct iproto_thread *)service->on_accept_param;
 	struct iproto_connection *con = iproto_connection_new(iproto_thread);
-	if (con == NULL)
-		return -1;
-	/*
-	 * Ignore msg allocation failure - the queue size is
-	 * fixed so there is a limited number of msgs in
-	 * use, all stored in just a few blocks of the memory pool.
-	 */
 	struct iproto_msg *msg = iproto_msg_new(con);
-	if (msg == NULL) {
-		iproto_connection_delete(con);
-		return -1;
-	}
 	assert(addrlen <= sizeof(msg->connect.addrstorage));
 	memcpy(&msg->connect.addrstorage, addr, addrlen);
 	msg->connect.addrlen = addrlen;
@@ -2926,7 +2869,6 @@ iproto_on_accept(struct evio_service *service, struct iostream *io,
 	msg->p_ibuf = con->p_ibuf;
 	msg->wpos = con->wpos;
 	cpipe_push(&iproto_thread->tx_pipe, &msg->base);
-	return 0;
 }
 
 /**
