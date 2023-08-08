@@ -154,6 +154,9 @@ alloc_failure(const char *filename, int line, size_t size)
 	(T *)xregion_aligned_alloc((region), sizeof(T) * (count), alignof(T));\
 })
 
+#define xobuf_alloc(p, size)	xalloc_impl((size), obuf_alloc, (p), (size))
+#define xobuf_reserve(p, size)	xalloc_impl((size), obuf_reserve, (p), (size))
+
 #define xobuf_dup(p, src, size)							\
 	({									\
 		size_t ret = obuf_dup((p), (src), (size));			\
