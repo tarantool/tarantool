@@ -4620,6 +4620,7 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 			return on_replace_dd_cluster_update(old_def, new_def);
 		return on_replace_dd_cluster_insert(new_def);
 	}
+	assert(old_def != NULL);
 	return on_replace_dd_cluster_delete(old_def);
 }
 
