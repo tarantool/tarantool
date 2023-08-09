@@ -143,21 +143,27 @@ static int (*fiber_invoke)(fiber_func f, va_list ap);
 #if ENABLE_ASAN
 #include <sanitizer/asan_interface.h>
 
-#define ASAN_START_SWITCH_FIBER(var_name, will_switch_back, bottom, size) \
-	void *var_name = NULL; \
-	__sanitizer_start_switch_fiber((will_switch_back) ? &var_name : NULL, \
+#define ASAN_START_SWITCH_FIBER(fake_stack_save, will_switch_back, bottom,     \
+				size)					       \
+	/*								       \
+	 * When leaving a fiber definitely, NULL must be passed as the first   \
+	 * argument so that the fake stack is destroyed.		       \
+	 */								       \
+	void *fake_stack_save = NULL;					       \
+	__sanitizer_start_switch_fiber((will_switch_back) ? &fake_stack_save   \
+							  : NULL,	       \
                                        (bottom), (size))
 #if ASAN_INTERFACE_OLD
-#define ASAN_FINISH_SWITCH_FIBER(var_name) \
-	__sanitizer_finish_switch_fiber(var_name);
+#define ASAN_FINISH_SWITCH_FIBER(fake_stack_save) \
+	__sanitizer_finish_switch_fiber(fake_stack_save)
 #else
-#define ASAN_FINISH_SWITCH_FIBER(var_name) \
-	__sanitizer_finish_switch_fiber(var_name, 0, 0);
+#define ASAN_FINISH_SWITCH_FIBER(fake_stack_save) \
+	__sanitizer_finish_switch_fiber(fake_stack_save, NULL, NULL)
 #endif
 
 #else
-#define ASAN_START_SWITCH_FIBER(var_name, will_switch_back, bottom, size)
-#define ASAN_FINISH_SWITCH_FIBER(var_name)
+#define ASAN_START_SWITCH_FIBER(fake_stack_save, will_switch_back, bottom, size)
+#define ASAN_FINISH_SWITCH_FIBER(fake_stack_save)
 #endif
 
 static inline int
@@ -394,6 +400,17 @@ cord_reset_slice(struct fiber *f)
 	if ((f->flags & FIBER_CUSTOM_SLICE) != 0)
 		new_slice = f->max_slice;
 	cord()->slice = new_slice;
+}
+
+/**
+ * True if a fiber with `fiber_flags` can be reused.
+ * A fiber can not be reused if it is somehow non-standard.
+ */
+static bool
+fiber_is_reusable(uint32_t fiber_flags)
+{
+	/* For now we can not reuse fibers with custom stack size. */
+	return (fiber_flags & FIBER_CUSTOM_STACK) == 0;
 }
 
 /**
@@ -678,12 +695,11 @@ fiber_join_timeout(struct fiber *fiber, double timeout)
 }
 
 /**
- * @note: this is not a cancellation point (@sa fiber_testcancel())
- * but it is considered good practice to call testcancel()
- * after each yield.
+ * Implementation of `fiber_yield()` and `fiber_yield_final()`.
+ * `will_switch_back` argument is used only by ASAN.
  */
-void
-fiber_yield(void)
+static void
+fiber_yield_impl(MAYBE_UNUSED bool will_switch_back)
 {
 	struct cord *cord = cord();
 	struct fiber *caller = cord->fiber;
@@ -710,12 +726,26 @@ fiber_yield(void)
 	cord->fiber = callee;
 	callee->flags = (callee->flags & ~FIBER_IS_READY) | FIBER_IS_RUNNING;
 
-	ASAN_START_SWITCH_FIBER(asan_state,
-				(caller->flags & FIBER_IS_DEAD) == 0,
-				callee->stack,
+	ASAN_START_SWITCH_FIBER(asan_state, will_switch_back, callee->stack,
 				callee->stack_size);
 	coro_transfer(&caller->ctx, &callee->ctx);
 	ASAN_FINISH_SWITCH_FIBER(asan_state);
+}
+
+void
+fiber_yield(void)
+{
+	fiber_yield_impl(true);
+}
+
+/**
+ * Like `fiber_yield()`, but should be used when this is the last switch from
+ * a dead fiber to the scheduler.
+ */
+static void
+fiber_yield_final(void)
+{
+	fiber_yield_impl(false);
 }
 
 struct fiber_watcher_data {
@@ -882,7 +912,7 @@ fiber_reset(struct fiber *fiber)
 	clock_stat_reset(&fiber->clock_stat);
 }
 
-/** Destroy an active fiber and prepare it for reuse. */
+/** Destroy an active fiber and prepare it for reuse or delete it. */
 static void
 fiber_recycle(struct fiber *fiber)
 {
@@ -891,7 +921,6 @@ fiber_recycle(struct fiber *fiber)
 	assert(diag_is_empty(&fiber->diag));
 	/* no pending wakeup */
 	assert(rlist_empty(&fiber->state));
-	bool has_custom_stack = fiber->flags & FIBER_CUSTOM_STACK;
 	fiber_stack_recycle(fiber);
 	fiber_reset(fiber);
 	fiber->name[0] = '\0';
@@ -910,7 +939,7 @@ fiber_recycle(struct fiber *fiber)
 	fiber->first_alloc_bt = NULL;
 	region_set_callbacks(&fiber->gc, NULL, NULL, NULL);
 #endif
-	if (!has_custom_stack) {
+	if (fiber_is_reusable(fiber->flags)) {
 		rlist_move_entry(&cord()->dead, fiber, link);
 	} else {
 		cord_add_garbage(cord(), fiber);
@@ -1037,7 +1066,14 @@ fiber_loop(MAYBE_UNUSED void *data)
 		 * function again, ap is garbage by now.
 		 */
 		fiber->f = NULL;
-		fiber_yield();	/* give control back to scheduler */
+		/*
+		 * Give control back to the scheduler.
+		 * If the fiber is not reusable, this is its final yield.
+		 */
+		if (fiber_is_reusable(fiber->flags))
+			fiber_yield();
+		else
+			fiber_yield_final();
 	}
 }
 
@@ -1330,13 +1366,10 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	assert(fiber_attr != NULL);
 	cord_collect_garbage(cord);
 
-	/* Now we can not reuse fiber if custom attribute was set */
-	if (!(fiber_attr->flags & FIBER_CUSTOM_STACK) &&
-	    !rlist_empty(&cord->dead)) {
-		fiber = rlist_first_entry(&cord->dead,
-					  struct fiber, link);
+	if (fiber_is_reusable(fiber_attr->flags) && !rlist_empty(&cord->dead)) {
+		fiber = rlist_first_entry(&cord->dead, struct fiber, link);
 		rlist_move_entry(&cord->alive, fiber, link);
-		assert((fiber->flags | FIBER_IS_DEAD) != 0);
+		assert(fiber_is_dead(fiber));
 	} else {
 		fiber = (struct fiber *)
 			mempool_alloc(&cord->fiber_mempool);
