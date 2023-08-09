@@ -53,6 +53,7 @@ struct auth_request;
 struct space;
 struct vclock;
 struct key_def;
+struct ballot;
 
 /**
  * Pointer to TX thread local vclock.
@@ -247,13 +248,17 @@ const char *box_status(void);
 void
 box_reset_stat(void);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
 /** Process an authentication request. */
-void
+int
 box_process_auth(struct auth_request *request,
 		 const char *salt, uint32_t salt_len);
+
+/** Process a vote request. */
+void
+box_process_vote(struct ballot *ballot);
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 /** Send current read view to the replica. */
 void
@@ -285,9 +290,6 @@ box_process_join(struct iostream *io, const struct xrow_header *header);
  */
 void
 box_process_subscribe(struct iostream *io, const struct xrow_header *header);
-
-void
-box_process_vote(struct ballot *ballot);
 
 /**
  * Check Lua configuration before initialization or
