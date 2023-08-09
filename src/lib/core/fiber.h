@@ -270,6 +270,9 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr, fiber_func f
 /**
  * Return control to another fiber and wait until it'll be woken.
  *
+ * \note this is not a cancellation point (\sa fiber_testcancel()), but it is
+ * considered a good practice to call fiber_testcancel() after each yield.
+ *
  * \sa fiber_wakeup
  */
 API_EXPORT void
