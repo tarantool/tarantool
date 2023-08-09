@@ -1278,46 +1278,46 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		return;
 	}
 
-	try {
-		/* Ensure we have sufficient space for the next round.  */
-		struct ibuf *in = iproto_connection_input_buffer(con);
-		if (in == NULL) {
-			iproto_connection_stop_readahead_limit(con);
-			return;
-		}
-		/* Read input. */
-		ssize_t nrd = iostream_read(io, in->wpos, ibuf_unused(in));
-		if (nrd < 0) {                  /* Socket is not ready. */
-			if (nrd == IOSTREAM_ERROR)
-				diag_raise();
-			int events = iostream_status_to_events(nrd);
-			if (con->input.events != events) {
-				ev_io_stop(loop, &con->input);
-				ev_io_set(&con->input, con->io.fd, events);
-			}
-			ev_io_start(loop, &con->input);
-			return;
-		}
-		if (nrd == 0) {                 /* EOF */
-			iproto_connection_close(con);
-			return;
-		}
-		/* Count statistics */
-		rmean_collect(con->iproto_thread->rmean,
-			      IPROTO_RECEIVED, nrd);
-
-		/* Update the read position and connection state. */
-		in->wpos += nrd;
-		con->parse_size += nrd;
-		/* Enqueue all requests which are fully read up. */
-		if (iproto_enqueue_batch(con, in) != 0)
-			diag_raise();
-	} catch (Exception *e) {
-		e->log();
-		/* Best effort at sending the error message to the client. */
-		iproto_write_error(io, e, ::schema_version, 0);
-		iproto_connection_close(con);
+	/* Ensure we have sufficient space for the next round.  */
+	struct ibuf *in = iproto_connection_input_buffer(con);
+	if (in == NULL) {
+		iproto_connection_stop_readahead_limit(con);
+		return;
 	}
+	/* Read input. */
+	ssize_t nrd = iostream_read(io, in->wpos, ibuf_unused(in));
+	if (nrd < 0) {                  /* Socket is not ready. */
+		if (nrd == IOSTREAM_ERROR)
+			goto error;
+		int events = iostream_status_to_events(nrd);
+		if (con->input.events != events) {
+			ev_io_stop(loop, &con->input);
+			ev_io_set(&con->input, con->io.fd, events);
+		}
+		ev_io_start(loop, &con->input);
+		return;
+	}
+	if (nrd == 0) {                 /* EOF */
+		iproto_connection_close(con);
+		return;
+	}
+	/* Count statistics */
+	rmean_collect(con->iproto_thread->rmean, IPROTO_RECEIVED, nrd);
+
+	/* Update the read position and connection state. */
+	in->wpos += nrd;
+	con->parse_size += nrd;
+	/* Enqueue all requests which are fully read up. */
+	if (iproto_enqueue_batch(con, in) != 0)
+		goto error;
+	return;
+error:;
+	struct error *e = diag_last_error(diag_get());
+	assert(e != NULL);
+	error_log(e);
+	/* Best effort at sending the error message to the client. */
+	iproto_write_error(io, e, ::schema_version, 0);
+	iproto_connection_close(con);
 }
 
 /** writev() to the socket and handle the result. */
@@ -1459,7 +1459,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	return con;
 }
 
-/** Recycle a connection. Never throws. */
+/** Recycle a connection. */
 static inline void
 iproto_connection_delete(struct iproto_connection *con)
 {
@@ -1969,8 +1969,7 @@ tx_end_msg(struct iproto_msg *msg, struct obuf_svp *svp)
 }
 
 /**
- * Write error message to the output buffer and advance
- * write position. Doesn't throw.
+ * Write error message to the output buffer and advance write position.
  */
 static void
 tx_reply_error(struct iproto_msg *msg)
@@ -1983,7 +1982,7 @@ tx_reply_error(struct iproto_msg *msg)
 
 /**
  * Write error from iproto thread to the output buffer and advance
- * write position. Doesn't throw.
+ * write position.
  */
 static void
 tx_reply_iproto_error(struct cmsg *m)
@@ -2362,65 +2361,57 @@ tx_process_misc(struct cmsg *m)
 	if (tx_check_msg(msg) != 0)
 		goto error;
 
-	try {
-		struct ballot ballot;
-		header = obuf_create_svp(out);
-		switch (msg->header.type) {
-		case IPROTO_AUTH:
-			box_process_auth(&msg->auth, con->salt,
-					 IPROTO_SALT_SIZE);
-			iproto_reply_ok(out, msg->header.sync,
-					::schema_version);
-			break;
-		case IPROTO_PING:
-			iproto_reply_ok(out, msg->header.sync,
-					::schema_version);
-			break;
-		case IPROTO_ID:
-			tx_process_id(con, &msg->id);
-			iproto_reply_id(out, box_auth_type, msg->header.sync,
-					::schema_version);
-			break;
-		case IPROTO_VOTE_DEPRECATED:
-			iproto_reply_vclock(out, &replicaset.vclock,
-					    msg->header.sync,
-					    ::schema_version);
-			break;
-		case IPROTO_VOTE:
-			box_process_vote(&ballot);
-			iproto_reply_vote(out, &ballot, msg->header.sync,
-					  ::schema_version);
-			break;
-		case IPROTO_WATCH:
-			session_watch(con->session, msg->header.sync,
-				      msg->watch.key, msg->watch.key_len,
-				      iproto_session_notify);
-			/* Sic: no reply. */
-			break;
-		case IPROTO_UNWATCH:
-			session_unwatch(con->session, msg->watch.key,
-					msg->watch.key_len);
-			/* Sic: no reply. */
-			break;
-		case IPROTO_WATCH_ONCE: {
-			const char *data, *data_end;
-			data = box_watch_once(msg->watch.key,
-					      msg->watch.key_len, &data_end);
-			iproto_prepare_select(out, &header);
-			xobuf_dup(out, data, data_end - data);
-			iproto_reply_select(out, &header, msg->header.sync,
-					    ::schema_version,
-					    data != NULL ? 1 : 0);
-			break;
-		}
-		default:
-			unreachable();
-		}
-		iproto_wpos_create(&msg->wpos, out);
-	} catch (Exception *e) {
-		header = obuf_create_svp(out);
-		tx_reply_error(msg);
+	struct ballot ballot;
+	header = obuf_create_svp(out);
+	switch (msg->header.type) {
+	case IPROTO_AUTH:
+		if (box_process_auth(&msg->auth, con->salt,
+				     IPROTO_SALT_SIZE) != 0)
+			goto error;
+		iproto_reply_ok(out, msg->header.sync, ::schema_version);
+		break;
+	case IPROTO_PING:
+		iproto_reply_ok(out, msg->header.sync, ::schema_version);
+		break;
+	case IPROTO_ID:
+		tx_process_id(con, &msg->id);
+		iproto_reply_id(out, box_auth_type, msg->header.sync,
+				::schema_version);
+		break;
+	case IPROTO_VOTE_DEPRECATED:
+		iproto_reply_vclock(out, &replicaset.vclock, msg->header.sync,
+				    ::schema_version);
+		break;
+	case IPROTO_VOTE:
+		box_process_vote(&ballot);
+		iproto_reply_vote(out, &ballot, msg->header.sync,
+				  ::schema_version);
+		break;
+	case IPROTO_WATCH:
+		session_watch(con->session, msg->header.sync,
+			      msg->watch.key, msg->watch.key_len,
+			      iproto_session_notify);
+		/* Sic: no reply. */
+		break;
+	case IPROTO_UNWATCH:
+		session_unwatch(con->session, msg->watch.key,
+				msg->watch.key_len);
+		/* Sic: no reply. */
+		break;
+	case IPROTO_WATCH_ONCE: {
+		const char *data, *data_end;
+		data = box_watch_once(msg->watch.key, msg->watch.key_len,
+				      &data_end);
+		iproto_prepare_select(out, &header);
+		xobuf_dup(out, data, data_end - data);
+		iproto_reply_select(out, &header, msg->header.sync,
+				    ::schema_version, data != NULL ? 1 : 0);
+		break;
 	}
+	default:
+		unreachable();
+	}
+	iproto_wpos_create(&msg->wpos, out);
 	tx_end_msg(msg, &header);
 	return;
 error:
@@ -2769,29 +2760,27 @@ tx_process_connect(struct cmsg *m)
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
 	struct obuf *out = msg->connection->tx.p_obuf;
-	try {              /* connect. */
-		con->session = session_new(SESSION_TYPE_BINARY);
-		con->session->meta.connection = con;
-		session_set_peer_addr(con->session, &msg->connect.addr,
-				      msg->connect.addrlen);
-		iproto_features_create(&con->session->meta.features);
-		tx_fiber_init(con->session, 0);
-		char *greeting = (char *) static_alloc(IPROTO_GREETING_SIZE);
-		/* TODO: dirty read from tx thread */
-		struct tt_uuid uuid = INSTANCE_UUID;
-		random_bytes(con->salt, IPROTO_SALT_SIZE);
-		greeting_encode(greeting, tarantool_version_id(), &uuid,
-				con->salt, IPROTO_SALT_SIZE);
-		xobuf_dup(out, greeting, IPROTO_GREETING_SIZE);
-		if (! rlist_empty(&session_on_connect)) {
-			if (session_run_on_connect_triggers(con->session) != 0)
-				diag_raise();
-		}
-		iproto_wpos_create(&msg->wpos, out);
-	} catch (Exception *e) {
-		tx_reply_error(msg);
-		msg->close_connection = true;
-	}
+	con->session = session_new(SESSION_TYPE_BINARY);
+	con->session->meta.connection = con;
+	session_set_peer_addr(con->session, &msg->connect.addr,
+			      msg->connect.addrlen);
+	iproto_features_create(&con->session->meta.features);
+	tx_fiber_init(con->session, 0);
+	char *greeting = (char *)static_alloc(IPROTO_GREETING_SIZE);
+	/* TODO: dirty read from tx thread */
+	struct tt_uuid uuid = INSTANCE_UUID;
+	random_bytes(con->salt, IPROTO_SALT_SIZE);
+	greeting_encode(greeting, tarantool_version_id(), &uuid,
+			con->salt, IPROTO_SALT_SIZE);
+	xobuf_dup(out, greeting, IPROTO_GREETING_SIZE);
+	if (!rlist_empty(&session_on_connect) &&
+	    session_run_on_connect_triggers(con->session) != 0)
+		goto error;
+	iproto_wpos_create(&msg->wpos, out);
+	return;
+error:
+	tx_reply_error(msg);
+	msg->close_connection = true;
 }
 
 /**
@@ -3163,13 +3152,8 @@ iproto_init(int threads_count)
 		iproto_thread->id = i;
 		iproto_thread_init(iproto_thread);
 		if (cord_costart(&iproto_thread->net_cord, "iproto",
-				 net_cord_f, iproto_thread)) {
-			mh_i32_delete(iproto_thread->req_handlers);
-			rmean_delete(iproto_thread->rmean);
-			rmean_delete(iproto_thread->tx.rmean);
-			slab_cache_destroy(&iproto_thread->net_slabc);
-			goto fail;
-		}
+				 net_cord_f, iproto_thread))
+			panic("failed to start iproto thread");
 		/* Create a pipe to "net" thread. */
 		char endpoint_name[ENDPOINT_NAME_MAX];
 		snprintf(endpoint_name, ENDPOINT_NAME_MAX, "net%u",
@@ -3184,11 +3168,6 @@ iproto_init(int threads_count)
 
 	if (box_on_shutdown(NULL, iproto_on_shutdown_f, NULL) != 0)
 		panic("failed to set iproto shutdown trigger");
-	return;
-
-fail:
-	iproto_free();
-	diag_raise();
 }
 
 /** Available iproto configuration changes. */
@@ -3276,76 +3255,61 @@ static int
 iproto_do_cfg_f(struct cbus_call_msg *m)
 {
 	struct iproto_cfg_msg *cfg_msg = (struct iproto_cfg_msg *) m;
-	int old;
 	struct iproto_thread *iproto_thread = cfg_msg->iproto_thread;
 	struct mh_i32_t *req_handlers = iproto_thread->req_handlers;
 	struct evio_service *binary = &iproto_thread->binary;
-
-	try {
-		switch (cfg_msg->op) {
-		case IPROTO_CFG_MSG_MAX:
-			cpipe_set_max_input(&iproto_thread->tx_pipe,
-					    cfg_msg->iproto_msg_max / 2);
-			old = iproto_msg_max;
-			iproto_msg_max = cfg_msg->iproto_msg_max;
-			if (old < iproto_msg_max)
-				iproto_resume(iproto_thread);
-			break;
-		case IPROTO_CFG_START:
-			evio_service_attach(binary, &tx_binary);
-			break;
-		case IPROTO_CFG_STOP:
-			evio_service_detach(binary);
-			break;
-		case IPROTO_CFG_RESTART:
-			evio_service_detach(binary);
-			evio_service_attach(binary, &tx_binary);
-			break;
-		case IPROTO_CFG_STAT:
-			iproto_fill_stat(iproto_thread, cfg_msg);
-			break;
-		case IPROTO_CFG_OVERRIDE:
-			if (cfg_msg->override.is_set) {
-				uint32_t old;
-				uint32_t *replaced = &old;
-				mh_i32_put(req_handlers,
-					   &cfg_msg->override.req_type,
-					   &replaced, NULL);
-				assert(replaced == NULL);
-			} else {
-				mh_int_t k =
-					mh_i32_find(req_handlers,
-						    cfg_msg->override.req_type,
-						    NULL);
-				assert(k != mh_end(req_handlers));
-				mh_i32_del(req_handlers, k, NULL);
-			}
-			break;
-		default:
-			unreachable();
-		}
-	} catch (Exception *e) {
-		return -1;
+	switch (cfg_msg->op) {
+	case IPROTO_CFG_MSG_MAX: {
+		cpipe_set_max_input(&iproto_thread->tx_pipe,
+				    cfg_msg->iproto_msg_max / 2);
+		int old = iproto_msg_max;
+		iproto_msg_max = cfg_msg->iproto_msg_max;
+		if (old < iproto_msg_max)
+			iproto_resume(iproto_thread);
+		break;
 	}
-
+	case IPROTO_CFG_START:
+		evio_service_attach(binary, &tx_binary);
+		break;
+	case IPROTO_CFG_STOP:
+		evio_service_detach(binary);
+		break;
+	case IPROTO_CFG_RESTART:
+		evio_service_detach(binary);
+		evio_service_attach(binary, &tx_binary);
+		break;
+	case IPROTO_CFG_STAT:
+		iproto_fill_stat(iproto_thread, cfg_msg);
+		break;
+	case IPROTO_CFG_OVERRIDE:
+		if (cfg_msg->override.is_set) {
+			uint32_t old;
+			uint32_t *replaced = &old;
+			mh_i32_put(req_handlers, &cfg_msg->override.req_type,
+				   &replaced, NULL);
+			assert(replaced == NULL);
+		} else {
+			mh_int_t k = mh_i32_find(req_handlers,
+						 cfg_msg->override.req_type,
+						 NULL);
+			assert(k != mh_end(req_handlers));
+			mh_i32_del(req_handlers, k, NULL);
+		}
+		break;
+	default:
+		unreachable();
+	}
 	return 0;
 }
 
-static inline int
+static inline void
 iproto_do_cfg(struct iproto_thread *iproto_thread, struct iproto_cfg_msg *msg)
 {
 	msg->iproto_thread = iproto_thread;
-	return cbus_call(&iproto_thread->net_pipe, &iproto_thread->tx_pipe, msg,
-			 iproto_do_cfg_f);
-}
-
-static inline void
-iproto_do_cfg_crit(struct iproto_thread *iproto_thread,
-		   struct iproto_cfg_msg *cfg_msg)
-{
-	int rc = iproto_do_cfg(iproto_thread, cfg_msg);
-	(void)rc;
+	int rc = cbus_call(&iproto_thread->net_pipe, &iproto_thread->tx_pipe,
+			   msg, iproto_do_cfg_f);
 	assert(rc == 0);
+	(void)rc;
 }
 
 /** Send IPROTO_CFG_STOP to all threads. */
@@ -3355,7 +3319,7 @@ iproto_send_stop_msg(void)
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STOP);
 	for (int i = 0; i < iproto_threads_count; i++)
-		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
+		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
 }
 
 /** Send IPROTO_CFG_START to all threads. */
@@ -3365,7 +3329,7 @@ iproto_send_start_msg(void)
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_START);
 	for (int i = 0; i < iproto_threads_count; i++)
-		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
+		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
 }
 
 /** Send IPROTO_CFG_RESTART to all threads. */
@@ -3375,7 +3339,7 @@ iproto_send_restart_msg(void)
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_RESTART);
 	for (int i = 0; i < iproto_threads_count; i++)
-		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
+		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
 }
 
 int
@@ -3454,7 +3418,7 @@ iproto_thread_stats_get(struct iproto_stats *stats, int thread_id)
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STAT);
 	assert(thread_id >= 0 && thread_id < iproto_threads_count);
 	cfg_msg.stats = stats;
-	iproto_do_cfg_crit(&iproto_threads[thread_id], &cfg_msg);
+	iproto_do_cfg(&iproto_threads[thread_id], &cfg_msg);
 	stats->requests_in_progress =
 		iproto_threads[thread_id].tx.requests_in_progress;
 }
@@ -3468,22 +3432,23 @@ iproto_reset_stat(void)
 	}
 }
 
-void
+int
 iproto_set_msg_max(int new_iproto_msg_max)
 {
 	if (new_iproto_msg_max < IPROTO_MSG_MAX_MIN) {
-		tnt_raise(ClientError, ER_CFG, "net_msg_max",
-			  tt_sprintf("minimal value is %d",
-				     IPROTO_MSG_MAX_MIN));
+		diag_set(ClientError, ER_CFG, "net_msg_max",
+			 tt_sprintf("minimal value is %d", IPROTO_MSG_MAX_MIN));
+		return -1;
 	}
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_MSG_MAX);
 	cfg_msg.iproto_msg_max = new_iproto_msg_max;
 	for (int i = 0; i < iproto_threads_count; i++) {
-		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
+		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
 		cpipe_set_max_input(&iproto_threads[i].net_pipe,
 				    new_iproto_msg_max / 2);
 	}
+	return 0;
 }
 
 /**
@@ -3497,7 +3462,7 @@ iproto_cfg_override(uint32_t req_type, bool is_set)
 	cfg_msg.override.req_type = req_type;
 	cfg_msg.override.is_set = is_set;
 	for (int i = 0; i < iproto_threads_count; ++i)
-		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
+		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
 }
 
 int

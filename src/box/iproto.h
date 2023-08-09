@@ -132,16 +132,13 @@ int
 iproto_override(uint32_t req_type, iproto_handler_t cb,
 		iproto_handler_destroy_t destroy, void *ctx);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
 void
 iproto_init(int threads_count);
 
 int
 iproto_listen(const struct uri_set *uri_set);
 
-void
+int
 iproto_set_msg_max(int iproto_msg_max);
 
 /**
@@ -159,6 +156,8 @@ iproto_session_send(struct session *session,
 void
 iproto_free(void);
 
+#if defined(__cplusplus)
+} /* extern "C" */
 #endif /* defined(__cplusplus) */
 
 #endif

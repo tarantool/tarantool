@@ -3143,7 +3143,8 @@ void
 box_set_net_msg_max(void)
 {
 	int new_iproto_msg_max = cfg_geti("net_msg_max");
-	iproto_set_msg_max(new_iproto_msg_max);
+	if (iproto_set_msg_max(new_iproto_msg_max) != 0)
+		diag_raise();
 	fiber_pool_set_max_size(&tx_fiber_pool,
 				new_iproto_msg_max *
 				IPROTO_FIBER_POOL_SIZE_FACTOR);
@@ -4114,7 +4115,7 @@ box_register_replica(const struct tt_uuid *uuid,
 	box_insert_replica_record(replica_id, uuid, name);
 }
 
-void
+int
 box_process_auth(struct auth_request *request,
 		 const char *salt, uint32_t salt_len)
 {
@@ -4124,13 +4125,16 @@ box_process_auth(struct auth_request *request,
 	rmean_collect(rmean_box, IPROTO_AUTH, 1);
 
 	/* Check that bootstrap has been finished */
-	if (!is_box_configured)
-		tnt_raise(ClientError, ER_LOADING);
+	if (!is_box_configured) {
+		diag_set(ClientError, ER_LOADING);
+		return -1;
+	}
 
 	const char *user = request->user_name;
 	uint32_t len = mp_decode_strl(&user);
 	if (authenticate(user, len, salt, request->scramble) != 0)
-		diag_raise();
+		return -1;
+	return 0;
 }
 
 void
