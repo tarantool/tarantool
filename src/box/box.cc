@@ -2336,8 +2336,14 @@ box_set_instance_name(void)
 	strlcpy(old_cfg_name, cfg_instance_name, NODE_NAME_SIZE_MAX);
 	auto guard = make_scoped_guard([&]{
 		strlcpy(cfg_instance_name, old_cfg_name, NODE_NAME_SIZE_MAX);
-		box_restart_replication();
-		replicaset_follow();
+		try {
+			box_restart_replication();
+			replicaset_follow();
+		} catch (Exception *exc) {
+			exc->log();
+		} catch (...) {
+			panic("Unknown exception on instance name set failure");
+		}
 	});
 	strlcpy(cfg_instance_name, name, NODE_NAME_SIZE_MAX);
 	/* Nil means the config doesn't care, allows to use any name. */
