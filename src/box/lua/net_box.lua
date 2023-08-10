@@ -6,6 +6,7 @@ local msgpack  = require('msgpack')
 local urilib   = require('uri')
 local internal = require('net.box.lib')
 local trigger  = require('internal.trigger')
+local utils    = require('internal.utils')
 
 local this_module
 
@@ -16,7 +17,7 @@ local check_select_opts   = box.internal.check_select_opts
 local check_index_arg     = box.internal.check_index_arg
 local check_space_arg     = box.internal.check_space_arg
 local check_primary_index = box.internal.check_primary_index
-local check_param_table   = box.internal.check_param_table
+local check_param_table   = utils.check_param_table
 
 local ibuf_t = ffi.typeof('struct ibuf')
 local is_tuple = box.tuple.is
