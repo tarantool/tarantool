@@ -40,7 +40,7 @@ extern "C" {
  * A public trigger fired on Raft state change, i.e. on a broadcast.
  * It's allowed to yield inside it, and it's run asynchronously.
  */
-extern struct rlist box_raft_on_broadcast;
+extern struct event *box_raft_on_election_event;
 
 enum election_mode {
 	ELECTION_MODE_INVALID = -1,

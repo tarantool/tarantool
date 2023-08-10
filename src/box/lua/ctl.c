@@ -38,12 +38,15 @@
 
 #include "lua/utils.h"
 #include "lua/trigger.h"
+#include "box/lua/trigger.h"
 
 #include "box/box.h"
 #include "box/schema.h"
 #include "box/engine.h"
 #include "box/memtx_engine.h"
 #include "box/raft.h"
+
+#include "core/event.h"
 
 static int
 lbox_ctl_wait_ro(struct lua_State *L)
@@ -79,26 +82,19 @@ lbox_ctl_on_shutdown(struct lua_State *L)
 static int
 lbox_ctl_on_schema_init(struct lua_State *L)
 {
-	return lbox_trigger_reset(L, 2, &on_schema_init, NULL, NULL);
-}
-
-static int
-lbox_push_recovery_state(struct lua_State *L, void *event)
-{
-	lua_pushstring(L, (const char *)event);
-	return 1;
+	struct event *event = event_get("box.ctl.on_schema_init", true);
+	return luaT_event_reset_trigger(L, 1, event);
 }
 
 static int
 lbox_ctl_on_recovery_state(struct lua_State *L)
 {
-	return lbox_trigger_reset(L, 2, &box_on_recovery_state,
-				  lbox_push_recovery_state, NULL);
+	return luaT_event_reset_trigger(L, 1, box_on_recovery_state_event);
 }
 static int
 lbox_ctl_on_election(struct lua_State *L)
 {
-	return lbox_trigger_reset(L, 2, &box_raft_on_broadcast, NULL, NULL);
+	return luaT_event_reset_trigger(L, 1, box_raft_on_election_event);
 }
 
 static int

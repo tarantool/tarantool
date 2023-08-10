@@ -98,6 +98,8 @@
 #include "memory.h"
 #include "node_name.h"
 #include "tt_sort.h"
+#include "event.h"
+#include "func_adapter.h"
 
 static char status[64] = "unconfigured";
 
@@ -183,7 +185,7 @@ static struct fiber_pool tx_fiber_pool;
  */
 static struct cbus_endpoint tx_prio_endpoint;
 
-RLIST_HEAD(box_on_recovery_state);
+struct event *box_on_recovery_state_event;
 
 /**
  * Recovery states supported by on_recovery_state triggers.
@@ -244,8 +246,22 @@ static int
 box_run_on_recovery_state(enum box_recovery_state state)
 {
 	assert(state >= 0 && state < box_recovery_state_MAX);
-	return trigger_run(&box_on_recovery_state,
-			   (char *)box_recovery_state_strs[state]);
+	const char *state_str = box_recovery_state_strs[state];
+
+	const char *name = NULL;
+	struct func_adapter *trigger = NULL;
+	struct func_adapter_ctx ctx;
+	struct event_trigger_iterator it;
+	int rc = 0;
+	event_trigger_iterator_create(&it, box_on_recovery_state_event);
+	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
+		func_adapter_begin(trigger, &ctx);
+		func_adapter_push_str0(trigger, &ctx, state_str);
+		rc = func_adapter_call(trigger, &ctx);
+		func_adapter_end(trigger, &ctx);
+	}
+	event_trigger_iterator_destroy(&it);
+	return rc;
 }
 
 static void
@@ -5865,6 +5881,9 @@ box_storage_free(void)
 void
 box_init(void)
 {
+	box_on_recovery_state_event =
+		event_get("box.ctl.on_recovery_state", true);
+	event_ref(box_on_recovery_state_event);
 	msgpack_init();
 	fiber_cond_create(&ro_cond);
 	auth_init();
@@ -5904,7 +5923,8 @@ box_free(void)
 	box_watcher_free();
 	box_raft_free();
 	sequence_free();
-	trigger_destroy(&box_on_recovery_state);
+	event_unref(box_on_recovery_state_event);
+	box_on_recovery_state_event = NULL;
 	/* tuple_free(); */
 	/* schema_module_free(); */
 	/* session_free(); */
