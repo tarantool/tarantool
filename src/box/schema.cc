@@ -41,6 +41,8 @@
 #include "txn.h"
 #include "engine.h"
 #include "version.h"
+#include "event.h"
+#include "func_adapter.h"
 
 /**
  * @module Data Dictionary
@@ -71,7 +73,6 @@ static uint32_t latest_dd_version_id = 0;
 /** Fiber that is currently running a schema upgrade. */
 static struct fiber *schema_upgrade_fiber;
 
-struct rlist on_schema_init = RLIST_HEAD_INITIALIZER(on_schema_init);
 struct rlist on_alter_space = RLIST_HEAD_INITIALIZER(on_alter_space);
 struct rlist on_alter_sequence = RLIST_HEAD_INITIALIZER(on_alter_sequence);
 struct rlist on_alter_func = RLIST_HEAD_INITIALIZER(on_alter_func);
@@ -290,6 +291,29 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 }
 
 /**
+ * Runs on_schema_init triggers.
+ */
+static void
+run_on_schema_init_triggers(void)
+{
+	struct event *event = event_get("box.ctl.on_schema_init", false);
+	if (event == NULL)
+		return;
+	const char *name = NULL;
+	struct func_adapter *trigger = NULL;
+	struct func_adapter_ctx ctx;
+	struct event_trigger_iterator it;
+	int rc = 0;
+	event_trigger_iterator_create(&it, event);
+	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
+		func_adapter_begin(trigger, &ctx);
+		rc = func_adapter_call(trigger, &ctx);
+		func_adapter_end(trigger, &ctx);
+	}
+	event_trigger_iterator_destroy(&it);
+}
+
+/**
  * Initialize a prototype for the two mandatory data
  * dictionary spaces and create a cache entry for them.
  * When restoring data from the snapshot these spaces
@@ -440,7 +464,7 @@ schema_init(void)
 	 * Run the triggers right after creating all the system
 	 * space stubs.
 	 */
-	trigger_run(&on_schema_init, NULL);
+	run_on_schema_init_triggers();
 }
 
 void

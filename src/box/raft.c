@@ -30,6 +30,8 @@
  */
 #include "box.h"
 #include "error.h"
+#include "event.h"
+#include "func_adapter.h"
 #include "journal.h"
 #include "raft.h"
 #include "relay.h"
@@ -63,8 +65,7 @@ static struct trigger box_raft_on_quorum_gain;
 /** Triggers executed once the node loses a quorum of connected peers. */
 static struct trigger box_raft_on_quorum_loss;
 
-struct rlist box_raft_on_broadcast =
-	RLIST_HEAD_INITIALIZER(box_raft_on_broadcast);
+struct event *box_raft_on_election_event;
 
 /**
  * Worker fiber does all the asynchronous work, which may need yields and can be
@@ -362,6 +363,24 @@ box_raft_process(struct raft_request *req, uint32_t source)
 	return raft_process_msg(box_raft(), &msg, source);
 }
 
+int
+box_raft_run_on_election_triggers(void)
+{
+	const char *name = NULL;
+	struct func_adapter *trigger = NULL;
+	struct func_adapter_ctx ctx;
+	struct event_trigger_iterator it;
+	int rc = 0;
+	event_trigger_iterator_create(&it, box_raft_on_election_event);
+	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
+		func_adapter_begin(trigger, &ctx);
+		rc = func_adapter_call(trigger, &ctx);
+		func_adapter_end(trigger, &ctx);
+	}
+	event_trigger_iterator_destroy(&it);
+	return rc;
+}
+
 static void
 box_raft_broadcast(struct raft *raft, const struct raft_msg *msg)
 {
@@ -371,7 +390,7 @@ box_raft_broadcast(struct raft *raft, const struct raft_msg *msg)
 	box_raft_msg_to_request(msg, &req);
 	replicaset_foreach(replica)
 		relay_push_raft(replica->relay, &req);
-	trigger_run(&box_raft_on_broadcast, NULL);
+	box_raft_run_on_election_triggers();
 }
 
 static void
@@ -630,6 +649,8 @@ box_raft_init(void)
 		       NULL, NULL);
 	trigger_create(&box_raft_on_quorum_loss, box_raft_on_quorum_change_f,
 		       NULL, NULL);
+	box_raft_on_election_event = event_get("box.ctl.on_election", true);
+	event_ref(box_raft_on_election_event);
 }
 
 void
@@ -648,4 +669,6 @@ box_raft_free(void)
 	raft->state = 0;
 
 	box_raft_remove_quorum_triggers();
+	event_unref(box_raft_on_election_event);
+	box_raft_on_election_event = NULL;
 }

@@ -81,7 +81,7 @@ extern struct rlist box_on_shutdown_trigger_list;
 /**
  * Triggers invoked during initial `box.cfg` call on various recovery stages.
  */
-extern struct rlist box_on_recovery_state;
+extern struct event *box_on_recovery_state_event;
 
 /**
  * Timeout during which the transaction must complete,
