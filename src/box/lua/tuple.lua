@@ -5,9 +5,12 @@ local msgpackffi = require('msgpackffi')
 local fun = require('fun')
 local buffer = require('buffer')
 local compat = require('compat')
+local utils = require('internal.utils')
+
 local internal = box.internal
 local cord_ibuf_take = buffer.internal.cord_ibuf_take
 local cord_ibuf_put = buffer.internal.cord_ibuf_put
+local check_param_table = utils.check_param_table
 
 ffi.cdef[[
 /** \cond public */
@@ -83,7 +86,7 @@ local new_tuple = function(...)
     if type(tuple) ~= 'table' and not box.tuple.is(tuple) then
         tuple = {tuple}
     end
-    internal.check_param_table(options, NEW_OPTION_TYPES)
+    check_param_table(options, NEW_OPTION_TYPES)
     if options == nil then
         return internal.tuple.new(tuple)
     end
