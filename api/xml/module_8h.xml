@@ -97,7 +97,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" prot="public" static="no">
         <name>PACKAGE_VERSION</name>
-        <initializer>&quot;3.0.0-alpha1-70-g61130805b&quot;</initializer>
+        <initializer>&quot;3.0.0-alpha1-74-g9d28d3726&quot;</initializer>
         <briefdescription>
 <para>A string with major-minor-patch-commit-id identifier of the release, e.g. </para>
         </briefdescription>
@@ -174,7 +174,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1a835dbb7b4216a8258c588d9781a3b66b" prot="public" static="no">
         <name>COMPILER_INFO</name>
-        <initializer>&quot;GNU-11.3.0&quot;</initializer>
+        <initializer>&quot;GNU-11.4.0&quot;</initializer>
         <briefdescription>
 <para>Compiler ID and version, assuming the C and C++ compiler IDs are equal. </para>
         </briefdescription>
@@ -12897,14 +12897,14 @@ In case of an error set a diag and return NULL. </para>
 <codeline lineno="57" refid="module_8h_1ac5f2c7580fd5bf200c5027443420902f" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MAJOR<sp/>3</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="61" refid="module_8h_1a4ab155eaff0a115e522c1faae631196e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MINOR<sp/>0</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="65" refid="module_8h_1abd1dbec4fd6761084d3e0c05afe2b138" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_PATCH<sp/>0</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;3.0.0-alpha1-70-g61130805b&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;3.0.0-alpha1-74-g9d28d3726&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="71"><highlight class="normal"></highlight></codeline>
 <codeline lineno="76" refid="module_8h_1adb6d1259777e8f56c6260be6faed183e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>SYSCONF_DIR<sp/>&quot;etc&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="78" refid="module_8h_1a643b6b7ac15874197420e2adbea8b6bb" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>INSTALL_PREFIX<sp/>&quot;/usr/local&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="80" refid="module_8h_1a040141d0f88e012c0b915e3531fef5cc" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>BUILD_TYPE<sp/>&quot;Debug&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="82" refid="module_8h_1ac8c9f90a1d4b7435c509fd2020e4aa88" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>BUILD_INFO<sp/>&quot;Linux-x86_64-Debug&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="84" refid="module_8h_1a2863d95c06ae4d073ea443a8ae48c5b6" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>BUILD_OPTIONS<sp/>&quot;cmake<sp/>.<sp/>-DCMAKE_INSTALL_PREFIX=/usr/local<sp/>-DENABLE_BACKTRACE=TRUE&quot;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="86" refid="module_8h_1a835dbb7b4216a8258c588d9781a3b66b" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>COMPILER_INFO<sp/>&quot;GNU-11.3.0&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="86" refid="module_8h_1a835dbb7b4216a8258c588d9781a3b66b" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>COMPILER_INFO<sp/>&quot;GNU-11.4.0&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="88" refid="module_8h_1adc01d1a8b018ef75d112a8f51dde4e27" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>TARANTOOL_C_FLAGS<sp/>&quot;<sp/>-fexceptions<sp/>-funwind-tables<sp/>-fasynchronous-unwind-tables<sp/>-fno-common<sp/>-msse2<sp/>-Wformat<sp/>-Wformat-security<sp/>-Werror=format-security<sp/>-fstack-protector-strong<sp/>-fPIC<sp/>-fmacro-prefix-map=/home/runner/work/tarantool/tarantool=.<sp/>-std=c11<sp/>-Wall<sp/>-Wextra<sp/>-Wno-gnu-alignof-expression<sp/>-fno-gnu89-inline<sp/>-Wno-cast-function-type<sp/>-Werror&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="90" refid="module_8h_1a2118c0a1a997878f04f860b4049ca934" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>TARANTOOL_CXX_FLAGS<sp/>&quot;<sp/>-fexceptions<sp/>-funwind-tables<sp/>-fasynchronous-unwind-tables<sp/>-fno-common<sp/>-msse2<sp/>-Wformat<sp/>-Wformat-security<sp/>-Werror=format-security<sp/>-fstack-protector-strong<sp/>-fPIC<sp/>-fmacro-prefix-map=/home/runner/work/tarantool/tarantool=.<sp/>-std=c++11<sp/>-Wall<sp/>-Wextra<sp/>-Wno-invalid-offsetof<sp/>-Wno-gnu-alignof-expression<sp/>-Wno-cast-function-type<sp/>-Werror&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="91"><highlight class="normal"></highlight></codeline>
