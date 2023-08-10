@@ -5,6 +5,7 @@ local fio = require('fio')
 local xlog = require('xlog')
 local ffi = require('ffi')
 local fun = require('fun')
+local utils = require('internal.utils')
 
 ffi.cdef([[
     uint32_t box_dd_version_id(void);
@@ -2116,7 +2117,7 @@ local downgrade_versions = {
 -- In case of downgrade check for issues is done before making any changes.
 -- If any issue is found then downgrade is failed and no any changes are done.
 local function downgrade_impl(version_str, dry_run)
-    box.internal.check_param(version_str, 'version_str', 'string')
+    utils.check_param(version_str, 'version_str', 'string')
     local version = mkversion.parse(version_str)
     if fun.index(version_str, downgrade_versions) == nil then
         error("Downgrade is only possible to version listed in" ..
