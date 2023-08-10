@@ -479,9 +479,16 @@ endif()
 #
 # XXhash
 #
-include(BuildLibXXhash)
-libxxhash_build()
-add_dependencies(build_bundled_libs xxhash)
+option(ENABLE_BUNDLED_XXHASH "Enable building of the bundled xxHash" ON)
+if (ENABLE_BUNDLED_XXHASH)
+    include(BuildLibXXhash)
+    libxxhash_build()
+    add_dependencies(build_bundled_libs xxhash)
+else()
+    set(XXHASH_FIND_REQUIRED ON)
+    find_package(XXHASH)
+endif()
+
 
 # Install headers.
 if (ENABLE_BUNDLED_LIBCURL)
