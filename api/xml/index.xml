@@ -440,6 +440,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaae80c04fbbd48c9e8d93fe46e2cbd0ee" kind="enumvalue"><name>ER_INSTANCE_NAME_MISMATCH</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac4c039ba89e54899024f9191785978d4" kind="enumvalue"><name>ER_SCHEMA_NEEDS_UPGRADE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea38e91997aa6deab10e6f735b1b0ab7e2" kind="enumvalue"><name>ER_SCHEMA_UPGRADE_IN_PROGRESS</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea2d832ae90b7ba0407a80b186d19edc0e" kind="enumvalue"><name>ER_DEPRECATED</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
