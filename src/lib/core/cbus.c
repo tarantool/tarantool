@@ -407,13 +407,12 @@ cbus_call_done(struct cmsg *m)
 	fiber_wakeup(msg->caller);
 }
 
-int
-cbus_call_timeout(struct cpipe *callee, struct cpipe *caller,
-		  struct cbus_call_msg *msg, cbus_call_f func,
-		  cbus_call_f free_cb, double timeout)
+/** Submit a call for execution without waiting for completion. */
+static void
+cbus_call_submit(struct cpipe *callee, struct cpipe *caller,
+		 struct cbus_call_msg *msg, cbus_call_f func,
+		 cbus_call_f free_cb)
 {
-	int rc;
-
 	diag_create(&msg->diag);
 	msg->caller = fiber();
 	msg->complete = false;
@@ -428,6 +427,14 @@ cbus_call_timeout(struct cpipe *callee, struct cpipe *caller,
 	msg->rc = 0;
 
 	cpipe_push(callee, cmsg(msg));
+}
+
+int
+cbus_call_timeout(struct cpipe *callee, struct cpipe *caller,
+		  struct cbus_call_msg *msg, cbus_call_f func,
+		  cbus_call_f free_cb, double timeout)
+{
+	cbus_call_submit(callee, caller, msg, func, free_cb);
 
 	ev_tstamp deadline = ev_monotonic_now(loop()) + timeout;
 	do {
@@ -439,9 +446,18 @@ cbus_call_timeout(struct cpipe *callee, struct cpipe *caller,
 		}
 	} while (!msg->complete);
 
-	if ((rc = msg->rc))
+	if (msg->rc != 0)
 		diag_move(&msg->diag, &fiber()->diag);
-	return rc;
+	return msg->rc;
+}
+
+void
+cbus_call_async(struct cpipe *callee, struct cpipe *caller,
+		struct cbus_call_msg *msg, cbus_call_f func,
+		cbus_call_f free_cb)
+{
+	cbus_call_submit(callee, caller, msg, func, free_cb);
+	msg->caller = NULL;
 }
 
 struct cbus_pair_msg {

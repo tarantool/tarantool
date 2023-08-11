@@ -389,6 +389,19 @@ cbus_call(struct cpipe *callee, struct cpipe *caller, struct cbus_call_msg *msg,
 }
 
 /**
+ * Execute an asynchronous call over cbus.
+ *
+ * In contrast to cbus_call_timeout, this function doesn't yield.
+ *
+ * If free_cb isn't NULL, it'll be invoked by the caller thread upon
+ * completion.
+ */
+void
+cbus_call_async(struct cpipe *callee, struct cpipe *caller,
+		struct cbus_call_msg *msg, cbus_call_f func,
+		cbus_call_f free_cb);
+
+/**
  * Block until all messages queued in a pipe have been processed.
  * Done by submitting a dummy message to the pipe and waiting
  * until it is complete.

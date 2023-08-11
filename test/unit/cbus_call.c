@@ -59,12 +59,29 @@ test_cbus_call_timeout(void)
 {
 	plan(3);
 	struct test_msg msg;
+	msg.was_freed = false;
 	int rc = cbus_call_timeout(&pipe_to_callee, &pipe_to_caller, &msg.base,
 				   func, free_cb, 0.01);
 	struct error *err = diag_last_error(diag_get());
 	bool pass = (rc == -1) && err && (err->type == &type_TimedOut);
 	ok(pass, "cbus_call timeout");
 	ok(!msg.was_freed, "free_cb doesn't fire on timeout");
+	barrier();
+	ok(msg.was_freed, "free_cb executed on message return");
+	check_plan();
+}
+
+static void
+test_cbus_call_async(void)
+{
+	plan(3);
+	struct test_msg msg;
+	msg.was_freed = false;
+	int csw = fiber()->csw;
+	cbus_call_async(&pipe_to_callee, &pipe_to_caller, &msg.base, func,
+			free_cb);
+	is(fiber()->csw, csw, "no context switch");
+	ok(!msg.was_freed, "free_cb doesn't fire on async call");
 	barrier();
 	ok(msg.was_freed, "free_cb executed on message return");
 	check_plan();
@@ -153,6 +170,7 @@ caller_fn(va_list ap)
 {
 	test_cbus_call();
 	test_cbus_call_timeout();
+	test_cbus_call_async();
 	test_cbus_call_wakeup();
 	test_cbus_call_cancel();
 
@@ -167,7 +185,7 @@ main(void)
 	struct cbus_endpoint endpoint;
 
 	header();
-	plan(4);
+	plan(5);
 
 	memory_init();
 	fiber_init(fiber_c_invoke);
