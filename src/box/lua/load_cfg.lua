@@ -983,9 +983,8 @@ for k, v in pairs(box) do
 end
 
 setmetatable(box, {
-    __index = function(table, index) -- luacheck: no unused args
-        error(debug.traceback("Please call box.cfg{} first"))
-        error("Please call box.cfg{} first")
+    __index = function()
+        box.error(box.error.UNCONFIGURED)
      end
 })
 

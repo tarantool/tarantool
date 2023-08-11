@@ -319,6 +319,14 @@ struct errcode_record {
 	/*264 */_(ER_NIL_UUID,			"Nil UUID is reserved and can't be used in replication") \
 	/*265 */_(ER_WRONG_FUNCTION_OPTIONS,	"Wrong function options: %s") \
 	/*266 */_(ER_MISSING_SYSTEM_SPACES,	"Snapshot has no system spaces") \
+	/*267 */_(ER_UNUSED1,			"") \
+	/*268 */_(ER_UNUSED2,			"") \
+	/*269 */_(ER_UNUSED3,			"") \
+	/*270 */_(ER_UNUSED4,			"") \
+	/*271 */_(ER_UNUSED5,			"") \
+	/*272 */_(ER_UNUSED6,			"") \
+	/*273 */_(ER_UNUSED7,			"") \
+	/*274 */_(ER_UNCONFIGURED,		"Please call box.cfg{} first") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

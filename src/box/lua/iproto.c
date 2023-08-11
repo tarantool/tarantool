@@ -313,6 +313,8 @@ lua_req_handler_destroy(void *ctx)
 static int
 lbox_iproto_override(struct lua_State *L)
 {
+	if (box_check_configured() != 0)
+		return luaT_error(L);
 	int n_args = lua_gettop(L);
 	if (n_args != 2)
 		return luaL_error(L, "Usage: "

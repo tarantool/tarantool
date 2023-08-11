@@ -484,6 +484,7 @@ t;
  |   264: box.error.NIL_UUID
  |   265: box.error.WRONG_FUNCTION_OPTIONS
  |   266: box.error.MISSING_SYSTEM_SPACES
+ |   274: box.error.UNCONFIGURED
  | ...
 
 test_run:cmd("setopt delimiter ''");

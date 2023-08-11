@@ -166,8 +166,8 @@ lbox_session_effective_user(struct lua_State *L)
 static int
 lbox_session_su(struct lua_State *L)
 {
-	if (!box_is_configured())
-		luaL_error(L, "Please call box.cfg{} first");
+	if (box_check_configured() != 0)
+		luaT_error(L);
 	int top = lua_gettop(L);
 	if (top < 1)
 		luaL_error(L, "session.su(): bad arguments");
