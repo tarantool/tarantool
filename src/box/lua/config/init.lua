@@ -5,10 +5,36 @@ local log = require('internal.config.utils.log')
 local tarantool = require('tarantool')
 local datetime = require('datetime')
 
-local extras = nil
-if tarantool.package == 'Tarantool Enterprise' then
-    extras = require('internal.config.extras')
+-- Tarantool Enterprise Edition has its own additions
+-- for config module.
+--
+-- Tarantool Community Edition may be extended using the same
+-- mechanism.
+local function load_extras()
+    local has_extras, extras = pcall(require, 'internal.config.extras')
+
+    -- The module is built into Tarantool EE executable. If it
+    -- can't be loaded, something is definitely going wrong.
+    if not has_extras and tarantool.package == 'Tarantool Enterprise' then
+        error('Tarantool Enterprise Edition build seems broken: built-in ' ..
+            'module internal.config.extras is not found')
+    end
+
+    -- The module may be provided by a user for Tarantool CE, but
+    -- it is optional.
+    if not has_extras then
+        return
+    end
+
+    -- Verify the contract.
+    assert(type(extras) == 'table')
+    assert(type(extras.initialize) == 'function')
+    assert(type(extras.post_apply) == 'function')
+
+    return extras
 end
+
+local extras = load_extras()
 
 -- {{{ Helpers
 
@@ -125,8 +151,6 @@ function methods._initialize(self)
     self:_register_applier(require('internal.config.applier.fiber'))
     self:_register_applier(require('internal.config.applier.app'))
 
-    -- Tarantool Enterprise Edition has its own additions
-    -- for this module.
     if extras ~= nil then
         extras.initialize(self)
     end
