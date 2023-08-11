@@ -453,3 +453,68 @@ for case_name, case in pairs({
         end
     end
 end
+
+-- Verify that it is possible to extend config's functionality
+-- using a non-public API.
+--
+-- The test registers an additional configuration source and
+-- verifies that values from it are taken into account.
+--
+-- It also verifies that the extension can add a post-apply hook.
+g.test_extras_on_community_edition = function(g)
+    -- Tarantool EE has its own internal.config.extras module, so
+    -- the external one will be ignored (if it is not placed into
+    -- the `override` directory).
+    t.tarantool.skip_if_enterprise()
+
+    local extras = string.dump(function()
+        local mysource = setmetatable({
+            name = 'mysource',
+            type = 'instance',
+            _values = {},
+        }, {
+            __index = {
+                sync = function(self, _config, _iconfig)
+                    self._values = {
+                        fiber = {
+                            slice = {
+                                warn = 10,
+                                err = 15,
+                            },
+                        },
+                    }
+                end,
+                get = function(self)
+                    return self._values
+                end,
+            },
+        })
+
+        local function initialize(config)
+            config:_register_source(mysource)
+        end
+
+        local function post_apply(_config)
+            rawset(_G, 'foo', 'extras.post_apply() is called')
+        end
+
+        return {
+            initialize = initialize,
+            post_apply = post_apply,
+        }
+    end)
+
+    local dir = treegen.prepare_directory(g, {}, {})
+    treegen.write_script(dir, 'internal/config/extras.lua', extras)
+
+    local verify = function()
+        local config = require('config')
+        t.assert_equals(config:get('fiber.slice'), {warn = 10, err = 15})
+        t.assert_equals(rawget(_G, 'foo'), 'extras.post_apply() is called')
+    end
+
+    helpers.success_case(g, {
+        dir = dir,
+        verify = verify,
+    })
+end
