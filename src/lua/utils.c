@@ -495,6 +495,31 @@ luaT_setmodule(struct lua_State *L, const char *modname)
 	return 0;
 }
 
+const char *
+luaL_tolstring_strict(struct lua_State *L, int idx, size_t *len_ptr)
+{
+	if (lua_type(L, idx) != LUA_TSTRING)
+		return NULL;
+
+	const char *res = lua_tolstring(L, idx, len_ptr);
+	assert(res != NULL);
+	return res;
+}
+
+bool
+luaL_tointeger_strict(struct lua_State *L, int idx, int *value)
+{
+	if (lua_type(L, idx) != LUA_TNUMBER)
+		return false;
+	double num = lua_tonumber(L, idx);
+	if (num < INT_MIN || num > INT_MAX)
+		return false;
+	*value = num;
+	if (*value != num)
+		return false;
+	return true;
+}
+
 /*
  * Maximum integer that doesn't lose precision on tostring() conversion.
  * Lua uses sprintf("%.14g") to format its numbers, see gh-1279.

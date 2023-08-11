@@ -115,10 +115,66 @@ test_dostring(lua_State *L)
 	check_plan();
 }
 
+static void
+test_tolstring_strict(lua_State *L)
+{
+	plan(3);
+	header();
+
+	size_t len;
+	const char *s;
+
+	lua_pushstring(L, "foo");
+	s = luaL_tolstring_strict(L, -1, &len);
+	is(len, 3, "string length");
+	is(strcmp(s, "foo"), 0, "string data");
+	lua_pop(L, 1);
+
+	lua_pushnumber(L, 42);
+	is(luaL_tolstring_strict(L, -1, &len), NULL, "number")
+	lua_pop(L, 1);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_tointeger_strict(lua_State *L)
+{
+	plan(6);
+	header();
+
+	int val;
+
+	lua_pushnumber(L, 42);
+	ok(luaL_tointeger_strict(L, -1, &val), "integer status");
+	is(val, 42, "integer value");
+	lua_pop(L, 1);
+
+	lua_pushnumber(L, 42.5);
+	ok(!luaL_tointeger_strict(L, -1, &val), "floating point number");
+	lua_pop(L, 1);
+
+	lua_pushnumber(L, 1e42);
+	ok(!luaL_tointeger_strict(L, -1, &val), "big positive number");
+	lua_pop(L, 1);
+
+	lua_pushnumber(L, -1e42);
+	ok(!luaL_tointeger_strict(L, -1, &val), "big negative number");
+	lua_pop(L, 1);
+
+	lua_pushstring(L, "42");
+	ok(!luaL_tointeger_strict(L, -1, &val), "string convertible to number");
+	lua_pop(L, 1);
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(3);
+	plan(5);
 	header();
 
 	struct lua_State *L = luaL_newstate();
@@ -130,6 +186,8 @@ main(void)
 	test_toerror(L);
 	test_call(L);
 	test_dostring(L);
+	test_tolstring_strict(L);
+	test_tointeger_strict(L);
 
 	fiber_free();
 	memory_free();

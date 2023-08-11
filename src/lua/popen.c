@@ -283,47 +283,6 @@ static const struct {
 /* {{{ General-purpose Lua helpers */
 
 /**
- * Extract a string from the Lua stack.
- *
- * Return (const char *) for a string, otherwise return NULL.
- *
- * Unlike luaL_tolstring() it accepts only a string and does not
- * accept a number.
- */
-static const char *
-luaL_tolstring_strict(struct lua_State *L, int idx, size_t *len_ptr)
-{
-	if (lua_type(L, idx) != LUA_TSTRING)
-		return NULL;
-
-	const char *res = lua_tolstring(L, idx, len_ptr);
-	assert(res != NULL);
-	return res;
-}
-
-/**
- * Extract an integer number from the Lua stack.
- *
- * Return true for an integer number and store its value in @a value.
- *
- * Unlike lua_tointeger() it accepts only an integer number and
- * does not accept a string.
- */
-static bool
-luaL_tointeger_strict(struct lua_State *L, int idx, int *value)
-{
-	if (lua_type(L, idx) != LUA_TNUMBER)
-		return false;
-	double num = lua_tonumber(L, idx);
-	if (num < INT_MIN || num > INT_MAX)
-		return false;
-	*value = num;
-	if (*value != num)
-		return false;
-	return true;
-}
-
-/**
  * Extract a timeout value from the Lua stack.
  *
  * Return -1.0 when error occurs.

@@ -344,6 +344,28 @@ luaT_newmodule(struct lua_State *L, const char *modname,
 int
 luaT_setmodule(struct lua_State *L, const char *modname);
 
+/**
+ * Extract a string from the Lua stack.
+ *
+ * Return (const char *) for a string, otherwise return NULL.
+ *
+ * Unlike luaL_tolstring() it accepts only a string and does not
+ * accept a number.
+ */
+const char *
+luaL_tolstring_strict(struct lua_State *L, int idx, size_t *len_ptr);
+
+/**
+ * Extract an integer number from the Lua stack.
+ *
+ * Return true for an integer number and store its value in @a value.
+ *
+ * Unlike lua_tointeger() it accepts only an integer number and
+ * does not accept a string.
+ */
+bool
+luaL_tointeger_strict(struct lua_State *L, int idx, int *value);
+
 /** \cond public */
 
 /**
