@@ -5283,6 +5283,16 @@ box_is_configured(void)
 	return is_box_configured;
 }
 
+int
+box_check_configured(void)
+{
+	if (!is_box_configured) {
+		diag_set(ClientError, ER_UNCONFIGURED);
+		return -1;
+	}
+	return 0;
+}
+
 static void
 box_cfg_xc(void)
 {

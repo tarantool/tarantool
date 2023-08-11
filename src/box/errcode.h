@@ -326,6 +326,7 @@ struct errcode_record {
 	/*271 */_(ER_SCHEMA_NEEDS_UPGRADE,	"Your schema version is %u.%u.%u while Tarantool %s requires a more recent schema version. Please, consider using box.schema.upgrade().") \
 	/*272 */_(ER_SCHEMA_UPGRADE_IN_PROGRESS, "Schema upgrade is already in progress") \
 	/*273 */_(ER_DEPRECATED,		"%s is deprecated") \
+	/*274 */_(ER_UNCONFIGURED,		"Please call box.cfg{} first") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
