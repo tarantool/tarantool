@@ -102,15 +102,17 @@ local function prepare_case(g, opts)
         treegen.write_script(dir, 'main.lua', script)
     end
 
+    local config = simple_config
     if options ~= nil then
-        local config = table.deepcopy(simple_config)
+        config = table.deepcopy(simple_config)
         for path, value in pairs(options) do
             cluster_config:set(config, path, value)
         end
-        treegen.write_script(dir, 'config.yaml', yaml.encode(config))
     end
 
+    treegen.write_script(dir, 'config.yaml', yaml.encode(config))
     local config_file = fio.pathjoin(dir, 'config.yaml')
+
     local server = {
         config_file = config_file,
         chdir = dir,
@@ -198,6 +200,7 @@ end
 --   Verify test invariants after config:reload().
 local function reload_success_case(g, opts)
     local script_2 = assert(opts.script_2)
+    local options = assert(opts.options)
     local verify_2 = assert(opts.verify_2)
 
     local prepared = success_case(g, opts)
@@ -205,6 +208,7 @@ local function reload_success_case(g, opts)
     prepare_case(g, {
         dir = prepared.dir,
         script = script_2,
+        options = options,
     })
     g.server:exec(function()
         local config = require('config')
@@ -232,6 +236,7 @@ end
 --   An error that config:reload() must raise.
 local function reload_failure_case(g, opts)
     local script_2 = assert(opts.script_2)
+    local options = assert(opts.options)
     local exp_err = assert(opts.exp_err)
 
     local prepared = success_case(g, opts)
@@ -239,6 +244,7 @@ local function reload_failure_case(g, opts)
     prepare_case(g, {
         dir = prepared.dir,
         script = script_2,
+        options = options,
     })
     t.assert_error_msg_equals(exp_err, g.server.exec, g.server, function()
         local config = require('config')
