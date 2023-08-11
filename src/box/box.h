@@ -128,6 +128,12 @@ box_cfg(void);
 bool
 box_is_configured(void);
 
+/**
+ * Return 0 if box has been configured, otherwise set diag and return -1.
+ */
+int
+box_check_configured(void);
+
 /** Check if the slice of main cord has expired. */
 int
 box_check_slice_slow(void);

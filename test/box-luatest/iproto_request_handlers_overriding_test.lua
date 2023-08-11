@@ -123,6 +123,14 @@ g.after_all(function(cg)
     cg.server:drop()
 end)
 
+-- Checks that `box.iproto.override` raises an error if called on
+-- an unconfigured instance (gh-8975).
+g.test_box_iproto_override_without_cfg = function()
+    t.assert_error_msg_equals('Please call box.cfg{} first',
+                              box.iproto.override, box.iproto.type.UNKNOWN,
+                              function() end)
+end
+
 -- Checks that `box.iproto.override` errors are handled correctly.
 g.test_box_iproto_override_errors = function(cg)
     cg.server:exec(function()
