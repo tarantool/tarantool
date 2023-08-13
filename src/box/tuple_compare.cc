@@ -829,60 +829,82 @@ tuple_compare_with_key_slowpath(struct tuple *tuple, hint_t tuple_hint,
 	return 0;
 }
 
+/**
+ * Compare key parts and skip compared equally. After function call, keys
+ * will point to the first field that differ or to the end of key or
+ * part_count + 1 field in order.
+ * Key arguments must not be NULL, allowed to be NULL if dereferenced.
+ */
 template<bool is_nullable>
 static inline int
-key_compare_parts(const char *key_a, const char *key_b, uint32_t part_count,
-		  struct key_def *key_def)
+key_compare_and_skip_parts(const char **key_a, const char **key_b,
+			   uint32_t part_count, struct key_def *key_def)
 {
 	assert(is_nullable == key_def->is_nullable);
-	assert((key_a != NULL && key_b != NULL) || part_count == 0);
+	assert(key_a != NULL && key_b != NULL);
+	assert((*key_a != NULL && *key_b != NULL) || part_count == 0);
 	struct key_part *part = key_def->parts;
+	int rc;
 	if (likely(part_count == 1)) {
+		enum mp_type a_type = mp_typeof(**key_a);
+		enum mp_type b_type = mp_typeof(**key_b);
 		if (! is_nullable) {
-			return tuple_compare_field(key_a, key_b, part->type,
-						   part->coll);
-		}
-		enum mp_type a_type = mp_typeof(*key_a);
-		enum mp_type b_type = mp_typeof(*key_b);
-		if (a_type == MP_NIL) {
-			return b_type == MP_NIL ? 0 : -1;
+			rc = tuple_compare_field(*key_a, *key_b, part->type,
+						 part->coll);
+		} else if (a_type == MP_NIL) {
+			rc = b_type == MP_NIL ? 0 : -1;
 		} else if (b_type == MP_NIL) {
-			return 1;
+			rc = 1;
 		} else {
-			return tuple_compare_field_with_type(key_a, a_type,
-							     key_b, b_type,
-							     part->type,
-							     part->coll);
+			rc = tuple_compare_field_with_type(*key_a, a_type,
+							   *key_b, b_type,
+							   part->type,
+							   part->coll);
 		}
+		/* If key parts are equals, we must skip them. */
+		if (rc == 0) {
+			mp_next(key_a);
+			mp_next(key_b);
+		}
+		return rc;
 	}
 
 	struct key_part *end = part + part_count;
-	int rc;
-	for (; part < end; ++part, mp_next(&key_a), mp_next(&key_b)) {
+	for (; part < end; ++part, mp_next(key_a), mp_next(key_b)) {
 		if (! is_nullable) {
-			rc = tuple_compare_field(key_a, key_b, part->type,
+			rc = tuple_compare_field(*key_a, *key_b, part->type,
 						 part->coll);
 			if (rc != 0)
 				return rc;
 			else
 				continue;
 		}
-		enum mp_type a_type = mp_typeof(*key_a);
-		enum mp_type b_type = mp_typeof(*key_b);
+		enum mp_type a_type = mp_typeof(**key_a);
+		enum mp_type b_type = mp_typeof(**key_b);
 		if (a_type == MP_NIL) {
 			if (b_type != MP_NIL)
 				return -1;
 		} else if (b_type == MP_NIL) {
 			return 1;
 		} else {
-			rc = tuple_compare_field_with_type(key_a, a_type, key_b,
-							   b_type, part->type,
+			rc = tuple_compare_field_with_type(*key_a, a_type,
+							   *key_b, b_type,
+							   part->type,
 							   part->coll);
 			if (rc != 0)
 				return rc;
 		}
 	}
 	return 0;
+}
+
+template<bool is_nullable>
+static inline int
+key_compare_parts(const char *key_a, const char *key_b, uint32_t part_count,
+		  struct key_def *key_def)
+{
+	return key_compare_and_skip_parts<is_nullable>(&key_a, &key_b,
+						       part_count, key_def);
 }
 
 template<bool is_nullable, bool has_optional_parts>
