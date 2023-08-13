@@ -1215,7 +1215,9 @@ popen_new(struct popen_opts *opts)
 	int *skip_fds = xregion_alloc_array(region, typeof(skip_fds[0]),
 					    nr_skip_fds_max);
 	size_t nr_skip_fds = opts->nr_inherit_fds;
-	memcpy(skip_fds, opts->inherit_fds, nr_skip_fds * sizeof(*skip_fds));
+	if (nr_skip_fds > 0)
+		memcpy(skip_fds, opts->inherit_fds,
+		       nr_skip_fds * sizeof(*skip_fds));
 
 	if (log_fd >= 0)
 		skip_fds[nr_skip_fds++] = log_fd;
