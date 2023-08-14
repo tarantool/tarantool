@@ -10,6 +10,10 @@ if (NOT ${benchmark_FOUND})
                       COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --red ${MSG}
                       COMMENT ${MSG}
     )
+    add_custom_target(test-perf
+                      DEPENDS test-c-perf test-lua-perf
+                      COMMENT "Running performance tests"
+    )
     return()
 endif()
 
@@ -76,4 +80,9 @@ create_perf_test_target(TARGET small)
 add_custom_target(test-c-perf
                   DEPENDS ${RUN_PERF_C_TESTS_LIST}
                   COMMENT "Running C performance tests"
+)
+
+add_custom_target(test-perf
+                  DEPENDS test-c-perf test-lua-perf
+                  COMMENT "Running performance tests"
 )
