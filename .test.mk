@@ -56,6 +56,11 @@ install-test-deps:
 run-test: install-test-deps
 	cd test && ${TEST_RUN_ENV} ./test-run.py --force --vardir ${VARDIR} ${TEST_RUN_PARAMS} ${TEST_RUN_EXTRA_PARAMS}
 
+.PHONY: run-perf-test
+run-perf-test:
+	cmake --build ${BUILD_DIR} --parallel
+	cmake --build ${BUILD_DIR} --target test-perf
+
 ##############################
 # Linux                      #
 ##############################
@@ -68,6 +73,13 @@ test-release: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
                              -DTEST_BUILD=ON
 
 test-release: build run-luajit-test run-test
+
+.PHONY: test-perf
+test-perf: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                          -DENABLE_WERROR=ON \
+                          -DTEST_BUILD=ON
+
+test-perf: build run-perf-test
 
 # Release ASAN build
 

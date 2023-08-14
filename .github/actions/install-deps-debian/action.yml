@@ -16,6 +16,7 @@ runs:
           lcov \
           ruby-dev \
           liblz4-dev \
+          libbenchmark-dev \
           autoconf \
           automake \
           libtool
