@@ -59,6 +59,7 @@
 #include "lua/fiber_cond.h"
 #include "lua/msgpack.h"
 #include "lua/uri.h"
+#include "lua/utils.h"
 #include "msgpuck.h"
 #include "small/ibuf.h"
 #include "small/region.h"
@@ -151,8 +152,10 @@ static const char *netbox_state_str[] = {
 };
 
 struct netbox_options {
-	/** Remote server URI. */
+	/** Remote server URI. Nil if this connection was created from fd. */
 	struct uri uri;
+	/** Connection fd. -1 if this connection was created from URI. */
+	int fd;
 	/** Authentication method. NULL if unspecified. */
 	const struct auth_method *auth_method;
 	/** User credentials. */
@@ -487,6 +490,7 @@ netbox_options_create(struct netbox_options *opts)
 {
 	memset(opts, 0, sizeof(*opts));
 	uri_create(&opts->uri, NULL);
+	opts->fd = -1;
 	opts->auth_method = NULL;
 	opts->callback_ref = LUA_NOREF;
 	opts->connect_timeout = NETBOX_DEFAULT_CONNECT_TIMEOUT;
@@ -1043,16 +1047,23 @@ netbox_transport_connect(struct netbox_transport *transport)
 	assert(!iostream_is_initialized(io));
 	ev_tstamp start, delay;
 	coio_timeout_init(&start, &delay, transport->opts.connect_timeout);
-	int fd = coio_connect_timeout(transport->opts.uri.host,
-				      transport->opts.uri.service,
-				      transport->opts.uri.host_hint,
-				      /*addr=*/NULL, /*addr_len=*/NULL, delay);
-	coio_timeout_update(&start, &delay);
-	if (fd < 0)
-		goto io_error;
-	if (iostream_create(io, fd, &transport->io_ctx) != 0) {
-		close(fd);
-		goto error;
+	int fd = transport->opts.fd;
+	if (fd >= 0) {
+		plain_iostream_create(io, fd);
+	} else {
+		assert(!uri_is_nil(&transport->opts.uri));
+		fd = coio_connect_timeout(transport->opts.uri.host,
+					  transport->opts.uri.service,
+					  transport->opts.uri.host_hint,
+					  /*addr=*/NULL, /*addr_len=*/NULL,
+					  delay);
+		coio_timeout_update(&start, &delay);
+		if (fd < 0)
+			goto io_error;
+		if (iostream_create(io, fd, &transport->io_ctx) != 0) {
+			close(fd);
+			goto error;
+		}
 	}
 	char greetingbuf[IPROTO_GREETING_SIZE];
 	if (coio_readn_timeout(io, greetingbuf, IPROTO_GREETING_SIZE,
@@ -2205,7 +2216,7 @@ luaT_netbox_request_pairs(struct lua_State *L)
 
 /**
  * Creates a netbox transport object (userdata) and pushes it to Lua stack.
- * Takes the following arguments: uri (string, number, or table),
+ * Takes the following arguments: uri (string or table) or fd (number),
  * user (string or nil), password (string or nil), callback (function),
  * connect_timeout (number or nil), reconnect_after (number or nil),
  * fetch_schema (boolean or nil), auth_type (string or nil).
@@ -2222,8 +2233,20 @@ luaT_netbox_new_transport(struct lua_State *L)
 	lua_setmetatable(L, -2);
 	/* Initialize options from Lua arguments. */
 	struct netbox_options *opts = &transport->opts;
-	if (luaT_uri_create(L, 1, &opts->uri) != 0)
-		return luaT_error(L);
+	if (lua_type(L, 1) == LUA_TNUMBER) {
+		if (!luaL_tointeger_strict(L, 1, &opts->fd) || opts->fd < 0) {
+			diag_set(IllegalParams,
+				 "Invalid fd: expected nonnegative integer");
+			return luaT_error(L);
+		}
+	} else {
+		if (luaT_uri_create(L, 1, &opts->uri) != 0)
+			return luaT_error(L);
+		if (iostream_ctx_create(&transport->io_ctx, IOSTREAM_CLIENT,
+					&opts->uri) != 0) {
+			return luaT_error(L);
+		}
+	}
 	if (!lua_isnil(L, 2))
 		opts->user = xstrdup(luaL_checkstring(L, 2));
 	if (!lua_isnil(L, 3))
@@ -2250,10 +2273,6 @@ luaT_netbox_new_transport(struct lua_State *L)
 	if (opts->user == NULL && opts->password != NULL) {
 		diag_set(ClientError, ER_PROC_LUA,
 			 "net.box: user is not defined");
-		return luaT_error(L);
-	}
-	if (iostream_ctx_create(&transport->io_ctx, IOSTREAM_CLIENT,
-				&opts->uri) != 0) {
 		return luaT_error(L);
 	}
 	return 1;
@@ -2927,7 +2946,8 @@ netbox_worker_f(va_list ap)
 	 */
 	assert(fiber()->storage.lua.stack == NULL);
 	fiber()->storage.lua.stack = L;
-	const double reconnect_after = transport->opts.reconnect_after;
+	const double reconnect_after = !uri_is_nil(&transport->opts.uri) ?
+				       transport->opts.reconnect_after : 0;
 	while (!fiber_is_cancelled()) {
 		if (netbox_transport_connect(transport) == 0) {
 			int rc = luaT_cpcall(L, netbox_connection_handler_f,
@@ -2973,9 +2993,15 @@ luaT_netbox_transport_start(struct lua_State *L)
 	struct lua_State *fiber_L = lua_newthread(L);
 	transport->coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	transport->self_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	const char *name = tt_sprintf("%s:%s (net.box)",
-				      transport->opts.uri.host ?: "",
-				      transport->opts.uri.service ?: "");
+	const char *name;
+	if (!uri_is_nil(&transport->opts.uri)) {
+		name = tt_sprintf("%s:%s (net.box)",
+				  transport->opts.uri.host ?: "",
+				  transport->opts.uri.service ?: "");
+	} else {
+		assert(transport->opts.fd >= 0);
+		name = tt_sprintf("fd=%d (net.box)", transport->opts.fd);
+	}
 	transport->worker = fiber_new_system(name, netbox_worker_f);
 	if (transport->worker == NULL) {
 		luaL_unref(L, LUA_REGISTRYINDEX, transport->coro_ref);
