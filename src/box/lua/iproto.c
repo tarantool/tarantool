@@ -11,8 +11,10 @@
 #include "box/iproto.h"
 #include "box/iproto_constants.h"
 #include "box/iproto_features.h"
+#include "box/user.h"
 
 #include "core/assoc.h"
+#include "core/iostream.h"
 #include "core/fiber.h"
 #include "core/tt_static.h"
 
@@ -179,6 +181,45 @@ push_iproto_protocol_features(struct lua_State *L)
 }
 
 /**
+ * Internal Lua wrapper around iproto_session_new.
+ *
+ * Takes fd number (mandatory) and user name (optional, default is guest).
+ * Returns the new session id on success. On error, raises an exception.
+ */
+static int
+lbox_iproto_session_new(struct lua_State *L)
+{
+	if (lua_isnoneornil(L, 1)) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "options parameter 'fd' is mandatory");
+		return luaT_error(L);
+	}
+	int fd;
+	if (!luaL_tointeger_strict(L, 1, &fd) || fd < 0) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "options parameter 'fd' must be nonnegative integer");
+		return luaT_error(L);
+	}
+	if (!box_is_configured()) {
+		diag_set(ClientError, ER_UNCONFIGURED);
+		return luaT_error(L);
+	}
+	struct user *user = NULL;
+	if (!lua_isnil(L, 2)) {
+		size_t name_len;
+		const char *name = luaL_checklstring(L, 2, &name_len);
+		user = user_find_by_name(name, name_len);
+		if (user == NULL)
+			return luaT_error(L);
+	}
+	struct iostream io;
+	plain_iostream_create(&io, fd);
+	uint64_t sid = iproto_session_new(&io, user);
+	luaL_pushuint64(L, sid);
+	return 1;
+}
+
+/**
  * Encodes a packet header/body argument to MsgPack: if the argument is a
  * string, then no encoding is needed — otherwise the argument must be a Lua
  * table. The Lua table is encoded to MsgPack using IPROTO key translation
@@ -340,22 +381,23 @@ void
 box_lua_iproto_init(struct lua_State *L)
 {
 	iproto_key_translation = mh_strnu32_new();
-
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-	lua_newtable(L);
-
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.iproto", 0);
 	push_iproto_constants(L);
 	push_iproto_protocol_features(L);
-
-	const struct luaL_Reg iproto_methods[] = {
+	static const struct luaL_Reg funcs[] = {
 		{"send", lbox_iproto_send},
 		{"override", lbox_iproto_override},
 		{NULL, NULL}
 	};
-	luaL_register(L, NULL, iproto_methods);
-
-	lua_setfield(L, -2, "iproto");
-	lua_pop(L, 1);
+	luaL_setfuncs(L, funcs, 0);
+	luaL_findtable(L, -1, "internal", 0);
+	static const struct luaL_Reg internal_funcs[] = {
+		{"session_new", lbox_iproto_session_new},
+		{NULL, NULL}
+	};
+	luaL_setfuncs(L, internal_funcs, 0);
+	lua_pop(L, 1); /* box.iproto.internal */
+	lua_pop(L, 1); /* box.iproto */
 }
 
 /**

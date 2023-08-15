@@ -32,11 +32,14 @@
  */
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "box/box.h"
 
 struct uri_set;
 struct session;
+struct user;
+struct iostream;
 
 #if defined(__cplusplus)
 extern "C" {
@@ -140,6 +143,28 @@ iproto_listen(const struct uri_set *uri_set);
 
 int
 iproto_set_msg_max(int iproto_msg_max);
+
+/**
+ * Creates a new IPROTO session over the given IO stream and returns the new
+ * session id. Never fails. Doesn't yield.
+ *
+ * The IO stream must refer to a non-blocking socket but this isn't enforced by
+ * this function. If it isn't so, the new connection may not work as expected.
+ *
+ * If the user argument isn't NULL, the new session will be authenticated as
+ * the specified user. Otherwise, it will be authenticated as guest.
+ *
+ * The function takes ownership of the passed IO stream by moving it to the
+ * new IPROTO connection (see iostream_move).
+ *
+ * Essentially, this function passes the IO stream to the callback invoked
+ * by an IPROTO thread upon accepting a new connection on a listening socket.
+ * The callback creates a new IPROTO connection, attaches it to the given
+ * session, then sends the greeting message and starts processing requests as
+ * usual. All of this is done asynchronously by an IPROTO thread.
+ */
+uint64_t
+iproto_session_new(struct iostream *io, struct user *user);
 
 /**
  * Sends a packet with the given header and body over the IPROTO session's

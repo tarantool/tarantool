@@ -358,6 +358,12 @@ struct iproto_msg
 			};
 			/** Peer address size. */
 			socklen_t addrlen;
+			/**
+			 * Session to use for the new connection.
+			 * Optional. If omitted, a new session object
+			 * will be created in the TX thread.
+			 */
+			struct session *session;
 		} connect;
 		/** Box request, if this is a DML */
 		struct request dml;
@@ -2760,7 +2766,12 @@ tx_process_connect(struct cmsg *m)
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
 	struct obuf *out = msg->connection->tx.p_obuf;
-	con->session = session_new(SESSION_TYPE_BINARY);
+	if (msg->connect.session != NULL) {
+		con->session = msg->connect.session;
+		session_set_type(con->session, SESSION_TYPE_BINARY);
+	} else {
+		con->session = session_new(SESSION_TYPE_BINARY);
+	}
 	con->session->meta.connection = con;
 	session_set_peer_addr(con->session, &msg->connect.addr,
 			      msg->connect.addrlen);
@@ -2824,23 +2835,38 @@ net_send_greeting(struct cmsg *m)
 
 /**
  * Create a connection and start input.
+ *
+ * If session is NULL, a new session object will be created for the connection
+ * in the TX thread.
+ *
+ * The function takes ownership of the passed IO stream and session.
  */
 static void
-iproto_on_accept(struct evio_service *service, struct iostream *io,
-		 struct sockaddr *addr, socklen_t addrlen)
+iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
+		     struct sockaddr *addr, socklen_t addrlen,
+		     struct session *session)
 {
-	struct iproto_thread *iproto_thread =
-		(struct iproto_thread *)service->on_accept_param;
 	struct iproto_connection *con = iproto_connection_new(iproto_thread);
 	struct iproto_msg *msg = iproto_msg_new(con);
 	assert(addrlen <= sizeof(msg->connect.addrstorage));
 	memcpy(&msg->connect.addrstorage, addr, addrlen);
 	msg->connect.addrlen = addrlen;
+	msg->connect.session = session;
 	iostream_move(&con->io, io);
 	cmsg_init(&msg->base, iproto_thread->connect_route);
 	msg->p_ibuf = con->p_ibuf;
 	msg->wpos = con->wpos;
 	cpipe_push(&iproto_thread->tx_pipe, &msg->base);
+}
+
+static void
+iproto_on_accept_cb(struct evio_service *service, struct iostream *io,
+		    struct sockaddr *addr, socklen_t addrlen)
+{
+	struct iproto_thread *iproto_thread =
+		(struct iproto_thread *)service->on_accept_param;
+	iproto_thread_accept(iproto_thread, io, addr, addrlen,
+			     /*session=*/NULL);
 }
 
 /**
@@ -2861,7 +2887,7 @@ net_cord_f(va_list  ap)
 		       sizeof(struct iproto_stream));
 
 	evio_service_create(loop(), &iproto_thread->binary, "binary",
-			    iproto_on_accept, iproto_thread);
+			    iproto_on_accept_cb, iproto_thread);
 
 	char endpoint_name[ENDPOINT_NAME_MAX];
 	snprintf(endpoint_name, ENDPOINT_NAME_MAX, "net%u",
@@ -3199,6 +3225,10 @@ enum iproto_cfg_op {
 	 * reset.
 	 */
 	IPROTO_CFG_OVERRIDE,
+	/**
+	 * Command code to create a new IPROTO session.
+	 */
+	IPROTO_CFG_SESSION_NEW,
 };
 
 /**
@@ -3216,6 +3246,12 @@ struct iproto_cfg_msg: public cbus_call_msg
 		struct iproto_stats *stats;
 		/** New iproto max message count. */
 		int iproto_msg_max;
+		struct {
+			/** New connection IO stream. */
+			struct iostream io;
+			/** New connection session. */
+			struct session *session;
+		} session_new;
 		struct {
 			/** Overridden request type. */
 			uint32_t req_type;
@@ -3296,13 +3332,29 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			mh_i32_del(req_handlers, k, NULL);
 		}
 		break;
+	case IPROTO_CFG_SESSION_NEW: {
+		struct iostream *io = &cfg_msg->session_new.io;
+		struct session *session = cfg_msg->session_new.session;
+		struct sockaddr_storage addrstorage;
+		struct sockaddr *addr = (struct sockaddr *)&addrstorage;
+		socklen_t addrlen = sizeof(addrstorage);
+		if (sio_getpeername(io->fd, addr, &addrlen) != 0)
+			addrlen = 0;
+		iproto_thread_accept(iproto_thread, io, addr, addrlen, session);
+		break;
+	}
 	default:
 		unreachable();
 	}
 	return 0;
 }
 
-static inline void
+/**
+ * Sends a configuration message to an IPROTO thread and waits for completion.
+ *
+ * The message may be allocated on stack.
+ */
+static void
 iproto_do_cfg(struct iproto_thread *iproto_thread, struct iproto_cfg_msg *msg)
 {
 	msg->iproto_thread = iproto_thread;
@@ -3310,6 +3362,28 @@ iproto_do_cfg(struct iproto_thread *iproto_thread, struct iproto_cfg_msg *msg)
 			   msg, iproto_do_cfg_f);
 	assert(rc == 0);
 	(void)rc;
+}
+
+static int
+iproto_do_cfg_async_free_f(struct cbus_call_msg *m)
+{
+	free(m);
+	return 0;
+}
+
+/**
+ * Sends a configuration message to an IPROTO thread without waiting for
+ * completion.
+ *
+ * The message must be allocated with malloc.
+ */
+static void
+iproto_do_cfg_async(struct iproto_thread *iproto_thread,
+		    struct iproto_cfg_msg *msg)
+{
+	msg->iproto_thread = iproto_thread;
+	cbus_call_async(&iproto_thread->net_pipe, &iproto_thread->tx_pipe,
+			msg, iproto_do_cfg_f, iproto_do_cfg_async_free_f);
 }
 
 /** Send IPROTO_CFG_STOP to all threads. */
@@ -3449,6 +3523,24 @@ iproto_set_msg_max(int new_iproto_msg_max)
 				    new_iproto_msg_max / 2);
 	}
 	return 0;
+}
+
+uint64_t
+iproto_session_new(struct iostream *io, struct user *user)
+{
+	assert(iostream_is_initialized(io));
+	struct session *session = session_new(SESSION_TYPE_BACKGROUND);
+	if (user != NULL)
+		credentials_reset(&session->credentials, user);
+	struct iproto_cfg_msg *cfg_msg =
+		(struct iproto_cfg_msg *)xmalloc(sizeof(*cfg_msg));
+	iproto_cfg_msg_create(cfg_msg, IPROTO_CFG_SESSION_NEW);
+	iostream_move(&cfg_msg->session_new.io, io);
+	cfg_msg->session_new.session = session;
+	static int thread = 0;
+	thread = (thread + 1) % iproto_threads_count;
+	iproto_do_cfg_async(&iproto_threads[thread], cfg_msg);
+	return session->id;
 }
 
 /**
