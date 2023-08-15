@@ -17,6 +17,7 @@ local check_select_opts   = box.internal.check_select_opts
 local check_index_arg     = box.internal.check_index_arg
 local check_space_arg     = box.internal.check_space_arg
 local check_primary_index = box.internal.check_primary_index
+local check_param         = utils.check_param
 local check_param_table   = utils.check_param_table
 
 local ibuf_t = ffi.typeof('struct ibuf')
@@ -117,7 +118,11 @@ local function parse_connect_params(host_or_uri, ...) -- self? host_or_uri port?
     if port == nil and (type(host_or_uri) == 'string' or
                         type(host_or_uri) == 'number' or
                         type(host_or_uri) == 'table') then
-        uri = host_or_uri
+        if type(host_or_uri) == 'number' then
+            uri = tostring(host_or_uri)
+        else
+            uri = host_or_uri
+        end
     elseif (type(host_or_uri) == 'string' or host_or_uri == nil) and
             (type(port) == 'string' or type(port) == 'number') then
         uri = urilib.format({host = host_or_uri, service = tostring(port)})
@@ -132,6 +137,7 @@ local function remote_serialize(self)
     return {
         host = self.host,
         port = self.port,
+        fd = self.fd,
         opts = next(self.opts) and self.opts,
         state = self.state,
         error = self.error,
@@ -237,22 +243,34 @@ end
 
 local space_metatable, index_metatable
 
-local function new_sm(uri, opts)
-    local parsed_uri, err = urilib.parse(uri)
-    if not parsed_uri then
-        error(err)
+local function new_sm(uri_or_fd, opts)
+    local host, port, fd
+    if type(uri_or_fd) == 'string' or type(uri_or_fd) == 'table' then
+        local parsed_uri, err = urilib.parse(uri_or_fd)
+        if not parsed_uri then
+            error(err)
+        end
+        if opts.user == nil and opts.password == nil then
+            opts.user, opts.password = parsed_uri.login, parsed_uri.password
+        end
+        if opts.auth_type == nil and parsed_uri.params ~= nil and
+           parsed_uri.params.auth_type ~= nil then
+            opts.auth_type = parsed_uri.params.auth_type[1]
+        end
+        host, port = parsed_uri.host, parsed_uri.service
+    else
+        assert(type(uri_or_fd) == 'number')
+        fd = uri_or_fd
     end
-    if opts.user == nil and opts.password == nil then
-        opts.user, opts.password = parsed_uri.login, parsed_uri.password
-    end
-    if opts.auth_type == nil and parsed_uri.params ~= nil and
-       parsed_uri.params.auth_type ~= nil then
-        opts.auth_type = parsed_uri.params.auth_type[1]
-    end
-    local host, port = parsed_uri.host, parsed_uri.service
     local user, password = opts.user, opts.password; opts.password = nil
     local last_reconnect_error
-    local remote = {host = host, port = port, opts = opts, state = 'initial'}
+    local remote = {
+        host = host,
+        port = port,
+        fd = fd,
+        opts = opts,
+        state = 'initial',
+    }
     local function callback(what, ...)
         if remote._fiber == nil then
             remote._fiber = fiber.self()
@@ -421,7 +439,7 @@ local function new_sm(uri, opts)
     end
     remote._callback = callback
     local transport = internal.new_transport(
-            uri, user, password, weak_callback,
+            uri_or_fd, user, password, weak_callback,
             opts.connect_timeout, opts.reconnect_after,
             opts.fetch_schema, opts.auth_type)
     weak_refs.transport = transport
@@ -458,6 +476,18 @@ local function connect(...)
     local uri, opts = parse_connect_params(...)
     check_param_table(opts, CONNECT_OPTION_TYPES)
     return new_sm(uri, opts)
+end
+
+--
+-- Create a connection from a file descriptor number.
+--
+-- The file descriptor should point to a socket and be switched to
+-- the non-blocking mode.
+--
+local function from_fd(fd, opts)
+    check_param(fd, 'fd', 'number')
+    check_param_table(opts, CONNECT_OPTION_TYPES)
+    return new_sm(fd, opts or {})
 end
 
 local function check_remote_arg(remote, method)
@@ -1233,6 +1263,7 @@ end
 this_module = {
     connect = connect,
     new = connect, -- Tarantool < 1.7.1 compatibility,
+    from_fd = from_fd,
 }
 
 function this_module.timeout(timeout, ...)
