@@ -190,12 +190,8 @@ local reference_table = {
 -- Checks that IPROTO constants and features are exported correctly.
 g.test_iproto_constants_and_features_export = function(cg)
     cg.server:exec(function(reference_table)
-        for k, v in pairs(box.iproto) do
-            local v_type = type(v)
-            if v_type ~= 'function' and v_type ~= 'thread' and
-               v_type ~= 'userdata' then
-                t.assert_equals(v, reference_table[k])
-            end
+        for k, v in pairs(reference_table) do
+            t.assert_equals(box.iproto[k], v)
         end
     end, {reference_table})
 end

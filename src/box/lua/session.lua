@@ -1,5 +1,7 @@
 -- session.lua
 
+local utils = require('internal.utils')
+
 local session = box.session
 
 setmetatable(session, {
@@ -21,3 +23,26 @@ setmetatable(session, {
 
     aggregate_storage = {}
 })
+
+local SESSION_NEW_OPTS = {
+    type = 'string',
+    fd = 'number',
+    user = 'string',
+    storage = 'table'
+}
+
+session.new = function(opts)
+    opts = opts or {}
+    utils.check_param_table(opts, SESSION_NEW_OPTS)
+    if opts.type ~= nil and opts.type ~= 'binary' then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "invalid session type '" .. opts.type .. "', " ..
+                  "the only supported type is 'binary'")
+    end
+    local sid = box.iproto.internal.session_new(opts.fd, opts.user)
+    -- It's okay to set the session storage after creating the session
+    -- because session_new doesn't yield so no one could possibly access
+    -- the uninitialized storage yet.
+    assert(session.exists(sid))
+    getmetatable(session).aggregate_storage[sid] = opts.storage
+end
