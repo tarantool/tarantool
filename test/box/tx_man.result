@@ -3880,6 +3880,7 @@ s:create_index('sk', {parts = {{2, 'unsigned'}}})
  | - unique: true
  |   parts:
  |   - type: unsigned
+ |     exclude_null: false
  |     is_nullable: false
  |     fieldno: 2
  |   hint: true

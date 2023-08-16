@@ -129,9 +129,12 @@ g.test_merge = function(cg)
                                                 {type = 'scalar', field = 2}}})
         local j = s:create_index('j', {parts = {{type = 'unsigned', field = 1},
                                                 {type = 'string', field = 3}}})
-        local exp = {{fieldno = 3, type = 'string', is_nullable = false},
-                     {fieldno = 2, type = 'scalar', is_nullable = false},
-                     {fieldno = 1, type = 'unsigned', is_nullable = false}}
+        local exp = {{fieldno = 3, type = 'string', is_nullable = false,
+                      exclude_null = false},
+                     {fieldno = 2, type = 'scalar', is_nullable = false,
+                      exclude_null = false},
+                     {fieldno = 1, type = 'unsigned', is_nullable = false,
+                      exclude_null = false}}
         t.assert_equals(i.parts:merge(j.parts):totable(), exp)
 
         t.assert_error_msg_content_equals(

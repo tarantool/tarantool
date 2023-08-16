@@ -311,6 +311,7 @@ pk = space:create_index('pk', {parts={{field = 1, type = 'unsigned'}}})
 pk.parts
 ---
 - - type: unsigned
+    exclude_null: false
     is_nullable: false
     fieldno: 1
 ...
@@ -323,6 +324,7 @@ pk = space:create_index('pk', {parts={{1, 'unsigned'}}})
 pk.parts
 ---
 - - type: unsigned
+    exclude_null: false
     is_nullable: false
     fieldno: 1
 ...
@@ -335,6 +337,7 @@ pk = space:create_index('pk', {parts={{1, type='unsigned'}}})
 pk.parts
 ---
 - - type: unsigned
+    exclude_null: false
     is_nullable: false
     fieldno: 1
 ...
@@ -726,6 +729,7 @@ s:format()
 s.index.sk3.parts
 ---
 - - type: string
+    exclude_null: false
     is_nullable: false
     fieldno: 2
 ...
@@ -953,6 +957,7 @@ s:create_index('test', {parts = {{field = 'test'}}})
 s:create_index('test', {parts = {1}}).parts
 ---
 - - type: scalar
+    exclude_null: false
     is_nullable: false
     fieldno: 1
 ...
@@ -980,6 +985,7 @@ s:create_index('test', {parts = {{field = 'test'}}})
 s:create_index('test1', {parts = {'test1'}}).parts
 ---
 - - type: integer
+    exclude_null: false
     is_nullable: false
     fieldno: 1
 ...
@@ -991,45 +997,54 @@ s:create_index('test2', {parts = {'test2'}}).parts
 s:create_index('test3', {parts = {{'test1', 'integer'}}}).parts
 ---
 - - type: integer
+    exclude_null: false
     is_nullable: false
     fieldno: 1
 ...
 s:create_index('test4', {parts = {{'test2', 'integer'}}}).parts
 ---
 - - type: integer
+    exclude_null: false
     is_nullable: false
     fieldno: 2
 ...
 s:create_index('test5', {parts = {{'test2', 'integer'}}}).parts
 ---
 - - type: integer
+    exclude_null: false
     is_nullable: false
     fieldno: 2
 ...
 s:create_index('test6', {parts = {1, 3}}).parts
 ---
 - - type: integer
+    exclude_null: false
     is_nullable: false
     fieldno: 1
   - type: integer
+    exclude_null: false
     is_nullable: false
     fieldno: 3
 ...
 s:create_index('test7', {parts = {'test1', 4}}).parts
 ---
 - - type: integer
+    exclude_null: false
     is_nullable: false
     fieldno: 1
   - type: scalar
+    exclude_null: false
     is_nullable: false
     fieldno: 4
 ...
 s:create_index('test8', {parts = {{1, 'integer'}, {'test4', 'scalar'}}}).parts
 ---
 - - type: integer
+    exclude_null: false
     is_nullable: false
     fieldno: 1
   - type: scalar
+    exclude_null: false
     is_nullable: false
     fieldno: 4
 ...
@@ -1668,6 +1683,7 @@ i = s:create_index('primary', { parts = {'field1'} })
 i.parts
 ---
 - - type: unsigned
+    exclude_null: false
     is_nullable: false
     fieldno: 1
 ...
@@ -1742,6 +1758,7 @@ i = s:create_index('secondary', { parts = {{2, 'string', is_nullable = true}} })
 i.parts
 ---
 - - type: string
+    exclude_null: false
     is_nullable: true
     fieldno: 2
 ...

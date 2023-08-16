@@ -82,36 +82,44 @@ box.execute("CREATE INDEX i4 ON t1 (id, c, b, a, d);")
 box.space.T1.index.I1.parts
 ---
 - - type: number
+    exclude_null: false
     is_nullable: true
     fieldno: 2
 ...
 box.space.T1.index.I2.parts
 ---
 - - type: integer
+    exclude_null: false
     is_nullable: true
     fieldno: 3
 ...
 box.space.T1.index.I3.parts
 ---
 - - type: string
+    exclude_null: false
     is_nullable: true
     fieldno: 4
 ...
 box.space.T1.index.I4.parts
 ---
 - - type: string
+    exclude_null: false
     is_nullable: false
     fieldno: 1
   - type: string
+    exclude_null: false
     is_nullable: true
     fieldno: 4
   - type: integer
+    exclude_null: false
     is_nullable: true
     fieldno: 3
   - type: number
+    exclude_null: false
     is_nullable: true
     fieldno: 2
   - type: scalar
+    exclude_null: false
     is_nullable: true
     fieldno: 5
 ...
