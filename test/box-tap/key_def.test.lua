@@ -30,6 +30,9 @@ local function set_key_part_defaults(parts)
         if res[i].is_nullable == nil then
             res[i].is_nullable = false
         end
+        if res[i].exclude_null == nil then
+            res[i].exclude_null = false
+        end
     end
     return res
 end
@@ -519,14 +522,15 @@ test:test('merge()', function(test)
     local key_def_cb = key_def_c:merge(key_def_b)
     local exp_parts = key_def_c:totable()
     exp_parts[#exp_parts + 1] = {type = 'number', fieldno = 3,
-        is_nullable = false}
+        is_nullable = false, exclude_null = false}
     test:is_deeply(key_def_cb:totable(), exp_parts,
         'case 3: verify with :totable()')
     test:is_deeply(key_def_cb:extract_key(tuple_a):totable(),
         {1, 1, box.NULL, 22}, 'case 3: verify with :extract_key()')
 
     local parts_unsigned = {
-        {type = 'unsigned', fieldno = 1, is_nullable = false},
+        {type = 'unsigned', fieldno = 1, is_nullable = false,
+         exclude_null = false},
     }
     local key_def_unsigned = key_def_lib.new(parts_unsigned)
     local key_def_string = key_def_lib.new({
@@ -549,9 +553,12 @@ test:test('merge()', function(test)
 
     local key_def_array_map = key_def_array:merge(key_def_map)
     local exp_parts = {
-        {type = 'array', fieldno = 1, is_nullable = false},
-        {type = 'unsigned', fieldno = 2, is_nullable = false},
-        {type = 'map', fieldno = 3, is_nullable = true},
+        {type = 'array', fieldno = 1, is_nullable = false,
+         exclude_null = false},
+        {type = 'unsigned', fieldno = 2, is_nullable = false,
+         exclude_null = false},
+        {type = 'map', fieldno = 3, is_nullable = true,
+         exclude_null = false},
     }
     test:is_deeply(key_def_array_map:totable(), exp_parts,
         'composite case')

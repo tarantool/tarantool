@@ -40,6 +40,7 @@ s1:create_index('pk')
  | - unique: true
  |   parts:
  |   - type: unsigned
+ |     exclude_null: false
  |     is_nullable: false
  |     fieldno: 1
  |   hint: true

@@ -1721,6 +1721,7 @@ rtreespace:create_index('pk', {if_not_exists = true})
 - unique: true
   parts:
   - type: unsigned
+    exclude_null: false
     is_nullable: false
     fieldno: 1
   hint: true
@@ -1733,6 +1734,7 @@ rtreespace:create_index('target', {type='rtree', dimension = 3, parts={2, 'array
 ---
 - parts:
   - type: array
+    exclude_null: false
     is_nullable: false
     fieldno: 2
   dimension: 3

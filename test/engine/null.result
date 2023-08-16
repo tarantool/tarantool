@@ -1959,6 +1959,7 @@ sk2 = s:create_index('sk2', {parts={{2, 'number', is_nullable=true, exclude_null
 sk2.parts
 ---
 - - type: number
+    exclude_null: false
     is_nullable: true
     fieldno: 2
 ...
@@ -2124,6 +2125,7 @@ sk1:alter({parts={{2, 'number', is_nullable=true, exclude_null=false}}})
 sk1.parts
 ---
 - - type: number
+    exclude_null: false
     is_nullable: true
     fieldno: 2
 ...
@@ -2455,6 +2457,7 @@ sk = s:create_index('sk', {parts = {2, is_nullable=true}})
 sk.parts
 ---
 - - type: scalar
+    exclude_null: false
     is_nullable: true
     fieldno: 2
 ...
@@ -2466,10 +2469,11 @@ sk = s:create_index('sk', {parts = {2, is_nullable=true, collation='unicode'}})
 ...
 sk.parts
 ---
-- - type: scalar
-    is_nullable: true
+- - fieldno: 2
+    type: scalar
+    exclude_null: false
     collation: unicode
-    fieldno: 2
+    is_nullable: true
 ...
 sk:drop()
 ---
@@ -2479,10 +2483,11 @@ sk = s:create_index('sk', {parts = {2, type='string', is_nullable=true, collatio
 ...
 sk.parts
 ---
-- - type: string
-    is_nullable: true
+- - fieldno: 2
+    type: string
+    exclude_null: false
     collation: unicode
-    fieldno: 2
+    is_nullable: true
 ...
 sk:drop()
 ---
@@ -2493,10 +2498,11 @@ sk = s:create_index('sk', {parts = {2, is_nullable=true, 3}})
 ...
 sk.parts
 ---
-- - type: string
-    is_nullable: true
+- - fieldno: 2
+    type: string
+    exclude_null: false
     collation: unicode
-    fieldno: 2
+    is_nullable: true
 ...
 sk:drop()
 ---
@@ -2507,9 +2513,11 @@ sk = s:create_index('sk', {parts = {2, 3}})
 sk.parts
 ---
 - - type: scalar
+    exclude_null: false
     is_nullable: false
     fieldno: 2
   - type: scalar
+    exclude_null: false
     is_nullable: false
     fieldno: 3
 ...
@@ -2522,12 +2530,15 @@ sk = s:create_index('sk', {parts = {2, 3, 4}})
 sk.parts
 ---
 - - type: scalar
+    exclude_null: false
     is_nullable: false
     fieldno: 2
   - type: scalar
+    exclude_null: false
     is_nullable: false
     fieldno: 3
   - type: scalar
+    exclude_null: false
     is_nullable: false
     fieldno: 4
 ...
@@ -2540,9 +2551,11 @@ sk = s:create_index('sk', {parts = {{2, 'int'}, {3, 'string'}}})
 sk.parts
 ---
 - - type: integer
+    exclude_null: false
     is_nullable: false
     fieldno: 2
   - type: string
+    exclude_null: false
     is_nullable: false
     fieldno: 3
 ...
@@ -2555,12 +2568,14 @@ sk = s:create_index('sk', {parts = {{2, is_nullable=true}, {3, collation='unicod
 sk.parts
 ---
 - - type: scalar
+    exclude_null: false
     is_nullable: true
     fieldno: 2
-  - type: scalar
-    is_nullable: false
+  - fieldno: 3
+    type: scalar
+    exclude_null: false
     collation: unicode
-    fieldno: 3
+    is_nullable: false
 ...
 sk:drop()
 ---
