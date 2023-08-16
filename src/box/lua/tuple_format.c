@@ -34,22 +34,13 @@ static int
 lbox_tuple_format_gc(struct lua_State *L)
 {
 	struct tuple_format *format = luaT_check_tuple_format(L, 1);
-	tuple_format_unref(format);
+	/*
+	 * The pointer is NULL if we failed to create the format in
+	 * lbox_tuple_format_new.
+	 */
+	if (format != NULL)
+		tuple_format_unref(format);
 	return 0;
-}
-
-/*
- * Creates a cdata object for tuple format and pushes it onto Lua stack.
- */
-static int
-luaT_push_tuple_format(struct lua_State *L, struct tuple_format *format)
-{
-	struct tuple_format **ptr = lua_newuserdata(L, sizeof(*ptr));
-	*ptr = format;
-	tuple_format_ref(format);
-	luaL_getmetatable(L, tuple_format_typename);
-	lua_setmetatable(L, -2);
-	return 1;
 }
 
 /*
@@ -82,13 +73,26 @@ lbox_tuple_format_new(struct lua_State *L)
 	size_t format_data_len = region_used(region) - region_svp;
 	const char *format_data = xregion_join(region, format_data_len);
 	bool names_only = lua_toboolean(L, 2);
+	/*
+	 * Tuple formats are reusable. It means that runtime_tuple_format_new
+	 * may return a format that is actually referenced by another Lua
+	 * object. So we have to be extra careful not to call anything that may
+	 * trigger Lua GC after we create a format and before we reference it.
+	 */
+	struct tuple_format **format_ptr =
+		lua_newuserdata(L, sizeof(*format_ptr));
+	*format_ptr = NULL;
+	luaL_getmetatable(L, tuple_format_typename);
+	lua_setmetatable(L, -2);
 	struct tuple_format *format =
 		runtime_tuple_format_new(format_data, format_data_len,
 					 names_only);
 	region_truncate(region, region_svp);
 	if (format == NULL)
 		return luaT_error(L);
-	return luaT_push_tuple_format(L, format);
+	tuple_format_ref(format);
+	*format_ptr = format;
+	return 1;
 }
 
 /**
