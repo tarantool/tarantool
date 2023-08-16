@@ -247,10 +247,16 @@ lbox_tuple_format_gc(struct lua_State *L)
 static int
 lbox_push_tuple_format(struct lua_State *L, struct tuple_format *format)
 {
+	/*
+	 * Tuple formats are reusable. It means that runtime_tuple_format_new
+	 * may return a format that is actually referenced by another Lua
+	 * object. So we have to be extra careful not to call anything that may
+	 * trigger Lua GC after we create a format and before we reference it.
+	 */
+	tuple_format_ref(format);
 	struct tuple_format **ptr = (struct tuple_format **)
 		luaL_pushcdata(L, CTID_STRUCT_TUPLE_FORMAT_PTR);
 	*ptr = format;
-	tuple_format_ref(format);
 	lua_pushcfunction(L, lbox_tuple_format_gc);
 	luaL_setcdatagc(L, -2);
 	return 1;
