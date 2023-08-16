@@ -21,13 +21,13 @@ test_key_new_va(const char *format, va_list ap)
 
 	/* Format the MsgPack key definition. */
 	const size_t mp_buf_size = 1024;
-	char *mp_buf = region_alloc(region, mp_buf_size);
+	char *mp_buf = (char *)region_alloc(region, mp_buf_size);
 	fail_if(mp_buf == NULL);
 	size_t mp_size = mp_vformat(mp_buf, mp_buf_size, format, ap);
 	fail_if(mp_size > mp_buf_size);
 
 	/* Create a key. */
-	char *key = xmalloc(mp_size);
+	char *key = (char *)xmalloc(mp_size);
 	memcpy(key, mp_buf, mp_size);
 
 	region_truncate(region, region_svp);
@@ -54,7 +54,7 @@ test_tuple_new_va(const char *format, va_list ap)
 
 	/* Format the MsgPack key definition. */
 	const size_t mp_buf_size = 1024;
-	char *mp_buf = region_alloc(region, mp_buf_size);
+	char *mp_buf = (char *)region_alloc(region, mp_buf_size);
 	fail_if(mp_buf == NULL);
 	size_t mp_size = mp_vformat(mp_buf, mp_buf_size, format, ap);
 	fail_if(mp_size > mp_buf_size);
@@ -87,14 +87,14 @@ test_key_def_new_va(const char *format, va_list ap, bool for_func_index)
 
 	/* Format the MsgPack key definition. */
 	const size_t mp_buf_size = 1024;
-	char *mp_buf = region_alloc(region, mp_buf_size);
+	char *mp_buf = (char *)region_alloc(region, mp_buf_size);
 	fail_if(mp_buf == NULL);
 	fail_if(mp_vformat(mp_buf, mp_buf_size, format, ap) > mp_buf_size);
 
 	/* Decode the key parts. */
 	const char *parts = mp_buf;
 	uint32_t part_count = mp_decode_array(&parts);
-	struct key_part_def *part_def = region_alloc(
+	struct key_part_def *part_def = (struct key_part_def *)region_alloc(
 		region, sizeof(*part_def) * part_count);
 	fail_if(part_def == NULL);
 	fail_if(key_def_decode_parts(part_def, part_count, &parts,
