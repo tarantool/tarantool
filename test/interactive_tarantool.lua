@@ -7,6 +7,7 @@ local log = require('log')
 local yaml = require('yaml')
 local popen = require('popen')
 local tnt = require('tarantool')
+local t = require('luatest')
 
 -- Default timeout for expecting an input on child's stdout.
 --
@@ -267,6 +268,15 @@ end
 function mt.close(self)
     self:_stop_stderr_logger()
     self.ph:close()
+end
+
+-- Run a command and assert response.
+function mt.roundtrip(self, command, expected)
+    self:execute_command(command)
+    local response = self:read_response()
+    if expected ~= nil then
+        t.assert_equals(response, expected)
+    end
 end
 
 -- }}} Instance methods
