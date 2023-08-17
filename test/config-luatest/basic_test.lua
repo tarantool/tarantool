@@ -252,9 +252,7 @@ for case_name, case in pairs({
             credentials = {
                 users = {
                     replicator = {
-                        password = {
-                            plain = 'topsecret',
-                        },
+                        password = 'topsecret',
                         roles = {'replication'},
                     },
                     guest = {
@@ -368,18 +366,14 @@ for case_name, case in pairs({
             credentials = {
                 users = {
                     replicator = {
-                        password = {
-                            plain = 'topsecret',
-                        },
+                        password = 'topsecret',
                         roles = {'replication'},
                     },
                     guest = {
                         roles = {'super'},
                     },
                     client = {
-                        password = {
-                            plain = 'secret',
-                        },
+                        password = 'secret',
                         roles = {'super'},
                     },
                 },
