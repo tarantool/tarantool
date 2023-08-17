@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - 'master'
+    paths:
+      - '.github/workflows/publish-module-api-doc.yaml'
+      - 'src/**'
   pull_request:
   workflow_dispatch:
 
