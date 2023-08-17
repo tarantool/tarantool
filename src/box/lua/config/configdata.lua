@@ -4,6 +4,8 @@
 -- Intended to be used as an immutable object.
 
 local fun = require('fun')
+local urilib = require('uri')
+local digest = require('digest')
 local instance_config = require('internal.config.instance_config')
 local cluster_config = require('internal.config.cluster_config')
 
@@ -62,7 +64,129 @@ function methods.names(self)
         group_name = self._group_name,
         replicaset_name = self._replicaset_name,
         instance_name = self._instance_name,
+        replicaset_uuid = self._replicaset_uuid,
+        instance_uuid = self._instance_uuid,
     }
+end
+
+local function uuid_from_name(str)
+    local sha = digest.sha1_hex(str)
+    return sha:sub(1,8)..'-'..sha:sub(9,12)..'-'..sha:sub(13,16)..'-'..
+           '00'..sha:sub(17,18)..'-'..sha:sub(19,30)
+end
+
+local function instance_sharding(iconfig, instance_name)
+    local roles = instance_config:get(iconfig, 'sharding.roles')
+    if roles == nil or #roles == 0 then
+        return nil
+    end
+    assert(type(roles) == 'table')
+    local is_storage = false
+    for _, role in pairs(roles) do
+        is_storage = is_storage or role == 'storage'
+    end
+    if not is_storage then
+        return nil
+    end
+    local zone = instance_config:get(iconfig, 'sharding.zone')
+    local uri = instance_config:instance_uri(iconfig, 'sharding')
+    --
+    -- Currently, vshard does not accept URI without a username. So if we got a
+    -- URI without a username, use "guest" as the username without a password.
+    --
+    local u, err = urilib.parse(uri)
+    -- NB: The URI is validated, so the parsing can't fail.
+    assert(u ~= nil, err)
+    if u.login == nil then
+        u.login = 'guest'
+        uri = urilib.format(u, true)
+    end
+    return {
+        uri = uri,
+        zone = zone,
+        name = instance_name,
+    }
+end
+
+local function apply_vars_f(data, w, vars)
+    if w.schema.type == 'string' and data ~= nil then
+        assert(type(data) == 'string')
+        return (data:gsub('{{ *(.-) *}}', function(var_name)
+            if vars[var_name] ~= nil then
+                return vars[var_name]
+            end
+            w.error(('Unknown variable %q'):format(var_name))
+        end))
+    end
+    return data
+end
+
+local function iconfig_apply_vars(iconfig, vars)
+    return instance_config:map(iconfig, apply_vars_f, vars)
+end
+
+function methods.sharding(self)
+    local sharding = {}
+    for _, group in pairs(self._cconfig.groups) do
+        for replicaset_name, value in pairs(group.replicasets) do
+            local lock
+            local replicaset_uuid
+            local replicaset_cfg = {}
+            for instance_name, _ in pairs(value.instances) do
+                local vars = {instance_name = instance_name}
+                local iconfig = cluster_config:instantiate(self._cconfig,
+                                                           instance_name)
+                iconfig = instance_config:apply_default(iconfig)
+                iconfig = iconfig_apply_vars(iconfig, vars)
+                if lock == nil then
+                    lock = instance_config:get(iconfig, 'sharding.lock')
+                end
+                local isharding = instance_sharding(iconfig, instance_name)
+                if isharding ~= nil then
+                    if replicaset_uuid == nil then
+                        replicaset_uuid = instance_config:get(iconfig,
+                            'database.replicaset_uuid')
+                        if replicaset_uuid == nil then
+                            replicaset_uuid = uuid_from_name(replicaset_name)
+                        end
+                    end
+                    local instance_uuid = instance_config:get(iconfig,
+                        'database.instance_uuid')
+                    if instance_uuid == nil then
+                        instance_uuid = uuid_from_name(instance_name)
+                    end
+                    replicaset_cfg[instance_uuid] = isharding
+                end
+            end
+            if next(replicaset_cfg) ~= nil then
+                assert(replicaset_uuid ~= nil)
+                sharding[replicaset_uuid] = {
+                    replicas = replicaset_cfg,
+                    master = 'auto',
+                    lock = lock,
+                }
+            end
+        end
+    end
+    local cfg = {sharding = sharding}
+
+    local vshard_global_options = {
+        'shard_index',
+        'bucket_count',
+        'rebalancer_disbalance_threshold',
+        'rebalancer_max_receiving',
+        'rebalancer_max_sending',
+        'sync_timeout',
+        'connection_outdate_delay',
+        'failover_ping_timeout',
+        'discovery_mode',
+        'sched_ref_quota',
+        'sched_move_quota',
+    }
+    for _, v in pairs(vshard_global_options) do
+        cfg[v] = instance_config:get(self._iconfig_def, 'sharding.'..v)
+    end
+    return cfg
 end
 
 -- Should be called only if the 'manual' failover method is
@@ -87,23 +211,6 @@ local mt = {
     __index = methods,
 }
 
-local function apply_vars_f(data, w, vars)
-    if w.schema.type == 'string' and data ~= nil then
-        assert(type(data) == 'string')
-        return (data:gsub('{{ *(.-) *}}', function(var_name)
-            if vars[var_name] ~= nil then
-                return vars[var_name]
-            end
-            w.error(('Unknown variable %q'):format(var_name))
-        end))
-    end
-    return data
-end
-
-local function iconfig_apply_vars(iconfig, vars)
-    return instance_config:map(iconfig, apply_vars_f, vars)
-end
-
 local function new(iconfig, cconfig, instance_name)
     -- Precalculate configuration with applied defaults.
     local iconfig_def = instance_config:apply_default(iconfig)
@@ -118,6 +225,17 @@ local function new(iconfig, cconfig, instance_name)
     -- replicaset.
     local found = cluster_config:find_instance(cconfig, instance_name)
     assert(found ~= nil)
+
+    local replicaset_uuid = instance_config:get(iconfig_def,
+        'database.replicaset_uuid')
+    local instance_uuid = instance_config:get(iconfig_def,
+        'database.instance_uuid')
+    if replicaset_uuid == nil then
+        replicaset_uuid = uuid_from_name(found.replicaset_name)
+    end
+    if instance_uuid == nil then
+        instance_uuid = uuid_from_name(instance_name)
+    end
 
     -- Save instance configs of the peers from the same replicaset.
     local peers = {}
@@ -222,6 +340,8 @@ local function new(iconfig, cconfig, instance_name)
         _iconfig_def = iconfig_def,
         _cconfig = cconfig,
         _peer_names = peer_names,
+        _replicaset_uuid = replicaset_uuid,
+        _instance_uuid = instance_uuid,
         _peers = peers,
         _group_name = found.group_name,
         _replicaset_name = found.replicaset_name,

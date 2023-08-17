@@ -245,6 +245,8 @@ local function apply(config)
     local names = configdata:names()
     box_cfg.instance_name = names.instance_name
     box_cfg.replicaset_name = names.replicaset_name
+    box_cfg.instance_uuid = names.instance_uuid
+    box_cfg.replicaset_uuid = names.replicaset_uuid
 
     -- Set bootstrap_leader option.
     box_cfg.bootstrap_leader = configdata:bootstrap_leader()
