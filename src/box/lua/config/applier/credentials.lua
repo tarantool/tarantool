@@ -1,4 +1,5 @@
 local log = require('internal.config.utils.log')
+local digest = require('digest')
 
 --[[
 This intermediate representation is a formatted set of
@@ -371,27 +372,77 @@ end
 
 local function set_password(user_name, password)
     if password == nil then
-        if user_name ~= 'guest' then
-            log.verbose('credentials.apply: remove password for user %q',
-                user_name)
-            -- TODO: Check for hashes and if absent remove the password.
-        end
-    else
         if user_name == 'guest' then
-            error('Setting a password for the guest user has no effect')
+            -- Guest can't have a password, so this is valid and there
+            -- is nothing to do.
+            return
         end
-        -- TODO: Check if the password can be hashed in somewhere other then
-        --       'chap-sha1' or if the select{user_name} may return table of
-        --       a different shape.
-        local stored_user_def = box.space._user.index.name:get({user_name})
-        local stored_hash = stored_user_def[5]['chap-sha1']
-        local given_hash = box.schema.user.password(password)
-        if given_hash == stored_hash then
+
+        local auth_def = box.space._user.index.name:get({user_name})[5]
+        if next(auth_def) == nil then
+            -- No password is currently set, there is nothing to do.
+            log.verbose('credentials.apply: user %q already has no password',
+                        user_name)
+            return
+        end
+
+        log.verbose('credentials.apply: remove password for user %q', user_name)
+        -- No password is set, so remove it for the user.
+        -- There is no handy function for it, so remove it directly in
+        -- system space _user. Users are described in the following way:
+        --
+        -- - [32, 1, 'myusername', 'user', {'chap-sha1': '<password_hash>'},
+        --          [], 1692279984]
+        --
+        -- The command below overrides with empty map the fifth tuple field,
+        -- containing hash (with auth_type == 'chap-sha1' and hash with salt
+        -- with auth_type == 'pap-sha256').
+        box.space._user.index.name:update(user_name,
+            {{'=', 5, setmetatable({}, {__serialize = 'map'})}})
+
+        return
+    end
+
+    if user_name == 'guest' then
+        error('Setting a password for the guest user is not allowed')
+    end
+
+    local auth_def = box.space._user.index.name:get({user_name})[5]
+    if next(auth_def) == nil then
+        -- No password is currently set for the user, just set a new one.
+        log.verbose('credentials.apply: set a password for user %q', user_name)
+        box.schema.user.passwd(user_name, password)
+        return
+    end
+
+    local auth_type = auth_def['chap-sha1'] and 'chap-sha1' or 'pap-sha256'
+
+    if auth_type == 'chap-sha1' then
+        local current_hash = auth_def['chap-sha1']
+
+        local new_hash = box.schema.user.password(password)
+        if new_hash == current_hash then
             log.verbose('credentials.apply: a password is already set ' ..
-                'for user %q', user_name)
+                        'for user %q', user_name)
         else
             log.verbose('credentials.apply: set a password for user %q',
-                user_name)
+                        user_name)
+            box.schema.user.passwd(user_name, password)
+        end
+    else
+        assert(auth_def['pap-sha256'])
+        local current_salt = auth_def['pap-sha256'][1]
+        local current_hash = auth_def['pap-sha256'][2]
+
+        local new_hash = digest.sha256(current_salt .. password)
+        if new_hash == current_hash then
+            log.verbose('credentials.apply: a password is already set ' ..
+                        'for user %q', user_name)
+        else
+            log.verbose('credentials.apply: set a password for user %q',
+                        user_name)
+            -- Note: passwd() generated new random salt, it will be different
+            -- from current_salt.
             box.schema.user.passwd(user_name, password)
         end
     end
@@ -456,5 +507,6 @@ return {
         privileges_subtract = privileges_subtract,
         privileges_add_defaults = privileges_add_defaults,
         sync_privileges = sync_privileges,
+        set_password = set_password,
     },
 }
