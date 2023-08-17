@@ -370,13 +370,13 @@ local function create_user(user_name)
 end
 
 local function set_password(user_name, password)
-    if password == nil or next(password) == nil then
+    if password == nil then
         if user_name ~= 'guest' then
             log.verbose('credentials.apply: remove password for user %q',
                 user_name)
             -- TODO: Check for hashes and if absent remove the password.
         end
-    elseif password ~= nil and password.plain ~= nil then
+    else
         if user_name == 'guest' then
             error('Setting a password for the guest user has no effect')
         end
@@ -385,21 +385,15 @@ local function set_password(user_name, password)
         --       a different shape.
         local stored_user_def = box.space._user.index.name:get({user_name})
         local stored_hash = stored_user_def[5]['chap-sha1']
-        local given_hash = box.schema.user.password(password.plain)
+        local given_hash = box.schema.user.password(password)
         if given_hash == stored_hash then
             log.verbose('credentials.apply: a password is already set ' ..
                 'for user %q', user_name)
         else
             log.verbose('credentials.apply: set a password for user %q',
                 user_name)
-            box.schema.user.passwd(user_name, password.plain)
+            box.schema.user.passwd(user_name, password)
         end
-    --[[
-    elseif sha1() then
-    elseif sha256() then
-    ]]--
-    else
-        assert(false)
     end
 end
 

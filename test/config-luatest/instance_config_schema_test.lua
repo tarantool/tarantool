@@ -19,23 +19,6 @@ local function validate_fields(config, record)
         end
     end
 
-    -- Only one of plain, sha1, and sha256 fields can appear at the same time.
-    local users = instance_config.schema.fields.credentials.fields.users
-    if record.validate == users.value.fields.password.validate then
-        if type(config) == 'table' then
-            if config.plain ~= nil then
-                table.insert(config_fields, 'sha1')
-                table.insert(config_fields, 'sha256')
-            elseif config.sha1 ~= nil then
-                table.insert(config_fields, 'plain')
-                table.insert(config_fields, 'sha256')
-            elseif config.sha256 ~= nil then
-                table.insert(config_fields, 'sha1')
-                table.insert(config_fields, 'plain')
-            end
-        end
-    end
-
     -- Only one of file, and module fields can appear at the same time.
     if record.validate == instance_config.schema.fields.app.validate then
         if type(config) == 'table' then
@@ -924,9 +907,7 @@ g.test_credentials = function()
             },
             users = {
                 two = {
-                    password = {
-                        plain = 'one',
-                    },
+                    password = 'one',
                     privileges = {
                         {
                             permissions = {
@@ -944,24 +925,6 @@ g.test_credentials = function()
     instance_config:validate(iconfig)
     validate_fields(iconfig.credentials,
                     instance_config.schema.fields.credentials)
-
-    iconfig = {
-        credentials = {
-            users = {
-                one = {
-                    password = {
-                        plain = 'one',
-                        sha1 = 'two',
-                    },
-                },
-            },
-        },
-    }
-    local err = '[instance_config] credentials.users.one.password: Only one '..
-                'of plain, sha1, and sha256 can appear at the same time.'
-    t.assert_error_msg_equals(err, function()
-        instance_config:validate(iconfig)
-    end)
 
     local res = instance_config:apply_default({}).credentials
     t.assert_equals(res, nil)

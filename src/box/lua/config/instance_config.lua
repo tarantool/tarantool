@@ -1108,23 +1108,8 @@ return schema.new('instance_config', schema.record({
             }),
             -- Parameters of the user.
             value = schema.record({
-                password = schema.record({
-                    plain = schema.scalar({
-                        type = 'string',
-                    }),
-                    sha1 = schema.scalar({
-                        type = 'string',
-                    }),
-                    sha256 = schema.scalar({
-                        type = 'string',
-                    }),
-                }, {
-                    validate = function(password, w)
-                        if next(password, next(password)) ~= nil then
-                            w.error('Only one of plain, sha1, and sha256 '..
-                                    'can appear at the same time.')
-                        end
-                    end,
+                password = schema.scalar({
+                    type = 'string',
                 }),
                 privileges = schema.array({
                     items = schema.record({

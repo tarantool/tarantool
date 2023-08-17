@@ -39,7 +39,7 @@ local function find_password(configdata, username)
     -- There is a user definition without a password. Let's assume
     -- that the user has no password.
     if user_def.password ~= nil then
-        return user_def.password.plain
+        return user_def.password
     end
     return nil
 end
