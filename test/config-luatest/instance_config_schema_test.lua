@@ -1254,3 +1254,41 @@ g.test_metrics = function()
     instance_config:validate(iconfig)
     validate_fields(iconfig.metrics, instance_config.schema.fields.metrics)
 end
+
+g.test_sharding = function()
+    local iconfig = {
+        sharding = {
+            roles = {'router', 'storage'},
+            lock = false,
+            zone = 1,
+            sync_timeout = 2,
+            connection_outdate_delay = 3,
+            failover_ping_timeout = 4,
+            discovery_mode = 'once',
+            bucket_count = 5,
+            shard_index = 'six',
+            rebalancer_disbalance_threshold = 7,
+            rebalancer_max_receiving = 8,
+            rebalancer_max_sending = 9,
+            sched_ref_quota = 10,
+            sched_move_quota = 11,
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.sharding, instance_config.schema.fields.sharding)
+
+    local exp = {
+        bucket_count = 3000,
+        discovery_mode = "on",
+        failover_ping_timeout = 5,
+        rebalancer_disbalance_threshold = 1,
+        rebalancer_max_receiving = 100,
+        rebalancer_max_sending = 1,
+        sched_move_quota = 1,
+        sched_ref_quota = 300,
+        shard_index = "bucket_id",
+        sync_timeout = 1,
+    }
+    local res = instance_config:apply_default({}).sharding
+    t.assert_equals(res, exp)
+end

@@ -259,6 +259,18 @@ g.test_defaults = function()
         } or {
             auth_type = "chap-sha1"
         },
+        sharding = {
+            bucket_count = 3000,
+            discovery_mode = "on",
+            failover_ping_timeout = 5,
+            rebalancer_disbalance_threshold = 1,
+            rebalancer_max_receiving = 100,
+            rebalancer_max_sending = 1,
+            sched_move_quota = 1,
+            sched_ref_quota = 300,
+            shard_index = "bucket_id",
+            sync_timeout = 1,
+        }
     }
     local res = cluster_config:apply_default({})
     t.assert_equals(res, exp)
