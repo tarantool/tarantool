@@ -478,3 +478,54 @@ g.test_sync_privileges = function(g)
 
     child:close()
 end
+
+g.test_set_password = function(g)
+
+    local auth_types = {
+        'chap-sha1',
+        'pap-sha256',
+    }
+
+    for _, auth_type in ipairs(auth_types) do
+        if auth_type == 'pap-sha256' then
+            t.tarantool.skip_if_not_enterprise()
+        end
+        local child = it.new()
+        local dir = treegen.prepare_directory(g, {}, {})
+        local socket = "unix/:./test_socket.iproto"
+
+        child:roundtrip(("box.cfg{work_dir = %q, listen = %q, auth_type = %q}")
+                        :format(dir, socket, auth_type))
+        child:roundtrip("nb = require('net.box')")
+
+        local name = "myuser"
+        child:roundtrip(("myuser = %q"):format(name))
+        child:roundtrip("box.schema.user.create(myuser)")
+
+        child:roundtrip("set_password = require('internal.config.applier." ..
+                        "credentials')._internal.set_password")
+
+        child:roundtrip("set_password(myuser, 'password1')")
+
+        child:roundtrip(("nb.connect(%q, {user = myuser, " ..
+                         "password = 'password1'}).state"):format(socket),
+                        "active")
+
+        child:roundtrip("set_password(myuser, 'password2')")
+
+        child:roundtrip(("nb.connect(%q, {user = myuser, " ..
+                         "password = 'password1'}).state"):format(socket),
+                        "error")
+
+        child:roundtrip(("nb.connect(%q, {user = myuser, " ..
+                         "password = 'password2'}).state"):format(socket),
+                        "active")
+
+        child:roundtrip("set_password(myuser, nil)")
+
+        child:roundtrip(("nb.connect(%q, {user = myuser, " ..
+                         "password = 'password2'}).state"):format(socket),
+                        "error")
+        child:close()
+    end
+end
