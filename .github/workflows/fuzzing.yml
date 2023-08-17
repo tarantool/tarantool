@@ -8,10 +8,12 @@ on:
     tags:
       - '**'
     paths:
-      - '.github/workflows/**'
+      - '.github/workflows/fuzzing.yml'
       - 'src/**'
       - 'test/fuzz/**'
       - 'test/static/corpus/**'
+    paths-ignore:
+      - '**.lua'
   pull_request:
     types: [opened, reopened, synchronize, labeled]
 
