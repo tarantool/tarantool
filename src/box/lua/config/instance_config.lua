@@ -1515,6 +1515,186 @@ return schema.new('instance_config', schema.record({
             value = schema.scalar({type = 'string'}),
         }),
     }),
+    sharding = schema.record({
+        -- Instance vshard options.
+        zone = schema.scalar({type = 'integer'}),
+        -- Replicaset vshard options.
+        lock = schema.scalar({
+            type = 'boolean',
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope == 'instance' then
+                    w.error('sharding.lock cannot be defined in the instance '..
+                            'scope')
+                end
+            end,
+        }),
+        -- TODO: Add validate.
+        roles = schema.set({
+            'router',
+            'storage',
+        }),
+        -- Global vshard options.
+        shard_index = schema.scalar({
+            type = 'string',
+            default = 'bucket_id',
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope ~= 'global' then
+                    w.error('sharding.shard_index should be a defined in '..
+                            'global scope')
+                end
+            end,
+        }),
+        bucket_count = schema.scalar({
+            type = 'integer',
+            default = 3000,
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope ~= 'global' then
+                    w.error('sharding.bucket_count should be a defined in '..
+                            'global scope')
+                end
+            end,
+        }),
+        rebalancer_disbalance_threshold = schema.scalar({
+            type = 'number',
+            default = 1,
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope ~= 'global' then
+                    w.error('sharding.rebalancer_disbalance_threshold should '..
+                            'be a defined in global scope')
+                end
+            end,
+        }),
+        rebalancer_max_receiving = schema.scalar({
+            type = 'integer',
+            default = 100,
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope ~= 'global' then
+                    w.error('sharding.rebalancer_max_receiving should '..
+                            'be a defined in global scope')
+                end
+            end,
+        }),
+        rebalancer_max_sending = schema.scalar({
+            type = 'integer',
+            default = 1,
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope ~= 'global' then
+                    w.error('sharding.rebalancer_max_sending should '..
+                            'be a defined in global scope')
+                end
+            end,
+        }),
+        sync_timeout = schema.scalar({
+            type = 'number',
+            default = 1,
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope ~= 'global' then
+                    w.error('sharding.sync_timeout should be a defined in '..
+                            'global scope')
+                end
+            end,
+        }),
+        connection_outdate_delay = schema.scalar({
+            type = 'number',
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope ~= 'global' then
+                    w.error('sharding.connection_outdate_delay should be a '..
+                            'defined in global scope')
+                end
+            end,
+        }),
+        failover_ping_timeout = schema.scalar({
+            type = 'number',
+            default = 5,
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope ~= 'global' then
+                    w.error('sharding.failover_ping_timeout should be a '..
+                            'defined in global scope')
+                end
+            end,
+        }),
+        discovery_mode = schema.enum({
+            'on',
+            'off',
+            'once',
+        }, {
+            default = 'on',
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope ~= 'global' then
+                    w.error('sharding.discovery_mode should be a defined in '..
+                            'global scope')
+                end
+            end,
+        }),
+        sched_ref_quota = schema.scalar({
+            type = 'number',
+            default = 300,
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope ~= 'global' then
+                    w.error('sharding.sched_ref_quota should be a defined ' ..
+                            'in global scope')
+                end
+            end,
+        }),
+        sched_move_quota = schema.scalar({
+            type = 'number',
+            default = 1,
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope ~= 'global' then
+                    w.error('sharding.sched_move_quota should be a defined ' ..
+                            'in global scope')
+                end
+            end,
+        }),
+    })
 }, {
     -- This kind of validation cannot be implemented as the
     -- 'validate' annotation of a particular schema node. There
