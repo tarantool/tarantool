@@ -81,47 +81,55 @@ box.execute("CREATE INDEX i4 ON t1 (id, c, b, a, d);")
 ...
 box.space.T1.index.I1.parts
 ---
-- - type: number
+- - fieldno: 2
+    sort_order: asc
+    type: number
     exclude_null: false
     is_nullable: true
-    fieldno: 2
 ...
 box.space.T1.index.I2.parts
 ---
-- - type: integer
+- - fieldno: 3
+    sort_order: asc
+    type: integer
     exclude_null: false
     is_nullable: true
-    fieldno: 3
 ...
 box.space.T1.index.I3.parts
 ---
-- - type: string
+- - fieldno: 4
+    sort_order: asc
+    type: string
     exclude_null: false
     is_nullable: true
-    fieldno: 4
 ...
 box.space.T1.index.I4.parts
 ---
-- - type: string
+- - fieldno: 1
+    sort_order: asc
+    type: string
     exclude_null: false
     is_nullable: false
-    fieldno: 1
-  - type: string
+  - fieldno: 4
+    sort_order: asc
+    type: string
     exclude_null: false
     is_nullable: true
-    fieldno: 4
-  - type: integer
+  - fieldno: 3
+    sort_order: asc
+    type: integer
     exclude_null: false
     is_nullable: true
-    fieldno: 3
-  - type: number
+  - fieldno: 2
+    sort_order: asc
+    type: number
     exclude_null: false
     is_nullable: true
-    fieldno: 2
-  - type: scalar
+  - fieldno: 5
+    sort_order: asc
+    type: scalar
     exclude_null: false
     is_nullable: true
-    fieldno: 5
 ...
 box.execute("DROP VIEW v1;")
 ---

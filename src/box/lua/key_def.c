@@ -85,6 +85,11 @@ luaT_push_key_def_parts(struct lua_State *L, const struct key_def *key_def)
 		lua_pushnumber(L, part->fieldno + TUPLE_INDEX_BASE);
 		lua_setfield(L, -2, "fieldno");
 
+		if (!key_def->is_unordered) {
+			lua_pushstring(L, sort_order_strs[part->sort_order]);
+			lua_setfield(L, -2, "sort_order");
+		}
+
 		if (part->path != NULL) {
 			lua_pushlstring(L, part->path, part->path_len);
 			lua_setfield(L, -2, "path");
@@ -227,6 +232,22 @@ luaT_key_def_set_part(struct lua_State *L, struct key_part_def *part,
 			return -1;
 		}
 		part->coll_id = coll_id->id;
+	}
+	lua_pop(L, 1);
+
+	/* Set part->sort_order. */
+	lua_pushstring(L, "sort_order");
+	lua_gettable(L, -2);
+	if (!lua_isnil(L, -1)) {
+		size_t sort_order_len;
+		const char *sort_order = lua_tolstring(L, -1, &sort_order_len);
+		part->sort_order = strnindex(sort_order_strs, sort_order,
+					     sort_order_len, sort_order_MAX);
+		if (part->sort_order == sort_order_MAX) {
+			diag_set(IllegalParams, "Unknown sort order: \"%s\"",
+				 sort_order);
+			return -1;
+		}
 	}
 	lua_pop(L, 1);
 
@@ -486,6 +507,7 @@ lbox_key_def_new(struct lua_State *L)
 				  "{fieldno = fieldno, type = type"
 				  "[, is_nullable = <boolean>]"
 				  "[, exclude_null = <boolean>]"
+				  "[, sort_order = <string>]"
 				  "[, path = <string>]"
 				  "[, collation_id = <number>]"
 				  "[, collation = <string>]}, ...}");

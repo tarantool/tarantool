@@ -849,14 +849,16 @@ not not s:create_index('test3', {parts = {{3, 'string', collation = 'UnIcOdE'}}}
 ...
 s:create_index('test4', {parts = {{4, 'string'}}}).parts
 ---
-- - type: string
+- - fieldno: 4
+    sort_order: asc
+    type: string
     exclude_null: false
     is_nullable: false
-    fieldno: 4
 ...
 s:create_index('test5', {parts = {{5, 'string', collation = 'Unicode'}}}).parts
 ---
 - - fieldno: 5
+    sort_order: asc
     type: string
     exclude_null: false
     collation: unicode
@@ -1051,6 +1053,7 @@ i = s:create_index('test2', {parts = {{2, 'string', is_nullable = true, collatio
 i.parts
 ---
 - - fieldno: 2
+    sort_order: asc
     type: string
     exclude_null: false
     collation: unicode
@@ -1061,10 +1064,11 @@ i = s:create_index('test4', {parts = {3, 'string', is_nullable = true}})
 ...
 i.parts
 ---
-- - type: string
+- - fieldno: 3
+    sort_order: asc
+    type: string
     exclude_null: false
     is_nullable: true
-    fieldno: 3
 ...
 i = s:create_index('test5', {parts = {3, 'string', collation = 'unicode'}})
 ---
@@ -1072,6 +1076,7 @@ i = s:create_index('test5', {parts = {3, 'string', collation = 'unicode'}})
 i.parts
 ---
 - - fieldno: 3
+    sort_order: asc
     type: string
     exclude_null: false
     collation: unicode
@@ -1082,10 +1087,11 @@ i = s:create_index('test6', {parts = {4, 'string'}})
 ...
 i.parts
 ---
-- - type: string
+- - fieldno: 4
+    sort_order: asc
+    type: string
     exclude_null: false
     is_nullable: false
-    fieldno: 4
 ...
 s:drop()
 ---

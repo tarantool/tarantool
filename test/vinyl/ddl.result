@@ -570,10 +570,11 @@ box.space.test.index.pk
 ---
 - unique: true
   parts:
-  - type: unsigned
+  - fieldno: 1
+    sort_order: asc
+    type: unsigned
     exclude_null: false
     is_nullable: false
-    fieldno: 1
   options:
     page_size: 8192
     run_count_per_level: 2

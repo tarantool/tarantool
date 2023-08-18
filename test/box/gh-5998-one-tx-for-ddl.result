@@ -39,10 +39,11 @@ s1:create_index('pk')
  | ---
  | - unique: true
  |   parts:
- |   - type: unsigned
+ |   - fieldno: 1
+ |     sort_order: asc
+ |     type: unsigned
  |     exclude_null: false
  |     is_nullable: false
- |     fieldno: 1
  |   hint: true
  |   id: 0
  |   type: TREE
