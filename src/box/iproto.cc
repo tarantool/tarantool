@@ -2178,7 +2178,7 @@ tx_process1(struct cmsg *m)
 				     IPROTO_FEATURE_DML_TUPLE_EXTENSION);
 	struct tuple_format_map format_map;
 	tuple_format_map_create_empty(&format_map);
-	auto format_map_guard = make_scoped_guard([&format_map] {
+	auto format_map_guard = make_scoped_guard([&format_map]() noexcept {
 		tuple_format_map_destroy(&format_map);
 	});
 	if (tx_check_msg(msg) != 0)
@@ -2240,7 +2240,7 @@ tx_process_select(struct cmsg *m)
 		mp_box_ctx_create(&ctx, NULL, NULL);
 		ctx_ref = (struct mp_ctx *)&ctx;
 	}
-	auto ctx_guard = make_scoped_guard([ctx_ref] {
+	auto ctx_guard = make_scoped_guard([ctx_ref]() noexcept {
 		mp_ctx_destroy(ctx_ref);
 	});
 	ctx_guard.is_active = box_tuple_as_ext;
@@ -2342,7 +2342,7 @@ tx_process_call(struct cmsg *m)
 		mp_box_ctx_create(&ctx, NULL, NULL);
 		ctx_ref = (struct mp_ctx *)&ctx;
 	}
-	auto ctx_guard = make_scoped_guard([ctx_ref] {
+	auto ctx_guard = make_scoped_guard([ctx_ref]() noexcept {
 		mp_ctx_destroy(ctx_ref);
 	});
 	ctx_guard.is_active = box_tuple_as_ext;

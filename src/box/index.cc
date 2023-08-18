@@ -471,8 +471,8 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 	char *pos_buf = NULL;
 	uint32_t pos_buf_size = 0;
 	uint32_t region_svp = region_used(&fiber()->gc);
-	auto pos_guard =
-		make_scoped_guard([&pos_buf, &pos_buf_size, region_svp] {
+	auto pos_guard = make_scoped_guard(
+		[&pos_buf, &pos_buf_size, region_svp]() noexcept {
 			region_truncate(&fiber()->gc, region_svp);
 			if (pos_buf != NULL)
 				runtime_memory_free(pos_buf, pos_buf_size);
@@ -501,7 +501,7 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 	it->space = space;
 	it->pos_buf = pos_buf;
 	it->pos_buf_size = pos_buf_size;
-	pos_guard.is_active = false;
+	pos_guard.reset();
 	region_truncate(&fiber()->gc, region_svp);
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 	return it;

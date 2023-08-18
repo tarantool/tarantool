@@ -720,7 +720,7 @@ replicaset_update(struct applier **appliers, int count, bool keep_connect)
 	struct replica *replica, *next;
 	struct applier *applier;
 
-	auto uniq_guard = make_scoped_guard([&]{
+	auto uniq_guard = make_scoped_guard([&]() noexcept {
 		replica_hash_foreach_safe(&uniq, replica, next) {
 			replica_hash_remove(&uniq, replica);
 			replica_clear_applier(replica);
@@ -1060,7 +1060,7 @@ replicaset_connect(const struct uri_set *uris,
 	}
 	int count = 0;
 	struct applier *appliers[VCLOCK_MAX] = {};
-	auto appliers_guard = make_scoped_guard([&]{
+	auto appliers_guard = make_scoped_guard([&]() noexcept {
 		for (int i = 0; i < count; i++) {
 			struct applier *applier = appliers[i];
 			applier_stop(applier);
@@ -1125,7 +1125,7 @@ replicaset_connect(const struct uri_set *uris,
 	 * Guards are run in the order reverse to the order of their
 	 * initialization. So triggers_guard will run before appliers_guard.
 	 */
-	auto triggers_guard = make_scoped_guard([&]{
+	auto triggers_guard = make_scoped_guard([&]() noexcept {
 		for (int i = 0; i < count; i++) {
 			struct applier_on_connect *trigger = &triggers[i];
 			trigger_clear(&trigger->base);
@@ -1163,11 +1163,11 @@ replicaset_connect(const struct uri_set *uris,
 		if (applier->state != APPLIER_CONNECTED)
 			applier_stop(applier);
 	}
-	triggers_guard.is_active = false;
+	triggers_guard.reset();
 
 	/* Now all the appliers are connected, update the replica set. */
 	replicaset_update(appliers, count, keep_connect);
-	appliers_guard.is_active = false;
+	appliers_guard.reset();
 	uri_set_destroy(&replication_uris);
 	uri_set_copy(&replication_uris, uris);
 }

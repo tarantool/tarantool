@@ -1983,7 +1983,7 @@ box_sync_replication(bool do_quorum, bool do_reuse)
 	int rc = cfg_get_uri_set("replication", &uri_set);
 	assert(rc == 0);
 	(void)rc;
-	auto uri_set_guard = make_scoped_guard([&]{
+	auto uri_set_guard = make_scoped_guard([&]() noexcept {
 		uri_set_destroy(&uri_set);
 	});
 	replicaset_connect(&uri_set, do_quorum, do_reuse);
@@ -2244,7 +2244,7 @@ box_set_replication_anon(void)
 	bool new_anon = box_check_replication_anon();
 	if (new_anon == cfg_replication_anon)
 		return;
-	auto guard = make_scoped_guard([&]{
+	auto guard = make_scoped_guard([&]() noexcept {
 		cfg_replication_anon = !new_anon;
 		box_broadcast_ballot();
 	});
@@ -2262,7 +2262,7 @@ box_set_replication_anon(void)
 			  "cannot be turned on after bootstrap"
 			  " has finished");
 	}
-	guard.is_active = false;
+	guard.reset();
 }
 
 /**
@@ -2360,7 +2360,7 @@ box_set_instance_name(void)
 	}
 	char old_cfg_name[NODE_NAME_SIZE_MAX];
 	strlcpy(old_cfg_name, cfg_instance_name, NODE_NAME_SIZE_MAX);
-	auto guard = make_scoped_guard([&]{
+	auto guard = make_scoped_guard([&]() noexcept {
 		strlcpy(cfg_instance_name, old_cfg_name, NODE_NAME_SIZE_MAX);
 		try {
 			box_restart_replication();
@@ -2379,7 +2379,7 @@ box_set_instance_name(void)
 		else
 			box_register_replica(&INSTANCE_UUID, name);
 	}
-	guard.is_active = false;
+	guard.reset();
 }
 
 /** Trigger to catch ACKs from all nodes when need to wait for quorum. */
@@ -2904,7 +2904,7 @@ box_promote_qsync(void)
 	assert(is_box_configured);
 	struct raft *raft = box_raft();
 	is_in_box_promote = true;
-	auto promote_guard = make_scoped_guard([&] {
+	auto promote_guard = make_scoped_guard([&]() noexcept {
 		is_in_box_promote = false;
 	});
 	assert(raft->state == RAFT_STATE_LEADER);
@@ -2930,7 +2930,7 @@ box_promote(void)
 	}
 	struct raft *raft = box_raft();
 	is_in_box_promote = true;
-	auto promote_guard = make_scoped_guard([&] {
+	auto promote_guard = make_scoped_guard([&]() noexcept {
 		is_in_box_promote = false;
 	});
 
@@ -2987,7 +2987,7 @@ box_demote(void)
 		return -1;
 	}
 	is_in_box_promote = true;
-	auto promote_guard = make_scoped_guard([&] {
+	auto promote_guard = make_scoped_guard([&]() noexcept {
 		is_in_box_promote = false;
 	});
 
@@ -4299,7 +4299,9 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 		&req.vclock, "replica %s", tt_uuid_str(&req.instance_uuid));
 	if (gc == NULL)
 		diag_raise();
-	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
+	auto gc_guard = make_scoped_guard([&]() noexcept {
+		gc_consumer_unregister(gc);
+	});
 
 	say_info("registering replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
@@ -4338,7 +4340,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
 	replica->gc = gc;
-	gc_guard.is_active = false;
+	gc_guard.reset();
 }
 
 void
@@ -4445,7 +4447,9 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 				"replica %s", tt_uuid_str(&req.instance_uuid));
 	if (gc == NULL)
 		diag_raise();
-	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
+	auto gc_guard = make_scoped_guard([&]() noexcept {
+		gc_consumer_unregister(gc);
+	});
 
 	say_info("joining replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
@@ -4499,7 +4503,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
 	replica->gc = gc;
-	gc_guard.is_active = false;
+	gc_guard.reset();
 }
 
 void
@@ -5118,7 +5122,7 @@ local_recovery(const struct vclock *checkpoint_vclock)
 
 	struct wal_stream wal_stream;
 	wal_stream_create(&wal_stream);
-	auto stream_guard = make_scoped_guard([&]{
+	auto stream_guard = make_scoped_guard([&]() noexcept {
 		wal_stream_abort(&wal_stream);
 		wal_stream_destroy(&wal_stream);
 	});
@@ -5129,7 +5133,7 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	 * in box.info while local recovery is in progress.
 	 */
 	box_vclock = &recovery->vclock;
-	auto guard = make_scoped_guard([&]{
+	auto guard = make_scoped_guard([&]() noexcept {
 		box_vclock = &replicaset.vclock;
 		recovery_delete(recovery);
 	});
@@ -5285,7 +5289,7 @@ local_recovery(const struct vclock *checkpoint_vclock)
 			panic("Can't proceed. %s.", mismatch_str);
 		}
 	}
-	stream_guard.is_active = false;
+	stream_guard.reset();
 	recovery_finalize(recovery);
 	wal_stream_destroy(&wal_stream);
 
@@ -5411,7 +5415,7 @@ box_cfg_xc(void)
 	struct journal bootstrap_journal;
 	journal_create(&bootstrap_journal, NULL, bootstrap_journal_write);
 	journal_set(&bootstrap_journal);
-	auto bootstrap_journal_guard = make_scoped_guard([] {
+	auto bootstrap_journal_guard = make_scoped_guard([]() noexcept {
 		journal_set(NULL);
 	});
 
@@ -5440,7 +5444,7 @@ box_cfg_xc(void)
 	 */
 	gc_delay_unref();
 
-	bootstrap_journal_guard.is_active = false;
+	bootstrap_journal_guard.reset();
 	assert(current_journal != &bootstrap_journal);
 
 	/*
@@ -5779,7 +5783,7 @@ box_generate_space_id(uint32_t *new_space_id, bool is_temporary)
 	key_end = mp_encode_uint(key_end, id_range_end);
 	struct credentials *orig_credentials = effective_user();
 	fiber_set_user(fiber(), &admin_credentials);
-	auto guard = make_scoped_guard([=] {
+	auto guard = make_scoped_guard([=]() noexcept {
 		fiber_set_user(fiber(), orig_credentials);
 	});
 	box_iterator_t *it = box_index_iterator(BOX_SPACE_ID, 0, ITER_LT,

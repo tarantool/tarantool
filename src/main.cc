@@ -753,7 +753,10 @@ main(int argc, char **argv)
 	/* The maximum possible number of Lua interpeter options */
 	int optc_max = (argc - 1) * 2;
 	bool say_entering_the_event_loop = true;
-	auto guard = make_scoped_guard([&optc, &optv]{ if (optc) free(optv); });
+	auto guard = make_scoped_guard([&optc, &optv]() noexcept {
+		if (optc)
+			free(optv);
+	});
 
 	static struct option longopts[] = {
 		{"help", no_argument, 0, 'h'},

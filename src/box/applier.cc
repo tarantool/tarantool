@@ -457,7 +457,7 @@ applier_watch_ballot(struct applier *applier)
 	struct ibuf ibuf;
 	iostream_clear(&io);
 	ibuf_create(&ibuf, &cord()->slabc, 1024);
-	auto guard = make_scoped_guard([&] {
+	auto guard = make_scoped_guard([&]() noexcept {
 		if (iostream_is_initialized(&io))
 			iostream_close(&io);
 		ibuf_destroy(&ibuf);
@@ -1508,7 +1508,7 @@ static void
 applier_synchro_filter_tx(struct stailq *rows)
 {
 	latch_lock(&txn_limbo.promote_latch);
-	auto guard = make_scoped_guard([] {
+	auto guard = make_scoped_guard([]() noexcept {
 		latch_unlock(&txn_limbo.promote_latch);
 	});
 	struct xrow_header *row;
@@ -2428,7 +2428,7 @@ applier_subscribe(struct applier *applier)
 	struct applier_thread *thread = applier_thread_next();
 	if (applier_thread_data_create(applier, thread) != 0)
 		diag_raise();
-	auto thread_guard = make_scoped_guard([&]{
+	auto thread_guard = make_scoped_guard([&]() noexcept {
 		applier_thread_data_destroy(applier);
 	});
 
@@ -2452,7 +2452,7 @@ applier_subscribe(struct applier *applier)
 	trigger_create(&on_rollback, applier_on_rollback, applier, NULL);
 	trigger_add(&replicaset.applier.on_rollback, &on_rollback);
 
-	auto trigger_guard = make_scoped_guard([&] {
+	auto trigger_guard = make_scoped_guard([&]() noexcept {
 		trigger_clear(&on_wal_write);
 		trigger_clear(&on_rollback);
 	});

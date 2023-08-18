@@ -92,7 +92,7 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 			  "struct recovery");
 	}
 
-	auto guard = make_scoped_guard([=]{
+	auto guard = make_scoped_guard([=]() noexcept {
 		free(r);
 	});
 
@@ -114,7 +114,7 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 	r->watcher = NULL;
 	rlist_create(&r->on_close_log);
 
-	guard.is_active = false;
+	guard.reset();
 	return r;
 }
 

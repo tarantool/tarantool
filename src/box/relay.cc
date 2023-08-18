@@ -460,7 +460,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 
 	relay_start(relay, io, sync, relay_send_initial_join_row, relay_yield,
 		    UINT64_MAX);
-	auto relay_guard = make_scoped_guard([=] {
+	auto relay_guard = make_scoped_guard([=]() noexcept {
 		relay_stop(relay);
 		relay_delete(relay);
 	});
@@ -468,7 +468,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	/* Freeze a read view in engines. */
 	struct engine_join_ctx ctx;
 	engine_prepare_join_xc(&ctx);
-	auto join_guard = make_scoped_guard([&] {
+	auto join_guard = make_scoped_guard([&]() noexcept {
 		engine_complete_join(&ctx);
 	});
 
@@ -529,7 +529,7 @@ int
 relay_final_join_f(va_list ap)
 {
 	struct relay *relay = va_arg(ap, struct relay *);
-	auto guard = make_scoped_guard([=] { relay_exit(relay); });
+	auto guard = make_scoped_guard([=]() noexcept { relay_exit(relay); });
 
 	relay_cord_init(relay);
 
@@ -556,7 +556,7 @@ relay_final_join(struct replica *replica, struct iostream *io, uint64_t sync,
 
 	relay_start(relay, io, sync, relay_process_row, relay_yield,
 		    UINT64_MAX);
-	auto relay_guard = make_scoped_guard([=] {
+	auto relay_guard = make_scoped_guard([=]() noexcept {
 		relay_stop(relay);
 	});
 	/*
@@ -1121,7 +1121,7 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 	relay_start(relay, io, sync, relay_process_row,
 		    relay_yield_and_send_heartbeat, sent_raft_term);
 	replica_on_relay_follow(replica);
-	auto relay_guard = make_scoped_guard([=] {
+	auto relay_guard = make_scoped_guard([=]() noexcept {
 		relay_stop(relay);
 		replica_on_relay_stop(replica);
 	});

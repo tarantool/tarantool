@@ -534,19 +534,23 @@ user_cache_init(void)
 	struct user_def *def = user_def_new(GUEST, ADMIN, SC_USER,
 					    name, strlen(name));
 	/* Free def in a case of exception. */
-	auto guest_def_guard = make_scoped_guard([=] { user_def_delete(def); });
+	auto guest_def_guard = make_scoped_guard([=]() noexcept {
+		user_def_delete(def);
+	});
 	struct user *user = user_cache_replace(def);
 	/* Now the user cache owns the def. */
-	guest_def_guard.is_active = false;
+	guest_def_guard.reset();
 	/* 0 is the auth token and user id by default. */
 	assert(user->def->uid == GUEST && user->auth_token == GUEST);
 	(void) user;
 
 	name = "admin";
 	def = user_def_new(ADMIN, ADMIN, SC_USER, name, strlen(name));
-	auto admin_def_guard = make_scoped_guard([=] { user_def_delete(def); });
+	auto admin_def_guard = make_scoped_guard([=]() noexcept {
+		user_def_delete(def);
+	});
 	user = user_cache_replace(def);
-	admin_def_guard.is_active = false;
+	admin_def_guard.reset();
 	/*
 	 * For performance reasons, we do not always explicitly
 	 * look at user id in access checks, while still need to
