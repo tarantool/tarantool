@@ -713,14 +713,16 @@ tmp = space:create_index('primary', { type = 'tree', parts = {3, 'unsigned', 2, 
 -- Print key fields in pk
 space.index['primary'].parts
 ---
-- - type: unsigned
+- - fieldno: 3
+    sort_order: asc
+    type: unsigned
     exclude_null: false
     is_nullable: false
-    fieldno: 3
-  - type: unsigned
+  - fieldno: 2
+    sort_order: asc
+    type: unsigned
     exclude_null: false
     is_nullable: false
-    fieldno: 2
 ...
 space:insert{1, 2, 3, 4}
 ---

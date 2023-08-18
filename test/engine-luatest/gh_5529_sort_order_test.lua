@@ -340,3 +340,98 @@ g_local.test_infinities_sort_order = function(cg)
         t.assert_equals(desc:select(), expect)
     end)
 end
+
+g_local.test_lua_api = function()
+    local key_def = require('key_def')
+
+    local function key_def_new(parts)
+        local def = {}
+        for _, part in ipairs(parts) do
+            table.insert(def, {
+                fieldno = part[1],
+                type = part[2],
+                sort_order = part[3]
+            })
+        end
+        return key_def.new(def)
+    end
+
+    local function canonical_compare(key_parts, tuple_a, tuple_b)
+        for _, part in pairs(key_parts) do
+            local fieldno = part.fieldno
+            local sort_order = part.sort_order
+            local field_a = tuple_a[fieldno]
+            local field_b = tuple_b[fieldno]
+            local rc = field_a < field_b and -1 or field_a > field_b and 1 or 0
+            -- Inverse the result if sort order is descending.
+            rc = sort_order ~= 'desc' and rc or -rc
+            if rc ~= 0 then
+                return rc
+            end
+        end
+        return 0
+    end
+
+    local function test(key_parts, tests)
+        local def = key_def_new(key_parts)
+        for _, test in pairs(tests) do
+            local function compare_results(result1, result2)
+                result1 = result1 > 0 and 1 or result1 < 0 and -1 or 0
+                result2 = result2 > 0 and 1 or result2 < 0 and -1 or 0
+                t.assert_equals(result1, result2)
+            end
+
+            local tuple_a = test[1]
+            local tuple_b = test[2]
+            local result = test[3]
+
+            local rc = canonical_compare(def:totable(), tuple_a, tuple_b)
+            t.assert_equals(result, rc)
+            compare_results(def:compare(tuple_a, tuple_b), result)
+            compare_results(def:compare(tuple_b, tuple_a), -result)
+        end
+    end
+
+    test({{1, 'unsigned', 'desc'}}, {
+        {{0}, {0}, 0},
+        {{0}, {1}, 1},
+        {{1}, {0}, -1},
+        {{1}, {1}, 0},
+    })
+
+    test({{2, 'unsigned', 'desc'}, {3, 'unsigned'}}, {
+        -- Different ascending part comparison.
+        {{0, 0, 0}, {0, 0, 1}, -1},
+        {{0, 0, 1}, {0, 0, 0}, 1},
+        -- Different descending part comparison.
+        {{0, 0, 0}, {0, 1, 0}, 1},
+        {{0, 1, 0}, {0, 0, 0}, -1},
+        -- All fields differ, comparison ends on the first
+        -- (descending) part, the first field is not indexed.
+        {{0, 0, 0}, {0, 1, 1}, 1},
+        {{1, 0, 0}, {0, 1, 1}, 1},
+        {{0, 0, 0}, {1, 1, 1}, 1},
+        {{0, 0, 1}, {0, 1, 0}, 1},
+        {{1, 0, 1}, {0, 1, 0}, 1},
+        {{0, 0, 1}, {1, 1, 0}, 1},
+        {{0, 1, 0}, {0, 0, 1}, -1},
+        {{1, 1, 0}, {0, 0, 1}, -1},
+        {{0, 1, 0}, {1, 0, 1}, -1},
+        {{0, 1, 1}, {0, 0, 0}, -1},
+        {{1, 1, 1}, {0, 0, 0}, -1},
+        {{0, 1, 1}, {1, 0, 0}, -1},
+        -- Equal by both parts, the first field is not indexed.
+        {{0, 0, 0}, {1, 0, 0}, 0},
+        {{1, 0, 0}, {0, 0, 0}, 0},
+        {{0, 0, 0}, {0, 0, 0}, 0},
+        {{0, 0, 1}, {1, 0, 1}, 0},
+        {{1, 0, 1}, {0, 0, 1}, 0},
+        {{0, 0, 1}, {0, 0, 1}, 0},
+        {{0, 1, 0}, {1, 1, 0}, 0},
+        {{1, 1, 0}, {0, 1, 0}, 0},
+        {{0, 1, 0}, {0, 1, 0}, 0},
+        {{0, 1, 1}, {1, 1, 1}, 0},
+        {{1, 1, 1}, {0, 1, 1}, 0},
+        {{0, 1, 1}, {0, 1, 1}, 0},
+    })
+end

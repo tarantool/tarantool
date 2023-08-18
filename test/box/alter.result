@@ -704,14 +704,16 @@ s.index.pk
 ---
 - unique: true
   parts:
-  - type: unsigned
+  - fieldno: 1
+    sort_order: asc
+    type: unsigned
     exclude_null: false
     is_nullable: false
-    fieldno: 1
-  - type: unsigned
+  - fieldno: 2
+    sort_order: asc
+    type: unsigned
     exclude_null: false
     is_nullable: false
-    fieldno: 2
   hint: true
   id: 0
   type: TREE
@@ -740,10 +742,11 @@ s.index.pk
 ---
 - unique: true
   parts:
-  - type: unsigned
+  - fieldno: 1
+    sort_order: asc
+    type: unsigned
     exclude_null: false
     is_nullable: false
-    fieldno: 1
   hint: true
   id: 0
   type: TREE
@@ -754,10 +757,11 @@ s.index.secondary
 ---
 - unique: true
   parts:
-  - type: unsigned
+  - fieldno: 2
+    sort_order: asc
+    type: unsigned
     exclude_null: false
     is_nullable: false
-    fieldno: 2
   hint: true
   id: 1
   type: TREE

@@ -310,10 +310,11 @@ pk = space:create_index('pk', {parts={{field = 1, type = 'unsigned'}}})
 ...
 pk.parts
 ---
-- - type: unsigned
+- - fieldno: 1
+    sort_order: asc
+    type: unsigned
     exclude_null: false
     is_nullable: false
-    fieldno: 1
 ...
 pk:drop()
 ---
@@ -323,10 +324,11 @@ pk = space:create_index('pk', {parts={{1, 'unsigned'}}})
 ...
 pk.parts
 ---
-- - type: unsigned
+- - fieldno: 1
+    sort_order: asc
+    type: unsigned
     exclude_null: false
     is_nullable: false
-    fieldno: 1
 ...
 pk:drop()
 ---
@@ -336,10 +338,11 @@ pk = space:create_index('pk', {parts={{1, type='unsigned'}}})
 ...
 pk.parts
 ---
-- - type: unsigned
+- - fieldno: 1
+    sort_order: asc
+    type: unsigned
     exclude_null: false
     is_nullable: false
-    fieldno: 1
 ...
 space:insert{1, 2, 3}
 ---
@@ -728,10 +731,11 @@ s:format()
 ...
 s.index.sk3.parts
 ---
-- - type: string
+- - fieldno: 2
+    sort_order: asc
+    type: string
     exclude_null: false
     is_nullable: false
-    fieldno: 2
 ...
 -- Space format can be updated, if conflicted index is deleted.
 sk3:drop()
@@ -956,10 +960,11 @@ s:create_index('test', {parts = {{field = 'test'}}})
 ...
 s:create_index('test', {parts = {1}}).parts
 ---
-- - type: scalar
+- - fieldno: 1
+    sort_order: asc
+    type: scalar
     exclude_null: false
     is_nullable: false
-    fieldno: 1
 ...
 s:drop()
 ---
@@ -984,10 +989,11 @@ s:create_index('test', {parts = {{field = 'test'}}})
 ...
 s:create_index('test1', {parts = {'test1'}}).parts
 ---
-- - type: integer
+- - fieldno: 1
+    sort_order: asc
+    type: integer
     exclude_null: false
     is_nullable: false
-    fieldno: 1
 ...
 s:create_index('test2', {parts = {'test2'}}).parts
 ---
@@ -996,57 +1002,66 @@ s:create_index('test2', {parts = {'test2'}}).parts
 ...
 s:create_index('test3', {parts = {{'test1', 'integer'}}}).parts
 ---
-- - type: integer
+- - fieldno: 1
+    sort_order: asc
+    type: integer
     exclude_null: false
     is_nullable: false
-    fieldno: 1
 ...
 s:create_index('test4', {parts = {{'test2', 'integer'}}}).parts
 ---
-- - type: integer
+- - fieldno: 2
+    sort_order: asc
+    type: integer
     exclude_null: false
     is_nullable: false
-    fieldno: 2
 ...
 s:create_index('test5', {parts = {{'test2', 'integer'}}}).parts
 ---
-- - type: integer
+- - fieldno: 2
+    sort_order: asc
+    type: integer
     exclude_null: false
     is_nullable: false
-    fieldno: 2
 ...
 s:create_index('test6', {parts = {1, 3}}).parts
 ---
-- - type: integer
+- - fieldno: 1
+    sort_order: asc
+    type: integer
     exclude_null: false
     is_nullable: false
-    fieldno: 1
-  - type: integer
+  - fieldno: 3
+    sort_order: asc
+    type: integer
     exclude_null: false
     is_nullable: false
-    fieldno: 3
 ...
 s:create_index('test7', {parts = {'test1', 4}}).parts
 ---
-- - type: integer
+- - fieldno: 1
+    sort_order: asc
+    type: integer
     exclude_null: false
     is_nullable: false
-    fieldno: 1
-  - type: scalar
+  - fieldno: 4
+    sort_order: asc
+    type: scalar
     exclude_null: false
     is_nullable: false
-    fieldno: 4
 ...
 s:create_index('test8', {parts = {{1, 'integer'}, {'test4', 'scalar'}}}).parts
 ---
-- - type: integer
+- - fieldno: 1
+    sort_order: asc
+    type: integer
     exclude_null: false
     is_nullable: false
-    fieldno: 1
-  - type: scalar
+  - fieldno: 4
+    sort_order: asc
+    type: scalar
     exclude_null: false
     is_nullable: false
-    fieldno: 4
 ...
 s:drop()
 ---
@@ -1682,10 +1697,11 @@ i = s:create_index('primary', { parts = {'field1'} })
 ...
 i.parts
 ---
-- - type: unsigned
+- - fieldno: 1
+    sort_order: asc
+    type: unsigned
     exclude_null: false
     is_nullable: false
-    fieldno: 1
 ...
 -- Check that is_nullable can't be set to false on non-empty space
 s:insert({1, NULL})
@@ -1757,10 +1773,11 @@ i = s:create_index('secondary', { parts = {{2, 'string', is_nullable = true}} })
 ...
 i.parts
 ---
-- - type: string
+- - fieldno: 2
+    sort_order: asc
+    type: string
     exclude_null: false
     is_nullable: true
-    fieldno: 2
 ...
 s:insert({1, NULL})
 ---
