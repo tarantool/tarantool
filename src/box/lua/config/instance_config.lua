@@ -180,7 +180,7 @@ end
 --
 --   It means 'bind to a random free port' for the bind() call,
 --   but it has no meaning at the connect() call on a client.
-local function uri_is_suitable_to_connect(_, uri)
+local function uri_is_suitable_to_connect(uri)
     assert(uri ~= nil)
 
     if uri.ipv4 == '0.0.0.0' then
@@ -222,7 +222,7 @@ local function advertise_peer_uri_validate(data, w)
         end
         w.error('Unable to parse an URI: %s', err)
     end
-    local ok, err = uri_is_suitable_to_connect(nil, uri)
+    local ok, err = uri_is_suitable_to_connect(uri)
     if not ok then
         w.error(err)
     end
@@ -230,6 +230,121 @@ local function advertise_peer_uri_validate(data, w)
     -- The return value is ignored by schema.lua, but useful in
     -- iproto.advertise.client validation.
     return uri
+end
+
+-- Accept a comma separated list of URIs and return the first one
+-- that is suitable to create a client socket (not just to listen
+-- on the server as, say, 0.0.0.0:3301 or localhost:0).
+--
+-- See the uri_is_suitable_to_connect() method in the instance
+-- schema object for details.
+local function find_suitable_uri_to_connect(uris)
+    for _, u in ipairs(urilib.parse_many(uris)) do
+        if uri_is_suitable_to_connect(u) then
+            -- The urilib.format() call has the second optional
+            -- argument `write_password`. Let's assume that the
+            -- given URIs are to listen on them and so have no
+            -- user/password.
+            return urilib.format(u)
+        end
+    end
+    return nil
+end
+
+local function find_password(self, iconfig, username)
+    -- The guest user can't have a password.
+    if username == 'guest' then
+        return nil
+    end
+
+    -- Find a user definition in the config.
+    local user_def = self:get(iconfig, 'credentials.users.' .. username)
+    if user_def == nil then
+        error(('Cannot find user %s in the config to use its password in a '..
+               'replication peer URI'):format(username), 0)
+    end
+
+    -- There is a user definition without a password. Let's assume
+    -- that the user has no password.
+    if user_def.password ~= nil then
+        return user_def.password
+    end
+    return nil
+end
+
+local function instance_uri(self, iconfig, advertise_type)
+    assert(advertise_type == 'peer' or advertise_type == 'sharding')
+    local listen = self:get(iconfig, 'iproto.listen')
+    local advertise = self:get(iconfig, 'iproto.advertise.'..advertise_type)
+    if advertise == nil and advertise_type == 'sharding' then
+        advertise = self:get(iconfig, 'iproto.advertise.peer')
+    end
+    if advertise ~= nil and not advertise:endswith('@') then
+        -- The iproto.advertise.* option contains an URI.
+        --
+        -- There are the following cases.
+        --
+        -- * host:port
+        -- * user@host:port
+        -- * user:pass@host:port
+        --
+        -- Note: the host:port part may represent a Unix domain
+        -- socket: host = 'unix/', port = '/path/to/socket'.
+        --
+        -- The second case needs additional handling: we should
+        -- find password for the given user in the 'credential'
+        -- section of the config.
+        --
+        -- Otherwise, the URI is returned as is.
+        local u, err = urilib.parse(advertise)
+        -- NB: The URI is validated, so the parsing can't fail.
+        assert(u ~= nil, err)
+        if u.login ~= nil and u.password == nil then
+            u.password = find_password(self, iconfig, u.login)
+            return urilib.format(u, true)
+        end
+        return advertise
+    elseif listen ~= nil then
+        -- The iproto.advertise.* option has no URI.
+        --
+        -- There are the following cases.
+        --
+        -- * <no iproto.advertise.*>
+        -- * user@
+        -- * user:pass@
+        --
+        -- In any case we should find an URI suitable to create a
+        -- client socket in iproto.listen option. After this, add
+        -- the auth information if any.
+        local uri = find_suitable_uri_to_connect(listen)
+        if uri == nil then
+            return nil
+        end
+
+        -- No additional auth information in iproto.advertise.*:
+        -- return the listen URI as is.
+        if advertise == nil then
+            return uri
+        end
+
+        -- Extract user and password from the iproto.advertise
+        -- option. If no password given, find it in the
+        -- 'credentials' section of the config.
+        assert(advertise:endswith('@'))
+        local auth = advertise:sub(1, -2):split(':', 1)
+        local username = auth[1]
+        local password = auth[2] or find_password(self, iconfig, username)
+
+        -- Rebuild the listen URI with the given username and
+        -- password,
+        local u, err = urilib.parse(uri)
+        -- NB: The URI is validated, so the parsing can't fail.
+        assert(u ~= nil, err)
+        u.login = username
+        u.password = password
+        return urilib.format(u, true)
+    end
+    return nil
 end
 
 local function feedback_apply_default_if(_data, _w)
@@ -1418,6 +1533,6 @@ return schema.new('instance_config', schema.record({
     config_version = CONFIG_VERSION,
 }), {
     methods = {
-        uri_is_suitable_to_connect = uri_is_suitable_to_connect,
+        instance_uri = instance_uri,
     },
 })

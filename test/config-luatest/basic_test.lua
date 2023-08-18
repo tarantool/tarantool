@@ -110,7 +110,7 @@ g.test_example_replicaset_election_failover = function(g)
     t.assert_equals(rw_count, 1)
 end
 
-local err_msg_cannot_find_user = 'box_cfg.apply: cannot find user unknown ' ..
+local err_msg_cannot_find_user = 'Cannot find user unknown ' ..
     'in the config to use its password in a replication peer URI'
 local err_msg_no_suitable_uris = 'replication.peers construction for ' ..
     'instance "instance-001" of replicaset "replicaset-001" of group ' ..
