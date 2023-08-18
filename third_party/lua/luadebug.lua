@@ -27,6 +27,9 @@
 local dbg
 
 local DEBUGGER = 'luadebug'
+local DEBUGGER_COMMANDS = '.luadebugrc'
+local dbg_cmds = {}
+
 -- Use ANSI color codes in the prompt by default.
 local COLOR_GRAY = ""
 local COLOR_RED = ""
@@ -370,6 +373,20 @@ local function remove_breakpoint(file, line)
 end
 
 local repl
+local fiber_id_func = require('fiber').id
+local last_fiber_id = fiber_id_func()
+
+-- visualize verbosely each fiber switch
+local function display_fiber_switch()
+    if dbg.cfg.fiber_switch then
+        local fiber_id = fiber_id_func()
+        if last_fiber_id ~= fiber_id then
+            dbg_write_warn('Fiber switched from %d to %d', last_fiber_id, fiber_id)
+            last_fiber_id = fiber_id
+        end
+    end
+end
+
 
 -- Return false for stack frames without source,
 -- which includes C frames, Lua bytecode, and `loadstring` functions
@@ -401,6 +418,9 @@ local function hook_factory(level)
             -- accounted for.
             local offset = get_stack_length(dbg_hook_ofs)
 
+            -- visualize fiber switches
+            display_fiber_switch()
+
             if event == "line" then
                 local matched = offset <= stop_level or
                                 has_breakpoint(normfile, info.currentline)
@@ -425,6 +445,7 @@ local function hook_check_bps()
         if not frame_has_line(info) then
             return
         end
+        display_fiber_switch()
         if event == 'line' and has_breakpoint(info.source, info.currentline) then
             repl('hit')
         end
@@ -1039,13 +1060,39 @@ local function motto()
     jit.flush()
 end
 
+-- preload commands from .luadebug.rc file
+local function load_dbg_commands()
+    local f = io.open(DEBUGGER_COMMANDS, 'rt')
+    if not f then
+        return
+    end
+    while true do
+        local line = f:read('*line')
+        if not line then
+            f:close()
+            return
+        end
+        table.insert(dbg_cmds, line)
+    end
+end
+
 -- lazily perform repl initialization
 local function start_repl()
     if started then
         return
     end
     motto()
+    load_dbg_commands()
     started = true
+end
+
+local function next_command()
+    if #dbg_cmds > 0 then
+        local line = table.remove(dbg_cmds, 1)
+        dbg_write_warn('Injecting command: "%s"', line)
+        return line
+    end
+    return dbg.read(color_red(DEBUGGER .. "> "))
 end
 
 repl = function(reason)
@@ -1067,11 +1114,11 @@ repl = function(reason)
         if not listing_shown then
             auto_listing(info)
         end
+        display_fiber_switch()
         -- Command could show their own context with listing
         -- so reset status before command executed.
         listing_shown = false
-        local success, done, hook = pcall(run_command,
-                                         dbg.read(color_red(DEBUGGER .. "> ")))
+        local success, done, hook = pcall(run_command, next_command())
         if success then
             debug.sethook(hook and hook(0), "l")
         else
@@ -1096,6 +1143,7 @@ dbg = setmetatable({
             auto_where  = 3,
             auto_eval   = false,
             pretty_depth = 3,
+            fiber_switch= true,
         },
         pretty  = pretty,
         pp = function(value, depth)
