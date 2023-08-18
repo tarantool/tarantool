@@ -477,6 +477,17 @@ alloc_failure(const char *filename, int line, size_t size)
 #  define PACKED
 #endif
 
+/**
+ * NO_SANITIZE_ADDRESS attribute disables AddressSanitizer for a given function.
+ * The attribute may not be supported by old compilers, but they do not support
+ * ASAN as well, so it's safe to define the attribute only if ASAN is enabled.
+ */
+#if __has_feature(address_sanitizer)
+#  define NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
+#else
+#  define NO_SANITIZE_ADDRESS
+#endif
+
 /** Function Attributes }}} */
 
 /** {{{ Statement Attributes */
