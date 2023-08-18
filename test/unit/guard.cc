@@ -11,20 +11,28 @@ sigsegf_handler(int signo)
 	exit(0);
 }
 
-static int __attribute__((noinline))
-stack_break_f(char *ptr)
+/*
+ * ASAN is disabled for this function, because for the stack-use-after-return
+ * detection it could allocate the `block' on a fake stack, rather than placing
+ * it on a fiber stack. In that case, a lot more recursive calls will be
+ * required to overflow the stack.
+ */
+static NOINLINE NO_SANITIZE_ADDRESS int
+stack_break_f(char *frame_zero)
 {
-	char block[2048];
+	char *frame_curr = (char *)__builtin_frame_address(0);
+	volatile char block[2048];
 	/*
 	 * Make sum volatile to prevent a compiler from
 	 * optimizing away call to this function.
 	 */
 	volatile char sum = 0;
-	memset(block, 0xff, 2048);
+	memset((void *)block, 0xff, sizeof(block));
 	sum += block[(unsigned char) block[4]];
-	ptrdiff_t stack_diff = ptr > block ? ptr - block : block - ptr;
-	if (stack_diff < (ptrdiff_t)default_attr.stack_size)
-		sum += stack_break_f(ptr);
+
+	ptrdiff_t stack_diff = frame_curr - frame_zero;
+	if ((size_t)abs(stack_diff) < default_attr.stack_size)
+		sum += stack_break_f(frame_zero);
 	return sum;
 }
 
@@ -53,7 +61,7 @@ main_f(va_list ap)
 	sigaction(SIGSEGV, &sa, NULL);
 	sigaction(SIGBUS, &sa, NULL);
 
-	int res = stack_break_f((char *)&stack);
+	int res = stack_break_f((char *)__builtin_frame_address(0));
 
 	ev_break(loop(), EVBREAK_ALL);
 	free(stack.ss_sp);
