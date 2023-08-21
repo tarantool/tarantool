@@ -43,6 +43,12 @@ local function apply(config)
         local prefix = ('mkdir.apply[%s]'):format(table.concat(w.path, '.'))
         safe_mkdir(prefix, fio.dirname(w.data))
     end)
+
+    local console = configdata:get('console', {use_default = true})
+    if console.enabled then
+        local prefix = ('mkdir.apply[%s]'):format('console.socket')
+        safe_mkdir(prefix, fio.dirname(console.socket))
+    end
 end
 
 return {

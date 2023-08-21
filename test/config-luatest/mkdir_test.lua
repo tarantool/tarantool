@@ -7,7 +7,7 @@ g.test_nested_dirs = function(g)
     local verify = function()
         local fio = require('fio')
 
-        for _, dir in ipairs({'a/b', 'd/e/f', 'g/h/i', 'j/k/l'}) do
+        for _, dir in ipairs({'a/b', 'd/e/f', 'g/h/i', 'j/k/l', 'm/n'}) do
             t.assert_equals(fio.path.is_dir(dir), true)
         end
     end
@@ -18,6 +18,7 @@ g.test_nested_dirs = function(g)
             ['vinyl.dir'] = 'd/e/f',
             ['wal.dir'] = 'g/h/i',
             ['snapshot.dir'] = 'j/k/l',
+            ['console.socket'] = 'm/n/o.socket',
         },
         verify = verify,
     })

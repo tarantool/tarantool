@@ -374,6 +374,10 @@ return schema.new('instance_config', schema.record({
         }),
         socket = schema.scalar({
             type = 'string',
+            -- The mk_parent_dir annotation is not present here,
+            -- because otherwise the directory would be created
+            -- unconditionally. Instead, mkdir applier creates it
+            -- if console.enabled is true.
             default = '{{ instance_name }}.control',
         }),
     }),
