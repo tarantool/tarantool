@@ -196,7 +196,7 @@ end
 --
 --   Verify test invariants after config:reload().
 local function reload_success_case(g, opts)
-    local script_2 = assert(opts.script_2)
+    local script_2 = opts.script_2
     local options = assert(opts.options)
     local verify_2 = assert(opts.verify_2)
 

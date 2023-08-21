@@ -357,6 +357,10 @@ return schema.new('instance_config', schema.record({
             type = 'string',
             box_cfg = 'work_dir',
             box_cfg_nondynamic = true,
+            -- The mkdir annotation is not present here, because
+            -- otherwise the directory would be created
+            -- unconditionally. Instead, mkdir applier creates it
+            -- only before the first box.cfg() call.
             default = box.NULL,
         }),
         pid_file = schema.scalar({
