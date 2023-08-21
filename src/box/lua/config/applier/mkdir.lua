@@ -24,6 +24,18 @@ end
 
 local function apply(config)
     local configdata = config._configdata
+
+    -- Create process.work_dir directory if box.cfg() is not
+    -- called yet.
+    if type(box.cfg) == 'function' then
+        local work_dir = configdata:get('process.work_dir',
+            {use_default = true})
+        if work_dir ~= nil then
+            local prefix = ('mkdir.apply[%s]'):format('process.work_dir')
+            safe_mkdir(prefix, work_dir)
+        end
+    end
+
     configdata:filter(function(w)
         return w.schema.mkdir ~= nil
     end, {use_default = true}):each(function(w)
