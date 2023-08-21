@@ -346,11 +346,16 @@ local function apply(config)
         end
     end
 
-    -- Add instance, replicaset and group (cluster) names.
+    -- Persist an instance name to protect a user from accidental
+    -- attempt to run an instance from a snapshot left by another
+    -- instance.
+    --
+    -- Persist a replicaset name to protect a user from attempt to
+    -- mix instances with data from different replicasets into one
+    -- replicaset.
     local names = configdata:names()
-    box_cfg.cluster_name = names.group_name
-    box_cfg.replicaset_name = names.replicaset_name
     box_cfg.instance_name = names.instance_name
+    box_cfg.replicaset_name = names.replicaset_name
 
     -- Set bootstrap_leader option.
     box_cfg.bootstrap_leader = configdata:bootstrap_leader()
