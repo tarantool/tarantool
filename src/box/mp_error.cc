@@ -480,7 +480,7 @@ error_unpack_unsafe(const char **data)
 		if (mp_typeof(**data) != MP_UINT) {
 			diag_set(ClientError, ER_INVALID_MSGPACK,
 				 "Invalid MP_ERROR MsgPack format");
-			return NULL;
+			goto error;
 		}
 		uint64_t key = mp_decode_uint(data);
 		switch(key) {
@@ -488,14 +488,14 @@ error_unpack_unsafe(const char **data)
 			if (mp_typeof(**data) != MP_ARRAY) {
 				diag_set(ClientError, ER_INVALID_MSGPACK,
 					 "Invalid MP_ERROR MsgPack format");
-				return NULL;
+				goto error;
 			}
 			uint32_t stack_sz = mp_decode_array(data);
 			struct error *effect = NULL;
 			for (uint32_t i = 0; i < stack_sz; i++) {
 				struct error *cur = mp_decode_error_one(data);
 				if (cur == NULL)
-					return NULL;
+					goto error;
 				if (err == NULL) {
 					err = cur;
 					effect = cur;
@@ -512,6 +512,14 @@ error_unpack_unsafe(const char **data)
 		}
 	}
 	return err;
+
+error:
+	if (err != NULL) {
+		/* A hack to delete the error. */
+		error_ref(err);
+		error_unref(err);
+	}
+	return NULL;
 }
 
 struct error *
