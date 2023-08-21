@@ -432,6 +432,10 @@ return schema.new('instance_config', schema.record({
         }),
         file = schema.scalar({
             type = 'string',
+            -- The mk_parent_dir annotation is not present here,
+            -- because otherwise the directory would be created
+            -- unconditionally. Instead, mkdir applier creates it
+            -- if log.to is 'file'.
             default = '{{ instance_name }}.log',
         }),
         pipe = schema.scalar({
