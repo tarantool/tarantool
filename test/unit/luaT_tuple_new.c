@@ -125,7 +125,7 @@ test_basic(struct lua_State *L)
 	part.exclude_null = false;
 	part.sort_order = SORT_ORDER_ASC;
 	part.path = NULL;
-	struct key_def *key_def = key_def_new(&part, 1, false);
+	struct key_def *key_def = key_def_new(&part, 1, 0);
 	box_tuple_format_t *another_format = box_tuple_format_new(&key_def, 1);
 	key_def_delete(key_def);
 

@@ -382,7 +382,9 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 				 space->def->field_count, &fiber()->gc) != 0)
 		return NULL;
 	bool for_func_index = opts.func_id > 0;
-	key_def = key_def_new(part_def, part_count, for_func_index);
+	key_def = key_def_new(part_def, part_count,
+			      (type != TREE ? KEY_DEF_UNORDERED : 0) |
+			      (for_func_index ? KEY_DEF_FOR_FUNC_INDEX : 0));
 	if (key_def == NULL)
 		return NULL;
 	struct index_def *index_def =

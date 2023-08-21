@@ -198,7 +198,7 @@ sc_space_new(uint32_t id, const char *name,
 	     uint32_t key_part_count,
 	     struct trigger *replace_trigger)
 {
-	struct key_def *key_def = key_def_new(key_parts, key_part_count, false);
+	struct key_def *key_def = key_def_new(key_parts, key_part_count, 0);
 	if (key_def == NULL)
 		diag_raise();
 	auto key_def_guard =

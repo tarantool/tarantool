@@ -884,7 +884,7 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	}
 	assert(n == nKeyCol);
 
-	struct key_def *key_def = key_def_new(parts, nKeyCol, false);
+	struct key_def *key_def = key_def_new(parts, nKeyCol, 0);
 	if (key_def == NULL) {
 		pParse->is_aborted = true;
 		return;
@@ -2775,7 +2775,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		part.path = NULL;
 		part.exclude_null = false;
 
-		struct key_def *key_def = key_def_new(&part, 1, false);
+		struct key_def *key_def = key_def_new(&part, 1, 0);
 		if (key_def == NULL) {
 tnt_error:
 			pWInfo->pParse->is_aborted = true;

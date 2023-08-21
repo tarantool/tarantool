@@ -138,8 +138,8 @@ result
     - - HEADER:
           type: INSERT
         BODY:
-          tuple: [0, {6: 512, 7: [{'field': 0, 'collation': 1, 'type': 'string'}],
-              9: 19, 12: 2, 13: 6}]
+          tuple: [0, {6: 512, 7: [{'field': 0, 'sort_order': 'asc', 'collation': 1,
+                  'type': 'string'}], 9: 19, 12: 2, 13: 6}]
       - HEADER:
           type: INSERT
         BODY:
@@ -163,8 +163,8 @@ result
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [0, {0: 2, 5: 1, 6: 512, 7: [{'field': 1, 'is_nullable': true, 'type': 'unsigned'}],
-              9: 19, 12: 3, 13: 6}]
+          tuple: [0, {0: 2, 5: 1, 6: 512, 7: [{'field': 1, 'sort_order': 'asc', 'is_nullable': true,
+                  'type': 'unsigned'}], 9: 19, 12: 3, 13: 6}]
       - HEADER:
           type: INSERT
         BODY:

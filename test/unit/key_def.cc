@@ -105,7 +105,8 @@ test_key_def_new_va(const char *format, va_list ap, bool for_func_index)
 				     region) != 0);
 
 	/* Create a key def. */
-	struct key_def *def = key_def_new(part_def, part_count, for_func_index);
+	struct key_def *def = key_def_new(part_def, part_count, for_func_index ?
+					  KEY_DEF_FOR_FUNC_INDEX : 0);
 	fail_if(def == NULL);
 	key_def_update_optionality(def, 0);
 
@@ -714,6 +715,15 @@ test_check_cases(std::vector<struct tuple *> tuples_eq,
 					 int expected,
 					 const char *funcname))
 {
+	bool ascending_key = !key_def_has_desc_parts(key_def);
+	int mul = ascending_key ? 1 : -1;
+	enum sort_order expect_sort_order = ascending_key ?
+					    SORT_ORDER_ASC : SORT_ORDER_DESC;
+
+	/* All parts are to be either ascending or descending. */
+	for (uint32_t i = 0; i < key_def->part_count; i++)
+		fail_unless(key_def->parts[i].sort_order == expect_sort_order);
+
 	fail_unless(tuples_eq.size() % 2 == 0);
 	for (size_t i = 0; i < tuples_eq.size(); i += 2) {
 		struct tuple *a = tuples_eq[i];
@@ -726,8 +736,8 @@ test_check_cases(std::vector<struct tuple *> tuples_eq,
 	for (size_t i = 0; i < tuples_gt.size(); i += 2) {
 		struct tuple *a = tuples_gt[i];
 		struct tuple *b = tuples_gt[i + 1];
-		test_check_func(a, b, key_def, 1, funcname);
-		test_check_func(b, a, key_def, -1, funcname);
+		test_check_func(a, b, key_def, 1 * mul, funcname);
+		test_check_func(b, a, key_def, -1 * mul, funcname);
 	}
 }
 
@@ -776,22 +786,25 @@ test_check_key_compare(struct tuple *tuple_a, struct tuple *tuple_b,
 }
 
 static void
-test_key_compare_singlepart(bool is_nullable)
+test_key_compare_singlepart(bool ascending_key, bool is_nullable)
 {
 	size_t p = 4 + (is_nullable ? 4 : 0);
 	plan(p);
 	header();
 
+	const char *sort_order = ascending_key ? "asc" : "desc";
+
 	/* Type is number to prevent using precompiled comparators. */
 	struct key_def *key_def = test_key_def_new(
-		"[{%s%u%s%s%s%b}]",
-		"field", 0, "type", "number", "is_nullable", is_nullable);
+		"[{%s%u%s%s%s%b%s%s}]",
+		"field", 0, "type", "number", "is_nullable", is_nullable,
+			    "sort_order", sort_order);
 
 	fail_unless(key_def->is_nullable == is_nullable);
 
 	const char *funcname = (const char *)xstrdup(tt_sprintf(
-		"key_compare<%s, key_def.part_count = 1>",
-		is_nullable ? "true" : "false"));
+		"key_compare<%s, key_def: singlepart, %s>", is_nullable ? "true"
+		: "false", sort_order));
 
 	std::vector<struct tuple *> tuples_eq = {
 		/* Regular case. */
@@ -829,23 +842,29 @@ test_key_compare_singlepart(bool is_nullable)
 }
 
 static void
-test_key_compare(bool is_nullable)
+test_key_compare(bool ascending_key, bool is_nullable)
 {
 	size_t p = 14 + (is_nullable ? 80 : 0);
 	plan(p);
 	header();
 
+	const char *sort_order = ascending_key ? "asc" : "desc";
+
 	struct key_def *key_def = test_key_def_new(
-		"[{%s%u%s%s}{%s%u%s%s}{%s%u%s%s%s%b}{%s%u%s%s%s%b}]",
-		"field", 0, "type", "number",
-		"field", 1, "type", "number",
+		"[{%s%u%s%s%s%s}{%s%u%s%s%s%s}{%s%u%s%s%s%b%s%s}"
+		"{%s%u%s%s%s%b%s%s}]",
+		"field", 0, "type", "number", "sort_order", sort_order,
+		"field", 1, "type", "number", "sort_order", sort_order,
 		"field", 2, "type", "number", "is_nullable", is_nullable,
-		"field", 3, "type", "number", "is_nullable", is_nullable);
+			    "sort_order", sort_order,
+		"field", 3, "type", "number", "is_nullable", is_nullable,
+			    "sort_order", sort_order);
 
 	fail_unless(key_def->is_nullable == is_nullable);
 
 	const char *funcname = (const char *)xstrdup(tt_sprintf(
-		"key_compare<%s>", is_nullable ? "true" : "false"));
+		"key_compare<%s, key_def: %s>", is_nullable ? "true" : "false",
+		sort_order));
 
 	std::vector<struct tuple *> tuples_eq;
 	std::vector<struct tuple *> tuples_gt;
@@ -888,16 +907,20 @@ test_check_tuple_compare_with_key(struct tuple *tuple_a, struct tuple *tuple_b,
 
 static void
 test_tuple_compare_with_key_slowpath_singlepart(
+	bool ascending_key,
 	bool is_nullable_and_has_optional_parts)
 {
 	size_t p = 8 + (is_nullable_and_has_optional_parts ? 10 : 0);
 	plan(p);
 	header();
 
+	const char *sort_order = ascending_key ? "asc" : "desc";
+
 	/* Type is number to prevent using precompiled comparators. */
 	struct key_def *key_def = test_key_def_new(
-		"[{%s%u%s%s%s%b}]", "field", 1, "type", "number",
-		"is_nullable", is_nullable_and_has_optional_parts);
+		"[{%s%u%s%s%s%b%s%s}]", "field", 1, "type", "number",
+		"is_nullable", is_nullable_and_has_optional_parts,
+		"sort_order", sort_order);
 
 	/* Update has_optional_parts if the last parts can't be nil. */
 	size_t min_field_count = tuple_format_min_field_count(&key_def, 1,
@@ -908,9 +931,9 @@ test_tuple_compare_with_key_slowpath_singlepart(
 	fail_unless(key_def->has_optional_parts == key_def->is_nullable);
 
 	const char *funcname = (const char *)xstrdup(tt_sprintf(
-		"tuple_compare_with_key_slowpath<%s, key_def.part_count = 1>",
+		"tuple_compare_with_key_slowpath<%s, key_def: singlepart, %s>",
 		is_nullable_and_has_optional_parts ?
-		"true, true" : "false, false"));
+		"true, true" : "false, false", sort_order));
 
 	std::vector<struct tuple *> tuples_eq = {
 		/* Regular case. */
@@ -965,11 +988,14 @@ test_tuple_compare_with_key_slowpath_singlepart(
 }
 
 static void
-test_tuple_compare_with_key_slowpath(bool is_nullable, bool has_optional_parts)
+test_tuple_compare_with_key_slowpath(bool ascending_key, bool is_nullable,
+				     bool has_optional_parts)
 {
 	size_t p = 16 + (is_nullable ? 12 : 0) + (has_optional_parts ? 68 : 0);
 	plan(p);
 	header();
+
+	const char *sort_order = ascending_key ? "asc" : "desc";
 
 	/* has_optional_parts is only valid if is_nullable. */
 	fail_unless(!has_optional_parts || is_nullable);
@@ -977,10 +1003,12 @@ test_tuple_compare_with_key_slowpath(bool is_nullable, bool has_optional_parts)
 	/* Type is number to prevent using precompiled comparators. */
 	const bool last_is_nullable = has_optional_parts;
 	struct key_def *key_def = test_key_def_new(
-		"[{%s%u%s%s}{%s%u%s%s%s%b}{%s%u%s%s%s%b}]",
-		"field", 1, "type", "number",
+		"[{%s%u%s%s%s%s}{%s%u%s%s%s%b%s%s}{%s%u%s%s%s%b%s%s}]",
+		"field", 1, "type", "number", "sort_order", sort_order,
 		"field", 2, "type", "number", "is_nullable", is_nullable,
-		"field", 3, "type", "number", "is_nullable", last_is_nullable);
+			    "sort_order", sort_order,
+		"field", 3, "type", "number", "is_nullable", last_is_nullable,
+			    "sort_order", sort_order);
 
 	/* Update has_optional_parts if the last parts can't be nil. */
 	size_t min_field_count = tuple_format_min_field_count(&key_def, 1,
@@ -991,8 +1019,9 @@ test_tuple_compare_with_key_slowpath(bool is_nullable, bool has_optional_parts)
 	fail_unless(key_def->has_optional_parts == has_optional_parts);
 
 	const char *funcname = (const char *)xstrdup(tt_sprintf(
-		"tuple_compare_with_key_slowpath<%s, %s>", is_nullable ?
-		"true" : "false", has_optional_parts ? "true" : "false"));
+		"tuple_compare_with_key_slowpath<%s, %s, key_def: %s>",
+		is_nullable ? "true" : "false", has_optional_parts ? "true" :
+		"false", sort_order));
 
 	std::vector<struct tuple *> tuples_eq;
 	std::vector<struct tuple *> tuples_gt;
@@ -1027,28 +1056,32 @@ test_check_tuple_compare(struct tuple *tuple_a, struct tuple *tuple_b,
 }
 
 static void
-test_tuple_compare_slowpath(bool is_nullable, bool has_optional_parts,
-			    bool is_unique)
+test_tuple_compare_slowpath(bool ascending_key, bool is_nullable,
+			    bool has_optional_parts, bool is_unique)
 {
 	size_t p = 14 + (is_nullable ? 14 : 0) + (has_optional_parts ? 68 : 0) +
 		   (is_unique ? 2 : 0);
 	plan(p);
 	header();
 
+	const char *sort_order = ascending_key ? "asc" : "desc";
+
 	/* has_optional_parts is only valid if is_nullable. */
 	fail_unless(!has_optional_parts || is_nullable);
 
 	struct key_def *pk_def = test_key_def_new(
-		"[{%s%u%s%s}]",
-		"field", 0, "type", "unsigned");
+		"[{%s%u%s%s%s%s}]",
+		"field", 0, "type", "unsigned", "sort_order", sort_order);
 
 	/* Type is number to prevent using precompiled comparators. */
 	const bool last_is_nullable = has_optional_parts;
 	struct key_def *key_def = test_key_def_new(
-		"[{%s%u%s%s}{%s%u%s%s%s%b}{%s%u%s%s%s%b}]",
-		"field", 1, "type", "number",
+		"[{%s%u%s%s%s%s}{%s%u%s%s%s%b%s%s}{%s%u%s%s%s%b%s%s}]",
+		"field", 1, "type", "number", "sort_order", sort_order,
 		"field", 2, "type", "number", "is_nullable", is_nullable,
-		"field", 3, "type", "number", "is_nullable", last_is_nullable);
+			    "sort_order", sort_order,
+		"field", 3, "type", "number", "is_nullable", last_is_nullable,
+			    "sort_order", sort_order);
 
 	struct key_def *cmp_def = key_def_merge(key_def, pk_def);
 	fail_unless(cmp_def->unique_part_count > key_def->part_count);
@@ -1072,10 +1105,10 @@ test_tuple_compare_slowpath(bool is_nullable, bool has_optional_parts,
 	fail_unless(cmp_def->has_optional_parts == has_optional_parts);
 
 	const char *funcname = (const char *)xstrdup(tt_sprintf(
-		"tuple_compare_slowpath<%s, %s, key_def.is_unique = %s>",
+		"tuple_compare_slowpath<%s, %s, key_def: %sunique, %s>",
 		is_nullable ? "true" : "false",
 		has_optional_parts ? "true" : "false",
-		is_unique ? "true" : "false"));
+		is_unique ? "" : "not ", sort_order));
 
 	std::vector<struct tuple *> tuples_eq;
 	std::vector<struct tuple *> tuples_gt;
@@ -1131,12 +1164,14 @@ test_tuple_compare_slowpath(bool is_nullable, bool has_optional_parts,
 }
 
 static void
-test_tuple_compare_with_key_sequential(bool is_nullable,
+test_tuple_compare_with_key_sequential(bool ascending_key, bool is_nullable,
 				       bool has_optional_parts)
 {
 	size_t p = 14 + (is_nullable ? 12 : 0) + (has_optional_parts ? 68 : 0);
 	plan(p);
 	header();
+
+	const char *sort_order = ascending_key ? "asc" : "desc";
 
 	/* has_optional_parts is only valid if is_nullable. */
 	fail_unless(!has_optional_parts || is_nullable);
@@ -1144,11 +1179,14 @@ test_tuple_compare_with_key_sequential(bool is_nullable,
 	/* Type is number to prevent using precompiled comparators. */
 	const bool last_is_nullable = has_optional_parts;
 	struct key_def *key_def = test_key_def_new(
-		"[{%s%u%s%s}{%s%u%s%s}{%s%u%s%s%s%b}{%s%u%s%s%s%b}]",
-		"field", 0, "type", "number",
-		"field", 1, "type", "number",
+		"[{%s%u%s%s%s%s}{%s%u%s%s%s%s}{%s%u%s%s%s%b%s%s}"
+		"{%s%u%s%s%s%b%s%s}]",
+		"field", 0, "type", "number", "sort_order", sort_order,
+		"field", 1, "type", "number", "sort_order", sort_order,
 		"field", 2, "type", "number", "is_nullable", is_nullable,
-		"field", 3, "type", "number", "is_nullable", last_is_nullable);
+			    "sort_order", sort_order,
+		"field", 3, "type", "number", "is_nullable", last_is_nullable,
+			    "sort_order", sort_order);
 
 	/* Update has_optional_parts if the last parts can't be nil. */
 	size_t min_field_count = tuple_format_min_field_count(&key_def, 1,
@@ -1159,8 +1197,9 @@ test_tuple_compare_with_key_sequential(bool is_nullable,
 	fail_unless(key_def->has_optional_parts == has_optional_parts);
 
 	const char *funcname = (const char *)xstrdup(tt_sprintf(
-		"tuple_compare_with_key_sequential<%s, %s>", is_nullable ?
-		"true" : "false", has_optional_parts ? "true" : "false"));
+		"tuple_compare_with_key_sequential<%s, %s, key_def: %s>",
+		is_nullable ? "true" : "false", has_optional_parts ? "true" :
+		"false", sort_order));
 
 	std::vector<struct tuple *> tuples_eq;
 	std::vector<struct tuple *> tuples_gt;
@@ -1179,11 +1218,14 @@ test_tuple_compare_with_key_sequential(bool is_nullable,
 }
 
 static void
-test_tuple_compare_sequential(bool is_nullable, bool has_optional_parts)
+test_tuple_compare_sequential(bool ascending_key, bool is_nullable,
+			      bool has_optional_parts)
 {
 	size_t p = 14 + (is_nullable ? 12 : 0) + (has_optional_parts ? 68 : 0);
 	plan(p);
 	header();
+
+	const char *sort_order = ascending_key ? "asc" : "desc";
 
 	/* has_optional_parts is only valid if is_nullable. */
 	fail_unless(!has_optional_parts || is_nullable);
@@ -1191,11 +1233,14 @@ test_tuple_compare_sequential(bool is_nullable, bool has_optional_parts)
 	/* Type is number to prevent using precompiled comparators. */
 	const bool last_is_nullable = has_optional_parts;
 	struct key_def *key_def = test_key_def_new(
-		"[{%s%u%s%s}{%s%u%s%s}{%s%u%s%s%s%b}{%s%u%s%s%s%b}]",
-		"field", 0, "type", "number",
-		"field", 1, "type", "number",
+		"[{%s%u%s%s%s%s}{%s%u%s%s%s%s}{%s%u%s%s%s%b%s%s}"
+		"{%s%u%s%s%s%b%s%s}]",
+		"field", 0, "type", "number", "sort_order", sort_order,
+		"field", 1, "type", "number", "sort_order", sort_order,
 		"field", 2, "type", "number", "is_nullable", is_nullable,
-		"field", 3, "type", "number", "is_nullable", last_is_nullable);
+			    "sort_order", sort_order,
+		"field", 3, "type", "number", "is_nullable", last_is_nullable,
+			    "sort_order", sort_order);
 
 	/* Update has_optional_parts if the last parts can't be nil. */
 	size_t min_field_count = tuple_format_min_field_count(&key_def, 1,
@@ -1206,8 +1251,9 @@ test_tuple_compare_sequential(bool is_nullable, bool has_optional_parts)
 	fail_unless(key_def->has_optional_parts == has_optional_parts);
 
 	const char *funcname = (const char *)xstrdup(tt_sprintf(
-		"tuple_compare_sequential<%s, %s>", is_nullable ? "true" :
-		"false", has_optional_parts ? "true" : "false"));
+		"tuple_compare_sequential<%s, %s, key_def: %s>", is_nullable ?
+		"true" : "false", has_optional_parts ? "true" : "false",
+		sort_order));
 
 	std::vector<struct tuple *> tuples_eq;
 	std::vector<struct tuple *> tuples_gt;
@@ -1225,22 +1271,26 @@ test_tuple_compare_sequential(bool is_nullable, bool has_optional_parts)
 }
 
 static void
-test_tuple_compare_sequential_no_optional_parts_unique(bool is_nullable)
+test_tuple_compare_sequential_no_optional_parts_unique(bool ascending_key,
+						       bool is_nullable)
 {
 	plan(is_nullable ? 18 : 14);
 	header();
 
+	const char *sort_order = ascending_key ? "asc" : "desc";
+
 	/* The primary key (PK). */
 	struct key_def *pk_def = test_key_def_new(
-		"[{%s%u%s%s}]",
-		"field", 3, "type", "number");
+		"[{%s%u%s%s%s%s}]",
+		"field", 3, "type", "number", "sort_order", sort_order);
 
 	/* The secondary key (SK). */
 	struct key_def *key_def = test_key_def_new(
-		"[{%s%u%s%s}{%s%u%s%s%s%b}{%s%u%s%s}]",
-		"field", 0, "type", "number",
+		"[{%s%u%s%s%s%s}{%s%u%s%s%s%b%s%s}{%s%u%s%s%s%s}]",
+		"field", 0, "type", "number", "sort_order", sort_order,
 		"field", 1, "type", "number", "is_nullable", is_nullable,
-		"field", 2, "type", "number");
+			    "sort_order", sort_order,
+		"field", 2, "type", "number", "sort_order", sort_order);
 
 	struct key_def *cmp_def = key_def_merge(key_def, pk_def);
 	fail_unless(cmp_def->unique_part_count > key_def->part_count);
@@ -1262,8 +1312,8 @@ test_tuple_compare_sequential_no_optional_parts_unique(bool is_nullable)
 	fail_unless(!cmp_def->has_optional_parts);
 
 	const char *funcname = (const char *)xstrdup(tt_sprintf(
-		"tuple_compare_sequential<%s, false, key_def is unique>",
-		is_nullable ? "true" : "false"));
+		"tuple_compare_sequential<%s, false, key_def: unique, %s>",
+		is_nullable ? "true" : "false", sort_order));
 
 	std::vector<struct tuple *> tuples_eq;
 	std::vector<struct tuple *> tuples_gt;
@@ -1317,36 +1367,59 @@ test_tuple_compare_sequential_no_optional_parts_unique(bool is_nullable)
 static int
 test_main(void)
 {
-	plan(27);
+	plan(50);
 	header();
 
 	test_func_compare();
 	test_func_compare_with_key();
 	test_tuple_extract_key_raw_slowpath_nullable();
 	test_tuple_validate_key_parts_raw();
-	test_tuple_compare_sequential(true, true);
-	test_tuple_compare_sequential(true, false);
-	test_tuple_compare_sequential(false, false);
-	test_tuple_compare_sequential_no_optional_parts_unique(true);
-	test_tuple_compare_sequential_no_optional_parts_unique(false);
-	test_tuple_compare_with_key_sequential(true, true);
-	test_tuple_compare_with_key_sequential(true, false);
-	test_tuple_compare_with_key_sequential(false, false);
-	test_tuple_compare_slowpath(true, true, true);
-	test_tuple_compare_slowpath(true, true, false);
-	test_tuple_compare_slowpath(true, false, true);
-	test_tuple_compare_slowpath(true, false, false);
-	test_tuple_compare_slowpath(false, false, true);
-	test_tuple_compare_slowpath(false, false, false);
-	test_tuple_compare_with_key_slowpath(true, true);
-	test_tuple_compare_with_key_slowpath(true, false);
-	test_tuple_compare_with_key_slowpath(false, false);
-	test_tuple_compare_with_key_slowpath_singlepart(true);
-	test_tuple_compare_with_key_slowpath_singlepart(false);
-	test_key_compare(true);
-	test_key_compare(false);
-	test_key_compare_singlepart(true);
-	test_key_compare_singlepart(false);
+	test_tuple_compare_sequential(true, true, true);
+	test_tuple_compare_sequential(true, true, false);
+	test_tuple_compare_sequential(true, false, false);
+	test_tuple_compare_sequential(false, true, true);
+	test_tuple_compare_sequential(false, true, false);
+	test_tuple_compare_sequential(false, false, false);
+	test_tuple_compare_sequential_no_optional_parts_unique(true, true);
+	test_tuple_compare_sequential_no_optional_parts_unique(true, false);
+	test_tuple_compare_sequential_no_optional_parts_unique(false, true);
+	test_tuple_compare_sequential_no_optional_parts_unique(false, false);
+	test_tuple_compare_with_key_sequential(true, true, true);
+	test_tuple_compare_with_key_sequential(true, true, false);
+	test_tuple_compare_with_key_sequential(true, false, false);
+	test_tuple_compare_with_key_sequential(false, true, true);
+	test_tuple_compare_with_key_sequential(false, true, false);
+	test_tuple_compare_with_key_sequential(false, false, false);
+	test_tuple_compare_slowpath(true, true, true, true);
+	test_tuple_compare_slowpath(true, true, true, false);
+	test_tuple_compare_slowpath(true, true, false, true);
+	test_tuple_compare_slowpath(true, true, false, false);
+	test_tuple_compare_slowpath(true, false, false, true);
+	test_tuple_compare_slowpath(true, false, false, false);
+	test_tuple_compare_slowpath(false, true, true, true);
+	test_tuple_compare_slowpath(false, true, true, false);
+	test_tuple_compare_slowpath(false, true, false, true);
+	test_tuple_compare_slowpath(false, true, false, false);
+	test_tuple_compare_slowpath(false, false, false, true);
+	test_tuple_compare_slowpath(false, false, false, false);
+	test_tuple_compare_with_key_slowpath(true, true, true);
+	test_tuple_compare_with_key_slowpath(true, true, false);
+	test_tuple_compare_with_key_slowpath(true, false, false);
+	test_tuple_compare_with_key_slowpath(false, true, true);
+	test_tuple_compare_with_key_slowpath(false, true, false);
+	test_tuple_compare_with_key_slowpath(false, false, false);
+	test_tuple_compare_with_key_slowpath_singlepart(true, true);
+	test_tuple_compare_with_key_slowpath_singlepart(true, false);
+	test_tuple_compare_with_key_slowpath_singlepart(false, true);
+	test_tuple_compare_with_key_slowpath_singlepart(false, false);
+	test_key_compare(true, true);
+	test_key_compare(true, false);
+	test_key_compare(false, true);
+	test_key_compare(false, false);
+	test_key_compare_singlepart(true, true);
+	test_key_compare_singlepart(true, false);
+	test_key_compare_singlepart(false, true);
+	test_key_compare_singlepart(false, false);
 
 	footer();
 	return check_plan();
