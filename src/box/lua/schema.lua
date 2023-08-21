@@ -3848,3 +3848,7 @@ function box.read_view.list()
 end
 
 box.NULL = msgpack.NULL
+box.index.FORWARD_INCLUSIVE = box.index.GE
+box.index.FORWARD_EXCLUSIVE = box.index.GT
+box.index.REVERSE_INCLUSIVE = box.index.LE
+box.index.REVERSE_EXCLUSIVE = box.index.LT

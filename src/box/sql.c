@@ -393,7 +393,7 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 		parts[i].coll_id = info->coll_ids[j];
 	}
 
-	struct key_def *key_def = key_def_new(parts, part_count, false);
+	struct key_def *key_def = key_def_new(parts, part_count, 0);
 	if (key_def == NULL)
 		return NULL;
 

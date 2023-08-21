@@ -214,7 +214,7 @@ test_merger(struct tuple_format *format)
 		merge_source_array_new(true),
 	};
 
-	struct key_def *key_def = key_def_new(&key_part_unsigned, 1, false);
+	struct key_def *key_def = key_def_new(&key_part_unsigned, 1, 0);
 	struct merge_source *merger = merger_new(key_def, sources, source_count,
 						 false);
 	key_def_delete(key_def);
@@ -252,7 +252,7 @@ test_basic()
 	plan(4);
 	header();
 
-	struct key_def *key_def = key_def_new(&key_part_integer, 1, false);
+	struct key_def *key_def = key_def_new(&key_part_integer, 1, 0);
 	struct tuple_format *format = box_tuple_format_new(&key_def, 1);
 	assert(format != NULL);
 

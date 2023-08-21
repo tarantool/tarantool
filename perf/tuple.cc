@@ -53,7 +53,7 @@ private:
 		struct key_part_def kdp{0};
 		kdp.fieldno = 4;
 		kdp.type = FIELD_TYPE_UNSIGNED;
-		kd = key_def_new(&kdp, 1, false);
+		kd = key_def_new(&kdp, 1, 0);
 		fmt = simple_tuple_format_new(&memtx_tuple_format_vtab,
 					      &memtx, &kd, 1);
 		tuple_format_ref(fmt);

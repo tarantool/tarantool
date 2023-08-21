@@ -2263,7 +2263,7 @@ index_fill_def(struct Parse *parse, struct index *index,
 		part->coll_id = coll_id;
 		part->path = NULL;
 	}
-	key_def = key_def_new(key_parts, expr_list->nExpr, false);
+	key_def = key_def_new(key_parts, expr_list->nExpr, 0);
 	if (key_def == NULL)
 		goto tnt_error;
 	/*

@@ -1989,6 +1989,8 @@ memtx_index_def_change_requires_rebuild(struct index *index,
 			return true;
 		if (old_part->exclude_null != new_part->exclude_null)
 			return true;
+		if (old_part->sort_order != new_part->sort_order)
+			return true;
 	}
 	assert(old_cmp_def->is_multikey == new_cmp_def->is_multikey);
 	return false;

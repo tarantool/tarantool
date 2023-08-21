@@ -1649,7 +1649,7 @@ sql_key_info_to_key_def(struct sql_key_info *key_info)
 {
 	if (key_info->key_def == NULL) {
 		key_info->key_def = key_def_new(key_info->parts,
-						key_info->part_count, false);
+						key_info->part_count, 0);
 	}
 	return key_info->key_def;
 }

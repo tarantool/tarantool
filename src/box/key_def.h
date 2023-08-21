@@ -64,7 +64,12 @@ struct key_part_def {
 	bool is_nullable;
 	/** Action to perform if NULL constraint failed. */
 	enum on_conflict_action nullable_action;
-	/** Part sort order. */
+	/**
+	 * Part sort order. key_part_def can have "undef" sort order, but when
+	 * key_part is created, the "undef" sort order is translated to "asc",
+	 * so, unlike key_part_def, only "asc" and "desc" values are possible
+	 * in the key_part.
+	 */
 	enum sort_order sort_order;
 	/**
 	 * JSON path to indexed data, relative to the field number,
@@ -212,6 +217,8 @@ struct key_def {
 	bool is_multikey;
 	/** True if it is a functional index key definition. */
 	bool for_func_index;
+	/** True if it is unordered index key definition. */
+	bool is_unordered;
 	/**
 	 * True, if some key parts can be absent in a tuple. These
 	 * fields assumed to be MP_NIL.
@@ -651,13 +658,18 @@ key_def_sizeof(uint32_t part_count, uint32_t path_pool_size)
 	       path_pool_size;
 }
 
+enum key_def_new_flags {
+	KEY_DEF_FOR_FUNC_INDEX = 1 << 0,
+	KEY_DEF_UNORDERED = 1 << 1,
+};
+
 /**
  * Allocate a new key_def with the given part count
  * and initialize its parts.
  */
 struct key_def *
 key_def_new(const struct key_part_def *parts, uint32_t part_count,
-	    bool for_func_index);
+	    unsigned flags);
 
 /**
  * Dump part definitions of the given key def.
@@ -812,6 +824,22 @@ key_def_has_collation(const struct key_def *key_def)
 {
 	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
 		if (key_def->parts[part_id].coll != NULL)
+			return true;
+	}
+	return false;
+}
+
+/**
+ * Return true if any part of @a key_def is descending.
+ * @param key_def key_def
+ * @retval true if the key_def has descending parts
+ * @retval false otherwise
+ */
+static inline bool
+key_def_has_desc_parts(struct key_def *key_def)
+{
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
+		if (key_def->parts[part_id].sort_order == SORT_ORDER_DESC)
 			return true;
 	}
 	return false;

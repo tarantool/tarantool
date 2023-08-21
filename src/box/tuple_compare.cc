@@ -573,6 +573,25 @@ tuple_compare_field_with_type(const char *field_a, enum mp_type a_type,
 }
 
 /*
+ * Reverse the compare result if the key part sort order is descending.
+ */
+static inline int
+key_part_compare_result(struct key_part *part, int result)
+{
+	return result * (part->sort_order != SORT_ORDER_DESC ? 1 : -1);
+}
+
+/*
+ * Reverse the hint if the key part sort order is descending.
+ */
+static hint_t
+key_part_hint(struct key_part *part, hint_t hint)
+{
+	/* HINT_MAX - HINT_NONE underflows to HINT_NONE. */
+	return part->sort_order != SORT_ORDER_DESC ? hint : HINT_MAX - hint;
+}
+
+/*
  * Implements the field comparison logic. If the key we use is not nullable
  * then a simple call to tuple_compare_field is used.
  *
@@ -606,7 +625,7 @@ key_part_compare_fields(struct key_part *part, const char *field_a,
 	if (!is_nullable) {
 		rc = tuple_compare_field(field_a, field_b,
 					 part->type, part->coll);
-		return rc;
+		return key_part_compare_result(part, rc);
 	}
 	enum mp_type a_type = (a_is_optional && field_a == NULL) ?
 			      MP_NIL : mp_typeof(*field_a);
@@ -623,7 +642,7 @@ key_part_compare_fields(struct key_part *part, const char *field_a,
 						   field_b, b_type,
 						   part->type, part->coll);
 	}
-	return rc;
+	return key_part_compare_result(part, rc);
 }
 
 template<bool is_nullable, bool has_optional_parts, bool has_json_paths,
@@ -1943,26 +1962,27 @@ field_hint(const char *field, struct coll *coll)
 	return HINT_NONE;
 }
 
-template <enum field_type type, bool is_nullable>
+template<enum field_type type, bool is_nullable>
 static hint_t
 key_hint(const char *key, uint32_t part_count, struct key_def *key_def)
 {
 	assert(!key_def->is_multikey);
 	if (part_count == 0)
 		return HINT_NONE;
-	return field_hint<type, is_nullable>(key, key_def->parts->coll);
+	hint_t h = field_hint<type, is_nullable>(key, key_def->parts->coll);
+	return key_part_hint(key_def->parts, h);
 }
 
-template <enum field_type type, bool is_nullable>
+template<enum field_type type, bool is_nullable>
 static hint_t
 tuple_hint(struct tuple *tuple, struct key_def *key_def)
 {
 	assert(!key_def->is_multikey);
 	const char *field = tuple_field_by_part(tuple, key_def->parts,
 						MULTIKEY_NONE);
-	if (is_nullable && field == NULL)
-		return hint_nil();
-	return field_hint<type, is_nullable>(field, key_def->parts->coll);
+	hint_t h = is_nullable && field == NULL ? hint_nil() :
+		   field_hint<type, is_nullable>(field, key_def->parts->coll);
+	return key_part_hint(key_def->parts, h);
 }
 
 static hint_t
@@ -1986,7 +2006,7 @@ key_hint_stub(const char *key, uint32_t part_count, struct key_def *key_def)
 }
 
 static hint_t
-key_hint_stub(struct tuple *tuple, struct key_def *key_def)
+tuple_hint_stub(struct tuple *tuple, struct key_def *key_def)
 {
 	(void) tuple;
 	(void) key_def;
@@ -2017,7 +2037,7 @@ key_def_set_hint_func(struct key_def *def)
 {
 	if (def->is_multikey || def->for_func_index) {
 		def->key_hint = key_hint_stub;
-		def->tuple_hint = key_hint_stub;
+		def->tuple_hint = tuple_hint_stub;
 		return;
 	}
 	switch (def->parts->type) {
@@ -2071,6 +2091,7 @@ key_def_set_compare_func_fast(struct key_def *def)
 	assert(!def->has_optional_parts);
 	assert(!def->has_json_paths);
 	assert(!key_def_has_collation(def));
+	assert(!key_def_has_desc_parts(def));
 
 	tuple_compare_t cmp = NULL;
 	tuple_compare_with_key_t cmp_wk = NULL;
@@ -2172,8 +2193,8 @@ key_def_set_compare_func(struct key_def *def)
 			key_def_set_compare_func_for_func_index<true>(def);
 		else
 			key_def_set_compare_func_for_func_index<false>(def);
-	} else if (!key_def_has_collation(def) &&
-	    !def->is_nullable && !def->has_json_paths) {
+	} else if (!def->is_nullable && !def->has_json_paths &&
+	    !key_def_has_collation(def) && !key_def_has_desc_parts(def)) {
 		key_def_set_compare_func_fast(def);
 	} else if (!def->has_json_paths) {
 		if (def->is_nullable && def->has_optional_parts) {

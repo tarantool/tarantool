@@ -67,7 +67,8 @@ typedef uint64_t hint_t;
 /**
  * Reserved value to use when comparison hint is undefined.
  */
-#define HINT_NONE ((hint_t)UINT64_MAX)
+#define HINT_NONE ((hint_t)(UINT64_MAX))
+#define HINT_MAX  ((hint_t)(UINT64_MAX - 1))
 
 /**
  * Compare two tuple hints.
