@@ -51,17 +51,14 @@ local function start_example_replicaset(g, dir, config_file, opts)
     local info = g.server_1:eval('return box.info')
     t.assert_equals(info.name, 'instance-001')
     t.assert_equals(info.replicaset.name, 'replicaset-001')
-    t.assert_equals(info.cluster.name, 'group-001')
 
     local info = g.server_2:eval('return box.info')
     t.assert_equals(info.name, 'instance-002')
     t.assert_equals(info.replicaset.name, 'replicaset-001')
-    t.assert_equals(info.cluster.name, 'group-001')
 
     local info = g.server_3:eval('return box.info')
     t.assert_equals(info.name, 'instance-003')
     t.assert_equals(info.replicaset.name, 'replicaset-001')
-    t.assert_equals(info.cluster.name, 'group-001')
 end
 
 -- A simple single instance configuration.

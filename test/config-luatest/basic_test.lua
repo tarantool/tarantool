@@ -518,3 +518,18 @@ g.test_extras_on_community_edition = function(g)
         verify = verify,
     })
 end
+
+-- Verify that an instance name and a replicaset name are set from
+-- the cluster config topology, while a cluster name remains
+-- unset.
+g.test_persistent_names = function(g)
+    local verify = function()
+        t.assert_equals(box.info.name, 'instance-001')
+        t.assert_equals(box.info.replicaset.name, 'replicaset-001')
+        t.assert_equals(box.info.cluster.name, nil)
+    end
+
+    helpers.success_case(g, {
+        verify = verify,
+    })
+end
