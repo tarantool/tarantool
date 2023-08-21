@@ -7,21 +7,10 @@ local function safe_mkdir(prefix, dir)
 
     if stat == nil then
         log.verbose('%s: create directory: %s', prefix, dir)
-        local _, err = fio.mkdir(dir)
-
-        -- A file can be created by another process in between the
-        -- stat() and the mkdir() calls.
-        --
-        -- In this case mkdir() gives an error. Let's ignore it if
-        -- the created file is a directory, but raise the error
-        -- otherwise.
+        local _, err = fio.mktree(dir)
         if err ~= nil then
-            if fio.path.is_dir(dir) then
-                log.verbose('%s: the directory already exists: %s', prefix, dir)
-            else
-                error(('%s: failed to create directory %s: %s'):format(prefix,
-                    dir, err))
-            end
+            error(('%s: failed to create directory %s: %s'):format(prefix,
+                dir, err))
         end
     else
         if fio.path.is_dir(dir) then
