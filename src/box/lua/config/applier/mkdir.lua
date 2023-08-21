@@ -49,6 +49,12 @@ local function apply(config)
         local prefix = ('mkdir.apply[%s]'):format('console.socket')
         safe_mkdir(prefix, fio.dirname(console.socket))
     end
+
+    local log = configdata:get('log', {use_default = true})
+    if log.to == 'file' then
+        local prefix = ('mkdir.apply[%s]'):format('log.file')
+        safe_mkdir(prefix, fio.dirname(log.file))
+    end
 end
 
 return {
