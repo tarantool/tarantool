@@ -500,7 +500,11 @@ g.test_set_password = function(g)
 
     local auth_types = {
         'chap-sha1',
-        'pap-sha256',
+        -- TODO: The pap-sha256 authentication method requires
+        -- an encrypted connection, so it is left untested for
+        -- now.
+        --
+        -- 'pap-sha256',
     }
 
     for _, auth_type in ipairs(auth_types) do
