@@ -368,7 +368,7 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'pid_file',
             box_cfg_nondynamic = true,
             mk_parent_dir = true,
-            default = '{{ instance_name }}.pid',
+            default = 'var/run/{{ instance_name }}/tarantool.pid',
         }),
     }),
     console = schema.record({
@@ -382,7 +382,7 @@ return schema.new('instance_config', schema.record({
             -- because otherwise the directory would be created
             -- unconditionally. Instead, mkdir applier creates it
             -- if console.enabled is true.
-            default = '{{ instance_name }}.control',
+            default = 'var/run/{{ instance_name }}/tarantool.control',
         }),
     }),
     fiber = schema.record({
@@ -440,7 +440,7 @@ return schema.new('instance_config', schema.record({
             -- because otherwise the directory would be created
             -- unconditionally. Instead, mkdir applier creates it
             -- if log.to is 'file'.
-            default = '{{ instance_name }}.log',
+            default = 'var/log/{{ instance_name }}/tarantool.log',
         }),
         pipe = schema.scalar({
             type = 'string',
@@ -767,7 +767,7 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'vinyl_dir',
             box_cfg_nondynamic = true,
             mkdir = true,
-            default = '{{ instance_name }}',
+            default = 'var/lib/{{ instance_name }}',
         }),
         max_tuple_size = schema.scalar({
             type = 'integer',
@@ -827,7 +827,7 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'wal_dir',
             box_cfg_nondynamic = true,
             mkdir = true,
-            default = '{{ instance_name }}',
+            default = 'var/lib/{{ instance_name }}',
         }),
         mode = schema.enum({
             'none',
@@ -908,7 +908,7 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'memtx_dir',
             box_cfg_nondynamic = true,
             mkdir = true,
-            default = '{{ instance_name }}',
+            default = 'var/lib/{{ instance_name }}',
         }),
         by = schema.record({
             interval = schema.scalar({

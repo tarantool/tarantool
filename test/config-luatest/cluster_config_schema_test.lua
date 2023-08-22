@@ -132,7 +132,7 @@ g.test_defaults = function()
         },
         log = {
             to = 'stderr',
-            file = '{{ instance_name }}.log',
+            file = 'var/log/{{ instance_name }}/tarantool.log',
             pipe = box.NULL,
             syslog = {
                 identity = 'tarantool',
@@ -144,7 +144,7 @@ g.test_defaults = function()
             format = 'plain',
         },
         snapshot = {
-            dir = '{{ instance_name }}',
+            dir = 'var/lib/{{ instance_name }}',
             by = {
                 interval = 3600,
                 wal_size = 1000000000000000000,
@@ -170,10 +170,10 @@ g.test_defaults = function()
             title = 'tarantool - {{ instance_name }}',
             username = box.NULL,
             work_dir = box.NULL,
-            pid_file = '{{ instance_name }}.pid',
+            pid_file = 'var/run/{{ instance_name }}/tarantool.pid',
         },
         vinyl = {
-            dir = '{{ instance_name }}',
+            dir = 'var/lib/{{ instance_name }}',
             max_tuple_size = 1048576,
             bloom_fpr = 0.05,
             page_size = 8192,
@@ -213,7 +213,7 @@ g.test_defaults = function()
             bootstrap_strategy = 'auto',
         },
         wal = {
-            dir = '{{ instance_name }}',
+            dir = 'var/lib/{{ instance_name }}',
             mode = 'write',
             max_size = 268435456,
             dir_rescan_delay = 2,
@@ -222,7 +222,7 @@ g.test_defaults = function()
         },
         console = {
             enabled = true,
-            socket = '{{ instance_name }}.control',
+            socket = 'var/run/{{ instance_name }}/tarantool.control',
         },
         memtx = {
             memory = 268435456,

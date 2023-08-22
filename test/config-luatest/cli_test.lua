@@ -44,7 +44,7 @@ g.test_help_env_list = function()
         {
             name = 'TT_CONSOLE_SOCKET',
             type = 'string',
-            default = '{{ instance_name }}.control',
+            default = 'var/run/{{ instance_name }}/tarantool.control',
             availability = 'Community Edition',
         },
         -- An Enterprise Edition option and, at the same time,
