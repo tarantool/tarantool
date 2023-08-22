@@ -271,6 +271,23 @@ box.execute("DROP TABLE c;")
 - null
 - 'Can''t drop space ''C'': other views depend on this space'
 ...
+-- Try to create invalid view using direct insert to space _space.
+space_tuple = box.space._space.index[0]:max():totable()
+---
+...
+space_tuple[1] = space_tuple[1] + 1 -- id
+---
+...
+space_tuple[3] = space_tuple[3] .. '1' -- name
+---
+...
+space_tuple[6].sql = string.gsub(space_tuple[6].sql, 'FROM c', 'FROM ccc')
+---
+...
+box.space._space:insert(space_tuple)
+---
+- error: Space 'CCC' does not exist
+...
 box.space.BCV:drop()
 ---
 ...

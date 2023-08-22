@@ -1853,19 +1853,15 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
  *
  * @param select Tables from this select to be updated.
  * @param update_value +1 on view creation, -1 on drop.
- * @param suppress_error If true, silently skip nonexistent
- *                       spaces from 'FROM' clause.
- * @param[out] not_found_space Name of a disappeared space.
- * @retval 0 on success, -1 if suppress_error is false and space
- *         from 'FROM' clause doesn't exist.
+ * @retval 0 on success, -1 on error (diag is set).
  */
 static int
-update_view_references(struct Select *select, int update_value,
-		       bool suppress_error, const char **not_found_space)
+update_view_references(struct Select *select, int update_value)
 {
 	assert(update_value == 1 || update_value == -1);
 	struct SrcList *list = sql_select_expand_from_tables(select);
 	int from_tables_count = sql_src_list_entry_count(list);
+	/* Firstly check that everything is correct. */
 	for (int i = 0; i < from_tables_count; ++i) {
 		const char *space_name = sql_src_list_entry_name(list, i);
 		assert(space_name != NULL);
@@ -1881,19 +1877,25 @@ update_view_references(struct Select *select, int update_value,
 			continue;
 		struct space *space = space_by_name0(space_name);
 		if (space == NULL) {
-			if (! suppress_error) {
-				assert(not_found_space != NULL);
-				*not_found_space = tt_sprintf("%s", space_name);
-				sqlSrcListDelete(list);
-				return -1;
-			}
-			continue;
+			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
+			goto error;
 		}
+	}
+	/* Secondly do the job. */
+	for (int i = 0; i < from_tables_count; ++i) {
+		const char *space_name = sql_src_list_entry_name(list, i);
+		/* See comment before sql_select_constains_cte call above. */
+		if (sql_select_constains_cte(select, space_name))
+			continue;
+		struct space *space = space_by_name0(space_name);
 		assert(space->def->view_ref_count > 0 || update_value > 0);
 		space->def->view_ref_count += update_value;
 	}
 	sqlSrcListDelete(list);
 	return 0;
+error:
+	sqlSrcListDelete(list);
+	return -1;
 }
 
 /**
@@ -1919,7 +1921,8 @@ on_create_view_rollback(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct Select *select = (struct Select *)trigger->data;
-	update_view_references(select, -1, true, NULL);
+	int rc = update_view_references(select, -1);
+	assert(rc == 0); (void)rc;
 	sql_select_delete(select);
 	return 0;
 }
@@ -1948,7 +1951,8 @@ on_drop_view_rollback(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct Select *select = (struct Select *)trigger->data;
-	update_view_references(select, 1, true, NULL);
+	int rc = update_view_references(select, 1);
+	assert(rc == 0); (void)rc;
 	sql_select_delete(select);
 	return 0;
 }
@@ -2178,19 +2182,8 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			auto select_guard = make_scoped_guard([=] {
 				sql_select_delete(select);
 			});
-			const char *disappeared_space;
-			if (update_view_references(select, 1, false,
-						   &disappeared_space) != 0) {
-				/*
-				 * Decrement counters which have
-				 * been increased by previous call.
-				 */
-				update_view_references(select, -1, false,
-						       &disappeared_space);
-				diag_set(ClientError, ER_NO_SUCH_SPACE,
-					  disappeared_space);
+			if (update_view_references(select, 1) != 0)
 				return -1;
-			}
 			struct trigger *on_commit_view =
 				txn_alter_trigger_new(on_create_view_commit,
 						      select);
@@ -2300,7 +2293,8 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			if (on_rollback_view == NULL)
 				return -1;
 			txn_stmt_on_rollback(stmt, on_rollback_view);
-			update_view_references(select, -1, true, NULL);
+			int rc = update_view_references(select, -1);
+			assert(rc == 0); (void)rc;
 			select_guard.is_active = false;
 		}
 	} else { /* UPDATE, REPLACE */

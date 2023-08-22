@@ -101,6 +101,14 @@ box.execute("DROP TABLE c;")
 box.execute("CREATE TABLE c (s1 INT PRIMARY KEY);")
 box.execute("CREATE VIEW bcv(x, y) AS VALUES((SELECT 'k' FROM b), (VALUES((SELECT 1 FROM b WHERE s1 IN (VALUES((SELECT 1 + c.s1 FROM c)))))))")
 box.execute("DROP TABLE c;")
+
+-- Try to create invalid view using direct insert to space _space.
+space_tuple = box.space._space.index[0]:max():totable()
+space_tuple[1] = space_tuple[1] + 1 -- id
+space_tuple[3] = space_tuple[3] .. '1' -- name
+space_tuple[6].sql = string.gsub(space_tuple[6].sql, 'FROM c', 'FROM ccc')
+box.space._space:insert(space_tuple)
+
 box.space.BCV:drop()
 box.execute("DROP TABLE c;")
 box.execute("DROP TABLE b;")
