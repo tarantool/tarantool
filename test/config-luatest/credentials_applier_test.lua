@@ -430,7 +430,7 @@ g.test_sync_privileges = function(g)
         }, {
             "revoke", "session,usage", "universe", ""
         }, {
-            "grant", "execute", "functions", ""
+            "grant", "execute", "function", ""
         },
     }
 
