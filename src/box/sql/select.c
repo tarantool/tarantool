@@ -483,9 +483,7 @@ src_list_append_unique(struct SrcList *list, const char *new_name)
 		if (name != NULL && strcmp(new_name, name) == 0)
 			return list;
 	}
-	struct SrcList *new_list =
-		sql_src_list_enlarge(list, 1, list->nSrc);
-	list = new_list;
+	list = sql_src_list_enlarge(list, 1, list->nSrc);
 	struct SrcList_item *pItem = &list->a[list->nSrc - 1];
 	pItem->zName = sql_xstrdup(new_name);
 	return list;
@@ -502,8 +500,7 @@ select_collect_table_names(struct Walker *walker, struct Select *select)
 		walker->u.pSrcList =
 			src_list_append_unique(walker->u.pSrcList,
 					       select->pSrc->a[i].zName);
-		if (walker->u.pSrcList == NULL)
-			return WRC_Abort;
+		assert(walker->u.pSrcList != NULL);
 	}
 	return WRC_Continue;
 }
@@ -518,10 +515,8 @@ sql_select_expand_from_tables(struct Select *select)
 	walker.xExprCallback = sqlExprWalkNoop;
 	walker.xSelectCallback = select_collect_table_names;
 	walker.u.pSrcList = table_names;
-	if (sqlWalkSelect(&walker, select) != 0) {
-		sqlSrcListDelete(walker.u.pSrcList);
-		return NULL;
-	}
+	int rc = sqlWalkSelect(&walker, select);
+	assert(rc == WRC_Continue); (void)rc;
 	return walker.u.pSrcList;
 }
 

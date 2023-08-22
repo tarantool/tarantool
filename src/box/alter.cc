@@ -1865,8 +1865,6 @@ update_view_references(struct Select *select, int update_value,
 {
 	assert(update_value == 1 || update_value == -1);
 	struct SrcList *list = sql_select_expand_from_tables(select);
-	if (list == NULL)
-		return -1;
 	int from_tables_count = sql_src_list_entry_count(list);
 	for (int i = 0; i < from_tables_count; ++i) {
 		const char *space_name = sql_src_list_entry_name(list, i);
