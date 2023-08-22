@@ -71,3 +71,60 @@ g.test_work_dir = function(g)
         verify_2 = verify,
     })
 end
+
+-- Verify the logic of directories calculation relative to
+-- process.work_dir at startup and reload.
+--
+-- See the comments in the verify() function in the test
+-- for details what exactly is verified.
+g.test_dirs_are_relative_to_work_dir = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+
+    local verify = loadstring(([[
+        local fio = require('fio')
+
+        local dirs = {'d', 'e', 'f', 'g', 'h', 'i'}
+
+        -- The requested directories are NOT created in the
+        -- startup dir.
+        local startup_dir = '%s'
+        for _, dir in ipairs(dirs) do
+            assert(not fio.path.exists(fio.pathjoin(startup_dir, dir)))
+        end
+
+        -- The requested directories are created in the work_dir.
+        local work_dir = fio.pathjoin(startup_dir, 'a/b/c')
+        for _, dir in ipairs(dirs) do
+            assert(fio.path.is_dir(dir))
+        end
+
+        -- The process.work_dir value should be used as a prefix
+        -- for requested directories only at startup. After this,
+        -- on reload, it would be harmful, because the process
+        -- has already changed the current working directory to
+        -- the work_dir.
+        assert(not fio.path.exists(fio.pathjoin(work_dir, 'a')))
+    ]]):format(dir))
+
+    helpers.reload_success_case(g, {
+        dir = dir,
+        options = {
+            ['process.work_dir'] = 'a/b/c',
+            ['process.pid_file'] = 'd/{{ instance_name }}.pid',
+            ['vinyl.dir'] = 'e',
+            ['wal.dir'] = 'f',
+            ['snapshot.dir'] = 'g',
+            ['console.socket'] = 'h/{{ instance_name }}.control',
+            ['log.to'] = 'file',
+            ['log.file'] = 'i/{{ instance_name }}.log',
+
+            -- Set the binary protocol socket as an absolute path
+            -- to don't confuse the testing helpers and allows
+            -- them to connect to the instance and execute
+            -- necessary commands (such as `config:reload()`).
+            ['iproto.listen'] = fio.pathjoin(dir, '{{ instance_name }}.iproto'),
+        },
+        verify = verify,
+        verify_2 = verify,
+    })
+end
