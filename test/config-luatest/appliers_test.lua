@@ -76,8 +76,8 @@ g.test_applier_mkdir = function()
     local opts = {nojson = true, stderr = false}
     local res = justrun.tarantool(dir, env, {'main.lua'}, opts)
     t.assert_equals(res.exit_code, 0)
-    t.assert_equals(res.stdout, 'instance-001')
-    t.assert(fio.path.is_dir(fio.pathjoin(dir, 'instance-001')))
+    t.assert_equals(res.stdout, 'var/lib/instance-001')
+    t.assert(fio.path.is_dir(fio.pathjoin(dir, '/var/lib/instance-001')))
 end
 
 g.test_applier_box_cfg = function()

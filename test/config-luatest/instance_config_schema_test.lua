@@ -156,7 +156,7 @@ g.test_process = function()
         title = 'tarantool - {{ instance_name }}',
         username = box.NULL,
         work_dir = box.NULL,
-        pid_file = '{{ instance_name }}.pid',
+        pid_file = 'var/run/{{ instance_name }}/tarantool.pid',
     }
     local res = instance_config:apply_default({}).process
     t.assert_equals(res, exp)
@@ -174,7 +174,7 @@ g.test_console = function()
 
     local exp = {
         enabled = true,
-        socket = '{{ instance_name }}.control',
+        socket = 'var/run/{{ instance_name }}/tarantool.control',
     }
     local res = instance_config:apply_default({}).console
     t.assert_equals(res, exp)
@@ -256,7 +256,7 @@ g.test_log = function()
 
     local exp = {
         to = 'stderr',
-        file = '{{ instance_name }}.log',
+        file = 'var/log/{{ instance_name }}/tarantool.log',
         pipe = box.NULL,
         syslog = {
             identity = 'tarantool',
@@ -734,7 +734,7 @@ g.test_vinyl = function()
     validate_fields(iconfig.vinyl, instance_config.schema.fields.vinyl)
 
     local exp = {
-        dir = '{{ instance_name }}',
+        dir = 'var/lib/{{ instance_name }}',
         max_tuple_size = 1048576,
         bloom_fpr = 0.05,
         page_size = 8192,
@@ -768,7 +768,7 @@ g.test_wal = function()
     validate_fields(iconfig.wal, instance_config.schema.fields.wal)
 
     local exp = {
-        dir = '{{ instance_name }}',
+        dir = 'var/lib/{{ instance_name }}',
         mode = 'write',
         max_size = 268435456,
         dir_rescan_delay = 2,
@@ -832,7 +832,7 @@ g.test_snapshot = function()
     validate_fields(iconfig.snapshot, instance_config.schema.fields.snapshot)
 
     local exp = {
-        dir = '{{ instance_name }}',
+        dir = 'var/lib/{{ instance_name }}',
         by = {
             interval = 3600,
             wal_size = 1000000000000000000,
