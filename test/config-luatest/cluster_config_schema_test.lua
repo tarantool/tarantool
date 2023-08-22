@@ -291,3 +291,11 @@ g.test_example_replicaset = function()
     fh:close()
     cluster_config:validate(config)
 end
+
+g.test_example_sharding = function()
+    local config_file = fio.abspath('doc/examples/config/sharding.yaml')
+    local fh = fio.open(config_file, {'O_RDONLY'})
+    local config = yaml.decode(fh:read())
+    fh:close()
+    cluster_config:validate(config)
+end
