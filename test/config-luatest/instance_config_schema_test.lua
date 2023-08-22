@@ -805,7 +805,7 @@ g.test_wal_enterprise = function()
     validate_fields(iconfig.wal, instance_config.schema.fields.wal)
 
     local exp = {
-        dir = '{{ instance_name }}',
+        dir = 'var/lib/{{ instance_name }}',
         mode = 'write',
         max_size = 268435456,
         dir_rescan_delay = 2,
