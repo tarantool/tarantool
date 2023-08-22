@@ -1,12 +1,10 @@
 credentials:
   users:
     replicator:
-      password:
-        plain: 'topsecret'
+      password: 'topsecret'
       roles: [replication]
     client:
-      password:
-        plain: 'secret'
+      password: 'secret'
       roles: [super]
 
 groups:
