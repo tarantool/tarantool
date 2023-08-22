@@ -527,3 +527,45 @@ g.test_persistent_names = function(g)
         verify = verify,
     })
 end
+
+-- Verify that a directory with the configuration file is added
+-- into the Lua loader paths.
+g.test_loader_paths = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = {
+        credentials = {
+            users = {
+                guest = {
+                    roles = {'super'},
+                },
+            },
+        },
+        iproto = {
+            listen = 'unix/:./{{ instance_name }}.iproto',
+        },
+        groups = {
+            ['group-001'] = {
+                replicasets = {
+                    ['replicaset-001'] = {
+                        instances = {
+                            ['instance-001'] = {},
+                        },
+                    },
+                },
+            },
+        },
+    }
+    local config_file = treegen.write_script(dir, 'foo/config.yaml',
+                                             yaml.encode(config))
+
+    treegen.write_script(dir, 'foo/bar.lua', [[return {whoami = 'bar'}]])
+
+    local opts = {config_file = config_file, chdir = dir}
+    g.server = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+    g.server:start()
+
+    g.server:exec(function()
+        local bar = require('bar')
+        t.assert_equals(bar.whoami, 'bar')
+    end)
+end
