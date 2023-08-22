@@ -1,0 +1,76 @@
+# See the vshard documentation for proper usage of vshard. The basic scenario
+# with this configuration is described below.
+#
+# Before using sharding, you need to create a spaces that will contain data and
+# define functions to work with these spaces on the storage masters, for
+# example:
+#
+# format = {{'id', 'unsigned'}, {'bucket_id', 'unsigned'}}
+# s = box.schema.space.create('test', {format = format})
+# s:create_index('id', {parts = {'id'}})
+# s:create_index('bucket_id', {parts = {'bucket_id'}, unique = false})
+
+# function get(id) return box.space.test:get(id) end
+# box.schema.func.create('get')
+# box.schema.role.grant('public', 'execute', 'function', 'get')
+
+# function put(id, b_id) box.space.test:insert({id, b_id}) return true end
+# box.schema.func.create('put')
+# box.schema.role.grant('public', 'execute', 'function', 'put')
+#
+# After this you need to call vshard.router.bootstrap() on router.
+#
+# To insert following function can be used on router after bootstrap:
+# vshard.router.call(bucket_id, 'write', 'put', {id, bucket_id})
+#
+# To get data following function can be used on router after bootstrap:
+# vshard.router.call(bucket_id, 'read', 'get', {id})
+
+credentials:
+  users:
+    replicator:
+      password: 'topsecret'
+      roles: [replication]
+     # For now, vshard itself will grant the specified user all the permissions
+     # it needs to prepare instances for sharding. However, they will be revoked
+     # after reload(). Since there is no way to grant the user  the proper
+     # rights to the functions, the "super" role is used.
+    storage:
+      password: 'secret'
+      roles: [super]
+
+iproto:
+  listen: 'unix/:./{{ instance_name }}.iproto'
+  # We currently need to manually define the user for vshard. If the user is not
+  # defined, the guest is used.
+  advertise:
+    peer: replicator@
+    sharding: storage@
+
+sharding:
+  bucket_count: 10000
+
+groups:
+  storages:
+    replication:
+      failover: manual
+    sharding:
+      roles: [storage]
+    replicasets:
+      storages-001:
+        leader: storage-001
+        instances:
+          storage-001: {}
+          storage-002: {}
+      storages-002:
+        leader: storage-004
+        instances:
+          storage-003: {}
+          storage-004: {}
+  routers:
+    replicasets:
+      routers-001:
+        sharding:
+          roles: [router]
+        instances:
+          router-001: {}
