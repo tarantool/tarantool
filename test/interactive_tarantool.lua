@@ -294,6 +294,7 @@ end
 function M._new_internal(opts)
     local opts = opts or {}
     local args = opts.args or {}
+    local env = opts.env or {}
     local prompt = opts.prompt
 
     local tarantool_exe = arg[-1]
@@ -301,7 +302,7 @@ function M._new_internal(opts)
         stdin = popen.opts.PIPE,
         stdout = popen.opts.PIPE,
         stderr = popen.opts.PIPE,
-        env = {
+        env = fun.chain({
             -- Don't know why, but without defined TERM environment
             -- variable readline doesn't accept INPUTRC environment
             -- variable.
@@ -313,7 +314,7 @@ function M._new_internal(opts)
             -- (because the command in the echo output will be
             -- trimmed).
             INPUTRC = '/dev/null',
-        },
+        }, env):tomap(),
     })
 
     local res = setmetatable({
