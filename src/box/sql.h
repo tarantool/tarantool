@@ -285,7 +285,6 @@ sql_select_delete(struct Select *select);
  *
  * @param select Select to be investigated.
  * @retval List containing all involved table names.
- *         NULL in case of OOM.
  */
 struct SrcList *
 sql_select_expand_from_tables(struct Select *select);
