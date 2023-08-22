@@ -1,7 +1,0 @@
-import re
-
-uuid = admin("lua box.uuid_hex()")
-
-if not re.search(re.compile('^\s+-\s+[a-f0-9]{32}\s*$', re.M), uuid):
-    if re.search('box.uuid\(\):', uuid):
-        self.skip = 1
