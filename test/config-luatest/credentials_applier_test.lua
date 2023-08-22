@@ -382,7 +382,16 @@ g.test_privileges_add_defaults = function(g)
     for _, case in ipairs(cases) do
         local role_or_user, name = unpack(case)
 
-        local child = it.new()
+        -- Disable hide/show prompt functionality, because it
+        -- breaks a command echo check. The reason is that the
+        -- 'scheduled next checkpoint' log message is issued from
+        -- a background fiber.
+        local child = it.new({
+            env = {
+                TT_CONSOLE_HIDE_SHOW_PROMPT = 'false',
+            },
+        })
+
         local dir = treegen.prepare_directory(g, {}, {})
 
         child:execute_command(("box.cfg{work_dir = %q}"):format(dir))
@@ -445,7 +454,15 @@ g.test_sync_privileges = function(g)
         },
     }
 
-    local child = it.new()
+    -- Disable hide/show prompt functionality, because it breaks
+    -- a command echo check. The reason is that the 'scheduled
+    -- next checkpoint' log message is issued from a background
+    -- fiber.
+    local child = it.new({
+        env = {
+            TT_CONSOLE_HIDE_SHOW_PROMPT = 'false',
+        },
+    })
     local dir = treegen.prepare_directory(g, {}, {})
     child:roundtrip(("box.cfg{work_dir = %q}"):format(dir))
 
@@ -490,7 +507,17 @@ g.test_set_password = function(g)
         if auth_type == 'pap-sha256' then
             t.tarantool.skip_if_not_enterprise()
         end
-        local child = it.new()
+
+        -- Disable hide/show prompt functionality, because it
+        -- breaks a command echo check. The reason is that the
+        -- 'scheduled next checkpoint' log message is issued from
+        -- a background fiber.
+        local child = it.new({
+            env = {
+                TT_CONSOLE_HIDE_SHOW_PROMPT = 'false',
+            },
+        })
+
         local dir = treegen.prepare_directory(g, {}, {})
         local socket = "unix/:./test_socket.iproto"
 
