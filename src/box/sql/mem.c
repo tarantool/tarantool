@@ -2728,21 +2728,15 @@ mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
 		if (type == MP_UUID) {
 			assert(len == UUID_LEN);
 			mem.type = MEM_TYPE_UUID;
-			if (uuid_unpack(b, len, &mem.u.uuid) == NULL)
-				return -1;
+			VERIFY(uuid_unpack(b, len, &mem.u.uuid) != NULL);
 			break;
 		} else if (type == MP_DECIMAL) {
 			mem.type = MEM_TYPE_DEC;
-			if (decimal_unpack(b, len, &mem.u.d) == 0)
-				return -1;
+			VERIFY(decimal_unpack(b, len, &mem.u.d) != NULL);
 			break;
 		} else if (type == MP_DATETIME) {
 			mem.type = MEM_TYPE_DATETIME;
-			if (datetime_unpack(b, len, &mem.u.dt) == 0) {
-				diag_set(ClientError, ER_INVALID_MSGPACK,
-					 "Invalid MP_DATETIME MsgPack format");
-				return -1;
-			}
+			VERIFY(datetime_unpack(b, len, &mem.u.dt) != NULL);
 			break;
 		} else if (type == MP_INTERVAL) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mp_str(*b),
@@ -3043,37 +3037,23 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 		uint32_t size = mp_decode_extl(&buf, &type);
 		if (type == MP_UUID) {
 			assert(size == UUID_LEN);
-			buf = svp;
-			if (mp_decode_uuid(&buf, &mem->u.uuid) == NULL) {
-				diag_set(ClientError, ER_INVALID_MSGPACK,
-					 "Invalid MP_UUID MsgPack format");
-				return -1;
-			}
+			VERIFY(uuid_unpack(&buf, size, &mem->u.uuid) != NULL);
 			mem->type = MEM_TYPE_UUID;
 			mem->flags = 0;
 			break;
 		} else if (type == MP_DECIMAL) {
-			buf = svp;
-			if (mp_decode_decimal(&buf, &mem->u.d) == NULL)
-				return -1;
+			VERIFY(decimal_unpack(&buf, size, &mem->u.d) != NULL);
 			mem->type = MEM_TYPE_DEC;
 			mem->flags = 0;
 			break;
 		} else if (type == MP_DATETIME) {
-			if (datetime_unpack(&buf, size, &mem->u.dt) == NULL) {
-				diag_set(ClientError, ER_INVALID_MSGPACK,
-					 "Invalid MP_DATETIME MsgPack format");
-				return -1;
-			}
+			VERIFY(datetime_unpack(&buf, size, &mem->u.dt) != NULL);
 			mem->type = MEM_TYPE_DATETIME;
 			mem->flags = 0;
 			break;
 		} else if (type == MP_INTERVAL) {
-			if (interval_unpack(&buf, size, &mem->u.itv) == NULL) {
-				diag_set(ClientError, ER_INVALID_MSGPACK,
-					 "Invalid MP_INTERVAL MsgPack format");
-				return -1;
-			}
+			VERIFY(interval_unpack(&buf, size,
+					       &mem->u.itv) != NULL);
 			mem->type = MEM_TYPE_INTERVAL;
 			mem->flags = 0;
 			break;
@@ -3686,44 +3666,23 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 			if (type == MP_UUID) {
 				assert(len == UUID_LEN);
 				struct tt_uuid *uuid = &val[i].u.uuid;
-				data = str;
-				if (mp_decode_uuid(&data, uuid) == NULL) {
-					diag_set(ClientError,
-						 ER_INVALID_MSGPACK, "Invalid "
-						 "MP_UUID MsgPack format");
-					goto error;
-				}
+				VERIFY(uuid_unpack(&data, len, uuid) != NULL);
 				val[i].type = MEM_TYPE_UUID;
 				break;
 			} else if (type == MP_DECIMAL) {
 				decimal_t *d = &val[i].u.d;
-				data = str;
-				if (mp_decode_decimal(&data, d) == NULL) {
-					diag_set(ClientError,
-						 ER_INVALID_MSGPACK, "Invalid "
-						 "MP_DECIMAL MsgPack format");
-					goto error;
-				}
+				VERIFY(decimal_unpack(&data, len, d) != NULL);
 				val[i].type = MEM_TYPE_DEC;
 				break;
 			} else if (type == MP_DATETIME) {
 				struct datetime *dt = &val[i].u.dt;
-				if (datetime_unpack(&data, len, dt) == 0) {
-					diag_set(ClientError,
-						 ER_INVALID_MSGPACK, "Invalid "
-						 "MP_DATETIME MsgPack format");
-					goto error;
-				}
+				VERIFY(datetime_unpack(&data, len, dt) != NULL);
 				val[i].type = MEM_TYPE_DATETIME;
 				break;
 			} else if (type == MP_INTERVAL) {
 				struct interval *itv = &val[i].u.itv;
-				if (interval_unpack(&data, len, itv) == NULL) {
-					diag_set(ClientError,
-						 ER_INVALID_MSGPACK, "Invalid "
-						 "MP_INTERVAL MsgPack format");
-					goto error;
-				}
+				VERIFY(interval_unpack(&data, len,
+						       itv) != NULL);
 				val[i].type = MEM_TYPE_INTERVAL;
 				break;
 			}

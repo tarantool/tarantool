@@ -486,34 +486,25 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 		case MP_DECIMAL:
 		{
 			decimal_t *dec = luaT_newdecimal(L);
-			dec = decimal_unpack(data, len, dec);
-			if (dec == NULL)
-				goto ext_decode_err;
+			VERIFY(decimal_unpack(data, len, dec) != NULL);
 			return;
 		}
 		case MP_UUID:
 		{
 			struct tt_uuid *uuid = luaT_newuuid(L);
-			*data = svp;
-			uuid = mp_decode_uuid(data, uuid);
-			if (uuid == NULL)
-				goto ext_decode_err;
+			VERIFY(uuid_unpack(data, len, uuid) != NULL);
 			return;
 		}
 		case MP_DATETIME:
 		{
 			struct datetime *date = luaT_newdatetime(L);
-			date = datetime_unpack(data, len, date);
-			if (date == NULL)
-				goto ext_decode_err;
+			VERIFY(datetime_unpack(data, len, date) != NULL);
 			return;
 		}
 		case MP_INTERVAL:
 		{
 			struct interval *itv = luaT_newinterval(L);
-			itv = interval_unpack(data, len, itv);
-			if (itv == NULL)
-				goto ext_decode_err;
+			VERIFY(interval_unpack(data, len, itv) != NULL);
 			return;
 		}
 		default:
@@ -526,9 +517,6 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 	}
 	}
 	return;
-ext_decode_err:
-	lua_pop(L, -1);
-	luaL_error(L, "msgpack.decode: invalid MsgPack");
 }
 
 

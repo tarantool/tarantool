@@ -108,32 +108,19 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 		uint32_t size = mp_decode_extl(packet, &ext_type);
 		switch (ext_type) {
 		case MP_UUID:
-			if (uuid_unpack(packet, size, &bind->uuid) == NULL) {
-				diag_set(ClientError, ER_INVALID_MSGPACK,
-					 "Invalid MP_UUID MsgPack format");
-				return -1;
-			}
+			VERIFY(uuid_unpack(packet, size, &bind->uuid) != NULL);
 			break;
 		case MP_DECIMAL:
-			if (decimal_unpack(packet, size, &bind->dec) == NULL) {
-				diag_set(ClientError, ER_INVALID_MSGPACK,
-					 "Invalid MP_DECIMAL MsgPack format");
-				return -1;
-			}
+			VERIFY(decimal_unpack(packet, size,
+					      &bind->dec) != NULL);
 			break;
 		case MP_DATETIME:
-			if (datetime_unpack(packet, size, &bind->dt) == NULL) {
-				diag_set(ClientError, ER_INVALID_MSGPACK,
-					 "Invalid MP_DATETIME MsgPack format");
-				return -1;
-			}
+			VERIFY(datetime_unpack(packet, size,
+					       &bind->dt) != NULL);
 			break;
 		case MP_INTERVAL:
-			if (interval_unpack(packet, size, &bind->itv) == NULL) {
-				diag_set(ClientError, ER_INVALID_MSGPACK,
-					 "Invalid MP_INTERVAL MsgPack format");
-				return -1;
-			}
+			VERIFY(interval_unpack(packet, size,
+					       &bind->itv) != NULL);
 			break;
 		default:
 			diag_set(ClientError, ER_SQL_BIND_TYPE, "USERDATA",
