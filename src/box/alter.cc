@@ -1868,8 +1868,7 @@ update_view_references(struct Select *select, int update_value,
 	int from_tables_count = sql_src_list_entry_count(list);
 	for (int i = 0; i < from_tables_count; ++i) {
 		const char *space_name = sql_src_list_entry_name(list, i);
-		if (space_name == NULL)
-			continue;
+		assert(space_name != NULL);
 		/*
 		 * Views are allowed to contain CTEs. CTE is a
 		 * temporary object, created and destroyed at SQL
