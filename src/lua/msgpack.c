@@ -315,6 +315,7 @@ restart: /* used by MP_EXT of unidentified subtype */
 		type = MP_ARRAY;
 		break;
 	case MP_EXT:
+		type = MP_EXT;
 		switch (field->ext_type) {
 		case MP_DECIMAL:
 			mpstream_encode_decimal(stream, field->decval);
