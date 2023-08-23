@@ -735,6 +735,13 @@ var##_assert_type(void)							\
 	(void)p;							\
 }
 
+/** Like assert() but evaluates the given expression even if NDEBUG is set. */
+#ifndef NDEBUG
+# define VERIFY(expr) assert(expr)
+#else
+# define VERIFY(expr) ((void)(expr))
+#endif
+
 #ifndef NDEBUG
 /**
  * Execute a CPU instruction that results in the SIGILL signal.
