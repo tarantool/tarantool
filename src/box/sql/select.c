@@ -480,7 +480,7 @@ src_list_append_unique(struct SrcList *list, const char *new_name)
 
 	for (int i = 0; i < list->nSrc; ++i) {
 		const char *name = list->a[i].zName;
-		if (name != NULL && strcmp(new_name, name) == 0)
+		if (strcmp(new_name, name) == 0)
 			return list;
 	}
 	list = sql_src_list_enlarge(list, 1, list->nSrc);
@@ -511,6 +511,7 @@ sql_select_expand_from_tables(struct Select *select)
 	assert(select != NULL);
 	struct Walker walker;
 	struct SrcList *table_names = sql_src_list_new();
+	table_names->nSrc = 0;
 	memset(&walker, 0, sizeof(walker));
 	walker.xExprCallback = sqlExprWalkNoop;
 	walker.xSelectCallback = select_collect_table_names;
