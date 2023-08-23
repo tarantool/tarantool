@@ -1,0 +1,211 @@
+name: static_build_pack_test_deploy
+
+on:
+  workflow_call:
+    inputs:
+      arch:
+        description: Package platform
+        default: x86_64
+        required: false
+        type: string
+      test-matrix:
+        description: JSON matrix for packages testing
+        default: '{"include": [{"os": "ubuntu-focal"}, {"os": "ubuntu-jammy"}]}'
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: [ self-hosted, Linux, '${{ inputs.arch }}', regular ]
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - uses: ./.github/actions/environment
+
+      - name: Make static build packages
+        run: make -f .pack.mk package-static
+
+      - name: Pack libraries for testing
+        run: >
+          find test/ -name '*.so' | tar -cvzf
+          ${{ github.workspace }}/build/test-libs-${{ inputs.arch }}.tgz -T -
+        working-directory: static-build/tarantool-prefix/src/tarantool-build/
+
+      - name: Upload deb packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: tarantool-deb-${{ inputs.arch }}
+          retention-days: 21
+          path: build/tarantool*.deb
+          if-no-files-found: error
+
+      - name: Upload rpm packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: tarantool-rpm-${{ inputs.arch }}
+          retention-days: 21
+          path: build/tarantool*.rpm
+          if-no-files-found: error
+
+      - name: Upload test libraries
+        uses: actions/upload-artifact@v3
+        with:
+          name: tarantool-test-libs-${{ inputs.arch }}
+          retention-days: 21
+          path: build/test-libs*.tgz
+          if-no-files-found: error
+
+      - name: Send VK Teams message on failure
+        if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+
+  test:
+    runs-on: [ self-hosted, Linux, '${{ inputs.arch }}', regular ]
+
+    needs: build
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.test-matrix) }}
+
+    container:
+      image: packpack/packpack:${{ matrix.os }}
+      # Mount /dev to the container to be able to mount a disk image inside it
+      # for successful run of the .github/actions/environment action.
+      volumes:
+        - /dev:/dev
+      # Our testing expects that the init process (PID 1) will
+      # reap orphan processes. At least the following test leans
+      # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
+      # Add extra privileges to the container for successful run
+      # of the .github/actions/environment action.
+      options: '--init --privileged'
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Set package manager
+        run: |
+          if ${{ startsWith(matrix.os, 'astra') ||
+                 startsWith(matrix.os, 'ubuntu') ||
+                 startsWith(matrix.os, 'debian') }}; then
+            echo "PACKAGE_MANAGER=apt" >> $GITHUB_ENV
+          elif ${{ startsWith(matrix.os, 'centos') ||
+                 startsWith(matrix.os, 'el') ||
+                 startsWith(matrix.os, 'fedora') ||
+                 startsWith(matrix.os, 'redos') }}; then
+            echo "PACKAGE_MANAGER=yum" >> $GITHUB_ENV
+          else
+            echo "Not supported OS provided: ${{ matrix.os }}"
+            exit 1
+          fi
+
+      # Install the 'e2fsprogs' package that contains the 'mkfs' program needed
+      # for the 'environment' action bellow.
+      - name: Install e2fsprogs
+        if: env.PACKAGE_MANAGER != 'apt'
+        run: ${{ env.PACKAGE_MANAGER }} -y install e2fsprogs
+
+      - uses: ./.github/actions/environment
+
+      - name: Download packages
+        uses: actions/download-artifact@v3
+        with:
+          name: tarantool-${{
+            env.PACKAGE_MANAGER == 'apt' && 'deb' || 'rpm' }}-${{ inputs.arch }}
+          path: build
+
+      - name: Download test libraries
+        uses: actions/download-artifact@v3
+        with:
+          name: tarantool-test-libs-${{ inputs.arch }}
+          path: build
+
+      - name: Install packages
+        run: ${{ env.PACKAGE_MANAGER }} -y install ./tarantool*
+        working-directory: build
+
+      - name: Extract test libraries
+        run: tar -xvzf test-libs*.tgz
+        working-directory: build
+
+      - name: Update list of available deb packages
+        if: env.PACKAGE_MANAGER == 'apt'
+        run: apt update
+
+      - name: Install test dependencies
+        run: |
+          ${{ env.PACKAGE_MANAGER }} -y install \
+            python3 \
+            python3-gevent \
+            python3-${{ env.PACKAGE_MANAGER == 'apt' &&  'yaml' || 'pyyaml' }} \
+            tzdata
+
+      - name: Run tests
+        run: |
+          ./test-run.py \
+            --force \
+            --builddir ../build \
+            --executable /usr/bin/tarantool
+        working-directory: test
+
+      - name: Send VK Teams message on failure
+        if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+
+  deploy:
+    if: startsWith(github.ref, 'refs/tags/') &&
+        !endsWith(github.ref, '-entrypoint')
+
+    runs-on: [ self-hosted, Linux, lightweight ]
+
+    needs: test
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Download deb packages
+        uses: actions/download-artifact@v3
+        with:
+          name: tarantool-deb-${{ inputs.arch }}
+          path: build
+
+      - name: Download rpm packages
+        uses: actions/download-artifact@v3
+        with:
+          name: tarantool-rpm-${{ inputs.arch }}
+          path: build
+
+      - name: Deploy packages
+        run: |
+          case ${{ github.ref }} in
+            refs/tags/*-alpha*|refs/tags/*-beta*|refs/tags/*-rc*)
+              REPO_TYPE=pre-release make -f .pack.mk deploy-static
+              ;;
+            refs/tags/*)
+              REPO_TYPE=release make -f .pack.mk deploy-static
+              ;;
+          esac
+        env:
+          RWS_AUTH: ${{ secrets.RWS_AUTH }}
