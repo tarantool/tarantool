@@ -308,8 +308,6 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 		return NULL;
 	if (index_opts_decode(&opts, opts_field, &fiber()->gc) != 0)
 		return NULL;
-	const char *parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS);
-	uint32_t part_count = mp_decode_array(&parts);
 	if (name_len > BOX_NAME_MAX) {
 		diag_set(ClientError, ER_MODIFY_INDEX,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
@@ -318,6 +316,19 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	}
 	if (identifier_check(name, name_len) != 0)
 		return NULL;
+
+	const char *parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS);
+	uint32_t part_count = mp_decode_array(&parts);
+	if (part_count == 0) {
+		diag_set(ClientError, ER_MODIFY_INDEX, tt_cstr(name, name_len),
+			 space_name(space), "part count must be positive");
+		return NULL;
+	}
+	if (part_count > BOX_INDEX_PART_MAX) {
+		diag_set(ClientError, ER_MODIFY_INDEX, tt_cstr(name, name_len),
+			 space_name(space), "too many key parts");
+		return NULL;
+	}
 	struct key_def *key_def = NULL;
 	struct key_part_def *part_def = (struct key_part_def *)
 		malloc(sizeof(*part_def) * part_count);

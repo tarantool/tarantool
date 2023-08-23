@@ -273,16 +273,6 @@ index_def_check(struct index_def *index_def, const char *space_name)
 			 space_name, "primary key must be unique");
 		return -1;
 	}
-	if (index_def->key_def->part_count == 0) {
-		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
-			 space_name, "part count must be positive");
-		return -1;
-	}
-	if (index_def->key_def->part_count > BOX_INDEX_PART_MAX) {
-		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
-			 space_name, "too many key parts");
-		return -1;
-	}
 	if (index_def->iid == 0 && index_def->key_def->is_multikey) {
 		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 			 space_name, "primary key cannot be multikey");
