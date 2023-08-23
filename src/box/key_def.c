@@ -268,6 +268,7 @@ struct key_def *
 key_def_new(const struct key_part_def *parts, uint32_t part_count,
 	    bool for_func_index)
 {
+	assert(part_count > 0);
 	size_t sz = 0;
 	for (uint32_t i = 0; i < part_count; i++)
 		sz += parts[i].path != NULL ? strlen(parts[i].path) : 0;
