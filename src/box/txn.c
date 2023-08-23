@@ -794,13 +794,28 @@ txn_on_journal_write(struct journal_entry *entry)
 	} else {
 		int64_t lsn;
 		/*
-		 * XXX: that is quite ugly. Need a more reliable way to get the
-		 * synchro LSN.
+		 * Synchro lsn is taken from the last global row of a
+		 * transaction. When this is a remote transaction
+		 * (n_applier_rows > 0) we know for sure the last applier row is
+		 * the last global row. Otherwise we need to find the last
+		 * global row.
 		 */
-		if (txn->n_applier_rows > 0)
+		if (txn->n_applier_rows > 0) {
 			lsn = entry->rows[txn->n_applier_rows - 1]->lsn;
-		else
-			lsn = entry->rows[entry->n_rows - 1]->lsn;
+		} else {
+			int i = entry->n_rows - 1;
+			struct xrow_header **rows = entry->rows;
+			/*
+			 * We don't care which lsn to choose for a fully local
+			 * transaction.
+			 */
+			if (!txn_is_fully_local(txn)) {
+				while (rows[i]->group_id == GROUP_LOCAL)
+					i--;
+				assert(i >= 0);
+			}
+			lsn = rows[i]->lsn;
+		}
 		txn_limbo_assign_lsn(&txn_limbo, txn->limbo_entry, lsn);
 		if (txn->fiber != NULL)
 			fiber_wakeup(txn->fiber);
@@ -819,9 +834,8 @@ txn_journal_entry_new(struct txn *txn)
 
 	assert(txn->n_new_rows + txn->n_applier_rows > 0);
 
-	/* Save space for an additional NOP row just in case. */
 	struct region *txn_region = tx_region_acquire(txn);
-	req = journal_entry_new(txn->n_new_rows + txn->n_applier_rows + 1,
+	req = journal_entry_new(txn->n_new_rows + txn->n_applier_rows,
 				txn_region, txn_on_journal_write, txn);
 	tx_region_release(txn, TX_ALLOC_SYSTEM);
 	txn_region = NULL;
@@ -885,30 +899,6 @@ txn_journal_entry_new(struct txn *txn)
 
 	assert(remote_row == req->rows + txn->n_applier_rows);
 	assert(local_row == remote_row + txn->n_new_rows);
-
-	/*
-	 * Append a dummy NOP statement to preserve replication tx
-	 * boundaries when the last tx row is a local one, and the
-	 * transaction has at least one global row.
-	 */
-	if (txn->n_local_rows > 0 &&
-	    (txn->n_local_rows != txn->n_new_rows || txn->n_applier_rows > 0) &&
-	    (*(local_row - 1))->group_id == GROUP_LOCAL) {
-		size_t size;
-		*local_row =
-			tx_region_alloc_object(txn, TX_OBJECT_XROW_HEADER,
-					       &size);
-		if (*local_row == NULL) {
-			diag_set(OutOfMemory, size, "tx_region_alloc_object",
-				 "row");
-			return NULL;
-		}
-		memset(*local_row, 0, sizeof(**local_row));
-		(*local_row)->type = IPROTO_NOP;
-		(*local_row)->group_id = GROUP_DEFAULT;
-	} else {
-		--req->n_rows;
-	}
 
 	static const uint8_t flags_map[] = {
 		[TXN_WAIT_SYNC] = IPROTO_FLAG_WAIT_SYNC,
