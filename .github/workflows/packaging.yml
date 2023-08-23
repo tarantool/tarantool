@@ -1,4 +1,4 @@
-name: static_build_packaging
+name: packaging
 
 on:
   push:
@@ -31,9 +31,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  static_build_packaging:
-    name: 'static_build_packaging (${{ matrix.arch }})'
-
+  packaging-x86_64:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'full-ci' or 'static-build-ci' label is set.
     if: github.repository == 'tarantool/tarantool' &&
@@ -41,45 +39,36 @@ jobs:
           contains(github.event.pull_request.labels.*.name, 'full-ci') ||
           contains(github.event.pull_request.labels.*.name, 'static-build-ci') )
 
-    runs-on: ${{ matrix.runner }}
+    uses: ./.github/workflows/static_build_pack_test_deploy.yml
+    with:
+      arch: x86_64
+      test-matrix: '{
+        "include": [
+          {"os": "debian-buster"}, {"os": "debian-bullseye"},
+          {"os": "centos-7"}, {"os": "centos-8"},
+          {"os": "fedora-35"}, {"os": "fedora-36"},
+          {"os": "ubuntu-focal"}, {"os": "ubuntu-jammy"}
+        ]
+      }'
+    secrets: inherit
 
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-20.04-self-hosted
-            arch: x86_64
-          - runner: graviton
-            arch: aarch64
+  packaging-aarch64:
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'full-ci' or 'static-build-ci' label is set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          contains(github.event.pull_request.labels.*.name, 'full-ci') ||
+          contains(github.event.pull_request.labels.*.name, 'static-build-ci') )
 
-    steps:
-      - name: Prepare checkout
-        uses: tarantool/actions/prepare-checkout@master
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          submodules: recursive
-      - uses: ./.github/actions/environment
-      - name: Install deps
-        uses: ./.github/actions/install-deps-debian
-      - name: Build static packages
-        uses: ./.github/actions/pack-and-deploy
-        env:
-          RWS_AUTH: ${{ secrets.RWS_AUTH }}
-      - name: Upload build artifacts
-        if: github.ref == 'refs/heads/master' ||
-            startsWith(github.ref, 'refs/heads/release/') ||
-            startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v3
-        with:
-          name: tarantool-deb-rpm-x86_64-aarch64
-          retention-days: 21
-          path: |
-            build/tarantool*.deb
-            build/tarantool*.rpm
-          if-no-files-found: error
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+    uses: ./.github/workflows/static_build_pack_test_deploy.yml
+    with:
+      arch: aarch64
+      test-matrix: '{
+        "include": [
+          {"os": "debian-buster"}, {"os": "debian-bullseye"},
+          {"os": "centos-7"}, {"os": "centos-8"},
+          {"os": "fedora-35"}, {"os": "fedora-36"},
+          {"os": "ubuntu-focal"}, {"os": "ubuntu-jammy"}
+        ]
+      }'
+    secrets: inherit
