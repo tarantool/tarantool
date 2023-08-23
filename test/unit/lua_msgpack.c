@@ -11,6 +11,7 @@
 #include "mpstream/mpstream.h"
 
 #include "small/ibuf.h"
+#include "tt_uuid.h"
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
@@ -20,6 +21,53 @@ static void
 mpstream_error_mock(void *ctx)
 {
 	(void)ctx;
+}
+
+/**
+ * Checks encoding to `MP_EXT`.
+ */
+static void
+test_encode_ext(lua_State *L)
+{
+	plan(2);
+	header();
+
+	struct mh_strnu32_t *translation = mh_strnu32_new();
+	const char *alias = "x";
+	struct mh_strnu32_node_t node = {
+		.str = alias,
+		.len = strlen(alias),
+		.hash = lua_hash(alias, strlen(alias)),
+		.val = 0
+	};
+	mh_strnu32_put(translation, &node, NULL, NULL);
+
+	struct ibuf *ibuf = cord_ibuf_take();
+	struct mpstream stream;
+	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
+		      mpstream_error_mock, L);
+
+	enum mp_type type;
+	struct tt_uuid uuid;
+	memset(&uuid, 0, sizeof(uuid));
+	luaT_pushuuid(L, &uuid);
+	luamp_encode_with_translation(L, luaL_msgpack_default, &stream, 1,
+				      translation, &type);
+	lua_pop(L, 1);
+	mpstream_flush(&stream);
+	const char *mp_expected = "\xd8\x02\x00\x00\x00\x00\x00\x00\x00"
+				  "\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+	ok(strncmp(ibuf->buf, mp_expected, ibuf_used(ibuf)) == 0,
+	   "UUID is correctly encoded as MP_EXT");
+	ok(type == MP_EXT, "type of UUID is MP_EXT");
+	ibuf_reset(ibuf);
+	mpstream_reset(&stream);
+
+	cord_ibuf_drop(ibuf);
+	mh_strnu32_delete(translation);
+
+	footer();
+	check_plan();
 }
 
 /**
@@ -149,7 +197,7 @@ test_translation_in_indexation(struct lua_State *L)
 int
 main(void)
 {
-	plan(2);
+	plan(3);
 	header();
 
 	struct lua_State *L = luaT_newteststate();
@@ -157,10 +205,13 @@ main(void)
 	memory_init();
 	fiber_init(fiber_c_invoke);
 
+	tarantool_lua_error_init(L);
+	tarantool_lua_utils_init(L);
 	tarantool_lua_serializer_init(L);
 	luaopen_msgpack(L);
 	lua_pop(L, 1);
 
+	test_encode_ext(L);
 	test_translation_in_encoding(L);
 	test_translation_in_indexation(L);
 
