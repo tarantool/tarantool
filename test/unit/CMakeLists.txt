@@ -82,7 +82,7 @@ create_unit_test(PREFIX rope_avl
 )
 create_unit_test(PREFIX rope_stress
                  SOURCES rope_stress.c
-                 LIBRARIES salad
+                 LIBRARIES salad unit
 )
 create_unit_test(PREFIX rope
                  SOURCES rope.c
