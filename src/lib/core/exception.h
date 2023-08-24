@@ -271,12 +271,6 @@ public:
 	virtual void raise() { throw this; }
 };
 
-/**
- * Initialize the exception subsystem.
- */
-void
-exception_init();
-
 #define tnt_error(class, ...) ({					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
 	class *e = new class(__FILE__, __LINE__, ##__VA_ARGS__);	\

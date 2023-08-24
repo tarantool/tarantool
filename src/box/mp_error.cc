@@ -204,14 +204,8 @@ mp_encode_error_one(char *data, const struct error *error)
 }
 
 static struct error *
-error_build_xc(struct mp_error *mp_error)
+error_build(struct mp_error *mp_error)
 {
-	/*
-	 * To create an error the "raw" constructor is used
-	 * because OOM error must be thrown in OOM case.
-	 * Builders returns a pointer to the static OOM error
-	 * in OOM case.
-	 */
 	struct error *err = NULL;
 	if (mp_error->type == NULL || mp_error->message == NULL ||
 	    mp_error->file == NULL) {
@@ -373,11 +367,7 @@ mp_decode_error_one(const char **data)
 		}
 	}
 
-	try {
-		err = error_build_xc(&mp_err);
-	} catch (OutOfMemory *e) {
-		assert(err == NULL && !diag_is_empty(diag_get()));
-	}
+	err = error_build(&mp_err);
 finish:
 	region_truncate(region, region_svp);
 	mp_error_destroy(&mp_err);

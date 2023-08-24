@@ -82,20 +82,12 @@ exception_get_int(struct error *e, const struct method_info *method)
 
 } /* extern "C" */
 
-/** out_of_memory::size is zero-initialized by the linker. */
-static OutOfMemory out_of_memory(__FILE__, __LINE__,
-				 sizeof(OutOfMemory), "malloc", "exception");
-
 const struct type_info type_Exception = make_type("Exception", NULL);
 
 void *
 Exception::operator new(size_t size)
 {
-	void *buf = malloc(size);
-	if (buf != NULL)
-		return buf;
-	diag_set_error(diag_get(), &out_of_memory);
-	throw &out_of_memory;
+	return xmalloc(size);
 }
 
 void
@@ -106,9 +98,7 @@ Exception::operator delete(void *ptr)
 
 Exception::~Exception()
 {
-	if (this != &out_of_memory) {
-		assert(refs == 0);
-	}
+	assert(refs == 0);
 	TRASH((struct error *) this);
 }
 
@@ -306,61 +296,48 @@ FileFormatError::FileFormatError(const char *file, unsigned line,
 	va_end(ap);
 }
 
-#define BuildAlloc(type)				\
-	void *p = malloc(sizeof(type));			\
-	if (p == NULL)					\
-		return &out_of_memory;
-
 struct error *
 BuildOutOfMemory(const char *file, unsigned line,
 		 size_t amount, const char *allocator,
 		 const char *object)
 {
-	BuildAlloc(OutOfMemory);
-	return new (p) OutOfMemory(file, line, amount, allocator,
-				   object);
+	return new OutOfMemory(file, line, amount, allocator, object);
 }
 
 struct error *
 BuildTimedOut(const char *file, unsigned line)
 {
-	BuildAlloc(TimedOut);
-	return new (p) TimedOut(file, line);
+	return new TimedOut(file, line);
 }
 
 struct error *
 BuildChannelIsClosed(const char *file, unsigned line)
 {
-	BuildAlloc(ChannelIsClosed);
-	return new (p) ChannelIsClosed(file, line);
+	return new ChannelIsClosed(file, line);
 }
 
 struct error *
 BuildFiberIsCancelled(const char *file, unsigned line)
 {
-	BuildAlloc(FiberIsCancelled);
-	return new (p) FiberIsCancelled(file, line);
+	return new FiberIsCancelled(file, line);
 }
 
 struct error *
 BuildFiberSliceIsExceeded(const char *file, unsigned line)
 {
-	BuildAlloc(FiberSliceIsExceeded);
-	return new(p) FiberSliceIsExceeded(file, line);
+	return new FiberSliceIsExceeded(file, line);
 }
 
 struct error *
 BuildLuajitError(const char *file, unsigned line, const char *msg)
 {
-	BuildAlloc(LuajitError);
-	return new (p) LuajitError(file, line, msg);
+	return new LuajitError(file, line, msg);
 }
 
 struct error *
 BuildIllegalParams(const char *file, unsigned line, const char *format, ...)
 {
-	BuildAlloc(IllegalParams);
-	IllegalParams *e =  new (p) IllegalParams(file, line, "");
+	IllegalParams *e = new IllegalParams(file, line, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
@@ -371,8 +348,7 @@ BuildIllegalParams(const char *file, unsigned line, const char *format, ...)
 struct error *
 BuildSystemError(const char *file, unsigned line, const char *format, ...)
 {
-	BuildAlloc(SystemError);
-	SystemError *e = new (p) SystemError(file, line, "");
+	SystemError *e = new SystemError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
@@ -384,8 +360,7 @@ BuildSystemError(const char *file, unsigned line, const char *format, ...)
 struct error *
 BuildCollationError(const char *file, unsigned line, const char *format, ...)
 {
-	BuildAlloc(CollationError);
-	CollationError *e =  new (p) CollationError(file, line, "");
+	CollationError *e = new CollationError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
@@ -396,8 +371,7 @@ BuildCollationError(const char *file, unsigned line, const char *format, ...)
 struct error *
 BuildSwimError(const char *file, unsigned line, const char *format, ...)
 {
-	BuildAlloc(SwimError);
-	SwimError *e =  new (p) SwimError(file, line, "");
+	SwimError *e = new SwimError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
@@ -408,8 +382,7 @@ BuildSwimError(const char *file, unsigned line, const char *format, ...)
 struct error *
 BuildCryptoError(const char *file, unsigned line, const char *format, ...)
 {
-	BuildAlloc(CryptoError);
-	CryptoError *e =  new (p) CryptoError(file, line, "");
+	CryptoError *e = new CryptoError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
@@ -421,8 +394,7 @@ struct error *
 BuildSocketError(const char *file, unsigned line, const char *socketname,
 		 const char *format, ...)
 {
-	BuildAlloc(SocketError);
-	SocketError *e = new (p) SocketError(file, line, socketname, "");
+	SocketError *e = new SocketError(file, line, socketname, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
@@ -435,8 +407,7 @@ BuildSocketError(const char *file, unsigned line, const char *socketname,
 struct error *
 BuildRaftError(const char *file, unsigned line, const char *format, ...)
 {
-	BuildAlloc(RaftError);
-	RaftError *e =  new (p) RaftError(file, line, "");
+	RaftError *e = new RaftError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
@@ -447,20 +418,10 @@ BuildRaftError(const char *file, unsigned line, const char *format, ...)
 struct error *
 BuildFileFormatError(const char *file, unsigned line, const char *format, ...)
 {
-	BuildAlloc(FileFormatError);
-	FileFormatError *e = new(p) FileFormatError(file, line, "");
+	FileFormatError *e = new FileFormatError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
 	va_end(ap);
 	return e;
 }
-
-void
-exception_init()
-{
-	/* A special workaround for out_of_memory static init */
-	out_of_memory.refs = 1;
-}
-
-#undef BuildAlloc
