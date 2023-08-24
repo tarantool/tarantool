@@ -811,8 +811,7 @@ static inline int
 bin_to_uuid(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_BIN);
-	if (mem->n != UUID_LEN ||
-	    tt_uuid_validate((struct tt_uuid *)mem->z) != 0)
+	if (mem->n != UUID_LEN)
 		return -1;
 	mem_set_uuid(mem, (struct tt_uuid *)mem->z);
 	return 0;

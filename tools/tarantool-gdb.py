@@ -534,8 +534,6 @@ class TtMsgPack(MsgPack):
             clock_seq_low = data.read_u8(),
             node = [ data.read_u8() for _ in range(0, 6) ],
         ))
-        if not uuid.is_valid():
-            return uuid, "uuid_unpack: invalid uuid"
         return uuid, None
 
     @classmethod
@@ -979,12 +977,6 @@ if find_type('struct tt_uuid') is not None:
     class Uuid:
         def __init__(self, val):
             self.val = val
-
-        def is_valid(self): # tt_uuid_validate
-            n = self.val['clock_seq_hi_and_reserved']
-            if (n & 0x80) != 0x00 and (n & 0xc0) != 0x80 and (n & 0xe0) != 0xc0:
-                return False
-            return True
 
         def __str__(self): # tt_uuid_to_string
             return '{:08x}-{:04x}-{:04x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}'.format(
