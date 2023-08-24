@@ -865,8 +865,6 @@ main(int argc, char **argv)
 	main_argc = argc;
 	main_argv = argv;
 
-	exception_init();
-
 	fiber_init(fiber_cxx_invoke);
 	popen_init();
 	coio_init();
