@@ -62,16 +62,6 @@ struct tt_uuid {
 void
 tt_uuid_create(struct tt_uuid *uu);
 
-inline int
-tt_uuid_validate(struct tt_uuid *uu)
-{
-	/* Check variant (NCS, RFC4122, MSFT) */
-	uint8_t n = uu->clock_seq_hi_and_reserved;
-	if ((n & 0x80) != 0x00 && (n & 0xc0) != 0x80 &&	(n & 0xe0) != 0xc0)
-		return 1;
-	return 0;
-}
-
 /**
  * \brief Parse UUID from string.
  * \param in string
@@ -88,8 +78,7 @@ tt_uuid_from_string(const char *in, struct tt_uuid *uu)
 		   &uu->node[0], &uu->node[1], &uu->node[2], &uu->node[3],
 		   &uu->node[4], &uu->node[5]) != 11)
 		return 1;
-
-	return tt_uuid_validate(uu);
+	return 0;
 }
 
 /**

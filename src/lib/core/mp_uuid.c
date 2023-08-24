@@ -55,7 +55,6 @@ uuid_pack(char *data, const struct tt_uuid *uuid)
 struct tt_uuid *
 uuid_unpack(const char **data, uint32_t len, struct tt_uuid *uuid)
 {
-	const char *const svp = *data;
 	if (len != UUID_PACKED_LEN)
 		return NULL;
 	uuid->time_low = mp_load_u32(data);
@@ -66,10 +65,6 @@ uuid_unpack(const char **data, uint32_t len, struct tt_uuid *uuid)
 	for (int i = 0; i < 6; i++)
 		uuid->node[i] = mp_load_u8(data);
 
-	if (tt_uuid_validate(uuid) != 0) {
-		*data = svp;
-		return NULL;
-	}
 	return uuid;
 }
 
