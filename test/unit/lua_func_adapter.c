@@ -104,7 +104,7 @@ test_tuple(void)
 		func_adapter_pop_tuple(func, &ctx, tuples + i);
 		isnt(tuples[i], NULL, "Returned tuple must not be NULL");
 	}
-	ok(func_adapter_is_null(func, &ctx), "Expected null - no values left")
+	ok(func_adapter_is_null(func, &ctx), "Expected null - no values left");
 	func_adapter_end(func, &ctx);
 	func_adapter_destroy(func);
 	lua_settop(tarantool_L, 0);
@@ -158,7 +158,7 @@ test_string(void)
 	strncpy(buf, s1, s1_len);
 	strcpy(buf + s1_len, s2);
 	is(strcmp(retval, buf), 0, "Expected %s", buf);
-	ok(func_adapter_is_null(func, &ctx), "Expected null - no values left")
+	ok(func_adapter_is_null(func, &ctx), "Expected null - no values left");
 	func_adapter_end(func, &ctx);
 	func_adapter_destroy(func);
 	lua_settop(tarantool_L, 0);
@@ -185,13 +185,13 @@ test_null(void)
 	int rc = func_adapter_call(func, &ctx);
 	fail_if(rc != 0);
 	for (size_t i = 0; i < null_count; ++i) {
-		ok(func_adapter_is_null(func, &ctx), "Expected null")
+		ok(func_adapter_is_null(func, &ctx), "Expected null");
 		func_adapter_pop_null(func, &ctx);
 	}
 	ok(func_adapter_is_double(func, &ctx), "Expected double");
 	double double_retval = 0;
 	func_adapter_pop_double(func, &ctx, &double_retval);
-	ok(func_adapter_is_null(func, &ctx), "Expected null - no values left")
+	ok(func_adapter_is_null(func, &ctx), "Expected null - no values left");
 	func_adapter_end(func, &ctx);
 	func_adapter_destroy(func);
 	lua_settop(tarantool_L, 0);

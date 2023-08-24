@@ -468,7 +468,7 @@ test_buffer_prepared_large(void)
 	fill_buffer(&buf, payload_small, payload_size, entry_count);
 	int entry_count_after = count_records(mem, buffer_size);
 	ok(entry_count_after == entry_count, "entry count after is %d",
-	   entry_count_after)
+	   entry_count_after);
 
 	footer();
 	check_plan();

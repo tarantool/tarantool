@@ -407,16 +407,16 @@ test_xrow_encode_dml(void)
 	is(memcmp(data, r.key, strlen(r.key)), 0, "decoded key");
 	data += strlen(r.key);
 
-	is(mp_decode_uint(&data), IPROTO_OPS, "decoded ops key")
+	is(mp_decode_uint(&data), IPROTO_OPS, "decoded ops key");
 	is(memcmp(data, r.ops, strlen(r.ops)), 0, "decoded ops");
 	data += strlen(r.ops);
 
-	is(mp_decode_uint(&data), IPROTO_TUPLE_META, "decoded meta key")
+	is(mp_decode_uint(&data), IPROTO_TUPLE_META, "decoded meta key");
 	is(memcmp(data, r.tuple_meta, strlen(r.tuple_meta)), 0,
 	   "decoded meta");
 	data += strlen(r.tuple_meta);
 
-	is(mp_decode_uint(&data), IPROTO_TUPLE, "decoded tuple key")
+	is(mp_decode_uint(&data), IPROTO_TUPLE, "decoded tuple key");
 	is(memcmp(data, r.tuple, strlen(r.tuple)), 0, "decoded tuple");
 	data += strlen(r.tuple);
 
