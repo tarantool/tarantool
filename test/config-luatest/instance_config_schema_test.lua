@@ -980,6 +980,8 @@ g.test_box_cfg_coverage = function()
         cluster_name = true,
         log = true,
         metrics = true,
+        audit_log = true,
+        audit_filter = true,
 
         -- Controlled by the leader and database.mode options,
         -- handled by the box_cfg applier.
@@ -994,12 +996,6 @@ g.test_box_cfg_coverage = function()
 
         -- Moved to the CLI options (see gh-8876).
         force_recovery = true,
-
-        -- TODO: Will be added in the scope of gh-8861.
-        audit_log = true,
-        audit_nonblock = true,
-        audit_format = true,
-        audit_filter = true,
     }
 
     -- There are options, where defaults are changed deliberately.
@@ -1007,6 +1003,7 @@ g.test_box_cfg_coverage = function()
         -- box.cfg.log_nonblock is set to nil by default, but
         -- actually it means false.
         log_nonblock = true,
+        audit_nonblock = true,
 
         -- Adjusted to use {{ instance_name }}.
         custom_proc_title = true,
@@ -1290,5 +1287,66 @@ g.test_sharding = function()
         sync_timeout = 1,
     }
     local res = instance_config:apply_default({}).sharding
+    t.assert_equals(res, exp)
+end
+
+g.test_audit_unavailable = function()
+    t.tarantool.skip_if_enterprise()
+    local iconfig = {
+        audit_log = {
+            to = 'file',
+        },
+    }
+    local err = '[instance_config] audit_log.to: This configuration '..
+                'parameter is available only in Tarantool Enterprise Edition'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+
+    iconfig = {
+        audit_log = {
+            filter = {'all'},
+        },
+    }
+    err = '[instance_config] audit_log: This configuration parameter is '..
+          'available only in Tarantool Enterprise Edition'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+end
+
+g.test_audit_available = function()
+    t.tarantool.skip_if_not_enterprise()
+    local iconfig = {
+        audit_log = {
+            to = 'file',
+            file = 'one',
+            pipe = 'two',
+            syslog = {
+                identity = 'three',
+                facility = 'four',
+                server = 'five',
+            },
+            nonblock = true,
+            format = 'plain',
+            filter = {'all', 'none'}
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.audit_log, instance_config.schema.fields.audit_log)
+
+    local exp = {
+        file = "var/log/{{ instance_name }}/audit.log",
+        format = "json",
+        nonblock = false,
+        pipe = box.NULL,
+        syslog = {
+            facility = "local7",
+            identity = "tarantool",
+            server = box.NULL
+        },
+        to = "devnull",
+    }
+    local res = instance_config:apply_default({}).audit_log
     t.assert_equals(res, exp)
 end
