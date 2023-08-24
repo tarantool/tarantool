@@ -917,14 +917,28 @@ wal_stream_apply_mixed_dml_row(struct wal_stream *stream,
 			       struct xrow_header *row)
 {
 	/*
-	 * A local transaction should not be written to nodes_rows with
-	 * id equal to 0. It should be written to nodes_rows with the id
-	 * of the node from which we are recovering. Since a local
-	 * transaction can only exist on the node from which we are
-	 * recovering.
+	 * A local row can be part of any node's transaction. Try to find the
+	 * right transaction by tsn. If this fails, assume the row belongs to
+	 * this node.
 	 */
-	uint32_t id = row->replica_id ? row->replica_id : instance_id;
+	uint32_t id;
 	struct rlist *nodes_rows = stream->nodes_rows;
+	if (row->replica_id == 0) {
+		id = instance_id;
+		for (uint32_t i = 0; i < VCLOCK_MAX; i++) {
+			if (rlist_empty(&nodes_rows[i]))
+				continue;
+			struct wal_row *tmp =
+				rlist_last_entry(&nodes_rows[i], typeof(*tmp),
+						 in_row_list);
+			if (tmp->row.tsn == row->tsn) {
+				id = i;
+				break;
+			}
+		}
+	} else {
+		id = row->replica_id;
+	}
 
 	struct wal_row *save_row = wal_stream_save_row(stream, row);
 	rlist_add_tail_entry(&nodes_rows[id], save_row, in_row_list);
