@@ -70,7 +70,9 @@ extern "C" {
 */
 
 /* private function, use ok(...) instead */
-int _ok(int condition, const char *fmt, ...);
+void
+_ok(int condition, const char *expr, const char *file, int line,
+    const char *fmt, ...);
 
 /* private function, use note(...) or diag(...) instead */
 void _space(FILE *stream);
@@ -90,41 +92,31 @@ _plan(int count, bool tap);
 */
 int check_plan(void);
 
-#define ok(condition, fmt, args...)	{		\
-	int res = _ok(condition, fmt, ##args);		\
-	if (!res) {					\
-		_space(stderr);			\
-		fprintf(stderr, "#   Failed test '");	\
-		fprintf(stderr, fmt, ##args);		\
-		fprintf(stderr, "'\n");			\
-		_space(stderr);			\
-		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
-	}						\
-}
+/*
+ * The ok macro is defined so that it can be called without a message:
+ *
+ *   ok(true);
+ *   ok(true, "message");
+ *   ok(true, "message %d", i);
+ *
+ * It supports up to 7 format arguments.
+ */
+#define _select_10th(f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, ...) f10
+#define _ok0(cond, expr, ...)						\
+	_select_10th(, ##__VA_ARGS__,					\
+		     _ok(cond, expr, __FILE__, __LINE__, __VA_ARGS__),	\
+		     _ok(cond, expr, __FILE__, __LINE__, __VA_ARGS__),	\
+		     _ok(cond, expr, __FILE__, __LINE__, __VA_ARGS__),	\
+		     _ok(cond, expr, __FILE__, __LINE__, __VA_ARGS__),	\
+		     _ok(cond, expr, __FILE__, __LINE__, __VA_ARGS__),	\
+		     _ok(cond, expr, __FILE__, __LINE__, __VA_ARGS__),	\
+		     _ok(cond, expr, __FILE__, __LINE__, __VA_ARGS__),	\
+		     _ok(cond, expr, __FILE__, __LINE__, __VA_ARGS__),	\
+		     _ok(cond, expr, __FILE__, __LINE__, "line %d", __LINE__))
 
-#define is(a, b, fmt, args...)	{			\
-	int res = _ok((a) == (b), fmt, ##args);	\
-	if (!res) {					\
-		_space(stderr);			\
-		fprintf(stderr, "#   Failed test '");	\
-		fprintf(stderr, fmt, ##args);		\
-		fprintf(stderr, "'\n");			\
-		_space(stderr);			\
-		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
-	}						\
-}
-
-#define isnt(a, b, fmt, args...) {			\
-	int res = _ok((a) != (b), fmt, ##args);	\
-	if (!res) {					\
-		_space(stderr);			\
-		fprintf(stderr, "#   Failed test '");	\
-		fprintf(stderr, fmt, ##args);		\
-		fprintf(stderr, "'\n");			\
-		_space(stderr);			\
-		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
-	}						\
-}
+#define ok(cond, ...)		_ok0(cond, #cond, ##__VA_ARGS__)
+#define is(a, b, ...)		_ok0((a) == (b), #a " == " #b, ##__VA_ARGS__)
+#define isnt(a, b, ...)		_ok0((a) != (b), #a " != " #b, ##__VA_ARGS__)
 
 #if UNIT_TAP_COMPATIBLE
 
