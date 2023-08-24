@@ -139,20 +139,20 @@ test_first(void)
 		test_tree_do_insert(&tree, i);
 	it = test_tree_view_first(&view);
 	p = test_tree_view_iterator_get_elem(&view, &it);
-	is(p, NULL, "empty view first after tree change")
+	is(p, NULL, "empty view first after tree change");
 	test_tree_view_destroy(&view);
 
 	test_tree_view_create(&view, &tree);
 	it = test_tree_view_first(&view);
 	p = test_tree_view_iterator_get_elem(&view, &it);
 	ok(p != NULL && *p == 0,
-	   "non-empty view first before tree change")
+	   "non-empty view first before tree change");
 	for (int i = 0; i < 100; i++)
 		test_tree_delete(&tree, i);
 	it = test_tree_view_first(&view);
 	p = test_tree_view_iterator_get_elem(&view, &it);
 	ok(p != NULL && *p == 0,
-	   "non-empty view first after tree change")
+	   "non-empty view first after tree change");
 	test_tree_view_destroy(&view);
 
 	test_tree_destroy(&tree);
@@ -179,20 +179,20 @@ test_last(void)
 		test_tree_do_insert(&tree, i);
 	it = test_tree_view_last(&view);
 	p = test_tree_view_iterator_get_elem(&view, &it);
-	is(p, NULL, "empty view last after tree change")
+	is(p, NULL, "empty view last after tree change");
 	test_tree_view_destroy(&view);
 
 	test_tree_view_create(&view, &tree);
 	it = test_tree_view_last(&view);
 	p = test_tree_view_iterator_get_elem(&view, &it);
 	ok(p != NULL && *p == 999,
-	   "non-empty view last before tree change")
+	   "non-empty view last before tree change");
 	for (int i = 900; i < 1000; i++)
 		test_tree_delete(&tree, i);
 	it = test_tree_view_last(&view);
 	p = test_tree_view_iterator_get_elem(&view, &it);
 	ok(p != NULL && *p == 999,
-	   "non-empty view last after tree change")
+	   "non-empty view last after tree change");
 	test_tree_view_destroy(&view);
 
 	test_tree_destroy(&tree);

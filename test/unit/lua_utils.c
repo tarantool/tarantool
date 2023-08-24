@@ -131,7 +131,7 @@ test_tolstring_strict(lua_State *L)
 	lua_pop(L, 1);
 
 	lua_pushnumber(L, 42);
-	is(luaL_tolstring_strict(L, -1, &len), NULL, "number")
+	is(luaL_tolstring_strict(L, -1, &len), NULL, "number");
 	lua_pop(L, 1);
 
 	footer();

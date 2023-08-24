@@ -165,7 +165,7 @@ swim_test_payload_refutation(void)
 	swim_cluster_set_drop_out(cluster, 2, 100);
 	is(swim_cluster_wait_payload_everywhere(cluster, 0, s0_new_payload,
 						s0_new_payload_size, 3), 0,
-	  "S3 learns S1's payload from S2")
+	  "S3 learns S1's payload from S2");
 
 	swim_cluster_delete(cluster);
 	swim_finish_test();

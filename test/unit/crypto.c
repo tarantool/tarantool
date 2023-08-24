@@ -105,7 +105,7 @@ test_aes128_codec(void)
 	rc = crypto_codec_encrypt(c, iv2, plain, plain_size,
 				  buffer2, buffer_size);
 	is(rc, 16, "encrypt with different IV and the same number of written "\
-	   "bytes returned")
+	   "bytes returned");
 	isnt(memcmp(buffer2, buffer1, rc), 0,
 	     "the encrypted data looks different");
 	rc = crypto_codec_decrypt(c, iv2, buffer2, 16, buffer1, buffer_size);

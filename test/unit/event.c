@@ -63,9 +63,9 @@ test_basic(void)
 		old = event_find_trigger(event, trg_name);
 		is(old, &func, "New trigger must be found");
 		ok(event_has_triggers(event), "Event must not be empty");
-		is(func_destroy_count, 0, "Func must not be destroyed yet")
+		is(func_destroy_count, 0, "Func must not be destroyed yet");
 		event_reset_trigger(event, trg_name, NULL);
-		is(func_destroy_count, 1, "Func must be destroyed")
+		is(func_destroy_count, 1, "Func must be destroyed");
 		old = event_find_trigger(event, trg_name);
 		is(old, NULL, "Deleted trigger must not be found");
 		ok(!event_has_triggers(event), "Event must be empty");
@@ -248,7 +248,7 @@ test_event_iterator_stability_del_step(int breakpoint, const char *del_mask,
 	const char *name = NULL;
 	for (int i = 0; i <= breakpoint; i++) {
 		bool ok = event_trigger_iterator_next(&it, &trg, &name);
-		ok(ok, "Iterator must not be exhausted yet")
+		ok(ok, "Iterator must not be exhausted yet");
 		const char *trg_name = tt_sprintf("%d", i);
 		is(strcmp(name, trg_name), 0,
 		   "Triggers must be traversed in reversed order");
@@ -314,7 +314,7 @@ test_event_iterator_stability_replace_step(int breakpoint,
 	const char *name = NULL;
 	for (int i = 0; i <= breakpoint; i++) {
 		bool ok = event_trigger_iterator_next(&it, &trg, &name);
-		ok(ok, "Iterator must not be exhausted yet")
+		ok(ok, "Iterator must not be exhausted yet");
 		const char *trg_name = tt_sprintf("%d", i);
 		is(strcmp(name, trg_name), 0,
 		   "Triggers must be traversed in reversed order");
@@ -328,7 +328,7 @@ test_event_iterator_stability_replace_step(int breakpoint,
 	ok(event_has_triggers(event), "Event must not be empty");
 	for (int i = breakpoint + 1; i < trigger_num; ++i) {
 		bool ok = event_trigger_iterator_next(&it, &trg, &name);
-		ok(ok, "Traversal must continue")
+		ok(ok, "Traversal must continue");
 		const char *trg_name = tt_sprintf("%d", i);
 		is(strcmp(name, trg_name), 0,
 		   "Triggers must be traversed in reversed order");

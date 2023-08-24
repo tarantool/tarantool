@@ -36,7 +36,7 @@ test_xcalloc(void)
 			if (p[i] != 0)
 				is_zeroed = false;
 		}
-		ok(is_zeroed, "p is zeroed")
+		ok(is_zeroed, "p is zeroed");
 		free(p);
 	}
 	check_plan();

@@ -139,7 +139,7 @@ test_bool_var(void)
 	v.type = TWEAK_VALUE_BOOL;
 	v.bval = false;
 	is(tweak_set(t, &v), 0, "set tweak value");
-	is(bool_var, false, "var value after set")
+	is(bool_var, false, "var value after set");
 	tweak_get(t, &v);
 	is(v.type, TWEAK_VALUE_BOOL, "tweak value type after set");
 	is(v.bval, false, "tweak value after set");
@@ -178,7 +178,7 @@ test_int_var(void)
 	v.type = TWEAK_VALUE_INT;
 	v.ival = 11;
 	is(tweak_set(t, &v), 0, "set tweak value");
-	is(int_var, 11, "var value after set")
+	is(int_var, 11, "var value after set");
 	tweak_get(t, &v);
 	is(v.type, TWEAK_VALUE_INT, "tweak value type after set");
 	is(v.ival, 11, "tweak value after set");
@@ -217,14 +217,14 @@ test_double_var(void)
 	v.type = TWEAK_VALUE_INT;
 	v.ival = 11;
 	is(tweak_set(t, &v), 0, "set tweak value to int");
-	is(double_var, 11, "var value after set to int")
+	is(double_var, 11, "var value after set to int");
 	tweak_get(t, &v);
 	is(v.type, TWEAK_VALUE_DOUBLE, "tweak value type after set to int");
 	is(v.dval, 11, "tweak value after set to int");
 	v.type = TWEAK_VALUE_DOUBLE;
 	v.dval = 0.5;
 	is(tweak_set(t, &v), 0, "set tweak value to double");
-	is(double_var, 0.5, "var value after set to double")
+	is(double_var, 0.5, "var value after set to double");
 	tweak_get(t, &v);
 	is(v.type, TWEAK_VALUE_DOUBLE, "tweak value type after set to double");
 	is(v.dval, 0.5, "tweak value after set to double");
