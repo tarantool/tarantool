@@ -282,7 +282,7 @@ test_buffer_prepared(void)
 	size_t new_entry_count = 0;
 	while (prbuf_iterator_next(&iter, &entry) == 0)
 		new_entry_count++;
-	is(new_entry_count < entry_count, true, "Entry count has decreased")
+	is(new_entry_count < entry_count, true, "Entry count has decreased");
 	footer();
 }
 
@@ -324,7 +324,7 @@ test_buffer_prepared_large(void)
 	size_t entry_count_after = 0;
 	while (prbuf_iterator_next(&iter, &entry) == 0)
 		entry_count_after++;
-	is(entry_count_after, entry_count, "Buffer is in correct state")
+	is(entry_count_after, entry_count, "Buffer is in correct state");
 	footer();
 }
 

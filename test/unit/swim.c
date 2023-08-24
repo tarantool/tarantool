@@ -358,7 +358,7 @@ swim_test_probe(void)
 	is(swim_probe_member(s1, NULL), -1, "probe validates URI");
 	is(swim_probe_member(s1, s2_uri), 0, "send probe");
 	is(swim_cluster_wait_fullmesh(cluster, 0.1), 0,
-	   "receive ACK on probe and get fullmesh")
+	   "receive ACK on probe and get fullmesh");
 
 	swim_cluster_delete(cluster);
 	swim_finish_test();
@@ -514,7 +514,7 @@ swim_test_quit(void)
 	swim_member_unref(s0_self);
 	is(swim_cluster_wait_status_everywhere(cluster, 0, MEMBER_LEFT, 0),
 	   0, "'quit' is sent to all the members without delays between "\
-	   "dispatches")
+	   "dispatches");
 	/*
 	 * Return the instance back and check that it refutes the
 	 * old LEFT status.
@@ -557,7 +557,7 @@ swim_test_quit(void)
 	swim_cluster_unblock_io(cluster, 1);
 	is(swim_cluster_wait_incarnation(cluster, 1, 1, 1, 1, 0), 0,
 	   "S2 finally got 'quit' message from S1, but with its 'own' UUID - "\
-	   "refute it")
+	   "refute it");
 	swim_cluster_delete(cluster);
 
 	/**
@@ -1081,7 +1081,7 @@ swim_test_member_by_uuid(void)
 	struct swim *s1 = swim_cluster_member(cluster, 0);
 	const struct swim_member *s1_self = swim_self(s1);
 	is(swim_member_by_uuid(s1, swim_member_uuid(s1_self)), s1_self,
-	   "found by UUID")
+	   "found by UUID");
 
 	struct tt_uuid uuid = uuid_nil;
 	uuid.time_low = 1000;

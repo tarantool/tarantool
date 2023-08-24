@@ -2267,7 +2267,7 @@ raft_test_pre_vote(void)
 
 	raft_run_for(node.cfg_death_timeout / 2);
 	is(raft_leader_idle(&node.raft), node.cfg_death_timeout / 2,
-	   "leader_idle counts from 0 on a previous leader")
+	   "leader_idle counts from 0 on a previous leader");
 
 	raft_node_cfg_is_enabled(&node, false);
 

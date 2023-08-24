@@ -104,12 +104,12 @@ test_one()
 	tuple = create_tuple();
 
 	is(tuple_count, 1, "allocated");
-	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs");
 
 	tuple_unref(tuple);
 
 	is(tuple_count, 0, "deallocated");
-	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs");
 
 	/* few refs */
 	tuple = create_tuple();
@@ -117,13 +117,13 @@ test_one()
 		tuple_ref(tuple);
 
 	is(tuple_count, 1, "allocated");
-	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs");
 
 	for (size_t j = 0; j < FEW_REFS; j++)
 		tuple_unref(tuple);
 
 	is(tuple_count, 0, "deallocated");
-	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs");
 
 	/* many refs */
 	tuple = create_tuple();
@@ -131,13 +131,13 @@ test_one()
 		tuple_ref(tuple);
 
 	is(tuple_count, 1, "allocated");
-	is(tuple_bigref_tuple_count(), 1, "bigrefs")
+	is(tuple_bigref_tuple_count(), 1, "bigrefs");
 
 	for (size_t j = 0; j < MANY_REFS; j++)
 		tuple_unref(tuple);
 
 	is(tuple_count, 0, "all deallocated");
-	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs");
 
 	footer();
 	check_plan();
@@ -160,13 +160,13 @@ test_batch()
 		tuples[i] = create_tuple();
 
 	is(tuple_count, TEST_MAX_TUPLE_COUNT, "all allocated");
-	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs");
 
 	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++)
 		tuple_unref(tuples[i]);
 
 	is(tuple_count, 0, "all deallocated");
-	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs");
 
 	/* few refs */
 	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++)
@@ -176,14 +176,14 @@ test_batch()
 			tuple_ref(tuples[i]);
 
 	is(tuple_count, TEST_MAX_TUPLE_COUNT, "all allocated");
-	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs");
 
 	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++)
 		for (size_t j = 0; j < FEW_REFS; j++)
 			tuple_unref(tuples[i]);
 
 	is(tuple_count, 0, "all deallocated");
-	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs");
 
 	/* many refs */
 	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++)
@@ -194,7 +194,7 @@ test_batch()
 	}
 
 	is(tuple_count, TEST_MAX_TUPLE_COUNT, "all allocated");
-	is(tuple_bigref_tuple_count(), TEST_MAX_TUPLE_COUNT, "all bigrefs")
+	is(tuple_bigref_tuple_count(), TEST_MAX_TUPLE_COUNT, "all bigrefs");
 
 	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++) {
 		for (size_t j = 0; j < MANY_REFS; j++)
@@ -202,7 +202,7 @@ test_batch()
 	}
 
 	is(tuple_count, 0, "all deallocated");
-	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs");
 
 	footer();
 	check_plan();
@@ -251,7 +251,7 @@ test_random()
 		tuple_unref(allocated_tuples[0]);
 
 	ok(no_erros, "no errors");
-	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs");
 
 	footer();
 	check_plan();
