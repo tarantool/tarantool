@@ -12,7 +12,7 @@ test_xmalloc(void)
 	plan(1);
 	const int size = 9000;
 	char *p = xmalloc(size);
-	isnt(p, NULL, "p != NULL");
+	isnt(p, NULL);
 	if (p != NULL) {
 		memset(p, 'x', size);
 		free(p);
@@ -29,14 +29,14 @@ test_xcalloc(void)
 	const int nmemb = 42;
 	const int size = 9000;
 	char *p = xcalloc(nmemb, size);
-	isnt(p, NULL, "p != NULL");
+	isnt(p, NULL);
 	if (p != NULL) {
 		bool is_zeroed = true;
 		for (int i = 0; i < nmemb * size && is_zeroed; i++) {
 			if (p[i] != 0)
 				is_zeroed = false;
 		}
-		ok(is_zeroed, "p is zeroed");
+		ok(is_zeroed);
 		free(p);
 	}
 	check_plan();
@@ -50,18 +50,18 @@ test_xrealloc(void)
 	plan(3);
 	const int size = 9000;
 	char *p = xrealloc(NULL, size);
-	isnt(p, NULL, "p != NULL on alloc");
+	isnt(p, NULL);
 	if (p != NULL)
 		memset(p, 'x', size);
 	p = xrealloc(p, size * 2);
-	isnt(p, NULL, "p != NULL on realloc");
+	isnt(p, NULL);
 	if (p != NULL) {
 		bool is_same = true;
 		for (int i = 0; i < size && is_same; i++) {
 			if (p[i] != 'x')
 				is_same = false;
 		}
-		ok(is_same, "p is same after realloc");
+		ok(is_same);
 		memset(p, 'x', size * 2);
 		free(p);
 	}
@@ -76,14 +76,14 @@ test_xstrdup(void)
 	plan(3);
 	const int size = 9000;
 	char *s = xmalloc(size);
-	isnt(s, NULL, "s != NULL");
+	isnt(s, NULL);
 	if (s != NULL) {
 		memset(s, 'x', size);
 		s[size - 1] = 0;
 		char *copy = xstrdup(s);
-		isnt(copy, NULL, "copy != NULL");
+		isnt(copy, NULL);
 		if (copy != NULL) {
-			is(strcmp(s, copy), 0, "strcmp(s, copy) == 0");
+			is(strcmp(s, copy), 0);
 			free(copy);
 		}
 		free(s);
@@ -100,18 +100,17 @@ test_xstrndup(void)
 	const int size = 9000;
 	const int n = size / 2;
 	char *s = xmalloc(size);
-	isnt(s, NULL, "s != NULL");
+	isnt(s, NULL);
 	if (s != NULL) {
 		memset(s, 'x', size);
 		s[size - 1] = 0;
 		char *copy = xstrndup(s, n);
-		isnt(copy, NULL, "copy != NULL");
+		isnt(copy, NULL);
 		if (copy != NULL) {
-			is(strlen(copy), (size_t)n, "strlen(copy) == n");
-			is(strncmp(s, copy, n), 0, "strncmp(s, copy, n) == 0");
-			ok(strncmp(s, copy, n + 1) > 0,
-			   "strncmp(s, copy, n + 1) > 0");
-			ok(strcmp(s, copy) > 0, "strcmp(s, copy) > 0");
+			is(strlen(copy), (size_t)n);
+			is(strncmp(s, copy, n), 0);
+			ok(strncmp(s, copy, n + 1) > 0);
+			ok(strcmp(s, copy) > 0);
 			free(copy);
 		}
 		free(s);
