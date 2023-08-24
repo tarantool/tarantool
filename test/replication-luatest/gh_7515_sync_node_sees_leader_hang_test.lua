@@ -9,6 +9,7 @@ local g = t.group('gh_7515_notice_leader_hang_during_sync')
 g.before_each(function(cg)
     cg.replica_set = replica_set:new{}
     local box_cfg = {
+        election_fencing_mode = 'off',
         replication_timeout = 0.1,
         replication = {
             server.build_listen_uri('server1', cg.replica_set.id),
