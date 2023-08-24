@@ -42,7 +42,7 @@ test_basic()
 	is_next_key("field3");
 	is_next_index(3, 4);
 
-	reset_to_new_path("[3].field[2].field")
+	reset_to_new_path("[3].field[2].field");
 	is_next_index(3, 2);
 	is_next_key("field");
 	is_next_index(3, 1);
@@ -141,25 +141,26 @@ test_errors()
 		   "error on position %d for <%s>", errpos, path);
 	}
 
-	reset_to_new_path("f.[2]")
+	reset_to_new_path("f.[2]");
 	struct json_token token;
 	json_lexer_next_token(&lexer, &token);
-	is(json_lexer_next_token(&lexer, &token), 3, "can not write <field.[index]>")
+	is(json_lexer_next_token(&lexer, &token), 3,
+	   "can not write <field.[index]>");
 
-	reset_to_new_path("[1]key")
+	reset_to_new_path("[1]key");
 	json_lexer_next_token(&lexer, &token);
 	is(json_lexer_next_token(&lexer, &token), 4, "can not omit '.' before "\
 	   "not a first key out of []");
 
-	reset_to_new_path("f.")
+	reset_to_new_path("f.");
 	json_lexer_next_token(&lexer, &token);
 	is(json_lexer_next_token(&lexer, &token), 3, "error in leading <.>");
 
-	reset_to_new_path("fiel d1")
+	reset_to_new_path("feel d1");
 	json_lexer_next_token(&lexer, &token);
 	is(json_lexer_next_token(&lexer, &token), 5, "space inside identifier");
 
-	reset_to_new_path("field\t1")
+	reset_to_new_path("field\t1");
 	json_lexer_next_token(&lexer, &token);
 	is(json_lexer_next_token(&lexer, &token), 6, "tab inside identifier");
 

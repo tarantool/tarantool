@@ -97,19 +97,19 @@ test_basic()
 
 	struct vy_lsm *pk = vy_lsm_new(&lsm_env, &cache_env, &mem_env,
 				       index_def, format, NULL, 0);
-	isnt(pk, NULL, "lsm is not NULL")
+	isnt(pk, NULL, "lsm is not NULL");
 
 	struct vy_range *range = vy_range_new(1, vy_entry_none(),
 					      vy_entry_none(), pk->cmp_def);
 
-	isnt(pk, NULL, "range is not NULL")
+	isnt(pk, NULL, "range is not NULL");
 	vy_lsm_add_range(pk, range);
 
 	struct rlist read_views = RLIST_HEAD_INITIALIZER(read_views);
 
 	char dir_tmpl[] = "./vy_point_test.XXXXXX";
 	char *dir_name = mkdtemp(dir_tmpl);
-	isnt(dir_name, NULL, "temp dir name is not NULL")
+	isnt(dir_name, NULL, "temp dir name is not NULL");
 	char path[PATH_MAX];
 	strcpy(path, dir_name);
 	strcat(path, "/512");

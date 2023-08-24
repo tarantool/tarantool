@@ -346,7 +346,8 @@ test_fromstring()
 	struct vclock tmp;						\
 	vclock_create(&tmp);						\
 	is(vclock_from_string(&tmp, str), offset,			\
-		"fromstring \"%s\" => %u", str, offset)})
+		"fromstring \"%s\" => %u", str, offset);		\
+})
 
 int
 test_fromstring_invalid()
