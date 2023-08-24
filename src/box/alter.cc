@@ -2155,10 +2155,13 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			    BOX_SPACE_FIELD_ID, &old_id) != 0)
 		return -1;
 	struct space *old_space = space_by_id(old_id);
+	struct space_def *def = NULL;
+	if (new_tuple != NULL) {
+		uint32_t errcode = (old_tuple == NULL) ?
+			ER_CREATE_SPACE : ER_ALTER_SPACE;
+		def = space_def_new_from_tuple(new_tuple, errcode, region);
+	}
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
-		struct space_def *def =
-			space_def_new_from_tuple(new_tuple, ER_CREATE_SPACE,
-						 region);
 		if (def == NULL)
 			return -1;
 		auto def_guard =
@@ -2326,9 +2329,6 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				 "view can not be altered");
 			return -1;
 		}
-		struct space_def *def =
-			space_def_new_from_tuple(new_tuple, ER_ALTER_SPACE,
-						 region);
 		if (def == NULL)
 			return -1;
 		auto def_guard =
