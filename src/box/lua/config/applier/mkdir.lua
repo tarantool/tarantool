@@ -78,6 +78,12 @@ local function apply(config)
         local prefix = ('mkdir.apply[%s]'):format('log.file')
         safe_mkdir(prefix, fio.dirname(log.file), work_dir)
     end
+
+    local audit_log = configdata:get('audit_log', {use_default = true})
+    if audit_log ~= nil and audit_log.to == 'file' then
+        local prefix = ('mkdir.apply[%s]'):format('audit_log.file')
+        safe_mkdir(prefix, fio.dirname(audit_log.file), work_dir)
+    end
 end
 
 return {

@@ -148,12 +148,16 @@ end
 --
 --   Function to run on the started server to verify some
 --   invariants.
+--
+-- * opts.verify_args
+--
+--  Arguments for the verify function.
 local function success_case(g, opts)
     local verify = assert(opts.verify)
     local prepared = prepare_case(g, opts)
     g.server = server:new(prepared.server)
     g.server:start()
-    g.server:exec(verify)
+    g.server:exec(verify, opts.verify_args)
     return prepared
 end
 

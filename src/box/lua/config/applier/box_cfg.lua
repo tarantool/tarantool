@@ -43,9 +43,8 @@ local function peer_uris(configdata)
     return uris
 end
 
-local function log_destination(configdata)
-    local log = configdata:get('log', {use_default = true})
-    if log.to == 'stderr' then
+local function log_destination(log)
+    if log.to == 'stderr' or log.to == 'devnull' then
         return box.NULL
     elseif log.to == 'file' then
         return ('file:%s'):format(log.file)
@@ -137,7 +136,24 @@ local function apply(config)
     -- `log.nonblock`, `log.level`, `log.format`, 'log.modules'
     -- options are marked with the `box_cfg` annotations and so
     -- they're already added to `box_cfg`.
-    box_cfg.log = log_destination(configdata)
+    local cfg_log = configdata:get('log', {use_default = true})
+    box_cfg.log = log_destination(cfg_log)
+
+    -- Construct audit logger destination and audit filter (box_cfg.audit_log
+    -- and audit_filter).
+    --
+    -- `audit_log.nonblock` and 'audit_log.filter' options are marked with the
+    -- `box_cfg` annotations and so they're already added to `box_cfg`.
+    local audit_log = configdata:get('audit_log', {use_default = true})
+    if audit_log ~= nil and next(audit_log) ~= nil then
+        box_cfg.audit_log = log_destination(audit_log)
+        if audit_log.filter ~= nil then
+            assert(type(audit_log.filter) == 'table')
+            box_cfg.audit_filter = table.concat(audit_log.filter, ',')
+        else
+            box_cfg.audit_filter = 'compatibility'
+        end
+    end
 
     local failover = configdata:get('replication.failover',
         {use_default = true})
@@ -225,6 +241,8 @@ local function apply(config)
             return w.schema.box_cfg, w.data
         end):tomap()
         box_cfg_nondynamic.log = box_cfg.log
+        box_cfg_nondynamic.audit_log = box_cfg.audit_log
+        box_cfg_nondynamic.audit_filter = box_cfg.audit_filter
         for k, v in pairs(box_cfg_nondynamic) do
             if v ~= box.cfg[k] then
                 local warning = 'box_cfg.apply: non-dynamic option '..k..

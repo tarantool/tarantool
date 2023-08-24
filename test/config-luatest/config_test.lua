@@ -2,6 +2,7 @@ local t = require('luatest')
 local server = require('test.luatest_helpers.server')
 local cluster_config = require('internal.config.cluster_config')
 local configdata = require('internal.config.configdata')
+local helpers = require('test.config-luatest.helpers')
 local treegen = require('test.treegen')
 local justrun = require('test.justrun')
 local json = require('json')
@@ -778,4 +779,39 @@ g.test_metrics_options = function()
         t.assert_equals(box.cfg.metrics.exclude, {'all'})
         t.assert_equals(box.cfg.metrics.labels, {foo = 'bar'})
     end)
+end
+
+g.test_audit_options = function()
+    t.tarantool.skip_if_not_enterprise()
+    local dir = treegen.prepare_directory(g, {}, {})
+
+    local events = {
+        'audit_enable', 'custom', 'auth_ok', 'auth_fail', 'disconnect',
+        'user_create', 'user_drop', 'role_create', 'role_drop', 'user_enable',
+        'user_disable', 'user_grant_rights', 'user_revoke_rights',
+        'role_grant_rights', 'role_revoke_rights', 'password_change',
+        'access_denied', 'eval', 'call', 'space_select', 'space_create',
+        'space_alter', 'space_drop', 'space_insert', 'space_replace',
+        'space_delete', 'none', 'all', 'audit', 'auth', 'priv', 'ddl', 'dml',
+        'data_operations', 'compatibility'
+    }
+
+    local verify = function(events)
+        t.assert_equals(box.cfg.audit_log, nil)
+        t.assert_equals(box.cfg.audit_nonblock, true)
+        t.assert_equals(box.cfg.audit_format, 'csv')
+        t.assert_equals(box.cfg.audit_filter, table.concat(events, ","))
+    end
+
+    helpers.success_case(g, {
+        dir = dir,
+        options = {
+            ['audit_log.to'] = 'devnull',
+            ['audit_log.nonblock'] = true,
+            ['audit_log.format'] = 'csv',
+            ['audit_log.filter'] = events,
+        },
+        verify = verify,
+        verify_args = {events}
+    })
 end

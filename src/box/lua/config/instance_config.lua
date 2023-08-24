@@ -1694,7 +1694,114 @@ return schema.new('instance_config', schema.record({
                 end
             end,
         }),
-    })
+    }),
+    audit_log = enterprise_edition(schema.record({
+        -- The same as the destination for the logger, audit logger destination
+        -- is handled separately in the box_cfg applier, so there are no
+        -- explicit box_cfg and box_cfg_nondynamic annotations.
+        --
+        -- The reason is that there is no direct-no-transform
+        -- mapping from, say, `audit_log.file` to `box_cfg.audit_log`.
+        -- The applier should add the `file:` prefix.
+        to = enterprise_edition(schema.enum({
+            'devnull',
+            'file',
+            'pipe',
+            'syslog',
+        }, {
+            default = 'devnull',
+        })),
+        file = enterprise_edition(schema.scalar({
+            type = 'string',
+            -- The mk_parent_dir annotation is not present here,
+            -- because otherwise the directory would be created
+            -- unconditionally. Instead, mkdir applier creates it
+            -- if audit_log.to is 'file'.
+            default = 'var/log/{{ instance_name }}/audit.log',
+        })),
+        pipe = enterprise_edition(schema.scalar({
+            type = 'string',
+            default = box.NULL,
+        })),
+        syslog = schema.record({
+            identity = enterprise_edition(schema.scalar({
+                type = 'string',
+                default = 'tarantool',
+            })),
+            facility = enterprise_edition(schema.scalar({
+                type = 'string',
+                default = 'local7',
+            })),
+            server = enterprise_edition(schema.scalar({
+                type = 'string',
+                -- The logger tries /dev/log and then
+                -- /var/run/syslog if no server is provided.
+                default = box.NULL,
+            })),
+        }),
+        nonblock = enterprise_edition(schema.scalar({
+            type = 'boolean',
+            box_cfg = 'audit_nonblock',
+            box_cfg_nondynamic = true,
+            default = false,
+        })),
+        format = enterprise_edition(schema.enum({
+            'plain',
+            'json',
+            'csv',
+        }, {
+            box_cfg = 'audit_format',
+            box_cfg_nondynamic = true,
+            default = 'json',
+        })),
+        -- The reason for the absence of the box_cfg and box_cfg_nondynamic
+        -- annotations is that this setting needs to be converted to a string
+        -- before being set to 'audit_filter'. This will be done in box_cfg
+        -- applier.
+        --
+        -- TODO: Add a validation and a default value. Currently, the audit_log
+        -- validation can catch the setting of the option in the CE, but adding
+        -- its own validation seems more appropriate.
+        filter = schema.set({
+            -- Events.
+            "audit_enable",
+            "custom",
+            "auth_ok",
+            "auth_fail",
+            "disconnect",
+            "user_create",
+            "user_drop",
+            "role_create",
+            "role_drop",
+            "user_enable",
+            "user_disable",
+            "user_grant_rights",
+            "user_revoke_rights",
+            "role_grant_rights",
+            "role_revoke_rights",
+            "password_change",
+            "access_denied",
+            "eval",
+            "call",
+            "space_select",
+            "space_create",
+            "space_alter",
+            "space_drop",
+            "space_insert",
+            "space_replace",
+            "space_delete",
+            -- Groups of events.
+            "none",
+            "all",
+            "audit",
+            "auth",
+            "priv",
+            "ddl",
+            "dml",
+            "data_operations",
+            "compatibility",
+        }),
+    })),
 }, {
     -- This kind of validation cannot be implemented as the
     -- 'validate' annotation of a particular schema node. There
