@@ -1,5 +1,6 @@
 #include "unit.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdarg.h>
 
@@ -19,12 +20,15 @@ _space(FILE *stream)
 }
 
 void
-plan(int count)
+_plan(int count, bool tap)
 {
 	++level;
 	plan_test[level] = count;
 	tests_done[level] = 0;
 	tests_failed[level] = 0;
+
+	if (tap && level == 0)
+		printf("TAP version 13\n");
 
 	_space(stdout);
 	printf("%d..%d\n", 1, plan_test[level]);
