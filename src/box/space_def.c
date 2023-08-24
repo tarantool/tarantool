@@ -305,6 +305,7 @@ space_opts_parse_temporary(const char **data, void *vopts,
 const char *space_type_strs[] = {
 	/* [SPACE_TYPE_NORMAL]         = */ "normal",
 	/* [SPACE_TYPE_DATA_TEMPORARY] = */ "data-temporary",
+	/* [SPACE_TYPE_TEMPORARY]      = */ "temporary",
 };
 
 static int
@@ -331,4 +332,43 @@ space_opts_parse_type(const char **data, void *vopts, struct region *region)
 	}
 	opts->type = space_type;
 	return 0;
+}
+
+bool
+space_def_tuple_is_temporary(const char *data, uint32_t *space_id)
+{
+	uint32_t field_count = mp_decode_array(&data);
+	if (field_count < BOX_SPACE_FIELD_OPTS + 1)
+		return false;
+
+	static_assert(BOX_SPACE_FIELD_ID == 0,
+		      "the following code relies on this assumption");
+	if (mp_typeof(*data) != MP_UINT)
+		return false;
+	assert(space_id != NULL);
+	*space_id = mp_decode_uint(&data);
+
+	for (uint32_t i = 1; i < BOX_SPACE_FIELD_OPTS; i++)
+		mp_next(&data);
+	if (mp_typeof(*data) != MP_MAP)
+		return false;
+	uint32_t map_size = mp_decode_map(&data);
+
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*data) != MP_STR)
+			return false;
+		uint32_t len;
+		const char *str = mp_decode_str(&data, &len);
+		if (len != strlen("type") || memcmp("type", str, len) != 0) {
+			mp_next(&data);
+			continue;
+		}
+		if (mp_typeof(*data) != MP_STR)
+			return false;
+		str = mp_decode_str(&data, &len);
+		enum space_type space_type = strnindex(space_type_strs, str,
+						       len, SPACE_TYPE_DEFAULT);
+		return space_type == SPACE_TYPE_TEMPORARY;
+	}
+	return false;
 }

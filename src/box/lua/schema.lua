@@ -700,6 +700,7 @@ box.internal.space.denormalize_format = denormalize_format
 local space_types = {
     'normal',
     'data-temporary',
+    'temporary',
 }
 local function check_space_type(space_type)
     if space_type == nil then
@@ -760,7 +761,7 @@ box.schema.space.create = function(name, options)
     end
     local id = options.id
     if not id then
-        id = internal.generate_space_id()
+        id = internal.generate_space_id(options.type == 'temporary')
     end
     local uid = session.euid()
     if options.user then
@@ -830,10 +831,15 @@ box.schema.space.drop = function(space_id, space_name, opts)
     local _truncate = box.space[box.schema.TRUNCATE_ID]
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     local _func_index = box.space[box.schema.FUNC_INDEX_ID]
-    local sequence_tuple = _space_sequence:delete{space_id}
-    if sequence_tuple ~= nil and sequence_tuple.is_generated == true then
-        -- Delete automatically generated sequence.
-        box.schema.sequence.drop(sequence_tuple.sequence_id)
+    -- This is needed to support dropping temporary spaces
+    -- in read-only mode, because sequences aren't supported for them yet
+    -- and therefore such requests aren't allowed in read-only mode.
+    if _space_sequence:get(space_id) ~= nil then
+        local sequence_tuple = _space_sequence:delete{space_id}
+        if sequence_tuple.is_generated == true then
+            -- Delete automatically generated sequence.
+            box.schema.sequence.drop(sequence_tuple.sequence_id)
+        end
     end
     for _, t in _trigger.index.space_id:pairs({space_id}) do
         _trigger:delete({t.name})
@@ -847,7 +853,15 @@ box.schema.space.drop = function(space_id, space_name, opts)
         _index:delete{v.id, v.iid}
     end
     revoke_object_privs('space', space_id)
-    _truncate:delete{space_id}
+    -- Deleting from _truncate currently adds a delete entry into WAL even
+    -- if the corresponding space was never truncated. This is a problem for
+    -- temporary spaces, because in such situations it's impossible to
+    -- filter out such entries from the within on_replace trigger which
+    -- basically results in temporary space's metadata getting into WAL
+    -- which breaks some invariants.
+    if _truncate:get{space_id} ~= nil then
+        _truncate:delete{space_id}
+    end
     if _space:delete{space_id} == nil then
         if space_name == nil then
             space_name = '#'..tostring(space_id)
@@ -1592,10 +1606,15 @@ box.schema.index.drop = function(space_id, index_id)
     check_param(index_id, 'index_id', 'number')
     if index_id == 0 then
         local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
-        local sequence_tuple = _space_sequence:delete{space_id}
-        if sequence_tuple ~= nil and sequence_tuple.is_generated == true then
-            -- Delete automatically generated sequence.
-            box.schema.sequence.drop(sequence_tuple.sequence_id)
+        -- This is needed to support dropping temporary spaces
+        -- in read-only mode, because sequences aren't supported for them yet
+        -- and therefore such requests aren't allowed in read-only mode.
+        if _space_sequence:get(space_id) ~= nil then
+            local sequence_tuple = _space_sequence:delete{space_id}
+            if sequence_tuple.is_generated == true then
+                -- Delete automatically generated sequence.
+                box.schema.sequence.drop(sequence_tuple.sequence_id)
+            end
         end
     end
     local _index = box.space[box.schema.INDEX_ID]

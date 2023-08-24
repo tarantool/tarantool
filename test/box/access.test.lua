@@ -588,6 +588,7 @@ box.schema.func.create('test_func')
 box.session.su("admin")
 box.schema.user.grant("tester", "read", "space", "_user")
 box.schema.user.grant("tester", "read", "space", "_func")
+box.schema.user.grant("tester", "read", "space", "_truncate")
 -- failed create
 box.session.su("tester")
 box.schema.space.create("test_space")

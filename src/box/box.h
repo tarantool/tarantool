@@ -767,7 +767,7 @@ boxk(int type, uint32_t space_id, const char *format, ...);
 
 /** Generate unique id for non-system space. */
 int
-box_generate_space_id(uint32_t *new_space_id);
+box_generate_space_id(uint32_t *new_space_id, bool is_temporary);
 
 /**
  * Broadcast the identification of the instance

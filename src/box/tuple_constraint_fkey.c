@@ -629,6 +629,12 @@ tuple_constraint_fkey_check_spaces(struct tuple_constraint *constr,
 				   struct space *space,
 				   struct space *foreign_space)
 {
+	if (space_is_temporary(foreign_space)) {
+		diag_set(ClientError, ER_CREATE_FOREIGN_KEY,
+			 constr->def.name, constr->space->def->name,
+			 "foreign space can't be temporary");
+		return -1;
+	}
 	if (space_is_data_temporary(foreign_space) &&
 	    !space_is_data_temporary(space)) {
 		diag_set(ClientError, ER_CREATE_FOREIGN_KEY,

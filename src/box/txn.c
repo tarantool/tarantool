@@ -850,7 +850,9 @@ txn_journal_entry_new(struct txn *txn)
 			rlist_splice(&txn->on_commit, &stmt->on_commit);
 		}
 
-		/* A read (e.g. select) request */
+		/* A read (e.g. select) request or
+		 * a temporary's space metadata update.
+		 */
 		if (stmt->row == NULL)
 			continue;
 
@@ -1543,4 +1545,13 @@ txn_attach(struct txn *txn)
 	fiber_set_txn(fiber(), txn);
 	trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
 	trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
+}
+
+void
+txn_stmt_mark_as_temporary(struct txn *txn, struct txn_stmt *stmt)
+{
+	assert(stmt->row != NULL);
+	/* Revert row counter increases. */
+	txn_update_row_counts(txn, stmt, -1);
+	stmt->row = NULL;
 }

@@ -353,6 +353,13 @@ space_is_data_temporary(const struct space *space)
 	return space_opts_is_data_temporary(&space->def->opts);
 }
 
+/** Return true if space is temporary. */
+static inline bool
+space_is_temporary(const struct space *space)
+{
+	return space_opts_is_temporary(&space->def->opts);
+}
+
 /** Return true if space is synchronous. */
 static inline bool
 space_is_sync(const struct space *space)

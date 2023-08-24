@@ -566,6 +566,11 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 			 "local space can't be synchronous");
 		return NULL;
 	}
+	if (space_opts_is_temporary(&opts) && opts.constraint_count > 0) {
+		diag_set(ClientError, ER_UNSUPPORTED, "temporary space",
+			 "constraints");
+		return NULL;
+	}
 	struct space_def *def =
 		space_def_new(id, uid, exact_field_count, name, name_len,
 			      engine_name, engine_name_len, &opts, fields,
@@ -1898,6 +1903,11 @@ update_view_references(struct Select *select, int update_value)
 			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
 			goto error;
 		}
+		if (space_is_temporary(space)) {
+			diag_set(ClientError, ER_UNSUPPORTED,
+				 "CREATE VIEW", "temporary spaces");
+			goto error;
+		}
 	}
 	/* Secondly do the job. */
 	for (int i = 0; i < from_tables_count; ++i) {
@@ -2078,6 +2088,27 @@ space_check_alter(struct space *old_space, struct space_def *new_space_def)
 	return 0;
 }
 
+/*
+ * box_process1() bypasses the read-only check for the _space system space
+ * because there it's not yet known if the related space is temporary. Perform
+ * the check here if the space isn't temporary and the statement was issued by
+ * this replica.
+ */
+static int
+filter_temporary_ddl_stmt(struct txn *txn, const struct space_def *def)
+{
+	if (def == NULL)
+		return 0;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	if (space_opts_is_temporary(&def->opts)) {
+		txn_stmt_mark_as_temporary(txn, stmt);
+		return 0;
+	}
+	if (stmt->row->replica_id == 0 && recovery_state != INITIAL_RECOVERY)
+		return box_check_writable();
+	return 0;
+}
+
 /**
  * A trigger which is invoked on replace in a data dictionary
  * space _space.
@@ -2161,6 +2192,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			ER_CREATE_SPACE : ER_ALTER_SPACE;
 		def = space_def_new_from_tuple(new_tuple, errcode, region);
 	}
+	if (filter_temporary_ddl_stmt(txn, old_space != NULL ?
+				      old_space->def : def) != 0)
+		return -1;
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
 		if (def == NULL)
 			return -1;
@@ -2354,6 +2388,13 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  "replication group is immutable");
 			return -1;
 		}
+		if (space_is_temporary(old_space) !=
+		     space_opts_is_temporary(&def->opts)) {
+			diag_set(ClientError, ER_ALTER_SPACE,
+				 old_space->def->name,
+				 "temporariness cannot change");
+			return -1;
+		}
 		if (def->opts.is_view != old_space->def->opts.is_view) {
 			diag_set(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
@@ -2482,6 +2523,8 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		return -1;
 	struct space *old_space = space_cache_find(id);
 	if (old_space == NULL)
+		return -1;
+	if (filter_temporary_ddl_stmt(txn, old_space->def) != 0)
 		return -1;
 	if (old_space->def->opts.is_view) {
 		diag_set(ClientError, ER_ALTER_SPACE, space_name(old_space),
@@ -2742,21 +2785,28 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *new_tuple = stmt->new_tuple;
 
-	if (new_tuple == NULL) {
-		/* Space drop - nothing to do. */
-		return 0;
-	}
 	if (recovery_state == INITIAL_RECOVERY) {
 		/* Space creation during initial recovery - nothing to do. */
 		return 0;
 	}
 
+	struct tuple *any_tuple = new_tuple;
+	if (any_tuple == NULL)
+		any_tuple = stmt->old_tuple;
 	uint32_t space_id;
-	if (tuple_field_u32(new_tuple, BOX_TRUNCATE_FIELD_SPACE_ID, &space_id) != 0)
+	if (tuple_field_u32(any_tuple, BOX_TRUNCATE_FIELD_SPACE_ID,
+			    &space_id) != 0)
 		return -1;
 	struct space *old_space = space_cache_find(space_id);
 	if (old_space == NULL)
 		return -1;
+	if (space_is_temporary(old_space))
+		txn_stmt_mark_as_temporary(txn, stmt);
+
+	if (new_tuple == NULL) {
+		/* Space drop - nothing else to do. */
+		return 0;
+	}
 
 	/*
 	 * box_process1() bypasses the read-only check for the _truncate system
@@ -2802,9 +2852,11 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	/*
 	 * Modify the WAL header to prohibit
 	 * replication of local & data-temporary
-	 * spaces truncation.
+	 * spaces truncation
+	 * unless it's a temporary space
+	 * in which case the header doesn't exist.
 	 */
-	if (is_temp) {
+	if (is_temp && !space_is_temporary(old_space)) {
 		stmt->row->group_id = GROUP_LOCAL;
 		/*
 		 * The trigger is invoked after txn->n_local_rows
@@ -3827,6 +3879,11 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 				  priv_name(priv_type),
 				  schema_object_name(SC_SPACE), name,
 				  grantor->def->name);
+			return -1;
+		}
+		if (space_is_temporary(space)) {
+			diag_set(ClientError, ER_UNSUPPORTED,
+				 "temporary space", "privileges");
 			return -1;
 		}
 		break;
@@ -5070,6 +5127,11 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 	struct space *space = space_cache_find(space_id);
 	if (space == NULL)
 		return -1;
+	if (space_is_temporary(space)) {
+		diag_set(ClientError, ER_SQL_EXECUTE,
+			 "sequences are not supported for temporary spaces");
+		return -1;
+	}
 	struct sequence *seq = sequence_by_id(sequence_id);
 	if (seq == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_SEQUENCE, int2str(sequence_id));
@@ -5311,6 +5373,13 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 				  "resolved on AST building from SQL");
 			return -1;
 		}
+		struct space *space = space_cache_find(space_id);
+		if (space != NULL && space_is_temporary(space)) {
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "triggers are not supported for "
+				 "temporary spaces");
+			return -1;
+		}
 
 		struct sql_trigger *old_trigger;
 		if (sql_trigger_replace(trigger_name,
@@ -5365,6 +5434,11 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 		space = space_cache_find(space_id);
 		if (space == NULL)
 			return -1;
+		if (space_is_temporary(space)) {
+			diag_set(ClientError, ER_UNSUPPORTED,
+				 "temporary space", "functional indexes");
+			return -1;
+		}
 		index = index_find(space, index_id);
 		if (index == NULL)
 			return -1;

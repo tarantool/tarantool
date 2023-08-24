@@ -1519,6 +1519,9 @@ box.schema.user.grant("tester", "read", "space", "_user")
 box.schema.user.grant("tester", "read", "space", "_func")
 ---
 ...
+box.schema.user.grant("tester", "read", "space", "_truncate")
+---
+...
 -- failed create
 box.session.su("tester")
 ---

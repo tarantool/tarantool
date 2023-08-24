@@ -45,7 +45,7 @@ _space:update({_space.id}, {{'-', 1, 2}})
 --
 -- Create a space
 --
-t = _space:insert{box.internal.generate_space_id(), ADMIN, 'hello', 'memtx', 0, EMPTY_MAP, {}}
+t = _space:insert{box.internal.generate_space_id(false), ADMIN, 'hello', 'memtx', 0, EMPTY_MAP, {}}
 -- Check that a space exists
 space = box.space[t[1]]
 space.id

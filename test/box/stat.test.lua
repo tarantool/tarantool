@@ -11,6 +11,9 @@ box.stat.SELECT.total
 box.stat.ERROR.total
 
 space = box.schema.space.create('tweedledum')
+-- create_space performs a select when choosing a new space id
+box.stat.SELECT.total
+
 index = space:create_index('primary', { type = 'hash' })
 
 -- check stat_cleanup

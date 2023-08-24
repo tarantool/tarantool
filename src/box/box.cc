@@ -3572,11 +3572,16 @@ box_process1(struct request *request, box_tuple_t **result)
 		return -1;
 	/*
 	 * Allow to write to data-temporary and local spaces in the read-only
-	 * mode. To handle space truncation, we postpone the read-only check for
-	 * the _truncate system space till the on_replace trigger is called,
-	 * when we know which space is truncated.
+	 * mode. To handle space truncation and/or ddl operations on temporary
+	 * spaces, we postpone the read-only check for the _truncate, _space &
+	 * _index system spaces till the on_replace trigger is called, when
+	 * we know which spaces are concerned.
 	 */
-	if (space_id(space) != BOX_TRUNCATE_ID &&
+	uint32_t id = space_id(space);
+	if (is_ro_summary &&
+	    id != BOX_TRUNCATE_ID &&
+	    id != BOX_SPACE_ID &&
+	    id != BOX_INDEX_ID &&
 	    !space_is_data_temporary(space) &&
 	    !space_is_local(space) &&
 	    box_check_writable() != 0)
@@ -5729,37 +5734,50 @@ box_read_ffi_enable(void)
 }
 
 int
-box_generate_space_id(uint32_t *new_space_id)
+box_generate_space_id(uint32_t *new_space_id, bool is_temporary)
 {
 	assert(new_space_id != NULL);
-	assert(mp_sizeof_array(0) == 1);
-	char empty_key[1];
-	char *empty_key_end = mp_encode_array(empty_key, 0);
-	struct tuple *res = NULL;
+	uint32_t id_range_begin = !is_temporary ?
+		BOX_SYSTEM_ID_MAX + 1 : BOX_SPACE_ID_TEMPORARY_MIN;
+	uint32_t id_range_end = !is_temporary ?
+		(uint32_t)BOX_SPACE_ID_TEMPORARY_MIN :
+		(uint32_t)BOX_SPACE_MAX + 1;
+	char key_buf[16];
+	char *key_end = key_buf;
+	key_end = mp_encode_array(key_end, 1);
+	key_end = mp_encode_uint(key_end, id_range_end);
 	struct credentials *orig_credentials = effective_user();
 	fiber_set_user(fiber(), &admin_credentials);
-	int rc = box_index_max(BOX_SPACE_ID, 0, empty_key, empty_key_end,
-			       &res);
-	fiber_set_user(fiber(), orig_credentials);
+	auto guard = make_scoped_guard([=] {
+		fiber_set_user(fiber(), orig_credentials);
+	});
+	box_iterator_t *it = box_index_iterator(BOX_SPACE_ID, 0, ITER_LT,
+						key_buf, key_end);
+	if (it == NULL)
+		return -1;
+	struct tuple *res = NULL;
+	int rc = box_iterator_next(it, &res);
+	box_iterator_free(it);
 	if (rc != 0)
 		return -1;
+	assert(res != NULL);
 	uint32_t max_id = 0;
-	if (res != NULL && tuple_field_u32(res, 0, &max_id) != 0)
-		return -1;
-	if (max_id > BOX_SPACE_MAX || max_id < BOX_SYSTEM_ID_MAX)
-		max_id = BOX_SYSTEM_ID_MAX;
+	rc = tuple_field_u32(res, 0, &max_id);
+	assert(rc == 0);
+	if (max_id < id_range_begin)
+		max_id = id_range_begin - 1;
 	*new_space_id = space_cache_find_next_unused_id(max_id);
 	/* Try again if overflowed. */
-	if (*new_space_id > BOX_SPACE_MAX) {
+	if (*new_space_id >= id_range_end) {
 		*new_space_id =
-			space_cache_find_next_unused_id(BOX_SYSTEM_ID_MAX);
+			space_cache_find_next_unused_id(id_range_begin - 1);
 		/*
 		 * The second overflow means all ids are occupied.
 		 * This situation cannot happen in real world with limited
 		 * memory, and its pretty hard to test it, so let's just panic
 		 * if we've run out of ids.
 		 */
-		if (*new_space_id > BOX_SPACE_MAX)
+		if (*new_space_id >= id_range_end)
 			panic("Space id limit is reached");
 	}
 	return 0;

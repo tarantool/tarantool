@@ -836,6 +836,24 @@ txn_is_fully_local(const struct txn *txn)
 }
 
 /**
+ * Mark @a stmt as temporary by removing the associated stmt->row
+ * and update @a txn accordingly.
+ *
+ * This function is called from on_replace_dd_* triggers to filter
+ * temporary space's metadata updates from WAL.
+ *
+ * NOTE: This could also be implemented by just not creating the stmt->row
+ * when txn_commit_stmt is called, but it would be less efficient that way
+ * as it would require putting an expensive check on a hot path.
+ * Doing the check inside the on_replace trigger is much cheaper
+ * as the data we're interested in (result of space_is_temporary(space))
+ * is readily available at that point.
+ * The downside of confusing control flow is outweighed by the efficiency.
+ */
+void
+txn_stmt_mark_as_temporary(struct txn *txn, struct txn_stmt *stmt);
+
+/**
  * End a statement. In autocommit mode, end
  * the current transaction as well.
  *

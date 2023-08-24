@@ -78,7 +78,7 @@ s:delete(1)
 ...
 s:drop()
 ---
-- error: Write access to space '_space_sequence' is denied for user 'testus'
+- error: Read access to space '_space_sequence' is denied for user 'testus'
 ...
 --
 -- Check double revoke
@@ -126,7 +126,7 @@ s:insert({3})
 ...
 s:drop()
 ---
-- error: Write access to space '_space_sequence' is denied for user 'testus'
+- error: Read access to space '_space_sequence' is denied for user 'testus'
 ...
 session.su('admin')
 ---
@@ -169,7 +169,7 @@ s:delete({3})
 ...
 s:drop()
 ---
-- error: Write access to space '_space_sequence' is denied for user 'guest'
+- error: Read access to space '_space_sequence' is denied for user 'guest'
 ...
 gs = box.schema.space.create('guest_space')
 ---
