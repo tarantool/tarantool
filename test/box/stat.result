@@ -33,6 +33,11 @@ box.stat.ERROR.total
 space = box.schema.space.create('tweedledum')
 ---
 ...
+-- create_space performs a select when choosing a new space id
+box.stat.SELECT.total
+---
+- 1
+...
 index = space:create_index('primary', { type = 'hash' })
 ---
 ...
@@ -59,7 +64,7 @@ box.stat.REPLACE.total
 ...
 box.stat.SELECT.total
 ---
-- 4
+- 5
 ...
 -- check exceptions
 space:get('Impossible value')
@@ -77,14 +82,14 @@ space:get(1)
 ...
 box.stat.SELECT.total
 ---
-- 5
+- 6
 ...
 space:get(11)
 ---
 ...
 box.stat.SELECT.total
 ---
-- 6
+- 7
 ...
 space:select(5)
 ---
@@ -92,7 +97,7 @@ space:select(5)
 ...
 box.stat.SELECT.total
 ---
-- 7
+- 8
 ...
 space:select(15)
 ---
@@ -100,14 +105,14 @@ space:select(15)
 ...
 box.stat.SELECT.total
 ---
-- 8
+- 9
 ...
 for _ in space:pairs() do end
 ---
 ...
 box.stat.SELECT.total
 ---
-- 9
+- 10
 ...
 -- reset
 box.stat.reset()

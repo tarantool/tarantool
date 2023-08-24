@@ -4850,7 +4850,7 @@ selectExpander(Walker * pWalker, Select * p)
 	ExprList *pEList;
 	struct SrcList_item *pFrom;
 	Expr *pE, *pRight, *pExpr;
-	u16 selFlags = p->selFlags;
+	u32 selFlags = p->selFlags;
 
 	p->selFlags |= SF_Expanded;
 	if (NEVER(p->pSrc == 0) || (selFlags & SF_Expanded) != 0) {

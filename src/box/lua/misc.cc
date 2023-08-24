@@ -238,8 +238,11 @@ port_msgpack_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 static int
 lbox_generate_space_id(lua_State *L)
 {
+	assert(lua_gettop(L) >= 1);
+	assert(lua_isboolean(L, 1) == 1);
+	bool is_temporary = lua_toboolean(L, 1) != 0;
 	uint32_t ret = 0;
-	if (box_generate_space_id(&ret) != 0)
+	if (box_generate_space_id(&ret, is_temporary) != 0)
 		return luaT_error(L);
 	lua_pushnumber(L, ret);
 	return 1;

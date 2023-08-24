@@ -56,6 +56,7 @@ enum space_type {
 	SPACE_TYPE_DEFAULT = -1,
 	SPACE_TYPE_NORMAL = 0,
 	SPACE_TYPE_DATA_TEMPORARY = 1,
+	SPACE_TYPE_TEMPORARY = 2,
 	space_type_MAX,
 };
 
@@ -80,6 +81,12 @@ struct space_opts {
 	 * - changes are not part of a snapshot
 	 * - in SQL: space_def memory is allocated on region and
 	 *   does not require manual release.
+	 *
+	 * If set to SPACE_TYPE_TEMPORARY:
+	 * - all of the above, but
+	 * - metadata is not persisted (doesn't exist at server start)
+	 * - metadata is not replicated (doesn't exist on replicas)
+	 * - this value cannot be changed from or to even for an empty space
 	 */
 	enum space_type type;
 	/**
@@ -136,6 +143,16 @@ space_opts_is_data_temporary(const struct space_opts *opts)
 {
 	assert(opts->type != SPACE_TYPE_DEFAULT);
 	return opts->type != SPACE_TYPE_NORMAL;
+}
+
+/**
+ * Check if the space is temporary.
+ */
+static inline bool
+space_opts_is_temporary(const struct space_opts *opts)
+{
+	assert(opts->type != SPACE_TYPE_DEFAULT);
+	return opts->type == SPACE_TYPE_TEMPORARY;
 }
 
 /** Space metadata. */
@@ -240,6 +257,15 @@ struct tuple_format *
 space_tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		       struct key_def *const *keys, uint16_t key_count,
 		       const struct space_def *def);
+
+/**
+ * Check if msgpack array pointed to by @a data represents a space definition
+ * tuple which corresponds to a temporary space.
+ * If @a space_id is not NULL the id of the space will be written into it in
+ * case of success.
+ */
+bool
+space_def_tuple_is_temporary(const char *data, uint32_t *space_id);
 
 #if defined(__cplusplus)
 } /* extern "C" */

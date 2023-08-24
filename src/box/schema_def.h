@@ -57,7 +57,14 @@ enum {
 	/** Yet another arbitrary limit which simply needs to
 	 * exist.
 	 */
-	BOX_INDEX_PART_MAX = UINT8_MAX
+	BOX_INDEX_PART_MAX = UINT8_MAX,
+	/**
+	 * Start of the range of default temporary space ids.
+	 * By default they get ids from a special range to avoid conflicts with
+	 * spaces which could arrive via replication. But the user is free to
+	 * choose an id from outside this range.
+	 */
+	BOX_SPACE_ID_TEMPORARY_MIN = (1 << 30),
 };
 static_assert(BOX_INVALID_NAME_MAX <= BOX_NAME_MAX,
 	      "invalid name max is less than name max");

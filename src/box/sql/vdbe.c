@@ -4324,7 +4324,7 @@ case OP_GenSpaceid: {
 	assert(pOp->p1 > 0);
 	pOut = vdbe_prepare_null_out(p, pOp->p1);
 	uint32_t u;
-	if (box_generate_space_id(&u) != 0)
+	if (box_generate_space_id(&u, false) != 0)
 		goto abort_due_to_error;
 	mem_set_uint(pOut, u);
 	break;

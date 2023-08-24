@@ -58,6 +58,7 @@
 #include "memtx_space.h"
 #include "memtx_space_upgrade.h"
 #include "tt_sort.h"
+#include "assoc.h"
 
 #include <type_traits>
 
@@ -797,6 +798,46 @@ primary_index_filter(struct space *space, struct index *index, void *arg)
 	return index->def->iid == 0;
 }
 
+/*
+ * Return true if tuple @a data represents temporary space's metadata.
+ * @a space_id is used to determine the tuple's format.
+ */
+static bool
+is_tuple_temporary(const char *data, uint32_t space_id,
+		   struct mh_i32_t *temp_space_ids)
+{
+	static_assert(BOX_SPACE_ID < BOX_INDEX_ID &&
+		      BOX_SPACE_ID < BOX_TRUNCATE_ID,
+		      "in this function temporary space ids are collected "
+		      "while processing tuples of _space and then this info is "
+		      "used when going over _index & _truncate");
+	switch (space_id) {
+	case BOX_SPACE_ID: {
+		uint32_t space_id = BOX_ID_NIL;
+		bool t = space_def_tuple_is_temporary(data, &space_id);
+		if (t)
+			mh_i32_put(temp_space_ids, &space_id,
+				   NULL, NULL);
+		return t;
+	}
+	case BOX_INDEX_ID:
+	case BOX_TRUNCATE_ID: {
+		static_assert(BOX_INDEX_FIELD_SPACE_ID == 0 &&
+			      BOX_TRUNCATE_FIELD_SPACE_ID == 0,
+			      "the following code assumes this is true");
+		uint32_t field_count = mp_decode_array(&data);
+		if (field_count < 1 || mp_typeof(*data) != MP_UINT)
+			return false;
+		uint32_t space_id = mp_decode_uint(&data);
+		mh_int_t pos = mh_i32_find(temp_space_ids, space_id,
+					   NULL);
+		return pos != mh_end(temp_space_ids);
+	}
+	default:
+		return false;
+	}
+}
+
 static struct checkpoint *
 checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 {
@@ -969,6 +1010,8 @@ checkpoint_f(va_list ap)
 	if (xdir_create_xlog(&ckpt->dir, &snap, &ckpt->vclock) != 0)
 		return -1;
 
+	struct mh_i32_t *temp_space_ids = mh_i32_new();
+
 	say_info("saving snapshot `%s'", snap.filename);
 	ERROR_INJECT_SLEEP(ERRINJ_SNAP_WRITE_DELAY);
 	ERROR_INJECT(ERRINJ_SNAP_SKIP_ALL_ROWS, goto done);
@@ -996,6 +1039,10 @@ checkpoint_f(va_list ap)
 			rc = index_read_view_iterator_next_raw(&it, &result);
 			if (rc != 0 || result.data == NULL)
 				break;
+			if (is_tuple_temporary(result.data,
+					       space_rv->id,
+					       temp_space_ids))
+				continue;
 			rc = checkpoint_write_tuple(&snap, space_rv->id,
 						    space_rv->group_id,
 						    result.data, result.size);
@@ -1006,6 +1053,7 @@ checkpoint_f(va_list ap)
 		if (rc != 0)
 			break;
 	}
+	mh_i32_delete(temp_space_ids);
 	if (rc != 0)
 		goto fail;
 	ERROR_INJECT(ERRINJ_SNAP_WRITE_CORRUPTED_INSERT_ROW, {
@@ -1235,6 +1283,7 @@ memtx_join_f(va_list ap)
 {
 	int rc = 0;
 	struct memtx_join_ctx *ctx = va_arg(ap, struct memtx_join_ctx *);
+	struct mh_i32_t *temp_space_ids = mh_i32_new();
 	struct space_read_view *space_rv;
 	read_view_foreach_space(space_rv, &ctx->rv) {
 		FiberGCChecker gc_check;
@@ -1253,6 +1302,10 @@ memtx_join_f(va_list ap)
 			rc = index_read_view_iterator_next_raw(&it, &result);
 			if (rc != 0 || result.data == NULL)
 				break;
+			if (is_tuple_temporary(result.data,
+					       space_rv->id,
+					       temp_space_ids))
+				continue;
 			rc = memtx_join_send_tuple(ctx->stream, space_rv->id,
 						   result.data, result.size);
 			if (rc != 0)
@@ -1262,6 +1315,7 @@ memtx_join_f(va_list ap)
 		if (rc != 0)
 			break;
 	}
+	mh_i32_delete(temp_space_ids);
 	return rc;
 }
 
