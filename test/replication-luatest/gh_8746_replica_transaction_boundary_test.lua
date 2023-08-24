@@ -15,6 +15,7 @@ end)
 local function prepare(cg)
     cg.replica_set:start()
     cg.master:exec(function()
+        box.ctl.wait_rw()
         box.schema.space.create('test')
         box.space.test:create_index('pk')
         box.schema.space.create('loc', {is_local = true})
@@ -78,5 +79,47 @@ g.test_replication_to_master = function(cg)
     cg.master:wait_for_vclock_of(cg.replica)
     t.helpers.retrying({}, function()
         cg.master:assert_follows_upstream(cg.replica:get_instance_id())
+    end)
+end
+
+g.before_test('test_replica_force_recovery', function(cg)
+    cg.master = cg.replica_set:build_and_add_server{
+        alias = 'master',
+        box_cfg = {
+            replication_timeout = 0.1,
+        },
+    }
+    cg.replica = cg.replica_set:build_and_add_server{
+        alias = 'replica',
+        box_cfg = {
+            read_only = true,
+            replication = server.build_listen_uri('master', cg.replica_set.id),
+            replication_timeout = 0.1,
+            force_recovery = true,
+        },
+    }
+end)
+
+g.test_replica_force_recovery = function(cg)
+    prepare(cg)
+    cg.master:exec(function()
+        box.begin()
+        box.space.test:replace{2}
+        box.space.test:replace{3}
+        box.commit()
+    end)
+    cg.replica:wait_for_vclock_of(cg.master)
+    cg.replica:exec(function()
+        box.cfg{read_only = false}
+        box.begin()
+        box.space.test:replace{4}
+        box.space.loc:replace{5}
+        box.space.test:replace{6}
+        box.commit()
+    end)
+    cg.replica:restart()
+    cg.replica:exec(function()
+        t.assert_equals(box.space.test:select{}, {{1}, {2}, {3}, {4}, {6}})
+        t.assert_equals(box.space.loc:select{}, {{1}, {2}, {3}, {4}, {5}, {6}})
     end)
 end
