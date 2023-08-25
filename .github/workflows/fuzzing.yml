@@ -10,10 +10,9 @@ on:
     paths:
       - '.github/workflows/fuzzing.yml'
       - 'src/**'
+      - '!src/**.lua'
       - 'test/fuzz/**'
       - 'test/static/corpus/**'
-    paths-ignore:
-      - '**.lua'
   pull_request:
     types: [opened, reopened, synchronize, labeled]
 
