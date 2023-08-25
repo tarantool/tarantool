@@ -34,7 +34,7 @@
 #include "tt_static.h"
 #include "lua/uri.h"
 
-enum { MAX_OPT_NAME_LEN = 256, MAX_OPT_VAL_LEN = 256 };
+enum { MAX_OPT_NAME_LEN = 256, MAX_OPT_VAL_LEN = 512 };
 
 static void
 cfg_get(const char *param)
