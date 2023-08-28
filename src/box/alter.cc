@@ -39,6 +39,7 @@
 #include "coll_id_cache.h"
 #include "coll_id_def.h"
 #include "txn.h"
+#include "txn_limbo.h"
 #include "tuple.h"
 #include "tuple_constraint.h"
 #include "fiber.h" /* for gc_pool */
@@ -4010,6 +4011,20 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 
 /* {{{ cluster configuration */
 
+static int
+start_synchro_filtering(va_list /* ap */)
+{
+	txn_limbo_filter_enable(&txn_limbo);
+	return 0;
+}
+
+static int
+stop_synchro_filtering(va_list /* ap */)
+{
+	txn_limbo_filter_disable(&txn_limbo);
+	return 0;
+}
+
 /**
  * This trigger is invoked only upon initial recovery, when
  * reading contents of the system spaces from the snapshot.
@@ -4060,6 +4075,25 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 			 * example, for box.internal.bootstrap().
 			 */
 			dd_version_id = tarantool_version_id();
+		}
+		if (recovery_state != FINISHED_RECOVERY) {
+			return 0;
+		}
+		struct fiber *fiber = NULL;
+		if (dd_version_id > version_id(2, 10, 1) &&
+		    recovery_state == FINISHED_RECOVERY) {
+			fiber = fiber_new_system("synchro_filter_enabler",
+						 start_synchro_filtering);
+			if (fiber == NULL)
+				return -1;
+			fiber_wakeup(fiber);
+		} else if (dd_version_id <= version_id(2, 10, 1) &&
+			   recovery_state == FINISHED_RECOVERY) {
+			fiber = fiber_new_system("synchro_filter_disabler",
+						 stop_synchro_filtering);
+			if (fiber == NULL)
+				return -1;
+			fiber_wakeup(fiber);
 		}
 	}
 	return 0;
