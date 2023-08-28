@@ -39,6 +39,7 @@
 #include "coll_id_cache.h"
 #include "coll_id_def.h"
 #include "txn.h"
+#include "txn_limbo.h"
 #include "tuple.h"
 #include "tuple_constraint.h"
 #include "fiber.h" /* for gc_pool */
@@ -4171,9 +4172,41 @@ on_commit_replicaset_name(struct trigger *trigger, void * /* event */)
 }
 
 static int
+start_synchro_filtering(va_list /* ap */)
+{
+	txn_limbo_filter_enable(&txn_limbo);
+	return 0;
+}
+
+static int
+stop_synchro_filtering(va_list /* ap */)
+{
+	txn_limbo_filter_disable(&txn_limbo);
+	return 0;
+}
+
+/** Data passed to on_commit_dd_version trigger. */
+struct on_commit_dd_version_data {
+	/** A fiber to perform async work after commit. */
+	struct fiber *fiber;
+	/** New version. */
+	uint32_t version_id;
+};
+
+/**
+ * Update the cached schema version and enable version-dependent features, like
+ * split-brain detection. Reenabling is done asynchronously by a separate fiber
+ * prepared by on_replace trigger.
+ */
+static int
 on_commit_dd_version(struct trigger *trigger, void * /* event */)
 {
-	dd_version_id = (uint32_t)(uintptr_t)trigger->data;
+	struct on_commit_dd_version_data *data =
+		(struct on_commit_dd_version_data *)trigger->data;
+	dd_version_id = data->version_id;
+	struct fiber *fiber = data->fiber;
+	if (fiber != NULL)
+		fiber_wakeup(fiber);
 	return 0;
 }
 
@@ -4346,11 +4379,38 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 			 */
 			version = tarantool_version_id();
 		}
+		struct on_commit_dd_version_data *data = xregion_alloc_object(
+			&txn->region, typeof(*data));
+		data->version_id = version;
+		data->fiber = NULL;
 		struct trigger *on_commit = txn_alter_trigger_new(
-			on_commit_dd_version, (void *)(uintptr_t)version);
+			on_commit_dd_version, data);
 		if (on_commit == NULL)
 			return -1;
 		txn_stmt_on_commit(stmt, on_commit);
+		if (recovery_state != FINISHED_RECOVERY) {
+			return 0;
+		}
+		/*
+		 * Set data->fiber after on_commit is created, because we can't
+		 * remove a not-yet-run fiber in case of on_commit creation
+		 * failure.
+		 */
+		struct fiber *fiber = NULL;
+		if (version > version_id(2, 10, 1) &&
+		    recovery_state == FINISHED_RECOVERY) {
+			fiber = fiber_new_system("synchro_filter_enabler",
+						 start_synchro_filtering);
+			if (fiber == NULL)
+				return -1;
+		} else if (version <= version_id(2, 10, 1) &&
+			   recovery_state == FINISHED_RECOVERY) {
+			fiber = fiber_new_system("synchro_filter_disabler",
+						 stop_synchro_filtering);
+			if (fiber == NULL)
+				return -1;
+		}
+		data->fiber = fiber;
 	} else if (strcmp(key, "bootstrap_leader_uuid") == 0) {
 		struct tt_uuid *uuid = xregion_alloc_object(&txn->region,
 							    typeof(*uuid));

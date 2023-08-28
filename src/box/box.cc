@@ -5466,9 +5466,12 @@ box_cfg_xc(void)
 	/*
 	 * Enable split brain detection once node is fully recovered or
 	 * bootstrapped. No split brain could happen during bootstrap or local
-	 * recovery.
+	 * recovery. Only do so in an upgraded cluster. Unfortunately, schema
+	 * version 2.10.1 was used in 2.10.0 release, while split-brain
+	 * detection appeared in 2.10.1. So use the schema version after 2.10.1.
 	 */
-	txn_limbo_filter_enable(&txn_limbo);
+	if (dd_version_id > version_id(2, 10, 1))
+		txn_limbo_filter_enable(&txn_limbo);
 
 	title("running");
 	say_info("ready to accept requests");
