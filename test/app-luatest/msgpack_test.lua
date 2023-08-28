@@ -2,6 +2,7 @@ local buffer = require('buffer')
 local console = require('console')
 local msgpack = require('msgpack')
 local ffi = require('ffi')
+local fun = require('fun')
 local t = require('luatest')
 
 local g = t.group()
@@ -124,7 +125,7 @@ g.test_encode_decode_buffer = function()
 end
 
 g.test_invalid_msgpack = function()
-    local err = "msgpack.decode: invalid MsgPack"
+    local err = "Invalid MsgPack - truncated input"
 
     -- Invalid msgpack.
     local first_buffer = {1, 2, 3}
@@ -138,6 +139,7 @@ g.test_invalid_msgpack = function()
                                       buf.rpos, buf:size() - 1)
 
     -- 0xc1 cannot be used in a valid MsgPack.
+    err = "Invalid MsgPack - illegal code"
     t.assert_error_msg_content_equals(err, msgpack.decode, '\xc1')
     t.assert_error_msg_content_equals(err, msgpack.decode, '\x91\xc1')
     t.assert_error_msg_content_equals(err, msgpack.decode, '\x81\xff\xc1')
@@ -245,10 +247,10 @@ g.test_object_from_raw = function()
     -- invalid msgpack
     local s = msgpack.encode(o)
     t.assert_error_msg_content_equals(
-        "msgpack.object_from_raw: invalid MsgPack",
+        "Invalid MsgPack - truncated input",
         msgpack.object_from_raw, s:sub(1, -2))
     t.assert_error_msg_content_equals(
-        "msgpack.object_from_raw: invalid MsgPack",
+        "Invalid MsgPack - junk after input",
         msgpack.object_from_raw, s .. s)
 end
 
@@ -545,4 +547,263 @@ g.test_object_autocomplete = function()
     rawset(_G, 'mp', msgpack.object({}))
     local r = tabcomplete('mp:')
     t.assert_equals(r, {'mp:', 'mp:get(', 'mp:decode(', 'mp:iterator('})
+end
+
+local g_error_details_params = {
+    decode = {
+        func = msgpack.decode,
+        exact = false,
+    },
+    decode_cdata = {
+        func = function(data)
+            return msgpack.decode(ffi.cast('char *', data), #data)
+        end,
+        exact = false,
+    },
+    object_from_raw = {
+        func = msgpack.object_from_raw,
+        exact = true,
+    },
+}
+
+local g_error_details = t.group('msgpack.error-details', t.helpers.matrix({
+    test = fun.totable(fun.map(function(k) return k end,
+                               g_error_details_params)),
+}))
+
+g_error_details.test_error_details = function(cg)
+    local params = g_error_details_params[cg.params.test]
+    local function check_error(data, expected)
+        local errmsg_prefix = 'Invalid MsgPack - '
+        local ok, err = pcall(params.func, data)
+        t.assert_not(ok)
+        local actual, prev
+        while err ~= nil do
+            local v = err:unpack()
+            v.prev = nil
+            v.trace = nil
+            v.base_type = nil
+            t.assert_equals(v.type, 'ClientError')
+            v.type = nil
+            t.assert_equals(v.code, box.error.INVALID_MSGPACK)
+            v.code = nil
+            if v.message:startswith(errmsg_prefix) then
+                v.message = v.message:sub(#errmsg_prefix + 1)
+            end
+            if prev == nil then
+                actual = v
+            else
+                prev.prev = v
+            end
+            prev = v
+            err = err.prev
+        end
+        t.assert_equals(actual, expected)
+    end
+    check_error('\xc1', {
+        message = 'illegal code', offset = 0,
+    })
+    check_error('', {
+        message = 'truncated input', offset = 0, trunc_count = 1,
+    })
+    check_error('\x94\xc0', {
+        message = 'truncated input', offset = 2, trunc_count = 3,
+    })
+    check_error('\x94\xda\x00', {
+        message = 'truncated input', offset = 1, trunc_count = 4,
+    })
+    if params.exact then
+        check_error('\xc0\xc0', {
+            message = 'junk after input', offset = 1,
+        })
+        check_error('\x92\x91\xc0\xc0\xc1', {
+            message = 'junk after input', offset = 4,
+        })
+    end
+    check_error('\xc7\x04\x01\xc0\xc0\xc0\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 4, ext_type = 1,
+        prev = {message = 'cannot unpack decimal'},
+    })
+    check_error('\xc7\x04\x02\xc0\xc0\xc0\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 4, ext_type = 2,
+        prev = {message = 'cannot unpack uuid'},
+    })
+    check_error('\xc7\x04\x04\xc0\xc0\xc0\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 4, ext_type = 4,
+        prev = {message = 'cannot unpack datetime'},
+    })
+    check_error('\xc7\x04\x06\xc0\xc0\xc0\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 4, ext_type = 6,
+        prev = {message = 'cannot unpack interval'},
+    })
+    check_error('\xc7\x02\x03\x91\xc1', {
+        message = 'invalid extension', offset = 3, ext_len = 2, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {message = 'illegal code', offset = 1},
+        },
+    })
+    check_error('\xc7\x02\x03\x92\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 2, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {message = 'truncated input', offset = 2, trunc_count = 1},
+        },
+    })
+    check_error('\xc7\x04\x03\x92\xc0\xc0\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 4, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {message = 'junk after input', offset = 3},
+        },
+    })
+    check_error('\xc7\x01\x03\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 1, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {message = 'error data must be MP_MAP', offset = 0},
+        },
+    })
+    check_error('\xc7\x03\x03\x81\xc0\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 3, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {message = 'error data key must be MP_UINT', offset = 1},
+        },
+    })
+    check_error('\xc7\x01\x03\x80', {
+        message = 'invalid extension', offset = 3, ext_len = 1, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {message = 'MP_ERROR_STACK is missing', offset = 1},
+        },
+    })
+    check_error('\xc7\x04\x03\x81\x00\x91\x80', {
+        message = 'invalid extension', offset = 3, ext_len = 4, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {message = 'MP_ERROR_TYPE is missing', offset = 4},
+        },
+    })
+    check_error('\xc7\x06\x03\x81\x00\x91\x81\x00\xa0', {
+        message = 'invalid extension', offset = 3, ext_len = 6, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {message = 'MP_ERROR_MESSAGE is missing', offset = 6},
+        },
+    })
+    check_error('\xc7\x08\x03\x81\x00\x91\x82\x00\xa0\x03\xa0', {
+        message = 'invalid extension', offset = 3, ext_len = 8, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {message = 'MP_ERROR_FILE is missing', offset = 8},
+        },
+    })
+    check_error('\xc7\x03\x03\x81\x00\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 3, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {
+                message = 'MP_ERROR_STACK value must be MP_ARRAY',
+                offset = 2,
+            },
+        },
+    })
+    check_error('\xc7\x04\x03\x81\x00\x91\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 4, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {
+                message = 'MP_ERROR_STACK array entry must be MP_MAP',
+                offset = 3,
+            },
+        },
+    })
+    check_error('\xc7\x06\x03\x81\x00\x91\x81\xc0\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 6, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {message = 'error field key must be MP_UINT', offset = 4},
+        },
+    })
+    check_error('\xc7\x06\x03\x81\x00\x91\x81\x00\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 6, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {
+                message = 'MP_ERROR_TYPE value must be MP_STR',
+                offset = 5,
+            },
+        },
+    })
+    check_error('\xc7\x06\x03\x81\x00\x91\x81\x01\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 6, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {
+                message = 'MP_ERROR_FILE value must be MP_STR',
+                offset = 5,
+            },
+        },
+    })
+    check_error('\xc7\x06\x03\x81\x00\x91\x81\x02\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 6, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {
+                message = 'MP_ERROR_LINE value must be MP_UINT',
+                offset = 5,
+            },
+        },
+    })
+    check_error('\xc7\x06\x03\x81\x00\x91\x81\x03\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 6, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {
+                message = 'MP_ERROR_MESSAGE value must be MP_STR',
+                offset = 5,
+            },
+        },
+    })
+    check_error('\xc7\x06\x03\x81\x00\x91\x81\x04\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 6, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {
+                message = 'MP_ERROR_ERRNO value must be MP_UINT',
+                offset = 5,
+            },
+        },
+    })
+    check_error('\xc7\x06\x03\x81\x00\x91\x81\x05\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 6, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {
+                message = 'MP_ERROR_CODE value must be MP_UINT',
+                offset = 5,
+            },
+        },
+    })
+    check_error('\xc7\x06\x03\x81\x00\x91\x81\x06\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 6, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {
+                message = 'MP_ERROR_FIELDS value must be MP_MAP',
+                offset = 5,
+            },
+        },
+    })
+    check_error('\xc7\x08\x03\x81\x00\x91\x81\x06\x81\xc0\xc0', {
+        message = 'invalid extension', offset = 3, ext_len = 8, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {
+                message = 'error payload field name must be MP_STR',
+                offset = 6,
+            },
+        },
+    })
 end
