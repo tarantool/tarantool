@@ -435,6 +435,10 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo);
 void
 txn_limbo_filter_enable(struct txn_limbo *limbo);
 
+/** Stop filtering incoming synchro requests. */
+void
+txn_limbo_filter_disable(struct txn_limbo *limbo);
+
 /**
  * Freeze limbo. Prevent CONFIRMs and ROLLBACKs until limbo is unfrozen.
  */
