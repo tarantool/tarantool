@@ -869,6 +869,7 @@ local function start()
     session_internal.create(1, "repl") -- stdin fileno
     repl(self)
     started = false
+    internal.console_exited()
 end
 
 --

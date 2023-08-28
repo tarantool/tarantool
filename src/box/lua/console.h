@@ -31,11 +31,21 @@
  * SUCH DAMAGE.
  */
 
+#include <stdbool.h>
 #include "small/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+/**
+ * If a local console is exited and there are active libev events (e.g. there's
+ * a background fiber running), Tarantool seemingly freezes - console stops to
+ * work, typed characters are not echoed. This flag is used by main() to display
+ * a message to stdout to make things clear.
+ * The flag is false if the local console was never started or still running.
+ */
+extern bool is_console_exited;
 
 /**
  * Triggers invoked on console eval.
