@@ -76,6 +76,7 @@
 #include "title.h"
 #include <libutil.h>
 #include "box/lua/init.h" /* box_lua_init() */
+#include "box/lua/console.h"
 #include "box/session.h"
 #include "box/memtx_tx.h"
 #include "box/module_cache.h"
@@ -968,6 +969,11 @@ main(int argc, char **argv)
 			if (say_entering_the_event_loop)
 				say_info("entering the event loop");
 			systemd_snotify("READY=1");
+			if (is_console_exited) {
+				printf("Exited console. Type Ctrl-C to exit "
+				       "Tarantool.\n");
+				fflush(stdout);
+			}
 			ev_now_update(loop());
 			ev_run(loop(), 0);
 		}
