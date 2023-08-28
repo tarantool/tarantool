@@ -7,3 +7,10 @@ were fixed as part of this activity:
 * Fixed recording of `BC_VARG` with unused vararg values.
 * Initialization instructions on trace are now emitted only for the first
   member of a union.
+* Prevent integer overflow while parsing long strings.
+* Fixed various `^` operator and `math.pow()` function inconsistencies.
+* Fixed parsing with predicting `next()` and `pairs()`.
+* Fixed binary number literal parsing. Parsing of binary number with a zero
+  fractional part raises error too now.
+* Fixed load forwarding optimization applied after table rehashing.
+* Fixed recording of the `BC_TSETM`.
