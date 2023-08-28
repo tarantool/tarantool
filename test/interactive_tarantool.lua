@@ -246,6 +246,21 @@ function mt.read_response(self, opts)
 
     local raw_reply = '---\n' .. table.concat(lines, '\n') .. '\n'
     local reply = yaml.decode(raw_reply)
+
+    -- Consider reply an error if the following conditions are met:
+    --
+    -- 1. The reply contains just one response.
+    -- 2. The response is a table.
+    -- 3. The table contains only one key.
+    -- 4. This key is 'error'.
+    --
+    -- This is how tarantool's console serializes a raised error.
+    local is_error = #reply == 1 and type(reply[1]) == 'table' and
+        next(reply[1], next(reply[1])) == nil and reply[1].error ~= nil
+    if is_error then
+        error(reply[1].error, 0)
+    end
+
     return unpack(reply, 1, table.maxn(reply))
 end
 
