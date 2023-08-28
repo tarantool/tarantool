@@ -1282,6 +1282,14 @@ txn_limbo_filter_enable(struct txn_limbo *limbo)
 }
 
 void
+txn_limbo_filter_disable(struct txn_limbo *limbo)
+{
+	latch_lock(&limbo->promote_latch);
+	limbo->do_validate = false;
+	latch_unlock(&limbo->promote_latch);
+}
+
+void
 txn_limbo_init(void)
 {
 	txn_limbo_create(&txn_limbo);
