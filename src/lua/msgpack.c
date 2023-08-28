@@ -581,7 +581,7 @@ lua_msgpack_decode_cdata(lua_State *L, bool check)
 		}
 		const char *p = data;
 		if (mp_check(&p, data + data_len) != 0)
-			return luaL_error(L, "msgpack.decode: invalid MsgPack");
+			return luaT_error(L);
 	}
 	struct luaL_serializer *cfg = luaL_checkserializer(L);
 	luamp_decode(L, cfg, &data);
@@ -604,7 +604,7 @@ lua_msgpack_decode_string(lua_State *L, bool check)
 	if (check) {
 		const char *p = data + offset;
 		if (mp_check(&p, data + data_len) != 0)
-			return luaL_error(L, "msgpack.decode: invalid MsgPack");
+			return luaT_error(L);
 	}
 	struct luaL_serializer *cfg = luaL_checkserializer(L);
 	const char *p = data + offset;
@@ -772,7 +772,7 @@ luamp_push_with_translation(struct lua_State *L, const char *data,
 	size_t data_len = data_end - data;
 	struct luamp_object *obj = luamp_new_object(L, data_len);
 	memcpy((char *)obj->data, data, data_len);
-	assert(mp_check(&data, data_end) == 0 && data == data_end);
+	assert(mp_check_exact(&data, data_end) == 0);
 	obj->translation = translation;
 }
 
@@ -828,10 +828,8 @@ lua_msgpack_object_from_raw(struct lua_State *L)
 	}
 	const char *p = data;
 	const char *data_end = data + data_len;
-	if (mp_check(&p, data_end) != 0 || p != data_end) {
-		return luaL_error(L, "msgpack.object_from_raw: "
-				  "invalid MsgPack");
-	}
+	if (mp_check_exact(&p, data_end) != 0)
+		return luaT_error(L);
 	struct luamp_object *obj = luamp_new_object(L, data_len);
 	memcpy((char *)obj->data, data, data_len);
 	obj->cfg = luaL_checkserializer(L);
