@@ -36,6 +36,7 @@
 #include "user.h"
 #include "vclock/vclock.h"
 #include "fiber.h"
+#include "session.h"
 #include "memtx_tx.h"
 #include "txn.h"
 #include "engine.h"
@@ -167,11 +168,14 @@ on_replace_dd_system_space(struct trigger *trigger, void *event)
 	 * so we only allow it
 	 *  - in the fiber that is currently running a schema upgrade because
 	 *    a schema upgrade implies DDL;
+	 *  - in the applier fiber so that it can replicate changes done by
+	 *    a schema upgrade on the master;
 	 *  - during recovery so that DDL records written to the WAL can be
 	 *    replayed.
 	 */
 	if (recovery_state == FINISHED_RECOVERY &&
 	    fiber() != schema_upgrade_fiber &&
+	    current_session()->type != SESSION_TYPE_APPLIER &&
 	    box_schema_needs_upgrade())
 		return -1;
 	memtx_tx_acquire_ddl(txn);
