@@ -78,7 +78,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: failure()
         with:
-          name: release_lto_clang11
+          name: release_lto_clang
           retention-days: 21
           path: ${{ env.VARDIR }}/artifacts
       - name: Upload artifacts to S3
