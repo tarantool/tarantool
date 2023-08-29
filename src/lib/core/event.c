@@ -15,6 +15,9 @@
 /** Registry of all events: name -> event. */
 static struct mh_strnptr_t *event_registry;
 
+/** Cached event 'tarantool.trigger.on_change'. */
+static struct event *on_change_event;
+
 /**
  * A named node of the list, containing func_adapter. Every event_trigger is
  * associated with an event. Since event_triggers have completely different
@@ -175,12 +178,39 @@ event_find_trigger(struct event *event, const char *name)
 	return trigger != NULL ? trigger->func : NULL;
 }
 
+/**
+ * Fires on_change triggers. Must be called after the change is applied.
+ * Each returned value is ignored, all thrown errors are logged.
+ */
+static void
+event_on_change(struct event *event)
+{
+	if (!event_has_triggers(on_change_event))
+		return;
+	struct event_trigger_iterator it;
+	event_trigger_iterator_create(&it, on_change_event);
+	struct func_adapter *func = NULL;
+	const char *name = NULL;
+	struct func_adapter_ctx ctx;
+	while (event_trigger_iterator_next(&it, &func, &name)) {
+		func_adapter_begin(func, &ctx);
+		func_adapter_push_str0(func, &ctx, event->name);
+		int rc = func_adapter_call(func, &ctx);
+		func_adapter_end(func, &ctx);
+		if (rc != 0)
+			diag_log();
+	}
+	event_trigger_iterator_destroy(&it);
+}
+
 void
 event_reset_trigger(struct event *event, const char *name,
 		    struct func_adapter *new_trigger)
 {
 	assert(event != NULL);
 	assert(name != NULL);
+	/* Reference event to prevent it from deletion during modification. */
+	event_ref(event);
 	struct event_trigger *found_trigger =
 		event_find_trigger_internal(event, name);
 	if (new_trigger != NULL) {
@@ -206,6 +236,8 @@ event_reset_trigger(struct event *event, const char *name,
 		found_trigger->is_deleted = true;
 		event_trigger_unref(found_trigger);
 	}
+	event_on_change(event);
+	event_unref(event);
 }
 
 void
@@ -309,12 +341,17 @@ void
 event_init(void)
 {
 	event_registry = mh_strnptr_new();
+	on_change_event = event_get("tarantool.trigger.on_change", true);
+	event_ref(on_change_event);
 }
 
 void
 event_free(void)
 {
 	assert(event_registry != NULL);
+	assert(on_change_event != NULL);
+	event_unref(on_change_event);
+	on_change_event = NULL;
 	struct mh_strnptr_t *h = event_registry;
 	mh_int_t i;
 	mh_foreach(h, i) {

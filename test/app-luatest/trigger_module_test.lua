@@ -1,3 +1,4 @@
+local server = require('luatest.server')
 local t = require('luatest')
 
 local g = t.group()
@@ -568,4 +569,94 @@ g.test_info_no_empty_events = function()
         t.assert_equals(trigger.info(event_name), {})
         t.assert_equals(trigger.info(), {})
     end)
+end
+
+g.test_trigger_on_change = function()
+    g.server:exec(function()
+        local trigger = require('trigger')
+        local story = {}
+        local function nop() end
+        local function another_nop() end
+        local handlers = {}
+        for i = 1, 2 do
+            handlers[i] = function(event_name, arg2)
+                t.assert_equals(arg2, nil)
+                t.assert_type(event_name, 'string')
+                local event_info = trigger.info(event_name)[event_name]
+                local event_len = event_info == nil and 0 or #event_info
+                table.insert(story, {'handlers[' .. tostring(i) .. ']',
+                                    event_name, event_len})
+            end
+        end
+
+        local on_change = 'tarantool.trigger.on_change'
+        trigger.set(on_change, 'h2', handlers[2])
+        t.assert_equals(story, {{'handlers[2]', on_change, 1}})
+        story = {}
+
+        trigger.set(on_change, 'h1', handlers[1])
+        t.assert_equals(story, {{'handlers[1]', on_change, 2},
+                                {'handlers[2]', on_change, 2}})
+        story = {}
+
+        trigger.set('test_ev', 'nop', nop)
+        t.assert_equals(story, {{'handlers[1]', 'test_ev', 1},
+                                {'handlers[2]', 'test_ev', 1}})
+        story = {}
+
+        trigger.set('test_ev', 'nop', another_nop)
+        t.assert_equals(story, {{'handlers[1]', 'test_ev', 1},
+                                {'handlers[2]', 'test_ev', 1}})
+        story = {}
+
+        trigger.del('test_ev', 'nop')
+        t.assert_equals(story, {{'handlers[1]', 'test_ev', 0},
+                                {'handlers[2]', 'test_ev', 0}})
+        story = {}
+    end)
+end
+
+g.test_trigger_on_change_error = function()
+    -- Check if it does not fail when box is not initialized
+    local run_before_cfg = [[
+        local trigger = require('trigger')
+        local on_change = "tarantool.trigger.on_change"
+        local function handler_err(event_name)
+            box.error({reason = 'handler_err: ' .. event_name})
+        end
+        trigger.set(on_change, 'handler', handler_err)
+        assert(#trigger.info(on_change)[on_change] == 1)
+    ]]
+    local test_server = server:new{
+        box_cfg = {log_level = 2},
+        env = {['TARANTOOL_RUN_BEFORE_BOX_CFG'] = run_before_cfg}
+    }
+    test_server:start()
+    test_server:exec(function()
+        local trigger = require('trigger')
+        local function nop() end
+        local handler_fired_count = 0
+        local function handler()
+            handler_fired_count = handler_fired_count + 1
+        end
+        local function handler_err1(event_name)
+            error('handler_err1: ' .. event_name)
+        end
+        local function handler_err2(event_name)
+            box.error({reason = 'handler_err2: ' .. event_name})
+        end
+
+        local on_change = 'tarantool.trigger.on_change'
+        trigger.set(on_change, 'h3', handler)
+        trigger.set(on_change, 'h2', handler_err2)
+        trigger.set(on_change, 'h1', handler_err1)
+        trigger.set('test_event', 'trigger', nop)
+        t.assert_equals(handler_fired_count, 4)
+    end)
+    local on_change = 'tarantool.trigger.on_change'
+    t.assert(test_server:grep_log('handler_err1: ' .. on_change))
+    t.assert(test_server:grep_log('handler_err2: ' .. on_change))
+    t.assert(test_server:grep_log('handler_err1: test_event'))
+    t.assert(test_server:grep_log('handler_err2: test_event'))
+    test_server:drop()
 end
