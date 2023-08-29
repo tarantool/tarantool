@@ -14,3 +14,4 @@ were fixed as part of this activity:
   fractional part raises error too now.
 * Fixed load forwarding optimization applied after table rehashing.
 * Fixed recording of the `BC_TSETM`.
+* Fix `predict_next()` in parser (again).
