@@ -21,7 +21,7 @@ local function is_supported()
     end
     -- If ASAN is enabled, malloc_info() exists but it is not implemented
     -- (all counters in the returned document are set to zeros).
-    if tarantool.build.flags:match('-fsanitize=[%a,]*address') then
+    if tarantool.build.asan then
         return false
     end
     return true
