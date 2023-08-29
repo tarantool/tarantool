@@ -7,3 +7,4 @@ were fixed as part of this activity:
 * Fixed recording of `BC_VARG` with unused vararg values.
 * Initialization instructions on trace are now emitted only for the first
   member of a union.
+* Fix handling of instable types in TNEW/TDUP load forwarding.
