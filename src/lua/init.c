@@ -801,6 +801,15 @@ luaopen_tarantool(lua_State *L)
 #endif
 	lua_settable(L, -3);
 
+	/* build.asan */
+	lua_pushstring(L, "asan");
+#ifdef ENABLE_ASAN
+	lua_pushboolean(L, true);
+#else
+	lua_pushboolean(L, false);
+#endif
+	lua_settable(L, -3);
+
 	lua_settable(L, -3);    /* box.info.build */
 
 	/* debug */
