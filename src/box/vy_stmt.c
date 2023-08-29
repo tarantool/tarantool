@@ -98,6 +98,8 @@ vy_tuple_new(struct tuple_format *format, const char *data, const char *end)
 static void
 vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
+	struct vy_stmt_env *env = format->engine;
+	size_t size = tuple_size(tuple);
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple_is_unreferenced(tuple));
 	/*
@@ -105,10 +107,15 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	 * multithread unsafe modifications of a reference
 	 * counter.
 	 */
-	if (cord_is_main())
+	if (cord_is_main()) {
+		if (format != env->key_format) {
+			assert(env->sum_tuple_size >= size);
+			env->sum_tuple_size -= size;
+		}
 		tuple_format_unref(format);
+	}
 #ifndef NDEBUG
-	memset(tuple, '#', tuple_size(tuple)); /* fail early */
+	memset(tuple, '#', size); /* fail early */
 #endif
 	free(tuple);
 }
@@ -119,6 +126,7 @@ vy_stmt_env_create(struct vy_stmt_env *env)
 	env->tuple_format_vtab.tuple_new = vy_tuple_new;
 	env->tuple_format_vtab.tuple_delete = vy_tuple_delete;
 	env->max_tuple_size = 1024 * 1024;
+	env->sum_tuple_size = 0;
 	env->key_format = vy_simple_stmt_format_new(env, NULL, 0);
 	if (env->key_format == NULL)
 		panic("failed to create vinyl key format");
@@ -185,8 +193,11 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t data_offset, uint32_t bsize)
 		  format->id, data_offset, bsize, tuple);
 	tuple_create(tuple, 1, tuple_format_id(format),
 		     data_offset, bsize, false);
-	if (cord_is_main())
+	if (cord_is_main()) {
+		if (format != env->key_format)
+			env->sum_tuple_size += total_size;
 		tuple_format_ref(format);
+	}
 	vy_stmt_set_lsn(tuple, 0);
 	vy_stmt_set_type(tuple, 0);
 	vy_stmt_set_flags(tuple, 0);
