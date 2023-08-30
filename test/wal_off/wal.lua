@@ -9,5 +9,5 @@ box.cfg{
 }
 
 -- Wal off tests can be running for a very long time without yields.
-require('fiber').set_max_slice(50)
+require('fiber').set_max_slice(120)
 require('console').listen(os.getenv('ADMIN'))
