@@ -30,6 +30,7 @@ g.before_each(function(g)
         box_cfg = box_cfg,
     })
     g.cluster:start()
+    g.cluster:wait_for_fullmesh()
     g.server1:exec(function()
         box.schema.space.create("test")
         box.space.test:create_index("pk")
