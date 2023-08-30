@@ -676,6 +676,14 @@ lbox_info_election(struct lua_State *L)
 	lua_pushinteger(L, raft->leader);
 	lua_setfield(L, -2, "leader");
 	if (raft_is_enabled(raft)) {
+		if (raft->leader != 0) {
+			char *leader_name = replica_by_id(raft->leader)->name;
+			if (*leader_name == 0)
+				luaL_pushnull(L);
+			else
+				lua_pushstring(L, leader_name);
+			lua_setfield(L, -2, "leader_name");
+		}
 		lua_pushnumber(L, raft_leader_idle(raft));
 		lua_setfield(L, -2, "leader_idle");
 	}
