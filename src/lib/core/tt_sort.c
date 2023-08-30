@@ -179,7 +179,7 @@ sort_bucket(va_list ap)
 		  worker->bucket_size, sort->elem_size,
 		  sort->cmp, sort->cmp_arg);
 
-	/* Move sorted data back from temporary space. */
+	/* Move sorted data back from data-temporary space. */
 	memcpy(sort->data + worker->bucket_begin * sort->elem_size,
 	       sort->buffer + worker->bucket_begin * sort->elem_size,
 	       worker->bucket_size * sort->elem_size);

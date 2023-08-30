@@ -1410,7 +1410,7 @@ s:alter({format = {{{1, 2, 3, 4}}}})
 - error: 'Illegal parameters, format[1]: name (string) is expected'
 ...
 --
--- Alter temporary.
+-- Alter data-temporary.
 --
 s:alter({temporary = true})
 ---

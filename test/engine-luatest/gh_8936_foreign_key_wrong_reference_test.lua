@@ -1,5 +1,5 @@
 -- https://github.com/tarantool/tarantool/issues/8936
--- Test foreign keys to temporary and local spaces.
+-- Test foreign keys to data-temporary and local spaces.
 local server = require('luatest.server')
 local t = require('luatest')
 
@@ -37,7 +37,7 @@ g.after_each(function(cg)
     end)
 end)
 
--- Foreign key must not refer to temporary space from normal space.
+-- Foreign key must not refer to data-temporary space from normal space.
 g.test_field_foreign_key_temporary = function(cg)
     local engine = cg.params.engine
     local country_is_temporary = cg.params.country_variant
@@ -46,7 +46,8 @@ g.test_field_foreign_key_temporary = function(cg)
     t.skip_if(engine == 'vinyl')
 
     cg.server:exec(function(engine, country_is_temporary, city_is_temporary)
-        -- foreign key must not point for non-temporary to temporary space.
+        -- foreign key must not point for non-data-temporary to data-temporary
+        -- space.
         local must_be_prohibited =
             country_is_temporary and not city_is_temporary
 
@@ -72,8 +73,8 @@ g.test_field_foreign_key_temporary = function(cg)
         if must_be_prohibited then
             t.assert_error_msg_content_equals(
                 "Failed to create foreign key 'country' in space 'city': " ..
-                "foreign key from non-temporary space " ..
-                "can't refer to temporary space",
+                "foreign key from non-data-temporary space " ..
+                "can't refer to data-temporary space",
                 box.schema.create_space, 'city', city_opts
             )
             return nil
@@ -87,8 +88,8 @@ g.test_field_foreign_key_temporary = function(cg)
         if country_is_temporary and city_is_temporary then
             t.assert_error_msg_content_equals(
                 "Failed to create foreign key 'country' in space 'city': " ..
-                "foreign key from non-temporary space " ..
-                "can't refer to temporary space",
+                "foreign key from non-data-temporary space " ..
+                "can't refer to data-temporary space",
                 city.alter, city, {temporary = false}
             )
             country:alter{temporary = false}
@@ -97,7 +98,8 @@ g.test_field_foreign_key_temporary = function(cg)
         if not country_is_temporary and not city_is_temporary then
             t.assert_error_msg_content_equals(
                 "Can't modify space 'country': foreign key 'country' from " ..
-                "non-temporary space 'city' can't refer to temporary space",
+                "non-data-temporary space 'city' can't refer to " ..
+                "data-temporary space",
                 country.alter, country, {temporary = true}
             )
             city:alter{temporary = true}
@@ -142,7 +144,8 @@ g.test_field_foreign_key_local = function(cg)
     local city_is_local = cg.params.city_variant
 
     cg.server:exec(function(engine, country_is_local, city_is_local)
-        -- foreign key must not point for non-temporary to temporary space.
+        -- foreign key must not point for non-data-temporary to data-temporary
+        -- space.
         local must_be_prohibited =
             country_is_local and not city_is_local
 

@@ -21,7 +21,7 @@ g_single.after_each(function(cg)
     end)
 end)
 
--- Checks that a temporary space can be truncated in the read-only mode.
+-- Checks that a data-temporary space can be truncated in the read-only mode.
 g_single.test_temp_space_truncate_ro = function(cg)
     cg.server:exec(function()
         local s = box.schema.create_space('test', {temporary = true})
@@ -89,8 +89,8 @@ g_replication.after_each(function(cg)
     cg.replica:wait_for_vclock_of(cg.master)
 end)
 
--- Checks that a truncate operation for a temporary space isn't replicated to
--- a read-only replica.
+-- Checks that a truncate operation for a data-temporary space isn't replicated
+-- to a read-only replica.
 g_replication.test_temp_space_truncate_ro = function(cg)
     cg.master:exec(function()
         local s = box.schema.create_space('test', {temporary = true})

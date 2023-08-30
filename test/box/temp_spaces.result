@@ -1,8 +1,8 @@
--- temporary spaces
+-- data-temporary spaces
 _space = box.space._space
 ---
 ...
--- not a temporary
+-- not a data-temporary
 FLAGS = 6
 ---
 ...
@@ -16,7 +16,7 @@ s.temporary
 s:drop()
 ---
 ...
--- not a temporary, too
+-- not a data-temporary, too
 s = box.schema.space.create('t', { temporary = false })
 ---
 ...
@@ -27,7 +27,7 @@ s.temporary
 s:drop()
 ---
 ...
--- not a temporary, too
+-- not a data-temporary, too
 s = box.schema.space.create('t', { temporary = nil })
 ---
 ...
@@ -65,14 +65,14 @@ s.temporary
 ...
 _ = _space:update(s.id, {{'=', FLAGS, {temporary = false}}})
 ---
-- error: 'Can''t modify space ''t'': can not switch temporary flag on a non-empty
+- error: 'Can''t modify space ''t'': can not change data-temporariness on a non-empty
     space'
 ...
 s.temporary
 ---
 - true
 ...
--- check that temporary space can be modified in read-only mode (gh-1378)
+-- check that data-temporary space can be modified in read-only mode (gh-1378)
 box.cfg{read_only=true}
 ---
 ...

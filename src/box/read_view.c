@@ -67,7 +67,7 @@ read_view_opts_create(struct read_view_opts *opts)
 	opts->filter_arg = NULL;
 	opts->enable_field_names = false;
 	opts->enable_space_upgrade = false;
-	opts->enable_temporary_spaces = false;
+	opts->enable_data_temporary_spaces = false;
 	opts->disable_decompression = false;
 }
 
@@ -157,7 +157,8 @@ read_view_add_space_cb(struct space *space, void *arg_raw)
 	struct read_view *rv = arg->rv;
 	const struct read_view_opts *opts = arg->opts;
 	if ((space->engine->flags & ENGINE_SUPPORTS_READ_VIEW) == 0 ||
-	    (space_is_temporary(space) && !opts->enable_temporary_spaces) ||
+	    (space_is_data_temporary(space) &&
+	     !opts->enable_data_temporary_spaces) ||
 	    !opts->filter_space(space, opts->filter_arg))
 		return 0;
 	struct space_read_view *space_rv = space_read_view_new(space, opts);

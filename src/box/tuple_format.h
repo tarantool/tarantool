@@ -245,7 +245,7 @@ struct tuple_format {
 	/** Reference counter */
 	int refs;
 	/**
-	 * Tuples of this format belong to a temporary space and
+	 * Tuples of this format belong to a data-temporary space and
 	 * hence can be freed immediately while checkpointing is
 	 * in progress.
 	 */
@@ -417,7 +417,7 @@ tuple_format_unref(struct tuple_format *format)
  * @param space_fields Array of fields, defined in a space format.
  * @param space_field_count Length of @a space_fields.
  * @param exact_field_count Exact field count for format.
- * @param is_temporary Set if format belongs to temporary space.
+ * @param is_temporary Set if format belongs to data-temporary space.
  * @param is_reusable Set if format may be reused.
  * @param constraint_def - Array of constraint definitions.
  * @param constraint_count - Number of constraints above.

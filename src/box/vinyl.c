@@ -586,9 +586,10 @@ vinyl_engine_check_space_def(struct space_def *def)
 			return -1;
 		}
 	}
-	if (space_opts_is_temporary(&def->opts)) {
+	if (space_opts_is_data_temporary(&def->opts)) {
 		diag_set(ClientError, ER_ALTER_SPACE,
-			 def->name, "engine does not support temporary flag");
+			 def->name,
+			 "engine does not support data-temporary spaces");
 		return -1;
 	}
 	return 0;

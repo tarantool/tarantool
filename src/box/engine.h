@@ -245,8 +245,8 @@ struct engine_vtab {
 	void (*reset_stat)(struct engine *);
 	/**
 	 * Check definition of a new space for engine-specific
-	 * limitations. E.g. not all engines support temporary
-	 * tables.
+	 * limitations. E.g. not all engines support data-temporary
+	 * spaces.
 	 */
 	int (*check_space_def)(struct space_def *);
 };

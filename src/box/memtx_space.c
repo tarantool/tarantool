@@ -1362,9 +1362,11 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 
 	if (old_memtx_space->bsize != 0 &&
-	    space_is_temporary(old_space) != space_is_temporary(new_space)) {
+	    space_is_data_temporary(old_space) !=
+	    space_is_data_temporary(new_space)) {
 		diag_set(ClientError, ER_ALTER_SPACE, old_space->def->name,
-			 "can not switch temporary flag on a non-empty space");
+			 "can not change data-temporariness on a non-empty "
+			 "space");
 		return -1;
 	}
 

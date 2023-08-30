@@ -399,7 +399,7 @@ enum tuple_flag {
 	 */
 	TUPLE_IS_DIRTY = 1,
 	/**
-	 * The tuple belongs to a temporary space so it can be freed
+	 * The tuple belongs to a data-temporary space so it can be freed
 	 * immediately while a snapshot is in progress.
 	 */
 	TUPLE_IS_TEMPORARY = 2,

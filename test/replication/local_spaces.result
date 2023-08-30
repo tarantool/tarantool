@@ -55,8 +55,8 @@ box.space._space:insert{9000, 1, 'test', engine, 0, {group_id = 2}, {}} -- error
 ---
 - error: Replication group '2' does not exist
 ...
--- Temporary local spaces should behave in the same fashion as
--- plain temporary spaces, i.e. neither replicated nor persisted.
+-- Data-temporary local spaces should behave in the same fashion as
+-- plain data-temporary spaces, i.e. neither replicated nor persisted.
 s3 = box.schema.space.create('test3', {is_local = true, temporary = true})
 ---
 ...
@@ -71,7 +71,7 @@ s3.temporary
 ---
 - true
 ...
--- gh-4263 The truncation of the local & temporary space
+-- gh-4263 The truncation of the local & data-temporary space
 -- should not spread among the replicas
 s4 = box.schema.space.create('test4', {is_local = true})
 ---

@@ -26,14 +26,14 @@ box.space._space:update(s2.id, {{'=', 6, {group_id = 0}}}) -- error
 -- 0 (global) and 1 (local)
 box.space._space:insert{9000, 1, 'test', engine, 0, {group_id = 2}, {}} -- error
 
--- Temporary local spaces should behave in the same fashion as
--- plain temporary spaces, i.e. neither replicated nor persisted.
+-- Data-temporary local spaces should behave in the same fashion as
+-- plain data-temporary spaces, i.e. neither replicated nor persisted.
 s3 = box.schema.space.create('test3', {is_local = true, temporary = true})
 _ = s3:create_index('pk')
 s3.is_local
 s3.temporary
 
--- gh-4263 The truncation of the local & temporary space
+-- gh-4263 The truncation of the local & data-temporary space
 -- should not spread among the replicas
 s4 = box.schema.space.create('test4', {is_local = true})
 _ = s4:create_index('pk')
