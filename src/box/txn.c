@@ -262,6 +262,8 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 		row->tm = 0;
 		row->flags = 0;
 		row->stream_id = 0;
+		row->header = NULL;
+		row->header_end = NULL;
 	}
 	/*
 	 * Group ID should be set both for requests not having a

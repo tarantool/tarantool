@@ -156,6 +156,8 @@ xrow_header_decode(struct xrow_header *header, const char **pos,
 		goto bad_header;
 	if (mp_typeof(**pos) != MP_MAP)
 		goto bad_header;
+	header->header = start;
+	header->header_end = tmp;
 	bool has_tsn = false;
 	uint32_t flags = 0;
 
