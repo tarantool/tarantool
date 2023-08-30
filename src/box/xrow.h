@@ -117,6 +117,16 @@ struct xrow_header {
 	/* See `IPROTO_SCHEMA_VERSION`. */
 	uint64_t schema_version;
 	struct iovec body[XROW_BODY_IOVMAX];
+	/**
+	 * A pointer to the beginning of xrow header, is set on decoding.
+	 * Is NULL by default.
+	 */
+	const char *header;
+	/**
+	 * A pointer to the end of xrow header, is set on decoding.
+	 * Is NULL by default.
+	 */
+	const char *header_end;
 };
 
 /**

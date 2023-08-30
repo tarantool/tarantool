@@ -210,7 +210,7 @@ test_xrow_header_encode_decode()
 	header();
 	/* Test all possible 3-bit combinations. */
 	const int bit_comb_count = 1 << 3;
-	plan(1 + bit_comb_count * 13);
+	plan(1 + bit_comb_count * 15);
 	struct xrow_header header;
 	char buffer[2048];
 	char *pos = mp_encode_uint(buffer, 300);
@@ -251,11 +251,12 @@ test_xrow_header_encode_decode()
 		is(size, exp_map_size, "header map size");
 
 		struct xrow_header decoded_header;
-		const char *begin = (const char *)vec[0].iov_base;
-		begin += fixheader_len;
+		const char *pos = (const char *)vec[0].iov_base;
+		pos += fixheader_len;
+		const char *const begin = pos;
 		const char *end = (const char *)vec[0].iov_base;
 		end += vec[0].iov_len;
-		is(xrow_header_decode(&decoded_header, &begin, end, true), 0,
+		is(xrow_header_decode(&decoded_header, &pos, end, true), 0,
 		   "header decode");
 		is(header.stream_id, decoded_header.stream_id, "decoded stream_id");
 		is(header.is_commit, decoded_header.is_commit, "decoded is_commit");
@@ -267,6 +268,8 @@ test_xrow_header_encode_decode()
 		is(header.tm, decoded_header.tm, "decoded tm");
 		is(decoded_header.sync, sync, "decoded sync");
 		is(decoded_header.bodycnt, 0, "decoded bodycnt");
+		is(decoded_header.header, begin);
+		is(decoded_header.header_end, end);
 	}
 
 	check_plan();
