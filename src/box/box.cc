@@ -3571,23 +3571,24 @@ box_process1(struct request *request, box_tuple_t **result)
 	if (space == NULL)
 		return -1;
 	/*
-	 * Allow to write to temporary and local spaces in the read-only mode.
-	 * To handle space truncation, we postpone the read-only check for the
-	 * _truncate system space till the on_replace trigger is called, when
-	 * we know which space is truncated.
+	 * Allow to write to data-temporary and local spaces in the read-only
+	 * mode. To handle space truncation, we postpone the read-only check for
+	 * the _truncate system space till the on_replace trigger is called,
+	 * when we know which space is truncated.
 	 */
 	if (space_id(space) != BOX_TRUNCATE_ID &&
-	    !space_is_temporary(space) &&
+	    !space_is_data_temporary(space) &&
 	    !space_is_local(space) &&
 	    box_check_writable() != 0)
 		return -1;
 	if (space_is_memtx(space)) {
 		/*
 		 * Due to on_init_schema triggers set on system spaces,
-		 * we can insert data during recovery to local and temporary
-		 * spaces. However, until recovery is finished, we can't
-		 * check key uniqueness (since indexes are still not yet built).
-		 * So reject any attempts to write into these spaces.
+		 * we can insert data during recovery to local and
+		 * data-temporary spaces. However, until recovery is finished,
+		 * we can't check key uniqueness (since indexes are still not
+		 * yet built). So reject any attempts to write into these
+		 * spaces.
 		 */
 		if (memtx_space_is_recovering(space)) {
 			diag_set(ClientError, ER_UNSUPPORTED, "Snapshot recovery",

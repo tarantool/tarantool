@@ -969,7 +969,7 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 			 * instance id. This is also true for
 			 * anonymous replicas, since they are
 			 * only capable of writing to local and
-			 * temporary spaces.
+			 * data-temporary spaces.
 			 */
 			if ((*row)->group_id != GROUP_LOCAL)
 				(*row)->replica_id = instance_id;

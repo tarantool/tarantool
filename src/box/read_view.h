@@ -163,10 +163,10 @@ struct read_view_opts {
 	 */
 	bool enable_space_upgrade;
 	/**
-	 * Temporary spaces aren't included into this read view unless this
+	 * Data-temporary spaces aren't included into this read view unless this
 	 * flag is set.
 	 */
-	bool enable_temporary_spaces;
+	bool enable_data_temporary_spaces;
 	/**
 	 * Memtx-specific. Disables decompression of tuples fetched from
 	 * the read view. Setting this flag makes the raw read view methods

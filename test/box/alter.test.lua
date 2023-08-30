@@ -560,7 +560,7 @@ s:alter({format = true})
 s:alter({format = {{{1, 2, 3, 4}}}})
 
 --
--- Alter temporary.
+-- Alter data-temporary.
 --
 s:alter({temporary = true})
 assert(s.temporary)

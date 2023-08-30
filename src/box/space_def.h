@@ -129,10 +129,10 @@ space_opts_create(struct space_opts *opts)
 }
 
 /**
- * Check if the space is temporary.
+ * Check if the space is data-temporary.
  */
 static inline bool
-space_opts_is_temporary(const struct space_opts *opts)
+space_opts_is_data_temporary(const struct space_opts *opts)
 {
 	assert(opts->type != SPACE_TYPE_DEFAULT);
 	return opts->type != SPACE_TYPE_NORMAL;

@@ -139,9 +139,9 @@ memtx_tuple_rv_version(struct memtx_tuple_rv *rv)
  * for each type maintain an independent list.
  */
 enum memtx_tuple_rv_type {
-	/** Tuples from non-temporary spaces. */
+	/** Tuples from non-data-temporary spaces. */
 	memtx_tuple_rv_default,
-	/** Tuples from temporary spaces. */
+	/** Tuples from data-temporary spaces. */
 	memtx_tuple_rv_temporary,
 	memtx_tuple_rv_type_MAX,
 };
@@ -257,7 +257,7 @@ public:
 		}
 		ReadView *rv = (ReadView *)xcalloc(1, sizeof(*rv));
 		for (int type = 0; type < memtx_tuple_rv_type_MAX; type++) {
-			if (!opts->enable_temporary_spaces &&
+			if (!opts->enable_data_temporary_spaces &&
 			    type == memtx_tuple_rv_temporary)
 				continue;
 			rv->rv[type] = memtx_tuple_rv_new(read_view_version,

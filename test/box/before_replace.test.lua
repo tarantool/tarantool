@@ -293,7 +293,7 @@ save_type
 s:drop()
 
 --
--- gh-4266 triggers on temporary space fail
+-- gh-4266 triggers on data-temporary space fail
 --
 s = box.schema.space.create('test', {temporary = true})
 

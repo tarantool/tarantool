@@ -31,7 +31,7 @@ box.execute('SELECT \'abc\';')
 box.execute('SELECT X\'4D6564766564\'')
 
 --
--- gh-4139: assertion when reading a temporary space.
+-- gh-4139: assertion when reading a data-temporary space.
 --
 format = {{name = 'id', type = 'integer'}}
 s = box.schema.space.create('s',{format=format, temporary=true})

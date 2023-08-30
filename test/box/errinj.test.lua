@@ -468,7 +468,7 @@ _ = box.schema.space.create('test')
 _ = box.space.test:create_index('pk')
 for i = 1, 100 do box.space.test:insert{i} end
 
--- Create a temporary space.
+-- Create a data-temporary space.
 count = 500
 pad = string.rep('x', 100 * 1024)
 _ = box.schema.space.create('tmp', {temporary = true})
@@ -480,7 +480,7 @@ c = fiber.channel(1)
 box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', true)
 _ = fiber.create(function() box.snapshot() c:put(true) end)
 
--- Overwrite data stored in the temporary space while snapshot
+-- Overwrite data stored in the data-temporary space while snapshot
 -- is in progress to make sure that tuples stored in it are freed
 -- immediately.
 for i = 1, count do box.space.tmp:delete{i} end

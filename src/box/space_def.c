@@ -113,7 +113,7 @@ space_tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 	return tuple_format_new(vtab, engine, keys, key_count,
 				def->fields, def->field_count,
 				def->exact_field_count, def->dict,
-				space_opts_is_temporary(&def->opts),
+				space_opts_is_data_temporary(&def->opts),
 				def->opts.is_ephemeral,
 				def->opts.constraint_def,
 				def->opts.constraint_count, def->format_data,
@@ -297,8 +297,7 @@ space_opts_parse_temporary(const char **data, void *vopts,
 			 "only one of 'type' or 'temporary' may be specified");
 		return -1;
 	}
-	bool is_temporary = mp_decode_bool(data);
-	opts->type = is_temporary ?
+	opts->type = mp_decode_bool(data) ?
 		SPACE_TYPE_DATA_TEMPORARY : SPACE_TYPE_NORMAL;
 	return 0;
 }

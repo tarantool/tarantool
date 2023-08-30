@@ -606,10 +606,10 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 
 	/*
 	 * Create WAL record for the write requests in
-	 * non-temporary spaces. stmt->space can be NULL for
+	 * non-data-temporary spaces. stmt->space can be NULL for
 	 * IRPOTO_NOP or IPROTO_RAFT_CONFIRM.
 	 */
-	if (stmt->space == NULL || !space_is_temporary(stmt->space)) {
+	if (stmt->space == NULL || !space_is_data_temporary(stmt->space)) {
 		if (txn_add_redo(txn, stmt, request) != 0)
 			goto fail;
 		assert(stmt->row != NULL);
@@ -1307,10 +1307,10 @@ txn_check_space_linearizability(const struct txn *txn,
 	 * require checking whether **any** node in the replicaset has
 	 * committed something, which's impossible as soon as at least one node
 	 * becomes unavailable.
-	 * The only exception are local and temporary spaces, which only store
-	 * updates present on this particular node.
+	 * The only exception are local and data-temporary spaces, which only
+	 * store updates present on this particular node.
 	 */
-	if (!space_is_sync(space) && !space_is_temporary(space) &&
+	if (!space_is_sync(space) && !space_is_data_temporary(space) &&
 	    !space_is_local(space)) {
 		diag_set(ClientError, ER_UNSUPPORTED,
 			 tt_sprintf("space \"%s\"", space_name(space)),

@@ -2031,8 +2031,8 @@ space_check_truncate(struct space *space)
 
 /**
  * Check whether @a old_space holders prohibit alter to @a new_space_def.
- * For example if the space becomes temporary, there can be foreign keys
- * from non-temporary space, so this alter must not be allowed.
+ * For example if the space becomes data-temporary, there can be foreign keys
+ * from non-data-temporary space, so this alter must not be allowed.
  * Return 0 if allowed, or -1 if not allowed (diag is set).
  */
 static int
@@ -2044,9 +2044,11 @@ space_check_alter(struct space *old_space, struct space_def *new_space_def)
 	 * required below.
 	 */
 	assert(old_space->def->opts.group_id == new_space_def->opts.group_id);
-	/* Only alter from non-temporary to temporary can cause problems. */
-	if (space_is_temporary(old_space) ||
-	    !space_opts_is_temporary(&new_space_def->opts))
+	/* Only alter from non-data-temporary to data-temporary can cause
+	 * problems.
+	 */
+	if (space_is_data_temporary(old_space) ||
+	    !space_opts_is_data_temporary(&new_space_def->opts))
 		return 0;
 	/* Check for foreign keys that refers to this space. */
 	struct space_cache_holder *h;
@@ -2060,15 +2062,16 @@ space_check_alter(struct space *old_space, struct space_def *new_space_def)
 				     space_cache_holder);
 		struct space *other_space = constr->space;
 		/*
-		 * If the referring space is temporary too then the alter
+		 * If the referring space is data-temporary too then the alter
 		 * can't break foreign key consistency after restart.
 		 */
-		if (space_opts_is_temporary(&other_space->def->opts))
+		if (space_opts_is_data_temporary(&other_space->def->opts))
 			continue;
 		diag_set(ClientError, ER_ALTER_SPACE,
 			 space_name(old_space),
-			 tt_sprintf("foreign key '%s' from non-temporary space"
-				    " '%s' can't refer to temporary space",
+			 tt_sprintf("foreign key '%s' from non-data-temporary"
+				    " space '%s' can't refer to data-temporary"
+				    " space",
 				    constr->def.name, space_name(other_space)));
 		return -1;
 	}
@@ -2759,9 +2762,9 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	 * box_process1() bypasses the read-only check for the _truncate system
 	 * space because there the space that is going to be truncated isn't yet
 	 * known. Perform the check here if this statement was issued by this
-	 * replica and the space isn't temporary or local.
+	 * replica and the space isn't data-temporary or local.
 	 */
-	bool is_temp = space_is_temporary(old_space) ||
+	bool is_temp = space_is_data_temporary(old_space) ||
 		       space_is_local(old_space);
 	if (!is_temp && stmt->row->replica_id == 0 &&
 	    box_check_writable() != 0)
@@ -2798,7 +2801,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 
 	/*
 	 * Modify the WAL header to prohibit
-	 * replication of local & temporary
+	 * replication of local & data-temporary
 	 * spaces truncation.
 	 */
 	if (is_temp) {
