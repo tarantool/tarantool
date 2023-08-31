@@ -675,6 +675,7 @@ main(int argc, char **argv)
 	static instance_state instance;
 	/* The maximum possible number of Lua interpeter options */
 	int optc_max = (argc - 1) * 2;
+	bool say_entering_the_event_loop = true;
 	auto guard = make_scoped_guard([&optc, &optv]{ if (optc) free(optv); });
 
 	static struct option longopts[] = {
@@ -754,6 +755,12 @@ main(int argc, char **argv)
 			break;
 		case 'O':
 #if ENABLE_FAILOVER
+			/*
+			 * No much sense to print this message for
+			 * a standalone failover coordinator
+			 * service.
+			 */
+			say_entering_the_event_loop = false;
 			opt_mask |= O_FAILOVER;
 			break;
 #else
@@ -958,7 +965,8 @@ main(int argc, char **argv)
 		 */
 		start_loop = start_loop && ev_activecnt(loop()) > events;
 		if (start_loop) {
-			say_info("entering the event loop");
+			if (say_entering_the_event_loop)
+				say_info("entering the event loop");
 			systemd_snotify("READY=1");
 			ev_now_update(loop());
 			ev_run(loop(), 0);
