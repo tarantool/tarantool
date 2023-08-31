@@ -795,15 +795,7 @@ luaopen_tarantool(lua_State *L)
 	lua_pushstring(L, tarantool_version());
 	lua_setfield(L, LUA_GLOBALSINDEX, "_TARANTOOL");
 
-	/*
-	 * Get tarantool module.
-	 *
-	 * src/lua/init.lua is already registered as tarantool
-	 * module, so we `require` it here, not create.
-	 */
-	lua_getfield(L, LUA_GLOBALSINDEX, "require");
-	lua_pushstring(L, "tarantool");
-	lua_call(L, 1, 1);
+	luaT_newmodule(L, "tarantool", NULL);
 
 	/* package */
 	lua_pushstring(L, tarantool_package());
@@ -998,6 +990,7 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 #if defined(ENABLE_BACKTRACE)
 	backtrace_lua_init();
 #endif /* defined(ENABLE_BACKTRACE) */
+	luaopen_tarantool(L);
 	for (const char **s = lua_modules; *s; s += 2) {
 		const char *modname = *s;
 		const char *modsrc = *(s + 1);
@@ -1018,9 +1011,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 		builtin_modcache_put(modname, modsrc);
 	}
 	lua_pop(L, 1); /* _PRELOAD */
-
-	luaopen_tarantool(L);
-
 #ifdef NDEBUG
 	/* Unload strict after boot in release mode */
 	if (luaL_dostring(L, "require('strict').off()") != 0)
