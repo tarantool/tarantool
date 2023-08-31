@@ -363,7 +363,7 @@ luaT_newmodule(struct lua_State *L, const char *modname,
 	       const struct luaL_Reg *funcs)
 {
 	say_debug("%s(%s)", __func__, modname);
-	assert(modname != NULL && funcs != NULL);
+	assert(modname != NULL);
 
 	/* Get loaders.builtin. */
 	lua_getfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
@@ -379,7 +379,8 @@ luaT_newmodule(struct lua_State *L, const char *modname,
 	lua_newtable(L);
 
 	/* Fill the module table with functions. */
-	luaL_setfuncs(L, funcs, 0);
+	if (funcs != NULL)
+		luaL_setfuncs(L, funcs, 0);
 
 	/* Copy the module table. */
 	lua_pushvalue(L, -1);

@@ -1,8 +1,8 @@
-
 -- init.lua -- internal file
 
 local ffi = require('ffi')
 local loaders = require('internal.loaders')
+local tarantool = require('tarantool')
 
 ffi.cdef[[
 struct method_info;
@@ -211,7 +211,7 @@ local mt = {
     __serialize = filter_out_private_fields,
 }
 
-return setmetatable({
+local tarantool_lua = {
     uptime = uptime,
     pid = pid,
     _internal = {
@@ -219,4 +219,9 @@ return setmetatable({
         module_name_from_filename = module_name_from_filename,
         run_preload = run_preload,
     },
-}, mt)
+}
+-- tarantool module is already registered by src/lua/init.c
+for k, v in pairs(tarantool_lua) do
+    tarantool[k] = v
+end
+return setmetatable(tarantool, mt)
