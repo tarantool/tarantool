@@ -108,23 +108,6 @@ local function instance_sharding(iconfig, instance_name)
     }
 end
 
-local function apply_vars_f(data, w, vars)
-    if w.schema.type == 'string' and data ~= nil then
-        assert(type(data) == 'string')
-        return (data:gsub('{{ *(.-) *}}', function(var_name)
-            if vars[var_name] ~= nil then
-                return vars[var_name]
-            end
-            w.error(('Unknown variable %q'):format(var_name))
-        end))
-    end
-    return data
-end
-
-local function iconfig_apply_vars(iconfig, vars)
-    return instance_config:map(iconfig, apply_vars_f, vars)
-end
-
 function methods.sharding(self)
     local sharding = {}
     for _, group in pairs(self._cconfig.groups) do
@@ -137,7 +120,7 @@ function methods.sharding(self)
                 local iconfig = cluster_config:instantiate(self._cconfig,
                                                            instance_name)
                 iconfig = instance_config:apply_default(iconfig)
-                iconfig = iconfig_apply_vars(iconfig, vars)
+                iconfig = instance_config:apply_vars(iconfig, vars)
                 if lock == nil then
                     lock = instance_config:get(iconfig, 'sharding.lock')
                 end
@@ -218,8 +201,8 @@ local function new(iconfig, cconfig, instance_name)
     -- Substitute {{ instance_name }} with actual instance name in
     -- the original config and in the config with defaults.
     local vars = {instance_name = instance_name}
-    iconfig = iconfig_apply_vars(iconfig, vars)
-    iconfig_def = iconfig_apply_vars(iconfig_def, vars)
+    iconfig = instance_config:apply_vars(iconfig, vars)
+    iconfig_def = instance_config:apply_vars(iconfig_def, vars)
 
     -- Find myself in a cluster config, determine peers in the same
     -- replicaset.
@@ -248,8 +231,9 @@ local function new(iconfig, cconfig, instance_name)
         -- Substitute variables according to the instance name
         -- of the peer.
         local peer_vars = {instance_name = peer_name}
-        peer_iconfig = iconfig_apply_vars(peer_iconfig, peer_vars)
-        peer_iconfig_def = iconfig_apply_vars(peer_iconfig_def, peer_vars)
+        peer_iconfig = instance_config:apply_vars(peer_iconfig, peer_vars)
+        peer_iconfig_def = instance_config:apply_vars(peer_iconfig_def,
+            peer_vars)
 
         peers[peer_name] = {
             iconfig = peer_iconfig,
