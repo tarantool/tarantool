@@ -645,6 +645,7 @@ print_help(FILE *stream, const char *program)
 		" -j cmd                 perform LuaJIT control command\n"
 		" -b ...                 save or list bytecode\n"
 		" -d                     activate debugging session for script\n"
+		" --failover             run a failover coordinator (Enterprise Edition)\n"
 		" --                     stop handling options\n"
 		" -                      execute stdin and stop handling options\n"
 		"\n"
@@ -694,6 +695,11 @@ main(int argc, char **argv)
 		 */
 		{"help-env-list", no_argument, 0, 'E'},
 		{"force-recovery", no_argument, 0, 'F'},
+		/*
+		 * Use 'O' for --failover. See --help-env-list
+		 * above for details of the approach.
+		 */
+		{"failover", no_argument, 0, 'O'},
 		{NULL, 0, 0, 0},
 	};
 	static const char *opts = "+hVvb::ij:e:l:dc:n:";
@@ -746,6 +752,15 @@ main(int argc, char **argv)
 			lj_arg = true;
 			optind--;
 			break;
+		case 'O':
+#if ENABLE_FAILOVER
+			opt_mask |= O_FAILOVER;
+			break;
+#else
+			fprintf(stderr, "--failover CLI option is available "
+				"only in Tarantool Enterprise Edition\n");
+			return EX_USAGE;
+#endif
 		case 'e':
 			opt_mask |= O_EXECUTE;
 			FALLTHROUGH;
@@ -842,14 +857,17 @@ main(int argc, char **argv)
 	 * * Run a script pointed by a positional argument or
 	 *   written using -e option.
 	 * * Start interactive REPL (-i).
+	 * * Start a failover coordinator (--failover).
 	 */
-	uint32_t action_opt_mask = O_INTERACTIVE | O_EXECUTE | O_HELP_ENV_LIST;
+	uint32_t action_opt_mask = O_INTERACTIVE | O_EXECUTE | O_HELP_ENV_LIST |
+		O_FAILOVER;
 	if (script == NULL && (opt_mask & action_opt_mask) == 0 &&
 	    instance.name == NULL) {
 		static const char misuse_msg[] = "Invalid usage: "
 			"please either provide a Lua script name\n"
 			"or specify an instance name to be started\n"
-			"or set -i CLI flag to spawn Lua REPL.\n\n"
+			"or set -i CLI flag to spawn Lua REPL or run a\n"
+			"failover coordinator using --failover CLI option.\n\n"
 			;
 		fputs(misuse_msg, stderr);
 		print_help(stderr, basename(argv[0]));

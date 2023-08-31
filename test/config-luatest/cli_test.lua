@@ -131,3 +131,12 @@ g.test_force_recovery = function()
     t.assert_equals(res.exit_code, 0)
     t.assert_equals(res.stdout, 'false')
 end
+
+g.test_failover = function()
+    t.tarantool.skip_if_enterprise()
+    local opts = {nojson = true, stderr = true}
+    local res = justrun.tarantool('.', {}, {'--failover'}, opts)
+    t.assert_not_equals(res.exit_code, 0)
+    t.assert_equals(res.stderr, '--failover CLI option is available only in ' ..
+        'Tarantool Enterprise Edition')
+end

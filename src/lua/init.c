@@ -1102,6 +1102,7 @@ run_script_f(va_list ap)
 	bool bytecode = opt_mask & O_BYTECODE;
 	bool debugging = opt_mask & O_DEBUGGING;
 	bool help_env_list = opt_mask & O_HELP_ENV_LIST;
+	bool failover = opt_mask & O_FAILOVER;
 	/*
 	 * An error is returned via an external diag. A caller
 	 * can't use fiber_join(), because the script can call
@@ -1201,6 +1202,29 @@ run_script_f(va_list ap)
 		if (luaT_call(L, 3, 0) != 0)
 			goto error;
 		lua_settop(L, 0);
+	}
+
+	/* Start the failover script. */
+	if (failover) {
+		/*
+		 * local failover = require('internal.failover')
+		 * failover:_startup({config_file = <...>})
+		 */
+		if (lua_require_lib(L, "internal.failover") != 0)
+			goto error;
+		lua_pushstring(L, "_startup");
+		lua_gettable(L, -2);
+		lua_pushvalue(L, -2);
+
+		/* {config_file = <...>} */
+		lua_createtable(L, 0, 1);
+		lua_pushstring(L, instance->config);
+		lua_setfield(L, -2, "config_file");
+
+		if (luaT_call(L, 2, 0) != 0)
+			goto error;
+		lua_settop(L, 0);
+		goto end;
 	}
 
 	/*

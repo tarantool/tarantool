@@ -35,6 +35,7 @@ Options:
  -j cmd                 perform LuaJIT control command
  -b ...                 save or list bytecode
  -d                     activate debugging session for script
+ --failover             run a failover coordinator (Enterprise Edition)
  --                     stop handling options
  -                      execute stdin and stop handling options
 
@@ -78,6 +79,7 @@ Options:
  -j cmd                 perform LuaJIT control command
  -b ...                 save or list bytecode
  -d                     activate debugging session for script
+ --failover             run a failover coordinator (Enterprise Edition)
  --                     stop handling options
  -                      execute stdin and stop handling options
 

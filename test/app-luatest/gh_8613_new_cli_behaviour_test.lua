@@ -8,7 +8,8 @@ local misuse = {
     output = table.concat({
         'Invalid usage: please either provide a Lua script name',
         'or specify an instance name to be started',
-        'or set -i CLI flag to spawn Lua REPL.',
+        'or set -i CLI flag to spawn Lua REPL or run a',
+        'failover coordinator using --failover CLI option.'
     }, '\n'),
     pattern = false,
 }
