@@ -77,6 +77,7 @@
 #include "box/lua/space_upgrade.h"
 #include "box/lua/wal_ext.h"
 #include "box/lua/trigger.h"
+#include "box/lua/failover.h"
 
 #include "mpstream/mpstream.h"
 
@@ -397,6 +398,8 @@ static const char *lua_sources[] = {
 	config_init_lua,
 
 	/* }}} config */
+
+	FAILOVER_LUA_MODULES
 
 	NULL
 };

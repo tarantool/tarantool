@@ -56,6 +56,7 @@ struct instance_state {
 #define O_DEBUGGING   0x4
 #define O_EXECUTE     0x8
 #define O_HELP_ENV_LIST 0x10
+#define O_FAILOVER      0x20
 
 /** Returns true if the name refers to a built-in global Lua object. */
 bool

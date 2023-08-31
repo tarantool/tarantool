@@ -62,6 +62,10 @@ if (ENABLE_CONFIG_EXTRAS)
 endif()
 # }}} config
 
+if (ENABLE_FAILOVER)
+    lua_multi_source(lua_sources ${FAILOVER_LUA_SOURCES})
+endif()
+
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h bootstrap_bin)
 
