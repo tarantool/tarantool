@@ -347,6 +347,23 @@ local function instance_uri(self, iconfig, advertise_type)
     return nil
 end
 
+local function apply_vars_f(data, w, vars)
+    if w.schema.type == 'string' and data ~= nil then
+        assert(type(data) == 'string')
+        return (data:gsub('{{ *(.-) *}}', function(var_name)
+            if vars[var_name] ~= nil then
+                return vars[var_name]
+            end
+            w.error(('Unknown variable %q'):format(var_name))
+        end))
+    end
+    return data
+end
+
+local function apply_vars(self, iconfig, vars)
+    return self:map(iconfig, apply_vars_f, vars)
+end
+
 local function feedback_apply_default_if(_data, _w)
     return box.internal.feedback_daemon ~= nil
 end
@@ -1833,5 +1850,6 @@ return schema.new('instance_config', schema.record({
 }), {
     methods = {
         instance_uri = instance_uri,
+        apply_vars = apply_vars,
     },
 })
