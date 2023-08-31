@@ -589,34 +589,10 @@ tuple_compare_slowpath(struct tuple *tuple_a, hint_t tuple_a_hint,
 	int rc = 0;
 	if (!is_multikey && (rc = hint_cmp(tuple_a_hint, tuple_b_hint)) != 0)
 		return rc;
+	bool was_null_met = false;
 	struct key_part *part = key_def->parts;
 	const char *tuple_a_raw = tuple_data(tuple_a);
 	const char *tuple_b_raw = tuple_data(tuple_b);
-	if (key_def->part_count == 1 && part->fieldno == 0 &&
-	    (!has_json_paths || part->path == NULL)) {
-		/*
-		 * First field can not be optional - empty tuples
-		 * can not exist.
-		 */
-		assert(!has_optional_parts);
-		mp_decode_array(&tuple_a_raw);
-		mp_decode_array(&tuple_b_raw);
-		if (! is_nullable) {
-			return tuple_compare_field(tuple_a_raw, tuple_b_raw,
-						   part->type, part->coll);
-		}
-		enum mp_type a_type = mp_typeof(*tuple_a_raw);
-		enum mp_type b_type = mp_typeof(*tuple_b_raw);
-		if (a_type == MP_NIL)
-			return b_type == MP_NIL ? 0 : -1;
-		else if (b_type == MP_NIL)
-			return 1;
-		return tuple_compare_field_with_type(tuple_a_raw,  a_type,
-						     tuple_b_raw, b_type,
-						     part->type, part->coll);
-	}
-
-	bool was_null_met = false;
 	struct tuple_format *format_a = tuple_format(tuple_a);
 	struct tuple_format *format_b = tuple_format(tuple_b);
 	const uint32_t *field_map_a = tuple_field_map(tuple_a);
