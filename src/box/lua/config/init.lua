@@ -162,6 +162,15 @@ function methods._initialize(self)
     }))
 end
 
+-- Collect data from configuration sources.
+--
+-- Return instance config, cluster config and sources information.
+--
+-- This method doesn't store anything in the config object.
+--
+-- It can be used with self._instance_name == nil to obtain a
+-- cluster configuration. All the instance_name related checks are
+-- in the self:_store() method.
 function methods._collect(self, opts)
     assert(type(opts) == 'table')
     local sync_source = opts.sync_source
@@ -223,6 +232,16 @@ function methods._collect(self, opts)
             source.type, has_data and '' or ' (no data)'))
     end
 
+    return iconfig, cconfig, source_info
+end
+
+-- Store the given configuration in the config object.
+--
+-- The method accepts collected instance config, cluster config
+-- and configuration source information and based on the given
+-- values performs several checks and stores the configuration
+-- within the config object as a configdata object.
+function methods._store(self, iconfig, cconfig, source_info)
     if next(cconfig) == nil then
         local is_reload = self._status == 'reload_in_progress'
         local action = is_reload and 'Reload' or 'Startup'
@@ -360,7 +379,7 @@ function methods._startup(self, instance_name, config_file)
     -- read-only mode on this phase.
     --
     -- This phase may take a long time.
-    self:_collect({sync_source = 'all'})
+    self:_store(self:_collect({sync_source = 'all'}))
     local needs_retry = self:_apply_on_startup({phase = 1})
 
     -- Startup phase 2/2.
@@ -371,7 +390,7 @@ function methods._startup(self, instance_name, config_file)
     --
     -- Otherwise finish applying the existing configuration.
     if needs_retry then
-        self:_collect({sync_source = 'all'})
+        self:_store(self:_collect({sync_source = 'all'}))
         self:_apply()
     else
         self:_apply_on_startup({phase = 2})
@@ -413,7 +432,7 @@ function methods._reload_noexc(self, opts)
     self._metadata = {}
 
     local ok, err = pcall(function(opts)
-        self:_collect(opts)
+        self:_store(self:_collect(opts))
         self:_apply()
         self:_set_status_based_on_alerts()
         self:_post_apply()
