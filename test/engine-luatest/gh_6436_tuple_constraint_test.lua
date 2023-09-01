@@ -64,11 +64,11 @@ g.test_tuple_constraint_basics = function(cg)
 
             t.assert_equals(s:replace{1, 2, 3, field4}, {1, 2, 3, field4})
             t.assert_error_msg_content_equals(
-                "Check constraint 'tuple_constr1' failed for tuple",
+                "Check constraint 'tuple_constr1' failed for a tuple",
                 function() s:replace{100, 2, 3, field4} end
             )
             t.assert_error_msg_content_equals(
-                "Check constraint 'tuple_constr1' failed for tuple",
+                "Check constraint 'tuple_constr1' failed for a tuple",
                 function() s:replace{1, 200, 3, field4} end
             )
             t.assert_equals(s:select{}, {{1, 2, 3, field4}})
@@ -81,10 +81,10 @@ g.test_tuple_constraint_basics = function(cg)
         local s = c.space.test
         t.assert_equals(s:replace{1, 2, 3, field4}, {1, 2, 3, field4})
         t.assert_error_msg_content_equals(
-            "Check constraint 'tuple_constr1' failed for tuple",
+            "Check constraint 'tuple_constr1' failed for a tuple",
             function() s:replace{100, 2, 3, field4} end)
         t.assert_error_msg_content_equals(
-            "Check constraint 'tuple_constr1' failed for tuple",
+            "Check constraint 'tuple_constr1' failed for a tuple",
             function() s:replace{1, 200, 3, field4} end)
         t.assert_equals(s:select{}, {{1, 2, 3, field4}})
      end
@@ -321,15 +321,15 @@ g.test_several_tuple_constraints = function(cg)
 
             t.assert_equals(s:replace{1, 2, 3, field4}, {1, 2, 3, field4})
             t.assert_error_msg_content_equals(
-                "Check constraint 'check1' failed for tuple",
+                "Check constraint 'check1' failed for a tuple",
                 function() s:replace{100, 2, 3, field4} end
             )
             t.assert_error_msg_content_equals(
-                "Check constraint 'check2' failed for tuple",
+                "Check constraint 'check2' failed for a tuple",
                 function() s:replace{1, 200, 3, field4} end
             )
             t.assert_error_msg_content_equals(
-                "Check constraint 'check2' failed for tuple",
+                "Check constraint 'check2' failed for a tuple",
                 function() s:replace{1, 2, 300, field4} end
             )
             t.assert_equals(s:select{}, {{1, 2, 3, field4}})
@@ -342,13 +342,13 @@ g.test_several_tuple_constraints = function(cg)
         local s = c.space.test
         t.assert_equals(s:replace{1, 2, 3, field4}, {1, 2, 3, field4})
         t.assert_error_msg_content_equals(
-            "Check constraint 'check1' failed for tuple",
+            "Check constraint 'check1' failed for a tuple",
             function() s:replace{100, 2, 3, field4} end)
         t.assert_error_msg_content_equals(
-            "Check constraint 'check2' failed for tuple",
+            "Check constraint 'check2' failed for a tuple",
             function() s:replace{1, 200, 3, field4} end)
         t.assert_error_msg_content_equals(
-            "Check constraint 'check2' failed for tuple",
+            "Check constraint 'check2' failed for a tuple",
             function() s:replace{1, 2, 300, field4} end)
         t.assert_equals(s:select{}, {{1, 2, 3, field4}})
      end
@@ -437,7 +437,7 @@ g.test_tuple_constraint_integrity = function(cg)
         t.assert_equals(s.constraint, {tuple_constr1 = box.func.tuple_constr1.id})
         t.assert_equals(s:replace{1, 2, 3}, {1, 2, 3})
         t.assert_error_msg_content_equals(
-            "Check constraint 'tuple_constr1' failed for tuple",
+            "Check constraint 'tuple_constr1' failed for a tuple",
             function() s:replace{100, 2, 3} end
         )
     end, {engine})
@@ -476,18 +476,18 @@ g.test_tuple_constraint_integrity = function(cg)
 
         t.assert_equals(s:replace{100, 2, 3}, {100, 2, 3})
         t.assert_error_msg_content_equals(
-            "Check constraint 'check2' failed for tuple",
+            "Check constraint 'check2' failed for a tuple",
             function() s:replace{1, 200, 3} end
         )
         t.assert_equals(s:replace{1, 2, 300}, {1, 2, 300})
 
         t.assert_error_msg_content_equals(
-            "Check constraint 'check3' failed for tuple",
+            "Check constraint 'check3' failed for a tuple",
             function() s:alter{constraint = {check2='tuple_constr2',
                                              check3='tuple_constr3'}} end
         )
         t.assert_error_msg_content_equals(
-            "Check constraint 'check2' failed for tuple",
+            "Check constraint 'check2' failed for a tuple",
             function() s:replace{1, 200, 3} end
         )
 

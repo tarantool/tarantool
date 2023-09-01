@@ -1176,7 +1176,7 @@ test:do_catchsql_test(
         INSERT INTO T21 VALUES(2, -1, 1);
     ]], {
         -- <table-21.3>
-        1, "Check constraint 'ck_unnamed_T21_1' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T21_1' failed for a tuple"
         -- </table-21.3>
     })
 
@@ -1327,7 +1327,7 @@ test:do_catchsql_test(
         INSERT INTO T28 VALUES(0);
     ]], {
         -- <table-22.10>
-        1, "Check constraint 'CHECK1' failed for tuple"
+        1, "Check constraint 'CHECK1' failed for a tuple"
         -- </table-22.10>
     })
 
@@ -1337,7 +1337,7 @@ test:do_catchsql_test(
         INSERT INTO T28 VALUES(9);
     ]], {
         -- <table-22.11>
-        1, "Check constraint 'CHECK2' failed for tuple"
+        1, "Check constraint 'CHECK2' failed for a tuple"
         -- </table-22.11>
     })
 

@@ -534,15 +534,18 @@ g.test_constraints_11 = function()
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY,
                                      CONSTRAINT one CHECK (i > 10));]])
         local _, err = box.execute([[INSERT INTO t VALUES (1);]])
-        t.assert_equals(err.message, "Check constraint 'ONE' failed for tuple")
+        t.assert_equals(err.message,
+                        "Check constraint 'ONE' failed for a tuple")
         _, err = box.execute([[ALTER TABLE t DISABLE CHECK CONSTRAINT one;]])
         t.assert_equals(err.message, "Syntax error at line 1 near 'DISABLE'")
         _, err = box.execute([[INSERT INTO t VALUES (1);]])
-        t.assert_equals(err.message, "Check constraint 'ONE' failed for tuple")
+        t.assert_equals(err.message,
+                        "Check constraint 'ONE' failed for a tuple")
         _, err = box.execute([[ALTER TABLE t ENABLE CHECK CONSTRAINT one;]])
         t.assert_equals(err.message, "Syntax error at line 1 near 'ENABLE'")
         _, err = box.execute([[INSERT INTO t VALUES (1);]])
-        t.assert_equals(err.message, "Check constraint 'ONE' failed for tuple")
+        t.assert_equals(err.message,
+                        "Check constraint 'ONE' failed for a tuple")
 
         box.execute([[DROP TABLE t;]])
     end)

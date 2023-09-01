@@ -24,11 +24,11 @@ g.test_sql_func_expr_1 = function()
         s:alter{constraint='abc'}
         t.assert_equals(s:insert{3, 4}, {3, 4})
         t.assert_error_msg_content_equals(
-            "Check constraint 'abc' failed for tuple",
+            "Check constraint 'abc' failed for a tuple",
             function() s:insert{1, 2} end
         )
         t.assert_error_msg_content_equals(
-            "Check constraint 'abc' failed for tuple",
+            "Check constraint 'abc' failed for a tuple",
             function() s:insert{true, 2} end
         )
         box.space.test:drop()
@@ -101,7 +101,7 @@ g.test_sql_func_expr_3 = function()
         s:create_index('i')
         s:alter{constraint='abc'}
         t.assert_error_msg_content_equals(
-            "Check constraint 'abc' failed for tuple",
+            "Check constraint 'abc' failed for a tuple",
             function() s:insert{1, 1} end
         )
     end)
@@ -109,7 +109,7 @@ g.test_sql_func_expr_3 = function()
     g.server:exec(function()
         t.assert_equals(box.func.abc.language, 'SQL_EXPR')
         t.assert_error_msg_content_equals(
-            "Check constraint 'abc' failed for tuple",
+            "Check constraint 'abc' failed for a tuple",
             function() box.space.test:insert{2, 2} end
         )
         t.assert_equals(box.space.test:insert{7, 7}, {7, 7})
@@ -130,7 +130,7 @@ g.test_sql_func_expr_4 = function()
         s:alter{constraint='abc'}
         t.assert_equals(s:insert{3, 4}, {3, 4})
         t.assert_error_msg_content_equals(
-            "Check constraint 'abc' failed for tuple",
+            "Check constraint 'abc' failed for a tuple",
             function() s:insert{1, 2} end
         )
         box.space.test:drop()
@@ -150,7 +150,7 @@ g.test_sql_func_expr_4 = function()
         s:alter{constraint='abc'}
         t.assert_equals(s:insert{3, 4}, {3, 4})
         t.assert_error_msg_content_equals(
-            "Check constraint 'abc' failed for tuple",
+            "Check constraint 'abc' failed for a tuple",
             function() s:insert{1, 2} end
         )
         box.space.test:drop()

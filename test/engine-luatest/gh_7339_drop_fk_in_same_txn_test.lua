@@ -94,7 +94,7 @@ g.test_constraints_alter_in_txn = function(cg)
         a:replace{10, 10}
         b:replace{10, 10}
         a:insert{0, 0}
-        msg = "Check constraint 'ck1' failed for tuple"
+        msg = "Check constraint 'ck1' failed for a tuple"
         t.assert_error_msg_content_equals(msg, b.insert, b, {0, 0})
         a:insert{30, 30}
         msg = "Check constraint 'ck2' failed for field '1 (i)'"

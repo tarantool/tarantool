@@ -93,7 +93,7 @@ g.test_tuple_ck_fk_constraints = function(cg)
             function() user:replace({2, 99, 'Bob'}) end
         )
         t.assert_error_msg_content_equals(
-            "Check constraint 'check' failed for tuple",
+            "Check constraint 'check' failed for a tuple",
             function() user:replace{2, 100, 'Bob'} end
         )
     end, {engine})

@@ -288,7 +288,7 @@ struct errcode_record {
 	/*233 */_(ER_TUPLE_FIELD_COUNT_LIMIT,	"Tuple field count limit reached: see box.schema.FIELD_MAX") \
 	/*234 */_(ER_CREATE_CONSTRAINT,		"Failed to create constraint '%s' in space '%s': %s") \
 	/*235 */_(ER_FIELD_CONSTRAINT_FAILED,	"Check constraint '%s' failed for field '%s'") \
-	/*236 */_(ER_TUPLE_CONSTRAINT_FAILED,	"Check constraint '%s' failed for tuple") \
+	/*236 */_(ER_TUPLE_CONSTRAINT_FAILED,	"Check constraint '%s' failed for a tuple") \
 	/*237 */_(ER_CREATE_FOREIGN_KEY,	"Failed to create foreign key '%s' in space '%s': %s") \
 	/*238 */_(ER_FOREIGN_KEY_INTEGRITY,	"Foreign key '%s' integrity check failed: %s") \
 	/*239 */_(ER_FIELD_FOREIGN_KEY_FAILED,	"Foreign key constraint '%s' failed for field '%s': %s") \
