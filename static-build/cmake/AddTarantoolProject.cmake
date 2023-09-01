@@ -16,6 +16,8 @@ ExternalProject_Add(tarantool
         -DCMAKE_INSTALL_LOCALSTATEDIR=<INSTALL_DIR>/var
         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
         -DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}
+        # Ensure that no external dependencies are dynamically linked.
+        -DCMAKE_FIND_USE_CMAKE_SYSTEM_PATH=FALSE
         -DOPENSSL_USE_STATIC_LIBS=TRUE
         -DBUILD_STATIC=TRUE
         -DENABLE_DIST=TRUE
