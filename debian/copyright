@@ -181,7 +181,6 @@ Copyright: 2013, Red Hat, Inc
 License: GPL
 
 Files: third_party/qsort_arg.c
-    third_party/compat/sys/bsd_time.h
     third_party/queue.h
     third_party/rb.h
     src/lib/small/small/rb.h
