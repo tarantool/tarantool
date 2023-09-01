@@ -224,7 +224,7 @@ test:do_catchsql_test(
         CREATE TABLE t1 (id INT PRIMARY KEY);
         ALTER TABLE t1 ADD CONSTRAINT ck CHECK(id > 0);
         INSERT INTO t1 VALUES (-1);
-    ]], { 1, "Check constraint 'CK' failed for tuple" })
+    ]], { 1, "Check constraint 'CK' failed for a tuple" })
 
 -- Make sure that one can't create constraint with the same name twice.
 --

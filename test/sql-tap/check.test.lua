@@ -55,7 +55,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(6,7, 2);
     ]], {
         -- <check-1.3>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
         -- </check-1.3>
     })
 
@@ -75,7 +75,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(4,3, 2);
     ]], {
         -- <check-1.5>
-        1, "Check constraint 'ck_unnamed_T1_2' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T1_2' failed for a tuple"
         -- </check-1.5>
     })
 
@@ -95,7 +95,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(NULL,6, 4);
     ]], {
         -- <check-1.7>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
         -- </check-1.7>
     })
 
@@ -115,7 +115,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(2,NULL, 5);
     ]], {
         -- <check-1.9>
-        1, "Check constraint 'ck_unnamed_T1_2' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T1_2' failed for a tuple"
         -- </check-1.9>
     })
 
@@ -147,7 +147,7 @@ test:do_catchsql_test(
         UPDATE t1 SET x=7 WHERE x==2
     ]], {
         -- <check-1.12>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
         -- </check-1.12>
     })
 
@@ -167,7 +167,7 @@ test:do_catchsql_test(
         UPDATE t1 SET x=5 WHERE x==2
     ]], {
         -- <check-1.14>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
         -- </check-1.14>
     })
 
@@ -349,7 +349,7 @@ test:do_catchsql_test(
         INSERT INTO t3 VALUES(111,222,333);
     ]], {
         -- <check-3.9>
-        1, "Check constraint 'ck_unnamed_T3_1' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T3_1' failed for a tuple"
         -- </check-3.9>
     })
 
@@ -420,7 +420,7 @@ test:do_catchsql_test(
         UPDATE t4 SET x=0, y=1;
     ]], {
         -- <check-4.6>
-        1, "Check constraint 'ck_unnamed_T4_1' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T4_1' failed for a tuple"
         -- </check-4.6>
     })
 
@@ -440,7 +440,7 @@ test:do_catchsql_test(
         UPDATE t4 SET x=0, y=2;
     ]], {
         -- <check-4.9>
-        1, "Check constraint 'ck_unnamed_T4_1' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T4_1' failed for a tuple"
         -- </check-4.9>
     })
 
@@ -517,7 +517,7 @@ test:do_catchsql_test(
         UPDATE OR FAIL t1 SET x=7-x, y=y+1;
     ]], {
         -- <check-6.5>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
         -- </check-6.5>
     })
 
@@ -539,7 +539,7 @@ test:do_catchsql_test(
         INSERT OR ROLLBACK INTO t1 VALUES(8,40.0, 10);
     ]], {
         -- <check-6.7>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
         -- </check-6.7>
     })
 
@@ -572,7 +572,7 @@ test:do_catchsql_test(
         REPLACE INTO t1 VALUES(6,7, 11);
     ]], {
         -- <check-6.12>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
         -- </check-6.12>
     })
 

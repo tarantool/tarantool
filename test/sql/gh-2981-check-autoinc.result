@@ -29,7 +29,7 @@ box.execute("insert into t1 values (18, null);")
 box.execute("insert into t1(s2) values (null);")
 ---
 - null
-- Check constraint 'ck_unnamed_T1_1' failed for tuple
+- Check constraint 'ck_unnamed_T1_1' failed for a tuple
 ...
 box.execute("insert into t2 values (18, null);")
 ---
@@ -38,7 +38,7 @@ box.execute("insert into t2 values (18, null);")
 box.execute("insert into t2(s2) values (null);")
 ---
 - null
-- Check constraint 'ck_unnamed_T2_1' failed for tuple
+- Check constraint 'ck_unnamed_T2_1' failed for a tuple
 ...
 box.execute("insert into t2 values (24, null);")
 ---
@@ -47,7 +47,7 @@ box.execute("insert into t2 values (24, null);")
 box.execute("insert into t2(s2) values (null);")
 ---
 - null
-- Check constraint 'ck_unnamed_T2_1' failed for tuple
+- Check constraint 'ck_unnamed_T2_1' failed for a tuple
 ...
 box.execute("insert into t3 values (9, null)")
 ---
@@ -56,7 +56,7 @@ box.execute("insert into t3 values (9, null)")
 box.execute("insert into t3(s2) values (null)")
 ---
 - null
-- Check constraint 'ck_unnamed_T3_1' failed for tuple
+- Check constraint 'ck_unnamed_T3_1' failed for a tuple
 ...
 box.execute("DROP TABLE t1")
 ---

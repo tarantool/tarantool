@@ -26,7 +26,7 @@ g.test_c_constraint = function(cg)
         s:alter{constraint='gh_6986.get_check'}
         t.assert_equals(s:insert{1}, {1})
         t.assert_error_msg_content_equals(
-            "Check constraint 'gh_6986.get_check' failed for tuple",
+            "Check constraint 'gh_6986.get_check' failed for a tuple",
             function() s:insert{2} end
         )
         s:drop()

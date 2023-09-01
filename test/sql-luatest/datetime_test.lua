@@ -263,7 +263,7 @@ g.test_datetime_12 = function()
                       CAST(dt as STRING) != '2001-01-01T01:00:00Z'));]])
 
         local sql = [[INSERT INTO t SELECT * from t1 LIMIT 1;]]
-        local res = [[Check constraint 'CK' failed for tuple]]
+        local res = [[Check constraint 'CK' failed for a tuple]]
         local _, err = box.execute(sql)
         box.execute([[DROP TABLE t;]])
 

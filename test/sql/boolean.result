@@ -436,7 +436,7 @@ INSERT INTO t1 VALUES (1, false);
 INSERT INTO t1 VALUES (2, true);
  | ---
  | - null
- | - Check constraint 'CK' failed for tuple
+ | - Check constraint 'CK' failed for a tuple
  | ...
 
 -- Check interactions with FOREIGN KEY constraint.
