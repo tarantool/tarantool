@@ -2206,17 +2206,11 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
         real_width = real_width - 1
     end
 
-    -- Yaml wraps all strings that contain spaces with single quotes, and
-    -- does not wrap otherwise. Let's add some invisible spaces to every line
-    -- in order to make them similar in output.
-    local prefix = string.char(0xE2) .. string.char(0x80) .. string.char(0x8B)
-    if not use_nbsp then prefix = '' end
-
     local header_row_delim = fselect_type == 'jira' and '||' or '|'
     local result_row_delim = '|'
     local delim_row_delim = fselect_type == 'sql' and '+' or '|'
 
-    local delim_row = prefix .. delim_row_delim
+    local delim_row = delim_row_delim
     for j = 1,num_cols do
         delim_row = delim_row .. string.rep('-', widths[j]) .. delim_row_delim
     end
@@ -2235,12 +2229,7 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
         else
             str = x:sub(1, n)
         end
-        if use_nbsp then
-            -- replace spaces with &nbsp
-            return str:gsub("%s", string.char(0xC2) .. string.char(0xA0))
-        else
-            return str
-        end
+        return str
     end
 
     local res = {}
@@ -2248,7 +2237,7 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     -- insert into res a string with formatted row.
     local res_insert = function(row, is_header)
         local delim = is_header and header_row_delim or result_row_delim
-        local str_row = prefix .. delim
+        local str_row = delim
         local shrink = fselect_type == 'jira' and is_header and 1 or 0
         for j = 1,num_cols do
             str_row = str_row .. fmt_str(row[j], widths[j] - shrink) .. delim
@@ -2275,6 +2264,14 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
             print(line)
         end
         return {}
+    end
+    if use_nbsp then
+        -- Hack that prevents YAML encoder from quoting output string.
+        for i,line in ipairs(res) do
+            line = line:gsub(' ', '\u{00a0}')
+            line = line:gsub('|', '\u{01c0}')
+            res[i] = line
+        end
     end
     return res
 end
