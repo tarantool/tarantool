@@ -79,7 +79,7 @@ end
 -- unless KEEP_DATA environment variable is set to a
 -- non-empty value.
 function treegen.clean(g)
-    local dirs = table.copy(g.tempdirs)
+    local dirs = table.copy(g.tempdirs) or {}
     g.tempdirs = nil
 
     local keep_data = (os.getenv('KEEP_DATA') or '') ~= ''
