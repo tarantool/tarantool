@@ -2,8 +2,9 @@ local json = require('json')
 local it = require('test.interactive_tarantool')
 local t = require('luatest')
 local treegen = require('test.treegen')
+local helpers = require('test.config-luatest.helpers')
 
-local g = t.group()
+local g = helpers.group()
 
 local internal = require('internal.config.applier.credentials')._internal
 
@@ -559,4 +560,79 @@ g.test_set_password = function(g)
                         "error")
         child:close()
     end
+end
+
+g.test_remove_user_role = function(g)
+    -- Verify that when user or role is removed from the config,
+    -- it is not being deleted.
+
+    -- Whole removed user/role configuration is expected to be left
+    -- as is after the reload, so verification functions for before/after
+    -- reload are the same.
+    local verify = function()
+        local ok, err = pcall(box.schema.user.info, 'myuser')
+        t.assert(ok, err)
+        ok, err = pcall(box.schema.role.info, 'myrole')
+        t.assert(ok, err)
+        local internal =
+                require('internal.config.applier.credentials')._internal
+
+        local guest_perm = box.schema.user.info('guest')
+        guest_perm = internal.privileges_from_box(guest_perm)
+
+        t.assert(guest_perm['role']['super'].execute)
+
+        local user_perm = box.schema.user.info('myuser')
+        user_perm = internal.privileges_from_box(user_perm)
+
+        t.assert(user_perm['universe'][''].execute)
+
+        local role_perm = box.schema.role.info('myrole')
+        role_perm = internal.privileges_from_box(role_perm)
+
+        t.assert(role_perm['universe'][''].read)
+        t.assert(role_perm['universe'][''].write)
+    end
+
+    helpers.reload_success_case(g, {
+        options = {
+            credentials = {
+                roles = {
+                    myrole = {
+                        privileges = {{
+                            permissions = {
+                                'read',
+                                'write',
+                            },
+                            universe = true,
+                        }}
+                    },
+                },
+                users = {
+                    guest = {
+                        roles = { 'super' }
+                    },
+                    myuser = {
+                        privileges = {{
+                            permissions = {
+                                'execute',
+                            },
+                            universe = true,
+                        }},
+                    },
+                }
+            }
+        },
+        verify = verify,
+        options_2 = {
+            credentials = {
+                users = {
+                    guest = {
+                        roles = { 'super' }
+                    },
+                }
+            }
+        },
+        verify_2 = verify,
+    })
 end
