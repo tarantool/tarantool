@@ -150,6 +150,7 @@ function methods._initialize(self)
     self:_register_applier(require('internal.config.applier.console'))
     self:_register_applier(require('internal.config.applier.fiber'))
     self:_register_applier(require('internal.config.applier.sharding'))
+    self:_register_applier(require('internal.config.applier.roles'))
     self:_register_applier(require('internal.config.applier.app'))
 
     if extras ~= nil then
