@@ -1802,6 +1802,13 @@ return schema.new('instance_config', schema.record({
             "compatibility",
         }),
     })),
+    roles_cfg = schema.map({
+        key = schema.scalar({type = 'string'}),
+        value = schema.scalar({type = 'any'}),
+    }),
+    roles = schema.array({
+        items = schema.scalar({type = 'string'})
+    }),
 }, {
     -- This kind of validation cannot be implemented as the
     -- 'validate' annotation of a particular schema node. There

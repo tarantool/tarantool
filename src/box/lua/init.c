@@ -144,6 +144,7 @@ extern char session_lua[],
 	config_applier_credentials_lua[],
 	config_applier_fiber_lua[],
 	config_applier_mkdir_lua[],
+	config_applier_roles_lua[],
 	config_applier_sharding_lua[],
 	config_cluster_config_lua[],
 	config_configdata_lua[],
@@ -386,6 +387,10 @@ static const char *lua_sources[] = {
 	"config/applier/sharding",
 	"internal.config.applier.sharding",
 	config_applier_sharding_lua,
+
+	"config/applier/roles",
+	"internal.config.applier.roles",
+	config_applier_roles_lua,
 
 	"config/init",
 	"config",

@@ -88,11 +88,18 @@ local simple_config = {
 
 local function prepare_case(g, opts)
     local dir = opts.dir
+    local roles = opts.roles
     local script = opts.script
     local options = opts.options
 
     if dir == nil then
         dir = treegen.prepare_directory(g, {}, {})
+    end
+
+    if roles ~= nil and next(roles) ~= nil then
+        for name, body in pairs(roles) do
+            treegen.write_script(dir, name .. '.lua', body)
+        end
     end
 
     if script ~= nil then
@@ -135,6 +142,10 @@ end
 -- Start a server with the given script and the given
 -- configuration, run a verification function on it.
 --
+-- * opts.roles
+--
+--   Role codes for writing into corresponding files.
+--
 -- * opts.script
 --
 --   Code write into the main.lua file.
@@ -164,6 +175,7 @@ end
 -- Start tarantool process with the given script/config and check
 -- the error.
 --
+-- * opts.roles
 -- * opts.script
 -- * opts.options
 --
@@ -185,11 +197,16 @@ end
 -- Start a server, write a new script/config, reload, run a
 -- verification function.
 --
+-- * opts.roles
 -- * opts.script
 -- * opts.options
 -- * opts.verify
 --
 --   Same as in success_case().
+--
+-- * opts.roles_2
+--
+--   A new list of roles to prepare before config:reload().
 --
 -- * opts.script_2
 --
@@ -205,6 +222,7 @@ end
 --
 --   Verify test invariants after config:reload().
 local function reload_success_case(g, opts)
+    local roles_2 = opts.roles_2
     local script_2 = opts.script_2
     local options = assert(opts.options)
     local verify_2 = assert(opts.verify_2)
@@ -214,6 +232,7 @@ local function reload_success_case(g, opts)
 
     prepare_case(g, {
         dir = prepared.dir,
+        roles = roles_2,
         script = script_2,
         options = options_2,
     })
@@ -227,31 +246,44 @@ end
 -- Start a server, write a new script/config, reload, run a
 -- verification function.
 --
+-- * opts.roles
 -- * opts.script
 -- * opts.options
 -- * opts.verify
 --
 --   Same as in success_case().
 --
+-- * opts.roles_2
+--
+--   A new list of roles to prepare before config:reload().
+--
 -- * opts.script_2
 --
 --   A new script to write into the main.lua file before
 --   config:reload().
 --
+-- * opts.options_2
+--
+--   A new config to use for the config:reload(). It is optional,
+--   if not provided opts.options is used instead.
+--
 -- * opts.exp_err
 --
 --   An error that config:reload() must raise.
 local function reload_failure_case(g, opts)
-    local script_2 = assert(opts.script_2)
+    local script_2 = opts.script_2
+    local roles_2 = opts.roles_2
     local options = assert(opts.options)
+    local options_2 = opts.options_2 or options
     local exp_err = assert(opts.exp_err)
 
     local prepared = success_case(g, opts)
 
     prepare_case(g, {
         dir = prepared.dir,
+        roles = roles_2,
         script = script_2,
-        options = options,
+        options = options_2,
     })
     t.assert_error_msg_equals(exp_err, g.server.exec, g.server, function()
         local config = require('config')
