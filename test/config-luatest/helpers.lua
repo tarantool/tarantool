@@ -196,6 +196,11 @@ end
 --   A new script to write into the main.lua file before
 --   config:reload().
 --
+-- * opts.options_2
+--
+--   A new config to use for the config:reload(). It is optional,
+--   if not provided opts.options is used instead.
+--
 -- * opts.verify_2
 --
 --   Verify test invariants after config:reload().
@@ -203,13 +208,14 @@ local function reload_success_case(g, opts)
     local script_2 = opts.script_2
     local options = assert(opts.options)
     local verify_2 = assert(opts.verify_2)
+    local options_2 = opts.options_2 or options
 
     local prepared = success_case(g, opts)
 
     prepare_case(g, {
         dir = prepared.dir,
         script = script_2,
-        options = options,
+        options = options_2,
     })
     g.server:exec(function()
         local config = require('config')
