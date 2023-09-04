@@ -79,7 +79,7 @@ else()
     GetLibUnwindVersion(LIBUNWIND_VERSION)
 endif()
 
-find_package_handle_standard_args(GetLIBUNWINDVersion.cmake
+find_package_handle_standard_args(LibUnwind
       VERSION_VAR LIBUNWIND_VERSION
       REQUIRED_VARS LIBUNWIND_INCLUDE_DIR LIBUNWIND_LIBRARIES)
 
