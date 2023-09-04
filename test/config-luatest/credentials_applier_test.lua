@@ -636,3 +636,94 @@ g.test_remove_user_role = function(g)
         verify_2 = verify,
     })
 end
+
+g.test_restore_defaults_for_default_user = function(g)
+    -- Verify that if the default users and roles are not present in config
+    -- their excessive privileges are revoked (restored to built-in defaults).
+
+    helpers.reload_success_case(g, {
+        options = {
+            credentials = {
+                roles = {
+                    dummy = { },
+                    super = {
+                        roles = { 'dummy' },
+                    },
+                    public = {
+                        roles = { 'dummy' },
+                    },
+                    replication = {
+                        roles = { 'dummy' },
+                    },
+                },
+                users = {
+                    guest = {
+                        roles = { 'super', 'dummy' }
+                    },
+                    admin = {
+                        roles = { 'dummy' }
+                    },
+                }
+            }
+        },
+        verify = function()
+            local internal =
+                    require('internal.config.applier.credentials')._internal
+
+            local default_identities = {{
+                'user', 'admin',
+            }, {
+                'user', 'guest',
+            }, {
+                'role', 'super',
+            }, {
+                'role', 'public',
+            }, {
+                'role', 'replication',
+            },}
+
+            for _, id in ipairs(default_identities) do
+                local user_or_role, name = unpack(id)
+
+                local perm = box.schema[user_or_role].info(name)
+                perm = internal.privileges_from_box(perm)
+
+                t.assert_equals(perm['role']['dummy'], {execute = true})
+            end
+        end,
+        options_2 = {
+            credentials = {
+                users = {
+                    guest = {
+                        roles = { 'super' }
+                    }
+                }
+            }
+        },
+        verify_2 = function()
+            local internal =
+                    require('internal.config.applier.credentials')._internal
+
+            local default_identities = {{
+                'user', 'admin',
+            }, {
+                'user', 'guest',
+            }, {
+                'role', 'super',
+            }, {
+                'role', 'public',
+            }, {
+                'role', 'replication',
+            },}
+
+            for _, id in ipairs(default_identities) do
+                local user_or_role, name = unpack(id)
+
+                local perm = box.schema[user_or_role].info(name)
+                perm = internal.privileges_from_box(perm)
+
+                t.assert_not_equals(perm['role']['dummy'], {execute = true})
+            end
+        end,
+    })
+end

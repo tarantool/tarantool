@@ -493,6 +493,35 @@ local function apply(config)
         return
     end
 
+    -- Tarantool has the following roles and users present by default on every
+    -- instance:
+    --
+    -- Default roles:
+    -- * super
+    -- * public
+    -- * replication
+    --
+    -- Default users:
+    -- * guest
+    -- * admin
+    --
+    -- These roles and users have according privileges pre-granted by design.
+    -- Credentials applier adds such privileges with `priviliges_add_default()`
+    -- when syncing. So, for the excessive (non-default) privs to be removed,
+    -- these roles and users must be present inside configuration at least in a
+    -- form of an empty table. Otherwise, the privileges will be left unchanged,
+    -- similar to all used-defined roles and users.
+
+    credentials.roles = credentials.roles or {}
+    credentials.roles['super'] = credentials.roles['super'] or {}
+    credentials.roles['public'] = credentials.roles['public'] or {}
+    credentials.roles['replication'] = credentials.roles['replication'] or {}
+
+    credentials.users = credentials.users or {}
+    credentials.users['guest'] = credentials.users['guest'] or {}
+    credentials.users['admin'] = credentials.users['admin'] or {}
+
+    -- Create roles and users and synchronise privileges for them.
     create_roles(credentials.roles)
     create_users(credentials.users)
 end
