@@ -6,7 +6,12 @@ local xlog = require('xlog')
 local ffi = require('ffi')
 local fun = require('fun')
 
-ffi.cdef('uint32_t box_dd_version_id(void);')
+ffi.cdef([[
+    uint32_t box_dd_version_id(void);
+    int box_schema_upgrade_begin(void);
+    void box_schema_upgrade_end(void);
+]])
+local builtin = ffi.C
 
 -- Guest user id - the default user
 local GUEST = 0
@@ -1425,7 +1430,7 @@ local handlers = {
 
 -- Schema version of the snapshot.
 local function get_version()
-    local version = ffi.C.box_dd_version_id()
+    local version = builtin.box_dd_version_id()
     local major = bit.band(bit.rshift(version, 16), 0xff)
     local minor = bit.band(bit.rshift(version, 8), 0xff)
     local patch = bit.band(version, 0xff)
@@ -1548,8 +1553,22 @@ local function upgrade_from(version)
     end
 end
 
+-- Runs the given function with the permission to execute DDL operations
+-- with an old schema. Used by upgrade/downgrade scripts.
+local function run_upgrade(func, ...)
+    if builtin.box_schema_upgrade_begin() ~= 0 then
+        box.error()
+    end
+    local ok, err = pcall(func, ...)
+    builtin.box_schema_upgrade_end()
+    if not ok then
+        error(err)
+    end
+end
+
 local function upgrade()
-    upgrade_from(get_version())
+    local version = get_version()
+    run_upgrade(upgrade_from, version)
 end
 
 --------------------------------------------------------------------------------
@@ -1581,20 +1600,15 @@ local function restore_sql_builtin_functions(issue_handler)
     }
     local datetime = os.date("%Y-%m-%d %H:%M:%S")
     local _func = box.space._func
-    -- Otherwise we can't insert SQL_BUILTIN function. It is prohibited
-    -- to add since 2.9.0.
-    with_disabled_system_triggers(function()
-        for _, func in ipairs(sql_builtin_list) do
-            if _func.index.name:get(func) == nil then
-                local t = _func:auto_increment{
-                    ADMIN, func, 1, 'SQL_BUILTIN', '', 'function', {}, 'any',
-                    'none', 'none', false, false, true, {}, setmap({}), '',
-                    datetime, datetime}
-                box.space._priv:replace{ADMIN, PUBLIC, 'function', t.id,
-                                        box.priv.X}
-            end
+    for _, func in ipairs(sql_builtin_list) do
+        if _func.index.name:get(func) == nil then
+            local t = _func:auto_increment{
+                ADMIN, func, 1, 'SQL_BUILTIN', '', 'function', {}, 'any',
+                'none', 'none', false, false, true, {}, setmap({}), '',
+                datetime, datetime}
+            box.space._priv:replace{ADMIN, PUBLIC, 'function', t.id, box.priv.X}
         end
-    end)
+    end
 end
 
 local function downgrade_from_2_9_1(issue_handler)
@@ -1764,16 +1778,13 @@ local function drop_vspace_sequence_space(issue_handler)
     end
     log.info("revoke grants for 'public' role for _vspace_sequence")
     box.space._priv:delete{PUBLIC, 'space', box.schema.VSPACE_SEQUENCE_ID}
-    local indexes = box.space._index:select(box.schema.VSPACE_SEQUENCE_ID)
-    -- Otherwise we can't drop neither the primary index nor the space.
-    with_disabled_system_triggers(function()
-        for _, index in pairs(indexes) do
-            log.info("drop index %s on _vspace_sequence", index[3])
-            box.space._index:delete{index[1], index[2]}
-        end
-        log.info("drop view _vspace_sequence")
-        box.space._space:delete{box.schema.VSPACE_SEQUENCE_ID}
-    end)
+    for _, index in box.space._index:pairs(box.schema.VSPACE_SEQUENCE_ID,
+                                           {iterator = 'REQ'}) do
+        log.info("drop index %s on _vspace_sequence", index[3])
+        box.space._index:delete{index[1], index[2]}
+    end
+    log.info("drop view _vspace_sequence")
+    box.space._space:delete{box.schema.VSPACE_SEQUENCE_ID}
 end
 
 local function downgrade_from_2_10_5(issue_handler)
@@ -2087,7 +2098,9 @@ box.schema.upgrade = upgrade
 box.schema.downgrade_versions = function()
     return table.copy(downgrade_versions)
 end
-box.schema.downgrade = function(version) downgrade_impl(version, false) end
+box.schema.downgrade = function(version)
+    run_upgrade(downgrade_impl, version, false)
+end
 box.schema.downgrade_issues = function(version)
     return downgrade_impl(version, true)
 end
@@ -2096,3 +2109,7 @@ box.internal.schema_needs_upgrade = schema_needs_upgrade;
 box.internal.get_snapshot_version = get_snapshot_version;
 box.internal.set_recovery_triggers = set_recovery_triggers;
 box.internal.clear_recovery_triggers = clear_recovery_triggers;
+
+-- Export the run_upgrade() helper to let users perform schema upgrade
+-- manually in case box.schema.upgrade() failed.
+box.internal.run_schema_upgrade = run_upgrade

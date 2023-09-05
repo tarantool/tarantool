@@ -52,6 +52,15 @@ extern uint32_t dd_version_id;
 /** Triggers invoked after schema initialization. */
 extern struct rlist on_schema_init;
 
+/**
+ * Returns true if data dictionary checks may be skipped by the current fiber.
+ *
+ * We disable some data dictionary checks for schema upgrade and downgrade, for
+ * example, we allow dropping a system space.
+ */
+bool
+dd_check_is_disabled(void);
+
 /** \cond public */
 
 /**

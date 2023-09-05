@@ -2454,7 +2454,8 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		/*
 		 * Dropping the primary key in a system space: off limits.
 		 */
-		if (space_is_system(old_space)) {
+		if (!dd_check_is_disabled() &&
+		    space_is_system(old_space)) {
 			diag_set(ClientError, ER_LAST_DROP,
 				  space_name(old_space));
 			return -1;
@@ -3114,13 +3115,12 @@ func_def_new_from_tuple(struct tuple *tuple)
 		language = STR2ENUM(func_language, language_str);
 		/*
 		 * 'SQL_BUILTIN' was dropped in 2.9, but to support upgrade
-		 * from previous versions, we allow to create such functions
-		 * if the data dictionary version is older.
+		 * from previous versions, we allow to create such functions.
 		 */
 		if (language == func_language_MAX ||
 		    language == FUNC_LANGUAGE_SQL ||
 		    (language == FUNC_LANGUAGE_SQL_BUILTIN &&
-		     dd_version_id >= version_id(2, 9, 0))) {
+		     !dd_check_is_disabled())) {
 			diag_set(ClientError, ER_FUNCTION_LANGUAGE,
 				 language_str, tt_cstr(name, name_len));
 			return NULL;

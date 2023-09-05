@@ -100,6 +100,8 @@ box_region_used
 box_replace
 box_return_mp
 box_return_tuple
+box_schema_upgrade_begin
+box_schema_upgrade_end
 box_schema_version
 box_select_ffi
 box_sequence_current
