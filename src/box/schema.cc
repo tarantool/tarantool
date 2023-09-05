@@ -36,8 +36,10 @@
 #include "user.h"
 #include "vclock/vclock.h"
 #include "fiber.h"
+#include "session.h"
 #include "memtx_tx.h"
 #include "txn.h"
+#include "engine.h"
 
 /**
  * @module Data Dictionary
@@ -62,6 +64,9 @@ uint64_t schema_version = 0;
 /** Persistent version of the schema, stored in _schema["version"]. */
 uint32_t dd_version_id = 0;
 
+/** Fiber that is currently running a schema upgrade. */
+static struct fiber *schema_upgrade_fiber;
+
 struct rlist on_schema_init = RLIST_HEAD_INITIALIZER(on_schema_init);
 struct rlist on_alter_space = RLIST_HEAD_INITIALIZER(on_alter_space);
 struct rlist on_alter_sequence = RLIST_HEAD_INITIALIZER(on_alter_sequence);
@@ -79,6 +84,58 @@ uint32_t
 box_dd_version_id(void)
 {
 	return dd_version_id;
+}
+
+/**
+ * Should be called before starting a schema upgrade in the current fiber.
+ * Returns 0 on success. Sets diag and returns -1 if a schema upgrade is
+ * already running in another fiber.
+ *
+ * This function is required to enable DDL operations with an old schema,
+ * which is necessary to perform a schema upgrade. The calling fiber must
+ * call box_schema_upgrade_end() upon the schema upgrade completion.
+ *
+ * Called from Lua via FFI.
+ */
+extern "C" int
+box_schema_upgrade_begin(void)
+{
+	if (schema_upgrade_fiber != NULL) {
+		assert(schema_upgrade_fiber != fiber());
+		diag_set(ClientError, ER_SCHEMA_UPGRADE_IN_PROGRESS);
+		return -1;
+	}
+	schema_upgrade_fiber = fiber();
+	return 0;
+}
+
+/**
+ * Called from Lua via FFI upon completion of a schema upgrade.
+ * See box_schema_upgrade_begin().
+ */
+extern "C" void
+box_schema_upgrade_end(void)
+{
+	assert(schema_upgrade_fiber == fiber());
+	schema_upgrade_fiber = NULL;
+}
+
+bool
+dd_check_is_disabled(void)
+{
+	/*
+	 * We disable data dictionary checks in the following scenarios:
+	 *  - in the fiber that is currently running a schema upgrade or
+	 *    downgrade so that it can perform DDL operations required to
+	 *    modify the schema, in particular drop a system space;
+	 *  - in the applier fiber so that it can replicate changes done by
+	 *    a schema upgrade on the master;
+	 *  - during recovery so that DDL records written to the WAL can be
+	 *    replayed.
+	 */
+	return fiber() == schema_upgrade_fiber ||
+	       current_session()->type == SESSION_TYPE_APPLIER ||
+	       recovery_state != FINISHED_RECOVERY;
 }
 
 static int

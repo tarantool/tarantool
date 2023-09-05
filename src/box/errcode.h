@@ -324,7 +324,7 @@ struct errcode_record {
 	/*269 */_(ER_UNUSED3,			"") \
 	/*270 */_(ER_UNUSED4,			"") \
 	/*271 */_(ER_UNUSED5,			"") \
-	/*272 */_(ER_UNUSED6,			"") \
+	/*272 */_(ER_SCHEMA_UPGRADE_IN_PROGRESS, "Schema upgrade is already in progress") \
 	/*273 */_(ER_UNUSED7,			"") \
 	/*274 */_(ER_UNCONFIGURED,		"Please call box.cfg{} first") \
 
