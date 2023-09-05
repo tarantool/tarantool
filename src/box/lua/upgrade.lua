@@ -1627,20 +1627,15 @@ local function restore_sql_builtin_functions(issue_handler)
     }
     local datetime = os.date("%Y-%m-%d %H:%M:%S")
     local _func = box.space._func
-    -- Otherwise we can't insert SQL_BUILTIN function. It is prohibited
-    -- to add since 2.9.0.
-    with_disabled_system_triggers(function()
-        for _, func in ipairs(sql_builtin_list) do
-            if _func.index.name:get(func) == nil then
-                local t = _func:auto_increment{
-                    ADMIN, func, 1, 'SQL_BUILTIN', '', 'function', {}, 'any',
-                    'none', 'none', false, false, true, {}, setmap({}), '',
-                    datetime, datetime}
-                box.space._priv:replace{ADMIN, PUBLIC, 'function', t.id,
-                                        box.priv.X}
-            end
+    for _, func in ipairs(sql_builtin_list) do
+        if _func.index.name:get(func) == nil then
+            local t = _func:auto_increment{
+                ADMIN, func, 1, 'SQL_BUILTIN', '', 'function', {}, 'any',
+                'none', 'none', false, false, true, {}, setmap({}), '',
+                datetime, datetime}
+            box.space._priv:replace{ADMIN, PUBLIC, 'function', t.id, box.priv.X}
         end
-    end)
+    end
 end
 
 local function downgrade_from_2_9_1(issue_handler)
@@ -1810,16 +1805,13 @@ local function drop_vspace_sequence_space(issue_handler)
     end
     log.info("revoke grants for 'public' role for _vspace_sequence")
     box.space._priv:delete{PUBLIC, 'space', box.schema.VSPACE_SEQUENCE_ID}
-    local indexes = box.space._index:select(box.schema.VSPACE_SEQUENCE_ID)
-    -- Otherwise we can't drop neither the primary index nor the space.
-    with_disabled_system_triggers(function()
-        for _, index in pairs(indexes) do
-            log.info("drop index %s on _vspace_sequence", index[3])
-            box.space._index:delete{index[1], index[2]}
-        end
-        log.info("drop view _vspace_sequence")
-        box.space._space:delete{box.schema.VSPACE_SEQUENCE_ID}
-    end)
+    for _, index in box.space._index:pairs(box.schema.VSPACE_SEQUENCE_ID,
+                                           {iterator = 'REQ'}) do
+        log.info("drop index %s on _vspace_sequence", index[3])
+        box.space._index:delete{index[1], index[2]}
+    end
+    log.info("drop view _vspace_sequence")
+    box.space._space:delete{box.schema.VSPACE_SEQUENCE_ID}
 end
 
 local function downgrade_from_2_10_5(issue_handler)

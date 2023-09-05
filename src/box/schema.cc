@@ -153,6 +153,24 @@ box_schema_upgrade_end(void)
 	schema_upgrade_fiber = NULL;
 }
 
+bool
+dd_check_is_disabled(void)
+{
+	/*
+	 * We disable data dictionary checks in the following scenarios:
+	 *  - in the fiber that is currently running a schema upgrade or
+	 *    downgrade so that it can perform DDL operations required to
+	 *    modify the schema, in particular drop a system space;
+	 *  - in the applier fiber so that it can replicate changes done by
+	 *    a schema upgrade on the master;
+	 *  - during recovery so that DDL records written to the WAL can be
+	 *    replayed.
+	 */
+	return fiber() == schema_upgrade_fiber ||
+	       current_session()->type == SESSION_TYPE_APPLIER ||
+	       recovery_state != FINISHED_RECOVERY;
+}
+
 static int
 on_replace_dd_system_space(struct trigger *trigger, void *event)
 {
@@ -165,18 +183,9 @@ on_replace_dd_system_space(struct trigger *trigger, void *event)
 	}
 	/*
 	 * In general it's unsafe to execute a DDL operation with an old schema
-	 * so we only allow it
-	 *  - in the fiber that is currently running a schema upgrade because
-	 *    a schema upgrade implies DDL;
-	 *  - in the applier fiber so that it can replicate changes done by
-	 *    a schema upgrade on the master;
-	 *  - during recovery so that DDL records written to the WAL can be
-	 *    replayed.
+	 * so we only allow it for schema upgrade.
 	 */
-	if (recovery_state == FINISHED_RECOVERY &&
-	    fiber() != schema_upgrade_fiber &&
-	    current_session()->type != SESSION_TYPE_APPLIER &&
-	    box_schema_needs_upgrade())
+	if (!dd_check_is_disabled() && box_schema_needs_upgrade())
 		return -1;
 	memtx_tx_acquire_ddl(txn);
 	return 0;
