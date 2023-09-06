@@ -32,6 +32,24 @@ audit_log_check_filter(const char *filter)
 	return 0;
 }
 
+/**
+ * Logs disconnect event if it is enabled.
+ */
+static inline void
+audit_on_disconnect(void) {}
+
+/**
+ * Logs authenticate event if it is enabled.
+ */
+static inline void
+audit_on_auth(const char *user_name, size_t user_name_len,
+	      bool is_authenticated)
+{
+	(void)user_name;
+	(void)user_name_len;
+	(void)is_authenticated;
+}
+
 static inline void
 audit_log_init(const char *init_str, int log_nonblock, const char *format,
 	       const char *filter)

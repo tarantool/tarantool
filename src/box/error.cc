@@ -31,6 +31,7 @@
 #include "error.h"
 #include <stdio.h>
 
+#include "audit.h"
 #include "fiber.h"
 #include "rmean.h"
 #include "trigger.h"

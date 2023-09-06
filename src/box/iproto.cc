@@ -1777,10 +1777,8 @@ tx_process_disconnect(struct cmsg *m)
 		 * closed, its push() method is replaced with a stub.
 		 */
 		con->tx.is_push_pending = false;
-		if (! rlist_empty(&session_on_disconnect)) {
-			tx_fiber_init(con->session, 0);
-			session_run_on_disconnect_triggers(con->session);
-		}
+		tx_fiber_init(con->session, 0);
+		session_run_on_disconnect_triggers(con->session);
 	}
 }
 
