@@ -20,7 +20,7 @@ struct error_field {
 	/** Data size. */
 	uint32_t size;
 	/** Zero terminated field name. */
-	char name[1];
+	char *name;
 };
 
 /**
