@@ -138,6 +138,16 @@ lbox_pushfiber(struct lua_State *L, struct fiber *f)
 	lua_rawgeti(L, LUA_REGISTRYINDEX, fid_ref);
 }
 
+/**
+ * Returns fiber id for the fiber located at the given `index` on the Lua stack.
+ */
+static uint64_t
+lbox_checkfiberid(struct lua_State *L, int index)
+{
+	uint64_t *fid = luaL_checkudata(L, index, fiberlib_name);
+	return *fid;
+}
+
 static struct fiber *
 lbox_checkfiber(struct lua_State *L, int index)
 {
@@ -145,7 +155,7 @@ lbox_checkfiber(struct lua_State *L, int index)
 	if (lua_type(L, index) == LUA_TNUMBER) {
 		fid = luaL_touint64(L, index);
 	} else {
-		fid = *(uint64_t *)luaL_checkudata(L, index, fiberlib_name);
+		fid = lbox_checkfiberid(L, index);
 	}
 	struct fiber *f = fiber_find(fid);
 	if (f == NULL)
@@ -160,7 +170,7 @@ lbox_fiber_id(struct lua_State *L)
 	if (lua_gettop(L)  == 0)
 		fid = fiber()->fid;
 	else
-		fid = *(uint64_t *)luaL_checkudata(L, 1, fiberlib_name);
+		fid = lbox_checkfiberid(L, 1);
 	luaL_pushuint64(L, fid);
 	return 1;
 }
@@ -506,8 +516,8 @@ static struct fiber *
 lbox_get_fiber(struct lua_State *L)
 {
 	if (lua_gettop(L) != 0) {
-		uint64_t *fid = luaL_checkudata(L, 1, fiberlib_name);
-		return fiber_find(*fid);
+		uint64_t fid = lbox_checkfiberid(L, 1);
+		return fiber_find(fid);
 	} else {
 		return fiber();
 	}
@@ -726,12 +736,16 @@ lbox_fiber_cancel(struct lua_State *L)
 static int
 lbox_fiber_serialize(struct lua_State *L)
 {
-	struct fiber *f = lbox_checkfiber(L, 1);
+	uint64_t fid = lbox_checkfiberid(L, 1);
+	struct fiber *f = fiber_find(fid);
+
 	lua_createtable(L, 0, 1);
-	luaL_pushuint64(L, f->fid);
+	luaL_pushuint64(L, fid);
 	lua_setfield(L, -2, "id");
-	lua_pushstring(L, fiber_name(f));
-	lua_setfield(L, -2, "name");
+	if (f != NULL) {
+		lua_pushstring(L, fiber_name(f));
+		lua_setfield(L, -2, "name");
+	}
 	lbox_fiber_status(L);
 	lua_setfield(L, -2, "status");
 	return 1;
@@ -740,10 +754,12 @@ lbox_fiber_serialize(struct lua_State *L)
 static int
 lbox_fiber_tostring(struct lua_State *L)
 {
-	char buf[32];
-	struct fiber *f = lbox_checkfiber(L, 1);
-	snprintf(buf, sizeof(buf), "fiber: %llu",
-		 (long long)f->fid);
+	char buf[35];
+	uint64_t fid = lbox_checkfiberid(L, 1);
+	bool is_dead = fiber_find(fid) == NULL;
+
+	snprintf(buf, sizeof(buf), "fiber: %llu%s", (long long)fid,
+		 is_dead ? " (dead)" : "");
 	lua_pushstring(L, buf);
 	return 1;
 }
