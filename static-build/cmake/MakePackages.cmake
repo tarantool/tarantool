@@ -32,6 +32,16 @@ install(DIRECTORY tarantool-prefix/bin/ DESTINATION bin
         EXCLUDE_FROM_ALL
         FILES_MATCHING PATTERN "tarantool")
 
+install(DIRECTORY tarantool-prefix/share/man/man1 DESTINATION share/man/
+        USE_SOURCE_PERMISSIONS
+        COMPONENT server
+        EXCLUDE_FROM_ALL
+        FILES_MATCHING PATTERN "tarantool.1")
+
+install(FILES ../README.md
+        DESTINATION /usr/share/doc/tarantool
+        COMPONENT server)
+
 set(CPACK_GENERATOR "DEB;RPM")
 
 set(CPACK_PACKAGE_NAME "tarantool")
