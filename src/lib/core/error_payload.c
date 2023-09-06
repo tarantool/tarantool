@@ -6,6 +6,7 @@
 #include "error_payload.h"
 #include "mp_uuid.h"
 #include "msgpuck.h"
+#include "salad/grp_alloc.h"
 
 void
 error_payload_create(struct error_payload *p)
@@ -27,9 +28,7 @@ error_payload_destroy(struct error_payload *p)
 
 /**
  * Prepare a payload field to get a new value. If the field didn't exist, it is
- * added. If it existed then it is reallocated if was necessary and should be
- * overwritten. Name is already filled in the field. Only need to fill the
- * value.
+ * added. If it existed then it is reallocated.
  * Extra parameter allows to allocate extra memory for arbitrary usage after the
  * error field and its value.
  */
@@ -38,27 +37,30 @@ error_payload_prepare(struct error_payload *e, const char *name,
 		      uint32_t value_size, uint32_t extra)
 {
 	struct error_field *f;
-	uint32_t name_size = strlen(name) + 1;
-	uint32_t data_offset = offsetof(struct error_field, name[name_size]);
-	uint32_t total = data_offset + value_size + extra;
-
 	struct error_field **fields = e->fields;
+	struct grp_alloc all = grp_alloc_initializer();
 	int count = e->count;
 	int i;
 	for (i = 0; i < count; ++i) {
 		f = fields[i];
 		if (strcmp(name, f->name) != 0)
 			continue;
-		f = xrealloc(f, total);
-		goto set;
+		TRASH(f);
+		free(f);
+		goto alloc_field;
 	}
 	e->count = ++count;
 	fields = xrealloc(fields, sizeof(fields[0]) * count);
 	e->fields = fields;
-	f = xmalloc(total);
-	memcpy(f->name, name, name_size);
-set:
-	f->data = (char *)f + data_offset;
+alloc_field:
+	grp_alloc_reserve_data(&all, sizeof(*f));
+	grp_alloc_reserve_str0(&all, name);
+	grp_alloc_reserve_data(&all, value_size + extra);
+	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
+	f = grp_alloc_create_data(&all, sizeof(*f));
+	f->name = grp_alloc_create_str0(&all, name);
+	f->data = grp_alloc_create_data(&all, value_size + extra);
+	assert(grp_alloc_size(&all) == 0);
 	f->size = value_size;
 	fields[i] = f;
 	return f;

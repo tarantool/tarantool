@@ -18,7 +18,7 @@ typedef void (*error_f)(struct error *e);
 struct error_field {
     char *_data;
     uint32_t _size;
-    char _name[1];
+    char *_name;
 };
 
 struct error_payload {

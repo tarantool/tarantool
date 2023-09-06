@@ -678,13 +678,55 @@ test_xrow_decode_error_4(void)
 	footer();
 }
 
+static void
+test_xrow_decode_error_gh_9098(void)
+{
+	header();
+	plan(1);
+
+	uint8_t data[] = {
+		0x81, /* MP_MAP of 1 element */
+		0x52, /* IPROTO_ERROR: */
+		0x81, /* MP_MAP of 1 element */
+		0x00, /* MP_ERROR_STACK: */
+		0x91, /* MP_ARRAY of 1 element */
+		0x84, /* MP_MAP of 4 elements */
+		0x00, 0xa1, 0x00, /* MP_ERROR_TYPE: "" */
+		0x01, 0xa1, 0x00, /* MP_ERROR_FILE: "" */
+		0x03, 0xa1, 0x00, /* MP_ERROR_MESSAGE: "" */
+		0x06, /* MP_ERROR_FIELDS: */
+		0x81, /* MP_MAP of 1 element */
+		0xa1, 0x78, 0x2a /* "x": 42 */
+	};
+
+	struct iovec body;
+	body.iov_base = (void *)data;
+	body.iov_len = sizeof(data);
+
+	struct xrow_header row;
+	row.type = IPROTO_TYPE_ERROR;
+	row.body[0] = body;
+	row.bodycnt = 1;
+
+	xrow_decode_error(&row);
+
+	uint64_t payload_value;
+	struct error *e = diag_last_error(diag_get());
+	error_get_uint(e, "x", &payload_value);
+	is(payload_value, 42, "decoded payload");
+	diag_destroy(diag_get());
+
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	header();
-	plan(10);
+	plan(11);
 
 	random_init();
 
@@ -699,6 +741,7 @@ main(void)
 	test_xrow_decode_error_2();
 	test_xrow_decode_error_3();
 	test_xrow_decode_error_4();
+	test_xrow_decode_error_gh_9098();
 
 	random_free();
 	fiber_free();
