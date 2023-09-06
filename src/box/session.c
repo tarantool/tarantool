@@ -43,6 +43,8 @@
 #include "on_shutdown.h"
 #include "sql.h"
 #include "tweaks.h"
+#include "audit.h"
+#include "security.h"
 
 const char *session_type_strs[] = {
 	"background",
@@ -341,6 +343,7 @@ session_run_triggers(struct session *session, struct rlist *triggers)
 void
 session_run_on_disconnect_triggers(struct session *session)
 {
+	audit_on_disconnect();
 	if (session_run_triggers(session, &session_on_disconnect) != 0)
 		diag_log();
 }
@@ -354,6 +357,10 @@ session_run_on_connect_triggers(struct session *session)
 int
 session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result)
 {
+	audit_on_auth(result->user_name, result->user_name_len,
+		      result->is_authenticated);
+	security_on_auth(result->user_name, result->user_name_len,
+			 result->is_authenticated);
 	return trigger_run(&session_on_auth, (void *)result);
 }
 

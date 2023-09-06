@@ -31,6 +31,7 @@
 #include "error.h"
 #include <stdio.h>
 
+#include "audit.h"
 #include "fiber.h"
 #include "rmean.h"
 #include "trigger.h"
@@ -286,8 +287,10 @@ AccessDeniedError::AccessDeniedError(const char *file, unsigned int line,
 	 * Don't run the triggers when create after marshaling
 	 * through network.
 	 */
-	if (run_trigers)
+	if (run_trigers) {
+		audit_on_access_denied(access_type, object_type, object_name);
 		trigger_run(&on_access_denied, (void *) &ctx);
+	}
 	error_set_str(this, "object_type", object_type);
 	error_set_str(this, "object_name", object_name);
 	error_set_str(this, "access_type", access_type);

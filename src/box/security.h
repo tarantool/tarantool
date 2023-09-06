@@ -19,6 +19,19 @@ extern "C" {
 
 struct user;
 
+/**
+ * Registers an authentication delay for the given user if authentication
+ * failed and the feature is enabled.
+ */
+static inline void
+security_on_auth(const char *user_name, size_t user_name_len,
+		 bool is_authenticated)
+{
+	(void)user_name;
+	(void)user_name_len;
+	(void)is_authenticated;
+}
+
 static inline void
 security_init(void) {}
 
