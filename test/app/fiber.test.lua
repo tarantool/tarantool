@@ -387,7 +387,7 @@ fiber.create(function()end):name()
 --
 -- gh-1926
 --
-fiber.create(function() fiber.wakeup(fiber.self()) end)
+_ = fiber.create(function() fiber.wakeup(fiber.self()) end)
 
 --
 -- gh-2066 test for fiber wakeup
