@@ -182,7 +182,6 @@ g2.test_tarantool_module = function(cg)
     end)
     find_in_log(cg, 'Lua debug message 1', true)
     find_in_log(cg, 'C debug message 1', false)
-    find_in_log(cg, 'tuple_new', false) -- printed during create_space()
 
     cg.server:exec(function()
         local log = require('log')
@@ -195,7 +194,6 @@ g2.test_tarantool_module = function(cg)
     end)
     find_in_log(cg, 'Lua debug message 2', false)
     find_in_log(cg, 'C debug message 2', true)
-    find_in_log(cg, 'tuple_new', true) -- printed during create_space()
 
     -- Reset global log level to the default value ("info") and check
     -- that Tarantool C log level is still "debug".

@@ -98,7 +98,6 @@ vy_tuple_new(struct tuple_format *format, const char *data, const char *end)
 static void
 vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
-	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple_is_unreferenced(tuple));
 	/*
 	 * Turn off formats referencing in worker threads to avoid
@@ -181,8 +180,6 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t data_offset, uint32_t bsize)
 		diag_set(OutOfMemory, total_size, "malloc", "struct vy_stmt");
 		return NULL;
 	}
-	say_debug("vy_stmt_alloc(format = %d data_offset = %u, bsize = %u) = %p",
-		  format->id, data_offset, bsize, tuple);
 	tuple_create(tuple, 1, tuple_format_id(format),
 		     data_offset, bsize, false);
 	if (cord_is_main())

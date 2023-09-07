@@ -136,7 +136,6 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 	char *raw = (char *) tuple + data_offset;
 	field_map_build(&builder, raw - field_map_size);
 	memcpy(raw, data, data_len);
-	say_debug("%s(%zu) = %p", __func__, data_len, tuple);
 end:
 	region_truncate(region, region_svp);
 	return tuple;
@@ -146,7 +145,6 @@ static void
 runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	assert(format->vtab.tuple_delete == tuple_format_runtime_vtab.tuple_delete);
-	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->local_refs == 0);
 	assert(!tuple_has_flag(tuple, TUPLE_HAS_UPLOADED_REFS));
 	size_t total = tuple_size(tuple);
@@ -357,9 +355,6 @@ tuple_arena_create(struct slab_arena *arena, struct quota *quota,
 				       " tuple arena", prealloc, arena_name);
 		}
 	}
-
-	say_debug("tuple arena %s: addr %p size %zu flags %#x dontdump %d",
-		  arena_name, arena->arena, prealloc, flags, dontdump);
 }
 
 void
