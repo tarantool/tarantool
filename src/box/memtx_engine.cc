@@ -1726,7 +1726,6 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 	raw = (char *) tuple + data_offset;
 	field_map_build(&builder, raw - field_map_size);
 	memcpy(raw, data, tuple_len);
-	say_debug("%s(%zu) = %p", __func__, tuple_len, tuple);
 end:
 	region_truncate(region, region_svp);
 	return tuple;
@@ -1744,7 +1743,6 @@ static void
 memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	assert(tuple_is_unreferenced(tuple));
-	say_debug("%s(%p)", __func__, tuple);
 	MemtxAllocator<ALLOC>::free_tuple(tuple);
 	tuple_format_unref(format);
 }
