@@ -37,6 +37,7 @@
 #include "cbus.h"
 #include "errinj.h"
 #include "fiber.h"
+#include "memory.h"
 #include "say.h"
 
 #include "coio.h"
@@ -122,6 +123,14 @@ struct relay {
 	struct recovery *r;
 	/** Xstream argument to recovery */
 	struct xstream stream;
+	/** A region used to save rows when collecting transactions. */
+	struct lsregion lsregion;
+	/** A monotonically growing identifier for lsregion allocations. */
+	int64_t lsr_id;
+	/** The tsn of the currently read transaction. */
+	int64_t read_tsn;
+	/** A list of rows making up the currently read transaction. */
+	struct rlist current_tx;
 	/** Vclock to stop playing xlogs */
 	struct vclock stop_vclock;
 	/** Remote replica */
@@ -189,13 +198,6 @@ struct relay {
 	enum relay_state state;
 	/** Whether relay should speed up the next heartbeat dispatch. */
 	bool need_new_vclock_sync;
-	/**
-	 * Whether relay is in process of sending a tx to the remote peer. In
-	 * this case cannot interrupt the transaction stream with any heartbeats
-	 * or other requests.
-	 */
-	bool is_sending_tx;
-
 	struct {
 		/* Align to prevent false-sharing with tx thread */
 		alignas(CACHELINE_SIZE)
@@ -267,8 +269,10 @@ static void
 relay_send(struct relay *relay, struct xrow_header *packet);
 static void
 relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row);
+
+/** Process a single row from the WAL stream. */
 static void
-relay_send_row(struct xstream *stream, struct xrow_header *row);
+relay_process_row(struct xstream *stream, struct xrow_header *row);
 
 struct relay *
 relay_new(struct replica *replica)
@@ -343,10 +347,11 @@ relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	relay->state = RELAY_FOLLOW;
 	relay->sent_raft_term = sent_raft_term;
 	relay->need_new_vclock_sync = false;
-	relay->is_sending_tx = false;
 	relay->last_row_time = ev_monotonic_now(loop());
 	relay->tx_seen_time = relay->last_row_time;
 	relay->last_heartbeat_time = relay->last_row_time;
+	/* Never send rows for REPLICA_ID_NIL to anyone */
+	relay->id_filter = 1 << REPLICA_ID_NIL;
 }
 
 void
@@ -377,6 +382,7 @@ relay_exit(struct relay *relay)
 	 */
 	recovery_delete(relay->r);
 	relay->r = NULL;
+	lsregion_destroy(&relay->lsregion);
 }
 
 static void
@@ -431,6 +437,17 @@ relay_set_cord_name(int fd)
 		snprintf(name, sizeof(name), "relay/<unknown>");
 	}
 	cord_set_name(name);
+}
+
+static void
+relay_cord_init(struct relay *relay)
+{
+	coio_enable();
+	relay_set_cord_name(relay->io->fd);
+	lsregion_create(&relay->lsregion, &runtime);
+	relay->lsr_id = 0;
+	relay->read_tsn = 0;
+	rlist_create(&relay->current_tx);
 }
 
 void
@@ -514,8 +531,7 @@ relay_final_join_f(va_list ap)
 	struct relay *relay = va_arg(ap, struct relay *);
 	auto guard = make_scoped_guard([=] { relay_exit(relay); });
 
-	coio_enable();
-	relay_set_cord_name(relay->io->fd);
+	relay_cord_init(relay);
 
 	/* Send all WALs until stop_vclock */
 	assert(relay->stream.write != NULL);
@@ -538,7 +554,8 @@ relay_final_join(struct replica *replica, struct iostream *io, uint64_t sync,
 	struct relay *relay = replica->relay;
 	assert(relay->state != RELAY_FOLLOW);
 
-	relay_start(relay, io, sync, relay_send_row, relay_yield, UINT64_MAX);
+	relay_start(relay, io, sync, relay_process_row, relay_yield,
+		    UINT64_MAX);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
 	});
@@ -783,8 +800,6 @@ relay_reader_f(va_list ap)
 static inline void
 relay_send_heartbeat(struct relay *relay)
 {
-	if (relay->is_sending_tx)
-		return;
 	struct xrow_header row;
 	try {
 		++relay->last_sent_ack.vclock_sync;
@@ -965,8 +980,7 @@ relay_subscribe_f(va_list ap)
 {
 	struct relay *relay = va_arg(ap, struct relay *);
 
-	coio_enable();
-	relay_set_cord_name(relay->io->fd);
+	relay_cord_init(relay);
 
 	cbus_endpoint_create(&relay->tx_endpoint,
 			     tt_sprintf("relay_tx_%p", relay),
@@ -1104,7 +1118,7 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 
 	if (replica_version_id < version_id(2, 6, 0) || replica->anon)
 		sent_raft_term = UINT64_MAX;
-	relay_start(relay, io, sync, relay_send_row,
+	relay_start(relay, io, sync, relay_process_row,
 		    relay_yield_and_send_heartbeat, sent_raft_term);
 	replica_on_relay_follow(replica);
 	auto relay_guard = make_scoped_guard([=] {
@@ -1121,7 +1135,7 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 	vclock_copy(&relay->tx.vclock, replica_clock);
 	relay->version_id = replica_version_id;
 
-	relay->id_filter = replica_id_filter;
+	relay->id_filter |= replica_id_filter;
 
 	int rc = cord_costart(&relay->cord, "subscribe",
 			      relay_subscribe_f, relay);
@@ -1210,39 +1224,14 @@ relay_push_raft(struct relay *relay, const struct raft_request *req)
 	relay_push_raft_msg(relay);
 }
 
-/** Send a single row to the client. */
-static void
-relay_send_row(struct xstream *stream, struct xrow_header *packet)
+/** Check if a row should be sent to a remote replica. */
+static bool
+relay_filter_row(struct relay *relay, struct xrow_header *packet)
 {
-	struct relay *relay = container_of(stream, struct relay, stream);
 	assert(cord() == &relay->cord);
 	assert(fiber()->f == relay_subscribe_f ||
 	       fiber()->f == relay_final_join_f);
 	bool is_subscribe = fiber()->f == relay_subscribe_f;
-	/* Do not send heartbeats during a final join. */
-	if (is_subscribe)
-		relay_send_heartbeat_on_timeout(relay);
-	if (packet->group_id == GROUP_LOCAL) {
-		/*
-		 * We do not relay replica-local rows to other
-		 * instances, since we started signing them with
-		 * a zero instance id. However, if replica-local
-		 * rows, signed with a non-zero id are present in
-		 * our WAL, we still need to relay them as NOPs in
-		 * order to correctly promote the vclock on the
-		 * replica.
-		 */
-		if (packet->replica_id == REPLICA_ID_NIL)
-			return;
-		packet->type = IPROTO_NOP;
-		packet->group_id = GROUP_DEFAULT;
-		packet->bodycnt = 0;
-	}
-	assert(iproto_type_is_dml(packet->type) ||
-	       iproto_type_is_synchro_request(packet->type));
-	/* Check if the rows from the instance are filtered. */
-	if ((1 << packet->replica_id & relay->id_filter) != 0)
-		return;
 	/*
 	 * We're feeding a WAL, thus responding to FINAL JOIN or SUBSCRIBE
 	 * request. If this is FINAL JOIN (i.e. relay->replica is NULL),
@@ -1255,9 +1244,95 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 	 * it). In the latter case packet's LSN is less than or equal to
 	 * local master's LSN at the moment it received 'SUBSCRIBE' request.
 	 */
-	if (!is_subscribe || packet->replica_id != relay->replica->id ||
-	    packet->lsn <= vclock_get(&relay->local_vclock_at_subscribe,
-				      packet->replica_id)) {
+	if ((1 << packet->replica_id & relay->id_filter) != 0) {
+		return false;
+	} else if (is_subscribe && packet->replica_id == relay->replica->id &&
+		   packet->lsn > vclock_get(&relay->local_vclock_at_subscribe,
+					    packet->replica_id)) {
+		/*
+		 * Knowing that recovery goes for LSNs in ascending order,
+		 * filter out this replica id to skip the expensive check above.
+		 * It'll always be true from now on for this relay.
+		 */
+		relay->id_filter |= 1 << packet->replica_id;
+		return false;
+	}
+
+	if (packet->group_id == GROUP_LOCAL) {
+		/*
+		 * All packets with REPLICA_ID_NIL are filtered out by
+		 * id_filter. The remaining ones are from old tarantool
+		 * versions, when local rows went by normal replica id. We have
+		 * to relay them as NOPs for the sake of vclock convergence.
+		 */
+		assert(packet->replica_id != REPLICA_ID_NIL);
+		packet->type = IPROTO_NOP;
+		packet->group_id = GROUP_DEFAULT;
+		packet->bodycnt = 0;
+	}
+
+	/*
+	 * This is not a filter, but still seems to be the best place for this
+	 * code. PROMOTE/DEMOTE should be sent only after corresponding RAFT
+	 * term was already sent. We assume that PROMOTE/DEMOTE will arrive
+	 * after RAFT term, otherwise something might break.
+	 */
+	if (iproto_type_is_promote_request(packet->type)) {
+		struct synchro_request req;
+		xrow_decode_synchro(packet, &req);
+		while (relay->sent_raft_term < req.term) {
+			if (fiber_is_cancelled()) {
+				diag_set(FiberIsCancelled);
+				diag_raise();
+			}
+			cbus_process(&relay->tx_endpoint);
+			if (relay->sent_raft_term >= req.term)
+				break;
+			fiber_yield();
+		}
+	}
+	return true;
+}
+
+/**
+ * A helper struct to collect all rows to be sent in scope of a transaction
+ * into a single list.
+ */
+struct relay_row {
+	/** A transaction row. */
+	struct xrow_header row;
+	/** A link in all transaction rows. */
+	struct rlist in_tx;
+};
+
+/** Save a single transaction row for the future use. */
+static void
+relay_save_row(struct relay *relay, struct xrow_header *packet)
+{
+	struct relay_row *tx_row = xlsregion_alloc_object(&relay->lsregion,
+							  ++relay->lsr_id,
+							  struct relay_row);
+	struct xrow_header *row = &tx_row->row;
+	*row = *packet;
+	if (packet->bodycnt == 1) {
+		size_t len = packet->body[0].iov_len;
+		void *new_body = xlsregion_alloc(&relay->lsregion, len,
+						 ++relay->lsr_id);
+		memcpy(new_body, packet->body[0].iov_base, len);
+		row->body[0].iov_base = new_body;
+	}
+	rlist_add_tail_entry(&relay->current_tx, tx_row, in_tx);
+}
+
+/** Send a full transaction to the replica. */
+static void
+relay_send_tx(struct relay *relay)
+{
+	struct relay_row *item;
+
+	rlist_foreach_entry(item, &relay->current_tx, in_tx) {
+		struct xrow_header *packet = &item->row;
+
 		struct errinj *inj = errinj(ERRINJ_RELAY_BREAK_LSN,
 					    ERRINJ_INT);
 		if (inj != NULL && packet->lsn == inj->iparam) {
@@ -1266,27 +1341,42 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 			say_warn("injected broken lsn: %lld",
 				 (long long) packet->lsn);
 		}
-		if (iproto_type_is_promote_request(packet->type)) {
-			struct synchro_request req;
-			xrow_decode_synchro(packet, &req);
-			/*
-			 * PROMOTE/DEMOTE should be sent only after
-			 * corresponding RAFT term was already sent.
-			 * We assume that PROMOTE/DEMOTE will arive after RAFT
-			 * term, otherwise something might break.
-			 */
-			while (relay->sent_raft_term < req.term) {
-				if (fiber_is_cancelled()) {
-					diag_set(FiberIsCancelled);
-					diag_raise();
-				}
-				cbus_process(&relay->tx_endpoint);
-				if (relay->sent_raft_term >= req.term)
-					break;
-				fiber_yield();
-			}
-		}
 		relay_send(relay, packet);
-		relay->is_sending_tx = !packet->is_commit;
 	}
+
+	rlist_create(&relay->current_tx);
+	lsregion_gc(&relay->lsregion, relay->lsr_id);
+}
+
+static void
+relay_process_row(struct xstream *stream, struct xrow_header *packet)
+{
+	struct relay *relay = container_of(stream, struct relay, stream);
+	struct rlist *current_tx = &relay->current_tx;
+
+	if (relay->read_tsn == 0) {
+		rlist_create(current_tx);
+		relay->read_tsn = packet->tsn;
+	} else if (relay->read_tsn != packet->tsn) {
+		tnt_raise(ClientError, ER_PROTOCOL, "Found a new transaction "
+			  "with previous one not yet committed");
+	}
+
+	if (!packet->is_commit) {
+		if (relay_filter_row(relay, packet)) {
+			relay_save_row(relay, packet);
+		}
+		return;
+	}
+	if (relay_filter_row(relay, packet)) {
+		relay_save_row(relay, packet);
+	} else if (rlist_empty(current_tx)) {
+		relay->read_tsn = 0;
+		return;
+	} else {
+		rlist_last_entry(current_tx, struct relay_row,
+				 in_tx)->row.flags = packet->flags;
+	}
+	relay_send_tx(relay);
+	relay->read_tsn = 0;
 }
