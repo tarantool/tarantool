@@ -45,7 +45,7 @@ for i = 1, 10000 - 1, 1 do
     test:do_test(
         "atof1-1."..i..".2",
         function()
-            local y = test:execsql(string.format("SELECT %s=CAST(quote(%s) AS NUMBER)",x, x))
+            local y = test:execsql(string.format("SELECT %s=CAST(QUOTE(%s) AS NUMBER)",x, x))
             return y
         end, {
             true

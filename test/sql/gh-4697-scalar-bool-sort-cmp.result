@@ -25,10 +25,10 @@ INSERT INTO test VALUES (3, NULL, NULL);
 -- scalar. Result with order by indexed (using index) and
 -- non-indexed (using no index) must be the same.
 --
-SELECT s2, typeof(s2) FROM SEQSCAN test ORDER BY s2;
+SELECT s2, TYPEOF(s2) FROM SEQSCAN test ORDER BY s2;
  | ---
  | - metadata:
- |   - name: S2
+ |   - name: s2
  |     type: scalar
  |   - name: COLUMN_1
  |     type: string
@@ -38,10 +38,10 @@ SELECT s2, typeof(s2) FROM SEQSCAN test ORDER BY s2;
  |   - [1, 'scalar']
  |   - [1.1, 'scalar']
  | ...
-SELECT s3, typeof(s3) FROM SEQSCAN test ORDER BY s3;
+SELECT s3, TYPEOF(s3) FROM SEQSCAN test ORDER BY s3;
  | ---
  | - metadata:
- |   - name: S3
+ |   - name: s3
  |     type: scalar
  |   - name: COLUMN_1
  |     type: string

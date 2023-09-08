@@ -173,7 +173,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "selectC-1.12.1",
     [[
-        SELECT DISTINCT upper(b) AS x
+        SELECT DISTINCT UPPER(b) AS x
           FROM t1
          ORDER BY x
     ]], {
@@ -198,7 +198,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "selectC-1.13.1",
     [[
-        SELECT upper(b) AS x
+        SELECT UPPER(b) AS x
           FROM t1
          GROUP BY x
          ORDER BY x
@@ -225,7 +225,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "selectC-1.14.1",
     [[
-        SELECT upper(b) AS x
+        SELECT UPPER(b) AS x
           FROM t1
          ORDER BY x DESC
     ]], {
@@ -303,7 +303,7 @@ test:do_execsql_test(
         CREATE TABLE t2(a  TEXT PRIMARY KEY, b TEXT);
         INSERT INTO t2 VALUES('abc', 'xxx');
         INSERT INTO t2 VALUES('def', 'yyy');
-        SELECT a, max(b || a) FROM t2 WHERE (b||b||b)!='value' GROUP BY a;
+        SELECT a, MAX(b || a) FROM t2 WHERE (b||b||b)!='value' GROUP BY a;
     ]], {
         -- <selectC-3.2>
         "abc", "xxxabc", "def", "yyydef"
@@ -313,7 +313,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "selectC-3.3",
     [[
-        SELECT b, max(a || b) FROM t2 WHERE (b||b||b)!='value' GROUP BY a;
+        SELECT b, MAX(a || b) FROM t2 WHERE (b||b||b)!='value' GROUP BY a;
     ]], {
         -- <selectC-3.3>
         "xxx", "abcxxx", "yyy", "defyyy"

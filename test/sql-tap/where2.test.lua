@@ -150,7 +150,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-1.1>
-        85, 6, 7396, 7402, "nosort", "T1", "*"
+        85, 6, 7396, 7402, "nosort", "t1", "*"
         -- </where2-1.1>
     })
 
@@ -167,11 +167,11 @@ test:do_test(
     "where2-2.1",
     function()
         return queryplan([[
-    SELECT * FROM t1 WHERE w=85 ORDER BY random();
+    SELECT * FROM t1 WHERE w=85 ORDER BY RANDOM();
   ]])
     end, {
         -- <where2-2.1>
-        85, 6, 7396, 7402, "sort", "T1", "*"
+        85, 6, 7396, 7402, "sort", "t1", "*"
         -- </where2-2.1>
     })
 
@@ -179,11 +179,11 @@ test:do_test(
     "where2-2.2",
     function()
         return queryplan([[
-    SELECT * FROM t1 WHERE x=6 AND y=7396 ORDER BY random();
+    SELECT * FROM t1 WHERE x=6 AND y=7396 ORDER BY RANDOM();
   ]])
     end, {
         -- <where2-2.2>
-        85, 6, 7396, 7402, "sort", "T1", "I1XY"
+        85, 6, 7396, 7402, "sort", "t1", "i1xy"
         -- </where2-2.2>
     })
 
@@ -202,7 +202,7 @@ test:do_test(
             INSERT INTO x2 VALUES(1);
         ]]
         local sql, out1, out2, out3
-        sql = "SELECT * FROM x1, x2 WHERE x=1 ORDER BY random()"
+        sql = "SELECT * FROM x1, x2 WHERE x=1 ORDER BY RANDOM()"
         out1 = test:execsql(sql)
         out2 = test:execsql(sql)
         out3 = test:execsql(sql)
@@ -216,8 +216,8 @@ test:do_test(
 test:do_execsql_test(
     "where2-2.5",
     [[
-        -- random() is not optimized out
-        EXPLAIN SELECT * FROM x1, x2 WHERE x=1 ORDER BY random();
+        -- RANDOM() is not optimized out
+        EXPLAIN SELECT * FROM x1, x2 WHERE x=1 ORDER BY RANDOM();
     ]], {
         -- <where2-2.5>
         "/RANDOM/"
@@ -227,8 +227,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "where2-2.5b",
     [[
-        -- random() is not optimized out
-        EXPLAIN SELECT * FROM x1, x2 WHERE x=1 ORDER BY random();
+        -- RANDOM() is not optimized out
+        EXPLAIN SELECT * FROM x1, x2 WHERE x=1 ORDER BY RANDOM();
     ]], {
         -- <where2-2.5b>
         "/SorterOpen/"
@@ -240,7 +240,7 @@ test:do_execsql_test(
     "where2-2.6",
     [[
         -- other constant functions are optimized out
-        EXPLAIN SELECT * FROM x1, x2 WHERE x=1 ORDER BY abs(5);
+        EXPLAIN SELECT * FROM x1, x2 WHERE x=1 ORDER BY ABS(5);
     ]], {
         -- <where2-2.6>
         "~/ABS/"
@@ -251,7 +251,7 @@ test:do_execsql_test(
     "where2-2.6b",
     [[
         -- other constant functions are optimized out
-        EXPLAIN SELECT * FROM x1, x2 WHERE x=1 ORDER BY abs(5);
+        EXPLAIN SELECT * FROM x1, x2 WHERE x=1 ORDER BY ABS(5);
     ]], {
         -- <where2-2.6b>
         "~/SorterOpen/"
@@ -282,7 +282,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.1>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", "I1ZYX"
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", "i1zyx"
         -- </where2-4.1>
     })
 
@@ -296,7 +296,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.2>
-        99, 6, 10000, 10006, "sort", "T1", "I1ZYX"
+        99, 6, 10000, 10006, "sort", "t1", "i1zyx"
         -- </where2-4.2>
     })
 
@@ -310,7 +310,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.3>
-        99, 6, 10000, 10006, "sort", "T1", "I1ZYX"
+        99, 6, 10000, 10006, "sort", "t1", "i1zyx"
         -- </where2-4.3>
     })
 
@@ -325,7 +325,7 @@ test:do_test(
       ]])
     end, {
         -- <where2-4.4>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", "I1ZYX"
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", "i1zyx"
         -- </where2-4.4>
     })
 
@@ -340,7 +340,7 @@ test:do_test(
       ]])
     end, {
         -- <where2-4.5>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", "I1ZYX"
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", "i1zyx"
         -- </where2-4.5>
     })
 
@@ -357,7 +357,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.6a>
-        99, 6, 10000, 10006, "nosort", "T1", "I1XY"
+        99, 6, 10000, 10006, "nosort", "t1", "i1xy"
         -- </where2-4.6a>
     })
 
@@ -372,7 +372,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.6b>
-        99, 6, 10000, 10006, "nosort", "T1", "I1XY"
+        99, 6, 10000, 10006, "nosort", "t1", "i1xy"
         -- </where2-4.6b>
     })
 
@@ -387,7 +387,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.6c>
-        99, 6, 10000, 10006, "nosort", "T1", "I1XY"
+        99, 6, 10000, 10006, "nosort", "t1", "i1xy"
         -- </where2-4.6c>
     })
 
@@ -402,7 +402,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.6d>
-        99, 6, 10000, 10006, "sort", "T1", "I1XY"
+        99, 6, 10000, 10006, "sort", "t1", "i1xy"
         -- </where2-4.6d>
     })
 
@@ -418,7 +418,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.6x>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", "I1ZYX"
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", "i1zyx"
         -- </where2-4.6x>
     })
 
@@ -431,7 +431,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.6y>
-        100, 6, 10201, 10207, 99, 6, 10000, 10006, "sort", "T1", "I1ZYX"
+        100, 6, 10201, 10207, 99, 6, 10000, 10006, "sort", "t1", "i1zyx"
         -- </where2-4.6y>
     })
 
@@ -446,7 +446,7 @@ test:do_test(
       ]])
     end, {
         -- <where2-4.7>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", "I1ZYX"
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", "i1zyx"
         -- </where2-4.7>
     })
 
@@ -465,7 +465,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-5.1>
-        99, 6, 10000, 10006, "nosort", "T1", "*"
+        99, 6, 10000, 10006, "nosort", "t1", "*"
         -- </where2-5.1>
     })
 
@@ -477,7 +477,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-5.2a>
-        99, 6, 10000, 10006, "nosort", "T1", "*"
+        99, 6, 10000, 10006, "nosort", "t1", "*"
         -- </where2-5.2a>
     })
 
@@ -489,7 +489,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-5.2b>
-        99, 6, 10000, 10006, "nosort", "T1", "*"
+        99, 6, 10000, 10006, "nosort", "t1", "*"
         -- </where2-5.2b>
     })
 
@@ -508,7 +508,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.1.1>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", idx
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", idx
         -- </where2-6.1.1>
     })
 
@@ -520,7 +520,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.1.2>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", idx
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", idx
         -- </where2-6.1.2>
     })
 
@@ -532,7 +532,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.2>
-        6, 2, 49, 51, 99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", idx
+        6, 2, 49, 51, 99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", idx
         -- </where2-6.2>
     })
 
@@ -550,7 +550,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.3>
-        6, 2, 49, 51, 99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", idx
+        6, 2, 49, 51, 99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", idx
         -- </where2-6.3>
     })
 
@@ -562,7 +562,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.4>
-        6, 2, 49, 51, "|", 99, 6, 10000, 10006, "|", 100, 6, 10201, 10207, "|", "sort", "T1", idx
+        6, 2, 49, 51, "|", 99, 6, 10000, 10006, "|", 100, 6, 10201, 10207, "|", "sort", "t1", idx
         -- </where2-6.4>
     })
 
@@ -574,11 +574,11 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.5>
-        6, 2, 49, 51, "|", 99, 6, 10000, 10006, "|", 100, 6, 10201, 10207, "|", "sort", "T1", idx
+        6, 2, 49, 51, "|", 99, 6, 10000, 10006, "|", 100, 6, 10201, 10207, "|", "sort", "t1", idx
         -- </where2-6.5>
     })
 
-idx = "I1ZYX"
+idx = "i1zyx"
 
 
 test:do_test(
@@ -591,7 +591,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.5>
-        1, 0, 4, 4, 2, 1, 9, 10, "sort", "A", "*", "B", idx
+        1, 0, 4, 4, 2, 1, 9, 10, "sort", "a", "*", "b", idx
         -- </where2-6.5>
     })
 
@@ -605,7 +605,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.6>
-        1, 0, 4, 4, 2, 1, 9, 10, "sort", "A", "*", "B", idx
+        1, 0, 4, 4, 2, 1, 9, 10, "sort", "a", "*", "b", idx
         -- </where2-6.6>
     })
 
@@ -632,7 +632,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.7>
-            123, '0123', "nosort", "T2249B", "*", "T2249A", "*"
+            123, '0123', "nosort", "t2249b", "*", "t2249a", "*"
             -- </where2-6.7>
         })
 
@@ -646,7 +646,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.9>
-            123, "0123", "nosort", "T2249B", "*", "T2249A", "*"
+            123, "0123", "nosort", "t2249b", "*", "t2249a", "*"
             -- </where2-6.9>
         })
 
@@ -660,7 +660,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.20>
-            '0123', '0123', "nosort", "X", "*", "Y", "*"
+            '0123', '0123', "nosort", "x", "*", "y", "*"
             -- </where2-6.20>
         })
 
@@ -678,7 +678,7 @@ test:do_test(
     ]])
         end, {
             -- <where2-6.21>
-            '0123', '0123', "nosort", "X", "*", "Y", "*"
+            '0123', '0123', "nosort", "x", "*", "y", "*"
             -- </where2-6.21>
         })
 
@@ -691,7 +691,7 @@ test:do_test(
     ]])
         end, {
             -- <where2-6.22>
-            '0123', '0123', "nosort", "X", "*", "Y", "*"
+            '0123', '0123', "nosort", "x", "*", "y", "*"
             -- </where2-6.22>
         })
 
@@ -704,7 +704,7 @@ test:do_test(
     ]])
         end, {
             -- <where2-6.23>
-            '0123', '0123', "nosort", "X", "*", "Y", "*"
+            '0123', '0123', "nosort", "x", "*", "y", "*"
             -- </where2-6.23>
         })
 
@@ -1066,7 +1066,7 @@ test:do_execsql_test(
             return test:execsql [[
                 COMMIT;
                 CREATE INDEX i10 ON t10(a,b);
-                SELECT count(*) FROM t10;
+                SELECT COUNT(*) FROM t10;
             ]]
         end, {
             -- <where2-9.1>
@@ -1137,7 +1137,7 @@ test:do_execsql_test(
             -- "/.*SEARCH TABLE t12 AS b .*SEARCH TABLE t12 AS b .*/"
             local cnt = 0
             for _, v in ipairs(data) do
-                if type(v) == 'string' and string.find(v, 'SEARCH TABLE T12 AS B ') then
+                if type(v) == 'string' and string.find(v, 'SEARCH TABLE t12 AS b ') then
                     cnt = cnt + 1
                 end
             end

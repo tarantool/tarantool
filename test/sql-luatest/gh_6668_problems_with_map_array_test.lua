@@ -49,8 +49,8 @@ g.test_group_by = function()
         box.execute([[DROP TABLE ta;]])
 
         box.execute([[CREATE TABLE tm(i INT PRIMARY KEY, m map);]])
-        box.space.TM:insert({1, {a = 1}})
-        box.space.TM:insert({2, {b = 2}})
+        box.space.tm:insert({1, {a = 1}})
+        box.space.tm:insert({2, {b = 2}})
         sql = [[SELECT m FROM tm GROUP BY m;]]
         res = [[Type mismatch: can not convert map to comparable type]]
         _, err = box.execute(sql)

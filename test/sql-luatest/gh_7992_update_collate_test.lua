@@ -14,7 +14,7 @@ end)
 
 g.test_ignore_collate_for_builtins = function()
     g.server:exec(function()
-        local res = box.execute([[select abs(NULL collate "unicode_ci");]])
+        local res = box.execute([[select ABS(NULL collate "unicode_ci");]])
         t.assert_equals(res.rows, {{box.NULL}})
     end)
 end

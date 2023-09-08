@@ -595,7 +595,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				if (pExpr->iTable < 0) {
 					diag_set(ClientError, ER_ILLEGAL_PARAMS,
 						"second argument to "
-						"likelihood() must be a "
+						"LIKELIHOOD() must be a "
 						"constant between 0.0 and 1.0");
 					pParse->is_aborted = true;
 					pNC->nErr++;

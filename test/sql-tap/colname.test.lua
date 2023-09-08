@@ -64,9 +64,9 @@ test:do_test(
             INSERT INTO txyz VALUES(4,5,6);
             CREATE TABLE tboth(a INT PRIMARY KEY,b INT,c INT,x INT,y INT,z INT);
             INSERT INTO tboth VALUES(11,12,13,14,15,16);
-            CREATE VIEW v1 AS SELECT tabC.a, txyZ.x, *
+            CREATE VIEW v1 AS SELECT tabc.a, txyz.x, *
               FROM tabc, txyz ORDER BY 1 LIMIT 1;
-            CREATE VIEW v2 AS SELECT tabC.a, txyZ.x, tboTh.a, tbotH.x, *
+            CREATE VIEW v2 AS SELECT tabc.a, txyz.x, tboth.a, tboth.x, *
               FROM tabc, txyz, tboth ORDER BY 1 LIMIT 1;
         ]]
         return test:execsql2 [[
@@ -74,17 +74,17 @@ test:do_test(
         ]]
     end, {
         -- <colname-2.1>
-        "A", 1, "B", 2, "C", 3
+        "a", 1, "b", 2, "c", 3
         -- </colname-2.1>
     })
 
 test:do_execsql2_test(
     "colname-2.2",
     [[
-        SELECT Tabc.a, tAbc.b, taBc.c, * FROM tabc
+        SELECT tabc.a, tabc.b, tabc.c, * from tabc
     ]], {
         -- <colname-2.2>
-        "A", 1, "B", 2, "C", 3, "A", 1, "B", 2, "C", 3
+        "a", 1, "b", 2, "c", 3, "a", 1, "b", 2, "c", 3
         -- </colname-2.2>
     })
 
@@ -94,7 +94,7 @@ test:do_execsql2_test(
         SELECT +tabc.a, -tabc.b, tabc.c, * FROM tabc
     ]], {
         -- <colname-2.3>
-        "COLUMN_1",1,"COLUMN_2",-2,"C",3,"A",1,"B",2,"C",3
+        "COLUMN_1", 1, "COLUMN_2", -2, "c", 3, "a", 1, "b", 2, "c", 3
         -- </colname-2.3>
     })
 
@@ -104,7 +104,7 @@ test:do_execsql2_test(
         SELECT +tabc.a AS AAA, -tabc.b AS BBB, tabc.c CCC, * FROM tabc
     ]], {
         -- <colname-2.4>
-        "AAA", 1, "BBB", -2, "CCC", 3, "A", 1, "B", 2, "C", 3
+        "AAA", 1, "BBB", -2, "CCC", 3, "a", 1, "b", 2, "c", 3
         -- </colname-2.4>
     })
 
@@ -114,7 +114,7 @@ test:do_execsql2_test(
         SELECT tabc.a, txyz.x, * FROM tabc, txyz;
     ]], {
         -- <colname-2.5>
-        "A", 1, "X", 4, "A", 1, "B", 2, "C", 3, "X", 4, "Y", 5, "Z", 6
+        "a", 1, "x", 4, "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6
         -- </colname-2.5>
     })
 
@@ -124,7 +124,7 @@ test:do_execsql2_test(
         SELECT tabc.a, txyz.x, tabc.*, txyz.* FROM tabc, txyz;
     ]], {
         -- <colname-2.6>
-        "A", 1, "X", 4, "A", 1, "B", 2, "C", 3, "X", 4, "Y", 5, "Z", 6
+        "a", 1, "x", 4, "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6
         -- </colname-2.6>
     })
 
@@ -134,7 +134,8 @@ test:do_execsql2_test(
         SELECT tabc.a, txyz.x, tboth.a, tboth.x, * FROM tabc, txyz, tboth;
     ]], {
         -- <colname-2.7>
-    "A",1,"X",4,"A",11,"X",14,"A",1,"B",2,"C",3,"X",4,"Y",5,"Z",6,"A",11,"B",12,"C",13,"X",14,"Y",15,"Z",16
+    "a", 1, "x", 4, "a", 11, "x", 14, "a", 1, "b", 2, "c", 3, "x", 4, "y", 5,
+    "z", 6, "a", 11, "b", 12, "c", 13, "x", 14, "y", 15, "z", 16
         -- </colname-2.7>
     })
 
@@ -144,7 +145,7 @@ test:do_execsql2_test(
         SELECT * FROM v1 ORDER BY 2;
     ]], {
         -- <colname-2.8>
-        "A",1,"X",4,"A_1",1,"B",2,"C",3,"X_1",4,"Y",5,"Z",6
+        "a",1,"x",4,"a_1",1,"b",2,"c",3,"x_1",4,"y",5,"z",6
         -- </colname-2.8>
     })
 
@@ -154,7 +155,9 @@ test:do_execsql2_test(
         SELECT * FROM v2 ORDER BY 2;
     ]], {
         -- <colname-2.9>
-        "A",1,"X",4,"A_1",11,"X_1",14,"A_2",1,"B",2,"C",3,"X_2",4,"Y",5,"Z",6,"A_3",11,"B_1",12,"C_1",13,"X_3",14,"Y_1",15,"Z_1",16
+        "a", 1, "x", 4, "a_1", 11, "x_1", 14, "a_2", 1, "b", 2, "c", 3,
+        "x_2", 4, "y", 5, "z", 6, "a_3", 11, "b_1", 12, "c_1", 13, "x_3", 14,
+        "y_1", 15, "z_1", 16
         -- </colname-2.9>
     })
 
@@ -164,9 +167,9 @@ test:do_test(
     function()
         test:execsql [[
             UPDATE "_session_settings" SET "value" = false WHERE "name" = 'sql_full_column_names';
-            CREATE VIEW v3 AS SELECT tabC.a, txyZ.x, *
+            CREATE VIEW v3 AS SELECT tabc.a, txyz.x, *
               FROM tabc, txyz ORDER BY 1 LIMIT 1;
-            CREATE VIEW v4 AS SELECT tabC.a, txyZ.x, tboTh.a, tbotH.x, *
+            CREATE VIEW v4 AS SELECT tabc.a, txyz.x, tboth.a, tboth.x, *
               FROM tabc, txyz, tboth ORDER BY 1 LIMIT 1;
         ]]
         return test:execsql2 [[
@@ -174,17 +177,17 @@ test:do_test(
         ]]
     end, {
         -- <colname-3.1>
-        "A", 1, "B", 2, "C", 3
+        "a", 1, "b", 2, "c", 3
         -- </colname-3.1>
     })
 
 test:do_execsql2_test(
     "colname-3.2",
     [[
-        SELECT Tabc.a, tAbc.b, taBc.c FROM tabc
+        SELECT tabc.a, tabc.b, tabc.c from tabc
     ]], {
         -- <colname-3.2>
-        "A", 1, "B", 2, "C", 3
+        "a", 1, "b", 2, "c", 3
         -- </colname-3.2>
     })
 
@@ -194,7 +197,7 @@ test:do_execsql2_test(
         SELECT +tabc.a, -tabc.b, tabc.c FROM tabc
     ]], {
         -- <colname-3.3>
-        "COLUMN_1",1,"COLUMN_2",-2,"C",3
+        "COLUMN_1", 1, "COLUMN_2", -2, "c", 3
         -- </colname-3.3>
     })
 
@@ -211,10 +214,10 @@ test:do_execsql2_test(
 test:do_execsql2_test(
     "colname-3.5",
     [[
-        SELECT Tabc.a, Txyz.x, * FROM tabc, txyz;
+        SELECT tabc.a, txyz.x, * from tabc, txyz;
     ]], {
         -- <colname-3.5>
-        "A", 1, "X", 4, "A", 1, "B", 2, "C", 3, "X", 4, "Y", 5, "Z", 6
+        "a", 1, "x", 4, "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6
         -- </colname-3.5>
     })
 
@@ -224,7 +227,7 @@ test:do_execsql2_test(
         SELECT tabc.*, txyz.* FROM tabc, txyz;
     ]], {
         -- <colname-3.6>
-        "A", 1, "B", 2, "C", 3, "X", 4, "Y", 5, "Z", 6
+        "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6
         -- </colname-3.6>
     })
 
@@ -234,7 +237,8 @@ test:do_execsql2_test(
         SELECT * FROM tabc, txyz, tboth;
     ]], {
         -- <colname-3.7>
-        "A",1,"B",2,"C",3,"X",4,"Y",5,"Z",6,"A",11,"B",12,"C",13,"X",14,"Y",15,"Z",16
+        "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6, "a", 11, "b", 12,
+        "c", 13, "x", 14, "y", 15, "z", 16
         -- </colname-3.7>
     })
 
@@ -244,7 +248,8 @@ test:do_execsql2_test(
         SELECT v1.a, * FROM v1 ORDER BY 2;
     ]], {
         -- <colname-3.8>
-        "A",1,"A",1,"X",4,"A_1",1,"B",2,"C",3,"X_1",4,"Y",5,"Z",6
+        "a", 1, "a", 1, "x", 4, "a_1", 1, "b", 2, "c", 3, "x_1", 4, "y", 5,
+        "z", 6
         -- </colname-3.8>
     })
 
@@ -254,7 +259,9 @@ test:do_execsql2_test(
         SELECT * FROM v2 ORDER BY 2;
     ]], {
         -- <colname-3.9>
-        "A",1,"X",4,"A_1",11,"X_1",14,"A_2",1,"B",2,"C",3,"X_2",4,"Y",5,"Z",6,"A_3",11,"B_1",12,"C_1",13,"X_3",14,"Y_1",15,"Z_1",16
+        "a", 1, "x", 4, "a_1", 11, "x_1", 14, "a_2", 1, "b", 2, "c", 3,
+        "x_2", 4, "y", 5, "z", 6, "a_3", 11, "b_1", 12, "c_1", 13, "x_3", 14,
+        "y_1", 15, "z_1", 16
         -- </colname-3.9>
     })
 
@@ -264,7 +271,7 @@ test:do_execsql2_test(
         SELECT * FROM v3 ORDER BY 2;
     ]], {
         -- <colname-3.10>
-        "A",1,"X",4,"A_1",1,"B",2,"C",3,"X_1",4,"Y",5,"Z",6
+        "a", 1, "x", 4, "a_1", 1, "b", 2, "c", 3, "x_1", 4, "y", 5, "z", 6
         -- </colname-3.10>
     })
 
@@ -274,7 +281,9 @@ test:do_execsql2_test(
         SELECT * FROM v4 ORDER BY 2;
     ]], {
         -- <colname-3.11>
-        "A",1,"X",4,"A_1",11,"X_1",14,"A_2",1,"B",2,"C",3,"X_2",4,"Y",5,"Z",6,"A_3",11,"B_1",12,"C_1",13,"X_3",14,"Y_1",15,"Z_1",16
+        "a", 1, "x", 4, "a_1", 11, "x_1", 14, "a_2", 1, "b", 2, "c", 3,
+        "x_2", 4, "y", 5, "z", 6, "a_3", 11, "b_1", 12, "c_1", 13, "x_3", 14,
+        "y_1", 15, "z_1", 16
         -- </colname-3.11>
     })
 
@@ -284,9 +293,9 @@ test:do_test(
     function()
         test:execsql [[
             UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_full_column_names';
-            CREATE VIEW v5 AS SELECT tabC.a, txyZ.x, *
+            CREATE VIEW v5 AS SELECT tabc.a, txyz.x, *
               FROM tabc, txyz ORDER BY 1 LIMIT 1;
-            CREATE VIEW v6 AS SELECT tabC.a, txyZ.x, tboTh.a, tbotH.x, *
+            CREATE VIEW v6 AS SELECT tabc.a, txyz.x, tboth.a, tboth.x, *
               FROM tabc, txyz, tboth ORDER BY 1 LIMIT 1;
         ]]
         return test:execsql2 [[
@@ -294,17 +303,17 @@ test:do_test(
         ]]
     end, {
         -- <colname-4.1>
-        "TABC.A", 1, "TABC.B", 2, "TABC.C", 3
+        "tabc.a", 1, "tabc.b", 2, "tabc.c", 3
         -- </colname-4.1>
     })
 
 test:do_execsql2_test(
     "colname-4.2",
     [[
-        SELECT Tabc.a, tAbc.b, taBc.c FROM tabc
+        SELECT tabc.a, tabc.b, tabc.c from tabc
     ]], {
         -- <colname-4.2>
-        "TABC.A", 1, "TABC.B", 2, "TABC.C", 3
+        "tabc.a", 1, "tabc.b", 2, "tabc.c", 3
         -- </colname-4.2>
     })
 
@@ -314,7 +323,7 @@ test:do_execsql2_test(
         SELECT +tabc.a, -tabc.b, tabc.c FROM tabc
     ]], {
         -- <colname-4.3>
-        "COLUMN_1",1,"COLUMN_2",-2,"TABC.C",3
+        "COLUMN_1", 1, "COLUMN_2", -2, "tabc.c", 3
         -- </colname-4.3>
     })
 
@@ -331,10 +340,11 @@ test:do_execsql2_test(
 test:do_execsql2_test(
     "colname-4.5",
     [[
-        SELECT Tabc.a, Txyz.x, * FROM tabc, txyz;
+        SELECT tabc.a, txyz.x, * from tabc, txyz;
     ]], {
         -- <colname-4.5>
-        "TABC.A", 1, "TXYZ.X", 4, "TABC.A", 1, "TABC.B", 2, "TABC.C", 3, "TXYZ.X", 4, "TXYZ.Y", 5, "TXYZ.Z", 6
+        "tabc.a", 1, "txyz.x", 4, "tabc.a", 1, "tabc.b", 2, "tabc.c", 3,
+        "txyz.x", 4, "txyz.y", 5, "txyz.z", 6
         -- </colname-4.5>
     })
 
@@ -344,7 +354,8 @@ test:do_execsql2_test(
         SELECT tabc.*, txyz.* FROM tabc, txyz;
     ]], {
         -- <colname-4.6>
-        "TABC.A", 1, "TABC.B", 2, "TABC.C", 3, "TXYZ.X", 4, "TXYZ.Y", 5, "TXYZ.Z", 6
+        "tabc.a", 1, "tabc.b", 2, "tabc.c", 3, "txyz.x", 4, "txyz.y", 5,
+        "txyz.z", 6
         -- </colname-4.6>
     })
 
@@ -354,7 +365,9 @@ test:do_execsql2_test(
         SELECT * FROM tabc, txyz, tboth;
     ]], {
         -- <colname-4.7>
-        "TABC.A", 1, "TABC.B", 2, "TABC.C", 3, "TXYZ.X", 4, "TXYZ.Y", 5, "TXYZ.Z", 6, "TBOTH.A", 11, "TBOTH.B", 12, "TBOTH.C", 13, "TBOTH.X", 14, "TBOTH.Y", 15, "TBOTH.Z", 16
+        "tabc.a", 1, "tabc.b", 2, "tabc.c", 3, "txyz.x", 4, "txyz.y", 5,
+        "txyz.z", 6, "tboth.a", 11, "tboth.b", 12, "tboth.c", 13,
+        "tboth.x", 14, "tboth.y", 15, "tboth.z", 16
         -- </colname-4.7>
     })
 
@@ -364,7 +377,8 @@ test:do_execsql2_test(
         SELECT * FROM v1 ORDER BY 2;
     ]], {
         -- <colname-4.8>
-        "V1.A",1,"V1.X",4,"V1.A_1",1,"V1.B",2,"V1.C",3,"V1.X_1",4,"V1.Y",5,"V1.Z",6
+        "v1.a", 1, "v1.x", 4, "v1.a_1", 1, "v1.b", 2, "v1.c", 3, "v1.x_1", 4,
+        "v1.y", 5, "v1.z", 6
         -- </colname-4.8>
     })
 
@@ -374,7 +388,9 @@ test:do_execsql2_test(
         SELECT * FROM v2 ORDER BY 2;
     ]], {
         -- <colname-4.9>
-        "V2.A",1,"V2.X",4,"V2.A_1",11,"V2.X_1",14,"V2.A_2",1,"V2.B",2,"V2.C",3,"V2.X_2",4,"V2.Y",5,"V2.Z",6,"V2.A_3",11,"V2.B_1",12,"V2.C_1",13,"V2.X_3",14,"V2.Y_1",15,"V2.Z_1",16
+        "v2.a", 1, "v2.x", 4, "v2.a_1", 11, "v2.x_1", 14, "v2.a_2", 1,
+        "v2.b", 2, "v2.c", 3, "v2.x_2", 4, "v2.y", 5, "v2.z", 6, "v2.a_3", 11,
+        "v2.b_1", 12, "v2.c_1", 13, "v2.x_3", 14, "v2.y_1", 15, "v2.z_1", 16
         -- </colname-4.9>
     })
 
@@ -384,7 +400,8 @@ test:do_execsql2_test(
         SELECT * FROM v3 ORDER BY 2;
     ]], {
         -- <colname-4.10>
-        "V3.A",1,"V3.X",4,"V3.A_1",1,"V3.B",2,"V3.C",3,"V3.X_1",4,"V3.Y",5,"V3.Z",6
+        "v3.a", 1, "v3.x", 4, "v3.a_1", 1, "v3.b", 2, "v3.c", 3, "v3.x_1", 4,
+        "v3.y", 5, "v3.z", 6
         -- </colname-4.10>
     })
 
@@ -394,7 +411,9 @@ test:do_execsql2_test(
         SELECT * FROM v4 ORDER BY 2;
     ]], {
         -- <colname-4.11>
-        "V4.A",1,"V4.X",4,"V4.A_1",11,"V4.X_1",14,"V4.A_2",1,"V4.B",2,"V4.C",3,"V4.X_2",4,"V4.Y",5,"V4.Z",6,"V4.A_3",11,"V4.B_1",12,"V4.C_1",13,"V4.X_3",14,"V4.Y_1",15,"V4.Z_1",16
+        "v4.a", 1, "v4.x", 4, "v4.a_1", 11, "v4.x_1", 14, "v4.a_2", 1,
+        "v4.b", 2, "v4.c", 3, "v4.x_2", 4, "v4.y", 5, "v4.z", 6, "v4.a_3", 11,
+        "v4.b_1", 12, "v4.c_1", 13, "v4.x_3", 14, "v4.y_1", 15, "v4.z_1", 16
         -- </colname-4.11>
     })
 
@@ -404,7 +423,8 @@ test:do_execsql2_test(
         SELECT * FROM v5 ORDER BY 2;
     ]], {
         -- <colname-4.12>
-        "V5.A",1,"V5.X",4,"V5.A_1",1,"V5.B",2,"V5.C",3,"V5.X_1",4,"V5.Y",5,"V5.Z",6
+        "v5.a", 1, "v5.x", 4, "v5.a_1", 1, "v5.b", 2, "v5.c", 3, "v5.x_1", 4,
+        "v5.y", 5, "v5.z", 6
         -- </colname-4.12>
     })
 
@@ -414,7 +434,9 @@ test:do_execsql2_test(
         SELECT * FROM v6 ORDER BY 2;
     ]], {
         -- <colname-4.13>
-        "V6.A",1,"V6.X",4,"V6.A_1",11,"V6.X_1",14,"V6.A_2",1,"V6.B",2,"V6.C",3,"V6.X_2",4,"V6.Y",5,"V6.Z",6,"V6.A_3",11,"V6.B_1",12,"V6.C_1",13,"V6.X_3",14,"V6.Y_1",15,"V6.Z_1",16
+        "v6.a", 1, "v6.x", 4, "v6.a_1", 11, "v6.x_1", 14, "v6.a_2", 1,
+        "v6.b", 2, "v6.c", 3, "v6.x_2", 4, "v6.y", 5, "v6.z", 6, "v6.a_3", 11,
+        "v6.b_1", 12, "v6.c_1", 13, "v6.x_3", 14, "v6.y_1", 15, "v6.z_1", 16
         -- </colname-4.13>
     })
 
@@ -447,67 +469,67 @@ test:do_test(
         return test:execsql2 "SELECT * FROM t6"
     end, {
         -- <colname-6.1>
-        "A", 1, "'a'", 2, [["a"]], 3, "[a]", 4, "`a`", 5
+        "a", 1, "'a'", 2, [["a"]], 3, "[a]", 4, "`a`", 5
         -- </colname-6.1>
     })
 
 test:do_execsql2_test(
     "colname-6.3",
     [=[
-        SELECT "'a'", "`a`", "[a]", "A", """a""" FROM t6
+        SELECT "'a'", "`a`", "[a]", "a", """a""" FROM t6
     ]=], {
         -- <colname-6.3>
-        "'a'", 2, "`a`", 5, "[a]", 4, "A", 1, [["a"]], 3
+        "'a'", 2, "`a`", 5, "[a]", 4, "a", 1, [["a"]], 3
         -- </colname-6.3>
     })
 
 test:do_execsql2_test(
     "colname-6.11",
     [[
-        SELECT a, max(a) AS m FROM t6
+        SELECT a, MAX(a) AS m FROM t6
     ]], {
         -- <colname-6.11>
-        "A", 1, "M", 1
+        "a", 1, "m", 1
         -- </colname-6.11>
     })
 
 test:do_execsql2_test(
     "colname-6.13",
     [[
-        SELECT a, max(a) AS m FROM t6
+        SELECT a, MAX(a) AS m FROM t6
     ]], {
         -- <colname-6.13>
-        "A", 1, "M", 1
+        "a", 1, "m", 1
         -- </colname-6.13>
     })
 
 test:do_execsql2_test(
     "colname-6.15",
     [[
-        SELECT t6.a, max(a) AS m FROM t6
+        SELECT t6.a, MAX(a) AS m FROM t6
     ]], {
         -- <colname-6.15>
-        "A", 1, "M", 1
+        "a", 1, "m", 1
         -- </colname-6.15>
     })
 
 test:do_execsql2_test(
     "colname-6.18",
     [=[
-        SELECT "[a]", max("[a]") AS m FROM t6
+        SELECT "[a]", MAX("[a]") AS m FROM t6
     ]=], {
         -- <colname-6.18>
-        "[a]", 4, "M", 4
+        "[a]", 4, "m", 4
         -- </colname-6.18>
     })
 
 test:do_execsql2_test(
     "colname-6.19",
     [=[
-        SELECT "`a`", max("`a`") AS m FROM t6
+        SELECT "`a`", MAX("`a`") AS m FROM t6
     ]=], {
         -- <colname-6.19>
-        "`a`", 5, "M", 5
+        "`a`", 5, "m", 5
         -- </colname-6.19>
     })
 
@@ -524,7 +546,7 @@ test:do_test(
         return test:execsql2 "SELECT x, * FROM t7"
     end, {
         -- <colname-7.1>
-        "X", 1, "X", 1, "Y", 2
+        "x", 1, "x", 1, "y", 2
         -- </colname-7.1>
     })
 
@@ -689,7 +711,7 @@ test:do_execsql2_test(
 test:do_execsql2_test(
     "colname-12.7",
     [[
-        SELECT s1 + 1 FROM j ORDER BY column_1;
+        SELECT s1 + 1 FROM j ORDER BY COLUMN_1;
     ]], {
         "COLUMN_1",2
     })
@@ -698,7 +720,7 @@ test:do_execsql2_test(
     "colname-12.8",
     [[
         SELECT * FROM (SELECT s1 + 1 FROM j
-                       ORDER BY column_1) ORDER BY column_1;
+                       ORDER BY COLUMN_1) ORDER BY COLUMN_1;
     ]], {
         "COLUMN_1",2
     })
@@ -706,7 +728,7 @@ test:do_execsql2_test(
 test:do_execsql2_test(
     "colname-12.9",
     [[
-        SELECT s1 + 1 FROM j GROUP BY column_1;
+        SELECT s1 + 1 FROM j GROUP BY COLUMN_1;
     ]], {
         "COLUMN_1",2
     })
@@ -715,7 +737,7 @@ test:do_execsql2_test(
     "colname-12.10",
     [[
         SELECT * FROM (SELECT s1 + 1 FROM j
-                       ORDER BY column_1) GROUP BY column_1;
+                       ORDER BY COLUMN_1) GROUP BY COLUMN_1;
     ]], {
         "COLUMN_1",2
     })
@@ -724,7 +746,7 @@ test:do_execsql2_test(
     "colname-12.11",
     [[
         SELECT * FROM (SELECT s1 + 1 FROM j
-                       ORDER BY column_1) WHERE column_1 = 2;
+                       ORDER BY COLUMN_1) WHERE COLUMN_1 = 2;
     ]], {
         "COLUMN_1",2
     })
@@ -732,37 +754,37 @@ test:do_execsql2_test(
 test:do_execsql2_test(
     "colname-12.12",
     [[
-        SELECT *, s1 + 1 FROM j ORDER BY column_1;
+        SELECT *, s1 + 1 FROM j ORDER BY COLUMN_1;
     ]], {
-        "S1",1,"COLUMN_1",2
+        "s1",1,"COLUMN_1",2
     })
 
 test:do_execsql2_test(
     "colname-12.13",
     [[
-        SELECT s1 + 1, * FROM j ORDER BY column_1;
+        SELECT s1 + 1, * FROM j ORDER BY COLUMN_1;
     ]], {
-        "COLUMN_1",2,"S1",1
+        "COLUMN_1",2,"s1",1
     })
 
 test:do_execsql2_test(
     "colname-12.14",
     [[
-        CREATE TABLE j_1 (column_1 INTEGER PRIMARY KEY, column_2 SCALAR);
+        CREATE TABLE j_1 (COLUMN_1 INTEGER PRIMARY KEY, COLUMN_2 SCALAR);
         INSERT INTO j_1 VALUES(1, 1);
     ]], {})
 
 test:do_execsql2_test(
     "colname-12.15",
     [[
-        SELECT column_1, column_1 + 1, column_2, 2 FROM j_1;
+        SELECT COLUMN_1, COLUMN_1 + 1, COLUMN_2, 2 FROM j_1;
     ]], {
         "COLUMN_1",1,"COLUMN_1",2,"COLUMN_2",1,"COLUMN_2",2
     })
 
 --
 -- The result order is different, because in the second case
--- expression "-column_1" with the auto generated name "column_1"
+-- expression "-COLUMN_1" with the auto generated name "COLUMN_1"
 -- is used for sorting. Auto generated names are considered as
 -- aliases. In the process of resolving an identifier from
 -- <ORDER BY>, it first checks for matching with aliases.
@@ -771,7 +793,7 @@ test:do_execsql2_test(
     "colname-12.16",
     [[
         INSERT INTO j_1 VALUES(2, 2);
-        SELECT column_1 FROM j_1 ORDER BY column_1;
+        SELECT COLUMN_1 FROM j_1 ORDER BY COLUMN_1;
     ]], {
         "COLUMN_1",1,"COLUMN_1",2
     })
@@ -779,7 +801,7 @@ test:do_execsql2_test(
 test:do_execsql2_test(
     "colname-12.17",
     [[
-        SELECT column_1, -column_1 FROM j_1 ORDER BY column_1;
+        SELECT COLUMN_1, -COLUMN_1 FROM j_1 ORDER BY COLUMN_1;
     ]], {
         "COLUMN_1",2,"COLUMN_1",-2,"COLUMN_1",1,"COLUMN_1",-1
     })

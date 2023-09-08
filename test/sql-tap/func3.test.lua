@@ -28,7 +28,7 @@ test:plan(33)
 test:do_execsql_test(
     "func3-5.1",
     [[
-        SELECT likelihood(9223372036854775807, 0.5e0);
+        SELECT LIKELIHOOD(9223372036854775807, 0.5e0);
     ]], {
         -- <func3-5.1>
         9223372036854775807LL
@@ -38,7 +38,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.2",
     [[
-        SELECT likelihood(-9223372036854775808, 0.5e0);
+        SELECT LIKELIHOOD(-9223372036854775808, 0.5e0);
     ]], {
         -- <func3-5.2>
         -9223372036854775808LL
@@ -48,7 +48,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.3",
     [[
-        SELECT likelihood(14.125e0, 0.5e0);
+        SELECT LIKELIHOOD(14.125e0, 0.5e0);
     ]], {
         -- <func3-5.3>
         14.125
@@ -58,7 +58,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.4",
     [[
-        SELECT likelihood(NULL, 0.5e0);
+        SELECT LIKELIHOOD(NULL, 0.5e0);
     ]], {
         -- <func3-5.4>
         ""
@@ -68,7 +68,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.5",
     [[
-        SELECT likelihood('test-string', 0.5e0);
+        SELECT LIKELIHOOD('test-string', 0.5e0);
     ]], {
         -- <func3-5.5>
         "test-string"
@@ -78,7 +78,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.6",
     [[
-        SELECT quote(likelihood(x'010203000405', 0.5e0));
+        SELECT QUOTE(LIKELIHOOD(x'010203000405', 0.5e0));
     ]], {
         -- <func3-5.6>
         "X'010203000405'"
@@ -91,7 +91,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.7",
     [[
-        SELECT likelihood(123, 1e0), likelihood(456, 0e0);
+        SELECT LIKELIHOOD(123, 1e0), LIKELIHOOD(456, 0e0);
     ]], {
         -- <func3-5.7>
         123, 456
@@ -101,30 +101,33 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "func3-5.8",
     [[
-        SELECT likelihood(123, 1.000001e0);
+        SELECT LIKELIHOOD(123, 1.000001e0);
     ]], {
         -- <func3-5.8>
-        1, "Illegal parameters, second argument to likelihood() must be a constant between 0.0 and 1.0"
+        1, "Illegal parameters, second argument to LIKELIHOOD() must be a "..
+        "constant between 0.0 and 1.0"
         -- </func3-5.8>
     })
 
 test:do_catchsql_test(
     "func3-5.9",
     [[
-        SELECT likelihood(123, -0.000001e0);
+        SELECT LIKELIHOOD(123, -0.000001e0);
     ]], {
         -- <func3-5.9>
-        1, "Illegal parameters, second argument to likelihood() must be a constant between 0.0 and 1.0"
+        1, "Illegal parameters, second argument to LIKELIHOOD() must be a "..
+        "constant between 0.0 and 1.0"
         -- </func3-5.9>
     })
 
 test:do_catchsql_test(
     "func3-5.10",
     [[
-        SELECT likelihood(123, 0.5e0 + 0.3e0);
+        SELECT LIKELIHOOD(123, 0.5e0 + 0.3e0);
     ]], {
         -- <func3-5.10>
-        1, "Illegal parameters, second argument to likelihood() must be a constant between 0.0 and 1.0"
+        1, "Illegal parameters, second argument to LIKELIHOOD() must be a "..
+        "constant between 0.0 and 1.0"
         -- </func3-5.10>
     })
 
@@ -135,7 +138,7 @@ test:do_catchsql_test(
 test:do_test(
     "func3-5.20",
     function()
-        return test:execsql "EXPLAIN SELECT likelihood(LEAST(1.0+'2.0',4*11), 0.5e0)"
+        return test:execsql "EXPLAIN SELECT LIKELIHOOD(LEAST(1.0+'2.0',4*11), 0.5e0)"
     end, test:execsql("EXPLAIN SELECT LEAST(1.0+'2.0',4*11)"))
 
 -- EVIDENCE-OF: R-11152-23456 The unlikely(X) function returns the
@@ -144,7 +147,7 @@ test:do_test(
 test:do_execsql_test(
     "func3-5.30",
     [[
-        SELECT unlikely(9223372036854775807);
+        SELECT UNLIKELY(9223372036854775807);
     ]], {
         -- <func3-5.30>
         9223372036854775807LL
@@ -154,7 +157,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.31",
     [[
-        SELECT unlikely(-9223372036854775808);
+        SELECT UNLIKELY(-9223372036854775808);
     ]], {
         -- <func3-5.31>
         -9223372036854775808LL
@@ -164,7 +167,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.32",
     [[
-        SELECT unlikely(14.125e0);
+        SELECT UNLIKELY(14.125e0);
     ]], {
         -- <func3-5.32>
         14.125
@@ -174,7 +177,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.33",
     [[
-        SELECT unlikely(NULL);
+        SELECT UNLIKELY(NULL);
     ]], {
         -- <func3-5.33>
         ""
@@ -184,7 +187,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.34",
     [[
-        SELECT unlikely('test-string');
+        SELECT UNLIKELY('test-string');
     ]], {
         -- <func3-5.34>
         "test-string"
@@ -194,21 +197,21 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.35",
     [[
-        SELECT quote(unlikely(x'010203000405'));
+        SELECT QUOTE(UNLIKELY(x'010203000405'));
     ]], {
         -- <func3-5.35>
         "X'010203000405'"
         -- </func3-5.35>
     })
 
--- EVIDENCE-OF: R-22887-63324 The unlikely(X) function is a no-op that
+-- EVIDENCE-OF: R-22887-63324 The UNLIKELY(X) function is a no-op that
 -- the code generator optimizes away so that it consumes no CPU cycles at
 -- run-time (that is, during calls to sql_step()).
 --
 test:do_test(
     "func3-5.39",
     function()
-        return test:execsql "EXPLAIN SELECT unlikely(LEAST(1.0+'2.0',4*11))"
+        return test:execsql "EXPLAIN SELECT UNLIKELY(LEAST(1.0+'2.0',4*11))"
     end, test:execsql "EXPLAIN SELECT LEAST(1.0+'2.0',4*11)")
 
 -- EVIDENCE-OF: R-23735-03107 The likely(X) function returns the argument
@@ -217,7 +220,7 @@ test:do_test(
 test:do_execsql_test(
     "func3-5.50",
     [[
-        SELECT likely(9223372036854775807);
+        SELECT LIKELY(9223372036854775807);
     ]], {
         -- <func3-5.50>
         9223372036854775807LL
@@ -227,7 +230,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.51",
     [[
-        SELECT likely(-9223372036854775808);
+        SELECT LIKELY(-9223372036854775808);
     ]], {
         -- <func3-5.51>
         -9223372036854775808LL
@@ -237,7 +240,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.52",
     [[
-        SELECT likely(14.125e0);
+        SELECT LIKELY(14.125e0);
     ]], {
         -- <func3-5.52>
         14.125
@@ -247,7 +250,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.53",
     [[
-        SELECT likely(NULL);
+        SELECT LIKELY(NULL);
     ]], {
         -- <func3-5.53>
         ""
@@ -257,7 +260,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.54",
     [[
-        SELECT likely('test-string');
+        SELECT LIKELY('test-string');
     ]], {
         -- <func3-5.54>
         "test-string"
@@ -267,7 +270,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func3-5.55",
     [[
-        SELECT quote(likely(x'010203000405'));
+        SELECT QUOTE(LIKELY(x'010203000405'));
     ]], {
         -- <func3-5.55>
         "X'010203000405'"
@@ -281,7 +284,7 @@ test:do_execsql_test(
 test:do_test(
     "func3-5.59",
     function()
-        return test:execsql "EXPLAIN SELECT likely(LEAST(1.0+'2.0',4*11))"
+        return test:execsql "EXPLAIN SELECT LIKELY(LEAST(1.0+'2.0',4*11))"
     end, test:execsql "EXPLAIN SELECT LEAST(1.0+'2.0',4*11)")
 
 

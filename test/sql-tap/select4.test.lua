@@ -411,7 +411,7 @@ test:do_catchsql_test(
         ORDER BY log;
     ]], {
         -- <select4-5.1>
-        1, "Space 'T2' does not exist"
+        1, "Space 't2' does not exist"
         -- </select4-5.1>
     })
 
@@ -421,7 +421,7 @@ test:do_catchsql_test(
         SELECT DISTINCT log AS "XYZZY" FROM t1
         UNION ALL
         SELECT n FROM t1 WHERE log=3
-        ORDER BY xyzzy;
+        ORDER BY XYZZY;
     ]], {
         -- <select4-5.2>
         0, {0, 1, 2, 3, 4, 5, 5, 6, 7, 8}
@@ -431,7 +431,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "select4-5.2b",
     [[
-        SELECT DISTINCT log AS xyzzy FROM t1
+        SELECT DISTINCT log AS XYZZY FROM t1
         UNION ALL
         SELECT n FROM t1 WHERE log=3
         ORDER BY "XYZZY";
@@ -601,7 +601,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "select4-6.1",
     [[
-        SELECT log, count(*) as cnt FROM t1 GROUP BY log
+        SELECT log, COUNT(*) as cnt FROM t1 GROUP BY log
         UNION
         SELECT log, n FROM t1 WHERE n=7
         ORDER BY cnt, log;
@@ -614,10 +614,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select4-6.2",
     [[
-        SELECT log, count(*) FROM t1 GROUP BY log
+        SELECT log, COUNT(*) FROM t1 GROUP BY log
         UNION
         SELECT log, n FROM t1 WHERE n=7
-        ORDER BY count(*), log;
+        ORDER BY COUNT(*), log;
     ]], {
         -- <select4-6.2>
         0, 1, 1, 1, 2, 2, 3, 4, 3, 7, 4, 8, 5, 15
@@ -722,7 +722,7 @@ test:do_execsql2_test(
         ORDER BY n
     ]], {
         -- <select4-7.2>
-        "N", 1, "LOG", 0, "N", 2, "LOG", 1, "N", 3, "LOG", 2, "N", 4, "LOG", 2, "N", 5, "LOG", 3
+        "n", 1, "log", 0, "n", 2, "log", 1, "n", 3, "log", 2, "n", 4, "log", 2, "n", 5, "log", 3
         -- </select4-7.2>
     })
 
@@ -733,7 +733,7 @@ test:do_execsql2_test(
         ORDER BY n LIMIT 2
     ]], {
         -- <select4-7.3>
-        "N", 6, "LOG", 3, "N", 7, "LOG", 3
+        "n", 6, "log", 3, "n", 7, "log", 3
         -- </select4-7.3>
     })
 
@@ -744,7 +744,7 @@ test:do_execsql2_test(
         ORDER BY n LIMIT 2
     ]], {
         -- <select4-7.4>
-        "N", 1, "LOG", 0, "N", 2, "LOG", 1
+        "n", 1, "log", 0, "n", 2, "log", 1
         -- </select4-7.4>
     })
 
@@ -797,7 +797,7 @@ test:do_execsql2_test(
         SELECT x, y FROM t2 UNION SELECT a, b FROM t3 ORDER BY x LIMIT 1
     ]], {
         -- <select4-9.1>
-        "X", 0, "Y", 1
+        "x", 0, "y", 1
         -- </select4-9.1>
     })
 
@@ -807,7 +807,7 @@ test:do_execsql2_test(
         SELECT x, y FROM t2 UNION ALL SELECT a, b FROM t3 ORDER BY x LIMIT 1
     ]], {
         -- <select4-9.2>
-        "X", 0, "Y", 1
+        "x", 0, "y", 1
         -- </select4-9.2>
     })
 
@@ -817,7 +817,7 @@ test:do_execsql2_test(
         SELECT x, y FROM t2 EXCEPT SELECT a, b FROM t3 ORDER BY x LIMIT 1
     ]], {
         -- <select4-9.3>
-        "X", 0, "Y", 1
+        "x", 0, "y", 1
         -- </select4-9.3>
     })
 
@@ -827,7 +827,7 @@ test:do_execsql2_test(
         SELECT x, y FROM t2 INTERSECT SELECT 0 AS a, 1 AS b;
     ]], {
         -- <select4-9.4>
-        "X", 0, "Y", 1
+        "x", 0, "y", 1
         -- </select4-9.4>
     })
 
@@ -842,7 +842,7 @@ test:do_execsql2_test(
         ORDER BY x LIMIT 1
     ]], {
         -- <select4-9.5>
-        "X", 0, "Y", 1
+        "x", 0, "y", 1
         -- </select4-9.5>
     })
 
@@ -858,7 +858,7 @@ test:do_execsql2_test(
         ) ORDER BY 1 LIMIT 1;
     ]], {
         -- <select4-9.6>
-        "X", 0, "Y", 1
+        "x", 0, "y", 1
         -- </select4-9.6>
     })
 
@@ -874,7 +874,7 @@ test:do_execsql2_test(
         ) ORDER BY x LIMIT 1;
     ]], {
         -- <select4-9.7>
-        "X", 0, "Y", 1
+        "x", 0, "y", 1
         -- </select4-9.7>
     })
 
@@ -900,7 +900,7 @@ test:do_execsql2_test(
         SELECT 1 AS a, 2 AS b UNION ALL SELECT 3 AS b, 4 AS a
     ]], {
         -- <select4-9.9.1>
-        "A", 1, "B", 2, "A", 3, "B", 4
+        "a", 1, "b", 2, "a", 3, "b", 4
         -- </select4-9.9.1>
     })
 
@@ -922,7 +922,7 @@ test:do_execsql2_test(
          WHERE b=2
     ]], {
         -- <select4-9.10>
-        "A", 1, "B", 2
+        "a", 1, "b", 2
         -- </select4-9.10>
     })
 
@@ -933,7 +933,7 @@ test:do_execsql2_test(
          WHERE b=2
     ]], {
         -- <select4-9.11>
-        "A", 1, "B", 2
+        "a", 1, "b", 2
         -- </select4-9.11>
     })
 
@@ -944,7 +944,7 @@ test:do_execsql2_test(
          WHERE b>0
     ]], {
         -- <select4-9.12>
-        "A", 1, "B", 2, "A", 3, "B", 4
+        "a", 1, "b", 2, "a", 3, "b", 4
         -- </select4-9.12>
     })
 
@@ -1055,7 +1055,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select4-10.9",
     [[
-        SELECT DISTINCT max(n), log FROM t1 ORDER BY +log; -- LIMIT 2 OFFSET 1
+        SELECT DISTINCT MAX(n), log FROM t1 ORDER BY +log; -- LIMIT 2 OFFSET 1
     ]], {
         -- <select4-10.9>
         31, 5
@@ -1449,7 +1449,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select4-14.15",
     [[
-        SELECT * FROM (SELECT 123), (SELECT 456) ON likely(false OR true) OR false;
+        SELECT * FROM (SELECT 123), (SELECT 456) ON LIKELY(false OR true) OR false;
     ]], {
         -- <select4-14.15>
         123, 456

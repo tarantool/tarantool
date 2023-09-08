@@ -47,11 +47,11 @@ box.execute("DELETE FROM t3 WHERE y IS NULL;");
 box.execute("SELECT * FROM t3;");
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: X
+  - name: x
     type: integer
-  - name: Y
+  - name: y
     type: integer
   rows:
   - [6, 234, 567]

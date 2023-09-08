@@ -102,7 +102,7 @@ test:do_test(
 
 test:do_execsql_test(
     "boundary3-1.2",
-    "SELECT count(*) FROM t1"
+    "SELECT COUNT(*) FROM t1"
     ,{64})
 
 test:do_test(
@@ -117,7 +117,7 @@ test:do_test(
             ---INSERT INTO t2 VALUES(100001,-9.22337303685477580800e+18,66);
             INSERT INTO t2 VALUES(9223372036854775807, 65);
             INSERT INTO t2 VALUES(-9223372036854775808, 66);
-            SELECT count(*) FROM t2;
+            SELECT COUNT(*) FROM t2;
         ]])
     end, {
         -- <boundary3-1.3>

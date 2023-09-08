@@ -49,17 +49,17 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
   - name: opts
     type: map
   rows:
-  - ['TT_AD', {'sql': 'CREATE TRIGGER tt_ad AFTER DELETE ON t FOR EACH ROW BEGIN SELECT
+  - ['tt_ad', {'sql': 'CREATE TRIGGER tt_ad AFTER DELETE ON t FOR EACH ROW BEGIN SELECT
         1; END'}]
-  - ['TT_AI', {'sql': 'CREATE TRIGGER tt_ai AFTER INSERT ON t FOR EACH ROW BEGIN SELECT
+  - ['tt_ai', {'sql': 'CREATE TRIGGER tt_ai AFTER INSERT ON t FOR EACH ROW BEGIN SELECT
         1; END'}]
-  - ['TT_AU', {'sql': 'CREATE TRIGGER tt_au AFTER UPDATE ON t FOR EACH ROW BEGIN SELECT
+  - ['tt_au', {'sql': 'CREATE TRIGGER tt_au AFTER UPDATE ON t FOR EACH ROW BEGIN SELECT
         1; END'}]
-  - ['TT_BD', {'sql': 'CREATE TRIGGER tt_bd BEFORE DELETE ON t FOR EACH ROW BEGIN
+  - ['tt_bd', {'sql': 'CREATE TRIGGER tt_bd BEFORE DELETE ON t FOR EACH ROW BEGIN
         SELECT 1; END'}]
-  - ['TT_BI', {'sql': 'CREATE TRIGGER tt_bi BEFORE INSERT ON t FOR EACH ROW BEGIN
+  - ['tt_bi', {'sql': 'CREATE TRIGGER tt_bi BEFORE INSERT ON t FOR EACH ROW BEGIN
         SELECT 1; END'}]
-  - ['TT_BU', {'sql': 'CREATE TRIGGER tt_bu BEFORE UPDATE ON t FOR EACH ROW BEGIN
+  - ['tt_bu', {'sql': 'CREATE TRIGGER tt_bu BEFORE UPDATE ON t FOR EACH ROW BEGIN
         SELECT 1; END'}]
 ...
 -- drop table

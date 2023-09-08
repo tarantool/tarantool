@@ -39,13 +39,13 @@ box.execute('SELECT float')
 box.execute('VALUES(TheColumnName)')
 ---
 - null
-- Can’t resolve field 'THECOLUMNNAME'
+- Can’t resolve field 'TheColumnName'
 ...
 -- check 'SELECT' against ID (should fail)
 box.execute('SELECT TheColumnName')
 ---
 - null
-- Can’t resolve field 'THECOLUMNNAME'
+- Can’t resolve field 'TheColumnName'
 ...
 -- check 'VALUES' well-formed expression  (returns value)
 box.execute('VALUES(-0.5e-2)')

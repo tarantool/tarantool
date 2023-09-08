@@ -41,7 +41,7 @@ test:do_test(
             INSERT INTO t1 VALUES(7,'seven',2,'VII',123.0);
             INSERT INTO t1 VALUES(8,'eight',3,'VIII',-1.6);
         ]]
-        return test:execsql "SELECT count(*) FROM t1"
+        return test:execsql "SELECT COUNT(*) FROM t1"
     end, {
         -- <sort-1.0>
         8
@@ -249,7 +249,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-2.1.2",
     [[
-        SELECT v FROM t1 ORDER BY substr(v,2,999);
+        SELECT v FROM t1 ORDER BY SUBSTR(v,2,999);
     ]], {
         -- <sort-2.1.2>
         "x-123.0", "x-2.15", "x-2b", "x-3.141592653", "x-4221.0", "x0.0013442", "x1.6", "x11.0"
@@ -259,7 +259,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-2.1.4",
     [[
-        SELECT v FROM t1 ORDER BY substr(v,2,999) DESC;
+        SELECT v FROM t1 ORDER BY SUBSTR(v,2,999) DESC;
     ]], {
         -- <sort-2.1.4>
         "x11.0", "x1.6", "x0.0013442", "x-4221.0", "x-3.141592653", "x-2b", "x-2.15", "x-123.0"
@@ -397,7 +397,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-4.8",
     [[
-        SELECT substr(v,2,99) FROM t1 ORDER BY 1;
+        SELECT SUBSTR(v,2,99) FROM t1 ORDER BY 1;
     ]], {
         -- <sort-4.8>
     "-123.0","-2.15","-2b","-3.141592653","-4.0e9","-4221.0","0.0013442","01234567890123456789","1.6","11.0","2.7","5.0e10"

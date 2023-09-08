@@ -27,13 +27,13 @@ g.test_seq_scan_error = function()
         box.execute([[SET SESSION "sql_seq_scan" = false;]])
 
         local _, err = box.execute([[SELECT * FROM t;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'T'")
+        t.assert_equals(err.message, "Scanning is not allowed for 't'")
 
         _, err = box.execute([[SELECT * FROM t WHERE i + 1 > 2;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'T'")
+        t.assert_equals(err.message, "Scanning is not allowed for 't'")
 
         _, err = box.execute([[SELECT * FROM t WHERE a > 2;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'T'")
+        t.assert_equals(err.message, "Scanning is not allowed for 't'")
     end)
 end
 
@@ -41,10 +41,10 @@ g.test_seq_scan_success = function()
     g.server:exec(function()
         box.execute([[SET SESSION "sql_seq_scan" = false;]])
 
-        local res, err = box.execute([[SELECT max(i) FROM t;]])
+        local res, err = box.execute([[SELECT MAX(i) FROM t;]])
         t.assert(res ~= nil and err == nil)
 
-        res, err = box.execute([[SELECT min(i) FROM t;]])
+        res, err = box.execute([[SELECT MIN(i) FROM t;]])
         t.assert(res ~= nil and err == nil)
 
         res, err = box.execute([[SELECT * FROM t WHERE i = 2;]])
@@ -81,20 +81,20 @@ g.test_seq_scan_joins = function()
         box.execute([[SET SESSION "sql_seq_scan" = false;]])
 
         local _, err = box.execute([[SELECT * FROM t, s;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'S'")
+        t.assert_equals(err.message, "Scanning is not allowed for 's'")
 
         _, err = box.execute([[SELECT * FROM SEQSCAN t, s;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'S'")
+        t.assert_equals(err.message, "Scanning is not allowed for 's'")
 
         _, err = box.execute([[SELECT * FROM t, SEQSCAN s;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'T'")
+        t.assert_equals(err.message, "Scanning is not allowed for 't'")
 
         local res
         res, err = box.execute([[SELECT * FROM SEQSCAN t, SEQSCAN s;]])
         t.assert(res ~= nil and err == nil)
 
         _, err = box.execute([[SELECT * FROM t, s USING(i);]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'T'")
+        t.assert_equals(err.message, "Scanning is not allowed for 't'")
 
         res, err = box.execute([[SELECT * FROM SEQSCAN t, s USING(i);]])
         t.assert(res ~= nil and err == nil)
@@ -103,19 +103,19 @@ g.test_seq_scan_joins = function()
         t.assert(res ~= nil and err == nil)
 
         _, err = box.execute([[SELECT * FROM t JOIN s;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'S'")
+        t.assert_equals(err.message, "Scanning is not allowed for 's'")
 
         _, err = box.execute([[SELECT * FROM SEQSCAN t JOIN s;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'S'")
+        t.assert_equals(err.message, "Scanning is not allowed for 's'")
 
         _, err = box.execute([[SELECT * FROM t JOIN SEQSCAN s;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'T'")
+        t.assert_equals(err.message, "Scanning is not allowed for 't'")
 
         res, err = box.execute([[SELECT * FROM SEQSCAN t JOIN SEQSCAN s;]])
         t.assert(res ~= nil and err == nil)
 
         _, err = box.execute([[SELECT * FROM t JOIN s USING(i);]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'T'")
+        t.assert_equals(err.message, "Scanning is not allowed for 't'")
 
         res, err = box.execute([[SELECT * FROM SEQSCAN t JOIN s USING(i);]])
         t.assert(res ~= nil and err == nil)
@@ -124,19 +124,19 @@ g.test_seq_scan_joins = function()
         t.assert(res ~= nil and err == nil)
 
         _, err = box.execute([[SELECT * FROM t LEFT JOIN s;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'S'")
+        t.assert_equals(err.message, "Scanning is not allowed for 's'")
 
         _, err = box.execute([[SELECT * FROM SEQSCAN t LEFT JOIN s;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'S'")
+        t.assert_equals(err.message, "Scanning is not allowed for 's'")
 
         _, err = box.execute([[SELECT * FROM t LEFT JOIN SEQSCAN s;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'T'")
+        t.assert_equals(err.message, "Scanning is not allowed for 't'")
 
         res, err = box.execute([[SELECT * FROM SEQSCAN t LEFT JOIN SEQSCAN s;]])
         t.assert(res ~= nil and err == nil)
 
         _, err = box.execute([[SELECT * FROM t LEFT JOIN s USING(i);]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'T'")
+        t.assert_equals(err.message, "Scanning is not allowed for 't'")
 
         res, err = box.execute([[SELECT * FROM SEQSCAN t
                                  LEFT JOIN s USING(i);]])
@@ -147,20 +147,20 @@ g.test_seq_scan_joins = function()
         t.assert(res ~= nil and err == nil)
 
         _, err = box.execute([[SELECT * FROM t INNER JOIN s;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'S'")
+        t.assert_equals(err.message, "Scanning is not allowed for 's'")
 
         _, err = box.execute([[SELECT * FROM SEQSCAN t INNER JOIN s;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'S'")
+        t.assert_equals(err.message, "Scanning is not allowed for 's'")
 
         _, err = box.execute([[SELECT * FROM t INNER JOIN SEQSCAN s;]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'T'")
+        t.assert_equals(err.message, "Scanning is not allowed for 't'")
 
         res, err = box.execute([[SELECT * FROM SEQSCAN t INNER JOIN
                                  SEQSCAN s;]])
         t.assert(res ~= nil and err == nil)
 
         _, err = box.execute([[SELECT * FROM t INNER JOIN s USING(i);]])
-        t.assert_equals(err.message, "Scanning is not allowed for 'T'")
+        t.assert_equals(err.message, "Scanning is not allowed for 't'")
 
         res, err = box.execute([[SELECT * FROM SEQSCAN t
                                  INNER JOIN s USING(i);]])

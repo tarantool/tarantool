@@ -12,15 +12,15 @@ box.execute('CREATE TABLE test (id INT PRIMARY KEY, a NUMBER, b TEXT)')
 ---
 - row_count: 1
 ...
-box.space.TEST:replace{1, 2, '3'}
+box.space.test:replace{1, 2, '3'}
 ---
 - [1, 2, '3']
 ...
-box.space.TEST:replace{7, 8.5, '9'}
+box.space.test:replace{7, 8.5, '9'}
 ---
 - [7, 8.5, '9']
 ...
-box.space.TEST:replace{10, 11, box.NULL}
+box.space.test:replace{10, 11, box.NULL}
 ---
 - [10, 11, null]
 ...
@@ -69,11 +69,11 @@ parameters[1][':value'] = 1
 execute('SELECT * FROM test WHERE id = :value', parameters)
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: number
-  - name: B
+  - name: b
     type: string
   rows:
   - [1, 2, '3']
@@ -196,9 +196,9 @@ execute('SELECT ?, ?, ?, ?, ?', {'abc', -123.456, msgpack.NULL, true, false})
 execute('SELECT ? AS kek, ? AS kek2', {1, 2})
 ---
 - metadata:
-  - name: KEK
+  - name: kek
     type: integer
-  - name: KEK2
+  - name: kek2
     type: integer
   rows:
   - [1, 2]
@@ -247,7 +247,7 @@ execute(sql, parameters)
 execute('SELECT ? AS big_uint', {0xefffffffffffffff})
 ---
 - metadata:
-  - name: BIG_UINT
+  - name: big_uint
     type: integer
   rows:
   - [17293822569102704640]
@@ -307,7 +307,7 @@ test_run:cmd("setopt delimiter ';'")
 if remote then
 	execute("CREATE TABLE t(a VARBINARY PRIMARY KEY);")
 	execute("INSERT INTO t VALUES (X'00');")
-	res = execute("SELECT typeof(?);", box.space.T:select()[1])
+    res = execute("SELECT TYPEOF(?);", box.space.t:select()[1])
 	assert(res['rows'][1][1] == "varbinary")
 	execute("DROP TABLE t;")
 end;
@@ -347,9 +347,9 @@ box.execute("CREATE TABLE t (id INT PRIMARY KEY, a TEXT);")
 box.execute("SELECT * FROM t WHERE a LIKE ?;", {'a%'});
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: string
   rows: []
 ...
@@ -360,13 +360,13 @@ box.execute("INSERT INTO t VALUES (1, 'aA'), (2, 'Ba'), (3, 'A');")
 box.execute("SELECT * FROM t WHERE a LIKE ?;", {'a%'});
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: string
   rows:
   - [1, 'aA']
 ...
-box.space.T:drop()
+box.space.t:drop()
 ---
 ...

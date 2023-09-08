@@ -35,16 +35,16 @@ box.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
 box.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
 ---
 - null
-- Duplicate key exists in unique index "pk_unnamed_FOOBAR_1" in space "FOOBAR" with
+- Duplicate key exists in unique index "pk_unnamed_foobar_1" in space "foobar" with
   old tuple - [1, "foo"] and new tuple - [1, "duplicate"]
 ...
 -- simple select
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -58,9 +58,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar LIMIT 2")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -73,9 +73,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar LIMIT 2")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=2")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -87,9 +87,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=2")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>2")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -101,9 +101,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>2")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>=2")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -116,9 +116,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>=2")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=10000")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -129,9 +129,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=10000")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>10000")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -142,9 +142,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>10000")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -156,9 +156,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2.001")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -171,9 +171,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2.001")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<=2")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -186,9 +186,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<=2")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<100")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -201,9 +201,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<100")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -212,7 +212,7 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
   rows:
   - ['foo', 1, 42, 'awesome']
 ...
-box.execute("SELECT count(*) FROM foobar")
+box.execute("SELECT COUNT(*) FROM foobar")
 ---
 - metadata:
   - name: COLUMN_1
@@ -220,7 +220,7 @@ box.execute("SELECT count(*) FROM foobar")
   rows:
   - [3]
 ...
-box.execute("SELECT count(*) FROM foobar WHERE bar='foo'")
+box.execute("SELECT COUNT(*) FROM foobar WHERE bar='foo'")
 ---
 - metadata:
   - name: COLUMN_1
@@ -231,9 +231,9 @@ box.execute("SELECT count(*) FROM foobar WHERE bar='foo'")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -247,9 +247,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar DESC")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -329,7 +329,7 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
   - name: opts
     type: map
   rows:
-  - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar FOR EACH ROW
+  - ['tfoobar', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar FOR EACH ROW
         BEGIN INSERT INTO barfoo VALUES (''trigger test'', 9999); END'}]
 ...
 -- Many entries
@@ -344,7 +344,7 @@ box.execute("WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt W
 box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 ---
 - metadata:
-  - name: A
+  - name: a
     type: integer
   rows:
   - [840]
@@ -372,7 +372,7 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
   - name: opts
     type: map
   rows:
-  - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar FOR EACH ROW
+  - ['tfoobar', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar FOR EACH ROW
         BEGIN INSERT INTO barfoo VALUES (''trigger test'', 9999); END'}]
 ...
 -- ... functional
@@ -384,9 +384,9 @@ box.execute("INSERT INTO foobar VALUES ('foobar trigger test', 8888)")
 box.execute("SELECT * FROM barfoo WHERE foo = 9999");
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: number
   rows: []
 ...
@@ -399,7 +399,7 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
   - name: opts
     type: map
   rows:
-  - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar FOR EACH ROW
+  - ['tfoobar', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar FOR EACH ROW
         BEGIN INSERT INTO barfoo VALUES (''trigger test'', 9999); END'}]
 ...
 -- and can be dropped just once
@@ -411,7 +411,7 @@ box.execute("DROP TRIGGER tfoobar")
 box.execute("DROP TRIGGER tfoobar")
 ---
 - null
-- Trigger 'TFOOBAR' doesn't exist
+- Trigger 'tfoobar' doesn't exist
 ...
 -- Should be empty
 box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
@@ -427,15 +427,15 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
 box.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 ---
 - null
-- Duplicate key exists in unique index "pk_unnamed_BARFOO_1" in space "BARFOO" with
+- Duplicate key exists in unique index "pk_unnamed_barfoo_1" in space "barfoo" with
   old tuple - ["foo", 1] and new tuple - ["xfoo", 1]
 ...
 box.execute("SELECT * FROM barfoo")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: number
   rows:
   - ['foo', 1]
@@ -445,9 +445,9 @@ box.execute("SELECT * FROM barfoo")
 box.execute("SELECT * FROM foobar");
 ---
 - metadata:
-  - name: FOO
+  - name: foo
     type: integer
-  - name: BAR
+  - name: bar
     type: string
   rows:
   - [2, 'bar']
@@ -456,7 +456,7 @@ box.execute("SELECT * FROM foobar");
 box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 ---
 - metadata:
-  - name: A
+  - name: a
     type: integer
   rows:
   - [840]

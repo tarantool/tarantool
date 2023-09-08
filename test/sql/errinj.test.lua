@@ -58,7 +58,8 @@ cn = remote.connect(box.cfg.listen)
 ch = fiber.channel(200)
 errinj.set("ERRINJ_IPROTO_TX_DELAY", true)
 for i = 1, 100 do fiber.create(function() for j = 1, 10 do cn:execute('REPLACE INTO test VALUES (1)') end ch:put(true) end) end
-for i = 1, 100 do fiber.create(function() for j = 1, 10 do cn.space.TEST:get{1} end ch:put(true) end) end
+for i = 1, 100 do fiber.create(function() for j = 1, 10 do\
+    cn.space.test:get{1} end ch:put(true) end) end
 for i = 1, 200 do ch:get() end
 errinj.set("ERRINJ_IPROTO_TX_DELAY", false)
 
@@ -80,7 +81,7 @@ box.execute("INSERT INTO t1 VALUES (3, 3);")
 box.execute("SELECT * from t1");
 box.execute("SELECT * from t2");
 box.error.injection.set("ERRINJ_WAL_IO", true)
-t = box.space._trigger:get('T1T')
+t = box.space._trigger:get('t1t')
 t_new = t:totable()
 t_new[3]['sql'] = 'CREATE TRIGGER t1t INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES (2, 2); END;'
 _ = box.space._trigger:replace(t, t_new)

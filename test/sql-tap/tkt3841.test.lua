@@ -40,7 +40,7 @@ test:do_execsql_test(
 
         SELECT
           table2.x,
-          (SELECT group_concat(list.value)
+          (SELECT GROUP_CONCAT(list.value)
             FROM list
             WHERE list.key = table2.key)
         FROM table2;

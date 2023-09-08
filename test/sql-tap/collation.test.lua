@@ -452,7 +452,7 @@ for _, data_collation in ipairs(data_collations) do
         test:do_execsql_test(
             extendex_prefix.."select_plan_contains_b-tree",
             string.format("explain query plan select b from t1 order by b %s;",data_collation[1]),
-            {0,0,0,"SCAN TABLE T1 (~1048576 rows)",
+            {0,0,0,"SCAN TABLE t1 (~1048576 rows)",
                 0,0,0,"USE TEMP B-TREE FOR ORDER BY"})
         test:do_execsql_test(
             extendex_prefix.."select",
@@ -465,7 +465,7 @@ for _, data_collation in ipairs(data_collations) do
         test:do_execsql_test(
             extendex_prefix.."select_from_index_plan_does_not_contain_b-tree",
             string.format("explain query plan select b from t1 order by b %s;",data_collation[1]),
-            {0,0,0,"SCAN TABLE T1 USING COVERING INDEX I (~1048576 rows)"})
+            {0,0,0,"SCAN TABLE t1 USING COVERING INDEX i (~1048576 rows)"})
         test:do_execsql_test(
             extendex_prefix.."select_from_index",
             string.format("select b from t1 order by b %s;",data_collation[1]),
@@ -494,7 +494,8 @@ local like_testcases =
         {0, {"aaa","Aab"}} },
     {"2.1.2",
         "EXPLAIN QUERY PLAN SELECT * FROM tx1 WHERE s1 LIKE 'A%';",
-        {0, {0, 0, 0, "SEARCH TABLE TX1 USING PRIMARY KEY (S1>? AND S1<?) (~16384 rows)"}}},
+        {0, {0, 0, 0, "SEARCH TABLE tx1 USING PRIMARY KEY "..
+                      "(s1>? AND s1<?) (~16384 rows)"}}},
     {"2.2.0",
         "SELECT * FROM tx1 WHERE s1 LIKE 'A%' COLLATE \"unicode\" order by s1;",
         {0, {"Aab"}} },
@@ -539,7 +540,7 @@ test:do_catchsql_set_test(like_testcases, prefix)
 test:do_catchsql_test(
         "collation-2.5.0",
         'CREATE TABLE test3 (a int, b int, c int, PRIMARY KEY (a, a COLLATE foo, b, c))',
-        {1, "Collation 'FOO' does not exist"})
+        {1, "Collation 'foo' does not exist"})
 
 -- gh-3805 Check COLLATE passing with string-like args only.
 

@@ -39,7 +39,7 @@ test:do_test(
         -- the output should appear in sorted order.  If random() is evaluated
         -- separately for the result set and the ORDER BY clause, then the output
         -- order will be random.
-        local l1 = test:execsql("SELECT random() AS y FROM t1 ORDER BY 1;")
+        local l1 = test:execsql("SELECT RANDOM() AS y FROM t1 ORDER BY 1;")
         -- Big random() numbers are cdata, but cdata numbers can
         -- not be compared nor sorted correctly.
         for k,_ in pairs(l1) do l1[k] = tonumber(l1[k]) end
@@ -51,7 +51,7 @@ test:do_test(
 test:do_test(
     1.1,
     function()
-        local l1 = test:execsql("SELECT random() AS y FROM t1 ORDER BY random();")
+        local l1 = test:execsql("SELECT RANDOM() AS y FROM t1 ORDER BY RANDOM();")
         for k,_ in pairs(l1) do l1[k] = tonumber(l1[k]) end
         local l2 = table.deepcopy(l1)
         table.sort(l1)
@@ -61,7 +61,7 @@ test:do_test(
 test:do_test(
     1.2,
     function()
-        local l1 = test:execsql("SELECT random() AS y FROM t1 ORDER BY +random();")
+        local l1 = test:execsql("SELECT RANDOM() AS y FROM t1 ORDER BY +RANDOM();")
         for k,_ in pairs(l1) do l1[k] = tonumber(l1[k]) end
         local l2 = table.deepcopy(l1)
         table.sort(l1)

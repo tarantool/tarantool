@@ -31,7 +31,7 @@ box.execute('INSERT INTO t VALUES (null);')
 box.commit();
 ---
 ...
-box.space.T:select();
+box.space.t:select();
 ---
 - - [1]
   - [2]
@@ -39,6 +39,6 @@ box.space.T:select();
   - [4]
   - [6]
 ...
-box.space.T:drop();
+box.space.t:drop();
 ---
 ...

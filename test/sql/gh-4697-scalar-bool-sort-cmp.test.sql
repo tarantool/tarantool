@@ -9,5 +9,5 @@ INSERT INTO test VALUES (3, NULL, NULL);
 -- scalar. Result with order by indexed (using index) and
 -- non-indexed (using no index) must be the same.
 --
-SELECT s2, typeof(s2) FROM SEQSCAN test ORDER BY s2;
-SELECT s3, typeof(s3) FROM SEQSCAN test ORDER BY s3;
+SELECT s2, TYPEOF(s2) FROM SEQSCAN test ORDER BY s2;
+SELECT s3, TYPEOF(s3) FROM SEQSCAN test ORDER BY s3;

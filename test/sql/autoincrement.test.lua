@@ -5,7 +5,7 @@ engine = test_run:get_cfg('engine')
 -- Not automatic sequence should not be removed by DROP TABLE.
 --
 box.schema.user.create('user1')
-test_space = box.schema.create_space('T', {         \
+test_space = box.schema.create_space('t', {         \
     engine = engine,                                \
     format = {{'i', 'integer'}}                     \
 })

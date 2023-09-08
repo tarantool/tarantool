@@ -243,7 +243,7 @@ end
 -- Make sure TYPEOF() properly works with the MAP constructor.
 g.test_map_4 = function()
     g.server:exec(function()
-        local sql = [[SELECT typeof({'a' : 123});]]
+        local sql = [[SELECT TYPEOF({'a' : 123});]]
         local res = {{'map'}}
         t.assert_equals(box.execute(sql).rows, res)
     end)
@@ -252,7 +252,7 @@ end
 -- Make sure PRINTF() properly works with the MAP constructor.
 g.test_map_5 = function()
     g.server:exec(function()
-        local sql = [[SELECT printf({});]]
+        local sql = [[SELECT PRINTF({});]]
         local res = {{'{}'}}
         t.assert_equals(box.execute(sql).rows, res)
     end)

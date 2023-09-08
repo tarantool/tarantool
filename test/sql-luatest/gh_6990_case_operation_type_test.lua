@@ -54,15 +54,15 @@ g.test_case_operation_type = function()
         res = "decimal"
         t.assert_equals(box.execute(sql).metadata[1].type, res)
 
-        sql = [[SELECT typeof(CASE 1 WHEN 1 THEN 1 ELSE {1 : 1} END);]]
+        sql = [[SELECT TYPEOF(CASE 1 WHEN 1 THEN 1 ELSE {1 : 1} END);]]
         res = "any"
         t.assert_equals(box.execute(sql).rows[1][1], res)
 
-        sql = [[SELECT typeof(CASE 1 WHEN 1 THEN 1 ELSE 'asd' END);]]
+        sql = [[SELECT TYPEOF(CASE 1 WHEN 1 THEN 1 ELSE 'asd' END);]]
         res = "scalar"
         t.assert_equals(box.execute(sql).rows[1][1], res)
 
-        sql = [[SELECT typeof(CASE 1 WHEN 1 THEN -1 ELSE 1.5e0 END);]]
+        sql = [[SELECT TYPEOF(CASE 1 WHEN 1 THEN -1 ELSE 1.5e0 END);]]
         res = "double"
         t.assert_equals(box.execute(sql).rows[1][1], res)
     end)

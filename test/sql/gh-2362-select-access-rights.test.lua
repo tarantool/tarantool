@@ -9,27 +9,27 @@ box.execute("INSERT INTO t1 VALUES (1, 1);")
 box.execute("INSERT INTO t2 VALUES (1);")
 
 box.schema.user.grant('guest', 'execute', 'sql')
-box.schema.user.grant('guest','read', 'space', 'T1')
+box.schema.user.grant('guest','read', 'space', 't1')
 c = nb.connect(box.cfg.listen)
 c:execute("SELECT * FROM SEQSCAN t1;")
 
-box.schema.user.revoke('guest','read', 'space', 'T1')
+box.schema.user.revoke('guest','read', 'space', 't1')
 c = nb.connect(box.cfg.listen)
 c:execute("SELECT * FROM SEQSCAN t1;")
 
-box.schema.user.grant('guest','read', 'space', 'T2')
+box.schema.user.grant('guest','read', 'space', 't2')
 c = nb.connect(box.cfg.listen)
 c:execute('SELECT * FROM SEQSCAN t1, SEQSCAN t2 WHERE t1.s1 = t2.s1')
 
 box.execute("CREATE VIEW v AS SELECT * FROM SEQSCAN t1")
 
-box.schema.user.grant('guest','read', 'space', 'V')
+box.schema.user.grant('guest','read', 'space', 'v')
 v = nb.connect(box.cfg.listen)
 c:execute('SELECT * FROM v')
 
 -- Cleanup
-box.schema.user.revoke('guest','read','space', 'V')
-box.schema.user.revoke('guest','read','space', 'T2')
+box.schema.user.revoke('guest','read','space', 'v')
+box.schema.user.revoke('guest','read','space', 't2')
 box.schema.user.revoke('guest', 'execute', 'sql')
 
 box.execute('DROP VIEW v')

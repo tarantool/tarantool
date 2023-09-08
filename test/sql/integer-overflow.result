@@ -131,24 +131,24 @@ box.execute('CREATE TABLE t (id INT PRIMARY KEY);')
 ---
 - row_count: 1
 ...
-box.space.T:insert({9223372036854775809})
+box.space.t:insert({9223372036854775809})
 ---
 - [9223372036854775808]
 ...
-box.space.T:insert({18446744073709551615ULL})
+box.space.t:insert({18446744073709551615ULL})
 ---
 - [18446744073709551615]
 ...
 box.execute('SELECT * FROM t;')
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
   rows:
   - [9223372036854775808]
   - [18446744073709551615]
 ...
-box.space.T:drop()
+box.space.t:drop()
 ---
 ...
 -- Make sure that integers stored in NUMBER field are converted
@@ -158,25 +158,25 @@ box.execute("CREATE TABLE t(id INT PRIMARY KEY, a NUMBER);")
 ---
 - row_count: 1
 ...
-box.space.T:insert({1, 18446744073709551615ULL})
+box.space.t:insert({1, 18446744073709551615ULL})
 ---
 - [1, 18446744073709551615]
 ...
-box.space.T:insert({2, -1})
+box.space.t:insert({2, -1})
 ---
 - [2, -1]
 ...
 box.execute("SELECT * FROM t;")
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: number
   rows:
   - [1, 18446744073709551615]
   - [2, -1]
 ...
-box.space.T:drop()
+box.space.t:drop()
 ---
 ...

@@ -331,10 +331,8 @@ sql_create_column_start(struct Parse *parse)
 	}
 #endif
 
-	struct region *region = &parse->region;
 	struct Token *name = &create_column_def->base.name;
-	char *column_name =
-		sql_normalized_name_region_new(region, name->z, name->n);
+	char *column_name = sql_name_temp(parse, name->z, name->n);
 
 	/*
 	 * Format can be set in Lua, then exact_field_count can be

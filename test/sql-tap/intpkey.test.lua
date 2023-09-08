@@ -39,10 +39,11 @@ test:do_execsql_test(
 test:do_execsql_test(
     "intpkey-1.1",
     [[
-        SELECT "_index"."name" FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T1'
+        SELECT "_index"."name" FROM "_index" JOIN "_space" WHERE
+        "_index"."id" = "_space"."id" AND "_space"."name"='t1'
     ]], {
         -- <intpkey-1.1>
-        "pk_unnamed_T1_1"
+        "pk_unnamed_t1_1"
         -- </intpkey-1.1>
     })
 
@@ -96,7 +97,9 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(5,'second','entry');
     ]], {
         -- <intpkey-1.6>
-        1, "Duplicate key exists in unique index \"pk_unnamed_T1_1\" in space \"T1\" with old tuple - [5, \"hello\", \"world\"] and new tuple - [5, \"second\", \"entry\"]"
+        1, "Duplicate key exists in unique index \"pk_unnamed_t1_1\" in "..
+        "space \"t1\" with old tuple - [5, \"hello\", \"world\"] and new "..
+        "tuple - [5, \"second\", \"entry\"]"
         -- </intpkey-1.6>
     })
 
@@ -178,7 +181,7 @@ test:do_execsql_test(
         SELECT * FROM t1 WHERE a==4;
     ]], {
         -- <intpkey-1.12.2>
-        "/SEARCH TABLE T1 /"
+        "/SEARCH TABLE t1 /"
         -- </intpkey-1.12.2>
     })
 
@@ -249,7 +252,8 @@ test:do_catchsql_test(
         INSERT INTO test VALUES (1);
         UPDATE test SET id = 2;
     ]], {
-        1, "Attempt to modify a tuple field which is part of primary index in space 'TEST'"
+        1, "Attempt to modify a tuple field which is part of primary index "..
+        "in space 'test'"
     })
 
 --### INDICES

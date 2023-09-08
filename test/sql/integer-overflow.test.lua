@@ -39,16 +39,16 @@ box.execute('SELECT CAST(18446744073709551600e0 AS INTEGER);')
 -- proper way, which now means that an error is raised.
 --
 box.execute('CREATE TABLE t (id INT PRIMARY KEY);')
-box.space.T:insert({9223372036854775809})
-box.space.T:insert({18446744073709551615ULL})
+box.space.t:insert({9223372036854775809})
+box.space.t:insert({18446744073709551615ULL})
 box.execute('SELECT * FROM t;')
-box.space.T:drop()
+box.space.t:drop()
 
 -- Make sure that integers stored in NUMBER field are converted
 -- to floating point properly.
 --
 box.execute("CREATE TABLE t(id INT PRIMARY KEY, a NUMBER);")
-box.space.T:insert({1, 18446744073709551615ULL})
-box.space.T:insert({2, -1})
+box.space.t:insert({1, 18446744073709551615ULL})
+box.space.t:insert({2, -1})
 box.execute("SELECT * FROM t;")
-box.space.T:drop()
+box.space.t:drop()

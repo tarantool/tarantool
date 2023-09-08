@@ -117,56 +117,26 @@ sqlDequote(char *z)
 	}
 }
 
-int
-sql_normalize_name(char *dst, int dst_size, const char *src, int src_len)
-{
-	assert(src != NULL);
-	assert(dst != NULL && dst_size > 0);
-	if (sqlIsquote(src[0])){
-		memcpy(dst, src, src_len);
-		dst[src_len] = '\0';
-		sqlDequote(dst);
-		return src_len + 1;
-	}
-	UErrorCode status = U_ZERO_ERROR;
-	assert(icu_ucase_default_map != NULL);
-	int len = ucasemap_utf8ToUpper(icu_ucase_default_map, dst, dst_size,
-				       src, src_len, &status);
-	assert(U_SUCCESS(status) || status == U_BUFFER_OVERFLOW_ERROR);
-	return len + 1;
-}
-
 char *
-sql_normalized_name_new(const char *name, int len)
+sql_name_new(const char *name, int len)
 {
 	int size = len + 1;
 	char *res = sql_xmalloc(size);
-	int rc = sql_normalize_name(res, size, name, len);
-	if (rc <= size)
-		return res;
-
-	size = rc;
-	res = sql_xrealloc(res, size);
-	rc = sql_normalize_name(res, size, name, len);
-	assert(rc <= size);
+	memcpy(res, name, len);
+	res[len] = '\0';
+	sqlDequote(res);
 	return res;
 }
 
 char *
-sql_normalized_name_region_new(struct region *r, const char *name, int len)
+sql_name_temp(struct Parse *parser, const char *name, int len)
 {
+	struct region *r = &parser->region;
 	int size = len + 1;
-	size_t region_svp = region_used(r);
 	char *res = xregion_alloc(r, size);
-	int rc = sql_normalize_name(res, size, name, len);
-	if (rc <= size)
-		return res;
-
-	size = rc;
-	region_truncate(r, region_svp);
-	res = xregion_alloc(r, size);
-	if (sql_normalize_name(res, size, name, len) > size)
-		unreachable();
+	memcpy(res, name, len);
+	res[len] = '\0';
+	sqlDequote(res);
 	return res;
 }
 

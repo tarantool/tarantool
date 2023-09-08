@@ -71,23 +71,23 @@ box.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, a INTEGER CHECK (a > 5) ON 
 box.execute("CREATE TABLE te17 (s1 INT NULL PRIMARY KEY NOT NULL);")
 ---
 - null
-- Primary index of space 'TE17' can not contain nullable parts
+- Primary index of space 'te17' can not contain nullable parts
 ...
 box.execute("CREATE TABLE te17 (s1 INT NULL PRIMARY KEY);")
 ---
 - null
-- Primary index of space 'TE17' can not contain nullable parts
+- Primary index of space 'te17' can not contain nullable parts
 ...
 box.execute("CREATE TABLE test (a int PRIMARY KEY, b int NULL ON CONFLICT IGNORE);")
 ---
 - null
-- 'Failed to execute SQL statement: NULL declaration for column ''B'' of table ''TEST''
+- 'Failed to execute SQL statement: NULL declaration for column ''b'' of table ''test''
   has been already set to ''none'''
 ...
 box.execute("CREATE TABLE test (a int, b int NULL, c int, PRIMARY KEY(a, b, c))")
 ---
 - null
-- Primary index of space 'TEST' can not contain nullable parts
+- Primary index of space 'test' can not contain nullable parts
 ...
 -- Several NOT NULL REPLACE constraints work
 --
@@ -106,11 +106,11 @@ box.execute("INSERT INTO a VALUES(2, NULL, NULL);")
 box.execute("SELECT * FROM a;")
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: integer
-  - name: B
+  - name: b
     type: integer
   rows:
   - [1, 1, 2]
@@ -141,9 +141,9 @@ box.execute("UPDATE OR IGNORE tj SET s1 = s1 + 1;")
 box.execute("SELECT s1, s2 FROM tj;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: integer
-  - name: S2
+  - name: s2
     type: integer
   rows:
   - [1, 2]
@@ -156,9 +156,9 @@ box.execute("UPDATE OR IGNORE tj SET s2 = s2 + 1;")
 box.execute("SELECT s1, s2 FROM tj;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: integer
-  - name: S2
+  - name: s2
     type: integer
   rows:
   - [1, 2]
@@ -189,9 +189,9 @@ box.execute("REPLACE INTO tj VALUES (1, 3);")
 box.execute("SELECT * FROM tj;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: integer
-  - name: S2
+  - name: s2
     type: integer
   rows:
   - [1, 3]
@@ -207,9 +207,9 @@ box.execute("UPDATE OR REPLACE tj SET s2 = s2 + 1;")
 box.execute("SELECT * FROM tj;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: integer
-  - name: S2
+  - name: s2
     type: integer
   rows:
   - [1, 4]

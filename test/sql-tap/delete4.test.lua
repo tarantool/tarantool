@@ -57,14 +57,14 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t1;
         CREATE TABLE t1(x INTEGER PRIMARY KEY, y INT , z SCALAR);
-        INSERT INTO t1 VALUES(1, 0, randomblob(200));
-        INSERT INTO t1 VALUES(2, 1, randomblob(200));
-        INSERT INTO t1 VALUES(3, 0, randomblob(200));
-        INSERT INTO t1 VALUES(4, 1, randomblob(200));
-        INSERT INTO t1 VALUES(5, 0, randomblob(200));
-        INSERT INTO t1 VALUES(6, 1, randomblob(200));
-        INSERT INTO t1 VALUES(7, 0, randomblob(200));
-        INSERT INTO t1 VALUES(8, 1, randomblob(200));
+        INSERT INTO t1 VALUES(1, 0, RANDOMBLOB(200));
+        INSERT INTO t1 VALUES(2, 1, RANDOMBLOB(200));
+        INSERT INTO t1 VALUES(3, 0, RANDOMBLOB(200));
+        INSERT INTO t1 VALUES(4, 1, RANDOMBLOB(200));
+        INSERT INTO t1 VALUES(5, 0, RANDOMBLOB(200));
+        INSERT INTO t1 VALUES(6, 1, RANDOMBLOB(200));
+        INSERT INTO t1 VALUES(7, 0, RANDOMBLOB(200));
+        INSERT INTO t1 VALUES(8, 1, RANDOMBLOB(200));
     ]])
 
 test:do_execsql_test(

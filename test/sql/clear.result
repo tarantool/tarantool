@@ -29,13 +29,13 @@ for i=1, 100 do box.execute(string.format("INSERT INTO zoobar VALUES (%d, %d, 'c
 box.execute("SELECT * FROM zoobar")
 ---
 - metadata:
-  - name: C1
+  - name: c1
     type: integer
-  - name: C2
+  - name: c2
     type: integer
-  - name: C3
+  - name: c3
     type: string
-  - name: C4
+  - name: c4
     type: integer
   rows:
   - [2, 1, 'c3', 444]
@@ -148,13 +148,13 @@ box.execute("DELETE FROM zoobar")
 box.execute("SELECT * from zoobar")
 ---
 - metadata:
-  - name: C1
+  - name: c1
     type: integer
-  - name: C2
+  - name: c2
     type: integer
-  - name: C3
+  - name: c3
     type: string
-  - name: C4
+  - name: c4
     type: integer
   rows: []
 ...
@@ -178,7 +178,7 @@ box.execute("DROP TABLE zoobar")
 box.execute("CREATE TABLE t1(id INT PRIMARY KEY, CONSTRAINT ck1 CHECK(id > 0), CONSTRAINT ck1 CHECK(id < 0));")
 ---
 - null
-- Function for the check constraint 'CK1' with name 'check_T1_CK1' already exists
+- Function for the check constraint 'ck1' with name 'check_t1_ck1' already exists
 ...
 box.space.t1
 ---

@@ -65,7 +65,7 @@ end
 -- Make sure that the default type for the first argument of ROUND() is DECIMAL.
 g.test_round_default_type = function()
     g.server:exec(function()
-        local sql = [[SELECT typeof(ROUND(?));]]
+        local sql = [[SELECT TYPEOF(ROUND(?));]]
         local res = {{'decimal'}}
         t.assert_equals(box.execute(sql, {1}).rows, res)
     end)

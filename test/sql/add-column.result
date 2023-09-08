@@ -26,7 +26,7 @@ ALTER TABLE t1 ADD COLUMN b INT;
 ALTER TABLE t1 ADD b SCALAR;
  | ---
  | - null
- | - Space field 'B' is duplicate
+ | - Space field 'b' is duplicate
  | ...
 
 --
@@ -39,20 +39,20 @@ CREATE VIEW v AS SELECT * FROM t1;
 ALTER TABLE v ADD c INT;
  | ---
  | - null
- | - 'Can''t modify space ''V'': view can not be altered'
+ | - 'Can''t modify space ''v'': view can not be altered'
  | ...
 
 \set language lua
  | ---
  | - true
  | ...
-view = box.space._space.index[2]:select('V')[1]:totable()
+view = box.space._space.index[2]:select('v')[1]:totable()
  | ---
  | ...
 view_format = view[7]
  | ---
  | ...
-f = {type = 'string', nullable_action = 'none', name = 'C', is_nullable = true}
+f = {type = 'string', nullable_action = 'none', name = 'c', is_nullable = true}
  | ---
  | ...
 table.insert(view_format, f)
@@ -66,7 +66,7 @@ view[7] = view_format
  | ...
 box.space._space:replace(view)
  | ---
- | - error: 'Can''t modify space ''V'': view can not be altered'
+ | - error: 'Can''t modify space ''v'': view can not be altered'
  | ...
 \set language sql
  | ---
@@ -100,7 +100,7 @@ INSERT INTO pk_check VALUES (1, 1);
 INSERT INTO pk_check VALUES (1, 1);
  | ---
  | - null
- | - Duplicate key exists in unique index "pk_unnamed_PK_CHECK_1" in space "PK_CHECK"
+ | - Duplicate key exists in unique index "pk_unnamed_pk_check_1" in space "pk_check"
  |   with old tuple - [1, 1] and new tuple - [1, 1]
  | ...
 DROP TABLE pk_check;
@@ -126,7 +126,7 @@ INSERT INTO unique_check VALUES (1, 1);
 INSERT INTO unique_check VALUES (2, 1);
  | ---
  | - null
- | - Duplicate key exists in unique index "unique_unnamed_UNIQUE_CHECK_2" in space "UNIQUE_CHECK"
+ | - Duplicate key exists in unique index "unique_unnamed_unique_check_2" in space "unique_check"
  |   with old tuple - [1, 1] and new tuple - [2, 1]
  | ...
 DROP TABLE unique_check;
@@ -148,7 +148,7 @@ ALTER TABLE ck_check ADD b INT CHECK (b > 0);
 INSERT INTO ck_check VALUES (1, 0);
  | ---
  | - null
- | - Check constraint 'ck_unnamed_CK_CHECK_B_1' failed for field '2 (B)'
+ | - Check constraint 'ck_unnamed_ck_check_b_1' failed for field '2 (b)'
  | ...
 INSERT INTO ck_check VALUES (1, 1);
  | ---
@@ -158,7 +158,7 @@ DROP TABLE ck_check;
  | ---
  | - row_count: 1
  | ...
-DELETE FROM "_func" WHERE "name" == 'check_CK_CHECK_ck_unnamed_CK_CHECK_B_1';
+DELETE FROM "_func" WHERE "name" == 'check_ck_check_ck_unnamed_ck_check_b_1';
  | ---
  | - row_count: 1
  | ...
@@ -177,19 +177,19 @@ ALTER TABLE fk_check ADD b INT REFERENCES t1(a);
 INSERT INTO fk_check VALUES (0, 1);
  | ---
  | - null
- | - 'Foreign key constraint ''fk_unnamed_FK_CHECK_B_1'' failed for field ''2 (B)'':
+ | - 'Foreign key constraint ''fk_unnamed_fk_check_b_1'' failed for field ''2 (b)'':
  |   foreign tuple was not found'
  | ...
 INSERT INTO fk_check VALUES (2, 0);
  | ---
  | - null
- | - 'Foreign key constraint ''fk_unnamed_FK_CHECK_B_1'' failed for field ''2 (B)'':
+ | - 'Foreign key constraint ''fk_unnamed_fk_check_b_1'' failed for field ''2 (b)'':
  |   foreign tuple was not found'
  | ...
 INSERT INTO fk_check VALUES (2, 1);
  | ---
  | - null
- | - 'Foreign key constraint ''fk_unnamed_FK_CHECK_B_1'' failed for field ''2 (B)'':
+ | - 'Foreign key constraint ''fk_unnamed_fk_check_b_1'' failed for field ''2 (b)'':
  |   foreign tuple was not found'
  | ...
 INSERT INTO t1 VALUES (1, 1);
@@ -239,13 +239,13 @@ UPDATE self SET b = 2;
 UPDATE self SET b = 3;
  | ---
  | - null
- | - 'Foreign key constraint ''fk_unnamed_SELF_B_1'' failed for field ''3 (B)'': foreign
+ | - 'Foreign key constraint ''fk_unnamed_self_b_1'' failed for field ''3 (b)'': foreign
  |   tuple was not found'
  | ...
 UPDATE self SET a = 3;
  | ---
  | - null
- | - 'Foreign key ''fk_unnamed_SELF_B_1'' integrity check failed: index was not found'
+ | - 'Foreign key ''fk_unnamed_self_b_1'' integrity check failed: index was not found'
  | ...
 DROP TABLE self;
  | ---
@@ -290,7 +290,7 @@ TRUNCATE TABLE autoinc_check;
 ALTER TABLE autoinc_check ADD c INT AUTOINCREMENT;
  | ---
  | - null
- | - 'Can''t add AUTOINCREMENT: space AUTOINC_CHECK can''t feature more than one AUTOINCREMENT
+ | - 'Can''t add AUTOINCREMENT: space autoinc_check can''t feature more than one AUTOINCREMENT
  |   field'
  | ...
 DROP TABLE autoinc_check;
@@ -320,9 +320,9 @@ INSERT INTO collate_check VALUES (2, 'A');
 SELECT * FROM collate_check WHERE b LIKE 'a';
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: integer
- |   - name: B
+ |   - name: b
  |     type: string
  |   rows:
  |   - [1, 'a']
@@ -351,9 +351,9 @@ INSERT INTO default_check(a) VALUES (1);
 SELECT * FROM default_check;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: integer
- |   - name: B
+ |   - name: b
  |     type: string
  |   rows:
  |   - [1, 'a']
@@ -381,9 +381,9 @@ INSERT INTO null_check(a) VALUES (1);
 SELECT * FROM null_check;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: integer
- |   - name: B
+ |   - name: b
  |     type: string
  |   rows:
  |   - [1, null]
@@ -407,7 +407,7 @@ ALTER TABLE notnull_check ADD b TEXT NOT NULL;
 INSERT INTO notnull_check(a) VALUES (1);
  | ---
  | - null
- | - 'Failed to execute SQL statement: NOT NULL constraint failed: NOTNULL_CHECK.B'
+ | - 'Failed to execute SQL statement: NOT NULL constraint failed: notnull_check.b'
  | ...
 INSERT INTO notnull_check VALUES (1, 'not null');
  | ---
@@ -452,7 +452,7 @@ DROP TABLE non_empty;
  | ---
  | - true
  | ...
-_ = box.schema.space.create('WITHOUT_FORMAT')
+_ = box.schema.space.create('without_format')
  | ---
  | ...
 \set language sql
@@ -479,7 +479,7 @@ DROP TABLE without_format;
  | ---
  | - true
  | ...
-with_format = box.schema.space.create('WITH_FORMAT')
+with_format = box.schema.space.create('with_format')
  | ---
  | ...
 with_format:format{{name = 'A', type = 'unsigned'}}
@@ -530,17 +530,17 @@ INSERT INTO t2 VALUES (1, 1, 1);
 INSERT INTO t2 VALUES (2, 1, 1);
  | ---
  | - null
- | - Duplicate key exists in unique index "unique_unnamed_T2_2" in space "T2" with old
+ | - Duplicate key exists in unique index "unique_unnamed_t2_2" in space "t2" with old
  |   tuple - [1, 1, 1] and new tuple - [2, 1, 1]
  | ...
 SELECT * FROM t2;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: integer
- |   - name: B
+ |   - name: b
  |     type: integer
- |   - name: C
+ |   - name: c
  |     type: integer
  |   rows:
  |   - [1, 1, 1]

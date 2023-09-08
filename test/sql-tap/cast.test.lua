@@ -37,7 +37,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.2",
     [[
-        SELECT typeof(x'616263')
+        SELECT TYPEOF(x'616263')
     ]], {
         -- <cast-1.2>
         "varbinary"
@@ -57,7 +57,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.4",
     [[
-        SELECT typeof(CAST(x'616263' AS text))
+        SELECT TYPEOF(CAST(x'616263' AS text))
     ]], {
         -- <cast-1.4>
         "string"
@@ -87,7 +87,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.8",
     [[
-        SELECT typeof(CAST(x'616263' AS SCALAR))
+        SELECT TYPEOF(CAST(x'616263' AS SCALAR))
     ]], {
         -- <cast-1.8>
         "scalar"
@@ -117,7 +117,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.12",
     [[
-        SELECT typeof(NULL)
+        SELECT TYPEOF(NULL)
     ]], {
         -- <cast-1.12>
         "NULL"
@@ -137,7 +137,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.14",
     [[
-        SELECT typeof(CAST(NULL AS text))
+        SELECT TYPEOF(CAST(NULL AS text))
     ]], {
         -- <cast-1.14>
         "NULL"
@@ -157,7 +157,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.16",
     [[
-        SELECT typeof(CAST(NULL AS NUMBER))
+        SELECT TYPEOF(CAST(NULL AS NUMBER))
     ]], {
         -- <cast-1.16>
         "NULL"
@@ -177,7 +177,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.18",
     [[
-        SELECT typeof(CAST(NULL AS SCALAR))
+        SELECT TYPEOF(CAST(NULL AS SCALAR))
     ]], {
         -- <cast-1.18>
         "NULL"
@@ -197,7 +197,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.20",
     [[
-        SELECT typeof(CAST(NULL AS integer))
+        SELECT TYPEOF(CAST(NULL AS integer))
     ]], {
         -- <cast-1.20>
         "NULL"
@@ -217,7 +217,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.22",
     [[
-        SELECT typeof(123)
+        SELECT TYPEOF(123)
     ]], {
         -- <cast-1.22>
         "integer"
@@ -237,7 +237,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.24",
     [[
-        SELECT typeof(CAST(123 AS text))
+        SELECT TYPEOF(CAST(123 AS text))
     ]], {
         -- <cast-1.24>
         "string"
@@ -257,7 +257,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.26",
     [[
-        SELECT typeof(CAST(123 AS DOUBLE))
+        SELECT TYPEOF(CAST(123 AS DOUBLE))
     ]], {
         -- <cast-1.26>
         "double"
@@ -277,7 +277,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.28",
     [[
-        SELECT typeof(CAST(123 AS SCALAR))
+        SELECT TYPEOF(CAST(123 AS SCALAR))
     ]], {
         -- <cast-1.28>
         "scalar"
@@ -297,7 +297,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.30",
     [[
-        SELECT typeof(CAST(123 AS integer))
+        SELECT TYPEOF(CAST(123 AS integer))
     ]], {
         -- <cast-1.30>
         "integer"
@@ -317,7 +317,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.32",
     [[
-        SELECT typeof(123.456e0)
+        SELECT TYPEOF(123.456e0)
     ]], {
         -- <cast-1.32>
         "double"
@@ -337,7 +337,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.34",
     [[
-        SELECT typeof(CAST(123.456e0 AS text))
+        SELECT TYPEOF(CAST(123.456e0 AS text))
     ]], {
         -- <cast-1.34>
         "string"
@@ -357,7 +357,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.36",
     [[
-        SELECT typeof(CAST(123.456e0 AS DOUBLE))
+        SELECT TYPEOF(CAST(123.456e0 AS DOUBLE))
     ]], {
         -- <cast-1.36>
         "double"
@@ -377,7 +377,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.38",
     [[
-        SELECT typeof(CAST(123.456e0 AS SCALAR))
+        SELECT TYPEOF(CAST(123.456e0 AS SCALAR))
     ]], {
         -- <cast-1.38>
         "scalar"
@@ -397,7 +397,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.38",
     [[
-        SELECT typeof(CAST(123.456e0 AS integer))
+        SELECT TYPEOF(CAST(123.456e0 AS integer))
     ]], {
         -- <cast-1.38>
         "integer"
@@ -417,7 +417,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.42",
     [[
-        SELECT typeof('123abc')
+        SELECT TYPEOF('123abc')
     ]], {
         -- <cast-1.42>
         "string"
@@ -437,7 +437,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.44",
     [[
-        SELECT typeof(CAST('123abc' AS text))
+        SELECT TYPEOF(CAST('123abc' AS text))
     ]], {
         -- <cast-1.44>
         "string"
@@ -457,7 +457,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "cast-1.48",
     [[
-        SELECT typeof(CAST('123abc' AS SCALAR))
+        SELECT TYPEOF(CAST('123abc' AS SCALAR))
     ]], {
         -- <cast-1.48>
         "scalar"
@@ -508,7 +508,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "case-1.61",
     [[
-        SELECT typeof(CAST(null AS NUMBER))
+        SELECT TYPEOF(CAST(null AS NUMBER))
     ]], {
         -- <case-1.61>
         "NULL"
@@ -528,7 +528,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "case-1.63",
     [[
-        SELECT typeof(CAST(1 AS NUMBER))
+        SELECT TYPEOF(CAST(1 AS NUMBER))
     ]], {
         -- <case-1.63>
         "number"
@@ -548,7 +548,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "case-1.65",
     [[
-        SELECT typeof(CAST('1' AS NUMBER))
+        SELECT TYPEOF(CAST('1' AS NUMBER))
     ]], {
         -- <case-1.65>
         "number"
@@ -578,7 +578,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "case-1.69",
     [[
-        SELECT typeof(CAST(x'31' AS NUMBER))
+        SELECT TYPEOF(CAST(x'31' AS NUMBER))
     ]], {
         -- <case-1.69>
         1, "Type mismatch: can not convert varbinary(x'31') to number"
@@ -1012,7 +1012,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "cast-8",
     [[
-        SELECT CAST(substr('true       ', 0, 6) AS BOOLEAN);
+        SELECT CAST(SUBSTR('true       ', 0, 6) AS BOOLEAN);
     ]], {
         true
     })

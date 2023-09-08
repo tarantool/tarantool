@@ -1041,7 +1041,7 @@ sql_expr_new(int op, const struct Token *token)
 struct Expr *
 sql_expr_new_dequoted(int op, const struct Token *token)
 {
-	int extra_size = 0, rc;
+	int extra_size = 0;
 	if (token != NULL) {
 		int val;
 		assert(token->z != NULL || token->n == 0);
@@ -1053,19 +1053,9 @@ sql_expr_new_dequoted(int op, const struct Token *token)
 	if (token == NULL || token->n == 0)
 		return e;
 	e->u.zToken = (char *) &e[1];
-	if (op != TK_ID && op != TK_COLLATE && op != TK_FUNCTION) {
-		memcpy(e->u.zToken, token->z, token->n);
-		e->u.zToken[token->n] = '\0';
-		sqlDequote(e->u.zToken);
-	} else if ((rc = sql_normalize_name(e->u.zToken, extra_size, token->z,
-					    token->n)) > extra_size) {
-		extra_size = rc;
-		e = sql_xrealloc(e, sizeof(*e) + extra_size);
-		e->u.zToken = (char *) &e[1];
-		if (sql_normalize_name(e->u.zToken, extra_size, token->z,
-				       token->n) > extra_size)
-			unreachable();
-	}
+	memcpy(e->u.zToken, token->z, token->n);
+	e->u.zToken[token->n] = '\0';
+	sqlDequote(e->u.zToken);
 	return e;
 }
 
@@ -1876,7 +1866,7 @@ sqlExprListSetName(Parse * pParse,	/* Parsing context */
 	struct ExprList_item *item = &pList->a[pList->nExpr - 1];
 	assert(item->zName == NULL);
 	if (dequote) {
-		item->zName = sql_normalized_name_new(pName->z, pName->n);
+		item->zName = sql_name_new(pName->z, pName->n);
 	} else {
 		item->zName = sql_xstrndup(pName->z, pName->n);
 	}

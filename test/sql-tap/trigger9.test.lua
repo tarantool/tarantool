@@ -45,7 +45,7 @@ local function has_rowdata(sql)
 --     X(41, "X!cmd", [=[["expr","[lsearch [execsql \"explain $sql\"] RowData]>=0"]]=])
 end
 
-box.schema.func.create('RANDSTR', {language = 'Lua',
+box.schema.func.create('randstr', {language = 'Lua',
                    body = 'function(n) return test.randstr(n) end',
                    param_list = {'integer'}, returns = 'string',
                    exports = {'LUA', 'SQL'}})
@@ -174,7 +174,7 @@ test:do_execsql_test(
         -- </trigger9-1.4.3>
     })
 
-box.func.RANDSTR:drop()
+box.func.randstr:drop()
 
 test:do_execsql_test(
     "trigger9-1.5.1",
@@ -390,7 +390,7 @@ test:do_execsql_test(
     "trigger9-3.6",
     [[
         CREATE VIEW v1 AS
-          SELECT CAST(sum(a) AS INTEGER) AS a, max(b) AS b FROM t3 GROUP BY t3.a HAVING b>'two';
+          SELECT CAST(SUM(a) AS INTEGER) AS a, MAX(b) AS b FROM t3 GROUP BY t3.a HAVING b>'two';
         DROP TRIGGER IF EXISTS trig1;
         CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 FOR EACH ROW BEGIN
           INSERT INTO t2 VALUES(old.a);

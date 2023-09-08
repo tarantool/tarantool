@@ -57,13 +57,13 @@ g.test_containers_error = function()
         _, err = box.execute([[SELECT true[1];]])
         t.assert_equals(err.message, res)
 
-        _, err = box.execute([[SELECT uuid()[1];]])
+        _, err = box.execute([[SELECT UUID()[1];]])
         t.assert_equals(err.message, res)
 
-        _, err = box.execute([[SELECT now()[1];]])
+        _, err = box.execute([[SELECT NOW()[1];]])
         t.assert_equals(err.message, res)
 
-        _, err = box.execute([[SELECT (now() - now())[1];]])
+        _, err = box.execute([[SELECT (NOW() - NOW())[1];]])
         t.assert_equals(err.message, res)
 
         _, err = box.execute([[SELECT CAST(1 AS NUMBER)[1];]])
@@ -110,19 +110,19 @@ end
 -- Make sure that the received element is of type ANY.
 g.test_containers_elem_type = function()
     g.server:exec(function()
-        local sql = [[SELECT typeof([123, 234, 356, 467][2]);]]
+        local sql = [[SELECT TYPEOF([123, 234, 356, 467][2]);]]
         t.assert_equals(box.execute(sql).rows, {{'any'}})
 
         sql = [[SELECT [123, 234, 356, 467][2];]]
         t.assert_equals(box.execute(sql).metadata[1].type, 'any')
 
-        sql = [[SELECT typeof({'one' : 123, 3 : 'two', '123' : true}[3]);]]
+        sql = [[SELECT TYPEOF({'one' : 123, 3 : 'two', '123' : true}[3]);]]
         t.assert_equals(box.execute(sql).rows, {{'any'}})
 
         sql = [[SELECT {'one' : 123, 3 : 'two', '123' : true}[3];]]
         t.assert_equals(box.execute(sql).metadata[1].type, 'any')
 
-        sql = [[SELECT typeof({'one' : [11, 22, 33], 3 : 'two'}['one']);]]
+        sql = [[SELECT TYPEOF({'one' : [11, 22, 33], 3 : 'two'}['one']);]]
         t.assert_equals(box.execute(sql).rows, {{'any'}})
 
         sql = [[SELECT {'one' : [11, 22, 33], 3 : 'two'}['one'];]]

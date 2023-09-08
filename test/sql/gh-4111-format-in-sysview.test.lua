@@ -9,5 +9,5 @@ test_run = require('test_run').new()
 box.space._vspace.index[1]:count(1) > 0
 
 box.execute([[CREATE VIEW t AS SELECT "name" FROM "_vspace" y]])
-box.execute([[SELECT * from t WHERE "name" = 'T']])
+box.execute([[SELECT * from t WHERE "name" = 't']])
 box.execute([[DROP VIEW t]])

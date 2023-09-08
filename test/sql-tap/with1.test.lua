@@ -122,7 +122,7 @@ test:do_catchsql_test(3.1, [[
   SELECT * FROM tmp1;
 ]], {
   -- <3.1>
-  1, "circular reference: TMP1"
+  1, "circular reference: tmp1"
   -- </3.1>
 })
 
@@ -133,7 +133,7 @@ test:do_catchsql_test(3.2, [[
   SELECT * FROM tmp;
 ]], {
   -- <3.2>
-  1, "Ambiguous table name in WITH query: TMP"
+  1, "Ambiguous table name in WITH query: tmp"
   -- </3.2>
 })
 
@@ -333,7 +333,7 @@ test:do_catchsql_test("5.6.1", [[
   SELECT * FROM i;
 ]], {
   -- <5.6.1>
-  1, "table I has 1 values for 2 columns"
+  1, "table i has 1 values for 2 columns"
   -- </5.6.1>
 })
 
@@ -342,7 +342,7 @@ test:do_catchsql_test("5.6.2", [[
   SELECT * FROM i;
 ]], {
   -- <5.6.2>
-  1, "table I has 2 values for 1 columns"
+  1, "table i has 2 values for 1 columns"
   -- </5.6.2>
 })
 
@@ -352,7 +352,7 @@ test:do_catchsql_test("5.6.3", [[
   SELECT * FROM i;
 ]], {
   -- <5.6.3>
-  1, "table I has 2 values for 1 columns"
+  1, "table i has 2 values for 1 columns"
   -- </5.6.3>
 })
 
@@ -361,7 +361,7 @@ test:do_catchsql_test("5.6.4", [[
   SELECT * FROM i;
 ]], {
   -- <5.6.4>
-  1, "table I has 2 values for 1 columns"
+  1, "table i has 2 values for 1 columns"
   -- </5.6.4>
 })
 
@@ -388,7 +388,7 @@ test:do_catchsql_test("5.6.7", [[
   SELECT * FROM i;
 ]], {
   -- <5.6.7>
-  1, "table I has 2 values for 1 columns"
+  1, "table i has 2 values for 1 columns"
   -- </5.6.7>
 })
 
@@ -435,7 +435,7 @@ test:do_execsql_test(6.3, [[
     UNION ALL
     SELECT id, fpath || '/' || name FROM f, flat WHERE parentid=fid
   )
-  SELECT count(*) FROM flat;
+  SELECT COUNT(*) FROM flat;
 ]], {
   -- <6.3>
   15
@@ -448,7 +448,7 @@ test:do_execsql_test(6.4, [[
     UNION ALL
     SELECT i+1 FROM x WHERE i<10
   )
-  SELECT count(*) FROM x
+  SELECT COUNT(*) FROM x
 ]], {
   -- <6.4>
   10
@@ -500,7 +500,7 @@ test:do_catchsql_test(7.4, [[
   SELECT id FROM t;
 ]], {
   -- <7.4>
-  1, "recursive reference in a subquery: T"
+  1, "recursive reference in a subquery: t"
   -- </7.4>
 })
 
@@ -513,7 +513,7 @@ test:do_catchsql_test(7.5, [[
   SELECT id FROM t;
 ]], {
   -- <7.5>
-  1, "multiple recursive references: T"
+  1, "multiple recursive references: t"
   -- </7.5>
 })
 
@@ -526,7 +526,7 @@ test:do_catchsql_test(7.6, [[
   SELECT id FROM t;
 ]], {
   -- <7.6>
-  1, "circular reference: T"
+  1, "circular reference: t"
   -- </7.6>
 })
 
@@ -543,13 +543,13 @@ test:do_execsql_test("8.1-mandelbrot", [[
        WHERE (x*x + y*y) < 4.0 AND iter<28
     ),
     m2(iter, cx, cy) AS (
-      SELECT max(iter), cx, cy FROM m GROUP BY cx, cy
+      SELECT MAX(iter), cx, cy FROM m GROUP BY cx, cy
     ),
     a(t) AS (
-      SELECT group_concat( substr(' .+*#', 1+LEAST(iter/7,4), 1), '')
+      SELECT GROUP_CONCAT( SUBSTR(' .+*#', 1+LEAST(iter/7,4), 1), '')
       FROM m2 GROUP BY cy
     )
-  SELECT group_concat(CAST(TRIM(TRAILING FROM t) AS VARBINARY),x'0a') FROM a;
+  SELECT GROUP_CONCAT(CAST(TRIM(TRAILING FROM t) AS VARBINARY),x'0a') FROM a;
 ]], {
   -- <8.1-mandelbrot>
   require('varbinary').new([[                                    ....#
@@ -594,19 +594,19 @@ test:do_execsql_test("8.2-soduko", [[
 
     /* The tricky bit. */
     x(s, ind) AS (
-      SELECT sud, position('.', sud) FROM input
+      SELECT sud, POSITION('.', sud) FROM input
       UNION ALL
       SELECT
-        substr(s, 1, ind-1) || z || substr(s, ind+1),
-        position('.', substr(s, 1, ind-1) || z || substr(s, ind+1))
+        SUBSTR(s, 1, ind-1) || z || SUBSTR(s, ind+1),
+        POSITION('.', SUBSTR(s, 1, ind-1) || z || SUBSTR(s, ind+1))
        FROM x, digits AS z
       WHERE ind>0
         AND NOT EXISTS (
               SELECT 1
                 FROM digits AS lp
-               WHERE z.z = substr(s, ((ind-1)/9)*9 + lp, 1)
-                  OR z.z = substr(s, ((ind-1)%9) + (lp-1)*9 + 1, 1)
-                  OR z.z = substr(s, (((ind-1)/3) % 3) * 3
+               WHERE z.z = SUBSTR(s, ((ind-1)/9)*9 + lp, 1)
+                  OR z.z = SUBSTR(s, ((ind-1)%9) + (lp-1)*9 + 1, 1)
+                  OR z.z = SUBSTR(s, (((ind-1)/3) % 3) * 3
                           + ((ind-1)/27) * 27 + lp
                           + ((lp-1) / 3) * 6, 1) LIMIT 1
            )
@@ -1036,7 +1036,7 @@ test:do_catchsql_test(13.3, [[
   SELECT i FROM c;
 ]], {
   -- <13.3>
-  1, "table C has 1 values for 2 columns"
+  1, "table c has 1 values for 2 columns"
   -- </13.3>
 })
 
@@ -1061,7 +1061,7 @@ test:do_execsql_test(14.1, [[
 --
 test:do_catchsql_test(16.1, [[
   WITH RECURSIVE
-    i(x) AS (VALUES(1) UNION SELECT count(*) FROM i)
+    i(x) AS (VALUES(1) UNION SELECT COUNT(*) FROM i)
   SELECT * FROM i;
 ]], {
   -- <16.1>

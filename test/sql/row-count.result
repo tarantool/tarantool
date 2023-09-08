@@ -234,7 +234,7 @@ box.execute("SELECT ROW_COUNT();")
 box.execute("SELECT * FROM tt2;")
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
   rows: []
 ...
@@ -352,9 +352,9 @@ box.execute("INSERT OR IGNORE INTO t VALUES (null, 1), (null, -1), (null, 2);")
 box.execute("SELECT * FROM t;")
 ---
 - metadata:
-  - name: I
+  - name: i
     type: integer
-  - name: A
+  - name: a
     type: integer
   rows:
   - [1, 1]
@@ -364,7 +364,7 @@ box.execute("DROP TABLE t;")
 ---
 - row_count: 1
 ...
-box.func.check_T_ck_unnamed_T_A_1:drop()
+box.func.check_t_ck_unnamed_t_a_1:drop()
 ---
 ...
 --
@@ -383,6 +383,6 @@ box.execute('DROP TABLE t1;')
 ---
 - row_count: 1
 ...
-box.func.check_T1_CK1:drop()
+box.func.check_t1_ck1:drop()
 ---
 ...

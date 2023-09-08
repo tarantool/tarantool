@@ -129,7 +129,7 @@ test:do_execsql_test(
     "tkt1443-1.1",
     [[
         select distinct
-            Items.Item as trove, UP.pattern as pattern
+            Items.item as trove, UP.pattern as pattern
         from
            ( select
                Permissions.labelId as labelId,
@@ -165,7 +165,7 @@ test:do_execsql_test(
         CREATE UNIQUE INDEX PermissionsIdx
              ON Permissions(userGroupId, labelId, itemId);
         select distinct
-            Items.Item as trove, UP.pattern as pattern
+            Items.item as trove, UP.pattern as pattern
         from
            ( select
                Permissions.labelId as labelId,

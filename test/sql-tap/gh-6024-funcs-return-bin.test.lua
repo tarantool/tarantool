@@ -15,7 +15,7 @@ box.schema.func.create("gh-6024-funcs-return-bin.ret_bin", {
 test:do_execsql_test(
     "gh-6024-1",
     [[
-        SELECT typeof("gh-6024-funcs-return-bin.ret_bin"());
+        SELECT TYPEOF("gh-6024-funcs-return-bin.ret_bin"());
     ]], {
         "varbinary"
     })
@@ -30,7 +30,7 @@ box.schema.func.create("gh-6024-funcs-return-bin.ret_uuid", {
 test:do_execsql_test(
     "gh-6024-2",
     [[
-        SELECT typeof("gh-6024-funcs-return-bin.ret_uuid"());
+        SELECT TYPEOF("gh-6024-funcs-return-bin.ret_uuid"());
     ]], {
         "uuid"
     })
@@ -45,7 +45,7 @@ box.schema.func.create("gh-6024-funcs-return-bin.ret_decimal", {
 test:do_execsql_test(
     "gh-6024-3",
     [[
-        SELECT typeof("gh-6024-funcs-return-bin.ret_decimal"());
+        SELECT TYPEOF("gh-6024-funcs-return-bin.ret_decimal"());
     ]], {
         "decimal"
     })
@@ -61,7 +61,7 @@ box.schema.func.create("get_uuid", {
 test:do_execsql_test(
     "gh-6024-4",
     [[
-        SELECT typeof("get_uuid"()), "get_uuid"() == "gh-6024-funcs-return-bin.ret_uuid"();
+        SELECT TYPEOF("get_uuid"()), "get_uuid"() == "gh-6024-funcs-return-bin.ret_uuid"();
     ]], {
         "uuid", true
     })
@@ -77,7 +77,7 @@ box.schema.func.create("get_decimal", {
 test:do_execsql_test(
     "gh-6024-5",
     [[
-        SELECT typeof("get_decimal"()), "get_decimal"() == "gh-6024-funcs-return-bin.ret_decimal"();
+        SELECT TYPEOF("get_decimal"()), "get_decimal"() == "gh-6024-funcs-return-bin.ret_decimal"();
     ]], {
         "decimal", true
     })

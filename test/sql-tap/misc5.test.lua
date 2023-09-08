@@ -87,7 +87,7 @@ test:do_execsql_test(
         INSERT INTO t2 SELECT DISTINCT(x) FROM t2_temp;
         COMMIT;
         DROP TABLE t2_temp;
-        select count(*) from t2;
+        select COUNT(*) from t2;
     ]], {
         -- <misc5-2.1>
         371
@@ -176,7 +176,7 @@ test:do_execsql_test(
               --     one      10
               --     three    5
               --
-              SELECT DISTINCT artist,sum(timesplayed) AS total
+              SELECT DISTINCT artist, SUM(timesplayed) AS total
               FROM songs
               GROUP BY LOWER(artist)
               ORDER BY total DESC

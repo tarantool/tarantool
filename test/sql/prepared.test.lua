@@ -52,7 +52,7 @@ box.info:sql()
 -- Test local interface and basic capabilities of prepared statements.
 --
 execute('CREATE TABLE test (id INT PRIMARY KEY, a NUMBER, b TEXT)')
-space = box.space.TEST
+space = box.space.test
 space:replace{1, 2, '3'}
 space:replace{4, 5, '6'}
 space:replace{7, 8.5, '9'}
@@ -117,7 +117,7 @@ s = prepare("ALTER TABLE test2 ADD CONSTRAINT fk1 FOREIGN KEY (id) REFERENCES te
 execute(s.stmt_id)
 execute(s.stmt_id)
 unprepare(s.stmt_id)
-box.space.TEST2:drop()
+box.space.test2:drop()
 
 s = prepare("CREATE TRIGGER tr1 INSERT ON test1 FOR EACH ROW BEGIN DELETE FROM test1; END;")
 execute(s.stmt_id)
@@ -137,7 +137,7 @@ unprepare(s.stmt_id)
 -- DQL
 --
 execute('CREATE TABLE test (id INT PRIMARY KEY, a NUMBER, b TEXT)')
-space = box.space.TEST
+space = box.space.test
 space:replace{1, 2, '3'}
 space:replace{4, 5, '6'}
 space:replace{7, 8.5, '9'}
@@ -156,7 +156,8 @@ end;
 test_run:cmd("setopt delimiter ''");
 unprepare(s.stmt_id)
 
-s = prepare("SELECT count(*), count(id - 3), max(b), abs(id) FROM test WHERE b = '3';")
+s = prepare("SELECT COUNT(*), COUNT(id - 3), MAX(b), ABS(id) FROM test "..\
+            "WHERE b = '3';")
 execute(s.stmt_id)
 execute(s.stmt_id)
 unprepare(s.stmt_id)
@@ -173,11 +174,11 @@ s = prepare([[WITH RECURSIVE \
                       SELECT iter+1, cx, cy, x*x-y*y + cx, 2.0*x*y + cy FROM m \
                           WHERE (x*x + y*y) < 4.0 AND iter<28), \
                       m2(iter, cx, cy) AS ( \
-                          SELECT max(iter), cx, cy FROM m GROUP BY cx, cy), \
+                          SELECT MAX(iter), cx, cy FROM m GROUP BY cx, cy), \
                       a(t) AS ( \
-                          SELECT group_concat( substr(' .+*#', 1+LEAST(iter/7,4), 1), '') \
+                          SELECT GROUP_CONCAT(SUBSTR(' .+*#', 1+LEAST(iter/7,4), 1), '') \
                               FROM m2 GROUP BY cy) \
-                  SELECT group_concat(CAST(TRIM(TRAILING FROM t) AS VARBINARY), x'0a') FROM a;]])
+                  SELECT GROUP_CONCAT(CAST(TRIM(TRAILING FROM t) AS VARBINARY), x'0a') FROM a;]])
 
 res = execute(s.stmt_id)
 res.metadata
@@ -339,5 +340,5 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 box.cfg{sql_cache_size = 5 * 1024 * 1024}
-box.space.TEST:drop()
+box.space.test:drop()
 box.schema.func.drop('SLEEP')

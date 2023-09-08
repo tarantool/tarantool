@@ -41,7 +41,7 @@ test:execsql [[
 test:do_execsql_test(
     "limit-1.0",
     [[
-        SELECT count(*) FROM t1
+        SELECT COUNT(*) FROM t1
     ]], {
         -- <limit-1.0>
         32
@@ -51,7 +51,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "limit-1.1",
     [[
-        SELECT count(*) FROM t1 LIMIT  5
+        SELECT COUNT(*) FROM t1 LIMIT  5
     ]], {
         -- <limit-1.1>
         32
@@ -213,7 +213,7 @@ test:do_execsql_test(
     "limit-2.1",
     [[
         CREATE VIEW v1 AS SELECT x,y FROM t1 LIMIT 2;
-        SELECT count(*) FROM (SELECT * FROM v1);
+        SELECT COUNT(*) FROM (SELECT * FROM v1);
     ]], {
         -- <limit-2.1>
         2
@@ -255,18 +255,18 @@ test:do_test(
             CREATE TABLE t3(x INT primary KEY);
             START TRANSACTION;
             INSERT INTO t3 SELECT x FROM t1 ORDER BY x LIMIT 10 OFFSET 1;
-            INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
-            INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
-            INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
-            INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
-            INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
-            INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
-            INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
-            INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
-            INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
-            INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
+            INSERT INTO t3 SELECT x+(SELECT MAX(x) FROM t3) FROM t3;
+            INSERT INTO t3 SELECT x+(SELECT MAX(x) FROM t3) FROM t3;
+            INSERT INTO t3 SELECT x+(SELECT MAX(x) FROM t3) FROM t3;
+            INSERT INTO t3 SELECT x+(SELECT MAX(x) FROM t3) FROM t3;
+            INSERT INTO t3 SELECT x+(SELECT MAX(x) FROM t3) FROM t3;
+            INSERT INTO t3 SELECT x+(SELECT MAX(x) FROM t3) FROM t3;
+            INSERT INTO t3 SELECT x+(SELECT MAX(x) FROM t3) FROM t3;
+            INSERT INTO t3 SELECT x+(SELECT MAX(x) FROM t3) FROM t3;
+            INSERT INTO t3 SELECT x+(SELECT MAX(x) FROM t3) FROM t3;
+            INSERT INTO t3 SELECT x+(SELECT MAX(x) FROM t3) FROM t3;
             COMMIT;
-            SELECT count(*) FROM t3;
+            SELECT COUNT(*) FROM t3;
         ]]
 
 
@@ -352,7 +352,7 @@ test:do_execsql_test(
         DELETE FROM t5;
         INSERT INTO t5 SELECT a.id + 1000 * b.id, a.x*100+b.x, a.y*100+b.y FROM t1 AS a, t1 AS b
                        ORDER BY 2, 3 LIMIT 1000;
-        SELECT count(*), sum(x), sum(y), min(x), max(x), min(y), max(y) FROM t5;
+        SELECT COUNT(*), SUM(x), SUM(y), MIN(x), MAX(x), MIN(y), MAX(y) FROM t5;
     ]], {
         -- <limit-5.5>
         1000, 1528204, 593161, 0, 3107, 505, 1005
@@ -581,7 +581,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "limit-8.1",
     [[
-        SELECT DISTINCT cast(round(x/100) as integer) FROM t3 LIMIT 5;
+        SELECT DISTINCT cast(ROUND(x/100) as integer) FROM t3 LIMIT 5;
     ]], {
         -- <limit-8.1>
         0, 1, 2, 3, 4
@@ -591,7 +591,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "limit-8.2",
     [[
-        SELECT DISTINCT cast(round(x/100) as integer) FROM t3 LIMIT 5 OFFSET 5;
+        SELECT DISTINCT cast(ROUND(x/100) as integer) FROM t3 LIMIT 5 OFFSET 5;
     ]], {
         -- <limit-8.2>
         5, 6, 7, 8, 9
@@ -601,7 +601,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "limit-8.3",
     [[
-        SELECT DISTINCT cast(round(x/100) as integer) FROM t3 LIMIT 5 OFFSET 25;
+        SELECT DISTINCT cast(ROUND(x/100) as integer) FROM t3 LIMIT 5 OFFSET 25;
     ]], {
         -- <limit-8.3>
         25, 26, 27, 28, 29
@@ -767,7 +767,7 @@ test:do_test(
 test:do_catchsql_test(
     "limit-12.1",
     [[
-        SELECT * FROM t1 LIMIT replace(1)
+        SELECT * FROM t1 LIMIT REPLACE(1)
     ]], {
         -- <limit-12.1>
         1, "Wrong number of arguments is passed to REPLACE(): expected 3, got 1"
@@ -777,7 +777,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "limit-12.2",
     [[
-        SELECT * FROM t1 LIMIT 5 OFFSET replace(1)
+        SELECT * FROM t1 LIMIT 5 OFFSET REPLACE(1)
     ]], {
         -- <limit-12.2>
         1, 'Wrong number of arguments is passed to REPLACE(): expected 3, got 1'
@@ -790,7 +790,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 LIMIT x
     ]], {
         -- <limit-12.3>
-        1, "Can’t resolve field 'X'"
+        1, "Can’t resolve field 'x'"
         -- </limit-12.3>
     })
 
@@ -800,7 +800,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 LIMIT 1 OFFSET x
     ]], {
         -- <limit-12.4>
-        1, "Can’t resolve field 'X'"
+        1, "Can’t resolve field 'x'"
         -- </limit-12.4>
     })
 

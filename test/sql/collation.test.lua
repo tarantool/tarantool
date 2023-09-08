@@ -13,7 +13,7 @@ box.execute("SELECT 1 LIMIT 1 OFFSET 1 COLLATE BINARY;")
 box.execute("SELECT 1 LIMIT 1, 1 COLLATE BINARY;")
 box.execute("SELECT 1 LIMIT 1 COLLATE BINARY, 1;")
 
--- gh-3052: upper/lower support only default locale
+-- gh-3052: UPPER/LOWER support only default locale
 -- For tr-TR result depends on collation
 box.execute([[CREATE TABLE tu (descriptor VARCHAR(50) PRIMARY KEY, letter VARCHAR(50))]]);
 box.internal.collation.create('TURKISH', 'ICU', 'tr-TR', {strength='primary'});
@@ -22,18 +22,22 @@ box.execute([[INSERT INTO tu VALUES ('Latin Small Letter I U+0069','i');]])
 box.execute([[INSERT INTO tu VALUES ('Latin Capital Letter I With Dot Above U+0130','İ');]])
 box.execute([[INSERT INTO tu VALUES ('Latin Small Letter Dotless I U+0131','ı');]])
 -- Without collation
-box.execute([[SELECT descriptor, upper(letter) AS upper,lower(letter) AS lower FROM tu;]])
+box.execute([[SELECT descriptor, UPPER(letter) AS upper, ]]..\
+            [[LOWER(letter) AS lower FROM tu;]])
 -- With collation
-box.execute([[SELECT descriptor, upper(letter COLLATE "TURKISH") AS upper,lower(letter COLLATE "TURKISH") AS lower FROM tu;]])
+box.execute([[SELECT descriptor, UPPER(letter COLLATE "TURKISH") AS upper, ]]..\
+            [[LOWER(letter COLLATE "TURKISH") AS lower FROM tu;]])
 box.internal.collation.drop('TURKISH')
 
 -- For de-DE result is actually the same
 box.internal.collation.create('GERMAN', 'ICU', 'de-DE', {strength='primary'});
-box.execute([[INSERT INTO tu VALUES ('German Small Letter Sharp S U+00DF','ß');]])
+box.execute("INSERT INTO tu VALUES('German Small Letter Sharp S U+00DF','ß');")
 -- Without collation
-box.execute([[SELECT descriptor, upper(letter), letter FROM tu where UPPER(letter) = 'SS';]])
+box.execute([[SELECT descriptor, UPPER(letter), ]]..\
+            [[letter FROM tu where UPPER(letter) = 'SS';]])
 -- With collation
-box.execute([[SELECT descriptor, upper(letter COLLATE "GERMAN"), letter FROM tu where UPPER(letter COLLATE "GERMAN") = 'SS';]])
+box.execute([[SELECT descriptor, UPPER(letter COLLATE "GERMAN"), ]]..\
+            [[letter FROM tu where UPPER(letter COLLATE "GERMAN") = 'SS';]])
 box.internal.collation.drop('GERMAN')
 box.execute(([[DROP TABLE tu]]))
 
@@ -47,8 +51,8 @@ cn:close()
 -- Explicitly set BINARY collation is predifined and has ID.
 --
 box.execute("CREATE TABLE t (id INT PRIMARY KEY, a TEXT, b TEXT COLLATE \"binary\");")
-box.space.T:format()[2]['collation']
-box.space.T:format()[3]['collation']
+box.space.t:format()[2]['collation']
+box.space.t:format()[3]['collation']
 box.execute("DROP TABLE t;")
 
 -- BINARY collation works in the same way as there is no collation
@@ -85,7 +89,7 @@ box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = c COLLATE \"unicode\";
 -- length  and resulting collation which depends on arguments
 -- is processed correctly.
 --
-box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = substr();")
+box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = SUBSTR();")
 
 -- Compound queries perform implicit comparisons between values.
 -- Hence, rules for collations compatibilities are the same.
@@ -178,8 +182,8 @@ box.execute("INSERT INTO t4b VALUES('gHz', 'xxx', 4);")
 box.execute("SELECT a FROM t4b ORDER BY a COLLATE \"unicode_ci\" || ''")
 box.execute("SELECT a FROM t4b ORDER BY a || b")
 
-box.space.T4A:drop()
-box.space.T4B:drop()
+box.space.t4a:drop()
+box.space.t4b:drop()
 
 -- gh-3537 Duplicate key error for an index that is not unique
 -- pk - default, sc - unicode_ci
@@ -309,11 +313,11 @@ box.execute("DROP TABLE qms4;")
 --
 box.execute("CREATE TABLE jj (s1 INT PRIMARY KEY, s2 VARCHAR(3) COLLATE \"unicode_ci\");")
 box.execute("INSERT INTO jj VALUES (1,'A'), (2,'a')")
-box.execute("SELECT DISTINCT trim(s2) FROM jj;")
+box.execute("SELECT DISTINCT TRIM(s2) FROM jj;")
 box.execute("INSERT INTO jj VALUES (3, 'aS'), (4, 'AS');")
-box.execute("SELECT DISTINCT replace(s2, 'S', 's') FROM jj;")
-box.execute("SELECT DISTINCT substr(s2, 1, 1) FROM jj;")
-box.space.JJ:drop()
+box.execute("SELECT DISTINCT REPLACE(s2, 'S', 's') FROM jj;")
+box.execute("SELECT DISTINCT SUBSTR(s2, 1, 1) FROM jj;")
+box.space.jj:drop()
 
 -- gh-3573: Strength in the _collation space
 -- Collation without 'strength' option set now has explicit

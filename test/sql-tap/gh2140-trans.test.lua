@@ -29,7 +29,8 @@ test:do_execsql_test('rollback1_check',
 
 for _, verb in ipairs({'ROLLBACK', 'ABORT'}) do
     box.execute('DELETE FROM t2')
-    local answer = "Duplicate key exists in unique index \"unique_unnamed_T1_2\" in space \"T1\""
+    local answer = [[Duplicate key exists in unique index ]]..
+                   [["unique_unnamed_t1_2" in space "t1"]]
     test:do_catchsql_prefix_test('insert1_'..verb,
                           [[START TRANSACTION;
                             INSERT INTO t2 VALUES (20, 2, 2);

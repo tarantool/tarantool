@@ -112,7 +112,7 @@ test:do_test(
             DELETE FROM t2;
             DELETE FROM t3;
             INSERT INTO t2 VALUES('ABC'),('def'),('GHI'),('jkl');
-            INSERT INTO t3 SELECT lower(a) FROM t2;
+            INSERT INTO t3 SELECT LOWER(a) FROM t2;
             SELECT a COLLATE "unicode_ci" FROM t2 EXCEPT SELECT a FROM t3
              ORDER BY 1
         ]]

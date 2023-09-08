@@ -4260,7 +4260,7 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 			if (pList->a[i].zName == 0) {
 				char *str = pList->a[i].zSpan;
 				int len = strlen(str);
-				char *name = sql_normalized_name_new(str, len);
+				char *name = sql_name_new(str, len);
 				pList->a[i].zName = name;
 			}
 		}

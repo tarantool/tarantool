@@ -94,7 +94,7 @@ test:do_catchsql_test(
         SELECT * FROM (SELECT a,b FROM t1 WHERE 1=x.a) AS x;
     ]], {
         -- <tkt3346-2.1>
-        1, "Field 'A' was not found in space 'X' format"
+        1, "Field 'a' was not found in space 'x' format"
         -- </tkt3346-2.1>
     })
 

@@ -8,12 +8,12 @@ INSERT INTO t VALUES (true), (false);
 \set language lua
 test_run = require('test_run').new()
 test_run:cmd("setopt delimiter ';'")
-box.schema.func.create('RETURN_TYPE', {language = 'Lua',
+box.schema.func.create('return_type', {language = 'Lua',
 		       is_deterministic = true,
 		       body = 'function(x) return type(x) end',
 		       returns = 'string', param_list = {'any'},
 		       exports = {'LUA', 'SQL'}});
-box.schema.func.create('IS_BOOLEAN', {language = 'Lua',
+box.schema.func.create('is_boolean', {language = 'Lua',
 		       is_deterministic = true,
 		       body = "function(x) return type(x) == 'boolean' end",
 		       returns = 'boolean', param_list = {'any'},
@@ -80,13 +80,13 @@ SELECT is_boolean(a) FROM t LIMIT 1;
 SELECT is_boolean('true');
 
 -- Check BOOLEAN as argument of scalar function.
-SELECT abs(a) FROM t0;
-SELECT lower(a) FROM t0;
-SELECT upper(a) FROM t0;
-SELECT quote(a) FROM t0;
+SELECT ABS(a) FROM t0;
+SELECT LOWER(a) FROM t0;
+SELECT UPPER(a) FROM t0;
+SELECT QUOTE(a) FROM t0;
 -- gh-4462: LENGTH didn't take BOOLEAN arguments.
-SELECT length(a) FROM t0;
-SELECT typeof(a) FROM t0;
+SELECT LENGTH(a) FROM t0;
+SELECT TYPEOF(a) FROM t0;
 
 -- Check BOOLEAN as argument of aggregate function.
 SELECT AVG(a) FROM t0;
@@ -99,7 +99,7 @@ SELECT GROUP_CONCAT(a, ' +++ ') FROM t0;
 
 -- Check BOOLEAN as binding parameter.
 \set language lua
-box.execute('SELECT ?, ?, return_type($1), typeof($2);', {true, false})
+box.execute('SELECT ?, ?, return_type($1), TYPEOF($2);', {true, false})
 
 parameters = {}
 parameters[1] = {}
@@ -1247,6 +1247,6 @@ DROP TABLE t0;
 DROP TABLE ts;
 DROP TABLE t;
 
-DELETE FROM "_func" WHERE "name" = 'check_T1_CK';
-DELETE FROM "_func" WHERE "name" = 'RETURN_TYPE';
-DELETE FROM "_func" WHERE "name" = 'IS_BOOLEAN';
+DELETE FROM "_func" WHERE "name" = 'check_t1_ck';
+DELETE FROM "_func" WHERE "name" = 'return_type';
+DELETE FROM "_func" WHERE "name" = 'is_boolean';

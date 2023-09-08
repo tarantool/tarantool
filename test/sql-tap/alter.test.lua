@@ -9,7 +9,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(1, 1, 2);
         CREATE TABLE "t1x1"(c  INT UNIQUE, b  INT PRIMARY KEY);
         INSERT INTO "t1x1" VALUES(3, 4);
-        CREATE INDEX t1i1 ON T1(B);
+        CREATE INDEX t1i1 ON t1(b);
         CREATE INDEX t1i2 ON t1(a, b);
         CREATE INDEX i3 ON "t1x1"(b, c);
         CREATE TABLE "Space_Table"(id  INT PRIMARY KEY, e INT , f INT , g  INT UNIQUE);
@@ -26,7 +26,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "alter-1.2",
     [[
-        SELECT count(*) FROM "_space" WHERE "name" IN ('T1', 't1x1', 'Space_Table')
+        SELECT COUNT(*) FROM "_space" WHERE "name" IN
+        ('t1', 't1x1', 'Space_Table');
     ]], {
         -- <alter-1.2>
         3
@@ -36,8 +37,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "alter-1.3",
     [[
-        ALTER TABLE T1 RENAME to "t1";
-        ALTER TABLE "t1x1" RENAME TO T2;
+        ALTER TABLE "t1x1" RENAME TO t2;
         ALTER TABLE "Space_Table" RENAME to SPACE_TABLE;
     ]], {
         -- <alter-1.3>
@@ -59,7 +59,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "alter-1.5",
     [[
-        SELECT count(*) FROM "_space" WHERE "name" IN ('T1', 't1x1', 'Space_Table', 'SPACE_TABLE', 't1', 'T2');
+        SELECT COUNT(*) FROM "_space" WHERE "name" IN
+        ('t1', 't1x1', 'Space_Table', 'SPACE_TABLE', 't1', 't2');
     ]], {
         -- <alter-1.5>
         3
@@ -72,7 +73,7 @@ test:do_catchsql_test(
         ALTER TABLE none RENAME TO hi;
     ]], {
         -- <alter-2.1>
-        1, "Space 'NONE' does not exist"
+        1, "Space 'none' does not exist"
         -- </alter-2.1>
     })
 
@@ -83,7 +84,7 @@ test:do_catchsql_test(
         ALTER TABLE t2 RENAME TO t3;
     ]], {
         -- <alter-2.2>
-        1, "Space 'T3' already exists"
+        1, "Space 't3' already exists"
         -- </alter-2.2>
     })
 
@@ -128,7 +129,8 @@ test:do_execsql_test(
     [[
         CREATE TABLE t6(id  INT PRIMARY KEY, a INT , b INT , c INT );
         CREATE TABLE tab(id  INT PRIMARY KEY);
-        CREATE TRIGGER trig1 AFTER INSERT ON T6 FOR EACH ROW BEGIN INSERT INTO tab VALUES(new.id); END;
+        CREATE TRIGGER trig1 AFTER INSERT ON t6 FOR EACH ROW
+        BEGIN INSERT INTO tab VALUES(new.id); END;
         INSERT INTO t6 VALUES(1, 1, 2, 3);
         SELECT * FROM tab;
 
@@ -268,7 +270,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "alter-5.2",
     [[
-        ALTER TABLE "xyz1234abc" RENAME TO xyzabc;
+        ALTER TABLE "xyz1234abc" RENAME TO XYZABC;
         SELECT "name" FROM "_space" WHERE "name" = 'XYZABC';
     ]], {
         -- <alter-5.2>
@@ -304,7 +306,7 @@ test:do_execsql_test(
         SELECT "name" FROM "_trigger";
     ]], {
         -- <alter-6.2>
-        "ON_T1", "ON_T3"
+        "on_t1", "on_t3"
         -- </alter-6.2>
     })
 
@@ -359,7 +361,7 @@ test:do_catchsql_test(
         INSERT INTO t5 VALUES(2, 1, 3);
     ]], {
         -- <alter-7.2>
-        1, "Foreign key constraint 'fk_unnamed_T1_2' failed: foreign tuple "..
+        1, "Foreign key constraint 'fk_unnamed_t1_2' failed: foreign tuple "..
         "was not found"
         -- </alter-7.2>
     })
@@ -370,7 +372,7 @@ test:do_catchsql_test(
         INSERT INTO t5 VALUES(2, 2, 2);
     ]], {
         -- <alter-7.3>
-        1, "Foreign key constraint 'fk_unnamed_T1_1' failed: foreign tuple "..
+        1, "Foreign key constraint 'fk_unnamed_t1_1' failed: foreign tuple "..
         "was not found"
         -- </alter-7.3>
     })
@@ -405,7 +407,7 @@ test:do_catchsql_test(
         SELECT * FROM t1;
     ]], {
         -- <alter-7.6>
-        1, "Space 'T1' does not exist"
+        1, "Space 't1' does not exist"
         -- </alter-7.6>
     })
 
@@ -437,7 +439,7 @@ test:do_catchsql_test(
         INSERT INTO t5 VALUES(4, 5, 3);
     ]], {
         -- <alter-7.9>
-        1, "Foreign key constraint 'fk_unnamed_T1_1' failed: foreign tuple "..
+        1, "Foreign key constraint 'fk_unnamed_t1_1' failed: foreign tuple "..
         "was not found"
         -- </alter-7.9>
     })
@@ -493,7 +495,7 @@ test:do_catchsql_test(
         INSERT INTO t5 VALUES(6, 5, 10);
     ]], {
         -- <alter-7.14>
-        1, "Foreign key constraint 'fk_unnamed_T1_2' failed: foreign tuple "..
+        1, "Foreign key constraint 'fk_unnamed_t1_2' failed: foreign tuple "..
         "was not found"
         -- </alter-7.14>
     })
@@ -527,7 +529,7 @@ test:do_test(
         local format = {}
         format[1] = { name = 'id', type = 'scalar'}
         format[2] = { name = 'f2', type = 'scalar'}
-        box.schema.create_space('T', {format = format})
+        box.schema.create_space('t', {format = format})
     end,
     {})
 
@@ -542,7 +544,7 @@ test:do_catchsql_test(
 test:do_test(
     "alter-8.1.2",
     function()
-        return box.space.T.index[0].id
+        return box.space.t.index[0].id
     end, 0)
 
 test:do_catchsql_prefix_test(
@@ -565,7 +567,7 @@ test:do_catchsql_test(
 test:do_test(
     "alter-8.3.2",
     function()
-        local i = box.space.T.index[1]
+        local i = box.space.t.index[1]
         return i.id
     end, 1)
 

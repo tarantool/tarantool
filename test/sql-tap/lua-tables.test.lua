@@ -40,7 +40,7 @@ test:do_execsql_test(
 
 test:do_catchsql_test(
     "lua-tables-4",
-    [[SELECT * from t1]],
+    [[SELECT * from T1]],
     {1, "Space 'T1' does not exist"}
 )
 
@@ -54,9 +54,9 @@ test:do_test(
     "lua-tables-prepare-6",
     function()
         local format, s
-        format = {{name = "CODE", type = "integer"},
-            {name = "NAME", type = "scalar"}}
-        s = box.schema.create_space("ELEMENT", {format = format})
+        format = {{name = "Code", type = "integer"},
+            {name = "Name", type = "scalar"}}
+        s = box.schema.create_space("Element", {format = format})
         s:create_index('pk', {parts = {1, 'scalar'}})
         s:replace{1, 'Elem1'}
         s:replace{2, 'Elem2'}
@@ -64,19 +64,19 @@ test:do_test(
         s:replace{4, 'Elem4'}
         s:replace{5, 'Elem5'}
 
-        format  = {{name = "CODEOR", type = "scalar"},
-            {name = "CODE", type = "scalar"}}
-        s = box.schema.create_space("ELEMOR", {format = format})
+        format  = {{name = "CodeOr", type = "scalar"},
+            {name = "Code", type = "scalar"}}
+        s = box.schema.create_space("ElemOr", {format = format})
         s:create_index('pk', {parts = {1, 'scalar', 2, 'scalar'}})
         s:replace{3, 4}
         s:replace{4, 5}
 
-        format = {{name = "CODEAND", type = "scalar"},
-            {name = "CODE", type = "scalar"},
-            {name = "ATTR1", type = "scalar"},
-            {name = "ATTR2", type = "scalar"},
-            {name = "ATTR3", type = "scalar"}}
-        s = box.schema.create_space("ELEMAND", {format = format})
+        format = {{name = "CodeAnd", type = "scalar"},
+            {name = "Code", type = "scalar"},
+            {name = "Attr1", type = "scalar"},
+            {name = "Attr2", type = "scalar"},
+            {name = "Attr3", type = "scalar"}}
+        s = box.schema.create_space("ElemAnd", {format = format})
         s:create_index('pk', {parts = {1, "scalar", 2, "scalar"}})
         s:replace{1, 3, 'a', 'b', 'c'}
         s:replace{1, 2, 'x', 'y', 'z'}
@@ -149,7 +149,7 @@ test:do_test(
 test:do_eqp_test(
     11,
     [[
-        SELECT * FROM test WHERE id = 2;
+        SELECT * FROM TEST WHERE ID = 2;
     ]], {
         {0, 0, 0, 'SEARCH TABLE TEST USING PRIMARY KEY (ID=?) (~1 row)'}
     })
@@ -157,7 +157,7 @@ test:do_eqp_test(
 test:do_eqp_test(
     12,
     [[
-        SELECT * FROM test WHERE a = 5;
+        SELECT * FROM TEST WHERE A = 5;
     ]], {
         {0, 0, 0, 'SEARCH TABLE TEST USING COVERING INDEX secondary (A=?) (~1 row)'}
     })
@@ -173,7 +173,7 @@ test:do_test(
 test:do_catchsql_test(
     "no-format-create-index",
     [[
-        CREATE INDEX i1 ON t(id);
+        CREATE INDEX i1 ON T(id);
     ]],
         {1, "SQL does not support space without format"})
 

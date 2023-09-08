@@ -82,7 +82,7 @@ box.execute("CREATE TABLE t (i INT PRIMARY KEY AUTOINCREMENT, a INT check (a > 0
 box.execute("INSERT OR IGNORE INTO t VALUES (null, 1), (null, -1), (null, 2);")
 box.execute("SELECT * FROM t;")
 box.execute("DROP TABLE t;")
-box.func.check_T_ck_unnamed_T_A_1:drop()
+box.func.check_t_ck_unnamed_t_a_1:drop()
 
 --
 -- gh-4363: make sure that row_count has increased in the case of
@@ -91,4 +91,4 @@ box.func.check_T_ck_unnamed_T_A_1:drop()
 box.execute('CREATE TABLE t1(id INTEGER PRIMARY KEY);')
 box.execute('ALTER TABLE t1 ADD CONSTRAINT ck1 CHECK(id > 0);')
 box.execute('DROP TABLE t1;')
-box.func.check_T1_CK1:drop()
+box.func.check_t1_ck1:drop()

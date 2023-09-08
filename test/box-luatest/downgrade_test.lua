@@ -818,8 +818,8 @@ g.test_downgrade_sql_tuple_check_contraints = function(cg)
     cg.server:exec(function()
         local helper = require('test.box-luatest.downgrade_helper')
 
-        box.execute([[CREATE TABLE t(i INT PRIMARY KEY, a INT);]])
-        box.execute([[ALTER TABLE t ADD CONSTRAINT c CHECK (a > 10);]])
+        box.execute([[CREATE TABLE T(I INT PRIMARY KEY, A INT);]])
+        box.execute([[ALTER TABLE T ADD CONSTRAINT C CHECK (A > 10);]])
 
         local function constraint_before()
             local space = box.space._space.index.name:get{'T'}
@@ -828,7 +828,7 @@ g.test_downgrade_sql_tuple_check_contraints = function(cg)
             t.assert(func_id ~= nil)
             local func = box.space._func:get{func_id}
             t.assert(func ~= nil)
-            t.assert_equals(func.body, 'a > 10')
+            t.assert_equals(func.body, 'A > 10')
         end
 
         local function constraint_after(func_id)
@@ -836,7 +836,7 @@ g.test_downgrade_sql_tuple_check_contraints = function(cg)
             t.assert(box.space._func:get{func_id} == nil)
             t.assert(space.flags.constraint == nil)
             local result = box.space._ck_constraint:get{space.id, 'C'}
-            local expected = {space.id, 'C', false, 'SQL', 'a > 10', true}
+            local expected = {space.id, 'C', false, 'SQL', 'A > 10', true}
             t.assert_equals(result, expected)
         end
 

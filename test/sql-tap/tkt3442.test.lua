@@ -55,7 +55,7 @@ test:do_test(
         return EQP(" SELECT node FROM listhash WHERE id='5000' LIMIT 1; ")
     end, {
         -- <tkt3442-1.2>
-        0, 0, 0, "SEARCH TABLE LISTHASH USING COVERING INDEX IDIDX (ID=?) (~1 row)"
+        0, 0, 0, "SEARCH TABLE listhash USING COVERING INDEX ididx (id=?) (~1 row)"
         -- </tkt3442-1.2>
     })
 
@@ -65,7 +65,7 @@ test:do_test(
         return EQP([[ SELECT node FROM listhash WHERE id=5000 LIMIT 1; ]])
     end, {
         -- <tkt3442-1.3>
-        0, 0, 0, "SCAN TABLE LISTHASH (~262144 rows)"
+        0, 0, 0, "SCAN TABLE listhash (~262144 rows)"
         -- </tkt3442-1.3>
     })
 

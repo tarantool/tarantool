@@ -35,7 +35,7 @@ test:do_execsql_test(
             INSERT INTO t1 VALUES('1','2','3');
             INSERT INTO t1 VALUES('a','b','c');
             INSERT INTO t1 VALUES('78','79','7a');
-            SELECT count(*) FROM t1;
+            SELECT COUNT(*) FROM t1;
     ]], {
         -- <where4-1.0>
         3

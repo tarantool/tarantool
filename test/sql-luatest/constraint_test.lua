@@ -202,135 +202,135 @@ g.test_constraints_5 = function()
     g.server:exec(function()
         local sql = "CREATE TABLE t (i INT PRIMARY KEY, a INT REFERENCES t(i));"
         box.execute(sql)
-        local res = {fk_unnamed_T_A_1 = {field = 1, space = box.space.T.id}}
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        local res = {fk_unnamed_t_a_1 = {field = 1, space = box.space.t.id}}
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY, a INT REFERENCES t);]]
         box.execute(sql)
-        res = {fk_unnamed_T_A_1 = {field = 1, space = box.space.T.id}}
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        res = {fk_unnamed_t_a_1 = {field = 1, space = box.space.t.id}}
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY, a INT REFERENCES t(a));]]
         box.execute(sql)
-        res = {fk_unnamed_T_A_1 = {field = 2, space = box.space.T.id}}
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        res = {fk_unnamed_t_a_1 = {field = 2, space = box.space.t.id}}
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY REFERENCES t(a), a INT);]]
         box.execute(sql)
-        res = {fk_unnamed_T_I_1 = {field = 2, space = box.space.T.id}}
-        t.assert_equals(box.space.T:format()[1].foreign_key, res)
+        res = {fk_unnamed_t_i_1 = {field = 2, space = box.space.t.id}}
+        t.assert_equals(box.space.t:format()[1].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY, ]]..
               [[a INT CONSTRAINT one REFERENCES t);]]
         box.execute(sql)
-        res = {ONE = {field = 1, space = box.space.T.id}}
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        res = {one = {field = 1, space = box.space.t.id}}
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         box.execute([[CREATE TABLE t0 (i INT PRIMARY KEY, a INT);]])
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY, a INT REFERENCES t0(i));]]
         box.execute(sql)
-        res = {fk_unnamed_T_A_1 = {field = 1, space = box.space.T0.id}}
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        res = {fk_unnamed_t_a_1 = {field = 1, space = box.space.t0.id}}
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY, a INT REFERENCES t0);]]
         box.execute(sql)
-        res = {fk_unnamed_T_A_1 = {field = 1, space = box.space.T0.id}}
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        res = {fk_unnamed_t_a_1 = {field = 1, space = box.space.t0.id}}
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY, a INT REFERENCES t0(a));]]
         box.execute(sql)
-        res = {fk_unnamed_T_A_1 = {field = 2, space = box.space.T0.id}}
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        res = {fk_unnamed_t_a_1 = {field = 2, space = box.space.t0.id}}
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY REFERENCES t0(a), a INT);]]
         box.execute(sql)
-        res = {fk_unnamed_T_I_1 = {field = 2, space = box.space.T0.id}}
-        t.assert_equals(box.space.T:format()[1].foreign_key, res)
+        res = {fk_unnamed_t_i_1 = {field = 2, space = box.space.t0.id}}
+        t.assert_equals(box.space.t:format()[1].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY, ]]..
               [[a INT CONSTRAINT one REFERENCES t0);]]
         box.execute(sql)
-        res = {ONE = {field = 1, space = box.space.T0.id}}
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        res = {one = {field = 1, space = box.space.t0.id}}
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         box.execute([[CREATE TABLE t (i INT PRIMARY KEY);]])
         sql = [[ALTER TABLE t ADD COLUMN a INT REFERENCES t(i);]]
         box.execute(sql)
-        res = {fk_unnamed_T_A_1 = {field = 1, space = box.space.T.id}}
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        res = {fk_unnamed_t_a_1 = {field = 1, space = box.space.t.id}}
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         box.execute([[CREATE TABLE t (i INT PRIMARY KEY);]])
         sql = [[ALTER TABLE t ADD COLUMN a INT REFERENCES t;]]
-        res = {fk_unnamed_T_A_1 = {field = 1, space = box.space.T.id}}
+        res = {fk_unnamed_t_a_1 = {field = 1, space = box.space.t.id}}
         box.execute(sql)
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         box.execute([[CREATE TABLE t (i INT PRIMARY KEY);]])
         sql = [[ALTER TABLE t ADD COLUMN a INT REFERENCES t(a);]]
-        res = {fk_unnamed_T_A_1 = {field = 2, space = box.space.T.id}}
+        res = {fk_unnamed_t_a_1 = {field = 2, space = box.space.t.id}}
         box.execute(sql)
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         box.execute([[CREATE TABLE t (i INT PRIMARY KEY);]])
         sql = [[ALTER TABLE t ADD COLUMN a INT CONSTRAINT one REFERENCES t;]]
-        res = {ONE = {field = 1, space = box.space.T.id}}
+        res = {one = {field = 1, space = box.space.t.id}}
         box.execute(sql)
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         box.execute([[CREATE TABLE t (i INT PRIMARY KEY);]])
         sql = [[ALTER TABLE t ADD COLUMN a INT REFERENCES t0(i);]]
-        res = {fk_unnamed_T_A_1 = {field = 1, space = box.space.T0.id}}
+        res = {fk_unnamed_t_a_1 = {field = 1, space = box.space.t0.id}}
         box.execute(sql)
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         box.execute([[CREATE TABLE t (i INT PRIMARY KEY);]])
         sql = [[ALTER TABLE t ADD COLUMN a INT REFERENCES t0;]]
-        res = {fk_unnamed_T_A_1 = {field = 1, space = box.space.T0.id}}
+        res = {fk_unnamed_t_a_1 = {field = 1, space = box.space.t0.id}}
         box.execute(sql)
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         box.execute([[CREATE TABLE t (i INT PRIMARY KEY);]])
         sql = [[ALTER TABLE t ADD COLUMN a INT REFERENCES t0(a);]]
-        res = {fk_unnamed_T_A_1 = {field = 2, space = box.space.T0.id}}
+        res = {fk_unnamed_t_a_1 = {field = 2, space = box.space.t0.id}}
         box.execute(sql)
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         box.execute([[CREATE TABLE t (i INT PRIMARY KEY);]])
         sql = [[ALTER TABLE t ADD COLUMN a INT CONSTRAINT one REFERENCES t0;]]
-        res = {ONE = {field = 1, space = box.space.T0.id}}
+        res = {one = {field = 1, space = box.space.t0.id}}
         box.execute(sql)
-        t.assert_equals(box.space.T:format()[2].foreign_key, res)
+        t.assert_equals(box.space.t:format()[2].foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
-        box.schema.space.create('T1')
+        box.schema.space.create('t1')
         sql = [[CREATE TABLE t (i INT PRIMARY KEY, a INT REFERENCES t1);]]
         local _, err = box.execute(sql)
-        res = [[Failed to create foreign key constraint 'fk_unnamed_T_A_1': ]]..
+        res = [[Failed to create foreign key constraint 'fk_unnamed_t_a_1': ]]..
               [[referenced space doesn't feature PRIMARY KEY]]
         t.assert_equals(err.message, res)
-        box.space.T1:drop()
+        box.space.t1:drop()
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY, a INT REFERENCES t(i, a));]]
         _, err = box.execute(sql)
-        res = [[Failed to create foreign key constraint 'fk_unnamed_T_A_1': ]]..
+        res = [[Failed to create foreign key constraint 'fk_unnamed_t_a_1': ]]..
               [[number of columns in foreign key does not match the number ]]..
               [[of columns in the primary index of referenced table]]
         t.assert_equals(err.message, res)
@@ -338,7 +338,7 @@ g.test_constraints_5 = function()
         box.execute([[CREATE VIEW v AS SELECT * FROM t0;]])
         sql = [[CREATE TABLE t (a INT REFERENCES v(i), i INT PRIMARY KEY);]]
         _, err = box.execute(sql)
-        res = [[Failed to create foreign key constraint 'fk_unnamed_T_A_1': ]]..
+        res = [[Failed to create foreign key constraint 'fk_unnamed_t_a_1': ]]..
               [[referenced space can't be VIEW]]
         t.assert_equals(err.message, res)
         box.execute([[DROP VIEW v;]])
@@ -347,7 +347,7 @@ g.test_constraints_5 = function()
               [[CONSTRAINT fk1 REFERENCES t(i) ]]..
               [[CONSTRAINT fk1 REFERENCES t(i));]]
         _, err = box.execute(sql)
-        res = [[FOREIGN KEY constraint 'FK1' already exists in space 'T']]
+        res = [[FOREIGN KEY constraint 'fk1' already exists in space 't']]
         t.assert_equals(err.message, res)
 
         box.execute([[DROP TABLE t0;]])
@@ -360,55 +360,55 @@ g.test_constraints_6 = function()
         local sql = [[CREATE TABLE t (i INT PRIMARY KEY, a INT, ]]..
             [[FOREIGN KEY (i, a) REFERENCES t(i, a));]]
         box.execute(sql)
-        local res = {fk_unnamed_T_1 = {space = box.space.T.id,
+        local res = {fk_unnamed_t_1 = {space = box.space.t.id,
                                        field = {[1] = 1, [2] = 2}}}
-        t.assert_equals(box.space.T.foreign_key, res)
+        t.assert_equals(box.space.t.foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         sql = [[CREATE TABLE t (i INT, a INT, PRIMARY KEY(i, a), ]]..
             [[FOREIGN KEY (i, a) REFERENCES t);]]
         box.execute(sql)
-        res = {fk_unnamed_T_1 = {space = box.space.T.id,
+        res = {fk_unnamed_t_1 = {space = box.space.t.id,
                                  field = {[1] = 1, [2] = 2}}}
-        t.assert_equals(box.space.T.foreign_key, res)
+        t.assert_equals(box.space.t.foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY, a INT, CONSTRAINT one ]]..
             [[FOREIGN KEY (i, a) REFERENCES t(i, a));]]
         box.execute(sql)
-        res = {ONE = {space = box.space.T.id, field = {[1] = 1, [2] = 2}}}
-        t.assert_equals(box.space.T.foreign_key, res)
+        res = {one = {space = box.space.t.id, field = {[1] = 1, [2] = 2}}}
+        t.assert_equals(box.space.t.foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         box.execute([[CREATE TABLE t0 (i INT, a INT, PRIMARY KEY (i, a));]])
-        local space_id = box.space.T0.id
+        local space_id = box.space.t0.id
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY, a INT, ]]..
             [[FOREIGN KEY (i, a) REFERENCES t0(a, i));]]
-        res = {fk_unnamed_T_1 = {space = space_id, field = {[1] = 2, [2] = 1}}}
+        res = {fk_unnamed_t_1 = {space = space_id, field = {[1] = 2, [2] = 1}}}
         box.execute(sql)
-        t.assert_equals(box.space.T.foreign_key, res)
+        t.assert_equals(box.space.t.foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         sql = [[CREATE TABLE t (i INT PRIMARY KEY, a INT, ]]..
             [[FOREIGN KEY (i, a) REFERENCES t0);]]
-        res = {fk_unnamed_T_1 = {space = space_id, field = {[1] = 1, [2] = 2}}}
+        res = {fk_unnamed_t_1 = {space = space_id, field = {[1] = 1, [2] = 2}}}
         box.execute(sql)
-        t.assert_equals(box.space.T.foreign_key, res)
+        t.assert_equals(box.space.t.foreign_key, res)
         box.execute([[DROP TABLE t;]])
 
         box.execute([[CREATE TABLE t (i INT, a INT, PRIMARY KEY (i, a))]])
 
         sql = [[ALTER TABLE t ADD CONSTRAINT c FOREIGN KEY (a) REFERENCES t(i)]]
-        res = {C = {space = box.space.T.id, field = {[2] = 1}}}
+        res = {c = {space = box.space.t.id, field = {[2] = 1}}}
         box.execute(sql)
-        t.assert_equals(box.space.T.foreign_key, res)
+        t.assert_equals(box.space.t.foreign_key, res)
         box.execute([[ALTER TABLE t DROP CONSTRAINT c;]])
 
         sql = [[ALTER TABLE t ADD CONSTRAINT c FOREIGN KEY (a, i) REFERENCES t]]
-        res = {C = {space = box.space.T.id, field = {[2] = 1, [1] = 2}}}
+        res = {c = {space = box.space.t.id, field = {[2] = 1, [1] = 2}}}
         box.execute(sql)
-        t.assert_equals(box.space.T.foreign_key, res)
+        t.assert_equals(box.space.t.foreign_key, res)
         box.execute([[ALTER TABLE t DROP CONSTRAINT c;]])
 
         box.execute([[DROP TABLE t;]])
@@ -421,28 +421,28 @@ end
 g.test_constraints_7 = function()
     g.server:exec(function()
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY, a INT CHECK(a > 10));]])
-        local res = {ck_unnamed_T_A_1 = box.func.check_T_ck_unnamed_T_A_1.id}
-        t.assert_equals(box.space.T:format()[2].constraint, res)
+        local res = {ck_unnamed_t_a_1 = box.func.check_t_ck_unnamed_t_a_1.id}
+        t.assert_equals(box.space.t:format()[2].constraint, res)
         box.execute([[DROP TABLE t;]])
-        box.func.check_T_ck_unnamed_T_A_1:drop()
+        box.func.check_t_ck_unnamed_t_a_1:drop()
 
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY);]])
         box.execute([[ALTER TABLE t ADD COLUMN a INT CHECK(a > 10);]])
-        res = {ck_unnamed_T_A_1 = box.func.check_T_ck_unnamed_T_A_1.id}
-        t.assert_equals(box.space.T:format()[2].constraint, res)
+        res = {ck_unnamed_t_a_1 = box.func.check_t_ck_unnamed_t_a_1.id}
+        t.assert_equals(box.space.t:format()[2].constraint, res)
         box.execute([[DROP TABLE t;]])
-        box.func.check_T_ck_unnamed_T_A_1:drop()
+        box.func.check_t_ck_unnamed_t_a_1:drop()
 
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY,
                     a INT CONSTRAINT one CHECK(a > 10));]])
-        res = {ONE = box.func.check_T_ONE.id}
-        t.assert_equals(box.space.T:format()[2].constraint, res)
+        res = {one = box.func.check_t_one.id}
+        t.assert_equals(box.space.t:format()[2].constraint, res)
         box.execute([[DROP TABLE t;]])
-        box.func.check_T_ONE:drop()
+        box.func.check_t_one:drop()
 
         local sql = [[CREATE TABLE t(i INT PRIMARY KEY, a INT CHECK(i > 10));]]
         local _, err = box.execute(sql)
-        res = [[Failed to create check constraint 'ck_unnamed_T_A_1': ]]..
+        res = [[Failed to create check constraint 'ck_unnamed_t_a_1': ]]..
               [[wrong field name specified in the field check constraint]]
         t.assert_equals(err.message, res)
     end)
@@ -453,32 +453,32 @@ g.test_constraints_8 = function()
     g.server:exec(function()
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY, a INT,
                       CHECK(a > 10));]])
-        local res = {ck_unnamed_T_1 = box.func.check_T_ck_unnamed_T_1.id}
-        t.assert_equals(box.space.T.constraint, res)
+        local res = {ck_unnamed_t_1 = box.func.check_t_ck_unnamed_t_1.id}
+        t.assert_equals(box.space.t.constraint, res)
         box.execute([[DROP TABLE t;]])
-        box.func.check_T_ck_unnamed_T_1:drop()
+        box.func.check_t_ck_unnamed_t_1:drop()
 
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY);]])
         box.execute([[ALTER TABLE t ADD CONSTRAINT two CHECK(a > 10);]])
-        res = {TWO = box.func.check_T_TWO.id}
-        t.assert_equals(box.space.T.constraint, res)
+        res = {two = box.func.check_t_two.id}
+        t.assert_equals(box.space.t.constraint, res)
         box.execute([[DROP TABLE t;]])
-        box.func.check_T_TWO:drop()
+        box.func.check_t_two:drop()
 
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY,
                     a INT, CONSTRAINT one CHECK(a > 10));]])
-        res = {ONE = box.func.check_T_ONE.id}
-        t.assert_equals(box.space.T.constraint, res)
+        res = {one = box.func.check_t_one.id}
+        t.assert_equals(box.space.t.constraint, res)
         box.execute([[DROP TABLE t;]])
-        box.func.check_T_ONE:drop()
+        box.func.check_t_one:drop()
 
         local sql = [[CREATE TABLE t(i INT PRIMARY KEY, a INT, CONSTRAINT ]]..
                     [[one CHECK(a > 10), CONSTRAINT one CHECK(a < 100));]]
         local _, err = box.execute(sql)
-        res = [[Function for the check constraint 'ONE' with name ]]..
-              [['check_T_ONE' already exists]]
+        res = [[Function for the check constraint 'one' with name ]]..
+              [['check_t_one' already exists]]
         t.assert_equals(err.message, res)
-        t.assert_equals(box.space._func.index[2]:get('check_T_ONE'), nil)
+        t.assert_equals(box.space._func.index[2]:get('check_t_one'), nil)
     end)
 end
 
@@ -517,7 +517,7 @@ end
 g.test_constraints_10 = function()
     g.server:exec(function()
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY);]])
-        local s = box.space.T
+        local s = box.space.t
         local rec = {s.id, 'one', false, 'SQL', 'I > 10', true}
         t.assert_equals(box.space._ck_constraint:insert(rec), rec)
         t.assert_equals(s.constraint, nil)
@@ -535,17 +535,17 @@ g.test_constraints_11 = function()
                                      CONSTRAINT one CHECK (i > 10));]])
         local _, err = box.execute([[INSERT INTO t VALUES (1);]])
         t.assert_equals(err.message,
-                        "Check constraint 'ONE' failed for a tuple")
+                        "Check constraint 'one' failed for a tuple")
         _, err = box.execute([[ALTER TABLE t DISABLE CHECK CONSTRAINT one;]])
         t.assert_equals(err.message, "Syntax error at line 1 near 'DISABLE'")
         _, err = box.execute([[INSERT INTO t VALUES (1);]])
         t.assert_equals(err.message,
-                        "Check constraint 'ONE' failed for a tuple")
+                        "Check constraint 'one' failed for a tuple")
         _, err = box.execute([[ALTER TABLE t ENABLE CHECK CONSTRAINT one;]])
         t.assert_equals(err.message, "Syntax error at line 1 near 'ENABLE'")
         _, err = box.execute([[INSERT INTO t VALUES (1);]])
         t.assert_equals(err.message,
-                        "Check constraint 'ONE' failed for a tuple")
+                        "Check constraint 'one' failed for a tuple")
 
         box.execute([[DROP TABLE t;]])
     end)
@@ -560,21 +560,21 @@ g.test_drop_field_constraints = function()
         local sql = [[CREATE TABLE t (i INT PRIMARY KEY,
                       a INT CONSTRAINT b CHECK (a > 10));]]
         box.execute(sql)
-        t.assert(box.space.T:format()[2].constraint['B'] ~= nil);
+        t.assert(box.space.t:format()[2].constraint['b'] ~= nil);
         local _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT b;]])
-        local exp = "Constraint 'B' does not exist in space 'T'"
+        local exp = "Constraint 'b' does not exist in space 't'"
         t.assert_equals(err.message, exp)
-        t.assert(box.space.T:format()[2].constraint['B'] ~= nil);
+        t.assert(box.space.t:format()[2].constraint['b'] ~= nil);
 
         local res = box.execute([[ALTER TABLE t DROP CONSTRAINT a.b;]])
         t.assert_equals(res, {row_count = 1})
-        t.assert(box.space.T:format()[2].constraint['B'] == nil);
+        t.assert(box.space.t:format()[2].constraint['b'] == nil);
 
         _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT a.b;]])
-        exp = "Constraint 'A.B' does not exist in space 'T'"
+        exp = "Constraint 'a.b' does not exist in space 't'"
         t.assert_equals(err.message, exp)
         box.execute([[DROP TABLE t;]])
-        box.func.check_T_B:drop()
+        box.func.check_t_b:drop()
     end)
 end
 
@@ -587,26 +587,26 @@ g.test_drop_constraints_with_the_same_name = function()
                                       CONSTRAINT b REFERENCES t(i),
                                       CONSTRAINT c CHECK (i + a > 100));]]
         box.execute(sql)
-        t.assert(box.space.T.constraint['C'] ~= nil);
-        t.assert(box.space.T.index['C'] ~= nil);
+        t.assert(box.space.t.constraint['c'] ~= nil);
+        t.assert(box.space.t.index['c'] ~= nil);
         local _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c;]])
         local exp = "Failed to execute SQL statement: "..
-                    "ambiguous constraint name: 'C'"
+                    "ambiguous constraint name: 'c'"
         t.assert_equals(err.message, exp)
-        t.assert(box.space.T.constraint['C'] ~= nil);
-        t.assert(box.space.T.index['C'] ~= nil);
+        t.assert(box.space.t.constraint['c'] ~= nil);
+        t.assert(box.space.t.index['c'] ~= nil);
 
-        t.assert(box.space.T:format()[2].constraint['B'] ~= nil);
-        t.assert(box.space.T:format()[2].foreign_key['B'] ~= nil);
+        t.assert(box.space.t:format()[2].constraint['b'] ~= nil);
+        t.assert(box.space.t:format()[2].foreign_key['b'] ~= nil);
         _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT a.b;]])
         exp = "Failed to execute SQL statement: "..
-              "ambiguous constraint name: 'A.B'"
+              "ambiguous constraint name: 'a.b'"
         t.assert_equals(err.message, exp)
-        t.assert(box.space.T:format()[2].constraint['B'] ~= nil);
-        t.assert(box.space.T:format()[2].foreign_key['B'] ~= nil);
+        t.assert(box.space.t:format()[2].constraint['b'] ~= nil);
+        t.assert(box.space.t:format()[2].foreign_key['b'] ~= nil);
         box.execute([[DROP TABLE t;]])
-        box.func.check_T_B:drop()
-        box.func.check_T_C:drop()
+        box.func.check_t_b:drop()
+        box.func.check_t_c:drop()
     end)
 end
 
@@ -621,76 +621,76 @@ g.test_drop_constraints_with_type = function()
                                       CONSTRAINT c FOREIGN KEY (a) REFERENCES t,
                                       CONSTRAINT d UNIQUE(a));]]
         box.execute(sql)
-        local s = box.space.T
-        t.assert(s.constraint['C'] ~= nil);
-        t.assert(s.foreign_key['C'] ~= nil);
-        t.assert(s.index['C'] ~= nil);
-        t.assert(s.index['D'] ~= nil);
-        t.assert(s:format()[2].constraint['B'] ~= nil);
-        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+        local s = box.space.t
+        t.assert(s.constraint['c'] ~= nil);
+        t.assert(s.foreign_key['c'] ~= nil);
+        t.assert(s.index['c'] ~= nil);
+        t.assert(s.index['d'] ~= nil);
+        t.assert(s:format()[2].constraint['b'] ~= nil);
+        t.assert(s:format()[2].foreign_key['b'] ~= nil);
 
         -- Make sure that a constraint with the given name but with the wrong
         -- type will not be dropped.
         local _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT d CHECK;]])
-        local exp = "Constraint 'D' does not exist in space 'T'"
+        local exp = "Constraint 'd' does not exist in space 't'"
         t.assert_equals(err.message, exp)
-        t.assert(s.constraint['C'] ~= nil);
-        t.assert(s.foreign_key['C'] ~= nil);
-        t.assert(s.index['C'] ~= nil);
-        t.assert(s.index['D'] ~= nil);
-        t.assert(s:format()[2].constraint['B'] ~= nil);
-        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+        t.assert(s.constraint['c'] ~= nil);
+        t.assert(s.foreign_key['c'] ~= nil);
+        t.assert(s.index['c'] ~= nil);
+        t.assert(s.index['d'] ~= nil);
+        t.assert(s:format()[2].constraint['b'] ~= nil);
+        t.assert(s:format()[2].foreign_key['b'] ~= nil);
 
         box.execute([[ALTER TABLE t DROP CONSTRAINT d UNIQUE;]])
-        t.assert(s.constraint['C'] ~= nil);
-        t.assert(s.foreign_key['C'] ~= nil);
-        t.assert(s.index['C'] ~= nil);
-        t.assert(s.index['D'] == nil);
-        t.assert(s:format()[2].constraint['B'] ~= nil);
-        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+        t.assert(s.constraint['c'] ~= nil);
+        t.assert(s.foreign_key['c'] ~= nil);
+        t.assert(s.index['c'] ~= nil);
+        t.assert(s.index['d'] == nil);
+        t.assert(s:format()[2].constraint['b'] ~= nil);
+        t.assert(s:format()[2].foreign_key['b'] ~= nil);
 
         box.execute([[ALTER TABLE t DROP CONSTRAINT c CHECK;]])
-        t.assert(s.constraint == nil or s.constraint['C'] == nil);
-        t.assert(s.foreign_key['C'] ~= nil);
-        t.assert(s.index['C'] ~= nil);
-        t.assert(s.index['D'] == nil);
-        t.assert(s:format()[2].constraint['B'] ~= nil);
-        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+        t.assert(s.constraint == nil or s.constraint['c'] == nil);
+        t.assert(s.foreign_key['c'] ~= nil);
+        t.assert(s.index['c'] ~= nil);
+        t.assert(s.index['d'] == nil);
+        t.assert(s:format()[2].constraint['b'] ~= nil);
+        t.assert(s:format()[2].foreign_key['b'] ~= nil);
 
         box.execute([[ALTER TABLE t DROP CONSTRAINT c FOREIGN KEY;]])
-        t.assert(s.constraint == nil or s.constraint['C'] == nil);
-        t.assert(s.foreign_key == nil or s.foreign_key['C'] == nil);
-        t.assert(s.index['C'] ~= nil);
-        t.assert(s.index['D'] == nil);
-        t.assert(s:format()[2].constraint['B'] ~= nil);
-        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+        t.assert(s.constraint == nil or s.constraint['c'] == nil);
+        t.assert(s.foreign_key == nil or s.foreign_key['c'] == nil);
+        t.assert(s.index['c'] ~= nil);
+        t.assert(s.index['d'] == nil);
+        t.assert(s:format()[2].constraint['b'] ~= nil);
+        t.assert(s:format()[2].foreign_key['b'] ~= nil);
 
         box.execute([[ALTER TABLE t DROP CONSTRAINT c PRIMARY KEY;]])
-        t.assert(s.constraint == nil or s.constraint['C'] == nil);
-        t.assert(s.foreign_key == nil or s.foreign_key['C'] == nil);
-        t.assert(s.index['C'] == nil);
-        t.assert(s.index['D'] == nil);
-        t.assert(s:format()[2].constraint['B'] ~= nil);
-        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+        t.assert(s.constraint == nil or s.constraint['c'] == nil);
+        t.assert(s.foreign_key == nil or s.foreign_key['c'] == nil);
+        t.assert(s.index['c'] == nil);
+        t.assert(s.index['d'] == nil);
+        t.assert(s:format()[2].constraint['b'] ~= nil);
+        t.assert(s:format()[2].foreign_key['b'] ~= nil);
 
         box.execute([[ALTER TABLE t DROP CONSTRAINT a.b CHECK;]])
-        t.assert(s.constraint == nil or s.constraint['C'] == nil);
-        t.assert(s.foreign_key == nil or s.foreign_key['C'] == nil);
-        t.assert(s.index['C']  == nil);
-        t.assert(s.index['D'] == nil);
-        t.assert(s:format()[2].constraint['B'] == nil);
-        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+        t.assert(s.constraint == nil or s.constraint['c'] == nil);
+        t.assert(s.foreign_key == nil or s.foreign_key['c'] == nil);
+        t.assert(s.index['c']  == nil);
+        t.assert(s.index['d'] == nil);
+        t.assert(s:format()[2].constraint['b'] == nil);
+        t.assert(s:format()[2].foreign_key['b'] ~= nil);
 
         box.execute([[ALTER TABLE t DROP CONSTRAINT a.b FOREIGN KEY;]])
-        t.assert(s.constraint == nil or s.constraint['C'] == nil);
-        t.assert(s.foreign_key == nil or s.foreign_key['C'] == nil);
-        t.assert(s.index['C']  == nil);
-        t.assert(s.index['D'] == nil);
-        t.assert(s:format()[2].constraint['B'] == nil);
-        t.assert(s:format()[2].foreign_key['B'] == nil);
+        t.assert(s.constraint == nil or s.constraint['c'] == nil);
+        t.assert(s.foreign_key == nil or s.foreign_key['c'] == nil);
+        t.assert(s.index['c']  == nil);
+        t.assert(s.index['d'] == nil);
+        t.assert(s:format()[2].constraint['b'] == nil);
+        t.assert(s:format()[2].foreign_key['b'] == nil);
 
         box.execute([[DROP TABLE t;]])
-        box.func.check_T_B:drop()
-        box.func.check_T_C:drop()
+        box.func.check_t_b:drop()
+        box.func.check_t_c:drop()
     end)
 end

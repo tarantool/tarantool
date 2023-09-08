@@ -39,9 +39,9 @@ box.execute("DELETE FROM t1 WHERE a=1;");
 box.execute("SELECT * FROM t1;");
 ---
 - metadata:
-  - name: A
+  - name: a
     type: integer
-  - name: B
+  - name: b
     type: integer
   rows:
   - [2, 4]
@@ -59,7 +59,7 @@ box.execute("DROP TABLE t1;");
 box.execute("DELETE FROM t1;")
 ---
 - null
-- Space 'T1' does not exist
+- Space 't1' does not exist
 ...
 box.execute("CREATE TABLE t2 (s1 INT PRIMARY KEY);")
 ---
@@ -72,7 +72,7 @@ box.execute("CREATE TRIGGER t2 BEFORE INSERT ON t2 FOR EACH ROW BEGIN DELETE FRO
 box.execute("INSERT INTO t2 VALUES (0);")
 ---
 - null
-- Space 'T1' does not exist
+- Space 't1' does not exist
 ...
 box.execute("DROP TABLE t2;")
 ---
@@ -115,11 +115,11 @@ box.execute("ROLLBACK")
 box.execute("SELECT * FROM t1")
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: integer
-  - name: B
+  - name: b
     type: string
   rows:
   - [1, 1, 'one']
@@ -133,7 +133,7 @@ box.execute("CREATE VIEW v1 AS SELECT * FROM t1;")
 box.execute("TRUNCATE TABLE v1;")
 ---
 - null
-- 'Failed to execute SQL statement: can not truncate space ''V1'' because space is
+- 'Failed to execute SQL statement: can not truncate space ''v1'' because space is
   a view'
 ...
 -- Can't truncate table with FK.
@@ -148,7 +148,7 @@ box.execute("INSERT INTO t2 VALUES(1);")
 box.execute("TRUNCATE TABLE t1;")
 ---
 - null
-- 'Can''t modify space ''T1'': space is referenced by foreign key'
+- 'Can''t modify space ''t1'': space is referenced by foreign key'
 ...
 -- Table triggers should be ignored.
 box.execute("DROP TABLE t2;")
@@ -170,18 +170,18 @@ box.execute("TRUNCATE TABLE t1;")
 box.execute("SELECT * FROM t1;")
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: integer
-  - name: B
+  - name: b
     type: string
   rows: []
 ...
 box.execute("SELECT * FROM t2;")
 ---
 - metadata:
-  - name: X
+  - name: x
     type: integer
   rows: []
 ...

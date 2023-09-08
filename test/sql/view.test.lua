@@ -13,16 +13,16 @@ box.execute("CREATE VIEW v1 AS SELECT a+b FROM t1;");
 
 -- View can't have any indexes.
 box.execute("CREATE INDEX i1 on v1(a);");
-v1 = box.space.V1;
+v1 = box.space.v1;
 v1:create_index('primary', {parts = {1, 'string'}})
 v1:create_index('secondary', {parts = {1, 'string'}})
 
 -- View option can't be changed.
-v1 = box.space._space.index[2]:select('V1')[1]:totable();
+v1 = box.space._space.index[2]:select('v1')[1]:totable();
 v1[6]['view'] = false;
 box.space._space:replace(v1);
 
-t1 = box.space._space.index[2]:select('T1')[1]:totable();
+t1 = box.space._space.index[2]:select('t1')[1]:totable();
 t1[6]['view'] = true;
 t1[6]['sql'] = 'SELECT * FROM t1;'
 box.space._space:replace(t1);
@@ -56,7 +56,7 @@ sp = box.space._space:replace(raw_sp);
 -- Can't drop space via Lua if at least one view refers to it.
 box.execute('CREATE TABLE t2(id INT PRIMARY KEY);');
 box.execute('CREATE VIEW v2 AS SELECT * FROM t2;');
-box.space.T2:drop();
+box.space.t2:drop();
 box.execute('DROP VIEW v2;');
 box.execute('DROP TABLE t2;');
 
@@ -64,7 +64,7 @@ box.execute('DROP TABLE t2;');
 box.execute("CREATE TABLE t2(id INTEGER PRIMARY KEY);");
 box.execute("CREATE VIEW v2 AS SELECT * FROM t2;");
 box.execute("DROP TABLE t2;");
-sp = box.space._space:get{box.space.T2.id};
+sp = box.space._space:get{box.space.t2.id};
 sp = box.space._space:replace(sp);
 box.execute("DROP TABLE t2;");
 box.execute("DROP VIEW v2;");
@@ -109,7 +109,7 @@ space_tuple[3] = space_tuple[3] .. '1' -- name
 space_tuple[6].sql = string.gsub(space_tuple[6].sql, 'FROM c', 'FROM ccc')
 box.space._space:insert(space_tuple)
 
-box.space.BCV:drop()
+box.space.bcv:drop()
 box.execute("DROP TABLE c;")
 box.execute("DROP TABLE b;")
 
@@ -124,8 +124,8 @@ box.execute([[SET SESSION "sql_seq_scan" = true;]])
 
 box.execute("DROP TABLE t2;")
 box.execute("SELECT * FROM v2;")
-box.space.V2:drop()
-box.space.T2:drop()
+box.space.v2:drop()
+box.space.t2:drop()
 
 -- Cleanup
 box.execute("DROP VIEW v1;");
@@ -158,29 +158,29 @@ box.execute("CREATE VIEW v AS SELECT * FROM t1;")
 --
 -- Try to change owner.
 --
-view = box.space._space.index[2]:select('V')[1]:totable()
+view = box.space._space.index[2]:select('v')[1]:totable()
 view[2] = 1
 box.space._space:replace(view)
 
 --
 -- Try to rename.
 --
-view = box.space._space.index[2]:select('V')[1]:totable()
+view = box.space._space.index[2]:select('v')[1]:totable()
 view[3] = 'a'
 box.space._space:replace(view)
 
 --
 -- Try to change engine.
 --
-view = box.space._space.index[2]:select('V')[1]:totable()
+view = box.space._space.index[2]:select('v')[1]:totable()
 view[4] = 'a'
 box.space._space:replace(view)
 
 --
 -- Try to add a field.
 --
-view = box.space._space.index[2]:select('V')[1]:totable()
-view_format = box.space.V:format()
+view = box.space._space.index[2]:select('v')[1]:totable()
+view_format = box.space.v:format()
 f = {type = 'string', nullable_action = 'none', name = 'B', is_nullable = true}
 table.insert(view_format, f)
 view[5] = 2
@@ -190,10 +190,10 @@ box.space._space:replace(view)
 --
 -- Try to modify format only.
 --
-view = box.space.V
+view = box.space.v
 view:format{}
 
-view_format = box.space.V:format()
+view_format = box.space.v:format()
 view_format[1].name = 'B'
 view:format(view_format)
 

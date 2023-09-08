@@ -29,7 +29,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(1,'a'),(2,'b'),(3,'c'),(4,'d'),(5,'e');
         CREATE TABLE t2(id INT primary key, x INT,y TEXT);
         INSERT INTO t2 VALUES(1, 8,'y'),(2, 9,'z'),(3, 6,'w'),(4, 7,'x');
-        SELECT count(*) FROM t1, t2;
+        SELECT COUNT(*) FROM t1, t2;
     ]], {
         -- <offset1-1.1>
         20

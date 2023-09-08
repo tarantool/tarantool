@@ -34,8 +34,8 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES (1, 'a');
         INSERT INTO t1 VALUES (2, 'A');
         INSERT INTO t1 VALUES (3, 'A');
-        SELECT count(CASE WHEN x='a' THEN 1 END),
-               count(CASE WHEN x='A' THEN 1 END)
+        SELECT COUNT(CASE WHEN x='a' THEN 1 END),
+               COUNT(CASE WHEN x='A' THEN 1 END)
           FROM t1;
     ]], {
         -- <tkt-fa7bf5ec-1>

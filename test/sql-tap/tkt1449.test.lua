@@ -77,7 +77,7 @@ test:do_execsql_test(
 
 
             select
-                    USERID, ISSUEID, ISSUENAME, min(DATE1) DATE1
+                    USERID, ISSUEID, ISSUENAME, MIN(DATE1) DATE1
                     from (
                     select p.USERID USERID, p.ISSUEID ISSUEID, iset.ISSUENAME ISSUENAME, t.DUETIME DATE1
                         from PARTICIPANTS p

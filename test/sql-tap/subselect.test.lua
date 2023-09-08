@@ -34,7 +34,7 @@ test:do_test(
             INSERT INTO t1 VALUES(3,4);
             INSERT INTO t1 VALUES(5,6);
         ]]
-        return test:execsql "SELECT * FROM t1 WHERE a = (SELECT count(*) FROM t1)"
+        return test:execsql "SELECT * FROM t1 WHERE a = (SELECT COUNT(*) FROM t1)"
     end, {
         -- <subselect-1.1>
         3, 4
@@ -114,7 +114,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subselect-1.4",
     [[
-        SELECT b from t1 where a = coalesce((SELECT a FROM t1 WHERE b=5),1)
+        SELECT b from t1 where a = COALESCE((SELECT a FROM t1 WHERE b=5),1)
     ]], {
         -- <subselect-1.4>
         2
@@ -135,7 +135,7 @@ test:do_test(
         ]]
         return test:execsql [[
             SELECT y from t2
-            WHERE x = (SELECT sum(b) FROM t1 where a is not null) - (SELECT sum(a) FROM t1)
+            WHERE x = (SELECT SUM(b) FROM t1 where a is not null) - (SELECT SUM(a) FROM t1)
         ]]
     end, {
         -- <subselect-1.5>
@@ -149,7 +149,7 @@ test:do_test(
 test:do_test(
     "subselect-1.6",
     function()
-        test:execsql "DELETE FROM t2 WHERE x < 0.5*(SELECT max(x) FROM t2)"
+        test:execsql "DELETE FROM t2 WHERE x < 0.5*(SELECT MAX(x) FROM t2)"
         return test:execsql "SELECT x FROM t2 ORDER BY x"
     end, {
         -- <subselect-1.6>
@@ -212,7 +212,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subselect-3.2",
     [[
-        SELECT sum(x) FROM (SELECT x FROM t3 ORDER BY x LIMIT 2);
+        SELECT SUM(x) FROM (SELECT x FROM t3 ORDER BY x LIMIT 2);
     ]], {
         -- <subselect-3.2>
         3
@@ -222,7 +222,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subselect-3.3",
     [[
-        SELECT sum(x) FROM (SELECT x FROM t3 ORDER BY x DESC LIMIT 2);
+        SELECT SUM(x) FROM (SELECT x FROM t3 ORDER BY x DESC LIMIT 2);
     ]], {
         -- <subselect-3.3>
         11

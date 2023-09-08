@@ -32,16 +32,16 @@ box.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
 box.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
 ---
 - null
-- Duplicate key exists in unique index "pk_unnamed_FOOBAR_1" in space "FOOBAR" with
+- Duplicate key exists in unique index "pk_unnamed_foobar_1" in space "foobar" with
   old tuple - [1, "foo"] and new tuple - [1, "duplicate"]
 ...
 -- simple select
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -55,9 +55,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar LIMIT 2")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -70,9 +70,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar LIMIT 2")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=2")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -84,9 +84,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=2")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>2")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -98,9 +98,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>2")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>=2")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -113,9 +113,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>=2")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=10000")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -126,9 +126,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=10000")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>10000")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -139,9 +139,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>10000")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -153,9 +153,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2.001")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -168,9 +168,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2.001")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<=2")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -183,9 +183,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<=2")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<100")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -198,9 +198,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<100")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -209,7 +209,7 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
   rows:
   - ['foo', 1, 42, 'awesome']
 ...
-box.execute("SELECT count(*) FROM foobar")
+box.execute("SELECT COUNT(*) FROM foobar;")
 ---
 - metadata:
   - name: COLUMN_1
@@ -217,7 +217,7 @@ box.execute("SELECT count(*) FROM foobar")
   rows:
   - [3]
 ...
-box.execute("SELECT count(*) FROM foobar WHERE bar='foo'")
+box.execute("SELECT COUNT(*) FROM foobar WHERE bar='foo';")
 ---
 - metadata:
   - name: COLUMN_1
@@ -228,9 +228,9 @@ box.execute("SELECT count(*) FROM foobar WHERE bar='foo'")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -244,9 +244,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar")
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar DESC")
 ---
 - metadata:
-  - name: BAR
+  - name: bar
     type: string
-  - name: FOO
+  - name: foo
     type: integer
   - name: COLUMN_1
     type: integer
@@ -317,15 +317,15 @@ box.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
 box.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 ---
 - null
-- Duplicate key exists in unique index "pk_unnamed_BARFOO_1" in space "BARFOO" with
+- Duplicate key exists in unique index "pk_unnamed_barfoo_1" in space "barfoo" with
   old tuple - ["foo", 1] and new tuple - ["xfoo", 1]
 ...
 box.execute("SELECT foo, bar FROM barfoo")
 ---
 - metadata:
-  - name: FOO
+  - name: foo
     type: number
-  - name: BAR
+  - name: bar
     type: string
   rows:
   - [1, 'foo']
@@ -335,9 +335,9 @@ box.execute("SELECT foo, bar FROM barfoo")
 box.execute("SELECT foo, bar FROM barfoo WHERE foo==2")
 ---
 - metadata:
-  - name: FOO
+  - name: foo
     type: number
-  - name: BAR
+  - name: bar
     type: string
   rows:
   - [2, 'bar']
@@ -345,9 +345,9 @@ box.execute("SELECT foo, bar FROM barfoo WHERE foo==2")
 box.execute("SELECT foo, bar FROM barfoo WHERE bar=='foobar'")
 ---
 - metadata:
-  - name: FOO
+  - name: foo
     type: number
-  - name: BAR
+  - name: bar
     type: string
   rows:
   - [1000, 'foobar']
@@ -355,9 +355,9 @@ box.execute("SELECT foo, bar FROM barfoo WHERE bar=='foobar'")
 box.execute("SELECT foo, bar FROM barfoo WHERE foo>=2")
 ---
 - metadata:
-  - name: FOO
+  - name: foo
     type: number
-  - name: BAR
+  - name: bar
     type: string
   rows:
   - [2, 'bar']
@@ -366,9 +366,9 @@ box.execute("SELECT foo, bar FROM barfoo WHERE foo>=2")
 box.execute("SELECT foo, bar FROM barfoo WHERE foo<=2")
 ---
 - metadata:
-  - name: FOO
+  - name: foo
     type: number
-  - name: BAR
+  - name: bar
     type: string
   rows:
   - [1, 'foo']
@@ -391,7 +391,7 @@ box.execute("DROP TABLE barfoo")
 box.execute("CREATE TABLE without_rowid_lacking_primary_key(x SCALAR)")
 ---
 - null
-- 'Failed to create space ''WITHOUT_ROWID_LACKING_PRIMARY_KEY'': PRIMARY KEY missing'
+- 'Failed to create space ''without_rowid_lacking_primary_key'': PRIMARY KEY missing'
 ...
 -- create a table with implicit indices (used to SEGFAULT)
 box.execute("CREATE TABLE implicit_indices(a INT PRIMARY KEY,b INT,c INT,d TEXT UNIQUE)")

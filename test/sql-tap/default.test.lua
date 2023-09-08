@@ -66,7 +66,7 @@ test:do_catchsql_test(
 	);
 	]], {
 	-- <default-1.3>
-	1, "Failed to create space 'T3': default value of column 'Y' is not constant"
+    1, "Failed to create space 't3': default value of column 'y' is not constant"
 	-- </default-1.3>
 })
 
@@ -80,7 +80,7 @@ test:do_execsql_test(
 	PRAGMA table_info(t4);
 	]], {
 	-- <default-2.1>
-	0,"ROWID","integer",1,"",1,1,"C","string",0,"'abc'",0
+    0, "rowid", "integer", 1, "", 1, 1, "c", "string", 0, "'abc'", 0
 	-- </default-2.1>
 })
 
@@ -91,7 +91,7 @@ test:do_execsql_test(
 	PRAGMA table_info(t4);
 	]], {
 	-- <default-2.2>
-	0,"ROWID","integer",1,"",1,1,"C","string",0,"'abc'",0
+    0, "rowid", "integer", 1, "", 1, 1, "c", "string", 0, "'abc'", 0
 	-- </default-2.2>
 })
 
@@ -110,9 +110,9 @@ test:do_execsql_test(
 	g INTEGER DEFAULT( 3600*12 )
 	);
 	INSERT INTO t3 VALUES(null, 5, 'row1', 5.25e0, 8.67e0, '321', 432);
-	SELECT a, typeof(a), b, typeof(b), c, typeof(c),
-	d, typeof(d), e, typeof(e), f, typeof(f),
-	g, typeof(g) FROM t3;
+    SELECT a, TYPEOF(a), b, TYPEOF(b), c, TYPEOF(c),
+    d, TYPEOF(d), e, TYPEOF(e), f, TYPEOF(f),
+    g, TYPEOF(g) FROM t3;
 	]], {
 	-- <default-3.1>
 	1, "integer", 5, "integer", "row1", "string", 5.25, "number", 8.67, "number", "321", "string", 432, "integer"
@@ -169,7 +169,7 @@ test:do_catchsql_test(
 	);
 	]], {
 	-- <default-4.2>
-	1, "Failed to create space 'T2': default value of column 'B' is not constant"
+    1, "Failed to create space 't2': default value of column 'b' is not constant"
 	-- </default-4.2>
 })
 
@@ -183,7 +183,7 @@ test:do_catchsql_test(
 	);
 	]], {
 	-- <default-4.3>
-	1, "Failed to create space 'T2': default value of column 'B' is not constant"
+    1, "Failed to create space 't2': default value of column 'b' is not constant"
 	-- </default-4.3>
 })
 
@@ -197,7 +197,7 @@ test:do_catchsql_test(
 	);
 	]], {
 	-- <default-4.4>
-	1, "Failed to create space 'T2': default value of column 'B' is not constant"
+    1, "Failed to create space 't2': default value of column 'b' is not constant"
 	-- </default-4.4>
 })
 
@@ -210,7 +210,7 @@ test:do_catchsql_test(
         CREATE TABLE t6(id INTEGER PRIMARY KEY, b TEXT DEFAULT(id));
     ]], {
     -- <default-5.1>
-    1, "Failed to create space 'T6': default value of column 'B' is not constant"
+    1, "Failed to create space 't6': default value of column 'b' is not constant"
     -- </default-5.1>
 })
 

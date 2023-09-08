@@ -43,7 +43,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-1.1.1>
-        1, "Space 'NO_SUCH_TABLE' does not exist"
+        1, "Space 'no_such_table' does not exist"
         -- </trigger1-1.1.1>
     })
 
@@ -56,7 +56,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-1.1.2>
-        1, "Space 'NO_SUCH_TABLE' does not exist"
+        1, "Space 'no_such_table' does not exist"
         -- </trigger1-1.1.2>
     })
 
@@ -106,7 +106,7 @@ test:do_catchsql_test(
          END
     ]], {
         -- <trigger1-1.2.1>
-        1, "Trigger 'TR1' already exists"
+        1, "Trigger 'tr1' already exists"
         -- </trigger1-1.2.1>
     })
 
@@ -119,7 +119,7 @@ test:do_catchsql_test(
          END
     ]], {
         -- <trigger1-1.2.2>
-        1, [[Trigger 'TR1' already exists]]
+        1, [[Trigger 'tr1' already exists]]
         -- </trigger1-1.2.2>
     })
 
@@ -166,7 +166,7 @@ test:do_catchsql_test(
         DROP TRIGGER biggles;
     ]], {
         -- <trigger1-1.6.2>
-        1, "Trigger 'BIGGLES' doesn't exist"
+        1, "Trigger 'biggles' doesn't exist"
         -- </trigger1-1.6.2>
     })
 
@@ -177,7 +177,7 @@ test:do_catchsql_test(
         DROP TRIGGER tr1;
     ]], {
         -- <trigger1-1.7>
-        1, "Trigger 'TR1' doesn't exist"
+        1, "Trigger 'tr1' doesn't exist"
         -- </trigger1-1.7>
     })
 
@@ -260,7 +260,7 @@ test:do_catchsql_test(
         end;
     ]], {
         -- <trigger1-1.12>
-        1, "Failed to execute SQL statement: cannot create INSTEAD OF trigger on space: T1"
+        1, "Failed to execute SQL statement: cannot create INSTEAD OF trigger on space: t1"
         -- </trigger1-1.12>
     })
 
@@ -274,7 +274,7 @@ test:do_catchsql_test(
         end;
     ]], {
         -- <trigger1-1.13>
-        1, "Failed to execute SQL statement: cannot create BEFORE trigger on view: V1"
+        1, "Failed to execute SQL statement: cannot create BEFORE trigger on view: v1"
         -- </trigger1-1.13>
     })
 
@@ -289,7 +289,7 @@ test:do_catchsql_test(
         end;
     ]], {
         -- <trigger1-1.14>
-        1, "Failed to execute SQL statement: cannot create AFTER trigger on view: V1"
+        1, "Failed to execute SQL statement: cannot create AFTER trigger on view: v1"
         -- </trigger1-1.14>
     })
 

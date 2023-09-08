@@ -28,7 +28,7 @@ _G.counter = 0
 
 -- Function is declared as deterministic deliberately.
 -- Otherwise it would be called as much as it occurs in a query.
-box.schema.func.create('SEQUENCE', {language = 'Lua', is_deterministic = true,
+box.schema.func.create('sequence', {language = 'Lua', is_deterministic = true,
                        returns = 'unsigned',
                        body = 'function() counter = counter + 1 return counter end',
                        exports = {'LUA', 'SQL'}})
@@ -219,6 +219,6 @@ test:do_test(
 --         -- </alias-3.1>
 --     })
 
-box.func.SEQUENCE:drop()
+box.func.sequence:drop()
 
 test:finish_test()

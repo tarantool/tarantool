@@ -29,9 +29,9 @@ test:do_execsql_test(
         CREATE TRIGGER trigItem_UNDO_AD AFTER DELETE ON Item FOR EACH ROW
         BEGIN
           INSERT INTO Undo VALUES
-             ((SELECT coalesce(max(id),0) + 1 FROM Undo),
-              (SELECT 'INSERT INTO Item (a,b,c) VALUES (' || CAST(coalesce(old.a,'NULL') AS TEXT)
-                  || ',' || CAST(quote(old.b) AS STRING) || ',' ||
+             ((SELECT COALESCE(MAX(id),0) + 1 FROM Undo),
+              (SELECT 'INSERT INTO Item (a,b,c) VALUES (' || CAST(COALESCE(old.a,'NULL') AS TEXT)
+                  || ',' || CAST(QUOTE(old.b) AS STRING) || ',' ||
                   CAST(old.c AS TEXT) || ');'));
         END;
         DELETE FROM Item WHERE a = 1;

@@ -116,7 +116,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-1.8",
     [[
-        SELECT count(*) FROM t1 WHERE a > (SELECT count(*) FROM t2);
+        SELECT COUNT(*) FROM t1 WHERE a > (SELECT COUNT(*) FROM t2);
     ]], {
         -- <subquery-1.8>
         2
@@ -168,7 +168,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-1.10.3",
     [[
-        SELECT * FROM (SELECT (SELECT sum(a) FROM t1));
+        SELECT * FROM (SELECT (SELECT SUM(a) FROM t1));
     ]], {
         -- <subquery-1.10.3>
         16
@@ -193,7 +193,7 @@ test:do_execsql_test(
         SELECT period, vsum
         FROM (SELECT
           a.period,
-          (select sum(val) from t5 where period between a.period and '2002-4') vsum
+          (select SUM(val) from t5 where period between a.period and '2002-4') vsum
           FROM t5 a where a.period between '2002-1' and '2002-4')
         WHERE vsum < 45 ;
     ]], {
@@ -207,7 +207,7 @@ test:do_execsql_test(
     [[
         SELECT period, vsum from
           (select a.period,
-          (select sum(val) from t5 where period between a.period and '2002-4') vsum
+          (select SUM(val) from t5 where period between a.period and '2002-4') vsum
         FROM t5 a where a.period between '2002-1' and '2002-4')
         WHERE vsum < 45 ;
     ]], {
@@ -318,7 +318,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-2.4.2",
     [[
-        SELECT count(*) FROM t3 WHERE a IN (SELECT 'XX')
+        SELECT COUNT(*) FROM t3 WHERE a IN (SELECT 'XX')
     ]], {
         -- <subquery-2.4.2>
         1
@@ -422,7 +422,7 @@ test:do_execsql_test(
     "subquery-3.3.3",
     [[
         INSERT INTO t1 VALUES(2, 4);
-        SELECT max(a), (SELECT d FROM t2 WHERE a=c) FROM t1;
+        SELECT MAX(a), (SELECT d FROM t2 WHERE a=c) FROM t1;
     ]], {
         -- <subquery-3.3.3>
         2, "two"
@@ -442,7 +442,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-3.3.5",
     [[
-        SELECT a, (SELECT count(*) FROM t2 WHERE a=c) FROM t1;
+        SELECT a, (SELECT COUNT(*) FROM t2 WHERE a=c) FROM t1;
     ]], {
         -- <subquery-3.3.5>
         1, 1, 2, 1
@@ -457,13 +457,13 @@ test:do_execsql_test(
     [[
         CREATE TABLE t34(id  INT primary key, x INT ,y INT );
         INSERT INTO t34 VALUES(1, 106,4), (2, 107,3), (3, 106,5), (4, 107,5);
-        SELECT a.x, avg(a.y)
+        SELECT a.x, AVG(a.y)
           FROM t34 AS a
          GROUP BY a.x
-         HAVING NOT EXISTS( SELECT b.x, avg(b.y)
+         HAVING NOT EXISTS( SELECT b.x, AVG(b.y)
                               FROM t34 AS b
                              GROUP BY b.x
-                             HAVING avg(a.y) > avg(b.y));
+                             HAVING AVG(a.y) > AVG(b.y));
     ]], {
         -- <subquery-3.4.1>
         106, 4, 107, 4
@@ -473,10 +473,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-3.4.2",
     [[
-        SELECT a.x, avg(a.y) AS avg1
+        SELECT a.x, AVG(a.y) AS avg1
           FROM t34 AS a
          GROUP BY a.x
-         HAVING NOT EXISTS( SELECT b.x, avg(b.y) AS avg2
+         HAVING NOT EXISTS( SELECT b.x, AVG(b.y) AS avg2
                               FROM t34 AS b
                              GROUP BY b.x
                              HAVING avg1 > avg2);
@@ -491,15 +491,15 @@ test:do_execsql_test(
     [[
         SELECT
            a.x,
-           avg(a.y),
-           NOT EXISTS ( SELECT b.x, avg(b.y)
+           AVG(a.y),
+           NOT EXISTS ( SELECT b.x, AVG(b.y)
                           FROM t34 AS b
                           GROUP BY b.x
-                         HAVING avg(a.y) > avg(b.y)),
-           EXISTS ( SELECT c.x, avg(c.y)
+                         HAVING AVG(a.y) > AVG(b.y)),
+           EXISTS ( SELECT c.x, AVG(c.y)
                       FROM t34 AS c
                       GROUP BY c.x
-                     HAVING avg(a.y) > avg(c.y))
+                     HAVING AVG(a.y) > AVG(c.y))
           FROM t34 AS a
          GROUP BY a.x
          ORDER BY a.x;
@@ -514,7 +514,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t35a(x  INT PRIMARY KEY); INSERT INTO t35a VALUES(1),(2),(3);
         CREATE TABLE t35b(y  INT PRIMARY KEY); INSERT INTO t35b VALUES(98), (99);
-        SELECT max((SELECT avg(y) FROM t35b)) FROM t35a;
+        SELECT MAX((SELECT AVG(y) FROM t35b)) FROM t35a;
     ]], {
         -- <subquery-3.5.1>
         98
@@ -524,7 +524,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-3.5.2",
     [[
-        SELECT max((SELECT count(y) FROM t35b)) FROM t35a;
+        SELECT MAX((SELECT COUNT(y) FROM t35b)) FROM t35a;
     ]], {
         -- <subquery-3.5.2>
         2
@@ -534,7 +534,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-3.5.3",
     [[
-        SELECT max((SELECT count() FROM t35b)) FROM t35a;
+        SELECT MAX((SELECT COUNT() FROM t35b)) FROM t35a;
     ]], {
         -- <subquery-3.5.3>
         2
@@ -544,7 +544,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "subquery-3.5.4",
     [[
-        SELECT max((SELECT count(x) FROM t35b)) FROM t35a;
+        SELECT MAX((SELECT COUNT(x) FROM t35b)) FROM t35a;
     ]], {
         -- <subquery-3.5.4>
         1, "misuse of aggregate: COUNT()"
@@ -554,7 +554,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "subquery-3.5.5",
     [[
-        SELECT max((SELECT count(x) FROM t35b)) FROM t35a;
+        SELECT MAX((SELECT COUNT(x) FROM t35b)) FROM t35a;
     ]], {
         -- <subquery-3.5.5>
         1, "misuse of aggregate: COUNT()"
@@ -564,7 +564,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "subquery-3.5.6",
     [[
-        SELECT max((SELECT a FROM (SELECT count(x) AS a FROM t35b))) FROM t35a;
+        SELECT MAX((SELECT a FROM (SELECT COUNT(x) AS a FROM t35b))) FROM t35a;
     ]], {
         -- <subquery-3.5.6>
         1, "misuse of aggregate: COUNT()"
@@ -574,7 +574,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "subquery-3.5.7",
     [[
-        SELECT max((SELECT a FROM (SELECT count(y) AS a FROM t35b))) FROM t35a;
+        SELECT MAX((SELECT a FROM (SELECT COUNT(y) AS a FROM t35b))) FROM t35a;
     ]], {
         -- <subquery-3.5.7>
         2
@@ -617,7 +617,7 @@ test:do_test(
             CREATE TABLE t3(a  INT PRIMARY KEY);
             INSERT INTO t3 VALUES(10);
         ]]
-        return test:execsql "INSERT INTO t3 VALUES((SELECT max(a) FROM t3)+1)"
+        return test:execsql "INSERT INTO t3 VALUES((SELECT MAX(a) FROM t3)+1)"
     end, {
         -- <subquery-4.2.1>
 
@@ -627,7 +627,7 @@ test:do_test(
 test:do_execsql_test(
     "subquery-4.2.2",
     [[
-        INSERT INTO t3 VALUES((SELECT max(a) FROM t3)+1)
+        INSERT INTO t3 VALUES((SELECT MAX(a) FROM t3)+1)
     ]], {
         -- <subquery-4.2.2>
 
@@ -648,7 +648,7 @@ _G.callcnt = 0
 test:do_test(
     "subquery-5.1",
     function()
-        box.schema.func.create('CALLCNT', {language = 'Lua',
+        box.schema.func.create('callcnt', {language = 'Lua',
                                is_deterministic = true,
                                param_list = {'integer'}, returns = 'integer',
                                exports = {'LUA', 'SQL'},
@@ -696,7 +696,7 @@ test:do_test(
     function()
         _G.callcnt = 0
         return test:execsql [[
-            SELECT x FROM t4 WHERE 1 IN (SELECT callcnt(count(*)) FROM t5 WHERE a=y)
+            SELECT x FROM t4 WHERE 1 IN (SELECT callcnt(COUNT(*)) FROM t5 WHERE a=y)
         ]]
     end, {
         -- <subquery-6.1>
@@ -716,7 +716,7 @@ test:do_test(
     function()
         _G.callcnt = 0
         return test:execsql [[
-            SELECT x FROM t4 WHERE 1 IN (SELECT callcnt(count(*)) FROM t5 WHERE a=1)
+            SELECT x FROM t4 WHERE 1 IN (SELECT callcnt(COUNT(*)) FROM t5 WHERE a=1)
         ]]
     end, {
         -- <subquery-6.3>
@@ -730,7 +730,7 @@ test:do_test(
         return _G.callcnt
     end, 1)
 
-box.func.CALLCNT:drop()
+box.func.callcnt:drop()
 
 --############  was disable until we get #2652 fixed
 -- Ticket #2652.  Allow aggregate functions of outer queries inside
@@ -762,7 +762,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.2",
     [[
-        SELECT (SELECT max(c7)+c8 FROM t7) FROM t8;
+        SELECT (SELECT MAX(c7)+c8 FROM t7) FROM t8;
     ]], {
         -- <subquery-7.2>
         103, 203, 303
@@ -772,7 +772,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.3",
     [[
-        SELECT (SELECT c7+max(c8) FROM t8) FROM t7
+        SELECT (SELECT c7+MAX(c8) FROM t8) FROM t7
     ]], {
         -- <subquery-7.3>
         301,302,303
@@ -782,7 +782,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.4",
     [[
-        SELECT (SELECT max(c7)+max(c8) FROM t8) FROM t7
+        SELECT (SELECT MAX(c7)+MAX(c8) FROM t8) FROM t7
     ]], {
         -- <subquery-7.4>
         303
@@ -793,7 +793,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.6",
     [[
-        SELECT (SELECT (SELECT max(c7+c8+c9) FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
+        SELECT (SELECT (SELECT MAX(c7+c8+c9) FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
     ]], {
         -- <subquery-7.6>
         30101, 30102, 30103
@@ -803,7 +803,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.7",
     [[
-        SELECT (SELECT (SELECT c7+max(c8+c9) FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
+        SELECT (SELECT (SELECT c7+MAX(c8+c9) FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
     ]], {
         -- <subquery-7.7>
         30101, 30102, 30103
@@ -813,7 +813,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.8",
     [[
-        SELECT (SELECT (SELECT max(c7)+c8+c9 FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
+        SELECT (SELECT (SELECT MAX(c7)+c8+c9 FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
     ]], {
         -- <subquery-7.8>
         10103
@@ -823,7 +823,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.9",
     [[
-        SELECT (SELECT (SELECT c7+max(c8)+c9 FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
+        SELECT (SELECT (SELECT c7+MAX(c8)+c9 FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
     ]], {
         -- <subquery-7.9>
         10301, 10302, 10303
@@ -833,7 +833,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.10",
     [[
-        SELECT (SELECT (SELECT c7+c8+max(c9) FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
+        SELECT (SELECT (SELECT c7+c8+MAX(c9) FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
     ]], {
         -- <subquery-7.10>
         30101, 30102, 30103
@@ -843,7 +843,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.11",
     [[
-        SELECT (SELECT (SELECT max(c7)+max(c8)+max(c9) FROM t9) FROM t8) FROM t7
+        SELECT (SELECT (SELECT MAX(c7)+MAX(c8)+MAX(c9) FROM t9) FROM t8) FROM t7
     ]], {
         -- <subquery-7.11>
         30303

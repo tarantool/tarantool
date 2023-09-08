@@ -31,7 +31,7 @@ test:do_execsql_test(
     1.1,
     [[
         WITH x1 AS (SELECT * FROM t1)
-        SELECT sum(a) FROM x1;
+        SELECT SUM(a) FROM x1;
     ]], {
         -- <1.1>
         3
@@ -42,7 +42,7 @@ test:do_execsql_test(
     1.2,
     [[
         WITH x1 AS (SELECT * FROM t1)
-        SELECT (SELECT sum(a) FROM x1);
+        SELECT (SELECT SUM(a) FROM x1);
     ]], {
         -- <1.2>
         3
@@ -53,7 +53,7 @@ test:do_execsql_test(
     1.3,
     [[
         WITH x1 AS (SELECT * FROM t1)
-        SELECT (SELECT sum(a) FROM x1);
+        SELECT (SELECT SUM(a) FROM x1);
     ]], {
         -- <1.3>
         3
@@ -70,7 +70,7 @@ test:do_execsql_test(
 
         WITH x1   AS (SELECT i FROM t2),
              i(a) AS (
-               SELECT min(i)-1 FROM x1 UNION SELECT a+1 FROM i WHERE a<10
+               SELECT MIN(i)-1 FROM x1 UNION SELECT a+1 FROM i WHERE a<10
              )
         SELECT a FROM i WHERE a NOT IN x1
     ]], {
@@ -116,7 +116,7 @@ test:do_execsql_test(
     1.9,
     [[
         WITH x1 AS (SELECT * FROM t1)
-        SELECT (SELECT sum(a) FROM x1), (SELECT max(a) FROM x1);
+        SELECT (SELECT SUM(a) FROM x1), (SELECT MAX(a) FROM x1);
     ]], {
         -- <1.9>
         3, 2
@@ -127,7 +127,7 @@ test:do_execsql_test(
     1.10,
     [[
         WITH x1 AS (SELECT * FROM t1)
-        SELECT (SELECT sum(a) FROM x1), (SELECT max(a) FROM x1), a FROM x1;
+        SELECT (SELECT SUM(a) FROM x1), (SELECT MAX(a) FROM x1), a FROM x1;
     ]], {
         -- <1.10>
         3, 2, 1, 3, 2, 2
@@ -159,7 +159,7 @@ test:do_execsql_test(
           UNION ALL
           SELECT i || '.' FROM r, (
             SELECT x FROM x INTERSECT SELECT y FROM y
-          ) WHERE length(i) < 10
+          ) WHERE LENGTH(i) < 10
         ),
         x(x) AS ( VALUES(1) UNION ALL VALUES(2) UNION ALL VALUES(3) ),
         y(y) AS ( VALUES(2) UNION ALL VALUES(4) UNION ALL VALUES(6) )
@@ -177,11 +177,11 @@ test:do_execsql_test(
         WITH r(i) AS (
           VALUES('.')
           UNION ALL
-          SELECT i || '.' FROM r, ( SELECT x FROM x WHERE x=2 ) WHERE length(i) < 10
+          SELECT i || '.' FROM r, ( SELECT x FROM x WHERE x=2 ) WHERE LENGTH(i) < 10
         ),
         x(x) AS ( VALUES(1) UNION ALL VALUES(2) UNION ALL VALUES(3) )
 
-        SELECT * FROM r ORDER BY length(i) DESC;
+        SELECT * FROM r ORDER BY LENGTH(i) DESC;
     ]], {
         -- <1.13>
         "..........", ".........", "........", ".......", "......", ".....", "....", "...", "..", "."
@@ -214,7 +214,7 @@ test:do_catchsql_test(1.16, [[
     SELECT * FROM t4;
 ]], {
     -- <1.16>
-    1, "multiple references to recursive table: T4"
+    1, "multiple references to recursive table: t4"
     -- </1.16>
 })
 
@@ -257,7 +257,7 @@ test:do_catchsql_test(3.1, [[
     SELECT * FROM i;
 ]], {
     -- <3.1>
-    1, "circular reference: I"
+    1, "circular reference: i"
     -- </3.1>
 })
 
@@ -269,7 +269,7 @@ test:do_catchsql_test(3.2, [[
     SELECT * FROM i;
 ]], {
     -- <3.2>
-    1, "circular reference: I"
+    1, "circular reference: i"
     -- </3.2>
 })
 
@@ -280,7 +280,7 @@ test:do_catchsql_test(3.3, [[
     SELECT * FROM i;
 ]], {
     -- <3.3>
-    1, "circular reference: I"
+    1, "circular reference: i"
     -- </3.3>
 })
 
@@ -291,7 +291,7 @@ test:do_catchsql_test(3.4, [[
     SELECT * FROM j;
 ]], {
     -- <3.4>
-    1, "circular reference: J"
+    1, "circular reference: j"
     -- </3.4>
 })
 
@@ -304,7 +304,7 @@ test:do_catchsql_test(3.5, [[
     SELECT * FROM i;
 ]], {
     -- <3.5>
-    1, "circular reference: I"
+    1, "circular reference: i"
     -- </3.5>
 })
 
@@ -536,7 +536,7 @@ test:do_catchsql_test("6.3.2", [[
     INSERT INTO t2 SELECT a, b FROM abc;
 ]], {
     -- <6.3>
-    1, "Space 'ABC' does not exist"
+    1, "Space 'abc' does not exist"
     -- </6.3>
 })
 
@@ -599,7 +599,7 @@ test:do_catchsql_test("6.10", [[
     SELECT * FROM x
 ]], {
     -- <6.10>
-    1, "Can’t resolve field 'C'"
+    1, "Can’t resolve field 'c'"
     -- </6.10>
 })
 

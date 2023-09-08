@@ -30,7 +30,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(3,'pqr','fuzzy',99);
         INSERT INTO t1 VALUES(4,'abcdefg','xy',22);
         INSERT INTO t1 VALUES(5,'shoe','mayer',2953);
-        SELECT x FROM t1 WHERE c=position(b, 'abcdefg') OR a='abcdefg' ORDER BY +x;
+        SELECT x FROM t1 WHERE c=POSITION(b, 'abcdefg') OR a='abcdefg' ORDER BY +x;
     ]], {
         -- <func5-1.1>
         2, 4
@@ -40,7 +40,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func5-1.2",
     [[
-        SELECT x FROM t1 WHERE a='abcdefg' OR c=position(b, 'abcdefg') ORDER BY +x;
+        SELECT x FROM t1 WHERE a='abcdefg' OR c=POSITION(b, 'abcdefg') ORDER BY +x;
     ]], {
         -- <func5-1.1>
         2, 4
@@ -71,7 +71,7 @@ test:do_execsql_test(
 
 _G.global_counter = 0
 
-box.schema.func.create('COUNTER1', {language = 'Lua', is_deterministic = false,
+box.schema.func.create('counter1', {language = 'Lua', is_deterministic = false,
                        param_list = {'any'}, returns = 'integer',
                        exports = {'SQL', 'LUA'},
                        body = [[
@@ -81,7 +81,7 @@ box.schema.func.create('COUNTER1', {language = 'Lua', is_deterministic = false,
                            end
                        ]]})
 
-box.schema.func.create('COUNTER2', {language = 'Lua', is_deterministic = true,
+box.schema.func.create('counter2', {language = 'Lua', is_deterministic = true,
                        param_list = {'any'}, returns = 'integer',
                        exports = {'SQL', 'LUA'},
                        body = [[
@@ -296,32 +296,32 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "func-6.1-ifnull",
     [[
-        SELECT ifnull('qqq1', 'qqq2') = 'qqq2';
+        SELECT IFNULL('qqq1', 'qqq2') = 'qqq2';
     ]], { false } )
 
 test:do_execsql_test(
     "func-6.2-ifnull",
     [[
-        SELECT ifnull(null, 'qqq2') = 'qqq2';
+        SELECT IFNULL(null, 'qqq2') = 'qqq2';
     ]], { true } )
 
 test:do_catchsql_test(
     "func-6.3-ifnull",
     [[
-        SELECT ifnull(null, 1) = 'qqq2';
+        SELECT IFNULL(null, 1) = 'qqq2';
     ]], {
         1, "Type mismatch: can not convert string('qqq2') to number"
     })
 
-box.func.COUNTER1:drop()
-box.func.COUNTER2:drop()
+box.func.counter1:drop()
+box.func.counter2:drop()
 
 --
 -- Make sure the correct error is displayed if the function throws an error when
 -- setting the default value.
 --
 local body = 'function(x) return 1 end'
-box.schema.func.create('F1', {language = 'Lua', returns = 'number', body = body,
+box.schema.func.create('f1', {language = 'Lua', returns = 'number', body = body,
                        param_list = {}, exports = {'LUA'}});
 box.execute([[CREATE TABLE t01(i INT PRIMARY KEY, a INT DEFAULT(f1(1)));]])
 test:do_catchsql_test(
@@ -329,10 +329,10 @@ test:do_catchsql_test(
     [[
         INSERT INTO t01(i) VALUES(1);
     ]], {
-        1, "function F1() is not available in SQL"
+        1, "function f1() is not available in SQL"
     })
 
-box.schema.func.create('F2', {language = 'Lua', returns = 'number', body = body,
+box.schema.func.create('f2', {language = 'Lua', returns = 'number', body = body,
                        exports = {'LUA', 'SQL'}});
 box.execute([[CREATE TABLE t02(i INT PRIMARY KEY, a INT DEFAULT(f2(1)));]])
 test:do_catchsql_test(
@@ -340,13 +340,13 @@ test:do_catchsql_test(
     [[
         INSERT INTO t02(i) VALUES(1);
     ]], {
-        1, "Wrong number of arguments is passed to F2(): expected 0, got 1"
+        1, "Wrong number of arguments is passed to f2(): expected 0, got 1"
     })
 
-box.func.F1:drop()
-box.func.F2:drop()
-box.space.T01:drop()
-box.space.T02:drop()
+box.func.f1:drop()
+box.func.f2:drop()
+box.space.t01:drop()
+box.space.t02:drop()
 
 --
 -- gh-6105:  Make sure that functions that were described in _func but were not
@@ -375,7 +375,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-8.1",
     [[
-        SELECT typeof(CAST(NULL AS UUID));
+        SELECT TYPEOF(CAST(NULL AS UUID));
     ]], {
         'NULL'
     })
@@ -383,7 +383,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-8.2",
     [[
-        SELECT typeof(CAST(NULL AS SCALAR));
+        SELECT TYPEOF(CAST(NULL AS SCALAR));
     ]], {
         'NULL'
     })
@@ -391,7 +391,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-8.3",
     [[
-        SELECT typeof(CAST(NULL AS BOOLEAN));
+        SELECT TYPEOF(CAST(NULL AS BOOLEAN));
     ]], {
         'NULL'
     })
@@ -399,7 +399,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-8.4",
     [[
-        SELECT typeof(CAST(NULL AS INTEGER));
+        SELECT TYPEOF(CAST(NULL AS INTEGER));
     ]], {
         'NULL'
     })
@@ -407,7 +407,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-8.5",
     [[
-        SELECT typeof(CAST(NULL AS UNSIGNED));
+        SELECT TYPEOF(CAST(NULL AS UNSIGNED));
     ]], {
         'NULL'
     })
@@ -415,7 +415,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-8.6",
     [[
-        SELECT typeof(CAST(NULL AS DOUBLE));
+        SELECT TYPEOF(CAST(NULL AS DOUBLE));
     ]], {
         'NULL'
     })
@@ -423,7 +423,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-8.7",
     [[
-        SELECT typeof(CAST(NULL AS NUMBER));
+        SELECT TYPEOF(CAST(NULL AS NUMBER));
     ]], {
         'NULL'
     })
@@ -431,7 +431,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-8.8",
     [[
-        SELECT typeof(CAST(NULL AS STRING));
+        SELECT TYPEOF(CAST(NULL AS STRING));
     ]], {
         'NULL'
     })
@@ -439,7 +439,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-8.9",
     [[
-        SELECT typeof(CAST(NULL AS VARBINARY));
+        SELECT TYPEOF(CAST(NULL AS VARBINARY));
     ]], {
         'NULL'
     })

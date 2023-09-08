@@ -26,10 +26,10 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(1,2,3);
         INSERT INTO t1 VALUES(1,3,4);
         INSERT INTO t1 VALUES(1,3,5);
-        SELECT count(distinct a),
-               count(distinct b),
-               count(distinct c),
-               count(all a) FROM t1;
+        SELECT COUNT(distinct a),
+               COUNT(distinct b),
+               COUNT(distinct c),
+               COUNT(all a) FROM t1;
     ]], {
         -- <distinctagg-1.1>
         1, 2, 3, 3
@@ -39,7 +39,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "distinctagg-1.2",
     [[
-        SELECT b, count(distinct c) FROM t1 GROUP BY b ORDER BY b
+        SELECT b, COUNT(distinct c) FROM t1 GROUP BY b ORDER BY b
     ]], {
         -- <distinctagg-1.2>
         2, 1, 3, 2
@@ -52,7 +52,7 @@ test:do_execsql_test(
         INSERT INTO t1 SELECT a+1, b+3, c+5 FROM t1;
         INSERT INTO t1 SELECT a+2, b+6, c+10 FROM t1;
         INSERT INTO t1 SELECT a+4, b+12, c+20 FROM t1;
-        SELECT count(*), count(distinct a), count(distinct b) FROM t1
+        SELECT COUNT(*), COUNT(distinct a), COUNT(distinct b) FROM t1
     ]], {
         -- <distinctagg-1.3>
         24, 8, 16
@@ -62,7 +62,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "distinctagg-1.4",
     [[
-        SELECT a, count(distinct c) FROM t1 GROUP BY a ORDER BY a
+        SELECT a, COUNT(distinct c) FROM t1 GROUP BY a ORDER BY a
     ]], {
         -- <distinctagg-1.4>
         1, 3, 2, 3, 3, 3, 4, 3, 5, 3, 6, 3, 7, 3, 8, 3
@@ -72,7 +72,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "distinctagg-2.1",
     [[
-        SELECT count(distinct) FROM t1;
+        SELECT COUNT(distinct) FROM t1;
     ]], {
         -- <distinctagg-2.1>
         1, "DISTINCT aggregates must have exactly one argument"
@@ -82,7 +82,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "distinctagg-2.2",
     [[
-        SELECT group_concat(distinct CAST(a AS STRING), CAST(b AS STRING))
+        SELECT GROUP_CONCAT(distinct CAST(a AS STRING), CAST(b AS STRING))
         FROM t1;
     ]], {
         -- <distinctagg-2.2>

@@ -236,8 +236,9 @@ if (1 > 0) then
             INSERT INTO t1 VALUES(5,3);
             INSERT INTO t1 VALUES(6,1);
             CREATE TABLE t2(x SCALAR primary key);
-            INSERT INTO t2 SELECT DISTINCT CASE a WHEN 1 THEN x'0000000000' WHEN 2 THEN zeroblob(5) ELSE 'xyzzy' END FROM t1;
-            SELECT quote(x) FROM t2 ORDER BY 1;
+            INSERT INTO t2 SELECT DISTINCT CASE a WHEN 1 THEN x'0000000000'
+            WHEN 2 THEN ZEROBLOB(5) ELSE 'xyzzy' END FROM t1;
+            SELECT QUOTE(x) FROM t2 ORDER BY 1;
         ]], {
             -- <4.1>
             "'xyzzy'", "X'0000000000'"

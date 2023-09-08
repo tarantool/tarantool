@@ -15,7 +15,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
 	test_prefix.."1.0.3",
 	[[
-		CREATE TRIGGER TRIG1 BEFORE INSERT ON T1
+        CREATE TRIGGER TRIG1 BEFORE INSERT ON t1
         FOR EACH ROW
 		begin
 			insert into t2 values(new.a);
@@ -81,13 +81,15 @@ local testcases = {
 		{0,{1,2,10,11,1,2,4,10,11}}},
 	{"14",
 		[[insert into t1 values(4);]],
-		{1,"Duplicate key exists in unique index \"pk_unnamed_T2_1\" in space \"T2\" with old tuple - [4] and new tuple - [4]"}},
+        {1,"Duplicate key exists in unique index \"pk_unnamed_t2_1\" in "..
+           "space \"t2\" with old tuple - [4] and new tuple - [4]"}},
 	{"15",
 		[[select * from t1 union all select * from t2;]],
 		{0,{1,2,10,11,1,2,4,10,11}}},
 	{"16",
 		[[insert or rollback into t1 values(4);]],
-		{1,"Duplicate key exists in unique index \"pk_unnamed_T2_1\" in space \"T2\" with old tuple - [4] and new tuple - [4]"}},
+        {1,"Duplicate key exists in unique index \"pk_unnamed_t2_1\" in "..
+           "space \"t2\" with old tuple - [4] and new tuple - [4]"}},
 	{"17",  -- should work as transaction is rolled back
 		[[insert or rollback into t1 values(4);
 		select * from t1 union all select * from t2;]],

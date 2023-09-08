@@ -55,10 +55,10 @@ s:drop()
 format = {}
 t = {}
 for i = 1, 70 do                                                \
-        format[i] = {name = 'FIELD'..i, type = 'unsigned'}      \
+        format[i] = {name = 'field'..i, type = 'unsigned'}      \
         t[i] = i                                                \
 end
-s = box.schema.create_space('TEST', {format = format})
+s = box.schema.create_space('test', {format = format})
 pk = s:create_index('pk', {parts = {70}})
 s:insert(t)
 box.execute('SELECT field70, field64 FROM test')
@@ -66,7 +66,7 @@ box.execute('SELECT field70, field64 FROM test')
 -- In the case below described optimization works fine.
 pk:alter({parts = {66}})
 box.execute('SELECT field66, field68, field70 FROM test')
-box.space.TEST:drop()
+box.space.test:drop()
 
 -- gh-4933: Make sure that autoindex optimization is used.
 box.execute('CREATE TABLE t1(i INT PRIMARY KEY, a INT);')
@@ -85,8 +85,8 @@ diag == box.error.last()
 
 -- exclude_null + SQL correctness
 box.execute([[CREATE TABLE j (s1 INT PRIMARY KEY, s2 STRING, s3 VARBINARY)]])
-s = box.space.J
-i = box.space.J:create_index('I3',{parts={2,'string', exclude_null=true}})
+s = box.space.j
+i = box.space.j:create_index('I3', {parts = {2, 'string', exclude_null = true}})
 box.execute([[INSERT INTO j VALUES (1,NULL,NULL), (2,'',X'00');]])
 
 box.execute([[SELECT * FROM j;]])
@@ -95,13 +95,13 @@ box.execute([[SELECT * FROM j INDEXED BY I3;]])
 box.execute([[SELECT COUNT(*) FROM j GROUP BY s2;]])
 box.execute([[SELECT COUNT(*) FROM j INDEXED BY I3;]])
 
-box.execute([[UPDATE j INDEXED BY i3 SET s2 = NULL;]])
+box.execute([[UPDATE j INDEXED BY I3 SET s2 = NULL;]])
 box.execute([[INSERT INTO j VALUES (3, 'a', X'33');]])
 
 box.execute([[SELECT * FROM j;]])
 box.execute([[SELECT * FROM j INDEXED BY I3;]])
 
-box.execute([[UPDATE j INDEXED BY i3 SET s3 = NULL;]])
+box.execute([[UPDATE j INDEXED BY I3 SET s3 = NULL;]])
 s:select{}
 
 s:drop()

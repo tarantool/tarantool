@@ -11,7 +11,7 @@ test:execsql([[
     ]])
 
 -- Make sure that persistent aggregate functions work as intended.
-box.schema.func.create("F1", {
+box.schema.func.create("f1", {
     language = "Lua",
     body = [[
         function(x, state)
@@ -46,9 +46,9 @@ local f2 = function(x, state)
     return state
 end
 
-rawset(_G, 'F2', f2)
+rawset(_G, 'f2', f2)
 
-box.schema.func.create("F2", {
+box.schema.func.create("f2", {
     language = "Lua",
     param_list = {"integer", "array"},
     returns = "array",
@@ -106,7 +106,7 @@ test:do_test(
     })
 
 -- Make sure finalizers of aggregate functions work as intended.
-box.schema.func.create("F1_finalize", {
+box.schema.func.create("f1_finalize", {
     language = "Lua",
     body = [[
         function(state)
@@ -124,7 +124,7 @@ box.schema.func.create("F1_finalize", {
 test:do_execsql_test(
     "gh-2579-6",
     [[
-        SELECT f1(i), typeof(f1(i)) from t;
+        SELECT f1(i), TYPEOF(f1(i)) from t;
     ]], {
         3, "integer"
     })
@@ -133,7 +133,7 @@ test:do_execsql_test(
 -- Make sure that the finalizers of the aggregate function and the aggregate
 -- function can be of different types.
 --
-box.schema.func.create("F2_finalize", {
+box.schema.func.create("f2_finalize", {
     language = "Lua",
     body = [[
         function(state)
@@ -157,8 +157,8 @@ test:do_execsql_test(
     })
 
 -- Make sure that aggregate function cannot become finalizer.
-box.schema.func.drop("F2_finalize")
-box.schema.func.create("F2_finalize", {
+box.schema.func.drop("f2_finalize")
+box.schema.func.create("f2_finalize", {
     language = "Lua",
     body = [[
         function(state)
@@ -181,7 +181,7 @@ box.schema.func.create("F2_finalize", {
 test:do_execsql_test(
     "gh-2579-8",
     [[
-        SELECT f2(i), typeof(f2(i)) from t;
+        SELECT f2(i), TYPEOF(f2(i)) from t;
     ]], {
         {1, 2, 3, 4, 5}, "array"
     })
@@ -190,8 +190,8 @@ test:do_execsql_test(
 -- Make sure that function with number of arguments not equal to 1 cannot become
 -- finalizer.
 --
-box.schema.func.drop("F2_finalize")
-box.schema.func.create("F2_finalize", {
+box.schema.func.drop("f2_finalize")
+box.schema.func.create("f2_finalize", {
     language = "Lua",
     body = [[
         function(state, x)
@@ -209,16 +209,16 @@ box.schema.func.create("F2_finalize", {
 test:do_execsql_test(
     "gh-2579-9",
     [[
-        SELECT f2(i), typeof(f2(i)), "F2_finalize"(f2(i), 2) from t;
+        SELECT f2(i), TYPEOF(f2(i)), "f2_finalize"(f2(i), 2) from t;
     ]], {
         {1, 2, 3, 4, 5}, "array", 10
     })
 
-box.schema.func.drop('F2_finalize')
-box.schema.func.drop('F1_finalize')
+box.schema.func.drop('f2_finalize')
+box.schema.func.drop('f1_finalize')
 box.schema.func.drop('gh-2579-custom-aggregate.f3')
-box.schema.func.drop('F2')
-box.schema.func.drop('F1')
+box.schema.func.drop('f2')
+box.schema.func.drop('f1')
 test:execsql([[DROP TABLE t;]])
 
 test:finish_test()

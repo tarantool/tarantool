@@ -27,7 +27,7 @@ end
 test:do_test(
     "concurrency:1",
     function()
-        return test:execsql([[select count(*) from "_space" where "name" like 'table-2723-%']])[1]
+        return test:execsql([[select COUNT(*) from "_space" where "name" LIKE 'table-2723-%']])[1]
     end,
     0)
 
@@ -52,7 +52,7 @@ end
 test:do_test(
     "concurrency:2",
     function()
-        return test:execsql("select count(*) from (select distinct * from t1);")[1]
+        return test:execsql("select COUNT(*) from (select distinct * from t1);")[1]
     end,
     N)
 box.execute("drop table t1;")
@@ -78,7 +78,7 @@ end
 test:do_test(
     "concurrency:3",
     function()
-        return test:execsql("select count(*) from t1;")[1]
+        return test:execsql("select COUNT(*) from t1;")[1]
     end,
     0)
 box.execute("drop table t1;")

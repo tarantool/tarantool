@@ -46,7 +46,7 @@ for _, table_count in ipairs({30, 31}) do
         create_string = create_string .. ' BEFORE INSERT ON t' .. i
             .. ' FOR EACH ROW '
         create_string = create_string .. ' BEGIN INSERT INTO t' .. i+1
-            .. ' (s1) SELECT max(s1)+1 FROM t' .. i+1 .. '; END'
+            .. ' (s1) SELECT MAX(s1)+1 FROM t' .. i+1 .. '; END'
         box.execute(create_string)
 
         -- Try triggers mixture: DELETE triggers UPDATE, which triggers
@@ -62,7 +62,7 @@ for _, table_count in ipairs({30, 31}) do
                 create_string = create_string .. ' BEFORE UPDATE ON tt' .. i
                     .. ' FOR EACH ROW'
                 create_string = create_string .. ' BEGIN INSERT INTO tt' .. i+1
-                    .. ' (s1) SELECT max(s1)+1 FROM tt' .. i+1 .. '; END'
+                    .. ' (s1) SELECT MAX(s1)+1 FROM tt' .. i+1 .. '; END'
             else
                 create_string = create_string .. ' BEFORE DELETE ON tt' .. i
                     .. ' FOR EACH ROW'

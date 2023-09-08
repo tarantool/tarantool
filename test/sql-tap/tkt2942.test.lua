@@ -40,7 +40,7 @@ test:do_execsql_test(
         insert into t1 values (2, '1');
         insert into t1 values (3, '3');
         insert into t1 values (4, '4');
-        SELECT group_concat("num") FROM (SELECT "num" FROM t1 ORDER BY "num" DESC);
+        SELECT GROUP_CONCAT("num") FROM (SELECT "num" FROM t1 ORDER BY "num" DESC);
     ]], {
         -- <tkt2942.1>
         "4,3,2,1"
@@ -50,7 +50,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2942.2",
     [[
-        SELECT group_concat("num") FROM (SELECT "num" FROM t1 ORDER BY "num");
+        SELECT GROUP_CONCAT("num") FROM (SELECT "num" FROM t1 ORDER BY "num");
     ]], {
         -- <tkt2942.2>
         "1,2,3,4"
@@ -60,7 +60,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2942.3",
     [[
-        SELECT group_concat("num") FROM (SELECT "num" FROM t1);
+        SELECT GROUP_CONCAT("num") FROM (SELECT "num" FROM t1);
     ]], {
         -- <tkt2942.3>
         "2,1,3,4"
@@ -70,7 +70,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2942.4",
     [[
-        SELECT group_concat("num") FROM (SELECT "num" FROM t1 ORDER BY id DESC);
+        SELECT GROUP_CONCAT("num") FROM (SELECT "num" FROM t1 ORDER BY id DESC);
     ]], {
         -- <tkt2942.4>
         "4,3,1,2"

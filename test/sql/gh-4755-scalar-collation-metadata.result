@@ -26,15 +26,15 @@ box.execute([[CREATE TABLE test (a SCALAR COLLATE "unicode_ci" PRIMARY KEY,
 box.execute("SELECT * FROM SEQSCAN test;");
  | ---
  | - metadata:
- |   - span: A
+ |   - span: a
  |     type: scalar
  |     is_nullable: false
- |     name: A
+ |     name: a
  |     collation: unicode_ci
- |   - span: B
+ |   - span: b
  |     type: string
  |     is_nullable: true
- |     name: B
+ |     name: b
  |     collation: unicode_ci
  |   rows: []
  | ...

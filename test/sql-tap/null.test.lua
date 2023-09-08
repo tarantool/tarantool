@@ -47,7 +47,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-1.1",
     [[
-        select ifnull(a+b,99) from t1;
+        select IFNULL(a+b,99) from t1;
     ]], {
         -- <null-1.1>
         1, 2, 4, 5, 99, 99, 99
@@ -57,7 +57,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-1.2",
     [[
-        select ifnull(b*c,99) from t1;
+        select IFNULL(b*c,99) from t1;
     ]], {
         -- <null-1.2>
         0, 0, 0, 1, 99, 99, 99
@@ -71,7 +71,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-2.1",
     [[
-        select ifnull(case when b<>0 then 1 else 0 end, 99) from t1;
+        select IFNULL(case when b<>0 then 1 else 0 end, 99) from t1;
     ]], {
         -- <null-2.1>
         0, 0, 1, 1, 0, 0, 0
@@ -81,7 +81,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-2.2",
     [[
-        select ifnull(case when not b<>0 then 1 else 0 end, 99) from t1;
+        select IFNULL(case when not b<>0 then 1 else 0 end, 99) from t1;
     ]], {
         -- <null-2.2>
         1, 1, 0, 0, 0, 0, 0
@@ -91,7 +91,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-2.3",
     [[
-        select ifnull(case when b<>0 and c<>0 then 1 else 0 end, 99) from t1;
+        select IFNULL(case when b<>0 and c<>0 then 1 else 0 end, 99) from t1;
     ]], {
         -- <null-2.3>
         0, 0, 0, 1, 0, 0, 0
@@ -101,7 +101,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-2.4",
     [[
-        select ifnull(case when not (b<>0 and c<>0) then 1 else 0 end, 99) from t1;
+        select IFNULL(case when not (b<>0 and c<>0) then 1 else 0 end, 99) from t1;
     ]], {
         -- <null-2.4>
         1, 1, 1, 0, 1, 0, 0
@@ -111,7 +111,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-2.5",
     [[
-        select ifnull(case when b<>0 or c<>0 then 1 else 0 end, 99) from t1;
+        select IFNULL(case when b<>0 or c<>0 then 1 else 0 end, 99) from t1;
     ]], {
         -- <null-2.5>
         0, 1, 1, 1, 0, 1, 0
@@ -121,7 +121,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-2.6",
     [[
-        select ifnull(case when not (b<>0 or c<>0) then 1 else 0 end, 99) from t1;
+        select IFNULL(case when not (b<>0 or c<>0) then 1 else 0 end, 99) from t1;
     ]], {
         -- <null-2.6>
         1, 0, 0, 0, 0, 0, 0
@@ -131,7 +131,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-2.7",
     [[
-        select ifnull(case b when c then 1 else 0 end, 99) from t1;
+        select IFNULL(case b when c then 1 else 0 end, 99) from t1;
     ]], {
         -- <null-2.7>
         1, 0, 0, 1, 0, 0, 0
@@ -141,7 +141,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-2.8",
     [[
-        select ifnull(case c when b then 1 else 0 end, 99) from t1;
+        select IFNULL(case c when b then 1 else 0 end, 99) from t1;
     ]], {
         -- <null-2.8>
         1, 0, 0, 1, 0, 0, 0
@@ -153,8 +153,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-3.1",
     [[
-        select count(*), count(b), count(c), sum(b), sum(c),
-               avg(b), avg(c), min(b), max(b) from t1;
+        select COUNT(*), COUNT(b), COUNT(c), SUM(b), SUM(c),
+               AVG(b), AVG(c), MIN(b), MAX(b) from t1;
     ]], {
         -- <null-3.1>
         7, 4, 6, 2, 3, 0, 0, 0, 1
@@ -166,7 +166,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-3.2",
     [[
-        SELECT sum(b), total(b) FROM t1 WHERE b<0
+        SELECT SUM(b), TOTAL(b) FROM t1 WHERE b<0
     ]], {
         -- <null-3.2>
         "", 0.0

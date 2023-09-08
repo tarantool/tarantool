@@ -30,7 +30,7 @@ box.execute("DROP TABLE zzzoobar")
 box.execute("INSERT INTO zzzoobar VALUES (111, 222, 'c3', 444)")
 ---
 - null
-- Space 'ZZZOOBAR' does not exist
+- Space 'zzzoobar' does not exist
 ...
 -- gh-3712: if space features sequence, data from _sequence_data
 -- must be deleted before space is dropped.
@@ -102,7 +102,7 @@ box.execute('CREATE TABLE t1 (id INT PRIMARY KEY, a INT)')
 box.execute('DROP TABLE t1')
 ---
 - null
-- Space 'T1' does not exist
+- Space 't1' does not exist
 ...
 box.session.su('admin')
 ---
@@ -186,7 +186,7 @@ box.execute('CREATE TABLE t4(x INTEGER PRIMARY KEY REFERENCES t3, a INT UNIQUE, 
 box.execute('DROP TABLE t3;')
 ---
 - null
-- 'Can''t modify space ''T3'': space is referenced by foreign key'
+- 'Can''t modify space ''t3'': space is referenced by foreign key'
 ...
 box.execute('DROP TABLE t4;')
 ---

@@ -18,7 +18,7 @@ test:do_catchsql_test(
     "index-info-1.1",
     "PRAGMA index_xinfo (t1.a);",
     {
-        1, "Pragma 'INDEX_XINFO' does not exist",
+        1, "Pragma 'index_xinfo' does not exist",
     })
 
 -- Case: old index_info syntax is banned.
@@ -34,7 +34,7 @@ test:do_execsql_test(
     "index-info-1.3",
     "PRAGMA index_info (t1.a);",
     {
-        0, 0, 'A', 0, 'BINARY', 'integer',
+        0, 0, 'a', 0, 'BINARY', 'integer',
     })
 
 -- Case: multiple columns index with integer columns.
@@ -42,9 +42,9 @@ test:do_execsql_test(
     "index-info-1.4",
     "PRAGMA index_info (t1.abc);",
     {
-        0, 0, 'A', 0, 'BINARY', 'integer',
-        1, 1, 'B', 0, 'BINARY', 'integer',
-        2, 2, 'C', 0, 'BINARY', 'integer',
+        0, 0, 'a', 0, 'BINARY', 'integer',
+        1, 1, 'b', 0, 'BINARY', 'integer',
+        2, 2, 'c', 0, 'BINARY', 'integer',
     })
 
 -- Case: multiple columns, reverse columns order.
@@ -52,9 +52,9 @@ test:do_execsql_test(
     "index-info-1.5",
     "PRAGMA index_info (t1.cba);",
     {
-        0, 2, 'C', 0, 'BINARY', 'integer',
-        1, 1, 'B', 0, 'BINARY', 'integer',
-        2, 0, 'A', 0, 'BINARY', 'integer',
+        0, 2, 'c', 0, 'BINARY', 'integer',
+        1, 1, 'b', 0, 'BINARY', 'integer',
+        2, 0, 'a', 0, 'BINARY', 'integer',
     })
 
 -- Case: index with a string column.
@@ -62,7 +62,7 @@ test:do_execsql_test(
     "index-info-1.6",
     "PRAGMA index_info (t1.d);",
     {
-        0, 3, 'D', 0, 'BINARY', 'string',
+        0, 3, 'd', 0, 'BINARY', 'string',
     })
 
 test:finish_test()

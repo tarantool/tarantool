@@ -27,7 +27,7 @@ box.execute([[INSERT INTO t (id) VALUES (1)]])
 box.execute([[SELECT * FROM SEQSCAN t]])
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
   rows:
   - [1]
@@ -42,7 +42,7 @@ c = require('net.box').connect(os.getenv("LISTEN"))
 -- Which could obviously lead to access denied error.
 c:eval([[ return box.execute('SELECT * FROM SEQSCAN t') ]])
 ---
-- {'metadata': [{'name': 'ID', 'type': 'integer'}], 'rows': [[1]]}
+- {'metadata': [{'name': 'id', 'type': 'integer'}], 'rows': [[1]]}
 ...
 -- sql.execute([[SELECT * FROM t]])
 box.execute([[DROP TABLE t]])

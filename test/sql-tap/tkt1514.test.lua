@@ -24,7 +24,7 @@ test:do_catchsql_test(
     "tkt1514-1.1",
     [[
         CREATE TABLE t1(a INT primary key,b INT);
-        SELECT a FROM t1 WHERE max(b)<10 GROUP BY a;
+        SELECT a FROM t1 WHERE MAX(b)<10 GROUP BY a;
     ]], {
         -- <tkt1514-1.1>
         1, "misuse of aggregate: MAX()"

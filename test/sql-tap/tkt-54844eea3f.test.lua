@@ -47,7 +47,7 @@ test:do_execsql_test(
     "1.1",
     [[
         SELECT 'test-2', t3.c, (
-              SELECT count(*)
+              SELECT COUNT(*)
               FROM t1 JOIN (SELECT DISTINCT t3.c AS p FROM t2) AS x ON t1.a=x.p
         )
         FROM t3;

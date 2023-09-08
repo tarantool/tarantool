@@ -25,7 +25,7 @@ test:do_catchsql_test("insert-1.1", [[
   INSERT INTO test1 VALUES(1,2,3)
 ]], {
   -- <insert-1.1>
-  1, "Space 'TEST1' does not exist"
+  1, "Space 'test1' does not exist"
   -- </insert-1.1>
 })
 
@@ -42,7 +42,7 @@ test:do_test("insert-1.3", function()
   return test:catchsql "INSERT INTO test1 VALUES(1,2)"
 end, {
   -- <insert-1.3>
-  1, "table TEST1 has 3 columns but 2 values were supplied"
+  1, "table test1 has 3 columns but 2 values were supplied"
   -- </insert-1.3>
 })
 
@@ -50,7 +50,7 @@ test:do_catchsql_test("insert-1.3b", [[
   INSERT INTO test1 VALUES(1,2,3,4)
 ]], {
   -- <insert-1.3b>
-  1, "table TEST1 has 3 columns but 4 values were supplied"
+  1, "table test1 has 3 columns but 4 values were supplied"
   -- </insert-1.3b>
 })
 
@@ -76,7 +76,7 @@ test:do_catchsql_test("insert-1.4", [[
   INSERT INTO test1(one,four) VALUES(1,2)
 ]], {
   -- <insert-1.4>
-  1, "Field 'FOUR' was not found in space 'TEST1' format"
+  1, "Field 'four' was not found in space 'test1' format"
   -- </insert-1.4>
 })
 
@@ -222,7 +222,7 @@ test:do_execsql_test("insert-4.1", [[
 })
 
 test:do_test("insert-4.2", function()
-  test:execsql "INSERT INTO t3 VALUES((SELECT max(a) FROM t3)+1,5,6);"
+  test:execsql "INSERT INTO t3 VALUES((SELECT MAX(a) FROM t3)+1,5,6);"
 
   return test:execsql [[
     SELECT * FROM t3 ORDER BY a;
@@ -235,11 +235,11 @@ end, {
 
 -- if X(0, "X!capable", [["subquery"]]) then
   test:do_catchsql_test("insert-4.3", [[
-    INSERT INTO t3 VALUES((SELECT max(a) FROM t3)+1,t3.a,6);
+    INSERT INTO t3 VALUES((SELECT MAX(a) FROM t3)+1,t3.a,6);
     SELECT * FROM t3 ORDER BY a;
   ]], {
     -- <insert-4.3>
-    1, "Field 'A' was not found in space 'T3' format"
+    1, "Field 'a' was not found in space 't3' format"
     -- </insert-4.3>
   })
 
@@ -267,7 +267,7 @@ test:do_catchsql_test("insert-4.6", [[
   INSERT INTO t3 VALUES(notafunc(2,3),2,3);
 ]], {
   -- <insert-4.6>
-  1, "Function 'NOTAFUNC' does not exist"
+  1, "Function 'notafunc' does not exist"
   -- </insert-4.6>
 })
 
@@ -518,14 +518,14 @@ test:do_catchsql_test(
     [[
         insert into test(a, a, b) values(1, 1, 1)
     ]],
-    {1, "table id list: duplicate column name A"})
+    {1, "table id list: duplicate column name a"})
 
 test:do_catchsql_test(
     "insert-13.2",
     [[
         insert into test(a, b, b) values(1, 1, 1)
     ]],
-    {1, "table id list: duplicate column name B"})
+    {1, "table id list: duplicate column name b"})
 
 test:do_execsql_test(
     "insert-13.3",

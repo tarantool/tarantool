@@ -26,14 +26,14 @@ box.execute("INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
 box.execute("INSERT INTO zoobar VALUES (112, 222, 'c3', 444)")
 ---
 - null
-- Duplicate key exists in unique index "pk_unnamed_ZOOBAR_1" in space "ZOOBAR" with
+- Duplicate key exists in unique index "pk_unnamed_zoobar_1" in space "zoobar" with
   old tuple - [111, 222, "c3", 444] and new tuple - [112, 222, "c3", 444]
 ...
 -- Unique index must be respected
 box.execute("INSERT INTO zoobar VALUES (111, 223, 'c3', 444)")
 ---
 - null
-- Duplicate key exists in unique index "ZOOBAR2" in space "ZOOBAR" with old tuple
+- Duplicate key exists in unique index "zoobar2" in space "zoobar" with old tuple
   - [111, 222, "c3", 444] and new tuple - [111, 223, "c3", 444]
 ...
 -- Cleanup

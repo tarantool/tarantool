@@ -50,12 +50,12 @@ test:do_execsql_test(
         -- </func-0.1>
     })
 
--- Check out the length() function
+-- Check out the LENGTH() function
 --
 test:do_execsql_test(
     "func-1.0",
     [[
-        SELECT length(t1) FROM tbl1 ORDER BY t1
+        SELECT LENGTH(t1) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-1.0>
         4, 2, 7, 8, 4
@@ -65,7 +65,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "func-1.1",
     [[
-        SELECT length(*) FROM tbl1 ORDER BY t1
+        SELECT LENGTH(*) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-1.1>
         1, "Wrong number of arguments is passed to LENGTH(): expected 1, got 0"
@@ -75,7 +75,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-1.2",
     [[
-        SELECT length(t1,5) FROM tbl1 ORDER BY t1
+        SELECT LENGTH(t1,5) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-1.2>
         1, "Wrong number of arguments is passed to LENGTH(): expected 1, got 2"
@@ -84,8 +84,8 @@ test:do_catchsql_test(
 
 test:do_execsql_test(
     "func-1.3",
-    [[SELECT length(t1), count(t1) FROM tbl1 GROUP BY length(t1)
-           ORDER BY length(t1)]], {
+    [[SELECT LENGTH(t1), COUNT(t1) FROM tbl1 GROUP BY LENGTH(t1)
+           ORDER BY LENGTH(t1)]], {
         -- <func-1.3>
         2, 1, 4, 2, 7, 1, 8, 1
         -- </func-1.3>
@@ -94,19 +94,19 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-1.4",
     [[
-        SELECT coalesce(length(CAST(a AS STRING)),-1) FROM t2
+        SELECT COALESCE(LENGTH(CAST(a AS STRING)),-1) FROM t2
     ]], {
         -- <func-1.4>
         1, -1, 3, -1, 5
         -- </func-1.4>
     })
 
--- Check out the substr() function
+-- Check out the SUBSTR() function
 --
 test:do_execsql_test(
     "func-2.0",
     [[
-        SELECT substr(t1,1,2) FROM tbl1 ORDER BY t1
+        SELECT SUBSTR(t1,1,2) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-2.0>
         "fr", "is", "pr", "so", "th"
@@ -116,7 +116,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-2.1",
     [[
-        SELECT substr(t1,2,1) FROM tbl1 ORDER BY t1
+        SELECT SUBSTR(t1,2,1) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-2.1>
         "r", "s", "r", "o", "h"
@@ -126,7 +126,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-2.2",
     [[
-        SELECT substr(t1,3,3) FROM tbl1 ORDER BY t1
+        SELECT SUBSTR(t1,3,3) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-2.2>
         "ee", "", "ogr", "ftw", "is"
@@ -136,7 +136,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-2.3",
     [[
-        SELECT substr(t1,-1,1) FROM tbl1 ORDER BY t1
+        SELECT SUBSTR(t1,-1,1) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-2.3>
         "", "", "", "", ""
@@ -146,7 +146,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-2.4",
     [[
-        SELECT substr(t1,-1,2) FROM tbl1 ORDER BY t1
+        SELECT SUBSTR(t1,-1,2) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-2.4>
         "", "", "", "", ""
@@ -156,7 +156,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-2.5",
     [[
-        SELECT substr(t1,-2,1) FROM tbl1 ORDER BY t1
+        SELECT SUBSTR(t1,-2,1) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-2.5>
         "", "", "", "", ""
@@ -166,7 +166,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-2.6",
     [[
-        SELECT substr(t1,-2,2) FROM tbl1 ORDER BY t1
+        SELECT SUBSTR(t1,-2,2) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-2.6>
         "", "", "", "", ""
@@ -176,7 +176,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-2.7",
     [[
-        SELECT substr(t1,-4,2) FROM tbl1 ORDER BY t1
+        SELECT SUBSTR(t1,-4,2) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-2.7>
         "", "", "", "", ""
@@ -186,7 +186,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-2.8",
     [[
-        SELECT t1 FROM tbl1 ORDER BY substr(t1,2,20)
+        SELECT t1 FROM tbl1 ORDER BY SUBSTR(t1,2,20)
     ]], {
         -- <func-2.8>
         "this", "software", "free", "program", "is"
@@ -215,7 +215,7 @@ if ("ሴ" ~= "u1234") then
     test:do_execsql_test(
         "func-3.1",
         [[
-            SELECT length(t1) FROM tbl1 ORDER BY t1
+            SELECT LENGTH(t1) FROM tbl1 ORDER BY t1
         ]], {
             -- <func-3.1>
             5, 10, 8, 5
@@ -225,7 +225,7 @@ if ("ሴ" ~= "u1234") then
     test:do_execsql_test(
         "func-3.2",
         [[
-            SELECT substr(t1,1,2) FROM tbl1 ORDER BY t1
+            SELECT SUBSTR(t1,1,2) FROM tbl1 ORDER BY t1
         ]], {
             -- <func-3.2>
             "UT", "ch", "co", "hi"
@@ -235,7 +235,7 @@ if ("ሴ" ~= "u1234") then
     test:do_execsql_test(
         "func-3.3",
         [[
-            SELECT substr(t1,1,3) FROM tbl1 ORDER BY t1
+            SELECT SUBSTR(t1,1,3) FROM tbl1 ORDER BY t1
         ]], {
             -- <func-3.3>
             "UTF", "cha", "con", "hiሴ"
@@ -245,7 +245,7 @@ if ("ሴ" ~= "u1234") then
     test:do_execsql_test(
         "func-3.4",
         [[
-            SELECT substr(t1,2,2) FROM tbl1 ORDER BY t1
+            SELECT SUBSTR(t1,2,2) FROM tbl1 ORDER BY t1
         ]], {
             -- <func-3.4>
             "TF", "ha", "on", "iሴ"
@@ -255,7 +255,7 @@ if ("ሴ" ~= "u1234") then
     test:do_execsql_test(
         "func-3.5",
         [[
-            SELECT substr(t1,2,3) FROM tbl1 ORDER BY t1
+            SELECT SUBSTR(t1,2,3) FROM tbl1 ORDER BY t1
         ]], {
             -- <func-3.5>
             "TF-", "har", "ont", "iሴh"
@@ -265,7 +265,7 @@ if ("ሴ" ~= "u1234") then
     test:do_execsql_test(
         "func-3.6",
         [[
-            SELECT substr(t1,3,2) FROM tbl1 ORDER BY t1
+            SELECT SUBSTR(t1,3,2) FROM tbl1 ORDER BY t1
         ]], {
             -- <func-3.6>
             "F-", "ar", "nt", "ሴh"
@@ -275,7 +275,7 @@ if ("ሴ" ~= "u1234") then
     test:do_execsql_test(
         "func-3.7",
         [[
-            SELECT substr(t1,4,2) FROM tbl1 ORDER BY t1
+            SELECT SUBSTR(t1,4,2) FROM tbl1 ORDER BY t1
         ]], {
             -- <func-3.7>
             "-8", "ra", "ta", "ho"
@@ -285,7 +285,7 @@ if ("ሴ" ~= "u1234") then
     test:do_execsql_test(
         "func-3.8",
         [[
-            SELECT substr(t1,-1,1) FROM tbl1 ORDER BY t1
+            SELECT SUBSTR(t1,-1,1) FROM tbl1 ORDER BY t1
         ]], {
             -- <func-3.8>
             "", "", "", ""
@@ -295,7 +295,7 @@ if ("ሴ" ~= "u1234") then
     test:do_execsql_test(
         "func-3.9",
         [[
-            SELECT substr(t1,-3,2) FROM tbl1 ORDER BY t1
+            SELECT SUBSTR(t1,-3,2) FROM tbl1 ORDER BY t1
         ]], {
             -- <func-3.9>
             "", "", "", ""
@@ -305,7 +305,7 @@ if ("ሴ" ~= "u1234") then
     test:do_execsql_test(
         "func-3.10",
         [[
-            SELECT substr(t1,-4,3) FROM tbl1 ORDER BY t1
+            SELECT SUBSTR(t1,-4,3) FROM tbl1 ORDER BY t1
         ]], {
             -- <func-3.10>
             "", "", "", ""
@@ -328,7 +328,7 @@ if ("ሴ" ~= "u1234") then
 
 end
 -- End \u1234!=u1234
--- Test the abs() and round() functions.
+-- Test the ABS() and ROUND() functions.
 --
 
 
@@ -341,7 +341,7 @@ test:do_test(
             INSERT INTO t1(id, a,b,c) VALUES(2, 2,1.2345678901234,-12345.67890);
             INSERT INTO t1(id, a,b,c) VALUES(3, 3,-2,-5);
         ]])
-        return test:catchsql("SELECT abs(a,b) FROM t1")
+        return test:catchsql("SELECT ABS(a,b) FROM t1")
     end, {
         -- <func-4.1>
         1, "Wrong number of arguments is passed to ABS(): expected 1, got 2"
@@ -353,7 +353,7 @@ test:do_test(
 test:do_catchsql_test(
     "func-4.2",
     [[
-        SELECT abs() FROM t1
+        SELECT ABS() FROM t1
     ]], {
         -- <func-4.2>
         1, "Wrong number of arguments is passed to ABS(): expected 1, got 0"
@@ -363,7 +363,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-4.3",
     [[
-        SELECT abs(b) FROM t1 ORDER BY a
+        SELECT ABS(b) FROM t1 ORDER BY a
     ]], {
         -- <func-4.3>
         0, {2, 1.2345678901234, 2}
@@ -373,7 +373,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-4.4",
     [[
-        SELECT abs(c) FROM t1 ORDER BY a
+        SELECT ABS(c) FROM t1 ORDER BY a
     ]], {
         -- <func-4.4>
         0, {3, 12345.6789, 5}
@@ -384,7 +384,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "func-4.4.1",
     [[
-        SELECT abs(a) FROM t2
+        SELECT ABS(a) FROM t2
     ]], {
         -- <func-4.4.1>
         1, "", 345, "", 67890
@@ -394,7 +394,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "func-4.4.2",
     [[
-        SELECT abs(t1) FROM tbl1
+        SELECT ABS(t1) FROM tbl1
     ]], {
         -- <func-4.4.2>
         1, "Failed to execute SQL statement: wrong arguments for function ABS()"
@@ -404,7 +404,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-4.5",
     [[
-        SELECT round(a,b,c) FROM t1
+        SELECT ROUND(a,b,c) FROM t1
     ]], {
         -- <func-4.5>
         1, "Wrong number of arguments is passed to ROUND(): expected from 1 to 2, got 3"
@@ -414,7 +414,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-4.6",
     [[
-        SELECT round(b,2) FROM t1 ORDER BY b
+        SELECT ROUND(b,2) FROM t1 ORDER BY b
     ]], {
         -- <func-4.6>
         0, {-2.0, 1.23, 2.0}
@@ -424,7 +424,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-4.7",
     [[
-        SELECT round(b,0) FROM t1 ORDER BY a
+        SELECT ROUND(b,0) FROM t1 ORDER BY a
     ]], {
         -- <func-4.7>
         0, {2.0, 1.0, -2.0}
@@ -434,7 +434,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-4.8",
     [[
-        SELECT round(c) FROM t1 ORDER BY a
+        SELECT ROUND(c) FROM t1 ORDER BY a
     ]], {
         -- <func-4.8>
         0, {3.0, -12346.0, -5.0}
@@ -444,7 +444,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-4.9",
     [[
-        SELECT round(c,a) FROM t1 ORDER BY a
+        SELECT ROUND(c,a) FROM t1 ORDER BY a
     ]], {
         -- <func-4.9>
         0, {3.0, -12345.68, -5.0}
@@ -454,7 +454,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-4.10",
     [[
-        SELECT 'x' || CAST(round(c,a) AS TEXT) || 'y' FROM t1 ORDER BY a
+        SELECT 'x' || CAST(ROUND(c,a) AS TEXT) || 'y' FROM t1 ORDER BY a
     ]], {
         -- <func-4.10>
         0, {"x3.0y", "x-12345.68y", "x-5.0y"}
@@ -464,7 +464,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-4.11",
     [[
-        SELECT round() FROM t1 ORDER BY a
+        SELECT ROUND() FROM t1 ORDER BY a
     ]], {
         -- <func-4.11>
         1, "Wrong number of arguments is passed to ROUND(): expected from 1 to 2, got 0"
@@ -474,7 +474,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "func-4.12",
     [[
-        SELECT coalesce(round(a,2),'nil') FROM t2
+        SELECT COALESCE(ROUND(a,2),'nil') FROM t2
     ]], {
         -- <func-4.12>
         1.0, "nil", 345.0, "nil", 67890.0
@@ -484,7 +484,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "func-4.13",
     [[
-        SELECT round(t1,2) FROM tbl1
+        SELECT ROUND(t1,2) FROM tbl1
     ]], {
         -- <func-4.13>
         1, "Failed to execute SQL statement: wrong arguments for function ROUND()"
@@ -494,7 +494,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "func-4.14",
     [[
-        SELECT typeof(round(5.1,1));
+        SELECT TYPEOF(ROUND(5.1,1));
     ]], {
         -- <func-4.14>
         "decimal"
@@ -504,7 +504,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.15",
     [[
-        SELECT typeof(round(5.1));
+        SELECT TYPEOF(ROUND(5.1));
     ]], {
         -- <func-4.15>
         "decimal"
@@ -514,7 +514,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "func-4.16",
     [[
-        SELECT round(b,2) FROM t1 ORDER BY b
+        SELECT ROUND(b,2) FROM t1 ORDER BY b
     ]], {
         -- <func-4.16>
         0, {-2.0, 1.23, 2.0}
@@ -530,7 +530,7 @@ for i = 1, 1000-1, 1 do
     local x2 = (40223 + i)
     test:do_execsql_test(
         "func-4.17."..i,
-        "SELECT round(CAST("..x1.." AS DOUBLE));", {
+        "SELECT ROUND(CAST("..x1.." AS DOUBLE));", {
             x2
         })
 
@@ -540,7 +540,7 @@ for i = 1, 1000-1, 1 do
     local x2 = (40222.1 + i)
     test:do_execsql_test(
         "func-4.18."..i,
-        "SELECT round(CAST("..x1.." AS DOUBLE), 1);", {
+        "SELECT ROUND(CAST("..x1.." AS DOUBLE), 1);", {
             x2
         })
 
@@ -548,7 +548,7 @@ end
 test:do_execsql_test(
     "func-4.20",
     [[
-        SELECT round(40223.4999999999e0);
+        SELECT ROUND(40223.4999999999e0);
     ]], {
         -- <func-4.20>
         40223.0
@@ -558,7 +558,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.21",
     [[
-        SELECT round(40224.4999999999e0);
+        SELECT ROUND(40224.4999999999e0);
     ]], {
         -- <func-4.21>
         40224.0
@@ -568,7 +568,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.22",
     [[
-        SELECT round(40225.4999999999e0);
+        SELECT ROUND(40225.4999999999e0);
     ]], {
         -- <func-4.22>
         40225.0
@@ -578,19 +578,19 @@ test:do_execsql_test(
 for i = 1, 9, 1 do
     test:do_execsql_test(
         "func-4.23."..i,
-        string.format("SELECT round(40223.4999999999e0,%s);", i), {
+        string.format("SELECT ROUND(40223.4999999999e0,%s);", i), {
             40223.5
         })
 
     test:do_execsql_test(
         "func-4.24."..i,
-        string.format("SELECT round(40224.4999999999e0,%s);", i), {
+        string.format("SELECT ROUND(40224.4999999999e0,%s);", i), {
             40224.5
         })
 
     test:do_execsql_test(
         "func-4.25."..i,
-        string.format("SELECT round(40225.4999999999e0,%s);", i), {
+        string.format("SELECT ROUND(40225.4999999999e0,%s);", i), {
             40225.5
         })
 
@@ -598,19 +598,19 @@ end
 for i = 10, 31, 1 do
     test:do_execsql_test(
         "func-4.26."..i,
-        string.format("SELECT round(40223.4999999999e0,%s);", i), {
+        string.format("SELECT ROUND(40223.4999999999e0,%s);", i), {
             40223.4999999999
         })
 
     test:do_execsql_test(
         "func-4.27."..i,
-        string.format("SELECT round(40224.4999999999e0,%s);", i), {
+        string.format("SELECT ROUND(40224.4999999999e0,%s);", i), {
             40224.4999999999
         })
 
     test:do_execsql_test(
         "func-4.28."..i,
-        string.format("SELECT round(40225.4999999999e0,%s);", i), {
+        string.format("SELECT ROUND(40225.4999999999e0,%s);", i), {
             40225.4999999999
         })
 
@@ -618,7 +618,7 @@ end
 test:do_execsql_test(
     "func-4.29",
     [[
-        SELECT round(1234567890.5e0);
+        SELECT ROUND(1234567890.5e0);
     ]], {
         -- <func-4.29>
         1234567891.0
@@ -628,7 +628,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.30",
     [[
-        SELECT round(12345678901.5e0);
+        SELECT ROUND(12345678901.5e0);
     ]], {
         -- <func-4.30>
         12345678902.0
@@ -638,7 +638,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.31",
     [[
-        SELECT round(123456789012.5e0);
+        SELECT ROUND(123456789012.5e0);
     ]], {
         -- <func-4.31>
         123456789013.0
@@ -648,7 +648,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.32",
     [[
-        SELECT round(1234567890123.5e0);
+        SELECT ROUND(1234567890123.5e0);
     ]], {
         -- <func-4.32>
         1234567890124.0
@@ -658,7 +658,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.33",
     [[
-        SELECT round(12345678901234.5e0);
+        SELECT ROUND(12345678901234.5e0);
     ]], {
         -- <func-4.33>
         12345678901235.0
@@ -668,7 +668,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.34",
     [[
-        SELECT round(1234567890123.35e0,1);
+        SELECT ROUND(1234567890123.35e0,1);
     ]], {
         -- <func-4.34>
         1234567890123.4
@@ -678,7 +678,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.35",
     [[
-        SELECT round(1234567890123.445e0,2);
+        SELECT ROUND(1234567890123.445e0,2);
     ]], {
         -- <func-4.35>
         1234567890123.45
@@ -688,7 +688,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.36",
     [[
-        SELECT round(99999999999994.5e0);
+        SELECT ROUND(99999999999994.5e0);
     ]], {
         -- <func-4.36>
         99999999999995.0
@@ -698,7 +698,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.37",
     [[
-        SELECT round(9999999999999.55e0,1);
+        SELECT ROUND(9999999999999.55e0,1);
     ]], {
         -- <func-4.37>
         9999999999999.6
@@ -708,7 +708,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.38",
     [[
-        SELECT round(9999999999999.556e0, 2);
+        SELECT ROUND(9999999999999.556e0, 2);
     ]], {
         -- <func-4.38>
         9999999999999.56
@@ -717,12 +717,12 @@ test:do_execsql_test(
 
 
 
--- Test the upper() and lower() functions
+-- Test the UPPER() and LOWER() functions
 --
 test:do_execsql_test(
     "func-5.1",
     [[
-        SELECT upper(t1) FROM tbl1
+        SELECT UPPER(t1) FROM tbl1
     ]], {
         -- <func-5.1>
         "THIS", "PROGRAM", "IS", "FREE", "SOFTWARE"
@@ -732,7 +732,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-5.2",
     [[
-        SELECT lower(upper(t1)) FROM tbl1
+        SELECT LOWER(UPPER(t1)) FROM tbl1
     ]], {
         -- <func-5.2>
         "this", "program", "is", "free", "software"
@@ -744,19 +744,19 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "func-5.5",
     [[
-        SELECT upper(*) FROM t2
+        SELECT UPPER(*) FROM t2
     ]], {
         -- <func-5.5>
         1, "Wrong number of arguments is passed to UPPER(): expected 1, got 0"
         -- </func-5.5>
     })
 
--- Test the coalesce() and nullif() functions
+-- Test the COALESCE() and NULLIF() functions
 --
 test:do_execsql_test(
     "func-6.1",
     [[
-        SELECT coalesce(a,'xyz') FROM t2
+        SELECT COALESCE(a,'xyz') FROM t2
     ]], {
         -- <func-6.1>
         1, "xyz", 345, "xyz", 67890
@@ -766,7 +766,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-6.3",
     [[
-        SELECT coalesce(nullif(1,1),'nil')
+        SELECT COALESCE(NULLIF(1,1),'nil')
     ]], {
         -- <func-6.3>
         "nil"
@@ -776,7 +776,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-6.4",
     [[
-        SELECT coalesce(nullif(1,2),'nil')
+        SELECT COALESCE(NULLIF(1,2),'nil')
     ]], {
         -- <func-6.4>
         1
@@ -786,7 +786,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-6.5",
     [[
-        SELECT coalesce(nullif(1,NULL),'nil')
+        SELECT COALESCE(NULLIF(1,NULL),'nil')
     ]], {
         -- <func-6.5>
         1
@@ -803,11 +803,11 @@ test:do_execsql_test(
 test:do_test(
     "func-8.1",
     function()
-        test:execsql("EXPLAIN SELECT sum(a) FROM t2;")
+        test:execsql("EXPLAIN SELECT SUM(a) FROM t2;")
 
 
         return test:execsql([[
-            SELECT sum(a), count(a), round(avg(a),2), min(a), max(a), count(*) FROM t2;
+            SELECT SUM(a), COUNT(a), ROUND(AVG(a),2), MIN(a), MAX(a), COUNT(*) FROM t2;
         ]])
     end, {
         -- <func-8.1>
@@ -822,7 +822,7 @@ test:do_test(
 test:do_execsql_test(
     "func-8.2",
     [[
-        SELECT max('z+'|| CAST(a AS TEXT) ||'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP') FROM t2;
+        SELECT MAX('z+'|| CAST(a AS TEXT) ||'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP') FROM t2;
     ]], {
         -- <func-8.2>
         "z+67890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP"
@@ -834,7 +834,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-9.1",
     [[
-        SELECT random() is not null;
+        SELECT RANDOM() is not null;
     ]], {
         -- <func-9.1>
         true
@@ -844,7 +844,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-9.2",
     [[
-        SELECT typeof(random());
+        SELECT TYPEOF(RANDOM());
     ]], {
         -- <func-9.2>
         "integer"
@@ -854,7 +854,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-9.3",
     [[
-        SELECT randomblob(32) is not null;
+        SELECT RANDOMBLOB(32) is not null;
     ]], {
         -- <func-9.3>
         true
@@ -864,7 +864,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-9.4",
     [[
-        SELECT typeof(randomblob(32));
+        SELECT TYPEOF(RANDOMBLOB(32));
     ]], {
         -- <func-9.4>
         "varbinary"
@@ -874,22 +874,22 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-9.5",
     [[
-        SELECT length(randomblob(32)), length(randomblob(-5)),
-               length(randomblob(2000))
+        SELECT LENGTH(RANDOMBLOB(32)), LENGTH(RANDOMBLOB(-5)),
+               LENGTH(RANDOMBLOB(2000))
     ]], {
         -- <func-9.5>
         32, "", 2000
         -- </func-9.5>
     })
 
--- The "hex()" function was added in order to be able to render blobs
--- generated by randomblob().  So this seems like a good place to test
--- hex().
+-- The "HEX()" function was added in order to be able to render blobs
+-- generated by RANDOMBLOB().  So this seems like a good place to test
+-- HEX().
 --
 test:do_execsql_test(
     "func-9.10",
     [[
-        SELECT hex(x'00112233445566778899aAbBcCdDeEfF')
+        SELECT HEX(x'00112233445566778899aAbBcCdDeEfF')
     ]], {
         -- <func-9.10>
         "00112233445566778899AABBCCDDEEFF"
@@ -903,7 +903,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-9.11-utf8",
     [[
-        SELECT HEX(CAST(replace('abcdefg','ef','12') AS VARBINARY))
+        SELECT HEX(CAST(REPLACE('abcdefg','ef','12') AS VARBINARY))
     ]], {
     -- <func-9.11-utf8>
     "61626364313267"
@@ -913,7 +913,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-9.12-utf8",
     [[
-        SELECT HEX(CAST(replace('abcdefg','','12') AS VARBINARY))
+        SELECT HEX(CAST(REPLACE('abcdefg','','12') AS VARBINARY))
     ]], {
     -- <func-9.12-utf8>
     "61626364656667"
@@ -923,7 +923,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-9.13-utf8",
     [[
-        SELECT HEX(CAST(replace('aabcdefg','a','aaa') AS VARBINARY))
+        SELECT HEX(CAST(REPLACE('aabcdefg','a','aaa') AS VARBINARY))
     ]], {
     -- <func-9.13-utf8>
     "616161616161626364656667"
@@ -1106,7 +1106,7 @@ test:do_execsql_test(
         CREATE TABLE t4(id integer primary key, x INT);
         INSERT INTO t4 VALUES(1, test_destructor('hello'));
         INSERT INTO t4 VALUES(2, test_destructor('world'));
-        SELECT min(test_destructor(x)), max(test_destructor(x)) FROM t4;
+        SELECT min(test_destructor(x)), MAX(test_destructor(x)) FROM t4;
     ]], {
         -- <func-12.5>
         "hello", "world"
@@ -1398,7 +1398,7 @@ test:do_execsql_test(
         INSERT INTO t5 VALUES(1, 1);
         INSERT INTO t5 VALUES(2, -99);
         INSERT INTO t5 VALUES(3, 10000);
-        SELECT sum(x) FROM t5;
+        SELECT SUM(x) FROM t5;
     ]], {
         -- <func-18.1>
         9902
@@ -1409,7 +1409,7 @@ test:do_execsql_test(
     "func-18.2",
     [[
         INSERT INTO t5 VALUES(4, 0.0);
-        SELECT sum(x) FROM t5;
+        SELECT SUM(x) FROM t5;
     ]], {
         -- <func-18.2>
         9902.0
@@ -1426,7 +1426,7 @@ test:do_execsql_test(
     "func-18.3",
     [[
         DELETE FROM t5;
-        SELECT sum(x), total(x) FROM t5;
+        SELECT SUM(x), TOTAL(x) FROM t5;
     ]], {
         -- <func-18.3>
         "", 0.0
@@ -1437,7 +1437,7 @@ test:do_execsql_test(
     "func-18.4",
     [[
         INSERT INTO t5 VALUES(1, NULL);
-        SELECT sum(x), total(x) FROM t5
+        SELECT SUM(x), TOTAL(x) FROM t5
     ]], {
         -- <func-18.4>
         "", 0.0
@@ -1448,7 +1448,7 @@ test:do_execsql_test(
     "func-18.5",
     [[
         INSERT INTO t5 VALUES(2, NULL);
-        SELECT sum(x), total(x) FROM t5
+        SELECT SUM(x), TOTAL(x) FROM t5
     ]], {
         -- <func-18.5>
         "", 0.0
@@ -1459,7 +1459,7 @@ test:do_execsql_test(
     "func-18.6",
     [[
         INSERT INTO t5 VALUES(3, 123);
-        SELECT sum(x), total(x) FROM t5
+        SELECT SUM(x), TOTAL(x) FROM t5
     ]], {
         -- <func-18.6>
         123, 123.0
@@ -1476,7 +1476,7 @@ test:do_execsql_test(
         CREATE TABLE t6(id INT primary key, x INTEGER);
         INSERT INTO t6 VALUES(1, 1);
         INSERT INTO t6 VALUES(2, 1<<62);
-        SELECT sum(x) - ((1<<62)+1) from t6;
+        SELECT SUM(x) - ((1<<62)+1) from t6;
     ]], {
         -- <func-18.10>
         0
@@ -1486,7 +1486,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-18.11",
     [[
-        SELECT typeof(sum(x)) FROM t6
+        SELECT TYPEOF(SUM(x)) FROM t6
     ]], {
         -- <func-18.11>
         "integer"
@@ -1497,7 +1497,7 @@ test:do_execsql_test(
     "func-18.12",
     [[
         INSERT INTO t6 VALUES(3, 1<<62);
-        SELECT sum(x) - ((1 << 62) * 2e0 + 1) from t6;
+        SELECT SUM(x) - ((1 << 62) * 2e0 + 1) from t6;
     ]], {
         -- <func-18.12>
         0
@@ -1507,7 +1507,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-18.13",
     [[
-        SELECT total(x) - ((1<<62)*2.0+1) FROM t6
+        SELECT TOTAL(x) - ((1<<62)*2.0+1) FROM t6
     ]], {
         -- <func-18.13>
         0.0
@@ -1517,7 +1517,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-18.14",
     [[
-        SELECT sum(-9223372036854775805);
+        SELECT SUM(-9223372036854775805);
     ]], {
         -- <func-18.14>
         -9223372036854775805LL
@@ -1526,7 +1526,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "func-18.16",
     [[
-        SELECT sum(x) FROM
+        SELECT SUM(x) FROM
            (SELECT 9223372036854775807 AS x UNION ALL
             SELECT -10 AS x);
     ]], {
@@ -1538,7 +1538,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-18.17",
     [[
-        SELECT sum(x) FROM
+        SELECT SUM(x) FROM
            (SELECT -9223372036854775807 AS x UNION ALL
             SELECT 10 AS x);
     ]], {
@@ -1550,7 +1550,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "func-18.15.1",
     [[
-        SELECT sum(x) FROM
+        SELECT SUM(x) FROM
            (SELECT 9223372036854775807 AS x UNION ALL
             SELECT 10 AS x);
     ]], {
@@ -1562,7 +1562,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "func-18.15.2",
     [[
-        SELECT sum(x) FROM
+        SELECT SUM(x) FROM
            (SELECT 9223372036854775807 AS x UNION ALL SELECT 9223372036854775807 AS x
             UNION ALL SELECT 10 AS x);
     ]], {
@@ -1574,7 +1574,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-18.18",
     [[
-        SELECT sum(x) FROM
+        SELECT SUM(x) FROM
            (SELECT -9223372036854775807 AS x UNION ALL
             SELECT -10 AS x);
     ]], {
@@ -1586,7 +1586,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-18.19",
     [[
-        SELECT sum(x) FROM (SELECT 9 AS x UNION ALL SELECT -10 AS x);
+        SELECT SUM(x) FROM (SELECT 9 AS x UNION ALL SELECT -10 AS x);
     ]], {
         -- <func-18.19>
         0, {-1}
@@ -1596,7 +1596,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-18.20",
     [[
-        SELECT sum(x) FROM (SELECT -9 AS x UNION ALL SELECT 10 AS x);
+        SELECT SUM(x) FROM (SELECT -9 AS x UNION ALL SELECT 10 AS x);
     ]], {
         -- <func-18.20>
         0, {1}
@@ -1606,7 +1606,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-18.21",
     [[
-        SELECT sum(x) FROM (SELECT -10 AS x UNION ALL SELECT 9 AS x);
+        SELECT SUM(x) FROM (SELECT -10 AS x UNION ALL SELECT 9 AS x);
     ]], {
         -- <func-18.21>
         0, {-1}
@@ -1616,7 +1616,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-18.22",
     [[
-        SELECT sum(x) FROM (SELECT 10 AS x UNION ALL SELECT -9 AS x);
+        SELECT SUM(x) FROM (SELECT 10 AS x UNION ALL SELECT -9 AS x);
     ]], {
         -- <func-18.22>
         0, {1}
@@ -1626,12 +1626,12 @@ test:do_catchsql_test(
 
 
 -- ifcapable compound&&subquery
--- Integer overflow on abs()
+-- Integer overflow on ABS()
 --
 test:do_catchsql_test(
     "func-18.31",
     [[
-        SELECT abs(-9223372036854775807);
+        SELECT ABS(-9223372036854775807);
     ]], {
         -- <func-18.31>
         0, {9223372036854775807LL}
@@ -1641,7 +1641,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-18.32",
     [[
-        SELECT abs(-9223372036854775807-1);
+        SELECT ABS(-9223372036854775807-1);
     ]], {
         -- <func-18.32>
         0, {9223372036854775808LL}
@@ -1672,7 +1672,7 @@ for i, val in ipairs({
     local sdx = val[2]
     test:do_execsql_test(
         "func-20."..i,
-        string.format("SELECT soundex('%s')", name), {
+        string.format("SELECT SOUNDEX('%s')", name), {
             sdx
         })
 end
@@ -1681,7 +1681,7 @@ end
 test:do_catchsql_test(
     "func-21.1",
     [[
-        SELECT replace(1,2);
+        SELECT REPLACE(1,2);
     ]], {
         -- <func-21.1>
         1, "Wrong number of arguments is passed to REPLACE(): expected 3, got 2"
@@ -1691,7 +1691,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-21.2",
     [[
-        SELECT replace(1,2,3,4);
+        SELECT REPLACE(1,2,3,4);
     ]], {
         -- <func-21.2>
         1, "Wrong number of arguments is passed to REPLACE(): expected 3, got 4"
@@ -1701,7 +1701,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "func-21.3",
     [[
-        SELECT typeof(replace('This is the main test string', NULL, 'ALT'));
+        SELECT TYPEOF(REPLACE('This is the main test string', NULL, 'ALT'));
     ]], {
         -- <func-21.3>
         "NULL"
@@ -1711,7 +1711,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-21.4",
     [[
-        SELECT typeof(replace(NULL, 'main', 'ALT'));
+        SELECT TYPEOF(REPLACE(NULL, 'main', 'ALT'));
     ]], {
         -- <func-21.4>
         "NULL"
@@ -1721,7 +1721,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-21.5",
     [[
-        SELECT typeof(replace('This is the main test string', 'main', NULL));
+        SELECT TYPEOF(REPLACE('This is the main test string', 'main', NULL));
     ]], {
         -- <func-21.5>
         "NULL"
@@ -1731,7 +1731,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-21.6",
     [[
-        SELECT replace('This is the main test string', 'main', 'ALT');
+        SELECT REPLACE('This is the main test string', 'main', 'ALT');
     ]], {
         -- <func-21.6>
         "This is the ALT test string"
@@ -1741,7 +1741,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-21.7",
     [[
-        SELECT replace('This is the main test string', 'main', 'larger-main');
+        SELECT REPLACE('This is the main test string', 'main', 'larger-main');
     ]], {
         -- <func-21.7>
         "This is the larger-main test string"
@@ -1751,7 +1751,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-21.8",
     [[
-        SELECT replace('aaaaaaa', 'a', '0123456789');
+        SELECT REPLACE('aaaaaaa', 'a', '0123456789');
     ]], {
         -- <func-21.8>
         "0123456789012345678901234567890123456789012345678901234567890123456789"
@@ -1781,7 +1781,7 @@ test:do_test(
 test:do_catchsql_test(
     "func-22.1",
     [[
-        SELECT trim(1,2,3)
+        SELECT TRIM(1,2,3)
     ]], {
         -- <func-22.1>
         1, "Syntax error at line 1 near ','"
@@ -1794,7 +1794,7 @@ test:do_catchsql_test(
         SELECT ltrim(1,2,3)
     ]], {
         -- <func-22.2>
-        1, "Function 'LTRIM' does not exist"
+        1, "Function 'ltrim' does not exist"
         -- </func-22.2>
     })
 
@@ -1804,14 +1804,14 @@ test:do_catchsql_test(
         SELECT rtrim(1,2,3)
     ]], {
         -- <func-22.3>
-        1, "Function 'RTRIM' does not exist"
+        1, "Function 'rtrim' does not exist"
         -- </func-22.3>
     })
 
 test:do_execsql_test(
     "func-22.4",
     [[
-        SELECT trim('  hi  ');
+        SELECT TRIM('  hi  ');
     ]], {
         -- <func-22.4>
         "hi"
@@ -1911,7 +1911,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.20",
     [[
-        SELECT typeof(trim(NULL));
+        SELECT TYPEOF(TRIM(NULL));
     ]], {
         -- <func-22.20>
         "NULL"
@@ -1921,7 +1921,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.21",
     [[
-        SELECT typeof(TRIM('xyz' FROM NULL));
+        SELECT TYPEOF(TRIM('xyz' FROM NULL));
     ]], {
         -- <func-22.21>
         "NULL"
@@ -1931,7 +1931,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.22",
     [[
-        SELECT typeof(TRIM(NULL FROM 'hello'));
+        SELECT TYPEOF(TRIM(NULL FROM 'hello'));
     ]], {
         -- <func-22.22>
         "NULL"
@@ -2120,12 +2120,12 @@ test:do_catchsql_test(
 --
 
 
--- The group_concat() function.
+-- The GROUP_CONCAT() function.
 --
 test:do_execsql_test(
     "func-24.1",
     [[
-        SELECT group_concat(t1) FROM tbl1
+        SELECT GROUP_CONCAT(t1) FROM tbl1
     ]], {
         -- <func-24.1>
         "this,program,is,free,software"
@@ -2135,7 +2135,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-24.2",
     [[
-        SELECT group_concat(t1,' ') FROM tbl1
+        SELECT GROUP_CONCAT(t1,' ') FROM tbl1
     ]], {
         -- <func-24.2>
         "this program is free software"
@@ -2144,13 +2144,13 @@ test:do_execsql_test(
 
 -- do_test func-24.3 {
 --   execsql {
---     SELECT group_concat(t1,' ' || rowid || ' ') FROM tbl1
+--     SELECT GROUP_CONCAT(t1,' ' || rowid || ' ') FROM tbl1
 --   }
 -- } {{this 2 program 3 is 4 free 5 software}}
 test:do_execsql_test(
     "func-24.4",
     [[
-        SELECT group_concat(NULL,t1) FROM tbl1
+        SELECT GROUP_CONCAT(NULL,t1) FROM tbl1
     ]], {
         -- <func-24.4>
         ""
@@ -2160,7 +2160,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-24.5",
     [[
-        SELECT group_concat(t1,NULL) FROM tbl1
+        SELECT GROUP_CONCAT(t1,NULL) FROM tbl1
     ]], {
         -- <func-24.5>
         "thisprogramisfreesoftware"
@@ -2170,7 +2170,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-24.6",
     [[
-        SELECT 'BEGIN-'||group_concat(t1) FROM tbl1
+        SELECT 'BEGIN-'||GROUP_CONCAT(t1) FROM tbl1
     ]], {
         -- <func-24.6>
         "BEGIN-this,program,is,free,software"
@@ -2213,7 +2213,7 @@ end
 test:do_execsql_test(
     "func-24.8",
     [[
-        SELECT group_concat(CASE t1 WHEN 'this' THEN '' ELSE t1 END) FROM tbl1
+        SELECT GROUP_CONCAT(CASE t1 WHEN 'this' THEN '' ELSE t1 END) FROM tbl1
     ]], {
         -- <func-24.8>
         ",program,is,free,software"
@@ -2223,7 +2223,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-24.9",
     [[
-        SELECT group_concat(CASE WHEN t1!='software' THEN '' ELSE t1 END) FROM tbl1
+        SELECT GROUP_CONCAT(CASE WHEN t1!='software' THEN '' ELSE t1 END) FROM tbl1
     ]], {
         -- <func-24.9>
         ",,,,software"
@@ -2236,7 +2236,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-24.10",
     [[
-        SELECT group_concat(CAST(CASE t1 WHEN 'this' THEN null ELSE t1 END
+        SELECT GROUP_CONCAT(CAST(CASE t1 WHEN 'this' THEN null ELSE t1 END
                             AS STRING)) FROM tbl1
     ]], {
         -- <func-24.10>
@@ -2247,7 +2247,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-24.11",
     [[
-        SELECT group_concat(CAST(CASE WHEN t1!='software' THEN null ELSE t1 END
+        SELECT GROUP_CONCAT(CAST(CASE WHEN t1!='software' THEN null ELSE t1 END
                             AS STRING)) FROM tbl1
     ]], {
         -- <func-24.11>
@@ -2258,7 +2258,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-24.12",
     [[
-        SELECT group_concat(CAST(CASE t1 WHEN 'this' THEN '' WHEN 'program' THEN
+        SELECT GROUP_CONCAT(CAST(CASE t1 WHEN 'this' THEN '' WHEN 'program' THEN
                             null ELSE t1 END AS STRING)) FROM tbl1
     ]], {
         -- <func-24.12>
@@ -2270,7 +2270,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-24.13",
     [[
-        SELECT typeof(group_concat(x)) FROM (SELECT '' AS x);
+        SELECT TYPEOF(GROUP_CONCAT(x)) FROM (SELECT '' AS x);
     ]], {
         -- <func-24.13>
         "string"
@@ -2280,7 +2280,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-24.14",
     [[
-        SELECT typeof(group_concat(x,''))
+        SELECT TYPEOF(GROUP_CONCAT(x,''))
           FROM (SELECT '' AS x UNION ALL SELECT '');
     ]], {
         -- <func-24.14>
@@ -2393,7 +2393,7 @@ end
 test:do_catchsql_test(
     "func-27.1",
     [[
-        SELECT coalesce()
+        SELECT COALESCE()
     ]], {
         -- <func-27.1>
         1, "Wrong number of arguments is passed to COALESCE(): expected at least 2, got 0"
@@ -2403,7 +2403,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-27.2",
     [[
-        SELECT coalesce(1)
+        SELECT COALESCE(1)
     ]], {
         -- <func-27.2>
         1, "Wrong number of arguments is passed to COALESCE(): expected at least 2, got 1"
@@ -2413,7 +2413,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-27.3",
     [[
-        SELECT coalesce(1,2)
+        SELECT COALESCE(1,2)
     ]], {
         -- <func-27.3>
         0, {1}
@@ -2434,7 +2434,7 @@ test:do_test(
         ]])
     end, {
         -- <func-28.1>
-        1, "Function 'NOSUCHFUNC' does not exist"
+        1, "Function 'nosuchfunc' does not exist"
         -- </func-28.1>
     })
 
@@ -2449,7 +2449,7 @@ test:do_test(
 test:do_execsql_test(
     "func-30.1",
     [[
-        SELECT unicode('$');
+        SELECT UNICODE('$');
     ]], {
         -- <func-30.1>
         36
@@ -2459,7 +2459,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-30.2",
     [[
-        SELECT unicode('¢');
+        SELECT UNICODE('¢');
     ]], {
         -- <func-30.2>
         162
@@ -2469,7 +2469,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-30.3",
     [[
-        SELECT unicode('€');
+        SELECT UNICODE('€');
     ]], {
         -- <func-30.3>
         8364
@@ -2479,7 +2479,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-30.4",
     [[
-        SELECT char(36,162,8364);
+        SELECT CHAR(36,162,8364);
     ]], {
         -- <func-30.4>
         "$¢€"
@@ -2489,7 +2489,7 @@ test:do_execsql_test(
 for i = 1, 0xd800-1, 13 do
     test:do_execsql_test(
         "func-30.5."..i,
-        "SELECT unicode(char("..i.."))", {
+        "SELECT UNICODE(CHAR("..i.."))", {
             i
         })
 
@@ -2498,7 +2498,7 @@ for i = 57344, 0xfffd, 17 do
     if (i ~= 65279) then
         test:do_execsql_test(
             "func-30.5."..i,
-            "SELECT unicode(char("..i.."))", {
+            "SELECT UNICODE(CHAR("..i.."))", {
                 i
             })
     end
@@ -2506,7 +2506,7 @@ end
 for i = 65536, 0x10ffff, 139 do
     test:do_execsql_test(
         "func-30.5."..i,
-        "SELECT unicode(char("..i.."))", {
+        "SELECT UNICODE(CHAR("..i.."))", {
             i
         })
 
@@ -2516,7 +2516,7 @@ end
 test:do_execsql_test(
     "func-31.1",
     [[
-        SELECT char(), length(char()), typeof(char())
+        SELECT CHAR(), LENGTH(CHAR()), TYPEOF(CHAR())
     ]], {
         -- <func-31.1>
         "", 0, "string"
@@ -2525,7 +2525,7 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "func-32",
-    [[SELECT version()]],
+    [[SELECT VERSION()]],
     {_TARANTOOL})
 
 test:do_execsql_test(

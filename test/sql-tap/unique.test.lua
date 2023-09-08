@@ -31,7 +31,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <unique-1.1>
-        1, [[Failed to create space 'T1': primary key has been already declared]]
+        1, [[Failed to create space 't1': primary key has been already declared]]
         -- </unique-1.1>
     })
 
@@ -65,7 +65,7 @@ test:do_catchsql_test(
         INSERT INTO t1(a,b,c) VALUES(1,3,'4')
     ]], {
         -- <unique-1.3>
-        1, "Duplicate key exists in unique index \"pk_unnamed_T1_1\" in space \"T1\" with old tuple - [1, 2, \"3\"] and new tuple - [1, 3, \"4\"]"
+        1, "Duplicate key exists in unique index \"pk_unnamed_t1_1\" in space \"t1\" with old tuple - [1, 2, \"3\"] and new tuple - [1, 3, \"4\"]"
         -- </unique-1.3>
     })
 
@@ -86,7 +86,7 @@ test:do_catchsql_test(
         INSERT INTO t1(a,b,c) VALUES(3,2,'4')
     ]], {
         -- <unique-1.5>
-        1, "Duplicate key exists in unique index \"unique_unnamed_T1_2\" in space \"T1\" with old tuple - [1, 2, \"3\"] and new tuple - [3, 2, \"4\"]"
+        1, "Duplicate key exists in unique index \"unique_unnamed_t1_2\" in space \"t1\" with old tuple - [1, 2, \"3\"] and new tuple - [3, 2, \"4\"]"
         -- </unique-1.5>
     })
 
@@ -162,7 +162,7 @@ test:do_catchsql_test(
         INSERT INTO t2 VALUES(3, 1,5);
     ]], {
         -- <unique-2.3>
-        1, "Duplicate key exists in unique index \"I2\" in space \"T2\" with old tuple - [1, 1, 2] and new tuple - [3, 1, 5]"
+        1, "Duplicate key exists in unique index \"i2\" in space \"t2\" with old tuple - [1, 1, 2] and new tuple - [3, 1, 5]"
         -- </unique-2.3>
     })
 
@@ -214,7 +214,7 @@ test:do_catchsql_test(
         CREATE UNIQUE INDEX i2 ON t2(a);
     ]], {
         -- <unique-2.8>
-        1, "Duplicate key exists in unique index \"I2\" in space \"T2\" with old tuple - [1, 1, 2] and new tuple - [4, 1, 5]"
+        1, "Duplicate key exists in unique index \"i2\" in space \"t2\" with old tuple - [1, 1, 2] and new tuple - [4, 1, 5]"
         -- </unique-2.8>
     })
 
@@ -277,7 +277,7 @@ test:do_catchsql_test(
         SELECT a,b,c,d FROM t3 ORDER BY a,b,c,d;
     ]], {
         -- <unique-3.4>
-        1, "Duplicate key exists in unique index \"unique_unnamed_T3_2\" in space \"T3\" with old tuple - [2, 1, 2, 3, 5] and new tuple - [3, 1, 4, 3, 5]"
+        1, "Duplicate key exists in unique index \"unique_unnamed_t3_2\" in space \"t3\" with old tuple - [2, 1, 2, 3, 5] and new tuple - [3, 1, 4, 3, 5]"
         -- </unique-3.4>
     })
 
@@ -387,7 +387,7 @@ test:do_catchsql_test(
         CREATE UNIQUE INDEX i4c ON t4(b)
     ]], {
         -- <unique-4.10>
-        1, "Duplicate key exists in unique index \"I4C\" in space \"T4\" with old tuple - [1, 1, 2, 3] and new tuple - [2, null, 2, null]"
+        1, "Duplicate key exists in unique index \"i4c\" in space \"t4\" with old tuple - [1, 1, 2, 3] and new tuple - [2, null, 2, null]"
         -- </unique-4.10>
     })
 
@@ -429,7 +429,7 @@ test:do_catchsql_test(
         INSERT INTO t5 VALUES(2, 1,2,3,4,5,6);
     ]], {
         -- <unique-5.2>
-        1, "Duplicate key exists in unique index \"unique_unnamed_T5_2\" in space \"T5\" with old tuple - [1, 1, 2, 3, 4, 5, 6] and new tuple - [2, 1, 2, 3, 4, 5, 6]"
+        1, "Duplicate key exists in unique index \"unique_unnamed_t5_2\" in space \"t5\" with old tuple - [1, 1, 2, 3, 4, 5, 6] and new tuple - [2, 1, 2, 3, 4, 5, 6]"
         -- </unique-5.2>
     })
 
