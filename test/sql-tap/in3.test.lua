@@ -475,7 +475,7 @@ test:do_catchsql_test(
         (SELECT folderid FROM Folder WHERE path LIKE 'C:\MP3\Albums\' || '%');
     ]], {
         -- <in3-5.2>
-        1, "Space 'FOLDER' does not exist"
+        1, "Space 'Folder' does not exist"
         -- </in3-5.2>
     })
 

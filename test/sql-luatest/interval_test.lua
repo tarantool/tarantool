@@ -11,9 +11,9 @@ g.before_all(function()
         local itv = require('datetime').interval
         local itv1 = itv.new({year = 1, month = 2, day = 3, hour = 4})
         local itv2 = itv.new({min = 5, sec = 6, nsec = 7})
-        local fmt1 = {{'I', 'integer'}, {'ITV', 'interval'}}
-        local t0 = box.schema.space.create('T0', {format = fmt1})
-        box.space.T0:create_index('I')
+        local fmt1 = {{'i', 'integer'}, {'itv', 'interval'}}
+        local t0 = box.schema.space.create('t0', {format = fmt1})
+        box.space.t0:create_index('i')
         t0:insert({1, itv1})
         t0:insert({2, itv2})
     end)
@@ -21,7 +21,7 @@ end)
 
 g.after_all(function()
     g.server:exec(function()
-        box.space.T0:drop()
+        box.space.t0:drop()
     end)
     g.server:stop()
 end)
@@ -40,8 +40,8 @@ end
 g.test_interval_2 = function()
     g.server:exec(function()
         local sql = [[CREATE TABLE t (itv INTERVAL PRIMARY KEY);]]
-        local res = "Can't create or modify index 'pk_unnamed_T_1' in space "..
-                    "'T': field type 'interval' is not supported"
+        local res = "Can't create or modify index 'pk_unnamed_t_1' in space "..
+                    "'t': field type 'interval' is not supported"
         local _, err = box.execute(sql)
         t.assert_equals(err.message, res)
     end)
@@ -143,7 +143,7 @@ g.test_interval_10 = function()
                       '+1 years, 2 months, 3 days, 4 hours'));]])
 
         local sql = [[INSERT INTO t SELECT * from t0 LIMIT 1;]]
-        local res = [[Check constraint 'CK' failed for a tuple]]
+        local res = [[Check constraint 'ck' failed for a tuple]]
         local _, err = box.execute(sql)
         box.execute([[DROP TABLE t;]])
 
@@ -155,8 +155,8 @@ end
 g.test_interval_11 = function()
     g.server:exec(function()
         local sql = [[CREATE TABLE t (i INT PRIMARY KEY, itv INTERVAL UNIQUE);]]
-        local res = [[Can't create or modify index 'unique_unnamed_T_2' in ]]..
-                    [[space 'T': field type 'interval' is not supported]]
+        local res = [[Can't create or modify index 'unique_unnamed_t_2' in ]]..
+                    [[space 't': field type 'interval' is not supported]]
         local _, err = box.execute(sql)
 
         t.assert_equals(err.message, res)

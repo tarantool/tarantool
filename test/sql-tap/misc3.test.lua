@@ -37,7 +37,7 @@ test:do_test(
             UPDATE t1 SET b=b||b;
             UPDATE t1 SET b=b||b;
             INSERT INTO t1 VALUES(2,'x');
-            UPDATE t1 SET b=substr(b,1,500);
+            UPDATE t1 SET b=SUBSTR(b,1,500);
             CREATE TABLE t2(x  INT PRIMARY KEY,y INT );
             START TRANSACTION;
         ]])
@@ -338,7 +338,7 @@ test:do_execsql_test(
         INSERT INTO t3 SELECT a+16,b||'f' FROM t3;
         INSERT INTO t3 SELECT a+32,b||'g' FROM t3;
         INSERT INTO t3 SELECT a+64,b||'h' FROM t3;
-        SELECT count(a), count(b) FROM t3;
+        SELECT COUNT(a), COUNT(b) FROM t3;
     ]], {
         -- <misc3-4.1>
         128, 64
@@ -348,7 +348,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc3-4.2",
     [[
-        SELECT count(a) FROM t3 WHERE b IN (SELECT b FROM t3);
+        SELECT COUNT(a) FROM t3 WHERE b IN (SELECT b FROM t3);
     ]], {
         -- <misc3-4.2>
         64
@@ -358,7 +358,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc3-4.3",
     [[
-        SELECT count(a) FROM t3 WHERE b IN (SELECT b FROM t3 ORDER BY a+1);
+        SELECT COUNT(a) FROM t3 WHERE b IN (SELECT b FROM t3 ORDER BY a+1);
     ]], {
         -- <misc3-4.3>
         64
@@ -383,7 +383,7 @@ test:do_execsql_test(
         INSERT INTO x2 VALUES(3,'three');
         INSERT INTO x2 VALUES(4,'four');
         SELECT x2.c AS c, e, b FROM x2 LEFT JOIN
-           (SELECT b, max(c)+0 AS c FROM x1 GROUP BY b)
+           (SELECT b, MAX(c)+0 AS c FROM x1 GROUP BY b)
            USING(c);
     ]], {
         -- <misc3-5.1>
@@ -396,7 +396,7 @@ test:do_execsql_test(
     [[
         SELECT * FROM (
           SELECT x2.c AS c, e, b FROM x2 LEFT JOIN
-             (SELECT b, max(c)+0 AS c FROM x1 GROUP BY b)
+             (SELECT b, MAX(c)+0 AS c FROM x1 GROUP BY b)
              USING(c)
         );
     ]], {
@@ -465,7 +465,7 @@ if (0 > 0) then
             INSERT INTO y1 SELECT a+16 FROM y1;
             INSERT INTO y2 SELECT a FROM y1;
             COMMIT;
-            SELECT count(*) FROM y1;
+            SELECT COUNT(*) FROM y1;
         ]], {
             -- <misc3-7.1>
             32
@@ -476,7 +476,7 @@ if (0 > 0) then
         "misc3-7.2",
         [[
             DELETE FROM y1;
-            SELECT count(*) FROM y1;
+            SELECT COUNT(*) FROM y1;
         ]], {
             -- <misc3-7.2>
             0
@@ -486,7 +486,7 @@ if (0 > 0) then
     test:do_execsql_test(
         "misc3-7.3",
         [[
-            SELECT count(*) FROM y3;
+            SELECT COUNT(*) FROM y3;
         ]], {
             -- <misc3-7.3>
             32
@@ -500,7 +500,7 @@ end
 test:do_execsql_test(
     "misc-8.1",
     [[
-        SELECT count(CASE WHEN b IN ('abc','xyz') THEN 'x' END) FROM t3
+        SELECT COUNT(CASE WHEN b IN ('abc','xyz') THEN 'x' END) FROM t3
     ]], {
         -- <misc-8.1>
         2

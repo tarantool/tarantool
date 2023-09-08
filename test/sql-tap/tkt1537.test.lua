@@ -185,7 +185,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt1537-3.1",
     [[
-        SELECT * FROM t1 LEFT JOIN t2 ON printf('%d', b) LIKE 'abc%' WHERE t1.id=1;
+        SELECT * FROM t1 LEFT JOIN t2 ON PRINTF('%d', b) LIKE 'abc%' WHERE t1.id=1;
     ]], {
         -- <tkt1537-3.1>
         1, "", "", "", ""
@@ -195,7 +195,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt1537-3.2",
     [[
-        SELECT * FROM t2 LEFT JOIN t1 ON printf('%d', a1) LIKE 'abc%' WHERE t2.id=3;
+        SELECT * FROM t2 LEFT JOIN t1 ON PRINTF('%d', a1) LIKE 'abc%' WHERE t2.id=3;
     ]], {
         -- <tkt1537-3.2>
         3, 1, "", "", ""

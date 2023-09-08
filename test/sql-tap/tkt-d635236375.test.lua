@@ -37,7 +37,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.1,
     [[
-        SELECT count(*) FROM t1, t2 GROUP BY id1, id1;
+        SELECT COUNT(*) FROM t1, t2 GROUP BY id1, id1;
     ]], {
         -- <1.1>
         2

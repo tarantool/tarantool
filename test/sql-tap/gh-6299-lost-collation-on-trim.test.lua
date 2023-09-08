@@ -15,7 +15,7 @@ test:execsql[[
 test:do_execsql_test(
     "gh-6299-2",
     [[
-        SELECT DISTINCT trim(LEADING FROM s) FROM t;
+        SELECT DISTINCT TRIM(LEADING FROM s) FROM t;
     ]], {
         'A'
     })
@@ -23,7 +23,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "gh-6299-3",
     [[
-        SELECT DISTINCT trim(TRAILING FROM s) FROM t;
+        SELECT DISTINCT TRIM(TRAILING FROM s) FROM t;
     ]], {
         'A'
     })
@@ -31,7 +31,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "gh-6299-4",
     [[
-        SELECT DISTINCT trim(BOTH FROM s) FROM t;
+        SELECT DISTINCT TRIM(BOTH FROM s) FROM t;
     ]], {
         'A'
     })
@@ -39,7 +39,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "gh-6299-1",
     [[
-        SELECT DISTINCT trim(s) FROM t;
+        SELECT DISTINCT TRIM(s) FROM t;
     ]], {
         'A'
     })

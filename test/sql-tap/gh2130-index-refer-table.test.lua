@@ -41,7 +41,7 @@ test:do_catchsql_test(
 	]],
 	{
 	-- <index-1.3>
-	1, "Index 'SAME_INDEX_NAME' already exists in space 'T1'"
+    1, "Index 'same_index_name' already exists in space 't1'"
 	-- <index-1.3>
 	})
 
@@ -52,7 +52,7 @@ test:do_catchsql_test(
 	]],
 	{
 	-- <index-1.4>
-	1, "Index 'SAME_INDEX_NAME' already exists in space 'T2'"
+    1, "Index 'same_index_name' already exists in space 't2'"
 	-- <index-1.4>
 	})
 

@@ -37,7 +37,8 @@ test:do_eqp_test(
     "indexed-by-1.1",
     "SELECT b FROM t1 WHERE b <= 5", {
         -- <indexed-by-1.1>
-        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX2 (B<?) (~262144 rows)' }
+        { 0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ix2 (b<?) '..
+                   '(~262144 rows)' }
         -- <indexed-by-1.1>
     })
 
@@ -45,7 +46,8 @@ test:do_eqp_test(
     "indexed-by-1.2",
     "SELECT b FROM t1 INDEXED BY t1ix1 WHERE b <= 5", {
         -- <indexed-by-1.2>
-        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX1 (B<?) (~262144 rows)' }
+        { 0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ix1 (b<?) '..
+                   '(~262144 rows)' }
         -- <indexed-by-1.2>
     })
 
@@ -60,7 +62,7 @@ test:do_catchsql_test(
     "indexed-by-1.3",
     "SELECT b FROM t1 INDEXED BY t1ix1 WHERE b <= 5", {
         -- <indexed-by-1.3>
-        1, "No index 'T1IX1' is defined in space 'T1'"
+        1, "No index 't1ix1' is defined in space 't1'"
         -- <indexed-by-1.3>
     })
 
@@ -68,7 +70,7 @@ test:do_catchsql_test(
     "indexed-by-1.4",
     "SELECT b FROM t1 INDEXED BY t1ix2 WHERE b <= 5", {
         -- <indexed-by-1.4>
-        1, "No index 'T1IX2' is defined in space 'T1'"
+        1, "No index 't1ix2' is defined in space 't1'"
         -- <indexed-by-1.4>
     })
 
@@ -82,7 +84,7 @@ test:do_eqp_test(
     "indexed-by-1.5",
     "DELETE FROM t1 WHERE b <= 5", {
         -- <indexed-by-1.5>
-        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX2 (B<?) (~262144 rows)' }
+        { 0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ix2 (b<?) (~262144 rows)' }
         -- <indexed-by-1.5>
     })
 
@@ -90,7 +92,7 @@ test:do_eqp_test(
     "indexed-by-1.6",
     "DELETE FROM t1 INDEXED BY t1ix1  WHERE b <= 5", {
         -- <indexed-by-1.6>
-        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX1 (B<?) (~262144 rows)' }
+        { 0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ix1 (b<?) (~262144 rows)' }
         -- <indexed-by-1.6>
     })
 
@@ -103,7 +105,7 @@ test:do_catchsql_test(
     "indexed-by-1.7",
     "DELETE FROM t1 INDEXED BY t1ix1 WHERE b <= 5", {
         -- <indexed-by-1.7>
-        1, "No index 'T1IX1' is defined in space 'T1'"
+        1, "No index 't1ix1' is defined in space 't1'"
         -- <indexed-by-1.7>
     })
 
@@ -111,7 +113,7 @@ test:do_catchsql_test(
     "indexed-by-1.8",
     "DELETE FROM t1 INDEXED BY t1ix2 WHERE b <= 5", {
         -- <indexed-by-1.8>
-        1, "No index 'T1IX2' is defined in space 'T1'"
+        1, "No index 't1ix2' is defined in space 't1'"
         -- <indexed-by-1.8>
     })
 
@@ -124,7 +126,7 @@ test:do_eqp_test(
     "indexed-by-1.9",
     "UPDATE t1 SET b = 20 WHERE b = 10", {
         -- <indexed-by-1.9>
-        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX2 (B=?) (~10 rows)' }
+        { 0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ix2 (b=?) (~10 rows)' }
         -- <indexed-by-1.9>
     })
 
@@ -132,7 +134,7 @@ test:do_eqp_test(
     "indexed-by-1.10",
     "UPDATE t1 INDEXED BY t1ix1 SET b = 20 WHERE b = 10", {
         -- <indexed-by-1.10>
-        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX1 (B=?) (~10 rows)' }
+        { 0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ix1 (b=?) (~10 rows)' }
         -- <indexed-by-1.10>
     })
 
@@ -145,7 +147,7 @@ test:do_catchsql_test(
     "indexed-by-1.11",
     "UPDATE t1 INDEXED BY t1ix1 SET b = 20 WHERE b = 10", {
         -- <indexed-by-1.11>
-        1, "No index 'T1IX1' is defined in space 'T1'"
+        1, "No index 't1ix1' is defined in space 't1'"
         -- <indexed-by-1.11>
     })
 
@@ -153,7 +155,7 @@ test:do_catchsql_test(
     "indexed-by-1.12",
     "UPDATE t1 INDEXED BY t1ix2 SET b = 20 WHERE b = 10", {
         -- <indexed-by-1.12>
-        1, "No index 'T1IX2' is defined in space 'T1'"
+        1, "No index 't1ix2' is defined in space 't1'"
         -- <indexed-by-1.12>
     })
 

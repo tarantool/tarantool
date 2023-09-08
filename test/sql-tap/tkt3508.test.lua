@@ -35,7 +35,7 @@ test:do_catchsql_test(
           EXPERIMENT_TYPE VARCHAR(80),
           REFERENCE_ID VARCHAR(80)
         );
-        select SUBSTRATE_HPRD_ID, count(substrate_refseq_id) as c
+        select SUBSTRATE_HPRD_ID, COUNT(SUBSTRATE_REFSEQ_ID) as c
           from modificationsTmp where c > 1 group by SUBSTRATE_HPRD_ID;
     ]], {
         -- <tkt3508-1.1>

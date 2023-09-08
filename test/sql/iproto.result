@@ -14,7 +14,7 @@ box.execute('create table test (id int primary key, a NUMBER, b text)')
 ---
 - row_count: 1
 ...
-space = box.space.TEST
+space = box.space.test
 ---
 ...
 space:replace{1, 2, '3'}
@@ -32,11 +32,11 @@ space:replace{7, 8.5, '9'}
 box.execute('select * from seqscan test')
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: number
-  - name: B
+  - name: b
     type: string
   rows:
   - [1, 2, '3']
@@ -70,11 +70,11 @@ ret = cn:execute('select * from test')
 ret
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: number
-  - name: B
+  - name: b
     type: string
   rows:
   - [1, 2, '3']
@@ -105,7 +105,7 @@ cn:execute('delete from test where a = 12')
 -- SQL errors.
 cn:execute('insert into not_existing_table values ("kek")')
 ---
-- error: Space 'NOT_EXISTING_TABLE' does not exist
+- error: Space 'not_existing_table' does not exist
 ...
 cn:execute('insert qwerty gjsdjq  q  qwd qmq;; q;qwd;')
 ---
@@ -115,7 +115,7 @@ cn:execute('insert qwerty gjsdjq  q  qwd qmq;; q;qwd;')
 cn:execute('select id as identifier from test where a = 5;')
 ---
 - metadata:
-  - name: IDENTIFIER
+  - name: identifier
     type: integer
   rows: []
 ...
@@ -143,11 +143,11 @@ cn:execute('   ;')
 cn:execute('select * from test where id = ?', {1})
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: number
-  - name: B
+  - name: b
     type: string
   rows:
   - [1, 2, '3']
@@ -155,11 +155,11 @@ cn:execute('select * from test where id = ?', {1})
 cn:execute('select * from test limit ?', {2})
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: number
-  - name: B
+  - name: b
     type: string
   rows:
   - [1, 2, '3']
@@ -183,11 +183,11 @@ cn:execute('select * from test limit ?', {'Hello'})
 cn:execute('select * from test limit 1 offset ?', {2})
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: number
-  - name: B
+  - name: b
     type: string
   rows:
   - [10, 11, null]
@@ -212,9 +212,9 @@ cn:execute('create table test2(id int primary key, a int, b int, c int)')
 ---
 - row_count: 1
 ...
-box.space.TEST2.name
+box.space.test2.name
 ---
-- TEST2
+- test2
 ...
 cn:execute('insert into test2 values (1, 1, 1, 1)')
 ---
@@ -223,13 +223,13 @@ cn:execute('insert into test2 values (1, 1, 1, 1)')
 cn:execute('select * from test2')
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: integer
-  - name: B
+  - name: b
     type: integer
-  - name: C
+  - name: c
     type: integer
   rows:
   - [1, 1, 1, 1]
@@ -238,7 +238,7 @@ cn:execute('create index test2_a_b_index on test2(a, b)')
 ---
 - row_count: 1
 ...
-#box.space.TEST2.index
+#box.space.test2.index
 ---
 - 1
 ...
@@ -246,7 +246,7 @@ cn:execute('drop table test2')
 ---
 - row_count: 1
 ...
-box.space.TEST2
+box.space.test2
 ---
 - null
 ...
@@ -330,7 +330,7 @@ cn:execute('create index idx2 on test3(b)')
 ---
 - row_count: 1
 ...
-box.space.TEST3:truncate()
+box.space.test3:truncate()
 ---
 ...
 cn:execute('CREATE TRIGGER trig INSERT ON test3 FOR EACH ROW BEGIN SELECT * FROM test3; END;')
@@ -388,11 +388,11 @@ cn:execute('select $2, $1, $3', parameters)
 cn:execute('select * from test where id = :1', {1})
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: number
-  - name: B
+  - name: b
     type: string
   rows:
   - [1, 2, '3']
@@ -406,11 +406,11 @@ res = cn:execute('select * from test')
 ...
 res.metadata
 ---
-- - name: ID
+- - name: id
     type: integer
-  - name: A
+  - name: a
     type: number
-  - name: B
+  - name: b
     type: string
 ...
 box.execute('drop table test')
@@ -446,7 +446,7 @@ future1:wait_result()
 future2:wait_result()
 ---
 - null
-- Duplicate key exists in unique index "pk_unnamed_TEST_1" in space "TEST" with old
+- Duplicate key exists in unique index "pk_unnamed_test_1" in space "test" with old
   tuple - [1, 1, 1] and new tuple - [1, 2, 2]
 ...
 future3:wait_result()
@@ -459,11 +459,11 @@ future4 = cn:execute('select * from seqscan test', nil, nil, {is_async = true})
 future4:wait_result()
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: integer
-  - name: B
+  - name: b
     type: integer
   rows:
   - [1, 1, 1]
@@ -520,9 +520,9 @@ cn:execute('insert into test values (null, 1), (null, 1), (null, 1), (null, 1), 
 cn:execute('select * from seqscan test')
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: integer
   rows:
   - [1, 11]
@@ -549,7 +549,7 @@ pk = s:create_index('pk', {sequence = 'test2'})
 function push_id() s:replace{box.NULL} s:replace{box.NULL} end
 ---
 ...
-_ = box.space.TEST:on_replace(push_id)
+_ = box.space.test:on_replace(push_id)
 ---
 ...
 cn:execute('insert into test values (null, 1)')
@@ -562,10 +562,10 @@ box.execute('create table test3 (id int primary key autoincrement)')
 ---
 - row_count: 1
 ...
-box.schema.sequence.alter('TEST3', {min=-10000, step=-10})
+box.schema.sequence.alter('test3', {min=-10000, step=-10})
 ---
 ...
-cn:execute('insert into TEST3 values (null), (null), (null), (null)')
+cn:execute('insert into test3 values (null), (null), (null), (null)')
 ---
 - autoincrement_ids:
   - 1
@@ -738,7 +738,7 @@ res.metadata
 ...
 -- Make sure that built-in functions have a right returning type.
 --
-cn:execute("SELECT zeroblob(1);")
+cn:execute("SELECT ZEROBLOB(1);")
 ---
 - metadata:
   - name: COLUMN_1
@@ -749,7 +749,7 @@ cn:execute("SELECT zeroblob(1);")
 -- randomblob() returns different results each time, so check only
 -- type in meta.
 --
-res = cn:execute("SELECT randomblob(1);")
+res = cn:execute("SELECT RANDOMBLOB(1);")
 ---
 ...
 res.metadata

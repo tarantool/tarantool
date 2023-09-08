@@ -19,5 +19,5 @@ box.execute('INSERT INTO t VALUES (null);')
 box.execute('ROLLBACK TO sp;')
 box.execute('INSERT INTO t VALUES (null);')
 box.commit();
-box.space.T:select();
-box.space.T:drop();
+box.space.t:select();
+box.space.t:drop();

@@ -26,7 +26,7 @@ box.execute("WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt W
 box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 ---
 - metadata:
-  - name: A
+  - name: a
     type: integer
   rows:
   - [840]

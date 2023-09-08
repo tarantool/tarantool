@@ -56,5 +56,5 @@ if remote then
 end;
 test_run:cmd("setopt delimiter ''");
 
-box.space.V:drop()
-box.space.T:drop()
+box.space.v:drop()
+box.space.t:drop()

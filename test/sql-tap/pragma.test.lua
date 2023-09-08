@@ -8,7 +8,7 @@ test:do_catchsql_test(
 	[[
 		PRAGMA kek = 'ON';
 	]], {
-		1, "Pragma 'KEK' does not exist"
+        1, "Pragma 'kek' does not exist"
 	})
 
 ---
@@ -19,7 +19,7 @@ test:do_catchsql_test(
 	[[
 		pragma sql_default_engine='creepy';
 	]], {
-	1, "Pragma 'SQL_DEFAULT_ENGINE' does not exist"
+    1, "Pragma 'sql_default_engine' does not exist"
 })
 
 --
@@ -34,7 +34,7 @@ test:execsql(
 		DROP TABLE IF EXISTS gh3733;
 		CREATE TABLE gh3733(id INT primary key, f NUMBER);
 		INSERT INTO gh3733 VALUES(1, 0.1), (2, 0.2), (3, 0.3);
-		CREATE INDEX IDX ON GH3733 (id);
+        CREATE INDEX IDX ON gh3733 (id);
 	]])
 
 ---
@@ -46,7 +46,7 @@ test:do_catchsql_test(
 		pragma query_only;
 	]], {
 	-- <pragma-4.1>
-	1, "Pragma 'QUERY_ONLY' does not exist"
+    1, "Pragma 'query_only' does not exist"
 	-- </pragma-4.1>
 })
 
@@ -59,7 +59,7 @@ test:do_catchsql_test(
 		pragma read_uncommitted;
 	]], {
 	-- <pragma-5.1>
-	1, "Pragma 'READ_UNCOMMITTED' does not exist"
+    1, "Pragma 'read_uncommitted' does not exist"
 	-- </pragma-5.1>
 })
 
@@ -72,7 +72,7 @@ test:do_execsql_test(
 		pragma index_list(gh3733)
 	]], {
 	-- <pragma-6.1>
-	0, 'pk_unnamed_GH3733_1', 1, 1, 'IDX', 0
+    0, 'pk_unnamed_gh3733_1', 1, 1, 'IDX', 0
 	-- </pragma-6.1>
 })
 
@@ -97,7 +97,7 @@ test:do_execsql_test(
 		pragma index_info(gh3733.IDX)
 	]], {
 	-- <pragma-8.1>
-	0, 0, 'ID', 0, 'BINARY', 'integer'
+    0, 0, 'id', 0, 'BINARY', 'integer'
 	-- </pragma-8.1>
 })
 

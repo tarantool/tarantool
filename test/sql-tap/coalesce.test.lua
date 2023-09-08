@@ -31,7 +31,7 @@ test:do_test(
             INSERT INTO t1 VALUES(7, null, 33, 99);
             INSERT INTO t1 VALUES(8, null, null, 44);
 
-            SELECT coalesce(b,c,d) FROM t1 ORDER BY a;
+            SELECT COALESCE(b,c,d) FROM t1 ORDER BY a;
         ]]
     end, {
         -- <coalesce-1.0>
@@ -43,7 +43,7 @@ test:do_test(
     "coalesce-1.1",
     function()
         return test:execsql [[
-            SELECT coalesce(d+c+b,d+c,d) FROM t1 ORDER BY a;
+            SELECT COALESCE(d+c+b,d+c,d) FROM t1 ORDER BY a;
         ]]
     end, {
         -- <coalesce-1.1>
@@ -55,7 +55,7 @@ test:do_test(
     "coalesce-1.2",
     function()
         return test:execsql [[
-            SELECT ifnull(d+c+b,ifnull(d+c,d)) FROM t1 ORDER BY a;
+            SELECT IFNULL(d+c+b, IFNULL(d+c, d)) FROM t1 ORDER BY a;
         ]]
     end, {
         -- <coalesce-1.2>
@@ -67,7 +67,7 @@ test:do_test(
     "coalesce-1.3",
     function()
         return test:execsql [[
-            SELECT ifnull(ifnull(d+c+b,d+c),d) FROM t1 ORDER BY a;
+            SELECT IFNULL(IFNULL(d+c+b, d+c), d) FROM t1 ORDER BY a;
         ]]
     end, {
         -- <coalesce-1.3>
@@ -79,7 +79,7 @@ test:do_test(
     "coalesce-1.4",
     function()
         return test:execsql [[
-            SELECT ifnull(ifnull(b,c),d) FROM t1 ORDER BY a;
+            SELECT IFNULL(IFNULL(b, c), d) FROM t1 ORDER BY a;
         ]]
     end, {
         -- <coalesce-1.4>
@@ -91,7 +91,7 @@ test:do_test(
     "coalesce-1.5",
     function()
         return test:execsql [[
-            SELECT ifnull(b,ifnull(c,d)) FROM t1 ORDER BY a;
+            SELECT IFNULL(b, IFNULL(c, d)) FROM t1 ORDER BY a;
         ]]
     end, {
         -- <coalesce-1.5>
@@ -103,7 +103,7 @@ test:do_test(
     "coalesce-1.6",
     function()
         return test:execsql [[
-            SELECT coalesce(b, NOT b, -b, abs(b), LEAST(b, 5), b * 123, c)
+            SELECT COALESCE(b, NOT b, -b, ABS(b), LEAST(b, 5), b * 123, c)
               FROM t1 ORDER BY a;
         ]]
     end, {
@@ -116,7 +116,7 @@ test:do_test(
     "coalesce-1.7",
     function()
         return test:execsql [[
-            SELECT ifnull(nullif(a,4),99)
+            SELECT IFNULL(NULLIF(a, 4), 99)
               FROM t1 ORDER BY a;
         ]]
     end, {
@@ -129,7 +129,7 @@ test:do_test(
     "coalesce-1.8",
     function()
         return test:execsql [[
-            SELECT coalesce(
+            SELECT COALESCE(
               CASE WHEN b=2 THEN 123 END,
               CASE WHEN b=3 THEN 234 END,
               CASE WHEN c=3 THEN 345 WHEN c=33 THEN 456 END,

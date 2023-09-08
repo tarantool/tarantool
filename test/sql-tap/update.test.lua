@@ -30,7 +30,7 @@ test:do_catchsql_test("update-1.1", [[
   UPDATE test1 SET f2=5 WHERE f1<1
 ]], {
   -- <update-1.1>
-  1, "Space 'TEST1' does not exist"
+  1, "Space 'test1' does not exist"
   -- </update-1.1>
 })
 
@@ -63,7 +63,7 @@ test:do_catchsql_test("update-3.2", [[
   UPDATE test1 SET f1=f3*2 WHERE f2==32
 ]], {
   -- <update-3.2>
-  1, "Can’t resolve field 'F3'"
+  1, "Can’t resolve field 'f3'"
   -- </update-3.2>
 })
 
@@ -71,7 +71,7 @@ test:do_catchsql_test("update-3.3", [[
   UPDATE test1 SET f1=test2.f1*2 WHERE f2==32
 ]], {
   -- <update-3.3>
-  1, "Field 'F1' was not found in space 'TEST2' format"
+  1, "Field 'f1' was not found in space 'test2' format"
   -- </update-3.3>
 })
 
@@ -79,7 +79,7 @@ test:do_catchsql_test("update-3.4", [[
   UPDATE test1 SET f3=f1*2 WHERE f2==32
 ]], {
   -- <update-3.4>
-  1, "Field 'F3' was not found in space 'TEST1' format"
+  1, "Field 'f3' was not found in space 'test1' format"
   -- </update-3.4>
 })
 
@@ -104,7 +104,7 @@ test:do_execsql_test("update-3.5", [[
 
 -- verify that SELECT does not reset the change counter
 test:do_test("update-3.5.2", function()
-  return test:db("eval", "SELECT count(*) FROM test1")
+  return test:db("eval", "SELECT COUNT(*) FROM test1")
 end, {
   -- <update-3.5.2>
   10
@@ -163,7 +163,7 @@ test:do_execsql_test("update-3.10", [[
 -- Swap the values of f1 and f2 for all elements
 --
 test:do_test("update-3.11", function()
-    return update_row_count("UPDATE test1 SET F2 = f1, F1 = f2")
+    return update_row_count("UPDATE test1 SET f2 = f1, f1 = f2")
   end,
   -- <update-3.11>
   10
@@ -171,7 +171,7 @@ test:do_test("update-3.11", function()
 )
 
 test:do_execsql_test("update-3.12", [[
-  SELECT f1,f2 FROM test1 ORDER BY F1
+  SELECT f1,f2 FROM test1 ORDER BY f1
 ]], {
   -- <update-3.12>
   2, 1, 4, 2, 8, 3, 16, 4, 32, 5, 64, 6, 128, 7, 256, 8, 512, 9, 1024, 10
@@ -179,7 +179,7 @@ test:do_execsql_test("update-3.12", [[
 })
 
 test:do_test("update-3.13", function()
-  return test:execsql "UPDATE test1 SET F2=f1, F1=f2"
+  return test:execsql "UPDATE test1 SET f2=f1, f1=f2"
 end, {
   -- <update-3.13>
 
@@ -187,7 +187,7 @@ end, {
 })
 
 test:do_execsql_test("update-3.14", [[
-  SELECT f1,f2 FROM test1 ORDER BY F1
+  SELECT f1,f2 FROM test1 ORDER BY f1
 ]], {
   -- <update-3.14>
   1, 2, 2, 4, 3, 8, 4, 16, 5, 32, 6, 64, 7, 128, 8, 256, 9, 512, 10, 1024
@@ -853,7 +853,7 @@ test:do_catchsql_test("update-9.1", [[
   UPDATE test1 SET x=11 WHERE f1=1025
 ]], {
   -- <update-9.1>
-  1, "Field 'X' was not found in space 'TEST1' format"
+  1, "Field 'x' was not found in space 'test1' format"
   -- </update-9.1>
 })
 
@@ -861,7 +861,7 @@ test:do_catchsql_test("update-9.2", [[
   UPDATE test1 SET f1=x(11) WHERE f1=1025
 ]], {
   -- <update-9.2>
-  1, "Function 'X' does not exist"
+  1, "Function 'x' does not exist"
   -- </update-9.2>
 })
 
@@ -869,7 +869,7 @@ test:do_catchsql_test("update-9.3", [[
   UPDATE test1 SET f1=11 WHERE x=1025
 ]], {
   -- <update-9.3>
-  1, "Can’t resolve field 'X'"
+  1, "Can’t resolve field 'x'"
   -- </update-9.3>
 })
 
@@ -877,7 +877,7 @@ test:do_catchsql_test("update-9.4", [[
   UPDATE test1 SET f1=11 WHERE x(f1)=1025
 ]], {
   -- <update-9.4>
-  1, "Function 'X' does not exist"
+  1, "Function 'x' does not exist"
   -- </update-9.4>
 })
 
@@ -917,7 +917,7 @@ test:do_catchsql_test("update-10.3", [[
   SELECT a,b,c,d,e,f FROM t1;
 ]], {
   -- <update-10.3>
-  1, "Duplicate key exists in unique index \"unique_unnamed_T1_1\" in space \"T1\" with old tuple - [1, 2, 3, 4, 9, 6, 1] and new tuple - [1, 3, 4, 4, 10, 7, 2]"
+  1, "Duplicate key exists in unique index \"unique_unnamed_t1_1\" in space \"t1\" with old tuple - [1, 2, 3, 4, 9, 6, 1] and new tuple - [1, 3, 4, 4, 10, 7, 2]"
   -- </update-10.3>
 })
 
@@ -943,7 +943,7 @@ test:do_catchsql_test("update-10.6", [[
   SELECT a,b,c,d,e,f FROM t1;
 ]], {
   -- <update-10.6>
-  1, "Duplicate key exists in unique index \"unique_unnamed_T1_2\" in space \"T1\" with old tuple - [1, 2, 3, 4, 11, 6, 1] and new tuple - [2, 2, 4, 4, 12, 7, 2]"
+  1, "Duplicate key exists in unique index \"unique_unnamed_t1_2\" in space \"t1\" with old tuple - [1, 2, 3, 4, 11, 6, 1] and new tuple - [2, 2, 4, 4, 12, 7, 2]"
   -- </update-10.6>
 })
 
@@ -969,7 +969,7 @@ test:do_catchsql_test("update-10.9", [[
   SELECT a,b,c,d,e,f FROM t1;
 ]], {
   -- <update-10.9>
-  1, "Duplicate key exists in unique index \"unique_unnamed_T1_3\" in space \"T1\" with old tuple - [1, 2, 3, 4, 13, 6, 1] and new tuple - [2, 3, 3, 4, 14, 7, 2]"
+  1, "Duplicate key exists in unique index \"unique_unnamed_t1_3\" in space \"t1\" with old tuple - [1, 2, 3, 4, 13, 6, 1] and new tuple - [2, 3, 3, 4, 14, 7, 2]"
   -- </update-10.9>
 })
 
@@ -1122,7 +1122,7 @@ test:do_catchsql_test(
     [[
         update test set a = 2, a = 3;
     ]],
-    {1, "set id list: duplicate column name A"})
+    {1, "set id list: duplicate column name a"})
 
 test:do_execsql_test(
   "insert-15.2",

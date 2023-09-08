@@ -40,7 +40,7 @@ test:do_execsql_test("1.1eqp", [[
   SELECT a FROM t1 WHERE b>9 OR b=9 ORDER BY +a;
 ]], {
   -- <1.1eqp>
-  "/SEARCH TABLE T1 USING COVERING INDEX T1BC/"
+  "/SEARCH TABLE t1 USING COVERING INDEX t1bc/"
   -- </1.1eqp>
 })
 
@@ -57,7 +57,7 @@ test:do_execsql_test("1.2eqp", [[
   SELECT a FROM t1 WHERE b>8 OR (b=8 AND c>7) ORDER BY +a;
 ]], {
   -- <1.2eqp>
-  "/SEARCH TABLE T1 USING COVERING INDEX T1BC/"
+  "/SEARCH TABLE t1 USING COVERING INDEX t1bc/"
   -- </1.2eqp>
 })
 
@@ -74,7 +74,7 @@ test:do_execsql_test("1.3eqp", [[
   SELECT a FROM t1 WHERE (b=8 AND c>7) OR b>8 ORDER BY +a;
 ]], {
   -- <1.3eqp>
-  "/SEARCH TABLE T1 USING COVERING INDEX T1BC/"
+  "/SEARCH TABLE t1 USING COVERING INDEX t1bc/"
   -- </1.3eqp>
 })
 
@@ -91,7 +91,7 @@ test:do_execsql_test("1.4eqp", [[
   SELECT a FROM t1 WHERE (b=8 AND c>7) OR 8<b ORDER BY +a;
 ]], {
   -- <1.4eqp>
-  "/SEARCH TABLE T1 USING COVERING INDEX T1BC/"
+  "/SEARCH TABLE t1 USING COVERING INDEX t1bc/"
   -- </1.4eqp>
 })
 
@@ -110,7 +110,7 @@ test:do_execsql_test("1.5eqp", [[
    ORDER BY +a;
 ]], {
   -- <1.5eqp>
-  "/SEARCH TABLE T1 USING COVERING INDEX T1BC/"
+  "/SEARCH TABLE t1 USING COVERING INDEX t1bc/"
   -- </1.5eqp>
 })
 

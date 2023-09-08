@@ -27,7 +27,7 @@ INSERT INTO t VALUES (1), (NULL), (10), (NULL), (NULL), (3), (NULL);
 SELECT * FROM SEQSCAN t;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
  |   rows:
  |   - [1]

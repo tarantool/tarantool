@@ -2,7 +2,7 @@
 local test = require("sqltester")
 test:plan(117)
 
-box.schema.func.create('A1', {
+box.schema.func.create('a1', {
     language = 'Lua',
     body = 'function(a) return {a} end',
     returns = 'array',
@@ -10,7 +10,7 @@ box.schema.func.create('A1', {
     exports = {'LUA', 'SQL'}
 });
 
-box.schema.func.create('A2', {
+box.schema.func.create('a2', {
     language = 'Lua',
     body = 'function(a, b) return {a, b} end',
     returns = 'array',
@@ -18,7 +18,7 @@ box.schema.func.create('A2', {
     exports = {'LUA', 'SQL'}
 });
 
-box.schema.func.create('A3', {
+box.schema.func.create('a3', {
     language = 'Lua',
     body = 'function(a, b, c) return {a, b, c} end',
     returns = 'array',
@@ -34,7 +34,7 @@ test:do_execsql_test(
     ]], {
     })
 
-box.space.T:insert({0, {1, 2, 3, 4}})
+box.space.t:insert({0, {1, 2, 3, 4}})
 
 -- Make sure it is possible to select from ARRAY field.
 test:do_execsql_test(
@@ -1020,7 +1020,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "array-13.5",
     [[
-        SELECT typeof([1]);
+        SELECT TYPEOF([1]);
     ]], {
         "array"
     })

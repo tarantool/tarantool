@@ -24,15 +24,15 @@ box.execute("CREATE TABLE t3_memtx(a INT PRIMARY KEY, b INT, c INT);")
 ---
 - row_count: 1
 ...
-assert(box.space.T1_VINYL.engine == 'vinyl')
+assert(box.space.t1_vinyl.engine == 'vinyl')
 ---
 - true
 ...
-assert(box.space.T2_VINYL.engine == 'vinyl')
+assert(box.space.t2_vinyl.engine == 'vinyl')
 ---
 - true
 ...
-assert(box.space.T3_MEMTX.engine == 'memtx')
+assert(box.space.t3_memtx.engine == 'memtx')
 ---
 - true
 ...
@@ -54,7 +54,7 @@ box.execute("CREATE TABLE t1_vinyl (id INT PRIMARY KEY) WITH ENGINE = 'vinyl'")
 ---
 - row_count: 1
 ...
-assert(box.space.T1_VINYL.engine == 'vinyl')
+assert(box.space.t1_vinyl.engine == 'vinyl')
 ---
 - true
 ...
@@ -62,7 +62,7 @@ box.execute("CREATE TABLE t1_memtx (id INT PRIMARY KEY) WITH ENGINE = 'memtx'")
 ---
 - row_count: 1
 ...
-assert(box.space.T1_MEMTX.engine == 'memtx')
+assert(box.space.t1_memtx.engine == 'memtx')
 ---
 - true
 ...
@@ -74,7 +74,7 @@ box.execute("CREATE TABLE t2_vinyl (id INT PRIMARY KEY) WITH ENGINE = 'vinyl'")
 ---
 - row_count: 1
 ...
-assert(box.space.T2_VINYL.engine == 'vinyl')
+assert(box.space.t2_vinyl.engine == 'vinyl')
 ---
 - true
 ...
@@ -82,20 +82,20 @@ box.execute("CREATE TABLE t2_memtx (id INT PRIMARY KEY) WITH ENGINE = 'memtx'")
 ---
 - row_count: 1
 ...
-assert(box.space.T2_MEMTX.engine == 'memtx')
+assert(box.space.t2_memtx.engine == 'memtx')
 ---
 - true
 ...
-box.space.T1_VINYL:drop()
+box.space.t1_vinyl:drop()
 ---
 ...
-box.space.T1_MEMTX:drop()
+box.space.t1_memtx:drop()
 ---
 ...
-box.space.T2_VINYL:drop()
+box.space.t2_vinyl:drop()
 ---
 ...
-box.space.T2_MEMTX:drop()
+box.space.t2_memtx:drop()
 ---
 ...
 -- Name of engine considered to be string literal, so should be
@@ -131,5 +131,5 @@ box.execute("CREATE TABLE t_wrong_engine (id INT PRIMARY KEY) WITH ENGINE = 'abc
 box.execute("CREATE TABLE t_long_engine_name (id INT PRIMARY KEY) WITH ENGINE = 'very_long_engine_name'")
 ---
 - null
-- 'Failed to create space ''T_LONG_ENGINE_NAME'': space engine name is too long'
+- 'Failed to create space ''t_long_engine_name'': space engine name is too long'
 ...

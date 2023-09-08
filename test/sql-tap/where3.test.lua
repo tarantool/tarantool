@@ -65,7 +65,7 @@ test:do_test(
 test:do_execsql_test(
     "where3-1.2",
     [[
-        CREATE TABLE test1(parent1key  INT primary key, child1key TEXT, Child2key TEXT , child3key INT );
+        CREATE TABLE test1(parent1key  INT primary key, child1key TEXT, child2key TEXT , child3key INT );
         CREATE TABLE child1 ( child1key  TEXT primary key, value  TEXT );
         CREATE TABLE child2 ( child2key  TEXT primary key, value  TEXT );
 
@@ -193,7 +193,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.1>
-        "TA", "*", "TB", "*", "TC", "*", "TD", "*"
+        "tA", "*", "tB", "*", "tC", "*", "tD", "*"
         -- </where3-2.1>
     })
 
@@ -206,7 +206,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.1.1>
-        "TA", "*", "TB", "*", "TC", "*", "TD", "*"
+        "tA", "*", "tB", "*", "tC", "*", "tD", "*"
         -- </where3-2.1.1>
     })
 
@@ -219,7 +219,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.1.2>
-        "TA", "*", "TB", "*", "TC", "*", "TD", "*"
+        "tA", "*", "tB", "*", "tC", "*", "tD", "*"
         -- </where3-2.1.2>
     })
 
@@ -232,7 +232,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.1.3>
-        "TA", "*", "TB", "*", "TC", "*", "TD", "*"
+        "tA", "*", "tB", "*", "tC", "*", "tD", "*"
         -- </where3-2.1.3>
     })
 
@@ -245,7 +245,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.1.4>
-        "TA", "*", "TB", "*", "TC", "*", "TD", "*"
+        "tA", "*", "tB", "*", "tC", "*", "tD", "*"
         -- </where3-2.1.4>
     })
 
@@ -258,7 +258,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.1.5>
-        "TA", "*", "TB", "*", "TC", "*", "TD", "*"
+        "tA", "*", "tB", "*", "tC", "*", "tD", "*"
         -- </where3-2.1.5>
     })
 
@@ -271,7 +271,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.2>
-        "TB", "*", "TA", "*", "TC", "*", "TD", "*"
+        "tB", "*", "tA", "*", "tC", "*", "tD", "*"
         -- </where3-2.2>
     })
 
@@ -284,7 +284,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.3>
-        "TB", "*", "TA", "*", "TC", "*", "TD", "*"
+        "tB", "*", "tA", "*", "tC", "*", "tD", "*"
         -- </where3-2.3>
     })
 
@@ -297,7 +297,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.4>
-        "TC", "*", "TA", "*", "TB", "*", "TD", "*"
+        "tC", "*", "tA", "*", "tB", "*", "tD", "*"
         -- </where3-2.4>
     })
 
@@ -310,7 +310,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.5>
-        "TA", "*", "TC", "*", "TB", "*", "TD", "*"
+        "tA", "*", "tC", "*", "tB", "*", "tD", "*"
         -- </where3-2.5>
     })
 
@@ -323,7 +323,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.6>
-        "TC", "*", "TB", "*", "TA", "*", "TD", "*"
+        "tC", "*", "tB", "*", "tA", "*", "tD", "*"
         -- </where3-2.6>
     })
 
@@ -336,7 +336,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.7>
-        "TB", "*", "TC", "*", "TA", "*", "TD", "*"
+        "tB", "*", "tC", "*", "tA", "*", "tD", "*"
         -- </where3-2.7>
     })
 
@@ -408,7 +408,7 @@ if 0
             SELECT * FROM t400, t401, t402 WHERE t402.z LIKE 'abc%';
         ]], {
             -- <where3-4.0>
-            0, 0, 2, "SCAN TABLE T402 (~983040 rows)", 0, 1, 0, "SCAN TABLE T400 (~1048576 rows)", 0, 2, 1, "SCAN TABLE T401 (~1048576 rows)"
+            0, 0, 2, "SCAN TABLE t402 (~983040 rows)", 0, 1, 0, "SCAN TABLE t400 (~1048576 rows)", 0, 2, 1, "SCAN TABLE t401 (~1048576 rows)"
             -- </where3-4.0>
         })
 
@@ -419,7 +419,7 @@ if 0
             SELECT * FROM t400, t401, t402 WHERE t401.r LIKE 'abc%';
         ]], {
             -- <where3-4.1>
-            0, 0, 1, "SCAN TABLE T401 (~983040 rows)", 0, 1, 0, "SCAN TABLE T400 (~1048576 rows)", 0, 2, 2, "SCAN TABLE T402 (~1048576 rows)"
+            0, 0, 1, "SCAN TABLE t401 (~983040 rows)", 0, 1, 0, "SCAN TABLE t400 (~1048576 rows)", 0, 2, 2, "SCAN TABLE t402 (~1048576 rows)"
             -- </where3-4.1>
         })
 
@@ -430,7 +430,7 @@ if 0
             SELECT * FROM t400, t401, t402 WHERE t400.c LIKE 'abc%';
         ]], {
             -- <where3-4.2>
-            0, 0, 0, "SCAN TABLE T400 (~983040 rows)", 0, 1, 1, "SCAN TABLE T401 (~1048576 rows)", 0, 2, 2, "SCAN TABLE T402 (~1048576 rows)"
+            0, 0, 0, "SCAN TABLE t400 (~983040 rows)", 0, 1, 1, "SCAN TABLE t401 (~1048576 rows)", 0, 2, 2, "SCAN TABLE t402 (~1048576 rows)"
             -- </where3-4.2>
         })
 

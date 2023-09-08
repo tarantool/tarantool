@@ -12,7 +12,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t(i INT PRIMARY KEY, v VARBINARY);
         INSERT INTO t VALUES(1, x'6178'), (2, x'6278'), (3, x'6379');
-        SELECT count(*), substr(v,2,1) AS m FROM t GROUP BY m;
+        SELECT COUNT(*), SUBSTR(v,2,1) AS m FROM t GROUP BY m;
     ]], {
         2, require('varbinary').new('x'),
         1, require('varbinary').new('y')
@@ -21,7 +21,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "gh-5890-2",
     [[
-        SELECT count(*), v || v AS m FROM t GROUP BY m;
+        SELECT COUNT(*), v || v AS m FROM t GROUP BY m;
     ]], {
         1, require('varbinary').new('axax'),
         1, require('varbinary').new('bxbx'),

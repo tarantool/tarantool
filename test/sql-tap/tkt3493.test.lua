@@ -23,9 +23,9 @@ test:plan(26)
 test:do_execsql_test(
     "tkt3493-1.1",
     [[
-        CREATE TABLE A (id INTEGER PRIMARY KEY, val TEXT);
-        CREATE TABLE B (id INTEGER PRIMARY KEY, val TEXT);
-        CREATE TABLE A_B (B_id INTEGER NOT NULL PRIMARY KEY, A_id INTEGER);
+        CREATE TABLE A (ID INTEGER PRIMARY KEY, VAL TEXT);
+        CREATE TABLE B (ID INTEGER PRIMARY KEY, VAL TEXT);
+        CREATE TABLE A_B (B_ID INTEGER NOT NULL PRIMARY KEY, A_ID INTEGER);
         START TRANSACTION;
         INSERT INTO A VALUES(1,'123');
         INSERT INTO A VALUES(2,'456');
@@ -45,13 +45,13 @@ test:do_execsql_test(
     [[
         SELECT
           CASE
-             WHEN B.val = '1' THEN 'XYZ'
-             ELSE A.val
-          END AS Col1
+             WHEN B.VAL = '1' THEN 'XYZ'
+             ELSE A.VAL
+          END AS COL1
         FROM B
-        LEFT OUTER JOIN A_B ON B.id = A_B.B_id
-        LEFT OUTER JOIN A ON A.id = A_B.A_id
-        ORDER BY Col1 ASC;
+        LEFT OUTER JOIN A_B ON B.ID = A_B.B_ID
+        LEFT OUTER JOIN A ON A.ID = A_B.A_ID
+        ORDER BY COL1 ASC;
     ]], {
         -- <tkt3493-1.2>
         "456", "XYZ"
@@ -63,13 +63,13 @@ test:do_execsql_test(
     [[
         SELECT DISTINCT
           CASE
-             WHEN B.val = '1' THEN 'XYZ'
-             ELSE A.val
-          END AS Col1
+             WHEN B.VAL = '1' THEN 'XYZ'
+             ELSE A.VAL
+          END AS COL1
         FROM B
-        LEFT OUTER JOIN A_B ON B.id = A_B.B_id
-        LEFT OUTER JOIN A ON A.id = A_B.A_id
-        ORDER BY Col1 ASC;
+        LEFT OUTER JOIN A_B ON B.ID = A_B.B_ID
+        LEFT OUTER JOIN A ON A.ID = A_B.A_ID
+        ORDER BY COL1 ASC;
     ]], {
         -- <tkt3493-1.3>
         "456", "XYZ"
@@ -79,10 +79,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-1.4",
     [[
-        SELECT b.val, CASE WHEN b.val = '1' THEN 'xyz' ELSE b.val END AS col1 FROM b;
+        SELECT B.VAL, CASE WHEN B.VAL = '1' THEN 'XYZ' ELSE B.VAL END AS COL1 FROM B;
     ]], {
         -- <tkt3493-1.4>
-        "1", "xyz", "2", "2"
+        "1", "XYZ", "2", "2"
         -- </tkt3493-1.4>
     })
 
@@ -90,9 +90,9 @@ test:do_catchsql_test(
     "tkt3493-1.5",
     [[
         SELECT DISTINCT
-          b.val,
-          CASE WHEN b.val = 1 THEN 'xyz' ELSE b.val END AS col1
-        FROM b;
+          B.VAL,
+          CASE WHEN B.VAL = 1 THEN 'XYZ' ELSE B.VAL END AS COL1
+        FROM B;
     ]], {
         -- <tkt3493-1.5>
         1, "Type mismatch: can not convert integer(1) to string"
@@ -103,12 +103,12 @@ test:do_execsql_test(
     "tkt3493-1.6",
     [[
         SELECT DISTINCT
-          b.val,
-          CASE WHEN b.val = '1' THEN 'xyz' ELSE b.val END AS col1
-        FROM b;
+          B.VAL,
+          CASE WHEN B.VAL = '1' THEN 'XYZ' ELSE B.VAL END AS COL1
+        FROM B;
     ]], {
         -- <tkt3493-1.6>
-        "1", "xyz", "2", "2"
+        "1", "XYZ", "2", "2"
         -- </tkt3493-1.6>
     })
 
@@ -156,7 +156,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "tkt3493-2.2.4",
     [[
-        SELECT count(*), a=123 FROM t1
+        SELECT COUNT(*), a=123 FROM t1
     ]], {
         -- <tkt3493-2.2.4>
         1, "Type mismatch: can not convert integer(123) to string"
@@ -166,7 +166,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "tkt3493-2.2.5",
     [[
-        SELECT count(*), +a=123 FROM t1
+        SELECT COUNT(*), +a=123 FROM t1
     ]], {
         -- <tkt3493-2.2.5>
         1, "Type mismatch: can not convert integer(123) to string"
@@ -206,7 +206,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "tkt3493-2.4.1",
     [[
-        SELECT typeof(a), a FROM t1 GROUP BY a HAVING a=123
+        SELECT TYPEOF(a), a FROM t1 GROUP BY a HAVING a=123
     ]], {
         -- <tkt3493-2.4.1>
         1, "Type mismatch: can not convert integer(123) to string"
@@ -216,7 +216,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "tkt3493-2.4.2",
     [[
-        SELECT typeof(a), a FROM t1 GROUP BY b HAVING a=123
+        SELECT TYPEOF(a), a FROM t1 GROUP BY b HAVING a=123
     ]], {
         -- <tkt3493-2.4.2>
         1, "Type mismatch: can not convert integer(123) to string"
@@ -226,7 +226,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "tkt3493-2.5.1",
     [[
-        SELECT typeof(b), b FROM t1 GROUP BY a HAVING b='456'
+        SELECT TYPEOF(b), b FROM t1 GROUP BY a HAVING b='456'
     ]], {
         -- <tkt3493-2.5.1>
         1, "Type mismatch: can not convert string('456') to number"
@@ -236,7 +236,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "tkt3493-2.5.2",
     [[
-        SELECT typeof(b), b FROM t1 GROUP BY b HAVING b='456'
+        SELECT TYPEOF(b), b FROM t1 GROUP BY b HAVING b='456'
     ]], {
         -- <tkt3493-2.5.2>
         1, "Type mismatch: can not convert string('456') to number"

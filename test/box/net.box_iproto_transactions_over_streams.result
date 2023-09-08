@@ -1344,72 +1344,72 @@ end$
 function monster_ddl(stream)
     local _, err1, err2, err3, err4, err5
     local stream_or_box = stream or box
-    execute_sql_string(stream, [[CREATE TABLE t1(id INTEGER PRIMARY KEY,
-                                                 a INTEGER,
-                                                 b INTEGER);]])
-    execute_sql_string(stream, [[CREATE TABLE t2(id INTEGER PRIMARY KEY,
-                                                 a INTEGER,
-                                                 b INTEGER UNIQUE,
-                                                 CONSTRAINT ck1
-                                                 CHECK(b < 100));]])
+    execute_sql_string(stream, [[CREATE TABLE T1(ID INTEGER PRIMARY KEY,
+                                                 A INTEGER,
+                                                 B INTEGER);]])
+    execute_sql_string(stream, [[CREATE TABLE T2(ID INTEGER PRIMARY KEY,
+                                                 A INTEGER,
+                                                 B INTEGER UNIQUE,
+                                                 CONSTRAINT CK1
+                                                 CHECK(B < 100));]])
 
-    execute_sql_string(stream, 'CREATE INDEX t1a ON t1(a);')
-    execute_sql_string(stream, 'CREATE INDEX t2a ON t2(a);')
+    execute_sql_string(stream, 'CREATE INDEX T1A ON T1(A);')
+    execute_sql_string(stream, 'CREATE INDEX T2A ON T2(A);')
 
-    execute_sql_string(stream, [[CREATE TABLE t_to_rename(id INTEGER PRIMARY
-                                                          KEY, a INTEGER);]])
+    execute_sql_string(stream, [[CREATE TABLE T_TO_RENAME(ID INTEGER PRIMARY
+                                                          KEY, A INTEGER);]])
 
-    execute_sql_string(stream, 'DROP INDEX t2a ON t2;')
+    execute_sql_string(stream, 'DROP INDEX T2A ON T2;')
 
-    execute_sql_string(stream, 'CREATE INDEX t_to_rename_a ON t_to_rename(a);')
+    execute_sql_string(stream, 'CREATE INDEX T_TO_RENAME_A ON T_TO_RENAME(A);')
 
-    execute_sql_string(stream, [[ALTER TABLE t1 ADD CONSTRAINT ck1
-                                 CHECK(b > 0);]])
+    execute_sql_string(stream, [[ALTER TABLE T1 ADD CONSTRAINT CK1
+                                 CHECK(B > 0);]])
 
     _, err1 =
-        execute_sql_string_and_return_result(stream, [[ALTER TABLE t_to_rename
-                                                       RENAME TO t1;]])
+        execute_sql_string_and_return_result(stream, [[ALTER TABLE T_TO_RENAME
+                                                       RENAME TO T1;]])
 
-    execute_sql_string(stream, [[ALTER TABLE t1 ADD CONSTRAINT
-                                 ck2 CHECK(a > 0);]])
-    execute_sql_string(stream, 'ALTER TABLE t1 DROP CONSTRAINT ck1;')
+    execute_sql_string(stream, [[ALTER TABLE T1 ADD CONSTRAINT
+                                 CK2 CHECK(A > 0);]])
+    execute_sql_string(stream, 'ALTER TABLE T1 DROP CONSTRAINT CK1;')
 
     _, err2 =
-        execute_sql_string_and_return_result(stream, [[CREATE TABLE t1(id
+        execute_sql_string_and_return_result(stream, [[CREATE TABLE T1(ID
                                                        INTEGER PRIMARY KEY);]])
 
     execute_sql_string(stream, [[CREATE TABLE
-                                 trigger_catcher(id INTEGER PRIMARY
+                                 TRIGGER_CATCHER(ID INTEGER PRIMARY
                                                  KEY AUTOINCREMENT);]])
 
-    execute_sql_string(stream, 'ALTER TABLE t_to_rename RENAME TO t_renamed;')
+    execute_sql_string(stream, 'ALTER TABLE T_TO_RENAME RENAME TO T_RENAMED;')
 
-    execute_sql_string(stream, 'DROP INDEX t_to_rename_a ON t_renamed;')
+    execute_sql_string(stream, 'DROP INDEX T_TO_RENAME_A ON T_RENAMED;')
 
-    execute_sql_string(stream, [[CREATE TRIGGER t1t AFTER INSERT ON
-                                 t1 FOR EACH ROW
+    execute_sql_string(stream, [[CREATE TRIGGER T1T AFTER INSERT ON
+                                 T1 FOR EACH ROW
                                  BEGIN
-                                     INSERT INTO trigger_catcher VALUES(1);
+                                     INSERT INTO TRIGGER_CATCHER VALUES(1);
                                  END; ]])
 
-    _, err3 = execute_sql_string_and_return_result(stream, 'DROP TABLE t3;')
+    _, err3 = execute_sql_string_and_return_result(stream, 'DROP TABLE T3;')
 
-    execute_sql_string(stream, [[CREATE TRIGGER t2t AFTER INSERT ON
-                                 t2 FOR EACH ROW
+    execute_sql_string(stream, [[CREATE TRIGGER T2T AFTER INSERT ON
+                                 T2 FOR EACH ROW
                                  BEGIN
-                                     INSERT INTO trigger_catcher VALUES(1);
+                                     INSERT INTO TRIGGER_CATCHER VALUES(1);
                                  END; ]])
 
     _, err4 =
-        execute_sql_string_and_return_result(stream, [[CREATE INDEX t1a
-                                                       ON t1(a, b);]])
+        execute_sql_string_and_return_result(stream, [[CREATE INDEX T1A
+                                                       ON T1(A, B);]])
 
-    execute_sql_string(stream, 'TRUNCATE TABLE t1;')
+    execute_sql_string(stream, 'TRUNCATE TABLE T1;')
     _, err5 =
         execute_sql_string_and_return_result(stream, [[TRUNCATE TABLE
-                                                       t_does_not_exist;]])
+                                                       T_DOES_NOT_EXIST;]])
 
-    execute_sql_string(stream, 'DROP TRIGGER t2t;')
+    execute_sql_string(stream, 'DROP TRIGGER T2T;')
 
     return {'Finished ok, errors in the middle: ', err1, err2, err3, err4, err5}
 end$
@@ -1614,7 +1614,7 @@ assert(conn:ping())
 stream = conn:new_stream()
 ---
 ...
-stream:execute('CREATE TABLE test (id INT PRIMARY KEY, a NUMBER, b TEXT)')
+stream:execute('CREATE TABLE TEST (ID INT PRIMARY KEY, A NUMBER, B TEXT)')
 ---
 - row_count: 1
 ...
@@ -1647,10 +1647,10 @@ conn.space.TEST:select()
 ---
 - []
 ...
-stream_pr = stream:prepare("SELECT * FROM test WHERE id = ? AND a = ?;")
+stream_pr = stream:prepare("SELECT * FROM TEST WHERE ID = ? AND A = ?;")
 ---
 ...
-conn_pr = conn:prepare("SELECT * FROM test WHERE id = ? AND a = ?;")
+conn_pr = conn:prepare("SELECT * FROM TEST WHERE ID = ? AND A = ?;")
 ---
 ...
 assert(stream_pr.stmt_id == conn_pr.stmt_id)

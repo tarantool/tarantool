@@ -28,9 +28,9 @@ test:do_execsql_test(
         insert into t1 values('anx');
         insert into t1 values('amy');
         insert into t1 values('bmy');
-        select * from t1 where x like 'a__'
-          intersect select * from t1 where x like '_m_'
-          intersect select * from t1 where x like '__x';
+        select * from t1 where x LIKE 'a__'
+          intersect select * from t1 where x LIKE '_m_'
+          intersect select * from t1 where x LIKE '__x';
     ]], {
         -- <select7-1.1>
         "amx"
@@ -88,10 +88,10 @@ test:do_execsql_test(
         CREATE TABLE IF NOT EXISTS photo(pk integer primary key, x INT);
         CREATE TABLE IF NOT EXISTS tag(pk integer primary key, fk int, name TEXT);
 
-        SELECT P.pk from PHOTO P WHERE NOT EXISTS (
-             SELECT T2.pk from TAG T2 WHERE T2.fk = P.pk
+        SELECT P.pk from photo P WHERE NOT EXISTS (
+             SELECT T2.pk from tag T2 WHERE T2.fk = P.pk
              EXCEPT
-             SELECT T3.pk from TAG T3 WHERE T3.fk = P.pk AND T3.name LIKE '%foo%'
+             SELECT T3.pk from tag T3 WHERE T3.fk = P.pk AND T3.name LIKE '%foo%'
         );
     ]], {
         -- <select7-4.1>
@@ -108,10 +108,10 @@ test:do_execsql_test(
         INSERT INTO tag VALUES(11,1,'one');
         INSERT INTO tag VALUES(12,1,'two');
         INSERT INTO tag VALUES(21,1,'one-b');
-        SELECT P.pk from PHOTO P WHERE NOT EXISTS (
-             SELECT T2.pk from TAG T2 WHERE T2.fk = P.pk
+        SELECT P.pk from photo P WHERE NOT EXISTS (
+             SELECT T2.pk from tag T2 WHERE T2.fk = P.pk
              EXCEPT
-             SELECT T3.pk from TAG T3 WHERE T3.fk = P.pk AND T3.name LIKE '%foo%' LIMIT 1
+             SELECT T3.pk from tag T3 WHERE T3.fk = P.pk AND T3.name LIKE '%foo%' LIMIT 1
         );
     ]], {
         -- <select7-4.2>
@@ -199,7 +199,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select7-7.2",
     [[
-        SELECT (CASE WHEN a=0 THEN 0 ELSE (a + 25) / 50 END) AS categ, count(*)
+        SELECT (CASE WHEN a=0 THEN 0 ELSE (a + 25) / 50 END) AS categ, COUNT(*)
         FROM t3 GROUP BY categ
     ]], {
         -- <select7-7.2>
@@ -232,7 +232,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select7-7.5",
     [[
-        SELECT a=0, typeof(a) FROM t4
+        SELECT a=0, TYPEOF(a) FROM t4
     ]], {
         -- <select7-7.5>
         false, "double", false, "double"
@@ -242,7 +242,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select7-7.6",
     [[
-        SELECT a=0, typeof(a) FROM t4 GROUP BY a
+        SELECT a=0, TYPEOF(a) FROM t4 GROUP BY a
     ]], {
         -- <select7-7.6>
         false, "double", false, "double"
@@ -255,7 +255,7 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t5;
         CREATE TABLE t5(a TEXT primary key, b INT);
         INSERT INTO t5 VALUES('123', 456);
-        SELECT typeof(a), a FROM t5 GROUP BY a HAVING CAST(a AS NUMBER) < b;
+        SELECT TYPEOF(a), a FROM t5 GROUP BY a HAVING CAST(a AS NUMBER) < b;
     ]], {
         -- <select7-7.7>
         "string", "123"

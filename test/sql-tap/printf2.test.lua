@@ -29,7 +29,7 @@ test:plan(22)
 test:do_execsql_test(
     "printf2-1.1",
     [[
-        SELECT quote(printf()), quote(printf(NULL,1,2,3));
+        SELECT QUOTE(PRINTF()), QUOTE(PRINTF(NULL,1,2,3));
     ]], {
         -- <printf2-1.1>
         "NULL", "NULL"
@@ -39,7 +39,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.2",
     [[
-        SELECT printf('hello');
+        SELECT PRINTF('hello');
     ]], {
         -- <printf2-1.2>
         "hello"
@@ -49,7 +49,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.3",
     [[
-        SELECT printf('%d,%d,%d',55,-11,3421);
+        SELECT PRINTF('%d,%d,%d',55,-11,3421);
     ]], {
         -- <printf2-1.3>
         "55,-11,3421"
@@ -59,7 +59,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.4",
     [[
-        SELECT printf('%d,%d,%d',55,'-11',3421);
+        SELECT PRINTF('%d,%d,%d',55,'-11',3421);
     ]], {
         -- <printf2-1.4>
         "55,-11,3421"
@@ -69,7 +69,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.5",
     [[
-        SELECT printf('%d,%d,%d,%d',55,'-11',3421);
+        SELECT PRINTF('%d,%d,%d,%d',55,'-11',3421);
     ]], {
         -- <printf2-1.5>
         "55,-11,3421,0"
@@ -79,7 +79,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.6",
     [[
-        SELECT printf('%.2f',3.141592653);
+        SELECT PRINTF('%.2f',3.141592653);
     ]], {
         -- <printf2-1.6>
         "3.14"
@@ -89,7 +89,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.7",
     [[
-        SELECT printf('%.*f',2,3.141592653);
+        SELECT PRINTF('%.*f',2,3.141592653);
     ]], {
         -- <printf2-1.7>
         "3.14"
@@ -99,7 +99,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.8",
     [[
-        SELECT printf('%*.*f',5,2,3.141592653);
+        SELECT PRINTF('%*.*f',5,2,3.141592653);
     ]], {
         -- <printf2-1.8>
          " 3.14"
@@ -109,7 +109,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.9",
     [[
-        SELECT printf('%d',314159.2653);
+        SELECT PRINTF('%d',314159.2653);
     ]], {
         -- <printf2-1.9>
         "314159"
@@ -119,7 +119,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.10",
     [[
-        SELECT printf('%lld',314159.2653);
+        SELECT PRINTF('%lld',314159.2653);
     ]], {
         -- <printf2-1.10>
         "314159"
@@ -129,7 +129,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.11",
     [[
-        SELECT printf('%lld%n',314159.2653,'hi');
+        SELECT PRINTF('%lld%n',314159.2653,'hi');
     ]], {
         -- <printf2-1.11>
         "314159"
@@ -139,7 +139,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.12",
     [[
-        SELECT printf('%n',0);
+        SELECT PRINTF('%n',0);
     ]], {
         -- <printf2-1.12>
         ""
@@ -151,7 +151,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.12",
     [[
-        SELECT printf('%.*z',5,'abcdefghijklmnop');
+        SELECT PRINTF('%.*z',5,'abcdefghijklmnop');
     ]], {
         -- <printf2-1.12>
         "abcde"
@@ -161,7 +161,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-1.13",
     [[
-        SELECT printf('%c','abcdefghijklmnop');
+        SELECT PRINTF('%c','abcdefghijklmnop');
     ]], {
         -- <printf2-1.13>
         "a"
@@ -177,7 +177,7 @@ test:do_execsql_test(
         CREATE TABLE t1(id INT primary key, a INT,b INT,c INT);
         INSERT INTO t1 VALUES(1, 1,2,3);
         INSERT INTO t1 VALUES(2, -1,-2,-3);
-        SELECT printf('(%s)-%n-(%s)',a,b,c) FROM t1 ORDER BY id;
+        SELECT PRINTF('(%s)-%n-(%s)',a,b,c) FROM t1 ORDER BY id;
     ]], {
         -- <printf2-2.1>
         "(1)--(2)", "(-1)--(-2)"
@@ -189,7 +189,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-2.2",
     [[
-        SELECT printf('%s=(%p)',a,a) FROM t1 ORDER BY a;
+        SELECT PRINTF('%s=(%p)',a,a) FROM t1 ORDER BY a;
     ]], {
         -- <printf2-2.2>
         "-1=(FFFFFFFFFFFFFFFF)", "1=(1)"
@@ -204,7 +204,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-2.3",
     [[
-        SELECT printf('%s=(%d/%g/%s)',a) FROM t1 ORDER BY a;
+        SELECT PRINTF('%s=(%d/%g/%s)',a) FROM t1 ORDER BY a;
     ]], {
         -- <printf2-2.3>
         "-1=(0/0/)", "1=(0/0/)"
@@ -216,7 +216,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-3.1",
     [[
-        SELECT printf('|%110.100c|','*');
+        SELECT PRINTF('|%110.100c|','*');
     ]], {
         -- <printf2-3.1>
         "|          ****************************************************************************************************|"
@@ -226,7 +226,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-3.2",
     [[
-        SELECT printf('|%-110.100c|','*');
+        SELECT PRINTF('|%-110.100c|','*');
     ]], {
         -- <printf2-3.2>
         "|****************************************************************************************************          |"
@@ -236,7 +236,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-3.3",
     [[
-        SELECT printf('|%9.8c|%-9.8c|','*','*');
+        SELECT PRINTF('|%9.8c|%-9.8c|','*','*');
     ]], {
         -- <printf2-3.3>
         "| ********|******** |"
@@ -246,7 +246,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-3.4",
     [[
-        SELECT printf('|%8.8c|%-8.8c|','*','*');
+        SELECT PRINTF('|%8.8c|%-8.8c|','*','*');
     ]], {
         -- <printf2-3.4>
         "|********|********|"
@@ -256,7 +256,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-3.5",
     [[
-        SELECT printf('|%7.8c|%-7.8c|','*','*');
+        SELECT PRINTF('|%7.8c|%-7.8c|','*','*');
     ]], {
         -- <printf2-3.5>
         "|********|********|"

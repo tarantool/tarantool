@@ -27,7 +27,7 @@ test:do_test(
         return test:execsql [[
             CREATE TABLE t1(x INT primary key);
             INSERT INTO t1 VALUES(123);
-            SELECT CASE ~max(x) WHEN min(x) THEN 1 ELSE max(x) END FROM t1;
+            SELECT CASE ~MAX(x) WHEN MIN(x) THEN 1 ELSE MAX(x) END FROM t1;
         ]]
     end, {
         -- <tkt3541-1.1>
@@ -39,7 +39,7 @@ test:do_test(
     "tkt3541-1.2",
     function()
         return test:execsql [[
-            SELECT CASE max(x) = 0 WHEN min(x) <> 0 THEN 1 ELSE max(x) END FROM t1;
+            SELECT CASE MAX(x) = 0 WHEN MIN(x) <> 0 THEN 1 ELSE MAX(x) END FROM t1;
         ]]
     end, {
         -- <tkt3541-1.2>

@@ -276,7 +276,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "6.1.2",
     [[
-        SELECT count(*) FROM t1 WHERE a COLLATE "binary" IN (SELECT DISTINCT a FROM t1)
+        SELECT COUNT(*) FROM t1 WHERE a COLLATE "binary"
+        IN (SELECT DISTINCT a FROM t1);
     ]], {
         -- <6.1.2>
         1
@@ -301,7 +302,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "6.2.2",
     [[
-        SELECT count(*) FROM t3 WHERE b IN (SELECT DISTINCT a FROM t3 LIMIT 5);
+        SELECT COUNT(*) FROM t3 WHERE b IN (SELECT DISTINCT a FROM t3 LIMIT 5);
     ]], {
         -- <6.2.2>
         3
@@ -311,7 +312,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "6.2.3",
     [[
-        SELECT count(*) FROM t3 WHERE b IN (SELECT          a FROM t3 LIMIT 5);
+        SELECT COUNT(*) FROM t3 WHERE b IN (SELECT a FROM t3 LIMIT 5);
     ]], {
         -- <6.2.3>
         2
@@ -325,7 +326,7 @@ test:do_execsql_test(
         CREATE TABLE x2(pk  INT primary key, b INT );
         INSERT INTO x1 VALUES(1, 1), (2, 1), (3, 2);
         INSERT INTO x2 VALUES(1, 1), (2, 2);
-        SELECT count(*) FROM x2 WHERE b IN (SELECT DISTINCT a FROM x1 LIMIT 2);
+        SELECT COUNT(*) FROM x2 WHERE b IN (SELECT DISTINCT a FROM x1 LIMIT 2);
     ]], {
         -- <6.3.1>
         2

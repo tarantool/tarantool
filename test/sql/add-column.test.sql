@@ -22,9 +22,9 @@ CREATE VIEW v AS SELECT * FROM t1;
 ALTER TABLE v ADD c INT;
 
 \set language lua
-view = box.space._space.index[2]:select('V')[1]:totable()
+view = box.space._space.index[2]:select('v')[1]:totable()
 view_format = view[7]
-f = {type = 'string', nullable_action = 'none', name = 'C', is_nullable = true}
+f = {type = 'string', nullable_action = 'none', name = 'c', is_nullable = true}
 table.insert(view_format, f)
 view[5] = 3
 view[7] = view_format
@@ -60,7 +60,7 @@ ALTER TABLE ck_check ADD b INT CHECK (b > 0);
 INSERT INTO ck_check VALUES (1, 0);
 INSERT INTO ck_check VALUES (1, 1);
 DROP TABLE ck_check;
-DELETE FROM "_func" WHERE "name" == 'check_CK_CHECK_ck_unnamed_CK_CHECK_B_1';
+DELETE FROM "_func" WHERE "name" == 'check_ck_check_ck_unnamed_ck_check_b_1';
 
 --
 -- Check FOREIGN KEY constraint works with an added column.
@@ -154,7 +154,7 @@ DROP TABLE non_empty;
 -- Add to a no-SQL adjusted space without format.
 --
 \set language lua
-_ = box.schema.space.create('WITHOUT_FORMAT')
+_ = box.schema.space.create('without_format')
 \set language sql
 ALTER TABLE without_format ADD a INT PRIMARY KEY;
 INSERT INTO without_format VALUES (1);
@@ -164,7 +164,7 @@ DROP TABLE without_format;
 -- Add to a no-SQL adjusted space with format.
 --
 \set language lua
-with_format = box.schema.space.create('WITH_FORMAT')
+with_format = box.schema.space.create('with_format')
 with_format:format{{name = 'A', type = 'unsigned'}}
 \set language sql
 ALTER TABLE with_format ADD b INT PRIMARY KEY;

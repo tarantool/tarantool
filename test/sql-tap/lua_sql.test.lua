@@ -6,7 +6,7 @@ test:plan(24)
 test:do_test(
     "lua_sql-1.0",
     function ()
-        box.schema.func.create('FUNC1', {language = 'Lua',
+        box.schema.func.create('func1', {language = 'Lua',
                          is_deterministic = true,
                          body = 'function(a) return 2 end',
                          param_list = {'scalar'}, returns = 'integer',
@@ -19,8 +19,8 @@ test:do_test(
 test:do_test(
     "lua_sql-1.1",
     function ()
-        box.func.FUNC1:drop()
-        box.schema.func.create('FUNC1', {language = 'Lua',
+        box.func.func1:drop()
+        box.schema.func.create('func1', {language = 'Lua',
                         is_deterministic = true,
                         body = 'function(a) return a end',
                         param_list = {'scalar'}, returns = 'scalar',
@@ -32,7 +32,7 @@ test:do_test(
 test:do_catchsql_test(
     "lua_sql-1.0",
     "select func3(1)",
-    {1, "Function 'FUNC3' does not exist"})
+    {1, "Function 'func3' does not exist"})
 
 
 -- check for different types
@@ -63,7 +63,7 @@ local from_sql_to_lua = {
 
 _G.from_sql_to_lua = from_sql_to_lua
 
-box.schema.func.create('CHECK_FROM_SQL_TO_LUA', {language = 'Lua',
+box.schema.func.create('check_from_sql_to_lua', {language = 'Lua',
                        is_deterministic = true,
                        body = [[
                            function(i, arg)
@@ -95,7 +95,7 @@ local from_lua_to_sql = {
 
 _G.from_lua_to_sql = from_lua_to_sql
 
-box.schema.func.create('CHECK_FROM_LUA_TO_SQL', {language = 'Lua',
+box.schema.func.create('check_from_lua_to_sql', {language = 'Lua',
                        is_deterministic = true,
                        body = [[
                            function(i)
@@ -117,7 +117,7 @@ test:do_execsql_test("lua_sql-2.4.1", "SELECT LUA('return box.NULL') is NULL", {
 test:do_execsql_test("lua_sql-2.4.2", "SELECT LUA('return nil') is NULL", {true})
 test:do_execsql_test("lua_sql-2.4.3", "SELECT LUA('ffi = require(\"ffi\") return ffi.new(\"uint64_t\", (2LLU^64)-1)') = 18446744073709551615", {true})
 
-box.schema.func.create('ALLWAYS_ERROR', {language = 'Lua',
+box.schema.func.create('allways_error', {language = 'Lua',
                        is_deterministic = true,
                        body = [[
                            function()
@@ -134,9 +134,9 @@ test:do_catchsql_test(
     "select allways_error()",
     {1, "/my_error123/"})
 
-box.func.FUNC1:drop()
-box.func.CHECK_FROM_SQL_TO_LUA:drop()
-box.func.CHECK_FROM_LUA_TO_SQL:drop()
-box.func.ALLWAYS_ERROR:drop()
+box.func.func1:drop()
+box.func.check_from_sql_to_lua:drop()
+box.func.check_from_lua_to_sql:drop()
+box.func.allways_error:drop()
 
 test:finish_test()

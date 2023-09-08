@@ -88,7 +88,7 @@ test:do_test(
 test:do_execsql_test(
     "select2-2.1",
     [[
-        SELECT count(*) FROM tbl2
+        SELECT COUNT(*) FROM tbl2
     ]], {
         -- <select2-2.1>
         30000
@@ -98,7 +98,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select2-2.2",
     [[
-        SELECT count(*) FROM tbl2 WHERE f2>1000
+        SELECT COUNT(*) FROM tbl2 WHERE f2>1000
     ]], {
         -- <select2-2.2>
         29500

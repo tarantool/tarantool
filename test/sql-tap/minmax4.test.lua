@@ -30,7 +30,7 @@ test:do_test(
     function()
         return test:execsql [[
             CREATE TABLE t1(p INT primary key,q INT);
-            SELECT p, max(q) FROM t1;
+            SELECT p, MAX(q) FROM t1;
         ]]
     end, {
         -- <minmax4-1.1>
@@ -42,7 +42,7 @@ test:do_test(
     "minmax4-1.2",
     function()
         return test:execsql [[
-            SELECT p, min(q) FROM t1;
+            SELECT p, MIN(q) FROM t1;
         ]]
     end, {
         -- <minmax4-1.2>
@@ -55,7 +55,7 @@ test:do_test(
     function()
         return test:execsql [[
             INSERT INTO t1 VALUES(1,2);
-            SELECT p, max(q) FROM t1;
+            SELECT p, MAX(q) FROM t1;
         ]]
     end, {
         -- <minmax4-1.3>
@@ -67,7 +67,7 @@ test:do_test(
     "minmax4-1.4",
     function()
         return test:execsql [[
-            SELECT p, min(q) FROM t1;
+            SELECT p, MIN(q) FROM t1;
         ]]
     end, {
         -- <minmax4-1.4>
@@ -80,7 +80,7 @@ test:do_test(
     function()
         return test:execsql [[
             INSERT INTO t1 VALUES(3,4);
-            SELECT p, max(q) FROM t1;
+            SELECT p, MAX(q) FROM t1;
         ]]
     end, {
         -- <minmax4-1.5>
@@ -92,10 +92,10 @@ test:do_test(
     "minmax4-1.6",
     function()
         local r = {test:execsql [[
-            SELECT p, min(q) FROM t1;
+            SELECT p, MIN(q) FROM t1;
         ]] }
         table.insert(r, test:execsql([[
-            SELECT p FROM (SELECT p, min(q) FROM t1);
+            SELECT p FROM (SELECT p, MIN(q) FROM t1);
         ]]))
         return r
     end, {
@@ -110,10 +110,10 @@ test:do_test(
     function()
         local r = {test:execsql [[
             INSERT INTO t1 VALUES(5,0);
-            SELECT p, max(q) FROM t1;
+            SELECT p, MAX(q) FROM t1;
         ]] }
         table.insert(r, test:execsql([[
-            SELECT p FROM (SELECT max(q), p FROM t1);
+            SELECT p FROM (SELECT MAX(q), p FROM t1);
         ]]))
         return r
     end, {
@@ -126,7 +126,7 @@ test:do_test(
     "minmax4-1.8",
     function()
         return test:execsql [[
-            SELECT p, min(q) FROM t1;
+            SELECT p, MIN(q) FROM t1;
         ]]
     end, {
         -- <minmax4-1.8>
@@ -139,10 +139,10 @@ test:do_test(
     function()
         local r = {test:execsql [[
             INSERT INTO t1 VALUES(6,1);
-            SELECT p, max(q) FROM t1;
+            SELECT p, MAX(q) FROM t1;
         ]] }
         table.insert(r, test:execsql([[
-            SELECT p FROM (SELECT max(q), p FROM t1);
+            SELECT p FROM (SELECT MAX(q), p FROM t1);
         ]]))
         return r
     end, {
@@ -155,7 +155,7 @@ test:do_test(
     "minmax4-1.10",
     function()
         return test:execsql [[
-            SELECT p, min(q) FROM t1;
+            SELECT p, MIN(q) FROM t1;
         ]]
     end, {
         -- <minmax4-1.10>
@@ -168,7 +168,7 @@ test:do_test(
     function()
         return test:execsql [[
             INSERT INTO t1 VALUES(7,NULL);
-            SELECT p, max(q) FROM t1;
+            SELECT p, MAX(q) FROM t1;
         ]]
     end, {
         -- <minmax4-1.11>
@@ -180,7 +180,7 @@ test:do_test(
     "minmax4-1.12",
     function()
         return test:execsql [[
-            SELECT p, min(q) FROM t1;
+            SELECT p, MIN(q) FROM t1;
         ]]
     end, {
         -- <minmax4-1.12>
@@ -193,7 +193,7 @@ test:do_test(
     function()
         return test:execsql [[
             DELETE FROM t1 WHERE q IS NOT NULL;
-            SELECT p, max(q) FROM t1;
+            SELECT p, MAX(q) FROM t1;
         ]]
     end, {
         -- <minmax4-1.13>
@@ -205,7 +205,7 @@ test:do_test(
     "minmax4-1.14",
     function()
         return test:execsql [[
-            SELECT p, min(q) FROM t1;
+            SELECT p, MIN(q) FROM t1;
         ]]
     end, {
         -- <minmax4-1.14>
@@ -223,7 +223,7 @@ test:do_test(
                  (1,2,3),
                  (1,1,4),
                  (2,3,5);
-            SELECT a, max(b), c FROM t2 GROUP BY a ORDER BY a;
+            SELECT a, MAX(b), c FROM t2 GROUP BY a ORDER BY a;
         ]]
     end, {
         -- <minmax4-2.1>
@@ -235,7 +235,7 @@ test:do_test(
     "minmax4-2.2",
     function()
         return test:execsql [[
-            SELECT a, min(b), c FROM t2 GROUP BY a ORDER BY a;
+            SELECT a, MIN(b), c FROM t2 GROUP BY a ORDER BY a;
         ]]
     end, {
         -- <minmax4-2.2>
@@ -247,7 +247,8 @@ test:do_test(
     "minmax4-2.3",
     function()
         return test:execsql [[
-            SELECT a, min(b), avg(b), count(b), c FROM t2 GROUP BY a ORDER BY a DESC;
+            SELECT a, MIN(b), AVG(b), COUNT(b), c FROM t2
+            GROUP BY a ORDER BY a DESC;
         ]]
     end, {
         -- <minmax4-2.3>
@@ -259,7 +260,7 @@ test:do_test(
     "minmax4-2.4",
     function()
         return test:execsql [[
-            SELECT a, min(b), max(b), c FROM t2 GROUP BY a ORDER BY a;
+            SELECT a, MIN(b), MAX(b), c FROM t2 GROUP BY a ORDER BY a;
         ]]
     end, {
         -- <minmax4-2.4>
@@ -271,7 +272,7 @@ test:do_test(
     "minmax4-2.5",
     function()
         return test:execsql [[
-            SELECT a, max(b), min(b), c FROM t2 GROUP BY a ORDER BY a;
+            SELECT a, MAX(b), MIN(b), c FROM t2 GROUP BY a ORDER BY a;
         ]]
     end, {
         -- <minmax4-2.5>
@@ -283,7 +284,7 @@ test:do_test(
     "minmax4-2.6",
     function()
         return test:execsql [[
-            SELECT a, max(b), b, max(c), c FROM t2 GROUP BY a ORDER BY a;
+            SELECT a, MAX(b), b, MAX(c), c FROM t2 GROUP BY a ORDER BY a;
         ]]
     end, {
         -- <minmax4-2.6>
@@ -295,7 +296,7 @@ test:do_test(
     "minmax4-2.7",
     function()
         return test:execsql [[
-            SELECT a, min(b), b, min(c), c FROM t2 GROUP BY a ORDER BY a;
+            SELECT a, MIN(b), b, MIN(c), c FROM t2 GROUP BY a ORDER BY a;
         ]]
     end, {
         -- <minmax4-2.7>

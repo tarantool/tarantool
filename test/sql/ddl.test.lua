@@ -14,18 +14,18 @@ box.execute('CREATE TABLE t2(id INTEGER PRIMARY KEY);')
 box.commit();
 test_run:cmd("setopt delimiter ''");
 
-box.space.T1 ~= nil
-box.space.T1.index[0] ~= nil
-box.space.T2 ~= nil
-box.space.T2.index[0] ~= nil
+box.space.t1 ~= nil
+box.space.t1.index[0] ~= nil
+box.space.t2 ~= nil
+box.space.t2.index[0] ~= nil
 
 test_run:cmd("setopt delimiter ';'")
 box.begin()
 box.execute('DROP TABLE t1;')
-assert(box.space.T1 == nil)
-assert(box.space.T2 ~= nil)
+assert(box.space.t1 == nil)
+assert(box.space.t2 ~= nil)
 box.execute('DROP TABLE t2;')
-assert(box.space.T2 == nil)
+assert(box.space.t2 == nil)
 box.commit();
 test_run:cmd("setopt delimiter ''");
 
@@ -33,11 +33,11 @@ test_run:cmd("setopt delimiter ''");
 -- Try to build an index transactionally.
 --
 box.execute('CREATE TABLE t1(id INTEGER PRIMARY KEY, a INTEGER, b INTEGER)')
-box.space.T1:replace{1, 1, 1}
-box.space.T1:replace{2, 2, 2}
-box.space.T1:replace{3, 3, 3}
-box.space.T1:replace{4, 4, 4}
-box.space.T1:replace{5, 5, 5}
+box.space.t1:replace{1, 1, 1}
+box.space.t1:replace{2, 2, 2}
+box.space.t1:replace{3, 3, 3}
+box.space.t1:replace{4, 4, 4}
+box.space.t1:replace{5, 5, 5}
 -- Snapshot to dump Vinyl memory level, and force reading from a
 -- disk, if someday create index will support transactions.
 box.snapshot()
@@ -70,7 +70,7 @@ test_run:cmd("setopt delimiter ''");
 -- Truncate should not be different from index drop in terms of
 -- yields and atomicity.
 --
-box.space.T2:replace{1}
+box.space.t2:replace{1}
 test_run:cmd("setopt delimiter ';'")
 function truncate_both()
     box.execute('TRUNCATE TABLE t1;')
@@ -80,11 +80,11 @@ test_run:cmd("setopt delimiter ''");
 
 box.begin() truncate_both() box.rollback()
 
-box.space.T1:count() > 0 and box.space.T2:count() > 0
+box.space.t1:count() > 0 and box.space.t2:count() > 0
 
 box.begin() truncate_both() box.commit()
 
-box.space.T1:count() == 0 and box.space.T2:count() == 0
+box.space.t1:count() == 0 and box.space.t2:count() == 0
 
 --
 -- Rename transactionally changes name of the table and its
@@ -99,17 +99,17 @@ box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW
 
 box.begin()
 box.execute('ALTER TABLE t1 RENAME TO t1_new;')
-sql = _trigger_index:select(box.space.T1_NEW.id)[1].opts.sql
-assert(sql:find('T1_NEW'))
+sql = _trigger_index:select(box.space.t1_new.id)[1].opts.sql
+assert(sql:find('t1_new'))
 box.rollback()$
 test_run:cmd("setopt delimiter ''")$
 
-sql = _trigger_index:select(box.space.T1.id)[1].opts.sql
-not sql:find('T1_NEW') and sql:find('t1') ~= nil
+sql = _trigger_index:select(box.space.t1.id)[1].opts.sql
+not sql:find('t1_new') and sql:find('t1') ~= nil
 
 box.execute('ALTER TABLE t1 RENAME TO t1_new;')
-sql = _trigger_index:select(box.space.T1_NEW.id)[1].opts.sql
-sql:find('T1_NEW') ~= nil
+sql = _trigger_index:select(box.space.t1_new.id)[1].opts.sql
+sql:find('t1_new') ~= nil
 
 box.execute('DROP TABLE t1_new')
 box.execute('DROP TABLE t2')
@@ -178,13 +178,13 @@ function monster_ddl_cmp_res(res1, res2)
     return res1, res2
 end$
 function monster_ddl_is_clean()
-    assert(box.space.T1 == nil)
-    assert(box.space.T2 == nil)
+    assert(box.space.t1 == nil)
+    assert(box.space.t2 == nil)
     assert(box.space._trigger:count() == 0)
     assert(box.space._fk_constraint:count() == 0)
     assert(box.space._ck_constraint:count() == 0)
-    assert(box.space.T_RENAMED == nil)
-    assert(box.space.T_TO_RENAME == nil)
+    assert(box.space.t_renamed == nil)
+    assert(box.space.t_to_rename == nil)
 end$
 function monster_ddl_check()
     local _, err, res
@@ -192,9 +192,9 @@ function monster_ddl_check()
     _, err = box.execute('INSERT INTO t2 VALUES(2, 2, 1)')
     box.execute('INSERT INTO t1 VALUES (1, 1, 1)')
     res = box.execute('SELECT * FROM trigger_catcher')
-    assert(box.space.T_RENAMED ~= nil)
-    assert(box.space.T_RENAMED.index.T_TO_RENAME_A == nil)
-    assert(box.space.T_TO_RENAME == nil)
+    assert(box.space.t_renamed ~= nil)
+    assert(box.space.t_renamed.index.t_to_rename_a == nil)
+    assert(box.space.t_to_rename == nil)
     return {'Finished ok, errors and trigger catcher content: ', err, res}
 end$
 function monster_ddl_clear()
@@ -267,12 +267,12 @@ monster_ddl_cmp_res(ddl_res, true_ddl_res)
 test_run:cmd("setopt delimiter ';'")
 box.begin()
 box.execute('CREATE TABLE t1(id INTEGER PRIMARY KEY);')
-assert(box.space.T1 ~= nil)
+assert(box.space.t1 ~= nil)
 box.execute('CREATE TABLE t2(id INTEGER PRIMARY KEY);')
-assert(box.space.T2 ~= nil)
+assert(box.space.t2 ~= nil)
 box.rollback();
 
-box.space.T1 == nil and box.space.T2 == nil;
+box.space.t1 == nil and box.space.t2 == nil;
 
 box.begin()
 save1 = box.savepoint()
@@ -281,25 +281,25 @@ save2 = box.savepoint()
 box.execute('CREATE TABLE t2(id INTEGER PRIMARY KEY, a INTEGER)')
 box.execute('CREATE INDEX t2a ON t2(a)')
 save3 = box.savepoint()
-assert(box.space.T1 ~= nil)
-assert(box.space.T2 ~= nil)
-assert(box.space.T2.index.T2A ~= nil)
+assert(box.space.t1 ~= nil)
+assert(box.space.t2 ~= nil)
+assert(box.space.t2.index.t2a ~= nil)
 box.execute('DROP TABLE t2')
-assert(box.space.T2 == nil)
+assert(box.space.t2 == nil)
 box.rollback_to_savepoint(save3)
-assert(box.space.T2 ~= nil)
-assert(box.space.T2.index.T2A ~= nil)
+assert(box.space.t2 ~= nil)
+assert(box.space.t2.index.t2a ~= nil)
 save3 = box.savepoint()
 box.execute('DROP TABLE t2')
-assert(box.space.T2 == nil)
+assert(box.space.t2 == nil)
 box.rollback_to_savepoint(save2)
-assert(box.space.T2 == nil)
-assert(box.space.T1 ~= nil)
+assert(box.space.t2 == nil)
+assert(box.space.t1 ~= nil)
 box.rollback_to_savepoint(save1)
 box.commit();
 test_run:cmd("setopt delimiter ''");
 
-box.space.T1 == nil and box.space.T2 == nil
+box.space.t1 == nil and box.space.t2 == nil
 
 --
 -- Unexpected rollback.

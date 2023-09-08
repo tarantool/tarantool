@@ -51,7 +51,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3334-1.2",
     [[
-        SELECT count(*) FROM (SELECT a FROM t1 ORDER BY b LIMIT 2) WHERE a=1;
+        SELECT COUNT(*) FROM (SELECT a FROM t1 ORDER BY b LIMIT 2) WHERE a=1;
     ]], {
         -- <tkt3334-1.2>
         0
@@ -71,7 +71,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3334-1.4",
     [[
-        SELECT count(*) FROM (SELECT a FROM t1 ORDER BY b LIMIT 3) WHERE a=1;
+        SELECT COUNT(*) FROM (SELECT a FROM t1 ORDER BY b LIMIT 3) WHERE a=1;
     ]], {
         -- <tkt3334-1.4>
         1
@@ -91,7 +91,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3334-1.6",
     [[
-        SELECT count(*) FROM (SELECT a FROM t1 ORDER BY b LIMIT 99) WHERE a=1;
+        SELECT COUNT(*) FROM (SELECT a FROM t1 ORDER BY b LIMIT 99) WHERE a=1;
     ]], {
         -- <tkt3334-1.6>
         3
@@ -111,7 +111,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3334-1.8",
     [[
-        SELECT count(*) FROM (SELECT a FROM t1 ORDER BY b) WHERE a=1;
+        SELECT COUNT(*) FROM (SELECT a FROM t1 ORDER BY b) WHERE a=1;
     ]], {
         -- <tkt3334-1.8>
         3
@@ -131,7 +131,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3334-1.10",
     [[
-        SELECT count(*) FROM (SELECT a FROM t1) WHERE a=1;
+        SELECT COUNT(*) FROM (SELECT a FROM t1) WHERE a=1;
     ]], {
         -- <tkt3334-1.10>
         3

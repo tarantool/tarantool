@@ -72,7 +72,7 @@ execute("SELECT c FROM t;")
  |   - span: c
  |     type: string
  |     is_nullable: true
- |     name: C
+ |     name: c
  |     collation: unicode_ci
  |   rows:
  |   - ['aSd']
@@ -96,16 +96,16 @@ execute("SELECT id, a, c FROM t;")
  |   - span: id
  |     type: integer
  |     is_autoincrement: true
- |     name: ID
+ |     name: id
  |     is_nullable: false
  |   - type: integer
  |     span: a
- |     name: A
+ |     name: a
  |     is_nullable: false
  |   - span: c
  |     type: string
  |     is_nullable: true
- |     name: C
+ |     name: c
  |     collation: unicode_ci
  |   rows:
  |   - [1, 1, 'aSd']
@@ -113,19 +113,19 @@ execute("SELECT id, a, c FROM t;")
 execute("SELECT * FROM t;")
  | ---
  | - metadata:
- |   - span: ID
+ |   - span: id
  |     type: integer
  |     is_autoincrement: true
- |     name: ID
+ |     name: id
  |     is_nullable: false
  |   - type: integer
- |     span: A
- |     name: A
+ |     span: a
+ |     name: a
  |     is_nullable: false
- |   - span: C
+ |   - span: c
  |     type: string
  |     is_nullable: true
- |     name: C
+ |     name: c
  |     collation: unicode_ci
  |   rows:
  |   - [1, 1, 'aSd']
@@ -139,33 +139,33 @@ execute("SELECT 1 AS x;")
  | - metadata:
  |   - type: integer
  |     span: '1'
- |     name: X
+ |     name: x
  |   rows:
  |   - [1]
  | ...
 execute("SELECT *, id + 1 AS x, a AS y, c || 'abc' FROM t;")
  | ---
  | - metadata:
- |   - span: ID
+ |   - span: id
  |     type: integer
  |     is_autoincrement: true
- |     name: ID
+ |     name: id
  |     is_nullable: false
  |   - type: integer
- |     span: A
- |     name: A
+ |     span: a
+ |     name: a
  |     is_nullable: false
- |   - span: C
+ |   - span: c
  |     type: string
  |     is_nullable: true
- |     name: C
+ |     name: c
  |     collation: unicode_ci
  |   - type: integer
  |     span: id + 1
- |     name: X
+ |     name: x
  |   - type: integer
  |     span: a
- |     name: Y
+ |     name: y
  |     is_nullable: false
  |   - type: string
  |     span: c || 'abc'
@@ -182,11 +182,11 @@ execute("SELECT * FROM v;")
  | ---
  | - metadata:
  |   - type: integer
- |     span: X
- |     name: X
+ |     span: x
+ |     name: x
  |   - type: integer
- |     span: Y
- |     name: Y
+ |     span: y
+ |     name: y
  |     is_nullable: false
  |   - type: string
  |     span: COLUMN_1
@@ -199,10 +199,10 @@ execute("SELECT x, y FROM v;")
  | - metadata:
  |   - type: integer
  |     span: x
- |     name: X
+ |     name: x
  |   - type: integer
  |     span: y
- |     name: Y
+ |     name: y
  |     is_nullable: false
  |   rows:
  |   - [2, 1]
@@ -229,9 +229,9 @@ test_run:cmd("setopt delimiter ''");
  | - true
  | ...
 
-box.space.V:drop()
+box.space.v:drop()
  | ---
  | ...
-box.space.T:drop()
+box.space.t:drop()
  | ---
  | ...

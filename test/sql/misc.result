@@ -177,12 +177,12 @@ t = {}
 ---
 ...
 for i = 1, 70 do                                                \
-        format[i] = {name = 'FIELD'..i, type = 'unsigned'}      \
+        format[i] = {name = 'field'..i, type = 'unsigned'}      \
         t[i] = i                                                \
 end
 ---
 ...
-s = box.schema.create_space('TEST', {format = format})
+s = box.schema.create_space('test', {format = format})
 ---
 ...
 pk = s:create_index('pk', {parts = {70}})
@@ -198,9 +198,9 @@ s:insert(t)
 box.execute('SELECT field70, field64 FROM test')
 ---
 - metadata:
-  - name: FIELD70
+  - name: field70
     type: unsigned
-  - name: FIELD64
+  - name: field64
     type: unsigned
   rows:
   - [70, 64]
@@ -212,16 +212,16 @@ pk:alter({parts = {66}})
 box.execute('SELECT field66, field68, field70 FROM test')
 ---
 - metadata:
-  - name: FIELD66
+  - name: field66
     type: unsigned
-  - name: FIELD68
+  - name: field68
     type: unsigned
-  - name: FIELD70
+  - name: field70
     type: unsigned
   rows:
   - [66, 68, 70]
 ...
-box.space.TEST:drop()
+box.space.test:drop()
 ---
 ...
 -- gh-4933: Make sure that autoindex optimization is used.
@@ -251,14 +251,14 @@ box.execute('EXPLAIN QUERY PLAN SELECT a, b FROM t1, t2 WHERE a = b;')
   - name: detail
     type: text
   rows:
-  - [0, 0, 0, 'SCAN TABLE T1 (~1048576 rows)']
-  - [0, 1, 1, 'SEARCH TABLE T2 USING EPHEMERAL INDEX (B=?) (~20 rows)']
+  - [0, 0, 0, 'SCAN TABLE t1 (~1048576 rows)']
+  - [0, 1, 1, 'SEARCH TABLE t2 USING EPHEMERAL INDEX (b=?) (~20 rows)']
 ...
 -- gh-5592: Make sure that diag is not changed with the correct query.
 box.execute('SELECT a;')
 ---
 - null
-- Can’t resolve field 'A'
+- Can’t resolve field 'a'
 ...
 diag = box.error.last()
 ---
@@ -280,10 +280,10 @@ box.execute([[CREATE TABLE j (s1 INT PRIMARY KEY, s2 STRING, s3 VARBINARY)]])
 ---
 - row_count: 1
 ...
-s = box.space.J
+s = box.space.j
 ---
 ...
-i = box.space.J:create_index('I3',{parts={2,'string', exclude_null=true}})
+i = box.space.j:create_index('I3', {parts = {2, 'string', exclude_null = true}})
 ---
 ...
 box.execute([[INSERT INTO j VALUES (1,NULL,NULL), (2,'',X'00');]])
@@ -293,11 +293,11 @@ box.execute([[INSERT INTO j VALUES (1,NULL,NULL), (2,'',X'00');]])
 box.execute([[SELECT * FROM j;]])
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: integer
-  - name: S2
+  - name: s2
     type: string
-  - name: S3
+  - name: s3
     type: varbinary
   rows:
   - [1, null, null]
@@ -306,11 +306,11 @@ box.execute([[SELECT * FROM j;]])
 box.execute([[SELECT * FROM j INDEXED BY I3;]])
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: integer
-  - name: S2
+  - name: s2
     type: string
-  - name: S3
+  - name: s3
     type: varbinary
   rows:
   - [2, '', !!binary AA==]
@@ -332,7 +332,7 @@ box.execute([[SELECT COUNT(*) FROM j INDEXED BY I3;]])
   rows:
   - [1]
 ...
-box.execute([[UPDATE j INDEXED BY i3 SET s2 = NULL;]])
+box.execute([[UPDATE j INDEXED BY I3 SET s2 = NULL;]])
 ---
 - row_count: 1
 ...
@@ -343,11 +343,11 @@ box.execute([[INSERT INTO j VALUES (3, 'a', X'33');]])
 box.execute([[SELECT * FROM j;]])
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: integer
-  - name: S2
+  - name: s2
     type: string
-  - name: S3
+  - name: s3
     type: varbinary
   rows:
   - [1, null, null]
@@ -357,16 +357,16 @@ box.execute([[SELECT * FROM j;]])
 box.execute([[SELECT * FROM j INDEXED BY I3;]])
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: integer
-  - name: S2
+  - name: s2
     type: string
-  - name: S3
+  - name: s3
     type: varbinary
   rows:
   - [3, 'a', !!binary Mw==]
 ...
-box.execute([[UPDATE j INDEXED BY i3 SET s3 = NULL;]])
+box.execute([[UPDATE j INDEXED BY I3 SET s3 = NULL;]])
 ---
 - row_count: 1
 ...

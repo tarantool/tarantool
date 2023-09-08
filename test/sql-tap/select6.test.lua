@@ -66,14 +66,14 @@ test:do_execsql2_test(
         SELECT * FROM (SELECT x, y FROM t1 WHERE x<2)
     ]], {
         -- <select6-1.1>
-        "X", 1, "Y", 1
+        "x", 1, "y", 1
         -- </select6-1.1>
     })
 
 test:do_execsql_test(
     "select6-1.2",
     [[
-        SELECT count(*) FROM (SELECT y FROM t1)
+        SELECT COUNT(*) FROM (SELECT y FROM t1)
     ]], {
         -- <select6-1.2>
         20
@@ -83,7 +83,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-1.3",
     [[
-        SELECT count(*) FROM (SELECT DISTINCT y FROM t1)
+        SELECT COUNT(*) FROM (SELECT DISTINCT y FROM t1)
     ]], {
         -- <select6-1.3>
         5
@@ -93,7 +93,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-1.4",
     [[
-        SELECT count(*) FROM (SELECT DISTINCT * FROM (SELECT y FROM t1))
+        SELECT COUNT(*) FROM (SELECT DISTINCT * FROM (SELECT y FROM t1))
     ]], {
         -- <select6-1.4>
         5
@@ -103,7 +103,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-1.5",
     [[
-        SELECT count(*) FROM (SELECT * FROM (SELECT DISTINCT y FROM t1))
+        SELECT COUNT(*) FROM (SELECT * FROM (SELECT DISTINCT y FROM t1))
     ]], {
         -- <select6-1.5>
         5
@@ -114,8 +114,8 @@ test:do_execsql_test(
     "select6-1.6",
     [[
         SELECT a.cnt, a.y, b.y, b.mx
-        FROM (SELECT count(*) AS cnt, y FROM t1 GROUP BY y) AS a,
-             (SELECT max(x) AS mx, y FROM t1 GROUP BY y) as b
+        FROM (SELECT COUNT(*) AS cnt, y FROM t1 GROUP BY y) AS a,
+             (SELECT MAX(x) AS mx, y FROM t1 GROUP BY y) as b
         WHERE a.y=b.y ORDER BY a.y
     ]], {
         -- <select6-1.6>
@@ -127,8 +127,8 @@ test:do_execsql_test(
     "select6-1.7",
     [=[
         SELECT a.y, a.COLUMN_1, COLUMN_2, COLUMN_1
-        FROM (SELECT count(*), y FROM t1 GROUP BY y) AS a,
-             (SELECT max(x), y FROM t1 GROUP BY y) as b
+        FROM (SELECT COUNT(*), y FROM t1 GROUP BY y) AS a,
+             (SELECT MAX(x), y FROM t1 GROUP BY y) as b
         WHERE a.y=b.y ORDER BY a.y
     ]=], {
         -- <select6-1.7>
@@ -140,8 +140,8 @@ test:do_execsql_test(
     "select6-1.8",
     [[
         SELECT q, p, r
-        FROM (SELECT count(*) as p , y as q FROM t1 GROUP BY y) AS a,
-             (SELECT max(x) as r, y as s FROM t1 GROUP BY y) as b
+        FROM (SELECT COUNT(*) as p , y as q FROM t1 GROUP BY y) AS a,
+             (SELECT MAX(x) as r, y as s FROM t1 GROUP BY y) as b
         WHERE q=s ORDER BY s
     ]], {
         -- <select6-1.8>
@@ -152,9 +152,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-1.9",
     [=[
-        SELECT q, p, r, min
-        FROM (SELECT count(*) as p , y as q FROM t1 GROUP BY y) AS a,
-             (SELECT max(x) as r, y as s, min(x)+y AS min FROM t1 GROUP BY y) as b
+        SELECT q, p, r, MIN
+        FROM (SELECT COUNT(*) as p , y as q FROM t1 GROUP BY y) AS a,
+             (SELECT MAX(x) as r, y as s, MIN(x)+y AS MIN FROM t1 GROUP BY y) as b
         WHERE q=s ORDER BY s
     ]=], {
         -- <select6-1.9>
@@ -185,14 +185,14 @@ test:do_execsql2_test(
         SELECT * FROM (SELECT a, b FROM t2 WHERE a<2)
     ]], {
         -- <select6-2.1>
-        "A", 1, "B", 1
+        "a", 1, "b", 1
         -- </select6-2.1>
     })
 
 test:do_execsql_test(
     "select6-2.2",
     [[
-        SELECT count(*) FROM (SELECT b FROM t2)
+        SELECT COUNT(*) FROM (SELECT b FROM t2)
     ]], {
         -- <select6-2.2>
         20
@@ -202,7 +202,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-2.3",
     [[
-        SELECT count(*) FROM (SELECT DISTINCT b FROM t2)
+        SELECT COUNT(*) FROM (SELECT DISTINCT b FROM t2)
     ]], {
         -- <select6-2.3>
         5
@@ -212,7 +212,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-2.4",
     [[
-        SELECT count(*) FROM (SELECT DISTINCT * FROM (SELECT b FROM t2))
+        SELECT COUNT(*) FROM (SELECT DISTINCT * FROM (SELECT b FROM t2))
     ]], {
         -- <select6-2.4>
         5
@@ -222,7 +222,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-2.5",
     [[
-        SELECT count(*) FROM (SELECT * FROM (SELECT DISTINCT b FROM t2))
+        SELECT COUNT(*) FROM (SELECT * FROM (SELECT DISTINCT b FROM t2))
     ]], {
         -- <select6-2.5>
         5
@@ -233,8 +233,8 @@ test:do_execsql_test(
     "select6-2.6",
     [[
         SELECT a.cnt, a.b, b.b, b.mx
-        FROM (SELECT count(*) AS cnt, b FROM t2 GROUP BY b) AS a,
-             (SELECT max(a) AS mx, b FROM t2 GROUP BY b) as b
+        FROM (SELECT COUNT(*) AS cnt, b FROM t2 GROUP BY b) AS a,
+             (SELECT MAX(a) AS mx, b FROM t2 GROUP BY b) as b
         WHERE a.b=b.b ORDER BY a.b
     ]], {
         -- <select6-2.6>
@@ -246,8 +246,8 @@ test:do_execsql_test(
     "select6-2.7",
     [=[
         SELECT a.b, a.count, max, count
-        FROM (SELECT count(*) AS count, b FROM t2 GROUP BY b) AS a,
-             (SELECT max(a) AS max, b FROM t2 GROUP BY b) as b
+        FROM (SELECT COUNT(*) AS count, b FROM t2 GROUP BY b) AS a,
+             (SELECT MAX(a) AS max, b FROM t2 GROUP BY b) as b
         WHERE a.b=b.b ORDER BY a.b
     ]=], {
         -- <select6-2.7>
@@ -259,8 +259,8 @@ test:do_execsql_test(
     "select6-2.8",
     [[
         SELECT q, p, r
-        FROM (SELECT count(*) as p , b as q FROM t2 GROUP BY b) AS a,
-             (SELECT max(a) as r, b as s FROM t2 GROUP BY b) as b
+        FROM (SELECT COUNT(*) as p , b as q FROM t2 GROUP BY b) AS a,
+             (SELECT MAX(a) as r, b as s FROM t2 GROUP BY b) as b
         WHERE q=s ORDER BY s
     ]], {
         -- <select6-2.8>
@@ -272,8 +272,8 @@ test:do_execsql_test(
     "select6-2.9",
     [[
         SELECT a.q, a.p, b.r
-        FROM (SELECT count(*) as p , b as q FROM t2 GROUP BY q) AS a,
-             (SELECT max(a) as r, b as s FROM t2 GROUP BY s) as b
+        FROM (SELECT COUNT(*) as p , b as q FROM t2 GROUP BY q) AS a,
+             (SELECT MAX(a) as r, b as s FROM t2 GROUP BY s) as b
         WHERE a.q=b.s ORDER BY a.q
     ]], {
         -- <select6-2.9>
@@ -287,7 +287,7 @@ test:do_execsql2_test(
         SELECT * FROM (SELECT * FROM (SELECT * FROM t1 WHERE x=3));
     ]], {
         -- <select6-3.1>
-        "X", 3, "Y", 2
+        "x", 3, "y", 2
         -- </select6-3.1>
     })
 
@@ -296,10 +296,10 @@ test:do_execsql_test(
     [[
         SELECT * FROM
           (SELECT a.q, a.p, b.r
-           FROM (SELECT count(*) as p , b as q FROM t2 GROUP BY q) AS a,
-                (SELECT max(a) as r, b as s FROM t2 GROUP BY s) as b
+           FROM (SELECT COUNT(*) as p , b as q FROM t2 GROUP BY q) AS a,
+                (SELECT MAX(a) as r, b as s FROM t2 GROUP BY s) as b
            WHERE a.q=b.s ORDER BY a.q)
-        ORDER BY "Q" -- there is no "a.q" in this context any more
+        ORDER BY "q" -- there is no "a.q" in this context any more
     ]], {
         -- <select6-3.2>
         1, 1, 1, 2, 2, 3, 3, 4, 7, 4, 8, 15, 5, 5, 20
@@ -309,7 +309,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.3",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as a, avg(y) as b FROM t1)
+        SELECT a,b,a+b FROM (SELECT AVG(x) as a, AVG(y) as b FROM t1)
     ]], {
         -- <select6-3.3>
         10, 3, 13
@@ -319,7 +319,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.4",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as a, avg(y) as b FROM t1 WHERE y=4)
+        SELECT a,b,a+b FROM (SELECT AVG(x) as a, AVG(y) as b FROM t1 WHERE y=4)
     ]], {
         -- <select6-3.4>
         11, 4, 15
@@ -329,7 +329,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.5",
     [[
-        SELECT x,y,x+y FROM (SELECT avg(a) as x, avg(b) as y FROM t2 WHERE a=4)
+        SELECT x,y,x+y FROM (SELECT AVG(a) as x, AVG(b) as y FROM t2 WHERE a=4)
     ]], {
         -- <select6-3.5>
         4, 3, 7
@@ -339,7 +339,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.6",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as a, avg(y) as b FROM t1)
+        SELECT a,b,a+b FROM (SELECT AVG(x) as a, AVG(y) as b FROM t1)
         WHERE a>10
     ]], {
         -- <select6-3.6>
@@ -349,7 +349,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.7",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as a, avg(y) as b FROM t1)
+        SELECT a,b,a+b FROM (SELECT AVG(x) as a, AVG(y) as b FROM t1)
         WHERE a<10
     ]], {
         -- <select6-3.7>
@@ -360,7 +360,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.8",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as a, avg(y) as b FROM t1 WHERE y=4)
+        SELECT a,b,a+b FROM (SELECT AVG(x) as a, AVG(y) as b FROM t1 WHERE y=4)
         WHERE a>10
     ]], {
         -- <select6-3.8>
@@ -371,7 +371,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.9",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as a, avg(y) as b FROM t1 WHERE y=4)
+        SELECT a,b,a+b FROM (SELECT AVG(x) as a, AVG(y) as b FROM t1 WHERE y=4)
         WHERE a<10
     ]], {
         -- <select6-3.9>
@@ -382,7 +382,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.10",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as a, y as b FROM t1 GROUP BY b)
+        SELECT a,b,a+b FROM (SELECT AVG(x) as a, y as b FROM t1 GROUP BY b)
         ORDER BY a
     ]], {
         -- <select6-3.10>
@@ -394,7 +394,7 @@ test:do_execsql_test(
     "select6-3.11",
     [[
         SELECT a,b,a+b FROM
-           (SELECT avg(x) as a, y as b FROM t1 GROUP BY b)
+           (SELECT AVG(x) as a, y as b FROM t1 GROUP BY b)
         WHERE b<4 ORDER BY a
     ]], {
         -- <select6-3.11>
@@ -406,7 +406,7 @@ test:do_execsql_test(
     "select6-3.12",
     [[
         SELECT a,b,a+b FROM
-           (SELECT avg(x) as a, y as b FROM t1 GROUP BY b HAVING a>1)
+           (SELECT AVG(x) as a, y as b FROM t1 GROUP BY b HAVING a>1)
         WHERE b<4 ORDER BY a
     ]], {
         -- <select6-3.12>
@@ -418,7 +418,7 @@ test:do_execsql_test(
     "select6-3.13",
     [[
         SELECT a,b,a+b FROM
-           (SELECT avg(x) as a, y as b FROM t1 GROUP BY b HAVING a>1)
+           (SELECT AVG(x) as a, y as b FROM t1 GROUP BY b HAVING a>1)
         ORDER BY a
     ]], {
         -- <select6-3.13>
@@ -429,7 +429,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.14",
     [=[
-        SELECT count, y FROM (SELECT count(*) AS count, y FROM t1 GROUP BY y)
+        SELECT count, y FROM (SELECT COUNT(*) AS count, y FROM t1 GROUP BY y)
         ORDER BY count
     ]=], {
         -- <select6-3.14>
@@ -440,7 +440,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.15",
     [=[
-        SELECT count, y FROM (SELECT count(*) AS count, y FROM t1 GROUP BY y)
+        SELECT count, y FROM (SELECT COUNT(*) AS count, y FROM t1 GROUP BY y)
         ORDER BY y
     ]=], {
         -- <select6-3.15>
@@ -483,7 +483,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-4.4",
     [[
-        SELECT avg(y) FROM (SELECT DISTINCT y FROM t1) WHERE y<5 ORDER BY y
+        SELECT AVG(y) FROM (SELECT DISTINCT y FROM t1) WHERE y<5 ORDER BY y
     ]], {
         -- <select6-4.4>
         2
@@ -493,7 +493,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-4.5",
     [[
-        SELECT avg(y) FROM (SELECT DISTINCT y FROM t1 WHERE y<5) ORDER BY y
+        SELECT AVG(y) FROM (SELECT DISTINCT y FROM t1 WHERE y<5) ORDER BY y
     ]], {
         -- <select6-4.5>
         2
@@ -642,7 +642,7 @@ test:do_execsql2_test(
         SELECT c,b,a,* FROM (SELECT 1 AS a, 2 AS b, 'abc' AS c WHERE true)
     ]], {
         -- <select6-7.4>
-        "C", "abc", "B", 2, "A", 1, "A", 1, "B", 2, "C", "abc"
+        "c", "abc", "b", 2, "a", 1, "a", 1, "b", 2, "c", "abc"
         -- </select6-7.4>
     })
 
@@ -974,7 +974,7 @@ test:do_execsql_test(
         CREATE INDEX t2wy ON t2(w,y);
 
         SELECT cnt, xyz, (SELECT y FROM t2 WHERE w=cnt), '|'
-          FROM (SELECT count(*) AS cnt, w AS xyz FROM t1 GROUP BY 2)
+          FROM (SELECT COUNT(*) AS cnt, w AS xyz FROM t1 GROUP BY 2)
          ORDER BY cnt, xyz;
     ]], {
         -- <11.1>
@@ -985,8 +985,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     11.2,
     [[
-        SELECT cnt, xyz, lower((SELECT y FROM t2 WHERE w=cnt)), '|'
-          FROM (SELECT count(*) AS cnt, w AS xyz FROM t1 GROUP BY 2)
+        SELECT cnt, xyz, LOWER((SELECT y FROM t2 WHERE w=cnt)), '|'
+          FROM (SELECT COUNT(*) AS cnt, w AS xyz FROM t1 GROUP BY 2)
          ORDER BY cnt, xyz;
     ]], {
         -- <11.2>
@@ -998,7 +998,7 @@ test:do_execsql_test(
     11.3,
     [[
         SELECT cnt, xyz, '|'
-          FROM (SELECT count(*) AS cnt, w AS xyz FROM t1 GROUP BY 2)
+          FROM (SELECT COUNT(*) AS cnt, w AS xyz FROM t1 GROUP BY 2)
          WHERE (SELECT y FROM t2 WHERE w=cnt)!='two'
          ORDER BY cnt, xyz;
     ]], {
@@ -1011,8 +1011,8 @@ test:do_execsql_test(
     11.4,
     [[
         SELECT cnt, xyz, '|'
-          FROM (SELECT count(*) AS cnt, w AS xyz FROM t1 GROUP BY 2)
-         ORDER BY lower((SELECT y FROM t2 WHERE w=cnt));
+          FROM (SELECT COUNT(*) AS cnt, w AS xyz FROM t1 GROUP BY 2)
+         ORDER BY LOWER((SELECT y FROM t2 WHERE w=cnt));
     ]], {
         -- <11.4>
         1, 1, "|", 3, 3, "|", 2, 2, "|"
@@ -1026,7 +1026,7 @@ test:do_execsql_test(
                CASE WHEN (SELECT y FROM t2 WHERE w=cnt)=='two'
                     THEN 'aaa' ELSE 'bbb'
                 END, '|'
-          FROM (SELECT count(*) AS cnt, w AS xyz FROM t1 GROUP BY 2)
+          FROM (SELECT COUNT(*) AS cnt, w AS xyz FROM t1 GROUP BY 2)
          ORDER BY +cnt;
     ]], {
         -- <11.5>
@@ -1042,7 +1042,7 @@ test:do_execsql_test(
         CREATE TABLE t1(x  INT primary key);
         CREATE TABLE t2(y  INT primary key, z INT );
         SELECT ( SELECT y FROM t2 WHERE z = cnt )
-          FROM ( SELECT count(*) AS cnt FROM t1 );
+          FROM ( SELECT COUNT(*) AS cnt FROM t1 );
     ]], {
         -- <11.100>
         ""

@@ -41,7 +41,7 @@ box.execute("SELECT 1 LIMIT 1 COLLATE BINARY, 1;")
 - null
 - Syntax error at line 1 near 'COLLATE'
 ...
--- gh-3052: upper/lower support only default locale
+-- gh-3052: UPPER/LOWER support only default locale
 -- For tr-TR result depends on collation
 box.execute([[CREATE TABLE tu (descriptor VARCHAR(50) PRIMARY KEY, letter VARCHAR(50))]]);
 ---
@@ -67,14 +67,15 @@ box.execute([[INSERT INTO tu VALUES ('Latin Small Letter Dotless I U+0131','ı')
 - row_count: 1
 ...
 -- Without collation
-box.execute([[SELECT descriptor, upper(letter) AS upper,lower(letter) AS lower FROM tu;]])
+box.execute([[SELECT descriptor, UPPER(letter) AS upper, ]]..\
+            [[LOWER(letter) AS lower FROM tu;]])
 ---
 - metadata:
-  - name: DESCRIPTOR
+  - name: descriptor
     type: string
-  - name: UPPER
+  - name: upper
     type: string
-  - name: LOWER
+  - name: lower
     type: string
   rows:
   - ['Latin Capital Letter I U+0049', 'I', 'i']
@@ -83,14 +84,15 @@ box.execute([[SELECT descriptor, upper(letter) AS upper,lower(letter) AS lower F
   - ['Latin Small Letter I U+0069', 'I', 'i']
 ...
 -- With collation
-box.execute([[SELECT descriptor, upper(letter COLLATE "TURKISH") AS upper,lower(letter COLLATE "TURKISH") AS lower FROM tu;]])
+box.execute([[SELECT descriptor, UPPER(letter COLLATE "TURKISH") AS upper, ]]..\
+            [[LOWER(letter COLLATE "TURKISH") AS lower FROM tu;]])
 ---
 - metadata:
-  - name: DESCRIPTOR
+  - name: descriptor
     type: string
-  - name: UPPER
+  - name: upper
     type: string
-  - name: LOWER
+  - name: lower
     type: string
   rows:
   - ['Latin Capital Letter I U+0049', 'I', 'ı']
@@ -105,32 +107,34 @@ box.internal.collation.drop('TURKISH')
 box.internal.collation.create('GERMAN', 'ICU', 'de-DE', {strength='primary'});
 ---
 ...
-box.execute([[INSERT INTO tu VALUES ('German Small Letter Sharp S U+00DF','ß');]])
+box.execute("INSERT INTO tu VALUES('German Small Letter Sharp S U+00DF','ß');")
 ---
 - row_count: 1
 ...
 -- Without collation
-box.execute([[SELECT descriptor, upper(letter), letter FROM tu where UPPER(letter) = 'SS';]])
+box.execute([[SELECT descriptor, UPPER(letter), ]]..\
+            [[letter FROM tu where UPPER(letter) = 'SS';]])
 ---
 - metadata:
-  - name: DESCRIPTOR
+  - name: descriptor
     type: string
   - name: COLUMN_1
     type: string
-  - name: LETTER
+  - name: letter
     type: string
   rows:
   - ['German Small Letter Sharp S U+00DF', 'SS', 'ß']
 ...
 -- With collation
-box.execute([[SELECT descriptor, upper(letter COLLATE "GERMAN"), letter FROM tu where UPPER(letter COLLATE "GERMAN") = 'SS';]])
+box.execute([[SELECT descriptor, UPPER(letter COLLATE "GERMAN"), ]]..\
+            [[letter FROM tu where UPPER(letter COLLATE "GERMAN") = 'SS';]])
 ---
 - metadata:
-  - name: DESCRIPTOR
+  - name: descriptor
     type: string
   - name: COLUMN_1
     type: string
-  - name: LETTER
+  - name: letter
     type: string
   rows:
   - ['German Small Letter Sharp S U+00DF', 'SS', 'ß']
@@ -161,11 +165,11 @@ box.execute("CREATE TABLE t (id INT PRIMARY KEY, a TEXT, b TEXT COLLATE \"binary
 ---
 - row_count: 1
 ...
-box.space.T:format()[2]['collation']
+box.space.t:format()[2]['collation']
 ---
 - null
 ...
-box.space.T:format()[3]['collation']
+box.space.t:format()[3]['collation']
 ---
 - 3
 ...
@@ -236,26 +240,26 @@ box.execute("CREATE TABLE t (id INT PRIMARY KEY, a TEXT, b TEXT COLLATE \"binary
 box.execute("SELECT * FROM t WHERE a = b;")
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: string
-  - name: B
+  - name: b
     type: string
-  - name: C
+  - name: c
     type: string
   rows: []
 ...
 box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = b;")
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: string
-  - name: B
+  - name: b
     type: string
-  - name: C
+  - name: c
     type: string
   rows: []
 ...
@@ -267,26 +271,26 @@ box.execute("SELECT * FROM t WHERE b = c;")
 box.execute("SELECT * FROM t WHERE b COLLATE \"binary\" = c;")
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: string
-  - name: B
+  - name: b
     type: string
-  - name: C
+  - name: c
     type: string
   rows: []
 ...
 box.execute("SELECT * FROM t WHERE a = c;")
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: string
-  - name: B
+  - name: b
     type: string
-  - name: C
+  - name: c
     type: string
   rows: []
 ...
@@ -299,7 +303,7 @@ box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = c COLLATE \"unicode\";
 -- length  and resulting collation which depends on arguments
 -- is processed correctly.
 --
-box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = substr();")
+box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = SUBSTR();")
 ---
 - null
 - 'Wrong number of arguments is passed to SUBSTR(): expected from 2 to 3, got 0'
@@ -326,14 +330,14 @@ box.execute("SELECT c FROM t UNION SELECT b FROM t;")
 box.execute("SELECT b FROM t UNION SELECT a FROM t;")
 ---
 - metadata:
-  - name: B
+  - name: b
     type: string
   rows: []
 ...
 box.execute("SELECT a FROM t UNION SELECT c FROM t;")
 ---
 - metadata:
-  - name: A
+  - name: a
     type: string
   rows: []
 ...
@@ -407,7 +411,7 @@ box.execute("UPDATE t0 SET s1 = 'A';")
 box.execute("SELECT s1 FROM t0;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['A']
@@ -415,9 +419,9 @@ box.execute("SELECT s1 FROM t0;")
 box.execute("SELECT * FROM t1;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: integer
-  - name: S0
+  - name: s0
     type: string
   rows:
   - [1, 'a']
@@ -453,14 +457,14 @@ box.execute("INSERT INTO t1 VALUES (1,'a');")
 box.execute("UPDATE t0 SET s1 = 'A';")
 ---
 - null
-- 'Foreign key ''fk_unnamed_T1_S0_1'' integrity check failed: index was not found'
+- 'Foreign key ''fk_unnamed_t1_s0_1'' integrity check failed: index was not found'
 ...
 box.execute("SELECT * FROM t1;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: integer
-  - name: S0
+  - name: s0
     type: string
   rows:
   - [1, 'a']
@@ -468,7 +472,7 @@ box.execute("SELECT * FROM t1;")
 box.execute("SELECT s1 FROM t0;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['a']
@@ -501,7 +505,7 @@ box.execute("INSERT INTO t4a VALUES('ghi','ghi',3);")
 box.execute("SELECT c FROM t4a WHERE (a||'') = b;")
 ---
 - metadata:
-  - name: C
+  - name: c
     type: integer
   rows:
   - [1]
@@ -513,7 +517,7 @@ box.execute("SELECT c FROM t4a WHERE (a||'') = b;")
 box.execute("SELECT c FROM t4a WHERE (a COLLATE \"binary\"||'') = b;")
 ---
 - metadata:
-  - name: C
+  - name: c
     type: integer
   rows:
   - [3]
@@ -537,7 +541,7 @@ box.execute("SELECT c FROM t4a WHERE (a COLLATE \"binary\"||'') = b COLLATE \"un
 box.execute("SELECT c FROM t4a WHERE (a||'')=(b||'');")
 ---
 - metadata:
-  - name: C
+  - name: c
     type: integer
   rows:
   - [3]
@@ -545,7 +549,7 @@ box.execute("SELECT c FROM t4a WHERE (a||'')=(b||'');")
 box.execute("SELECT c FROM t4a WHERE (a||b)=(b||a);")
 ---
 - metadata:
-  - name: C
+  - name: c
     type: integer
   rows:
   - [3]
@@ -567,7 +571,7 @@ box.execute("INSERT INTO t4b VALUES('ghi','ghi',3);")
 box.execute("SELECT c FROM t4a WHERE (a||b)=(b||a);")
 ---
 - metadata:
-  - name: C
+  - name: c
     type: integer
   rows:
   - [3]
@@ -577,7 +581,7 @@ box.execute("SELECT c FROM t4a WHERE (a||b)=(b||a);")
 box.execute("SELECT c FROM t4a WHERE (a||b COLLATE \"binary\")=(b||a);")
 ---
 - metadata:
-  - name: C
+  - name: c
     type: integer
   rows:
   - [3]
@@ -601,7 +605,7 @@ box.execute("INSERT INTO t4b VALUES('gHz', 'xxx', 4);")
 box.execute("SELECT a FROM t4b ORDER BY a COLLATE \"unicode_ci\" || ''")
 ---
 - metadata:
-  - name: A
+  - name: a
     type: string
   rows:
   - ['abc']
@@ -612,7 +616,7 @@ box.execute("SELECT a FROM t4b ORDER BY a COLLATE \"unicode_ci\" || ''")
 box.execute("SELECT a FROM t4b ORDER BY a || b")
 ---
 - metadata:
-  - name: A
+  - name: a
     type: string
   rows:
   - ['abc']
@@ -620,10 +624,10 @@ box.execute("SELECT a FROM t4b ORDER BY a || b")
   - ['ghi']
   - ['gHz']
 ...
-box.space.T4A:drop()
+box.space.t4a:drop()
 ---
 ...
-box.space.T4B:drop()
+box.space.t4b:drop()
 ---
 ...
 -- gh-3537 Duplicate key error for an index that is not unique
@@ -647,7 +651,7 @@ box.execute("INSERT INTO t3 VALUES ('A');")
 box.execute("SELECT * FROM t3;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['A']
@@ -677,7 +681,7 @@ box.execute("INSERT INTO t3b VALUES ('A');")
 box.execute("SELECT * FROM t3b;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['A']
@@ -707,13 +711,13 @@ box.execute("INSERT INTO t3b VALUES ('A');")
 box.execute("INSERT INTO t3b VALUES ('a');")
 ---
 - null
-- Duplicate key exists in unique index "pk_unnamed_T3B_1" in space "T3B" with old
+- Duplicate key exists in unique index "pk_unnamed_t3b_1" in space "t3b" with old
   tuple - ["a"] and new tuple - ["a"]
 ...
 box.execute("SELECT * FROM t3b;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['A']
@@ -743,7 +747,7 @@ box.execute("INSERT INTO t3c VALUES ('A');")
 box.execute("SELECT * FROM t3c;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['a']
@@ -773,13 +777,13 @@ box.execute("INSERT INTO t3c VALUES ('A');")
 box.execute("INSERT INTO t3c VALUES ('a');")
 ---
 - null
-- Duplicate key exists in unique index "pk_unnamed_T3C_1" in space "T3C" with old
+- Duplicate key exists in unique index "pk_unnamed_t3c_1" in space "t3c" with old
   tuple - ["a"] and new tuple - ["a"]
 ...
 box.execute("SELECT * FROM t3c;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['a']
@@ -809,7 +813,7 @@ box.execute("INSERT INTO t3d VALUES ('A');")
 box.execute("SELECT * FROM t3d;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['A']
@@ -839,13 +843,13 @@ box.execute("INSERT INTO t3d VALUES ('A');")
 box.execute("INSERT INTO t3d VALUES ('a');")
 ---
 - null
-- Duplicate key exists in unique index "pk_unnamed_T3D_1" in space "T3D" with old
+- Duplicate key exists in unique index "pk_unnamed_t3d_1" in space "t3d" with old
   tuple - ["a"] and new tuple - ["a"]
 ...
 box.execute("SELECT * FROM t3d;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['A']
@@ -871,13 +875,13 @@ box.execute("INSERT INTO t3e VALUES ('a');")
 box.execute("INSERT INTO t3e VALUES ('A');")
 ---
 - null
-- Duplicate key exists in unique index "pk_unnamed_T3E_1" in space "T3E" with old
+- Duplicate key exists in unique index "pk_unnamed_t3e_1" in space "t3e" with old
   tuple - ["a"] and new tuple - ["A"]
 ...
 box.execute("SELECT * FROM t3e;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['a']
@@ -906,7 +910,7 @@ box.execute("INSERT INTO t3f VALUES ('A');")
 box.execute("SELECT * FROM t3f;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['a']
@@ -936,13 +940,13 @@ box.execute("INSERT INTO t3f VALUES ('A');")
 box.execute("INSERT INTO t3f VALUES ('a');")
 ---
 - null
-- Duplicate key exists in unique index "pk_unnamed_T3F_1" in space "T3F" with old
+- Duplicate key exists in unique index "pk_unnamed_t3f_1" in space "t3f" with old
   tuple - ["a"] and new tuple - ["a"]
 ...
 box.execute("SELECT * FROM t3f;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['a']
@@ -968,13 +972,13 @@ box.execute("INSERT INTO t3g VALUES ('a');")
 box.execute("INSERT INTO t3g VALUES ('A');")
 ---
 - null
-- Duplicate key exists in unique index "pk_unnamed_T3G_1" in space "T3G" with old
+- Duplicate key exists in unique index "pk_unnamed_t3g_1" in space "t3g" with old
   tuple - ["a"] and new tuple - ["A"]
 ...
 box.execute("SELECT * FROM t3g;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: string
   rows:
   - ['a']
@@ -1003,13 +1007,13 @@ box.execute("INSERT INTO qms1 VALUES ('WWW', 'nnn', 'qqq', 2);")
 box.execute("SELECT * FROM qms1;")
 ---
 - metadata:
-  - name: W
+  - name: w
     type: string
-  - name: N
+  - name: n
     type: string
-  - name: Q
+  - name: q
     type: string
-  - name: S
+  - name: s
     type: integer
   rows:
   - ['WWW', 'nnn', 'qqq', 2]
@@ -1038,13 +1042,13 @@ box.execute("INSERT INTO qms2 VALUES ('WWW', 'nnn', 'qqq', 2);")
 box.execute("SELECT * FROM qms2;")
 ---
 - metadata:
-  - name: W
+  - name: w
     type: string
-  - name: N
+  - name: n
     type: string
-  - name: Q
+  - name: q
     type: string
-  - name: S
+  - name: s
     type: integer
   rows:
   - ['WWW', 'nnn', 'qqq', 2]
@@ -1074,13 +1078,13 @@ box.execute("INSERT INTO qms3 VALUES ('WWW', 'nnn', 'qqq', 2);")
 box.execute("SELECT * FROM qms3;")
 ---
 - metadata:
-  - name: W
+  - name: w
     type: string
-  - name: N
+  - name: n
     type: string
-  - name: Q
+  - name: q
     type: string
-  - name: S
+  - name: s
     type: integer
   rows:
   - ['WWW', 'nnn', 'qqq', 2]
@@ -1109,13 +1113,13 @@ box.execute("INSERT INTO qms4 VALUES ('WWW', 'nnn', 'qqq', 2);")
 box.execute("SELECT * FROM qms4;")
 ---
 - metadata:
-  - name: W
+  - name: w
     type: string
-  - name: N
+  - name: n
     type: string
-  - name: Q
+  - name: q
     type: string
-  - name: S
+  - name: s
     type: integer
   rows:
   - ['WWW', 'nnn', 'qqq', 2]
@@ -1136,7 +1140,7 @@ box.execute("INSERT INTO jj VALUES (1,'A'), (2,'a')")
 ---
 - row_count: 2
 ...
-box.execute("SELECT DISTINCT trim(s2) FROM jj;")
+box.execute("SELECT DISTINCT TRIM(s2) FROM jj;")
 ---
 - metadata:
   - name: COLUMN_1
@@ -1148,7 +1152,7 @@ box.execute("INSERT INTO jj VALUES (3, 'aS'), (4, 'AS');")
 ---
 - row_count: 2
 ...
-box.execute("SELECT DISTINCT replace(s2, 'S', 's') FROM jj;")
+box.execute("SELECT DISTINCT REPLACE(s2, 'S', 's') FROM jj;")
 ---
 - metadata:
   - name: COLUMN_1
@@ -1157,7 +1161,7 @@ box.execute("SELECT DISTINCT replace(s2, 'S', 's') FROM jj;")
   - ['A']
   - ['as']
 ...
-box.execute("SELECT DISTINCT substr(s2, 1, 1) FROM jj;")
+box.execute("SELECT DISTINCT SUBSTR(s2, 1, 1) FROM jj;")
 ---
 - metadata:
   - name: COLUMN_1
@@ -1165,7 +1169,7 @@ box.execute("SELECT DISTINCT substr(s2, 1, 1) FROM jj;")
   rows:
   - ['A']
 ...
-box.space.JJ:drop()
+box.space.jj:drop()
 ---
 ...
 -- gh-3573: Strength in the _collation space

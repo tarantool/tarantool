@@ -55,7 +55,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(6,7, 2);
     ]], {
         -- <check-1.3>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t1_1' failed for a tuple"
         -- </check-1.3>
     })
 
@@ -75,7 +75,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(4,3, 2);
     ]], {
         -- <check-1.5>
-        1, "Check constraint 'ck_unnamed_T1_2' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t1_2' failed for a tuple"
         -- </check-1.5>
     })
 
@@ -95,7 +95,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(NULL,6, 4);
     ]], {
         -- <check-1.7>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t1_1' failed for a tuple"
         -- </check-1.7>
     })
 
@@ -115,7 +115,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(2,NULL, 5);
     ]], {
         -- <check-1.9>
-        1, "Check constraint 'ck_unnamed_T1_2' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t1_2' failed for a tuple"
         -- </check-1.9>
     })
 
@@ -147,7 +147,7 @@ test:do_catchsql_test(
         UPDATE t1 SET x=7 WHERE x==2
     ]], {
         -- <check-1.12>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t1_1' failed for a tuple"
         -- </check-1.12>
     })
 
@@ -167,7 +167,7 @@ test:do_catchsql_test(
         UPDATE t1 SET x=5 WHERE x==2
     ]], {
         -- <check-1.14>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t1_1' failed for a tuple"
         -- </check-1.14>
     })
 
@@ -206,9 +206,9 @@ test:do_execsql_test(
     [[
         CREATE TABLE t2(
           id  INT primary key,
-          x SCALAR CONSTRAINT one CHECK( typeof(coalesce(x,0))=='integer'),
-          y DOUBLE CONSTRAINT two CHECK( typeof(coalesce(y,0.1e0))=='double' ),
-          z SCALAR CONSTRAINT three CHECK( typeof(coalesce(z,''))=='string' )
+          x SCALAR CONSTRAINT one CHECK( TYPEOF(COALESCE(x,0))=='integer'),
+          y DOUBLE CONSTRAINT two CHECK( TYPEOF(COALESCE(y,0.1e0))=='double' ),
+          z SCALAR CONSTRAINT three CHECK( TYPEOF(COALESCE(z,''))=='string' )
         );
     ]], {
         -- <check-2.1>
@@ -244,7 +244,7 @@ test:do_catchsql_test(
         INSERT INTO t2 VALUES(3, 1.1, NULL, NULL);
     ]], {
         -- <check-2.4>
-        1, "Check constraint 'ONE' failed for field '2 (X)'"
+        1, "Check constraint 'one' failed for field '2 (x)'"
         -- </check-2.4>
     })
 
@@ -265,7 +265,7 @@ test:do_catchsql_test(
         INSERT INTO t2 VALUES(5, NULL, NULL, 3.14159);
     ]], {
         -- <check-2.6>
-        1, "Check constraint 'THREE' failed for field '4 (Z)'"
+        1, "Check constraint 'three' failed for field '4 (z)'"
         -- </check-2.6>
     })
 
@@ -275,7 +275,7 @@ test:do_catchsql_test(
     "check-2.10",
     [[
         CREATE TABLE t2b(
-          x INTEGER CHECK( typeof(coalesce(x,0))=='integer' ) CONSTRAINT one,
+          x INTEGER CHECK( TYPEOF(COALESCE(x,0))=='integer' ) CONSTRAINT one,
           PRIMARY KEY (x)
         );
     ]], {
@@ -288,7 +288,7 @@ test:do_catchsql_test(
     "check-2.11",
     [[
         CREATE TABLE t2c(
-          x INTEGER CONSTRAINT one CHECK( typeof(coalesce(x,0))=='integer' )
+          x INTEGER CONSTRAINT one CHECK( TYPEOF(COALESCE(x,0))=='integer' )
         CONSTRAINT two,
           PRIMARY KEY (x)
         );
@@ -349,7 +349,7 @@ test:do_catchsql_test(
         INSERT INTO t3 VALUES(111,222,333);
     ]], {
         -- <check-3.9>
-        1, "Check constraint 'ck_unnamed_T3_1' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t3_1' failed for a tuple"
         -- </check-3.9>
     })
 
@@ -420,7 +420,7 @@ test:do_catchsql_test(
         UPDATE t4 SET x=0, y=1;
     ]], {
         -- <check-4.6>
-        1, "Check constraint 'ck_unnamed_T4_1' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t4_1' failed for a tuple"
         -- </check-4.6>
     })
 
@@ -440,7 +440,7 @@ test:do_catchsql_test(
         UPDATE t4 SET x=0, y=2;
     ]], {
         -- <check-4.9>
-        1, "Check constraint 'ck_unnamed_T4_1' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t4_1' failed for a tuple"
         -- </check-4.9>
     })
 
@@ -517,7 +517,7 @@ test:do_catchsql_test(
         UPDATE OR FAIL t1 SET x=7-x, y=y+1;
     ]], {
         -- <check-6.5>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t1_1' failed for a tuple"
         -- </check-6.5>
     })
 
@@ -539,7 +539,7 @@ test:do_catchsql_test(
         INSERT OR ROLLBACK INTO t1 VALUES(8,40.0, 10);
     ]], {
         -- <check-6.7>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t1_1' failed for a tuple"
         -- </check-6.7>
     })
 
@@ -572,7 +572,7 @@ test:do_catchsql_test(
         REPLACE INTO t1 VALUES(6,7, 11);
     ]], {
         -- <check-6.12>
-        1, "Check constraint 'ck_unnamed_T1_1' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t1_1' failed for a tuple"
         -- </check-6.12>
     })
 
@@ -615,7 +615,7 @@ test:do_execsql_test(
 -- cannot be tested).
 --
 --reset_db()
-box.schema.func.create('MYFUNC', {language = 'Lua',
+box.schema.func.create('myfunc', {language = 'Lua',
                        is_deterministic = true,
                        body = 'function(x) return x < 10 end',
                        returns = 'boolean', param_list = {'number'},
@@ -637,7 +637,7 @@ test:do_catchsql_test(
     7.3,
     " INSERT INTO t6 VALUES(11) ", {
         -- <7.3>
-        1, "Check constraint 'ck_unnamed_T6_A_1' failed for field '1 (A)'"
+        1, "Check constraint 'ck_unnamed_t6_a_1' failed for field '1 (a)'"
         -- </7.3>
     })
 
@@ -660,7 +660,7 @@ test:do_test(
         return test:catchsql(" INSERT INTO t6 VALUES(8) ") --, "db2")
     end, {
         -- <7.5>
-        1, "unknown function: MYFUNC()"
+        1, "unknown function: myfunc()"
         -- </7.5>
     })
 
@@ -670,7 +670,7 @@ test:do_test(
         return test:catchsql(" CREATE TABLE t7(a  INT CHECK (myfunc(a))) ") --, "db2 INT ")
     end, {
         -- <7.6>
-        1, "no such function: MYFUNC"
+        1, "no such function: myfunc"
         -- </7.6>
     })
 
@@ -744,7 +744,7 @@ test:do_catchsql_test(
         -- </9.3>
     })
 
-box.func.MYFUNC:drop()
+box.func.myfunc:drop()
 
 test:finish_test()
 

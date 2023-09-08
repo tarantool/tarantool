@@ -33,7 +33,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2391.2",
     [[
-        SELECT count(*) FROM folders WHERE foldername < 'FolderC';
+        SELECT COUNT(*) FROM folders WHERE foldername < 'FolderC';
     ]], {
         -- <tkt2391.2>
         1
@@ -43,7 +43,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2391.3",
     [[
-        SELECT count(*) FROM folders WHERE foldername < 'FolderC' COLLATE "unicode_ci";
+        SELECT COUNT(*) FROM folders WHERE foldername < 'FolderC' COLLATE "unicode_ci";
     ]], {
         -- <tkt2391.3>
         2
@@ -58,7 +58,7 @@ test:do_execsql_test(
     "tkt2391.4",
     [[
         CREATE INDEX f_i ON folders(foldername);
-        SELECT count(*) FROM folders WHERE foldername < 'FolderC' COLLATE "unicode_ci";
+        SELECT COUNT(*) FROM folders WHERE foldername < 'FolderC' COLLATE "unicode_ci";
     ]], {
         -- <tkt2391.4>
         2

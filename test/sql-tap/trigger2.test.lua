@@ -93,29 +93,29 @@ for _, tbl_defn in ipairs(tbl_definitions) do
     test:execsql [[
         CREATE TRIGGER before_update_row BEFORE UPDATE ON tbl FOR EACH ROW
           BEGIN
-            INSERT INTO rlog VALUES ((SELECT coalesce(max(idx),0) + 1 FROM rlog),
+            INSERT INTO rlog VALUES ((SELECT COALESCE(MAX(idx),0) + 1 FROM rlog),
                                      old.a, old.b,
-                                     (SELECT coalesce(sum(a),0) FROM tbl),
-                                     (SELECT coalesce(sum(b),0) FROM tbl),
+                                     (SELECT COALESCE(SUM(a),0) FROM tbl),
+                                     (SELECT COALESCE(SUM(b),0) FROM tbl),
                                      new.a, new.b);
           END;
 
         CREATE TRIGGER after_update_row AFTER UPDATE ON tbl FOR EACH ROW
           BEGIN
-            INSERT INTO rlog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM rlog),
+            INSERT INTO rlog VALUES ( (SELECT COALESCE(MAX(idx),0) + 1 FROM rlog),
                                       old.a, old.b,
-                                      (SELECT coalesce(sum(a),0) FROM tbl),
-                                      (SELECT coalesce(sum(b),0) FROM tbl),
+                                      (SELECT COALESCE(SUM(a),0) FROM tbl),
+                                      (SELECT COALESCE(SUM(b),0) FROM tbl),
                                       new.a, new.b);
           END;
 
         CREATE TRIGGER conditional_update_row AFTER UPDATE ON tbl FOR EACH ROW
           WHEN old.a = 1
             BEGIN
-              INSERT INTO clog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM clog),
+              INSERT INTO clog VALUES ( (SELECT COALESCE(MAX(idx),0) + 1 FROM clog),
                                         old.a, old.b,
-                                        (SELECT coalesce(sum(a),0) FROM tbl),
-                                        (SELECT coalesce(sum(b),0) FROM tbl),
+                                        (SELECT COALESCE(SUM(a),0) FROM tbl),
+                                        (SELECT COALESCE(SUM(b),0) FROM tbl),
                                         new.a, new.b);
             END;
     ]]
@@ -146,19 +146,19 @@ for _, tbl_defn in ipairs(tbl_definitions) do
         INSERT INTO tbl(a, b) VALUES (300, 200);
         CREATE TRIGGER delete_before_row BEFORE DELETE ON tbl FOR EACH ROW
           BEGIN
-          INSERT INTO rlog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM rlog),
+          INSERT INTO rlog VALUES ( (SELECT COALESCE(MAX(idx),0) + 1 FROM rlog),
         old.a, old.b,
-        (SELECT coalesce(sum(a),0) FROM tbl),
-            (SELECT coalesce(sum(b),0) FROM tbl),
+        (SELECT COALESCE(SUM(a),0) FROM tbl),
+            (SELECT COALESCE(SUM(b),0) FROM tbl),
         0, 0);
         END;
 
         CREATE TRIGGER delete_after_row AFTER DELETE ON tbl FOR EACH ROW
           BEGIN
-          INSERT INTO rlog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM rlog),
+          INSERT INTO rlog VALUES ( (SELECT COALESCE(MAX(idx),0) + 1 FROM rlog),
         old.a, old.b,
-        (SELECT coalesce(sum(a),0) FROM tbl),
-            (SELECT coalesce(sum(b),0) FROM tbl),
+        (SELECT COALESCE(SUM(a),0) FROM tbl),
+            (SELECT COALESCE(SUM(b),0) FROM tbl),
         0, 0);
         END;
     ]]
@@ -181,19 +181,19 @@ for _, tbl_defn in ipairs(tbl_definitions) do
         DELETE FROM rlog;
         CREATE TRIGGER insert_before_row BEFORE INSERT ON tbl FOR EACH ROW
           BEGIN
-          INSERT INTO rlog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM rlog),
+          INSERT INTO rlog VALUES ( (SELECT COALESCE(MAX(idx),0) + 1 FROM rlog),
         0, 0,
-        (SELECT coalesce(sum(a),0) FROM tbl),
-            (SELECT coalesce(sum(b),0) FROM tbl),
+        (SELECT COALESCE(SUM(a),0) FROM tbl),
+            (SELECT COALESCE(SUM(b),0) FROM tbl),
         new.a, new.b);
         END;
 
         CREATE TRIGGER insert_after_row AFTER INSERT ON tbl FOR EACH ROW
           BEGIN
-          INSERT INTO rlog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM rlog),
+          INSERT INTO rlog VALUES ( (SELECT COALESCE(MAX(idx),0) + 1 FROM rlog),
         0, 0,
-        (SELECT coalesce(sum(a),0) FROM tbl),
-            (SELECT coalesce(sum(b),0) FROM tbl),
+        (SELECT COALESCE(SUM(a),0) FROM tbl),
+            (SELECT COALESCE(SUM(b),0) FROM tbl),
         new.a, new.b);
         END;
     ]]
@@ -353,7 +353,7 @@ test:catchsql [[
 -- }
 -- trigger2-3.2: WHEN clause
 local when_triggers = { "t1 BEFORE INSERT ON tbl FOR EACH ROW WHEN new.a > 20" }
-table.insert(when_triggers,"t2 BEFORE INSERT ON tbl FOR EACH ROW WHEN (SELECT count(*) FROM tbl) = 0")
+table.insert(when_triggers,"t2 BEFORE INSERT ON tbl FOR EACH ROW WHEN (SELECT COUNT(*) FROM tbl) = 0")
 
 
 test:execsql [[
@@ -622,29 +622,29 @@ test:do_execsql_test(
         CREATE VIEW abcd AS SELECT a, b, c, d FROM ab, cd;
 
         CREATE TRIGGER before_update INSTEAD OF UPDATE ON abcd FOR EACH ROW BEGIN
-          INSERT INTO tlog VALUES( (SELECT coalesce(max(ii),0) + 1 FROM tlog),
+          INSERT INTO tlog VALUES( (SELECT COALESCE(MAX(ii),0) + 1 FROM tlog),
         old.a, old.b, old.c, old.d, new.a, new.b, new.c, new.d);
         END;
         CREATE TRIGGER after_update INSTEAD OF UPDATE ON abcd FOR EACH ROW BEGIN
-          INSERT INTO tlog VALUES( (SELECT coalesce(max(ii),0) + 1 FROM tlog),
+          INSERT INTO tlog VALUES( (SELECT COALESCE(MAX(ii),0) + 1 FROM tlog),
         old.a, old.b, old.c, old.d, new.a, new.b, new.c, new.d);
         END;
 
         CREATE TRIGGER before_delete INSTEAD OF DELETE ON abcd FOR EACH ROW BEGIN
-          INSERT INTO tlog VALUES( (SELECT coalesce(max(ii),0) + 1 FROM tlog),
+          INSERT INTO tlog VALUES( (SELECT COALESCE(MAX(ii),0) + 1 FROM tlog),
         old.a, old.b, old.c, old.d, 0, 0, 0, 0);
         END;
         CREATE TRIGGER after_delete INSTEAD OF DELETE ON abcd FOR EACH ROW BEGIN
-          INSERT INTO tlog VALUES( (SELECT coalesce(max(ii),0) + 1 FROM tlog),
+          INSERT INTO tlog VALUES( (SELECT COALESCE(MAX(ii),0) + 1 FROM tlog),
         old.a, old.b, old.c, old.d, 0, 0, 0, 0);
         END;
 
         CREATE TRIGGER before_insert INSTEAD OF INSERT ON abcd FOR EACH ROW BEGIN
-          INSERT INTO tlog VALUES( (SELECT coalesce(max(ii),0) + 1 FROM tlog),
+          INSERT INTO tlog VALUES( (SELECT COALESCE(MAX(ii),0) + 1 FROM tlog),
         0, 0, 0, 0, new.a, new.b, new.c, new.d);
         END;
          CREATE TRIGGER after_insert INSTEAD OF INSERT ON abcd FOR EACH ROW BEGIN
-          INSERT INTO tlog VALUES( (SELECT coalesce(max(ii),0) + 1 FROM tlog),
+          INSERT INTO tlog VALUES( (SELECT COALESCE(MAX(ii),0) + 1 FROM tlog),
         0, 0, 0, 0, new.a, new.b, new.c, new.d);
          END;
     ]], {

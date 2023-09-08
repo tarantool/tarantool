@@ -30,7 +30,7 @@ test:do_catchsql_test(
         INSERT INTO x VALUES('assert');
     ]], {
         -- <1.1>
-        1, "Field 'A' was not found in space 'ABC' format"
+        1, "Field 'a' was not found in space 'abc' format"
         -- </1.1>
     })
 

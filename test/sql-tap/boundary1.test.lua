@@ -102,7 +102,7 @@ test:do_test(
 
 test:do_execsql_test(
     "boundary1-1.2",
-    "SELECT count(*) FROM t1",
+    "SELECT COUNT(*) FROM t1",
     {64})
 
 test:do_execsql_test(

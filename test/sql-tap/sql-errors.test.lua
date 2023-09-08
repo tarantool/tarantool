@@ -33,7 +33,7 @@ test:do_catchsql_test(
 	create_statement,
 	{
 		-- <sql-errors-1.2>
-		1,"Failed to create space 'T2': space column count 2001 exceeds the limit (2000)"
+        1,"Failed to create space 't2': space column count 2001 exceeds the limit (2000)"
 		-- </sql-errors-1.2>
 	})
 
@@ -43,7 +43,7 @@ test:do_catchsql_test(
 		CREATE TABLE t3 (i INT PRIMARY KEY, a INT DEFAULT(MAX(i, 1)));
 	]], {
 		-- <sql-errors-1.3>
-		1,"Failed to create space 'T3': default value of column 'A' is not constant"
+        1,"Failed to create space 't3': default value of column 'a' is not constant"
 		-- </sql-errors-1.3>
 	})
 
@@ -53,7 +53,7 @@ test:do_catchsql_test(
 		CREATE TABLE t4 (i INT PRIMARY KEY, a INT PRIMARY KEY);
 	]], {
 		-- <sql-errors-1.4>
-		1,"Failed to create space 'T4': primary key has been already declared"
+        1,"Failed to create space 't4': primary key has been already declared"
 		-- </sql-errors-1.4>
 	})
 
@@ -63,7 +63,7 @@ test:do_catchsql_test(
 		CREATE TABLE t5 (i TEXT PRIMARY KEY AUTOINCREMENT);
 	]], {
 		-- <sql-errors-1.5>
-		1,"Can't create or modify index 'pk_unnamed_T5_1' in space 'T5': sequence cannot be used with a non-integer key"
+        1,"Can't create or modify index 'pk_unnamed_t5_1' in space 't5': sequence cannot be used with a non-integer key"
 		-- </sql-errors-1.5>
 	})
 
@@ -73,7 +73,7 @@ test:do_catchsql_test(
 		CREATE TABLE t6 (i INT);
 	]], {
 		-- <sql-errors-1.6>
-		1,"Failed to create space 'T6': PRIMARY KEY missing"
+        1,"Failed to create space 't6': PRIMARY KEY missing"
 		-- </sql-errors-1.6>
 	})
 
@@ -83,7 +83,7 @@ test:do_catchsql_test(
 		CREATE VIEW v7(a,b,c) AS SELECT * FROM t0;
 	]], {
 		-- <sql-errors-1.7>
-		1,"Failed to create space 'V7': number of aliases doesn't match provided columns"
+        1,"Failed to create space 'v7': number of aliases doesn't match provided columns"
 		-- </sql-errors-1.7>
 	})
 
@@ -93,7 +93,7 @@ test:do_catchsql_test(
 		DROP VIEW t0;
 	]], {
 		-- <sql-errors-1.8>
-		1,"Can't drop space 'T0': use DROP TABLE"
+        1,"Can't drop space 't0': use DROP TABLE"
 		-- </sql-errors-1.8>
 	})
 
@@ -103,7 +103,7 @@ test:do_catchsql_test(
 		DROP TABLE v0;
 	]], {
 		-- <sql-errors-1.9>
-		1,"Can't drop space 'V0': use DROP VIEW"
+        1,"Can't drop space 'v0': use DROP VIEW"
 		-- </sql-errors-1.9>
 	})
 
@@ -114,7 +114,7 @@ test:do_catchsql_test(
 	]], {
 		-- <sql-errors-1.10>
                 1,"Failed to create foreign key constraint "..
-                "'fk_unnamed_T10_I_1': referenced space can't be VIEW"
+                "'fk_unnamed_t10_i_1': referenced space can't be VIEW"
 		-- </sql-errors-1.10>
 	})
 
@@ -124,7 +124,7 @@ test:do_catchsql_test(
 		CREATE VIEW v11 AS SELECT * FROM t0 WHERE i = ?;
 	]], {
 		-- <sql-errors-1.11>
-		1,"Failed to create space 'V11': parameters are not allowed in views"
+        1,"Failed to create space 'v11': parameters are not allowed in views"
 		-- </sql-errors-1.11>
 	})
 
@@ -134,7 +134,7 @@ test:do_catchsql_test(
 		CREATE INDEX i12 ON v0(i);
 	]], {
 		-- <sql-errors-1.12>
-		1,"Can't create or modify index 'I12' in space 'V0': views can not be indexed"
+        1,"Can't create or modify index 'i12' in space 'v0': views can not be indexed"
 		-- </sql-errors-1.12>
 	})
 
@@ -275,7 +275,7 @@ test:do_catchsql_test(
 		INSERT INTO v0 VALUES (2);
 	]], {
 		-- <sql-errors-1.23>
-		1,"Can't modify space 'V0': space is a view"
+        1,"Can't modify space 'v0': space is a view"
 		-- </sql-errors-1.23>
 	})
 
@@ -285,7 +285,7 @@ test:do_catchsql_test(
 		UPDATE v0 SET i = 2 WHERE i = 1;
 	]], {
 		-- <sql-errors-1.24>
-		1,"Can't modify space 'V0': space is a view"
+        1,"Can't modify space 'v0': space is a view"
 		-- </sql-errors-1.24>
 	})
 
@@ -295,7 +295,7 @@ test:do_catchsql_test(
 		DELETE FROM v0;
 	]], {
 		-- <sql-errors-1.25>
-		1,"Can't modify space 'V0': space is a view"
+        1,"Can't modify space 'v0': space is a view"
 		-- </sql-errors-1.25>
 	})
 
@@ -394,7 +394,7 @@ test:do_catchsql_test(
 	select_statement,
 	{
 		-- <sql-errors-1.34>
-		1,"Invalid identifier 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' (expected printable symbols only or it is too long)"
+        1,"Invalid identifier 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' (expected printable symbols only or it is too long)"
 		-- </sql-errors-1.34>
 	})
 
@@ -411,10 +411,10 @@ test:do_catchsql_test(
 test:do_catchsql_test(
 	"sql-errors-1.36",
 	[[
-		SELECT likelihood(1, 2);
+        SELECT LIKELIHOOD(1, 2);
 	]], {
 		-- <sql-errors-1.36>
-		1,"Illegal parameters, second argument to likelihood() must be a constant between 0.0 and 1.0"
+        1,"Illegal parameters, second argument to LIKELIHOOD() must be a constant between 0.0 and 1.0"
 		-- </sql-errors-1.36>
 	})
 
@@ -444,7 +444,7 @@ test:do_catchsql_test(
 		SELECT * FROM t0();
 	]], {
 		-- <sql-errors-1.39>
-		1,"'T0' is not a function"
+        1,"'t0' is not a function"
 		-- </sql-errors-1.39>
 	})
 
@@ -514,7 +514,7 @@ test:do_catchsql_test(
 		INSERT INTO not_exist VALUES(1) a;
 	]], {
 		-- <sql-errors-1.46>
-		1, "Space 'NOT_EXIST' does not exist"
+        1, "Space 'not_exist' does not exist"
 		-- </sql-errors-1.46>
 	})
 
@@ -805,9 +805,9 @@ test:do_catchsql_test(
 		"ыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыы...) to unsigned"
 	})
 
-local format = {{'I', 'integer'}, {'A', 'array'}, {'M', 'map'}}
-local s = box.schema.space.create('TEST', {format=format})
-s:create_index('I')
+local format = {{'i', 'integer'}, {'a', 'array'}, {'m', 'map'}}
+local s = box.schema.space.create('test', {format=format})
+s:create_index('i')
 s:insert({1, {str1}, {a = 1, b = str1}})
 
 test:do_catchsql_test(

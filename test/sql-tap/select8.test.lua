@@ -32,7 +32,7 @@ test:execsql [[
     INSERT INTO songs VALUES(6,'two',11);
 ]]
 local result = test:execsql [[
-    SELECT DISTINCT artist,sum(timesplayed) AS total
+    SELECT DISTINCT artist, SUM(timesplayed) AS total
     FROM songs
     GROUP BY LOWER(artist)
 ]]
@@ -48,7 +48,7 @@ end
 test:do_execsql_test(
     "select8-1.1",
     [[
-        SELECT DISTINCT artist,sum(timesplayed) AS total
+        SELECT DISTINCT artist, SUM(timesplayed) AS total
         FROM songs
         GROUP BY LOWER(artist)
         LIMIT 1 OFFSET 1
@@ -57,7 +57,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select8-1.2",
     [[
-        SELECT DISTINCT artist,sum(timesplayed) AS total
+        SELECT DISTINCT artist, SUM(timesplayed) AS total
         FROM songs
         GROUP BY LOWER(artist)
         LIMIT 2 OFFSET 1
@@ -66,7 +66,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select8-1.3",
     [[
-        SELECT DISTINCT artist,sum(timesplayed) AS total
+        SELECT DISTINCT artist, SUM(timesplayed) AS total
         FROM songs
         GROUP BY LOWER(artist)
         LIMIT 1000 OFFSET 2

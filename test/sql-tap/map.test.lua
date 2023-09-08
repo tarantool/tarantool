@@ -2,7 +2,7 @@
 local test = require("sqltester")
 test:plan(112)
 
-box.schema.func.create('M1', {
+box.schema.func.create('m1', {
     language = 'Lua',
     body = 'function(a, b) local m = {[a] = b} '..
            'return setmetatable(m, { __serialize = "map" }) end',
@@ -11,7 +11,7 @@ box.schema.func.create('M1', {
     exports = {'LUA', 'SQL'}
 });
 
-box.schema.func.create('M2', {
+box.schema.func.create('m2', {
     language = 'Lua',
     body = 'function(a, b, c, d) local m = {[a] = b, [c] = d} '..
            'return setmetatable(m, { __serialize = "map" }) end',
@@ -20,7 +20,7 @@ box.schema.func.create('M2', {
     exports = {'LUA', 'SQL'}
 });
 
-box.schema.func.create('M3', {
+box.schema.func.create('m3', {
     language = 'Lua',
     body = 'function(a, b, c, d, e, f) local m = {[a] = b, [c] = d, [e] = f} '..
            'return setmetatable(m, { __serialize = "map" }) end',
@@ -37,7 +37,7 @@ test:do_execsql_test(
     ]], {
     })
 
-box.space.T:insert({0, {a = 1, b = 2}})
+box.space.t:insert({0, {a = 1, b = 2}})
 
 -- Make sure it is possible to select from MAP field.
 test:do_execsql_test(

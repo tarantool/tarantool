@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(75)
+test:plan(73)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -114,7 +114,7 @@ test:do_test(
 test:do_test(
     "table-1.13",
     function()
-        return test:execsql [[DROP TABLE "TEST1"]]
+        return test:execsql [[DROP TABLE "test1"]]
         --execsql {SELECT name FROM "sql_master" WHERE type!='meta'}
     end, {
         -- <table-1.13>
@@ -127,11 +127,11 @@ test:do_test(
 test:do_test(
     "table-2.1",
     function()
-        test:execsql "CREATE TABLE TEST2(one text primary key)"
+        test:execsql "CREATE TABLE test2(one text primary key)"
         return test:catchsql "CREATE TABLE test2(id int primary key, two text default 'hi')"
     end, {
         -- <table-2.1>
-        1, "Space 'TEST2' already exists"
+        1, "Space 'test2' already exists"
         -- </table-2.1>
     })
 
@@ -263,31 +263,11 @@ test:do_test(
 test:do_catchsql_test(
     "table-3.2",
     [[
-        CREATE TABLE BIG(xyz int primary key)
+        CREATE TABLE big(xyz int primary key)
     ]], {
         -- <table-3.2>
-        1, "Space 'BIG' already exists"
+        1, "Space 'big' already exists"
         -- </table-3.2>
-    })
-
-test:do_catchsql_test(
-    "table-3.3",
-    [[
-        CREATE TABLE biG(xyz int primary key)
-    ]], {
-        -- <table-3.3>
-        1, "Space 'BIG' already exists"
-        -- </table-3.3>
-    })
-
-test:do_catchsql_test(
-    "table-3.4",
-    [[
-        CREATE TABLE bIg(xyz int primary key)
-    ]], {
-        -- <table-3.4>
-        1, "Space 'BIG' already exists"
-        -- </table-3.4>
     })
 
 -- do_test table-3.5 {
@@ -311,7 +291,7 @@ test:do_test(
 --
 local r = {}
 for i = 1, 100, 1 do
-    table.insert(r, string.format("TEST%03d", i))
+    table.insert(r, string.format("test%03d", i))
 end
 test:do_test(
     "table-4.1",
@@ -337,14 +317,14 @@ test:do_test(
 --
 r = {}
 for i = 1, 100, 2 do
-    table.insert(r,string.format("TEST%03d", i))
+    table.insert(r,string.format("test%03d", i))
 end
 test:do_test(
     "table-4.2",
     function()
         for i = 2, 100, 2 do
             -- if {$i==38} {execsql {pragma vdbe_trace=on}}
-            local sql = "DROP TABLE "..string.format("TEST%03d", i)..""
+            local sql = "DROP TABLE "..string.format("test%03d", i)..""
             test:execsql(sql)
         end
         --execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
@@ -377,14 +357,14 @@ test:do_catchsql_test(
         DROP TABLE test009
     ]], {
         -- <table-5.1.1>
-        1, "Space 'TEST009' does not exist"
+        1, "Space 'test009' does not exist"
         -- </table-5.1.1>
     })
 
 test:do_catchsql_test(
     "table-5.1.2",
     [[
-        DROP TABLE IF EXISTS TEST009
+        DROP TABLE IF EXISTS test009
     ]], {
         -- <table-5.1.2>
         0
@@ -472,7 +452,7 @@ test:do_test(
         --execsql {SELECT name FROM sql_master WHERE type!='meta'}
     end, {
         -- <table-5.4>
-        "TEST1"
+        "test1"
         -- </table-5.4>
     })
 
@@ -495,7 +475,7 @@ test:do_catchsql_test(
           key int,
           "14_vac" int,
           fuzzy_dog_12 varchar(10),
-          beginn SCALAR,
+          begin_n SCALAR,
           endd SCALAR
         )
     ]=], {
@@ -521,7 +501,8 @@ test:do_execsql2_test(
         SELECT * FROM weird;
     ]], {
         -- <table-7.3>
-        "ID",1,"desc","a","asc","b","KEY",9,"14_vac",0,"FUZZY_DOG_12","xyz","BEGINN","hi","ENDD","y'all"
+        "id",1,"desc","a","asc","b","key",9,"14_vac",0,"fuzzy_dog_12","xyz",
+        "begin_n","hi","endd","y'all"
         -- </table-7.3>
     })
 
@@ -551,14 +532,15 @@ test:do_execsql2_test(
           key int,
           "14_vac" int,
           fuzzy_dog_12 varchar(10),
-          beginn SCALAR,
+          begin_n SCALAR,
           endd SCALAR
         );
         INSERT INTO t2 SELECT * from weird;
         SELECT * FROM t2;
     ]=], {
         -- <table-8.1>
-        "ID",1,"desc","a","asc","b","KEY",9,"14_vac",0,"FUZZY_DOG_12","xyz","BEGINN","hi","ENDD","y'all"
+        "id",1,"desc","a","asc","b","key",9,"14_vac",0,"fuzzy_dog_12","xyz",
+        "begin_n","hi","endd","y'all"
         -- </table-8.1>
     })
 
@@ -640,7 +622,8 @@ test:do_execsql2_test(
         SELECT * FROM t2;
     ]], {
         -- <table-8.6>
-        "ID",1,"desc","a","asc","b","KEY",9,"14_vac",0,"FUZZY_DOG_12","xyz","BEGINN","hi","ENDD","y'all"
+        "id",1,"desc","a","asc","b","key",9,"14_vac",0,"fuzzy_dog_12","xyz",
+        "begin_n","hi","endd","y'all"
         -- </table-8.6>
     })
 
@@ -650,7 +633,7 @@ test:do_catchsql_test(
         SELECT * FROM t5;
     ]], {
         -- <table-8.7>
-        1, "Space 'T5' does not exist"
+        1, "Space 't5' does not exist"
         -- </table-8.7>
     })
 
@@ -697,7 +680,7 @@ test:do_catchsql_test(
         CREATE TABLE t6(a int primary key,b int,a int);
     ]], {
         -- <table-9.1>
-        1, "Space field 'A' is duplicate"
+        1, "Space field 'a' is duplicate"
         -- </table-9.1>
     })
 
@@ -707,7 +690,7 @@ test:do_catchsql_test(
         CREATE TABLE t6(a varchar(100) primary key, b SCALAR, a integer);
     ]], {
         -- <table-9.2>
-        1, "Space field 'A' is duplicate"
+        1, "Space field 'a' is duplicate"
         -- </table-9.2>
     })
 
@@ -722,7 +705,7 @@ test:do_catchsql_test(
         INSERT INTO t6 VALUES(NULL);
     ]], {
         -- <table-10.1>
-        1, "Failed to execute SQL statement: NOT NULL constraint failed: T6.A"
+        1, "Failed to execute SQL statement: NOT NULL constraint failed: t6.a"
         -- </table-10.1>
     })
 
@@ -758,7 +741,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <table-10.7>
-        1, "Failed to create foreign key constraint 'fk_unnamed_T6_1': foreign key refers to nonexistent field B"
+        1, "Failed to create foreign key constraint 'fk_unnamed_t6_1': foreign key refers to nonexistent field b"
         -- </table-10.7>
     })
 
@@ -770,7 +753,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <table-10.9>
-        1, "Failed to create foreign key constraint 'fk_unnamed_T6_1': number of columns in foreign key does not match the number of columns in the primary index of referenced table"
+        1, "Failed to create foreign key constraint 'fk_unnamed_t6_1': number of columns in foreign key does not match the number of columns in the primary index of referenced table"
         -- </table-10.9>
     })
 
@@ -785,7 +768,7 @@ test:do_test(
         ]]
     end, {
         -- <table-10.10>
-        1, "Failed to create foreign key constraint 'fk_unnamed_T6_1': number of columns in foreign key does not match the number of columns in the primary index of referenced table"
+        1, "Failed to create foreign key constraint 'fk_unnamed_t6_1': number of columns in foreign key does not match the number of columns in the primary index of referenced table"
         -- </table-10.10>
     })
 
@@ -798,7 +781,7 @@ test:do_test(
         ]]
     end, {
         -- <table-10.11>
-        1, "Failed to create foreign key constraint 'fk_unnamed_T6_C_1': "..
+        1, "Failed to create foreign key constraint 'fk_unnamed_t6_c_1': "..
         "number of columns in foreign key does not match the number of "..
         "columns in the primary index of referenced table"
         -- </table-10.11>
@@ -815,8 +798,8 @@ test:do_test(
         ]]
     end, {
         -- <table-10.12>
-        1, [[Failed to create foreign key constraint 'fk_unnamed_T6_1': ]]..
-           [[foreign key refers to nonexistent field X]]
+        1, [[Failed to create foreign key constraint 'fk_unnamed_t6_1': ]]..
+           [[foreign key refers to nonexistent field x]]
         -- </table-10.12>
     })
 
@@ -831,8 +814,8 @@ test:do_test(
         ]]
     end, {
         -- <table-10.13>
-        1, [[Failed to create foreign key constraint 'fk_unnamed_T6_1': ]]..
-           [[foreign key refers to nonexistent field X]]
+        1, [[Failed to create foreign key constraint 'fk_unnamed_t6_1': ]]..
+           [[foreign key refers to nonexistent field x]]
         -- </table-10.13>
     })
 
@@ -855,8 +838,8 @@ test:do_execsql_test(
            h text
         );
         INSERT INTO t7(a) VALUES(1);
-        SELECT typeof(a), typeof(b), typeof(c), typeof(d),
-               typeof(e), typeof(f), typeof(g), typeof(h)
+        SELECT TYPEOF(a), TYPEOF(b), TYPEOF(c), TYPEOF(d),
+               TYPEOF(e), TYPEOF(f), TYPEOF(g), TYPEOF(h)
         FROM t7 LIMIT 1;
     ]], {
         -- <table-11.1>
@@ -867,7 +850,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "table-11.2",
     [[
-        SELECT typeof(a+b), typeof(a||b), typeof(c+d), typeof(c||d)
+        SELECT TYPEOF(a+b), TYPEOF(a||b), TYPEOF(c+d), TYPEOF(c||d)
         FROM t7 LIMIT 1;
     ]], {
         -- <table-11.2>
@@ -1162,38 +1145,38 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "table-21.2",
     [[
-        INSERT INTO T21 VALUES(1, 1, 1);
-        INSERT INTO T21 VALUES(1, 2, 2);
+        INSERT INTO t21 VALUES(1, 1, 1);
+        INSERT INTO t21 VALUES(1, 2, 2);
     ]], {
         -- <table-21.2>
-        1, "Duplicate key exists in unique index \"pk_unnamed_T21_1\" in space \"T21\" with old tuple - [1, 1, 1] and new tuple - [1, 2, 2]"
+        1, "Duplicate key exists in unique index \"pk_unnamed_t21_1\" in space \"t21\" with old tuple - [1, 1, 1] and new tuple - [1, 2, 2]"
         -- </table-21.2>
     })
 
 test:do_catchsql_test(
     "table-21.3",
     [[
-        INSERT INTO T21 VALUES(2, -1, 1);
+        INSERT INTO t21 VALUES(2, -1, 1);
     ]], {
         -- <table-21.3>
-        1, "Check constraint 'ck_unnamed_T21_1' failed for a tuple"
+        1, "Check constraint 'ck_unnamed_t21_1' failed for a tuple"
         -- </table-21.3>
     })
 
 test:do_catchsql_test(
     "table-21.4",
     [[
-        INSERT INTO T21 VALUES(2, 1, -1);
+        INSERT INTO t21 VALUES(2, 1, -1);
     ]], {
         -- <table-21.4>
-        1, "Check constraint 'ck_unnamed_T21_C_1' failed for field '3 (C)'"
+        1, "Check constraint 'ck_unnamed_t21_C_1' failed for field '3 (C)'"
         -- </table-21.4>
     })
 
 test:do_execsql_test(
     "check-21.cleanup",
     [[
-        DROP TABLE IF EXISTS T21;
+        DROP TABLE IF EXISTS t21;
     ]], {
         -- <check-21.cleanup>
 
@@ -1327,7 +1310,7 @@ test:do_catchsql_test(
         INSERT INTO T28 VALUES(0);
     ]], {
         -- <table-22.10>
-        1, "Check constraint 'CHECK1' failed for a tuple"
+        1, "Check constraint 'check1' failed for a tuple"
         -- </table-22.10>
     })
 
@@ -1337,7 +1320,7 @@ test:do_catchsql_test(
         INSERT INTO T28 VALUES(9);
     ]], {
         -- <table-22.11>
-        1, "Check constraint 'CHECK2' failed for a tuple"
+        1, "Check constraint 'check2' failed for a tuple"
         -- </table-22.11>
     })
 

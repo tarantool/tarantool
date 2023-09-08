@@ -26,14 +26,14 @@ test_run:cmd("setopt delimiter ';'")
  | ---
  | - true
  | ...
-box.schema.func.create('RETURN_TYPE', {language = 'Lua',
+box.schema.func.create('return_type', {language = 'Lua',
 		       is_deterministic = true,
 		       body = 'function(x) return type(x) end',
 		       returns = 'string', param_list = {'any'},
 		       exports = {'LUA', 'SQL'}});
  | ---
  | ...
-box.schema.func.create('IS_BOOLEAN', {language = 'Lua',
+box.schema.func.create('is_boolean', {language = 'Lua',
 		       is_deterministic = true,
 		       body = "function(x) return type(x) == 'boolean' end",
 		       returns = 'boolean', param_list = {'any'},
@@ -53,7 +53,7 @@ test_run:cmd("setopt delimiter ''");
 SELECT a FROM t WHERE a;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   rows:
  |   - [true]
@@ -61,7 +61,7 @@ SELECT a FROM t WHERE a;
 SELECT a FROM t WHERE a != true;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   rows:
  |   - [false]
@@ -87,9 +87,9 @@ INSERT INTO t0 VALUES (3, NULL);
 SELECT * FROM t0;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   rows:
  |   - [1, false]
@@ -105,9 +105,9 @@ INSERT INTO t0 VALUES (4, UNKNOWN);
 SELECT * FROM t0;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   rows:
  |   - [1, false]
@@ -128,7 +128,7 @@ INSERT INTO ts SELECT * FROM t0;
 SELECT s FROM ts WHERE s = true;
  | ---
  | - metadata:
- |   - name: S
+ |   - name: s
  |     type: scalar
  |   rows:
  |   - [true]
@@ -143,7 +143,7 @@ INSERT INTO ts(s) VALUES ('abc'), (12.5);
 SELECT s FROM ts WHERE s = true;
  | ---
  | - metadata:
- |   - name: S
+ |   - name: s
  |     type: scalar
  |   rows:
  |   - [true]
@@ -151,7 +151,7 @@ SELECT s FROM ts WHERE s = true;
 SELECT s FROM ts WHERE s < true;
  | ---
  | - metadata:
- |   - name: S
+ |   - name: s
  |     type: scalar
  |   rows:
  |   - [false]
@@ -159,7 +159,7 @@ SELECT s FROM ts WHERE s < true;
 SELECT s FROM ts WHERE s IN (true, 1, 'abcd');
  | ---
  | - metadata:
- |   - name: S
+ |   - name: s
  |     type: scalar
  |   rows:
  |   - [true]
@@ -222,7 +222,7 @@ EXPLAIN QUERY PLAN SELECT a FROM t0 WHERE a = true;
  |   - name: detail
  |     type: text
  |   rows:
- |   - [0, 0, 0, 'SEARCH TABLE T0 USING COVERING INDEX I0 (A=?) (~10 rows)']
+ |   - [0, 0, 0, 'SEARCH TABLE t0 USING COVERING INDEX i0 (a=?) (~10 rows)']
  | ...
 
 -- Check that ephemeral tables are used with BOOLEAN.
@@ -284,22 +284,22 @@ SELECT is_boolean('true');
  | ...
 
 -- Check BOOLEAN as argument of scalar function.
-SELECT abs(a) FROM t0;
+SELECT ABS(a) FROM t0;
  | ---
  | - null
  | - 'Failed to execute SQL statement: wrong arguments for function ABS()'
  | ...
-SELECT lower(a) FROM t0;
+SELECT LOWER(a) FROM t0;
  | ---
  | - null
  | - 'Failed to execute SQL statement: wrong arguments for function LOWER()'
  | ...
-SELECT upper(a) FROM t0;
+SELECT UPPER(a) FROM t0;
  | ---
  | - null
  | - 'Failed to execute SQL statement: wrong arguments for function UPPER()'
  | ...
-SELECT quote(a) FROM t0;
+SELECT QUOTE(a) FROM t0;
  | ---
  | - metadata:
  |   - name: COLUMN_1
@@ -311,12 +311,12 @@ SELECT quote(a) FROM t0;
  |   - ['NULL']
  | ...
 -- gh-4462: LENGTH didn't take BOOLEAN arguments.
-SELECT length(a) FROM t0;
+SELECT LENGTH(a) FROM t0;
  | ---
  | - null
  | - 'Failed to execute SQL statement: wrong arguments for function LENGTH()'
  | ...
-SELECT typeof(a) FROM t0;
+SELECT TYPEOF(a) FROM t0;
  | ---
  | - metadata:
  |   - name: COLUMN_1
@@ -379,7 +379,7 @@ SELECT GROUP_CONCAT(a, ' +++ ') FROM t0;
  | ---
  | - true
  | ...
-box.execute('SELECT ?, ?, return_type($1), typeof($2);', {true, false})
+box.execute('SELECT ?, ?, return_type($1), TYPEOF($2);', {true, false})
  | ---
  | - metadata:
  |   - name: COLUMN_1
@@ -436,7 +436,7 @@ INSERT INTO t1 VALUES (1, false);
 INSERT INTO t1 VALUES (2, true);
  | ---
  | - null
- | - Check constraint 'CK' failed for a tuple
+ | - Check constraint 'ck' failed for a tuple
  | ...
 
 -- Check interactions with FOREIGN KEY constraint.
@@ -447,13 +447,13 @@ CREATE TABLE t2 (a BOOLEAN PRIMARY KEY, b BOOLEAN REFERENCES t2(a));
 INSERT INTO t2 VALUES (false, true)
  | ---
  | - null
- | - 'Foreign key constraint ''fk_unnamed_T2_B_1'' failed for field ''2 (B)'': foreign
+ | - 'Foreign key constraint ''fk_unnamed_t2_b_1'' failed for field ''2 (b)'': foreign
  |   tuple was not found'
  | ...
 INSERT INTO t2 VALUES (true, false)
  | ---
  | - null
- | - 'Foreign key constraint ''fk_unnamed_T2_B_1'' failed for field ''2 (B)'': foreign
+ | - 'Foreign key constraint ''fk_unnamed_t2_b_1'' failed for field ''2 (b)'': foreign
  |   tuple was not found'
  | ...
 INSERT INTO t2 VALUES (true, NULL)
@@ -481,13 +481,13 @@ INSERT INTO t3 VALUES (2, false)
 INSERT INTO t3 VALUES (3, true)
  | ---
  | - null
- | - Duplicate key exists in unique index "UQ" in space "T3" with old tuple - [1, true]
+ | - Duplicate key exists in unique index "uq" in space "t3" with old tuple - [1, true]
  |   and new tuple - [3, true]
  | ...
 INSERT INTO t3 VALUES (4, false)
  | ---
  | - null
- | - Duplicate key exists in unique index "UQ" in space "T3" with old tuple - [2, false]
+ | - Duplicate key exists in unique index "uq" in space "t3" with old tuple - [2, false]
  |   and new tuple - [4, false]
  | ...
 
@@ -605,9 +605,9 @@ DROP TRIGGER r;
 SELECT * FROM t4;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   rows:
  |   - [100, false]
@@ -615,9 +615,9 @@ SELECT * FROM t4;
 SELECT * FROM t5;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: B
+ |   - name: b
  |     type: boolean
  |   rows:
  |   - [1, true]
@@ -631,9 +631,9 @@ INSERT INTO t5 VALUES (100, false);
 SELECT * FROM t4 UNION SELECT * FROM t5;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   rows:
  |   - [1, true]
@@ -642,9 +642,9 @@ SELECT * FROM t4 UNION SELECT * FROM t5;
 SELECT * FROM t4 UNION ALL SELECT * FROM t5;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   rows:
  |   - [100, false]
@@ -654,9 +654,9 @@ SELECT * FROM t4 UNION ALL SELECT * FROM t5;
 SELECT * FROM t4 INTERSECT SELECT * FROM t5;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   rows:
  |   - [100, false]
@@ -672,9 +672,9 @@ INSERT INTO t5(b) SELECT a FROM t4;
 SELECT * FROM t5;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: B
+ |   - name: b
  |     type: boolean
  |   rows:
  |   - [1, true]
@@ -685,13 +685,13 @@ SELECT * FROM t5;
 SELECT * FROM (SELECT t4.i, t5.i, a, b FROM t4, t5 WHERE a = false OR b = true);
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: I_1
+ |   - name: i_1
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
- |   - name: B
+ |   - name: b
  |     type: boolean
  |   rows:
  |   - [100, 1, false, true]
@@ -707,7 +707,7 @@ CREATE VIEW v AS SELECT b FROM t5;
 SELECT * FROM v;
  | ---
  | - metadata:
- |   - name: B
+ |   - name: b
  |     type: boolean
  |   rows:
  |   - [true]
@@ -719,7 +719,7 @@ SELECT * FROM v;
 SELECT DISTINCT * FROM v;
  | ---
  | - metadata:
- |   - name: B
+ |   - name: b
  |     type: boolean
  |   rows:
  |   - [true]
@@ -735,9 +735,9 @@ INSERT INTO t4 SELECT * from temp;
 SELECT * FROM t4;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   rows:
  |   - [100, false]
@@ -750,9 +750,9 @@ WITH RECURSIVE cnt(x, y) AS \
 SELECT x, y FROM cnt;
  | ---
  | - metadata:
- |   - name: X
+ |   - name: x
  |     type: integer
- |   - name: Y
+ |   - name: y
  |     type: boolean
  |   rows:
  |   - [1, false]
@@ -771,13 +771,13 @@ SELECT x, y FROM cnt;
 SELECT * FROM t4 JOIN t5 ON t4.a = t5.b;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: B
+ |   - name: b
  |     type: boolean
  |   rows:
  |   - [100, false, 100, false]
@@ -789,13 +789,13 @@ SELECT * FROM t4 JOIN t5 ON t4.a = t5.b;
 SELECT * FROM t4 LEFT JOIN t5 ON t4.a = t5.b;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: B
+ |   - name: b
  |     type: boolean
  |   rows:
  |   - [100, false, 100, false]
@@ -807,13 +807,13 @@ SELECT * FROM t4 LEFT JOIN t5 ON t4.a = t5.b;
 SELECT * FROM t4 INNER JOIN t5 ON t4.a = t5.b;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: B
+ |   - name: b
  |     type: boolean
  |   rows:
  |   - [100, false, 100, false]
@@ -831,9 +831,9 @@ UPDATE t4 SET a = NOT a;
 SELECT * FROM t4;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   rows:
  |   - [100, true]
@@ -851,9 +851,9 @@ END AS a0 \
 FROM t4;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A0
+ |   - name: a0
  |     type: boolean
  |   rows:
  |   - [100, true]
@@ -865,9 +865,9 @@ FROM t4;
 SELECT * FROM t4 UNION SELECT * FROM t5 ORDER BY a, i;
  | ---
  | - metadata:
- |   - name: I
+ |   - name: i
  |     type: integer
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   rows:
  |   - [100, false]
@@ -882,7 +882,7 @@ SELECT * FROM t4 UNION SELECT * FROM t5 ORDER BY a, i;
 SELECT a, COUNT(*) FROM (SELECT * FROM t4 UNION SELECT * FROM t5) GROUP BY a;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: integer
@@ -920,7 +920,7 @@ SELECT NOT false;
 SELECT a, NOT a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -997,7 +997,7 @@ SELECT false OR false;
 SELECT a, true AND a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1008,7 +1008,7 @@ SELECT a, true AND a FROM t;
 SELECT a, false AND a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1019,7 +1019,7 @@ SELECT a, false AND a FROM t;
 SELECT a, true OR a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1030,7 +1030,7 @@ SELECT a, true OR a FROM t;
 SELECT a, false OR a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1041,7 +1041,7 @@ SELECT a, false OR a FROM t;
 SELECT a, a AND true FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1052,7 +1052,7 @@ SELECT a, a AND true FROM t;
 SELECT a, a AND false FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1063,7 +1063,7 @@ SELECT a, a AND false FROM t;
 SELECT a, a OR true FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1074,7 +1074,7 @@ SELECT a, a OR true FROM t;
 SELECT a, a OR false FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1086,9 +1086,9 @@ SELECT a, a OR false FROM t;
 SELECT a, a1, a AND a1 FROM t, t6;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
- |   - name: A1
+ |   - name: a1
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1101,9 +1101,9 @@ SELECT a, a1, a AND a1 FROM t, t6;
 SELECT a, a1, a OR a1 FROM t, t6;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
- |   - name: A1
+ |   - name: a1
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1702,7 +1702,7 @@ SELECT false < false;
 SELECT a, true > a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1713,7 +1713,7 @@ SELECT a, true > a FROM t;
 SELECT a, false > a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1724,7 +1724,7 @@ SELECT a, false > a FROM t;
 SELECT a, true < a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1735,7 +1735,7 @@ SELECT a, true < a FROM t;
 SELECT a, false < a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1746,7 +1746,7 @@ SELECT a, false < a FROM t;
 SELECT a, a > true FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1757,7 +1757,7 @@ SELECT a, a > true FROM t;
 SELECT a, a > false FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1768,7 +1768,7 @@ SELECT a, a > false FROM t;
 SELECT a, a < true FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1779,7 +1779,7 @@ SELECT a, a < true FROM t;
 SELECT a, a < false FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1791,9 +1791,9 @@ SELECT a, a < false FROM t;
 SELECT a, a1, a > a1 FROM t, t6;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
- |   - name: A1
+ |   - name: a1
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1806,9 +1806,9 @@ SELECT a, a1, a > a1 FROM t, t6;
 SELECT a, a1, a < a1 FROM t, t6;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
- |   - name: A1
+ |   - name: a1
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1887,7 +1887,7 @@ SELECT false <= false;
 SELECT a, true >= a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: any
@@ -1898,7 +1898,7 @@ SELECT a, true >= a FROM t;
 SELECT a, false >= a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: any
@@ -1909,7 +1909,7 @@ SELECT a, false >= a FROM t;
 SELECT a, true <= a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1920,7 +1920,7 @@ SELECT a, true <= a FROM t;
 SELECT a, false <= a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1931,7 +1931,7 @@ SELECT a, false <= a FROM t;
 SELECT a, a >= true FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: any
@@ -1942,7 +1942,7 @@ SELECT a, a >= true FROM t;
 SELECT a, a >= false FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: any
@@ -1953,7 +1953,7 @@ SELECT a, a >= false FROM t;
 SELECT a, a <= true FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1964,7 +1964,7 @@ SELECT a, a <= true FROM t;
 SELECT a, a <= false FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -1976,9 +1976,9 @@ SELECT a, a <= false FROM t;
 SELECT a, a1, a >= a1 FROM t, t6;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
- |   - name: A1
+ |   - name: a1
  |     type: boolean
  |   - name: COLUMN_1
  |     type: any
@@ -1991,9 +1991,9 @@ SELECT a, a1, a >= a1 FROM t, t6;
 SELECT a, a1, a <= a1 FROM t, t6;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
- |   - name: A1
+ |   - name: a1
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2072,7 +2072,7 @@ SELECT false != false;
 SELECT a, true == a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2083,7 +2083,7 @@ SELECT a, true == a FROM t;
 SELECT a, false == a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2094,7 +2094,7 @@ SELECT a, false == a FROM t;
 SELECT a, true != a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2105,7 +2105,7 @@ SELECT a, true != a FROM t;
 SELECT a, false != a FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2116,7 +2116,7 @@ SELECT a, false != a FROM t;
 SELECT a, a == true FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2127,7 +2127,7 @@ SELECT a, a == true FROM t;
 SELECT a, a == false FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2138,7 +2138,7 @@ SELECT a, a == false FROM t;
 SELECT a, a != true FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2149,7 +2149,7 @@ SELECT a, a != true FROM t;
 SELECT a, a != false FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2161,9 +2161,9 @@ SELECT a, a != false FROM t;
 SELECT a, a1, a == a1 FROM t, t6;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
- |   - name: A1
+ |   - name: a1
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2176,9 +2176,9 @@ SELECT a, a1, a == a1 FROM t, t6;
 SELECT a, a1, a != a1 FROM t, t6;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
- |   - name: A1
+ |   - name: a1
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2289,7 +2289,7 @@ SELECT false IN (1, 1.2, 'true', false);
 SELECT a, a IN (true) FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2300,7 +2300,7 @@ SELECT a, a IN (true) FROM t;
 SELECT a, a IN (false) FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2311,7 +2311,7 @@ SELECT a, a IN (false) FROM t;
 SELECT a, a IN (true, false) FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2322,7 +2322,7 @@ SELECT a, a IN (true, false) FROM t;
 SELECT a, a IN (SELECT a1 FROM t6 LIMIT 1) FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2333,7 +2333,7 @@ SELECT a, a IN (SELECT a1 FROM t6 LIMIT 1) FROM t;
 SELECT a, a IN (SELECT a1 FROM t6) FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2344,7 +2344,7 @@ SELECT a, a IN (SELECT a1 FROM t6) FROM t;
 SELECT a, a IN (1, 1.2, 'true', false) FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2421,7 +2421,7 @@ SELECT false BETWEEN false AND true;
 SELECT a, a BETWEEN true AND true FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2432,7 +2432,7 @@ SELECT a, a BETWEEN true AND true FROM t;
 SELECT a, a BETWEEN false AND false FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2443,7 +2443,7 @@ SELECT a, a BETWEEN false AND false FROM t;
 SELECT a, a BETWEEN true AND false FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2454,7 +2454,7 @@ SELECT a, a BETWEEN true AND false FROM t;
 SELECT a, a BETWEEN false AND true FROM t;
  | ---
  | - metadata:
- |   - name: A
+ |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -2569,7 +2569,7 @@ SELECT b, true AND b FROM t7;
 SELECT b, false AND b FROM t7;
  | ---
  | - metadata:
- |   - name: B
+ |   - name: b
  |     type: integer
  |   - name: COLUMN_1
  |     type: boolean
@@ -2594,7 +2594,7 @@ SELECT b, b AND true FROM t7;
 SELECT b, b AND false FROM t7;
  | ---
  | - metadata:
- |   - name: B
+ |   - name: b
  |     type: integer
  |   - name: COLUMN_1
  |     type: boolean
@@ -3918,7 +3918,7 @@ SELECT false IN (SELECT b FROM t7);
 SELECT a1, a1 IN (0, 1, 2, 3) FROM t6
  | ---
  | - metadata:
- |   - name: A1
+ |   - name: a1
  |     type: boolean
  |   - name: COLUMN_1
  |     type: boolean
@@ -4054,7 +4054,7 @@ SELECT c, true AND c FROM t8;
 SELECT c, false AND c FROM t8;
  | ---
  | - metadata:
- |   - name: C
+ |   - name: c
  |     type: double
  |   - name: COLUMN_1
  |     type: boolean
@@ -4079,7 +4079,7 @@ SELECT c, c AND true FROM t8;
 SELECT c, c AND false FROM t8;
  | ---
  | - metadata:
- |   - name: C
+ |   - name: c
  |     type: double
  |   - name: COLUMN_1
  |     type: boolean
@@ -5230,7 +5230,7 @@ SELECT d, true AND d FROM t9;
 SELECT d, false AND d FROM t9;
  | ---
  | - metadata:
- |   - name: D
+ |   - name: d
  |     type: string
  |   - name: COLUMN_1
  |     type: boolean
@@ -5255,7 +5255,7 @@ SELECT d, d AND true FROM t9;
 SELECT d, d AND false FROM t9;
  | ---
  | - metadata:
- |   - name: D
+ |   - name: d
  |     type: string
  |   - name: COLUMN_1
  |     type: boolean
@@ -5605,7 +5605,7 @@ SELECT d, true AND d FROM t9 WHERE d = 'TRUE';
 SELECT d, false AND d FROM t9 WHERE d = 'TRUE';
  | ---
  | - metadata:
- |   - name: D
+ |   - name: d
  |     type: string
  |   - name: COLUMN_1
  |     type: boolean
@@ -5630,7 +5630,7 @@ SELECT d, d AND true FROM t9 WHERE d = 'TRUE';
 SELECT d, d AND false FROM t9 WHERE d = 'TRUE';
  | ---
  | - metadata:
- |   - name: D
+ |   - name: d
  |     type: string
  |   - name: COLUMN_1
  |     type: boolean
@@ -5785,7 +5785,7 @@ SELECT d, true AND d FROM t9 WHERE d = 'true';
 SELECT d, false AND d FROM t9 WHERE d = 'true';
  | ---
  | - metadata:
- |   - name: D
+ |   - name: d
  |     type: string
  |   - name: COLUMN_1
  |     type: boolean
@@ -5810,7 +5810,7 @@ SELECT d, d AND true FROM t9 WHERE d = 'true';
 SELECT d, d AND false FROM t9 WHERE d = 'true';
  | ---
  | - metadata:
- |   - name: D
+ |   - name: d
  |     type: string
  |   - name: COLUMN_1
  |     type: boolean
@@ -5965,7 +5965,7 @@ SELECT d, true AND d FROM t9 WHERE d = 'FALSE';
 SELECT d, false AND d FROM t9 WHERE d = 'FALSE';
  | ---
  | - metadata:
- |   - name: D
+ |   - name: d
  |     type: string
  |   - name: COLUMN_1
  |     type: boolean
@@ -5990,7 +5990,7 @@ SELECT d, d AND true FROM t9 WHERE d = 'FALSE';
 SELECT d, d AND false FROM t9 WHERE d = 'FALSE';
  | ---
  | - metadata:
- |   - name: D
+ |   - name: d
  |     type: string
  |   - name: COLUMN_1
  |     type: boolean
@@ -6145,7 +6145,7 @@ SELECT d, true AND d FROM t9 WHERE d = 'false';
 SELECT d, false AND d FROM t9 WHERE d = 'false';
  | ---
  | - metadata:
- |   - name: D
+ |   - name: d
  |     type: string
  |   - name: COLUMN_1
  |     type: boolean
@@ -6170,7 +6170,7 @@ SELECT d, d AND true FROM t9 WHERE d = 'false';
 SELECT d, d AND false FROM t9 WHERE d = 'false';
  | ---
  | - metadata:
- |   - name: D
+ |   - name: d
  |     type: string
  |   - name: COLUMN_1
  |     type: boolean
@@ -6283,15 +6283,15 @@ DROP TABLE t;
  | - row_count: 1
  | ...
 
-DELETE FROM "_func" WHERE "name" = 'check_T1_CK';
+DELETE FROM "_func" WHERE "name" = 'check_t1_ck';
  | ---
  | - row_count: 1
  | ...
-DELETE FROM "_func" WHERE "name" = 'RETURN_TYPE';
+DELETE FROM "_func" WHERE "name" = 'return_type';
  | ---
  | - row_count: 1
  | ...
-DELETE FROM "_func" WHERE "name" = 'IS_BOOLEAN';
+DELETE FROM "_func" WHERE "name" = 'is_boolean';
  | ---
  | - row_count: 1
  | ...

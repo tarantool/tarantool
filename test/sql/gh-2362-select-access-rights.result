@@ -29,7 +29,7 @@ box.execute("INSERT INTO t2 VALUES (1);")
 box.schema.user.grant('guest', 'execute', 'sql')
 ---
 ...
-box.schema.user.grant('guest','read', 'space', 'T1')
+box.schema.user.grant('guest','read', 'space', 't1')
 ---
 ...
 c = nb.connect(box.cfg.listen)
@@ -38,14 +38,14 @@ c = nb.connect(box.cfg.listen)
 c:execute("SELECT * FROM SEQSCAN t1;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: integer
-  - name: S2
+  - name: s2
     type: integer
   rows:
   - [1, 1]
 ...
-box.schema.user.revoke('guest','read', 'space', 'T1')
+box.schema.user.revoke('guest','read', 'space', 't1')
 ---
 ...
 c = nb.connect(box.cfg.listen)
@@ -53,9 +53,9 @@ c = nb.connect(box.cfg.listen)
 ...
 c:execute("SELECT * FROM SEQSCAN t1;")
 ---
-- error: Read access to space 'T1' is denied for user 'guest'
+- error: Read access to space 't1' is denied for user 'guest'
 ...
-box.schema.user.grant('guest','read', 'space', 'T2')
+box.schema.user.grant('guest','read', 'space', 't2')
 ---
 ...
 c = nb.connect(box.cfg.listen)
@@ -63,13 +63,13 @@ c = nb.connect(box.cfg.listen)
 ...
 c:execute('SELECT * FROM SEQSCAN t1, SEQSCAN t2 WHERE t1.s1 = t2.s1')
 ---
-- error: Read access to space 'T1' is denied for user 'guest'
+- error: Read access to space 't1' is denied for user 'guest'
 ...
 box.execute("CREATE VIEW v AS SELECT * FROM SEQSCAN t1")
 ---
 - row_count: 1
 ...
-box.schema.user.grant('guest','read', 'space', 'V')
+box.schema.user.grant('guest','read', 'space', 'v')
 ---
 ...
 v = nb.connect(box.cfg.listen)
@@ -77,13 +77,13 @@ v = nb.connect(box.cfg.listen)
 ...
 c:execute('SELECT * FROM v')
 ---
-- error: Read access to space 'T1' is denied for user 'guest'
+- error: Read access to space 't1' is denied for user 'guest'
 ...
 -- Cleanup
-box.schema.user.revoke('guest','read','space', 'V')
+box.schema.user.revoke('guest','read','space', 'v')
 ---
 ...
-box.schema.user.revoke('guest','read','space', 'T2')
+box.schema.user.revoke('guest','read','space', 't2')
 ---
 ...
 box.schema.user.revoke('guest', 'execute', 'sql')

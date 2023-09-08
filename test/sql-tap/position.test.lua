@@ -5,7 +5,7 @@ test:plan(81)
 test:do_test(
     "position-1.1",
     function()
-        return test:execsql "SELECT position('a', 'abcdefg');"
+        return test:execsql "SELECT POSITION('a', 'abcdefg');"
     end, {
         -- <position-1.1>
         1
@@ -15,7 +15,7 @@ test:do_test(
 test:do_test(
     "position-1.2",
     function()
-        return test:execsql "SELECT position('b', 'abcdefg');"
+        return test:execsql "SELECT POSITION('b', 'abcdefg');"
     end, {
         -- <position-1.2>
         2
@@ -25,7 +25,7 @@ test:do_test(
 test:do_test(
     "position-1.3",
     function()
-        return test:execsql "SELECT position('c', 'abcdefg');"
+        return test:execsql "SELECT POSITION('c', 'abcdefg');"
     end, {
         -- <position-1.3>
         3
@@ -35,7 +35,7 @@ test:do_test(
 test:do_test(
     "position-1.4",
     function()
-        return test:execsql "SELECT position('d', 'abcdefg');"
+        return test:execsql "SELECT POSITION('d', 'abcdefg');"
     end, {
         -- <position-1.4>
         4
@@ -45,7 +45,7 @@ test:do_test(
 test:do_test(
     "position-1.5",
     function()
-        return test:execsql "SELECT position('e', 'abcdefg');"
+        return test:execsql "SELECT POSITION('e', 'abcdefg');"
     end, {
         -- <position-1.5>
         5
@@ -55,7 +55,7 @@ test:do_test(
 test:do_test(
     "position-1.6",
     function()
-        return test:execsql "SELECT position('f', 'abcdefg');"
+        return test:execsql "SELECT POSITION('f', 'abcdefg');"
     end, {
         -- <position-1.6>
         6
@@ -65,7 +65,7 @@ test:do_test(
 test:do_test(
     "position-1.7",
     function()
-        return test:execsql "SELECT position('g', 'abcdefg');"
+        return test:execsql "SELECT POSITION('g', 'abcdefg');"
     end, {
         -- <position-1.7>
         7
@@ -75,7 +75,7 @@ test:do_test(
 test:do_test(
     "position-1.8",
     function()
-        return test:execsql "SELECT position('h', 'abcdefg');"
+        return test:execsql "SELECT POSITION('h', 'abcdefg');"
     end, {
         -- <position-1.8>
         0
@@ -85,7 +85,7 @@ test:do_test(
 test:do_test(
     "position-1.9",
     function()
-        return test:execsql "SELECT position('abcdefg', 'abcdefg');"
+        return test:execsql "SELECT POSITION('abcdefg', 'abcdefg');"
     end, {
         -- <position-1.9>
         1
@@ -95,7 +95,7 @@ test:do_test(
 test:do_test(
     "position-1.10",
     function()
-        return test:execsql "SELECT position('abcdefgh', 'abcdefg');"
+        return test:execsql "SELECT POSITION('abcdefgh', 'abcdefg');"
     end, {
         -- <position-1.10>
         0
@@ -105,7 +105,7 @@ test:do_test(
 test:do_test(
     "position-1.11",
     function()
-        return test:execsql "SELECT position('bcdefg', 'abcdefg');"
+        return test:execsql "SELECT POSITION('bcdefg', 'abcdefg');"
     end, {
         -- <position-1.11>
         2
@@ -115,7 +115,7 @@ test:do_test(
 test:do_test(
     "position-1.12",
     function()
-        return test:execsql "SELECT position('bcdefgh', 'abcdefg');"
+        return test:execsql "SELECT POSITION('bcdefgh', 'abcdefg');"
     end, {
         -- <position-1.12>
         0
@@ -125,7 +125,7 @@ test:do_test(
 test:do_test(
     "position-1.13",
     function()
-        return test:execsql "SELECT position('cdefg', 'abcdefg');"
+        return test:execsql "SELECT POSITION('cdefg', 'abcdefg');"
     end, {
         -- <position-1.13>
         3
@@ -135,7 +135,7 @@ test:do_test(
 test:do_test(
     "position-1.14",
     function()
-        return test:execsql "SELECT position('cdefgh', 'abcdefg');"
+        return test:execsql "SELECT POSITION('cdefgh', 'abcdefg');"
     end, {
         -- <position-1.14>
         0
@@ -145,7 +145,7 @@ test:do_test(
 test:do_test(
     "position-1.15",
     function()
-        return test:execsql "SELECT position('defg', 'abcdefg');"
+        return test:execsql "SELECT POSITION('defg', 'abcdefg');"
     end, {
         -- <position-1.15>
         4
@@ -155,7 +155,7 @@ test:do_test(
 test:do_test(
     "position-1.16",
     function()
-        return test:execsql "SELECT position('defgh', 'abcdefg');"
+        return test:execsql "SELECT POSITION('defgh', 'abcdefg');"
     end, {
         -- <position-1.16>
         0
@@ -165,7 +165,7 @@ test:do_test(
 test:do_test(
     "position-1.17",
     function()
-        return test:execsql "SELECT position('efg', 'abcdefg');"
+        return test:execsql "SELECT POSITION('efg', 'abcdefg');"
     end, {
         -- <position-1.17>
         5
@@ -175,7 +175,7 @@ test:do_test(
 test:do_test(
     "position-1.18",
     function()
-        return test:execsql "SELECT position('efgh', 'abcdefg');"
+        return test:execsql "SELECT POSITION('efgh', 'abcdefg');"
     end, {
         -- <position-1.18>
         0
@@ -185,7 +185,7 @@ test:do_test(
 test:do_test(
     "position-1.19",
     function()
-        return test:execsql "SELECT position('fg', 'abcdefg');"
+        return test:execsql "SELECT POSITION('fg', 'abcdefg');"
     end, {
         -- <position-1.19>
         6
@@ -195,7 +195,7 @@ test:do_test(
 test:do_test(
     "position-1.20",
     function()
-        return test:execsql "SELECT position('fgh', 'abcdefg');"
+        return test:execsql "SELECT POSITION('fgh', 'abcdefg');"
     end, {
         -- <position-1.20>
         0
@@ -205,7 +205,7 @@ test:do_test(
 test:do_test(
     "position-1.21",
     function()
-        return test:execsql "SELECT coalesce(position(NULL, 'abcdefg'), 'nil');"
+        return test:execsql "SELECT COALESCE(POSITION(NULL, 'abcdefg'), 'nil');"
     end, {
         -- <position-1.21>
         "nil"
@@ -215,7 +215,7 @@ test:do_test(
 test:do_test(
     "position-1.22",
     function()
-        return test:execsql "SELECT coalesce(position('x', NULL), 'nil');"
+        return test:execsql "SELECT COALESCE(POSITION('x', NULL), 'nil');"
     end, {
         -- <position-1.22>
         "nil"
@@ -225,7 +225,7 @@ test:do_test(
 test:do_test(
     "position-1.23",
     function()
-        return test:catchsql "SELECT position(34, 12345);"
+        return test:catchsql "SELECT POSITION(34, 12345);"
     end, {
         -- <position-1.23>
         1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
@@ -235,7 +235,7 @@ test:do_test(
 test:do_test(
     "position-1.24",
     function()
-        return test:catchsql "SELECT position(34, 123456.78);"
+        return test:catchsql "SELECT POSITION(34, 123456.78);"
     end, {
         -- <position-1.24>
         1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
@@ -245,7 +245,7 @@ test:do_test(
 test:do_test(
     "position-1.25",
     function()
-        return test:catchsql "SELECT position(x'3334', 123456.78);"
+        return test:catchsql "SELECT POSITION(x'3334', 123456.78);"
     end, {
         -- <position-1.25>
         1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
@@ -255,7 +255,7 @@ test:do_test(
 test:do_test(
     "position-1.26",
     function()
-        return test:execsql "SELECT position('efg', 'äbcdefg');"
+        return test:execsql "SELECT POSITION('efg', 'äbcdefg');"
     end, {
         -- <position-1.26>
         5
@@ -265,7 +265,7 @@ test:do_test(
 test:do_test(
     "position-1.27",
     function()
-        return test:execsql "SELECT position('xyz', '€xyzzy');"
+        return test:execsql "SELECT POSITION('xyz', '€xyzzy');"
     end, {
         -- <position-1.27>
         2
@@ -275,7 +275,7 @@ test:do_test(
 test:do_test(
     "position-1.28",
     function()
-        return test:execsql "SELECT position('xyz', 'abc€xyzzy');"
+        return test:execsql "SELECT POSITION('xyz', 'abc€xyzzy');"
     end, {
         -- <position-1.28>
         5
@@ -285,7 +285,7 @@ test:do_test(
 test:do_test(
     "position-1.29",
     function()
-        return test:execsql "SELECT position('€xyz', 'abc€xyzzy');"
+        return test:execsql "SELECT POSITION('€xyz', 'abc€xyzzy');"
     end, {
         -- <position-1.29>
         4
@@ -295,7 +295,7 @@ test:do_test(
 test:do_test(
     "position-1.30",
     function()
-        return test:execsql "SELECT position('c€xyz', 'abc€xyzzy');"
+        return test:execsql "SELECT POSITION('c€xyz', 'abc€xyzzy');"
     end, {
         -- <position-1.30>
         3
@@ -305,7 +305,7 @@ test:do_test(
 test:do_test(
     "position-1.31",
     function()
-        return test:execsql "SELECT position(x'01', x'0102030405');"
+        return test:execsql "SELECT POSITION(x'01', x'0102030405');"
     end, {
         -- <position-1.31>
         1
@@ -315,7 +315,7 @@ test:do_test(
 test:do_test(
     "position-1.32",
     function()
-        return test:execsql "SELECT position(x'02', x'0102030405');"
+        return test:execsql "SELECT POSITION(x'02', x'0102030405');"
     end, {
         -- <position-1.32>
         2
@@ -325,7 +325,7 @@ test:do_test(
 test:do_test(
     "position-1.33",
     function()
-        return test:execsql "SELECT position(x'03', x'0102030405');"
+        return test:execsql "SELECT POSITION(x'03', x'0102030405');"
     end, {
         -- <position-1.33>
         3
@@ -335,7 +335,7 @@ test:do_test(
 test:do_test(
     "position-1.34",
     function()
-        return test:execsql "SELECT position(x'04', x'0102030405');"
+        return test:execsql "SELECT POSITION(x'04', x'0102030405');"
     end, {
         -- <position-1.34>
         4
@@ -345,7 +345,7 @@ test:do_test(
 test:do_test(
     "position-1.35",
     function()
-        return test:execsql "SELECT position(x'05', x'0102030405');"
+        return test:execsql "SELECT POSITION(x'05', x'0102030405');"
     end, {
         -- <position-1.35>
         5
@@ -355,7 +355,7 @@ test:do_test(
 test:do_test(
     "position-1.36",
     function()
-        return test:execsql "SELECT position(x'06', x'0102030405');"
+        return test:execsql "SELECT POSITION(x'06', x'0102030405');"
     end, {
         -- <position-1.36>
         0
@@ -365,7 +365,7 @@ test:do_test(
 test:do_test(
     "position-1.37",
     function()
-        return test:execsql "SELECT position(x'0102030405', x'0102030405');"
+        return test:execsql "SELECT POSITION(x'0102030405', x'0102030405');"
     end, {
         -- <position-1.37>
         1
@@ -375,7 +375,7 @@ test:do_test(
 test:do_test(
     "position-1.38",
     function()
-        return test:execsql "SELECT position(x'02030405', x'0102030405');"
+        return test:execsql "SELECT POSITION(x'02030405', x'0102030405');"
     end, {
         -- <position-1.38>
         2
@@ -385,7 +385,7 @@ test:do_test(
 test:do_test(
     "position-1.39",
     function()
-        return test:execsql "SELECT position(x'030405', x'0102030405');"
+        return test:execsql "SELECT POSITION(x'030405', x'0102030405');"
     end, {
         -- <position-1.39>
         3
@@ -395,7 +395,7 @@ test:do_test(
 test:do_test(
     "position-1.40",
     function()
-        return test:execsql "SELECT position(x'0405', x'0102030405');"
+        return test:execsql "SELECT POSITION(x'0405', x'0102030405');"
     end, {
         -- <position-1.40>
         4
@@ -405,7 +405,7 @@ test:do_test(
 test:do_test(
     "position-1.41",
     function()
-        return test:execsql "SELECT position(x'0506', x'0102030405');"
+        return test:execsql "SELECT POSITION(x'0506', x'0102030405');"
     end, {
         -- <position-1.41>
         0
@@ -415,7 +415,7 @@ test:do_test(
 test:do_test(
     "position-1.42",
     function()
-        return test:execsql "SELECT position(x'', x'0102030405');"
+        return test:execsql "SELECT POSITION(x'', x'0102030405');"
     end, {
         -- <position-1.42>
         1
@@ -425,7 +425,7 @@ test:do_test(
 test:do_test(
     "position-1.43",
     function()
-        return test:execsql "SELECT position(x'', x'');"
+        return test:execsql "SELECT POSITION(x'', x'');"
     end, {
         -- <position-1.43>
         1
@@ -435,7 +435,7 @@ test:do_test(
 test:do_test(
     "position-1.44",
     function()
-        return test:execsql "SELECT position('', '');"
+        return test:execsql "SELECT POSITION('', '');"
     end, {
         -- <position-1.44>
         1
@@ -445,7 +445,7 @@ test:do_test(
 test:do_test(
     "position-1.45",
     function()
-        return test:execsql "SELECT position('', 'abcdefg');"
+        return test:execsql "SELECT POSITION('', 'abcdefg');"
     end, {
         -- <position-1.45>
         1
@@ -470,7 +470,7 @@ longstr = longstr .. "Xabcde"
 test:do_test(
     "position-1.46",
     function()
-        return test:execsql("SELECT position('X', '"..longstr.."');")
+        return test:execsql("SELECT POSITION('X', '"..longstr.."');")
     end, {
         -- <position-1.46>
         106497
@@ -480,7 +480,7 @@ test:do_test(
 test:do_test(
     "position-1.47",
     function()
-        return test:execsql("SELECT position('Y', '"..longstr.."');")
+        return test:execsql("SELECT POSITION('Y', '"..longstr.."');")
     end, {
         -- <position-1.47>
         0
@@ -490,7 +490,7 @@ test:do_test(
 test:do_test(
     "position-1.48",
     function()
-        return test:execsql( "SELECT position('Xa', '"..longstr.."');")
+        return test:execsql( "SELECT POSITION('Xa', '"..longstr.."');")
     end, {
         -- <position-1.48>
         106497
@@ -500,7 +500,7 @@ test:do_test(
 test:do_test(
     "position-1.49",
     function()
-        return test:execsql("SELECT position('zXa', '"..longstr.."');")
+        return test:execsql("SELECT POSITION('zXa', '"..longstr.."');")
     end, {
         -- <position-1.49>
         106496
@@ -511,7 +511,7 @@ longstr = string.gsub(longstr, "a", "ä")
 test:do_test(
     "position-1.50",
     function()
-        return test:execsql("SELECT position('X', '"..longstr.."');")
+        return test:execsql("SELECT POSITION('X', '"..longstr.."');")
     end, {
         -- <position-1.50>
         106497
@@ -521,7 +521,7 @@ test:do_test(
 test:do_test(
     "position-1.51",
     function()
-        return test:execsql("SELECT position('Y', '"..longstr.."');")
+        return test:execsql("SELECT POSITION('Y', '"..longstr.."');")
     end, {
         -- <position-1.51>
         0
@@ -531,7 +531,7 @@ test:do_test(
 test:do_test(
     "position-1.52",
     function()
-        return test:execsql("SELECT position('Xä', '"..longstr.."');")
+        return test:execsql("SELECT POSITION('Xä', '"..longstr.."');")
     end, {
         -- <position-1.52>
         106497
@@ -541,7 +541,7 @@ test:do_test(
 test:do_test(
     "position-1.53",
     function()
-        return test:execsql("SELECT position('zXä', '"..longstr.."');")
+        return test:execsql("SELECT POSITION('zXä', '"..longstr.."');")
     end, {
         -- <position-1.53>
         106496
@@ -551,7 +551,7 @@ test:do_test(
 test:do_test(
     "position-1.54",
     function()
-        return test:catchsql("SELECT position('x', x'78c3a4e282ac79');")
+        return test:catchsql("SELECT POSITION('x', x'78c3a4e282ac79');")
     end, {
         -- <position-1.54>
         1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
@@ -561,7 +561,7 @@ test:do_test(
 test:do_test(
     "position-1.55",
     function()
-        return test:catchsql "SELECT position('y', x'78c3a4e282ac79');"
+        return test:catchsql "SELECT POSITION('y', x'78c3a4e282ac79');"
     end, {
         -- <position-1.55>
         1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
@@ -571,7 +571,7 @@ test:do_test(
 test:do_test(
     "position-1.56.1",
     function()
-        return test:execsql "SELECT position(x'79', x'78c3a4e282ac79');"
+        return test:execsql "SELECT POSITION(x'79', x'78c3a4e282ac79');"
     end, {
         -- <position-1.56.1>
         7
@@ -581,7 +581,7 @@ test:do_test(
 test:do_test(
     "position-1.56.2",
     function()
-        return test:execsql "SELECT position(x'7a', x'78c3a4e282ac79');"
+        return test:execsql "SELECT POSITION(x'7a', x'78c3a4e282ac79');"
     end, {
         -- <position-1.56.2>
         0
@@ -591,7 +591,7 @@ test:do_test(
 test:do_test(
     "position-1.56.3",
     function()
-        return test:execsql "SELECT position(x'78', x'78c3a4e282ac79');"
+        return test:execsql "SELECT POSITION(x'78', x'78c3a4e282ac79');"
     end, {
         -- <position-1.56.3>
         1
@@ -601,7 +601,7 @@ test:do_test(
 test:do_test(
     "position-1.56.3",
     function()
-        return test:execsql "SELECT position(x'a4', x'78c3a4e282ac79');"
+        return test:execsql "SELECT POSITION(x'a4', x'78c3a4e282ac79');"
     end, {
         -- <position-1.56.3>
         3
@@ -611,7 +611,7 @@ test:do_test(
 test:do_test(
     "position-1.57.1",
     function()
-        return test:catchsql "SELECT position(x'79', 'xä€y');"
+        return test:catchsql "SELECT POSITION(x'79', 'xä€y');"
     end, {
         -- <position-1.57.1>
         1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
@@ -621,7 +621,7 @@ test:do_test(
 test:do_test(
     "position-1.57.2",
     function()
-        return test:catchsql "SELECT position(x'a4', 'xä€y');"
+        return test:catchsql "SELECT POSITION(x'a4', 'xä€y');"
     end, {
         -- <position-1.57.2>
         1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
@@ -631,7 +631,7 @@ test:do_test(
 test:do_test(
     "position-1.57.3",
     function()
-        return test:catchsql "SELECT position('y', x'78c3a4e282ac79');"
+        return test:catchsql "SELECT POSITION('y', x'78c3a4e282ac79');"
     end, {
         -- <position-1.57.3>
         1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
@@ -644,7 +644,7 @@ test:do_test(
 test:do_execsql_test(
     "position-1.60",
     [[
-        SELECT coalesce(position(NULL, 'abc'), 999);
+        SELECT COALESCE(POSITION(NULL, 'abc'), 999);
     ]], {
         -- <position-1.60>
         999
@@ -654,7 +654,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "position-1.61",
     [[
-        SELECT coalesce(position('abc', NULL), 999);
+        SELECT COALESCE(POSITION('abc', NULL), 999);
     ]], {
         -- <position-1.61>
         999
@@ -664,7 +664,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "position-1.62",
     [[
-        SELECT coalesce(position(NULL, NULL), 999);
+        SELECT COALESCE(POSITION(NULL, NULL), 999);
     ]], {
         -- <position-1.62>
         999

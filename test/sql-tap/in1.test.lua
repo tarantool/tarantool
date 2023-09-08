@@ -37,7 +37,7 @@ test:do_test(
         end
         return test:execsql [[
             COMMIT;
-            SELECT count(*) FROM t1;
+            SELECT COUNT(*) FROM t1;
         ]]
     end, {
         -- <in-1.0>
@@ -222,7 +222,7 @@ test:do_catchsql_test(
         SELECT a FROM t1 WHERE c IN (10,20)
     ]], {
         -- <in-2.11>
-        1, "Can’t resolve field 'C'"
+        1, "Can’t resolve field 'c'"
         -- </in-2.11>
     })
 

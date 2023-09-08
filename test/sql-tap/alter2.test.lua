@@ -25,7 +25,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(2, 3, 2);
     ]], {
         -- <alter2-1.2>
-        1, "Foreign key constraint 'FK2' failed: foreign tuple was not found"
+        1, "Foreign key constraint 'fk2' failed: foreign tuple was not found"
         -- </alter2-1.2>
     })
 
@@ -46,7 +46,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(2, 3, 2);
     ]], {
         -- <alter2-1.4>
-        1, "Foreign key constraint 'FK2' failed: foreign tuple was not found"
+        1, "Foreign key constraint 'fk2' failed: foreign tuple was not found"
         -- </alter2-1.4>
     })
 
@@ -66,7 +66,7 @@ test:do_test(
     "alter2-1.5.1",
     function()
         test:execsql([[DELETE FROM t1;]])
-        if box.space.T1.engine == 'vinyl' then
+        if box.space.t1.engine == 'vinyl' then
             -- trigger dump to empty the space
             box.snapshot()
         end
@@ -84,7 +84,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(4, 2, 1);
     ]], {
         -- <alter2-1.6>
-        1, "Foreign key constraint 'FK1' failed: foreign tuple was not found"
+        1, "Foreign key constraint 'fk1' failed: foreign tuple was not found"
         -- </alter2-1.6>
     })
 
@@ -104,7 +104,7 @@ test:do_test(
     "alter2-1.7.1",
     function()
         test:execsql([[DELETE FROM t1;]])
-        if box.space.T1.engine == 'vinyl' then
+        if box.space.t1.engine == 'vinyl' then
             -- trigger dump to empty the space
             box.snapshot()
         end
@@ -144,7 +144,7 @@ test:do_catchsql_test(
         INSERT INTO parent VALUES(1, 2, 3);
     ]], {
         -- <alter2-2.1>
-        1, "Foreign key constraint 'FK' failed: foreign tuple was not found"
+        1, "Foreign key constraint 'fk' failed: foreign tuple was not found"
         -- </alter2-2.1>
     })
 
@@ -155,7 +155,7 @@ test:do_catchsql_test(
         INSERT INTO child VALUES(2, 1, 1);
     ]], {
         -- <alter2-2.2>
-        1, "Foreign key constraint 'FK' failed: foreign tuple was not found"
+        1, "Foreign key constraint 'fk' failed: foreign tuple was not found"
         -- </alter2-2.2>
     })
 
@@ -166,7 +166,7 @@ test:do_catchsql_test(
         INSERT INTO parent VALUES(3, 4, 2);
     ]], {
         -- <alter2-2.3>
-        1, "Foreign key constraint 'FK' failed: foreign tuple was not found"
+        1, "Foreign key constraint 'fk' failed: foreign tuple was not found"
         -- </alter2-2.3>
     })
 
@@ -210,7 +210,7 @@ test:do_catchsql_test(
         ALTER TABLE child DROP CONSTRAINT fake;
     ]], {
         -- <alter2-5.2>
-        1, "Constraint 'FAKE' does not exist in space 'CHILD'"
+        1, "Constraint 'fake' does not exist in space 'child'"
         -- </alter2-5.2>
     })
 
@@ -224,7 +224,7 @@ test:do_catchsql_test(
         CREATE TABLE t1 (id INT PRIMARY KEY);
         ALTER TABLE t1 ADD CONSTRAINT ck CHECK(id > 0);
         INSERT INTO t1 VALUES (-1);
-    ]], { 1, "Check constraint 'CK' failed for a tuple" })
+    ]], { 1, "Check constraint 'ck' failed for a tuple" })
 
 -- Make sure that one can't create constraint with the same name twice.
 --
@@ -232,7 +232,7 @@ test:do_catchsql_test(
     "alter2-6.2",
     [[
         ALTER TABLE t1 ADD CONSTRAINT ck CHECK(id > 0);
-    ]], { 1, "Function for the check constraint 'CK' with name 'check_T1_CK' "..
+    ]], { 1, "Function for the check constraint 'ck' with name 'check_t1_ck' "..
          "already exists"})
 
 -- Make sure that CHECK constraint can be created only on empty space.
@@ -251,6 +251,6 @@ test:do_catchsql_test(
     "alter2-6.4",
     [[
         ALTER TABLE fake ADD CONSTRAINT ck CHECK(id > 0);
-    ]], { 1, "Space 'FAKE' does not exist" })
+    ]], { 1, "Space 'fake' does not exist" })
 
 test:finish_test()

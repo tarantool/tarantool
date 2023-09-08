@@ -14,13 +14,13 @@ box.execute([[CREATE VIEW t AS SELECT "name" FROM "_vspace" y]])
 ---
 - row_count: 1
 ...
-box.execute([[SELECT * from t WHERE "name" = 'T']])
+box.execute([[SELECT * from t WHERE "name" = 't']])
 ---
 - metadata:
   - name: name
     type: string
   rows:
-  - ['T']
+  - ['t']
 ...
 box.execute([[DROP VIEW t]])
 ---

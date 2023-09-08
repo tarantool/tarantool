@@ -80,7 +80,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t3(i INT PRIMARY KEY, e INT, f INT);
         INSERT INTO t3 VALUES(1, 123,654), (2, 555,444), (3, 234,987);
-        SELECT (SELECT count(*) FROM t1, t2 WHERE a=e AND x=f), e, f, '|' FROM t3 ORDER BY i;
+        SELECT (SELECT COUNT(*) FROM t1, t2 WHERE a=e AND x=f), e, f, '|' FROM t3 ORDER BY i;
     ]], {
         -- <autoindex4-2.0>
         1, 123, 654, "|", 0, 555, 444, "|", 4, 234, 987, "|"

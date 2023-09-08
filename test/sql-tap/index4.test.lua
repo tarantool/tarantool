@@ -23,23 +23,23 @@ test:do_execsql_test(
     [[
         CREATE TABLE t1(x SCALAR primary key);
         START TRANSACTION;
-          INSERT INTO t1 VALUES(randomblob(102));
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --     2
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --     4
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --     8
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --    16
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --    32
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --    64
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --   128
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --   256
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --   512
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --  1024
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --  2048
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --  4096
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     --  8192
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     -- 16384
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     -- 32768
-          INSERT INTO t1 SELECT randomblob(102) FROM t1;     -- 65536
+          INSERT INTO t1 VALUES(RANDOMBLOB(102));
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --     2
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --     4
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --     8
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --    16
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --    32
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --    64
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --   128
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --   256
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --   512
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --  1024
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --  2048
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --  4096
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     --  8192
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     -- 16384
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     -- 32768
+          INSERT INTO t1 SELECT RANDOMBLOB(102) FROM t1;     -- 65536
         COMMIT;
     ]])
 
@@ -85,11 +85,11 @@ test:do_execsql_test(
           INSERT INTO t1 VALUES('f');
           INSERT INTO t1 VALUES('g');
           -- INSERT INTO t1 VALUES(NULL);
-          INSERT INTO t1 SELECT randomblob(1202) FROM t1;     --    16
-          INSERT INTO t1 SELECT randomblob(2202) FROM t1;     --    32
-          INSERT INTO t1 SELECT randomblob(3202) FROM t1;     --    64
-          INSERT INTO t1 SELECT randomblob(4202) FROM t1;     --   128
-          INSERT INTO t1 SELECT randomblob(5202) FROM t1;     --   256
+          INSERT INTO t1 SELECT RANDOMBLOB(1202) FROM t1;     --    16
+          INSERT INTO t1 SELECT RANDOMBLOB(2202) FROM t1;     --    32
+          INSERT INTO t1 SELECT RANDOMBLOB(3202) FROM t1;     --    64
+          INSERT INTO t1 SELECT RANDOMBLOB(4202) FROM t1;     --   128
+          INSERT INTO t1 SELECT RANDOMBLOB(5202) FROM t1;     --   256
         COMMIT;
         CREATE INDEX i1 ON t1(x);
         --PRAGMA integrity_check
@@ -153,7 +153,8 @@ test:do_catchsql_test(
         CREATE UNIQUE INDEX i3 ON t2(x);
     ]], {
         -- <2.2>
-        1, "Duplicate key exists in unique index \"I3\" in space \"T2\" with old tuple - [2, 35] and new tuple - [4, 35]"
+        1, "Duplicate key exists in unique index \"i3\" in space \"t2\" with "..
+        "old tuple - [2, 35] and new tuple - [4, 35]"
         -- </2.2>
     })
 

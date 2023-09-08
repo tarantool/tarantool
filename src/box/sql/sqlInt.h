@@ -2458,46 +2458,16 @@ void sqlTreeViewWith(TreeView *, const With *);
 
 void sqlDequote(char *);
 
-/**
- * Perform SQL name normalization: cast name to the upper-case
- * (via Unicode Character Folding). Casing is locale-independent
- * and context-sensitive. The result may be longer or shorter
- * than the original. The source string and the destination buffer
- * must not overlap.
- * For example, ß is converted to SS.
- * The result is similar to SQL UPPER function.
- *
- * @param dst A buffer for the result string. The result will be
- *        0-terminated if the buffer is large enough. The contents
- *        is undefined in case of failure.
- * @param dst_size The size of the buffer (number of bytes).
- * @param src The original string.
- * @param src_len The length of the original string.
- * @retval The count of bytes written (or need to be written).
- */
-int
-sql_normalize_name(char *dst, int dst_size, const char *src, int src_len);
+/** Duplicate the string and remove the double quotes if necessary. */
+char *
+sql_name_new(const char *name, int len);
 
 /**
- * Duplicate a normalized version of @a name onto an sql_xmalloc().
- * For normalization rules @sa sql_normalize_name().
- *
- * @param name Source string.
- * @param len Length of @a name.
- * @retval Not NULL Success. A normalized string is returned.
+ * Duplicate the string onto parser region and remove the double quotes if
+ * necessary.
  */
 char *
-sql_normalized_name_new(const char *name, int len);
-
-/**
- * Duplicate a normalized version of @a name onto a region @a r.
- * For normalization rules @sa sql_normalize_name().
- * @param r Region allocator.
- * @param name Source string.
- * @param len Length of @a name.
- */
-char *
-sql_normalized_name_region_new(struct region *r, const char *name, int len);
+sql_name_temp(struct Parse *parser, const char *name, int len);
 
 /**
  * Return an escaped version of the original name in memory allocated with
@@ -3088,7 +3058,7 @@ static inline char *
 sql_name_from_token(const struct Token *t)
 {
 	assert(t != NULL && t->z != NULL);
-	return sql_normalized_name_new(t->z, t->n);
+	return sql_name_new(t->z, t->n);
 }
 
 /**

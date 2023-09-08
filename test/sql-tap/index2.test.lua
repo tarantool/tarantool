@@ -76,7 +76,7 @@ test:do_test(
             test:execsql(sql)
         end
         test:execsql "COMMIT"
-        return test:execsql "SELECT count(*) FROM t1"
+        return test:execsql "SELECT COUNT(*) FROM t1"
     end, {
         -- <index2-1.4>
         ROW_NUM + 1
@@ -85,7 +85,7 @@ test:do_test(
 
 test:do_execsql_test(
     "index2-1.5",
-    "SELECT round(sum(c"..COL_NUM..")) FROM t1", {
+    "SELECT ROUND(SUM(c"..COL_NUM..")) FROM t1", {
         -- <index2-1.5>
         10000*ROW_NUM*(ROW_NUM+1)/2 + (COL_NUM+1)*(ROW_NUM+1)-1
         -- </index2-1.5>

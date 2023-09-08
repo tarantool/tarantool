@@ -32,7 +32,7 @@ test:do_test(
             INSERT INTO t1 VALUES(4, 123.e+2);
             INSERT INTO t1 VALUES(5, .125e+3);
             INSERT INTO t1 VALUES(6, 123e4);
-            SELECT x FROM t1 WHERE typeof(y)=='number' ORDER BY x;
+            SELECT x FROM t1 WHERE TYPEOF(y)=='number' ORDER BY x;
         ]]
     end, {
         -- <tkt-3998683a16.1>

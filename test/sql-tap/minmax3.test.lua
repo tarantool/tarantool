@@ -72,7 +72,7 @@ test:do_test(
     "minmax3-1.1.1",
     function()
         -- Linear scan.
-        return count(" SELECT max(y) FROM t1 WHERE x = '2'; ")
+        return count(" SELECT MAX(y) FROM t1 WHERE x = '2'; ")
     end, {
         -- <minmax3-1.1.1>
         "V", 5
@@ -87,7 +87,7 @@ test:do_test(
     function()
         -- Index optimizes the WHERE x='2' constraint.
         test:execsql " CREATE INDEX i1 ON t1(x) "
-        return count(" SELECT max(y) FROM t1 WHERE x = '2'; ")
+        return count(" SELECT MAX(y) FROM t1 WHERE x = '2'; ")
     end, {
         -- <minmax3-1.1.2>
         "V", 4
@@ -99,7 +99,7 @@ test:do_test(
     function()
         -- Index optimizes the WHERE x='2' constraint and the MAX(y).
         test:execsql " CREATE INDEX i2 ON t1(x,y) "
-        return count(" SELECT max(y) FROM t1 WHERE x = '2'; ")
+        return count(" SELECT MAX(y) FROM t1 WHERE x = '2'; ")
     end, {
         -- <minmax3-1.1.3>
         "V", 1
@@ -111,7 +111,7 @@ test:do_test(
     function()
         -- Index optimizes the WHERE x='2' constraint and the MAX(y).
         test:execsql " DROP INDEX i2 ON t1; CREATE INDEX i2 ON t1(x, y DESC) "
-        return count(" SELECT max(y) FROM t1 WHERE x = '2'; ")
+        return count(" SELECT MAX(y) FROM t1 WHERE x = '2'; ")
     end, {
         -- <minmax3-1.1.4>
         "V", 1
@@ -121,7 +121,7 @@ test:do_test(
 test:do_test(
     "minmax3-1.1.5",
     function()
-        return count(" SELECT max(y) FROM t1 WHERE x = '2' AND y != 'V'; ")
+        return count(" SELECT MAX(y) FROM t1 WHERE x = '2' AND y != 'V'; ")
     end, {
         -- <minmax3-1.1.5>
         "IV", 2
@@ -131,7 +131,7 @@ test:do_test(
 test:do_test(
     "minmax3-1.1.6",
     function()
-        return count(" SELECT max(y) FROM t1 WHERE x = '2' AND y < 'V'; ")
+        return count(" SELECT MAX(y) FROM t1 WHERE x = '2' AND y < 'V'; ")
     end, {
         -- <minmax3-1.1.6>
         "IV", 1
@@ -142,7 +142,7 @@ test:do_test(
 test:do_test(
     "minmax3-1.1.6",
     function()
-        return count(" SELECT max(y) FROM t1 WHERE x = '2' AND z != 'five'; ")
+        return count(" SELECT MAX(y) FROM t1 WHERE x = '2' AND z != 'five'; ")
     end, {
         -- <minmax3-1.1.6>
         "IV", 2
@@ -154,7 +154,7 @@ test:do_test(
     function()
         -- Linear scan of t1.
         test:execsql " DROP INDEX i1 ON t1; DROP INDEX i2 ON t1;"
-        return count(" SELECT min(y) FROM t1 WHERE x = '2'; ")
+        return count(" SELECT MIN(y) FROM t1 WHERE x = '2'; ")
     end, {
         -- <minmax3-1.2.1>
         "II", 5
@@ -167,7 +167,7 @@ test:do_test(
     function()
         -- Index i1 optimizes the WHERE x='2' constraint.
         test:execsql " CREATE INDEX i1 ON t1(x) "
-        return count(" SELECT min(y) FROM t1 WHERE x = '2'; ")
+        return count(" SELECT MIN(y) FROM t1 WHERE x = '2'; ")
     end, {
         -- <minmax3-1.2.2>
         "II", 5
@@ -179,7 +179,7 @@ test:do_test(
     function()
         -- Index i2 optimizes the WHERE x='2' constraint and the min(y).
         test:execsql " CREATE INDEX i2 ON t1(x,y) "
-        return count(" SELECT min(y) FROM t1 WHERE x = '2'; ")
+        return count(" SELECT MIN(y) FROM t1 WHERE x = '2'; ")
     end, {
         -- <minmax3-1.2.3>
         "II", 1
@@ -191,7 +191,7 @@ test:do_test(
     function()
         -- Index optimizes the WHERE x='2' constraint and the MAX(y).
         test:execsql " DROP INDEX i2 ON t1; CREATE INDEX i2 ON t1(x, y DESC) "
-        return count(" SELECT min(y) FROM t1 WHERE x = '2'; ")
+        return count(" SELECT MIN(y) FROM t1 WHERE x = '2'; ")
     end, {
         -- <minmax3-1.2.4>
         "II", 1
@@ -203,7 +203,7 @@ test:do_test(
     function()
         -- Linear scan
         test:execsql " DROP INDEX i1 ON t1; DROP INDEX i2 ON t1;"
-        return count(" SELECT min(y) FROM t1; ")
+        return count(" SELECT MIN(y) FROM t1; ")
     end, {
         -- <minmax3-1.3.1>
         "I", 5
@@ -215,7 +215,7 @@ test:do_test(
     function()
         -- Index i1 optimizes the min(y)
         test:execsql " CREATE INDEX i1 ON t1(y) "
-        return count(" SELECT min(y) FROM t1; ")
+        return count(" SELECT MIN(y) FROM t1; ")
     end, {
         -- <minmax3-1.3.2>
         "I", 1
@@ -227,7 +227,7 @@ test:do_test(
     function()
         -- Index i1 optimizes the min(y)
         test:execsql " DROP INDEX i1 ON t1; CREATE INDEX i1 ON t1(y DESC) "
-        return count(" SELECT min(y) FROM t1; ")
+        return count(" SELECT MIN(y) FROM t1; ")
     end, {
         -- <minmax3-1.3.3>
         "I", 1
@@ -239,7 +239,7 @@ test:do_test(
     function()
         -- Linear scan
         test:execsql " DROP INDEX i1 ON t1;"
-        return count(" SELECT max(y) FROM t1; ")
+        return count(" SELECT MAX(y) FROM t1; ")
     end, {
         -- <minmax3-1.4.1>
         "VI", 5
@@ -251,7 +251,7 @@ test:do_test(
     function()
         -- Index i1 optimizes the max(y)
         test:execsql " CREATE INDEX i1 ON t1(y) "
-        return count(" SELECT max(y) FROM t1; ")
+        return count(" SELECT MAX(y) FROM t1; ")
     end, {
         -- <minmax3-1.4.2>
         "VI", 0
@@ -264,7 +264,7 @@ test:do_test(
         -- Index i1 optimizes the max(y)
         test:execsql " DROP INDEX i1 ON t1; CREATE INDEX i1 ON t1(y DESC) "
         test:execsql " SELECT y from t1"
-        return count(" SELECT max(y) FROM t1; ")
+        return count(" SELECT MAX(y) FROM t1; ")
     end, {
         -- <minmax3-1.4.3>
         "VI", 0
@@ -306,7 +306,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.2",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1;
+        SELECT MIN(b) FROM t2 WHERE a = 1;
     ]], {
         -- <minmax3-2.2>
         1
@@ -316,7 +316,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.3",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b>1;
+        SELECT MIN(b) FROM t2 WHERE a = 1 AND b>1;
     ]], {
         -- <minmax3-2.3>
         2
@@ -326,7 +326,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.4",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b>-1;
+        SELECT MIN(b) FROM t2 WHERE a = 1 AND b>-1;
     ]], {
         -- <minmax3-2.4>
         1
@@ -336,7 +336,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.5",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1;
+        SELECT MIN(b) FROM t2 WHERE a = 1;
     ]], {
         -- <minmax3-2.5>
         1
@@ -346,7 +346,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.6",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b<2;
+        SELECT MIN(b) FROM t2 WHERE a = 1 AND b<2;
     ]], {
         -- <minmax3-2.6>
         1
@@ -356,7 +356,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.7",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b<1;
+        SELECT MIN(b) FROM t2 WHERE a = 1 AND b<1;
     ]], {
         -- <minmax3-2.7>
         ""
@@ -366,7 +366,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.8",
     [[
-        SELECT min(b) FROM t2 WHERE a = 3 AND b<1;
+        SELECT MIN(b) FROM t2 WHERE a = 3 AND b<1;
     ]], {
         -- <minmax3-2.8>
         ""
@@ -399,7 +399,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.2",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1;
+        SELECT MIN(b) FROM t2 WHERE a = 1;
     ]], {
         -- <minmax3-3.2>
         1
@@ -409,7 +409,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.3",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b>1;
+        SELECT MIN(b) FROM t2 WHERE a = 1 AND b>1;
     ]], {
         -- <minmax3-3.3>
         2
@@ -419,7 +419,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.4",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b>-1;
+        SELECT MIN(b) FROM t2 WHERE a = 1 AND b>-1;
     ]], {
         -- <minmax3-3.4>
         1
@@ -429,7 +429,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.5",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1;
+        SELECT MIN(b) FROM t2 WHERE a = 1;
     ]], {
         -- <minmax3-3.5>
         1
@@ -439,7 +439,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.6",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b<2;
+        SELECT MIN(b) FROM t2 WHERE a = 1 AND b<2;
     ]], {
         -- <minmax3-3.6>
         1
@@ -449,7 +449,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.7",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b<1;
+        SELECT MIN(b) FROM t2 WHERE a = 1 AND b<1;
     ]], {
         -- <minmax3-3.7>
         ""
@@ -459,7 +459,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.8",
     [[
-        SELECT min(b) FROM t2 WHERE a = 3 AND b<1;
+        SELECT MIN(b) FROM t2 WHERE a = 3 AND b<1;
     ]], {
         -- <minmax3-3.8>
         ""
@@ -472,7 +472,7 @@ test:do_execsql_test(
         CREATE TABLE t4(x TEXT primary key);
         INSERT INTO t4 VALUES('abc');
         INSERT INTO t4 VALUES('BCD');
-        SELECT max(x) FROM t4;
+        SELECT MAX(x) FROM t4;
     ]], {
         -- <minmax3-4.1>
         "abc"
@@ -482,7 +482,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.2",
     [[
-        SELECT max(x COLLATE "unicode_ci") FROM t4;
+        SELECT MAX(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.2>
         "BCD"
@@ -492,7 +492,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.3",
     [[
-        SELECT max(x), max(x COLLATE "unicode_ci") FROM t4;
+        SELECT MAX(x), MAX(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.3>
         "abc", "BCD"
@@ -502,7 +502,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.4",
     [[
-        SELECT max(x COLLATE "binary"), max(x COLLATE "unicode_ci") FROM t4;
+        SELECT MAX(x COLLATE "binary"), MAX(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.4>
         "abc", "BCD"
@@ -512,8 +512,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.5",
     [[
-        --SELECT max(x COLLATE nocase), max(x COLLATE rtrim) FROM t4;
-        SELECT max(x COLLATE "unicode_ci") FROM t4;
+        --SELECT MAX(x COLLATE nocase), MAX(x COLLATE rtrim) FROM t4;
+        SELECT MAX(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.5>
         --"BCD", "abc"
@@ -524,7 +524,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.6",
     [[
-        SELECT max(x COLLATE "unicode_ci"), max(x) FROM t4;
+        SELECT MAX(x COLLATE "unicode_ci"), MAX(x) FROM t4;
     ]], {
         -- <minmax3-4.6>
         "BCD", "abc"
@@ -534,7 +534,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.10",
     [[
-        SELECT min(x) FROM t4;
+        SELECT MIN(x) FROM t4;
     ]], {
         -- <minmax3-4.10>
         "BCD"
@@ -544,7 +544,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.11",
     [[
-        SELECT min(x COLLATE "unicode_ci") FROM t4;
+        SELECT MIN(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.11>
         "abc"
@@ -554,7 +554,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.12",
     [[
-        SELECT min(x), min(x COLLATE "unicode_ci") FROM t4;
+        SELECT MIN(x), MIN(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.12>
         "BCD", "abc"
@@ -564,7 +564,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.13",
     [[
-        SELECT min(x COLLATE "binary"), min(x COLLATE "unicode_ci") FROM t4;
+        SELECT MIN(x COLLATE "binary"), MIN(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.13>
         "BCD", "abc"
@@ -574,8 +574,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.14",
     [[
-        --SELECT min(x COLLATE nocase), min(x COLLATE rtrim) FROM t4;
-        SELECT min(x COLLATE "unicode_ci") FROM t4;
+        --SELECT MIN(x COLLATE nocase), MIN(x COLLATE rtrim) FROM t4;
+        SELECT MIN(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.14>
         --"abc", "BCD"
@@ -586,7 +586,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.15",
     [[
-        SELECT min(x COLLATE "unicode_ci"), min(x) FROM t4;
+        SELECT MIN(x COLLATE "unicode_ci"), MIN(x) FROM t4;
     ]], {
         -- <minmax3-4.15>
         "abc", "BCD"

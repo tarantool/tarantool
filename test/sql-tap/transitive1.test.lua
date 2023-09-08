@@ -318,51 +318,51 @@ test:do_execsql_test(
         CREATE VIEW episodeview
         AS
           SELECT episode.*,
-                 files.strfilename           AS strFileName,
-                 path.strpath                AS strPath,
-                 files.playcount             AS playCount,
-                 files.lastplayed            AS lastPlayed,
-                 files.dateadded             AS dateAdded,
+                 files.strFilename           AS strFileName,
+                 path.strPath                AS strPath,
+                 files.playCount             AS playCount,
+                 files.lastPlayed            AS lastPlayed,
+                 files.dateAdded             AS dateAdded,
                  tvshow.c00                  AS strTitle,
                  tvshow.c14                  AS strStudio,
                  tvshow.c05                  AS premiered,
                  tvshow.c13                  AS mpaa,
                  tvshow.c16                  AS strShowPath,
-                 bookmark.timeinseconds      AS resumeTimeInSeconds,
-                 bookmark.totaltimeinseconds AS totalTimeInSeconds,
-                 seasons.idseason            AS idSeason
+                 bookmark.timeInSeconds      AS resumeTimeInSeconds,
+                 bookmark.totalTimeInSeconds AS totalTimeInSeconds,
+                 seasons.idSeason            AS idSeason
           FROM   episode
                  JOIN files
-                   ON files.idfile = episode.idfile
+                   ON files.idFile = episode.idFile
                  JOIN tvshow
-                   ON tvshow.idshow = episode.idshow
+                   ON tvshow.idShow = episode.idShow
                  LEFT JOIN seasons
-                        ON seasons.idshow = episode.idshow
+                        ON seasons.idShow = episode.idShow
                            AND seasons.season = CAST(episode.c12 AS INTEGER)
                  JOIN path
-                   ON files.idpath = path.idpath
+                   ON files.idPath = path.idPath
                  LEFT JOIN bookmark
-                        ON bookmark.idfile = episode.idfile
+                        ON bookmark.idFile = episode.idFile
                            AND bookmark.type = 1;
         CREATE VIEW tvshowview
         AS
           SELECT tvshow.*,
-                 path.strpath                              AS strPath,
-                 path.dateadded                            AS dateAdded,
-                 Max(files.lastplayed)                     AS lastPlayed,
-                 NULLIF(Count(episode.c12), 0)             AS totalCount,
-                 Count(files.playcount)                    AS watchedcount,
-                 NULLIF(Count(DISTINCT( episode.c12 )), 0) AS totalSeasons
+                 path.strPath                              AS strPath,
+                 path.dateAdded                            AS dateAdded,
+                 MAX(files.lastPlayed)                     AS lastPlayed,
+                 NULLIF(COUNT(episode.c12), 0)             AS totalCount,
+                 COUNT(files.playCount)                    AS watchedcount,
+                 NULLIF(COUNT(DISTINCT( episode.c12 )), 0) AS totalSeasons
           FROM   tvshow
                  LEFT JOIN tvshowlinkpath
-                        ON tvshowlinkpath.idshow = tvshow.idshow
+                        ON tvshowlinkpath.idShow = tvshow.idShow
                  LEFT JOIN path
-                        ON path.idpath = tvshowlinkpath.idpath
+                        ON path.idPath = tvshowlinkpath.idPath
                  LEFT JOIN episode
-                        ON episode.idshow = tvshow.idshow
+                        ON episode.idShow = tvshow.idShow
                  LEFT JOIN files
-                        ON files.idfile = episode.idfile
-          GROUP  BY tvshow.idshow;
+                        ON files.idFile = episode.idFile
+          GROUP  BY tvshow.idShow;
         SELECT
           episodeview.c12,
           path.strPath,
@@ -373,8 +373,8 @@ test:do_execsql_test(
           tvshowview.c14,
           tvshowview.c13,
           seasons.idSeason,
-          count(1),
-          count(files.playCount)
+          COUNT(1),
+          COUNT(files.playCount)
         FROM episodeview
             JOIN tvshowview ON tvshowview.idShow = episodeview.idShow
             JOIN seasons ON (seasons.idShow = tvshowview.idShow
@@ -493,7 +493,7 @@ test:do_execsql_test(
         SELECT x, y, z FROM c1 WHERE x=y AND y=z AND z='abc';
     ]], {
         -- <transitive1-560eqp>
-        "/SCAN TABLE C1/"
+        "/SCAN TABLE c1/"
         -- </transitive1-560eqp>
     })
 
@@ -516,7 +516,7 @@ test:do_execsql_test(
         SELECT * FROM c1 WHERE x=y AND z=y AND z='abc';
     ]], {
         -- <transitive1-570eqp>
-        "/SCAN TABLE C1/"
+        "/SCAN TABLE c1/"
         -- </transitive1-570eqp>
     })
 

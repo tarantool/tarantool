@@ -48,7 +48,7 @@ test:do_catchsql_test(
         SELECT 1 AS yy FROM t1, t2 ORDER BY y;
     ]], {
         -- <resolver01-1.2>
-        1, "ambiguous column name: Y"
+        1, "ambiguous column name: y"
         -- </resolver01-1.2>
     })
 
@@ -119,7 +119,7 @@ test:do_catchsql_test(
         SELECT 2 AS yy FROM t1, t2 ORDER BY y;
     ]], {
         -- <resolver01-2.2>
-        1, "ambiguous column name: Y"
+        1, "ambiguous column name: y"
         -- </resolver01-2.2>
     })
 
@@ -176,7 +176,7 @@ test:do_catchsql_test(
         SELECT 3 AS y FROM t1, t2 ORDER BY +y;
     ]], {
         -- <resolver01-3.1>
-        1, "ambiguous column name: Y"
+        1, "ambiguous column name: y"
         -- </resolver01-3.1>
     })
 
@@ -186,7 +186,7 @@ test:do_catchsql_test(
         SELECT 2 AS yy FROM t1, t2 ORDER BY +y;
     ]], {
         -- <resolver01-3.2>
-        1, "ambiguous column name: Y"
+        1, "ambiguous column name: y"
         -- </resolver01-3.2>
     })
 
@@ -235,9 +235,9 @@ test:do_test(
             INSERT INTO t4 VALUES('cx');
         ]])
         local r = {}
-        table.insert(r, test:execsql("SELECT '1', substr(m,2) AS m FROM t4 ORDER BY m;"))
-        table.insert(r, test:execsql("SELECT '2', substr(m,2) AS m FROM t4 ORDER BY m COLLATE \"binary\";"))
-        table.insert(r, test:execsql("SELECT '3', substr(m,2) AS m FROM t4 ORDER BY lower(m);"))
+        table.insert(r, test:execsql("SELECT '1', SUBSTR(m,2) AS m FROM t4 ORDER BY m;"))
+        table.insert(r, test:execsql("SELECT '2', SUBSTR(m,2) AS m FROM t4 ORDER BY m COLLATE \"binary\";"))
+        table.insert(r, test:execsql("SELECT '3', SUBSTR(m,2) AS m FROM t4 ORDER BY LOWER(m);"))
         return r
     end, {
         -- <resolver01-4.1>
@@ -261,7 +261,7 @@ test:do_execsql_test(
         INSERT INTO t5 VALUES('ax');
         INSERT INTO t5 VALUES('bx');
         INSERT INTO t5 VALUES('cy');
-        SELECT count(*), substr(m,2,1) AS m FROM t5 GROUP BY m ORDER BY 1, 2;
+        SELECT COUNT(*), SUBSTR(m,2,1) AS m FROM t5 GROUP BY m ORDER BY 1, 2;
     ]], {
         -- <resolver01-5.1>
         1, "x", 1, "x", 1, "y"
@@ -273,7 +273,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "resolver01-5.2",
     [[
-        SELECT count(*), substr(m,2,1) AS mx FROM t5 GROUP BY m ORDER BY 1, 2;
+        SELECT COUNT(*), SUBSTR(m,2,1) AS mx FROM t5 GROUP BY m ORDER BY 1, 2;
     ]], {
         -- <resolver01-5.2>
         1, "x", 1, "x", 1, "y"
@@ -286,7 +286,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "resolver01-5.3",
     [[
-        SELECT count(*), substr(m,2,1) AS mx FROM t5 GROUP BY mx ORDER BY 1, 2;
+        SELECT COUNT(*), SUBSTR(m,2,1) AS mx FROM t5 GROUP BY mx ORDER BY 1, 2;
     ]], {
         -- <resolver01-5.3>
         1, "y", 2, "x"
@@ -296,8 +296,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "resolver01-5.4",
     [[
-        SELECT count(*), substr(m,2,1) AS mx FROM t5
-         GROUP BY substr(m,2,1) ORDER BY 1, 2;
+        SELECT COUNT(*), SUBSTR(m,2,1) AS mx FROM t5
+         GROUP BY SUBSTR(m,2,1) ORDER BY 1, 2;
     ]], {
         -- <resolver01-5.4>
         1, "y", 2, "x"
@@ -311,7 +311,7 @@ test:do_execsql_test(
     "resolver01-6.1",
     [[
         CREATE TABLE t61(name TEXT primary key);
-        SELECT min(name) FROM t61 GROUP BY lower(name);
+        SELECT MIN(name) FROM t61 GROUP BY LOWER(name);
     ]], {
         -- <resolver01-6.1>
 
@@ -321,7 +321,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "resolver01-6.2",
     [[
-        SELECT min(name) AS name FROM t61 GROUP BY lower(name);
+        SELECT MIN(name) AS name FROM t61 GROUP BY LOWER(name);
     ]], {
         -- <resolver01-6.2>
 
@@ -334,10 +334,10 @@ test:do_execsql_test(
         CREATE TABLE t63(id  INT primary key, name TEXT);
         INSERT INTO t63 VALUES (1, NULL);
         INSERT INTO t63 VALUES (2, 'abc');
-        SELECT count(),
+        SELECT COUNT(),
              NULLIF(name,'abc') AS name
           FROM t63
-         GROUP BY lower(name);
+         GROUP BY LOWER(name);
     ]], {
         -- <resolver01-6.3>
         1, "", 1, ""

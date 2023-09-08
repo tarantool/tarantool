@@ -14,13 +14,13 @@ end)
 
 g.test_index_field_missing = function()
     g.server:exec(function()
-        local format = {{'I', 'integer'}}
-        local s = box.schema.space.create('T', {format = format})
+        local format = {{'i', 'integer'}}
+        local s = box.schema.space.create('t', {format = format})
         s:create_index('i')
         box.execute('INSERT INTO t VALUES (1), (2);')
-        format[2] = {'A', 'integer', is_nullable = true}
+        format[2] = {'a', 'integer', is_nullable = true}
         s:format(format)
-        s:create_index('a', {parts={'A'}, unique = false})
+        s:create_index('a', {parts={'a'}, unique = false})
         local rows = box.execute('SELECT * FROM t WHERE a IS NULL;').rows
         t.assert_equals(rows, {{1, box.NULL}, {2, box.NULL}})
     end)

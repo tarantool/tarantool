@@ -74,7 +74,7 @@ test:do_eqp_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE unlikely(cname LIKE '%bach%')
+         WHERE UNLIKELY(cname LIKE '%bach%')
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
@@ -88,7 +88,7 @@ test:do_execsql_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE unlikely(cname LIKE '%bach%' COLLATE "unicode_ci")
+         WHERE UNLIKELY(cname LIKE '%bach%' COLLATE "unicode_ci")
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
@@ -103,7 +103,7 @@ test:do_eqp_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE likelihood(cname LIKE '%bach%', 0.5e0)
+         WHERE LIKELIHOOD(cname LIKE '%bach%', 0.5e0)
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
@@ -117,7 +117,7 @@ test:do_execsql_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE likelihood(cname LIKE '%bach%' COLLATE "unicode_ci", 0.5e0)
+         WHERE LIKELIHOOD(cname LIKE '%bach%' COLLATE "unicode_ci", 0.5e0)
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
@@ -160,8 +160,8 @@ test:do_eqp_test(
         SELECT DISTINCT aname
           FROM album, composer, track
          WHERE cname LIKE '%bach%'
-           AND unlikely(composer.cid=track.cid)
-           AND unlikely(album.aid=track.aid);
+           AND UNLIKELY(composer.cid=track.cid)
+           AND UNLIKELY(album.aid=track.aid);
     ]], {
         -- <whereG-1.7>
         "/.*track.*(composer.*album|album.*composer).*/"
@@ -174,8 +174,8 @@ test:do_execsql_test(
         SELECT DISTINCT aname
           FROM album, composer, track
          WHERE cname LIKE '%bach%' COLLATE "unicode_ci"
-           AND unlikely(composer.cid=track.cid)
-           AND unlikely(album.aid=track.aid);
+           AND UNLIKELY(composer.cid=track.cid)
+           AND UNLIKELY(album.aid=track.aid);
     ]], {
         -- <whereG-1.8>
         "Mass in B Minor, BWV 232"
@@ -187,12 +187,12 @@ test:do_catchsql_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE likelihood(cname LIKE '%bach%', -0.1e0)
+         WHERE LIKELIHOOD(cname LIKE '%bach%', -0.1e0)
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
         -- <whereG-2.1>
-        1, "Illegal parameters, second argument to likelihood() must be a constant between 0.0 and 1.0"
+        1, "Illegal parameters, second argument to LIKELIHOOD() must be a constant between 0.0 and 1.0"
         -- </whereG-2.1>
     })
 
@@ -201,12 +201,12 @@ test:do_catchsql_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE likelihood(cname LIKE '%bach%', 1.01e0)
+         WHERE LIKELIHOOD(cname LIKE '%bach%', 1.01e0)
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
         -- <whereG-2.2>
-        1, "Illegal parameters, second argument to likelihood() must be a constant between 0.0 and 1.0"
+        1, "Illegal parameters, second argument to LIKELIHOOD() must be a constant between 0.0 and 1.0"
         -- </whereG-2.2>
     })
 
@@ -215,12 +215,12 @@ test:do_catchsql_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE likelihood(cname LIKE '%bach%', track.cid)
+         WHERE LIKELIHOOD(cname LIKE '%bach%', track.cid)
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
         -- <whereG-2.3>
-        1, "Illegal parameters, second argument to likelihood() must be a constant between 0.0 and 1.0"
+        1, "Illegal parameters, second argument to LIKELIHOOD() must be a constant between 0.0 and 1.0"
         -- </whereG-2.3>
     })
 
@@ -330,8 +330,8 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t2;
         CREATE TABLE t2(i int PRIMARY KEY, b TEXT);
         INSERT INTO t2 VALUES(1,'T'), (2,'F');
-        SELECT count(*) FROM t1 LEFT JOIN t2 ON t1.i=t2.i AND b='T' union all
-        SELECT count(*) FROM t1 LEFT JOIN t2 ON likely(t1.i=t2.i) AND b='T';
+        SELECT COUNT(*) FROM t1 LEFT JOIN t2 ON t1.i=t2.i AND b='T' union all
+        SELECT COUNT(*) FROM t1 LEFT JOIN t2 ON LIKELY(t1.i=t2.i) AND b='T';
     ]], {
         -- <6.0>
         4, 4
@@ -350,7 +350,7 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t2;
         CREATE TABLE t2(x INT , y INT , PRIMARY KEY(x,y));
         INSERT INTO t2 VALUES(3,3),(4,4);
-        SELECT likely(a), x FROM t1, t2 ORDER BY 1, 2;
+        SELECT LIKELY(a), x FROM t1, t2 ORDER BY 1, 2;
     ]], {
         -- <7.0>
         1, 3, 1, 4, 9, 3, 9, 4
@@ -360,7 +360,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "7.1",
     [[
-        SELECT unlikely(a), x FROM t1, t2 ORDER BY 1, 2;
+        SELECT UNLIKELY(a), x FROM t1, t2 ORDER BY 1, 2;
     ]], {
         -- <7.1>
         1, 3, 1, 4, 9, 3, 9, 4
@@ -370,7 +370,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "7.2",
     [[
-        SELECT likelihood(a, 0.5e0), x FROM t1, t2 ORDER BY 1, 2;
+        SELECT LIKELIHOOD(a, 0.5e0), x FROM t1, t2 ORDER BY 1, 2;
     ]], {
         -- <7.2>
         1, 3, 1, 4, 9, 3, 9, 4
@@ -380,7 +380,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "7.3",
     [[
-        SELECT coalesce(a,a), x FROM t1, t2 ORDER BY 1, 2;
+        SELECT COALESCE(a,a), x FROM t1, t2 ORDER BY 1, 2;
     ]], {
         -- <7.3>
         1, 3, 1, 4, 9, 3, 9, 4
@@ -443,7 +443,7 @@ test:do_execsql_test(
     [[
         EXPLAIN QUERY PLAN SELECT name FROM people WHERE height>=180;
     ]],
-    {0,0,0,"SCAN TABLE PEOPLE (~983040 rows)"})
+    {0,0,0,"SCAN TABLE people (~983040 rows)"})
 
 test:do_execsql_test(
     "7.3",
@@ -453,7 +453,7 @@ test:do_execsql_test(
     ]],
     -- {0,0,0,"SEARCH TABLE PEOPLE USING COVERING INDEX PEOPLE_IDX1" ..
     --     " (ANY(ROLE) AND HEIGHT>?)"}
-    {0,0,0,"SCAN TABLE PEOPLE (~983040 rows)" }
+    {0,0,0,"SCAN TABLE people (~983040 rows)" }
     )
 
 test:finish_test()

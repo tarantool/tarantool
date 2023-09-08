@@ -12,7 +12,7 @@ test_run:cmd("setopt delimiter ';'")
 - true
 ...
 upper_lower_test = function (str)
-    return box.execute(string.format("select lower('%s'), upper('%s')", str, str))
+    return box.execute(string.format("select LOWER('%s'), UPPER('%s')", str, str))
 end;
 ---
 ...
@@ -259,17 +259,17 @@ test_run:cmd("setopt delimiter ''");
 - true
 ...
 -- Bad test cases
-box.execute("select upper('1', 2)")
+box.execute("select UPPER('1', 2)")
 ---
 - null
 - 'Wrong number of arguments is passed to UPPER(): expected 1, got 2'
 ...
-box.execute("select upper(\"1\")")
+box.execute("select UPPER(\"1\")")
 ---
 - null
 - Can’t resolve field '1'
 ...
-box.execute("select upper()")
+box.execute("select UPPER()")
 ---
 - null
 - 'Wrong number of arguments is passed to UPPER(): expected 1, got 0'

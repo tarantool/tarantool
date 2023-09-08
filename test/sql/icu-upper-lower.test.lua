@@ -5,7 +5,7 @@ _ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 test_run:cmd("setopt delimiter ';'")
 
 upper_lower_test = function (str)
-    return box.execute(string.format("select lower('%s'), upper('%s')", str, str))
+    return box.execute(string.format("select LOWER('%s'), UPPER('%s')", str, str))
 end;
 
 -- Some pangrams
@@ -80,7 +80,7 @@ upper_lower_test([[
 test_run:cmd("setopt delimiter ''");
 
 -- Bad test cases
-box.execute("select upper('1', 2)")
-box.execute("select upper(\"1\")")
-box.execute("select upper()")
+box.execute("select UPPER('1', 2)")
+box.execute("select UPPER(\"1\")")
+box.execute("select UPPER()")
 

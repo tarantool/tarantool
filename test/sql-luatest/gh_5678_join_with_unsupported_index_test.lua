@@ -17,7 +17,7 @@ end)
 
 g.test_join_with_unsupported_index = function()
     g.server:exec(function()
-        local s = box.schema.space.create('T', {format = {'I'}})
+        local s = box.schema.space.create('t', {format = {'i'}})
         s:create_index('ii', {type = 'hash'})
         local _, err = box.execute([[SELECT a.i FROM t AS a, t;]])
         local msg = [[SQL does not support using non-TREE index type. ]]..

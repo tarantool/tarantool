@@ -12,7 +12,7 @@ engine = test_run:get_cfg('engine')
 box.schema.user.create('user1')
  | ---
  | ...
-test_space = box.schema.create_space('T', {         \
+test_space = box.schema.create_space('t', {         \
     engine = engine,                                \
     format = {{'i', 'integer'}}                     \
 })

@@ -12,7 +12,9 @@ test:do_catchsql_test(
     test_prefix.."1.0.2",
     "CREATE TABLE t2 (a int primary key);")
 
-local insert_err = {1, "Duplicate key exists in unique index \"pk_unnamed_T2_1\" in space \"T2\" with old tuple - [2] and new tuple - [2]"}
+local insert_err = {1,
+    "Duplicate key exists in unique index \"pk_unnamed_t2_1\" in space "..
+    "\"t2\" with old tuple - [2] and new tuple - [2]"}
 local data = {
 --id|TRIG TYPE|INSERT TYPE|insert error|commit error| result
  {1, "AFTER", "or abort",   insert_err, {0},          {1,1,2}},
@@ -36,7 +38,7 @@ for _, val in ipairs(data) do
     test:do_catchsql_test(
         local_test_prefix.."0.3",
         string.format([[
-        CREATE TRIGGER TRIG1 %s INSERT ON T1
+        CREATE TRIGGER TRIG1 %s INSERT ON t1
         FOR EACH ROW
         begin
             insert %s into t2 values(new.a);

@@ -53,7 +53,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "metatypes-1.2",
     [[
-        SELECT typeof(s) FROM t;
+        SELECT TYPEOF(s) FROM t;
     ]], {
         "scalar", "scalar", "scalar", "scalar", "scalar", "scalar",
         "NULL", "NULL", "NULL", "NULL", "NULL", "NULL"
@@ -62,7 +62,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "metatypes-1.3",
     [[
-        SELECT typeof(n) FROM t;
+        SELECT TYPEOF(n) FROM t;
     ]], {
         "number", "number", "NULL", "NULL", "NULL", "NULL", "NULL", "NULL",
         "NULL", "NULL", "NULL", "NULL"
@@ -71,7 +71,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "metatypes-1.4",
     [[
-        SELECT typeof(a) FROM t;
+        SELECT TYPEOF(a) FROM t;
     ]], {
         "any", "any", "NULL", "NULL", "NULL", "NULL", "any", "any", "any",
         "any", "any", "any"

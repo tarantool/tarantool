@@ -37,13 +37,13 @@ local function substr_test(id, string, i1, i2, result)
     test:execsql(sql)
     test:do_execsql_test(
         "substr-"..id..".1",
-        string.format("SELECT substr(t, %s, %s) FROM t1", i1, i2),
+        string.format("SELECT SUBSTR(t, %s, %s) FROM t1", i1, i2),
         {result})
     --local qstr = string.gsub("' '", string)--"string","map","' ''",["string"]]]=]).."'"
     local qstr = string
     test:do_execsql_test(
         "substr-"..id..".2",
-        string.format("SELECT substr('%s', %s, %s)",qstr, i1, i2),
+        string.format("SELECT SUBSTR('%s', %s, %s)",qstr, i1, i2),
         {result})
 end
 
@@ -57,12 +57,12 @@ local function subblob_test(id, hex, i1, i2, hexresult)
     test:do_execsql_test(
         "substr-"..id..".1",
         string.format(
-            "SELECT HEX(substr(CAST(b AS VARBINARY), %s, %s)) FROM t1", i1, i2),
+            "SELECT HEX(SUBSTR(CAST(b AS VARBINARY), %s, %s)) FROM t1", i1, i2),
         {hexresult})
     --local qstr = string.gsub("' '", string)--"string","map","' ''",["string"]]]=]).."'"
     test:do_execsql_test(
         "substr-"..id..".2",
-        string.format("SELECT HEX(substr(x'%s', %s, %s))",
+        string.format("SELECT HEX(SUBSTR(x'%s', %s, %s))",
                       hex, i1, i2),
         {hexresult})
 end
@@ -86,7 +86,7 @@ substr_test("1.18", "abcdefg","200","100","")
 test:do_test(
     "substr-1.90",
     function()
-        return test:execsql "SELECT ifnull(substr(NULL,1,1),'nil')"
+        return test:execsql "SELECT IFNULL(SUBSTR(NULL,1,1),'nil')"
     end, {
         -- <substr-1.90>
         "nil"
@@ -96,7 +96,7 @@ test:do_test(
 test:do_test(
     "substr-1.91",
     function()
-        return test:execsql "SELECT ifnull(substr(NULL,1),'nil')"
+        return test:execsql "SELECT IFNULL(SUBSTR(NULL,1),'nil')"
     end, {
         -- <substr-1.91>
         "nil"
@@ -106,7 +106,7 @@ test:do_test(
 test:do_test(
     "substr-1.92",
     function()
-        return test:execsql "SELECT ifnull(substr('abcdefg',NULL,1),'nil')"
+        return test:execsql "SELECT IFNULL(SUBSTR('abcdefg',NULL,1),'nil')"
     end, {
         -- <substr-1.92>
         "nil"
@@ -116,7 +116,7 @@ test:do_test(
 test:do_test(
     "substr-1.93",
     function()
-        return test:execsql "SELECT ifnull(substr('abcdefg',NULL),'nil')"
+        return test:execsql "SELECT IFNULL(SUBSTR('abcdefg',NULL),'nil')"
     end, {
         -- <substr-1.93>
         "nil"
@@ -126,7 +126,7 @@ test:do_test(
 test:do_test(
     "substr-1.94",
     function()
-        return test:execsql "SELECT ifnull(substr('abcdefg',1,NULL),'nil')"
+        return test:execsql "SELECT IFNULL(SUBSTR('abcdefg',1,NULL),'nil')"
     end, {
         -- <substr-1.94>
         "nil"
@@ -175,13 +175,13 @@ local function substr_2_test(id, string, idx, result)
     test:execsql(sql)
     test:do_execsql_test(
         "substr-"..id..".1",
-        string.format("SELECT substr(t,%s) FROM t1",idx),
+        string.format("SELECT SUBSTR(t,%s) FROM t1",idx),
         {result})
     --qstr = "'"..X(153, "X!cmd", [=[["string","map","' ''",["string"]]]=]).."'"
     local qstr = string
     test:do_execsql_test(
         "substr-"..id..".2",
-        string.format("SELECT substr('%s',%s) FROM t1",qstr, idx),
+        string.format("SELECT SUBSTR('%s',%s) FROM t1",qstr, idx),
         {result})
 end
 

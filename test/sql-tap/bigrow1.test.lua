@@ -224,7 +224,7 @@ test:do_test(
             DELETE FROM t1;
             INSERT INTO t1(a,b,c) VALUES('one','abcdefghijklmnopqrstuvwxyz0123','hi');
         ]]
-        return test:execsql "SELECT a,length(b),c FROM t1"
+        return test:execsql "SELECT a, LENGTH(b), c FROM t1;"
     end, {
         -- <bigrow-3.1>
         "one", 30, "hi"
@@ -239,7 +239,7 @@ test:do_test(
             UPDATE t1 SET b=b||b;
             UPDATE t1 SET b=b||b;
         ]]
-        return test:execsql "SELECT a,length(b),c FROM t1"
+        return test:execsql "SELECT a, LENGTH(b), c FROM t1;"
     end, {
         -- <bigrow-3.2>
         "one", 240, "hi"
@@ -251,7 +251,7 @@ for i = 1, 9, 1 do
         "bigrow-3.3."..i,
         function()
             test:execsql("UPDATE t1 SET b=b||'"..i.."'")
-            return test:execsql "SELECT a,length(b),c FROM t1"
+            return test:execsql "SELECT a, LENGTH(b), c FROM t1;"
         end, {
             "one", 240 + i, "hi"
         })
@@ -266,7 +266,7 @@ test:do_test(
             DELETE FROM t1;
             INSERT INTO t1(a,b,c) VALUES('one','abcdefghijklmnopqrstuvwxyz0123','hi');
         ]]
-        return test:execsql "SELECT a,length(b),c FROM t1"
+        return test:execsql "SELECT a, LENGTH(b), c FROM t1;"
     end, {
         -- <bigrow-4.1>
         "one", 30, "hi"
@@ -290,7 +290,7 @@ test:do_test(
             UPDATE t1 SET b=b||b;
             UPDATE t1 SET b=b||b;
         ]]
-        return test:execsql "SELECT a,length(b),c FROM t1"
+        return test:execsql "SELECT a, LENGTH(b), c FROM t1;"
     end, {
         -- <bigrow-4.2>
         "one", 122880, "hi"
@@ -301,9 +301,9 @@ test:do_test(
     "bigrow-4.3",
     function()
         test:execsql [[
-            UPDATE t1 SET b=substr(b,1,65515)
+            UPDATE t1 SET b = SUBSTR(b, 1, 65515);
         ]]
-        return test:execsql "SELECT a,length(b),c FROM t1"
+        return test:execsql "SELECT a, LENGTH(b), c FROM t1;"
     end, {
         -- <bigrow-4.3>
         "one", 65515, "hi"
@@ -315,7 +315,7 @@ for i = 1, 9, 1 do
         "bigrow-4.4."..i,
         function()
             test:execsql("UPDATE t1 SET b=b||'"..i.."'")
-            return test:execsql "SELECT a,length(b),c FROM t1"
+            return test:execsql "SELECT a, LENGTH(b), c FROM t1;"
         end, {
             "one", 65515 + i, "hi"
         })
@@ -331,7 +331,7 @@ test:do_test(
             DELETE FROM t1;
             INSERT INTO t1(a,b,c) VALUES('one','abcdefghijklmnopqrstuvwxyz0123','hi');
         ]]
-        return test:execsql "SELECT a,length(b),c FROM t1"
+        return test:execsql "SELECT a, LENGTH(b), c FROM t1;"
     end, {
         -- <bigrow-5.1>
         "one", 30, "hi"
@@ -345,7 +345,7 @@ while sz < 1048560 -1 do
         "bigrow-5.2."..i,
         [[
             UPDATE t1 SET b=b||b;
-            SELECT a,length(b),c FROM t1;
+            SELECT a, LENGTH(b), c FROM t1;
         ]], {
             "one", sz, "hi"
         })
@@ -365,7 +365,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "bigrow-5.4",
     [[
-        SELECT length(b) FROM t1
+        SELECT LENGTH(b) FROM t1;
     ]], {
         -- <bigrow-5.4>
         1966080
@@ -385,7 +385,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "bigrow-5.6",
     [[
-        SELECT length(b) FROM t1
+        SELECT LENGTH(b) FROM t1;
     ]], {
         -- <bigrow-5.6>
         3932160

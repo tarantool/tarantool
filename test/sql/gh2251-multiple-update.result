@@ -32,7 +32,7 @@ box.execute("UPDATE t1 SET e=e+1 WHERE b IN (SELECT b FROM t1);")
 box.execute("SELECT e FROM t1")
 ---
 - metadata:
-  - name: E
+  - name: e
     type: integer
   rows:
   - [7]
@@ -57,7 +57,7 @@ box.execute("UPDATE t2 SET e=e+1 WHERE b IN (SELECT b FROM t2);")
 box.execute("SELECT e FROM t2")
 ---
 - metadata:
-  - name: E
+  - name: e
     type: integer
   rows:
   - [6]

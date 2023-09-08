@@ -43,7 +43,7 @@ test:do_execsql_test(
         SELECT * FROM "_sequence";
     ]], {
         -- <autoinc-1.3>
-        1,1,"T1",1,0,9223372036854775807LL,1,0,false
+        1,1,"t1",1,0,9223372036854775807LL,1,0,false
         -- </autoinc-1.3>
     })
 
@@ -79,7 +79,7 @@ test:do_execsql_test(
         SELECT "name" FROM "_space" WHERE "name" NOT IN (SELECT "name" FROM "_space" WHERE "name" LIKE '\_%' ESCAPE '\')
     ]], {
         -- <autoinc-1.6>
-        "T1"
+        "t1"
         -- </autoinc-1.6>
     })
 
@@ -138,7 +138,7 @@ test:do_execsql_test(
     "autoinc-2.6",
     [[
         DELETE FROM t1 WHERE y=567;
-        SELECT max(x) FROM t1;
+        SELECT MAX(x) FROM t1;
     ]], {
         -- <autoinc-2.6>
         123
@@ -149,7 +149,7 @@ test:do_execsql_test(
     "autoinc-2.7",
     [[
         INSERT INTO t1 VALUES(NULL,567);
-        SELECT max(x) FROM t1;
+        SELECT MAX(x) FROM t1;
     ]], {
         -- <autoinc-2.7>
         125
@@ -169,7 +169,7 @@ test:do_execsql_test(
     "autoinc-2.9",
     [[
         INSERT INTO t1 VALUES(12,34);
-        SELECT max(x) FROM t1;
+        SELECT MAX(x) FROM t1;
     ]], {
         -- <autoinc-2.9>
         12
@@ -180,7 +180,7 @@ test:do_execsql_test(
     "autoinc-2.10",
     [[
         INSERT INTO t1 VALUES(125,456);
-        SELECT max(x) FROM t1;
+        SELECT MAX(x) FROM t1;
     ]], {
         -- <autoinc-2.10>
         125
@@ -191,7 +191,7 @@ test:do_execsql_test(
     "autoinc-2.11",
     [[
         INSERT INTO t1 VALUES(-1234567,-1);
-        SELECT max(x) FROM t1;
+        SELECT MAX(x) FROM t1;
     ]], {
         -- <autoinc-2.11>
         125
@@ -202,7 +202,7 @@ test:do_execsql_test(
     "autoinc-2.12",
     [[
         INSERT INTO t1 VALUES(234,5678);
-        SELECT max(x) FROM t1;
+        SELECT MAX(x) FROM t1;
     ]], {
         -- <autoinc-2.12>
         234
@@ -279,7 +279,7 @@ test:do_execsql_test(
     "autoinc-2.71",
     [[
         INSERT INTO t2(d) VALUES(2);
-        SELECT max(x) FROM t1 UNION SELECT max(e) FROM t2;
+        SELECT MAX(x) FROM t1 UNION SELECT MAX(e) FROM t2;
     ]], {
         -- <autoinc-2.71>
         2, 238
@@ -290,7 +290,7 @@ test:do_execsql_test(
     "autoinc-2.72",
     [[
         INSERT INTO t1(x) VALUES(10000);
-        SELECT max(x) FROM t1 UNION SELECT max(e) FROM t2;
+        SELECT MAX(x) FROM t1 UNION SELECT MAX(e) FROM t2;
     ]], {
         -- <autoinc-2.72>
         2, 10000
@@ -302,8 +302,8 @@ test:do_execsql_test(
     [[
         CREATE TABLE t3(g INTEGER PRIMARY KEY AUTOINCREMENT, h INT );
         INSERT INTO t3(h) VALUES(1);
-        SELECT max(x) FROM t1 UNION SELECT max(e) FROM t2
-          UNION SELECT max(g) FROM t3;
+        SELECT MAX(x) FROM t1 UNION SELECT MAX(e) FROM t2
+          UNION SELECT MAX(g) FROM t3;
     ]], {
         -- <autoinc-2.73>
         1, 2, 10000
@@ -314,8 +314,8 @@ test:do_execsql_test(
     "autoinc-2.74",
     [[
         INSERT INTO t2(d,e) VALUES(3,100);
-        SELECT max(x) FROM t1 UNION SELECT max(e) FROM t2
-          UNION SELECT max(g) FROM t3;
+        SELECT MAX(x) FROM t1 UNION SELECT MAX(e) FROM t2
+          UNION SELECT MAX(g) FROM t3;
     ]], {
         -- <autoinc-2.74>
         1, 100, 10000
@@ -332,7 +332,7 @@ test:do_execsql_test(
         SELECT "name" FROM "_sequence"
     ]], {
         -- <autoinc-3.1>
-        "T1", "T2", "T3"
+        "t1", "t2", "t3"
         -- </autoinc-3.1>
     })
 
@@ -343,7 +343,7 @@ test:do_execsql_test(
         SELECT "name" FROM "_sequence";
     ]], {
         -- <autoinc-3.2>
-       "T2", "T3"
+       "t2", "t3"
         -- </autoinc-3.2>
     })
 
@@ -354,7 +354,7 @@ test:do_execsql_test(
         SELECT "name" FROM "_sequence";
     ]], {
         -- <autoinc-3.3>
-        "T2"
+        "t2"
         -- </autoinc-3.3>
     })
 
@@ -516,7 +516,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t6(v INTEGER PRIMARY KEY AUTOINCREMENT, w INT );
         INSERT INTO t6 VALUES(9223372036854775807,1);
-        SELECT max(v) FROM t6;
+        SELECT MAX(v) FROM t6;
     ]], {
         -- <autoinc-6.1>
         9223372036854775807LL
@@ -529,7 +529,7 @@ test:do_catchsql_test(
         INSERT INTO t6 VALUES(NULL,1);
     ]], {
         -- <autoinc-6.2>
-        1, "Sequence 'T6' has overflowed"
+        1, "Sequence 't6' has overflowed"
         -- </autoinc-6.2>
     })
 
@@ -559,7 +559,8 @@ test:do_catchsql_test(
         CREATE TABLE t8(x TEXT PRIMARY KEY AUTOINCREMENT);
     ]], {
         -- <autoinc-7.2>
-        1, "Can't create or modify index 'pk_unnamed_T8_1' in space 'T8': sequence cannot be used with a non-integer key"
+        1, "Can't create or modify index 'pk_unnamed_t8_1' in space 't8': "..
+        "sequence cannot be used with a non-integer key"
         -- </autoinc-7.2>
     })
 
@@ -577,7 +578,7 @@ test:do_test(
             CREATE TABLE t3(a INTEGER PRIMARY KEY AUTOINCREMENT, b INT );
             INSERT INTO t3 SELECT * FROM t2 WHERE y>1;
 
-            SELECT max(a) FROM t3;
+            SELECT MAX(a) FROM t3;
         ]])
     end, {
         -- <autoinc-9.1>
@@ -669,7 +670,7 @@ test:do_test(
     "autoinc-3928.2",
     function()
         return test:execsql([[
-            SELECT max(a) FROM t3928;
+            SELECT MAX(a) FROM t3928;
         ]])
     end, {
         -- <autoinc-3928.2>
@@ -705,7 +706,7 @@ test:do_test(
     "autoinc-3928.4",
     function()
         return test:execsql([[
-            SELECT max(a) FROM t3928;
+            SELECT MAX(a) FROM t3928;
         ]])
     end, {
         -- <autoinc-3928.4>
@@ -756,7 +757,7 @@ test:do_test(
     "autoinc-3928.7",
     function()
         return test:execsql([[
-            SELECT max(a) FROM t3928 UNION SELECT max(y) FROM t3928c
+            SELECT MAX(a) FROM t3928 UNION SELECT MAX(y) FROM t3928c
         ]])
     end, {
         -- <autoinc-3928.7>
@@ -871,7 +872,8 @@ test:do_catchsql_test(
     [[
         CREATE TABLE t11_6 (i INT, a INT, b INT AUTOINCREMENT, PRIMARY KEY(a, i));
     ]], {
-        1, "Can't create or modify index 'pk_unnamed_T11_6_1' in space 'T11_6': sequence field must be a part of the index"
+        1, "Can't create or modify index 'pk_unnamed_t11_6_1' in space "..
+        "'t11_6': sequence field must be a part of the index"
     })
 
 test:do_catchsql_test(
@@ -895,7 +897,7 @@ test:do_catchsql_test(
     [[
         CREATE TABLE t11_9 (i INT, PRIMARY KEY(a AUTOINCREMENT), a INT);
     ]], {
-        1, "Can’t resolve field 'A'"
+        1, "Can’t resolve field 'a'"
     })
 
 test:do_catchsql_test(

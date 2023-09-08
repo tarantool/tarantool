@@ -35,15 +35,16 @@ box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT IN
 ...
 immutable_part(box.space._trigger:select())
 ---
-- - - T1T
+- - - t1t
     - {'sql': 'CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO
         t2 VALUES(1); END; '}
 ...
-space_id = box.space._space.index["name"]:get('T1').id
+space_id = box.space._space.index["name"]:get('t1').id
 ---
 ...
 -- Checks for LUA tuples.
-tuple = {"T1t", space_id, {sql = "CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END;"}}
+tuple = {"T1t", space_id, {sql = "CREATE TRIGGER t1t AFTER INSERT ON t1 "..\
+                           "FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END;"}}
 ---
 ...
 box.space._trigger:insert(tuple)
@@ -51,7 +52,8 @@ box.space._trigger:insert(tuple)
 - error: 'Failed to execute SQL statement: trigger name does not match extracted from
     SQL'
 ...
-tuple = {"T1t", space_id, {sql = "CREATE TRIGGER t12t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END;"}}
+tuple = {"T1t", space_id, {sql = "CREATE TRIGGER t12t AFTER INSERT ON t1 "..\
+                           "FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END;"}}
 ---
 ...
 box.space._trigger:insert(tuple)
@@ -59,7 +61,9 @@ box.space._trigger:insert(tuple)
 - error: 'Failed to execute SQL statement: trigger name does not match extracted from
     SQL'
 ...
-tuple = {"T2T", box.space.T1.id + 1, {sql = "CREATE TRIGGER t2t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END;"}}
+tuple = {"t2t", box.space.t1.id + 1, {sql = "CREATE TRIGGER t2t AFTER "..\
+                                      "INSERT ON t1 FOR EACH ROW BEGIN "..\
+                                      "INSERT INTO t2 VALUES(1); END;"}}
 ---
 ...
 box.space._trigger:insert(tuple)
@@ -69,11 +73,11 @@ box.space._trigger:insert(tuple)
 ...
 immutable_part(box.space._trigger:select())
 ---
-- - - T1T
+- - - t1t
     - {'sql': 'CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO
         t2 VALUES(1); END; '}
 ...
-box.execute("DROP TABLE T1;")
+box.execute("DROP TABLE t1;")
 ---
 - row_count: 1
 ...
@@ -91,11 +95,11 @@ box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT IN
 ...
 immutable_part(box.space._trigger:select())
 ---
-- - - T1T
+- - - t1t
     - {'sql': 'CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO
         t2 VALUES(1); END; '}
 ...
-space_id = box.space._space.index["name"]:get('T1').id
+space_id = box.space._space.index["name"]:get('t1').id
 ---
 ...
 -- Test, didn't trigger t1t degrade.
@@ -106,7 +110,7 @@ box.execute("INSERT INTO t1 VALUES(1);")
 box.execute("SELECT * FROM t2;")
 ---
 - metadata:
-  - name: X
+  - name: x
     type: integer
   rows:
   - [1]
@@ -116,13 +120,15 @@ box.execute("DELETE FROM t2;")
 - row_count: 1
 ...
 -- Test triggers.
-tuple = {"T2T", space_id, {sql = "CREATE TRIGGER t2t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(2); END;"}}
+tuple = {"t2t", space_id, {sql = "CREATE TRIGGER t2t AFTER INSERT ON t1 FOR "..\
+                           "EACH ROW BEGIN INSERT INTO t2 VALUES(2); END;"}}
 ---
 ...
 _ = box.space._trigger:insert(tuple)
 ---
 ...
-tuple = {"T3T", space_id, {sql = "CREATE TRIGGER t3t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(3); END;"}}
+tuple = {"t3t", space_id, {sql = "CREATE TRIGGER t3t AFTER INSERT ON t1 FOR "..\
+                           "EACH ROW BEGIN INSERT INTO t2 VALUES(3); END;"}}
 ---
 ...
 _ = box.space._trigger:insert(tuple)
@@ -130,13 +136,13 @@ _ = box.space._trigger:insert(tuple)
 ...
 immutable_part(box.space._trigger:select())
 ---
-- - - T1T
+- - - t1t
     - {'sql': 'CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO
         t2 VALUES(1); END; '}
-  - - T2T
+  - - t2t
     - {'sql': 'CREATE TRIGGER t2t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO
         t2 VALUES(2); END;'}
-  - - T3T
+  - - t3t
     - {'sql': 'CREATE TRIGGER t3t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO
         t2 VALUES(3); END;'}
 ...
@@ -147,7 +153,7 @@ box.execute("INSERT INTO t1 VALUES(2);")
 box.execute("SELECT * FROM t2;")
 ---
 - metadata:
-  - name: X
+  - name: x
     type: integer
   rows:
   - [1]
@@ -159,16 +165,16 @@ box.execute("DELETE FROM t2;")
 - row_count: 3
 ...
 -- Test t1t after t2t and t3t drop.
-box.execute("DROP TRIGGER T2T;")
+box.execute("DROP TRIGGER t2t;")
 ---
 - row_count: 1
 ...
-_ = box.space._trigger:delete("T3T")
+_ = box.space._trigger:delete("t3t")
 ---
 ...
 immutable_part(box.space._trigger:select())
 ---
-- - - T1T
+- - - t1t
     - {'sql': 'CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO
         t2 VALUES(1); END; '}
 ...
@@ -179,7 +185,7 @@ box.execute("INSERT INTO t1 VALUES(3);")
 box.execute("SELECT * FROM t2;")
 ---
 - metadata:
-  - name: X
+  - name: x
     type: integer
   rows:
   - [1]
@@ -199,13 +205,13 @@ box.execute([[CREATE TRIGGER t3t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT IN
 ...
 immutable_part(box.space._trigger:select())
 ---
-- - - T1T
+- - - t1t
     - {'sql': 'CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO
         t2 VALUES(1); END; '}
-  - - T2T
+  - - t2t
     - {'sql': 'CREATE TRIGGER t2t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO
         t2 VALUES(2); END; '}
-  - - T3T
+  - - t3t
     - {'sql': 'CREATE TRIGGER t3t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO
         t2 VALUES(3); END; '}
 ...
@@ -216,7 +222,7 @@ box.execute("INSERT INTO t1 VALUES(4);")
 box.execute("SELECT * FROM t2;")
 ---
 - metadata:
-  - name: X
+  - name: x
     type: integer
   rows:
   - [1]
@@ -241,53 +247,61 @@ box.execute("CREATE TABLE t1(a INT PRIMARY KEY,b INT);")
 ---
 - row_count: 1
 ...
-space_id = box.space.T1.id
+space_id = box.space.t1.id
 ---
 ...
-tuple = {"T1T", space_id, {sql = [[create trigger t1t instead of update on t1 for each row begin delete from t1 WHERE a=old.a+2; end;]]}}
+tuple = {"t1t", space_id, {sql = [[create trigger t1t instead of update on ]]..\
+                           [[t1 for each row begin delete from t1 WHERE ]]..\
+                           [[a=old.a+2; end;]]}}
 ---
 ...
 box.space._trigger:insert(tuple)
 ---
 - error: 'Failed to execute SQL statement: cannot create INSTEAD OF trigger on space:
-    T1'
+    t1'
 ...
-box.execute("CREATE VIEW V1 AS SELECT * FROM t1;")
+box.execute("CREATE VIEW v1 AS SELECT * FROM t1;")
 ---
 - row_count: 1
 ...
-space_id = box.space.V1.id
+space_id = box.space.v1.id
 ---
 ...
-tuple = {"V1T", space_id, {sql = [[create trigger v1t before update on v1 for each row begin delete from t1 WHERE a=old.a+2; end;]]}}
----
-...
-box.space._trigger:insert(tuple)
----
-- error: 'Failed to execute SQL statement: cannot create BEFORE trigger on view: V1'
-...
-tuple = {"V1T", space_id, {sql = [[create trigger v1t AFTER update on v1 for each row begin delete from t1 WHERE a=old.a+2; end;]]}}
+tuple = {"v1t", space_id, {sql = [[create trigger v1t before update on v1 ]]..\
+                           [[for each row begin delete from t1 WHERE ]]..\
+                           [[a=old.a+2; end;]]}}
 ---
 ...
 box.space._trigger:insert(tuple)
 ---
-- error: 'Failed to execute SQL statement: cannot create AFTER trigger on view: V1'
+- error: 'Failed to execute SQL statement: cannot create BEFORE trigger on view: v1'
+...
+tuple = {"v1t", space_id, {sql = [[create trigger v1t AFTER update on v1 ]]..\
+                           [[for each row begin delete from t1 WHERE ]]..\
+                           [[a=old.a+2; end;]]}}
+---
+...
+box.space._trigger:insert(tuple)
+---
+- error: 'Failed to execute SQL statement: cannot create AFTER trigger on view: v1'
 ...
 space_id =  box.space._fk_constraint.id
 ---
 ...
-tuple = {"T1T", space_id, {sql = [[create trigger t1t instead of update on "_fk_constraint" for each row begin delete from t1 WHERE a=old.a+2; end;]]}}
+tuple = {"t1t", space_id, {sql = [[create trigger t1t instead of update on ]]..\
+                           [["_fk_constraint" for each row begin delete ]]..\
+                           [[from t1 WHERE a=old.a+2; end;]]}}
 ---
 ...
 box.space._trigger:insert(tuple)
 ---
 - error: 'Failed to execute SQL statement: cannot create trigger on system table'
 ...
-box.execute("DROP VIEW V1;")
+box.execute("DROP VIEW v1;")
 ---
 - row_count: 1
 ...
-box.execute("DROP TABLE T1;")
+box.execute("DROP TABLE t1;")
 ---
 - row_count: 1
 ...
@@ -458,13 +472,13 @@ box.execute("UPDATE v SET s1 = s1 + 5;")
 box.execute("SELECT * FROM t;")
 ---
 - metadata:
-  - name: S1
+  - name: s1
     type: integer
-  - name: S2
+  - name: s2
     type: integer
-  - name: S3
+  - name: s3
     type: integer
-  - name: S4
+  - name: s4
     type: integer
   rows:
   - [1, 1, 6, 1]
@@ -484,7 +498,7 @@ box.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT);")
 ---
 - row_count: 1
 ...
-space_id = box.space.T1.id
+space_id = box.space.t1.id
 ---
 ...
 box.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;")
@@ -510,7 +524,7 @@ box.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT);")
 ---
 - row_count: 1
 ...
-space_id = box.space.T1.id
+space_id = box.space.t1.id
 ---
 ...
 box.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN ; END;")
@@ -548,7 +562,7 @@ box.session.su('tester')
 box.execute([[CREATE TRIGGER r1 AFTER INSERT ON t1 FOR EACH ROW BEGIN SELECT 1; END; ]])
 ---
 - null
-- Space 'T1' does not exist
+- Space 't1' does not exist
 ...
 box.session.su('admin')
 ---
@@ -595,7 +609,7 @@ box.execute('INSERT INTO t2 VALUES (NULL), (NULL), (NULL);')
 box.execute('SELECT * FROM t1;')
 ---
 - metadata:
-  - name: I
+  - name: i
     type: integer
   rows:
   - [100]
@@ -606,7 +620,7 @@ box.execute('SELECT * FROM t1;')
 box.execute('SELECT * FROM t2;')
 ---
 - metadata:
-  - name: I
+  - name: i
     type: integer
   rows:
   - [1]
@@ -628,7 +642,7 @@ box.execute('INSERT INTO t3 VALUES (NULL), (NULL), (NULL);')
 box.execute('SELECT * FROM t1;')
 ---
 - metadata:
-  - name: I
+  - name: i
     type: integer
   rows:
   - [100]
@@ -642,7 +656,7 @@ box.execute('SELECT * FROM t1;')
 box.execute('SELECT * FROM t2;')
 ---
 - metadata:
-  - name: I
+  - name: i
     type: integer
   rows:
   - [1]
@@ -655,7 +669,7 @@ box.execute('SELECT * FROM t2;')
 box.execute('SELECT * FROM t3;')
 ---
 - metadata:
-  - name: I
+  - name: i
     type: integer
   rows:
   - [1]

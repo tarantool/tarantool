@@ -235,17 +235,9 @@ sql_trigger_step_new(u8 op, struct Token *target_name)
 	int size = sizeof(struct TriggerStep) + name_size;
 	struct TriggerStep *trigger_step = sql_xmalloc0(size);
 	char *z = (char *)&trigger_step[1];
-	int rc = sql_normalize_name(z, name_size, target_name->z,
-				    target_name->n);
-	if (rc > name_size) {
-		name_size = rc;
-		trigger_step = sql_xrealloc(trigger_step,
-					    sizeof(*trigger_step) + name_size);
-		z = (char *) &trigger_step[1];
-		if (sql_normalize_name(z, name_size, target_name->z,
-				       target_name->n) > name_size)
-			unreachable();
-	}
+	memcpy(z, target_name->z, target_name->n);
+	z[target_name->n] = '\0';
+	sqlDequote(z);
 	trigger_step->zTarget = z;
 	trigger_step->op = op;
 	return trigger_step;

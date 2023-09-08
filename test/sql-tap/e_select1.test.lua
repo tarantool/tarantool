@@ -81,18 +81,18 @@ end
 -- -- syntax diagram join-constraint
 --
 do_join_test("e_select-0.1.1", [[
-  SELECT count(*) FROM t1 JOIN_PATTERN t2 ON (t1.a=t2.a)
+  SELECT COUNT(*) FROM t1 JOIN_PATTERN t2 ON (t1.a=t2.a)
 ]], {3})
 do_join_test("e_select-0.1.2", [[
-  SELECT count(*) FROM t1 JOIN_PATTERN t2 USING (a)
+  SELECT COUNT(*) FROM t1 JOIN_PATTERN t2 USING (a)
 ]], {3})
 do_join_test("e_select-0.1.3", [[
-  SELECT count(*) FROM t1 JOIN_PATTERN t2
+  SELECT COUNT(*) FROM t1 JOIN_PATTERN t2
 ]], {9})
 test:do_catchsql_test(
     "e_select-0.1.4",
     [[
-        SELECT count(*) FROM t1, t2 ON (t1.a=t2.a) USING (a)
+        SELECT COUNT(*) FROM t1, t2 ON (t1.a=t2.a) USING (a)
     ]], {
         -- <e_select-0.1.4>
         1, "cannot have both ON and USING clauses in the same join"
@@ -102,7 +102,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "e_select-0.1.5",
     [[
-        SELECT count(*) FROM t1, t2 USING (a) ON (t1.a=t2.a)
+        SELECT COUNT(*) FROM t1, t2 USING (a) ON (t1.a=t2.a)
     ]], {
         -- <e_select-0.1.5>
         1, [[At line 1 at or near position 47: keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.]]
@@ -152,51 +152,56 @@ test:do_select_tests(
         {"2110.0", "SELECT ALL a, b, a||b FROM t1 WHERE a=='x'", {}},
 
         {"0001.1", "SELECT 1, 2, 3 GROUP BY 2", {1, 2, 3}},
-        {"0002.1", "SELECT 1, 2, 3 GROUP BY 2 HAVING count(*)=1", {1, 2, 3}},
-        {"0002.2", "SELECT 1, 2, 3 GROUP BY 2 HAVING count(*)>1", {}},
+        {"0002.1", "SELECT 1, 2, 3 GROUP BY 2 HAVING COUNT(*)=1", {1, 2, 3}},
+        {"0002.2", "SELECT 1, 2, 3 GROUP BY 2 HAVING COUNT(*)>1", {}},
 
         {"1001.1", "SELECT DISTINCT 1, 2, 3 GROUP BY 2", {1, 2, 3}},
-        {"1002.1", "SELECT DISTINCT 1, 2, 3 GROUP BY 2 HAVING count(*)=1", {1, 2, 3}},
-        {"1002.2", "SELECT DISTINCT 1, 2, 3 GROUP BY 2 HAVING count(*)>1", {}},
+        {"1002.1", "SELECT DISTINCT 1, 2, 3 GROUP BY 2 HAVING COUNT(*)=1",
+         {1, 2, 3}},
+        {"1002.2", "SELECT DISTINCT 1, 2, 3 GROUP BY 2 HAVING COUNT(*)>1",
+         {}},
 
         {"2001.1", "SELECT ALL 1, 2, 3 GROUP BY 2", {1, 2, 3}},
-        {"2002.1", "SELECT ALL 1, 2, 3 GROUP BY 2 HAVING count(*)=1", {1, 2, 3}},
-        {"2002.2", "SELECT ALL 1, 2, 3 GROUP BY 2 HAVING count(*)>1", {}},
+        {"2002.1", "SELECT ALL 1, 2, 3 GROUP BY 2 HAVING COUNT(*)=1", {1, 2, 3}},
+        {"2002.2", "SELECT ALL 1, 2, 3 GROUP BY 2 HAVING COUNT(*)>1", {}},
 
-        {"0101.1", "SELECT count(*), max(a) FROM t1 GROUP BY b", {1, "a", 1, "c", 1, "b"}},
-        {"0102.1", "SELECT count(*), max(a) FROM t1 GROUP BY b HAVING count(*)=1", {1, "a", 1, "c", 1, "b"}},
-        {"0102.2", "SELECT count(*), max(a) FROM t1 GROUP BY b HAVING count(*)=2", { }},
+        {"0101.1", "SELECT COUNT(*), MAX(a) FROM t1 GROUP BY b",
+         {1, "a", 1, "c", 1, "b"}},
+        {"0102.1", "SELECT COUNT(*), MAX(a) FROM t1 GROUP BY b HAVING COUNT(*)=1",
+         {1, "a", 1, "c", 1, "b"}},
+        {"0102.2", "SELECT COUNT(*), MAX(a) FROM t1 GROUP BY b HAVING COUNT(*)=2",
+         { }},
 
-        {"1101.1", "SELECT DISTINCT count(*), max(a) FROM t1 GROUP BY b", {1, "a", 1, "c", 1, "b"}},
-        {"1102.1", "SELECT DISTINCT count(*), max(a) FROM t1 GROUP BY b HAVING count(*)=1", {1, "a", 1, "c", 1, "b"}},
-        {"1102.2", "SELECT DISTINCT count(*), max(a) FROM t1 GROUP BY b HAVING count(*)=2", { }},
+        {"1101.1", "SELECT DISTINCT COUNT(*), MAX(a) FROM t1 GROUP BY b", {1, "a", 1, "c", 1, "b"}},
+        {"1102.1", "SELECT DISTINCT COUNT(*), MAX(a) FROM t1 GROUP BY b HAVING COUNT(*)=1", {1, "a", 1, "c", 1, "b"}},
+        {"1102.2", "SELECT DISTINCT COUNT(*), MAX(a) FROM t1 GROUP BY b HAVING COUNT(*)=2", { }},
 
-        {"2101.1", "SELECT ALL count(*), max(a) FROM t1 GROUP BY b", {1, "a", 1, "c", 1, "b"}},
-        {"2102.1", "SELECT ALL count(*), max(a) FROM t1 GROUP BY b HAVING count(*)=1", {1, "a", 1, "c", 1, "b"}},
-        {"2102.2", "SELECT ALL count(*), max(a) FROM t1 GROUP BY b HAVING count(*)=2", {}},
+        {"2101.1", "SELECT ALL COUNT(*), MAX(a) FROM t1 GROUP BY b", {1, "a", 1, "c", 1, "b"}},
+        {"2102.1", "SELECT ALL COUNT(*), MAX(a) FROM t1 GROUP BY b HAVING COUNT(*)=1", {1, "a", 1, "c", 1, "b"}},
+        {"2102.2", "SELECT ALL COUNT(*), MAX(a) FROM t1 GROUP BY b HAVING COUNT(*)=2", {}},
 
         {"0011.1", "SELECT 1, 2, 3 WHERE true GROUP BY 2", {1, 2, 3}},
-        {"0012.1", "SELECT 1, 2, 3 WHERE false GROUP BY 2 HAVING count(*)=1", {}},
-        {"0012.2", "SELECT 1, 2, 3 WHERE false GROUP BY 2 HAVING count(*)>1", {}},
+        {"0012.1", "SELECT 1, 2, 3 WHERE false GROUP BY 2 HAVING COUNT(*)=1", {}},
+        {"0012.2", "SELECT 1, 2, 3 WHERE false GROUP BY 2 HAVING COUNT(*)>1", {}},
 
         {"1011.1", "SELECT DISTINCT 1, 2, 3 WHERE false GROUP BY 2", {}},
-        {"1012.1", "SELECT DISTINCT 1, 2, 3 WHERE true GROUP BY 2 HAVING count(*)=1", {1, 2, 3}},
-        {"1012.2", "SELECT DISTINCT 1, 2, 3 WHERE NULL GROUP BY 2 HAVING count(*)>1", {}},
+        {"1012.1", "SELECT DISTINCT 1, 2, 3 WHERE true GROUP BY 2 HAVING COUNT(*)=1", {1, 2, 3}},
+        {"1012.2", "SELECT DISTINCT 1, 2, 3 WHERE NULL GROUP BY 2 HAVING COUNT(*)>1", {}},
 
         {"2011.1", "SELECT ALL 1, 2, 3 WHERE true GROUP BY 2", {1, 2, 3}},
-        {"2012.1", "SELECT ALL 1, 2, 3 WHERE false GROUP BY 2 HAVING count(*)=1", {}},
-        {"2012.2", "SELECT ALL 1, 2, 3 WHERE true GROUP BY 2 HAVING count(*)>1", {}},
+        {"2012.1", "SELECT ALL 1, 2, 3 WHERE false GROUP BY 2 HAVING COUNT(*)=1", {}},
+        {"2012.2", "SELECT ALL 1, 2, 3 WHERE true GROUP BY 2 HAVING COUNT(*)>1", {}},
 
-        {"0111.1", "SELECT count(*), max(a) FROM t1 WHERE a='a' GROUP BY b", {1, "a"}},
-        {"0112.1", "SELECT count(*), max(a) FROM t1 WHERE a='c' GROUP BY b HAVING count(*)=1", {1, "c"}},
-        {"0112.2", "SELECT count(*), max(a) FROM t1 WHERE false GROUP BY b HAVING count(*)=2", { }},
-        {"1111.1", "SELECT DISTINCT count(*), max(a) FROM t1 WHERE a<'c' GROUP BY b", {1, "a", 1, "b"}},
-        {"1112.1", "SELECT DISTINCT count(*), max(a) FROM t1 WHERE a>'a' GROUP BY b HAVING count(*)=1", {1, "c", 1, "b"}},
-        {"1112.2", "SELECT DISTINCT count(*), max(a) FROM t1 WHERE false GROUP BY b HAVING count(*)=2", { }},
+        {"0111.1", "SELECT COUNT(*), MAX(a) FROM t1 WHERE a='a' GROUP BY b", {1, "a"}},
+        {"0112.1", "SELECT COUNT(*), MAX(a) FROM t1 WHERE a='c' GROUP BY b HAVING COUNT(*)=1", {1, "c"}},
+        {"0112.2", "SELECT COUNT(*), MAX(a) FROM t1 WHERE false GROUP BY b HAVING COUNT(*)=2", { }},
+        {"1111.1", "SELECT DISTINCT COUNT(*), MAX(a) FROM t1 WHERE a<'c' GROUP BY b", {1, "a", 1, "b"}},
+        {"1112.1", "SELECT DISTINCT COUNT(*), MAX(a) FROM t1 WHERE a>'a' GROUP BY b HAVING COUNT(*)=1", {1, "c", 1, "b"}},
+        {"1112.2", "SELECT DISTINCT COUNT(*), MAX(a) FROM t1 WHERE false GROUP BY b HAVING COUNT(*)=2", { }},
 
-        {"2111.1", "SELECT ALL count(*), max(a) FROM t1 WHERE b>'one' GROUP BY b", {1, "c", 1, "b"}},
-        {"2112.1", "SELECT ALL count(*), max(a) FROM t1 WHERE a!='b' GROUP BY b HAVING count(*)=1", {1, "a", 1, "c"}},
-        {"2112.2", "SELECT ALL count(*), max(a) FROM t1 WHERE false GROUP BY b HAVING count(*)=2", { }},
+        {"2111.1", "SELECT ALL COUNT(*), MAX(a) FROM t1 WHERE b>'one' GROUP BY b", {1, "c", 1, "b"}},
+        {"2112.1", "SELECT ALL COUNT(*), MAX(a) FROM t1 WHERE a!='b' GROUP BY b HAVING COUNT(*)=1", {1, "a", 1, "c"}},
+        {"2112.2", "SELECT ALL COUNT(*), MAX(a) FROM t1 WHERE false GROUP BY b HAVING COUNT(*)=2", { }},
     })
 
 -- -- syntax diagram result-column
@@ -293,9 +298,9 @@ test:do_select_tests(
         {"1", "SELECT 'abc'", {"abc"}},
         {"2", "SELECT 'abc' WHERE NULL", {}},
         {"3", "SELECT NULL", {""}},
-        {"4", "SELECT count(*)", {1}},
-        {"5", "SELECT count(*) WHERE false", {0}},
-        {"6", "SELECT count(*) WHERE true", {1}},
+        {"4", "SELECT COUNT(*)", {1}},
+        {"5", "SELECT COUNT(*) WHERE false", {0}},
+        {"6", "SELECT COUNT(*) WHERE true", {1}},
     })
 
 --
@@ -382,7 +387,7 @@ do_join_test("e_select-1.4.2.1", [[
 --
 -- x1, x2    (Nlhs=3, Nrhs=2)   (Mlhs=2, Mrhs=3)
 do_join_test("e_select-1.4.3.1", [[
-  SELECT count(*) FROM x1 JOIN_PATTERN x2
+  SELECT COUNT(*) FROM x1 JOIN_PATTERN x2
 ]], {3 * 2})
 test:do_test(
     "e_select-1.4.3.2",
@@ -392,7 +397,7 @@ test:do_test(
 
 -- x2, x3    (Nlhs=2, Nrhs=5)   (Mlhs=3, Mrhs=4)
 do_join_test("e_select-1.4.3.3", [[
-  SELECT count(*) FROM x2 JOIN_PATTERN x3
+  SELECT COUNT(*) FROM x2 JOIN_PATTERN x3
 ]], {2 * 5})
 test:do_test(
     "e_select-1.4.3.4",
@@ -402,7 +407,7 @@ test:do_test(
 
 -- x3, x1    (Nlhs=5, Nrhs=3)   (Mlhs=4, Mrhs=2)
 do_join_test("e_select-1.4.3.5", [[
-  SELECT count(*) FROM x3 JOIN_PATTERN x1
+  SELECT COUNT(*) FROM x3 JOIN_PATTERN x1
 ]], {5 * 3})
 test:do_test(
     "e_select-1.4.3.6",
@@ -412,7 +417,7 @@ test:do_test(
 
 -- x3, x3    (Nlhs=5, Nrhs=5)   (Mlhs=4, Mrhs=4)
 do_join_test("e_select-1.4.3.7", [[
-  SELECT count(*) FROM x3 JOIN_PATTERN x3
+  SELECT COUNT(*) FROM x3 JOIN_PATTERN x3
 ]], {5 * 5})
 test:do_test(
     "e_select-1.4.3.8",
@@ -470,15 +475,15 @@ end
 test:do_catchsql_test(
     "e_select-1.4.1",
     "SELECT * FROM t1, t3 USING (b)",
-    {1, "/cannot join using column B -- column not present in both tables/"})
+    {1, "/cannot join using column b -- column not present in both tables/"})
 test:do_catchsql_test(
     "e_select-1.4.2",
     "SELECT * FROM t3, t1 USING (c)",
-    {1, "/cannot join using column C -- column not present in both tables/"})
+    {1, "/cannot join using column c -- column not present in both tables/"})
 test:do_catchsql_test(
     "e_select-1.4.3",
     "SELECT * FROM t3, (SELECT a AS b, b AS c FROM t1) USING (a)",
-    {1, "/cannot join using column A -- column not present in both tables/"})
+    {1, "/cannot join using column a -- column not present in both tables/"})
 -- EVIDENCE-OF: R-22776-52830 For each pair of named columns, the
 -- expression "lhs.X = rhs.X" is evaluated for each row of the cartesian
 -- product as a boolean expression. Only rows for which all such
@@ -567,10 +572,10 @@ test:do_execsql_test(
 test:do_select_tests(
     "e_select-1.8",
     {
-        {"1a", "SELECT count(*) FROM t7 JOIN t8 ON (t7.a=t8.a)", {1}},
-        {"1b", "SELECT count(*) FROM t7 LEFT JOIN t8 ON (t7.a=t8.a)", {2}},
-        {"2a", "SELECT count(*) FROM t7 JOIN t8 USING (a)", {1}},
-        {"2b", "SELECT count(*) FROM t7 LEFT JOIN t8 USING (a)", {2}},
+        {"1a", "SELECT COUNT(*) FROM t7 JOIN t8 ON (t7.a=t8.a)", {1}},
+        {"1b", "SELECT COUNT(*) FROM t7 LEFT JOIN t8 ON (t7.a=t8.a)", {2}},
+        {"2a", "SELECT COUNT(*) FROM t7 JOIN t8 USING (a)", {1}},
+        {"2b", "SELECT COUNT(*) FROM t7 LEFT JOIN t8 USING (a)", {2}},
     })
 
 -- EVIDENCE-OF: R-15607-52988 The added rows contain NULL values in the
@@ -795,9 +800,9 @@ test:do_select_tests(
         {"4", "SELECT z2.d, z2.e FROM z1,z2 LIMIT 1", {"", 21}},
         {"5", "SELECT z2.d, z2.e, z1.a, z1.b, z1.c FROM z1,z2 LIMIT 1", {"", 21, 51.65, -59.58, "belfries"}},
 
-        {"6", "SELECT count(*), a,b,c FROM z1", {6, 63, 0, "-26"}},
-        {"7", "SELECT max(a), a,b,c FROM z1", {63, 63, 0, "-26"}},
-        {"8", "SELECT a,b,c, min(a) FROM z1", {-5, "", "75", -5}},
+        {"6", "SELECT COUNT(*), a,b,c FROM z1", {6, 63, 0, "-26"}},
+        {"7", "SELECT MAX(a), a,b,c FROM z1", {63, 63, 0, "-26"}},
+        {"8", "SELECT a,b,c, MIN(a) FROM z1", {-5, "", "75", -5}},
 
         {"9", "SELECT a,b,c,d,e,a,b,c,d,e FROM z1,z2 LIMIT 1", {
             51.65, -59.58, "belfries", "", 21, 51.65, -59.58, "belfries", "", 21}},
@@ -820,7 +825,7 @@ data = {
     {"2.1", "SELECT *", "Failed to expand '*' in SELECT statement without FROM clause"},
     {"2.2", "SELECT * WHERE 1", "Failed to expand '*' in SELECT statement without FROM clause"},
     {"2.3", "SELECT * WHERE 0", "Failed to expand '*' in SELECT statement without FROM clause"},
-    {"2.4", "SELECT count(*), *", "Failed to expand '*' in SELECT statement without FROM clause"}
+    {"2.4", "SELECT COUNT(*), *", "Failed to expand '*' in SELECT statement without FROM clause"}
 }
 
 for _, val in ipairs(data) do
@@ -905,12 +910,12 @@ test:do_select_tests(
 test:do_select_tests(
     "e_select-4.5",
     {
-        {"1", "SELECT count(a), max(a), count(b), max(b) FROM z1", {5, 63, 5, 67}},
-        {"2", "SELECT count(*), max(1)", {1, 1}},
+        {"1", "SELECT COUNT(a), MAX(a), COUNT(b), MAX(b) FROM z1", {5, 63, 5, 67}},
+        {"2", "SELECT COUNT(*), MAX(1)", {1, 1}},
 
-        {"3", "SELECT sum(b+1) FROM z1 NATURAL LEFT JOIN z3", {-43.06}},
-        {"4", "SELECT sum(b+2) FROM z1 NATURAL LEFT JOIN z3", {-38.06}},
-        {"5", "SELECT sum(CASE WHEN b IS NOT NULL THEN 1 ELSE 0 END) "..
+        {"3", "SELECT SUM(b+1) FROM z1 NATURAL LEFT JOIN z3", {-43.06}},
+        {"4", "SELECT SUM(b+2) FROM z1 NATURAL LEFT JOIN z3", {-38.06}},
+        {"5", "SELECT SUM(CASE WHEN b IS NOT NULL THEN 1 ELSE 0 END) "..
               "FROM z1 NATURAL LEFT JOIN z3", {5}},
     })
 
@@ -950,13 +955,13 @@ test:do_execsql_test(
 test:do_select_tests(
     "e_select-4.6",
     {
-        {"1", "SELECT one, two, count(*) FROM a1", {4, 10, 4}},
-        {"2", "SELECT one, two, count(*) FROM a1 WHERE one<3", {2, 3, 2}},
-        {"3", "SELECT one, two, count(*) FROM a1 WHERE one>3", {4, 10, 1}},
-        {"4", "SELECT *, count(*) FROM a1 JOIN a2", {4, 10, 10, 4, 16}},
-        {"5", "SELECT *, sum(three) FROM a1 NATURAL JOIN a2", {3, 6, 2, 3}},
-        {"6", "SELECT *, sum(three) FROM a1 NATURAL JOIN a2", {3, 6, 2, 3}},
-        {"7", "SELECT group_concat('1', ''), a1.* FROM a1 NATURAL JOIN a2", {"11", 3, 6}},
+        {"1", "SELECT one, two, COUNT(*) FROM a1", {4, 10, 4}},
+        {"2", "SELECT one, two, COUNT(*) FROM a1 WHERE one<3", {2, 3, 2}},
+        {"3", "SELECT one, two, COUNT(*) FROM a1 WHERE one>3", {4, 10, 1}},
+        {"4", "SELECT *, COUNT(*) FROM a1 JOIN a2", {4, 10, 10, 4, 16}},
+        {"5", "SELECT *, SUM(three) FROM a1 NATURAL JOIN a2", {3, 6, 2, 3}},
+        {"6", "SELECT *, SUM(three) FROM a1 NATURAL JOIN a2", {3, 6, 2, 3}},
+        {"7", "SELECT GROUP_CONCAT('1', ''), a1.* FROM a1 NATURAL JOIN a2", {"11", 3, 6}},
     })
 
 -- EVIDENCE-OF: R-04486-07266 Or, if the dataset contains zero rows, then
@@ -966,9 +971,9 @@ test:do_select_tests(
 test:do_select_tests(
     "e_select-4.7",
     {
-        {"1", "SELECT one, two, count(*) FROM a1 WHERE false", {"", "", 0}},
-        {"2", "SELECT sum(two), * FROM a1, a2 WHERE three>5", {"", "", "", "", ""}},
-        {"3", "SELECT max(one) IS NULL, one IS NULL, two IS NULL FROM a1 WHERE two=7", {true, true, true}},
+        {"1", "SELECT one, two, COUNT(*) FROM a1 WHERE false", {"", "", 0}},
+        {"2", "SELECT SUM(two), * FROM a1, a2 WHERE three>5", {"", "", "", "", ""}},
+        {"3", "SELECT MAX(one) IS NULL, one IS NULL, two IS NULL FROM a1 WHERE two=7", {true, true, true}},
     })
 
 -- EVIDENCE-OF: R-64138-28774 An aggregate query without a GROUP BY
@@ -982,7 +987,7 @@ if 0>0 then
 local X = nil
 local sql_finalize = nil
 local sql_prepare_v2 = nil
-for _ in X(0, "X!foreach", [=[["tn select","\n  8.1  \"SELECT count(*) FROM a1\"\n  8.2  \"SELECT count(*) FROM a1 WHERE 0\"\n  8.3  \"SELECT count(*) FROM a1 WHERE 1\"\n  8.4  \"SELECT max(a1.one)+min(two), a1.one, two, * FROM a1, a2 WHERE 1\"\n  8.5  \"SELECT max(a1.one)+min(two), a1.one, two, * FROM a1, a2 WHERE 0\"\n"]]=]) do
+for _ in X(0, "X!foreach", [=[["tn select","\n  8.1  \"SELECT COUNT(*) FROM a1\"\n  8.2  \"SELECT COUNT(*) FROM a1 WHERE 0\"\n  8.3  \"SELECT COUNT(*) FROM a1 WHERE 1\"\n  8.4  \"SELECT MAX(a1.one)+MIN(two), a1.one, two, * FROM a1, a2 WHERE 1\"\n  8.5  \"SELECT MAX(a1.one)+MIN(two), a1.one, two, * FROM a1, a2 WHERE 0\"\n"]]=]) do
     -- Set $nRow to the number of rows returned by $select:
     local stmt, nRow
     stmt = sql_prepare_v2("db", select, -1, "DUMMY")
@@ -1048,13 +1053,13 @@ test:do_execsql_test(
 test:do_select_tests(
     "e_select-4.9",
     {
-        {"1", [[SELECT group_concat(CAST(one AS STRING)), two FROM b1 GROUP BY
+        {"1", [[SELECT GROUP_CONCAT(CAST(one AS STRING)), two FROM b1 GROUP BY
                 two]], {"4,5","f","1","o","6,7","s","2,3","t"}},
-        {"2", [[SELECT group_concat(CAST(one AS STRING)), sum(one) FROM b1
+        {"2", [[SELECT GROUP_CONCAT(CAST(one AS STRING)), SUM(one) FROM b1
                 GROUP BY (one>4)]], {"1,2,3,4",10,"5,6,7",18}},
-        {"3", [[SELECT group_concat(CAST(one AS STRING)) FROM b1 GROUP BY
+        {"3", [[SELECT GROUP_CONCAT(CAST(one AS STRING)) FROM b1 GROUP BY
                 (two>'o'), one%2]], {"4","1,5","2,6","3,7"}},
-        {"4", [[SELECT group_concat(CAST(one AS STRING)) FROM b1 GROUP BY
+        {"4", [[SELECT GROUP_CONCAT(CAST(one AS STRING)) FROM b1 GROUP BY
                 (one==2 OR two=='o')]], {"3,4,5,6,7","1,2"}},
     })
 
@@ -1064,8 +1069,8 @@ test:do_select_tests(
 test:do_select_tests(
     "e_select-4.10",
     {
-        {"1", "SELECT group_concat(y) FROM b2 GROUP BY x", {"0,1","3","2,4"}},
-        {"2", "SELECT count(*) FROM b2 GROUP BY CASE WHEN y<'4' THEN NULL ELSE 0 END", {4, 1}},
+        {"1", "SELECT GROUP_CONCAT(y) FROM b2 GROUP BY x", {"0,1","3","2,4"}},
+        {"2", "SELECT COUNT(*) FROM b2 GROUP BY CASE WHEN y<'4' THEN NULL ELSE 0 END", {4, 1}},
     })
 
 -- EVIDENCE-OF: R-10470-30318 The usual rules for selecting a collation
@@ -1075,21 +1080,21 @@ test:do_select_tests(
 test:do_select_tests(
     "e_select-4.11",
     {
-        {"1", "SELECT count(*) FROM b3 GROUP BY b", {1, 1, 1, 1}},
-        {"2", "SELECT count(*) FROM b3 GROUP BY a", {2, 2}},
-        {"3", "SELECT count(*) FROM b3 GROUP BY +b", {1, 1, 1, 1}},
-        {"4", "SELECT count(*) FROM b3 GROUP BY +a", {2, 2}},
-        {"5", "SELECT count(*) FROM b3 GROUP BY b||''", {1, 1, 1, 1}},
-        {"6", "SELECT count(*) FROM b3 GROUP BY a||''", {1, 1, 1, 1}},
+        {"1", "SELECT COUNT(*) FROM b3 GROUP BY b", {1, 1, 1, 1}},
+        {"2", "SELECT COUNT(*) FROM b3 GROUP BY a", {2, 2}},
+        {"3", "SELECT COUNT(*) FROM b3 GROUP BY +b", {1, 1, 1, 1}},
+        {"4", "SELECT COUNT(*) FROM b3 GROUP BY +a", {2, 2}},
+        {"5", "SELECT COUNT(*) FROM b3 GROUP BY b||''", {1, 1, 1, 1}},
+        {"6", "SELECT COUNT(*) FROM b3 GROUP BY a||''", {1, 1, 1, 1}},
     })
 
 -- EVIDENCE-OF: R-63573-50730 The expressions in a GROUP BY clause may
 -- not be aggregate expressions.
 --
 data = {
-    {"12.1", "SELECT a,b FROM b3 GROUP BY count(*)"},
-    {"12.2", "SELECT max(a) FROM b3 GROUP BY max(b)"},
-    {"12.3", "SELECT group_concat(a) FROM b3 GROUP BY a, max(b)"},
+    {"12.1", "SELECT a,b FROM b3 GROUP BY COUNT(*)"},
+    {"12.2", "SELECT MAX(a) FROM b3 GROUP BY MAX(b)"},
+    {"12.3", "SELECT GROUP_CONCAT(a) FROM b3 GROUP BY a, MAX(b)"},
 }
 for _, val in ipairs(data) do
     local tn = val[1]
@@ -1161,10 +1166,10 @@ test:do_execsql_test(
 test:do_select_tests(
     "e_select-4.13",
     {
-        {"1.1", "SELECT up FROM c1 GROUP BY up HAVING count(*)>3", {"x"}},
-        {"1.2", "SELECT up FROM c1 GROUP BY up HAVING sum(down)>16", {"y"}},
-        {"1.3", "SELECT up FROM c1 GROUP BY up HAVING sum(down)<16", {"x"}},
-        {"1.4", "SELECT up|| CAST(down AS TEXT) FROM c1 GROUP BY (down<5) HAVING max(down)<10", {"x4"}},
+        {"1.1", "SELECT up FROM c1 GROUP BY up HAVING COUNT(*)>3", {"x"}},
+        {"1.2", "SELECT up FROM c1 GROUP BY up HAVING SUM(down)>16", {"y"}},
+        {"1.3", "SELECT up FROM c1 GROUP BY up HAVING SUM(down)<16", {"x"}},
+        {"1.4", "SELECT up|| CAST(down AS TEXT) FROM c1 GROUP BY (down<5) HAVING MAX(down)<10", {"x4"}},
 
         {"2.1", "SELECT up FROM c1 GROUP BY up HAVING down>10", {"y"}},
         {"2.2", "SELECT up FROM c1 GROUP BY up HAVING up='y'", {"y"}},
@@ -1181,11 +1186,11 @@ test:do_select_tests(
 test:do_select_tests(
     "e_select-4.15",
     {
-        {"1", "SELECT sum(down) FROM c1 GROUP BY up", {15, 48}},
-        {"2", "SELECT sum(j), max(j) FROM c2 GROUP BY (i%3)", {54, 36, 27, 21, 39, 28}},
-        {"3", "SELECT sum(j), max(j) FROM c2 GROUP BY (j%2)", {80, 36, 40, 21}},
-        {"4", "SELECT 1+sum(j), max(j)+1 FROM c2 GROUP BY (j%2)", {81, 37, 41, 22}},
-        {"5", "SELECT count(*), round(avg(i),2) FROM c1, c2 ON (i=down) GROUP BY j%2", {3, 4, 1, 2.0}},
+        {"1", "SELECT SUM(down) FROM c1 GROUP BY up", {15, 48}},
+        {"2", "SELECT SUM(j), MAX(j) FROM c2 GROUP BY (i%3)", {54, 36, 27, 21, 39, 28}},
+        {"3", "SELECT SUM(j), MAX(j) FROM c2 GROUP BY (j%2)", {80, 36, 40, 21}},
+        {"4", "SELECT 1+SUM(j), MAX(j)+1 FROM c2 GROUP BY (j%2)", {81, 37, 41, 22}},
+        {"5", "SELECT COUNT(*), ROUND(AVG(i),2) FROM c1, c2 ON (i=down) GROUP BY j%2", {3, 4, 1, 2.0}},
     })
 
 -- EVIDENCE-OF: R-62913-19830 Otherwise, it is evaluated against a single
@@ -1202,7 +1207,7 @@ test:do_select_tests(
         {"2", "SELECT i, j FROM c2 GROUP BY i%2 HAVING j<30", {8, 28}},
         {"3", "SELECT i, j FROM c2 GROUP BY i%2 HAVING j>30", {9, 36}},
         {"4", "SELECT i, j FROM c2 GROUP BY i%2 HAVING j>30", {9, 36}},
-        {"5", "SELECT count(*), i, k FROM c2 NATURAL JOIN c3 GROUP BY substr(k, 1, 1)",
+        {"5", "SELECT COUNT(*), i, k FROM c2 NATURAL JOIN c3 GROUP BY SUBSTR(k, 1, 1)",
             {2, 5, "boron", 2, 2, "helium", 1, 3, "lithium"}},
 })
 
@@ -1218,9 +1223,9 @@ test:do_select_tests(
 test:do_select_tests(
     "e_select.4.16",
     {
-        {1, "select count(*) from (SELECT i, j FROM c2 GROUP BY i%2)", {2}},
-        {2, "select count(*) from (SELECT i, j FROM c2 GROUP BY i)", {9}},
-        {3, "select count(*) from (SELECT i, j FROM c2 GROUP BY i HAVING i<5)", {4}}})
+        {1, "select COUNT(*) from (SELECT i, j FROM c2 GROUP BY i%2)", {2}},
+        {2, "select COUNT(*) from (SELECT i, j FROM c2 GROUP BY i)", {9}},
+        {3, "select COUNT(*) from (SELECT i, j FROM c2 GROUP BY i HAVING i<5)", {4}}})
 ---------------------------------------------------------------------------
 -- The following tests attempt to verify statements made regarding the ALL
 -- and DISTINCT keywords.
@@ -1380,26 +1385,26 @@ end
 
 data = {
     {1, "SELECT * FROM j1 ORDER BY a UNION ALL SELECT * FROM j2,j3", "ORDER BY", "UNION ALL"},
-    {2, "SELECT count(*) FROM j1 ORDER BY 1 UNION ALL SELECT max(e) FROM j2",  "ORDER BY", "UNION ALL"},
-    {3, "SELECT count(*), * FROM j1 ORDER BY 1,2,3 UNION ALL SELECT *,* FROM j2",  "ORDER BY", "UNION ALL"},
+    {2, "SELECT COUNT(*) FROM j1 ORDER BY 1 UNION ALL SELECT MAX(e) FROM j2",  "ORDER BY", "UNION ALL"},
+    {3, "SELECT COUNT(*), * FROM j1 ORDER BY 1,2,3 UNION ALL SELECT *,* FROM j2",  "ORDER BY", "UNION ALL"},
     {4, "SELECT * FROM j1 LIMIT 10 UNION ALL SELECT * FROM j2,j3",   "LIMIT", "UNION ALL"},
     {5, "SELECT * FROM j1 LIMIT 10 OFFSET 5 UNION ALL SELECT * FROM j2,j3",   "LIMIT", "UNION ALL"},
     {6, "SELECT a FROM j1 LIMIT (SELECT e FROM j2) UNION ALL SELECT g FROM j2,j3",   "LIMIT", "UNION ALL"},
     {7, "SELECT * FROM j1 ORDER BY a UNION SELECT * FROM j2,j3",   "ORDER BY", "UNION"},
-    {8, "SELECT count(*) FROM j1 ORDER BY 1 UNION SELECT max(e) FROM j2",  "ORDER BY", "UNION"},
-    {9, "SELECT count(*), * FROM j1 ORDER BY 1,2,3 UNION SELECT *,* FROM j2",  "ORDER BY", "UNION"},
+    {8, "SELECT COUNT(*) FROM j1 ORDER BY 1 UNION SELECT MAX(e) FROM j2",  "ORDER BY", "UNION"},
+    {9, "SELECT COUNT(*), * FROM j1 ORDER BY 1,2,3 UNION SELECT *,* FROM j2",  "ORDER BY", "UNION"},
     {10, "SELECT * FROM j1 LIMIT 10 UNION SELECT * FROM j2,j3",   "LIMIT", "UNION"},
     {11, "SELECT * FROM j1 LIMIT 10 OFFSET 5 UNION SELECT * FROM j2,j3",   "LIMIT", "UNION"},
     {12, "SELECT a FROM j1 LIMIT (SELECT e FROM j2) UNION SELECT g FROM j2,j3",   "LIMIT", "UNION"},
     {13, "SELECT * FROM j1 ORDER BY a EXCEPT SELECT * FROM j2,j3",   "ORDER BY", "EXCEPT"},
-    {14, "SELECT count(*) FROM j1 ORDER BY 1 EXCEPT SELECT max(e) FROM j2",  "ORDER BY", "EXCEPT"},
-    {15, "SELECT count(*), * FROM j1 ORDER BY 1,2,3 EXCEPT SELECT *,* FROM j2",  "ORDER BY", "EXCEPT"},
+    {14, "SELECT COUNT(*) FROM j1 ORDER BY 1 EXCEPT SELECT MAX(e) FROM j2",  "ORDER BY", "EXCEPT"},
+    {15, "SELECT COUNT(*), * FROM j1 ORDER BY 1,2,3 EXCEPT SELECT *,* FROM j2",  "ORDER BY", "EXCEPT"},
     {16, "SELECT * FROM j1 LIMIT 10 EXCEPT SELECT * FROM j2,j3",   "LIMIT", "EXCEPT"},
     {17, "SELECT * FROM j1 LIMIT 10 OFFSET 5 EXCEPT SELECT * FROM j2,j3",   "LIMIT", "EXCEPT"},
     {18, "SELECT a FROM j1 LIMIT (SELECT e FROM j2) EXCEPT SELECT g FROM j2,j3",   "LIMIT", "EXCEPT"},
     {19, "SELECT * FROM j1 ORDER BY a INTERSECT SELECT * FROM j2,j3",   "ORDER BY", "INTERSECT"},
-    {20, "SELECT count(*) FROM j1 ORDER BY 1 INTERSECT SELECT max(e) FROM j2",  "ORDER BY", "INTERSECT"},
-    {21, "SELECT count(*), * FROM j1 ORDER BY 1,2,3 INTERSECT SELECT *,* FROM j2",  "ORDER BY", "INTERSECT"},
+    {20, "SELECT COUNT(*) FROM j1 ORDER BY 1 INTERSECT SELECT MAX(e) FROM j2",  "ORDER BY", "INTERSECT"},
+    {21, "SELECT COUNT(*), * FROM j1 ORDER BY 1,2,3 INTERSECT SELECT *,* FROM j2",  "ORDER BY", "INTERSECT"},
     {22, "SELECT * FROM j1 LIMIT 10 INTERSECT SELECT * FROM j2,j3",   "LIMIT", "INTERSECT"},
     {23, "SELECT * FROM j1 LIMIT 10 OFFSET 5 INTERSECT SELECT * FROM j2,j3",   "LIMIT", "INTERSECT"},
     {24, "SELECT a FROM j1 LIMIT (SELECT e FROM j2) INTERSECT SELECT g FROM j2,j3",   "LIMIT", "INTERSECT"},
@@ -1425,27 +1430,27 @@ end
 
 data = {
     {1, "SELECT * FROM j1 UNION ALL SELECT * FROM j2,j3 ORDER BY a"},
-    {2, "SELECT count(*) FROM j1 UNION ALL SELECT max(e) FROM j2 ORDER BY 1"},
-    {3, "SELECT count(*), * FROM j1 UNION ALL SELECT *,* FROM j2 ORDER BY 1,2,3"},
+    {2, "SELECT COUNT(*) FROM j1 UNION ALL SELECT MAX(e) FROM j2 ORDER BY 1"},
+    {3, "SELECT COUNT(*), * FROM j1 UNION ALL SELECT *,* FROM j2 ORDER BY 1,2,3"},
     {4, "SELECT * FROM j1 UNION ALL SELECT * FROM j2,j3 LIMIT 10"},
     {5, "SELECT * FROM j1 UNION ALL SELECT * FROM j2,j3 LIMIT 10 OFFSET 5" },
     {6, "SELECT a FROM j1 UNION ALL SELECT g FROM j2,j3 LIMIT (SELECT 10)"},
     {7, "SELECT * FROM j1 UNION SELECT * FROM j2,j3 ORDER BY a"},
-    {8, "SELECT count(*) FROM j1 UNION SELECT max(e) FROM j2 ORDER BY 1"},
-    {"8b", "VALUES('8b') UNION SELECT max(e) FROM j2 ORDER BY 1"},
-    {9, "SELECT count(*), * FROM j1 UNION SELECT *,* FROM j2 ORDER BY 1,2,3"},
+    {8, "SELECT COUNT(*) FROM j1 UNION SELECT MAX(e) FROM j2 ORDER BY 1"},
+    {"8b", "VALUES('8b') UNION SELECT MAX(e) FROM j2 ORDER BY 1"},
+    {9, "SELECT COUNT(*), * FROM j1 UNION SELECT *,* FROM j2 ORDER BY 1,2,3"},
     {10, "SELECT * FROM j1 UNION SELECT * FROM j2,j3 LIMIT 10"},
     {11, "SELECT * FROM j1 UNION SELECT * FROM j2,j3 LIMIT 10 OFFSET 5"},
     {12, "SELECT a FROM j1 UNION SELECT g FROM j2,j3 LIMIT (SELECT 10)"},
     {13, "SELECT * FROM j1 EXCEPT SELECT * FROM j2,j3 ORDER BY a"},
-    {14, "SELECT count(*) FROM j1 EXCEPT SELECT max(e) FROM j2 ORDER BY 1"},
-    {15, "SELECT count(*), * FROM j1 EXCEPT SELECT *,* FROM j2 ORDER BY 1,2,3"},
+    {14, "SELECT COUNT(*) FROM j1 EXCEPT SELECT MAX(e) FROM j2 ORDER BY 1"},
+    {15, "SELECT COUNT(*), * FROM j1 EXCEPT SELECT *,* FROM j2 ORDER BY 1,2,3"},
     {16, "SELECT * FROM j1 EXCEPT SELECT * FROM j2,j3 LIMIT 10"},
     {17, "SELECT * FROM j1 EXCEPT SELECT * FROM j2,j3 LIMIT 10 OFFSET 5"},
     {18, "SELECT a FROM j1 EXCEPT SELECT g FROM j2,j3 LIMIT (SELECT 10)"},
     {19, "SELECT * FROM j1 INTERSECT SELECT * FROM j2,j3 ORDER BY a"},
-    {20, "SELECT count(*) FROM j1 INTERSECT SELECT max(e) FROM j2 ORDER BY 1"},
-    {21, "SELECT count(*), * FROM j1 INTERSECT SELECT *,* FROM j2 ORDER BY 1,2,3"},
+    {20, "SELECT COUNT(*) FROM j1 INTERSECT SELECT MAX(e) FROM j2 ORDER BY 1"},
+    {21, "SELECT COUNT(*), * FROM j1 INTERSECT SELECT *,* FROM j2 ORDER BY 1,2,3"},
     {22, "SELECT * FROM j1 INTERSECT SELECT * FROM j2,j3 LIMIT 10"},
     {23, "SELECT * FROM j1 INTERSECT SELECT * FROM j2,j3 LIMIT 10 OFFSET 5"},
     {24, "SELECT a FROM j1 INTERSECT SELECT g FROM j2,j3 LIMIT (SELECT 10)"}
@@ -1463,8 +1468,8 @@ end
 for _, val in ipairs({
     {50, "SELECT * FROM j1 ORDER BY 1 UNION ALL SELECT * FROM j2,j3", },
     {51, "SELECT * FROM j1 LIMIT 1 UNION ALL SELECT * FROM j2,j3", },
-    {52, "SELECT count(*) FROM j1 UNION ALL VALUES(11) ORDER BY 1", },
-    {53, "SELECT count(*) FROM j1 UNION ALL VALUES(11) LIMIT 1"}}) do
+    {52, "SELECT COUNT(*) FROM j1 UNION ALL VALUES(11) ORDER BY 1", },
+    {53, "SELECT COUNT(*) FROM j1 UNION ALL VALUES(11) LIMIT 1"}}) do
     local tn = val[1]
     local select = val[2]
     test:do_test(
@@ -1507,7 +1512,7 @@ test:do_select_tests(
     "e_select-7.4",
     {
         {1, "SELECT a FROM q1 UNION ALL SELECT d FROM q2", {"16", "legible", "beauty", "legible", "beauty", "-65", "emanating"}},
-        {"3", "SELECT count(*) FROM q1 UNION ALL SELECT min(e) FROM q2", {3, -16.56}},
+        {"3", "SELECT COUNT(*) FROM q1 UNION ALL SELECT MIN(e) FROM q2", {3, -16.56}},
         {"4", "SELECT d,e FROM q2 UNION ALL SELECT f,g FROM q3", {"legible" , 1, "beauty", 2, "-65", 4, "emanating", -16.56, "beauty", 2, "beauty", 2}},
         })
 
@@ -1521,7 +1526,7 @@ test:do_select_tests(
         {1, "SELECT a FROM q1 UNION SELECT d FROM q2",
             {"-65", "16", "beauty", "emanating", "legible"}},
 
-        {3, "SELECT count(*) FROM q1 UNION SELECT min(e) FROM q2",
+        {3, "SELECT COUNT(*) FROM q1 UNION SELECT MIN(e) FROM q2",
             {-16.56, 3}},
 
         {4, "SELECT d,e FROM q2 UNION SELECT f,g FROM q3",
@@ -2194,7 +2199,7 @@ for _, val in ipairs({
     {"2", "SELECT b FROM f1 ORDER BY a LIMIT NULL "},
     {"3", "SELECT b FROM f1 ORDER BY a LIMIT X'ABCD' "},
     {"4", "SELECT b FROM f1 ORDER BY a LIMIT 5.1e0 "},
-    {"5", "SELECT b FROM f1 ORDER BY a LIMIT (SELECT group_concat(b) FROM f1)"}}) do
+    {"5", "SELECT b FROM f1 ORDER BY a LIMIT (SELECT GROUP_CONCAT(b) FROM f1)"}}) do
     local tn = val[1]
     local select = val[2]
     test:do_catchsql_test(
@@ -2212,8 +2217,8 @@ test:do_select_tests(
     "e_select-9.4",
     {
         {"1", "SELECT b FROM f1 ORDER BY a LIMIT 10000 ", {"a",  "b",  "c",  "d",  "e",  "f",  "g",  "h",  "i",  "j",  "k",  "l",  "m",  "n",  "o",  "p",  "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}},
-        {"2", "SELECT b FROM f1 ORDER BY a LIMIT 123+length('abc')-100 ", {"a",  "b",  "c",  "d",  "e",  "f",  "g",  "h",  "i",  "j",  "k",  "l",  "m",  "n",  "o",  "p",  "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}},
-        {"3", "SELECT b FROM f1 ORDER BY a LIMIT (SELECT count(*) FROM f1)/2 - 10 ", {"a",  "b",  "c"}},
+        {"2", "SELECT b FROM f1 ORDER BY a LIMIT 123+LENGTH('abc')-100 ", {"a",  "b",  "c",  "d",  "e",  "f",  "g",  "h",  "i",  "j",  "k",  "l",  "m",  "n",  "o",  "p",  "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}},
+        {"3", "SELECT b FROM f1 ORDER BY a LIMIT (SELECT COUNT(*) FROM f1)/2 - 10 ", {"a",  "b",  "c"}},
     })
 
 -- EVIDENCE-OF: R-33750-29536 Otherwise, the SELECT returns the first N
@@ -2237,7 +2242,7 @@ test:do_select_tests(
     "e_select-9.6",
     {
         {"1", "SELECT b FROM f1 WHERE a>21 ORDER BY a LIMIT 10 ", {"v", "w", "x", "y", "z"}},
-        {"2", "SELECT count(*) FROM f1 GROUP BY a/5 ORDER BY 1 LIMIT 10 ", {2, 4, 5, 5, 5, 5}},
+        {"2", "SELECT COUNT(*) FROM f1 GROUP BY a/5 ORDER BY 1 LIMIT 10 ", {2, 4, 5, 5, 5, 5}},
     })
 
 -- EVIDENCE-OF: R-24188-24349 The expression attached to the optional
@@ -2249,7 +2254,7 @@ for _, val in ipairs({
     {2, "SELECT b FROM f1 ORDER BY a LIMIT 2 OFFSET NULL"},
     {3, "SELECT b FROM f1 ORDER BY a LIMIT 2 OFFSET X'ABCD'"},
     {4, "SELECT b FROM f1 ORDER BY a LIMIT 2 OFFSET 51e-1"},
-    {5, "SELECT b FROM f1 ORDER BY a LIMIT 2 OFFSET (SELECT group_concat(b) FROM f1)"}}) do
+    {5, "SELECT b FROM f1 ORDER BY a LIMIT 2 OFFSET (SELECT GROUP_CONCAT(b) FROM f1)"}}) do
     local tn = val[1]
     local select = val[2]
     test:do_catchsql_test(

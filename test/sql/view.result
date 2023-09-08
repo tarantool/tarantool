@@ -26,21 +26,21 @@ box.execute("CREATE VIEW v1 AS SELECT a+b FROM t1;");
 box.execute("CREATE INDEX i1 on v1(a);");
 ---
 - null
-- 'Can''t create or modify index ''I1'' in space ''V1'': views can not be indexed'
+- 'Can''t create or modify index ''i1'' in space ''v1'': views can not be indexed'
 ...
-v1 = box.space.V1;
+v1 = box.space.v1;
 ---
 ...
 v1:create_index('primary', {parts = {1, 'string'}})
 ---
-- error: 'Can''t modify space ''V1'': can not add index on a view'
+- error: 'Can''t modify space ''v1'': can not add index on a view'
 ...
 v1:create_index('secondary', {parts = {1, 'string'}})
 ---
-- error: 'Can''t modify space ''V1'': can not add index on a view'
+- error: 'Can''t modify space ''v1'': can not add index on a view'
 ...
 -- View option can't be changed.
-v1 = box.space._space.index[2]:select('V1')[1]:totable();
+v1 = box.space._space.index[2]:select('v1')[1]:totable();
 ---
 ...
 v1[6]['view'] = false;
@@ -48,9 +48,9 @@ v1[6]['view'] = false;
 ...
 box.space._space:replace(v1);
 ---
-- error: 'Can''t modify space ''V1'': view can not be altered'
+- error: 'Can''t modify space ''v1'': view can not be altered'
 ...
-t1 = box.space._space.index[2]:select('T1')[1]:totable();
+t1 = box.space._space.index[2]:select('t1')[1]:totable();
 ---
 ...
 t1[6]['view'] = true;
@@ -61,7 +61,7 @@ t1[6]['sql'] = 'SELECT * FROM t1;'
 ...
 box.space._space:replace(t1);
 ---
-- error: 'Can''t modify space ''T1'': can not convert a space to a view and vice versa'
+- error: 'Can''t modify space ''t1'': can not convert a space to a view and vice versa'
 ...
 -- View can't exist without SQL statement.
 v1[6] = {};
@@ -72,7 +72,7 @@ v1[6]['view'] = true;
 ...
 box.space._space:replace(v1);
 ---
-- error: 'Can''t modify space ''V1'': view can not be altered'
+- error: 'Can''t modify space ''v1'': view can not be altered'
 ...
 -- Views can't be created via space_create().
 box.schema.create_space('view', {view = true})
@@ -83,7 +83,7 @@ box.schema.create_space('view', {view = true})
 box.execute("ALTER TABLE t1 RENAME TO new_name;")
 ---
 - null
-- 'Can''t modify space ''T1'': can not rename space which is referenced by view'
+- 'Can''t modify space ''t1'': can not rename space which is referenced by view'
 ...
 -- View can be created via straight insertion into _space.
 sp = box.schema.create_space('test');
@@ -129,9 +129,9 @@ box.execute('CREATE VIEW v2 AS SELECT * FROM t2;');
 ---
 - row_count: 1
 ...
-box.space.T2:drop();
+box.space.t2:drop();
 ---
-- error: 'Can''t drop space ''T2'': other views depend on this space'
+- error: 'Can''t drop space ''t2'': other views depend on this space'
 ...
 box.execute('DROP VIEW v2;');
 ---
@@ -153,9 +153,9 @@ box.execute("CREATE VIEW v2 AS SELECT * FROM t2;");
 box.execute("DROP TABLE t2;");
 ---
 - null
-- 'Can''t drop space ''T2'': other views depend on this space'
+- 'Can''t drop space ''t2'': other views depend on this space'
 ...
-sp = box.space._space:get{box.space.T2.id};
+sp = box.space._space:get{box.space.t2.id};
 ---
 ...
 sp = box.space._space:replace(sp);
@@ -164,7 +164,7 @@ sp = box.space._space:replace(sp);
 box.execute("DROP TABLE t2;");
 ---
 - null
-- 'Can''t drop space ''T2'': other views depend on this space'
+- 'Can''t drop space ''t2'': other views depend on this space'
 ...
 box.execute("DROP VIEW v2;");
 ---
@@ -223,7 +223,7 @@ box.execute("CREATE VIEW bv (wombat) AS VALUES ((SELECT 'k' FROM b));")
 box.execute("DROP TABLE b;")
 ---
 - null
-- 'Can''t drop space ''B'': other views depend on this space'
+- 'Can''t drop space ''b'': other views depend on this space'
 ...
 box.execute("DROP VIEW bv;")
 ---
@@ -248,7 +248,7 @@ box.execute("CREATE VIEW bcv AS SELECT * FROM b WHERE s1 IN (SELECT * FROM c);")
 box.execute("DROP TABLE c;")
 ---
 - null
-- 'Can''t drop space ''C'': other views depend on this space'
+- 'Can''t drop space ''c'': other views depend on this space'
 ...
 box.execute("DROP VIEW bcv;")
 ---
@@ -269,7 +269,7 @@ box.execute("CREATE VIEW bcv(x, y) AS VALUES((SELECT 'k' FROM b), (VALUES((SELEC
 box.execute("DROP TABLE c;")
 ---
 - null
-- 'Can''t drop space ''C'': other views depend on this space'
+- 'Can''t drop space ''c'': other views depend on this space'
 ...
 -- Try to create invalid view using direct insert to space _space.
 space_tuple = box.space._space.index[0]:max():totable()
@@ -286,9 +286,9 @@ space_tuple[6].sql = string.gsub(space_tuple[6].sql, 'FROM c', 'FROM ccc')
 ...
 box.space._space:insert(space_tuple)
 ---
-- error: Space 'CCC' does not exist
+- error: Space 'ccc' does not exist
 ...
-box.space.BCV:drop()
+box.space.bcv:drop()
 ---
 ...
 box.execute("DROP TABLE c;")
@@ -322,19 +322,19 @@ box.execute([[SET SESSION "sql_seq_scan" = true;]])
 box.execute("DROP TABLE t2;")
 ---
 - null
-- 'Can''t drop space ''T2'': other views depend on this space'
+- 'Can''t drop space ''t2'': other views depend on this space'
 ...
 box.execute("SELECT * FROM v2;")
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
   rows: []
 ...
-box.space.V2:drop()
+box.space.v2:drop()
 ---
 ...
-box.space.T2:drop()
+box.space.t2:drop()
 ---
 ...
 -- Cleanup
@@ -395,9 +395,9 @@ box.execute('UPDATE v SET a = 10;')
 box.execute('SELECT * FROM t1;')
 ---
 - metadata:
-  - name: I
+  - name: i
     type: integer
-  - name: A
+  - name: a
     type: integer
   rows:
   - [1, 1]
@@ -439,7 +439,7 @@ box.execute("CREATE VIEW v AS SELECT * FROM t1;")
 --
 -- Try to change owner.
 --
-view = box.space._space.index[2]:select('V')[1]:totable()
+view = box.space._space.index[2]:select('v')[1]:totable()
 ---
 ...
 view[2] = 1
@@ -447,12 +447,12 @@ view[2] = 1
 ...
 box.space._space:replace(view)
 ---
-- error: 'Can''t modify space ''V'': view can not be altered'
+- error: 'Can''t modify space ''v'': view can not be altered'
 ...
 --
 -- Try to rename.
 --
-view = box.space._space.index[2]:select('V')[1]:totable()
+view = box.space._space.index[2]:select('v')[1]:totable()
 ---
 ...
 view[3] = 'a'
@@ -460,12 +460,12 @@ view[3] = 'a'
 ...
 box.space._space:replace(view)
 ---
-- error: 'Can''t modify space ''V'': view can not be altered'
+- error: 'Can''t modify space ''v'': view can not be altered'
 ...
 --
 -- Try to change engine.
 --
-view = box.space._space.index[2]:select('V')[1]:totable()
+view = box.space._space.index[2]:select('v')[1]:totable()
 ---
 ...
 view[4] = 'a'
@@ -473,15 +473,15 @@ view[4] = 'a'
 ...
 box.space._space:replace(view)
 ---
-- error: 'Can''t modify space ''V'': view can not be altered'
+- error: 'Can''t modify space ''v'': view can not be altered'
 ...
 --
 -- Try to add a field.
 --
-view = box.space._space.index[2]:select('V')[1]:totable()
+view = box.space._space.index[2]:select('v')[1]:totable()
 ---
 ...
-view_format = box.space.V:format()
+view_format = box.space.v:format()
 ---
 ...
 f = {type = 'string', nullable_action = 'none', name = 'B', is_nullable = true}
@@ -498,19 +498,19 @@ view[7] = view_format
 ...
 box.space._space:replace(view)
 ---
-- error: 'Can''t modify space ''V'': view can not be altered'
+- error: 'Can''t modify space ''v'': view can not be altered'
 ...
 --
 -- Try to modify format only.
 --
-view = box.space.V
+view = box.space.v
 ---
 ...
 view:format{}
 ---
-- error: 'Can''t modify space ''V'': view can not be altered'
+- error: 'Can''t modify space ''v'': view can not be altered'
 ...
-view_format = box.space.V:format()
+view_format = box.space.v:format()
 ---
 ...
 view_format[1].name = 'B'
@@ -518,7 +518,7 @@ view_format[1].name = 'B'
 ...
 view:format(view_format)
 ---
-- error: 'Can''t modify space ''V'': view can not be altered'
+- error: 'Can''t modify space ''v'': view can not be altered'
 ...
 box.execute("DROP VIEW v;")
 ---

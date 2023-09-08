@@ -53,7 +53,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cse-1.3",
     [[
-        SELECT b, abs(b), coalesce(b,-b,NOT b,c,NOT c), c, -c FROM t1;
+        SELECT b, ABS(b), COALESCE(b,-b,NOT b,c,NOT c), c, -c FROM t1;
     ]], {
         -- <cse-1.3>
         11, 11, 11, 12, -12, 21, 21, 21, 22, -22
@@ -165,7 +165,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cse-1.10",
     [[
-        SELECT CAST(b AS integer), typeof(b), CAST(b AS text), typeof(b) FROM t1
+        SELECT CAST(b AS integer), TYPEOF(b), CAST(b AS text), TYPEOF(b) FROM t1
     ]], {
         -- <cse-1.10>
         11, "integer", "11", "integer", 21, "integer", "21", "integer"
@@ -187,9 +187,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cse-1.12",
     [[
-        SELECT coalesce(b,c,d,e), a, b, c, d, e FROM t1 WHERE a=2
+        SELECT COALESCE(b,c,d,e), a, b, c, d, e FROM t1 WHERE a=2
         UNION ALL
-        SELECT coalesce(e,d,c,b), e, d, c, b, a FROM t1 WHERE a=1
+        SELECT COALESCE(e,d,c,b), e, d, c, b, a FROM t1 WHERE a=1
     ]], {
         -- <cse-1.12>
         21, 2, 21, 22, 23, 24, 14, 14, 13, 12, 11, 1
@@ -201,7 +201,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cse-1.13",
     [[
-        SELECT typeof(b), b FROM t1
+        SELECT TYPEOF(b), b FROM t1
     ]], {
         -- <cse-1.13>
         "integer", 11, "integer", 21
@@ -211,7 +211,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cse-1.14",
     [[
-        SELECT b, typeof(b), typeof(b), b FROM t1
+        SELECT b, TYPEOF(b), TYPEOF(b), b FROM t1
     ]], {
         -- <cse-1.14>
         11, "integer", "integer", 11, 21, "integer", "integer", 21

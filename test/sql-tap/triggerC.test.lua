@@ -238,7 +238,7 @@ test:do_catchsql_test(
         UPDATE OR ROLLBACK t1 SET a=100;
     ]], {
         -- <triggerC-1.15>
-        1, "Duplicate key exists in unique index \"unique_unnamed_T1_1\" in space \"T1\" with old tuple - [100, 2, 3, 4, 5] and new tuple - [100, 7, 8, 9, 10]"
+        1, "Duplicate key exists in unique index \"unique_unnamed_t1_1\" in space \"t1\" with old tuple - [100, 2, 3, 4, 5] and new tuple - [100, 7, 8, 9, 10]"
         -- </triggerC-1.15>
     })
 
@@ -754,7 +754,7 @@ for testno, v in ipairs(tests11) do
             test:execsql(v[1])
             return test:execsql [[
                 CREATE TRIGGER tt1 BEFORE INSERT ON t1 FOR EACH ROW BEGIN
-                  INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
+                  INSERT INTO log VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM log),
                                          new.a, new.b);
                 END;
                 INSERT INTO t1 DEFAULT VALUES;
@@ -806,7 +806,7 @@ test:do_test(
             CREATE TABLE t2(a INT PRIMARY KEY, b INT);
             CREATE VIEW v2 AS SELECT * FROM t2;
             CREATE TRIGGER tv2 INSTEAD OF INSERT ON v2 FOR EACH ROW BEGIN
-              INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
+              INSERT INTO log VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM log),
                                      new.a, new.b);
             END;
             INSERT INTO v2 DEFAULT VALUES;

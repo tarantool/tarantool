@@ -273,7 +273,7 @@ test:do_eqp_test(
         SELECT * FROM v4 WHERE d='xyz' AND c='def'
     ]], {
         -- <index7-6.4>
-    {0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX I4 (C=?) (~9 rows)"}
+    {0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX i4 (c=?) (~9 rows)"}
         -- </index7-6.4>
     })
 
@@ -309,9 +309,9 @@ test:do_catchsql_test(
             pragma index_info(t.i1);
         ]],
         {0, {
-            0, 0, 'A', 0, 'BINARY', 'integer',
-            1, 1, 'B', 0, 'BINARY', 'integer',
-            2, 2, 'C', 0, 'BINARY', 'integer',
+            0, 0, 'a', 0, 'BINARY', 'integer',
+            1, 1, 'b', 0, 'BINARY', 'integer',
+            2, 2, 'c', 0, 'BINARY', 'integer',
         }}
 )
 
@@ -332,10 +332,10 @@ test:do_catchsql_test(
             SELECT "_index"."name"
             FROM "_index" JOIN "_space" WHERE
                 "_index"."id" = "_space"."id" AND
-                "_space"."name"='TEST4'       AND
-                "_index"."name"='INDEX1';
+                "_space"."name"='test4'       AND
+                "_index"."name"='index1';
         ]],
-        {0, {'INDEX1'}})
+        {0, {'index1'}})
 
 -- This test checks that CREATE TABLE statement with PK constraint
 -- and NON-NAMED UNIQUE constraint (declared on THE SAME COLUMNS)
@@ -348,9 +348,9 @@ test:do_catchsql_test(
             SELECT "_index"."name", "_index"."iid"
             FROM "_index" JOIN "_space" WHERE
                 "_index"."id" = "_space"."id" AND
-                "_space"."name"='TEST5';
+                "_space"."name"='test5';
         ]],
-        {0, {"pk_unnamed_TEST5_1",0}})
+        {0, {"pk_unnamed_test5_1",0}})
 
 -- This test checks that CREATE TABLE statement with PK constraint
 -- and NAMED UNIQUE constraint (declared on THE SAME COLUMNS)
@@ -364,9 +364,9 @@ test:do_catchsql_test(
             SELECT "_index"."name", "_index"."iid"
             FROM "_index" JOIN "_space" WHERE
                 "_index"."id" = "_space"."id" AND
-                "_space"."name"='TEST6';
+                "_space"."name"='test6';
         ]],
-        {0, {"pk_unnamed_TEST6_1",0,"C1",1}})
+        {0, {"pk_unnamed_test6_1",0,"c1",1}})
 
 -- This test checks that CREATE TABLE statement with PK constraint
 -- and UNIQUE constraint is executed correctly
@@ -379,9 +379,9 @@ test:do_catchsql_test(
             SELECT "_index"."name", "_index"."iid"
             FROM "_index" JOIN "_space" WHERE
                 "_index"."id" = "_space"."id" AND
-                "_space"."name"='TEST7';
+                "_space"."name"='test7';
         ]],
-        {0, {"unique_unnamed_TEST7_1",0}})
+        {0, {"unique_unnamed_test7_1",0}})
 
 
 -- This test is the same as previous, but with named UNIQUE
@@ -394,8 +394,8 @@ test:do_catchsql_test(
             SELECT "_index"."name", "_index"."iid"
             FROM "_index" JOIN "_space" WHERE
                 "_index"."id" = "_space"."id" AND
-                "_space"."name"='TEST8';
+                "_space"."name"='test8';
         ]],
-        {0, {"pk_unnamed_TEST8_2",0,"C1",1}})
+        {0, {"pk_unnamed_test8_2",0,"c1",1}})
 
 test:finish_test()

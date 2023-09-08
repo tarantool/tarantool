@@ -28,7 +28,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES('1'), ('2'), ('3');
         CREATE TABLE t2(b1 STRING PRIMARY KEY);
         INSERT INTO t2 VALUES('4'), ('5');
-        SELECT (SELECT group_concat(a1,'x') FROM t2 LIMIT 1) FROM t1;
+        SELECT (SELECT GROUP_CONCAT(a1,'x') FROM t2 LIMIT 1) FROM t1;
     ]],
     {
         -- <aggnested-1.1>
@@ -40,7 +40,7 @@ test:do_execsql_test(
     "aggnested-1.2",
     [[
         SELECT
-         (SELECT group_concat(a1,'x') || '-' || group_concat(b1,'y') FROM t2)
+         (SELECT GROUP_CONCAT(a1,'x') || '-' || GROUP_CONCAT(b1,'y') FROM t2)
         FROM t1;
     ]],
     {
@@ -51,7 +51,7 @@ test:do_execsql_test(
 
 test:do_execsql_test("aggnested-1.3",
     [[
-        SELECT (SELECT group_concat(b1,a1) FROM t2) FROM t1;
+        SELECT (SELECT GROUP_CONCAT(b1,a1) FROM t2) FROM t1;
     ]],
     {
         -- <aggnested-1.3>
@@ -61,7 +61,7 @@ test:do_execsql_test("aggnested-1.3",
 
 test:do_execsql_test("aggnested-1.4",
     [[
-        SELECT (SELECT group_concat(a1,b1) FROM t2) FROM t1;
+        SELECT (SELECT GROUP_CONCAT(a1,b1) FROM t2) FROM t1;
     ]],
     {
         -- <aggnested-1.4>
@@ -179,9 +179,9 @@ test:do_execsql_test("aggnested-3.2",
         );
         INSERT INTO t2 VALUES(1);
         SELECT
-         (SELECT sum(xyz) FROM t2 where xyz = value2)
+         (SELECT SUM(xyz) FROM t2 where xyz = value2)
         FROM
-         (SELECT value1 as xyz, max(x1) AS pqr
+         (SELECT value1 as xyz, MAX(x1) AS pqr
             FROM t1
            GROUP BY id1);
     ]],
@@ -206,9 +206,9 @@ test:do_execsql_test("aggnested-3.2-2",
         );
         INSERT INTO t2 VALUES(1);
         SELECT
-         (SELECT sum(xyz) FROM t2 where xyz <> value2)
+         (SELECT SUM(xyz) FROM t2 where xyz <> value2)
         FROM
-         (SELECT value1 as xyz, max(x1) AS pqr
+         (SELECT value1 as xyz, MAX(x1) AS pqr
             FROM t1
            GROUP BY id1);
     ]],
@@ -226,7 +226,7 @@ test:do_execsql_test("aggnested-3.3",
         INSERT INTO t1 VALUES(4469,2),(4469,1);
         CREATE TABLE t2 (value2 INT PRIMARY KEY);
         INSERT INTO t2 VALUES(1);
-        SELECT (SELECT sum(value1) FROM t2 where value1=value2), max(value1)
+        SELECT (SELECT SUM(value1) FROM t2 where value1=value2), MAX(value1)
           FROM t1
          GROUP BY id1;
     ]],

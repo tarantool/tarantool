@@ -8,13 +8,13 @@ g.before_all(function()
     g.server:start()
     g.server:exec(function()
         box.execute([[SET SESSION "sql_seq_scan" = true;]])
-        local fmt1 = {{'I', 'integer'}, {'DT', 'datetime'}}
-        local t1 = box.schema.space.create('T1', {format = fmt1})
-        box.space.T1:create_index('I')
+        local fmt1 = {{'i', 'integer'}, {'dt', 'datetime'}}
+        local t1 = box.schema.space.create('t1', {format = fmt1})
+        box.space.t1:create_index('i')
 
-        local fmt2 = {{'DT', 'datetime'}}
-        local t2 = box.schema.space.create('T2', {format = fmt2})
-        box.space.T2:create_index('I')
+        local fmt2 = {{'dt', 'datetime'}}
+        local t2 = box.schema.space.create('t2', {format = fmt2})
+        box.space.t2:create_index('i')
 
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
@@ -35,8 +35,8 @@ end)
 
 g.after_all(function()
     g.server:exec(function()
-        box.space.T1:drop()
-        box.space.T2:drop()
+        box.space.t1:drop()
+        box.space.t2:drop()
     end)
     g.server:stop()
 end)
@@ -149,7 +149,7 @@ g.test_datetime_5_1 = function()
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
         local dt3 = dt.new({year = 2003, month = 3, day = 3, hour = 3})
 
-        local sql = [[SELECT count(*), dt FROM t1 GROUP BY dt;]]
+        local sql = [[SELECT COUNT(*), dt FROM t1 GROUP BY dt;]]
         local res = {{2, dt1}, {2, dt2}, {2, dt3}}
         t.assert_equals(box.execute(sql).rows, res)
     end)
@@ -162,7 +162,7 @@ g.test_datetime_5_2 = function()
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
         local dt3 = dt.new({year = 2003, month = 3, day = 3, hour = 3})
 
-        local sql = [[SELECT count(*), dt FROM t2 GROUP BY dt;]]
+        local sql = [[SELECT COUNT(*), dt FROM t2 GROUP BY dt;]]
         local res = {{1, dt1}, {1, dt2}, {1, dt3}}
         t.assert_equals(box.execute(sql).rows, res)
     end)
@@ -246,8 +246,8 @@ g.test_datetime_11 = function()
         local sql = [[INSERT INTO t SELECT
                       (SELECT dt from t2 LIMIT 1 OFFSET 1),
                       (SELECT dt from t2 LIMIT 1);]]
-        local res = [[Foreign key constraint 'fk_unnamed_T_DT_1' failed for ]]..
-                    [[field '2 (DT)': foreign tuple was not found]]
+        local res = [[Foreign key constraint 'fk_unnamed_t_dt_1' failed for ]]..
+                    [[field '2 (dt)': foreign tuple was not found]]
         local _, err = box.execute(sql)
         box.execute([[DROP TABLE t;]])
 
@@ -263,7 +263,7 @@ g.test_datetime_12 = function()
                       CAST(dt as STRING) != '2001-01-01T01:00:00Z'));]])
 
         local sql = [[INSERT INTO t SELECT * from t1 LIMIT 1;]]
-        local res = [[Check constraint 'CK' failed for a tuple]]
+        local res = [[Check constraint 'ck' failed for a tuple]]
         local _, err = box.execute(sql)
         box.execute([[DROP TABLE t;]])
 
@@ -279,7 +279,7 @@ g.test_datetime_13 = function()
 
         local sql = [[INSERT INTO t SELECT 2, dt from t1 LIMIT 1;]]
         local res = [[Duplicate key exists in unique index ]]..
-                    [["unique_unnamed_T_2" in space "T" with old tuple - ]]..
+                    [["unique_unnamed_t_2" in space "t" with old tuple - ]]..
                     [[[1, 2001-01-01T01:00:00Z] and new tuple - ]]..
                     "[2, 2001-01-01T01:00:00Z]"
         local _, err = box.execute(sql)
@@ -1494,7 +1494,7 @@ end
 -- Make sure that function NOW() works as intended.
 g.test_datetime_29_1 = function()
     g.server:exec(function()
-        local sql = [[SELECT typeof(now());]]
+        local sql = [[SELECT TYPEOF(NOW());]]
         local res = {{"datetime"}}
         local rows = box.execute(sql).rows
 
@@ -1504,7 +1504,7 @@ end
 
 g.test_datetime_29_2 = function()
     g.server:exec(function()
-        local sql = [[SELECT now(), now() FROM (values(1), (2), (3));]]
+        local sql = [[SELECT NOW(), NOW() FROM (values(1), (2), (3));]]
         local rows = box.execute(sql).rows
 
         t.assert_equals(rows[1][1], rows[1][2])
@@ -1522,7 +1522,7 @@ g.test_datetime_30_1 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('millennium', ?);]]
+        local sql = [[SELECT DATE_PART('millennium', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{2}}
         t.assert_equals(rows, res)
@@ -1559,7 +1559,7 @@ g.test_datetime_30_2 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('century', ?);]]
+        local sql = [[SELECT DATE_PART('century', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{20}}
         t.assert_equals(rows, res)
@@ -1596,7 +1596,7 @@ g.test_datetime_30_3 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('decade', ?);]]
+        local sql = [[SELECT DATE_PART('decade', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{200}}
         t.assert_equals(rows, res)
@@ -1633,7 +1633,7 @@ g.test_datetime_30_4 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('year', ?);]]
+        local sql = [[SELECT DATE_PART('year', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{2000}}
         t.assert_equals(rows, res)
@@ -1670,7 +1670,7 @@ g.test_datetime_30_5 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('quarter', ?);]]
+        local sql = [[SELECT DATE_PART('quarter', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{2}}
         t.assert_equals(rows, res)
@@ -1707,7 +1707,7 @@ g.test_datetime_30_6 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('month', ?);]]
+        local sql = [[SELECT DATE_PART('month', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{4}}
         t.assert_equals(rows, res)
@@ -1744,7 +1744,7 @@ g.test_datetime_30_7 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('week', ?);]]
+        local sql = [[SELECT DATE_PART('week', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{14}}
         t.assert_equals(rows, res)
@@ -1781,7 +1781,7 @@ g.test_datetime_30_8 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('day', ?);]]
+        local sql = [[SELECT DATE_PART('day', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{5}}
         t.assert_equals(rows, res)
@@ -1818,7 +1818,7 @@ g.test_datetime_30_9 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('dow', ?);]]
+        local sql = [[SELECT DATE_PART('dow', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{3}}
         t.assert_equals(rows, res)
@@ -1855,7 +1855,7 @@ g.test_datetime_30_10 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('doy', ?);]]
+        local sql = [[SELECT DATE_PART('doy', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{96}}
         t.assert_equals(rows, res)
@@ -1892,7 +1892,7 @@ g.test_datetime_30_11 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('hour', ?);]]
+        local sql = [[SELECT DATE_PART('hour', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{6}}
         t.assert_equals(rows, res)
@@ -1921,7 +1921,7 @@ g.test_datetime_30_12 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('minute', ?);]]
+        local sql = [[SELECT DATE_PART('minute', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{33}}
         t.assert_equals(rows, res)
@@ -1950,7 +1950,7 @@ g.test_datetime_30_13 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('second', ?);]]
+        local sql = [[SELECT DATE_PART('second', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{22}}
         t.assert_equals(rows, res)
@@ -1979,7 +1979,7 @@ g.test_datetime_30_14 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('millisecond', ?);]]
+        local sql = [[SELECT DATE_PART('millisecond', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{523}}
         t.assert_equals(rows, res)
@@ -2008,7 +2008,7 @@ g.test_datetime_30_15 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('microsecond', ?);]]
+        local sql = [[SELECT DATE_PART('microsecond', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{523999}}
         t.assert_equals(rows, res)
@@ -2037,7 +2037,7 @@ g.test_datetime_30_16 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('nanosecond', ?);]]
+        local sql = [[SELECT DATE_PART('nanosecond', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{523999111}}
         t.assert_equals(rows, res)
@@ -2066,7 +2066,7 @@ g.test_datetime_30_17 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('epoch', ?);]]
+        local sql = [[SELECT DATE_PART('epoch', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{954916402}}
         t.assert_equals(rows, res)
@@ -2089,7 +2089,7 @@ g.test_datetime_30_18 = function()
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
 
-        local sql = [[SELECT date_part('timezone_offset', ?);]]
+        local sql = [[SELECT DATE_PART('timezone_offset', ?);]]
         local rows = box.execute(sql, {dt0}).rows
         local res = {{0}}
         t.assert_equals(rows, res)
@@ -2713,31 +2713,31 @@ g.test_datetime_35 = function()
         box.execute([[CREATE TABLE t(dt DATETIME PRIMARY KEY, itv INTERVAL);]])
         box.execute([[INSERT INTO t VALUES (?, ?);]], {dt1, itv1})
 
-        local sql = [[SELECT typeof(dt - dt) FROM t;]]
+        local sql = [[SELECT TYPEOF(dt - dt) FROM t;]]
         t.assert_equals(box.execute(sql).rows, {{'interval'}})
 
         sql = [[SELECT dt - dt FROM t;]]
         t.assert_equals(box.execute(sql).metadata[1].type, 'interval')
 
-        sql = [[SELECT typeof(dt - itv) FROM t;]]
+        sql = [[SELECT TYPEOF(dt - itv) FROM t;]]
         t.assert_equals(box.execute(sql).rows, {{'datetime'}})
 
         sql = [[SELECT dt - itv FROM t;]]
         t.assert_equals(box.execute(sql).metadata[1].type, 'datetime')
 
-        sql = [[SELECT typeof(dt + itv) FROM t;]]
+        sql = [[SELECT TYPEOF(dt + itv) FROM t;]]
         t.assert_equals(box.execute(sql).rows, {{'datetime'}})
 
         sql = [[SELECT dt + itv FROM t;]]
         t.assert_equals(box.execute(sql).metadata[1].type, 'datetime')
 
-        sql = [[SELECT typeof(itv - itv) FROM t;]]
+        sql = [[SELECT TYPEOF(itv - itv) FROM t;]]
         t.assert_equals(box.execute(sql).rows, {{'interval'}})
 
         sql = [[SELECT itv - itv FROM t;]]
         t.assert_equals(box.execute(sql).metadata[1].type, 'interval')
 
-        sql = [[SELECT typeof(itv + itv) FROM t;]]
+        sql = [[SELECT TYPEOF(itv + itv) FROM t;]]
         t.assert_equals(box.execute(sql).rows, {{'interval'}})
 
         sql = [[SELECT itv + itv FROM t;]]

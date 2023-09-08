@@ -24,9 +24,9 @@ box.execute([[INSERT INTO t1 VALUES(1,2);]])
 box.execute([[SELECT * FROM SEQSCAN t1]])
 ---
 - metadata:
-  - name: A
+  - name: a
     type: integer
-  - name: B
+  - name: b
     type: integer
   rows:
   - [1, 2]
@@ -43,9 +43,9 @@ box.execute([[INSERT INTO t1 VALUES(2,3);]])
 box.execute([[SELECT * FROM SEQSCAN t1]])
 ---
 - metadata:
-  - name: A
+  - name: a
     type: integer
-  - name: B
+  - name: b
     type: integer
   rows:
   - [1, 2]

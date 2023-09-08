@@ -23,21 +23,21 @@ test:do_execsql_test(
     ]], {
     })
 
-box.space.T0:insert({1, dec1})
-box.space.T0:insert({2, dec2})
-box.space.T0:insert({3, dec3})
-box.space.T0:insert({4, dec4})
-box.space.T0:insert({5, dec5})
-box.space.T0:insert({6, dec6})
-box.space.T1:insert({1, dec1})
-box.space.T1:insert({2, dec2})
-box.space.T1:insert({3, dec3})
-box.space.T1:insert({4, dec1})
-box.space.T1:insert({5, dec1})
-box.space.T1:insert({6, dec2})
-box.space.T2:insert({dec1})
-box.space.T2:insert({dec2})
-box.space.T2:insert({dec3})
+box.space.t0:insert({1, dec1})
+box.space.t0:insert({2, dec2})
+box.space.t0:insert({3, dec3})
+box.space.t0:insert({4, dec4})
+box.space.t0:insert({5, dec5})
+box.space.t0:insert({6, dec6})
+box.space.t1:insert({1, dec1})
+box.space.t1:insert({2, dec2})
+box.space.t1:insert({3, dec3})
+box.space.t1:insert({4, dec1})
+box.space.t1:insert({5, dec1})
+box.space.t1:insert({6, dec2})
+box.space.t2:insert({dec1})
+box.space.t2:insert({dec2})
+box.space.t2:insert({dec3})
 
 -- Check that SELECT can work with DECIMAL.
 test:do_execsql_test(
@@ -93,7 +93,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "dec-2.3.1",
     [[
-        SELECT count(*), u FROM t1 GROUP BY u;
+        SELECT COUNT(*), u FROM t1 GROUP BY u;
     ]], {
         3, dec1, 1, dec3, 2, dec2
     })
@@ -101,7 +101,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "dec-2.3.2",
     [[
-        SELECT count(*), u FROM t2 GROUP BY u;
+        SELECT COUNT(*), u FROM t2 GROUP BY u;
     ]], {
         1, dec1, 1, dec3, 1, dec2
     })
@@ -143,7 +143,7 @@ test:do_execsql_test(
     "dec-3",
     [[
         INSERT INTO t3 SELECT u FROM t2;
-        SELECT s, typeof(s) FROM t3;
+        SELECT s, TYPEOF(s) FROM t3;
     ]], {
         dec1, "scalar", dec3, "scalar", dec2, "scalar"
     })
@@ -170,8 +170,8 @@ test:do_catchsql_test(
     [[
         INSERT INTO t5f SELECT (SELECT u from t2 LIMIT 1 OFFSET 1), (SELECT u from t2 LIMIT 1);
     ]], {
-        1, "Foreign key constraint 'fk_unnamed_T5F_F_1' failed for field "..
-        "'2 (F)': foreign tuple was not found"
+        1, "Foreign key constraint 'fk_unnamed_t5f_f_1' failed for field "..
+        "'2 (f)': foreign tuple was not found"
     })
 
 test:do_execsql_test(
@@ -199,7 +199,7 @@ test:do_catchsql_test(
     [[
         INSERT INTO t5c SELECT 1, u FROM t2 LIMIT 1;
     ]], {
-        1, "Check constraint 'CK' failed for a tuple"
+        1, "Check constraint 'ck' failed for a tuple"
     })
 
 test:do_execsql_test(
@@ -226,8 +226,8 @@ test:do_catchsql_test(
     [[
         INSERT INTO t5u SELECT 2, u FROM t2 LIMIT 1;
     ]], {
-        1, 'Duplicate key exists in unique index "unique_unnamed_T5U_2" in '..
-           'space "T5U" with old tuple - [1, 111] and new tuple - [2, 111]'
+        1, 'Duplicate key exists in unique index "unique_unnamed_t5u_2" in '..
+           'space "t5u" with old tuple - [1, 111] and new tuple - [2, 111]'
     })
 
 local func = {language = 'Lua', body = 'function(x) return type(x) end',
@@ -489,7 +489,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "dec-10.1.7",
     [[
-        SELECT hex(cast(u AS VARBINARY)) FROM t2;
+        SELECT HEX(cast(u AS VARBINARY)) FROM t2;
     ]], {
         1, "Type mismatch: can not convert decimal(111) to varbinary"
     })
@@ -981,7 +981,7 @@ test:execsql([[
 test:do_execsql_test(
     "dec-17.1",
     [[
-        SELECT 1.0, typeof(1.0);
+        SELECT 1.0, TYPEOF(1.0);
     ]], {
         dec.new(1), 'decimal'
     })
@@ -997,7 +997,7 @@ test:do_test(
 test:do_execsql_test(
     "dec-17.3",
     [[
-        SELECT typeof(1), typeof(1e0), typeof(1.0);
+        SELECT TYPEOF(1), TYPEOF(1e0), TYPEOF(1.0);
     ]], {
         "integer", "double", "decimal"
     })
@@ -1030,7 +1030,7 @@ test:execsql([[
 test:do_execsql_test(
     "dec-18.1",
     [[
-        SELECT typeof(ABS(d)), ABS(d) FROM t18;
+        SELECT TYPEOF(ABS(d)), ABS(d) FROM t18;
     ]], {
         "decimal", dec.new(123),
         "decimal", dec.new(0.7),
@@ -1040,7 +1040,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "dec-18.2",
     [[
-        SELECT typeof(AVG(d)), AVG(d) FROM t18;
+        SELECT TYPEOF(AVG(d)), AVG(d) FROM t18;
     ]], {
         "decimal", dec.new('3333333333333333333373.7666666666666667')
     })
@@ -1048,7 +1048,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "dec-18.3",
     [[
-        SELECT typeof(GREATEST(d, d * 0 + i)), GREATEST(d, d * 0 + i) FROM t18;
+        SELECT TYPEOF(GREATEST(d, d * 0 + i)), GREATEST(d, d * 0 + i) FROM t18;
     ]], {
         "decimal", dec.new(123),
         "decimal", dec.new(2),
@@ -1058,7 +1058,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "dec-18.4",
     [[
-        SELECT typeof(LEAST(d, d * 0 + i)), LEAST(d, d * 0 + i) FROM t18;
+        SELECT TYPEOF(LEAST(d, d * 0 + i)), LEAST(d, d * 0 + i) FROM t18;
     ]], {
         "decimal", dec.new(1),
         "decimal", dec.new(-0.7),
@@ -1068,7 +1068,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "dec-18.5",
     [[
-        SELECT typeof(MAX(d)), MAX(d) FROM t18;
+        SELECT TYPEOF(MAX(d)), MAX(d) FROM t18;
     ]], {
         "decimal", dec.new('9999999999999999999999')
     })
@@ -1076,7 +1076,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "dec-18.6",
     [[
-        SELECT typeof(MIN(d)), MIN(d) FROM t18;
+        SELECT TYPEOF(MIN(d)), MIN(d) FROM t18;
     ]], {
         "decimal", dec.new(-0.7),
     })
@@ -1084,7 +1084,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "dec-18.7",
     [[
-        SELECT typeof(SUM(d)), SUM(d) FROM t18;
+        SELECT TYPEOF(SUM(d)), SUM(d) FROM t18;
     ]], {
         "decimal", dec.new('10000000000000000000121.3')
     })
@@ -1092,7 +1092,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "dec-18.8",
     [[
-        SELECT typeof(TOTAL(d)), TOTAL(d) FROM t18;
+        SELECT TYPEOF(TOTAL(d)), TOTAL(d) FROM t18;
     ]], {
         "double", 1e+22
     })

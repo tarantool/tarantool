@@ -94,9 +94,12 @@ test:do_delete_tests("e_delete-1.2", {
     {4, "DELETE FROM t4 WHERE NULL    ; SELECT x FROM t4", {1, 2, 3, 4, 5}},
     {5, "DELETE FROM t4 WHERE y!='two'; SELECT x FROM t4", {2}},
     {6, "DELETE FROM t4 WHERE y='two' ; SELECT x FROM t4", {}},
-    {7, "DELETE FROM t5 WHERE x=(SELECT max(x) FROM t5);SELECT x FROM t5", {1, 2, 3, 4}},
-    {8, "DELETE FROM t5 WHERE (SELECT max(x) FROM t4)  ;SELECT x FROM t5", {1, 2, 3, 4}},
-    {9, "DELETE FROM t5 WHERE (SELECT max(x) FROM t6) != 0  ;SELECT x FROM t5", {}},
+    {7, "DELETE FROM t5 WHERE x=(SELECT MAX(x) FROM t5);SELECT x FROM t5",
+     {1, 2, 3, 4}},
+    {8, "DELETE FROM t5 WHERE (SELECT MAX(x) FROM t4)  ;SELECT x FROM t5",
+     {1, 2, 3, 4}},
+    {9, "DELETE FROM t5 WHERE (SELECT MAX(x) FROM t6) != 0  ;SELECT x FROM t5",
+     {}},
     {10, "DELETE FROM t6 WHERE y>'seven' ; SELECT y FROM t6", {"one", "four", "five"}},
 })
 

@@ -4,7 +4,7 @@ engine = test_run:get_cfg('engine')
 _ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 
 box.execute('create table test (id int primary key, a NUMBER, b text)')
-space = box.space.TEST
+space = box.space.test
 space:replace{1, 2, '3'}
 space:replace{4, 5, '6'}
 space:replace{7, 8.5, '9'}
@@ -61,13 +61,13 @@ cn:execute('select * from test limit 1 offset ?', {'Hello'})
 
 -- gh-2608 SQL iproto DDL
 cn:execute('create table test2(id int primary key, a int, b int, c int)')
-box.space.TEST2.name
+box.space.test2.name
 cn:execute('insert into test2 values (1, 1, 1, 1)')
 cn:execute('select * from test2')
 cn:execute('create index test2_a_b_index on test2(a, b)')
-#box.space.TEST2.index
+#box.space.test2.index
 cn:execute('drop table test2')
-box.space.TEST2
+box.space.test2
 
 -- gh-2617 DDL row_count either 0 or 1.
 
@@ -103,7 +103,7 @@ cn:execute('drop trigger if exists trig')
 -- Create more indexes, triggers and _truncate tuple.
 cn:execute('create index idx1 on test3(a)')
 cn:execute('create index idx2 on test3(b)')
-box.space.TEST3:truncate()
+box.space.test3:truncate()
 cn:execute('CREATE TRIGGER trig INSERT ON test3 FOR EACH ROW BEGIN SELECT * FROM test3; END;')
 cn:execute('insert into test3 values (1, 1, 1), (2, 2, 2), (3, 3, 3)')
 cn:execute('drop table test3')
@@ -162,12 +162,12 @@ s = box.schema.create_space('test2', {engine = engine})
 sq = box.schema.sequence.create('test2')
 pk = s:create_index('pk', {sequence = 'test2'})
 function push_id() s:replace{box.NULL} s:replace{box.NULL} end
-_ = box.space.TEST:on_replace(push_id)
+_ = box.space.test:on_replace(push_id)
 cn:execute('insert into test values (null, 1)')
 
 box.execute('create table test3 (id int primary key autoincrement)')
-box.schema.sequence.alter('TEST3', {min=-10000, step=-10})
-cn:execute('insert into TEST3 values (null), (null), (null), (null)')
+box.schema.sequence.alter('test3', {min=-10000, step=-10})
+cn:execute('insert into test3 values (null), (null), (null), (null)')
 
 box.execute('drop table test')
 s:drop()
@@ -223,11 +223,11 @@ res.metadata
 
 -- Make sure that built-in functions have a right returning type.
 --
-cn:execute("SELECT zeroblob(1);")
+cn:execute("SELECT ZEROBLOB(1);")
 -- randomblob() returns different results each time, so check only
 -- type in meta.
 --
-res = cn:execute("SELECT randomblob(1);")
+res = cn:execute("SELECT RANDOMBLOB(1);")
 res.metadata
 -- Type set during compilation stage, and since min/max are accept
 -- arguments of all scalar type, we can't say nothing more than

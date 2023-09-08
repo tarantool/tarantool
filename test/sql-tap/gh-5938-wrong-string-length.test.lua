@@ -14,8 +14,8 @@ box.schema.func.create("gh-5938-wrong-string-length.ret_str", {
 })
 
 test:execsql([[CREATE TABLE t (i INT PRIMARY KEY, s STRING);]])
-box.space.T:insert({1, 'This is a complete string'})
-box.space.T:insert({2, 'This is a cropped\0 string'})
+box.space.t:insert({1, 'This is a complete string'})
+box.space.t:insert({2, 'This is a cropped\0 string'})
 
 test:do_execsql_test(
     "gh-5938-1",

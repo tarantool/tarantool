@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(184)
+test:plan(182)
 
 --!./tcltestrunner.lua
 -- 2009 January 29
@@ -43,7 +43,6 @@ local kwlist = {
 	"plan",
 	"query",
 	"restrict",
-	"raise",
 	"enable",
 	"disable"
 }
@@ -199,7 +198,6 @@ local exprkw = [[
     "current_date",
     "current_time",
     "current_timestamp",
-    "raise",
 ]]
 for _, kw in ipairs(kwlist) do
     test:do_test(

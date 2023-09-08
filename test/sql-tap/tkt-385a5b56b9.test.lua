@@ -65,7 +65,7 @@ test:do_eqp_test(
     "2.1",
     " SELECT DISTINCT x FROM t2 ", {
         -- <2.1>
-        {0, 0, 0, "SCAN TABLE T2 (~1048576 rows)"}
+        {0, 0, 0, "SCAN TABLE t2 (~1048576 rows)"}
         -- </2.1>
     })
 
@@ -77,7 +77,7 @@ test:do_eqp_test(
         -- actually it does not matter, because each y val is
         -- distinct even in pk
         --{0, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2y"}
-        {0, 0, 0, "SCAN TABLE T2 (~1048576 rows)"}
+        {0, 0, 0, "SCAN TABLE t2 (~1048576 rows)"}
         -- </2.2>
     })
 
@@ -85,7 +85,7 @@ test:do_eqp_test(
     "2.3",
     " SELECT DISTINCT x, y FROM t2 WHERE y=10 ", {
         -- <2.3>
-        {0, 0, 0, "SEARCH TABLE T2 USING COVERING INDEX T2Y (Y=?) (~1 row)"}
+        {0, 0, 0, "SEARCH TABLE t2 USING COVERING INDEX t2y (y=?) (~1 row)"}
         -- </2.3>
     })
 
@@ -96,7 +96,7 @@ test:do_eqp_test(
         -- changed after reordering indexes + add pk to x affected
         -- actually it does not matter
         --{0, 0, 0, "SEARCH TABLE t2 USING INDEX t2x (x=?)"}
-        {0, 0, 0, "SEARCH TABLE T2 USING PRIMARY KEY (X=?) (~1 row)"}
+        {0, 0, 0, "SEARCH TABLE t2 USING PRIMARY KEY (x=?) (~1 row)"}
         -- </2.4>
     })
 

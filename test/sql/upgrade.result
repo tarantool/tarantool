@@ -53,19 +53,19 @@ box.space._index:get({box.space._space.index['name']:get('T1').id, 0})
 - [512, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
 ...
 -- test system tables functionality
-box.execute("CREATE TABLE t(x INTEGER PRIMARY KEY);")
+box.execute("CREATE TABLE T(X INTEGER PRIMARY KEY);")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TABLE t_out(x INTEGER PRIMARY KEY);")
+box.execute("CREATE TABLE T_OUT(X INTEGER PRIMARY KEY);")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER t1t AFTER INSERT ON t FOR EACH ROW BEGIN INSERT INTO t_out VALUES(1); END;")
+box.execute("CREATE TRIGGER T1T AFTER INSERT ON T FOR EACH ROW BEGIN INSERT INTO T_OUT VALUES(1); END;")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER t2t AFTER INSERT ON t FOR EACH ROW BEGIN INSERT INTO t_out VALUES(2); END;")
+box.execute("CREATE TRIGGER T2T AFTER INSERT ON T FOR EACH ROW BEGIN INSERT INTO T_OUT VALUES(2); END;")
 ---
 - row_count: 1
 ...
@@ -91,7 +91,7 @@ t1t.name
 ...
 t1t.opts
 ---
-- {'sql': 'CREATE TRIGGER t1t AFTER INSERT ON t FOR EACH ROW BEGIN INSERT INTO t_out
+- {'sql': 'CREATE TRIGGER T1T AFTER INSERT ON T FOR EACH ROW BEGIN INSERT INTO T_OUT
     VALUES(1); END;'}
 ...
 t2t.name
@@ -100,7 +100,7 @@ t2t.name
 ...
 t2t.opts
 ---
-- {'sql': 'CREATE TRIGGER t2t AFTER INSERT ON t FOR EACH ROW BEGIN INSERT INTO t_out
+- {'sql': 'CREATE TRIGGER T2T AFTER INSERT ON T FOR EACH ROW BEGIN INSERT INTO T_OUT
     VALUES(2); END;'}
 ...
 assert(t1t.space_id == t2t.space_id)

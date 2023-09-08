@@ -25,7 +25,7 @@ box.execute("UPDATE t1 SET e=e+1 WHERE b IN (SELECT b FROM t1);");
 box.execute("SELECT e FROM SEQSCAN t1");
 ---
 - metadata:
-  - name: E
+  - name: e
     type: integer
   rows:
   - [7]

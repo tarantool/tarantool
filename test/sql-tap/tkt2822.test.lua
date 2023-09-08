@@ -228,7 +228,7 @@ test:do_test(
     function()
         -- Case does not matter.  b should match B
         return test:execsql [[
-            SELECT a AS b FROM t3 ORDER BY B;
+            SELECT a AS b FROM t3 ORDER BY b;
         ]]
     end, {
         -- <tkt2822-5.2>
@@ -241,7 +241,7 @@ test:do_test(
     function()
         -- Quoting should not matter
         return test:execsql [[
-            SELECT a as b FROM t3 ORDER BY "B";
+            SELECT a as b FROM t3 ORDER BY "b";
         ]]
     end, {
         -- <tkt2822-5.3>

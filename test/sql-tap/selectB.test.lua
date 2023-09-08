@@ -249,7 +249,7 @@ for ii = 3, 6, 1 do
     test:do_execsql_test(
         "selectB-"..ii..".2",
         [[
-            SELECT c, count(*) FROM
+            SELECT c, COUNT(*) FROM
               (SELECT c FROM t1 UNION ALL SELECT e FROM t2)
             GROUP BY c ORDER BY 1;
         ]], {
@@ -259,9 +259,9 @@ for ii = 3, 6, 1 do
     test:do_execsql_test(
         "selectB-"..ii..".3",
         [[
-            SELECT c, count(*) FROM
+            SELECT c, COUNT(*) FROM
               (SELECT c FROM t1 UNION ALL SELECT e FROM t2)
-            GROUP BY c HAVING count(*)>1;
+            GROUP BY c HAVING COUNT(*)>1;
         ]], {
             6, 2
         })

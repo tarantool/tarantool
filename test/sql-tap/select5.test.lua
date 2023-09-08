@@ -53,7 +53,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-1.1",
     [[
-        SELECT y, count(*) FROM t1 GROUP BY y ORDER BY y
+        SELECT y, COUNT(*) FROM t1 GROUP BY y ORDER BY y
     ]], {
         -- <select5-1.1>
         5, 15, 6, 8, 7, 4, 8, 2, 9, 1, 10, 1
@@ -63,7 +63,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-1.2",
     [[
-        SELECT y, count(*) FROM t1 GROUP BY y ORDER BY count(*), y
+        SELECT y, COUNT(*) FROM t1 GROUP BY y ORDER BY COUNT(*), y
     ]], {
         -- <select5-1.2>
         9, 1, 10, 1, 8, 2, 7, 4, 6, 8, 5, 15
@@ -73,7 +73,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-1.3",
     [[
-        SELECT count(*), y FROM t1 GROUP BY y ORDER BY count(*), y
+        SELECT COUNT(*), y FROM t1 GROUP BY y ORDER BY COUNT(*), y
     ]], {
         -- <select5-1.3>
         1, 9, 1, 10, 2, 8, 4, 7, 8, 6, 15, 5
@@ -85,27 +85,27 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "select5-2.1.1",
     [[
-        SELECT y, count(*) FROM t1 GROUP BY z ORDER BY y
+        SELECT y, COUNT(*) FROM t1 GROUP BY z ORDER BY y
     ]], {
         -- <select5-2.1.1>
-        1, "Can’t resolve field 'Z'"
+        1, "Can’t resolve field 'z'"
         -- </select5-2.1.1>
     })
 
 test:do_catchsql_test(
     "select5-2.2",
     [[
-        SELECT y, count(*) FROM t1 GROUP BY z(y) ORDER BY y
+        SELECT y, COUNT(*) FROM t1 GROUP BY z(y) ORDER BY y
     ]], {
         -- <select5-2.2>
-        1, "Function 'Z' does not exist"
+        1, "Function 'z' does not exist"
         -- </select5-2.2>
     })
 
 test:do_catchsql_test(
     "select5-2.3",
     [[
-        SELECT y, count(*) FROM t1 GROUP BY y HAVING count(*)<3 ORDER BY y
+        SELECT y, COUNT(*) FROM t1 GROUP BY y HAVING COUNT(*)<3 ORDER BY y
     ]], {
         -- <select5-2.3>
         0, {8, 2, 9, 1, 10, 1}
@@ -115,20 +115,20 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "select5-2.4",
     [[
-        SELECT y, count(*) FROM t1 GROUP BY y HAVING z(y)<3 ORDER BY y
+        SELECT y, COUNT(*) FROM t1 GROUP BY y HAVING z(y)<3 ORDER BY y
     ]], {
         -- <select5-2.4>
-        1, "Function 'Z' does not exist"
+        1, "Function 'z' does not exist"
         -- </select5-2.4>
     })
 
 test:do_catchsql_test(
     "select5-2.5",
     [[
-        SELECT y, count(*) FROM t1 GROUP BY y HAVING count(*)<z ORDER BY y
+        SELECT y, COUNT(*) FROM t1 GROUP BY y HAVING COUNT(*)<z ORDER BY y
     ]], {
         -- <select5-2.5>
-        1, "Can’t resolve field 'Z'"
+        1, "Can’t resolve field 'z'"
         -- </select5-2.5>
     })
 
@@ -137,7 +137,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "select5-3.1",
     [[
-        SELECT x, count(*), avg(y) FROM t1 GROUP BY x HAVING x<4 ORDER BY x
+        SELECT x, COUNT(*), AVG(y) FROM t1 GROUP BY x HAVING x<4 ORDER BY x
     ]], {
         -- <select5-3.1>
         1, 1, 5.0, 2, 1, 5.0, 3, 1, 5.0
@@ -149,7 +149,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-4.1",
     [[
-        SELECT avg(x) FROM t1 WHERE x>100
+        SELECT AVG(x) FROM t1 WHERE x>100
     ]], {
         -- <select5-4.1>
         ""
@@ -159,7 +159,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-4.2",
     [[
-        SELECT count(x) FROM t1 WHERE x>100
+        SELECT COUNT(x) FROM t1 WHERE x>100
     ]], {
         -- <select5-4.2>
         0
@@ -169,7 +169,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-4.3",
     [[
-        SELECT min(x) FROM t1 WHERE x>100
+        SELECT MIN(x) FROM t1 WHERE x>100
     ]], {
         -- <select5-4.3>
         ""
@@ -179,7 +179,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-4.4",
     [[
-        SELECT max(x) FROM t1 WHERE x>100
+        SELECT MAX(x) FROM t1 WHERE x>100
     ]], {
         -- <select5-4.4>
         ""
@@ -189,7 +189,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-4.5",
     [[
-        SELECT sum(x) FROM t1 WHERE x>100
+        SELECT SUM(x) FROM t1 WHERE x>100
     ]], {
         -- <select5-4.5>
         ""
@@ -262,7 +262,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-5.11",
     [[
-        SELECT max(c), b*a, b, a FROM t2 GROUP BY b*a, b, a
+        SELECT MAX(c), b*a, b, a FROM t2 GROUP BY b*a, b, a
     ]], {
         -- <select5-5.11>
         3, 2, 2, 1, 5, 4, 4, 1, 7, 24, 4, 6
@@ -280,7 +280,7 @@ test:do_execsql_test(
         INSERT INTO t3 VALUES(1,NULL);
         INSERT INTO t3 VALUES(2,NULL);
         INSERT INTO t3 VALUES(3,4);
-        SELECT count(x), y FROM t3 GROUP BY y ORDER BY 1
+        SELECT COUNT(x), y FROM t3 GROUP BY y ORDER BY 1
     ]], {
         -- <select5-6.1>
         1, 4, 2, ""
@@ -300,7 +300,7 @@ test:do_execsql_test(
         INSERT INTO t4 VALUES(5,5,NULL,NULL);
         INSERT INTO t4 VALUES(6,5,NULL,NULL);
         INSERT INTO t4 VALUES(7,6,7,8);
-        SELECT max(x), count(x), y, z FROM t4 GROUP BY y, z ORDER BY 1
+        SELECT MAX(x), COUNT(x), y, z FROM t4 GROUP BY y, z ORDER BY 1
     ]], {
         -- <select5-6.2>
         1, 1, 2, "", 2, 1, 3, "", 3, 1, "", 5, 4, 2, "", 6, 5, 2, "", "", 6, 1, 7, 8
@@ -310,7 +310,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-7.2",
     [[
-        SELECT count(*), count(x) as cnt FROM t4 GROUP BY y ORDER BY cnt;
+        SELECT COUNT(*), COUNT(x) as cnt FROM t4 GROUP BY y ORDER BY cnt;
     ]], {
         -- <select5-7.2>
         1, 1, 1, 1, 1, 1, 5, 5
@@ -333,7 +333,7 @@ test:do_execsql_test(
         INSERT INTO t8b(rowid,x) VALUES(1,111);
         INSERT INTO t8b(rowid,x) VALUES(2,222);
         INSERT INTO t8b(rowid,x) VALUES(3,333);
-        SELECT a, count(b) FROM t8a, t8b WHERE b=t8b.rowid GROUP BY a ORDER BY a;
+        SELECT a, COUNT(b) FROM t8a, t8b WHERE b=t8b.rowid GROUP BY a ORDER BY a;
     ]], {
         -- <select5-8.1>
         "one", 2, "two", 1
@@ -343,7 +343,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-8.2",
     [[
-        SELECT a, count(b) FROM t8a, t8b WHERE b=+t8b.rowid GROUP BY a ORDER BY a;
+        SELECT a, COUNT(b) FROM t8a, t8b WHERE b=+t8b.rowid GROUP BY a ORDER BY a;
     ]], {
         -- <select5-8.2>
         "one", 2, "two", 1
@@ -353,7 +353,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-8.3",
     [[
-        SELECT t8a.a, count(t8a.b) FROM t8a, t8b WHERE t8a.b=t8b.rowid
+        SELECT t8a.a, COUNT(t8a.b) FROM t8a, t8b WHERE t8a.b=t8b.rowid
          GROUP BY 1 ORDER BY 1;
     ]], {
         -- <select5-8.3>
@@ -364,7 +364,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-8.4",
     [[
-        SELECT a, count(*) FROM t8a, t8b WHERE b=+t8b.rowid GROUP BY a ORDER BY a;
+        SELECT a, COUNT(*) FROM t8a, t8b WHERE b=+t8b.rowid GROUP BY a ORDER BY a;
     ]], {
         -- <select5-8.4>
         "one", 2, "two", 1
@@ -374,7 +374,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-8.5",
     [[
-        SELECT a, count(b) FROM t8a, t8b WHERE b<x GROUP BY a ORDER BY a;
+        SELECT a, COUNT(b) FROM t8a, t8b WHERE b<x GROUP BY a ORDER BY a;
     ]], {
         -- <select5-8.5>
         "one", 6, "two", 3
@@ -384,7 +384,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-8.6",
     [[
-        SELECT a, count(t8a.b) FROM t8a, t8b WHERE b=t8b.rowid
+        SELECT a, COUNT(t8a.b) FROM t8a, t8b WHERE b=t8b.rowid
          GROUP BY a ORDER BY 2;
     ]], {
         -- <select5-8.6>
@@ -395,7 +395,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-8.7",
     [[
-        SELECT a, count(b) FROM t8a, t8b GROUP BY a ORDER BY 2;
+        SELECT a, COUNT(b) FROM t8a, t8b GROUP BY a ORDER BY 2;
     ]], {
         -- <select5-8.7>
         "two", 3, "one", 6
@@ -405,7 +405,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select5-8.8",
     [[
-        SELECT a, count(*) FROM t8a, t8b GROUP BY a ORDER BY 2;
+        SELECT a, COUNT(*) FROM t8a, t8b GROUP BY a ORDER BY 2;
     ]], {
         -- <select5-8.8>
         "two", 3, "one", 9
@@ -555,7 +555,7 @@ test:do_catchsql_test(
     [[
             CREATE TABLE jj (s1 INT, s2 VARCHAR(1), PRIMARY KEY(s1));
             INSERT INTO jj VALUES(1, 'A'), (2, 'a');
-            SELECT 1 FROM jj HAVING avg(s2) = 1 AND avg(s2) = 0;
+            SELECT 1 FROM jj HAVING AVG(s2) = 1 AND AVG(s2) = 0;
     ]], {
     -- <select5-9.13.2>
     1, "Failed to execute SQL statement: wrong arguments for function AVG()"

@@ -30,7 +30,7 @@ g.test_insertion_crash_2 = function()
     g.server:exec(function()
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY, a INT);]])
         local sql = [[INSERT INTO t SELECT a, i, 1 FROM t;]]
-        local res = [[table T has 2 columns but 3 values were supplied]]
+        local res = [[table t has 2 columns but 3 values were supplied]]
         local _, err = box.execute(sql)
         t.assert_equals(err.message, res)
         box.execute([[DROP TABLE t;]])

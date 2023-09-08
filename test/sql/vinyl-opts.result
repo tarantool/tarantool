@@ -21,7 +21,7 @@ box.execute('CREATE TABLE v1 (id INT PRIMARY KEY, b INT);')
 ---
 - row_count: 1
 ...
-box.space.V1.index[0].options
+box.space.v1.index[0].options
 ---
 - page_size: 32768
   run_count_per_level: 3
@@ -33,7 +33,7 @@ box.execute('CREATE INDEX i1 ON v1(b);')
 ---
 - row_count: 1
 ...
-box.space.V1.index[1].options
+box.space.v1.index[1].options
 ---
 - page_size: 32768
   run_count_per_level: 3
@@ -41,7 +41,7 @@ box.space.V1.index[1].options
   bloom_fpr: 0.1
   range_size: 536870912
 ...
-box.space.V1:drop()
+box.space.v1:drop()
 ---
 ...
 test_run:cmd('switch default')

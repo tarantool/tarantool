@@ -63,7 +63,7 @@ test:do_test(
         return test:execsql [[
             SELECT a, b FROM t1
             UNION ALL
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-2.2>
@@ -77,7 +77,7 @@ test:do_test(
         return test:execsql [[
             SELECT a, b FROM t1
             UNION ALL
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
         ]]
     end, {
         -- <tkt2927-2.3>
@@ -91,7 +91,7 @@ test:do_test(
         return test:execsql [[
             SELECT a, b FROM t1
             UNION ALL
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-2.4>
@@ -103,7 +103,7 @@ test:do_test(
     "tkt2927-2.5",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             UNION ALL
             SELECT a, b FROM t1
         ]]
@@ -117,9 +117,9 @@ test:do_test(
     "tkt2927-2.6",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             UNION ALL
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-2.6>
@@ -131,9 +131,9 @@ test:do_test(
     "tkt2927-2.7",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             UNION ALL
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
         ]]
     end, {
         -- <tkt2927-2.7>
@@ -145,9 +145,9 @@ test:do_test(
     "tkt2927-2.8",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             UNION ALL
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-2.8>
@@ -159,7 +159,7 @@ test:do_test(
     "tkt2927-2.9",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             UNION ALL
             SELECT a, b FROM t1
         ]]
@@ -173,9 +173,9 @@ test:do_test(
     "tkt2927-2.10",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             UNION ALL
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-2.10>
@@ -187,9 +187,9 @@ test:do_test(
     "tkt2927-2.11",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             UNION ALL
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
         ]]
     end, {
         -- <tkt2927-2.11>
@@ -201,9 +201,9 @@ test:do_test(
     "tkt2927-2.12",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             UNION ALL
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-2.12>
@@ -215,7 +215,7 @@ test:do_test(
     "tkt2927-2.13",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             UNION ALL
             SELECT a, b FROM t1
         ]]
@@ -229,9 +229,9 @@ test:do_test(
     "tkt2927-2.14",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             UNION ALL
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-2.14>
@@ -243,9 +243,9 @@ test:do_test(
     "tkt2927-2.15",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             UNION ALL
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
         ]]
     end, {
         -- <tkt2927-2.15>
@@ -257,9 +257,9 @@ test:do_test(
     "tkt2927-2.16",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             UNION ALL
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-2.16>
@@ -288,7 +288,7 @@ test:do_test(
         return test:execsql [[
             SELECT a, b FROM t1
             UNION
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -303,7 +303,7 @@ test:do_test(
         return test:execsql [[
             SELECT a, b FROM t1
             UNION
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -318,7 +318,7 @@ test:do_test(
         return test:execsql [[
             SELECT a, b FROM t1
             UNION
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -331,7 +331,7 @@ test:do_test(
     "tkt2927-3.5",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             UNION
             SELECT a, b FROM t1
             ORDER BY 1
@@ -346,9 +346,9 @@ test:do_test(
     "tkt2927-3.6",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             UNION
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -361,9 +361,9 @@ test:do_test(
     "tkt2927-3.7",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             UNION
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -376,9 +376,9 @@ test:do_test(
     "tkt2927-3.8",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             UNION
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -391,7 +391,7 @@ test:do_test(
     "tkt2927-3.9",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             UNION
             SELECT a, b FROM t1
             ORDER BY 1
@@ -406,9 +406,9 @@ test:do_test(
     "tkt2927-3.10",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             UNION
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -421,9 +421,9 @@ test:do_test(
     "tkt2927-3.11",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             UNION
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -436,9 +436,9 @@ test:do_test(
     "tkt2927-3.12",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             UNION
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -451,7 +451,7 @@ test:do_test(
     "tkt2927-3.13",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             UNION
             SELECT a, b FROM t1
             ORDER BY 1
@@ -466,9 +466,9 @@ test:do_test(
     "tkt2927-3.14",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             UNION
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -481,9 +481,9 @@ test:do_test(
     "tkt2927-3.15",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             UNION
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -496,9 +496,9 @@ test:do_test(
     "tkt2927-3.16",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             UNION
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -527,7 +527,7 @@ test:do_test(
         return test:execsql [[
             SELECT a+b, a-b, a, b FROM t1
             UNION ALL
-            SELECT a+b, a-b, a, abs(b) FROM t1
+            SELECT a+b, a-b, a, ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-4.2>
@@ -541,7 +541,7 @@ test:do_test(
         return test:execsql [[
             SELECT a+b, a-b, a, b FROM t1
             UNION ALL
-            SELECT a+b, a-b, abs(a), b FROM t1
+            SELECT a+b, a-b, ABS(a), b FROM t1
         ]]
     end, {
         -- <tkt2927-4.3>
@@ -555,7 +555,7 @@ test:do_test(
         return test:execsql [[
             SELECT a+b, a-b, a, b FROM t1
             UNION ALL
-            SELECT a+b, a-b, abs(a), abs(b) FROM t1
+            SELECT a+b, a-b, ABS(a), ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-4.4>
@@ -567,7 +567,7 @@ test:do_test(
     "tkt2927-4.5",
     function()
         return test:execsql [[
-            SELECT a+b, a-b, a, abs(b) FROM t1
+            SELECT a+b, a-b, a, ABS(b) FROM t1
             UNION ALL
             SELECT a+b, a-b, a, b FROM t1
         ]]
@@ -581,9 +581,9 @@ test:do_test(
     "tkt2927-4.6",
     function()
         return test:execsql [[
-            SELECT a+b, a-b, a, abs(b) FROM t1
+            SELECT a+b, a-b, a, ABS(b) FROM t1
             UNION ALL
-            SELECT a+b, a-b, a, abs(b) FROM t1
+            SELECT a+b, a-b, a, ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-4.6>
@@ -595,9 +595,9 @@ test:do_test(
     "tkt2927-4.7",
     function()
         return test:execsql [[
-            SELECT a+b, a-b, a, abs(b) FROM t1
+            SELECT a+b, a-b, a, ABS(b) FROM t1
             UNION ALL
-            SELECT a+b, a-b, abs(a), b FROM t1
+            SELECT a+b, a-b, ABS(a), b FROM t1
         ]]
     end, {
         -- <tkt2927-4.7>
@@ -609,9 +609,9 @@ test:do_test(
     "tkt2927-4.8",
     function()
         return test:execsql [[
-            SELECT a+b, a-b, a, abs(b) FROM t1
+            SELECT a+b, a-b, a, ABS(b) FROM t1
             UNION ALL
-            SELECT a+b, a-b, abs(a), abs(b) FROM t1
+            SELECT a+b, a-b, ABS(a), ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-4.8>
@@ -623,7 +623,7 @@ test:do_test(
     "tkt2927-4.9",
     function()
         return test:execsql [[
-            SELECT a+b, a-b, abs(a), b FROM t1
+            SELECT a+b, a-b, ABS(a), b FROM t1
             UNION ALL
             SELECT a+b, a-b, a, b FROM t1
         ]]
@@ -637,9 +637,9 @@ test:do_test(
     "tkt2927-4.10",
     function()
         return test:execsql [[
-            SELECT a+b, a-b, abs(a), b FROM t1
+            SELECT a+b, a-b, ABS(a), b FROM t1
             UNION ALL
-            SELECT a+b, a-b, a, abs(b) FROM t1
+            SELECT a+b, a-b, a, ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-4.10>
@@ -651,9 +651,9 @@ test:do_test(
     "tkt2927-4.11",
     function()
         return test:execsql [[
-            SELECT a+b, a-b, abs(a), b FROM t1
+            SELECT a+b, a-b, ABS(a), b FROM t1
             UNION ALL
-            SELECT a+b, a-b, abs(a), b FROM t1
+            SELECT a+b, a-b, ABS(a), b FROM t1
         ]]
     end, {
         -- <tkt2927-4.11>
@@ -665,9 +665,9 @@ test:do_test(
     "tkt2927-4.12",
     function()
         return test:execsql [[
-            SELECT a+b, a-b, abs(a), b FROM t1
+            SELECT a+b, a-b, ABS(a), b FROM t1
             UNION ALL
-            SELECT a+b, a-b, abs(a), abs(b) FROM t1
+            SELECT a+b, a-b, ABS(a), ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-4.12>
@@ -679,7 +679,7 @@ test:do_test(
     "tkt2927-4.13",
     function()
         return test:execsql [[
-            SELECT a+b, a-b, abs(a), abs(b) FROM t1
+            SELECT a+b, a-b, ABS(a), ABS(b) FROM t1
             UNION ALL
             SELECT a+b, a-b, a, b FROM t1
         ]]
@@ -693,9 +693,9 @@ test:do_test(
     "tkt2927-4.14",
     function()
         return test:execsql [[
-            SELECT a+b, a-b, abs(a), abs(b) FROM t1
+            SELECT a+b, a-b, ABS(a), ABS(b) FROM t1
             UNION ALL
-            SELECT a+b, a-b, a, abs(b) FROM t1
+            SELECT a+b, a-b, a, ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-4.14>
@@ -707,9 +707,9 @@ test:do_test(
     "tkt2927-4.15",
     function()
         return test:execsql [[
-            SELECT a+b, a-b, abs(a), abs(b) FROM t1
+            SELECT a+b, a-b, ABS(a), ABS(b) FROM t1
             UNION ALL
-            SELECT a+b, a-b, abs(a), b FROM t1
+            SELECT a+b, a-b, ABS(a), b FROM t1
         ]]
     end, {
         -- <tkt2927-4.15>
@@ -721,9 +721,9 @@ test:do_test(
     "tkt2927-4.16",
     function()
         return test:execsql [[
-            SELECT a+b, a-b, abs(a), abs(b) FROM t1
+            SELECT a+b, a-b, ABS(a), ABS(b) FROM t1
             UNION ALL
-            SELECT a+b, a-b, abs(a), abs(b) FROM t1
+            SELECT a+b, a-b, ABS(a), ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-4.16>
@@ -751,7 +751,7 @@ test:do_test(
         return test:execsql [[
             SELECT a, b FROM t1
             EXCEPT
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-5.2>
@@ -765,7 +765,7 @@ test:do_test(
         return test:execsql [[
             SELECT a, b FROM t1
             EXCEPT
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
         ]]
     end, {
         -- <tkt2927-5.3>
@@ -779,7 +779,7 @@ test:do_test(
         return test:execsql [[
             SELECT a, b FROM t1
             EXCEPT
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-5.4>
@@ -791,7 +791,7 @@ test:do_test(
     "tkt2927-5.5",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             EXCEPT
             SELECT a, b FROM t1
         ]]
@@ -805,9 +805,9 @@ test:do_test(
     "tkt2927-5.6",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             EXCEPT
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-5.6>
@@ -819,9 +819,9 @@ test:do_test(
     "tkt2927-5.7",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             EXCEPT
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
         ]]
     end, {
         -- <tkt2927-5.7>
@@ -833,9 +833,9 @@ test:do_test(
     "tkt2927-5.8",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             EXCEPT
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-5.8>
@@ -847,7 +847,7 @@ test:do_test(
     "tkt2927-5.9",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             EXCEPT
             SELECT a, b FROM t1
         ]]
@@ -861,9 +861,9 @@ test:do_test(
     "tkt2927-5.10",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             EXCEPT
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-5.10>
@@ -875,9 +875,9 @@ test:do_test(
     "tkt2927-5.11",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             EXCEPT
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
         ]]
     end, {
         -- <tkt2927-5.11>
@@ -889,9 +889,9 @@ test:do_test(
     "tkt2927-5.12",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             EXCEPT
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-5.12>
@@ -903,7 +903,7 @@ test:do_test(
     "tkt2927-5.13",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             EXCEPT
             SELECT a, b FROM t1
         ]]
@@ -917,9 +917,9 @@ test:do_test(
     "tkt2927-5.14",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             EXCEPT
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-5.14>
@@ -931,9 +931,9 @@ test:do_test(
     "tkt2927-5.15",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             EXCEPT
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
         ]]
     end, {
         -- <tkt2927-5.15>
@@ -945,9 +945,9 @@ test:do_test(
     "tkt2927-5.16",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             EXCEPT
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
         ]]
     end, {
         -- <tkt2927-5.16>
@@ -976,7 +976,7 @@ test:do_test(
         return test:execsql [[
             SELECT a, b FROM t1
             INTERSECT
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -991,7 +991,7 @@ test:do_test(
         return test:execsql [[
             SELECT a, b FROM t1
             INTERSECT
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -1006,7 +1006,7 @@ test:do_test(
         return test:execsql [[
             SELECT a, b FROM t1
             INTERSECT
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -1019,7 +1019,7 @@ test:do_test(
     "tkt2927-6.5",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             INTERSECT
             SELECT a, b FROM t1
             ORDER BY 1
@@ -1034,9 +1034,9 @@ test:do_test(
     "tkt2927-6.6",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             INTERSECT
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -1049,9 +1049,9 @@ test:do_test(
     "tkt2927-6.7",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             INTERSECT
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -1064,9 +1064,9 @@ test:do_test(
     "tkt2927-6.8",
     function()
         return test:execsql [[
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             INTERSECT
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -1079,7 +1079,7 @@ test:do_test(
     "tkt2927-6.9",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             INTERSECT
             SELECT a, b FROM t1
             ORDER BY 1
@@ -1094,9 +1094,9 @@ test:do_test(
     "tkt2927-6.10",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             INTERSECT
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -1109,9 +1109,9 @@ test:do_test(
     "tkt2927-6.11",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             INTERSECT
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -1124,9 +1124,9 @@ test:do_test(
     "tkt2927-6.12",
     function()
         return test:execsql [[
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             INTERSECT
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -1139,7 +1139,7 @@ test:do_test(
     "tkt2927-6.13",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             INTERSECT
             SELECT a, b FROM t1
             ORDER BY 1
@@ -1154,9 +1154,9 @@ test:do_test(
     "tkt2927-6.14",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             INTERSECT
-            SELECT a, abs(b) FROM t1
+            SELECT a, ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -1169,9 +1169,9 @@ test:do_test(
     "tkt2927-6.15",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             INTERSECT
-            SELECT abs(a), b FROM t1
+            SELECT ABS(a), b FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -1184,9 +1184,9 @@ test:do_test(
     "tkt2927-6.16",
     function()
         return test:execsql [[
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             INTERSECT
-            SELECT abs(a), abs(b) FROM t1
+            SELECT ABS(a), ABS(b) FROM t1
             ORDER BY 1
         ]]
     end, {
@@ -1209,13 +1209,13 @@ test:do_test(
             INSERT INTO host VALUES('aald04','aalp03',4);
             INSERT INTO host VALUES('aald17','aalp01',1);
             CREATE VIEW consolemap1a as
-              select hostname, consolehost, '/dev/cuaD0.' || cast(consoleport-1 as text) consoleport
-                from host where consolehost='aalp01';
+              select hostname, consoleHost, '/dev/cuaD0.' || cast(consolePort-1 as text) consolePort
+                from host where consoleHost='aalp01';
             CREATE VIEW consolemap1b as
-              select hostname hostname, consolehost consolehost, '/dev/cuaD' ||
-                     substr('01',1+((consoleport-1)/16),1) ||
-                     substr('0123456789abcdef',1+((consoleport-1)%16),1) consoleport
-                from host where consolehost='aalp03';
+              select hostname, consoleHost, '/dev/cuaD' ||
+                     SUBSTR('01',1+((consolePort-1)/16),1) ||
+                     SUBSTR('0123456789abcdef',1+((consolePort-1)%16),1) consolePort
+                from host where consoleHost='aalp03';
             CREATE VIEW consolemap1 as
               select * from consolemap1a
               union

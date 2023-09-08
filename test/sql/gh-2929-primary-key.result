@@ -20,22 +20,22 @@ box.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT UNIQUE)")
 box.execute("CREATE TABLE t2(a INT UNIQUE, b INT)")
 ---
 - null
-- 'Failed to create space ''T2'': PRIMARY KEY missing'
+- 'Failed to create space ''t2'': PRIMARY KEY missing'
 ...
 box.execute("CREATE TABLE t3(a NUMBER)")
 ---
 - null
-- 'Failed to create space ''T3'': PRIMARY KEY missing'
+- 'Failed to create space ''t3'': PRIMARY KEY missing'
 ...
 box.execute("CREATE TABLE t4(a NUMBER, b TEXT)")
 ---
 - null
-- 'Failed to create space ''T4'': PRIMARY KEY missing'
+- 'Failed to create space ''t4'': PRIMARY KEY missing'
 ...
 box.execute("CREATE TABLE t5(a NUMBER, b NUMBER UNIQUE)")
 ---
 - null
-- 'Failed to create space ''T5'': PRIMARY KEY missing'
+- 'Failed to create space ''t5'': PRIMARY KEY missing'
 ...
 box.execute("DROP TABLE t1")
 ---
@@ -47,5 +47,5 @@ box.execute("DROP TABLE t1")
 box.execute("CREATE TABLE tx (a INT, PRIMARY KEY (b));")
 ---
 - null
-- Can’t resolve field 'B'
+- Can’t resolve field 'b'
 ...

@@ -56,7 +56,7 @@ if (1 > 0)
             END;
 
             -- Verify the table content
-            SELECT count(*), sum(x) FROM t1;
+            SELECT COUNT(*), SUM(x) FROM t1;
         ]], {
             -- <tkt2767-1.1>
             32, 528
@@ -72,7 +72,7 @@ if (1 > 0)
         "tkt2767-1.2",
         [[
             DELETE FROM t1 WHERE x>0;
-            SELECT count(*), sum(x) FROM t1;
+            SELECT COUNT(*), SUM(x) FROM t1;
         ]], {
             -- <tkt2767-1.2>
             32, 528
@@ -88,7 +88,7 @@ if (1 > 0)
         "tkt2767-1.3",
         [[
             UPDATE t1 SET x=x+1;
-            SELECT count(*), sum(x) FROM t1;
+            SELECT COUNT(*), SUM(x) FROM t1;
         ]], {
             -- <tkt2767-1.3>
             32, 528
@@ -103,7 +103,7 @@ if (1 > 0)
         "tkt2767-1.4",
         [[
             INSERT INTO t1 (x) SELECT x+32 FROM t1;
-            SELECT count(*), sum(x) FROM t1;
+            SELECT COUNT(*), SUM(x) FROM t1;
         ]], {
             -- <tkt2767-1.4>
             32, 528

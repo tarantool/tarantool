@@ -18,7 +18,7 @@ end)
 -- Make sure that tuples with undescribed fields do not cause an error.
 g.test_cursor_invalidation_1 = function()
     g.server:exec(function()
-        local s = box.schema.space.create('T', {format = {'A'}})
+        local s = box.schema.space.create('t', {format = {'a'}})
         s:create_index('ii')
         s:insert({1,2,3,4,5})
         s:insert({2})
@@ -33,7 +33,7 @@ end
 --
 g.test_cursor_invalidation_2 = function()
     g.server:exec(function()
-        local s = box.schema.space.create('T', {format = {{'A', 'integer'}}})
+        local s = box.schema.space.create('t', {format = {{'a', 'integer'}}})
         s:create_index('ii', {parts = {{1, 'integer'}, {2, 'integer'},
                                        {3, 'integer'}, {4, 'integer'}}})
         s:insert({1,2,3,4})

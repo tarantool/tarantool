@@ -30,11 +30,11 @@ box.execute("INSERT INTO t3 VALUES(2, NULL,'xyz')");
 box.execute("SELECT * FROM t3")
 ---
 - metadata:
-  - name: ID
+  - name: id
     type: integer
-  - name: A
+  - name: a
     type: string
-  - name: B
+  - name: b
     type: string
   rows:
   - [1, 'abc', null]

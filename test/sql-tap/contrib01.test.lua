@@ -85,7 +85,7 @@ test:do_test(
              WHERE T1.B = T2.B
                AND T1.C = T2.C
              GROUP BY T2.A, T2.B, T1.D, T1.E, T1.F, T1.G, T1.H
-             ORDER BY +max(t1.c);
+             ORDER BY +MAX(T1.C);
         ]]
     end, {
         -- <contrib01-1.1>
@@ -102,7 +102,7 @@ test:do_test(
              WHERE T1.B = T2.B
                AND T1.C = T2.C
              GROUP BY T2.A, T2.B, T1.F, T1.D, T1.E, T1.G, T1.H
-             ORDER BY +max(t1.c);
+             ORDER BY +MAX(T1.C);
         ]]
     end, {
         -- <contrib01-1.2>

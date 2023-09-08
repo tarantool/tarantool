@@ -59,13 +59,10 @@ sql_desc_append_name(struct sql_desc *desc, const char *name)
 {
 	char *escaped = sql_escaped_name_new(name);
 	assert(escaped[0] == '"' && escaped[strlen(escaped) - 1] == '"');
-	char *normalized = sql_normalized_name_new(name, strlen(name));
-	if (isalpha(name[0]) && strlen(escaped) == strlen(name) + 2 &&
-	    strcmp(normalized, name) == 0)
-		sqlXPrintf(&desc->acc, "%s", normalized);
+	if (isalpha(name[0]) && strlen(escaped) == strlen(name) + 2)
+		sqlXPrintf(&desc->acc, "%s", name);
 	else
 		sqlXPrintf(&desc->acc, "%s", escaped);
-	sql_xfree(normalized);
 	sql_xfree(escaped);
 }
 

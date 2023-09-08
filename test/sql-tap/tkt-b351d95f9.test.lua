@@ -40,7 +40,7 @@ test:do_execsql_test(
     "tkt-b351d95.2",
     [[
         DELETE FROM t2;
-        INSERT INTO t2 SELECT a, coalesce(b,a) FROM t1;
+        INSERT INTO t2 SELECT a, COALESCE(b,a) FROM t1;
         SELECT x, y FROM t2 ORDER BY x;
     ]], {
         -- <tkt-b351d95.2>
@@ -52,7 +52,7 @@ test:do_execsql_test(
     "tkt-b351d95.3",
     [[
         DELETE FROM t2;
-        INSERT INTO t2 SELECT a, coalesce(b,a) FROM t1;
+        INSERT INTO t2 SELECT a, COALESCE(b,a) FROM t1;
         SELECT x, y BETWEEN 'xy' AND 'xz' FROM t2 ORDER BY x;
     ]], {
         -- <tkt-b351d95.3>

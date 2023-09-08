@@ -47,7 +47,7 @@ test:do_execsql_test(
         INSERT INTO t1 SELECT x+131072 FROM t1;
         INSERT INTO t1 SELECT x+262144 FROM t1;
         COMMIT;
-        SELECT count(*) FROM t1;
+        SELECT COUNT(*) FROM t1;
     ]], {
         -- <delete3-1.1>
         524288
@@ -58,7 +58,7 @@ test:do_execsql_test(
     "delete3-1.2",
     [[
         DELETE FROM t1 WHERE x%2==0;
-        SELECT count(*) FROM t1;
+        SELECT COUNT(*) FROM t1;
     ]], {
         -- <delete3-1.2>
         262144

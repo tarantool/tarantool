@@ -121,7 +121,7 @@ test:do_test(
 test:do_execsql_test(
     "misc1-1.7",
     [[
-        SELECT count(*) FROM manycol
+        SELECT COUNT(*) FROM manycol
     ]], {
         -- <misc1-1.7>
         11
@@ -132,7 +132,7 @@ test:do_test(
     "misc1-1.8",
     function()
         test:execsql("DELETE FROM manycol WHERE x98 = '1234'")
-        return test:execsql("SELECT count(*) FROM manycol")
+        return test:execsql("SELECT COUNT(*) FROM manycol")
     end, {
         -- <misc1-1.8>
         11
@@ -143,7 +143,7 @@ test:do_test(
     "misc1-1.9",
     function()
         test:execsql("DELETE FROM manycol WHERE x98 = '998'")
-        return test:execsql("SELECT count(*) FROM manycol")
+        return test:execsql("SELECT COUNT(*) FROM manycol")
     end, {
         -- <misc1-1.9>
         10
@@ -154,7 +154,7 @@ test:do_test(
     "misc1-1.10",
     function()
         test:execsql("DELETE FROM manycol WHERE x99 = '500'")
-        return test:execsql("SELECT count(*) FROM manycol")
+        return test:execsql("SELECT COUNT(*) FROM manycol")
     end, {
         -- <misc1-1.10>
         10
@@ -165,7 +165,7 @@ test:do_test(
     "misc1-1.11",
     function()
         test:execsql("DELETE FROM manycol WHERE x99 = '599'")
-        return test:execsql("SELECT count(*) FROM manycol")
+        return test:execsql("SELECT COUNT(*) FROM manycol")
     end, {
         -- <misc1-1.11>
         9
@@ -188,7 +188,7 @@ test:do_test(
             INSERT INTO agger VALUES(6, 'two', 'hello', 'no');
             COMMIT
         ]])
-        return test:execsql("SELECT count(*) FROM agger")
+        return test:execsql("SELECT COUNT(*) FROM agger")
     end, {
         -- <misc1-2.1>
         6
@@ -197,8 +197,8 @@ test:do_test(
 
 test:do_execsql_test(
     "misc1-2.2",
-    [[SELECT sum(one), two, four FROM agger
-           GROUP BY two, four ORDER BY sum(one) desc]], {
+    [[SELECT SUM(one), two, four FROM agger
+           GROUP BY two, four ORDER BY SUM(one) desc]], {
         -- <misc1-2.2>
         8, "two", "no", 6, "one", "yes", 4, "two", "yes", 3, "thr", "yes"
         -- </misc1-2.2>
@@ -206,8 +206,8 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "misc1-2.3",
-    [[SELECT sum((one)), (two), (four) FROM agger
-           GROUP BY (two), (four) ORDER BY sum(one) desc]], {
+    [[SELECT SUM((one)), (two), (four) FROM agger
+           GROUP BY (two), (four) ORDER BY SUM(one) desc]], {
         -- <misc1-2.3>
         8, "two", "no", 6, "one", "yes", 4, "two", "yes", 3, "thr", "yes"
         -- </misc1-2.3>
@@ -253,7 +253,7 @@ test:do_execsql_test(
         INSERT INTO t2 (a) SELECT '5 - ' || a FROM t2;
         INSERT INTO t2 (a) SELECT '6 - ' || a FROM t2;
         COMMIT;
-        SELECT count(*) FROM t2;
+        SELECT COUNT(*) FROM t2;
     ]], {
         -- <misc1-4.1>
         64
@@ -359,7 +359,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <misc1-7.1>
-        1, [[Failed to create space 'ERROR1': primary key has been already declared]]
+        1, [[Failed to create space 'error1': primary key has been already declared]]
         -- </misc1-7.1>
     })
 
@@ -372,7 +372,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <misc1-7.2>
-        1, [[Failed to create space 'ERROR1': primary key has been already declared]]
+        1, [[Failed to create space 'error1': primary key has been already declared]]
         -- </misc1-7.2>
     })
 
@@ -394,7 +394,7 @@ test:do_catchsql_test(
         INSERT INTO t5 VALUES(1,2,4);
     ]], {
         -- <misc1-7.4>
-        1, "Duplicate key exists in unique index \"pk_unnamed_T5_1\" in space \"T5\" with old tuple - [1, 2, 3] and new tuple - [1, 2, 4]"
+        1, "Duplicate key exists in unique index \"pk_unnamed_t5_1\" in space \"t5\" with old tuple - [1, 2, 3] and new tuple - [1, 2, 4]"
         -- </misc1-7.4>
     })
 
@@ -434,7 +434,7 @@ test:do_catchsql_test(
         SELECT t1.*;
     ]], {
         -- <misc1-8.2>
-        1, "Space 'T1' does not exist"
+        1, "Space 't1' does not exist"
         -- </misc1-8.2>
     })
 
@@ -471,7 +471,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "misc1-10.0",
     [[
-        SELECT count(*) FROM manycol
+        SELECT COUNT(*) FROM manycol
     ]], {
         -- <misc1-10.0>
         9
@@ -486,7 +486,7 @@ test:do_test(
     "misc1-10.1",
     function()
         where = "WHERE CAST(x0 AS NUMBER) >= 0" .. where_part
-        return test:catchsql("SELECT count(*) FROM manycol "..where.."")
+        return test:catchsql("SELECT COUNT(*) FROM manycol "..where.."")
     end, {
         -- <misc1-10.1>
         0, {9}
@@ -510,7 +510,7 @@ test:do_test(
 test:do_execsql_test(
     "misc1-10.4",
     [[
-        SELECT count(*) FROM manycol
+        SELECT COUNT(*) FROM manycol
     ]], {
         -- <misc1-10.4>
         8
@@ -592,7 +592,7 @@ if (0 > 0) then
             test:execsql("START TRANSACTION")
             test:execsql("UPDATE t1 SET a=0 WHERE 0")
             sql("db2", "test.db")
-            local rc = X(371, "X!cmd", [=[["catch","db2 eval {SELECT count(*) FROM t1}","msg"]]=])
+            local rc = X(371, "X!cmd", [=[["catch","db2 eval {SELECT COUNT(*) FROM t1}","msg"]]=])
             return table.insert(rc,msg) or rc
             -- v2 result: {1 {database is locked}}
         end, {
@@ -609,7 +609,7 @@ if (0 > 0) then
             local X = nil
             local msg = nil
             test:execsql("COMMIT")
-            local rc = X(377, "X!cmd", [=[["catch","db2 eval {SELECT count(*) FROM t1}","msg"]]=])
+            local rc = X(377, "X!cmd", [=[["catch","db2 eval {SELECT COUNT(*) FROM t1}","msg"]]=])
             return table.insert(rc,msg) or rc
         end, {
             -- <misc1-11.2>
@@ -695,7 +695,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc1-12.8",
     [[
-        SELECT min(z), max(z), count(z) FROM t7 GROUP BY x ORDER BY 1;
+        SELECT MIN(z), MAX(z), COUNT(z) FROM t7 GROUP BY x ORDER BY 1;
     ]], {
         -- <misc1-12.8>
         1, 4, 4
@@ -705,7 +705,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc1-12.9",
     [[
-        SELECT min(z), max(z), count(z) FROM t7 GROUP BY y ORDER BY 1;
+        SELECT MIN(z), MAX(z), COUNT(z) FROM t7 GROUP BY y ORDER BY 1;
     ]], {
         -- <misc1-12.9>
         1, 2, 2, 3, 4, 2
@@ -764,7 +764,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc1-12.12",
     [[
-        SELECT min(z), max(z), count(z) FROM t8 GROUP BY x ORDER BY 1;
+        SELECT MIN(z), MAX(z), COUNT(z) FROM t8 GROUP BY x ORDER BY 1;
     ]], {
         -- <misc1-12.12>
         1, 3, 2, 2, 4, 2
@@ -774,7 +774,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc1-12.13",
     [[
-        SELECT min(z), max(z), count(z) FROM t8 GROUP BY y ORDER BY 1;
+        SELECT MIN(z), MAX(z), COUNT(z) FROM t8 GROUP BY y ORDER BY 1;
     ]], {
         -- <misc1-12.13>
         1, 4, 4
@@ -902,7 +902,7 @@ test:do_catchsql_test(
         CREATE TABLE test(a integer, primary key(a));
     ]], {
         -- <misc1-16.2>
-        1, "Space 'TEST' already exists"
+        1, "Space 'test' already exists"
         -- </misc1-16.2>
     })
 
@@ -912,7 +912,7 @@ test:do_catchsql_test(
         CREATE TABLE test2(a text primary key, b text, primary key(a,b));
     ]], {
         -- <misc1-16.3>
-        1, [[Failed to create space 'TEST2': primary key has been already declared]]
+        1, [[Failed to create space 'test2': primary key has been already declared]]
         -- </misc1-16.3>
     })
 

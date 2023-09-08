@@ -298,7 +298,7 @@ test:do_execsql_test(
         INSERT INTO t2 SELECT x+16, y+16 FROM t2;
         INSERT INTO t2 SELECT x+32, y+32 FROM t2;
         INSERT INTO t2 SELECT x+64, y+64 FROM t2;
-        SELECT count(*), sum(x), sum(y) FROM t2;
+        SELECT COUNT(*), SUM(x), SUM(y) FROM t2;
     ]], {
         -- <tkt1473-4.1>
         64, 4096, 4160

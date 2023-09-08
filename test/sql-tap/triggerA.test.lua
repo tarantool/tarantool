@@ -47,7 +47,7 @@ test:do_test(
             ]], i, word, i, j, word))
         end
         return test:execsql [[
-            SELECT count(*) FROM t1 UNION ALL SELECT count(*) FROM t2;
+            SELECT COUNT(*) FROM t1 UNION ALL SELECT COUNT(*) FROM t2;
         ]]
     end, {
         -- <triggerA-1.1>
@@ -134,7 +134,7 @@ test:do_test(
         return test:execsql [[
             CREATE TABLE result2(id INTEGER PRIMARY KEY, a TEXT,b INT);
             CREATE TRIGGER r1d INSTEAD OF DELETE ON v1 FOR EACH ROW BEGIN
-              INSERT INTO result2(id, a,b) VALUES((SELECT coalesce(max(id),0) + 1 FROM result2),
+              INSERT INTO result2(id, a,b) VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM result2),
                                                   old.y, old.x);
             END;
             DELETE FROM v1 WHERE x=5;
@@ -152,7 +152,7 @@ test:do_test(
         return test:execsql [[
             CREATE TABLE result4(id INTEGER PRIMARY KEY, a TEXT,b INT,c TEXT,d INT);
             CREATE TRIGGER r1u INSTEAD OF UPDATE ON v1 FOR EACH ROW BEGIN
-              INSERT INTO result4(id, a,b,c,d) VALUES((SELECT coalesce(max(id),0) + 1 FROM result4),
+              INSERT INTO result4(id, a,b,c,d) VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM result4),
                                                       old.y, old.x, new.y, new.x);
             END;
             UPDATE v1 SET y=y||'-extra' WHERE x BETWEEN 3 AND 5;
@@ -170,7 +170,7 @@ test:do_test(
         return test:execsql [[
             DELETE FROM result2;
             CREATE TRIGGER r2d INSTEAD OF DELETE ON v2 FOR EACH ROW BEGIN
-              INSERT INTO result2(id, a,b) VALUES((SELECT coalesce(max(id),0) + 1 FROM result2),
+              INSERT INTO result2(id, a,b) VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM result2),
                                                   old.y, old.x);
             END;
             DELETE FROM v2 WHERE x=5;
@@ -188,7 +188,7 @@ test:do_test(
         return test:execsql [[
             DELETE FROM result4;
             CREATE TRIGGER r2u INSTEAD OF UPDATE ON v2 FOR EACH ROW BEGIN
-              INSERT INTO result4(id, a,b,c,d) VALUES((SELECT coalesce(max(id),0) + 1 FROM result4),
+              INSERT INTO result4(id, a,b,c,d) VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM result4),
                                                       old.y, old.x, new.y, new.x);
             END;
             UPDATE v2 SET y=y||'-extra' WHERE x BETWEEN 3 AND 5;
@@ -206,7 +206,7 @@ test:do_test(
         return test:execsql [[
             CREATE TABLE result1(id INTEGER PRIMARY KEY, a TEXT);
             CREATE TRIGGER r3d INSTEAD OF DELETE ON v3 FOR EACH ROW BEGIN
-              INSERT INTO result1(id, a) VALUES((SELECT coalesce(max(id),0) + 1 FROM result1),
+              INSERT INTO result1(id, a) VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM result1),
                                                 old.c1);
             END;
             DELETE FROM v3 WHERE c1 BETWEEN '8' AND 'eight';
@@ -225,7 +225,7 @@ test:do_test(
             DROP TABLE result2;
             CREATE TABLE result2(id INTEGER PRIMARY KEY, a TEXT,b TEXT);
             CREATE TRIGGER r3u INSTEAD OF UPDATE ON v3 FOR EACH ROW BEGIN
-              INSERT INTO result2(id, a,b) VALUES((SELECT coalesce(max(id),0) + 1 FROM result2),
+              INSERT INTO result2(id, a,b) VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM result2),
                                                   old.c1, new.c1);
             END;
             UPDATE v3 SET c1 = c1 || '-extra' WHERE c1 BETWEEN '8' and 'eight';
@@ -243,7 +243,7 @@ test:do_test(
         return test:execsql [[
             DELETE FROM result1;
             CREATE TRIGGER r4d INSTEAD OF DELETE ON v4 FOR EACH ROW BEGIN
-              INSERT INTO result1(id, a) VALUES((SELECT coalesce(max(id),0) + 1 FROM result1),
+              INSERT INTO result1(id, a) VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM result1),
                                                 old.c1);
             END;
             DELETE FROM v4 WHERE c1 BETWEEN '8' AND 'eight';
@@ -261,7 +261,7 @@ test:do_test(
         return test:execsql [[
             DELETE FROM result2;
             CREATE TRIGGER r4u INSTEAD OF UPDATE ON v4 FOR EACH ROW BEGIN
-              INSERT INTO result2(id, a,b) VALUES((SELECT coalesce(max(id),0) + 1 FROM result2),
+              INSERT INTO result2(id, a,b) VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM result2),
                                                   old.c1, new.c1);
             END;
             UPDATE v4 SET c1 = c1 || '-extra' WHERE c1 BETWEEN '8' and 'eight';
@@ -280,7 +280,7 @@ test:do_test(
             DROP TABLE result2;
             CREATE TABLE result2(id INTEGER PRIMARY KEY, a TEXT,b INT);
             CREATE TRIGGER r5d INSTEAD OF DELETE ON v5 FOR EACH ROW BEGIN
-              INSERT INTO result2(id, a,b) VALUES((SELECT coalesce(max(id),0) + 1 FROM result2),
+              INSERT INTO result2(id, a,b) VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM result2),
                                                   CAST(old.x AS STRING), old.b);
             END;
             DELETE FROM v5 WHERE x=5;
@@ -298,7 +298,7 @@ test:do_test(
         return test:execsql [[
             DELETE FROM result4;
             CREATE TRIGGER r5u INSTEAD OF UPDATE ON v5 FOR EACH ROW BEGIN
-              INSERT INTO result4(id, a,b,c,d) VALUES((SELECT coalesce(max(id),0) + 1 FROM result4),
+              INSERT INTO result4(id, a,b,c,d) VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM result4),
                                                       CAST(old.x AS STRING), old.b, CAST(new.x AS STRING), new.b);
             END;
             UPDATE v5 SET b = b+9900000 WHERE x BETWEEN 3 AND 5;

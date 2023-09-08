@@ -69,7 +69,7 @@ if (0 > 0)
             SELECT * FROM v1 ORDER BY a;
         ]], {
             -- <view-1.2>
-            1, "Space 'V1' does not exist"
+            1, "Space 'v1' does not exist"
             -- </view-1.2>
         })
 
@@ -104,7 +104,7 @@ test:do_catchsql_test(
         SELECT * FROM v1 ORDER BY a;
     ]], {
         -- <view-1.4>
-        1, "Space 'V1' does not exist"
+        1, "Space 'v1' does not exist"
         -- </view-1.4>
     })
 
@@ -125,7 +125,7 @@ test:do_catchsql_test(
         DROP TABLE t1;
     ]], {
         -- <view-1.6>
-        1, "Can't drop space 'T1': other views depend on this space"
+        1, "Can't drop space 't1': other views depend on this space"
         -- </view-1.6>
     })
 
@@ -177,7 +177,7 @@ test:do_test(
         ]]
     end, {
         -- <view-2.1>
-        "X", 7, "A", 8, "B", 9, "C", 10
+        "x", 7, "a", 8, "b", 9, "c", 10
         -- </view-2.1>
     })
 
@@ -187,7 +187,7 @@ test:do_catchsql_test(
         INSERT INTO v2 VALUES(1,2,3,4);
     ]], {
         -- <view-2.2>
-        1, "Can't modify space 'V2': space is a view"
+        1, "Can't modify space 'v2': space is a view"
         -- </view-2.2>
     })
 
@@ -197,7 +197,7 @@ test:do_catchsql_test(
         UPDATE v2 SET a=10 WHERE a=5;
     ]], {
         -- <view-2.3>
-        1, "Can't modify space 'V2': space is a view"
+        1, "Can't modify space 'v2': space is a view"
         -- </view-2.3>
     })
 
@@ -207,7 +207,7 @@ test:do_catchsql_test(
         DELETE FROM v2;
     ]], {
         -- <view-2.4>
-        1, "Can't modify space 'V2': space is a view"
+        1, "Can't modify space 'v2': space is a view"
         -- </view-2.4>
     })
 
@@ -241,7 +241,7 @@ test:do_execsql2_test(
         SELECT * FROM v1 LIMIT 1
     ]], {
         -- <view-3.1>
-        "A", 2, "B", 3
+        "a", 2, "b", 3
         -- </view-3.1>
     })
 
@@ -251,7 +251,7 @@ test:do_execsql2_test(
         SELECT * FROM v2 LIMIT 1
     ]], {
         -- <view-3.2>
-        "X", 7, "A", 8, "B", 9, "C", 10
+        "x", 7, "a", 8, "b", 9, "c", 10
         -- </view-3.2>
     })
 
@@ -263,7 +263,7 @@ test:do_execsql2_test(
         SELECT * FROM v1 LIMIT 1
     ]], {
         -- <view-3.3.1>
-        "XYZ", 2, "PQR", 7, "COLUMN_1", 1
+        "xyz", 2, "pqr", 7, "COLUMN_1", 1
         -- </view-3.3.1>
     })
 
@@ -274,7 +274,7 @@ test:do_execsql2_test(
         SELECT * FROM v1b LIMIT 1
     ]], {
         -- <view-3.3.2>
-        "A", 2, "COLUMN_1", 7, "C", 4
+        "a", 2, "COLUMN_1", 7, "c", 4
         -- </view-3.3.2>
     })
 
@@ -283,7 +283,7 @@ test:do_execsql2_test(
     [[
         CREATE VIEW v1c(x,y,z) AS SELECT a, b+c, c-b FROM t1;
         SELECT * FROM v1c LIMIT 1;
-    ]],{"X", 2, "Y", 7, "Z", 1})
+    ]],{"x", 2, "y", 7, "z", 1})
 
 test:do_catchsql_test(
     "view-3.3.4",
@@ -300,7 +300,7 @@ test:do_catchsql_test(
     [[
         CREATE VIEW v1err(x,y) AS SELECT a, b+c, c-b FROM t1;
         SELECT * FROM v1err;
-    ]], {1, "Failed to create space 'V1ERR': number of aliases doesn't match provided columns"})
+    ]], {1, "Failed to create space 'v1err': number of aliases doesn't match provided columns"})
 
 test:do_catchsql_test(
     "view-3.3.5.2",
@@ -308,7 +308,7 @@ test:do_catchsql_test(
         DROP VIEW IF EXISTS v1err;
         CREATE VIEW v1err(w,x,y,z) AS SELECT a, b+c, c-b FROM t1;
         SELECT * FROM v1err;
-    ]], {1, "Failed to create space 'V1ERR': number of aliases doesn't match provided columns"})
+    ]], {1, "Failed to create space 'v1err': number of aliases doesn't match provided columns"})
 
 -- #MUST_WORK_TEST no query solution
 -- # ifcapable compound {
@@ -319,7 +319,7 @@ test:do_execsql2_test(
         SELECT * FROM v3 LIMIT 4;
     ]], {
         -- <view-3.4>
-        "A", 2, "A", 3, "A", 5, "A", 6
+        "a", 2, "a", 3, "a", 5, "a", 6
         -- </view-3.4>
     })
 
@@ -330,7 +330,7 @@ test:do_catchsql_test(
         DROP VIEW t1;
     ]], {
         -- <view-4.1>
-        1, "Can't drop space 'T1': use DROP TABLE"
+        1, "Can't drop space 't1': use DROP TABLE"
         -- </view-4.1>
     })
 
@@ -350,7 +350,7 @@ test:do_catchsql_test(
         DROP TABLE v1;
     ]], {
         -- <view-4.3>
-        1, "Can't drop space 'V1': use DROP VIEW"
+        1, "Can't drop space 'v1': use DROP VIEW"
         -- </view-4.3>
     })
 
@@ -370,7 +370,7 @@ test:do_catchsql_test(
         CREATE INDEX i1v1 ON v1(xyz);
     ]], {
         -- <view-4.5>
-        1, "Can't create or modify index 'I1V1' in space 'V1': views can not be indexed"
+        1, "Can't create or modify index 'i1v1' in space 'v1': views can not be indexed"
         -- </view-4.5>
     })
 
@@ -466,7 +466,7 @@ test:do_test(
 test:do_execsql_test(
     "view-6.1",
     [[
-        SELECT min(x), min(a), min(b), min(c), min(a+b+c) FROM v2;
+        SELECT MIN(x), MIN(a), MIN(b), MIN(c), MIN(a+b+c) FROM v2;
     ]], {
         -- <view-6.1>
         7, 8, 9, 10, 27
@@ -476,7 +476,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "view-6.2",
     [[
-        SELECT max(x), max(a), max(b), max(c), max(a+b+c) FROM v2;
+        SELECT MAX(x), MAX(a), MAX(b), MAX(c), MAX(a+b+c) FROM v2;
     ]], {
         -- <view-6.2>
         11, 12, 13, 14, 39
@@ -601,8 +601,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "view-8.4",
     [[
-        CREATE VIEW v8 AS SELECT max(cnt) AS mx FROM
-          (SELECT a%2 AS eo, count(*) AS cnt FROM t1 GROUP BY eo);
+        CREATE VIEW v8 AS SELECT MAX(cnt) AS mx FROM
+          (SELECT a%2 AS eo, COUNT(*) AS cnt FROM t1 GROUP BY eo);
         SELECT * FROM v8;
     ]], {
         -- <view-8.4>
@@ -654,7 +654,7 @@ test:do_execsql_test(
         INSERT INTO t2 SELECT y+100, a FROM t2 WHERE a<5;
         INSERT INTO t2 SELECT y+400, a FROM t2 WHERE a<4;
         INSERT INTO t2 SELECT y+800, a FROM t2 WHERE a<3;
-        SELECT DISTINCT count(*) FROM t2 GROUP BY a ORDER BY 1;
+        SELECT DISTINCT COUNT(*) FROM t2 GROUP BY a ORDER BY 1;
     ]], {
         -- <view-9.1>
         1, 2, 4, 8
@@ -664,7 +664,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "view-9.2",
     [[
-        SELECT DISTINCT count(*) FROM t2 GROUP BY a ORDER BY 1 LIMIT 3;
+        SELECT DISTINCT COUNT(*) FROM t2 GROUP BY a ORDER BY 1 LIMIT 3;
     ]], {
         -- <view-9.2>
         1, 2, 4
@@ -675,7 +675,7 @@ test:do_execsql_test(
     "view-9.3",
     [[
         CREATE VIEW v9 AS
-           SELECT DISTINCT count(*) FROM t2 GROUP BY a ORDER BY 1 LIMIT 3;
+           SELECT DISTINCT COUNT(*) FROM t2 GROUP BY a ORDER BY 1 LIMIT 3;
         SELECT * FROM v9;
     ]], {
         -- <view-9.3>
@@ -697,7 +697,7 @@ test:do_execsql_test(
     "view-9.5",
     [[
         CREATE VIEW v10 AS
-           SELECT DISTINCT a, count(*) FROM t2 GROUP BY a ORDER BY 2 LIMIT 3;
+           SELECT DISTINCT a, COUNT(*) FROM t2 GROUP BY a ORDER BY 2 LIMIT 3;
         SELECT * FROM v10;
     ]], {
         -- <view-9.5>
@@ -806,7 +806,7 @@ test:do_catchsql_test(
         CREATE VIEW v12 AS SELECT a FROM t1 WHERE b=?
     ]], {
         -- <view-12.1>
-        1, "Failed to create space 'V12': parameters are not allowed in views"
+        1, "Failed to create space 'v12': parameters are not allowed in views"
         -- </view-12.1>
     })
 
@@ -816,7 +816,7 @@ test:do_catchsql_test(
         CREATE VIEW v12(x) AS SELECT a FROM t1 WHERE b=?
     ]], {
         -- <view-12.2>
-        1, "Failed to create space 'V12': parameters are not allowed in views"
+        1, "Failed to create space 'v12': parameters are not allowed in views"
         -- </view-12.2>
     })
 
@@ -866,7 +866,7 @@ test:do_execsql2_test(
         SELECT * FROM v15 LIMIT 1;
     ]], {
         -- <view-15.1>
-        "X", 2, "Y", 3
+        "x", 2, "y", 3
         -- </view-15.1>
     })
 
@@ -876,7 +876,7 @@ test:do_execsql2_test(
         SELECT x, y FROM v15 LIMIT 1
     ]], {
         -- <view-15.2>
-        "X", 2, "Y", 3
+        "x", 2, "y", 3
         -- </view-15.2>
     })
 
@@ -915,7 +915,7 @@ test:do_catchsql_test(
         DROP VIEW nosuchview
     ]], {
         -- <view-17.1>
-        1, "Space 'NOSUCHVIEW' does not exist"
+        1, "Space 'nosuchview' does not exist"
         -- </view-17.1>
     })
 
@@ -925,7 +925,7 @@ test:do_catchsql_test(
         DROP VIEW main.nosuchview
     ]], {
         -- <view-17.2>
-        1, "Space 'MAIN' does not exist"
+        1, "Space 'main' does not exist"
         -- </view-17.2>
     })
 
@@ -1132,7 +1132,7 @@ test:do_catchsql_test(
         DROP TABLE t11;
     ]], {
         -- <view-23.2>
-        1, "Can't drop space 'T11': other views depend on this space"
+        1, "Can't drop space 't11': other views depend on this space"
         -- </view-23.2>
     })
 
@@ -1142,7 +1142,7 @@ test:do_catchsql_test(
         DROP TABLE t12;
     ]], {
         -- <view-23.3>
-        1, "Can't drop space 'T12': other views depend on this space"
+        1, "Can't drop space 't12': other views depend on this space"
         -- </view-23.3>
     })
 
@@ -1152,7 +1152,7 @@ test:do_catchsql_test(
         DROP TABLE t13;
     ]], {
         -- <view-23.4>
-        1, "Can't drop space 'T13': other views depend on this space"
+        1, "Can't drop space 't13': other views depend on this space"
         -- </view-23.4>
     })
 
@@ -1275,12 +1275,12 @@ test:do_execsql_test(
                 SELECT iter+1, cx, cy, x*x-y*y + cx, 2.0*x*y + cy FROM m WHERE (x*x + y*y) < 4.0 AND iter<1
             ),
             m2(iter, cx, cy) AS (
-            SELECT max(iter), cx, cy FROM m GROUP BY cx, cy
+            SELECT MAX(iter), cx, cy FROM m GROUP BY cx, cy
             ),
             a(t) AS (
-                SELECT group_concat( substr('a', 1+least(iter/7,4), 1), '') FROM m2 GROUP BY cy
+                SELECT GROUP_CONCAT( SUBSTR('a', 1+LEAST(iter/7,4), 1), '') FROM m2 GROUP BY cy
             )
-          SELECT group_concat(CAST(trim(t) AS VARBINARY),x'0a') FROM a;
+          SELECT GROUP_CONCAT(CAST(TRIM(t) AS VARBINARY),x'0a') FROM a;
         SELECT * FROM v;
     ]], {
         -- <view-24.5>

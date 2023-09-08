@@ -19,15 +19,15 @@ test:do_execsql_test(
     ]], {
     })
 
-box.space.T1:insert({1, uuid1})
-box.space.T1:insert({2, uuid2})
-box.space.T1:insert({3, uuid3})
-box.space.T1:insert({4, uuid1})
-box.space.T1:insert({5, uuid1})
-box.space.T1:insert({6, uuid2})
-box.space.T2:insert({uuid1})
-box.space.T2:insert({uuid2})
-box.space.T2:insert({uuid3})
+box.space.t1:insert({1, uuid1})
+box.space.t1:insert({2, uuid2})
+box.space.t1:insert({3, uuid3})
+box.space.t1:insert({4, uuid1})
+box.space.t1:insert({5, uuid1})
+box.space.t1:insert({6, uuid2})
+box.space.t2:insert({uuid1})
+box.space.t2:insert({uuid2})
+box.space.t2:insert({uuid3})
 
 -- Check that SELECT can work with UUID.
 test:do_execsql_test(
@@ -83,7 +83,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "uuid-2.3.1",
     [[
-        SELECT count(*), u FROM t1 GROUP BY u;
+        SELECT COUNT(*), u FROM t1 GROUP BY u;
     ]], {
         3, uuid1, 1, uuid3, 2, uuid2
     })
@@ -91,7 +91,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "uuid-2.3.2",
     [[
-        SELECT count(*), u FROM t2 GROUP BY u;
+        SELECT COUNT(*), u FROM t2 GROUP BY u;
     ]], {
         1, uuid1, 1, uuid3, 1, uuid2
     })
@@ -163,8 +163,8 @@ test:do_catchsql_test(
     [[
         INSERT INTO t5f SELECT (SELECT u from t2 LIMIT 1 OFFSET 1), (SELECT u from t2 LIMIT 1);
     ]], {
-        1, "Foreign key constraint 'fk_unnamed_T5F_F_1' failed for field "..
-        "'2 (F)': foreign tuple was not found"
+        1, "Foreign key constraint 'fk_unnamed_t5f_f_1' failed for field "..
+        "'2 (f)': foreign tuple was not found"
     })
 
 test:do_execsql_test(
@@ -192,7 +192,7 @@ test:do_catchsql_test(
     [[
         INSERT INTO t5c SELECT 1, u FROM t2 LIMIT 1;
     ]], {
-        1, "Check constraint 'CK' failed for a tuple"
+        1, "Check constraint 'ck' failed for a tuple"
     })
 
 test:do_execsql_test(
@@ -219,8 +219,8 @@ test:do_catchsql_test(
     [[
         INSERT INTO t5u SELECT 2, u FROM t2 LIMIT 1;
     ]], {
-        1, 'Duplicate key exists in unique index "unique_unnamed_T5U_2" '..
-        'in space "T5U" with old tuple - '..
+        1, 'Duplicate key exists in unique index "unique_unnamed_t5u_2" '..
+        'in space "t5u" with old tuple - '..
         '[1, 11111111-1111-1111-1111-111111111111] and new tuple - '..
         '[2, 11111111-1111-1111-1111-111111111111]'
     })
@@ -500,26 +500,26 @@ test:do_catchsql_test(
 
 local func = {language = 'Lua', body = 'function(x) return type(x) end',
               returns = 'string', param_list = {'any'}, exports = {'SQL'}}
-box.schema.func.create('RETURN_TYPE', func);
+box.schema.func.create('return_type', func);
 
 -- Check that Lua user-defined functions can accept UUID.
 test:do_execsql_test(
     "uuid-6.2",
     [[
-        SELECT RETURN_TYPE(u) FROM t2;
+        SELECT return_type(u) FROM t2;
     ]], {
         "cdata", "cdata", "cdata"
     })
 
 func = {language = 'Lua', returns = 'uuid', param_list = {}, exports = {'SQL'},
         body = 'function(x) return require("uuid").fromstr("11111111-1111-1111-1111-111111111111") end'}
-box.schema.func.create('GET_UUID', func);
+box.schema.func.create('get_uuid', func);
 
 -- Check that Lua user-defined functions can return UUID.
 test:do_execsql_test(
     "uuid-6.3",
     [[
-        SELECT GET_UUID();
+        SELECT get_uuid();
     ]], {
         uuid1
     })
@@ -602,7 +602,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "uuid-7.1.7",
     [[
-        SELECT hex(cast(u AS VARBINARY)) FROM t2;
+        SELECT HEX(cast(u AS VARBINARY)) FROM t2;
     ]], {
         "11111111111111111111111111111111",
         "11111111333311111111111111111111",
@@ -1217,7 +1217,7 @@ test:do_execsql_test(
         INSERT INTO t14 VALUES (x'11111111111111111111111111111111');
         INSERT INTO t14 VALUES (CAST(x'11111111111111111111111111111111' AS UUID));
         INSERT INTO t14 VALUES ('11111111-1111-1111-1111-111111111111');
-        SELECT typeof(s) FROM t14;
+        SELECT TYPEOF(s) FROM t14;
     ]], {
         "scalar", "scalar", "scalar", "scalar", "scalar", "scalar", "scalar"
     })
@@ -1232,7 +1232,7 @@ s:insert({3, {['1'] = 1}, {1,2,3,4,5}})
 test:do_execsql_test(
     "uuid-16.1",
     [[
-        SELECT typeof(uuid());
+        SELECT TYPEOF(UUID());
     ]], {
         "uuid"
     })
@@ -1240,7 +1240,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "uuid-16.2",
     [[
-        SELECT typeof(uuid(4));
+        SELECT TYPEOF(UUID(4));
     ]], {
         "uuid"
     })
@@ -1248,7 +1248,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "uuid-16.3",
     [[
-        SELECT uuid(1);
+        SELECT UUID(1);
     ]], {
         1, "Function UUID does not support versions other than 4"
     })
@@ -1256,7 +1256,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "uuid-16.4",
     [[
-        SELECT uuid('asd');
+        SELECT UUID('asd');
     ]], {
         1, "Failed to execute SQL statement: wrong arguments for function UUID()"
     })
@@ -1264,7 +1264,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "uuid-16.5",
     [[
-        SELECT uuid(4, 5);
+        SELECT UUID(4, 5);
     ]], {
         1, "Wrong number of arguments is passed to UUID(): expected from 0 to 1, got 2"
     })
@@ -1273,7 +1273,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "uuid-16.6",
     [[
-        SELECT uuid() != uuid();
+        SELECT UUID() != UUID();
     ]], {
         true
     })
@@ -1282,7 +1282,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "uuid-16.7",
     [[
-        SELECT uuid(NULL) IS NULL;
+        SELECT UUID(NULL) IS NULL;
     ]], {
         true
     })
@@ -1307,7 +1307,7 @@ test:do_catchsql_test(
 test:execsql([[
     DROP TRIGGER t;
     DROP VIEW v;
-    DROP TABLE t15;
+    DROP TABLE T15;
     DROP TABLE t14;
     DROP TABLE t10;
     DROP TABLE t9t;

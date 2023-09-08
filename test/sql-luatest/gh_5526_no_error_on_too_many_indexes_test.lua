@@ -20,8 +20,8 @@ g.test_no_error_on_too_many_indexes = function()
         end
         s = s .. ");"
         local _, err = box.execute(s)
-        local res = [[Can't create or modify index 'unique_unnamed_ADD_129' ]]..
-                    [[in space 'ADD': index id too big]]
+        local res = [[Can't create or modify index 'unique_unnamed_add_129' ]]..
+                    [[in space 'add': index id too big]]
         t.assert_equals(err.message, res)
     end)
 end

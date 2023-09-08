@@ -40,9 +40,9 @@ test:execsql([[
        VALUES(1,'abc'),
              (2,'ABX'),
              (3,'BCD'),
-             (4, char(0x61, 0x62, 0x63)),
-             (5, char(0x41, 0x42, 0x58)),
-             (6, char(0x42, 0x43, 0x44));
+             (4, CHAR(0x61, 0x62, 0x63)),
+             (5, CHAR(0x41, 0x42, 0x58)),
+             (6, CHAR(0x42, 0x43, 0x44));
     CREATE INDEX t1ba ON t1(b,a);
 ]])
 

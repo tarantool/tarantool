@@ -9,7 +9,7 @@ box.schema.func.create('CORRUPT_SELECT', {
     returns = 'integer',
     body = [[
         function()
-            box.space.T:select()
+            box.space.t:select()
             return 1
         end]],
     exports = {'LUA', 'SQL'},
@@ -18,7 +18,7 @@ box.schema.func.create('CORRUPT_GET', {
     returns = 'integer',
     body = [[
         function()
-            box.space.T:get('aaaaaaaaaaaa')
+            box.space.t:get('aaaaaaaaaaaa')
             return 1
         end]],
     exports = {'LUA', 'SQL'},
@@ -27,7 +27,7 @@ box.schema.func.create('CORRUPT_COUNT', {
     returns = 'integer',
     body = [[
         function()
-            box.space.T:count()
+            box.space.t:count()
             return 1
         end]],
     exports = {'LUA', 'SQL'},
@@ -36,7 +36,7 @@ box.schema.func.create('CORRUPT_MAX', {
     returns = 'integer',
     body = [[
         function()
-            box.space.T.index[0]:max()
+            box.space.t.index[0]:max()
             return 1
         end]],
     exports = {'LUA', 'SQL'},
@@ -45,7 +45,7 @@ box.schema.func.create('CORRUPT_MIN', {
     returns = 'integer',
     body = [[
         function()
-            box.space.T.index[0]:min()
+            box.space.t.index[0]:min()
             return 1
         end]],
     exports = {'LUA', 'SQL'},
