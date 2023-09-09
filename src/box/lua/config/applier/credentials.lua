@@ -1,5 +1,6 @@
 local log = require('internal.config.utils.log')
 local digest = require('digest')
+local fiber = require('fiber')
 
 --[[
 This intermediate representation is a formatted set of
@@ -466,30 +467,16 @@ end
 
 -- }}} Create users
 
-local function apply(config)
+local fiber_wait_rw
+
+local function set_credentials(config)
+    -- Credentials cannot be applied when instance is in Read Only state,
+    -- thus set_credentials() must be called only on Read Write instance.
+    assert(not box.info.ro)
+
     local configdata = config._configdata
     local credentials = configdata:get('credentials')
     if credentials == nil then
-        return
-    end
-
-    -- TODO: What if all the instances in a replicaset are
-    -- read-only at configuration applying? They all will ignore
-    -- the section and so it will never be applied -- even when
-    -- some instance goes to RW.
-    --
-    -- Moreover, this skip is silent: no log warnings or issue
-    -- reporting.
-    --
-    -- OTOH, a replica (downstream) should ignore all the config
-    -- data that is persisted.
-    --
-    -- A solution could be postpone applying of such data till
-    -- RW state. The applying should check that the data is not
-    -- added/updated already (arrived from master).
-    if box.info.ro then
-        log.verbose('credentials.apply: skip the credentials section, ' ..
-            'because the instance is in the read-only mode')
         return
     end
 
@@ -524,6 +511,37 @@ local function apply(config)
     -- Create roles and users and synchronise privileges for them.
     create_roles(credentials.roles)
     create_users(credentials.users)
+end
+
+local function wait_rw(config)
+    if box.info.ro then
+        log.verbose('credentials.apply: Tarantool is in Read Only mode ' ..
+                    'credentials will be set up in the background when it ' ..
+                    'is switched to Read Write mode')
+        box.ctl.wait_rw()
+    end
+    set_credentials(config)
+end
+
+local function apply(config)
+    -- Fiber is required here to have the credentials synced in the background
+    -- when Tarantool is in Read Only mode after it is switched to RW.
+
+    -- Note that only one fiber exists at a time.
+    if fiber_wait_rw == nil or fiber_wait_rw:status() == 'dead' then
+        fiber_wait_rw = fiber.new(wait_rw, config)
+    end
+
+    -- If Tarantool is already in Read Write mode, credentials are still
+    -- applied in the fiber to avoid possible concurrency issues, but the
+    -- main applier fiber is blocked by the `join()`.
+    if not box.info.ro then
+        fiber_wait_rw:set_joinable(true)
+        local ok, err = fiber_wait_rw:join()
+        if not ok then
+            error(err)
+        end
+    end
 end
 
 return {

@@ -727,3 +727,59 @@ g.test_restore_defaults_for_default_user = function(g)
         end,
     })
 end
+
+g.test_sync_ro_rw = function(g)
+    helpers.reload_success_case(g, {
+        options = {
+            credentials = {
+                users = {
+                    guest = {
+                        roles = { 'super' }
+                    },
+                }
+            }
+        },
+        verify = function() end,
+        options_2 = {
+            database = {
+                mode = 'ro',
+            },
+            credentials = {
+                roles = {
+                    dummy = {},
+                },
+                users = {
+                    guest = {
+                        roles = { 'super', 'dummy' }
+                    },
+                }
+            }
+        },
+        verify_2 = function()
+            t.assert(box.info.ro)
+
+            local internal =
+                    require('internal.config.applier.credentials')._internal
+
+            local perm = box.schema.user.info('guest')
+            perm = internal.privileges_from_box(perm)
+
+            t.assert_not_equals(perm['role']['dummy'], {execute = true})
+
+            box.cfg{read_only = false}
+            t.assert_not(box.info.ro)
+
+            local retrying = require('luatest.helpers').retrying
+
+            retrying(
+                {timeout = 10, delay = 0.5},
+                function()
+                    local perm = box.schema.user.info('guest')
+                    perm = internal.privileges_from_box(perm)
+
+                    t.assert_equals(perm['role']['dummy'], {execute = true})
+                end
+            )
+        end,
+    })
+end
