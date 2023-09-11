@@ -66,6 +66,7 @@ enum { TUPLE_INDEX_BASE = 1 };
 enum { TUPLE_OFFSET_SLOT_NIL = INT32_MAX };
 
 struct tuple;
+struct tuple_info;
 struct tuple_format;
 struct coll;
 struct Expr;
@@ -104,6 +105,13 @@ struct tuple_format_vtab {
 	struct tuple*
 	(*tuple_new)(struct tuple_format *format, const char *data,
 	             const char *end);
+	/**
+	 * Fill `tuple_info' with the engine-specific and allocator-specific
+	 * information about the `tuple'.
+	 */
+	void
+	(*tuple_info)(struct tuple_format *format, struct tuple *tuple,
+		      struct tuple_info *tuple_info);
 };
 
 struct tuple_constraint;

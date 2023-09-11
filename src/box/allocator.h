@@ -129,6 +129,11 @@ public:
 	{
 		return &small_alloc;
 	}
+	static inline void
+	get_alloc_info(void *ptr, size_t size, struct small_alloc_info *info)
+	{
+		small_alloc_info(&small_alloc, ptr, size, info);
+	}
 private:
 	static struct small_alloc small_alloc;
 };

@@ -333,6 +333,7 @@ local methods = {
     ["upsert"]      = tuple_upsert;
     ["bsize"]       = tuple_bsize;
     ["tomap"]       = internal.tuple.tuple_to_map;
+    ["info"]        = internal.tuple.info;
 }
 
 -- Aliases for tuple:methods().

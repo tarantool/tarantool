@@ -459,6 +459,44 @@ struct PACKED tuple
 
 static_assert(sizeof(struct tuple) == 10, "Just to be sure");
 
+/** Type of the arena where the tuple is allocated. */
+enum tuple_arena_type {
+	TUPLE_ARENA_MEMTX = 0,
+	TUPLE_ARENA_MALLOC = 1,
+	TUPLE_ARENA_RUNTIME = 2,
+	tuple_arena_type_MAX
+};
+
+/** Arena type names. */
+extern const char *tuple_arena_type_strs[tuple_arena_type_MAX];
+
+/** Information about the tuple. */
+struct tuple_info {
+	/** Size of the MsgPack data. See also tuple_bsize(). */
+	size_t data_size;
+	/** Header size depends on the engine and on the compact/bulky mode. */
+	size_t header_size;
+	/** Size of the field_map. See also field_map_build_size(). */
+	size_t field_map_size;
+	/**
+	 * The amount of excess memory used to store the tuple in mempool.
+	 * Note that this value is calculated not during the actual allocation,
+	 * but afterwards. This means that it can be incorrect if the state of
+	 * the allocator changed. See also small_alloc_info().
+	 */
+	size_t waste_size;
+	/** Type of the arena where the tuple is allocated. */
+	enum tuple_arena_type arena_type;
+};
+
+/** Fill `info' with the information about the `tuple'. */
+static inline void
+tuple_info(struct tuple *tuple, struct tuple_info *info)
+{
+	struct tuple_format *format = tuple_format_by_id(tuple->format_id);
+	format->vtab.tuple_info(format, tuple, info);
+}
+
 static_assert(DIV_ROUND_UP(tuple_flag_MAX, 8) <=
 	      sizeof(((struct tuple *)0)->flags),
 	      "enum tuple_flag doesn't fit into tuple->flags");

@@ -48,9 +48,20 @@ test_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	MemtxAllocator<SmallAlloc>::free_tuple(tuple);
 }
 
+static void
+test_tuple_info(struct tuple_format *format, struct tuple *tuple,
+		struct tuple_info *tuple_info)
+{
+	assert(format == test_tuple_format);
+	(void)format;
+	(void)tuple;
+	(void)tuple_info;
+}
+
 static struct tuple_format_vtab test_tuple_format_vtab = {
 	.tuple_delete = test_tuple_delete,
 	.tuple_new = test_tuple_new,
+	.tuple_info = test_tuple_info,
 };
 
 static struct tuple *
