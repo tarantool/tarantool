@@ -1,6 +1,7 @@
 #include "box/iproto_constants.h"
 #include "box/xrow.h"
 #include "memory.h"
+#include "fiber.h"
 
 void
 cord_on_yield(void) {}
@@ -10,12 +11,14 @@ static void
 setup(void)
 {
 	memory_init();
+	fiber_init(fiber_c_invoke);
 }
 
 __attribute__((destructor))
 static void
 teardown(void)
 {
+	fiber_free();
 	memory_free();
 }
 
