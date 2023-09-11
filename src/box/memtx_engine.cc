@@ -1881,14 +1881,60 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	tuple_format_unref(format);
 }
 
+/** Fill `info' with the information about the `tuple'. */
+template<class ALLOC>
+static inline void
+memtx_tuple_info(struct tuple_format *format, struct tuple *tuple,
+		 struct tuple_info *info);
+
+template<>
+inline void
+memtx_tuple_info<SmallAlloc>(struct tuple_format *format, struct tuple *tuple,
+			     struct tuple_info *info)
+{
+	(void)format;
+	size_t size = tuple_size(tuple);
+	struct small_alloc_info alloc_info;
+	SmallAlloc::get_alloc_info(tuple, size, &alloc_info);
+
+	info->data_size = tuple_bsize(tuple);
+	info->header_size = sizeof(struct tuple);
+	if (tuple_is_compact(tuple))
+		info->header_size -= TUPLE_COMPACT_SAVINGS;
+	info->field_map_size = tuple_data_offset(tuple) - info->header_size;
+	if (alloc_info.is_large) {
+		info->waste_size = 0;
+		info->arena_type = TUPLE_ARENA_MALLOC;
+	} else {
+		info->waste_size = alloc_info.real_size - size;
+		info->arena_type = TUPLE_ARENA_MEMTX;
+	}
+}
+
+template<>
+inline void
+memtx_tuple_info<SysAlloc>(struct tuple_format *format, struct tuple *tuple,
+			   struct tuple_info *info)
+{
+	(void)format;
+	info->data_size = tuple_bsize(tuple);
+	info->header_size = sizeof(struct tuple);
+	if (tuple_is_compact(tuple))
+		info->header_size -= TUPLE_COMPACT_SAVINGS;
+	info->field_map_size = tuple_data_offset(tuple) - info->header_size;
+	info->waste_size = 0;
+	info->arena_type = TUPLE_ARENA_MALLOC;
+}
+
 struct tuple_format_vtab memtx_tuple_format_vtab;
 
-template <class ALLOC>
+template<class ALLOC>
 static inline void
 create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab)
 {
 	vtab->tuple_delete = memtx_tuple_delete<ALLOC>;
 	vtab->tuple_new = memtx_tuple_new<ALLOC>;
+	vtab->tuple_info = memtx_tuple_info<ALLOC>;
 }
 
 /**

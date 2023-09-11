@@ -46,6 +46,12 @@ enum {
 	OBJSIZE_MIN = 16,
 };
 
+const char *tuple_arena_type_strs[tuple_arena_type_MAX] = {
+	[TUPLE_ARENA_MEMTX] = "memtx",
+	[TUPLE_ARENA_MALLOC] = "malloc",
+	[TUPLE_ARENA_RUNTIME] = "runtime",
+};
+
 /**
  * Storage for additional reference counter of a tuple.
  */
@@ -93,10 +99,16 @@ runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple);
 static struct tuple *
 runtime_tuple_new(struct tuple_format *format, const char *data, const char *end);
 
+/** Fill `tuple_info'. */
+static void
+runtime_tuple_info(struct tuple_format *format, struct tuple *tuple,
+		   struct tuple_info *tuple_info);
+
 /** A virtual method table for tuple_format_runtime */
 static struct tuple_format_vtab tuple_format_runtime_vtab = {
 	runtime_tuple_delete,
 	runtime_tuple_new,
+	runtime_tuple_info,
 };
 
 static struct tuple *
@@ -150,6 +162,24 @@ runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	size_t total = tuple_size(tuple);
 	tuple_format_unref(format);
 	smfree(&runtime_alloc, tuple, total);
+}
+
+static void
+runtime_tuple_info(struct tuple_format *format, struct tuple *tuple,
+		   struct tuple_info *tuple_info)
+{
+	assert(format->vtab.tuple_delete ==
+	       tuple_format_runtime_vtab.tuple_delete);
+	(void)format;
+
+	uint16_t data_offset = tuple_data_offset(tuple);
+	tuple_info->data_size = tuple_bsize(tuple);
+	tuple_info->header_size = sizeof(struct tuple);
+	if (tuple_is_compact(tuple))
+		tuple_info->header_size -= TUPLE_COMPACT_SAVINGS;
+	tuple_info->field_map_size = data_offset - tuple_info->header_size;
+	tuple_info->waste_size = 0;
+	tuple_info->arena_type = TUPLE_ARENA_RUNTIME;
 }
 
 int

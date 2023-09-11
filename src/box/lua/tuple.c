@@ -722,6 +722,41 @@ luaT_pushtuple(struct lua_State *L, box_tuple_t *tuple)
 	luaL_setcdatagc(L, -2);
 }
 
+/**
+ * Push to Lua stack a table with the information about a tuple, located on top
+ * of the stack.
+ */
+static int
+lbox_tuple_info(lua_State *L)
+{
+	int argc = lua_gettop(L);
+	if (argc != 1)
+		luaL_error(L, "Usage: tuple:info()");
+
+	struct tuple *tuple = luaT_checktuple(L, 1);
+	struct tuple_info info;
+	tuple_info(tuple, &info);
+
+	lua_newtable(L);
+
+	lua_pushnumber(L, info.data_size);
+	lua_setfield(L, -2, "data_size");
+
+	lua_pushnumber(L, info.header_size);
+	lua_setfield(L, -2, "header_size");
+
+	lua_pushnumber(L, info.field_map_size);
+	lua_setfield(L, -2, "field_map_size");
+
+	lua_pushnumber(L, info.waste_size);
+	lua_setfield(L, -2, "waste_size");
+
+	lua_pushstring(L, tuple_arena_type_strs[info.arena_type]);
+	lua_setfield(L, -2, "arena");
+
+	return 1;
+}
+
 static const struct luaL_Reg lbox_tuple_meta[] = {
 	{"__gc", lbox_tuple_gc},
 	{"tostring", lbox_tuple_to_string},
@@ -730,6 +765,7 @@ static const struct luaL_Reg lbox_tuple_meta[] = {
 	{"tuple_to_map", lbox_tuple_to_map},
 	{"tuple_field_by_path", lbox_tuple_field_by_path},
 	{"new", lbox_tuple_new},
+	{"info", lbox_tuple_info},
 	{NULL, NULL}
 };
 

@@ -119,11 +119,26 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	free(tuple);
 }
 
+/** Fill `tuple_info'. */
+static void
+vy_tuple_info(struct tuple_format *format, struct tuple *tuple,
+	      struct tuple_info *tuple_info)
+{
+	(void)format;
+	uint16_t data_offset = tuple_data_offset(tuple);
+	tuple_info->data_size = tuple_bsize(tuple);
+	tuple_info->header_size = sizeof(struct vy_stmt);
+	tuple_info->field_map_size = data_offset - tuple_info->header_size;
+	tuple_info->waste_size = 0;
+	tuple_info->arena_type = TUPLE_ARENA_MALLOC;
+}
+
 void
 vy_stmt_env_create(struct vy_stmt_env *env)
 {
 	env->tuple_format_vtab.tuple_new = vy_tuple_new;
 	env->tuple_format_vtab.tuple_delete = vy_tuple_delete;
+	env->tuple_format_vtab.tuple_info = vy_tuple_info;
 	env->max_tuple_size = 1024 * 1024;
 	env->sum_tuple_size = 0;
 	env->key_format = vy_simple_stmt_format_new(env, NULL, 0);
