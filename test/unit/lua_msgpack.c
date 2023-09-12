@@ -43,7 +43,7 @@ test_encode_ext(lua_State *L)
 	};
 	mh_strnu32_put(translation, &node, NULL, NULL);
 	struct mp_ctx ctx;
-	mp_ctx_create(&ctx, translation);
+	mp_ctx_create_default(&ctx, translation);
 
 	struct ibuf *ibuf = cord_ibuf_take();
 	struct mpstream stream;
@@ -92,7 +92,7 @@ test_translation_in_encoding(lua_State *L)
 	};
 	mh_strnu32_put(translation, &node, NULL, NULL);
 	struct mp_ctx ctx;
-	mp_ctx_create(&ctx, translation);
+	mp_ctx_create_default(&ctx, translation);
 	struct ibuf *ibuf = cord_ibuf_take();
 	struct mpstream stream;
 
@@ -178,14 +178,16 @@ test_translation_in_indexation(struct lua_State *L)
 		.val = key,
 	};
 	mh_strnu32_put(translation, &node, NULL, NULL);
-
+	struct mp_ctx ctx;
+	mp_ctx_create_default(&ctx, translation);
 	char buf[64];
 
 	char *w = mp_encode_map(buf, 1);
 
 	w = mp_encode_uint(w, key);
 	w = mp_encode_bool(w, true);
-	luamp_push_with_translation(L, buf, w, translation);
+	luamp_push_with_ctx(L, buf, w, &ctx);
+	mp_ctx_destroy(&ctx);
 	lua_getfield(L, -1, alias);
 	ok(lua_toboolean(L, -1), "string key is aliased");
 	lua_pop(L, 2);
