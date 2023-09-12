@@ -205,8 +205,9 @@ port_c_add_str(struct port *base, const char *str, uint32_t len)
 }
 
 static int
-port_c_dump_msgpack(struct port *base, struct obuf *out)
+port_c_dump_msgpack(struct port *base, struct obuf *out, struct mp_ctx *ctx)
 {
+	(void)ctx;
 	struct port_c *port = (struct port_c *)base;
 	struct port_c_entry *pe;
 	for (pe = port->first; pe != NULL; pe = pe->next) {
@@ -235,7 +236,8 @@ static bool c_func_iproto_multireturn = true;
 TWEAK_BOOL(c_func_iproto_multireturn);
 
 int
-port_c_dump_msgpack_wrapped(struct port *base, struct obuf *out)
+port_c_dump_msgpack_wrapped(struct port *base, struct obuf *out,
+			    struct mp_ctx *ctx)
 {
 	struct port_c *port = (struct port_c *)base;
 	char *size_buf = obuf_alloc(out, mp_sizeof_array(port->size));
@@ -245,7 +247,7 @@ port_c_dump_msgpack_wrapped(struct port *base, struct obuf *out)
 		return -1;
 	}
 	mp_encode_array(size_buf, port->size);
-	if (port_c_dump_msgpack(base, out) < 0)
+	if (port_c_dump_msgpack(base, out, ctx) < 0)
 		return -1;
 	return 1;
 }
@@ -256,12 +258,13 @@ port_c_dump_msgpack_wrapped(struct port *base, struct obuf *out)
  * wrapping them in the additional msgpack array.
  */
 static int
-port_c_dump_msgpack_compatible(struct port *base, struct obuf *out)
+port_c_dump_msgpack_compatible(struct port *base, struct obuf *out,
+			       struct mp_ctx *ctx)
 {
 	if (c_func_iproto_multireturn)
-		return port_c_dump_msgpack(base, out);
+		return port_c_dump_msgpack(base, out, ctx);
 	else
-		return port_c_dump_msgpack_wrapped(base, out);
+		return port_c_dump_msgpack_wrapped(base, out, ctx);
 }
 
 /** Callback to forward and error from mpstream methods. */

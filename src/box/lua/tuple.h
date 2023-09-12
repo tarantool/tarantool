@@ -45,6 +45,7 @@ struct mpstream;
 struct luaL_serializer;
 struct tuple_format;
 typedef struct tuple_format box_tuple_format_t;
+struct mp_ctx;
 
 /** \cond public */
 
@@ -135,9 +136,20 @@ int
 luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
 		  struct mpstream *stream, int index);
 
+/**
+ * Encode tuple (box.tuple or Lua array) to a MsgPack stream.
+ */
 int
+luamp_encode_tuple_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
+			    struct mpstream *stream, int index,
+			    struct mp_ctx *ctx);
+
+static inline int
 luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
-		   struct mpstream *stream, int index);
+		   struct mpstream *stream, int index)
+{
+	return luamp_encode_tuple_with_ctx(L, cfg, stream, index, NULL);
+}
 
 void
 tuple_to_mpstream(struct tuple *tuple, struct mpstream *stream);

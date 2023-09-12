@@ -44,6 +44,7 @@
 
 #include "core/assoc.h"
 #include "core/decimal.h" /* decimal_unpack() */
+#include "core/mp_ctx.h"
 #include "core/tweaks.h"
 #include "lua/decimal.h" /* luaT_newdecimal() */
 #include "mp_extension_types.h"
@@ -137,10 +138,14 @@ luamp_get(struct lua_State *L, int idx, size_t *data_len)
 
 static enum mp_type
 luamp_encode_extension_default(struct lua_State *L, int idx,
-			       struct mpstream *stream);
+			       struct mpstream *stream, struct mp_ctx *ctx);
 
+/**
+ * Default extension decoder, always throws an error.
+ */
 static void
-luamp_decode_extension_default(struct lua_State *L, const char **data);
+luamp_decode_extension_default(struct lua_State *L, const char **data,
+			       struct mp_ctx *ctx);
 
 static luamp_encode_extension_f luamp_encode_extension =
 		luamp_encode_extension_default;
@@ -149,11 +154,12 @@ static luamp_decode_extension_f luamp_decode_extension =
 
 static enum mp_type
 luamp_encode_extension_default(struct lua_State *L, int idx,
-			       struct mpstream *stream)
+			       struct mpstream *stream, struct mp_ctx *ctx)
 {
 	(void) L;
 	(void) idx;
 	(void) stream;
+	(void)ctx;
 	return MP_EXT;
 }
 
@@ -168,8 +174,10 @@ luamp_set_encode_extension(luamp_encode_extension_f handler)
 }
 
 static void
-luamp_decode_extension_default(struct lua_State *L, const char **data)
+luamp_decode_extension_default(struct lua_State *L, const char **data,
+			       struct mp_ctx *ctx)
 {
+	(void)ctx;
 	int8_t ext_type;
 	mp_decode_extl(data, &ext_type);
 	luaL_error(L, "msgpack.decode: unsupported extension: %d", ext_type);
@@ -207,13 +215,13 @@ translate_map_key_field(struct luaL_field *field, uint32_t hash,
 }
 
 int
-luamp_encode_with_translation_r(struct lua_State *L,
-				struct luaL_serializer *cfg,
-				struct mpstream *stream,
-				struct luaL_field *field,
-				int level,
-				struct mh_strnu32_t *translation,
-				enum mp_type *type_out)
+luamp_encode_with_ctx_r(struct lua_State *L,
+			struct luaL_serializer *cfg,
+			struct mpstream *stream,
+			struct luaL_field *field,
+			int level,
+			struct mp_ctx *ctx,
+			enum mp_type *type_out)
 {
 	int top = lua_gettop(L);
 	enum mp_type type;
@@ -274,21 +282,21 @@ restart: /* used by MP_EXT of unidentified subtype */
 			lua_pushvalue(L, -2); /* push a copy of key to top */
 			if (luaL_tofield(L, cfg, lua_gettop(L), field) < 0)
 				goto error;
-			if (translation != NULL && level == 0 &&
-			    field->type == MP_STR)
+			if (ctx != NULL && ctx->translation != NULL &&
+			    level == 0 && field->type == MP_STR)
 				translate_map_key_field(field,
 							lua_hashstring(L, -1),
-							translation);
-			if (luamp_encode_with_translation_r(
+							ctx->translation);
+			if (luamp_encode_with_ctx_r(
 					L, cfg, stream, field, level + 1,
-					translation, NULL) != 0)
+					ctx, NULL) != 0)
 				goto error;
 			lua_pop(L, 1); /* pop a copy of key */
 			if (luaL_tofield(L, cfg, lua_gettop(L), field) < 0)
 				goto error;
-			if (luamp_encode_with_translation_r(
+			if (luamp_encode_with_ctx_r(
 					L, cfg, stream, field, level + 1,
-					translation, NULL) != 0)
+					ctx, NULL) != 0)
 				goto error;
 			lua_pop(L, 1); /* pop value */
 		}
@@ -314,9 +322,9 @@ restart: /* used by MP_EXT of unidentified subtype */
 			lua_rawgeti(L, top, i + 1);
 			if (luaL_tofield(L, cfg, top + 1, field) < 0)
 				goto error;
-			if (luamp_encode_with_translation_r(
+			if (luamp_encode_with_ctx_r(
 					L, cfg, stream, field, level + 1,
-					translation, NULL) != 0)
+					ctx, NULL) != 0)
 				goto error;
 			lua_pop(L, 1);
 		}
@@ -337,7 +345,7 @@ restart: /* used by MP_EXT of unidentified subtype */
 				field->ext_type = MP_UNKNOWN_EXTENSION;
 				goto convert;
 			}
-			type = luamp_encode_extension(L, top, stream);
+			type = luamp_encode_extension(L, top, stream, ctx);
 			break;
 		case MP_DATETIME:
 			mpstream_encode_datetime(stream, field->dateval);
@@ -353,7 +361,7 @@ restart: /* used by MP_EXT of unidentified subtype */
 				break;
 			}
 			/* Run trigger if type can't be encoded */
-			type = luamp_encode_extension(L, top, stream);
+			type = luamp_encode_extension(L, top, stream, ctx);
 			if (type != MP_EXT) {
 				/* Value has been packed by the trigger */
 				break;
@@ -377,10 +385,9 @@ error:
 }
 
 int
-luamp_encode_with_translation(struct lua_State *L, struct luaL_serializer *cfg,
-			      struct mpstream *stream, int index,
-			      struct mh_strnu32_t *translation,
-			      enum mp_type *type)
+luamp_encode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
+		      struct mpstream *stream, int index,
+		      struct mp_ctx *ctx, enum mp_type *type)
 {
 	int top = lua_gettop(L);
 	if (index < 0)
@@ -395,8 +402,8 @@ luamp_encode_with_translation(struct lua_State *L, struct luaL_serializer *cfg,
 	int rc = -1;
 	if (luaL_tofield(L, cfg, lua_gettop(L), &field) < 0)
 		goto cleanup;
-	if (luamp_encode_with_translation_r(L, cfg, stream, &field, 0,
-					    translation, type) != 0)
+	if (luamp_encode_with_ctx_r(L, cfg, stream, &field, 0,
+				    ctx, type) != 0)
 		goto cleanup;
 	rc = 0;
 cleanup:
@@ -408,8 +415,8 @@ cleanup:
 }
 
 void
-luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
-	     const char **data)
+luamp_decode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
+		      const char **data, struct mp_ctx *ctx)
 {
 	double d;
 	switch (mp_typeof(**data)) {
@@ -458,7 +465,7 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 		uint32_t size = mp_decode_array(data);
 		lua_createtable(L, size, 0);
 		for (uint32_t i = 0; i < size; i++) {
-			luamp_decode(L, cfg, data);
+			luamp_decode_with_ctx(L, cfg, data, ctx);
 			lua_rawseti(L, -2, i + 1);
 		}
 		if (cfg->decode_save_metatables)
@@ -470,8 +477,8 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 		uint32_t size = mp_decode_map(data);
 		lua_createtable(L, 0, size);
 		for (uint32_t i = 0; i < size; i++) {
-			luamp_decode(L, cfg, data);
-			luamp_decode(L, cfg, data);
+			luamp_decode_with_ctx(L, cfg, data, ctx);
+			luamp_decode_with_ctx(L, cfg, data, ctx);
 			lua_settable(L, -3);
 		}
 		if (cfg->decode_save_metatables)
@@ -511,7 +518,7 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 		default:
 			/* reset data to the extension header */
 			*data = svp;
-			luamp_decode_extension(L, data);
+			luamp_decode_extension(L, data, ctx);
 			break;
 		}
 		break;

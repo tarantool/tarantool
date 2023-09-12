@@ -431,8 +431,9 @@ luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
 }
 
 int
-luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
-		   struct mpstream *stream, int index)
+luamp_encode_tuple_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
+			    struct mpstream *stream, int index,
+			    struct mp_ctx *ctx)
 {
 	struct tuple *tuple = luaT_istuple(L, index);
 	if (tuple != NULL) {
@@ -441,8 +442,7 @@ luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 	}
 
 	enum mp_type type;
-	if (luamp_encode_with_translation(L, cfg, stream, index, NULL,
-					  &type) != 0)
+	if (luamp_encode_with_ctx(L, cfg, stream, index, ctx, &type) != 0)
 		return -1;
 	if (type != MP_ARRAY) {
 		diag_set(ClientError, ER_TUPLE_NOT_ARRAY);
