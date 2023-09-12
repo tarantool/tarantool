@@ -44,7 +44,6 @@ extern "C" {
 struct luaL_field;
 struct luaL_serializer;
 struct mpstream;
-struct mh_strnu32_t;
 struct mp_ctx;
 
 /**
@@ -65,20 +64,17 @@ enum { LUAMP_ALLOC_FACTOR = 256 };
 
 /**
  * Pushes a new MsgPack object and stores the given MsgPack data in it.
- * The new object uses the default serializer for decoding.
- * Passes a translation table to the MsgPack object which contains aliases for
- * string keys used during indexation.
- * The translation table must use `lua_hash` as the hash function.
+ * The new object uses the default serializer for decoding. The MsgPack decoding
+ * context ownership is moved to the new object.
  */
 void
-luamp_push_with_translation(struct lua_State *L, const char *data,
-			    const char *data_end,
-			    struct mh_strnu32_t *translation);
+luamp_push_with_ctx(struct lua_State *L, const char *data, const char *data_end,
+		    struct mp_ctx *ctx);
 
 static inline void
 luamp_push(struct lua_State *L, const char *data, const char *data_end)
 {
-	luamp_push_with_translation(L, data, data_end, NULL);
+	luamp_push_with_ctx(L, data, data_end, NULL);
 }
 
 /**

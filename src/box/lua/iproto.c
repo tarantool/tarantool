@@ -245,7 +245,7 @@ encode_packet(struct lua_State *L, int idx, size_t *mp_len)
 		      luamp_error, L);
 	size_t used = region_used(gc);
 	struct mp_ctx ctx;
-	mp_ctx_create(&ctx, iproto_key_translation);
+	mp_ctx_create_default(&ctx, iproto_key_translation);
 	if (luamp_encode_with_ctx(L, luaL_msgpack_default, &stream, idx,
 				  &ctx, NULL) != 0) {
 		region_truncate(gc, used);
@@ -309,17 +309,19 @@ cleanup:
 static enum iproto_handler_status
 lua_req_handler_cb(const char *header, const char *header_end,
 		   const char *body, const char *body_end,
-		   void *ctx)
+		   void *cb_ctx)
 {
 	struct lua_State *L = luaT_newthread(tarantool_L);
 	if (L == NULL)
 		return IPROTO_HANDLER_ERROR;
-	int cb_ref = (int)(uintptr_t)ctx;
+	int cb_ref = (int)(uintptr_t)cb_ctx;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_ref);
-	luamp_push_with_translation(L, header, header_end,
-				    iproto_key_translation);
-	luamp_push_with_translation(L, body, body_end,
-				    iproto_key_translation);
+	struct mp_ctx mp_ctx_header;
+	mp_ctx_create_default(&mp_ctx_header, iproto_key_translation);
+	luamp_push_with_ctx(L, header, header_end, &mp_ctx_header);
+	struct mp_ctx mp_ctx_body;
+	mp_ctx_create_default(&mp_ctx_body, iproto_key_translation);
+	luamp_push_with_ctx(L, body, body_end, &mp_ctx_body);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	if (luaT_call(L, 2, 1) != 0)
 		return IPROTO_HANDLER_ERROR;

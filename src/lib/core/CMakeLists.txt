@@ -47,6 +47,7 @@ set(core_sources
     tweaks.c
     tt_sort.c
     event.c
+    mp_ctx.c
 )
 
 if (ENABLE_BACKTRACE)

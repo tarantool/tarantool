@@ -84,12 +84,9 @@ struct luamp_object {
 	 */
 	int decoded_ref;
 	/**
-	 * Translation table containing string key aliases. If present, used
-	 * during indexation.
-	 * Must use `lua_hash` as the hash function.
-	 * Initially set to NULL.
+	 * Context used for decoding the MsgPack data. Default initialized.
 	 */
-	struct mh_strnu32_t *translation;
+	struct mp_ctx ctx;
 };
 
 static const char luamp_object_typename[] = "msgpack.object";
@@ -772,22 +769,23 @@ luamp_new_object(struct lua_State *L, size_t data_len)
 	obj->data = (char *)obj + sizeof(*obj);
 	obj->data_end = obj->data + data_len;
 	obj->decoded_ref = LUA_NOREF;
-	obj->translation = NULL;
+	mp_ctx_create_default(&obj->ctx, NULL);
 	luaL_getmetatable(L, luamp_object_typename);
 	lua_setmetatable(L, -2);
 	return obj;
 }
 
 void
-luamp_push_with_translation(struct lua_State *L, const char *data,
-			    const char *data_end,
-			    struct mh_strnu32_t *translation)
+luamp_push_with_ctx(struct lua_State *L, const char *data,
+		    const char *data_end,
+		    struct mp_ctx *ctx)
 {
 	size_t data_len = data_end - data;
 	struct luamp_object *obj = luamp_new_object(L, data_len);
 	memcpy((char *)obj->data, data, data_len);
 	assert(mp_check_exact(&data, data_end) == 0);
-	obj->translation = translation;
+	if (ctx != NULL)
+		mp_ctx_move(&obj->ctx, ctx);
 }
 
 /**
@@ -879,6 +877,7 @@ luamp_object_gc(struct lua_State *L)
 	luaL_unref(L, LUA_REGISTRYINDEX, obj->cfg_ref);
 	luaL_unref(L, LUA_REGISTRYINDEX, obj->data_ref);
 	luaL_unref(L, LUA_REGISTRYINDEX, obj->decoded_ref);
+	mp_ctx_destroy(&obj->ctx);
 	return 0;
 }
 
@@ -898,7 +897,7 @@ luamp_object_decode(struct lua_State *L)
 {
 	struct luamp_object *obj = luamp_check_object(L, 1);
 	const char *data = obj->data;
-	luamp_decode(L, obj->cfg, &data);
+	luamp_decode_with_ctx(L, obj->cfg, &data, &obj->ctx);
 	assert(data == obj->data_end);
 	return 1;
 }
@@ -936,7 +935,7 @@ luamp_object_get(struct lua_State *L)
 		return luaL_error(L, "not an array or map");
 	if (obj->decoded_ref == LUA_NOREF) {
 		const char *data = obj->data;
-		luamp_decode(L, obj->cfg, &data);
+		luamp_decode_with_ctx(L, obj->cfg, &data, &obj->ctx);
 		assert(data == obj->data_end);
 		obj->decoded_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	}
@@ -946,7 +945,7 @@ luamp_object_get(struct lua_State *L)
 	lua_pushvalue(L, -2);
 	/* Indexes the decoded MsgPack data and pops the key. */
 	lua_rawget(L, -2);
-	if (!lua_isnil(L, -1) || obj->translation == NULL ||
+	if (!lua_isnil(L, -1) || obj->ctx.translation == NULL ||
 	    lua_type(L, -3) != LUA_TSTRING)
 		return 1;
 
@@ -957,11 +956,11 @@ luamp_object_get(struct lua_State *L)
 		.len = len,
 		.hash = lua_hashstring(L, -3),
 	};
-	mh_int_t k = mh_strnu32_find(obj->translation, &key, NULL);
-	if (k != mh_end(obj->translation)) {
+	mh_int_t k = mh_strnu32_find(obj->ctx.translation, &key, NULL);
+	if (k != mh_end(obj->ctx.translation)) {
 		lua_pop(L, 1);
 		struct mh_strnu32_node_t *node =
-			mh_strnu32_node(obj->translation, k);
+			mh_strnu32_node(obj->ctx.translation, k);
 		luaL_pushuint64(L, node->val);
 		lua_rawget(L, -2);
 	}
@@ -1092,7 +1091,7 @@ luamp_iterator_decode(struct lua_State *L)
 {
 	struct luamp_iterator *it = luamp_check_iterator(L, 1);
 	luamp_iterator_check_data_end(L, it);
-	luamp_decode(L, it->source->cfg, &it->pos);
+	luamp_decode_with_ctx(L, it->source->cfg, &it->pos, &it->source->ctx);
 	return 1;
 }
 
