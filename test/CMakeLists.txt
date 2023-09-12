@@ -69,10 +69,20 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/small
 add_custom_target(symlink_libsmall_test_binaries ALL
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small)
 
+# Get the test-run jobs count from the env variable. If the variable is not
+# defined, use the CPU count instead. If the ProcessorCount fails to determine
+# the number of cores, it yields 0, which means for test-run 2 x CPU count.
+set(TEST_RUN_JOBS $ENV{TEST_RUN_JOBS})
+if(NOT TEST_RUN_JOBS)
+    include(ProcessorCount)
+    ProcessorCount(TEST_RUN_JOBS)
+endif()
+
 add_custom_target(test-unit
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
             ${UNIT_TEST_TARGETS}
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        --jobs ${TEST_RUN_JOBS}
         --builddir=${PROJECT_BINARY_DIR}
         small/
         unit/)
@@ -81,6 +91,7 @@ add_custom_target(test-unit-force
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
             ${UNIT_TEST_TARGETS}
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        --jobs ${TEST_RUN_JOBS}
         --builddir=${PROJECT_BINARY_DIR}
         --force
         small/
@@ -88,12 +99,14 @@ add_custom_target(test-unit-force
 
 add_custom_target(test-func
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        --jobs ${TEST_RUN_JOBS}
         --builddir=${PROJECT_BINARY_DIR}
         --exclude small/
         --exclude unit/)
 
 add_custom_target(test-func-force
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        --jobs ${TEST_RUN_JOBS}
         --builddir=${PROJECT_BINARY_DIR}
         --exclude small/
         --exclude unit/
@@ -104,6 +117,7 @@ add_custom_target(test
             LuaJIT-test
             ${UNIT_TEST_TARGETS}
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        --jobs ${TEST_RUN_JOBS}
         --builddir=${PROJECT_BINARY_DIR})
 
 add_custom_target(test-force
@@ -111,5 +125,6 @@ add_custom_target(test-force
             LuaJIT-test
             ${UNIT_TEST_TARGETS}
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        --jobs ${TEST_RUN_JOBS}
         --builddir=${PROJECT_BINARY_DIR}
         --force)
