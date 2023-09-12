@@ -2055,11 +2055,8 @@ vdbeSorterRowkey(const VdbeSorter * pSorter,	/* Sorter object */
 	return pKey;
 }
 
-/*
- * Copy the current sorter key into the memory cell pOut.
- */
-int
-sqlVdbeSorterRowkey(const VdbeCursor * pCsr, Mem * pOut)
+void
+sqlVdbeSorterRowkey(struct VdbeCursor *pCsr)
 {
 	VdbeSorter *pSorter;
 	void *pKey;
@@ -2068,10 +2065,7 @@ sqlVdbeSorterRowkey(const VdbeCursor * pCsr, Mem * pOut)
 	assert(pCsr->eCurType == CURTYPE_SORTER);
 	pSorter = pCsr->uc.pSorter;
 	pKey = vdbeSorterRowkey(pSorter, &nKey);
-	if (mem_copy_bin(pOut, pKey, nKey) != 0)
-		return -1;
-
-	return 0;
+	vdbe_field_ref_prepare_data(&pCsr->field_ref, pKey, nKey);
 }
 
 /*
