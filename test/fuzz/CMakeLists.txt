@@ -93,6 +93,10 @@ create_fuzz_test(PREFIX mp_datetime
                  LIBRARIES core fuzzer_config
 )
 
+create_fuzz_test(PREFIX vclock_from_string
+                 SOURCES vclock_from_string_fuzzer.c
+                 LIBRARIES vclock fuzzer_config)
+
 # Building xrow library triggers building LuaJIT that doesn't support UBSan.
 # See https://github.com/tarantool/tarantool/issues/8473.
 if (NOT ENABLE_UB_SANITIZER)
