@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #if defined(__cplusplus)
@@ -41,6 +42,7 @@ struct obuf;
 struct lua_State;
 struct port;
 struct Mem;
+struct mp_ctx;
 
 /**
  * A single port represents a destination of any output. One such
@@ -54,16 +56,19 @@ struct port_vtab {
 	 * Dump the content of a port to an output buffer.
 	 * @param port Port to dump.
 	 * @param out Buffer to dump to.
+	 * @param ctx MsgPack encoding context to save meta information to.
 	 *
 	 * @retval >= 0 Number of entries dumped.
 	 * @retval < 0 Error.
 	 */
-	int (*dump_msgpack)(struct port *port, struct obuf *out);
+	int (*dump_msgpack)(struct port *port, struct obuf *out,
+			    struct mp_ctx *ctx);
 	/**
 	 * Same as dump_msgpack(), but do not add MsgPack array
 	 * header. Used by the legacy Tarantool 1.6 format.
 	 */
-	int (*dump_msgpack_16)(struct port *port, struct obuf *out);
+	int (*dump_msgpack_16)(struct port *port, struct obuf *out,
+			       struct mp_ctx *ctx);
 	/**
 	 * Dump the content of a port to a given Lua stack.
 	 * When is_flat == true is specified, the data is dumped
@@ -133,15 +138,29 @@ void
 port_destroy(struct port *port);
 
 static inline int
+port_dump_msgpack_with_ctx(struct port *port, struct obuf *out,
+			   struct mp_ctx *ctx)
+{
+	return port->vtab->dump_msgpack(port, out, ctx);
+}
+
+static inline int
 port_dump_msgpack(struct port *port, struct obuf *out)
 {
-	return port->vtab->dump_msgpack(port, out);
+	return port_dump_msgpack_with_ctx(port, out, NULL);
+}
+
+static inline int
+port_dump_msgpack_16_with_ctx(struct port *port, struct obuf *out,
+			      struct mp_ctx *ctx)
+{
+	return port->vtab->dump_msgpack_16(port, out, ctx);
 }
 
 static inline int
 port_dump_msgpack_16(struct port *port, struct obuf *out)
 {
-	return port->vtab->dump_msgpack_16(port, out);
+	return port_dump_msgpack_16_with_ctx(port, out, NULL);
 }
 
 static inline void

@@ -49,6 +49,7 @@
 #include "mpstream/mpstream.h"
 #include "box/session.h"
 #include "box/iproto_features.h"
+#include "core/mp_ctx.h"
 
 /**
  * Handlers identifiers to obtain lua_Cfunction reference from
@@ -459,6 +460,8 @@ execute_lua_eval(lua_State *L)
 struct encode_lua_ctx {
 	struct port_lua *port;
 	struct mpstream *stream;
+	/** MsgPack encoding context to save meta information to. */
+	struct mp_ctx *mp_ctx;
 };
 
 /**
@@ -476,9 +479,9 @@ static int
 encode_lua_call(lua_State *L)
 {
 	assert(lua_islightuserdata(L, -1));
-	struct encode_lua_ctx *ctx =
+	struct encode_lua_ctx *encode_lua_ctx =
 		(struct encode_lua_ctx *) lua_topointer(L, -1);
-	assert(ctx->port->L == L);
+	assert(encode_lua_ctx->port->L == L);
 	/* Delete ctx from the stack. */
 	lua_pop(L, 1);
 	/*
@@ -489,11 +492,12 @@ encode_lua_call(lua_State *L)
 	struct luaL_serializer *cfg = get_call_serializer();
 	const int size = lua_gettop(L);
 	for (int i = 1; i <= size; ++i) {
-		if (luamp_encode(L, cfg, ctx->stream, i) != 0)
+		if (luamp_encode_with_ctx(L, cfg, encode_lua_ctx->stream, i,
+					  encode_lua_ctx->mp_ctx, NULL) != 0)
 			return luaT_error(L);
 	}
-	ctx->port->size = size;
-	mpstream_flush(ctx->stream);
+	encode_lua_ctx->port->size = size;
+	mpstream_flush(encode_lua_ctx->stream);
 	return 0;
 }
 
@@ -529,8 +533,8 @@ encode_lua_call_16(lua_State *L)
 }
 
 static inline int
-port_lua_do_dump(struct port *base, struct mpstream *stream,
-		 enum handlers handler)
+port_lua_do_dump_with_ctx(struct port *base, struct mpstream *stream,
+			  enum handlers handler, struct mp_ctx *mp_ctx)
 {
 	struct port_lua *port = (struct port_lua *) base;
 	assert(port->vtab == &port_lua_vtab);
@@ -538,9 +542,11 @@ port_lua_do_dump(struct port *base, struct mpstream *stream,
 	 * Use the same global state, assuming the encoder doesn't
 	 * yield.
 	 */
-	struct encode_lua_ctx ctx;
-	ctx.port = port;
-	ctx.stream = stream;
+	struct encode_lua_ctx encode_lua_ctx = {
+		.port = port,
+		.stream = stream,
+		.mp_ctx = mp_ctx,
+	};
 	lua_State *L = port->L;
 	/*
 	 * At the moment Lua stack holds only values to encode.
@@ -551,31 +557,46 @@ port_lua_do_dump(struct port *base, struct mpstream *stream,
 	lua_rawgeti(L, LUA_REGISTRYINDEX, execute_lua_refs[handler]);
 	assert(lua_isfunction(L, -1) && lua_iscfunction(L, -1));
 	lua_insert(L, 1);
-	lua_pushlightuserdata(L, &ctx);
+	lua_pushlightuserdata(L, &encode_lua_ctx);
 	/* nargs -- all arguments + lightuserdata. */
 	if (luaT_call(L, size + 1, 0) != 0)
 		return -1;
 	return port->size;
 }
 
+static inline int
+port_lua_do_dump(struct port *base, struct mpstream *stream,
+		 enum handlers handler)
+{
+	return port_lua_do_dump_with_ctx(base, stream, handler, NULL);
+}
+
+/**
+ * Dump Lua port contents to output buffer in MsgPack format.
+ */
 static int
-port_lua_dump(struct port *base, struct obuf *out)
+port_lua_dump(struct port *base, struct obuf *out, struct mp_ctx *ctx)
 {
 	struct port_lua *port = (struct port_lua *) base;
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
 		      luamp_error, port->L);
-	return port_lua_do_dump(base, &stream, HANDLER_ENCODE_CALL);
+	return port_lua_do_dump_with_ctx(base, &stream, HANDLER_ENCODE_CALL,
+					 ctx);
 }
 
+/**
+ * Dump Lua port contents to output buffer in MsgPack format.
+ */
 static int
-port_lua_dump_16(struct port *base, struct obuf *out)
+port_lua_dump_16(struct port *base, struct obuf *out, struct mp_ctx *ctx)
 {
 	struct port_lua *port = (struct port_lua *)base;
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
 		      luamp_error, port->L);
-	return port_lua_do_dump(base, &stream, HANDLER_ENCODE_CALL_16);
+	return port_lua_do_dump_with_ctx(base, &stream, HANDLER_ENCODE_CALL_16,
+					 ctx);
 }
 
 static void

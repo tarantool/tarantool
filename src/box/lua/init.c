@@ -703,8 +703,9 @@ static const struct luaL_Reg boxlib_backup[] = {
  */
 static enum mp_type
 luamp_encode_extension_box(struct lua_State *L, int idx,
-			   struct mpstream *stream)
+			   struct mpstream *stream, struct mp_ctx *ctx)
 {
+	(void)ctx;
 	struct tuple *tuple = luaT_istuple(L, idx);
 	if (tuple != NULL) {
 		tuple_to_mpstream(tuple, stream);
@@ -721,8 +722,10 @@ luamp_encode_extension_box(struct lua_State *L, int idx,
  * A MsgPack extensions handler that supports errors decode.
  */
 static void
-luamp_decode_extension_box(struct lua_State *L, const char **data)
+luamp_decode_extension_box(struct lua_State *L, const char **data,
+			   struct mp_ctx *ctx)
 {
+	(void)ctx;
 	assert(mp_typeof(**data) == MP_EXT);
 	int8_t ext_type;
 	uint32_t len = mp_decode_extl(data, &ext_type);

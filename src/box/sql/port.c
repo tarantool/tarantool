@@ -246,7 +246,7 @@ sql_get_prepare_common_keys(struct Vdbe *stmt, struct obuf *out, int keys)
  * @retval -1 Memory error.
  */
 static int
-port_sql_dump_msgpack(struct port *port, struct obuf *out)
+port_sql_dump_msgpack(struct port *port, struct obuf *out, struct mp_ctx *ctx)
 {
 	assert(port->vtab == &port_sql_vtab);
 	struct port_sql *sql_port = (struct port_sql *)port;
@@ -270,7 +270,7 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 			return -1;
 		}
 		pos = mp_encode_uint(pos, IPROTO_DATA);
-		if (port_c_dump_msgpack_wrapped(port, out) < 0)
+		if (port_c_dump_msgpack_wrapped(port, out, ctx) < 0)
 			return -1;
 		break;
 	}

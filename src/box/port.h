@@ -180,7 +180,8 @@ port_free(void);
  * -1 otherwise.
  */
 int
-port_c_dump_msgpack_wrapped(struct port *port, struct obuf *out);
+port_c_dump_msgpack_wrapped(struct port *port, struct obuf *out,
+			    struct mp_ctx *ctx);
 
 #if defined(__cplusplus)
 } /* extern "C" */
