@@ -241,9 +241,11 @@ port_msgpack_dump_lua(struct port *base, struct lua_State *L,
 		const char *args = port->data;
 		uint32_t arg_count = mp_decode_array(&args);
 		for (uint32_t i = 0; i < arg_count; i++)
-			luamp_decode(L, luaL_msgpack_default, &args);
+			luamp_decode_with_ctx(L, luaL_msgpack_default, &args,
+					      port->ctx);
 	} else {
-		luamp_push(L, port->data, port->data + port->data_sz);
+		luamp_push_with_ctx(L, port->data, port->data + port->data_sz,
+				    port->ctx);
 	}
 }
 
