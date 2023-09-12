@@ -51,13 +51,15 @@ struct rlist box_on_call = RLIST_HEAD_INITIALIZER(box_on_call);
 static const struct port_vtab port_msgpack_vtab;
 
 void
-port_msgpack_create(struct port *base, const char *data, uint32_t data_sz)
+port_msgpack_create_with_ctx(struct port *base, const char *data,
+			     uint32_t data_sz, struct mp_ctx *ctx)
 {
 	struct port_msgpack *port_msgpack = (struct port_msgpack *) base;
 	memset(port_msgpack, 0, sizeof(*port_msgpack));
 	port_msgpack->vtab = &port_msgpack_vtab;
 	port_msgpack->data = data;
 	port_msgpack->data_sz = data_sz;
+	port_msgpack->ctx = ctx;
 }
 
 static const char *
@@ -96,6 +98,8 @@ port_msgpack_destroy(struct port *base)
 	struct port_msgpack *port = (struct port_msgpack *)base;
 	assert(port->vtab == &port_msgpack_vtab);
 	free(port->plain);
+	if (port->ctx != NULL)
+		mp_ctx_destroy(port->ctx);
 }
 
 int

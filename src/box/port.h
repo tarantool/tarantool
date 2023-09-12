@@ -53,6 +53,11 @@ struct port_msgpack {
 	 * dump on demand and is deleted together with the port.
 	 */
 	char *plain;
+	/**
+	 * Context for decoding MsgPack data. Owned by port, ownership can be
+	 * acquired by calling `port_get_msgpack`.
+	 */
+	struct mp_ctx *ctx;
 };
 
 static_assert(sizeof(struct port_msgpack) <= sizeof(struct port),
@@ -60,7 +65,14 @@ static_assert(sizeof(struct port_msgpack) <= sizeof(struct port),
 
 /** Initialize a port to dump raw data. */
 void
-port_msgpack_create(struct port *port, const char *data, uint32_t data_sz);
+port_msgpack_create_with_ctx(struct port *port, const char *data,
+			     uint32_t data_sz, struct mp_ctx *ctx);
+
+static inline void
+port_msgpack_create(struct port *port, const char *data, uint32_t data_sz)
+{
+	port_msgpack_create_with_ctx(port, data, data_sz, NULL);
+}
 
 /** Destroy a MessagePack port. */
 void
