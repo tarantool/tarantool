@@ -38,6 +38,7 @@
 #include "errinj.h"
 #include "mpstream/mpstream.h"
 #include "tweaks.h"
+#include "box/mp_box_ctx.h"
 
 /**
  * The pool is used by port_c to allocate entries and to store
@@ -207,14 +208,22 @@ port_c_add_str(struct port *base, const char *str, uint32_t len)
 static int
 port_c_dump_msgpack(struct port *base, struct obuf *out, struct mp_ctx *ctx)
 {
-	(void)ctx;
 	struct port_c *port = (struct port_c *)base;
 	struct port_c_entry *pe;
 	for (pe = port->first; pe != NULL; pe = pe->next) {
 		uint32_t size = pe->mp_size;
 		if (size == 0) {
-			if (tuple_to_obuf(pe->tuple, out) != 0)
+			if (ctx != NULL) {
+				if (tuple_to_obuf_as_ext(pe->tuple, out) != 0)
+					return -1;
+				struct mp_box_ctx *box_ctx =
+					mp_box_ctx_check(ctx);
+				tuple_format_map_add_format(
+					&box_ctx->tuple_format_map,
+					pe->tuple->format_id);
+			} else if (tuple_to_obuf(pe->tuple, out) != 0) {
 				return -1;
+			}
 		} else if (obuf_dup(out, pe->mp, size) != size) {
 			diag_set(OutOfMemory, size, "obuf_dup", "data");
 			return -1;

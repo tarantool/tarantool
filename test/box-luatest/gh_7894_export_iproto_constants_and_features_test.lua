@@ -84,6 +84,7 @@ local reference_table = {
         INSTANCE_NAME = 0x5d,
         SPACE_NAME = 0x5e,
         INDEX_NAME = 0x5f,
+        TUPLE_FORMATS = 0x60,
     },
 
     -- `iproto_metadata_key` enumeration.
@@ -175,6 +176,8 @@ local reference_table = {
         pagination = true,
         space_and_index_names = true,
         watch_once = true,
+        dml_tuple_extension = true,
+        call_ret_tuple_extension = true,
     },
     feature = {
         streams = 0,
@@ -184,6 +187,8 @@ local reference_table = {
         pagination = 4,
         space_and_index_names = 5,
         watch_once = 6,
+        dml_tuple_extension = 7,
+        call_ret_tuple_extension = 8,
     },
 }
 

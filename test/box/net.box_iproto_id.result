@@ -22,10 +22,12 @@ c.peer_protocol_features
  | - transactions: true
  |   watchers: true
  |   error_extension: true
- |   streams: true
  |   pagination: true
  |   space_and_index_names: true
+ |   streams: true
  |   watch_once: true
+ |   dml_tuple_extension: true
+ |   call_ret_tuple_extension: true
  | ...
 c:close()
  | ---
@@ -52,10 +54,12 @@ c.peer_protocol_features
  | - transactions: false
  |   watchers: false
  |   error_extension: false
- |   streams: false
  |   pagination: false
  |   space_and_index_names: false
+ |   streams: false
  |   watch_once: false
+ |   dml_tuple_extension: false
+ |   call_ret_tuple_extension: false
  | ...
 errinj.set('ERRINJ_IPROTO_DISABLE_ID', false)
  | ---
@@ -103,10 +107,12 @@ c.peer_protocol_features
  | - transactions: true
  |   watchers: true
  |   error_extension: true
- |   streams: true
  |   pagination: true
  |   space_and_index_names: true
+ |   streams: true
  |   watch_once: true
+ |   dml_tuple_extension: true
+ |   call_ret_tuple_extension: true
  | ...
 c:close()
  | ---
@@ -159,10 +165,12 @@ c.peer_protocol_features
  | - transactions: false
  |   watchers: true
  |   error_extension: true
- |   streams: true
  |   pagination: true
  |   space_and_index_names: true
+ |   streams: true
  |   watch_once: true
+ |   dml_tuple_extension: true
+ |   call_ret_tuple_extension: true
  | ...
 c:close()
  | ---
@@ -188,10 +196,12 @@ c.peer_protocol_features
  | - transactions: true
  |   watchers: true
  |   error_extension: true
- |   streams: true
  |   pagination: true
  |   space_and_index_names: true
+ |   streams: true
  |   watch_once: true
+ |   dml_tuple_extension: true
+ |   call_ret_tuple_extension: true
  | ...
 c:close()
  | ---

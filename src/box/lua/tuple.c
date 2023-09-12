@@ -441,6 +441,41 @@ luamp_encode_tuple_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
 		return 0;
 	}
 
+	/*
+	 * This snippet handles a special when a box tuple is sent over IPROTO
+	 * as MP_TUPLE and is decoded by net.box using the `return_raw` option,
+	 * which return a MsgPack object. This case is semantically equivalent
+	 * to the case above where the MP_TUPLE should have been decoded as a
+	 * box tuple. While we expect the encoded MsgPack to be an MP_ARRAY, the
+	 * Lua MsgPack encoder below encodes MsgPack objects by simply copying
+	 * their contents to the MsgPack stream, so we would get MP_TUPLE as the
+	 * returned type.
+	 *
+	 * To overcome this limitation, we convert the top-level MP_TUPLE to a
+	 * MsgPack array by skipping the extension header and format identifier
+	 * and copying the tuple data to the MsgPack stream.
+	 */
+	size_t data_len;
+	const char *data = luamp_get(L, index, &data_len);
+	if (data != NULL) {
+		if (mp_typeof(*data) == MP_EXT) {
+			const char *tuple_data = data;
+			int8_t ext_type;
+			uint32_t tuple_data_len =
+				mp_decode_extl(&tuple_data, &ext_type);
+			if (ext_type == MP_TUPLE) {
+				/* Skip the tuple format identifier. */
+				assert(mp_typeof(*tuple_data) == MP_UINT);
+				uint64_t format_id =
+					mp_decode_uint(&tuple_data);
+				tuple_data_len -= mp_sizeof_uint(format_id);
+				mpstream_memcpy(stream, tuple_data,
+						tuple_data_len);
+				return 0;
+			}
+		}
+	}
+
 	enum mp_type type;
 	if (luamp_encode_with_ctx(L, cfg, stream, index, ctx, &type) != 0)
 		return -1;

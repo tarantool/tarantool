@@ -45,6 +45,9 @@
 #include "box/txn.h"
 #include "box/func.h"
 #include "box/mp_error.h"
+#include "box/mp_box_ctx.h"
+#include "box/mp_tuple.h"
+#include "box/tuple.h"
 
 #include "box/lua/error.h"
 #include "box/lua/tuple.h"
@@ -704,14 +707,21 @@ static const struct luaL_Reg boxlib_backup[] = {
  */
 static bool
 luamp_encode_extension_box(struct lua_State *L, int idx,
-			   struct mpstream *stream, struct mp_ctx *ctx,
+			   struct mpstream *stream, struct mp_ctx *base,
 			   enum mp_type *type)
 {
-	(void)ctx;
 	struct tuple *tuple = luaT_istuple(L, idx);
 	if (tuple != NULL) {
-		tuple_to_mpstream(tuple, stream);
-		*type = MP_ARRAY;
+		if (base != NULL) {
+			struct mp_box_ctx *ctx = mp_box_ctx_check(base);
+			tuple_to_mpstream_as_ext(tuple, stream);
+			tuple_format_map_add_format(&ctx->tuple_format_map,
+						    tuple->format_id);
+			*type = MP_EXT;
+		} else {
+			tuple_to_mpstream(tuple, stream);
+			*type = MP_ARRAY;
+		}
 		return true;
 	}
 	struct error *err = luaL_iserror(L, idx);
@@ -724,31 +734,44 @@ luamp_encode_extension_box(struct lua_State *L, int idx,
 }
 
 /**
- * A MsgPack extensions handler that supports errors decode.
+ * A MsgPack extensions handler that supports box extensions decode.
  */
 static void
 luamp_decode_extension_box(struct lua_State *L, const char **data,
 			   struct mp_ctx *ctx)
 {
-	(void)ctx;
 	assert(mp_typeof(**data) == MP_EXT);
 	int8_t ext_type;
 	uint32_t len = mp_decode_extl(data, &ext_type);
-
-	if (ext_type != MP_ERROR) {
+	switch (ext_type) {
+	case MP_ERROR: {
+		struct error *err = error_unpack(data, len);
+		if (err == NULL)
+			luaL_error(L, "Can not parse an error from MsgPack");
+		luaT_pusherror(L, err);
+		break;
+	}
+	case MP_TUPLE: {
+		struct tuple *tuple;
+		if (ctx == NULL) {
+			tuple = tuple_unpack_without_format(data);
+		} else {
+			struct tuple_format_map *tuple_format_map =
+				&mp_box_ctx_check(ctx)->tuple_format_map;
+			tuple = tuple_unpack(data, tuple_format_map);
+		}
+		if (tuple == NULL)
+			goto tuple_err;
+		luaT_pushtuple(L, tuple);
+		break;
+tuple_err:
+		luaL_error(L, "Can not parse a tuple from MsgPack");
+		break;
+	}
+	default:
 		luaL_error(L, "Unsupported MsgPack extension type: %d",
 			   ext_type);
-		return;
 	}
-
-	struct error *err = error_unpack(data, len);
-	if (err == NULL) {
-		luaL_error(L, "Can not parse an error from MsgPack");
-		return;
-	}
-
-	luaT_pusherror(L, err);
-	return;
 }
 
 #include "say.h"

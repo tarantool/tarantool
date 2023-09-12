@@ -4,6 +4,7 @@
  * Copyright 2010-2023, Tarantool AUTHORS, please see AUTHORS file.
  */
 
+#include "box/iproto_constants.h"
 #include "box/tuple_format_map.h"
 #include "box/tuple.h"
 #include "diag.h"
@@ -136,6 +137,15 @@ tuple_format_map_destroy(struct tuple_format_map *map)
 }
 
 void
+tuple_format_map_move(struct tuple_format_map *dst,
+		      struct tuple_format_map *src)
+{
+	memcpy(dst, src, sizeof(*dst));
+	src->cache_last_index = -1;
+	src->hash_table = NULL;
+}
+
+void
 tuple_format_map_add_format(struct tuple_format_map *map, uint16_t format_id)
 {
 	struct tuple_format *format = tuple_format_by_id(format_id);
@@ -158,6 +168,31 @@ tuple_format_map_to_mpstream(struct tuple_format_map *map,
 			tuple_format_to_mpstream(mh_i32ptr_node(h, k)->val,
 						 stream);
 	}
+}
+
+static void
+mpstream_error(void *is_err)
+{
+	*(bool *)is_err = true;
+}
+
+int
+tuple_format_map_to_iproto_obuf(struct tuple_format_map *map,
+				struct obuf *obuf)
+{
+	struct mpstream stream;
+	bool is_error = false;
+	mpstream_init(&stream, obuf, obuf_reserve_cb, obuf_alloc_cb,
+		      mpstream_error, &is_error);
+	mpstream_encode_uint(&stream, IPROTO_TUPLE_FORMATS);
+	tuple_format_map_to_mpstream(map, &stream);
+	mpstream_flush(&stream);
+	if (is_error) {
+		diag_set(OutOfMemory, stream.pos - stream.buf,
+			 "mpstream_flush", "stream");
+		return -1;
+	}
+	return 0;
 }
 
 struct tuple_format *

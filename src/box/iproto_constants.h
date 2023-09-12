@@ -208,6 +208,11 @@ extern const char *iproto_flag_bit_strs[];
 	 * when identifier is present (i.e., the identifier is ignored).
 	 */								\
 	_(INDEX_NAME, 0x5f, MP_STR)					\
+	/**
+	 * Mapping of format identifier to format clause consisting of field
+	 * names and field types.
+	 */								\
+	_(TUPLE_FORMATS, 0x60, MP_MAP)
 
 #define IPROTO_KEY_MEMBER(s, v, ...) IPROTO_ ## s = v,
 

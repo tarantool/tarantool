@@ -96,6 +96,12 @@ additional msgpack array when returning them via iproto.
 https://tarantool.io/compat/c_func_iproto_multireturn
 ]]
 
+local BOX_TUPLE_EXTENSION_BRIEF = [[
+Controls IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION feature bit.
+
+https://tarantool.io/compat/box_tuple_extension
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -181,6 +187,13 @@ local options = {
         brief = C_FUNC_IPROTO_MULTIRETURN_BRIEF,
         run_action_now = true,
         action = tweak_action('c_func_iproto_multireturn', false, true),
+    },
+    box_tuple_extension = {
+        default = 'new',
+        obsolete = nil,
+        brief = BOX_TUPLE_EXTENSION_BRIEF,
+        run_action_now = true,
+        action = tweak_action('box_tuple_extension', false, true)
     },
 }
 

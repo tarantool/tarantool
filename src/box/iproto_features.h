@@ -59,6 +59,18 @@ extern "C" {
 	_(SPACE_AND_INDEX_NAMES,  5)					\
 	/** IPROTO_WATCH_ONCE request support. */			\
 	_(WATCH_ONCE,  6)						\
+	/**
+	 * Tuple format in DML request responses support:
+	 * Tuples in IPROTO_DATA response field are encoded as MP_TUPLE and
+	 * tuple format is sent in IPROTO_TUPLE_FORMATS field.
+	 */								\
+	_(DML_TUPLE_EXTENSION, 7)					\
+	/**
+	 * Tuple format in call and eval request responses support:
+	 * Tuples in IPROTO_DATA response field are encoded as MP_TUPLE and
+	 * tuple formats are sent in IPROTO_TUPLE_FORMATS field.
+	 */								\
+	_(CALL_RET_TUPLE_EXTENSION, 8)					\
 
 #define IPROTO_FEATURE_MEMBER(s, v) IPROTO_FEATURE_ ## s = v,
 
