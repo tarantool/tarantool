@@ -4,6 +4,7 @@
 #include "core/cord_buf.h"
 #include "core/fiber.h"
 #include "core/memory.h"
+#include "core/mp_ctx.h"
 
 #include "lua/msgpack.h"
 #include "lua/serializer.h"
@@ -41,6 +42,8 @@ test_encode_ext(lua_State *L)
 		.val = 0
 	};
 	mh_strnu32_put(translation, &node, NULL, NULL);
+	struct mp_ctx ctx;
+	mp_ctx_create(&ctx, translation);
 
 	struct ibuf *ibuf = cord_ibuf_take();
 	struct mpstream stream;
@@ -51,8 +54,8 @@ test_encode_ext(lua_State *L)
 	struct tt_uuid uuid;
 	memset(&uuid, 0, sizeof(uuid));
 	luaT_pushuuid(L, &uuid);
-	luamp_encode_with_translation(L, luaL_msgpack_default, &stream, 1,
-				      translation, &type);
+	luamp_encode_with_ctx(L, luaL_msgpack_default, &stream, 1,
+			      &ctx, &type);
 	lua_pop(L, 1);
 	mpstream_flush(&stream);
 	const char *mp_expected = "\xd8\x02\x00\x00\x00\x00\x00\x00\x00"
@@ -63,6 +66,7 @@ test_encode_ext(lua_State *L)
 	ibuf_reset(ibuf);
 	mpstream_reset(&stream);
 
+	mp_ctx_destroy(&ctx);
 	cord_ibuf_drop(ibuf);
 	mh_strnu32_delete(translation);
 
@@ -88,7 +92,8 @@ test_translation_in_encoding(lua_State *L)
 		.val = 0
 	};
 	mh_strnu32_put(translation, &node, NULL, NULL);
-
+	struct mp_ctx ctx;
+	mp_ctx_create(&ctx, translation);
 	struct ibuf *ibuf = cord_ibuf_take();
 	struct mpstream stream;
 	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
@@ -97,8 +102,7 @@ test_translation_in_encoding(lua_State *L)
 	lua_createtable(L, 0, 1);
 	lua_pushboolean(L, true);
 	lua_setfield(L, 1, alias);
-	luamp_encode_with_translation(L, luaL_msgpack_default, &stream, 1,
-				      translation, NULL);
+	luamp_encode_with_ctx(L, luaL_msgpack_default, &stream, 1, &ctx, NULL);
 	lua_pop(L, 1);
 	mpstream_flush(&stream);
 	ok(strncmp(ibuf->buf, "\x81\x00\xc3", ibuf_used(ibuf)) == 0,
@@ -111,8 +115,7 @@ test_translation_in_encoding(lua_State *L)
 	lua_pushboolean(L, true);
 	lua_setfield(L, -2, alias);
 	lua_setfield(L, -2, "k");
-	luamp_encode_with_translation(L, luaL_msgpack_default, &stream, 1,
-				      translation, NULL);
+	luamp_encode_with_ctx(L, luaL_msgpack_default, &stream, 1, &ctx, NULL);
 	lua_pop(L, 1);
 	mpstream_flush(&stream);
 	ok(strncmp(ibuf->buf, "\x81\xa1k\x81\xa1x\xc3", ibuf_used(ibuf)) == 0,
@@ -124,8 +127,7 @@ test_translation_in_encoding(lua_State *L)
 	lua_pushnumber(L, 0);
 	lua_pushboolean(L, true);
 	lua_settable(L, -3);
-	luamp_encode_with_translation(L, luaL_msgpack_default, &stream, 1,
-				      translation, NULL);
+	luamp_encode_with_ctx(L, luaL_msgpack_default, &stream, 1, &ctx, NULL);
 	mpstream_flush(&stream);
 	ok(strncmp(ibuf->buf, "\x81\x00\xc3", ibuf_used(ibuf)) == 0,
 	   "only keys with MP_STRING type are translated");
@@ -138,8 +140,7 @@ test_translation_in_encoding(lua_State *L)
 	lua_pushnumber(L, 0);
 	lua_pushboolean(L, false);
 	lua_settable(L, -3);
-	luamp_encode_with_translation(L, luaL_msgpack_default, &stream, 1,
-				      translation, NULL);
+	luamp_encode_with_ctx(L, luaL_msgpack_default, &stream, 1, &ctx, NULL);
 	lua_pop(L, 1);
 	mpstream_flush(&stream);
 	ok(strncmp(ibuf->buf, "\x82\x00\xc2\x00\xc3", ibuf_used(ibuf)) == 0,
@@ -149,6 +150,7 @@ test_translation_in_encoding(lua_State *L)
 	ibuf_reset(ibuf);
 	mpstream_reset(&stream);
 
+	mp_ctx_destroy(&ctx);
 	cord_ibuf_drop(ibuf);
 	mh_strnu32_delete(translation);
 

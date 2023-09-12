@@ -15,7 +15,7 @@ struct mh_strnu32_t;
 
 /**
  * Translation table for `box.iproto.key` constants encoding and aliasing: used
- * in `luamp_encode_with_translation` and `luamp_push_with_translation`.
+ * in `luamp_encode_with_ctx` and `luamp_push_with_translation`.
  */
 extern struct mh_strnu32_t *iproto_key_translation;
 

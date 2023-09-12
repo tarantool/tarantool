@@ -44,6 +44,7 @@
 #include "small/obuf.h"
 #include "small/rlist.h"
 #include "tt_static.h"
+#include "core/mp_ctx.h"
 
 struct rlist box_on_call = RLIST_HEAD_INITIALIZER(box_on_call);
 
@@ -69,8 +70,10 @@ port_msgpack_get_msgpack(struct port *base, uint32_t *size)
 }
 
 static int
-port_msgpack_dump_msgpack(struct port *base, struct obuf *out)
+port_msgpack_dump_msgpack(struct port *base, struct obuf *out,
+			  struct mp_ctx *ctx)
 {
+	(void)ctx;
 	struct port_msgpack *port = (struct port_msgpack *)base;
 	assert(port->vtab == &port_msgpack_vtab);
 	size_t size = port->data_sz;

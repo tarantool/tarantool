@@ -45,6 +45,7 @@ struct luaL_field;
 struct luaL_serializer;
 struct mpstream;
 struct mh_strnu32_t;
+struct mp_ctx;
 
 /**
  * Default instance of msgpack serializer (msgpack = require('msgpack')).
@@ -89,55 +90,61 @@ const char *
 luamp_get(struct lua_State *L, int idx, size_t *data_len);
 
 /**
- * Recursive version of `luamp_encode_with_translation`.
+ * Recursive version of `luamp_encode_with_ctx`.
  */
 int
-luamp_encode_with_translation_r(struct lua_State *L,
-				struct luaL_serializer *cfg,
-				struct mpstream *stream,
-				struct luaL_field *field, int level,
-				struct mh_strnu32_t *translation,
-				enum mp_type *type_out);
+luamp_encode_with_ctx_r(struct lua_State *L,
+			struct luaL_serializer *cfg,
+			struct mpstream *stream,
+			struct luaL_field *field, int level,
+			struct mp_ctx *ctx,
+			enum mp_type *type_out);
 
 static inline int
 luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg,
 	       struct mpstream *stream, struct luaL_field *field, int level)
 {
-	return luamp_encode_with_translation_r(L, cfg, stream, field,
-					       level, NULL, NULL);
+	return luamp_encode_with_ctx_r(L, cfg, stream, field,
+				       level, NULL, NULL);
 }
 
 /**
- * Recursion base for `luamp_encode_with_translation_r`: recursively encodes Lua
- * value at the top of the stack, using a translation table: if a  first-level
- * `MP_MAP` key has `MP_STRING` type, tries to look it up in the translation
- * table and replace it with the translation, if found.
- *
- * The translation table must use `lua_hash` as the hash function.
+ * Recursion base for `luamp_encode_with_ctx_r`: recursively encodes Lua
+ * value at the top of the stack.
  *
  * Return:
  *  0 - on success
  * -1 - on error (diag is set)
  */
 int
-luamp_encode_with_translation(struct lua_State *L, struct luaL_serializer *cfg,
-			      struct mpstream *stream, int index,
-			      struct mh_strnu32_t *translation,
-			      enum mp_type *type);
+luamp_encode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
+		      struct mpstream *stream, int index,
+		      struct mp_ctx *ctx, enum mp_type *type);
 
 static inline int
 luamp_encode(struct lua_State *L, struct luaL_serializer *cfg,
 	     struct mpstream *stream, int index)
 {
-	return luamp_encode_with_translation(L, cfg, stream, index, NULL, NULL);
+	return luamp_encode_with_ctx(L, cfg, stream, index, NULL, NULL);
 }
 
+/**
+ * Decode MsgPack data to Lua stack.
+ */
 void
+luamp_decode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
+		      const char **data, struct mp_ctx *ctx);
+
+static inline void
 luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
-	     const char **data);
+	     const char **data)
+{
+	luamp_decode_with_ctx(L, cfg, data, NULL);
+}
 
 typedef enum mp_type
-(*luamp_encode_extension_f)(struct lua_State *, int, struct mpstream *);
+(*luamp_encode_extension_f)(struct lua_State *, int, struct mpstream *,
+			    struct mp_ctx *);
 
 /**
  * @brief Set a callback that executed by encoder on unsupported Lua type
@@ -147,7 +154,8 @@ void
 luamp_set_encode_extension(luamp_encode_extension_f handler);
 
 typedef void
-(*luamp_decode_extension_f)(struct lua_State *L, const char **data);
+(*luamp_decode_extension_f)(struct lua_State *L, const char **data,
+			    struct mp_ctx *ctx);
 
 /**
  * @brief Set a callback that executed by decode on unsupported extension

@@ -204,8 +204,9 @@ port_c_add_str(struct port *base, const char *str, uint32_t len)
 }
 
 static int
-port_c_dump_msgpack_16(struct port *base, struct obuf *out)
+port_c_dump_msgpack_16(struct port *base, struct obuf *out, struct mp_ctx *ctx)
 {
+	(void)ctx;
 	struct port_c *port = (struct port_c *)base;
 	struct port_c_entry *pe;
 	for (pe = port->first; pe != NULL; pe = pe->next) {
@@ -228,7 +229,7 @@ port_c_dump_msgpack_16(struct port *base, struct obuf *out)
 }
 
 static int
-port_c_dump_msgpack(struct port *base, struct obuf *out)
+port_c_dump_msgpack(struct port *base, struct obuf *out, struct mp_ctx *ctx)
 {
 	struct port_c *port = (struct port_c *)base;
 	char *size_buf = obuf_alloc(out, mp_sizeof_array(port->size));
@@ -238,7 +239,7 @@ port_c_dump_msgpack(struct port *base, struct obuf *out)
 		return -1;
 	}
 	mp_encode_array(size_buf, port->size);
-	if (port_c_dump_msgpack_16(base, out) < 0)
+	if (port_c_dump_msgpack_16(base, out, ctx) < 0)
 		return -1;
 	return 1;
 }

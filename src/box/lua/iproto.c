@@ -16,6 +16,7 @@
 #include "core/assoc.h"
 #include "core/iostream.h"
 #include "core/fiber.h"
+#include "core/mp_ctx.h"
 #include "core/tt_static.h"
 
 #include "lua/msgpack.h"
@@ -243,11 +244,14 @@ encode_packet(struct lua_State *L, int idx, size_t *mp_len)
 	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
 		      luamp_error, L);
 	size_t used = region_used(gc);
-	if (luamp_encode_with_translation(L, luaL_msgpack_default, &stream, idx,
-					  iproto_key_translation, NULL) != 0) {
+	struct mp_ctx ctx;
+	mp_ctx_create(&ctx, iproto_key_translation);
+	if (luamp_encode_with_ctx(L, luaL_msgpack_default, &stream, idx,
+				  &ctx, NULL) != 0) {
 		region_truncate(gc, used);
 		return NULL;
 	}
+	mp_ctx_destroy(&ctx);
 	mpstream_flush(&stream);
 	*mp_len = region_used(gc) - used;
 	return xregion_join(gc, *mp_len);
