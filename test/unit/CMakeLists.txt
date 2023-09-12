@@ -261,6 +261,11 @@ create_unit_test(PREFIX cbus_call
                  LIBRARIES core unit stat
 )
 
+create_unit_test(PREFIX cbus_lcpipe
+                 SOURCES cbus_lcpipe.c core_test_utils.c
+                 LIBRARIES core unit stat
+)
+
 include(CheckSymbolExists)
 check_symbol_exists(__GLIBC__ features.h GLIBC_USED)
 if (GLIBC_USED)

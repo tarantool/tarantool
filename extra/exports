@@ -153,6 +153,10 @@ box_txn_set_isolation
 box_txn_set_timeout
 box_update
 box_upsert
+cbus_endpoint_delete
+cbus_endpoint_new
+cbus_loop
+cbus_process
 clock_monotonic
 clock_monotonic64
 clock_process
@@ -242,6 +246,11 @@ ibuf_reinit
 ibuf_reserve_slow
 lbox_socket_local_resolve
 lbox_socket_nonblock
+lcpipe_delete
+lcpipe_flush_input
+lcpipe_new
+lcpipe_push
+lcpipe_push_now
 log_format
 log_level
 log_level_flightrec

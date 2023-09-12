@@ -1922,9 +1922,9 @@ applier_thread_next_msg(struct applier *applier)
 		if (msg->tx_cnt != 0) {
 			if (msg->tx_cnt > APPLIER_THREAD_TX_MAX)
 				continue;
-			if (stailq_empty(&thread->tx_pipe.input))
+			if (stailq_empty(&thread->tx_pipe.base.input))
 				continue;
-			if (stailq_first_entry(&thread->tx_pipe.input,
+			if (stailq_first_entry(&thread->tx_pipe.base.input,
 					       struct cmsg, fifo) !=
 			    &msg->base.base) {
 				continue;
