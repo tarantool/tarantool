@@ -86,7 +86,6 @@ box.schema.user.grant('guest', 'execute', 'universe', nil,
                       {if_not_exists = true})
 
 local test = tap.test('gh-4954-merger-via-net-box.test.lua')
-test:plan(6)
 
 local tuples = {
     {1},
@@ -94,17 +93,25 @@ local tuples = {
     {3},
 }
 
+test:plan(3 * #tuples + 3)
+
 local connection = net_box.connect(box.cfg.listen)
 
+local function check_res(test, res, test_name)
+    for i, t in ipairs(tuples) do
+        test:is_deeply(res[i]:totable(), t, test_name)
+    end
+end
+
 local res = connection:call('use_table_source', {tuples})
-test:is_deeply(res, tuples, 'verify table source')
+check_res(test, res, 'verify table source')
 local res = connection:call('use_buffer_source', {tuples})
-test:is_deeply(res, tuples, 'verify buffer source')
+check_res(test, res, 'verify buffer source')
 local res = connection:call('use_tuple_source', {tuples})
-test:is_deeply(res, tuples, 'verify tuple source')
+check_res(test, res, 'verify tuple source')
 
 local function test_verify_source_async(test, func_name, request_count)
-    test:plan(request_count)
+    test:plan(request_count * #tuples)
 
     local futures = {}
     for _ = 1, request_count do
@@ -113,7 +120,7 @@ local function test_verify_source_async(test, func_name, request_count)
     end
     for i = 1, request_count do
         local res = unpack(futures[i]:wait_result())
-        test:is_deeply(res, tuples, ('verify request %d'):format(i))
+        check_res(test, res, ('verify request %d'):format(i))
     end
 end
 

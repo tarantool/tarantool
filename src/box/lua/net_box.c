@@ -49,8 +49,9 @@
 #include "box/execute.h"
 #include "box/error.h"
 #include "box/schema_def.h"
+#include "box/mp_box_ctx.h"
+#include "box/mp_tuple.h"
 
-#include "assoc.h"
 #include "coio.h"
 #include "fiber.h"
 #include "fiber_cond.h"
@@ -687,20 +688,22 @@ netbox_encode_ping(lua_State *L, int idx, struct netbox_method_encode_ctx *ctx)
  * Raises a Lua error on memory allocation failure.
  */
 static void
-netbox_encode_id(struct lua_State *L, struct ibuf *ibuf, uint64_t sync)
+netbox_encode_id(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
+		 bool fetch_schema)
 {
-	struct iproto_features *features = &NETBOX_IPROTO_FEATURES;
+	struct iproto_features features = NETBOX_IPROTO_FEATURES;
+	if (fetch_schema) {
+		iproto_features_clear(&features,
+				      IPROTO_FEATURE_DML_TUPLE_EXTENSION);
+	}
 #ifndef NDEBUG
-	struct iproto_features features_value;
 	struct errinj *errinj = errinj(ERRINJ_NETBOX_FLIP_FEATURE, ERRINJ_INT);
 	if (errinj->iparam >= 0 && errinj->iparam < iproto_feature_id_MAX) {
 		int feature_id = errinj->iparam;
-		features_value = *features;
-		features = &features_value;
-		if (iproto_features_test(features, feature_id))
-			iproto_features_clear(features, feature_id);
+		if (iproto_features_test(&features, feature_id))
+			iproto_features_clear(&features, feature_id);
 		else
-			iproto_features_set(features, feature_id);
+			iproto_features_set(&features, feature_id);
 	}
 #endif
 	struct mpstream stream;
@@ -712,9 +715,9 @@ netbox_encode_id(struct lua_State *L, struct ibuf *ibuf, uint64_t sync)
 	mpstream_encode_uint(&stream, IPROTO_VERSION);
 	mpstream_encode_uint(&stream, NETBOX_IPROTO_VERSION);
 	mpstream_encode_uint(&stream, IPROTO_FEATURES);
-	size_t size = mp_sizeof_iproto_features(features);
+	size_t size = mp_sizeof_iproto_features(&features);
 	char *data = mpstream_reserve(&stream, size);
-	mp_encode_iproto_features(data, features);
+	mp_encode_iproto_features(data, &features);
 	mpstream_advance(&stream, size);
 
 	netbox_end_encode(&stream, svp);
@@ -1492,6 +1495,10 @@ struct response_body {
 	const char *pos;
 	/* IPROTO_POSITION length */
 	uint32_t pos_len;
+	/* IPROTO_TUPLE_FORMATS */
+	const char *tuple_formats;
+	/* IPROTO_TUPLE_FORMATS end. */
+	const char *tuple_formats_end;
 };
 
 /*
@@ -1521,6 +1528,11 @@ response_body_decode(struct response_body *response_body, const char **data,
 			response_body->pos =
 				mp_decode_str(&value, &response_body->pos_len);
 			assert(response_body->pos_len != 0);
+			break;
+		case IPROTO_TUPLE_FORMATS:
+			assert(mp_typeof(*value) == MP_MAP);
+			response_body->tuple_formats = value;
+			response_body->tuple_formats_end = *data;
 			break;
 		default:
 			break;
@@ -1561,11 +1573,17 @@ netbox_decode_table(struct lua_State *L, const char **data,
 		lua_pushnil(L);
 		return;
 	}
+	struct mp_box_ctx ctx;
+	mp_box_ctx_create(&ctx, NULL, response_body.tuple_formats);
 	if (return_raw) {
-		luamp_push(L, response_body.data, response_body.data_end);
+		luamp_push_with_ctx(L, response_body.data,
+				    response_body.data_end,
+				    (struct mp_ctx *)&ctx);
 	} else {
-		luamp_decode(L, cfg, &response_body.data);
+		luamp_decode_with_ctx(L, cfg, &response_body.data,
+				      (struct mp_ctx *)&ctx);
 	}
+	mp_ctx_destroy((struct mp_ctx *)&ctx);
 }
 
 /**
@@ -1585,11 +1603,17 @@ netbox_decode_value(struct lua_State *L, const char **data,
 		lua_pushnil(L);
 		return;
 	}
+	struct mp_box_ctx ctx;
+		mp_box_ctx_create(&ctx, NULL, response_body.tuple_formats);
 	if (return_raw) {
-		luamp_push(L, response_body.data, response_body.data_end);
+		luamp_push_with_ctx(L, response_body.data,
+				    response_body.data_end,
+				    (struct mp_ctx *)&ctx);
 	} else {
-		luamp_decode(L, cfg, &response_body.data);
+		luamp_decode_with_ctx(L, cfg, &response_body.data,
+				      (struct mp_ctx *)&ctx);
 	}
+	mp_ctx_destroy((struct mp_ctx *)&ctx);
 }
 
 /**
@@ -1610,17 +1634,22 @@ netbox_decode_count(struct lua_State *L, const char **data,
  */
 static void
 netbox_decode_data(struct lua_State *L, const char **data,
-		   struct tuple_format *format)
+		   struct tuple_format *format, struct mp_box_ctx *ctx)
 {
 	uint32_t count = mp_decode_array(data);
 	lua_createtable(L, count, 0);
 	for (uint32_t j = 0; j < count; ++j) {
 		const char *begin = *data;
 		mp_next(data);
-		struct tuple *tuple =
-			box_tuple_new(format, begin, *data);
-		if (tuple == NULL)
+		struct tuple *tuple;
+		if (tuple_format_map_is_empty(&ctx->tuple_format_map))
+			tuple = box_tuple_new(format, begin, *data);
+		else
+			tuple = mp_decode_tuple(&begin, &ctx->tuple_format_map);
+		if (tuple == NULL) {
+			mp_ctx_destroy((struct mp_ctx *)ctx);
 			luaT_error(L);
+		}
 		luaT_pushtuple(L, tuple);
 		lua_rawseti(L, -2, j + 1);
 	}
@@ -1637,11 +1666,16 @@ netbox_decode_select(struct lua_State *L, const char **data,
 {
 	struct response_body response_body;
 	response_body_decode(&response_body, data, data_end);
+	struct mp_box_ctx ctx;
+	mp_box_ctx_create(&ctx, NULL, response_body.tuple_formats);
 	if (return_raw) {
-		luamp_push(L, response_body.data, response_body.data_end);
+		luamp_push_with_ctx(L, response_body.data,
+				    response_body.data_end,
+				    (struct mp_ctx *)&ctx);
 	} else {
-		netbox_decode_data(L, &response_body.data, format);
+		netbox_decode_data(L, &response_body.data, format, &ctx);
 	}
+	mp_ctx_destroy((struct mp_ctx *)&ctx);
 }
 
 /**
@@ -1658,11 +1692,18 @@ netbox_decode_select_with_pos(struct lua_State *L, const char **data,
 	response_body_decode(&response_body, data, data_end);
 	lua_createtable(L, response_body.pos != NULL ? 2 : 1, 0);
 	int table_idx = lua_gettop(L);
+	struct mp_box_ctx ctx;
+	mp_box_ctx_create(&ctx, NULL, response_body.tuple_formats);
 	if (return_raw) {
-		luamp_push(L, response_body.data, response_body.data_end);
+		luamp_push_with_ctx(L, response_body.data,
+				    response_body.data_end,
+				    (struct mp_ctx *)&ctx);
 	} else {
-		netbox_decode_data(L, &response_body.data, format);
+		struct mp_box_ctx ctx;
+		mp_box_ctx_create(&ctx, NULL, response_body.tuple_formats);
+		netbox_decode_data(L, &response_body.data, format, &ctx);
 	}
+	mp_ctx_destroy((struct mp_ctx *)&ctx);
 	lua_rawseti(L, table_idx, 1);
 	if (response_body.pos != NULL) {
 		lua_pushlstring(L, response_body.pos, response_body.pos_len);
@@ -1687,13 +1728,29 @@ netbox_decode_tuple(struct lua_State *L, const char **data,
 		return;
 	}
 	if (return_raw) {
-		luamp_push(L, response_body.data, response_body.data_end);
+		struct mp_box_ctx ctx;
+		mp_box_ctx_create(&ctx, NULL, response_body.tuple_formats);
+		luamp_push_with_ctx(L, response_body.data,
+				    response_body.data_end,
+				    (struct mp_ctx *)&ctx);
 	} else {
-		struct tuple *tuple =
-			box_tuple_new(format, response_body.data,
-				      response_body.data_end);
-		if (tuple == NULL)
+		struct tuple *tuple;
+		if (response_body.tuple_formats == NULL) {
+			tuple = box_tuple_new(format, response_body.data,
+					      response_body.data_end);
+		} else {
+			struct tuple_format_map tuple_format_map;
+			const char *tuple_formats = response_body.tuple_formats;
+			if (tuple_format_map_create_from_mp(&tuple_format_map,
+							    tuple_formats) != 0)
+				luaT_error(L);
+			tuple = mp_decode_tuple(&response_body.data,
+						&tuple_format_map);
+			tuple_format_map_destroy(&tuple_format_map);
+		}
+		if (tuple == NULL) {
 			luaT_error(L);
+		}
 		luaT_pushtuple(L, tuple);
 	}
 }
@@ -1833,8 +1890,11 @@ netbox_decode_execute(struct lua_State *L, const char **data,
 				mp_next(data);
 				luamp_push(L, begin, *data);
 			} else {
+				struct mp_box_ctx ctx;
+				mp_box_ctx_create(&ctx, NULL, NULL);
 				netbox_decode_data(L, data,
-						   tuple_format_runtime);
+						   tuple_format_runtime, &ctx);
+				mp_ctx_destroy((struct mp_ctx *)&ctx);
 			}
 			rows_index = lua_gettop(L);
 			break;
@@ -2570,9 +2630,10 @@ netbox_transport_on_event(struct netbox_transport *transport,
 }
 
 /**
- * Argument data is the body of response, it must be an MP_MAP. Only two keys
- * are expected to appear: IPROTO_DATA (necessarily, must be the first one)
- * and IPROTO_POSITION (unnecessarily). The function writes response to
+ * Argument data is the body of response, it must be an MP_MAP. Only three keys
+ * are expected to appear: IPROTO_DATA (necessarily, must be the first one),
+ * IPROTO_TUPLE_FORMATS (optionally), and
+ * IPROTO_POSITION (optionally). The function writes response to
  * passed ibuf. If skip_header flag is set, data is written without IPROTO_DATA
  * header. If skip_header is true and response contains IPROTO_POSITION,
  * position is not written to a buffer - the function returns a table with
@@ -2588,40 +2649,23 @@ netbox_write_response_to_buffer(const char *data, const char *data_end,
 	/* Copy xrow.body to user-provided buffer. */
 	size_t data_len = data_end - data;
 	bool return_table = false;
+	struct response_body response_body;
+	const char *data_ptr = data;
+	response_body_decode(&response_body, &data_ptr, data_end);
 	if (skip_header) {
-		assert(mp_typeof(*data) == MP_MAP);
-		uint32_t map_size = mp_decode_map(&data);
-		uint32_t key = mp_decode_uint(&data);
-		assert(key == IPROTO_DATA);
-		(void)key;
-		if (map_size > 1) {
-			/*
-			 * The map has more than one element iff it
-			 * contains IPROTO_DATA and IPROTO_POSITION
-			 * and they are placed exactly in this order.
-			 */
-			assert(map_size == 2);
-			/* Find the end of IPROTO_DATA and its len. */
-			const char *iproto_position = data;
-			mp_next(&iproto_position);
-			data_len = iproto_position - data;
+		data = response_body.data;
+		data_len = response_body.data_end - response_body.data;
+		if (response_body.pos != NULL) {
 			/* Create table to return 2 values. */
 			return_table = true;
 			lua_createtable(L, 2, 0);
-			/* Skip IPROTO_POSITION key. */
-			key = mp_decode_uint(&iproto_position);
-			assert(key == IPROTO_POSITION);
 			/* Check position length */
-			assert(mp_typeof(*iproto_position) == MP_STR);
-			uint32_t str_len = mp_decode_strl(&iproto_position);
-			if (str_len != 0) {
+			if (response_body.pos_len != 0) {
 				/* Set position to the 2nd place in table. */
-				lua_pushlstring(L, iproto_position, str_len);
+				lua_pushlstring(L, response_body.pos,
+						response_body.pos_len);
 				lua_rawseti(L, -2, 2);
 			}
-		} else {
-			/* Update data_len if header is skipped. */
-			data_len = data_end - data;
 		}
 	}
 	void *wpos = ibuf_alloc(buffer, data_len);
@@ -2733,7 +2777,8 @@ netbox_transport_do_id(struct netbox_transport *transport, struct lua_State *L)
 	ERROR_INJECT(ERRINJ_NETBOX_DISABLE_ID, goto out);
 	if (peer_version_id < version_id(2, 10, 0))
 		goto unsupported;
-	netbox_encode_id(L, &transport->send_buf, transport->next_sync++);
+	netbox_encode_id(L, &transport->send_buf, transport->next_sync++,
+			 transport->opts.fetch_schema);
 	struct xrow_header hdr;
 	if (netbox_transport_send_and_recv(transport, &hdr) != 0)
 		luaT_error(L);
@@ -3163,6 +3208,10 @@ luaopen_net_box(struct lua_State *L)
 			    IPROTO_FEATURE_SPACE_AND_INDEX_NAMES);
 	iproto_features_set(&NETBOX_IPROTO_FEATURES,
 			    IPROTO_FEATURE_WATCH_ONCE);
+	iproto_features_set(&NETBOX_IPROTO_FEATURES,
+			    IPROTO_FEATURE_DML_TUPLE_EXTENSION);
+	iproto_features_set(&NETBOX_IPROTO_FEATURES,
+			    IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION);
 
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);

@@ -242,7 +242,7 @@ resp_len = c:call('do_pushes', {300}, {on_push = table.insert, on_push_ctx = mes
 ...
 resp_len
 ---
-- 10
+- 12
 ...
 messages
 ---
@@ -274,7 +274,7 @@ r, _ = msgpack.decode_unchecked(ibuf.rpos)
 ...
 r
 ---
-- {48: [300]}
+- {96: {}, 48: [300]}
 ...
 --
 -- Test error in __serialize.

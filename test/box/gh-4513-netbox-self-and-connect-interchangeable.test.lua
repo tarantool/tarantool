@@ -13,7 +13,6 @@ end
 --
 -- netbox:self and netbox:connect should work interchangeably
 --
-type(nb:eval('return box.tuple.new{1}')) -- table
 type(nb:eval('return box.error.new(1, "test error")')) -- cdata
 type(nb:eval('return box.NULL')) -- cdata
 

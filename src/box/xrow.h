@@ -779,7 +779,8 @@ iproto_prepare_select_with_position(struct obuf *buf, struct obuf_svp *svp)
  */
 void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
-		    uint64_t schema_version, uint32_t count);
+		    uint64_t schema_version, uint32_t count,
+		    bool box_tuple_as_ext);
 
 /**
  * Write extended select header to a preallocated buffer.
@@ -788,7 +789,8 @@ void
 iproto_reply_select_with_position(struct obuf *buf, struct obuf_svp *svp,
 				  uint64_t sync, uint32_t schema_version,
 				  uint32_t count, const char *packed_pos,
-				  const char *packed_pos_end);
+				  const char *packed_pos_end,
+				  bool box_tuple_as_ext);
 
 /**
  * Encode iproto header with IPROTO_OK response code.

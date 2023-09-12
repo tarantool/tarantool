@@ -69,12 +69,14 @@
 #include "tt_static.h"
 #include "trivia/util.h"
 #include "salad/stailq.h"
-#include "assoc.h"
 #include "txn.h"
 #include "on_shutdown.h"
 #include "flightrec.h"
 #include "security.h"
 #include "watcher.h"
+#include "box/mp_box_ctx.h"
+#include "box/tuple.h"
+#include "mpstream/mpstream.h"
 
 enum {
 	IPROTO_SALT_SIZE = 32,
@@ -2172,6 +2174,14 @@ static void
 tx_process1(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
+	bool box_tuple_as_ext =
+		iproto_features_test(&msg->connection->session->meta.features,
+				     IPROTO_FEATURE_DML_TUPLE_EXTENSION);
+	struct tuple_format_map format_map;
+	tuple_format_map_create_empty(&format_map);
+	auto format_map_guard = make_scoped_guard([&format_map] {
+		tuple_format_map_destroy(&format_map);
+	});
 	if (tx_check_msg(msg) != 0)
 		goto error;
 
@@ -2185,10 +2195,25 @@ tx_process1(struct cmsg *m)
 		goto error;
 	out = msg->connection->tx.p_obuf;
 	iproto_prepare_select(out, &svp);
-	if (tuple && tuple_to_obuf(tuple, out))
+	if (tuple != NULL) {
+		if (box_tuple_as_ext) {
+			tuple_format_map_add_format(&format_map,
+						    tuple->format_id);
+			if (tuple_to_obuf_as_ext(tuple, out) != 0)
+				goto error;
+		} else if (tuple_to_obuf(tuple, out) != 0) {
+			goto error;
+		}
+	}
+	/*
+	 * Even if there is no tuple, we still need to send an empty tuple
+	 * format map.
+	 */
+	if (box_tuple_as_ext &&
+	    tuple_format_map_to_iproto_obuf(&format_map, out) != 0)
 		goto error;
 	iproto_reply_select(out, &svp, msg->header.sync, ::schema_version,
-			    tuple != 0);
+			    tuple != 0, box_tuple_as_ext);
 	iproto_wpos_create(&msg->wpos, out);
 	tx_end_msg(msg, &svp);
 	return;
@@ -2203,9 +2228,24 @@ static void
 tx_process_select(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
+	bool box_tuple_as_ext =
+		iproto_features_test(&msg->connection->session->meta.features,
+				     IPROTO_FEATURE_DML_TUPLE_EXTENSION);
 	struct obuf *out;
 	struct obuf_svp svp;
 	struct port port;
+
+	struct mp_box_ctx ctx;
+	struct mp_ctx *ctx_ref = NULL;
+	if (box_tuple_as_ext) {
+		mp_box_ctx_create(&ctx, NULL, NULL);
+		ctx_ref = (struct mp_ctx *)&ctx;
+	}
+	auto ctx_guard = make_scoped_guard([ctx_ref] {
+		mp_ctx_destroy(ctx_ref);
+	});
+	ctx_guard.is_active = box_tuple_as_ext;
+
 	int count;
 	int rc;
 	const char *packed_pos, *packed_pos_end;
@@ -2246,19 +2286,22 @@ tx_process_select(struct cmsg *m)
 	/*
 	 * SELECT output format has not changed since Tarantool 1.6
 	 */
-	count = port_dump_msgpack_16(&port, out);
+	count = port_dump_msgpack_16_with_ctx(&port, out, ctx_ref);
 	port_destroy(&port);
-	if (count < 0) {
+	if (count < 0 || (box_tuple_as_ext &&
+			  tuple_format_map_to_iproto_obuf(&ctx.tuple_format_map,
+							  out) != 0)) {
 		goto discard;
 	}
 	if (reply_position) {
 		assert(packed_pos != NULL);
 		iproto_reply_select_with_position(out, &svp, msg->header.sync,
 						  ::schema_version, count,
-						  packed_pos, packed_pos_end);
+						  packed_pos, packed_pos_end,
+						  box_tuple_as_ext);
 	} else {
 		iproto_reply_select(out, &svp, msg->header.sync,
-				    ::schema_version, count);
+				    ::schema_version, count, box_tuple_as_ext);
 	}
 	region_truncate(&fiber()->gc, region_svp);
 	iproto_wpos_create(&msg->wpos, out);
@@ -2290,6 +2333,21 @@ static void
 tx_process_call(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
+
+	bool box_tuple_as_ext =
+		iproto_features_test(&msg->connection->session->meta.features,
+				     IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION);
+	struct mp_box_ctx ctx;
+	struct mp_ctx *ctx_ref = NULL;
+	if (box_tuple_as_ext) {
+		mp_box_ctx_create(&ctx, NULL, NULL);
+		ctx_ref = (struct mp_ctx *)&ctx;
+	}
+	auto ctx_guard = make_scoped_guard([ctx_ref] {
+		mp_ctx_destroy(ctx_ref);
+	});
+	ctx_guard.is_active = box_tuple_as_ext;
+
 	if (tx_check_msg(msg) != 0)
 		goto error;
 
@@ -2351,17 +2409,19 @@ tx_process_call(struct cmsg *m)
 	iproto_prepare_select(out, &svp);
 
 	if (msg->header.type == IPROTO_CALL_16)
-		count = port_dump_msgpack_16(&port, out);
+		count = port_dump_msgpack_16_with_ctx(&port, out, ctx_ref);
 	else
-		count = port_dump_msgpack(&port, out);
+		count = port_dump_msgpack_with_ctx(&port, out, ctx_ref);
+
 	port_destroy(&port);
-	if (count < 0) {
+	if (count < 0 || (box_tuple_as_ext &&
+			  tuple_format_map_to_iproto_obuf(&ctx.tuple_format_map,
+							  out) != 0)) {
 		obuf_rollback_to_svp(out, &svp);
 		goto error;
 	}
-
 	iproto_reply_select(out, &svp, msg->header.sync,
-			    ::schema_version, count);
+			    ::schema_version, count, box_tuple_as_ext);
 	iproto_wpos_create(&msg->wpos, out);
 	tx_end_msg(msg, &svp);
 	return;
@@ -2375,7 +2435,11 @@ error:
 static void
 tx_process_id(struct iproto_connection *con, const struct id_request *id)
 {
+	extern bool box_tuple_extension;
 	con->session->meta.features = id->features;
+	if (!box_tuple_extension)
+		iproto_features_clear(&con->session->meta.features,
+				      IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION);
 }
 
 /** Callback passed to session_watch. */
@@ -2439,7 +2503,8 @@ tx_process_misc(struct cmsg *m)
 		iproto_prepare_select(out, &header);
 		xobuf_dup(out, data, data_end - data);
 		iproto_reply_select(out, &header, msg->header.sync,
-				    ::schema_version, data != NULL ? 1 : 0);
+				    ::schema_version, data != NULL ? 1 : 0,
+				    /*box_tuple_as_ext=*/false);
 		break;
 	}
 	default:

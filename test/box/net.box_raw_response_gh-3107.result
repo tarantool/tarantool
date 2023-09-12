@@ -103,14 +103,14 @@ finalize_long()
 ...
 future:wait_result(100)
 ---
-- 10
+- 12
 ...
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
 ---
-- {48: [1, 2, 3]}
+- {96: {}, 48: [1, 2, 3]}
 ...
 box.schema.func.drop('long_function')
 ---

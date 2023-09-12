@@ -260,6 +260,7 @@ set(box_sources
     watcher.c
     decimal.c
     read_view.c
+    mp_box_ctx.c
     ${sql_sources}
     ${lua_sources}
     lua/init.c

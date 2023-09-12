@@ -46,6 +46,14 @@
 #include "iproto_features.h"
 #include "mpstream/mpstream.h"
 #include "errinj.h"
+#include "core/tweaks.h"
+
+/**
+ * Controls whether `IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION` feature bit is set
+ * in `IPROTO_ID` request responses.
+ */
+bool box_tuple_extension;
+TWEAK_BOOL(box_tuple_extension);
 
 /**
  * Min length of the salt sent in a greeting message.
@@ -483,23 +491,22 @@ iproto_reply_id(struct obuf *out, const char *auth_type,
 	assert(auth_type != NULL);
 	uint32_t auth_type_len = strlen(auth_type);
 	unsigned version = IPROTO_CURRENT_VERSION;
-	struct iproto_features *features = &IPROTO_CURRENT_FEATURES;
-
+	struct iproto_features features = IPROTO_CURRENT_FEATURES;
+	if (!box_tuple_extension)
+		iproto_features_clear(&features,
+				      IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION);
 #ifndef NDEBUG
 	struct errinj *errinj;
 	errinj = errinj(ERRINJ_IPROTO_SET_VERSION, ERRINJ_INT);
 	if (errinj->iparam >= 0)
 		version = errinj->iparam;
-	struct iproto_features features_value;
 	errinj = errinj(ERRINJ_IPROTO_FLIP_FEATURE, ERRINJ_INT);
 	if (errinj->iparam >= 0 && errinj->iparam < iproto_feature_id_MAX) {
 		int feature_id = errinj->iparam;
-		features_value = *features;
-		features = &features_value;
-		if (iproto_features_test(features, feature_id))
-			iproto_features_clear(features, feature_id);
+		if (iproto_features_test(&features, feature_id))
+			iproto_features_clear(&features, feature_id);
 		else
-			iproto_features_set(features, feature_id);
+			iproto_features_set(&features, feature_id);
 	}
 #endif
 
@@ -508,7 +515,7 @@ iproto_reply_id(struct obuf *out, const char *auth_type,
 	size += mp_sizeof_uint(IPROTO_VERSION);
 	size += mp_sizeof_uint(version);
 	size += mp_sizeof_uint(IPROTO_FEATURES);
-	size += mp_sizeof_iproto_features(features);
+	size += mp_sizeof_iproto_features(&features);
 	size += mp_sizeof_uint(IPROTO_AUTH_TYPE);
 	size += mp_sizeof_str(auth_type_len);
 
@@ -518,7 +525,7 @@ iproto_reply_id(struct obuf *out, const char *auth_type,
 	data = mp_encode_uint(data, IPROTO_VERSION);
 	data = mp_encode_uint(data, version);
 	data = mp_encode_uint(data, IPROTO_FEATURES);
-	data = mp_encode_iproto_features(data, features);
+	data = mp_encode_iproto_features(data, &features);
 	data = mp_encode_uint(data, IPROTO_AUTH_TYPE);
 	data = mp_encode_str(data, auth_type, auth_type_len);
 	assert(size == (size_t)(data - buf));
@@ -713,7 +720,8 @@ iproto_prepare_header(struct obuf *buf, struct obuf_svp *svp, size_t size)
 /** Reply select with IPROTO_DATA. */
 void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
-		    uint64_t schema_version, uint32_t count)
+		    uint64_t schema_version, uint32_t count,
+		    bool box_tuple_as_ext)
 {
 	char *pos = (char *) obuf_svp_to_ptr(buf, svp);
 	iproto_header_encode(pos, IPROTO_OK, sync, schema_version,
@@ -721,6 +729,7 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 			     IPROTO_HEADER_LEN);
 
 	struct iproto_body_bin body = iproto_body_bin;
+	body.m_body += box_tuple_as_ext;
 	body.v_data_len = mp_bswap_u32(count);
 
 	memcpy(pos + IPROTO_HEADER_LEN, &body, sizeof(body));
@@ -731,7 +740,8 @@ void
 iproto_reply_select_with_position(struct obuf *buf, struct obuf_svp *svp,
 				  uint64_t sync, uint32_t schema_version,
 				  uint32_t count, const char *packed_pos,
-				  const char *packed_pos_end)
+				  const char *packed_pos_end,
+				  bool box_tuple_as_ext)
 {
 	size_t packed_pos_size = packed_pos_end - packed_pos;
 	size_t key_size = mp_sizeof_uint(IPROTO_POSITION);
@@ -747,6 +757,7 @@ iproto_reply_select_with_position(struct obuf *buf, struct obuf_svp *svp,
 			     IPROTO_HEADER_LEN);
 
 	struct iproto_body_bin body = iproto_body_bin_with_position;
+	body.m_body += box_tuple_as_ext;
 	body.v_data_len = mp_bswap_u32(count);
 
 	memcpy(pos + IPROTO_HEADER_LEN, &body, sizeof(body));

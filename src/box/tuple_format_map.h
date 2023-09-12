@@ -61,6 +61,14 @@ tuple_format_map_create_from_mp(struct tuple_format_map *map, const char *data);
 void
 tuple_format_map_destroy(struct tuple_format_map *map);
 
+/**
+ * Move the tuple format from @a src to @a dst and destroy @a src.
+ * The destination format map must be empty or uninitialized.
+ */
+void
+tuple_format_map_move(struct tuple_format_map *dst,
+		      struct tuple_format_map *src);
+
 static inline bool
 tuple_format_map_is_empty(struct tuple_format_map *map)
 {
@@ -79,6 +87,15 @@ tuple_format_map_add_format(struct tuple_format_map *map, uint16_t format_id);
 void
 tuple_format_map_to_mpstream(struct tuple_format_map *map,
 			     struct mpstream *stream);
+
+/**
+ * Serialize a tuple format map as `IPROTO_TUPLE_FORMATS` to an output buffer.
+ *
+ * Returns 0 on success, otherwise -1 and sets diagnostic.
+ */
+int
+tuple_format_map_to_iproto_obuf(struct tuple_format_map *map,
+				struct obuf *obuf);
 
 /**
  * Find a format in the tuple format map.
