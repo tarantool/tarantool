@@ -51,6 +51,13 @@ initialization or new session creation.
 https://tarantool.io/compat/sql_seq_scan_default
 ]]
 
+local C_FUNC_IPROTO_MULTIRETURN_BRIEF = [[
+Whether the results of the C stored function should be encoded with an
+additional msgpack array when returning them via iproto.
+
+https://tarantool.io/compat/c_func_iproto_multireturn
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -95,6 +102,13 @@ local options = {
         obsolete = nil,
         brief = SQL_SEQ_SCAN_DEFAULT_BRIEF,
         action = tweak_action('sql_seq_scan_default', true, false),
+    },
+    c_func_iproto_multireturn = {
+        default = 'old',
+        obsolete = nil,
+        brief = C_FUNC_IPROTO_MULTIRETURN_BRIEF,
+        run_action_now = true,
+        action = tweak_action('c_func_iproto_multireturn', false, true),
     },
 }
 

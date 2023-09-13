@@ -37,6 +37,7 @@
 #include <fiber.h>
 #include "errinj.h"
 #include "mpstream/mpstream.h"
+#include "tweaks.h"
 
 /**
  * The pool is used by port_c to allocate entries and to store
@@ -204,7 +205,7 @@ port_c_add_str(struct port *base, const char *str, uint32_t len)
 }
 
 static int
-port_c_dump_msgpack_16(struct port *base, struct obuf *out)
+port_c_dump_msgpack(struct port *base, struct obuf *out)
 {
 	struct port_c *port = (struct port_c *)base;
 	struct port_c_entry *pe;
@@ -227,8 +228,14 @@ port_c_dump_msgpack_16(struct port *base, struct obuf *out)
 	return port->size;
 }
 
-static int
-port_c_dump_msgpack(struct port *base, struct obuf *out)
+/**
+ * If set, don't wrap results into an additional array on encode.
+ */
+static bool c_func_iproto_multireturn = false;
+TWEAK_BOOL(c_func_iproto_multireturn);
+
+int
+port_c_dump_msgpack_wrapped(struct port *base, struct obuf *out)
 {
 	struct port_c *port = (struct port_c *)base;
 	char *size_buf = obuf_alloc(out, mp_sizeof_array(port->size));
@@ -238,9 +245,23 @@ port_c_dump_msgpack(struct port *base, struct obuf *out)
 		return -1;
 	}
 	mp_encode_array(size_buf, port->size);
-	if (port_c_dump_msgpack_16(base, out) < 0)
+	if (port_c_dump_msgpack(base, out) < 0)
 		return -1;
 	return 1;
+}
+
+/**
+ * Encode the C port results to the msgpack.
+ * If c_func_iproto_multireturn is disabled, encode them without
+ * wrapping them in the additional msgpack array.
+ */
+static int
+port_c_dump_msgpack_compatible(struct port *base, struct obuf *out)
+{
+	if (c_func_iproto_multireturn)
+		return port_c_dump_msgpack(base, out);
+	else
+		return port_c_dump_msgpack_wrapped(base, out);
 }
 
 /** Callback to forward and error from mpstream methods. */
@@ -299,8 +320,8 @@ extern struct sql_value *
 port_c_get_vdbemem(struct port *base, uint32_t *size);
 
 const struct port_vtab port_c_vtab = {
-	.dump_msgpack = port_c_dump_msgpack,
-	.dump_msgpack_16 = port_c_dump_msgpack_16,
+	.dump_msgpack = port_c_dump_msgpack_compatible,
+	.dump_msgpack_16 = port_c_dump_msgpack,
 	.dump_lua = port_c_dump_lua,
 	.dump_plain = NULL,
 	.get_msgpack = port_c_get_msgpack,
