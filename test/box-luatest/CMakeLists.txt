@@ -1,1 +1,4 @@
+include_directories(${MSGPUCK_INCLUDE_DIRS})
+build_module(gh_4799_lib gh_4799_fix_c_stored_functions_call.c)
+target_link_libraries(gh_4799_lib msgpuck)
 build_module(gh_6506_lib gh_6506_wakeup_writing_to_wal_fiber.c)

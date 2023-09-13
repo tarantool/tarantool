@@ -270,7 +270,7 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 			return -1;
 		}
 		pos = mp_encode_uint(pos, IPROTO_DATA);
-		if (port_c_vtab.dump_msgpack(port, out) < 0)
+		if (port_c_dump_msgpack_wrapped(port, out) < 0)
 			return -1;
 		break;
 	}
