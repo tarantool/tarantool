@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "memtx_tx.h"
+#include "memtx_space.h"
 
 #include <assert.h>
 #include <limits.h>
@@ -2722,16 +2723,19 @@ memtx_tx_prepare_finalize(struct txn *txn)
 }
 
 void
-memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize)
+memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 {
+	struct tuple *old_tuple, *new_tuple;
+	old_tuple = stmt->del_story == NULL ? NULL : stmt->del_story->tuple;
+	new_tuple = stmt->add_story == NULL ? NULL : stmt->add_story->tuple;
+	memtx_space_update_tuple_stat(stmt->space, old_tuple, new_tuple);
+
 	if (stmt->add_story != NULL) {
 		assert(stmt->add_story->add_stmt == stmt);
-		*bsize += tuple_bsize(stmt->add_story->tuple);
 		memtx_tx_story_unlink_added_by(stmt->add_story, stmt);
 	}
 	if (stmt->del_story != NULL) {
 		assert(stmt->del_story->del_stmt == stmt);
-		*bsize -= tuple_bsize(stmt->del_story->tuple);
 		memtx_tx_story_unlink_deleted_by(stmt->del_story, stmt);
 	}
 	memtx_tx_story_gc();

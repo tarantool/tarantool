@@ -75,21 +75,56 @@ static size_t
 memtx_space_bsize(struct space *space)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
-	return memtx_space->bsize;
+	return memtx_space->tuple_stat[TUPLE_ARENA_MEMTX].data_size +
+	       memtx_space->tuple_stat[TUPLE_ARENA_MALLOC].data_size;
 }
 
 /* {{{ DML */
 
 void
-memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
-			 struct tuple *new_tuple)
+memtx_space_update_tuple_stat(struct space *space, struct tuple *old_tuple,
+			      struct tuple *new_tuple)
 {
 	assert(space->vtab->destroy == &memtx_space_destroy);
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
-	ssize_t old_bsize = old_tuple ? box_tuple_bsize(old_tuple) : 0;
-	ssize_t new_bsize = new_tuple ? box_tuple_bsize(new_tuple) : 0;
-	assert((ssize_t)memtx_space->bsize + new_bsize - old_bsize >= 0);
-	memtx_space->bsize += new_bsize - old_bsize;
+	struct tuple_info info, *stat;
+
+	if (new_tuple != NULL) {
+		tuple_info(new_tuple, &info);
+
+		assert(info.arena_type == TUPLE_ARENA_MEMTX ||
+		       info.arena_type == TUPLE_ARENA_MALLOC);
+		stat = &memtx_space->tuple_stat[info.arena_type];
+
+		stat->data_size += info.data_size;
+		stat->header_size += info.header_size;
+		stat->field_map_size += info.field_map_size;
+		stat->waste_size += info.waste_size;
+	}
+
+	if (old_tuple != NULL) {
+		tuple_info(old_tuple, &info);
+
+		assert(info.arena_type == TUPLE_ARENA_MEMTX ||
+		       info.arena_type == TUPLE_ARENA_MALLOC);
+		stat = &memtx_space->tuple_stat[info.arena_type];
+
+		assert(stat->data_size >= info.data_size);
+		assert(stat->header_size >= info.header_size);
+		assert(stat->field_map_size >= info.field_map_size);
+
+		stat->data_size -= info.data_size;
+		stat->header_size -= info.header_size;
+		stat->field_map_size -= info.field_map_size;
+		/*
+		 * Avoid negative values, since waste_size is calculated
+		 * imprecisely.
+		 */
+		if (stat->waste_size > info.waste_size)
+			stat->waste_size -= info.waste_size;
+		else
+			stat->waste_size = 0;
+	}
 }
 
 /**
@@ -142,7 +177,7 @@ memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
 	}
 	if (index_build_next(space->index[0], new_tuple) != 0)
 		return -1;
-	memtx_space_update_bsize(space, NULL, new_tuple);
+	memtx_space_update_tuple_stat(space, NULL, new_tuple);
 	tuple_ref(new_tuple);
 	return 0;
 }
@@ -161,7 +196,7 @@ memtx_space_replace_primary_key(struct space *space, struct tuple *old_tuple,
 	if (index_replace(space->index[0], old_tuple,
 			  new_tuple, mode, &old_tuple, &successor) != 0)
 		return -1;
-	memtx_space_update_bsize(space, old_tuple, new_tuple);
+	memtx_space_update_tuple_stat(space, old_tuple, new_tuple);
 	if (new_tuple != NULL)
 		tuple_ref(new_tuple);
 	*result = old_tuple;
@@ -313,7 +348,7 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 			goto rollback;
 	}
 
-	memtx_space_update_bsize(space, old_tuple, new_tuple);
+	memtx_space_update_tuple_stat(space, old_tuple, new_tuple);
 	if (new_tuple != NULL)
 		tuple_ref(new_tuple);
 	*result = old_tuple;
@@ -1366,7 +1401,7 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 
-	if (old_memtx_space->bsize != 0 &&
+	if (memtx_space_bsize(old_space) != 0 &&
 	    space_is_data_temporary(old_space) !=
 	    space_is_data_temporary(new_space)) {
 		diag_set(ClientError, ER_ALTER_SPACE, old_space->def->name,
@@ -1380,9 +1415,9 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 }
 
 /**
- * Copy bsize to the newly altered space from the old space.
+ * Copy memory usage statistics to the newly altered space from the old space.
  * In case of DropIndex or TruncateIndex alter operations, the new space will be
- * empty, and bsize must not be copied.
+ * empty, and tuple statistics must not be copied.
  */
 static void
 memtx_space_finish_alter(struct space *old_space, struct space *new_space)
@@ -1392,8 +1427,12 @@ memtx_space_finish_alter(struct space *old_space, struct space *new_space)
 
 	bool is_empty = new_space->index_count == 0 ||
 			index_size(new_space->index[0]) == 0;
-	if (!is_empty)
-		new_memtx_space->bsize = old_memtx_space->bsize;
+	if (!is_empty) {
+		new_memtx_space->tuple_stat[TUPLE_ARENA_MEMTX] =
+			old_memtx_space->tuple_stat[TUPLE_ARENA_MEMTX];
+		new_memtx_space->tuple_stat[TUPLE_ARENA_MALLOC] =
+			old_memtx_space->tuple_stat[TUPLE_ARENA_MALLOC];
+	}
 }
 
 /* }}} DDL */
@@ -1458,7 +1497,7 @@ memtx_space_new(struct memtx_engine *memtx,
 	/* Format is now referenced by the space. */
 	tuple_format_unref(format);
 
-	memtx_space->bsize = 0;
+	memset(&memtx_space->tuple_stat, 0, sizeof(memtx_space->tuple_stat));
 	memtx_space->rowid = 0;
 	memtx_space->replace = memtx_space_replace_no_keys;
 	return (struct space *)memtx_space;
