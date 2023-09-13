@@ -42,6 +42,24 @@ install(FILES ../README.md
         DESTINATION /usr/share/doc/tarantool
         COMPONENT server)
 
+if (PACKAGE_FORMAT STREQUAL "DEB")
+    install(FILES ../AUTHORS ../debian/copyright ../LICENSE
+            DESTINATION /usr/share/doc/tarantool
+            COMPONENT server)
+    install(FILES ../AUTHORS ../debian/copyright ../LICENSE
+            DESTINATION /usr/share/doc/tarantool-dev
+            COMPONENT dev)
+endif()
+
+if (PACKAGE_FORMAT STREQUAL "RPM")
+    install(FILES ../AUTHORS ../LICENSE
+            DESTINATION /usr/share/licenses/tarantool
+            COMPONENT server)
+    install(FILES ../AUTHORS ../LICENSE
+            DESTINATION /usr/share/licenses/tarantool-devel
+            COMPONENT dev)
+endif()
+
 set(CPACK_GENERATOR "DEB;RPM")
 
 set(CPACK_PACKAGE_NAME "tarantool")
