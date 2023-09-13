@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
+#include "small/obuf.h"
 #include <port.h>
 #include <stdbool.h>
 
@@ -172,6 +173,14 @@ port_init(void);
 
 void
 port_free(void);
+
+/**
+ * Encodes the port's content into the msgpack array.
+ * Returns 1 (amount of results) in the case of success,
+ * -1 otherwise.
+ */
+int
+port_c_dump_msgpack_wrapped(struct port *port, struct obuf *out);
 
 #if defined(__cplusplus)
 } /* extern "C" */

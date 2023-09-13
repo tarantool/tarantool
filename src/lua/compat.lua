@@ -89,6 +89,13 @@ an error on any attempt to use it.
 https://tarantool.io/compat/box_session_push_deprecation
 ]]
 
+local C_FUNC_IPROTO_MULTIRETURN_BRIEF = [[
+Whether the results of the C stored function should be encoded with an
+additional msgpack array when returning them via iproto.
+
+https://tarantool.io/compat/c_func_iproto_multireturn
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -167,6 +174,13 @@ local options = {
         brief = BOX_SESSION_PUSH_DEPRECATION_BRIEF,
         run_action_now = true,
         action = tweak_action('box_session_push_is_disabled', false, true),
+    },
+    c_func_iproto_multireturn = {
+        default = 'old',
+        obsolete = nil,
+        brief = C_FUNC_IPROTO_MULTIRETURN_BRIEF,
+        run_action_now = true,
+        action = tweak_action('c_func_iproto_multireturn', false, true),
     },
 }
 
