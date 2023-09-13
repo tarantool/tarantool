@@ -428,13 +428,6 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 			return NULL;
 		index_def_set_func(index_def, func);
 	}
-	if (index_def->iid == 0 && space->sequence != NULL)
-		if (index_def_check_sequence(index_def, space->sequence_fieldno,
-					     space->sequence_path,
-					     space->sequence_path != NULL ?
-					     strlen(space->sequence_path) : 0,
-					     space_name(space)) != 0)
-			return NULL;
 	index_def_guard.is_active = false;
 	return index_def;
 }

@@ -248,7 +248,6 @@ pk:drop()
 
 pk = s:create_index('pk', {parts = {1, 'unsigned'}, sequence = 'test'}) -- ok
 pk:alter{parts = {1, 'string'}} -- error
-box.space._index:update({s.id, pk.id}, {{'=', 6, {{0, 'string'}}}}) -- error
 box.space._index:delete{s.id, pk.id} -- error
 pk:alter{parts = {1, 'string'}, sequence = false} -- ok
 sk = s:create_index('sk', {parts = {2, 'unsigned'}})

@@ -774,11 +774,6 @@ pk:alter{parts = {1, 'string'}} -- error
 - error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
     be used with a non-integer key'
 ...
-box.space._index:update({s.id, pk.id}, {{'=', 6, {{0, 'string'}}}}) -- error
----
-- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
-    be used with a non-integer key'
-...
 box.space._index:delete{s.id, pk.id} -- error
 ---
 - error: 'Can''t modify space ''test'': can not drop primary key while space sequence
