@@ -6,6 +6,7 @@
 #include "sql_query.pb.h"
 #include "sql_query_proto_to_string.h"
 
+#include "event.h"
 #include "fiber.h"
 #include "memory.h"
 #include "coll/coll.h"
@@ -21,6 +22,7 @@ setup()
 	memory_init();
 	fiber_init(fiber_cxx_invoke);
 	coll_init();
+	event_init();
 	box_init();
 	sql_init();
 }
@@ -30,6 +32,7 @@ static void
 teardown()
 {
 	box_free();
+	event_free();
 	coll_free();
 	fiber_free();
 	memory_free();
