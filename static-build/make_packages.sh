@@ -39,9 +39,12 @@ if [ "${USER_ID}" = "0" ]; then
         --volume ${OUTPUT_DIR}:/tarantool/build \
         --workdir /tarantool/static-build/ \
         packpack/packpack:centos-7 sh -c "
-            cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" &&
+            cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" . &&
             make -j $(nproc) &&
-            make package"
+            cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" -DPACKAGE_FORMAT=DEB . &&
+            cpack3 -G DEB &&
+            cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" -DPACKAGE_FORMAT=RPM . &&
+            cpack3 -G RPM"
 else
     docker run --rm --pull=always \
         --env VERSION=${VERSION} \
@@ -52,7 +55,10 @@ else
         packpack/packpack:centos-7 sh -c "
             useradd -u ${USER_ID} tarantool;
             su -m tarantool sh -c '
-                cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" &&
+                cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" . &&
                 make -j $(nproc) &&
-                make package'"
+                cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" -DPACKAGE_FORMAT=DEB . &&
+                cpack3 -G DEB &&
+                cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" -DPACKAGE_FORMAT=RPM . &&
+                cpack3 -G RPM'"
 fi
