@@ -251,10 +251,9 @@ memtx_tx_prepare_finalize(struct txn *txn);
  * NB: can trigger story garbage collection.
  *
  * @param stmt current statement.
- * @param bsize the space bsize.
  */
 void
-memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize);
+memtx_tx_history_commit_stmt(struct txn_stmt *stmt);
 
 /** Helper of memtx_tx_tuple_clarify */
 struct tuple *

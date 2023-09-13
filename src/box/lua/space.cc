@@ -47,6 +47,7 @@ extern "C" {
 #include "box/func.h"
 #include "box/func_def.h"
 #include "box/space.h"
+#include "box/memtx_space.h"
 #include "box/schema.h"
 #include "box/user_def.h"
 #include "box/tuple.h"
@@ -746,6 +747,59 @@ usage_error:
 	return luaL_error(L, "Usage: space:frommap(map, opts)");
 }
 
+/**
+ * Push to Lua stack a table with the statistics on the memory usage by tuples
+ * of the space.
+ */
+static int
+lbox_space_stat(struct lua_State *L)
+{
+	int argc = lua_gettop(L);
+	if (argc != 1 || !lua_istable(L, 1))
+		luaL_error(L, "Usage: space:stat()");
+
+	lua_getfield(L, 1, "id");
+	uint32_t id = (int)lua_tointeger(L, -1);
+	struct space *space = space_by_id(id);
+	if (space == NULL) {
+		lua_pushnil(L);
+		lua_pushfstring(L, "Space with id '%d' doesn't exist", id);
+		return 2;
+	}
+
+	if (!space_is_memtx(space)) {
+		lua_newtable(L);
+		return 1;
+	}
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+
+	lua_newtable(L); /* Result table. */
+	lua_newtable(L); /* result.tuple */
+
+	for (int i = TUPLE_ARENA_MEMTX; i <= TUPLE_ARENA_MALLOC; i++) {
+		enum tuple_arena_type type = (enum tuple_arena_type)i;
+		struct tuple_info *stat = &memtx_space->tuple_stat[type];
+		lua_newtable(L);
+
+		lua_pushnumber(L, stat->data_size);
+		lua_setfield(L, -2, "data_size");
+
+		lua_pushnumber(L, stat->header_size);
+		lua_setfield(L, -2, "header_size");
+
+		lua_pushnumber(L, stat->field_map_size);
+		lua_setfield(L, -2, "field_map_size");
+
+		lua_pushnumber(L, stat->waste_size);
+		lua_setfield(L, -2, "waste_size");
+
+		lua_setfield(L, -2, tuple_arena_type_strs[i]);
+	}
+	lua_setfield(L, -2, "tuple");
+
+	return 1;
+}
+
 void
 box_lua_space_init(struct lua_State *L)
 {
@@ -849,6 +903,7 @@ box_lua_space_init(struct lua_State *L)
 
 	static const struct luaL_Reg space_internal_lib[] = {
 		{"frommap", lbox_space_frommap},
+		{"stat", lbox_space_stat},
 		{NULL, NULL}
 	};
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal.space", 0);

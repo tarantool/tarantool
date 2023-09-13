@@ -2709,6 +2709,7 @@ space_mt.run_triggers = function(space, yesno)
     builtin.space_run_triggers(s, yesno)
 end
 space_mt.frommap = box.internal.space.frommap
+space_mt.stat = box.internal.space.stat
 space_mt.__index = space_mt
 
 box.schema.index_mt = base_index_mt

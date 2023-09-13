@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "space.h"
+#include "tuple.h"
 #include "memtx_engine.h"
 
 #if defined(__cplusplus)
@@ -41,8 +42,13 @@ struct memtx_engine;
 
 struct memtx_space {
 	struct space base;
-	/* Number of bytes used in memory by tuples in the space. */
-	size_t bsize;
+	/**
+	 * Cumulative statistics on the memory usage by tuples in the space,
+	 * grouped by the following arena types:
+	 *  0 - TUPLE_ARENA_MEMTX;
+	 *  1 - TUPLE_ARENA_MALLOC.
+	 */
+	struct tuple_info tuple_stat[2];
 	/**
 	 * This counter is used to generate unique ids for
 	 * ephemeral spaces. Mostly used by SQL: values of this
@@ -59,17 +65,17 @@ struct memtx_space {
 };
 
 /**
- * Change binary size of a space subtracting old tuple's size and
- * adding new tuple's size. Used also for rollback by swaping old
- * and new tuple.
+ * Update memory usage statistics of a space by subtracting old tuple's sizes
+ * and adding new tuple's sizes. Used also for rollback by swapping old and new
+ * tuples.
  *
  * @param space Instance of memtx space.
  * @param old_tuple Old tuple (replaced or deleted).
  * @param new_tuple New tuple (inserted).
  */
 void
-memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
-			 struct tuple *new_tuple);
+memtx_space_update_tuple_stat(struct space *space, struct tuple *old_tuple,
+			      struct tuple *new_tuple);
 
 int
 memtx_space_replace_no_keys(struct space *, struct tuple *, struct tuple *,
