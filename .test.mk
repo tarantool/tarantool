@@ -81,6 +81,8 @@ test-release: build run-luajit-test run-test
 # Experiments once again confirm the notorious quote that "640 Kb
 # ought to be enough for anybody".
 test-release-asan: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                                  -DLUAJIT_USE_SYSMALLOC=ON \
+                                  -DLUAJIT_ENABLE_GC64=ON \
                                   -DENABLE_WERROR=ON \
                                   -DENABLE_ASAN=ON \
                                   -DENABLE_UB_SANITIZER=ON \
