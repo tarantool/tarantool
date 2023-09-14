@@ -72,6 +72,13 @@ runs:
         # 2. Build package on tag 2.4.8. It will produce package with
         #    name 2.4.8.x.
         git fetch --tags -f
+        # Found that actions/checkout fetches the repository with the
+        # '--unshallow' option, but it doesn't do the same for submodules.
+        # So this may lead to the following error while using 'git describe'
+        # for submodules:
+        #   fatal: No tags can describe '<sha>'.
+        #   Try --always, or create some tags.
+        git submodule foreach 'git fetch --unshallow || true'
         # Github Actions may runs twice the same job on branch push and
         # on new tag if it was created on this push. To avoid of fails
         # on saving the commonly named packages, lets drop a tag that
