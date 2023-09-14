@@ -231,7 +231,7 @@ port_c_dump_msgpack(struct port *base, struct obuf *out)
 /**
  * If set, don't wrap results into an additional array on encode.
  */
-static bool c_func_iproto_multireturn = false;
+static bool c_func_iproto_multireturn = true;
 TWEAK_BOOL(c_func_iproto_multireturn);
 
 int

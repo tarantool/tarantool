@@ -592,7 +592,6 @@ c:call('function1.test_push',   \
        {on_push = table.insert, \
         on_push_ctx = messages})
 ---
-- []
 ...
 messages
 ---
