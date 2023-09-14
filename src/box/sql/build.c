@@ -1467,47 +1467,6 @@ sql_store_select(struct Parse *parse_context, struct Select *select)
 }
 
 /**
- * Create expression record "@col_name = '@col_value'".
- *
- * @param parse The parsing context.
- * @param col_name Name of column.
- * @param col_value Name of row.
- * @retval not NULL on success.
- * @retval NULL on failure.
- */
-static struct Expr *
-sql_id_eq_str_expr(struct Parse *parse, const char *col_name,
-		   const char *col_value)
-{
-	struct Expr *col_name_expr = sql_expr_new_named(TK_ID, col_name);
-	struct Expr *col_value_expr = sql_expr_new_named(TK_STRING, col_value);
-	return sqlPExpr(parse, TK_EQ, col_name_expr, col_value_expr);
-}
-
-void
-vdbe_emit_stat_space_clear(struct Parse *parse, const char *stat_table_name,
-			   const char *idx_name, const char *table_name)
-{
-	assert(idx_name != NULL || table_name != NULL);
-	struct SrcList *src_list = sql_src_list_new();
-	src_list->a[0].zName = sql_xstrdup(stat_table_name);
-	struct Expr *expr, *where = NULL;
-	if (idx_name != NULL) {
-		expr = sql_id_eq_str_expr(parse, "idx", idx_name);
-		where = sql_and_expr_new(expr, where);
-	}
-	if (table_name != NULL) {
-		expr = sql_id_eq_str_expr(parse, "tbl", table_name);
-		where = sql_and_expr_new(expr, where);
-	}
-	/**
-	 * On memory allocation error sql_table delete_from
-	 * releases memory for its own.
-	 */
-	sql_table_delete_from(parse, src_list, where);
-}
-
-/**
  * Generate VDBE program to remove entry from _index space.
  *
  * @param parse_context Parsing context.
