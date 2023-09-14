@@ -47,6 +47,18 @@ g.test_compat_c_func_iproto_multireturn = function()
 
         -- Test the default behaviour.
         compat.c_func_iproto_multireturn = 'default'
-        t.assert_equals({connect:call(C_FUNC)}, EXPECTED_OLD)
+        t.assert_equals({connect:call(C_FUNC)}, EXPECTED_NEW)
+    end)
+end
+
+-- Test for consistent results when calling the C function locally
+-- and via iproto.
+g.test_c_func_consistent_results = function()
+    g.server:exec(function()
+        local net = require('net.box')
+        -- This function returns `true` and `-1` as the results.
+        local C_FUNC = 'gh_4799_lib.multires'
+        local connect = net:connect(box.cfg.listen)
+        t.assert_equals({connect:call(C_FUNC)}, {box.func[C_FUNC]:call()})
     end)
 end

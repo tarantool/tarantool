@@ -176,7 +176,7 @@ local options = {
         action = tweak_action('box_session_push_is_disabled', false, true),
     },
     c_func_iproto_multireturn = {
-        default = 'old',
+        default = 'new',
         obsolete = nil,
         brief = C_FUNC_IPROTO_MULTIRETURN_BRIEF,
         run_action_now = true,

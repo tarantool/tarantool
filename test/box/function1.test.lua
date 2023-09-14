@@ -276,8 +276,6 @@ box.schema.func.create(name, {language = "C", exports = {'LUA'}})
 box.func[name]:call()
 
 box.schema.user.grant('guest', 'super')
--- Netbox:call() returns not the same as local call for C
--- functions, see #4799.
 net:connect(box.cfg.listen):call(name)
 box.schema.user.revoke('guest', 'super')
 
