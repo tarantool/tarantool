@@ -1047,8 +1047,6 @@ sql_expr_new_dequoted(int op, const struct Token *token)
 	if (token == NULL || token->n == 0)
 		return e;
 	e->u.zToken = (char *) &e[1];
-	if (token->z[0] == '"')
-		e->flags |= EP_DblQuoted;
 	if (op != TK_ID && op != TK_COLLATE && op != TK_FUNCTION) {
 		memcpy(e->u.zToken, token->z, token->n);
 		e->u.zToken[token->n] = '\0';

@@ -1415,8 +1415,6 @@ struct Expr {
 #define EP_Error     0x000008	/* Expression contains one or more errors */
 #define EP_Distinct  0x000010	/* Aggregate function with DISTINCT keyword */
 #define EP_VarSelect 0x000020	/* pSelect is correlated, not constant */
-#define EP_DblQuoted 0x000040	/* token.z was originally in "..." */
-#define EP_InfixFunc 0x000080	/* True for an infix function: LIKE, etc */
 #define EP_Collate   0x000100	/* Tree contains a TK_COLLATE operator */
 #define EP_IntValue  0x000400	/* Integer value contained in u.iValue */
 #define EP_xIsSelect 0x000800	/* x.pSelect is valid (otherwise x.pList is) */
@@ -1430,7 +1428,6 @@ struct Expr {
 #define EP_ConstFunc 0x080000	/* A sql_FUNC_CONSTANT or _SLOCHNG function */
 #define EP_CanBeNull 0x100000	/* Can be null despite NOT NULL constraint */
 #define EP_Subquery  0x200000	/* Tree contains a TK_SELECT operator */
-#define EP_Alias     0x400000	/* Is an alias for a result set column */
 #define EP_Leaf      0x800000	/* Expr.pLeft, .pRight, .u.pSelect all NULL */
 /** Expression is system-defined. */
 #define EP_System    0x1000000
