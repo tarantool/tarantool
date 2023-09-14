@@ -1212,7 +1212,6 @@ expr(A) ::= expr(A) likeop(OP) expr(Y).  [LIKE_KW]  {
   A.pExpr = sqlExprFunction(pParse, pList, &OP);
   exprNot(pParse, bNot, &A);
   A.zEnd = Y.zEnd;
-  if( A.pExpr ) A.pExpr->flags |= EP_InfixFunc;
 }
 expr(A) ::= expr(A) likeop(OP) expr(Y) ESCAPE expr(E).  [LIKE_KW]  {
   ExprList *pList;
@@ -1224,7 +1223,6 @@ expr(A) ::= expr(A) likeop(OP) expr(Y) ESCAPE expr(E).  [LIKE_KW]  {
   A.pExpr = sqlExprFunction(pParse, pList, &OP);
   exprNot(pParse, bNot, &A);
   A.zEnd = E.zEnd;
-  if( A.pExpr ) A.pExpr->flags |= EP_InfixFunc;
 }
 
 %include {

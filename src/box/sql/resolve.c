@@ -111,7 +111,6 @@ resolveAlias(struct ExprList *pEList, int iCol, struct Expr *pExpr,
 		incrAggFunctionDepth(pDup, nSubquery);
 	if (pExpr->op == TK_COLLATE)
 		pDup = sqlExprAddCollateString(pDup, pExpr->u.zToken);
-	ExprSetProperty(pDup, EP_Alias);
 
 	/* Before calling sql_expr_delete(), set the EP_Static flag. This
 	 * prevents ExprDelete() from deleting the Expr structure itself,
