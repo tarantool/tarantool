@@ -900,6 +900,13 @@ g.test_credentials = function()
                                 'drop',
                             },
                             universe = false,
+                            spaces = {
+                                'myspace1',
+                            },
+                            functions = {
+                                'myfunc1',
+                            },
+                            sequences = { },
                         },
                     },
                     roles = {'one', 'two'},
@@ -915,6 +922,13 @@ g.test_credentials = function()
                                 'read',
                             },
                             universe = true,
+                            spaces = { },
+                            functions = {
+                                'myfunc2',
+                            },
+                            sequences = {
+                                'myseq2'
+                            },
                         },
                     },
                     roles = {'one', 'two'},
