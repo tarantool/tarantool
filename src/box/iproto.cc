@@ -1479,10 +1479,15 @@ iproto_connection_delete(struct iproto_connection *con)
 	 */
 	ibuf_destroy(&con->ibuf[0]);
 	ibuf_destroy(&con->ibuf[1]);
+#ifdef ENABLE_ASAN
+	assert(con->obuf[0].iov == NULL);
+	assert(con->obuf[1].iov == NULL);
+#else
 	assert(con->obuf[0].pos == 0 &&
 	       con->obuf[0].iov[0].iov_base == NULL);
 	assert(con->obuf[1].pos == 0 &&
 	       con->obuf[1].iov[0].iov_base == NULL);
+#endif
 
 	assert(mh_size(con->streams) == 0);
 	mh_i64ptr_delete(con->streams);
