@@ -1480,10 +1480,8 @@ iproto_connection_delete(struct iproto_connection *con)
 	 */
 	ibuf_destroy(&con->ibuf[0]);
 	ibuf_destroy(&con->ibuf[1]);
-	assert(con->obuf[0].pos == 0 &&
-	       con->obuf[0].iov[0].iov_base == NULL);
-	assert(con->obuf[1].pos == 0 &&
-	       con->obuf[1].iov[0].iov_base == NULL);
+	assert(!obuf_is_initialized(&con->obuf[0]));
+	assert(!obuf_is_initialized(&con->obuf[1]));
 
 	assert(mh_size(con->streams) == 0);
 	mh_i64ptr_delete(con->streams);
