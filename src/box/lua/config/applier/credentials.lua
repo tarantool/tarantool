@@ -2,6 +2,11 @@ local log = require('internal.config.utils.log')
 local digest = require('digest')
 local fiber = require('fiber')
 
+-- Var is set with the first apply() call.
+local config
+
+-- {{{ Sync helpers
+
 --[[
 This intermediate representation is a formatted set of
 all permissions for a user or role. It is required to
@@ -277,55 +282,261 @@ local function privileges_add_defaults(name, role_or_user, intermediate)
     return res
 end
 
--- The privileges synchronization between A and B is performed in three steps:
--- 1. Grant all privileges that are present in B,
---    but not present in A (`grant(B - A)`).
--- 2. Add default privileges to B (`B = B + defaults`).
--- 3. Revoke all privileges that are not present in B,
---    but present in A (`revoke(A - B)).
---
--- Default privileges are not granted on step 1, so they stay revoked if
--- revoked manually (e.g. with `box.schema.{user,role}.revoke()`).
--- However, defaults should never be revoked, so target state B is enriched
--- with them before step 3.
-local function sync_privileges(name, config_privileges, role_or_user)
-    assert(role_or_user == 'user' or role_or_user == 'role')
-    log.verbose('syncing privileges for %s %q', role_or_user, name)
+-- Get the latest credentials configuration from the config and add empty
+-- default users and roles configuration, if they are missing.
+local function get_credentials(config)
+    local configdata = config._configdata
+    local credentials = configdata:get('credentials')
 
-    local grant_f = function(name, privs, obj_type, obj_name)
-        privs = table.concat(privs, ',')
-        log.debug('credentials.apply: ' .. role_or_user ..
-                  '.grant(%q, %q, %q, %q)', name, privs, obj_type, obj_name)
-        box.schema[role_or_user].grant(name, privs, obj_type, obj_name)
-    end
-    local revoke_f = function(name, privs, obj_type, obj_name)
-        privs = table.concat(privs, ',')
-        log.debug('credentials.apply: ' .. role_or_user ..
-                  '.revoke(%q, %q, %q, %q)', name, privs, obj_type, obj_name)
-        box.schema[role_or_user].revoke(name, privs, obj_type, obj_name)
+    -- If credentials section in config is empty, skip applier.
+    if credentials == nil then
+        return {}
     end
 
-    local box_privileges = box.schema[role_or_user].info(name)
+    -- Tarantool has the following roles and users present by default on every
+    -- instance:
+    --
+    -- Default roles:
+    -- * super
+    -- * public
+    -- * replication
+    --
+    -- Default users:
+    -- * guest
+    -- * admin
+    --
+    -- These roles and users have according privileges pre-granted by design.
+    -- Credentials applier adds such privileges with `priviliges_add_default()`
+    -- when syncing. So, for the excessive (non-default) privs to be removed,
+    -- these roles and users must be present inside configuration at least in a
+    -- form of an empty table. Otherwise, the privileges will be left unchanged,
+    -- similar to all used-defined roles and users.
 
-    config_privileges = privileges_from_config(config_privileges)
-    box_privileges = privileges_from_box(box_privileges)
+    credentials.roles = credentials.roles or {}
+    credentials.roles['super'] = credentials.roles['super'] or {}
+    credentials.roles['public'] = credentials.roles['public'] or {}
+    credentials.roles['replication'] = credentials.roles['replication'] or {}
 
-    local grants = privileges_subtract(config_privileges, box_privileges)
+    credentials.users = credentials.users or {}
+    credentials.users['guest'] = credentials.users['guest'] or {}
+    credentials.users['admin'] = credentials.users['admin'] or {}
 
-    for _, to_grant in ipairs(grants) do
-        grant_f(name, to_grant.privs, to_grant.obj_type, to_grant.obj_name)
-    end
-
-    config_privileges = privileges_add_defaults(name, role_or_user,
-                                                config_privileges)
-
-    local revokes = privileges_subtract(box_privileges, config_privileges)
-
-    for _, to_revoke in ipairs(revokes) do
-        revoke_f(name, to_revoke.privs, to_revoke.obj_type, to_revoke.obj_name)
-    end
-
+    return credentials
 end
+
+-- }}} Sync helpers
+
+-- {{{ Triggers for grants after obj creation
+
+-- This is fiber channel that contains all scheduled tasks
+-- in form of a table with the following format:
+-- {type = 'BLOCKING_FULL_SYNC'/'BACKGROUND_FULL_SYNC'/obj_type,
+--  name = obj_name}
+local sync_tasks
+
+-- This is a map of all objects that are mentioned in the config.
+-- It is always in sync with the latest reload and has the following format:
+-- [obj_type][obj_name] = true/nil
+local target_object_map = {
+    ['space'] = {},
+    ['function'] = {},
+    ['sequence'] = {},
+}
+
+-- Iterate through requests and sync when the according flag is set.
+local function on_commit_trigger(iterator)
+    log.debug('credentials.apply: on_commit_trigger() started')
+    for _, old_obj, new_obj, space_id in iterator() do
+
+        local obj_type
+        if space_id == box.schema.SPACE_ID then
+            obj_type = 'space'
+        elseif space_id == box.schema.FUNC_ID then
+            obj_type = 'function'
+        elseif space_id == box.schema.SEQUENCE_ID then
+            obj_type = 'sequence'
+        else
+            goto skip
+        end
+
+        if new_obj == nil then
+            goto skip
+        end
+
+        -- Check if the request is for obj creation or obj rename.
+        if old_obj == nil or old_obj.name ~= new_obj.name then
+            local obj_name = new_obj.name
+
+            -- Check that the object is present inside config.
+            if target_object_map[obj_type][obj_name] then
+                if not sync_tasks:is_full() then
+                    sync_tasks:put({name = obj_name, type = obj_type})
+                else
+                    -- In some rare cases the channel can fill up.
+                    -- It means that a great number of objects requires
+                    -- sync. Thus perform a full synchronization.
+                    while not sync_tasks:is_empty() do
+                        sync_tasks:get()
+                    end
+                    sync_tasks:put({type = 'BACKGROUND_FULL_SYNC'})
+                end
+            end
+        end
+
+        ::skip::
+    end
+    log.debug('credentials.apply: on_commit_trigger() finished')
+end
+
+-- Check that request is space/function/sequence creation or rename
+-- and set on_commit_trigger for the transaction.
+local function on_replace_trigger(old_obj, new_obj, obj_type, request_type)
+    log.debug('credentials.apply: on_replace_trigger() started')
+    if box.session.type() == 'applier' then
+        -- The request is caused by replication, so the instance is in
+        -- RO mode. Thus, skip all applier actions.
+        return
+    end
+
+    if obj_type == '_space' then
+        obj_type = 'space'
+    elseif obj_type == '_func' then
+        obj_type = 'function'
+    elseif obj_type == '_sequence' then
+        obj_type = 'sequence'
+    else
+        return
+    end
+
+    -- Check if the request is object creation or rename
+    if new_obj == nil then
+        return
+    end
+
+    if not ((request_type == 'INSERT' and old_obj == nil) or
+            (request_type == 'UPDATE' and old_obj ~= nil and
+                old_obj.name ~= new_obj.name)) then
+        return
+    end
+
+    local obj_name = new_obj.name
+    -- Check that the object is present inside config.
+    if not target_object_map[obj_type][obj_name] then
+        return
+    end
+
+    -- Set the on_commit trigger to apply the action. Action could not
+    -- be applied at this point because the object may not be fully
+    -- registered.
+    box.on_commit(on_commit_trigger)
+    log.debug('credentials.apply: on_replace_trigger() finished')
+end
+
+-- }}} Triggers for grants after obj creation
+
+-- {{{ Main sync logic
+
+-- Grant or revoke some user/role privileges for an object.
+local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
+                                     obj_type, obj_name)
+    assert(grant_or_revoke == 'grant' or grant_or_revoke == 'revoke')
+    privs = table.concat(privs, ',')
+
+    -- Try to apply the action immediately. If the object doesn't exist,
+    -- the sync will be applied inside the trigger on object creation/rename.
+    local ok, err = pcall(box.schema[role_or_user][grant_or_revoke],
+                          name, privs, obj_type, obj_name)
+
+    if ok then
+        log.debug('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q)',
+                  role_or_user, grant_or_revoke, name, privs,
+                  obj_type, obj_name)
+        return
+    end
+    if err.code ~= box.error.NO_SUCH_SPACE and
+            err.code ~= box.error.NO_SUCH_FUNCTION and
+            err.code ~= box.error.NO_SUCH_SEQUENCE then
+        err = ('box.schema.%s.%s(%q, %q, %q, %q) failed: %s'):format(
+                  role_or_user, grant_or_revoke, name, privs,
+                  obj_type, obj_name, err)
+        config:_alert({type = 'warn', message = err})
+    end
+end
+
+-- Perform a synchronization of privileges for all users/roles.
+-- obj_to_sync is an optional parameter, if it is non-nil,
+-- the sync is being performed only for the provided object.
+local function sync_privileges(credentials, obj_to_sync)
+    assert(obj_to_sync == nil or type(obj_to_sync) == 'table')
+
+    if obj_to_sync then
+        log.verbose('syncing privileges for %s %q', obj_to_sync.type,
+                                                    obj_to_sync.name)
+    end
+
+    -- The privileges synchronization between A and B is performed in 3 steps:
+    -- 1. Grant all privileges that are present in B,
+    --    but not present in A (`grant(B - A)`).
+    -- 2. Add default privileges to B (`B = B + defaults`).
+    -- 3. Revoke all privileges that are not present in B,
+    --    but present in A (`revoke(A - B)).
+    --
+    -- Default privileges are not granted on step 1, so they stay revoked if
+    -- revoked manually (e.g. with `box.schema.{user,role}.revoke()`).
+    -- However, defaults should never be revoked, so target state B is enriched
+    -- with them before step 3.
+    local function sync(role_or_user, name, config_privileges)
+        assert(role_or_user == 'user' or role_or_user == 'role')
+        if not obj_to_sync then
+            log.verbose('syncing privileges for %s %q', role_or_user, name)
+        end
+
+        local box_privileges = box.schema[role_or_user].info(name)
+
+        config_privileges = privileges_from_config(config_privileges)
+        box_privileges = privileges_from_box(box_privileges)
+
+        local grants = privileges_subtract(config_privileges, box_privileges)
+
+        for _, to_grant in ipairs(grants) do
+            -- Note that grants are filtered per object, if required.
+            if obj_to_sync == nil or (obj_to_sync.type == to_grant.obj_type and
+                                     obj_to_sync.name == to_grant.obj_name) then
+                privileges_action_f('grant', role_or_user, name, to_grant.privs,
+                                    to_grant.obj_type, to_grant.obj_name)
+            end
+        end
+
+        config_privileges = privileges_add_defaults(name, role_or_user,
+                                                    config_privileges)
+
+        local revokes = privileges_subtract(box_privileges, config_privileges)
+
+        for _, to_revoke in ipairs(revokes) do
+            -- Note that revokes are filtered per object, if required.
+            if obj_to_sync == nil or (obj_to_sync.type == to_revoke.obj_type and
+                                    obj_to_sync.name == to_revoke.obj_name) then
+                privileges_action_f('revoke', role_or_user, name,
+                                    to_revoke.privs, to_revoke.obj_type,
+                                    to_revoke.obj_name)
+            end
+        end
+    end
+
+    -- Note that the logic inside the sync() function, i.e. privileges dump
+    -- from box, diff calculation and grants/revokes should happen inside one
+    -- transaction.
+
+    for name, user_def in pairs(credentials.users or {}) do
+        sync('user', name, user_def)
+    end
+
+    for name, role_def in pairs(credentials.roles or {}) do
+        sync('role', name, role_def)
+    end
+end
+
+-- }}} Main sync logic
 
 -- {{{ Create roles
 
@@ -333,27 +544,15 @@ local function create_role(role_name)
     if box.schema.role.exists(role_name) then
         log.verbose('credentials.apply: role %q already exists', role_name)
     else
+        log.verbose('credentials.apply: create role %q', role_name)
         box.schema.role.create(role_name)
     end
 end
 
--- Create roles, grant them permissions and assign underlying
--- roles.
 local function create_roles(role_map)
-    if role_map == nil then
-        return
-    end
-
     for role_name, role_def in pairs(role_map or {}) do
         if role_def ~= nil then
             create_role(role_name)
-        end
-    end
-
-    -- Sync privileges and assign underlying roles.
-    for role_name, role_def in pairs(role_map or {}) do
-        if role_def ~= nil then
-            sync_privileges(role_name, role_def, 'role')
         end
     end
 end
@@ -405,7 +604,8 @@ local function set_password(user_name, password)
     end
 
     if user_name == 'guest' then
-        error('Setting a password for the guest user is not allowed')
+        config:_alert({type = 'warn',
+            message = 'Setting a password for the guest user is not allowed'})
     end
 
     local auth_def = box.space._user.index.name:get({user_name})[5]
@@ -449,100 +649,152 @@ local function set_password(user_name, password)
     end
 end
 
--- Create users, set them passwords, assign roles, grant
--- permissions.
 local function create_users(user_map)
-    if user_map == nil then
-        return
-    end
-
     for user_name, user_def in pairs(user_map or {}) do
         if user_def ~= nil then
             create_user(user_name)
             set_password(user_name, user_def.password)
-            sync_privileges(user_name, user_def, 'user')
         end
     end
 end
 
 -- }}} Create users
 
-local fiber_wait_rw
+-- {{{ Applier
 
-local function set_credentials(config)
-    -- Credentials cannot be applied when instance is in Read Only state,
-    -- thus set_credentials() must be called only on Read Write instance.
-    assert(not box.info.ro)
-
-    local configdata = config._configdata
-    local credentials = configdata:get('credentials')
-    if credentials == nil then
-        return
+-- Objects that are inside the config must be registered in target_object_map,
+-- so they will trigger synchronization every time an object with such name
+-- is created or is being renamed to the config-provided name.
+local function register_objects(users_or_roles_config)
+    for _name, config in pairs(users_or_roles_config or {}) do
+        local privileges = privileges_from_config(config)
+        for obj_type in pairs(target_object_map) do
+            for obj_name in pairs(privileges[obj_type] or {}) do
+                target_object_map[obj_type][obj_name] = true
+            end
+        end
     end
-
-    -- Tarantool has the following roles and users present by default on every
-    -- instance:
-    --
-    -- Default roles:
-    -- * super
-    -- * public
-    -- * replication
-    --
-    -- Default users:
-    -- * guest
-    -- * admin
-    --
-    -- These roles and users have according privileges pre-granted by design.
-    -- Credentials applier adds such privileges with `priviliges_add_default()`
-    -- when syncing. So, for the excessive (non-default) privs to be removed,
-    -- these roles and users must be present inside configuration at least in a
-    -- form of an empty table. Otherwise, the privileges will be left unchanged,
-    -- similar to all used-defined roles and users.
-
-    credentials.roles = credentials.roles or {}
-    credentials.roles['super'] = credentials.roles['super'] or {}
-    credentials.roles['public'] = credentials.roles['public'] or {}
-    credentials.roles['replication'] = credentials.roles['replication'] or {}
-
-    credentials.users = credentials.users or {}
-    credentials.users['guest'] = credentials.users['guest'] or {}
-    credentials.users['admin'] = credentials.users['admin'] or {}
-
-    -- Create roles and users and synchronise privileges for them.
-    create_roles(credentials.roles)
-    create_users(credentials.users)
 end
 
-local function wait_rw(config)
-    if box.info.ro then
-        log.verbose('credentials.apply: Tarantool is in Read Only mode ' ..
-                    'credentials will be set up in the background when it ' ..
-                    'is switched to Read Write mode')
-        box.ctl.wait_rw()
+-- Fiber channel for resulting message to block execution
+-- of main fiber in case of 'BLOCKING_FULL_SYNC'.
+local wait_sync
+
+-- The worker gets synchronization commands from sync_tasks.
+-- If the instance is in RO mode, the worker will wait for it
+-- to be switched to RW.
+-- Possible commands:
+-- {type = 'BLOCKING_FULL_SYNC'} - perform a full sync, write message
+--                                 to `wait_sync` on return
+-- {type = 'BACKGROUND_FULL_SYNC'} - perform a full sync, skip return message
+-- {type = obj_type, name = obj_name} - perform a per-object sync, skip
+--                                      return message
+local function sync_credentials_worker()
+    while true do
+        local obj_to_sync = sync_tasks:get()
+
+        if obj_to_sync.type == 'BLOCKING_FULL_SYNC' or
+                obj_to_sync.type == 'BACKGROUND_FULL_SYNC' then
+
+            if box.info.ro then
+                log.verbose('credentials.apply: Tarantool is in Read Only ' ..
+                            'mode credentials will be set up in the ' ..
+                            'background when it is switched to Read Write mode')
+                box.ctl.wait_rw()
+            end
+
+            -- On config reload, drop the old list of registered objects.
+            target_object_map = {
+                ['space'] = {},
+                ['function'] = {},
+                ['sequence'] = {},
+            }
+
+            local credentials = get_credentials(config)
+
+            register_objects(credentials.roles)
+            register_objects(credentials.users)
+
+            box.atomic(function()
+                create_roles(credentials.roles)
+                create_users(credentials.users)
+
+                sync_privileges(credentials)
+            end)
+
+            if obj_to_sync.type == 'BLOCKING_FULL_SYNC' then
+                wait_sync:put('Done')
+            end
+        else
+            local credentials = get_credentials(config)
+
+            box.atomic(sync_privileges, credentials, obj_to_sync)
+        end
     end
-    set_credentials(config)
 end
 
-local function apply(config)
+-- Credentials are being synced inside this dedicated fiber worker.
+local sync_credentials_fiber
+
+-- One-shot flag. It indicates that on_replace triggers are
+-- set for box.space._space/_func/_sequence.
+local triggers_are_set
+
+local function apply(config_module)
+    config = config_module
+
+    -- Create a fiber channel for scheduled tasks for sync worker.
+    if not sync_tasks then
+        -- There is no good reason to have the channel capacity limited,
+        -- but tarantool fiber channels have an upper limit by design.
+        -- Thus, in rare cases when the channel is full, the mandatory
+        -- full sync is executed, dropping all other scheduled tasks.
+        sync_tasks = fiber.channel(1024)
+    else
+        -- Clear scheduled syncs on reload. Full sync will be executed
+        -- afterwards anyway.
+        while not sync_tasks:is_empty() do
+            sync_tasks:get()
+        end
+    end
+
+    if not wait_sync then
+        wait_sync = fiber.channel()
+    end
+
+    -- Set trigger on after space/function/sequence creation.
+    if not triggers_are_set then
+        triggers_are_set = true
+        box.space._space:on_replace(on_replace_trigger)
+        box.space._func:on_replace(on_replace_trigger)
+        box.space._sequence:on_replace(on_replace_trigger)
+    end
+
     -- Fiber is required here to have the credentials synced in the background
     -- when Tarantool is in Read Only mode after it is switched to RW.
 
     -- Note that only one fiber exists at a time.
-    if fiber_wait_rw == nil or fiber_wait_rw:status() == 'dead' then
-        fiber_wait_rw = fiber.new(wait_rw, config)
+    if sync_credentials_fiber == nil or
+            sync_credentials_fiber:status() == 'dead' then
+        sync_credentials_fiber = fiber.new(sync_credentials_worker)
     end
 
     -- If Tarantool is already in Read Write mode, credentials are still
     -- applied in the fiber to avoid possible concurrency issues, but the
-    -- main applier fiber is blocked by the `join()`.
+    -- main applier fiber is blocked by `wait_sync`.
     if not box.info.ro then
-        fiber_wait_rw:set_joinable(true)
-        local ok, err = fiber_wait_rw:join()
-        if not ok then
-            error(err)
-        end
+        -- Schedule a full sync with a result message on return.
+        sync_tasks:put({type = 'BLOCKING_FULL_SYNC'})
+
+        wait_sync:get()
+    else
+        -- Schedule a full sync in the background. It will be executed
+        -- when the instance switches to RW.
+        sync_tasks:put({type = 'BACKGROUND_FULL_SYNC'})
     end
 end
+
+-- }}} Applier
 
 return {
     name = 'credentials',

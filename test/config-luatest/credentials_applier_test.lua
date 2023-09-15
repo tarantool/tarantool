@@ -435,23 +435,31 @@ g.test_sync_privileges = function(g)
         },
     }
 
-    local config_privileges = {
-        privileges = {{
-                permissions = {
-                    'write',
-                    'execute',
+    local credentials = {
+        users = {
+            guest = {
+                roles = { 'super' }
+            },
+            myuser = {
+                privileges = {
+                    {
+                        permissions = {
+                            'write',
+                            'execute',
+                        },
+                        universe = true,
+                    }, {
+                        permissions = {
+                            'session',
+                            'usage',
+                        },
+                        universe = true,
+                    },
                 },
-                universe = true,
-            }, {
-                permissions = {
-                    'session',
-                    'usage',
+                roles = {
+                    'public',
                 },
-                universe = true,
-            }
-        },
-        roles = {
-            'public'
+            },
         },
     }
 
@@ -478,16 +486,17 @@ g.test_sync_privileges = function(g)
     child:roundtrip("sync_privileges = require('internal.config.applier." ..
                     "credentials')._internal.sync_privileges")
     child:roundtrip("json = require('json')")
-    child:roundtrip(("config_privileges = json.decode(%q)"):format(
-                     json.encode(config_privileges)))
-    child:roundtrip(("sync_privileges(%q, config_privileges, 'user')")
+    child:roundtrip(("credentials = json.decode(%q)"):format(
+                     json.encode(credentials)))
+    child:roundtrip(("sync_privileges(credentials)")
                     :format(name))
 
     child:execute_command(("box.schema.user.info('%s')"):format(name))
     local result_privileges = child:read_response()
 
     result_privileges = internal.privileges_from_box(result_privileges)
-    config_privileges = internal.privileges_from_config(config_privileges)
+    local config_privileges = internal.privileges_from_config(
+                                            credentials.users.myuser)
 
     config_privileges = internal.privileges_add_defaults(name, "user",
                                                          config_privileges)
@@ -781,5 +790,379 @@ g.test_sync_ro_rw = function(g)
                 end
             )
         end,
+    })
+end
+
+g.test_postpone_grants_till_creation = function(g)
+    local iconfig = {
+        credentials = {
+            users = {
+                guest = {
+                    roles = { 'super' }
+                },
+                myuser1 = {
+                    privileges = {
+                        {
+                            permissions = {
+                                'read',
+                                'write',
+                            },
+                            spaces = {
+                                'myspace1',
+                                'myspace2',
+                            },
+                            sequences = {
+                                'myseq1',
+                                'myseq2',
+                            }
+                        }, {
+                            permissions = {
+                                'execute',
+                            },
+                            functions = {
+                                'myfunc1',
+                                'myfunc2',
+                            },
+                        },
+                    },
+                },
+                myuser2 = {
+                    privileges = {
+                        {
+                            permissions = {
+                                'read',
+                                'write',
+                            },
+                            spaces = {
+                                'myspace1',
+                                'myspace3',
+                            },
+                            sequences = {
+                                'myseq1',
+                                'myseq3',
+                            }
+                        }, {
+                            permissions = {
+                                'execute',
+                            },
+                            functions = {
+                                'myfunc1',
+                                'myfunc3',
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    -- Check that grants are correctly postponed and applied when object
+    -- is being created at runtime.
+    helpers.reload_success_case(g, {
+        options = iconfig,
+        verify = function()
+            box.schema.space.create('myspace1')
+            box.schema.func.create('myfunc2')
+            box.schema.sequence.create('myseq3')
+
+            local internal =
+                    require('internal.config.applier.credentials')._internal
+
+            local perm_1 = box.schema.user.info('myuser1')
+            perm_1 = internal.privileges_from_box(perm_1)
+
+            local perm_2 = box.schema.user.info('myuser2')
+            perm_2 = internal.privileges_from_box(perm_2)
+
+            t.assert_equals(perm_1['space']['myspace1'],
+                                {read = true, write = true})
+            t.assert_equals(perm_2['space']['myspace1'],
+                                {read = true, write = true})
+            t.assert_equals(perm_1['function']['myfunc2'],
+                                {execute = true})
+            t.assert_equals(perm_2['function']['myfunc2'], nil)
+            t.assert_equals(perm_1['sequence']['myseq3'], nil)
+            t.assert_equals(perm_2['sequence']['myseq3'],
+                                {read = true, write = true})
+
+            t.assert_equals(perm_1['space']['myspace2'], nil)
+            t.assert_equals(perm_2['space']['myspace3'], nil)
+            t.assert_equals(perm_1['function']['myfunc1'], nil)
+            t.assert_equals(perm_2['function']['myfunc3'], nil)
+            t.assert_equals(perm_1['sequence']['myseq1'], nil)
+            t.assert_equals(perm_2['sequence']['myseq1'], nil)
+        end,
+        options_2 = iconfig,
+        verify_2 = function(iconfig)
+            box.schema.space.create('myspace2')
+            box.schema.space.create('myspace3')
+            box.schema.func.create('myfunc1')
+            box.schema.func.create('myfunc3')
+            box.schema.sequence.create('myseq1')
+            box.schema.sequence.create('myseq2')
+
+            local internal =
+                    require('internal.config.applier.credentials')._internal
+
+            local perm_1 = box.schema.user.info('myuser1')
+            perm_1 = internal.privileges_from_box(perm_1)
+
+            local perm_2 = box.schema.user.info('myuser2')
+            perm_2 = internal.privileges_from_box(perm_2)
+
+            local exp_perm_1 = iconfig.credentials.users.myuser1
+            exp_perm_1 = internal.privileges_from_config(exp_perm_1)
+            exp_perm_1 = internal.privileges_add_defaults('myuser1', 'user',
+                                                          exp_perm_1)
+
+            local exp_perm_2 = iconfig.credentials.users.myuser2
+            exp_perm_2 = internal.privileges_from_config(exp_perm_2)
+            exp_perm_2 = internal.privileges_add_defaults('myuser2', 'user',
+                                                          exp_perm_2)
+
+            t.assert_equals(perm_1, exp_perm_1)
+            t.assert_equals(perm_2, exp_perm_2)
+
+            -- Recheck relevant permissions without privileges_from_config()
+            -- and privileges_add_defaults() helper function, in case they
+            -- are faulty.
+            t.assert_equals(perm_1['space']['myspace1'],
+                                {read = true, write = true})
+            t.assert_equals(perm_1['space']['myspace2'],
+                                {read = true, write = true})
+            t.assert_equals(perm_1['sequence']['myseq1'],
+                                {read = true, write = true})
+            t.assert_equals(perm_1['sequence']['myseq2'],
+                                {read = true, write = true})
+            t.assert_equals(perm_1['function']['myfunc1'],
+                                {execute = true})
+            t.assert_equals(perm_1['function']['myfunc2'],
+                                {execute = true})
+
+            t.assert_equals(perm_2['space']['myspace1'],
+                                {read = true, write = true})
+            t.assert_equals(perm_2['space']['myspace3'],
+                                {read = true, write = true})
+            t.assert_equals(perm_2['sequence']['myseq1'],
+                                {read = true, write = true})
+            t.assert_equals(perm_2['sequence']['myseq3'],
+                                {read = true, write = true})
+            t.assert_equals(perm_2['function']['myfunc1'],
+                                {execute = true})
+            t.assert_equals(perm_2['function']['myfunc3'],
+                                {execute = true})
+
+        end,
+        verify_args_2 = {iconfig},
+    })
+end
+
+g.test_postpone_grants_till_rename = function(g)
+    -- Check that basic object rename is handled correctly.
+    helpers.success_case(g, {
+        options = {
+            credentials = {
+                users = {
+                    guest = {
+                        roles = { 'super' }
+                    },
+                    myuser1 = {
+                        privileges = {
+                            {
+                                permissions = {
+                                    'read',
+                                    'write',
+                                },
+                                spaces = {
+                                    'myspace1',
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        verify = function()
+            box.schema.space.create('myspace2')
+
+            local internal =
+                    require('internal.config.applier.credentials')._internal
+
+            local perm_1 = box.schema.user.info('myuser1')
+            perm_1 = internal.privileges_from_box(perm_1)
+
+            t.assert_equals(perm_1['space']['myspace1'], nil)
+
+            box.space['myspace2']:rename('myspace1')
+
+            local perm_2 = box.schema.user.info('myuser1')
+            perm_2 = internal.privileges_from_box(perm_2)
+
+            t.assert_equals(perm_2['space']['myspace1'],
+                                {read = true, write = true})
+
+            t.assert_equals(perm_2['space']['myspace2'], nil)
+        end
+    })
+
+    -- Test that when one object is renamed to another with colliding
+    -- permissions. Both objects should have correct permissions after
+    -- each creation/rename, because it is their first appearance after
+    -- reload.
+
+    local iconfig = {
+        credentials = {
+            users = {
+                guest = {
+                    roles = { 'super' }
+                },
+                myuser = {
+                    privileges = {
+                        {
+                            permissions = {
+                                'read',
+                            },
+                            spaces = {
+                                'myspace1',
+                            },
+                        }, {
+                            permissions = {
+                                'read',
+                                'write',
+                            },
+                            spaces = {
+                                'myspace2',
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    helpers.reload_success_case(g, {
+        options = iconfig,
+        verify = function()
+            box.schema.space.create('myspace1')
+
+            local internal =
+                    require('internal.config.applier.credentials')._internal
+
+            local perm_1 = box.schema.user.info('myuser')
+            perm_1 = internal.privileges_from_box(perm_1)
+
+            t.assert_equals(perm_1['space']['myspace1'],
+                                {read = true})
+
+            t.assert_equals(perm_1['space']['myspace2'], nil)
+
+            box.space['myspace1']:rename('myspace2')
+
+            local perm_2 = box.schema.user.info('myuser')
+            perm_2 = internal.privileges_from_box(perm_2)
+
+            t.assert_equals(perm_2['space']['myspace2'],
+                                {read = true, write = true})
+
+            t.assert_equals(perm_2['space']['myspace1'], nil)
+        end,
+        options_2 = iconfig,
+        verify_2 = function(iconfig)
+            box.schema.space.create('myspace1')
+
+            local internal =
+                    require('internal.config.applier.credentials')._internal
+
+            local perm = box.schema.user.info('myuser')
+            perm = internal.privileges_from_box(perm)
+
+            local exp_perm = iconfig.credentials.users.myuser
+            exp_perm = internal.privileges_from_config(exp_perm)
+            exp_perm = internal.privileges_add_defaults('myuser', 'user',
+                                                        exp_perm)
+            t.assert_equals(perm, exp_perm)
+
+            -- Recheck relevant permissions without privileges_from_config()
+            -- and privileges_add_defaults() helper function, in case they
+            -- are faulty.
+            t.assert_equals(perm['space']['myspace1'],
+                                {read = true})
+            t.assert_equals(perm['space']['myspace2'],
+                                {read = true, write = true})
+        end,
+        verify_args_2 = {iconfig},
+    })
+
+
+    -- Switch names of two spaces and check that privileges are
+    -- in sync with config.
+    iconfig  = {
+        credentials = {
+            users = {
+                guest = {
+                    roles = { 'super' }
+                },
+                myuser = {
+                    privileges = {
+                        {
+                            permissions = {
+                                'write',
+                            },
+                            spaces = {
+                                'myspace1',
+                            },
+                        }, {
+                            permissions = {
+                                'read',
+                                'alter',
+                            },
+                            spaces = {
+                                'myspace2',
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    helpers.success_case(g, {
+        options = iconfig,
+        verify = function(iconfig)
+            local internal =
+                    require('internal.config.applier.credentials')._internal
+
+            local function check_sync()
+
+                local perm = box.schema.user.info('myuser')
+                perm = internal.privileges_from_box(perm)
+
+                local exp_perm = iconfig.credentials.users.myuser
+                exp_perm = internal.privileges_from_config(exp_perm)
+                exp_perm = internal.privileges_add_defaults('myuser', 'user',
+                                                            exp_perm)
+                t.assert_equals(perm, exp_perm)
+
+                -- Recheck relevant permissions without privileges_from_config()
+                -- and privileges_add_defaults() helper function, in case they
+                -- are faulty.
+                t.assert_equals(perm['space']['myspace1'],
+                                    {write = true})
+                t.assert_equals(perm['space']['myspace2'],
+                                    {read = true, alter = true})
+            end
+
+            box.schema.space.create('myspace1')
+            box.schema.space.create('myspace2')
+
+            check_sync()
+
+            box.space.myspace1:rename('myspace_tmp')
+            box.space.myspace2:rename('myspace1')
+            box.space.myspace_tmp:rename('myspace2')
+
+            check_sync()
+        end,
+        verify_args = {iconfig},
     })
 end
