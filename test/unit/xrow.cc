@@ -720,13 +720,56 @@ test_xrow_decode_error_gh_9098(void)
 	footer();
 }
 
+static void
+test_xrow_decode_error_gh_9136(void)
+{
+	header();
+	plan(1);
+
+	uint8_t data[] = {
+		0x81, /* MP_MAP of 1 element */
+		0x52, /* IPROTO_ERROR: */
+		0x82, /* MP_MAP of 2 elements */
+		0x00, /* MP_ERROR_STACK: */
+		0x91, /* MP_ARRAY of 1 element */
+		0x83, /* MP_MAP of 3 elements */
+		0x00, 0xa1, 0x00, /* MP_ERROR_TYPE: "" */
+		0x01, 0xa1, 0x00, /* MP_ERROR_FILE: "" */
+		0x03, 0xa1, 0x00, /* MP_ERROR_MESSAGE: "" */
+		0x00, /* MP_ERROR_STACK: */
+		0x91, /* MP_ARRAY of 1 element */
+		0x83, /* MP_MAP of 3 elements */
+		0x00, 0xa1, 0x00, /* MP_ERROR_TYPE: "" */
+		0x01, 0xa1, 0x00, /* MP_ERROR_FILE: "" */
+		0x03, 0xa1, 0x00, /* MP_ERROR_MESSAGE: "" */
+	};
+
+	struct iovec body;
+	body.iov_base = (void *)data;
+	body.iov_len = sizeof(data);
+
+	struct xrow_header row;
+	row.type = IPROTO_TYPE_ERROR | 9136;
+	row.body[0] = body;
+	row.bodycnt = 1;
+
+	xrow_decode_error(&row);
+
+	struct error *e = diag_last_error(diag_get());
+	is(e->code, 9136, "xrow_decode_error");
+	diag_destroy(diag_get());
+
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	header();
-	plan(11);
+	plan(12);
 
 	random_init();
 
@@ -742,6 +785,7 @@ main(void)
 	test_xrow_decode_error_3();
 	test_xrow_decode_error_4();
 	test_xrow_decode_error_gh_9098();
+	test_xrow_decode_error_gh_9136();
 
 	random_free();
 	fiber_free();

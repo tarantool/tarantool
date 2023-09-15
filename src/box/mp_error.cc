@@ -485,6 +485,11 @@ error_unpack_unsafe(const char **data)
 		uint64_t key = mp_decode_uint(data);
 		switch(key) {
 		case MP_ERROR_STACK: {
+			if (err != NULL) {
+				diag_set(ClientError, ER_INVALID_MSGPACK,
+					 "Invalid MP_ERROR MsgPack format");
+				goto error;
+			}
 			if (mp_typeof(**data) != MP_ARRAY) {
 				diag_set(ClientError, ER_INVALID_MSGPACK,
 					 "Invalid MP_ERROR MsgPack format");
