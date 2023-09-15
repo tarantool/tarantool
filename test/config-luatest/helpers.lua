@@ -201,6 +201,7 @@ end
 -- * opts.script
 -- * opts.options
 -- * opts.verify
+-- * opts.verify_args
 --
 --   Same as in success_case().
 --
@@ -221,11 +222,16 @@ end
 -- * opts.verify_2
 --
 --   Verify test invariants after config:reload().
+--
+-- * opts.verify_args_2
+--
+--   Arguments for the second verify function.
 local function reload_success_case(g, opts)
     local roles_2 = opts.roles_2
     local script_2 = opts.script_2
     local options = assert(opts.options)
     local verify_2 = assert(opts.verify_2)
+    local verify_args_2 = opts.verify_args_2
     local options_2 = opts.options_2 or options
 
     local prepared = success_case(g, opts)
@@ -240,7 +246,7 @@ local function reload_success_case(g, opts)
         local config = require('config')
         config:reload()
     end)
-    g.server:exec(verify_2)
+    g.server:exec(verify_2, verify_args_2)
 end
 
 -- Start a server, write a new script/config, reload, run a
