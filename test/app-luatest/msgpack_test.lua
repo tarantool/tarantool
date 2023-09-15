@@ -678,6 +678,14 @@ g_error_details.test_error_details = function(cg)
             prev = {message = 'MP_ERROR_STACK is missing', offset = 1},
         },
     })
+    check_error('\xc7\x10\x03\x82\x00\x91\x83\x00\xa1\x00\x01\xa1\x00\x03' ..
+                '\xa1\x00\x00\x91\x00', {
+        message = 'invalid extension', offset = 3, ext_len = 16, ext_type = 3,
+        prev = {
+            message = 'cannot unpack error',
+            prev = {message = 'duplicate MP_ERROR_STACK key', offset = 14},
+        },
+    })
     check_error('\xc7\x04\x03\x81\x00\x91\x80', {
         message = 'invalid extension', offset = 3, ext_len = 4, ext_type = 3,
         prev = {

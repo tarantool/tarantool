@@ -480,6 +480,11 @@ error_unpack_unsafe(const char **data)
 		uint64_t key = mp_decode_uint(data);
 		switch(key) {
 		case MP_ERROR_STACK: {
+			if (err != NULL) {
+				diag_set(ClientError, ER_INVALID_MSGPACK,
+					 "duplicate MP_ERROR_STACK key");
+				goto error;
+			}
 			if (CHECK_MP_TYPE(data, MP_ARRAY,
 					  "MP_ERROR_STACK value") != 0)
 				goto error;
