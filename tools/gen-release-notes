@@ -12,7 +12,7 @@ import subprocess
 # {{{ Redefinitions
 
 # Ensure certain order for known sections.
-SECTIONS_TOP = ['enterprise', 'core', 'memtx', 'vinyl', 'replication', 'swim',
+SECTIONS_TOP = ['core', 'memtx', 'vinyl', 'replication', 'swim',
                 'raft', 'luajit', 'lua', 'sql']
 SECTIONS_BOTTOM = ['build', 'testing', 'misc']
 
@@ -131,6 +131,18 @@ all the new features of the 1.10.x series.
 // }}} LTS 1.10.Z
 """.strip()  # noqa: E501 line too long
 
+ENTERPRISE_TEMPLATE = """
+// {{{ ENTERPRISE EDITION ONLY
+
+## Community edition
+
+Please consult the corresponding [page][ce-release] for details.
+
+[ce-release]: https://github.com/tarantool/tarantool/releases/tag/**TBD**
+
+// }}} ENTERPRISE EDITION ONLY
+""".strip()  # noqa: E501 line too long
+
 # }}} Templates
 
 
@@ -158,36 +170,10 @@ def popen(cmdline):
             cmdline[0], str(e)))
 
 
-def git_superproject_dir(source_dir):
-    """ Return the absolute path of the root of the superproject's tree that
-        uses the given repository as its submodule. If the repository isn't
-        used as a submodule, returns none.
-    """
-    process = popen(['git', '-C', source_dir, 'rev-parse',
-                     '--show-superproject-working-tree'])
-    res = process.stdout.read().rstrip() or None
-    process.wait()
-    return res
-
 # }}} Helpers
 
 
 # {{{ Collecting
-
-def changelog_dirs():
-    """ Return a list of directories where changelog entries are stored.
-    """
-    # Be immutable to a caller current working directory.
-    res = []
-    script_file = os.path.realpath(__file__)
-    script_dir = os.path.dirname(script_file)
-    source_dir = os.path.dirname(script_dir)
-    res.append(os.path.join(source_dir, 'changelogs', 'unreleased'))
-    superproject_dir = git_superproject_dir(source_dir)
-    if superproject_dir:
-        res.append(os.path.join(superproject_dir, 'changelogs', 'unreleased'))
-    return res
-
 
 def changelog_entries_sorted(entries_dir):
     """ Acquire order of appearance from ```git log``.
@@ -478,7 +464,9 @@ def print_section(section, redefinitions):
 
 
 def print_templates(feature_count, bugfix_count):
-    for template in (OVERVIEW_TEMPLATE, COMPATIBILITY_TEMPLATE):
+    for template in (OVERVIEW_TEMPLATE,
+                     COMPATIBILITY_TEMPLATE,
+                     ENTERPRISE_TEMPLATE):
         block = template                                  \
             .replace(FEATURES_ANCHOR, str(feature_count)) \
             .replace(BUGFIXES_ANCHOR, str(bugfix_count))
@@ -518,9 +506,14 @@ def print_release_notes(entry_section, comments, redefinitions):
 
 if __name__ == '__main__':
     try:
-        entries = []
-        for entries_dir in changelog_dirs():
-            entries += changelog_entries(entries_dir)
+        # Be immutable to a caller current working directory.
+        # Sic: Use abspath rather than realpath because the script
+        # may be called via a symlink from another repository.
+        script_file = os.path.abspath(__file__)
+        script_dir = os.path.dirname(script_file)
+        source_dir = os.path.dirname(script_dir)
+        entries_dir = os.path.join(source_dir, 'changelogs', 'unreleased')
+        entries = changelog_entries(entries_dir)
         entry_section, comments = parse_changelog_entries(entries)
         print_release_notes(entry_section, comments, REDEFINITIONS)
     except RuntimeError as e:
