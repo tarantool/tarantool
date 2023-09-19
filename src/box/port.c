@@ -274,8 +274,7 @@ set_encode_error(void *error_ctx)
 	*(bool *)error_ctx = true;
 }
 
-/** Method get_msgpack for struct port_c. */
-static const char *
+const char *
 port_c_get_msgpack(struct port *base, uint32_t *size)
 {
 	struct port_c *port = (struct port_c *)base;

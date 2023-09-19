@@ -37,6 +37,7 @@
 #include "tarantoolInt.h"
 #include "box/schema.h"
 #include "box/tuple.h"
+#include "box/lua/misc.h"
 #include "mpstream/mpstream.h"
 #include "box/port.h"
 #include "lua/utils.h"
@@ -3355,6 +3356,13 @@ vdbemem_alloc_on_region(uint32_t count)
 }
 
 /**
+ * Get port contents as raw MsgPack. Encodes the port's VDBE memory registers on
+ * the current fiber's region using a MsgPack stream.
+ */
+static const char *
+port_vdbemem_get_msgpack(struct port *base, uint32_t *size);
+
+/**
  * Dump port contents to Lua. Iterates over the port's VDBE memory registers
  * and pushes Lua values to the provided Lua stack depending on the type of the
  * memory register.
@@ -3363,9 +3371,14 @@ static void
 port_vdbemem_dump_lua(struct port *base, struct lua_State *L,
 		      enum port_dump_lua_mode mode)
 {
-	(void)mode;
 	struct port_vdbemem *port = (struct port_vdbemem *) base;
-	assert(mode == PORT_DUMP_LUA_MODE_FLAT);
+	assert(mode == PORT_DUMP_LUA_MODE_FLAT ||
+	       mode == PORT_DUMP_LUA_MODE_MP_OBJECT);
+	if (mode == PORT_DUMP_LUA_MODE_MP_OBJECT) {
+		port_dump_lua_mp_object_mode_slow(base, L, &fiber()->gc,
+						  port_vdbemem_get_msgpack);
+		return;
+	}
 	for (uint32_t i = 0; i < port->mem_count; i++) {
 		struct Mem *mem = (struct Mem *)port->mem + i;
 		switch (mem->type) {

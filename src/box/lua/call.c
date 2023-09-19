@@ -43,6 +43,7 @@
 #include "lua/trigger.h"
 
 #include "box/port.h"
+#include "box/lua/misc.h"
 #include "box/lua/tuple.h"
 #include "small/obuf.h"
 #include "trivia/util.h"
@@ -369,15 +370,9 @@ struct execute_lua_ctx {
 static inline void
 push_lua_args(lua_State *L, struct execute_lua_ctx *ctx)
 {
-	if (ctx->takes_raw_args) {
-		uint32_t size;
-		size_t region_svp = region_used(&fiber()->gc);
-		const char *data = port_get_msgpack(ctx->args, &size);
-		luamp_push(L, data, data + size);
-		region_truncate(&fiber()->gc, region_svp);
-	} else {
-		port_dump_lua(ctx->args, L, PORT_DUMP_LUA_MODE_FLAT);
-	}
+	port_dump_lua(ctx->args, L, ctx->takes_raw_args ?
+				    PORT_DUMP_LUA_MODE_MP_OBJECT :
+				    PORT_DUMP_LUA_MODE_FLAT);
 }
 
 /**
@@ -532,6 +527,13 @@ encode_lua_call_16(lua_State *L)
 	return 0;
 }
 
+/**
+ * Get port contents as raw MsgPack. Encodes the port's Lua values on
+ * the current fiber's region using a MsgPack stream.
+ */
+static const char *
+port_lua_get_msgpack(struct port *base, uint32_t *size);
+
 static inline int
 port_lua_do_dump_with_ctx(struct port *base, struct mpstream *stream,
 			  enum handlers handler, struct mp_ctx *mp_ctx)
@@ -607,12 +609,17 @@ static void
 port_lua_dump_lua(struct port *base, struct lua_State *L,
 		  enum port_dump_lua_mode mode)
 {
-	(void)mode;
-	assert(mode == PORT_DUMP_LUA_MODE_FLAT);
-	struct port_lua *port = (struct port_lua *) base;
-	uint32_t size = lua_gettop(port->L);
-	lua_xmove(port->L, L, size);
-	port->size = size;
+	assert(mode == PORT_DUMP_LUA_MODE_FLAT ||
+	       mode == PORT_DUMP_LUA_MODE_MP_OBJECT);
+	if (mode == PORT_DUMP_LUA_MODE_FLAT) {
+		struct port_lua *port = (struct port_lua *)base;
+		uint32_t size = lua_gettop(port->L);
+		lua_xmove(port->L, L, size);
+		port->size = size;
+	} else {
+		port_dump_lua_mp_object_mode_slow(base, L, &fiber()->gc,
+						  port_lua_get_msgpack);
+	}
 }
 
 static const char *
