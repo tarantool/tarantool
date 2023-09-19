@@ -1428,6 +1428,11 @@ return schema.new('instance_config', schema.record({
             default = 0,
             box_cfg = 'auth_delay',
         })),
+        auth_retries = enterprise_edition(schema.scalar({
+            type = 'integer',
+            default = 0,
+            box_cfg = 'auth_retries',
+        })),
         disable_guest = enterprise_edition(schema.scalar({
             type = 'boolean',
             default = false,

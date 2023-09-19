@@ -666,6 +666,7 @@ g.test_security_options = function()
         security:
             auth_type: pap-sha256
             auth_delay: 5
+            auth_retries: 3
             disable_guest: false
             password_lifetime_days: 90
             password_min_length: 14
@@ -693,6 +694,7 @@ g.test_security_options = function()
     g.server:exec(function()
         t.assert_equals(box.cfg.auth_type, 'pap-sha256')
         t.assert_equals(box.cfg.auth_delay, 5)
+        t.assert_equals(box.cfg.auth_retries, 3)
         t.assert_equals(box.cfg.disable_guest, false)
         t.assert_equals(box.cfg.password_lifetime_days, 90)
         t.assert_equals(box.cfg.password_min_length, 14)
