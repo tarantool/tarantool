@@ -1187,6 +1187,7 @@ g.test_security_enterprise = function()
         security = {
             auth_type = 'pap-sha256',
             auth_delay = 5,
+            auth_retries = 3,
             disable_guest = true,
             password_lifetime_days = 90,
             password_min_length = 10,

@@ -247,6 +247,7 @@ g.test_defaults = function()
         } or nil,
         security = is_enterprise and {
             auth_delay = 0,
+            auth_retries = 0,
             auth_type = "chap-sha1",
             disable_guest = false,
             password_enforce_digits = false,

@@ -119,6 +119,7 @@ local default_cfg = {
 
     auth_type           = 'chap-sha1',
     auth_delay          = ifdef_security(0),
+    auth_retries        = ifdef_security(0),
     disable_guest       = ifdef_security(false),
     password_lifetime_days = ifdef_security(0),
     password_min_length = ifdef_security(0),
@@ -314,6 +315,7 @@ local template_cfg = {
 
     auth_type           = 'string',
     auth_delay          = ifdef_security('number'),
+    auth_retries        = ifdef_security('number'),
     disable_guest       = ifdef_security('boolean'),
     password_lifetime_days = ifdef_security('number'),
     password_min_length = ifdef_security('number'),
@@ -517,6 +519,7 @@ local dynamic_cfg = {
     txn_isolation           = private.cfg_set_txn_isolation,
     auth_type               = private.cfg_set_auth_type,
     auth_delay              = private.cfg_set_security,
+    auth_retries            = private.cfg_set_security,
     disable_guest           = private.cfg_set_security,
     password_lifetime_days  = private.cfg_set_security,
     password_min_length     = ifdef_security(nop),
@@ -679,6 +682,7 @@ local dynamic_cfg_skip_at_load = {
     readahead               = true,
     auth_type               = true,
     auth_delay              = ifdef_security(true),
+    auth_retries            = ifdef_security(true),
     disable_guest           = ifdef_security(true),
     password_lifetime_days  = ifdef_security(true),
 }

@@ -35,6 +35,7 @@ local _enterprise_keys = {
     flightrec_requests_max_req_size = true,
     flightrec_requests_max_res_size = true,
     auth_delay = true,
+    auth_retries = true,
     disable_guest = true,
     password_lifetime_days = true,
     password_min_length = true,
