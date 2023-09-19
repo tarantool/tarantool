@@ -560,7 +560,7 @@ lbox_func_call(struct lua_State *L)
 	}
 
 	int top = lua_gettop(L);
-	port_dump_lua(&ret, L, true);
+	port_dump_lua(&ret, L, PORT_DUMP_LUA_MODE_FLAT);
 	int cnt = lua_gettop(L) - top;
 
 	port_destroy(&ret);
