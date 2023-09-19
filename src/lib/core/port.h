@@ -45,6 +45,23 @@ struct Mem;
 struct mp_ctx;
 
 /**
+ * Mode in which data is dumped from a port to a Lua stack (@sa
+ * `port_dump_lua`).
+ */
+enum port_dump_lua_mode {
+	/**
+	 * Data is dumped directly to Lua stack, item-by-item. This mode follows
+	 * the Lua functions' convention to pass arguments and return results.
+	 */
+	PORT_DUMP_LUA_MODE_FLAT,
+	/**
+	 * Data is dumped as a table.  This mode follows Tarantool's
+	 * `box.select` convention when a table of results is returned.
+	 */
+	PORT_DUMP_LUA_MODE_TABLE,
+};
+
+/**
  * A single port represents a destination of any output. One such
  * destination can be a Lua stack, or the binary protocol. An
  * instance of a port is usually short lived, as it is created
@@ -70,16 +87,11 @@ struct port_vtab {
 	int (*dump_msgpack_16)(struct port *port, struct obuf *out,
 			       struct mp_ctx *ctx);
 	/**
-	 * Dump the content of a port to a given Lua stack.
-	 * When is_flat == true is specified, the data is dumped
-	 * directly to Lua stack, item-by-item. Otherwise, a
-	 * result table is created. The is_flat == true mode
-	 * follows Lua functions convention to pass arguments
-	 * and return a results, while is_flat == false follows
-	 * Tarantool's :select convention when the table of
-	 * results is returned.
+	 * Dump the content of a port to a given Lua stack (@sa
+	 * `port_dump_lua_mode` for a description of operation modes).
 	 */
-	void (*dump_lua)(struct port *port, struct lua_State *L, bool is_flat);
+	void (*dump_lua)(struct port *port, struct lua_State *L,
+			 enum port_dump_lua_mode mode);
 	/**
 	 * Dump a port content as a plain text into a buffer,
 	 * allocated inside.
@@ -164,9 +176,10 @@ port_dump_msgpack_16(struct port *port, struct obuf *out)
 }
 
 static inline void
-port_dump_lua(struct port *port, struct lua_State *L, bool is_flat)
+port_dump_lua(struct port *port, struct lua_State *L,
+	      enum port_dump_lua_mode mode)
 {
-	port->vtab->dump_lua(port, L, is_flat);
+	port->vtab->dump_lua(port, L, mode);
 }
 
 static inline const char *

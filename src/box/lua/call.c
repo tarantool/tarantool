@@ -377,7 +377,7 @@ push_lua_args(lua_State *L, struct execute_lua_ctx *ctx)
 		luamp_push(L, data, data + size);
 		region_truncate(&fiber()->gc, region_svp);
 	} else {
-		port_dump_lua(ctx->args, L, true);
+		port_dump_lua(ctx->args, L, PORT_DUMP_LUA_MODE_FLAT);
 	}
 }
 
@@ -600,11 +600,16 @@ port_lua_dump_16(struct port *base, struct obuf *out, struct mp_ctx *ctx)
 					 ctx);
 }
 
+/**
+ * Dump port contents to Lua. Simply moves values from the Lua stack owned by
+ * the port to the provided Lua stack.
+ */
 static void
-port_lua_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
+port_lua_dump_lua(struct port *base, struct lua_State *L,
+		  enum port_dump_lua_mode mode)
 {
-	(void) is_flat;
-	assert(is_flat == true);
+	(void)mode;
+	assert(mode == PORT_DUMP_LUA_MODE_FLAT);
 	struct port_lua *port = (struct port_lua *) base;
 	uint32_t size = lua_gettop(port->L);
 	lua_xmove(port->L, L, size);
@@ -1014,7 +1019,7 @@ lbox_func_call(struct lua_State *L)
 	}
 
 	int top = lua_gettop(L);
-	port_dump_lua(&ret, L, true);
+	port_dump_lua(&ret, L, PORT_DUMP_LUA_MODE_FLAT);
 	int cnt = lua_gettop(L) - top;
 
 	port_destroy(&ret);

@@ -165,10 +165,11 @@ lbox_unprepare(struct lua_State *L)
 }
 
 void
-port_sql_dump_lua(struct port *port, struct lua_State *L, bool is_flat)
+port_sql_dump_lua(struct port *port, struct lua_State *L,
+		  enum port_dump_lua_mode mode)
 {
-	(void) is_flat;
-	assert(is_flat == false);
+	(void)mode;
+	assert(mode == PORT_DUMP_LUA_MODE_TABLE);
 	assert(port->vtab == &port_sql_vtab);
 	struct port_sql *port_sql = (struct port_sql *)port;
 	struct Vdbe *stmt = port_sql->stmt;
@@ -177,7 +178,7 @@ port_sql_dump_lua(struct port *port, struct lua_State *L, bool is_flat)
 		lua_createtable(L, 0, 2);
 		lua_sql_get_metadata(stmt, L, sql_column_count(stmt));
 		lua_setfield(L, -2, "metadata");
-		port_c_vtab.dump_lua(port, L, false);
+		port_c_vtab.dump_lua(port, L, PORT_DUMP_LUA_MODE_TABLE);
 		lua_setfield(L, -2, "rows");
 		break;
 	}
@@ -485,7 +486,7 @@ lbox_execute(struct lua_State *L)
 					 &fiber()->gc) != 0)
 			goto error;
 	}
-	port_dump_lua(&port, L, false);
+	port_dump_lua(&port, L, PORT_DUMP_LUA_MODE_TABLE);
 	port_destroy(&port);
 	region_truncate(&fiber()->gc, region_svp);
 	return 1;
@@ -511,7 +512,7 @@ lbox_prepare(struct lua_State *L)
 	const char *sql = lua_tolstring(L, 1, &length);
 	if (sql_prepare(sql, length, &port) != 0)
 		return luaT_push_nil_and_error(L);
-	port_dump_lua(&port, L, false);
+	port_dump_lua(&port, L, PORT_DUMP_LUA_MODE_TABLE);
 	port_destroy(&port);
 	return 1;
 }

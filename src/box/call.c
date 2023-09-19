@@ -84,7 +84,8 @@ port_msgpack_dump_msgpack(struct port *base, struct obuf *out,
 }
 
 extern void
-port_msgpack_dump_lua(struct port *base, struct lua_State *L, bool is_flat);
+port_msgpack_dump_lua(struct port *base, struct lua_State *L,
+		      enum port_dump_lua_mode mode);
 
 extern const char *
 port_msgpack_dump_plain(struct port *base, uint32_t *size);
