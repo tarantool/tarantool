@@ -197,10 +197,11 @@ lua_wrap_formatted_array(struct lua_State *L, struct tuple_format *format)
 }
 
 extern "C" void
-port_c_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
+port_c_dump_lua(struct port *base, struct lua_State *L,
+		enum port_dump_lua_mode mode)
 {
 	struct port_c *port = (struct port_c *)base;
-	if (!is_flat)
+	if (mode == PORT_DUMP_LUA_MODE_TABLE)
 		lua_createtable(L, port->size, 0);
 	struct port_c_entry *pe = port->first;
 	const char *mp;
@@ -216,16 +217,17 @@ port_c_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 				lua_wrap_formatted_array(L, pe->mp_format);
 			}
 		}
-		if (!is_flat)
+		if (mode == PORT_DUMP_LUA_MODE_TABLE)
 			lua_rawseti(L, -2, ++i);
 	}
 }
 
 extern "C" void
-port_msgpack_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
+port_msgpack_dump_lua(struct port *base, struct lua_State *L,
+		      enum port_dump_lua_mode mode)
 {
-	(void) is_flat;
-	assert(is_flat == true);
+	(void)mode;
+	assert(mode == PORT_DUMP_LUA_MODE_FLAT);
 	struct port_msgpack *port = (struct port_msgpack *) base;
 
 	const char *args = port->data;
@@ -330,7 +332,7 @@ lbox_select(lua_State *L)
 	 * table always crashed the first (can't be fixed with pcall).
 	 * https://github.com/tarantool/tarantool/issues/1182
 	 */
-	port_dump_lua(&port, L, false);
+	port_dump_lua(&port, L, PORT_DUMP_LUA_MODE_TABLE);
 	port_destroy(&port);
 	if (fetch_pos && packed_pos != NULL) {
 		lua_pushlstring(L, packed_pos, packed_pos_end - packed_pos);

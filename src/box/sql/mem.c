@@ -3354,12 +3354,18 @@ vdbemem_alloc_on_region(uint32_t count)
 	return ret;
 }
 
+/**
+ * Dump port contents to Lua. Iterates over the port's VDBE memory registers
+ * and pushes Lua values to the provided Lua stack depending on the type of the
+ * memory register.
+ */
 static void
-port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
+port_vdbemem_dump_lua(struct port *base, struct lua_State *L,
+		      enum port_dump_lua_mode mode)
 {
-	(void) is_flat;
+	(void)mode;
 	struct port_vdbemem *port = (struct port_vdbemem *) base;
-	assert(is_flat == true);
+	assert(mode == PORT_DUMP_LUA_MODE_FLAT);
 	for (uint32_t i = 0; i < port->mem_count; i++) {
 		struct Mem *mem = (struct Mem *)port->mem + i;
 		switch (mem->type) {
