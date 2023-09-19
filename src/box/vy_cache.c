@@ -62,9 +62,18 @@ vy_cache_env_create(struct vy_cache_env *e, struct slab_cache *slab_cache)
 		       sizeof(struct vy_cache_node));
 }
 
+/** Delete a node from the cache. */
+static void
+vy_cache_gc_step(struct vy_cache_env *env);
+
 void
 vy_cache_env_destroy(struct vy_cache_env *e)
 {
+#if ENABLE_ASAN
+	/* Purge cache to suppress leak detector. */
+	while (e->mem_used > 0)
+		vy_cache_gc_step(e);
+#endif
 	mempool_destroy(&e->cache_node_mempool);
 }
 
