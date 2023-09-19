@@ -59,6 +59,14 @@ enum port_dump_lua_mode {
 	 * `box.select` convention when a table of results is returned.
 	 */
 	PORT_DUMP_LUA_MODE_TABLE,
+	/**
+	 * Data is dumped as a MsgPack object. This means that data is possibly
+	 * first converted to MsgPack, and then a MsgPack object is created from
+	 * it. This mode follows Tarantool's convention of passing raw MsgPack
+	 * data coming from IPROTO to Lua (see `box.schema.func::takes_raw_args`
+	 * option).
+	 */
+	PORT_DUMP_LUA_MODE_MP_OBJECT,
 };
 
 /**

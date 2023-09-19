@@ -200,7 +200,14 @@ extern "C" void
 port_c_dump_lua(struct port *base, struct lua_State *L,
 		enum port_dump_lua_mode mode)
 {
+	assert(mode == PORT_DUMP_LUA_MODE_FLAT ||
+	       mode == PORT_DUMP_LUA_MODE_TABLE);
 	struct port_c *port = (struct port_c *)base;
+	if (mode == PORT_DUMP_LUA_MODE_MP_OBJECT) {
+		port_dump_lua_mp_object_mode_slow(base, L, &fiber()->gc,
+						  port_c_get_msgpack);
+		return;
+	}
 	if (mode == PORT_DUMP_LUA_MODE_TABLE)
 		lua_createtable(L, port->size, 0);
 	struct port_c_entry *pe = port->first;
@@ -226,14 +233,18 @@ extern "C" void
 port_msgpack_dump_lua(struct port *base, struct lua_State *L,
 		      enum port_dump_lua_mode mode)
 {
-	(void)mode;
-	assert(mode == PORT_DUMP_LUA_MODE_FLAT);
+	assert(mode == PORT_DUMP_LUA_MODE_FLAT ||
+	       mode == PORT_DUMP_LUA_MODE_MP_OBJECT);
 	struct port_msgpack *port = (struct port_msgpack *) base;
 
-	const char *args = port->data;
-	uint32_t arg_count = mp_decode_array(&args);
-	for (uint32_t i = 0; i < arg_count; i++)
-		luamp_decode(L, luaL_msgpack_default, &args);
+	if (mode == PORT_DUMP_LUA_MODE_FLAT) {
+		const char *args = port->data;
+		uint32_t arg_count = mp_decode_array(&args);
+		for (uint32_t i = 0; i < arg_count; i++)
+			luamp_decode(L, luaL_msgpack_default, &args);
+	} else {
+		luamp_push(L, port->data, port->data + port->data_sz);
+	}
 }
 
 /** Generate unique id for non-system space. */

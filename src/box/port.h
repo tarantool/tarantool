@@ -168,6 +168,10 @@ port_c_add_formatted_mp(struct port *port, const char *mp, const char *mp_end,
 int
 port_c_add_str(struct port *port, const char *str, uint32_t len);
 
+/** Method get_msgpack for struct port_c. */
+const char *
+port_c_get_msgpack(struct port *base, uint32_t *size);
+
 void
 port_init(void);
 
