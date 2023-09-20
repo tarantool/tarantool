@@ -4454,7 +4454,7 @@ sql_func_finalize(const char *name);
  * function, 0 is returned, which means no parameters have been set.
  */
 uint32_t
-sql_func_flags(const char *name);
+sql_func_flags(const struct Expr *expr);
 
 /**
  * Generate VDBE code to halt execution with correct error if
