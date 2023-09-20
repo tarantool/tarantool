@@ -369,7 +369,7 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 		if (op == TK_FUNCTION) {
 			uint32_t arg_count = p->x.pList == NULL ? 0 :
 					     p->x.pList->nExpr;
-			uint32_t flags = sql_func_flags(p->u.zToken);
+			uint32_t flags = sql_func_flags(p);
 			if (((flags & SQL_FUNC_DERIVEDCOLL) != 0) &&
 			    arg_count > 0 && p->type == FIELD_TYPE_STRING) {
 				/*

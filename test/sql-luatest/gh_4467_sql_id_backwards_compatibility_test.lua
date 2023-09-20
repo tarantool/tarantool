@@ -167,13 +167,18 @@ g.test_expression = function()
         box.space.Tab:drop()
         box.func.fUn:drop()
 
-        -- Make sure table names and column names are looked up twice in
-        -- expressions.
+        -- Make sure table names, column names and function names are looked up
+        -- twice in expressions.
+        box.schema.func.create("RTY", {returns = 'number',
+                               body = 'function (a, b) return a * b end',
+                               param_list = {'number', 'number'},
+                               exports = {'LUA', 'SQL'}})
         box.execute([[CREATE TABLE ASD(QWE INT PRIMARY KEY, ZXC INT);]])
         box.space.ASD:insert({12, 21})
-        local rows = box.execute([[SELECT AsD.qWe * 2 - zxc FROM asd;]]).rows
-        t.assert_equals(rows, {{3}})
+        local sql = [[SELECT rtY(AsD.qWe, 2) - abs(zxc) FROM asd;]]
+        t.assert_equals(box.execute(sql).rows, {{3}})
         box.space.ASD:drop()
+        box.func.RTY:drop()
     end)
 end
 

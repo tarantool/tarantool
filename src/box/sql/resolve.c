@@ -603,7 +603,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			assert(!ExprHasProperty(pExpr, EP_xIsSelect));
 			zId = pExpr->u.zToken;
 			nId = sqlStrlen30(zId);
-			uint32_t flags = sql_func_flags(zId);
+			uint32_t flags = sql_func_flags(pExpr);
 			bool is_agg = (flags & SQL_FUNC_AGG) != 0;
 			if ((flags & SQL_FUNC_UNLIKELY) != 0 && n == 2) {
 				ExprSetProperty(pExpr, EP_Unlikely | EP_Skip);
@@ -624,7 +624,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				 * unlikely() probability is
 				 * 0.0625, likely() is 0.9375
 				 */
-				pExpr->iTable = zId[0] == 'u' ?
+				pExpr->iTable = zId[0] == 'u' || zId[0] == 'U' ?
 						8388608 : 125829120;
 			}
 			if (is_agg && (pNC->ncFlags & NC_AllowAgg) == 0) {

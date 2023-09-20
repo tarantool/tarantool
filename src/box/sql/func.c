@@ -2074,13 +2074,20 @@ static struct sql_func_definition definitions[] = {
 	 func_zeroblob, NULL},
 };
 
+/** Find built-in function by name. */
 static struct sql_func_dictionary *
-built_in_func_get(const char *name)
+built_in_func_get(const char *name, const char *old_name)
 {
 	uint32_t len = strlen(name);
 	mh_int_t k = mh_strnptr_find_str(built_in_functions, name, len);
-	if (k == mh_end(built_in_functions))
-		return NULL;
+	if (k == mh_end(built_in_functions)) {
+		if (old_name == NULL)
+			return NULL;
+		uint32_t old_len = strlen(old_name);
+		k = mh_strnptr_find_str(built_in_functions, old_name, old_len);
+		if (k == mh_end(built_in_functions))
+			return NULL;
+	}
 	return mh_strnptr_node(built_in_functions, k)->val;
 }
 
@@ -2089,7 +2096,7 @@ built_in_func_put(struct sql_func_dictionary *dict)
 {
 	const char *name = dict->name;
 	uint32_t len = strlen(name);
-	assert(built_in_func_get(name) == NULL);
+	assert(built_in_func_get(name, NULL) == NULL);
 
 	uint32_t hash = mh_strn_hash(name, len);
 	const struct mh_strnptr_node_t strnode = {name, len, hash, dict};
@@ -2234,10 +2241,19 @@ struct func *
 sql_func_find(struct Expr *expr)
 {
 	const char *name = expr->u.zToken;
-	struct sql_func_dictionary *dict = built_in_func_get(name);
-	if (dict != NULL)
+	size_t len = strlen(name);
+	char *old_name = NULL;
+	if ((expr->flags & EP_Lookup2) != 0)
+		old_name = sql_legacy_name_new(name, len);
+	struct sql_func_dictionary *dict = built_in_func_get(name, old_name);
+	if (dict != NULL) {
+		sql_xfree(old_name);
 		return find_built_in_func(expr, dict);
-	struct func *func = func_by_name(name, strlen(name));
+	}
+	struct func *func = func_by_name(name, len);
+	if (func == NULL && old_name != NULL)
+		func = func_by_name(old_name, strlen(old_name));
+	sql_xfree(old_name);
 	if (func == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_FUNCTION, name);
 		return NULL;
@@ -2274,12 +2290,22 @@ sql_func_finalize(const char *name)
 }
 
 uint32_t
-sql_func_flags(const char *name)
+sql_func_flags(const struct Expr *expr)
 {
-	struct sql_func_dictionary *dict = built_in_func_get(name);
-	if (dict != NULL)
+	const char *name = expr->u.zToken;
+	size_t len = strlen(name);
+	char *old_name = NULL;
+	if ((expr->flags & EP_Lookup2) != 0)
+		old_name = sql_legacy_name_new(name, len);
+	struct sql_func_dictionary *dict = built_in_func_get(name, old_name);
+	if (dict != NULL) {
+		sql_xfree(old_name);
 		return dict->flags;
-	struct func *func = func_by_name(name, strlen(name));
+	}
+	struct func *func = func_by_name(name, len);
+	if (func == NULL && old_name != NULL)
+		func = func_by_name(old_name, strlen(old_name));
+	sql_xfree(old_name);
 	if (func == NULL || func->def->aggregate != FUNC_AGGREGATE_GROUP)
 		return 0;
 	return SQL_FUNC_AGG;
@@ -2298,7 +2324,8 @@ sql_built_in_functions_cache_init(void)
 	for (uint32_t i = 0; i < nelem(definitions); ++i) {
 		struct sql_func_definition *desc = &definitions[i];
 		const char *name = desc->name;
-		struct sql_func_dictionary *dict = built_in_func_get(name);
+		struct sql_func_dictionary *dict = built_in_func_get(name,
+								     NULL);
 		assert(dict != NULL);
 
 		uint32_t len = strlen(name);
@@ -2336,9 +2363,10 @@ sql_built_in_functions_cache_init(void)
 	 * another name for CHAR_LENGTH().
 	 */
 	const char *name = "CHARACTER_LENGTH";
-	struct sql_func_dictionary *dict = built_in_func_get(name);
+	struct sql_func_dictionary *dict = built_in_func_get(name, NULL);
 	name = "CHAR_LENGTH";
-	struct sql_func_dictionary *dict_original = built_in_func_get(name);
+	struct sql_func_dictionary *dict_original = built_in_func_get(name,
+								      NULL);
 	dict->count = dict_original->count;
 	dict->functions = dict_original->functions;
 }
