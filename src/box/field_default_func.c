@@ -17,8 +17,12 @@
 static int
 field_default_func_verify(struct func *func)
 {
-	const char *func_name = func->def->name;
+	if (func->def->language == FUNC_LANGUAGE_SQL_EXPR) {
+		assert(func->def->body != NULL);
+		return 0;
+	}
 
+	const char *func_name = func->def->name;
 	if (func->def->language == FUNC_LANGUAGE_LUA) {
 		if (func->def->body != NULL)
 			return 0;
@@ -27,7 +31,6 @@ field_default_func_verify(struct func *func)
 		return -1;
 	}
 
-	/* TODO(gh-8793): Support SQL */
 	diag_set(ClientError, ER_CREATE_DEFAULT_FUNC, func_name,
 		 "unsupported language");
 	return -1;

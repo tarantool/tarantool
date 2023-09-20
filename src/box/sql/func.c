@@ -2456,15 +2456,28 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 {
 	struct func_sql_expr *func_sql = (struct func_sql_expr *)func;
 	struct Vdbe *stmt = func_sql->stmt;
-	if (args->vtab != &port_c_vtab || ((struct port_c *)args)->size != 2) {
+	if (args->vtab != &port_c_vtab) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
 			 "SQL functions");
 		return -1;
 	}
-	struct port_c_entry *pe = ((struct port_c *)args)->first;
-	const char *data = pe->mp;
-	uint32_t mp_size = pe->mp_size;
-	struct tuple_format *format = pe->mp_format;
+	struct port_c *port = (struct port_c *)args;
+	char buf[32];
+	const char *data;
+	uint32_t mp_size;
+	struct tuple_format *format;
+	if (port->size > 0) {
+		struct port_c_entry *pe = port->first;
+		data = pe->mp;
+		mp_size = pe->mp_size;
+		format = pe->mp_format;
+	} else {
+		char *end = mp_encode_nil(buf);
+		data = buf;
+		mp_size = end - data;
+		format = NULL;
+	}
+
 	struct region *region = &fiber()->gc;
 	size_t svp = region_used(region);
 	port_sql_create(ret, stmt, DQL_EXECUTE, false);
