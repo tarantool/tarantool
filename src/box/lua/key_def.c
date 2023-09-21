@@ -494,18 +494,13 @@ lbox_key_def_new(struct lua_State *L)
 
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	size_t size;
-	struct key_part_def *parts =
-		region_alloc_array(region, typeof(parts[0]), part_count, &size);
-	if (parts == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "parts");
-		return luaT_error(L);
-	}
 	if (part_count == 0) {
 		diag_set(IllegalParams, "Key definition can only be constructed"
 					" by using at least 1 key_part");
 		return luaT_error(L);
 	}
+	struct key_part_def *parts =
+		xregion_alloc_array(region, typeof(parts[0]), part_count);
 
 	for (uint32_t i = 0; i < part_count; ++i) {
 		lua_pushinteger(L, i + 1);

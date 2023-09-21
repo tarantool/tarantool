@@ -276,8 +276,12 @@ sql_shallow_space_copy(struct Parse *parse, struct space *space)
 	struct space *ret = sql_template_space_new(parse, space->def->name);
 	ret->index_count = space->index_count;
 	ret->index_id_max = space->index_id_max;
-	ret->index = xregion_alloc_array(&parse->region, typeof(struct index *),
-					 space->index_count);
+	if (space->index_count > 0)
+		ret->index = xregion_alloc_array(&parse->region,
+						 struct index *,
+						 space->index_count);
+	else
+		ret->index = NULL;
 	memcpy(ret->index, space->index,
 	       sizeof(struct index *) * space->index_count);
 	memcpy(ret->def, space->def, sizeof(struct space_def));

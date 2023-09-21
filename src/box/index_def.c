@@ -252,15 +252,11 @@ index_def_to_key_def(struct rlist *index_defs, int *size)
 	struct index_def *index_def;
 	rlist_foreach_entry(index_def, index_defs, link)
 		key_count++;
-	size_t bsize;
-	struct key_def **keys =
-		region_alloc_array(&fiber()->gc, typeof(keys[0]), key_count,
-				   &bsize);
-	if (keys == NULL) {
-		diag_set(OutOfMemory, bsize, "region_alloc_array", "keys");
-		return NULL;
-	}
 	*size = key_count;
+	if (key_count == 0)
+		return NULL;
+	struct key_def **keys =
+		xregion_alloc_array(&fiber()->gc, typeof(keys[0]), key_count);
 	key_count = 0;
 	rlist_foreach_entry(index_def, index_defs, link)
 		keys[key_count++] = index_def->key_def;
