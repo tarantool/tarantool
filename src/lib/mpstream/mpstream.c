@@ -21,7 +21,8 @@
 void
 mpstream_reserve_slow(struct mpstream *stream, size_t size)
 {
-	stream->alloc(stream->ctx, stream->pos - stream->buf);
+	if (stream->pos != stream->buf)
+		stream->alloc(stream->ctx, stream->pos - stream->buf);
 	stream->buf = stream->reserve(stream->ctx, &size);
 	if (stream->buf == NULL) {
 		diag_set(OutOfMemory, size, "mpstream", "reserve");
