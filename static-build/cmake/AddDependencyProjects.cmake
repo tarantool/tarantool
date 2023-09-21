@@ -186,7 +186,7 @@ set(TARANTOOL_DEPENDS ncurses ${TARANTOOL_DEPENDS})
 # Patched to fix file descriptor leak with zero-length history file.
 #
 ExternalProject_Add(readline
-    URL https://ftp.gnu.org/gnu/readline/readline-${READLINE_VERSION}.tar.gz
+    URL ${BACKUP_STORAGE}/readline/readline-${READLINE_VERSION}.tar.gz
     URL_MD5 ${READLINE_HASH}
     CONFIGURE_COMMAND <SOURCE_DIR>/configure
         CC=${CMAKE_C_COMPILER}
@@ -206,7 +206,7 @@ set(TARANTOOL_DEPENDS readline ${TARANTOOL_DEPENDS})
 #
 if (APPLE)
     ExternalProject_Add(iconv
-        URL https://ftp.gnu.org/pub/gnu/libiconv/libiconv-${LIBICONV_VERSION}.tar.gz
+        URL URL ${BACKUP_STORAGE}/libiconv/libiconv-${LIBICONV_VERSION}.tar.gz
         URL_MD5 ${LIBICONV_HASH}
         CONFIGURE_COMMAND <SOURCE_DIR>/configure
             CC=${CMAKE_C_COMPILER}
