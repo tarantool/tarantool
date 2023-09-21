@@ -65,10 +65,6 @@ service_engine_create_space(struct engine *engine, struct space_def *def,
 	int key_count = 0;
 	size_t region_svp = region_used(&fiber()->gc);
 	struct key_def **keys = index_def_to_key_def(key_list, &key_count);
-	if (keys == NULL) {
-		free(space);
-		return NULL;
-	}
 	struct tuple_format *format =
 		space_tuple_format_new(&tuple_format_runtime->vtab,
 				       NULL, keys, key_count, def);

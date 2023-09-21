@@ -167,10 +167,14 @@ xrow_update_read_ops(struct xrow_update *update, const char *expr,
 		return -1;
 	}
 
-	int size = update->op_count * sizeof(update->ops[0]);
-	update->ops = (struct xrow_update_op *)
-		xregion_aligned_alloc(&fiber()->gc, size,
-				      alignof(struct xrow_update_op));
+	if (update->op_count > 0) {
+		update->ops = (struct xrow_update_op *)
+			xregion_alloc_array(&fiber()->gc,
+					    typeof(update->ops[0]),
+					    update->op_count);
+	} else {
+		update->ops = NULL;
+	}
 	struct xrow_update_op *op = update->ops;
 	struct xrow_update_op *ops_end = op + update->op_count;
 	for (int i = 1; op < ops_end; op++, i++) {

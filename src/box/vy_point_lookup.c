@@ -185,15 +185,12 @@ vy_point_lookup_scan_slices(struct vy_lsm *lsm, const struct vy_read_view **rv,
 							   ITER_EQ, key);
 	assert(range != NULL);
 	int slice_count = range->slice_count;
-	size_t size;
 	size_t region_svp = region_used(&fiber()->gc);
+	if (slice_count == 0)
+		return 0;
 	struct vy_slice **slices =
-		region_alloc_array(&fiber()->gc, typeof(slices[0]), slice_count,
-				   &size);
-	if (slices == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "slices");
-		return -1;
-	}
+		xregion_alloc_array(&fiber()->gc, typeof(slices[0]),
+				    slice_count);
 	int i = 0;
 	struct vy_slice *slice;
 	rlist_foreach_entry(slice, &range->slices, in_range) {

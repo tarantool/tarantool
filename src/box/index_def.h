@@ -398,8 +398,7 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
  *
  * @param index_defs List head.
  * @param[out] size  Array size.
- * @retval not NULL  Array of pointers to key_def
- * @retval NULL      Memory error.
+ * @retval Array of pointers to key_def (NULL if size == 0).
  */
 struct key_def **
 index_def_to_key_def(struct rlist *index_defs, int *size);

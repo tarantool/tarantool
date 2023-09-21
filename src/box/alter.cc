@@ -2431,16 +2431,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * these fields become optional - index
 		 * comparators must be updated.
 		 */
-		struct key_def **keys;
-		size_t bsize;
+		struct key_def **keys = NULL;
 		RegionGuard region_guard(&fiber()->gc);
-		keys = region_alloc_array(&fiber()->gc, typeof(keys[0]),
-					  old_space->index_count, &bsize);
-		if (keys == NULL) {
-			diag_set(OutOfMemory, bsize, "region_alloc_array",
-				 "keys");
-			return -1;
-		}
+		if (old_space->index_count > 0)
+			keys = xregion_alloc_array(&fiber()->gc,
+						   typeof(keys[0]),
+						   old_space->index_count);
 		for (uint32_t i = 0; i < old_space->index_count; ++i)
 			keys[i] = old_space->index[i]->def->key_def;
 		alter->new_min_field_count =

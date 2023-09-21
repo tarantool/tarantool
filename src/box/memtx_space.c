@@ -1416,10 +1416,6 @@ memtx_space_new(struct memtx_engine *memtx,
 	int key_count = 0;
 	size_t region_svp = region_used(&fiber()->gc);
 	struct key_def **keys = index_def_to_key_def(key_list, &key_count);
-	if (keys == NULL) {
-		free(memtx_space);
-		return NULL;
-	}
 	struct tuple_format *format =
 		space_tuple_format_new(&memtx_tuple_format_vtab,
 				       memtx, keys, key_count, def);
