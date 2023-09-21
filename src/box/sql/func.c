@@ -517,7 +517,9 @@ func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 	struct region *region = &fiber()->gc;
 	size_t svp = region_used(region);
-	uint8_t *chars_len = xregion_alloc(region, chars_size);
+	uint8_t *chars_len = NULL;
+	if (chars_size > 0)
+		chars_len = xregion_alloc(region, chars_size);
 	size_t chars_count = 0;
 
 	int32_t offset = 0;
