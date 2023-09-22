@@ -19,10 +19,10 @@ g.before_each(function(cg)
     local engine = cg.params.engine
     cg.master:exec(function(engine)
         box.schema.space.create('test', {engine = engine})
-        box.space.test:create_index('pk', {parts = {{1, 'number'}}})
-        box.space.test:insert{1.8e308}
-        box.space.test:insert{-1.8e308}
-        box.space.test:insert{0/0}
+        box.space.test:create_index('pk', {
+            parts = {{1, 'number'}},
+            hint = false
+        })
     end, {engine})
 end)
 
@@ -32,11 +32,20 @@ g.after_each(function(cg)
     end)
 end)
 
+local minf = -1 / 0
+local inf = 1 / 0
+local nan = 0 / 0
+local val = decimal.new(1)
+
+g.before_test('test_decimal_compare_inf_crash', function(cg)
+    cg.master:exec(function(inf, minf, nan)
+        box.space.test:insert{inf}
+        box.space.test:insert{minf}
+        box.space.test:insert{nan}
+    end, {inf, minf, nan})
+end)
+
 g.test_decimal_compare_inf_crash = function(cg)
-    local minf = -1 / 0
-    local inf = 1 / 0
-    local nan = 0 / 0
-    local val = decimal.new(1)
     local ordered_ret = {
         tostring(nan),
         tostring(minf),
@@ -52,4 +61,31 @@ g.test_decimal_compare_inf_crash = function(cg)
         return tab
     end, {val})
     t.assert_equals(ret, ordered_ret, "Error in decimal comarison with Inf/NaN")
+end
+
+local mbig = -1e50
+local big = 1e50
+
+g.before_test('test_decimal_compare_big_float', function(cg)
+    cg.master:exec(function(mbig, big)
+        box.space.test:insert{mbig}
+        box.space.test:insert{big}
+    end, {mbig, big})
+end)
+
+g.test_decimal_compare_big_float = function(cg)
+    local ordered_ret = {
+        mbig,
+        val,
+        big,
+    }
+    local ret = cg.master:exec(function(val)
+        box.space.test:insert{val}
+        local tab = box.space.test:select{}
+        for k, v in pairs(tab) do
+            tab[k] = v[1]
+        end
+        return tab
+    end, {val})
+    t.assert_equals(ret, ordered_ret)
 end
