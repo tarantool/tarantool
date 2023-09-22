@@ -40,19 +40,6 @@ mpstream_reserve_slow(struct mpstream *stream, size_t size)
 	stream->end = stream->pos + size;
 }
 
-void
-mpstream_reset(struct mpstream *stream)
-{
-	size_t size = 0;
-	stream->buf = stream->reserve(stream->ctx, &size);
-	if (stream->buf == NULL) {
-		diag_set(OutOfMemory, size, "mpstream", "reset");
-		stream->error(stream->error_ctx);
-	}
-	stream->pos = stream->buf;
-	stream->end = stream->pos + size;
-}
-
 /**
  * A streaming API so that it's possible to encode to any output
  * stream.
@@ -67,7 +54,9 @@ mpstream_init(struct mpstream *stream, void *ctx,
 	stream->alloc = alloc;
 	stream->error = error;
 	stream->error_ctx = error_ctx;
-	mpstream_reset(stream);
+	stream->buf = NULL;
+	stream->pos = NULL;
+	stream->end = NULL;
 }
 
 void

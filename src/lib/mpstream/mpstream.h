@@ -57,9 +57,6 @@ mpstream_panic_cb(void *error_ctx);
 void
 mpstream_reserve_slow(struct mpstream *stream, size_t size);
 
-void
-mpstream_reset(struct mpstream *stream);
-
 /**
  * A streaming API so that it's possible to encode to any output
  * stream.
@@ -72,7 +69,8 @@ mpstream_init(struct mpstream *stream, void *ctx,
 static inline void
 mpstream_flush(struct mpstream *stream)
 {
-	stream->alloc(stream->ctx, stream->pos - stream->buf);
+	if (stream->pos != stream->buf)
+		stream->alloc(stream->ctx, stream->pos - stream->buf);
 	stream->buf = stream->pos;
 }
 
