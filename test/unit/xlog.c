@@ -137,7 +137,7 @@ test_dynamic_sized_ibuf(void)
 	ok(ibuf_capacity(&cursor.rbuf) == 0, "ibuf capacity decreased to 0");
 
 	xlog_cursor_close(&cursor, false);
-	fail_if(xlog_close(&xlog, false) < 0);
+	fail_if(xlog_close(&xlog) != 0);
 	unlink(filename);
 	rmdir(dirname);
 
