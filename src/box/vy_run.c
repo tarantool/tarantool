@@ -2084,23 +2084,20 @@ vy_run_write_index(struct vy_run *run, const char *dirpath,
 
 	ERROR_INJECT(ERRINJ_VY_INDEX_FILE_RENAME, {
 		diag_set(ClientError, ER_INJECTION, "vinyl index file rename");
-		xlog_close(&index_xlog, false);
-		return -1;
+		goto fail;
 	});
 
-	if (xlog_flush(&index_xlog) < 0 ||
-	    xlog_rename(&index_xlog) < 0)
+	if (xlog_close(&index_xlog) != 0 ||
+	    xlog_materialize(&index_xlog) != 0)
 		goto fail;
 
-	xlog_close(&index_xlog, false);
 	return 0;
 
 fail_rollback:
 	region_truncate(region, mem_used);
 	xlog_tx_rollback(&index_xlog);
 fail:
-	xlog_close(&index_xlog, false);
-	unlink(path);
+	xlog_discard(&index_xlog);
 	return -1;
 }
 
@@ -2299,16 +2296,14 @@ out:
 /**
  * Destroy a run writer.
  * @param writer Writer to destroy.
- * @param reuse_fd True in a case of success run write. And else
- *        false.
  */
 static void
-vy_run_writer_destroy(struct vy_run_writer *writer, bool reuse_fd)
+vy_run_writer_destroy(struct vy_run_writer *writer)
 {
 	if (writer->last.stmt != NULL)
 		vy_stmt_unref_if_possible(writer->last.stmt);
 	if (xlog_is_open(&writer->data_xlog))
-		xlog_close(&writer->data_xlog, reuse_fd);
+		xlog_discard(&writer->data_xlog);
 	if (writer->bloom != NULL)
 		tuple_bloom_builder_delete(writer->bloom);
 	ibuf_destroy(&writer->row_index_buf);
@@ -2326,7 +2321,7 @@ vy_run_writer_commit(struct vy_run_writer *writer)
 
 	struct vy_run *run = writer->run;
 	if (vy_run_is_empty(run)) {
-		vy_run_writer_destroy(writer, false);
+		vy_run_writer_destroy(writer);
 		rc = 0;
 		goto out;
 	}
@@ -2352,9 +2347,11 @@ vy_run_writer_commit(struct vy_run_writer *writer)
 	});
 
 	/* Sync data and link the file to the final name. */
-	if (xlog_sync(&writer->data_xlog) < 0 ||
-	    xlog_rename(&writer->data_xlog) < 0)
+	if (xlog_close_reuse_fd(&writer->data_xlog, &run->fd) != 0 ||
+	    xlog_materialize(&writer->data_xlog) != 0) {
+		xlog_discard(&writer->data_xlog);
 		goto out;
+	}
 
 	if (writer->bloom != NULL) {
 		run->info.bloom = tuple_bloom_new(writer->bloom,
@@ -2366,8 +2363,6 @@ vy_run_writer_commit(struct vy_run_writer *writer)
 			       writer->space_id, writer->iid) != 0)
 		goto out;
 
-	run->fd = writer->data_xlog.fd;
-	vy_run_writer_destroy(writer, true);
 	rc = 0;
 out:
 	region_truncate(&fiber()->gc, region_svp);
@@ -2377,7 +2372,7 @@ out:
 void
 vy_run_writer_abort(struct vy_run_writer *writer)
 {
-	vy_run_writer_destroy(writer, false);
+	vy_run_writer_destroy(writer);
 }
 
 int

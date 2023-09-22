@@ -646,6 +646,19 @@ wal_sync(struct vclock *vclock)
 	return rc;
 }
 
+/**
+ * Wrapper around xlog_close() that logs errors.
+ *
+ * We can't handle xlog_close() failure in any reasonable way in WAL.
+ * The best we can do is print an error to the log.
+ */
+static void
+wal_xlog_close(struct xlog *xlog)
+{
+	if (xlog_close(xlog) != 0)
+		diag_log();
+}
+
 static int
 wal_begin_checkpoint_f(struct cbus_call_msg *data)
 {
@@ -666,8 +679,7 @@ wal_begin_checkpoint_f(struct cbus_call_msg *data)
 	if (xlog_is_open(&writer->current_wal) &&
 	    vclock_sum(&writer->current_wal.meta.vclock) !=
 	    vclock_sum(&writer->vclock)) {
-
-		xlog_close(&writer->current_wal, false);
+		wal_xlog_close(&writer->current_wal);
 		/*
 		 * The next WAL will be created on the first write.
 		 */
@@ -841,12 +853,7 @@ wal_opt_rotate(struct wal_writer *writer)
 	 */
 	if (xlog_is_open(&writer->current_wal) &&
 	    writer->current_wal.offset >= writer->wal_max_size) {
-		/*
-		 * We can not handle xlog_close()
-		 * failure in any reasonable way.
-		 * A warning is written to the error log.
-		 */
-		xlog_close(&writer->current_wal, false);
+		wal_xlog_close(&writer->current_wal);
 	}
 
 	if (xlog_is_open(&writer->current_wal))
@@ -1213,16 +1220,16 @@ wal_writer_f(va_list ap)
 		struct xlog l;
 		if (xdir_create_xlog(&writer->wal_dir, &l,
 				     &writer->vclock) == 0)
-			xlog_close(&l, false);
+			wal_xlog_close(&l);
 		else
 			diag_log();
 	}
 
 	if (xlog_is_open(&writer->current_wal))
-		xlog_close(&writer->current_wal, false);
+		wal_xlog_close(&writer->current_wal);
 
 	if (xlog_is_open(&vy_log_writer.xlog))
-		xlog_close(&vy_log_writer.xlog, false);
+		wal_xlog_close(&vy_log_writer.xlog);
 
 	cpipe_destroy(&writer->tx_prio_pipe);
 	return 0;
@@ -1385,7 +1392,7 @@ wal_rotate_vy_log_f(struct cbus_call_msg *msg)
 {
 	(void) msg;
 	if (xlog_is_open(&vy_log_writer.xlog))
-		xlog_close(&vy_log_writer.xlog, false);
+		wal_xlog_close(&vy_log_writer.xlog);
 	return 0;
 }
 

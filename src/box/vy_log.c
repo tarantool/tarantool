@@ -966,15 +966,13 @@ vy_log_open(struct xlog *xlog)
 	}
 	region_truncate(&fiber()->gc, region_svp);
 
-	if (xlog_rename(xlog) < 0)
+	if (xlog_materialize(xlog) != 0)
 		goto fail_close_xlog;
 
 	return 0;
 
 fail_close_xlog:
-	if (unlink(xlog->filename) < 0)
-		say_syserror("failed to delete file '%s'", xlog->filename);
-	xlog_close(xlog, false);
+	xlog_discard(xlog);
 fail:
 	return -1;
 }
@@ -2665,29 +2663,18 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 
 	ERROR_INJECT(ERRINJ_VY_LOG_FILE_RENAME, {
 		diag_set(ClientError, ER_INJECTION, "vinyl log file rename");
-		xlog_close(&xlog, false);
-		return -1;
+		goto err_write_xlog;
 	});
 
-	/* Finalize the new xlog. */
-	if (xlog_flush(&xlog) < 0 ||
-	    xlog_sync(&xlog) < 0 ||
-	    xlog_rename(&xlog) < 0)
+	if (xlog_close(&xlog) != 0 ||
+	    xlog_materialize(&xlog) != 0)
 		goto err_write_xlog;
-
-	xlog_close(&xlog, false);
 done:
 	say_verbose("done saving vylog");
 	return 0;
 
 err_write_xlog:
-	/* Delete the unfinished xlog. */
-	assert(xlog_is_open(&xlog));
-	if (unlink(xlog.filename) < 0)
-		say_syserror("failed to delete file '%s'",
-			     xlog.filename);
-	xlog_close(&xlog, false);
-
+	xlog_discard(&xlog);
 err_create_xlog:
 	return -1;
 }

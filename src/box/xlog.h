@@ -481,15 +481,6 @@ xlog_is_open(struct xlog *l)
 }
 
 /**
- * Rename xlog
- *
- * @retval 0 for ok
- * @retval -1 for error
- */
-int
-xlog_rename(struct xlog *l);
-
-/**
  * Allocate @size bytes of disk space at the end of the given
  * xlog file.
  *
@@ -538,25 +529,64 @@ xlog_tx_rollback(struct xlog *log);
 ssize_t
 xlog_flush(struct xlog *log);
 
-
 /**
- * Sync a log file. The exact action is defined
- * by xdir flags.
+ * Closes an xlog object.
  *
- * @retval 0 success
- * @retval -1 error
+ * This function seals the xlog file by flushing the write buffer, writing
+ * the EOF marker, and syncing the file, then closes the xlog file fd.
+ * After calling the function, the xlog file must not be used for writing
+ * anymore. However, it may still be materialized with xlog_materialize() or
+ * discarded with xlog_discard() unless it hasn't been already materialized.
+ *
+ * Returns 0 on success. On failure, sets diag and returns -1.
+ *
+ * Note that the write buffers are freed and the xlog file fd is closed
+ * on both success and error.
+ *
+ * MT note: This function must be called in the same thread where the xlog
+ * object was created because the write buffer isn't MT-safe.
  */
 int
-xlog_sync(struct xlog *l);
+xlog_close(struct xlog *l);
 
 /**
- * Close the log file and free xlog object.
- *
- * @retval 0 success
- * @retval -1 error (fclose() failed).
+ * Same as xlog_close() but doesn't close the fd. Instead, it stores it in
+ * the out argument. Useful if the caller needs to reuse the xlog fd for reads.
  */
 int
-xlog_close(struct xlog *l, bool reuse_fd);
+xlog_close_reuse_fd(struct xlog *l, int *fd);
+
+/**
+ * Materializes an xlog object.
+ *
+ * This function removes the .inprogress suffix from the xlog file name thus
+ * making it available for future reads. It may only be called only once for
+ * an xlog object created with xlog_create(). It may not be called for an xlog
+ * object created with xlog_open(). It's allowed to call this function after
+ * closing the xlog object with xlog_close().
+ *
+ * Returns 0 on success. On error, sets diag and returns -1.
+ *
+ * MT note: This function is safe to call in any thread.
+ */
+int
+xlog_materialize(struct xlog *l);
+
+/**
+ * Discards an xlog object.
+ *
+ * This function closes the xlog file fd if it's still open and deletes the
+ * xlog file if it hasn't already been deleted. The xlog object must not be
+ * materialized (see xlog_materialize()). The xlog object must not be used
+ * after calling this function but it's allowed to call xlog_discard() more
+ * than once (all subsequent calls will be no-ops).
+ *
+ * MT note: If the xlog object was closed (see xlog_close()), this function may
+ * be called in any thread, otherwise it must be called in the same thread
+ * where the xlog object was created because the write buffer isn't MT-safe.
+ */
+void
+xlog_discard(struct xlog *l);
 
 /* {{{ xlog_tx_cursor - iterate over rows in xlog transaction */
 
