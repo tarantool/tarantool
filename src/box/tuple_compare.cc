@@ -238,16 +238,17 @@ mp_compare_decimal(const char *lhs, const char *rhs)
 }
 
 /**
- * Compare decimal to 'not a number' which is either NaN or inf. Decimal value
- * does not matter then. It is always a valid number.
+ * Compare a decimal to something not representable as decimal. Like NaN, Inf or
+ * just a value outside the (-1e38, 1e38) range. In all these cases the decimal
+ * value doesn't matter.
  */
 static inline int
-decimal_compare_nan(double rhs)
+decimal_compare_nan_or_huge(double rhs)
 {
 	/* We assume NaN is less than everything else. */
 	if (isnan(rhs))
 		return 1;
-	assert(isinf(rhs));
+	assert(fabs(rhs) >= 1e38);
 	return (rhs < 0) - (rhs > 0);
 }
 
@@ -263,7 +264,7 @@ mp_compare_decimal_any_number(decimal_t *lhs, const char *rhs,
 		double d = mp_decode_float(&rhs);
 		rc = decimal_from_double(&rhs_dec, d);
 		if (rc == NULL)
-			return decimal_compare_nan(d) * k;
+			return decimal_compare_nan_or_huge(d) * k;
 		break;
 	}
 	case MP_DOUBLE:
@@ -271,7 +272,7 @@ mp_compare_decimal_any_number(decimal_t *lhs, const char *rhs,
 		double d = mp_decode_double(&rhs);
 		rc = decimal_from_double(&rhs_dec, d);
 		if (rc == NULL)
-			return decimal_compare_nan(d) * k;
+			return decimal_compare_nan_or_huge(d) * k;
 		break;
 	}
 	case MP_INT:
