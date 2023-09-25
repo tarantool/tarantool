@@ -171,6 +171,7 @@ struct errinj {
 	_(ERRINJ_VY_STMT_ALLOC, ERRINJ_INT, {.iparam = -1})\
 	_(ERRINJ_VY_TASK_COMPLETE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_WRITE_ITERATOR_START_FAIL, ERRINJ_BOOL, {.bparam = false})\
+	_(ERRINJ_WAIT_QUORUM_COUNT, ERRINJ_INT, {.iparam = 0}) \
 	_(ERRINJ_WAL_BREAK_LSN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_WAL_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_DELAY_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
@@ -178,6 +179,7 @@ struct errinj {
 	_(ERRINJ_WAL_IO, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_ROTATE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_SYNC, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_SYNC_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_WRITE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_WRITE_COUNT, ERRINJ_INT, {.iparam = 0}) \
 	_(ERRINJ_WAL_WRITE_DISK, ERRINJ_BOOL, {.bparam = false}) \

@@ -2113,6 +2113,10 @@ static int
 box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
 		double timeout)
 {
+#ifndef NDEBUG
+    ++errinj(ERRINJ_WAIT_QUORUM_COUNT, ERRINJ_INT)->iparam;
+#endif
+
 	struct box_quorum_trigger t;
 	memset(&t, 0, sizeof(t));
 	vclock_create(&t.vclock);
