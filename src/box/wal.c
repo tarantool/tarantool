@@ -643,6 +643,7 @@ wal_sync(struct vclock *vclock)
 			   wal_sync_f);
 	if (vclock != NULL)
 		vclock_copy(vclock, &msg.vclock);
+	ERROR_INJECT_YIELD(ERRINJ_WAL_SYNC_DELAY);
 	return rc;
 }
 
