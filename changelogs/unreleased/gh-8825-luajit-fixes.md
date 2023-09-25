@@ -10,3 +10,6 @@ were fixed as part of this activity:
   fractional part raises error too now.
 * Fixed load forwarding optimization applied after table rehashing.
 * Fixed recording of the `BC_TSETM`.
+* Fixed the panic routine when `mprotect` fails to change flags for mcode area.
+* Fixed handling of instable types in TNEW/TDUP load forwarding.
+* Handled table unsinking in the presence of `IRFL_TAB_NOMM`.
