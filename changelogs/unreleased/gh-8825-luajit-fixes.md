@@ -18,3 +18,4 @@ were fixed as part of this activity:
 * Fixed frame for on-trace OOM handling.
 * Fixed handling of instable types in TNEW/TDUP load forwarding.
 * Handled table unsinking in the presence of `IRFL_TAB_NOMM`.
+* Fixed `lua_concat()`.
