@@ -639,6 +639,7 @@ wal_sync(struct vclock *vclock)
 	fiber_set_cancellable(cancellable);
 	if (vclock != NULL)
 		vclock_copy(vclock, &msg.vclock);
+	ERROR_INJECT_YIELD(ERRINJ_WAL_SYNC_DELAY);
 	return rc;
 }
 
