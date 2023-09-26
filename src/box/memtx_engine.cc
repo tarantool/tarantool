@@ -521,7 +521,7 @@ memtx_engine_end_recovery(struct engine *engine)
 			return -1;
 		memtx->on_indexes_built_cb();
 	}
-	xdir_collect_inprogress(&memtx->snap_dir);
+	xdir_remove_temporary_files(&memtx->snap_dir);
 
 	/* Complete space initialization. */
 	int rc = space_foreach(space_on_final_recovery_complete, NULL);
