@@ -107,3 +107,11 @@ files["test/replication/replica_quorum.lua"] = {
         "nonexistent_uri",
     },
 }
+
+-- Defined functions is unused in preamble,
+-- but could be used by generated Lua programs.
+files["test/fuzz/luaL_loadbuffer/preamble.lua"] = {
+    ignore = {
+        "211",
+    },
+}
