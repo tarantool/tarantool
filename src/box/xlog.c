@@ -693,8 +693,19 @@ xdir_remove_file_by_vclock(struct xdir *dir, struct vclock *to_remove)
 	return 0;
 }
 
+/** Default implementation of xlog_file_is_temporary(). */
+static bool
+xlog_file_is_temporary_default(const char *filename)
+{
+	char *ext = strrchr(filename, '.');
+	return ext != NULL && strcmp(ext, inprogress_suffix) == 0;
+}
+
+xlog_file_is_temporary_f xlog_file_is_temporary =
+				xlog_file_is_temporary_default;
+
 void
-xdir_collect_inprogress(struct xdir *xdir)
+xdir_remove_temporary_files(struct xdir *xdir)
 {
 	const char *dirname = xdir->dirname;
 	DIR *dh = opendir(dirname);
@@ -705,12 +716,10 @@ xdir_collect_inprogress(struct xdir *xdir)
 	}
 	struct dirent *dent;
 	while ((dent = readdir(dh)) != NULL) {
-		char *ext = strrchr(dent->d_name, '.');
-		if (ext == NULL || strcmp(ext, inprogress_suffix) != 0)
-			continue;
 		const char *filename = tt_snprintf(PATH_MAX, "%s/%s",
 						   dirname, dent->d_name);
-		xlog_remove_file(filename, XLOG_RM_VERBOSE);
+		if (xlog_file_is_temporary(filename))
+			xlog_remove_file(filename, XLOG_RM_VERBOSE);
 	}
 	closedir(dh);
 }
