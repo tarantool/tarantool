@@ -887,6 +887,47 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 
 /** }}} */
 
+/** {{{ xlog_remove_file */
+
+/**
+ * Flags passed to xlog_remove_file().
+ */
+enum {
+	/** Log info message on success. */
+	XLOG_RM_VERBOSE = 1 << 0,
+	/** Remove file asynchronously. */
+	XLOG_RM_ASYNC = 1 << 1,
+};
+
+typedef int
+(*xlog_remove_file_impl_f)(const char *filename, bool *existed);
+
+/**
+ * Low-level function used by xlog_remove_file().
+ *
+ * Removes an xlog file with the given name.
+ *
+ * On success, sets the 'existed' flag to true if the file existed and was
+ * actually deleted or to false otherwise and returns 0. On failure, sets
+ * diag and returns -1.
+ *
+ * Note that this function doesn't treat ENOENT as error.
+ */
+extern xlog_remove_file_impl_f xlog_remove_file_impl;
+
+/**
+ * Removes an xlog file with the given name.
+ *
+ * Returns true if the file was removed or didn't exist. If the file wasn't
+ * removed due to an error, logs the error and returns false.
+ *
+ * See XLOG_RM_* for available flags.
+ */
+bool
+xlog_remove_file(const char *filename, unsigned flags);
+
+/** }}} */
+
 #if defined(__cplusplus)
 } /* extern C */
 
