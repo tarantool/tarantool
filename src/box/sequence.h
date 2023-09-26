@@ -106,6 +106,8 @@ sequence_free(void);
  * the new sequence and will be freed automatically when
  * the sequence is destroyed so it must be allocated with
  * malloc().
+ *
+ * This function never fails (never returns NULL).
  */
 struct sequence *
 sequence_new(struct sequence_def *def);
