@@ -12,6 +12,8 @@
 
 using namespace lua_grammar;
 
+extern char preamble_lua[];
+
 #define PROTO_TOSTRING(TYPE, VAR_NAME) \
 	std::string TYPE##ToString(const TYPE & (VAR_NAME))
 
@@ -958,10 +960,10 @@ NESTED_PROTO_TOSTRING(UnaryOpExp, unary, Expression)
  */
 PROTO_TOSTRING(TableConstructor, table)
 {
-	std::string table_str = "{ ";
+	std::string table_str = " (setmetatable({ ";
 	if (table.has_fieldlist())
 		table_str += FieldListToString(table.fieldlist());
-	table_str += " }";
+	table_str += " }, table_mt))()";
 	return table_str;
 }
 
@@ -1107,7 +1109,7 @@ MainBlockToString(const Block &block)
 	GetCounterIdProvider().clean();
 
 	std::string block_str = BlockToString(block);
-	std::string retval;
+	std::string retval = preamble_lua;
 
 	for (size_t i = 0; i < GetCounterIdProvider().count(); ++i) {
 		retval += GetCounterName(i);
