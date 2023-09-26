@@ -40,12 +40,13 @@
 #include <tarantool_eio.h>
 #include <msgpuck.h>
 
-#include "coio_file.h"
+#include "coio_task.h"
 #include "tt_static.h"
 #include "error.h"
 #include "xrow.h"
 #include "iproto_constants.h"
 #include "errinj.h"
+#include "salad/grp_alloc.h"
 #include "trivia/util.h"
 
 /*
@@ -658,41 +659,20 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 					      inprogress_suffix : "");
 }
 
-static void
-xdir_say_gc(int result, int errorno, const char *filename)
-{
-	if (result == 0) {
-		say_info("removed %s", filename);
-	} else if (errorno != ENOENT) {
-		errno = errorno;
-		say_syserror("error while removing %s", filename);
-	}
-}
-
-static int
-xdir_complete_gc(eio_req *req)
-{
-	xdir_say_gc(req->result, req->errorno, EIO_PATH(req));
-	return 0;
-}
-
 void
 xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 {
+	unsigned rm_flags = XLOG_RM_VERBOSE;
+	if (flags & XDIR_GC_ASYNC)
+		rm_flags |= XLOG_RM_ASYNC;
 	struct vclock *vclock;
 	while ((vclock = vclockset_first(&dir->index)) != NULL &&
 	       vclock_sum(vclock) < signature) {
 		const char *filename =
 			xdir_format_filename(dir, vclock_sum(vclock), NONE);
-		if (flags & XDIR_GC_ASYNC) {
-			eio_unlink(filename, 0, xdir_complete_gc, NULL);
-		} else {
-			int rc = unlink(filename);
-			xdir_say_gc(rc, errno, filename);
-		}
+		xlog_remove_file(filename, rm_flags);
 		vclockset_remove(&dir->index, vclock);
 		free(vclock);
-
 		if (flags & XDIR_GC_REMOVE_ONE)
 			break;
 	}
@@ -706,9 +686,7 @@ xdir_remove_file_by_vclock(struct xdir *dir, struct vclock *to_remove)
 		return -1;
 	const char *filename =
 		xdir_format_filename(dir, vclock_sum(find), NONE);
-	int rc = unlink(filename);
-	xdir_say_gc(rc, errno, filename);
-	if (rc != 0)
+	if (!xlog_remove_file(filename, XLOG_RM_VERBOSE))
 		return -1;
 	vclockset_remove(&dir->index, find);
 	free(find);
@@ -730,30 +708,9 @@ xdir_collect_inprogress(struct xdir *xdir)
 		char *ext = strrchr(dent->d_name, '.');
 		if (ext == NULL || strcmp(ext, inprogress_suffix) != 0)
 			continue;
-
-		char path[PATH_MAX];
-		int rc;
-		if ((size_t)snprintf(path, sizeof(path), "%s/%s", dirname,
-				     dent->d_name) >= sizeof(path)) {
-			/*
-			 * If we allocated a large enough buffer for the path,
-			 * unlink would fail with this error according to the
-			 * POSIX standard.
-			 */
-			errno = ENAMETOOLONG;
-			rc = -1;
-		} else {
-			rc = unlink(path);
-		}
-		if (rc < 0)
-			/*
-			 * In case the path got truncated, print the expected
-			 * path.
-			 */
-			say_syserror("error while removing %s/%s",
-				     dirname, dent->d_name);
-		else
-			say_info("removed %s", path);
+		const char *filename = tt_snprintf(PATH_MAX, "%s/%s",
+						   dirname, dent->d_name);
+		xlog_remove_file(filename, XLOG_RM_VERBOSE);
 	}
 	closedir(dh);
 }
@@ -913,7 +870,7 @@ xlog_create(struct xlog *xlog, const char *name, int flags,
 err_write:
 	close(xlog->fd);
 	xlog->fd = -1;
-	unlink(xlog->filename); /* try to remove incomplete file */
+	xlog_remove_file(xlog->filename, 0); /* try to remove incomplete file */
 err_open:
 	xlog_free(xlog);
 err:
@@ -1550,8 +1507,7 @@ xlog_discard(struct xlog *l)
 	}
 	if (l->filename[0] != '\0') {
 		assert(l->is_inprogress);
-		if (unlink(l->filename) != 0)
-			say_syserror("failed to remove file '%s'", l->filename);
+		xlog_remove_file(l->filename, 0);
 		l->filename[0] = '\0';
 	}
 }
@@ -2166,6 +2122,102 @@ xlog_cursor_close(struct xlog_cursor *i, bool reuse_fd)
 	 * Do not trash the cursor object since the caller might
 	 * still want to access its state and/or meta information.
 	 */
+}
+
+/* }}} */
+
+/* {{{ xlog_remove_file */
+
+/** xlog_remove_file() coio task. */
+struct xlog_remove_file_task {
+	/** Base class. */
+	struct coio_task base;
+	/** Path to the file. */
+	char *filename;
+	/** Bitwise combination of XLOG_RM_* flags. */
+	unsigned flags;
+};
+
+/** Default implementation of xlog_remove_file_impl(). */
+static int
+xlog_remove_file_impl_default(const char *filename, bool *existed)
+{
+	if (unlink(filename) != 0) {
+		if (errno != ENOENT) {
+			diag_set(SystemError, "failed to unlink file '%s'",
+				 filename);
+			return -1;
+		}
+		*existed = false;
+	} else {
+		*existed = true;
+	}
+	return 0;
+}
+
+xlog_remove_file_impl_f xlog_remove_file_impl = xlog_remove_file_impl_default;
+
+/** Blocking implementation of xlog_remove_file(). */
+static bool
+xlog_remove_file_blocking(const char *filename, unsigned flags)
+{
+	bool existed;
+	if (xlog_remove_file_impl(filename, &existed) != 0) {
+		diag_log();
+		diag_clear(diag_get());
+		say_error("error while removing %s", filename);
+		return false;
+	}
+	if (existed && (flags & XLOG_RM_VERBOSE) != 0)
+		say_info("removed %s", filename);
+	return true;
+}
+
+static int
+xlog_remove_file_cb(struct coio_task *base)
+{
+	struct xlog_remove_file_task *task =
+		(struct xlog_remove_file_task *)base;
+	xlog_remove_file_blocking(task->filename, task->flags);
+	return 0;
+}
+
+static int
+xlog_remove_file_done_cb(struct coio_task *base)
+{
+	struct xlog_remove_file_task *task =
+		(struct xlog_remove_file_task *)base;
+	TRASH(task);
+	free(task);
+	return 0;
+}
+
+/** Asynchronous implementation of xlog_remove_file(). */
+static bool
+xlog_remove_file_async(const char *filename, unsigned flags)
+{
+	struct xlog_remove_file_task *task;
+	struct grp_alloc all = grp_alloc_initializer();
+	grp_alloc_reserve_data(&all, sizeof(*task));
+	grp_alloc_reserve_str0(&all, filename);
+	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
+	task = grp_alloc_create_data(&all, sizeof(*task));
+	task->filename = grp_alloc_create_str0(&all, filename);
+	task->flags = flags;
+	assert(grp_alloc_size(&all) == 0);
+	coio_task_create(&task->base, xlog_remove_file_cb,
+			 xlog_remove_file_done_cb);
+	coio_task_post(&task->base);
+	return true;
+}
+
+bool
+xlog_remove_file(const char *filename, unsigned flags)
+{
+	if (flags & XLOG_RM_ASYNC)
+		return xlog_remove_file_async(filename, flags);
+	else
+		return xlog_remove_file_blocking(filename, flags);
 }
 
 /* }}} */

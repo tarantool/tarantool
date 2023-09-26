@@ -2511,11 +2511,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 	/* New run index is ready for write, unlink old file if exists */
 	vy_run_snprint_path(path, sizeof(path), dir,
 			    space_id, iid, run->id, VY_FILE_INDEX);
-	if (unlink(path) < 0 && errno != ENOENT) {
-		diag_set(SystemError, "failed to unlink file '%s'",
-			 path);
-		goto close_err;
-	}
+	xlog_remove_file(path, 0);
 	if (vy_run_write_index(run, dir, space_id, iid) != 0)
 		goto close_err;
 	return 0;
@@ -2571,13 +2567,8 @@ vy_run_remove_files_f(va_list ap)
 	for (int type = 0; type < vy_file_MAX; type++) {
 		vy_run_snprint_path(path, sizeof(path), dir,
 				    space_id, iid, run_id, type);
-		if (unlink(path) < 0) {
-			if (errno != ENOENT) {
-				say_syserror("error while removing %s", path);
-				ret = -1;
-			}
-		} else
-			say_info("removed %s", path);
+		if (!xlog_remove_file(path, XLOG_RM_VERBOSE))
+			ret = -1;
 	}
 	/* Remove the root directory if it's empty. */
 	vy_lsm_snprint_path(path, sizeof(path), dir, space_id, iid);
