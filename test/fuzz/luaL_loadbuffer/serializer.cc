@@ -196,22 +196,23 @@ public:
 	enum class BlockType {
 		kReturnable,
 		kBreakable,
+		kReturnableWithVararg,
 	};
 
 	void step_in(BlockType type)
 	{
 		block_stack_.push(type);
-		if (type == BlockType::kReturnable) {
-			++returnable_counter_;
+		if (block_type_is_returnable_(type)) {
+			returnable_stack_.push(type);
 		}
 	}
 
 	void step_out()
 	{
 		assert(!block_stack_.empty());
-		if (block_stack_.top() == BlockType::kReturnable) {
-			assert(returnable_counter_ > 0);
-			--returnable_counter_;
+		if (block_type_is_returnable_(block_stack_.top())) {
+			assert(!returnable_stack_.empty());
+			returnable_stack_.pop();
 		}
 		block_stack_.pop();
 	}
@@ -233,10 +234,30 @@ public:
 
 	bool return_is_possible()
 	{
-		return returnable_counter_ > 0;
+		return !returnable_stack_.empty();
+	}
+
+	bool vararg_is_possible()
+	{
+		return (returnable_stack_.empty() ||
+			(!returnable_stack_.empty() &&
+			 returnable_stack_.top() ==
+				BlockType::kReturnableWithVararg));
 	}
 
 private:
+
+	bool block_type_is_returnable_(BlockType type)
+	{
+		switch (type) {
+		case BlockType::kBreakable:
+			return false;
+		case BlockType::kReturnable:
+		case BlockType::kReturnableWithVararg:
+			return true;
+		}
+		unreachable();
+	}
 
 	std::string get_exit_statement_()
 	{
@@ -245,6 +266,7 @@ private:
 		case BlockType::kBreakable:
 			return "break";
 		case BlockType::kReturnable:
+		case BlockType::kReturnableWithVararg:
 			return "return";
 		}
 		unreachable();
@@ -260,9 +282,9 @@ private:
 	 * `function foo() while true do return end end`
 	 * Erroneous code:
 	 * `while true do function foo() break end end`
-	 * This counter is used to check if `return` is possible.
+	 * This stack is used to check if `return` is possible.
 	 */
-	uint64_t returnable_counter_ = 0;
+	std::stack<BlockType> returnable_stack_;
 };
 
 Context&
@@ -318,6 +340,31 @@ FuncBodyToStringReqProtected(const FuncBody &body)
 	body_str += BlockToString(body.block());
 	body_str += "end\n";
 	return body_str;
+}
+
+bool
+FuncBodyHasVararg(const FuncBody &body)
+{
+	if (!body.has_parlist()) {
+		return false;
+	}
+	const FuncBody::ParList &parlist = body.parlist();
+	switch (parlist.parlist_oneof_case()) {
+	case FuncBody::ParList::ParlistOneofCase::kNamelist:
+		return parlist.namelist().has_ellipsis();
+	case FuncBody::ParList::ParlistOneofCase::kEllipsis:
+		return true;
+	default:
+		return parlist.namelist().has_ellipsis();
+	}
+}
+
+Context::BlockType
+GetFuncBodyType(const FuncBody &body)
+{
+	return FuncBodyHasVararg(body) ?
+		Context::BlockType::kReturnableWithVararg :
+		Context::BlockType::kReturnable;
 }
 
 std::string
@@ -671,7 +718,7 @@ PROTO_TOSTRING(ForCycleList, forcyclelist)
  */
 PROTO_TOSTRING(Function, func)
 {
-	GetContext().step_in(Context::BlockType::kReturnable);
+	GetContext().step_in(GetFuncBodyType(func.body()));
 
 	std::string func_str = "function ";
 	func_str += FuncNameToString(func.name());
@@ -729,7 +776,7 @@ NESTED_PROTO_TOSTRING(ParList, parlist, FuncBody)
  */
 PROTO_TOSTRING(LocalFunc, localfunc)
 {
-	GetContext().step_in(Context::BlockType::kReturnable);
+	GetContext().step_in(GetFuncBodyType(localfunc.funcbody()));
 
 	std::string localfunc_str = "local function ";
 	localfunc_str += NameToString(localfunc.name());
@@ -856,7 +903,11 @@ PROTO_TOSTRING(Expression, expr)
 	case ExprType::kStr:
 		return "'" + ConvertToStringDefault(expr.str()) + "'";
 	case ExprType::kEllipsis:
-		return " ... ";
+		if (GetContext().vararg_is_possible()) {
+			return " ... ";
+		} else {
+			return " nil";
+		}
 	case ExprType::kFunction:
 		return AnonFuncToString(expr.function());
 	case ExprType::kPrefixexp:
@@ -878,7 +929,7 @@ PROTO_TOSTRING(Expression, expr)
 
 NESTED_PROTO_TOSTRING(AnonFunc, func, Expression)
 {
-	GetContext().step_in(Context::BlockType::kReturnable);
+	GetContext().step_in(GetFuncBodyType(func.body()));
 
 	std::string retval = "function ";
 	retval += FuncBodyToStringReqProtected(func.body());
