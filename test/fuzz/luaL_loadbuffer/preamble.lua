@@ -4,6 +4,10 @@ local always_number = function(val)
     return tonumber(val) or DEFAULT_NUMBER
 end
 
+local not_nan_and_nil = function(val)
+    return (val ~= val or val == nil) and DEFAULT_NUMBER or val
+end
+
 local __add = function(v1, v2)
     return always_number(v1) + always_number(v2)
 end
