@@ -131,11 +131,7 @@ sequence_free(void)
 struct sequence *
 sequence_new(struct sequence_def *def)
 {
-	struct sequence *seq = calloc(1, sizeof(*seq));
-	if (seq == NULL) {
-		diag_set(OutOfMemory, sizeof(*seq), "malloc", "sequence");
-		return NULL;
-	}
+	struct sequence *seq = xcalloc(1, sizeof(*seq));
 	seq->def = def;
 	return seq;
 }
@@ -341,7 +337,7 @@ sequence_data_iterator_next_raw(struct index_read_view_iterator *iterator,
 
 	const size_t buf_size = mp_sizeof_array(2) +
 				2 * mp_sizeof_uint(UINT64_MAX);
-	char *buf = region_alloc(&fiber()->gc, buf_size);
+	char *buf = xregion_alloc(&fiber()->gc, buf_size);
 	char *buf_end = buf;
 	buf_end = mp_encode_array(buf_end, 2);
 	buf_end = mp_encode_uint(buf_end, sd->id);

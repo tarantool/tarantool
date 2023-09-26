@@ -4888,8 +4888,6 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 		if (on_rollback == NULL)
 			return -1;
 		seq = sequence_new(new_def);
-		if (seq == NULL)
-			return -1;
 		sequence_cache_insert(seq);
 		on_rollback->data = seq;
 		txn_stmt_on_rollback(stmt, on_rollback);
