@@ -942,7 +942,6 @@ local function rocks()
     local cfg = require("luarocks.core.cfg")
     cfg.init()
     local util = require("luarocks.util")
-    local command_line = require("luarocks.cmd")
     -- Tweak help messages
     util.see_help = function(command, program) -- luacheck: no unused args
         -- TODO: print extended help message here
@@ -951,6 +950,7 @@ local function rocks()
     util.this_program = function(default) -- luacheck: no unused args
         return command_path .. " rocks"
     end
+    local command_line = require("luarocks.cmd")
 
     -- Disabled: path, upload
     local rocks_commands = {
@@ -981,7 +981,8 @@ local function rocks()
     shift_argv(lua_arguments, 0, 1)
     -- Call LuaRocks.
     command_line.run_command('LuaRocks main command-line interface',
-                             rocks_commands, nil, unpack(lua_arguments))
+                             rocks_commands, 'luarocks.cmd.external',
+                             unpack(lua_arguments))
 end
 
 local function exit_wrapper(func)
