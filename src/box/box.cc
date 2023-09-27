@@ -5719,9 +5719,11 @@ box_broadcast_schema(void)
 {
 	char buf[1024];
 	char *w = buf;
-	w = mp_encode_map(w, 1);
+	w = mp_encode_map(w, 2);
 	w = mp_encode_str0(w, "version");
 	w = mp_encode_uint(w, box_schema_version());
+	w = mp_encode_str0(w, "dd_version_id");
+	w = mp_encode_uint(w, dd_version_id);
 
 	box_broadcast("box.schema", strlen("box.schema"), buf, w);
 

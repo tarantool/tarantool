@@ -4174,6 +4174,7 @@ static int
 on_commit_dd_version(struct trigger *trigger, void * /* event */)
 {
 	dd_version_id = (uint32_t)(uintptr_t)trigger->data;
+	box_broadcast_schema();
 	return 0;
 }
 
