@@ -250,6 +250,7 @@ g.test_defaults = function()
             auth_retries = 0,
             auth_type = "chap-sha1",
             disable_guest = false,
+            secure_erasing = false,
             password_enforce_digits = false,
             password_enforce_lowercase = false,
             password_enforce_specialchars = false,

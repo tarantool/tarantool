@@ -1189,6 +1189,7 @@ g.test_security_enterprise = function()
             auth_delay = 5,
             auth_retries = 3,
             disable_guest = true,
+            secure_erasing = true,
             password_lifetime_days = 90,
             password_min_length = 10,
             password_enforce_uppercase = true,
