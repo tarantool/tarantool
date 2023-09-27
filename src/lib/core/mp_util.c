@@ -16,12 +16,8 @@ mp_vformat_on_region(struct region *region, size_t *size, const char *format,
 	va_list ap;
 	va_copy(ap, src);
 	size_t buf_size = mp_vformat(NULL, 0, format, ap);
-	char *buf = region_alloc(region, buf_size);
+	char *buf = xregion_alloc(region, buf_size);
 	va_end(ap);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, buf_size, "region_alloc", "buf");
-		return buf;
-	}
 	va_copy(ap, src);
 	*size = mp_vformat(buf, buf_size, format, ap);
 	va_end(ap);

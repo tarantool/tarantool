@@ -1488,10 +1488,6 @@ sql_constraint_drop(uint32_t space_id, const char *name)
 	const char *ops = mp_format_on_region(region, &size, "[[%s%s%u]]", "#",
 					      path, 1);
 	const char *end = ops + size;
-	if (ops == NULL) {
-		region_truncate(region, used);
-		return -1;
-	}
 	int rc = box_update(BOX_SPACE_ID, 0, key, key_end, ops, end, 0, NULL);
 	region_truncate(region, used);
 	return rc;
@@ -1544,8 +1540,6 @@ sql_constraint_create(const char *name, uint32_t space_id, const char *path,
 		ops = mp_format_on_region(region, &ops_size, "[[%s%s%p]]", "!",
 					  buf, value);
 	}
-	if (ops == NULL)
-		goto error;
 	const char *end = ops + ops_size;
 	if (box_update(BOX_SPACE_ID, 0, key, key_end, ops, end, 0, NULL) != 0)
 		goto error;
@@ -1596,8 +1590,6 @@ sql_foreign_key_create(const char *name, uint32_t child_id, uint32_t parent_id,
 					    "space", parent_id, "field",
 					    mapping);
 	}
-	if (value == NULL)
-		return -1;
 	assert(mp_typeof(*value) == MP_MAP);
 	for (uint32_t i = 0; i < count; ++i) {
 		if (cdefs[i].type != CONSTR_FKEY)
