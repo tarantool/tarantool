@@ -1,7 +1,16 @@
 local t = require('luatest')
 local justrun = require('test.justrun')
+local treegen = require('test.treegen')
 
 local g = t.group()
+
+g.before_all(function()
+    treegen.init(g)
+end)
+
+g.after_all(function()
+    treegen.clean(g)
+end)
 
 g.test_help_env_list = function()
     local res = justrun.tarantool('.', {}, {'--help-env-list'}, {nojson = true})
@@ -69,4 +78,56 @@ g.test_help_env_list = function()
             case.default, case.availability)
         t.assert(res.stdout:find(needle), case.name)
     end
+end
+
+g.test_force_recovery = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local script = [[
+        box.cfg{}
+        print(box.cfg.force_recovery)
+        os.exit(0)
+    ]]
+    treegen.write_script(dir, 'main.lua', script)
+
+    -- Make sure the CLI force-recovery option sets the box.cfg force_recovery
+    -- option.
+    local env = {}
+    local opts = {nojson = true, stderr = false}
+    local args = {'--force-recovery', 'main.lua'}
+    local res = justrun.tarantool(dir, env, args, opts)
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.stdout, 'true')
+
+    -- Make sure the CLI force-recovery option sets the box.cfg force_recovery
+    -- option to true even if the env TT_FORCE_RECOVERY option is set to false.
+    env = {TT_FORCE_RECOVERY = false}
+    opts = {nojson = true, stderr = false}
+    args = {'--force-recovery', 'main.lua'}
+    res = justrun.tarantool(dir, env, args, opts)
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.stdout, 'true')
+
+    -- Make sure the env option TT_FORCE_RECOVERY sets correctly if CLI
+    -- force-recovery is not set.
+    env = {TT_FORCE_RECOVERY = true}
+    opts = {nojson = true, stderr = false}
+    args = {'main.lua'}
+    res = justrun.tarantool(dir, env, args, opts)
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.stdout, 'true')
+
+    -- Make sure the CLI force recovery option is overwritten by explicitly
+    -- setting the force_recovery option in box.cfg.
+    script = [[
+        box.cfg{force_recovery = false}
+        print(box.cfg.force_recovery)
+        os.exit(0)
+    ]]
+    treegen.write_script(dir, 'two.lua', script)
+    env = {}
+    opts = {nojson = true, stderr = false}
+    args = {'--force-recovery', 'two.lua'}
+    res = justrun.tarantool(dir, env, args, opts)
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.stdout, 'false')
 end

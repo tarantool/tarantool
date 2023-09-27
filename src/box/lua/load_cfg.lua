@@ -1036,6 +1036,12 @@ local function load_cfg(cfg)
 
     cfg = upgrade_cfg(cfg, translate_cfg)
 
+    -- Forced recovery can be envoked by CLI options. Set the appropriate
+    -- box_cfg option in this case.
+    if cfg.force_recovery == nil and private.cfg_get_force_recovery() then
+        cfg.force_recovery = true;
+    end
+
     -- Set options passed through environment variables.
     apply_env_cfg(cfg, box.internal.cfg.env, pre_load_cfg_is_set)
 
