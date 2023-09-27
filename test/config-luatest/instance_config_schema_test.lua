@@ -1351,3 +1351,24 @@ g.test_audit_available = function()
     local res = instance_config:apply_default({}).audit_log
     t.assert_equals(res, exp)
 end
+
+g.test_failover = function()
+    local iconfig = {
+        failover = {
+            probe_interval = 5,
+            connect_timeout = 2,
+            call_timeout = 2,
+        },
+    }
+
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.failover, instance_config.schema.fields.failover)
+
+    local exp = {
+        probe_interval = 10,
+        connect_timeout = 1,
+        call_timeout = 1,
+    }
+    local res = instance_config:apply_default({}).failover
+    t.assert_equals(res, exp)
+end

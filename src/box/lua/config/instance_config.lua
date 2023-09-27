@@ -1831,6 +1831,23 @@ return schema.new('instance_config', schema.record({
     roles = schema.array({
         items = schema.scalar({type = 'string'})
     }),
+    -- Options of the failover coordinator service.
+    --
+    -- TODO: Allow only in the global scope.
+    failover = schema.record({
+        probe_interval = schema.scalar({
+            type = 'number',
+            default = 10,
+        }),
+        connect_timeout = schema.scalar({
+            type = 'number',
+            default = 1,
+        }),
+        call_timeout = schema.scalar({
+            type = 'number',
+            default = 1,
+        }),
+    }),
 }, {
     -- This kind of validation cannot be implemented as the
     -- 'validate' annotation of a particular schema node. There
