@@ -37,6 +37,7 @@ local _enterprise_keys = {
     auth_delay = true,
     auth_retries = true,
     disable_guest = true,
+    secure_erasing = true,
     password_lifetime_days = true,
     password_min_length = true,
     password_enforce_uppercase = true,

@@ -1461,6 +1461,11 @@ return schema.new('instance_config', schema.record({
             default = false,
             box_cfg = 'disable_guest',
         })),
+        secure_erasing = enterprise_edition(schema.scalar({
+            type = 'boolean',
+            default = false,
+            box_cfg = 'secure_erasing',
+        })),
         password_lifetime_days = enterprise_edition(schema.scalar({
             type = 'integer',
             default = 0,

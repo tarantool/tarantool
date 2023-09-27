@@ -668,6 +668,7 @@ g.test_security_options = function()
             auth_delay: 5
             auth_retries: 3
             disable_guest: false
+            secure_erasing: false
             password_lifetime_days: 90
             password_min_length: 14
             password_enforce_uppercase: true
@@ -696,6 +697,7 @@ g.test_security_options = function()
         t.assert_equals(box.cfg.auth_delay, 5)
         t.assert_equals(box.cfg.auth_retries, 3)
         t.assert_equals(box.cfg.disable_guest, false)
+        t.assert_equals(box.cfg.secure_erasing, false)
         t.assert_equals(box.cfg.password_lifetime_days, 90)
         t.assert_equals(box.cfg.password_min_length, 14)
         t.assert_equals(box.cfg.password_enforce_uppercase, true)
