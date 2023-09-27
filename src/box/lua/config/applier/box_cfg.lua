@@ -1,6 +1,8 @@
+local fiber = require('fiber')
 local fio = require('fio')
 local log = require('internal.config.utils.log')
 local instance_config = require('internal.config.instance_config')
+local mkversion = require('internal.mkversion')
 
 local function peer_uri(configdata, peer_name)
     local iconfig = configdata._peers[peer_name].iconfig_def
@@ -115,6 +117,47 @@ end
 local function has_snapshot(configdata)
     local pattern = fio.pathjoin(effective_snapshot_dir(configdata), '*.snap')
     return #fio.glob(pattern) > 0
+end
+
+--
+-- If schema version is less than 3.0.0, set box.watch trigger, which
+-- automatically configures names as soon as schema is upgraded to
+-- the version >= 3.0.0
+--
+local function apply_names_on_upgrade(names, is_rw)
+    local version = mkversion.get()
+    local version_3 = mkversion(3, 0, 0)
+    if version >= version_3 then
+        return
+    end
+
+    box.watch('box.schema', function(_, value)
+        local id = value.dd_version_id
+        -- dd_version_id is not updated in most cases.
+        if id == version.id then
+            return
+        end
+
+        if version < version_3 and mkversion.from_id(id) >= version_3 then
+            -- Indefinitely retry setting names, schema was already updated,
+            -- we must set names before restart. Otherwise, it will be
+            -- impossible to start instance again with yaml config.
+            -- Manual intervention will be required: configure without names,
+            -- set names with box.cfg.
+            while true do
+                local ok, err = pcall(box.cfg, {
+                    instance_name = names.instance_name,
+                    replicaset_name = is_rw and names.replicaset_name or nil,
+                })
+                if ok then
+                    break
+                end
+
+                log.info('Failed to set names: %s. Retrying...', err)
+                fiber.sleep(1)
+            end
+        end
+    end)
 end
 
 -- Returns nothing or {needs_retry = true}.
@@ -395,6 +438,7 @@ local function apply(config)
 
         log.debug('box_cfg.apply (startup): %s', box_cfg)
         box.cfg(box_cfg)
+        apply_names_on_upgrade(names, configured_as_rw)
 
         -- NB: needs_retry should be true when force_read_only is
         -- true. It is so by construction.
@@ -404,6 +448,9 @@ local function apply(config)
     -- If it is reload, just apply the new configuration.
     log.debug('box_cfg.apply: %s', box_cfg)
     box.cfg(box_cfg)
+    if is_startup then
+        apply_names_on_upgrade(names, not box_cfg.read_only)
+    end
 end
 
 return {
