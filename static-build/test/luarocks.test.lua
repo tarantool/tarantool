@@ -27,7 +27,7 @@ test:diag(diag_msg('Loaded luarocks modules at startup', loaded_luarocks))
 
 -- Check that all luarocks modules exists at package.preload
 local preload_luarocks = find_luarocks_modules(package.preload)
-test:ok(#preload_luarocks == 91, 'preloaded rocks count equals')
+test:ok(#preload_luarocks == 92, 'preloaded rocks count equals')
 test:diag(diag_msg('Preloaded luarocks module', preload_luarocks))
 
 -- Check that luarocks.core.cfg works
