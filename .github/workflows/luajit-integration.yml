@@ -52,7 +52,7 @@ jobs:
     runs-on: [self-hosted, regular, '${{ inputs.os }}', '${{ inputs.arch }}']
     steps:
       - name: Prepare checkout
-        uses: tarantool/actions/prepare-checkout@master
+        uses: tarantool/actions/prepare-checkout@ylobankov/improve-prepare-checkout
 
       - name: Checkout
         uses: actions/checkout@v3

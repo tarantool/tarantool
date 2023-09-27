@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Prepare checkout
-        uses: tarantool/actions/prepare-checkout@master
+        uses: tarantool/actions/prepare-checkout@ylobankov/improve-prepare-checkout
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
