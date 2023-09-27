@@ -444,6 +444,9 @@ lbox_info_cluster(struct lua_State *L)
 static int
 lbox_info_memory_call(struct lua_State *L)
 {
+	if (box_check_configured() != 0)
+		return luaT_error(L);
+
 	struct engine_memory_stat stat;
 	engine_memory_stat(&stat);
 
@@ -496,6 +499,9 @@ lbox_info_memory(struct lua_State *L)
 static int
 lbox_info_gc_call(struct lua_State *L)
 {
+	if (box_check_configured() != 0)
+		return luaT_error(L);
+
 	int count;
 
 	lua_newtable(L);
@@ -594,6 +600,9 @@ lbox_info_gc(struct lua_State *L)
 static int
 lbox_info_vinyl_call(struct lua_State *L)
 {
+	if (box_check_configured() != 0)
+		return luaT_error(L);
+
 	struct info_handler h;
 	luaT_info_handler_create(&h, L);
 	struct engine *vinyl = engine_by_name("vinyl");
@@ -621,6 +630,9 @@ lbox_info_vinyl(struct lua_State *L)
 static int
 lbox_info_sql_call(struct lua_State *L)
 {
+	if (box_check_configured() != 0)
+		return luaT_error(L);
+
 	struct info_handler h;
 	luaT_info_handler_create(&h, L);
 	sql_stmt_cache_stat(&h);
