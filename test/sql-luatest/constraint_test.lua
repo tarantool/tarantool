@@ -609,3 +609,88 @@ g.test_drop_constraints_with_the_same_name = function()
         box.func.check_T_C:drop()
     end)
 end
+
+-- Make sure the variations of the DROP CONSTRAINT statement with the specified
+-- constraint type work correctly.
+g.test_drop_constraints_with_type = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE t (i INT CONSTRAINT c PRIMARY KEY,
+                                      a INT CONSTRAINT b CHECK (a > 10)
+                                      CONSTRAINT b REFERENCES t(i),
+                                      CONSTRAINT c CHECK (i + a > 100),
+                                      CONSTRAINT c FOREIGN KEY (a) REFERENCES t,
+                                      CONSTRAINT d UNIQUE(a));]]
+        box.execute(sql)
+        local s = box.space.T
+        t.assert(s.constraint['C'] ~= nil);
+        t.assert(s.foreign_key['C'] ~= nil);
+        t.assert(s.index['C'] ~= nil);
+        t.assert(s.index['D'] ~= nil);
+        t.assert(s:format()[2].constraint['B'] ~= nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        -- Make sure that a constraint with the given name but with the wrong
+        -- type will not be dropped.
+        local _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT d CHECK;]])
+        local exp = "Constraint 'D' does not exist in space 'T'"
+        t.assert_equals(err.message, exp)
+        t.assert(s.constraint['C'] ~= nil);
+        t.assert(s.foreign_key['C'] ~= nil);
+        t.assert(s.index['C'] ~= nil);
+        t.assert(s.index['D'] ~= nil);
+        t.assert(s:format()[2].constraint['B'] ~= nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        box.execute([[ALTER TABLE t DROP CONSTRAINT d UNIQUE;]])
+        t.assert(s.constraint['C'] ~= nil);
+        t.assert(s.foreign_key['C'] ~= nil);
+        t.assert(s.index['C'] ~= nil);
+        t.assert(s.index['D'] == nil);
+        t.assert(s:format()[2].constraint['B'] ~= nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        box.execute([[ALTER TABLE t DROP CONSTRAINT c CHECK;]])
+        t.assert(s.constraint == nil or s.constraint['C'] == nil);
+        t.assert(s.foreign_key['C'] ~= nil);
+        t.assert(s.index['C'] ~= nil);
+        t.assert(s.index['D'] == nil);
+        t.assert(s:format()[2].constraint['B'] ~= nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        box.execute([[ALTER TABLE t DROP CONSTRAINT c FOREIGN KEY;]])
+        t.assert(s.constraint == nil or s.constraint['C'] == nil);
+        t.assert(s.foreign_key == nil or s.foreign_key['C'] == nil);
+        t.assert(s.index['C'] ~= nil);
+        t.assert(s.index['D'] == nil);
+        t.assert(s:format()[2].constraint['B'] ~= nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        box.execute([[ALTER TABLE t DROP CONSTRAINT c PRIMARY KEY;]])
+        t.assert(s.constraint == nil or s.constraint['C'] == nil);
+        t.assert(s.foreign_key == nil or s.foreign_key['C'] == nil);
+        t.assert(s.index['C'] == nil);
+        t.assert(s.index['D'] == nil);
+        t.assert(s:format()[2].constraint['B'] ~= nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        box.execute([[ALTER TABLE t DROP CONSTRAINT a.b CHECK;]])
+        t.assert(s.constraint == nil or s.constraint['C'] == nil);
+        t.assert(s.foreign_key == nil or s.foreign_key['C'] == nil);
+        t.assert(s.index['C']  == nil);
+        t.assert(s.index['D'] == nil);
+        t.assert(s:format()[2].constraint['B'] == nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        box.execute([[ALTER TABLE t DROP CONSTRAINT a.b FOREIGN KEY;]])
+        t.assert(s.constraint == nil or s.constraint['C'] == nil);
+        t.assert(s.foreign_key == nil or s.foreign_key['C'] == nil);
+        t.assert(s.index['C']  == nil);
+        t.assert(s.index['D'] == nil);
+        t.assert(s:format()[2].constraint['B'] == nil);
+        t.assert(s:format()[2].foreign_key['B'] == nil);
+
+        box.execute([[DROP TABLE t;]])
+        box.func.check_T_B:drop()
+        box.func.check_T_C:drop()
+    end)
+end
