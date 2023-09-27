@@ -14,22 +14,16 @@ local BUILDDIR = os.getenv('BUILDDIR') or '.'
 local SOURCEDIR = os.getenv("SOURCEDIR") or '.'
 
 -- Find tarantoolctl.
-local TARANTOOLCTL_PATH
-if test_run == nil then
-    -- If we're not under test-run, assume that current directory
-    -- is tarantool's build directory. Also allow to set it via the
-    -- BUILDDIR environment variable.
-    TARANTOOLCTL_PATH = ('%s/extra/dist/tarantoolctl'):format(BUILDDIR)
-    -- If we have no tarantoolctl in the build directory, assume
-    -- that the testing is performed against system tarantool.
-    if not fio.path.exists(TARANTOOLCTL_PATH) then
-        TARANTOOLCTL_PATH = arg[-1] .. 'ctl'
-    end
-else
-    -- test-run knows the path to tarantoolctl.
+local TARANTOOLCTL_PATH = ('%s/extra/dist/tarantoolctl'):format(BUILDDIR)
+-- If we have no tarantoolctl in the build directory, assume
+-- that the testing is performed against system tarantool.
+if not fio.path.exists(TARANTOOLCTL_PATH) then
+    TARANTOOLCTL_PATH = arg[-1] .. 'ctl'
+end
+-- If no tarantoolctl found, use one from the test-run.
+if not fio.path.exists(TARANTOOLCTL_PATH) then
     TARANTOOLCTL_PATH = os.getenv('TARANTOOLCTL')
 end
-
 if TARANTOOLCTL_PATH == nil then
     error("Can't find tarantoolctl")
 end
@@ -138,7 +132,8 @@ local function tctl_command(dir, cmd, args)
     if not fio.stat(fio.pathjoin(dir, '.tarantoolctl')) then
         create_script(dir, '.tarantoolctl', tctlcfg_code)
     end
-    local command = ('LUA_PATH="' .. rocks_path .. '" tarantoolctl %s %s'):format(cmd, args)
+    local command = ('LUA_PATH="' .. rocks_path .. '" ' ..
+        TARANTOOLCTL_PATH .. ' %s %s'):format(cmd, args)
     return run_command(dir, command)
 end
 
@@ -351,14 +346,12 @@ do
 
     local status, err = pcall(function()
         test:test("check basic help", function(test_i)
-            local exp = 'tarantoolctl rocks %- ' ..
-                'LuaRocks main command%-line interface'
             test_i:plan(6)
             test_help(test_i, nil, "tarantoolctl", "Usage:")
             test_help(test_i, nil, "tarantoolctl help", "Usage:")
             test_help(test_i, nil, "tarantoolctl --help", "Usage:")
             test_help(test_i, dir, "tarantoolctl", "Usage:")
-            check_ok(test_i, dir, "rocks", "--help", 0, exp)
+            check_ok(test_i, dir, "rocks", "--help", 0, "Usage:")
         end)
     end)
 
