@@ -3478,8 +3478,6 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 	RegionGuard region_guard(region);
 	const char *data = mp_vformat_on_region(region, &size, format, ap);
 	va_end(ap);
-	if (data == NULL)
-		return -1;
 	const char *data_end = data + size;
 	switch (type) {
 	case IPROTO_INSERT:
