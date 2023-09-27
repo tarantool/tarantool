@@ -635,6 +635,7 @@ print_help(FILE *stream, const char *program)
 		"Options:\n\n"
 		" -h, --help             display this help and exit\n"
 		" --help-env-list        display env variables taken into account\n"
+		" --force-recovery       enable force-recovery\n"
 		" -v, --version          print program version and exit\n"
 		" -c, --config PATH      set a path to yaml config file as 'PATH'\n"
 		" -n, --name INSTANCE    set an instance name as 'INSTANCE'\n"
@@ -692,6 +693,7 @@ main(int argc, char **argv)
 		 * change it if -E short option should be added.
 		 */
 		{"help-env-list", no_argument, 0, 'E'},
+		{"force-recovery", no_argument, 0, 'F'},
 		{NULL, 0, 0, 0},
 	};
 	static const char *opts = "+hVvb::ij:e:l:dc:n:";
@@ -723,6 +725,9 @@ main(int argc, char **argv)
 			return 0;
 		case 'E':
 			opt_mask |= O_HELP_ENV_LIST;
+			break;
+		case 'F':
+			box_is_force_recovery = true;
 			break;
 		case 'i':
 			/* Force interactive mode */

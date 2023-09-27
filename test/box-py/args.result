@@ -25,6 +25,7 @@ Options:
 
  -h, --help             display this help and exit
  --help-env-list        display env variables taken into account
+ --force-recovery       enable force-recovery
  -v, --version          print program version and exit
  -c, --config PATH      set a path to yaml config file as 'PATH'
  -n, --name INSTANCE    set an instance name as 'INSTANCE'
@@ -67,6 +68,7 @@ Options:
 
  -h, --help             display this help and exit
  --help-env-list        display env variables taken into account
+ --force-recovery       enable force-recovery
  -v, --version          print program version and exit
  -c, --config PATH      set a path to yaml config file as 'PATH'
  -n, --name INSTANCE    set an instance name as 'INSTANCE'
