@@ -577,3 +577,35 @@ g.test_drop_field_constraints = function()
         box.func.check_T_B:drop()
     end)
 end
+
+-- Make sure the ALTER TABLE DROP CONSTRAINT statement cannot drop constraints
+-- if more than one constraint is found for a given name.
+g.test_drop_constraints_with_the_same_name = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE t (i INT CONSTRAINT c PRIMARY KEY,
+                                      a INT CONSTRAINT b CHECK (a > 10)
+                                      CONSTRAINT b REFERENCES t(i),
+                                      CONSTRAINT c CHECK (i + a > 100));]]
+        box.execute(sql)
+        t.assert(box.space.T.constraint['C'] ~= nil);
+        t.assert(box.space.T.index['C'] ~= nil);
+        local _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c;]])
+        local exp = "Failed to execute SQL statement: "..
+                    "ambiguous constraint name: 'C'"
+        t.assert_equals(err.message, exp)
+        t.assert(box.space.T.constraint['C'] ~= nil);
+        t.assert(box.space.T.index['C'] ~= nil);
+
+        t.assert(box.space.T:format()[2].constraint['B'] ~= nil);
+        t.assert(box.space.T:format()[2].foreign_key['B'] ~= nil);
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT a.b;]])
+        exp = "Failed to execute SQL statement: "..
+              "ambiguous constraint name: 'A.B'"
+        t.assert_equals(err.message, exp)
+        t.assert(box.space.T:format()[2].constraint['B'] ~= nil);
+        t.assert(box.space.T:format()[2].foreign_key['B'] ~= nil);
+        box.execute([[DROP TABLE t;]])
+        box.func.check_T_B:drop()
+        box.func.check_T_C:drop()
+    end)
+end
