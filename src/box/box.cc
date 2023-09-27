@@ -99,6 +99,9 @@
 #include "node_name.h"
 #include "tt_sort.h"
 
+/** Names can be set only with schema >= 3.0.0. */
+#define MIN_NAMES_VERSION_ID 196608
+
 static char status[64] = "unconfigured";
 
 /** box.stat rmean */
@@ -1506,6 +1509,22 @@ box_check_node_name(char *out, const char *cfg_name, bool set_diag)
 		}
 		return -1;
 	}
+
+	/**
+	 * If schema version is less then 3.0.0, then we consider setting name
+	 * as NoOp in order to allow painless configuration of Tarantool 3.0
+	 * on the lower schema . if dd_version_id == 0, then recovery/bootstrap
+	 * is not done, we can say nothing, allow retrieving a name.
+	 */
+	if (dd_version_id != 0 && dd_version_id < MIN_NAMES_VERSION_ID) {
+		say_warn("Setting %s was skipped. Please, consider upgrading "
+			 "schema. If you're using yaml configuration names "
+			 "will be automatically set after schema upgrade",
+			 cfg_name);
+		*out = 0;
+		return 0;
+	}
+
 	strlcpy(out, name, NODE_NAME_SIZE_MAX);
 	return 0;
 }
@@ -5396,6 +5415,14 @@ box_cfg_xc(void)
 		bootstrap(&is_bootstrap_leader);
 	}
 	replicaset_state = REPLICASET_READY;
+	/**
+	 * Check configured name after recovery one more time.
+	 * Otherwise, it might be set to incorrect value, when
+	 * we run on schema version < 3.0.0 and it will block
+	 * reconfiguriation of instance_name in the future.
+	 */
+	if (box_check_instance_name(cfg_instance_name) != 0)
+		diag_raise();
 
 	/*
 	 * replicaset.applier.vclock is filled with real
