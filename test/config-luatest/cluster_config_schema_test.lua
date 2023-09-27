@@ -284,6 +284,11 @@ g.test_defaults = function()
             },
             to = "devnull",
         } or nil,
+        failover = {
+            probe_interval = 10,
+            connect_timeout = 1,
+            call_timeout = 1,
+        },
     }
     local res = cluster_config:apply_default({})
     t.assert_equals(res, exp)
