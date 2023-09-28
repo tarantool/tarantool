@@ -1404,84 +1404,20 @@ index_field_tuple_est(const struct index_def *idx_def, uint32_t field)
 	return tnt_idx->def->opts.stat->tuple_log_est[field];
 }
 
-/**
- * Find the constraint in space and return its JSON path in buffer allocated on
- * region.
- */
-static const char *
-sql_constraint_path(struct region *region, uint32_t space_id, const char *name)
+/** Drop tuple or field constraint. */
+static int
+sql_constraint_drop(uint32_t space_id, const char *name, const char *prefix)
 {
-	struct space *space = space_by_id(space_id);
-	if (space == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
-		return NULL;
-	}
-	uint32_t size = strlen(name) + 32;
-	char *path = xregion_alloc(region, size);
-	struct tuple_constraint_def *cdefs = space->def->opts.constraint_def;
-	uint32_t count = space->def->opts.constraint_count;
-	for (uint32_t i = 0; i < count; ++i) {
-		if (strcmp(cdefs[i].name, name) != 0)
-			continue;
-		enum tuple_constraint_type type = cdefs[i].type;
-		uint32_t type_count = 0;
-		for (uint32_t j = 0; j < count; ++j) {
-			if (cdefs[j].type == type)
-				++type_count;
-		}
-		assert(type_count > 0);
-		const char *type_str = tuple_constraint_type_strs[type];
-		int len;
-		if (type_count == 1) {
-			len = snprintf(path, size, "flags.%s", type_str);
-		} else {
-			len = snprintf(path, size, "flags.%s.%s", type_str,
-				       name);
-		}
-		assert(len >= 0 && (uint32_t)len < size);
-		(void)len;
-		return path;
-	}
-	uint32_t field_count = space->def->field_count;
-	for (uint32_t i = 0; i < field_count; ++i) {
-		cdefs = space->def->fields[i].constraint_def;
-		count = space->def->fields[i].constraint_count;
-		for (uint32_t j = 0; j < count; ++j) {
-			if (strcmp(cdefs[j].name, name) != 0)
-				continue;
-			enum tuple_constraint_type type = cdefs[j].type;
-			uint32_t type_count = 0;
-			for (uint32_t k = 0; k < count; ++k) {
-				if (cdefs[k].type == type)
-					++type_count;
-			}
-			assert(type_count > 0);
-			const char *type_str = tuple_constraint_type_strs[type];
-			int len;
-			if (type_count == 1) {
-				len = snprintf(path, size, "format[%u].%s",
-					       i + 1, type_str);
-			} else {
-				len = snprintf(path, size, "format[%u].%s.%s",
-					       i + 1, type_str, name);
-			}
-			assert(len >= 0 && (uint32_t)len < size);
-			(void)len;
-			return path;
-		}
-	}
-	diag_set(ClientError, ER_NO_SUCH_CONSTRAINT, name, space->def->name);
-	return NULL;
-}
+	size_t name_len = strlen(name);
+	size_t prefix_len = strlen(prefix);
 
-int
-sql_constraint_drop(uint32_t space_id, const char *name)
-{
 	struct region *region = &fiber()->gc;
 	uint32_t used = region_used(region);
-	const char *path = sql_constraint_path(region, space_id, name);
-	if (path == NULL)
-		return -1;
+	char *path = xregion_alloc(region, name_len + prefix_len + 1);
+	memcpy(path, prefix, prefix_len);
+	memcpy(path + prefix_len, name, name_len);
+	path[name_len + prefix_len] = '\0';
+
 	char key[16];
 	char *key_end = key + mp_format(key, 16, "[%u]", space_id);
 	size_t size;
@@ -1491,6 +1427,33 @@ sql_constraint_drop(uint32_t space_id, const char *name)
 	int rc = box_update(BOX_SPACE_ID, 0, key, key_end, ops, end, 0, NULL);
 	region_truncate(region, used);
 	return rc;
+}
+
+int
+sql_tuple_foreign_key_drop(uint32_t space_id, const char *name)
+{
+	return sql_constraint_drop(space_id, name, "flags.foreign_key.");
+}
+
+int
+sql_tuple_check_drop(uint32_t space_id, const char *name)
+{
+	return sql_constraint_drop(space_id, name, "flags.constraint.");
+}
+
+int
+sql_field_foreign_key_drop(uint32_t space_id, uint32_t fieldno,
+			   const char *name)
+{
+	const char *prefix = tt_sprintf("format[%u].foreign_key.", fieldno + 1);
+	return sql_constraint_drop(space_id, name, prefix);
+}
+
+int
+sql_field_check_drop(uint32_t space_id, uint32_t fieldno, const char *name)
+{
+	const char *prefix = tt_sprintf("format[%u].constraint.", fieldno + 1);
+	return sql_constraint_drop(space_id, name, prefix);
 }
 
 /**
@@ -1654,6 +1617,101 @@ sql_check_create(const char *name, uint32_t space_id, uint32_t func_id,
 		}
 	}
 	return sql_constraint_create(name, space_id, path, value);
+}
+
+const struct space *
+sql_space_by_token(const struct Token *name)
+{
+	char *name_str = sql_name_from_token(name);
+	struct space *res = space_by_name0(name_str);
+	sql_xfree(name_str);
+	return res;
+}
+
+uint32_t
+sql_index_id_by_token(const struct space *space, const struct Token *name)
+{
+	char *name_str = sql_name_from_token(name);
+	uint32_t res = UINT32_MAX;
+	for (uint32_t i = 0; i < space->index_count; ++i) {
+		if (strcmp(space->index[i]->def->name, name_str) == 0) {
+			res = space->index[i]->def->iid;
+			break;
+		}
+	}
+	sql_xfree(name_str);
+	return res;
+}
+
+uint32_t
+sql_fieldno_by_token(const struct space *space, const struct Token *name)
+{
+	char *name_str = sql_name_from_token(name);
+	for (uint32_t i = 0; i < space->def->field_count; ++i) {
+		if (strcmp(space->def->fields[i].name, name_str) == 0) {
+			sql_xfree(name_str);
+			return i;
+		}
+	}
+	sql_xfree(name_str);
+	return UINT32_MAX;
+}
+
+/**
+ * Return a constraint with the name specified by the token and the
+ * specified type. Return NULL if the constraint was not found.
+ */
+static const struct tuple_constraint_def *
+sql_constraint_by_token(const struct tuple_constraint_def *cdefs,
+			uint32_t count, enum tuple_constraint_type type,
+			const struct Token *name)
+{
+	char *name_str = sql_name_from_token(name);
+	for (uint32_t i = 0; i < count; ++i) {
+		if (strcmp(cdefs[i].name, name_str) == 0 &&
+		    cdefs[i].type == type) {
+			sql_xfree(name_str);
+			return &cdefs[i];
+		}
+	}
+	sql_xfree(name_str);
+	return NULL;
+}
+
+const struct tuple_constraint_def *
+sql_tuple_fk_by_token(const struct space *space, const struct Token *name)
+{
+	struct tuple_constraint_def *cdefs = space->def->opts.constraint_def;
+	uint32_t count = space->def->opts.constraint_count;
+	return sql_constraint_by_token(cdefs, count, CONSTR_FKEY, name);
+}
+
+const struct tuple_constraint_def *
+sql_tuple_ck_by_token(const struct space *space, const struct Token *name)
+{
+	struct tuple_constraint_def *cdefs = space->def->opts.constraint_def;
+	uint32_t count = space->def->opts.constraint_count;
+	return sql_constraint_by_token(cdefs, count, CONSTR_FUNC, name);
+}
+
+const struct tuple_constraint_def *
+sql_field_fk_by_token(const struct space *space, uint32_t fieldno,
+		      const struct Token *name)
+{
+	struct field_def *field = &space->def->fields[fieldno];
+	struct tuple_constraint_def *cdefs = field->constraint_def;
+	uint32_t count = field->constraint_count;
+	return sql_constraint_by_token(cdefs, count, CONSTR_FKEY, name);
+}
+
+const struct tuple_constraint_def *
+sql_field_ck_by_token(const struct space *space, uint32_t fieldno,
+		      const struct Token *name)
+{
+	struct field_def *field = &space->def->fields[fieldno];
+	struct tuple_constraint_def *cdefs = field->constraint_def;
+	uint32_t count = field->constraint_count;
+	return sql_constraint_by_token(cdefs, count, CONSTR_FUNC, name);
 }
 
 #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION

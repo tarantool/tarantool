@@ -3089,11 +3089,75 @@ void sqlExprIfFalse(Parse *, Expr *, int, int);
  * Does not return NULL.
  */
 static inline char *
-sql_name_from_token(struct Token *t)
+sql_name_from_token(const struct Token *t)
 {
 	assert(t != NULL && t->z != NULL);
 	return sql_normalized_name_new(t->z, t->n);
 }
+
+/**
+ * Return the name from the token in static memory. Should only be used in case
+ * of errors, as the name may be truncated due to static memory limitations.
+ */
+static inline const char *
+sql_tt_name_from_token(const struct Token *t)
+{
+	char *name = sql_name_from_token(t);
+	const char *res = tt_cstr(name, strlen(name));
+	sql_xfree(name);
+	return res;
+}
+
+/**
+ * Return space with name defined by the token. Return NULL if the space was not
+ * found.
+ */
+const struct space *
+sql_space_by_token(const struct Token *name);
+
+/**
+ * Return id of index with the name defined by the token. Return UINT32_MAX if
+ * the index was not found.
+ */
+uint32_t
+sql_index_id_by_token(const struct space *space, const struct Token *name);
+
+/**
+ * Return the fieldno of the field with the name defined by the token. Return
+ * UINT32_MAX if the field was not found.
+ */
+uint32_t
+sql_fieldno_by_token(const struct space *space, const struct Token *name);
+
+/**
+ * Return the tuple foreign key constraint with the name defined by the token.
+ * Return NULL if the tuple foreign key constraint was not found.
+ */
+const struct tuple_constraint_def *
+sql_tuple_fk_by_token(const struct space *space, const struct Token *name);
+
+/**
+ * Return the tuple check constraint with the name defined by the token. Return
+ * NULL if the tuple check constraint was not found.
+ */
+const struct tuple_constraint_def *
+sql_tuple_ck_by_token(const struct space *space, const struct Token *name);
+
+/**
+ * Return the field foreign key constraint with the name defined by the token.
+ * Return NULL if the field foreign key constraint was not found.
+ */
+const struct tuple_constraint_def *
+sql_field_fk_by_token(const struct space *space, uint32_t fieldno,
+		      const struct Token *name);
+
+/**
+ * Return the field check constraint with the name defined by the token. Return
+ * NULL if the field check constraint was not found.
+ */
+const struct tuple_constraint_def *
+sql_field_ck_by_token(const struct space *space, uint32_t fieldno,
+		      const struct Token *name);
 
 int sqlExprCompare(Expr *, Expr *, int);
 int sqlExprListCompare(ExprList *, ExprList *, int);
@@ -3598,17 +3662,16 @@ int sqlJoinType(Parse *, Token *, Token *, Token *);
 void
 sql_create_foreign_key(struct Parse *parse_context);
 
-/**
- * Emit code to drop the entry from _index or _ck_contstraint or
- * _fk_constraint space corresponding with the constraint type.
- *
- * Function called from parser to handle
- * <ALTER TABLE table DROP CONSTRAINT constraint> SQL statement.
- *
- * @param parse_context Parsing context.
- */
+/** Emit code to drop UNIQUE, tuple FOREIGN KEY or tuple CHECK constraint. */
 void
-sql_drop_constraint(struct Parse *parse_context);
+sql_drop_table_constraint(struct Parse *parser, const struct Token *table_name,
+			  const struct Token *constraint_name);
+
+/** Emit code to field FOREIGN KEY or field CHECK constraint. */
+void
+sql_drop_field_constraint(struct Parse *parser, const struct Token *table_name,
+			  const struct Token *column_name,
+			  const struct Token *name);
 
 /**
  * Now our SQL implementation can't operate on spaces which

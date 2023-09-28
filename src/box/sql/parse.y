@@ -1722,10 +1722,14 @@ cmd ::= alter_table_start(A) RENAME TO nm(N). {
     sql_alter_table_rename(pParse);
 }
 
-cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {
-  drop_constraint_def_init(&pParse->drop_constraint_def, X, &Z, false);
+cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z). {
   pParse->initiateTTrans = true;
-  sql_drop_constraint(pParse);
+  sql_drop_table_constraint(pParse, &X, &Z);
+}
+
+cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z). {
+  pParse->initiateTTrans = true;
+  sql_drop_field_constraint(pParse, &X, &F, &Z);
 }
 
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////

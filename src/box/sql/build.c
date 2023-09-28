@@ -57,6 +57,7 @@
 #include "box/user.h"
 #include "box/constraint_id.h"
 #include "box/session_settings.h"
+#include "box/tuple_constraint_def.h"
 
 void
 sql_finish_coding(struct Parse *parse_context)
@@ -2030,49 +2031,102 @@ tnt_error:
 	goto exit_create_fk;
 }
 
-/**
- * Emit code to drop the entry from _index or _ck_contstraint or
- * _fk_constraint space corresponding with the constraint type.
- */
 void
-sql_drop_constraint(struct Parse *parse_context)
+sql_drop_table_constraint(struct Parse *parser, const struct Token *table_name,
+			  const struct Token *name)
 {
-	struct drop_entity_def *drop_def =
-		&parse_context->drop_constraint_def.base;
-	assert(drop_def->base.entity_type == ENTITY_TYPE_CONSTRAINT);
-	assert(drop_def->base.alter_action == ALTER_ACTION_DROP);
-	const char *table_name = drop_def->base.entity_name->a[0].zName;
-	assert(table_name != NULL);
-	struct space *space = space_by_name0(table_name);
+	const struct space *space = sql_space_by_token(table_name);
 	if (space == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
-		parse_context->is_aborted = true;
+		const char *table_name_str = sql_tt_name_from_token(table_name);
+		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name_str);
+		parser->is_aborted = true;
 		return;
 	}
-	char *name = sql_normalized_name_region_new(&parse_context->region,
-						    drop_def->name.z,
-						    drop_def->name.n);
-	struct Vdbe *v = sqlGetVdbe(parse_context);
-	assert(v != NULL);
-	struct constraint_id *id = space_find_constraint_id(space, name);
-	if (id == NULL) {
+	struct Vdbe *v = sqlGetVdbe(parser);
+
+	const struct tuple_constraint_def *fk =
+		sql_tuple_fk_by_token(space, name);
+	if (fk != NULL) {
 		sqlVdbeCountChanges(v);
-		sqlVdbeAddOp4(v, OP_DropTupleConstraint, space->def->id, 0, 0,
-			      sql_xstrdup(name), P4_DYNAMIC);
+		sqlVdbeAddOp4(v, OP_DropTupleForeignKey, space->def->id, 0, 0,
+			      sql_xstrdup(fk->name), P4_DYNAMIC);
 		return;
 	}
-	/*
-	 * We account changes to row count only if drop of
-	 * foreign keys take place in a separate
-	 * ALTER TABLE DROP CONSTRAINT statement, since whole
-	 * DROP TABLE always returns 1 (one) as a row count.
-	 */
-	assert(id->type == CONSTRAINT_TYPE_PK ||
-	       id->type == CONSTRAINT_TYPE_UNIQUE);
-	vdbe_emit_index_drop(parse_context, name, space->def,
-			     ER_NO_SUCH_CONSTRAINT, false);
-	sqlVdbeCountChanges(v);
-	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
+
+	const struct tuple_constraint_def *ck =
+		sql_tuple_ck_by_token(space, name);
+	if (ck != NULL) {
+		sqlVdbeCountChanges(v);
+		sqlVdbeAddOp4(v, OP_DropTupleCheck, space->def->id, 0, 0,
+			      sql_xstrdup(ck->name), P4_DYNAMIC);
+		return;
+	}
+
+	uint32_t index_id = sql_index_id_by_token(space, name);
+	if (index_id != UINT32_MAX) {
+		int regs = sqlGetTempRange(parser, 3);
+		sqlVdbeCountChanges(v);
+		sqlVdbeAddOp2(v, OP_Integer, space->def->id, regs);
+		sqlVdbeAddOp2(v, OP_Integer, index_id, regs + 1);
+		sqlVdbeAddOp3(v, OP_MakeRecord, regs, 2, regs + 2);
+		sqlVdbeAddOp3(v, OP_SDelete, BOX_INDEX_ID, regs + 2, 0);
+		sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
+		sqlReleaseTempRange(parser, regs, 3);
+		return;
+	}
+
+	diag_set(ClientError, ER_NO_SUCH_CONSTRAINT,
+		 sql_tt_name_from_token(name), space->def->name);
+	parser->is_aborted = true;
+}
+
+void
+sql_drop_field_constraint(struct Parse *parser, const struct Token *table_name,
+			  const struct Token *column_name,
+			  const struct Token *name)
+{
+	const struct space *space = sql_space_by_token(table_name);
+	if (space == NULL) {
+		const char *table_name_str = sql_tt_name_from_token(table_name);
+		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name_str);
+		parser->is_aborted = true;
+		return;
+	}
+	uint32_t fieldno = sql_fieldno_by_token(space, column_name);
+	if (fieldno == UINT32_MAX) {
+		const char *column_name_str =
+			sql_tt_name_from_token(column_name);
+		diag_set(ClientError, ER_NO_SUCH_FIELD_NAME_IN_SPACE,
+			 space->def->name, column_name_str);
+		parser->is_aborted = true;
+		return;
+	}
+	struct Vdbe *v = sqlGetVdbe(parser);
+
+	const struct tuple_constraint_def *fk =
+		sql_field_fk_by_token(space, fieldno, name);
+	if (fk != NULL) {
+		sqlVdbeCountChanges(v);
+		sqlVdbeAddOp4(v, OP_DropFieldForeignKey, space->def->id, 0,
+			      fieldno, sql_xstrdup(fk->name), P4_DYNAMIC);
+		return;
+	}
+
+	const struct tuple_constraint_def *ck =
+		sql_field_ck_by_token(space, fieldno, name);
+	if (ck != NULL) {
+		sqlVdbeCountChanges(v);
+		sqlVdbeAddOp4(v, OP_DropFieldCheck, space->def->id, 0, fieldno,
+			      sql_xstrdup(ck->name), P4_DYNAMIC);
+		return;
+	}
+
+	const char *field_name = space->def->fields[fieldno].name;
+	char *name_str = sql_name_from_token(name);
+	diag_set(ClientError, ER_NO_SUCH_CONSTRAINT,
+		 tt_sprintf("%s.%s", field_name, name_str), space->def->name);
+	sql_xfree(name_str);
+	parser->is_aborted = true;
 }
 
 /**
