@@ -934,7 +934,11 @@ local function reconfig_modules(module_keys, oldcfg, newcfg, log_basecfg)
             error(err)
         end
 
-        log_changed_options(oldcfg, keys, log_basecfg)
+        if log_basecfg ~= nil then
+            log_changed_options(oldcfg, keys, log_basecfg)
+        else
+            log_changed_options(oldcfg, keys, oldvals)
+        end
     end
 end
 
