@@ -2195,14 +2195,51 @@ case OP_CreateCheck: {
 }
 
 /**
- * Opcode: DropTupleConstraint P1 * * P4 *
- * Synopsis: Drop constraint from box.space[P1]
- *
- * Drop constraint named P4.z from space P1.
+ * Opcode: OP_DropTupleForeignKey P1 * * P4 *
+ * Synopsis: Drop FOREIGN KEY constraint from box.space[P1]
  */
-case OP_DropTupleConstraint: {
+case OP_DropTupleForeignKey: {
 	assert(pOp->p1 >= 0 && pOp->p4.z != NULL);
-	if (sql_constraint_drop(pOp->p1, pOp->p4.z) != 0)
+	if (sql_tuple_foreign_key_drop(pOp->p1, pOp->p4.z) != 0)
+		goto abort_due_to_error;
+	assert(p->nChange == 0);
+	p->nChange = 1;
+	break;
+}
+
+/**
+ * Opcode: DropTupleConstraint P1 * * P4 *
+ * Synopsis: Drop CHECK constraint from box.space[P1]
+ */
+case OP_DropTupleCheck: {
+	assert(pOp->p1 >= 0 && pOp->p4.z != NULL);
+	if (sql_tuple_check_drop(pOp->p1, pOp->p4.z) != 0)
+		goto abort_due_to_error;
+	assert(p->nChange == 0);
+	p->nChange = 1;
+	break;
+}
+
+/**
+ * Opcode: OP_DropFieldForeignKey P1 * P3 P4 *
+ * Synopsis: Drop FOREIGN KEY constraint from field P3 of box.space[P1]
+ */
+case OP_DropFieldForeignKey: {
+	assert(pOp->p1 >= 0 && pOp->p4.z != NULL);
+	if (sql_field_foreign_key_drop(pOp->p1, pOp->p3, pOp->p4.z) != 0)
+		goto abort_due_to_error;
+	assert(p->nChange == 0);
+	p->nChange = 1;
+	break;
+}
+
+/**
+ * Opcode: OP_DropFieldCheck P1 * P3 P4 *
+ * Synopsis: Drop CHECK constraint from field P3 of box.space[P1]
+ */
+case OP_DropFieldCheck: {
+	assert(pOp->p1 >= 0 && pOp->p4.z != NULL);
+	if (sql_field_check_drop(pOp->p1, pOp->p3, pOp->p4.z) != 0)
 		goto abort_due_to_error;
 	assert(p->nChange == 0);
 	p->nChange = 1;
