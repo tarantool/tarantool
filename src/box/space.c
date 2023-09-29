@@ -46,7 +46,6 @@
 #include "iproto_constants.h"
 #include "schema.h"
 #include "assoc.h"
-#include "constraint_id.h"
 #include "box.h"
 #include "space_upgrade.h"
 #include "tuple_constraint.h"
@@ -534,7 +533,6 @@ space_create(struct space *space, struct engine *engine,
 			}
 		}
 	}
-	space->constraint_ids = mh_strnptr_new();
 	rlist_create(&space->memtx_stories);
 	rlist_create(&space->alter_stmts);
 	space->lua_ref = LUA_NOREF;
@@ -636,12 +634,9 @@ space_delete(struct space *space)
 		space_upgrade_unref(space->upgrade);
 	space_def_delete(space->def);
 	/*
-	 * SQL triggers and constraints should be deleted with
-	 * on_replace_dd_ triggers on deletion from corresponding
-	 * system space.
+	 * SQL triggers should be deleted with on_replace_dd_triggers on
+	 * deletion from corresponding system space.
 	 */
-	assert(mh_size(space->constraint_ids) == 0);
-	mh_strnptr_delete(space->constraint_ids);
 	assert(space->sql_triggers == NULL);
 	assert(rlist_empty(&space->space_cache_pin_list));
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, space->lua_ref);
@@ -1284,41 +1279,6 @@ space_execute_dml(struct space *space, struct txn *txn,
 		*result = NULL;
 	}
 	return 0;
-}
-
-struct constraint_id *
-space_find_constraint_id(struct space *space, const char *name)
-{
-	struct mh_strnptr_t *ids = space->constraint_ids;
-	uint32_t len = strlen(name);
-	mh_int_t pos = mh_strnptr_find_str(ids, name, len);
-	if (pos == mh_end(ids))
-		return NULL;
-	return (struct constraint_id *) mh_strnptr_node(ids, pos)->val;
-}
-
-void
-space_add_constraint_id(struct space *space, struct constraint_id *id)
-{
-	assert(space_find_constraint_id(space, id->name) == NULL);
-	struct mh_strnptr_t *ids = space->constraint_ids;
-	uint32_t len = strlen(id->name);
-	uint32_t hash = mh_strn_hash(id->name, len);
-	const struct mh_strnptr_node_t name_node = {id->name, len, hash, id};
-	mh_strnptr_put(ids, &name_node, NULL, NULL);
-}
-
-struct constraint_id *
-space_pop_constraint_id(struct space *space, const char *name)
-{
-	struct mh_strnptr_t *ids = space->constraint_ids;
-	uint32_t len = strlen(name);
-	mh_int_t pos = mh_strnptr_find_str(ids, name, len);
-	assert(pos != mh_end(ids));
-	struct constraint_id *id = (struct constraint_id *)
-		mh_strnptr_node(ids, pos)->val;
-	mh_strnptr_del(ids, pos, NULL);
-	return id;
 }
 
 /* {{{ Virtual method stubs */

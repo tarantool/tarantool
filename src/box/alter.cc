@@ -56,7 +56,6 @@
 #include "version.h"
 #include "sequence.h"
 #include "sql.h"
-#include "constraint_id.h"
 #include "space_upgrade.h"
 #include "box.h"
 #include "authentication.h"
@@ -599,12 +598,6 @@ space_swap_triggers(struct space *new_space, struct space *old_space)
 	old_space->sql_triggers = new_value;
 }
 
-static void
-space_swap_constraint_ids(struct space *new_space, struct space *old_space)
-{
-	SWAP(new_space->constraint_ids, old_space->constraint_ids);
-}
-
 /**
  * True if the space has records identified by key 'uid'.
  * Uses 'iid' index.
@@ -935,7 +928,6 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	 * constraints.
 	 */
 	space_swap_triggers(alter->new_space, alter->old_space);
-	space_swap_constraint_ids(alter->new_space, alter->old_space);
 	space_reattach_constraints(alter->old_space);
 	space_pin_collations(alter->old_space);
 	space_pin_defaults(alter->old_space);
@@ -1059,7 +1051,6 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 * constraints.
 	 */
 	space_swap_triggers(alter->new_space, alter->old_space);
-	space_swap_constraint_ids(alter->new_space, alter->old_space);
 	/*
 	 * The new space is ready. Time to update the space
 	 * cache with it.
@@ -1669,120 +1660,6 @@ UpdateSchemaVersion::alter(struct alter_space *alter)
 {
     (void)alter;
     box_schema_version_bump();
-}
-
-/**
- * Check if a constraint name is not occupied in @a space. Treat
- * existence as an error.
- */
-static inline int
-space_ensure_constraint_name_is_available(struct space *space, const char *name)
-{
-	struct constraint_id *id = space_find_constraint_id(space, name);
-	if (id == NULL)
-		return 0;
-	diag_set(ClientError, ER_CONSTRAINT_EXISTS,
-		 constraint_type_strs[id->type], name, space_name(space));
-	return -1;
-}
-
-static inline void
-space_delete_constraint_id(struct space *space, const char *name)
-{
-	constraint_id_delete(space_pop_constraint_id(space, name));
-}
-
-/** CreateConstraintID - add a new constraint id to a space. */
-class CreateConstraintID: public AlterSpaceOp
-{
-	struct constraint_id *new_id;
-public:
-	CreateConstraintID(struct alter_space *alter, enum constraint_type type,
-			   const char *name)
-		:AlterSpaceOp(alter), new_id(NULL)
-	{
-		new_id = constraint_id_new(type, name);
-		if (new_id == NULL)
-			diag_raise();
-	}
-	virtual void prepare(struct alter_space *alter);
-	virtual void alter(struct alter_space *alter);
-	virtual void rollback(struct alter_space *alter);
-	virtual void commit(struct alter_space *alter, int64_t signature);
-	virtual ~CreateConstraintID();
-};
-
-void
-CreateConstraintID::prepare(struct alter_space *alter)
-{
-	if (space_ensure_constraint_name_is_available(alter->old_space,
-						      new_id->name) != 0)
-		diag_raise();
-}
-
-void
-CreateConstraintID::alter(struct alter_space *alter)
-{
-	space_add_constraint_id(alter->old_space, new_id);
-}
-
-void
-CreateConstraintID::rollback(struct alter_space *alter)
-{
-	space_delete_constraint_id(alter->new_space, new_id->name);
-	new_id = NULL;
-}
-
-void
-CreateConstraintID::commit(struct alter_space *alter, int64_t signature)
-{
-	(void) alter;
-	(void) signature;
-	/*
-	 * Constraint id is added to the space, and should not be
-	 * deleted from now on.
-	 */
-	new_id = NULL;
-}
-
-CreateConstraintID::~CreateConstraintID()
-{
-	if (new_id != NULL)
-		constraint_id_delete(new_id);
-}
-
-/** DropConstraintID - drop a constraint id from the space. */
-class DropConstraintID: public AlterSpaceOp
-{
-	struct constraint_id *old_id;
-	const char *name;
-public:
-	DropConstraintID(struct alter_space *alter, const char *name)
-		:AlterSpaceOp(alter), old_id(NULL), name(name)
-	{}
-	virtual void alter(struct alter_space *alter);
-	virtual void commit(struct alter_space *alter , int64_t signature);
-	virtual void rollback(struct alter_space *alter);
-};
-
-void
-DropConstraintID::alter(struct alter_space *alter)
-{
-	old_id = space_pop_constraint_id(alter->old_space, name);
-}
-
-void
-DropConstraintID::commit(struct alter_space *alter, int64_t signature)
-{
-	(void) alter;
-	(void) signature;
-	constraint_id_delete(old_id);
-}
-
-void
-DropConstraintID::rollback(struct alter_space *alter)
-{
-	space_add_constraint_id(alter->new_space, old_id);
 }
 
 /* }}} */
@@ -2569,7 +2446,6 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			     old_space->access, SC_SPACE, priv_type) != 0)
 		return -1;
 	struct index *old_index = space_index(old_space, iid);
-	struct index_def *old_def = old_index != NULL ? old_index->def : NULL;
 
 	/*
 	 * Deal with various cases of dropping of the primary key.
@@ -2638,10 +2514,6 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		if (alter_space_move_indexes(alter, 0, iid) != 0)
 			return -1;
 		try {
-			if (old_index->def->opts.is_unique) {
-				(void) new DropConstraintID(alter,
-							    old_def->name);
-			}
 			(void) new DropIndex(alter, old_index);
 		} catch (Exception *e) {
 			return -1;
@@ -2657,11 +2529,6 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			return -1;
 		index_def_update_optionality(def, alter->new_min_field_count);
 		try {
-			if (def->opts.is_unique) {
-				(void) new CreateConstraintID(
-					alter, iid == 0 ? CONSTRAINT_TYPE_PK :
-					CONSTRAINT_TYPE_UNIQUE, def->name);
-			}
 			(void) new CreateIndex(alter, def);
 		} catch (Exception *e) {
 			index_def_delete(def);
@@ -2676,34 +2543,6 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			return -1;
 		auto index_def_guard =
 			make_scoped_guard([=] { index_def_delete(index_def); });
-		/*
-		 * We put a new name when either an index is
-		 * becoming unique (i.e. constraint), or when a
-		 * unique index's name is under change.
-		 */
-		bool do_new_constraint_id =
-			!old_def->opts.is_unique && index_def->opts.is_unique;
-		bool do_drop_constraint_id =
-			old_def->opts.is_unique && !index_def->opts.is_unique;
-
-		if (old_def->opts.is_unique && index_def->opts.is_unique &&
-		    strcmp(index_def->name, old_def->name) != 0) {
-			do_new_constraint_id = true;
-			do_drop_constraint_id = true;
-		}
-		try {
-			if (do_new_constraint_id) {
-				(void) new CreateConstraintID(
-					alter, CONSTRAINT_TYPE_UNIQUE,
-					index_def->name);
-			}
-			if (do_drop_constraint_id) {
-				(void) new DropConstraintID(alter,
-							    old_def->name);
-			}
-		} catch (Exception *e) {
-			return -1;
-		}
 		/*
 		 * To detect which key parts are optional,
 		 * min_field_count is required. But
