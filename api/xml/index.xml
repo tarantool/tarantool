@@ -91,6 +91,7 @@
     <member refid="module_8h_1adf764cbdea00d65edcd07bb9953ad2b7" kind="enum"><name>@1</name></member>
     <member refid="module_8h_1adf764cbdea00d65edcd07bb9953ad2b7afdc4a3a1343ddde9cd823989746b952c" kind="enumvalue"><name>BOX_KEY_PART_DEF_IS_NULLABLE</name></member>
     <member refid="module_8h_1adf764cbdea00d65edcd07bb9953ad2b7ad2e98bad103f326bc113cd03b1d16279" kind="enumvalue"><name>BOX_KEY_PART_DEF_EXCLUDE_NULL</name></member>
+    <member refid="module_8h_1adf764cbdea00d65edcd07bb9953ad2b7ab0579a1bee43f2c11bb41c5548109577" kind="enumvalue"><name>BOX_KEY_PART_DEF_SORT_ORDER_DESC</name></member>
     <member refid="module_8h_1a99fb83031ce9923c84392b4e92f956b5" kind="enum"><name>@2</name></member>
     <member refid="module_8h_1a99fb83031ce9923c84392b4e92f956b5a372d10ebd12378fbc28f503f5c14a433" kind="enumvalue"><name>BOX_KEY_PART_DEF_T_SIZE</name></member>
     <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bf" kind="enum"><name>field_type</name></member>
