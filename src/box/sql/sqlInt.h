@@ -2046,7 +2046,6 @@ struct Parse {
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
 		struct rename_entity_def rename_entity_def;
-		struct drop_constraint_def drop_constraint_def;
 		struct drop_index_def drop_index_def;
 		struct drop_table_def drop_table_def;
 		struct drop_trigger_def drop_trigger_def;
