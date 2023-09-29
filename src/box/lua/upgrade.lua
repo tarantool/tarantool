@@ -6,6 +6,7 @@ local xlog = require('xlog')
 local ffi = require('ffi')
 local fun = require('fun')
 local utils = require('internal.utils')
+local tarantool = require('tarantool')
 
 ffi.cdef([[
     uint32_t box_dd_version_id(void);
@@ -2125,6 +2126,12 @@ local function downgrade_impl(version_str, dry_run)
     end
 
     local schema_version_cur = get_version()
+    local app_version = tarantool.version:match('^%d+%.%d+%.%d+')
+    if schema_version_cur > mkversion.parse(app_version) then
+        local err = "Cannot downgrade as current schema version %s is newer" ..
+                    " than Tarantool version %s"
+        error(err:format(schema_version_cur, app_version))
+    end
     local schema_version_dst = app2schema_version(version)
     if schema_version_cur < schema_version_dst then
         local err = "Cannot downgrade as current schema version %s is older" ..
