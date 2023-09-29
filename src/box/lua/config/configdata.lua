@@ -190,6 +190,13 @@ function methods.bootstrap_leader(self)
     return self._bootstrap_leader
 end
 
+-- Should be called only if the 'supervised' failover method is
+-- configured.
+function methods.bootstrap_leader_name(self)
+    assert(self._failover == 'supervised')
+    return self._bootstrap_leader_name
+end
+
 local mt = {
     __index = methods,
 }
@@ -260,8 +267,8 @@ local function new(iconfig, cconfig, instance_name)
     local leader = found.replicaset.leader
 
     if failover ~= 'manual' then
-        -- Verify that no leader is set in the "off" or "election"
-        -- failover mode.
+        -- Verify that no leader is set in the "off", "election"
+        -- or "supervised" failover mode.
         if leader ~= nil then
             error(('"leader" = %q option is set for replicaset %q of group ' ..
                 '%q, but this option cannot be used together with ' ..
@@ -272,7 +279,8 @@ local function new(iconfig, cconfig, instance_name)
     if failover ~= 'off' then
         -- Verify that peers in the given replicaset have no direct
         -- database.mode option set if the replicaset is configured
-        -- with the "manual" or "election" failover mode.
+        -- with the "manual", "election" or "supervised" failover
+        -- mode.
         --
         -- This check doesn't verify the whole cluster config, only
         -- the given replicaset.
@@ -319,6 +327,31 @@ local function new(iconfig, cconfig, instance_name)
                                         found.group_name, bootstrap_leader), 0)
         end
     end
+
+    -- Verify "replication.failover" = "supervised" strategy
+    -- prerequisites.
+    local bootstrap_leader_name
+    if failover == 'supervised' then
+        -- An instance that is potentially a bootstrap leader
+        -- starts in RW in assumption that the bootstrap strategy
+        -- will choose it as the bootstrap leader.
+        --
+        -- It doesn't work in at least 'config' and 'supervised'
+        -- bootstrap strategies. It is possible to support them,
+        -- but an extra logic that is not implemented yet is
+        -- required.
+        --
+        -- See applier/box_cfg.lua for the details.
+        if bootstrap_strategy ~= 'auto' then
+            error(('"bootstrap_strategy" = %q is set for replicaset %q, but ' ..
+                'it is not supported with "replication.failover" = ' ..
+                '"supervised"'):format(bootstrap_strategy,
+                found.replicaset_name), 0)
+        end
+        assert(bootstrap_leader == nil)
+        bootstrap_leader_name = peer_names[1]
+    end
+
     return setmetatable({
         _iconfig = iconfig,
         _iconfig_def = iconfig_def,
@@ -333,6 +366,7 @@ local function new(iconfig, cconfig, instance_name)
         _failover = failover,
         _leader = leader,
         _bootstrap_leader = bootstrap_leader,
+        _bootstrap_leader_name = bootstrap_leader_name,
     }, mt)
 end
 
