@@ -56,7 +56,6 @@
 #include "box/tuple_format.h"
 #include "box/coll_id_cache.h"
 #include "box/user.h"
-#include "box/constraint_id.h"
 #include "box/session_settings.h"
 #include "box/tuple_constraint_def.h"
 

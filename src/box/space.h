@@ -53,7 +53,6 @@ struct request;
 struct port;
 struct tuple;
 struct tuple_format;
-struct constraint_id;
 struct space_upgrade;
 struct space_wal_ext;
 
@@ -247,10 +246,6 @@ struct space {
 	 * fields is guaranteed by another unique index.
 	 */
 	void *check_unique_constraint_map;
-	/**
-	 * Hash table with constraint identifiers hashed by name.
-	 */
-	struct mh_strnptr_t *constraint_ids;
 	/** List of space holders. This member is a property of space cache. */
 	struct rlist space_cache_pin_list;
 	/**
@@ -754,25 +749,6 @@ space_dump_def(const struct space *space, struct rlist *key_list);
 /** Rebuild index map in a space after a series of swap index. */
 void
 space_fill_index_map(struct space *space);
-
-/** Find a constraint identifier by name. */
-struct constraint_id *
-space_find_constraint_id(struct space *space, const char *name);
-
-/**
- * Add a new constraint id to the space's hash table of all
- * constraints. That is used to prevent existence of constraints
- * with equal names.
- */
-void
-space_add_constraint_id(struct space *space, struct constraint_id *id);
-
-/**
- * Remove a given name from the hash of all constraint
- * identifiers of the given space.
- */
-struct constraint_id *
-space_pop_constraint_id(struct space *space, const char *name);
 
 /*
  * Virtual method stubs.
