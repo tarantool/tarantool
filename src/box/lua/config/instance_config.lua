@@ -1095,6 +1095,24 @@ return schema.new('instance_config', schema.record({
             --
             -- No database.mode or 'leader' options should be set.
             'election',
+            -- Automatic leader appointment by an external
+            -- failover agent ('supervised').
+            --
+            -- The default database.mode is 'ro' (but there is an
+            -- exception during a replicaset bootstrapping, see
+            -- applier/box_cfg.lua).
+            --
+            -- The failover agent assigns the 'rw' mode to one
+            -- instance in the replicaset.
+            --
+            -- No database.mode or 'leader' options should be set.
+            --
+            -- TODO: Raise an error if this value is set on
+            -- Tarantool Community Edition. The instance side code
+            -- that handles failover agent commands is part of
+            -- Tarantool Enterprise Edition, so there is no much
+            -- sense to enable this mode on the Community Edition.
+            'supervised',
         }, {
             default = 'off',
         }),
