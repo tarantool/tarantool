@@ -25,16 +25,16 @@ Key features of the application server:
 
 Key features of the database:
 
-* MessagePack data format and MessagePack based client-server protocol.
+* MessagePack data format and MessagePack-based client-server protocol.
 * Two data engines: 100% in-memory with complete WAL-based persistence and an
   own implementation of LSM-tree, to use with large data sets.
 * Multiple index types: HASH, TREE, RTREE, BITSET.
-* Document oriented JSON path indexes.
+* Document-oriented JSON path indexes.
 * Asynchronous master-master replication.
 * Synchronous quorum-based replication.
 * RAFT-based automatic leader election for the single-leader configuration.
 * Authentication and access control.
-* ANSI SQL, including views, joins, referential and check constraints.
+* ANSI SQL, including views, joins, referential, and check constraints.
 * [Connectors][connectors] for many programming languages.
 * The database is a C extension of the application server and can be turned
   off.
@@ -43,15 +43,15 @@ Supported platforms are Linux (x86_64, aarch64), Mac OS X (x86_64, M1), FreeBSD
 (x86_64).
 
 Tarantool is ideal for data-enriched components of scalable Web architecture:
-queue servers, caches, stateful Web applications.
+queue servers, caches, and stateful Web applications.
 
 To download and install Tarantool as a binary package for your OS or using
 Docker, please see the [download instructions][download].
 
-To build Tarantool from source, see detailed [instructions][building] in the
+To build Tarantool from the source, see detailed [instructions][building] in the
 Tarantool documentation.
 
-To find modules, connectors and tools for Tarantool, check out our [Awesome
+To find modules, connectors, and tools for Tarantool, check out our [Awesome
 Tarantool][awesome-list] list.
 
 Please report bugs to our [issue tracker][issue-tracker]. We also warmly
