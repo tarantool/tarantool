@@ -140,7 +140,8 @@ function Server:connect_net_box()
     local saved_eval = self.net_box.eval
     self.net_box.eval = function(self, expr, args, opts)
         if expr == 'return _G.ready' then
-            expr = "return require('config'):info().status == 'ready'"
+            expr = "return require('config'):info().status == 'ready' or " ..
+                          "require('config'):info().status == 'check_warnings'"
         end
         return saved_eval(self, expr, args, opts)
     end
