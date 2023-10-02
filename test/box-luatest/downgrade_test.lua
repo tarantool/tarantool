@@ -92,7 +92,8 @@ g.test_downgrade_from_more_recent_version = function(cg)
         local err = 'Cannot downgrade as current schema version %s is newer' ..
                     ' than Tarantool version %s'
         t.assert_error_msg_contains(err:format(new_version, app_version),
-                                    box.schema.downgrade, app_version)
+                                    box.schema.downgrade,
+                                    box.schema.downgrade_versions()[1])
         t.assert_equals(schema_version(), new_version)
     end)
 end
