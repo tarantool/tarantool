@@ -171,7 +171,7 @@ end
 
 -- Checks that `box.iproto.override` reset of non-existing request handler is
 -- handled correctly.
-g.test_box_iproto_override_errors = function(cg)
+g.test_box_iproto_override_non_existing_request = function(cg)
     cg.server:exec(function()
         box.iproto.override(777, nil)
     end)
@@ -279,7 +279,7 @@ g.test_box_iproto_override_nop_rq_type = function(cg)
     end)
 end
 
--- Checks that `box.iproto.override` works correctly with arbitrary request type
+-- Checks that `box.iproto.override` works correctly with arbitrary request
 -- type.
 g.test_box_iproto_override_arbitrary_rq_type = function(cg)
     cg.server:exec(function()
