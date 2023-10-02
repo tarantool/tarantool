@@ -1853,6 +1853,14 @@ return schema.new('instance_config', schema.record({
             type = 'number',
             default = 1,
         }),
+        lease_interval = schema.scalar({
+            type = 'number',
+            default = 30,
+        }),
+        renew_interval = schema.scalar({
+            type = 'number',
+            default = 10,
+        }),
     }),
 }, {
     -- This kind of validation cannot be implemented as the

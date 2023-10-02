@@ -1372,6 +1372,8 @@ g.test_failover = function()
             probe_interval = 5,
             connect_timeout = 2,
             call_timeout = 2,
+            lease_interval = 10,
+            renew_interval = 1,
         },
     }
 
@@ -1382,6 +1384,8 @@ g.test_failover = function()
         probe_interval = 10,
         connect_timeout = 1,
         call_timeout = 1,
+        lease_interval = 30,
+        renew_interval = 10,
     }
     local res = instance_config:apply_default({}).failover
     t.assert_equals(res, exp)

@@ -288,6 +288,8 @@ g.test_defaults = function()
             probe_interval = 10,
             connect_timeout = 1,
             call_timeout = 1,
+            lease_interval = 30,
+            renew_interval = 10,
         },
     }
     local res = cluster_config:apply_default({})
