@@ -11,6 +11,7 @@
 #include "trivia/util.h"
 #include "event.h"
 #include "tt_static.h"
+#include "trigger.h"
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
@@ -557,9 +558,74 @@ test_event_ref_all_triggers(void)
 }
 
 static int
+on_change_trigger_run_f(struct trigger *trg, void *arg)
+{
+	trg->data = arg;
+	return 0;
+}
+
+static void
+test_event_on_change(void)
+{
+	const char *names[] = {
+		"name",
+		"name with spaces",
+		"namespace.name",
+		"NAMESPACE[123].name"
+	};
+
+	struct trigger triggers[3];
+	for (size_t i = 0; i < lengthof(triggers); i++) {
+		struct trigger *trigger = &triggers[i];
+		trigger_create(trigger, on_change_trigger_run_f, NULL, NULL);
+		event_on_change(trigger);
+	}
+
+	plan(3 * lengthof(names) * lengthof(triggers));
+
+	struct func_adapter_vtab vtab = {.destroy = func_destroy};
+	struct func_adapter func = {.vtab = &vtab};
+	const char *trg_name = "my_triggers.trg[1]";
+	for (size_t i = 0; i < lengthof(names); i++) {
+		const char *name = names[i];
+		struct event *event = event_get(name, true);
+		event_reset_trigger(event, trg_name, NULL);
+		for (size_t i = 0; i < lengthof(triggers); i++) {
+			struct trigger *trigger = &triggers[i];
+			is(trigger->data, event,
+			   "On change triggers must be called");
+		}
+	}
+	for (size_t i = 0; i < lengthof(names); i++) {
+		const char *name = names[i];
+		struct event *event = event_get(name, true);
+		event_reset_trigger(event, trg_name, &func);
+		for (size_t i = 0; i < lengthof(triggers); i++) {
+			struct trigger *trigger = &triggers[i];
+			is(trigger->data, event,
+			   "On change triggers must be called");
+		}
+	}
+	for (size_t i = 0; i < lengthof(names); i++) {
+		const char *name = names[i];
+		struct event *event = event_get(name, true);
+		event_reset_trigger(event, trg_name, NULL);
+		for (size_t i = 0; i < lengthof(triggers); i++) {
+			struct trigger *trigger = &triggers[i];
+			is(trigger->data, event,
+			   "On change triggers must be called");
+		}
+	}
+	for (size_t i = 0; i < lengthof(triggers); i++) {
+		trigger_clear(&triggers[i]);
+	}
+	check_plan();
+}
+
+static int
 test_main(void)
 {
-	plan(7);
+	plan(8);
 	test_basic();
 	test_event_foreach();
 	test_event_trigger_iterator();
@@ -567,14 +633,19 @@ test_main(void)
 	test_event_trigger_temporary();
 	test_event_free();
 	test_event_ref_all_triggers();
+	test_event_on_change();
 	return check_plan();
 }
 
 int
 main(void)
 {
+	memory_init();
+	fiber_init(fiber_c_invoke);
 	event_init();
 	int rc = test_main();
 	event_free();
+	fiber_free();
+	memory_free();
 	return rc;
 }
