@@ -359,7 +359,6 @@ local target_object_map = {
 
 -- Iterate through requests and sync when the according flag is set.
 local function on_commit_trigger(iterator)
-    log.debug('credentials.apply: on_commit_trigger() started')
     for _, old_obj, new_obj, space_id in iterator() do
 
         local obj_type
@@ -399,13 +398,11 @@ local function on_commit_trigger(iterator)
 
         ::skip::
     end
-    log.debug('credentials.apply: on_commit_trigger() finished')
 end
 
 -- Check that request is space/function/sequence creation or rename
 -- and set on_commit_trigger for the transaction.
 local function on_replace_trigger(old_obj, new_obj, obj_type, request_type)
-    log.debug('credentials.apply: on_replace_trigger() started')
     if box.session.type() == 'applier' then
         -- The request is caused by replication, so the instance is in
         -- RO mode. Thus, skip all applier actions.
@@ -443,7 +440,6 @@ local function on_replace_trigger(old_obj, new_obj, obj_type, request_type)
     -- be applied at this point because the object may not be fully
     -- registered.
     box.on_commit(on_commit_trigger)
-    log.debug('credentials.apply: on_replace_trigger() finished')
 end
 
 -- }}} Triggers for grants after obj creation
@@ -462,18 +458,24 @@ local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
                           name, privs, obj_type, obj_name)
 
     if ok then
-        log.debug('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q)',
-                  role_or_user, grant_or_revoke, name, privs,
-                  obj_type, obj_name)
+        log.verbose('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q)',
+                    role_or_user, grant_or_revoke, name, privs,
+                    obj_type, obj_name)
         return
     end
     if err.code ~= box.error.NO_SUCH_SPACE and
             err.code ~= box.error.NO_SUCH_FUNCTION and
             err.code ~= box.error.NO_SUCH_SEQUENCE then
-        err = ('box.schema.%s.%s(%q, %q, %q, %q) failed: %s'):format(
-                  role_or_user, grant_or_revoke, name, privs,
-                  obj_type, obj_name, err)
-        config:_alert({type = 'warn', message = err})
+        err = ('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q) failed: %s')
+              :format(role_or_user, grant_or_revoke, name, privs, obj_type,
+                      obj_name, err)
+        config:_alert({type = 'error', message = err})
+    else
+        local msg = "credentials.apply: %s %q hasn't been created yet, " ..
+                    "'box.schema.%s.%s(%q, %q, %q, %q)' will be applied later"
+        msg = msg:format(obj_type, obj_name, role_or_user, grant_or_revoke,
+                         name, privs, obj_type, obj_name)
+        config:_alert({type = 'warn', message = msg})
     end
 end
 
@@ -484,8 +486,8 @@ local function sync_privileges(credentials, obj_to_sync)
     assert(obj_to_sync == nil or type(obj_to_sync) == 'table')
 
     if obj_to_sync then
-        log.verbose('syncing privileges for %s %q', obj_to_sync.type,
-                                                    obj_to_sync.name)
+        log.verbose('credentials.apply: syncing privileges for %s %q',
+                    obj_to_sync.type, obj_to_sync.name)
     end
 
     -- The privileges synchronization between A and B is performed in 3 steps:
@@ -502,7 +504,8 @@ local function sync_privileges(credentials, obj_to_sync)
     local function sync(role_or_user, name, config_privileges)
         assert(role_or_user == 'user' or role_or_user == 'role')
         if not obj_to_sync then
-            log.verbose('syncing privileges for %s %q', role_or_user, name)
+            log.verbose('credentials.apply: syncing privileges for %s %q',
+                        role_or_user, name)
         end
 
         local box_privileges = box.schema[role_or_user].info(name)
@@ -618,8 +621,9 @@ local function set_password(user_name, password)
     end
 
     if user_name == 'guest' then
-        config:_alert({type = 'warn',
-            message = 'Setting a password for the guest user is not allowed'})
+        config:_alert({type = 'error',
+            message = 'credentials.apply: setting a password for ' ..
+                      'the guest user is not allowed'})
     end
 
     local auth_def = box.space._user.index.name:get({user_name})[5]
@@ -722,9 +726,10 @@ local function sync_credentials_worker()
                 obj_to_sync.type == 'BACKGROUND_FULL_SYNC' then
 
             if box.info.ro then
-                log.verbose('credentials.apply: Tarantool is in Read Only ' ..
-                            'mode credentials will be set up in the ' ..
-                            'background when it is switched to Read Write mode')
+                local msg = 'credentials.apply: Tarantool is in Read Only ' ..
+                            'mode, so credentials will be set up in the ' ..
+                            'background when it is switched to Read Write mode'
+                config:_alert({type = 'warn', message = msg})
                 box.ctl.wait_rw()
             end
 
