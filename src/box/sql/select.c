@@ -4260,10 +4260,14 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 		pList = pParent->pEList;
 		for (i = 0; i < pList->nExpr; i++) {
 			if (pList->a[i].zName == 0) {
-				char *str = pList->a[i].zSpan;
-				int len = strlen(str);
+				const char *str = pList->a[i].zSpan;
+				size_t len = strlen(str);
 				char *name = sql_name_new(str, len);
 				pList->a[i].zName = name;
+				if (pList->a[i].zSpan[0] != '"') {
+					pList->a[i].legacy_name =
+						sql_legacy_name_new(str, len);
+				}
 			}
 		}
 		if (pSub->pOrderBy) {
@@ -5004,9 +5008,11 @@ selectExpander(Walker * pWalker, Select * p)
 			pNew = sql_expr_list_append(pNew, a[k].pExpr);
 			pNew->a[pNew->nExpr - 1].zName = a[k].zName;
 			pNew->a[pNew->nExpr - 1].zSpan = a[k].zSpan;
+			pNew->a[pNew->nExpr - 1].legacy_name = a[k].legacy_name;
 			a[k].zName = 0;
 			a[k].zSpan = 0;
 			a[k].pExpr = 0;
+			a[k].legacy_name = NULL;
 			continue;
 		}
 		/*
@@ -5047,7 +5053,8 @@ selectExpander(Walker * pWalker, Select * p)
 				assert(zName != NULL);
 				if (zTName != NULL && pSub != NULL &&
 				    sqlMatchSpanName(pSub->pEList->a[j].zSpan,
-						     0, zTName) == 0)
+						     NULL, zTName, NULL,
+						     NULL) == 0)
 					continue;
 				tableSeen = 1;
 

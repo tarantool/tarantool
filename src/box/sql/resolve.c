@@ -130,48 +130,67 @@ resolveAlias(struct ExprList *pEList, int iCol, struct Expr *pExpr,
 	sql_xfree(pDup);
 }
 
-/*
- * Return TRUE if the name zCol occurs anywhere in the USING clause.
- *
- * Return FALSE if the USING clause is NULL or if it does not contain
- * zCol.
+/**
+ * Return TRUE if the name occurs anywhere in the USING clause.
+ * Return FALSE if the USING clause is NULL or if it does not contain the name.
  */
-static int
-nameInUsingClause(IdList * pUsing, const char *zCol)
+static bool
+nameInUsingClause(struct IdList *pUsing, const char *zCol, const char *old_col)
 {
 	if (pUsing) {
-		int k;
-		for (k = 0; k < pUsing->nId; k++) {
+		for (int k = 0; k < pUsing->nId; k++) {
 			if (strcmp(pUsing->a[k].zName, zCol) == 0)
-				return 1;
+				return true;
+		}
+		for (int i = 0; i < pUsing->nId; i++) {
+			if (strcmp(pUsing->a[i].zName, old_col) == 0)
+				return true;
 		}
 	}
-	return 0;
+	return false;
 }
 
-/*
- * Subqueries stores the original database, table and column names for their
- * result sets in ExprList.a[].zSpan, in the form "DATABASE.TABLE.COLUMN".
- * Check to see if the zSpan given to this routine matches the zTab,
- * and zCol.  If any of zTab, and zCol are NULL then those fields will
- * match anything.
- */
-int
-sqlMatchSpanName(const char *zSpan,
-		     const char *zCol, const char *zTab
-	)
+bool
+sqlMatchSpanName(const char *span, const char *col, const char *tab,
+		 const char *old_col, const char *old_tab)
 {
-	int n;
-	for (n = 0; ALWAYS(zSpan[n]) && zSpan[n] != '.'; n++) {
+	size_t n;
+	const char *name = span;
+	size_t len = strlen(span);
+	for (n = 0; n < len && span[n] != '.'; n++) {
 	}
-	if (zTab && (sqlStrNICmp(zSpan, zTab, n) != 0 || zTab[n] != 0)) {
-		return 0;
+	if (tab != NULL) {
+		if ((strlen(tab) != n || strncmp(name, tab, n) != 0) &&
+		    (old_tab == NULL || strlen(old_tab) != n ||
+		     strncmp(name, old_tab, n) != 0))
+			return false;
+		name += n + 1;
+		len -= n + 1;
 	}
-	zSpan += n + 1;
-	if (zCol && strcmp(zSpan, zCol) != 0) {
-		return 0;
+	if (col == NULL)
+		return true;
+	if ((strlen(col) != len || strncmp(name, col, len) != 0) &&
+	    (old_col == NULL || strlen(old_col) != len ||
+	     strncmp(name, old_col, len) != 0))
+		return false;
+	return true;
+}
+
+/**
+ * Match spans for all expressions of the list with the table name and the
+ * column name.
+ */
+static int
+sql_find_column_expr(const struct ExprList *list, const char *tab_name,
+		     const char *col_name, const char *old_tab,
+		     const char *old_col)
+{
+	for (int j = 0; j < list->nExpr; j++) {
+		if (sqlMatchSpanName(list->a[j].zSpan, col_name, tab_name,
+				     old_tab, old_col))
+			return j;
 	}
-	return 1;
+	return -1;
 }
 
 /*
@@ -199,13 +218,30 @@ sqlMatchSpanName(const char *zSpan,
  * in pParse and return WRC_Abort.  Return WRC_Prune on success.
  */
 static int
-lookupName(Parse * pParse,	/* The parsing context */
-	   const char *zTab,	/* Name of table containing column, or NULL */
-	   const char *zCol,	/* Name of the column. */
-	   NameContext * pNC,	/* The name context used to resolve the name */
-	   Expr * pExpr		/* Make this EXPR node point to the selected column */
-    )
+lookupName(struct Parse *pParse, struct Expr *pExpr, struct NameContext *pNC)
 {
+	const char *zTab = NULL;
+	const char *zCol = NULL;
+	char *old_tab = NULL;
+	char *old_col = NULL;
+	const struct Expr *col = NULL;
+	if (pExpr->op == TK_DOT) {
+		assert(pExpr->pLeft->op == TK_ID && pExpr->pRight->op == TK_ID);
+		zTab = pExpr->pLeft->u.zToken;
+		if ((pExpr->pLeft->flags & EP_Lookup2) != 0)
+			old_tab = sql_legacy_name_new0(zTab);
+		zCol = pExpr->pRight->u.zToken;
+		if ((pExpr->pRight->flags & EP_Lookup2) != 0)
+			old_col = sql_legacy_name_new0(zCol);
+		col = pExpr->pRight;
+	} else {
+		assert(pExpr->op == TK_ID);
+		zCol = pExpr->u.zToken;
+		if ((pExpr->flags & EP_Lookup2) != 0)
+			old_col = sql_legacy_name_new0(zCol);
+		col = pExpr;
+	}
+
 	int i, j;		/* Loop counters */
 	int cnt = 0;		/* Number of matching column names */
 	int cntTab = 0;		/* Number of matching table names */
@@ -241,16 +277,14 @@ lookupName(Parse * pParse,	/* The parsing context */
 					selFlags & SF_NestedFrom) != 0) {
 					int hit = 0;
 					pEList = pItem->pSelect->pEList;
-					for (j = 0; j < pEList->nExpr; j++) {
-						if (sqlMatchSpanName
-						    (pEList->a[j].zSpan, zCol,
-						     zTab)) {
-							cnt++;
-							cntTab = 2;
-							pMatch = pItem;
-							pExpr->iColumn = j;
-							hit = 1;
-						}
+					j = sql_find_column_expr(pEList, zTab,
+								 zCol, old_tab,
+								 old_col);
+					if (j >= 0) {
+						cnt++;
+						cntTab = 2;
+						pMatch = pItem;
+						pExpr->iColumn = j;
 					}
 					if (hit || zTab == 0)
 						continue;
@@ -260,37 +294,33 @@ lookupName(Parse * pParse,	/* The parsing context */
 					    pItem->zAlias ? pItem->
 					    zAlias : space_def->name;
 					assert(zTabName != 0);
-					if (strcmp(zTabName, zTab) != 0) {
+					if (strcmp(zTabName, zTab) != 0 &&
+					    (old_tab == NULL ||
+					     strcmp(zTabName, old_tab) != 0))
 						continue;
-					}
 				}
 				if (0 == (cntTab++)) {
 					pMatch = pItem;
 				}
-				for (j = 0; j < (int)space_def->field_count;
-				     j++) {
-					if (strcmp(space_def->fields[j].name,
-						   zCol) == 0) {
-						/* If there has been exactly one prior match and this match
-						 * is for the right-hand table of a NATURAL JOIN or is in a
-						 * USING clause, then skip this match.
-						 */
-						if (cnt == 1) {
-							if (pItem->fg.
-							    jointype &
-							    JT_NATURAL)
-								continue;
-							if (nameInUsingClause
-							    (pItem->pUsing,
-							     zCol))
-								continue;
-						}
-						cnt++;
-						pMatch = pItem;
-						pExpr->iColumn = (i16) j;
-						break;
-					}
-				}
+				uint32_t fieldno =
+					sql_fieldno_by_expr(pItem->space, col);
+				if (fieldno == UINT32_MAX)
+					continue;
+				j = fieldno;
+				/*
+				 * If there has been exactly one prior match and
+				 * this match is for the right-hand table of a
+				 * NATURAL JOIN or is in a USING clause, then
+				 * skip this match.
+				 */
+				if (cnt == 1 &&
+				    ((pItem->fg.jointype & JT_NATURAL) != 0 ||
+				     nameInUsingClause(pItem->pUsing, zCol,
+						       old_col)))
+					continue;
+				cnt++;
+				pMatch = pItem;
+				pExpr->iColumn = (i16) j;
 			}
 			if (pMatch) {
 				pExpr->iTable = pMatch->iCursor;
@@ -326,10 +356,12 @@ lookupName(Parse * pParse,	/* The parsing context */
 				cntTab++;
 				for (iCol = 0; iCol <
 				     (int)space_def->field_count; iCol++) {
-					if (strcmp(space_def->fields[iCol].name,
-						   zCol) == 0) {
+					const char *name =
+						space_def->fields[iCol].name;
+					if (strcmp(name, zCol) == 0 ||
+					    (old_col != NULL &&
+					     strcmp(name, old_col) == 0))
 						break;
-					}
 				}
 				if (iCol < (int)space_def->field_count) {
 					cnt++;
@@ -364,7 +396,9 @@ lookupName(Parse * pParse,	/* The parsing context */
 		if ((pEList = pNC->pEList) != 0 && zTab == 0 && cnt == 0) {
 			for (j = 0; j < pEList->nExpr; j++) {
 				char *zAs = pEList->a[j].zName;
-				if (zAs != 0 && strcmp(zAs, zCol) == 0) {
+				if (zAs != 0 && (strcmp(zAs, zCol) == 0 ||
+						 (old_col != NULL &&
+						  strcmp(zAs, old_col) == 0))) {
 					Expr *pOrig;
 					assert(pExpr->pLeft == 0
 					       && pExpr->pRight == 0);
@@ -379,14 +413,14 @@ lookupName(Parse * pParse,	/* The parsing context */
 							 ER_SQL_PARSER_GENERIC,
 							 tt_sprintf(err, zAs));
 						pParse->is_aborted = true;
-						return WRC_Abort;
+						goto lookupname_end;
 					}
 					if (sqlExprVectorSize(pOrig) != 1) {
 						diag_set(ClientError,
 							 ER_SQL_PARSER_GENERIC,
 							 "row value misused");
 						pParse->is_aborted = true;
-						return WRC_Abort;
+						goto lookupname_end;
 					}
 					resolveAlias(pEList, j, pExpr, "",
 						     nSubquery);
@@ -457,7 +491,9 @@ lookupName(Parse * pParse,	/* The parsing context */
 	pExpr->pRight = 0;
 	pExpr->op = (isTrigger ? TK_TRIGGER : TK_COLUMN_REF);
  lookupname_end:
-	if (cnt == 1) {
+	sql_xfree(old_tab);
+	sql_xfree(old_col);
+	if (cnt == 1 && !pParse->is_aborted) {
 		assert(pNC != 0);
 		/* Increment the nRef value on all name contexts from TopNC up to
 		 * the point where the name matched.
@@ -549,31 +585,12 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 	case TK_ID:{
 			if ((pNC->ncFlags & NC_AllowAgg) != 0)
 				pNC->ncFlags |= NC_HasUnaggregatedId;
-			return lookupName(pParse, 0, pExpr->u.zToken, pNC,
-					  pExpr);
+			return lookupName(pParse, pExpr, pNC);
 		}
 
-		/* A table name and column name:     ID.ID
-		 * Or a database, table and column:  ID.ID.ID
-		 */
-	case TK_DOT:{
-			const char *zColumn;
-			const char *zTable;
-			Expr *pRight;
-
-			/* if( pSrcList==0 ) break; */
-			pRight = pExpr->pRight;
-			if (pRight->op == TK_ID) {
-				zTable = pExpr->pLeft->u.zToken;
-				zColumn = pRight->u.zToken;
-			} else {
-				assert(pRight->op == TK_DOT);
-				zTable = pRight->pLeft->u.zToken;
-				zColumn = pRight->pRight->u.zToken;
-			}
-			return lookupName(pParse, zTable, zColumn, pNC,
-					  pExpr);
-		}
+	/* A table name and column name: ID.ID. */
+	case TK_DOT:
+		return lookupName(pParse, pExpr, pNC);
 
 		/* Resolve function names
 		 */

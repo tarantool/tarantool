@@ -134,35 +134,24 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		if (sqlResolveExprNames(&sNC, pChanges->a[i].pExpr)) {
 			goto update_cleanup;
 		}
-		for (j = 0; j < (int)def->field_count; j++) {
-			if (strcmp(def->fields[j].name,
-				   pChanges->a[i].zName) == 0) {
-				if (pPk &&
-				    sql_space_column_is_in_pk(space, j))
-					is_pk_modified = true;
-				if (aXRef[j] != -1) {
-					const char *err =
-						"set id list: duplicate "\
-						"column name %s";
-					err = tt_sprintf(err,
-							 pChanges->a[i].zName);
-					diag_set(ClientError,
-						 ER_SQL_PARSER_GENERIC,
-						 err);
-					pParse->is_aborted = true;
-					goto update_cleanup;
-				}
-				aXRef[j] = i;
-				upd_cols_cnt++;
-				break;
-			}
-		}
-		if (j >= (int)def->field_count) {
+		uint32_t fieldno = sql_fieldno_by_item(space, &pChanges->a[i]);
+		if (fieldno == UINT32_MAX) {
 			diag_set(ClientError, ER_NO_SUCH_FIELD_NAME_IN_SPACE,
 				 pChanges->a[i].zName, def->name);
 			pParse->is_aborted = true;
 			goto update_cleanup;
 		}
+		if (pPk != NULL && sql_space_column_is_in_pk(space, fieldno))
+			is_pk_modified = true;
+		if (aXRef[fieldno] != -1) {
+			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+				 tt_sprintf("set id list: duplicate column "
+					    "name %s", pChanges->a[i].zName));
+			pParse->is_aborted = true;
+			goto update_cleanup;
+		}
+		aXRef[fieldno] = i;
+		upd_cols_cnt++;
 	}
 	/*
 	 * The SET expressions are not actually used inside the

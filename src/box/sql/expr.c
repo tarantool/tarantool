@@ -1628,6 +1628,7 @@ sql_expr_list_dup(struct ExprList *p, int flags)
 		}
 		pItem->zName = sql_xstrdup(pOldItem->zName);
 		pItem->zSpan = sql_xstrdup(pOldItem->zSpan);
+		pItem->legacy_name = sql_xstrdup(pOldItem->legacy_name);
 		pItem->sort_order = pOldItem->sort_order;
 		pItem->done = 0;
 		pItem->bSpanIsTab = pOldItem->bSpanIsTab;
@@ -1702,6 +1703,7 @@ sqlIdListDup(struct IdList *p)
 		struct IdList_item *pNewItem = &pNew->a[i];
 		struct IdList_item *pOldItem = &p->a[i];
 		pNewItem->zName = sql_xstrdup(pOldItem->zName);
+		pNewItem->legacy_name = sql_xstrdup(pOldItem->legacy_name);
 		pNewItem->idx = pOldItem->idx;
 	}
 	return pNew;
@@ -1808,7 +1810,10 @@ sqlExprListAppendVector(Parse * pParse,	/* Parsing context */
 		pList = sql_expr_list_append(pList, pSubExpr);
 		assert(pList->nExpr == iFirst + i + 1);
 		pList->a[pList->nExpr - 1].zName = pColumns->a[i].zName;
+		pList->a[pList->nExpr - 1].legacy_name =
+			pColumns->a[i].legacy_name;
 		pColumns->a[i].zName = 0;
+		pColumns->a[i].legacy_name = NULL;
 	}
 
 	if (pExpr->op == TK_SELECT) {
@@ -1870,6 +1875,7 @@ sqlExprListSetName(Parse * pParse,	/* Parsing context */
 	assert(item->zName == NULL);
 	if (dequote) {
 		item->zName = sql_name_new(pName->z, pName->n);
+		item->legacy_name = sql_legacy_name_new(pName->z, pName->n);
 	} else {
 		item->zName = sql_xstrndup(pName->z, pName->n);
 	}
@@ -1900,6 +1906,7 @@ exprListDeleteNN(struct ExprList *pList)
 		sql_expr_delete(pItem->pExpr);
 		sql_xfree(pItem->zName);
 		sql_xfree(pItem->zSpan);
+		sql_xfree(pItem->legacy_name);
 	}
 	sql_xfree(pList->a);
 	sql_xfree(pList);
@@ -5439,13 +5446,23 @@ uint32_t
 sql_fieldno_by_expr(const struct space *space, const struct Expr *expr)
 {
 	assert(expr->op == TK_ID);
-	return sql_space_fieldno(space, expr->u.zToken);
+	uint32_t res = sql_space_fieldno(space, expr->u.zToken);
+	if (res != UINT32_MAX || (expr->flags & EP_Lookup2) == 0)
+		return res;
+	char *old_name_str = sql_legacy_name_new0(expr->u.zToken);
+	res = sql_space_fieldno(space, old_name_str);
+	sql_xfree(old_name_str);
+	return res;
+
 }
 
 uint32_t
 sql_fieldno_by_item(const struct space *space, const struct ExprList_item *item)
 {
-	return sql_space_fieldno(space, item->zName);
+	uint32_t res = sql_space_fieldno(space, item->zName);
+	if (res != UINT32_MAX || item->legacy_name == NULL)
+		return res;
+	return sql_space_fieldno(space, item->legacy_name);
 }
 
 uint32_t

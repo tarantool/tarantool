@@ -2922,6 +2922,10 @@ sql_id_list_append(struct IdList *list, struct Token *name_token)
 	list->a = sqlArrayAllocate(list->a, sizeof(list->a[0]), &list->nId, &i);
 	assert(i >= 0);
 	list->a[i].zName = sql_name_from_token(name_token);
+	if (name_token->z[0] != '"') {
+		list->a[i].legacy_name = sql_legacy_name_new(name_token->z,
+							     name_token->n);
+	}
 	return list;
 }
 
@@ -2933,6 +2937,7 @@ sqlIdListDelete(struct IdList *pList)
 		return;
 	for (i = 0; i < pList->nId; i++) {
 		sql_xfree(pList->a[i].zName);
+		sql_xfree(pList->a[i].legacy_name);
 	}
 	sql_xfree(pList->a);
 	sql_xfree(pList);
