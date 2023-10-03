@@ -1499,7 +1499,7 @@ cmd ::= FUNCTION_KW(T) expr(E). {
     return;
   }
   pParse->parsed_ast_type = AST_TYPE_EXPR;
-  pParse->parsed_ast.expr = sqlExprDup(E.pExpr, 0);
+  pParse->parsed_ast.expr = E.pExpr;
 }
 
 //////////////////////////// The SHOW CREATE TABLE command /////////////////////
