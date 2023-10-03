@@ -97,7 +97,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" prot="public" static="no">
         <name>PACKAGE_VERSION</name>
-        <initializer>&quot;3.0.0-alpha3-57-gcbe6a4dab&quot;</initializer>
+        <initializer>&quot;3.0.0-alpha3-65-gf9a402fe5&quot;</initializer>
         <briefdescription>
 <para>A string with major-minor-patch-commit-id identifier of the release, e.g. </para>
         </briefdescription>
@@ -12953,7 +12953,7 @@ In case of an error set a diag and return NULL. </para>
 <codeline lineno="57" refid="module_8h_1ac5f2c7580fd5bf200c5027443420902f" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MAJOR<sp/>3</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="61" refid="module_8h_1a4ab155eaff0a115e522c1faae631196e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MINOR<sp/>0</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="65" refid="module_8h_1abd1dbec4fd6761084d3e0c05afe2b138" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_PATCH<sp/>0</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;3.0.0-alpha3-57-gcbe6a4dab&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;3.0.0-alpha3-65-gf9a402fe5&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="71"><highlight class="normal"></highlight></codeline>
 <codeline lineno="76" refid="module_8h_1adb6d1259777e8f56c6260be6faed183e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>SYSCONF_DIR<sp/>&quot;etc&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="78" refid="module_8h_1a643b6b7ac15874197420e2adbea8b6bb" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>INSTALL_PREFIX<sp/>&quot;/usr/local&quot;</highlight><highlight class="normal"></highlight></codeline>
