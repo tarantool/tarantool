@@ -359,6 +359,32 @@ BENCHMARK_F(MemtxFixture, TreeSelectAll)
 	state.SetItemsProcessed(counter);
 }
 
+/**
+ * Benchmark random `replace`s of existing keys in the tree index.
+ * The key subset is regenerated through every iteration.
+ */
+BENCHMARK_F(MemtxFixture, TreeReplaceRandomExistingKeys)
+(benchmark::State & state)
+{
+	auto itr = key_subset.begin();
+	int64_t counter = 0;
+	for (MAYBE_UNUSED auto _ : state) {
+		if (itr == key_subset.end()) {
+			state.PauseTiming();
+			generate_key_subset();
+			state.ResumeTiming();
+			itr = key_subset.begin();
+		}
+		struct tuple *result;
+		if (::box_replace(sid, itr->first, itr->second, &result) != 0)
+			panic("failed to replace the tuple");
+		benchmark::DoNotOptimize(result);
+		++counter;
+		++itr;
+	}
+	state.SetItemsProcessed(counter);
+}
+
 BENCHMARK_MAIN();
 
 #include "debug_warning.h"
