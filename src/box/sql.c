@@ -1695,7 +1695,10 @@ sql_fieldno_by_token(const struct space *space, const struct Token *name)
 uint32_t
 sql_fieldno_by_id(const struct space *space, const struct IdList_item *id)
 {
-	return sql_space_fieldno(space, id->zName);
+	uint32_t res = sql_space_fieldno(space, id->zName);
+	if (res != UINT32_MAX || id->legacy_name == NULL)
+		return res;
+	return sql_space_fieldno(space, id->legacy_name);
 }
 
 uint32_t

@@ -113,11 +113,12 @@ g.test_create_tuple_foreign_key = function()
         t.assert(box.space.tab.foreign_key.one ~= nil);
         box.space.tab:drop()
 
-        -- Make sure table name is looked up twice in tuple FK creation clause.
+        -- Make sure table name and column names are looked up twice in tuple FK
+        -- creation clause.
         box.execute([[CREATE TABLE ASD(QWE INT PRIMARY KEY);]])
         local sql = [[CREATE TABLE ASD1(QWE1 INT PRIMARY KEY, ZXC1 INT,
-                      CONSTRAINT f1 FOREIGN KEY (ZXC1) REFERENCES Asd(QWE),
-                      CONSTRAINT f2 FOREIGN KEY (ZXC1) REFERENCES asD1(QWE1));]]
+                      CONSTRAINT f1 FOREIGN KEY (zXC1) REFERENCES Asd(QwE),
+                      CONSTRAINT f2 FOREIGN KEY (ZXc1) REFERENCES asD1(qwe1));]]
         t.assert_equals(box.execute(sql), {row_count = 1})
         local foreign_key = box.space.ASD1.foreign_key
         t.assert_equals(foreign_key.f1.space, box.space.ASD.id)
@@ -136,11 +137,12 @@ g.test_create_field_foreign_key = function()
         t.assert(box.space.tab:format()[2].foreign_key.one ~= nil);
         box.space.tab:drop()
 
-        -- Make sure table name is looked up twice in field FK creation clause.
+        -- Make sure table name and column names are looked up twice in field FK
+        -- creation clause.
         box.execute([[CREATE TABLE ASD(QWE INT PRIMARY KEY);]])
         local sql = [[CREATE TABLE ASD1(QWE1 INT PRIMARY KEY, ZXC1 INT
-                      CONSTRAINT f1 REFERENCES Asd(QWE)
-                      CONSTRAINT f2 REFERENCES asD1(QWE1));]]
+                      CONSTRAINT f1 REFERENCES Asd(qwE)
+                      CONSTRAINT f2 REFERENCES asD1(Qwe1));]]
         t.assert_equals(box.execute(sql), {row_count = 1})
         local foreign_key = box.space.ASD1:format()[2].foreign_key
         t.assert_equals(foreign_key.f1.space, box.space.ASD.id)
@@ -164,6 +166,14 @@ g.test_expression = function()
         t.assert_equals(box.execute(sql).rows, {{124}})
         box.space.Tab:drop()
         box.func.fUn:drop()
+
+        -- Make sure table names and column names are looked up twice in
+        -- expressions.
+        box.execute([[CREATE TABLE ASD(QWE INT PRIMARY KEY, ZXC INT);]])
+        box.space.ASD:insert({12, 21})
+        local rows = box.execute([[SELECT AsD.qWe * 2 - zxc FROM asd;]]).rows
+        t.assert_equals(rows, {{3}})
+        box.space.ASD:drop()
     end)
 end
 
@@ -174,6 +184,12 @@ g.test_create_primary_key = function()
                       CONSTRAINT Three PRIMARY KEY (Second, First));]])
         t.assert_equals(box.space.Tab.index[0].name, 'Three');
         box.space.Tab:drop()
+
+        -- Make sure column names in primary key definition are looked up twice.
+        box.execute([[CREATE TABLE ASD(QWE INT, ZXC INT,
+                      CONSTRAINT THREE PRIMARY KEY (Qwe, zxc));]])
+        t.assert_equals(box.space.ASD.index[0].name, 'THREE');
+        box.space.ASD:drop()
     end)
 end
 
@@ -185,6 +201,13 @@ g.test_create_unique = function()
                       CONSTRAINT Four UNIQUE (Second, First));]])
         t.assert_equals(box.space.Tab.index[1].name, 'Four');
         box.space.Tab:drop()
+
+        -- Make sure column names in unique constraint definition are looked up
+        -- twice.
+        box.execute([[CREATE TABLE ASD(QWE INT PRIMARY KEY, ZXC INT,
+                      CONSTRAINT FOUR UNIQUE (Qwe, zxc));]])
+        t.assert_equals(box.space.ASD.index[1].name, 'FOUR');
+        box.space.ASD:drop()
     end)
 end
 
@@ -302,13 +325,13 @@ g.test_update = function()
         t.assert_equals(box.space.Tab:select(), {{3, 11, -1}})
         box.space.Tab:drop()
 
-        -- Make sure table name is looked up twice in UPDATE.
+        -- Make sure table name and column names are looked up twice in UPDATE.
         box.execute([[CREATE TABLE ASD(PK INT PRIMARY KEY, QWE INT, ZXC INT);]])
         box.space.ASD:insert({3, 5, 7})
-        sql = [[UPDATE aSd SET QWE = 1, ZXC = 9;]]
+        sql = [[UPDATE aSd SET qWE = 1, ZXc = 9;]]
         t.assert_equals(box.execute(sql), {row_count = 1});
         t.assert_equals(box.space.ASD:select(), {{3, 1, 9}})
-        sql = [[UPDATE asd SET (QWE, ZXC) = (11, -1);]]
+        sql = [[UPDATE asd SET (qwE, Zxc) = (11, -1);]]
         t.assert_equals(box.execute(sql), {row_count = 1});
         t.assert_equals(box.space.ASD:select(), {{3, 11, -1}})
         box.space.ASD:drop()
@@ -323,9 +346,9 @@ g.test_insert = function()
         t.assert_equals(box.space.Tab:select(), {{123, nil, 321}})
         box.space.Tab:drop()
 
-        -- Make sure table name is looked up twice in INSERT.
+        -- Make sure table name and column names are looked up twice in INSERT.
         box.execute([[CREATE TABLE ASD(PK INT PRIMARY KEY, QWE INT, ZXC INT);]])
-        box.execute([[INSERT INTO asd(PK, ZXC) VALUES (123, 321);]])
+        box.execute([[INSERT INTO asd(pK, zxc) VALUES (123, 321);]])
         t.assert_equals(box.space.ASD:select(), {{123, nil, 321}})
         box.space.ASD:drop()
     end)
@@ -341,9 +364,10 @@ g.test_create_index = function()
         t.assert(box.space.Tab.index.In1 ~= nil)
         box.space.Tab:drop()
 
-        -- Make sure table name is looked up twice in CREATE INDEX.
+        -- Make sure table name and column names looked up twice in
+        -- CREATE INDEX.
         box.execute([[CREATE TABLE ASD(PK INT PRIMARY KEY, QWE INT, ZXC INT);]])
-        sql = [[CREATE INDEX IND ON Asd(ZXC, QWE);]]
+        sql = [[CREATE INDEX IND ON Asd(zxc, qWe);]]
         t.assert_equals(box.execute(sql), {row_count = 1})
         t.assert(box.space.ASD.index.IND ~= nil)
         box.space.ASD:drop()

@@ -1495,6 +1495,8 @@ struct ExprList {
 		Expr *pExpr;	/* The list of expressions */
 		char *zName;	/* Token associated with this expression */
 		char *zSpan;	/* Original text of the expression */
+		/** Normalized name for the second lookup. */
+		char *legacy_name;
 		enum sort_order sort_order;
 		unsigned done:1;	/* A flag to indicate when processing is finished */
 		unsigned bSpanIsTab:1;	/* zSpan holds DB.TABLE.COLUMN */
@@ -1538,6 +1540,8 @@ struct ExprSpan {
 struct IdList {
 	struct IdList_item {
 		char *zName;	/* Name of the identifier */
+		/** Normalized name for the second lookup. */
+		char *legacy_name;
 		int idx;	/* Index in some Table.aCol[] of a column named zName */
 	} *a;
 	int nId;		/* Number of identifiers on the list */
@@ -3138,21 +3142,26 @@ sql_fieldno_by_token(const struct space *space, const struct Token *name);
 
 /**
  * Return the fieldno of the field with the name defined by the element of
- * IdList. Return UINT32_MAX if the field was not found.
+ * IdList. A second lookup will be performed if the field is not found on the
+ * first try and field legacy_name of the id is not NULL. Return UINT32_MAX if
+ * the field was not found.
  */
 uint32_t
 sql_fieldno_by_id(const struct space *space, const struct IdList_item *id);
 
 /**
- * Return the fieldno of the field with the name defined by the expression.
- * Return UINT32_MAX if the field was not found.
+ * Return the fieldno of the field with the name defined by the expression. A
+ * second lookup will be performed if the field is not found on the first try
+ * and flag EP_Lookup2 is set. Return UINT32_MAX if the field was not found.
  */
 uint32_t
 sql_fieldno_by_expr(const struct space *space, const struct Expr *expr);
 
 /**
  * Return the fieldno of the field with the name defined by the name of
- * expression from exprList. Return UINT32_MAX if the field was not found.
+ * expression from exprList. A second lookup will be performed if the field is
+ * not found on the first try and field legacy_name of element of ExprList is
+ * not NULL. Return UINT32_MAX if the field was not found.
  */
 uint32_t
 sql_fieldno_by_item(const struct space *space, const struct ExprList_item *it);
@@ -4077,7 +4086,15 @@ void sqlSelectPrep(Parse *, Select *, NameContext *);
 const char *
 sql_select_op_name(int id);
 
-int sqlMatchSpanName(const char *, const char *, const char *);
+/**
+ * Subqueries stores the original table and column names for their result sets
+ * in ExprList.a[].zSpan, in the form "TABLE.COLUMN". Check to see if the span
+ * given to this routine matches given table or column names.
+ */
+bool
+sqlMatchSpanName(const char *span, const char *col, const char *tab,
+		 const char *old_col, const char *old_tab);
+
 int sqlResolveExprNames(NameContext *, Expr *);
 int sqlResolveExprListNames(NameContext *, ExprList *);
 void sqlResolveSelectNames(Parse *, Select *, NameContext *);
