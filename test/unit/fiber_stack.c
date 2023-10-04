@@ -44,10 +44,6 @@ main_f(va_list ap)
 	 * gh-9026. Stack size crafted to be close to 64k so we should
 	 * hit red zone around stack when writing watermark if bug is not
 	 * fixed.
-	 *
-	 * The test is placed at the beginning because stderr is redirected
-	 * to /dev/null at the end of the test and ASAN diagnostic will
-	 * not be visible if the test will be placed at the end.
 	 */
 	fiber_attr = fiber_attr_new();
 	fiber_attr_setstacksize(fiber_attr, (64 << 10) - 128);
@@ -130,17 +126,9 @@ main_f(va_list ap)
 	inj = errinj(ERRINJ_FIBER_MPROTECT, ERRINJ_INT);
 	inj->iparam = PROT_READ | PROT_WRITE;
 
-	/* On fiber_mprotect() fail we are logging number of bytes to be
-	 * leaked. However, it depends on system page_size (_SC_PAGESIZE).
-	 * On different OS's this parameter may vary. So let's temporary
-	 * redirect stderr to dev/null to make this test stable regardless
-	 * of OS.
-	 */
-	freopen("/dev/null", "w", stderr);
 	fiber_start(fiber);
 	fiber_join(fiber);
 	inj->iparam = -1;
-	freopen("/dev/stderr", "w", stderr);
 
 	used_after = slabc->allocated.stats.used;
 	ok(used_after > used_before, "expected leak detected");
