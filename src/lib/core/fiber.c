@@ -1338,6 +1338,14 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 			 */
 			say_syserror("fiber: Can't put guard page to slab. "
 				     "Leak %zu bytes", (size_t)fiber->stack_size);
+			/*
+			 * Suppress memory leak report for this object.
+			 *
+			 * Works even though it is not a beginning of
+			 * allocation (there is ASAN slab cache allocation
+			 * header).
+			 */
+			LSAN_IGNORE_OBJECT(fiber->stack_slab);
 		} else {
 			slab_put(slabc, fiber->stack_slab);
 		}
