@@ -828,25 +828,31 @@ end
 --
 -- Add or/and delete a trigger on member event. Possible usages:
 --
--- * on_member_event(new[, ctx]) - add a new trigger. It should
+-- * on_member_event(new[, ctx][, name]) - add a new trigger. It should
 --   accept 3 arguments: an updated member, an events object, an
---   optional @a ctx parameter passed as is.
+--   optional @a ctx parameter passed as is. If name is passed as
+--   the third parameter, the new trigger is set by name.
 --
 -- * on_member_event(new, old[, ctx]) - add a new trigger @a new
 --   if not nil, in place of @a old trigger.
 --
+-- * on_member_event(new, old, name[, ctx]) - add a new trigger
+--   @a new if not nil by passed name, @a old is ignored. Name
+--   must be a string, otherwise it is considered to be a ctx.
+--
+-- * on_member_event{func = new, name = name, ctx = ctx} - add
+--   a new trigger @a new if not nil by passed name.
+--
 -- * on_member_event() - get a list of triggers.
 --
-local function swim_on_member_event(s, new, old, ctx)
+local function swim_on_member_event(s, ...)
     local ptr = swim_check_instance(s, 'swim:on_member_event')
-    if type(old) ~= 'function' then
-        ctx = old
-        old = nil
-    end
+    local new, old, name, ctx =
+        internal.swim_on_member_event_normalize_arguments(...)
     if new ~= nil then
         new = swim_on_member_event_new(s, new, ctx)
     end
-    return internal.swim_on_member_event(ptr, new, old)
+    return internal.swim_on_member_event(ptr, new, old, name)
 end
 
 --
