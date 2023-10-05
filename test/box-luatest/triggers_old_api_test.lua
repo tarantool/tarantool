@@ -42,6 +42,8 @@ g.before_all(function()
         -- one is a function that sets triggers, and the second one is the name
         -- of the associated event in the trigger registry. The second element
         -- is optional.
+        -- SWIM triggers cannot be tested because they use wrappers as triggers,
+        -- so they should be tested in a separate test.
         rawset(_G, 'old_api_triggers', {
             {box.session.on_connect, 'box.session.on_connect'},
             {box.session.on_disconnect, 'box.session.on_disconnect'},
@@ -283,5 +285,77 @@ g.test_callable_number = function()
         for _, trg_descr in pairs(old_api_triggers) do
             check_trigger(trg_descr[1])
         end
+    end)
+end
+
+-- Triggers swim:on_member_event require a separate test since they accept ctx
+-- and use wrappers as triggers.
+g.test_swim_on_member_event = function()
+    g.server:exec(function()
+        local fiber = require('fiber')
+        local swim = require('swim')
+        local function uuid(i)
+            local min_valid_prefix = '00000000-0000-1000-8000-'
+            if i < 10 then
+                return min_valid_prefix..'00000000000'..tostring(i)
+            end
+            assert(i < 100)
+            return min_valid_prefix..'0000000000'..tostring(i)
+        end
+        local function uri(port)
+            port = port or 0
+            return '127.0.0.1:'..tostring(port)
+        end
+
+        local history = {}
+        local ctx_history = {}
+        local s = swim.new({generation = 0})
+
+        s:on_member_event(function(_, _, ctx)
+            table.insert(history, 1)
+            table.insert(ctx_history, ctx)
+        end, 'ctx1')
+
+        s:on_member_event(function(_, _, ctx)
+            table.insert(history, 2)
+            table.insert(ctx_history, ctx)
+        end, nil, {ctx = 'ctx2'})
+
+        -- Each next trigger is inserted and then replaced.
+        local t3 = s:on_member_event(function() end, nil, nil, 'ctx3')
+        s:on_member_event(function(_, _, ctx)
+            table.insert(history, 3)
+            table.insert(ctx_history, ctx)
+        end, t3, nil, 'ctx3')
+
+        s:on_member_event(function() end, nil, 'named1', 'ctx4')
+        s:on_member_event(function(_, _, ctx)
+            table.insert(history, 4)
+            table.insert(ctx_history, ctx)
+        end, nil, 'named1', 'ctx4')
+
+        s:on_member_event(function() end, 'ctx5', 'named2')
+        s:on_member_event(function(_, _, ctx)
+            table.insert(history, 5)
+            table.insert(ctx_history, ctx)
+        end, 'ctx5', 'named2')
+
+        s:on_member_event{func = function() end, name = 'named3'}
+        s:on_member_event{func = function(_, _, ctx)
+            table.insert(history, 6)
+            table.insert(ctx_history, ctx)
+        end, name = 'named3', ctx = 'ctx6'}
+
+        s:on_member_event(function() end, nil, 'named4')
+        s:on_member_event(function(_, _, ctx)
+            table.insert(history, 7)
+            table.insert(ctx_history, ctx)
+        end, nil, 'named4')
+
+        s:cfg{uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01}
+        while #history < 1 do fiber.sleep(0) end
+        t.assert_equals(history, {7, 6, 5, 4, 3, 2, 1})
+        t.assert_equals(ctx_history,
+            {'ctx6', 'ctx5', 'ctx4', 'ctx3', {ctx = 'ctx2'}, 'ctx1'})
     end)
 end
