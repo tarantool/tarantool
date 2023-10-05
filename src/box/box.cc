@@ -1068,22 +1068,6 @@ say_check_cfg(const char *log,
 }
 
 /**
- * Raises error if audit log configuration is incorrect.
- */
-static void
-box_check_audit(void)
-{
-	if (audit_log_check_format(cfg_gets("audit_format")) != 0) {
-		tnt_raise(ClientError, ER_CFG, "audit_format",
-			  diag_last_error(diag_get())->errmsg);
-	}
-	if (audit_log_check_filter(cfg_gets("audit_filter")) != 0) {
-		tnt_raise(ClientError, ER_CFG, "audit_filter",
-			  diag_last_error(diag_get())->errmsg);
-	}
-}
-
-/**
  * Returns the authentication method corresponding to box.cfg.auth_type.
  * If not found, sets diag and returns NULL.
  */
@@ -1851,7 +1835,8 @@ box_check_config(void)
 	struct uri_set uri_set;
 	char name[NODE_NAME_SIZE_MAX];
 	box_check_say();
-	box_check_audit();
+	if (audit_log_check_cfg() != 0)
+		diag_raise();
 	if (box_check_flightrec() != 0)
 		diag_raise();
 	if (box_check_listen(&uri_set) != 0)
@@ -5814,8 +5799,7 @@ box_storage_init(void)
 	port_init();
 	iproto_init(cfg_geti("iproto_threads"));
 	sql_init();
-	audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"),
-		       cfg_gets("audit_format"), cfg_gets("audit_filter"));
+	audit_log_init();
 	security_cfg();
 
 	int64_t wal_max_size = box_check_wal_max_size(
