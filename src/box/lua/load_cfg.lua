@@ -116,6 +116,8 @@ local default_cfg = {
     audit_nonblock      = ifdef_audit(true),
     audit_format        = ifdef_audit('json'),
     audit_filter        = ifdef_audit('compatibility'),
+    audit_spaces        = ifdef_audit(nil),
+    audit_extract_key   = ifdef_audit(false),
 
     auth_type           = 'chap-sha1',
     auth_delay          = ifdef_security(0),
@@ -312,6 +314,8 @@ local template_cfg = {
     audit_nonblock      = ifdef_audit('boolean'),
     audit_format        = ifdef_audit('string'),
     audit_filter        = ifdef_audit('string'),
+    audit_spaces        = ifdef_audit('table'),
+    audit_extract_key   = ifdef_audit('boolean'),
 
     auth_type           = 'string',
     auth_delay          = ifdef_security('number'),
