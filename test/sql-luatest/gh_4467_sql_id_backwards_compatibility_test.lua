@@ -50,6 +50,12 @@ g.test_release_savepoint = function()
         t.assert_equals(box.execute([[SAVEPOINT aSd;]]), exp)
         t.assert_equals(box.execute([[RELEASE aSd;]]), exp)
         t.assert_equals(box.execute([[ROLLBACK;]]), exp)
+
+        -- Make sure savepoint name is looked up twice in RELEASE.
+        t.assert_equals(box.execute([[START TRANSACTION;]]), exp)
+        t.assert_equals(box.execute([[SAVEPOINT ASD;]]), exp)
+        t.assert_equals(box.execute([[RELEASE aSd;]]), exp)
+        t.assert_equals(box.execute([[ROLLBACK;]]), exp)
     end)
 end
 
@@ -59,6 +65,12 @@ g.test_rollback_to_savepoint = function()
         local exp = {row_count = 0}
         t.assert_equals(box.execute([[START TRANSACTION;]]), exp)
         t.assert_equals(box.execute([[SAVEPOINT aSd;]]), exp)
+        t.assert_equals(box.execute([[ROLLBACK TO aSd;]]), exp)
+        t.assert_equals(box.execute([[ROLLBACK;]]), exp)
+
+        -- Make sure savepoint name is looked up twice IN ROLLBACK TO.
+        t.assert_equals(box.execute([[START TRANSACTION;]]), exp)
+        t.assert_equals(box.execute([[SAVEPOINT ASD;]]), exp)
         t.assert_equals(box.execute([[ROLLBACK TO aSd;]]), exp)
         t.assert_equals(box.execute([[ROLLBACK;]]), exp)
     end)

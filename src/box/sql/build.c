@@ -3201,7 +3201,19 @@ sqlSavepoint(Parse * pParse, int op, Token * pName)
 		sql_xfree(zName);
 		return;
 	}
-	sqlVdbeAddOp4(v, OP_Savepoint, op, 0, 0, zName, P4_DYNAMIC);
+	/*
+	 * Keep the uppercase version of the unquoted name for backwards
+	 * compatibility.
+	 */
+	int old_name_reg = 0;
+	assert(pName->n > 0);
+	if (op != SAVEPOINT_BEGIN && pName->z[0] != '"') {
+		old_name_reg = ++pParse->nMem;
+		char *old_name = sql_legacy_name_new(pName->z, pName->n);
+		sqlVdbeAddOp4(v, OP_String8, 0, old_name_reg, 0, old_name,
+			      P4_DYNAMIC);
+	}
+	sqlVdbeAddOp4(v, OP_Savepoint, op, 0, old_name_reg, zName, P4_DYNAMIC);
 }
 
 /**

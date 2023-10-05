@@ -2469,6 +2469,20 @@ sql_name_new(const char *name, int len);
 char *
 sql_name_temp(struct Parse *parser, const char *name, int len);
 
+/** Normalize the given name and write it to the newly allocated memory. */
+char *
+sql_legacy_name_new(const char *name, int len);
+
+/**
+ * Normalize the given NULL-terminated name and write it to the newly allocated
+ * memory.
+ */
+static inline char *
+sql_legacy_name_new0(const char *name)
+{
+	return sql_legacy_name_new(name, strlen(name));
+}
+
 /**
  * Return an escaped version of the original name in memory allocated with
  * sql_xmalloc().

@@ -2246,11 +2246,15 @@ case OP_DropFieldCheck: {
 	break;
 }
 
-/* Opcode: Savepoint P1 * * P4 *
+/* Opcode: Savepoint P1 * P3 P4 *
  *
  * Open, release or rollback the savepoint named by parameter P4, depending
  * on the value of P1. To open a new savepoint, P1==0. To release (commit) an
  * existing savepoint, P1==1, or to rollback an existing savepoint P1==2.
+ *
+ * For RELEASE SAVEPOINT and ROLLBACK SAVEPOINT, if P3 is not 0, if a savepoint
+ * is not found by the name specified in P4, an additional search is performed
+ * on the name specified in P3.
  */
 case OP_Savepoint: {
 	int p1;                         /* Value of P1 operand */
@@ -2283,6 +2287,10 @@ case OP_Savepoint: {
 		 * an error is returned to the user.
 		 */
 		struct txn_savepoint *sv = txn_savepoint_by_name(txn, zName);
+		if (sv == NULL && pOp->p3 > 0) {
+			struct Mem *old_name = &aMem[pOp->p3];
+			sv = txn_savepoint_by_name(txn, old_name->z);
+		}
 		if (sv == NULL) {
 			diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
 			goto abort_due_to_error;
