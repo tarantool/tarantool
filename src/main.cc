@@ -89,6 +89,7 @@
 #include "core/clock_lowres.h"
 #include "lua/utils.h"
 #include "core/event.h"
+#include "on_shutdown.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -163,8 +164,7 @@ on_shutdown_f(va_list ap)
 	while (!is_shutting_down)
 		fiber_yield();
 
-	if (trigger_fiber_run(&box_on_shutdown_trigger_list, NULL,
-			      on_shutdown_trigger_timeout) != 0) {
+	if (on_shutdown_run_triggers() != 0) {
 		say_error("on_shutdown triggers failed");
 		diag_log();
 		diag_clear(diag_get());

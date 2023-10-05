@@ -60,6 +60,16 @@ box_on_shutdown(void *arg, int (*new_handler)(void *),
 
 /** \endcond public */
 
+/**
+ * Runs triggers from box_on_shutdown_trigger_list in separate fibers.
+ * Waits for their completion for on_shutdown_trigger_timeout seconds.
+ * When time is over, the function immediately stops without waiting
+ * for other triggers completion and returns a TimedOut error.
+ * NB: the function removes all elements from box_on_shutdown_trigger_list.
+ */
+int
+on_shutdown_run_triggers(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
