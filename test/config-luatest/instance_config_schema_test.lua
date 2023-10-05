@@ -1345,7 +1345,9 @@ g.test_audit_available = function()
             },
             nonblock = true,
             format = 'plain',
-            filter = {'all', 'none'}
+            filter = {'all', 'none'},
+            spaces = {'space1', 'space2', 'space3'},
+            extract_key = true,
         },
     }
     instance_config:validate(iconfig)
@@ -1362,6 +1364,7 @@ g.test_audit_available = function()
             server = box.NULL
         },
         to = "devnull",
+        extract_key = false,
     }
     local res = instance_config:apply_default({}).audit_log
     t.assert_equals(res, exp)

@@ -1834,6 +1834,20 @@ return schema.new('instance_config', schema.record({
             "data_operations",
             "compatibility",
         }),
+        spaces = enterprise_edition(schema.array({
+            items = schema.scalar({
+                type = 'string',
+            }),
+            box_cfg = 'audit_spaces',
+            box_cfg_nondynamic = true,
+            default = box.NULL,
+        })),
+        extract_key = enterprise_edition(schema.scalar({
+            type = 'boolean',
+            box_cfg = 'audit_extract_key',
+            box_cfg_nondynamic = true,
+            default = false,
+        })),
     })),
     roles_cfg = schema.map({
         key = schema.scalar({type = 'string'}),

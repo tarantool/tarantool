@@ -805,6 +805,8 @@ g.test_audit_options = function()
         t.assert_equals(box.cfg.audit_nonblock, true)
         t.assert_equals(box.cfg.audit_format, 'csv')
         t.assert_equals(box.cfg.audit_filter, table.concat(events, ","))
+        t.assert_equals(box.cfg.audit_spaces, {'space1', 'space2', 'space3'})
+        t.assert_equals(box.cfg.audit_extract_key, true)
     end
 
     helpers.success_case(g, {
@@ -814,6 +816,8 @@ g.test_audit_options = function()
             ['audit_log.nonblock'] = true,
             ['audit_log.format'] = 'csv',
             ['audit_log.filter'] = events,
+            ['audit_log.spaces'] = {'space1', 'space2', 'space3'},
+            ['audit_log.extract_key'] = true,
         },
         verify = verify,
         verify_args = {events}

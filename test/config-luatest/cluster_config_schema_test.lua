@@ -284,6 +284,7 @@ g.test_defaults = function()
                 server = box.NULL
             },
             to = "devnull",
+            extract_key = false,
         } or nil,
         failover = {
             probe_interval = 10,
