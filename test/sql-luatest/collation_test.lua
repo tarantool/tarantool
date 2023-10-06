@@ -19,3 +19,13 @@ g.test_ghs_80 = function()
         t.assert_equals(err.message, "Collation 'A' does not exist")
     end)
 end
+
+g.test_gh_9229 = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE t(i INT, a INT, PRIMARY KEY(i, a),
+                      b STRING UNIQUE COLLATE "unicode_ci");]]
+        box.execute(sql)
+        t.assert_equals(box.space.T.index[1].parts[1].collation, "unicode_ci")
+        box.execute([[DROP TABLE t;]])
+    end)
+end
