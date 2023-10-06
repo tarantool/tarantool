@@ -833,26 +833,32 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 void
 sqlAddCollateType(Parse * pParse, Token * pToken)
 {
+	char *coll_name = sql_name_from_token(pToken);
+	uint32_t coll_id;
+	struct coll *coll = sql_get_coll_seq(pParse, coll_name, &coll_id);
+	sql_xfree(coll_name);
+	if (coll == NULL)
+		return;
+
 	struct space *space = pParse->create_column_def.space;
 	assert(space != NULL);
-	uint32_t i = space->def->field_count - 1;
-	char *coll_name = sql_name_from_token(pToken);
-	uint32_t *coll_id = &space->def->fields[i].coll_id;
-	if (sql_get_coll_seq(pParse, coll_name, coll_id) != NULL) {
-		/* If the column is declared as "<name> PRIMARY KEY COLLATE <type>",
-		 * then an index may have been created on this column before the
-		 * collation type was added. Correct this if it is the case.
-		 */
-		for (uint32_t i = 0; i < space->index_count; ++i) {
-			struct index *idx = space->index[i];
-			assert(idx->def->key_def->part_count == 1);
-			if (idx->def->key_def->parts[0].fieldno == i) {
-				coll_id = &idx->def->key_def->parts[0].coll_id;
-				(void)sql_column_collation(space->def, i, coll_id);
-			}
-		}
+	uint32_t fieldno = space->def->field_count - 1;
+	space->def->fields[fieldno].coll_id = coll_id;
+
+	/*
+	 * Indexes that include the current field may have already been created
+	 * before the collation was added. These indexes can be created using
+	 * ... field_name STRING PRIMARY KEY COLLATE ...
+	 * or
+	 * ... field_name STRING UNIQUE COLLATE ...
+	 * In this case, we should add a collation to them.
+	 */
+	for (uint32_t iid = 0; iid < space->index_count; ++iid) {
+		struct index *idx = space->index[iid];
+		if (idx->def->key_def->part_count == 1 &&
+		    idx->def->key_def->parts[0].fieldno == fieldno)
+			idx->def->key_def->parts[0].coll_id = coll_id;
 	}
-	sql_xfree(coll_name);
 }
 
 struct coll *
