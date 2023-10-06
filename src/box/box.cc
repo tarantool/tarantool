@@ -113,6 +113,8 @@ double txn_timeout_default;
 struct rlist box_on_shutdown_trigger_list =
 	RLIST_HEAD_INITIALIZER(box_on_shutdown_trigger_list);
 
+struct event *box_on_shutdown_event = NULL;
+
 const struct vclock *box_vclock = &replicaset.vclock;
 
 const char *box_auth_type;
@@ -5884,6 +5886,8 @@ box_init(void)
 	box_on_recovery_state_event =
 		event_get("box.ctl.on_recovery_state", true);
 	event_ref(box_on_recovery_state_event);
+	box_on_shutdown_event = event_get("box.ctl.on_shutdown", true);
+	event_ref(box_on_shutdown_event);
 	msgpack_init();
 	fiber_cond_create(&ro_cond);
 	auth_init();
