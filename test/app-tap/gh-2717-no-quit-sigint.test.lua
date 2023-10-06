@@ -36,7 +36,10 @@ local time_quota = 10.0
 local output = ''
 while output:find(prompt) == nil
         and clock.monotonic() - start_time < time_quota do
-    output = output .. ph:read({timeout = 1.0})
+    local data = ph:read({timeout = 1.0})
+    if data ~= nil then
+        output = output .. data
+    end
 end
 assert(clock.monotonic() - start_time < time_quota, 'time_quota is violated')
 ph:signal(popen.signal.SIGINT)
@@ -79,7 +82,10 @@ local prompt_name = 'tarantool'
 local expected_output = prompt
 while output:find(expected_output) == nil
         and clock.monotonic() - start_time < time_quota do
-    output = output .. ph:read({timeout = 1.0})
+    local data = ph:read({timeout = 1.0})
+    if data ~= nil then
+        output = output .. data
+    end
 end
 assert(clock.monotonic() - start_time < time_quota, 'time_quota is violated')
 
