@@ -1246,6 +1246,21 @@ return schema.new('instance_config', schema.record({
                                 type = 'string',
                             }),
                         }),
+                        lua_eval = schema.scalar({
+                            type = 'boolean',
+                        }),
+                        lua_call = schema.array({
+                            items = schema.scalar({
+                                type = 'string',
+                                allowed_values = {'all'},
+                            }),
+                        }),
+                        sql = schema.array({
+                            items = schema.scalar({
+                                type = 'string',
+                                allowed_values = {'all'},
+                            }),
+                        }),
                     }),
                 }),
                 -- The given role has all the privileges from
@@ -1295,6 +1310,21 @@ return schema.new('instance_config', schema.record({
                         sequences = schema.array({
                             items = schema.scalar({
                                 type = 'string',
+                            }),
+                        }),
+                        lua_eval = schema.scalar({
+                            type = 'boolean',
+                        }),
+                        lua_call = schema.array({
+                            items = schema.scalar({
+                                type = 'string',
+                                allowed_values = {'all'},
+                            }),
+                        }),
+                        sql = schema.array({
+                            items = schema.scalar({
+                                type = 'string',
+                                allowed_values = {'all'},
                             }),
                         }),
                     }),
