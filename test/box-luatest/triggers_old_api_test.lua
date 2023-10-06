@@ -27,6 +27,7 @@ g.before_all(function()
             {box.ctl.on_election, 'box.ctl.on_election'},
             {box.ctl.on_recovery_state, 'box.ctl.on_recovery_state'},
             {box.ctl.on_schema_init, 'box.ctl.on_schema_init'},
+            {box.ctl.on_shutdown, 'box.ctl.on_shutdown'},
         })
 
         rawset(_G, 'ffi_monotonic_id', 0)

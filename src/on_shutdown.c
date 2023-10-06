@@ -157,6 +157,20 @@ on_shutdown_trigger_fiber_f(va_list ap)
 	return rc;
 }
 
+/**
+ * Runs trigger from event, passed with va_list.
+ */
+static int
+on_shutdown_event_trigger_fiber_f(va_list ap)
+{
+	struct func_adapter *trigger = va_arg(ap, struct func_adapter *);
+	struct func_adapter_ctx ctx;
+	func_adapter_begin(trigger, &ctx);
+	int rc = func_adapter_call(trigger, &ctx);
+	func_adapter_end(trigger, &ctx);
+	return rc;
+}
+
 int
 on_shutdown_run_triggers(void)
 {
@@ -165,11 +179,12 @@ on_shutdown_run_triggers(void)
 	rlist_splice(&triggers, &box_on_shutdown_trigger_list);
 
 	double timeout = on_shutdown_trigger_timeout;
+	struct event *event = box_on_shutdown_event;
 	int rc = 0;
 	struct trigger *trigger;
 	struct region *region = &fiber()->gc;
 	uint32_t region_svp = region_used(region);
-	unsigned trigger_count = 0;
+	unsigned trigger_count = event->trigger_count;
 
 	/* Calculating the total number of triggers. */
 	rlist_foreach_entry(trigger, &triggers, link)
@@ -191,6 +206,7 @@ on_shutdown_run_triggers(void)
 	ev_timer_start(loop(), &timer);
 
 	unsigned current_fiber = 0;
+	char name[FIBER_NAME_INLINE];
 	while (!rlist_empty(&triggers)) {
 		/*
 		 * Since the triggers will not be used later, we can
@@ -198,7 +214,6 @@ on_shutdown_run_triggers(void)
 		 * underlying trigger's removal.
 		 */
 		trigger = rlist_shift_entry(&triggers, struct trigger, link);
-		char name[FIBER_NAME_INLINE];
 		snprintf(name, FIBER_NAME_INLINE,
 			 "trigger_fiber%d", current_fiber);
 		fibers[current_fiber] =
@@ -212,6 +227,31 @@ on_shutdown_run_triggers(void)
 			goto out;
 		}
 	}
+
+	const char *trigger_name = NULL;
+	struct func_adapter *func = NULL;
+	struct event_trigger_iterator it;
+	event_trigger_iterator_create(&it, event);
+	/*
+	 * Since new event triggers can appear, let's run the triggers
+	 * until we've run out of fibers.
+	 */
+	while (event_trigger_iterator_next(&it, &func, &trigger_name) &&
+	       current_fiber < trigger_count) {
+		snprintf(name, FIBER_NAME_INLINE,
+			 "trigger_fiber_%s", trigger_name);
+		fibers[current_fiber] =
+			fiber_new(name, on_shutdown_event_trigger_fiber_f);
+		if (fibers[current_fiber] != NULL) {
+			fiber_set_joinable(fibers[current_fiber], true);
+			fiber_start(fibers[current_fiber], func);
+			current_fiber++;
+		} else {
+			rc = -1;
+			goto out;
+		}
+	}
+	event_trigger_iterator_destroy(&it);
 
 	/*
 	 * Waiting for all triggers completion.
