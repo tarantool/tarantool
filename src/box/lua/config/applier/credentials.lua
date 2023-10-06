@@ -29,6 +29,12 @@ obj_types:
  - 'function'
  - 'sequence'
  - 'universe'
+ - 'lua_eval'
+ - 'lua_call'
+ - 'sql'
+
+Note that 'lua_eval', 'lua_call', 'sql' and 'universe' are special,
+they don't allow obj_name specialisation.
 
 obj_names:
  - mostly user defined strings, provided by config or box
@@ -40,9 +46,6 @@ privs:
  - read
  - write
  - execute
-   - lua_eval
-   - lua_call
-   - sql
  - session
  - usage
  - create
@@ -84,6 +87,9 @@ local function privileges_from_box(privileges)
         ['function'] = {},
         ['sequence'] = {},
         ['universe'] = {},
+        ['lua_eval'] = {},
+        ['lua_call'] = {},
+        ['sql'] = {},
     }
 
     for _, priv in ipairs(privileges) do
@@ -136,6 +142,9 @@ local function privileges_from_config(config_data)
         ['function'] = {},
         ['sequence'] = {},
         ['universe'] = {},
+        ['lua_eval'] = {},
+        ['lua_call'] = {},
+        ['sql'] = {},
     }
 
     for _, priv in ipairs(privileges) do
@@ -143,9 +152,14 @@ local function privileges_from_config(config_data)
             if priv.universe then
                 privileges_add_perm('universe', 'all', perm, intermediate)
             end
+            if priv.lua_eval then
+                privileges_add_perm('lua_eval', 'all', perm, intermediate)
+            end
             privileges_add_perm('space', priv.spaces, perm, intermediate)
             privileges_add_perm('function', priv.functions, perm, intermediate)
             privileges_add_perm('sequence', priv.sequences, perm, intermediate)
+            privileges_add_perm('lua_call', priv.lua_call, perm, intermediate)
+            privileges_add_perm('sql', priv.sql, perm, intermediate)
         end
     end
 
