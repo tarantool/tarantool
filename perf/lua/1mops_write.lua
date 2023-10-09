@@ -28,12 +28,25 @@ local params = require('internal.argparse').parse(arg, {
 
 local test_dir = fio.tempdir()
 
+local function rmtree(s)
+    if (fio.path.is_file(s) or fio.path.is_link(s)) then
+        fio.unlink(s)
+        return
+    end
+    if fio.path.is_dir(s) then
+        for _,i in pairs(fio.listdir(s)) do
+            rmtree(s..'/'..i)
+        end
+        fio.rmdir(s)
+    end
+end
+
 local function exit(res, details)
     if (details ~= nil) then
         print(details)
     end
     if test_dir ~= nil then
-        fio.rmdir(test_dir)
+        rmtree(test_dir)
         test_dir = nil
     end
     os.exit(res)
@@ -66,8 +79,8 @@ if params.help or params.h then
     exit(0)
 end
 
--- turn true to test the qsync
-local test_qsync = params.qsync or false
+-- turn true to test the synchronous replication
+local test_sync = params.sync or false
 
 -- number of operations performed by test
 local num_ops = params.ops or 10000000
@@ -193,7 +206,7 @@ local space
 local done = false
 local err
 
-if (test_qsync) then
+if (test_sync) then
     box.cfg{replication_synchro_quorum = nodes}
     print('# promoting')
     box.ctl.promote()
