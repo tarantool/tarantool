@@ -294,6 +294,7 @@ fiber_start(struct fiber *callee, ...);
  * fiber_start which means no yields.
  *
  * \param f     fiber to set the context for
+ *              if NULL, the current fiber is used
  * \param f_arg context for the fiber function
  */
 API_EXPORT void
@@ -302,6 +303,7 @@ fiber_set_ctx(struct fiber *f, void *f_arg);
 /**
  * Get the context for the fiber which was set via the fiber_set_ctx
  * function. Can be used to avoid calling fiber_start which means no yields.
+ * If \a f is NULL, the current fiber is used.
  *
  * \retval      context for the fiber function set by fiber_set_ctx function
  *
@@ -344,7 +346,8 @@ fiber_set_cancellable(bool yesno);
 
 /**
  * Set fiber to be joinable (false by default).
- * \param fiber to (un)set the joinable property
+ * \param fiber to (un)set the joinable property.
+ *              If set to NULL, the current fiber is used.
  * \param yesno status to set
  */
 API_EXPORT void
@@ -428,6 +431,49 @@ fiber_clock64(void);
  */
 API_EXPORT void
 fiber_reschedule(void);
+
+/**
+ * Set fiber name.
+ * @param fiber Target fiber, if it's NULL the current fiber is used.
+ * @param name A new name of @a fiber.
+ * @param len Length of the string pointed to by @a name.
+ */
+API_EXPORT void
+fiber_set_name_n(struct fiber *fiber, const char *name, uint32_t len);
+
+/**
+ * Get fiber name.
+ * @param fiber Target fiber, if it's NULL the current fiber is used.
+ * @return pointer to a nul-terminated string.
+ */
+API_EXPORT const char *
+fiber_name(const struct fiber *fiber);
+
+/**
+ * Get fiber id.
+ * @param fiber Target fiber, if it's NULL the current fiber is used.
+ */
+API_EXPORT uint64_t
+fiber_id(const struct fiber *fiber);
+
+/**
+ * Get number of context switches of the given fiber.
+ * @param fiber Target fiber, if it's NULL the current fiber is used.
+ */
+API_EXPORT uint64_t
+fiber_csw(const struct fiber *fiber);
+
+/**
+ * Get a pointer to a live fiber in the current cord by the given fiber id,
+ * which may be used for getting other info about the fiber (name, csw, etc.).
+ *
+ * @param fid Target fiber id.
+ * @return fiber on success, NULL if fiber was not found.
+ *
+ * @sa fiber_name, fiber_csw, fiber_id
+ */
+API_EXPORT struct fiber *
+fiber_find(uint64_t fid);
 
 /**
  * box region allocator
@@ -957,13 +1003,10 @@ fiber_signal_reset(void);
  * @param fiber Fiber to set name for.
  * @param name A new name of @a fiber.
  */
-void
-fiber_set_name(struct fiber *fiber, const char *name);
-
-static inline const char *
-fiber_name(struct fiber *f)
+static inline void
+fiber_set_name(struct fiber *fiber, const char *name)
 {
-	return f->name;
+	fiber_set_name_n(fiber, name, strlen(name));
 }
 
 /** Helper function to check if slice is valid. */
@@ -1101,9 +1144,6 @@ fiber_destroy_all(struct cord *cord);
 
 void
 fiber_call(struct fiber *callee);
-
-struct fiber *
-fiber_find(uint64_t fid);
 
 void
 fiber_schedule_cb(ev_loop * /* loop */, ev_watcher *watcher, int revents);

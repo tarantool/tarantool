@@ -328,6 +328,12 @@ fiber_set_ctx_test_func(va_list va)
 static int
 test_fiber_set_ctx(lua_State *L)
 {
+	/* Set context for the current fiber. */
+	fiber_set_ctx(NULL, (void *)0xCAFEBABEDEADF00D);
+	uint64_t ctx = (uint64_t)fiber_get_ctx(NULL);
+	fail_unless(ctx == 0xCAFEBABEDEADF00D);
+
+	/* Set context for a child fiber. */
 	struct fiber *fiber = fiber_new("test fiber", fiber_set_ctx_test_func);
 	fiber_set_joinable(fiber, true);
 	char data[3] = { '?', '!', '\0' };
@@ -3298,6 +3304,57 @@ test_box_iproto_override_reset(struct lua_State *L)
 
 /* }}} Helpers for `box_iproto_override` Lua/C API test cases */
 
+static int
+fiber_basic_api_func(va_list va)
+{
+	(void)va;
+	const char *name = "oppenheimer";
+	/* fiber_set_joinable now works with NULL. (Consistency!) */
+	fiber_set_joinable(NULL, true);
+	fiber_set_name_n(fiber_self(), name, strlen(name));
+	return 0;
+}
+
+static int
+test_fiber_basic_api(lua_State *L)
+{
+	uint64_t self_id = fiber_id(NULL);
+	struct fiber *t = fiber_find(self_id);
+	fail_unless(fiber_self() == t);
+
+	/* Set/get name of self works. */
+	const char *name = "parent";
+	fiber_set_name_n(NULL, name, strlen(name));
+	string_check_equal(fiber_name(NULL), name);
+
+	/* No such fiber. */
+	t = fiber_find((uint64_t)-1);
+	fail_unless(t == NULL);
+
+	/* Fiber is created and is immediately accessible via fiber_find. */
+	struct fiber *fiber = fiber_new("barbie", fiber_basic_api_func);
+	string_check_equal(fiber_name(fiber), "barbie");
+	uint64_t f_id = fiber_id(fiber);
+	t = fiber_find(f_id);
+	fail_unless(fiber == t);
+
+	/* Check that csw is increased because fiber_start yields. */
+	uint64_t csw0_parent = fiber_csw(NULL);
+	uint64_t csw0_child = fiber_csw(fiber);
+	fiber_start(fiber);
+	uint64_t csw1_parent = fiber_csw(NULL);
+	uint64_t csw1_child = fiber_csw(fiber);
+	fail_unless(csw1_parent == csw0_parent + 1);
+	fail_unless(csw1_child == csw0_child + 1);
+
+	string_check_equal(fiber_name(fiber), "oppenheimer");
+	/* At this point fiber is recycled. */
+	fiber_join(fiber);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -3316,6 +3373,7 @@ luaopen_module_api(lua_State *L)
 		{"test_toint64", test_toint64 },
 		{"test_fiber", test_fiber },
 		{"test_fiber_set_ctx", test_fiber_set_ctx },
+		{"test_fiber_basic_api", test_fiber_basic_api },
 		{"pushcdata", test_pushcdata },
 		{"checkcdata", test_checkcdata },
 		{"test_clock", test_clock },

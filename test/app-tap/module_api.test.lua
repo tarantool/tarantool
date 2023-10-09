@@ -671,7 +671,7 @@ local function test_box_ibuf(test, module)
 end
 
 require('tap').test("module_api", function(test)
-    test:plan(49)
+    test:plan(50)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
