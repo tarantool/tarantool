@@ -129,6 +129,12 @@ jobs:
     with:
       artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
 
+  crud:
+    needs: tarantool
+    uses: tarantool/crud/.github/workflows/reusable_test.yml@master
+    with:
+      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+
   ddl:
     needs: tarantool
     uses: tarantool/ddl/.github/workflows/reusable_test.yml@master
