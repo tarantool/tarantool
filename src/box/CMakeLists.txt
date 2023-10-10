@@ -77,7 +77,6 @@ set(sql_sources
     sql/alter.c
     sql/cursor.c
     sql/build.c
-    sql/callback.c
     sql/delete.c
     sql/expr.c
     sql/func.c

@@ -3175,6 +3175,13 @@ uint32_t
 sql_coll_id_by_token(const struct Token *name);
 
 /**
+ * Return the ID of the collation with the name defined by the expression.
+ * Return UINT32_MAX if the field was not found.
+ */
+uint32_t
+sql_coll_id_by_expr(const struct Expr *expr);
+
+/**
  * Return the tuple foreign key constraint with the name defined by the token.
  * Return NULL if the tuple foreign key constraint was not found.
  */
@@ -4090,17 +4097,6 @@ int sqlResolveOrderGroupBy(Parse *, Select *, ExprList *, const char *);
  */
 char *
 rename_trigger(char const *sql_stmt, char const *table_name, bool *is_quoted);
-
-/**
- * Find a collation by name. Set error in @a parser if not found.
- * @param parser Parser.
- * @param name Collation name.
- * @param[out] Collation identifier.
- *
- * @retval Collation object. NULL on error or not found.
- */
-struct coll *
-sql_get_coll_seq(Parse *parser, const char *name, uint32_t *coll_id);
 
 /**
  * This function returns average size of tuple in given index.
