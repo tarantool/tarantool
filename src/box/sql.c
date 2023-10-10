@@ -1730,7 +1730,9 @@ sql_coll_id_by_token(const struct Token *name)
 
 /**
  * Return a constraint with the name specified by the token and the
- * specified type. Return NULL if the constraint was not found.
+ * specified type. A second lookup will be performed if the constraint is not
+ * found on the first try and token is not start with double quote. Return NULL
+ * if the constraint was not found.
  */
 static const struct tuple_constraint_def *
 sql_constraint_by_token(const struct tuple_constraint_def *cdefs,
@@ -1746,6 +1748,17 @@ sql_constraint_by_token(const struct tuple_constraint_def *cdefs,
 		}
 	}
 	sql_xfree(name_str);
+	if (name->z[0] == '"')
+		return NULL;
+	char *old_name_str = sql_legacy_name_new(name->z, name->n);
+	for (uint32_t i = 0; i < count; ++i) {
+		if (strcmp(cdefs[i].name, old_name_str) == 0 &&
+		    cdefs[i].type == type) {
+			sql_xfree(old_name_str);
+			return &cdefs[i];
+		}
+	}
+	sql_xfree(old_name_str);
 	return NULL;
 }
 

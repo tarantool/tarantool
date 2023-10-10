@@ -3191,29 +3191,37 @@ sql_coll_id_by_expr(const struct Expr *expr);
 
 /**
  * Return the tuple foreign key constraint with the name defined by the token.
- * Return NULL if the tuple foreign key constraint was not found.
+ * A second lookup will be performed if the constraint is not found on the first
+ * try and token is not start with double quote. Return NULL if the tuple
+ * foreign key constraint was not found.
  */
 const struct tuple_constraint_def *
 sql_tuple_fk_by_token(const struct space *space, const struct Token *name);
 
 /**
- * Return the tuple check constraint with the name defined by the token. Return
- * NULL if the tuple check constraint was not found.
+ * Return the tuple check constraint with the name defined by the token. A
+ * second lookup will be performed if the constraint is not found on the first
+ * try and token is not start with double quote. Return NULL if the tuple check
+ * constraint was not found.
  */
 const struct tuple_constraint_def *
 sql_tuple_ck_by_token(const struct space *space, const struct Token *name);
 
 /**
  * Return the field foreign key constraint with the name defined by the token.
- * Return NULL if the field foreign key constraint was not found.
+ * A second lookup will be performed if the constraint is not found on the first
+ * try and token is not start with double quote. Return NULL if the field
+ * foreign key constraint was not found.
  */
 const struct tuple_constraint_def *
 sql_field_fk_by_token(const struct space *space, uint32_t fieldno,
 		      const struct Token *name);
 
 /**
- * Return the field check constraint with the name defined by the token. Return
- * NULL if the field check constraint was not found.
+ * Return the field check constraint with the name defined by the token. A
+ * second lookup will be performed if the constraint is not found on the first
+ * try and token is not start with double quote. Return NULL if the field check
+ * constraint was not found.
  */
 const struct tuple_constraint_def *
 sql_field_ck_by_token(const struct space *space, uint32_t fieldno,
