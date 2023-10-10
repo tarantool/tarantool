@@ -5436,3 +5436,9 @@ sqlClearTempRegCache(Parse * pParse)
 	pParse->nRangeReg = 0;
 }
 
+uint32_t
+sql_fieldno_by_expr(const struct space *space, const struct Expr *expr)
+{
+	assert(expr->op == TK_ID);
+	return sql_space_fieldno(space, expr->u.zToken);
+}
