@@ -291,9 +291,15 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 		}
 		if (op == TK_COLLATE ||
 		    (op == TK_REGISTER && p->op2 == TK_COLLATE)) {
-			*coll = sql_get_coll_seq(parse, p->u.zToken, coll_id);
-			if (*coll == NULL)
+			uint32_t id = sql_coll_id_by_expr(p);
+			if (id == UINT32_MAX) {
+				diag_set(ClientError, ER_NO_SUCH_COLLATION,
+					 p->u.zToken);
+				parse->is_aborted = true;
 				return -1;
+			}
+			*coll_id = id;
+			*coll = coll_by_id(id)->coll;
 			*is_explicit_coll = true;
 			break;
 		}
@@ -5447,4 +5453,15 @@ uint32_t
 sql_fieldno_by_item(const struct space *space, const struct ExprList_item *item)
 {
 	return sql_space_fieldno(space, item->zName);
+}
+
+uint32_t
+sql_coll_id_by_expr(const struct Expr *expr)
+{
+	assert(expr->op == TK_COLLATE);
+	const char *name = expr->u.zToken;
+	struct coll_id *coll_id = coll_by_name(name, strlen(name));
+	if (coll_id != NULL)
+		return coll_id->id;
+	return UINT32_MAX;
 }

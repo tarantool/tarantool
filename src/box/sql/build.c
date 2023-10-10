@@ -2449,9 +2449,12 @@ index_fill_def(struct Parse *parse, struct index *index,
 		uint32_t fieldno = column_expr->iColumn;
 		uint32_t coll_id;
 		if (expr->op == TK_COLLATE) {
-			if (sql_get_coll_seq(parse, expr->u.zToken,
-					     &coll_id) == NULL)
+			coll_id = sql_coll_id_by_expr(expr);
+			if (coll_id == UINT32_MAX) {
+				diag_set(ClientError, ER_NO_SUCH_COLLATION,
+					 expr->u.zToken);
 				goto tnt_error;
+			}
 		} else {
 			sql_column_collation(space_def, fieldno, &coll_id);
 		}
