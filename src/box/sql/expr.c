@@ -1056,6 +1056,8 @@ sql_expr_new_dequoted(int op, const struct Token *token)
 	memcpy(e->u.zToken, token->z, token->n);
 	e->u.zToken[token->n] = '\0';
 	sqlDequote(e->u.zToken);
+	if (op == TK_ID || op == TK_COLLATE || op == TK_FUNCTION)
+		e->flags |= token->z[0] != '"' ? EP_Lookup2 : 0;
 	return e;
 }
 
@@ -5451,6 +5453,14 @@ sql_coll_id_by_expr(const struct Expr *expr)
 	assert(expr->op == TK_COLLATE);
 	const char *name = expr->u.zToken;
 	struct coll_id *coll_id = coll_by_name(name, strlen(name));
+	if (coll_id != NULL)
+		return coll_id->id;
+	if ((expr->flags & EP_Lookup2) == 0)
+		return UINT32_MAX;
+
+	char *old_name_str = sql_legacy_name_new0(expr->u.zToken);
+	coll_id = coll_by_name(old_name_str, strlen(old_name_str));
+	sql_xfree(old_name_str);
 	if (coll_id != NULL)
 		return coll_id->id;
 	return UINT32_MAX;

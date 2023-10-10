@@ -87,6 +87,19 @@ g.test_collation_name = function()
         local sql = [[SELECT UPPER('asd' COLLATE qwE);]]
         t.assert_equals(box.execute(sql).rows, {{'ASD'}})
         box.space._collation:delete({coll.id})
+
+        coll_def = {'ZXC', 1, 'BINARY', '', map}
+        coll = box.space._collation:auto_increment(coll_def)
+        t.assert(coll ~= nil)
+        t.assert_equals(coll.name, 'ZXC')
+        sql = [[SELECT UPPER('asd' COLLATE zXc);]]
+        t.assert_equals(box.execute(sql).rows, {{'ASD'}})
+
+        sql = [[CREATE TABLE t(s STRING PRIMARY KEY COLLATE Zxc);]]
+        t.assert_equals(box.execute(sql), {row_count = 1})
+        t.assert_equals(box.space.t:format()[1].collation, coll.id)
+        box.space.t:drop()
+        box.space._collation:delete({coll.id})
     end)
 end
 

@@ -940,6 +940,8 @@ idlist(A) ::= nm(Y). {
     memcpy(p->u.zToken, t.z, t.n);
     p->u.zToken[t.n] = '\0';
     sqlDequote(p->u.zToken);
+    if (op == TK_ID || op == TK_COLLATE || op == TK_FUNCTION)
+      p->flags |= t.z[0] != '"' ? EP_Lookup2 : 0;
 #if SQL_MAX_EXPR_DEPTH>0
     p->nHeight = 1;
 #endif  

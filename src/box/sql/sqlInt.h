@@ -1415,6 +1415,8 @@ struct Expr {
 #define EP_Error     0x000008	/* Expression contains one or more errors */
 #define EP_Distinct  0x000010	/* Aggregate function with DISTINCT keyword */
 #define EP_VarSelect 0x000020	/* pSelect is correlated, not constant */
+/** Second lookup could be performed for the ID. */
+#define EP_Lookup2   0x000040
 #define EP_Collate   0x000100	/* Tree contains a TK_COLLATE operator */
 #define EP_IntValue  0x000400	/* Integer value contained in u.iValue */
 #define EP_xIsSelect 0x000800	/* x.pSelect is valid (otherwise x.pList is) */
@@ -3152,15 +3154,19 @@ uint32_t
 sql_fieldno_by_item(const struct space *space, const struct ExprList_item *it);
 
 /**
- * Return the ID of the collation with the name defined by the token. Return
- * UINT32_MAX if the field was not found.
+ * Return the ID of the collation with the name defined by the token. A second
+ * lookup will be performed if the collation is not found on the first try and
+ * token is not start with double quote. Return UINT32_MAX if the field was not
+ * found.
  */
 uint32_t
 sql_coll_id_by_token(const struct Token *name);
 
 /**
- * Return the ID of the collation with the name defined by the expression.
- * Return UINT32_MAX if the field was not found.
+ * Return the ID of the collation with the name defined by the expression. A
+ * second lookup will be performed if the collation is not found on the first
+ * try and EP_Lookup2 flag is set. Return UINT32_MAX if the collation was not
+ * found.
  */
 uint32_t
 sql_coll_id_by_expr(const struct Expr *expr);
