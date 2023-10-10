@@ -2675,7 +2675,7 @@ sql_show_create_table(uint32_t space_id, struct Mem *ret, struct Mem *err);
  * the rest of fields.
  */
 bool
-sql_space_column_is_in_pk(struct space *space, uint32_t);
+sql_space_column_is_in_pk(const struct space *space, uint32_t);
 
 /**
  * Given an expression list (which is really the list of expressions

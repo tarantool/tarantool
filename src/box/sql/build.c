@@ -114,13 +114,13 @@ sql_finish_coding(struct Parse *parse_context)
 }
 
 bool
-sql_space_column_is_in_pk(struct space *space, uint32_t column)
+sql_space_column_is_in_pk(const struct space *space, uint32_t column)
 {
 	if (space->def->opts.is_view)
 		return false;
-	struct index *primary_idx = space_index(space, 0);
+	const struct index *primary_idx = space->index[0];
 	assert(primary_idx != NULL);
-	struct key_def *key_def = primary_idx->def->key_def;
+	const struct key_def *key_def = primary_idx->def->key_def;
 	uint64_t pk_mask = key_def->column_mask;
 	if (column < 63)
 		return (pk_mask & (((uint64_t) 1) << column)) != 0;
