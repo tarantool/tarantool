@@ -159,6 +159,13 @@ set(tuple_sources
     identifier.c
 )
 
+# The comparators extensively use inlining so we let gcc inline functions until
+# the compilation unit growth reaches 100% (the default is 30%).
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set_source_files_properties(tuple_compare.cc PROPERTIES
+                                COMPILE_FLAGS "--param inline-unit-growth=100")
+endif()
+
 if(ENABLE_TUPLE_COMPRESSION)
     list(APPEND tuple_sources ${TUPLE_COMPRESSION_BOX_SOURCES})
 endif()
