@@ -3534,37 +3534,26 @@ sql_setting_set(struct Parse *parse_context, struct Token *name,
 void
 sql_emit_show_create_table_one(struct Parse *parse, struct Token *name)
 {
+	const struct space *space = sql_space_by_token(name);
+	if (space == NULL) {
+		const char *name_str = sql_tt_name_from_token(name);
+		diag_set(ClientError, ER_NO_SUCH_SPACE, name_str);
+		parse->is_aborted = true;
+		return;
+	}
+
 	struct Vdbe *v = sqlGetVdbe(parse);
-	char *space_name = sql_name_from_token(name);
 	sqlVdbeSetNumCols(v, 2);
 	vdbe_metadata_set_col_name(v, 0, "STATEMENTS");
 	vdbe_metadata_set_col_type(v, 0, "array");
 	vdbe_metadata_set_col_name(v, 1, "ERRORS");
 	vdbe_metadata_set_col_type(v, 1, "array");
-
-	int cursor = parse->nTab++;
-	int space_reg = ++parse->nMem;
-	int name_reg = ++parse->nMem;
-	sqlVdbeAddOp2(v, OP_OpenSpace, space_reg, BOX_VSPACE_ID);
-	sqlVdbeAddOp3(v, OP_IteratorOpen, cursor, 2, space_reg);
-	sqlVdbeChangeP5(v, OPFLAG_SEEKEQ);
-	sqlVdbeAddOp4(v, OP_String8, 0, name_reg, 0, space_name, P4_DYNAMIC);
-	int addr1 = sqlVdbeAddOp4Int(v, OP_SeekGE, cursor, 0, name_reg, 1);
-	int addr2 = sqlVdbeAddOp4Int(v, OP_IdxGT, cursor, 0, name_reg, 1);
 	int space_id_reg = ++parse->nMem;
-	sqlVdbeAddOp3(v, OP_Column, cursor, BOX_SPACE_FIELD_ID, space_id_reg);
+	sqlVdbeAddOp2(v, OP_Integer, space->def->id, space_id_reg);
 	int result_reg = ++parse->nMem;
 	++parse->nMem;
 	sqlVdbeAddOp2(v, OP_ShowCreateTable, space_id_reg, result_reg);
 	sqlVdbeAddOp2(v, OP_ResultRow, result_reg, 2);
-	int addr3 = sqlVdbeAddOp0(v, OP_Goto);
-	sqlVdbeJumpHere(v, addr1);
-	sqlVdbeJumpHere(v, addr2);
-
-	char *err = sqlMPrintf(tnt_errcode_desc(ER_NO_SUCH_SPACE), space_name);
-	sqlVdbeAddOp4(v, OP_SetDiag, ER_NO_SUCH_SPACE, 0, 0, err, P4_DYNAMIC);
-	sqlVdbeAddOp2(v, OP_Halt, -1, ON_CONFLICT_ACTION_ABORT);
-	sqlVdbeJumpHere(v, addr3);
 }
 
 /** Emit VDBE instructions for "SHOW CREATE TABLE;" statement. */
