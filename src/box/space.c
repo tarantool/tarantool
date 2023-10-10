@@ -1417,6 +1417,13 @@ generic_space_prepare_alter(struct space *old_space, struct space *new_space)
 	return 0;
 }
 
+void
+generic_space_finish_alter(struct space *old_space, struct space *new_space)
+{
+	(void)old_space;
+	(void)new_space;
+}
+
 int
 generic_space_prepare_upgrade(struct space *old_space, struct space *new_space)
 {

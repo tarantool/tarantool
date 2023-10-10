@@ -145,6 +145,12 @@ struct space_vtab {
 	 */
 	int (*prepare_alter)(struct space *old_space,
 			     struct space *new_space);
+	/**
+	 * Notify the engine after altering a space and before replacing
+	 * old_space with new_space in the space cache.
+	 */
+	void (*finish_alter)(struct space *old_space,
+			     struct space *new_space);
 	/** Prepares a space for online upgrade on alter. */
 	int (*prepare_upgrade)(struct space *old_space,
 			       struct space *new_space);
@@ -658,6 +664,13 @@ space_prepare_alter(struct space *old_space, struct space *new_space)
 	return new_space->vtab->prepare_alter(old_space, new_space);
 }
 
+static inline void
+space_finish_alter(struct space *old_space, struct space *new_space)
+{
+	assert(old_space->vtab == new_space->vtab);
+	new_space->vtab->finish_alter(old_space, new_space);
+}
+
 static inline int
 space_prepare_upgrade(struct space *old_space, struct space *new_space)
 {
@@ -771,6 +784,7 @@ int generic_space_check_format(struct space *, struct tuple_format *);
 int generic_space_build_index(struct space *, struct index *,
 			      struct tuple_format *, bool);
 int generic_space_prepare_alter(struct space *, struct space *);
+void generic_space_finish_alter(struct space *, struct space *);
 int generic_space_prepare_upgrade(struct space *old_space,
 				  struct space *new_space);
 void generic_space_invalidate(struct space *);
