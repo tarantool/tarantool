@@ -1593,6 +1593,8 @@ struct SrcList {
 	struct SrcList_item {
 		char *zName;	/* Name of the table */
 		char *zAlias;	/* The "B" part of a "A AS B" phrase.  zName is the "A" */
+		/** Normalized name for the second lookup. */
+		char *legacy_name;
 		/** A space corresponding to zName */
 		struct space *space;
 		Select *pSelect;	/* A SELECT statement used in place of a table name */
@@ -3091,15 +3093,17 @@ sql_tt_name_from_token(const struct Token *t)
 }
 
 /**
- * Return space with name defined by the token. Return NULL if the space was not
- * found.
+ * Return space with name defined by the token. A second lookup will be
+ * performed if the space is not found on the first try and token is not start
+ * with double quote. Return NULL if the space was not found.
  */
 const struct space *
 sql_space_by_token(const struct Token *name);
 
 /**
- * Return space with name defined by the element of struct SrcList. Return NULL
- * if the space was not found.
+ * Return space with name defined by the element of struct SrcList. A second
+ * lookup will be performed if the space is not found on the first try and field
+ * legacy_name of the src is not NULL. Return NULL if the space was not found.
  */
 const struct space *
 sql_space_by_src(const struct SrcList_item *src);

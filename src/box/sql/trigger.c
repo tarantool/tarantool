@@ -82,6 +82,11 @@ sql_trigger_begin(struct Parse *parse)
 	const char *table_name = alter_def->entity_name->a[0].zName;
 	uint32_t space_id = box_space_id_by_name(table_name,
 						 strlen(table_name));
+	if (space_id == BOX_ID_NIL &&
+	    alter_def->entity_name->a[0].legacy_name != NULL) {
+		char *old_name = alter_def->entity_name->a[0].legacy_name;
+		space_id = box_space_id_by_name(old_name, strlen(old_name));
+	}
 	if (space_id == BOX_ID_NIL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
 		goto set_tarantool_error_and_cleanup;

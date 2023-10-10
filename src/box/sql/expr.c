@@ -1659,6 +1659,7 @@ sqlSrcListDup(struct SrcList *p, int flags)
 		struct SrcList_item *pOldItem = &p->a[i];
 		pNewItem->zName = sql_xstrdup(pOldItem->zName);
 		pNewItem->zAlias = sql_xstrdup(pOldItem->zAlias);
+		pNewItem->legacy_name = sql_xstrdup(pOldItem->legacy_name);
 		pNewItem->fg = pOldItem->fg;
 		pNewItem->iCursor = pOldItem->iCursor;
 		pNewItem->addrFillSub = pOldItem->addrFillSub;

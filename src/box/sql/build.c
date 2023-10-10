@@ -1822,8 +1822,16 @@ sql_create_foreign_key(struct Parse *parse_context)
 	 * self-referenced, but in this case parent (which is
 	 * also child) table will definitely exist.
 	 */
-	is_self_referenced = !is_alter_add_constr &&
-			     strcmp(parent_name, space->def->name) == 0;
+	if (!is_alter_add_constr) {
+		const char *space_name = space->def->name;
+		is_self_referenced = strcmp(parent_name, space_name) == 0;
+		if (!is_self_referenced && parent->z[0] != '"') {
+			char *old_name = sql_legacy_name_new(parent->z,
+							     parent->n);
+			is_self_referenced = strcmp(old_name, space_name) == 0;
+			sql_xfree(old_name);
+		}
+	}
 	const struct space *parent_space = sql_space_by_token(parent);
 	if (parent_space == NULL && !is_self_referenced) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, parent_name);
@@ -3003,8 +3011,13 @@ sql_src_list_append(struct SrcList *list, struct Token *name_token)
 		list = new_list;
 	}
 	struct SrcList_item *item = &list->a[list->nSrc - 1];
-	if (name_token != NULL)
+	if (name_token != NULL) {
 		item->zName = sql_name_from_token(name_token);
+		if (name_token->z[0] != '"') {
+			item->legacy_name = sql_legacy_name_new(name_token->z,
+								name_token->n);
+		}
+	}
 	return list;
 }
 
@@ -3036,6 +3049,7 @@ sqlSrcListDelete(struct SrcList *pList)
 	for (pItem = pList->a, i = 0; i < pList->nSrc; i++, pItem++) {
 		sql_xfree(pItem->zName);
 		sql_xfree(pItem->zAlias);
+		sql_xfree(pItem->legacy_name);
 		if (pItem->fg.isIndexedBy)
 			sql_xfree(pItem->u1.zIndexedBy);
 		if (pItem->fg.isTabFunc)
