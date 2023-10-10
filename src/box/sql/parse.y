@@ -1486,7 +1486,7 @@ cmd ::= PRAGMA nm(X).                        {
 cmd ::= PRAGMA nm(X) LP nm(Y) RP.         {
     sqlPragma(pParse,&X,&Y,0);
 }
-cmd ::= PRAGMA nm(X) LP nm(Z) DOT nm(Y) RP.  {
+cmd ::= PRAGMA nm(X) LP nm(Y) DOT nm(Z) RP.  {
     sqlPragma(pParse,&X,&Y,&Z);
 }
 cmd ::= FUNCTION_KW(T) expr(E). {
