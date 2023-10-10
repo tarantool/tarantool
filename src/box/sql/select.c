@@ -863,6 +863,8 @@ sqlProcessJoin(Parse * pParse, Select * p)
 			pRight->pOn = 0;
 		}
 
+		if (pRight->pUsing == NULL)
+			continue;
 		/* Create extra terms on the WHERE clause for each column named
 		 * in the USING clause.  Example: If the two tables to be joined are
 		 * A and B and the USING clause names X, Y, and Z, then add this
@@ -870,32 +872,30 @@ sqlProcessJoin(Parse * pParse, Select * p)
 		 * Report an error if any column mentioned in the USING clause is
 		 * not contained in both tables to be joined.
 		 */
-		if (pRight->pUsing) {
-			const char *err = "cannot join using column %s - "\
-					  "column not present in both tables";
-			IdList *pList = pRight->pUsing;
-			for (j = 0; j < pList->nId; j++) {
-				char *zName;	/* Name of the term in the USING clause */
-				int iLeft;	/* Table on the left with matching column name */
-				int iLeftCol;	/* Column number of matching column on the left */
-				int iRightCol;	/* Column number of matching column on the right */
-
-				zName = pList->a[j].zName;
-				iRightCol = columnIndex(right_space->def, zName);
-				if (iRightCol < 0
-				    || !tableAndColumnIndex(pSrc, i + 1, zName,
-							    &iLeft, &iLeftCol)
-				    ) {
-					err = tt_sprintf(err, zName);
-					diag_set(ClientError,
-						 ER_SQL_PARSER_GENERIC, err);
-					pParse->is_aborted = true;
-					return 1;
-				}
-				addWhereTerm(pParse, pSrc, iLeft, iLeftCol,
-					     i + 1, iRightCol, isOuter,
-					     &p->pWhere);
+		for (int id = 0; id < pRight->pUsing->nId; ++id) {
+			struct IdList_item *item = &pRight->pUsing->a[id];
+			uint32_t fieldno_right = sql_fieldno_by_id(right_space,
+								   item);
+			uint32_t fieldno_left = UINT32_MAX;
+			int n;
+			for (n = 0; n <= i; ++n) {
+				const struct space *space = pSrc->a[n].space;
+				fieldno_left = sql_fieldno_by_id(space, item);
+				if (fieldno_left != UINT32_MAX)
+					break;
 			}
+			if (fieldno_left == UINT32_MAX ||
+			    fieldno_right == UINT32_MAX) {
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 tt_sprintf("cannot join using column "
+						    "%s - column not present "
+						    "in both tables",
+						    item->zName));
+				pParse->is_aborted = true;
+				return 1;
+			}
+			addWhereTerm(pParse, pSrc, n, fieldno_left, i + 1,
+				     fieldno_right, isOuter, &p->pWhere);
 		}
 	}
 	return 0;

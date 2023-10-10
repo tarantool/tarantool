@@ -3119,6 +3119,13 @@ const struct space *
 sql_space_by_src(const struct SrcList_item *src);
 
 /**
+ * Return the fieldno of the field with the given name. Return UINT32_MAX if the
+ * field was not found.
+ */
+uint32_t
+sql_space_fieldno(const struct space *space, const char *name);
+
+/**
  * Return id of index with the name defined by the token. Return UINT32_MAX if
  * the index was not found.
  */
@@ -3138,6 +3145,13 @@ sql_index_id_by_src(const struct SrcList_item *src);
  */
 uint32_t
 sql_fieldno_by_token(const struct space *space, const struct Token *name);
+
+/**
+ * Return the fieldno of the field with the name defined by the element of
+ * IdList. Return UINT32_MAX if the field was not found.
+ */
+uint32_t
+sql_fieldno_by_id(const struct space *space, const struct IdList_item *id);
 
 /**
  * Return the tuple foreign key constraint with the name defined by the token.
