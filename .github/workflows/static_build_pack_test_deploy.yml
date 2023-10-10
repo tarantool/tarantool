@@ -157,10 +157,12 @@ jobs:
 
       - name: Run tests
         run: |
+          # Tarantool packages don't provide `tarantoolctl` since series 3.
           ./test-run.py \
             --force \
             --builddir ../build \
-            --executable /usr/bin/tarantool
+            --executable /usr/bin/tarantool \
+            --exclude app-tap/tarantoolctl.test.lua
         working-directory: test
 
       - name: Send VK Teams message on failure
