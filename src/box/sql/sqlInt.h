@@ -3168,6 +3168,13 @@ uint32_t
 sql_fieldno_by_item(const struct space *space, const struct ExprList_item *it);
 
 /**
+ * Return the ID of the collation with the name defined by the token. Return
+ * UINT32_MAX if the field was not found.
+ */
+uint32_t
+sql_coll_id_by_token(const struct Token *name);
+
+/**
  * Return the tuple foreign key constraint with the name defined by the token.
  * Return NULL if the tuple foreign key constraint was not found.
  */

@@ -57,6 +57,7 @@
 #include "box/tuple_constraint_def.h"
 #include "mp_util.h"
 #include "tweaks.h"
+#include "coll_id_cache.h"
 
 static sql *db = NULL;
 
@@ -1687,6 +1688,17 @@ uint32_t
 sql_fieldno_by_id(const struct space *space, const struct IdList_item *id)
 {
 	return sql_space_fieldno(space, id->zName);
+}
+
+uint32_t
+sql_coll_id_by_token(const struct Token *name)
+{
+	char *name_str = sql_name_from_token(name);
+	struct coll_id *coll_id = coll_by_name(name_str, strlen(name_str));
+	sql_xfree(name_str);
+	if (coll_id != NULL)
+		return coll_id->id;
+	return UINT32_MAX;
 }
 
 /**

@@ -738,12 +738,13 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 void
 sqlAddCollateType(Parse * pParse, Token * pToken)
 {
-	char *coll_name = sql_name_from_token(pToken);
-	uint32_t coll_id;
-	struct coll *coll = sql_get_coll_seq(pParse, coll_name, &coll_id);
-	sql_xfree(coll_name);
-	if (coll == NULL)
+	uint32_t coll_id = sql_coll_id_by_token(pToken);
+	if (coll_id == UINT32_MAX) {
+		diag_set(ClientError, ER_NO_SUCH_COLLATION,
+			 sql_tt_name_from_token(pToken));
+		pParse->is_aborted = true;
 		return;
+	}
 
 	struct space *space = pParse->create_column_def.space;
 	assert(space != NULL);
