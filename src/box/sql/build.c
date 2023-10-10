@@ -3344,24 +3344,20 @@ int
 sql_fieldno_by_name(struct Parse *parse_context, struct Expr *field_name,
 		    uint32_t *fieldno)
 {
-	struct space_def *def = parse_context->create_table_def.new_space->def;
+	const struct space *space = parse_context->create_table_def.new_space;
 	struct Expr *name = sqlExprSkipCollate(field_name);
 	if (name->op != TK_ID) {
 		diag_set(ClientError, ER_INDEX_DEF_UNSUPPORTED, "Expressions");
 		parse_context->is_aborted = true;
 		return -1;
 	}
-	uint32_t i;
-	for (i = 0; i < def->field_count; ++i) {
-		if (strcmp(def->fields[i].name, name->u.zToken) == 0)
-			break;
-	}
-	if (i == def->field_count) {
+	uint32_t id = sql_fieldno_by_expr(space, name);
+	if (id == UINT32_MAX) {
 		diag_set(ClientError, ER_SQL_CANT_RESOLVE_FIELD, name->u.zToken);
 		parse_context->is_aborted = true;
 		return -1;
 	}
-	*fieldno = i;
+	*fieldno = id;
 	return 0;
 }
 
