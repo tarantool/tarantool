@@ -274,6 +274,13 @@ g.test_indexed_by = function()
         local _, err = box.execute([[SELECT * FROM Tab INDEXED BY Four;]])
         t.assert(err == nil);
         box.space.Tab:drop()
+
+        -- Make sure index name is looked up twice in INDEXED BY clause.
+        box.execute([[CREATE TABLE ASD(QWE INT PRIMARY KEY, ZXC INT,
+                      CONSTRAINT RTY UNIQUE (qwe, zxc));]])
+        _, err = box.execute([[SELECT * FROM asd INDEXED BY rty;]])
+        t.assert(err == nil);
+        box.space.ASD:drop()
     end)
 end
 
@@ -390,11 +397,12 @@ g.test_drop_index = function()
         t.assert(box.space.Tab.index.In1 == nil)
         box.space.Tab:drop()
 
-        -- Make sure table name is looked up twice in DROP INDEX.
+        -- Make sure table name and index name are looked up twice in
+        -- DROP INDEX.
         box.execute([[CREATE TABLE ASD(PK INT PRIMARY KEY, QWE INT, ZXC INT);]])
         box.execute([[CREATE INDEX IND ON aSd(ZXC, QWE);]])
         t.assert(box.space.ASD.index.IND ~= nil)
-        sql = [[DROP INDEX IND ON asD;]]
+        sql = [[DROP INDEX iNd ON asD;]]
         t.assert_equals(box.execute(sql), {row_count = 1})
         t.assert(box.space.ASD.index.IND == nil)
         box.space.ASD:drop()
@@ -411,12 +419,12 @@ g.test_pragma = function()
         t.assert_equals(box.execute([[PRAGMA index_info(Tab.In1);]]).rows, exp)
         box.space.Tab:drop()
 
-        -- Make sure table name is looked up twice in PRAGMA.
+        -- Make sure table name and index name are looked up twice in PRAGMA.
         box.execute([[CREATE TABLE ASD(PK INT PRIMARY KEY, QWE INT, ZXC INT);]])
         box.execute([[CREATE INDEX IND ON asD(ZXC, QWE);]])
         local exp = {{0, 2, 'ZXC', 0, 'BINARY', 'integer'},
                      {1, 1, 'QWE', 0, 'BINARY', 'integer'}}
-        t.assert_equals(box.execute([[PRAGMA index_info(aSD.IND);]]).rows, exp)
+        t.assert_equals(box.execute([[PRAGMA index_info(aSD.inD);]]).rows, exp)
         box.space.ASD:drop()
     end)
 end
