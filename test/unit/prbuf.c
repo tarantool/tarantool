@@ -24,7 +24,7 @@ enum test_buffer_status {
 	TEST_BUFFER_STATUS_COUNT
 };
 
-const char *info_msg = "prbuf(size=%lu, payload=%lu, iterations=%lu) %s";
+const char *info_msg = "prbuf(size=%lu, payload=%lu, iterations=%zu) %s";
 
 const char *test_buffer_status_strs[TEST_BUFFER_STATUS_COUNT] = {
 	"has been validated",
@@ -105,8 +105,9 @@ test_buffer_foreach_copy_number(uint32_t buffer_size,
 	for (size_t i = 0; i < lengthof(copy_number_arr); ++i) {
 		rc = test_buffer(buffer_size, payload, payload_size,
 				 copy_number_arr[i]);
-		is(rc, 0, info_msg, buffer_size, payload_size,
-		   copy_number_arr[i], test_buffer_status_strs[rc]);
+		is(rc, 0, info_msg, (unsigned long)buffer_size,
+		   (unsigned long)payload_size, copy_number_arr[i],
+		   test_buffer_status_strs[rc]);
 	}
 	footer();
 }
