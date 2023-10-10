@@ -4501,25 +4501,17 @@ is_simple_count(struct Select *select, struct AggInfo *agg_info)
 int
 sqlIndexedByLookup(Parse * pParse, struct SrcList_item *pFrom)
 {
-	if (pFrom->space != NULL && pFrom->fg.isIndexedBy) {
-		struct space *space = pFrom->space;
-		char *zIndexedBy = pFrom->u1.zIndexedBy;
-		struct index *idx = NULL;
-		for (uint32_t i = 0; i < space->index_count; ++i) {
-			if (strcmp(space->index[i]->def->name,
-				   zIndexedBy) == 0) {
-				idx = space->index[i];
-				break;
-			}
-		}
-		if (idx == NULL) {
-			diag_set(ClientError, ER_NO_SUCH_INDEX_NAME,
-				 zIndexedBy, space->def->name);
-			pParse->is_aborted = true;
-			return -1;
-		}
-		pFrom->pIBIndex = idx->def;
+	if (pFrom->space == NULL || pFrom->fg.isIndexedBy == 0)
+		return 0;
+	uint32_t index_id = sql_index_id_by_src(pFrom);
+	if (index_id == UINT32_MAX) {
+		diag_set(ClientError, ER_NO_SUCH_INDEX_NAME,
+			 pFrom->u1.zIndexedBy, pFrom->space->def->name);
+		pParse->is_aborted = true;
+		return -1;
 	}
+	assert(index_id <= pFrom->space->index_id_max);
+	pFrom->pIBIndex = pFrom->space->index_map[index_id]->def;
 	return 0;
 }
 

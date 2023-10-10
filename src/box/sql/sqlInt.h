@@ -3126,6 +3126,13 @@ uint32_t
 sql_index_id_by_token(const struct space *space, const struct Token *name);
 
 /**
+ * Return index with name defined by the element of struct SrcList. Return NULL
+ * if the index was not found.
+ */
+uint32_t
+sql_index_id_by_src(const struct SrcList_item *src);
+
+/**
  * Return the fieldno of the field with the name defined by the token. Return
  * UINT32_MAX if the field was not found.
  */
