@@ -2198,7 +2198,7 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 		nName = sqlStrlen30(zName);
 		void *field = &space_def->fields[i];
 		if (sqlHashInsert(&ht, zName, field) == field) {
-			sql_free(zName);
+			sqlDbFree(db, zName);
 			sqlOomFault(db);
 			goto cleanup;
 		}
@@ -2209,6 +2209,7 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 		}
 		memcpy(space_def->fields[i].name, zName, nName);
 		space_def->fields[i].name[nName] = '\0';
+		sqlDbFree(db, zName);
 	}
 cleanup:
 	sqlHashClear(&ht);
