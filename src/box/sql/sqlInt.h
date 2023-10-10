@@ -3161,6 +3161,13 @@ uint32_t
 sql_fieldno_by_expr(const struct space *space, const struct Expr *expr);
 
 /**
+ * Return the fieldno of the field with the name defined by the name of
+ * expression from exprList. Return UINT32_MAX if the field was not found.
+ */
+uint32_t
+sql_fieldno_by_item(const struct space *space, const struct ExprList_item *it);
+
+/**
  * Return the tuple foreign key constraint with the name defined by the token.
  * Return NULL if the tuple foreign key constraint was not found.
  */

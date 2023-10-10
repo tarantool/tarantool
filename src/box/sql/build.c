@@ -1167,31 +1167,21 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 	sqlVdbeCountChanges(vdbe);
 }
 
-/**
- * Find fieldno by name.
- * @param parse_context Parser. Used for error reporting.
- * @param def Space definition to search field in.
- * @param field_name Field name to search by.
- * @param[out] link Result fieldno.
- * @param fk_name FK name. Used for error reporting.
- *
- * @retval 0 Success.
- * @retval -1 Error - field is not found.
- */
+/** Find fieldno by name. */
 static int
-resolve_link(struct Parse *parse_context, const struct space_def *def,
-	     const char *field_name, uint32_t *link, const char *fk_name)
+resolve_link(struct Parse *parse_context, const struct space *space,
+	     const struct ExprList_item *item, uint32_t *link,
+	     const char *fk_name)
 {
 	assert(link != NULL);
-	for (uint32_t j = 0; j < def->field_count; ++j) {
-		if (strcmp(field_name, def->fields[j].name) == 0) {
-			*link = j;
-			return 0;
-		}
+	uint32_t fieldno = sql_fieldno_by_item(space, item);
+	if (fieldno != UINT32_MAX) {
+		*link = fieldno;
+		return 0;
 	}
 	diag_set(ClientError, ER_CREATE_FK_CONSTRAINT, fk_name,
 		 tt_sprintf("unknown column %s in foreign key definition",
-			    field_name));
+			    item->zName));
 	parse_context->is_aborted = true;
 	return -1;
 }
@@ -1272,8 +1262,7 @@ vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
 		if (fk_parse->selfref_cols != NULL) {
 			struct ExprList *cols = fk_parse->selfref_cols;
 			for (uint32_t i = 0; i < fk_def->field_count; ++i) {
-				if (resolve_link(parse, space->def,
-						 cols->a[i].zName,
+				if (resolve_link(parse, space, &cols->a[i],
 						 &fk_def->links[i].parent_field,
 						 fk_def->name) != 0)
 					return;
@@ -1684,31 +1673,23 @@ sql_drop_table(struct Parse *parse_context)
 /**
  * Return ordinal number of column by name. In case of error,
  * set error message.
- *
- * @param parse_context Parsing context.
- * @param space Space which column belongs to.
- * @param column_name Name of column to investigate.
- * @param[out] colno Found name of column.
- * @param fk_name Name of FK constraint to be created.
- *
- * @retval 0 on success, -1 on fault.
  */
 static int
 columnno_by_name(struct Parse *parse_context, const struct space *space,
-		 const char *column_name, uint32_t *colno, const char *fk_name)
+		 const struct ExprList_item *item, uint32_t *colno,
+		 const char *fk_name)
 {
 	assert(colno != NULL);
-	uint32_t column_len = strlen(column_name);
-	if (tuple_fieldno_by_name(space->def->dict, column_name, column_len,
-				  field_name_hash(column_name, column_len),
-				  colno) != 0) {
-		diag_set(ClientError, ER_CREATE_FK_CONSTRAINT, fk_name,
-			 tt_sprintf("foreign key refers to nonexistent field %s",
-				    column_name));
-		parse_context->is_aborted = true;
-		return -1;
+	uint32_t fieldno = sql_fieldno_by_item(space, item);
+	if (fieldno != UINT32_MAX) {
+		*colno = fieldno;
+		return 0;
 	}
-	return 0;
+	diag_set(ClientError, ER_CREATE_FK_CONSTRAINT, fk_name,
+		 tt_sprintf("foreign key refers to nonexistent field %s",
+			    item->zName));
+	parse_context->is_aborted = true;
+	return -1;
 }
 
 /** Generate unique name for foreign key constraint. */
@@ -1910,7 +1891,7 @@ sql_create_foreign_key(struct Parse *parse_context)
 			fk_def->links[i].parent_field = pk_def->parts[i].fieldno;
 		} else if (!is_self_referenced &&
 			   columnno_by_name(parse_context, parent_space,
-					    parent_cols->a[i].zName,
+					    &parent_cols->a[i],
 					    &fk_def->links[i].parent_field,
 					    constraint_name) != 0) {
 			goto exit_create_fk;
@@ -1928,14 +1909,14 @@ sql_create_foreign_key(struct Parse *parse_context)
 					space->def->field_count - 1;
 				break;
 			}
-			if (resolve_link(parse_context, space->def,
-					 child_cols->a[i].zName,
+			if (resolve_link(parse_context, space,
+					 &child_cols->a[i],
 					 &fk_def->links[i].child_field,
 					 constraint_name) != 0)
 				goto exit_create_fk;
 		/* In case of ALTER parent table must exist. */
 		} else if (columnno_by_name(parse_context, child_space,
-					    child_cols->a[i].zName,
+					    &child_cols->a[i],
 					    &fk_def->links[i].child_field,
 					    constraint_name) != 0) {
 			goto exit_create_fk;
