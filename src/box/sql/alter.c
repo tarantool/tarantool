@@ -51,10 +51,9 @@ sql_alter_table_rename(struct Parse *parse)
 		diag_set(ClientError, ER_SPACE_EXISTS, new_name);
 		goto tnt_error;
 	}
-	const char *tbl_name = src_tab->a[0].zName;
-	struct space *space = space_by_name0(tbl_name);
+	const struct space *space = sql_space_by_src(&src_tab->a[0]);
 	if (space == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_SPACE, tbl_name);
+		diag_set(ClientError, ER_NO_SUCH_SPACE, src_tab->a[0].zName);
 		goto tnt_error;
 	}
 	sql_set_multi_write(parse, false);

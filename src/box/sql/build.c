@@ -271,7 +271,7 @@ sql_field_retrieve(Parse *parser, struct space_def *space_def, uint32_t id)
  * index definitions (constraints).
  */
 static struct space *
-sql_shallow_space_copy(struct Parse *parse, struct space *space)
+sql_shallow_space_copy(struct Parse *parse, const struct space *space)
 {
 	assert(space->def != NULL);
 	struct space *ret = sql_template_space_new(parse, space->def->name);
@@ -310,14 +310,14 @@ sql_create_column_start(struct Parse *parse)
 	struct space *space = parse->create_table_def.new_space;
 	bool is_alter = space == NULL;
 	if (is_alter) {
-		const char *space_name =
-			alter_entity_def->entity_name->a[0].zName;
-		space = space_by_name0(space_name);
-		if (space == NULL) {
-			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
+		const struct space *origin =
+			sql_space_by_src(&alter_entity_def->entity_name->a[0]);
+		if (origin == NULL) {
+			diag_set(ClientError, ER_NO_SUCH_SPACE,
+				 alter_entity_def->entity_name->a[0].zName);
 			goto tnt_error;
 		}
-		space = sql_shallow_space_copy(parse, space);
+		space = sql_shallow_space_copy(parse, origin);
 	}
 	create_column_def->space = space;
 	struct space_def *def = space->def;
@@ -711,10 +711,11 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 	sql_xfree(name);
 	ck_def->name[name_len] = '\0';
 	if (is_alter_add_constr) {
-		const char *space_name = alter_def->entity_name->a[0].zName;
-		struct space *space = space_by_name0(space_name);
+		const struct space *space =
+			sql_space_by_src(&alter_def->entity_name->a[0]);
 		if (space == NULL) {
-			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
+			diag_set(ClientError, ER_NO_SUCH_SPACE,
+				 alter_def->entity_name->a[0].zName);
 			parser->is_aborted = true;
 			return;
 		}
@@ -790,12 +791,19 @@ sql_column_collation(struct space_def *def, uint32_t column, uint32_t *coll_id)
 }
 
 void
-vdbe_emit_open_cursor(struct Parse *parse_context, int cursor, int index_id,
-		      struct space *space)
+vdbe_emit_open_cursor(struct Parse *parse_context, int cursor,
+		      uint32_t index_id, const struct space *space)
 {
 	assert(space != NULL);
-	struct index *idx = index_find(space, index_id);
-	assert(idx != NULL);
+	const struct index *idx = NULL;
+	if (index_id <= space->index_id_max)
+		idx = space->index_map[index_id];
+	if (idx == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_INDEX_ID, index_id,
+			 space->def->name);
+		parse_context->is_aborted = true;
+		return;
+	}
 	if (idx->def->type != TREE) {
 		diag_set(ClientError, ER_UNSUPPORTED, "SQL",
 			 "using non-TREE index type. Please, use " \
@@ -1212,7 +1220,8 @@ vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
 	 */
 	if (is_alter) {
 		space = parse->create_column_def.space;
-		i = space_by_name0(space->def->name)->index_count;
+		assert(space->def->id != 0);
+		i = space_by_id(space->def->id)->index_count;
 	}
 	assert(space != NULL);
 	for (; i < space->index_count; ++i) {
@@ -1477,7 +1486,7 @@ sql_store_select(struct Parse *parse_context, struct Select *select)
  */
 static void
 vdbe_emit_revoke_object(struct Parse *parser, const char *object_type,
-			uint32_t object_id, struct access *access)
+			uint32_t object_id, const struct access *access)
 {
 	struct Vdbe *v = sqlGetVdbe(parser);
 	assert(v != NULL);
@@ -1515,7 +1524,7 @@ vdbe_emit_revoke_object(struct Parse *parser, const char *object_type,
  * @param is_view True, if space is
  */
 static void
-sql_code_drop_table(struct Parse *parse_context, struct space *space,
+sql_code_drop_table(struct Parse *parse_context, const struct space *space,
 		    bool is_view)
 {
 	struct Vdbe *v = sqlGetVdbe(parse_context);
@@ -1535,7 +1544,7 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	 * Do not account triggers deletion - they will be
 	 * accounted in DELETE from _space below.
 	 */
-	struct sql_trigger *trigger = space->sql_triggers;
+	const struct sql_trigger *trigger = space->sql_triggers;
 	while (trigger != NULL) {
 		vdbe_code_drop_trigger(parse_context, trigger->zName, false);
 		trigger = trigger->next;
@@ -1642,7 +1651,7 @@ sql_drop_table(struct Parse *parse_context)
 	assert(!parse_context->is_aborted);
 	assert(table_name_list->nSrc == 1);
 	const char *space_name = table_name_list->a[0].zName;
-	struct space *space = space_by_name0(space_name);
+	const struct space *space = sql_space_by_src(&table_name_list->a[0]);
 	if (space == NULL) {
 		if (!drop_def.if_exist) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
@@ -1802,12 +1811,14 @@ sql_create_foreign_key(struct Parse *parse_context)
 		constraint_name = sql_fk_unique_name_new(parse_context);
 	assert(constraint_name != NULL);
 	if (is_alter_add_constr) {
-		const char *child_name = alter_def->entity_name->a[0].zName;
-		child_space = space_by_name0(child_name);
-		if (child_space == NULL) {
-			diag_set(ClientError, ER_NO_SUCH_SPACE, child_name);
+		const struct space *origin =
+			sql_space_by_src(&alter_def->entity_name->a[0]);
+		if (origin == NULL) {
+			diag_set(ClientError, ER_NO_SUCH_SPACE,
+				 alter_def->entity_name->a[0].zName);
 			goto tnt_error;
 		}
+		child_space = space_by_id(origin->def->id);
 	} else {
 		struct fk_constraint_parse *fk_parse =
 			xregion_alloc_object(&parse_context->region,
@@ -1833,7 +1844,7 @@ sql_create_foreign_key(struct Parse *parse_context)
 	 */
 	is_self_referenced = !is_alter_add_constr &&
 			     strcmp(parent_name, space->def->name) == 0;
-	struct space *parent_space = space_by_name0(parent_name);
+	const struct space *parent_space = sql_space_by_token(parent);
 	if (parent_space == NULL && !is_self_referenced) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, parent_name);
 		goto tnt_error;
@@ -1866,13 +1877,13 @@ sql_create_foreign_key(struct Parse *parse_context)
 		 * If parent columns are not specified, then PK
 		 * columns of parent table are used as referenced.
 		 */
-		struct index *parent_pk = space_index(parent_space, 0);
-		if (parent_pk == NULL) {
+		if (parent_space->index_count == 0) {
 			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 				 constraint_name,
 				 "referenced space doesn't feature PRIMARY KEY");
 			goto tnt_error;
 		}
+		const struct index *parent_pk = parent_space->index[0];
 		if (parent_pk->def->key_def->part_count != child_cols_count) {
 			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 				 constraint_name, error_msg);
@@ -2552,15 +2563,16 @@ sql_create_index(struct Parse *parse) {
 	struct Token token = create_entity_def->name;
 	if (tbl_name != NULL) {
 		assert(token.n > 0 && token.z != NULL);
-		const char *name = tbl_name->a[0].zName;
-		space = space_by_name0(name);
-		if (space == NULL) {
+		const struct space *origin = sql_space_by_src(&tbl_name->a[0]);
+		if (origin == NULL) {
 			if (! create_entity_def->if_not_exist) {
-				diag_set(ClientError, ER_NO_SUCH_SPACE, name);
+				diag_set(ClientError, ER_NO_SUCH_SPACE,
+					 tbl_name->a[0].zName);
 				parse->is_aborted = true;
 			}
 			goto exit_create_index;
 		}
+		space = space_by_id(origin->def->id);
 	} else if (!is_create_table_or_add_col) {
 		goto exit_create_index;
 	}
@@ -2857,13 +2869,13 @@ sql_drop_index(struct Parse *parse_context)
 	assert(!parse_context->is_aborted);
 	struct SrcList *table_list = drop_def->base.entity_name;
 	assert(table_list->nSrc == 1);
-	char *table_name = table_list->a[0].zName;
 	sqlVdbeCountChanges(v);
-	struct space *space = space_by_name0(table_name);
+	const struct space *space = sql_space_by_src(&table_list->a[0]);
 	bool if_exists = drop_def->if_exist;
 	if (space == NULL) {
 		if (!if_exists) {
-			diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
+			diag_set(ClientError, ER_NO_SUCH_SPACE,
+				 table_list->a[0].zName);
 			parse_context->is_aborted = true;
 		}
 		goto exit_drop_index;

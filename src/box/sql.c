@@ -1628,6 +1628,12 @@ sql_space_by_token(const struct Token *name)
 	return res;
 }
 
+const struct space *
+sql_space_by_src(const struct SrcList_item *src)
+{
+	return space_by_name0(src->zName);
+}
+
 uint32_t
 sql_index_id_by_token(const struct space *space, const struct Token *name)
 {
