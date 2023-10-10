@@ -1072,7 +1072,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	 * we have to check the semantics.
 	 */
 	pItem = pSelect->pSrc->a;
-	struct space *src = space_by_name0(pItem->zName);
+	const struct space *src = sql_space_by_src(pItem);
 	/* FROM clause does not contain a real table. */
 	if (src == NULL)
 		return 0;

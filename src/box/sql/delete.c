@@ -39,7 +39,7 @@ sql_lookup_space(struct Parse *parse, struct SrcList_item *space_name)
 {
 	assert(space_name != NULL);
 	assert(space_name->space == NULL);
-	struct space *space = space_by_name0(space_name->zName);
+	const struct space *space = sql_space_by_src(space_name);
 	if (space == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, space_name->zName);
 		parse->is_aborted = true;
@@ -56,10 +56,11 @@ sql_lookup_space(struct Parse *parse, struct SrcList_item *space_name)
 		parse->is_aborted = true;
 		return NULL;
 	}
-	space_name->space = space;
+	struct space *res = space_by_id(space->def->id);
+	space_name->space = res;
 	if (sqlIndexedByLookup(parse, space_name) != 0)
 		space = NULL;
-	return space;
+	return res;
 }
 
 void
@@ -86,10 +87,9 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 	assert(tab_list->nSrc == 1);
 
 	struct Vdbe *v = sqlGetVdbe(parse);
-	const char *tab_name = tab_list->a->zName;
-	struct space *space = space_by_name0(tab_name);
+	const struct space *space = sql_space_by_src(&tab_list->a[0]);
 	if (space == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_SPACE, tab_name);
+		diag_set(ClientError, ER_NO_SUCH_SPACE, tab_list->a[0].zName);
 		goto tarantool_error;
 	}
 	if (space->def->opts.is_view) {

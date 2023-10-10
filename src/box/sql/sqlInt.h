@@ -2771,8 +2771,8 @@ sqlEndTable(struct Parse *parse);
  * @param space Pointer to space object.
  */
 void
-vdbe_emit_open_cursor(struct Parse *parse, int cursor, int index_id,
-		      struct space *space);
+vdbe_emit_open_cursor(struct Parse *parse, int cursor, uint32_t index_id,
+		      const struct space *space);
 
 /**
  * The parser calls this routine in order to create a new VIEW.
@@ -3110,6 +3110,13 @@ sql_tt_name_from_token(const struct Token *t)
  */
 const struct space *
 sql_space_by_token(const struct Token *name);
+
+/**
+ * Return space with name defined by the element of struct SrcList. Return NULL
+ * if the space was not found.
+ */
+const struct space *
+sql_space_by_src(const struct SrcList_item *src);
 
 /**
  * Return id of index with the name defined by the token. Return UINT32_MAX if
