@@ -4172,8 +4172,10 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 	 */
 	sql_xfree(pSubitem->zName);
 	sql_xfree(pSubitem->zAlias);
+	sql_xfree(pSubitem->legacy_name);
 	pSubitem->zName = 0;
 	pSubitem->zAlias = 0;
+	pSubitem->legacy_name = NULL;
 	pSubitem->pSelect = 0;
 
 	/* Deletion of the pSubitem->space will be done when a corresponding

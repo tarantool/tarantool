@@ -1626,13 +1626,21 @@ sql_space_by_token(const struct Token *name)
 	char *name_str = sql_name_from_token(name);
 	struct space *res = space_by_name0(name_str);
 	sql_xfree(name_str);
+	if (res != NULL || name->z[0] == '"')
+		return res;
+	char *old_name_str = sql_legacy_name_new(name->z, name->n);
+	res = space_by_name0(old_name_str);
+	sql_xfree(old_name_str);
 	return res;
 }
 
 const struct space *
 sql_space_by_src(const struct SrcList_item *src)
 {
-	return space_by_name0(src->zName);
+	struct space *res = space_by_name0(src->zName);
+	if (res != NULL || src->legacy_name == NULL)
+		return res;
+	return space_by_name0(src->legacy_name);
 }
 
 /**
