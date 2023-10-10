@@ -4641,6 +4641,7 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .build_index = */ vinyl_space_build_index,
 	/* .swap_index = */ vinyl_space_swap_index,
 	/* .prepare_alter = */ vinyl_space_prepare_alter,
+	/* .finish_alter = */ generic_space_finish_alter,
 	/* .prepare_upgrade = */ generic_space_prepare_upgrade,
 	/* .invalidate = */ vinyl_space_invalidate,
 };

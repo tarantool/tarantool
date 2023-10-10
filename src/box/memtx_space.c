@@ -1052,7 +1052,6 @@ memtx_space_drop_primary_key(struct space *space)
 	 *   can be put back online properly.
 	 */
 	memtx_space->replace = memtx_space_replace_no_keys;
-	memtx_space->bsize = 0;
 }
 
 static void
@@ -1369,8 +1368,24 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 	}
 
 	new_memtx_space->replace = old_memtx_space->replace;
-	new_memtx_space->bsize = old_memtx_space->bsize;
 	return 0;
+}
+
+/**
+ * Copy bsize to the newly altered space from the old space.
+ * In case of DropIndex or TruncateIndex alter operations, the new space will be
+ * empty, and bsize must not be copied.
+ */
+static void
+memtx_space_finish_alter(struct space *old_space, struct space *new_space)
+{
+	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
+	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
+
+	bool is_empty = new_space->index_count == 0 ||
+			index_size(new_space->index[0]) == 0;
+	if (!is_empty)
+		new_memtx_space->bsize = old_memtx_space->bsize;
 }
 
 /* }}} DDL */
@@ -1395,6 +1410,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .build_index = */ memtx_space_build_index,
 	/* .swap_index = */ generic_space_swap_index,
 	/* .prepare_alter = */ memtx_space_prepare_alter,
+	/* .finish_alter = */ memtx_space_finish_alter,
 	/* .prepare_upgrade = */ memtx_space_prepare_upgrade,
 	/* .invalidate = */ generic_space_invalidate,
 };

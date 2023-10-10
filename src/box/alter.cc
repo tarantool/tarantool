@@ -1017,6 +1017,7 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 * The new space is ready. Time to update the space
 	 * cache with it.
 	 */
+	space_finish_alter(alter->old_space, alter->new_space);
 	space_cache_replace(alter->old_space, alter->new_space);
 	space_detach_constraints(alter->old_space);
 	space_unpin_collations(alter->old_space);
