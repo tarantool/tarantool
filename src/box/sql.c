@@ -1665,17 +1665,28 @@ sql_index_id_by_src(const struct SrcList_item *src)
 }
 
 uint32_t
+sql_space_fieldno(const struct space *space, const char *name)
+{
+	for (uint32_t i = 0; i < space->def->field_count; ++i) {
+		if (strcmp(space->def->fields[i].name, name) == 0)
+			return i;
+	}
+	return UINT32_MAX;
+}
+
+uint32_t
 sql_fieldno_by_token(const struct space *space, const struct Token *name)
 {
 	char *name_str = sql_name_from_token(name);
-	for (uint32_t i = 0; i < space->def->field_count; ++i) {
-		if (strcmp(space->def->fields[i].name, name_str) == 0) {
-			sql_xfree(name_str);
-			return i;
-		}
-	}
+	uint32_t res = sql_space_fieldno(space, name_str);
 	sql_xfree(name_str);
-	return UINT32_MAX;
+	return res;
+}
+
+uint32_t
+sql_fieldno_by_id(const struct space *space, const struct IdList_item *id)
+{
+	return sql_space_fieldno(space, id->zName);
 }
 
 /**
