@@ -5442,3 +5442,9 @@ sql_fieldno_by_expr(const struct space *space, const struct Expr *expr)
 	assert(expr->op == TK_ID);
 	return sql_space_fieldno(space, expr->u.zToken);
 }
+
+uint32_t
+sql_fieldno_by_item(const struct space *space, const struct ExprList_item *item)
+{
+	return sql_space_fieldno(space, item->zName);
+}
