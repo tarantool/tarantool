@@ -1634,19 +1634,34 @@ sql_space_by_src(const struct SrcList_item *src)
 	return space_by_name0(src->zName);
 }
 
+/**
+ * Return id of index with the given name. Return UINT32_MAX if the index was
+ * not found.
+ */
+static uint32_t
+sql_space_index_id(const struct space *space, const char *name)
+{
+	for (uint32_t i = 0; i < space->index_count; ++i) {
+		if (strcmp(space->index[i]->def->name, name) == 0)
+			return space->index[i]->def->iid;
+	}
+	return UINT32_MAX;
+}
+
 uint32_t
 sql_index_id_by_token(const struct space *space, const struct Token *name)
 {
 	char *name_str = sql_name_from_token(name);
-	uint32_t res = UINT32_MAX;
-	for (uint32_t i = 0; i < space->index_count; ++i) {
-		if (strcmp(space->index[i]->def->name, name_str) == 0) {
-			res = space->index[i]->def->iid;
-			break;
-		}
-	}
+	uint32_t res = sql_space_index_id(space, name_str);
 	sql_xfree(name_str);
 	return res;
+}
+
+uint32_t
+sql_index_id_by_src(const struct SrcList_item *src)
+{
+	assert(src->space != NULL && src->fg.isIndexedBy != 0);
+	return sql_space_index_id(src->space, src->u1.zIndexedBy);
 }
 
 uint32_t
