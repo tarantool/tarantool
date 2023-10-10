@@ -958,7 +958,7 @@ local function rocks()
         config = "luarocks.cmd.config",
         doc = "luarocks.cmd.doc",
         download = "luarocks.cmd.download",
-        help = "luarocks.cmd.help",
+        help = pcall(require, "luarocks.cmd.help") and "luarocks.cmd.help" or nil,
         init = "luarocks.cmd.init",
         install = "luarocks.cmd.install",
         lint = "luarocks.cmd.lint",
