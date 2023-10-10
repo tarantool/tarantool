@@ -1630,6 +1630,8 @@ struct SrcList {
 			char *zIndexedBy;	/* Identifier from "INDEXED BY <zIndex>" clause */
 			ExprList *pFuncArg;	/* Arguments to table-valued-function */
 		} u1;
+		/** Normalized index name for the second lookup. */
+		char *legacy_index_name;
 		struct index_def *pIBIndex;
 	} a[1];			/* One entry for each identifier on the list */
 };
@@ -3120,15 +3122,18 @@ uint32_t
 sql_space_fieldno(const struct space *space, const char *name);
 
 /**
- * Return id of index with the name defined by the token. Return UINT32_MAX if
- * the index was not found.
+ * Return id of index with the name defined by the token. A second lookup will
+ * be performed if the index is not found on the first try and token is not
+ * start with double quote. Return UINT32_MAX if the index was not found.
  */
 uint32_t
 sql_index_id_by_token(const struct space *space, const struct Token *name);
 
 /**
- * Return index with name defined by the element of struct SrcList. Return NULL
- * if the index was not found.
+ * Return index with name defined by the element of struct SrcList. A second
+ * lookup will be performed if the index is not found on the first try and field
+ * legacy_index_name of the src is not NULL. Return NULL if the index was not
+ * found.
  */
 uint32_t
 sql_index_id_by_src(const struct SrcList_item *src);

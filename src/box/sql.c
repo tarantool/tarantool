@@ -1663,6 +1663,11 @@ sql_index_id_by_token(const struct space *space, const struct Token *name)
 	char *name_str = sql_name_from_token(name);
 	uint32_t res = sql_space_index_id(space, name_str);
 	sql_xfree(name_str);
+	if (res != UINT32_MAX || name->z[0] == '"')
+		return res;
+	char *old_name_str = sql_legacy_name_new(name->z, name->n);
+	res = sql_space_index_id(space, old_name_str);
+	sql_xfree(old_name_str);
 	return res;
 }
 
@@ -1670,7 +1675,10 @@ uint32_t
 sql_index_id_by_src(const struct SrcList_item *src)
 {
 	assert(src->space != NULL && src->fg.isIndexedBy != 0);
-	return sql_space_index_id(src->space, src->u1.zIndexedBy);
+	uint32_t res = sql_space_index_id(src->space, src->u1.zIndexedBy);
+	if (res != UINT32_MAX || src->legacy_index_name == NULL)
+		return res;
+	return sql_space_index_id(src->space, src->legacy_index_name);
 }
 
 uint32_t

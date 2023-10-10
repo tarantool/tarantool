@@ -1668,6 +1668,8 @@ sqlSrcListDup(struct SrcList *p, int flags)
 		if (pNewItem->fg.isIndexedBy) {
 			pNewItem->u1.zIndexedBy =
 				sql_xstrdup(pOldItem->u1.zIndexedBy);
+			pNewItem->legacy_index_name =
+				sql_xstrdup(pOldItem->legacy_index_name);
 		}
 		pNewItem->pIBIndex = pOldItem->pIBIndex;
 		if (pNewItem->fg.isTabFunc) {

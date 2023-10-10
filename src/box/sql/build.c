@@ -3055,8 +3055,10 @@ sqlSrcListDelete(struct SrcList *pList)
 		sql_xfree(pItem->zName);
 		sql_xfree(pItem->zAlias);
 		sql_xfree(pItem->legacy_name);
-		if (pItem->fg.isIndexedBy)
+		if (pItem->fg.isIndexedBy) {
 			sql_xfree(pItem->u1.zIndexedBy);
+			sql_xfree(pItem->legacy_index_name);
+		}
 		if (pItem->fg.isTabFunc)
 			sql_expr_list_delete(pItem->u1.pFuncArg);
 		/*
@@ -3132,6 +3134,11 @@ sqlSrcListIndexedBy(struct SrcList *p, struct Token *pIndexedBy)
 		} else if (pIndexedBy->z != NULL) {
 			pItem->u1.zIndexedBy = sql_name_from_token(pIndexedBy);
 			pItem->fg.isIndexedBy = true;
+			if (pIndexedBy->z[0] != '"') {
+				pItem->legacy_index_name =
+					sql_legacy_name_new(pIndexedBy->z,
+							    pIndexedBy->n);
+			}
 		}
 	}
 }
