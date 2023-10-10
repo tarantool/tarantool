@@ -1698,6 +1698,14 @@ sql_coll_id_by_token(const struct Token *name)
 	sql_xfree(name_str);
 	if (coll_id != NULL)
 		return coll_id->id;
+	if (name->z[0] == '"')
+		return UINT32_MAX;
+
+	char *old_name_str = sql_legacy_name_new(name->z, name->n);
+	coll_id = coll_by_name(old_name_str, strlen(old_name_str));
+	sql_xfree(old_name_str);
+	if (coll_id != NULL)
+		return coll_id->id;
 	return UINT32_MAX;
 }
 
