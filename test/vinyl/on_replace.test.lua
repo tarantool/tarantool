@@ -18,7 +18,6 @@ fail = true
 space:insert({7, 'g'})
 old_tuple, new_tuple
 index:select{}
-space:on_replace(nil, on_replace)
 space:drop()
 fail = false
 
@@ -36,7 +35,6 @@ space:insert({2, 3})
 old_tuple, new_tuple
 index:select{}
 index2:select{}
-space:on_replace(nil, on_replace)
 space:drop()
 fail = false
 
@@ -56,7 +54,6 @@ space:replace({2, 100})
 old_tuple, new_tuple
 space:select{}
 fail = false
-space:on_replace(nil, on_replace)
 space:drop()
 
 -- ensure trigger error causes rollback of only one statement
@@ -76,7 +73,6 @@ box.commit()
 index:select{}
 index2:select{}
 fail = false
-space:on_replace(nil, on_replace)
 space:drop()
 
 -- on replace in multiple indexes
@@ -102,7 +98,6 @@ old_tuple, new_tuple
 index:select{}
 index2:select{}
 fail = false
-space:on_replace(nil, on_replace)
 space:drop()
 
 -- on delete from one index
@@ -122,7 +117,6 @@ index:delete({1})
 old_tuple, new_tuple
 index:select{}
 fail = false
-space:on_replace(nil, on_replace)
 space:drop()
 
 -- on delete from multiple indexes
@@ -144,7 +138,6 @@ old_tuple, new_tuple
 index:select{}
 index2:select{}
 fail = false
-space:on_replace(nil, on_replace)
 space:drop()
 
 -- on update one index
@@ -168,7 +161,6 @@ index:update({1}, {{'=', 2, 'one'}})
 old_tuple, new_tuple
 index:select{}
 fail = false
-space:on_replace(nil, on_replace)
 space:drop()
 
 -- on update multiple indexes
@@ -196,7 +188,6 @@ old_tuple, new_tuple
 index:select{}
 index2:select{}
 fail = false
-space:on_replace(nil, on_replace)
 space:drop()
 
 -- on upsert one index
@@ -219,7 +210,6 @@ old_tuple, new_tuple
 index:select{}
 
 fail = false
-space:on_replace(nil, on_replace)
 space:drop()
 
 -- on upsert multiple indexes
@@ -246,5 +236,4 @@ old_tuple, new_tuple
 space:upsert({5, 5, 5}, {{'!', 4, 500}})
 old_tuple, new_tuple
 fail = false
-space:on_replace(nil, on_replace)
 space:drop()

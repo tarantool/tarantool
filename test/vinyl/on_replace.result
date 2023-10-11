@@ -55,9 +55,6 @@ index:select{}
 ---
 - - [6, 'f']
 ...
-space:on_replace(nil, on_replace)
----
-...
 space:drop()
 ---
 ...
@@ -113,9 +110,6 @@ index:select{}
 index2:select{}
 ---
 - - [1, 2]
-...
-space:on_replace(nil, on_replace)
----
 ...
 space:drop()
 ---
@@ -184,9 +178,6 @@ space:select{}
 fail = false
 ---
 ...
-space:on_replace(nil, on_replace)
----
-...
 space:drop()
 ---
 ...
@@ -250,9 +241,6 @@ index2:select{}
   - [2, 'b']
 ...
 fail = false
----
-...
-space:on_replace(nil, on_replace)
 ---
 ...
 space:drop()
@@ -354,9 +342,6 @@ index2:select{}
 fail = false
 ---
 ...
-space:on_replace(nil, on_replace)
----
-...
 space:drop()
 ---
 ...
@@ -420,9 +405,6 @@ index:select{}
   - [2, 3, 4]
 ...
 fail = false
----
-...
-space:on_replace(nil, on_replace)
 ---
 ...
 space:drop()
@@ -496,9 +478,6 @@ index2:select{}
   - [2, 2, 'b']
 ...
 fail = false
----
-...
-space:on_replace(nil, on_replace)
 ---
 ...
 space:drop()
@@ -585,9 +564,6 @@ index:select{}
   - [4]
 ...
 fail = false
----
-...
-space:on_replace(nil, on_replace)
 ---
 ...
 space:drop()
@@ -696,9 +672,6 @@ index2:select{}
 fail = false
 ---
 ...
-space:on_replace(nil, on_replace)
----
-...
 space:drop()
 ---
 ...
@@ -769,9 +742,6 @@ index:select{}
   - [4, 4, 4, 4]
 ...
 fail = false
----
-...
-space:on_replace(nil, on_replace)
 ---
 ...
 space:drop()
@@ -872,9 +842,6 @@ old_tuple, new_tuple
 - null
 ...
 fail = false
----
-...
-space:on_replace(nil, on_replace)
 ---
 ...
 space:drop()

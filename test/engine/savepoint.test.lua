@@ -110,7 +110,6 @@ select3
 select2
 select1
 s:select{}
-s:on_replace(nil, on_replace)
 s:drop()
 
 -- Test rollback to savepoint, created in trigger,
@@ -143,7 +142,6 @@ select3
 select4
 ok1
 errmsg1
-s:on_replace(nil, on_replace2)
 s:drop()
 
 -- Test incorrect savepoints usage inside a transaction.
@@ -248,7 +246,6 @@ s:replace{5}
 box.commit()
 test_run:cmd("setopt delimiter ''");
 s:select{}
-s:on_replace(nil, on_replace3)
 s:truncate()
 
 -- Several savepoints on a same statement.
