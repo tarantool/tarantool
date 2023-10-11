@@ -10,13 +10,16 @@ local script = os.getenv('SOURCEDIR') .. '/test/box-luatest/gh_7434_child.lua'
 local output_file
 
 g.before_all(function(cg)
-    local server = require('luatest.server')
-    cg.server = server:new({alias = 'master'})
-    output_file = cg.server.workdir .. '/on_shutdown_completed.txt'
+    cg.tempdir = fio.tempdir()
+    output_file = cg.tempdir .. '/on_shutdown_completed.txt'
 end)
 
 g.after_each(function()
     os.remove(output_file)
+end)
+
+g.after_all(function(cg)
+    fio.rmtree(cg.tempdir)
 end)
 
 -- Shutdown by reaching the end of the script
