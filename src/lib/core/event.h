@@ -79,15 +79,41 @@ struct func_adapter *
 event_find_trigger(struct event *event, const char *name);
 
 /**
+ * Flags for event triggers.
+ * Must be power of two - 1 bit in binary representation.
+ */
+enum event_trigger_flag {
+	/**
+	 * The trigger is temporary - all such triggers can be dropped with
+	 * special method.
+	 */
+	EVENT_TRIGGER_IS_TEMPORARY = 1,
+};
+
+/**
  * Resets trigger by name in an event.
  * Arguments event and name must not be NULL.
  * If new_trigger is NULL, the function removes a trigger by name from the
  * event. Otherwise, it replaces trigger by name or inserts it in the beginning
- * of the underlying list of event.
+ * of the underlying list of event. The new trigger is created with passed
+ * flags.
  */
 void
+event_reset_trigger_with_flags(struct event *event, const char *name,
+			       struct func_adapter *new_trigger, uint8_t flags);
+
+static inline void
 event_reset_trigger(struct event *event, const char *name,
-		    struct func_adapter *new_trigger);
+		    struct func_adapter *new_trigger)
+{
+	event_reset_trigger_with_flags(event, name, new_trigger, 0);
+}
+
+/**
+ * Remove all the triggers marked as temporary from the event.
+ */
+void
+event_remove_temporary_triggers(struct event *event);
 
 /**
  * Iterator over triggers from event. Never invalidates.
