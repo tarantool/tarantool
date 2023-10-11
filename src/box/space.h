@@ -287,6 +287,12 @@ struct space_alter_stmt {
 };
 
 /**
+ * Remove all temporary triggers from all associated events.
+ */
+void
+space_remove_temporary_triggers(struct space *space);
+
+/**
  * Detach constraints from space. They can be reattached or deleted then.
  */
 void

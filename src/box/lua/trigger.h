@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include <stdint.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -56,7 +58,14 @@ box_lua_trigger_init(struct lua_State *L);
  * of the trigger list otherwise. The new trigger is returned.
  */
 int
-luaT_event_reset_trigger(struct lua_State *L, int bottom, struct event *event);
+luaT_event_reset_trigger_with_flags(struct lua_State *L, int bottom,
+				    struct event *event, uint8_t flags);
+
+static inline int
+luaT_event_reset_trigger(struct lua_State *L, int bottom, struct event *event)
+{
+	return luaT_event_reset_trigger_with_flags(L, bottom, event, 0);
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -116,7 +116,6 @@ s2:insert{1, 1, 1, 1}
 s2:before_replace(ret_update) == ret_update
 s2.index.sk:update(1, {{'+', 4, 1}})
 s2:select()
-s2:before_replace(nil, ret_update)
 s2:drop()
 
 -- Stacking triggers.
@@ -291,7 +290,6 @@ save_type
 _ = s:upsert({3,4,5}, {{'+', 2, 1}})
 save_type
 
-s:before_replace(nil, find_type)
 s:drop()
 
 --
@@ -303,11 +301,10 @@ _ = s:create_index('pk')
 
 save_type = ''
 
-tid = s:before_replace(function(old,new, name, type) save_type = type return new end)
+_ = s:before_replace(function(old,new, name, type) save_type = type return new end)
 _ = s:insert{1}
 save_type
 
-s:before_replace(nil, tid)
 s:drop()
 
 --
@@ -317,7 +314,7 @@ s:drop()
 test_run:cmd('create server test with script="box/on_schema_init.lua"')
 test_run:cmd('start server test')
 test_run:cmd('switch test')
-require('fiber').set_max_slice(100500)
+require('fiber').set_max_slice(15)
 s = box.schema.space.create('test_on_schema_init')
 _ = s:create_index('pk')
 test_run:cmd('setopt delimiter ";"')

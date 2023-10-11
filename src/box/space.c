@@ -423,6 +423,19 @@ space_reset_events(struct space *space)
 	space->run_recovery_triggers = false;
 }
 
+void
+space_remove_temporary_triggers(struct space *space)
+{
+	struct space_event *space_events[] = {
+		&space->on_replace_event,
+		&space->before_replace_event,
+	};
+	for (size_t i = 0; i < lengthof(space_events); ++i) {
+		event_remove_temporary_triggers(space_events[i]->by_id);
+		event_remove_temporary_triggers(space_events[i]->by_name);
+	}
+}
+
 int
 space_create(struct space *space, struct engine *engine,
 	     const struct space_vtab *vtab, struct space_def *def,

@@ -1793,6 +1793,7 @@ on_drop_space_commit(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct space *space = (struct space *)trigger->data;
+	space_remove_temporary_triggers(space);
 	space_delete(space);
 	return 0;
 }

@@ -293,7 +293,7 @@ luaT_event_reset_trigger_check_positional_input(struct lua_State *L, int bottom)
  */
 static int
 luaT_event_reset_trigger_by_name(struct lua_State *L, struct event *event,
-				 int name_idx, int func_idx)
+				 int name_idx, int func_idx, uint8_t flags)
 {
 	if (lua_type(L, name_idx) != LUA_TSTRING)
 		luaL_error(L, "name must be a string");
@@ -301,7 +301,8 @@ luaT_event_reset_trigger_by_name(struct lua_State *L, struct event *event,
 	if (luaL_iscallable(L, func_idx)) {
 		struct func_adapter *func =
 			func_adapter_lua_create(L, func_idx);
-		event_reset_trigger(event, trigger_name, func);
+		event_reset_trigger_with_flags(event, trigger_name, func,
+					       flags);
 		lua_pushvalue(L, func_idx);
 		return 1;
 	} else if (lua_isnil(L, func_idx) || luaL_isnull(L, func_idx)) {
@@ -312,7 +313,8 @@ luaT_event_reset_trigger_by_name(struct lua_State *L, struct event *event,
 }
 
 int
-luaT_event_reset_trigger(struct lua_State *L, int bottom, struct event *event)
+luaT_event_reset_trigger_with_flags(struct lua_State *L, int bottom,
+				    struct event *event, uint8_t flags)
 {
 	assert(L != NULL);
 	assert(bottom >= 1);
@@ -322,13 +324,15 @@ luaT_event_reset_trigger(struct lua_State *L, int bottom, struct event *event)
 	    !luaL_iscallable(L, -1)) {
 		lua_getfield(L, bottom, "name");
 		lua_getfield(L, bottom, "func");
-		return luaT_event_reset_trigger_by_name(L, event, -2, -1);
+		return luaT_event_reset_trigger_by_name(L, event, -2, -1,
+							flags);
 	}
 	/* Old way with name support. */
 	luaT_event_reset_trigger_check_positional_input(L, bottom);
 	const int top = bottom + 2;
 	if (!lua_isnil(L, top) && !luaL_isnull(L, top))
-		return luaT_event_reset_trigger_by_name(L, event, top, bottom);
+		return luaT_event_reset_trigger_by_name(L, event, top, bottom,
+							flags);
 	/*
 	 * Name is not passed - old API support.
 	 * 1. If triggers are not passed, return table of triggers.
@@ -376,7 +380,8 @@ luaT_event_reset_trigger(struct lua_State *L, int bottom, struct event *event)
 	}
 	if (new_handler != NULL && old_handler != NULL) {
 		if (old_handler == new_handler) {
-			event_reset_trigger(event, new_name, new_trg);
+			event_reset_trigger_with_flags(event, new_name,
+						       new_trg, flags);
 		} else {
 			/*
 			 * Need to reference the event because it can be
@@ -389,14 +394,15 @@ luaT_event_reset_trigger(struct lua_State *L, int bottom, struct event *event)
 			 * new trigger at the beginning of the trigger list.
 			 */
 			event_reset_trigger(event, new_name, NULL);
-			event_reset_trigger(event, new_name, new_trg);
+			event_reset_trigger_with_flags(event, new_name, new_trg,
+						       flags);
 			event_unref(event);
 		}
 	} else if (old_handler != NULL) {
 		event_reset_trigger(event, old_name, NULL);
 	} else {
 		assert(new_handler != NULL);
-		event_reset_trigger(event, new_name, new_trg);
+		event_reset_trigger_with_flags(event, new_name, new_trg, flags);
 	}
 	return ret_count;
 }

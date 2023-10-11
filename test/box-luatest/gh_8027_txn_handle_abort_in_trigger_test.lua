@@ -17,13 +17,9 @@ end)
 
 g.after_each(function(cg)
     cg.server:exec(function()
-        local s = box.space.test
-        t.assert_not_equals(s, nil)
-        s:before_replace(nil, nil, 't1')
-        s:before_replace(nil, nil, 't2')
-        s:on_replace(nil, nil, 't1')
-        s:on_replace(nil, nil, 't2')
-        s:drop()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
     end)
 end)
 
@@ -37,13 +33,13 @@ g.test_yield_before_replace = function(cg)
                 fiber.yield()
             end
             return new
-        end, nil, 't1')
+        end)
         s:before_replace(function(_, new)
             if new[2] == 10 then
                 fiber.yield()
             end
             return new
-        end, nil, 't2')
+        end)
         local errmsg = 'Transaction has been aborted by a fiber yield'
         t.assert_error_msg_equals(errmsg, s.insert, s, {10, 1})
         t.assert_error_msg_equals(errmsg, s.insert, s, {1, 10})

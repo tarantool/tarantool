@@ -167,15 +167,13 @@ box.schema.func.drop('do_push')
 -- Test push from a non-call request.
 --
 s:truncate()
-function on_replace() box.session.push('replace') end
-_ = s:on_replace(on_replace)
+_ = s:on_replace(function() box.session.push('replace') end)
 c:reload_schema()
 c.space.test:replace({200}, {on_push = table.insert, on_push_ctx = messages})
 messages
 s:select{}
 
 c:close()
-_ = s:on_replace(nil, on_replace)
 s:drop()
 
 --
