@@ -1296,3 +1296,52 @@ g.test_lua_eval_lua_call_sql = function()
         end
     })
 end
+
+g.test_consider_auth_type_for_passwods = function(g)
+    t.tarantool.skip_if_not_enterprise()
+
+    helpers.reload_success_case(g, {
+        options = {
+            credentials = {
+                users = {
+                    guest = {
+                        roles = { 'super' }
+                    },
+                    myuser = {
+                        password = 'secret',
+                    },
+                },
+            },
+            security = {
+                auth_type = 'chap-sha1',
+            },
+        },
+        verify = function()
+            t.assert_equals(box.cfg.auth_type, 'chap-sha1')
+
+            local password_def = box.space._user.index.name:get({'myuser'})[5]
+            t.assert_equals(type(password_def['chap-sha1']), 'string')
+        end,
+        options_2 = {
+            credentials = {
+                users = {
+                    guest = {
+                        roles = { 'super' }
+                    },
+                    myuser = {
+                        password = 'secret',
+                    },
+                },
+            },
+            security = {
+                auth_type = 'pap-sha256',
+            },
+        },
+        verify_2 = function()
+            t.assert_equals(box.cfg.auth_type, 'pap-sha256')
+
+            local password_def = box.space._user.index.name:get({'myuser'})[5]
+            t.assert_equals(type(password_def['pap-sha256']), 'table')
+        end,
+    })
+end

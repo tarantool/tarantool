@@ -632,17 +632,14 @@ local function set_password(user_name, password)
 
     local auth_type = auth_def['chap-sha1'] and 'chap-sha1' or 'pap-sha256'
 
+    local new_password = false
+
     if auth_type == 'chap-sha1' then
         local current_hash = auth_def['chap-sha1']
 
         local new_hash = box.schema.user.password(password)
-        if new_hash == current_hash then
-            log.verbose('credentials.apply: a password is already set ' ..
-                        'for user %q', user_name)
-        else
-            log.verbose('credentials.apply: set a password for user %q',
-                        user_name)
-            box.schema.user.passwd(user_name, password)
+        if new_hash ~= current_hash then
+            new_password = true
         end
     else
         assert(auth_def['pap-sha256'])
@@ -651,16 +648,30 @@ local function set_password(user_name, password)
 
         local new_hash = digest.sha256(current_salt .. password)
         if new_hash == current_hash then
+            -- Note: passwd() generated new random salt, it will be different
+            -- from current_salt.
+            new_password = true
+        end
+    end
+
+    if not new_password then
+        -- Note that security.auth_type is applied by box_cfg applier.
+        -- It is executed before credentials applier, so the current
+        -- box.cfg.auth_type is already set.
+        if box.cfg.auth_type == auth_type then
             log.verbose('credentials.apply: a password is already set ' ..
                         'for user %q', user_name)
         else
-            log.verbose('credentials.apply: set a password for user %q',
-                        user_name)
-            -- Note: passwd() generated new random salt, it will be different
-            -- from current_salt.
+            log.verbose('credentials.apply: a password for user %q has ' ..
+                        'different auth_type, resetting it', user_name)
             box.schema.user.passwd(user_name, password)
         end
+    else
+        log.verbose('credentials.apply: set a password for user %q',
+                    user_name)
+        box.schema.user.passwd(user_name, password)
     end
+
 end
 
 local function create_users(user_map)
