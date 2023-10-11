@@ -390,6 +390,100 @@ test_event_trigger_iterator_stability(void)
 }
 
 static void
+test_event_trigger_temporary_step(const char *tmp_mask, int trigger_num)
+{
+	size_t non_tmp_count = 0;
+	for (int i = 0; i < trigger_num; ++i) {
+		if (tmp_mask[i] == 0)
+			non_tmp_count++;
+	}
+	plan(2 * (trigger_num + non_tmp_count) + 2);
+
+	const char *event_name = "test_event";
+	struct func_adapter_vtab vtab = {.destroy = func_destroy};
+	struct func_adapter func = {.vtab = &vtab};
+	struct func_adapter new_func = {.vtab = &vtab};
+
+	struct event *event = event_get(event_name, true);
+	event_ref(event);
+	for (int i = trigger_num; i >= 0; --i) {
+		const char *trg_name = tt_sprintf("%d", i);
+		/* Extra temporary trigger to delete it. */
+		if (i == trigger_num || tmp_mask[i]) {
+			event_reset_trigger_with_flags(
+				event, trg_name, &func,
+				EVENT_TRIGGER_IS_TEMPORARY);
+		} else {
+			event_reset_trigger(event, trg_name, &func);
+		}
+	}
+	event_reset_trigger(event, tt_sprintf("%d", trigger_num), NULL);
+
+	struct event_trigger_iterator it;
+	event_trigger_iterator_create(&it, event);
+	struct func_adapter *trg = NULL;
+	const char *name = NULL;
+	for (int i = 0; i < trigger_num; i++) {
+		bool ok = event_trigger_iterator_next(&it, &trg, &name);
+		ok(ok, "Iterator must not be exhausted yet");
+		const char *trg_name = tt_sprintf("%d", i);
+		is(strcmp(name, trg_name), 0,
+		   "Triggers must be traversed in reversed order");
+	}
+	bool ok = event_trigger_iterator_next(&it, &trg, &name);
+	ok(!ok, "Iterator must be exhausted");
+	event_trigger_iterator_destroy(&it);
+
+	event_remove_temporary_triggers(event);
+
+	event_trigger_iterator_create(&it, event);
+	for (int i = 0; i < trigger_num; ++i) {
+		if (tmp_mask[i] != 0)
+			continue;
+		ok = event_trigger_iterator_next(&it, &trg, &name);
+		ok(ok, "Traversal must continue");
+		const char *trg_name = tt_sprintf("%d", i);
+		is(strcmp(name, trg_name), 0,
+		   "Triggers must be traversed in reversed order");
+	}
+	ok = event_trigger_iterator_next(&it, &trg, &name);
+	ok(!ok, "Iterator must be exhausted");
+	event_trigger_iterator_destroy(&it);
+
+	for (int i = 0; i < trigger_num; ++i) {
+		const char *trg_name = tt_sprintf("%d", i);
+		event_reset_trigger(event, trg_name, NULL);
+	}
+	event_unref(event);
+
+	check_plan();
+}
+
+static void
+test_event_trigger_temporary(void)
+{
+	plan(3);
+	char mask[8];
+	const size_t trigger_num = lengthof(mask);
+	memset(mask, 0, trigger_num);
+
+	mask[trigger_num / 2] = 1;
+	test_event_trigger_temporary_step(mask, trigger_num);
+	memset(mask, 0, trigger_num);
+
+	mask[0] = 1;
+	mask[trigger_num / 2] = 1;
+	mask[trigger_num - 1] = 1;
+	test_event_trigger_temporary_step(mask, trigger_num);
+	memset(mask, 0, trigger_num);
+
+	memset(mask, 1, trigger_num);
+	test_event_trigger_temporary_step(mask, trigger_num);
+	memset(mask, 0, trigger_num);
+	check_plan();
+}
+
+static void
 test_event_free(void)
 {
 	plan(1);
@@ -426,11 +520,12 @@ test_event_free(void)
 static int
 test_main(void)
 {
-	plan(5);
+	plan(6);
 	test_basic();
 	test_event_foreach();
 	test_event_trigger_iterator();
 	test_event_trigger_iterator_stability();
+	test_event_trigger_temporary();
 	test_event_free();
 	return check_plan();
 }
