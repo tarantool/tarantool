@@ -1,15 +1,15 @@
+local fio = require('fio')
 local t = require('luatest')
 
 local g = t.group('gh-8083', {{errinj = 'ERRINJ_SIGILL_MAIN_THREAD'},
                               {errinj = 'ERRINJ_SIGILL_NONMAIN_THREAD'}})
 
 g.before_each(function(cg)
-    local server = require('luatest.server')
-    cg.server = server:new({alias = 'master'})
+    cg.tempdir = fio.tempdir()
 end)
 
 g.after_each(function(cg)
-    cg.server:drop()
+    fio.rmtree(cg.tempdir)
 end)
 
 -- Check that forked Tarantool creates a crash report on the illegal instruction
@@ -24,7 +24,7 @@ g.test_fatal_signal_handler = function(cg)
     -- Use `cd' and `shell = true' due to lack of cwd option in popen (gh-5633),
     -- `feedback_enabled = false' to avoid forking for sending feedback.
     local fmt = 'cd %s && %s -e "box.cfg{feedback_enabled = false} os.exit()"'
-    local cmd = string.format(fmt, cg.server.workdir, tarantool_exe)
+    local cmd = string.format(fmt, cg.tempdir, tarantool_exe)
     local ph = popen.new({cmd}, {stderr = popen.opts.PIPE, env = tarantool_env,
                                  shell = true})
     t.assert(ph)

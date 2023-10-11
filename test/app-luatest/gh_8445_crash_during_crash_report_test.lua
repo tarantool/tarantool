@@ -1,13 +1,13 @@
+local fio = require('fio')
 local t = require('luatest')
 local g = t.group('gh-8445')
 
-g.before_all(function(cg)
-    local server = require('luatest.server')
-    cg.server = server:new({alias = 'gh-8445'})
+g.before_each(function(cg)
+    cg.tempdir = fio.tempdir()
 end)
 
-g.after_all(function(cg)
-    cg.server:drop()
+g.after_each(function(cg)
+    fio.rmtree(cg.tempdir)
 end)
 
 -- Check that forked Tarantool doesn't crash when preparing a crash report.
@@ -17,7 +17,7 @@ g.test_crash_during_crash_report = function(cg)
 
     -- Use `cd' and `shell = true' due to lack of cwd option in popen (gh-5633).
     local exe = arg[-1]
-    local dir = cg.server.workdir
+    local dir = cg.tempdir
     local cmd = [[
         cd %s && %s -e "box.cfg{} require('log').info('pid = ' .. box.info.pid)"
     ]]
