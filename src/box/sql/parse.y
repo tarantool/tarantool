@@ -290,8 +290,8 @@ cconsname(N) ::= CONSTRAINT nm(X). { N = X; }
 cconsname(N) ::= . { N = Token_nil; }
 ccons ::= DEFAULT term(X).            {sqlAddDefaultValue(pParse,&X);}
 ccons ::= DEFAULT LP expr(X) RP.      {sqlAddDefaultValue(pParse,&X);}
-ccons ::= DEFAULT PLUS term(X).       {sqlAddDefaultValue(pParse,&X);}
-ccons ::= DEFAULT MINUS(A) term(X).      {
+ccons ::= DEFAULT PLUS number(X).     {sqlAddDefaultValue(pParse,&X);}
+ccons ::= DEFAULT MINUS(A) number(X). {
   ExprSpan v;
   v.pExpr = sqlPExpr(pParse, TK_UMINUS, X.pExpr, 0);
   v.zStart = A.z;
@@ -888,6 +888,8 @@ idlist(A) ::= nm(Y). {
 %destructor expr {sql_expr_delete($$.pExpr);}
 %type term {ExprSpan}
 %destructor term {sql_expr_delete($$.pExpr);}
+%type number {ExprSpan}
+%destructor number {sql_expr_delete($$.pExpr);}
 
 %include {
   /* This is a utility routine used to set the ExprSpan.zStart and
@@ -964,14 +966,15 @@ expr(A) ::= nm(X) DOT nm(Y). {
   spanSet(&A,&X,&Y); /*A-overwrites-X*/
   A.pExpr = sqlPExpr(pParse, TK_DOT, temp1, temp2);
 }
-term(A) ::= FLOAT|BLOB(X). {spanExpr(&A, @X, X);/*A-overwrites-X*/}
+term(A) ::= BLOB(X). {spanExpr(&A, @X, X);/*A-overwrites-X*/}
 term(A) ::= STRING(X).     {spanExpr(&A, @X, X);/*A-overwrites-X*/}
 term(A) ::= FALSE(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
 term(A) ::= TRUE(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
 term(A) ::= UNKNOWN(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
-term(A) ::= DECIMAL(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
-
-term(A) ::= INTEGER(X). {
+term(A) ::= number(A).
+number(A) ::= FLOAT(X). {spanExpr(&A, @X, X);/*A-overwrites-X*/}
+number(A) ::= DECIMAL(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
+number(A) ::= INTEGER(X). {
   A.pExpr = sql_expr_new_dequoted(TK_INTEGER, &X);
   A.pExpr->type = FIELD_TYPE_INTEGER;
   A.zStart = X.z;
