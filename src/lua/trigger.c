@@ -237,3 +237,89 @@ lbox_trigger_reset(struct lua_State *L, int top, struct rlist *list,
 	}
 	return 0;
 }
+
+const char *trigger_list_typename = "trigger.trigger_list";
+
+/**
+ * Gets trigger_list from Lua stack with type check.
+ */
+static inline struct rlist *
+luaT_check_trigger_list(struct lua_State *L, int idx)
+{
+	return luaL_checkudata(L, idx, trigger_list_typename);
+}
+
+/**
+ * Creates new trigger list in Lua.
+ */
+static int
+luaT_trigger_list_new(struct lua_State *L)
+{
+	struct rlist *trigger_list = lua_newuserdata(L, sizeof(*trigger_list));
+	rlist_create(trigger_list);
+	luaL_getmetatable(L, trigger_list_typename);
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
+/**
+ * Runs all triggers from trigger list with passed arguments.
+ */
+static int
+luaT_trigger_list_run(struct lua_State *L)
+{
+	struct rlist *trigger_list = luaT_check_trigger_list(L, 1);
+	int top = lua_gettop(L);
+	struct lbox_trigger *trigger;
+	rlist_foreach_entry(trigger, trigger_list, base.link) {
+		/* Only lbox_trigger is expected to be here. */
+		assert(trigger->base.run == lbox_trigger_run);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
+		for (int i = 2; i <= top; i++)
+			lua_pushvalue(L, i);
+		if (luaT_call(L, top - 1, 0) != 0)
+			luaT_error(L);
+	}
+	return 0;
+}
+
+/**
+ * Metamethod __call for trigger list.
+ * See description of lbox_trigger_reset for details.
+ */
+static int
+luaT_trigger_list_call(struct lua_State *L)
+{
+	struct rlist *trigger_list = luaT_check_trigger_list(L, 1);
+	return lbox_trigger_reset(L, 3, trigger_list, NULL, NULL);
+}
+
+/**
+ * Destroys a trigger list.
+ */
+static int
+luaT_trigger_list_gc(struct lua_State *L)
+{
+	struct rlist *trigger_list = luaT_check_trigger_list(L, 1);
+	trigger_destroy(trigger_list);
+	return 0;
+}
+
+void
+tarantool_lua_trigger_init(struct lua_State *L)
+{
+	const struct luaL_Reg module_funcs[] = {
+		{"new", luaT_trigger_list_new},
+		{NULL, NULL}
+	};
+	luaT_newmodule(L, "internal.trigger", module_funcs);
+	lua_pop(L, 1);
+	const struct luaL_Reg trigger_list_methods[] = {
+		{"run", luaT_trigger_list_run},
+		{"__call", luaT_trigger_list_call},
+		{"__gc", luaT_trigger_list_gc},
+		{NULL, NULL}
+	};
+	luaL_register_type(L, trigger_list_typename,
+			   trigger_list_methods);
+}

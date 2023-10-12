@@ -1,7 +1,5 @@
 #!/usr/bin/env tarantool
 
-local table_clear = require('table.clear')
-
 box.cfg{
     log = "tarantool.log"
 }
@@ -35,18 +33,17 @@ test:test("simple trigger test", function(test)
     test:is(#trigger_list(), 2, "check that we've returned copy")
 
     -- Delete both triggers
-    test:is(trigger_list(nil, trigger_cnt), trigger_cnt, "pop trigger")
+    test:is(trigger_list(nil, trigger_cnt), nil, "pop trigger")
     trigger_list:run()
     test:is(#trigger_list(), 1, "check trigger count after delete")
     test:is(cnt, 4, "check third run")
-    test:is(trigger_list(nil, trigger_cnt), trigger_cnt, "pop trigger")
+    test:is(trigger_list(nil, trigger_cnt), nil, "pop trigger")
     trigger_list:run()
     test:is(#trigger_list(), 0, "check trigger count after delete")
 
 
     -- Check that we've failed to delete trigger
-    local _, err = pcall(getmetatable(trigger_list).__call, trigger_list,
-                         nil, trigger_cnt)
+    local _, err = pcall(trigger_list, nil, trigger_cnt)
     test:ok(string.find(err, "is not found"), "check error")
 end)
 
@@ -70,18 +67,19 @@ test:test("errored trigger test", function(test)
     -- Append errored trigger
     trigger_list(trigger_errored)
     pcall(function() trigger_list:run() end)
-    test:is(cnt, 2, "check simple+error trigger")
+    test:is(cnt, 1, "check error+simple trigger")
     -- Flush triggers
-    table_clear(trigger_list)
+    trigger_list(nil, trigger_errored)
+    trigger_list(nil, trigger_cnt)
     test:is(#trigger_list(), 0, "successfull flush")
     -- Append first trigger
     trigger_list(trigger_errored)
     pcall(function() trigger_list:run() end)
-    test:is(cnt, 2, "check error trigger")
+    test:is(cnt, 1, "check error trigger")
     -- Append errored trigger
     trigger_list(trigger_cnt)
     pcall(function() trigger_list:run() end)
-    test:is(cnt, 2, "check error+simple trigger")
+    test:is(cnt, 2, "check simple+error trigger")
 end)
 
 os.exit(test:check() == true and 0 or -1)
