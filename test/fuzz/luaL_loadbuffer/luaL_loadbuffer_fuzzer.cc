@@ -3,11 +3,11 @@ extern "C"
 #include <signal.h>
 #include <unistd.h>
 
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
+#include "lua.h"
+#include "lualib.h"
+#include "lauxlib.h"
 /* luaM_metrics */
-#include <lmisclib.h>
+#include "lmisclib.h"
 }
 
 #include "lua_grammar.pb.h"
