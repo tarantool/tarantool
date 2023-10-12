@@ -19,11 +19,11 @@ test:test("simple trigger test", function(test)
     local function trigger_cnt() cnt = cnt + 1 end
 
     -- Append first trigger
-    trigger_list(trigger_cnt)
+    trigger_list(trigger_cnt, nil, "trigger1")
     trigger_list:run()
     test:is(cnt, 1, "check first run")
     -- Append second trigger
-    trigger_list(trigger_cnt)
+    trigger_list(trigger_cnt, nil, "trigger2")
     trigger_list:run()
     test:is(cnt, 3, "check first run")
     -- Check listing
@@ -33,14 +33,13 @@ test:test("simple trigger test", function(test)
     test:is(#trigger_list(), 2, "check that we've returned copy")
 
     -- Delete both triggers
-    test:is(trigger_list(nil, trigger_cnt), nil, "pop trigger")
+    test:is(trigger_list(nil, nil, "trigger1"), nil, "pop trigger")
     trigger_list:run()
     test:is(#trigger_list(), 1, "check trigger count after delete")
     test:is(cnt, 4, "check third run")
-    test:is(trigger_list(nil, trigger_cnt), nil, "pop trigger")
+    test:is(trigger_list(nil, nil, "trigger2"), nil, "pop trigger")
     trigger_list:run()
     test:is(#trigger_list(), 0, "check trigger count after delete")
-
 
     -- Check that we've failed to delete trigger
     local _, err = pcall(trigger_list, nil, trigger_cnt)

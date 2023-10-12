@@ -150,8 +150,8 @@ box.on_commit(on_commit[1])
 table.insert(funcs, box.on_commit())
 box.on_commit(on_commit[2])
 table.insert(funcs, box.on_commit())
-box.on_commit(on_commit[3])
-box.on_commit(on_commit[3])
+box.on_commit(on_commit[3], nil, 'on_commit[3][1]')
+box.on_commit(on_commit[3], nil, 'on_commit[3][2]')
 table.insert(funcs, box.on_commit())
 box.on_commit(on_commit[3], on_commit[2])
 table.insert(funcs, box.on_commit())
@@ -168,7 +168,9 @@ for _, list in pairs(funcs) do
     end
 end;
 inspector:cmd("setopt delimiter ''");
--- Yes, the order is reversed. Like all other Lua triggers.
+-- The order of triggers is reversed order of their insertion, like all other
+-- Lua triggers. But on_commit triggers are called in reversed order of their
+-- arrangement - it's the order they were added.
 call_list
 funcs
 --

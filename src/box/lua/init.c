@@ -693,13 +693,13 @@ static int                                                                     \
 lbox_on_##name(struct lua_State *L) {                                          \
 	struct txn *txn = in_txn();                                            \
 	int top = lua_gettop(L);                                               \
-	if (top > 2 || txn == NULL) {                                          \
+	if (top > 3 || txn == NULL) {                                          \
 		return luaL_error(L, "Usage inside a transaction: "            \
-				  "box.on_" #name "([function | nil, "         \
-				  "[function | nil]])");                       \
+				  "box.on_" #name "([new_function | nil, "     \
+				  "[old_function | nil], [name | nil]])");     \
 	}                                                                      \
 	txn_init_triggers(txn);                                                \
-	return lbox_trigger_reset(L, 2, &txn->on_##name, lbox_push_txn, NULL); \
+	return lbox_trigger_reset(L, 1, &txn->on_##name, lbox_push_txn, NULL); \
 }
 
 LBOX_TXN_TRIGGER(commit)
