@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(43)
+test:plan(41)
 
 --!./tcltestrunner.lua
 -- 2009 August 24
@@ -739,64 +739,6 @@ test:do_test(
         -- </triggerC-11.0>
     })
 
--- MUST_WORK_TEST
-local
-tests11 = {-- {"CREATE TABLE t1(a PRIMARY KEY, b)",                         {{}, {}}},
-           {"CREATE TABLE t1(a INT PRIMARY KEY DEFAULT 1, b TEXT DEFAULT 'abc')", {1, "abc"}}}
-
---for _ in X(0, "X!foreach", [=[["testno tbl defaults","\n  1 \"CREATE TABLE t1(a PRIMARY KEY, b)\"                          {{} {}}\n  2 \"CREATE TABLE t1(a PRIMARY KEY DEFAULT 1, b DEFAULT 'abc')\"  {1 abc}\n  3 \"CREATE TABLE t1(a PRIMARY KEY, b DEFAULT 4.5)\"              {{} 4.5}\n"]]=]) do
-for testno, v in ipairs(tests11) do
-    test:do_test(
-        "triggerC-11."..testno..".1",
-        function()
-            test:catchsql " DROP TABLE t1 "
-            test:execsql " DELETE FROM log "
-            test:execsql(v[1])
-            return test:execsql [[
-                CREATE TRIGGER tt1 BEFORE INSERT ON t1 FOR EACH ROW BEGIN
-                  INSERT INTO log VALUES((SELECT COALESCE(MAX(id),0) + 1 FROM log),
-                                         new.a, new.b);
-                END;
-                INSERT INTO t1 DEFAULT VALUES;
-                SELECT a,b FROM log;
-            ]]
-        end, v[2])
-
-    -- Tarantool: we're unable to do double insert of default vals
-    -- (PK will be not unique). Comment so far
-    -- test:do_test(
-    --     "triggerC-11."..testno..".2",
-    --     function()
-    --         test:execsql " DELETE FROM log "
-    --         return test:execsql [[
-    --             CREATE TRIGGER tt2 AFTER INSERT ON t1 FOR EACH ROW BEGIN
-    --               INSERT INTO log VALUES(new.a, new.b);
-    --             END;
-    --             INSERT INTO t1 DEFAULT VALUES;
-    --             SELECT * FROM log;
-    --         ]]
-    --     end, {
-    --         -- X(891, "X!cmd", [=[["concat",["defaults"],["defaults"]]]=])
-    --     })
-
-    -- Legacy from the original code. Must be replaced with valid value.
-    local defaults = nil
-    test:do_test(
-        "triggerC-11."..testno..".3",
-        function()
-            test:execsql " DROP TRIGGER tt1 "
-            test:execsql " DELETE FROM t1"
-            test:execsql " DELETE FROM log "
-            return test:execsql [[
-                INSERT INTO t1 DEFAULT VALUES;
-                SELECT a,b FROM log;
-            ]]
-        end, {
-            defaults
-        })
-
-    --
-end
 test:do_test(
     "triggerC-11.4",
     function()

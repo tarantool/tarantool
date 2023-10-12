@@ -155,17 +155,6 @@ uint32_t
 sql_trigger_space_id(struct sql_trigger *trigger);
 
 /**
- * Given space_id and field number, return default value
- * for the field.
- * @param space_id Space ID.
- * @param fieldno Field index.
- * @retval Pointer to AST corresponding to default value.
- * Can be NULL if no DEFAULT specified or it is a view.
- */
-struct Expr*
-space_column_default_expr(uint32_t space_id, uint32_t fieldno);
-
-/**
  * Return the number of bytes required to create a duplicate of the
  * expression passed as the first argument. The second argument is a
  * mask containing EXPRDUP_XXX flags.

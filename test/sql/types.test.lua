@@ -465,7 +465,7 @@ box.execute("SELECT * FROM t3;")
 box.execute("DROP TABLE t3;")
 box.func.check_t3_ck_unnamed_t3_d_1:drop()
 
-box.execute("CREATE TABLE t4 (i INT PRIMARY KEY, d DOUBLE DEFAULT 1.2345);")
+box.execute("CREATE TABLE t4 (i INT PRIMARY KEY, d DOUBLE DEFAULT 1.2345e0);")
 box.execute("INSERT INTO t4(i) VALUES (1);")
 box.execute("SELECT * FROM t4;")
 box.execute("DROP TABLE t4;")

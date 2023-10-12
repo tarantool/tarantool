@@ -233,3 +233,15 @@ g.test_only_numbers_with_signs = function()
         box.execute([[DROP TABLE t;]])
     end)
 end
+
+g.test_new_defaults = function()
+    g.server:exec(function()
+        -- Make sure a literal works correctly as a default value.
+        local sql = [[CREATE TABLE T(I INT PRIMARY KEY, A ANY DEFAULT 123,
+                      B STRING DEFAULT('something'));]]
+        box.execute(sql)
+        t.assert_equals(box.space.T:format()[2].default, 123)
+        t.assert_equals(box.space.T:format()[3].default, 'something')
+        box.space.T:drop()
+    end)
+end

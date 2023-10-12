@@ -288,15 +288,20 @@ carglist ::= .
 %type cconsname { struct Token }
 cconsname(N) ::= CONSTRAINT nm(X). { N = X; }
 cconsname(N) ::= . { N = Token_nil; }
-ccons ::= DEFAULT term(X).            {sqlAddDefaultValue(pParse,&X);}
-ccons ::= DEFAULT LP expr(X) RP.      {sqlAddDefaultValue(pParse,&X);}
-ccons ::= DEFAULT PLUS number(X).     {sqlAddDefaultValue(pParse,&X);}
+ccons ::= DEFAULT term(X).            {sql_add_term_default(pParse, &X);}
+ccons ::= DEFAULT LP expr(X) RP.      {
+  if (sql_expr_is_term(X.pExpr))
+    sql_add_term_default(pParse, &X);
+  else
+    sqlAddDefaultValue(pParse, &X);
+}
+ccons ::= DEFAULT PLUS number(X).     {sql_add_term_default(pParse, &X);}
 ccons ::= DEFAULT MINUS(A) number(X). {
   ExprSpan v;
   v.pExpr = sqlPExpr(pParse, TK_UMINUS, X.pExpr, 0);
   v.zStart = A.z;
   v.zEnd = X.zEnd;
-  sqlAddDefaultValue(pParse,&v);
+  sql_add_term_default(pParse, &v);
 }
 
 // In addition to the type name, we also care about the primary key and
