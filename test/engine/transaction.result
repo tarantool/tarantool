@@ -318,7 +318,8 @@ call_list = {}
 -- Incorrect usage outside of a transaction.
 box.on_commit()
 ---
-- error: 'Usage inside a transaction: box.on_commit([function | nil, [function | nil]])'
+- error: 'Usage inside a transaction: box.on_commit([new_function | nil, [old_function
+    | nil], [name | nil]])'
 ...
 -- Incorrect usage inside a transaction.
 box.begin() s:replace{3} box.on_rollback(on_rollback) box.on_commit(100)
@@ -350,8 +351,8 @@ box.on_commit(on_commit[1])
 table.insert(funcs, box.on_commit())
 box.on_commit(on_commit[2])
 table.insert(funcs, box.on_commit())
-box.on_commit(on_commit[3])
-box.on_commit(on_commit[3])
+box.on_commit(on_commit[3], nil, 'on_commit[3][1]')
+box.on_commit(on_commit[3], nil, 'on_commit[3][2]')
 table.insert(funcs, box.on_commit())
 box.on_commit(on_commit[3], on_commit[2])
 table.insert(funcs, box.on_commit())
@@ -374,7 +375,9 @@ inspector:cmd("setopt delimiter ''");
 ---
 - true
 ...
--- Yes, the order is reversed. Like all other Lua triggers.
+-- The order of triggers is reversed order of their insertion, like all other
+-- Lua triggers. But on_commit triggers are called in reversed order of their
+-- arrangement - it's the order they were added.
 call_list
 ---
 - - on_commit_1
@@ -386,16 +389,16 @@ funcs
 ---
 - - []
   - - on_commit_1
-  - - on_commit_1
+  - - on_commit_2
+    - on_commit_1
+  - - on_commit_3
+    - on_commit_3
     - on_commit_2
-  - - on_commit_1
-    - on_commit_2
+    - on_commit_1
+  - - on_commit_3
     - on_commit_3
     - on_commit_3
-  - - on_commit_1
-    - on_commit_3
-    - on_commit_3
-    - on_commit_3
+    - on_commit_1
 ...
 --
 -- Test on_commit/rollback txn iterators.

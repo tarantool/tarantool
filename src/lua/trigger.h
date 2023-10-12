@@ -57,37 +57,48 @@ typedef int
 (*lbox_pop_event_f)(struct lua_State *L, int nret, void *event);
 
 /**
- * Create a Lua trigger, replace an existing one,
- * or delete a trigger.
+ * Creates a Lua trigger, replaces an existing one, or deletes a trigger.
  *
- * The function accepts a Lua stack with at least
- * one argument.
+ * The function accepts a Lua stack. Values starting from index bottom are
+ * considered as the function arguments.
  *
- * The argument at the top of the stack defines the old value
- * of the trigger, which serves as a search key if the trigger
- * needs to be updated. If it is not present or is nil, a new
- * trigger is created.
- * The argument just below the top must reference a Lua function
- * or closure for which the trigger needs to be set.
- * If argument below the top is nil, but argument at the top is an
- * existing trigger, it's erased.
+ * The function supports two API versions.
  *
- * An existing trigger is searched on the 'list' by checking
- * trigger->data of all triggers on the list which have the same
- * trigger->run function as passed in in 'run' argument.
+ * The first version - key-value arguments. The function is called with one Lua
+ * argument which is not callable table. In this case, the table must contain
+ * key "name" with value of type string - the name of a trigger. The second
+ * key, "func", is optional. If it is not present, a trigger with passed name
+ * is deleted, or no-op, if there is no such trigger. If key "func" is present,
+ * it must contain a callable object as a value - it will be used as a handler
+ * for a new trigger. The new trigger will be appended to the beginning of the
+ * trigger list or replace an existing one with the same name. The function
+ * returns new trigger (or nothing, if it was deleted).
  *
- * When a new trigger is set, the function passed in the first
- * value on Lua stack is referenced, and the reference is saved
- * in trigger->data (if an old trigger is found it's current Lua
- * function is first dereferenced, the reference is destroyed).
+ * The second version - positional arguments. The function is called with up to
+ * three Lua arguments. The first one is a new trigger handler - it must be a
+ * callable object or nil. The second one is an old trigger handler - it must
+ * be a callable object or nil as well. The third argument is a trigger name of
+ * type string (it can be nil too).
+ * If the name is passed, the logic is equivalent to key-value API -
+ * the third argument is a trigger name, the first one is a trigger handler (or
+ * nil if the function is called to delete a trigger by name), the second
+ * argument is ignored, but the type check is still performed. If the name is
+ * not passed, the function mimics the behavior of function lbox_trigger_reset:
+ * 1. If triggers (first and second arguments) are not passed, returns table of
+ * triggers.
+ * 2. If new trigger is passed and old one is not - sets new trigger using
+ * its address as name. The new trigger is returned.
+ * 3. If old trigger is passed and new trigger is not - deletes a trigger by
+ * address of an old trigger as a name. Returns nothing.
+ * 4. If both triggers are provided - replace old trigger with new one if they
+ * have the same address, delete old trigger and insert new one at the beginning
+ * of the trigger list otherwise. The new trigger is returned.
  *
- * @param top defines the top of the stack. If the actual
- *        lua_gettop(L) is less than 'top', the stack is filled
- *        with nils (this allows the second argument to be
- *        optional).
+ * Argument push_f pushes arguments from C to Lua stack. Argument pop_f pops
+ * returned values from Lua stack to C.
  */
 int
-lbox_trigger_reset(struct lua_State *L, int top, struct rlist *list,
+lbox_trigger_reset(struct lua_State *L, int bottom, struct rlist *list,
 		   lbox_push_event_f push_f, lbox_pop_event_f pop_f);
 
 /**

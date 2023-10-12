@@ -14,6 +14,23 @@ g.before_all(function()
     g.server = server:new({alias = 'master', env = env})
     g.server:start()
     g.server:exec(function()
+        local net_box = require('net.box')
+        local conn = net_box.connect("a:b")
+        local function net_box_on_connect(...)
+            return conn:on_connect(...)
+        end
+        local function net_box_on_disconnect(...)
+            return conn:on_disconnect(...)
+        end
+        local function net_box_on_schema_reload(...)
+            return conn:on_schema_reload(...)
+        end
+        -- There is an internal trigger initially - the test expects empty
+        -- triggers in the beginning. Let's remove it - the triggers won't
+        -- be fired anyway.
+        local net_box_on_connect_trg = conn:on_connect()[1]
+        conn:on_connect(nil, net_box_on_connect_trg)
+
         box.schema.space.create('test', {id = 512})
         local function space_on_replace(...)
             return box.space.test:on_replace(...)
@@ -29,12 +46,16 @@ g.before_all(function()
             {box.session.on_connect, 'box.session.on_connect'},
             {box.session.on_disconnect, 'box.session.on_disconnect'},
             {box.session.on_auth, 'box.session.on_auth'},
+            {box.session.on_access_denied, 'box.session.on_access_denied'},
             {space_on_replace, 'box.space[512].on_replace'},
             {space_before_replace, 'box.space[512].before_replace'},
             {box.ctl.on_election, 'box.ctl.on_election'},
             {box.ctl.on_recovery_state, 'box.ctl.on_recovery_state'},
             {box.ctl.on_schema_init, 'box.ctl.on_schema_init'},
             {box.ctl.on_shutdown, 'box.ctl.on_shutdown'},
+            {net_box_on_connect, nil},
+            {net_box_on_disconnect, nil},
+            {net_box_on_schema_reload, nil},
         })
 
         rawset(_G, 'ffi_monotonic_id', 0)
@@ -73,6 +94,9 @@ g.test_old_api = function()
         local generate_callable_objects =
             rawget(_G, 'generate_callable_objects')
         local function check_trigger(old_api_trigger)
+            -- Test inside transaction to make transactional triggers work
+            box.begin()
+
             local function h1() end
             local h2, h3, h4 = generate_callable_objects(h1)
 
@@ -147,6 +171,8 @@ g.test_old_api = function()
             t.assert_equals(old_api_trigger(), {h2})
             t.assert_equals(old_api_trigger(nil, nil, 't2'), nil)
             t.assert_equals(old_api_trigger(), {})
+
+            box.commit()
         end
         for _, trg_descr in pairs(old_api_triggers) do
             local trg = trg_descr[1]
@@ -161,6 +187,9 @@ g.test_key_value_args = function()
         local generate_callable_objects =
             rawget(_G, 'generate_callable_objects')
         local function check_trigger(old_api_trigger)
+            -- Test inside transaction to make transactional triggers work
+            box.begin()
+
             local function h1() end
             local h2, h3, h4 = generate_callable_objects(h1)
 
@@ -196,6 +225,8 @@ g.test_key_value_args = function()
             t.assert_equals(old_api_trigger(), {h1})
             t.assert_equals(old_api_trigger{name = 'h1'}, nil)
             t.assert_equals(old_api_trigger(), {})
+
+            box.commit()
         end
         for _, trg_descr in pairs(old_api_triggers) do
             local trg = trg_descr[1]
