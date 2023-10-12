@@ -2611,6 +2611,16 @@ struct Expr *
 expr_new_variable(struct Parse *parse, const struct Token *spec,
 		  const struct Token *id);
 
+/** Return TRUE if expression is term, FALSE otherwise. */
+static inline bool
+sql_expr_is_term(const struct Expr *expr)
+{
+	uint8_t op = expr->op;
+	return op == TK_STRING || op == TK_BLOB || op == TK_INTEGER ||
+	       op == TK_FLOAT || op == TK_DECIMAL || op == TK_TRUE ||
+	       op == TK_FALSE || op == TK_UNKNOWN || op == TK_NULL;
+}
+
 /**
  * Set the sort order for the last element on the given ExprList.
  *
@@ -2735,6 +2745,10 @@ sqlAddPrimaryKey(struct Parse *parse);
  */
 void
 sql_create_check_contraint(struct Parse *parser, bool is_field_ck);
+
+/** Add a default literal to the last created column. */
+void
+sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span);
 
 void sqlAddDefaultValue(Parse *, ExprSpan *);
 void sqlAddCollateType(Parse *, Token *);

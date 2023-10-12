@@ -1237,20 +1237,6 @@ sql_debug_info(struct info_handler *h)
 	info_end(h);
 }
 
-struct Expr*
-space_column_default_expr(uint32_t space_id, uint32_t fieldno)
-{
-	struct space *space;
-	space = space_cache_find(space_id);
-	assert(space != NULL);
-	assert(space->def != NULL);
-	if (space->def->opts.is_view)
-		return NULL;
-	assert(space->def->field_count > fieldno);
-	struct tuple_field *field = tuple_format_field(space->format, fieldno);
-	return field->sql_default_value_expr;
-}
-
 /**
  * Create and initialize a new template space_def object.
  * @param parser SQL Parser object.

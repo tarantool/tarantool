@@ -80,7 +80,7 @@ test:do_execsql_test(
 	PRAGMA table_info(t4);
 	]], {
 	-- <default-2.1>
-    0, "rowid", "integer", 1, "", 1, 1, "c", "string", 0, "'abc'", 0
+    0, "rowid", "integer", 1, "", 1, 1, "c", "string", 0, "", 0
 	-- </default-2.1>
 })
 
@@ -91,7 +91,7 @@ test:do_execsql_test(
 	PRAGMA table_info(t4);
 	]], {
 	-- <default-2.2>
-    0, "rowid", "integer", 1, "", 1, 1, "c", "string", 0, "'abc'", 0
+    0, "rowid", "integer", 1, "", 1, 1, "c", "string", 0, "", 0
 	-- </default-2.2>
 })
 

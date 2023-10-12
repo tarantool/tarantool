@@ -801,12 +801,13 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct space *space,
 			on_conflict != ON_CONFLICT_ACTION_DEFAULT ?
 			on_conflict : def->fields[i].nullable_action;
 		/* ABORT is a default error action. */
-		if (on_conflict_nullable == ON_CONFLICT_ACTION_DEFAULT)
+		if (on_conflict_nullable == ON_CONFLICT_ACTION_DEFAULT ||
+		    on_conflict_nullable == ON_CONFLICT_ACTION_REPLACE)
 			on_conflict_nullable = ON_CONFLICT_ACTION_ABORT;
-		struct Expr *dflt = space_column_default_expr(def->id, i);
-		if (on_conflict_nullable == ON_CONFLICT_ACTION_REPLACE &&
-		    dflt == NULL)
-			on_conflict_nullable = ON_CONFLICT_ACTION_ABORT;
+		/* If default it set it will be inserted instead of NULL. */
+		if (on_conflict_nullable == ON_CONFLICT_ACTION_ABORT &&
+		    def->fields[i].default_value != NULL)
+			on_conflict_nullable = ON_CONFLICT_ACTION_NONE;
 		int addr;
 		switch (on_conflict_nullable) {
 		case ON_CONFLICT_ACTION_ABORT:
@@ -826,14 +827,8 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct space *space,
 			sqlVdbeAddOp2(v, OP_IsNull, new_tuple_reg + i,
 					  ignore_label);
 			break;
-		case ON_CONFLICT_ACTION_REPLACE:
-			addr = sqlVdbeAddOp1(v, OP_NotNull,
-						  new_tuple_reg + i);
-			sqlExprCode(parse_context, dflt, new_tuple_reg + i);
-			sqlVdbeJumpHere(v, addr);
-			break;
 		default:
-			unreachable();
+			assert(on_conflict_nullable == ON_CONFLICT_ACTION_NONE);
 		}
 	}
 	sql_emit_table_types(v, space->def, new_tuple_reg);

@@ -47,6 +47,7 @@
 #include "sqlInt.h"
 #include "mem.h"
 #include "vdbeInt.h"
+#include "mp_decimal.h"
 #include "tarantoolInt.h"
 #include "box/sequence.h"
 #include "box/session.h"
@@ -486,6 +487,145 @@ sqlAddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 		}
 	}
 	sql_expr_delete(pSpan->pExpr);
+}
+
+/** Fetch negative integer value from the expr. */
+static int
+sql_expr_nint(const struct Expr *expr, int64_t *res)
+{
+	assert(expr->op == TK_INTEGER);
+	if ((expr->flags & EP_IntValue) != 0) {
+		*res = -expr->u.iValue;
+		return 0;
+	}
+	assert(strlen(expr->u.zToken) > 2);
+	const char *str = tt_sprintf("-%s", expr->u.zToken);
+	int base = str[1] == '0' && (str[2] == 'x' || str[2] == 'X') ? 16 : 10;
+	errno = 0;
+	*res = strtoll(str, NULL, base);
+	return errno == 0 ? 0 : -1;
+}
+
+/** Fetch non-negative integer value from the expr. */
+static int
+sql_expr_uint(const struct Expr *expr, uint64_t *res)
+{
+	assert(expr->op == TK_INTEGER);
+	if ((expr->flags & EP_IntValue) != 0) {
+		*res = expr->u.iValue;
+		return 0;
+	}
+	assert(strlen(expr->u.zToken) > 2);
+	const char *str = expr->u.zToken;
+	int base = str[1] == '0' && (str[2] == 'x' || str[2] == 'X') ? 16 : 10;
+	errno = 0;
+	*res = strtoull(str, NULL, base);
+	return errno == 0 ? 0 : -1;
+}
+
+void
+sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
+{
+	assert(parser->create_column_def.space != NULL);
+	char *buf = NULL;
+	uint32_t size = 0;
+	struct region *region = &parser->region;
+	struct Expr *expr = expr_span->pExpr;
+	switch (sql_expr_type(expr)) {
+	case FIELD_TYPE_BOOLEAN: {
+		assert(expr->op == TK_TRUE || expr->op == TK_FALSE);
+		bool val = expr->op == TK_TRUE;
+		size = mp_sizeof_bool(val);
+		buf = xregion_alloc(region, size);
+		mp_encode_bool(buf, val);
+		break;
+	}
+	case FIELD_TYPE_VARBINARY: {
+		assert(expr->u.zToken[0] == 'x' || expr->u.zToken[0] == 'X');
+		assert(expr->u.zToken[1] == '\'');
+		const char *val_hex = &expr->u.zToken[2];
+		uint32_t len = strlen(val_hex) - 1;
+		assert(val_hex[len] == '\'');
+		size = mp_sizeof_bin(len / 2);
+		buf = xregion_alloc(region, size);
+		char *val = sqlHexToBlob(val_hex, len);
+		mp_encode_bin(buf, val, len / 2);
+		sql_xfree(val);
+		break;
+	}
+	case FIELD_TYPE_STRING: {
+		const char *val = expr->u.zToken;
+		uint32_t len = strlen(val);
+		size = mp_sizeof_str(len);
+		buf = xregion_alloc(region, size);
+		mp_encode_str(buf, val, len);
+		break;
+	}
+	case FIELD_TYPE_DOUBLE: {
+		double val;
+		sqlAtoF(expr_span->zStart, &val,
+			expr_span->zEnd - expr_span->zStart);
+		assert(!sqlIsNaN(val));
+		size = mp_sizeof_double(val);
+		buf = xregion_alloc(region, size);
+		mp_encode_double(buf, val);
+		break;
+	}
+	case FIELD_TYPE_DECIMAL: {
+		const char *str = tt_cstr(expr_span->zStart,
+					  expr_span->zEnd - expr_span->zStart);
+		decimal_t val;
+		decimal_from_string(&val, str);
+		size = mp_sizeof_decimal(&val);
+		buf = xregion_alloc(region, size);
+		mp_encode_decimal(buf, &val);
+		break;
+	}
+	case FIELD_TYPE_INTEGER: {
+		if (expr->op == TK_UMINUS) {
+			int64_t val;
+			if (sql_expr_nint(expr->pLeft, &val) == 0) {
+				size = mp_sizeof_int(val);
+				buf = xregion_alloc(region, size);
+				mp_encode_int(buf, val);
+				break;
+			}
+			int errcode = ER_INT_LITERAL_MAX;
+			const char *str = expr->pLeft->u.zToken;
+			if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
+				errcode = ER_HEX_LITERAL_MAX;
+			diag_set(ClientError, errcode, "-", str);
+			parser->is_aborted = true;
+			break;
+		}
+		uint64_t val;
+		if (sql_expr_uint(expr, &val) == 0) {
+			size = mp_sizeof_uint(val);
+			buf = xregion_alloc(region, size);
+			mp_encode_uint(buf, val);
+			break;
+		}
+		int errcode = ER_INT_LITERAL_MAX;
+		const char *str = expr->u.zToken;
+		if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
+			errcode = ER_HEX_LITERAL_MAX;
+		diag_set(ClientError, errcode, "", str);
+		parser->is_aborted = true;
+		break;
+	}
+	default:
+		assert(sql_expr_type(expr) == FIELD_TYPE_SCALAR);
+		assert(expr->op == TK_NULL || expr->op == TK_UNKNOWN);
+		assert(buf == NULL);
+		assert(size == 0);
+	}
+	sql_expr_delete(expr_span->pExpr);
+	if (parser->is_aborted)
+		return;
+	struct space_def *def = parser->create_column_def.space->def;
+	struct field_def *field = &def->fields[def->field_count - 1];
+	field->default_value = buf;
+	field->default_value_size = size;
 }
 
 static int

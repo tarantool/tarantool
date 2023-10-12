@@ -134,7 +134,7 @@ test:do_execsql_test(
             SELECT * FROM t2dup;
     ]], {
         -- <insert3-2.1>
-        1, 123, "b", "c", 2, -1, "234", "c", 3, -1, "b", "345"
+        1, 123, "", "", 2, -1, "234", "", 3, -1, "", "345"
         -- </insert3-2.1>
 })
 
@@ -148,7 +148,7 @@ test:do_execsql_test(
             SELECT * FROM t2dup;
     ]], {
         -- <insert3-2.2>
-        4, 1, "b", "c", 5, -1, "987", "c", 6, -1, "b", "876"
+        4, 1, "", "", 5, -1, "987", "", 6, -1, "", "876"
         -- </insert3-2.2>
 })
 
@@ -237,7 +237,7 @@ test:do_execsql_test(
     "insert3-3.7",
     [[
             CREATE TABLE t6(id INTEGER PRIMARY KEY AUTOINCREMENT, x INT,
-                            y DOUBLE DEFAULT 4.3, z TEXT DEFAULT 'hi');
+                            y DOUBLE DEFAULT 4.3e0, z TEXT DEFAULT 'hi');
             INSERT INTO t6 DEFAULT VALUES;
             SELECT * FROM t6;
     ]], {
