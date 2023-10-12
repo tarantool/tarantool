@@ -41,10 +41,10 @@ function on_connect() connected_cnt = connected_cnt + 1 end
 function on_disconnect() disconnected_cnt = disconnected_cnt + 1 end
 ---
 ...
-conn:on_connect(on_connect)
+_ = conn:on_connect(on_connect)
 ---
 ...
-conn:on_disconnect(on_disconnect)
+_ = conn:on_disconnect(on_disconnect)
 ---
 ...
 test_run:cmd('stop server connecter')

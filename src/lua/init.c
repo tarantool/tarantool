@@ -153,7 +153,6 @@ extern char minifio_lua[],
 	env_lua[],
 	pwd_lua[],
 	table_lua[],
-	trigger_lua[],
 	string_lua[],
 	varbinary_lua[],
 	swim_lua[],
@@ -301,7 +300,6 @@ static const char *lua_modules[] = {
 	"help.en_US", help_en_US_lua,
 	"help", help_lua,
 	"internal.argparse", argparse_lua,
-	"internal.trigger", trigger_lua,
 	"pwd", pwd_lua,
 	"http.client", httpc_lua,
 	"iconv", iconv_lua,
@@ -960,6 +958,7 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_lua_swim_init(L);
 	tarantool_lua_decimal_init(L);
 	tarantool_lua_compress_init(L);
+	tarantool_lua_trigger_init(L);
 #ifdef ENABLE_BACKTRACE
 	luaM_sysprof_set_backtracer(fiber_backtracer);
 #endif

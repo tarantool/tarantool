@@ -14,8 +14,8 @@ connected_cnt = 0
 disconnected_cnt = 0
 function on_connect() connected_cnt = connected_cnt + 1 end
 function on_disconnect() disconnected_cnt = disconnected_cnt + 1 end
-conn:on_connect(on_connect)
-conn:on_disconnect(on_disconnect)
+_ = conn:on_connect(on_connect)
+_ = conn:on_disconnect(on_disconnect)
 test_run:cmd('stop server connecter')
 test_run:cmd('start server connecter')
 while conn.state ~= 'active' do fiber.sleep(0.1) end

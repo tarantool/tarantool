@@ -90,6 +90,12 @@ int
 lbox_trigger_reset(struct lua_State *L, int top, struct rlist *list,
 		   lbox_push_event_f push_f, lbox_pop_event_f pop_f);
 
+/**
+ * Registers internal trigger list object in Lua.
+ */
+void
+tarantool_lua_trigger_init(struct lua_State *L);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
