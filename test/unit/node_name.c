@@ -15,7 +15,7 @@ test_node_name_is_valid(void)
 		"1",
 		"1abc",
 		"*",
-		"a_b",
+		"a+b",
 		"aBcD",
 		"a~b",
 		"{ab}",
@@ -28,7 +28,7 @@ test_node_name_is_valid(void)
 	}
 	const char *good_names[] = {
 		"a",
-		"a-b-c",
+		"a_b-c",
 		"abc",
 		"a1b2c3-d4-e5-",
 	};

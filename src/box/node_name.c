@@ -15,7 +15,7 @@ node_name_is_valid_n(const char *name, size_t len)
 	const char *end = name + len;
 	while (name < end) {
 		char c = *(name++);
-		if (!isalnum(c) && c != '-')
+		if (!isalnum(c) && c != '-' && c != '_')
 			return false;
 		if (tolower(c) != c)
 			return false;
