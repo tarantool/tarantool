@@ -68,7 +68,7 @@ curl_easy_io_read_cb(char *buffer, size_t size, size_t nitems, void *ctx)
 
 	size_t read_len = ibuf_len < buffer_size ? ibuf_len : buffer_size;
 	memcpy(buffer, req->send.rpos, read_len);
-	req->send.rpos += read_len;
+	ibuf_consume(&req->send, read_len);
 
 	fiber_cond_broadcast(&req->io_send_cond);
 	return read_len;
@@ -541,7 +541,7 @@ httpc_request_io_read(struct httpc_request *req, char *buf, size_t len,
 		if (copied == ibuf_len)
 			ibuf_reset(&req->io_recv);
 		else
-			req->io_recv.rpos += copied;
+			ibuf_consume(&req->io_recv, copied);
 	}
 
 	if (copied < len && recv_len > 0) {

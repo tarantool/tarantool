@@ -427,6 +427,7 @@ prbuf_reader_wrap(struct prbuf_reader *reader)
 	ibuf_reset(&reader->buf);
 	reader->pos = reader->data_begin;
 	reader->read_pos = reader->pos;
+	reader->last_read_size = 0;
 }
 
 int
@@ -445,6 +446,8 @@ prbuf_reader_next(struct prbuf_reader *reader,
 		return 0;
 	}
 
+	/* Consume the record data of the previous read. */
+	ibuf_consume(&reader->buf, reader->last_read_size);
 	/* Check if we hit end of buffer and need to wrap around. */
 	if (reader->data_end - reader->pos < (off_t)record_size_overhead)
 		prbuf_reader_wrap(reader);
@@ -472,14 +475,14 @@ prbuf_reader_next(struct prbuf_reader *reader,
 	}
 
 	/* Read record data. */
-	reader->buf.rpos += record_size_overhead;
+	ibuf_consume(&reader->buf, record_size_overhead);
 	if (prbuf_reader_ensure(reader, sz) != 0)
 		return -1;
 
 	entry->ptr = reader->buf.rpos;
 	entry->size = sz;
+	reader->last_read_size = sz;
 	reader->pos += full_sz;
-	reader->buf.rpos += sz;
 	reader->unread_size -= full_sz;
 	return 0;
 }
