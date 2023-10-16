@@ -1,0 +1,35 @@
+name: Set up Build Env
+
+description: Set up an environment for a build routine
+
+runs:
+  using: composite
+  steps:
+    - run: |
+        # Found that GitHub `checkout` action doesn't retrieve annotated tags,
+        # please check: https://github.com/actions/checkout/issues/290.
+        # To avoid the issue, let's fetch tags manually to be sure that all of
+        # them will always exist.
+        git fetch --tags -f
+
+        # Due to the workaround above, we need to save the correct version of
+        # the build if the workflow job has been run on branch push after a tag
+        # had been pushed. So let's drop the new tag (if any) pointing to the
+        # current commit if the job was triggered by pushing to the branch and
+        # retain it for the job triggered by tag push.
+        if ${{ ! startsWith(github.ref, 'refs/tags/') }}; then
+          git tag -d "$(git tag --points-at HEAD)" || true
+        fi
+
+        # Found that GitHub `checkout` action fetches the repository with the
+        # '--unshallow' option, but it doesn't do the same for submodules.
+        # So this may lead to the following error while using `git describe`
+        # for submodules:
+        #   fatal: No tags can describe '<sha>'.
+        #   Try --always, or create some tags.
+        git submodule foreach 'git fetch --unshallow || true'
+
+        # Found that GitHub `checkout` action cleans up the local repository
+        # without submodules. This may lead to the various build issues.
+        git submodule foreach --recursive 'git clean -xffd'
+      shell: bash
