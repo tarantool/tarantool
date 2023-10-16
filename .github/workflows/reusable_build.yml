@@ -55,7 +55,7 @@ jobs:
       - name: 'Get the commit SHA'
         id: get_sha
         run: echo "sha=$(git log -1 --format='%H')" >> $GITHUB_OUTPUT
-      - uses: ./.github/actions/environment
+      - uses: ./.github/actions/setup-build-env
       - name: Optional submodule bump
         if: ${{ inputs.submodule }}
         uses: ./.github/actions/bump-submodule

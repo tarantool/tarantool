@@ -70,7 +70,7 @@ jobs:
           revision: ${{ inputs.revision }}
 
       - name: Set environment
-        uses: ./.github/actions/environment
+        uses: ./.github/actions/setup-test-env-luajit
 
       - name: Install deps on Linux
         uses: ./.github/actions/install-deps-debian

@@ -39,7 +39,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - uses: ./.github/actions/environment
+      - uses: ./.github/actions/setup-env
 
       - name: Install deps
         uses: ./.github/actions/install-deps-osx

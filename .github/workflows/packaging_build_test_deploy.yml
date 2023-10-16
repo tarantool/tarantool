@@ -29,7 +29,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - uses: ./.github/actions/environment
+      - uses: ./.github/actions/setup-build-env
 
       - name: Make static build packages
         run: make -f .pack.mk package-static
@@ -84,14 +84,14 @@ jobs:
     container:
       image: packpack/packpack:${{ matrix.os }}
       # Mount /dev to the container to be able to mount a disk image inside it
-      # for successful run of the .github/actions/environment action.
+      # for successful run of the .github/actions/setup-test-env-luajit action.
       volumes:
         - /dev:/dev
       # Our testing expects that the init process (PID 1) will
       # reap orphan processes. At least the following test leans
       # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
       # Add extra privileges to the container for successful run
-      # of the .github/actions/environment action.
+      # of the .github/actions/setup-test-env-luajit action.
       options: '--init --privileged'
 
     steps:
@@ -101,6 +101,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - uses: ./.github/actions/setup-test-env
 
       - name: Set package manager
         run: |
@@ -117,14 +119,6 @@ jobs:
             echo "Not supported OS provided: ${{ matrix.os }}"
             exit 1
           fi
-
-      # Install the 'e2fsprogs' package that contains the 'mkfs' program needed
-      # for the 'environment' action bellow.
-      - name: Install e2fsprogs
-        if: env.PACKAGE_MANAGER != 'apt'
-        run: ${{ env.PACKAGE_MANAGER }} -y install e2fsprogs
-
-      - uses: ./.github/actions/environment
 
       - name: Download packages
         uses: actions/download-artifact@v4

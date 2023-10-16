@@ -31,13 +31,6 @@ jobs:
 
     container:
       image: docker.io/tarantool/testing:ubuntu-focal
-      # Mount /dev to the container to be able to mount a disk image inside it
-      # for successful run of the .github/actions/environment action.
-      volumes:
-        - /dev:/dev
-      # Add extra privileges to the container for successful run
-      # of the .github/actions/environment action.
-      options: '--privileged'
 
     steps:
     - name: Prepare checkout
@@ -55,7 +48,7 @@ jobs:
         languages: ${{ matrix.language }}
 
     - name: Setup env
-      uses: ./.github/actions/environment
+      uses: ./.github/actions/setup-build-env
 
     - name: Install deps
       uses: ./.github/actions/install-deps-debian
