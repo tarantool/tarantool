@@ -319,10 +319,10 @@ struct errcode_record {
 	/*264 */_(ER_NIL_UUID,			"Nil UUID is reserved and can't be used in replication") \
 	/*265 */_(ER_WRONG_FUNCTION_OPTIONS,	"Wrong function options: %s") \
 	/*266 */_(ER_MISSING_SYSTEM_SPACES,	"Snapshot has no system spaces") \
-	/*267 */_(ER_CLUSTER_NAME_MISMATCH,	"Cluster name mismatch: expected %s, got %s") \
-	/*268 */_(ER_REPLICASET_NAME_MISMATCH,	"Replicaset name mismatch: expected %s, got %s") \
+	/*267 */_(ER_CLUSTER_NAME_MISMATCH,	"Cluster name mismatch: name '%s' provided in config confilcts with the instance one '%s'") \
+	/*268 */_(ER_REPLICASET_NAME_MISMATCH,	"Replicaset name mismatch: name '%s' provided in config confilcts with the instance one '%s'") \
 	/*269 */_(ER_INSTANCE_NAME_DUPLICATE,	"Duplicate replica name %s, already occupied by %s") \
-	/*270 */_(ER_INSTANCE_NAME_MISMATCH,	"Instance name mismatch: expected %s, got %s") \
+	/*270 */_(ER_INSTANCE_NAME_MISMATCH,	"Instance name mismatch: name '%s' provided in config confilcts with the instance one '%s'") \
 	/*271 */_(ER_SCHEMA_NEEDS_UPGRADE,	"Your schema version is %u.%u.%u while Tarantool %s requires a more recent schema version. Please, consider using box.schema.upgrade().") \
 	/*272 */_(ER_SCHEMA_UPGRADE_IN_PROGRESS, "Schema upgrade is already in progress") \
 	/*273 */_(ER_DEPRECATED,		"%s is deprecated") \

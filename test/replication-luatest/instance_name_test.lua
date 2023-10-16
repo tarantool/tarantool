@@ -259,7 +259,8 @@ g.test_instance_name_bootstrap_mismatch = function(lg)
                                  new_replica.alias .. '.log')
     wait_for_death(new_replica)
     t.assert(new_replica:grep_log(
-        'Instance name mismatch: expected new%-replica%-name, got other%-name',
+        'Instance name mismatch: name \'new%-replica%-name\' provided in ' ..
+        'config confilcts with the instance one \'other%-name\'',
         1024, {filename = logfile}))
     new_replica:drop()
     --
@@ -285,7 +286,8 @@ g.test_instance_name_bootstrap_mismatch = function(lg)
     logfile = fio.pathjoin(new_replica.workdir, new_replica.alias .. '.log')
     wait_for_death(new_replica)
     t.assert(new_replica:grep_log(
-        'Instance name mismatch: expected new%-replica%-name, got <no%-name>',
+        'Instance name mismatch: name \'new%-replica%-name\' provided in ' ..
+        'config confilcts with the instance one \'<no%-name>\'',
         1024, {filename = logfile}))
     new_replica:drop()
     --
@@ -320,7 +322,8 @@ g.test_instance_name_recovery_mismatch = function(lg)
                                  lg.replica.alias .. '.log')
     wait_for_death(lg.replica)
     t.assert(lg.replica:grep_log(
-        'Instance name mismatch: expected new%-name, got replica%-name', 1024,
+        'Instance name mismatch: name \'new%-name\' provided in config ' ..
+        'confilcts with the instance one \'replica%-name\'', 1024,
         {filename = logfile}))
     --
     -- Has name in WAL, no name in cfg. Then the replica uses the saved name, no
@@ -358,7 +361,8 @@ g.test_instance_name_recovery_mismatch = function(lg)
     logfile = fio.pathjoin(lg.replica.workdir, lg.replica.alias .. '.log')
     wait_for_death(lg.replica)
     t.assert(lg.replica:grep_log(
-        'Instance name mismatch: expected new%-name, got <no%-name>', 1024,
+        'Instance name mismatch: name \'new%-name\' provided in config ' ..
+        'confilcts with the instance one \'<no%-name>\'', 1024,
         {filename = logfile}))
     box_cfg.instance_name = nil
     box_cfg.force_recovery = nil
@@ -380,7 +384,8 @@ g.test_instance_name_recovery_mismatch = function(lg)
     logfile = fio.pathjoin(lg.master.workdir, lg.master.alias .. '.log')
     wait_for_death(lg.master)
     t.assert(lg.master:grep_log(
-        'Instance name mismatch: expected new%-name, got master%-name', 1024,
+        'Instance name mismatch: name \'new%-name\' provided in config ' ..
+        'confilcts with the instance one \'master%-name\'', 1024,
         {filename = logfile}))
     --
     -- No name in WAL, has name in cfg.
@@ -405,7 +410,8 @@ g.test_instance_name_recovery_mismatch = function(lg)
     logfile = fio.pathjoin(lg.master.workdir, lg.master.alias .. '.log')
     wait_for_death(lg.master)
     t.assert(lg.master:grep_log(
-        'Instance name mismatch: expected new%-name, got <no%-name>', 1024,
+        'Instance name mismatch: name \'new%-name\' provided in config ' ..
+        'confilcts with the instance one \'<no%-name>\'', 1024,
         {filename = logfile}))
     box_cfg.instance_name = nil
     box_cfg.force_recovery = nil
