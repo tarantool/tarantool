@@ -598,6 +598,22 @@ luaL_merge_source_buffer_next(struct merge_source *base,
 	--source->remaining_tuple_count;
 	if (format == NULL)
 		format = tuple_format_runtime;
+	/*
+	 * If we encounter an MP_TUPLE, skip the extension header and the tuple
+	 * format identifier.
+	 */
+	if (mp_typeof(*tuple_beg) == MP_EXT) {
+		int8_t type;
+		mp_decode_extl(&tuple_beg, &type);
+		if (type != MP_TUPLE) {
+			diag_set(IllegalParams,
+				 "Unexpected MsgPack extension type "
+				 "(should be MP_TUPLE)");
+			return -1;
+		}
+		/* Skip the tuple format identifier. */
+		mp_decode_uint(&tuple_beg);
+	}
 	struct tuple *tuple = tuple_new(format, tuple_beg, tuple_end);
 	ibuf_consume_before(source->buf, tuple_end);
 	if (tuple == NULL)
