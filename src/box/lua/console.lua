@@ -853,11 +853,7 @@ local function connect(uri, opts)
     -- We don't know if the remote end is binary or Lua console so we first try
     -- to connect to it as binary using net.box and fall back on Lua console if
     -- it fails.
-    local remote = net_box.connect(u.host, u.service, {
-            connect_timeout = opts.timeout,
-            user = u.login,
-            password = u.password,
-    })
+    local remote = net_box.connect(uri, {connect_timeout = opts.timeout})
     if remote.state == 'error' then
         local err = remote.error
         remote = nil
