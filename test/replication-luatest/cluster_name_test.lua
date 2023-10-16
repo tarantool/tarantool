@@ -238,7 +238,8 @@ g.test_cluster_name_bootstrap_mismatch = function(lg)
                                  new_replica.alias .. '.log')
     wait_for_death(new_replica)
     t.assert(new_replica:grep_log(
-        'Cluster name mismatch: expected test%-name, got <no%-name>', 1024,
+        'Cluster name mismatch: name \'test%-name\' provided in config ' ..
+        'confilcts with the instance one \'<no%-name>\'', 1024,
         {filename = logfile}))
     new_replica:drop()
     --
@@ -262,7 +263,8 @@ g.test_cluster_name_bootstrap_mismatch = function(lg)
     logfile = fio.pathjoin(new_replica.workdir, new_replica.alias .. '.log')
     wait_for_death(new_replica)
     t.assert(new_replica:grep_log(
-        'Cluster name mismatch: expected new%-name, got test%-name', 1024,
+        'Cluster name mismatch: name \'new%-name\' provided in config ' ..
+        'confilcts with the instance one \'test%-name\'', 1024,
         {filename = logfile}))
     new_replica:drop()
     lg.master:exec(function(replica_id)
@@ -291,7 +293,8 @@ g.test_cluster_name_recovery_mismatch = function(lg)
     local logfile = fio.pathjoin(lg.replica.workdir, lg.replica.alias .. '.log')
     wait_for_death(lg.replica)
     t.assert(lg.replica:grep_log(
-        'Cluster name mismatch: expected new%-name, got test%-name', 1024,
+        'Cluster name mismatch: name \'new%-name\' provided in config ' ..
+        'confilcts with the instance one \'test%-name\'', 1024,
         {filename = logfile}))
     --
     -- Has name in WAL, no name in cfg. Then the replica uses the saved name, no
@@ -329,7 +332,8 @@ g.test_cluster_name_recovery_mismatch = function(lg)
     }, {wait_until_ready = false})
     wait_for_death(lg.replica)
     t.assert(lg.replica:grep_log(
-        'Cluster name mismatch: expected new%-name, got <no%-name>', 1024,
+        'Cluster name mismatch: name \'new%-name\' provided in config ' ..
+        'confilcts with the instance one \'<no%-name>\'', 1024,
         {filename = logfile}))
     box_cfg.cluster_name = nil
     box_cfg.force_recovery = nil
@@ -360,7 +364,8 @@ g.test_cluster_name_recovery_mismatch = function(lg)
     logfile = fio.pathjoin(lg.master.workdir, lg.master.alias .. '.log')
     wait_for_death(lg.master)
     t.assert(lg.master:grep_log(
-        'Cluster name mismatch: expected new%-name, got test%-name', 1024,
+        'Cluster name mismatch: name \'new%-name\' provided in config ' ..
+        'confilcts with the instance one \'test%-name\'', 1024,
         {filename = logfile}))
     --
     -- No name in WAL, has name in cfg.
@@ -386,7 +391,8 @@ g.test_cluster_name_recovery_mismatch = function(lg)
     }, {wait_until_ready = false})
     wait_for_death(lg.master)
     t.assert(lg.master:grep_log(
-        'Cluster name mismatch: expected new%-name, got <no%-name>', 1024,
+        'Cluster name mismatch: name \'new%-name\' provided in config ' ..
+        'confilcts with the instance one \'<no%-name>\'', 1024,
         {filename = logfile}))
     box_cfg.cluster_name = nil
     box_cfg.force_recovery = nil
