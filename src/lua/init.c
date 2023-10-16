@@ -1057,8 +1057,17 @@ run_script_f(va_list ap)
 	 * never really dead. It never returns from its function.
 	 */
 	struct diag *diag = va_arg(ap, struct diag *);
-	bool aux_loop_is_run = false;
 	bool is_option_e_ran = false;
+
+	/*
+	 * Return control to tarantool_lua_run_script.
+	 * tarantool_lua_run_script then will start an auxiliary event
+	 * loop and re-schedule this fiber.
+	 *
+	 * This also update time in ev after Tarantool startup which
+	 * reduce time slip in timers (see #9261).
+	 */
+	fiber_sleep(0.0);
 
 	/*
 	 * Execute scripts or modules pointed by TT_PRELOAD
@@ -1117,14 +1126,6 @@ run_script_f(va_list ap)
 			unreachable(); /* checked by getopt() in main() */
 		}
 	}
-
-	/*
-	 * Return control to tarantool_lua_run_script.
-	 * tarantool_lua_run_script then will start an auxiliary event
-	 * loop and re-schedule this fiber.
-	 */
-	fiber_sleep(0.0);
-	aux_loop_is_run = true;
 
 	int is_a_tty = isatty(STDIN_FILENO);
 
@@ -1189,13 +1190,6 @@ run_script_f(va_list ap)
 	 * return control back to tarantool_lua_run_script.
 	 */
 end:
-	/*
-	 * Auxiliary loop in tarantool_lua_run_script
-	 * should start (ev_run()) before this fiber
-	 * invokes ev_break().
-	 */
-	if (!aux_loop_is_run)
-		fiber_sleep(0.0);
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 
@@ -1238,8 +1232,7 @@ tarantool_lua_run_script(char *path, uint32_t opt_mask,
 	 * Run an auxiliary event loop to re-schedule run_script fiber.
 	 * When this fiber finishes, it will call ev_break to stop the loop.
 	 */
-	if (start_loop)
-		ev_run(loop(), 0);
+	ev_run(loop(), 0);
 	/* The fiber running the startup script has ended. */
 	script_fiber = NULL;
 	diag_move(&script_diag, diag_get());
