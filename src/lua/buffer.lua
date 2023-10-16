@@ -154,6 +154,13 @@ local function ibuf_read(buf, size)
     return rpos
 end
 
+local function ibuf_consume(buf, size)
+    checkibuf(buf, 'consume')
+    checksize(buf, size)
+    utils.poison_memory_region(buf.rpos, size);
+    buf.rpos = buf.rpos + size
+end
+
 local function ibuf_serialize(buf)
     local properties = { rpos = buf.rpos, wpos = buf.wpos }
     return { ibuf = properties }
@@ -168,6 +175,7 @@ local ibuf_methods = {
 
     checksize = ibuf_checksize;
     read = ibuf_read;
+    consume = ibuf_consume;
     __serialize = ibuf_serialize;
 
     size = ibuf_used;

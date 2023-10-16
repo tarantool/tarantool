@@ -424,7 +424,7 @@ local function io_read(self, opts, timeout)
     local len = check(self, chunk, delimiter)
     if len ~= nil then
         local data = ffi.string(rbuf.rpos, len)
-        rbuf.rpos = rbuf.rpos + len
+        rbuf:consume(len)
         return data
     end
 
@@ -438,15 +438,15 @@ local function io_read(self, opts, timeout)
             self._errno = nil
             local len = rbuf:size()
             local data = ffi.string(rbuf.rpos, len)
-            rbuf.rpos = rbuf.rpos + len
+            rbuf:consume(len)
             return data
         else
-            rbuf.wpos = rbuf.wpos + res
+            rbuf:alloc(res)
             local len = check(self, chunk, delimiter)
             if len ~= nil then
                 self._errno = nil
                 local data = ffi.string(rbuf.rpos, len)
-                rbuf.rpos = rbuf.rpos + len
+                rbuf:consume(len)
                 return data
             end
         end

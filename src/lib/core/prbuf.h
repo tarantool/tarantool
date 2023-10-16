@@ -95,6 +95,10 @@ struct prbuf_reader {
 	 */
 	size_t unread_size;
 	/**
+	 * Number of bytes in the last record read by client.
+	 */
+	size_t last_read_size;
+	/**
 	 * File offset of the beginning of the data area.
 	 * Data area is the area after header till the end of the buffer.
 	 */
@@ -121,6 +125,9 @@ prbuf_reader_create(struct prbuf_reader *reader, int fd, off_t offset);
 /**
  * Read the next record into entry argument. If there are no more records
  * then returned record will be a terminator (EOF, ptr == NULL && size == 0).
+ *
+ * Pointer to data on successful read is valid until next call to this
+ * function.
  *
  * After EOF the function can be called again and will return EOF.
  *

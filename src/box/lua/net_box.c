@@ -270,6 +270,8 @@ struct netbox_transport {
 	struct ibuf send_buf;
 	/** Connection receive buffer. */
 	struct ibuf recv_buf;
+	/** Size of the last received message. */
+	size_t last_msg_size;
 	/** Signalled when send_buf becomes empty. */
 	struct fiber_cond on_send_buf_empty;
 	/** Next request id. */
@@ -523,6 +525,7 @@ netbox_transport_create(struct netbox_transport *transport)
 	iostream_clear(&transport->io);
 	ibuf_create(&transport->send_buf, &cord()->slabc, NETBOX_READAHEAD);
 	ibuf_create(&transport->recv_buf, &cord()->slabc, NETBOX_READAHEAD);
+	transport->last_msg_size = 0;
 	fiber_cond_create(&transport->on_send_buf_empty);
 	transport->next_sync = 1;
 	transport->requests = mh_i64ptr_new();
@@ -580,6 +583,7 @@ netbox_transport_set_error(struct netbox_transport *transport)
 	/* Reset buffers. */
 	ibuf_reinit(&transport->send_buf);
 	ibuf_reinit(&transport->recv_buf);
+	transport->last_msg_size = 0;
 	fiber_cond_broadcast(&transport->on_send_buf_empty);
 	/* Complete requests and clean up the hash. */
 	struct mh_i64ptr_t *h = transport->requests;
@@ -1142,7 +1146,7 @@ netbox_transport_communicate(struct netbox_transport *transport, size_t limit)
 						"Peer closed");
 				return -1;
 			} if (rc > 0) {
-				recv_buf->wpos += rc;
+				VERIFY(ibuf_alloc(recv_buf, rc) != NULL);
 			} else if (rc == IOSTREAM_ERROR) {
 				goto io_error;
 			} else {
@@ -1156,7 +1160,7 @@ netbox_transport_communicate(struct netbox_transport *transport, size_t limit)
 			ssize_t rc = iostream_write(io, send_buf->rpos,
 						    ibuf_used(send_buf));
 			if (rc >= 0) {
-				send_buf->rpos += rc;
+				ibuf_consume(send_buf, rc);
 				if (ibuf_used(send_buf) == 0)
 					fiber_cond_broadcast(on_send_buf_empty);
 			} else if (rc == IOSTREAM_ERROR) {
@@ -1193,6 +1197,7 @@ static int
 netbox_transport_send_and_recv(struct netbox_transport *transport,
 			       struct xrow_header *hdr)
 {
+	ibuf_consume(&transport->recv_buf, transport->last_msg_size);
 	while (true) {
 		size_t required;
 		size_t data_len = ibuf_used(&transport->recv_buf);
@@ -1212,10 +1217,11 @@ netbox_transport_send_and_recv(struct netbox_transport *transport,
 			required = size + len;
 			if (data_len >= required) {
 				const char *body_end = rpos + len;
-				transport->recv_buf.rpos = (char *)body_end;
-				return xrow_header_decode(
-					hdr, &rpos, body_end,
-					/*end_is_exact=*/true);
+				int rc = xrow_header_decode(
+						hdr, &rpos, body_end,
+						/*end_is_exact=*/true);
+				transport->last_msg_size = body_end - bufpos;
+				return rc;
 			}
 		}
 		if (netbox_transport_communicate(transport, required) != 0)

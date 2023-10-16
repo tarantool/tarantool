@@ -50,7 +50,7 @@ coio_bread(struct iostream *io, struct ibuf *buf, size_t sz)
 	ssize_t n = coio_read_ahead(io, buf->wpos, sz, ibuf_unused(buf));
 	if (n < 0)
 		diag_raise();
-	buf->wpos += n;
+	VERIFY(ibuf_alloc(buf, n) != NULL);
 	return n;
 }
 
@@ -68,7 +68,7 @@ coio_bread_timeout(struct iostream *io, struct ibuf *buf, size_t sz,
 			                    timeout);
 	if (n < 0)
 		diag_raise();
-	buf->wpos += n;
+	VERIFY(ibuf_alloc(buf, n) != NULL);
 	return n;
 }
 
@@ -80,7 +80,7 @@ coio_breadn(struct iostream *io, struct ibuf *buf, size_t sz)
 	ssize_t n = coio_readn_ahead(io, buf->wpos, sz, ibuf_unused(buf));
 	if (n < 0)
 		diag_raise();
-	buf->wpos += n;
+	VERIFY(ibuf_alloc(buf, n) != NULL);
 	return n;
 }
 
@@ -99,7 +99,7 @@ coio_breadn_timeout(struct iostream *io, struct ibuf *buf, size_t sz,
 			                     timeout);
 	if (n < 0)
 		diag_raise();
-	buf->wpos += n;
+	VERIFY(ibuf_alloc(buf, n) != NULL);
 	return n;
 }
 

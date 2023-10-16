@@ -705,7 +705,7 @@ local function read(self, limit, timeout, check, ...)
     if len ~= nil then
         self._errno = nil
         local data = ffi.string(rbuf.rpos, len)
-        rbuf.rpos = rbuf.rpos + len
+        rbuf:consume(len)
         return data
     end
 
@@ -720,15 +720,15 @@ local function read(self, limit, timeout, check, ...)
             self._errno = nil
             local len = rbuf:size()
             local data = ffi.string(rbuf.rpos, len)
-            rbuf.rpos = rbuf.rpos + len
+            rbuf:consume(len)
             return data
         elseif res ~= nil then
-            rbuf.wpos = rbuf.wpos + res
+            rbuf:alloc(res)
             local len = check(self, limit, ...)
             if len ~= nil then
                 self._errno = nil
                 local data = ffi.string(rbuf.rpos, len)
-                rbuf.rpos = rbuf.rpos + len
+                rbuf:consume(len)
                 return data
             end
         elseif not errno_is_transient[self._errno] then
