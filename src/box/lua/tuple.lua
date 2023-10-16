@@ -270,9 +270,7 @@ end
 local function tuple_to_msgpack(buf, tuple)
     assert(ffi.istype(tuple_t, tuple))
     local bsize = builtin.box_tuple_bsize(tuple)
-    buf:reserve(bsize)
-    builtin.box_tuple_to_buf(tuple, buf.wpos, bsize)
-    buf.wpos = buf.wpos + bsize
+    builtin.box_tuple_to_buf(tuple, buf:alloc(bsize), bsize)
 end
 
 local function tuple_bsize(tuple)

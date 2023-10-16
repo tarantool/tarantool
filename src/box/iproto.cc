@@ -949,7 +949,7 @@ iproto_connection_close(struct iproto_connection *con)
 		 * parsed data is processed.  It's important this
 		 * is done only once.
 		 */
-		con->p_ibuf->wpos -= con->parse_size;
+		ibuf_discard(con->p_ibuf, con->parse_size);
 		mh_int_t node;
 		mh_foreach(con->streams, node) {
 			struct iproto_stream *stream = (struct iproto_stream *)
@@ -1056,15 +1056,16 @@ iproto_connection_input_buffer(struct iproto_connection *con)
 	}
 
 	xibuf_reserve(new_ibuf, to_read + con->parse_size);
-	/*
-	 * Discard unparsed data in the old buffer, otherwise it
-	 * won't be recycled when all parsed requests are processed.
-	 */
-	old_ibuf->wpos -= con->parse_size;
 	if (con->parse_size != 0) {
 		/* Move the cached request prefix to the new buffer. */
-		memcpy(new_ibuf->rpos, old_ibuf->wpos, con->parse_size);
-		new_ibuf->wpos += con->parse_size;
+		void *wpos = ibuf_alloc(new_ibuf, con->parse_size);
+		assert(wpos != NULL);
+		memcpy(wpos, old_ibuf->wpos - con->parse_size, con->parse_size);
+		/*
+		 * Discard unparsed data in the old buffer, otherwise it
+		 * won't be recycled when all parsed requests are processed.
+		 */
+		ibuf_discard(old_ibuf, con->parse_size);
 		/*
 		 * We made ibuf idle. If obuf was already idle it
 		 * makes the both ibuf and obuf idle, time to trim
