@@ -1063,6 +1063,7 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 * The new space is ready. Time to update the space
 	 * cache with it.
 	 */
+	space_finish_alter(alter->old_space, alter->new_space);
 	space_cache_replace(alter->old_space, alter->new_space);
 	space_detach_constraints(alter->old_space);
 	space_unpin_collations(alter->old_space);
@@ -1793,6 +1794,7 @@ on_drop_space_commit(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct space *space = (struct space *)trigger->data;
+	space_remove_temporary_triggers(space);
 	space_delete(space);
 	return 0;
 }

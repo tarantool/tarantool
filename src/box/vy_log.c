@@ -1205,7 +1205,7 @@ vy_log_end_recovery(void)
 		return -1;
 	}
 
-	xdir_collect_inprogress(&vy_log.dir);
+	xdir_remove_temporary_files(&vy_log.dir);
 	vy_log.recovery = NULL;
 	return 0;
 }

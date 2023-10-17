@@ -91,7 +91,7 @@ g.test_constraints_2 = function()
         t.assert_equals(s:format()[1].constraint, ck1)
         t.assert_equals(s:format()[2].foreign_key, fk1)
 
-        ret = box.execute([[ALTER TABLE "a" DROP CONSTRAINT "seven";]])
+        ret = box.execute([[ALTER TABLE "a" DROP CONSTRAINT "a"."seven";]])
         t.assert_equals(ret.row_count, 1)
         t.assert_equals(s.foreign_key, {two = {field = {b = 'b'}}})
         t.assert_equals(s.constraint, {three = func_id})
@@ -105,33 +105,33 @@ g.test_constraints_2 = function()
         t.assert_equals(s:format()[1].constraint, {eight = func_id})
         t.assert_equals(s:format()[2].foreign_key, fk1)
 
-        ret = box.execute([[ALTER TABLE "a" DROP CONSTRAINT "five";]])
+        ret = box.execute([[ALTER TABLE "a" DROP CONSTRAINT "b"."five";]])
         t.assert_equals(ret.row_count, 1)
         t.assert_equals(s.foreign_key, nil)
         t.assert_equals(s.constraint, {three = func_id})
         t.assert_equals(s:format()[1].constraint, {eight = func_id})
         t.assert_equals(s:format()[2].foreign_key, {six = {field = 'b'}})
 
-        ret = box.execute([[ALTER TABLE "a" DROP CONSTRAINT "eight";]])
+        ret = box.execute([[ALTER TABLE "a" DROP CONSTRAINT "a"."eight";]])
         t.assert_equals(ret.row_count, 1)
         t.assert_equals(s.foreign_key, nil)
         t.assert_equals(s.constraint, {three = func_id})
-        t.assert_equals(s:format()[1].constraint, nil)
+        t.assert_equals(s:format()[1].constraint, {})
         t.assert_equals(s:format()[2].foreign_key, {six = {field = 'b'}})
 
         ret = box.execute([[ALTER TABLE "a" DROP CONSTRAINT "three";]])
         t.assert_equals(ret.row_count, 1)
         t.assert_equals(s.foreign_key, nil)
         t.assert_equals(s.constraint, nil)
-        t.assert_equals(s:format()[1].constraint, nil)
+        t.assert_equals(s:format()[1].constraint, {})
         t.assert_equals(s:format()[2].foreign_key, {six = {field = 'b'}})
 
-        ret = box.execute([[ALTER TABLE "a" DROP CONSTRAINT "six";]])
+        ret = box.execute([[ALTER TABLE "a" DROP CONSTRAINT "b"."six";]])
         t.assert_equals(ret.row_count, 1)
         t.assert_equals(s.foreign_key, nil)
         t.assert_equals(s.constraint, nil)
-        t.assert_equals(s:format()[1].constraint, nil)
-        t.assert_equals(s:format()[2].foreign_key, nil)
+        t.assert_equals(s:format()[1].constraint, {})
+        t.assert_equals(s:format()[2].foreign_key, {})
 
         _, err = box.execute([[ALTER TABLE "a" DROP CONSTRAINT "eight";]])
         res = [[Constraint 'eight' does not exist in space 'a']]
@@ -548,5 +548,149 @@ g.test_constraints_11 = function()
                         "Check constraint 'ONE' failed for a tuple")
 
         box.execute([[DROP TABLE t;]])
+    end)
+end
+
+-- Make sure the field constraint can be dropped using
+-- "ALTER TABLE table_name DROP CONSTRAINT field_name.constraint_name;"
+-- and cannot be dropped using
+-- "ALTER TABLE table_name DROP CONSTRAINT constraint_name;".
+g.test_drop_field_constraints = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE t (i INT PRIMARY KEY,
+                      a INT CONSTRAINT b CHECK (a > 10));]]
+        box.execute(sql)
+        t.assert(box.space.T:format()[2].constraint['B'] ~= nil);
+        local _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT b;]])
+        local exp = "Constraint 'B' does not exist in space 'T'"
+        t.assert_equals(err.message, exp)
+        t.assert(box.space.T:format()[2].constraint['B'] ~= nil);
+
+        local res = box.execute([[ALTER TABLE t DROP CONSTRAINT a.b;]])
+        t.assert_equals(res, {row_count = 1})
+        t.assert(box.space.T:format()[2].constraint['B'] == nil);
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT a.b;]])
+        exp = "Constraint 'A.B' does not exist in space 'T'"
+        t.assert_equals(err.message, exp)
+        box.execute([[DROP TABLE t;]])
+        box.func.check_T_B:drop()
+    end)
+end
+
+-- Make sure the ALTER TABLE DROP CONSTRAINT statement cannot drop constraints
+-- if more than one constraint is found for a given name.
+g.test_drop_constraints_with_the_same_name = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE t (i INT CONSTRAINT c PRIMARY KEY,
+                                      a INT CONSTRAINT b CHECK (a > 10)
+                                      CONSTRAINT b REFERENCES t(i),
+                                      CONSTRAINT c CHECK (i + a > 100));]]
+        box.execute(sql)
+        t.assert(box.space.T.constraint['C'] ~= nil);
+        t.assert(box.space.T.index['C'] ~= nil);
+        local _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c;]])
+        local exp = "Failed to execute SQL statement: "..
+                    "ambiguous constraint name: 'C'"
+        t.assert_equals(err.message, exp)
+        t.assert(box.space.T.constraint['C'] ~= nil);
+        t.assert(box.space.T.index['C'] ~= nil);
+
+        t.assert(box.space.T:format()[2].constraint['B'] ~= nil);
+        t.assert(box.space.T:format()[2].foreign_key['B'] ~= nil);
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT a.b;]])
+        exp = "Failed to execute SQL statement: "..
+              "ambiguous constraint name: 'A.B'"
+        t.assert_equals(err.message, exp)
+        t.assert(box.space.T:format()[2].constraint['B'] ~= nil);
+        t.assert(box.space.T:format()[2].foreign_key['B'] ~= nil);
+        box.execute([[DROP TABLE t;]])
+        box.func.check_T_B:drop()
+        box.func.check_T_C:drop()
+    end)
+end
+
+-- Make sure the variations of the DROP CONSTRAINT statement with the specified
+-- constraint type work correctly.
+g.test_drop_constraints_with_type = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE t (i INT CONSTRAINT c PRIMARY KEY,
+                                      a INT CONSTRAINT b CHECK (a > 10)
+                                      CONSTRAINT b REFERENCES t(i),
+                                      CONSTRAINT c CHECK (i + a > 100),
+                                      CONSTRAINT c FOREIGN KEY (a) REFERENCES t,
+                                      CONSTRAINT d UNIQUE(a));]]
+        box.execute(sql)
+        local s = box.space.T
+        t.assert(s.constraint['C'] ~= nil);
+        t.assert(s.foreign_key['C'] ~= nil);
+        t.assert(s.index['C'] ~= nil);
+        t.assert(s.index['D'] ~= nil);
+        t.assert(s:format()[2].constraint['B'] ~= nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        -- Make sure that a constraint with the given name but with the wrong
+        -- type will not be dropped.
+        local _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT d CHECK;]])
+        local exp = "Constraint 'D' does not exist in space 'T'"
+        t.assert_equals(err.message, exp)
+        t.assert(s.constraint['C'] ~= nil);
+        t.assert(s.foreign_key['C'] ~= nil);
+        t.assert(s.index['C'] ~= nil);
+        t.assert(s.index['D'] ~= nil);
+        t.assert(s:format()[2].constraint['B'] ~= nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        box.execute([[ALTER TABLE t DROP CONSTRAINT d UNIQUE;]])
+        t.assert(s.constraint['C'] ~= nil);
+        t.assert(s.foreign_key['C'] ~= nil);
+        t.assert(s.index['C'] ~= nil);
+        t.assert(s.index['D'] == nil);
+        t.assert(s:format()[2].constraint['B'] ~= nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        box.execute([[ALTER TABLE t DROP CONSTRAINT c CHECK;]])
+        t.assert(s.constraint == nil or s.constraint['C'] == nil);
+        t.assert(s.foreign_key['C'] ~= nil);
+        t.assert(s.index['C'] ~= nil);
+        t.assert(s.index['D'] == nil);
+        t.assert(s:format()[2].constraint['B'] ~= nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        box.execute([[ALTER TABLE t DROP CONSTRAINT c FOREIGN KEY;]])
+        t.assert(s.constraint == nil or s.constraint['C'] == nil);
+        t.assert(s.foreign_key == nil or s.foreign_key['C'] == nil);
+        t.assert(s.index['C'] ~= nil);
+        t.assert(s.index['D'] == nil);
+        t.assert(s:format()[2].constraint['B'] ~= nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        box.execute([[ALTER TABLE t DROP CONSTRAINT c PRIMARY KEY;]])
+        t.assert(s.constraint == nil or s.constraint['C'] == nil);
+        t.assert(s.foreign_key == nil or s.foreign_key['C'] == nil);
+        t.assert(s.index['C'] == nil);
+        t.assert(s.index['D'] == nil);
+        t.assert(s:format()[2].constraint['B'] ~= nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        box.execute([[ALTER TABLE t DROP CONSTRAINT a.b CHECK;]])
+        t.assert(s.constraint == nil or s.constraint['C'] == nil);
+        t.assert(s.foreign_key == nil or s.foreign_key['C'] == nil);
+        t.assert(s.index['C']  == nil);
+        t.assert(s.index['D'] == nil);
+        t.assert(s:format()[2].constraint['B'] == nil);
+        t.assert(s:format()[2].foreign_key['B'] ~= nil);
+
+        box.execute([[ALTER TABLE t DROP CONSTRAINT a.b FOREIGN KEY;]])
+        t.assert(s.constraint == nil or s.constraint['C'] == nil);
+        t.assert(s.foreign_key == nil or s.foreign_key['C'] == nil);
+        t.assert(s.index['C']  == nil);
+        t.assert(s.index['D'] == nil);
+        t.assert(s:format()[2].constraint['B'] == nil);
+        t.assert(s:format()[2].foreign_key['B'] == nil);
+
+        box.execute([[DROP TABLE t;]])
+        box.func.check_T_B:drop()
+        box.func.check_T_C:drop()
     end)
 end

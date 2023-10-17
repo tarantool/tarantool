@@ -1,4 +1,5 @@
 local fio = require('fio')
+local fiber = require('fiber')
 local log = require('internal.config.utils.log')
 local instance_config = require('internal.config.instance_config')
 
@@ -155,6 +156,10 @@ local function apply(config)
         end
     end
 
+    -- The startup process may need a special handling and differs
+    -- from the configuration reloading process.
+    local is_startup = type(box.cfg) == 'function'
+
     local failover = configdata:get('replication.failover',
         {use_default = true})
 
@@ -229,6 +234,72 @@ local function apply(config)
         else
             assert(false)
         end
+    elseif failover == 'supervised' then
+        -- The startup flow in the 'supervised' failover mode is
+        -- the following.
+        --
+        -- * Look over the peer names of the replicaset and choose
+        --   the minimal name (compare them lexicographically).
+        -- * The instance with the minimal name starts in the RW
+        --   mode to be able to bootstrap the replicaset if there
+        --   is no local snapshot. Otherwise, it starts as usual,
+        --   in RO.
+        -- * All the other instances are started in RO.
+        -- * The instance that is started in RW re-checks, whether
+        --   it was a bootstrap leader (box.info.id == 1) and, if
+        --   not, goes to RO.
+        --
+        -- The algorithm leans on the replicaset bootstrap process
+        -- that chooses an RW instance as the bootstrap leader.
+        -- bootstrap_strategy 'auto' fits this criteria.
+        --
+        -- As result, all the instances are in RO or one is in RW.
+        -- The supervisor (failover agent) manages the RO/RW mode
+        -- during the lifetime of the replicaset.
+        --
+        -- The 'minimal name' criteria is chosen with idea that
+        -- instances are often names like 'storage-001',
+        -- 'storage-002' and so on, so a probability that a newly
+        -- added instance has the minimal name is low.
+        --
+        -- The RO/RW mode remains unchanged on reload.
+        local am_i_bootstrap_leader = false
+        if is_startup then
+            local instance_name = configdata:names().instance_name
+            am_i_bootstrap_leader = not has_snapshot(configdata) and
+                instance_name == configdata:bootstrap_leader_name()
+            box_cfg.read_only = not am_i_bootstrap_leader
+        end
+
+        -- It is possible that an instance with the minimal
+        -- name (configdata:bootstrap_leader_name()) is added to
+        -- the configuration, when the replicaset is already
+        -- bootstrapped.
+        --
+        -- Ideally, we shouldn't make this instance RW. However,
+        -- we can't differentiate this situation from one, when
+        -- the replicaset bootstrap is needed, before a first
+        -- box.cfg().
+        --
+        -- However, after leaving box.cfg() or from a background
+        -- fiber after box.ctl.wait_rw() we can check that the
+        -- instance was a bootstrap leader using the
+        -- box.info.id == 1 condition.
+        --
+        -- If box.info.id != 1, then the replicaset was already
+        -- bootstrapped and so we should go to RO.
+        if am_i_bootstrap_leader then
+            fiber.new(function()
+                local name = 'config_set_read_only_if_not_bootstrap_leader'
+                fiber.self():name(name, {truncate = true})
+                box.ctl.wait_rw()
+                if box.info.id ~= 1 then
+                    -- Not really a bootstrap leader, just a
+                    -- replica. Go to RO.
+                    box.cfg({read_only = true})
+                end
+            end)
+        end
     else
         assert(false)
     end
@@ -280,10 +351,6 @@ local function apply(config)
         labels = labels or { alias = names.instance_name },
     }
 
-    -- The startup process may need a special handling and differs
-    -- from the configuration reloading process.
-    local is_startup = type(box.cfg) == 'function'
-
     -- First box.cfg() call.
     --
     -- Force the read-only mode if:
@@ -310,7 +377,9 @@ local function apply(config)
     -- in effect. The configuration has no leadership information,
     -- in this case, so there is no much sense to re-read it after
     -- startup.
-    if is_startup and failover ~= 'election' then
+    --
+    -- The same for the supervised failover mode.
+    if is_startup and failover ~= 'election' and failover ~= 'supervised' then
         local configured_as_rw = not box_cfg.read_only
         local in_replicaset = #configdata:peers() > 1
         local has_snap = has_snapshot(configdata)

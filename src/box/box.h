@@ -75,13 +75,16 @@ extern const char *box_auth_type;
 /** Time to wait for shutdown triggers finished */
 extern double on_shutdown_trigger_timeout;
 
-/** Invoked on box shutdown. */
+/** Internal and set by C API on_shutdown triggers. */
 extern struct rlist box_on_shutdown_trigger_list;
+
+/** User-defined on_shutdown triggers set from Lua. */
+extern struct event *box_on_shutdown_event;
 
 /**
  * Triggers invoked during initial `box.cfg` call on various recovery stages.
  */
-extern struct rlist box_on_recovery_state;
+extern struct event *box_on_recovery_state_event;
 
 /**
  * Timeout during which the transaction must complete,

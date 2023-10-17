@@ -37,7 +37,7 @@
 #include "fio.h"
 #include "cbus.h"
 #include "memory.h"
-#include "coio_file.h"
+#include "coio_task.h"
 
 #include "replication.h"
 #include "tuple_bloom.h"
@@ -2511,11 +2511,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 	/* New run index is ready for write, unlink old file if exists */
 	vy_run_snprint_path(path, sizeof(path), dir,
 			    space_id, iid, run->id, VY_FILE_INDEX);
-	if (unlink(path) < 0 && errno != ENOENT) {
-		diag_set(SystemError, "failed to unlink file '%s'",
-			 path);
-		goto close_err;
-	}
+	xlog_remove_file(path, 0);
 	if (vy_run_write_index(run, dir, space_id, iid) != 0)
 		goto close_err;
 	return 0;
@@ -2543,7 +2539,7 @@ static int
 try_rmdir(const char *path)
 {
 	int rc = 0;
-	if (coio_rmdir(path) < 0) {
+	if (rmdir(path) < 0) {
 		if (errno != ENOENT) {
 			if (errno != ENOTEMPTY)
 				say_syserror("error while removing %s", path);
@@ -2555,10 +2551,14 @@ try_rmdir(const char *path)
 	return rc;
 }
 
-int
-vy_run_remove_files(const char *dir, uint32_t space_id,
-		    uint32_t iid, int64_t run_id)
+static ssize_t
+vy_run_remove_files_f(va_list ap)
 {
+	const char *dir = va_arg(ap, typeof(dir));
+	uint32_t space_id = va_arg(ap, typeof(space_id));
+	uint32_t iid = va_arg(ap, typeof(iid));
+	int64_t run_id = va_arg(ap, typeof(run_id));
+
 	ERROR_INJECT(ERRINJ_VY_GC,
 		     {say_error("error injection: vinyl run %lld not deleted",
 				(long long)run_id); return -1;});
@@ -2567,13 +2567,8 @@ vy_run_remove_files(const char *dir, uint32_t space_id,
 	for (int type = 0; type < vy_file_MAX; type++) {
 		vy_run_snprint_path(path, sizeof(path), dir,
 				    space_id, iid, run_id, type);
-		if (coio_unlink(path) < 0) {
-			if (errno != ENOENT) {
-				say_syserror("error while removing %s", path);
-				ret = -1;
-			}
-		} else
-			say_info("removed %s", path);
+		if (!xlog_remove_file(path, XLOG_RM_VERBOSE))
+			ret = -1;
 	}
 	/* Remove the root directory if it's empty. */
 	vy_lsm_snprint_path(path, sizeof(path), dir, space_id, iid);
@@ -2582,6 +2577,13 @@ vy_run_remove_files(const char *dir, uint32_t space_id,
 	vy_space_snprint_path(path, sizeof(path), dir, space_id);
 	try_rmdir(path);
 	return ret;
+}
+
+int
+vy_run_remove_files(const char *dir, uint32_t space_id,
+		    uint32_t iid, int64_t run_id)
+{
+	return coio_call(vy_run_remove_files_f, dir, space_id, iid, run_id);
 }
 
 /**

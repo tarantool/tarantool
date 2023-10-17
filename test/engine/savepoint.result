@@ -221,9 +221,6 @@ s:select{}
 - - [1]
   - [2]
 ...
-s:on_replace(nil, on_replace)
----
-...
 s:drop()
 ---
 ...
@@ -298,9 +295,6 @@ ok1
 errmsg1
 ---
 - 'Can not rollback to savepoint: the savepoint does not exist'
-...
-s:on_replace(nil, on_replace2)
----
 ...
 s:drop()
 ---
@@ -507,9 +501,6 @@ s:select{}
 ---
 - - [1, 'create savepoint']
   - [5]
-...
-s:on_replace(nil, on_replace3)
----
 ...
 s:truncate()
 ---

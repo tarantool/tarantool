@@ -1536,15 +1536,21 @@ applier_synchro_filter_tx(struct stailq *rows)
 	 */
 	struct xrow_header *last_row =
 		&stailq_last_entry(rows, struct applier_tx_row, next)->row;
+	struct applier_tx_row *item;
 	if (!last_row->wait_sync) {
-		if (iproto_type_is_dml(last_row->type) &&
-		    txn_limbo.owner_id != REPLICA_ID_NIL) {
+		if (!iproto_type_is_dml(last_row->type) ||
+		    txn_limbo.owner_id == REPLICA_ID_NIL) {
+			return;
+		}
+		stailq_foreach_entry(item, rows, next) {
+			row = &item->row;
+			if (row->type == IPROTO_NOP)
+				continue;
 			tnt_raise(ClientError, ER_SPLIT_BRAIN,
 				  "got an async transaction from an old term");
 		}
 		return;
 	}
-	struct applier_tx_row *item;
 	stailq_foreach_entry(item, rows, next) {
 		row = &item->row;
 		row->type = IPROTO_NOP;

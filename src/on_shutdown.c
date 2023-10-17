@@ -32,12 +32,15 @@
 #include "on_shutdown.h"
 
 #include "box/box.h"
+#include "fiber.h"
 #include "say.h"
 
 #include <stdlib.h>
 #include <small/rlist.h>
 #include <errno.h>
-#include <trigger.h>
+#include <core/event.h>
+#include <core/func_adapter.h>
+#include <core/trigger.h>
 
 struct on_shutdown_trigger {
 	struct trigger trigger;
@@ -127,4 +130,146 @@ box_on_shutdown(void *arg, int (*new_handler)(void *),
 	return -1;
 }
 
+/**
+ * Callback that is fired when ev_timer is expired.
+ */
+static void
+on_shutdown_run_triggers_timeout(ev_loop *loop, ev_timer *watcher, int revents)
+{
+	(void)loop;
+	(void)revents;
 
+	bool *expired = (bool *)watcher->data;
+	assert(expired != NULL);
+	*expired = true;
+}
+
+/**
+ * A wrapper over trigger->run to call in a separate fiber.
+ */
+static int
+on_shutdown_trigger_fiber_f(va_list ap)
+{
+	struct trigger *trigger = va_arg(ap, struct trigger *);
+	int rc = trigger->run(trigger, NULL);
+	if (trigger->destroy != NULL)
+		trigger->destroy(trigger);
+	return rc;
+}
+
+/**
+ * Runs trigger from event, passed with va_list.
+ */
+static int
+on_shutdown_event_trigger_fiber_f(va_list ap)
+{
+	struct func_adapter *trigger = va_arg(ap, struct func_adapter *);
+	struct func_adapter_ctx ctx;
+	func_adapter_begin(trigger, &ctx);
+	int rc = func_adapter_call(trigger, &ctx);
+	func_adapter_end(trigger, &ctx);
+	return rc;
+}
+
+int
+on_shutdown_run_triggers(void)
+{
+	/* Save on_shutdown triggers - no new triggers will be added then. */
+	RLIST_HEAD(triggers);
+	rlist_splice(&triggers, &box_on_shutdown_trigger_list);
+
+	double timeout = on_shutdown_trigger_timeout;
+	struct event *event = box_on_shutdown_event;
+	int rc = 0;
+	struct trigger *trigger;
+	struct region *region = &fiber()->gc;
+	uint32_t region_svp = region_used(region);
+	unsigned trigger_count = event->trigger_count;
+
+	/* Calculating the total number of triggers. */
+	rlist_foreach_entry(trigger, &triggers, link)
+		trigger_count++;
+
+	struct fiber **fibers =
+		xregion_alloc_array(region, struct fiber *, trigger_count);
+
+	bool expired = false;
+	struct ev_timer timer;
+	ev_timer_init(&timer, on_shutdown_run_triggers_timeout, timeout, 0);
+	timer.data = &expired;
+	/*
+	 * We don't check if triggers are timed out during they launch
+	 * since we want to give them all a chance to run. So in
+	 * rlist_foreach_entry_safe loop, we run all the triggers,
+	 * regardless of whether the timeout has expired or not.
+	 */
+	ev_timer_start(loop(), &timer);
+
+	unsigned current_fiber = 0;
+	char name[FIBER_NAME_INLINE];
+	while (!rlist_empty(&triggers)) {
+		/*
+		 * Since the triggers will not be used later, we can
+		 * pop them instead of iteration. It is safe against
+		 * underlying trigger's removal.
+		 */
+		trigger = rlist_shift_entry(&triggers, struct trigger, link);
+		snprintf(name, FIBER_NAME_INLINE,
+			 "trigger_fiber%d", current_fiber);
+		fibers[current_fiber] =
+			fiber_new(name, on_shutdown_trigger_fiber_f);
+		if (fibers[current_fiber] != NULL) {
+			fiber_set_joinable(fibers[current_fiber], true);
+			fiber_start(fibers[current_fiber], trigger);
+			current_fiber++;
+		} else {
+			rc = -1;
+			goto out;
+		}
+	}
+
+	const char *trigger_name = NULL;
+	struct func_adapter *func = NULL;
+	struct event_trigger_iterator it;
+	event_trigger_iterator_create(&it, event);
+	/*
+	 * Since new event triggers can appear, let's run the triggers
+	 * until we've run out of fibers.
+	 */
+	while (event_trigger_iterator_next(&it, &func, &trigger_name) &&
+	       current_fiber < trigger_count) {
+		snprintf(name, FIBER_NAME_INLINE,
+			 "trigger_fiber_%s", trigger_name);
+		fibers[current_fiber] =
+			fiber_new(name, on_shutdown_event_trigger_fiber_f);
+		if (fibers[current_fiber] != NULL) {
+			fiber_set_joinable(fibers[current_fiber], true);
+			fiber_start(fibers[current_fiber], func);
+			current_fiber++;
+		} else {
+			rc = -1;
+			goto out;
+		}
+	}
+	event_trigger_iterator_destroy(&it);
+
+	/*
+	 * Waiting for all triggers completion.
+	 */
+	for (unsigned int i = 0; i < current_fiber && !expired; i++) {
+		if (fiber_join_timeout(fibers[i], timeout) != 0) {
+			assert(!diag_is_empty(diag_get()));
+			diag_log();
+			diag_clear(diag_get());
+		}
+	}
+	if (expired) {
+		diag_set(TimedOut);
+		rc = -1;
+		goto out;
+	}
+out:
+	ev_timer_stop(loop(), &timer);
+	region_truncate(region, region_svp);
+	return rc;
+}

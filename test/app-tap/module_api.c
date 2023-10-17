@@ -220,6 +220,8 @@ test_box_ibuf(lua_State *L)
 	fail_unless(ibuf_used(ibuf) == 0);
 	fail_unless(*rpos == *wpos);
 
+	ibuf_destroy(ibuf);
+
 	lua_pushboolean(L, 1);
 	return 1;
 }

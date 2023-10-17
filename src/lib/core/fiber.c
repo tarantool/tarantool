@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pmatomic.h>
+#include <tarantool_ev.h>
 
 #include "assoc.h"
 #include "memory.h"
@@ -49,7 +50,20 @@
 extern void cord_on_yield(void);
 
 static struct fiber_slice zero_slice = {.warn = 0.0, .err = 0.0};
+
+/**
+ * ASAN build is slow. Turn slice check off to suppress noisy failures
+ * on exceeding slice limit in this case.
+ */
+#if ENABLE_ASAN
+static struct fiber_slice default_slice = {
+	.warn = TIMEOUT_INFINITY,
+	.err = TIMEOUT_INFINITY,
+};
+#else
 static struct fiber_slice default_slice = {.warn = 0.5, .err = 1.0};
+#endif
+
 /** Number of cord-threads still running right now. */
 static int cord_count = 0;
 
@@ -186,19 +200,27 @@ fiber_madvise(void *addr, size_t len, int advice)
 static inline int
 fiber_mprotect(void *addr, size_t len, int prot)
 {
-	int rc = 0;
-
+	(void)addr;
+	(void)len;
+	(void)prot;
 	struct errinj *inj = errinj(ERRINJ_FIBER_MPROTECT, ERRINJ_INT);
 	if (inj != NULL && inj->iparam == prot) {
 		errno = ENOMEM;
-		rc = -1;
+		goto error;
 	}
-
-	if (rc != 0 || mprotect(addr, len, prot) != 0) {
-		diag_set(SystemError, "fiber mprotect failed");
-		return -1;
-	}
+/*
+ * TODO(gh-8423) Disable mprotect temporarily. Leak sanitizer does not work
+ * well if memory is protected. We fail to remove protection due to the use of
+ * `cord_cancel_and_join` to cancel cords.
+ */
+#ifndef ENABLE_ASAN
+	if (mprotect(addr, len, prot) != 0)
+		goto error;
+#endif
 	return 0;
+error:
+	diag_set(SystemError, "fiber mprotect failed");
+	return -1;
 }
 
 static __thread bool fiber_top_enabled = false;
@@ -1114,6 +1136,21 @@ page_align_up(void *ptr)
 	return page_align_down(ptr + page_size - 1);
 }
 
+/**
+ * Call madvise(2) on given range but align start on page up and
+ * end on page down.
+ *
+ * This way madvise(2) requirement on alignment of start address is met.
+ * Also we won't touch memory after end due to rounding up of range length.
+ */
+static inline int
+fiber_madvise_unaligned(void *start, void *end, int advice)
+{
+	start = page_align_up(start);
+	end = page_align_down(end);
+	return fiber_madvise(start, (char *)end - (char *)start, advice);
+}
+
 #ifdef HAVE_MADV_DONTNEED
 /**
  * Check if stack poison values are present starting from
@@ -1170,9 +1207,9 @@ fiber_stack_recycle(struct fiber *fiber)
 	void *start, *end;
 	if (stack_direction < 0) {
 		start = fiber->stack;
-		end = page_align_down(fiber->stack_watermark);
+		end = fiber->stack_watermark;
 	} else {
-		start = page_align_up(fiber->stack_watermark);
+		start = fiber->stack_watermark;
 		end = fiber->stack + fiber->stack_size;
 	}
 
@@ -1181,7 +1218,7 @@ fiber_stack_recycle(struct fiber *fiber)
 	 * just a hint for OS and not critical for
 	 * functionality.
 	 */
-	fiber_madvise(start, end - start, MADV_DONTNEED);
+	fiber_madvise_unaligned(start, end, MADV_DONTNEED);
 	stack_put_watermark(fiber->stack_watermark);
 }
 
@@ -1204,8 +1241,8 @@ fiber_stack_watermark_create(struct fiber *fiber,
 	 * not exit if MADV_DONTNEED failed, it is just a hint
 	 * for OS, not critical one.
 	 */
-	fiber_madvise(fiber->stack, fiber->stack_size, MADV_DONTNEED);
-
+	fiber_madvise_unaligned(fiber->stack, fiber->stack + fiber->stack_size,
+				MADV_DONTNEED);
 	/*
 	 * To increase probability of stack overflow detection
 	 * we put the first mark at a random position.
@@ -1246,9 +1283,6 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 
 	if (fiber->stack != NULL) {
 		VALGRIND_STACK_DEREGISTER(fiber->stack_id);
-#if ENABLE_ASAN
-		ASAN_UNPOISON_MEMORY_REGION(fiber->stack, fiber->stack_size);
-#endif
 		void *guard;
 		if (stack_direction < 0)
 			guard = page_align_down(fiber->stack - page_size);
@@ -1275,6 +1309,14 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 			 */
 			say_syserror("fiber: Can't put guard page to slab. "
 				     "Leak %zu bytes", (size_t)fiber->stack_size);
+			/*
+			 * Suppress memory leak report for this object.
+			 *
+			 * Works even though it is not a beginning of
+			 * allocation (there is ASAN slab cache allocation
+			 * header).
+			 */
+			LSAN_IGNORE_OBJECT(fiber->stack_slab);
 		} else {
 			slab_put(slabc, fiber->stack_slab);
 		}

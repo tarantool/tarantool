@@ -1,6 +1,6 @@
 utils = dofile('utils.lua')
 fiber = require('fiber')
-fiber.set_max_slice(15)
+fiber.set_max_slice(100500)
 
 s0 = box.schema.space.create('tweedledum')
 i0 = s0:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}, unique = true })

@@ -907,6 +907,9 @@ g.test_credentials = function()
                                 'myfunc1',
                             },
                             sequences = { },
+                            lua_eval = false,
+                            lua_call = { 'all' },
+                            sql = { 'all' },
                         },
                     },
                     roles = {'one', 'two'},
@@ -929,6 +932,9 @@ g.test_credentials = function()
                             sequences = {
                                 'myseq2'
                             },
+                            lua_eval = true,
+                            lua_call = { },
+                            sql = { },
                         },
                     },
                     roles = {'one', 'two'},
@@ -942,6 +948,51 @@ g.test_credentials = function()
 
     local res = instance_config:apply_default({}).credentials
     t.assert_equals(res, nil)
+
+    iconfig = {
+        credentials = {
+            roles = {
+                myrole = {
+                    privileges = {
+                        {
+                            permissions = {
+                                'execute',
+                            },
+                            lua_call = { 'myfunc' },
+                        },
+                    },
+                },
+            },
+        },
+    }
+    local err = '[instance_config] credentials.roles.myrole.privileges[1].' ..
+                'lua_call[1]: Got myfunc, but only the following values are ' ..
+                'allowed: all'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+
+    iconfig = {
+        credentials = {
+            users = {
+                myuser = {
+                    privileges = {
+                        {
+                            permissions = {
+                                'execute',
+                            },
+                            sql = { 'myfunc' },
+                        },
+                    },
+                },
+            },
+        },
+    }
+    err = '[instance_config] credentials.users.myuser.privileges[1].sql[1]: ' ..
+          'Got myfunc, but only the following values are allowed: all'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
 end
 
 g.test_app = function()
@@ -1203,6 +1254,7 @@ g.test_security_enterprise = function()
             auth_delay = 5,
             auth_retries = 3,
             disable_guest = true,
+            secure_erasing = true,
             password_lifetime_days = 90,
             password_min_length = 10,
             password_enforce_uppercase = true,
@@ -1344,7 +1396,9 @@ g.test_audit_available = function()
             },
             nonblock = true,
             format = 'plain',
-            filter = {'all', 'none'}
+            filter = {'all', 'none'},
+            spaces = {'space1', 'space2', 'space3'},
+            extract_key = true,
         },
     }
     instance_config:validate(iconfig)
@@ -1361,6 +1415,7 @@ g.test_audit_available = function()
             server = box.NULL
         },
         to = "devnull",
+        extract_key = false,
     }
     local res = instance_config:apply_default({}).audit_log
     t.assert_equals(res, exp)
@@ -1372,6 +1427,8 @@ g.test_failover = function()
             probe_interval = 5,
             connect_timeout = 2,
             call_timeout = 2,
+            lease_interval = 10,
+            renew_interval = 1,
         },
     }
 
@@ -1382,6 +1439,8 @@ g.test_failover = function()
         probe_interval = 10,
         connect_timeout = 1,
         call_timeout = 1,
+        lease_interval = 30,
+        renew_interval = 10,
     }
     local res = instance_config:apply_default({}).failover
     t.assert_equals(res, exp)

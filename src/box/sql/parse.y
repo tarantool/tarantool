@@ -1499,7 +1499,7 @@ cmd ::= FUNCTION_KW(T) expr(E). {
     return;
   }
   pParse->parsed_ast_type = AST_TYPE_EXPR;
-  pParse->parsed_ast.expr = sqlExprDup(E.pExpr, 0);
+  pParse->parsed_ast.expr = E.pExpr;
 }
 
 //////////////////////////// The SHOW CREATE TABLE command /////////////////////
@@ -1722,10 +1722,44 @@ cmd ::= alter_table_start(A) RENAME TO nm(N). {
     sql_alter_table_rename(pParse);
 }
 
-cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {
-  drop_constraint_def_init(&pParse->drop_constraint_def, X, &Z, false);
+cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z). {
   pParse->initiateTTrans = true;
-  sql_drop_constraint(pParse);
+  sql_drop_table_constraint(pParse, &X, &Z);
+}
+
+cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) FOREIGN KEY. {
+  pParse->initiateTTrans = true;
+  sql_drop_tuple_foreign_key(pParse, &X, &Z);
+}
+
+cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) PRIMARY KEY. {
+  pParse->initiateTTrans = true;
+  sql_drop_primary_key(pParse, &X, &Z);
+}
+
+cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) UNIQUE. {
+  pParse->initiateTTrans = true;
+  sql_drop_unique(pParse, &X, &Z);
+}
+
+cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) CHECK. {
+  pParse->initiateTTrans = true;
+  sql_drop_tuple_check(pParse, &X, &Z);
+}
+
+cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z). {
+  pParse->initiateTTrans = true;
+  sql_drop_field_constraint(pParse, &X, &F, &Z);
+}
+
+cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z) FOREIGN KEY. {
+  pParse->initiateTTrans = true;
+  sql_drop_field_foreign_key(pParse, &X, &F, &Z);
+}
+
+cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z) CHECK. {
+  pParse->initiateTTrans = true;
+  sql_drop_field_check(pParse, &X, &F, &Z);
 }
 
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////

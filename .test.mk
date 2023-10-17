@@ -56,6 +56,11 @@ install-test-deps:
 run-test: install-test-deps
 	cd test && ${TEST_RUN_ENV} ./test-run.py --force --vardir ${VARDIR} ${TEST_RUN_PARAMS} ${TEST_RUN_EXTRA_PARAMS}
 
+.PHONY: run-perf-test
+run-perf-test:
+	cmake --build ${BUILD_DIR} --parallel
+	cmake --build ${BUILD_DIR} --target test-perf
+
 ##############################
 # Linux                      #
 ##############################
@@ -69,6 +74,42 @@ test-release: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
 
 test-release: build run-luajit-test run-test
 
+.PHONY: test-perf
+test-perf: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                          -DENABLE_WERROR=ON \
+                          -DTEST_BUILD=ON
+
+test-perf: build run-perf-test
+
+# *_ASAN variables are common part of respective variables for all ASAN builds.
+CMAKE_PARAMS_ASAN = -DENABLE_WERROR=ON \
+                    -DENABLE_ASAN=ON \
+                    -DENABLE_UB_SANITIZER=ON \
+                    -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=OFF \
+                    -DENABLE_FUZZER=ON \
+                    -DTEST_BUILD=ON
+# Some checks are temporary suppressed in the scope of the issue
+# https://github.com/tarantool/tarantool/issues/4360:
+#   - ASAN: to suppress failures of memory error checks caught while tests run, the asan/asan.supp
+#     file is used. It is set as a value for the `-fsanitize-blacklist` option at the build time in
+#     the cmake/profile.cmake file.
+#   - LSAN: to suppress failures of memory leak checks caught while tests run, the asan/lsan.supp
+#     file is used.
+TEST_RUN_ENV_ASAN = ASAN=ON \
+                    LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
+                    ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:$\
+                                 detect_invalid_pointer_pairs=1:symbolize=1:$\
+                                 detect_leaks=1:dump_instruction_bytes=1:$\
+                                 print_suppressions=0
+LUAJIT_TEST_ENV_ASAN = LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
+                       ASAN_OPTIONS=detect_invalid_pointer_pairs=1:$\
+                                    detect_leaks=1:$\
+                                    dump_instruction_bytes=1:$\
+                                    heap_profile=0:$\
+                                    print_suppressions=0:$\
+                                    symbolize=1:$\
+                                    unmap_shadow_on_exit=1
+
 # Release ASAN build
 
 .PHONY: test-release-asan
@@ -80,36 +121,29 @@ test-release: build run-luajit-test run-test
 # while running LuaJIT tests with ASan support enabled.
 # Experiments once again confirm the notorious quote that "640 Kb
 # ought to be enough for anybody".
-test-release-asan: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                                  -DENABLE_WERROR=ON \
-                                  -DENABLE_ASAN=ON \
-                                  -DENABLE_UB_SANITIZER=ON \
-                                  -DFIBER_STACK_SIZE=640Kb \
-                                  -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=OFF \
-                                  -DENABLE_FUZZER=ON \
-                                  -DTEST_BUILD=ON
-# Some checks are temporary suppressed in the scope of the issue
-# https://github.com/tarantool/tarantool/issues/4360:
-#   - ASAN: to suppress failures of memory error checks caught while tests run, the asan/asan.supp
-#     file is used. It is set as a value for the `-fsanitize-blacklist` option at the build time in
-#     the cmake/profile.cmake file.
-#   - LSAN: to suppress failures of memory leak checks caught while tests run, the asan/lsan.supp
-#     file is used.
-test-release-asan: TEST_RUN_ENV = ASAN=ON \
-                                  LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
-                                  ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:$\
-                                               detect_invalid_pointer_pairs=1:symbolize=1:$\
-                                               detect_leaks=1:dump_instruction_bytes=1:$\
-                                               print_suppressions=0
-test-release-asan: LUAJIT_TEST_ENV = LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
-                                     ASAN_OPTIONS=detect_invalid_pointer_pairs=1:$\
-                                                  detect_leaks=1:$\
-                                                  dump_instruction_bytes=1:$\
-                                                  heap_profile=0:$\
-                                                  print_suppressions=0:$\
-                                                  symbolize=1:$\
-                                                  unmap_shadow_on_exit=1
+test-release-asan: CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
+                                  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                                  -DFIBER_STACK_SIZE=640Kb
+test-release-asan: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
+test-release-asan: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
 test-release-asan: build run-luajit-test run-test
+
+# Debug ASAN build
+
+.PHONY: test-debug-asan
+# We need even larger fiber stacks in ASAN debug build for luajit tests
+# to pass. Value twice as big as in ASAN release is just a wild guess.
+test-debug-asan: CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
+                                -DCMAKE_BUILD_TYPE=Debug \
+                                -DFIBER_STACK_SIZE=1280Kb
+test-debug-asan: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
+test-debug-asan: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
+# Increase timeouts as some tests in ASAN debug build take quite a lot
+# of time to finish.
+test-debug-asan: TEST_RUN_PARAMS += --test-timeout 620 \
+                                    --no-output-timeout 630 \
+                                    --server-start-timeout 610
+test-debug-asan: build run-luajit-test run-test
 
 # Debug build
 

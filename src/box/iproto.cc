@@ -1292,6 +1292,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		return;
 	}
 	/* Read input. */
+	ibuf_reserve(in, ibuf_unused(in));
 	ssize_t nrd = iostream_read(io, in->wpos, ibuf_unused(in));
 	if (nrd < 0) {                  /* Socket is not ready. */
 		if (nrd == IOSTREAM_ERROR)
@@ -1312,7 +1313,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 	rmean_collect(con->iproto_thread->rmean, IPROTO_RECEIVED, nrd);
 
 	/* Update the read position and connection state. */
-	in->wpos += nrd;
+	ibuf_alloc(in, nrd);
 	con->parse_size += nrd;
 	/* Enqueue all requests which are fully read up. */
 	if (iproto_enqueue_batch(con, in) != 0)
@@ -1480,10 +1481,8 @@ iproto_connection_delete(struct iproto_connection *con)
 	 */
 	ibuf_destroy(&con->ibuf[0]);
 	ibuf_destroy(&con->ibuf[1]);
-	assert(con->obuf[0].pos == 0 &&
-	       con->obuf[0].iov[0].iov_base == NULL);
-	assert(con->obuf[1].pos == 0 &&
-	       con->obuf[1].iov[0].iov_base == NULL);
+	assert(!obuf_is_initialized(&con->obuf[0]));
+	assert(!obuf_is_initialized(&con->obuf[1]));
 
 	assert(mh_size(con->streams) == 0);
 	mh_i64ptr_delete(con->streams);

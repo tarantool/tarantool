@@ -668,6 +668,7 @@ g.test_security_options = function()
             auth_delay: 5
             auth_retries: 3
             disable_guest: false
+            secure_erasing: false
             password_lifetime_days: 90
             password_min_length: 14
             password_enforce_uppercase: true
@@ -696,6 +697,7 @@ g.test_security_options = function()
         t.assert_equals(box.cfg.auth_delay, 5)
         t.assert_equals(box.cfg.auth_retries, 3)
         t.assert_equals(box.cfg.disable_guest, false)
+        t.assert_equals(box.cfg.secure_erasing, false)
         t.assert_equals(box.cfg.password_lifetime_days, 90)
         t.assert_equals(box.cfg.password_min_length, 14)
         t.assert_equals(box.cfg.password_enforce_uppercase, true)
@@ -803,6 +805,8 @@ g.test_audit_options = function()
         t.assert_equals(box.cfg.audit_nonblock, true)
         t.assert_equals(box.cfg.audit_format, 'csv')
         t.assert_equals(box.cfg.audit_filter, table.concat(events, ","))
+        t.assert_equals(box.cfg.audit_spaces, {'space1', 'space2', 'space3'})
+        t.assert_equals(box.cfg.audit_extract_key, true)
     end
 
     helpers.success_case(g, {
@@ -812,8 +816,83 @@ g.test_audit_options = function()
             ['audit_log.nonblock'] = true,
             ['audit_log.format'] = 'csv',
             ['audit_log.filter'] = events,
+            ['audit_log.spaces'] = {'space1', 'space2', 'space3'},
+            ['audit_log.extract_key'] = true,
         },
         verify = verify,
         verify_args = {events}
+    })
+end
+
+-- "replication.failover" = "supervised" mode has several
+-- constraints.
+--
+-- "<replicaset>.leader" and "database.mode" options are
+-- forbidden.
+--
+-- "replication.bootstrap_strategy" = "auto" is supported, but
+-- other strategies aren't.
+g.test_failover_supervised_constrainsts = function(g)
+    local replicaset_prefix = 'groups.group-001.replicasets.replicaset-001'
+    local instance_prefix = replicaset_prefix .. '.instances.instance-001'
+
+    local leader_exp_err = '"leader" = "instance-001" option is set for ' ..
+        'replicaset "replicaset-001" of group "group-001", but this option ' ..
+        'cannot be used together with replication.failover = "supervised"'
+    local mode_exp_err = 'database.mode = "ro" is set for instance ' ..
+        '"instance-001" of replicaset "replicaset-001" of group ' ..
+        '"group-001", but this option cannot be used together with ' ..
+        'replication.failover = "supervised"'
+    local bootstrap_strategy_exp_err_template = '"bootstrap_strategy" = %q ' ..
+        'is set for replicaset "replicaset-001", but it is not supported ' ..
+        'with "replication.failover" = "supervised"'
+
+    -- The "<replicaset>.leader" option is forbidden in the
+    -- "supervised" failover mode.
+    helpers.failure_case(g, {
+        options = {
+            ['replication.failover'] = 'supervised',
+            [replicaset_prefix .. '.leader'] = 'instance-001',
+        },
+        exp_err = leader_exp_err,
+    })
+
+    -- The "database.mode" option is forbidden in the "supervised"
+    -- failover mode.
+    helpers.failure_case(g, {
+        options = {
+            ['replication.failover'] = 'supervised',
+            [instance_prefix .. '.database.mode'] = 'ro',
+        },
+        exp_err = mode_exp_err
+    })
+
+    -- "replication.bootstrap_strategy" = "legacy" is forbidden.
+    helpers.failure_case(g, {
+        options = {
+            ['replication.failover'] = 'supervised',
+            ['replication.bootstrap_strategy'] = 'legacy',
+        },
+        exp_err = bootstrap_strategy_exp_err_template:format('legacy'),
+    })
+
+    -- "replication.bootstrap_strategy" = "config" is forbidden.
+    helpers.failure_case(g, {
+        options = {
+            ['replication.failover'] = 'supervised',
+            ['replication.bootstrap_strategy'] = 'config',
+            [replicaset_prefix .. '.bootstrap_leader'] = 'instance-001',
+        },
+        exp_err = bootstrap_strategy_exp_err_template:format('config'),
+    })
+
+    -- "replication.bootstrap_strategy" = "supervised" is
+    -- forbidden.
+    helpers.failure_case(g, {
+        options = {
+            ['replication.failover'] = 'supervised',
+            ['replication.bootstrap_strategy'] = 'supervised',
+        },
+        exp_err = bootstrap_strategy_exp_err_template:format('supervised'),
     })
 end

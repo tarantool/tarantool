@@ -25,7 +25,13 @@ g.test_converters = function()
         }, {
             'session,usage',
             'universe',
-        },
+        }, {
+            'execute',
+            'lua_call',
+        }, {
+            'execute',
+            'lua_eval',
+        }
     }
 
     -- Guest privileges in format provided by config schema
@@ -36,6 +42,14 @@ g.test_converters = function()
                     'usage'
                 },
                 universe = true,
+            }, {
+                permissions = {
+                    'execute',
+                },
+                lua_eval = true,
+                lua_call = {
+                    'all'
+                },
             }
         },
         roles = {
@@ -60,6 +74,17 @@ g.test_converters = function()
                 ['usage'] = true,
             }
         },
+        ['lua_eval'] = {
+            [''] = {
+                ['execute'] = true,
+            },
+        },
+        ['lua_call'] = {
+            [''] = {
+                ['execute'] = true,
+            },
+        },
+        ['sql'] = {},
     }
 
     t.assert_equals(internal.privileges_from_box(box_guest_privileges),
@@ -121,6 +146,9 @@ g.test_converters = function()
                 ['delete'] = true,
             }
         },
+        ['lua_eval'] = {},
+        ['lua_call'] = {},
+        ['sql'] = {},
     }
 
     t.assert_equals(internal.privileges_from_box(box_admin_privileges),
@@ -171,6 +199,9 @@ g.test_converters = function()
                 ['read'] = true,
             },
         },
+        ['lua_eval'] = {},
+        ['lua_call'] = {},
+        ['sql'] = {},
     }
 
     t.assert_equals(internal.privileges_from_box(box_replication_privileges),
@@ -214,6 +245,9 @@ g.test_converters = function()
             'execute',
             'role',
             'public',
+        }, {
+            'execute',
+            'lua_call',
         },
     }
 
@@ -243,6 +277,13 @@ g.test_converters = function()
                     'read',
                 },
                 universe = true,
+            }, {
+                permissions = {
+                    'execute',
+                },
+                lua_call = {
+                    'all'
+                },
             },
         },
         roles = {
@@ -294,6 +335,13 @@ g.test_converters = function()
                 ['read'] = true,
             },
         },
+        ['lua_eval'] = {},
+        ['lua_call'] = {
+            [''] = {
+                ['execute'] = true,
+            },
+        },
+        ['sql'] = {},
     }
 
     t.assert_equals(internal.privileges_from_box(box_custom_privileges),
@@ -415,6 +463,9 @@ g.test_privileges_add_defaults = function(g)
             ['function'] = {},
             ['sequence'] = {},
             ['universe'] = {},
+            ['lua_eval'] = {},
+            ['lua_call'] = {},
+            ['sql'] = {},
         }
         defaults = internal.privileges_add_defaults(name, role_or_user,
                                                     defaults)
@@ -1164,5 +1215,133 @@ g.test_postpone_grants_till_rename = function(g)
             check_sync()
         end,
         verify_args = {iconfig},
+    })
+end
+
+g.test_lua_eval_lua_call_sql = function()
+    helpers.reload_success_case(g, {
+        options = {
+            credentials = {
+                users = {
+                    guest = {
+                        roles = { 'super' }
+                    },
+                    myuser = {
+                        password = 'secret',
+                        privileges = {
+                            {
+                                permissions = {
+                                    'execute',
+                                },
+                                lua_eval = true,
+                                lua_call = {
+                                    'all',
+                                },
+                                sql = {
+                                    'all',
+                                },
+                            }
+                        },
+                    }
+                },
+            },
+            iproto = {
+                listen = 'unix/:./test.iproto',
+            },
+        },
+        verify = function()
+            local conn = require('net.box').connect(
+                'unix/:./test.iproto',
+                {
+                    user = 'myuser',
+                    password = 'secret',
+                }
+            )
+            t.assert(conn:eval('return true'))
+
+            conn:eval([[function myfunc() return true end]])
+            t.assert(conn:call('myfunc'))
+
+            t.assert(conn:execute('SELECT 1'))
+        end,
+        options_2 = {
+            credentials = {
+                users = {
+                    guest = {
+                        roles = { 'super' }
+                    },
+                    myuser = {
+                        password = 'secret',
+                    },
+                },
+            },
+            iproto = {
+                listen = 'unix/:./test.iproto',
+            },
+        },
+        verify_2 = function()
+            local conn = require('net.box').connect(
+                'unix/:./test.iproto',
+                {
+                    user = 'myuser',
+                    password = 'secret',
+                }
+            )
+            t.assert_error(conn.eval, conn, 'return true')
+
+            -- `myfunc` already exists.
+            t.assert_error(conn.call, conn, 'myfunc')
+
+            t.assert_error(conn.execute, conn, 'SELECT 1')
+        end
+    })
+end
+
+g.test_consider_auth_type_for_passwods = function(g)
+    t.tarantool.skip_if_not_enterprise()
+
+    helpers.reload_success_case(g, {
+        options = {
+            credentials = {
+                users = {
+                    guest = {
+                        roles = { 'super' }
+                    },
+                    myuser = {
+                        password = 'secret',
+                    },
+                },
+            },
+            security = {
+                auth_type = 'chap-sha1',
+            },
+        },
+        verify = function()
+            t.assert_equals(box.cfg.auth_type, 'chap-sha1')
+
+            local password_def = box.space._user.index.name:get({'myuser'})[5]
+            t.assert_equals(type(password_def['chap-sha1']), 'string')
+        end,
+        options_2 = {
+            credentials = {
+                users = {
+                    guest = {
+                        roles = { 'super' }
+                    },
+                    myuser = {
+                        password = 'secret',
+                    },
+                },
+            },
+            security = {
+                auth_type = 'pap-sha256',
+            },
+        },
+        verify_2 = function()
+            t.assert_equals(box.cfg.auth_type, 'pap-sha256')
+
+            local password_def = box.space._user.index.name:get({'myuser'})[5]
+            t.assert_equals(type(password_def['pap-sha256']), 'table')
+        end,
     })
 end

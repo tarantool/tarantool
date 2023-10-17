@@ -25,7 +25,6 @@ struct region;
  * list.
  * @param src Variable argument list.
  *
- * @retval NULL on error.
  * @retval Address of the buffer with the encoded value.
  */
 const char *
@@ -42,7 +41,6 @@ mp_vformat_on_region(struct region *region, size_t *size, const char *format,
  * resulting msgpack and the types of the next arguments.
  * @param ... Values to encode.
  *
- * @retval NULL on error.
  * @retval Address of the buffer with the encoded value.
  */
 const char *

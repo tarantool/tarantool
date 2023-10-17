@@ -24,6 +24,10 @@ g.before_all(function()
             {box.session.on_auth, 'box.session.on_auth'},
             {space_on_replace, 'box.space[512].on_replace'},
             {space_before_replace, 'box.space[512].before_replace'},
+            {box.ctl.on_election, 'box.ctl.on_election'},
+            {box.ctl.on_recovery_state, 'box.ctl.on_recovery_state'},
+            {box.ctl.on_schema_init, 'box.ctl.on_schema_init'},
+            {box.ctl.on_shutdown, 'box.ctl.on_shutdown'},
         })
 
         rawset(_G, 'ffi_monotonic_id', 0)

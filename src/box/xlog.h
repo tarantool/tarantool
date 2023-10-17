@@ -247,11 +247,23 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags);
 int
 xdir_remove_file_by_vclock(struct xdir *dir, struct vclock *vclock);
 
+typedef bool
+(*xlog_file_is_temporary_f)(const char *filename);
+
 /**
- * Remove inprogress files in the specified directory.
+ * Returns true if the file with the given name is a temporary xlog file that
+ * should be removed by xdir_remove_temporary_files().
+ */
+extern xlog_file_is_temporary_f xlog_file_is_temporary;
+
+/**
+ * Removes all temporary files in the specified directory.
+ *
+ * We call this function at startup to clean up the xlog directory of
+ * incomplete files left from the previous run.
  */
 void
-xdir_collect_inprogress(struct xdir *xdir);
+xdir_remove_temporary_files(struct xdir *xdir);
 
 /**
  * Return LSN and vclock (unless @vclock is NULL) of the oldest
@@ -884,6 +896,47 @@ xlog_cursor_tx_pos(struct xlog_cursor *cursor)
 int
 xdir_open_cursor(struct xdir *dir, int64_t signature,
 		 struct xlog_cursor *cursor);
+
+/** }}} */
+
+/** {{{ xlog_remove_file */
+
+/**
+ * Flags passed to xlog_remove_file().
+ */
+enum {
+	/** Log info message on success. */
+	XLOG_RM_VERBOSE = 1 << 0,
+	/** Remove file asynchronously. */
+	XLOG_RM_ASYNC = 1 << 1,
+};
+
+typedef int
+(*xlog_remove_file_impl_f)(const char *filename, bool *existed);
+
+/**
+ * Low-level function used by xlog_remove_file().
+ *
+ * Removes an xlog file with the given name.
+ *
+ * On success, sets the 'existed' flag to true if the file existed and was
+ * actually deleted or to false otherwise and returns 0. On failure, sets
+ * diag and returns -1.
+ *
+ * Note that this function doesn't treat ENOENT as error.
+ */
+extern xlog_remove_file_impl_f xlog_remove_file_impl;
+
+/**
+ * Removes an xlog file with the given name.
+ *
+ * Returns true if the file was removed or didn't exist. If the file wasn't
+ * removed due to an error, logs the error and returns false.
+ *
+ * See XLOG_RM_* for available flags.
+ */
+bool
+xlog_remove_file(const char *filename, unsigned flags);
 
 /** }}} */
 

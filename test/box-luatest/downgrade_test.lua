@@ -76,6 +76,28 @@ g.test_downgrade_sanity_checks = function(cg)
     end)
 end
 
+g.test_downgrade_from_more_recent_version = function(cg)
+    cg.server:exec(function()
+        local tarantool = require('tarantool')
+        local function schema_version()
+            local t = box.space._schema:get{'version'}
+            return string.format('%d.%d.%d', t[2], t[3], t[4])
+        end
+
+        local app_version = tarantool.version:match('^%d+%.%d+%.%d+')
+        local major, minor, patch = app_version:match('(%d+)%.(%d+)%.(%d+)')
+        box.space._schema:replace({'version', tonumber(major), tonumber(minor),
+                                   tonumber(patch) + 1})
+        local new_version = schema_version()
+        local err = 'Cannot downgrade as current schema version %s is newer' ..
+                    ' than Tarantool version %s'
+        t.assert_error_msg_contains(err:format(new_version, app_version),
+                                    box.schema.downgrade,
+                                    box.schema.downgrade_versions()[1])
+        t.assert_equals(schema_version(), new_version)
+    end)
+end
+
 g.test_downgrade_and_upgrade = function(cg)
     cg.server:exec(function()
         box.schema.downgrade("2.8.2")

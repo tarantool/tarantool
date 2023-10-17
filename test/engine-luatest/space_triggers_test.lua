@@ -152,6 +152,104 @@ g.test_before_replace_return_nil_or_none = function(cg)
     end, {cg.params.engine, cg.params.space_name})
 end
 
+g = t.group('Old API triggers', t.helpers.matrix{
+    engine = {'vinyl', 'memtx'},
+})
+
+g.before_all(function(cg)
+    cg.server = server:new({alias = 'master'})
+    cg.server:start()
+end)
+
+g.after_all(function(cg)
+    cg.server:stop()
+end)
+
+-- Checks if triggers set with old API are removed with the space.
+g.test_old_api_triggers_are_temporary = function(cg)
+    cg.server:exec(function(engine)
+        local trigger = require('trigger')
+        t.assert_equals(trigger.info(), {})
+        local space_id = 743
+        local on_replace_event = string.format('box.space[%d].on_replace',
+            space_id)
+        local before_replace_event =
+            string.format('box.space[%d].before_replace', space_id)
+        local s = box.schema.create_space('test1', {
+            id = space_id, engine = engine,
+            format = {{name = 'field1', type = 'unsigned'}}
+        })
+        s:create_index('pk')
+
+        local all_triggers = {}
+        local non_space_triggers = {}
+        local function space_set_trigger(new, old, name)
+            local h = s:on_replace(new, old, name)
+            s:before_replace(new, old, name)
+            table.insert(all_triggers, 1, {name, new})
+            return h
+        end
+        local function event_set_trigger(name, handler)
+            local h = trigger.set(on_replace_event, name, handler)
+            trigger.set(before_replace_event, name, handler)
+            table.insert(all_triggers, 1, {name, handler})
+            table.insert(non_space_triggers, 1, {name, handler})
+            return h
+        end
+        local function check_space_triggers(expected)
+            -- Space shows only handlers.
+            local expected_handlers = {}
+            for _, trigger_info in pairs(expected) do
+                table.insert(expected_handlers, trigger_info[2])
+            end
+            t.assert_equals(s:on_replace(), expected_handlers)
+            t.assert_equals(s:before_replace(), expected_handlers)
+        end
+        local function check_event_triggers(expected)
+            local info = trigger.info(on_replace_event)[on_replace_event]
+            t.assert_equals(info, expected)
+            info = trigger.info(before_replace_event)[before_replace_event]
+            t.assert_equals(info, expected)
+        end
+
+        -- Insert and remove trigger.
+        local h = space_set_trigger(function() end, nil)
+        space_set_trigger(nil, h)
+        all_triggers = {}
+
+        space_set_trigger(function() end, nil, "space_trigger1")
+        event_set_trigger("event_trigger1", function() end)
+        space_set_trigger(function() end, nil, "space_trigger2")
+        event_set_trigger("event_trigger2", function() end)
+
+        space_set_trigger(function() end, nil, "space_replaced_with_event")
+        event_set_trigger("space_replaced_with_event", function() end)
+        table.remove(all_triggers, 2)
+
+        event_set_trigger("event_replaced_with_space", function() end)
+        space_set_trigger(function() end, nil, "event_replaced_with_space")
+        -- The last trigger was replaced with an old space API.
+        table.remove(non_space_triggers, 1)
+        table.remove(all_triggers, 2)
+
+        space_set_trigger(function() end, nil, "space_trigger3")
+
+        check_space_triggers(all_triggers)
+        check_event_triggers(all_triggers)
+
+        s:alter({
+            name = 'test2',
+            format = {{name = 'field1', type = 'unsigned'}}
+        })
+        check_space_triggers(all_triggers)
+        check_event_triggers(all_triggers)
+
+        s:drop()
+        check_event_triggers(non_space_triggers)
+
+    end, {cg.params.engine})
+end
+
 g = t.group('Recovery triggers', {
     -- Vinyl does not recover from snapshot.
     {engine = 'vinyl', snapshot = false},

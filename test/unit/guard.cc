@@ -1,5 +1,7 @@
 #include "memory.h"
 #include "fiber.h"
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 static struct fiber_attr default_attr;
@@ -7,8 +9,9 @@ static struct fiber_attr default_attr;
 static void
 sigsegf_handler(int signo)
 {
-	note("signal handler called");
-	exit(0);
+	ok(true);
+	footer();
+	exit(check_plan());
 }
 
 /*
@@ -70,6 +73,10 @@ main_f(va_list ap)
 
 int main()
 {
+	plan(1);
+	header();
+
+#ifndef ENABLE_ASAN
 	memory_init();
 	fiber_init(fiber_cxx_invoke);
 	fiber_attr_create(&default_attr);
@@ -78,6 +85,10 @@ int main()
 	ev_run(loop(), 0);
 	fiber_free();
 	memory_free();
-	fail("signal handler was not executed", "");
-	return 0;
+#else
+	ok(true);
+#endif
+
+	footer();
+	return check_plan();
 }

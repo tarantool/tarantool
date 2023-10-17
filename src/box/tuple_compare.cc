@@ -588,7 +588,7 @@ key_part_compare_result(struct key_part *part, int result)
  * Reverse the hint if the key part sort order is descending.
  */
 template<bool has_desc_parts>
-static hint_t
+static inline hint_t
 key_part_hint(struct key_part *part, hint_t hint)
 {
 	bool is_asc = !has_desc_parts || part->sort_order != SORT_ORDER_DESC;
@@ -612,6 +612,9 @@ key_part_hint(struct key_part *part, hint_t hint)
  * any of \p field_a and \p field_b is absent or NIL. Othervice the pointed
  * value is not modified.
  *
+ * This code had been deduplicated, so made the function always_inline in
+ * order to make sure it's still inlined after refactoring.
+ *
  * @param part the key part we compare
  * @param field_a the field to compare
  * @param field_b the field to compare against
@@ -623,7 +626,7 @@ key_part_hint(struct key_part *part, hint_t hint)
  */
 template<bool is_nullable, bool a_is_optional, bool b_is_optional,
 	 bool has_desc_parts>
-static int
+static inline __attribute__((always_inline)) int
 key_part_compare_fields(struct key_part *part, const char *field_a,
 			const char *field_b, bool *was_null_met = NULL)
 {

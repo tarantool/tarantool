@@ -34,6 +34,8 @@ struct event_trigger {
 	char *name;
 	/** Trigger reference counter. */
 	uint32_t ref_count;
+	/** Flags of the trigger. */
+	uint8_t flags;
 	/** This flag is set when the trigger is deleted. */
 	bool is_deleted;
 };
@@ -47,7 +49,7 @@ struct event_trigger {
  */
 static struct event_trigger *
 event_trigger_new(struct func_adapter *func, struct event *event,
-		  const char *name)
+		  const char *name, uint8_t flags)
 {
 	assert(name != NULL);
 	assert(event != NULL);
@@ -58,6 +60,7 @@ event_trigger_new(struct func_adapter *func, struct event *event,
 	trigger->name = (char *)(trigger + 1);
 	strlcpy(trigger->name, name, name_len + 1);
 	trigger->ref_count = 0;
+	trigger->flags = flags;
 	trigger->is_deleted = false;
 	trigger->event = event;
 	event_ref(event);
@@ -203,9 +206,22 @@ event_on_change(struct event *event)
 	event_trigger_iterator_destroy(&it);
 }
 
+/** Detach the trigger from the event. */
+static void
+event_detach_trigger(struct event *event, struct event_trigger *trigger)
+{
+	assert(trigger->event == event);
+	assert(!trigger->is_deleted);
+	assert(event->trigger_count > 0);
+
+	event->trigger_count--;
+	trigger->is_deleted = true;
+	event_trigger_unref(trigger);
+}
+
 void
-event_reset_trigger(struct event *event, const char *name,
-		    struct func_adapter *new_trigger)
+event_reset_trigger_with_flags(struct event *event, const char *name,
+			       struct func_adapter *new_trigger, uint8_t flags)
 {
 	assert(event != NULL);
 	assert(name != NULL);
@@ -216,7 +232,7 @@ event_reset_trigger(struct event *event, const char *name,
 	if (new_trigger != NULL) {
 		event->trigger_count++;
 		struct event_trigger *trigger =
-			event_trigger_new(new_trigger, event, name);
+			event_trigger_new(new_trigger, event, name, flags);
 		event_trigger_ref(trigger);
 		if (found_trigger == NULL) {
 			rlist_add_entry(&event->triggers, trigger, link);
@@ -230,14 +246,23 @@ event_reset_trigger(struct event *event, const char *name,
 					     trigger, link);
 		}
 	}
-	if (found_trigger != NULL) {
-		assert(event->trigger_count > 0);
-		event->trigger_count--;
-		found_trigger->is_deleted = true;
-		event_trigger_unref(found_trigger);
-	}
+	if (found_trigger != NULL)
+		event_detach_trigger(event, found_trigger);
 	event_on_change(event);
 	event_unref(event);
+}
+
+void
+event_remove_temporary_triggers(struct event *event)
+{
+	struct event_trigger *curr = NULL;
+	struct event_trigger *tmp = NULL;
+	rlist_foreach_entry_safe(curr, &event->triggers, link, tmp) {
+		if (!curr->is_deleted &&
+		    curr->flags & EVENT_TRIGGER_IS_TEMPORARY) {
+			event_detach_trigger(event, curr);
+		}
+	}
 }
 
 void

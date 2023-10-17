@@ -54,6 +54,8 @@
 #include <string.h>
 #include <strings.h>
 
+bool is_console_exited;
+
 struct rlist on_console_eval = RLIST_HEAD_INITIALIZER(on_console_eval);
 
 static struct luaL_serializer *serializer_yaml;
@@ -727,6 +729,16 @@ lbox_console_run_on_eval(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Sets `is_console_exited' to true.
+ */
+static int
+lbox_console_console_exited(MAYBE_UNUSED struct lua_State *L)
+{
+	is_console_exited = true;
+	return 0;
+}
+
 int
 console_session_fd(struct session *session)
 {
@@ -897,6 +909,7 @@ tarantool_lua_console_init(struct lua_State *L)
 		{"format_yaml",		lbox_console_format_yaml},
 		{"format_lua",		lbox_console_format_lua},
 		{"run_on_eval",		lbox_console_run_on_eval},
+		{"console_exited",	lbox_console_console_exited},
 		{NULL, NULL}
 	};
 	luaT_newmodule(L, "console.lib", consolelib);

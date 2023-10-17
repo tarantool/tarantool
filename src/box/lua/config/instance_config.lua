@@ -1095,6 +1095,24 @@ return schema.new('instance_config', schema.record({
             --
             -- No database.mode or 'leader' options should be set.
             'election',
+            -- Automatic leader appointment by an external
+            -- failover agent ('supervised').
+            --
+            -- The default database.mode is 'ro' (but there is an
+            -- exception during a replicaset bootstrapping, see
+            -- applier/box_cfg.lua).
+            --
+            -- The failover agent assigns the 'rw' mode to one
+            -- instance in the replicaset.
+            --
+            -- No database.mode or 'leader' options should be set.
+            --
+            -- TODO: Raise an error if this value is set on
+            -- Tarantool Community Edition. The instance side code
+            -- that handles failover agent commands is part of
+            -- Tarantool Enterprise Edition, so there is no much
+            -- sense to enable this mode on the Community Edition.
+            'supervised',
         }, {
             default = 'off',
         }),
@@ -1228,6 +1246,21 @@ return schema.new('instance_config', schema.record({
                                 type = 'string',
                             }),
                         }),
+                        lua_eval = schema.scalar({
+                            type = 'boolean',
+                        }),
+                        lua_call = schema.array({
+                            items = schema.scalar({
+                                type = 'string',
+                                allowed_values = {'all'},
+                            }),
+                        }),
+                        sql = schema.array({
+                            items = schema.scalar({
+                                type = 'string',
+                                allowed_values = {'all'},
+                            }),
+                        }),
                     }),
                 }),
                 -- The given role has all the privileges from
@@ -1277,6 +1310,21 @@ return schema.new('instance_config', schema.record({
                         sequences = schema.array({
                             items = schema.scalar({
                                 type = 'string',
+                            }),
+                        }),
+                        lua_eval = schema.scalar({
+                            type = 'boolean',
+                        }),
+                        lua_call = schema.array({
+                            items = schema.scalar({
+                                type = 'string',
+                                allowed_values = {'all'},
+                            }),
+                        }),
+                        sql = schema.array({
+                            items = schema.scalar({
+                                type = 'string',
+                                allowed_values = {'all'},
                             }),
                         }),
                     }),
@@ -1442,6 +1490,11 @@ return schema.new('instance_config', schema.record({
             type = 'boolean',
             default = false,
             box_cfg = 'disable_guest',
+        })),
+        secure_erasing = enterprise_edition(schema.scalar({
+            type = 'boolean',
+            default = false,
+            box_cfg = 'secure_erasing',
         })),
         password_lifetime_days = enterprise_edition(schema.scalar({
             type = 'integer',
@@ -1811,6 +1864,20 @@ return schema.new('instance_config', schema.record({
             "data_operations",
             "compatibility",
         }),
+        spaces = enterprise_edition(schema.array({
+            items = schema.scalar({
+                type = 'string',
+            }),
+            box_cfg = 'audit_spaces',
+            box_cfg_nondynamic = true,
+            default = box.NULL,
+        })),
+        extract_key = enterprise_edition(schema.scalar({
+            type = 'boolean',
+            box_cfg = 'audit_extract_key',
+            box_cfg_nondynamic = true,
+            default = false,
+        })),
     })),
     roles_cfg = schema.map({
         key = schema.scalar({type = 'string'}),
@@ -1834,6 +1901,14 @@ return schema.new('instance_config', schema.record({
         call_timeout = schema.scalar({
             type = 'number',
             default = 1,
+        }),
+        lease_interval = schema.scalar({
+            type = 'number',
+            default = 30,
+        }),
+        renew_interval = schema.scalar({
+            type = 'number',
+            default = 10,
         }),
     }),
 }, {

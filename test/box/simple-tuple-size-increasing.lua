@@ -9,4 +9,4 @@ box.cfg{
 }
 
 -- Tests with this cfg can run for a very long time without yields.
-require('fiber').set_max_slice(100)
+require('fiber').set_max_slice(100500)

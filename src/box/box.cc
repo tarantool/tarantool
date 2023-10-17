@@ -98,6 +98,8 @@
 #include "memory.h"
 #include "node_name.h"
 #include "tt_sort.h"
+#include "event.h"
+#include "func_adapter.h"
 
 static char status[64] = "unconfigured";
 
@@ -110,6 +112,8 @@ double txn_timeout_default;
 
 struct rlist box_on_shutdown_trigger_list =
 	RLIST_HEAD_INITIALIZER(box_on_shutdown_trigger_list);
+
+struct event *box_on_shutdown_event = NULL;
 
 const struct vclock *box_vclock = &replicaset.vclock;
 
@@ -183,7 +187,7 @@ static struct fiber_pool tx_fiber_pool;
  */
 static struct cbus_endpoint tx_prio_endpoint;
 
-RLIST_HEAD(box_on_recovery_state);
+struct event *box_on_recovery_state_event;
 
 /**
  * Recovery states supported by on_recovery_state triggers.
@@ -244,8 +248,22 @@ static int
 box_run_on_recovery_state(enum box_recovery_state state)
 {
 	assert(state >= 0 && state < box_recovery_state_MAX);
-	return trigger_run(&box_on_recovery_state,
-			   (char *)box_recovery_state_strs[state]);
+	const char *state_str = box_recovery_state_strs[state];
+
+	const char *name = NULL;
+	struct func_adapter *trigger = NULL;
+	struct func_adapter_ctx ctx;
+	struct event_trigger_iterator it;
+	int rc = 0;
+	event_trigger_iterator_create(&it, box_on_recovery_state_event);
+	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
+		func_adapter_begin(trigger, &ctx);
+		func_adapter_push_str0(trigger, &ctx, state_str);
+		rc = func_adapter_call(trigger, &ctx);
+		func_adapter_end(trigger, &ctx);
+	}
+	event_trigger_iterator_destroy(&it);
+	return rc;
 }
 
 static void
@@ -917,14 +935,28 @@ wal_stream_apply_mixed_dml_row(struct wal_stream *stream,
 			       struct xrow_header *row)
 {
 	/*
-	 * A local transaction should not be written to nodes_rows with
-	 * id equal to 0. It should be written to nodes_rows with the id
-	 * of the node from which we are recovering. Since a local
-	 * transaction can only exist on the node from which we are
-	 * recovering.
+	 * A local row can be part of any node's transaction. Try to find the
+	 * right transaction by tsn. If this fails, assume the row belongs to
+	 * this node.
 	 */
-	uint32_t id = row->replica_id ? row->replica_id : instance_id;
+	uint32_t id;
 	struct rlist *nodes_rows = stream->nodes_rows;
+	if (row->replica_id == 0) {
+		id = instance_id;
+		for (uint32_t i = 0; i < VCLOCK_MAX; i++) {
+			if (rlist_empty(&nodes_rows[i]))
+				continue;
+			struct wal_row *tmp =
+				rlist_last_entry(&nodes_rows[i], typeof(*tmp),
+						 in_row_list);
+			if (tmp->row.tsn == row->tsn) {
+				id = i;
+				break;
+			}
+		}
+	} else {
+		id = row->replica_id;
+	}
 
 	struct wal_row *save_row = wal_stream_save_row(stream, row);
 	rlist_add_tail_entry(&nodes_rows[id], save_row, in_row_list);
@@ -1065,22 +1097,6 @@ say_check_cfg(const char *log,
 		return -1;
 	}
 	return 0;
-}
-
-/**
- * Raises error if audit log configuration is incorrect.
- */
-static void
-box_check_audit(void)
-{
-	if (audit_log_check_format(cfg_gets("audit_format")) != 0) {
-		tnt_raise(ClientError, ER_CFG, "audit_format",
-			  diag_last_error(diag_get())->errmsg);
-	}
-	if (audit_log_check_filter(cfg_gets("audit_filter")) != 0) {
-		tnt_raise(ClientError, ER_CFG, "audit_filter",
-			  diag_last_error(diag_get())->errmsg);
-	}
 }
 
 /**
@@ -1851,7 +1867,8 @@ box_check_config(void)
 	struct uri_set uri_set;
 	char name[NODE_NAME_SIZE_MAX];
 	box_check_say();
-	box_check_audit();
+	if (audit_log_check_cfg() != 0)
+		diag_raise();
 	if (box_check_flightrec() != 0)
 		diag_raise();
 	if (box_check_listen(&uri_set) != 0)
@@ -3464,8 +3481,6 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 	RegionGuard region_guard(region);
 	const char *data = mp_vformat_on_region(region, &size, format, ap);
 	va_end(ap);
-	if (data == NULL)
-		return -1;
 	const char *data_end = data + size;
 	switch (type) {
 	case IPROTO_INSERT:
@@ -5814,8 +5829,7 @@ box_storage_init(void)
 	port_init();
 	iproto_init(cfg_geti("iproto_threads"));
 	sql_init();
-	audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"),
-		       cfg_gets("audit_format"), cfg_gets("audit_filter"));
+	audit_log_init();
 	security_cfg();
 
 	int64_t wal_max_size = box_check_wal_max_size(
@@ -5851,6 +5865,11 @@ box_storage_free(void)
 void
 box_init(void)
 {
+	box_on_recovery_state_event =
+		event_get("box.ctl.on_recovery_state", true);
+	event_ref(box_on_recovery_state_event);
+	box_on_shutdown_event = event_get("box.ctl.on_shutdown", true);
+	event_ref(box_on_shutdown_event);
 	msgpack_init();
 	fiber_cond_create(&ro_cond);
 	auth_init();
@@ -5890,7 +5909,8 @@ box_free(void)
 	box_watcher_free();
 	box_raft_free();
 	sequence_free();
-	trigger_destroy(&box_on_recovery_state);
+	event_unref(box_on_recovery_state_event);
+	box_on_recovery_state_event = NULL;
 	/* tuple_free(); */
 	/* schema_module_free(); */
 	/* session_free(); */

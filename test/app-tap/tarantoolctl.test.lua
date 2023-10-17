@@ -176,7 +176,7 @@ local function merge(...)
 end
 
 local test = tap.test('tarantoolctl')
-test:plan(8)
+test:plan(9)
 
 -- basic start/stop test
 -- must be stopped afterwards
@@ -352,6 +352,18 @@ do
             test_help(test_i, nil, "tarantoolctl --help", "Usage:")
             test_help(test_i, dir, "tarantoolctl", "Usage:")
             check_ok(test_i, dir, "rocks", "--help", 0, "Usage:")
+        end)
+        test:test("check no luarocks warnings issues", function(test_i)
+            test_i:plan(1)
+            local _, _, stderr = tctl_command(dir, "rocks", "--version")
+            local warnings = 0
+            for _, line in pairs(string.split(stderr, '\n')) do
+                if line:match('[Ww]arning:') then
+                    warnings = warnings + 1
+                end
+            end
+
+            test_i:is(warnings, 0, 'no warnings issued')
         end)
     end)
 

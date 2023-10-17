@@ -827,6 +827,13 @@ illegal_instruction(void)
 }
 #endif
 
+#ifdef ENABLE_ASAN
+# include <sanitizer/lsan_interface.h>
+# define LSAN_IGNORE_OBJECT(ptr) __lsan_ignore_object(ptr)
+#else
+# define LSAN_IGNORE_OBJECT(ptr) ((void)ptr)
+#endif
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

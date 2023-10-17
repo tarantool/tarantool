@@ -66,7 +66,7 @@ test_run:cmd("restart server default")
 fiber = require('fiber')
 ---
 ...
-fiber.set_max_slice(15)
+fiber.set_max_slice(100500)
 ---
 ...
 space = box.space['test']

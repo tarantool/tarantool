@@ -179,13 +179,22 @@ sql_encode_table_opts(struct region *region, struct space_def *def,
 char *
 fk_constraint_encode_links(const struct fk_constraint_def *fk, uint32_t *size);
 
-/**
- * Drop the check constraint or foreign key. This function drops tuple and field
- * constraints. If there is more than one constraint with the given name, one of
- * them will be dropped.
- */
+/** Drop tuple FOREIGN KEY constraint with given name. */
 int
-sql_constraint_drop(uint32_t space_id, const char *name);
+sql_tuple_foreign_key_drop(uint32_t space_id, const char *name);
+
+/** Drop tuple CHECK constraint with given name. */
+int
+sql_tuple_check_drop(uint32_t space_id, const char *name);
+
+/** Drop field FOREIGN KEY constraint of given field with given name. */
+int
+sql_field_foreign_key_drop(uint32_t space_id, uint32_t fieldno,
+			   const char *name);
+
+/** Drop field CHECK constraint of given field with given name. */
+int
+sql_field_check_drop(uint32_t space_id, uint32_t fieldno, const char *name);
 
 /**
  * Create new foreign key.

@@ -76,6 +76,7 @@
 #include "title.h"
 #include <libutil.h>
 #include "box/lua/init.h" /* box_lua_init() */
+#include "box/lua/console.h"
 #include "box/session.h"
 #include "box/memtx_tx.h"
 #include "box/module_cache.h"
@@ -89,6 +90,7 @@
 #include "core/clock_lowres.h"
 #include "lua/utils.h"
 #include "core/event.h"
+#include "on_shutdown.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -163,8 +165,7 @@ on_shutdown_f(va_list ap)
 	while (!is_shutting_down)
 		fiber_yield();
 
-	if (trigger_fiber_run(&box_on_shutdown_trigger_list, NULL,
-			      on_shutdown_trigger_timeout) != 0) {
+	if (on_shutdown_run_triggers() != 0) {
 		say_error("on_shutdown triggers failed");
 		diag_log();
 		diag_clear(diag_get());
@@ -968,6 +969,11 @@ main(int argc, char **argv)
 			if (say_entering_the_event_loop)
 				say_info("entering the event loop");
 			systemd_snotify("READY=1");
+			if (is_console_exited) {
+				printf("Exited console. Type Ctrl-C to exit "
+				       "Tarantool.\n");
+				fflush(stdout);
+			}
 			ev_now_update(loop());
 			ev_run(loop(), 0);
 		}

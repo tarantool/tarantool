@@ -59,9 +59,9 @@ extern "C" {
 #include "vclock/vclock.h"
 
 /**
- * Set/Reset/Get a trigger to an event associated with space by id. Argument
- * event_fmt is a format string for the event name - it must expect one uint32_t
- * value as an argument.
+ * Set/Reset/Get a temporary trigger to an event associated with space by id.
+ * Argument event_fmt is a format string for the event name - it must expect
+ * one uint32_t value as an argument.
  */
 static int
 lbox_space_reset_trigger(struct lua_State *L, uint32_t space_id,
@@ -70,7 +70,8 @@ lbox_space_reset_trigger(struct lua_State *L, uint32_t space_id,
 	const char *event_name = tt_sprintf(event_fmt, space_id);
 	struct event *event = event_get(event_name, true);
 	assert(event != NULL);
-	return luaT_event_reset_trigger(L, 2, event);
+	return luaT_event_reset_trigger_with_flags(
+		L, 2, event, EVENT_TRIGGER_IS_TEMPORARY);
 }
 
 /**

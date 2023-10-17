@@ -250,6 +250,7 @@ g.test_defaults = function()
             auth_retries = 0,
             auth_type = "chap-sha1",
             disable_guest = false,
+            secure_erasing = false,
             password_enforce_digits = false,
             password_enforce_lowercase = false,
             password_enforce_specialchars = false,
@@ -283,11 +284,14 @@ g.test_defaults = function()
                 server = box.NULL
             },
             to = "devnull",
+            extract_key = false,
         } or nil,
         failover = {
             probe_interval = 10,
             connect_timeout = 1,
             call_timeout = 1,
+            lease_interval = 30,
+            renew_interval = 10,
         },
     }
     local res = cluster_config:apply_default({})

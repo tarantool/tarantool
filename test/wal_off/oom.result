@@ -248,7 +248,7 @@ collectgarbage('collect')
 ---
 - 0
 ...
-for i=1,10000 do space:insert{i, str} end
+for i=1,10492 do space:insert{i, str} end
 ---
 - error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
 ...
@@ -273,7 +273,7 @@ collectgarbage('collect')
 ---
 - 0
 ...
-for i=1,10000 do space:insert{i, str} end
+for i=1,10492 do space:insert{i, str} end
 ---
 - error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
 ...

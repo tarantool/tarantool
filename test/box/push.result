@@ -321,10 +321,7 @@ box.schema.func.drop('do_push')
 s:truncate()
 ---
 ...
-function on_replace() box.session.push('replace') end
----
-...
-_ = s:on_replace(on_replace)
+_ = s:on_replace(function() box.session.push('replace') end)
 ---
 ...
 c:reload_schema()
@@ -343,9 +340,6 @@ s:select{}
 - - [200]
 ...
 c:close()
----
-...
-_ = s:on_replace(nil, on_replace)
 ---
 ...
 s:drop()
