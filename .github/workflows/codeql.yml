@@ -27,6 +27,16 @@ jobs:
 
     runs-on: ubuntu-20.04-self-hosted
 
+    container:
+      image: docker.io/tarantool/testing:ubuntu-focal
+      # Mount /dev to the container to be able to mount a disk image inside it
+      # for successful run of the .github/actions/environment action.
+      volumes:
+        - /dev:/dev
+      # Add extra privileges to the container for successful run
+      # of the .github/actions/environment action.
+      options: '--privileged'
+
     steps:
     - name: Prepare checkout
       uses: tarantool/actions/prepare-checkout@master
