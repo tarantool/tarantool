@@ -40,6 +40,9 @@ jobs:
 
     runs-on: ubuntu-20.04-self-hosted
 
+    container:
+      image: docker.io/tarantool/testing:ubuntu-focal
+
     steps:
       - name: Prepare checkout
         uses: tarantool/actions/prepare-checkout@master
@@ -67,6 +70,9 @@ jobs:
 
     runs-on: ubuntu-20.04-self-hosted
 
+    container:
+      image: docker.io/tarantool/testing:ubuntu-focal
+
     steps:
       - name: Prepare checkout
         uses: tarantool/actions/prepare-checkout@master
@@ -93,6 +99,9 @@ jobs:
           !contains(github.event.pull_request.labels.*.name, 'notest') )
 
     runs-on: ubuntu-20.04-self-hosted
+
+    container:
+      image: docker.io/tarantool/testing:ubuntu-focal
 
     steps:
       - name: Prepare checkout

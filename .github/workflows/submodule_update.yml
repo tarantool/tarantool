@@ -18,6 +18,9 @@ jobs:
 
     runs-on: [ self-hosted, Linux, x86_64, flavor-1-2 ]
 
+    container:
+      image: docker.io/tarantool/testing:ubuntu-focal
+
     outputs:
       commit-sha: ${{ steps.update-ee.outputs.sha }}
 
