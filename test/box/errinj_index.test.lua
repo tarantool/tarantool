@@ -121,6 +121,11 @@ res
 res = {}
 for i = 5001,5010 do table.insert(res, (s:get{i})) end
 res
+
+errinj.set("ERRINJ_HASH_INDEX_REPLACE", true)
+s:replace{3594, 3594}
+errinj.set("ERRINJ_HASH_INDEX_REPLACE", false)
+
 s:drop()
 
 errinj = nil

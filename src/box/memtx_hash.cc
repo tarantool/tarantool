@@ -371,15 +371,13 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 		if (pos == light_index_end)
 			pos = light_index_insert(hash_table, h, new_tuple);
 
-		ERROR_INJECT(ERRINJ_INDEX_ALLOC,
-		{
+		ERROR_INJECT(ERRINJ_HASH_INDEX_REPLACE, {
 			light_index_delete(hash_table, pos);
 			pos = light_index_end;
 		});
 
 		if (pos == light_index_end) {
-			diag_set(OutOfMemory,
-				 (ssize_t)light_index_count(hash_table),
+			diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
 				 "hash_table", "key");
 			return -1;
 		}
