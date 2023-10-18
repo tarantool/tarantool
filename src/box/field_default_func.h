@@ -23,6 +23,8 @@ struct field_default_func {
 	int (*call)(struct field_default_func *default_func,
 		    const char *arg_data, uint32_t arg_size,
 		    const char **ret_data, uint32_t *ret_size);
+	/** Destructor. */
+	void (*destroy)(struct field_default_func *func);
 };
 
 /**
@@ -40,6 +42,13 @@ field_default_func_call(struct field_default_func *default_func,
 {
 	return default_func->call(default_func, arg_data, arg_size, ret_data,
 				  ret_size);
+}
+
+static inline void
+field_default_func_destroy(struct field_default_func *default_func)
+{
+	if (default_func->destroy != NULL)
+		default_func->destroy(default_func);
 }
 
 /**

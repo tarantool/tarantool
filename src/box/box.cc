@@ -5911,7 +5911,7 @@ box_free(void)
 	sequence_free();
 	event_unref(box_on_recovery_state_event);
 	box_on_recovery_state_event = NULL;
-	/* tuple_free(); */
+	tuple_free();
 	/* schema_module_free(); */
 	/* session_free(); */
 	/* user_cache_free(); */

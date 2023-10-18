@@ -208,6 +208,15 @@ memtx_engine_shutdown(struct engine *engine)
 	mempool_destroy(&memtx->index_extent_pool);
 	slab_cache_destroy(&memtx->index_slab_cache);
 	/*
+	 * The last blessed tuple may refer to a memtx tuple, which would
+	 * become inaccessible once we destroyed the arena, so we need to
+	 * clear it first.
+	 */
+	if (box_tuple_last != NULL) {
+		tuple_unref(box_tuple_last);
+		box_tuple_last = NULL;
+	}
+	/*
 	 * The order is vital: allocator destroy should take place before
 	 * slab cache destroy!
 	 */

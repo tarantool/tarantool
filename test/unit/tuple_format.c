@@ -230,7 +230,6 @@ main(void)
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	coll_init();
-	tuple_init(test_field_name_hash);
 	event_init();
 	box_init();
 	sql_init();
@@ -239,7 +238,6 @@ main(void)
 
 	box_free();
 	event_free();
-	tuple_free();
 	coll_free();
 	fiber_free();
 	memory_free();
