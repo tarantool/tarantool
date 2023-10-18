@@ -489,6 +489,18 @@ res
   - [5009, 5009]
   - [5010, 5010]
 ...
+errinj.set("ERRINJ_HASH_INDEX_REPLACE", true)
+---
+- ok
+...
+s:replace{3594, 3594}
+---
+- error: Failed to allocate 16384 bytes in hash_table for key
+...
+errinj.set("ERRINJ_HASH_INDEX_REPLACE", false)
+---
+- ok
+...
 s:drop()
 ---
 ...
