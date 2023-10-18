@@ -72,6 +72,16 @@ field_default_func_call_impl(struct field_default_func *default_func,
 	return 0;
 }
 
+/**
+ * Implementation of field_default_func_destroy().
+ * Called by pointer to avoid linking dependencies.
+ */
+static void
+field_default_func_destroy_impl(struct field_default_func *default_func)
+{
+	field_default_func_unpin(default_func);
+}
+
 void
 field_default_func_unpin(struct field_default_func *default_func)
 {
@@ -109,5 +119,6 @@ field_default_func_init(struct field_default_func *default_func)
 	}
 	func_pin(func, &default_func->holder, FUNC_HOLDER_FIELD_DEFAULT);
 	default_func->call = field_default_func_call_impl;
+	default_func->destroy = field_default_func_destroy_impl;
 	return 0;
 }
