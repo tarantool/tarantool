@@ -48,7 +48,7 @@
  * in it can have dramatic impact on the overall
  * performance.
  */
-inline __attribute__((always_inline)) int
+ALWAYS_INLINE int
 mp_compare_uint(const char **data_a, const char **data_b);
 
 enum mp_class {
@@ -626,7 +626,7 @@ key_part_hint(struct key_part *part, hint_t hint)
  */
 template<bool is_nullable, bool a_is_optional, bool b_is_optional,
 	 bool has_desc_parts>
-static inline __attribute__((always_inline)) int
+static ALWAYS_INLINE int
 key_part_compare_fields(struct key_part *part, const char *field_a,
 			const char *field_b, bool *was_null_met = NULL)
 {
