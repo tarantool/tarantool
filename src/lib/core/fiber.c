@@ -223,6 +223,49 @@ error:
 	return -1;
 }
 
+/**
+ * Sets an alternative signal stack.
+ *
+ * We use an alternative signal stack so that we can print the stack trace on
+ * stack overflow, which makes the current stack unusable. This function should
+ * be called in each thread because the SIGSEGV signal is thread-directed.
+ * At thread exit, one should call signal_stack_free() to free the stack set by
+ * this function.
+ *
+ * We skip this for ASAN because it installs its own signal stack.
+ */
+static void
+signal_stack_init(void)
+{
+#ifndef ENABLE_ASAN
+	stack_t stack;
+	stack.ss_flags = 0;
+	/* SIGSTKSZ doesn't seem to be enough for libunwind. */
+	stack.ss_size = 4 * SIGSTKSZ;
+	stack.ss_sp = xmalloc(stack.ss_size);
+	if (sigaltstack(&stack, NULL) != 0) {
+		say_syserror("sigaltstack");
+		free(stack.ss_sp);
+	}
+#endif
+}
+
+/**
+ * Frees the signal stack set with signal_stack_init().
+ */
+static void
+signal_stack_free(void)
+{
+#ifndef ENABLE_ASAN
+	stack_t stack;
+	if (sigaltstack(NULL, &stack) != 0) {
+		say_syserror("sigaltstack");
+	} else {
+		free(stack.ss_sp);
+	}
+#endif
+}
+
 static __thread bool fiber_top_enabled = false;
 
 #ifdef ENABLE_BACKTRACE
@@ -1730,6 +1773,7 @@ cord_create(struct cord *cord, const char *name)
 #ifdef HAVE_MADV_DONTNEED
 	cord->sched.stack_watermark = NULL;
 #endif
+	signal_stack_init();
 }
 
 void
@@ -1759,6 +1803,7 @@ cord_exit(struct cord *cord)
 	assert(cord == cord());
 	(void)cord;
 	trigger_free_in_thread();
+	signal_stack_free();
 }
 
 void
