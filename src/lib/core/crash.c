@@ -225,9 +225,12 @@ crash_signal_init(void)
 	 *
 	 * SA_NODEFER allows receiving the same signal
 	 * during handler.
+	 *
+	 * SA_ONSTACK is required to handle stack overflow, which
+	 * makes the current stack unusable.
 	 */
 	struct sigaction sa = {
-		.sa_flags = SA_RESETHAND | SA_NODEFER | SA_SIGINFO,
+		.sa_flags = SA_RESETHAND | SA_NODEFER | SA_SIGINFO | SA_ONSTACK,
 		.sa_sigaction = crash_signal_cb,
 	};
 	sigemptyset(&sa.sa_mask);
