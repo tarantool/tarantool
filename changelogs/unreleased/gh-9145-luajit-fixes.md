@@ -13,3 +13,6 @@ were fixed as part of this activity:
 * Improved error reporting on stack overflow.
 * Fixed assertion on the Lua stack overflow for a stitched trace.
 * Fixed snapshoting of functions for non-base frames.
+* Fixed error handling after return from a child coroutine.
+* Fix C file generation in `jit.bcsave`.
+* Add 'cc' file type for saving bytecode.
