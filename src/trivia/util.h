@@ -399,6 +399,23 @@ alloc_failure(const char *filename, int line, size_t size)
 #endif
 
 /**
+ * Adds the 'always_inline' attribute to the function if it's supported. This
+ * attribute forces the function to be inlined if it's possible. If it's not,
+ * this results in a diagnostic.
+ *
+ * Example:
+ *
+ * \code
+ * ALWAYS_INLINE int function() { return 0; }
+ * \endcode
+ */
+#if __has_attribute(always_inline) || defined(__GNUC__)
+#  define ALWAYS_INLINE inline __attribute__((always_inline))
+#else
+#  define ALWAYS_INLINE inline
+#endif
+
+/**
  * A function declared as NORETURN shall not return to its caller.
  * The compiler will generate a diagnostic for a function declared as
  * NORETURN that appears to be capable of returning to its caller.
