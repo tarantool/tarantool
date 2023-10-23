@@ -65,6 +65,11 @@ end
 --
 --   Collect stderr and place it into the `stderr` field of the
 --   return value
+--
+-- - quote_args (boolean, default: false)
+--
+--   Quote CLI arguments before concatenating them into a shell
+--   command.
 function justrun.tarantool(dir, env, args, opts)
     assert(type(dir) == 'string')
     assert(type(env) == 'table')
@@ -82,8 +87,11 @@ function justrun.tarantool(dir, env, args, opts)
     local env_str = table.concat(fun.iter(env):map(function(k, v)
         return ('%s=%q'):format(k, v)
     end):totable(), ' ')
+    local args_str = table.concat(fun.iter(args):map(function(v)
+        return opts.quote_args and ('%q'):format(v) or v
+    end):totable(), ' ')
     local command = ('cd %s && %s %s %s'):format(dir, env_str, tarantool_exe,
-                                                 table.concat(args, ' '))
+                                                 args_str)
     log.info(('Running a command: %s'):format(command))
     local mode = opts.stderr and 'rR' or 'r'
     local ph = popen.shell(command, mode)
