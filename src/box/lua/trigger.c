@@ -378,7 +378,11 @@ luaT_event_reset_trigger_with_flags(struct lua_State *L, int bottom,
 		lua_pushvalue(L, bottom);
 		ret_count = 1;
 	}
-	if (new_handler != NULL && old_handler != NULL) {
+	/*
+	 * Function lua_topointer can return NULL, so let's use names to check
+	 * if handlers are passed - they are assured not to be NULL in the case.
+	 */
+	if (new_name != NULL && old_name != NULL) {
 		if (old_handler == new_handler) {
 			event_reset_trigger_with_flags(event, new_name,
 						       new_trg, flags);
@@ -398,10 +402,10 @@ luaT_event_reset_trigger_with_flags(struct lua_State *L, int bottom,
 						       flags);
 			event_unref(event);
 		}
-	} else if (old_handler != NULL) {
+	} else if (old_name != NULL) {
 		event_reset_trigger(event, old_name, NULL);
 	} else {
-		assert(new_handler != NULL);
+		assert(new_name != NULL);
 		event_reset_trigger_with_flags(event, new_name, new_trg, flags);
 	}
 	return ret_count;
