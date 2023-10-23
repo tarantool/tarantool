@@ -7,6 +7,35 @@ local g = t.group()
 
 local is_enterprise = require('tarantool').package == 'Tarantool Enterprise'
 
+-- Generate a config with specific names.
+--
+-- Set some default valid names if they're not provided.
+--
+-- Usage:
+--
+-- gen_config_from_names({
+--     group = <...>,
+--     replicaset = <...>,
+--     instance = <...>,
+-- })
+--
+-- All the options are optional.
+local function gen_config_from_names(names)
+    return {
+        groups = {
+            [names.group or 'a'] = {
+                replicasets = {
+                    [names.replicaset or 'b'] = {
+                        instances = {
+                            [names.instance or 'c'] = {},
+                        },
+                    },
+                },
+            },
+        },
+    }
+end
+
 g.test_cluster_config = function()
     local config = {
         credentials = {
@@ -320,4 +349,87 @@ g.test_example_sharding = function()
     local config = yaml.decode(fh:read())
     fh:close()
     cluster_config:validate(config)
+end
+
+-- Verify that a valid name is accepted as an instance name,
+-- a replicaset name, a group name.
+g.test_name_success = function()
+    local names = {
+        'instance-001',
+        'instance_001',
+        ('x'):rep(63),
+    }
+
+    for _, name in ipairs(names) do
+        -- Pass a given name as a group name, a replicaset name
+        -- and an instance name.
+        for _, target in ipairs({'group', 'replicaset', 'instance'}) do
+            local config = gen_config_from_names({[target] = name})
+            cluster_config:validate(config)
+        end
+    end
+end
+
+-- Verify that an invalid name is not accepted as an instance
+-- name, a replicaset name, a group name.
+g.test_name_failure = function()
+    local err_must_start_from = 'A name must start from a lowercase letter, ' ..
+        'got %q'
+    local err_must_contain_only = 'A name must contain only lowercase ' ..
+        'letters, digits, dash and underscore, got %q'
+
+    local cases = {
+        {
+            name = '',
+            exp_err = 'Zero length name is forbidden',
+        },
+        {
+            name = ('x'):rep(64),
+            exp_err = 'A name must fit 63 characters limit, got %q',
+        },
+        {
+            name = '1st',
+            exp_err = err_must_start_from,
+        },
+        {
+            name = '_abc',
+            exp_err = err_must_start_from,
+        },
+        {
+            name = '_abC',
+            exp_err = err_must_contain_only,
+        },
+        {
+            name = 'Abc',
+            exp_err = err_must_contain_only,
+        },
+        {
+            name = 'abC',
+            exp_err = err_must_contain_only,
+        },
+        {
+            name = 'a.b',
+            exp_err = err_must_contain_only,
+        },
+        {
+            name = 'a b',
+            exp_err = err_must_contain_only,
+        },
+    }
+
+    for _, case in ipairs(cases) do
+        -- Prepare expected error message.
+        local exp_err = case.exp_err
+        if exp_err:match('%%q') then
+            exp_err = exp_err:format(case.name)
+        end
+
+        -- Pass a given name as a group name, a replicaset name
+        -- and an instance name.
+        for _, target in ipairs({'group', 'replicaset', 'instance'}) do
+            local config = gen_config_from_names({[target] = case.name})
+            t.assert_error_msg_contains(exp_err, cluster_config.validate,
+                cluster_config, config)
+        end
+    end
 end

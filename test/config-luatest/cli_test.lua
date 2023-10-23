@@ -140,3 +140,110 @@ g.test_failover = function()
     t.assert_equals(res.stderr, '--failover CLI option is available only in ' ..
         'Tarantool Enterprise Edition')
 end
+
+-- Verify that valid TT_INSTANCE_NAME and --name values are
+-- accepted.
+g.test_name_success = function()
+    local names = {
+        'instance-001',
+        'instance_001',
+        ('x'):rep(63),
+    }
+
+    for _, name in ipairs(names) do
+        -- If tarantool reports an empty configuration error, it
+        -- means that --name/TT_INSTANCE_NAME validation passes.
+        local exp_err = 'No cluster config received'
+
+        -- Common options.
+        local opts = {nojson = true, stderr = true}
+
+        -- Run tarantool --name <...>.
+        local args = {'--name', name}
+        local res = justrun.tarantool('.', {}, args, opts)
+        t.assert_not_equals(res.exit_code, 0)
+        t.assert_str_contains(res.stderr, exp_err)
+
+        -- Run TT_INSTANCE_NAME=<...> tarantool.
+        local env = {['TT_INSTANCE_NAME'] = name}
+        local res = justrun.tarantool('.', env, {}, opts)
+        t.assert_not_equals(res.exit_code, 0)
+        t.assert_str_contains(res.stderr, exp_err)
+    end
+
+end
+
+-- Verify that invalid TT_INSTANCE_NAME and --name values are not
+-- accepted.
+g.test_name_failure = function()
+    local err_must_start_from = 'A name must start from a lowercase letter, ' ..
+        'got %q'
+    local err_must_contain_only = 'A name must contain only lowercase ' ..
+        'letters, digits, dash and underscore, got %q'
+
+    local cases = {
+        {
+            name = '',
+            exp_err = 'Zero length name is forbidden',
+        },
+        {
+            name = ('x'):rep(64),
+            exp_err = 'A name must fit 63 characters limit, got %q',
+        },
+        {
+            name = '1st',
+            exp_err = err_must_start_from,
+        },
+        {
+            name = '_abc',
+            exp_err = err_must_start_from,
+        },
+        {
+            name = '_abC',
+            exp_err = err_must_contain_only,
+        },
+        {
+            name = 'Abc',
+            exp_err = err_must_contain_only,
+        },
+        {
+            name = 'abC',
+            exp_err = err_must_contain_only,
+        },
+        {
+            name = 'a.b',
+            exp_err = err_must_contain_only,
+        },
+        {
+            name = 'a b',
+            exp_err = err_must_contain_only,
+        },
+    }
+
+    for _, case in ipairs(cases) do
+        -- Prepare expected error message.
+        local exp_err = case.exp_err
+        if exp_err:match('%%q') then
+            exp_err = exp_err:format(case.name)
+        end
+        local exp_err = table.concat({
+            ('LuajitError: [--name] %s'):format(exp_err),
+            'fatal error, exiting the event loop',
+        }, '\n')
+
+        -- Common options.
+        local opts = {nojson = true, stderr = true, quote_args = true}
+
+        -- Run tarantool --name <...>.
+        local args = {'--name', case.name}
+        local res = justrun.tarantool('.', {}, args, opts)
+        t.assert_not_equals(res.exit_code, 0)
+        t.assert_equals(res.stderr, exp_err)
+
+        -- Run TT_INSTANCE_NAME=<...> tarantool.
+        local env = {['TT_INSTANCE_NAME'] = case.name}
+        local res = justrun.tarantool('.', env, {}, opts)
+        t.assert_not_equals(res.exit_code, 0)
+        t.assert_equals(res.stderr, exp_err)
+    end
+end

@@ -117,20 +117,55 @@ local function instance_config_with_scope(scope)
     return schema
 end
 
+-- Validate instance_name, replicaset_name, group_name.
+--
+-- Please, keep it is-sync with src/box/node_name.[ch].
+local function validate_name(_self, name)
+    local NODE_NAME_LEN_MAX = 63
+    if #name == 0 then
+        return false, 'Zero length name is forbidden'
+    end
+    if #name > NODE_NAME_LEN_MAX then
+        return false, ('A name must fit %d characters limit, got %q'):format(
+            NODE_NAME_LEN_MAX, name)
+    end
+    if name:match('^[a-z0-9_-]+$') == nil then
+        return false, ('A name must contain only lowercase letters, digits, ' ..
+            'dash and underscore, got %q'):format(name)
+    end
+    if name:match('^[a-z]') == nil then
+        return false, ('A name must start from a lowercase letter, ' ..
+            'got %q'):format(name)
+    end
+    return true
+end
+
+-- A schema node that represents an instance name, a replicaset
+-- name, a group name.
+local name = schema.scalar({
+    type = 'string',
+    validate = function(name, w)
+        local ok, err = validate_name(nil, name)
+        if not ok then
+            w.error(err)
+        end
+    end,
+})
+
 return schema.new('cluster_config', record_from_fields({
     instance_config_with_scope('global'),
     groups = schema.map({
-        key = schema.scalar({type = 'string'}),
+        key = name,
         value = record_from_fields({
             instance_config_with_scope('group'),
             replicasets = schema.map({
-                key = schema.scalar({type = 'string'}),
+                key = name,
                 value = record_from_fields({
                     leader = schema.scalar({type = 'string'}),
                     bootstrap_leader = schema.scalar({type = 'string'}),
                     instance_config_with_scope('replicaset'),
                     instances = schema.map({
-                        key = schema.scalar({type = 'string'}),
+                        key = name,
                         value = instance_config_with_scope('instance'),
                     }),
                 }),
@@ -141,5 +176,6 @@ return schema.new('cluster_config', record_from_fields({
     methods = {
         instantiate = instantiate,
         find_instance = find_instance,
+        validate_name = validate_name,
     },
 })

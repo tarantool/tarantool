@@ -366,6 +366,12 @@ end
 
 function methods._startup(self, instance_name, config_file)
     assert(self._status == 'uninitialized')
+
+    local ok, err = cluster_config:validate_name(instance_name)
+    if not ok then
+        error(('[--name] %s'):format(err), 0)
+    end
+
     self._status = 'startup_in_progress'
     self._instance_name = instance_name
     self._config_file = config_file
