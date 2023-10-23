@@ -4,6 +4,7 @@ tarantool - a Lua application server and a database management system
 
 =head1 SYNOPSIS
 
+    tarantool [OPTIONS] --name NAME --config CONFIG
     tarantool [OPTIONS] [SCRIPT [ARGS]]
 
 =head1 DESCRIPTION
@@ -99,64 +100,96 @@ The database is a C extension of the application server and can be turned off.
 
 =head1 OPTIONS
 
-You can use these options before (or instead of) the interpreted 'SCRIPT'
-name:
+All the options are separated into two groups: action options and modifier
+options.
+
+At least one action option should be specified.
+
+All the modifier options are optional.
+
+=head2 ACTION OPTIONS
 
 =over
 
 =item -h, --help
 
-Display the help screen and exit.
+Print this help message.
 
-=item -V, -v, --version
+=item -v, -V, --version
 
-Print the program version and exit.
+Print version and build information.
 
-=item -c, --config
+=item --help-env-list
 
-Set a path to yaml config file as 'PATH'.
+Print environment variables list.
 
-=item -n, --name
+=item -n <...> [-c <...>], --name <...> [--config <...>]
 
-Set an instance name as 'INSTANCE'.
+Start an instance.
 
-=item -e EXRP
+The path to the configuration file can be omitted if a configuration is stored
+in etcd and C<TT_CONFIG_ETCD_*> environment variables are set.
 
-Execute the string 'EXPR'.
+=item <first positional argument> [<..more args..>]
 
-=item -l NAME
+Run a Lua script file. All the arguments after the script name are stored in
+the `arg` global value.
 
-Require the library 'NAME'.
+The file may be pointed as `-` to read the script from stdin.
 
-=item -j CMD
+=item -e <..code..>
 
-Perform LuaJIT control command.
+Run a Lua code.
 
-=item -b ...
+It can be used on its own (as an action option) or together with another action
+option (as a modifier).
+
+=item -i
+
+Run the interactive REPL.
+
+=item --failover
+
+Run a failover coordinator service.
+
+It is available in Tarantool Enterprise Edition.
+
+=back
+
+=head2 MODIFIER OPTIONS
+
+=over
+
+=item --force-recovery
+
+Enable force-recovery mode at database loading.
+
+=item -l <module>
+
+C<require> Lua module <module> and set it the same named global variable.
+
+=item -j <cmd>
+
+Perform LuaJIT control command <cmd>.
+
+=item -b <...>
 
 Save or list bytecode.
 
 =item -d
 
-Activate debugging session for a script.
-
-=item -i
-
-Enter the interactive mode after executing 'SCRIPT'.
+Activate debugging session for a given script.
 
 =item --
 
-Stop handling options.
-
-=item -
-
-Execute stdin and stop handling options.
+End-of-options marker. All the arguments after the marker are interpreted as
+non-option ones.
 
 =back
 
 =head1 SEE ALSO
 
-tarantoolctl(1), Tarantool documentation at http://tarantool.org
+Tarantool documentation at https://tarantool.io
 
 =head1 COPYRIGHT
 
