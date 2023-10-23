@@ -1,10 +1,17 @@
 local server = require('luatest.server')
 local t = require('luatest')
+local pathjoin = require('fio').pathjoin
 
 local g = t.group()
 
+local libext = package.cpath:match('?.(%a+);')
+local libpath = pathjoin(os.getenv('BUILDDIR'), 'test', 'box-luatest')
+local env = {
+    LUA_CPATH = ('%s/?.%s;%s;'):format(libpath, libext, os.getenv('LUA_CPATH')),
+}
+
 g.before_all(function()
-    g.server = server:new({alias = 'master'})
+    g.server = server:new({alias = 'master', env = env})
     g.server:start()
     g.server:exec(function()
         box.schema.space.create('test', {id = 512})
@@ -217,6 +224,33 @@ g.test_associated_event = function()
             if event_name ~= nil then
                 check_trigger(trg, event_name)
             end
+        end
+    end)
+end
+
+-- https://github.com/tarantool/tarantool/issues/9287
+g.test_callable_number = function()
+    g.server:exec(function()
+        local old_api_triggers = rawget(_G, 'old_api_triggers')
+        local trg = require('libcallnum')
+        t.assert_type(trg, 'number')
+        t.assert_type(trg(), 'number')
+        local function f() end
+
+        local function check_trigger(old_api_trigger)
+            old_api_trigger(trg)
+            t.assert_equals(old_api_trigger(), {trg})
+            old_api_trigger(f, trg)
+            t.assert_equals(old_api_trigger(), {f})
+            old_api_trigger(trg, f)
+            t.assert_equals(old_api_trigger(), {trg})
+            old_api_trigger(trg, trg)
+            t.assert_equals(old_api_trigger(), {trg})
+            old_api_trigger(nil, trg)
+            t.assert_equals(old_api_trigger(), {})
+        end
+        for _, trg_descr in pairs(old_api_triggers) do
+            check_trigger(trg_descr[1])
         end
     end)
 end
