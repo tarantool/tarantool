@@ -445,8 +445,7 @@ local function log_configure(self, cfg, box_api)
             local env_cfg = box.internal.env_cfg(box2log_keys)
             box.internal.apply_env_cfg(cfg, box_to_log_cfg(env_cfg))
         end
-        cfg = box.internal.prepare_cfg(cfg, default_cfg, option_types)
-        box.internal.merge_cfg(cfg, log_cfg);
+        cfg = box.internal.prepare_cfg(cfg, log_cfg, default_cfg, option_types)
     end
 
     log_check_cfg(cfg)

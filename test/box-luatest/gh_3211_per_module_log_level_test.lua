@@ -80,14 +80,6 @@ g2.test_per_module_log_level = function(cg)
         local log = require('log')
         local log_cfg = _G.log_cfg
 
-        local function assert_log_and_box_cfg_equals()
-            t.assert_equals(log.cfg.level, box.cfg.log_level)
-            t.assert_equals(log.cfg.modules.mod1, box.cfg.log_modules.mod1)
-            t.assert_equals(log.cfg.modules.mod2, box.cfg.log_modules.mod2)
-            t.assert_equals(log.cfg.modules.mod3, box.cfg.log_modules.mod3)
-            t.assert_equals(log.cfg.modules.mod4, box.cfg.log_modules.mod4)
-        end
-
         t.assert_error_msg_contains(
            "modules': should be of type table",
             log_cfg, {modules = 'hello'})
@@ -99,6 +91,14 @@ g2.test_per_module_log_level = function(cg)
             "Incorrect value for option 'log_modules.mod2': " ..
             "expected crit,warn,info,debug,syserror,verbose,fatal,error",
             log_cfg, {modules = {mod2 = 'hello'}})
+        t.assert_error_msg_content_equals(
+            "Incorrect value for option 'log_modules.mod3': " ..
+            "expected crit,warn,info,debug,syserror,verbose,fatal,error",
+            log_cfg, {modules = {mod3 = ''}})
+        t.assert_error_msg_content_equals(
+            "Incorrect value for option 'log_modules.mod4': " ..
+            "should be one of types number, string",
+            log_cfg, {modules = {mod4 = box.NULL}})
         t.assert_error_msg_content_equals(
             "Incorrect value for option 'module name': should be of type string",
             log_cfg, {modules = {[123] = 'debug'}})
@@ -112,40 +112,23 @@ g2.test_per_module_log_level = function(cg)
         -- per-module levels.
         log_cfg{level = 'warn'}
         t.assert_equals(log.cfg.level, 'warn')
-        t.assert_equals(log.cfg.modules.mod1, 'debug')
-        t.assert_equals(log.cfg.modules.mod2, 2)
-        t.assert_equals(log.cfg.modules.mod3, 'error')
-        assert_log_and_box_cfg_equals()
-        --[[ TODO(gh-7962)
-        -- Check that log.cfg{modules = {...}} with the new modules appends them
-        -- to the existing ones.
-        log_cfg{modules = {mod4 = 4}}
-        t.assert_equals(log.cfg.modules.mod1, 'debug')
-        t.assert_equals(log.cfg.modules.mod2, 2)
-        t.assert_equals(log.cfg.modules.mod3, 'error')
-        t.assert_equals(log.cfg.modules.mod4, 4)
-        assert_log_and_box_cfg_equals()
-        -- Check that log.cfg{modules = {...}} sets levels for the specified
-        -- modules, and doesn't affect other modules.
-        log_cfg{modules = {mod1 = 0, mod3 = 'info'}}
-        t.assert_equals(log.cfg.modules.mod1, 0)
-        t.assert_equals(log.cfg.modules.mod2, 2)
-        t.assert_equals(log.cfg.modules.mod3, 'info')
-        t.assert_equals(log.cfg.modules.mod4, 4)
-        assert_log_and_box_cfg_equals()
-        -- Check that box.NULL and the empty string remove the corresponding
-        -- module from the config.
-        log_cfg{modules = {mod2 = box.NULL, mod4 = ''}}
-        t.assert_equals(log.cfg.modules.mod1, 0)
-        t.assert_equals(log.cfg.modules.mod2, nil)
-        t.assert_equals(log.cfg.modules.mod3, 'info')
-        t.assert_equals(log.cfg.modules.mod4, nil)
-        assert_log_and_box_cfg_equals()
+        t.assert_equals(box.cfg.log_level, log.cfg.level)
+        t.assert_equals(log.cfg.modules, {
+            mod1 = 'debug', mod2 = 2, mod3 = 'error'
+        })
+        t.assert_equals(box.cfg.log_modules, log.cfg.modules)
+        -- Check that log.cfg{modules = {...}} overwrites old modules.
+        log_cfg{modules = {mod3 = 'info', mod4 = 4}}
+        t.assert_equals(log.cfg.modules, {mod3 = 'info', mod4 = 4})
+        t.assert_equals(box.cfg.log_modules, log.cfg.modules)
+        t.assert_equals(log.cfg.level, 'warn')
+        t.assert_equals(box.cfg.log_level, log.cfg.level)
         -- Check that log.cfg{modules = box.NULL} removes all modules.
         log_cfg{modules = box.NULL}
         t.assert_equals(log.cfg.modules, nil)
         t.assert_equals(box.cfg.log_modules, nil)
-        --]]
+        t.assert_equals(log.cfg.level, 'warn')
+        t.assert_equals(box.cfg.log_level, log.cfg.level)
         -- Check that log levels actually affect what is printed to the log.
         log_cfg{level = 'info', modules = {module2 = 4,
                                            module3 = 'debug'}}
@@ -224,8 +207,4 @@ g2.test_tarantool_module = function(cg)
     end)
     find_in_log(cg, 'Lua verbose message 3', false)
     find_in_log(cg, 'C debug message 3', true)
-
-    -- TODO(gh-7962)
-    -- Check that box.NULL unsets custom Tarantool C log level.
-    -- _G.log_cfg{modules = {tarantool = box.NULL}}
 end

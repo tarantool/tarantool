@@ -812,11 +812,10 @@ local function check_cfg_option_type(template, name, value)
     end
 end
 
-local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
+local function prepare_cfg(cfg, old_cfg, default_cfg, template_cfg, modify_cfg)
     if cfg == nil then
-        return {}
-    end
-    if type(cfg) ~= 'table' then
+        cfg = {}
+    elseif type(cfg) ~= 'table' then
         error("Error: cfg should be a table")
     end
     local new_cfg = {}
@@ -834,6 +833,15 @@ local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
         end
         new_cfg[k] = v
     end
+    -- Use the old config for omitted options.
+    for k, v in pairs(old_cfg) do
+        -- Don't override options set to box.NULL (which equals nil but
+        -- evaluates to true) because setting an option to box.NULL must
+        -- be equivalent to resetting it to the default value.
+        if cfg[k] == nil and not cfg[k] then
+            new_cfg[k] = v
+        end
+    end
     return new_cfg
 end
 
@@ -846,16 +854,6 @@ local function apply_env_cfg(cfg, env_cfg, skip_cfg)
     for k, v in pairs(env_cfg) do
         if cfg[k] == nil and (skip_cfg == nil or skip_cfg[k] == nil) then
             cfg[k] = v
-        end
-    end
-end
-
-local function merge_cfg(cfg, cur_cfg)
-    for k,v in pairs(cur_cfg) do
-        if cfg[k] == nil then
-            cfg[k] = v
-        elseif type(v) == 'table' then
-            merge_cfg(cfg[k], v)
         end
     end
 end
@@ -952,8 +950,8 @@ end
 
 local function reload_cfg(oldcfg, cfg)
     cfg = upgrade_cfg(cfg, translate_cfg)
-    local newcfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
-
+    local newcfg = prepare_cfg(cfg, {}, default_cfg, template_cfg,
+                               modify_cfg)
     local module_keys = {}
     -- iterate over original table because prepare_cfg() may store NILs
     for key in pairs(cfg) do
@@ -1057,8 +1055,7 @@ local function load_cfg(cfg)
     -- Set options passed through environment variables.
     apply_env_cfg(cfg, box.internal.cfg.env, pre_load_cfg_is_set)
 
-    cfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
-    merge_cfg(cfg, pre_load_cfg);
+    cfg = prepare_cfg(cfg, pre_load_cfg, default_cfg, template_cfg, modify_cfg)
 
     -- Save new box.cfg
     box.cfg = cfg
@@ -1275,7 +1272,6 @@ end
 
 box.internal.prepare_cfg = prepare_cfg
 box.internal.apply_env_cfg = apply_env_cfg
-box.internal.merge_cfg = merge_cfg
 box.internal.check_cfg_option_type = check_cfg_option_type
 box.internal.update_cfg = update_cfg
 box.internal.env_cfg = env_cfg
