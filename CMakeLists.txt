@@ -18,6 +18,7 @@ include(CheckFunctionExists)
 include(FindOptionalPackage)
 include(FindPackageMessage)
 include(ExternalProject)
+include(CheckPatch)
 
 find_program(ECHO echo)
 find_program(CAT cat)
