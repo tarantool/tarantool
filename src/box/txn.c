@@ -762,6 +762,11 @@ txn_complete_success(struct txn *txn)
 	assert(!txn_has_flag(txn, TXN_WAIT_SYNC));
 	assert(txn->signature >= 0);
 	assert(in_txn() == txn);
+#ifndef NDEBUG
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &txn->stmts, next)
+		assert(!stmt->has_triggers || rlist_empty(&stmt->on_commit));
+#endif
 	txn->status = TXN_COMMITTED;
 	if (txn->engine != NULL)
 		engine_commit(txn->engine, txn);
@@ -1018,6 +1023,19 @@ static bool
 txn_commit_nop(struct txn *txn)
 {
 	if (txn->n_new_rows + txn->n_applier_rows == 0) {
+		/*
+		 * A transcation without any new rows may still have
+		 * on_commit triggers, for example if it's a ddl operation
+		 * for a fully-temporary space.
+		 */
+		struct txn_stmt *stmt;
+		stailq_foreach_entry(stmt, &txn->stmts, next) {
+			if (stmt->has_triggers) {
+				txn_init_triggers(txn);
+				rlist_splice(&txn->on_commit, &stmt->on_commit);
+			}
+		}
+
 		txn->signature = TXN_SIGNATURE_NOP;
 		txn_complete_success(txn);
 		fiber_set_txn(fiber(), NULL);

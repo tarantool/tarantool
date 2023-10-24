@@ -622,6 +622,10 @@ txn_complete_fail(struct txn *txn);
 /**
  * Complete transaction processing successfully. All the changes are going to
  * become committed and visible.
+ *
+ * This function will run any on_commit triggers associated with @a txn and only
+ * them, so if any statements of this transaction have on_commit triggers,
+ * they must be moved into txn->on_commit before this function is called.
  */
 void
 txn_complete_success(struct txn *txn);
