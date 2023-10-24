@@ -279,7 +279,7 @@ box.internal.collation.create('test', 'ICU', 'ru-RU')
 
 -- Only admin can create collation.
 coll_cnt = #box.space._collation:select{}
-box.schema.user.grant("guest", "read, write, alter, execute", "space", "_collation")
+box.schema.user.grant("guest", "read, write, alter", "space", "_collation")
 box.session.su("guest")
 box.internal.collation.create('guest0', 'ICU', 'ru-RU')
 box.space._vcollation:select{0}
@@ -287,7 +287,7 @@ box.space._vcollation:select{0}
 box.session.su('admin')
 
 -- _vcollation is readable anyway.
-box.schema.user.revoke("guest", "read, write, alter, execute", "space", "_collation")
+box.schema.user.revoke("guest", "read, write, alter", "space", "_collation")
 box.session.su("guest")
 #box.space._vcollation:select{}
 session.su('admin')

@@ -125,7 +125,7 @@ print("\n")
 admin("box.cfg.wal_mode")
 admin("space = box.schema.space.create('test', { id = 567 })")
 admin("index = space:create_index('primary', { type = 'hash' })")
-admin("box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')")
+admin("box.schema.user.grant('guest', 'read,write', 'space', 'test')")
 
 c = Connection(None, server.iproto.port)
 c.connect()
@@ -419,7 +419,7 @@ c.close()
 
 admin("space = box.schema.space.create('test_index_base', { id = 568 })")
 admin("index = space:create_index('primary', { type = 'hash' })")
-admin("box.schema.user.grant('guest', 'read,write,execute', 'space', 'test_index_base')")
+admin("box.schema.user.grant('guest', 'read,write', 'space', 'test_index_base')")
 
 c = Connection(None, server.iproto.port)
 c.connect()
@@ -678,7 +678,7 @@ print("""
 """)
 admin("space = box.schema.space.create('test', { id = 567 })")
 admin("index = space:create_index('primary', { type = 'tree' })")
-admin("box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')")
+admin("box.schema.user.grant('guest', 'read,write', 'space', 'test')")
 
 c = Connection(None, server.iproto.port)
 c.connect()

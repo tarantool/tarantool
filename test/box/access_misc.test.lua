@@ -213,7 +213,7 @@ for key, v in s.index.primary:pairs(1, {iterator = 'GE'}) do table.insert (t, v)
 t
 t = {}
 session.su('admin')
-box.schema.user.grant('testuser', 'read, write, execute', 'space', 'glade')
+box.schema.user.grant('testuser', 'read, write', 'space', 'glade')
 session.su('testuser')
 s:select()
 for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end

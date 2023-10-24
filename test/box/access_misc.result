@@ -537,7 +537,7 @@ t = {}
 session.su('admin')
 ---
 ...
-box.schema.user.grant('testuser', 'read, write, execute', 'space', 'glade')
+box.schema.user.grant('testuser', 'read, write', 'space', 'glade')
 ---
 ...
 session.su('testuser')

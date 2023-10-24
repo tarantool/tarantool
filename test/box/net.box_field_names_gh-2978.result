@@ -14,7 +14,7 @@ box.space.named:insert({1, 1})
 ---
 - [1, 1]
 ...
-box.schema.user.grant('guest', 'read, write, execute', 'space')
+box.schema.user.grant('guest', 'read, write', 'space')
 ---
 ...
 cn = net.connect(box.cfg.listen)
@@ -96,6 +96,6 @@ cn:close()
 box.space.named:drop()
 ---
 ...
-box.schema.user.revoke('guest', 'read, write, execute', 'space')
+box.schema.user.revoke('guest', 'read, write', 'space')
 ---
 ...

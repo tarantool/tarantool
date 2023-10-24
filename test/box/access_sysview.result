@@ -667,7 +667,7 @@ box.internal.collation.create('test', 'ICU', 'ru-RU')
 coll_cnt = #box.space._collation:select{}
 ---
 ...
-box.schema.user.grant("guest", "read, write, alter, execute", "space", "_collation")
+box.schema.user.grant("guest", "read, write, alter", "space", "_collation")
 ---
 ...
 box.session.su("guest")
@@ -689,7 +689,7 @@ box.session.su('admin')
 ---
 ...
 -- _vcollation is readable anyway.
-box.schema.user.revoke("guest", "read, write, alter, execute", "space", "_collation")
+box.schema.user.revoke("guest", "read, write, alter", "space", "_collation")
 ---
 ...
 box.session.su("guest")
