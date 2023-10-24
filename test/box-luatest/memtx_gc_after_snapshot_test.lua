@@ -31,6 +31,7 @@ g.test_memtx_gc_after_snapshot = function(cg)
             box.space.test:delete(i)
         end
         box.commit()
+        box.tuple.new() -- drop blessed tuple ref
         collectgarbage('collect') -- drop Lua refs
         local mem_used_3 = box.info.memory().data
         t.assert_gt(mem_used_2 - mem_used_3, 1000000)
