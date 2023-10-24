@@ -520,3 +520,40 @@ g.test_meta_data_not_persisted = function()
 
     check_wal_and_snap({})
 end
+
+-- check memory is not leaked when dropping temporary spaces
+g.test_no_memory_leak_after_drop = function()
+    g.server:exec(function()
+        -- Create a `weak_refs` table, with a weak reference to `object`
+        local object = {'object'}
+        local weak_refs = setmetatable({object}, {__mode = 'v'})
+
+        local s = box.schema.space.create('temp', { type = 'temporary' })
+
+        -- Create a strong reference to the same `object` which belongs to
+        -- the on_replace trigger of the temporary space.
+        s:on_replace((function()
+            local strong_ref = object
+            return function() print(strong_ref) end
+        end)())
+
+        -- Delete the original strong reference to `object`
+        object = nil
+
+        -- Trigger garbage collection (needs to be called twice to collect
+        -- memory freed by __gc methods invoked on the first call).
+        collectgarbage()
+        collectgarbage()
+
+        -- on_replace trigger is still live, so `object` still exists.
+        t.assert(weak_refs[1])
+
+        -- space.drop should free the on_replace triggers
+        s:drop()
+        collectgarbage()
+        collectgarbage()
+
+        -- on_replace trigger was destroyed and so was `object`
+        t.assert(not weak_refs[1])
+    end)
+end
