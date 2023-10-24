@@ -6,7 +6,7 @@ net = require('net.box')
 _ = box.schema.create_space("named", {format = {{name = "id"}, {name="abc"}}})
 _ = box.space.named:create_index('id', {parts = {{1, 'unsigned'}}})
 box.space.named:insert({1, 1})
-box.schema.user.grant('guest', 'read, write, execute', 'space')
+box.schema.user.grant('guest', 'read, write', 'space')
 cn = net.connect(box.cfg.listen)
 
 s = cn.space.named
@@ -26,4 +26,4 @@ s:select()[1]:tomap()
 
 cn:close()
 box.space.named:drop()
-box.schema.user.revoke('guest', 'read, write, execute', 'space')
+box.schema.user.revoke('guest', 'read, write', 'space')

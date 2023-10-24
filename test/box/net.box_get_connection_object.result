@@ -14,7 +14,7 @@ space ~= nil
 _ = box.space.test:create_index('primary')
 ---
 ...
-box.schema.user.grant('guest','read,write,execute','space', 'test')
+box.schema.user.grant('guest','read,write','space', 'test')
 ---
 ...
 c = net.connect(box.cfg.listen)
@@ -32,7 +32,7 @@ c.space.test.connection == c
 ---
 - true
 ...
-box.schema.user.revoke('guest','read,write,execute','space', 'test')
+box.schema.user.revoke('guest','read,write','space', 'test')
 ---
 ...
 c:close()

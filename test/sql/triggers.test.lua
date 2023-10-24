@@ -180,7 +180,7 @@ box.execute("DROP TABLE t1;")
 -- in SQL
 --
 box.schema.user.create('tester')
-box.schema.user.grant('tester','read,write,create,execute', 'space', '_trigger')
+box.schema.user.grant('tester','read,write,create', 'space', '_trigger')
 box.execute("CREATE TABLE t1(x INTEGER PRIMARY KEY AUTOINCREMENT);")
 box.session.su('tester')
 --

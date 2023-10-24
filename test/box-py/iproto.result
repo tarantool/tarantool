@@ -55,7 +55,7 @@ space = box.schema.space.create('test', { id = 567 })
 index = space:create_index('primary', { type = 'hash' })
 ---
 ...
-box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')
+box.schema.user.grant('guest', 'read,write', 'space', 'test')
 ---
 ...
 - [1, 'baobab']
@@ -178,7 +178,7 @@ space = box.schema.space.create('test_index_base', { id = 568 })
 index = space:create_index('primary', { type = 'hash' })
 ---
 ...
-box.schema.user.grant('guest', 'read,write,execute', 'space', 'test_index_base')
+box.schema.user.grant('guest', 'read,write', 'space', 'test_index_base')
 ---
 ...
 - [1, 0, 0, 0]
@@ -302,7 +302,7 @@ space = box.schema.space.create('test', { id = 567 })
 index = space:create_index('primary', { type = 'tree' })
 ---
 ...
-box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')
+box.schema.user.grant('guest', 'read,write', 'space', 'test')
 ---
 ...
 Simple pagination with after_pos

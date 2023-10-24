@@ -10,6 +10,7 @@ local session = box.session
 local internal = box.internal
 local utf8 = require('utf8')
 local utils = require('internal.utils')
+local compat = require('compat')
 
 local check_param = utils.check_param
 local check_param_table = utils.check_param_table
@@ -2935,10 +2936,11 @@ local priv_object_combo = {
     ["lua_call"] = bit.bor(box.priv.X, box.priv.U),
     ["lua_eval"] = bit.bor(box.priv.X, box.priv.U),
     ["sql"]      = bit.bor(box.priv.X, box.priv.U),
--- sic: we allow to grant 'execute' on space. This is a legacy
--- bug, please fix it in 2.0
-    ["space"]    = bit.bxor(box.priv.ALL, box.priv.S,
-                            box.priv.REVOKE, box.priv.GRANT),
+    ["space"]    = bit.bor(box.priv.R, box.priv.W, box.priv.U,
+                           box.priv.C, box.priv.D, box.priv.A,
+                           box.priv.REFERENCE, box.priv.TRIGGER,
+                           box.priv.INSERT, box.priv.UPDATE,
+                           box.priv.DELETE),
     ["sequence"] = bit.bor(box.priv.R, box.priv.W, box.priv.U,
                            box.priv.C, box.priv.A, box.priv.D),
     ["function"] = bit.bor(box.priv.X, box.priv.U,
@@ -2948,6 +2950,29 @@ local priv_object_combo = {
     ["user"]     = bit.bor(box.priv.C, box.priv.A,
                            box.priv.D),
 }
+
+local BOX_SPACE_EXECUTE_PRIV_BRIEF = [[
+Historically, it was possible to grant the execute privilege on a space although
+this action had no effect. The new behavior is to raise an error in this case.
+
+https://tarantool.io/compat/box_space_execute_priv
+]]
+
+compat.add_option({
+    name = 'box_space_execute_priv',
+    default = 'new',
+    obsolete = nil,
+    brief = BOX_SPACE_EXECUTE_PRIV_BRIEF,
+    action = function(is_new)
+        if is_new then
+            priv_object_combo.space = bit.band(priv_object_combo.space,
+                                               bit.bnot(box.priv.X))
+        else
+            priv_object_combo.space = bit.bor(priv_object_combo.space,
+                                              box.priv.X)
+        end
+    end,
+})
 
 --
 -- Resolve privilege hex by name and check
