@@ -232,8 +232,7 @@ test:do_catchsql_test(
     "alter2-6.2",
     [[
         ALTER TABLE t1 ADD CONSTRAINT ck CHECK(id > 0);
-    ]], { 1, "Function for the check constraint 'ck' with name 'check_t1_ck' "..
-         "already exists"})
+    ]], { 1, "Function 'check_t1_ck' already exists"})
 
 -- Make sure that CHECK constraint can be created only on empty space.
 --

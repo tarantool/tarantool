@@ -1165,22 +1165,13 @@ emitNewSysSpaceSequenceRecord(Parse *pParse, int reg_space_id, int reg_seq_id)
 }
 
 /**
- * Generate opcodes to serialize check constraint definition into
- * MsgPack and insert produced tuple into _ck_constraint space.
- * @param parser Parsing context.
- * @param ck_def Check constraint definition to be serialized.
- * @param reg_space_id The VDBE register containing space id.
- * @param space_name Name of the space owning the CHECK. For error
- *     message.
+ * Emit code to create a new function with the given name and body and copy the
+ * new function ID into the given register.
  */
 static void
-vdbe_emit_ck_constraint_create(struct Parse *parser,
-			       const struct ck_constraint_def *ck_def,
-			       uint32_t reg_space_id, const char *space_name)
+vdbe_emit_create_function(struct Parse *parser, int reg_id, const char *name,
+			  const char *body)
 {
-	struct Vdbe *v = sqlGetVdbe(parser);
-	assert(v != NULL);
-	char *func_name = sqlMPrintf("check_%s_%s", space_name, ck_def->name);
 	/*
 	 * Occupy registers for 20 fields: each member in _func space plus one
 	 * for final msgpack tuple.
@@ -1188,12 +1179,13 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 	const int reg_count = box_func_field_MAX + 1;
 	int regs = sqlGetTempRange(parser, reg_count);
 	int name_reg = regs + BOX_FUNC_FIELD_NAME;
-	sqlVdbeAddOp4(v, OP_String8, 0, name_reg, 0, func_name, P4_DYNAMIC);
-	const char *err = tt_sprintf("Function for the check constraint '%s' "
-		"with name '%s' already exists", ck_def->name, func_name);
+	struct Vdbe *v = sqlGetVdbe(parser);
+	sqlVdbeAddOp4(v, OP_String8, 0, name_reg, 0, sql_xstrdup(name),
+		      P4_DYNAMIC);
+	const char *err = tt_sprintf("Function '%s' already exists", name);
 	vdbe_emit_halt_with_presence_test(parser, BOX_FUNC_ID,
 					  BOX_FUNC_FIELD_NAME, name_reg, 1,
-					  ER_SQL_EXECUTE, err, false,
+					  ER_FUNCTION_EXISTS, err, false,
 					  OP_NoConflict);
 	sqlVdbeAddOp3(v, OP_NextSystemSpaceId, BOX_FUNC_ID,
 		      regs + BOX_FUNC_FIELD_ID, BOX_FUNC_FIELD_ID);
@@ -1203,7 +1195,7 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 	sqlVdbeAddOp4(v, OP_String8, 0, regs + BOX_FUNC_FIELD_LANGUAGE, 0,
 		      "SQL_EXPR", P4_STATIC);
 	sqlVdbeAddOp4(v, OP_String8, 0, regs + BOX_FUNC_FIELD_BODY, 0,
-		      sql_xstrdup(ck_def->expr_str), P4_DYNAMIC);
+		      sql_xstrdup(body), P4_DYNAMIC);
 	sqlVdbeAddOp4(v, OP_String8, 0, regs + BOX_FUNC_FIELD_ROUTINE_TYPE, 0,
 		      "function", P4_STATIC);
 	char *param_list = sql_xmalloc(32);
@@ -1238,11 +1230,34 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 	sqlVdbeAddOp3(v, OP_MakeRecord, regs, box_func_field_MAX,
 		      regs + box_func_field_MAX);
 	sqlVdbeAddOp2(v, OP_SInsert, BOX_FUNC_ID, regs + box_func_field_MAX);
+	sqlVdbeAddOp2(v, OP_SCopy, regs + BOX_FUNC_FIELD_ID, reg_id);
+	sqlReleaseTempRange(parser, regs, reg_count);
+}
+
+/**
+ * Generate opcodes to serialize check constraint definition into
+ * MsgPack and insert produced tuple into _ck_constraint space.
+ * @param parser Parsing context.
+ * @param ck_def Check constraint definition to be serialized.
+ * @param reg_space_id The VDBE register containing space id.
+ * @param space_name Name of the space owning the CHECK. For error
+ *     message.
+ */
+static void
+vdbe_emit_ck_constraint_create(struct Parse *parser,
+			       const struct ck_constraint_def *ck_def,
+			       uint32_t reg_space_id, const char *space_name)
+{
+	struct Vdbe *v = sqlGetVdbe(parser);
+	assert(v != NULL);
+	char *name = sqlMPrintf("check_%s_%s", space_name, ck_def->name);
+	int reg_id = ++parser->nMem;
+	vdbe_emit_create_function(parser, reg_id, name, ck_def->expr_str);
+	sql_xfree(name);
 	VdbeComment((v, "Create func constraint %s", ck_def->name));
-	sqlVdbeAddOp4(v, OP_CreateCheck, reg_space_id, regs, ck_def->fieldno,
+	sqlVdbeAddOp4(v, OP_CreateCheck, reg_space_id, reg_id, ck_def->fieldno,
 		      sql_xstrdup(ck_def->name), P4_DYNAMIC);
 	sqlVdbeChangeP5(v, ck_def->is_field_ck);
-	sqlReleaseTempRange(parser, regs, reg_count);
 	sqlVdbeCountChanges(v);
 }
 
