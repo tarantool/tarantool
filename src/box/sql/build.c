@@ -366,6 +366,18 @@ tnt_error:
 static void
 vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id);
 
+/** Emit VDBE code to add SQL_EXPR function as default value. */
+static void
+vdbe_emit_create_defaults(struct Parse *parser, int reg_space_id)
+{
+	struct Vdbe *v = sqlGetVdbe(parser);
+	for (uint32_t i = 0; i < parser->default_func_count; ++i) {
+		sqlVdbeAddOp3(v, OP_AddFuncDefault, reg_space_id,
+			      parser->default_funcs[i].reg_func_id,
+			      parser->default_funcs[i].fieldno);
+	}
+}
+
 void
 sql_create_column_end(struct Parse *parse)
 {
@@ -424,6 +436,7 @@ sql_create_column_end(struct Parse *parse)
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 	sqlReleaseTempRange(parse, tuple_reg, box_space_field_MAX + 1);
 	vdbe_emit_create_constraints(parse, key_reg);
+	vdbe_emit_create_defaults(parse, key_reg);
 }
 
 void
@@ -448,45 +461,6 @@ sql_column_add_nullable_action(struct Parse *parser,
 	}
 	field->nullable_action = nullable_action;
 	field->is_nullable = action_is_nullable(nullable_action);
-}
-
-/*
- * The expression is the default value for the most recently added
- * column.
- *
- * Default value expressions must be constant.  Raise an exception if this
- * is not the case.
- *
- * This routine is called by the parser while in the middle of
- * parsing a <CREATE TABLE> or an <ALTER TABLE ADD COLUMN>
- * statement.
- */
-void
-sqlAddDefaultValue(Parse * pParse, ExprSpan * pSpan)
-{
-	struct space *p = pParse->create_column_def.space;
-	if (p != NULL) {
-		assert(p->def->opts.is_ephemeral);
-		struct space_def *def = p->def;
-		if (!sqlExprIsConstantOrFunction
-		    (pSpan->pExpr, sql_get()->init.busy)) {
-			const char *column_name =
-				def->fields[def->field_count - 1].name;
-			diag_set(ClientError, ER_CREATE_SPACE, def->name,
-				 tt_sprintf("default value of column '%s' is "\
-					    "not constant", column_name));
-			pParse->is_aborted = true;
-		} else {
-			assert(def != NULL);
-			struct field_def *field =
-				&def->fields[def->field_count - 1];
-			struct region *region = &pParse->region;
-			size_t len = pSpan->zEnd - pSpan->zStart + 1;
-			field->sql_default_value = xregion_alloc(region, len);
-			strlcpy(field->sql_default_value, pSpan->zStart, len);
-		}
-	}
-	sql_expr_delete(pSpan->pExpr);
 }
 
 /** Fetch negative integer value from the expr. */
@@ -1261,6 +1235,38 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 	sqlVdbeCountChanges(v);
 }
 
+void
+sql_add_func_default(struct Parse *parser, struct ExprSpan *span)
+{
+	assert(parser->create_column_def.space != NULL);
+	struct space_def *def = parser->create_column_def.space->def;
+	uint32_t fieldno = def->field_count - 1;
+	const char *field_name = def->fields[fieldno].name;
+
+	if (!sqlExprIsConstantOrFunction(span->pExpr, sql_get()->init.busy)) {
+		diag_set(ClientError, ER_CREATE_SPACE, def->name,
+			 tt_sprintf("default value of column '%s' is not "
+				    "constant", field_name));
+		parser->is_aborted = true;
+		sql_expr_delete(span->pExpr);
+		return;
+	}
+	sql_expr_delete(span->pExpr);
+
+	char *name = sqlMPrintf("default_%s_%s", def->name, field_name);
+	char *body = sql_xstrndup(span->zStart, span->zEnd - span->zStart);
+	int reg_id = ++parser->nMem;
+	vdbe_emit_create_function(parser, reg_id, name, body);
+	sql_xfree(name);
+	sql_xfree(body);
+	int id = parser->default_func_count++;
+	size_t size = parser->default_func_count *
+		      sizeof(*parser->default_funcs);
+	parser->default_funcs = sql_xrealloc(parser->default_funcs, size);
+	parser->default_funcs[id].fieldno = fieldno;
+	parser->default_funcs[id].reg_func_id = reg_id;
+}
+
 /**
  * Generate opcodes to create foreign key constraint.
  *
@@ -1508,6 +1514,7 @@ sqlEndTable(struct Parse *pParse)
 	int reg_space_id = getNewSpaceId(pParse);
 	vdbe_emit_space_create(pParse, reg_space_id, name_reg, new_space);
 	vdbe_emit_create_constraints(pParse, reg_space_id);
+	vdbe_emit_create_defaults(pParse, reg_space_id);
 }
 
 void

@@ -202,6 +202,7 @@ sql_parser_destroy(Parse *parser)
 {
 	assert(parser != NULL);
 	assert(!parser->parse_only || parser->pVdbe == NULL);
+	sql_xfree(parser->default_funcs);
 	sql_xfree(parser->aLabel);
 	sql_expr_list_delete(parser->pConstExpr);
 	struct create_fk_constraint_parse_def *create_fk_constraint_parse_def =

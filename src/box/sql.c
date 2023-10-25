@@ -1619,6 +1619,20 @@ sql_check_create(const char *name, uint32_t space_id, uint32_t func_id,
 	return sql_constraint_create(name, space_id, path, value);
 }
 
+int
+sql_add_default(uint32_t space_id, uint32_t fieldno, uint32_t func_id)
+{
+	const char *path = tt_sprintf("format[%u].default_func", fieldno + 1);
+	const int ops_size = 128;
+	char ops[ops_size];
+	const char *ops_end = ops + mp_format(ops, ops_size, "[[%s%s%u]]", "!",
+					      path, func_id);
+	const int key_size = 16;
+	char key[key_size];
+	const char *key_end = key + mp_format(key, key_size, "[%u]", space_id);
+	return box_update(BOX_SPACE_ID, 0, key, key_end, ops, ops_end, 0, NULL);
+}
+
 const struct space *
 sql_space_by_token(const struct Token *name)
 {

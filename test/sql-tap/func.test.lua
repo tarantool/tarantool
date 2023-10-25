@@ -2426,11 +2426,8 @@ test:do_catchsql_test(
 test:do_test(
     "func-28.1",
     function()
-        test:execsql([[
-            CREATE TABLE t28(id INT primary key, x INT, y INT DEFAULT(nosuchfunc(1)));
-        ]])
         return test:catchsql([[
-            INSERT INTO t28(id, x) VALUES(1, 1);
+            CREATE TABLE t28(id INT primary key, x INT, y INT DEFAULT(nosuchfunc(1)));
         ]])
     end, {
         -- <func-28.1>

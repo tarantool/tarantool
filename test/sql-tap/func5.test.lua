@@ -323,30 +323,26 @@ box.func.counter2:drop()
 local body = 'function(x) return 1 end'
 box.schema.func.create('f1', {language = 'Lua', returns = 'number', body = body,
                        param_list = {}, exports = {'LUA'}});
-box.execute([[CREATE TABLE t01(i INT PRIMARY KEY, a INT DEFAULT(f1(1)));]])
 test:do_catchsql_test(
     "func-7.1",
     [[
-        INSERT INTO t01(i) VALUES(1);
+        CREATE TABLE t01(i INT PRIMARY KEY, a INT DEFAULT(f1(1)));
     ]], {
         1, "function f1() is not available in SQL"
     })
 
 box.schema.func.create('f2', {language = 'Lua', returns = 'number', body = body,
                        exports = {'LUA', 'SQL'}});
-box.execute([[CREATE TABLE t02(i INT PRIMARY KEY, a INT DEFAULT(f2(1)));]])
 test:do_catchsql_test(
     "func-7.2",
     [[
-        INSERT INTO t02(i) VALUES(1);
+        CREATE TABLE t02(i INT PRIMARY KEY, a INT DEFAULT(f2(1)));
     ]], {
         1, "Wrong number of arguments is passed to f2(): expected 0, got 1"
     })
 
 box.func.f1:drop()
 box.func.f2:drop()
-box.space.t01:drop()
-box.space.t02:drop()
 
 --
 -- gh-6105:  Make sure that functions that were described in _func but were not

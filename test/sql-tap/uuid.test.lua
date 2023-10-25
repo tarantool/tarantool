@@ -900,7 +900,7 @@ test:do_execsql_test(
         INSERT INTO t10 VALUES (4, NULL);
         SELECT * FROM t10 WHERE i = 4;
     ]], {
-        4, ''
+        4, uuid1
     })
 
 -- Check that UPDATE of UUID field works.
