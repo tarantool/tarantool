@@ -2246,6 +2246,21 @@ case OP_DropFieldCheck: {
 	break;
 }
 
+/**
+ * Opcode: AddFuncDefault P1 P2 P3 * *
+ * Synopsis: Add function r[P2] as default for field P3 of box.space[r[P1]]
+ */
+case OP_AddFuncDefault: {
+	assert(aMem[pOp->p1].type == MEM_TYPE_UINT);
+	uint32_t space_id = aMem[pOp->p1].u.u;
+	uint32_t fieldno = pOp->p3;
+	assert(aMem[pOp->p2].type == MEM_TYPE_UINT);
+	uint32_t func_id = aMem[pOp->p2].u.u;
+	if (sql_add_default(space_id, fieldno, func_id) != 0)
+		goto abort_due_to_error;
+	break;
+}
+
 /* Opcode: Savepoint P1 * P3 P4 *
  *
  * Open, release or rollback the savepoint named by parameter P4, depending

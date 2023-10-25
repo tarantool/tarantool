@@ -293,7 +293,7 @@ ccons ::= DEFAULT LP expr(X) RP.      {
   if (sql_expr_is_term(X.pExpr))
     sql_add_term_default(pParse, &X);
   else
-    sqlAddDefaultValue(pParse, &X);
+    sql_add_func_default(pParse, &X);
 }
 ccons ::= DEFAULT PLUS number(X).     {sql_add_term_default(pParse, &X);}
 ccons ::= DEFAULT MINUS(A) number(X). {

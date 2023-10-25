@@ -1942,6 +1942,14 @@ enum ast_type {
 	ast_type_MAX
 };
 
+/** Information about the expressions that will be used as default values. */
+struct sql_default_func {
+	/** Fieldno of the field to which default value will be added. */
+	uint32_t fieldno;
+	/** Register that will contain the ID of the new SQL EXPR functions. */
+	int reg_func_id;
+};
+
 /*
  * An SQL parser context.  A copy of this structure is passed through
  * the parser and down into all the parser action routine in order to
@@ -2068,6 +2076,10 @@ struct Parse {
 	 */
 	struct create_table_def create_table_def;
 	struct create_column_def create_column_def;
+	/** Array of default function descriptions. */
+	struct sql_default_func *default_funcs;
+	/** Length of array of default function descriptions. */
+	uint32_t default_func_count;
 	/** AST of parsed SQL statement. */
 	struct sql_ast ast;
 	/*
@@ -2750,7 +2762,10 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck);
 void
 sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span);
 
-void sqlAddDefaultValue(Parse *, ExprSpan *);
+/** Add a default expression to the last created column. */
+void
+sql_add_func_default(struct Parse *parser, struct ExprSpan *span);
+
 void sqlAddCollateType(Parse *, Token *);
 
 /**

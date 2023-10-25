@@ -229,6 +229,10 @@ int
 sql_check_create(const char *name, uint32_t space_id, uint32_t func_id,
 		 uint32_t fieldno, bool is_field_ck);
 
+/** Add SQL_EXPR function as the field default value to space format. */
+int
+sql_add_default(uint32_t space_id, uint32_t fieldno, uint32_t func_id);
+
 /**
  * Encode index parts of given foreign key constraint into
  * MsgPack on @region.

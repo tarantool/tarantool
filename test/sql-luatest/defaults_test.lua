@@ -245,3 +245,21 @@ g.test_new_defaults = function()
         box.space.T:drop()
     end)
 end
+
+g.test_new_func_defaults = function()
+    g.server:exec(function()
+        -- Make sure an expression works correctly as a default value.
+        local sql = [[CREATE TABLE T(I INT PRIMARY KEY, A ANY DEFAULT(9 * 7));]]
+        box.execute(sql)
+        local s = box.space.T
+        local func = box.func.default_T_A
+        t.assert_equals(func.body, '9 * 7')
+        t.assert_equals(s:format()[2].default_func, func.id)
+        s:insert({1})
+        t.assert_equals(s:select(), {{1, 63}})
+        box.execute([[INSERT INTO T VALUES (2, NULL);]])
+        t.assert_equals(s:select(), {{1, 63}, {2, 63}})
+        s:drop()
+        func:drop()
+    end)
+end
