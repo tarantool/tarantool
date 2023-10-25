@@ -178,7 +178,7 @@ box.execute("DROP TABLE zoobar")
 box.execute("CREATE TABLE t1(id INT PRIMARY KEY, CONSTRAINT ck1 CHECK(id > 0), CONSTRAINT ck1 CHECK(id < 0));")
 ---
 - null
-- Function for the check constraint 'ck1' with name 'check_t1_ck1' already exists
+- Function 'check_t1_ck1' already exists
 ...
 box.space.t1
 ---

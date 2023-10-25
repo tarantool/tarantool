@@ -475,8 +475,7 @@ g.test_constraints_8 = function()
         local sql = [[CREATE TABLE t(i INT PRIMARY KEY, a INT, CONSTRAINT ]]..
                     [[one CHECK(a > 10), CONSTRAINT one CHECK(a < 100));]]
         local _, err = box.execute(sql)
-        res = [[Function for the check constraint 'one' with name ]]..
-              [['check_t_one' already exists]]
+        res = [[Function 'check_t_one' already exists]]
         t.assert_equals(err.message, res)
         t.assert_equals(box.space._func.index[2]:get('check_t_one'), nil)
     end)
