@@ -57,7 +57,7 @@ fi
 
 # Find current branch (report HEAD for 'detached HEAD' state).
 branch=`git rev-parse --abbrev-ref HEAD`
-if [[ "$branch" =~ ^(master|release/.*)$ ]]; then
+if [[ "$branch" =~ ^(nshy/master|nshy/release/.*)$ ]]; then
     # We need to find the commit that starts this branch (i.e. that the first
     # commit on this branch after the commit that is common for two branches.)
     #
@@ -66,10 +66,10 @@ if [[ "$branch" =~ ^(master|release/.*)$ ]]; then
     #
     # Unfortunately I did not find a way to set arguments for git rev-list
     # without this branch.
-    if [[ "$branch" = master ]]; then
-        not_remotes="--remotes=origin/release/*"
+    if [[ "$branch" = nshy/master ]]; then
+        not_remotes="--remotes=origin/nshy/release/*"
     else
-        not_remotes="--exclude origin/$branch --remotes=origin/release/* origin/master"
+        not_remotes="--exclude origin/$branch --remotes=origin/nshy/release/* origin/nshy/master"
     fi
     entrypoint=`git rev-list HEAD --not $not_remotes | tail -n1`
     if [[ $entrypoint ]]; then
