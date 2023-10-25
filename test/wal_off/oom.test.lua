@@ -43,6 +43,9 @@ for state, v in space:pairs() do
 end;
 test_run:cmd("setopt delimiter ''");
 t
+
+-- TODO(gh-3807) - may fail to truncate due to memory limit is reached
+box.cfg{memtx_memory = box.cfg.memtx_memory + 1024}
 space:truncate()
 space:insert{0, 'test'}
 space.index['primary']:get{0}
