@@ -95,7 +95,7 @@ local function broadcast(self)
     box.broadcast('config.info', self:info())
 end
 
-function methods._alert(self, alert)
+function methods._alert(self, key, alert)
     assert(alert.type == 'error' or alert.type == 'warn')
     if alert.type == 'error' then
         log.error(alert.message)
@@ -103,7 +103,14 @@ function methods._alert(self, alert)
         log.warn(alert.message)
     end
     alert.timestamp = datetime.now()
-    table.insert(self._alerts, alert)
+    self._alerts[key] = alert
+end
+
+function methods._alert_drop(self, key)
+    self._alerts[key] = nil
+    if self._status == 'check_warnings' and table.equals(self._alerts, {}) then
+        self._status = 'ready'
+    end
 end
 
 function methods._meta(self, source_name, key, value)
@@ -446,7 +453,7 @@ function methods._reload_noexc(self, opts)
 
     assert(not ok or err == nil)
     if not ok then
-        self:_alert({type = 'error', message = err})
+        self:_alert('reload_error', {type = 'error', message = err})
     end
 
     self:_set_status_based_on_alerts()
@@ -464,8 +471,17 @@ end
 
 function methods.info(self)
     selfcheck(self, 'info')
+    -- Don't return alert keys from config:info().
+    local alerts = {}
+    for _, alert in pairs(self._alerts) do
+        table.insert(alerts, alert)
+    end
+    table.sort(alerts, function(a, b)
+        return a.timestamp < b.timestamp
+    end)
+
     return {
-        alerts = self._alerts,
+        alerts = alerts,
         meta = self._metadata,
         status = self._status,
     }

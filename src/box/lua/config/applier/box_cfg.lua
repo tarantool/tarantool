@@ -270,7 +270,8 @@ local function apply(config)
             if v ~= box.cfg[k] then
                 local warning = 'box_cfg.apply: non-dynamic option '..k..
                     ' will not be set until the instance is restarted'
-                config:_alert({type = 'warn', message = warning})
+                config:_alert('box_cfg_apply_non_dynamic',
+                              {type = 'warn', message = warning})
                 box_cfg[k] = nil
             end
         end
