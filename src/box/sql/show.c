@@ -281,8 +281,10 @@ sql_describe_field(struct sql_desc *desc, const struct field_def *field)
 	}
 	if (!field->is_nullable)
 		sql_desc_append(desc, " NOT NULL");
-	if (field->sql_default_value != NULL)
-		sql_desc_append(desc, " DEFAULT(%s)", field->sql_default_value);
+	if (field->default_value != NULL || field->default_func_id != 0) {
+		const char *err = "BOX default values are unsupported";
+		sql_desc_error(desc, "field", field->name, err);
+	}
 	for (uint32_t i = 0; i < field->constraint_count; ++i) {
 		struct tuple_constraint_def *cdef = &field->constraint_def[i];
 		assert(cdef->type == CONSTR_FKEY || cdef->type == CONSTR_FUNC);
