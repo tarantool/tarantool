@@ -1018,6 +1018,10 @@ sql_encode_table(struct region *region, struct space_def *def, uint32_t *size)
 			base_len += 1;
 		if (default_str != NULL)
 			base_len += 1;
+		if (field->default_value != NULL)
+			base_len += 1;
+		if (field->default_func_id != 0)
+			base_len += 1;
 		uint32_t ck_count = 0;
 		uint32_t fk_count = 0;
 		struct tuple_constraint_def *cdefs = field->constraint_def;
@@ -1055,6 +1059,15 @@ sql_encode_table(struct region *region, struct space_def *def, uint32_t *size)
 		if (default_str != NULL) {
 			mpstream_encode_str(&stream, "sql_default");
 			mpstream_encode_str(&stream, default_str);
+		}
+		if (field->default_value != NULL) {
+			mpstream_encode_str(&stream, "default");
+			mpstream_memcpy(&stream, field->default_value,
+					field->default_value_size);
+		}
+		if (field->default_func_id != 0) {
+			mpstream_encode_str(&stream, "default_func");
+			mpstream_encode_uint(&stream, field->default_func_id);
 		}
 		sql_mpstream_encode_constraints(&stream, cdefs, ck_count,
 						fk_count);
