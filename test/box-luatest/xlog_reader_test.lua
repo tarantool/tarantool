@@ -2,11 +2,13 @@ local fio = require('fio')
 local server = require('luatest.server')
 local t = require('luatest')
 local xlog = require('xlog')
+local uuid = require('uuid')
 
 local g = t.group()
 
 g.before_all(function(cg)
-    cg.server = server:new()
+    g.box_cfg = { instance_uuid = uuid() }
+    cg.server = server:new({box_cfg = g.box_cfg})
     cg.server:start()
 end)
 
@@ -149,4 +151,15 @@ g.test_bad_xlog = function(cg)
             },
         },
     })
+end
+
+g.test_xlog_meta = function(cg)
+    local glob = fio.glob(fio.pathjoin(cg.server.workdir, '*.snap'))
+    local snap_path = glob[#glob]
+
+    local meta = xlog.meta(snap_path)
+    t.assert_equals(meta.filetype, 'SNAP')
+    t.assert_equals(meta.instance_uuid, cg.box_cfg.instance_uuid)
+    t.assert_not_equals(meta.vclock, nil)
+    t.assert_not_equals(meta.prev_vclock, nil)
 end

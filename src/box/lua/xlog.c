@@ -365,8 +365,48 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 	return 3;
 }
 
+/** Opens an xlog file and returns its meta block. */
+static int
+lbox_xlog_parser_open_meta(struct lua_State *L)
+{
+	int args_n = lua_gettop(L);
+	if (args_n != 1 || !lua_isstring(L, 1))
+		luaL_error(L, "Usage: parser.open(log_filename)");
+
+	const char *filename = luaL_checkstring(L, 1);
+
+	/* Construct xlog cursor and object */
+	struct xlog_cursor *cur = xcalloc(1, sizeof(struct xlog_cursor));
+	if (xlog_cursor_open(cur, filename) < 0) {
+		return luaT_error(L);
+	}
+
+	lua_newtable(L);
+
+	lua_pushstring(L, "filetype");
+	lua_pushstring(L, cur->meta.filetype);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "instance_uuid");
+	luaT_pushuuidstr(L, &cur->meta.instance_uuid);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "vclock");
+	luaT_pushvclock(L, &cur->meta.vclock);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "prev_vclock");
+	luaT_pushvclock(L, &cur->meta.prev_vclock);
+	lua_settable(L, -3);
+
+	xlog_cursor_close(cur, false);
+	free(cur);
+	return 1;
+}
+
 static const struct luaL_Reg lbox_xlog_parser_lib [] = {
 	{ "pairs",	lbox_xlog_parser_open_pairs },
+	{ "meta",	lbox_xlog_parser_open_meta  },
 	{ NULL,		NULL                        }
 };
 
