@@ -1,7 +1,7 @@
-local fio = require('fio')
 local fiber = require('fiber')
 local log = require('internal.config.utils.log')
 local instance_config = require('internal.config.instance_config')
+local snapshot = require('internal.config.utils.snapshot')
 
 local function peer_uri(configdata, peer_name)
     local iconfig = configdata._peers[peer_name].iconfig_def
@@ -67,55 +67,6 @@ local function log_destination(log)
     else
         assert(false)
     end
-end
-
--- Determine where snapshot should reside based on the given
--- configuration.
---
--- To be called before first box.cfg().
-local function effective_snapshot_dir(configdata)
-    -- The snapshot directory has a default value in the schema
-    -- (it is a string). So, it can't be nil or box.NULL.
-    local snap_dir = configdata:get('snapshot.dir', {use_default = true})
-    assert(snap_dir ~= nil)
-
-    -- If the path is absolute, just return it.
-    --
-    -- This check is necessary due to fio.pathjoin() peculiars,
-    -- see gh-8816.
-    if snap_dir:startswith('/') then
-        return snap_dir
-    end
-
-    -- We assume that the startup working directory is the current
-    -- working directory. IOW, that this function is called before
-    -- first box.cfg() call. Let's verify it.
-    assert(type(box.cfg) == 'function')
-
-    -- If the snapshot directory is not absolute, it is relative
-    -- to the working directory.
-    --
-    -- Determine an absolute path to the configured working
-    -- directory considering that it may be relative to the
-    -- working directory at the startup moment.
-    local work_dir = configdata:get('process.work_dir', {use_default = true})
-    if work_dir == nil then
-        work_dir = '.'
-    end
-    work_dir = fio.abspath(work_dir)
-
-    -- Now we know the absolute path to the configured working
-    -- directory. Let's determine the snapshot directory path.
-    return fio.abspath(fio.pathjoin(work_dir, snap_dir))
-end
-
--- Determine whether the instance will be started from an existing
--- snapshot.
---
--- To be called before first box.cfg().
-local function has_snapshot(configdata)
-    local pattern = fio.pathjoin(effective_snapshot_dir(configdata), '*.snap')
-    return #fio.glob(pattern) > 0
 end
 
 -- Returns nothing or {needs_retry = true}.
@@ -266,7 +217,8 @@ local function apply(config)
         local am_i_bootstrap_leader = false
         if is_startup then
             local instance_name = configdata:names().instance_name
-            am_i_bootstrap_leader = not has_snapshot(configdata) and
+            am_i_bootstrap_leader =
+                snapshot.get_path(configdata._iconfig_def) == nil and
                 instance_name == configdata:bootstrap_leader_name()
             box_cfg.read_only = not am_i_bootstrap_leader
         end
@@ -382,7 +334,7 @@ local function apply(config)
     if is_startup and failover ~= 'election' and failover ~= 'supervised' then
         local configured_as_rw = not box_cfg.read_only
         local in_replicaset = #configdata:peers() > 1
-        local has_snap = has_snapshot(configdata)
+        local has_snap = snapshot.get_path(configdata._iconfig_def) ~= nil
 
         -- Require at least one writable instance in the
         -- replicaset if the instance is to be bootstrapped (has

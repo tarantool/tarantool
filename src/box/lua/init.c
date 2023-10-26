@@ -155,6 +155,7 @@ extern char session_lua[],
 	config_source_file_lua[],
 	config_utils_log_lua[],
 	config_utils_schema_lua[],
+	config_utils_snapshot_lua[],
 	config_utils_tabulate_lua[]
 #if ENABLE_CONFIG_EXTRAS
 	,
@@ -334,6 +335,10 @@ static const char *lua_sources[] = {
 	"config/instance_config",
 	"internal.config.instance_config",
 	config_instance_config_lua,
+
+	"config/utils/snapshot",
+	"internal.config.utils.snapshot",
+	config_utils_snapshot_lua,
 
 	"config/cluster_config",
 	"internal.config.cluster_config",
