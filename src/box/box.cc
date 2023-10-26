@@ -2349,6 +2349,15 @@ box_set_instance_name(void)
 		diag_raise();
 	if (strcmp(cfg_instance_name, name) == 0)
 		return;
+	/**
+	 * It's possible, that the name is set on master by the manual replace.
+	 * Don't make all appliers to resubscribe in such case. Just update
+	 * the saved cfg_instance_name.
+	 */
+	if (strcmp(INSTANCE_NAME, name) == 0) {
+		strlcpy(cfg_instance_name, name, NODE_NAME_SIZE_MAX);
+		return;
+	}
 	char old_cfg_name[NODE_NAME_SIZE_MAX];
 	strlcpy(old_cfg_name, cfg_instance_name, NODE_NAME_SIZE_MAX);
 	auto guard = make_scoped_guard([&]{
