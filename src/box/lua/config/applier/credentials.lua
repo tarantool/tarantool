@@ -469,13 +469,15 @@ local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
         err = ('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q) failed: %s')
               :format(role_or_user, grant_or_revoke, name, privs, obj_type,
                       obj_name, err)
-        config:_alert({type = 'error', message = err})
+        config:_alert('credentials_grant_or_revoke_err',
+                      {type = 'error', message = err})
     else
         local msg = "credentials.apply: %s %q hasn't been created yet, " ..
                     "'box.schema.%s.%s(%q, %q, %q, %q)' will be applied later"
         msg = msg:format(obj_type, obj_name, role_or_user, grant_or_revoke,
                          name, privs, obj_type, obj_name)
-        config:_alert({type = 'warn', message = msg})
+        config:_alert('credentials_grant_or_revoke_warn',
+                      {type = 'warn', message = msg})
     end
 end
 
@@ -621,9 +623,10 @@ local function set_password(user_name, password)
     end
 
     if user_name == 'guest' then
-        config:_alert({type = 'error',
-            message = 'credentials.apply: setting a password for ' ..
-                      'the guest user is not allowed'})
+        local message = 'credentials.apply: setting a password for ' ..
+                        'the guest user is not allowed'
+        config:_alert('credentials_apply_password',
+                      {type = 'error', message = message})
     end
 
     local auth_def = box.space._user.index.name:get({user_name})[5]
@@ -729,7 +732,8 @@ local function sync_credentials_worker()
                 local msg = 'credentials.apply: Tarantool is in Read Only ' ..
                             'mode, so credentials will be set up in the ' ..
                             'background when it is switched to Read Write mode'
-                config:_alert({type = 'warn', message = msg})
+                config:_alert('credentials_apply_ro',
+                              {type = 'warn', message = msg})
                 box.ctl.wait_rw()
             end
 
