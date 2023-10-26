@@ -108,7 +108,30 @@ local function get_snapshot_names(snap_path)
     }
 end
 
+local function get_snapshot_schema_version(snap_path)
+    for _, row in xlog.pairs(snap_path) do
+        local body = row.BODY
+        if not body.space_id then
+            goto continue
+        end
+
+        if body.space_id > box.schema.SCHEMA_ID then
+            break
+        end
+
+        if body.space_id == box.schema.SCHEMA_ID then
+            if body.tuple[1] == 'version' then
+                return body.tuple
+            end
+        end
+        ::continue::
+    end
+
+    assert(false)
+end
+
 return {
     get_path = get_snapshot_path,
     get_names = get_snapshot_names,
+    get_schema_version = get_snapshot_schema_version,
 }

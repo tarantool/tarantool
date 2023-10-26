@@ -3,6 +3,7 @@ local log = require('internal.config.utils.log')
 local instance_config = require('internal.config.instance_config')
 local snapshot = require('internal.config.utils.snapshot')
 local schedule_task = fiber._internal.schedule_task
+local mkversion = require('internal.mkversion')
 
 local function peer_uri(configdata, peer_name)
     local iconfig = configdata._peers[peer_name].iconfig_def
@@ -81,6 +82,8 @@ local names_state = {
     is_configured = false,
     -- Waiting for rw status.
     rw_watcher = nil,
+    -- Shows, whether schema upgrade trigger should be deleted.
+    is_upgrade_wait = false,
 }
 
 -- Make alerts for all names, which are missing (from snapshot or
@@ -190,6 +193,25 @@ local function names_rw_watcher()
     end)
 end
 
+local function names_schema_upgrade_on_replace(old, new)
+    if old == nil or new == nil then
+        return
+    end
+
+    local version_3 = mkversion(3, 0, 0)
+    local old_version = mkversion.from_tuple(old)
+    local new_version = mkversion.from_tuple(new)
+    if old_version < version_3 and new_version >= version_3 then
+        -- We cannot do it inside on_replace trigger, as the version
+        -- is not considered set yet and we may try to set names, when
+        -- schema is not yet updated, which will fail as DDL is
+        -- prohibited before schema upgrade.
+        box.on_commit(function()
+            names_state.rw_watcher = names_rw_watcher()
+        end)
+    end
+end
+
 local function names_cluster_on_replace(old, new)
     -- Ignore insert of a new replica. Every new replica will have
     -- name set, as it may join to a replicaset only by bootstrap, which
@@ -239,13 +261,18 @@ names_check_and_clean = function()
         box.space._schema:on_replace(nil, names_schema_on_replace)
         box.space._cluster:on_replace(nil, names_cluster_on_replace)
 
+        if names_state.is_upgrade_wait then
+            names_state.is_upgrade_wait = false
+            box.space._schema:on_replace(nil, names_schema_upgrade_on_replace)
+        end
+
         if names_state.rw_watcher ~= nil then
             names_state.rw_watcher:unregister()
         end
     end
 end
 
-local function names_apply(config, missing_names)
+local function names_apply(config, missing_names, schema_version)
     -- names_state.config should be updated, as all triggers rely on configdata,
     -- saved in it. configdata may be different from the one, we already have.
     names_state.config = config
@@ -261,9 +288,25 @@ local function names_apply(config, missing_names)
     box.space._schema:on_replace(names_schema_on_replace)
     box.space._cluster:on_replace(names_cluster_on_replace)
 
-    -- Wait for rw state.
-    names_state.rw_watcher = names_rw_watcher()
+    -- Wait for rw state. If schema version is nil, bootstrap is
+    -- going to be done.
+    if schema_version and schema_version < mkversion(3, 0, 0) then
+        box.space._schema:on_replace(names_schema_upgrade_on_replace)
+        names_state.is_upgrade_wait = true
+    else
+        names_state.rw_watcher = names_rw_watcher()
+    end
+
     names_state.is_configured = true
+end
+
+local function get_schema_version_before_cfg(config)
+    local snap_path = snapshot.get_path(config._configdata._iconfig_def)
+    if snap_path ~= nil then
+        return mkversion.from_tuple(snapshot.get_schema_version(snap_path))
+    end
+    -- Bootstrap, config not found
+    return nil
 end
 
 -- Returns nothing or {needs_retry = true}.
@@ -497,17 +540,19 @@ local function apply(config)
     if not missing_names_is_empty(missing_names, names.replicaset_name) then
         if is_startup then
             local on_schema_init
+            -- schema version may be nil, if bootstrap is done.
+            local version = get_schema_version_before_cfg(config)
             -- on_schema init trigger isn't deleted, as it's executed only once.
             on_schema_init = box.ctl.on_schema_init(function()
                 -- missing_names cannot be gathered inside on_schema_init
                 -- trigger, as box.cfg is already considered configured but
                 -- box.info is still not properly initialized.
-                names_apply(config, missing_names)
+                names_apply(config, missing_names, version)
                 box.ctl.on_schema_init(nil, on_schema_init)
             end)
         else
             -- Note, that we try to find new missing names on every reload.
-            names_apply(config, missing_names)
+            names_apply(config, missing_names, mkversion.get())
         end
     end
 
