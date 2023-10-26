@@ -2,7 +2,7 @@ local fio = require('fio')
 local replica_set = require('luatest.replica_set')
 local server = require('luatest.server')
 local t = require('luatest')
-local g = t.group()
+local g = t.group('with-names')
 
 local function wait_for_death(instance)
     t.helpers.retrying({}, function()
@@ -551,4 +551,49 @@ g.test_instance_name_new_uuid = function(lg)
     lg.master:exec(function(replication)
         box.cfg{replication = replication}
     end, {lg.master.box_cfg.replication})
+end
+
+local g_no_name = t.group('no-names')
+
+g_no_name.before_all = function(lg)
+    lg.replica_set = replica_set:new({})
+    local box_cfg = {
+        replication_timeout = 0.1,
+        replication = {
+            server.build_listen_uri('master', lg.replica_set.id),
+            server.build_listen_uri('replica', lg.replica_set.id),
+        },
+    }
+
+    lg.master = lg.replica_set:build_and_add_server({
+        alias = 'master',
+        box_cfg = box_cfg,
+    })
+
+    box_cfg.read_only = true
+    lg.replica = lg.replica_set:build_and_add_server({
+        alias = 'replica',
+        box_cfg = box_cfg,
+    })
+
+    lg.replica_set:start()
+    lg.replica_set:wait_for_fullmesh()
+end
+
+g_no_name.after_all = function(lg)
+    lg.replica_set:drop()
+end
+
+-- Test, that replica doesn't hang on name apply.
+g_no_name.test_replica_hang = function(lg)
+    lg.master:exec(function()
+        box.space._cluster:update(2, {{'=', 3, 'replica'}})
+    end)
+
+    -- Wait for INSTANCE_NAME to be set.
+    lg.replica:wait_for_vclock_of(lg.master)
+    lg.replica:exec(function()
+        -- Test, that no hang happens.
+        box.cfg{instance_name = 'replica'}
+    end)
 end
