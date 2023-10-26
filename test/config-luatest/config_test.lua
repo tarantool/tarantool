@@ -1,7 +1,5 @@
 local t = require('luatest')
 local server = require('test.luatest_helpers.server')
-local cluster_config = require('internal.config.cluster_config')
-local configdata = require('internal.config.configdata')
 local helpers = require('test.config-luatest.helpers')
 local treegen = require('test.treegen')
 local justrun = require('test.justrun')
@@ -23,7 +21,20 @@ g.after_each(function()
     end
 end)
 
-g.test_configdata = function()
+local function verify_configdata()
+    local json = require('json')
+    local t = require('luatest')
+    local configdata = require('internal.config.configdata')
+    local cluster_config = require('internal.config.cluster_config')
+
+    local saved_assert_equals = t.assert_equals
+    t.assert_equals = function(...)
+        local ok, err = pcall(saved_assert_equals, ...)
+        if not ok then
+            error(json.encode(err), 2)
+        end
+    end
+
     local cconfig = {
         credentials = {
             users = {
@@ -145,6 +156,20 @@ g.test_configdata = function()
     t.assert_equals(res_names, expected_names)
 
     t.assert_equals(data:peers(), {'instance-001', 'instance-002'})
+end
+
+g.test_configdata = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local script = string.dump(verify_configdata)
+    treegen.write_script(dir, 'main.lua', script)
+
+    local opts = {nojson = true, stderr = true}
+    local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
+    t.assert_equals(res, {
+        exit_code = 0,
+        stdout = '',
+        stderr = '',
+    })
 end
 
 g.test_config_general = function()

@@ -8,6 +8,7 @@ local urilib = require('uri')
 local digest = require('digest')
 local instance_config = require('internal.config.instance_config')
 local cluster_config = require('internal.config.cluster_config')
+local snapshot = require('internal.config.utils.snapshot')
 
 local function choose_iconfig(self, opts)
     if opts ~= nil and opts.peer ~= nil then
@@ -197,9 +198,172 @@ function methods.bootstrap_leader_name(self)
     return self._bootstrap_leader_name
 end
 
+-- Returns instance_uuid and replicaset_uuid, saved in config.
+local function find_uuids_by_name(peers, instance_name)
+    for name, peer in pairs(peers) do
+        if name == instance_name then
+            local iconfig = peer.iconfig_def
+            return instance_config:get(iconfig, 'database.instance_uuid'),
+                   instance_config:get(iconfig, 'database.replicaset_uuid')
+        end
+    end
+    return nil
+end
+
+local function find_peer_name_by_uuid(peers, instance_uuid)
+    for name, peer in pairs(peers) do
+        local uuid = instance_config:get(peer.iconfig_def,
+                                         'database.instance_uuid')
+        if uuid == instance_uuid then
+            return name
+        end
+    end
+    return nil
+end
+
+function methods.peer_name_by_uuid(self, instance_uuid)
+    return find_peer_name_by_uuid(self._peers, instance_uuid)
+end
+
+local function find_saved_names(iconfig)
+    if type(box.cfg) == 'function' then
+        local snap_path = snapshot.get_path(iconfig)
+        -- Bootstrap is going to be done, no names are saved.
+        if snap_path == nil then
+            return nil
+        end
+
+        -- Read system spaces of snap file.
+        return snapshot.get_names(snap_path)
+    end
+
+    -- Box.cfg was already done. No sense in snapshot
+    -- reading, we can get all data from memory.
+    local peers = {}
+    for _, row in ipairs(box.space._cluster:select(nil, {limit = 32})) do
+        if row[3] ~= nil then
+            peers[row[3]] = row[2]
+        end
+    end
+
+    return {
+        replicaset_name = box.info.replicaset.name,
+        replicaset_uuid = box.info.replicaset.uuid,
+        instance_name = box.info.name,
+        instance_uuid = box.info.uuid,
+        peers = peers,
+    }
+end
+
+-- Return a map, which shows, which instances doesn't have a name
+-- set, info about the current replicaset name is also included in map.
+function methods.missing_names(self)
+    local missing_names = {
+        -- Note, that replicaset_name cannot start with underscore (_peers
+        -- name is forbidden), so we won't overwrite it with list of peers.
+        _peers = {},
+    }
+
+    local saved_names = find_saved_names(self._iconfig_def)
+    if saved_names == nil then
+        -- All names will be set during replicaset bootstrap.
+        return missing_names
+    end
+
+    -- Missing name of the current replicaset.
+    if saved_names.replicaset_name == nil then
+        missing_names[self._replicaset_name] = saved_names.replicaset_uuid
+    end
+
+    for name, peer in pairs(self._peers) do
+        local iconfig = peer.iconfig_def
+        -- We allow anonymous replica without instance_uuid. Anonymous replica
+        -- cannot have name set, it's enough to validate replicaset_name/uuid.
+        if instance_config:get(iconfig, 'replication.anon') then
+            goto continue
+        end
+
+        -- cfg_uuid may be box.NULL if instance_uuid is not passed to config.
+        local cfg_uuid = instance_config:get(iconfig, 'database.instance_uuid')
+        if cfg_uuid == box.NULL then
+            cfg_uuid = 'unknown'
+        end
+
+        if not saved_names.peers[name] then
+            missing_names._peers[name] = cfg_uuid
+        end
+
+        ::continue::
+    end
+
+    return missing_names
+end
+
 local mt = {
     __index = methods,
 }
+
+-- Validate UUIDs and names passed to config against the data,
+-- saved inside snapshot. Fail early if mismatch is found.
+local function validate_names(saved_names, config_names)
+    -- Snapshot always has replicaset uuid and
+    -- at least one peer in _cluster space.
+    assert(saved_names.replicaset_uuid)
+    assert(saved_names.instance_uuid)
+    -- Config always has names set.
+    assert(config_names.replicaset_name ~= nil)
+    assert(config_names.instance_name ~= nil)
+
+    if config_names.replicaset_uuid ~= nil and
+       config_names.replicaset_uuid ~= saved_names.replicaset_uuid then
+        error(string.format('Replicaset UUID mismatch. Snapshot: %s, ' ..
+                            'config: %s.', saved_names.replicaset_uuid,
+                            config_names.replicaset_uuid), 0)
+    end
+
+    if saved_names.replicaset_name ~= nil and
+       saved_names.replicaset_name ~= config_names.replicaset_name then
+        error(string.format('Replicaset name mismatch. Snapshot: %s, ' ..
+                            'config: %s.', saved_names.replicaset_name,
+                            config_names.replicaset_name), 0)
+    end
+
+    if config_names.instance_uuid ~= nil and
+       config_names.instance_uuid ~= saved_names.instance_uuid then
+        error(string.format('Instance UUID mismatch. Snapshot: %s, ' ..
+                            'config: %s.', saved_names.instance_uuid,
+                            config_names.instance_uuid), 0)
+    end
+
+    if saved_names.instance_name ~= nil and
+       saved_names.instance_name ~= config_names.instance_name then
+        error(string.format('Instance name mismatch. Snapshot: %s, ' ..
+                            'config: %s.', saved_names.instance_name,
+                            config_names.instance_name), 0)
+    end
+
+    -- Fail early, if current UUID is not set, but no name is found
+    -- inside the snapshot file. Ignore this failure, if replica is
+    -- configured as anonymous, anon replicas cannot have names.
+    local iconfig = config_names.peers[config_names.instance_name].iconfig_def
+    if not instance_config:get(iconfig, 'replication.anon') then
+        if saved_names.instance_name == nil and
+           config_names.instance_uuid == nil then
+            error(string.format('Instance name for %s is not set in snapshot' ..
+                                ' and UUID is missing in the config. Found ' ..
+                                '%s in snapshot.', config_names.instance_name,
+                                saved_names.instance_uuid), 0)
+        end
+        if saved_names.replicaset_name == nil and
+           config_names.replicaset_uuid == nil then
+            error(string.format('Replicaset name for %s is not set in ' ..
+                                'snapshot and  UUID is missing in the ' ..
+                                'config. Found %s in snapshot.',
+                                config_names.replicaset_name,
+                                saved_names.replicaset_uuid), 0)
+        end
+    end
+end
 
 local function new(iconfig, cconfig, instance_name)
     -- Precalculate configuration with applied defaults.
@@ -350,6 +514,22 @@ local function new(iconfig, cconfig, instance_name)
         end
         assert(bootstrap_leader == nil)
         bootstrap_leader_name = peer_names[1]
+    end
+
+    -- Names and UUIDs are always validated: during instance start
+    -- and during config reload.
+    local saved_names = find_saved_names(iconfig_def)
+    if saved_names ~= nil then
+        local config_instance_uuid, config_replicaset_uuid =
+            find_uuids_by_name(peers, instance_name)
+        validate_names(saved_names, {
+            replicaset_name = found.replicaset_name,
+            instance_name = instance_name,
+            -- UUIDs from config, generated one should not be used here.
+            replicaset_uuid = config_replicaset_uuid,
+            instance_uuid = config_instance_uuid,
+            peers = peers,
+        })
     end
 
     return setmetatable({
