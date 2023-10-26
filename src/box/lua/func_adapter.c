@@ -148,6 +148,71 @@ func_adapter_lua_push_msgpack(struct func_adapter_ctx *base, const char *data,
 }
 
 /**
+ * This function must be pushed as a closure with 4 upvalues.
+ * Advances the iterator - invokes iterator_next() with a saved state.
+ * For details, see description of func_adapter_lua_push_iterator().
+ */
+static int
+func_adapter_lua_iterator_next(lua_State *L)
+{
+	func_adapter_iterator_next_f iterator_next =
+		lua_touserdata(L, lua_upvalueindex(1));
+	void *state = lua_touserdata(L, lua_upvalueindex(2));
+	struct func_adapter *func_base =
+		lua_touserdata(L, lua_upvalueindex(3));
+	struct func_adapter_ctx *ctx_base =
+		lua_touserdata(L, lua_upvalueindex(4));
+	struct func_adapter_lua_ctx *ctx =
+		(struct func_adapter_lua_ctx *)ctx_base;
+	int top_svp = lua_gettop(ctx->L);
+	int rc = iterator_next(func_base, ctx_base, state);
+	if (rc != 0)
+		luaT_error(L);
+	int top = lua_gettop(ctx->L);
+	assert(top >= top_svp);
+	return top - top_svp;
+}
+
+/**
+ * This function must be pushed as a closure with 4 upvalues.
+ * Creates an iterator - pushes another closure with the same upvalues.
+ * For details, see description of func_adapter_lua_push_iterator().
+ */
+static int
+func_adapter_lua_iterator_start(lua_State *L)
+{
+	for (int i = 1; i <= 4; ++i)
+		lua_pushvalue(L, lua_upvalueindex(i));
+	lua_pushcclosure(L, func_adapter_lua_iterator_next, 4);
+	return 1;
+}
+
+/**
+ * Iterators in Lua are implemented as usual functions (or closures), which
+ * return the next element. So this function pushes a closure, that returns an
+ * actual iterator - another closure, which is a wrapper over iterator_next.
+ * That's how it looks from Lua:
+ * function(iter)
+ *     for v1, v2 in iter() do
+ *         process(v1, v2)
+ *     end
+ * end
+ */
+static void
+func_adapter_lua_push_iterator(struct func_adapter *func,
+			       struct func_adapter_ctx *base_ctx, void *state,
+			       func_adapter_iterator_next_f iterator_next)
+{
+	struct func_adapter_lua_ctx *ctx =
+		(struct func_adapter_lua_ctx *)base_ctx;
+	lua_pushlightuserdata(ctx->L, iterator_next);
+	lua_pushlightuserdata(ctx->L, state);
+	lua_pushlightuserdata(ctx->L, func);
+	lua_pushlightuserdata(ctx->L, ctx);
+	lua_pushcclosure(ctx->L, func_adapter_lua_iterator_start, 4);
+}
+
+/**
  * Checks if the next value is a Lua number. Cdata numeric types and decimal are
  * not supported.
  */
@@ -281,6 +346,7 @@ func_adapter_lua_create(lua_State *L, int idx)
 		.push_bool = func_adapter_lua_push_bool,
 		.push_null = func_adapter_lua_push_null,
 		.push_msgpack = func_adapter_lua_push_msgpack,
+		.push_iterator = func_adapter_lua_push_iterator,
 
 		.is_double = func_adapter_lua_is_double,
 		.pop_double = func_adapter_lua_pop_double,
