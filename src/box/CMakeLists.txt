@@ -54,6 +54,7 @@ lua_source(lua_sources lua/config/source/env.lua          config_source_env_lua)
 lua_source(lua_sources lua/config/source/file.lua         config_source_file_lua)
 lua_source(lua_sources lua/config/utils/log.lua           config_utils_log_lua)
 lua_source(lua_sources lua/config/utils/schema.lua        config_utils_schema_lua)
+lua_source(lua_sources lua/config/utils/snapshot.lua      config_utils_snapshot_lua)
 lua_source(lua_sources lua/config/utils/tabulate.lua      config_utils_tabulate_lua)
 
 if (ENABLE_CONFIG_EXTRAS)
