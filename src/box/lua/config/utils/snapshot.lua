@@ -1,4 +1,5 @@
 local fio = require('fio')
+local xlog = require('xlog')
 local instance_config = require('internal.config.instance_config')
 
 local snapshot_path = nil
@@ -62,6 +63,52 @@ local function get_snapshot_path(iconfig)
     return snapshot_path
 end
 
+-- Read snap file and return a map of saved UUIDs and names for
+-- all instances and for the current replicaset.
+local function get_snapshot_names(snap_path)
+    local peers = {}
+    local instance_uuid = xlog.meta(snap_path).instance_uuid
+    local instance_name, replicaset_name, replicaset_uuid
+    for _, row in xlog.pairs(snap_path) do
+        local body = row.BODY
+        if not body.space_id then
+            goto continue
+        end
+
+        if body.space_id > box.schema.CLUSTER_ID then
+            -- No sense in scanning after _cluster.
+            break
+        end
+
+        if body.space_id == box.schema.SCHEMA_ID then
+            if body.tuple[1] == 'replicaset_uuid' or
+               body.tuple[1] == 'cluster' then
+                replicaset_uuid = body.tuple[2]
+            elseif body.tuple[1] == 'replicaset_name' then
+                replicaset_name = body.tuple[2]
+            end
+        elseif body.space_id == box.schema.CLUSTER_ID then
+            if body.tuple[2] == instance_uuid then
+                instance_name = body.tuple[3]
+            end
+
+            if body.tuple[3] ~= nil then
+                peers[body.tuple[3]] = body.tuple[2]
+            end
+        end
+        ::continue::
+    end
+
+    return {
+        replicaset_name = replicaset_name,
+        replicaset_uuid = replicaset_uuid,
+        instance_name = instance_name,
+        instance_uuid = instance_uuid,
+        peers = peers,
+    }
+end
+
 return {
     get_path = get_snapshot_path,
+    get_names = get_snapshot_names,
 }
