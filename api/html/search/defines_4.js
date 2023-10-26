@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['deprecated_618',['DEPRECATED',['../module_8h.html#a033c6face33bc7db165c0ba591696fcc',1,'module.h']]]
+  ['deprecated_628',['DEPRECATED',['../module_8h.html#a033c6face33bc7db165c0ba591696fcc',1,'module.h']]]
 ];
