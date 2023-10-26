@@ -12,6 +12,7 @@ OutOfMemory: Failed to allocate 42 bytes in allocator for exception
 # exception propagated
 # cancel dead has started
 # by this time the fiber should be dead already
+# Can change the joinability in safe cases.
 	*** fiber_join_test: done ***
 	*** fiber_stack_test ***
 # normal-stack fiber not crashed

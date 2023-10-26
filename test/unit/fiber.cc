@@ -191,6 +191,20 @@ fiber_join_test()
 	fiber_cancel(fiber);
 	fiber_join(fiber);
 
+	note("Can change the joinability in safe cases.");
+	fiber = fiber_new_xc("alive_not_joinable", noop_f);
+	/* Non-joinable not dead fiber.  */
+	fiber_set_joinable(fiber, true);
+	fail_unless((fiber->flags & FIBER_IS_JOINABLE) != 0);
+	/* Joinable not dead and not joined fiber. */
+	fiber_set_joinable(fiber, false);
+	fail_unless((fiber->flags & FIBER_IS_JOINABLE) == 0);
+	/* The same as the first case , just to be sure. */
+	fiber_set_joinable(fiber, true);
+	fail_unless((fiber->flags & FIBER_IS_JOINABLE) != 0);
+	fiber_wakeup(fiber);
+	fiber_join(fiber);
+
 	footer();
 }
 
