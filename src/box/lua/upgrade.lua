@@ -7,9 +7,9 @@ local ffi = require('ffi')
 local fun = require('fun')
 local utils = require('internal.utils')
 local tarantool = require('tarantool')
+local mkversion = require('internal.mkversion')
 
 ffi.cdef([[
-    uint32_t box_dd_version_id(void);
     void box_init_latest_dd_version_id(uint32_t version_id);
     bool box_schema_needs_upgrade(void);
     int box_schema_upgrade_begin(void);
@@ -39,40 +39,6 @@ local SUPER = 31
 -- not possible to infer type from table content.
 local function setmap(tab)
     return setmetatable(tab, { __serialize = 'map' })
-end
-
-local mkversion = {}
-mkversion.__index = mkversion
-setmetatable(mkversion, {__call = function(c, ...) return c.new(...) end})
-
-function mkversion.new(major, minor, patch)
-    local self = setmetatable({}, mkversion)
-    self.major = major
-    self.minor = minor
-    self.patch = patch
-    self.id = bit.bor(bit.lshift(bit.bor(bit.lshift(major, 8), minor), 8), patch)
-    return self
-end
-
--- Parse string with version in format 'A.B.C' to version object.
-function mkversion.parse(version)
-    local major, minor, patch = version:match('^(%d+)%.(%d+)%.(%d+)$')
-    if major == nil then
-        error('version should be in format A.B.C')
-    end
-    return mkversion.new(tonumber(major), tonumber(minor), tonumber(patch))
-end
-
-function mkversion.__tostring(self)
-    return string.format('%s.%s.%s', self.major, self.minor, self.patch)
-end
-
-function mkversion.__eq(lhs, rhs)
-    return lhs.id == rhs.id
-end
-
-function mkversion.__lt(lhs, rhs)
-    return lhs.id < rhs.id
 end
 
 -- space:truncate() doesn't work with disabled triggers on __index
@@ -139,16 +105,6 @@ local function reset_system_formats()
     end)
 end
 
-local function version_from_tuple(tuple)
-    local major, minor, patch = tuple:unpack(2, 4)
-    patch = patch or 0
-    if major and minor and type(major) == 'number' and
-       type(minor) == 'number' and type(patch) == 'number' then
-        return mkversion(major, minor, patch)
-    end
-    return nil
-end
-
 -- Get schema version, stored in _schema system space, by reading the latest
 -- snapshot file from the snap_dir. Useful to define schema_version before
 -- recovering the snapshot, because some schema versions are too old and cannot
@@ -168,7 +124,7 @@ local function get_snapshot_version(snap_dir)
         if sid == box.schema.SCHEMA_ID then
             local tuple = row.BODY.tuple
             if tuple and tuple[1] == 'version' then
-                version = version_from_tuple(tuple)
+                version = mkversion.from_tuple(tuple)
                 if not version then
                     log.error("Corrupted version tuple in space '_schema' "..
                               "in snapshot '%s': %s ", snap, tuple)
@@ -1469,15 +1425,6 @@ local handlers = {
 }
 builtin.box_init_latest_dd_version_id(handlers[#handlers].version.id)
 
--- Schema version of the snapshot.
-local function get_version()
-    local version = builtin.box_dd_version_id()
-    local major = bit.band(bit.rshift(version, 16), 0xff)
-    local minor = bit.band(bit.rshift(version, 8), 0xff)
-    local patch = bit.band(version, 0xff)
-    return mkversion(major, minor, patch)
-end
-
 local trig_oldest_version = nil
 
 -- Some schema changes before version 1.7.7 make it impossible to recover from
@@ -1517,7 +1464,7 @@ local recovery_triggers = {
 -- snapshot), the triggers helping recover the old schema should be removed.
 local function schema_trig_last(_, tuple)
     if tuple and tuple[1] == 'version' then
-        local version = version_from_tuple(tuple)
+        local version = mkversion.from_tuple(tuple)
         if version then
             log.info("Recovery trigger: recovered schema version %s. "..
                      "Removing outdated recovery triggers.", version)
@@ -1596,7 +1543,7 @@ local function run_upgrade(func, ...)
 end
 
 local function upgrade()
-    local version = get_version()
+    local version = mkversion.get()
     run_upgrade(upgrade_from, version)
 end
 
@@ -2113,15 +2060,15 @@ local downgrade_versions = {
 local function downgrade_impl(version_str, dry_run)
     utils.box_check_configured()
     utils.check_param(version_str, 'version_str', 'string')
-    local version = mkversion.parse(version_str)
+    local version = mkversion.from_string(version_str)
     if fun.index(version_str, downgrade_versions) == nil then
         error("Downgrade is only possible to version listed in" ..
               " box.schema.downgrade_versions().")
     end
 
-    local schema_version_cur = get_version()
+    local schema_version_cur = mkversion.get()
     local app_version = tarantool.version:match('^%d+%.%d+%.%d+')
-    if schema_version_cur > mkversion.parse(app_version) then
+    if schema_version_cur > mkversion.from_string(app_version) then
         local err = "Cannot downgrade as current schema version %s is newer" ..
                     " than Tarantool version %s"
         error(err:format(schema_version_cur, app_version))
