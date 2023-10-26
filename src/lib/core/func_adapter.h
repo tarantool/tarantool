@@ -35,6 +35,16 @@ struct func_adapter_ctx {
 struct func_adapter;
 
 /**
+ * Type of function that can be used as an iterator_next method.
+ * Function must return 0 in the case of success. In the case of error,
+ * diag must be set and -1 must be returned.
+ * The state of an iterator is passed as the third argument.
+ */
+typedef int
+(*func_adapter_iterator_next_f)(struct func_adapter *,
+				struct func_adapter_ctx *, void *);
+
+/**
  * Virtual table for func_adapter class.
  * Usage of these methods is in the description of func_adapter class.
  */
@@ -82,6 +92,15 @@ struct func_adapter_vtab {
 	 */
 	void (*push_msgpack)(struct func_adapter_ctx *ctx, const char *data,
 			     const char *data_end);
+	/**
+	 * Pushes an iterator as argument. The third argument is a pointer that
+	 * will be passed to iterator next. The fourth one is a function which
+	 * will be called to advance the iterator. See type declaration
+	 * description for details.
+	 */
+	void (*push_iterator)(struct func_adapter *func,
+			      struct func_adapter_ctx *ctx, void *state,
+			      func_adapter_iterator_next_f iterator_next);
 	/**
 	 * Checks if the next returned value is a tuple.
 	 */
@@ -229,6 +248,14 @@ func_adapter_push_msgpack(struct func_adapter *func,
 			  const char *data, const char *data_end)
 {
 	func->vtab->push_msgpack(ctx, data, data_end);
+}
+
+static inline void
+func_adapter_push_iterator(struct func_adapter *func,
+			   struct func_adapter_ctx *ctx, void *state,
+			   func_adapter_iterator_next_f iterator_next)
+{
+	func->vtab->push_iterator(func, ctx, state, iterator_next);
 }
 
 static inline bool

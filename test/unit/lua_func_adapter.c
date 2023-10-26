@@ -376,10 +376,143 @@ test_callable(void)
 	check_plan();
 }
 
+/**
+ * Iterator state for the test.
+ */
+struct test_iterator_state {
+	/**
+	 * Current value, is incremented after every yield.
+	 */
+	double current;
+	/**
+	 * Maximum value, after which iterator yields nothing.
+	 */
+	double limit;
+};
+
+/**
+ * Yields 3 sequentially growing values, stops when the iterator is exhausted.
+ */
+static int
+test_iterator_next(struct func_adapter *func, struct func_adapter_ctx *ctx,
+		   void *state)
+{
+	struct test_iterator_state *test_state =
+		(struct test_iterator_state *)state;
+
+	for (int i = 0; i < 3; ++i) {
+		if (test_state->current > test_state->limit)
+			break;
+		func_adapter_push_double(func, ctx, test_state->current++);
+	}
+	return 0;
+}
+
+static void
+test_iterator(void)
+{
+	plan(3 * 2 + 1);
+	header();
+
+	struct test_iterator_state state = {.current = 1.0, .limit = 20.0};
+
+	int idx = generate_function(
+		"function(iter) "
+		"  local res1 = 0 "
+		"  local res2 = 0 "
+		"  local res3 = 0 "
+		"  for v1, v2, v3 in iter() do "
+		"    if v1 ~= nil then res1 = res1 + v1 end"
+		"    if v2 ~= nil then res2 = res2 + v2 end"
+		"    if v3 ~= nil then res3 = res3 + v3 end"
+		"  end "
+		"  return res1, res2, res3 "
+		"end");
+
+	double results[3] = {0.0, 0.0, 0.0};
+	int i = 0;
+	for (int v = state.current; v <= state.limit; ++v, i = (i + 1) % 3)
+		results[i] += v;
+
+	struct func_adapter *func = func_adapter_lua_create(tarantool_L, idx);
+	struct func_adapter_ctx ctx;
+	func_adapter_begin(func, &ctx);
+	func_adapter_push_iterator(func, &ctx, &state, test_iterator_next);
+	int rc = func_adapter_call(func, &ctx);
+	fail_if(rc != 0);
+
+	for (int i = 0; i < 3; ++i) {
+		ok(func_adapter_is_double(func, &ctx), "Expected double");
+		double val;
+		func_adapter_pop_double(func, &ctx, &val);
+		ok(number_eq(val, results[i]),
+		   "Function result must match expected one");
+	}
+	ok(func_adapter_is_empty(func, &ctx), "Func adapter is empty");
+	func_adapter_end(func, &ctx);
+	func_adapter_destroy(func);
+
+	footer();
+	check_plan();
+}
+
+/**
+ * Message of error returned by iterator next.
+ */
+static const char *iterator_next_errmsg = "My error in iterator next";
+
+/**
+ * Iterator next that returns an error.
+ */
+static int
+test_iterator_next_error(struct func_adapter *func,
+			 struct func_adapter_ctx *ctx, void *state)
+{
+	diag_set(ClientError, ER_PROC_C, iterator_next_errmsg);
+	return -1;
+}
+
+/**
+ * Check if errors in iterator_next are handled correctly.
+ */
+static void
+test_iterator_error(void)
+{
+	plan(2);
+	header();
+
+	struct test_iterator_state state;
+
+	int idx = generate_function(
+		"function(iter) "
+		"  local res = 0 "
+		"  for i in iter() do res = res + i end "
+		"  return res "
+		"end");
+
+	struct func_adapter *func = func_adapter_lua_create(tarantool_L, idx);
+	struct func_adapter_ctx ctx;
+	func_adapter_begin(func, &ctx);
+	func_adapter_push_iterator(func, &ctx, &state,
+				   test_iterator_next_error);
+	int rc = func_adapter_call(func, &ctx);
+	fail_unless(rc != 0);
+	struct error *e = diag_last_error(diag_get());
+	is(e->cause, NULL, "Thrown error has no cause");
+	is(strcmp(e->errmsg, iterator_next_errmsg), 0,
+	   "Expected errmsg: %s, got: %s", iterator_next_errmsg, e->errmsg);
+
+	func_adapter_end(func, &ctx);
+	func_adapter_destroy(func);
+
+	footer();
+	check_plan();
+}
+
 static int
 test_lua_func_adapter(void)
 {
-	plan(9);
+	plan(11);
 	header();
 
 	test_numeric();
@@ -391,6 +524,8 @@ test_lua_func_adapter(void)
 	test_error();
 	test_get_func();
 	test_callable();
+	test_iterator();
+	test_iterator_error();
 
 	footer();
 	return check_plan();
