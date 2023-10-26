@@ -34,3 +34,25 @@ g.test_default_after_add_column = function()
         func:drop()
     end)
 end
+
+-- Make sure default is not supported by SHOW CREATE TABLE.
+g.test_default_in_show_create_table = function()
+    g.server:exec(function()
+        local body = 'function(a) return a + 123 end'
+        local func_def = {is_deterministic = true, body = body}
+        box.schema.func.create('F1', func_def)
+        local format = {{'I', 'integer'}, {'A', 'integer', default = 321,
+                                           default_func = 'F1'}}
+        local s = box.schema.space.create('A', {format = format})
+        s:create_index('ii')
+        local func = box.func.F1
+        t.assert_equals(s:format()[2].default, 321)
+        t.assert_equals(s:format()[2].default_func, func.id)
+        local rows = box.execute([[SHOW CREATE TABLE A;]]).rows
+        local exp = "Problem with field 'A': BOX default values are "..
+                    "unsupported."
+        t.assert_equals(rows[1][2][1], exp)
+        s:drop()
+        func:drop()
+    end)
+end

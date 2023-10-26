@@ -35,7 +35,7 @@ g.test_show_create_table_one = function()
         local sql = [[CREATE TABLE t(i INT CONSTRAINT c0 PRIMARY KEY,
                                      a STRING CONSTRAINT c1 REFERENCES t(i)
                                      CONSTRAINT c2 UNIQUE,
-                                     b UUID NOT NULL DEFAULT(uuid()),
+                                     b UUID NOT NULL,
                                      CONSTRAINT c3 CHECK(i * a < 100),
                                      CONSTRAINT c4 UNIQUE (a, b),
                                      CONSTRAINT c5 FOREIGN KEY(i, a)
@@ -44,7 +44,7 @@ g.test_show_create_table_one = function()
         box.execute(sql)
         res = {'CREATE TABLE t(\ni INTEGER NOT NULL,\n'..
                'a STRING CONSTRAINT c1 REFERENCES t(i),\n'..
-               'b UUID NOT NULL DEFAULT(uuid()),\n'..
+               'b UUID NOT NULL,\n'..
                'CONSTRAINT c0 PRIMARY KEY(i),\n'..
                'CONSTRAINT c3 CHECK(i * a < 100),\n'..
                'CONSTRAINT c5 FOREIGN KEY(i, a) REFERENCES t(a, b))\n'..
