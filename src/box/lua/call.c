@@ -28,6 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "box/box.h"
 #include "box/lua/call.h"
 #include "box/call.h"
 #include "box/error.h"
@@ -946,6 +947,8 @@ static struct func_vtab func_persistent_lua_vtab = {
 static int
 lbox_module_reload(lua_State *L)
 {
+	if (box_check_configured() != 0)
+		return luaT_error(L);
 	const char *name = luaL_checkstring(L, 1);
 	if (box_module_reload(name) != 0)
 		return luaT_error(L);
@@ -955,6 +958,8 @@ lbox_module_reload(lua_State *L)
 int
 lbox_func_call(struct lua_State *L)
 {
+	if (box_check_configured() != 0)
+		return luaT_error(L);
 	if (lua_gettop(L) < 1 || !lua_isstring(L, 1))
 		return luaL_error(L, "Use func:call(...)");
 
