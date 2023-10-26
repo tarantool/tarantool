@@ -1011,6 +1011,7 @@ local box_cfg_guard_whitelist = {
     info = true;
     iproto = true;
     priv = true;
+    schema = true;
 };
 
 -- List of box members that requires full box loading.

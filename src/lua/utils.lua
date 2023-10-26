@@ -144,4 +144,11 @@ else
     utils.memory_region_is_poisoned = function() return false end
 end
 
+--[[ Throw an error, if box is unconfigured. --]]
+function utils.box_check_configured()
+    if type(box.cfg) == 'function' then
+        box.error(box.error.UNCONFIGURED)
+    end
+end
+
 return utils

@@ -2744,6 +2744,7 @@ local function wrap_schema_object_mt(name)
 end
 
 function box.schema.space.bless(space)
+    utils.box_check_configured()
     local index_mt_name
     if space.engine == 'vinyl' then
         index_mt_name = 'vinyl_index_mt'
@@ -2798,6 +2799,7 @@ box.sequence = {}
 box.schema.sequence = {}
 
 function box.schema.sequence.bless(seq)
+    utils.box_check_configured()
     setmetatable(seq, {__index = sequence_mt})
 end
 
@@ -3238,6 +3240,7 @@ func_mt.call = function(func, args)
 end
 
 function box.schema.func.bless(func)
+    utils.box_check_configured()
     setmetatable(func, {__index = func_mt})
 end
 
@@ -3311,6 +3314,7 @@ end
 box.schema.user = {}
 
 box.schema.user.password = function(password)
+    utils.box_check_configured()
     return internal.prepare_auth(box.cfg.auth_type, password)
 end
 

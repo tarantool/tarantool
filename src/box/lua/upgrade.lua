@@ -1584,6 +1584,7 @@ end
 -- Runs the given function with the permission to execute DDL operations
 -- with an old schema. Used by upgrade/downgrade scripts.
 local function run_upgrade(func, ...)
+    utils.box_check_configured()
     if builtin.box_schema_upgrade_begin() ~= 0 then
         box.error()
     end
@@ -2110,6 +2111,7 @@ local downgrade_versions = {
 -- In case of downgrade check for issues is done before making any changes.
 -- If any issue is found then downgrade is failed and no any changes are done.
 local function downgrade_impl(version_str, dry_run)
+    utils.box_check_configured()
     utils.check_param(version_str, 'version_str', 'string')
     local version = mkversion.parse(version_str)
     if fun.index(version_str, downgrade_versions) == nil then
