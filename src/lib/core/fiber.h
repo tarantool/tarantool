@@ -170,6 +170,11 @@ enum {
 	 * This flag idicates, if the fiber can be killed from the Lua world.
 	 */
 	FIBER_IS_SYSTEM         = 1 << 8,
+	/**
+	 * Someone has joined the fiber already. So this fiber can't be joined
+	 * once again nor can its joinability be changed.
+	 */
+	FIBER_JOIN_BEEN_INVOKED = 1 << 9,
 	FIBER_DEFAULT_FLAGS	= 0
 };
 
@@ -346,6 +351,11 @@ fiber_set_cancellable(bool yesno);
 
 /**
  * Set fiber to be joinable (false by default).
+ * The fiber must not be joined already nor dead.
+ *
+ * @pre the fiber is not dead (panic if not).
+ * @pre the fiber is not joined yet (panic if not).
+ *
  * \param fiber to (un)set the joinable property.
  *              If set to NULL, the current fiber is used.
  * \param yesno status to set
@@ -357,7 +367,9 @@ fiber_set_joinable(struct fiber *fiber, bool yesno);
  * Wait until the fiber is dead and then move its execution
  * status to the caller.
  * The fiber must not be detached (@sa fiber_set_joinable()).
- * @pre FIBER_IS_JOINABLE flag is set.
+ *
+ * @pre FIBER_IS_JOINABLE flag is set (panic if not).
+ * @pre the fiber is not joined yet (panic if not).
  *
  * \param f fiber to be woken up
  * \return fiber function ret code
@@ -372,7 +384,9 @@ fiber_join(struct fiber *f);
  * Return fiber execution status to the caller or -1
  * if timeout exceeded and set diag.
  * The fiber must not be detached @sa fiber_set_joinable()
+ *
  * @pre FIBER_IS_JOINABLE flag is set.
+ * @pre the fiber is not joined yet (panic if not).
  *
  * \param f fiber to be woken up
  * \param timeout time during which we wait for the fiber completion

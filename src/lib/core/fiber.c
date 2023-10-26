@@ -664,6 +664,56 @@ fiber_set_joinable(struct fiber *fiber, bool yesno)
 {
 	if (fiber == NULL)
 		fiber = fiber();
+
+	/*
+	 * The C fiber API does not allow to report any error to the caller. At
+	 * the same time using the function in some conditions is unsafe. So in
+	 * case if such a condition is met the function panics.
+	 *
+	 * Here're the conditions the function may be called in:
+	 * 1. The fiber is not joinable and hasn't finished yet. We're good to
+	 *    change the fiber's joinability.
+	 * 2. The fiber is not joinable and is finished. That means the fiber
+	 *    is recycled already, so this is a use after free. This case is
+	 *    impossible from the Lua world, but can be done with C API, so it
+	 *    is to be prohibited.
+	 * 3. The fiber is joinable, not finished and not joined. We're good to
+	 *    change its joinability.
+	 * 4. The fiber is joinable, not finished, but joined already. Making
+	 *    the fiber non-joinable will lead to a double free: one in the
+	 *    fiber_loop, the second one in the active fiber_join_timeout.
+	 *    Making it joinable is a sign of attempt to join it later, so we
+	 *    can expect the second join in the future - detect it now, while
+	 *    we can do it, because in the future the fiber struct may be
+	 *    reused and it will be much more difficult to find the root cause
+	 *    of the double join (or we won't be able to detect it at all).
+	 * 5. The fiber is joinable, finished and not joined. The fiber should
+	 *    be joined in order to be recycled, so making it non-joinable can
+	 *    lead to a fiber leak and to be prohibited. The point about making
+	 *    it joinable from the statement #4 is applied here too.
+	 * 6. The fiber is joinable, finished and joined. In order to avoid
+	 *    introducing a new fiber flag, a joined fiber becomes non-joinable
+	 *    on death (see the fiber_join_timeout implementation), so this
+	 *    condition transforms into #2. And it's a use after free too.
+	 *
+	 * Simplifying:
+	 *   OK:
+	 *     1: !is_joinable && !is_dead
+	 *     3: is_joinable && !is_dead && !is_joined
+	 *   NOT OK:
+	 *     2: !is_joinable && is_dead
+	 *     4: is_joinable && !is_dead && is_joined
+	 *     5: is_joinable && is_dead && !is_joined
+	 *     6. is_joinable && is_dead && is_joined
+	 *
+	 *  Othervice, OK: !is_dead && (!is_joinable || !is_joined)
+	 *  So NOT OK: is_dead || (is_joinable && is_joined)
+	 *  So NOT OK: is_dead || is_joined, because joined implies joinable.
+	 */
+	if ((fiber->flags & FIBER_IS_DEAD) != 0 ||
+	    (fiber->flags & FIBER_JOIN_BEEN_INVOKED) != 0)
+		panic("%s on a dead or joined fiber detected", __func__);
+
 	if (yesno == true)
 		fiber->flags |= FIBER_IS_JOINABLE;
 	else
@@ -732,6 +782,12 @@ fiber_join_timeout(struct fiber *fiber, double timeout)
 	if ((fiber->flags & FIBER_IS_JOINABLE) == 0)
 		panic("the fiber is not joinable");
 
+	if ((fiber->flags & FIBER_JOIN_BEEN_INVOKED) != 0)
+		panic("join of a joined fiber detected");
+
+	/* Prohibit joining the fiber and changing its joinability. */
+	fiber->flags |= FIBER_JOIN_BEEN_INVOKED;
+
 	if (!fiber_is_dead(fiber)) {
 		double deadline = fiber_clock() + timeout;
 		while (!fiber_wait_on_deadline(fiber, deadline) &&
@@ -752,6 +808,11 @@ fiber_join_timeout(struct fiber *fiber, double timeout)
 	}
 	assert((fiber->flags & FIBER_IS_RUNNING) == 0);
 	assert((fiber->flags & FIBER_IS_JOINABLE) != 0);
+	/*
+	 * This line is here just to make the following statement true: if
+	 * a fiber is dead and is not joinable, that means it's recycled.
+	 * So we don't have to introduce a new FIBER_IS_RECYCLED flag.
+	 */
 	fiber->flags &= ~FIBER_IS_JOINABLE;
 
 	/* Move exception to the caller */
