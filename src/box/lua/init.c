@@ -94,6 +94,7 @@ extern char session_lua[],
 	feedback_daemon_lua[],
 #endif
 	net_box_lua[],
+	mkversion_lua[],
 	upgrade_lua[],
 	console_lua[],
 	merger_lua[],
@@ -206,6 +207,7 @@ static const char *lua_sources[] = {
 	READ_VIEW_BOX_LUA_MODULES
 	SECURITY_BOX_LUA_MODULES
 	"box/xlog", "xlog", xlog_lua,
+	"box/mkversion", "internal.mkversion", mkversion_lua,
 	"box/upgrade", NULL, upgrade_lua,
 	"box/net_box", "net.box", net_box_lua,
 	"box/console", "console", console_lua,
