@@ -2,6 +2,7 @@ local fiber = require('fiber')
 local log = require('internal.config.utils.log')
 local instance_config = require('internal.config.instance_config')
 local snapshot = require('internal.config.utils.snapshot')
+local schedule_task = fiber._internal.schedule_task
 
 local function peer_uri(configdata, peer_name)
     local iconfig = configdata._peers[peer_name].iconfig_def
@@ -67,6 +68,202 @@ local function log_destination(log)
     else
         assert(false)
     end
+end
+
+--------------------------------------------------------------------------------
+--  Instance/replicaset names
+--------------------------------------------------------------------------------
+
+local names_state = {
+    -- Used to access confidata and drop alerts.
+    config = nil,
+    -- Shows, whether triggers for setting names are configured.
+    is_configured = false,
+    -- Waiting for rw status.
+    rw_watcher = nil,
+}
+
+-- Make alerts for all names, which are missing (from snapshot or
+-- from box.info) and which have not be alerted already.
+local function names_alert_missing(config, missing_names)
+    local msg = 'box_cfg.apply: name %s for %s uuid is missing from the ' ..
+                'snapshot. It will be automatically set when master switches' ..
+                ' to Read Write mode'
+    local replicaset_name = config._configdata._replicaset_name
+    if missing_names[replicaset_name] ~= nil and
+       config._alerts[replicaset_name] == nil then
+        local replicaset_uuid = missing_names[replicaset_name]
+        local warning = msg:format(replicaset_name, replicaset_uuid)
+        config:_alert(replicaset_name, {type = 'warn', message = warning})
+    end
+
+    local unknown_msg = 'box_cfg.apply: instance %s is unknown. Possibly ' ..
+                        'instance_name is not set and UUID is not specified'
+    for name, uuid in pairs(missing_names._peers) do
+        local warning
+        if uuid == 'unknown' then
+            warning = unknown_msg:format(name)
+        else
+            warning = msg:format(name, uuid)
+        end
+        -- Alert may be done with 'unknown' uuid. If it was so, update alert.
+        local alert = config._alerts[name]
+        if alert == nil or alert.message ~= warning then
+            config:_alert(name, {type = 'warn', message = warning})
+        end
+    end
+end
+
+-- Formward declaration of function, which cleans triggers.
+local names_check_and_clean
+
+local function names_box_cfg(cfg)
+    local ok, err = pcall(function()
+        box.cfg(cfg)
+    end)
+    if not ok then
+        log.warn('Failed to apply name in box.cfg: %s.', err)
+    end
+    return ok
+end
+
+local function names_on_name_set(name)
+    names_state.config:_alert_drop(name)
+
+    local config_rs_name = names_state.config._configdata._replicaset_name
+    local config_inst_name = names_state.config._configdata._instance_name
+    if name == config_rs_name then
+        names_box_cfg({replicaset_name = name})
+    elseif name == config_inst_name then
+        names_box_cfg({instance_name = name})
+    end
+
+    names_check_and_clean()
+end
+
+local function names_schema_on_replace(old, new)
+    if old == nil and new and new[1] == 'replicaset_name' then
+        box.on_commit(function()
+            schedule_task(names_on_name_set, new[2])
+        end)
+    end
+end
+
+local function missing_names_is_empty(missing_names, replicaset_name)
+    return not missing_names[replicaset_name] and
+           table.equals(missing_names._peers, {})
+end
+
+local function names_on_rw_transit()
+    local configdata = names_state.config._configdata
+    local replicaset_name = configdata._replicaset_name
+    local missing_names = configdata:missing_names()
+
+    if missing_names_is_empty(missing_names, replicaset_name) then
+        -- Somebody have done work for us, nothing to update.
+        return
+    end
+
+    box.begin()
+    -- Set replicaset_name.
+    if missing_names[replicaset_name] ~= nil then
+        box.space._schema:insert{'replicaset_name', replicaset_name}
+    end
+
+    -- Set names for all instances in the replicaset.
+    for name, uuid in pairs(missing_names._peers) do
+        if uuid ~= 'unknown' then
+            local tuple = box.space._cluster.index.uuid:select(uuid)
+            box.space._cluster:update(tuple[1][1], {{'=', 3, name}})
+        end
+    end
+    box.commit()
+end
+
+local function names_rw_watcher()
+    return box.watch('box.status', function(_, status)
+        -- It's ok, if names_on_rw_transit will be triggered
+        -- several times. It's NoOp after first execution.
+        if status.is_ro == false then
+            schedule_task(names_on_rw_transit)
+        end
+    end)
+end
+
+local function names_cluster_on_replace(old, new)
+    -- Ignore insert of a new replica. Every new replica will have
+    -- name set, as it may join to a replicaset only by bootstrap, which
+    -- means that config will pass instance_name to box.cfg. If user joins
+    -- replica without config module, we consider he understands, what he's
+    -- doing and don't automatically set instance_name.
+    if old == nil then
+        return
+    end
+
+    -- Name may be nil, if e.g. UUID have not been passed to config.
+    -- In such case alert was not done, it's safe to ignore such case.
+    local instance_name = nil
+    if new == nil then
+        instance_name = names_state.config._configdata:peer_name_by_uuid(old[2])
+    elseif old[3] == nil then
+        instance_name = new[3]
+    end
+
+    if instance_name ~= nil then
+        box.on_commit(function()
+            schedule_task(names_on_name_set, instance_name)
+        end)
+    end
+end
+
+local function no_missing_names_alerts(config)
+    local configdata = config._configdata
+    if config._alerts[configdata._replicaset_name] ~= nil then
+        return false
+    end
+
+    local peers = configdata:peers()
+    for _, name in ipairs(peers) do
+        if config._alerts[name] ~= nil then
+            return false
+        end
+    end
+
+    return true
+end
+
+names_check_and_clean = function()
+    if no_missing_names_alerts(names_state.config) then
+        names_state.is_configured = false
+
+        box.space._schema:on_replace(nil, names_schema_on_replace)
+        box.space._cluster:on_replace(nil, names_cluster_on_replace)
+
+        if names_state.rw_watcher ~= nil then
+            names_state.rw_watcher:unregister()
+        end
+    end
+end
+
+local function names_apply(config, missing_names)
+    -- names_state.config should be updated, as all triggers rely on configdata,
+    -- saved in it. configdata may be different from the one, we already have.
+    names_state.config = config
+
+    -- Even if everything is configured we try to make alerts one
+    -- more time, as new instances without names may be found.
+    names_alert_missing(config, missing_names)
+    if names_state.is_configured then
+        -- All triggers are already configured, nothing to do, but wait.
+        return
+    end
+
+    box.space._schema:on_replace(names_schema_on_replace)
+    box.space._cluster:on_replace(names_cluster_on_replace)
+
+    -- Wait for rw state.
+    names_state.rw_watcher = names_rw_watcher()
+    names_state.is_configured = true
 end
 
 -- Returns nothing or {needs_retry = true}.
@@ -285,10 +482,34 @@ local function apply(config)
     -- mix instances with data from different replicasets into one
     -- replicaset.
     local names = configdata:names()
-    box_cfg.instance_name = names.instance_name
-    box_cfg.replicaset_name = names.replicaset_name
     box_cfg.instance_uuid = names.instance_uuid
     box_cfg.replicaset_uuid = names.replicaset_uuid
+
+    -- Names are applied only if they're already in snap file.
+    -- Otherwise, master must apply names after box.cfg asynchronously.
+    local missing_names = configdata:missing_names()
+    if not missing_names._peers[names.instance_name] then
+        box_cfg.instance_name = names.instance_name
+    end
+    if not missing_names[names.replicaset_name] then
+        box_cfg.replicaset_name = names.replicaset_name
+    end
+    if not missing_names_is_empty(missing_names, names.replicaset_name) then
+        if is_startup then
+            local on_schema_init
+            -- on_schema init trigger isn't deleted, as it's executed only once.
+            on_schema_init = box.ctl.on_schema_init(function()
+                -- missing_names cannot be gathered inside on_schema_init
+                -- trigger, as box.cfg is already considered configured but
+                -- box.info is still not properly initialized.
+                names_apply(config, missing_names)
+                box.ctl.on_schema_init(nil, on_schema_init)
+            end)
+        else
+            -- Note, that we try to find new missing names on every reload.
+            names_apply(config, missing_names)
+        end
+    end
 
     -- Set bootstrap_leader option.
     box_cfg.bootstrap_leader = configdata:bootstrap_leader()
