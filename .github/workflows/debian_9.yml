@@ -34,9 +34,7 @@ jobs:
   debian_9:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'full-ci' label is set.
-    if: github.repository == 'tarantool/tarantool' &&
-        ( github.event_name != 'pull_request' ||
-          contains(github.event.pull_request.labels.*.name, 'full-ci') )
+    if: github.repository == 'tarantool/tarantool'
 
     runs-on: ubuntu-20.04-self-hosted
 
