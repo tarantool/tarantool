@@ -111,13 +111,17 @@ end
 
 function methods.sharding(self)
     local sharding = {}
-    for _, group in pairs(self._cconfig.groups) do
+    for group_name, group in pairs(self._cconfig.groups) do
         for replicaset_name, value in pairs(group.replicasets) do
             local lock
             local replicaset_uuid
             local replicaset_cfg = {}
             for instance_name, _ in pairs(value.instances) do
-                local vars = {instance_name = instance_name}
+                local vars = {
+                    instance_name = instance_name,
+                    replicaset_name = replicaset_name,
+                    group_name = group_name,
+                }
                 local iconfig = cluster_config:instantiate(self._cconfig,
                                                            instance_name)
                 iconfig = instance_config:apply_default(iconfig)
@@ -366,19 +370,25 @@ local function validate_names(saved_names, config_names)
 end
 
 local function new(iconfig, cconfig, instance_name)
+    -- Find myself in a cluster config, determine peers in the same
+    -- replicaset.
+    local found = cluster_config:find_instance(cconfig, instance_name)
+    assert(found ~= nil)
+
     -- Precalculate configuration with applied defaults.
     local iconfig_def = instance_config:apply_default(iconfig)
 
     -- Substitute {{ instance_name }} with actual instance name in
     -- the original config and in the config with defaults.
-    local vars = {instance_name = instance_name}
+    --
+    -- The same for {{ replicaset_name }} and {{ group_name }}.
+    local vars = {
+        instance_name = instance_name,
+        replicaset_name = found.replicaset_name,
+        group_name = found.group_name,
+    }
     iconfig = instance_config:apply_vars(iconfig, vars)
     iconfig_def = instance_config:apply_vars(iconfig_def, vars)
-
-    -- Find myself in a cluster config, determine peers in the same
-    -- replicaset.
-    local found = cluster_config:find_instance(cconfig, instance_name)
-    assert(found ~= nil)
 
     local replicaset_uuid = instance_config:get(iconfig_def,
         'database.replicaset_uuid')
@@ -401,7 +411,14 @@ local function new(iconfig, cconfig, instance_name)
 
         -- Substitute variables according to the instance name
         -- of the peer.
-        local peer_vars = {instance_name = peer_name}
+        --
+        -- The replicaset and group names are same as for the
+        -- current instance.
+        local peer_vars = {
+            instance_name = peer_name,
+            replicaset_name = found.replicaset_name,
+            group_name = found.group_name,
+        }
         peer_iconfig = instance_config:apply_vars(peer_iconfig, peer_vars)
         peer_iconfig_def = instance_config:apply_vars(peer_iconfig_def,
             peer_vars)
