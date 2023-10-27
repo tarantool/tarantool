@@ -1,4 +1,3 @@
-local msgpack = require('msgpack')
 local net = require('net.box')
 local server = require('luatest.server')
 local socket = require('socket')
@@ -7,39 +6,37 @@ local t = require('luatest')
 
 local g = t.group()
 
-local IPROTO_REQUEST_TYPE = 0
-local IPROTO_TYPE_ERROR = bit.lshift(1, 15)
-local IPROTO_AUTH = 7
-local IPROTO_TUPLE = 33
-local IPROTO_USER = 35
-local IPROTO_ERROR = 49
-
 -- Opens a new connection and sends IPROTO_AUTH request.
 -- Returns {code, error}
 local function auth(sock_path, user, tuple)
-    local hdr = msgpack.encode({[IPROTO_REQUEST_TYPE] = IPROTO_AUTH})
-    local body = msgpack.encode({
-        [IPROTO_USER] = user,
-        [IPROTO_TUPLE] = tuple,
-    })
-    local len = hdr:len() + body:len()
-    t.assert_lt(len, 256)
     local s = socket.tcp_connect('unix/', sock_path)
-    local data = s:read(128) -- greeting
-    t.assert_equals(#data, 128)
-    data = '\xce\00\00\00' .. string.char(len) .. hdr .. body
-    t.assert_equals(s:write(data), #data) -- request
-    data = s:read(5) -- fixheader
-    t.assert_equals(#data, 5)
-    len = msgpack.decode(data)
-    data = s:read(len) -- response
-    t.assert_equals(#data, len)
+    local greeting = s:read(box.iproto.GREETING_SIZE)
+    greeting = box.iproto.decode_greeting(greeting)
+    t.assert_covers(greeting, {protocol = 'Binary'})
+    local request = box.iproto.encode_packet({
+        sync = 123,
+        request_type = box.iproto.type.AUTH,
+    }, {
+        user_name = user,
+        tuple = tuple,
+    })
+    t.assert_equals(s:write(request), #request)
+    local response = ''
+    local header, body
+    repeat
+        header, body = box.iproto.decode_packet(response)
+        if header == nil then
+            local size = body
+            local data = s:read(size)
+            t.assert_is_not(data)
+            response = response .. data
+        end
+    until header ~= nil
     s:close()
-    hdr, len = msgpack.decode(data)
-    body = msgpack.decode(data, len)
+    t.assert_equals(header.sync, 123)
     return {
-        bit.band(hdr[IPROTO_REQUEST_TYPE], bit.bnot(IPROTO_TYPE_ERROR)),
-        body[IPROTO_ERROR],
+        bit.band(header.request_type, bit.bnot(box.iproto.type.TYPE_ERROR)),
+        body.error_24,
     }
 end
 

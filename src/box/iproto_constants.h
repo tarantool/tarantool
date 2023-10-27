@@ -43,8 +43,10 @@ extern "C" {
 enum {
 	/** Maximal iproto package body length (2GiB) */
 	IPROTO_BODY_LEN_MAX = 2147483648UL,
-	/* Maximal length of text handshake (greeting) */
+	/** Size of iproto greeting message. */
 	IPROTO_GREETING_SIZE = 128,
+	/** Size of salt sent in iproto greeting message. */
+	IPROTO_SALT_SIZE = 32,
 	/** marker + len + prev crc32 + cur crc32 + (padding) */
 	XLOG_FIXHEADER_SIZE = 19
 };
