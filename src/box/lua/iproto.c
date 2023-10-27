@@ -12,12 +12,18 @@
 #include "box/iproto_constants.h"
 #include "box/iproto_features.h"
 #include "box/user.h"
+#include "box/xrow.h"
+
+#include "version.h"
 
 #include "core/assoc.h"
 #include "core/iostream.h"
 #include "core/fiber.h"
 #include "core/mp_ctx.h"
+#include "core/random.h"
+
 #include "core/tt_static.h"
+#include "core/tt_uuid.h"
 
 #include "lua/msgpack.h"
 #include "lua/utils.h"
@@ -150,6 +156,12 @@ push_iproto_raft_keys_enum(struct lua_State *L)
 static void
 push_iproto_constants(struct lua_State *L)
 {
+	lua_pushinteger(L, IPROTO_GREETING_SIZE);
+	lua_setfield(L, -2, "GREETING_SIZE");
+	lua_pushinteger(L, GREETING_PROTOCOL_LEN_MAX);
+	lua_setfield(L, -2, "GREETING_PROTOCOL_LEN_MAX");
+	lua_pushinteger(L, GREETING_SALT_LEN_MAX);
+	lua_setfield(L, -2, "GREETING_SALT_LEN_MAX");
 	push_iproto_flag_enum(L);
 	push_iproto_key_enum(L);
 	push_iproto_metadata_key_enum(L);
@@ -381,6 +393,283 @@ lbox_iproto_override(struct lua_State *L)
 }
 
 /**
+ * Encodes Tarantool greeting message.
+ *
+ * Takes a table with the following fields that will be used in
+ * the greeting (all fields are optional):
+ *  - version: Tarantool version string in the form 'X.Y.Z'.
+ *    Default: current Tarantool version.
+ *  - uuid: Instance UUID string. Default: Some random UUID.
+ *    (We don't use INSTANCE_UUID because it may be uninitialized.)
+ *  - salt: Salt string (used for authentication).
+ *    Default: Some random salt string.
+ *
+ * Returns the encoded greeting message string on success.
+ * Raises an error on invalid arguments.
+ */
+static int
+lbox_iproto_encode_greeting(struct lua_State *L)
+{
+	int n_args = lua_gettop(L);
+	if (n_args == 0) {
+		lua_newtable(L);
+	} else if (n_args != 1 || lua_type(L, 1) != LUA_TTABLE) {
+		return luaL_error(L, "Usage: box.iproto.encode_greeting({"
+				  "version = x, uuid = x, salt = x})");
+	}
+
+	uint32_t version;
+	lua_getfield(L, 1, "version");
+	if (lua_isnil(L, -1)) {
+		version = tarantool_version_id();
+	} else if (lua_type(L, -1) == LUA_TSTRING) {
+		const char *str = lua_tostring(L, -1);
+		unsigned major, minor, patch;
+		if (sscanf(str, "%u.%u.%u", &major, &minor, &patch) != 3)
+			return luaL_error(L, "cannot parse version string");
+		version = version_id(major, minor, patch);
+	} else {
+		return luaL_error(L, "version must be a string");
+	}
+	lua_pop(L, 1); /* version */
+
+	struct tt_uuid uuid;
+	lua_getfield(L, 1, "uuid");
+	if (lua_isnil(L, -1)) {
+		tt_uuid_create(&uuid);
+	} else if (lua_type(L, -1) == LUA_TSTRING) {
+		const char *uuid_str = lua_tostring(L, -1);
+		if (tt_uuid_from_string(uuid_str, &uuid) != 0)
+			return luaL_error(L, "cannot parse uuid string");
+	} else {
+		return luaL_error(L, "uuid must be a string");
+	}
+	lua_pop(L, 1); /* uuid */
+
+	uint32_t salt_len;
+	char salt[GREETING_SALT_LEN_MAX];
+	lua_getfield(L, 1, "salt");
+	if (lua_isnil(L, -1)) {
+		salt_len = IPROTO_SALT_SIZE;
+		random_bytes(salt, IPROTO_SALT_SIZE);
+	} else if (lua_type(L, -1) == LUA_TSTRING) {
+		size_t len;
+		const char *str = lua_tolstring(L, -1, &len);
+		if (len > GREETING_SALT_LEN_MAX)
+			return luaL_error(L, "salt string length "
+					  "cannot be greater than %d",
+					  GREETING_SALT_LEN_MAX);
+		salt_len = len;
+		memcpy(salt, str, len);
+	} else {
+		return luaL_error(L, "salt must be a string");
+	}
+	lua_pop(L, 1); /* salt */
+
+	char greeting_str[IPROTO_GREETING_SIZE];
+	greeting_encode(greeting_str, version, &uuid, salt, salt_len);
+
+	lua_pushlstring(L, greeting_str, sizeof(greeting_str));
+	return 1;
+}
+
+/**
+ * Decodes Tarantool greeting message.
+ *
+ * Takes a greeting message string and returns a table with the following
+ * fields on success:
+ *  - version: Tarantool version string in the form 'X.Y.Z'.
+ *  - protocol: Tarantool protocol string ("Binary" for IPROTO).
+ *  - uuid: Instance UUID string.
+ *  - salt: Salt string (used for authentication).
+ *
+ * Raises an error on invalid input.
+ */
+static int
+lbox_iproto_decode_greeting(struct lua_State *L)
+{
+	int n_args = lua_gettop(L);
+	if (n_args != 1 || lua_type(L, 1) != LUA_TSTRING) {
+		return luaL_error(
+			L, "Usage: box.iproto.decode_greeting(string)");
+	}
+
+	size_t len;
+	const char *greeting_str = lua_tolstring(L, 1, &len);
+	if (len != IPROTO_GREETING_SIZE) {
+		return luaL_error(L, "greeting length must equal %d",
+				  IPROTO_GREETING_SIZE);
+	}
+	struct greeting greeting;
+	if (greeting_decode(greeting_str, &greeting) != 0)
+		return luaL_error(L, "cannot parse greeting string");
+
+	lua_newtable(L);
+	lua_pushfstring(L, "%u.%u.%u",
+			version_id_major(greeting.version_id),
+			version_id_minor(greeting.version_id),
+			version_id_patch(greeting.version_id));
+	lua_setfield(L, -2, "version");
+	lua_pushstring(L, greeting.protocol);
+	lua_setfield(L, -2, "protocol");
+	luaT_pushuuidstr(L, &greeting.uuid);
+	lua_setfield(L, -2, "uuid");
+	lua_pushlstring(L, greeting.salt, greeting.salt_len);
+	lua_setfield(L, -2, "salt");
+	return 1;
+}
+
+/**
+ * Encodes IPROTO packet.
+ *
+ * Takes a packet header and optionally a body given as a string or a table.
+ * If an argument is a table, it will be encoded in MsgPack using the IPROTO
+ * key translation table. If an argument is a string, it's supposed to store
+ * valid MsgPack data and will be copied as is.
+ *
+ * On success, returns a string storing the encoded IPROTO packet.
+ * On failure, raises a Lua error.
+ */
+static int
+lbox_iproto_encode_packet(struct lua_State *L)
+{
+	int n_args = lua_gettop(L);
+	if (n_args != 1 && n_args != 2)
+		return luaL_error(
+			L, "Usage: box.iproto.encode_packet(header[, body])");
+	int header_type = lua_type(L, 1);
+	if (header_type != LUA_TSTRING && header_type != LUA_TTABLE)
+		return luaL_error(L, "header must be a string or a table");
+	int body_type = lua_type(L, 2);
+	if (body_type != LUA_TSTRING && body_type != LUA_TTABLE &&
+	    body_type != LUA_TNONE && body_type != LUA_TNIL)
+		return luaL_error(L, "body must be a string or a table");
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	struct mpstream stream;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      mpstream_panic_cb, NULL);
+	size_t fixheader_size = mp_sizeof_uint(UINT32_MAX);
+	char *fixheader = mpstream_reserve(&stream, fixheader_size);
+	mpstream_advance(&stream, fixheader_size);
+	struct mp_ctx ctx;
+	mp_ctx_create_default(&ctx, iproto_key_translation);
+	if (header_type == LUA_TTABLE) {
+		int rc = luamp_encode_with_ctx(L, luaL_msgpack_default,
+					       &stream, 1, &ctx, NULL);
+		if (rc != 0)
+			goto error;
+	} else if (header_type == LUA_TSTRING) {
+		size_t size;
+		const char *data = lua_tolstring(L, 1, &size);
+		mpstream_memcpy(&stream, data, size);
+	}
+	if (body_type == LUA_TTABLE) {
+		int rc = luamp_encode_with_ctx(L, luaL_msgpack_default,
+					       &stream, 2, &ctx, NULL);
+		if (rc != 0)
+			goto error;
+	} else if (body_type == LUA_TSTRING) {
+		size_t size;
+		const char *data = lua_tolstring(L, 2, &size);
+		mpstream_memcpy(&stream, data, size);
+	}
+	mpstream_flush(&stream);
+	size_t data_size = region_used(region) - region_svp;
+	*fixheader = 0xce;
+	mp_store_u32(fixheader + 1, data_size - fixheader_size);
+	char *data = xregion_join(region, data_size);
+	lua_pushlstring(L, data, data_size);
+	region_truncate(region, region_svp);
+	return 1;
+error:
+	region_truncate(region, region_svp);
+	return luaT_error(L);
+}
+
+/**
+ * Decodes IPROTO packet.
+ *
+ * Takes a string that contains an encoded IPROTO packet and optionally
+ * the position in the string to start decoding from (if the position is
+ * omitted, the function will start decoding from the beginning of the
+ * input string, i.e. assume that the position equals 1).
+ *
+ * On success returns three values: the decoded packet header (never nil),
+ * the decoded packet body (may be nil), and the position of the following
+ * packet in the string. The header and body are returned as MsgPack objects.
+ *
+ * If the packet is truncated, returns nil and the minimal number of bytes
+ * necessary to decode the packet.
+ *
+ * On failure, raises a Lua error.
+ */
+static int
+lbox_iproto_decode_packet(struct lua_State *L)
+{
+	int n_args = lua_gettop(L);
+	if (n_args == 0 || n_args > 2 ||
+	    lua_type(L, 1) != LUA_TSTRING ||
+	    (n_args == 2 && lua_type(L, 2) != LUA_TNUMBER))
+		return luaL_error(
+			L, "Usage: box.iproto.decode_packet(string[, pos])");
+
+	size_t data_size;
+	const char *data = lua_tolstring(L, 1, &data_size);
+	const char *data_end = data + data_size;
+	const char *p = data;
+	if (n_args == 2) {
+		int pos = lua_tointeger(L, 2);
+		if (pos <= 0)
+			return luaL_error(L, "position must be greater than 0");
+		p += pos - 1;
+	}
+	ptrdiff_t n = p - data_end + 1;
+	if (n > 0)
+		goto truncated_input;
+	if (mp_typeof(*p) != MP_UINT) {
+		diag_set(ClientError, ER_PROTOCOL, "invalid fixheader");
+		return luaT_error(L);
+	}
+	n = mp_check_uint(p, data_end);
+	if (n > 0)
+		goto truncated_input;
+	size_t packet_size = mp_decode_uint(&p);
+	if (packet_size == 0) {
+		diag_set(ClientError, ER_PROTOCOL, "invalid fixheader");
+		return luaT_error(L);
+	}
+	const char *packet_end = p + packet_size;
+	n = packet_end - data_end;
+	if (n > 0)
+		goto truncated_input;
+	const char *header = p;
+	if (mp_check(&p, packet_end) != 0)
+		return luaT_error(L);
+	const char *header_end = p;
+	const char *body = p;
+	if (p != packet_end && mp_check_exact(&p, packet_end) != 0)
+		return luaT_error(L);
+	const char *body_end = p;
+	struct mp_ctx ctx;
+	mp_ctx_create_default(&ctx, iproto_key_translation);
+	luamp_push_with_ctx(L, header, header_end, &ctx);
+	if (body != body_end) {
+		mp_ctx_create_default(&ctx, iproto_key_translation);
+		luamp_push_with_ctx(L, body, body_end, &ctx);
+	} else {
+		lua_pushnil(L);
+	}
+	lua_pushnumber(L, packet_end - data + 1);
+	return 3;
+truncated_input:
+	assert(n > 0);
+	lua_pushnil(L);
+	lua_pushnumber(L, n);
+	return 2;
+}
+
+/**
  * Initializes module for working with Tarantool's network subsystem.
  */
 void
@@ -393,6 +682,10 @@ box_lua_iproto_init(struct lua_State *L)
 	static const struct luaL_Reg funcs[] = {
 		{"send", lbox_iproto_send},
 		{"override", lbox_iproto_override},
+		{"encode_greeting", lbox_iproto_encode_greeting},
+		{"decode_greeting", lbox_iproto_decode_greeting},
+		{"encode_packet", lbox_iproto_encode_packet},
+		{"decode_packet", lbox_iproto_decode_packet},
 		{NULL, NULL}
 	};
 	luaL_setfuncs(L, funcs, 0);

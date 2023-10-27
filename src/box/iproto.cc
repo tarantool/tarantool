@@ -79,7 +79,6 @@
 #include "mpstream/mpstream.h"
 
 enum {
-	IPROTO_SALT_SIZE = 32,
 	IPROTO_PACKET_SIZE_MAX = 2UL * 1024 * 1024 * 1024,
 };
 
