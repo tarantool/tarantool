@@ -101,7 +101,8 @@ local function names_alert_missing(config, missing_names)
     end
 
     local unknown_msg = 'box_cfg.apply: instance %s is unknown. Possibly ' ..
-                        'instance_name is not set and UUID is not specified'
+                        'instance_name is not set in database and UUID is ' ..
+                        'not specified. Or instance have not joined yet.'
     for name, uuid in pairs(missing_names._peers) do
         local warning
         if uuid == 'unknown' then
@@ -213,22 +214,11 @@ local function names_schema_upgrade_on_replace(old, new)
 end
 
 local function names_cluster_on_replace(old, new)
-    -- Ignore insert of a new replica. Every new replica will have
-    -- name set, as it may join to a replicaset only by bootstrap, which
-    -- means that config will pass instance_name to box.cfg. If user joins
-    -- replica without config module, we consider he understands, what he's
-    -- doing and don't automatically set instance_name.
-    if old == nil then
-        return
-    end
-
-    -- Name may be nil, if e.g. UUID have not been passed to config.
-    -- In such case alert was not done, it's safe to ignore such case.
     local instance_name = nil
-    if new == nil then
-        instance_name = names_state.config._configdata:peer_name_by_uuid(old[2])
-    elseif old[3] == nil then
+    if new ~= nil then
         instance_name = new[3]
+    elseif old ~= nil then
+        instance_name = names_state.config._configdata:peer_name_by_uuid(old[2])
     end
 
     if instance_name ~= nil then
