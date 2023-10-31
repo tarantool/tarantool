@@ -2153,13 +2153,13 @@ from_tt_list
         def create_predicate(gdb_condition, entry_info):
             substitutions = (
                 ('$index', lambda item: str(item[0])),
-                ('$item', lambda item: '(({}*){})'.format(
+                ('$item', lambda item: '(({}*){:#x})'.format(
                                 lst.item_gdb_type.tag,
                                 int_from_address(item[1])
                             )),
-                ('$entry', lambda item: '(({}*){})'.format(
+                ('$entry', lambda item: '(({}*){:#x})'.format(
                                 entry_info.container_type.tag,
-                                int_from_address(item[1])
+                                int_from_address(entry_info.container_from_field(item[1]))
                             )),
             )
             substitutions = filter(lambda s: gdb_condition.find(s[0]) != -1, substitutions)
