@@ -395,12 +395,18 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp,
 	struct stailq rollback;
 	stailq_cut_tail(&txn->stmts, svp, &rollback);
 	stailq_reverse(&rollback);
-	if (run_triggers && txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
-		stmt = stailq_first_entry(&rollback, struct txn_stmt, next);
-		if (trigger_run(&txn->on_rollback, stmt) != 0) {
-			diag_log();
-			panic("transaction rollback trigger failed");
+	if (run_triggers) {
+		if (txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
+			stmt = stailq_first_entry(&rollback, struct txn_stmt,
+						  next);
+			if (trigger_run(&txn->on_rollback, stmt) != 0) {
+				diag_log();
+				panic("transaction rollback trigger failed");
+			}
 		}
+		if (txn_event_on_rollback_to_svp_run_triggers(txn,
+							      &rollback) != 0)
+			diag_log();
 	}
 	stailq_foreach_entry(stmt, &rollback, next) {
 		txn_rollback_one_stmt(txn, stmt);
@@ -525,6 +531,8 @@ txn_begin(void)
 	trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
 	trigger_create(&txn->fiber_on_stop, txn_on_stop, NULL, NULL);
 	trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
+	for (size_t i = 0; i < lengthof(txn->txn_events); i++)
+		txn_event_init(&txn->txn_events[i]);
 	/*
 	 * By default, all transactions may yield.
 	 * It's a responsibility of an engine to disable yields
@@ -642,6 +650,15 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 		txn_update_row_counts(txn, stmt, 1);
 	}
 	/*
+	 * If there are transactional event triggers set on `stmt->space', save
+	 * them in the `txn' for further running, to avoid another loop through
+	 * all the statements on commit/rollback of the transaction.
+	 */
+	if (stmt->space != NULL) {
+		for (size_t i = 0; i < lengthof(txn->txn_events); i++)
+			txn_event_add_space(txn, stmt->space, i);
+	}
+	/*
 	 * If there are triggers, and they are not disabled, and
 	 * the statement found any rows, run triggers.
 	 * XXX:
@@ -732,6 +749,8 @@ txn_complete_fail(struct txn *txn)
 		/* Commit won't happen after rollback. */
 		trigger_destroy(&txn->on_commit);
 	}
+	if (txn_event_on_rollback_run_triggers(txn) != 0)
+		diag_log();
 	txn_free_or_wakeup(txn);
 	rmean_collect(rmean_box, IPROTO_ROLLBACK, 1);
 }
@@ -762,6 +781,8 @@ txn_complete_success(struct txn *txn)
 		/* Rollback won't happen after commit. */
 		trigger_destroy(&txn->on_rollback);
 	}
+	if (txn_event_on_commit_run_triggers(txn) != 0)
+		diag_log();
 	txn_free_or_wakeup(txn);
 	rmean_collect(rmean_box, IPROTO_COMMIT, 1);
 }
@@ -943,8 +964,8 @@ txn_journal_entry_new(struct txn *txn)
 	return req;
 }
 
-/*
- * Prepare a transaction using engines.
+/**
+ * Prepare a transaction using engines, run triggers, etc.
  */
 static int
 txn_prepare(struct txn *txn)
@@ -956,6 +977,16 @@ txn_prepare(struct txn *txn)
 		ev_timer_stop(loop(), txn->rollback_timer);
 		txn->rollback_timer = NULL;
 	}
+
+	if (txn_event_before_commit_run_triggers(txn) != 0) {
+		txn->status = TXN_ABORTED;
+		return -1;
+	}
+	/*
+	 * Transaction can be aborted by a yield in the `before_commit' trigger.
+	 */
+	if (txn_check_can_continue(txn) != 0)
+		return -1;
 
 	assert(txn->psn == 0);
 	/* psn must be set before calling engine handlers. */

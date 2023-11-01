@@ -40,6 +40,7 @@
 #include "diag.h"
 #include "iproto_constants.h"
 #include "core/event.h"
+#include "txn_event_trigger.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -189,6 +190,8 @@ struct space {
 	struct space_event before_replace_event;
 	/** User-defined on_replace triggers. */
 	struct space_event on_replace_event;
+	/** User-defined transactional event triggers. */
+	struct space_event txn_events[txn_event_id_MAX];
 	/** SQL Trigger list. */
 	struct sql_trigger *sql_triggers;
 	/**
@@ -548,14 +551,23 @@ int
 access_check_space(struct space *space, user_access_t access);
 
 /**
+ * Check if the `space_event' has registered triggers.
+ */
+static inline bool
+space_event_has_triggers(struct space_event *space_event)
+{
+	return event_has_triggers(space_event->by_id) ||
+	       event_has_triggers(space_event->by_name);
+}
+
+/**
  * Check if the space has registered on_replace triggers.
  */
 static inline bool
 space_has_on_replace_triggers(struct space *space)
 {
 	return !rlist_empty(&space->on_replace) ||
-	       event_has_triggers(space->on_replace_event.by_id) ||
-	       event_has_triggers(space->on_replace_event.by_name);
+	       space_event_has_triggers(&space->on_replace_event);
 }
 
 /**
@@ -565,8 +577,7 @@ static inline bool
 space_has_before_replace_triggers(struct space *space)
 {
 	return !rlist_empty(&space->before_replace) ||
-	       event_has_triggers(space->before_replace_event.by_id) ||
-	       event_has_triggers(space->before_replace_event.by_name);
+	       space_event_has_triggers(&space->before_replace_event);
 }
 
 /**

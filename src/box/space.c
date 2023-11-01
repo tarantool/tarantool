@@ -327,12 +327,51 @@ space_unpin_defaults(struct space *space)
 }
 
 /**
- * Set all the events associated with space: on_replace and before_replace,
+ * Setup each event in `events', associated with the `space' by id and by name.
+ */
+static void
+space_set_events_impl(struct space *space, struct space_event *events[],
+		      size_t event_count, const char *const by_id_fmt[],
+		      const char *const by_name_fmt[])
+{
+	size_t space_id_len = snprintf(NULL, 0, "%u", space_id(space));
+	size_t space_name_len = strlen(space_name(space));
+
+	for (size_t i = 0; i < event_count; ++i) {
+		size_t region_svp = region_used(&fiber()->gc);
+
+		/* Set event by id. */
+		size_t buf_size = strlen(by_id_fmt[i]) + space_id_len
+				  - strlen("%u") + 1;
+		char *event_name = xregion_alloc(&fiber()->gc, buf_size);
+		snprintf(event_name, buf_size, by_id_fmt[i], space_id(space));
+		struct event **event = &events[i]->by_id;
+		assert(*event == NULL);
+		*event = event_get(event_name, true);
+		event_ref(*event);
+
+		/* Set event by name. */
+		buf_size = strlen(by_name_fmt[i]) + space_name_len
+			   - strlen("%s") + 1;
+		event_name = xregion_alloc(&fiber()->gc, buf_size);
+		snprintf(event_name, buf_size, by_name_fmt[i],
+			 space_name(space));
+		event = &events[i]->by_name;
+		assert(*event == NULL);
+		*event = event_get(event_name, true);
+		event_ref(*event);
+
+		region_truncate(&fiber()->gc, region_svp);
+	}
+}
+
+/**
+ * Set DML events associated with the space: on_replace and before_replace,
  * bound by name and by id. If argument is_on_recovery is true, recovery events
  * are set instead of regular ones.
  */
 static void
-space_set_events(struct space *space, bool is_on_recovery)
+space_set_dml_events(struct space *space, bool is_on_recovery)
 {
 	assert(space->def != NULL);
 	/*
@@ -346,62 +385,99 @@ space_set_events(struct space *space, bool is_on_recovery)
 	};
 	/*
 	 * Format strings for names of events associated with the space by id
-	 * and by name. Since space has several versions of each replace trigger
+	 * and by name. The space has several versions of each replace trigger
 	 * (for example, on_recovery_replace which is fired only on recovery and
-	 * on_replace which is fired after recovery), name of replace operation
-	 * is an argument for format string.
+	 * on_replace which is fired after recovery).
 	 */
-	static const char * const event_by_id_fmt[] = {
-		"box.space[%u].on_%s",
-		"box.space[%u].before_%s",
+	static const char *const event_by_id_recovery_fmt[] = {
+		"box.space[%u].on_recovery_replace",
+		"box.space[%u].before_recovery_replace",
 	};
-	static const char * const event_by_name_fmt[] = {
-		"box.space.%s.on_%s",
-		"box.space.%s.before_%s",
+	static const char *const event_by_id_fmt[] = {
+		"box.space[%u].on_replace",
+		"box.space[%u].before_replace",
 	};
+	static const char *const event_by_name_recovery_fmt[] = {
+		"box.space.%s.on_recovery_replace",
+		"box.space.%s.before_recovery_replace",
+	};
+	static const char *const event_by_name_fmt[] = {
+		"box.space.%s.on_replace",
+		"box.space.%s.before_replace",
+	};
+	static_assert(lengthof(space_events) ==
+		      lengthof(event_by_id_recovery_fmt),
+		      "Every space event must be covered with name");
 	static_assert(lengthof(space_events) == lengthof(event_by_id_fmt),
+		      "Every space event must be covered with name");
+	static_assert(lengthof(space_events) ==
+		      lengthof(event_by_name_recovery_fmt),
 		      "Every space event must be covered with name");
 	static_assert(lengthof(space_events) == lengthof(event_by_name_fmt),
 		      "Every space event must be covered with name");
 
-	const char *replace_name =
-		is_on_recovery ? "recovery_replace" : "replace";
+	const char *const *by_id_fmt =
+		is_on_recovery ? event_by_id_recovery_fmt : event_by_id_fmt;
+	const char *const *by_name_fmt =
+		is_on_recovery ? event_by_name_recovery_fmt : event_by_name_fmt;
+
 	space->run_recovery_triggers = is_on_recovery;
+
+	space_set_events_impl(space, space_events, lengthof(space_events),
+			      by_id_fmt, by_name_fmt);
+}
+
+/**
+ * Set transactional events associated with the space, bound by space name and
+ * by space id.
+ */
+static void
+space_set_txn_events(struct space *space)
+{
+	assert(space->def != NULL);
 	/*
-	 * Allocate buffer for event names. We make an assumption that all
-	 * format strings for event names are limited by the constant below.
-	 * This assumption is tested in the loop at the end of the function.
-	 * Another assumption is that string representation of space id is
-	 * limited by another constant below.
+	 * Transactional events associated with the space by id and by name. All
+	 * format strings for event names must be declared in the same order.
 	 */
-	const size_t event_fmt_max_len = 30;
-	const size_t space_id_max_len = 10;
-	const size_t buf_size = event_fmt_max_len + strlen(replace_name) + 1 +
-		MAX(space_id_max_len, strlen(space->def->name)) + 1;
-	size_t region_svp = region_used(&fiber()->gc);
-	char *event_name = xregion_alloc(&fiber()->gc, buf_size);
-	for (size_t i = 0; i < lengthof(space_events); ++i) {
-		/* Test our assumption made during buf_size calculation. */
-		assert(strlen(event_by_name_fmt[i]) <= event_fmt_max_len);
-		assert(strlen(event_by_id_fmt[i]) <= event_fmt_max_len);
+	struct space_event *txn_events[] = {
+		&space->txn_events[TXN_EVENT_BEFORE_COMMIT],
+		&space->txn_events[TXN_EVENT_ON_COMMIT],
+		&space->txn_events[TXN_EVENT_ON_ROLLBACK],
+	};
+	static_assert(lengthof(space->txn_events) == lengthof(txn_events),
+		      "Every txn event must be present in txn_events");
+	/*
+	 * Format strings for event names.
+	 */
+	static const char *const event_by_id_fmt[] = {
+		"box.before_commit.space[%u]",
+		"box.on_commit.space[%u]",
+		"box.on_rollback.space[%u]",
+	};
+	static const char *const event_by_name_fmt[] = {
+		"box.before_commit.space.%s",
+		"box.on_commit.space.%s",
+		"box.on_rollback.space.%s",
+	};
+	static_assert(lengthof(event_by_id_fmt) == lengthof(txn_events),
+		      "Every txn event must be covered with name");
+	static_assert(lengthof(event_by_name_fmt) == lengthof(txn_events),
+		      "Every txn event must be covered with name");
 
-		/* Set event by id. */
-		snprintf(event_name, buf_size, event_by_id_fmt[i],
-			 space->def->id, replace_name);
-		struct event **event = &space_events[i]->by_id;
-		assert(*event == NULL);
-		*event = event_get(event_name, true);
-		event_ref(*event);
+	space_set_events_impl(space, txn_events, lengthof(txn_events),
+			      event_by_id_fmt, event_by_name_fmt);
+}
 
-		/* Set event by name. */
-		snprintf(event_name, buf_size, event_by_name_fmt[i],
-			 space->def->name, replace_name);
-		event = &space_events[i]->by_name;
-		assert(*event == NULL);
-		*event = event_get(event_name, true);
-		event_ref(*event);
-	}
-	region_truncate(&fiber()->gc, region_svp);
+/**
+ * Set all events (DML and transactional) associated with the space, bound by
+ * name and by id. If argument is_on_recovery is true, recovery events are set
+ * instead of regular ones (applicable only to DML events).
+ */
+static void
+space_set_events(struct space *space, bool is_on_recovery)
+{
+	space_set_dml_events(space, is_on_recovery);
+	space_set_txn_events(space);
 }
 
 /**
@@ -410,15 +486,21 @@ space_set_events(struct space *space, bool is_on_recovery)
 static void
 space_reset_events(struct space *space)
 {
-	struct space_event *space_events[] = {
+	struct space_event *space_dml_events[] = {
 		&space->on_replace_event,
 		&space->before_replace_event,
 	};
-	for (size_t i = 0; i < lengthof(space_events); ++i) {
-		event_unref(space_events[i]->by_id);
-		space_events[i]->by_id = NULL;
-		event_unref(space_events[i]->by_name);
-		space_events[i]->by_name = NULL;
+	for (size_t i = 0; i < lengthof(space_dml_events); ++i) {
+		event_unref(space_dml_events[i]->by_id);
+		space_dml_events[i]->by_id = NULL;
+		event_unref(space_dml_events[i]->by_name);
+		space_dml_events[i]->by_name = NULL;
+	}
+	for (size_t i = 0; i < lengthof(space->txn_events); ++i) {
+		event_unref(space->txn_events[i].by_id);
+		space->txn_events[i].by_id = NULL;
+		event_unref(space->txn_events[i].by_name);
+		space->txn_events[i].by_name = NULL;
 	}
 	space->run_recovery_triggers = false;
 }
@@ -799,7 +881,7 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 		else
 			func_adapter_push_null(trigger, &ctx);
 		/* TODO: maybe the space object has to be here */
-		func_adapter_push_str0(trigger, &ctx, stmt->space->def->name);
+		func_adapter_push_str0(trigger, &ctx, space_name(stmt->space));
 		/* Operation type: INSERT/UPDATE/UPSERT/REPLACE/DELETE */
 		func_adapter_push_str0(trigger, &ctx,
 				       iproto_type_name(stmt->type));

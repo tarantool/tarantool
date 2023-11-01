@@ -488,6 +488,8 @@ struct txn {
 	struct trigger fiber_on_stop;
 	/** Commit and rollback triggers. */
 	struct rlist on_commit, on_rollback, on_wal_write;
+	/** User-defined event triggers, bounded by space ID or space name. */
+	struct txn_event txn_events[txn_event_id_MAX];
 	/** List of savepoints to find savepoint by name. */
 	struct rlist savepoints;
 	/**

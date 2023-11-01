@@ -241,6 +241,7 @@ set(box_sources
     port.c
     txn.c
     txn_limbo.c
+    txn_event_trigger.c
     raft.c
     box.cc
     gc.c

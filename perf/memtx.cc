@@ -94,6 +94,7 @@ private:
 		::memtx_tx_manager_init();
 		::event_init();
 
+		::txn_event_trigger_init();
 		::space_cache_init();
 		::user_cache_init();
 		::session_init();
@@ -189,6 +190,7 @@ private:
 
 		memtx->base.vtab->shutdown(&memtx->base);
 		::tuple_free();
+		::txn_event_trigger_free();
 
 		::fiber_free();
 		::memory_free();
