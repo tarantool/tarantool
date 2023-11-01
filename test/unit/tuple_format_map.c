@@ -68,7 +68,7 @@ test_tuple_format_map_only_cache(void)
 	size_t format_data_len[TUPLE_FORMAT_MAP_CACHE_SIZE];
 	uint16_t format_ids[TUPLE_FORMAT_MAP_CACHE_SIZE];
 	for (ssize_t i = 0; i < TUPLE_FORMAT_MAP_CACHE_SIZE; ++i) {
-		char num[4];
+		char num[32];
 		snprintf(num, lengthof(num), "%zu", i);
 		size_t len = mp_format(p, lengthof(buf) - (p - buf),
 				       "[{%s%s}]", "name", num);
@@ -159,7 +159,7 @@ test_tuple_format_map_cache_and_hash_table(void)
 	size_t format_data_len[TUPLE_FORMAT_MAP_CACHE_SIZE + 2];
 	uint16_t format_ids[TUPLE_FORMAT_MAP_CACHE_SIZE + 2];
 	for (ssize_t i = 0; i < TUPLE_FORMAT_MAP_CACHE_SIZE + 2; ++i) {
-		char num[4];
+		char num[32];
 		snprintf(num, lengthof(num), "%zu", i);
 		size_t len = mp_format(p, lengthof(buf) - (p - buf),
 				       "[{%s%s}]", "name", num);
@@ -252,7 +252,7 @@ test_tuple_format_map_duplicate(size_t format_count, size_t add_count)
 	tuple_format_map_create_empty(&map);
 
 	for (size_t i = 0; i < format_count; ++i) {
-		char name[8];
+		char name[32];
 		snprintf(name, lengthof(name), "test%zu", i);
 		char str_format[16];
 		size_t len = mp_format(str_format, lengthof(str_format),
@@ -340,7 +340,7 @@ test_tuple_format_map_decode_from_msgpack(void)
 	header();
 
 	struct tuple_format *format[2];
-	char name[2][8];
+	char name[2][32];
 	for (size_t i = 0; i < lengthof(format); i++) {
 		snprintf(name[i], lengthof(name[i]), "test%zu", i);
 		char str_format[16];
