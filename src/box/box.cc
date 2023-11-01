@@ -5887,6 +5887,7 @@ box_init(void)
 	event_ref(box_on_recovery_state_event);
 	box_on_shutdown_event = event_get("box.ctl.on_shutdown", true);
 	event_ref(box_on_shutdown_event);
+	txn_event_trigger_init();
 	msgpack_init();
 	fiber_cond_create(&ro_cond);
 	auth_init();
@@ -5928,6 +5929,7 @@ box_free(void)
 	sequence_free();
 	event_unref(box_on_recovery_state_event);
 	box_on_recovery_state_event = NULL;
+	txn_event_trigger_free();
 	tuple_free();
 	/* schema_module_free(); */
 	/* session_free(); */
