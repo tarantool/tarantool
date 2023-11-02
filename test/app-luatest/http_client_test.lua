@@ -1112,7 +1112,7 @@ g.test_http_client_io_read_invalid_arg = function(cg)
 
     local ok, err = pcall(io.read, io, -1)
     t.assert_not(ok, 'an error expected', 'first arg error')
-    t.assert_str_contains(err, 'chunk can not be negative')
+    t.assert_str_contains(err, 'chunk size can not be negative')
 
     local ok, err = pcall(io.read, io, function() end)
     t.assert_not(ok, 'an error expected')
@@ -1120,7 +1120,7 @@ g.test_http_client_io_read_invalid_arg = function(cg)
 
     local ok, err = pcall(io.read, io, {chunk = -1})
     t.assert_not(ok, 'an error expected')
-    t.assert_str_contains(err, 'chunk can not be negative')
+    t.assert_str_contains(err, 'chunk size can not be negative')
     io:finish()
 end
 
