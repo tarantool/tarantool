@@ -60,7 +60,7 @@ struct httpc_stat {
  * HTTP Client Environment
  */
 struct httpc_env {
-	/** Curl enviroment. */
+	/** Curl environment. */
 	struct curl_env curl_env;
 	/** Memory pool for requests */
 	struct mempool req_pool;
@@ -99,7 +99,7 @@ struct httpc_request {
 	struct curl_slist *headers;
 	/** Buffer for data send. */
 	struct ibuf send;
-	/** curl resuest. */
+	/** curl request. */
 	struct curl_request curl_request;
 	/** HTTP status code */
 	int status;
