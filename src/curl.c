@@ -69,7 +69,7 @@ curl_multi_process(CURLM *multi, curl_socket_t sockfd, int events)
 	}
 
 	/*
-	 * Check for resuls
+	 * Check for results.
 	 */
 
 	CURLMsg *msg;

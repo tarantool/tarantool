@@ -411,7 +411,7 @@ local function io_read(self, opts, timeout)
     end
 
     if chunk < 0 then
-        error('io:read(): chunk can not be negative')
+        error('io:read(): chunk size can not be negative')
     end
 
     chunk = math.min(chunk, IO_CHUNK_DEFAULT)
