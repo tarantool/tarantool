@@ -1,7 +1,15 @@
 #!/usr/bin/env tarantool
 
 local tap = require('tap')
+local tarantool = require('tarantool')
+
 local test = tap.test('embedded-luarocks')
+
+if tarantool.build.linking == 'dynamic' then
+    test:plan(1)
+    test:skip('luarocks is not embedded in dynamic build')
+    os.exit(0)
+end
 
 test:plan(3)
 
