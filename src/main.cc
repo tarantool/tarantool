@@ -729,7 +729,7 @@ print_help(FILE *stream)
 		"to see online documentation.\n"
 		"\n"
 		"Visit https://github.com/tarantool/tarantool to submit bugs\n"
-		"contribute a patch.\n";
+		"or contribute a patch.\n";
 	fprintf(stream, help_msg, tarantool_version());
 }
 

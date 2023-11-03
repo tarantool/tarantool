@@ -106,7 +106,7 @@ Please visit project home page at https://tarantool.io
 to see online documentation.
 
 Visit https://github.com/tarantool/tarantool to submit bugs
-contribute a patch.
+or contribute a patch.
 
 tarantool -h
 Tarantool 3.<minor>.<patch>-<suffix>
@@ -216,7 +216,7 @@ Please visit project home page at https://tarantool.io
 to see online documentation.
 
 Visit https://github.com/tarantool/tarantool to submit bugs
-contribute a patch.
+or contribute a patch.
 
 tarantool -Z
 tarantool: invalid option
