@@ -342,35 +342,6 @@ include_directories(${EXTRA_BOX_INCLUDE_DIRS})
 set(TARANTOOL_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
 set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
 
-set(EXPORT_LIST)
-if(BUILD_STATIC)
-    # for each static library we should find a corresponding shared library to
-    # parse and reexport library api functions
-    foreach(libstatic
-            ${READLINE_LIBRARIES}
-            ${CURL_LIBRARIES}
-            ${OPENSSL_LIBRARIES}
-            ${ICU_LIBRARIES})
-        if (${libstatic} MATCHES "lib[^/]+.a")
-            string(REGEX MATCH "lib[^/]+.a" libname ${libstatic})
-            string(REGEX REPLACE "\\.a$" "" libname ${libname})
-            string(REGEX REPLACE "^lib" "" libname ${libname})
-            find_library(SYMBOLS_LIB NAMES ${libname})
-            # add found library to export list
-            list(APPEND EXPORT_LIST ${SYMBOLS_LIB})
-            # set variable to allow rescan (CMake depended)
-            set(SYMBOLS_LIB "SYMBOLS_LIB-NOTFOUND")
-        elseif (${libstatic} STREQUAL bundled-libcurl OR
-                ${libstatic} STREQUAL bundled-ares OR
-                ${libstatic} STREQUAL bundled-nghttp2)
-            message("We don't need to export symbols from statically linked ${libstatic}, skipped")
-        else()
-            message(WARNING "${libstatic} should be a static")
-        endif()
-    endforeach(libstatic)
-    string(REPLACE ";" " " EXPORT_LIST "${EXPORT_LIST}")
-endif()
-
 set(exports_file_sources
     ${PROJECT_SOURCE_DIR}/extra/exports
     ${EXTRA_EXPORTS_FILE_SOURCES})
@@ -390,7 +361,6 @@ add_custom_command(
     COMMAND ${PROJECT_SOURCE_DIR}/extra/mkexports
             ${exports_file_sources_str}
             ${exports_file} ${CMAKE_SYSTEM_NAME}
-            ${EXPORT_LIST}
 )
 
 add_executable(
