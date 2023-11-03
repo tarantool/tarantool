@@ -353,3 +353,222 @@ g.test_role_reload_error = function(g)
         exp_err = 'Error stopping role one: Wrongly stopped'
     })
 end
+
+-- Make sure dependencies in roles works as intended.
+g.test_role_dependencies_success = function(g)
+    local one = [[
+        local function apply()
+            _G.foo = _G.foo .. '_one'
+        end
+
+        return {
+            validate = function() end,
+            apply = apply,
+            stop = function() end,
+        }
+    ]]
+
+    local two = [[
+        local function apply()
+            _G.foo = _G.foo .. '_two'
+        end
+
+        return {
+            dependencies = {'one'},
+            validate = function() end,
+            apply = apply,
+            stop = function() end,
+        }
+    ]]
+
+    local three = [[
+        local function apply()
+            _G.foo = _G.foo .. '_three'
+        end
+
+        return {
+            dependencies = {'four', 'two'},
+            validate = function() end,
+            apply = apply,
+            stop = function() end,
+        }
+    ]]
+
+    local four = [[
+        _G.foo = 'four'
+
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+    local five = [[
+        local function apply()
+            _G.foo = _G.foo .. '_five'
+        end
+
+        return {
+            validate = function() end,
+            apply = apply,
+            stop = function() end,
+        }
+    ]]
+
+    local verify = function()
+        t.assert_equals(_G.foo, 'four_one_two_three_five')
+    end
+
+    helpers.success_case(g, {
+        roles = {one = one, two = two, three = three, four = four, five = five},
+        options = {
+            ['roles'] = {'four', 'three', 'two', 'one', 'five'}
+        },
+        verify = verify,
+    })
+end
+
+g.test_role_dependencies_error_wrong_type = function(g)
+    local one = [[
+        return {
+            dependencies = 'two',
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+    helpers.failure_case(g, {
+        roles = {one = one},
+        options = {
+            ['roles'] = {'one'}
+        },
+        exp_err = 'Role "one" has field "dependencies" of type string, '..
+                  'array-like table or nil expected'
+    })
+end
+
+g.test_role_dependencies_error_no_role = function(g)
+    local one = [[
+        return {
+            dependencies = {'two'},
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+    helpers.failure_case(g, {
+        roles = {one = one},
+        options = {
+            ['roles'] = {'one'}
+        },
+        exp_err = 'Role "one" requires role "two", but the latter is not in ' ..
+                  'the list of roles of the instance'
+    })
+end
+
+g.test_role_dependencies_error_self = function(g)
+    local one = [[
+        return {
+            dependencies = {'one'},
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+    helpers.failure_case(g, {
+        roles = {one = one},
+        options = {
+            ['roles'] = {'one'}
+        },
+        exp_err = 'Circular dependency: role "one" depends on itself'
+    })
+end
+
+g.test_role_dependencies_error_circular = function(g)
+    local one = [[
+        return {
+            dependencies = {'two'},
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+    local two = [[
+        return {
+            dependencies = {'one'},
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+    helpers.failure_case(g, {
+        roles = {one = one, two = two},
+        options = {
+            ['roles'] = {'one', 'two'}
+        },
+        exp_err = 'Circular dependency: roles "two" and "one" depend on ' ..
+                  'each other'
+    })
+end
+
+g.test_role_dependencies_stop_required_role = function(g)
+    local one = [[
+        return {
+            dependencies = {'two', 'three'},
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+    local two = [[
+        return {
+            dependencies = {'three'},
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+    local three = [[
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+    helpers.reload_failure_case(g, {
+        roles = {one = one, two = two, three = three},
+        roles_2 = {one = one, three = three},
+        options = {
+            ['roles'] = {'one', 'two', 'three'}
+        },
+        options_2 = {
+            ['roles'] = {'one', 'three'}
+        },
+        verify = function() end,
+        exp_err = 'Role "two" cannot be stopped because role "one" ' ..
+                  'depends on it'
+    })
+
+    helpers.reload_failure_case(g, {
+        roles = {one = one, two = two, three = three},
+        roles_2 = {one = one, two = two},
+        options = {
+            ['roles'] = {'one', 'two', 'three'}
+        },
+        options_2 = {
+            ['roles'] = {'one', 'two'}
+        },
+        verify = function() end,
+        exp_err = 'Role "three" cannot be stopped because roles ' ..
+                  '"one", "two" depend on it'
+    })
+end
