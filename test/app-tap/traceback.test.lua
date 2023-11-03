@@ -1,9 +1,19 @@
 #!/usr/bin/env tarantool
 
 local tap = require('tap')
+local tarantool = require('tarantool')
 local fiber = require('fiber')
 
 local test = tap.test('traceback')
+
+local _, _, enable_bt = string.find(tarantool.build.options,
+                                    '-DENABLE_BACKTRACE=(%a+)')
+if enable_bt == 'FALSE' or enable_bt == 'OFF' then
+    test:plan(1)
+    test:skip('backtrace is disabled')
+    os.exit(0)
+end
+
 test:plan(1)
 
 local info = fiber.info()[fiber.id()]
