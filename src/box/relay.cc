@@ -1280,7 +1280,8 @@ relay_filter_row(struct relay *relay, struct xrow_header *packet)
 	 */
 	if (iproto_type_is_promote_request(packet->type)) {
 		struct synchro_request req;
-		xrow_decode_synchro(packet, &req, NULL);
+		if (xrow_decode_synchro(packet, &req, NULL) != 0)
+			diag_raise();
 		while (relay->sent_raft_term < req.term) {
 			if (fiber_is_cancelled()) {
 				diag_set(FiberIsCancelled);
