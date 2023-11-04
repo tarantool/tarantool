@@ -7,6 +7,5 @@ cmake_minimum_required(VERSION 3.1)
 # linux machine).
 project(tarantool-static C CXX)
 
-include(cmake/AddDependencyProjects.cmake)
 include(cmake/AddTarantoolProject.cmake)
 include(cmake/AddTests.cmake)
