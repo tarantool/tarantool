@@ -1,10 +1,4 @@
-# Get install directories of built libraries for building
-# tarantool with custom CMAKE_PREFIX_PATH
-foreach(proj IN LISTS TARANTOOL_DEPENDS)
-    ExternalProject_Get_Property(${proj} install_dir)
-    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}:${install_dir})
-    message(STATUS "Add external project ${proj} in ${install_dir}")
-endforeach()
+include(ExternalProject)
 
 ExternalProject_Add(tarantool
     DEPENDS ${TARANTOOL_DEPENDS}
@@ -15,9 +9,8 @@ ExternalProject_Add(tarantool
         # https://cmake.org/cmake/help/v3.4/module/GNUInstallDirs.html#special-cases
         -DCMAKE_INSTALL_LOCALSTATEDIR=<INSTALL_DIR>/var
         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-        -DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}
         -DOPENSSL_USE_STATIC_LIBS=TRUE
-        -DBUILD_STATIC=TRUE
+        -DBUILD_STATIC_WITH_BUNDLED_LIBS=TRUE
         -DENABLE_DIST=TRUE
         -DENABLE_BACKTRACE=TRUE
         -DENABLE_HARDENING=${ENABLE_HARDENING}

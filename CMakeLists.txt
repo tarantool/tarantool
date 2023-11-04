@@ -56,6 +56,10 @@ endif()
 # Define GNU standard installation directories
 include(GNUInstallDirs)
 
+if(BUILD_STATIC_WITH_BUNDLED_LIBS)
+    set(BUILD_STATIC ON)
+endif()
+
 include(cmake/utils.cmake)
 include(cmake/pod2man.cmake)
 # the order is significant: we need to know os and compiler to configure libs
@@ -375,6 +379,9 @@ find_package_message(MODULE_LIBPATH "Lua package.cpath: ${MODULE_LIBPATH}"
 ## Third-Party libraries
 ##
 
+# URL of the backup storage to download bundled dependencies from.
+set(BACKUP_STORAGE https://distrib.hb.vkcs.cloud)
+
 set(EMBED_LUAZLIB ${BUILD_STATIC})
 set(EMBED_LUAROCKS ${BUILD_STATIC})
 
@@ -409,8 +416,16 @@ endif()
 #
 # ZLIB
 #
-set(ZLIB_FIND_REQUIRED ON)
-find_package(ZLIB)
+
+option(ENABLE_BUNDLED_ZLIB "Enable building of the bundled zlib"
+    ${BUILD_STATIC_WITH_BUNDLED_LIBS})
+if(ENABLE_BUNDLED_ZLIB)
+    include(BuildZLIB)
+    add_dependencies(build_bundled_libs bundled-zlib)
+else()
+    set(ZLIB_FIND_REQUIRED ON)
+    find_package(ZLIB)
+endif()
 
 #
 # ZZIP
@@ -423,7 +438,20 @@ endif()
 #
 # OpenSSL
 #
-find_package(OpenSSL)
+
+set(ENABLE_BUNDLED_OPENSSL_DEFAULT OFF)
+if(BUILD_STATIC_WITH_BUNDLED_LIBS AND OPENSSL_USE_STATIC_LIBS)
+    set(ENABLE_BUNDLED_OPENSSL_DEFAULT ON)
+endif()
+option(ENABLE_BUNDLED_OPENSSL "Enable building of the bundled openssl"
+    ${ENABLE_BUNDLED_OPENSSL_DEFAULT})
+if(ENABLE_BUNDLED_OPENSSL)
+    set(OPENSSL_USE_STATIC_LIBS ON)
+    include(BuildOpenSSL)
+    add_dependencies(build_bundled_libs bundled-openssl)
+else()
+    find_package(OpenSSL)
+endif()
 if (OPENSSL_FOUND)
     message(STATUS "OpenSSL ${OPENSSL_VERSION} found")
     include_directories(${OPENSSL_INCLUDE_DIR})
@@ -437,6 +465,9 @@ endif()
 #
 if(OPENSSL_USE_STATIC_LIBS)
     set(OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES})
+    if(ENABLED_BUNDLED_OPENSSL AND ENABLE_BUNDLED_ZLIB)
+        add_dependencies(bundled-openssl bundled-zlib)
+    endif()
 endif()
 
 #
@@ -492,21 +523,48 @@ message(STATUS "EXPORT_LIBCURL_SYMBOLS: ${EXPORT_LIBCURL_SYMBOLS}")
 # ReadLine
 #
 
-set(Readline_FIND_REQUIRED ON)
-find_package(Readline)
+option(ENABLE_BUNDLED_READLINE "Enable building of the bundled readline"
+    ${BUILD_STATIC_WITH_BUNDLED_LIBS})
+if(ENABLE_BUNDLED_READLINE)
+    include(BuildReadline)
+    add_dependencies(build_bundled_libs bundled-readline)
+else()
+    set(Readline_FIND_REQUIRED ON)
+    find_package(Readline)
+endif()
 
 #
 # ICONV
 #
-set(ICONV_FIND_REQUIRED ON)
-find_package(ICONV)
+
+# In Linux iconv is embedded into glibc.
+set(ENABLE_BUNDLED_ICONV_DEFAULT OFF)
+if(APPLE AND BUILD_STATIC_WITH_BUNDLED_LIBS)
+    set(ENABLE_BUNDLED_ICONV_DEFAULT ON)
+endif()
+option(ENABLE_BUNDLED_ICONV "Enable building of the bundled iconv"
+    ${ENABLE_BUNDLED_ICONV_DEFAULT})
+if(ENABLE_BUNDLED_ICONV)
+    include(BuildICONV)
+    add_dependencies(build_bundled_libs bundled-iconv)
+else()
+    set(ICONV_FIND_REQUIRED ON)
+    find_package(ICONV)
+endif()
 
 #
 # ICU
 #
 
-set(ICU_FIND_REQUIRED ON)
-find_package(ICU)
+option(ENABLE_BUNDLED_ICU "Enable building of the bundled icu"
+    ${BUILD_STATIC_WITH_BUNDLED_LIBS})
+if(ENABLE_BUNDLED_ICU)
+    include(BuildICU)
+    add_dependencies(build_bundled_libs bundled-icu)
+else()
+    set(ICU_FIND_REQUIRED ON)
+    find_package(ICU)
+endif()
 
 #
 # libunwind
@@ -755,8 +813,13 @@ set(options PACKAGE VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
     ENABLE_HARDENING
     ENABLE_DOC
     ENABLE_DIST
+    ENABLE_BUNDLED_ZLIB
+    ENABLE_BUNDLED_OPENSSL
     ENABLE_BUNDLED_LIBCURL
     BUNDLED_LIBCURL_USE_ARES
+    ENABLE_BUNDLED_READLINE
+    ENABLE_BUNDLED_ICONV
+    ENABLE_BUNDLED_ICU
     ENABLE_BUNDLED_LIBYAML
     ENABLE_BUNDLED_MSGPUCK
     ENABLE_BUNDLED_LIBUNWIND)
