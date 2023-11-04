@@ -92,6 +92,14 @@ if (ENABLE_BACKTRACE)
     endif()
 endif()
 
+if (ENABLE_BUNDLED_OPENSSL)
+    add_dependencies(core bundled-openssl)
+endif()
+
+if (ENABLE_BUNDLED_ICU)
+    add_dependencies(core bundled-icu)
+endif()
+
 if (ENABLE_TUPLE_COMPRESSION)
     target_link_libraries(core ${ZSTD_LIBRARIES})
 endif()

@@ -70,7 +70,7 @@ if(BUILD_STATIC)
     endif()
     # Ditto,
     # https://github.com/libunwind/libunwind/blob/4feb1152d1c4aaafbb2d504dbe34c6db5b6fe9f2/configure.ac#L319-L334
-    set(LIBUNWIND_LIBRARIES ${LIBUNWIND_LIBRARIES} ZLIB::ZLIB)
+    set(LIBUNWIND_LIBRARIES ${LIBUNWIND_LIBRARIES} ${ZLIB_LIBRARIES})
 endif()
 
 if(PC_LIBUNWIND_VERSION)

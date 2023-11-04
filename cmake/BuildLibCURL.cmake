@@ -220,6 +220,14 @@ macro(curl_build)
     add_library(bundled-libcurl STATIC IMPORTED GLOBAL)
     set_target_properties(bundled-libcurl PROPERTIES IMPORTED_LOCATION
         ${LIBCURL_INSTALL_DIR}/lib/libcurl.a)
+    if (ENABLE_BUNDLED_ZLIB)
+        # Need to build zlib first
+        add_dependencies(bundled-libcurl-project bundled-zlib)
+    endif()
+    if (ENABLE_BUNDLED_OPENSSL)
+        # Need to build openssl first
+        add_dependencies(bundled-libcurl-project bundled-openssl)
+    endif()
     if (BUNDLED_LIBCURL_USE_ARES)
         # Need to build ares first
         add_dependencies(bundled-libcurl-project bundled-ares)

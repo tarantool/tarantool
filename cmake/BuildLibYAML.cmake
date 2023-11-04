@@ -24,6 +24,10 @@ macro(libyaml_build)
         BUILD_BYPRODUCTS ${LIBYAML_LIBRARY}
     )
 
+    if(ENABLE_BUNDLED_ICU)
+        add_dependencies(bundled-libyaml-project bundled-icu)
+    endif()
+
     add_library(bundled-libyaml STATIC IMPORTED GLOBAL)
     set_target_properties(bundled-libyaml PROPERTIES IMPORTED_LOCATION
         ${LIBYAML_LIBRARY})
