@@ -560,19 +560,11 @@ sqlInsert(Parse * pParse,	/* Parser context */
 			}
 			if ((!useTempTable && !pList)
 			    || (pColumn && j >= pColumn->nId)) {
-				if (i == (int) autoinc_fieldno) {
-					sqlVdbeAddOp2(v, OP_Integer, -1,
-							  regCols + i + 1);
-				} else {
-					struct tuple_field *field =
-						tuple_format_field(
-							space->format, i);
-					struct Expr *dflt =
-						field->sql_default_value_expr;
-					sqlExprCode(pParse,
-							dflt,
-							regCols + i + 1);
-				}
+				int reg = regCols + i + 1;
+				if (i == (int)autoinc_fieldno)
+					sqlVdbeAddOp2(v, OP_Integer, -1, reg);
+				else
+					sqlVdbeAddOp2(v, OP_Null, 0, reg);
 			} else if (useTempTable) {
 				sqlVdbeAddOp3(v, OP_Column, srcTab, j,
 						  regCols + i + 1);
@@ -624,17 +616,7 @@ sqlInsert(Parse * pParse,	/* Parser context */
 			}
 			if (j < 0 || nColumn == 0
 			    || (pColumn && j >= pColumn->nId)) {
-				if (i == (int) autoinc_fieldno) {
-					sqlVdbeAddOp2(v, OP_Null, 0, iRegStore);
-					continue;
-				}
-				struct tuple_field *field =
-					tuple_format_field(space->format, i);
-				struct Expr *dflt =
-					field->sql_default_value_expr;
-				sqlExprCodeFactorable(pParse,
-							  dflt,
-							  iRegStore);
+				sqlVdbeAddOp2(v, OP_Null, 0, iRegStore);
 			} else if (useTempTable) {
 				if (i == (int) autoinc_fieldno) {
 					int regTmp = ++pParse->nMem;
@@ -1091,19 +1073,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		if (!dest->def->fields[i].is_nullable &&
 		    src->def->fields[i].is_nullable)
 			return 0;
-		/* Default values for second and subsequent columns need to match. */
-		if (i > 0) {
-			char *src_expr_str =
-				src->def->fields[i].sql_default_value;
-			char *dest_expr_str =
-				dest->def->fields[i].sql_default_value;
-			if ((dest_expr_str == NULL) != (src_expr_str == NULL) ||
-			    (dest_expr_str &&
-			     strcmp(src_expr_str, dest_expr_str) != 0)
-			    ) {
-				return 0;	/* Default values must be the same for all columns */
-			}
-		}
 	}
 
 	for (uint32_t i = 0; i < dest->index_count; ++i) {

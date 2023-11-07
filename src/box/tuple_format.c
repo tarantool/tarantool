@@ -49,9 +49,6 @@ static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 static uint32_t formats_size = 0, formats_capacity = 0;
 static uint64_t formats_epoch = 0;
 
-tuple_format_expr_compile_f tuple_format_expr_compile;
-tuple_format_expr_delete_f tuple_format_expr_delete;
-
 /**
  * Find in format1::fields the field by format2_field's JSON path.
  * Routine uses fiber region for temporal path allocation and
@@ -118,21 +115,6 @@ tuple_format_cmp(const struct tuple_format *format1,
 		if (field_a->is_key_part != field_b->is_key_part)
 			return (int)field_a->is_key_part -
 				(int)field_b->is_key_part;
-		if (field_a->sql_default_value_expr !=
-		    field_b->sql_default_value_expr) {
-			/*
-			 * We cannot compare SQL expression ASTs, so as a
-			 * workaround we compare pointers (which are actually
-			 * never equal): since we need to provide some total
-			 * order, we compare pointer values.
-			 */
-			uintptr_t ptr_a =
-				(uintptr_t)field_a->sql_default_value_expr;
-			uintptr_t ptr_b =
-				(uintptr_t)field_b->sql_default_value_expr;
-			intptr_t cmp = (intptr_t)(ptr_a - ptr_b);
-			return cmp < 0 ? -1 : 1;
-		}
 		if (field_a->compression_type != field_b->compression_type)
 			return (int)field_a->compression_type -
 			       (int)field_b->compression_type;
@@ -184,8 +166,6 @@ tuple_format_hash(struct tuple_format *format)
 		TUPLE_FIELD_MEMBER_HASH(f, coll_id, h, carry, size)
 		TUPLE_FIELD_MEMBER_HASH(f, nullable_action, h, carry, size)
 		TUPLE_FIELD_MEMBER_HASH(f, is_key_part, h, carry, size)
-		TUPLE_FIELD_MEMBER_HASH(f, sql_default_value_expr, h, carry,
-					size)
 		TUPLE_FIELD_MEMBER_HASH(f, compression_type, h, carry, size);
 		for (uint32_t i = 0; i < f->constraint_count; ++i)
 			size += tuple_constraint_hash_process(&f->constraint[i],
@@ -241,8 +221,6 @@ tuple_field_delete(struct tuple_field *field)
 	for (uint32_t i = 0; i < field->constraint_count; i++)
 		field->constraint[i].destroy(&field->constraint[i]);
 	free(field->constraint);
-	if (field->sql_default_value_expr != NULL)
-		tuple_format_expr_delete(field->sql_default_value_expr);
 	field_default_func_destroy(&field->default_value.func);
 	free(field->default_value.data);
 	free(field);
@@ -555,13 +533,6 @@ tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 			tuple_constraint_array_new(fields[i].constraint_def,
 						   fields[i].constraint_count);
 		field->constraint_count = fields[i].constraint_count;
-		const char *expr = fields[i].sql_default_value;
-		if (expr != NULL) {
-			field->sql_default_value_expr =
-				tuple_format_expr_compile(expr, strlen(expr));
-			if (field->sql_default_value_expr == NULL)
-				return -1;
-		}
 		if (fields[i].default_func_id > 0) {
 			field->default_value.func.id =
 				fields[i].default_func_id;

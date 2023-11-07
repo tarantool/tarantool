@@ -69,26 +69,7 @@ struct tuple;
 struct tuple_info;
 struct tuple_format;
 struct coll;
-struct Expr;
 struct mpstream;
-
-typedef struct Expr *
-(*tuple_format_expr_compile_f)(const char *expr, int expr_len);
-
-typedef void
-(*tuple_format_expr_delete_f)(struct Expr *expr);
-
-/**
- * Callback that compiles an SQL expression.
- * Needed for avoid SQL dependency.
- */
-extern tuple_format_expr_compile_f tuple_format_expr_compile;
-
-/**
- * Callback that deletes an SQL expression.
- * Needed for avoid SQL dependency.
- */
-extern tuple_format_expr_delete_f tuple_format_expr_delete;
 
 /** Engine-specific tuple format methods. */
 struct tuple_format_vtab {
@@ -183,8 +164,6 @@ struct tuple_field {
 	struct tuple_constraint *constraint;
 	/** Number of constraints. */
 	uint32_t constraint_count;
-	/** AST for parsed SQL default value. */
-	struct Expr *sql_default_value_expr;
 	/** Tuple field default value. */
 	struct field_default_value default_value;
 };

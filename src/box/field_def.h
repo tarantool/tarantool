@@ -149,8 +149,6 @@ struct field_def {
 	enum on_conflict_action nullable_action;
 	/** Collation ID for string comparison. */
 	uint32_t coll_id;
-	/** 0-terminated SQL expression for DEFAULT value. */
-	char *sql_default_value;
 	/** MsgPack with the default value. */
 	char *default_value;
 	/** Size of the default value. */

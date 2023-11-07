@@ -66,18 +66,6 @@ static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
 static bool sql_seq_scan_default = false;
 TWEAK_BOOL(sql_seq_scan_default);
 
-static Expr *
-sql_expr_compile_cb(const char *expr, int expr_len)
-{
-	return sql_expr_compile(expr, expr_len);
-}
-
-static void
-sql_expr_delete_cb(struct Expr *expr)
-{
-	sql_expr_delete(expr);
-}
-
 uint32_t
 sql_default_session_flags(void)
 {
@@ -89,9 +77,6 @@ sql_default_session_flags(void)
 void
 sql_init(void)
 {
-	tuple_format_expr_compile = sql_expr_compile_cb;
-	tuple_format_expr_delete = sql_expr_delete_cb;
-
 	current_session()->sql_flags = sql_default_session_flags();
 
 	if (sql_init_db(&db) != 0)
@@ -365,7 +350,6 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 		names += strlen(fields[i].name) + 1;
 		fields[i].is_nullable = true;
 		fields[i].nullable_action = ON_CONFLICT_ACTION_NONE;
-		fields[i].sql_default_value = NULL;
 		fields[i].default_value = NULL;
 		fields[i].default_value_size = 0;
 		fields[i].default_func_id = 0;
@@ -1012,11 +996,8 @@ sql_encode_table(struct region *region, struct space_def *def, uint32_t *size)
 	for (uint32_t i = 0; i < field_count && !is_error; i++) {
 		uint32_t cid = def->fields[i].coll_id;
 		struct field_def *field = &def->fields[i];
-		const char *default_str = field->sql_default_value;
 		int base_len = 4;
 		if (cid != COLL_NONE)
-			base_len += 1;
-		if (default_str != NULL)
 			base_len += 1;
 		if (field->default_value != NULL)
 			base_len += 1;
@@ -1055,10 +1036,6 @@ sql_encode_table(struct region *region, struct space_def *def, uint32_t *size)
 		if (cid != COLL_NONE) {
 			mpstream_encode_str(&stream, "collation");
 			mpstream_encode_uint(&stream, cid);
-		}
-		if (default_str != NULL) {
-			mpstream_encode_str(&stream, "sql_default");
-			mpstream_encode_str(&stream, default_str);
 		}
 		if (field->default_value != NULL) {
 			mpstream_encode_str(&stream, "default");
