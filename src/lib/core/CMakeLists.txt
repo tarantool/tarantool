@@ -92,6 +92,10 @@ if (ENABLE_BACKTRACE)
     endif()
 endif()
 
+if(EXTRA_CORE_DEPENDENCIES)
+    add_dependencies(core ${EXTRA_CORE_DEPENDENCIES})
+endif()
+
 if (ENABLE_BUNDLED_OPENSSL)
     add_dependencies(core bundled-openssl)
 endif()
