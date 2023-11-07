@@ -430,9 +430,17 @@ endif()
 #
 # ZZIP
 #
+
+option(ENABLE_BUNDLED_ZZIP "Enable building of the bundled zzip"
+    ${BUILD_STATIC_WITH_BUNDLED_LIBS})
 if(EMBED_LUAZIP)
-    set(ZZIP_FIND_REQUIRED ON)
-    find_package(ZZIP)
+    if(ENABLE_BUNDLED_ZZIP)
+        include(BuildZZIP)
+        add_dependencies(build_bundled_libs bundled-zzip)
+    else()
+        set(ZZIP_FIND_REQUIRED ON)
+        find_package(ZZIP)
+    endif()
 endif()
 
 #
