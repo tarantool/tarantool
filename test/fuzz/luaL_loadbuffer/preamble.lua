@@ -22,8 +22,26 @@ local __index = function(self, key)
     end
     return always_number(key)
 end
+local __le = function(v1, v2)
+    if type(v1) == 'number' and type(v2) == 'number' then
+        return v1 <= v2 -- Numeric comparison.
+    elseif type(v1) == 'string' and type(v2) == 'string' then
+        return v1 <= v2 -- Lexicographic comparison.
+    else
+        return always_number(v1) <= always_number(v2)
+    end
+end
 local __len = function(_v)
     return DEFAULT_NUMBER
+end
+local __lt = function(v1, v2)
+    if type(v1) == 'number' and type(v2) == 'number' then
+        return v1 < v2 -- Numeric comparison.
+    elseif type(v1) == 'string' and type(v2) == 'string' then
+        return v1 < v2 -- Lexicographic comparison.
+    else
+        return always_number(v1) < always_number(v2)
+    end
 end
 local __mod = function(v1, v2)
     return always_number(v1) % always_number(v2)
@@ -76,7 +94,9 @@ debug.setmetatable(nil, {
     __concat = __concat,
     __div = __div,
     __index = __index,
+    __le = __le,
     __len = __len,
+    __lt = __lt,
     __mod = __mod,
     __mul = __mul,
     __newindex = __newindex,
@@ -89,7 +109,9 @@ debug.setmetatable(function() end, {
     __concat = __concat,
     __div = __div,
     __index = __index,
+    __le = __le,
     __len = __len,
+    __lt = __lt,
     __mod = __mod,
     __mul = __mul,
     __newindex = __newindex,
@@ -103,7 +125,9 @@ debug.setmetatable(true, {
     __concat = __concat,
     __div = __div,
     __index = __index,
+    __le = __le,
     __len = __len,
+    __lt = __lt,
     __mod = __mod,
     __mul = __mul,
     __newindex = __newindex,
@@ -116,7 +140,9 @@ local table_mt = {
     __call = __call,
     __concat = __concat,
     __div = __div,
+    __le = __le,
     __len = __len,
+    __lt = __lt,
     __mod = __mod,
     __mul = __mul,
     __newindex = __newindex,
@@ -124,5 +150,19 @@ local table_mt = {
     __sub = __sub,
     __unm = __unm,
 }
+
+local only_numbers_cmp = function(v1, v2, cmp_op_str)
+    local op_func = {
+        ['<'] = function(a1, a2) return a1 < a2 end,
+        ['<='] = function(a1, a2) return a1 <= a2 end,
+        ['>'] = function(a1, a2) return a1 > a2 end,
+        ['>='] = function(a1, a2) return a1 >= a2 end,
+    }
+    if type(v1) == 'number' and
+       type(v2) == 'number' then
+        return op_func[cmp_op_str](v1, v2)
+    end
+    return false
+end
 
 ---------------------- END OF PREAMBLE ----------------------------

@@ -27,6 +27,7 @@ namespace {
 
 const std::string kCounterNamePrefix = "counter_";
 const std::string kNumberWrapperName = "always_number";
+const std::string kBinOpWrapperName = "only_numbers_cmp";
 
 PROTO_TOSTRING(Block, block);
 PROTO_TOSTRING(Chunk, chunk);
@@ -972,9 +973,26 @@ NESTED_PROTO_TOSTRING(AnonFunc, func, Expression)
 
 NESTED_PROTO_TOSTRING(ExpBinaryOpExp, binary, Expression)
 {
-	std::string binary_str = ExpressionToString(binary.leftexp());
-	binary_str += " " + BinaryOperatorToString(binary.binop()) + " ";
-	binary_str += ExpressionToString(binary.rightexp());
+	std::string leftexp_str = ExpressionToString(binary.leftexp());
+	std::string binop_str = BinaryOperatorToString(binary.binop());
+	std::string rightexp_str = ExpressionToString(binary.rightexp());
+
+	std::string binary_str;
+	if (binop_str == "<" ||
+	    binop_str == ">" ||
+	    binop_str == "<=" ||
+	    binop_str == ">=") {
+		binary_str = kBinOpWrapperName;
+		binary_str += "(" + leftexp_str;
+		binary_str += ", '" + binop_str + "', ";
+		binary_str += rightexp_str + ")";
+		return binary_str;
+	}
+
+	binary_str = leftexp_str;
+	binary_str += " " + binop_str + " ";
+	binary_str += rightexp_str;
+
 	return binary_str;
 }
 
