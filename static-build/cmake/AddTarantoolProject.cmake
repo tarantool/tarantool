@@ -9,7 +9,6 @@ ExternalProject_Add(tarantool
         # https://cmake.org/cmake/help/v3.4/module/GNUInstallDirs.html#special-cases
         -DCMAKE_INSTALL_LOCALSTATEDIR=<INSTALL_DIR>/var
         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-        -DOPENSSL_USE_STATIC_LIBS=TRUE
         -DBUILD_STATIC_WITH_BUNDLED_LIBS=TRUE
         -DENABLE_DIST=TRUE
         -DENABLE_BACKTRACE=TRUE
