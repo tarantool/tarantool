@@ -731,6 +731,10 @@ include(BuildMisc)
 libmisc_build()
 add_dependencies(build_bundled_libs misc)
 
+if(DEFINED EXTRA_DEPENDENCIES_CMAKE)
+    include(${EXTRA_DEPENDENCIES_CMAKE})
+endif()
+
 # cpack config. called package.cmake to avoid
 # conflicts with the global CPack.cmake (On MacOS X
 # file names are case-insensitive)
