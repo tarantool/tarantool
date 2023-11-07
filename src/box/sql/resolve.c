@@ -137,15 +137,17 @@ resolveAlias(struct ExprList *pEList, int iCol, struct Expr *pExpr,
 static bool
 nameInUsingClause(struct IdList *pUsing, const char *zCol, const char *old_col)
 {
-	if (pUsing) {
-		for (int k = 0; k < pUsing->nId; k++) {
-			if (strcmp(pUsing->a[k].zName, zCol) == 0)
-				return true;
-		}
-		for (int i = 0; i < pUsing->nId; i++) {
-			if (strcmp(pUsing->a[i].zName, old_col) == 0)
-				return true;
-		}
+	if (pUsing == NULL)
+		return false;
+	for (int k = 0; k < pUsing->nId; k++) {
+		if (strcmp(pUsing->a[k].zName, zCol) == 0)
+			return true;
+	}
+	if (old_col == NULL)
+		return false;
+	for (int i = 0; i < pUsing->nId; i++) {
+		if (strcmp(pUsing->a[i].zName, old_col) == 0)
+			return true;
 	}
 	return false;
 }
