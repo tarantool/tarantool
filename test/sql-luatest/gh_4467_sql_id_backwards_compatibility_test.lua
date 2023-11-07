@@ -661,3 +661,12 @@ g.test_drop_constraint = function()
         box.func.check_ASD_THREE:drop()
     end)
 end
+
+-- Make sure USING in JOIN does not cause segfault.
+g.test_using_in_join = function()
+    g.server:exec(function()
+        box.execute([[CREATE TABLE T(I INT PRIMARY KEY, A INT);]])
+        box.execute([[SELECT * FROM T LEFT JOIN T USING(A);]])
+        box.execute([[DROP TABLE T;]])
+    end)
+end
