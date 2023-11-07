@@ -31,7 +31,7 @@ mpstream_error(void *is_err)
 static int
 test_tuple_format_cmp(void)
 {
-	plan(19);
+	plan(18);
 	header();
 
 	char buf[1024];
@@ -123,17 +123,6 @@ test_tuple_format_cmp(void)
 	coll_id_cache_delete(coll_id1);
 	coll_id_delete(coll_id2);
 	coll_id_delete(coll_id1);
-
-	size = mp_format(buf, lengthof(buf), "[{%s%s %s%s}]",
-			 "name", "f", "sql_default", "1 + 1");
-	f1 = runtime_tuple_format_new(buf, size, false);
-	size = mp_format(buf, lengthof(buf), "[{%s%s %s%s}]",
-			 "name", "f", "sql_default", "2");
-	f2 = runtime_tuple_format_new(buf, size, false);
-	ok(f1 != f2, "tuple formats with different expressions in "
-	   "'sql_default' definitions are not equal");
-	tuple_format_delete(f1);
-	tuple_format_delete(f2);
 
 	size = mp_format(buf, lengthof(buf), "[{%s%s %s{%s%d %s%d}}]",
 			 "name", "f", "constraint", "c1", 1,

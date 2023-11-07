@@ -201,7 +201,6 @@ static const struct opt_def field_def_reg[] = {
 	OPT_DEF_ENUM("nullable_action", on_conflict_action, struct field_def,
 		     nullable_action, NULL),
 	OPT_DEF("collation", OPT_UINT32, struct field_def, coll_id),
-	OPT_DEF("sql_default", OPT_STRPTR, struct field_def, sql_default_value),
 	OPT_DEF_ENUM("compression", compression_type, struct field_def,
 		     compression_type, NULL),
 	OPT_DEF_CUSTOM("default", field_def_parse_default_value),
@@ -222,7 +221,6 @@ const struct field_def field_def_default = {
 	.is_nullable = false,
 	.nullable_action = ON_CONFLICT_ACTION_DEFAULT,
 	.coll_id = COLL_NONE,
-	.sql_default_value = NULL,
 	.default_value = NULL,
 	.default_value_size = 0,
 	.default_func_id = 0,
@@ -443,10 +441,6 @@ field_def_array_dup(const struct field_def *fields, uint32_t field_count)
 	grp_alloc_reserve_data(&all, sizeof(*fields) * field_count);
 	for (uint32_t i = 0; i < field_count; i++) {
 		grp_alloc_reserve_str0(&all, fields[i].name);
-		if (fields[i].sql_default_value != NULL) {
-			grp_alloc_reserve_str0(&all,
-					       fields[i].sql_default_value);
-		}
 		grp_alloc_reserve_data(&all, fields[i].default_value_size);
 	}
 	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
@@ -455,10 +449,6 @@ field_def_array_dup(const struct field_def *fields, uint32_t field_count)
 	for (uint32_t i = 0; i < field_count; ++i) {
 		copy[i] = fields[i];
 		copy[i].name = grp_alloc_create_str0(&all, fields[i].name);
-		if (fields[i].sql_default_value != NULL) {
-			copy[i].sql_default_value = grp_alloc_create_str0(
-				&all, fields[i].sql_default_value);
-		}
 		if (fields[i].default_value != NULL) {
 			size_t size = fields[i].default_value_size;
 			char *buf = grp_alloc_create_data(&all, size);

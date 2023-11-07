@@ -113,10 +113,8 @@ sql_pragma_table_info(struct Parse *parse, const struct space *space)
 			k = key_def_find_by_fieldno(kdef, i) - kdef->parts + 1;
 		}
 		sqlVdbeMultiLoad(v, 1, "issisi", i, field->name,
-				     field_type_strs[field->type],
-				     !field->is_nullable,
-				     field->sql_default_value,
-				     k);
+				 field_type_strs[field->type],
+				 !field->is_nullable, NULL, k);
 		sqlVdbeAddOp2(v, OP_ResultRow, 1, 6);
 	}
 }
