@@ -4395,7 +4395,8 @@ out:
 static int
 vy_deferred_delete_on_commit(struct trigger *trigger, void *event)
 {
-	struct txn *txn = event;
+	(void)event;
+	struct txn *txn = in_txn();
 	struct vy_mem *mem = trigger->data;
 	/*
 	 * Update dump_lsn so that we can skip dumped deferred

@@ -357,7 +357,7 @@ txn_rollback_one_stmt(struct txn *txn, struct txn_stmt *stmt)
 {
 	if (txn->engine != NULL && stmt->space != NULL)
 		engine_rollback_statement(txn->engine, txn, stmt);
-	if (stmt->has_triggers && trigger_run(&stmt->on_rollback, txn) != 0) {
+	if (stmt->has_triggers && trigger_run(&stmt->on_rollback, stmt) != 0) {
 		diag_log();
 		panic("statement rollback trigger failed");
 	}
@@ -710,7 +710,7 @@ txn_complete_fail(struct txn *txn)
 	if (txn->engine != NULL)
 		engine_rollback(txn->engine, txn);
 	if (txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
-		if (trigger_run(&txn->on_rollback, txn) != 0) {
+		if (trigger_run(&txn->on_rollback, txn_first_stmt(txn)) != 0) {
 			diag_log();
 			panic("transaction rollback trigger failed");
 		}
@@ -739,7 +739,8 @@ txn_complete_success(struct txn *txn)
 		 * so that a trigger sees the changes done by previous triggers
 		 * (this is vital for DDL).
 		 */
-		if (trigger_run_reverse(&txn->on_commit, txn) != 0) {
+		if (trigger_run_reverse(&txn->on_commit,
+					txn_first_stmt(txn)) != 0) {
 			diag_log();
 			panic("transaction commit trigger failed");
 		}

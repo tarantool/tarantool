@@ -868,7 +868,8 @@ struct mh_i32_t *AlterSpaceLock::registry;
 static int
 alter_space_commit(struct trigger *trigger, void *event)
 {
-	struct txn *txn = (struct txn *) event;
+	(void)event;
+	struct txn *txn = in_txn();
 	struct alter_space *alter = (struct alter_space *) trigger->data;
 	/*
 	 * The engine (vinyl) expects us to pass the signature of
