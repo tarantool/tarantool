@@ -6,6 +6,7 @@
 #include "tweaks.h"
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -111,18 +112,53 @@ tweak_get_int(struct tweak *tweak, struct tweak_value *val)
 {
 	assert(tweak->get == tweak_get_int);
 	val->type = TWEAK_VALUE_INT;
-	val->ival = *(int *)tweak->data;
+	val->ival = *(int64_t *)tweak->data;
 }
 
 int
 tweak_set_int(struct tweak *tweak, const struct tweak_value *val)
 {
 	assert(tweak->set == tweak_set_int);
-	if (val->type != TWEAK_VALUE_INT) {
+	if (val->type == TWEAK_VALUE_INT) {
+		*(int64_t *)tweak->data = val->ival;
+	} else if (val->type == TWEAK_VALUE_UINT) {
+		if (val->uval > INT64_MAX) {
+			diag_set(IllegalParams, "Invalid value, "
+				 "must be <= %" PRIi64, INT64_MAX);
+			return -1;
+		}
+		*(int64_t *)tweak->data = (int64_t)val->uval;
+	} else {
 		diag_set(IllegalParams, "Invalid value, expected integer");
 		return -1;
 	}
-	*(int *)tweak->data = val->ival;
+	return 0;
+}
+
+void
+tweak_get_uint(struct tweak *tweak, struct tweak_value *val)
+{
+	assert(tweak->get == tweak_get_uint);
+	val->type = TWEAK_VALUE_UINT;
+	val->uval = *(uint64_t *)tweak->data;
+}
+
+int
+tweak_set_uint(struct tweak *tweak, const struct tweak_value *val)
+{
+	assert(tweak->set == tweak_set_uint);
+	if (val->type == TWEAK_VALUE_UINT) {
+		*(uint64_t *)tweak->data = val->uval;
+	} else if (val->type == TWEAK_VALUE_INT) {
+		if (val->ival < 0) {
+			diag_set(IllegalParams, "Invalid value, must be >= 0");
+			return -1;
+		}
+		*(uint64_t *)tweak->data = (uint64_t)val->ival;
+	} else {
+		diag_set(IllegalParams, "Invalid value, expected integer");
+		return -1;
+	}
 	return 0;
 }
 
@@ -140,6 +176,8 @@ tweak_set_double(struct tweak *tweak, const struct tweak_value *val)
 	assert(tweak->set == tweak_set_double);
 	if (val->type == TWEAK_VALUE_INT) {
 		*(double *)tweak->data = val->ival;
+	} else if (val->type == TWEAK_VALUE_UINT) {
+		*(double *)tweak->data = val->uval;
 	} else if (val->type == TWEAK_VALUE_DOUBLE) {
 		*(double *)tweak->data = val->dval;
 	} else {

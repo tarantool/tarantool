@@ -2,12 +2,14 @@
 #include "lualib.h"
 #include <lauxlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "core/tweaks.h"
 #include "diag.h"
 #include "fiber.h"
 #include "lua/error.h"
+#include "lua/msgpack.h"
 #include "lua/tweaks.h"
 #include "lua/utils.h"
 #include "memory.h"
@@ -22,8 +24,11 @@ static struct lua_State *L;
 static bool bool_var = true;
 TWEAK_BOOL(bool_var);
 
-static int int_var = 42;
+static int64_t int_var = 42;
 TWEAK_INT(int_var);
+
+static uint64_t uint_var = 123;
+TWEAK_UINT(uint_var);
 
 static double double_var = 3.14;
 TWEAK_DOUBLE(double_var);
@@ -45,7 +50,7 @@ TWEAK_ENUM(my_enum, enum_var);
 static void
 test_index(void)
 {
-	plan(10);
+	plan(12);
 	header();
 	lua_settop(L, 0);
 	is(luaT_dostring(L, "return tweaks.no_such_var"), 0, "no_such_var");
@@ -56,6 +61,9 @@ test_index(void)
 	lua_settop(L, 0);
 	is(luaT_dostring(L, "return tweaks.int_var"), 0, "int_var");
 	ok(!lua_isnoneornil(L, 1), "int_var found");
+	lua_settop(L, 0);
+	is(luaT_dostring(L, "return tweaks.uint_var"), 0, "uint_var");
+	ok(!lua_isnoneornil(L, 1), "uint_var found");
 	lua_settop(L, 0);
 	is(luaT_dostring(L, "return tweaks.double_var"), 0, "double_var");
 	ok(!lua_isnoneornil(L, 1), "double_var found");
@@ -70,7 +78,7 @@ test_index(void)
 static void
 test_newindex(void)
 {
-	plan(6);
+	plan(4);
 	header();
 	is(luaT_dostring(L, "tweaks.no_such_var = 1"), -1, "unknown option");
 	ok(!diag_is_empty(diag_get()) &&
@@ -78,12 +86,6 @@ test_newindex(void)
 	   "check error");
 	is(luaT_dostring(L, "tweaks.bool_var = {}"), -1,
 	   "invalid value - table");
-	ok(!diag_is_empty(diag_get()) &&
-	   strcmp(diag_last_error(diag_get())->errmsg,
-		  "Value must be boolean, number, or string") == 0,
-	   "check error");
-	is(luaT_dostring(L, "tweaks.bool_var = 999999999999999999LLU"), -1,
-	   "invalid value - big int");
 	ok(!diag_is_empty(diag_get()) &&
 	   strcmp(diag_last_error(diag_get())->errmsg,
 		  "Value must be boolean, number, or string") == 0,
@@ -121,7 +123,7 @@ test_bool_var(void)
 static void
 test_int_var(void)
 {
-	plan(10);
+	plan(22);
 	header();
 	lua_settop(L, 0);
 	is(luaT_dostring(L, "tweaks.int_var = true"), -1,
@@ -130,6 +132,30 @@ test_int_var(void)
 	   strcmp(diag_last_error(diag_get())->errmsg,
 		  "Invalid value, expected integer") == 0,
 	   "check error");
+	is(luaT_dostring(L, "tweaks.int_var = 1.5"), -1,
+	   "set double value");
+	ok(!diag_is_empty(diag_get()) &&
+	   strcmp(diag_last_error(diag_get())->errmsg,
+		  "Invalid value, expected integer") == 0,
+	   "check error");
+	is(luaT_dostring(L, "tweaks.int_var = 9223372036854775808ULL"), -1,
+	   "set too big value");
+	ok(!diag_is_empty(diag_get()) &&
+	   strcmp(diag_last_error(diag_get())->errmsg,
+		  "Invalid value, must be <= 9223372036854775807") == 0,
+	   "check error");
+	is(luaT_dostring(L, "tweaks.int_var = -9223372036854775808LL"), 0,
+	   "set min value");
+	is(int_var, INT64_MIN, "check C value");
+	is(luaT_dostring(L, "return tweaks.int_var"), 0, "get value");
+	is(luaL_toint64(L, 1), INT64_MIN, "check Lua value");
+	lua_settop(L, 0);
+	is(luaT_dostring(L, "tweaks.int_var = 9223372036854775807LL"), 0,
+	   "set max value");
+	is(int_var, INT64_MAX, "check C value");
+	is(luaT_dostring(L, "return tweaks.int_var"), 0, "get value");
+	is(luaL_toint64(L, 1), INT64_MAX, "check Lua value");
+	lua_settop(L, 0);
 	is(luaT_dostring(L, "tweaks.int_var = 11"), 0, "set value");
 	is(int_var, 11, "check C value");
 	is(luaT_dostring(L, "return tweaks.int_var"), 0, "get value");
@@ -145,9 +171,53 @@ test_int_var(void)
 }
 
 static void
+test_uint_var(void)
+{
+	plan(18);
+	header();
+	lua_settop(L, 0);
+	is(luaT_dostring(L, "tweaks.uint_var = true"), -1,
+	   "set invalid value");
+	ok(!diag_is_empty(diag_get()) &&
+	   strcmp(diag_last_error(diag_get())->errmsg,
+		  "Invalid value, expected integer") == 0,
+	   "check error");
+	is(luaT_dostring(L, "tweaks.uint_var = 1.5"), -1,
+	   "set double value");
+	ok(!diag_is_empty(diag_get()) &&
+	   strcmp(diag_last_error(diag_get())->errmsg,
+		  "Invalid value, expected integer") == 0,
+	   "check error");
+	is(luaT_dostring(L, "tweaks.uint_var = -1"), -1,
+	   "set negative value");
+	ok(!diag_is_empty(diag_get()) &&
+	   strcmp(diag_last_error(diag_get())->errmsg,
+		  "Invalid value, must be >= 0") == 0,
+	   "check error");
+	is(luaT_dostring(L, "tweaks.uint_var = 18446744073709551615ULL"), 0,
+	   "set max value");
+	is(uint_var, UINT64_MAX, "check C value");
+	is(luaT_dostring(L, "return tweaks.uint_var"), 0, "get value");
+	is(luaL_touint64(L, 1), UINT64_MAX, "check Lua value");
+	lua_settop(L, 0);
+	is(luaT_dostring(L, "tweaks.uint_var = 11"), 0, "set value");
+	is(uint_var, 11, "check C value");
+	is(luaT_dostring(L, "return tweaks.uint_var"), 0, "get value");
+	is(lua_tointeger(L, 1), 11, "check Lua value");
+	lua_settop(L, 0);
+	is(luaT_dostring(L, "tweaks.uint_var = 123"), 0, "set value");
+	is(uint_var, 123, "check C value");
+	is(luaT_dostring(L, "return tweaks.uint_var"), 0, "get value");
+	is(lua_tointeger(L, 1), 123, "check Lua value");
+	lua_settop(L, 0);
+	footer();
+	check_plan();
+}
+
+static void
 test_double_var(void)
 {
-	plan(10);
+	plan(18);
 	header();
 	lua_settop(L, 0);
 	is(luaT_dostring(L, "tweaks.double_var = true"), -1,
@@ -160,6 +230,18 @@ test_double_var(void)
 	is(double_var, 11, "check C value");
 	is(luaT_dostring(L, "return tweaks.double_var"), 0, "get value");
 	is(lua_tonumber(L, 1), 11, "check Lua value");
+	lua_settop(L, 0);
+	is(luaT_dostring(L, "tweaks.double_var = -9223372036854775808LL"), 0,
+	   "set min int value");
+	is(double_var, (double)INT64_MIN, "check C value");
+	is(luaT_dostring(L, "return tweaks.double_var"), 0, "get value");
+	is(lua_tonumber(L, 1), (double)INT64_MIN, "check Lua value");
+	lua_settop(L, 0);
+	is(luaT_dostring(L, "tweaks.double_var = 18446744073709551615ULL"), 0,
+	   "set max int value");
+	is(double_var, (double)UINT64_MAX, "check C value");
+	is(luaT_dostring(L, "return tweaks.double_var"), 0, "get value");
+	is(lua_tonumber(L, 1), (double)UINT64_MAX, "check Lua value");
 	lua_settop(L, 0);
 	is(luaT_dostring(L, "tweaks.double_var = 3.14"), 0, "set double value");
 	is(double_var, 3.14, "check C value");
@@ -205,7 +287,7 @@ test_enum_var(void)
 static void
 test_tweak_table(const char *method)
 {
-	plan(5);
+	plan(6);
 	header();
 	lua_settop(L, 0);
 	is(luaT_dostring(L, tt_sprintf("return getmetatable(tweaks).%s()",
@@ -216,6 +298,9 @@ test_tweak_table(const char *method)
 	lua_pop(L, 1);
 	lua_getfield(L, 1, "int_var");
 	is(lua_tointeger(L, 2), 42, "int_var");
+	lua_pop(L, 1);
+	lua_getfield(L, 1, "uint_var");
+	is(lua_tointeger(L, 2), 123, "uint_var");
 	lua_pop(L, 1);
 	lua_getfield(L, 1, "double_var");
 	is(lua_tonumber(L, 2), 3.14, "double_var");
@@ -251,12 +336,13 @@ test_autocomplete(void)
 static int
 test_lua_tweaks(void)
 {
-	plan(8);
+	plan(9);
 	header();
 	test_index();
 	test_newindex();
 	test_bool_var();
 	test_int_var();
+	test_uint_var();
 	test_double_var();
 	test_enum_var();
 	test_serialize();
@@ -272,6 +358,8 @@ main(void)
 	fiber_init(fiber_c_invoke);
 
 	L = luaT_newteststate();
+	luaopen_msgpack(L);
+	lua_pop(L, 1);
 	tarantool_lua_tweaks_init(L);
 
 	/*

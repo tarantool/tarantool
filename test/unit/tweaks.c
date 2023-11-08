@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "diag.h"
@@ -14,8 +15,11 @@
 static bool bool_var = true;
 TWEAK_BOOL(bool_var);
 
-static int int_var = 42;
+static int64_t int_var = 42;
 TWEAK_INT(int_var);
+
+static uint64_t uint_var = 123;
+TWEAK_UINT(uint_var);
 
 static double double_var = 3.14;
 TWEAK_DOUBLE(double_var);
@@ -37,11 +41,12 @@ TWEAK_ENUM(my_enum, enum_var);
 static void
 test_lookup(void)
 {
-	plan(5);
+	plan(6);
 	header();
 	ok(tweak_find("no_such_var") == NULL, "no_such_var not found");
 	ok(tweak_find("bool_var") != NULL, "bool_var found");
 	ok(tweak_find("int_var") != NULL, "int_var found");
+	ok(tweak_find("uint_var") != NULL, "uint_var found");
 	ok(tweak_find("double_var") != NULL, "double_var found");
 	ok(tweak_find("enum_var") != NULL, "enum_var found");
 	footer();
@@ -60,6 +65,9 @@ test_foreach_cb(const char *name, struct tweak *tweak, void *arg)
 	} else if (strcmp(name, "int_var") == 0) {
 		is(v.type, TWEAK_VALUE_INT, "int_var tweak value type");
 		is(v.ival, 42, "int_var tweak value");
+	} else if (strcmp(name, "uint_var") == 0) {
+		is(v.type, TWEAK_VALUE_UINT, "uint_var tweak value type");
+		is(v.ival, 123, "uint_var tweak value");
 	} else if (strcmp(name, "double_var") == 0) {
 		is(v.type, TWEAK_VALUE_DOUBLE, "double_var tweak value type");
 		is(v.dval, 3.14, "double_var tweak value");
@@ -73,7 +81,7 @@ test_foreach_cb(const char *name, struct tweak *tweak, void *arg)
 static void
 test_foreach(void)
 {
-	plan(8);
+	plan(10);
 	header();
 	tweak_foreach(test_foreach_cb, NULL);
 	footer();
@@ -154,7 +162,7 @@ test_bool_var(void)
 static void
 test_int_var(void)
 {
-	plan(15);
+	plan(22);
 	header();
 	struct tweak *t;
 	struct tweak_value v;
@@ -172,16 +180,31 @@ test_int_var(void)
 		  "Invalid value, expected integer") == 0,
 	   "diag after set invalid tweak value type");
 	is(int_var, 42, "var value after failed set");
+	v.type = TWEAK_VALUE_UINT;
+	v.uval = (uint64_t)INT64_MAX + 1;
+	is(tweak_set(t, &v), -1, "set too big value");
+	ok(!diag_is_empty(diag_get()) &&
+	   strcmp(diag_last_error(diag_get())->errmsg,
+		  "Invalid value, must be <= 9223372036854775807") == 0,
+	   "diag after set too big value");
+	is(int_var, 42, "var value after failed set");
 	tweak_get(t, &v);
 	is(v.type, TWEAK_VALUE_INT, "tweak value type after failed set");
 	is(v.ival, 42, "tweak value after failed set");
 	v.type = TWEAK_VALUE_INT;
-	v.ival = 11;
-	is(tweak_set(t, &v), 0, "set tweak value");
-	is(int_var, 11, "var value after set");
+	v.ival = -11;
+	is(tweak_set(t, &v), 0, "set tweak value to int");
+	is(int_var, -11, "var value after set to int");
 	tweak_get(t, &v);
-	is(v.type, TWEAK_VALUE_INT, "tweak value type after set");
-	is(v.ival, 11, "tweak value after set");
+	is(v.type, TWEAK_VALUE_INT, "tweak value type after set to int");
+	is(v.ival, -11, "tweak value after set to int");
+	v.type = TWEAK_VALUE_UINT;
+	v.ival = 11;
+	is(tweak_set(t, &v), 0, "set tweak value to uint");
+	is(int_var, 11, "var value after set to uint");
+	tweak_get(t, &v);
+	is(v.type, TWEAK_VALUE_INT, "tweak value type after set to uint");
+	is(v.ival, 11, "tweak value after set to uint");
 	int_var = 42;
 	tweak_get(t, &v);
 	is(v.type, TWEAK_VALUE_INT, "tweak value type after var update");
@@ -191,9 +214,63 @@ test_int_var(void)
 }
 
 static void
+test_uint_var(void)
+{
+	plan(22);
+	header();
+	struct tweak *t;
+	struct tweak_value v;
+	t = tweak_find("uint_var");
+	ok(t != NULL, "tweak found");
+	tweak_get(t, &v);
+	is(uint_var, 123, "init var value");
+	is(v.type, TWEAK_VALUE_UINT, "init tweak value type");
+	is(v.uval, 123, "init tweak value");
+	v.type = TWEAK_VALUE_BOOL;
+	v.bval = true;
+	is(tweak_set(t, &v), -1, "set invalid tweak value type");
+	ok(!diag_is_empty(diag_get()) &&
+	   strcmp(diag_last_error(diag_get())->errmsg,
+		  "Invalid value, expected integer") == 0,
+	   "diag after set invalid tweak value type");
+	is(uint_var, 123, "var value after failed set");
+	v.type = TWEAK_VALUE_INT;
+	v.ival = -1;
+	is(tweak_set(t, &v), -1, "set negative value");
+	ok(!diag_is_empty(diag_get()) &&
+	   strcmp(diag_last_error(diag_get())->errmsg,
+		  "Invalid value, must be >= 0") == 0,
+	   "diag after set negative value");
+	is(uint_var, 123, "var value after failed set");
+	tweak_get(t, &v);
+	is(v.type, TWEAK_VALUE_UINT, "tweak value type after failed set");
+	is(v.uval, 123, "tweak value after failed set");
+	v.type = TWEAK_VALUE_INT;
+	v.ival = 11;
+	is(tweak_set(t, &v), 0, "set tweak value to int");
+	is(uint_var, 11, "var value after set to int");
+	tweak_get(t, &v);
+	is(v.type, TWEAK_VALUE_UINT, "tweak value type after set to int");
+	is(v.uval, 11, "tweak value after set to int");
+	v.type = TWEAK_VALUE_UINT;
+	v.uval = 22;
+	is(tweak_set(t, &v), 0, "set tweak value to uint");
+	is(uint_var, 22, "var value after set to uint");
+	tweak_get(t, &v);
+	is(v.type, TWEAK_VALUE_UINT, "tweak value type after set to uint");
+	is(v.uval, 22, "tweak value after set to uint");
+	uint_var = 123;
+	tweak_get(t, &v);
+	is(v.type, TWEAK_VALUE_UINT, "tweak value type after var update");
+	is(v.uval, 123, "tweak value after var update");
+	footer();
+	check_plan();
+}
+
+static void
 test_double_var(void)
 {
-	plan(19);
+	plan(23);
 	header();
 	struct tweak *t;
 	struct tweak_value v;
@@ -215,12 +292,19 @@ test_double_var(void)
 	is(v.type, TWEAK_VALUE_DOUBLE, "tweak value type after failed set");
 	is(v.dval, 3.14, "tweak value after failed set");
 	v.type = TWEAK_VALUE_INT;
-	v.ival = 11;
+	v.ival = -11;
 	is(tweak_set(t, &v), 0, "set tweak value to int");
-	is(double_var, 11, "var value after set to int");
+	is(double_var, -11, "var value after set to int");
 	tweak_get(t, &v);
 	is(v.type, TWEAK_VALUE_DOUBLE, "tweak value type after set to int");
-	is(v.dval, 11, "tweak value after set to int");
+	is(v.dval, -11, "tweak value after set to int");
+	v.type = TWEAK_VALUE_UINT;
+	v.uval = 11;
+	is(tweak_set(t, &v), 0, "set tweak value to uint");
+	is(double_var, 11, "var value after set to uint");
+	tweak_get(t, &v);
+	is(v.type, TWEAK_VALUE_DOUBLE, "tweak value type after set to uint");
+	is(v.dval, 11, "tweak value after set to uint");
 	v.type = TWEAK_VALUE_DOUBLE;
 	v.dval = 0.5;
 	is(tweak_set(t, &v), 0, "set tweak value to double");
@@ -285,13 +369,14 @@ test_enum_var(void)
 static int
 test_tweaks(void)
 {
-	plan(7);
+	plan(8);
 	header();
 	test_lookup();
 	test_foreach();
 	test_foreach_break();
 	test_bool_var();
 	test_int_var();
+	test_uint_var();
 	test_double_var();
 	test_enum_var();
 	footer();

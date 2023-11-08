@@ -12,6 +12,8 @@
 
 #include "core/tweaks.h"
 #include "diag.h"
+#include "lua/msgpack.h"
+#include "lua/serializer.h"
 #include "lua/utils.h"
 #include "trivia/util.h"
 
@@ -26,7 +28,10 @@ luaT_push_tweak_value(struct lua_State *L, const struct tweak_value *v)
 		lua_pushboolean(L, v->bval);
 		return 1;
 	case TWEAK_VALUE_INT:
-		lua_pushinteger(L, v->ival);
+		luaL_pushint64(L, v->ival);
+		return 1;
+	case TWEAK_VALUE_UINT:
+		luaL_pushuint64(L, v->uval);
 		return 1;
 	case TWEAK_VALUE_DOUBLE:
 		lua_pushnumber(L, v->dval);
@@ -71,26 +76,29 @@ luaT_tweaks_newindex(struct lua_State *L)
 		return luaT_error(L);
 	}
 	struct tweak_value v;
-	switch (lua_type(L, 3)) {
-	case LUA_TBOOLEAN:
+	struct luaL_field field;
+	if (luaL_tofield(L, luaL_msgpack_default, 3, &field) != 0)
+		return luaT_error(L);
+	switch (field.type) {
+	case MP_BOOL:
 		v.type = TWEAK_VALUE_BOOL;
-		v.bval = lua_toboolean(L, 3);
+		v.bval = field.bval;
 		break;
-	case LUA_TNUMBER: {
-		int ival = lua_tointeger(L, 3);
-		double dval = lua_tonumber(L, 3);
-		if (ival == dval) {
-			v.type = TWEAK_VALUE_INT;
-			v.ival = ival;
-		} else {
-			v.type = TWEAK_VALUE_DOUBLE;
-			v.dval = dval;
-		}
+	case MP_INT:
+		v.type = TWEAK_VALUE_INT;
+		v.ival = field.ival;
 		break;
-	}
-	case LUA_TSTRING:
+	case MP_UINT:
+		v.type = TWEAK_VALUE_UINT;
+		v.uval = (uint64_t)field.ival;
+		break;
+	case MP_DOUBLE:
+		v.type = TWEAK_VALUE_DOUBLE;
+		v.dval = field.dval;
+		break;
+	case MP_STR:
 		v.type = TWEAK_VALUE_STR;
-		v.sval = lua_tostring(L, 3);
+		v.sval = field.sval.data;
 		break;
 	default:
 		diag_set(IllegalParams,
