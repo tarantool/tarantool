@@ -451,8 +451,8 @@ static unsigned int yy_find_shift_action(
   int i;
   int stateno = pParser->yytos->stateno;
  
-  if( stateno>=YY_MIN_REDUCE ) return stateno;
-  assert( stateno <= YY_SHIFT_COUNT );
+  assert(stateno>=YY_MIN_REDUCE || stateno<=YY_SHIFT_COUNT);
+  if( stateno>YY_SHIFT_COUNT ) return stateno;
   do{
     i = yy_shift_ofst[stateno];
     assert( iLookAhead!=YYNOCODE );
