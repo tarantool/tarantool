@@ -103,6 +103,14 @@ IPROTO_FEATURE_CALL_ARG_TUPLE_EXTENSION feature bits.
 https://tarantool.io/compat/box_tuple_extension
 ]]
 
+local BOX_SPACE_MAX_BRIEF = [[
+Controls the max space id (box.schema.SPACE_MAX). The old limit is 2147483647.
+The new limit is 2147483646. The limit was decremented because the old value is
+used as an error indicator in the box C API.
+
+https://tarantool.io/compat/box_space_max
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -195,6 +203,12 @@ local options = {
         brief = BOX_TUPLE_EXTENSION_BRIEF,
         run_action_now = true,
         action = tweak_action('box_tuple_extension', false, true)
+    },
+    box_space_max = {
+        default = 'new',
+        obsolete = nil,
+        brief = BOX_SPACE_MAX_BRIEF,
+        action = tweak_action('BOX_SPACE_MAX', 2147483647, 2147483646)
     },
 }
 

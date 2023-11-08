@@ -29,6 +29,14 @@
  * SUCH DAMAGE.
  */
 #include "schema_def.h"
+#include "tweaks.h"
+
+/**
+ * Don't let the user create a space with id = BOX_ID_NIL because
+ * it's used as an error indicator in the box C API.
+ */
+uint64_t BOX_SPACE_MAX = BOX_ID_NIL - 1;
+TWEAK_UINT(BOX_SPACE_MAX);
 
 const char *sql_storage_engine_strs[] = {
 	[SQL_STORAGE_ENGINE_MEMTX] = "memtx",
