@@ -579,9 +579,9 @@ lbox_txn_iterator_next(struct lua_State *L)
 }
 
 /**
- * Open an iterator over the transaction statements. This is a C
- * closure and 1 upvalue should be available - id of the
- * transaction to iterate over.
+ * Open an iterator over the transaction statements. This is a C closure and
+ * 2 upvalues should be available: first is an id of the transaction to iterate
+ * over, second is the first statement of the iteration.
  * It returns 3 values which can be used in Lua 'for': iterator
  * generator function, unused nil and the zero key.
  */
@@ -590,13 +590,14 @@ lbox_txn_pairs(struct lua_State *L)
 {
 	int64_t txn_id = luaL_toint64(L, lua_upvalueindex(1));
 	struct txn *txn = in_txn();
+	struct txn_stmt *stmt;
+	stmt = (struct txn_stmt *)lua_topointer(L, lua_upvalueindex(2));
 	if (txn == NULL || txn->id != txn_id) {
 		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
 		return luaT_error(L);
 	}
 	luaL_pushint64(L, txn_id);
-	lua_pushlightuserdata(L, stailq_first_entry(&txn->stmts,
-						    struct txn_stmt, next));
+	lua_pushlightuserdata(L, stmt);
 	lua_pushcclosure(L, lbox_txn_iterator_next, 2);
 	lua_pushnil(L);
 	lua_pushinteger(L, 0);
@@ -604,15 +605,17 @@ lbox_txn_pairs(struct lua_State *L)
 }
 
 /**
- * Push an argument for on_commit Lua trigger. The argument is
+ * Push an argument for on_commit and on_rollback Lua triggers. The argument is
  * a function to open an iterator over the transaction statements.
  */
 static int
 lbox_push_txn(struct lua_State *L, void *event)
 {
-	struct txn *txn = (struct txn *) event;
+	struct txn *txn = in_txn();
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	luaL_pushint64(L, txn->id);
-	lua_pushcclosure(L, lbox_txn_pairs, 1);
+	lua_pushlightuserdata(L, stmt);
+	lua_pushcclosure(L, lbox_txn_pairs, 2);
 	return 1;
 }
 

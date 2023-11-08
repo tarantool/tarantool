@@ -909,6 +909,13 @@ txn_is_first_statement(struct txn *txn)
 	return stailq_last(&txn->stmts) == stailq_first(&txn->stmts);
 }
 
+/** The first statement of the transaction. */
+static inline struct txn_stmt *
+txn_first_stmt(struct txn *txn)
+{
+	return stailq_first_entry(&txn->stmts, struct txn_stmt, next);
+}
+
 /** The current statement of the transaction. */
 static inline struct txn_stmt *
 txn_current_stmt(struct txn *txn)

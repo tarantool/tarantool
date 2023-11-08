@@ -1219,8 +1219,9 @@ applier_rollback_by_wal_io(int64_t signature)
 static int
 applier_txn_rollback_cb(struct trigger *trigger, void *event)
 {
-	(void) trigger;
-	struct txn *txn = (struct txn *) event;
+	(void)trigger;
+	(void)event;
+	struct txn *txn = in_txn();
 	/*
 	 * Synchronous transaction rollback due to receiving a
 	 * ROLLBACK entry is a normal event and requires no
