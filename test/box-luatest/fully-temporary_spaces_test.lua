@@ -62,9 +62,8 @@ g.test_temporary_create = function()
         s:drop()
 
         -- Now there's no more room to grow...
-        local BOX_SPACE_MAX = 0x7fffffff
         box.schema.space.create('temp2', { type = 'temporary',
-                                           id = BOX_SPACE_MAX })
+                                           id = box.schema.SPACE_MAX })
 
         -- ... therefore we start filling in the gaps
         s = box.schema.space.create('temp4', { type = 'temporary' })

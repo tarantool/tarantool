@@ -41,7 +41,7 @@ box.schema.INDEX_MAX
 ...
 box.schema.SPACE_MAX
 ---
-- 2147483647
+- 2147483646
 ...
 box.schema.SYSTEM_ID_MAX
 ---

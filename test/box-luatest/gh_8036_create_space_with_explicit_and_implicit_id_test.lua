@@ -55,13 +55,13 @@ g.test_create_space_with_explicit_and_implicit_id_space_id_overflow = function()
     g.server:exec(function()
         box.schema.space.create('SPACE', {
         format = {{name = 'id', type = 'unsigned'}},
-            id = 0x7fffffff
+            id = box.schema.SPACE_MAX,
         })
         box.schema.space.create('SPACE2', {
             format = {{name = 'id', type = 'unsigned'}}
         })
         t.assert_not_equals(box.space.SPACE, nil)
-        t.assert_equals(box.space.SPACE.id, 0x7fffffff)
+        t.assert_equals(box.space.SPACE.id, box.schema.SPACE_MAX)
         t.assert_not_equals(box.space.SPACE2, nil)
         t.assert_equals(box.space.SPACE2.id, 512)
     end)

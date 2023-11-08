@@ -39,7 +39,6 @@ extern "C" {
 
 enum {
 	BOX_ENGINE_MAX = 3, /* + 1 to the actual number of engines */
-	BOX_SPACE_MAX = INT32_MAX,
 	BOX_FUNCTION_MAX = 32000,
 	BOX_INDEX_MAX = 128,
 	BOX_NAME_MAX = 65000,
@@ -130,6 +129,9 @@ enum {
 	BOX_ID_NIL = 2147483647
 };
 /** \endcond public */
+
+/** Max possible space id. */
+extern uint64_t BOX_SPACE_MAX;
 
 /** _space fields. */
 enum {
