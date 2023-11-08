@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "iproto_port.h"
 #include "tarantool.h"
@@ -41,6 +42,13 @@
 #include "evio.h"
 #include "session.h"
 #include "scoped_guard.h"
+
+static struct timespec t_input;
+static struct timespec t_input_finish;
+static struct timespec t_output;
+static struct timespec t_output_finish;
+static struct timespec t_process_request;
+static struct timespec t_process_request_finish;
 
 static struct iproto_header dummy_header = { 0, 0, 0 };
 const uint32_t msg_ping = 0xff00;
@@ -504,6 +512,7 @@ static void
 iproto_session_on_input(struct ev_io *watcher,
 			int revents __attribute__((unused)))
 {
+	clock_gettime(CLOCK_MONOTONIC, &t_input);
 	struct iproto_session *session = (struct iproto_session *) watcher->data;
 	int fd = session->input.fd;
 	assert(fd >= 0);
@@ -542,6 +551,7 @@ iproto_session_on_input(struct ev_io *watcher,
 		e.log();
 		iproto_session_shutdown(session);
 	}
+	clock_gettime(CLOCK_MONOTONIC, &t_input_finish);
 }
 
 /** Get the iobuf which is currently being flushed. */
@@ -593,10 +603,23 @@ iproto_flush(struct iobuf *iobuf, int fd, struct obuf_svp *svp)
 	return -1;
 }
 
+static size_t
+timespec_diff_ns(struct timespec t0, struct timespec t1)
+{
+        size_t diff_sec = t1.tv_sec - t0.tv_sec;
+        size_t diff_nsec = t1.tv_nsec - t0.tv_nsec;
+        if (t1.tv_nsec < t0.tv_nsec) {
+                diff_sec--;
+                diff_nsec = 1000000000 + t1.tv_nsec - t0.tv_nsec;
+        }
+        return diff_sec * 1000000000 + diff_nsec;
+}
+
 static void
 iproto_session_on_output(struct ev_io *watcher,
 			 int revent __attribute__((unused)))
 {
+	clock_gettime(CLOCK_MONOTONIC, &t_output);
 	struct iproto_session *session = (struct iproto_session *) watcher->data;
 	int fd = session->output.fd;
 	struct obuf_svp *svp = &session->write_pos;
@@ -617,6 +640,15 @@ iproto_session_on_output(struct ev_io *watcher,
 		e.log();
 		iproto_session_shutdown(session);
 	}
+	clock_gettime(CLOCK_MONOTONIC, &t_output_finish);
+	size_t input = timespec_diff_ns(t_input, t_input_finish);
+	size_t process_request = timespec_diff_ns(t_process_request, t_process_request_finish);
+	size_t output = timespec_diff_ns(t_output, t_output_finish);
+	size_t overall = timespec_diff_ns(t_input, t_output_finish);
+	printf("Input: %zu\n", input);
+	printf("Processing: %zu\n", process_request);
+	printf("Output: %zu\n", output);
+	printf("Overall: %zu\n", overall);
 }
 
 /* }}} */
@@ -670,6 +702,7 @@ iproto_reply(struct iproto_port *port, box_process_func callback,
 static void
 iproto_process_request(struct iproto_request *request)
 {
+	clock_gettime(CLOCK_MONOTONIC, &t_process_request);
 	struct iproto_session *session = request->session;
 	struct iproto_header *header = request->header;
 	struct iobuf *iobuf = request->iobuf;
@@ -691,6 +724,7 @@ iproto_process_request(struct iproto_request *request)
 
 	if (! ev_is_active(&session->output))
 		ev_feed_event(&session->output, EV_WRITE);
+	clock_gettime(CLOCK_MONOTONIC, &t_process_request_finish);
 }
 
 /**
