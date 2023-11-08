@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "diag.h"
 #include "trivia/util.h"
@@ -16,7 +17,7 @@
  * an arbitrary C variable. To register a tweak, use a TWEAK_XXX macro
  * at the global level in a C source file, for example:
  *
- *   static int my_var;
+ *   static int64_t my_var;
  *   TWEAK_INT(my_var);
  *
  * This will create a tweak with name "my_var" that can be accessed with
@@ -35,6 +36,7 @@ extern "C" {
 enum tweak_value_type {
 	TWEAK_VALUE_BOOL,
 	TWEAK_VALUE_INT,
+	TWEAK_VALUE_UINT,
 	TWEAK_VALUE_DOUBLE,
 	TWEAK_VALUE_STR,
 };
@@ -47,7 +49,9 @@ struct tweak_value {
 		/** TWEAK_VALUE_BOOL */
 		bool bval;
 		/** TWEAK_VALUE_INT */
-		int ival;
+		int64_t ival;
+		/** TWEAK_VALUE_UINT */
+		uint64_t uval;
 		/** TWEAK_VALUE_DOUBLE */
 		double dval;
 		/** TWEAK_VALUE_STR */
@@ -166,8 +170,21 @@ tweak_set_int(struct tweak *tweak, const struct tweak_value *val);
 
 /** Registers a tweak for an integer variable. */
 #define TWEAK_INT(var)							\
-STATIC_ASSERT_VAR_TYPE(var, int)					\
+STATIC_ASSERT_VAR_TYPE(var, int64_t)					\
 TWEAK(var, tweak_get_int, tweak_set_int)
+
+/** Unsigned integer tweak value getter. */
+void
+tweak_get_uint(struct tweak *tweak, struct tweak_value *val);
+
+/** Unsigned integer tweak value setter. */
+int
+tweak_set_uint(struct tweak *tweak, const struct tweak_value *val);
+
+/** Registers a tweak for an unsigned integer variable. */
+#define TWEAK_UINT(var)							\
+STATIC_ASSERT_VAR_TYPE(var, uint64_t)					\
+TWEAK(var, tweak_get_uint, tweak_set_uint)
 
 /** Double tweak value getter. */
 void
