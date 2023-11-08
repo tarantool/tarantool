@@ -382,13 +382,26 @@ txn_update_row_counts(struct txn *txn, struct txn_stmt *stmt, int ofs)
 	}
 }
 
+/**
+ * Rollback all statements of `txn' newer than `svp', and run `on_rollback'
+ * triggers if `run_triggers' is true.
+ * The statements are rolled back in reverse order.
+ */
 static void
-txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
+txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp,
+		    bool run_triggers)
 {
 	struct txn_stmt *stmt;
 	struct stailq rollback;
 	stailq_cut_tail(&txn->stmts, svp, &rollback);
 	stailq_reverse(&rollback);
+	if (run_triggers && txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
+		stmt = stailq_first_entry(&rollback, struct txn_stmt, next);
+		if (trigger_run(&txn->on_rollback, stmt) != 0) {
+			diag_log();
+			panic("transaction rollback trigger failed");
+		}
+	}
 	stailq_foreach_entry(stmt, &rollback, next) {
 		txn_rollback_one_stmt(txn, stmt);
 		if (stmt->row != NULL)
@@ -1116,7 +1129,7 @@ txn_rollback_stmt(struct txn *txn)
 		return;
 	assert(txn->in_sub_stmt > 0);
 	txn->in_sub_stmt--;
-	txn_rollback_to_svp(txn, txn->sub_stmt_begin[txn->in_sub_stmt]);
+	txn_rollback_to_svp(txn, txn->sub_stmt_begin[txn->in_sub_stmt], false);
 }
 
 void
@@ -1424,7 +1437,7 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 		diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
 		return -1;
 	}
-	txn_rollback_to_svp(txn, svp->stmt);
+	txn_rollback_to_svp(txn, svp->stmt, false);
 	/* Discard from list all newer savepoints. */
 	RLIST_HEAD(discard);
 	rlist_cut_before(&discard, &txn->savepoints, &svp->link);
@@ -1461,13 +1474,26 @@ txn_on_stop(struct trigger *trigger, void *event)
 	return 0;
 }
 
+/**
+ * Transaction rollback timer callback.
+ *
+ * If there are `on_rollback' triggers, the transaction can not be rolled back
+ * completely here, because this callback is invoked outside of the transaction,
+ * however triggers must be executed in the fiber with the active transaction.
+ * Thus, the transaction is marked as aborted here, and rolled back at commit.
+ * As opposed to abort-by-yield, it is OK to postpone the rollback, because in
+ * memtx the transaction can be aborted by timeout only when MVCC is on.
+ */
 static void
 txn_on_timeout(ev_loop *loop, ev_timer *watcher, int revents)
 {
 	(void) loop;
 	(void) revents;
 	struct txn *txn = (struct txn *)watcher->data;
-	txn_rollback_to_svp(txn, NULL);
+	if (!txn_has_flag(txn, TXN_HAS_TRIGGERS) ||
+	    rlist_empty(&txn->on_rollback)) {
+		txn_rollback_to_svp(txn, NULL, false);
+	}
 	txn->status = TXN_ABORTED;
 	txn_set_flags(txn, TXN_IS_ABORTED_BY_TIMEOUT);
 }
@@ -1497,10 +1523,16 @@ txn_on_yield(struct trigger *trigger, void *event)
 	struct txn *txn = in_txn();
 	assert(txn != NULL);
 	if (txn->status != TXN_ABORTED && !txn_has_flag(txn, TXN_CAN_YIELD)) {
-		txn_rollback_to_svp(txn, NULL);
+		txn_rollback_to_svp(txn, NULL, true);
 		txn->status = TXN_ABORTED;
 		txn_set_flags(txn, TXN_IS_ABORTED_BY_YIELD);
 		say_warn("Transaction has been aborted by a fiber yield");
+		if (txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
+			/* Can't rollback more than once. */
+			trigger_destroy(&txn->on_rollback);
+			/* Commit won't happen after rollback. */
+			trigger_destroy(&txn->on_commit);
+		}
 		return 0;
 	}
 	if (txn->rollback_timer == NULL && txn->timeout != TIMEOUT_INFINITY) {
