@@ -283,6 +283,8 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
 		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
+		if (rc != 0 && fiber_is_cancelled())
+			return -1;
 		if (txn_limbo_is_frozen(limbo))
 			goto wait;
 		if (rc != 0)
