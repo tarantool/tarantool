@@ -327,7 +327,8 @@ memtx_engine_recover_synchro(const struct xrow_header *row)
 {
 	assert(row->type == IPROTO_RAFT_PROMOTE);
 	struct synchro_request req;
-	if (xrow_decode_synchro(row, &req) != 0)
+	struct vclock synchro_vclock;
+	if (xrow_decode_synchro(row, &req, &synchro_vclock) != 0)
 		return -1;
 	/*
 	 * Origin id cannot be deduced from row.replica_id in a checkpoint,
@@ -767,6 +768,8 @@ struct checkpoint {
 	struct xdir dir;
 	struct raft_request raft;
 	struct synchro_request synchro_state;
+	/** The limbo confirmed vclock at the moment of checkpoint creation. */
+	struct vclock synchro_vclock;
 	/**
 	 * Do nothing, just touch the snapshot file - the
 	 * checkpoint already exists.
@@ -823,7 +826,8 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID, &opts);
 	vclock_create(&ckpt->vclock);
 	box_raft_checkpoint_local(&ckpt->raft);
-	txn_limbo_checkpoint(&txn_limbo, &ckpt->synchro_state);
+	txn_limbo_checkpoint(&txn_limbo, &ckpt->synchro_state,
+			     &ckpt->synchro_vclock);
 	ckpt->touch = false;
 	return ckpt;
 }

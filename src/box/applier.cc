@@ -795,8 +795,11 @@ applier_wait_snapshot(struct applier *applier)
 				xrow_decode_error_xc(&row);
 			} else if (iproto_type_is_promote_request(row.type)) {
 				struct synchro_request req;
-				if (xrow_decode_synchro(&row, &req) != 0)
+				struct vclock limbo_vclock;
+				if (xrow_decode_synchro(&row, &req,
+							&limbo_vclock) != 0) {
 					diag_raise();
+				}
 				if (txn_limbo_process(&txn_limbo, &req) != 0)
 					diag_raise();
 			} else if (iproto_type_is_raft_request(row.type)) {
@@ -1102,7 +1105,7 @@ applier_parse_tx_row(struct applier_tx_row *tx_row)
 			diag_raise();
 		}
 	} else if (iproto_type_is_synchro_request(type)) {
-		if (xrow_decode_synchro(row, &tx_row->req.synchro) != 0) {
+		if (xrow_decode_synchro(row, &tx_row->req.synchro, NULL) != 0) {
 			diag_raise();
 		}
 	} else if (iproto_type_is_raft_request(type)) {

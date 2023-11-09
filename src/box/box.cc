@@ -681,7 +681,7 @@ wal_stream_apply_synchro_row(struct wal_stream *stream, struct xrow_header *row)
 		return -1;
 	}
 	struct synchro_request syn_req;
-	if (xrow_decode_synchro(row, &syn_req) != 0) {
+	if (xrow_decode_synchro(row, &syn_req, NULL) != 0) {
 		say_error("couldn't decode a synchro request");
 		return -1;
 	}
