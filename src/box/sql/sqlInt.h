@@ -1223,7 +1223,7 @@ struct UnpackedRecord {
  * @param field Number of field to be examined.
  * @retval Estimate logarithm of tuples selected by given field.
  */
-log_est_t
+int16_t
 index_field_tuple_est(const struct index_def *idx, uint32_t field);
 
 #ifdef DEFAULT_TUPLE_COUNT

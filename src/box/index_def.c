@@ -49,7 +49,6 @@ const struct index_opts index_opts_default = {
 	/* .run_size_ratio      = */ 3.5,
 	/* .bloom_fpr           = */ 0.05,
 	/* .lsn                 = */ 0,
-	/* .stat                = */ NULL,
 	/* .func                = */ 0,
 	/* .hint                = */ INDEX_HINT_DEFAULT,
 };
@@ -135,8 +134,6 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->space_id = space_id;
 	def->iid = iid;
 	def->opts = *opts;
-	/* Statistics are initialized separately. */
-	assert(opts->stat == NULL);
 	return def;
 }
 
@@ -151,61 +148,6 @@ index_def_dup(const struct index_def *def)
 	dup->pk_def = key_def_dup(def->pk_def);
 	rlist_create(&dup->link);
 	dup->opts = def->opts;
-	if (def->opts.stat != NULL)
-		dup->opts.stat = index_stat_dup(def->opts.stat);
-	return dup;
-}
-
-size_t
-index_stat_sizeof(const struct index_sample *samples, uint32_t sample_count,
-		  uint32_t field_count)
-{
-	/* Space for index_stat struct itself. */
-	size_t alloc_size = sizeof(struct index_stat);
-	/*
-	 * Space for stat1, log_est and avg_eg arrays.
-	 * stat1 and log_est feature additional field
-	 * to describe total count of tuples in index.
-	 */
-	alloc_size += (3 * field_count + 2) * sizeof(uint32_t);
-	/* Space for samples structs. */
-	alloc_size += sizeof(struct index_sample) * sample_count;
-	/* Space for eq, lt and dlt stats. */
-	alloc_size += 3 * sizeof(uint32_t) * field_count * sample_count;
-	/* Space for sample keys. */
-	for (uint32_t i = 0; i < sample_count; ++i)
-		alloc_size += samples[i].key_size;
-	return alloc_size;
-}
-
-struct index_stat *
-index_stat_dup(const struct index_stat *src)
-{
-	size_t size = index_stat_sizeof(src->samples, src->sample_count,
-					src->sample_field_count);
-	struct index_stat *dup = xmalloc(size);
-	memcpy(dup, src, size);
-	uint32_t array_size = src->sample_field_count * sizeof(uint32_t);
-	uint32_t stat1_offset = sizeof(struct index_stat);
-	char *pos = (char *) dup + stat1_offset;
-	dup->tuple_stat1 = (uint32_t *) pos;
-	pos += array_size + sizeof(uint32_t);
-	dup->tuple_log_est = (log_est_t *) pos;
-	pos += array_size + sizeof(uint32_t);
-	dup->avg_eq = (uint32_t *) pos;
-	pos += array_size;
-	dup->samples = (struct index_sample *) pos;
-	pos += src->sample_count * sizeof(struct index_sample);
-	for (uint32_t i = 0; i < src->sample_count; ++i) {
-		dup->samples[i].eq = (uint32_t *) pos;
-		pos += array_size;
-		dup->samples[i].lt = (uint32_t *) pos;
-		pos += array_size;
-		dup->samples[i].dlt = (uint32_t *) pos;
-		pos += array_size;
-		dup->samples[i].sample_key = pos;
-		pos += dup->samples[i].key_size;
-	}
 	return dup;
 }
 

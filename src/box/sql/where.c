@@ -936,215 +936,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 }
 
 /*
- * Estimate the location of a particular key among all keys in an
- * index.  Store the results in aStat as follows:
- *
- *    aStat[0]      Est. number of rows less than pRec
- *    aStat[1]      Est. number of rows equal to pRec
- *
- * Return the index of the sample that is the smallest sample that
- * is greater than or equal to pRec. Note that this index is not an index
- * into the aSample[] array - it is an index into a virtual set of samples
- * based on the contents of aSample[] and the number of fields in record
- * pRec.
- *
- * @param idx_def Definition of index.
- * @param pRec Vector of values to consider.
- * @param roundUp Round up if true.  Round down if false.
- * @param[out] aStat stats written here.
- */
-static int
-whereKeyStats(struct index_def *idx_def, struct UnpackedRecord *pRec,
-	      int roundUp, unsigned *aStat)
-{
-	struct space *space = space_by_id(idx_def->space_id);
-	assert(space != NULL);
-	struct index *idx = space_index(space, idx_def->iid);
-	assert(idx != NULL && idx->def->opts.stat != NULL);
-	struct index_sample *samples = idx->def->opts.stat->samples;
-	assert(idx->def->opts.stat->sample_count > 0);
-	assert(idx->def->opts.stat->samples != NULL);
-	assert(idx->def->opts.stat->sample_field_count >= pRec->nField);
-	int iCol;		/* Index of required stats in anEq[] etc. */
-	int i;			/* Index of first sample >= pRec */
-	int iSample;		/* Smallest sample larger than or equal to pRec */
-	int iMin = 0;		/* Smallest sample not yet tested */
-	int iTest;		/* Next sample to test */
-	int res;		/* Result of comparison operation */
-	int nField;		/* Number of fields in pRec */
-	tRowcnt iLower = 0;	/* anLt[] + anEq[] of largest sample pRec is > */
-
-	assert(pRec != 0);
-	assert(pRec->nField > 0);
-
-	/* Do a binary search to find the first sample greater than or equal
-	 * to pRec. If pRec contains a single field, the set of samples to search
-	 * is simply the aSample[] array. If the samples in aSample[] contain more
-	 * than one fields, all fields following the first are ignored.
-	 *
-	 * If pRec contains N fields, where N is more than one, then as well as the
-	 * samples in aSample[] (truncated to N fields), the search also has to
-	 * consider prefixes of those samples. For example, if the set of samples
-	 * in aSample is:
-	 *
-	 *     aSample[0] = (a, 5)
-	 *     aSample[1] = (a, 10)
-	 *     aSample[2] = (b, 5)
-	 *     aSample[3] = (c, 100)
-	 *     aSample[4] = (c, 105)
-	 *
-	 * Then the search space should ideally be the samples above and the
-	 * unique prefixes [a], [b] and [c]. But since that is hard to organize,
-	 * the code actually searches this set:
-	 *
-	 *     0: (a)
-	 *     1: (a, 5)
-	 *     2: (a, 10)
-	 *     3: (a, 10)
-	 *     4: (b)
-	 *     5: (b, 5)
-	 *     6: (c)
-	 *     7: (c, 100)
-	 *     8: (c, 105)
-	 *     9: (c, 105)
-	 *
-	 * For each sample in the aSample[] array, N samples are present in the
-	 * effective sample array. In the above, samples 0 and 1 are based on
-	 * sample aSample[0]. Samples 2 and 3 on aSample[1] etc.
-	 *
-	 * Often, sample i of each block of N effective samples has (i+1) fields.
-	 * Except, each sample may be extended to ensure that it is greater than or
-	 * equal to the previous sample in the array. For example, in the above,
-	 * sample 2 is the first sample of a block of N samples, so at first it
-	 * appears that it should be 1 field in size. However, that would make it
-	 * smaller than sample 1, so the binary search would not work. As a result,
-	 * it is extended to two fields. The duplicates that this creates do not
-	 * cause any problems.
-	 */
-	nField = pRec->nField;
-	iCol = 0;
-	uint32_t sample_count = idx->def->opts.stat->sample_count;
-	iSample = sample_count * nField;
-	do {
-		int iSamp;	/* Index in aSample[] of test sample */
-		int n;		/* Number of fields in test sample */
-
-		iTest = (iMin + iSample) / 2;
-		iSamp = iTest / nField;
-		if (iSamp > 0) {
-			/* The proposed effective sample is a prefix of sample aSample[iSamp].
-			 * Specifically, the shortest prefix of at least (1 + iTest%nField)
-			 * fields that is greater than the previous effective sample.
-			 */
-			for (n = (iTest % nField) + 1; n < nField; n++) {
-				if (samples[iSamp - 1].lt[n - 1] !=
-				    samples[iSamp].lt[n - 1])
-					break;
-			}
-		} else {
-			n = iTest + 1;
-		}
-
-		pRec->nField = n;
-		res =
-		    sqlVdbeRecordCompareMsgpack(samples[iSamp].sample_key,
-						    pRec);
-		if (res < 0) {
-			iLower =
-			    samples[iSamp].lt[n - 1] + samples[iSamp].eq[n - 1];
-			iMin = iTest + 1;
-		} else if (res == 0 && n < nField) {
-			iLower = samples[iSamp].lt[n - 1];
-			iMin = iTest + 1;
-			res = -1;
-		} else {
-			iSample = iTest;
-			iCol = n - 1;
-		}
-	} while (res && iMin < iSample);
-	i = iSample / nField;
-
-#ifdef SQL_DEBUG
-	/* The following assert statements check that the binary search code
-	 * above found the right answer. This block serves no purpose other
-	 * than to invoke the asserts.
-	 */
-	if (res == 0) {
-		/* If res == 0, then pRec must be equal to sample i. */
-		assert(i < (int)sample_count);
-		assert(iCol == nField - 1);
-		pRec->nField = nField;
-		assert(sqlVdbeRecordCompareMsgpack(samples[i].sample_key,
-						   pRec) == 0);
-	} else {
-		/*
-		 * Unless i == pIdx->nSample, indicating that pRec is larger
-		 * than all samples in the aSample[] array, pRec must be smaller
-		 * than the iCol + 1 field prefix of sample i.
-		 */
-		assert(i <= (int)sample_count && i >= 0);
-		pRec->nField = iCol + 1;
-		assert(i == (int)sample_count ||
-		       sqlVdbeRecordCompareMsgpack(samples[i].sample_key,
-						   pRec) > 0);
-
-		/*
-		 * if i == 0 and iCol == 0, then record pRec is smaller than all
-		 * samples in the aSample[] array. Otherwise, if iCol > 0 then
-		 * pRec must be greater than or equal to the iCol field prefix
-		 * of sample i. If i > 0, then pRec must also be greater than
-		 * sample i - 1.
-		 */
-		if (iCol > 0) {
-			pRec->nField = iCol;
-			assert(sqlVdbeRecordCompareMsgpack(
-				samples[i].sample_key, pRec) <= 0);
-		}
-		if (i > 0) {
-			pRec->nField = nField;
-			assert(sqlVdbeRecordCompareMsgpack(
-				samples[i - 1].sample_key, pRec) < 0);
-		}
-	}
-#endif				/* ifdef SQL_DEBUG */
-
-	if (res == 0) {
-		/* Record pRec is equal to sample i */
-		assert(iCol == nField - 1);
-		aStat[0] = samples[i].lt[iCol];
-		aStat[1] = samples[i].eq[iCol];
-	} else {
-		/* At this point, the (iCol+1) field prefix of aSample[i] is the first
-		 * sample that is greater than pRec. Or, if i==pIdx->nSample then pRec
-		 * is larger than all samples in the array.
-		 */
-		tRowcnt iUpper, iGap;
-		if (i >= (int) sample_count) {
-			iUpper = sqlLogEstToInt(idx->def->opts.stat->tuple_log_est[0]);
-		} else {
-			iUpper = samples[i].lt[iCol];
-		}
-
-		if (iLower >= iUpper) {
-			iGap = 0;
-		} else {
-			iGap = iUpper - iLower;
-		}
-		if (roundUp) {
-			iGap = (iGap * 2) / 3;
-		} else {
-			iGap = iGap / 3;
-		}
-		aStat[0] = iLower + iGap;
-		aStat[1] = idx->def->opts.stat->avg_eq[iCol];
-	}
-
-	/* Restore the pRec->nField value before returning.  */
-	pRec->nField = nField;
-	return i;
-}
-
-/*
  * If it is not NULL, pTerm is a term that provides an upper or lower
  * bound on a range scan. Without considering pTerm, it is estimated
  * that the scan will visit nNew rows. This function returns the number
@@ -1168,120 +959,6 @@ whereRangeAdjust(WhereTerm * pTerm, LogEst nNew)
 		}
 	}
 	return nRet;
-}
-
-/*
- * This function is called to estimate the number of rows visited by a
- * range-scan on a skip-scan index. For example:
- *
- *   CREATE INDEX i1 ON t1(a, b, c);
- *   SELECT * FROM t1 WHERE a=? AND c BETWEEN ? AND ?;
- *
- * Value pLoop->nOut is currently set to the estimated number of rows
- * visited for scanning (a=? AND b=?). This function reduces that estimate
- * by some factor to account for the (c BETWEEN ? AND ?) expression based
- * on the stat4 data for the index. this scan will be peformed multiple
- * times (once for each (a,b) combination that matches a=?) is dealt with
- * by the caller.
- *
- * It does this by scanning through all stat4 samples, comparing values
- * extracted from pLower and pUpper with the corresponding column in each
- * sample. If L and U are the number of samples found to be less than or
- * equal to the values extracted from pLower and pUpper respectively, and
- * N is the total number of samples, the pLoop->nOut value is adjusted
- * as follows:
- *
- *   nOut = nOut * ( min(U - L, 1) / N )
- *
- * If pLower is NULL, or a value cannot be extracted from the term, L is
- * set to zero. If pUpper is NULL, or a value cannot be extracted from it,
- * U is set to N.
- *
- * Normally, this function sets *pbDone to 1 before returning. However,
- * if no value can be extracted from either pLower or pUpper (and so the
- * estimate of the number of rows delivered remains unchanged), *pbDone
- * is left as is.
- *
- * If an error occurs, an sql error code is returned. Otherwise,
- * 0.
- */
-static int
-whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
-		      WhereTerm * pLower,	/* Lower bound on the range. ex: "x>123" Might be NULL */
-		      WhereTerm * pUpper,	/* Upper bound on the range. ex: "x<455" Might be NULL */
-		      WhereLoop * pLoop,	/* Update the .nOut value of this loop */
-		      int *pbDone)		/* Set to true if at least one expr. value extracted */
-{
-	struct index_def *p = pLoop->index_def;
-	struct space *space = space_by_id(p->space_id);
-	assert(space != NULL);
-	struct index *index = space_index(space, p->iid);
-	assert(index != NULL && index->def->opts.stat != NULL);
-	int nEq = pLoop->nEq;
-	int nLower = -1;
-	int nUpper = index->def->opts.stat->sample_count + 1;
-	int rc = 0;
-	enum field_type type = p->key_def->parts[nEq].type;
-
-	/* Value extracted from pLower */
-	struct Mem *p1 = NULL;
-	/* Value extracted from pUpper */
-	struct Mem *p2 = NULL;
-	/* Value extracted from record */
-	struct Mem *pVal = NULL;
-
-	struct coll *coll = p->key_def->parts[nEq].coll;
-	if (pLower) {
-		rc = sqlStat4ValueFromExpr(pParse, pLower->pExpr->pRight,
-					       type, &p1);
-		nLower = 0;
-	}
-	if (pUpper != NULL && rc == 0) {
-		rc = sqlStat4ValueFromExpr(pParse, pUpper->pExpr->pRight,
-					       type, &p2);
-		nUpper = p2 ? 0 : index->def->opts.stat->sample_count;
-	}
-
-	if (p1 || p2) {
-		int i;
-		int nDiff;
-		uint32_t sample_count = index->def->opts.stat->sample_count;
-		for (i = 0; i < (int)sample_count; i++) {
-			if (p1 != NULL && mem_cmp_scalar(p1, pVal, coll) >= 0)
-				nLower++;
-			if (p2 != NULL && mem_cmp_scalar(p2, pVal, coll) >= 0)
-				nUpper++;
-		}
-		nDiff = (nUpper - nLower);
-		if (nDiff <= 0)
-			nDiff = 1;
-
-		/* If there is both an upper and lower bound specified, and the
-		 * comparisons indicate that they are close together, use the fallback
-		 * method (assume that the scan visits 1/64 of the rows) for estimating
-		 * the number of rows visited. Otherwise, estimate the number of rows
-		 * using the method described in the header comment for this function.
-		 */
-		if (nDiff != 1 || pUpper == 0 || pLower == 0) {
-			int nAdjust =
-			    (sqlLogEst(sample_count) -
-			     sqlLogEst(nDiff));
-			pLoop->nOut -= nAdjust;
-			*pbDone = 1;
-			WHERETRACE(0x10,
-				   ("range skip-scan regions: %u..%u  adjust=%d est=%d\n",
-				    nLower, nUpper, nAdjust * -1, pLoop->nOut));
-		}
-
-	} else {
-		assert(*pbDone == 0);
-	}
-
-	mem_delete(p1);
-	mem_delete(p2);
-	mem_delete(pVal);
-
-	return rc;
 }
 
 /*
@@ -1325,172 +1002,12 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
  * rows visited by a factor of 64.
  */
 static int
-whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
-		  WhereLoopBuilder * pBuilder, WhereTerm * pLower,	/* Lower bound on the range. ex: "x>123" Might be NULL */
-		  WhereTerm * pUpper,	/* Upper bound on the range. ex: "x<455" Might be NULL */
-		  WhereLoop * pLoop)	/* Modify the .nOut and maybe .rRun fields */
+whereRangeScanEst(struct WhereTerm *pLower, struct WhereTerm *pUpper,
+		  struct WhereLoop *pLoop)
 {
 	int rc = 0;
 	int nOut = pLoop->nOut;
 	LogEst nNew;
-
-	struct index_def *p = pLoop->index_def;
-	int nEq = pLoop->nEq;
-	struct space *space = space_by_id(p->space_id);
-	assert(space != NULL);
-	struct index *idx = space_index(space, p->iid);
-	assert(idx != NULL);
-	struct index_stat *stat = idx->def->opts.stat;
-	/*
-	 * Create surrogate stat in case ANALYZE command hasn't
-	 * been ran. Simply fill it with zeros.
-	 */
-	struct index_stat surrogate_stat;
-	memset(&surrogate_stat, 0, sizeof(surrogate_stat));
-	if (stat == NULL)
-		stat = &surrogate_stat;
-	if (stat->sample_count > 0 && nEq < (int) stat->sample_field_count) {
-		if (nEq == pBuilder->nRecValid) {
-			UnpackedRecord *pRec = pBuilder->pRec;
-			tRowcnt a[2];
-			int nBtm = pLoop->nBtm;
-			int nTop = pLoop->nTop;
-
-			/* Variable iLower will be set to the estimate of the number of rows in
-			 * the index that are less than the lower bound of the range query. The
-			 * lower bound being the concatenation of $P and $L, where $P is the
-			 * key-prefix formed by the nEq values matched against the nEq left-most
-			 * columns of the index, and $L is the value in pLower.
-			 *
-			 * Or, if pLower is NULL or $L cannot be extracted from it (because it
-			 * is not a simple variable or literal value), the lower bound of the
-			 * range is $P. Due to a quirk in the way whereKeyStats() works, even
-			 * if $L is available, whereKeyStats() is called for both ($P) and
-			 * ($P:$L) and the larger of the two returned values is used.
-			 *
-			 * Similarly, iUpper is to be set to the estimate of the number of rows
-			 * less than the upper bound of the range query. Where the upper bound
-			 * is either ($P) or ($P:$U). Again, even if $U is available, both values
-			 * of iUpper are requested of whereKeyStats() and the smaller used.
-			 *
-			 * The number of rows between the two bounds is then just iUpper-iLower.
-			 */
-			tRowcnt iLower;	/* Rows less than the lower bound */
-			tRowcnt iUpper;	/* Rows less than the upper bound */
-			int iLwrIdx = -2;	/* aSample[] for the lower bound */
-			int iUprIdx = -1;	/* aSample[] for the upper bound */
-
-			if (pRec) {
-				pRec->nField = pBuilder->nRecValid;
-			}
-			/* Determine iLower and iUpper using ($P) only. */
-			if (nEq == 0) {
-				/*
-				 * In this simple case, there are no any
-				 * equality constraints, so initially all rows
-				 * are in range.
-				 */
-				iLower = 0;
-				iUpper = index_size(idx);
-			} else {
-				/* Note: this call could be optimized away - since the same values must
-				 * have been requested when testing key $P in whereEqualScanEst().
-				 */
-				whereKeyStats(p, pRec, 0, a);
-				iLower = a[0];
-				iUpper = a[0] + a[1];
-			}
-
-			assert(pLower == 0
-			       || (pLower->eOperator & (WO_GT | WO_GE)) != 0);
-			assert(pUpper == 0
-			       || (pUpper->eOperator & (WO_LT | WO_LE)) != 0);
-			if (p->key_def->parts[nEq].sort_order !=
-			    SORT_ORDER_ASC) {
-				/* The roles of pLower and pUpper are swapped for a DESC index */
-				SWAP(pLower, pUpper);
-				SWAP(nBtm, nTop);
-			}
-
-			/* If possible, improve on the iLower estimate using ($P:$L). */
-			if (pLower) {
-				int n;	/* Values extracted from pExpr */
-				Expr *pExpr = pLower->pExpr->pRight;
-				rc = sqlStat4ProbeSetValue(pParse, p, &pRec,
-							       pExpr, nBtm, nEq,
-							       &n);
-				if (rc == 0 && n != 0) {
-					tRowcnt iNew;
-					u16 mask = WO_GT | WO_LE;
-					if (sqlExprVectorSize(pExpr) > n)
-						mask = (WO_LE | WO_LT);
-					iLwrIdx = whereKeyStats(p, pRec, 0, a);
-					iNew =
-					    a[0] +
-					    ((pLower->
-					      eOperator & mask) ? a[1] : 0);
-					if (iNew > iLower)
-						iLower = iNew;
-					nOut--;
-					pLower = 0;
-				}
-			}
-
-			/* If possible, improve on the iUpper estimate using ($P:$U). */
-			if (pUpper) {
-				int n;	/* Values extracted from pExpr */
-				Expr *pExpr = pUpper->pExpr->pRight;
-				rc = sqlStat4ProbeSetValue(pParse, p, &pRec,
-							       pExpr, nTop, nEq,
-							       &n);
-				if (rc == 0 && n != 0) {
-					tRowcnt iNew;
-					u16 mask = WO_GT | WO_LE;
-					if (sqlExprVectorSize(pExpr) > n)
-						mask = (WO_LE | WO_LT);
-					iUprIdx = whereKeyStats(p, pRec, 1, a);
-					iNew =
-					    a[0] +
-					    ((pUpper->
-					      eOperator & mask) ? a[1] : 0);
-					if (iNew < iUpper)
-						iUpper = iNew;
-					nOut--;
-					pUpper = 0;
-				}
-			}
-
-			pBuilder->pRec = pRec;
-			if (rc == 0) {
-				if (iUpper > iLower) {
-					nNew = sqlLogEst(iUpper - iLower);
-					/* TUNING:  If both iUpper and iLower are derived from the same
-					 * sample, then assume they are 4x more selective.  This brings
-					 * the estimated selectivity more in line with what it would be
-					 * if estimated without the use of STAT4 table.
-					 */
-					if (iLwrIdx == iUprIdx)
-						nNew -= 20;
-					assert(20 == sqlLogEst(4));
-				} else {
-					nNew = 10;
-					assert(10 == sqlLogEst(2));
-				}
-				if (nNew < nOut) {
-					nOut = nNew;
-				}
-				WHERETRACE(0x10,
-					   ("STAT4 range scan: %u..%u  est=%d\n",
-					    (u32) iLower, (u32) iUpper, nOut));
-			}
-		} else {
-			int bDone = 0;
-			rc = whereRangeSkipScanEst(pParse, pLower, pUpper,
-						   pLoop, &bDone);
-			if (bDone)
-				return rc;
-		}
-	}
 	assert(pUpper == 0 || (pUpper->wtFlags & TERM_VNULL) == 0);
 	nNew = whereRangeAdjust(pLower, nOut);
 	nNew = whereRangeAdjust(pUpper, nNew);
@@ -1518,102 +1035,6 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 	}
 #endif
 	pLoop->nOut = (LogEst) nOut;
-	return rc;
-}
-
-/*
- * Estimate the number of rows that will be returned based on
- * an equality constraint x=VALUE and where that VALUE occurs in
- * the histogram data.  This only works when x is the left-most
- * column of an index and sql_stat4 histogram data is available
- * for that index.  When pExpr==NULL that means the constraint is
- * "x IS NULL" instead of "x=VALUE".
- *
- * Write the estimated row count into *pnRow and return 0.
- * If unable to make an estimate, leave *pnRow unchanged and return
- * non-zero.
- *
- * This routine can fail if it is unable to load a collating sequence
- * required for string comparison, or if unable to allocate memory
- * for a UTF conversion required for comparison.  The error is stored
- * in the pParse structure.
- */
-static int
-whereEqualScanEst(Parse * pParse,	/* Parsing & code generating context */
-		  WhereLoopBuilder * pBuilder, Expr * pExpr,	/* Expression for VALUE in the x=VALUE constraint */
-		  tRowcnt * pnRow)	/* Write the revised row estimate here */
-{
-	struct index_def *p = pBuilder->pNew->index_def;
-	int nEq = pBuilder->pNew->nEq;
-	UnpackedRecord *pRec = pBuilder->pRec;
-	int rc;			/* Subfunction return code */
-	tRowcnt a[2];		/* Statistics */
-	int bOk;
-
-	assert(nEq >= 1);
-	assert(nEq <= (int) p->key_def->part_count);
-	assert(pBuilder->nRecValid == (nEq - 1));
-
-	rc = sqlStat4ProbeSetValue(pParse, p, &pRec, pExpr, 1, nEq - 1,
-				       &bOk);
-	pBuilder->pRec = pRec;
-	if (rc != 0)
-		return rc;
-	assert(bOk != 0);
-	pBuilder->nRecValid = nEq;
-
-	whereKeyStats(p, pRec, 0, a);
-	WHERETRACE(0x10, ("equality scan regions %s(%d): %d\n", p->name,
-		   nEq - 1, (int)a[1]));
-	*pnRow = a[1];
-
-	return rc;
-}
-
-/*
- * Estimate the number of rows that will be returned based on
- * an IN constraint where the right-hand side of the IN operator
- * is a list of values.  Example:
- *
- *        WHERE x IN (1,2,3,4)
- *
- * Write the estimated row count into *pnRow and return 0.
- * If unable to make an estimate, leave *pnRow unchanged and return
- * non-zero.
- *
- * This routine can fail if it is unable to load a collating sequence
- * required for string comparison, or if unable to allocate memory
- * for a UTF conversion required for comparison.  The error is stored
- * in the pParse structure.
- */
-static int
-whereInScanEst(Parse * pParse,	/* Parsing & code generating context */
-	       WhereLoopBuilder * pBuilder, ExprList * pList,	/* The value list on the RHS of "x IN (v1,v2,v3,...)" */
-	       tRowcnt * pnRow)	/* Write the revised row estimate here */
-{
-	struct index_def *p = pBuilder->pNew->index_def;
-	i64 nRow0 = sqlLogEstToInt(index_field_tuple_est(p, 0));
-	int nRecValid = pBuilder->nRecValid;
-	int rc = 0;	/* Subfunction return code */
-	tRowcnt nEst;		/* Number of rows for a single term */
-	tRowcnt nRowEst = 0;	/* New estimate of the number of rows */
-	int i;			/* Loop counter */
-
-	for (i = 0; rc == 0 && i < pList->nExpr; i++) {
-		nEst = nRow0;
-		rc = whereEqualScanEst(pParse, pBuilder, pList->a[i].pExpr,
-				       &nEst);
-		nRowEst += nEst;
-		pBuilder->nRecValid = nRecValid;
-	}
-
-	if (rc == 0) {
-		if (nRowEst > nRow0)
-			nRowEst = nRow0;
-		*pnRow = nRowEst;
-		WHERETRACE(0x10, ("IN row estimate: est=%d\n", nRowEst));
-	}
-	assert(pBuilder->nRecValid == nRecValid);
 	return rc;
 }
 
@@ -2330,22 +1751,6 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 		    WO_EQ | WO_IN | WO_GT | WO_GE | WO_LT | WO_LE | WO_ISNULL;
 	}
 	struct space *space = space_by_id(probe->space_id);
-	struct index_stat *stat = NULL;
-	if (space != NULL && probe->iid != UINT32_MAX) {
-		struct index *idx = space_index(space, probe->iid);
-		assert(idx != NULL);
-		stat = idx->def->opts.stat;
-	}
-	/*
-	 * Create surrogate stat in case ANALYZE command hasn't
-	 * been ran. Simply fill it with zeros.
-	 */
-	struct index_stat surrogate_stat;
-	memset(&surrogate_stat, 0, sizeof(surrogate_stat));
-	if (stat == NULL)
-		stat = &surrogate_stat;
-	if (stat->is_unordered)
-		opMask &= ~(WO_GT | WO_GE | WO_LT | WO_LE);
 	assert(pNew->nEq < probe_part_count);
 
 	saved_nEq = pNew->nEq;
@@ -2500,7 +1905,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 			/* Adjust nOut using stat4 data. Or, if there is no stat4
 			 * data, using some other estimate.
 			 */
-			whereRangeScanEst(pParse, pBuilder, pBtm, pTop, pNew);
+			whereRangeScanEst(pBtm, pTop, pNew);
 		} else {
 			int nEq = ++pNew->nEq;
 			assert(eOp & (WO_ISNULL | WO_EQ | WO_IN));
@@ -2511,48 +1916,17 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 				pNew->nOut += pTerm->truthProb;
 				pNew->nOut -= nIn;
 			} else {
-				tRowcnt nOut = 0;
-				if (nInMul == 0
-				    && stat->sample_count
-				    && pNew->nEq <= stat->sample_field_count
-				    && ((eOp & WO_IN) == 0
-					|| !ExprHasProperty(pTerm->pExpr,
-							    EP_xIsSelect))
-				    ) {
-					Expr *pExpr = pTerm->pExpr;
-					if ((eOp & (WO_EQ | WO_ISNULL))
-					    != 0) {
-						rc = whereEqualScanEst(pParse,
-								       pBuilder,
-								       pExpr->pRight,
-								       &nOut);
-					} else {
-						rc = whereInScanEst(pParse,
-								    pBuilder,
-								    pExpr->x.pList,
-								    &nOut);
-					}
-					if (rc != 0)
-						break;	/* Jump out of the pTerm loop */
-					if (nOut) {
-						pNew->nOut =
-						    sqlLogEst(nOut);
-						if (pNew->nOut > saved_nOut)
-							pNew->nOut = saved_nOut;
-						pNew->nOut -= nIn;
-					}
-				}
-				if (nOut == 0) {
-					pNew->nOut +=
-						(index_field_tuple_est(probe, nEq) -
-						 index_field_tuple_est(probe, nEq -1));
-					if (eOp & WO_ISNULL) {
-						/* TUNING: If there is no likelihood() value, assume that a
-						 * "col IS NULL" expression matches twice as many rows
-						 * as (col=?).
-						 */
-						pNew->nOut += 10;
-					}
+				pNew->nOut +=
+					(index_field_tuple_est(probe, nEq) -
+					 index_field_tuple_est(probe, nEq - 1));
+				if ((eOp & WO_ISNULL) != 0) {
+					/*
+					 * TUNING: If there is no likelihood()
+					 * value, assume that a "col IS NULL"
+					 * expression matches twice as many rows
+					 * as (col=?).
+					 */
+					pNew->nOut += 10;
 				}
 			}
 		}
@@ -2626,29 +2000,6 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 	 * more expensive.
 	 */
 	assert(42 == sqlLogEst(18));
-	if (saved_nEq == saved_nSkip && saved_nEq + 1U < probe_part_count &&
-	    stat->skip_scan_enabled == true &&
-	    /* TUNING: Minimum for skip-scan */
-	    index_field_tuple_est(probe, saved_nEq + 1) >= 42) {
-		whereLoopResize(pNew, pNew->nLTerm + 1);
-		LogEst nIter;
-		pNew->nEq++;
-		pNew->nSkip++;
-		pNew->aLTerm[pNew->nLTerm++] = 0;
-		pNew->wsFlags |= WHERE_SKIPSCAN;
-		nIter = index_field_tuple_est(probe, saved_nEq) -
-			index_field_tuple_est(probe, saved_nEq + 1);
-		pNew->nOut -= nIter;
-		/* TUNING:  Because uncertainties in the estimates for skip-scan queries,
-		 * add a 1.375 fudge factor to make skip-scan slightly less likely.
-		 */
-		nIter += 5;
-		whereLoopAddBtreeIndex(pBuilder, pSrc, probe, nIter + nInMul);
-		pNew->nOut = saved_nOut;
-		pNew->nEq = saved_nEq;
-		pNew->nSkip = saved_nSkip;
-		pNew->wsFlags = saved_wsFlags;
-	}
 
 	WHERETRACE(0x800, ("END addBtreeIdx(%s), nEq=%d, rc=%d\n",
 			   probe->name, saved_nEq, rc));
@@ -2670,8 +2021,6 @@ indexMightHelpWithOrderBy(WhereLoopBuilder * pBuilder,
 	ExprList *pOB;
 	int ii, jj;
 	int part_count = idx_def->key_def->part_count;
-	if (idx_def->opts.stat != NULL && idx_def->opts.stat->is_unordered)
-		return 0;
 	if ((pOB = pBuilder->pWInfo->pOrderBy) == 0)
 		return 0;
 	for (ii = 0; ii < pOB->nExpr; ii++) {
@@ -3242,11 +2591,10 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 			if (pLoop->wsFlags & WHERE_IPK) {
 				idx_def = NULL;
 				nColumn = 1;
-			} else if ((idx_def = pLoop->index_def) == NULL ||
-				   (idx_def->opts.stat != NULL &&
-				    idx_def->opts.stat->is_unordered)) {
+			} else if (pLoop->index_def == NULL) {
 				return 0;
 			} else {
+				idx_def = pLoop->index_def;
 				nColumn = idx_def->key_def->part_count;
 				isOrderDistinct = idx_def->opts.is_unique;
 			}
