@@ -1361,9 +1361,8 @@ sql_index_tuple_size(struct space *space, struct index *idx)
  * generated here are based on typical values found in actual
  * indices.
  */
-const log_est_t default_tuple_est[] = {DEFAULT_TUPLE_LOG_COUNT,
-/**                  [10*log_{2}(x)]:  10, 9,  8,  7,  6,  5 */
-				       33, 32, 30, 28, 26, 23};
+const int16_t default_tuple_est[] = {DEFAULT_TUPLE_LOG_COUNT, 33, 32, 30, 28,
+				     26, 23};
 
 LogEst
 sql_space_tuple_log_count(struct space *space)
@@ -1379,7 +1378,7 @@ sql_space_tuple_log_count(struct space *space)
 	return sqlLogEst(pk->vtab->size(pk));
 }
 
-log_est_t
+int16_t
 index_field_tuple_est(const struct index_def *idx_def, uint32_t field)
 {
 	assert(idx_def != NULL);
@@ -1389,21 +1388,14 @@ index_field_tuple_est(const struct index_def *idx_def, uint32_t field)
 	if (strcmp(idx_def->name, "fake_autoindex") == 0)
 		return DEFAULT_TUPLE_LOG_COUNT;
 	assert(field <= idx_def->key_def->part_count);
-	/* Statistics is held only in real indexes. */
-	struct index *tnt_idx = space_index(space, idx_def->iid);
-	assert(tnt_idx != NULL);
-	if (tnt_idx->def->opts.stat == NULL) {
-		/*
-		 * Last number for unique index is always 0:
-		 * only one tuple exists with given full key
-		 * in unique index and log(1) == 0.
-		 */
-		if (field == idx_def->key_def->part_count &&
-		    idx_def->opts.is_unique)
-			return 0;
-		return default_tuple_est[field + 1 >= 6 ? 6 : field];
-	}
-	return tnt_idx->def->opts.stat->tuple_log_est[field];
+	/*
+	 * Last number for unique index is always 0: only one tuple exists with
+	 * given full key in unique index and log(1) == 0.
+	 */
+	if (field == idx_def->key_def->part_count &&
+	    idx_def->opts.is_unique)
+		return 0;
+	return default_tuple_est[field + 1 >= 6 ? 6 : field];
 }
 
 /** Drop tuple or field constraint. */
