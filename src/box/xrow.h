@@ -282,9 +282,14 @@ struct synchro_request {
 	int64_t lsn;
 	/**
 	 * The new term the instance issuing this request is in. Only used for
-	 * PROMOTE request.
+	 * PROMOTE and DEMOTE requests.
 	 */
 	uint64_t term;
+	/**
+	 * Confirmed lsns of all the previous limbo owners. Only used for
+	 * PROMOTE and DEMOTE requests.
+	 */
+	struct vclock *confirmed_vclock;
 };
 
 /**
@@ -301,11 +306,13 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
  * Decode synchronous replication request.
  * @param row xrow header.
  * @param[out] req Request parameters.
+ * @param[out] vclock Storage for request vclock.
  * @retval -1 on error.
  * @retval 0 success.
  */
 int
-xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req);
+xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req,
+		    struct vclock *vclock);
 
 /**
  * Raft request. It repeats Raft message to the letter, but can be extended in

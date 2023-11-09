@@ -479,7 +479,8 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 
 	struct synchro_request req;
 	struct raft_request raft_req;
-	txn_limbo_checkpoint(&txn_limbo, &req);
+	struct vclock limbo_vclock;
+	txn_limbo_checkpoint(&txn_limbo, &req, &limbo_vclock);
 	box_raft_checkpoint_local(&raft_req);
 
 	/* Respond to the JOIN request with the current vclock. */
@@ -1230,7 +1231,7 @@ relay_filter_row(struct relay *relay, struct xrow_header *packet)
 	 */
 	if (iproto_type_is_promote_request(packet->type)) {
 		struct synchro_request req;
-		xrow_decode_synchro(packet, &req);
+		xrow_decode_synchro(packet, &req, NULL);
 		while (relay->sent_raft_term < req.term) {
 			if (fiber_is_cancelled()) {
 				diag_set(FiberIsCancelled);

@@ -1093,19 +1093,31 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
 
 	char *pos = body;
 
-	pos = mp_encode_map(pos,
-			    iproto_type_is_promote_request(req->type) ? 3 : 2);
+	/* Skip one byte for the map. */
+	pos++;
+	uint32_t map_size = 0;
 
 	pos = mp_encode_uint(pos, IPROTO_REPLICA_ID);
 	pos = mp_encode_uint(pos, req->replica_id);
+	map_size++;
 
 	pos = mp_encode_uint(pos, IPROTO_LSN);
 	pos = mp_encode_uint(pos, req->lsn);
+	map_size++;
 
-	if (iproto_type_is_promote_request(req->type)) {
+	if (req->term != 0) {
 		pos = mp_encode_uint(pos, IPROTO_TERM);
 		pos = mp_encode_uint(pos, req->term);
+		map_size++;
 	}
+
+	if (req->confirmed_vclock != NULL) {
+		pos = mp_encode_uint(pos, IPROTO_VCLOCK);
+		pos = mp_encode_vclock_ignore0(pos, req->confirmed_vclock);
+		map_size++;
+	}
+
+	mp_encode_map(body, map_size);
 
 	assert(pos - body < XROW_BODY_LEN_MAX);
 
@@ -1117,7 +1129,8 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
 }
 
 int
-xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
+xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req,
+		    struct vclock *vclock)
 {
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
@@ -1144,6 +1157,7 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 		uint8_t key = mp_decode_uint(&d);
 		if (key < IPROTO_KEY_MAX &&
 		    iproto_key_type[key] != mp_typeof(*d)) {
+bad_msgpack:
 			xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 					   "request body");
 			return -1;
@@ -1157,6 +1171,13 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 			break;
 		case IPROTO_TERM:
 			req->term = mp_decode_uint(&d);
+			break;
+		case IPROTO_VCLOCK:
+			if (vclock == NULL)
+				mp_next(&d);
+			else if (mp_decode_vclock_ignore0(&d, vclock) != 0)
+				goto bad_msgpack;
+			req->confirmed_vclock = vclock;
 			break;
 		default:
 			mp_next(&d);

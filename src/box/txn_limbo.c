@@ -49,6 +49,7 @@ txn_limbo_create(struct txn_limbo *limbo)
 	fiber_cond_create(&limbo->wait_cond);
 	vclock_create(&limbo->vclock);
 	vclock_create(&limbo->promote_term_map);
+	vclock_create(&limbo->confirmed_vclock);
 	limbo->promote_greatest_term = 0;
 	latch_create(&limbo->promote_latch);
 	limbo->confirmed_lsn = 0;
@@ -358,13 +359,16 @@ complete:
 }
 
 void
-txn_limbo_checkpoint(const struct txn_limbo *limbo,
-		     struct synchro_request *req)
+txn_limbo_checkpoint(const struct txn_limbo *limbo, struct synchro_request *req,
+		     struct vclock *vclock)
 {
 	req->type = IPROTO_RAFT_PROMOTE;
 	req->replica_id = limbo->owner_id;
 	req->lsn = limbo->confirmed_lsn;
 	req->term = limbo->promote_greatest_term;
+	if (vclock != NULL)
+		vclock_copy(vclock, &limbo->confirmed_vclock);
+	req->confirmed_vclock = vclock;
 }
 
 /** Write a request to WAL. */
@@ -411,7 +415,7 @@ fail:
 /** Create a request for a specific limbo and write it to WAL. */
 static void
 txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
-			uint64_t term)
+			uint64_t term, struct vclock *vclock)
 {
 	assert(lsn >= 0);
 
@@ -420,6 +424,7 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 		.replica_id = limbo->owner_id,
 		.lsn = lsn,
 		.term = term,
+		.confirmed_vclock = vclock,
 	};
 	synchro_request_write(&req);
 }
@@ -434,7 +439,8 @@ txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
 	assert(lsn > limbo->confirmed_lsn);
 	assert(!limbo->is_in_rollback);
 	limbo->confirmed_lsn = lsn;
-	txn_limbo_write_synchro(limbo, IPROTO_RAFT_CONFIRM, lsn, 0);
+	vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
+	txn_limbo_write_synchro(limbo, IPROTO_RAFT_CONFIRM, lsn, 0, NULL);
 }
 
 /** Confirm all the entries <= @a lsn. */
@@ -506,8 +512,10 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 	 * comparing existing confirm_lsn with the one arriving from a remote
 	 * instance.
 	 */
-	if (limbo->confirmed_lsn < lsn)
+	if (limbo->confirmed_lsn < lsn) {
 		limbo->confirmed_lsn = lsn;
+		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
+	}
 }
 
 /**
@@ -521,7 +529,7 @@ txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 	assert(lsn > limbo->confirmed_lsn);
 	assert(!limbo->is_in_rollback);
 	limbo->is_in_rollback = true;
-	txn_limbo_write_synchro(limbo, IPROTO_RAFT_ROLLBACK, lsn, 0);
+	txn_limbo_write_synchro(limbo, IPROTO_RAFT_ROLLBACK, lsn, 0, NULL);
 	limbo->is_in_rollback = false;
 }
 
@@ -575,6 +583,11 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 		.origin_id = instance_id,
 		.lsn = lsn,
 		.term = term,
+		/*
+		 * Confirmed_vclock is only persisted in checkpoints. It doesn't
+		 * appear in WALs and replication.
+		 */
+		.confirmed_vclock = NULL,
 	};
 	if (txn_limbo_req_prepare(limbo, &req) < 0)
 		return -1;
@@ -589,19 +602,15 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
  */
 static void
 txn_limbo_read_promote(struct txn_limbo *limbo, uint32_t replica_id,
-		       uint32_t prev_id, int64_t lsn)
+		       int64_t lsn)
 {
 	txn_limbo_read_confirm(limbo, lsn);
 	txn_limbo_read_rollback(limbo, lsn + 1);
 	assert(txn_limbo_is_empty(limbo));
 	limbo->owner_id = replica_id;
+	limbo->confirmed_lsn = vclock_get(&limbo->confirmed_vclock,
+					  replica_id);
 	box_update_ro_summary();
-	/*
-	 * Only nullify confirmed_lsn when the new value is unknown. I.e. when
-	 * prev_id != replica_id.
-	 */
-	if (replica_id != prev_id)
-		limbo->confirmed_lsn = 0;
 }
 
 int
@@ -617,6 +626,7 @@ txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 		.origin_id = instance_id,
 		.lsn = lsn,
 		.term = term,
+		.confirmed_vclock = NULL,
 	};
 	if (txn_limbo_req_prepare(limbo, &req) < 0)
 		return -1;
@@ -631,9 +641,9 @@ txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
  * @sa txn_limbo_read_promote.
  */
 static void
-txn_limbo_read_demote(struct txn_limbo *limbo, uint32_t prev_id, int64_t lsn)
+txn_limbo_read_demote(struct txn_limbo *limbo, int64_t lsn)
 {
-	return txn_limbo_read_promote(limbo, REPLICA_ID_NIL, prev_id, lsn);
+	return txn_limbo_read_promote(limbo, REPLICA_ID_NIL, lsn);
 }
 
 void
@@ -1116,6 +1126,8 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 		assert(limbo->svp_confirmed_lsn == -1);
 		limbo->svp_confirmed_lsn = limbo->confirmed_lsn;
 		limbo->confirmed_lsn = req->lsn;
+		vclock_reset(&limbo->confirmed_vclock, limbo->owner_id,
+			     req->lsn);
 		break;
 	}
 	/*
@@ -1137,6 +1149,8 @@ txn_limbo_req_rollback(struct txn_limbo *limbo,
 		assert(limbo->is_in_rollback);
 		assert(limbo->svp_confirmed_lsn >= 0);
 		limbo->confirmed_lsn = limbo->svp_confirmed_lsn;
+		vclock_reset(&limbo->confirmed_vclock, limbo->owner_id,
+			     limbo->svp_confirmed_lsn);
 		limbo->svp_confirmed_lsn = -1;
 		limbo->is_in_rollback = false;
 		break;
@@ -1192,6 +1206,8 @@ txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 			}
 		}
 	}
+	if (req->confirmed_vclock != NULL)
+		vclock_copy(&limbo->confirmed_vclock, req->confirmed_vclock);
 
 	int64_t lsn = req->lsn;
 	switch (req->type) {
@@ -1202,11 +1218,10 @@ txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 		txn_limbo_read_rollback(limbo, lsn);
 		break;
 	case IPROTO_RAFT_PROMOTE:
-		txn_limbo_read_promote(limbo, req->origin_id, req->replica_id,
-				       lsn);
+		txn_limbo_read_promote(limbo, req->origin_id, lsn);
 		break;
 	case IPROTO_RAFT_DEMOTE:
-		txn_limbo_read_demote(limbo, req->replica_id, lsn);
+		txn_limbo_read_demote(limbo, lsn);
 		break;
 	default:
 		unreachable();
