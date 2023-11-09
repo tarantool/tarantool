@@ -1384,8 +1384,10 @@ index_field_tuple_est(const struct index_def *idx_def, uint32_t field)
 {
 	assert(idx_def != NULL);
 	struct space *space = space_by_id(idx_def->space_id);
-	if (space == NULL || strcmp(idx_def->name, "fake_autoindex") == 0)
-		return idx_def->opts.stat->tuple_log_est[field];
+	if (space == NULL)
+		return 0;
+	if (strcmp(idx_def->name, "fake_autoindex") == 0)
+		return DEFAULT_TUPLE_LOG_COUNT;
 	assert(field <= idx_def->key_def->part_count);
 	/* Statistics is held only in real indexes. */
 	struct index *tnt_idx = space_index(space, idx_def->iid);
