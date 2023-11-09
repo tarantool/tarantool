@@ -2792,18 +2792,6 @@ tnt_error:
 			goto tnt_error;
 		/* Special marker for  non-existent index. */
 		fake_index->iid = UINT32_MAX;
-		int size = sizeof(struct index_stat) + sizeof(log_est_t) * 2;
-
-		struct index_stat *stat = (struct index_stat *) calloc(1, size);
-		if (stat == NULL) {
-			diag_set(OutOfMemory, size, "calloc", "stat");
-			goto tnt_error;
-		}
-		stat->tuple_log_est = (log_est_t *) ((char *) (stat + 1));
-		stat->tuple_log_est[0] = sql_space_tuple_log_count(pSrc->space);
-		stat->tuple_log_est[1] = 0;
-		fake_index->opts.stat = stat;
-
 		probe = fake_index;
 	}
 
