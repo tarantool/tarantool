@@ -40,7 +40,6 @@ luacheck: configure
 .PHONY: build
 build: configure
 	${CMAKE_BUILD}
-	if [ "${CTEST}" = "true" ]; then cd ${BUILD_DIR} && ctest -V; fi
 
 # Testing
 
@@ -146,7 +145,6 @@ test-static: build run-luajit-test run-test
 test-static-cmake: SRC_DIR = ${STATIC_DIR}
 test-static-cmake: BUILD_DIR = ${STATIC_DIR}
 test-static-cmake: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON"
-test-static-cmake: CTEST = true
 test-static-cmake: LUAJIT_TEST_BUILD_DIR = ${STATIC_BIN_DIR}
 test-static-cmake: TEST_RUN_PARAMS = --builddir ${PWD}/${STATIC_BIN_DIR}
 test-static-cmake: build run-luajit-test run-test
@@ -217,7 +215,6 @@ test-osx-debug-arm64: prebuild-osx build
 test-osx-static-cmake: SRC_DIR = ${STATIC_DIR}
 test-osx-static-cmake: BUILD_DIR = ${STATIC_DIR}
 test-osx-static-cmake: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON"
-test-osx-static-cmake: CTEST = true
 test-osx-static-cmake: LUAJIT_TEST_BUILD_DIR = ${STATIC_BIN_DIR}
 test-osx-static-cmake: TEST_RUN_PARAMS = --builddir ${PWD}/${STATIC_BIN_DIR}
 test-osx-static-cmake: prebuild-osx build run-luajit-test pretest-osx run-test
@@ -230,7 +227,6 @@ test-osx-static-cmake: prebuild-osx build run-luajit-test pretest-osx run-test
 test-osx-static-cmake-arm64: SRC_DIR = ${STATIC_DIR}
 test-osx-static-cmake-arm64: BUILD_DIR = ${STATIC_DIR}
 test-osx-static-cmake-arm64: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DTEST_BUILD=ON"
-test-osx-static-cmake-arm64: CTEST = true
 test-osx-static-cmake-arm64: LUAJIT_TEST_BUILD_DIR = ${STATIC_BIN_DIR}
 test-osx-static-cmake-arm64: TEST_RUN_PARAMS = --builddir ${PWD}/${STATIC_BIN_DIR}
 test-osx-static-cmake-arm64: prebuild-osx build
