@@ -139,6 +139,11 @@ struct txn_limbo {
 	 */
 	struct vclock promote_term_map;
 	/**
+	 * A vclock containing biggest known confirmed lsns for each previous
+	 * limbo owner.
+	 */
+	struct vclock confirmed_vclock;
+	/**
 	 * The biggest PROMOTE term seen by the instance and persisted in WAL.
 	 * It is related to raft term, but not the same. Synchronous replication
 	 * represented by the limbo is interested only in the won elections
@@ -408,8 +413,8 @@ txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout);
  * Persist limbo state to a given synchro request.
  */
 void
-txn_limbo_checkpoint(const struct txn_limbo *limbo,
-		     struct synchro_request *req);
+txn_limbo_checkpoint(const struct txn_limbo *limbo, struct synchro_request *req,
+		     struct vclock *vclock);
 
 /**
  * Write a PROMOTE request, which has the same effect as CONFIRM(@a lsn) and

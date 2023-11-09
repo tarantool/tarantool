@@ -496,7 +496,8 @@ test_xrow_decode_unknown_key(void)
 
 	struct synchro_request synchro;
 	header.type = IPROTO_RAFT_PROMOTE;
-	is(xrow_decode_synchro(&header, &synchro), 0, "xrow_decode_synchro");
+	is(xrow_decode_synchro(&header, &synchro, NULL), 0,
+	   "xrow_decode_synchro");
 
 	struct raft_request raft;
 	header.type = IPROTO_RAFT;
@@ -561,7 +562,7 @@ test_xrow_decode_synchro_types(void)
 	header.body[0].iov_len = mp_format(buf, sizeof(buf), "{%u%s}",
 					   IPROTO_INSTANCE_NAME, "somename");
 	struct synchro_request synchro;
-	is(xrow_decode_synchro(&header, &synchro), 0,
+	is(xrow_decode_synchro(&header, &synchro, NULL), 0,
 	   "xrow_decode_synchro correctly handles key types");
 
 	check_plan();
