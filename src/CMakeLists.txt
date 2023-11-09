@@ -415,4 +415,13 @@ else ()
     set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 endif()
 
+if(BUILD_STATIC AND OPENSSL_USE_STATIC_LIBS)
+    add_custom_command(
+        TARGET tarantool POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            -DFILE=${PROJECT_BINARY_DIR}/src/tarantool
+            -P ${PROJECT_SOURCE_DIR}/cmake/CheckDependencies.cmake
+    )
+endif()
+
 install (TARGETS tarantool DESTINATION bin)
