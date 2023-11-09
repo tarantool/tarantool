@@ -1073,8 +1073,15 @@ txn_commit(struct txn *txn)
 			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id,
 				      limbo_entry->lsn);
 		}
-		if (txn_limbo_wait_complete(&txn_limbo, limbo_entry) < 0)
-			goto rollback;
+		int rc = txn_limbo_wait_complete(&txn_limbo, limbo_entry);
+		if (rc < 0) {
+			if (fiber_is_cancelled()) {
+				txn->fiber = NULL;
+				return -1;
+			} else {
+				goto rollback;
+			}
+		}
 	}
 	assert(txn_has_flag(txn, TXN_IS_DONE));
 	assert(txn->signature >= 0);

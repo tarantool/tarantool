@@ -343,6 +343,7 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn);
  * entry is either committed or rolled back.
  * If timeout is reached before acks are collected, the tx is
  * rolled back as well as all the txs in the limbo following it.
+ * If fiber is cancelled before acks are collected, the tx is left in limbo.
  * Returns -1 when rollback was performed and tx has to be freed.
  *          0 when tx processing can go on.
  */
