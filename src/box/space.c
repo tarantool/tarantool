@@ -56,6 +56,7 @@
 #include "wal_ext.h"
 #include "coll_id_cache.h"
 #include "func_adapter.h"
+#include "lua/utils.h"
 
 int
 access_check_space(struct space *space, user_access_t access)
@@ -536,6 +537,7 @@ space_create(struct space *space, struct engine *engine,
 	space->constraint_ids = mh_strnptr_new();
 	rlist_create(&space->memtx_stories);
 	rlist_create(&space->alter_stmts);
+	space->lua_ref = LUA_NOREF;
 	return 0;
 
 fail_free_indexes:
@@ -642,6 +644,7 @@ space_delete(struct space *space)
 	mh_strnptr_delete(space->constraint_ids);
 	assert(space->sql_triggers == NULL);
 	assert(rlist_empty(&space->space_cache_pin_list));
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, space->lua_ref);
 	space->vtab->destroy(space);
 }
 

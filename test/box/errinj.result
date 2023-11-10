@@ -418,11 +418,6 @@ s_withdata:drop()
 ---
 - error: Failed to write to disk
 ...
--- FIXME(gh-9120): The space is recreated, so the s_withdata object is not
--- valid anymore.
-s_withdata = box.space.withdata
----
-...
 box.space['withdata'].enabled
 ---
 - true
@@ -1342,11 +1337,6 @@ s:truncate()
 s:drop()
 ---
 - error: Failed to write to disk
-...
--- FIXME(gh-9120): The space object is invalidated on reverted drop, so we set
--- it to the current one.
-s = box.space.test
----
 ...
 s:truncate()
 ---
