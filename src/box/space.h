@@ -280,6 +280,12 @@ struct space {
 	 * Linked by `coll_id_cache_holder::in_space`.
 	 */
 	struct rlist coll_id_holders;
+	/**
+	 * A reference to the lua table representing this space. Only used
+	 * on space drop rollback in order to keep the lua references to
+	 * this object in sync. For more information see #9120.
+	 */
+	int lua_ref;
 };
 
 /** Space alter statement. */

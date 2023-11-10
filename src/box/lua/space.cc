@@ -615,6 +615,26 @@ box_lua_space_new(struct lua_State *L, struct space *space)
 		lua_setfield(L, -2, "space");
 		lua_getfield(L, -1, "space");
 	}
+	/*
+	 * We can have the following conditions here:
+	 * a) The space is totally new (e. g. on new space creation).
+	 * b) The space is replaced (e. g. on index update).
+	 * c) The space is updated (e. g. on sequence update).
+	 * d) The space is reverted (e. g. on space drop rollback).
+	 *
+	 * - In case a) we need to create new box.space.<id|name> entries.
+	 * - In cases b) and c) we need to update the existing box.space.<id>
+	 *   entry, drop the old box.space.<name> and create a new one.
+	 * - In case d) we need to restore the original box.space.<id|name>
+	 *   entries, but let's only restore the box.space.<id> entry and
+	 *   perform the same actions as for b) and c) - it won't change the
+	 *   visible behavior but will make the code simpler.
+	 */
+	if (space->lua_ref != LUA_NOREF) {
+		/* We have either case c) or d). */
+		lua_rawgeti(L, LUA_REGISTRYINDEX, space->lua_ref);
+		lua_rawseti(L, -2, space_id(space));
+	}
 	lua_rawgeti(L, -1, space_id(space));
 	if (lua_isnil(L, -1)) {
 		/*
@@ -635,6 +655,18 @@ box_lua_space_new(struct lua_State *L, struct space *space)
 	}
 	lbox_fillspace(L, space, lua_gettop(L));
 	lua_setfield(L, -2, space_name(space));
+
+	if (space->lua_ref == LUA_NOREF) {
+		/*
+		 * Save the reference to the box.space[id] to restore
+		 * the exactly same object on the space drop rollback.
+		 * It prevents the situations when old references to
+		 * the space go out of sync with the space which had
+		 * been rolled back. For more information see #9120.
+		 */
+		lua_rawgeti(L, -1, space_id(space));
+		space->lua_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
 
 	lua_pop(L, 2); /* box, space */
 }
