@@ -433,13 +433,38 @@ test_xrow_decode_unknown_key(void)
 	footer();
 }
 
+static void
+test_xrow_decode_synchro_types(void)
+{
+	header();
+	plan(1);
+
+	char buf[128];
+
+	const char *p = buf;
+	const char *end = buf + mp_format(buf, sizeof(buf), "{%u%s}",
+					  IPROTO_INSTANCE_UUID, "someuuid");
+	struct xrow_header header;
+	memset(&header, 0, sizeof(header));
+	header.bodycnt = 1;
+	header.body[0].iov_base = buf;
+	header.body[0].iov_len = mp_format(buf, sizeof(buf), "{%u%s}",
+					   IPROTO_INSTANCE_UUID, "someuuid");
+	struct synchro_request synchro;
+	is(xrow_decode_synchro(&header, &synchro), 0,
+	   "xrow_decode_synchro correctly handles key types");
+
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	header();
-	plan(5);
+	plan(6);
 
 	random_init();
 
@@ -449,6 +474,7 @@ main(void)
 	test_request_str();
 	test_xrow_fields();
 	test_xrow_decode_unknown_key();
+	test_xrow_decode_synchro_types();
 
 	random_free();
 	fiber_free();

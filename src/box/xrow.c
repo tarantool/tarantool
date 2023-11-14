@@ -1142,7 +1142,8 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 			continue;
 		}
 		uint8_t key = mp_decode_uint(&d);
-		if (key < IPROTO_KEY_MAX && iproto_key_type[key] != type) {
+		if (key < IPROTO_KEY_MAX &&
+		    iproto_key_type[key] != mp_typeof(*d)) {
 			xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 					   "request body");
 			return -1;
