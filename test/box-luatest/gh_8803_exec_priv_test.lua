@@ -133,6 +133,7 @@ g.before_test('test_lua_call_func', function(cg)
             language = 'LUA',
             body = [[function() return true end]],
         })
+        box.schema.func.create('dostring', {language = 'LUA'})
     end)
 end)
 
@@ -141,19 +142,21 @@ g.after_test('test_lua_call_func', function(cg)
         box.schema.func.drop('c_func')
         box.schema.func.drop('lua_func')
         box.schema.func.drop('stored_lua_func')
+        box.schema.func.drop('dostring')
     end)
 end)
 
--- Checks that execute privilege granted on lua_call does not grant access to
--- Lua functions from _func.
+-- Checks that execute privilege granted on lua_call grants access to
+-- Lua functions registered in _func except for built-ins and persistent
+-- functions.
 g.test_lua_call_func = function(cg)
     local c = cg.conn
     local errfmt = "Execute access to function '%s' is denied for user 'test'"
-    local func_list = {'c_func', 'lua_func', 'stored_lua_func'}
     cg.grant('test', 'execute', 'lua_call')
-    for _, func in ipairs(func_list) do
+    for _, func in ipairs({'c_func', 'stored_lua_func', 'dostring'}) do
         t.assert_error_msg_equals(errfmt:format(func), c.call, c, func)
     end
+    t.assert(c:call('lua_func'))
 end
 
 -- Checks that execute privilege granted on lua_call does not grant access

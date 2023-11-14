@@ -160,9 +160,8 @@ box_run_on_call(enum iproto_type type, const char *expr, int expr_len,
 	trigger_run(&box_on_call, &ctx);
 }
 
-/** Checks if the current user may execute any global Lua function. */
-static int
-access_check_call(const char *name, uint32_t name_len)
+int
+access_check_lua_call(const char *name, uint32_t name_len)
 {
 	struct credentials *cr = effective_user();
 	user_access_t access = PRIV_X | PRIV_U;
@@ -182,7 +181,7 @@ access_check_call(const char *name, uint32_t name_len)
 
 /** Checks if the current user may execute an arbitrary Lua expression. */
 static int
-access_check_eval(void)
+access_check_lua_eval(void)
 {
 	struct credentials *cr = effective_user();
 	user_access_t access = PRIV_X | PRIV_U;
@@ -229,7 +228,7 @@ box_process_call(struct call_request *request, struct port *port)
 			goto cleanup;
 		}
 	} else {
-		if (access_check_call(name, name_len) != 0) {
+		if (access_check_lua_call(name, name_len) != 0) {
 			rc = -1;
 			goto cleanup;
 		}
@@ -249,7 +248,7 @@ box_process_eval(struct call_request *request, struct port *port)
 {
 	rmean_collect(rmean_box, IPROTO_EVAL, 1);
 	/* Check permissions */
-	if (access_check_eval() != 0)
+	if (access_check_lua_eval() != 0)
 		return -1;
 	struct mp_box_ctx ctx;
 	if (mp_box_ctx_create(&ctx, NULL, request->tuple_formats) != 0)

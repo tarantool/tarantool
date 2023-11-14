@@ -31,6 +31,7 @@
 #include "func.h"
 #include "fiber.h"
 #include "assoc.h"
+#include "call.h"
 #include "lua/call.h"
 #include "diag.h"
 #include "port.h"
@@ -567,6 +568,10 @@ func_access_check(struct func *func)
 	if ((func_access & PRIV_U) != 0 ||
 	    (func->def->uid != credentials->uid &&
 	     func_access & ~func->access[credentials->auth_token].effective)) {
+		if (func->def->language == FUNC_LANGUAGE_LUA &&
+		    func->def->body == NULL)
+			return access_check_lua_call(func->def->name,
+						     func->def->name_len);
 		/* Access violation, report error. */
 		struct user *user = user_find(credentials->uid);
 		if (user != NULL) {
