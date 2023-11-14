@@ -810,6 +810,14 @@ local function check_cfg_option_type(template, name, value)
                       template)
         end
     end
+    -- It makes no sense to set any configuration option value to an infinite
+    -- number (nan, inf, -inf). To prevent such numbers from slipping through
+    -- configuration option sanity checks and breaking the application logic,
+    -- we forbid them explicitly at the top level.
+    if type(value) == 'number' and not
+            (value == value and value > -math.huge and value < math.huge) then
+        box.error(box.error.CFG, name, "should be a finite number")
+    end
 end
 
 local function prepare_cfg(cfg, old_cfg, default_cfg, template_cfg, modify_cfg)
