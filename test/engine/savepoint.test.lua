@@ -285,20 +285,20 @@ did_rollback = false
 box.begin()                                                                     \
 svp = box.savepoint()                                                           \
 s:replace{4}                                                                    \
-box.on_rollback(function() did_rollback = true assert(false) end)               \
+box.on_rollback(function() did_rollback = true end)                             \
 box.rollback_to_savepoint(svp)                                                  \
 box.commit()
-assert(not did_rollback)
+assert(did_rollback)
 
 -- Try DDL too. It installs the flag in the statement that it has triggers.
 -- This should not change the behaviour.
 box.begin()                                                                     \
 svp = box.savepoint()                                                           \
 box.schema.create_space('test2', {engine = engine})                             \
-box.on_rollback(function() did_rollback = true assert(false) end)               \
+box.on_rollback(function() did_rollback = true end)                             \
 box.rollback_to_savepoint(svp)                                                  \
 box.commit()
-assert(not did_rollback)
+assert(did_rollback)
 assert(not box.schema.space.test2)
 
 s:drop()

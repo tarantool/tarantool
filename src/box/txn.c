@@ -1437,7 +1437,7 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 		diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
 		return -1;
 	}
-	txn_rollback_to_svp(txn, svp->stmt, false);
+	txn_rollback_to_svp(txn, svp->stmt, true);
 	/* Discard from list all newer savepoints. */
 	RLIST_HEAD(discard);
 	rlist_cut_before(&discard, &txn->savepoints, &svp->link);

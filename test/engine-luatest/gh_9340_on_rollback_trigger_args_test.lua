@@ -102,6 +102,58 @@ g_mvcc_on.test_trigger_args = function(cg)
         box.commit()
         s2:on_replace(nil, error_in_on_replace)
         t.assert_equals(_G.result, {})
+
+        -- Check rollback to savepoint (with empty txn).
+        box.begin()
+        local svp = box.savepoint()
+        box.rollback_to_savepoint(svp)
+        t.assert_equals(_G.result, {})
+        box.commit()
+        t.assert_equals(_G.result, {})
+
+        -- Check rollback to savepoint (with txn commit).
+        box.begin()
+        s1:insert{8}
+        s2:insert{9}
+        local svp1 = box.savepoint()
+        s1:insert{10}
+        local svp2 = box.savepoint()
+        s2:insert{11}
+        box.rollback_to_savepoint(svp2)
+        t.assert_equals(_G.result, {
+            {num = 1, space_id = 513, old_tuple = nil, new_tuple = {11}},
+        })
+        s1:insert{12}
+        box.rollback_to_savepoint(svp1)
+        t.assert_equals(_G.result, {
+            {num = 1, space_id = 512, old_tuple = nil, new_tuple = {12}},
+            {num = 2, space_id = 512, old_tuple = nil, new_tuple = {10}},
+        })
+        _G.result = {}
+        box.commit()
+        t.assert_equals(_G.result, {})
+
+        -- Check rollback to savepoint (with txn rollback).
+        box.begin()
+        s1:insert{13}
+        s2:insert{14}
+        local svp = box.savepoint()
+        s1:insert{15}
+        s2:insert{16}
+        box.rollback_to_savepoint(svp)
+        t.assert_equals(_G.result, {
+            {num = 1, space_id = 513, old_tuple = nil, new_tuple = {16}},
+            {num = 2, space_id = 512, old_tuple = nil, new_tuple = {15}},
+        })
+        s1:insert{17}
+        s2:insert{18}
+        box.rollback()
+        t.assert_equals(_G.result, {
+            {num = 1, space_id = 513, old_tuple = nil, new_tuple = {18}},
+            {num = 2, space_id = 512, old_tuple = nil, new_tuple = {17}},
+            {num = 3, space_id = 513, old_tuple = nil, new_tuple = {14}},
+            {num = 4, space_id = 512, old_tuple = nil, new_tuple = {13}},
+        })
     end, {cg.params.engine})
 end
 

@@ -560,12 +560,12 @@ did_rollback = false
 box.begin()                                                                     \
 svp = box.savepoint()                                                           \
 s:replace{4}                                                                    \
-box.on_rollback(function() did_rollback = true assert(false) end)               \
+box.on_rollback(function() did_rollback = true end)                             \
 box.rollback_to_savepoint(svp)                                                  \
 box.commit()
 ---
 ...
-assert(not did_rollback)
+assert(did_rollback)
 ---
 - true
 ...
@@ -574,12 +574,12 @@ assert(not did_rollback)
 box.begin()                                                                     \
 svp = box.savepoint()                                                           \
 box.schema.create_space('test2', {engine = engine})                             \
-box.on_rollback(function() did_rollback = true assert(false) end)               \
+box.on_rollback(function() did_rollback = true end)                             \
 box.rollback_to_savepoint(svp)                                                  \
 box.commit()
 ---
 ...
-assert(not did_rollback)
+assert(did_rollback)
 ---
 - true
 ...
