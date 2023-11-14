@@ -16,7 +16,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="src/module.h" line="1865" column="10" bodyfile="src/module.h" bodystart="1865" bodyend="-1"/>
+        <location file="src/module.h" line="1874" column="10" bodyfile="src/module.h" bodystart="1874" bodyend="-1"/>
       </memberdef>
       <memberdef kind="variable" id="unionPACKED_1a4c3fa9f54c4da8295b2cdf3ca5f843ac" prot="public" static="no" mutable="no">
         <type>uint32_t</type>
@@ -31,7 +31,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="src/module.h" line="1867" column="10" bodyfile="src/module.h" bodystart="1867" bodyend="-1"/>
+        <location file="src/module.h" line="1876" column="10" bodyfile="src/module.h" bodystart="1876" bodyend="-1"/>
       </memberdef>
       <memberdef kind="variable" id="unionPACKED_1ae1b4d9361929d8bc2b374a36a2133910" prot="public" static="no" mutable="no">
         <type>const char *</type>
@@ -45,7 +45,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="src/module.h" line="1869" column="12" bodyfile="src/module.h" bodystart="1869" bodyend="-1"/>
+        <location file="src/module.h" line="1878" column="12" bodyfile="src/module.h" bodystart="1878" bodyend="-1"/>
       </memberdef>
       <memberdef kind="variable" id="unionPACKED_1abe5b199132aa0fc5215b5933e8b7c8c6" prot="public" static="no" mutable="no">
         <type>const char *</type>
@@ -59,7 +59,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="src/module.h" line="1871" column="12" bodyfile="src/module.h" bodystart="1871" bodyend="-1"/>
+        <location file="src/module.h" line="1880" column="12" bodyfile="src/module.h" bodystart="1880" bodyend="-1"/>
       </memberdef>
       <memberdef kind="variable" id="unionPACKED_1a47de0769ba4faf0a06782fd5e8892555" prot="public" static="no" mutable="no">
         <type>const char *</type>
@@ -77,7 +77,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="src/module.h" line="1891" column="12" bodyfile="src/module.h" bodystart="1891" bodyend="-1"/>
+        <location file="src/module.h" line="1900" column="12" bodyfile="src/module.h" bodystart="1900" bodyend="-1"/>
       </memberdef>
       <memberdef kind="variable" id="unionPACKED_1a6edcf6b5ce400f83345c6c108c93da4d" prot="public" static="no" mutable="no">
         <type>struct PACKED::@4</type>
@@ -90,7 +90,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="src/module.h" line="1892" column="1"/>
+        <location file="src/module.h" line="1901" column="1"/>
       </memberdef>
       <memberdef kind="variable" id="unionPACKED_1a1782075c62f8d5e3b0f6a87c8382d373" prot="public" static="no" mutable="no">
         <type>char</type>
@@ -104,7 +104,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="src/module.h" line="1897" column="6" bodyfile="src/module.h" bodystart="1897" bodyend="-1"/>
+        <location file="src/module.h" line="1906" column="6" bodyfile="src/module.h" bodystart="1906" bodyend="-1"/>
       </memberdef>
       </sectiondef>
     <briefdescription>
@@ -117,7 +117,7 @@
 <para>New fields may be added into the end of the structure in later tarantool versions. Also new flags may be introduced within <emphasis>flags</emphasis> field. <emphasis>collation</emphasis> cannot be changed to a union (to reuse for some other value), because it is verified even for a non-string key part by <ref refid="module_8h_1a3591006ff571eb1ac2b05f5e41a8a8ca" kindref="member">box_key_def_new_v2()</ref>.</para>
 <para>Fields that are unknown at given tarantool version are ignored in general, but filled with zeros when initialized. </para>
     </detaileddescription>
-    <location file="src/module.h" line="1862" column="1" bodyfile="src/module.h" bodystart="1862" bodyend="1898"/>
+    <location file="src/module.h" line="1871" column="1" bodyfile="src/module.h" bodystart="1871" bodyend="1907"/>
     <listofallmembers>
       <member refid="unionPACKED_1abe5b199132aa0fc5215b5933e8b7c8c6" prot="public" virt="non-virtual"><scope>PACKED</scope><name>collation</name></member>
       <member refid="unionPACKED_1ae1b4d9361929d8bc2b374a36a2133910" prot="public" virt="non-virtual"><scope>PACKED</scope><name>field_type</name></member>
