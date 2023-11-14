@@ -76,6 +76,10 @@ box_process_call(struct call_request *request, struct port *port);
 int
 box_process_eval(struct call_request *request, struct port *port);
 
+/** Checks if the current user may execute a global Lua function. */
+int
+access_check_lua_call(const char *name, uint32_t name_len);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
