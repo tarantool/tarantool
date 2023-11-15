@@ -89,6 +89,14 @@ struct priv_def {
 	/* Object id - is only defined for object type */
 	uint32_t object_id;
 	/**
+	 * Object name if the object is identified by a string name,
+	 * not by a numeric id. The object id is set to 0 in this case.
+	 * NOTE: This string isn't null-terminated.
+	 */
+	const char *object_name;
+	/** Length of the object_name string. */
+	uint32_t object_name_len;
+	/**
 	 * If this flag is set, the object id is unused and the privilege
 	 * should be applied to the whole object class.
 	 */

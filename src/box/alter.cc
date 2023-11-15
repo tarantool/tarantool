@@ -3843,9 +3843,22 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 	 */
 	switch (mp_typeof(*data)) {
 	case MP_STR:
-		if (mp_decode_strl(&data) == 0) {
+		priv->object_name = mp_decode_str(&data,
+						  &priv->object_name_len);
+		if (priv->object_name_len == 0) {
 			/* Entity-wide privilege. */
 			priv->is_entity_access = true;
+			priv->object_id = 0;
+			priv->object_name = NULL;
+			break;
+		} else if (priv->object_type == SC_LUA_CALL) {
+			/*
+			 * lua_call objects are global Lua functions.
+			 * They aren't stored in the database hence
+			 * don't have numeric ids. They are identified
+			 * by string names.
+			 */
+			priv->is_entity_access = false;
 			priv->object_id = 0;
 			break;
 		}
@@ -3855,6 +3868,8 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 		if (tuple_field_u32(tuple,
 		    BOX_PRIV_FIELD_OBJECT_ID, &(priv->object_id)) != 0)
 			return -1;
+		priv->object_name = NULL;
+		priv->object_name_len = 0;
 	}
 	if (priv->object_type == SC_UNKNOWN) {
 		diag_set(ClientError, ER_UNKNOWN_SCHEMA_OBJECT,

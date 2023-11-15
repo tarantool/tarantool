@@ -160,6 +160,13 @@ credentials_reset(struct credentials *cr, struct user *new_user)
  */
 extern struct user *guest_user, *admin_user;
 
+/**
+ * Returns cached runtime access information for the given Lua function name.
+ * If it doesn't exist, returns NULL.
+ */
+struct access *
+access_lua_call_find(const char *name, uint32_t name_len);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
