@@ -36,8 +36,10 @@
 #include "index.h"
 #include "bit/bit.h"
 #include "fiber.h"
+#include "salad/grp_alloc.h"
 #include "scoped_guard.h"
 #include "sequence.h"
+#include "trivia/util.h"
 #include "tt_static.h"
 
 struct universe universe;
@@ -146,6 +148,12 @@ priv_def_compare(const struct priv_def *lhs, const struct priv_def *rhs)
 		return lhs->object_type > rhs->object_type ? 1 : -1;
 	if (lhs->object_id != rhs->object_id)
 		return lhs->object_id > rhs->object_id ? 1 : -1;
+	int cmp = memcmp(lhs->object_name, rhs->object_name,
+			 MIN(lhs->object_name_len, rhs->object_name_len));
+	if (cmp != 0)
+		return cmp;
+	if (lhs->object_name_len != rhs->object_name_len)
+		return lhs->object_name_len > rhs->object_name_len ? 1 : -1;
 	return 0;
 }
 
@@ -187,37 +195,128 @@ user_destroy(struct user *user)
  * Add a privilege definition to the list
  * of effective privileges of a user.
  */
-int
-user_grant_priv(struct user *user, struct priv_def *def)
+void
+user_grant_priv(struct user *user, const struct priv_def *def)
 {
 	struct priv_def *old = privset_search(&user->privs, def);
 	if (old == NULL) {
-		size_t size;
-		old = region_alloc_object(&user->pool, typeof(*old), &size);
-		if (old == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc_object",
-				 "old");
-			return -1;
-		}
+		old = xregion_alloc_object(&user->pool, typeof(*old));
 		*old = *def;
+		if (def->object_name != NULL) {
+			char *object_name = (char *)xregion_alloc(
+					&user->pool, def->object_name_len);
+			memcpy(object_name, def->object_name,
+			       def->object_name_len);
+			old->object_name = object_name;
+		}
 		privset_insert(&user->privs, old);
 	} else {
 		old->access |= def->access;
 	}
-	return 0;
+}
+
+/**
+ * Stores cached runtime access information for global Lua functions.
+ * Nodes are created on demand and removed if empty.
+ */
+static mh_strnptr_t *access_lua_call_registry;
+
+/** Node in access_lua_call_registry. */
+struct access_lua_call_node {
+	/** Name of the global Lua function this node is for. */
+	const char *name;
+	/** Length of the name string. */
+	uint32_t name_len;
+	/** Cached runtime access information. */
+	struct access access[BOX_USER_MAX];
+};
+
+struct access *
+access_lua_call_find(const char *name, uint32_t name_len)
+{
+	struct mh_strnptr_t *h = access_lua_call_registry;
+	mh_int_t i = mh_strnptr_find_str(h, name, name_len);
+	if (i != mh_end(h)) {
+		struct access_lua_call_node *node =
+			(typeof(node))mh_strnptr_node(h, i)->val;
+		return node->access;
+	}
+	return NULL;
+}
+
+/**
+ * Returns cached runtime access information for the given Lua function name.
+ * Creates one if it doesn't exist.
+ */
+static struct access *
+access_lua_call_find_or_create(const char *name, uint32_t name_len)
+{
+	uint32_t name_hash = mh_strn_hash(name, name_len);
+	struct mh_strnptr_t *h = access_lua_call_registry;
+	struct mh_strnptr_key_t k = {name, name_len, name_hash};
+	mh_int_t i = mh_strnptr_find(h, &k, NULL);
+	if (i != mh_end(h)) {
+		struct access_lua_call_node *node =
+			(typeof(node))mh_strnptr_node(h, i)->val;
+		return node->access;
+	}
+	struct access_lua_call_node *node;
+	grp_alloc all = grp_alloc_initializer();
+	grp_alloc_reserve_data(&all, sizeof(*node));
+	grp_alloc_reserve_str(&all, name_len);
+	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
+	node = (typeof(node))grp_alloc_create_data(&all, sizeof(*node));
+	node->name = grp_alloc_create_str(&all, name, name_len);
+	node->name_len = name_len;
+	memset(node->access, 0, sizeof(node->access));
+	assert(grp_alloc_size(&all) == 0);
+	mh_strnptr_node_t n = {node->name, name_len, name_hash, node};
+	mh_strnptr_put(h, &n, NULL, NULL);
+	return node->access;
+}
+
+/**
+ * Deletes cached runtime access information for a Lua function if it's empty
+ * (i.e. grants no access to any user).
+ */
+static void
+access_lua_call_delete_if_empty(struct access *object)
+{
+	for (int i = 0; i < BOX_USER_MAX; ++i) {
+		struct access *access = &object[i];
+		if (access->granted != 0 || access->effective != 0)
+			return;
+	}
+	struct mh_strnptr_t *h = access_lua_call_registry;
+	struct access_lua_call_node *node = (typeof(node))(
+		(char *)object - offsetof(typeof(*node), access));
+	mh_int_t i = mh_strnptr_find_str(h, node->name, node->name_len);
+	assert(i != mh_end(h));
+	assert(mh_strnptr_node(h, i)->val == node);
+	mh_strnptr_del(h, i, NULL);
+	free(node);
 }
 
 /**
  * Find the corresponding access structure for the given privilege.
+ * Must be released with access_put() after use.
  */
 static struct access *
-access_find(const struct priv_def *priv)
+access_get(const struct priv_def *priv)
 {
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
 		return universe.access;
 	case SC_LUA_CALL:
-		return universe.access_lua_call;
+		if (priv->is_entity_access)
+			return universe.access_lua_call;
+		/*
+		 * lua_call objects aren't persisted in the database so
+		 * we create an access struct on demand and delete it in
+		 * access_put() if it's empty.
+		 */
+		return access_lua_call_find_or_create(priv->object_name,
+						      priv->object_name_len);
 	case SC_LUA_EVAL:
 		return universe.access_lua_eval;
 	case SC_SQL:
@@ -262,6 +361,23 @@ access_find(const struct priv_def *priv)
 	}
 }
 
+/** Releases an object returned by access_get(). */
+static void
+access_put(const struct priv_def *priv, struct access *object)
+{
+	switch (priv->object_type) {
+	case SC_LUA_CALL:
+		/*
+		 * lua_call objects aren't persisted in the database so
+		 * we don't need to keep an access struct if it's empty.
+		 */
+		if (!priv->is_entity_access)
+			access_lua_call_delete_if_empty(object);
+		break;
+	default:
+		break;
+	}
+}
 
 /**
  * Reset effective access of the user in the
@@ -274,12 +390,13 @@ user_set_effective_access(struct user *user)
 	privset_ifirst(&user->privs, &it);
 	struct priv_def *priv;
 	while ((priv = privset_inext(&it)) != NULL) {
-		struct access *object = access_find(priv);
+		struct access *object = access_get(priv);
 		 /* Protect against a concurrent drop. */
 		if (object == NULL)
 			continue;
 		struct access *access = &object[user->auth_token];
 		access->effective = access->granted | priv->access;
+		access_put(priv, object);
 	}
 }
 
@@ -340,8 +457,7 @@ user_reload_privs(struct user *user)
 			 * interested in real objects.
 			 */
 			if (priv.object_type != SC_ROLE || !(priv.access & PRIV_X))
-				if (user_grant_priv(user, &priv) != 0)
-					return -1;
+				user_grant_priv(user, &priv);
 			if (iterator_next(it, &tuple) != 0)
 				return -1;
 		}
@@ -355,10 +471,8 @@ user_reload_privs(struct user *user)
 			struct privset_iterator it;
 			privset_ifirst(&role->privs, &it);
 			struct priv_def *def;
-			while ((def = privset_inext(&it))) {
-				if (user_grant_priv(user, def) != 0)
-					return -1;
-			}
+			while ((def = privset_inext(&it)))
+				user_grant_priv(user, def);
 		}
 	}
 	user_set_effective_access(user);
@@ -522,6 +636,7 @@ user_cache_init(void)
 	/** Mark all tokens as unused. */
 	memset(tokens, 0xFF, sizeof(tokens));
 	user_registry = mh_i32ptr_new();
+	access_lua_call_registry = mh_strnptr_new();
 	/*
 	 * Solve a chicken-egg problem:
 	 * we need a functional user cache entry for superuser to
@@ -572,8 +687,18 @@ user_cache_init(void)
 void
 user_cache_free(void)
 {
-	if (user_registry)
+	if (user_registry != NULL) {
 		mh_i32ptr_delete(user_registry);
+		user_registry = NULL;
+	}
+	if (access_lua_call_registry != NULL) {
+		struct mh_strnptr_t *h = access_lua_call_registry;
+		mh_int_t i;
+		mh_foreach(h, i)
+			free(mh_strnptr_node(h, i)->val);
+		mh_strnptr_delete(h);
+		access_lua_call_registry = NULL;
+	}
 }
 
 /* }}} user cache */
@@ -734,17 +859,19 @@ role_revoke(struct user *grantee, struct user *role)
 int
 priv_grant(struct user *grantee, struct priv_def *priv)
 {
-	struct access *object = access_find(priv);
+	struct access *object = access_get(priv);
 	if (object == NULL)
 		return 0;
 	if (grantee->auth_token == ADMIN && priv->object_type == SC_UNIVERSE &&
 	    priv->access != USER_ACCESS_FULL) {
 		diag_set(ClientError, ER_GRANT,
 			 "can't revoke universe from the admin user");
+		access_put(priv, object);
 		return -1;
 	}
 	struct access *access = &object[grantee->auth_token];
 	access->granted = priv->access;
+	access_put(priv, object);
 	if (rebuild_effective_grants(grantee) != 0)
 		return -1;
 	return 0;

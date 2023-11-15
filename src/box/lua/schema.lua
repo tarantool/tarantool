@@ -3039,7 +3039,6 @@ end
 -- Set of object types that have a single global instance.
 local singleton_object_types = {
     ['universe'] = true,
-    ['lua_call'] = true,
     ['lua_eval'] = true,
     ['sql'] = true,
 }
@@ -3055,6 +3054,9 @@ local function object_resolve(object_type, object_name)
     end
     if is_singleton_object_type(object_type) then
         return 0
+    end
+    if object_type == 'lua_call' then
+        return object_name
     end
     if object_type == 'space' then
         if object_name == '' then
@@ -3119,6 +3121,9 @@ end
 local function object_name(object_type, object_id)
     if is_singleton_object_type(object_type) or object_id == '' then
         return ""
+    end
+    if object_type == 'lua_call' then
+        return object_id
     end
     local space
     if object_type == 'space' then

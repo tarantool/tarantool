@@ -165,12 +165,21 @@ access_check_lua_call(const char *name, uint32_t name_len)
 {
 	struct credentials *cr = effective_user();
 	user_access_t access = PRIV_X | PRIV_U;
+	/* Check for universal access. */
 	access &= ~cr->universal_access;
 	if (access == 0)
 		return 0;
+	/* Check for entity access. Don't allow to call built-ins. */
 	access &= ~universe.access_lua_call[cr->auth_token].effective;
 	if (access == 0 && !tarantool_lua_is_builtin_global(name, name_len))
 		return 0;
+	/* Check for function access if the user has usage access. */
+	if ((access & PRIV_U) == 0) {
+		struct access *object = access_lua_call_find(name, name_len);
+		if (object != NULL &&
+		    (object[cr->auth_token].effective & PRIV_X) != 0)
+			return 0;
+	}
 	struct user *user = user_find(cr->uid);
 	if (user != NULL)
 		diag_set(AccessDeniedError, priv_name(PRIV_X),
