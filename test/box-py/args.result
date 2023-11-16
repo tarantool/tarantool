@@ -22,6 +22,9 @@ Run an interactive Lua interpreter:
 
 $ tt run -i
 
+Please visit https://tarantool.io/tt to see online
+documentation.
+
 ----------------------------------------------------------
 
 At the lower level there are the following action options.
@@ -131,6 +134,9 @@ $ tt run [OPTIONS] script.lua [ARGS]
 Run an interactive Lua interpreter:
 
 $ tt run -i
+
+Please visit https://tarantool.io/tt to see online
+documentation.
 
 ----------------------------------------------------------
 
