@@ -71,7 +71,7 @@ local simple_config = {
         },
     },
     iproto = {
-        listen = 'unix/:./{{ instance_name }}.iproto',
+        listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}}
     },
     groups = {
         ['group-001'] = {

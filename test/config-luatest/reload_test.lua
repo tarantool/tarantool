@@ -27,7 +27,8 @@ g.test_no_cluster_config_failure = function(g)
               roles:
               - super
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
         groups:
           group-001:
             replicasets:
@@ -68,7 +69,8 @@ g.test_no_cluster_config_failure = function(g)
               roles:
               - super
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
     ]]
     treegen.write_script(dir, 'config.yaml', config)
     g.server:exec(function()

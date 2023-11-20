@@ -46,7 +46,7 @@ g.test_cluster_config = function()
             },
         },
         iproto = {
-            listen = 'unix/:./{{ instance_name }}.iproto',
+            listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}},
         },
         groups = {
             ['group-001'] = {
@@ -92,7 +92,7 @@ g.test_cluster_config = function()
             mode = 'rw',
         },
         iproto = {
-            listen = 'unix/:./{{ instance_name }}.iproto',
+            listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}},
         },
     }
     t.assert_equals(instance_config, expected_config)
@@ -182,7 +182,6 @@ g.test_defaults = function()
             snap_io_rate_limit = box.NULL,
         },
         iproto = {
-            listen = box.NULL,
             advertise = {
                 client = box.NULL,
             },

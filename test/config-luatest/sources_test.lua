@@ -37,7 +37,7 @@ g.test_source_file = function()
             },
         },
         iproto = {
-            listen = 'unix/:./{{ instance_name }}.iproto',
+            listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}},
         },
         groups = {
             ['group-001'] = {
@@ -133,7 +133,7 @@ g.test_sources_priority = function(g)
             },
         },
         iproto = {
-            listen = 'unix/:./{{ instance_name }}.iproto',
+            listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}},
         },
         process = {
             title = 'from file',

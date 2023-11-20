@@ -68,7 +68,7 @@ g.before_all(function(g)
         },
 
         iproto = {
-            listen = 'unix/:./{{ instance_name }}.iproto',
+            listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}},
         },
 
         replication = {

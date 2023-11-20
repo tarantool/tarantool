@@ -325,6 +325,13 @@ local function apply(config)
         return w.schema.box_cfg, w.data
     end):tomap()
 
+    -- Explicitly set box_cfg.listen to box.NULL if iproto.listen is not
+    -- provided.
+    -- TODO: drop this when default for array value will be supported.
+    if configdata:get('iproto.listen') == nil then
+        box_cfg.listen = box.NULL
+    end
+
     -- Construct box_cfg.replication.
     if box_cfg.replication == nil then
         box_cfg.replication = peer_uris(configdata)

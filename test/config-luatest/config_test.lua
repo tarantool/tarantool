@@ -3,7 +3,9 @@ local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
 local treegen = require('test.treegen')
 local justrun = require('test.justrun')
+local yaml = require('yaml')
 local json = require('json')
+local fio = require('fio')
 
 local g = t.group()
 
@@ -16,8 +18,10 @@ g.after_all(function()
 end)
 
 g.after_each(function()
-    if g.server ~= nil then
-        g.server:stop()
+    for k, v in pairs(g) do
+        if k == 'server' or k:match('^server_%d+$') then
+            v:stop()
+        end
     end
 end)
 
@@ -44,7 +48,7 @@ local function verify_configdata()
             },
         },
         iproto = {
-            listen = 'unix/:./{{ instance_name }}.iproto',
+            listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}},
         },
         groups = {
             ['group-001'] = {
@@ -85,7 +89,7 @@ local function verify_configdata()
             },
         },
         iproto = {
-            listen = 'unix/:./instance-001.iproto',
+            listen = {{uri = 'unix/:./instance-001.iproto'}},
         },
         sql = {
             cache_size = 2000,
@@ -337,7 +341,8 @@ g.test_remaining_vinyl_options = function()
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         vinyl:
           bloom_fpr: 0.37
@@ -393,7 +398,8 @@ g.test_feedback_options = function()
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         feedback:
           crashinfo: false
@@ -440,7 +446,8 @@ g.test_memtx_sort_threads = function()
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         memtx:
             sort_threads: 11
@@ -472,7 +479,8 @@ g.test_memtx_sort_threads = function()
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         memtx:
             sort_threads: 12
@@ -506,7 +514,8 @@ g.test_bootstrap_leader = function(g)
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         groups:
           group-001:
@@ -536,7 +545,8 @@ g.test_bootstrap_leader = function(g)
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         replication:
           bootstrap_strategy: 'config'
@@ -565,7 +575,8 @@ g.test_bootstrap_leader = function(g)
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         replication:
           bootstrap_strategy: 'config'
@@ -595,7 +606,8 @@ g.test_bootstrap_leader = function(g)
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         replication:
           bootstrap_strategy: 'config'
@@ -630,7 +642,8 @@ g.test_flightrec_options = function()
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         flightrec:
             enabled: false
@@ -684,7 +697,8 @@ g.test_security_options = function()
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         security:
             auth_type: pap-sha256
@@ -741,7 +755,8 @@ g.test_metrics_options_default = function()
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         groups:
           group-001:
@@ -777,7 +792,8 @@ g.test_metrics_options = function()
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         metrics:
           include: [cpu]
@@ -930,7 +946,8 @@ g.test_advertise_from_env = function(g)
               - super
 
         iproto:
-          listen: unix/:./{{ instance_name }}.iproto
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
 
         groups:
           group-001:
@@ -969,4 +986,372 @@ g.test_advertise_from_env = function(g)
         }
         t.assert_equals(res, exp)
     end)
+end
+
+g.test_listen_from_env = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+    local script = [[
+        print(require('yaml').encode(box.cfg.listen))
+        os.exit(0)
+    ]]
+    treegen.write_script(dir, 'main.lua', script)
+    local listen = {
+        {
+            uri = 'unix/:./instance-001_1.iproto',
+            params = {transport = 'plain'},
+        },
+        {
+            uri = 'unix/:./instance-001_2.iproto',
+            params = {transport = 'plain'},
+        },
+        {
+            uri = 'unix/:./instance-001_3.iproto',
+        },
+    }
+    local env = {TT_IPROTO_LISTEN = json.encode(listen)}
+    local opts = {nojson = true, stderr = false}
+    local args = {'--name', 'instance-001', '--config', 'config.yaml',
+                  'main.lua'}
+    local res = justrun.tarantool(dir, env, args, opts)
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(yaml.decode(res.stdout), listen)
+end
+
+g.test_iproto_listen_plain = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+
+    local verify = function()
+        local res = {
+            {
+                params = {transport = "plain"},
+                uri = "unix/:./instance-001.iproto",
+            },
+            {
+                params = {transport = "plain"},
+                uri = "unix/:./instance-001_2.iproto",
+            },
+            {
+                params = {transport = "plain"},
+                uri = "unix/:./instance-001_3.iproto",
+            },
+        }
+        t.assert_equals(box.cfg.listen, res)
+    end
+
+    helpers.success_case(g, {
+        dir = dir,
+        options = {
+            ['iproto.listen'] = {
+                {
+                    uri = 'unix/:./{{ instance_name }}.iproto',
+                    params = {transport = 'plain'},
+                },
+                {
+                    uri = 'unix/:./{{ instance_name }}_2.iproto',
+                    params = {transport = 'plain'},
+                },
+                {
+                    uri = 'unix/:./{{ instance_name }}_3.iproto',
+                    params = {transport = 'plain'},
+                },
+            },
+        },
+        verify = verify,
+    })
+end
+
+g.test_iproto_listen_to_advertise = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = yaml.encode({
+        credentials = {
+            users = {
+                guest = {
+                    roles = {'super'},
+                },
+                replicator = {
+                    roles = {'replication'},
+                    password = 'secret',
+                },
+            },
+        },
+        iproto = {
+            listen = {{
+                uri = 'unix/:./{{ instance_name }}.iproto',
+                params = {
+                    transport = 'plain',
+                },
+            }},
+            advertise = {
+                peer = {
+                    login = 'replicator',
+                },
+            },
+        },
+        groups = {
+            ['group-001'] = {
+                replicasets = {
+                    ['replicaset-001'] = {
+                        instances = {
+                            ['instance-001'] = {
+                                database = {
+                                    mode = 'rw',
+                                },
+                            },
+                            ['instance-002'] = {},
+                        },
+                    },
+                },
+            },
+        },
+    })
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    g.server_1 = server:new({config_file = config_file, chdir = dir,
+                             alias = 'instance-001'})
+    g.server_2 = server:new({config_file = config_file, chdir = dir,
+                             alias = 'instance-002'})
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_2:start({wait_until_ready = false})
+
+    g.server_1:wait_until_ready()
+    g.server_2:wait_until_ready()
+
+    g.server_1:exec(function()
+        t.assert_equals(#box.info.replication, 2)
+        local peer
+        if box.info.replication[2].name == 'instance-002' then
+            peer = box.info.replication[2].upstream.peer
+        else
+            peer = box.info.replication[1].upstream.peer
+        end
+        local exp = 'replicator@unix/:./instance-002.iproto?transport=plain'
+        t.assert_equals(peer, exp)
+    end)
+end
+
+g.test_iproto_listen_ssl = function()
+    t.tarantool.skip_if_enterprise()
+    helpers.failure_case(g, {
+        options = {
+            ['iproto.listen'] = {
+                {
+                    uri = 'unix/:./{{ instance_name }}.iproto',
+                    params = {transport = 'ssl'},
+                },
+            },
+        },
+        exp_err = 'SSL is not available in this build',
+    })
+end
+
+g.test_iproto_listen_ssl_enterprise = function()
+    t.tarantool.skip_if_not_enterprise()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local passwd = '123qwe'
+    local passwd_file = fio.pathjoin(dir, 'passwd.txt')
+    local file = fio.open(passwd_file, {'O_WRONLY', 'O_CREAT'},
+                          tonumber('666', 8))
+    t.assert(file ~= nil)
+    file:write(passwd)
+    file:close()
+    local cert_dir = fio.pathjoin(fio.abspath(os.getenv('SOURCEDIR') or '.'),
+                                  'test/enterprise-luatest/ssl_cert')
+    local ca_file = fio.pathjoin(cert_dir, 'ca.crt')
+    local cert_file = fio.pathjoin(cert_dir, 'client.crt')
+    local key_file = fio.pathjoin(cert_dir, 'client.enc.key')
+    local ciphers = 'ECDHE-RSA-AES256-GCM-SHA384'
+
+    local verify = function(ca, cert, key, password, password_file, cipher)
+        local exp = {
+            transport = 'ssl',
+            ssl_ca_file = ca,
+            ssl_cert_file = cert,
+            ssl_key_file = key,
+            ssl_password = password,
+            ssl_password_file = password_file,
+            ssl_ciphers = cipher,
+        }
+        t.assert_equals(#box.cfg.listen, 1)
+        t.assert_equals(box.cfg.listen[1].uri, 'unix/:./instance-001.iproto')
+        t.assert_equals(box.cfg.listen[1].params, exp)
+    end
+
+    helpers.success_case(g, {
+        dir = dir,
+        options = {
+            ['iproto.listen'] = {{
+                uri = 'unix/:./{{ instance_name }}.iproto',
+                params = {
+                    transport = 'ssl',
+                    ssl_ca_file = ca_file,
+                    ssl_cert_file = cert_file,
+                    ssl_key_file = key_file,
+                    ssl_password = passwd,
+                    ssl_password_file = passwd_file,
+                    ssl_ciphers = ciphers,
+                },
+            }},
+        },
+        verify = verify,
+        verify_args = {ca_file, cert_file, key_file, passwd, passwd_file,
+                       ciphers}
+    })
+end
+
+g.test_replication_ssl_enterprise = function()
+    t.tarantool.skip_if_not_enterprise()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local cert_dir = fio.pathjoin(fio.abspath(os.getenv('SOURCEDIR') or '.'),
+                                  'test/enterprise-luatest/ssl_cert')
+
+    local passwd_file = fio.pathjoin(dir, 'passwd.txt')
+    local file = fio.open(passwd_file, {'O_WRONLY', 'O_CREAT'},
+                          tonumber('666', 8))
+    file:write('123qwe')
+    t.assert(file ~= nil)
+    local passwd = '1q2w3e'
+    local ciphers = 'ECDHE-RSA-AES256-GCM-SHA384'
+
+    -- Master certificates.
+    local s1c = fio.pathjoin(cert_dir, 'server.crt')
+    local s1k = fio.pathjoin(cert_dir, 'server.enc.key')
+    local c1a = fio.pathjoin(cert_dir, 'ca.crt')
+    local c1c = fio.pathjoin(cert_dir, 'client.crt')
+    local c1k = fio.pathjoin(cert_dir, 'client.enc.key')
+    -- Replica certificates.
+    local s2c = fio.pathjoin(cert_dir, 'server2.crt')
+    local s2k = fio.pathjoin(cert_dir, 'server2.key')
+    local c2a = fio.pathjoin(cert_dir, 'ca2.crt')
+    local c2c = fio.pathjoin(cert_dir, 'client2.crt')
+    local c2k = fio.pathjoin(cert_dir, 'client2.key')
+
+    local config = {
+        credentials = {
+            users = {
+                guest = {
+                    roles = {'super'},
+                },
+                replicator = {
+                    password = 'topsecret',
+                    roles = {'replication'},
+                },
+            },
+        },
+        groups = {
+            ['group-001'] = {
+                replicasets = {
+                    ['replicaset-001'] = {
+                        instances = {
+                            ['instance-001'] = {
+                                database = {
+                                    mode = 'rw',
+                                },
+                                iproto = {
+                                    listen = {{
+                                        uri = 'unix/:./instance-001.iproto',
+                                        params = {
+                                            transport = 'ssl',
+                                            ssl_ca_file = c1a,
+                                            ssl_cert_file = s1c,
+                                            ssl_key_file = s1k,
+                                            ssl_password = passwd,
+                                            ssl_ciphers = ciphers,
+                                        },
+                                    }},
+                                    advertise = {
+                                        peer = {
+                                            login = 'replicator',
+                                            uri = 'unix/:./instance-001.iproto',
+                                            params = {
+                                                transport = 'ssl',
+                                                ssl_cert_file = c1c,
+                                                ssl_key_file = c1k,
+                                                ssl_password_file = passwd_file,
+                                                ssl_ciphers = ciphers,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            ['instance-002'] = {
+                                iproto = {
+                                    listen = {{
+                                        uri = 'unix/:./instance-002.iproto',
+                                        params = {
+                                            transport = 'ssl',
+                                            ssl_ca_file = c2a,
+                                            ssl_cert_file = s2c,
+                                            ssl_key_file = s2k,
+                                            ssl_ciphers = ciphers,
+                                        },
+                                    }},
+                                    advertise = {
+                                        peer = {
+                                            login = 'replicator',
+                                            uri = 'unix/:./instance-002.iproto',
+                                            params = {
+                                                transport = 'ssl',
+                                                ssl_cert_file = c2c,
+                                                ssl_key_file = c2k,
+                                                ssl_ciphers = ciphers,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+    local config_file = treegen.write_script(dir, 'config.yaml',
+                                             yaml.encode(config))
+    g.server_1 = server:new({
+        config_file = config_file,
+        chdir = dir,
+        alias = 'instance-001',
+    })
+    g.server_2 = server:new({
+        config_file = config_file,
+        chdir = dir,
+        alias = 'instance-002',
+    })
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_2:start({wait_until_ready = false})
+
+    g.server_1:wait_until_ready()
+    g.server_2:wait_until_ready()
+
+    g.server_1:exec(function(cert_file, key_file, ciphers)
+        t.assert_equals(#box.info.replication, 2)
+        local res = require('uri').parse(box.info.replication[2].upstream.peer)
+        t.assert_equals(res.params.ssl_cert_file, {cert_file})
+        t.assert_equals(res.params.ssl_key_file, {key_file})
+        t.assert_equals(res.params.ssl_ciphers, {ciphers})
+    end, {c2c, c2k, ciphers})
+
+    g.server_2:exec(function(cert_file, key_file, password_file, ciphers)
+        t.assert_equals(#box.info.replication, 2)
+        local res = require('uri').parse(box.info.replication[1].upstream.peer)
+        t.assert_equals(res.params.ssl_cert_file, {cert_file})
+        t.assert_equals(res.params.ssl_key_file, {key_file})
+        t.assert_equals(res.params.ssl_ciphers, {ciphers})
+        t.assert_equals(res.params.ssl_password_file, {password_file})
+    end, {c1c, c1k, passwd_file, ciphers})
 end

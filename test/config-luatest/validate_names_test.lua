@@ -57,7 +57,7 @@ local function cluster_initialize(g, with_names)
         },
 
         iproto = {
-            listen = 'unix/:./{{ instance_name }}.iproto',
+            listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}},
         },
 
         groups = {

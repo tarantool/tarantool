@@ -133,7 +133,7 @@ g.test_peer = run_as_script(function()
     local instance_name = 'instance-001'
     local cconfig = {
         iproto = {
-            listen = listen_template,
+            listen = {{uri = listen_template}},
         },
         groups = {
             ['group-001'] = {
@@ -156,7 +156,7 @@ g.test_peer = run_as_script(function()
             instance_name, 'tarantool.iproto'}, '/')
     end
 
-    local res = configdata:get('iproto.listen', {peer = 'instance-002'})
+    local res = configdata:get('iproto.listen', {peer = 'instance-002'})[1].uri
     t.assert_equals(res, exp_uri('group-001', 'replicaset-001', 'instance-002'))
 end)
 
@@ -177,7 +177,7 @@ g.test_sharding = run_as_script(function()
     local instance_name = 'router-001'
     local cconfig = {
         iproto = {
-            listen = listen_template,
+            listen = {{uri = listen_template}},
         },
         groups = {
             ['routers'] = {

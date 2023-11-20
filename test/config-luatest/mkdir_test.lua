@@ -65,7 +65,8 @@ g.test_work_dir = function(g)
             ['snapshot.dir'] = data_dir,
             ['console.socket'] = fio.pathjoin(dir,
                 '{{ instance_name }}.control'),
-            ['iproto.listen'] = fio.pathjoin(dir, '{{ instance_name }}.iproto'),
+            ['iproto.listen'] =
+                {{uri = fio.pathjoin(dir, '{{ instance_name }}.iproto')}},
         },
         verify = verify,
         verify_2 = verify,
@@ -122,7 +123,8 @@ g.test_dirs_are_relative_to_work_dir = function(g)
             -- to don't confuse the testing helpers and allows
             -- them to connect to the instance and execute
             -- necessary commands (such as `config:reload()`).
-            ['iproto.listen'] = fio.pathjoin(dir, '{{ instance_name }}.iproto'),
+            ['iproto.listen'] =
+                {{uri = fio.pathjoin(dir, '{{ instance_name }}.iproto')}},
         },
         verify = verify,
         verify_2 = verify,

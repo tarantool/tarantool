@@ -1246,7 +1246,7 @@ g.test_lua_eval_lua_call_sql = function()
                 },
             },
             iproto = {
-                listen = 'unix/:./test.iproto',
+                listen = {{uri = 'unix/:./test.iproto'}},
             },
         },
         verify = function()
@@ -1276,7 +1276,7 @@ g.test_lua_eval_lua_call_sql = function()
                 },
             },
             iproto = {
-                listen = 'unix/:./test.iproto',
+                listen = {{uri = 'unix/:./test.iproto'}},
             },
         },
         verify_2 = function()
