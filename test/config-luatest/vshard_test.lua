@@ -22,7 +22,8 @@ g.test_fixed_masters = function(g)
           password: "storage"
 
     iproto:
-      listen: 'unix/:./{{ instance_name }}.iproto'
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
       advertise:
         sharding:
           login: 'storage'
@@ -270,7 +271,8 @@ g.test_rebalancer_role = function(g)
           password: "storage"
 
     iproto:
-      listen: 'unix/:./{{ instance_name }}.iproto'
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
       advertise:
         sharding:
           login: 'storage'
@@ -437,7 +439,8 @@ g.test_too_many_rebalancers = function(g)
           password: "storage"
 
     iproto:
-      listen: 'unix/:./{{ instance_name }}.iproto'
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
       advertise:
         sharding:
           login: 'storage'

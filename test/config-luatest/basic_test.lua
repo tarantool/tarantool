@@ -33,7 +33,7 @@ g.test_basic = function(g)
             },
         },
         iproto = {
-            listen = 'unix/:./{{ instance_name }}.iproto',
+            listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}},
         },
         groups = {
             ['group-001'] = {
@@ -119,14 +119,18 @@ local err_msg_no_suitable_uris = 'replication.peers construction for ' ..
 -- Bad cases for building replicaset.
 for case_name, case in pairs({
     advertise_unknown_user = {
-        listen_2 = 'unix/:./{{ instance_name }}.iproto',
+        listen_2 = {{
+            uri = 'unix/:./{{ instance_name }}.iproto'
+        }},
         advertise_2 = {
             login = 'unknown',
         },
         exp_err = err_msg_cannot_find_user,
     },
     advertise_unknown_user_uri = {
-        listen_2 = 'unix/:./{{ instance_name }}.iproto',
+        listen_2 = {{
+            uri = 'unix/:./{{ instance_name }}.iproto'
+        }},
         advertise_2 = {
             uri = 'unix/:./{{ instance_name }}.iproto',
             login = 'unknown',
@@ -134,22 +138,38 @@ for case_name, case in pairs({
         exp_err = err_msg_cannot_find_user,
     },
     no_advertise_no_listen = {
-        listen_2 = box.NULL,
-        listen_3 = box.NULL,
+        listen_2 = {},
+        listen_3 = {},
         advertise_2 = box.NULL,
         advertise_3 = box.NULL,
         exp_err = err_msg_no_suitable_uris,
     },
     no_advertise_no_suitable_listen = {
-        listen_2 = 'localhost:0,0.0.0.0:3301,[::]:3301',
-        listen_3 = 'localhost:0,0.0.0.0:3301,[::]:3301',
+        listen_2 = {
+            {uri = 'localhost:0'},
+            {uri = '0.0.0.0:3301'},
+            {uri = '[::]:3301'}
+        },
+        listen_3 = {
+            {uri = 'localhost:0'},
+            {uri = '0.0.0.0:3301'},
+            {uri = '[::]:3301'}
+        },
         advertise_2 = box.NULL,
         advertise_3 = box.NULL,
         exp_err = err_msg_no_suitable_uris,
     },
     advertise_user_no_suitable_listen = {
-        listen_2 = 'localhost:0,0.0.0.0:3301,[::]:3301',
-        listen_3 = 'localhost:0,0.0.0.0:3301,[::]:3301',
+        listen_2 = {
+            {uri = 'localhost:0'},
+            {uri = '0.0.0.0:3301'},
+            {uri = '[::]:3301'}
+        },
+        listen_3 = {
+            {uri = 'localhost:0'},
+            {uri = '0.0.0.0:3301'},
+            {uri = '[::]:3301'}
+        },
         advertise_2 = {
             login = 'replicator',
         },
@@ -159,8 +179,16 @@ for case_name, case in pairs({
         exp_err = err_msg_no_suitable_uris,
     },
     advertise_user_pass_no_suitable_listen = {
-        listen_2 = 'localhost:0,0.0.0.0:3301,[::]:3301',
-        listen_3 = 'localhost:0,0.0.0.0:3301,[::]:3301',
+        listen_2 = {
+            {uri = 'localhost:0'},
+            {uri = '0.0.0.0:3301'},
+            {uri = '[::]:3301'}
+        },
+        listen_3 = {
+            {uri = 'localhost:0'},
+            {uri = '0.0.0.0:3301'},
+            {uri = '[::]:3301'}
+        },
         advertise_2 = {
             login = 'replicator',
             password = 'topsecret',
@@ -231,7 +259,9 @@ for case_name, case in pairs({
     g[('test_bad_replicaset_build_%s'):format(case_name)] = function(g)
         local dir = treegen.prepare_directory(g, {}, {})
 
-        local good_listen = 'unix/:./{{ instance_name }}.iproto'
+        local good_listen = {{
+            uri = 'unix/:./{{ instance_name }}.iproto'
+        }}
         local good_advertise = {
             login = 'replicator',
         }
@@ -320,7 +350,9 @@ end
 -- Successful cases for building replicaset.
 for case_name, case in pairs({
     advertise_user_pass_uri = {
-        listen = 'unix/:./{{ instance_name }}.iproto',
+        listen = {{
+            uri = 'unix/:./{{ instance_name }}.iproto',
+        }},
         advertise = {
             uri = 'unix/:./{{ instance_name }}.iproto',
             login = 'replicator',
@@ -328,51 +360,69 @@ for case_name, case in pairs({
         },
     },
     advertise_user_uri = {
-        listen = 'unix/:./{{ instance_name }}.iproto',
+        listen = {{
+            uri = 'unix/:./{{ instance_name }}.iproto',
+        }},
         advertise = {
             uri = 'unix/:./{{ instance_name }}.iproto',
             login = 'replicator',
         },
     },
     advertise_uri = {
-        listen = 'unix/:./{{ instance_name }}.iproto',
+        listen = {{
+            uri = 'unix/:./{{ instance_name }}.iproto',
+        }},
         advertise = {
             uri = 'unix/:./{{ instance_name }}.iproto',
         },
     },
     advertise_user_pass = {
-        listen = 'unix/:./{{ instance_name }}.iproto',
+        listen = {{
+            uri = 'unix/:./{{ instance_name }}.iproto',
+        }},
         advertise = {
             login = 'replicator',
             password = 'topsecret',
         },
     },
     advertise_user = {
-        listen = 'unix/:./{{ instance_name }}.iproto',
+        listen = {{
+            uri = 'unix/:./{{ instance_name }}.iproto',
+        }},
         advertise = {
             login = 'replicator',
         },
     },
     advertise_user_first_listen_suitable = {
-        listen = 'unix/:./{{ instance_name }}.iproto,localhost:0',
+        listen = {
+            {uri = 'unix/:./{{ instance_name }}.iproto'},
+            {uri = 'localhost:0'},
+        },
         advertise = {
             login = 'replicator',
         },
     },
     advertise_user_second_listen_suitable = {
-        listen = 'localhost:0,unix/:./{{ instance_name }}.iproto',
+        listen = {
+            {uri = 'localhost:0'},
+            {uri = 'unix/:./{{ instance_name }}.iproto'},
+        },
         advertise = {
             login = 'replicator',
         },
     },
     advertise_guest = {
-        listen = 'unix/:./{{ instance_name }}.iproto',
+        listen = {{
+            uri = 'unix/:./{{ instance_name }}.iproto',
+        }},
         advertise = {
             login = 'guest',
         },
     },
     advertise_guest_uri = {
-        listen = 'unix/:./{{ instance_name }}.iproto',
+        listen = {{
+            uri = 'unix/:./{{ instance_name }}.iproto',
+        }},
         advertise = {
             uri = 'unix/:./{{ instance_name }}.iproto',
             login = 'guest',
@@ -382,14 +432,20 @@ for case_name, case in pairs({
         -- It is OK to have a peer with iproto.listen unsuitable
         -- to connect if there is at least one suitable to
         -- replicate from.
-        listen = 'unix/:./{{ instance_name }}.iproto',
+        listen = {{
+            uri = 'unix/:./{{ instance_name }}.iproto',
+        }},
         advertise = {
             login = 'replicator',
         },
-        listen_4 = 'localhost:0',
+        listen_4 = {{
+            uri = 'localhost:0',
+        }},
     },
     election_mode = {
-        listen = 'unix/:./{{ instance_name }}.iproto',
+        listen = {{
+            uri = 'unix/:./{{ instance_name }}.iproto'
+        }},
         advertise = {
             login = 'replicator',
         },
@@ -585,7 +641,7 @@ g.test_loader_paths = function(g)
             },
         },
         iproto = {
-            listen = 'unix/:./{{ instance_name }}.iproto',
+            listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}},
         },
         groups = {
             ['group-001'] = {

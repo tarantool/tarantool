@@ -40,7 +40,8 @@ credentials:
       roles: [super]
 
 iproto:
-  listen: 'unix/:./{{ instance_name }}.iproto'
+  listen:
+  - uri: 'unix/:./{{ instance_name }}.iproto'
   # We currently need to manually define the user for vshard. If the user is not
   # defined, the guest is used.
   advertise:

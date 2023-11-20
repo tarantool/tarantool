@@ -74,34 +74,22 @@ local function find_advertise_uri(config, instance_name, dir)
         listen = listen or config.iproto.listen
     end
 
-    local uri = advertise or listen
-
-    -- Neither advertise, nor listen contain an URI.
-    if uri == nil then
-        return nil
+    local uris
+    if advertise ~= nil then
+        uris = {{uri = advertise}}
+    else
+        uris = listen
     end
 
-    uri = uri:gsub('{{ *instance_name *}}', instance_name)
-
-    if dir ~= nil then
-        uri = uri:gsub('unix/:%./', ('unix/:%s/'):format(dir))
-    end
-
-    -- The listen option can contain several URIs. Let's find
-    -- first URI suitable to create a client socket.
-    local uris, err = urilib.parse_many(uri)
-    if uris == nil then
-        error(err)
-    end
-    for _, u in ipairs(uris) do
-        local suitable = u.ipv4 ~= '0.0.0.0' and u.ipv6 ~= '::' and
-            u.service ~= '0'
-        if suitable then
-            return urilib.format(u)
+    for _, uri in ipairs(uris or {}) do
+        uri.uri = uri.uri:gsub('{{ *instance_name *}}', instance_name)
+        uri.uri = uri.uri:gsub('unix/:%./', ('unix/:%s/'):format(dir))
+        local u = urilib.parse(uri)
+        if u.ipv4 ~= '0.0.0.0' and u.ipv6 ~= '::' and u.service ~= '0' then
+            return uri
         end
     end
-
-    error(('No suitable URIs to connect found in %s'):format(uri))
+    error('No suitable URI to connect is found')
 end
 
 local Server = luatest.Server:inherit({})

@@ -239,20 +239,22 @@ local function advertise_client_uri_validate(data, w)
     return uri
 end
 
--- Accept a comma separated list of URIs and return the first one
+-- Accept a value of 'iproto.listen' option and return the first URI
 -- that is suitable to create a client socket (not just to listen
 -- on the server as, say, 0.0.0.0:3301 or localhost:0).
 --
 -- See the uri_is_suitable_to_connect() method in the instance
 -- schema object for details.
-local function find_suitable_uri_to_connect(uris)
-    for _, u in ipairs(urilib.parse_many(uris)) do
-        if uri_is_suitable_to_connect(u) then
+local function find_suitable_uri_to_connect(listen)
+    for _, u in ipairs(listen) do
+        assert(u.uri ~= nil)
+        local uri = urilib.parse(u.uri)
+        if uri ~= nil and uri_is_suitable_to_connect(uri) then
             -- The urilib.format() call has the second optional
             -- argument `write_password`. Let's assume that the
             -- given URIs are to listen on them and so have no
             -- user/password.
-            return urilib.format(u)
+            return urilib.format(uri), u.params
         end
     end
     return nil
@@ -298,7 +300,7 @@ local function instance_uri(self, iconfig, advertise_type)
         if listen == nil then
             return nil
         end
-        uri.uri = find_suitable_uri_to_connect(listen)
+        uri.uri, uri.params = find_suitable_uri_to_connect(listen)
     end
     if uri.uri == nil then
         return nil
@@ -689,25 +691,68 @@ return schema.new('instance_config', schema.record({
         end,
     }),
     iproto = schema.record({
-        -- XXX: listen/advertise are specific: accept a string of
-        -- a particular format, a number (port), a table of a
-        -- particular format.
-        --
-        -- Only a string is accepted for now.
-        listen = schema.scalar({
-            type = 'string',
+        listen = schema.array({
+            items = schema.record({
+                uri = schema.scalar({
+                    type = 'string',
+                    validate = function(data, w)
+                        -- Substitute variables with placeholders to don't
+                        -- confuse the URI parser with the curly brackets.
+                        data = data:gsub('{{ *.- *}}', 'placeholder')
+                        local uri, err = urilib.parse(data)
+                        if uri == nil then
+                            w.error('Unable to parse an URI: %s', err)
+                        end
+                        if uri.login ~= nil then
+                            w.error("Login cannot be set for iproto.listen")
+                        end
+                        assert(uri.password == nil)
+                        if uri.params ~= nil then
+                            err = "URI parameters should be described in " ..
+                                  "the 'params' field, not as the part of URI"
+                            w.error(err)
+                        end
+                    end,
+                }),
+                params = schema.record({
+                    transport = schema.enum({
+                        'plain',
+                        'ssl',
+                    }),
+                    -- Mandatory server options for TLS.
+                    ssl_key_file = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_cert_file = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    -- Optional server options for TLS.
+                    ssl_ca_file = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_ciphers = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_password = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_password_file = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                }),
+            }, {
+                validate = function(data, w)
+                    -- No items in iproto.listen at all -- OK.
+                    if next(data) == nil then
+                        return
+                    end
+                    -- There is some data -- the URI should be there.
+                    if data.uri == nil then
+                        w.error('The URI is required for iproto.listen')
+                    end
+                end,
+            }),
             box_cfg = 'listen',
-            default = box.NULL,
-            validate = function(data, w)
-                -- Substitute variables with placeholders to don't
-                -- confuse the URI parser with the curly brackets.
-                data = data:gsub('{{ *.- *}}', 'placeholder')
-
-                local uris, err = urilib.parse_many(data)
-                if uris == nil then
-                    w.error('Unable to parse an URI/a list of URIs: %s', err)
-                end
-            end,
         }),
         -- URIs for clients to let them know where to connect.
         --
