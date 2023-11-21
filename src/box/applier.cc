@@ -1520,14 +1520,14 @@ applier_synchro_filter_tx(struct stailq *rows)
 	 * It  may happen that we receive the instance's rows via some third
 	 * node, so cannot check for applier->instance_id here.
 	 */
-	row = &stailq_first_entry(rows, struct applier_tx_row, next)->row;
+	row = &stailq_last_entry(rows, struct applier_tx_row, next)->row;
 	uint64_t term = txn_limbo_replica_term(&txn_limbo, row->replica_id);
 	assert(term <= txn_limbo.promote_greatest_term);
 	if (term == txn_limbo.promote_greatest_term)
 		return;
 
 	/*
-	 * We do not nopify promotion/demotion and confirm/rollback.
+	 * We do not nopify promotion/demotion and most of confirm/rollback.
 	 * Such syncrhonous requests should be filtered by txn_limbo to detect
 	 * possible split brain situations.
 	 *
@@ -1538,14 +1538,10 @@ applier_synchro_filter_tx(struct stailq *rows)
 	 * claimed by someone is a marker of split-brain by itself: consider it
 	 * a synchronous transaction, which is committed with quorum 1.
 	 */
-	struct xrow_header *last_row =
-		&stailq_last_entry(rows, struct applier_tx_row, next)->row;
 	struct applier_tx_row *item;
-	if (!last_row->wait_sync) {
-		if (!iproto_type_is_dml(last_row->type) ||
-		    txn_limbo.owner_id == REPLICA_ID_NIL) {
+	if (iproto_type_is_dml(row->type) && !row->wait_sync) {
+		if (txn_limbo.owner_id == REPLICA_ID_NIL)
 			return;
-		}
 		stailq_foreach_entry(item, rows, next) {
 			row = &item->row;
 			if (row->type == IPROTO_NOP)
@@ -1554,6 +1550,38 @@ applier_synchro_filter_tx(struct stailq *rows)
 				  "got an async transaction from an old term");
 		}
 		return;
+	} else if (iproto_type_is_synchro_request(row->type)) {
+		item = stailq_last_entry(rows, typeof(*item), next);
+		struct synchro_request req = item->req.synchro;
+		/* Note! Might be different from row->replica_id. */
+		uint32_t owner_id = req.replica_id;
+		int64_t confirmed_lsn =
+			txn_limbo_replica_confirmed_lsn(&txn_limbo, owner_id);
+		/*
+		 * A CONFIRM with lsn <= known confirm lsn for this replica may
+		 * be nopified without a second thought. The transactions it's
+		 * going to confirm were already confirmed by one of the
+		 * PROMOTE/DEMOTE requests in a new term.
+		 *
+		 * Same about a ROLLBACK with lsn > known confirm lsn.
+		 * These requests, although being out of date, do not contradict
+		 * anything, so we may silently skip them.
+		 */
+		switch (row->type) {
+		case IPROTO_RAFT_PROMOTE:
+		case IPROTO_RAFT_DEMOTE:
+			return;
+		case IPROTO_RAFT_CONFIRM:
+			if (req.lsn > confirmed_lsn)
+				return;
+			break;
+		case IPROTO_RAFT_ROLLBACK:
+			if (req.lsn <= confirmed_lsn)
+				return;
+			break;
+		default:
+			unreachable();
+		}
 	}
 	stailq_foreach_entry(item, rows, next) {
 		row = &item->row;
