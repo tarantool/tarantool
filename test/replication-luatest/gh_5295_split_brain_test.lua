@@ -109,6 +109,15 @@ local function reconnect_and_check_split_brain(cg)
     end)
 end
 
+local function reconnect_and_check_no_split_brain(cg)
+    local srv = cg.split_replica
+    srv:exec(update_replication, {cg.main.net_box_uri})
+    t.helpers.retrying({}, srv.exec, srv, function()
+        local upstream = box.info.replication[1].upstream
+        t.assert_equals(upstream.status, 'follow', 'no split-brain')
+    end)
+end
+
 local function write_promote()
     t.assert_not_equals(box.info.synchro.queue.owner,  box.info.id,
                         "Promoting a follower")
@@ -137,18 +146,72 @@ g.test_async_old_term = function(cg)
     reconnect_and_check_split_brain(cg)
 end
 
--- Any unseen sync transaction confirmation from an obsolete term means a
+-- A conflicting sync transaction confirmation from an obsolete term means a
 -- split-brain.
-g.test_confirm_old_term = function(cg)
+g.test_bad_confirm_old_term = function(cg)
     partition_replica(cg)
     cg.split_replica:exec(write_promote)
     cg.main:exec(function() box.space.sync:replace{1} end)
     reconnect_and_check_split_brain(cg)
 end
 
--- Any unseen sync transaction rollback from an obsolete term means a
+-- Obsolete sync transaction confirmation might be fine when it doesn't
+-- contradict local history.
+g.test_good_confirm_old_term = function(cg)
+    t.tarantool.skip_if_not_debug()
+    -- Delay confirmation on the old leader, so that the transaction is included
+    -- into new leader's PROMOTE, but the old leader writes a CONFIRM for it.
+    cg.main:exec(function()
+        local lsn = box.info.lsn
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 1)
+        require('fiber').new(function() box.space.sync:replace{1} end)
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.lsn, lsn + 1)
+        end)
+    end)
+    partition_replica(cg)
+    cg.split_replica:exec(write_promote)
+    cg.main:exec(function()
+        local lsn = box.info.lsn
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.lsn, lsn + 1)
+        end)
+    end)
+    reconnect_and_check_no_split_brain(cg)
+end
+
+-- A conflicting sync transaction rollback from an obsolete term means a
 -- split-brain.
-g.test_rollback_old_term = function(cg)
+g.test_bad_rollback_old_term = function(cg)
+    t.tarantool.skip_if_not_debug()
+    -- Delay rollback on the old leader, so that the transaction is included
+    -- into new leader's PROMOTE, but the old leader writes a ROLLBACK for it.
+    cg.main:exec(function()
+        local lsn = box.info.lsn
+        box.cfg{replication_synchro_quorum = 31}
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 1)
+        require('fiber').new(function() box.space.sync:replace{1} end)
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.lsn, lsn + 1)
+        end)
+    end)
+    partition_replica(cg)
+    cg.split_replica:exec(write_promote)
+    cg.main:exec(function()
+        local lsn = box.info.lsn
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.lsn, lsn + 1)
+        end)
+        box.cfg{replication_synchro_quorum = 1}
+    end)
+    reconnect_and_check_split_brain(cg)
+end
+
+-- Obsolete sync transaction rollback might be fine when it doesn't contradict
+-- local history.
+g.test_good_rollback_old_term = function(cg)
     partition_replica(cg)
     cg.split_replica:exec(write_promote)
     cg.main:exec(function()
@@ -156,7 +219,7 @@ g.test_rollback_old_term = function(cg)
         pcall(box.space.sync.replace, box.space.sync, {1})
         box.cfg{replication_synchro_quorum = 1}
     end)
-    reconnect_and_check_split_brain(cg)
+    reconnect_and_check_no_split_brain(cg)
 end
 
 -- Conflicting demote for the same term is a split-brain.
@@ -230,4 +293,87 @@ g.test_promote_new_term_conflicting_queue = function(cg)
     cg.main:exec(write_promote)
     fill_queue_and_write(cg.split_replica)
     reconnect_and_check_split_brain(cg)
+end
+
+local g_very_old_term = t.group('test-confirm-very-old-term')
+
+g_very_old_term.before_each(function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.cluster = cluster:new{}
+    cg.box_cfg = {
+        replication_timeout = 0.1,
+        replication_synchro_quorum = 1,
+        replication = {
+            server.build_listen_uri('server1', cg.cluster.id),
+            server.build_listen_uri('server2', cg.cluster.id),
+            server.build_listen_uri('server3', cg.cluster.id),
+        },
+        election_mode = 'voter',
+    }
+    cg.servers = {}
+    for i = 1, 3 do
+        cg.servers[i] = cg.cluster:build_and_add_server{
+            alias = 'server' .. i,
+            box_cfg = cg.box_cfg,
+        }
+    end
+    cg.servers[1].box_cfg.election_mode = 'manual'
+    cg.cluster:start()
+    cg.cluster:wait_for_fullmesh()
+    cg.servers[1]:exec(function()
+        local s = box.schema.space.create('sync', {is_sync = true})
+        s:create_index('pk')
+    end)
+end)
+
+g_very_old_term.after_each(function(cg)
+    cg.cluster:drop()
+end)
+
+g_very_old_term.test_confirm = function( cg)
+    -- Create a sync transaction and block its confirmation.
+    cg.servers[1]:exec(function()
+        local lsn = box.info.lsn
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 1)
+        require('fiber').new(function()
+            box.space.sync:insert{1}
+        end)
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.lsn, lsn + 1)
+        end)
+    end)
+    -- Make sure the transaction reaches other servers and disconnect them.
+    cg.servers[1]:update_box_cfg({replication = ""})
+    local new_cfg = table.deepcopy(cg.box_cfg)
+    table.remove(new_cfg.replication, 1)
+    new_cfg.election_mode = 'manual'
+    for i = 2, 3 do
+        cg.servers[i]:wait_for_vclock_of(cg.servers[1])
+        cg.servers[i]:update_box_cfg(new_cfg)
+    end
+    cg.servers[1]:exec(function()
+        local lsn = box.info.lsn
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.lsn, lsn + 1)
+        end)
+    end)
+    -- Perform a few cycles: promote either server2 or server3, let it write
+    -- some synchronous transaction.
+    for j = 1, 4 do
+        local leader = cg.servers[2 + j % 2]
+        local replica = cg.servers[2 + (j - 1) % 2]
+        leader:exec(function(n)
+            box.ctl.promote()
+            box.ctl.wait_rw()
+            box.space.sync:insert{n}
+        end, {j + 1})
+        replica:wait_for_vclock_of(leader)
+    end
+    for i = 2, 3 do
+        cg.servers[i]:exec(function() box.snapshot() end)
+        cg.servers[i]:restart()
+    end
+    cg.servers[1]:update_box_cfg({replication = cg.box_cfg.replication})
+    cg.cluster:wait_for_fullmesh()
 end
