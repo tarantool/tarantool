@@ -1,6 +1,6 @@
 set(ZZIP_VERSION v0.13.71)
 set(ZZIP_HASH 1aa094186cf2222e4cda1b91b8fb8f60)
-set(ZZIP_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/zzip)
+set(ZZIP_INSTALL_DIR ${BUNDLED_LIBS_INSTALL_DIR}/zzip-prefix)
 set(ZZIP_INCLUDE_DIR ${ZZIP_INSTALL_DIR}/include)
 set(ZZIP_LIBRARY ${ZZIP_INSTALL_DIR}/lib/libzzip-0.a)
 set(ZZIP_CFLAGS "${DEPENDENCY_CFLAGS} -O2")
@@ -33,6 +33,9 @@ endif()
 
 ExternalProject_Add(bundled-zzip-project
     PREFIX ${ZZIP_INSTALL_DIR}
+    SOURCE_DIR ${ZZIP_INSTALL_DIR}/src/zzip
+    BINARY_DIR ${ZZIP_INSTALL_DIR}/src/zzip-build
+    STAMP_DIR ${ZZIP_INSTALL_DIR}/src/zzip-stamp
     URL https://github.com/gdraheim/zziplib/archive/${ZZIP_VERSION}.tar.gz
     URL_MD5 ${ZZIP_HASH}
     CMAKE_ARGS ${ZZIP_CMAKE_FLAGS}

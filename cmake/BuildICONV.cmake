@@ -1,6 +1,6 @@
 set(ICONV_VERSION 1.17)
 set(ICONV_HASH d718cd5a59438be666d1575855be72c3)
-set(ICONV_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/iconv)
+set(ICONV_INSTALL_DIR ${BUNDLED_LIBS_INSTALL_DIR}/iconv-prefix)
 set(ICONV_INCLUDE_DIR ${ICONV_INSTALL_DIR}/include)
 set(ICONV_LIBRARY ${ICONV_INSTALL_DIR}/lib/libiconv.a)
 set(ICONV_CFLAGS "${DEPENDENCY_CFLAGS} -O2")
@@ -14,6 +14,9 @@ endif()
 
 ExternalProject_Add(bundled-iconv-project
     PREFIX ${ICONV_INSTALL_DIR}
+    SOURCE_DIR ${ICONV_INSTALL_DIR}/src/iconv
+    BINARY_DIR ${ICONV_INSTALL_DIR}/src/iconv-build
+    STAMP_DIR ${ICONV_INSTALL_DIR}/src/iconv-stamp
     URL URL ${BACKUP_STORAGE}/libiconv/libiconv-${ICONV_VERSION}.tar.gz
     URL_MD5 ${ICONV_HASH}
     CONFIGURE_COMMAND <SOURCE_DIR>/configure
