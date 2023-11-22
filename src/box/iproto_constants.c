@@ -94,6 +94,8 @@ const char *iproto_type_strs[iproto_type_MAX] = {
 	IPROTO_TYPES(IPROTO_TYPE_STRS_MEMBER)
 };
 
+char *iproto_type_lower_strs[iproto_type_MAX];
+
 #define IPROTO_RAFT_KEY_STRS_MEMBER(s, ...) \
 	[IPROTO_RAFT_ ## s] = #s,
 

@@ -5889,6 +5889,7 @@ box_storage_free(void)
 void
 box_init(void)
 {
+	iproto_constants_init();
 	box_on_recovery_state_event =
 		event_get("box.ctl.on_recovery_state", true);
 	event_ref(box_on_recovery_state_event);
@@ -5963,6 +5964,7 @@ box_free(void)
 	box_on_recovery_state_event = NULL;
 	txn_event_trigger_free();
 	tuple_free();
+	iproto_constants_free();
 	/* schema_module_free(); */
 	/* session_free(); */
 	/* user_cache_free(); */

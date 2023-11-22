@@ -427,6 +427,9 @@ enum iproto_type {
 /** IPROTO type name by code */
 extern const char *iproto_type_strs[];
 
+/** IPROTO type name by code, in lower case. */
+extern char *iproto_type_lower_strs[];
+
 #define IPROTO_RAFT_KEYS(_)						\
 	_(TERM, 0)							\
 	_(VOTE, 1)							\
@@ -465,6 +468,15 @@ iproto_type_name(uint16_t type)
 	default:
 		return NULL;
 	}
+}
+
+/** Returns lowercase IPROTO type name by IPROTO `type'. */
+static inline const char *
+iproto_type_name_lower(uint16_t type)
+{
+	if (type < iproto_type_MAX)
+		return iproto_type_lower_strs[type];
+	return NULL;
 }
 
 /** Predefined replication group identifiers. */
@@ -668,6 +680,27 @@ vy_row_index_key_name(enum vy_row_index_key key)
 		return NULL;
 	extern const char *vy_row_index_key_strs[];
 	return vy_row_index_key_strs[key];
+}
+
+/** Initialize the "IPROTO constants" subsystem. */
+static inline void
+iproto_constants_init(void)
+{
+	for (size_t i = 0; i < iproto_type_MAX; i++) {
+		const char *type_name = iproto_type_strs[i];
+		iproto_type_lower_strs[i] = type_name == NULL ? NULL :
+					    strtolowerdup(type_name);
+	}
+}
+
+/** Destroy the "IPROTO constants" subsystem. */
+static inline void
+iproto_constants_free(void)
+{
+	for (size_t i = 0; i < iproto_type_MAX; i++) {
+		free(iproto_type_lower_strs[i]);
+		iproto_type_lower_strs[i] = NULL;
+	}
 }
 
 #if defined(__cplusplus)
