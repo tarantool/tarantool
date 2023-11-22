@@ -1,7 +1,7 @@
 set(ICU_VERSION release-71-1/icu4c-71_1)
 set(ICU_HASH e06ffc96f59762bd3c929b217445aaec)
 set(ICU_PATCHES_DIR ${PROJECT_SOURCE_DIR}/patches)
-set(ICU_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/icu)
+set(ICU_INSTALL_DIR ${BUNDLED_LIBS_INSTALL_DIR}/icu-prefix)
 set(ICU_INCLUDE_DIR ${ICU_INSTALL_DIR}/include)
 set(ICU_I18N_LIBRARY ${ICU_INSTALL_DIR}/lib/libicui18n.a)
 set(ICU_UC_LIBRARY ${ICU_INSTALL_DIR}/lib/libicuuc.a)
@@ -19,6 +19,9 @@ endif()
 
 ExternalProject_Add(bundled-icu-project
     PREFIX ${ICU_INSTALL_DIR}
+    SOURCE_DIR ${ICU_INSTALL_DIR}/src/icu
+    BINARY_DIR ${ICU_INSTALL_DIR}/src/icu-build
+    STAMP_DIR ${ICU_INSTALL_DIR}/src/icu-stamp
     URL https://github.com/unicode-org/icu/releases/download/${ICU_VERSION}-src.tgz
     URL_MD5 ${ICU_HASH}
     CONFIGURE_COMMAND <SOURCE_DIR>/source/configure
