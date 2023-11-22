@@ -1,6 +1,6 @@
 set(ZLIB_VERSION 1.2.12)
 set(ZLIB_HASH 5fc414a9726be31427b440b434d05f78)
-set(ZLIB_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/zlib)
+set(ZLIB_INSTALL_DIR ${BUNDLED_LIBS_INSTALL_DIR}/zlib-prefix)
 set(ZLIB_INCLUDE_DIR ${ZLIB_INSTALL_DIR}/include)
 set(ZLIB_LIBRARY ${ZLIB_INSTALL_DIR}/lib/libz.a)
 set(ZLIB_CFLAGS "${DEPENDENCY_CFLAGS} -O2")
@@ -14,6 +14,9 @@ endif()
 
 ExternalProject_Add(bundled-zlib-project
     PREFIX ${ZLIB_INSTALL_DIR}
+    SOURCE_DIR ${ZLIB_INSTALL_DIR}/src/zlib
+    BINARY_DIR ${ZLIB_INSTALL_DIR}/src/zlib-build
+    STAMP_DIR ${ZLIB_INSTALL_DIR}/src/zlib-stamp
     URL ${BACKUP_STORAGE}/zlib/zlib-${ZLIB_VERSION}.tar.gz
     URL_MD5 ${ZLIB_HASH}
     CONFIGURE_COMMAND env

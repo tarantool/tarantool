@@ -60,6 +60,10 @@ if(BUILD_STATIC_WITH_BUNDLED_LIBS)
     set(BUILD_STATIC ON)
 endif()
 
+if(NOT BUNDLED_LIBS_INSTALL_DIR)
+    set(BUNDLED_LIBS_INSTALL_DIR ${PROJECT_BINARY_DIR}/build)
+endif()
+
 include(cmake/utils.cmake)
 include(cmake/pod2man.cmake)
 # the order is significant: we need to know os and compiler to configure libs
