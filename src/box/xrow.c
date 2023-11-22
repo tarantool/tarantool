@@ -1266,7 +1266,7 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
 		pos = mp_encode_uint(pos, req->term);
 	}
 
-	assert(pos - body < XROW_SYNCHRO_BODY_LEN_MAX);
+	assert(pos - body < XROW_BODY_LEN_MAX);
 
 	memset(row, 0, sizeof(*row));
 	row->type = req->type;

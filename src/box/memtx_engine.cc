@@ -876,7 +876,7 @@ static int
 checkpoint_write_synchro(struct xlog *l, const struct synchro_request *req)
 {
 	struct xrow_header row;
-	char body[XROW_SYNCHRO_BODY_LEN_MAX];
+	char body[XROW_BODY_LEN_MAX];
 	xrow_encode_synchro(&row, body, req);
 	return checkpoint_write_row(l, &row);
 }
