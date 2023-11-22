@@ -13,11 +13,9 @@ jobs:
   source:
     if: github.repository == 'tarantool/tarantool'
 
-    runs-on: ubuntu-20.04-self-hosted
+    runs-on: ubuntu-22.04
 
     steps:
-      - name: Prepare checkout
-        uses: tarantool/actions/prepare-checkout@master
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -28,10 +26,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_S3_ENDPOINT_URL: ${{ secrets.AWS_S3_ENDPOINT_URL }}
-        run: |
-          sudo apt-get -y update
-          sudo apt-get install -y awscli
-          ${CI_MAKE} source-deploy
+        run: ${CI_MAKE} source-deploy
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
