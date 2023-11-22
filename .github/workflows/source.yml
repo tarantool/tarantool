@@ -15,9 +15,6 @@ jobs:
 
     runs-on: ubuntu-22.04
 
-    container:
-      image: docker.io/tarantool/testing:ubuntu-focal
-
     steps:
       - uses: actions/checkout@v3
         with:
