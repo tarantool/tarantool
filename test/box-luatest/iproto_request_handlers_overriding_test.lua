@@ -1,6 +1,24 @@
 local server = require('luatest.server')
 local t = require('luatest')
 
+-- Keep in sync with `is_iproto_override_supported' in `iproto.cc'.
+local unsupported_rq_types = {
+    JOIN = box.iproto.type.JOIN,
+    SUBSCRIBE = box.iproto.type.SUBSCRIBE,
+    FETCH_SNAPSHOT = box.iproto.type.FETCH_SNAPSHOT,
+    REGISTER = box.iproto.type.REGISTER,
+}
+
+-- Grep server logs for error messages about unsupported request types.
+local function check_unsupported_rq_types(cg)
+    local msg
+    for req in pairs(unsupported_rq_types) do
+        msg = "C> IPROTO request handler overriding does not support `" ..
+              req .. "' request type"
+        t.assert(cg.server:grep_log(msg))
+    end
+end
+
 local g = t.group()
 
 g.before_all(function(cg)
@@ -133,7 +151,7 @@ end
 
 -- Checks that `box.iproto.override` errors are handled correctly.
 g.test_box_iproto_override_errors = function(cg)
-    cg.server:exec(function()
+    cg.server:exec(function(unsupported_rq_types)
         local err_msg = "Usage: box.iproto.override(request_type, callback)"
         t.assert_error_msg_content_equals(err_msg, function()
             box.iproto.override()
@@ -153,12 +171,6 @@ g.test_box_iproto_override_errors = function(cg)
         t.assert_error_msg_content_equals(err_msg, function()
             box.iproto.override(0, 'str')
         end)
-        local unsupported_rq_types = {
-            JOIN = box.iproto.type.JOIN,
-            FETCH_SNAPSHOT = box.iproto.type.FETCH_SNAPSHOT,
-            REGISTER = box.iproto.type.REGISTER,
-            SUBSCRIBE = box.iproto.type.SUBSCRIBE,
-        }
         for rq_name, rq_type in pairs(unsupported_rq_types) do
             err_msg = ("IPROTO request handler overriding does not " ..
                        "support %s request type"):format(rq_name)
@@ -166,7 +178,7 @@ g.test_box_iproto_override_errors = function(cg)
                 box.iproto.override(rq_type, function() end)
             end)
         end
-    end)
+    end, {unsupported_rq_types})
 end
 
 -- Checks that `box.iproto.override` reset of non-existing request handler is
@@ -430,5 +442,187 @@ g.test_box_iproto_override_fallback_double_accounting = function(cg)
         box.iproto.override(box.iproto.type.PING, nil)
         local after = box.stat.net().REQUESTS_IN_PROGRESS.current
         t.assert_equals(after - before, 0)
+    end)
+end
+
+-- Start server and set global functions.
+local function init_server(cg, server_env)
+    cg.server = server:new({env = server_env})
+    cg.server:start()
+    cg.server:exec(function(net_box_uri)
+        rawset(_G, 'send_request_and_read_response', function(request_type)
+            local uri = require('uri')
+            local socket = require('socket')
+            -- Connect to the server.
+            local u = uri.parse(net_box_uri)
+            local s = socket.tcp_connect(u.host, u.service)
+            local greeting = s:read(box.iproto.GREETING_SIZE)
+            greeting = box.iproto.decode_greeting(greeting)
+            t.assert_covers(greeting, {protocol = 'Binary'})
+            -- Send the request.
+            local request = box.iproto.encode_packet(
+                {request_type = request_type}, {}
+            )
+            t.assert_equals(s:write(request), #request)
+            -- Read the response.
+            local response = ''
+            local header, body
+            repeat
+                header, body = box.iproto.decode_packet(response)
+                if header == nil then
+                    local size = body
+                    local data = s:read(size)
+                    t.assert_is_not(data)
+                    response = response .. data
+                end
+            until header ~= nil
+            s:close()
+            return body[1]
+        end)
+    end, {cg.server.net_box_uri})
+end
+
+-- Delete spaces and triggers.
+local function delete_spaces_and_triggers(cg)
+    cg.server:exec(function()
+        local trigger = require('trigger')
+        if box.space.test then box.space.test:drop() end
+        -- Delete all registered triggers.
+        for event, trigger_list in pairs(trigger.info()) do
+            for _, trigger_descr in pairs(trigger_list) do
+                local trigger_name = trigger_descr[1]
+                trigger.del(event, trigger_name)
+            end
+        end
+    end)
+end
+
+-- Grep server logs for error messages about wrong request types.
+-- Note that event names are case-sensitive.
+local function check_wrong_rq_types(cg)
+    local msg
+    msg = "C> The event `box.iproto.override.' is in IPROTO override " ..
+          "namespace, but `' is not a valid request type"
+    t.assert(cg.server:grep_log(msg))
+    msg = "C> The event `box.iproto.override.pinG' is in IPROTO override " ..
+          "namespace, but `pinG' is not a valid request type"
+    t.assert(cg.server:grep_log(msg))
+    msg = "C> The event `box.iproto.override%[' is in IPROTO override " ..
+          "namespace, but `%[' is not a valid request type"
+    t.assert(cg.server:grep_log(msg))
+    msg = "C> The event `box.iproto.override%[64' is in IPROTO override " ..
+          "namespace, but `%[64' is not a valid request type"
+    t.assert(cg.server:grep_log(msg))
+    msg = "C> The event `box.iproto.override%[ 64%]' is in IPROTO override " ..
+          "namespace, but `%[ 64%]' is not a valid request type"
+    t.assert(cg.server:grep_log(msg))
+    msg = "C> The event `box.iproto.override%[64 %]' is in IPROTO override " ..
+          "namespace, but `%[64 %]' is not a valid request type"
+    t.assert(cg.server:grep_log(msg))
+    msg = "C> The event `box.iproto.override%[64%] ' is in IPROTO override " ..
+          "namespace, but `%[64%] ' is not a valid request type"
+    t.assert(cg.server:grep_log(msg))
+    msg = "C> The event `box.iproto.override%[%-%]' is in IPROTO override " ..
+          "namespace, but `%[%-%]' is not a valid request type"
+    t.assert(cg.server:grep_log(msg))
+    msg = "C> The event `box.iproto.override%[ping%]' is in IPROTO override " ..
+          "namespace, but `%[ping%]' is not a valid request type"
+    t.assert(cg.server:grep_log(msg))
+    msg = "C> The event `box.iproto.override%[64%].ping' is in IPROTO " ..
+          "override namespace, but `%[64%].ping' is not a valid request type"
+    t.assert(cg.server:grep_log(msg))
+end
+
+-- Test IPROTO request handlers override using event triggers, that are set
+-- before `box.cfg{}'. Requests are sent via a raw socket to test the response
+-- on the unknown request types.
+local g2 = t.group('gh-8138-triggers-before-box-cfg')
+
+g2.before_all(function(cg)
+    -- List of unsupported request types, represented as a string.
+    local req_types_str = ''
+    for req in pairs(unsupported_rq_types) do
+        req_types_str = req_types_str .. ("'%s', "):format(req:lower())
+    end
+    -- Set event triggers before `box.cfg{}'.
+    t.assert_equals(box.iproto.type.EXECUTE, 11)
+    local run_before_cfg = ([[
+        local trigger = require('trigger')
+        local function handler_execute()
+            local resp = 'IPROTO_EXECUTE handler, set by name, before box.cfg{}'
+            box.iproto.send(box.session.id(), {}, {resp})
+            return true
+        end
+        local function handler_n11()
+            local resp = 'IPROTO_EXECUTE handler, set by id, before box.cfg{}'
+            box.iproto.send(box.session.id(), {}, {resp})
+            return true
+        end
+        local function handler_ping()
+            local resp = 'IPROTO_PING handler, set by name, before box.cfg{}'
+            box.iproto.send(box.session.id(), {}, {resp})
+            return true
+        end
+        local function handler_n555()
+            local resp = 'IPROTO #555 handler, set by id, before box.cfg{}'
+            box.iproto.send(box.session.id(), {}, {resp})
+            return true
+        end
+        local function handler_unknown()
+            local resp = 'IPROTO_UNKNOWN handler, set by name, before box.cfg{}'
+            box.iproto.send(box.session.id(), {}, {resp})
+            return true
+        end
+        trigger.set('box.iproto.override.execute', 'exec', handler_execute)
+        trigger.set('box.iproto.override[11]', '#11', handler_n11)
+        trigger.set('box.iproto.override.ping', 'ping', handler_ping)
+        trigger.set('box.iproto.override[555]', '#555', handler_n555)
+        trigger.set('box.iproto.override.unknown', 'unk', handler_unknown)
+        -- Set triggers on the unsupported request types.
+        for _, req in pairs({%s}) do
+            trigger.set('box.iproto.override.' .. req, 'unsup', function() end)
+        end
+        -- Set triggers on the wrong request types.
+        trigger.set('box.iproto.override.', 'wrong', function() end)
+        trigger.set('box.iproto.override.pinG', 'wrong', function() end)
+        trigger.set('box.iproto.override[', 'wrong', function() end)
+        trigger.set('box.iproto.override[64', 'wrong', function() end)
+        trigger.set('box.iproto.override[ 64]', 'wrong', function() end)
+        trigger.set('box.iproto.override[64 ]', 'wrong', function() end)
+        trigger.set('box.iproto.override[64] ', 'wrong', function() end)
+        trigger.set('box.iproto.override[-]', 'wrong', function() end)
+        trigger.set('box.iproto.override[ping]', 'wrong', function() end)
+        trigger.set('box.iproto.override[64].ping', 'wrong', function() end)
+    ]]):format(req_types_str)
+    init_server(cg, {['TARANTOOL_RUN_BEFORE_BOX_CFG'] = run_before_cfg})
+end)
+
+g2.after_all(function(cg) cg.server:drop() end)
+g2.after_each(delete_spaces_and_triggers)
+
+-- Check that it is possible to override the handlers using event triggers.
+g2.test_event_triggers = function(cg)
+    -- Grep logs for errors about unsupported and wrong request types.
+    check_unsupported_rq_types(cg)
+    check_wrong_rq_types(cg)
+
+    -- Send correct requests with overridden handlers.
+    cg.server:exec(function()
+        -- Note that IPROTO_EXECUTE is overridden both by id and by name, and
+        -- "by id" handler is always called first.
+        t.assert_equals(
+            _G.send_request_and_read_response(box.iproto.type.EXECUTE),
+            'IPROTO_EXECUTE handler, set by id, before box.cfg{}')
+        t.assert_equals(
+            _G.send_request_and_read_response(box.iproto.type.PING),
+            'IPROTO_PING handler, set by name, before box.cfg{}')
+        -- Send an unknown request with a dedicated handler.
+        t.assert_equals(
+            _G.send_request_and_read_response(555),
+            'IPROTO #555 handler, set by id, before box.cfg{}')
+        -- Send an unknown request without a dedicated handler.
+        t.assert_equals(
+            _G.send_request_and_read_response(666),
+            'IPROTO_UNKNOWN handler, set by name, before box.cfg{}')
     end)
 end

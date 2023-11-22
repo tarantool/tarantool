@@ -33,6 +33,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 #include <msgpuck.h>
 #include <small/ibuf.h>
@@ -41,6 +42,7 @@
 
 #include "version.h"
 #include "event.h"
+#include "func_adapter.h"
 #include "fiber.h"
 #include "fiber_cond.h"
 #include "cbus.h"
@@ -296,9 +298,21 @@ static int iproto_msg_max = IPROTO_MSG_MAX_MIN;
 /**
  * Request handlers meta information. The IPROTO request of each type can be
  * overridden by the following types of handlers (listed in priority order):
- *  1. C handler, set by `iproto_override()'.
+ *  1. Lua handlers, set in the event registry by request type id;
+ *  2. Lua handlers, set in the event registry by request type name;
+ *  3. C handler, set by `iproto_override()'.
  */
 struct iproto_req_handlers {
+	/**
+	 * Triggers from the event registry, set by request type id.
+	 * NULL if no such triggers.
+	 */
+	struct event *event_by_id;
+	/**
+	 * Triggers from the event registry, set by request type name.
+	 * NULL if no such triggers.
+	 */
+	struct event *event_by_name;
 	/**
 	 * C request handler.
 	 */
@@ -2829,6 +2843,10 @@ iproto_req_handlers_new(void)
 static void
 iproto_req_handlers_delete(struct iproto_req_handlers *handlers)
 {
+	if (handlers->event_by_id != NULL)
+		event_unref(handlers->event_by_id);
+	if (handlers->event_by_name != NULL)
+		event_unref(handlers->event_by_name);
 	if (handlers->c.destroy != NULL)
 		handlers->c.destroy(handlers->c.ctx);
 	TRASH(handlers);
@@ -2879,6 +2897,34 @@ mh_req_handlers_del(uint32_t req_type)
 }
 
 /**
+ * Replaces an event in `handlers' by the new `event'. If `is_by_id', the
+ * handler is set by request type id, otherwise it is set by request type name.
+ */
+static void
+iproto_req_handlers_set_event(struct iproto_req_handlers *handlers,
+			      struct event *event, bool is_by_id)
+{
+	assert(handlers != NULL);
+	assert(event != NULL);
+
+	if (is_by_id) {
+		if (handlers->event_by_id == NULL) {
+			event_ref(event);
+			handlers->event_by_id = event;
+		} else {
+			assert(handlers->event_by_id == event);
+		}
+	} else {
+		if (handlers->event_by_name == NULL) {
+			event_ref(event);
+			handlers->event_by_name = event;
+		} else {
+			assert(handlers->event_by_name == event);
+		}
+	}
+}
+
+/**
  * Returns `true' if there is at least one handler in `handlers'.
  */
 static bool
@@ -2887,7 +2933,79 @@ iproto_req_handler_is_set(struct iproto_req_handlers *handlers)
 	if (handlers == NULL)
 		return false;
 
-	return handlers->c.cb != NULL;
+	return handlers->event_by_id != NULL ||
+	       handlers->event_by_name != NULL ||
+	       handlers->c.cb != NULL;
+}
+
+/**
+ * Returns `enum iproto_type' if `name' is a valid IPROTO type name or equals
+ * "unknown". Otherwise, iproto_type_MAX is returned. The name is expected to
+ * be in lowercase.
+ */
+static enum iproto_type
+get_iproto_type_by_name(const char *name)
+{
+	for (uint32_t i = 0; i < iproto_type_MAX; i++) {
+		const char *type_name = iproto_type_name_lower(i);
+		if (type_name != NULL && strcmp(type_name, name) == 0)
+			return (enum iproto_type)i;
+	}
+	if (strcmp(name, "unknown") == 0)
+		return IPROTO_UNKNOWN;
+	return iproto_type_MAX;
+}
+
+/**
+ * Runs triggers registered for the `event'.
+ * The given header and body the IPROTO packet are passed as trigger args.
+ * Returns IPROTO_HANDLER_OK if some trigger successfully handled the request,
+ * IPROTO_HANDLER_FALLBACK if no triggers handled the request, or
+ * IPROTO_HANDLER_ERROR on failure.
+ */
+static enum iproto_handler_status
+tx_run_override_triggers(struct event *event, const char *header,
+			 const char *header_end, const char *body,
+			 const char *body_end)
+{
+	enum iproto_handler_status rc = IPROTO_HANDLER_FALLBACK;
+	const char *name = NULL;
+	struct func_adapter *trigger = NULL;
+	struct func_adapter_ctx ctx;
+	struct event_trigger_iterator it;
+	event_trigger_iterator_create(&it, event);
+
+	while (event_trigger_iterator_next(&it, &trigger, &name)) {
+		struct mp_ctx mp_ctx_header, mp_ctx_body;
+		mp_ctx_create_default(&mp_ctx_header, iproto_key_translation);
+		mp_ctx_create_default(&mp_ctx_body, iproto_key_translation);
+
+		func_adapter_begin(trigger, &ctx);
+		func_adapter_push_msgpack_with_ctx(trigger, &ctx, header,
+						   header_end, &mp_ctx_header);
+		func_adapter_push_msgpack_with_ctx(trigger, &ctx, body,
+						   body_end, &mp_ctx_body);
+		if (func_adapter_call(trigger, &ctx) == 0) {
+			if (func_adapter_is_bool(trigger, &ctx)) {
+				bool ok = false;
+				func_adapter_pop_bool(trigger, &ctx, &ok);
+				if (ok)
+					rc = IPROTO_HANDLER_OK;
+			} else {
+				diag_set(ClientError, ER_PROC_LUA,
+					 "Invalid Lua IPROTO handler return "
+					 "type: expected boolean");
+				rc = IPROTO_HANDLER_ERROR;
+			}
+		} else {
+			rc = IPROTO_HANDLER_ERROR;
+		}
+		func_adapter_end(trigger, &ctx);
+		if (rc != IPROTO_HANDLER_FALLBACK)
+			break;
+	}
+	event_trigger_iterator_destroy(&it);
+	return rc;
 }
 
 /**
@@ -2921,10 +3039,29 @@ tx_process_override(struct cmsg *m)
 	if (handlers == NULL)
 		handlers = mh_req_handlers_get(IPROTO_UNKNOWN);
 	assert(handlers != NULL);
-	enum iproto_handler_status rc;
+	enum iproto_handler_status rc = IPROTO_HANDLER_FALLBACK;
 
-	rc = handlers->c.cb(header, header_end, body, body_end,
-			    handlers->c.ctx);
+	/*
+	 * Run handlers from the event registry, set by request type id.
+	 */
+	if (handlers->event_by_id != NULL) {
+		rc = tx_run_override_triggers(handlers->event_by_id, header,
+					      header_end, body, body_end);
+	}
+	/*
+	 * Run handlers from the event registry, set by request type name.
+	 */
+	if (rc == IPROTO_HANDLER_FALLBACK && handlers->event_by_name != NULL) {
+		rc = tx_run_override_triggers(handlers->event_by_name, header,
+					      header_end, body, body_end);
+	}
+	/*
+	 * Run C handlers.
+	 */
+	if (rc == IPROTO_HANDLER_FALLBACK && handlers->c.cb != NULL) {
+		rc = handlers->c.cb(header, header_end, body, body_end,
+				    handlers->c.ctx);
+	}
 
 	struct cmsg_hop *route = NULL;
 	switch (rc) {
@@ -3482,6 +3619,134 @@ iproto_thread_init(struct iproto_thread *iproto_thread)
 	rlist_create(&iproto_thread->connections);
 }
 
+/**
+ * True for IPROTO request types that can be overridden.
+ */
+static bool
+is_iproto_override_supported(uint32_t req_type)
+{
+	switch (req_type) {
+	case IPROTO_JOIN:
+	case IPROTO_SUBSCRIBE:
+	case IPROTO_FETCH_SNAPSHOT:
+	case IPROTO_REGISTER:
+		return false;
+	default:
+		return true;
+	}
+}
+
+/**
+ * If the `name' contains a valid name of an IPROTO overriding event, sets
+ * `req_type' and returns True. If the name contains correct prefix, but
+ * the request type is invalid, the error is logged with CRIT log level.
+ * `is_by_id' set to True if the request is overridden by id, False if by name.
+ */
+static bool
+get_iproto_type_from_event_name(const char *name, uint32_t *req_type,
+				bool *is_by_id)
+{
+	const char *prefix = "box.iproto.override";
+	const size_t prefix_len = strlen(prefix);
+	if (strncmp(name, prefix, prefix_len) != 0)
+		return false;
+
+	const char *req_name = name + prefix_len;
+	const char *req_name_err = req_name;
+	if (*req_name == '.') {
+		*is_by_id = false;
+		/* Skip the dot. */
+		req_name++;
+		req_name_err = req_name;
+		*req_type = get_iproto_type_by_name(req_name);
+		if (*req_type == iproto_type_MAX)
+			goto err_bad_type;
+	} else if (*req_name == '[') {
+		*is_by_id = true;
+		/* Skip open bracket. */
+		req_name++;
+		if (!isdigit(*req_name) && *req_name != '-')
+			goto err_bad_type;
+		char *endptr;
+		*req_type = strtol(req_name, &endptr, 10);
+		if (endptr == req_name)
+			goto err_bad_type;
+		/*
+		 * At least one digit is parsed.
+		 * Check that the rest of the string equals "]".
+		 */
+		if (*endptr != ']' || endptr[1] != 0)
+			goto err_bad_type;
+	} else {
+		/* Not in IPROTO override namespace. */
+		return false;
+	}
+
+	if (!is_iproto_override_supported(*req_type)) {
+		say_crit("IPROTO request handler overriding does not support "
+			 "`%s' request type", iproto_type_name(*req_type));
+		return false;
+	}
+	return true;
+
+err_bad_type:
+	say_crit("The event `%s' is in IPROTO override namespace, but `%s' is "
+		 "not a valid request type", name, req_name_err);
+	return false;
+}
+
+/**
+ * Gets an arbitrary `event', checks its name, and adds it to `req_handlers' if
+ * it is a valid IPROTO overriding event.
+ * If the event name contains correct IPROTO overriding prefix, but the request
+ * type is invalid, the error is logged with CRIT log level.
+ */
+static bool
+iproto_override_event_init(struct event *event, void *arg)
+{
+	(void)arg;
+	uint32_t type;
+	bool is_by_id;
+	if (!get_iproto_type_from_event_name(event->name, &type, &is_by_id))
+		return true;
+
+	struct iproto_req_handlers *handlers = mh_req_handlers_get(type);
+	if (handlers == NULL) {
+		handlers = iproto_req_handlers_new();
+		mh_req_handlers_put(type, handlers);
+	}
+	iproto_req_handlers_set_event(handlers, event, is_by_id);
+
+	for (int i = 0; i < iproto_threads_count; i++) {
+		struct iproto_thread *iproto_thread = &iproto_threads[i];
+		mh_i32_put(iproto_thread->req_handlers, &type, NULL, NULL);
+	}
+	return true;
+}
+
+/**
+ * Notifies IPROTO threads that a new request handler has been set.
+ */
+static void
+iproto_cfg_override(uint32_t req_type, bool is_set);
+
+/**
+ * Calls iproto_cfg_override() and destroys the handlers when necessary.
+ */
+static void
+iproto_override_finish(struct iproto_req_handlers *handlers, uint32_t req_type,
+		       bool old_is_set)
+{
+	bool new_is_set = iproto_req_handler_is_set(handlers);
+	if (new_is_set != old_is_set)
+		iproto_cfg_override(req_type, new_is_set);
+
+	if (!new_is_set && handlers != NULL) {
+		mh_req_handlers_del(req_type);
+		iproto_req_handlers_delete(handlers);
+	}
+}
+
 /** Initialize the iproto subsystem and start network io thread */
 void
 iproto_init(int threads_count)
@@ -3507,6 +3772,17 @@ iproto_init(int threads_count)
 		struct iproto_thread *iproto_thread = &iproto_threads[i];
 		iproto_thread->id = i;
 		iproto_thread_init(iproto_thread);
+	}
+
+	/*
+	 * Go through all events with triggers, and initialize overridden
+	 * request handlers that were registered before IPROTO initialization.
+	 */
+	tx_req_handlers = mh_i32ptr_new();
+	event_foreach(iproto_override_event_init, NULL);
+
+	for (int i = 0; i < threads_count; i++) {
+		struct iproto_thread *iproto_thread = &iproto_threads[i];
 		if (cord_costart(&iproto_thread->net_cord, "iproto",
 				 net_cord_f, iproto_thread))
 			panic("failed to start iproto thread");
@@ -3519,7 +3795,6 @@ iproto_init(int threads_count)
 				    iproto_msg_max / 2);
 	}
 
-	tx_req_handlers = mh_i32ptr_new();
 	session_vtab_registry[SESSION_TYPE_BINARY] = iproto_session_vtab;
 
 	if (box_on_shutdown(NULL, iproto_on_shutdown_f, NULL) != 0)
@@ -3861,9 +4136,6 @@ iproto_session_new(struct iostream *io, struct user *user, uint64_t *sid)
 	return 0;
 }
 
-/**
- * Notifies IPROTO threads that a new request handler has been set.
- */
 static void
 iproto_cfg_override(uint32_t req_type, bool is_set)
 {
@@ -4031,8 +4303,7 @@ int
 iproto_override(uint32_t req_type, iproto_handler_t cb,
 		iproto_handler_destroy_t destroy, void *ctx)
 {
-	if (req_type == IPROTO_JOIN || req_type == IPROTO_FETCH_SNAPSHOT ||
-	    req_type == IPROTO_REGISTER || req_type == IPROTO_SUBSCRIBE) {
+	if (!is_iproto_override_supported(req_type)) {
 		const char *feature = tt_sprintf("%s request type",
 						 iproto_type_name(req_type));
 		diag_set(ClientError, ER_UNSUPPORTED,
@@ -4042,7 +4313,7 @@ iproto_override(uint32_t req_type, iproto_handler_t cb,
 
 	struct iproto_req_handlers *handlers;
 	handlers = mh_req_handlers_get(req_type);
-	bool old_is_set = iproto_req_handler_is_set(handlers);
+	bool is_set = iproto_req_handler_is_set(handlers);
 
 	if (handlers != NULL && handlers->c.destroy != NULL)
 		handlers->c.destroy(handlers->c.ctx);
@@ -4061,13 +4332,6 @@ iproto_override(uint32_t req_type, iproto_handler_t cb,
 		handlers->c.ctx = NULL;
 	}
 
-	bool new_is_set = iproto_req_handler_is_set(handlers);
-	if (new_is_set != old_is_set)
-		iproto_cfg_override(req_type, new_is_set);
-
-	if (!new_is_set && handlers != NULL) {
-		mh_req_handlers_del(req_type);
-		iproto_req_handlers_delete(handlers);
-	}
+	iproto_override_finish(handlers, req_type, is_set);
 	return 0;
 }
