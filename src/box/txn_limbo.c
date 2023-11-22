@@ -372,7 +372,7 @@ synchro_request_write(const struct synchro_request *req)
 	 * This is a synchronous commit so we can
 	 * allocate everything on a stack.
 	 */
-	char body[XROW_SYNCHRO_BODY_LEN_MAX];
+	char body[XROW_BODY_LEN_MAX];
 	struct xrow_header row;
 	char buf[sizeof(struct journal_entry) +
 		 sizeof(struct xrow_header *)];
