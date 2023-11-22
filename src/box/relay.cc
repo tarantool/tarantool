@@ -500,7 +500,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 		xrow_encode_raft(&row, &fiber()->gc, &raft_req);
 		xstream_write(&relay->stream, &row);
 
-		char body[XROW_SYNCHRO_BODY_LEN_MAX];
+		char body[XROW_BODY_LEN_MAX];
 		xrow_encode_synchro(&row, body, &req);
 		row.replica_id = req.replica_id;
 		xstream_write(&relay->stream, &row);
