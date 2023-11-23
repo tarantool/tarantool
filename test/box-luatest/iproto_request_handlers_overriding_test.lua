@@ -9,6 +9,27 @@ local unsupported_rq_types = {
     REGISTER = box.iproto.type.REGISTER,
 }
 
+local basic_rq_types = {
+    SELECT = box.iproto.type.SELECT,
+    INSERT = box.iproto.type.INSERT,
+    REPLACE = box.iproto.type.REPLACE,
+    UPDATE = box.iproto.type.UPDATE,
+    DELETE = box.iproto.type.DELETE,
+    UPSERT = box.iproto.type.UPSERT,
+    CALL_16 = box.iproto.type.CALL_16,
+    CALL = box.iproto.type.CALL,
+    EVAL = box.iproto.type.EVAL,
+    WATCH = box.iproto.type.WATCH,
+    UNWATCH = box.iproto.type.UNWATCH,
+    EXECUTE = box.iproto.type.EXECUTE,
+    PREPARE = box.iproto.type.PREPARE,
+    PING = box.iproto.type.PING,
+    ID = box.iproto.type.ID,
+    VOTE_DEPRECATED = box.iproto.type.VOTE_DEPRECATED,
+    VOTE = box.iproto.type.VOTE,
+    AUTH = box.iproto.type.AUTH,
+}
+
 -- Grep server logs for error messages about unsupported request types.
 local function check_unsupported_rq_types(cg)
     local msg
@@ -141,12 +162,11 @@ g.after_all(function(cg)
     cg.server:drop()
 end)
 
--- Checks that `box.iproto.override` raises an error if called on
--- an unconfigured instance (gh-8975).
+-- Checks that `box.iproto.override` does not raise an error if called on an
+-- unconfigured instance.
 g.test_box_iproto_override_without_cfg = function()
-    t.assert_error_msg_equals('Please call box.cfg{} first',
-                              box.iproto.override, box.iproto.type.UNKNOWN,
-                              function() end)
+    box.iproto.override(box.iproto.type.UNKNOWN, function() end)
+    box.iproto.override(box.iproto.type.UNKNOWN, nil)
 end
 
 -- Checks that `box.iproto.override` errors are handled correctly.
@@ -156,29 +176,23 @@ g.test_box_iproto_override_errors = function(cg)
         t.assert_error_msg_content_equals(err_msg, function()
             box.iproto.override()
         end)
+        err_msg = "bad argument #1 to 'override' " ..
+                  "(number or string expected, got function)"
         t.assert_error_msg_content_equals(err_msg, function()
-            box.iproto.override(0)
-        end)
-        t.assert_error_msg_content_equals(err_msg, function()
-            box.iproto.override(0, function() end, 'str')
-        end)
-        err_msg = "expected uint64_t as 1 argument"
-        t.assert_error_msg_content_equals(err_msg, function()
-            box.iproto.override('str', function() end)
+            box.iproto.override(function() end)
         end)
         err_msg = "bad argument #2 to 'override' " ..
                   "(function expected, got string)"
         t.assert_error_msg_content_equals(err_msg, function()
             box.iproto.override(0, 'str')
         end)
-        for rq_name, rq_type in pairs(unsupported_rq_types) do
-            err_msg = ("IPROTO request handler overriding does not " ..
-                       "support %s request type"):format(rq_name)
-            t.assert_error_msg_content_equals(err_msg, function()
-                box.iproto.override(rq_type, function() end)
-            end)
+        for _, rq_type in pairs(unsupported_rq_types) do
+            box.iproto.override(rq_type, function() end)
         end
     end, {unsupported_rq_types})
+
+    -- Check error messages about unsupported request types.
+    check_unsupported_rq_types(cg)
 end
 
 -- Checks that `box.iproto.override` reset of non-existing request handler is
@@ -190,8 +204,9 @@ g.test_box_iproto_override_non_existing_request = function(cg)
 end
 
 -- Checks that `box.iproto.override` works correctly for basic request types.
-g.test_box_iproto_override_basic_rq_types = function(cg)
-    cg.server:exec(function()
+-- Request type is set as a number.
+g.test_box_iproto_override_basic_rq_types_num = function(cg)
+    cg.server:exec(function(basic_rq_types)
         local header = setmetatable(
                     {
                         [box.iproto.key.SYNC] = 1,
@@ -204,34 +219,42 @@ g.test_box_iproto_override_basic_rq_types = function(cg)
                         [box.iproto.key.STMT_ID] = 4,
                         [box.iproto.key.SQL_TEXT] = 'text'
                     }, {__serialize = 'map'})
-        local rq_types = {
-            box.iproto.type.SELECT,
-            box.iproto.type.INSERT,
-            box.iproto.type.REPLACE,
-            box.iproto.type.UPDATE,
-            box.iproto.type.DELETE,
-            box.iproto.type.UPSERT,
-            box.iproto.type.CALL_16,
-            box.iproto.type.CALL,
-            box.iproto.type.EVAL,
-            box.iproto.type.WATCH,
-            box.iproto.type.UNWATCH,
-            box.iproto.type.EXECUTE,
-            box.iproto.type.PREPARE,
-            box.iproto.type.PING,
-            box.iproto.type.ID,
-            box.iproto.type.VOTE_DEPRECATED,
-            box.iproto.type.VOTE,
-            box.iproto.type.AUTH,
-        }
-        for _, rq_type in ipairs(rq_types) do
+
+        for _, rq_type in pairs(basic_rq_types) do
             box.iproto.override(rq_type, _G.cb)
             header[box.iproto.key.REQUEST_TYPE] = rq_type
             _G.test_cb_resp(header, body)
             _G.test_cb_resp(header)
             box.iproto.override(rq_type, nil)
         end
-    end)
+    end, {basic_rq_types})
+end
+
+-- Checks that `box.iproto.override` works correctly for basic request types.
+-- Request type is set as a string.
+g.test_box_iproto_override_basic_rq_types_str = function(cg)
+    cg.server:exec(function(basic_rq_types)
+        local header = setmetatable(
+                    {
+                        [box.iproto.key.SYNC] = 1,
+                        [box.iproto.key.SPACE_ID] = 2,
+                        [box.iproto.key.INDEX_ID] = 3,
+                    }, {__serialize = 'map'})
+        local body = setmetatable(
+                    {
+                        [box.iproto.key.OPTIONS] = 3,
+                        [box.iproto.key.STMT_ID] = 4,
+                        [box.iproto.key.SQL_TEXT] = 'text'
+                    }, {__serialize = 'map'})
+
+        for rq_name, rq_type in pairs(basic_rq_types) do
+            box.iproto.override(rq_name, _G.cb)
+            header[box.iproto.key.REQUEST_TYPE] = rq_type
+            _G.test_cb_resp(header, body)
+            _G.test_cb_resp(header)
+            box.iproto.override(rq_name, nil)
+        end
+    end, {basic_rq_types})
 end
 
 -- Checks that `box.iproto.override` works correctly for stream request types.
@@ -424,8 +447,8 @@ g.test_box_iproto_override_cb_lua_invalid_return_type = function(cg)
                     [box.iproto.key.SYNC] = 1,
                 }, {__serialize = 'map'})
         _G.test_cb_err(header, nil, box.error.PROC_LUA,
-                       "Invalid Lua IPROTO handler return type 'cdata' " ..
-                       "%(expected boolean%)")
+                       "Invalid Lua IPROTO handler return type: expected " ..
+                       "boolean")
         box.iproto.override(box.iproto.type.PING, nil)
     end)
 end
