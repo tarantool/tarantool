@@ -316,85 +316,6 @@ cleanup:
 }
 
 /**
- * Lua request handler callback: creates new Lua execution context, gets the Lua
- * callback function, pushes the request header and body as MsgPack objects and
- * calls the Lua callback.
- */
-static enum iproto_handler_status
-lua_req_handler_cb(const char *header, const char *header_end,
-		   const char *body, const char *body_end,
-		   void *cb_ctx)
-{
-	struct lua_State *L = luaT_newthread(tarantool_L);
-	if (L == NULL)
-		return IPROTO_HANDLER_ERROR;
-	int cb_ref = (int)(uintptr_t)cb_ctx;
-	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_ref);
-	struct mp_ctx mp_ctx_header;
-	mp_ctx_create_default(&mp_ctx_header, iproto_key_translation);
-	luamp_push_with_ctx(L, header, header_end, &mp_ctx_header);
-	struct mp_ctx mp_ctx_body;
-	mp_ctx_create_default(&mp_ctx_body, iproto_key_translation);
-	luamp_push_with_ctx(L, body, body_end, &mp_ctx_body);
-	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-	if (luaT_call(L, 2, 1) != 0)
-		return IPROTO_HANDLER_ERROR;
-	if (!lua_isboolean(L, 1)) {
-		diag_set(ClientError, ER_PROC_LUA,
-			 tt_sprintf("Invalid Lua IPROTO handler return type "
-				    "'%s' (expected boolean)",
-				    luaL_typename(L, 1)));
-		return IPROTO_HANDLER_ERROR;
-	}
-	bool ok = lua_toboolean(L, 1);
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-	return ok ? IPROTO_HANDLER_OK : IPROTO_HANDLER_FALLBACK;
-}
-
-/**
- * Lua request handler destructor: unreferences the request handler's Lua
- * callback function.
- */
-static void
-lua_req_handler_destroy(void *ctx)
-{
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, (int)(uintptr_t)ctx);
-}
-
-/**
- * Sets IPROTO request handler callback (second argument) for the given request
- * type (first argument): the Lua callback function is referenced in Lua and
- * unreferenced in `lua_req_handler_destroy`.
- * Passing nil as the callback resets the corresponding request handler.
- */
-static int
-lbox_iproto_override(struct lua_State *L)
-{
-	if (box_check_configured() != 0)
-		return luaT_error(L);
-	int n_args = lua_gettop(L);
-	if (n_args != 2)
-		return luaL_error(L, "Usage: "
-				     "box.iproto.override(request_type, "
-				     "callback)");
-	uint32_t req_type = luaL_checkuint64(L, 1);
-	if (lua_isnil(L, 2)) {
-		if (iproto_override(req_type, NULL, NULL, NULL) != 0)
-			return luaT_error(L);
-		return 0;
-	}
-	luaL_checktype(L, 2, LUA_TFUNCTION);
-	int cb_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	if (iproto_override(req_type, lua_req_handler_cb,
-			    lua_req_handler_destroy,
-			    (void *)(uintptr_t)cb_ref) != 0) {
-		luaL_unref(L, LUA_REGISTRYINDEX, cb_ref);
-		return luaT_error(L);
-	}
-	return 0;
-}
-
-/**
  * Encodes Tarantool greeting message.
  *
  * Takes a table with the following fields that will be used in
@@ -683,7 +604,6 @@ box_lua_iproto_init(struct lua_State *L)
 	push_iproto_protocol_features(L);
 	static const struct luaL_Reg funcs[] = {
 		{"send", lbox_iproto_send},
-		{"override", lbox_iproto_override},
 		{"encode_greeting", lbox_iproto_encode_greeting},
 		{"decode_greeting", lbox_iproto_decode_greeting},
 		{"encode_packet", lbox_iproto_encode_packet},

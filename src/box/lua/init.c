@@ -104,6 +104,7 @@ extern char session_lua[],
 	upgrade_lua[],
 	console_lua[],
 	merger_lua[],
+	iproto_lua[],
 	checks_version_lua[],
 	checks_lua[],
 	metrics_api_lua[],
@@ -227,6 +228,7 @@ static const char *lua_sources[] = {
 	"box/load_cfg", NULL, load_cfg_lua,
 	"box/key_def", "key_def", key_def_lua,
 	"box/merger", "merger", merger_lua,
+	"box/iproto", "iproto", iproto_lua,
 	/*
 	 * To support tarantool-only types with checks, the module
 	 * must be loaded after decimal and datetime lua modules
