@@ -243,6 +243,13 @@ replication_disconnect_timeout(void);
 void
 replication_init(int num_threads);
 
+/**
+ * Prepare for freeing resources in replication_free while TX event loop is
+ * still running.
+ */
+void
+replication_shutdown(void);
+
 void
 replication_free(void);
 

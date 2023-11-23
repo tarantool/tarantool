@@ -2124,7 +2124,9 @@ applier_thread_f(va_list ap)
 
 	cbus_loop(&thread->endpoint);
 
-	unreachable();
+	cbus_endpoint_destroy(&thread->endpoint, cbus_process);
+	cpipe_destroy(&thread->tx_pipe);
+	return 0;
 }
 
 /** Initialize and start the applier thread. */
@@ -2171,7 +2173,10 @@ applier_free(void)
 {
 	for (int i = 0; i < replication_threads; i++) {
 		struct applier_thread *thread = applier_threads[i];
-		cord_cancel_and_join(&thread->cord);
+		cbus_stop_loop(&thread->thread_pipe);
+		cpipe_destroy(&thread->thread_pipe);
+		if (cord_join(&thread->cord) != 0)
+			panic_syserror("applier cord join failed");
 		free(thread);
 	}
 	free(applier_threads);
@@ -2554,9 +2559,14 @@ applier_f(va_list ap)
 	bool was_anon = true;
 
 	/* Re-connect loop */
-	while (!fiber_is_cancelled()) {
+	while (true) {
 		FiberGCChecker gc_check;
 		try {
+			/*
+			 * Test cancel after reconnection sleep at the end
+			 * of the loop here to use catch for FiberIsCancelled.
+			 */
+			fiber_testcancel();
 			applier_connect(applier);
 			if (tt_uuid_is_nil(&REPLICASET_UUID)) {
 				/*

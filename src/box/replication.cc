@@ -62,6 +62,18 @@ double replication_sync_timeout = 300.0; /* seconds */
 bool replication_skip_conflict = false;
 int replication_threads = 1;
 
+/**
+ * Fiber executing replicaset_connect. NULL if the function
+ * is not being executed.
+ */
+static struct fiber *replication_connect_fiber;
+
+/** Condition that replicaset_connect finished execution. */
+static struct fiber_cond replication_connect_cond;
+
+/** If set then replication shutdown is started. */
+static bool replication_is_shutting_down;
+
 bool cfg_replication_anon = true;
 struct tt_uuid cfg_bootstrap_leader_uuid;
 struct uri cfg_bootstrap_leader_uri;
@@ -219,6 +231,7 @@ replication_init(int num_threads)
 	diag_create(&replicaset.applier.diag);
 
 	replication_threads = num_threads;
+	fiber_cond_create(&replication_connect_cond);
 
 	/* The local instance is always part of the quorum. */
 	replicaset.healthy_count = 1;
@@ -227,13 +240,35 @@ replication_init(int num_threads)
 }
 
 void
+replication_shutdown(void)
+{
+	replication_is_shutting_down = true;
+	if (replication_connect_fiber != NULL)
+		fiber_cancel(replication_connect_fiber);
+	while (replication_connect_fiber != NULL)
+		fiber_cond_wait(&replication_connect_cond);
+
+	struct replica *replica;
+	rlist_foreach_entry(replica, &replicaset.anon, in_anon)
+		applier_stop(replica->applier);
+	replicaset_foreach(replica) {
+		if (replica->applier != NULL)
+			applier_stop(replica->applier);
+	}
+}
+
+void
 replication_free(void)
 {
 	diag_destroy(&replicaset.applier.diag);
 	trigger_destroy(&replicaset.on_ack);
 	trigger_destroy(&replicaset.on_relay_thread_start);
-
+	fiber_cond_destroy(&replication_connect_cond);
+	fiber_cond_destroy(&replicaset.applier.cond);
+	latch_destroy(&replicaset.applier.order_latch);
 	applier_free();
+
+	TRASH(&replicaset);
 }
 
 int
@@ -517,7 +552,6 @@ replica_on_applier_sync(struct replica *replica)
 {
 	if (replica->applier_sync_state == APPLIER_SYNC)
 		return;
-	assert(replica->applier_sync_state == APPLIER_CONNECTED);
 
 	replica->applier_sync_state = APPLIER_SYNC;
 	replicaset.applier.synced++;
@@ -1038,6 +1072,9 @@ void
 replicaset_connect(const struct uri_set *uris,
 		   bool connect_quorum, bool keep_connect)
 {
+	if (replication_is_shutting_down)
+		tnt_raise(ClientError, ER_SHUTDOWN);
+
 	if (uris->uri_count == 0) {
 		/* Cleanup the replica set. */
 		replicaset_update(NULL, 0, false);
@@ -1050,6 +1087,12 @@ replicaset_connect(const struct uri_set *uris,
 		tnt_raise(ClientError, ER_CFG, "replication",
 			  "too many replicas");
 	}
+	assert(replication_connect_fiber == NULL);
+	replication_connect_fiber = fiber();
+	auto connect_fiber_guard = make_scoped_guard([&]{
+		replication_connect_fiber = NULL;
+		fiber_cond_signal(&replication_connect_cond);
+	});
 	int count = 0;
 	struct applier *appliers[VCLOCK_MAX] = {};
 	auto appliers_guard = make_scoped_guard([&]{
@@ -1126,8 +1169,10 @@ replicaset_connect(const struct uri_set *uris,
 	while (!replicaset_is_connected(&state, appliers, count,
 					connect_quorum)) {
 		double wait_start = ev_monotonic_now(loop());
-		if (fiber_cond_wait_timeout(&state.wakeup, timeout) != 0)
+		if (fiber_cond_wait_timeout(&state.wakeup, timeout) != 0) {
+			fiber_testcancel();
 			break;
+		}
 		timeout -= ev_monotonic_now(loop()) - wait_start;
 	}
 	if (state.connected < count) {
