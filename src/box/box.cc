@@ -5927,6 +5927,7 @@ box_storage_shutdown()
 	if (!is_storage_initialized)
 		return;
 	iproto_shutdown();
+	replication_shutdown();
 }
 
 void
