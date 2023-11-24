@@ -134,6 +134,28 @@ g.test_config_enterprise = function()
     t.assert_equals(res, exp)
 end
 
+-- A non-empty `config.etcd` table should contain the `prefix`
+-- field.
+--
+-- The error is the same as for Tarantool Enterprise Edition as
+-- well as for Tarantool Community Edition in the case.
+--
+-- However, if the prefix presence check succeeds, the validation
+-- fails on CE, because the option is EE only.
+g.test_config_etcd_no_prefix = function()
+    local iconfig = {
+        config = {
+            etcd = {
+                endpoints = {'localhost:2379'},
+            },
+        },
+    }
+    local err = '[instance_config] config.etcd: No config.etcd.prefix provided'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+end
+
 g.test_process = function()
     local iconfig = {
         process = {
