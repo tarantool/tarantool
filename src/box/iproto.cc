@@ -2925,6 +2925,25 @@ iproto_req_handlers_set_event(struct iproto_req_handlers *handlers,
 }
 
 /**
+ * Deletes an event, which is set in `handlers' by request type id (if
+ * `is_by_id'), or by request type name.
+ */
+static void
+iproto_req_handlers_del_event(struct iproto_req_handlers *handlers,
+			      bool is_by_id)
+{
+	assert(handlers != NULL);
+
+	if (is_by_id) {
+		event_unref(handlers->event_by_id);
+		handlers->event_by_id = NULL;
+	} else {
+		event_unref(handlers->event_by_name);
+		handlers->event_by_name = NULL;
+	}
+}
+
+/**
  * Returns `true' if there is at least one handler in `handlers'.
  */
 static bool
@@ -3747,6 +3766,39 @@ iproto_override_finish(struct iproto_req_handlers *handlers, uint32_t req_type,
 	}
 }
 
+/**
+ * Trigger which is fired on any change in the event registry.
+ */
+static int
+trigger_on_change_iproto_notify(struct trigger *trigger, void *arg)
+{
+	(void)trigger;
+	uint32_t type;
+	bool is_by_id;
+	struct event *event = (struct event *)arg;
+	if (!get_iproto_type_from_event_name(event->name, &type, &is_by_id))
+		return 0;
+
+	struct iproto_req_handlers *handlers;
+	handlers = mh_req_handlers_get(type);
+	bool is_set = iproto_req_handler_is_set(handlers);
+
+	if (event_has_triggers(event)) {
+		if (handlers == NULL) {
+			handlers = iproto_req_handlers_new();
+			mh_req_handlers_put(type, handlers);
+		}
+		iproto_req_handlers_set_event(handlers, event, is_by_id);
+	} else {
+		iproto_req_handlers_del_event(handlers, is_by_id);
+	}
+
+	iproto_override_finish(handlers, type, is_set);
+	return 0;
+}
+
+TRIGGER(trigger_on_change, trigger_on_change_iproto_notify);
+
 /** Initialize the iproto subsystem and start network io thread */
 void
 iproto_init(int threads_count)
@@ -3797,6 +3849,7 @@ iproto_init(int threads_count)
 
 	session_vtab_registry[SESSION_TYPE_BINARY] = iproto_session_vtab;
 
+	event_on_change(&trigger_on_change);
 	if (box_on_shutdown(NULL, iproto_on_shutdown_f, NULL) != 0)
 		panic("failed to set iproto shutdown trigger");
 }
