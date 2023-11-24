@@ -1576,6 +1576,7 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 	trigger_destroy(&f->on_stop);
 	rlist_del(&f->state);
 	rlist_del(&f->link);
+	rlist_del(&f->wake);
 #ifdef ENABLE_BACKTRACE
 	region_set_callbacks(&f->gc, NULL, NULL, NULL);
 #endif
@@ -1764,6 +1765,7 @@ cord_create(struct cord *cord, const char *name)
 	/* sched fiber is not present in alive/ready/dead list. */
 	rlist_create(&cord->sched.state);
 	rlist_create(&cord->sched.link);
+	rlist_create(&cord->sched.wake);
 	cord->sched.fid = FIBER_ID_SCHED;
 	fiber_reset(&cord->sched);
 	diag_create(&cord->sched.diag);

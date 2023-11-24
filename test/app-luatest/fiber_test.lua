@@ -34,3 +34,26 @@ g.test_tostring = function()
     fiber.yield()
     t.assert_equals(tostring(f), "fiber: " .. fid .. " (dead)")
 end
+
+g.test_gh_9406_shutdown_with_lingering_fiber_join = function()
+    local script = [[
+        local fiber = require('fiber')
+
+        local f = nil
+        fiber.create(function()
+            while f == nil do
+                fiber.sleep(0.1)
+            end
+            fiber.join(f)
+        end)
+        f = fiber.new(function()
+            fiber.sleep(1000)
+        end)
+        f:set_joinable(true)
+        fiber.sleep(0.2)
+        os.exit()
+    ]]
+    local tarantool_bin = arg[-1]
+    local cmd = string.format('%s -e "%s"', tarantool_bin, script)
+    t.assert(os.execute(cmd) == 0)
+end
