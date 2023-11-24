@@ -3910,6 +3910,9 @@ box_process_fetch_snapshot(struct iostream *io,
 {
 	assert(header->type == IPROTO_FETCH_SNAPSHOT);
 
+	struct fetch_snapshot_request req;
+	xrow_decode_fetch_snapshot_xc(header, &req);
+
 	/* Check that bootstrap has been finished */
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
@@ -3927,7 +3930,7 @@ box_process_fetch_snapshot(struct iostream *io,
 
 	/* Send the snapshot data to the instance. */
 	struct vclock start_vclock;
-	relay_initial_join(io, header->sync, &start_vclock, 0);
+	relay_initial_join(io, header->sync, &start_vclock, req.version_id);
 	say_info("read-view sent.");
 
 	/* Remember master's vclock after the last request */
