@@ -2317,6 +2317,29 @@ xrow_decode_join(const struct xrow_header *row, struct join_request *req)
 }
 
 void
+xrow_encode_fetch_snapshot(struct xrow_header *row,
+			   const struct fetch_snapshot_request *req)
+{
+	struct fetch_snapshot_request *cast =
+		(struct fetch_snapshot_request *)req;
+	const struct replication_request base_req = {
+		.version_id = &cast->version_id,
+	};
+	xrow_encode_replication_request(row, &base_req, IPROTO_FETCH_SNAPSHOT);
+}
+
+int
+xrow_decode_fetch_snapshot(const struct xrow_header *row,
+			   struct fetch_snapshot_request *req)
+{
+	memset(req, 0, sizeof(*req));
+	struct replication_request base_req = {
+		.version_id = &req->version_id,
+	};
+	return xrow_decode_replication_request(row, &base_req);
+}
+
+void
 xrow_encode_relay_heartbeat(struct xrow_header *row,
 			    const struct relay_heartbeat *req)
 {
