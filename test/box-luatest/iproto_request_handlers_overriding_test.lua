@@ -626,3 +626,201 @@ g2.test_event_triggers = function(cg)
             'IPROTO_UNKNOWN handler, set by name, before box.cfg{}')
     end)
 end
+
+-- Test IPROTO request handlers override using event triggers, that are set
+-- after `box.cfg{}'. Requests are sent via a raw socket to test the response on
+-- the unknown request types.
+local g3 = t.group('gh-8138-triggers-after-box-cfg')
+
+g3.before_all(init_server)
+g3.after_all(function(cg) cg.server:drop() end)
+g3.after_each(delete_spaces_and_triggers)
+
+-- Check that it is possible to override the handlers using event triggers.
+g3.test_event_triggers = function(cg)
+    cg.server:exec(function(unsupported_rq_types)
+        local trigger = require('trigger')
+
+        local resp_exec = 'IPROTO_EXECUTE handler, set by id, after box.cfg{}'
+        local resp_ping = 'IPROTO_PING handler, set by name, after box.cfg{}'
+        local resp_n555 = 'IPROTO #555 handler, set by id, after box.cfg{}'
+        local resp_unkn = 'IPROTO_UNKNOWN handler, set by name, after box.cfg{}'
+        local resp_n129 = 'IPROTO #129 handler, set by id, after box.cfg{}'
+
+        t.assert_equals(box.iproto.type.EXECUTE, 11)
+        trigger.set('box.iproto.override[11]', '#11', function()
+            box.iproto.send(box.session.id(), {}, {resp_exec})
+            return true
+        end)
+        trigger.set('box.iproto.override.ping', 'ping', function()
+            box.iproto.send(box.session.id(), {}, {resp_ping})
+            return true
+        end)
+        trigger.set('box.iproto.override[555]', '#555', function()
+            box.iproto.send(box.session.id(), {}, {resp_n555})
+            return true
+        end)
+        trigger.set('box.iproto.override.unknown', 'unk', function()
+            box.iproto.send(box.session.id(), {}, {resp_unkn})
+            return true
+        end)
+        trigger.set('box.iproto.override[129]', '#129', function()
+            box.iproto.send(box.session.id(), {}, {resp_n129})
+            return true
+        end)
+
+        -- Send known requests with overridden handlers.
+        t.assert_equals(
+            _G.send_request_and_read_response(box.iproto.type.EXECUTE),
+            resp_exec)
+        t.assert_equals(
+            _G.send_request_and_read_response(box.iproto.type.PING),
+            resp_ping)
+        -- Send an unknown request with a dedicated handler.
+        t.assert_equals(
+            _G.send_request_and_read_response(555),
+            resp_n555)
+        -- Send an unknown request without a dedicated handler.
+        t.assert_equals(
+            _G.send_request_and_read_response(666),
+            resp_unkn)
+        -- Send an unknown request of type 129, this is current value of
+        -- `iproto_type_MAX'.
+        t.assert_equals(
+            _G.send_request_and_read_response(129),
+            resp_n129)
+
+        -- Set triggers on the unsupported request types.
+        for req in pairs(unsupported_rq_types) do
+            trigger.set('box.iproto.override.' .. req:lower(), 'unsup',
+                        function() end)
+        end
+        -- Set triggers on the wrong request types.
+        trigger.set('box.iproto.override.', 'wrong', function() end)
+        trigger.set('box.iproto.override.pinG', 'wrong', function() end)
+        trigger.set('box.iproto.override[', 'wrong', function() end)
+        trigger.set('box.iproto.override[64', 'wrong', function() end)
+        trigger.set('box.iproto.override[ 64]', 'wrong', function() end)
+        trigger.set('box.iproto.override[64 ]', 'wrong', function() end)
+        trigger.set('box.iproto.override[64] ', 'wrong', function() end)
+        trigger.set('box.iproto.override[-]', 'wrong', function() end)
+        trigger.set('box.iproto.override[ping]', 'wrong', function() end)
+        trigger.set('box.iproto.override[64].ping', 'wrong', function() end)
+    end, {unsupported_rq_types})
+
+    -- Grep logs for errors about unsupported and wrong request types.
+    check_unsupported_rq_types(cg)
+    check_wrong_rq_types(cg)
+end
+
+-- Test IPROTO request handlers override using event triggers.
+-- Requests are sent via `net.box'.
+local g4 = t.group('gh-8138-triggers-netbox')
+local space_id = 771
+
+g4.before_all(init_server)
+g4.after_all(function(cg) cg.server:drop() end)
+g4.before_each(function(cg)
+    cg.server:exec(function(space_id)
+        local s = box.schema.space.create('test', {id = space_id})
+        s:create_index('pk')
+    end, {space_id})
+end)
+g4.after_each(delete_spaces_and_triggers)
+
+-- Test errors in triggers.
+g4.test_errors = function(cg)
+    cg.server:exec(function(space_id, net_box_uri)
+        local net = require('net.box')
+        local trigger = require('trigger')
+
+        -- Override select requests from the space #771.
+        local function select_handler(_, body)
+            if body.space_id ~= space_id then
+                return false
+            end
+            t.assert_equals(#body.key, 1)
+            local key = body.key[1]
+            if key == 1000 then
+                return 'wrong type'
+            elseif key == 1001 then
+                error('error 1001')
+            elseif key == 1002 then
+                box.error({reason = 'error 1002', errcode = 1002})
+            end
+            return false
+        end
+        trigger.set('box.iproto.override.select', 'over_771', select_handler)
+
+        local conn = net.connect(net_box_uri)
+        local s = conn.space.test
+
+        t.assert_error_msg_equals(
+            'Invalid Lua IPROTO handler return type: expected boolean',
+            s.select, s, 1000)
+        t.assert_error_msg_content_equals('error 1001', s.select, s, 1001)
+        t.assert_error_msg_equals('error 1002', s.select, s, 1002)
+    end, {space_id, cg.server.net_box_uri})
+end
+
+-- Checks that the triggers are called in reverse order of their installation,
+-- however triggers set by type id are called before triggers set by type name.
+-- If a trigger returns `false', the next trigger in the list is called, or a
+-- system handler if there are no more triggers. If a trigger returns `true',
+-- no more triggers or system handlers are called.
+g4.test_triggers_order = function(cg)
+    cg.server:exec(function(space_id, net_box_uri)
+        local net = require('net.box')
+        local trigger = require('trigger')
+
+        -- Override select requests from the space #771. All invocations of
+        -- triggers are logged to `triggers_order'. If requested `key' equals
+        -- to the predefined trigger key, send trigger name as a response.
+        rawset(_G, 'triggers_order', {})
+        local function trigger_set(event, name, trig_key)
+            trigger.set(event, name, function(header, body)
+                if body.space_id ~= space_id then
+                    return false
+                end
+                table.insert(_G.triggers_order, name)
+                t.assert_equals(#body.key, 1)
+                local key = body.key[1]
+                if key ~= trig_key then
+                    return false
+                end
+                box.iproto.send(box.session.id(),
+                                { request_type = box.iproto.type.OK,
+                                  sync = header.sync,
+                                  schema_version = box.info.schema_version
+                                },
+                                { data = {{key, name}} })
+                return true
+            end)
+        end
+        trigger_set('box.iproto.override[1]', 'by_id_10', 10)
+        trigger_set('box.iproto.override.select', 'by_name_20', 20)
+        trigger_set('box.iproto.override[1]', 'by_id_30', 30)
+        trigger_set('box.iproto.override.select', 'by_name_30', 30)
+        trigger_set('box.iproto.override.select', 'by_name_40', 40)
+        trigger_set('box.iproto.override[1]', 'by_id_40', 40)
+
+        local conn = net.connect(net_box_uri)
+        local s = conn.space.test
+        s:insert{50}
+        t.assert_equals(s:select(10), {{10, 'by_id_10'}})
+        t.assert_equals(s:select(20), {{20, 'by_name_20'}})
+        t.assert_equals(s:select(30), {{30, 'by_id_30'}})
+        t.assert_equals(s:select(40), {{40, 'by_id_40'}})
+        t.assert_equals(s:select(50), {{50}})
+        t.assert_equals(_G.triggers_order,
+                        {'by_id_40', 'by_id_30', 'by_id_10',
+                         'by_id_40', 'by_id_30', 'by_id_10', 'by_name_40',
+                                'by_name_30', 'by_name_20',
+                         'by_id_40', 'by_id_30',
+                         'by_id_40',
+                         'by_id_40', 'by_id_30', 'by_id_10', 'by_name_40',
+                                'by_name_30', 'by_name_20'
+                        }
+        )
+    end, {space_id, cg.server.net_box_uri})
+end
