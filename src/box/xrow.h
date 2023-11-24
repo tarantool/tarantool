@@ -661,6 +661,21 @@ xrow_encode_join(struct xrow_header *row, const struct join_request *req);
 int
 xrow_decode_join(const struct xrow_header *row, struct join_request *req);
 
+struct fetch_snapshot_request {
+	/** Replica's version. */
+	uint32_t version_id;
+};
+
+/** Encode FETCH_SNAPSHOT request. */
+void
+xrow_encode_fetch_snapshot(struct xrow_header *row,
+			   const struct fetch_snapshot_request *req);
+
+/** Decode FETCH_SNAPSHOT request. */
+int
+xrow_decode_fetch_snapshot(const struct xrow_header *row,
+			   struct fetch_snapshot_request *req);
+
 /**
  * Heartbeat from relay to applier. Follows the replication stream. Same
  * direction.
@@ -1139,6 +1154,15 @@ static inline void
 xrow_decode_join_xc(const struct xrow_header *row, struct join_request *req)
 {
 	if (xrow_decode_join(row, req) != 0)
+		diag_raise();
+}
+
+/** @copydoc xrow_decode_fetch_snapshot. */
+static inline void
+xrow_decode_fetch_snapshot_xc(const struct xrow_header *row,
+			      struct fetch_snapshot_request *req)
+{
+	if (xrow_decode_fetch_snapshot(row, req) != 0)
 		diag_raise();
 }
 
