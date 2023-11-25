@@ -45,6 +45,7 @@
 #include "box/engine.h"
 #include "box/memtx_engine.h"
 #include "box/raft.h"
+#include "box/security.h"
 
 #include "core/event.h"
 
@@ -150,6 +151,28 @@ lbox_ctl_set_on_shutdown_timeout(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Enable or disable security.iproto_lockdown option.
+ */
+static int
+lbox_ctl_set_iproto_lockdown(struct lua_State *L)
+{
+#if defined(ENABLE_SECURITY)
+	int index = lua_gettop(L);
+	if (index != 1 || !lua_isboolean(L, 1)) {
+		lua_pushstring(L, "function expected one boolean argument");
+		lua_error(L);
+	}
+	bool new_val = lua_toboolean(L, 1);
+	security_set_iproto_lockdown(new_val);
+#else
+	lua_pushstring(L, "box.ctl.iproto_lockdown() is available only in "
+		       "Enterprise Edition builds.");
+	lua_error(L);
+#endif
+	return 0;
+}
+
 static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"wait_ro", lbox_ctl_wait_ro},
 	{"wait_rw", lbox_ctl_wait_rw},
@@ -164,6 +187,7 @@ static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"make_bootstrap_leader", lbox_ctl_make_bootstrap_leader},
 	{"is_recovery_finished", lbox_ctl_is_recovery_finished},
 	{"set_on_shutdown_timeout", lbox_ctl_set_on_shutdown_timeout},
+	{"iproto_lockdown", lbox_ctl_set_iproto_lockdown},
 	{NULL, NULL}
 };
 
