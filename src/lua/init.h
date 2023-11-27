@@ -49,6 +49,8 @@ struct instance_state {
 	const char *name;
 	/* Path to configuration file. */
 	const char *config;
+	/* Path to file with hash sums of modules and configuration file. */
+	const char *hashes;
 };
 
 #define O_INTERACTIVE 0x1
@@ -57,6 +59,7 @@ struct instance_state {
 #define O_EXECUTE     0x8
 #define O_HELP_ENV_LIST 0x10
 #define O_FAILOVER      0x20
+#define O_INTEGRITY     0x40
 
 /** Returns true if the name refers to a built-in global Lua object. */
 bool

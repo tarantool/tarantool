@@ -708,6 +708,10 @@ print_help(FILE *stream)
 		"\n"
 		"    Enable force-recovery mode at database loading.\n"
 		"\n"
+		"--integrity-check <path/to/hashes.json>\n"
+		"\n"
+		"    Enable integrity check and load hash sums.\n"
+		"\n"
 		"-l <module>\n"
 		"\n"
 		"    `require` Lua module <module> and set it the same named\n"
@@ -778,6 +782,7 @@ main(int argc, char **argv)
 		 */
 		{"help-env-list", no_argument, 0, 'E'},
 		{"force-recovery", no_argument, 0, 'F'},
+		{"integrity-check", required_argument, 0, 'I'},
 		/*
 		 * Use 'O' for --failover. See --help-env-list
 		 * above for details of the approach.
@@ -818,6 +823,18 @@ main(int argc, char **argv)
 		case 'F':
 			box_is_force_recovery = true;
 			break;
+		case 'I':
+#if ENABLE_INTEGRITY
+			opt_mask |= O_INTEGRITY;
+			instance.hashes = optarg;
+			break;
+#else
+			fprintf(stderr, "--integrity-check CLI option is "
+				"available only in Tarantool "
+				"Enterprise Edition\n");
+			return EX_USAGE;
+#endif
+
 		case 'i':
 			/* Force interactive mode */
 			opt_mask |= O_INTERACTIVE;

@@ -290,6 +290,7 @@
 #cmakedefine ENABLE_ETCD_CLIENT 1
 #cmakedefine ENABLE_CONFIG_EXTRAS 1
 #cmakedefine ENABLE_FAILOVER 1
+#cmakedefine ENABLE_INTEGRITY 1
 
 #cmakedefine EXPORT_LIBCURL_SYMBOLS 1
 
