@@ -107,7 +107,8 @@ static double start_time;
 /** A preallocated fiber to run on_shutdown triggers. */
 static struct fiber *on_shutdown_fiber = NULL;
 /** A flag restricting repeated execution of tarantool_exit(). */
-static bool is_shutting_down = false;
+static bool shutdown_started = false;
+static bool shutdown_finished = false;
 static int exit_code = 0;
 
 char tarantool_path[PATH_MAX];
@@ -162,7 +163,7 @@ on_shutdown_f(va_list ap)
 		fiber_sleep(0.0);
 
 	/* Handle spurious wakeups. */
-	while (!is_shutting_down)
+	while (!shutdown_started)
 		fiber_yield();
 
 	if (on_shutdown_run_triggers() != 0) {
@@ -170,6 +171,7 @@ on_shutdown_f(va_list ap)
 		diag_log();
 		diag_clear(diag_get());
 	}
+	shutdown_finished = true;
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }
@@ -178,7 +180,7 @@ void
 tarantool_exit(int code)
 {
 	start_loop = false;
-	if (is_shutting_down) {
+	if (shutdown_started) {
 		/*
 		 * We are already running on_shutdown triggers,
 		 * and will exit as soon as they'll finish.
@@ -186,7 +188,7 @@ tarantool_exit(int code)
 		 */
 		return;
 	}
-	is_shutting_down = true;
+	shutdown_started = true;
 	exit_code = code;
 	box_broadcast_fmt("box.shutdown", "%b", true);
 	fiber_wakeup(on_shutdown_fiber);
@@ -1074,10 +1076,10 @@ main(int argc, char **argv)
 	 * init script, and there was neither os.exit nor SIGTERM, then call
 	 * tarantool_exit and start an event loop to run on_shutdown triggers.
 	 */
-	if (!is_shutting_down) {
+	if (!shutdown_started)
 		tarantool_exit(exit_code);
+	if (!shutdown_finished)
 		ev_run(loop(), 0);
-	}
 	/* freeing resources */
 	free((void *)instance.name);
 	free((void *)instance.config);
