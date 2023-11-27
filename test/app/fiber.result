@@ -963,7 +963,7 @@ fiber.create(function()end):name()
 --
 fiber.create(function() fiber.wakeup(fiber.self()) end)
 ---
-- the fiber is dead
+- error: 'console: exception while formatting the output: "the fiber is dead"'
 ...
 --
 -- gh-2066 test for fiber wakeup
