@@ -66,7 +66,7 @@ func_cache_delete(uint32_t fid)
 	mh_i32ptr_del(funcs, k, NULL);
 	k = mh_strnptr_find_str(funcs_by_name, func->def->name,
 				strlen(func->def->name));
-	if (k != mh_end(funcs))
+	if (k != mh_end(funcs_by_name))
 		mh_strnptr_del(funcs_by_name, k, NULL);
 }
 
