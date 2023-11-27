@@ -81,6 +81,7 @@
 #include "box/lua/wal_ext.h"
 #include "box/lua/trigger.h"
 #include "box/lua/failover.h"
+#include "box/lua/integrity.h"
 
 #include "mpstream/mpstream.h"
 
@@ -209,6 +210,7 @@ static const char *lua_sources[] = {
 	FLIGHT_RECORDER_BOX_LUA_MODULES
 	READ_VIEW_BOX_LUA_MODULES
 	SECURITY_BOX_LUA_MODULES
+	INTEGRITY_BOX_LUA_MODULES
 	"box/xlog", "xlog", xlog_lua,
 	"box/mkversion", "internal.mkversion", mkversion_lua,
 	"box/upgrade", NULL, upgrade_lua,
@@ -831,6 +833,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_security_init(L);
 	box_lua_flightrec_init(L);
 	box_lua_trigger_init(L);
+	box_lua_integrity_init(L);
 	luaopen_net_box(L);
 	lua_pop(L, 1);
 	tarantool_lua_console_init(L);

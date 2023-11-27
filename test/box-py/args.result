@@ -80,6 +80,10 @@ The following modifier options are applicable to actions.
 
     Enable force-recovery mode at database loading.
 
+--integrity-check <path/to/hashes.json>
+
+    Enable integrity check and load hash sums.
+
 -l <module>
 
     `require` Lua module <module> and set it the same named
@@ -189,6 +193,10 @@ The following modifier options are applicable to actions.
 --force-recovery
 
     Enable force-recovery mode at database loading.
+
+--integrity-check <path/to/hashes.json>
+
+    Enable integrity check and load hash sums.
 
 -l <module>
 

@@ -21,6 +21,7 @@
 
 #include "box/error.h"
 #include "box/port.h"
+#include "box/lua/integrity.h"
 
 #include "lua/utils.h"
 #include "libeio/eio.h"
@@ -322,6 +323,12 @@ module_new(const char *package, size_t package_len,
 		      dir_name, (int)package_len, package);
 	if (rc < 0 || (size_t)rc >= sizeof(dir_name)) {
 		diag_set(SystemError, "failed to generate path to dso");
+		goto error;
+	}
+
+	if (!integrity_verify_file(source_path, NULL, 0)) {
+		diag_set(SystemError, "integrity check failed for module %s",
+			 source_path);
 		goto error;
 	}
 
