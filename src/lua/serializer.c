@@ -273,7 +273,7 @@ lua_field_inspect_ucdata(struct lua_State *L, struct luaL_serializer *cfg,
 			luaL_error(L, "invalid " LUAL_SERIALIZE  " value");
 		/* copy object itself */
 		lua_pushvalue(L, idx);
-		lua_pcall(L, 1, 1, 0);
+		lua_call(L, 1, 1);
 		/* replace obj with the unpacked value */
 		lua_replace(L, idx);
 		if (luaL_tofield(L, cfg, idx, field) < 0)
