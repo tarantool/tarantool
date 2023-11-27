@@ -1312,6 +1312,12 @@ this_module.self = {
         check_call_args(args)
         args = args or {}
         proc_name = tostring(proc_name)
+        if box.ctl.is_recovery_finished() then
+            local f = box.func[proc_name]
+            if f ~= nil then
+                return handle_eval_result(pcall(f.call, f, args))
+            end
+        end
         local status, proc, obj = pcall(box.internal.call_loadproc, proc_name)
         if not status then
             rollback()
