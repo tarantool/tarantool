@@ -68,7 +68,7 @@ enum {
 	 * applied from WAL. It allows not to block the event
 	 * loop for the whole recovery stage.
 	 */
-	WAL_ROWS_PER_YIELD = 1 << 15,
+	WAL_ROWS_PER_YIELD = 1 << 0,
 };
 
 /** String constants for the supported modes. */
