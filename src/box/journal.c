@@ -32,6 +32,7 @@
 #include <small/region.h>
 #include <diag.h>
 #include "error.h"
+#include "watcher.h"
 
 struct journal *current_journal = NULL;
 
@@ -46,9 +47,13 @@ void
 diag_set_journal_res_detailed(const char *file, unsigned line, int64_t res)
 {
 	switch(res) {
-	case JOURNAL_ENTRY_ERR_IO:
+	case JOURNAL_ENTRY_ERR_IO: {
+		static uint64_t io_error_count;
+		box_broadcast_fmt("box.wal_error", "{%s%llu}",
+				  "count", ++io_error_count);
 		diag_set_detailed(file, line, ClientError, ER_WAL_IO);
 		return;
+	}
 	case JOURNAL_ENTRY_ERR_CASCADE:
 		diag_set_detailed(file, line, ClientError, ER_CASCADE_ROLLBACK);
 		return;
