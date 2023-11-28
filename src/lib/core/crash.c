@@ -15,9 +15,13 @@
 #include "core/backtrace.h"
 #include "crash.h"
 #include "say.h"
+#include "tweaks.h"
 
 /** Storage for crash_collect function return value. */
 static struct crash_info crash_info;
+
+bool crash_produce_coredump = true;
+TWEAK_BOOL(crash_produce_coredump);
 
 /**
  * The routine is called inside crash signal handler so
@@ -186,6 +190,9 @@ crash_signal_cb(int signo, siginfo_t *siginfo, void *context)
 		/* Got a signal while running the handler. */
 		fprintf(stderr, "Fatal %d while backtracing\n", signo);
 	}
+
+	if (!crash_produce_coredump)
+		exit(EXIT_FAILURE);
 
 	/* Try to dump a core */
 	struct sigaction sa = {

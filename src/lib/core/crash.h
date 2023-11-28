@@ -13,6 +13,9 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/** If reset, do not produce coredump on crash. */
+extern bool crash_produce_coredump;
+
 #if TARGET_OS_LINUX && defined(__x86_64__)
 # define HAS_GREG
 #endif

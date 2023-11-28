@@ -33,6 +33,7 @@
 #include <limits.h>
 #include <stddef.h>
 #include "trivia/util.h"
+#include "crash.h"
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -261,8 +262,9 @@ void errinj_set_with_environment_vars(void);
 #define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
 #define ERROR_INJECT_SLEEP(ID) ERROR_INJECT_WHILE(ID, usleep(1000))
 #define ERROR_INJECT_YIELD(ID) ERROR_INJECT_WHILE(ID, fiber_sleep(0.001))
-#define ERROR_INJECT_TERMINATE(ID) ERROR_INJECT(ID, assert(0))
-#define ERROR_INJECT_SIGILL(ID) ERROR_INJECT(ID, illegal_instruction())
+#define ERROR_INJECT_TERMINATE(ID) ERROR_INJECT(ID, exit(EXIT_FAILURE))
+#define ERROR_INJECT_SIGILL(ID) ERROR_INJECT(ID, \
+		{ crash_produce_coredump = false; illegal_instruction(); })
 #define ERROR_INJECT_INT(ID, COND, CODE) ERROR_INJECT_COND(ID, ERRINJ_INT, COND, CODE)
 #define ERROR_INJECT_DOUBLE(ID, COND, CODE) ERROR_INJECT_COND(ID, ERRINJ_DOUBLE, COND, CODE)
 
