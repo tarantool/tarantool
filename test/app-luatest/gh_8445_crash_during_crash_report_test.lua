@@ -18,10 +18,15 @@ g.test_crash_during_crash_report = function(cg)
     -- Use `cd' and `shell = true' due to lack of cwd option in popen (gh-5633).
     local exe = arg[-1]
     local dir = cg.tempdir
-    local cmd = [[
-        cd %s && %s -e "box.cfg{} require('log').info('pid = ' .. box.info.pid)"
+    local script = [[
+        local tweaks = require('internal.tweaks')
+        local log = require('log')
+        box.cfg{}
+        tweaks.crash_produce_coredump = false
+        log.info('pid = ' .. box.info.pid)
     ]]
-    local ph = popen.new({string.format(cmd, dir, exe)},
+    local ph = popen.new({string.format('cd %s && %s -e "%s"',
+                                         dir, exe, script)},
                          {stdout = popen.opts.DEVNULL,
                           stderr = popen.opts.PIPE, shell = true})
     t.assert(ph)
