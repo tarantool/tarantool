@@ -5634,6 +5634,7 @@ builtin_events_init(void)
 	box_broadcast_fmt("box.schema", "{}");
 	box_broadcast_fmt("box.status", "{}");
 	box_broadcast_fmt("box.election", "{}");
+	box_broadcast_fmt("box.wal_error", "{}");
 	box_broadcast_fmt(box_ballot_event_key, "{}");
 	ev_timer_init(&box_broadcast_ballot_timer,
 		      box_broadcast_ballot_on_timeout, 0, 0);
