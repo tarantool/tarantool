@@ -57,22 +57,23 @@ end)
 -- Checks that the client properly handles the case when the server reports
 -- the 'watchers' feature as available, but actually doesn't support it.
 g.test_iproto_watch_reported_but_not_implemented = function()
-    local conn = net.connect(g.server.net_box_uri)
-    t.assert_covers(conn.peer_protocol_features, {watchers = true})
     local err_count_1 = g.server:exec(function()
         return box.stat.ERROR.total
     end)
+    local conn = net.connect(g.server.net_box_uri)
+    t.assert_covers(conn.peer_protocol_features, {watchers = true})
     local event_count = 0
     local watcher = conn:watch('foo', function()
         event_count = event_count + 1
     end)
     fiber.sleep(0.01)
     watcher:unregister()
-    fiber.sleep(0.01)
-    local err_count_2 = g.server:exec(function()
-        return box.stat.ERROR.total
-    end)
-    t.assert_equals(err_count_2 - err_count_1, 2)
+    g.server:exec(function(err_count_1)
+        t.helpers.retrying({}, function()
+            local err_count_2 = box.stat.ERROR.total
+            t.assert_equals(err_count_2 - err_count_1, 3)
+        end)
+    end, {err_count_1})
     conn:close()
     t.assert_equals(event_count, 0)
 end
