@@ -183,7 +183,30 @@ local function uri_is_suitable_to_connect(uri)
     return true
 end
 
-local function advertise_peer_uri_validate(data, w)
+local function validate_uri_str(data, w)
+    --
+    -- Substitute variables with placeholders to don't confuse the URI parser
+    -- with the curly brackets.
+    --
+    data = data:gsub('{{ *.- *}}', 'placeholder')
+    local uri, err = urilib.parse(data)
+    if uri == nil then
+        w.error('Unable to parse an URI: %s', err)
+    end
+    if uri.login ~= nil then
+        w.error("Login must be set via the 'login' option")
+    end
+    assert(uri.password == nil)
+    if uri.params ~= nil then
+        w.error("Parameters must be set via the 'params' option")
+    end
+    local ok, err = uri_is_suitable_to_connect(uri)
+    if not ok then
+        w.error(err)
+    end
+end
+
+local function advertise_client_uri_validate(data, w)
     -- Accept the special syntax user@ or user:pass@.
     --
     -- It means using iproto.listen value to connect and using the
@@ -258,77 +281,32 @@ end
 
 local function instance_uri(self, iconfig, advertise_type)
     assert(advertise_type == 'peer' or advertise_type == 'sharding')
-    local listen = self:get(iconfig, 'iproto.listen')
-    local advertise = self:get(iconfig, 'iproto.advertise.'..advertise_type)
-    if advertise == nil and advertise_type == 'sharding' then
-        advertise = self:get(iconfig, 'iproto.advertise.peer')
-    end
-    if advertise ~= nil and not advertise:endswith('@') then
-        -- The iproto.advertise.* option contains an URI.
-        --
-        -- There are the following cases.
-        --
-        -- * host:port
-        -- * user@host:port
-        -- * user:pass@host:port
-        --
-        -- Note: the host:port part may represent a Unix domain
-        -- socket: host = 'unix/', port = '/path/to/socket'.
-        --
-        -- The second case needs additional handling: we should
-        -- find password for the given user in the 'credential'
-        -- section of the config.
-        --
-        -- Otherwise, the URI is returned as is.
-        local u, err = urilib.parse(advertise)
-        -- NB: The URI is validated, so the parsing can't fail.
-        assert(u ~= nil, err)
-        if u.login ~= nil and u.password == nil then
-            u.password = find_password(self, iconfig, u.login)
-            return urilib.format(u, true)
-        end
-        return advertise
-    elseif listen ~= nil then
-        -- The iproto.advertise.* option has no URI.
-        --
-        -- There are the following cases.
-        --
-        -- * <no iproto.advertise.*>
-        -- * user@
-        -- * user:pass@
-        --
-        -- In any case we should find an URI suitable to create a
-        -- client socket in iproto.listen option. After this, add
-        -- the auth information if any.
-        local uri = find_suitable_uri_to_connect(listen)
+    local uri
+    if advertise_type == 'sharding' then
+        uri = self:get(iconfig, 'iproto.advertise.sharding')
         if uri == nil then
+            advertise_type = 'peer'
+        end
+    end
+    if advertise_type == 'peer' then
+        uri = self:get(iconfig, 'iproto.advertise.peer')
+    end
+    uri = uri ~= nil and uri or {}
+    if uri.uri == nil then
+        assert(uri.params == nil)
+        local listen = self:get(iconfig, 'iproto.listen')
+        if listen == nil then
             return nil
         end
-
-        -- No additional auth information in iproto.advertise.*:
-        -- return the listen URI as is.
-        if advertise == nil then
-            return uri
-        end
-
-        -- Extract user and password from the iproto.advertise
-        -- option. If no password given, find it in the
-        -- 'credentials' section of the config.
-        assert(advertise:endswith('@'))
-        local auth = advertise:sub(1, -2):split(':', 1)
-        local username = auth[1]
-        local password = auth[2] or find_password(self, iconfig, username)
-
-        -- Rebuild the listen URI with the given username and
-        -- password,
-        local u, err = urilib.parse(uri)
-        -- NB: The URI is validated, so the parsing can't fail.
-        assert(u ~= nil, err)
-        u.login = username
-        u.password = password
-        return urilib.format(u, true)
+        uri.uri = find_suitable_uri_to_connect(listen)
     end
-    return nil
+    if uri.uri == nil then
+        return nil
+    end
+    if uri.password == nil and uri.login ~= nil then
+        uri.password = find_password(self, iconfig, uri.login)
+    end
+    return uri
 end
 
 local function apply_vars_f(data, w, vars)
@@ -763,11 +741,16 @@ return schema.new('instance_config', schema.record({
         --
         -- The iproto.advertise.{peer,sharding} options have the
         -- following syntax variants:
+        -- {uri = ...}
+        -- {uri = ..., params = ...}
+        -- {login = ...}
+        -- {login = ..., password = ...}
+        -- {login = ..., uri = ...}
+        -- {login = ..., password = ..., uri = ...}
+        -- {login = ..., uri = ..., params = ...}
+        -- {login = ..., password = ..., uri = ..., params = ...}
         --
-        -- 1. user@
-        -- 2. user:pass@
-        -- 3. user@host:port
-        -- 4. host:port
+        -- where uri is host:port.
         --
         -- Note: the host:port part may represent a Unix domain
         -- socket: host = 'unix/', port = '/path/to/socket'.
@@ -786,7 +769,7 @@ return schema.new('instance_config', schema.record({
                 validate = function(data, w)
                     -- Re-use peer URI validation code, but add
                     -- several extra constraints.
-                    local uri = advertise_peer_uri_validate(data, w)
+                    local uri = advertise_client_uri_validate(data, w)
 
                     if data:endswith('@') then
                         w.error('user@ and user:pass@ syntax is not ' ..
@@ -801,15 +784,107 @@ return schema.new('instance_config', schema.record({
                     end
                 end,
             }),
-            peer = schema.scalar({
-                type = 'string',
-                default = box.NULL,
-                validate = advertise_peer_uri_validate,
+            peer = schema.record({
+                login = schema.scalar({
+                    type = 'string',
+                }),
+                password = schema.scalar({
+                    type = 'string',
+                }),
+                uri = schema.scalar({
+                    type = 'string',
+                    validate = validate_uri_str,
+                }),
+                params = schema.record({
+                    transport = schema.enum({
+                        'plain',
+                        'ssl',
+                    }),
+                    ssl_ca_file = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_cert_file = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_ciphers = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_key_file = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_password = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_password_file = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                }),
+            }, {
+                validate = function(data, w)
+                    -- No data in iproto.advertise.peer -- OK.
+                    if next(data) == nil then
+                        return
+                    end
+                    -- If a password is set, a login must also be specified.
+                    if data.password ~= nil and data.login == nil then
+                        w.error('Password cannot be set without setting login')
+                    end
+                    -- If a params is set, an uri must also be specified.
+                    if data.params ~= nil and data.uri == nil then
+                        w.error('Params cannot be set without setting uri')
+                    end
+                end,
             }),
-            sharding = schema.scalar({
-                type = 'string',
-                default = box.NULL,
-                validate = advertise_peer_uri_validate,
+            sharding = schema.record({
+                login = schema.scalar({
+                    type = 'string',
+                }),
+                password = schema.scalar({
+                    type = 'string',
+                }),
+                uri = schema.scalar({
+                    type = 'string',
+                    validate = validate_uri_str,
+                }),
+                params = schema.record({
+                    transport = schema.enum({
+                        'plain',
+                        'ssl',
+                    }),
+                    ssl_ca_file = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_cert_file = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_ciphers = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_key_file = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_password = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                    ssl_password_file = enterprise_edition(schema.scalar({
+                        type = 'string',
+                    })),
+                }),
+            }, {
+                validate = function(data, w)
+                    -- No data in iproto.advertise.sharding -- OK.
+                    if next(data) == nil then
+                        return
+                    end
+                    -- If a password is set, a login must also be specified.
+                    if data.password ~= nil and data.login == nil then
+                        w.error('Password cannot be set without setting login')
+                    end
+                    -- If a params is set, an uri must also be specified.
+                    if data.params ~= nil and data.uri == nil then
+                        w.error('Params cannot be set without setting uri')
+                    end
+                end,
             }),
         }),
         threads = schema.scalar({

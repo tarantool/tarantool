@@ -919,3 +919,54 @@ g.test_failover_supervised_constrainsts = function(g)
         exp_err = bootstrap_strategy_exp_err_template:format('supervised'),
     })
 end
+
+g.test_advertise_from_env = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen: unix/:./{{ instance_name }}.iproto
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local opts = {
+        config_file = config_file,
+        chdir = dir,
+        alias = 'instance-001',
+        env = {
+            TT_IPROTO_ADVERTISE_PEER_URI = 'unix/:./instance-001.iproto',
+            TT_IPROTO_ADVERTISE_PEER_PARAMS_TRANSPORT = 'plain',
+            TT_IPROTO_ADVERTISE_SHARDING_URI = 'unix/:./instance-002.iproto'
+        }
+    }
+    g.server = server:new(opts)
+    g.server:start()
+    g.server:exec(function()
+        local config = require('config')
+        local res = config:get('iproto.advertise')
+        local exp = {
+            client = box.NULL,
+            peer = {
+                uri = 'unix/:./instance-001.iproto',
+                params = {
+                    transport = 'plain',
+                },
+            },
+            sharding = {
+                uri = 'unix/:./instance-002.iproto',
+            }
+        }
+        t.assert_equals(res, exp)
+    end)
+end

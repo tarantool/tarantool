@@ -43,7 +43,7 @@ local function validate_fields(config, record)
                 validate_fields(v1, v.items)
             end
         end
-        if v.type ~= 'record' or not v.enterprise_edition or is_enterprise then
+        if not v.enterprise_edition or is_enterprise then
             table.insert(record_fields, k)
         end
     end
@@ -294,14 +294,93 @@ g.test_log = function()
     t.assert_equals(res, exp)
 end
 
+local function check_validate_iproto()
+    local iconfig = {
+        iproto = {
+            advertise = {
+                peer = {
+                    uri = 'localhost:3301?transport=plain',
+                }
+            },
+        },
+    }
+    local err = "[instance_config] iproto.advertise.peer.uri: Parameters " ..
+                "must be set via the 'params' option"
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+
+    iconfig = {
+        iproto = {
+            advertise = {
+                peer = {
+                    password = 'secret',
+                }
+            },
+        },
+    }
+    err = "[instance_config] iproto.advertise.peer: Password cannot be set " ..
+          "without setting login"
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+
+    iconfig = {
+        iproto = {
+            advertise = {
+                sharding = {
+                    uri = 'one:two@localhost:3301',
+                }
+            },
+        },
+    }
+    err = "[instance_config] iproto.advertise.sharding.uri: Login must be " ..
+          "set via the 'login' option"
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+
+    iconfig = {
+        iproto = {
+            advertise = {
+                sharding = {
+                    params = {
+                        transport = 'plain',
+                    },
+                }
+            },
+        },
+    }
+    err = "[instance_config] iproto.advertise.sharding: Params cannot be " ..
+          "set without setting uri"
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+end
+
 g.test_iproto = function()
+    t.tarantool.skip_if_enterprise()
     local iconfig = {
         iproto = {
             listen = 'one',
             advertise = {
                 client = 'two',
-                peer = 'three',
-                sharding = 'four',
+                peer = {
+                    uri = 'three',
+                    login = 'four',
+                    params = {
+                        transport = 'plain',
+                    },
+                    password = 'five',
+                },
+                sharding = {
+                    uri = 'six',
+                    login = 'seven',
+                    params = {
+                        transport = 'ssl',
+                    },
+                    password = 'ten',
+                },
             },
             threads = 1,
             net_msg_max = 1,
@@ -310,13 +389,68 @@ g.test_iproto = function()
     }
     instance_config:validate(iconfig)
     validate_fields(iconfig.iproto, instance_config.schema.fields.iproto)
-
+    check_validate_iproto()
     local exp = {
         listen = box.NULL,
         advertise = {
             client = box.NULL,
-            peer = box.NULL,
-            sharding = box.NULL,
+        },
+        threads = 1,
+        net_msg_max = 768,
+        readahead = 16320,
+    }
+    local res = instance_config:apply_default({}).iproto
+    t.assert_equals(res, exp)
+end
+
+g.test_iproto_enterprise = function()
+    t.tarantool.skip_if_not_enterprise()
+    local iconfig = {
+        iproto = {
+            listen = 'one',
+            advertise = {
+                client = 'two',
+                peer = {
+                    uri = 'three',
+                    login = 'four',
+                    params = {
+                        transport = 'plain',
+                        ssl_password = 'eleven',
+                        ssl_cert_file = 'twelve',
+                        ssl_key_file = 'thirteen',
+                        ssl_password_file = 'fourteen',
+                        ssl_ciphers = 'fifteen',
+                        ssl_ca_file = 'sixteen',
+                    },
+                    password = 'five',
+                },
+                sharding = {
+                    uri = 'six',
+                    login = 'seven',
+                    params = {
+                        transport = 'ssl',
+                        ssl_password = 'seventeen',
+                        ssl_cert_file = 'eighteen',
+                        ssl_key_file = 'nineteen',
+                        ssl_password_file = 'twenty',
+                        ssl_ciphers = 'twenty-one',
+                        ssl_ca_file = 'twenty-two',
+                    },
+                    password = 'ten',
+                },
+            },
+            threads = 1,
+            net_msg_max = 1,
+            readahead = 1,
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.iproto, instance_config.schema.fields.iproto)
+    check_validate_iproto()
+    local exp = {
+        listen = box.NULL,
+        advertise = {
+            client = box.NULL,
         },
         threads = 1,
         net_msg_max = 768,
@@ -329,87 +463,88 @@ end
 -- Verify iproto.advertise validation, bad cases.
 for case_name, case in pairs({
     incorrect_uri = {
-        advertise = ':3301',
+        advertise = {uri = ':3301'},
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.%s',
+            '[instance_config] iproto.advertise.%s.uri',
             'Unable to parse an URI',
             'Incorrect URI',
             'expected host:service or /unix.socket'
         }, ': '),
     },
     multiple_uris = {
-        advertise = 'localhost:3301,localhost:3302',
+        advertise = {uri = 'localhost:3301,localhost:3302'},
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.%s',
-            'A single URI is expected, not a list of URIs',
+            '[instance_config] iproto.advertise.%s.uri',
+            'Unable to parse an URI: Incorrect URI: expected host:service ' ..
+            'or /unix.socket',
         }, ': '),
     },
     inaddr_any_ipv4 = {
-        advertise = '0.0.0.0:3301',
+        advertise = {uri = '0.0.0.0:3301'},
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.%s',
+            '[instance_config] iproto.advertise.%s.uri',
             'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
         }, ': '),
     },
     inaddr_any_ipv4_user = {
-        advertise = 'user@0.0.0.0:3301',
+        advertise = {uri = '0.0.0.0:3301', login = 'user'},
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.%s',
+            '[instance_config] iproto.advertise.%s.uri',
             'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
         }, ': '),
     },
     inaddr_any_ipv4_user_pass = {
-        advertise = 'user:pass@0.0.0.0:3301',
+        advertise = {uri = '0.0.0.0:3301', login = 'user', password = 'pass'},
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.%s',
+            '[instance_config] iproto.advertise.%s.uri',
             'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
         }, ': '),
     },
     inaddr_any_ipv6 = {
-        advertise = '[::]:3301',
+        advertise = {uri = '[::]:3301'},
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.%s',
+            '[instance_config] iproto.advertise.%s.uri',
             'in6addr_any (::) cannot be used to create a client socket',
         }, ': '),
     },
     inaddr_any_ipv6_user = {
-        advertise = 'user@[::]:3301',
+        advertise = {uri = '[::]:3301', login = 'user'},
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.%s',
+            '[instance_config] iproto.advertise.%s.uri',
             'in6addr_any (::) cannot be used to create a client socket',
         }, ': '),
     },
     inaddr_any_ipv6_user_pass = {
-        advertise = 'user:pass@[::]:3301',
+        advertise = {uri = '[::]:3301', login = 'user', password = 'pass'},
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.%s',
+            '[instance_config] iproto.advertise.%s.uri',
             'in6addr_any (::) cannot be used to create a client socket',
         }, ': '),
     },
     zero_port = {
-        advertise = 'localhost:0',
+        advertise = {uri = 'localhost:0'},
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.%s',
+            '[instance_config] iproto.advertise.%s.uri',
             'An URI with zero port cannot be used to create a client socket',
         }, ': '),
     },
     zero_port_user = {
-        advertise = 'user@localhost:0',
+        advertise = {uri = 'localhost:0', login = 'user'},
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.%s',
+            '[instance_config] iproto.advertise.%s.uri',
             'An URI with zero port cannot be used to create a client socket',
         }, ': '),
     },
     zero_port_user_pass = {
-        advertise = 'user:pass@localhost:0',
+        advertise = {uri = 'localhost:0', login = 'user', password = 'pass'},
         exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.%s',
+            '[instance_config] iproto.advertise.%s.uri',
             'An URI with zero port cannot be used to create a client socket',
         }, ': '),
     },
 }) do
     g[('test_bad_iproto_advertise_%s'):format(case_name)] = function()
-        for _, option_name in ipairs({'client', 'peer', 'sharding'}) do
+        for _, option_name in ipairs({'peer', 'sharding'}) do
             local exp_err_msg = case.exp_err_msg:format(option_name)
             t.assert_error_msg_equals(exp_err_msg, function()
                 instance_config:validate({
@@ -434,6 +569,85 @@ local err_advertise_client_user_syntax = '[instance_config] ' ..
 
 -- Extra bad cases specific for iproto.advertise.client.
 for case_name, case in pairs({
+    incorrect_uri = {
+        advertise = ':3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise.client',
+            'Unable to parse an URI',
+            'Incorrect URI',
+            'expected host:service or /unix.socket'
+        }, ': '),
+    },
+    multiple_uris = {
+        advertise = 'localhost:3301,localhost:3302',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise.client',
+            'A single URI is expected, not a list of URIs',
+        }, ': '),
+    },
+    inaddr_any_ipv4 = {
+        advertise = '0.0.0.0:3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise.client',
+            'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
+        }, ': '),
+    },
+    inaddr_any_ipv4_user = {
+        advertise = 'user@0.0.0.0:3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise.client',
+            'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
+        }, ': '),
+    },
+    inaddr_any_ipv4_user_pass = {
+        advertise = 'user:pass@0.0.0.0:3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise.client',
+            'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
+        }, ': '),
+    },
+    inaddr_any_ipv6 = {
+        advertise = '[::]:3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise.client',
+            'in6addr_any (::) cannot be used to create a client socket',
+        }, ': '),
+    },
+    inaddr_any_ipv6_user = {
+        advertise = 'user@[::]:3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise.client',
+            'in6addr_any (::) cannot be used to create a client socket',
+        }, ': '),
+    },
+    inaddr_any_ipv6_user_pass = {
+        advertise = 'user:pass@[::]:3301',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise.client',
+            'in6addr_any (::) cannot be used to create a client socket',
+        }, ': '),
+    },
+    zero_port = {
+        advertise = 'localhost:0',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise.client',
+            'An URI with zero port cannot be used to create a client socket',
+        }, ': '),
+    },
+    zero_port_user = {
+        advertise = 'user@localhost:0',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise.client',
+            'An URI with zero port cannot be used to create a client socket',
+        }, ': '),
+    },
+    zero_port_user_pass = {
+        advertise = 'user:pass@localhost:0',
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.advertise.client',
+            'An URI with zero port cannot be used to create a client socket',
+        }, ': '),
+    },
     inet_socket_user = {
         advertise = 'user@localhost:3301',
         exp_err_msg = err_advertise_client_uri_with_user,
@@ -475,28 +689,51 @@ end
 -- Successful cases for iproto.advertise.{peer,sharding}.
 for case_name, case in pairs({
     inet_socket = {
-        advertise = 'localhost:3301',
+        advertise = {
+            uri = 'localhost:3301',
+        },
     },
     inet_socket_user = {
-        advertise = 'user@localhost:3301',
+        advertise = {
+            uri = 'localhost:3301',
+            login = 'user',
+        },
     },
     inet_socket_user_pass = {
-        advertise = 'user:pass@localhost:3301',
+        advertise = {
+            uri = 'localhost:3301',
+            login = 'user',
+            password = 'pass',
+        },
     },
     unix_socket = {
-        advertise = 'unix/:/foo/bar.iproto',
+        advertise = {
+            uri = 'unix/:/foo/bar.iproto',
+        },
     },
     unix_socket_user = {
-        advertise = 'user@unix/:/foo/bar.iproto',
+        advertise = {
+            uri = 'unix/:/foo/bar.iproto',
+            login = 'user',
+        },
     },
     unix_socket_user_pass = {
-        advertise = 'user:pass@unix/:/foo/bar.iproto',
+        advertise = {
+            uri = 'unix/:/foo/bar.iproto',
+            login = 'user',
+            password = 'pass',
+        },
     },
     user = {
-        advertise = 'user@',
+        advertise = {
+            login = 'user',
+        },
     },
     user_pass = {
-        advertise = 'user:pass@',
+        advertise = {
+            login = 'user',
+            password = 'pass',
+        },
     },
 }) do
     g[('test_good_iproto_advertise_peer_%s'):format(case_name)] = function()

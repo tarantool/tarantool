@@ -44,8 +44,10 @@ iproto:
   # We currently need to manually define the user for vshard. If the user is not
   # defined, the guest is used.
   advertise:
-    peer: replicator@
-    sharding: storage@
+    peer:
+      login: 'replicator'
+    sharding:
+      login: 'storage'
 
 sharding:
   bucket_count: 10000

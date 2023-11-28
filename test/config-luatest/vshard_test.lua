@@ -24,7 +24,8 @@ g.test_fixed_masters = function(g)
     iproto:
       listen: 'unix/:./{{ instance_name }}.iproto'
       advertise:
-        sharding: 'storage@'
+        sharding:
+          login: 'storage'
 
     sharding:
       bucket_count: 1234
@@ -132,11 +133,19 @@ g.test_fixed_masters = function(g)
                 replicas = {
                     ["ef10b92d-9ae9-e7bb-004c-89d8fb468341"] = {
                         name = "instance-002",
-                        uri = "storage:storage@unix/:./instance-002.iproto",
+                        uri = {
+                            login = "storage",
+                            password = "storage",
+                            uri = "unix/:./instance-002.iproto",
+                        },
                     },
                     ["ffe08155-a26d-bd7c-0024-00ee6815a41c"] = {
                         name = "instance-001",
-                        uri = "storage:storage@unix/:./instance-001.iproto",
+                        uri = {
+                            login = "storage",
+                            password = "storage",
+                            uri = "unix/:./instance-001.iproto",
+                        },
                     },
                 },
                 weight = 1,
@@ -146,11 +155,19 @@ g.test_fixed_masters = function(g)
                 replicas = {
                     ["22222222-2222-2222-0022-222222222222"] = {
                         name = "instance-003",
-                        uri = "storage:storage@unix/:./instance-003.iproto",
+                        uri = {
+                            login = "storage",
+                            password = "storage",
+                            uri = "unix/:./instance-003.iproto",
+                        },
                     },
                     ["50367d8e-488b-309b-001a-138a0c516772"] = {
                         name = "instance-004",
-                        uri = "storage:storage@unix/:./instance-004.iproto"
+                        uri = {
+                            login = "storage",
+                            password = "storage",
+                            uri = "unix/:./instance-004.iproto",
+                        },
                     },
                 },
                 weight = 1,
@@ -255,7 +272,8 @@ g.test_rebalancer_role = function(g)
     iproto:
       listen: 'unix/:./{{ instance_name }}.iproto'
       advertise:
-        sharding: 'storage@'
+        sharding:
+          login: 'storage'
 
     groups:
       group-001:
@@ -341,11 +359,19 @@ g.test_rebalancer_role = function(g)
             replicas = {
                 ["ef10b92d-9ae9-e7bb-004c-89d8fb468341"] = {
                     name = "instance-002",
-                    uri = "storage:storage@unix/:./instance-002.iproto",
+                    uri = {
+                        login = "storage",
+                        password = "storage",
+                        uri = "unix/:./instance-002.iproto"
+                    },
                 },
                 ["ffe08155-a26d-bd7c-0024-00ee6815a41c"] = {
                     name = "instance-001",
-                    uri = "storage:storage@unix/:./instance-001.iproto",
+                    uri = {
+                        login = "storage",
+                        password = "storage",
+                        uri = "unix/:./instance-001.iproto"
+                    },
                 },
             },
             weight = 1,
@@ -355,11 +381,19 @@ g.test_rebalancer_role = function(g)
             replicas = {
                 ["f2974852-9b48-8e24-00ea-d34059bf24fd"] = {
                     name = "instance-003",
-                    uri = "storage:storage@unix/:./instance-003.iproto",
+                    uri = {
+                        login = "storage",
+                        password = "storage",
+                        uri = "unix/:./instance-003.iproto"
+                    },
                 },
                 ["50367d8e-488b-309b-001a-138a0c516772"] = {
                     name = "instance-004",
-                    uri = "storage:storage@unix/:./instance-004.iproto"
+                    uri = {
+                        login = "storage",
+                        password = "storage",
+                        uri = "unix/:./instance-004.iproto"
+                    },
                 },
             },
             weight = 1,
@@ -405,7 +439,8 @@ g.test_too_many_rebalancers = function(g)
     iproto:
       listen: 'unix/:./{{ instance_name }}.iproto'
       advertise:
-        sharding: 'storage@'
+        sharding:
+          login: 'storage'
 
     groups:
       group-001:
