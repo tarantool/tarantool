@@ -185,8 +185,6 @@ g.test_defaults = function()
             listen = box.NULL,
             advertise = {
                 client = box.NULL,
-                peer = box.NULL,
-                sharding = box.NULL,
             },
             threads = 1,
             net_msg_max = 768,

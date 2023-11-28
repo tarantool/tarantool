@@ -66,7 +66,9 @@ local base_config = {
     iproto = {
         listen = 'unix/:./{{ instance_name }}.iproto',
         advertise = {
-            peer = 'replicator@',
+            peer = {
+                login = 'replicator',
+            }
         },
     },
     replication = {

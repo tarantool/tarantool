@@ -111,9 +111,21 @@ g.test_no_anonymous_upstream = function(g)
     replicaset:each(function(server)
         server:exec(function()
             t.assert_equals(box.cfg.replication, {
-                'replicator:secret@unix/:./instance-001.iproto',
-                'replicator:secret@unix/:./instance-002.iproto',
-                'replicator:secret@unix/:./instance-003.iproto',
+                {
+                    login = 'replicator',
+                    password = 'secret',
+                    uri = 'unix/:./instance-001.iproto',
+                },
+                {
+                    login = 'replicator',
+                    password = 'secret',
+                    uri = 'unix/:./instance-002.iproto',
+                },
+                {
+                    login = 'replicator',
+                    password = 'secret',
+                    uri = 'unix/:./instance-003.iproto',
+                },
                 -- No instance-{004,005}, because they're
                 -- anonymous replicas.
             })

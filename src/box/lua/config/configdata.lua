@@ -92,6 +92,9 @@ local function instance_sharding(iconfig, instance_name)
     end
     local zone = instance_config:get(iconfig, 'sharding.zone')
     local uri = instance_config:instance_uri(iconfig, 'sharding')
+    if uri == nil then
+        error('No suitable URI provided', 0)
+    end
     --
     -- Currently, vshard does not accept URI without a username. So if we got a
     -- URI without a username, use "guest" as the username without a password.
