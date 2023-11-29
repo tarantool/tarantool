@@ -546,6 +546,7 @@
     <member refid="module_8h_1adf5cc88ba87d8e5afe81604385609191" kind="function"><name>box_txn_alloc</name></member>
     <member refid="module_8h_1a3e930976f6e8e73e213f701c3761fce4" kind="function"><name>box_txn_set_timeout</name></member>
     <member refid="module_8h_1a8a24686e9b0f80d53ded039aa69dfd33" kind="function"><name>box_txn_set_isolation</name></member>
+    <member refid="module_8h_1a2442c7908ecc3c927337bbd3e2da00e9" kind="function"><name>box_txn_make_sync</name></member>
     <member refid="module_8h_1a5a457c9503bb15df42c4854fbede340e" kind="function"><name>box_tuple_format_default</name></member>
     <member refid="module_8h_1a2211f2682d19f564c55f2888e35d6430" kind="function"><name>box_tuple_ref</name></member>
     <member refid="module_8h_1a22d7b12b1afbff0c3cc20726c10cc6cc" kind="function"><name>box_tuple_unref</name></member>
