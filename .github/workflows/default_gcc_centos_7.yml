@@ -50,7 +50,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      - uses: ./.github/actions/environment
+      - uses: ./.github/actions/setup-env
       - name: test
         env:
           # Our testing expects that the init process (PID 1) will

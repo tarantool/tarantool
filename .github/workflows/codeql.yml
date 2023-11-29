@@ -53,7 +53,7 @@ jobs:
         languages: ${{ matrix.language }}
 
     - name: Setup env
-      uses: ./.github/actions/environment
+      uses: ./.github/actions/setup-build-env
 
     - name: Install deps
       uses: ./.github/actions/install-deps-debian

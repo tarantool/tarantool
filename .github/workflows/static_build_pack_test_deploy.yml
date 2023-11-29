@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - uses: ./.github/actions/environment
+      - uses: ./.github/actions/setup-build-env
 
       - name: Make static build packages
         run: make -f .pack.mk package-static
@@ -98,6 +98,8 @@ jobs:
         with:
           submodules: recursive
 
+      - uses: ./.github/actions/setup-test-env
+
       - name: Set package manager
         run: |
           if ${{ startsWith(matrix.os, 'astra') ||
@@ -113,14 +115,6 @@ jobs:
             echo "Not supported OS provided: ${{ matrix.os }}"
             exit 1
           fi
-
-      # Install the 'e2fsprogs' package that contains the 'mkfs' program needed
-      # for the 'environment' action bellow.
-      - name: Install e2fsprogs
-        if: env.PACKAGE_MANAGER != 'apt'
-        run: ${{ env.PACKAGE_MANAGER }} -y install e2fsprogs
-
-      - uses: ./.github/actions/environment
 
       - name: Download packages
         uses: actions/download-artifact@v3

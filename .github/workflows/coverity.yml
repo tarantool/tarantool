@@ -25,7 +25,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      - uses: ./.github/actions/environment
+      - uses: ./.github/actions/setup-build-env
       - name: test
         run: make -f .test.mk test-coverity
         env:
