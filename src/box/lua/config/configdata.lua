@@ -369,6 +369,50 @@ local function validate_names(saved_names, config_names)
     end
 end
 
+-- A couple of replication.failover specific checks.
+local function validate_failover(found, peers, failover, leader)
+    if failover ~= 'manual' then
+        -- Verify that no leader is set in the "off", "election"
+        -- or "supervised" failover mode.
+        if leader ~= nil then
+            error(('"leader" = %q option is set for replicaset %q of group ' ..
+                '%q, but this option cannot be used together with ' ..
+                'replication.failover = %q'):format(leader,
+                found.replicaset_name, found.group_name, failover), 0)
+        end
+    end
+
+    if failover ~= 'off' then
+        -- Verify that peers in the given replicaset have no direct
+        -- database.mode option set if the replicaset is configured
+        -- with the "manual", "election" or "supervised" failover
+        -- mode.
+        --
+        -- This check doesn't verify the whole cluster config, only
+        -- the given replicaset.
+        for peer_name, peer in pairs(peers) do
+            local mode = instance_config:get(peer.iconfig, 'database.mode')
+            if mode ~= nil then
+                error(('database.mode = %q is set for instance %q of ' ..
+                    'replicaset %q of group %q, but this option cannot be ' ..
+                    'used together with replication.failover = %q'):format(mode,
+                    peer_name, found.replicaset_name, found.group_name,
+                    failover), 0)
+            end
+        end
+    end
+
+    if failover == 'manual' then
+        -- Verify that the 'leader' option is set to a name of an
+        -- existing instance from the given replicaset (or unset).
+        if leader ~= nil and peers[leader] == nil then
+            error(('"leader" = %q option is set for replicaset %q of group ' ..
+                '%q, but instance %q is not found in this replicaset'):format(
+                leader, found.replicaset_name, found.group_name, leader), 0)
+        end
+    end
+end
+
 local function new(iconfig, cconfig, instance_name)
     -- Find myself in a cluster config, determine peers in the same
     -- replicaset.
@@ -446,45 +490,7 @@ local function new(iconfig, cconfig, instance_name)
     -- access to environment of other instances.
     local failover = instance_config:get(iconfig_def, 'replication.failover')
     local leader = found.replicaset.leader
-
-    if failover ~= 'manual' then
-        -- Verify that no leader is set in the "off", "election"
-        -- or "supervised" failover mode.
-        if leader ~= nil then
-            error(('"leader" = %q option is set for replicaset %q of group ' ..
-                '%q, but this option cannot be used together with ' ..
-                'replication.failover = %q'):format(leader,
-                found.replicaset_name, found.group_name, failover), 0)
-        end
-    end
-    if failover ~= 'off' then
-        -- Verify that peers in the given replicaset have no direct
-        -- database.mode option set if the replicaset is configured
-        -- with the "manual", "election" or "supervised" failover
-        -- mode.
-        --
-        -- This check doesn't verify the whole cluster config, only
-        -- the given replicaset.
-        for peer_name, peer in pairs(peers) do
-            local mode = instance_config:get(peer.iconfig, 'database.mode')
-            if mode ~= nil then
-                error(('database.mode = %q is set for instance %q of ' ..
-                    'replicaset %q of group %q, but this option cannot be ' ..
-                    'used together with replication.failover = %q'):format(mode,
-                    peer_name, found.replicaset_name, found.group_name,
-                    failover), 0)
-            end
-        end
-    end
-    if failover == 'manual' then
-        -- Verify that the 'leader' option is set to a name of an
-        -- existing instance from the given replicaset (or unset).
-        if leader ~= nil and peers[leader] == nil then
-            error(('"leader" = %q option is set for replicaset %q of group ' ..
-                '%q, but instance %q is not found in this replicaset'):format(
-                leader, found.replicaset_name, found.group_name, leader), 0)
-        end
-    end
+    validate_failover(found, peers, failover, leader)
 
     local bootstrap_strategy = instance_config:get(iconfig_def,
         'replication.bootstrap_strategy')
