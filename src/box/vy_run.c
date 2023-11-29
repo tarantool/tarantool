@@ -2363,6 +2363,7 @@ vy_run_writer_commit(struct vy_run_writer *writer)
 			       writer->space_id, writer->iid) != 0)
 		goto out;
 
+	vy_run_writer_destroy(writer);
 	rc = 0;
 out:
 	region_truncate(&fiber()->gc, region_svp);
