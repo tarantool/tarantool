@@ -10,6 +10,7 @@ g.before_all(function(cg)
     cg.server:start()
     cg.server:exec(function()
         local msgpack = require('msgpack')
+        local fiber = require('fiber')
 
         box.session.on_connect(function()
             rawset(_G, 'sid', box.session.id())
@@ -32,6 +33,12 @@ g.before_all(function(cg)
                    t.assert_equals(packet_header, lua_header)
                    t.assert_equals(packet_body, lua_body)
                end)
+        local ch = fiber.channel(1)
+        rawset(_G, 'test_channel', ch)
+        rawset(_G, 'test_on_disconnect', function()
+            local _, err = pcall(function() box.iproto.send(_G.sid, {}) end)
+            ch:put(err)
+        end)
     end)
 end)
 
@@ -52,6 +59,20 @@ g.before_each(function(cg)
         t.assert_equals(#s:read(128), 128)
         rawset(_G, 's', s)
     end, {cg.server.net_box_uri})
+end)
+
+g.before_test('test_box_iproto_send_errors', function(cg)
+    cg.server:exec(function()
+        require('log').info('adding callback')
+        box.session.on_disconnect(_G.test_on_disconnect)
+    end)
+end)
+
+g.after_test('test_box_iproto_send_errors', function(cg)
+    cg.server:exec(function()
+        require('log').info('removing callback')
+        box.session.on_disconnect(nil, _G.test_on_disconnect)
+    end)
 end)
 
 -- Checks that `box.iproto.send` errors are handled correctly.
@@ -92,19 +113,12 @@ g.test_box_iproto_send_errors = function(cg)
         local sid = _G.sid
         local s = _G.s
         -- Checks that closed session is handled correctly.
-        local _
-        local err
-        local ch = fiber.channel(1)
-        box.session.on_disconnect(function()
-            _, err = pcall(function() box.iproto.send(sid, {}) end)
-            ch:put({})
-        end)
         s:close()
-        _, err = pcall(function() box.iproto.send(sid, {}) end)
+        local _, err = pcall(function() box.iproto.send(sid, {}) end)
         if err ~= nil then
             t.assert_str_contains(tostring(err), 'Session is closed')
         else
-            ch:get()
+            err = _G.test_channel:get()
             t.assert_str_contains(tostring(err), 'Session is closed')
         end
     end)
