@@ -198,6 +198,17 @@ uri_create_params(struct uri *uri, const char *query)
 }
 
 void
+uri_set_credentials(struct uri *uri, const char *login, const char *password)
+{
+	assert(login != NULL);
+	free(uri->login);
+	uri->login = xstrdup(login);
+
+	free(uri->password);
+	uri->password = password == NULL ? NULL : xstrdup(password);
+}
+
+void
 uri_copy(struct uri *dst, const struct uri *src)
 {
 	dst->scheme = XSTRDUP(src->scheme);
