@@ -94,7 +94,7 @@ struct datetime {
 };
 
 /**
- * To be able to perform arithmetics on time intervals and receive
+ * To be able to perform arithmetic on time intervals and receive
  * deterministic results, we keep each component (i.e. years, months, weeks,
  * days, etc) separately from seconds.
  * We add/subtract interval components separately, and rebase upon resultant
@@ -216,9 +216,9 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
  * @param str input text in relaxed ISO-8601 format (0-terminated)
  * @param len length of str buffer
  * @param[out] tzoffset return timezone offset if recognized
- * @param[out] tzindex return timzeon index if recognized
+ * @param[out] tzindex return timezone index if recognized
  * @retval Upon successful completion returns length of accepted
- *         substring. Returns 0 if text is not recognizable as timzeone.
+ *         substring. Returns 0 if text is not recognizable as timezone.
  *         Returns negative value is there is unaccepted timezone.
  * @sa datetime_parse_full()
  */

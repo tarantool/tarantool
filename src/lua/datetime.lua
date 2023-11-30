@@ -7,7 +7,7 @@ local tz = require('timezones')
     values, where `dt` is a number of dates since Rata Die date (0001-01-01).
 
     `c-dt` uses 32-bit integer number to store `dt` values, so range of
-    suported dates is limited to dates from -5879610-06-22 (INT32_MIN) to
+    supported dates is limited to dates from -5879610-06-22 (INT32_MIN) to
     +5879611-07-11 (INT32_MAX).
 
     For better compactness of our typical data in MessagePack stream we shift
@@ -253,7 +253,7 @@ local function check_str_or_nil(s, message)
 end
 
 -- range may be of a form of pair {from, to} or
--- tuple {fom, to, -1 in extra}
+-- tuple {from, to, -1 in extra}
 -- -1 is a special value (so far) used for days only
 local function check_range(v, from, to, txt, extra)
     if type(v) ~= 'number' then
