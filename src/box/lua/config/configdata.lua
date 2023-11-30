@@ -411,6 +411,38 @@ local function validate_failover(found, peers, failover, leader)
                 leader, found.replicaset_name, found.group_name, leader), 0)
         end
     end
+
+    -- Verify that 'election_mode' option is set to a value other
+    -- than 'off' only in the 'failover: election' mode.
+    --
+    -- The alternative would be silent ignoring the election
+    -- mode if failover mode is not 'election'.
+    --
+    -- For a while, a simple and straightforward approach is
+    -- chosen: let the user create an explicit consistent
+    -- configuration manually.
+    --
+    -- We can relax it in a future, though. For example, if two
+    -- conflicting options are set in different scopes, we can
+    -- ignore one from the outer scope.
+    if failover ~= 'election' then
+        for peer_name, peer in pairs(peers) do
+            local election_mode = instance_config:get(peer.iconfig_def,
+                'replication.election_mode')
+            if election_mode ~= nil and election_mode ~= 'off' then
+                error(('replication.election_mode = %q is set for instance ' ..
+                    '%q of replicaset %q of group %q, but this option is ' ..
+                    'only applicable if replication.failover = "election"; ' ..
+                    'the replicaset is configured with replication.failover ' ..
+                    '= %q; if this particular instance requires its own ' ..
+                    'election mode, for example, if it is an anonymous ' ..
+                    'replica, consider configuring the election mode ' ..
+                    'specifically for this particular instance'):format(
+                    election_mode, peer_name, found.replicaset_name,
+                    found.group_name, failover), 0)
+            end
+        end
+    end
 end
 
 local function new(iconfig, cconfig, instance_name)
