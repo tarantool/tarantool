@@ -187,12 +187,6 @@ bool
 datetime_isdst(const struct datetime *date);
 
 /**
- * Return gmtoff of a given @sa datetime moment.
- */
-long
-datetime_gmtoff(const struct datetime *date);
-
-/**
  * Parse datetime text in ISO-8601 given format, and construct output
  * datetime value
  * @param date output datetime value
