@@ -32,6 +32,51 @@ uri_params_g.test_params = function(cg)
     t.assert_equals(uri_params(cg.params.params), cg.params.query_string)
 end
 
+local uri_creds_g = t.group("uri_creds", {
+    {tab = {uri = 'localhost:3301', login = 'one', password = 'two'},
+     res = {login = 'one', password = 'two'}},
+    {tab = {uri = 'localhost:3301', login = 'one'},
+     res = {login = 'one'}},
+    {tab = {uri = 'alpha:qwe@localhost:3301', login = 'one', password = 'two'},
+     res = {login = 'one', password = 'two'}},
+    {tab = {uri = 'alpha:qwe@localhost:3301', login = 'one'},
+     res = {login = 'one'}},
+})
+
+uri_creds_g.test_creads = function(cg)
+    local res = uri.parse(cg.params.tab)
+    t.assert_equals(res.login, cg.params.res.login)
+    t.assert_equals(res.password, cg.params.res.password)
+end
+
+local uri_creds_errors_g = t.group("uri_creds_errors", {
+    {tab = {uri = 'localhost:3301', login = 1, password = 'two'},
+     err = 'Invalid URI table: expected type for login is string'},
+    {tab = {uri = 'localhost:3301', login = 'one', password = 2},
+     err = 'Invalid URI table: expected type for password is string'},
+    {tab = {uri = 'alpha:qwe@localhost:3301', password = 'two'},
+     err = 'Invalid URI table: login required if password is set'},
+})
+
+uri_creds_errors_g.test_creads_errors = function(cg)
+    local res, err = uri.parse(cg.params.tab)
+    t.assert(res == nil)
+    t.assert_equals(err.message, cg.params.err)
+end
+
+local uri_set_creds_errors_g = t.group("uri_set_creds_errors", {
+    {tab = {'localhost:3301', 'localhost:3302', login = 'one'},
+     err = 'URI login is not allowed for multiple URIs'},
+    {tab = {'localhost:3301', 'localhost:3302', password = 'two'},
+     err = 'URI password is not allowed for multiple URIs'},
+})
+
+uri_set_creds_errors_g.test_set_creds_errors = function(cg)
+    local res, err = uri.parse_many(cg.params.tab)
+    t.assert(res == nil)
+    t.assert_equals(err.message, cg.params.err)
+end
+
 g.test_params_escaping = function(_)
     local uri_params = uri._internal.params
     local params = {

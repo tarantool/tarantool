@@ -161,12 +161,42 @@ uri_create_from_lua_table(struct lua_State *L, int idx, struct uri *uri)
 	lua_pop(L, 1);
 	if (rc != 0)
 		return rc;
+
+	lua_getfield(L, idx, "login");
+	if (lua_type(L, -1) == LUA_TSTRING) {
+		lua_getfield(L, idx, "password");
+		if (lua_type(L, -1) == LUA_TSTRING) {
+			uri_set_credentials(uri, lua_tostring(L, -2),
+					    lua_tostring(L, -1));
+		} else if (lua_type(L, -1) == LUA_TNIL) {
+			uri_set_credentials(uri, lua_tostring(L, -2), NULL);
+		} else {
+			diag_set(IllegalParams, "Invalid URI table: expected "
+				 "type for password is string");
+			rc = -1;
+		}
+		lua_pop(L, 1);
+	} else if (lua_type(L, -1) != LUA_TNIL) {
+		diag_set(IllegalParams, "Invalid URI table: expected type for "
+			 "login is string");
+		rc = -1;
+	} else if (is_field_present(L, idx, "password")) {
+		diag_set(IllegalParams, "Invalid URI table: login required if "
+			 "password is set");
+		rc = -1;
+	}
+	lua_pop(L, 1);
+	if (rc != 0)
+		goto error;
+
 	lua_pushstring(L, "params");
 	lua_rawget(L, idx);
 	rc = uri_add_params_from_lua(uri, L, true);
 	lua_pop(L, 1);
-	if (rc != 0)
-		uri_destroy(uri);
+	if (rc == 0)
+		return 0;
+error:
+	uri_destroy(uri);
 	return rc;
 
 }
@@ -243,10 +273,20 @@ uri_set_create_from_lua_table(struct lua_State *L, int idx,
 
 	/*
 	 * Here we are only in case when it is an URI array, so it
-	 * shouldn't be "params" field here.
+	 * shouldn't be "params", "login" and "password" fields here.
 	 */
 	if (is_field_present(L, idx, "params")) {
 		diag_set(IllegalParams, "URI parameters are "
+			 "not allowed for multiple URIs");
+		goto fail;
+	}
+	if (is_field_present(L, idx, "login")) {
+		diag_set(IllegalParams, "URI login is "
+			 "not allowed for multiple URIs");
+		goto fail;
+	}
+	if (is_field_present(L, idx, "password")) {
+		diag_set(IllegalParams, "URI password is "
 			 "not allowed for multiple URIs");
 		goto fail;
 	}

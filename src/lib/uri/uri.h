@@ -64,6 +64,10 @@ uri_add_param(struct uri *uri, const char *name, const char *value);
 void
 uri_remove_param(struct uri *uri, const char *name);
 
+/** Set @a login and @a password in the @a uri. */
+void
+uri_set_credentials(struct uri *uri, const char *login, const char *password);
+
 /**
  * Copy constructor for @a dst URI. Copies all fiels from
  * @a src URI to @dst URI.
