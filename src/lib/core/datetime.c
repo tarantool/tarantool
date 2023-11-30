@@ -80,16 +80,6 @@ datetime_isdst(const struct datetime *date)
 	return isdst != 0;
 }
 
-long
-datetime_gmtoff(const struct datetime *date)
-{
-	int isdst = 0;
-	long gmtoff = date->tzoffset * 60;
-
-	epoch_timezone_lookup(date->epoch, date->tzindex, &gmtoff, &isdst);
-	return gmtoff;
-}
-
 void
 datetime_to_tm(const struct datetime *date, struct tnt_tm *tm)
 {
