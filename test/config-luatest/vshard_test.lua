@@ -16,11 +16,14 @@ g.test_fixed_masters = function(g)
       users:
         guest:
           roles: [super]
+        storage:
+          roles: [super]
+          password: "storage"
 
     iproto:
       listen: 'unix/:./{{ instance_name }}.iproto'
       advertise:
-        sharding: 'storage:storage@'
+        sharding: 'storage@'
 
     sharding:
       bucket_count: 1234
@@ -116,15 +119,10 @@ g.test_fixed_masters = function(g)
         bucket_count = 1234,
         discovery_mode = "on",
         failover_ping_timeout = 5,
-        listen = "unix/:./instance-002.iproto",
-        read_only = true,
         rebalancer_disbalance_threshold = 1,
         rebalancer_max_receiving = 100,
         rebalancer_max_sending = 1,
-        replication = {
-            "unix/:./instance-001.iproto",
-            "unix/:./instance-002.iproto"
-        },
+        rebalancer_mode = "auto",
         sched_move_quota = 1,
         sched_ref_quota = 258,
         shard_index = "bucket_id",
@@ -161,86 +159,21 @@ g.test_fixed_masters = function(g)
         },
     }
 
-    -- Non-master storages.
+    -- Storages.
     local exec = 'return vshard.storage.internal.current_cfg'
-    local res = g.server_2:eval(exec)
+    local res = g.server_1:eval(exec)
+    t.assert_equals(res, exp)
+    res = g.server_2:eval(exec)
+    t.assert_equals(res, exp)
+    res = g.server_3:eval(exec)
     t.assert_equals(res, exp)
     res = g.server_4:eval(exec)
-    t.assert_equals(res.sharding, exp.sharding)
+    t.assert_equals(res, exp)
 
     -- Router.
     exec = 'return vshard.router.internal.static_router.current_cfg'
     res = g.server_5:eval(exec)
     t.assert_equals(res.sharding, exp.sharding)
-
-    exp = {
-        ["11111111-1111-1111-0011-111111111111"] = {
-            replicas = {
-                ["ef10b92d-9ae9-e7bb-004c-89d8fb468341"] = {
-                    name = "instance-002",
-                    uri = "storage:storage@unix/:./instance-002.iproto",
-                },
-                ["ffe08155-a26d-bd7c-0024-00ee6815a41c"] = {
-                    name = "instance-001",
-                    uri = "storage:storage@unix/:./instance-001.iproto",
-                    master = true,
-                },
-            },
-            weight = 1,
-        },
-        ["d1f75e70-6883-d7fe-0087-e582c9c67543"] = {
-            master = "auto",
-            replicas = {
-                ["22222222-2222-2222-0022-222222222222"] = {
-                    name = "instance-003",
-                    uri = "storage:storage@unix/:./instance-003.iproto",
-                },
-                ["50367d8e-488b-309b-001a-138a0c516772"] = {
-                    name = "instance-004",
-                    uri = "storage:storage@unix/:./instance-004.iproto"
-                },
-            },
-            weight = 1,
-        },
-    }
-
-    -- Master storages.
-    exec = 'return vshard.storage.internal.current_cfg'
-    res = g.server_1:eval(exec)
-    t.assert_equals(res.sharding, exp)
-
-    exp = {
-        ["11111111-1111-1111-0011-111111111111"] = {
-            master = "auto",
-            replicas = {
-                ["ef10b92d-9ae9-e7bb-004c-89d8fb468341"] = {
-                    name = "instance-002",
-                    uri = "storage:storage@unix/:./instance-002.iproto",
-                },
-                ["ffe08155-a26d-bd7c-0024-00ee6815a41c"] = {
-                    name = "instance-001",
-                    uri = "storage:storage@unix/:./instance-001.iproto",
-                },
-            },
-            weight = 1,
-        },
-        ["d1f75e70-6883-d7fe-0087-e582c9c67543"] = {
-            replicas = {
-                ["22222222-2222-2222-0022-222222222222"] = {
-                    name = "instance-003",
-                    uri = "storage:storage@unix/:./instance-003.iproto",
-                    master = true,
-                },
-                ["50367d8e-488b-309b-001a-138a0c516772"] = {
-                    name = "instance-004",
-                    uri = "storage:storage@unix/:./instance-004.iproto"
-                },
-            },
-            weight = 1,
-        },
-    }
-    res = g.server_3:eval(exec)
-    t.assert_equals(res.sharding, exp)
 
     -- Check that basic sharding works.
     exec = [[
@@ -252,7 +185,13 @@ g.test_fixed_masters = function(g)
         function get(id)
             return box.space.a:get(id)
         end
+    ]]
+    g.server_1:eval(exec)
+    g.server_2:eval(exec)
+    g.server_3:eval(exec)
+    g.server_4:eval(exec)
 
+    exec = [[
         box.schema.func.create('put')
         box.schema.role.grant('public', 'execute', 'function', 'put')
         box.schema.func.create('get')
@@ -282,81 +221,22 @@ g.test_fixed_masters = function(g)
         t.assert_equals(res, {{1, 1}})
     end)
 
-    -- Check that vshard cfg is reformed when master is changed.
+    -- Make sure that the new master is auto-discovered when master is changed.
     g.server_1:eval([[box.cfg{read_only = true}]])
-    exec = 'return vshard.storage.internal.current_cfg'
-    exp = {
-        ["11111111-1111-1111-0011-111111111111"] = {
-            master = "auto",
-            replicas = {
-                ["ef10b92d-9ae9-e7bb-004c-89d8fb468341"] = {
-                    name = "instance-002",
-                    uri = "storage:storage@unix/:./instance-002.iproto",
-                },
-                ["ffe08155-a26d-bd7c-0024-00ee6815a41c"] = {
-                    name = "instance-001",
-                    uri = "storage:storage@unix/:./instance-001.iproto",
-                },
-            },
-            weight = 1,
-        },
-        ["d1f75e70-6883-d7fe-0087-e582c9c67543"] = {
-            master = "auto",
-            replicas = {
-                ["22222222-2222-2222-0022-222222222222"] = {
-                    name = "instance-003",
-                    uri = "storage:storage@unix/:./instance-003.iproto",
-                },
-                ["50367d8e-488b-309b-001a-138a0c516772"] = {
-                    name = "instance-004",
-                    uri = "storage:storage@unix/:./instance-004.iproto"
-                },
-            },
-            weight = 1,
-        },
-    }
-    t.helpers.retrying({timeout = 60}, function()
-        local res = g.server_1:eval(exec)
-        t.assert_equals(res.sharding, exp)
-        res = g.server_2:eval(exec)
-        t.assert_equals(res.sharding, exp)
-    end)
-
     g.server_2:eval([[box.cfg{read_only = false}]])
-    res = g.server_1:eval(exec)
-    t.assert_equals(res.sharding, exp)
-    exp = {
-        ["11111111-1111-1111-0011-111111111111"] = {
-            replicas = {
-                ["ef10b92d-9ae9-e7bb-004c-89d8fb468341"] = {
-                    name = "instance-002",
-                    uri = "storage:storage@unix/:./instance-002.iproto",
-                    master = true,
-                },
-                ["ffe08155-a26d-bd7c-0024-00ee6815a41c"] = {
-                    name = "instance-001",
-                    uri = "storage:storage@unix/:./instance-001.iproto",
-                },
-            },
-            weight = 1,
-        },
-        ["d1f75e70-6883-d7fe-0087-e582c9c67543"] = {
-            master = "auto",
-            replicas = {
-                ["22222222-2222-2222-0022-222222222222"] = {
-                    name = "instance-003",
-                    uri = "storage:storage@unix/:./instance-003.iproto",
-                },
-                ["50367d8e-488b-309b-001a-138a0c516772"] = {
-                    name = "instance-004",
-                    uri = "storage:storage@unix/:./instance-004.iproto"
-                },
-            },
-            weight = 1,
-        },
-    }
+    g.server_3:eval([[box.cfg{read_only = true}]])
+    g.server_4:eval([[box.cfg{read_only = false}]])
+    exec = [[
+        vshard.router.call(2, 'write', 'put', {{id = 2, bucket_id = 2}},
+                           {timeout = 30})
+        vshard.router.call(799, 'write', 'put', {{id = 799, bucket_id = 799}},
+                           {timeout = 30})
+    ]]
+    g.server_5:eval(exec)
     t.helpers.retrying({timeout = 60}, function()
-        local res = g.server_2:eval(exec)
-        t.assert_equals(res.sharding, exp)
+        local res = g.server_1:eval([[return box.space.a:select()]])
+        t.assert_equals(res, {{799, 799}, {800, 800}})
+        res = g.server_3:eval([[return box.space.a:select()]])
+        t.assert_equals(res, {{1, 1}, {2, 2}})
     end)
 end
