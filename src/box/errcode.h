@@ -330,6 +330,7 @@ struct errcode_record {
 	/*275 */_(ER_CREATE_DEFAULT_FUNC,	"Failed to create field default function '%s': %s") \
 	/*276 */_(ER_DEFAULT_FUNC_FAILED,	"Error calling field default function '%s': %s") \
 	/*277 */_(ER_INVALID_DEC,		"Invalid decimal: '%s'") \
+	/*278 */_(ER_IN_ANOTHER_PROMOTE,	"box.ctl.promote() is already running") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
