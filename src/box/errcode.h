@@ -327,6 +327,10 @@ struct errcode_record {
 	/*272 */_(ER_SCHEMA_UPGRADE_IN_PROGRESS, "Schema upgrade is already in progress") \
 	/*273 */_(ER_UNUSED7,			"") \
 	/*274 */_(ER_UNCONFIGURED,		"Please call box.cfg{} first") \
+	/*275 */_(ER_UNUSED8,			"") \
+	/*276 */_(ER_UNUSED9,			"") \
+	/*277 */_(ER_UNUSED10,			"") \
+	/*278 */_(ER_IN_ANOTHER_PROMOTE,	"box.ctl.promote() is already running") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
