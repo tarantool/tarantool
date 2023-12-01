@@ -486,6 +486,7 @@ t;
  |   266: box.error.MISSING_SYSTEM_SPACES
  |   272: box.error.SCHEMA_UPGRADE_IN_PROGRESS
  |   274: box.error.UNCONFIGURED
+ |   278: box.error.IN_ANOTHER_PROMOTE
  | ...
 
 test_run:cmd("setopt delimiter ''");

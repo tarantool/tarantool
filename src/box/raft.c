@@ -122,14 +122,22 @@ box_raft_update_synchro_queue(struct raft *raft)
 		return;
 	int rc = 0;
 	uint32_t errcode = 0;
+	bool try_again;
 	do {
+		try_again = false;
 		rc = box_promote_qsync();
 		if (rc != 0) {
 			struct error *err = diag_last_error(diag_get());
 			errcode = box_error_code(err);
 			diag_log();
+			if (!fiber_is_cancelled() &&
+			    (errcode == ER_QUORUM_WAIT ||
+			    errcode == ER_IN_ANOTHER_PROMOTE)) {
+				try_again = true;
+				fiber_sleep(0);
+			}
 		}
-	} while (rc != 0 && errcode == ER_QUORUM_WAIT && !fiber_is_cancelled());
+	} while (try_again);
 }
 
 static int

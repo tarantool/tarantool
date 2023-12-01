@@ -2584,7 +2584,10 @@ end:
 int
 box_promote_qsync(void)
 {
-	assert(!is_in_box_promote);
+	if (is_in_box_promote) {
+		diag_set(ClientError, ER_IN_ANOTHER_PROMOTE);
+		return -1;
+	}
 	assert(is_box_configured);
 	struct raft *raft = box_raft();
 	is_in_box_promote = true;
