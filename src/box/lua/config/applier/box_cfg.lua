@@ -348,6 +348,7 @@ local function apply(config)
 
     local failover = configdata:get('replication.failover',
         {use_default = true})
+    local is_anon = configdata:get('replication.anon', {use_default = true})
 
     -- Read-only or read-write?
     if failover == 'off' then
@@ -525,8 +526,12 @@ local function apply(config)
 
     -- Names are applied only if they're already in snap file.
     -- Otherwise, master must apply names after box.cfg asynchronously.
+    --
+    -- Note: an anonymous replica has no an entry in the _cluster
+    -- system space, so it can't have a persistent instance name.
+    -- It is never returned by :missing_names().
     local missing_names = configdata:missing_names()
-    if not missing_names._peers[names.instance_name] then
+    if not is_anon and not missing_names._peers[names.instance_name] then
         box_cfg.instance_name = names.instance_name
     end
     if not missing_names[names.replicaset_name] then
