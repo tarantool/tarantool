@@ -144,6 +144,7 @@ lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/sysprof/parse.lua sysprof_par
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/avl.lua utils_avl_lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/bufread.lua utils_bufread_lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/symtab.lua utils_symtab_lua)
+lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/evread.lua utils_evread_lua)
 
 add_custom_target(generate_lua_sources
     WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/src/box
