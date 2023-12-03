@@ -164,6 +164,7 @@ extern char session_lua[],
 #if ENABLE_CONFIG_EXTRAS
 	,
 	config_source_etcd_lua[],
+	config_storage_init_lua[],
 	config_extras_lua[]
 #endif
 	;
@@ -323,6 +324,7 @@ static const char *lua_sources[] = {
 	 * - configuration sources
 	 * - configuration appliers
 	 * - the entrypoint
+	 * - config.storage role
 	 */
 
 	"config/utils/log",
@@ -406,6 +408,12 @@ static const char *lua_sources[] = {
 	"config/init",
 	"config",
 	config_init_lua,
+
+#if ENABLE_CONFIG_EXTRAS
+	"config/storage/init",
+	"config.storage",
+	config_storage_init_lua,
+#endif
 
 	/* }}} config */
 
