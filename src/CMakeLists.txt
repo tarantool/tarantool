@@ -137,7 +137,6 @@ lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/memprof/humanize.lua memprof_
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/memprof/parse.lua memprof_parse_lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/memprof/process.lua memprof_process_lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/sysprof.lua sysprof_lua)
-lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/sysprof/collapse.lua sysprof_collapse_lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/sysprof/parse.lua sysprof_parse_lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/avl.lua utils_avl_lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/bufread.lua utils_bufread_lua)
