@@ -5,11 +5,6 @@ local snapshot = require('internal.config.utils.snapshot')
 local schedule_task = fiber._internal.schedule_task
 local mkversion = require('internal.mkversion')
 
-local function peer_uri(configdata, peer_name)
-    local iconfig = configdata._peers[peer_name].iconfig_def
-    return instance_config:instance_uri(iconfig, 'peer')
-end
-
 local function peer_uris(configdata)
     local peers = configdata:peers()
     if #peers <= 1 then
@@ -27,16 +22,31 @@ local function peer_uris(configdata)
 
     local uris = {}
     for _, peer_name in ipairs(peers) do
-        local uri = peer_uri(configdata, peer_name)
-        if uri == nil then
-            log.info('%s: instance %q has no iproto.advertise.peer or ' ..
-                'iproto.listen URI suitable to create a client socket',
-                err_msg_prefix, peer_name)
+        local iconfig_def = configdata._peers[peer_name].iconfig_def
+        local is_anon = instance_config:get(iconfig_def, 'replication.anon')
+        -- Don't use anonymous replicas as upstreams.
+        --
+        -- An anonymous replica can't be an upstream for a
+        -- non-anonymous instance.
+        --
+        -- An anonymous replica can be an upstream for another
+        -- anonymous replica, but only non-anonymous peers are set
+        -- as upstreams by default.
+        --
+        -- A user may configure a custom data flow using
+        -- `replication.peers` option.
+        if not is_anon then
+            local uri = instance_config:instance_uri(iconfig_def, 'peer')
+            if uri == nil then
+                log.info('%s: instance %q has no iproto.advertise.peer or ' ..
+                    'iproto.listen URI suitable to create a client socket',
+                    err_msg_prefix, peer_name)
+            end
+            if uri ~= nil and peer_name ~= names.instance_name then
+                has_upstream = true
+            end
+            table.insert(uris, uri)
         end
-        if uri ~= nil and peer_name ~= names.instance_name then
-            has_upstream = true
-        end
-        table.insert(uris, uri)
     end
 
     if not has_upstream then

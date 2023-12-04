@@ -5,10 +5,6 @@
 
   There are caveats that are not resolved yet:
 
-  * An anonymous replica shouldn't be used as an upstream for non-anonymous
-    replica.
-  * An anonymous replica possibly shouldn't be used as an upstream for other
-    anonymous replicas by default.
   * An anonymous replica shouldn't be chosen as a bootstrap leader in
     `replication.failover: supervised` mode.
   * An attempt to configure a replicaset where all instances are anonymous
