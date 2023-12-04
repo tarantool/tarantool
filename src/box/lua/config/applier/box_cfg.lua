@@ -436,7 +436,8 @@ local function apply(config)
         -- the following.
         --
         -- * Look over the peer names of the replicaset and choose
-        --   the minimal name (compare them lexicographically).
+        --   the minimal name across all non-anonymous instances
+        --   (compare them lexicographically).
         -- * The instance with the minimal name starts in the RW
         --   mode to be able to bootstrap the replicaset if there
         --   is no local snapshot. Otherwise, it starts as usual,

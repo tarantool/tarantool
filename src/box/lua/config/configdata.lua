@@ -568,7 +568,18 @@ local function new(iconfig, cconfig, instance_name)
                 found.replicaset_name), 0)
         end
         assert(bootstrap_leader == nil)
-        bootstrap_leader_name = peer_names[1]
+
+        -- Choose first non-anonymous instance.
+        for _, peer_name in ipairs(peer_names) do
+            assert(peers[peer_name] ~= nil)
+            local iconfig_def = peers[peer_name].iconfig_def
+            local is_anon = instance_config:get(iconfig_def, 'replication.anon')
+            if not is_anon then
+                bootstrap_leader_name = peer_name
+                break
+            end
+        end
+        assert(bootstrap_leader_name ~= nil)
     end
 
     -- Names and UUIDs are always validated: during instance start

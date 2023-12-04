@@ -5,8 +5,6 @@
 
   There are caveats that are not resolved yet:
 
-  * An anonymous replica shouldn't be chosen as a bootstrap leader in
-    `replication.failover: supervised` mode.
   * An attempt to configure a replicaset where all instances are anonymous
     replicas should lead to an error on config validation, before configuration
     applying.
