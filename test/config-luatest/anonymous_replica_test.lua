@@ -115,3 +115,45 @@ g.test_no_anonymous_upstream = function(g)
         end)
     end)
 end
+
+-- Verify that anonymous replicas are skipped when choosing a
+-- bootstrap leader in the `failover: supervised` mode.
+g.test_supervised_mode_bootstrap_leader_not_anon = function(g)
+    -- `failover: supervised` assigns a first non-anonymous
+    -- instance as a bootstrap leader. The order is alphabetical.
+    local config = cbuilder.new()
+        :set_replicaset_option('replication.failover', 'supervised')
+        :add_instance('instance-001', {
+            replication = {
+                anon = true,
+            },
+        })
+        :add_instance('instance-002', {})
+        :add_instance('instance-003', {})
+        :add_instance('instance-004', {})
+        :add_instance('instance-005', {
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+
+    local replicaset = replicaset.new(g, config)
+    replicaset:start()
+
+    -- Verify that instance-001 (anonymous replica) is
+    -- successfully started. An attempt to make it writable (to
+    -- use as a bootstrap leader) would lead to a startup error.
+    t.helpers.retrying({timeout = 60}, function()
+        replicaset['instance-001']:exec(function()
+            t.assert_equals(box.info.status, 'running')
+        end)
+    end)
+
+    -- Verify that instance-002 is the bootstrap leader.
+    --
+    -- NB: An instance with box.info.id = 1 is a bootstrap leader.
+    replicaset['instance-002']:exec(function()
+        t.assert_equals(box.info.id, 1)
+    end)
+end
