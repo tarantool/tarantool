@@ -589,6 +589,7 @@ wal_free(void)
 	struct wal_writer *writer = &wal_writer_singleton;
 
 	cbus_stop_loop(&writer->wal_pipe);
+	cpipe_destroy(&writer->wal_pipe);
 
 	if (cord_join(&writer->cord)) {
 		/* We can't recover from this in any reasonable way. */
@@ -1233,6 +1234,7 @@ wal_writer_f(va_list ap)
 		wal_xlog_close(&vy_log_writer.xlog);
 
 	cpipe_destroy(&writer->tx_prio_pipe);
+	cbus_endpoint_destroy(&endpoint, cbus_process);
 	return 0;
 }
 
