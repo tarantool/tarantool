@@ -445,6 +445,37 @@ local function validate_failover(found, peers, failover, leader)
     end
 end
 
+-- Verify that the given replicaset contains at least one
+-- non-anonymous replica.
+--
+-- This check doesn't verify the whole cluster config, only the
+-- given replicaset.
+local function validate_anon(found, peers)
+    -- failover: <any>
+    --
+    -- A replicaset can't consist of only anonymous replicas.
+    assert(next(peers) ~= nil)
+    local found_non_anon = false
+    for _, peer in pairs(peers) do
+        local is_anon =
+            instance_config:get(peer.iconfig_def, 'replication.anon')
+        if not is_anon then
+            found_non_anon = true
+            break
+        end
+    end
+    if not found_non_anon then
+        error(('All the instances of replicaset %q of group %q are ' ..
+            'configured as anonymous replicas; it effectively means that ' ..
+            'the whole replicaset is read-only; moreover, it means that ' ..
+            'default replication.peers construction logic will create ' ..
+            'empty upstream list and each instance is de-facto isolated: ' ..
+            'neither is connected to any other; this configuration is ' ..
+            'forbidden, because it looks like there is no meaningful ' ..
+            'use case'):format(found.replicaset_name, found.group_name), 0)
+    end
+end
+
 local function new(iconfig, cconfig, instance_name)
     -- Find myself in a cluster config, determine peers in the same
     -- replicaset.
@@ -546,6 +577,10 @@ local function new(iconfig, cconfig, instance_name)
                                         found.group_name, bootstrap_leader), 0)
         end
     end
+
+    -- Verify that there is at least one non-anonymous replica in
+    -- the given replicaset.
+    validate_anon(found, peers)
 
     -- Verify "replication.failover" = "supervised" strategy
     -- prerequisites.

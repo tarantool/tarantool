@@ -8,6 +8,11 @@ g.before_all(replicaset.init)
 g.after_each(replicaset.drop)
 g.after_all(replicaset.clean)
 
+-- Ease writing of a long error message in a code.
+local function toline(s)
+    return s:gsub('\n', ''):gsub(' +', ' '):strip()
+end
+
 -- Verify that an anonymous replica can be started and joined to
 -- a replicaset.
 --
@@ -156,4 +161,37 @@ g.test_supervised_mode_bootstrap_leader_not_anon = function(g)
     replicaset['instance-002']:exec(function()
         t.assert_equals(box.info.id, 1)
     end)
+end
+
+-- Verify that a replicaset with all the instances configured as
+-- anonymous replicas refuse to start with a meaningful error
+-- message.
+g.test_all_anonymous = function(g)
+    local config = cbuilder.new()
+        :add_instance('instance-001', {
+            replication = {
+                anon = true,
+            },
+        })
+        :add_instance('instance-002', {
+            replication = {
+                anon = true,
+            },
+        })
+        :add_instance('instance-003', {
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+
+    replicaset.startup_error(g, config, toline([[
+        All the instances of replicaset "replicaset-001" of group "group-001"
+        are configured as anonymous replicas; it effectively means that the
+        whole replicaset is read-only; moreover, it means that default
+        replication.peers construction logic will create empty upstream list
+        and each instance is de-facto isolated: neither is connected to any
+        other; this configuration is forbidden, because it looks like there
+        is no meaningful use case
+    ]]))
 end

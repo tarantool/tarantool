@@ -5,9 +5,6 @@
 
   There are caveats that are not resolved yet:
 
-  * An attempt to configure a replicaset where all instances are anonymous
-    replicas should lead to an error on config validation, before configuration
-    applying.
   * An attempt to configure an anonymous replica in read-write mode (using
     `database.mode` or `<replicaset>.leader`) should lead to an error on config
     validation, before configuration applying.

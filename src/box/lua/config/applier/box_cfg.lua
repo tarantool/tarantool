@@ -369,6 +369,10 @@ local function apply(config)
         --
         -- * 1 instance: read-write.
         -- * >1 instances: read-only.
+        --
+        -- NB: configdata.lua verifies that there is at least one
+        -- non-anonymous instance. So, an anonymous replica is
+        -- read-only by default.
         local mode = configdata:get('database.mode', {use_default = true})
         if mode == 'ro' then
             box_cfg.read_only = true
