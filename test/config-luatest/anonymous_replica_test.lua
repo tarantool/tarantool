@@ -331,3 +331,54 @@ g.test_anonymous_replica_election_mode_off = function(g)
     replicaset['instance-004']:exec(verify_election_mode_off)
     replicaset['instance-005']:exec(verify_election_mode_off)
 end
+
+-- Verify that an anonymous replica can join a replicaset that has
+-- all the instances in read-only mode.
+g.test_join_anonymous_replica_to_all_ro_replicaset = function(g)
+    local config = cbuilder.new()
+        :set_replicaset_option('replication.failover', 'manual')
+        :set_replicaset_option('leader', 'instance-001')
+        :add_instance('instance-001', {})
+        :add_instance('instance-002', {})
+        :add_instance('instance-003', {})
+        :config()
+
+    -- Bootstrap the replicaset.
+    local replicaset = replicaset.new(g, config)
+    replicaset:start()
+
+    -- Unset the leader -- make all the instances read-only.
+    local new_config = cbuilder.new(config)
+        :set_replicaset_option('leader', nil)
+        :config()
+    replicaset:reload(new_config)
+
+    -- Verify that the instances actually enter read-only mode.
+    replicaset:each(function(server)
+        server:exec(function()
+            t.assert_equals(box.info.ro, true)
+        end)
+    end)
+
+    -- Add a new anonymous replica into the config and reflect it
+    -- in the replicaset object. Start the replica.
+    local new_config_2 = cbuilder.new(new_config)
+        :add_instance('instance-004', {
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+    replicaset:sync(new_config_2)
+    replicaset:start_instance('instance-004')
+
+    -- Verify that the new instance is an anonymous replica and
+    -- that it is synchronized with instance-{001,002,003}.
+    t.helpers.retrying({timeout = 60}, function()
+        replicaset['instance-004']:exec(function()
+            t.assert_equals(box.info.id, 0)
+            t.assert_equals(box.info.status, 'running')
+            t.assert_equals(box.space._cluster:count(), 3)
+        end)
+    end)
+end
