@@ -373,6 +373,9 @@ local function apply(config)
         -- NB: configdata.lua verifies that there is at least one
         -- non-anonymous instance. So, an anonymous replica is
         -- read-only by default.
+        --
+        -- NB: configdata.lua also verifies that read-write mode
+        -- is not enabled for an anonymous replica in the config.
         local mode = configdata:get('database.mode', {use_default = true})
         if mode == 'ro' then
             box_cfg.read_only = true
@@ -392,11 +395,23 @@ local function apply(config)
         --
         -- NB: If there is no configured leader, all the instances
         -- of the given replicaset are configured as read-only.
+        --
+        -- NB: configdata.lua verifies that an anonymous replica
+        -- is not set as a leader.
         box_cfg.read_only = not configdata:is_leader()
     elseif failover == 'election' then
-        -- Enable leader election.
+        -- Enable leader election on non-anonymous instances.
         if box_cfg.election_mode == nil then
-            box_cfg.election_mode = 'candidate'
+            box_cfg.election_mode = is_anon and 'off' or 'candidate'
+        end
+
+        -- An anonymous replica can be configured with
+        -- `election_mode: off`, but not other modes.
+        --
+        -- The validation is performed in configdata.lua for all
+        -- the peers of the given replicaset.
+        if is_anon then
+            assert(box_cfg.election_mode == 'off')
         end
 
         -- A particular instance may participate in the replicaset
