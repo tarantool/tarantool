@@ -211,7 +211,11 @@ proc_title_init(int argc, char **argv)
 	char *mem;
 	size_t argv_copy_size, clobber_size;
 	int envc = 0;
-	while (environ[envc]) {
+	/*
+	 * XXX: The whole environment might be reset and environ
+	 * might be NULL as a result of <clearenv>.
+	 */
+	while (environ && environ[envc]) {
 		envc++;
 	}
 	argv_copy_size = sizeof(argv[0]) * (argc + 1);
