@@ -420,6 +420,12 @@ struct iproto_msg
 	struct stailq_entry in_stream;
 	/** Stream that owns this message, or NULL. */
 	struct iproto_stream *stream;
+	/**
+	 * True if message processing in tx thread is started. The flag is
+	 * used to prevent double accounting of message in case of iproto
+	 * override fallback to original handler.
+	 */
+	bool accepted;
 };
 
 static struct iproto_msg *
@@ -812,6 +818,7 @@ iproto_msg_new(struct iproto_connection *con)
 	msg->close_connection = false;
 	msg->connection = con;
 	msg->stream = NULL;
+	msg->accepted = false;
 	rmean_collect(con->iproto_thread->rmean, IPROTO_REQUESTS, 1);
 	return msg;
 }
@@ -1978,6 +1985,9 @@ static inline struct iproto_msg *
 tx_accept_msg(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
+	if (msg->accepted)
+		return msg;
+	msg->accepted = true;
 	tx_accept_wpos(msg->connection, &msg->wpos);
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 	tx_prepare_transaction_for_request(msg);

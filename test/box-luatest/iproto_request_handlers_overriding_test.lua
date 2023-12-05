@@ -417,3 +417,18 @@ g.test_box_iproto_override_cb_lua_invalid_return_type = function(cg)
         box.iproto.override(box.iproto.type.PING, nil)
     end)
 end
+
+-- gh-9345: Checks that we don't account message twice in case of fallback.
+g.test_box_iproto_override_fallback_double_accounting = function(cg)
+    cg.server:exec(function()
+        local cb_fallback = function()
+            return false
+        end
+        local before = box.stat.net().REQUESTS_IN_PROGRESS.current
+        box.iproto.override(box.iproto.type.PING, cb_fallback)
+        _G.test_ping()
+        box.iproto.override(box.iproto.type.PING, nil)
+        local after = box.stat.net().REQUESTS_IN_PROGRESS.current
+        t.assert_equals(after - before, 0)
+    end)
+end
