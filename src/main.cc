@@ -821,6 +821,19 @@ main(int argc, char **argv)
 		case 'I':
 #if ENABLE_INTEGRITY
 			opt_mask |= O_INTEGRITY;
+
+			/*
+			 * Reset all environment variables.
+			 * XXX: This is the most early spot to
+			 * reset the environment; if the error
+			 * occurs, execution cannot be proceed.
+			 */
+			if (clearenv() != 0) {
+				fprintf(stderr, "Environment is not reset, but "
+					"integrity check is enabled.\n");
+				return 1;
+			}
+
 			instance.hashes = optarg;
 			break;
 #else
