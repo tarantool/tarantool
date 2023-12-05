@@ -445,12 +445,21 @@ local function validate_failover(found, peers, failover, leader)
     end
 end
 
--- Verify that the given replicaset contains at least one
--- non-anonymous replica.
+-- Verify replication.anon = true prerequisites.
 --
--- This check doesn't verify the whole cluster config, only the
+-- First, it verifies that the given replicaset contains at least
+-- one non-anonymous replica.
+--
+-- The key idea of the rest of the checks is that an anonymous
+-- replica must be in the read-only mode.
+--
+-- Different failover modes control read-only/read-write mode in
+-- different ways, so we need specific checks for each of them in
+-- regard of an anonymous replica.
+--
+-- These checks don't verify the whole cluster config, only the
 -- given replicaset.
-local function validate_anon(found, peers)
+local function validate_anon(found, peers, failover, leader)
     -- failover: <any>
     --
     -- A replicaset can't consist of only anonymous replicas.
@@ -473,6 +482,105 @@ local function validate_anon(found, peers)
             'neither is connected to any other; this configuration is ' ..
             'forbidden, because it looks like there is no meaningful ' ..
             'use case'):format(found.replicaset_name, found.group_name), 0)
+    end
+
+    -- failover: off
+    --
+    -- An anonymous replica shouldn't be set to RW.
+    if failover == 'off' then
+        for peer_name, peer in pairs(peers) do
+            local is_anon =
+                instance_config:get(peer.iconfig_def, 'replication.anon')
+            local mode =
+                instance_config:get(peer.iconfig_def, 'database.mode')
+            if is_anon and mode == 'rw' then
+                error(('database.mode = "rw" is set for instance %q of ' ..
+                    'replicaset %q of group %q, but this option cannot be ' ..
+                    'used together with replication.anon = true'):format(
+                    peer_name, found.replicaset_name, found.group_name), 0)
+            end
+        end
+    end
+
+    -- failover: manual
+    --
+    -- An anonymous replica can't be a leader.
+    if failover == 'manual' and leader ~= nil then
+        assert(peers[leader] ~= nil)
+        local iconfig_def = peers[leader].iconfig_def
+        local is_anon = instance_config:get(iconfig_def, 'replication.anon')
+        if is_anon then
+            error(('replication.anon = true is set for instance %q of ' ..
+                'replicaset %q of group %q that is configured as a ' ..
+                'leader; a leader can not be an anonymous replica'):format(
+                leader, found.replicaset_name, found.group_name), 0)
+        end
+    end
+
+    -- failover: election
+    --
+    -- An anonymous replica can be in `election_mode: off`, but
+    -- not any other.
+    --
+    -- Let's look on illustrative examples below. The following
+    -- one works.
+    --
+    -- replicasets:
+    --   r-001:
+    --     replication:
+    --       failover: election
+    --     instances:
+    --       i-001: {}       # candidate
+    --       i-002: {}       # candidate
+    --       i-003: {}       # candidate
+    --       i-004:          # off --------+
+    --         replication:  #             +--> OK
+    --           anon: true  # anonymous --+
+    --
+    -- All the non-anonymous instances have effective default
+    -- 'replication.election_mode: candidate', while anonymous
+    -- replicas default to 'off'.
+    --
+    -- However, the following example doesn't work.
+    --
+    -- replicasets:
+    --   r-001:
+    --     replication:
+    --       failover: election
+    --       election_mode: candidate # !!
+    --     instances:
+    --       i-001: {}       # candidate
+    --       i-002: {}       # candidate
+    --       i-003: {}       # candidate
+    --       i-004:          # candidate --+
+    --         replication:  #             +--> error
+    --           anon: true  # anonymous --+
+    --
+    -- The default 'off' is not applied, because the explicit
+    -- 'candidate' value is set in the replicaset scope. It can be
+    -- fixed like so:
+    --
+    -- <...>
+    --       i-004:
+    --         replication:
+    --           anon: true
+    --           election_mode: off # !!
+    if failover == 'election' then
+        for peer_name, peer in pairs(peers) do
+            local is_anon = instance_config:get(peer.iconfig_def,
+                'replication.anon')
+            local election_mode = instance_config:get(peer.iconfig_def,
+                'replication.election_mode')
+            if is_anon and election_mode ~= nil and election_mode ~= 'off' then
+                error(('replication.election_mode = %q is set for instance ' ..
+                    '%q of replicaset %q of group %q, but this option ' ..
+                    'cannot be used together with replication.anon = true; ' ..
+                    'consider setting replication.election_mode = "off" ' ..
+                    'explicitly for this instance'):format(
+                    election_mode, peer_name, found.replicaset_name,
+                    found.group_name), 0)
+            end
+        end
     end
 end
 
@@ -580,7 +688,12 @@ local function new(iconfig, cconfig, instance_name)
 
     -- Verify that there is at least one non-anonymous replica in
     -- the given replicaset.
-    validate_anon(found, peers)
+    --
+    -- Verify that `replication.anon: true` (if any) doesn't
+    -- conflict with any other option (say, database.mode,
+    -- <replicaset>.leader or replication.election_mode).
+    validate_anon(found, peers, failover, leader)
+
 
     -- Verify "replication.failover" = "supervised" strategy
     -- prerequisites.

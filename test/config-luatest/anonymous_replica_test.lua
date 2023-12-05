@@ -195,3 +195,139 @@ g.test_all_anonymous = function(g)
         is no meaningful use case
     ]]))
 end
+
+-- Verify that an anonymous replica can't be configured in
+-- read-write mode.
+--
+-- The whole replicaset refuses to start if this misconfiguration
+-- is found.
+--
+-- replication.failover: off
+g.test_anonymous_replica_rw_mode = function(g)
+    local config = cbuilder.new()
+        :add_instance('instance-001', {
+            database = {
+                mode = 'rw',
+            },
+        })
+        :add_instance('instance-002', {})
+        :add_instance('instance-003', {})
+        :add_instance('instance-004', {
+            database = {
+                mode = 'rw',
+            },
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+
+    replicaset.startup_error(g, config, toline([[
+        database.mode = "rw" is set for instance "instance-004" of replicaset
+        "replicaset-001" of group "group-001", but this option cannot be used
+        together with replication.anon = true
+    ]]))
+end
+
+-- Verify that an anonymous replica can't be assigned as a leader.
+--
+-- The whole replicaset refuses to start if this misconfiguration
+-- is found.
+--
+-- replication.failover: manual
+g.test_anonymous_replica_leader = function(g)
+    local config = cbuilder.new()
+        :set_replicaset_option('replication.failover', 'manual')
+        :set_replicaset_option('leader', 'instance-004')
+        :add_instance('instance-001', {})
+        :add_instance('instance-002', {})
+        :add_instance('instance-003', {})
+        :add_instance('instance-004', {
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+
+    replicaset.startup_error(g, config, toline([[
+        replication.anon = true is set for instance "instance-004" of replicaset
+        "replicaset-001" of group "group-001" that is configured as a leader; a
+        leader can not be an anonymous replica
+    ]]))
+end
+
+-- Verify that an anonymous replica can't be configured with
+-- replication.election_mode parameter other than null or "off".
+--
+-- The whole replicaset refuses to start if this misconfiguration
+-- is found.
+--
+-- replication.failover: election
+g.test_anonymous_replica_election_mode_other_than_off = function(g)
+    local error_t = toline([[
+        replication.election_mode = %q is set for instance "instance-004" of
+        replicaset "replicaset-001" of group "group-001", but this option cannot
+        be used together with replication.anon = true; consider setting
+        replication.election_mode = "off" explicitly for this instance
+    ]])
+
+    for _, election_mode in ipairs({'candidate', 'voter', 'manual'}) do
+        local config = cbuilder.new()
+            :set_replicaset_option('replication.failover', 'election')
+            :add_instance('instance-001', {})
+            :add_instance('instance-002', {})
+            :add_instance('instance-003', {})
+            :add_instance('instance-004', {
+                replication = {
+                    anon = true,
+                    election_mode = election_mode,
+                },
+            })
+            :config()
+
+        replicaset.startup_error(g, config, error_t:format(election_mode))
+    end
+end
+
+-- Verify that the election mode defaults to 'off' for an
+-- anonymous replica in a replicaset with election failover.
+g.test_anonymous_replica_election_mode_off = function(g)
+    -- Three non-anonymous instances, two anonymous replicas.
+    --
+    -- The replicaset is in `failover: election` mode.
+    local config = cbuilder.new()
+        :set_replicaset_option('replication.failover', 'election')
+        :add_instance('instance-001', {})
+        :add_instance('instance-002', {})
+        :add_instance('instance-003', {})
+        :add_instance('instance-004', {
+            replication = {
+                anon = true,
+            },
+        })
+        :add_instance('instance-005', {
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+
+    local replicaset = replicaset.new(g, config)
+    replicaset:start()
+
+    local function verify_election_mode_candidate()
+        t.assert_equals(box.cfg.election_mode, 'candidate')
+    end
+
+    local function verify_election_mode_off()
+        t.assert_equals(box.cfg.election_mode, 'off')
+    end
+
+    -- Verify that non-anonymous instances have election mode
+    -- 'candidate', while anonymous replicas are 'off'.
+    replicaset['instance-001']:exec(verify_election_mode_candidate)
+    replicaset['instance-002']:exec(verify_election_mode_candidate)
+    replicaset['instance-003']:exec(verify_election_mode_candidate)
+    replicaset['instance-004']:exec(verify_election_mode_off)
+    replicaset['instance-005']:exec(verify_election_mode_off)
+end
