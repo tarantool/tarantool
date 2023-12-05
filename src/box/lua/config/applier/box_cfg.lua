@@ -646,10 +646,9 @@ local function apply(config)
         -- already registered. We should decide what to do in the
         -- case.
         --
-        -- TODO: An anonymous replica is not to be registered in
+        -- Note: an anonymous replica is not to be registered in
         -- _cluster. So, it can subscribe to such a replicaset.
-        -- We should decide what to do in the case.
-        if in_replicaset and not has_snap then
+        if in_replicaset and not has_snap and not is_anon then
             local has_rw = false
             if failover == 'off' then
                 for _, peer_name in ipairs(configdata:peers()) do
