@@ -1,3 +1,3 @@
-## feature/misc
+## bugfix/misc
 
-* Updated luarocks version to 3.9.2 (gh-6597).
+* Updated luarocks version to 3.9.2 to address rockspec security issues (gh-6587).
