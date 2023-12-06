@@ -14,7 +14,7 @@ import subprocess
 # Ensure certain order for known sections.
 SECTIONS_TOP = ['core', 'memtx', 'vinyl', 'replication', 'swim',
                 'raft', 'luajit', 'lua', 'sql']
-SECTIONS_BOTTOM = ['build', 'testing', 'misc']
+SECTIONS_BOTTOM = ['build', 'misc']
 
 # Prettify headers, apply the ordering.
 REDEFINITIONS = {
@@ -284,9 +284,10 @@ class Parser:
         if line.startswith('## '):
             header = line.split(' ', 1)[1].strip()
             fst = header.split('/', 1)[0]
-            if fst not in ('feature', 'bugfix'):
+            if fst not in ('feature', 'bugfix', 'tools', 'testing'):
                 raise self.error("Unknown header: '{}', should be "
-                                 "'feature/<...>' or 'bugfix/<...>'"
+                                 "'feature/<...>' or 'bugfix/<...>' or"
+                                 "'tools/<...>' or 'testing/<...>'"
                                  .format(header))
             self.header = header
             self._process = self._wait_content
