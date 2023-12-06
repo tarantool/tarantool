@@ -68,9 +68,6 @@ g.test_source_env = function()
     treegen.write_script(dir, 'main.lua', script)
 
     local exp = {
-        config = {
-            version = 'dev',
-        },
         log = {
             level = 'info',
         },

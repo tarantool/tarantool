@@ -40,46 +40,6 @@ local urilib = require('uri')
 --
 --   Create a parent directory for the given file before box.cfg().
 
-local CONFIG_VERSION = 'dev'
-
--- Any configuration data should contain a version of the config
--- schema for which it is written.
---
--- However, it is allowed only in the global scope of the cluster
--- config and in the instance config.
---
--- * In the instance config: must be present.
---
---   TODO: This check is disabled for the early config schema
---   version, because the schema is often changed and there is no
---   schema evolution support yet.
--- * In the cluster config: must be present in the global scope.
---
---   TODO: This check is disabled as well, see above.
--- * In the cluster config: must not be present in the other
---   scopes (group, replicaset, instance).
--- * If present, must correspond to one of supported config
---   versions, but is it validated by the config.version schema
---   node definition.
-local function validate_config_version(data, w)
-    -- scope == nil means that it is the instance config.
-    local scope = w.schema.scope
-    if scope == nil or scope == 'global' then
-        -- Must be present.
-        if data.config == nil or data.config.version == nil then
-            -- TODO: Enable this check closer to 3.0.0 release.
-            -- w.error('config.version is mandatory')
-            return
-        end
-    else
-        -- Must not be present.
-        assert(scope == 'group' or scope == 'replicaset' or scope == 'instance')
-        if data.config ~= nil and data.config.version ~= nil then
-            w.error('config.version must not be present in the %s scope', scope)
-        end
-    end
-end
-
 -- Verify that replication.failover option is not present in the
 -- instance scope of the cluster config.
 local function validate_replication_failover(data, w)
@@ -104,12 +64,6 @@ local function validate_replication_failover(data, w)
 end
 
 local function validate_outmost_record(data, w)
-    -- Ensure that the function is called for the outmost record
-    -- of the instance_config schema, where the scope is present
-    -- in the cluster config.
-    assert(w.schema.config_version ~= nil)
-
-    validate_config_version(data, w)
     validate_replication_failover(data, w)
 end
 
@@ -407,9 +361,6 @@ end
 
 return schema.new('instance_config', schema.record({
     config = schema.record({
-        version = schema.enum({
-            CONFIG_VERSION,
-        }),
         reload = schema.enum({
             'auto',
             'manual',
@@ -2147,10 +2098,6 @@ return schema.new('instance_config', schema.record({
     --   reach from the 'validate' function of a nested schema
     --   node.
     validate = validate_outmost_record,
-    -- Store the config schema version right in the outmost schema
-    -- node as an annotation. It simplifies accesses from other
-    -- code.
-    config_version = CONFIG_VERSION,
 }), {
     methods = {
         instance_uri = instance_uri,

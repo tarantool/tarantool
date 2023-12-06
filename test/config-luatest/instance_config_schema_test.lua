@@ -59,24 +59,11 @@ g.test_config = function()
     t.tarantool.skip_if_enterprise()
     local iconfig = {
         config = {
-            version = 'dev',
             reload = 'auto',
         },
     }
     instance_config:validate(iconfig)
     validate_fields(iconfig.config, instance_config.schema.fields.config)
-
-    iconfig = {
-        config = {
-            version = '0.0.0',
-            reload = 'auto',
-        },
-    }
-    local err = '[instance_config] config.version: Got 0.0.0, but only the '..
-                'following values are allowed: dev'
-    t.assert_error_msg_equals(err, function()
-        instance_config:validate(iconfig)
-    end)
 
     local exp = {
         reload = 'auto',
@@ -93,7 +80,6 @@ g.test_config_enterprise = function()
     t.tarantool.skip_if_not_enterprise()
     local iconfig = {
         config = {
-            version = 'dev',
             reload = 'auto',
             etcd = {
                 prefix = '/one',
@@ -137,18 +123,6 @@ g.test_config_enterprise = function()
     }
     instance_config:validate(iconfig)
     validate_fields(iconfig.config, instance_config.schema.fields.config)
-
-    iconfig = {
-        config = {
-            version = '0.0.0',
-            reload = 'auto',
-        },
-    }
-    local err = '[instance_config] config.version: Got 0.0.0, but only the '..
-                'following values are allowed: dev'
-    t.assert_error_msg_equals(err, function()
-        instance_config:validate(iconfig)
-    end)
 
     local exp = {
         reload = 'auto',
