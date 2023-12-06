@@ -170,19 +170,25 @@ g.test_names_are_set_after_reload = function(g)
         instance_uuid = g.uuids['instance-002']
     }
 
+    -- Reload config on instance-001 and wait for the name to be assigned
     local cfg = yaml.encode(g.config)
     opts.config_file = treegen.write_script(g.dir, 'cfg.yaml', cfg)
-    g.instance_2 = server:new(fun.chain(opts, {alias = 'instance-002'}):tomap())
-
-    g.instance_2:start({wait_until_ready = false})
-    g.instance_1:exec(function()
+    g.instance_1:exec(function(uuid)
         require('config'):reload()
-    end)
+        t.helpers.retrying({timeout = 20}, function()
+            t.assert_equals(box.space._cluster.index.uuid:select(uuid)[1][3],
+                            'instance-002')
+        end)
+    end, {g.uuids['instance-002']})
+
+    g.instance_1:grep_log(msg:format('instance-002', g.uuids['instance-002']),
+                          1024, {filename = g.dir .. log_postfix})
+
+    -- Start instance-002
+    g.instance_2 = server:new(fun.chain(opts, {alias = 'instance-002'}):tomap())
+    g.instance_2:start({wait_until_ready = false})
 
     g.instance_2:wait_until_ready()
     g.instance_2:wait_for_vclock_of(g.instance_1)
     g.instance_2:exec(check_names, {rs_name, 'instance-002', g.uuids})
-
-    g.instance_1:grep_log(msg:format('instance-002', g.uuids['instance-002']),
-                          1024, {filename = g.dir .. log_postfix})
 end
