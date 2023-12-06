@@ -105,7 +105,10 @@ Server.constructor_checks = fun.chain(Server.constructor_checks, {
 function Server:initialize()
     if self.config_file ~= nil then
         self.command = arg[-1]
-        self.args = {'--name', self.alias}
+
+        self.args = fun.chain(self.args or {}, {
+            '--name', self.alias
+        }):totable()
 
         if self.config_file ~= '' then
             table.insert(self.args, '--config')
