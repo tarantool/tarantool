@@ -113,7 +113,6 @@ local function verify_configdata()
                 type = "integer",
                 computed = {
                     annotations = {
-                        config_version = "dev",
                         box_cfg = "sql_cache_size",
                     },
                 },
@@ -128,7 +127,6 @@ local function verify_configdata()
                 type = "integer",
                 computed = {
                     annotations = {
-                        config_version = "dev",
                         box_cfg = "memtx_memory",
                     },
                 },
