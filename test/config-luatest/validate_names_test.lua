@@ -82,9 +82,13 @@ local function cluster_initialize(g, with_names)
     g.server = server:new({alias = 'server'})
     g.server:start()
     g.server:exec(function()
-        -- Simulate startup procedure for configdata.
-        box.cfg = function() end
-
+        rawset(_G, 'box_cfg_clean', function()
+            rawset(_G, 'old_box_cfg', box.cfg)
+            box.cfg = function() end
+        end)
+        rawset(_G, 'box_cfg_restore', function()
+            box.cfg = _G.old_box_cfg
+        end)
         -- In order not to call require on every test
         rawset(_G, 'cluster_config', require('internal.config.cluster_config'))
         rawset(_G, 'configdata', require('internal.config.configdata'))
@@ -102,6 +106,7 @@ end)
 
 g_names.test_replicaset_uuid_mismatch = function(g)
     g.server:exec(function(config)
+        _G.box_cfg_clean()
         local rs = config.groups['group-001'].replicasets['replicaset-001']
         rs.database.replicaset_uuid = require('uuid').str()
 
@@ -109,11 +114,13 @@ g_names.test_replicaset_uuid_mismatch = function(g)
         t.assert_error_msg_contains('Replicaset UUID mismatch', function()
             return _G.configdata.new(iconfig, config, 'instance-001')
         end)
+        _G.box_cfg_restore()
     end, {g.config})
 end
 
 g_names.test_replicaset_name_mismatch = function(g)
     g.server:exec(function(config)
+        _G.box_cfg_clean()
         local rs = config.groups['group-001'].replicasets['replicaset-001']
         config.groups['group-001'].replicasets['replicaset-002'] = rs
         config.groups['group-001'].replicasets['replicaset-001'] = nil
@@ -122,21 +129,25 @@ g_names.test_replicaset_name_mismatch = function(g)
         t.assert_error_msg_contains('Replicaset name mismatch', function()
             return _G.configdata.new(iconfig, config, 'instance-001')
         end)
+        _G.box_cfg_restore()
     end, {g.config})
 end
 
 g_names.test_instance_uuid_mismatch = function(g)
     g.server:exec(function(config)
+        _G.box_cfg_clean()
         -- Workdir has snapshot files for instance-001.
         local iconfig = _G.cluster_config:instantiate(config, 'instance-002')
         t.assert_error_msg_contains('Instance UUID mismatch', function()
             return _G.configdata.new(iconfig, config, 'instance-002')
         end)
+        _G.box_cfg_restore()
     end, {g.config})
 end
 
 g_names.test_instance_name_mismatch = function(g)
     g.server:exec(function(config)
+        _G.box_cfg_clean()
         -- UUID is correct, but name is not
         local rs = config.groups['group-001'].replicasets['replicaset-001']
         rs.instances['instance-003'] = rs.instances['instance-001']
@@ -146,6 +157,7 @@ g_names.test_instance_name_mismatch = function(g)
         t.assert_error_msg_contains('Instance name mismatch', function()
             return _G.configdata.new(iconfig, config, 'instance-003')
         end)
+        _G.box_cfg_restore()
     end, {g.config})
 end
 
@@ -161,6 +173,7 @@ end)
 
 g_no_names.test_missing_names = function(g)
     g.server:exec(function(config)
+        _G.box_cfg_clean()
         -- Name should be missing even if no uuid was passed.
         local rs = config.groups['group-001'].replicasets['replicaset-001']
         rs.instances['instance-002'].database = nil
@@ -171,11 +184,13 @@ g_no_names.test_missing_names = function(g)
         t.assert_not_equals(missing._peers['instance-001'], nil)
         t.assert_not_equals(missing._peers['instance-002'], nil)
         t.assert_not_equals(missing['replicaset-001'], nil)
+        _G.box_cfg_restore()
     end, {g.config})
 end
 
 g_no_names.test_instance_uuid_require = function(g)
     g.server:exec(function(config)
+        _G.box_cfg_clean()
         local rs = config.groups['group-001'].replicasets['replicaset-001']
         rs.instances['instance-001'].database = nil
 
@@ -184,11 +199,13 @@ g_no_names.test_instance_uuid_require = function(g)
         t.assert_error_msg_contains(msg, function()
             return _G.configdata.new(iconfig, config, 'instance-001')
         end)
+        _G.box_cfg_restore()
     end, {g.config})
 end
 
 g_no_names.test_replicaset_uuid_require = function(g)
     g.server:exec(function(config)
+        _G.box_cfg_clean()
         local rs = config.groups['group-001'].replicasets['replicaset-001']
         rs.database = nil
 
@@ -197,5 +214,6 @@ g_no_names.test_replicaset_uuid_require = function(g)
         t.assert_error_msg_contains(msg, function()
             return _G.configdata.new(iconfig, config, 'instance-001')
         end)
+        _G.box_cfg_restore()
     end, {g.config})
 end
