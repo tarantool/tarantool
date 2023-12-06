@@ -90,8 +90,7 @@ local names_state = {
 -- from box.info) and which have not be alerted already.
 local function names_alert_missing(config, missing_names)
     local msg = 'box_cfg.apply: name %s for %s uuid is missing from the ' ..
-                'snapshot. It will be automatically set when master switches' ..
-                ' to Read Write mode'
+                'snapshot. It will be automatically set when possible.'
     local replicaset_name = config._configdata._replicaset_name
     if missing_names[replicaset_name] ~= nil and
        config._alerts[replicaset_name] == nil then
@@ -158,13 +157,15 @@ local function missing_names_is_empty(missing_names, replicaset_name)
            table.equals(missing_names._peers, {})
 end
 
-local function names_on_rw_transit()
+local function names_try_set_missing()
     local configdata = names_state.config._configdata
     local replicaset_name = configdata._replicaset_name
     local missing_names = configdata:missing_names()
 
-    if missing_names_is_empty(missing_names, replicaset_name) then
-        -- Somebody have done work for us, nothing to update.
+    if box.info.ro or missing_names_is_empty(missing_names,
+                                             replicaset_name) then
+        -- Somebody have done work for us, nothing to update or we're not
+        -- a rw, which is possible if the function was invoked after reload.
         return
     end
 
@@ -186,10 +187,10 @@ end
 
 local function names_rw_watcher()
     return box.watch('box.status', function(_, status)
-        -- It's ok, if names_on_rw_transit will be triggered
+        -- It's ok, if names_try_set_missing will be triggered
         -- several times. It's NoOp after first execution.
         if status.is_ro == false then
-            schedule_task(names_on_rw_transit)
+            schedule_task(names_try_set_missing)
         end
     end)
 end
@@ -270,6 +271,10 @@ local function names_apply(config, missing_names, schema_version)
     -- Even if everything is configured we try to make alerts one
     -- more time, as new instances without names may be found.
     names_alert_missing(config, missing_names)
+    -- Don't wait for box.status to change, we may be already rw, set names
+    -- on reload, if it's possible and needed.
+    names_try_set_missing()
+
     if names_state.is_configured then
         -- All triggers are already configured, nothing to do, but wait.
         return
