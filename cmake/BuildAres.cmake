@@ -11,6 +11,7 @@ macro(ares_build)
     endif()
 
     set(ARES_CMAKE_FLAGS "-DCARES_STATIC=ON")
+    list(APPEND ARES_CMAKE_FLAGS "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
     list(APPEND ARES_CMAKE_FLAGS "-DCARES_SHARED=OFF")
     list(APPEND ARES_CMAKE_FLAGS "-DCARES_BUILD_TOOLS=OFF")
     # We build both static and shared versions of curl, so ares

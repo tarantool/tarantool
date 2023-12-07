@@ -11,6 +11,10 @@ macro(libeio_build)
         set(eio_compile_flags
             "${eio_compile_flags} -DHAVE_SYS_PRCTL_H -DHAVE_PRCTL_SET_NAME")
     endif ()
+    if (TARANTOOL_DEBUG)
+        set(eio_compile_flags
+            "${eio_compile_flags} ${CMAKE_C_FLAGS_DEBUG}")
+    endif (TARANTOOL_DEBUG)
 
     set(eio_src
         ${PROJECT_SOURCE_DIR}/third_party/tarantool_eio.c

@@ -185,11 +185,14 @@ macro(curl_build)
     # catch the symbols may require extra work.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_ZSTD=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DLIBCURL_OUTPUT_NAME=libcurl")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_CURLDEBUG=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_DEBUG=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_CURLDEBUG=${TARANTOOL_DEBUG}")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_DEBUG=${TARANTOOL_DEBUG}")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_MSH3=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_WEBSOCKETS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_UNITY_BUILD=OFF")
+    # Note that CMake build does not allow build curl and libcurl debug
+    # enabled, see https://github.com/curl/curl/blob/master/docs/INSTALL.cmake
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
 
     # We need PIC at least to enable build for Fedora on
     # ARM64 CPU. Without it configuration with Fedora
