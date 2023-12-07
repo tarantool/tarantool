@@ -206,6 +206,15 @@ macro(curl_build)
     # libcurl-d.a. We use this name below.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_DEBUG_POSTFIX=")
 
+    # Disables 'install' targets.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_INSTALL=OFF")
+
+    # Disables local binding support.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_BINDLOCAL=OFF")
+
+    # Disables headers-api support.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_HEADERS_API=OFF")
+
     include(ExternalProject)
     ExternalProject_Add(
         bundled-libcurl-project
