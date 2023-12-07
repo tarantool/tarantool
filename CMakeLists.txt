@@ -381,6 +381,10 @@ find_package_message(MODULE_LUAPATH "Lua package.path: ${MODULE_LUAPATH}"
 find_package_message(MODULE_LIBPATH "Lua package.cpath: ${MODULE_LIBPATH}"
     "${MODULE_LIBPATH}")
 
+set(TARANTOOL_DEBUG OFF)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(TARANTOOL_DEBUG ON)
+endif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 ##
 ## Third-Party libraries

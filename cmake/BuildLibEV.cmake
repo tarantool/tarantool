@@ -25,6 +25,10 @@ macro(libev_build)
         set(ev_compile_flags "${ev_compile_flags} -DEV_USE_KQUEUE")
     endif()
 
+    if (TARANTOOL_DEBUG)
+        set(ev_compile_flags "${ev_compile_flags} ${CMAKE_C_FLAGS_DEBUG}")
+    endif(TARANTOOL_DEBUG)
+
     list(APPEND ev_link_libraries "m")
     if (TARGET_OS_DEBIAN_FREEBSD)
         # libev depends on librt under kFreeBSD
