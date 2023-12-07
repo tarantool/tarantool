@@ -30,6 +30,11 @@ macro(zstd_build)
     if (CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
         set(zstd_cflags "${zstd_cflags} -Wno-implicit-fallthrough")
     endif()
+    if (TARANTOOL_DEBUG)
+        # See lib/common/debug.h,
+        # https://github.com/facebook/zstd/blob/7567769a7e8e8236a2015769a5083d0f090a654b/lib/common/debug.h#L21-L29
+        set(zstd_cflags "${zstd_cflags} -DDEBUG_LEVEL=2")
+    endif()
     set_source_files_properties(${zstd_src}
         PROPERTIES COMPILE_FLAGS ${zstd_cflags})
 
