@@ -34,48 +34,18 @@ Build-Depends: cdbs (>= 0.4.100), debhelper (>= 9), dpkg-dev (>= 1.16.1~),
  tzdata,
 # For third-party subprojects that are built with autotools.
  autoconf, automake, libtool,
+# For building testlib package
+ rsync
 Section: database
 Standards-Version: 4.5.1
 Homepage: http://tarantool.org/
 VCS-Browser: https://github.com/tarantool/tarantool
 VCS-Git: git://github.com/tarantool/tarantool.git
 
-Package: tarantool-common
-Architecture: all
-Priority: optional
-Conflicts: tarantool-common (<< 2.2.1),
- tarantool-lts-modules,
- tarantool-lts-client,
- tarantool-lts-postgresql-module,
- tarantool-lts-mysql-module,
- tarantool-dbg (<< 1.5.2),
- tarantool-client (<< 1.6~),
- tarantool-client-dbg (<< 1.6~),
- tarantool-plugins (<< 1.6~),
- tarantool-mysql-plugin (<< 1.6~),
- tarantool-postgresql-plugin (<< 1.6~),
- tarantool-modules,
- tarantool-mysql-module,
- tarantool-postgresql-module,
- libtarantool-dev (<< 1.6~)
-Replaces: tarantool-common (<< 2.2.1), tarantool-lts-common
-Depends: ${misc:Depends}, adduser, lsb-base,
-# Deps for built-in package manager
-# https://github.com/tarantool/tarantool/issues/2612
- openssl
-Recommends: tarantool-dev, git, build-essential, cmake, tt
-Description: Tarantool in-memory database - common files
- Tarantool is an in-memory database and Lua application server.
- This package provides scripts to work with tarantool configuration
- and log files.
-
 Package: tarantool
 Architecture: i386 amd64 armhf arm64
 Priority: optional
-Depends: ${shlibs:Depends}, ${misc:Depends}, netbase,
-  openssl, tarantool-common (>= 2.2.1), tzdata,
-# libcurl dependencies (except ones we have already)
- zlib1g
+Depends: ${shlibs:Depends}, ${misc:Depends}, tzdata
 Replaces: tarantool-lts
 Conflicts: tarantool-lts-modules,
  tarantool-lts-postgresql-module,
@@ -123,6 +93,17 @@ Conflicts: tarantool-lts-dev,
  tarantool-mysql-plugin (<< 1.6~),
  tarantool-postgresql-plugin (<< 1.6~),
  libtarantool-dev (<< 1.6~)
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ tarantool (= ${binary:Version})
+Description: Tarantool in-memory database - development headers
+ Tarantool is an in-memory database and Lua application server.
+ This package provides server development files needed to build pluggable
+ modules.
+
+Package: tarantool-testlib
+Architecture: i386 amd64 armhf arm64
+Priority: optional
+Section: libdevel
 Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool (= ${binary:Version})
 Description: Tarantool in-memory database - development headers
