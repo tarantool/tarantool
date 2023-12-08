@@ -246,8 +246,7 @@ enum snapshot_recovery_state {
  * @retval 0 success
  */
 static int
-memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
-				  struct xrow_header *row,
+memtx_engine_recover_snapshot_row(struct xrow_header *row,
 				  enum snapshot_recovery_state *state);
 
 int
@@ -272,7 +271,7 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
 	while ((rc = xlog_cursor_next(&cursor, &row, force_recovery)) == 0) {
 		row.lsn = signature;
-		rc = memtx_engine_recover_snapshot_row(memtx, &row, &state);
+		rc = memtx_engine_recover_snapshot_row(&row, &state);
 		if (state == DONE_RECOVERING_SYSTEM_SPACES)
 			force_recovery = memtx->force_recovery;
 		if (rc < 0) {
@@ -368,8 +367,7 @@ snapshot_recovery_state_update(enum snapshot_recovery_state *state,
 }
 
 static int
-memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
-				  struct xrow_header *row,
+memtx_engine_recover_snapshot_row(struct xrow_header *row,
 				  enum snapshot_recovery_state *state)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
@@ -395,7 +393,7 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	if (space == NULL)
 		goto log_request;
 	/* memtx snapshot must contain only memtx spaces */
-	if (space->engine != (struct engine *)memtx) {
+	if ((space->engine->flags & ENGINE_CHECKPOINT_BY_MEMTX) == 0) {
 		diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 		goto log_request;
 	}
@@ -698,7 +696,7 @@ memtx_engine_bootstrap(struct engine *engine)
 	struct xrow_header row;
 	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
 	while ((rc = xlog_cursor_next(&cursor, &row, true)) == 0) {
-		rc = memtx_engine_recover_snapshot_row(memtx, &row, &state);
+		rc = memtx_engine_recover_snapshot_row(&row, &state);
 		if (rc < 0)
 			break;
 	}
@@ -799,7 +797,7 @@ static bool
 checkpoint_space_filter(struct space *space, void *arg)
 {
 	(void)arg;
-	return space_is_memtx(space) &&
+	return (space->engine->flags & ENGINE_CHECKPOINT_BY_MEMTX) != 0 &&
 		space_index(space, 0) != NULL;
 }
 
@@ -1240,7 +1238,7 @@ static bool
 memtx_join_space_filter(struct space *space, void *arg)
 {
 	(void)arg;
-	return space_is_memtx(space) &&
+	return (space->engine->flags & ENGINE_JOIN_BY_MEMTX) != 0 &&
 	       !space_is_local(space) &&
 	       space_index(space, 0) != NULL;
 }
@@ -1621,7 +1619,9 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 
 	memtx->base.vtab = &memtx_engine_vtab;
 	memtx->base.name = "memtx";
-	memtx->base.flags = ENGINE_SUPPORTS_READ_VIEW;
+	memtx->base.flags = (ENGINE_SUPPORTS_READ_VIEW |
+			     ENGINE_CHECKPOINT_BY_MEMTX |
+			     ENGINE_JOIN_BY_MEMTX);
 
 	memtx->func_key_format = simple_tuple_format_new(
 		&memtx_tuple_format_vtab, &memtx->base, NULL, 0);
