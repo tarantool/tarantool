@@ -263,6 +263,16 @@ enum {
 	 * Set if the engine supports creation of a read view.
 	 */
 	ENGINE_SUPPORTS_READ_VIEW = 1 << 1,
+	/**
+	 * Set if checkpointing is implemented by the memtx engine.
+	 * Engine setting this flag must support read views.
+	 */
+	ENGINE_CHECKPOINT_BY_MEMTX = 1 << 2,
+	/**
+	 * Set if replica join is implemented by the memtx engine.
+	 * Engine setting this flag must support read views.
+	 */
+	ENGINE_JOIN_BY_MEMTX = 1 << 3,
 };
 
 struct engine {
