@@ -80,6 +80,7 @@
 #include "box/lua/space_upgrade.h"
 #include "box/lua/wal_ext.h"
 #include "box/lua/trigger.h"
+#include "box/lua/config/utils/expression_lexer.h"
 #include "box/lua/failover.h"
 #include "box/lua/integrity.h"
 
@@ -886,6 +887,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_flightrec_init(L);
 	box_lua_trigger_init(L);
 	box_lua_integrity_init(L);
+	box_lua_expression_lexer_init(L);
 	luaopen_net_box(L);
 	lua_pop(L, 1);
 	tarantool_lua_console_init(L);

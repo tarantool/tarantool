@@ -295,6 +295,7 @@ set(box_sources
     lua/func_adapter.c
     lua/tuple_format.c
     lua/trigger.c
+    lua/config/utils/expression_lexer.c
     ${bin_sources})
 
 if(ENABLE_AUDIT_LOG)
