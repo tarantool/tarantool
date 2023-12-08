@@ -331,6 +331,10 @@ if(ENABLE_INTEGRITY)
     list(APPEND box_sources ${INTEGRITY_SOURCE})
 endif()
 
+if(ENABLE_MEMCS_ENGINE)
+    list(APPEND box_sources ${MEMCS_ENGINE_SOURCES})
+endif()
+
 add_library(box STATIC ${box_sources})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
