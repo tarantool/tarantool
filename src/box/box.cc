@@ -55,6 +55,7 @@
 #include "engine.h"
 #include "memtx_engine.h"
 #include "memtx_space.h"
+#include "memcs_engine.h"
 #include "sysview.h"
 #include "blackhole.h"
 #include "service_engine.h"
@@ -4776,6 +4777,8 @@ engine_init()
 				    box_on_indexes_built);
 	engine_register((struct engine *)memtx);
 	box_set_memtx_max_tuple_size();
+
+	memcs_engine_register();
 
 	struct sysview_engine *sysview = sysview_engine_new_xc();
 	engine_register((struct engine *)sysview);

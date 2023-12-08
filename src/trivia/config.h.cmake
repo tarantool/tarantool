@@ -286,6 +286,7 @@
 #cmakedefine ENABLE_WAL_EXT 1
 #cmakedefine ENABLE_READ_VIEW 1
 #cmakedefine ENABLE_SECURITY 1
+#cmakedefine ENABLE_MEMCS_ENGINE 1
 #cmakedefine ENABLE_COMPRESS_MODULE 1
 #cmakedefine ENABLE_ETCD_CLIENT 1
 #cmakedefine ENABLE_CONFIG_EXTRAS 1
