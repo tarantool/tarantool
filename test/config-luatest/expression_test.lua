@@ -1,4 +1,5 @@
 local lexer = require('internal.config.utils.expression_lexer')
+local expression = require('internal.config.utils.expression')
 local t = require('luatest')
 
 local g = t.group()
@@ -201,4 +202,225 @@ g.test_lexer = function()
     t.assert_error_msg_equals(exp_err(1, 8, 'invalid version literal: ' ..
         'expected 3 components, got 4'),
         lexer.split, '1.2.3.4')
+end
+
+-- Verify AST generation.
+g.test_parse_basic = function()
+    -- Verify operations priority and parentheses.
+    t.assert_equals(expression.parse(
+        '(a > b || c < d) && e <= 1.0.0 || 2.3.4 >= f || g != h && i == j'),
+        {
+            type = 'operation',
+            value = '||',
+            left = {
+                type = 'operation',
+                value = '||',
+                left = {
+                    type = 'operation',
+                    value = '&&',
+                    left = {
+                        type = 'operation',
+                        value = '||',
+                        left = {
+                            type = 'operation',
+                            value = '>',
+                            left = {
+                                type = 'variable',
+                                value = 'a',
+                            },
+                            right = {
+                                type = 'variable',
+                                value = 'b',
+                            },
+                        },
+                        right = {
+                            type = 'operation',
+                            value = '<',
+                            left = {
+                                type = 'variable',
+                                value = 'c',
+                            },
+                            right = {
+                                type = 'variable',
+                                value = 'd',
+                            },
+                        },
+                    },
+                    right = {
+                        type = 'operation',
+                        value = '<=',
+                        left = {
+                            type = 'variable',
+                            value = 'e',
+                        },
+                        right = {
+                            type = 'version_literal',
+                            value = '1.0.0',
+                        },
+                    },
+                },
+                right = {
+                    type = 'operation',
+                    value = '>=',
+                    left = {
+                        type = 'version_literal',
+                        value = '2.3.4',
+                    },
+                    right = {
+                        type = 'variable',
+                        value = 'f',
+                    },
+                },
+            },
+            right = {
+                type = 'operation',
+                value = '&&',
+                left = {
+                    type = 'operation',
+                    value = '!=',
+                    left = {
+                        type = 'variable',
+                        value = 'g',
+                    },
+                    right = {
+                        type = 'variable',
+                        value = 'h',
+                    },
+                },
+                right = {
+                    type = 'operation',
+                    value = '==',
+                    left = {
+                        type = 'variable',
+                        value = 'i',
+                    },
+                    right = {
+                        type = 'variable',
+                        value = 'j',
+                    },
+                },
+            },
+        })
+    -- A closing parenthesis is correctly consumed as an end of
+    -- an inner sub-expression.
+    t.assert_equals(expression.parse('((((1.0.0))))'), {
+        type = 'version_literal',
+        value = '1.0.0',
+    })
+    -- Left associativity of && and ||.
+    --
+    -- The comparison operations are also left associative, but
+    -- it doesn't matter. Sespite that `a >= b >= c` parses
+    -- successfully, such expressions don't pass a validation
+    -- stage.
+    t.assert_equals(expression.parse('a > b && b > c && c > d'), {
+        type = 'operation',
+        value = '&&',
+        left = {
+            type = 'operation',
+            value = '&&',
+            left = {
+                type = 'operation',
+                value = '>',
+                left = {
+                    type = 'variable',
+                    value = 'a',
+                },
+                right = {
+                    type = 'variable',
+                    value = 'b',
+                },
+            },
+            right = {
+                type = 'operation',
+                value = '>',
+                left = {
+                    type = 'variable',
+                    value = 'b',
+                },
+                right = {
+                    type = 'variable',
+                    value = 'c',
+                },
+            },
+        },
+        right = {
+            type = 'operation',
+            value = '>',
+            left = {
+                type = 'variable',
+                value = 'c',
+            },
+            right = {
+                type = 'variable',
+                value = 'd',
+            },
+        },
+    })
+    t.assert_equals(expression.parse('a > b || b > c || c > d'), {
+        type = 'operation',
+        value = '||',
+        left = {
+            type = 'operation',
+            value = '||',
+            left = {
+                type = 'operation',
+                value = '>',
+                left = {
+                    type = 'variable',
+                    value = 'a',
+                },
+                right = {
+                    type = 'variable',
+                    value = 'b',
+                },
+            },
+            right = {
+                type = 'operation',
+                value = '>',
+                left = {
+                    type = 'variable',
+                    value = 'b',
+                },
+                right = {
+                    type = 'variable',
+                    value = 'c',
+                },
+            },
+        },
+        right = {
+            type = 'operation',
+            value = '>',
+            left = {
+                type = 'variable',
+                value = 'c',
+            },
+            right = {
+                type = 'variable',
+                value = 'd',
+            },
+        },
+    })
+end
+
+-- A couple of incorrect expressions.
+g.test_parse_failure = function()
+    t.assert_error_msg_equals('Expected a string as an expression, got nil',
+        expression.parse)
+    t.assert_error_msg_equals('Expected a string as an expression, got number',
+        expression.parse, 1)
+    t.assert_error_msg_equals('Unexpected end of an expression',
+        expression.parse, '')
+    t.assert_error_msg_equals('Unexpected end of an expression',
+        expression.parse, '(4.0.0 <')
+    t.assert_error_msg_equals('Expected ")", got end of an expression',
+        expression.parse, '(4.0.0 < 5.0.0')
+    t.assert_error_msg_equals('Expected an operation, got "6.0.0"',
+        expression.parse, '(4.0.0 < 5.0.0 6.0.0')
+    t.assert_error_msg_equals('Expected an operation, got "("',
+        expression.parse, '(4.0.0 < 5.0.0 (')
+    t.assert_error_msg_equals('Unexpected token ">"',
+        expression.parse, '>')
+    t.assert_error_msg_equals('Expected end of an expression, got ")"',
+        expression.parse, '5.0.0 < 6.0.0)')
 end
