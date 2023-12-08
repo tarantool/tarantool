@@ -1165,6 +1165,19 @@ run_script_f(va_list ap)
 			break;
 		case 'e':
 			/*
+			 * Do not run the chunk given via -e
+			 * option if the integrity check is enabled.
+			 * XXX: Fortunately, -e and its argument
+			 * are stripped from the Lua <arg> table,
+			 * so this is "The Last Homely House"
+			 * where one can obtain this Lua chunk.
+			 * TODO: inform the user that -e Lua chunk
+			 * was not executed during the startup.
+			 */
+			if (integrity)
+				break;
+
+			/*
 			 * Execute chunk
 			 */
 			if (luaL_loadbuffer(L, optv[i + 1], strlen(optv[i + 1]),
