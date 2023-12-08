@@ -26,6 +26,7 @@ g.test_jsonify_table = function(g)
         exit_code = 0,
         stdout = '',
         stderr = 'foo: {"bar":"baz"}',
+        env = os.environ(),
     })
 end
 

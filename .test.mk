@@ -99,7 +99,8 @@ TEST_RUN_ENV_ASAN = ASAN=ON \
                     ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:$\
                                  detect_invalid_pointer_pairs=1:symbolize=1:$\
                                  detect_leaks=1:dump_instruction_bytes=1:$\
-                                 print_suppressions=0
+                                 print_suppressions=0:$\
+                                 abort_on_error=true
 LUAJIT_TEST_ENV_ASAN = LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
                        ASAN_OPTIONS=detect_invalid_pointer_pairs=1:$\
                                     detect_leaks=1:$\
@@ -107,7 +108,8 @@ LUAJIT_TEST_ENV_ASAN = LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
                                     heap_profile=0:$\
                                     print_suppressions=0:$\
                                     symbolize=1:$\
-                                    unmap_shadow_on_exit=1
+                                    unmap_shadow_on_exit=1:$\
+                                    abort_on_error=true
 
 # Release ASAN build
 

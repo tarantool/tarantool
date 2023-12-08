@@ -30,7 +30,8 @@ g.test = function()
     local handle, err = popen.new({tarantool_bin, '-e', script},
                                   {stdout = popen.opts.PIPE,
                                    stdin = popen.opts.DEVNULL,
-                                   stderr = popen.opts.DEVNULL})
+                                   stderr = popen.opts.DEVNULL,
+                                   env = os.environ()})
     assert(handle, err)
     g.handle = handle
     -- NB: Don't guess a good timeout, just use 60 seconds as

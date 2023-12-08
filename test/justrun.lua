@@ -94,6 +94,7 @@ function justrun.tarantool(dir, env, args, opts)
                                                  args_str)
     log.info(('Running a command: %s'):format(command))
     local mode = opts.stderr and 'rR' or 'r'
+    mode.env = os.environ()
     local ph = popen.shell(command, mode)
 
     local stderr_fiber
