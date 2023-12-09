@@ -492,3 +492,55 @@ g.test_validate_failure = function()
         t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
     end
 end
+
+g.test_evaluate = function()
+    local function eval(s, vars)
+        local ast = expression.parse(s)
+        expression.validate(ast, vars)
+        local res_1 = expression.evaluate(ast, vars)
+        local res_2 = expression.eval(s, vars)
+        t.assert_equals(res_1, res_2)
+        return res_1
+    end
+
+    t.assert_equals(eval('v > 1.0.0', {v = '0.0.1'}), false)
+    t.assert_equals(eval('v > 1.0.0', {v = '1.0.0'}), false)
+    t.assert_equals(eval('v > 1.0.0', {v = '1.0.1'}), true)
+    t.assert_equals(eval('v > 1.0.0', {v = '2.0.0'}), true)
+
+    t.assert_equals(eval('v < 1.0.0', {v = '0.0.1'}), true)
+    t.assert_equals(eval('v < 1.0.0', {v = '1.0.0'}), false)
+    t.assert_equals(eval('v < 1.0.0', {v = '1.0.1'}), false)
+    t.assert_equals(eval('v < 1.0.0', {v = '2.0.0'}), false)
+
+    t.assert_equals(eval('v >= 1.0.0', {v = '0.0.1'}), false)
+    t.assert_equals(eval('v >= 1.0.0', {v = '1.0.0'}), true)
+    t.assert_equals(eval('v >= 1.0.0', {v = '1.0.1'}), true)
+    t.assert_equals(eval('v >= 1.0.0', {v = '2.0.0'}), true)
+
+    t.assert_equals(eval('v <= 1.0.0', {v = '0.0.1'}), true)
+    t.assert_equals(eval('v <= 1.0.0', {v = '1.0.0'}), true)
+    t.assert_equals(eval('v <= 1.0.0', {v = '1.0.1'}), false)
+    t.assert_equals(eval('v <= 1.0.0', {v = '2.0.0'}), false)
+
+    t.assert_equals(eval('v == 1.0.0', {v = '0.0.1'}), false)
+    t.assert_equals(eval('v == 1.0.0', {v = '1.0.0'}), true)
+    t.assert_equals(eval('v == 1.0.0', {v = '1.0.1'}), false)
+    t.assert_equals(eval('v == 1.0.0', {v = '2.0.0'}), false)
+
+    t.assert_equals(eval('v != 1.0.0', {v = '0.0.1'}), true)
+    t.assert_equals(eval('v != 1.0.0', {v = '1.0.0'}), false)
+    t.assert_equals(eval('v != 1.0.0', {v = '1.0.1'}), true)
+    t.assert_equals(eval('v != 1.0.0', {v = '2.0.0'}), true)
+
+    local expr = 'v >= 3.1.0 && v < 3.2.0 || v >= 4.0.0'
+    t.assert_equals(eval(expr, {v = '3.0.0'}), false)
+    t.assert_equals(eval(expr, {v = '3.1.0'}), true)
+    t.assert_equals(eval(expr, {v = '3.1.1'}), true)
+    t.assert_equals(eval(expr, {v = '3.2.0'}), false)
+    t.assert_equals(eval(expr, {v = '4.0.0'}), true)
+    t.assert_equals(eval(expr, {v = '4.1.0'}), true)
+    t.assert_equals(eval(expr, {v = '5.1.0'}), true)
+
+    t.assert_equals(eval('1.10.0 > 1.2.0', {}), true)
+end

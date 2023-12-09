@@ -1,4 +1,4 @@
--- Parse C style expression.
+-- Evaluate C style expression.
 --
 -- The module implements Pratt's expression parsing algorithm.
 --
@@ -195,7 +195,72 @@ local function validate(node, vars)
     validate_expr(node, vars)
 end
 
+local function compare_version(a, b)
+    local av = a:split('.')
+    local bv = b:split('.')
+    assert(#av == 3)
+    assert(#bv == 3)
+    for i = 1, 3 do
+        local ac = tonumber(av[i])
+        local bc = tonumber(bv[i])
+        if ac ~= bc then
+            return ac - bc
+        end
+    end
+    return 0
+end
+
+local operations = {
+    ['||'] = function(a, b)
+        return a or b
+    end,
+    ['&&'] = function(a, b)
+        return a and b
+    end,
+    ['<'] = function(a, b)
+        return compare_version(a, b) < 0
+    end,
+    ['>'] = function(a, b)
+        return compare_version(a, b) > 0
+    end,
+    ['<='] = function(a, b)
+        return compare_version(a, b) <= 0
+    end,
+    ['>='] = function(a, b)
+        return compare_version(a, b) >= 0
+    end,
+    ['=='] = function(a, b)
+        return compare_version(a, b) == 0
+    end,
+    ['!='] = function(a, b)
+        return compare_version(a, b) ~= 0
+    end,
+}
+
+local function evaluate(node, vars)
+    if node.type == 'version_literal' then
+        return node.value
+    elseif node.type == 'variable' then
+        return vars[node.value]
+    elseif node.type == 'operation' then
+        local left = evaluate(node.left, vars)
+        local op = operations[node.value]
+        local right = evaluate(node.right, vars)
+        return op(left, right)
+    else
+        assert(false)
+    end
+end
+
+local function eval(s, vars)
+    local ast = parse(s)
+    validate(ast, vars)
+    return evaluate(ast, vars)
+end
+
 return {
     parse = parse,
     validate = validate,
+    evaluate = evaluate,
+    eval = eval,
 }
