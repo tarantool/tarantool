@@ -1,0 +1,24 @@
+conditional:
+- if: tarantool_version >= 3.99.0 && tarantool_version < 4.0.0
+  # This section shouldn't be validated and shouldn't be applied.
+  replication:
+    new_option: foo
+- if: tarantool_version < 3.99.0
+  # This section is to be applied.
+  process:
+    title: '{{ instance_name }} -- in upgrade'
+
+credentials:
+  users:
+    guest:
+      roles: [super]
+
+iproto:
+  listen: 'unix/:./{{ instance_name }}.iproto'
+
+groups:
+  group-001:
+    replicasets:
+      replicaset-001:
+        instances:
+          instance-001: {}
