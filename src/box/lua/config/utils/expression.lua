@@ -126,6 +126,76 @@ local function parse(s)
     return ast
 end
 
+local function validate_expr(node, vars)
+    -- luacheck: ignore 542 empty if branch
+    if node.type == 'version_literal' then
+        -- Nothing to validate.
+    elseif node.type == 'variable' then
+        local var = vars[node.value]
+        if type(var) == 'nil' then
+            error(('Unknown variable: %q'):format(node.value), 0)
+        end
+        if type(var) ~= 'string' then
+            error(('Variable %q has type %s, expected string'):format(
+                node.value, type(var)), 0)
+        end
+        if var == '' then
+            error(('Expected a version in variable %q, got an empty ' ..
+                'string'):format(node.value), 0)
+        end
+        local components = var:split('.')
+        for _, v in ipairs(components) do
+            if not v:match('^[0-9]+$') then
+                error(('Variable %q is not a version string'):format(
+                    node.value), 0)
+            end
+        end
+        if #components ~= 3 then
+            error(('Expected a three component version in variable %q, got ' ..
+                '%d components'):format(node.value, #components), 0)
+        end
+    elseif node.type == 'operation' then
+        local lbool = node.left.type == 'operation'
+        local rbool = node.right.type == 'operation'
+
+        local requires_boolean = {
+            ['||'] = true,
+            ['&&'] = true,
+        }
+        if requires_boolean[node.value] and not (lbool and rbool) then
+            error('A logical operator (&& or ||) accepts only boolean ' ..
+                'expressions as arguments', 0)
+        end
+
+        local requires_version_values = {
+            ['<'] = true,
+            ['>'] = true,
+            ['<='] = true,
+            ['>='] = true,
+            ['!='] = true,
+            ['=='] = true,
+        }
+        if requires_version_values[node.value] and (lbool or rbool) then
+            error('A comparison operator (<, >, <=, >=, !=, ==) requires ' ..
+                'version literals or variables as arguments', 0)
+        end
+
+        validate_expr(node.left, vars)
+        validate_expr(node.right, vars)
+    else
+        assert(false)
+    end
+end
+
+local function validate(node, vars)
+    if node.type ~= 'operation' then
+        error(('An expression should be a predicate, got %s'):format(
+            node.type), 0)
+    end
+    validate_expr(node, vars)
+end
+
 return {
     parse = parse,
+    validate = validate,
 }

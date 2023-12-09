@@ -424,3 +424,71 @@ g.test_parse_failure = function()
     t.assert_error_msg_equals('Expected end of an expression, got ")"',
         expression.parse, '5.0.0 < 6.0.0)')
 end
+
+g.test_validate_success = function()
+    local v = '1.0.0'
+    local vars = {a = v, b = v, c = v, d = v, e = v, f = v, g = v, h = v, i = v,
+        j = v}
+    local ast = expression.parse(
+        '(a > b || c < d) && e <= 1.0.0 || 2.3.4 >= f || g != h && i == j')
+    expression.validate(ast, vars)
+end
+
+g.test_validate_failure = function()
+    local ast = expression.parse('a')
+    local exp_err = 'An expression should be a predicate, got variable'
+    t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
+
+    local ast = expression.parse('1.0.0')
+    local exp_err = 'An expression should be a predicate, got version_literal'
+    t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
+
+    local ast = expression.parse('1.0.0 < 2.0.0 < 3.0.0')
+    local exp_err = 'A comparison operator (<, >, <=, >=, !=, ==) requires ' ..
+        'version literals or variables as arguments'
+    t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
+
+    local ast = expression.parse('1.0.0 == 2.0.0 == 3.0.0')
+    local exp_err = 'A comparison operator (<, >, <=, >=, !=, ==) requires ' ..
+        'version literals or variables as arguments'
+    t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
+
+    local ast = expression.parse('1.0.0 != 2.0.0 != 3.0.0')
+    local exp_err = 'A comparison operator (<, >, <=, >=, !=, ==) requires ' ..
+        'version literals or variables as arguments'
+    t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
+
+    local ast = expression.parse('x && 2.0.0')
+    local exp_err = 'A logical operator (&& or ||) accepts only boolean ' ..
+        'expressions as arguments'
+    t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
+
+    local ast = expression.parse('x > 0.0.0')
+    local exp_err = 'Unknown variable: "x"'
+    t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
+
+    local vars = {x = 1}
+    local ast = expression.parse('x > 0.0.0')
+    local exp_err = 'Variable "x" has type number, expected string'
+    t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
+
+    local vars = {x = ''}
+    local ast = expression.parse('x > 0.0.0')
+    local exp_err = 'Expected a version in variable "x", got an empty string'
+    t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
+
+    for _, x in ipairs({'.1', '1.', 'x', ' 1', '1 ', '1..2'}) do
+        local vars = {x = x}
+        local ast = expression.parse('x > 0.0.0')
+        local exp_err = 'Variable "x" is not a version string'
+        t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
+    end
+
+    for _, x in ipairs({'1', '1.2', '1.2.3.4', '1.2.3.4.5'}) do
+        local vars = {x = x}
+        local ast = expression.parse('x > 0.0.0')
+        local exp_err = ('Expected a three component version in variable ' ..
+            '"x", got %d components'):format((#x + 1) / 2)
+        t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
+    end
+end
