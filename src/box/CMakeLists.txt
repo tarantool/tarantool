@@ -64,6 +64,7 @@ lua_source(lua_sources lua/config/utils/tabulate.lua      config_utils_tabulate_
 if (ENABLE_CONFIG_EXTRAS)
     lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/source/etcd.lua config_source_etcd_lua)
     lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/storage/init.lua config_storage_init_lua)
+    lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/source/storage.lua config_source_storage_lua)
     lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/extras.lua config_extras_lua)
 endif()
 # }}} config
