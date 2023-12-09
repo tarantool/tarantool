@@ -223,6 +223,26 @@ function methods._collect(self, opts)
         local source_iconfig
         if source.type == 'cluster' then
             local source_cconfig = source:get()
+
+            -- Extract and merge conditional sections into the
+            -- data from the source.
+            --
+            -- It is important to call :apply_conditional() before
+            -- :merge() for each cluster config.
+            --
+            -- The 'conditional' field is an array and if several
+            -- sources have the field, the last one replaces all
+            -- the previous ones. If we merge all the configs and
+            -- then call :apply_conditional(), we loss all the
+            -- conditional sections except the last one.
+            --
+            -- The same is applicable for config sources that
+            -- construct a config from several separately stored
+            -- parts using :merge(). They should call
+            -- :apply_conditional() for each of the parts before
+            -- :merge().
+            source_cconfig = cluster_config:apply_conditional(source_cconfig)
+
             cconfig = cluster_config:merge(source_cconfig, cconfig)
             source_iconfig = cluster_config:instantiate(cconfig,
                 self._instance_name)
