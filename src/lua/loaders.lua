@@ -140,11 +140,9 @@ local function gen_loader_func(search_fn, load_fn)
             return err
         end
         local loaded, err = load_fn(file, name)
-        if err == nil then
-            return loaded
-        else
-            return err
-        end
+        local message = ("error loading module '%s' from file '%s':\n\t%s")
+                        :format(name, file, err)
+        return assert(loaded, message)
     end
 end
 
