@@ -9,6 +9,16 @@ on:
       - '**'
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      submodule:
+        description: Name of submodule to bump.
+        required: true
+        type: string
+      revision:
+        description: Git revision from submodule repository
+        required: true
+        type: string
 
 concurrency:
   # Update of a developer branch cancels the previously scheduled workflow
@@ -50,6 +60,12 @@ jobs:
       - uses: ./.github/actions/environment
       - name: Install deps
         uses: ./.github/actions/install-deps-debian
+      - name: Optional submodule bump
+        if: ${{ inputs.submodule }}
+        uses: ./.github/actions/bump-submodule
+        with:
+          submodule: ${{ inputs.submodule }}
+          revision: ${{ inputs.revision }}
       - name: test
         run: make -f .test.mk test-perf
       - name: Send VK Teams message on failure
