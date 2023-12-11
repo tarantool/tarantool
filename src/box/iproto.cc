@@ -294,15 +294,22 @@ unsigned iproto_readahead = 16320;
 static int iproto_msg_max = IPROTO_MSG_MAX_MIN;
 
 /**
- * Request handler meta information.
+ * Request handlers meta information. The IPROTO request of each type can be
+ * overridden by the following types of handlers (listed in priority order):
+ *  1. C handler, set by `iproto_override()'.
  */
-struct iproto_req_handler {
-	/** Request handler callback. */
-	iproto_handler_t cb;
-	/** Request handler destructor, can be NULL. */
-	iproto_handler_destroy_t destroy;
-	/** Context passed to request handler callback and destructor. */
-	void *ctx;
+struct iproto_req_handlers {
+	/**
+	 * C request handler.
+	 */
+	struct {
+		/** C request handler. NULL if not set. */
+		iproto_handler_t cb;
+		/** C request handler destructor, can be NULL. */
+		iproto_handler_destroy_t destroy;
+		/** Context passed to the handler and destructor. */
+		void *ctx;
+	} c;
 };
 
 /**
@@ -2805,22 +2812,92 @@ tx_process_replication(struct cmsg *m)
 }
 
 /**
- * Process a request using the overridden handler (or the unknown request
- * handler as a last resort). We assume that the IPROTO thread checked the
- * handler availability.
+ * Allocates a new `iproto_req_handlers'. The memory is set to zero.
+ */
+static struct iproto_req_handlers *
+iproto_req_handlers_new(void)
+{
+	struct iproto_req_handlers *handlers;
+	handlers = (struct iproto_req_handlers *)xmalloc(sizeof(*handlers));
+	memset(handlers, 0, sizeof(*handlers));
+	return handlers;
+}
+
+/**
+ * Destroys all handlers and deallocates the `handlers' structure.
+ */
+static void
+iproto_req_handlers_delete(struct iproto_req_handlers *handlers)
+{
+	if (handlers->c.destroy != NULL)
+		handlers->c.destroy(handlers->c.ctx);
+	TRASH(handlers);
+	free(handlers);
+}
+
+/**
+ * Inserts `handlers' for the given `req_type' into the `tx_req_handlers' table.
+ * There must be no previous entries in the table for this key.
+ */
+static void
+mh_req_handlers_put(uint32_t req_type, struct iproto_req_handlers *handlers)
+{
+	struct mh_i32ptr_node_t old;
+	struct mh_i32ptr_node_t *replaced = &old;
+	struct mh_i32ptr_node_t node = {
+		/* .key = */ req_type,
+		/* .val = */ handlers,
+	};
+	mh_i32ptr_put(tx_req_handlers, &node, &replaced, NULL);
+	assert(replaced == NULL);
+}
+
+/**
+ * Returns a pointer to `iproto_req_handlers' for the given IPROTO request
+ * `req_type', or NULL if there are no such handlers.
+ */
+static struct iproto_req_handlers *
+mh_req_handlers_get(uint32_t req_type)
+{
+	mh_int_t k = mh_i32ptr_find(tx_req_handlers, req_type, NULL);
+	if (k == mh_end(tx_req_handlers))
+		return NULL;
+	struct mh_i32ptr_node_t *node = mh_i32ptr_node(tx_req_handlers, k);
+	return (struct iproto_req_handlers *)node->val;
+}
+
+/**
+ * Deletes the handlers of IPROTO request `req_type' from the `tx_req_handlers'
+ * hash table. The entry must be present in the table.
+ */
+static void
+mh_req_handlers_del(uint32_t req_type)
+{
+	mh_int_t k = mh_i32ptr_find(tx_req_handlers, req_type, NULL);
+	assert(k != mh_end(tx_req_handlers));
+	mh_i32ptr_del(tx_req_handlers, k, NULL);
+}
+
+/**
+ * Returns `true' if there is at least one handler in `handlers'.
+ */
+static bool
+iproto_req_handler_is_set(struct iproto_req_handlers *handlers)
+{
+	if (handlers == NULL)
+		return false;
+
+	return handlers->c.cb != NULL;
+}
+
+/**
+ * Process a request using overridden handlers (or the unknown request handler
+ * as a last resort).
  */
 static void
 tx_process_override(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
-	mh_int_t k = mh_i32ptr_find(tx_req_handlers, msg->header.type, NULL);
-	if (k == mh_end(tx_req_handlers)) {
-		k = mh_i32ptr_find(tx_req_handlers, IPROTO_UNKNOWN, NULL);
-		assert(k != mh_end(tx_req_handlers));
-	}
-	struct mh_i32ptr_node_t *node = mh_i32ptr_node(tx_req_handlers, k);
-	struct iproto_req_handler *handler =
-		(struct iproto_req_handler *)node->val;
 	const char *header = msg->reqstart;
 	mp_decode_uint(&header);
 
@@ -2834,8 +2911,23 @@ tx_process_override(struct cmsg *m)
 		body_end = body + msg->header.body[0].iov_len;
 	}
 
+	/*
+	 * If we took the `override_route', there must exist either request
+	 * type-specific or unknown request type handler. Their availability
+	 * is checked by the IPROTO thread.
+	 */
+	struct iproto_req_handlers *handlers;
+	handlers = mh_req_handlers_get(msg->header.type);
+	if (handlers == NULL)
+		handlers = mh_req_handlers_get(IPROTO_UNKNOWN);
+	assert(handlers != NULL);
+	enum iproto_handler_status rc;
+
+	rc = handlers->c.cb(header, header_end, body, body_end,
+			    handlers->c.ctx);
+
 	struct cmsg_hop *route = NULL;
-	switch (handler->cb(header, header_end, body, body_end, handler->ctx)) {
+	switch (rc) {
 	case IPROTO_HANDLER_OK: {
 		struct obuf *out = msg->connection->tx.p_obuf;
 		iproto_wpos_create(&msg->wpos, out);
@@ -3816,18 +3908,6 @@ iproto_session_send(struct session *session,
 	return 0;
 }
 
-/**
- * Calls the IPROTO request handler's destructor, if there is one, and
- * deallocates the handler.
- */
-static void
-iproto_req_handler_delete(struct iproto_req_handler *handler)
-{
-	if (handler->destroy != NULL)
-		handler->destroy(handler->ctx);
-	free(handler);
-}
-
 void
 iproto_shutdown(void)
 {
@@ -3860,9 +3940,9 @@ iproto_free(void)
 	mh_foreach(tx_req_handlers, i) {
 		struct mh_i32ptr_node_t *node =
 			mh_i32ptr_node(tx_req_handlers, i);
-		struct iproto_req_handler *handler =
-			(struct iproto_req_handler *)node->val;
-		iproto_req_handler_delete(handler);
+		struct iproto_req_handlers *handlers =
+			(struct iproto_req_handlers *)node->val;
+		iproto_req_handlers_delete(handlers);
 	}
 	mh_i32ptr_delete(tx_req_handlers);
 	fiber_cond_destroy(&drop_finished_cond);
@@ -3960,39 +4040,34 @@ iproto_override(uint32_t req_type, iproto_handler_t cb,
 		return -1;
 	}
 
-	if (cb == NULL) {
-		mh_int_t k = mh_i32ptr_find(tx_req_handlers, req_type, NULL);
-		if (k != mh_end(tx_req_handlers)) {
-			struct mh_i32ptr_node_t *node =
-				mh_i32ptr_node(tx_req_handlers, k);
-			struct iproto_req_handler *old =
-				(struct iproto_req_handler *)node->val;
-			iproto_cfg_override(req_type, false);
-			iproto_req_handler_delete(old);
-			mh_i32ptr_del(tx_req_handlers, k, NULL);
+	struct iproto_req_handlers *handlers;
+	handlers = mh_req_handlers_get(req_type);
+	bool old_is_set = iproto_req_handler_is_set(handlers);
+
+	if (handlers != NULL && handlers->c.destroy != NULL)
+		handlers->c.destroy(handlers->c.ctx);
+
+	if (cb != NULL) {
+		if (handlers == NULL) {
+			handlers = iproto_req_handlers_new();
+			mh_req_handlers_put(req_type, handlers);
 		}
-		return 0;
+		handlers->c.cb = cb;
+		handlers->c.destroy = destroy;
+		handlers->c.ctx = ctx;
+	} else if (handlers != NULL) {
+		handlers->c.cb = NULL;
+		handlers->c.destroy = NULL;
+		handlers->c.ctx = NULL;
 	}
 
-	struct iproto_req_handler *handler =
-		(struct iproto_req_handler *)xmalloc(sizeof(*handler));
-	*handler = (struct iproto_req_handler) {
-		/* .handler = */ cb,
-		/* .destroy = */ destroy,
-		/* .ctx = */ ctx,
-	};
-	struct mh_i32ptr_node_t node = {
-		/* .key = */ req_type,
-		/* .val = */ handler,
-	};
-	struct mh_i32ptr_node_t old;
-	struct mh_i32ptr_node_t *replaced = &old;
-	mh_i32ptr_put(tx_req_handlers, &node, &replaced, NULL);
-	if (replaced != NULL) {
-		handler = (struct iproto_req_handler *)replaced->val;
-		iproto_req_handler_delete(handler);
-		return 0;
+	bool new_is_set = iproto_req_handler_is_set(handlers);
+	if (new_is_set != old_is_set)
+		iproto_cfg_override(req_type, new_is_set);
+
+	if (!new_is_set && handlers != NULL) {
+		mh_req_handlers_del(req_type);
+		iproto_req_handlers_delete(handlers);
 	}
-	iproto_cfg_override(req_type, true);
 	return 0;
 }
