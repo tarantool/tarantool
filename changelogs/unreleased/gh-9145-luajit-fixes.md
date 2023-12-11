@@ -22,3 +22,5 @@ were fixed as part of this activity:
 * Fixed possible storing of NaN keys to table on trace.
 * Fixed ABC FOLD optimization with constants.
 * Marked `CONV` as non-weak, to prevent invalid control flow path choice.
+* Fixed double-emitting of `IR_NEWREF` when restoring sunk values for side
+  trace (gh-7937).
