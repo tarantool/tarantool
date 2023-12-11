@@ -264,6 +264,10 @@ g.test_defaults = function()
         },
         config = {
             reload = 'auto',
+            storage = {
+                timeout = 3,
+                reconnect_after = 3,
+            },
         },
         feedback = box.internal.feedback_daemon ~= nil and {
             crashinfo = true,
