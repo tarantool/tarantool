@@ -63,25 +63,10 @@ jobs:
           ref: ${{ inputs.release }}
 
       - name: LuaJIT bump
-        run: |
-          pushd third_party/luajit
-          git fetch origin
-          git checkout ${{ inputs.revision }}
-          popd
-          # XXX: export the following environment variables to
-          # suppress git config warning. The commit is required to
-          # avoid resetting dirty changes in LuaJIT submodule.
-          export GIT_COMMITTER_NAME="LuaJIT integration testing workflow"
-          export GIT_COMMITTER_EMAIL="noreply@tarantool.org"
-          export GIT_AUTHOR_NAME="LuaJIT integration testing workflow"
-          export GIT_AUTHOR_EMAIL="noreply@tarantool.org"
-          # XXX: --allow-empty is required to rerun flaky tests
-          # for tarantool/luajit HEAD when it is already bumped
-          # in tarantool/tarantool repo to the same revision.
-          # Otherwise the command below fails with "nothing to
-          # commit" reason.
-          git commit --allow-empty -m "luajit: integration testing bump" \
-            third_party/luajit
+        uses: ./.github/actions/bump-submodule
+        with:
+          submodule: luajit
+          revision: ${{ inputs.revision }}
 
       - name: Set environment
         uses: ./.github/actions/environment

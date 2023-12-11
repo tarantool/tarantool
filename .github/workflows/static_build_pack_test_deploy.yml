@@ -13,6 +13,14 @@ on:
         default: '{"include": [{"os": "ubuntu-focal"}, {"os": "ubuntu-jammy"}]}'
         required: false
         type: string
+      submodule:
+        description: Name of submodule to bump.
+        required: false
+        type: string
+      revision:
+        description: Git revision from submodule repository
+        required: false
+        type: string
 
 jobs:
   build:
@@ -28,6 +36,13 @@ jobs:
           submodules: recursive
 
       - uses: ./.github/actions/environment
+
+      - name: Optional submodule bump
+        if: ${{ inputs.submodule }}
+        uses: ./.github/actions/bump-submodule
+        with:
+          submodule: ${{ inputs.submodule }}
+          revision: ${{ inputs.revision }}
 
       - name: Make static build packages
         run: make -f .pack.mk package-static
