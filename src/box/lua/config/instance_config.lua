@@ -484,6 +484,83 @@ return schema.new('instance_config', schema.record({
                 end
             end,
         })),
+        storage = enterprise_edition(schema.record({
+            prefix = schema.scalar({
+                type = 'string',
+                validate = function(data, w)
+                    if not data:startswith('/') then
+                        w.error(('config.storage.prefix should be ' ..
+                            'a path alike value, got %q'):format(data))
+                    end
+                end,
+            }),
+            endpoints = schema.array({
+                items = schema.record({
+                    uri = schema.scalar({
+                        type = 'string',
+                    }),
+                    login = schema.scalar({
+                        type = 'string',
+                    }),
+                    password = schema.scalar({
+                        type = 'string',
+                    }),
+                    params = schema.record({
+                        transport = schema.enum({
+                            'plain',
+                            'ssl',
+                        }),
+                        ssl_key_file = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_cert_file = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_ca_file = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_ciphers = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_password = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_password_file = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                    }),
+                }),
+                validate = function(data, w)
+                    if #data == 0 then
+                        w.error('At least one endpoint must be' ..
+                            'specified in config.storage.endpoints')
+                    end
+                end,
+            }),
+            timeout = schema.scalar({
+                type = 'number',
+                default = 3,
+            }),
+            reconnect_after = schema.scalar({
+                type = 'number',
+                default = 3,
+            })
+        }, {
+            validate = function(data, w)
+                if data == nil or next(data) == nil then
+                    return
+                end
+                if data.prefix == nil and data.endpoints == nil then
+                    return
+                end
+                if data.prefix == nil then
+                    w.error('No config.storage.prefix provided')
+                end
+                if data.endpoints == nil then
+                    w.error('No config.storage.endpoints provided')
+                end
+            end
+        })),
     }),
     process = schema.record({
         strip_core = schema.scalar({

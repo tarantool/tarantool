@@ -80,6 +80,10 @@ g.test_config = function()
 
     local exp = {
         reload = 'auto',
+        storage = {
+            timeout = 3,
+            reconnect_after = 3,
+        }
     }
     local res = instance_config:apply_default({}).config
     t.assert_equals(res, exp)
@@ -109,7 +113,26 @@ g.test_config_enterprise = function()
                     verify_peer = true,
                     verify_host = false,
                 },
-            }
+            },
+            storage = {
+                prefix = '/one',
+                endpoints = {{
+                    uri = 'two',
+                    login = 'three',
+                    password = 'four',
+                    params = {
+                        transport = 'ssl',
+                        ssl_key_file = 'five',
+                        ssl_cert_file = 'six',
+                        ssl_ca_file = 'seven',
+                        ssl_ciphers = 'eight',
+                        ssl_password = 'nine',
+                        ssl_password_file = 'ten',
+                    },
+                }},
+                timeout = 1.1,
+                reconnect_after = 1.2,
+            },
         },
     }
     instance_config:validate(iconfig)
@@ -129,6 +152,10 @@ g.test_config_enterprise = function()
 
     local exp = {
         reload = 'auto',
+        storage = {
+            timeout = 3,
+            reconnect_after = 3,
+        }
     }
     local res = instance_config:apply_default({}).config
     t.assert_equals(res, exp)
