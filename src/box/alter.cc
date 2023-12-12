@@ -2290,7 +2290,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			txn_stmt_on_rollback(stmt, on_rollback_view);
 			select_guard.is_active = false;
 		}
-	} else if (new_tuple == NULL) { /* DELETE */
+	} else if (new_tuple == NULL && old_space != NULL) { /* DELETE */
 		if (access_check_ddl(old_space->def->name, old_space->def->uid,
 				     old_space->access, SC_SPACE, PRIV_D) != 0)
 			return -1;
@@ -2390,6 +2390,13 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			assert(rc == 0); (void)rc;
 			select_guard.is_active = false;
 		}
+	} else if (new_tuple == NULL && old_space == NULL) {
+		/*
+		 * DELETE of a space that is present in `_space', but is absent
+		 * in the space cache. This can only happen if the space was
+		 * created when `on_replace_dd_space' trigger was turned off.
+		 */
+		return 0;
 	} else { /* UPDATE, REPLACE */
 		assert(old_space != NULL && new_tuple != NULL);
 		if (old_space->def->opts.is_view) {
