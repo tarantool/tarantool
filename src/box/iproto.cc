@@ -454,13 +454,10 @@ iproto_resume(struct iproto_thread *iproto_thread);
 /**
  * Prepares IPROTO message: decodes the message header, checks the message's
  * stream identifier, and set's the message's cbus route.
- * If the message contains a replication request, sets the stop input flag,
- * which means the connection's buffers needs to be detached from the event
- * loop.
  */
 static void
-iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend,
-		   bool *stop_input);
+iproto_msg_prepare(struct iproto_msg *msg, const char **pos,
+		   const char *reqend);
 
 enum rmean_net_name {
 	IPROTO_SENT,
@@ -730,6 +727,11 @@ struct iproto_connection
 	char salt[IPROTO_SALT_SIZE];
 	/** Iproto connection thread */
 	struct iproto_thread *iproto_thread;
+	/**
+	 * The connection is processing replication command so that
+	 * IO is handled by relay code.
+	 */
+	bool is_in_replication;
 };
 
 /** Returns a string suitable for logging. */
@@ -1149,9 +1151,8 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
 	assert(rlist_empty(&con->in_stop_list));
 	int n_requests = 0;
-	bool stop_input = false;
 	const char *errmsg;
-	while (con->parse_size != 0 && !stop_input) {
+	while (con->parse_size != 0 && !con->is_in_replication) {
 		if (iproto_check_msg_max(con->iproto_thread)) {
 			iproto_connection_stop_msg_max_limit(con);
 			cpipe_flush_input(&con->iproto_thread->tx_pipe);
@@ -1187,7 +1188,7 @@ err_msgpack:
 		msg->len = reqend - reqstart; /* total request length */
 		con->input_msg_count[msg->p_ibuf == &con->ibuf[1]]++;
 
-		iproto_msg_prepare(msg, &pos, reqend, &stop_input);
+		iproto_msg_prepare(msg, &pos, reqend);
 		if (iproto_msg_start_processing_in_stream(msg)) {
 			cpipe_push_input(&con->iproto_thread->tx_pipe, &msg->base);
 			n_requests++;
@@ -1198,7 +1199,7 @@ err_msgpack:
 		assert(con->parse_size >= (size_t) (reqend - reqstart));
 		con->parse_size -= reqend - reqstart;
 	}
-	if (stop_input) {
+	if (con->is_in_replication) {
 		/**
 		 * Don't mess with the file descriptor
 		 * while join is running. ev_io_stop()
@@ -1474,6 +1475,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	con->can_write = true;
 	con->long_poll_count = 0;
 	con->session = NULL;
+	con->is_in_replication = false;
 	rlist_create(&con->in_stop_list);
 	/* It may be very awkward to allocate at close. */
 	cmsg_init(&con->destroy_msg, con->iproto_thread->destroy_route);
@@ -1556,14 +1558,12 @@ static int
 iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route);
 
 static void
-iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend,
-		   bool *stop_input)
+iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 {
 	uint64_t stream_id;
 	uint32_t type;
 	bool request_is_not_for_stream;
 	bool request_is_only_for_stream;
-	bool is_replication_request;
 	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
 	mh_i32_t *handlers = iproto_thread->req_handlers;
 	mh_int_t handler;
@@ -1594,16 +1594,14 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend,
 		goto error;
 	}
 
-	is_replication_request = type == IPROTO_JOIN ||
-				 type == IPROTO_FETCH_SNAPSHOT ||
-				 type == IPROTO_REGISTER ||
-				 type == IPROTO_SUBSCRIBE;
-	if (is_replication_request)
-		*stop_input = true;
+	msg->connection->is_in_replication = type == IPROTO_JOIN ||
+					     type == IPROTO_FETCH_SNAPSHOT ||
+					     type == IPROTO_REGISTER ||
+					     type == IPROTO_SUBSCRIBE;
 
 	handler = mh_i32_find(handlers, type, NULL);
 	if (handler != mh_end(handlers)) {
-		assert(!is_replication_request);
+		assert(!msg->connection->is_in_replication);
 		cmsg_init(&msg->base, iproto_thread->override_route);
 		return;
 	}
@@ -2789,6 +2787,7 @@ net_end_join(struct cmsg *m)
 	iproto_msg_delete(msg);
 
 	assert(! ev_is_active(&con->input));
+	con->is_in_replication = false;
 	/*
 	 * Enqueue any messages if they are in the readahead
 	 * queue. Will simply start input otherwise.
