@@ -4,3 +4,5 @@
 # File format:
 #fun:*
 #src:*
+# TODO(gh-8423) expected to be removed when the issue is solved
+fun:ev_async_stop
