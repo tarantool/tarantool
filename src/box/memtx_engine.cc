@@ -68,9 +68,6 @@
 static void
 checkpoint_cancel(struct checkpoint *ckpt);
 
-static void
-replica_join_cancel(struct cord *replica_join_cord);
-
 enum {
 	OBJSIZE_MIN = 16,
 	SLAB_SIZE = 16 * 1024 * 1024,
@@ -200,8 +197,6 @@ memtx_engine_shutdown(struct engine *engine)
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	if (memtx->checkpoint != NULL)
 		checkpoint_cancel(memtx->checkpoint);
-	if (memtx->replica_join_cord != NULL)
-		replica_join_cancel(memtx->replica_join_cord);
 	mempool_destroy(&memtx->iterator_pool);
 	if (mempool_is_initialized(&memtx->rtree_iterator_pool))
 		mempool_destroy(&memtx->rtree_iterator_pool);
@@ -916,17 +911,6 @@ checkpoint_cancel(struct checkpoint *ckpt)
 	checkpoint_delete(ckpt);
 }
 
-static void
-replica_join_cancel(struct cord *replica_join_cord)
-{
-	/*
-	 * Cancel the thread being used to join replica if it's
-	 * running and wait for it to terminate so as to
-	 * eliminate the possibility of use-after-free.
-	 */
-	cord_cancel_and_join(replica_join_cord);
-}
-
 static int
 checkpoint_write_raft(struct xlog *l, const struct raft_request *req)
 {
@@ -1361,10 +1345,7 @@ memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
 	struct cord cord;
 	if (cord_costart(&cord, "initial_join", memtx_join_f, ctx) != 0)
 		return -1;
-	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-	memtx->replica_join_cord = &cord;
 	int res = cord_cojoin(&cord);
-	memtx->replica_join_cord = NULL;
 	xstream_reset(stream);
 	return res;
 }
@@ -1637,8 +1618,6 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		}
 	}
 	memtx->sort_threads = sort_threads;
-
-	memtx->replica_join_cord = NULL;
 
 	memtx->base.vtab = &memtx_engine_vtab;
 	memtx->base.name = "memtx";

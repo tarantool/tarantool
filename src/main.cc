@@ -171,6 +171,7 @@ on_shutdown_f(va_list ap)
 		diag_log();
 		diag_clear(diag_get());
 	}
+	box_shutdown();
 	shutdown_finished = true;
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;

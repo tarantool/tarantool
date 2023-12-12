@@ -112,6 +112,10 @@ extern bool box_is_force_recovery;
 void
 box_init(void);
 
+/** Shutdown box storage i.e. stop parts that need TX loop running. */
+void
+box_shutdown(void);
+
 /**
  * Cleanup box library
  */

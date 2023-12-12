@@ -203,6 +203,15 @@ struct iproto_thread {
 	struct evio_service binary;
 	/** Requests count currently pending in stream queue. */
 	size_t requests_in_stream_queue;
+	/** List of all connections. */
+	struct rlist connections;
+	/** Number of connections that pending drop. */
+	size_t drop_pending_connection_count;
+	/**
+	 * Message used to notify TX thread that all connections marked
+	 * to de dropped are dropped.
+	 */
+	struct cmsg drop_finished_msg;
 	/**
 	 * The following fields are used exclusively by the tx thread.
 	 * Align them to prevent false-sharing.
@@ -215,6 +224,11 @@ struct iproto_thread {
 		struct rmean *rmean;
 	} tx;
 };
+
+/** Condition for drop finished. */
+static struct fiber_cond drop_finished_cond;
+/** Count of iproto threads that are not finished connections drop yet. */
+static size_t drop_pending_thread_count;
 
 /**
  * IPROTO listen URIs. Set by box.cfg.listen.
@@ -437,12 +451,10 @@ struct iproto_msg
 	struct stailq_entry in_stream;
 	/** Stream that owns this message, or NULL. */
 	struct iproto_stream *stream;
-	/**
-	 * True if message processing in tx thread is started. The flag is
-	 * used to prevent double accounting of message in case of iproto
-	 * override fallback to original handler.
-	 */
-	bool accepted;
+	/** Link in connection->tx.inprogress. */
+	struct rlist in_inprogress;
+	/** TX thread fiber that processing this message. */
+	struct fiber *fiber;
 };
 
 /**
@@ -722,6 +734,8 @@ struct iproto_connection
 		 * return.
 		 */
 		bool is_push_pending;
+		/** List of inprogress messages. */
+		struct rlist inprogress;
 	} tx;
 	/** Authentication salt. */
 	char salt[IPROTO_SALT_SIZE];
@@ -732,6 +746,15 @@ struct iproto_connection
 	 * IO is handled by relay code.
 	 */
 	bool is_in_replication;
+	/** Link in iproto_thread->connections. */
+	struct rlist in_connections;
+	/** Set if connection is being dropped. */
+	bool is_drop_pending;
+	/**
+	 * Messaged sent to TX to cancel all inprogress requests of the
+	 * connection.
+	 */
+	struct cmsg cancel_msg;
 };
 
 /** Returns a string suitable for logging. */
@@ -819,7 +842,7 @@ iproto_msg_new(struct iproto_connection *con)
 	msg->close_connection = false;
 	msg->connection = con;
 	msg->stream = NULL;
-	msg->accepted = false;
+	msg->fiber = NULL;
 	rmean_collect(con->iproto_thread->rmean, IPROTO_REQUESTS, 1);
 	return msg;
 }
@@ -1476,7 +1499,10 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	con->long_poll_count = 0;
 	con->session = NULL;
 	con->is_in_replication = false;
+	con->is_drop_pending = false;
 	rlist_create(&con->in_stop_list);
+	rlist_create(&con->tx.inprogress);
+	rlist_add_entry(&iproto_thread->connections, con, in_connections);
 	/* It may be very awkward to allocate at close. */
 	cmsg_init(&con->destroy_msg, con->iproto_thread->destroy_route);
 	cmsg_init(&con->disconnect_msg, con->iproto_thread->disconnect_route);
@@ -1485,6 +1511,27 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	con->tx.is_push_sent = false;
 	rmean_collect(iproto_thread->rmean, IPROTO_CONNECTIONS, 1);
 	return con;
+}
+
+/** Notify that connections drop is finished. */
+static void
+tx_process_drop_finished(struct cmsg *m)
+{
+	(void)m;
+	assert(drop_pending_thread_count > 0);
+	if (--drop_pending_thread_count == 0)
+		fiber_cond_signal(&drop_finished_cond);
+}
+
+/** Send message to TX thread to notify that connections drop is finished. */
+static void
+iproto_send_drop_finished(struct iproto_thread *iproto_thread)
+{
+	static const struct cmsg_hop drop_finished_route[1] =
+					{{ tx_process_drop_finished, NULL }};
+
+	cmsg_init(&iproto_thread->drop_finished_msg, drop_finished_route);
+	cpipe_push(&iproto_thread->tx_pipe, &iproto_thread->drop_finished_msg);
 }
 
 /** Recycle a connection. */
@@ -1506,6 +1553,14 @@ iproto_connection_delete(struct iproto_connection *con)
 
 	assert(mh_size(con->streams) == 0);
 	mh_i64ptr_delete(con->streams);
+	rlist_del(&con->in_connections);
+	if (con->is_drop_pending) {
+		struct iproto_thread *iproto_thread = con->iproto_thread;
+
+		assert(iproto_thread->drop_pending_connection_count > 0);
+		if (--iproto_thread->drop_pending_connection_count == 0)
+			iproto_send_drop_finished(iproto_thread);
+	}
 	mempool_free(&con->iproto_thread->iproto_connection_pool, con);
 }
 
@@ -1781,6 +1836,17 @@ net_finish_rollback_on_disconnect(struct cmsg *m)
 		iproto_connection_try_to_start_destroy(con);
 }
 
+/** Cancel all inprogress requests of the connection. */
+static void
+tx_process_cancel_inprogress(struct cmsg *m)
+{
+	struct iproto_connection *con =
+		container_of(m, struct iproto_connection, cancel_msg);
+	struct iproto_msg *msg;
+	rlist_foreach_entry(msg, &con->tx.inprogress, in_inprogress)
+		fiber_cancel(msg->fiber);
+}
+
 static void
 tx_process_disconnect(struct cmsg *m)
 {
@@ -1951,13 +2017,15 @@ static inline struct iproto_msg *
 tx_accept_msg(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
-	if (msg->accepted)
+	if (msg->fiber != NULL)
 		return msg;
-	msg->accepted = true;
 	tx_accept_wpos(msg->connection, &msg->wpos);
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 	tx_prepare_transaction_for_request(msg);
 	msg->connection->iproto_thread->tx.requests_in_progress++;
+	rlist_add_entry(&msg->connection->tx.inprogress, msg,
+			in_inprogress);
+	msg->fiber = fiber();
 	rmean_collect(msg->connection->iproto_thread->tx.rmean,
 		      REQUESTS_IN_PROGRESS, 1);
 	flightrec_write_request(msg->reqstart, msg->len);
@@ -2009,6 +2077,8 @@ tx_end_msg(struct iproto_msg *msg, struct obuf_svp *svp)
 		msg->stream->txn = txn_detach();
 	}
 	msg->connection->iproto_thread->tx.requests_in_progress--;
+	rlist_del(&msg->in_inprogress);
+	msg->fiber = NULL;
 	struct obuf *out = msg->connection->tx.p_obuf;
 	if (msg->connection->tx.p_obuf->used != svp->used)
 		/* Log response to the flight recorder. */
@@ -2621,6 +2691,8 @@ tx_process_replication(struct cmsg *m)
 		  * In case of a timeout the error could come after a partially
 		  * written row. Do not push it on top.
 		  */
+	} catch (FiberIsCancelled *e) {
+		/* Do not write into connection on connection drop. */
 	} catch (Exception *e) {
 		iproto_write_error(io, e, ::schema_version, msg->header.sync);
 	}
@@ -2788,6 +2860,11 @@ net_end_join(struct cmsg *m)
 
 	assert(! ev_is_active(&con->input));
 	con->is_in_replication = false;
+
+	if (con->is_drop_pending) {
+		iproto_connection_close(con);
+		return;
+	}
 	/*
 	 * Enqueue any messages if they are in the readahead
 	 * queue. Will simply start input otherwise.
@@ -3205,6 +3282,7 @@ iproto_thread_init(struct iproto_thread *iproto_thread)
 	rlist_create(&iproto_thread->stopped_connections);
 	iproto_thread->tx.requests_in_progress = 0;
 	iproto_thread->requests_in_stream_queue = 0;
+	rlist_create(&iproto_thread->connections);
 }
 
 /** Initialize the iproto subsystem and start network io thread */
@@ -3226,6 +3304,7 @@ iproto_init(int threads_count)
 	evio_service_create(loop(), &tx_binary, "tx_binary", NULL, NULL);
 	iproto_threads = (struct iproto_thread *)
 		xcalloc(threads_count, sizeof(struct iproto_thread));
+	fiber_cond_create(&drop_finished_cond);
 
 	for (int i = 0; i < threads_count; i++, iproto_threads_count++) {
 		struct iproto_thread *iproto_thread = &iproto_threads[i];
@@ -3283,6 +3362,10 @@ enum iproto_cfg_op {
 	 * Command code to create a new IPROTO session.
 	 */
 	IPROTO_CFG_SESSION_NEW,
+	/**
+	 * Command code to drop all current connections.
+	 */
+	IPROTO_CFG_DROP_CONNECTIONS,
 };
 
 /**
@@ -3397,6 +3480,33 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		iproto_thread_accept(iproto_thread, io, addr, addrlen, session);
 		break;
 	}
+	case IPROTO_CFG_DROP_CONNECTIONS: {
+		struct iproto_connection *con;
+		static const struct cmsg_hop cancel_route[1] =
+				{{ tx_process_cancel_inprogress, NULL }};
+		rlist_foreach_entry(con, &iproto_thread->connections,
+				    in_connections) {
+			/*
+			 * Replication IO is done outside iproto so we
+			 * cannot close them as usual. Anyway we cancel
+			 * replication fibers as well and close connection
+			 * after replication is breaked.
+			 */
+			if (!con->is_in_replication &&
+			    con->state == IPROTO_CONNECTION_ALIVE)
+				iproto_connection_close(con);
+			con->is_drop_pending = true;
+			iproto_thread->drop_pending_connection_count++;
+			if (con->state != IPROTO_CONNECTION_DESTROYED) {
+				cmsg_init(&con->cancel_msg, cancel_route);
+				cpipe_push(&iproto_thread->tx_pipe,
+					   &con->cancel_msg);
+			}
+		}
+		if (iproto_thread->drop_pending_connection_count == 0)
+			iproto_send_drop_finished(iproto_thread);
+		break;
+	}
 	default:
 		unreachable();
 	}
@@ -3458,6 +3568,24 @@ iproto_send_start_msg(void)
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_START);
 	for (int i = 0; i < iproto_threads_count; i++)
 		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
+}
+
+void
+iproto_drop_connections(void)
+{
+	static struct latch latch = LATCH_INITIALIZER(latch);
+	latch_lock(&latch);
+	drop_pending_thread_count = iproto_threads_count;
+	for (int i = 0; i < iproto_threads_count; i++) {
+		struct iproto_cfg_msg *cfg_msg =
+			(struct iproto_cfg_msg *)xmalloc(sizeof(*cfg_msg));
+		iproto_cfg_msg_create(cfg_msg, IPROTO_CFG_DROP_CONNECTIONS);
+		iproto_do_cfg_async(&iproto_threads[i], cfg_msg);
+	}
+
+	while (drop_pending_thread_count != 0)
+		fiber_cond_wait(&drop_finished_cond);
+	latch_unlock(&latch);
 }
 
 /** Send IPROTO_CFG_RESTART to all threads. */
@@ -3683,6 +3811,7 @@ iproto_free(void)
 		iproto_req_handler_delete(handler);
 	}
 	mh_i32ptr_delete(tx_req_handlers);
+	fiber_cond_destroy(&drop_finished_cond);
 
 	/*
 	 * Here we close sockets and unlink all unix socket paths.

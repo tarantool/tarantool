@@ -62,10 +62,6 @@ enum relay_state {
 struct relay *
 relay_new(struct replica *replica);
 
-/** Cancel a running relay. Called on shutdown. */
-void
-relay_cancel(struct relay *relay);
-
 /** Destroy and delete the relay */
 void
 relay_delete(struct relay *relay);
