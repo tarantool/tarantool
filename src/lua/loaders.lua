@@ -14,34 +14,6 @@ local ROCKS_LUA_TEMPLATES = {
     ROCKS_LUA_PATH .. '/?/init.lua',
 }
 
--- Tarantool's builtin modules.
---
--- Similar to _LOADED (package.loaded).
-local builtin_modules = debug.getregistry()._TARANTOOL_BUILTIN
-
--- Loader for built-in modules.
-local function builtin_loader(name)
-    -- A loader is more like a searching function rather than a
-    -- loading function (fun fact: package.loaders was renamed to
-    -- package.searchers in Lua 5.2).
-    --
-    -- A loader (a searcher) typically searches for a file and, if
-    -- the file is found, loads it and returns a function to
-    -- execute it. Typically just result of loadfile(file).
-    --
-    -- Our 'filesystem' is a table of modules, a 'file' is an
-    -- entry in the table. If a module is found, the loader
-    -- returns a function that 'executes' it. The function just
-    -- returns the module itself.
-    if builtin_modules[name] ~= nil then
-        return function(_name)
-            return builtin_modules[name]
-        end
-    end
-
-    return ("\n\tno field loaders.builtin['%s']"):format(name)
-end
-
 local package_searchroot
 
 local function searchroot()
@@ -118,6 +90,33 @@ local function gen_search_func(path_fn, templates, need_traverse)
         return package.searchpath(name, searchpath)
     end
 end
+
+-- Lua table with "package searchers".
+local searchers = debug.getregistry()._TARANTOOL_PACKAGE_SEARCHERS
+
+rawset(searchers, 'preload', function(name)
+    assert(type(package.preload) == 'table',
+           "'package.preload' must be a table")
+    local loader = package.preload[name]
+    if loader ~= nil then
+        return loader, ':preload:'
+    end
+    return ("\n\tno field package.preload['%s']"):format(name)
+end)
+
+-- Tarantool's builtin modules.
+--
+-- Similar to _LOADED (package.loaded).
+local builtin_modules = debug.getregistry()._TARANTOOL_BUILTIN
+
+-- Searcher for builtin modules.
+rawset(searchers, 'builtin', function(name)
+    local module = builtin_modules[name]
+    if module ~= nil then
+        return function(_name) return module end, ':builtin:'
+    end
+    return ("\n\tno field loaders.builtin['%s']"):format(name)
+end)
 
 -- Compose a loader function from options.
 --
@@ -351,6 +350,23 @@ local override_loader = conditional_loader(chain_loaders({
     prefix_loader('override', package.loaders[7]),
 }), override_loader_onoff)
 
+
+local function dummy_loader(searcher, sentinel)
+    return function(name)
+        local loader, data = searcher(name)
+        -- XXX: <loader> (i.e. the first return value) contains
+        -- error message in this case. Just propagate it to the
+        -- <require> frame...
+        if not data then
+           return loader
+        end
+        -- XXX: ... Otherwise, this is a valid module loader.
+        -- Check the <data> and return the <loader> function.
+        assert(data == sentinel, 'Invalid searcher')
+        return loader
+    end
+end
+
 -- Add two loaders:
 --
 -- - Search for override.<module_name> module. It is necessary for
@@ -362,9 +378,9 @@ local override_loader = conditional_loader(chain_loaders({
 -- change ordinals of the loaders 2-8. It is possible that someone
 -- has a logic based on those loader positions.
 package.loaders[1] = chain_loaders({
-    package.loaders[1],
+    dummy_loader(searchers['preload'], ':preload:'),
     override_loader,
-    builtin_loader,
+    dummy_loader(searchers['builtin'], ':builtin:'),
 })
 
 rawset(package, "search", search)
