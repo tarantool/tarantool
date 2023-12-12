@@ -1390,6 +1390,17 @@ g.test_sharding = function()
     instance_config:validate(iconfig)
     validate_fields(iconfig.sharding, instance_config.schema.fields.sharding)
 
+    local iconfig = {
+        sharding = {
+            roles = {'router', 'rebalancer'},
+        },
+    }
+    local err = '[instance_config] sharding: The rebalancer role cannot be ' ..
+                'present without the storage role'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+
     local exp = {
         bucket_count = 3000,
         discovery_mode = "on",
