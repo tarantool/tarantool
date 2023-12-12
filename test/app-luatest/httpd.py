@@ -4,6 +4,9 @@ import sys
 import tempfile
 from gevent.pywsgi import WSGIServer
 from gevent import spawn, sleep, socket
+from signal import signal, SIGPIPE, SIG_DFL
+
+signal(SIGPIPE, SIG_DFL)
 
 def absent():
     code = "500 Server Error"
