@@ -3159,6 +3159,7 @@ expr_code_dec(struct Parse *parser, struct Expr *expr, bool is_neg, int reg)
 	return;
 error:
 	sql_xfree(value);
+	diag_set(ClientError, ER_INVALID_DEC, str);
 	parser->is_aborted = true;
 }
 

@@ -548,7 +548,11 @@ sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
 		const char *str = tt_cstr(expr_span->zStart,
 					  expr_span->zEnd - expr_span->zStart);
 		decimal_t val;
-		decimal_from_string(&val, str);
+		if (decimal_from_string(&val, str) == NULL) {
+			diag_set(ClientError, ER_INVALID_DEC, str);
+			parser->is_aborted = true;
+			break;
+		}
 		size = mp_sizeof_decimal(&val);
 		buf = xregion_alloc(region, size);
 		mp_encode_decimal(buf, &val);
