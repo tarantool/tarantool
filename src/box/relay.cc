@@ -109,8 +109,6 @@ struct relay_raft_msg {
 
 /** State of a replication relay. */
 struct relay {
-	/** The thread in which we relay data to the replica. */
-	struct cord cord;
 	/** Replica connection */
 	struct iostream *io;
 	/** Request sync */
@@ -354,16 +352,6 @@ relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	relay->id_filter = 1 << REPLICA_ID_NIL;
 }
 
-void
-relay_cancel(struct relay *relay)
-{
-	/* Check that the thread is running first. */
-	if (relay->cord.id != 0) {
-		cord_cancel_and_join(&relay->cord);
-		relay->cord.id = 0;
-	}
-}
-
 /**
  * Called by a relay thread right before termination.
  */
@@ -388,11 +376,6 @@ relay_exit(struct relay *relay)
 static void
 relay_stop(struct relay *relay)
 {
-	/*
-	 * The thread has to be already stopped or it could use the destroyed
-	 * data below.
-	 */
-	assert(relay->cord.id == 0);
 	struct relay_gc_msg *gc_msg, *next_gc_msg;
 	stailq_foreach_entry_safe(gc_msg, next_gc_msg,
 				  &relay->pending_gc, in_pending) {
@@ -567,10 +550,10 @@ relay_final_join(struct replica *replica, struct iostream *io, uint64_t sync,
 	relay->r = recovery_new(wal_dir(), false, start_vclock);
 	vclock_copy(&relay->stop_vclock, stop_vclock);
 
-	int rc = cord_costart(&relay->cord, "final_join",
-			      relay_final_join_f, relay);
+	struct cord cord;
+	int rc = cord_costart(&cord, "final_join", relay_final_join_f, relay);
 	if (rc == 0)
-		rc = cord_cojoin(&relay->cord);
+		rc = cord_cojoin(&cord);
 	if (rc != 0)
 		diag_raise();
 
@@ -1138,10 +1121,10 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 
 	relay->id_filter |= replica_id_filter;
 
-	int rc = cord_costart(&relay->cord, "subscribe",
-			      relay_subscribe_f, relay);
+	struct cord cord;
+	int rc = cord_costart(&cord, "subscribe", relay_subscribe_f, relay);
 	if (rc == 0)
-		rc = cord_cojoin(&relay->cord);
+		rc = cord_cojoin(&cord);
 	if (rc != 0)
 		diag_raise();
 }
@@ -1229,7 +1212,6 @@ relay_push_raft(struct relay *relay, const struct raft_request *req)
 static bool
 relay_filter_row(struct relay *relay, struct xrow_header *packet)
 {
-	assert(cord() == &relay->cord);
 	assert(fiber()->f == relay_subscribe_f ||
 	       fiber()->f == relay_final_join_f);
 	bool is_subscribe = fiber()->f == relay_subscribe_f;

@@ -5916,6 +5916,21 @@ box_init(void)
 	crash_callback = box_crash_callback;
 }
 
+/** Shutdown box storage i.e. stop parts that need TX loop running. */
+static void
+box_storage_shutdown()
+{
+	if (!is_storage_initialized)
+		return;
+	iproto_drop_connections();
+}
+
+void
+box_shutdown(void)
+{
+	box_storage_shutdown();
+}
+
 void
 box_free(void)
 {

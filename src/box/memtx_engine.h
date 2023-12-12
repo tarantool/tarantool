@@ -127,11 +127,6 @@ struct memtx_engine {
 	/** Skip invalid snapshot records if this flag is set. */
 	bool force_recovery;
 	/**
-	 * Cord being currently used to join replica. It is only
-	 * needed to be able to cancel it on shutdown.
-	 */
-	struct cord *replica_join_cord;
-	/**
 	 * A callback run once memtx engine builds secondary indexes for the
 	 * data.
 	 */

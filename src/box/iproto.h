@@ -181,6 +181,14 @@ iproto_session_send(struct session *session,
 void
 iproto_free(void);
 
+/**
+ * Drop all current connections. That is stop IO and cancel all inprogress
+ * requests. Return when the requests are finished and connection is freed.
+ * Concurrent calls are serialized.
+ */
+void
+iproto_drop_connections(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
