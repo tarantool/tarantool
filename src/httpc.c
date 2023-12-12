@@ -141,6 +141,15 @@ httpc_env_create(struct httpc_env *env, int max_conns, int max_total_conns)
 }
 
 void
+httpc_env_finish(struct httpc_env *ctx)
+{
+	assert(ctx);
+
+	curl_env_finish(&ctx->curl_env);
+	ctx->cleanup = 1;
+}
+
+void
 httpc_env_destroy(struct httpc_env *ctx)
 {
 	assert(ctx);
@@ -208,12 +217,18 @@ httpc_request_new(struct httpc_env *env, const char *method,
 
 	ibuf_create(&req->send, &cord()->slabc, 1);
 
+	++env->req_count;
+
 	return req;
 }
 
 void
 httpc_request_delete(struct httpc_request *req)
 {
+	struct httpc_env *env = req->env;
+	--env->req_count;
+	assert(env->req_count >= 0);
+
 	if (req->headers != NULL)
 		curl_slist_free_all(req->headers);
 
@@ -230,6 +245,11 @@ httpc_request_delete(struct httpc_request *req)
 	}
 
 	mempool_free(&req->env->req_pool, req);
+
+	if (env->req_count == 0 &&
+	    env->cleanup == 1) {
+		httpc_env_destroy(env);
+	}
 }
 
 int
