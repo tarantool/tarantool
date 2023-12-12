@@ -60,6 +60,10 @@ struct httpc_stat {
  * HTTP Client Environment
  */
 struct httpc_env {
+	/** Number of a current active http requests. */
+	int req_count;
+	/** Flag that triggers cleanup. */
+	int cleanup;
 	/** Curl environment. */
 	struct curl_env curl_env;
 	/** Memory pool for requests */
@@ -77,6 +81,13 @@ struct httpc_env {
  */
 int
 httpc_env_create(struct httpc_env *ctx, int max_conns, int max_total_conns);
+
+/**
+ * Finish HTTP client environment
+ * @param env pointer to a structure to finish
+ */
+void
+httpc_env_finish(struct httpc_env *env);
 
 /**
  * Destroy HTTP client environment
