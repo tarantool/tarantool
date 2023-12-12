@@ -329,6 +329,7 @@ struct errcode_record {
 	/*274 */_(ER_UNCONFIGURED,		"Please call box.cfg{} first") \
 	/*275 */_(ER_CREATE_DEFAULT_FUNC,	"Failed to create field default function '%s': %s") \
 	/*276 */_(ER_DEFAULT_FUNC_FAILED,	"Error calling field default function '%s': %s") \
+	/*277 */_(ER_INVALID_DEC,		"Invalid decimal: '%s'") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
