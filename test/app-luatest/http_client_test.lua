@@ -1352,3 +1352,49 @@ g.test_http_client_io_post_parts = function(cg)
     t.assert_equals(io.status, 200, 'io')
     t.assert_equals(io.reason, 'Ok', '200 - Ok')
 end
+
+-- GH-9453: GC had collected HTTP client object
+-- when HTTP IO object is alive.
+-- Symptom: A message "IllegalParams: io: request must be io"
+-- is happened on calling HTTP IO methods.
+g.test_http_client_gc_finalizer_gh_9453 = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local client = client.new()
+    opts.chunked = true
+
+    local http_io = client:get(url, opts)
+
+    -- GC collect HTTP client object.
+    client = nil -- luacheck: no unused
+    collectgarbage()
+    collectgarbage()
+
+    -- HTTP IO object is alive.
+    local ok, res = pcall(http_io.read, http_io, 4)
+    t.assert_equals(ok, true)
+    t.assert_equals(res, 'hell')
+
+    -- Teardown.
+    http_io = nil -- luacheck: no unused
+    collectgarbage()
+    collectgarbage()
+end
+
+g.test_gh_9346_httpc_io_cleanup = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local client = client.new()
+    opts.chunked = true
+
+    local http_io = client:get(url, opts) -- luacheck: no unused
+
+    collectgarbage()
+    collectgarbage()
+
+    -- Teardown.
+    client = nil -- luacheck: no unused
+    collectgarbage()
+    collectgarbage()
+    http_io = nil -- luacheck: no unused
+    collectgarbage()
+    collectgarbage()
+end

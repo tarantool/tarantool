@@ -259,7 +259,7 @@ error_exit:
 }
 
 void
-curl_env_destroy(struct curl_env *env)
+curl_env_finish(struct curl_env *env)
 {
 	assert(env);
 	if (env->multi != NULL) {
@@ -276,6 +276,15 @@ curl_env_destroy(struct curl_env *env)
 		}
 		curl_multi_cleanup(env->multi);
 	}
+}
+
+void
+curl_env_destroy(struct curl_env *env)
+{
+	assert(env);
+
+	assert(mempool_count(&env->sock_pool) == 0);
+	assert(mempool_used(&env->sock_pool) == 0);
 
 	mempool_destroy(&env->sock_pool);
 }
