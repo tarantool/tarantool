@@ -189,7 +189,7 @@ sql_find_column_expr(const struct ExprList *list, const char *tab_name,
 {
 	for (int j = 0; j < list->nExpr; j++) {
 		if (sqlMatchSpanName(list->a[j].zSpan, col_name, tab_name,
-				     old_tab, old_col))
+				     old_col, old_tab))
 			return j;
 	}
 	return -1;
