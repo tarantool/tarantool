@@ -1629,6 +1629,7 @@ return schema.new('instance_config', schema.record({
         roles = schema.set({
             'router',
             'storage',
+            'rebalancer',
         }),
         -- Global vshard options.
         shard_index = schema.scalar({
@@ -1794,6 +1795,20 @@ return schema.new('instance_config', schema.record({
             if data.roles ~= nil and scope == 'instance' then
                 w.error('sharding.roles cannot be defined in the instance ' ..
                         'scope')
+            end
+            -- Make sure that if the rebalancer role is present, the storage
+            -- role is also present.
+            if data.roles ~= nil then
+                local has_storage = false
+                local has_rebalancer = false
+                for _, role in pairs(data.roles) do
+                    has_storage = has_storage or role == 'storage'
+                    has_rebalancer = has_rebalancer or role == 'rebalancer'
+                end
+                if has_rebalancer and not has_storage then
+                    w.error('The rebalancer role cannot be present without ' ..
+                            'the storage role')
+                end
             end
         end,
     }),

@@ -1,6 +1,7 @@
 local fun = require('fun')
 local t = require('luatest')
 local treegen = require('test.treegen')
+local justrun = require('test.justrun')
 local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
 
@@ -237,4 +238,196 @@ g.test_fixed_masters = function(g)
         res = g.server_3:eval([[return box.space.a:select()]])
         t.assert_equals(res, {{1, 1}, {2, 2}})
     end)
+end
+
+g.test_rebalancer_role = function(g)
+    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        storage:
+          roles: [super]
+          password: "storage"
+
+    iproto:
+      listen: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        sharding: 'storage@'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            sharding:
+              roles: [storage, rebalancer]
+            instances:
+              instance-001:
+                database:
+                  mode: rw
+              instance-002: {}
+          replicaset-002:
+            sharding:
+              roles: [storage]
+            instances:
+              instance-003:
+                database:
+                  mode: rw
+              instance-004: {}
+          replicaset-003:
+            sharding:
+              roles: [router]
+            instances:
+              instance-005: {}
+    ]]
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = config_file,
+        chdir = dir,
+    }
+    g.server_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+    g.server_2 = server:new(fun.chain(opts, {alias = 'instance-002'}):tomap())
+    g.server_3 = server:new(fun.chain(opts, {alias = 'instance-003'}):tomap())
+    g.server_4 = server:new(fun.chain(opts, {alias = 'instance-004'}):tomap())
+    g.server_5 = server:new(fun.chain(opts, {alias = 'instance-005'}):tomap())
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_2:start({wait_until_ready = false})
+    g.server_3:start({wait_until_ready = false})
+    g.server_4:start({wait_until_ready = false})
+    g.server_5:start({wait_until_ready = false})
+
+    g.server_1:wait_until_ready()
+    g.server_2:wait_until_ready()
+    g.server_3:wait_until_ready()
+    g.server_4:wait_until_ready()
+    g.server_5:wait_until_ready()
+
+    -- Check that cluster was created.
+    local info = g.server_1:eval('return box.info')
+    t.assert_equals(info.name, 'instance-001')
+    t.assert_equals(info.replicaset.name, 'replicaset-001')
+
+    info = g.server_2:eval('return box.info')
+    t.assert_equals(info.name, 'instance-002')
+    t.assert_equals(info.replicaset.name, 'replicaset-001')
+
+    info = g.server_3:eval('return box.info')
+    t.assert_equals(info.name, 'instance-003')
+    t.assert_equals(info.replicaset.name, 'replicaset-002')
+
+    info = g.server_4:eval('return box.info')
+    t.assert_equals(info.name, 'instance-004')
+    t.assert_equals(info.replicaset.name, 'replicaset-002')
+
+    info = g.server_5:eval('return box.info')
+    t.assert_equals(info.name, 'instance-005')
+    t.assert_equals(info.replicaset.name, 'replicaset-003')
+
+    t.assert_equals(g.server_1:eval('return box.info.ro'), false)
+    t.assert_equals(g.server_2:eval('return box.info.ro'), true)
+    t.assert_equals(g.server_3:eval('return box.info.ro'), false)
+    t.assert_equals(g.server_4:eval('return box.info.ro'), true)
+    t.assert_equals(g.server_5:eval('return box.info.ro'), false)
+
+    -- Check vshard config on each instance.
+    local exp = {
+        ["2ab78dc2-4652-3699-00e4-12df0ae32351"] = {
+            master = "auto",
+            rebalancer = true,
+            replicas = {
+                ["ef10b92d-9ae9-e7bb-004c-89d8fb468341"] = {
+                    name = "instance-002",
+                    uri = "storage:storage@unix/:./instance-002.iproto",
+                },
+                ["ffe08155-a26d-bd7c-0024-00ee6815a41c"] = {
+                    name = "instance-001",
+                    uri = "storage:storage@unix/:./instance-001.iproto",
+                },
+            },
+            weight = 1,
+        },
+        ["d1f75e70-6883-d7fe-0087-e582c9c67543"] = {
+            master = "auto",
+            replicas = {
+                ["f2974852-9b48-8e24-00ea-d34059bf24fd"] = {
+                    name = "instance-003",
+                    uri = "storage:storage@unix/:./instance-003.iproto",
+                },
+                ["50367d8e-488b-309b-001a-138a0c516772"] = {
+                    name = "instance-004",
+                    uri = "storage:storage@unix/:./instance-004.iproto"
+                },
+            },
+            weight = 1,
+        },
+    }
+
+    -- Storages.
+    local exec = 'return vshard.storage.internal.current_cfg'
+    local res = g.server_1:eval(exec)
+    t.assert_equals(res.sharding, exp)
+    res = g.server_2:eval(exec)
+    t.assert_equals(res.sharding, exp)
+    res = g.server_3:eval(exec)
+    t.assert_equals(res.sharding, exp)
+    res = g.server_4:eval(exec)
+    t.assert_equals(res.sharding, exp)
+
+    -- Router.
+    exec = 'return vshard.router.internal.static_router.current_cfg'
+    res = g.server_5:eval(exec)
+    t.assert_equals(res.sharding, exp)
+
+    -- Check that rebalancer is master of replicaset-001.
+    exec = 'return vshard.storage.internal.rebalancer_service ~= nil'
+    t.assert_equals(g.server_1:eval(exec), true)
+    t.assert_equals(g.server_2:eval(exec), false)
+    t.assert_equals(g.server_3:eval(exec), false)
+    t.assert_equals(g.server_4:eval(exec), false)
+end
+
+g.test_too_many_rebalancers = function(g)
+    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        storage:
+          roles: [super]
+          password: "storage"
+
+    iproto:
+      listen: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        sharding: 'storage@'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            sharding:
+              roles: [storage, rebalancer, router]
+            instances:
+              instance-001: {}
+          replicaset-002:
+            sharding:
+              roles: [storage, rebalancer]
+            instances:
+              instance-002: {}
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+    local env = {LUA_PATH = os.environ()['LUA_PATH']}
+    local opts = {nojson = true, stderr = true}
+    local args = {'--name', 'instance-001', '--config', 'config.yaml'}
+    local res = justrun.tarantool(dir, env, args, opts)
+    t.assert_equals(res.exit_code, 1)
+    local err = 'The rebalancer role must be present in no more than one ' ..
+                'replicaset. Replicasets with the role:'
+    t.assert_str_contains(res.stderr, err)
 end

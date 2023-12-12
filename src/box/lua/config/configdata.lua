@@ -111,11 +111,13 @@ end
 
 function methods.sharding(self)
     local sharding = {}
+    local rebalancers = {}
     for group_name, group in pairs(self._cconfig.groups) do
         for replicaset_name, value in pairs(group.replicasets) do
             local lock
             local replicaset_uuid
             local replicaset_cfg = {}
+            local is_rebalancer = nil
             for instance_name, _ in pairs(value.instances) do
                 local vars = {
                     instance_name = instance_name,
@@ -128,6 +130,15 @@ function methods.sharding(self)
                 iconfig = instance_config:apply_vars(iconfig, vars)
                 if lock == nil then
                     lock = instance_config:get(iconfig, 'sharding.lock')
+                end
+                if is_rebalancer == nil then
+                    local roles = instance_config:get(iconfig, 'sharding.roles')
+                    for _, role in pairs(roles) do
+                        is_rebalancer = is_rebalancer or role == 'rebalancer'
+                    end
+                    if is_rebalancer then
+                        table.insert(rebalancers, replicaset_name)
+                    end
                 end
                 local isharding = instance_sharding(iconfig, instance_name)
                 if isharding ~= nil then
@@ -149,12 +160,18 @@ function methods.sharding(self)
             if next(replicaset_cfg) ~= nil then
                 assert(replicaset_uuid ~= nil)
                 sharding[replicaset_uuid] = {
+                    rebalancer = is_rebalancer or nil,
                     replicas = replicaset_cfg,
                     master = 'auto',
                     lock = lock,
                 }
             end
         end
+    end
+    if #rebalancers > 1 then
+        local err = "The rebalancer role must be present in no more than " ..
+                    "one replicaset. Replicasets with the role: %s"
+        error(err:format(table.concat(rebalancers, ", ")), 0)
     end
     local cfg = {
         sharding = sharding,
