@@ -138,6 +138,25 @@ waker_f(va_list ap)
 	return 0;
 }
 
+static int
+canceller_f(va_list ap)
+{
+	struct fiber *main_fiber = (struct fiber *)fiber()->f_arg;
+	fiber_cancel(main_fiber);
+	return 0;
+}
+
+static int
+watcher_f(va_list ap)
+{
+	fiber_sleep(1);
+	if (fiber_is_cancelled())
+		return 0;
+
+	fail("watcher timeout", "triggered");
+	unreachable();
+}
+
 static void
 fiber_join_test()
 {
@@ -400,6 +419,32 @@ cord_cojoin_test(void)
 }
 
 static void
+cord_cojoin_cancel_test(void)
+{
+	header();
+
+	struct cord cord;
+	fail_if(cord_costart(&cord, "cord", wait_cancel_f, NULL) != 0);
+
+	struct fiber *canceller_fiber = fiber_new("canceller", canceller_f);
+	fail_if(canceller_fiber == NULL);
+	canceller_fiber->f_arg = fiber();
+	fiber_wakeup(canceller_fiber);
+
+	struct fiber *watcher_fiber = fiber_new("watcher", watcher_f);
+	fail_if(watcher_fiber == NULL);
+	fiber_set_joinable(watcher_fiber, true);
+	fiber_wakeup(watcher_fiber);
+
+	fail_if(cord_cojoin(&cord) != 0);
+
+	fiber_cancel(watcher_fiber);
+	fiber_join(watcher_fiber);
+
+	footer();
+}
+
+static void
 cord_cancel_and_join_test(void)
 {
 	header();
@@ -548,6 +593,7 @@ main_f(va_list ap)
 	fiber_flags_respect_test();
 	fiber_wait_on_deadline_test();
 	cord_cojoin_test();
+	cord_cojoin_cancel_test();
 	cord_cancel_and_join_test();
 	fiber_test_defaults();
 	fiber_test_leak_modes();

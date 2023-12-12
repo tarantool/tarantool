@@ -1806,6 +1806,20 @@ box_region_truncate(size_t size)
 	return region_truncate(&fiber()->gc, size);
 }
 
+/**
+ * Callback for cancel_event. This event is used to signal to cord that
+ * its fiber should be cancelled.
+ */
+static void
+cord_cancel_callback(ev_loop *loop, ev_async *watcher, int revents)
+{
+	(void)loop;
+	(void)watcher;
+	(void)revents;
+	if (cord()->main_fiber)
+		fiber_cancel(cord()->main_fiber);
+}
+
 void
 cord_create(struct cord *cord, const char *name)
 {
@@ -1846,6 +1860,7 @@ cord_create(struct cord *cord, const char *name)
 	 * event loop iteration.
 	 */
 	ev_async_init(&cord->wakeup_event, fiber_schedule_wakeup);
+	cord->main_fiber = NULL;
 
 	ev_idle_init(&cord->idle_event, fiber_schedule_idle);
 
@@ -1942,6 +1957,8 @@ void *cord_thread_func(void *p)
 {
 	struct cord_thread_arg *ct_arg = (struct cord_thread_arg *) p;
 	cord_create(ct_arg->cord, (ct_arg->name));
+	ev_async_init(&cord()->cancel_event, cord_cancel_callback);
+	ev_async_start(loop(), &cord()->cancel_event);
 	/** Can't possibly be the main thread */
 	assert(cord()->id != main_thread_id);
 	tt_pthread_mutex_lock(&ct_arg->start_mutex);
@@ -1970,6 +1987,7 @@ void *cord_thread_func(void *p)
 	if (!changed)
 		handler->callback(handler->argument);
 
+	ev_async_stop(loop(), &cord()->cancel_event);
 	cord_exit(cord());
 
 	return res;
@@ -2110,6 +2128,8 @@ cord_cojoin(struct cord *cord)
 		 */
 		do {
 			assert(cord->id != 0);
+			if (fiber_is_cancelled())
+				ev_async_send(cord->loop, &cord->cancel_event);
 			fiber_yield();
 		} while (!ctx.task_complete);
 	}
@@ -2143,6 +2163,7 @@ cord_costart_thread_func(void *arg)
 	struct fiber *f = fiber_new("main", ctx.run);
 	if (f == NULL)
 		return NULL;
+	cord()->main_fiber = f;
 
 	TRIGGER(break_ev_loop, break_ev_loop_f);
 	/*
@@ -2163,6 +2184,7 @@ cord_costart_thread_func(void *arg)
 	assert(fiber_is_dead(f));
 	fiber()->f_ret = fiber_join(f);
 	fiber_check_gc();
+	cord()->main_fiber = NULL;
 
 	return NULL;
 }
