@@ -6565,8 +6565,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 			 */
 			sqlVdbeJumpHere(v, addr1);
 			updateAccumulator(pParse, &sAggInfo);
-			if (pParse->is_aborted)
-				goto select_end;
 			sqlVdbeAddOp2(v, OP_Integer, 1, iUseFlag);
 			VdbeComment((v, "indicate data in accumulator"));
 
@@ -6581,6 +6579,8 @@ sqlSelect(Parse * pParse,		/* The parser context */
 				sqlWhereEnd(pWInfo);
 				sqlVdbeChangeToNoop(v, addrSortingIdx);
 			}
+			if (pParse->is_aborted)
+				goto select_end;
 
 			/* Output the final row of result
 			 */
