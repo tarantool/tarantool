@@ -319,6 +319,7 @@ struct errcode_record {
 	/*264 */_(ER_UNUSED18,			"") \
 	/*265 */_(ER_UNUSED19,			"") \
 	/*266 */_(ER_MISSING_SYSTEM_SPACES,	"Snapshot has no system spaces") \
+	/*267 */_(ER_INVALID_DEC,		"Invalid decimal: '%s'") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
