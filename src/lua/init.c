@@ -913,6 +913,10 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	}
 	lua_setfield(L, LUA_GLOBALSINDEX, "arg");
 
+	/* Create a table for "package.searchers" analogue. */
+	lua_newtable(L);
+	lua_setfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_PACKAGE_SEARCHERS");
+
 	/*
 	 * Create a table for storing loaded built-in modules.
 	 * Similar to _LOADED (package.loaded).
