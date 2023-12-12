@@ -614,6 +614,9 @@ curl_mt = {
                         write = io_write,
                         finish = io_finish,
                     },
+                    _internal = {
+                        httpc = self,
+                    },
                 })
             end
         end,
@@ -751,5 +754,6 @@ for _, name in ipairs({ 'get', 'delete', 'trace', 'options', 'head',
                      'connect', 'post', 'put', 'patch', 'request'}) do
     this_module[name] = http_default_wrap(name)
 end
+this_module.curl = http_default.curl
 
 return this_module

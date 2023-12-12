@@ -112,6 +112,13 @@ void
 curl_env_destroy(struct curl_env *env);
 
 /**
+ * Finish HTTP client environment
+ * @param env pointer to an environment to finish
+ */
+void
+curl_env_finish(struct curl_env *env);
+
+/**
  * Initialize a new CURL request
  * @param curl_request request
  * @retval  0 success
