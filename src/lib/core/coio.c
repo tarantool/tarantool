@@ -270,6 +270,10 @@ coio_read_ahead_timeout(struct iostream *io, void *buf, size_t sz,
 			size_t bufsiz, ev_tstamp timeout)
 {
 	assert(sz <= bufsiz);
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
 	ev_tstamp start, delay;
 	coio_timeout_init(&start, &delay, timeout);
 	ssize_t to_read = (ssize_t) sz;
@@ -368,6 +372,10 @@ ssize_t
 coio_write_timeout(struct iostream *io, const void *buf, size_t sz,
 		   ev_tstamp timeout)
 {
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
 	ssize_t towrite = sz;
 	ev_tstamp start, delay;
 	coio_timeout_init(&start, &delay, timeout);
@@ -422,6 +430,10 @@ ssize_t
 coio_writev_timeout(struct iostream *io, struct iovec *iov, int iovcnt,
 		    size_t size_hint, ev_tstamp timeout)
 {
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
 	size_t total = 0;
 	size_t iov_len = 0;
 	struct iovec *end = iov + iovcnt;
