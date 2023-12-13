@@ -2,8 +2,8 @@
 
 * Fixed a bug when the assertion in `box_wait_limbo_acked` would fail. The
   assertion is that the lsn of the last entry in limbo is always positive after
-  `wal_sync`. What happened in the release build before the patch? If the
-  `replication_synchro_quorum` is set too high on the replica, then it will never
-  be reached. After the timeout is triggered, the user will receive a `TimedOut`
-  error. If `replication_synchro_quorum` <= number of instances in the replica
-  set, the program will immediately stop with a `Segmentation fault` (gh-9235).
+  `wal_sync`. Before the patch, if the `replication_synchro_quorum` was set too
+  high on the replica, it would never be reached. After the timeout was
+  triggered, the user received a `TimedOut` error. If the quorum was greater
+  than or equal to the number of instances in the replica set, the program
+  immediately stopped with a segmentation fault (gh-9235).
