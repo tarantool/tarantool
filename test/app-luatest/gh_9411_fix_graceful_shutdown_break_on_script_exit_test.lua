@@ -33,7 +33,16 @@ g.test = function()
                                    stderr = popen.opts.DEVNULL})
     assert(handle, err)
     g.handle = handle
-    local output, err = handle:read({timeout = 3})
+    -- NB: Don't guess a good timeout, just use 60 seconds as
+    -- something that is definitely less than default test timeout
+    -- (110 seconds), but large enough to perform an action that
+    -- usually takes a fraction of a second.
+    --
+    -- The bad case doesn't stuck the test case anyway: if the
+    -- child process doesn't call an on_shutdown trigger, the
+    -- process exits without output and we get EOF (an empty
+    -- string) here.
+    local output, err = handle:read({timeout = 60})
     assert(output, err)
     t.assert_equals(output, 'shutdown callback finished\n')
     local status = handle:wait()
