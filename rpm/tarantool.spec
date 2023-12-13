@@ -1,10 +1,3 @@
-# Enable systemd for on RHEL >= 7 and Fedora >= 15
-%if (0%{?fedora} >= 15 || 0%{?rhel} >= 7)
-%bcond_without systemd
-%else
-%bcond_with systemd
-%endif
-
 # XXX: There is an old CMake (2.8.12) provided by cmake package in
 # main CentOS 7 repositories. At the same time, there is a newer
 # package cmake3 providing CMake 3+ from EPEL repository. So, one
@@ -34,10 +27,6 @@ BuildRequires: gcc-c++ >= 4.5
 %endif
 BuildRequires: coreutils
 BuildRequires: sed
-BuildRequires: readline-devel
-BuildRequires: openssl-devel
-BuildRequires: libicu-devel
-#BuildRequires: msgpuck-devel
 %if 0%{?fedora} > 0
 # pod2man is needed to build man pages
 BuildRequires: perl-podlators
@@ -48,18 +37,6 @@ Requires(pre): %{_sbindir}/groupadd
 # libcurl dependencies (except ones we have already).
 BuildRequires: zlib-devel
 Requires: zlib
-
-%if %{with systemd}
-Requires(post): systemd
-Requires(preun): systemd
-Requires(postun): systemd
-BuildRequires: systemd
-%else
-Requires(post): chkconfig
-Requires(post): initscripts
-Requires(preun): chkconfig
-Requires(preun): initscripts
-%endif
 
 #
 # Disable stripping of /usr/bin/tarantool to allow the debug symbols
@@ -78,6 +55,8 @@ BuildRequires: python3-gevent
 BuildRequires: python3-pyyaml
 # needed for datetime tests
 BuildRequires: tzdata
+# needed for building testlib
+BuildRequires: rsync
 
 # Install prove to run LuaJIT tests.
 BuildRequires: perl-Test-Harness
@@ -97,8 +76,6 @@ Summary: In-memory database and Lua application server
 License: BSD
 
 Provides: tarantool-debuginfo = %{version}-%{release}
-Provides: tarantool-common = %{version}-%{release}
-Obsoletes: tarantool-common < 1.6.8.434-1
 # Add dependency on network configuration files used by `socket` module
 # https://github.com/tarantool/tarantool/issues/1794
 Requires: /etc/protocols
@@ -139,6 +116,13 @@ stored procedures in Lua.
 This package provides server development files needed to create
 C and Lua/C modules.
 
+%package testlib
+Summary: test libs for tarantool
+Group: Applications/Databases
+Requires: %{name}%{?_isa} = %{version}-%{release}
+%description testlib
+Libs for tarantool tests
+
 %prep
 %setup -q -n %{name}-%{version}
 
@@ -161,26 +145,25 @@ C and Lua/C modules.
        -B . \
          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
          -DCMAKE_INSTALL_LOCALSTATEDIR:PATH=%{_localstatedir} \
-         -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
-%if %{with systemd}
-         -DWITH_SYSTEMD:BOOL=ON \
-         -DSYSTEMD_UNIT_DIR:PATH=%{_unitdir} \
-         -DSYSTEMD_TMPFILES_DIR:PATH=%{_tmpfilesdir} \
-%endif
+         -DBUILD_STATIC_WITH_BUNDLED_LIBS=ON \
 %if 0%{?fedora} >= 33
          -DENABLE_LTO=ON \
 %endif
 %if %{_gc64} == "true"
          -DLUAJIT_ENABLE_GC64:BOOL=ON \
 %endif
-         -DENABLE_WERROR:BOOL=ON \
-         -DENABLE_DIST:BOOL=ON
-make %{?_smp_mflags}
+         -DENABLE_WERROR:BOOL=ON
+
+# This hack helps resolving problems with building libicu. The variable
+# BUILDDIR from buiding tarantool replaces BUILDDIR of building libicu.
+MAKEFLAGS= make %{?_smp_mflags}
 
 %install
 %make_install
 # %%doc and %%license macroses are used instead
 rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
+mkdir -p %{buildroot}%{_libdir}/tarantool-testlib/
+rsync -avz --include='*/' --include='*.so' --exclude='*' ./ %{buildroot}%{_libdir}/tarantool-testlib/
 
 %if "%{getenv:MAKE_CHECK}" != "false"
 %check
@@ -193,27 +176,10 @@ make test-force
     -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
 
 %post
-%if %{with systemd}
-%tmpfiles_create tarantool.conf
-%systemd_post tarantool@.service
-%else
-chkconfig --add tarantool || :
-%endif
 
 %preun
-%if %{with systemd}
-%systemd_preun tarantool@.service
-%else
-if [ $1 -eq 0 ] ; then # uninstall
-    service tarantool stop || :
-    chkconfig --del tarantool || :
-fi
-%endif
 
 %postun
-%if %{with systemd}
-%systemd_postun_with_restart tarantool@.service
-%endif
 
 %files
 %{_bindir}/tarantool
@@ -222,29 +188,9 @@ fi
 %{!?_licensedir:%global license %doc}
 %license LICENSE AUTHORS
 
-%{_bindir}/tarantoolctl
-%{_mandir}/man1/tarantoolctl.1*
-%config(noreplace) %{_sysconfdir}/sysconfig/tarantool
-%dir %{_sysconfdir}/tarantool
-%dir %{_sysconfdir}/tarantool/instances.available
-%config(noreplace) %{_sysconfdir}/tarantool/instances.available/example.lua
-# Use 0750 for database files
-%attr(0750,tarantool,tarantool) %dir %{_localstatedir}/lib/tarantool/
-%attr(0750,tarantool,tarantool) %dir %{_localstatedir}/log/tarantool/
-%config(noreplace) %{_sysconfdir}/logrotate.d/tarantool
 # tarantool package should own module directories
 %dir %{_libdir}/tarantool
 %dir %{_datadir}/tarantool
-%{_datadir}/tarantool/luarocks
-
-%if %{with systemd}
-%{_unitdir}/tarantool@.service
-%{_tmpfilesdir}/tarantool.conf
-%else
-%{_sysconfdir}/init.d/tarantool
-%dir %{_sysconfdir}/tarantool/instances.enabled
-%attr(-,tarantool,tarantool) %dir %{_localstatedir}/run/tarantool/
-%endif
 
 %files devel
 %dir %{_includedir}/tarantool
@@ -257,6 +203,10 @@ fi
 %{_includedir}/tarantool/lualib.h
 %{_includedir}/tarantool/module.h
 %{_includedir}/tarantool/curl
+
+%files testlib
+%dir %{_libdir}/tarantool-testlib
+%{_libdir}/tarantool-testlib/*
 
 %changelog
 * Thu Aug 19 2021 Kirill Yukhin <kyukhin@tarantool.org> 2.8.2.0-1
