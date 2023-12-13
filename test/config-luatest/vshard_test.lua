@@ -33,35 +33,31 @@ g.test_fixed_masters = function(g)
       group-001:
         replicasets:
           replicaset-001:
+            sharding:
+              roles: [storage]
             database:
               replicaset_uuid: '11111111-1111-1111-0011-111111111111'
             instances:
               instance-001:
                 database:
                   mode: rw
-                sharding:
-                  roles: [storage]
-              instance-002:
-                sharding:
-                  roles: [storage]
+              instance-002: {}
           replicaset-002:
+            sharding:
+              roles: [storage]
             instances:
               instance-003:
                 database:
                   instance_uuid: '22222222-2222-2222-0022-222222222222'
                   mode: rw
-                sharding:
-                  roles: [storage]
-              instance-004:
-                sharding:
-                  roles: [storage]
+              instance-004: {}
           replicaset-003:
+            sharding:
+              roles: [router]
             instances:
               instance-005:
                 database:
                   mode: rw
-                sharding:
-                  roles: [router]
     ]]
     local config_file = treegen.write_script(dir, 'config.yaml', config)
     local opts = {

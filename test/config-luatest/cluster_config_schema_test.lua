@@ -433,3 +433,29 @@ g.test_name_failure = function()
         end
     end
 end
+
+g.test_sharding = function()
+    local config = {
+        groups = {
+            ['group-001'] = {
+                replicasets = {
+                    ['replicaset-001'] = {
+                        instances = {
+                            ['instance-001'] = {
+                                sharding = {
+                                    roles = {'storage'},
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+    local err = '[cluster_config] groups.group-001.replicasets.' ..
+                'replicaset-001.instances.instance-001.sharding: ' ..
+                'sharding.roles cannot be defined in the instance scope'
+    t.assert_error_msg_equals(err, function()
+        cluster_config:validate(config)
+    end)
+end
