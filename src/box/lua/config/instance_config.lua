@@ -1864,6 +1864,15 @@ return schema.new('instance_config', schema.record({
                 end
             end,
         }),
+    }, {
+        validate = function(data, w)
+            -- Forbid sharding.roles in instance scope.
+            local scope = w.schema.computed.annotations.scope
+            if data.roles ~= nil and scope == 'instance' then
+                w.error('sharding.roles cannot be defined in the instance ' ..
+                        'scope')
+            end
+        end,
     }),
     audit_log = enterprise_edition(schema.record({
         -- The same as the destination for the logger, audit logger destination
