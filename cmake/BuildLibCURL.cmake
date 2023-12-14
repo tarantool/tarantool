@@ -89,7 +89,11 @@ macro(curl_build)
     # Additionaly disable some more protocols.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SMB=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_GOPHER=ON")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_CRYPTO_AUTH=ON")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_BASIC_AUTH=ON")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_BEARER_AUTH=ON")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_DIGEST_AUTH=ON")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_KERBEROS_AUTH=ON")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_AWS=ON")
 
     # Don't attempt to find system CA bundle/certificates at
     # libcurl configuration step (build time). Fallback to
