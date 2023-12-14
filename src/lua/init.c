@@ -136,6 +136,8 @@ extern char minifio_lua[],
 	utils_lua[],
 	argparse_lua[],
 	iconv_lua[],
+	protobuf_wireformat_lua[],
+	protobuf_lua[],
 	/* jit.* library */
 	jit_vmdef_lua[],
 	jit_bc_lua[],
@@ -211,6 +213,8 @@ static const char *lua_modules[] = {
 	"http.client", httpc_lua,
 	"iconv", iconv_lua,
 	"swim", swim_lua,
+	"internal.protobuf.wireformat", protobuf_wireformat_lua,
+	"protobuf", protobuf_lua,
 	COMPRESS_LUA_MODULES
 	/* jit.* library */
 	"jit.vmdef", jit_vmdef_lua,
