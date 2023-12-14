@@ -24,7 +24,7 @@ if(CHECKPATCH)
     )
 else()
     set(WARN_MSG "`checkpatch.pl' is not found, so checkpatch target is dummy.")
-    add_custom_command(TARGET ${PROJECT_NAME}-checkpatch
+    add_custom_command(TARGET checkpatch
         COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --red ${WARN_MSG}
         COMMENT ${WARN_MSG}
     )
