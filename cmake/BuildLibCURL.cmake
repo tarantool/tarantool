@@ -179,7 +179,6 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_GSSAPI=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_LIBSSH=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_LIBPSL=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_OPENLDAP=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_WERROR=OFF")
     # CURL_ZSTD adds zstd encoding/decoding support. Tuning libcurl's build to
     # catch the symbols may require extra work.
