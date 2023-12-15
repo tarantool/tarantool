@@ -116,6 +116,7 @@ g.test_fixed_masters = function(g)
 
     -- Check vshard config on each instance.
     local exp = {
+        box_cfg_mode = "manual",
         bucket_count = 1234,
         discovery_mode = "on",
         failover_ping_timeout = 5,
@@ -125,6 +126,7 @@ g.test_fixed_masters = function(g)
         rebalancer_mode = "auto",
         sched_move_quota = 1,
         sched_ref_quota = 258,
+        schema_management_mode = "auto",
         shard_index = "bucket_id",
         sync_timeout = 1,
         sharding = {
@@ -173,7 +175,7 @@ g.test_fixed_masters = function(g)
     -- Router.
     exec = 'return vshard.router.internal.static_router.current_cfg'
     res = g.server_5:eval(exec)
-    t.assert_equals(res.sharding, exp.sharding)
+    t.assert_equals(res, exp)
 
     -- Check that basic sharding works.
     exec = [[

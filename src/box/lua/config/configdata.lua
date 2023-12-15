@@ -156,7 +156,11 @@ function methods.sharding(self)
             end
         end
     end
-    local cfg = {sharding = sharding}
+    local cfg = {
+        sharding = sharding,
+        box_cfg_mode = 'manual',
+        schema_management_mode = 'auto',
+    }
 
     local vshard_global_options = {
         'shard_index',
