@@ -176,6 +176,13 @@ g.test_sharding = run_as_script(function()
 
     local instance_name = 'router-001'
     local cconfig = {
+        credentials = {
+            users = {
+                guest = {
+                    roles = {'sharding'},
+                },
+            },
+        },
         iproto = {
             listen = {{uri = listen_template}},
         },
