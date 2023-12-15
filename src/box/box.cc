@@ -5866,7 +5866,6 @@ box_storage_free(void)
 {
 	if (!is_storage_initialized)
 		return;
-	iproto_free();
 	replication_free();
 	gc_free();
 	engine_shutdown();
@@ -5922,7 +5921,7 @@ box_storage_shutdown()
 {
 	if (!is_storage_initialized)
 		return;
-	iproto_drop_connections();
+	iproto_shutdown();
 }
 
 void

@@ -178,8 +178,12 @@ iproto_session_send(struct session *session,
 		    const char *header, const char *header_end,
 		    const char *body, const char *body_end);
 
+/**
+ * Drop all current connections (see iproto_drop_connections) stop and
+ * free iproto. TX event loop running is required to work.
+ */
 void
-iproto_free(void);
+iproto_shutdown(void);
 
 /**
  * Drop all current connections. That is stop IO and cancel all inprogress
