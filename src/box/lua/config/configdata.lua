@@ -100,6 +100,39 @@ local function instance_sharding(iconfig)
         uri = urilib.format(u, true)
     end
     local uuid = instance_config:get(iconfig, 'database.instance_uuid')
+
+    local user = instance_config:get(iconfig, {'credentials', 'users', u.login})
+    --
+    -- If the user is not described in the credentials, this may mean that the
+    -- user already exists and may have all the necessary privileges. If not, an
+    -- error will be thrown later.
+    --
+    if user ~= nil then
+        -- Check that the vshard storage user has the credential sharding role.
+        local function check_sharding_role(roles)
+            if roles == nil or next(roles) == nil then
+                return false
+            end
+            for _, role_name in pairs(roles) do
+                if role_name == 'sharding' then
+                    return true
+                end
+            end
+            for _, role_name in pairs(roles) do
+                local path = {'credentials', 'roles', role_name, 'roles'}
+                if check_sharding_role(instance_config:get(iconfig, path)) then
+                    return true
+                end
+            end
+            return false
+        end
+
+        if not check_sharding_role(user.roles) then
+            local err = "storage user %q should have %q role"
+            error(err:format(u.login, 'sharding'), 0)
+        end
+    end
+
     return {
         uri = uri,
         uuid = uuid,

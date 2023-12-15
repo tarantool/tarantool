@@ -18,7 +18,7 @@ g.test_fixed_masters = function(g)
         guest:
           roles: [super]
         storage:
-          roles: [super]
+          roles: [sharding]
           password: "storage"
 
     iproto:
@@ -266,7 +266,7 @@ g.test_rebalancer_role = function(g)
         guest:
           roles: [super]
         storage:
-          roles: [super]
+          roles: [sharding]
           password: "storage"
 
     iproto:
@@ -430,7 +430,7 @@ g.test_too_many_rebalancers = function(g)
         guest:
           roles: [super]
         storage:
-          roles: [super]
+          roles: [sharding]
           password: "storage"
 
     iproto:
@@ -463,4 +463,156 @@ g.test_too_many_rebalancers = function(g)
     local err = 'The rebalancer role must be present in no more than one ' ..
                 'replicaset. Replicasets with the role:'
     t.assert_str_contains(res.stderr, err)
+end
+
+--
+-- Make sure that if the vshard storage user is in credentials, it has the
+-- credentials sharding role.
+--
+g.test_no_sharding_credentials_role_success = function(g)
+    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    helpers.success_case(g, {
+        options = {
+            ['credentials.users.storage.roles'] = {'sharding'},
+            ['credentials.users.storage.password'] = 'storage',
+            ['sharding.roles'] = {'storage', 'router'},
+            ['iproto.advertise.sharding'] = {login = 'storage'},
+        },
+        verify = function() end,
+    })
+
+    helpers.success_case(g, {
+        options = {
+            ['credentials.roles.some_role.roles'] = {'sharding', 'super'},
+            ['credentials.users.storage.roles'] = {'some_role'},
+            ['credentials.users.storage.password'] = 'storage',
+            ['sharding.roles'] = {'storage', 'router'},
+            ['iproto.advertise.sharding'] = {login = 'storage'},
+        },
+        verify = function() end,
+    })
+end
+
+g.test_no_sharding_credentials_role_error = function(g)
+    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        storage:
+          roles: [super]
+          password: "storage"
+
+    iproto:
+      listen:
+      - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        sharding:
+            login: 'storage'
+
+    sharding:
+        roles: [storage, router]
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001: {}
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+    local opts = {nojson = true, stderr = true}
+    local args = {'--name', 'instance-001', '--config', 'config.yaml'}
+    local res = justrun.tarantool(dir, {}, args, opts)
+    local exp_err = 'storage user "storage" should have "sharding" role'
+    t.assert_equals(res.exit_code, 1)
+    t.assert_str_contains(res.stderr, exp_err)
+end
+
+--
+-- Make sure that if the vshard storage user is not specified in the
+-- credentials, its credential sharding role is not checked.
+--
+g.test_no_storage_user = function(g)
+    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    helpers.success_case(g, {
+        options = {
+            ['sharding.roles'] = {'storage', 'router'},
+            ['iproto.advertise.sharding'] = {
+                login = 'storage',
+                password = 'storage',
+            },
+        },
+        verify = function() end,
+    })
+end
+
+-- Make sure that the credential sharding role has all necessary credentials.
+g.test_sharding_credentials_role = function(g)
+    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        storage:
+          roles: [sharding]
+          password: "storage"
+
+    iproto:
+      listen:
+      - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        sharding:
+          login: 'storage'
+
+    sharding:
+        roles: [storage, router]
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001: {}
+    ]]
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = config_file,
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+
+    g.server:exec(function()
+        local user = box.space._user.index.name:get('storage')
+        local role = box.space._user.index.name:get('sharding')
+        local repl_id = box.space._user.index.name:get('replication').id
+        t.assert(role ~= nil)
+        local vexports = require('vshard.storage.exports')
+        local exports = vexports.compile(vexports.log[#vexports.log])
+
+        -- The role should have the necessary privileges.
+        t.assert(box.space._priv:get({role.id, 'role', repl_id}) ~= nil)
+        t.assert(box.space._priv:get({user.id, 'role', role.id}) ~= nil)
+        for name in pairs(exports.funcs) do
+            local func = box.space._func.index.name:get(name)
+            t.assert(box.space._priv:get({role.id, 'function', func.id}) ~= nil)
+        end
+
+        -- After reload(), the role should have the necessary privileges.
+        local config = require('config')
+        config:reload()
+        t.assert(box.space._priv:get({role.id, 'role', repl_id}) ~= nil)
+        t.assert(box.space._priv:get({user.id, 'role', role.id}) ~= nil)
+        for name in pairs(exports.funcs) do
+            local func = box.space._func.index.name:get(name)
+            t.assert(box.space._priv:get({role.id, 'function', func.id}) ~= nil)
+        end
+    end)
 end
