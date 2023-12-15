@@ -199,7 +199,14 @@ function methods.sharding(self)
     local cfg = {
         sharding = sharding,
         box_cfg_mode = 'manual',
-        schema_management_mode = 'auto',
+        --
+        -- We set this option to "manual" to be able to manage privileges using
+        -- the credentials config section and to be able to create the necessary
+        -- vshard functions in case all instances in a replicaset are running in
+        -- read-only mode (which is possible, for example, in case of
+        -- replication.failover == election).
+        --
+        schema_management_mode = 'manual_access',
         identification_mode = 'name_as_key',
     }
 
