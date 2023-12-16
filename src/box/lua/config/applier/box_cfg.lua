@@ -710,7 +710,7 @@ local function apply(config)
             box_cfg.read_only = true
         end
 
-        log.debug('box_cfg.apply (startup): %s', box_cfg)
+        log.debug('box_cfg.apply (startup)')
         box.cfg(box_cfg)
 
         -- NB: needs_retry should be true when force_read_only is
@@ -719,7 +719,7 @@ local function apply(config)
     end
 
     -- If it is reload, just apply the new configuration.
-    log.debug('box_cfg.apply: %s', box_cfg)
+    log.debug('box_cfg.apply')
     box.cfg(box_cfg)
 end
 
