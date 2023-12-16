@@ -6,6 +6,7 @@
 local fun = require('fun')
 local urilib = require('uri')
 local digest = require('digest')
+local uuid = require('uuid')
 local instance_config = require('internal.config.instance_config')
 local cluster_config = require('internal.config.cluster_config')
 local snapshot = require('internal.config.utils.snapshot')
@@ -330,11 +331,21 @@ local mt = {
 
 -- Validate UUIDs and names passed to config against the data,
 -- saved inside snapshot. Fail early if mismatch is found.
-local function validate_names(saved_names, config_names)
+local function validate_names(saved_names, config_names, iconfig)
     -- Snapshot always has replicaset uuid and
     -- at least one peer in _cluster space.
-    assert(saved_names.replicaset_uuid)
-    assert(saved_names.instance_uuid)
+    if saved_names.replicaset_uuid == nil then
+        local snap_path = snapshot.get_path(iconfig)
+        error(('Snapshot file %s has no "replicaset_uuid" key in _cluster ' ..
+            'system space. The snapshot is likely corrupted.'):format(
+            snap_path), 0)
+    end
+    if saved_names.instance_uuid == uuid.NULL then
+        local snap_path = snapshot.get_path(iconfig)
+        error(('Snapshot file %s has no "Instance" header with an instance ' ..
+            'UUID. The snapshot is likely corrupted.'):format(
+            snap_path), 0)
+    end
     -- Config always has names set.
     assert(config_names.replicaset_name ~= nil)
     assert(config_names.instance_name ~= nil)
@@ -764,7 +775,7 @@ local function new(iconfig, cconfig, instance_name)
             replicaset_uuid = config_replicaset_uuid,
             instance_uuid = config_instance_uuid,
             peers = peers,
-        })
+        }, iconfig_def)
     end
 
     return setmetatable({
