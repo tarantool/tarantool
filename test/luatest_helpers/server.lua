@@ -4,6 +4,30 @@ local urilib = require('uri')
 local fio = require('fio')
 local luatest = require('luatest')
 
+-- Join paths in an intuitive way.
+--
+-- If a component is nil, it is skipped.
+--
+-- If a component is an absolute path, it skips all the previous
+-- components.
+--
+-- The wrapper is written for two components for simplicity.
+local function pathjoin(a, b)
+    -- No first path -- skip it.
+    if a == nil then
+        return b
+    end
+    -- No second path -- skip it.
+    if b == nil then
+        return a
+    end
+    -- The absolute path is checked explicitly due to gh-8816.
+    if b:startswith('/') then
+        return b
+    end
+    return fio.pathjoin(a, b)
+end
+
 -- Determine advertise URI for given instance from a cluster
 -- configuration.
 local function find_advertise_uri(config, instance_name, dir)
@@ -114,7 +138,16 @@ function Server:initialize()
             table.insert(self.args, '--config')
             table.insert(self.args, self.config_file)
 
-            local fh = fio.open(self.config_file, {'O_RDONLY'})
+            -- Take into account self.chdir to calculate a config
+            -- file path.
+            local config_file_path = pathjoin(self.chdir, self.config_file)
+
+            -- Read the provided config file.
+            local fh, err = fio.open(config_file_path, {'O_RDONLY'})
+            if fh == nil then
+                error(('Unable to open file %q: %s'):format(config_file_path,
+                    err))
+            end
             self.config = yaml.decode(fh:read())
             fh:close()
         end
