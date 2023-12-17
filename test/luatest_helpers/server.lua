@@ -154,8 +154,16 @@ function Server:initialize()
 
         if self.net_box_uri == nil then
             local config = self.config or self.remote_config
-            self.net_box_uri = find_advertise_uri(config, self.alias,
-                self.chdir)
+
+            -- NB: listen and advertise URIs are relative to
+            -- process.work_dir, which, in turn, is relative to
+            -- self.chdir.
+            local work_dir
+            if config.process ~= nil and config.process.work_dir ~= nil then
+                work_dir = config.process.work_dir
+            end
+            local dir = pathjoin(self.chdir, work_dir)
+            self.net_box_uri = find_advertise_uri(config, self.alias, dir)
         end
     end
     getmetatable(getmetatable(self)).initialize(self)
