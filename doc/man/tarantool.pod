@@ -148,12 +148,6 @@ option (as a modifier).
 
 Run the interactive REPL.
 
-=item --failover
-
-Run a failover coordinator service.
-
-It is available in Tarantool Enterprise Edition.
-
 =back
 
 =head2 MODIFIER OPTIONS
