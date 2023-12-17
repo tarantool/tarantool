@@ -1,3 +1,4 @@
+local fio = require('fio')
 local instance_config = require('internal.config.instance_config')
 local cluster_config = require('internal.config.cluster_config')
 local configdata = require('internal.config.configdata')
@@ -381,7 +382,14 @@ function methods._startup(self, instance_name, config_file)
 
     self._status = 'startup_in_progress'
     self._instance_name = instance_name
-    self._config_file = config_file
+    -- box.cfg() changes a current working directory that
+    -- invalidates relative paths.
+    --
+    -- Let's calculate an absolute path to access the file later
+    -- on :reload().
+    if config_file ~= nil then
+        self._config_file = fio.abspath(config_file)
+    end
     broadcast(self)
 
     self:_initialize()
