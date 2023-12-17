@@ -71,12 +71,6 @@ At the lower level there are the following action options.
 
     Run the interactive REPL.
 
---failover
-
-    Run a failover coordinator service.
-
-    It is available in Tarantool Enterprise Edition.
-
 The following modifier options are applicable to actions.
 
 --force-recovery
@@ -187,12 +181,6 @@ At the lower level there are the following action options.
 -i
 
     Run the interactive REPL.
-
---failover
-
-    Run a failover coordinator service.
-
-    It is available in Tarantool Enterprise Edition.
 
 The following modifier options are applicable to actions.
 
