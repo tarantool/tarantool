@@ -218,6 +218,7 @@ applier_thread_writer_f(va_list ap)
 			ERROR_INJECT(ERRINJ_APPLIER_SLOW_ACK, {
 				fiber_sleep(0.01);
 			});
+			//say_info("Sent ACK");
 			/*
 			 * Even if new ACK is requested during the
 			 * write, don't send it again right away.

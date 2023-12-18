@@ -173,6 +173,16 @@ struct relay {
 	struct cpipe tx_pipe;
 	/** A pipe from 'tx' thread to 'relay' */
 	struct cpipe relay_pipe;
+
+	//====
+	struct cbus_endpoint tx_endpoint2;
+	/** A pipe from 'relay' thread to 'tx' */
+	struct cpipe tx_pipe_2;
+	/** A pipe from 'tx' thread to 'relay' */
+	struct cpipe relay_pipe_2;
+	//===
+
+
 	/** Status message */
 	struct relay_status_msg status_msg;
 	/**
@@ -321,12 +331,16 @@ relay_yield(struct xstream *stream)
 static void
 relay_send_heartbeat_on_timeout(struct relay *relay);
 
+static void
+relay_send_heartbeat_on_timeout_from_yield(struct relay *relay);
+
 /** A callback for recovery to send heartbeats while scanning a WAL. */
 static void
 relay_yield_and_send_heartbeat(struct xstream *stream)
 {
 	struct relay *relay = container_of(stream, struct relay, stream);
-	relay_send_heartbeat_on_timeout(relay);
+	//relay_send_heartbeat_on_timeout(relay);
+	relay_send_heartbeat_on_timeout_from_yield(relay);
 	fiber_sleep(0);
 }
 
@@ -768,6 +782,7 @@ relay_reader_f(va_list ap)
 			coio_read_xrow_timeout_xc(relay->io, &ibuf, &xrow,
 					replication_disconnect_timeout());
 			xrow_decode_applier_heartbeat_xc(&xrow, last_recv_ack);
+			//say_info("Got ACK");
 			/*
 			 * Replica send us last replicated transaction
 			 * timestamp which is needed for relay lag
@@ -827,6 +842,30 @@ relay_send_heartbeat(struct relay *relay)
  * Check whether a new heartbeat message should be sent and send it
  * in case it's required.
  */
+static inline void
+relay_send_heartbeat_on_timeout_from_yield(struct relay *relay)
+{
+	double now = ev_monotonic_now(loop());
+	/*
+	 * Do not send a message when it was just sent or when tx thread is
+	 * unresponsive.
+	 * Waiting for a replication_disconnect_timeout before declaring tx
+	 * thread unresponsive helps fight leader disruptions: followers start
+	 * counting down replication_disconnect_timeout only when the same
+	 * timeout already passes on the leader, meaning tx thread hang will be
+	 * noticed twice as late compared to a usual failure, like a crash or
+	 * network error. IOW transient hangs are tolerated without leader
+	 * switchover.
+	 */
+	if (!relay->need_new_vclock_sync &&
+	    (now - relay->last_heartbeat_time <= replication_timeout ||
+	    now - relay->tx_seen_time >= replication_disconnect_timeout()))
+		return;
+	// tx_seen_time не обновляется
+	say_info("Send heartbeat on timeout");
+	relay_send_heartbeat(relay);
+}
+
 static inline void
 relay_send_heartbeat_on_timeout(struct relay *relay)
 {
@@ -971,6 +1010,36 @@ relay_check_status_needs_update(struct relay *relay)
 }
 
 /**
+ * Relay uptime fiber function.
+ * The fiber updates the tx_seen_time so that a heartbeat is correctly
+ * generated after N rows from the WAL.
+ */
+int
+relay_uptime_f(va_list ap)
+{
+	struct relay *relay = va_arg(ap, struct relay *);
+	struct fiber *relay_f = va_arg(ap, struct fiber *);
+
+	try {
+		while (!fiber_is_cancelled()) {
+			FiberGCChecker gc_check;
+			//cbus_process(&relay->tx_endpoint2);
+			relay_check_status_needs_update(relay);
+			fiber_yield();
+
+
+			// fiber_cond_signal хз нужен ли?
+			//fiber_cond_signal(&relay->reader_cond);
+		}
+	} catch (Exception *e) {
+		// Нужно ли так делать, как сделано в catch?
+		relay_set_error(relay, e);
+		fiber_cancel(relay_f);
+	}
+	return 0;
+}
+
+/**
  * A libev callback invoked when a relay client socket is ready
  * for read. This currently only happens when the client closes
  * its socket, and we get an EOF.
@@ -987,6 +1056,13 @@ relay_subscribe_f(va_list ap)
 			     fiber_schedule_cb, fiber());
 	cbus_pair("tx", relay->tx_endpoint.name, &relay->tx_pipe,
 		  &relay->relay_pipe, relay_thread_on_start, relay,
+		  cbus_process);
+
+	cbus_endpoint_create(&relay->tx_endpoint2,
+			     tt_sprintf("relay_uptime_%p", relay),
+			     fiber_schedule_cb, fiber());
+	cbus_pair("tx", relay->tx_endpoint2.name, &relay->tx_pipe_2,
+		  &relay->relay_pipe_2, relay_thread_on_start, relay,
 		  cbus_process);
 
 	cbus_endpoint_create(&relay->wal_endpoint,
@@ -1007,12 +1083,40 @@ relay_subscribe_f(va_list ap)
 	wal_set_watcher(&relay->wal_watcher, relay->wal_endpoint.name,
 			relay_process_wal_event, cbus_process);
 
+	/**
+	 * 1. relay_process_wal_event дергает recover_remaining_wals
+	 *
+	 * 2. recover_remaining_wals дергает recover_xlog, который
+	 *    делает yield после каждой строчки в WAL
+	 *
+	 * 3. Необходимо создать новый fiber (как это сделано для
+	 *    relay_reader_f). И когда будет происходить yield после
+	 *    каждой строчки в WAL, мы будем обновлять tx_seen_time.
+	 *
+	 * 4. В новом файбере необходимо сделать чтобы он чекал tx и,
+	 *    если tx жив, то обновлять tx_seen_time. Нет! В новом файбере
+	 *    дергаем relay_check_status_needs_update(). Он много чего
+	 *    другого делает, но пока так оставляем.
+	 */
+
 	/* Start fiber for receiving replica acks. */
 	char name[FIBER_NAME_MAX];
 	snprintf(name, sizeof(name), "%s:%s", fiber()->name, "reader");
 	struct fiber *reader = fiber_new_xc(name, relay_reader_f);
 	fiber_set_joinable(reader, true);
 	fiber_start(reader, relay, fiber());
+
+	//====
+	/*
+	 * When recovering from a long WAL, fiber_yield() will occur after
+	 * N rows and the current fiber will be called.
+	 */
+	snprintf(name, sizeof(name), "%s:%s", fiber()->name, "uptime");
+	struct fiber *uptime = fiber_new_xc(name, relay_uptime_f);
+	fiber_set_joinable(uptime, true);
+	fiber_start(uptime, relay, fiber());
+	//====
+
 
 	/*
 	 * If the replica happens to be up to date on subscribe,
@@ -1025,6 +1129,8 @@ relay_subscribe_f(va_list ap)
 	/*
 	 * Run the event loop until the connection is broken
 	 * or an error occurs.
+	 * Пока текущий файбер relay_subscribe_f не cancelled
+	 * идем в цикл
 	 */
 	while (!fiber_is_cancelled()) {
 		FiberGCChecker gc_check;
@@ -1051,6 +1157,7 @@ relay_subscribe_f(va_list ap)
 		 * Check that the vclock has been updated and the previous
 		 * status message is delivered
 		 */
+		say_info("!!!!!!!!!!!!!!!!!!!!!");
 		relay_check_status_needs_update(relay);
 	}
 
@@ -1062,6 +1169,12 @@ relay_subscribe_f(va_list ap)
 	trigger_clear(&on_close_log);
 	wal_clear_watcher(&relay->wal_watcher, cbus_process);
 
+	//====
+	/* ????? */
+	fiber_cancel(uptime);
+	fiber_join(uptime);
+	//====
+
 	/* Join ack reader fiber. */
 	fiber_cancel(reader);
 	fiber_join(reader);
@@ -1069,7 +1182,10 @@ relay_subscribe_f(va_list ap)
 	/* Destroy cpipe to tx. */
 	cbus_unpair(&relay->tx_pipe, &relay->relay_pipe,
 		    relay_thread_on_stop, relay, cbus_process);
+	cbus_unpair(&relay->tx_pipe_2, &relay->relay_pipe_2,
+		    relay_thread_on_stop, relay, cbus_process);
 	cbus_endpoint_destroy(&relay->wal_endpoint, cbus_process);
+	cbus_endpoint_destroy(&relay->tx_endpoint2, cbus_process);
 	cbus_endpoint_destroy(&relay->tx_endpoint, cbus_process);
 
 	relay_exit(relay);

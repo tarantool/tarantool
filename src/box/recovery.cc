@@ -142,7 +142,8 @@ recovery_scan(struct recovery *r, struct vclock *end_vclock,
 	struct xrow_header row;
 	while (xlog_cursor_next(&cursor, &row, true) == 0) {
 		vclock_follow_xrow(end_vclock, &row);
-		if (++stream->row_count % WAL_ROWS_PER_YIELD == 0)
+		//if (++stream->row_count % WAL_ROWS_PER_YIELD == 0)
+		if (++stream->row_count % 1 == 0)
 			xstream_yield(stream);
 	}
 	xlog_cursor_close(&cursor, false);
@@ -250,7 +251,8 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 	struct xrow_header row;
 	while (xlog_cursor_next_xc(&r->cursor, &row,
 				   r->wal_dir.force_recovery) == 0) {
-		if (++stream->row_count % WAL_ROWS_PER_YIELD == 0) {
+		//if (++stream->row_count % WAL_ROWS_PER_YIELD == 0) {
+		if (++stream->row_count % 1 == 0) {
 			xstream_yield(stream);
 		}
 		if (stream->row_count % 100000 == 0) {

@@ -62,14 +62,14 @@ enum wal_mode {
 	WAL_MODE_MAX
 };
 
-enum {
-	/**
-	 * Recovery yields once per that number of rows read and
-	 * applied from WAL. It allows not to block the event
-	 * loop for the whole recovery stage.
-	 */
-	WAL_ROWS_PER_YIELD = 1 << 0,
-};
+// enum {
+// 	/**
+// 	 * Recovery yields once per that number of rows read and
+// 	 * applied from WAL. It allows not to block the event
+// 	 * loop for the whole recovery stage.
+// 	 */
+// 	WAL_ROWS_PER_YIELD = 1 << 0,
+// };
 
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];

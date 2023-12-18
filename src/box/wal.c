@@ -1486,7 +1486,7 @@ wal_watcher_detach(void *arg)
 	assert(!rlist_empty(&watcher->next));
 	rlist_del_entry(watcher, next);
 }
-
+//-->
 void
 wal_set_watcher(struct wal_watcher *watcher, const char *name,
 		void (*watcher_cb)(struct wal_watcher *, unsigned events),
