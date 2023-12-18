@@ -2042,6 +2042,99 @@ return schema.new('instance_config', schema.record({
             default = 10,
         }),
     }),
+    -- Compatibility options.
+    compat = schema.record({
+        json_escape_forward_slash = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        yaml_pretty_multiline = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        fiber_channel_close_mode = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        box_cfg_replication_sync_timeout = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        sql_seq_scan_default = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        fiber_slice_default = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        box_info_cluster_meaning = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        binary_data_decoding = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        box_tuple_new_vararg = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        box_session_push_deprecation = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
+        sql_priv = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        c_func_iproto_multireturn = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        box_space_execute_priv = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        box_tuple_extension = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+        box_space_max = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
+    }),
 }, {
     -- This kind of validation cannot be implemented as the
     -- 'validate' annotation of a particular schema node. There

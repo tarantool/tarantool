@@ -146,6 +146,7 @@ extern char session_lua[],
 	/* {{{ config */
 	config_applier_app_lua[],
 	config_applier_box_cfg_lua[],
+	config_applier_compat_lua[],
 	config_applier_console_lua[],
 	config_applier_credentials_lua[],
 	config_applier_fiber_lua[],
@@ -387,6 +388,10 @@ static const char *lua_sources[] = {
 	"config/applier/box_cfg",
 	"internal.config.applier.box_cfg",
 	config_applier_box_cfg_lua,
+
+	"config/applier/compat",
+	"internal.config.applier.compat",
+	config_applier_compat_lua,
 
 	"config/applier/console",
 	"internal.config.applier.console",
