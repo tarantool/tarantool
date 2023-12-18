@@ -44,14 +44,14 @@ jobs:
   tarantool:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'full-ci' or 'integration-ci' label is set.
-    if: github.repository == 'tarantool/tarantool' &&
+    if: github.repository_owner == 'tarantool' &&
         ( github.event_name != 'pull_request' ||
           contains(github.event.pull_request.labels.*.name, 'full-ci') ||
           contains(github.event.pull_request.labels.*.name, 'integration-ci') )
 
     uses: tarantool/tarantool/.github/workflows/reusable_build.yml@master
     with:
-      ref: ${{ github.sha }}
+      ref: ${{ inputs.submodule && 'master' || github.ref }}
       os: ubuntu
       dist: focal
       submodule: ${{ inputs.submodule }}
@@ -61,94 +61,93 @@ jobs:
     needs: tarantool
     uses: tarantool/vshard/.github/workflows/reusable_testing.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   expirationd:
     needs: tarantool
     uses: tarantool/expirationd/.github/workflows/reusable_testing.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
-
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
   smtp:
     needs: tarantool
     uses: tarantool/smtp/.github/workflows/reusable_testing.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   memcached:
     needs: tarantool
     uses: tarantool/memcached/.github/workflows/reusable_testing.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   metrics:
     needs: tarantool
     uses: tarantool/metrics/.github/workflows/reusable-test.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   avro-schema:
     needs: tarantool
     uses: tarantool/avro-schema/.github/workflows/reusable_testing.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   queue:
     needs: tarantool
     uses: tarantool/queue/.github/workflows/reusable_testing.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   checks:
     needs: tarantool
     uses: tarantool/checks/.github/workflows/reusable_testing.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   mysql:
     needs: tarantool
     uses: tarantool/mysql/.github/workflows/reusable_testing.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   tarantool-c:
     needs: tarantool
     uses: tarantool/tarantool-c/.github/workflows/reusable_testing.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   tarantool-python:
     needs: tarantool
     uses: tarantool/tarantool-python/.github/workflows/reusable_testing.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   php-client:
     needs: tarantool
     uses: tarantool-php/client/.github/workflows/reusable_qa.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   php-queue:
     needs: tarantool
     uses: tarantool-php/queue/.github/workflows/reusable_qa.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   go-tarantool:
     needs: tarantool
     uses: tarantool/go-tarantool/.github/workflows/reusable_testing.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   crud:
     needs: tarantool
     uses: tarantool/crud/.github/workflows/reusable_test.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
 
   ddl:
     needs: tarantool
     uses: tarantool/ddl/.github/workflows/reusable_test.yml@master
     with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+      artifact_name: tarantool-ubuntu-focal-${{ needs.tarantool.outputs.sha }}
