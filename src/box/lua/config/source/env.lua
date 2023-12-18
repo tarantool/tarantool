@@ -1,3 +1,5 @@
+local uri = require('uri')
+local fun = require('fun')
 local schema = require('internal.config.utils.schema')
 local tabulate = require('internal.config.utils.tabulate')
 local instance_config = require('internal.config.instance_config')
@@ -6,6 +8,62 @@ local methods = {}
 local mt = {
     __index = methods,
 }
+
+-- Adjust the given URI list to the form that is accepted by
+-- instance config validators.
+--
+-- The target format is the following.
+--
+-- {
+--     login = <...>,
+--     password = <...>,
+--     uri = <...>,
+--     params = {
+--         transport = 'plain',
+--         <...>,
+--     },
+-- }
+local function normalize_uri_list(src)
+    return fun.iter(uri.parse_many(src)):map(function(u)
+        local res = {
+            login = u.login,
+            password = u.password,
+        }
+        if u.params ~= nil then
+            -- If there is only one value with the given key,
+            -- transform {[k] = {v}} to {[k] = v}.
+            res.params = fun.iter(u.params):map(function(k, v)
+                if type(v) == 'table' and #v == 1 then
+                    return k, v[1]
+                end
+                return k, v
+            end):tomap()
+        end
+        u = table.copy(u)
+        u.login = nil
+        u.password = nil
+        u.params = nil
+        res.uri = uri.format(u)
+        return res
+    end):totable()
+end
+
+local function box_cfg_env_var(box_cfg_option_name)
+    local res = box.internal.cfg.env[box_cfg_option_name]
+
+    if res == nil then
+        return nil
+    end
+
+    -- TT_LISTEN needs a special handling, because
+    -- config's schema is more strict regarding a
+    -- form of an URI than box.cfg's schema.
+    if box_cfg_option_name == 'listen' then
+        return normalize_uri_list(res)
+    end
+
+    return res
+end
 
 function methods._env_var_name(self, path_in_schema)
     local env_var_name = 'TT_' .. table.concat(path_in_schema, '_'):upper()
@@ -74,6 +132,24 @@ end
 -- Gather most actual config values.
 function methods.sync(self, _config_module, _iconfig)
     local values = {}
+
+    -- Handle old TT_* box.cfg()'s environment variables such as
+    -- IPROTO_LISTEN.
+    --
+    -- Here we miss all the options without 'box_cfg' annotation:
+    -- at least 'log', 'replication', 'audit_log' and 'metrics'.
+    --
+    -- They can be handled separately if there is a demand.
+    if self.name == 'env (default)' then
+        for _, w in instance_config:pairs() do
+            if w.schema.box_cfg ~= nil then
+                local value = box_cfg_env_var(w.schema.box_cfg)
+                if value ~= nil then
+                    instance_config:set(values, w.path, value)
+                end
+            end
+        end
+    end
 
     for _, w in instance_config:pairs() do
         local env_var_name = self:_env_var_name(w.path)
