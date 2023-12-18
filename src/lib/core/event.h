@@ -116,6 +116,13 @@ void
 event_remove_temporary_triggers(struct event *event);
 
 /**
+ * Reference all non-deleted triggers to prevent their deletion.
+ * They will be freed only with the event subsystem.
+ */
+void
+event_ref_all_triggers(struct event *event);
+
+/**
  * Iterator over triggers from event. Never invalidates.
  */
 struct event_trigger_iterator {
