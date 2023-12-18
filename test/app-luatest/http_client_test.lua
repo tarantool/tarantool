@@ -1,4 +1,4 @@
-local client = require('http.client')
+local httpc_module = require('http.client')
 local json = require('json')
 local fiber = require('fiber')
 local uri = require('uri')
@@ -50,7 +50,7 @@ local function start_server(sock_family)
     url = string.format("http://%s/", sock_addr)
 
     t.helpers.retrying({}, function()
-        local ok, res = pcall(client.get, url, client_opts)
+        local ok, res = pcall(httpc_module.get, url, client_opts)
         t.skip_if(not ok, "not supported")
         t.assert_equals(res.status, 200, "connection is ok")
     end)
@@ -61,6 +61,7 @@ end
 g.before_each(function(cg)
     local sock_family = cg.params.sock_family
     cg.server, cg.url, cg.opts = start_server(sock_family)
+    cg.httpc_module = httpc_module
 end)
 
 g.after_each(function(cg)
@@ -68,12 +69,12 @@ g.after_each(function(cg)
     if cg.unix_socket_path then
         os.remove(cg.unix_socket_path)
     end
-    cg.server, cg.url, cg.opts = nil, nil, nil
+    cg.server, cg.url, cg.opts, cg.httpc_module = nil, nil, nil, nil
 end)
 
 g.test_http_client = function(cg)
     -- gh-4136: confusing httpc usage error message
-    local url, opts = cg.url, cg.opts
+    local url, opts, client = cg.url, cg.opts, cg.httpc_module
     local ok, err = pcall(client.request, client)
     local usage_err = "request(method, url[, body, [options]])"
     t.assert_equals({ok, err:split(': ')[2]}, {false, usage_err},
@@ -99,7 +100,7 @@ end
 
 g.test_follow_location = function(cg)
     -- gh-4119: specify whether to follow 'Location' header
-    local url, opts = cg.url, cg.opts
+    local url, opts, client = cg.url, cg.opts, cg.httpc_module
     local endpoint = 'redirect'
 
     -- Verify that the default behaviour is to follow location.
@@ -159,11 +160,11 @@ end
 --          set explicitly by the caller.
 --
 g.test_http_client_headers_redefine = function(cg)
-    local url = cg.url
+    local url, client = cg.url, cg.httpc_module.new()
     local opts = table.deepcopy(cg.opts)
     -- Test defaults
     opts.headers = {['Connection'] = nil, ['Accept'] = nil}
-    local r = client.post(url, nil, opts)
+    local r = client:post(url, nil, opts)
     t.assert_equals(r.status, 200, 'simple 200')
     t.assert_equals(r.headers['connection'], 'close',
                     'Default Connection header')
@@ -174,7 +175,7 @@ g.test_http_client_headers_redefine = function(cg)
     opts.headers={['Connection'] = 'close'}
     opts.keepalive_idle = 2
     opts.keepalive_interval = 1
-    local r = client.get(url, opts)
+    local r = client:get(url, opts)
     t.assert_equals(r.status, 200, 'simple 200')
     t.assert_equals(r.headers['connection'], 'close',
                     'Redefined Connection header')
@@ -183,7 +184,7 @@ g.test_http_client_headers_redefine = function(cg)
     -- Test that user-defined Connection and Acept headers
     -- are used
     opts.headers={['Connection'] = 'Keep-Alive', ['Accept'] = 'text/html'}
-    local r = client.get(url, opts)
+    local r = client:get(url, opts)
     t.assert_equals(r.status, 200, 'simple 200')
     t.assert_equals(r.headers['accept'], 'text/html',
                     'Redefined Accept header')
@@ -192,7 +193,7 @@ g.test_http_client_headers_redefine = function(cg)
 end
 
 g.test_http_client_content_length_invalid = function(cg)
-    local url = cg.url
+    local url, client = cg.url, cg.httpc_module
     local expected = "Content%-Length header " ..
         "value must be a non%-negative integer"
     for _, length in ipairs({"asd", "-1", "1asd"}) do
@@ -205,7 +206,7 @@ g.test_http_client_content_length_invalid = function(cg)
 end
 
 g.test_cancel_and_errinj = function(cg)
-    local url, opts = cg.url, cg.opts
+    local url, opts, client = cg.url, cg.opts, cg.httpc_module
     local ch = fiber.channel(1)
     local http = client:new()
     local func  = function(fopts)
@@ -231,7 +232,7 @@ g.test_cancel_and_errinj = function(cg)
 end
 
 g.test_post_and_get = function(cg)
-    local http = client.new()
+    local http = cg.httpc_module.new()
     t.assert(http ~= nil, "client is created")
 
     local headers = { header1 = "1", header2 = "2" }
@@ -321,8 +322,8 @@ g.test_post_and_get = function(cg)
     t.assert_equals(st.active_requests, 0, "No active requests")
 end
 
-g.test_errors = function()
-    local http = client:new()
+g.test_errors = function(cg)
+    local http = cg.httpc_module:new()
     local status, err = pcall(http.get, http, "htp://mail.ru")
     t.assert_not(status, "GET: exception on bad protocol - status")
     t.assert_str_contains(json.encode(err), "Unsupported protocol",
@@ -337,7 +338,7 @@ end
 -- gh-4281 Check that opts.headers can be a table and opts.headers
 -- keys can be strings only.
 g.test_request_headers = function(cg)
-    local url, opts = cg.url, cg.opts
+    local url, opts, client = cg.url, cg.opts, cg.httpc_module
     local exp_err_bad_opts_headers = 'opts.headers should be a table'
     local exp_err_bad_key = 'opts.headers keys should be strings'
     local exp_err_bad_value = 'opts.headers values should be strings'
@@ -433,7 +434,7 @@ g.test_request_headers = function(cg)
 end
 
 g.test_headers = function(cg)
-    local url, opts = cg.url, cg.opts
+    local url, opts, client = cg.url, cg.opts, cg.httpc_module
     local http = client:new()
     local r = http:get(url .. 'headers', opts)
     t.assert_equals(type(r.headers["set-cookie"]), 'string', "set-cookie check")
@@ -490,7 +491,7 @@ g.test_headers = function(cg)
 end
 
 g.test_special_methods = function(cg)
-    local url, opts = cg.url, cg.opts
+    local url, opts, client = cg.url, cg.opts, cg.httpc_module
     local http = client.new()
     local responses = {}
     local fibers = 7
@@ -562,7 +563,7 @@ g.test_concurrent = function(cg)
     t.skip_if(cg.params.sock_family == 'AF_UNIX' and jit.os ~= 'Linux',
               "Linux-specific")
 
-    local url, opts = cg.url, cg.opts
+    local url, opts, client = cg.url, cg.opts, cg.httpc_module
     local num_test = 10
     local num_load = 10
     local curls   = { }
@@ -656,15 +657,16 @@ g.test_concurrent = function(cg)
     t.assert(ok_active, "no active requests")
 end
 
-g.test_default_body_encoders = function(_)
-    local httpc = client:new()
+g.test_default_body_encoders = function(cg)
+    local httpc = cg.httpc_module:new()
     t.assert_equals(type(httpc.encoders), 'table')
     t.assert_equals(type(httpc.encoders['application/json']), 'function')
     t.assert_equals(type(httpc.encoders['application/yaml']), 'function')
     t.assert_equals(type(httpc.encoders['application/msgpack']), 'function')
 end
 
-g.test_default_body_encoders_module = function(_)
+g.test_default_body_encoders_module = function(cg)
+    local client = cg.httpc_module
     t.assert_equals(type(client.encoders), 'table')
     t.assert_equals(type(client.encoders['application/json']), 'function')
     t.assert_equals(type(client.encoders['application/yaml']), 'function')
@@ -672,8 +674,9 @@ g.test_default_body_encoders_module = function(_)
 end
 
 -- Each of the httpc instance contains an independent copy of encoders table.
-g.test_body_encoders = function(_)
+g.test_body_encoders = function(cg)
     local mime_type = "application/yaml"
+    local client = cg.httpc_module
 
     local httpc1 = client:new()
     t.assert_equals(type(httpc1.encoders), 'table')
@@ -685,6 +688,7 @@ g.test_body_encoders = function(_)
 end
 
 g.test_encode_body_method_post_default_content_type_table = function(cg)
+    local client = cg.httpc_module
     local url = cg.url
     local opts = table.deepcopy(cg.opts)
     opts.headers = {
@@ -703,6 +707,7 @@ g.test_encode_body_method_post_default_content_type_table = function(cg)
 end
 
 g.test_encode_body_method_post_default_content_type_string = function(cg)
+    local client = cg.httpc_module
     local url = cg.url
     local opts = table.deepcopy(cg.opts)
     opts.headers = {
@@ -718,6 +723,7 @@ g.test_encode_body_method_post_default_content_type_string = function(cg)
 end
 
 g.test_encode_body_method_post_default_content_type_number = function(cg)
+    local client = cg.httpc_module
     local url = cg.url
     local opts = table.deepcopy(cg.opts)
     opts.headers = {
@@ -733,6 +739,7 @@ g.test_encode_body_method_post_default_content_type_number = function(cg)
 end
 
 g.test_encode_body_method_post_default_content_type_boolean = function(cg)
+    local client = cg.httpc_module
     local url = cg.url
     local opts = table.deepcopy(cg.opts)
     opts.headers = {
@@ -748,8 +755,9 @@ g.test_encode_body_method_post_default_content_type_boolean = function(cg)
 end
 
 -- Each of the httpc instance contains an independent copy of decoders table.
-g.test_body_decoders = function(_)
+g.test_body_decoders = function(cg)
     local mime_type = "application/yaml"
+    local client = cg.httpc_module
 
     local httpc1 = client:new()
     t.assert_equals(type(httpc1.decoders), 'table')
@@ -760,8 +768,8 @@ g.test_body_decoders = function(_)
     t.assert_not_equals(httpc2.decoders[mime_type], nil)
 end
 
-g.test_default_body_decoders = function(_)
-    local httpc = client:new()
+g.test_default_body_decoders = function(cg)
+    local httpc = cg.httpc_module:new()
     t.assert_equals(type(httpc.decoders), 'table')
     t.assert_equals(type(httpc.decoders['application/json']), 'function')
     t.assert_equals(type(httpc.decoders['application/yaml']), 'function')
@@ -769,8 +777,9 @@ g.test_default_body_decoders = function(_)
 end
 
 -- Each of the httpc instance contains an independent copy of decoders table.
-g.test_body_decoders = function(_)
+g.test_body_decoders = function(cg)
     local mime_type = "application/yaml"
+    local client = cg.httpc_module
 
     local httpc1 = client:new()
     t.assert_equals(type(httpc1.decoders), 'table')
@@ -781,8 +790,8 @@ g.test_body_decoders = function(_)
     t.assert_not_equals(httpc2.decoders[mime_type], nil)
 end
 
-g.test_default_body_decoders = function(_)
-    local httpc = client:new()
+g.test_default_body_decoders = function(cg)
+    local httpc = cg.httpc_module:new()
     t.assert_equals(type(httpc.decoders), 'table')
     t.assert_equals(type(httpc.decoders['application/json']), 'function')
     t.assert_equals(type(httpc.decoders['application/yaml']), 'function')
@@ -790,6 +799,7 @@ g.test_default_body_decoders = function(_)
 end
 
 g.test_encode_body_method_post_content_type_camelcase = function(cg)
+    local client = cg.httpc_module
     local url = cg.url
     local content_type = 'Application/JSON'
     local opts = table.deepcopy(cg.opts)
@@ -809,6 +819,7 @@ g.test_encode_body_method_post_content_type_camelcase = function(cg)
 end
 
 g.test_encode_body_method_post = function(cg)
+    local client = cg.httpc_module
     local url = cg.url
     local opts = table.deepcopy(cg.opts)
     opts.headers = {
@@ -834,6 +845,7 @@ g.test_encode_body_method_post = function(cg)
 end
 
 g.test_encode_body_method_put = function(cg)
+    local client = cg.httpc_module
     local url = cg.url
     local opts = table.deepcopy(cg.opts)
     opts.headers = {
@@ -859,6 +871,7 @@ g.test_encode_body_method_put = function(cg)
 end
 
 g.test_encode_body_method_patch = function(cg)
+    local client = cg.httpc_module
     local url = cg.url
     local opts = table.deepcopy(cg.opts)
     opts.headers = {
@@ -892,7 +905,7 @@ g.test_decode_body = function(cg)
     local body = {
         Moscow = 1,
     }
-    local http = client:new()
+    local http = cg.httpc_module:new()
     local r, _ = http:post(url, body, opts)
     t.assert_equals(r.status, 200, 'HTTP code is not 200')
     t.assert_equals(r.headers['content_type'], 'application/json')
@@ -901,7 +914,7 @@ end
 
 g.test_decode_body_gh_8363 = function(cg)
     local opts = table.deepcopy(cg.opts)
-    local http = client:new()
+    local http = cg.httpc_module:new()
     local resp = http:get(cg.url .. "json_body", opts)
     t.assert_equals(resp.status, 200, "HTTP code is not 200")
     t.assert_equals(resp.headers["content-type"],
@@ -912,7 +925,7 @@ end
 
 g.test_decode_body_custom_decoder = function(cg)
     local opts = table.deepcopy(cg.opts)
-    local http = client:new()
+    local http = cg.httpc_module:new()
     -- Define a new custom decoder, it adds a "team" word.
     http.decoders["application/lango"] = function(body, _)
         return string.format("%s team", body)
@@ -927,6 +940,7 @@ g.test_decode_body_custom_decoder = function(cg)
 end
 
 g.test_decode_body_with_content_type_camel_case = function(cg)
+    local client = cg.httpc_module
     local url = cg.url
     local content_type = 'Application/JSON' -- Camel case.
     local opts = table.deepcopy(cg.opts)
@@ -944,6 +958,7 @@ g.test_decode_body_with_content_type_camel_case = function(cg)
 end
 
 g.test_http_params_get = function(cg)
+    local client = cg.httpc_module
     local opts = table.deepcopy(cg.opts)
     opts.params = { a = "1", b = 2 }
     opts.timeout = 0.1
@@ -954,6 +969,7 @@ g.test_http_params_get = function(cg)
 end
 
 g.test_http_params_head = function(cg)
+    local client = cg.httpc_module
     local opts = table.deepcopy(cg.opts)
     opts.params = { m = 2 }
     opts.timeout = 0.1
@@ -963,6 +979,7 @@ g.test_http_params_head = function(cg)
 end
 
 g.test_http_params_delete = function(cg)
+    local client = cg.httpc_module
     local opts = table.deepcopy(cg.opts)
     opts.params = { h = "1" }
     opts.timeout = 0.1
@@ -972,6 +989,7 @@ g.test_http_params_delete = function(cg)
 end
 
 g.test_http_params_post_body = function(cg)
+    local client = cg.httpc_module
     local opts = table.deepcopy(cg.opts)
     opts.params = { c = 2, m = uri.values("lango", "lungo") }
     opts.timeout = 0.1
@@ -981,6 +999,7 @@ g.test_http_params_post_body = function(cg)
 end
 
 g.test_http_params_post_body_nil = function(cg)
+    local client = cg.httpc_module
     local opts = table.deepcopy(cg.opts)
     opts.params = { c = "2", d = 4 }
     opts.timeout = 0.1
@@ -990,7 +1009,7 @@ g.test_http_params_post_body_nil = function(cg)
 end
 
 g.test_http_params_request_get = function(cg)
-    local http = client.new()
+    local http = cg.httpc_module.new()
     t.assert(http ~= nil, "client is created")
 
     local opts = table.deepcopy(cg.opts)
@@ -1010,7 +1029,7 @@ g.test_http_params_request_get = function(cg)
 end
 
 g.test_http_params_request_post = function(cg)
-    local http = client.new()
+    local http = cg.httpc_module.new()
     t.assert(http ~= nil, "client is created")
 
     local opts = table.deepcopy(cg.opts)
@@ -1029,7 +1048,7 @@ g.test_http_params_request_post = function(cg)
 end
 
 g.test_http_params_escaped_request_post = function(cg)
-    local http = client.new()
+    local http = cg.httpc_module.new()
     t.assert(http ~= nil, "client is created")
 
     local opts = table.deepcopy(cg.opts)
@@ -1047,7 +1066,7 @@ g.test_http_params_escaped_request_post = function(cg)
 end
 
 g.test_http_params_escaped_request_get = function(cg)
-    local http = client.new()
+    local http = cg.httpc_module.new()
     t.assert(http ~= nil, "client is created")
 
     local opts = table.deepcopy(cg.opts)
@@ -1065,7 +1084,7 @@ g.test_http_params_escaped_request_get = function(cg)
 end
 
 g.test_http_client_io_get = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     opts.chunked = true
 
     local io = client.get(url, opts)
@@ -1087,7 +1106,7 @@ g.test_http_client_io_get = function(cg)
 end
 
 g.test_http_client_io_get_delimiter = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     opts.chunked = true
 
     local io = client.get(url, opts)
@@ -1103,7 +1122,7 @@ g.test_http_client_io_get_delimiter = function(cg)
 end
 
 g.test_http_client_io_read_invalid_arg = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     opts.chunked = true
 
     local io = client.get(url, opts)
@@ -1125,7 +1144,7 @@ g.test_http_client_io_read_invalid_arg = function(cg)
 end
 
 g.test_http_client_io_get_parts = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     opts.chunked = true
 
     local io = client.get(url, opts)
@@ -1144,7 +1163,7 @@ g.test_http_client_io_get_parts = function(cg)
 end
 
 g.test_http_client_io_get_write = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     opts.chunked = true
 
     local io = client.get(url, opts)
@@ -1156,7 +1175,7 @@ g.test_http_client_io_get_write = function(cg)
 end
 
 g.test_http_client_io_get_read_closed = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     opts.chunked = true
 
     local io = client.get(url, opts)
@@ -1175,7 +1194,7 @@ g.test_http_client_io_get_read_closed = function(cg)
 end
 
 g.test_http_client_io_finish = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     opts.chunked = true
 
     local io = client.get(url, opts)
@@ -1195,7 +1214,7 @@ g.test_http_client_io_finish = function(cg)
 end
 
 g.test_http_client_io_finish_timeout = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     opts.chunked = true
 
     local io = client.post(url .. 'long_query', nil, opts)
@@ -1206,7 +1225,7 @@ g.test_http_client_io_finish_timeout = function(cg)
 end
 
 g.test_http_client_io_get_fast = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     opts.chunked = true
 
     local io = client.get(url .. 'this/page/not/exists', opts)
@@ -1219,6 +1238,7 @@ end
 
 g.test_http_client_io_error = function(cg)
     local opts = table.deepcopy(cg.opts)
+    local client = cg.httpc_module
     opts.chunked = true
 
     local status, err = pcall(client.get, 'htp://mail.ru', opts)
@@ -1228,7 +1248,7 @@ g.test_http_client_io_error = function(cg)
 end
 
 g.test_http_client_io_post = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     local data = 'any data'
     opts.chunked = true
     opts.headers = {['Content-Length'] = tostring(string.len(data))}
@@ -1251,7 +1271,7 @@ g.test_http_client_io_post = function(cg)
 end
 
 g.test_http_client_io_post_encoding_chunked = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     local endpoint = 'encoding'
     local data = 'any data'
     opts.chunked = true
@@ -1264,7 +1284,7 @@ g.test_http_client_io_post_encoding_chunked = function(cg)
 end
 
 g.test_http_client_io_post_content_length_no_encoding = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     local endpoint = 'encoding'
     local data = 'any data'
     opts.chunked = true
@@ -1278,7 +1298,7 @@ g.test_http_client_io_post_content_length_no_encoding = function(cg)
 end
 
 g.test_http_client_io_post_more_than_content_length = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     local data = 'any data'
     opts.chunked = true
     opts.headers = {['Content-Length'] = tostring(string.len(data))}
@@ -1297,7 +1317,7 @@ g.test_http_client_io_post_more_than_content_length = function(cg)
 end
 
 g.test_http_client_io_post_send_close = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     local data = 'any data'
     opts.chunked = true
     opts.headers = {['Content-Length'] = tostring(string.len(data))}
@@ -1318,7 +1338,7 @@ g.test_http_client_io_post_send_close = function(cg)
 end
 
 g.test_http_client_io_post_post_read = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     local data = 'any data'
     opts.chunked = true
     opts.headers = {['Content-Length'] = tostring(string.len(data))}
@@ -1336,7 +1356,7 @@ g.test_http_client_io_post_post_read = function(cg)
 end
 
 g.test_http_client_io_post_parts = function(cg)
-    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local url, opts, client = cg.url, table.deepcopy(cg.opts), cg.httpc_module
     local first_part = 'any'
     local second_part = 'data'
     local total_len = string.len(first_part) + string.len(second_part)
@@ -1359,7 +1379,7 @@ end
 -- is happened on calling HTTP IO methods.
 g.test_http_client_gc_finalizer_gh_9453 = function(cg)
     local url, opts = cg.url, table.deepcopy(cg.opts)
-    local client = client.new()
+    local client = cg.httpc_module.new()
     opts.chunked = true
 
     local http_io = client:get(url, opts)
@@ -1382,7 +1402,7 @@ end
 
 g.test_gh_9346_httpc_io_cleanup = function(cg)
     local url, opts = cg.url, table.deepcopy(cg.opts)
-    local client = client.new()
+    local client = cg.httpc_module.new()
     opts.chunked = true
 
     local http_io = client:get(url, opts) -- luacheck: no unused
@@ -1400,8 +1420,8 @@ g.test_gh_9346_httpc_io_cleanup = function(cg)
 end
 
 g.test_http_client_GET = function(cg)
-    local default_http_client = client
-    local http_new = client.new()
+    local default_http_client = cg.httpc_module
+    local http_new = cg.httpc_module.new()
     local url, opts = cg.url, table.deepcopy(cg.opts)
     local resp
 
@@ -1414,8 +1434,8 @@ g.test_http_client_GET = function(cg)
 end
 
 g.test_http_client_POST = function(cg)
-    local default_http_client = client
-    local http_new = client.new()
+    local default_http_client = cg.httpc_module
+    local http_new = cg.httpc_module.new()
     local url, opts = cg.url, table.deepcopy(cg.opts)
     local resp
 
@@ -1428,8 +1448,8 @@ g.test_http_client_POST = function(cg)
 end
 
 g.test_http_client_PUT = function(cg)
-    local default_http_client = client
-    local http_new = client.new()
+    local default_http_client = cg.httpc_module
+    local http_new = cg.httpc_module.new()
     local url, opts = cg.url, table.deepcopy(cg.opts)
     local resp
 
@@ -1442,8 +1462,8 @@ g.test_http_client_PUT = function(cg)
 end
 
 g.test_http_client_DELETE = function(cg)
-    local default_http_client = client
-    local http_new = client.new()
+    local default_http_client = cg.httpc_module
+    local http_new = cg.httpc_module.new()
     local url, opts = cg.url, table.deepcopy(cg.opts)
     local resp
 
@@ -1456,8 +1476,8 @@ g.test_http_client_DELETE = function(cg)
 end
 
 g.test_http_client_PATCH = function(cg)
-    local default_http_client = client
-    local http_new = client.new()
+    local default_http_client = cg.httpc_module
+    local http_new = cg.httpc_module.new()
     local url, opts = cg.url, table.deepcopy(cg.opts)
     opts.headers = {
         ['content-type'] = 'application/json'
@@ -1476,8 +1496,8 @@ g.test_http_client_PATCH = function(cg)
 end
 
 g.test_http_client_TRACE = function(cg)
-    local default_http_client = client
-    local http_new = client.new()
+    local default_http_client = cg.httpc_module
+    local http_new = cg.httpc_module.new()
     local url, opts = cg.url, table.deepcopy(cg.opts)
     local resp
 
@@ -1490,8 +1510,8 @@ g.test_http_client_TRACE = function(cg)
 end
 
 g.test_http_client_OPTIONS = function(cg)
-    local default_http_client = client
-    local http_new = client.new()
+    local default_http_client = cg.httpc_module
+    local http_new = cg.httpc_module.new()
     local url, opts = cg.url, table.deepcopy(cg.opts)
     local resp
 
@@ -1504,8 +1524,8 @@ g.test_http_client_OPTIONS = function(cg)
 end
 
 g.test_http_client_HEAD = function(cg)
-    local default_http_client = client
-    local http_new = client.new()
+    local default_http_client = cg.httpc_module
+    local http_new = cg.httpc_module.new()
     local url, opts = cg.url, table.deepcopy(cg.opts)
     local resp
 
@@ -1518,8 +1538,8 @@ g.test_http_client_HEAD = function(cg)
 end
 
 g.test_http_client_CONNECT = function(cg)
-    local default_http_client = client
-    local http_new = client.new()
+    local default_http_client = cg.httpc_module
+    local http_new = cg.httpc_module.new()
     local url, opts = cg.url, table.deepcopy(cg.opts)
     local resp
 
