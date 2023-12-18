@@ -326,6 +326,23 @@ g.test_defaults = function()
             lease_interval = 30,
             renew_interval = 10,
         },
+        compat = {
+            json_escape_forward_slash = 'new',
+            yaml_pretty_multiline = 'new',
+            fiber_channel_close_mode = 'new',
+            box_cfg_replication_sync_timeout = 'new',
+            sql_seq_scan_default = 'new',
+            fiber_slice_default = 'new',
+            box_info_cluster_meaning = 'new',
+            binary_data_decoding = 'new',
+            box_tuple_new_vararg = 'new',
+            box_session_push_deprecation = 'old',
+            sql_priv = 'new',
+            c_func_iproto_multireturn = 'new',
+            box_space_execute_priv = 'new',
+            box_tuple_extension = 'new',
+            box_space_max = 'new',
+        },
     }
     local res = cluster_config:apply_default({})
     t.assert_equals(res, exp)

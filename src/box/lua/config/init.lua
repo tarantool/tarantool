@@ -151,6 +151,7 @@ function methods._initialize(self)
         self:_register_source(require('internal.config.source.file').new())
     end
 
+    self:_register_applier(require('internal.config.applier.compat'))
     self:_register_applier(require('internal.config.applier.mkdir'))
     self:_register_applier(require('internal.config.applier.box_cfg'))
     self:_register_applier(require('internal.config.applier.credentials'))
@@ -301,10 +302,11 @@ function methods._store(self, iconfig, cconfig, source_info)
     self._configdata = configdata.new(iconfig, cconfig, self._instance_name)
 end
 
--- Invoke mkdir and box_cfg appliers at the first phase. Invoke
--- all the other ones at the second phase.
+-- Invoke compat, mkdir and box_cfg appliers at the first phase.
+-- Invoke all the other ones at the second phase.
 function methods._apply_on_startup(self, opts)
     local first_phase_appliers = {
+        compat = true,
         mkdir = true,
         box_cfg = true,
     }
@@ -388,8 +390,8 @@ function methods._startup(self, instance_name, config_file)
 
     -- Startup phase 1/2.
     --
-    -- Start mkdir and box_cfg appliers. The latter may force the
-    -- read-only mode on this phase.
+    -- Start compat, mkdir and box_cfg appliers. The latter may
+    -- force the read-only mode on this phase.
     --
     -- This phase may take a long time.
     self:_store(self:_collect({sync_source = 'all'}))

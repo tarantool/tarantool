@@ -335,6 +335,12 @@ end
 
 local compat = { }
 
+-- src/box/lua/config/applier/compat.lua needs information about
+-- default values.
+function compat._options()
+    return options
+end
+
 function compat.dump(mode)
     -- dump() works in one of the following modes:
     -- dump compat configuration as is with `default` if any
