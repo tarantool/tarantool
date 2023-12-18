@@ -92,6 +92,7 @@ box_latch_lock
 box_latch_new
 box_latch_trylock
 box_latch_unlock
+box_latest_dd_version_id
 box_on_shutdown
 box_read_ffi_disable
 box_read_ffi_is_disabled
