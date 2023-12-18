@@ -4,6 +4,8 @@
  * Copyright 2010-2023, Tarantool AUTHORS, please see AUTHORS file.
  */
 
+#include "lua/msgpack.h"
+#include "lib/core/func_adapter.h"
 #include "box/lua/func_adapter.h"
 #include "core/event.h"
 #include <diag.h>
@@ -39,6 +41,79 @@ luaT_trigger_set(struct lua_State *L)
 	return 1;
 }
 
+static void
+luaT_trigger_push_handler_info(struct lua_State *L, struct func_adapter *trigger)
+{
+	if (func_adapter_is_lua(trigger))
+		func_adapter_lua_get_func(trigger, L);
+	else
+		lua_pushstring(L, "non-Lua handler");
+}
+
+static int
+luaT_trigger_non_lua_call(struct lua_State *L)
+{
+	struct func_adapter *trigger = 
+		(struct func_adapter *)lua_touserdata(L, lua_upvalueindex(1));
+	struct func_adapter_ctx ctx;
+	func_adapter_begin(trigger, &ctx);
+	int argnum = lua_gettop(L);
+	bool ok = true;
+
+	for (int i = 1; i <= argnum; i++) {
+		int type = lua_type(L, i); 
+		switch(type) {
+			case LUA_TNIL:
+				func_adapter_push_null(trigger, &ctx);
+				break;
+			case LUA_TBOOLEAN:
+				func_adapter_push_bool(trigger, &ctx,
+						       lua_toboolean(L, i));
+				break;
+			case LUA_TNUMBER:
+				func_adapter_push_double(trigger, &ctx,
+							 lua_tonumber(L, i));
+				break;
+			case LUA_TSTRING: {
+				size_t len;
+				const char *str = lua_tolstring(L, i, &len);
+				func_adapter_push_str(trigger, &ctx, str, len);
+				break;
+			}
+			case LUA_TUSERDATA: {
+				size_t len;
+				const char *mp = luamp_get(L, i, &len);
+				if (mp == NULL) {
+					ok = false;
+					goto out;
+				}
+				func_adapter_push_msgpack(trigger, &ctx,
+							  mp, mp + len);
+				break;
+			}
+			defualt:
+				ok = false;
+				goto out;
+			
+		}
+	}
+	int rc = func_adapter_call(trigger, &ctx);
+out:
+	func_adapter_end(trigger, &ctx);
+	if (!ok)
+		luaL_error(L, "Invalid argument was passed to a trigger");
+	return rc;
+}
+
+static void
+luaT_trigger_push_handler(struct lua_State *L, struct func_adapter *trigger)
+{
+	if (func_adapter_is_lua(trigger))
+		func_adapter_lua_get_func(trigger, L);
+	else
+		lua_pushstring(L, "non-Lua handler");
+}
+
 /**
  * Deletes a trigger with passed name from passed event.
  * The first argument is event name, the second one is trigger name.
@@ -57,7 +132,7 @@ luaT_trigger_del(struct lua_State *L)
 	struct func_adapter *old = event_find_trigger(event, trigger_name);
 	if (old == NULL)
 		return 0;
-	func_adapter_lua_get_func(old, L);
+	luaT_trigger_push_handler_info(L, old);
 	event_reset_trigger(event, trigger_name, NULL);
 	return 1;
 }
@@ -117,7 +192,7 @@ trigger_info_push_event(struct event *event, void *arg)
 		lua_createtable(L, 2, 0);
 		lua_pushstring(L, name);
 		lua_rawseti(L, -2, 1);
-		func_adapter_lua_get_func(trigger, L);
+		luaT_trigger_push_handler_info(L, trigger);
 		lua_rawseti(L, -2, 2);
 		lua_rawseti(L, -2, idx);
 	}

@@ -3,73 +3,53 @@
  *
  * Copyright 2010-2023, Tarantool AUTHORS, please see AUTHORS file.
  */
-#include "box/lua/func_adapter.h"
-#include "box/lua/tuple.h"
+#include "box/func_adapter_func.h"
+#include "box/func.h"
 #include "box/tuple.h"
 #include "core/func_adapter.h"
-#include "lua/msgpack.h"
-#include "lua/utils.h"
 
 /**
- * Context for func_adapter_lua.
+ * Context for func_adapter_func.
  */
-struct func_adapter_lua_ctx {
-	/**
-	 * Lua state which stores arguments and is used to call Lua function.
-	 */
-	struct lua_State *L;
-	/**
-	 * A reference to Lua state in Lua registry.
-	 */
-	int coro_ref;
-	/**
-	 * Saved top of L.
-	 */
-	int top_svp;
-	/**
-	 * Index of an element that will be popped next. It is used not to
-	 * remove elements from the middle of the Lua stack.
-	 */
-	int idx;
+struct func_adapter_func_ctx {
+	/** The function itself. */
+	struct func *func;
+	/** Arguments for the function. */
+	struct port args;
+	/** Values returned by the function. */
+	struct port retvals;
 };
 
-static_assert(sizeof(struct func_adapter_lua_ctx) <= sizeof(struct func_adapter_ctx),
-	      "sizeof(func_adapter_lua_ctx) must be <= "
+static_assert(sizeof(struct func_adapter_func_ctx) <= sizeof(struct func_adapter_ctx),
+	      "sizeof(func_adapter_func_ctx) must be <= "
 	      "sizeof(func_adapter_ctx)");
 
 /**
- * Specialization of func_adapter for Lua functions and other callable objects.
+ * Specialization of func_adapter for persistent functions.
  */
-struct func_adapter_lua {
+struct func_adapter_func {
 	/**
 	 * Virtual table.
 	 */
 	const struct func_adapter_vtab *vtab;
 	/**
-	 * Reference to the function in Lua registry.
+	 * Reference to the function itself.
 	 */
-	int func_ref;
+	struct func *func;
 };
 
 /**
- * Creates (or gets cached in fiber) Lua state and saves its top.
+ * Creates port for args.
  */
 static void
-func_adapter_lua_begin(struct func_adapter *base,
-		       struct func_adapter_ctx *base_ctx)
+func_adapter_func_begin(struct func_adapter *base,
+			struct func_adapter_ctx *base_ctx)
 {
-	struct func_adapter_lua *func = (struct func_adapter_lua *)base;
-	struct func_adapter_lua_ctx *ctx =
-		(struct func_adapter_lua_ctx *)base_ctx;
-	if (fiber()->storage.lua.stack == NULL) {
-		ctx->L = luaT_newthread(tarantool_L);
-		if (ctx->L == NULL)
-			panic("Cannot create Lua thread");
-		ctx->coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-	} else {
-		ctx->L = fiber()->storage.lua.stack;
-		ctx->coro_ref = LUA_REFNIL;
-	}
+	struct func_adapter_func *func = (struct func_adapter_func *)base;
+	struct func_adapter_func_ctx *ctx =
+		(struct func_adapter_func_ctx *)base_ctx;
+	ctx->func = func->func;
+	
 	ctx->idx = 0;
 	ctx->top_svp = lua_gettop(ctx->L);
 	lua_rawgeti(ctx->L, LUA_REGISTRYINDEX, func->func_ref);
@@ -255,13 +235,6 @@ func_adapter_lua_destroy(struct func_adapter *func_base)
 	struct func_adapter_lua *func = (struct func_adapter_lua *)func_base;
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, func->func_ref);
 	free(func);
-}
-
-bool
-func_adapter_is_lua(struct func_adapter *func)
-{
-	assert(func != NULL);
-	return func->vtab->destroy == func_adapter_lua_destroy;
 }
 
 void
