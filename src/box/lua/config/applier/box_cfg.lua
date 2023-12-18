@@ -283,7 +283,9 @@ local function names_apply(config, missing_names, schema_version)
     names_alert_missing(config, missing_names)
     -- Don't wait for box.status to change, we may be already rw, set names
     -- on reload, if it's possible and needed.
-    names_try_set_missing()
+    if schema_version and schema_version >= mkversion.get_latest() then
+        names_try_set_missing()
+    end
 
     if names_state.is_configured then
         -- All triggers are already configured, nothing to do, but wait.
