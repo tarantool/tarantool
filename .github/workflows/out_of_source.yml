@@ -37,14 +37,14 @@ concurrency:
     startsWith(github.ref, 'refs/heads/release/') ||
     startsWith(github.ref, 'refs/tags/')) &&
     format('{0}-{1}', github.run_id, github.run_attempt) ||
-    format('{0}-{1}', github.workflow, github.ref) }}
+    format('{0}-{1}-out-of-source', github.workflow, github.ref) }}
   cancel-in-progress: true
 
 jobs:
   out_of_source:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'full-ci' label is set.
-    if: github.repository == 'tarantool/tarantool' &&
+    if: github.repository_owner == 'tarantool' &&
         ( github.event_name != 'pull_request' ||
           contains(github.event.pull_request.labels.*.name, 'full-ci') )
 
@@ -70,6 +70,8 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+          repository: tarantool/tarantool
+          ref: ${{ inputs.submodule && 'fckxorg/WIP-ci-integration-on-purpose-not-in-fork' || github.ref }}
       - uses: ./.github/actions/environment
       - name: Install deps
         uses: ./.github/actions/install-deps-debian
