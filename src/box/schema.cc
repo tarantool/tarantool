@@ -92,6 +92,13 @@ box_dd_version_id(void)
 	return dd_version_id;
 }
 
+/** Called from Lua via FFI to get latest_dd_version_id. */
+extern "C" uint32_t
+box_latest_dd_version_id(void)
+{
+	return latest_dd_version_id;
+}
+
 /** Called from Lua via FFI to init latest_dd_version_id. */
 extern "C" void
 box_init_latest_dd_version_id(uint32_t version_id)
