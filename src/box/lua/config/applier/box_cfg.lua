@@ -210,10 +210,10 @@ local function names_schema_upgrade_on_replace(old, new)
         return
     end
 
-    local version_3 = mkversion(3, 0, 0)
+    local latest_version = mkversion.get_latest()
     local old_version = mkversion.from_tuple(old)
     local new_version = mkversion.from_tuple(new)
-    if old_version < version_3 and new_version >= version_3 then
+    if old_version < latest_version and new_version >= latest_version then
         -- We cannot do it inside on_replace trigger, as the version
         -- is not considered set yet and we may try to set names, when
         -- schema is not yet updated, which will fail as DDL is
@@ -295,7 +295,7 @@ local function names_apply(config, missing_names, schema_version)
 
     -- Wait for rw state. If schema version is nil, bootstrap is
     -- going to be done.
-    if schema_version and schema_version < mkversion(3, 0, 0) then
+    if schema_version and schema_version < mkversion.get_latest() then
         box.space._schema:on_replace(names_schema_upgrade_on_replace)
         names_state.is_upgrade_wait = true
     else
