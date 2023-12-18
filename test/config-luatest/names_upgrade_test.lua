@@ -96,6 +96,12 @@ local function assert_before_upgrade()
     local info = box.info
     t.assert_equals(info.name, nil)
     t.assert_equals(info.replicaset.name, nil)
+    -- Check that config:reload() respects old schema version.
+    local config = require('config')
+    config:reload()
+    info = box.info
+    t.assert_equals(info.name, nil)
+    t.assert_equals(info.replicaset.name, nil)
 end
 
 local function assert_after_upgrade(instance_name, replicaset_name, names)
