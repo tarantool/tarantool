@@ -228,6 +228,12 @@ on_shutdown_run_triggers(void)
 		}
 	}
 
+	/*
+	 * Since we run the triggers asynchronously, we need to reference them
+	 * to prevent use-after-free, because a trigger can delete another one
+	 * or even itself, and nothing would reference it anymore.
+	 */
+	event_ref_all_triggers(event);
 	const char *trigger_name = NULL;
 	struct func_adapter *func = NULL;
 	struct event_trigger_iterator it;
