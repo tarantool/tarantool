@@ -517,16 +517,56 @@ test_event_free(void)
 	check_plan();
 }
 
+static void
+test_event_ref_all_triggers(void)
+{
+	plan(3);
+
+	struct func_adapter_vtab vtab = {.destroy = func_destroy};
+	struct func_adapter func = {.vtab = &vtab};
+	const char *trg_names[] = {
+		"test.trg[1]",
+		"test.trg[2]",
+		"test.trg[3]",
+		"test.trg[4]",
+		"test.trg[5]"
+	};
+	const char *name = "event_name";
+	struct event *event = event_get(name, true);
+	isnt(event, NULL, "Event must be created");
+	/* Reference the event. */
+	event_ref(event);
+	for (size_t i = 0; i < lengthof(trg_names); i++)
+		event_reset_trigger(event, trg_names[i], &func);
+
+	func_destroy_count = 0;
+
+	event_ref_all_triggers(event);
+	for (size_t i = 0; i < lengthof(trg_names); i++)
+		event_reset_trigger(event, trg_names[i], NULL);
+
+	is(func_destroy_count, 0, "No triggers must be destroyed yet");
+
+	event_free();
+	is(func_destroy_count, lengthof(trg_names),
+	   "All triggers must be destroyed");
+	/* Initialize event back. */
+	event_init();
+
+	check_plan();
+}
+
 static int
 test_main(void)
 {
-	plan(6);
+	plan(7);
 	test_basic();
 	test_event_foreach();
 	test_event_trigger_iterator();
 	test_event_trigger_iterator_stability();
 	test_event_trigger_temporary();
 	test_event_free();
+	test_event_ref_all_triggers();
 	return check_plan();
 }
 

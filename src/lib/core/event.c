@@ -266,6 +266,16 @@ event_remove_temporary_triggers(struct event *event)
 }
 
 void
+event_ref_all_triggers(struct event *event)
+{
+	struct event_trigger *curr = NULL;
+	rlist_foreach_entry(curr, &event->triggers, link) {
+		if (!curr->is_deleted)
+			event_trigger_ref(curr);
+	}
+}
+
+void
 event_trigger_iterator_create(struct event_trigger_iterator *it,
 			      struct event *event)
 {
