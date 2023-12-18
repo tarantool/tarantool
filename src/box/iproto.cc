@@ -3395,6 +3395,13 @@ struct iproto_cfg_msg: public cbus_call_msg
 			/** Whether the request handler is set or reset. */
 			bool is_set;
 		} override;
+		struct {
+			/**
+			 * Connection that executing iproto_drop_connections.
+			 * NULL if the function is called not from connection.
+			 */
+			struct iproto_connection *owner;
+		} drop_connections;
 	};
 	struct iproto_thread *iproto_thread;
 };
@@ -3495,8 +3502,14 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			if (!con->is_in_replication &&
 			    con->state == IPROTO_CONNECTION_ALIVE)
 				iproto_connection_close(con);
-			con->is_drop_pending = true;
-			iproto_thread->drop_pending_connection_count++;
+			/*
+			 * Do not wait deletion of connection that called
+			 * iproto_drop_connections to avoid deadlock.
+			 */
+			if (con != cfg_msg->drop_connections.owner) {
+				con->is_drop_pending = true;
+				iproto_thread->drop_pending_connection_count++;
+			}
 			if (con->state != IPROTO_CONNECTION_DESTROYED) {
 				cmsg_init(&con->cancel_msg, cancel_route);
 				cpipe_push(&iproto_thread->tx_pipe,
@@ -3575,11 +3588,16 @@ iproto_drop_connections(void)
 {
 	static struct latch latch = LATCH_INITIALIZER(latch);
 	latch_lock(&latch);
+	struct iproto_connection *owner = NULL;
+	struct session *session = fiber_get_session(fiber());
+	if (session != NULL && session->type == SESSION_TYPE_BINARY)
+		owner = (struct iproto_connection *)session->meta.connection;
 	drop_pending_thread_count = iproto_threads_count;
 	for (int i = 0; i < iproto_threads_count; i++) {
 		struct iproto_cfg_msg *cfg_msg =
 			(struct iproto_cfg_msg *)xmalloc(sizeof(*cfg_msg));
 		iproto_cfg_msg_create(cfg_msg, IPROTO_CFG_DROP_CONNECTIONS);
+		cfg_msg->drop_connections.owner = owner;
 		iproto_do_cfg_async(&iproto_threads[i], cfg_msg);
 	}
 
