@@ -1,3 +1,4 @@
+local expression = require('internal.config.utils.expression')
 local log = require('internal.config.utils.log')
 _G.vshard = nil
 
@@ -10,9 +11,17 @@ local function apply(config)
     if roles == nil then
         return
     end
-    if _G.vshard == nil then
-        _G.vshard = require('vshard')
+    -- Make sure vshard is available and its version is not too old.
+    local ok, vshard = pcall(require, 'vshard')
+    if not ok then
+        error('The vshard module is not available', 0)
     end
+    if expression.eval('v < 0.1.25', {v = vshard.consts.VERSION}) then
+        error('The vshard module is too old: the minimum supported version ' ..
+              'is 0.1.25.', 0)
+    end
+
+    _G.vshard = vshard
     local is_storage = false
     local is_router = false
     for _, role in pairs(roles) do
