@@ -306,6 +306,15 @@ struct iproto_req_handler {
  */
 static mh_i32ptr_t *tx_req_handlers;
 
+/**
+ * If set then command to start/restart accepting sockets will be ignored.
+ *
+ * It is used in the process of Tarantool shutdown. We stop accepting
+ * new connections at some point and should not start accepting them
+ * again if it is requested through iproto API.
+ */
+static bool is_listen_disabled;
+
 int
 iproto_addr_count(void)
 {
@@ -3174,6 +3183,7 @@ iproto_on_shutdown_f(void *arg)
 {
 	(void)arg;
 	fiber_set_name(fiber_self(), "iproto.shutdown");
+	is_listen_disabled = true;
 	iproto_send_stop_msg();
 	evio_service_stop(&tx_binary);
 	return 0;
@@ -3579,8 +3589,11 @@ iproto_send_start_msg(void)
 {
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_START);
-	for (int i = 0; i < iproto_threads_count; i++)
+	for (int i = 0; i < iproto_threads_count; i++) {
+		if (is_listen_disabled)
+			return;
 		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
+	}
 }
 
 void
@@ -3612,8 +3625,11 @@ iproto_send_restart_msg(void)
 {
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_RESTART);
-	for (int i = 0; i < iproto_threads_count; i++)
+	for (int i = 0; i < iproto_threads_count; i++) {
+		if (is_listen_disabled)
+			return;
 		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
+	}
 }
 
 int
@@ -3641,6 +3657,11 @@ iproto_listen(const struct uri_set *uri_set)
 	uri_set_copy(&iproto_uris, uri_set);
 	iproto_send_stop_msg();
 	evio_service_stop(&tx_binary);
+	/* Server can be stopped meanwhile. */
+	if (iproto_threads_count == 0) {
+		diag_set(ClientError, ER_SERVER_SHUTDOWN);
+		return -1;
+	}
 	struct errinj *inj = errinj(ERRINJ_IPROTO_CFG_LISTEN, ERRINJ_INT);
 	if (inj != NULL && inj->iparam > 0) {
 		inj->iparam--;
@@ -3729,6 +3750,10 @@ uint64_t
 iproto_session_new(struct iostream *io, struct user *user)
 {
 	assert(iostream_is_initialized(io));
+	if (iproto_threads_count == 0) {
+		diag_set(ClientError, ER_SERVER_SHUTDOWN);
+		return -1;
+	}
 	struct session *session = session_new(SESSION_TYPE_BACKGROUND);
 	if (user != NULL)
 		credentials_reset(&session->credentials, user);
@@ -3805,12 +3830,22 @@ iproto_req_handler_delete(struct iproto_req_handler *handler)
 void
 iproto_shutdown(void)
 {
+	int threads_count = iproto_threads_count;
 	iproto_drop_connections();
+	iproto_threads_count = 0;
+	struct iproto_cfg_msg cfg_msg;
+	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STOP);
 
-	for (int i = 0; i < iproto_threads_count; i++) {
+	for (int i = 0; i < threads_count; i++) {
+		/*
+		 * Finish any iproto API calls that where started before we
+		 * zero threads count. Sending stop message second time is
+		 * NOOP. We do it just to flush queues.
+		 */
+		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
 		cbus_stop_loop(&iproto_threads[i].net_pipe);
 		cpipe_destroy(&iproto_threads[i].net_pipe);
-		if (cord_join(&iproto_threads[i].net_cord) != 0)
+		if (cord_cojoin(&iproto_threads[i].net_cord) != 0)
 			panic_syserror("iproto cord join failed");
 		mh_i32_delete(iproto_threads[i].req_handlers);
 		/*
@@ -3857,48 +3892,34 @@ iproto_thread_rmean_foreach_impl(struct rmean *rmean, void *cb, void *cb_ctx)
 	return rc;
 }
 
-/**
- * We use offset of rmean in struct iproto_thread, instead of pointer to
- * rmean, because we should iterate over all same rmeans for all iproto
- * threads.
- */
-static int
-iproto_rmean_foreach_impl(ptrdiff_t rmean_offset, void *cb, void *cb_ctx)
-{
-	struct rmean *rmean0 =
-		*(struct rmean **)((char *)&iproto_threads[0] + rmean_offset);
-	for (size_t i = 0; i < rmean0->stats_n; i++) {
-		int64_t mean = 0;
-		int64_t total = 0;
-		for (int j = 0; j < iproto_threads_count; j++) {
-			struct rmean *rmean =
-				*(struct rmean **)
-				((char *)&iproto_threads[j] + rmean_offset);
-			assert(rmean == iproto_threads[j].rmean ||
-			       rmean == iproto_threads[j].tx.rmean);
-			mean += rmean_mean(rmean, i);
-			total += rmean_total(rmean, i);
-		}
-		int rc = ((rmean_cb)cb)(rmean0->stats[i].name, mean,
-					total, cb_ctx);
-		if (rc != 0)
-			return rc;
-	}
-	return 0;
-}
-
 int
 iproto_rmean_foreach(void *cb, void *cb_ctx)
 {
 	int rc;
-	rc = iproto_rmean_foreach_impl(offsetof(struct iproto_thread, rmean),
-				       cb, cb_ctx);
-	if (rc != 0)
-		return rc;
-	rc = iproto_rmean_foreach_impl(offsetof(struct iproto_thread, tx.rmean),
-				       cb, cb_ctx);
-	if (rc != 0)
-		return rc;
+	for (size_t i = 0; i < RMEAN_NET_LAST; i++) {
+		int64_t mean = 0;
+		int64_t total = 0;
+		for (int j = 0; j < iproto_threads_count; j++) {
+			struct rmean *rmean = iproto_threads[j].rmean;
+			mean += rmean_mean(rmean, i);
+			total += rmean_total(rmean, i);
+		}
+		rc = ((rmean_cb)cb)(rmean_net_strings[i], mean, total, cb_ctx);
+		if (rc != 0)
+			return rc;
+	}
+	for (size_t i = 0; i < RMEAN_TX_LAST; i++) {
+		int64_t mean = 0;
+		int64_t total = 0;
+		for (int j = 0; j < iproto_threads_count; j++) {
+			struct rmean *rmean = iproto_threads[j].tx.rmean;
+			mean += rmean_mean(rmean, i);
+			total += rmean_total(rmean, i);
+		}
+		rc = ((rmean_cb)cb)(rmean_tx_strings[i], mean, total, cb_ctx);
+		if (rc != 0)
+			return rc;
+	}
 	return 0;
 }
 
@@ -3926,6 +3947,10 @@ iproto_override(uint32_t req_type, iproto_handler_t cb,
 						 iproto_type_name(req_type));
 		diag_set(ClientError, ER_UNSUPPORTED,
 			 "IPROTO request handler overriding", feature);
+		return -1;
+	}
+	if (iproto_threads_count == 0) {
+		diag_set(ClientError, ER_SERVER_SHUTDOWN);
 		return -1;
 	}
 
