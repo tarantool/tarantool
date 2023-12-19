@@ -161,6 +161,7 @@ extern char session_lua[],
 	config_source_env_lua[],
 	config_source_file_lua[],
 	config_utils_expression_lua[],
+	config_utils_file_lua[],
 	config_utils_log_lua[],
 	config_utils_schema_lua[],
 	config_utils_snapshot_lua[],
@@ -336,6 +337,10 @@ static const char *lua_sources[] = {
 	"config/utils/expression",
 	"internal.config.utils.expression",
 	config_utils_expression_lua,
+
+	"config/utils/file",
+	"internal.config.utils.file",
+	config_utils_file_lua,
 
 	"config/utils/log",
 	"internal.config.utils.log",
