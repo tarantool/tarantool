@@ -447,6 +447,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea779d0a945aa3f0394a3e6a50b95da6c9" kind="enumvalue"><name>ER_UNCONFIGURED</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf77675547d9c9a76a2b584dda0e1417c" kind="enumvalue"><name>ER_CREATE_DEFAULT_FUNC</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceae486cedbba191958e3b58c46294d9d69" kind="enumvalue"><name>ER_DEFAULT_FUNC_FAILED</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea868f49acf1dd09596e8550c6f415c8d4" kind="enumvalue"><name>ER_INVALID_DEC</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
