@@ -395,7 +395,6 @@ endif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 set(BACKUP_STORAGE https://distrib.hb.vkcs.cloud)
 
 set(EMBED_LUAZLIB ${BUILD_STATIC})
-set(EMBED_LUAROCKS ${BUILD_STATIC})
 
 #
 # Since we *optionally* build bundled libs, a direct build

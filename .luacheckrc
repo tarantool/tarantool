@@ -29,7 +29,6 @@ ignore = {
 
 include_files = {
     "**/*.lua",
-    "extra/dist/tarantoolctl.in",
 }
 
 exclude_files = {
