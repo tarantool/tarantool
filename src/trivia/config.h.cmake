@@ -298,7 +298,6 @@
 #cmakedefine BUILD_STATIC 1
 #cmakedefine EMBED_LUAZLIB 1
 #cmakedefine EMBED_LUAZIP 1
-#cmakedefine EMBED_LUAROCKS 1
 
 /*
  * vim: syntax=c
