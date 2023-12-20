@@ -153,8 +153,6 @@ local function verify_configdata()
         replicaset_name = "replicaset-001",
     }
     local res_names = data:names()
-    res_names.instance_uuid = nil
-    res_names.replicaset_uuid = nil
     t.assert_equals(res_names, expected_names)
 
     t.assert_equals(data:peers(), {'instance-001', 'instance-002'})

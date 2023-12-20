@@ -186,20 +186,9 @@ g.test_sharding = run_as_script(function()
                 },
                 replicasets = {
                     ['routers-a'] = {
-                        database = {
-                            replicaset_uuid = t.helpers.uuid('f', 0),
-                        },
                         instances = {
-                            ['router-001'] = {
-                                database = {
-                                    instance_uuid = t.helpers.uuid('f', 1),
-                                },
-                            },
-                            ['router-002'] = {
-                                database = {
-                                    instance_uuid = t.helpers.uuid('f', 2),
-                                },
-                            },
+                            ['router-001'] = {},
+                            ['router-002'] = {},
                         },
                     },
                 },
@@ -210,47 +199,17 @@ g.test_sharding = run_as_script(function()
                 },
                 replicasets = {
                     ['storages-a'] = {
-                        database = {
-                            replicaset_uuid = t.helpers.uuid('e', 'a', 0),
-                        },
                         instances = {
-                            ['storage-a-001'] = {
-                                database = {
-                                    instance_uuid = t.helpers.uuid('e', 'a', 1),
-                                },
-                            },
-                            ['storage-a-002'] = {
-                                database = {
-                                    instance_uuid = t.helpers.uuid('e', 'a', 2),
-                                },
-                            },
-                            ['storage-a-003'] = {
-                                database = {
-                                    instance_uuid = t.helpers.uuid('e', 'a', 3),
-                                },
-                            },
+                            ['storage-a-001'] = {},
+                            ['storage-a-002'] = {},
+                            ['storage-a-003'] = {},
                         },
                     },
                     ['storages-b'] = {
-                        database = {
-                            replicaset_uuid = t.helpers.uuid('e', 'b', 0),
-                        },
                         instances = {
-                            ['storage-b-001'] = {
-                                database = {
-                                    instance_uuid = t.helpers.uuid('e', 'b', 1),
-                                },
-                            },
-                            ['storage-b-002'] = {
-                                database = {
-                                    instance_uuid = t.helpers.uuid('e', 'b', 2),
-                                },
-                            },
-                            ['storage-b-003'] = {
-                                database = {
-                                    instance_uuid = t.helpers.uuid('e', 'b', 3),
-                                },
-                            },
+                            ['storage-b-001'] = {},
+                            ['storage-b-002'] = {},
+                            ['storage-b-003'] = {},
                         },
                     },
                 },
@@ -269,36 +228,30 @@ g.test_sharding = run_as_script(function()
 
     -- Verify URIs of the storages.
     t.assert_equals(res.sharding, {
-        [t.helpers.uuid('e', 'a', 0)] = {
+        ['storages-a'] = {
             master = 'auto',
             replicas = {
-                [t.helpers.uuid('e', 'a', 1)] = {
-                    name = 'storage-a-001',
+                ['storage-a-001'] = {
                     uri = exp_uri('storages', 'storages-a', 'storage-a-001'),
                 },
-                [t.helpers.uuid('e', 'a', 2)] = {
-                    name = 'storage-a-002',
+                ['storage-a-002'] = {
                     uri = exp_uri('storages', 'storages-a', 'storage-a-002'),
                 },
-                [t.helpers.uuid('e', 'a', 3)] = {
-                    name = 'storage-a-003',
+                ['storage-a-003'] = {
                     uri = exp_uri('storages', 'storages-a', 'storage-a-003'),
                 },
             },
         },
-        [t.helpers.uuid('e', 'b', 0)] = {
+        ['storages-b'] = {
             master = 'auto',
             replicas = {
-                [t.helpers.uuid('e', 'b', 1)] = {
-                    name = 'storage-b-001',
+                ['storage-b-001'] = {
                     uri = exp_uri('storages', 'storages-b', 'storage-b-001'),
                 },
-                [t.helpers.uuid('e', 'b', 2)] = {
-                    name = 'storage-b-002',
+                ['storage-b-002'] = {
                     uri = exp_uri('storages', 'storages-b', 'storage-b-002'),
                 },
-                [t.helpers.uuid('e', 'b', 3)] = {
-                    name = 'storage-b-003',
+                ['storage-b-003'] = {
                     uri = exp_uri('storages', 'storages-b', 'storage-b-003'),
                 },
             },

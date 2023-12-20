@@ -5,7 +5,6 @@
 
 local fun = require('fun')
 local urilib = require('uri')
-local digest = require('digest')
 local uuid = require('uuid')
 local instance_config = require('internal.config.instance_config')
 local cluster_config = require('internal.config.cluster_config')
@@ -71,13 +70,7 @@ function methods.names(self)
     }
 end
 
-local function uuid_from_name(str)
-    local sha = digest.sha1_hex(str)
-    return sha:sub(1,8)..'-'..sha:sub(9,12)..'-'..sha:sub(13,16)..'-'..
-           '00'..sha:sub(17,18)..'-'..sha:sub(19,30)
-end
-
-local function instance_sharding(iconfig, instance_name)
+local function instance_sharding(iconfig)
     local roles = instance_config:get(iconfig, 'sharding.roles')
     if roles == nil or #roles == 0 then
         return nil
@@ -106,10 +99,11 @@ local function instance_sharding(iconfig, instance_name)
         u.login = 'guest'
         uri = urilib.format(u, true)
     end
+    local uuid = instance_config:get(iconfig, 'database.instance_uuid')
     return {
         uri = uri,
+        uuid = uuid,
         zone = zone,
-        name = instance_name,
     }
 end
 
@@ -144,28 +138,20 @@ function methods.sharding(self)
                         table.insert(rebalancers, replicaset_name)
                     end
                 end
-                local isharding = instance_sharding(iconfig, instance_name)
+                local isharding = instance_sharding(iconfig)
                 if isharding ~= nil then
                     if replicaset_uuid == nil then
                         replicaset_uuid = instance_config:get(iconfig,
                             'database.replicaset_uuid')
-                        if replicaset_uuid == nil then
-                            replicaset_uuid = uuid_from_name(replicaset_name)
-                        end
                     end
-                    local instance_uuid = instance_config:get(iconfig,
-                        'database.instance_uuid')
-                    if instance_uuid == nil then
-                        instance_uuid = uuid_from_name(instance_name)
-                    end
-                    replicaset_cfg[instance_uuid] = isharding
+                    replicaset_cfg[instance_name] = isharding
                 end
             end
             if next(replicaset_cfg) ~= nil then
-                assert(replicaset_uuid ~= nil)
-                sharding[replicaset_uuid] = {
+                sharding[replicaset_name] = {
                     rebalancer = is_rebalancer or nil,
                     replicas = replicaset_cfg,
+                    uuid = replicaset_uuid,
                     master = 'auto',
                     lock = lock,
                 }
@@ -181,6 +167,7 @@ function methods.sharding(self)
         sharding = sharding,
         box_cfg_mode = 'manual',
         schema_management_mode = 'auto',
+        identification_mode = 'name_as_key',
     }
 
     local vshard_global_options = {
@@ -644,12 +631,6 @@ local function new(iconfig, cconfig, instance_name)
         'database.replicaset_uuid')
     local instance_uuid = instance_config:get(iconfig_def,
         'database.instance_uuid')
-    if replicaset_uuid == nil then
-        replicaset_uuid = uuid_from_name(found.replicaset_name)
-    end
-    if instance_uuid == nil then
-        instance_uuid = uuid_from_name(instance_name)
-    end
 
     -- Save instance configs of the peers from the same replicaset.
     local peers = {}

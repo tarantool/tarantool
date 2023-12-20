@@ -6,6 +6,7 @@ local treegen = require('test.treegen')
 local justrun = require('test.justrun')
 local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
+local cbuilder = require('test.config-luatest.cbuilder')
 
 local g = helpers.group()
 
@@ -667,5 +668,46 @@ g.test_loader_paths = function(g)
     g.server:exec(function()
         local bar = require('bar')
         t.assert_equals(bar.whoami, 'bar')
+    end)
+end
+
+-- Verify, that instance can recover from the xlogs using config.
+g.test_recovery_without_uuid = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local cfg = cbuilder.new()
+        :add_instance('instance-001', {
+            database = {
+                mode = 'rw',
+                instance_uuid = '22222222-2222-2222-0022-222222222222',
+            }
+        })
+        :config()
+    local cfg_file = treegen.write_script(dir, 'config.yaml', yaml.encode(cfg))
+    local opts = {
+        config_file = cfg_file,
+        chdir = dir,
+        net_box_credentials = {
+            user = 'client',
+            password = 'secret',
+        },
+    }
+    g.server = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+
+    -- Initial start.
+    g.server:start()
+    g.server:exec(function()
+        t.assert_equals(box.info.status, 'running')
+    end)
+
+    -- Remove UUID. Previously generated ones were used, so it wasn't possible
+    -- to recover from the xlogs without passing UUID to config.
+    local cfg_rs = cfg.groups['group-001'].replicasets['replicaset-001']
+    cfg_rs.instances['instance-001'].database.instance_uuid = nil
+    cfg_file = treegen.write_script(dir, 'config.yaml', yaml.encode(cfg))
+    g.server.config_file = cfg_file
+    -- Recovery process.
+    g.server:restart()
+    g.server:exec(function()
+        t.assert_equals(box.info.status, 'running')
     end)
 end
