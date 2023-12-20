@@ -3036,12 +3036,12 @@ net_cord_f(va_list  ap)
 	cbus_loop(&endpoint);
 
 	cpipe_destroy(&iproto_thread->tx_pipe);
-	cbus_endpoint_destroy(&endpoint, cbus_process);
+	/*
+	 * Nothing to do in the fiber so far, the service
+	 * will take care of creating events for incoming
+	 * connections.
+	 */
 	evio_service_detach(&iproto_thread->binary);
-
-	mempool_destroy(&iproto_thread->iproto_stream_pool);
-	mempool_destroy(&iproto_thread->iproto_connection_pool);
-	mempool_destroy(&iproto_thread->iproto_msg_pool);
 	return 0;
 }
 
@@ -3803,15 +3803,10 @@ iproto_req_handler_delete(struct iproto_req_handler *handler)
 }
 
 void
-iproto_shutdown(void)
+iproto_free(void)
 {
-	iproto_drop_connections();
-
 	for (int i = 0; i < iproto_threads_count; i++) {
-		cbus_stop_loop(&iproto_threads[i].net_pipe);
-		cpipe_destroy(&iproto_threads[i].net_pipe);
-		if (cord_join(&iproto_threads[i].net_cord) != 0)
-			panic_syserror("iproto cord join failed");
+		cord_cancel_and_join(&iproto_threads[i].net_cord);
 		mh_i32_delete(iproto_threads[i].req_handlers);
 		/*
 		 * Close socket descriptor to prevent hot standby instance
