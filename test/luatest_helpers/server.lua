@@ -82,6 +82,7 @@ local function find_advertise_uri(config, instance_name, dir)
     end
 
     for _, uri in ipairs(uris or {}) do
+        uri = table.copy(uri)
         uri.uri = uri.uri:gsub('{{ *instance_name *}}', instance_name)
         uri.uri = uri.uri:gsub('unix/:%./', ('unix/:%s/'):format(dir))
         local u = urilib.parse(uri)
