@@ -1,10 +1,3 @@
-# Enable systemd for on RHEL >= 7 and Fedora >= 15
-%if (0%{?fedora} >= 15 || 0%{?rhel} >= 7)
-%bcond_without systemd
-%else
-%bcond_with systemd
-%endif
-
 # XXX: There is an old CMake (2.8.12) provided by cmake package in
 # main CentOS 7 repositories. At the same time, there is a newer
 # package cmake3 providing CMake 3+ from EPEL repository. So, one
@@ -48,18 +41,6 @@ Requires(pre): %{_sbindir}/groupadd
 # libcurl dependencies (except ones we have already).
 BuildRequires: zlib-devel
 Requires: zlib
-
-%if %{with systemd}
-Requires(post): systemd
-Requires(preun): systemd
-Requires(postun): systemd
-BuildRequires: systemd
-%else
-Requires(post): chkconfig
-Requires(post): initscripts
-Requires(preun): chkconfig
-Requires(preun): initscripts
-%endif
 
 #
 # Disable stripping of /usr/bin/tarantool to allow the debug symbols
@@ -162,11 +143,6 @@ C and Lua/C modules.
          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
          -DCMAKE_INSTALL_LOCALSTATEDIR:PATH=%{_localstatedir} \
          -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
-%if %{with systemd}
-         -DWITH_SYSTEMD:BOOL=ON \
-         -DSYSTEMD_UNIT_DIR:PATH=%{_unitdir} \
-         -DSYSTEMD_TMPFILES_DIR:PATH=%{_tmpfilesdir} \
-%endif
 %if 0%{?fedora} >= 33
          -DENABLE_LTO=ON \
 %endif
@@ -192,59 +168,12 @@ make test-force
 /usr/sbin/useradd -M %{?rhel:-N} -g tarantool -r -d /var/lib/tarantool -s /sbin/nologin\
     -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
 
-%post
-%if %{with systemd}
-%tmpfiles_create tarantool.conf
-%systemd_post tarantool@.service
-%else
-chkconfig --add tarantool || :
-%endif
-
-%preun
-%if %{with systemd}
-%systemd_preun tarantool@.service
-%else
-if [ $1 -eq 0 ] ; then # uninstall
-    service tarantool stop || :
-    chkconfig --del tarantool || :
-fi
-%endif
-
-%postun
-%if %{with systemd}
-%systemd_postun_with_restart tarantool@.service
-%endif
-
 %files
 %{_bindir}/tarantool
 %{_mandir}/man1/tarantool.1*
 %doc README.md
 %{!?_licensedir:%global license %doc}
 %license LICENSE AUTHORS
-
-%{_bindir}/tarantoolctl
-%{_mandir}/man1/tarantoolctl.1*
-%config(noreplace) %{_sysconfdir}/sysconfig/tarantool
-%dir %{_sysconfdir}/tarantool
-%dir %{_sysconfdir}/tarantool/instances.available
-%config(noreplace) %{_sysconfdir}/tarantool/instances.available/example.lua
-# Use 0750 for database files
-%attr(0750,tarantool,tarantool) %dir %{_localstatedir}/lib/tarantool/
-%attr(0750,tarantool,tarantool) %dir %{_localstatedir}/log/tarantool/
-%config(noreplace) %{_sysconfdir}/logrotate.d/tarantool
-# tarantool package should own module directories
-%dir %{_libdir}/tarantool
-%dir %{_datadir}/tarantool
-%{_datadir}/tarantool/luarocks
-
-%if %{with systemd}
-%{_unitdir}/tarantool@.service
-%{_tmpfilesdir}/tarantool.conf
-%else
-%{_sysconfdir}/init.d/tarantool
-%dir %{_sysconfdir}/tarantool/instances.enabled
-%attr(-,tarantool,tarantool) %dir %{_localstatedir}/run/tarantool/
-%endif
 
 %files devel
 %dir %{_includedir}/tarantool

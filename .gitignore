@@ -41,8 +41,6 @@ doc/Makefile
 doc/*/Makefile
 extra/Makefile
 extra/*/Makefile
-extra/luarocks/hardcoded.lua
-extra/luarocks/hardcoded.lua.c
 perf/Makefile
 test/Makefile
 test/*/Makefile
@@ -57,8 +55,6 @@ extra/txt2c
 extra/bin2c
 extra/lemon
 extra/mkkeywordhash
-extra/dist/tarantoolctl
-extra/dist/tarantoolctl.1
 extra/dist/tarantool.logrotate
 extra/dist/tarantool@.service
 extra/dist/tarantool.tmpfiles.conf
