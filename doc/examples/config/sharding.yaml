@@ -26,17 +26,28 @@
 # To get data following function can be used on router after bootstrap:
 # vshard.router.call(bucket_id, 'read', 'get', {id})
 
+config:
+  context:
+    replicator_password:
+      from: file
+      file: secrets/replicator_password.txt
+      rstrip: true
+    storage_password:
+      from: file
+      file: secrets/storage_password.txt
+      rstrip: true
+
 credentials:
   users:
     replicator:
-      password: 'topsecret'
+      password: '{{ context.replicator_password }}'
       roles: [replication]
      # For now, vshard itself will grant the specified user all the permissions
      # it needs to prepare instances for sharding. However, they will be revoked
      # after reload(). Since there is no way to grant the user  the proper
      # rights to the functions, the "super" role is used.
     storage:
-      password: 'secret'
+      password: '{{ context.storage_password }}'
       roles: [super]
 
 iproto:

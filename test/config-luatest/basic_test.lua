@@ -71,6 +71,8 @@ end
 
 g.test_example_replicaset = function(g)
     local dir = treegen.prepare_directory(g, {}, {})
+    fio.copytree('doc/examples/config/secrets', fio.pathjoin(dir, 'secrets'))
+
     local config_file = fio.abspath('doc/examples/config/replicaset.yaml')
     helpers.start_example_replicaset(g, dir, config_file)
 
@@ -83,6 +85,8 @@ end
 
 g.test_example_replicaset_manual_failover = function(g)
     local dir = treegen.prepare_directory(g, {}, {})
+    fio.copytree('doc/examples/config/secrets', fio.pathjoin(dir, 'secrets'))
+
     local config_file = fio.abspath('doc/examples/config/' ..
         'replicaset_manual_failover.yaml')
     helpers.start_example_replicaset(g, dir, config_file)
@@ -96,6 +100,8 @@ end
 
 g.test_example_replicaset_election_failover = function(g)
     local dir = treegen.prepare_directory(g, {}, {})
+    fio.copytree('doc/examples/config/secrets', fio.pathjoin(dir, 'secrets'))
+
     local config_file = fio.abspath('doc/examples/config/' ..
         'replicaset_election_failover.yaml')
     helpers.start_example_replicaset(g, dir, config_file)

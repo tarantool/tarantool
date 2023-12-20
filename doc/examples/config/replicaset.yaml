@@ -1,10 +1,21 @@
+config:
+  context:
+    replicator_password:
+      from: file
+      file: secrets/replicator_password.txt
+      rstrip: true
+    client_password:
+      from: file
+      file: secrets/client_password.txt
+      rstrip: true
+
 credentials:
   users:
     replicator:
-      password: 'topsecret'
+      password: '{{ context.replicator_password }}'
       roles: [replication]
     client:
-      password: 'secret'
+      password: '{{ context.client_password }}'
       roles: [super]
 
 iproto:
