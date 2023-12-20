@@ -91,6 +91,7 @@ local function prepare_case(g, opts)
     local roles = opts.roles
     local script = opts.script
     local options = opts.options
+    local env = opts.env
 
     if dir == nil then
         dir = treegen.prepare_directory(g, {}, {})
@@ -120,13 +121,14 @@ local function prepare_case(g, opts)
     local server = {
         config_file = config_file,
         chdir = dir,
+        env = env,
         alias = 'instance-001',
     }
     local justrun = {
         -- dir
         dir,
         -- env
-        {},
+        env or {},
         -- args
         {'--name', 'instance-001', '--config', config_file},
         -- opts
@@ -163,6 +165,10 @@ end
 -- * opts.verify_args
 --
 --  Arguments for the verify function.
+--
+-- * opts.env
+--
+--   Environment variables to set for the child process.
 local function success_case(g, opts)
     local verify = assert(opts.verify)
     local prepared = prepare_case(g, opts)
@@ -178,6 +184,7 @@ end
 -- * opts.roles
 -- * opts.script
 -- * opts.options
+-- * opts.env
 --
 --   Same as in success_case().
 --
@@ -202,6 +209,7 @@ end
 -- * opts.options
 -- * opts.verify
 -- * opts.verify_args
+-- * opts.env
 --
 --   Same as in success_case().
 --
@@ -256,6 +264,7 @@ end
 -- * opts.script
 -- * opts.options
 -- * opts.verify
+-- * opts.env
 --
 --   Same as in success_case().
 --
