@@ -145,10 +145,6 @@ lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/avl.lua utils_avl_lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/bufread.lua utils_bufread_lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/symtab.lua utils_symtab_lua)
 
-if(EMBED_LUAROCKS)
-    include("luarocks_lua_sources.cmake")
-endif()
-
 add_custom_target(generate_lua_sources
     WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/src/box
     DEPENDS ${lua_sources})
