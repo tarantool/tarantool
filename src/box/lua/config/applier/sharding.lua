@@ -22,7 +22,9 @@ local function apply(config)
     local cfg = configdata:sharding()
     if is_storage then
         log.info('sharding: apply storage config')
-        _G.vshard.storage.cfg(cfg, box.info.uuid)
+        -- Name may be not set in box.info.name, e.g. during names applying.
+        -- Configure vshard anyway, pass configuration name.
+        _G.vshard.storage.cfg(cfg, configdata:names().instance_name)
     end
     if is_router then
         log.info('sharding: apply router config')

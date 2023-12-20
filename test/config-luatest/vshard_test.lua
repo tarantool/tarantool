@@ -119,6 +119,7 @@ g.test_fixed_masters = function(g)
         bucket_count = 1234,
         discovery_mode = "on",
         failover_ping_timeout = 5,
+        identification_mode = 'name_as_key',
         rebalancer_disbalance_threshold = 1,
         rebalancer_max_receiving = 100,
         rebalancer_max_sending = 1,
@@ -129,41 +130,39 @@ g.test_fixed_masters = function(g)
         shard_index = "bucket_id",
         sync_timeout = 1,
         sharding = {
-            ["11111111-1111-1111-0011-111111111111"] = {
+            ["replicaset-001"] = {
                 master = "auto",
                 replicas = {
-                    ["ef10b92d-9ae9-e7bb-004c-89d8fb468341"] = {
-                        name = "instance-002",
-                        uri = {
-                            login = "storage",
-                            password = "storage",
-                            uri = "unix/:./instance-002.iproto",
-                        },
-                    },
-                    ["ffe08155-a26d-bd7c-0024-00ee6815a41c"] = {
-                        name = "instance-001",
+                    ["instance-001"] = {
                         uri = {
                             login = "storage",
                             password = "storage",
                             uri = "unix/:./instance-001.iproto",
                         },
                     },
+                    ["instance-002"] = {
+                        uri = {
+                            login = "storage",
+                            password = "storage",
+                            uri = "unix/:./instance-002.iproto",
+                        },
+                    },
                 },
+                uuid = "11111111-1111-1111-0011-111111111111",
                 weight = 1,
             },
-            ["d1f75e70-6883-d7fe-0087-e582c9c67543"] = {
+            ["replicaset-002"] = {
                 master = "auto",
                 replicas = {
-                    ["22222222-2222-2222-0022-222222222222"] = {
-                        name = "instance-003",
+                    ["instance-003"] = {
                         uri = {
                             login = "storage",
                             password = "storage",
                             uri = "unix/:./instance-003.iproto",
                         },
+                        uuid = "22222222-2222-2222-0022-222222222222",
                     },
-                    ["50367d8e-488b-309b-001a-138a0c516772"] = {
-                        name = "instance-004",
+                    ["instance-004"] = {
                         uri = {
                             login = "storage",
                             password = "storage",
@@ -233,9 +232,9 @@ g.test_fixed_masters = function(g)
     g.server_5:eval(exec)
     t.helpers.retrying({timeout = 60}, function()
         local res = g.server_2:eval([[return box.space.a:select()]])
-        t.assert_equals(res, {{800, 800}})
-        res = g.server_4:eval([[return box.space.a:select()]])
         t.assert_equals(res, {{1, 1}})
+        res = g.server_4:eval([[return box.space.a:select()]])
+        t.assert_equals(res, {{800, 800}})
     end)
 
     -- Make sure that the new master is auto-discovered when master is changed.
@@ -252,9 +251,9 @@ g.test_fixed_masters = function(g)
     g.server_5:eval(exec)
     t.helpers.retrying({timeout = 60}, function()
         local res = g.server_1:eval([[return box.space.a:select()]])
-        t.assert_equals(res, {{799, 799}, {800, 800}})
-        res = g.server_3:eval([[return box.space.a:select()]])
         t.assert_equals(res, {{1, 1}, {2, 2}})
+        res = g.server_3:eval([[return box.space.a:select()]])
+        t.assert_equals(res, {{799, 799}, {800, 800}})
     end)
 end
 
@@ -355,42 +354,38 @@ g.test_rebalancer_role = function(g)
 
     -- Check vshard config on each instance.
     local exp = {
-        ["2ab78dc2-4652-3699-00e4-12df0ae32351"] = {
+        ["replicaset-001"] = {
             master = "auto",
             rebalancer = true,
             replicas = {
-                ["ef10b92d-9ae9-e7bb-004c-89d8fb468341"] = {
-                    name = "instance-002",
-                    uri = {
-                        login = "storage",
-                        password = "storage",
-                        uri = "unix/:./instance-002.iproto"
-                    },
-                },
-                ["ffe08155-a26d-bd7c-0024-00ee6815a41c"] = {
-                    name = "instance-001",
+                ["instance-001"] = {
                     uri = {
                         login = "storage",
                         password = "storage",
                         uri = "unix/:./instance-001.iproto"
                     },
                 },
+                ["instance-002"] = {
+                    uri = {
+                        login = "storage",
+                        password = "storage",
+                        uri = "unix/:./instance-002.iproto"
+                    },
+                },
             },
             weight = 1,
         },
-        ["d1f75e70-6883-d7fe-0087-e582c9c67543"] = {
+        ["replicaset-002"] = {
             master = "auto",
             replicas = {
-                ["f2974852-9b48-8e24-00ea-d34059bf24fd"] = {
-                    name = "instance-003",
+                ["instance-003"] = {
                     uri = {
                         login = "storage",
                         password = "storage",
                         uri = "unix/:./instance-003.iproto"
                     },
                 },
-                ["50367d8e-488b-309b-001a-138a0c516772"] = {
-                    name = "instance-004",
+                ["instance-004"] = {
                     uri = {
                         login = "storage",
                         password = "storage",
