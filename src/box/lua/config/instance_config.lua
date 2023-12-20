@@ -287,6 +287,7 @@ local function instance_uri(self, iconfig, advertise_type)
         if listen == nil then
             return nil
         end
+        uri = table.copy(uri)
         uri.uri, uri.params = find_suitable_uri_to_connect(listen)
     end
     -- No URI found for the given instance.
@@ -297,6 +298,7 @@ local function instance_uri(self, iconfig, advertise_type)
     -- If there is a login. but there are no password: lookup the
     -- credentials section.
     if uri.password == nil and uri.login ~= nil then
+        uri = table.copy(uri)
         uri.password = find_password(self, iconfig, uri.login)
     end
     return uri
