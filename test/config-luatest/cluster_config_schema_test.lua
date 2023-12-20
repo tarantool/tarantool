@@ -345,28 +345,44 @@ g.test_defaults = function()
     t.assert_equals(res, exp)
 end
 
-g.test_example_single = function()
-    local config_file = fio.abspath('doc/examples/config/single.yaml')
-    local fh = fio.open(config_file, {'O_RDONLY'})
-    local config = yaml.decode(fh:read())
-    fh:close()
-    cluster_config:validate(config)
+local examples = {
+    single = 'single.yaml',
+    upgrade = 'upgrade.yaml',
+    sharding = 'sharding.yaml',
+    replicaset = 'replicaset.yaml',
+    replicaset_manual_failover = 'replicaset_manual_failover.yaml',
+    replicaset_election_failover = 'replicaset_election_failover.yaml',
+}
+
+for case, path in pairs(examples) do
+    local test_name = ('test_example_%s'):format(case)
+    local config_path = ('doc/examples/config/%s'):format(path)
+    g[test_name] = function()
+        local config_file = fio.abspath(config_path)
+        local fh = fio.open(config_file, {'O_RDONLY'})
+        local config = yaml.decode(fh:read())
+        fh:close()
+        cluster_config:validate(config)
+    end
 end
 
-g.test_example_replicaset = function()
-    local config_file = fio.abspath('doc/examples/config/replicaset.yaml')
-    local fh = fio.open(config_file, {'O_RDONLY'})
-    local config = yaml.decode(fh:read())
-    fh:close()
-    cluster_config:validate(config)
-end
+local enterprise_examples = {
+    etcd_local = 'etcd/local.yaml',
+    etcd_remote = 'etcd/remote.yaml',
+    config_storage = 'config-storage/config.yaml',
+}
 
-g.test_example_sharding = function()
-    local config_file = fio.abspath('doc/examples/config/sharding.yaml')
-    local fh = fio.open(config_file, {'O_RDONLY'})
-    local config = yaml.decode(fh:read())
-    fh:close()
-    cluster_config:validate(config)
+for case, path in pairs(enterprise_examples) do
+    local test_name = ('test_example_%s'):format(case)
+    local config_path = ('doc/examples/config/%s'):format(path)
+    g[test_name] = function()
+        t.tarantool.skip_if_not_enterprise()
+        local config_file = fio.abspath(config_path)
+        local fh = fio.open(config_file, {'O_RDONLY'})
+        local config = yaml.decode(fh:read())
+        fh:close()
+        cluster_config:validate(config)
+    end
 end
 
 -- Verify that a valid name is accepted as an instance name,
