@@ -1,3 +1,4 @@
+local instance_config = require('internal.config.instance_config')
 local t = require('luatest')
 local treegen = require('test.treegen')
 local justrun = require('test.justrun')
@@ -56,6 +57,26 @@ local function run_as_script(f)
             stderr = '',
         })
     end
+end
+
+-- Verify the given configuration option.
+--
+-- Also ensure that the last configuration apply is successful.
+--
+-- Usage:
+--
+-- helpers.success_case(g, {
+--     <...>,
+--     verify = verify_option('process.title', 'foo'),
+-- })
+local function verify_option(option, exp)
+    return loadstring(([[
+        local t = require('luatest')
+        local config = require('config')
+
+        t.assert_equals(config:info().status, 'ready')
+        t.assert_equals(config:get(%q), %q)
+    ]]):format(option, exp))
 end
 
 -- Verify all the template variables:
@@ -265,3 +286,186 @@ g.test_sharding = run_as_script(function()
         },
     })
 end)
+
+-- Verify configuration schema constraints.
+g.test_context_var_validation = function()
+    local function verify(var_def, exp_err)
+        local config = {
+            config = {
+                context = {
+                    myvar = var_def,
+                },
+            },
+        }
+        t.assert_error_msg_equals(exp_err, instance_config.validate,
+            instance_config, config)
+    end
+
+    local err_must_be_defined = table.concat({
+        '[instance_config] config.context.myvar',
+        '"from" field must be defined in a context variable definition',
+    }, ': ')
+
+    verify({}, err_must_be_defined)
+    verify({env = 'FOO'}, err_must_be_defined)
+    verify({file = 'foo'}, err_must_be_defined)
+    verify({rstrip = true}, err_must_be_defined)
+
+    verify({from = 'env'}, table.concat({
+        '[instance_config] config.context.myvar',
+        '"env" field must define an environment variable name if "from" ' ..
+            'field is set to "env"',
+    }, ': '))
+    verify({from = 'file'}, table.concat({
+        '[instance_config] config.context.myvar',
+        '"file" field must define a file name if "from" field is set to ' ..
+            '"file"',
+    }, ': '))
+end
+
+-- No env variable -> apply error.
+g.test_context_var_env_failure = function(g)
+    helpers.failure_case(g, {
+        options = {
+            ['config.context'] = {
+                myvar = {
+                    from = 'env',
+                    env = 'UNKNOWN_ENV_VAR',
+                },
+            },
+            ['process.title'] = '{{ context.myvar }}'
+        },
+        exp_err = table.concat({
+            'Unable to read config.context.myvar variable value',
+            'no "UNKNOWN_ENV_VAR" environment variable',
+        }, ': '),
+    })
+end
+
+-- No file -> apply error.
+g.test_context_var_file_failure = function(g)
+    helpers.failure_case(g, {
+        options = {
+            ['config.context'] = {
+                myvar = {
+                    from = 'file',
+                    file = 'unknown_file.txt',
+                },
+            },
+            ['process.title'] = '{{ context.myvar }}'
+        },
+        exp_err = table.concat({
+            'Unable to read config.context.myvar variable value',
+            'Unable to open file',
+        }, ': '),
+    })
+end
+
+-- Verify a config.context variable with 'from: env'.
+g.test_context_var_env = function(g)
+    helpers.success_case(g, {
+        env = {
+            ['FOO'] = 'needle',
+        },
+        options = {
+            ['config.context'] = {
+                myvar = {
+                    from = 'env',
+                    env = 'FOO',
+                },
+            },
+            ['process.title'] = '{{ context.myvar }}'
+        },
+        verify = verify_option('process.title', 'needle'),
+    })
+end
+
+-- Verify a config.context variable with 'from: file'.
+g.test_context_var_file = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    treegen.write_script(dir, 'foo.txt', 'needle\n')
+
+    helpers.success_case(g, {
+        dir = dir,
+        options = {
+            ['config.context'] = {
+                myvar = {
+                    from = 'file',
+                    file = 'foo.txt',
+                },
+            },
+            ['process.title'] = '{{ context.myvar }}'
+        },
+        verify = verify_option('process.title', 'needle\n'),
+    })
+end
+
+-- Verify a config.context variable with 'from: file' and
+-- 'rstrip: true'.
+g.test_context_var_file_rstrip = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    treegen.write_script(dir, 'foo.txt', 'needle\n')
+
+    helpers.success_case(g, {
+        dir = dir,
+        options = {
+            ['config.context'] = {
+                myvar = {
+                    from = 'file',
+                    file = 'foo.txt',
+                    rstrip = true,
+                },
+            },
+            ['process.title'] = '{{ context.myvar }}'
+        },
+        verify = verify_option('process.title', 'needle'),
+    })
+end
+
+-- Verify how file paths are working together with
+-- process.work_dir.
+g.test_context_var_file_process_work_dir = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    treegen.write_script(dir, 'foo.txt', 'needle')
+
+    -- foo.txt
+    -- w/
+    --   var/
+    helpers.success_case(g, {
+        dir = dir,
+        options = {
+            ['process.work_dir'] = 'w',
+            ['config.context'] = {
+                myvar = {
+                    from = 'file',
+                    file = '../foo.txt',
+                },
+            },
+            ['process.title'] = '{{ context.myvar }}'
+        },
+        verify = verify_option('process.title', 'needle'),
+        verify_2 = verify_option('process.title', 'needle'),
+    })
+
+    local dir = treegen.prepare_directory(g, {}, {})
+    treegen.write_script(dir, 'w/foo.txt', 'needle')
+
+    -- w/
+    --   foo.txt
+    --   var/
+    helpers.success_case(g, {
+        dir = dir,
+        options = {
+            ['process.work_dir'] = 'w',
+            ['config.context'] = {
+                myvar = {
+                    from = 'file',
+                    file = 'foo.txt',
+                },
+            },
+            ['process.title'] = '{{ context.myvar }}'
+        },
+        verify = verify_option('process.title', 'needle'),
+        verify_2 = verify_option('process.title', 'needle'),
+    })
+end

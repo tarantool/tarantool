@@ -3,6 +3,8 @@ local tarantool = require('tarantool')
 local compat = require('compat')
 local uuid = require('uuid')
 local urilib = require('uri')
+local fio = require('fio')
+local file = require('internal.config.utils.file')
 
 -- List of annotations:
 --
@@ -324,7 +326,88 @@ local function apply_vars_f(data, w, vars)
     return data
 end
 
+-- Interpret the given path as relative to the given base
+-- directory.
+local function prepare_file_path(base_dir, path)
+    -- fio.pathjoin('/foo', '/bar') gives '/foo/bar/', see
+    -- gh-8816.
+    --
+    -- Let's check whether the second path is absolute.
+    local needs_prepending = base_dir ~= nil and not path:startswith('/')
+    if needs_prepending then
+        path = fio.pathjoin(base_dir, path)
+    end
+
+    -- Let's consider the following example.
+    --
+    -- config:
+    --   context:
+    --     foo:
+    --       from: file
+    --       file: ../foo.txt
+    -- process:
+    --   work_dir: x
+    --
+    -- In such a case we get correct "x/../foo.txt" on
+    -- startup, but fio.open() complains if there is no "x"
+    -- directory.
+    --
+    -- The working directory is created at startup if needed,
+    -- so a user is not supposed to create it manually before
+    -- first tarantool startup.
+    --
+    -- Let's strip all these ".." path components using
+    -- fio.abspath().
+    return fio.abspath(path)
+end
+
+-- Read a config.context[name] variable depending of its "from"
+-- type.
+local function read_context_var_noexc(base_dir, def)
+    if def.from == 'env' then
+        local value = os.getenv(def.env)
+        if value == nil then
+            return false, ('no %q environment variable'):format(def.env)
+        end
+        return true, value
+    elseif def.from == 'file' then
+        local path = prepare_file_path(base_dir, def.file)
+        return pcall(file.universal_read, path, 'file')
+    else
+        assert(false)
+    end
+end
+
 local function apply_vars(self, iconfig, vars)
+    vars = table.copy(vars)
+
+    -- The file path is interpreted as relative to
+    -- `process.work_dir`. The first box.cfg() call sets a
+    -- current working directory to this path.
+    --
+    -- However, we should prepend paths manually before the first
+    -- box.cfg() call.
+    --
+    -- TODO: Glue all such code from applier/mkdir.lua and
+    -- utils/snapshot.lua.
+    local work_dir = self:get(iconfig, 'process.work_dir')
+    local base_dir = type(box.cfg) == 'function' and work_dir or nil
+
+    -- Read config.context.* variables and add them into the
+    -- variables list.
+    local context_vars = self:get(iconfig, 'config.context')
+    for name, def in pairs(context_vars or {}) do
+        local ok, res = read_context_var_noexc(base_dir, def)
+        if not ok then
+            error(('Unable to read config.context.%s variable value: ' ..
+                '%s'):format(name, res), 0)
+        end
+        if def.rstrip then
+            res = res:rstrip()
+        end
+        vars['context.' .. name] = res
+    end
+
     return self:map(iconfig, apply_vars_f, vars)
 end
 
@@ -492,6 +575,43 @@ return schema.new('instance_config', schema.record({
                 end
             end
         })),
+        context = schema.map({
+            key = schema.scalar({
+                type = 'string',
+            }),
+            value = schema.record({
+                from = schema.enum({
+                    'env',
+                    'file',
+                }),
+                env = schema.scalar({
+                    type = 'string',
+                }),
+                file = schema.scalar({
+                    type = 'string',
+                }),
+                rstrip = schema.scalar({
+                    type = 'boolean',
+                }, {
+                    default = false,
+                }),
+            }, {
+                validate = function(var, w)
+                    if var.from == nil then
+                        w.error('"from" field must be defined in a context ' ..
+                            'variable definition')
+                    end
+                    if var.from == 'env' and var.env == nil then
+                        w.error('"env" field must define an environment ' ..
+                            'variable name if "from" field is set to "env"')
+                    end
+                    if var.from == 'file' and var.file == nil then
+                        w.error('"file" field must define a file name if ' ..
+                            '"from" field is set to "file"')
+                    end
+                end,
+            }),
+        }),
     }),
     process = schema.record({
         strip_core = schema.scalar({

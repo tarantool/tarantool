@@ -60,6 +60,7 @@ g.test_config = function()
     local iconfig = {
         config = {
             reload = 'auto',
+            context = {},
         },
     }
     instance_config:validate(iconfig)
