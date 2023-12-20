@@ -5,16 +5,6 @@ on:
     branches: [ "master" ]
   workflow_dispatch:
     branches: [ "master" ]
-  workflow_call:
-    inputs:
-      submodule:
-        description: Name of submodule to bump.
-        required: true
-        type: string
-      revision:
-        description: Git revision from submodule repository
-        required: true
-        type: string
 
 jobs:
   analyze:
@@ -67,13 +57,6 @@ jobs:
 
     - name: Install deps
       uses: ./.github/actions/install-deps-debian
-
-    - name: Optional submodule bump
-      if: ${{ inputs.submodule }}
-      uses: ./.github/actions/bump-submodule
-      with:
-        submodule: ${{ inputs.submodule }}
-        revision: ${{ inputs.revision }}
 
     - name: Build
       run: make -f .test.mk build
