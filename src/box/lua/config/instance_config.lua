@@ -185,60 +185,37 @@ local function uri_is_suitable_to_connect(uri)
     return true
 end
 
-local function validate_uri_str(data, w)
-    --
-    -- Substitute variables with placeholders to don't confuse the URI parser
-    -- with the curly brackets.
-    --
-    data = data:gsub('{{ *.- *}}', 'placeholder')
-    local uri, err = urilib.parse(data)
-    if uri == nil then
-        w.error('Unable to parse an URI: %s', err)
-    end
-    if uri.login ~= nil then
-        w.error("Login must be set via the 'login' option")
-    end
-    assert(uri.password == nil)
-    if uri.params ~= nil then
-        w.error("Parameters must be set via the 'params' option")
-    end
-    local ok, err = uri_is_suitable_to_connect(uri)
-    if not ok then
-        w.error(err)
-    end
-end
-
-local function advertise_client_uri_validate(data, w)
-    -- Accept the special syntax user@ or user:pass@.
-    --
-    -- It means using iproto.listen value to connect and using the
-    -- given user and password.
-    --
-    -- If the password is not given, it is extracted from the
-    -- `credentials` section of the config.
-    if data:endswith('@') then
-        return
-    end
-
-    -- Substitute variables with placeholders to don't confuse the
-    -- URI parser with the curly brackets.
-    data = data:gsub('{{ *.- *}}', 'placeholder')
-
-    local uri, err = urilib.parse(data)
-    if uri == nil then
-        if data:find(',') then
-            w.error('A single URI is expected, not a list of URIs')
+-- Verify 'uri' field in iproto.listen and iproto.advertise.* options.
+local function validate_uri_field(has_login_field, used_to_connect)
+    return function(data, w)
+        -- Substitute variables with placeholders to don't confuse
+        -- the URI parser with the curly brackets.
+        data = data:gsub('{{ *.- *}}', 'placeholder')
+        local uri, err = urilib.parse(data)
+        if uri == nil then
+            if data:find(',') then
+                w.error('A single URI is expected, not a list of URIs')
+            end
+            w.error('Unable to parse an URI: %s', err)
         end
-        w.error('Unable to parse an URI: %s', err)
+        if uri.login ~= nil and has_login_field then
+            w.error("Login must be set via the 'login' option")
+        end
+        if uri.login ~= nil and not has_login_field then
+            w.error('Login cannot be set for as part of the URI')
+        end
+        assert(uri.password == nil)
+        if uri.params ~= nil then
+            w.error("URI parameters should be described in the 'params' " ..
+                "field, not as the part of URI")
+        end
+        if used_to_connect then
+            local ok, err = uri_is_suitable_to_connect(uri)
+            if not ok then
+                w.error(err)
+            end
+        end
     end
-    local ok, err = uri_is_suitable_to_connect(uri)
-    if not ok then
-        w.error(err)
-    end
-
-    -- The return value is ignored by schema.lua, but useful in
-    -- iproto.advertise.client validation.
-    return uri
 end
 
 -- Accept a value of 'iproto.listen' option and return the first URI
@@ -256,6 +233,10 @@ local function find_suitable_uri_to_connect(listen)
             -- argument `write_password`. Let's assume that the
             -- given URIs are to listen on them and so have no
             -- user/password.
+            --
+            -- NB: We need to format the URI back to construct the
+            -- 'uri' field. urilib.parse() creates separate 'host'
+            -- and 'service'.
             return urilib.format(uri), u.params
         end
     end
@@ -285,6 +266,9 @@ end
 
 local function instance_uri(self, iconfig, advertise_type)
     assert(advertise_type == 'peer' or advertise_type == 'sharding')
+
+    -- An effective value of iproto.advertise.sharding defaults to
+    -- iproto.advertise.peer.
     local uri
     if advertise_type == 'sharding' then
         uri = self:get(iconfig, 'iproto.advertise.sharding')
@@ -295,6 +279,7 @@ local function instance_uri(self, iconfig, advertise_type)
     if advertise_type == 'peer' then
         uri = self:get(iconfig, 'iproto.advertise.peer')
     end
+    -- If there is no uri field, look it in iproto.listen.
     uri = uri ~= nil and uri or {}
     if uri.uri == nil then
         assert(uri.params == nil)
@@ -304,9 +289,13 @@ local function instance_uri(self, iconfig, advertise_type)
         end
         uri.uri, uri.params = find_suitable_uri_to_connect(listen)
     end
+    -- No URI found for the given instance.
     if uri.uri == nil then
         return nil
     end
+
+    -- If there is a login. but there are no password: lookup the
+    -- credentials section.
     if uri.password == nil and uri.login ~= nil then
         uri.password = find_password(self, iconfig, uri.login)
     end
@@ -815,24 +804,7 @@ return schema.new('instance_config', schema.record({
             items = schema.record({
                 uri = schema.scalar({
                     type = 'string',
-                    validate = function(data, w)
-                        -- Substitute variables with placeholders to don't
-                        -- confuse the URI parser with the curly brackets.
-                        data = data:gsub('{{ *.- *}}', 'placeholder')
-                        local uri, err = urilib.parse(data)
-                        if uri == nil then
-                            w.error('Unable to parse an URI: %s', err)
-                        end
-                        if uri.login ~= nil then
-                            w.error("Login cannot be set for iproto.listen")
-                        end
-                        assert(uri.password == nil)
-                        if uri.params ~= nil then
-                            err = "URI parameters should be described in " ..
-                                  "the 'params' field, not as the part of URI"
-                            w.error(err)
-                        end
-                    end,
+                    validate = validate_uri_field(false, false),
                 }),
                 params = schema.record({
                     transport = schema.enum({
@@ -862,11 +834,7 @@ return schema.new('instance_config', schema.record({
                 }),
             }, {
                 validate = function(data, w)
-                    -- No items in iproto.listen at all -- OK.
-                    if next(data) == nil then
-                        return
-                    end
-                    -- There is some data -- the URI should be there.
+                    -- If data is not nil then the URI should be there.
                     if data.uri == nil then
                         w.error('The URI is required for iproto.listen')
                     end
@@ -906,48 +874,37 @@ return schema.new('instance_config', schema.record({
         --
         -- The iproto.advertise.{peer,sharding} options have the
         -- following syntax variants:
+        --
+        -- With URI:
         -- {uri = ...}
         -- {uri = ..., params = ...}
-        -- {login = ...}
-        -- {login = ..., password = ...}
         -- {login = ..., uri = ...}
         -- {login = ..., password = ..., uri = ...}
         -- {login = ..., uri = ..., params = ...}
         -- {login = ..., password = ..., uri = ..., params = ...}
+        --
+        -- Without URI:
+        --
+        -- {login = ...}
+        -- {login = ..., password = ...}
         --
         -- where uri is host:port.
         --
         -- Note: the host:port part may represent a Unix domain
         -- socket: host = 'unix/', port = '/path/to/socket'.
         --
-        -- If there is no host:port (1, 2), it is to be looked in
+        -- If there is no uri field, it is to be looked in
         -- iproto.listen.
         --
-        -- If there is a user, but no password (1, 3), the
-        -- password is to be looked in the `credentials` section
-        -- of the configuration (except user 'guest', which can't
-        -- have a password).
+        -- If there is a user, but no password, the password is to
+        -- be looked in the `credentials` section of the
+        -- configuration (except user 'guest', which can't  have a
+        -- password).
         advertise = schema.record({
             client = schema.scalar({
                 type = 'string',
                 default = box.NULL,
-                validate = function(data, w)
-                    -- Re-use peer URI validation code, but add
-                    -- several extra constraints.
-                    local uri = advertise_client_uri_validate(data, w)
-
-                    if data:endswith('@') then
-                        w.error('user@ and user:pass@ syntax is not ' ..
-                            'accepted by iproto.advertise.client option: ' ..
-                            'only host:port is considered valid')
-                    end
-
-                    if uri.login ~= nil or uri.password ~= nil then
-                        w.error('user@host:port and user:pass@host:port ' ..
-                            'syntax is not accepted by iproto.advertise.' ..
-                            'client option: only host:port is considered valid')
-                    end
-                end,
+                validate = validate_uri_field(false, true),
             }),
             peer = schema.record({
                 login = schema.scalar({
@@ -958,7 +915,7 @@ return schema.new('instance_config', schema.record({
                 }),
                 uri = schema.scalar({
                     type = 'string',
-                    validate = validate_uri_str,
+                    validate = validate_uri_field(true, true),
                 }),
                 params = schema.record({
                     transport = schema.enum({
@@ -986,9 +943,8 @@ return schema.new('instance_config', schema.record({
                 }),
             }, {
                 validate = function(data, w)
-                    -- No data in iproto.advertise.peer -- OK.
                     if next(data) == nil then
-                        return
+                        w.error('An URI should have at least one field')
                     end
                     -- If a password is set, a login must also be specified.
                     if data.password ~= nil and data.login == nil then
@@ -1009,7 +965,7 @@ return schema.new('instance_config', schema.record({
                 }),
                 uri = schema.scalar({
                     type = 'string',
-                    validate = validate_uri_str,
+                    validate = validate_uri_field(true, true),
                 }),
                 params = schema.record({
                     transport = schema.enum({
@@ -1037,9 +993,8 @@ return schema.new('instance_config', schema.record({
                 }),
             }, {
                 validate = function(data, w)
-                    -- No data in iproto.advertise.sharding -- OK.
                     if next(data) == nil then
-                        return
+                        w.error('An URI should have at least one field')
                     end
                     -- If a password is set, a login must also be specified.
                     if data.password ~= nil and data.login == nil then

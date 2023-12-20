@@ -70,7 +70,7 @@ function methods.names(self)
     }
 end
 
-local function instance_sharding(iconfig)
+local function instance_sharding(iconfig, instance_name)
     local roles = instance_config:get(iconfig, 'sharding.roles')
     if roles == nil or #roles == 0 then
         return nil
@@ -86,7 +86,8 @@ local function instance_sharding(iconfig)
     local zone = instance_config:get(iconfig, 'sharding.zone')
     local uri = instance_config:instance_uri(iconfig, 'sharding')
     if uri == nil then
-        error('No suitable URI provided', 0)
+        local err = 'No suitable URI provided for instance %q'
+        error(err:format(instance_name), 0)
     end
     --
     -- Currently, vshard does not accept URI without a username. So if we got a
@@ -171,7 +172,7 @@ function methods.sharding(self)
                         table.insert(rebalancers, replicaset_name)
                     end
                 end
-                local isharding = instance_sharding(iconfig)
+                local isharding = instance_sharding(iconfig, instance_name)
                 if isharding ~= nil then
                     if replicaset_uuid == nil then
                         replicaset_uuid = instance_config:get(iconfig,
