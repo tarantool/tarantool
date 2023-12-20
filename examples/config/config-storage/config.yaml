@@ -1,0 +1,47 @@
+credentials:
+  users:
+    replicator:
+      password: 'topsecret'
+      roles: [replication]
+    client:
+      password: 'secret'
+      privileges:
+        - permissions: [execute]
+          # `tt connect` uses eval to execute commands.
+          # So, specify permission in this way.
+          universe: true
+        - permissions: [read, write]
+          spaces: [config_storage, config_storage_meta]
+
+iproto:
+  advertise:
+    peer:
+      login: replicator
+
+replication:
+  failover: election
+
+database:
+  use_mvcc_engine: true
+
+groups:
+  group-001:
+    replicasets:
+      replicaset-001:
+        roles: [config.storage]
+        roles_cfg:
+          config.storage:
+            status_check_interval: 3
+        instances:
+          instance-001:
+            iproto:
+              listen:
+              - uri: 127.0.0.1:3301
+          instance-002:
+            iproto:
+              listen:
+              - uri: 127.0.0.1:3302
+          instance-003:
+            iproto:
+              listen:
+              - uri: 127.0.0.1:3303
