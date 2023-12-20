@@ -616,3 +616,39 @@ g.test_sharding_credentials_role = function(g)
         end
     end)
 end
+
+g.test_no_suitable_uri = function(g)
+    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        storage:
+          roles: [super]
+          password: "storage"
+
+    iproto:
+      advertise:
+        sharding:
+          login: 'storage'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            sharding:
+              roles: [storage, router]
+            instances:
+              instance-001: {}
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+    local env = {LUA_PATH = os.environ()['LUA_PATH']}
+    local opts = {nojson = true, stderr = true}
+    local args = {'--name', 'instance-001', '--config', 'config.yaml'}
+    local res = justrun.tarantool(dir, env, args, opts)
+    t.assert_equals(res.exit_code, 1)
+    local err = 'No suitable URI provided for instance "instance-001"'
+    t.assert_str_contains(res.stderr, err)
+end

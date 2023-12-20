@@ -306,8 +306,9 @@ local function check_validate_iproto()
             },
         },
     }
-    local err = "[instance_config] iproto.advertise.peer.uri: Parameters " ..
-                "must be set via the 'params' option"
+    local err = "[instance_config] iproto.advertise.peer.uri: URI " ..
+                "parameters should be described in the 'params' field, not " ..
+                "as the part of URI"
     t.assert_error_msg_equals(err, function()
         instance_config:validate(iconfig)
     end)
@@ -519,8 +520,7 @@ for case_name, case in pairs({
         advertise = {uri = 'localhost:3301,localhost:3302'},
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.%s.uri',
-            'Unable to parse an URI: Incorrect URI: expected host:service ' ..
-            'or /unix.socket',
+            'A single URI is expected, not a list of URIs',
         }, ': '),
     },
     inaddr_any_ipv4 = {
@@ -603,14 +603,6 @@ for case_name, case in pairs({
     end
 end
 
-local err_advertise_client_uri_with_user = '[instance_config] ' ..
-    'iproto.advertise.client: user@host:port and user:pass@host:port syntax ' ..
-    'is not accepted by iproto.advertise.client option: only host:port is ' ..
-    'considered valid'
-local err_advertise_client_user_syntax = '[instance_config] ' ..
-    'iproto.advertise.client: user@ and user:pass@ syntax is not accepted ' ..
-    'by iproto.advertise.client option: only host:port is considered valid'
-
 -- Extra bad cases specific for iproto.advertise.client.
 for case_name, case in pairs({
     incorrect_uri = {
@@ -636,36 +628,8 @@ for case_name, case in pairs({
             'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
         }, ': '),
     },
-    inaddr_any_ipv4_user = {
-        advertise = 'user@0.0.0.0:3301',
-        exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.client',
-            'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
-        }, ': '),
-    },
-    inaddr_any_ipv4_user_pass = {
-        advertise = 'user:pass@0.0.0.0:3301',
-        exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.client',
-            'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
-        }, ': '),
-    },
     inaddr_any_ipv6 = {
         advertise = '[::]:3301',
-        exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.client',
-            'in6addr_any (::) cannot be used to create a client socket',
-        }, ': '),
-    },
-    inaddr_any_ipv6_user = {
-        advertise = 'user@[::]:3301',
-        exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.client',
-            'in6addr_any (::) cannot be used to create a client socket',
-        }, ': '),
-    },
-    inaddr_any_ipv6_user_pass = {
-        advertise = 'user:pass@[::]:3301',
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.client',
             'in6addr_any (::) cannot be used to create a client socket',
@@ -678,43 +642,16 @@ for case_name, case in pairs({
             'An URI with zero port cannot be used to create a client socket',
         }, ': '),
     },
-    zero_port_user = {
-        advertise = 'user@localhost:0',
-        exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.client',
-            'An URI with zero port cannot be used to create a client socket',
-        }, ': '),
-    },
-    zero_port_user_pass = {
-        advertise = 'user:pass@localhost:0',
-        exp_err_msg = table.concat({
-            '[instance_config] iproto.advertise.client',
-            'An URI with zero port cannot be used to create a client socket',
-        }, ': '),
-    },
-    inet_socket_user = {
-        advertise = 'user@localhost:3301',
-        exp_err_msg = err_advertise_client_uri_with_user,
-    },
-    inet_socket_user_pass = {
-        advertise = 'user:pass@localhost:3301',
-        exp_err_msg = err_advertise_client_uri_with_user,
-    },
-    unix_socket_user = {
-        advertise = 'user@unix/:/foo/bar.iproto',
-        exp_err_msg = err_advertise_client_uri_with_user,
-    },
-    unix_socket_user_pass = {
-        advertise = 'user:pass@unix/:/foo/bar.iproto',
-        exp_err_msg = err_advertise_client_uri_with_user,
-    },
-    user = {
-        advertise = 'user@',
-        exp_err_msg = err_advertise_client_user_syntax,
-    },
     user_pass = {
-        advertise = 'user:pass@',
-        exp_err_msg = err_advertise_client_user_syntax,
+        advertise = 'user:pass@unix/:/foo/bar.iproto',
+        exp_err_msg = '[instance_config] iproto.advertise.client: Login ' ..
+                      'cannot be set for as part of the URI',
+    },
+    params = {
+        advertise = 'unix/:/foo/bar.iproto?transport=plain',
+        exp_err_msg = '[instance_config] iproto.advertise.client: URI ' ..
+                      "parameters should be described in the 'params' " ..
+                      'field, not as the part of URI',
     },
 }) do
     g[('test_bad_iproto_advertise_client_%s'):format(case_name)] = function()
@@ -829,6 +766,41 @@ for case_name, case in pairs({
             'Unable to parse an URI',
             'Incorrect URI',
             'expected host:service or /unix.socket'
+        }, ': '),
+    },
+    multiple_uri = {
+        listen = {{
+            uri = '3301, 3302',
+        }},
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.listen[1].uri',
+            'A single URI is expected, not a list of URIs'
+        }, ': '),
+    },
+    user_pass = {
+        listen = {{
+            uri = 'one:two@127.0.0.1',
+        }},
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.listen[1].uri',
+            'Login cannot be set for as part of the URI'
+        }, ': '),
+    },
+    params = {
+        listen = {{
+            uri = "127.0.0.1?transport='plain'",
+        }},
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.listen[1].uri',
+            "URI parameters should be described in the 'params' field, not " ..
+            'as the part of URI'
+        }, ': '),
+    },
+    no_uri = {
+        listen = {{}},
+        exp_err_msg = table.concat({
+            '[instance_config] iproto.listen[1]',
+            'The URI is required for iproto.listen'
         }, ': '),
     },
 }) do
