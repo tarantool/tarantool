@@ -5,6 +5,7 @@ on:
     branches:
       - 'master'
       - 'release/**'
+      - 'foxzi/static_build_make_source_packages'
     tags:
       - '**'
   pull_request:
@@ -41,7 +42,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  packaging-x86_64:
+  packaging-deb-x86_64:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'full-ci' or 'static-build-ci' label is set.
     if: github.repository == 'tarantool/tarantool' &&
@@ -49,22 +50,21 @@ jobs:
           contains(github.event.pull_request.labels.*.name, 'full-ci') ||
           contains(github.event.pull_request.labels.*.name, 'static-build-ci') )
 
-    uses: ./.github/workflows/static_build_pack_test_deploy.yml
+    uses: ./.github/workflows/static_build_pack_test_deploy_deb.yml
     with:
       arch: x86_64
       test-matrix: '{
         "include": [
           {"os": "debian-buster"}, {"os": "debian-bullseye"},
-          {"os": "centos-7"}, {"os": "centos-8"},
-          {"os": "fedora-35"}, {"os": "fedora-36"},
           {"os": "ubuntu-focal"}, {"os": "ubuntu-jammy"}
         ]
       }'
       submodule: ${{ inputs.submodule }}
       revision: ${{ inputs.revision }}
+      testlib-path: /usr/lib/tarantool-testlib/obj-x86_64-linux-gnu/
     secrets: inherit
 
-  packaging-aarch64:
+  packaging-rpm-x86_64:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'full-ci' or 'static-build-ci' label is set.
     if: github.repository == 'tarantool/tarantool' &&
@@ -72,15 +72,56 @@ jobs:
           contains(github.event.pull_request.labels.*.name, 'full-ci') ||
           contains(github.event.pull_request.labels.*.name, 'static-build-ci') )
 
-    uses: ./.github/workflows/static_build_pack_test_deploy.yml
+    uses: ./.github/workflows/static_build_pack_test_deploy_rpm.yml
+    with:
+      arch: x86_64
+      test-matrix: '{
+        "include": [
+          {"os": "centos-7"}, {"os": "centos-8"},
+          {"os": "fedora-35"}, {"os": "fedora-36"},
+        ]
+      }'
+      submodule: ${{ inputs.submodule }}
+      revision: ${{ inputs.revision }}
+      testlib-path: /usr/lib64/tarantool-testlib/
+    secrets: inherit
+
+  packaging-deb-aarch64:
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'full-ci' or 'static-build-ci' label is set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          contains(github.event.pull_request.labels.*.name, 'full-ci') ||
+          contains(github.event.pull_request.labels.*.name, 'static-build-ci') )
+
+    uses: ./.github/workflows/static_build_pack_test_deploy_deb.yml
     with:
       arch: aarch64
       test-matrix: '{
         "include": [
           {"os": "debian-buster"}, {"os": "debian-bullseye"},
-          {"os": "centos-7"}, {"os": "centos-8"},
-          {"os": "fedora-35"}, {"os": "fedora-36"},
           {"os": "ubuntu-focal"}, {"os": "ubuntu-jammy"}
         ]
       }'
+      testlib-path: /usr/lib/tarantool-testlib/obj-aarch64-linux-gnu/
+    secrets: inherit
+
+  packaging-rpm-aarch64:
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'full-ci' or 'static-build-ci' label is set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          contains(github.event.pull_request.labels.*.name, 'full-ci') ||
+          contains(github.event.pull_request.labels.*.name, 'static-build-ci') )
+
+    uses: ./.github/workflows/static_build_pack_test_deploy_rpm.yml
+    with:
+      arch: aarch64
+      test-matrix: '{
+        "include": [
+          {"os": "centos-7"}, {"os": "centos-8"},
+          {"os": "fedora-35"}, {"os": "fedora-36"}
+        ]
+      }'
+      testlib-path: /usr/lib64/tarantool-testlib/
     secrets: inherit
