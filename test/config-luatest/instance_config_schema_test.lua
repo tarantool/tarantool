@@ -82,6 +82,7 @@ g.test_config_enterprise = function()
     local iconfig = {
         config = {
             reload = 'auto',
+            context = {},
             etcd = {
                 prefix = '/one',
                 endpoints = {'two', 'three'},
