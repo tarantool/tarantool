@@ -45,12 +45,6 @@ build: configure
 
 .PHONY: run-luajit-test
 run-luajit-test:
-	# Temporary hack for an unstable LuaJIT test. To be removed in
-	# the scope of gh-9145.
-	sed -i.bak -e 's/for _ = 1, 4000 do/for _ = 1, 10000 do/' \
-		third_party/luajit/test/tarantool-tests/lj-946-print-errors-from-gc-fin-custom.test.lua
-	sed -i.bak -e 's/for _ = 1, 4000 do/for _ = 1, 10000 do/' \
-		third_party/luajit/test/tarantool-tests/lj-946-print-errors-from-gc-fin-default/script.lua
 	${LUAJIT_TEST_ENV} cmake --build ${LUAJIT_TEST_BUILD_DIR} --parallel ${NPROC} --target LuaJIT-test
 
 .PHONY: install-test-deps
