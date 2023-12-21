@@ -93,6 +93,12 @@ local base_config = {
     },
 }
 
+local function cbuilder_set_global_option(self, path, value)
+    assert(type(path) == 'string')
+    cluster_config:set(self._config, path, value)
+    return self
+end
+
 -- Set an option for replicaset-001.
 local function cbuilder_set_replicaset_option(self, path, value)
     assert(type(path) == 'string')
@@ -156,6 +162,7 @@ local function cbuilder_config(self)
 end
 
 local cbuilder_mt = {
+    set_global_option = cbuilder_set_global_option,
     set_replicaset_option = cbuilder_set_replicaset_option,
     set_instance_option = cbuilder_set_instance_option,
     add_instance = cbuilder_add_instance,
