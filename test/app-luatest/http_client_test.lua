@@ -1398,3 +1398,135 @@ g.test_gh_9346_httpc_io_cleanup = function(cg)
     collectgarbage()
     collectgarbage()
 end
+
+g.test_http_client_GET = function(cg)
+    local default_http_client = client
+    local http_new = client.new()
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local resp
+
+    resp = default_http_client:get(url, opts)
+    t.assert_equals(resp.status, 200)
+    resp = default_http_client.get(url, opts)
+    t.assert_equals(resp.status, 200)
+    resp = http_new:get(url, opts)
+    t.assert_equals(resp.status, 200)
+end
+
+g.test_http_client_POST = function(cg)
+    local default_http_client = client
+    local http_new = client.new()
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local resp
+
+    resp = default_http_client:post(url, nil, opts)
+    t.assert_equals(resp.status, 200)
+    resp = default_http_client.post(url, nil, opts)
+    t.assert_equals(resp.status, 200)
+    resp = http_new:post(url, nil, opts)
+    t.assert_equals(resp.status, 200)
+end
+
+g.test_http_client_PUT = function(cg)
+    local default_http_client = client
+    local http_new = client.new()
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local resp
+
+    resp = default_http_client:put(url, nil, opts)
+    t.assert_equals(resp.status, 200)
+    resp = default_http_client.put(url, nil, opts)
+    t.assert_equals(resp.status, 200)
+    resp = http_new:put(url, nil, opts)
+    t.assert_equals(resp.status, 200)
+end
+
+g.test_http_client_DELETE = function(cg)
+    local default_http_client = client
+    local http_new = client.new()
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local resp
+
+    resp = default_http_client:delete(url, opts)
+    t.assert_equals(resp.status, 200)
+    resp = default_http_client.delete(url, opts)
+    t.assert_equals(resp.status, 200)
+    resp = http_new:delete(url, opts)
+    t.assert_equals(resp.status, 200)
+end
+
+g.test_http_client_PATCH = function(cg)
+    local default_http_client = client
+    local http_new = client.new()
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    opts.headers = {
+        ['content-type'] = 'application/json'
+    }
+    local body = {
+        Moscow = 1,
+    }
+    local resp
+
+    resp = default_http_client:patch(url, body, opts)
+    t.assert_equals(resp.status, 200)
+    resp = default_http_client.patch(url, body, opts)
+    t.assert_equals(resp.status, 200)
+    resp = http_new:patch(url, body, opts)
+    t.assert_equals(resp.status, 200)
+end
+
+g.test_http_client_TRACE = function(cg)
+    local default_http_client = client
+    local http_new = client.new()
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local resp
+
+    resp = default_http_client:trace(url, opts)
+    t.assert_equals(resp.status, 200)
+    resp = default_http_client.trace(url, opts)
+    t.assert_equals(resp.status, 200)
+    resp = http_new:trace(url, opts)
+    t.assert_equals(resp.status, 200)
+end
+
+g.test_http_client_OPTIONS = function(cg)
+    local default_http_client = client
+    local http_new = client.new()
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local resp
+
+    resp = default_http_client:options(url, opts)
+    t.assert_equals(resp.status, 200)
+    resp = default_http_client.options(url, opts)
+    t.assert_equals(resp.status, 200)
+    resp = http_new:options(url, opts)
+    t.assert_equals(resp.status, 200)
+end
+
+g.test_http_client_HEAD = function(cg)
+    local default_http_client = client
+    local http_new = client.new()
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local resp
+
+    resp = default_http_client:head(url, opts)
+    t.assert_equals(resp.status, 200)
+    resp = default_http_client.head(url, opts)
+    t.assert_equals(resp.status, 200)
+    resp = http_new:head(url, opts)
+    t.assert_equals(resp.status, 200)
+end
+
+g.test_http_client_CONNECT = function(cg)
+    local default_http_client = client
+    local http_new = client.new()
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local resp
+
+    resp = default_http_client:connect(url, opts)
+    t.assert_equals(resp.status, 200)
+    resp = default_http_client.connect(url, opts)
+    t.assert_equals(resp.status, 200)
+    resp = http_new:connect(url, opts)
+    t.assert_equals(resp.status, 200)
+end

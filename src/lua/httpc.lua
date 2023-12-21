@@ -743,17 +743,30 @@ local this_module = {
         decode_body = decode_body,
         extract_mime_type = extract_mime_type,
         get_icase = get_icase,
+        curl = http_default.curl,
     }
 }
+local this_module_raw = table.deepcopy(this_module)
 
-local function http_default_wrap(fname)
-    return function(...) return http_default[fname](http_default, ...) end
-end
+local this_module_mt = {
+    __index = function(self, key, _value)
+        if this_module_raw[key] ~= nil then
+            return self[key]
+        end
+        local httpc_method = http_default[key]
+        if http_default ~= nil and
+           type(httpc_method) == 'function' then
+            return function(self, ...)
+                if type(self) == 'table' then
+                    -- Example: require('http.client'):get(...).
+                    return httpc_method(http_default, ...)
+                else
+                    -- Example: require('http.client').get(...).
+                    return httpc_method(http_default, self, ...)
+                end
+            end
+        end
+    end,
+}
 
-for _, name in ipairs({ 'get', 'delete', 'trace', 'options', 'head',
-                     'connect', 'post', 'put', 'patch', 'request'}) do
-    this_module[name] = http_default_wrap(name)
-end
-this_module.curl = http_default.curl
-
-return this_module
+return setmetatable(this_module, this_module_mt)
