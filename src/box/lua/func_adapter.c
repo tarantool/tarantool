@@ -141,10 +141,10 @@ func_adapter_lua_push_null(struct func_adapter_ctx *base)
 
 static void
 func_adapter_lua_push_msgpack(struct func_adapter_ctx *base, const char *data,
-			      const char *data_end)
+			      const char *data_end, struct mp_ctx *mp_ctx)
 {
 	struct func_adapter_lua_ctx *ctx = (struct func_adapter_lua_ctx *)base;
-	luamp_push(ctx->L, data, data_end);
+	luamp_push_with_ctx(ctx->L, data, data_end, mp_ctx);
 }
 
 /**

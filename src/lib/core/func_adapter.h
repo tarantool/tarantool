@@ -17,6 +17,7 @@ extern "C" {
 #endif
 
 struct tuple;
+struct mp_ctx;
 
 #define FUNC_ADAPTER_CTX_SIZE 24
 
@@ -91,7 +92,7 @@ struct func_adapter_vtab {
 	 * Pushes MsgPack argument.
 	 */
 	void (*push_msgpack)(struct func_adapter_ctx *ctx, const char *data,
-			     const char *data_end);
+			     const char *data_end, struct mp_ctx *mp_ctx);
 	/**
 	 * Pushes an iterator as argument. The third argument is a pointer that
 	 * will be passed to iterator next. The fourth one is a function which
@@ -247,7 +248,16 @@ func_adapter_push_msgpack(struct func_adapter *func,
 			  struct func_adapter_ctx *ctx,
 			  const char *data, const char *data_end)
 {
-	func->vtab->push_msgpack(ctx, data, data_end);
+	func->vtab->push_msgpack(ctx, data, data_end, NULL);
+}
+
+static inline void
+func_adapter_push_msgpack_with_ctx(struct func_adapter *func,
+				   struct func_adapter_ctx *ctx,
+				   const char *data, const char *data_end,
+				   struct mp_ctx *mp_ctx)
+{
+	func->vtab->push_msgpack(ctx, data, data_end, mp_ctx);
 }
 
 static inline void
