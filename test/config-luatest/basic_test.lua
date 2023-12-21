@@ -23,6 +23,18 @@ local function last_n_lines(s, n)
     return table.concat(res, '\n')
 end
 
+local function replicaset_has_no_alerts(g)
+    local function no_alerts()
+        local config = require('config')
+
+        local info = config:info()
+        t.assert_equals(info.alerts, {})
+    end
+    g.server_1:exec(no_alerts)
+    g.server_2:exec(no_alerts)
+    g.server_3:exec(no_alerts)
+end
+
 g.test_basic = function(g)
     local dir = treegen.prepare_directory(g, {}, {})
     local config = {
@@ -81,6 +93,9 @@ g.test_example_replicaset = function(g)
     t.assert_equals(g.server_1:eval('return box.info.ro'), false)
     t.assert_equals(g.server_2:eval('return box.info.ro'), true)
     t.assert_equals(g.server_3:eval('return box.info.ro'), true)
+
+    -- Verify that this basic scenario starts without any alerts.
+    replicaset_has_no_alerts(g)
 end
 
 g.test_example_replicaset_manual_failover = function(g)
@@ -96,6 +111,9 @@ g.test_example_replicaset_manual_failover = function(g)
     t.assert_equals(g.server_1:eval('return box.info.ro'), false)
     t.assert_equals(g.server_2:eval('return box.info.ro'), true)
     t.assert_equals(g.server_3:eval('return box.info.ro'), true)
+
+    -- Verify that this basic scenario starts without any alerts.
+    replicaset_has_no_alerts(g)
 end
 
 g.test_example_replicaset_election_failover = function(g)
@@ -115,6 +133,9 @@ g.test_example_replicaset_election_failover = function(g)
         return not ro
     end):length()
     t.assert_equals(rw_count, 1)
+
+    -- Verify that this basic scenario starts without any alerts.
+    replicaset_has_no_alerts(g)
 end
 
 local err_msg_cannot_find_user = 'Cannot find user unknown ' ..

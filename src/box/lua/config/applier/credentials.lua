@@ -804,11 +804,12 @@ local function sync_credentials_worker()
                 obj_to_sync.type == 'BACKGROUND_FULL_SYNC' then
 
             if box.info.ro then
-                local msg = 'credentials.apply: Tarantool is in Read Only ' ..
-                            'mode, so credentials will be set up in the ' ..
-                            'background when it is switched to Read Write mode'
-                config:_alert('credentials_apply_ro',
-                              {type = 'warn', message = msg})
+                log.verbose('credentials: the database is in the read-only ' ..
+                    'mode. Waiting for the read-write mode to set up the ' ..
+                    'credentials given in the configuration. If another ' ..
+                    'instance in the replicaset will write these new ' ..
+                    'credentials, this instance will receive them and will ' ..
+                    'skip further actions.')
                 box.ctl.wait_rw()
             end
 
