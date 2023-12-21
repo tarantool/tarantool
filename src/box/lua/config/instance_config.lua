@@ -364,7 +364,25 @@ local function rebase_file_path(base_dir, path)
     --
     -- Let's strip all these ".." path components using
     -- fio.abspath().
-    return fio.abspath(path)
+    path = fio.abspath(path)
+
+    -- However, if possible, use a relative path. Sometimes an
+    -- absolute path overruns the Unix socket path length limit
+    -- (107 on Linux and 103 on Mac OS -- in our case).
+    --
+    -- Using a relative path allows to listen on the given Unix
+    -- socket path in such cases.
+    local cwd = fio.cwd()
+    if cwd == nil then
+        return path
+    end
+    if not cwd:endswith('/') then
+        cwd = cwd .. '/'
+    end
+    if path:startswith(cwd) then
+        path = path:sub(#cwd + 1, #path)
+    end
+    return path
 end
 
 -- Interpret the given path as relative to the given working
