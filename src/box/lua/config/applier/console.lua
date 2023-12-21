@@ -1,6 +1,7 @@
 local errno = require('errno')
 local console = require('console')
 local log = require('internal.config.utils.log')
+local instance_config = require('internal.config.instance_config')
 
 local function socket_file_to_listen_uri(file)
     if file:startswith('/') or file:startswith('./') then
@@ -20,6 +21,12 @@ local function apply(config)
 
     local socket_file = configdata:get('console.socket', {use_default = true})
     assert(socket_file ~= nil)
+
+    -- The same socket file is pointed by different paths before
+    -- and after first box.cfg() if the `process.work_dir` option
+    -- is set.
+    local iconfig_def = configdata._iconfig_def
+    socket_file = instance_config:prepare_file_path(iconfig_def, socket_file)
 
     local listen_uri = socket_file_to_listen_uri(socket_file)
     log.debug('console.apply: %s', listen_uri)
