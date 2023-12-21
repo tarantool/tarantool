@@ -78,10 +78,14 @@ local function replicaset_size(self)
 end
 
 -- Start all the instances of replicaset-001 (from group-001).
-local function replicaset_start(self)
+local function replicaset_start(self, opts)
     self:each(function(server)
         server:start({wait_until_ready = false})
     end)
+
+    if opts ~= nil and not opts.wait_until_ready then
+        return
+    end
 
     self:each(function(server)
         server:wait_until_ready()
