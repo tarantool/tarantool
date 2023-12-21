@@ -317,9 +317,24 @@ local function apply_vars_f(data, w, vars)
     return data
 end
 
+-- The file path is interpreted as relative to `process.work_dir`.
+-- The first box.cfg() call sets a current working directory to this path.
+--
+-- However, we should prepend paths manually before the first
+-- box.cfg() call.
+--
+-- This function returns the prefix to add into config's paths.
+--
+-- TODO: Glue all such code from applier/mkdir.lua and
+-- utils/snapshot.lua.
+local function base_dir(self, iconfig)
+    local work_dir = self:get(iconfig, 'process.work_dir')
+    return type(box.cfg) == 'function' and work_dir or nil
+end
+
 -- Interpret the given path as relative to the given base
 -- directory.
-local function prepare_file_path(base_dir, path)
+local function rebase_file_path(base_dir, path)
     -- fio.pathjoin('/foo', '/bar') gives '/foo/bar/', see
     -- gh-8816.
     --
@@ -352,6 +367,16 @@ local function prepare_file_path(base_dir, path)
     return fio.abspath(path)
 end
 
+-- Interpret the given path as relative to the given working
+-- directory from the config.
+--
+-- This function takes care to the chdir performed by the first
+-- box.cfg() call if the working directory is set.
+local function prepare_file_path(self, iconfig, path)
+    local base_dir = self:base_dir(iconfig)
+    return rebase_file_path(base_dir, path)
+end
+
 -- Read a config.context[name] variable depending of its "from"
 -- type.
 local function read_context_var_noexc(base_dir, def)
@@ -362,7 +387,7 @@ local function read_context_var_noexc(base_dir, def)
         end
         return true, value
     elseif def.from == 'file' then
-        local path = prepare_file_path(base_dir, def.file)
+        local path = rebase_file_path(base_dir, def.file)
         return pcall(file.universal_read, path, 'file')
     else
         assert(false)
@@ -372,17 +397,7 @@ end
 local function apply_vars(self, iconfig, vars)
     vars = table.copy(vars)
 
-    -- The file path is interpreted as relative to
-    -- `process.work_dir`. The first box.cfg() call sets a
-    -- current working directory to this path.
-    --
-    -- However, we should prepend paths manually before the first
-    -- box.cfg() call.
-    --
-    -- TODO: Glue all such code from applier/mkdir.lua and
-    -- utils/snapshot.lua.
-    local work_dir = self:get(iconfig, 'process.work_dir')
-    local base_dir = type(box.cfg) == 'function' and work_dir or nil
+    local base_dir = self:base_dir(iconfig)
 
     -- Read config.context.* variables and add them into the
     -- variables list.
@@ -2299,5 +2314,7 @@ return schema.new('instance_config', schema.record({
     methods = {
         instance_uri = instance_uri,
         apply_vars = apply_vars,
+        base_dir = base_dir,
+        prepare_file_path = prepare_file_path,
     },
 })
