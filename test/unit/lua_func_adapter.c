@@ -10,6 +10,8 @@
 #include "box/lua/func_adapter.h"
 #include "box/lua/tuple.h"
 #include "core/func_adapter.h"
+#include "core/mp_ctx.h"
+#include "core/assoc.h"
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
@@ -509,10 +511,74 @@ test_iterator_error(void)
 	check_plan();
 }
 
+static void
+test_translation(void)
+{
+	plan(6);
+	header();
+
+	const uint32_t keys[] = {21, 42};
+	const char *names[] = {"foo", "bar"};
+	struct mh_strnu32_t *mp_key_translation = mh_strnu32_new();
+
+	for (size_t i = 0; i < nelem(keys); i++) {
+		size_t len = strlen(names[i]);
+		struct mh_strnu32_node_t translation = {
+			.str = names[i],
+			.len = len,
+			.hash = lua_hash(names[i], len),
+			.val = keys[i]
+		};
+		mh_strnu32_put(mp_key_translation, &translation, NULL, NULL);
+	}
+
+	#define MP_BUF_LEN 64
+	char mp_buf[MP_BUF_LEN];
+	char *mp = mp_buf;
+	mp = mp_encode_map(mp, 2);
+	mp = mp_encode_uint(mp, keys[1]);
+	mp = mp_encode_uint(mp, 64);
+	mp = mp_encode_uint(mp, keys[0]);
+	mp = mp_encode_uint(mp, 32);
+	fail_unless(mp < mp_buf + MP_BUF_LEN);
+	#undef MP_BUF_LEN
+
+	int idx = generate_function(
+		"function(a) "
+		"  local mp = require('msgpack') "
+		"  assert(mp.is_object(a)) "
+		"  return a.foo, a.bar "
+		"end");
+
+	struct func_adapter *func = func_adapter_lua_create(tarantool_L, idx);
+	struct func_adapter_ctx ctx;
+	struct mp_ctx mp_ctx;
+	mp_ctx_create_default(&mp_ctx, mp_key_translation);
+	func_adapter_begin(func, &ctx);
+	func_adapter_push_msgpack_with_ctx(func, &ctx, mp_buf, mp, &mp_ctx);
+	int rc = func_adapter_call(func, &ctx);
+	is(rc, 0, "Function must return successfully");
+
+	ok(func_adapter_is_double(func, &ctx), "A double must be returned");
+	double val = 0.0;
+	func_adapter_pop_double(func, &ctx, &val);
+	ok(number_eq(32, val), "Returned value must be as expected");
+	ok(func_adapter_is_double(func, &ctx), "A double must be returned");
+	func_adapter_pop_double(func, &ctx, &val);
+	ok(number_eq(64, val), "Returned value must be as expected");
+
+	ok(func_adapter_is_empty(func, &ctx), "No values left");
+	func_adapter_end(func, &ctx);
+	mh_strnu32_delete(mp_key_translation);
+
+	footer();
+	check_plan();
+}
+
 static int
 test_lua_func_adapter(void)
 {
-	plan(11);
+	plan(12);
 	header();
 
 	test_numeric();
@@ -526,6 +592,7 @@ test_lua_func_adapter(void)
 	test_callable();
 	test_iterator();
 	test_iterator_error();
+	test_translation();
 
 	footer();
 	return check_plan();
