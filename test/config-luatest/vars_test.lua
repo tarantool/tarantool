@@ -1,63 +1,9 @@
 local instance_config = require('internal.config.instance_config')
 local t = require('luatest')
 local treegen = require('test.treegen')
-local justrun = require('test.justrun')
 local helpers = require('test.config-luatest.helpers')
 
 local g = helpers.group()
-
--- Write the given function into a Lua file and execute it.
---
--- Ensure that the exit code is zero and there is no stdout/stderr
--- output.
---
--- Use require('myluatest') instead of require('luatest') inside
--- the test case to get better diagnostics at failure.
-local function run_as_script(f)
-    return function(g)
-        local dir = treegen.prepare_directory(g, {}, {})
-        treegen.write_script(dir, 'myluatest.lua', string.dump(function()
-            local t = require('luatest')
-
-            -- Luatest raises a table as an error. If the error is
-            -- not caught, it looks like the following on stderr.
-            --
-            -- LuajitError: table: 0x41b2ce08
-            -- fatal error, exiting the event loop
-            --
-            -- Moreover, if the message is too long it is
-            -- truncated at converting to box error. See
-            -- DIAG_ERRMSG_MAX in src/lib/core/diag.h, it is 512
-            -- at the time of writing.
-            --
-            -- Let's write the message on stderr and re-raise a
-            -- short message instead.
-            local saved_assert_equals = t.assert_equals
-            t.assert_equals = function(...)
-                local ok, err = pcall(saved_assert_equals, ...)
-                if ok then
-                    return
-                end
-                if type(err) == 'table' and type(err.message) == 'string' then
-                    err = err.message
-                end
-                io.stderr:write(err .. '\n')
-                error('See stderr output above', 2)
-            end
-
-            return t
-        end))
-        treegen.write_script(dir, 'main.lua', string.dump(f))
-
-        local opts = {nojson = true, stderr = true}
-        local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
-        t.assert_equals(res, {
-            exit_code = 0,
-            stdout = '',
-            stderr = '',
-        })
-    end
-end
 
 -- Verify the given configuration option.
 --
@@ -142,7 +88,7 @@ end
 --
 -- The configdata module depends on box.cfg(), so we can't run
 -- this unit test directly. Let's run it as a script.
-g.test_peer = run_as_script(function()
+g.test_peer = helpers.run_as_script(function()
     local cluster_config = require('internal.config.cluster_config')
     local configdata_lib = require('internal.config.configdata')
     local t = require('myluatest')
@@ -186,7 +132,7 @@ end)
 --
 -- The configdata module depends on box.cfg(), so we can't run
 -- this unit test directly. Let's run it as a script.
-g.test_sharding = run_as_script(function()
+g.test_sharding = helpers.run_as_script(function()
     local cluster_config = require('internal.config.cluster_config')
     local configdata_lib = require('internal.config.configdata')
     local t = require('myluatest')

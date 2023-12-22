@@ -26,6 +26,53 @@ local function group(name, params)
     return g
 end
 
+local function run_as_script(f)
+    return function(g)
+        local dir = treegen.prepare_directory(g, {}, {})
+        treegen.write_script(dir, 'myluatest.lua', string.dump(function()
+            local t = require('luatest')
+
+            -- Luatest raises a table as an error. If the error is
+            -- not caught, it looks like the following on stderr.
+            --
+            -- LuajitError: table: 0x41b2ce08
+            -- fatal error, exiting the event loop
+            --
+            -- Moreover, if the message is too long it is
+            -- truncated at converting to box error. See
+            -- DIAG_ERRMSG_MAX in src/lib/core/diag.h, it is 512
+            -- at the time of writing.
+            --
+            -- Let's write the message on stderr and re-raise a
+            -- short message instead.
+            local saved_assert_equals = t.assert_equals
+            t.assert_equals = function(...)
+                local ok, err = pcall(saved_assert_equals, ...)
+                if ok then
+                    return
+                end
+                if type(err) == 'table' and type(err.message) == 'string' then
+                    err = err.message
+                end
+                io.stderr:write(err .. '\n')
+                error('See stderr output above', 2)
+            end
+
+            return t
+        end))
+        treegen.write_script(dir, 'main.lua', string.dump(f))
+
+        local opts = {nojson = true, stderr = true}
+        local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
+        t.assert_equals(res, {
+            exit_code = 0,
+            stdout = '',
+            stderr = '',
+        })
+    end
+end
+
+
 local function start_example_replicaset(g, dir, config_file, opts)
     local credentials = {
         user = 'client',
@@ -320,6 +367,15 @@ return {
     -- hooks to stop servers between tests and to remove temporary
     -- files after the testing.
     group = group,
+
+    -- Write the given function into a Lua file and execute it.
+    --
+    -- Ensure that the exit code is zero and there is no
+    -- stdout/stderr output.
+    --
+    -- Use require('myluatest') instead of require('luatest')
+    -- inside the test case to get better diagnostics at failure.
+    run_as_script = run_as_script,
 
     -- Start a three instance replicaset with the given config
     -- file.
