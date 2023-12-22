@@ -23,9 +23,9 @@ g.test_basic = function(g)
     -- One master, two replicas, two anonymous replicas.
     local config = cbuilder.new()
         :set_replicaset_option('replication.peers', {
-            'replicator:secret@unix/:./instance-001.iproto',
-            'replicator:secret@unix/:./instance-002.iproto',
-            'replicator:secret@unix/:./instance-003.iproto',
+            'instance-001',
+            'instance-002',
+            'instance-003',
         })
         :add_instance('instance-001', {
             database = {

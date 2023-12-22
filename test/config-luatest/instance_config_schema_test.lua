@@ -1120,6 +1120,28 @@ g.test_replication = function()
     validate_fields(iconfig.replication,
                     instance_config.schema.fields.replication)
 
+    iconfig = {
+        replication = {
+            peers = {},
+        },
+    }
+    local err = '[instance_config] replication.peers: replication.peers can ' ..
+                'only be nil or non-empty'
+    t.assert_error_msg_content_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+
+    iconfig = {
+        replication = {
+            peers = {'one', 'two', 'one'},
+        },
+    }
+    err = '[instance_config] replication.peers: instance "one" specified ' ..
+          'more than once'
+    t.assert_error_msg_content_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
+
     local exp = {
         failover = 'off',
         anon = false,
@@ -1299,6 +1321,7 @@ g.test_box_cfg_coverage = function()
         metrics = true,
         audit_log = true,
         audit_filter = true,
+        replication = true,
 
         -- Controlled by the leader and database.mode options,
         -- handled by the box_cfg applier.

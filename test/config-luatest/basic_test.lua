@@ -166,13 +166,20 @@ for case_name, case in pairs({
         exp_err = err_msg_cannot_find_user,
     },
     no_advertise_no_listen = {
+        listen_1 = {},
         listen_2 = {},
         listen_3 = {},
+        advertise_1 = box.NULL,
         advertise_2 = box.NULL,
         advertise_3 = box.NULL,
         exp_err = err_msg_no_suitable_uris,
     },
     no_advertise_no_suitable_listen = {
+        listen_1 = {
+            {uri = 'localhost:0'},
+            {uri = '0.0.0.0:3301'},
+            {uri = '[::]:3301'}
+        },
         listen_2 = {
             {uri = 'localhost:0'},
             {uri = '0.0.0.0:3301'},
@@ -183,11 +190,17 @@ for case_name, case in pairs({
             {uri = '0.0.0.0:3301'},
             {uri = '[::]:3301'}
         },
+        advertise_1 = box.NULL,
         advertise_2 = box.NULL,
         advertise_3 = box.NULL,
         exp_err = err_msg_no_suitable_uris,
     },
     advertise_user_no_suitable_listen = {
+        listen_1 = {
+            {uri = 'localhost:0'},
+            {uri = '0.0.0.0:3301'},
+            {uri = '[::]:3301'}
+        },
         listen_2 = {
             {uri = 'localhost:0'},
             {uri = '0.0.0.0:3301'},
@@ -197,6 +210,9 @@ for case_name, case in pairs({
             {uri = 'localhost:0'},
             {uri = '0.0.0.0:3301'},
             {uri = '[::]:3301'}
+        },
+        advertise_1 = {
+            login = 'replicator',
         },
         advertise_2 = {
             login = 'replicator',
@@ -207,6 +223,11 @@ for case_name, case in pairs({
         exp_err = err_msg_no_suitable_uris,
     },
     advertise_user_pass_no_suitable_listen = {
+        listen_1 = {
+            {uri = 'localhost:0'},
+            {uri = '0.0.0.0:3301'},
+            {uri = '[::]:3301'}
+        },
         listen_2 = {
             {uri = 'localhost:0'},
             {uri = '0.0.0.0:3301'},
@@ -216,6 +237,10 @@ for case_name, case in pairs({
             {uri = 'localhost:0'},
             {uri = '0.0.0.0:3301'},
             {uri = '[::]:3301'}
+        },
+        advertise_1 = {
+            login = 'replicator',
+            password = 'topsecret',
         },
         advertise_2 = {
             login = 'replicator',

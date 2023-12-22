@@ -647,6 +647,45 @@ local function validate_anon(found, peers, failover, leader)
     end
 end
 
+local function validate_peers(cconfig, peers)
+    local err = 'The instance %q cannot be an upstream for the instance %q: %s'
+    for peer_name, peer in pairs(peers) do
+        local upstreams = instance_config:get(peer.iconfig_def,
+            'replication.peers')
+        if upstreams == nil then
+            return
+        end
+        local peer_anon = instance_config:get(peer.iconfig_def,
+            'replication.anon')
+        for _, upstream_name in ipairs(upstreams) do
+            if peers[upstream_name] == nil then
+                if cluster_config:find_instance(cconfig,
+                    upstream_name) ~= nil then
+                    error(err:format(upstream_name, peer_name, 'instances ' ..
+                        'are not in the same replicaset'), 0)
+                else
+                    local msg = ('the instance %q is not defined in the ' ..
+                        'config'):format(upstream_name)
+                    error(err:format(upstream_name, peer_name, msg), 0)
+                end
+            end
+
+            local upstream_anon =
+                instance_config:get(peers[upstream_name].iconfig_def,
+                    'replication.anon')
+            --
+            -- An anonymous instance can't be an upstream for a
+            -- non-anonymous instance.
+            --
+            if upstream_anon and not peer_anon then
+                error(err:format(upstream_name, peer_name, 'an anonymous ' ..
+                    'replica cannot be an upstream of a non-anonymous replica'),
+                    0)
+            end
+        end
+    end
+end
+
 local function new(iconfig, cconfig, instance_name)
     -- Find myself in a cluster config, determine peers in the same
     -- replicaset.
@@ -700,6 +739,7 @@ local function new(iconfig, cconfig, instance_name)
             iconfig_def = peer_iconfig_def,
         }
     end
+    validate_peers(cconfig, peers)
 
     -- Make the order of the peers predictable and the same on all
     -- instances in the replicaset.

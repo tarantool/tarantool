@@ -1353,3 +1353,107 @@ g.test_replication_ssl_enterprise = function()
         t.assert_equals(res.params.ssl_password_file, {password_file})
     end, {c1c, c1k, passwd_file, ciphers})
 end
+
+g.test_peers_errors = function()
+    helpers.failure_case(g, {
+        options = {
+            ['replication.peers'] = {'one'},
+        },
+        exp_err = 'The instance "one" cannot be an upstream for the ' ..
+            'instance "instance-001": the instance "one" is not defined in ' ..
+            'the config',
+    })
+
+    helpers.failure_case(g, {
+        options = {
+            ['replication.peers'] = {'one'},
+            ['groups.group2.replicasets.replicaset2.instances.one'] = {},
+        },
+        exp_err = 'The instance "one" cannot be an upstream for the ' ..
+            'instance "instance-001": instances are not in the same replicaset',
+    })
+
+    helpers.failure_case(g, {
+        options = {
+            ['replication.peers'] = {'one'},
+            ['groups.group-001.replicasets.replicaset-001.instances.one'] = {
+                replication = {
+                    anon = true,
+                }
+            },
+        },
+        exp_err = 'The instance "one" cannot be an upstream for the ' ..
+            'instance "instance-001": an anonymous replica cannot be an ' ..
+            'upstream of a non-anonymous replica',
+    })
+
+    helpers.failure_case(g, {
+        options = {
+            ['replication.peers'] = {'one'},
+            ['groups.group-001.replicasets.replicaset-001.instances.one'] = {
+                iproto = {
+                    listen = {{
+                        uri = '0.0.0.0:3301',
+                    }},
+                },
+                database = {
+                    mode = 'rw',
+                },
+            },
+        },
+        exp_err = 'replication.peers construction for instance ' ..
+            '"instance-001" of replicaset "replicaset-001" of group ' ..
+            '"group-001": instance "one" has no iproto.advertise.peer or ' ..
+            'iproto.listen URI suitable to create a client socket',
+    })
+end
+
+g.test_peers_success = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+
+    replication:
+      peers: [instance-001]
+      bootstrap_strategy: 'config'
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            bootstrap_leader: instance-001
+            instances:
+              instance-001:
+                database:
+                  mode: rw
+              instance-002: {}
+              instance-003: {}
+    ]]
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    g.server_1 = server:new({config_file = config_file, chdir = dir,
+        alias = 'instance-001'})
+    g.server_2 = server:new({config_file = config_file, chdir = dir,
+        alias = 'instance-002'})
+    g.server_3 = server:new({config_file = config_file, chdir = dir,
+        alias = 'instance-003'})
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_2:start({wait_until_ready = false})
+    g.server_3:start({wait_until_ready = false})
+
+    g.server_1:wait_until_ready()
+    g.server_2:wait_until_ready()
+    g.server_3:wait_until_ready()
+
+    local exp = {{uri = "unix/:./instance-001.iproto"}}
+    t.assert_equals(g.server_1:eval('return box.cfg.replication'), exp)
+    t.assert_equals(g.server_2:eval('return box.cfg.replication'), exp)
+    t.assert_equals(g.server_3:eval('return box.cfg.replication'), exp)
+end

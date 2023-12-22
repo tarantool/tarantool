@@ -1404,13 +1404,24 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'off',
         }),
-        -- XXX: needs more validation
         peers = schema.array({
             items = schema.scalar({
                 type = 'string',
             }),
-            box_cfg = 'replication',
             default = box.NULL,
+            validate = function(data, w)
+                if #data == 0 then
+                    w.error('replication.peers can only be nil or non-empty')
+                end
+                local upstreams = {}
+                for _, peer_name in ipairs(data) do
+                    if upstreams[peer_name] then
+                        w.error(('instance %q specified more than ' ..
+                                 'once'):format(peer_name))
+                    end
+                    upstreams[peer_name] = true
+                end
+            end,
         }),
         anon = schema.scalar({
             type = 'boolean',

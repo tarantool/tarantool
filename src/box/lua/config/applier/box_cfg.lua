@@ -5,23 +5,10 @@ local snapshot = require('internal.config.utils.snapshot')
 local schedule_task = fiber._internal.schedule_task
 local mkversion = require('internal.mkversion')
 
-local function peer_uris(configdata)
-    local peers = configdata:peers()
-    if #peers <= 1 then
-        return nil
-    end
-
-    local names = configdata:names()
-    local err_msg_prefix = ('replication.peers construction for instance %q ' ..
-        'of replicaset %q of group %q'):format(names.instance_name,
-        names.replicaset_name, names.group_name)
-
-    -- Is there a peer in our replicaset with an URI suitable to
-    -- connect (except ourself)?
-    local has_upstream = false
-
-    local uris = {}
-    for _, peer_name in ipairs(peers) do
+local function auto_upstreams(configdata)
+    local all_peers = configdata:peers()
+    local peers = {}
+    for _, peer_name in ipairs(all_peers) do
         local iconfig_def = configdata._peers[peer_name].iconfig_def
         local is_anon = instance_config:get(iconfig_def, 'replication.anon')
         -- Don't use anonymous replicas as upstreams.
@@ -32,24 +19,50 @@ local function peer_uris(configdata)
         -- An anonymous replica can be an upstream for another
         -- anonymous replica, but only non-anonymous peers are set
         -- as upstreams by default.
-        --
-        -- A user may configure a custom data flow using
-        -- `replication.peers` option.
         if not is_anon then
-            local uri = instance_config:instance_uri(iconfig_def, 'peer')
-            if uri == nil then
-                log.info('%s: instance %q has no iproto.advertise.peer or ' ..
-                    'iproto.listen URI suitable to create a client socket',
-                    err_msg_prefix, peer_name)
-            end
-            if uri ~= nil and peer_name ~= names.instance_name then
-                has_upstream = true
-            end
-            table.insert(uris, uri)
+            table.insert(peers, peer_name)
         end
     end
+    --
+    -- Replicaset should have at least one non-anonymous replica and it was
+    -- already validated in validate_anon().
+    --
+    assert(#peers > 0)
+    return peers
+end
 
-    if not has_upstream then
+local function peer_uris(configdata)
+    local peers = instance_config:get(configdata._iconfig_def,
+        'replication.peers')
+    if peers == nil then
+        --
+        -- No need to set box.cfg.replication if there is only one instance in
+        -- the replicaset.
+        --
+        if #configdata:peers() == 1 then
+            return box.NULL
+        end
+        peers = auto_upstreams(configdata)
+    end
+
+    local names = configdata:names()
+    local err_msg_prefix = ('replication.peers construction for instance %q ' ..
+        'of replicaset %q of group %q'):format(names.instance_name,
+        names.replicaset_name, names.group_name)
+
+    local uris = {}
+    for _, peer_name in ipairs(peers) do
+        local iconfig_def = configdata._peers[peer_name].iconfig_def
+        local uri = instance_config:instance_uri(iconfig_def, 'peer')
+        if uri == nil then
+            log.info('%s: instance %q has no iproto.advertise.peer or ' ..
+                'iproto.listen URI suitable to create a client socket',
+                err_msg_prefix, peer_name)
+        end
+        table.insert(uris, uri)
+    end
+
+    if next(uris) == nil then
         error(('%s: no suitable peer URIs found'):format(err_msg_prefix), 0)
     end
 
@@ -333,9 +346,7 @@ local function apply(config)
     end
 
     -- Construct box_cfg.replication.
-    if box_cfg.replication == nil then
-        box_cfg.replication = peer_uris(configdata)
-    end
+    box_cfg.replication = peer_uris(configdata)
 
     -- Construct logger destination (box_cfg.log) and log modules.
     --
