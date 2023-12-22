@@ -190,4 +190,28 @@ function Server:start(opts)
     getmetatable(getmetatable(self)).start(self, opts)
 end
 
+-- Eval a string similar to `Server:eval()` and reconnect to the server
+-- in case the connection has been dropped.
+function Server:eval_reconnect(code, ...)
+    if self.net_box == nil then
+        error('net_box is not connected', 2)
+    end
+    local ok, err = pcall(self.net_box.eval, self.net_box, code, ...)
+    if not ok and tostring(err):find('Peer closed') then
+        self:wait_until_ready()
+    elseif not ok then
+        error(err)
+    end
+    return err
+end
+
+-- Prepare for iproto_lockdown caused by integrity check failure.
+function Server:prepare_integrity_lockdown()
+    -- Drop connection to the server ahead of time, before it is dropped
+    -- uncontrollingly in test-body. If the iproto_lockdown is already on,
+    -- it won't drop connections until turned off and on again.
+
+    self:eval_reconnect("box.ctl.iproto_lockdown(true)")
+end
+
 return Server
