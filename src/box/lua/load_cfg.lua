@@ -1151,9 +1151,12 @@ local function get_option_from_env(option)
     if param_type:find('table') and (raw_value:startswith('{') or
                                      raw_value:startswith('[')) then
         return json.decode(raw_value)
-    elseif param_type:find('table') and raw_value:find('=') then
+    end
+
+    if param_type:find('table') and raw_value:find('=') then
         assert(not param_type:find('boolean'))
         local res = {}
+        local contains_uri = false
         for _, v in ipairs(raw_value:split(',')) do
             local eq = v:find('=')
             if eq == nil then
@@ -1168,17 +1171,37 @@ local function get_option_from_env(option)
                                          'in `key=value` or `value` format, ' ..
                                          '`key` must not be empty'))
             end
+            -- Don't interpret `=` as a key-value separator if
+            -- there is `?` in a key.
+            --
+            -- Otherwise, for example,
+            -- `localhost:3301?transport=plain` would be
+            -- interpreted as the following map.
+            --
+            -- {
+            --     ['localhost:3301?transport'] = 'plain',
+            -- }
+            if lhs:find('?') then
+                contains_uri = true
+            end
             res[lhs] = tonumber(rhs) or rhs
         end
-        return res
-    elseif param_type:find('table') and raw_value:find(',') then
+        if not contains_uri then
+            return res
+        end
+        -- Fall through otherwise.
+    end
+
+    if param_type:find('table') and raw_value:find(',') then
         assert(not param_type:find('boolean'))
         local res = {}
         for i, v in ipairs(raw_value:split(',')) do
             res[i] = tonumber(v) or v
         end
         return res
-    elseif param_type:find('boolean') then
+    end
+
+    if param_type:find('boolean') then
         assert(param_type == 'boolean')
         if raw_value:lower() == 'false' then
             return false
@@ -1186,20 +1209,24 @@ local function get_option_from_env(option)
             return true
         end
         error(err_msg_fmt:format(env_var_name, option, '"true" or "false"'))
-    elseif param_type == 'number' then
+    end
+
+    if param_type == 'number' then
         local res = tonumber(raw_value)
         if res == nil then
             error(err_msg_fmt:format(env_var_name, option,
                 'convertible to a number'))
         end
         return res
-    elseif param_type:find('number') then
+    end
+
+    if param_type:find('number') then
         assert(not param_type:find('boolean'))
         return tonumber(raw_value) or raw_value
-    else
-        assert(param_type == 'string')
-        return raw_value
     end
+
+    assert(param_type == 'string')
+    return raw_value
 end
 
 -- Get options from env vars for given set.
