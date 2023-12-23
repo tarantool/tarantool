@@ -25,6 +25,34 @@ extern char preamble_lua[];
 namespace luajit_fuzzer {
 namespace {
 
+/*
+ * The following keywords are reserved and cannot be used as names,
+ * see Lua 5.1 Reference Manual, 2.1 – Lexical Conventions.
+ */
+const std::set<std::string> KReservedLuaKeywords {
+	"and",
+	"break",
+	"do",
+	"else",
+	"elseif",
+	"end",
+	"false",
+	"for",
+	"function",
+	"if",
+	"in",
+	"local",
+	"nil",
+	"not",
+	"or",
+	"repeat",
+	"return",
+	"then",
+	"true",
+	"until",
+	"while",
+};
+
 const std::string kCounterNamePrefix = "counter_";
 const std::string kNumberWrapperName = "always_number";
 const std::string kBinOpWrapperName = "only_numbers_cmp";
@@ -911,7 +939,12 @@ NESTED_PROTO_TOSTRING(IndexWithName, indexname, Variable)
 {
 	std::string indexname_str = PrefixExpressionToString(
 		indexname.prefixexp());
-	indexname_str += "." + ConvertToStringDefault(indexname.name());
+	std::string idx_str = ConvertToStringDefault(indexname.name());
+	/* Prevent using reserved keywords as indices. */
+	if (KReservedLuaKeywords.find(idx_str) != KReservedLuaKeywords.end()) {
+		idx_str += "_1";
+	}
+	indexname_str += "." + idx_str;
 	return indexname_str;
 }
 
