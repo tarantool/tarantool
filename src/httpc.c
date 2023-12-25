@@ -214,6 +214,8 @@ httpc_request_new(struct httpc_env *env, const char *method,
 			 curl_easy_header_cb);
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_NOPROGRESS, 1L);
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_NOSIGNAL, 1L);
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_HTTP_VERSION,
+			 CURL_HTTP_VERSION_1_1);
 
 	ibuf_create(&req->send, &cord()->slabc, 1);
 
