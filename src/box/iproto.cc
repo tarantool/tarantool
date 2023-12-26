@@ -306,6 +306,99 @@ struct iproto_req_handler {
  */
 static mh_i32ptr_t *tx_req_handlers;
 
+/** Available iproto configuration changes. */
+enum iproto_cfg_op {
+	/** Command code to set max input for iproto thread */
+	IPROTO_CFG_MSG_MAX,
+	/**
+	 * Command code to start listen socket contained
+	 * in evio_service object
+	 */
+	IPROTO_CFG_START,
+	/**
+	 * Command code to stop listen socket contained
+	 * in evio_service object. In case when user sets
+	 * new parameters for iproto, it is necessary to stop
+	 * listen sockets in iproto threads before reconfiguration.
+	 */
+	IPROTO_CFG_STOP,
+	/**
+	 * Equivalent to IPROTO_CFG_STOP followed by IPROTO_CFG_START.
+	 */
+	IPROTO_CFG_RESTART,
+	/**
+	 * Command code do get statistic from iproto thread
+	 */
+	IPROTO_CFG_STAT,
+	/**
+	 * Command code to notify IPROTO threads a new handler has been set or
+	 * reset.
+	 */
+	IPROTO_CFG_OVERRIDE,
+	/**
+	 * Command code to create a new IPROTO session.
+	 */
+	IPROTO_CFG_SESSION_NEW,
+	/**
+	 * Command code to drop all current connections.
+	 */
+	IPROTO_CFG_DROP_CONNECTIONS,
+	IPROTO_CFG_SHUTDOWN,
+};
+
+/**
+ * Since there is no way to "synchronously" change the
+ * state of the io thread, to change the listen port or max
+ * message count in flight send a special message to iproto
+ * thread.
+ */
+struct iproto_cfg_msg: public cbus_call_msg
+{
+	/** Operation to execute in iproto thread. */
+	enum iproto_cfg_op op;
+	union {
+		/** Pointer to the statistic structure. */
+		struct iproto_stats *stats;
+		/** New iproto max message count. */
+		int iproto_msg_max;
+		struct {
+			/** New connection IO stream. */
+			struct iostream io;
+			/** New connection session. */
+			struct session *session;
+		} session_new;
+		struct {
+			/** Overridden request type. */
+			uint32_t req_type;
+			/** Whether the request handler is set or reset. */
+			bool is_set;
+		} override;
+		struct {
+			/**
+			 * Connection that executing iproto_drop_connections.
+			 * NULL if the function is called not from connection.
+			 */
+			struct iproto_connection *owner;
+		} drop_connections;
+	};
+	struct iproto_thread *iproto_thread;
+};
+
+static inline void
+iproto_cfg_msg_create(struct iproto_cfg_msg *msg, enum iproto_cfg_op op)
+{
+	memset(msg, 0, sizeof(*msg));
+	msg->op = op;
+}
+
+/**
+ * Sends a configuration message to an IPROTO thread and waits for completion.
+ *
+ * The message may be allocated on stack.
+ */
+static void
+iproto_do_cfg(struct iproto_thread *iproto_thread, struct iproto_cfg_msg *msg);
+
 int
 iproto_addr_count(void)
 {
@@ -3329,90 +3422,6 @@ iproto_init(int threads_count)
 		panic("failed to set iproto shutdown trigger");
 }
 
-/** Available iproto configuration changes. */
-enum iproto_cfg_op {
-	/** Command code to set max input for iproto thread */
-	IPROTO_CFG_MSG_MAX,
-	/**
-	 * Command code to start listen socket contained
-	 * in evio_service object
-	 */
-	IPROTO_CFG_START,
-	/**
-	 * Command code to stop listen socket contained
-	 * in evio_service object. In case when user sets
-	 * new parameters for iproto, it is necessary to stop
-	 * listen sockets in iproto threads before reconfiguration.
-	 */
-	IPROTO_CFG_STOP,
-	/**
-	 * Equivalent to IPROTO_CFG_STOP followed by IPROTO_CFG_START.
-	 */
-	IPROTO_CFG_RESTART,
-	/**
-	 * Command code do get statistic from iproto thread
-	 */
-	IPROTO_CFG_STAT,
-	/**
-	 * Command code to notify IPROTO threads a new handler has been set or
-	 * reset.
-	 */
-	IPROTO_CFG_OVERRIDE,
-	/**
-	 * Command code to create a new IPROTO session.
-	 */
-	IPROTO_CFG_SESSION_NEW,
-	/**
-	 * Command code to drop all current connections.
-	 */
-	IPROTO_CFG_DROP_CONNECTIONS,
-};
-
-/**
- * Since there is no way to "synchronously" change the
- * state of the io thread, to change the listen port or max
- * message count in flight send a special message to iproto
- * thread.
- */
-struct iproto_cfg_msg: public cbus_call_msg
-{
-	/** Operation to execute in iproto thread. */
-	enum iproto_cfg_op op;
-	union {
-		/** Pointer to the statistic stucture. */
-		struct iproto_stats *stats;
-		/** New iproto max message count. */
-		int iproto_msg_max;
-		struct {
-			/** New connection IO stream. */
-			struct iostream io;
-			/** New connection session. */
-			struct session *session;
-		} session_new;
-		struct {
-			/** Overridden request type. */
-			uint32_t req_type;
-			/** Whether the request handler is set or reset. */
-			bool is_set;
-		} override;
-		struct {
-			/**
-			 * Connection that executing iproto_drop_connections.
-			 * NULL if the function is called not from connection.
-			 */
-			struct iproto_connection *owner;
-		} drop_connections;
-	};
-	struct iproto_thread *iproto_thread;
-};
-
-static inline void
-iproto_cfg_msg_create(struct iproto_cfg_msg *msg, enum iproto_cfg_op op)
-{
-	memset(msg, 0, sizeof(*msg));
-	msg->op = op;
-}
-
 static void
 iproto_fill_stat(struct iproto_thread *iproto_thread,
 		 struct iproto_cfg_msg *cfg_msg)
@@ -3526,11 +3535,6 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 	return 0;
 }
 
-/**
- * Sends a configuration message to an IPROTO thread and waits for completion.
- *
- * The message may be allocated on stack.
- */
 static void
 iproto_do_cfg(struct iproto_thread *iproto_thread, struct iproto_cfg_msg *msg)
 {
