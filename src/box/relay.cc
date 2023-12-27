@@ -955,6 +955,46 @@ relay_check_status_needs_update(struct relay *relay)
 }
 
 /**
+ * Relay uptime fiber function.
+ * The fiber updates the tx_seen_time so that a heartbeat is correctly
+ * generated after N rows from the WAL.
+ */
+static int
+relay_uptime_f(va_list ap)
+{
+	struct relay *relay = va_arg(ap, struct relay *);
+	struct fiber *relay_f = va_arg(ap, struct fiber *);
+
+	try {
+		while (!fiber_is_cancelled()) {
+			FiberGCChecker gc_check;
+			double timeout = 0.01;
+			struct errinj *inj =
+				errinj(ERRINJ_RELAY_REPORT_INTERVAL,
+				       ERRINJ_DOUBLE);
+			if (inj != NULL && inj->dparam != 0)
+				timeout = inj->dparam;
+
+			fiber_cond_wait_deadline(&relay->reader_cond,
+						 relay->last_row_time +
+						 timeout);
+
+			inj = errinj(ERRINJ_RELAY_FROM_TX_DELAY, ERRINJ_BOOL);
+			if (inj == NULL || !inj->bparam) {
+				cbus_process(&relay->tx_endpoint);
+				relay_check_status_needs_update(relay);
+			}
+
+			fiber_sleep(0.0001);
+		}
+	} catch (Exception *e) {
+		relay_set_error(relay, e);
+		fiber_cancel(relay_f);
+	}
+	return 0;
+}
+
+/**
  * A libev callback invoked when a relay client socket is ready
  * for read. This currently only happens when the client closes
  * its socket, and we get an EOF.
@@ -987,12 +1027,22 @@ relay_subscribe_f(va_list ap)
 	if (!relay->replica->anon)
 		trigger_add(&relay->r->on_close_log, &on_close_log);
 
+	char name[FIBER_NAME_MAX];
+
+	/*
+	 * When recovering from a long WAL, fiber_yield() will occur after
+	 * N rows and the current fiber will be called.
+	 */
+	snprintf(name, sizeof(name), "%s:uptime", fiber()->name);
+	struct fiber *uptime = fiber_new_xc(name, relay_uptime_f);
+	fiber_set_joinable(uptime, true);
+	fiber_start(uptime, relay, fiber());
+
 	/* Setup WAL watcher for sending new rows to the replica. */
 	wal_set_watcher(&relay->wal_watcher, relay->wal_endpoint.name,
 			relay_process_wal_event, cbus_process);
 
 	/* Start fiber for receiving replica acks. */
-	char name[FIBER_NAME_MAX];
 	snprintf(name, sizeof(name), "%s:%s", fiber()->name, "reader");
 	struct fiber *reader = fiber_new_xc(name, relay_reader_f);
 	fiber_set_joinable(reader, true);
@@ -1026,9 +1076,6 @@ relay_subscribe_f(va_list ap)
 		 * status messaging or by an acknowledge to status message.
 		 * Handle cbus messages first.
 		 */
-		inj = errinj(ERRINJ_RELAY_FROM_TX_DELAY, ERRINJ_BOOL);
-		if (inj == NULL || !inj->bparam)
-			cbus_process(&relay->tx_endpoint);
 		cbus_process(&relay->wal_endpoint);
 		relay_send_heartbeat_on_timeout(relay);
 		/*
@@ -1038,6 +1085,9 @@ relay_subscribe_f(va_list ap)
 		relay_check_status_needs_update(relay);
 	}
 
+	/* Join tx_seen_time updater fiber. */
+	fiber_cancel(uptime);
+	fiber_join(uptime);
 	/*
 	 * Clear garbage collector trigger and WAL watcher.
 	 * trigger_clear() does nothing in case the triggers
