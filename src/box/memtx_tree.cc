@@ -2047,6 +2047,7 @@ tree_read_view_create_iterator(struct index_read_view *base,
 	struct tree_read_view_iterator<USE_HINT> *it =
 		(struct tree_read_view_iterator<USE_HINT> *)iterator;
 	it->base.index = base;
+	it->base.destroy = generic_index_read_view_iterator_destroy;
 	it->base.next_raw = exhausted_index_read_view_iterator_next_raw;
 	if (it->base.index->def->key_def->for_func_index)
 		it->base.position =
