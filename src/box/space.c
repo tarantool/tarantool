@@ -43,6 +43,7 @@
 #include "xrow_update.h"
 #include "request.h"
 #include "xrow.h"
+#include "iproto.h"
 #include "iproto_constants.h"
 #include "schema.h"
 #include "assoc.h"
@@ -56,6 +57,7 @@
 #include "coll_id_cache.h"
 #include "func_adapter.h"
 #include "lua/utils.h"
+#include "core/mp_ctx.h"
 
 int
 access_check_space(struct space *space, user_access_t access)
@@ -887,15 +889,21 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 				       iproto_type_name(stmt->type));
 		/* Pass xrow header and body to recovery triggers. */
 		if (stmt->space->run_recovery_triggers) {
+			struct mp_ctx mp_ctx_header, mp_ctx_body;
+			mp_ctx_create_default(&mp_ctx_header,
+					      iproto_key_translation);
+			mp_ctx_create_default(&mp_ctx_body,
+					      iproto_key_translation);
 			struct xrow_header *row = stmt->row;
 			assert(row != NULL && row->header != NULL);
-			func_adapter_push_msgpack(trigger, &ctx, row->header,
-						  row->header_end);
+			func_adapter_push_msgpack_with_ctx(
+				trigger, &ctx, row->header, row->header_end,
+				&mp_ctx_header);
 			assert(row->bodycnt == 1);
 			const char *body = row->body[0].iov_base;
 			const char *body_end = body + row->body[0].iov_len;
-			func_adapter_push_msgpack(trigger, &ctx, body,
-						  body_end);
+			func_adapter_push_msgpack_with_ctx(
+				trigger, &ctx, body, body_end, &mp_ctx_body);
 		}
 
 		rc = func_adapter_call(trigger, &ctx);

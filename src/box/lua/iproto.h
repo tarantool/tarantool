@@ -14,12 +14,6 @@ struct lua_State;
 struct mh_strnu32_t;
 
 /**
- * Translation table for `box.iproto.key` constants encoding and aliasing: used
- * in `luamp_encode_with_ctx` and `luamp_push_with_ctx`.
- */
-extern struct mh_strnu32_t *iproto_key_translation;
-
-/**
  * Initializes `box.iproto` submodule for working with Tarantool network
  * subsystem.
  */

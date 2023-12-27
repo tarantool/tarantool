@@ -83,6 +83,12 @@ extern unsigned iproto_readahead;
 extern int iproto_threads_count;
 
 /**
+ * Translation table for `box.iproto.key` constants encoding and aliasing: used
+ * in `luamp_encode_with_ctx` and `luamp_push_with_ctx`.
+ */
+extern struct mh_strnu32_t *iproto_key_translation;
+
+/**
  * Return total iproto statistic.
  */
 void
