@@ -308,6 +308,11 @@ g.test_recovery_replace = function(cg)
                 local states = rawget(_G, 'test_states')
                 assert(msgpack.is_object(header))
                 assert(msgpack.is_object(body))
+                -- Check translation of `box.iproto.key' constants.
+                assert(header.lsn ~= nil)
+                assert(header.LSN ~= nil)
+                assert(body.space_id == 512)
+                assert(body.SPACE_ID == 512)
                 table.insert(states, {i,
                     {old, new, space, req, header:decode(), body:decode()}
                 })

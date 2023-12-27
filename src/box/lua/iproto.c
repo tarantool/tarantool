@@ -713,4 +713,5 @@ box_lua_iproto_free(void)
 	mh_foreach(h, k)
 		free((void *)mh_strnu32_node(h, k)->str);
 	mh_strnu32_delete(iproto_key_translation);
+	iproto_key_translation = NULL;
 }
