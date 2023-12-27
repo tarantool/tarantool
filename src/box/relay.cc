@@ -166,11 +166,11 @@ struct relay {
 	 * separated helps to synchronize the data coming from TX and WAL. Such
 	 * as term bumps from TX with PROMOTE rows from WAL.
 	 */
-	struct cbus_endpoint tx_endpoint;
+	struct cbus_endpoint tx_endpoint[2];
 	/** A pipe from 'relay' thread to 'tx' */
-	struct cpipe tx_pipe;
+	struct cpipe tx_pipe[2];
 	/** A pipe from 'tx' thread to 'relay' */
-	struct cpipe relay_pipe;
+	struct cpipe relay_pipe[2];
 	/** Status message */
 	struct relay_status_msg status_msg;
 	/**
@@ -212,6 +212,10 @@ struct relay {
 		 * True if the relay is ready to accept messages via the cbus.
 		 */
 		bool is_paired;
+		/**
+		 * True if a cpipe for uptime fiber is not destroyed.
+		 */
+		bool is_uptime;
 		/**
 		 * A pair of raft messages travelling between tx and relay
 		 * threads. While one is en route, the other is ready to save
@@ -581,7 +585,9 @@ relay_status_update(struct cmsg *msg)
 	struct relay_status_msg *status = (struct relay_status_msg *)msg;
 	struct relay *relay = status->relay;
 	relay->tx_seen_time = ev_monotonic_now(loop());
-	relay_check_status_needs_update(relay);
+	if (relay->tx.is_uptime) {
+		relay_check_status_needs_update(relay);
+	}
 }
 
 /**
@@ -627,7 +633,7 @@ tx_status_update(struct cmsg *msg)
 		{relay_status_update, NULL}
 	};
 	cmsg_init(msg, route);
-	cpipe_push(&status->relay->relay_pipe, msg);
+	cpipe_push(&status->relay->relay_pipe[1], msg);
 }
 
 /**
@@ -695,7 +701,7 @@ relay_schedule_pending_gc(struct relay *relay, const struct vclock *vclock)
 		gc_msg = curr;
 	}
 	if (gc_msg != NULL)
-		cpipe_push(&relay->tx_pipe, &gc_msg->msg);
+		cpipe_push(&relay->tx_pipe[0], &gc_msg->msg);
 }
 
 static void
@@ -842,7 +848,7 @@ relay_push_raft_msg(struct relay *relay)
 		return;
 	struct relay_raft_msg *msg =
 		&relay->tx.raft_msgs[relay->tx.raft_ready_msg];
-	cpipe_push(&relay->relay_pipe, &msg->base);
+	cpipe_push(&relay->relay_pipe[0], &msg->base);
 	relay->tx.raft_ready_msg = (relay->tx.raft_ready_msg + 1) % 2;
 	relay->tx.is_raft_push_sent = true;
 	relay->tx.is_raft_push_pending = false;
@@ -911,8 +917,8 @@ relay_trigger_vclock_sync(struct relay *relay, uint64_t *vclock_sync,
 		(struct relay_trigger_vclock_sync_msg *)xmalloc(sizeof(*msg));
 	msg->relay = relay;
 	double timeout = deadline - ev_monotonic_now(loop());
-	if (cbus_call_timeout(&relay->relay_pipe, &relay->tx_pipe, &msg->base,
-			      relay_trigger_vclock_sync_f,
+	if (cbus_call_timeout(&relay->relay_pipe[0], &relay->tx_pipe[0],
+			      &msg->base, relay_trigger_vclock_sync_f,
 			      relay_trigger_vclock_sync_msg_free, timeout) < 0)
 		return -1;
 	*vclock_sync = msg->vclock_sync;
@@ -951,7 +957,58 @@ relay_check_status_needs_update(struct relay *relay)
 	status_msg->relay = relay;
 	status_msg->term = last_recv_ack->term;
 	status_msg->vclock_sync = last_recv_ack->vclock_sync;
-	cpipe_push(&relay->tx_pipe, &status_msg->msg);
+	cpipe_push(&relay->tx_pipe[0], &status_msg->msg);
+}
+
+/** A notification that uptime fiber is ready to process cbus messages. */
+static void
+relay_uptime_start(void *arg)
+{
+	struct relay *relay = (struct relay *)arg;
+	relay->tx.is_uptime = true;
+}
+
+/** A notification about uptime fiber detach from the cbus. */
+static void
+relay_uptime_stop(void *arg)
+{
+	struct relay *relay = (struct relay *)arg;
+	relay->tx.is_uptime = false;
+}
+
+/**
+ * Relay uptime fiber function.
+ * The fiber updates the tx_seen_time so that a heartbeat is correctly
+ * generated after N rows from the WAL.
+ */
+static int
+relay_uptime_f(va_list ap)
+{
+	struct relay *relay = va_arg(ap, struct relay *);
+	struct fiber *relay_f = va_arg(ap, struct fiber *);
+
+	cbus_endpoint_create(&relay->tx_endpoint[1],
+			     tt_sprintf("relay_uptime_%p", relay),
+			     fiber_schedule_cb, fiber());
+	cbus_pair("tx", relay->tx_endpoint[1].name, &relay->tx_pipe[1],
+		  &relay->relay_pipe[1], relay_uptime_start, relay,
+		  cbus_process);
+
+	try {
+		while (!fiber_is_cancelled()) {
+			FiberGCChecker gc_check;
+			cbus_process(&relay->tx_endpoint[1]);
+			relay_check_status_needs_update(relay);
+			fiber_sleep(replication_timeout);
+		}
+	} catch (Exception *e) {
+		relay_set_error(relay, e);
+		fiber_cancel(relay_f);
+	}
+	cbus_unpair(&relay->tx_pipe[1], &relay->relay_pipe[1],
+		    relay_uptime_stop, relay, cbus_process);
+	cbus_endpoint_destroy(&relay->tx_endpoint[1], cbus_process);
+	return 0;
 }
 
 /**
@@ -966,11 +1023,11 @@ relay_subscribe_f(va_list ap)
 
 	relay_cord_init(relay);
 
-	cbus_endpoint_create(&relay->tx_endpoint,
+	cbus_endpoint_create(&relay->tx_endpoint[0],
 			     tt_sprintf("relay_tx_%p", relay),
 			     fiber_schedule_cb, fiber());
-	cbus_pair("tx", relay->tx_endpoint.name, &relay->tx_pipe,
-		  &relay->relay_pipe, relay_thread_on_start, relay,
+	cbus_pair("tx", relay->tx_endpoint[0].name, &relay->tx_pipe[0],
+		  &relay->relay_pipe[0], relay_thread_on_start, relay,
 		  cbus_process);
 
 	cbus_endpoint_create(&relay->wal_endpoint,
@@ -987,12 +1044,21 @@ relay_subscribe_f(va_list ap)
 	if (!relay->replica->anon)
 		trigger_add(&relay->r->on_close_log, &on_close_log);
 
+	/*
+	 * When recovering from a long WAL, fiber_yield() will occur after
+	 * N rows and the current fiber will be called.
+	 */
+	char name[FIBER_NAME_MAX];
+	snprintf(name, sizeof(name), "%s:%s", fiber()->name, "uptime");
+	struct fiber *uptime = fiber_new_xc(name, relay_uptime_f);
+	fiber_set_joinable(uptime, true);
+	fiber_start(uptime, relay, fiber());
+
 	/* Setup WAL watcher for sending new rows to the replica. */
 	wal_set_watcher(&relay->wal_watcher, relay->wal_endpoint.name,
 			relay_process_wal_event, cbus_process);
 
 	/* Start fiber for receiving replica acks. */
-	char name[FIBER_NAME_MAX];
 	snprintf(name, sizeof(name), "%s:%s", fiber()->name, "reader");
 	struct fiber *reader = fiber_new_xc(name, relay_reader_f);
 	fiber_set_joinable(reader, true);
@@ -1028,7 +1094,7 @@ relay_subscribe_f(va_list ap)
 		 */
 		inj = errinj(ERRINJ_RELAY_FROM_TX_DELAY, ERRINJ_BOOL);
 		if (inj == NULL || !inj->bparam)
-			cbus_process(&relay->tx_endpoint);
+			cbus_process(&relay->tx_endpoint[0]);
 		cbus_process(&relay->wal_endpoint);
 		relay_send_heartbeat_on_timeout(relay);
 		/*
@@ -1046,15 +1112,19 @@ relay_subscribe_f(va_list ap)
 	trigger_clear(&on_close_log);
 	wal_clear_watcher(&relay->wal_watcher, cbus_process);
 
+	/* Join tx_seen_time updater fiber. */
+	fiber_cancel(uptime);
+	fiber_join(uptime);
+
 	/* Join ack reader fiber. */
 	fiber_cancel(reader);
 	fiber_join(reader);
 
 	/* Destroy cpipe to tx. */
-	cbus_unpair(&relay->tx_pipe, &relay->relay_pipe,
+	cbus_unpair(&relay->tx_pipe[0], &relay->relay_pipe[0],
 		    relay_thread_on_stop, relay, cbus_process);
 	cbus_endpoint_destroy(&relay->wal_endpoint, cbus_process);
-	cbus_endpoint_destroy(&relay->tx_endpoint, cbus_process);
+	cbus_endpoint_destroy(&relay->tx_endpoint[0], cbus_process);
 
 	relay_exit(relay);
 
@@ -1199,7 +1269,7 @@ relay_push_raft(struct relay *relay, const struct raft_request *req)
 		vclock_copy(&msg->vclock, req->vclock);
 	}
 	msg->route[0].f = relay_raft_msg_push;
-	msg->route[0].pipe = &relay->tx_pipe;
+	msg->route[0].pipe = &relay->tx_pipe[0];
 	msg->route[1].f = tx_raft_msg_return;
 	msg->route[1].pipe = NULL;
 	cmsg_init(&msg->base, msg->route);
@@ -1269,7 +1339,7 @@ relay_filter_row(struct relay *relay, struct xrow_header *packet)
 				diag_set(FiberIsCancelled);
 				diag_raise();
 			}
-			cbus_process(&relay->tx_endpoint);
+			cbus_process(&relay->tx_endpoint[0]);
 			if (relay->sent_raft_term >= req.term)
 				break;
 			fiber_yield();
