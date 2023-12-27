@@ -5926,7 +5926,7 @@ box_storage_shutdown()
 {
 	if (!is_storage_initialized)
 		return;
-	iproto_drop_connections();
+	iproto_shutdown();
 }
 
 void
