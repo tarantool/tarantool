@@ -331,6 +331,7 @@ struct errcode_record {
 	/*276 */_(ER_DEFAULT_FUNC_FAILED,	"Error calling field default function '%s': %s") \
 	/*277 */_(ER_INVALID_DEC,		"Invalid decimal: '%s'") \
 	/*278 */_(ER_IN_ANOTHER_PROMOTE,	"box.ctl.promote() is already running") \
+	/*279 */_(ER_SHUTDOWN,			"Server is shutting down") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

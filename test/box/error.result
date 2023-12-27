@@ -497,6 +497,7 @@ t;
  |   276: box.error.DEFAULT_FUNC_FAILED
  |   277: box.error.INVALID_DEC
  |   278: box.error.IN_ANOTHER_PROMOTE
+ |   279: box.error.SHUTDOWN
  | ...
 
 test_run:cmd("setopt delimiter ''");

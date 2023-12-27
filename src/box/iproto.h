@@ -145,8 +145,8 @@ int
 iproto_set_msg_max(int iproto_msg_max);
 
 /**
- * Creates a new IPROTO session over the given IO stream and returns the new
- * session id. Never fails. Doesn't yield.
+ * Creates a new IPROTO session over the given IO stream. Doesn't yield.
+ * Set the output parameter sid to the sid of newly created session.
  *
  * The IO stream must refer to a non-blocking socket but this isn't enforced by
  * this function. If it isn't so, the new connection may not work as expected.
@@ -155,16 +155,18 @@ iproto_set_msg_max(int iproto_msg_max);
  * the specified user. Otherwise, it will be authenticated as guest.
  *
  * The function takes ownership of the passed IO stream by moving it to the
- * new IPROTO connection (see iostream_move).
+ * new IPROTO connection (see iostream_move) except for error case.
  *
  * Essentially, this function passes the IO stream to the callback invoked
  * by an IPROTO thread upon accepting a new connection on a listening socket.
  * The callback creates a new IPROTO connection, attaches it to the given
  * session, then sends the greeting message and starts processing requests as
  * usual. All of this is done asynchronously by an IPROTO thread.
+ *
+ * Returns 0 on success, and -1 otherwise (diagnostic is set).
  */
-uint64_t
-iproto_session_new(struct iostream *io, struct user *user);
+int
+iproto_session_new(struct iostream *io, struct user *user, uint64_t *sid);
 
 /**
  * Sends a packet with the given header and body over the IPROTO session's
