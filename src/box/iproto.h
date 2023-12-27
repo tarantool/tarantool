@@ -191,6 +191,13 @@ iproto_free(void);
 void
 iproto_drop_connections(void);
 
+/**
+ * Prepare for freeing resources in iproto_free while TX event loop is still
+ * running.
+ */
+void
+iproto_shutdown(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
