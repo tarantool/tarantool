@@ -227,7 +227,9 @@ lbox_iproto_session_new(struct lua_State *L)
 	}
 	struct iostream io;
 	plain_iostream_create(&io, fd);
-	uint64_t sid = iproto_session_new(&io, user);
+	uint64_t sid;
+	if (iproto_session_new(&io, user, &sid) != 0)
+		return luaT_error(L);
 	luaL_pushuint64(L, sid);
 	return 1;
 }
