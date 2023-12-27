@@ -1049,4 +1049,10 @@ generic_index_read_view_iterator_position(struct index_read_view_iterator *it,
 	return -1;
 }
 
+void
+generic_index_read_view_iterator_destroy(struct index_read_view_iterator *it)
+{
+	TRASH(it);
+}
+
 /* }}} */

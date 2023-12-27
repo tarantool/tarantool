@@ -718,6 +718,9 @@ struct index_read_view {
 struct index_read_view_iterator_base {
 	/** Pointer to the index read view. */
 	struct index_read_view *index;
+	/** Destroy a read view iterator. */
+	void
+	(*destroy)(struct index_read_view_iterator *iterator);
 	/**
 	 * Iterate to the next tuple in the read view.
 	 *
@@ -747,7 +750,7 @@ struct index_read_view_iterator_base {
 };
 
 /** Size of the index_read_view_iterator struct. */
-#define INDEX_READ_VIEW_ITERATOR_SIZE 64
+#define INDEX_READ_VIEW_ITERATOR_SIZE 72
 
 static_assert(sizeof(struct index_read_view_iterator_base) <=
 	      INDEX_READ_VIEW_ITERATOR_SIZE,
@@ -1049,7 +1052,7 @@ index_read_view_create_iterator(struct index_read_view *rv,
 static inline void
 index_read_view_iterator_destroy(struct index_read_view_iterator *iterator)
 {
-	TRASH(iterator);
+	iterator->base.destroy(iterator);
 }
 
 static inline int
@@ -1123,6 +1126,8 @@ generic_iterator_position(struct iterator *it, const char **pos,
 int
 generic_index_read_view_iterator_position(struct index_read_view_iterator *it,
 					  const char **pos, uint32_t *size);
+void
+generic_index_read_view_iterator_destroy(struct index_read_view_iterator *it);
 
 #if defined(__cplusplus)
 } /* extern "C" */

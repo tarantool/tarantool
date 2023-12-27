@@ -628,6 +628,7 @@ hash_read_view_create_iterator(struct index_read_view *base,
 	struct hash_read_view_iterator *it =
 		(struct hash_read_view_iterator *)iterator;
 	it->base.index = base;
+	it->base.destroy = generic_index_read_view_iterator_destroy;
 	it->base.next_raw = exhausted_index_read_view_iterator_next_raw;
 	it->base.position = generic_index_read_view_iterator_position;
 	light_index_view_iterator_begin(&rv->view, &it->iterator);

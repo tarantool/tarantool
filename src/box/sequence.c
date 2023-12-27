@@ -388,7 +388,9 @@ sequence_data_iterator_create(struct index_read_view *base,
 	struct sequence_data_iterator *iter =
 		(struct sequence_data_iterator *)iterator;
 	iter->base.index = base;
+	iter->base.destroy = generic_index_read_view_iterator_destroy;
 	iter->base.next_raw = sequence_data_iterator_next_raw;
+	iter->base.position = generic_index_read_view_iterator_position;
 	light_sequence_view_iterator_begin(&rv->view, &iter->iter);
 	return 0;
 }
