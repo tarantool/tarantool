@@ -213,6 +213,11 @@ struct iproto_thread {
 	 */
 	struct cmsg drop_finished_msg;
 	/**
+	 * If set then iproto thread shutdown is started and we should not
+	 * accept new connections.
+	 */
+	bool is_shutting_down;
+	/**
 	 * The following fields are used exclusively by the tx thread.
 	 * Align them to prevent false-sharing.
 	 */
@@ -305,6 +310,12 @@ struct iproto_req_handler {
  * overridden handlers.
  */
 static mh_i32ptr_t *tx_req_handlers;
+
+/**
+ * If set then iproto shutdown is started and we should not accept new
+ * connections.
+ */
+static bool iproto_is_shutting_down;
 
 /** Available iproto configuration changes. */
 enum iproto_cfg_op {
@@ -3256,9 +3267,6 @@ iproto_session_notify(struct session *session, uint64_t sync,
 
 /** }}} */
 
-static void
-iproto_send_stop_msg(void);
-
 /**
  * Stops accepting new connections on shutdown.
  */
@@ -3267,7 +3275,11 @@ iproto_on_shutdown_f(void *arg)
 {
 	(void)arg;
 	fiber_set_name(fiber_self(), "iproto.shutdown");
-	iproto_send_stop_msg();
+	iproto_is_shutting_down = true;
+	struct iproto_cfg_msg cfg_msg;
+	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_SHUTDOWN);
+	for (int i = 0; i < iproto_threads_count; i++)
+		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
 	evio_service_stop(&tx_binary);
 	return 0;
 }
@@ -3458,8 +3470,13 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		break;
 	}
 	case IPROTO_CFG_START:
+		if (iproto_thread->is_shutting_down)
+			break;
 		evio_service_attach(binary, &tx_binary);
 		break;
+	case IPROTO_CFG_SHUTDOWN:
+		iproto_thread->is_shutting_down = true;
+		FALLTHROUGH;
 	case IPROTO_CFG_STOP:
 		evio_service_detach(binary);
 		break;
@@ -3729,10 +3746,14 @@ iproto_set_msg_max(int new_iproto_msg_max)
 	return 0;
 }
 
-uint64_t
-iproto_session_new(struct iostream *io, struct user *user)
+int
+iproto_session_new(struct iostream *io, struct user *user, uint64_t *sid)
 {
 	assert(iostream_is_initialized(io));
+	if (iproto_is_shutting_down) {
+		diag_set(ClientError, ER_SHUTDOWN);
+		return -1;
+	}
 	struct session *session = session_new(SESSION_TYPE_BACKGROUND);
 	if (user != NULL)
 		credentials_reset(&session->credentials, user);
@@ -3744,7 +3765,8 @@ iproto_session_new(struct iostream *io, struct user *user)
 	static int thread = 0;
 	thread = (thread + 1) % iproto_threads_count;
 	iproto_do_cfg_async(&iproto_threads[thread], cfg_msg);
-	return session->id;
+	*sid = session->id;
+	return 0;
 }
 
 /**
