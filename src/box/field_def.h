@@ -70,6 +70,16 @@ enum field_type {
 	FIELD_TYPE_INTERVAL,
 	FIELD_TYPE_ARRAY,
 	FIELD_TYPE_MAP,
+	FIELD_TYPE_INT8,
+	FIELD_TYPE_UINT8,
+	FIELD_TYPE_INT16,
+	FIELD_TYPE_UINT16,
+	FIELD_TYPE_INT32,
+	FIELD_TYPE_UINT32,
+	FIELD_TYPE_INT64,
+	FIELD_TYPE_UINT64,
+	FIELD_TYPE_FLOAT32,
+	FIELD_TYPE_FLOAT64,
 	field_type_MAX
 };
 
@@ -90,6 +100,10 @@ enum on_conflict_action {
 /** \endcond public */
 
 extern const char *field_type_strs[];
+extern const bool field_type_is_fixed_signed[];
+extern const bool field_type_is_fixed_unsigned[];
+extern const int64_t field_type_min_value[];
+extern const uint64_t field_type_max_value[];
 
 extern const char *on_conflict_action_strs[];
 

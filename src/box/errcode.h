@@ -332,6 +332,7 @@ struct errcode_record {
 	/*277 */_(ER_INVALID_DEC,		"Invalid decimal: '%s'") \
 	/*278 */_(ER_IN_ANOTHER_PROMOTE,	"box.ctl.promote() is already running") \
 	/*279 */_(ER_SHUTDOWN,			"Server is shutting down") \
+	/*280 */_(ER_FIELD_VALUE_OUT_OF_RANGE,	"The value of field %s exceeds the supported range for type '%s': expected [%s..%s], got %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
