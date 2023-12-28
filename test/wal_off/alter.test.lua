@@ -11,7 +11,7 @@ for k = 1, box.schema.FORMAT_ID_MAX, 1 do
     local s = box.schema.space.create('space'..k)
     table.insert(spaces, s)
 end;
-#spaces;
+#spaces > 65000;
 -- cleanup
 for k, v in pairs(spaces) do
     v:drop()

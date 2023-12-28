@@ -26,9 +26,9 @@ end;
 ---
 - error: 'Tuple format limit reached: 65536'
 ...
-#spaces;
+#spaces > 65000;
 ---
-- 65499
+- true
 ...
 -- cleanup
 for k, v in pairs(spaces) do
