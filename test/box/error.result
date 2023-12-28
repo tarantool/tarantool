@@ -498,6 +498,7 @@ t;
  |   277: box.error.INVALID_DEC
  |   278: box.error.IN_ANOTHER_PROMOTE
  |   279: box.error.SHUTDOWN
+ |   280: box.error.FIELD_VALUE_OUT_OF_RANGE
  | ...
 
 test_run:cmd("setopt delimiter ''");

@@ -201,6 +201,17 @@ tuple_field_has_default(const struct tuple_field *tuple_field)
 }
 
 /**
+ * Return true for fixed-size integer field `type'.
+ */
+static inline bool
+tuple_field_type_is_fixed_int(enum field_type type)
+{
+	assert(type < field_type_MAX);
+	return field_type_is_fixed_signed[type] ||
+	       field_type_is_fixed_unsigned[type];
+}
+
+/**
  * Return path to a tuple field. Used for error reporting.
  */
 const char *

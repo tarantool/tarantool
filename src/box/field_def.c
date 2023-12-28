@@ -83,6 +83,16 @@ const uint32_t field_mp_type[] = {
 	/* [FIELD_TYPE_INTERVAL] =  */ 0,
 	/* [FIELD_TYPE_ARRAY]    =  */ 1U << MP_ARRAY,
 	/* [FIELD_TYPE_MAP]      =  */ (1U << MP_MAP),
+	/* [FIELD_TYPE_INT8]     =  */ (1U << MP_UINT) | (1U << MP_INT),
+	/* [FIELD_TYPE_UINT8]    =  */ 1U << MP_UINT,
+	/* [FIELD_TYPE_INT16]    =  */ (1U << MP_UINT) | (1U << MP_INT),
+	/* [FIELD_TYPE_UINT16]   =  */ 1U << MP_UINT,
+	/* [FIELD_TYPE_INT32]    =  */ (1U << MP_UINT) | (1U << MP_INT),
+	/* [FIELD_TYPE_UINT32]   =  */ 1U << MP_UINT,
+	/* [FIELD_TYPE_INT64]    =  */ (1U << MP_UINT) | (1U << MP_INT),
+	/* [FIELD_TYPE_UINT64]   =  */ 1U << MP_UINT,
+	/* [FIELD_TYPE_FLOAT32]  =  */ 1U << MP_FLOAT,
+	/* [FIELD_TYPE_FLOAT64]  =  */ 1U << MP_DOUBLE,
 };
 
 static_assert(lengthof(field_mp_type) == field_type_MAX,
@@ -105,6 +115,16 @@ const uint32_t field_ext_type[] = {
 	/* [FIELD_TYPE_INTERVAL]  = */ 1U << MP_INTERVAL,
 	/* [FIELD_TYPE_ARRAY]     = */ 0,
 	/* [FIELD_TYPE_MAP]       = */ 0,
+	/* [FIELD_TYPE_INT8]      = */ 0,
+	/* [FIELD_TYPE_UINT8]     = */ 0,
+	/* [FIELD_TYPE_INT16]     = */ 0,
+	/* [FIELD_TYPE_UINT16]    = */ 0,
+	/* [FIELD_TYPE_INT32]     = */ 0,
+	/* [FIELD_TYPE_UINT32]    = */ 0,
+	/* [FIELD_TYPE_INT64]     = */ 0,
+	/* [FIELD_TYPE_UINT64]    = */ 0,
+	/* [FIELD_TYPE_FLOAT32]   = */ 0,
+	/* [FIELD_TYPE_FLOAT64]   = */ 0,
 };
 
 static_assert(lengthof(field_ext_type) == field_type_MAX,
@@ -126,10 +146,150 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_INTERVAL] = */ "interval",
 	/* [FIELD_TYPE_ARRAY]    = */ "array",
 	/* [FIELD_TYPE_MAP]      = */ "map",
+	/* [FIELD_TYPE_INT8]     = */ "int8",
+	/* [FIELD_TYPE_UINT8]    = */ "uint8",
+	/* [FIELD_TYPE_INT16]    = */ "int16",
+	/* [FIELD_TYPE_UINT16]   = */ "uint16",
+	/* [FIELD_TYPE_INT32]    = */ "int32",
+	/* [FIELD_TYPE_UINT32]   = */ "uint32",
+	/* [FIELD_TYPE_INT64]    = */ "int64",
+	/* [FIELD_TYPE_UINT64]   = */ "uint64",
+	/* [FIELD_TYPE_FLOAT32]  = */ "float32",
+	/* [FIELD_TYPE_FLOAT64]  = */ "float64",
 };
 
 static_assert(lengthof(field_type_strs) == field_type_MAX,
 	      "Each field type must be present in field_type_strs");
+
+/**
+ * True for fixed-size signed integer field types.
+ */
+const bool field_type_is_fixed_signed[] = {
+	/* [FIELD_TYPE_ANY]       = */ false,
+	/* [FIELD_TYPE_UNSIGNED]  = */ false,
+	/* [FIELD_TYPE_STRING]    = */ false,
+	/* [FIELD_TYPE_NUMBER]    = */ false,
+	/* [FIELD_TYPE_DOUBLE]    = */ false,
+	/* [FIELD_TYPE_INTEGER]   = */ false,
+	/* [FIELD_TYPE_BOOLEAN]   = */ false,
+	/* [FIELD_TYPE_VARBINARY] = */ false,
+	/* [FIELD_TYPE_SCALAR]    = */ false,
+	/* [FIELD_TYPE_DECIMAL]   = */ false,
+	/* [FIELD_TYPE_UUID]      = */ false,
+	/* [FIELD_TYPE_DATETIME]  = */ false,
+	/* [FIELD_TYPE_INTERVAL]  = */ false,
+	/* [FIELD_TYPE_ARRAY]     = */ false,
+	/* [FIELD_TYPE_MAP]       = */ false,
+	/* [FIELD_TYPE_INT8]      = */ true,
+	/* [FIELD_TYPE_UINT8]     = */ false,
+	/* [FIELD_TYPE_INT16]     = */ true,
+	/* [FIELD_TYPE_UINT16]    = */ false,
+	/* [FIELD_TYPE_INT32]     = */ true,
+	/* [FIELD_TYPE_UINT32]    = */ false,
+	/* [FIELD_TYPE_INT64]     = */ true,
+	/* [FIELD_TYPE_UINT64]    = */ false,
+	/* [FIELD_TYPE_FLOAT32]   = */ false,
+	/* [FIELD_TYPE_FLOAT64]   = */ false,
+};
+
+static_assert(lengthof(field_type_is_fixed_signed) == field_type_MAX,
+	      "Each field type must be present in field_type_is_fixed_signed");
+
+/**
+ * True for fixed-size unsigned integer field types.
+ */
+const bool field_type_is_fixed_unsigned[] = {
+	/* [FIELD_TYPE_ANY]       = */ false,
+	/* [FIELD_TYPE_UNSIGNED]  = */ false,
+	/* [FIELD_TYPE_STRING]    = */ false,
+	/* [FIELD_TYPE_NUMBER]    = */ false,
+	/* [FIELD_TYPE_DOUBLE]    = */ false,
+	/* [FIELD_TYPE_INTEGER]   = */ false,
+	/* [FIELD_TYPE_BOOLEAN]   = */ false,
+	/* [FIELD_TYPE_VARBINARY] = */ false,
+	/* [FIELD_TYPE_SCALAR]    = */ false,
+	/* [FIELD_TYPE_DECIMAL]   = */ false,
+	/* [FIELD_TYPE_UUID]      = */ false,
+	/* [FIELD_TYPE_DATETIME]  = */ false,
+	/* [FIELD_TYPE_INTERVAL]  = */ false,
+	/* [FIELD_TYPE_ARRAY]     = */ false,
+	/* [FIELD_TYPE_MAP]       = */ false,
+	/* [FIELD_TYPE_INT8]      = */ false,
+	/* [FIELD_TYPE_UINT8]     = */ true,
+	/* [FIELD_TYPE_INT16]     = */ false,
+	/* [FIELD_TYPE_UINT16]    = */ true,
+	/* [FIELD_TYPE_INT32]     = */ false,
+	/* [FIELD_TYPE_UINT32]    = */ true,
+	/* [FIELD_TYPE_INT64]     = */ false,
+	/* [FIELD_TYPE_UINT64]    = */ true,
+	/* [FIELD_TYPE_FLOAT32]   = */ false,
+	/* [FIELD_TYPE_FLOAT64]   = */ false,
+};
+
+static_assert(lengthof(field_type_is_fixed_unsigned) == field_type_MAX, "Each "
+	      "field type must be present in field_type_is_fixed_unsigned");
+
+const int64_t field_type_min_value[] = {
+	/* [FIELD_TYPE_ANY]       = */ 0,
+	/* [FIELD_TYPE_UNSIGNED]  = */ 0,
+	/* [FIELD_TYPE_STRING]    = */ 0,
+	/* [FIELD_TYPE_NUMBER]    = */ 0,
+	/* [FIELD_TYPE_DOUBLE]    = */ 0,
+	/* [FIELD_TYPE_INTEGER]   = */ 0,
+	/* [FIELD_TYPE_BOOLEAN]   = */ 0,
+	/* [FIELD_TYPE_VARBINARY] = */ 0,
+	/* [FIELD_TYPE_SCALAR]    = */ 0,
+	/* [FIELD_TYPE_DECIMAL]   = */ 0,
+	/* [FIELD_TYPE_UUID]      = */ 0,
+	/* [FIELD_TYPE_DATETIME]  = */ 0,
+	/* [FIELD_TYPE_INTERVAL]  = */ 0,
+	/* [FIELD_TYPE_ARRAY]     = */ 0,
+	/* [FIELD_TYPE_MAP]       = */ 0,
+	/* [FIELD_TYPE_INT8]      = */ INT8_MIN,
+	/* [FIELD_TYPE_UINT8]     = */ 0,
+	/* [FIELD_TYPE_INT16]     = */ INT16_MIN,
+	/* [FIELD_TYPE_UINT16]    = */ 0,
+	/* [FIELD_TYPE_INT32]     = */ INT32_MIN,
+	/* [FIELD_TYPE_UINT32]    = */ 0,
+	/* [FIELD_TYPE_INT64]     = */ INT64_MIN,
+	/* [FIELD_TYPE_UINT64]    = */ 0,
+	/* [FIELD_TYPE_FLOAT32]   = */ 0,
+	/* [FIELD_TYPE_FLOAT64]   = */ 0,
+};
+
+static_assert(lengthof(field_type_min_value) == field_type_MAX,
+	      "Each field type must be present in field_type_min_value");
+
+const uint64_t field_type_max_value[] = {
+	/* [FIELD_TYPE_ANY]       = */ 0,
+	/* [FIELD_TYPE_UNSIGNED]  = */ 0,
+	/* [FIELD_TYPE_STRING]    = */ 0,
+	/* [FIELD_TYPE_NUMBER]    = */ 0,
+	/* [FIELD_TYPE_DOUBLE]    = */ 0,
+	/* [FIELD_TYPE_INTEGER]   = */ 0,
+	/* [FIELD_TYPE_BOOLEAN]   = */ 0,
+	/* [FIELD_TYPE_VARBINARY] = */ 0,
+	/* [FIELD_TYPE_SCALAR]    = */ 0,
+	/* [FIELD_TYPE_DECIMAL]   = */ 0,
+	/* [FIELD_TYPE_UUID]      = */ 0,
+	/* [FIELD_TYPE_DATETIME]  = */ 0,
+	/* [FIELD_TYPE_INTERVAL]  = */ 0,
+	/* [FIELD_TYPE_ARRAY]     = */ 0,
+	/* [FIELD_TYPE_MAP]       = */ 0,
+	/* [FIELD_TYPE_INT8]      = */ INT8_MAX,
+	/* [FIELD_TYPE_UINT8]     = */ UINT8_MAX,
+	/* [FIELD_TYPE_INT16]     = */ INT16_MAX,
+	/* [FIELD_TYPE_UINT16]    = */ UINT16_MAX,
+	/* [FIELD_TYPE_INT32]     = */ INT32_MAX,
+	/* [FIELD_TYPE_UINT32]    = */ UINT32_MAX,
+	/* [FIELD_TYPE_INT64]     = */ INT64_MAX,
+	/* [FIELD_TYPE_UINT64]    = */ UINT64_MAX,
+	/* [FIELD_TYPE_FLOAT32]   = */ 0,
+	/* [FIELD_TYPE_FLOAT64]   = */ 0,
+};
+
+static_assert(lengthof(field_type_max_value) == field_type_MAX,
+	      "Each field type must be present in field_type_max_value");
 
 const char *on_conflict_action_strs[] = {
 	/* [ON_CONFLICT_ACTION_NONE]     = */ "none",
@@ -164,7 +324,23 @@ field_type1_contains_type2(enum field_type type1, enum field_type type2)
 		mp_type1 = field_mp_type[type1];
 		mp_type2 = field_mp_type[type2];
 	}
-	return (mp_type1 & mp_type2) == mp_type2;
+
+	bool type1_contains_type2 = (mp_type1 & mp_type2) == mp_type2;
+	if (!type1_contains_type2)
+		return false;
+	if (!tuple_field_type_is_fixed_int(type1))
+		return true;
+	if (!tuple_field_type_is_fixed_int(type2)) {
+		/* uint64 is an alias for unsigned. */
+		return type1 == FIELD_TYPE_UINT64 &&
+		       type2 == FIELD_TYPE_UNSIGNED;
+	}
+
+	int64_t min1 = field_type_min_value[type1];
+	int64_t min2 = field_type_min_value[type2];
+	uint64_t max1 = field_type_max_value[type1];
+	uint64_t max2 = field_type_max_value[type2];
+	return min1 <= min2 && max1 >= max2;
 }
 
 /**

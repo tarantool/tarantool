@@ -1025,6 +1025,65 @@ tuple_format_required_fields_validate(struct tuple_format *format,
 				      uint32_t required_fields_sz);
 
 /**
+ * Check if integer value in `mp_data' is within an allowed range for the given
+ * `field' type.
+ * Return -1 and raise an error if it is out of range, or 0 if all is ok.
+ */
+static int
+tuple_field_check_fixed_int_range(struct tuple_format *format,
+				  struct tuple_field *field,
+				  const char *mp_data)
+{
+	assert(tuple_field_type_is_fixed_int(field->type));
+	const char *min_str, *max_str, *val_str;
+	enum mp_type mp_type = mp_typeof(*mp_data);
+	if (mp_type == MP_NIL)
+		return 0;
+	assert(mp_type == MP_INT || mp_type == MP_UINT);
+
+	if (field_type_is_fixed_signed[field->type]) {
+		int64_t min = field_type_min_value[field->type];
+		int64_t max = field_type_max_value[field->type];
+		if (mp_type == MP_INT) {
+			int64_t value = mp_decode_int(&mp_data);
+			if (value < min || value > max) {
+				min_str = tt_sprintf("%" PRId64, min);
+				max_str = tt_sprintf("%" PRId64, max);
+				val_str = tt_sprintf("%" PRId64, value);
+				goto error;
+			}
+		} else {
+			assert(mp_type == MP_UINT);
+			uint64_t value = mp_decode_uint(&mp_data);
+			if (value > (uint64_t)max) {
+				min_str = tt_sprintf("%" PRId64, min);
+				max_str = tt_sprintf("%" PRId64, max);
+				val_str = tt_sprintf("%" PRIu64, value);
+				goto error;
+			}
+		}
+	} else {
+		assert(field_type_is_fixed_unsigned[field->type]);
+		assert(mp_type == MP_UINT);
+		uint64_t value = mp_decode_uint(&mp_data);
+		uint64_t min = field_type_min_value[field->type];
+		uint64_t max = field_type_max_value[field->type];
+		if (value > max) {
+			min_str = tt_sprintf("%" PRIu64, min);
+			max_str = tt_sprintf("%" PRIu64, max);
+			val_str = tt_sprintf("%" PRIu64, value);
+			goto error;
+		}
+	}
+	return 0;
+error:
+	diag_set(ClientError, ER_FIELD_VALUE_OUT_OF_RANGE,
+		 tuple_field_path(field, format), field_type_strs[field->type],
+		 min_str, max_str, val_str);
+	return -1;
+}
+
+/**
  * Check constraints of one particular @a field.
  */
 static int
@@ -1109,6 +1168,10 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 					 mp_type_strs[mp_typeof(*pos)]);
 				goto error;
 			}
+			if (tuple_field_type_is_fixed_int(field->type) &&
+			    tuple_field_check_fixed_int_range(format, field,
+							      pos) != 0)
+				goto error;
 			if (tuple_field_check_constraint(field, pos,
 							 next_pos) != 0)
 				goto error;
@@ -1470,6 +1533,10 @@ tuple_format_iterator_next(struct tuple_format_iterator *it,
 			 mp_type_strs[mp_typeof(*entry->data)]);
 		return -1;
 	}
+	if (tuple_field_type_is_fixed_int(field->type) &&
+	    tuple_field_check_fixed_int_range(it->format, field,
+					      entry->data) != 0)
+		return -1;
 	if (tuple_field_check_constraint(field, entry->data,
 					 entry->data_end) != 0)
 		return -1;
