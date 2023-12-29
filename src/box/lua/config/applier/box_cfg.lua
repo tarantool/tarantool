@@ -188,8 +188,12 @@ local function names_try_set_missing()
     -- Set names for all instances in the replicaset.
     for name, uuid in pairs(missing_names._peers) do
         if uuid ~= 'unknown' then
-            local tuple = box.space._cluster.index.uuid:select(uuid)
-            box.space._cluster:update(tuple[1][1], {{'=', 3, name}})
+            local tuple = box.space._cluster.index.uuid:get(uuid)
+            -- Tuple may be nil, when instance has not joined yet. Alert
+            -- will be dropped, when instance is joined, nothing to do.
+            if tuple ~= nil then
+                box.space._cluster:update(tuple[1], {{'=', 3, name}})
+            end
         end
     end
     box.commit()
