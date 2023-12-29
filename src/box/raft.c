@@ -37,6 +37,7 @@
 #include "txn_limbo.h"
 #include "xrow.h"
 #include "errinj.h"
+#include "watcher.h"
 
 struct raft box_raft_global = {
 	/*
@@ -637,6 +638,13 @@ box_raft_election_fencing_resume(void)
 	box_raft_election_fencing_paused = false;
 }
 
+static void
+box_raft_on_wal_error_f(struct watcher *watcher)
+{
+	(void)watcher;
+	box_raft_leader_step_off();
+}
+
 void
 box_raft_init(void)
 {
@@ -653,6 +661,13 @@ box_raft_init(void)
 		       NULL, NULL);
 	trigger_create(&box_raft_on_quorum_loss, box_raft_on_quorum_change_f,
 		       NULL, NULL);
+
+	struct watcher *watcher = xmalloc(sizeof(*watcher));
+	const char *key = "box.wal_error";
+	size_t key_len = strlen(key);
+	box_register_watcher(key, key_len, box_raft_on_wal_error_f,
+			     (watcher_destroy_f)free, 0,
+			     watcher);
 }
 
 void
