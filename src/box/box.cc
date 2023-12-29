@@ -5951,8 +5951,8 @@ box_init(void)
 		diag_raise();
 	txn_limbo_init();
 	sequence_init();
-	box_raft_init();
 	box_watcher_init();
+	box_raft_init();
 	wal_ext_init();
 	/*
 	 * Default built-in events to help users distinguish an event being not

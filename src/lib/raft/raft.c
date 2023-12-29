@@ -599,7 +599,7 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 			raft_sm_become_leader(raft);
 			break;
 		default:
-			panic("RAFT: unreacheable state hit");
+			panic("RAFT: unreachable state hit");
 			break;
 		}
 	}

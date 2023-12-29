@@ -43,6 +43,7 @@
 #include "coio_task.h"
 #include "replication.h"
 #include "iproto_constants.h"
+#include "watcher.h"
 
 enum {
 	/**
@@ -1192,7 +1193,7 @@ wal_write_to_disk(struct cmsg *msg)
 	}
 	rc = xlog_flush(l);
 	if (rc < 0) {
-		err_code= JOURNAL_ENTRY_ERR_IO;
+		err_code = JOURNAL_ENTRY_ERR_IO;
 		goto done;
 	}
 
@@ -1318,11 +1319,17 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 	struct wal_writer *writer = (struct wal_writer *) journal;
 
 	ERROR_INJECT(ERRINJ_WAL_IO, {
-		diag_set(ClientError, ER_WAL_IO);
+		ERROR_INJECT_COUNTDOWN(ERRINJ_WAL_IO_COUNTDOWN, {
+				struct errinj *e =
+					errinj(ERRINJ_WAL_IO, ERRINJ_BOOL);
+				e->bparam = false;
+		});
+
+		diag_set_journal_res(JOURNAL_ENTRY_ERR_IO);
 		goto fail;
 	});
 
-	if (! stailq_empty(&writer->rollback)) {
+	if (!stailq_empty(&writer->rollback)) {
 		/*
 		 * The writer rollback queue is not empty,
 		 * roll back this transaction immediately.
