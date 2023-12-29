@@ -39,6 +39,7 @@
 #include "txn_limbo.h"
 #include "xrow.h"
 #include "errinj.h"
+#include "watcher.h"
 
 struct raft box_raft_global = {
 	/*
@@ -299,6 +300,25 @@ box_raft_fence(void)
 
 	txn_limbo_fence(&txn_limbo);
 	raft_resign(raft);
+}
+
+/**
+ * Resign RAFT leadership and freeze limbo regardless of
+ * box_election_fencing_mode. It waits until the elections
+ * begin. After the death-timeout expires, it starts a new
+ * round of elections.
+ */
+static void
+box_raft_leader_step_off(void)
+{
+	struct raft *raft = box_raft();
+	if (!raft->is_enabled || raft->state != RAFT_STATE_LEADER)
+		return;
+
+	/* It will be unfenced the next time new term is written. */
+	txn_limbo_fence(&txn_limbo);
+	raft_resign(raft);
+	raft_restore(raft);
 }
 
 /**
@@ -642,6 +662,13 @@ box_raft_election_fencing_resume(void)
 }
 
 void
+box_raft_on_wal_error_f(struct watcher *watcher)
+{
+	(void)watcher;
+	box_raft_leader_step_off();
+}
+
+void
 box_raft_init(void)
 {
 	static const struct raft_vtab box_raft_vtab = {
@@ -657,6 +684,12 @@ box_raft_init(void)
 		       NULL, NULL);
 	trigger_create(&box_raft_on_quorum_loss, box_raft_on_quorum_change_f,
 		       NULL, NULL);
+	struct watcher *watcher = xmalloc(sizeof(*watcher));
+	const char *key = "box.wal_error";
+	size_t key_len = strlen(key);
+	box_register_watcher(key, key_len, box_raft_on_wal_error_f,
+			     (watcher_destroy_f)free, 0,
+			     watcher);
 	box_raft_on_election_event = event_get("box.ctl.on_election", true);
 	event_ref(box_raft_on_election_event);
 }
