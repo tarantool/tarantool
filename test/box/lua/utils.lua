@@ -188,6 +188,13 @@ local function create_iterator(obj, key, opts)
         local _, tp = iter.gen(key, state)
         return tp
     end
+    -- Disable JIT to avoid test failures when the iterator object
+    -- is referenced at the trace as the function's upvalue.
+    -- For more information, see
+    -- https://github.com/tarantool/tarantool/wiki/LuaJIT-function-inlining.
+    -- It helps to avoid side effects like those mentioned in the
+    -- tarantool/tarantool-qa#233.
+    jit.off(res.next)
     res.iterate_over = function()
         local ret = {}
         local i = 0
