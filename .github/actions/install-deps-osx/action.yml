@@ -6,23 +6,16 @@ runs:
   using: composite
   steps:
     - run: |
-        # FIXME: Temporary pinned python3 to specific version (python@3.8)
-        # to avoid 'gevent' package installation failure described in
-        # gevent/gevent#1721. Change to python3 when the issue is resolved.
-        PKGS='openssl
-              readline
-              curl
-              icu4c
-              libiconv
-              zlib
-              cmake
-              ninja
-              python@3.8
-              autoconf
-              automake
-              libtool'
-
-        # Try to install the packages or upgrade them if the packages are
-        # already installed.
-        brew install --force ${PKGS} || brew upgrade ${PKGS}
+        brew install --force \
+          openssl \
+          readline \
+          curl \
+          icu4c \
+          libiconv \
+          zlib \
+          cmake \
+          ninja \
+          autoconf \
+          automake \
+          libtool
       shell: bash
