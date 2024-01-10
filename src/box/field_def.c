@@ -146,11 +146,11 @@ field_type_by_name_wrapper(const char *str, uint32_t len)
 static const bool field_type_compatibility[] = {
 /*              ANY   UNSIGNED  STRING   NUMBER  DOUBLE  INTEGER  BOOLEAN VARBINARY SCALAR  DECIMAL   UUID   DATETIME INTERVAL  ARRAY    MAP   */
 /*   ANY    */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,   false,   false,  false,
-/* UNSIGNED */ true,   true,    false,   true,    false,   true,    false,   false,  true,   false,  false,   false,   false,   false,  false,
+/* UNSIGNED */ true,   true,    false,   true,    true,    true,    false,   false,  true,   false,  false,   false,   false,   false,  false,
 /*  STRING  */ true,   false,   true,    false,   false,   false,   false,   false,  true,   false,  false,   false,   false,   false,  false,
-/*  NUMBER  */ true,   false,   false,   true,    false,   false,   false,   false,  true,   false,  false,   false,   false,   false,  false,
+/*  NUMBER  */ true,   false,   false,   true,    true,    false,   false,   false,  true,   false,  false,   false,   false,   false,  false,
 /*  DOUBLE  */ true,   false,   false,   true,    true,    false,   false,   false,  true,   false,  false,   false,   false,   false,  false,
-/*  INTEGER */ true,   false,   false,   true,    false,   true,    false,   false,  true,   false,  false,   false,   false,   false,  false,
+/*  INTEGER */ true,   false,   false,   true,    true,    true,    false,   false,  true,   false,  false,   false,   false,   false,  false,
 /*  BOOLEAN */ true,   false,   false,   false,   false,   false,   true,    false,  true,   false,  false,   false,   false,   false,  false,
 /* VARBINARY*/ true,   false,   false,   false,   false,   false,   false,   true,   true,   false,  false,   false,   false,   false,  false,
 /*  SCALAR  */ true,   false,   false,   false,   false,   false,   false,   false,  true,   false,  false,   false,   false,   false,  false,
