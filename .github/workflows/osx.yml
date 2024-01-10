@@ -106,3 +106,20 @@ jobs:
           access-key-id: ${{ secrets.MULTIVAC_S3_ACCESS_KEY_ID }}
           secret-access-key: ${{ secrets.MULTIVAC_S3_SECRET_ACCESS_KEY }}
           source: ${{ env.VARDIR }}/artifacts
+        # From time to time, this step fails due to the following error:
+        #
+        #     Error: Unable to retrieve job ID by provided job name
+        #
+        # The action tries to get job ID by the name via the `get-job-id` action
+        # to compose the proper artifact name. `get-job-id` performs a request
+        # to GitHub for the list of workflow jobs and finds the job by its name
+        # and then gets its ID.
+        #
+        # For some reason, sometimes GitHub doesn't give the complete job list
+        # and there is no chance to find the job and get its ID. At least, it
+        # has been noticed for this workflow with 36 parallel jobs.
+        #
+        # It looks like the issue resides on the GitHub side and the simplest
+        # way to resolve this is to ignore the failure and not fail the whole
+        # workflow due to this GitHub bug.
+        continue-on-error: true
