@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        osx-version: [ 13 ]
+        osx-version: [ 14 ]
         machine-arch: [ x86_64, aarch64 ]
         tarantool-branch:
           - 'master'
@@ -26,19 +26,19 @@ jobs:
           - 'release/2.10'
         build-type: [ debug, release, release-lto, static-cmake ]
         include:
-          - osx-version: 12
+          - osx-version: 13
             machine-arch: x86_64
             tarantool-branch: 'master'
             build-type: release
-          - osx-version: 12
+          - osx-version: 13
             machine-arch: x86_64
             tarantool-branch: 'release/3.0'
             build-type: release
-          - osx-version: 12
+          - osx-version: 13
             machine-arch: x86_64
             tarantool-branch: 'release/2.11'
             build-type: release
-          - osx-version: 12
+          - osx-version: 13
             machine-arch: x86_64
             tarantool-branch: 'release/2.10'
             build-type: release
