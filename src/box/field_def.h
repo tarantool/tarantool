@@ -89,22 +89,6 @@ enum on_conflict_action {
 
 /** \endcond public */
 
-enum {
-	/**
-	 * This mask allows to store in VdbeOp.p5 operand of
-	 * OP_Eq, OP_Lt etc opcodes field type alongside with
-	 * flags.
-	 */
-	FIELD_TYPE_MASK = 15
-};
-
-/**
- * For detailed explanation see context of OP_Eq, OP_Lt etc
- * opcodes in vdbe.c.
- */
-static_assert((int) field_type_MAX <= (int) FIELD_TYPE_MASK,
-	      "values of enum field_type should fit into 4 bits of VdbeOp.p5");
-
 extern const char *field_type_strs[];
 
 extern const char *on_conflict_action_strs[];
