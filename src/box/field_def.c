@@ -85,6 +85,9 @@ const uint32_t field_mp_type[] = {
 	/* [FIELD_TYPE_MAP]      =  */ (1U << MP_MAP),
 };
 
+static_assert(lengthof(field_mp_type) == field_type_MAX,
+	      "Each field type must be present in field_mp_type");
+
 const uint32_t field_ext_type[] = {
 	/* [FIELD_TYPE_ANY]       = */ UINT32_MAX ^ (1U << MP_UNKNOWN_EXTENSION),
 	/* [FIELD_TYPE_UNSIGNED]  = */ 0,
@@ -104,6 +107,9 @@ const uint32_t field_ext_type[] = {
 	/* [FIELD_TYPE_MAP]       = */ 0,
 };
 
+static_assert(lengthof(field_ext_type) == field_type_MAX,
+	      "Each field type must be present in field_ext_type");
+
 const char *field_type_strs[] = {
 	/* [FIELD_TYPE_ANY]      = */ "any",
 	/* [FIELD_TYPE_UNSIGNED] = */ "unsigned",
@@ -122,6 +128,9 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_MAP]      = */ "map",
 };
 
+static_assert(lengthof(field_type_strs) == field_type_MAX,
+	      "Each field type must be present in field_type_strs");
+
 const char *on_conflict_action_strs[] = {
 	/* [ON_CONFLICT_ACTION_NONE]     = */ "none",
 	/* [ON_CONFLICT_ACTION_ROLLBACK] = */ "rollback",
@@ -138,35 +147,24 @@ field_type_by_name_wrapper(const char *str, uint32_t len)
 	return field_type_by_name(str, len);
 }
 
-/**
- * Table of a field types compatibility.
- * For an i row and j column the value is true, if the i type
- * values can be stored in the j type.
- */
-static const bool field_type_compatibility[] = {
-/*              ANY   UNSIGNED  STRING   NUMBER  DOUBLE  INTEGER  BOOLEAN VARBINARY SCALAR  DECIMAL   UUID   DATETIME INTERVAL  ARRAY    MAP   */
-/*   ANY    */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,   false,   false,  false,
-/* UNSIGNED */ true,   true,    false,   true,    true,    true,    false,   false,  true,   false,  false,   false,   false,   false,  false,
-/*  STRING  */ true,   false,   true,    false,   false,   false,   false,   false,  true,   false,  false,   false,   false,   false,  false,
-/*  NUMBER  */ true,   false,   false,   true,    true,    false,   false,   false,  true,   false,  false,   false,   false,   false,  false,
-/*  DOUBLE  */ true,   false,   false,   true,    true,    false,   false,   false,  true,   false,  false,   false,   false,   false,  false,
-/*  INTEGER */ true,   false,   false,   true,    true,    true,    false,   false,  true,   false,  false,   false,   false,   false,  false,
-/*  BOOLEAN */ true,   false,   false,   false,   false,   false,   true,    false,  true,   false,  false,   false,   false,   false,  false,
-/* VARBINARY*/ true,   false,   false,   false,   false,   false,   false,   true,   true,   false,  false,   false,   false,   false,  false,
-/*  SCALAR  */ true,   false,   false,   false,   false,   false,   false,   false,  true,   false,  false,   false,   false,   false,  false,
-/*  DECIMAL */ true,   false,   false,   true,    false,   false,   false,   false,  true,   true,   false,   false,   false,   false,  false,
-/*   UUID   */ true,   false,   false,   false,   false,   false,   false,   false,  true,   false,  true,    false,   false,   false,  false,
-/* DATETIME */ true,   false,   false,   false,   false,   false,   false,   false,  true,   false,  false,   true,    false,   false,  false,
-/* INTERVAL */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,   true,    false,  false,
-/*   ARRAY  */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,   false,   true,   false,
-/*    MAP   */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,   false,   false,  true,
-};
-
 bool
 field_type1_contains_type2(enum field_type type1, enum field_type type2)
 {
-	int idx = type2 * field_type_MAX + type1;
-	return field_type_compatibility[idx];
+	uint32_t mp_type1, mp_type2;
+	assert(type1 < field_type_MAX);
+	assert(type2 < field_type_MAX);
+	if (type1 == type2)
+		return true;
+
+	bool is_mp_ext = field_mp_type[type2] == 0;
+	if (is_mp_ext) {
+		mp_type1 = field_ext_type[type1];
+		mp_type2 = field_ext_type[type2];
+	} else {
+		mp_type1 = field_mp_type[type1];
+		mp_type2 = field_mp_type[type2];
+	}
+	return (mp_type1 & mp_type2) == mp_type2;
 }
 
 /**

@@ -232,23 +232,60 @@ test_tuple_format_to_mpstream(void)
 	return check_plan();
 }
 
+/**
+ * Table of a field types compatibility.
+ * For an i row and j column the value is true, if the i type values can be
+ * stored in the j type.
+ */
+static const bool field_type_compatibility[] = {
+/*                  0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 */
+/*  0: ANY       */ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/*  1: UNSIGNED  */ 1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+/*  2: STRING    */ 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+/*  3: NUMBER    */ 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+/*  4: DOUBLE    */ 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+/*  5: INTEGER   */ 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+/*  6: BOOLEAN   */ 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0,
+/*  7: VARBINARY */ 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0,
+/*  8: SCALAR    */ 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+/*  9: DECIMAL   */ 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0,
+/* 10: UUID      */ 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0,
+/* 11: DATETIME  */ 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
+/* 12: INTERVAL  */ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+/* 13: ARRAY     */ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+/* 14: MAP       */ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+};
+
 static int
-test_tuple_format(void)
+test_field_type1_contains_type2(void)
 {
-	plan(2);
+	plan(field_type_MAX * field_type_MAX);
 	header();
-
-	test_tuple_format_cmp();
-	test_tuple_format_to_mpstream();
-
+	for (int i = 0; i < field_type_MAX; i++) {
+		for (int j = 0; j < field_type_MAX; j++) {
+			int idx = i * field_type_MAX + j;
+			is(field_type1_contains_type2(j, i),
+			   field_type_compatibility[idx],
+			   "%s can store values of %s",
+			   field_type_strs[j], field_type_strs[i]);
+		}
+	}
 	footer();
 	return check_plan();
 }
 
-static uint32_t
-test_field_name_hash(const char *str, uint32_t len)
+static int
+test_tuple_format(void)
 {
-	return str[0] + len;
+	plan(3);
+	header();
+
+	test_tuple_format_cmp();
+	test_tuple_format_to_mpstream();
+	test_field_type1_contains_type2();
+
+	footer();
+	return check_plan();
 }
 
 int
