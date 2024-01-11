@@ -675,7 +675,7 @@ applier_connect(struct applier *applier)
 	applier->version_id = greeting.version_id;
 
 	/* Don't display previous error messages in box.info.replication */
-	diag_clear(&fiber()->diag);
+	diag_clear(&applier->diag);
 
 	/*
 	 * Send an IPROTO_ID request if it's supported by the master.
@@ -2529,6 +2529,12 @@ applier_disconnect(struct applier *applier, enum applier_state state)
 	ibuf_reinit(&applier->ibuf);
 }
 
+static void
+applier_set_last_error(struct applier *applier, struct error *e)
+{
+	diag_set_error(&applier->diag, e);
+}
+
 static int
 applier_f(va_list ap)
 {
@@ -2594,9 +2600,10 @@ applier_f(va_list ap)
 			    tt_uuid_is_equal(&applier->uuid, &INSTANCE_UUID)) {
 				/* Connection to itself, stop applier */
 				applier_disconnect(applier, APPLIER_OFF);
-				return 0;
+				break;
 			} else if (e->errcode() == ER_LOADING) {
 				/* Autobootstrap */
+				applier_set_last_error(applier, e);
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);
 				goto reconnect;
@@ -2609,6 +2616,7 @@ applier_f(va_list ap)
 				 * until they receive _cluster record of this
 				 * instance. From some third node, for example.
 				 */
+				applier_set_last_error(applier, e);
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);
 				goto reconnect;
@@ -2618,6 +2626,7 @@ applier_f(va_list ap)
 				 * Join failure due to synchronous
 				 * transaction rollback.
 				 */
+				applier_set_last_error(applier, e);
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);
 				goto reconnect;
@@ -2626,12 +2635,14 @@ applier_f(va_list ap)
 				   e->errcode() == ER_NO_SUCH_USER ||
 				   e->errcode() == ER_CREDS_MISMATCH) {
 				/* Invalid configuration */
+				applier_set_last_error(applier, e);
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);
 				goto reconnect;
 			} else if (e->errcode() == ER_SYSTEM ||
 				   e->errcode() == ER_SSL) {
 				/* System error from master instance. */
+				applier_set_last_error(applier, e);
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_DISCONNECTED);
 				goto reconnect;
@@ -2643,15 +2654,17 @@ applier_f(va_list ap)
 				 * will be replaced by a normal tarantool node
 				 * sooner or later.
 				 */
+				applier_set_last_error(applier, e);
 				applier_log_error(applier, e);
 				applier_disconnect(applier,
 						   APPLIER_DISCONNECTED);
 				goto reconnect;
 			} else {
 				/* Unrecoverable errors */
+				applier_set_last_error(applier, e);
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_STOPPED);
-				return -1;
+				break;
 			}
 		} catch (XlogGapError *e) {
 			/*
@@ -2676,33 +2689,38 @@ applier_f(va_list ap)
 			 * and in the meantime try to get newer changes from
 			 * node1.
 			 */
+			applier_set_last_error(applier, e);
 			applier_log_error(applier, e);
 			applier_disconnect(applier, APPLIER_LOADING);
 			goto reconnect;
 		} catch (FiberIsCancelled *e) {
 			if (!diag_is_empty(&applier->diag)) {
-				diag_move(&applier->diag, &fiber()->diag);
 				applier_disconnect(applier, APPLIER_STOPPED);
-				break;
+			} else {
+				applier_set_last_error(applier, e);
+				applier_disconnect(applier, APPLIER_OFF);
 			}
-			applier_disconnect(applier, APPLIER_OFF);
 			break;
 		} catch (SocketError *e) {
+			applier_set_last_error(applier, e);
 			applier_log_error(applier, e);
 			applier_disconnect(applier, APPLIER_DISCONNECTED);
 			goto reconnect;
 		} catch (SystemError *e) {
+			applier_set_last_error(applier, e);
 			applier_log_error(applier, e);
 			applier_disconnect(applier, APPLIER_DISCONNECTED);
 			goto reconnect;
 		} catch (SSLError *e) {
+			applier_set_last_error(applier, e);
 			applier_log_error(applier, e);
 			applier_disconnect(applier, APPLIER_DISCONNECTED);
 			goto reconnect;
 		} catch (Exception *e) {
+			applier_set_last_error(applier, e);
 			applier_log_error(applier, e);
 			applier_disconnect(applier, APPLIER_STOPPED);
-			return -1;
+			break;
 		}
 		/* Put fiber_sleep() out of catch block.
 		 *
@@ -2874,8 +2892,9 @@ applier_wait_for_state(struct applier_on_state *trigger, double timeout)
 		assert(applier->state == APPLIER_OFF ||
 		       applier->state == APPLIER_STOPPED);
 		/* Re-throw the original error */
-		assert(!diag_is_empty(&applier->fiber->diag));
-		diag_move(&applier->fiber->diag, &fiber()->diag);
+		assert(!diag_is_empty(&applier->diag));
+		diag_set_error(&fiber()->diag,
+			       diag_last_error(&applier->diag));
 		return -1;
 	}
 	return 0;
