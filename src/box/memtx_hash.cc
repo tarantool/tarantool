@@ -109,7 +109,8 @@ hash_iterator_ge_base(struct iterator *ptr, struct tuple **ret)
 {
 	assert(ptr->free == hash_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
-	struct memtx_hash_index *index = (struct memtx_hash_index *)ptr->index;
+	struct memtx_hash_index *index = (struct memtx_hash_index *)
+		index_weak_ref_get_index_checked(&ptr->index_ref);
 	struct tuple **res = light_index_iterator_get_and_next(&index->hash_table,
 							       &it->iterator);
 	*ret = res != NULL ? *res : NULL;
@@ -121,7 +122,8 @@ hash_iterator_gt_base(struct iterator *ptr, struct tuple **ret)
 {
 	assert(ptr->free == hash_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
-	struct memtx_hash_index *index = (struct memtx_hash_index *)ptr->index;
+	struct memtx_hash_index *index = (struct memtx_hash_index *)
+		index_weak_ref_get_index_checked(&ptr->index_ref);
 	struct tuple **res = light_index_iterator_get_and_next(&index->hash_table,
 							       &it->iterator);
 	if (res != NULL)
@@ -136,8 +138,9 @@ static int									\
 name(struct iterator *iterator, struct tuple **ret)				\
 {										\
 	struct txn *txn = in_txn();						\
-	struct space *space = space_by_id(iterator->space_id);			\
-	struct index *idx = iterator->index;					\
+	struct space *space;							\
+	struct index *index;							\
+	index_weak_ref_get_checked(&iterator->index_ref, &space, &index);	\
 	bool is_first = true;							\
 	do {									\
 		int rc;								\
@@ -150,7 +153,7 @@ name(struct iterator *iterator, struct tuple **ret)				\
 		if (rc != 0 || *ret == NULL)					\
 			return rc;						\
 		is_first = false;						\
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, 0);	\
+		*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0);	\
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/\
 		memtx_tx_story_gc();						\
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/\
@@ -173,8 +176,10 @@ hash_iterator_eq(struct iterator *it, struct tuple **ret)
 	if (*ret == NULL)
 		return 0;
 	struct txn *txn = in_txn();
-	struct space *sp = space_by_id(it->space_id);
-	*ret = memtx_tx_tuple_clarify(txn, sp, *ret, it->index, 0);
+	struct space *space;
+	struct index *index;
+	index_weak_ref_get_checked(&it->index_ref, &space, &index);
+	*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 	memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
@@ -447,7 +452,8 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 	it->pool = &memtx->iterator_pool;
 	it->base.free = hash_iterator_free;
 	light_index_iterator_begin(&index->hash_table, &it->iterator);
-
+	struct space *space = index_weak_ref_get_space_checked(
+		&it->base.index_ref);
 	switch (type) {
 	case ITER_GT: {
 		static bool warn_once = false;
@@ -469,9 +475,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		}
 		/* This iterator needs to be supported as a legacy. */
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
-		memtx_tx_track_full_scan(in_txn(),
-					 space_by_id(it->base.space_id),
-					 &index->base);
+		memtx_tx_track_full_scan(in_txn(), space, &index->base);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		break;
 	}
@@ -479,9 +483,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		light_index_iterator_begin(&index->hash_table, &it->iterator);
 		it->base.next_internal = hash_iterator_ge;
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
-		memtx_tx_track_full_scan(in_txn(),
-					 space_by_id(it->base.space_id),
-					 &index->base);
+		memtx_tx_track_full_scan(in_txn(), space, &index->base);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		break;
 	case ITER_EQ:
@@ -491,8 +493,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		it->base.next_internal = hash_iterator_eq;
 		if (it->iterator.slotpos == light_index_end)
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
-			memtx_tx_track_point(in_txn(),
-					     space_by_id(it->base.space_id),
+			memtx_tx_track_point(in_txn(), space,
 					     &index->base, key);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		break;

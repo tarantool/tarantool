@@ -189,6 +189,7 @@ set(box_sources
     tuple_convert.c
     index.cc
     index_def.c
+    index_weak_ref.c
     iterator_type.c
     memtx_hash.cc
     memtx_tree.cc

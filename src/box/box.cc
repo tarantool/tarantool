@@ -3776,7 +3776,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 		 * Refresh the pointer to the space, because the space struct
 		 * could be freed if the iterator yielded.
 		 */
-		space = iterator_space(it);
+		space = index_weak_ref_get_space(&it->index_ref);
 	}
 
 	txn_end_ro_stmt(txn, &svp);

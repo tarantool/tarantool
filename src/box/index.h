@@ -36,6 +36,7 @@
 #include "trivia/util.h"
 #include "iterator_type.h"
 #include "index_def.h"
+#include "index_weak_ref.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -309,6 +310,8 @@ int
 box_index_compact(uint32_t space_id, uint32_t index_id);
 
 struct iterator {
+	/** Weak reference to the index this iterator is for. */
+	struct index_weak_ref index_ref;
 	/**
 	 * Same as next(), but returns a tuple as it is stored in the index,
 	 * without any transformations. Used internally by engines. For
@@ -331,12 +334,6 @@ struct iterator {
 	int (*position)(struct iterator *it, const char **pos, uint32_t *size);
 	/** Destroy the iterator. */
 	void (*free)(struct iterator *);
-	/** Space cache version at the time of the last index lookup. */
-	uint32_t space_cache_version;
-	/** ID of the space the iterator is for. */
-	uint32_t space_id;
-	/** ID of the index the iterator is for. */
-	uint32_t index_id;
 	/**
 	 * Allocator that was used for allocation of fields pos_buf requires
 	 * its size on deallocation.
@@ -348,17 +345,6 @@ struct iterator {
 	 * Needed for box_index_iterator_after.
 	 */
 	char *pos_buf;
-	/**
-	 * Pointer to the index the iterator is for.
-	 * Guaranteed to be valid only if the schema
-	 * state has not changed since the last lookup.
-	 */
-	struct index *index;
-	/**
-	 * Pointer to the space this iterator is for.
-	 * Don't access directly, use iterator_space().
-	 */
-	struct space *space;
 };
 
 /**
@@ -370,24 +356,6 @@ struct iterator {
  */
 void
 iterator_create(struct iterator *it, struct index *index);
-
-/** iterator_space() slow path. */
-struct space *
-iterator_space_slow(struct iterator *it);
-
-/**
- * Returns the space this iterator is for or NULL if the iterator is invalid
- * (e.g. the index was dropped).
- */
-static inline struct space *
-iterator_space(struct iterator *it)
-{
-	extern uint32_t space_cache_version;
-	if (likely(it->space != NULL &&
-		   it->space_cache_version == space_cache_version))
-		return it->space;
-	return iterator_space_slow(it);
-}
 
 /**
  * Iterate to the next tuple.

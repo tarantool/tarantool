@@ -471,8 +471,7 @@ int tarantoolsqlEphemeralDelete(BtCursor *pCur)
 	char *key;
 	uint32_t key_size;
 	size_t region_svp = region_used(&fiber()->gc);
-	key = tuple_extract_key(pCur->last_tuple,
-				pCur->iter->index->def->key_def,
+	key = tuple_extract_key(pCur->last_tuple, pCur->index->def->key_def,
 				MULTIKEY_NONE, &key_size);
 	if (key == NULL)
 		return -1;
@@ -498,7 +497,7 @@ tarantoolsqlDelete(struct BtCursor *pCur)
 
 	size_t region_svp = region_used(&fiber()->gc);
 	key = tuple_extract_key(pCur->last_tuple,
-				pCur->iter->index->def->key_def,
+				pCur->index->def->key_def,
 				MULTIKEY_NONE, &key_size);
 	if (key == NULL)
 		return -1;
@@ -552,7 +551,7 @@ int tarantoolsqlEphemeralClearTable(BtCursor *pCur)
 
 	while (iterator_next(it, &tuple) == 0 && tuple != NULL) {
 		size_t region_svp = region_used(&fiber()->gc);
-		key = tuple_extract_key(tuple, it->index->def->key_def,
+		key = tuple_extract_key(tuple, pCur->index->def->key_def,
 					MULTIKEY_NONE, &key_size);
 		int rc = space_ephemeral_delete(pCur->space, key);
 		region_truncate(&fiber()->gc, region_svp);
@@ -719,7 +718,7 @@ tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 	uint32_t key_size;
 #endif
 
-	key_def = cursor->iter->index->def->key_def;
+	key_def = cursor->index->def->key_def;
 	n = MIN(unpacked->nField, key_def->part_count);
 	tuple = cursor->last_tuple;
 	base = tuple_data(tuple);
