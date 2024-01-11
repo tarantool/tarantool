@@ -106,7 +106,8 @@ local function names_alert_missing(config, missing_names)
        config._aboard:get(replicaset_name) == nil then
         local replicaset_uuid = missing_names[replicaset_name]
         local warning = msg:format(replicaset_name, replicaset_uuid)
-        config._aboard:set(replicaset_name, {type = 'warn', message = warning})
+        config._aboard:set({type = 'warn', message = warning},
+            {key = replicaset_name})
     end
 
     local unknown_msg = 'box_cfg.apply: instance %s is unknown. Possibly ' ..
@@ -122,7 +123,7 @@ local function names_alert_missing(config, missing_names)
         -- Alert may be done with 'unknown' uuid. If it was so, update alert.
         local alert = config._aboard:get(name)
         if alert == nil or alert.message ~= warning then
-            config._aboard:set(name, {type = 'warn', message = warning})
+            config._aboard:set({type = 'warn', message = warning}, {key = name})
         end
     end
 end
@@ -549,8 +550,7 @@ local function apply(config)
             if v ~= box.cfg[k] then
                 local warning = 'box_cfg.apply: non-dynamic option '..k..
                     ' will not be set until the instance is restarted'
-                config._aboard:set('box_cfg_apply_non_dynamic',
-                                   {type = 'warn', message = warning})
+                config._aboard:set({type = 'warn', message = warning})
                 box_cfg[k] = nil
             end
         end
