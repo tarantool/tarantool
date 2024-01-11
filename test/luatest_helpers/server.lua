@@ -28,21 +28,6 @@ local function pathjoin(a, b)
     return fio.pathjoin(a, b)
 end
 
--- Find corresponding group, replicaset and instance configuration by name.
-local function find_instance_config(groups, instance_name)
-    for _, group in pairs(groups or {}) do
-        for _, replicaset in pairs(group.replicasets or {}) do
-            local instance = (replicaset.instances or {})[instance_name]
-
-            if instance ~= nil then
-                return group, replicaset, instance
-            end
-        end
-    end
-
-    return nil, nil, nil
-end
-
 -- Determine advertise URI for given instance from a cluster
 -- configuration.
 local function find_advertise_uri(config, instance_name, dir)
@@ -52,30 +37,33 @@ local function find_advertise_uri(config, instance_name, dir)
 
     -- Determine listen and advertise options that are in effect
     -- for the given instance.
-    local advertise = nil
-    local listen = nil
+    local advertise
+    local listen
 
-    local group, replicaset, instance = find_instance_config(config.groups,
-        instance_name)
-
-    if instance ~= nil then
-        if instance.iproto ~= nil then
-            if instance.iproto.advertise ~= nil then
-                advertise = advertise or instance.iproto.advertise.client
+    for _, group in pairs(config.groups or {}) do
+        for _, replicaset in pairs(group.replicasets or {}) do
+            local instance = (replicaset.instances or {})[instance_name]
+            if instance == nil then
+                break
             end
-            listen = listen or instance.iproto.listen
-        end
-        if replicaset.iproto ~= nil then
-            if replicaset.iproto.advertise ~= nil then
-                advertise = advertise or replicaset.iproto.advertise.client
+            if instance.iproto ~= nil then
+                if instance.iproto.advertise ~= nil then
+                    advertise = advertise or instance.iproto.advertise.client
+                end
+                listen = listen or instance.iproto.listen
             end
-            listen = listen or replicaset.iproto.listen
-        end
-        if group.iproto ~= nil then
-            if group.iproto.advertise ~= nil then
-                advertise = advertise or group.iproto.advertise.client
+            if replicaset.iproto ~= nil then
+                if replicaset.iproto.advertise ~= nil then
+                    advertise = advertise or replicaset.iproto.advertise.client
+                end
+                listen = listen or replicaset.iproto.listen
             end
-            listen = listen or group.iproto.listen
+            if group.iproto ~= nil then
+                if group.iproto.advertise ~= nil then
+                    advertise = advertise or group.iproto.advertise.client
+                end
+                listen = listen or group.iproto.listen
+            end
         end
     end
 
