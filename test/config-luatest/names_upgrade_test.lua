@@ -110,7 +110,7 @@ local function assert_after_upgrade(instance_name, replicaset_name, names)
         t.assert_equals(info.name, instance_name)
         t.assert_equals(info.replicaset.name, replicaset_name)
 
-        local alerts = require('config')._alerts
+        local alerts = require('config'):info().alerts
         for name, _ in pairs(names) do
             t.assert_equals(alerts[name], nil)
         end

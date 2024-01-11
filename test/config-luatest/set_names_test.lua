@@ -119,7 +119,7 @@ local function check_names(rs_name, name, names)
         t.assert_equals(box.cfg.replicaset_name, rs_name)
         t.assert_equals(box.cfg.instance_name, name)
 
-        local alerts = require('config')._alerts
+        local alerts = require('config'):info().alerts
         for name, _ in pairs(names) do
             t.assert_equals(alerts[name], nil)
         end
