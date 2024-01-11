@@ -16,6 +16,26 @@ g.after_all(function(g)
     treegen.clean(g)
 end)
 
+-- Collect delayed grant alerts and transform to
+-- '<space> <permission>' form.
+local function warnings()
+    local config = require('config')
+
+    local res = {}
+    for _, alert in ipairs(config:info().alerts) do
+        if alert.message:find('box.schema.user.grant') then
+            local pattern = 'box.schema.user.grant%(".-", "(.-)", ' ..
+                '"space", "(.-)"%)'
+            local permissions, space = alert.message:match(pattern)
+            for _, permission in ipairs(permissions:split(',')) do
+                table.insert(res, ('%s %s'):format(space, permission))
+            end
+        end
+    end
+    table.sort(res)
+    return res
+end
+
 g.test_converters = function()
     -- Guest privileges in format provided by box.schema.{user,role}.info()
     local box_guest_privileges = {{
@@ -1343,5 +1363,44 @@ g.test_consider_auth_type_for_passwods = function(g)
             local password_def = box.space._user.index.name:get({'myuser'})[5]
             t.assert_equals(type(password_def['pap-sha256']), 'table')
         end,
+    })
+end
+
+-- Verify that all the missed permissions are reported in
+-- config:info().alerts.
+--
+-- In this case,
+--
+-- * s read
+-- * s write
+-- * t read
+-- * t write
+g.test_delayed_grant_alert = function(g)
+    helpers.success_case(g, {
+        options = {
+            ['credentials.users.guest.privileges'] = {
+                {
+                    permissions = {'read', 'write'},
+                    spaces = {'s', 't'},
+                },
+            },
+        },
+        verify = function(warnings)
+            local config = require('config')
+
+            t.assert_equals({
+                status = config:info().status,
+                alerts = loadstring(warnings)(),
+            }, {
+                status = 'check_warnings',
+                alerts = {
+                    's read',
+                    's write',
+                    't read',
+                    't write',
+                },
+            })
+        end,
+        verify_args = {string.dump(warnings)},
     })
 end
