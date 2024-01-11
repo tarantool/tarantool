@@ -5,8 +5,9 @@ local log = require('internal.config.utils.log')
 
 -- Set an alert.
 --
--- The `key` is an unique identifier of the alert. Attempt to set
--- a new alert with the same key replaces the existing alert.
+-- Optional `opts.key` declares an unique identifier of the alert.
+-- Attempt to set a new alert with the same key replaces the
+-- existing alert.
 --
 -- The key can be used to drop the alert using :drop().
 --
@@ -25,7 +26,7 @@ local log = require('internal.config.utils.log')
 --
 -- A timestamp is saved on the :set() method call to show it in
 -- an :alerts() result.
-local function aboard_set(self, key, alert)
+local function aboard_set(self, alert, opts)
     assert(alert.type == 'error' or alert.type == 'warn')
     if alert.type == 'error' then
         log.error(alert.message)
@@ -33,6 +34,15 @@ local function aboard_set(self, key, alert)
         log.warn(alert.message)
     end
     alert.timestamp = datetime.now()
+
+    local key
+    if opts == nil or opts.key == nil then
+        key = self._next_key
+        self._next_key = self._next_key + 1
+    else
+        key = opts.key
+    end
+
     self._alerts[key] = alert
 end
 
@@ -62,6 +72,7 @@ end
 -- The `on_drop` callback is NOT called.
 local function aboard_clean(self)
     self._alerts = {}
+    self._next_key = 1
 end
 
 -- Serialize the alerts to show them to a user.
@@ -152,6 +163,7 @@ local function new(opts)
         --
         -- The key can be a string or a number.
         _alerts = {},
+        _next_key = 1,
         _on_drop = on_drop,
     }, mt)
 end

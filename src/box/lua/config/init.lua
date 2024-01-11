@@ -456,7 +456,7 @@ function methods._reload_noexc(self, opts)
 
     assert(not ok or err == nil)
     if not ok then
-        self._aboard:set('reload_error', {type = 'error', message = err})
+        self._aboard:set({type = 'error', message = err})
     end
 
     self:_set_status_based_on_alerts()

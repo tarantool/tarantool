@@ -1353,3 +1353,43 @@ g.test_replication_ssl_enterprise = function()
         t.assert_equals(res.params.ssl_password_file, {password_file})
     end, {c1c, c1k, passwd_file, ciphers})
 end
+
+-- Verify that all the non-dynamic options that are changed on the
+-- configuration reloading are reported in alerts.
+g.test_non_dynamic_alert = function(g)
+    helpers.reload_success_case(g, {
+        options = {},
+        verify = function() end,
+        options_2 = {
+            ['process.strip_core'] = false,
+            ['process.background'] = true,
+            ['process.work_dir'] = 'foo',
+        },
+        verify_2 = function()
+            local config = require('config')
+
+            local options = {}
+            local info = config:info()
+            for _, alert in ipairs(info.alerts) do
+                if alert.message:find('non%-dynamic option') then
+                    local pattern = 'non%-dynamic option (.-) will not be set'
+                    local option = alert.message:match(pattern)
+                    table.insert(options, option)
+                end
+            end
+            table.sort(options)
+
+            t.assert_equals({
+                status = info.status,
+                options = options,
+            }, {
+                status = 'check_warnings',
+                options = {
+                    'background',
+                    'strip_core',
+                    'work_dir',
+                },
+            })
+        end,
+    })
+end
