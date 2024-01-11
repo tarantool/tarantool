@@ -91,9 +91,8 @@ sysview_iterator_next(struct iterator *iterator, struct tuple **ret)
 	assert(iterator->free == sysview_iterator_free);
 	struct sysview_iterator *it = sysview_iterator(iterator);
 	*ret = NULL;
-	if (it->source->space_cache_version != space_cache_version)
-		return 0; /* invalidate iterator */
-	struct sysview_index *index = (struct sysview_index *)iterator->index;
+	struct sysview_index *index = (struct sysview_index *)
+		index_weak_ref_get_index_checked(&iterator->index_ref);
 	int rc;
 	while ((rc = iterator_next(it->source, ret)) == 0 && *ret != NULL) {
 		if (index->filter(it->space, *ret))

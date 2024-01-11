@@ -498,7 +498,6 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 	txn_end_ro_stmt(txn, &svp);
 	if (it == NULL)
 		return NULL;
-	it->space = space;
 	it->pos_buf = pos_buf;
 	it->pos_buf_size = pos_buf_size;
 	pos_guard.is_active = false;
@@ -521,7 +520,7 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 	assert(result != NULL);
 	if (box_check_slice() != 0)
 		return -1;
-	struct space *space = iterator_space(itr);
+	struct space *space = index_weak_ref_get_space(&itr->index_ref);
 	if (space == NULL) {
 		*result = NULL;
 		return 0;
@@ -577,64 +576,19 @@ box_index_compact(uint32_t space_id, uint32_t index_id)
 void
 iterator_create(struct iterator *it, struct index *index)
 {
+	index_weak_ref_create(&it->index_ref, index);
 	it->next_internal = NULL;
 	it->next = NULL;
 	it->free = NULL;
-	it->space_cache_version = space_cache_version;
-	it->space_id = index->def->space_id;
-	it->index_id = index->def->iid;
-	it->index = index;
-	it->space = NULL;
 	it->pos_buf = NULL;
 	it->pos_buf_size = 0;
-}
-
-/**
- * Helper function that checks that the iterated index wasn't dropped
- * and updates it->space and it->space_cache_version on success.
- * Returns 0 on success, -1 on failure.
- */
-static int
-iterator_check_space(struct iterator *it)
-{
-	struct space *space = space_by_id(it->space_id);
-	if (space == NULL)
-		return -1;
-	struct index *index = space_index(space, it->index_id);
-	if (index != it->index ||
-	    index->space_cache_version > it->space_cache_version)
-		return -1;
-	it->space_cache_version = space_cache_version;
-	it->space = space;
-	return 0;
-}
-
-static bool
-iterator_is_valid(struct iterator *it)
-{
-	/* In case of ephemeral space there is no need to check schema version */
-	if (it->space_id == 0)
-		return true;
-	if (unlikely(it->space_cache_version != space_cache_version)) {
-		if (iterator_check_space(it) != 0)
-			return false;
-	}
-	return true;
-}
-
-struct space *
-iterator_space_slow(struct iterator *it)
-{
-	if (iterator_check_space(it) != 0)
-		return NULL;
-	return it->space;
 }
 
 int
 iterator_next(struct iterator *it, struct tuple **ret)
 {
 	assert(it->next != NULL);
-	if (!iterator_is_valid(it)) {
+	if (!index_weak_ref_check(&it->index_ref)) {
 		*ret = NULL;
 		return 0;
 	}
@@ -645,7 +599,7 @@ int
 iterator_next_internal(struct iterator *it, struct tuple **ret)
 {
 	assert(it->next_internal != NULL);
-	if (!iterator_is_valid(it)) {
+	if (!index_weak_ref_check(&it->index_ref)) {
 		*ret = NULL;
 		return 0;
 	}
@@ -658,7 +612,7 @@ iterator_position(struct iterator *it, const char **pos, uint32_t *size)
 	assert(it->position != NULL);
 	assert(pos != NULL);
 	assert(size != NULL);
-	if (!iterator_is_valid(it)) {
+	if (!index_weak_ref_check(&it->index_ref)) {
 		*pos = NULL;
 		*size = 0;
 		return 0;
@@ -1077,10 +1031,10 @@ int
 generic_iterator_position(struct iterator *it, const char **pos,
 			  uint32_t *size)
 {
-	(void)it;
 	(void)pos;
 	(void)size;
-	diag_set(UnsupportedIndexFeature, it->index->def, "pagination");
+	struct index *index = index_weak_ref_get_index_checked(&it->index_ref);
+	diag_set(UnsupportedIndexFeature, index->def, "pagination");
 	return -1;
 }
 

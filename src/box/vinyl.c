@@ -3735,7 +3735,8 @@ vinyl_iterator_position(struct iterator *base, const char **pos, uint32_t *size)
 {
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
 	/* Sic: can't use it->lsm here, because the iterator may be closed. */
-	struct vy_lsm *lsm = vy_lsm(base->index);
+	struct vy_lsm *lsm = vy_lsm(index_weak_ref_get_index_checked(
+			&base->index_ref));
 	struct key_def *cmp_def = lsm->cmp_def;
 	struct vy_entry entry = it->pos;
 	if (entry.stmt == NULL) {

@@ -193,7 +193,9 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 {
 	assert(iterator->free == bitset_index_iterator_free);
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
-
+	struct space *space;
+	struct index *index_base;
+	index_weak_ref_get_checked(&iterator->index_ref, &space, &index_base);
 	do {
 		size_t value = tt_bitset_iterator_next(&it->bitset_it);
 		if (value == SIZE_MAX) {
@@ -202,16 +204,14 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 		}
 #ifndef OLD_GOOD_BITSET
 		struct memtx_bitset_index *index =
-			(struct memtx_bitset_index *)iterator->index;
+			(struct memtx_bitset_index *)index_base;
 		struct tuple *tuple =
 			memtx_bitset_index_value_to_tuple(index, value);
 #else /* #ifndef OLD_GOOD_BITSET */
 		struct tuple *tuple = value_to_tuple(value);
 #endif /* #ifndef OLD_GOOD_BITSET */
-		struct index *idx = iterator->index;
 		struct txn *txn = in_txn();
-		struct space *space = space_by_id(iterator->space_id);
-		*ret = memtx_tx_tuple_clarify(txn, space, tuple, idx, 0);
+		*ret = memtx_tx_tuple_clarify(txn, space, tuple, index_base, 0);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
