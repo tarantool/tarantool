@@ -2,9 +2,8 @@ local fio = require('fio')
 local instance_config = require('internal.config.instance_config')
 local cluster_config = require('internal.config.cluster_config')
 local configdata = require('internal.config.configdata')
-local log = require('internal.config.utils.log')
+local aboard = require('internal.config.utils.aboard')
 local tarantool = require('tarantool')
-local datetime = require('datetime')
 
 -- Tarantool Enterprise Edition has its own additions
 -- for config module.
@@ -94,24 +93,6 @@ end
 
 local function broadcast(self)
     box.broadcast('config.info', self:info())
-end
-
-function methods._alert(self, key, alert)
-    assert(alert.type == 'error' or alert.type == 'warn')
-    if alert.type == 'error' then
-        log.error(alert.message)
-    else
-        log.warn(alert.message)
-    end
-    alert.timestamp = datetime.now()
-    self._alerts[key] = alert
-end
-
-function methods._alert_drop(self, key)
-    self._alerts[key] = nil
-    if self._status == 'check_warnings' and table.equals(self._alerts, {}) then
-        self._status = 'ready'
-    end
 end
 
 function methods._meta(self, source_name, key, value)
@@ -382,16 +363,7 @@ end
 
 -- Set proper status depending on received alerts.
 function methods._set_status_based_on_alerts(self)
-    local status = 'ready'
-    for _, alert in pairs(self._alerts) do
-        assert(alert.type == 'error' or alert.type == 'warn')
-        if alert.type == 'error' then
-            status = 'check_errors'
-            break
-        end
-        status = 'check_warnings'
-    end
-    self._status = status
+    self._status = self._aboard:status()
     broadcast(self)
 end
 
@@ -472,7 +444,7 @@ function methods._reload_noexc(self, opts)
     self._status = 'reload_in_progress'
     broadcast(self)
 
-    self._alerts = {}
+    self._aboard:clean()
     self._metadata = {}
 
     local ok, err = pcall(function(opts)
@@ -484,7 +456,7 @@ function methods._reload_noexc(self, opts)
 
     assert(not ok or err == nil)
     if not ok then
-        self:_alert('reload_error', {type = 'error', message = err})
+        self._aboard:set('reload_error', {type = 'error', message = err})
     end
 
     self:_set_status_based_on_alerts()
@@ -502,17 +474,8 @@ end
 
 function methods.info(self)
     selfcheck(self, 'info')
-    -- Don't return alert keys from config:info().
-    local alerts = {}
-    for _, alert in pairs(self._alerts) do
-        table.insert(alerts, alert)
-    end
-    table.sort(alerts, function(a, b)
-        return a.timestamp < b.timestamp
-    end)
-
     return {
-        alerts = alerts,
+        alerts = self._aboard:alerts(),
         meta = self._metadata,
         status = self._status,
     }
@@ -521,7 +484,7 @@ end
 -- The object is a singleton. The constructor should be called
 -- only once.
 local function new()
-    return setmetatable({
+    local self = setmetatable({
         _sources = {},
         _appliers = {},
         -- There are values the module need to hold, which are not
@@ -532,13 +495,27 @@ local function new()
         _configdata = nil,
         -- Track applied config values as well.
         _configdata_applied = nil,
-        -- Track situations when something is going wrong.
-        _alerts = {},
         -- Metadata from sources.
         _metadata = {},
         -- Current status.
         _status = 'uninitialized',
     }, mt)
+
+    -- Track situations when something is going wrong.
+    self._aboard = aboard.new({
+        -- Transit from 'check_warnings' to 'ready' if the last
+        -- warning is dropped.
+        on_drop = function(_, _)
+            if not self._aboard:is_empty() then
+                return
+            end
+            if self._status == 'check_warnings' then
+                self._status = 'ready'
+            end
+        end,
+    })
+
+    return self
 end
 
 return new()
