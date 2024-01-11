@@ -77,6 +77,12 @@ jobs:
         with:
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
 
+      - name: Calculate short name for Tarantool branch
+        if: failure()
+        run: >
+          echo "SHORT_BRANCH_NAME=$(basename ${{ matrix.tarantool-branch }})" >>
+          $GITHUB_ENV
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         if: failure()
@@ -85,7 +91,7 @@ jobs:
             'osx-{0}-{1}-{2}-{3}',
             matrix.osx-version,
             matrix.machine-arch,
-            matrix.tarantool-branch,
+            env.SHORT_BRANCH_NAME,
             matrix.build-type) }}
           retention-days: 21
           path: ${{ env.VARDIR }}/artifacts

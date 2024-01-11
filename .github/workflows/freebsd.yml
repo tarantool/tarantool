@@ -47,11 +47,20 @@ jobs:
         with:
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
 
+      - name: Calculate short name for Tarantool branch
+        if: failure()
+        run: >
+          echo "SHORT_BRANCH_NAME=$(basename ${{ matrix.tarantool-branch }})" >>
+          $GITHUB_ENV
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         if: failure()
         with:
-          name: freebsd-${{ matrix.freebsd-version }}-${{ matrix.tarantool-branch }}
+          name: ${{ format(
+            'freebsd-{0}-{1}',
+            matrix.freebsd-version,
+            env.SHORT_BRANCH_NAME) }}
           retention-days: 21
           path: ${{ env.VARDIR }}/artifacts
 
