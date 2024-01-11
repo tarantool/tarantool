@@ -29,11 +29,11 @@ g.test_basic = function(g)
 
     rs['i-001']:exec(function()
         t.assert_equals(box.info.name, 'i-001')
-        t.assert_equals(require('config')._alerts, {})
+        t.assert_equals(require('config'):info().alerts, {})
     end)
 
     rs['i-002']:exec(function()
         t.assert_equals(box.info.name, 'i-002')
-        t.assert_equals(require('config')._alerts, {})
+        t.assert_equals(require('config'):info().alerts, {})
     end)
 end

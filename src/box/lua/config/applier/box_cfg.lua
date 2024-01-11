@@ -103,10 +103,10 @@ local function names_alert_missing(config, missing_names)
                 'snapshot. It will be automatically set when possible.'
     local replicaset_name = config._configdata._replicaset_name
     if missing_names[replicaset_name] ~= nil and
-       config._alerts[replicaset_name] == nil then
+       config._aboard:get(replicaset_name) == nil then
         local replicaset_uuid = missing_names[replicaset_name]
         local warning = msg:format(replicaset_name, replicaset_uuid)
-        config:_alert(replicaset_name, {type = 'warn', message = warning})
+        config._aboard:set(replicaset_name, {type = 'warn', message = warning})
     end
 
     local unknown_msg = 'box_cfg.apply: instance %s is unknown. Possibly ' ..
@@ -120,9 +120,9 @@ local function names_alert_missing(config, missing_names)
             warning = msg:format(name, uuid)
         end
         -- Alert may be done with 'unknown' uuid. If it was so, update alert.
-        local alert = config._alerts[name]
+        local alert = config._aboard:get(name)
         if alert == nil or alert.message ~= warning then
-            config:_alert(name, {type = 'warn', message = warning})
+            config._aboard:set(name, {type = 'warn', message = warning})
         end
     end
 end
@@ -141,7 +141,7 @@ local function names_box_cfg(cfg)
 end
 
 local function names_on_name_set(name)
-    names_state.config:_alert_drop(name)
+    names_state.config._aboard:drop(name)
 
     local config_rs_name = names_state.config._configdata._replicaset_name
     local config_inst_name = names_state.config._configdata._instance_name
@@ -245,13 +245,13 @@ end
 
 local function no_missing_names_alerts(config)
     local configdata = config._configdata
-    if config._alerts[configdata._replicaset_name] ~= nil then
+    if config._aboard:get(configdata._replicaset_name) ~= nil then
         return false
     end
 
     local peers = configdata:peers()
     for _, name in ipairs(peers) do
-        if config._alerts[name] ~= nil then
+        if config._aboard:get(name) ~= nil then
             return false
         end
     end
@@ -549,8 +549,8 @@ local function apply(config)
             if v ~= box.cfg[k] then
                 local warning = 'box_cfg.apply: non-dynamic option '..k..
                     ' will not be set until the instance is restarted'
-                config:_alert('box_cfg_apply_non_dynamic',
-                              {type = 'warn', message = warning})
+                config._aboard:set('box_cfg_apply_non_dynamic',
+                                   {type = 'warn', message = warning})
                 box_cfg[k] = nil
             end
         end

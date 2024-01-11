@@ -544,15 +544,15 @@ local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
         err = ('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q) failed: %s')
               :format(role_or_user, grant_or_revoke, name, privs, obj_type,
                       obj_name, err)
-        config:_alert('credentials_grant_or_revoke_err',
-                      {type = 'error', message = err})
+        config._aboard:set('credentials_grant_or_revoke_err',
+                           {type = 'error', message = err})
     else
         local msg = "credentials.apply: %s %q hasn't been created yet, " ..
                     "'box.schema.%s.%s(%q, %q, %q, %q)' will be applied later"
         msg = msg:format(obj_type, obj_name, role_or_user, grant_or_revoke,
                          name, privs, obj_type, obj_name)
-        config:_alert('credentials_grant_or_revoke_warn',
-                      {type = 'warn', message = msg})
+        config._aboard:set('credentials_grant_or_revoke_warn',
+                           {type = 'warn', message = msg})
     end
 end
 
@@ -700,8 +700,8 @@ local function set_password(user_name, password)
     if user_name == 'guest' then
         local message = 'credentials.apply: setting a password for ' ..
                         'the guest user is not allowed'
-        config:_alert('credentials_apply_password',
-                      {type = 'error', message = message})
+        config._aboard:set('credentials_apply_password',
+                           {type = 'error', message = message})
     end
 
     local auth_def = box.space._user.index.name:get({user_name})[5]
