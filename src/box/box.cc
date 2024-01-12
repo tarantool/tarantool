@@ -62,7 +62,6 @@
 #include "vinyl.h"
 #include "space.h"
 #include "index.h"
-#include "result.h"
 #include "port.h"
 #include "txn.h"
 #include "txn_limbo.h"
@@ -3759,10 +3758,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 		rc = box_check_slice();
 		if (rc != 0)
 			break;
-		struct result_processor res_proc;
-		result_process_prepare(&res_proc, space);
 		rc = iterator_next(it, &tuple);
-		result_process_perform(&res_proc, &rc, &tuple);
 		if (rc != 0 || tuple == NULL)
 			break;
 		if (offset > 0) {

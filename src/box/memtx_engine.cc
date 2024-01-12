@@ -48,6 +48,9 @@
 #include "bootstrap.h"
 #include "replication.h"
 #include "schema.h"
+#include "space.h"
+#include "space_cache.h"
+#include "space_upgrade.h"
 #include "gc.h"
 #include "raft.h"
 #include "txn_limbo.h"
@@ -2050,13 +2053,18 @@ memtx_index_def_change_requires_rebuild(struct index *index,
 }
 
 int
-memtx_prepare_result_tuple(struct tuple **result)
+memtx_prepare_result_tuple(struct space *space, struct tuple **result)
 {
 	if (*result != NULL) {
 		*result = memtx_tuple_decompress(*result);
 		if (*result == NULL)
 			return -1;
 		tuple_bless(*result);
+		if (unlikely(space != NULL && space->upgrade != NULL)) {
+			*result = space_upgrade_apply(space->upgrade, *result);
+			if (*result == NULL)
+				return -1;
+		}
 	}
 	return 0;
 }
@@ -2092,7 +2100,8 @@ memtx_index_get(struct index *index, const char *key, uint32_t part_count,
 {
 	if (index->vtab->get_internal(index, key, part_count, result) != 0)
 		return -1;
-	return memtx_prepare_result_tuple(result);
+	struct space *space = space_by_id(index->def->space_id);
+	return memtx_prepare_result_tuple(space, result);
 }
 
 int
@@ -2100,5 +2109,6 @@ memtx_iterator_next(struct iterator *it, struct tuple **ret)
 {
 	if (it->next_internal(it, ret) != 0)
 		return -1;
-	return memtx_prepare_result_tuple(ret);
+	struct space *space = index_weak_ref_get_space_checked(&it->index_ref);
+	return memtx_prepare_result_tuple(space, ret);
 }
