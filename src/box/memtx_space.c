@@ -30,6 +30,7 @@
  */
 #include "memtx_space.h"
 #include "space.h"
+#include "space_upgrade.h"
 #include "iproto_constants.h"
 #include "txn.h"
 #include "memtx_tx.h"
@@ -46,7 +47,6 @@
 #include "memtx_space_upgrade.h"
 #include "memtx_tuple_compression.h"
 #include "schema.h"
-#include "result.h"
 #include "small/region.h"
 
 /*
@@ -474,8 +474,14 @@ memtx_space_execute_delete(struct space *space, struct txn *txn,
 	if (memtx_space_replace_tuple(space, stmt, old_tuple, NULL,
 				      DUP_REPLACE_OR_INSERT) != 0)
 		return -1;
-	*result = result_process(space, stmt->old_tuple);
-	return *result == NULL ? -1 : 0;
+	if (unlikely(space->upgrade != NULL)) {
+		*result = space_upgrade_apply(space->upgrade, stmt->old_tuple);
+		if (*result == NULL)
+			return -1;
+	} else {
+		*result = stmt->old_tuple;
+	}
+	return 0;
 }
 
 static int
@@ -499,19 +505,14 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 		*result = NULL;
 		return 0;
 	}
-
-	struct tuple *decompressed = memtx_tuple_decompress(old_tuple);
-	if (decompressed == NULL)
-		return -1;
-	tuple_bless(decompressed);
-	decompressed = result_process(space, decompressed);
-	if (decompressed == NULL)
+	struct tuple *prepared = old_tuple;
+	if (memtx_prepare_result_tuple(space, &prepared) != 0)
 		return -1;
 
 	/* Update the tuple; legacy, request ops are in request->tuple */
 	uint32_t new_size = 0, bsize;
 	struct tuple_format *format = space->format;
-	const char *old_data = tuple_data_range(decompressed, &bsize);
+	const char *old_data = tuple_data_range(prepared, &bsize);
 	size_t region_svp = region_used(&fiber()->gc);
 	const char *new_data =
 		xrow_update_execute(request->tuple, request->tuple_end,
@@ -602,16 +603,11 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 			return -1;
 		tuple_ref(new_tuple);
 	} else {
-		struct tuple *decompressed = memtx_tuple_decompress(old_tuple);
-		if (decompressed == NULL)
+		struct tuple *prepared = old_tuple;
+		if (memtx_prepare_result_tuple(space, &prepared) != 0)
 			return -1;
-		tuple_bless(decompressed);
-		decompressed = result_process(space, decompressed);
-		if (decompressed == NULL)
-			return -1;
-
 		uint32_t new_size = 0, bsize;
-		const char *old_data = tuple_data_range(decompressed, &bsize);
+		const char *old_data = tuple_data_range(prepared, &bsize);
 		/*
 		 * Update the tuple.
 		 * xrow_upsert_execute() fails on totally wrong

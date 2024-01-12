@@ -296,7 +296,7 @@ memtx_set_tuple_format_vtab(const char *allocator_name);
  * to format in which, it should be visible for users.
  */
 int
-memtx_prepare_result_tuple(struct tuple **result);
+memtx_prepare_result_tuple(struct space *space, struct tuple **result);
 
 /**
  * Prepares a tuple retrieved from a consistent index read view to be returned

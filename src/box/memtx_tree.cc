@@ -967,7 +967,7 @@ memtx_tree_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	} while (*result == NULL);
-	return memtx_prepare_result_tuple(result);
+	return memtx_prepare_result_tuple(space, result);
 }
 
 template <bool USE_HINT>
