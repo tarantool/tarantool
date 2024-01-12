@@ -713,7 +713,7 @@ space_delete(struct space *space)
 	trigger_destroy(&space->on_replace);
 	space_reset_events(space);
 	if (space->upgrade != NULL)
-		space_upgrade_unref(space->upgrade);
+		space_upgrade_delete(space->upgrade);
 	space_def_delete(space->def);
 	/*
 	 * SQL triggers should be deleted with on_replace_dd_triggers on
