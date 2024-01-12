@@ -50,26 +50,10 @@ void
 space_upgrade_def_delete(struct space_upgrade_def *def);
 
 /**
- * Increments the reference counter of a space upgrade state,
- * thus preventing it from being freed.
- *
- * We need to reference a space upgrade state if we are going to yield,
- * because the ongoing space upgrade may complete and delete the space
- * struct.
+ * Deletes a space upgrade state.
  */
 static inline void
-space_upgrade_ref(struct space_upgrade *upgrade)
-{
-	(void)upgrade;
-	unreachable();
-}
-
-/**
- * Decrements the reference counter of a space upgrade state.
- * The state is deleted when its reference count reaches zero.
- */
-static inline void
-space_upgrade_unref(struct space_upgrade *upgrade)
+space_upgrade_delete(struct space_upgrade *upgrade)
 {
 	(void)upgrade;
 	unreachable();
