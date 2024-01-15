@@ -5913,7 +5913,7 @@ box_storage_free(void)
 	iproto_free();
 	replication_free();
 	gc_free();
-	engine_shutdown();
+	engine_free();
 	/* schema_free(); */
 	wal_free();
 	flightrec_free();
@@ -5980,6 +5980,7 @@ box_storage_shutdown()
 	fiber_shutdown();
 	replication_shutdown();
 	gc_shutdown();
+	engine_shutdown();
 }
 
 void
