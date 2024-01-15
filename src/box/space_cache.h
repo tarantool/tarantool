@@ -81,6 +81,32 @@ void
 space_cache_destroy(void);
 
 /**
+ * Slow version of space lookup by id.
+ * Performs a direct lookup in the spaces hash table.
+ * Returns NULL if not found (doesn't set diag).
+ */
+struct space *
+space_by_id_slow(uint32_t id);
+
+/**
+ * Fast version of space lookup by id.
+ * Caches the last looked up space.
+ * Returns NULL if not found (doesn't set diag).
+ */
+static inline struct space *
+space_by_id_fast(uint32_t id)
+{
+	extern uint32_t prev_space_cache_version;
+	extern struct space *prev_space;
+	if (prev_space_cache_version == space_cache_version &&
+	    prev_space != NULL && prev_space->def->id == id)
+		return prev_space;
+	prev_space = space_by_id_slow(id);
+	prev_space_cache_version = space_cache_version;
+	return prev_space;
+}
+
+/**
  * Try to look up a space by space number in the space cache.
  * FFI-friendly no-exception-thrown space lookup function.
  *
@@ -88,6 +114,12 @@ space_cache_destroy(void);
  */
 struct space *
 space_by_id(uint32_t id);
+
+/*
+ * Use the inline function for space lookups in Tarantool.
+ * The space_by_id() symbol exists only for FFI.
+ */
+#define space_by_id(id) space_by_id_fast(id)
 
 /**
  * Try to look up a space by space name in the space name cache.
@@ -119,17 +151,9 @@ space_cache_find_next_unused_id(uint32_t cur_id);
 static inline struct space *
 space_cache_find(uint32_t id)
 {
-	static uint32_t prev_space_cache_version;
-	static struct space *space;
-	if (prev_space_cache_version != space_cache_version)
-		space = NULL;
-	if (space && space->def->id == id)
+	struct space *space = space_by_id(id);
+	if (space != NULL)
 		return space;
-	space = space_by_id(id);
-	if (space != NULL) {
-		prev_space_cache_version = space_cache_version;
-		return space;
-	}
 	diag_set(ClientError, ER_NO_SUCH_SPACE, int2str(id));
 	return NULL;
 }

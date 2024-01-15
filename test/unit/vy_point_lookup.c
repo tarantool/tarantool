@@ -12,7 +12,10 @@
 
 uint64_t schema_version;
 uint32_t space_cache_version;
-struct space *space_by_id(uint32_t id) { return NULL; }
+uint32_t prev_space_cache_version;
+struct space *prev_space;
+struct space *
+space_by_id_slow(uint32_t id) { return NULL; }
 struct vy_lsm *vy_lsm(struct index *index) { return NULL; }
 void index_delete(struct index *index) { unreachable(); }
 
