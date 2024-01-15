@@ -510,7 +510,7 @@ static const struct space_vtab sysview_space_vtab = {
 };
 
 static void
-sysview_engine_shutdown(struct engine *engine)
+sysview_engine_free(struct engine *engine)
 {
 	struct sysview_engine *sysview = (struct sysview_engine *)engine;
 	if (mempool_is_initialized(&sysview->iterator_pool))
@@ -557,7 +557,8 @@ sysview_engine_create_space(struct engine *engine, struct space_def *def,
 }
 
 static const struct engine_vtab sysview_engine_vtab = {
-	/* .shutdown = */ sysview_engine_shutdown,
+	/* .free = */ sysview_engine_free,
+	/* .shutdown = */ generic_engine_shutdown,
 	/* .create_space = */ sysview_engine_create_space,
 	/* .create_read_view = */ generic_engine_create_read_view,
 	/* .prepare_join = */ generic_engine_prepare_join,

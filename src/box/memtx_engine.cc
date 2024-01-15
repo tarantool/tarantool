@@ -192,7 +192,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 }
 
 static void
-memtx_engine_shutdown(struct engine *engine)
+memtx_engine_free(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	mempool_destroy(&memtx->iterator_pool);
@@ -1370,7 +1370,8 @@ memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 }
 
 static const struct engine_vtab memtx_engine_vtab = {
-	/* .shutdown = */ memtx_engine_shutdown,
+	/* .free = */ memtx_engine_free,
+	/* .shutdown = */ generic_engine_shutdown,
 	/* .create_space = */ memtx_engine_create_space,
 	/* .create_read_view = */ memtx_engine_create_read_view,
 	/* .prepare_join = */ memtx_engine_prepare_join,

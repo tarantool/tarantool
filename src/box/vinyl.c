@@ -2720,7 +2720,7 @@ vinyl_engine_new(const char *dir, size_t memory,
 }
 
 static void
-vinyl_engine_shutdown(struct engine *engine)
+vinyl_engine_free(struct engine *engine)
 {
 	struct vy_env *env = vy_env(engine);
 	vy_env_delete(env);
@@ -4585,7 +4585,8 @@ static TRIGGER(on_replace_vinyl_deferred_delete, vy_deferred_delete_on_replace);
 /* }}} Deferred DELETE handling */
 
 static const struct engine_vtab vinyl_engine_vtab = {
-	/* .shutdown = */ vinyl_engine_shutdown,
+	/* .free = */ vinyl_engine_free,
+	/* .shutdown = */ generic_engine_shutdown,
 	/* .create_space = */ vinyl_engine_create_space,
 	/* .create_read_view = */ generic_engine_create_read_view,
 	/* .prepare_join = */ vinyl_engine_prepare_join,

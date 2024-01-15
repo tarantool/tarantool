@@ -188,7 +188,7 @@ private:
 		::user_cache_free();
 		::space_cache_destroy();
 
-		memtx->base.vtab->shutdown(&memtx->base);
+		memtx->base.vtab->free(&memtx->base);
 		::tuple_free();
 		::txn_event_trigger_free();
 

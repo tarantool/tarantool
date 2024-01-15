@@ -93,6 +93,11 @@ engine_backup_cb(const char *path, void *arg);
 
 struct engine_vtab {
 	/** Destroy an engine instance. */
+	void (*free)(struct engine *);
+	/**
+	 * Shutdown an engine instance. Shutdown stops all internal
+	 * fibers/threads. It may yield.
+	 */
 	void (*shutdown)(struct engine *);
 	/** Allocate a new space instance. */
 	struct space *(*create_space)(struct engine *engine,
@@ -396,10 +401,17 @@ engine_read_view_delete(struct engine_read_view *rv)
 }
 
 /**
- * Shutdown all engine factories.
+ * Shutdown all engines. Shutdown stops all internal fibers/threads.
+ * It may yield.
  */
 void
 engine_shutdown(void);
+
+/**
+ * Free all engines.
+ */
+void
+engine_free(void);
 
 /**
  * Called before switching the instance to read-only mode.
@@ -504,6 +516,7 @@ int generic_engine_backup(struct engine *, const struct vclock *,
 void generic_engine_memory_stat(struct engine *, struct engine_memory_stat *);
 void generic_engine_reset_stat(struct engine *);
 int generic_engine_check_space_def(struct space_def *);
+void generic_engine_shutdown(struct engine *engine);
 
 #if defined(__cplusplus)
 } /* extern "C" */

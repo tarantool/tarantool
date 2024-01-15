@@ -78,6 +78,15 @@ engine_shutdown(void)
 }
 
 void
+engine_free(void)
+{
+	struct engine *engine, *tmp;
+	rlist_foreach_entry_safe(engine, &engines, link, tmp) {
+		engine->vtab->free(engine);
+	}
+}
+
+void
 engine_switch_to_ro(void)
 {
 	struct engine *engine;
@@ -465,6 +474,12 @@ generic_engine_check_space_def(struct space_def *def)
 {
 	(void)def;
 	return 0;
+}
+
+void
+generic_engine_shutdown(struct engine *engine)
+{
+	(void)engine;
 }
 
 /* }}} */
