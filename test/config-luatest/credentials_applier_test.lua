@@ -3,18 +3,16 @@ local it = require('test.interactive_tarantool')
 local t = require('luatest')
 local treegen = require('test.treegen')
 local helpers = require('test.config-luatest.helpers')
+local cbuilder = require('test.config-luatest.cbuilder')
+local replicaset = require('test.config-luatest.replicaset')
 
 local g = helpers.group()
 
 local internal = require('internal.config.applier.credentials')._internal
 
-g.before_all(function(g)
-    treegen.init(g)
-end)
-
-g.after_all(function(g)
-    treegen.clean(g)
-end)
+g.before_all(replicaset.init)
+g.after_each(replicaset.drop)
+g.after_all(replicaset.clean)
 
 -- Collect delayed grant alerts and transform to
 -- '<space> <permission>' form.
@@ -34,6 +32,43 @@ local function warnings()
     end
     table.sort(res)
     return res
+end
+
+-- Define the _G.warnings() function on the given server.
+local function define_warnings_function(server)
+    server:exec(function(warnings)
+        rawset(_G, 'warnings', loadstring(warnings))
+    end, {string.dump(warnings)})
+end
+
+-- Define the _G.assert_priv() function of the given server to
+-- verify privileges on the given space granted for the 'guest'
+-- user.
+local function define_assert_priv_function(server)
+    server:exec(function()
+        rawset(_G, 'assert_priv', function(space_name, exp_privs)
+            -- Collect all the privileges into a hash table.
+            local ht = {}
+            for _, priv in ipairs(box.schema.user.info('guest')) do
+                local perms, obj_type, obj_name = unpack(priv)
+                if obj_type == 'space' and obj_name == space_name then
+                    for _, perm in ipairs(perms:split(',')) do
+                        ht[perm] = true
+                    end
+                end
+            end
+
+            -- Transform them into an array-like table and sort.
+            local res = {}
+            for priv in pairs(ht) do
+                table.insert(res, priv)
+            end
+            table.sort(res)
+
+            -- Compare to the given list of privileges.
+            t.assert_equals(table.concat(res, ','), exp_privs)
+        end)
+    end)
 end
 
 g.test_converters = function()
@@ -554,8 +589,10 @@ g.test_sync_privileges = function(g)
         child:roundtrip(("box.schema.user.%s(%q, %q, %q, %q, %s)"):format(
                          action, name, perm, obj_type, obj_name, opts))
     end
-    child:roundtrip("sync_privileges = require('internal.config.applier." ..
-                    "credentials')._internal.sync_privileges")
+    child:roundtrip("applier = require('internal.config.applier.credentials')")
+    child:roundtrip("applier._internal.set_config({_aboard = " ..
+        "require('internal.config.utils.aboard').new()})")
+    child:roundtrip("sync_privileges =  applier._internal.sync_privileges")
     child:roundtrip("json = require('json')")
     child:roundtrip(("credentials = json.decode(%q)"):format(
                      json.encode(credentials)))
@@ -1403,4 +1440,275 @@ g.test_delayed_grant_alert = function(g)
         end,
         verify_args = {string.dump(warnings)},
     })
+end
+
+-- Verify that an alert regarding a delayed privilege granting
+-- (due to lack of a space/function/sequence) is dropped, when the
+-- privilege is finally granted.
+--
+-- This test case starts an instance with a configuration that
+-- contains permissions on space 's'. The startup has the
+-- following steps.
+--
+-- 1. The new database is up.
+-- 2. The credentials applier sees the privileges and sees that
+--    space 's' does not exist. It issues an alert.
+-- 3. The application script is started and it creates the space.
+-- 4. The credentials applier wakes up (it has a trigger), grants
+--    the requested privileges and eliminates the alert that is
+--    issued on the step 2.
+--
+-- This test case verifies that the last step actually eliminates
+-- the alert.
+g.test_delayed_grant_alert_dropped = function(g)
+    helpers.success_case(g, {
+        script = string.dump(function()
+            box.once('app', function()
+                box.schema.space.create('s')
+                box.space.s:create_index('pk')
+            end)
+        end),
+        options = {
+            ['app.file'] = 'main.lua',
+            ['credentials.users.guest.privileges'] = {
+                {
+                    permissions = {'read', 'write'},
+                    spaces = {'s'},
+                },
+            },
+        },
+        verify = function()
+            local config = require('config')
+
+            local info = config:info()
+            t.assert_equals({
+                status = info.status,
+                alerts = info.alerts,
+            }, {
+                status = 'ready',
+                alerts = {},
+            })
+        end,
+    })
+end
+
+-- Verify how alerts are working in a scenario with renaming of a
+-- space.
+--
+-- Create a space and rename it to a space that should have the
+-- same privileges.
+g.test_space_rename_rw2rw = function(g)
+    -- Create a configuration with privileges for two spaces.
+    local config = cbuilder.new()
+        :add_instance('i-001', {})
+        :set_global_option('credentials.users.guest.privileges', {
+            {
+                permissions = {'read', 'write'},
+                spaces = {'src'},
+            },
+            {
+                permissions = {'read', 'write'},
+                spaces = {'dest'},
+            },
+        })
+        :config()
+
+    local replicaset = replicaset.new(g, config)
+    replicaset:start()
+    define_warnings_function(replicaset['i-001'])
+    define_assert_priv_function(replicaset['i-001'])
+
+    -- Verify that alerts are set for delayed privilege grants
+    -- for the given spaces.
+    replicaset['i-001']:exec(function()
+        t.assert_equals(_G.warnings(), {
+            'dest read',
+            'dest write',
+            'src read',
+            'src write',
+        })
+    end)
+
+    -- Create space 'src'.
+    replicaset['i-001']:exec(function()
+        box.schema.space.create('src')
+        box.space.src:create_index('pk')
+    end)
+
+    -- Verify that privileges are granted for the space 'src'.
+    replicaset['i-001']:call('assert_priv', {'src', 'read,write'})
+
+    -- Verify that the alerts regarding the space 'src' are gone.
+    replicaset['i-001']:exec(function()
+        t.assert_equals(_G.warnings(), {
+            'dest read',
+            'dest write',
+        })
+    end)
+
+    -- Rename 'src' to 'dest'.
+    replicaset['i-001']:exec(function()
+        box.space.src:rename('dest')
+    end)
+
+    -- Verify that the proper privileges are kept for the space
+    -- 'dest'.
+    replicaset['i-001']:call('assert_priv', {'dest', 'read,write'})
+
+    -- Verify that the alert regarding the 'dest' space is gone.
+    --
+    -- Also verify that the alerts are set for the space 'src',
+    -- which is gone after the rename.
+    replicaset['i-001']:exec(function()
+        t.assert_equals(_G.warnings(), {
+            'src read',
+            'src write',
+        })
+    end)
+end
+
+-- Verify how alerts are working in a scenario with renaming of a
+-- space.
+--
+-- Create a space with the 'read' privilege and rename it to a
+-- space that should have 'read,write' privileges.
+g.test_space_rename_r2rw = function(g)
+    -- Create a configuration with different privileges for two
+    -- spaces.
+    local config = cbuilder.new()
+        :add_instance('i-001', {})
+        :set_global_option('credentials.users.guest.privileges', {
+            {
+                permissions = {'read'},
+                spaces = {'src'},
+            },
+            {
+                permissions = {'read', 'write'},
+                spaces = {'dest'},
+            },
+        })
+        :config()
+
+    local replicaset = replicaset.new(g, config)
+    replicaset:start()
+    define_warnings_function(replicaset['i-001'])
+    define_assert_priv_function(replicaset['i-001'])
+
+    -- Verify that alerts are set for delayed privilege grants
+    -- for the given spaces.
+    replicaset['i-001']:exec(function()
+        t.assert_equals(_G.warnings(), {
+            'dest read',
+            'dest write',
+            'src read',
+        })
+    end)
+
+    -- Create space 'src'.
+    replicaset['i-001']:exec(function()
+        box.schema.space.create('src')
+        box.space.src:create_index('pk')
+    end)
+
+    -- Verify that privileges are granted for the space 'src'.
+    replicaset['i-001']:call('assert_priv', {'src', 'read'})
+
+    -- Verify that the alerts regarding the space 'src' are gone.
+    replicaset['i-001']:exec(function()
+        t.assert_equals(_G.warnings(), {
+            'dest read',
+            'dest write',
+        })
+    end)
+
+    -- Rename 'src' to 'dest'.
+    replicaset['i-001']:exec(function()
+        box.space.src:rename('dest')
+    end)
+
+    -- Verify privileges are adjusted for the space 'dest'.
+    replicaset['i-001']:call('assert_priv', {'dest', 'read,write'})
+
+    -- Verify that the alerts regarding the 'dest' space are gone.
+    --
+    -- Also verify that the alert is set for the space 'src',
+    -- which is gone after the rename.
+    replicaset['i-001']:exec(function()
+        t.assert_equals(_G.warnings(), {
+            'src read',
+        })
+    end)
+end
+
+-- Verify how alerts are working in a scenario with renaming of a
+-- space.
+--
+-- Create a space with 'read,write' privileges and rename it to a
+-- space that should have just 'read' privilege.
+g.test_space_rename_rw2r = function(g)
+    -- Create a configuration with different privileges for two
+    -- spaces.
+    local config = cbuilder.new()
+        :add_instance('i-001', {})
+        :set_global_option('credentials.users.guest.privileges', {
+            {
+                permissions = {'read', 'write'},
+                spaces = {'src'},
+            },
+            {
+                permissions = {'read'},
+                spaces = {'dest'},
+            },
+        })
+        :config()
+
+    local replicaset = replicaset.new(g, config)
+    replicaset:start()
+    define_warnings_function(replicaset['i-001'])
+    define_assert_priv_function(replicaset['i-001'])
+
+    -- Verify that alerts are set for delayed privilege grants
+    -- for the given spaces.
+    replicaset['i-001']:exec(function()
+        t.assert_equals(_G.warnings(), {
+            'dest read',
+            'src read',
+            'src write',
+        })
+    end)
+
+    -- Create space 'src'.
+    replicaset['i-001']:exec(function()
+        box.schema.space.create('src')
+        box.space.src:create_index('pk')
+    end)
+
+    -- Verify that privileges are granted for the space 'src'.
+    replicaset['i-001']:call('assert_priv', {'src', 'read,write'})
+
+    -- Verify that the alerts regarding the space 'src' are gone.
+    replicaset['i-001']:exec(function()
+        t.assert_equals(_G.warnings(), {
+            'dest read',
+        })
+    end)
+
+    -- Rename 'src' to 'dest'.
+    replicaset['i-001']:exec(function()
+        box.space.src:rename('dest')
+    end)
+
+    -- Verify privileges are adjusted for the space 'dest'.
+    replicaset['i-001']:call('assert_priv', {'dest', 'read'})
+
+    -- Verify that the alert regarding the 'dest' space is gone.
+    --
+    -- Also verify that the alerts are set for the space 'src',
+    -- which is gone after the rename.
+    replicaset['i-001']:exec(function()
+        t.assert_equals(_G.warnings(), {
+            'src read',
+            'src write',
+        })
+    end)
 end
