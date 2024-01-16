@@ -8,6 +8,7 @@ local g = t.group()
 local appliers_script = [[
     local configdata = require('internal.config.configdata')
     local cluster_config = require('internal.config.cluster_config')
+    local aboard = require('internal.config.utils.aboard')
     local cconfig = {
         credentials = {
             users = {
@@ -40,7 +41,10 @@ local appliers_script = [[
         },
     }
     local iconfig = cluster_config:instantiate(cconfig, 'instance-001')
-    config = {_configdata = configdata.new(iconfig, cconfig, 'instance-001')}
+    config = {
+        _configdata = configdata.new(iconfig, cconfig, 'instance-001'),
+        _aboard = aboard.new(),
+    }
     local mkdir = require('internal.config.applier.mkdir')
     mkdir.apply(config)
     local box_cfg = require('internal.config.applier.box_cfg')
