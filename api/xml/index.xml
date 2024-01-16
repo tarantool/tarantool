@@ -111,6 +111,16 @@
     <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa12d7241945474251750a8c0e0a7117cc" kind="enumvalue"><name>FIELD_TYPE_INTERVAL</name></member>
     <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfafbcca017643e1cedae264ae95b6c57f9" kind="enumvalue"><name>FIELD_TYPE_ARRAY</name></member>
     <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa54cefef16d36f636ad1ad146cd5c503b" kind="enumvalue"><name>FIELD_TYPE_MAP</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa56ac3ad0316ed0f0fced56053c5632dc" kind="enumvalue"><name>FIELD_TYPE_INT8</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa43a6ac6f6d42d50461504a9cfeb0f860" kind="enumvalue"><name>FIELD_TYPE_UINT8</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfabd2a2627a5403a08a2f580bd39c7f717" kind="enumvalue"><name>FIELD_TYPE_INT16</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa223140220a4b360ef4e9e811b87de63e" kind="enumvalue"><name>FIELD_TYPE_UINT16</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa3d55739d09369d119f6ac86376f9d71c" kind="enumvalue"><name>FIELD_TYPE_INT32</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa0eb6c41048c61373f364a05fa52de221" kind="enumvalue"><name>FIELD_TYPE_UINT32</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfad6d7c4555d6515546da67210e94e57e0" kind="enumvalue"><name>FIELD_TYPE_INT64</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa4b16790b92367cdc563a9ef39ee953b1" kind="enumvalue"><name>FIELD_TYPE_UINT64</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfaff9b755a110b72bae60c39836d6e9b28" kind="enumvalue"><name>FIELD_TYPE_FLOAT32</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa5830e446c7a004076b4b70edf8953969" kind="enumvalue"><name>FIELD_TYPE_FLOAT64</name></member>
     <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfad9d9ff6bc850b99a8230934e8257c79e" kind="enumvalue"><name>field_type_MAX</name></member>
     <member refid="module_8h_1ac42b7e2d98df6589252f8ede07932619" kind="enum"><name>on_conflict_action</name></member>
     <member refid="module_8h_1ac42b7e2d98df6589252f8ede07932619aa9b27bf642c85cef5f63d92c1f880e63" kind="enumvalue"><name>ON_CONFLICT_ACTION_NONE</name></member>
@@ -450,6 +460,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea868f49acf1dd09596e8550c6f415c8d4" kind="enumvalue"><name>ER_INVALID_DEC</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea20fe453a264ae79a9919e91b8886c979" kind="enumvalue"><name>ER_IN_ANOTHER_PROMOTE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0deee8c4296920e4b286fe6d49725e53" kind="enumvalue"><name>ER_SHUTDOWN</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceada2d5d365cc46ae05e04145b31059cff" kind="enumvalue"><name>ER_FIELD_VALUE_OUT_OF_RANGE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
