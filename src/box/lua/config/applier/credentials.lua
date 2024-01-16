@@ -545,12 +545,6 @@ local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
               :format(role_or_user, grant_or_revoke, name, privs, obj_type,
                       obj_name, err)
         config._aboard:set({type = 'error', message = err})
-    else
-        local msg = "credentials.apply: %s %q hasn't been created yet, " ..
-                    "'box.schema.%s.%s(%q, %q, %q, %q)' will be applied later"
-        msg = msg:format(obj_type, obj_name, role_or_user, grant_or_revoke,
-                         name, privs, obj_type, obj_name)
-        config._aboard:set({type = 'warn', message = msg})
     end
 end
 
@@ -564,6 +558,18 @@ local function sync_privileges(credentials, obj_to_sync)
         log.verbose('credentials.apply: syncing privileges for %s %q',
                     obj_to_sync.type, obj_to_sync.name)
     end
+
+    -- Drop missed privilege alerts.
+    --
+    -- The actual alerts will be issued in the sync() function
+    -- below.
+    --
+    -- Important: we don't follow the `obj_to_sync` filter here
+    -- for simplicity. Just revisit all the missed privilege
+    -- alerts: drop all of them and issue again the actual ones.
+    config._aboard:drop_if(function(_key, alert)
+        return alert._trait == 'missed_privilege'
+    end)
 
     -- The privileges synchronization between A and B is performed in 3 steps:
     -- 1. Grant all privileges that are present in B,
@@ -612,6 +618,50 @@ local function sync_privileges(credentials, obj_to_sync)
                                     to_revoke.privs, to_revoke.obj_type,
                                     to_revoke.obj_name)
             end
+        end
+
+        -- Collect updated information about privileges in the
+        -- database and recalculate the difference from the target
+        -- configuration.
+        box_privileges = box.schema[role_or_user].info(name)
+        box_privileges = privileges_from_box(box_privileges)
+        local missed_grants = privileges_subtract(config_privileges,
+                                                  box_privileges)
+
+        -- The most frequent scenario is when a privilege
+        -- couldn't be granted, because the object (space/
+        -- function/sequence) doesn't exist at the moment.
+        --
+        -- That's normal and the alert will be dropped on next
+        -- sync_privileges() call. If the object appears and the
+        -- privileges from the configuration are given, the alert
+        -- will not be issued again in this call.
+        --
+        -- If a serious error occurs on the privilege granting
+        -- (not a 'no such an object' one), then an alert of the
+        -- 'error' type is issued in the privileges_action_f().
+        --
+        -- The 'error' alerts aren't dropped here. The only way
+        -- to get rid of them is to try to re-apply the
+        -- configuration using config:reload() (or using automatic
+        -- reload from a remote config storage in Tarantool
+        -- Enterprise Edition).
+        --
+        -- Important: this code deliberately ignores the
+        -- `obj_to_sync` filter. It should be in-sync with the
+        -- :drop_if() call above.
+        for _, grant in ipairs(missed_grants) do
+            local alert = {
+                type = 'warn',
+                _trait = 'missed_privilege',
+            }
+            local msg = 'box.schema.%s.%s(%q, %q, %q, %q) has failed ' ..
+                'because either the object has not been created yet, ' ..
+                'or the privilege write has failed (separate alert reported)'
+            local privs = table.concat(grant.privs, ',')
+            alert.message = msg:format(role_or_user, 'grant', name, privs,
+                                       grant.obj_type, grant.obj_name)
+            config._aboard:set(alert)
         end
     end
 
@@ -908,6 +958,9 @@ return {
     apply = apply,
     -- Exported for testing purposes.
     _internal = {
+        set_config = function(config_module)
+            config = config_module
+        end,
         privileges_from_box = privileges_from_box,
         privileges_from_config = privileges_from_config,
         privileges_subtract = privileges_subtract,

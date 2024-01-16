@@ -19,7 +19,8 @@ local log = require('internal.config.utils.log')
 -- }
 --
 -- More fields may be placed into the table and all these fields
--- are returned from :alerts().
+-- are returned from :alerts() (except ones that start from the
+-- underscore character).
 --
 -- The alert board takes an ownership of the `alert` table and
 -- modifies it.
@@ -67,6 +68,30 @@ local function aboard_drop(self, key)
     end
 end
 
+-- Drop alerts that fit the given criteria.
+--
+-- | local function filter_f(key, alert)
+-- |     return <boolean>
+-- | end
+--
+-- The filter function is called on each alert. An alert is
+-- dropped if the function returns `true`.
+--
+-- The `on_drop` callback (see the aboard.new() function) is
+-- called for each of the dropped alert.
+local function aboard_drop_if(self, filter_f)
+    local to_drop = {}
+    for key, alert in pairs(self._alerts) do
+        if filter_f(key, alert) then
+            table.insert(to_drop, key)
+        end
+    end
+
+    for _, key in ipairs(to_drop) do
+        self:drop(key)
+    end
+end
+
 -- Drop all the alerts.
 --
 -- The `on_drop` callback is NOT called.
@@ -79,11 +104,21 @@ end
 --
 -- The alerts are sorted by a time of the :set() method call and
 -- returned as an array-like table.
+--
+-- Fields of the alert object that start from the underscore
+-- character are NOT shown.
 local function aboard_alerts(self)
     -- Don't return alert keys.
     local alerts = {}
     for _, alert in pairs(self._alerts) do
-        table.insert(alerts, alert)
+        -- Don't show fields that start from an underscore.
+        local serialized = {}
+        for k, v in pairs(alert) do
+            if not k:startswith('_') then
+                serialized[k] = v
+            end
+        end
+        table.insert(alerts, serialized)
     end
     -- Sort by timestamps.
     table.sort(alerts, function(a, b)
@@ -122,6 +157,7 @@ local mt = {
         set = aboard_set,
         get = aboard_get,
         drop = aboard_drop,
+        drop_if = aboard_drop_if,
         clean = aboard_clean,
         alerts = aboard_alerts,
         status = aboard_status,
