@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        freebsd-version: [ 12, 13 ]
+        freebsd-version: [ 13, 14 ]
         tarantool-branch:
           - 'master'
           - 'release/3.0'
