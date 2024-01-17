@@ -151,12 +151,13 @@ os.remove(pid_file)
 os.remove(xlog_file)
 os.remove(snap_file)
 
-local ph_server = popen.shell(TARANTOOL_PATH .. arg, 'r')
+local ph_server = popen.shell('INPUTRC=non_existent_file ' .. TARANTOOL_PATH
+                              .. arg, 'r')
 
 local f = process_timeout.open_with_timeout(log_file, file_open_timeout)
 assert(f, 'error while opening ' .. log_file)
 
-cmd = TARANTOOL_PATH .. ' -i 2>&1'
+cmd = 'INPUTRC=non_existent_file ' .. TARANTOOL_PATH .. ' -i 2>&1'
 local ph_client = popen.new({cmd}, {
     shell = true,
     setsid = true,
@@ -170,7 +171,7 @@ assert(ph_client, 'the nested console is not up')
 ph_client:write('require("console").connect(\'unix/:' .. sock .. '\')\n')
 
 local client_data = ''
-while string.endswith(client_data, 'unix/:' .. sock .. '>') == nil
+while not string.endswith(client_data, 'unix/:' .. sock .. '> ')
         and clock.monotonic() - start_time < time_quota do
     local cur_data = ph_client:read({timeout = 3.0})
     if cur_data ~= nil and cur_data ~= '' then
@@ -183,7 +184,7 @@ start_time = clock.monotonic()
 ph_client:signal(popen.signal.SIGINT)
 test:unlike(ph_client:info().status.state, popen.state.EXITED,
             'SIGINT doesn\'t kill nested tarantool in interactive mode')
-while string.endswith(client_data, 'C\n---\n...\n\nunix/:' .. sock .. '>') == nil
+while not string.endswith(client_data, 'C\n---\n...\n\nunix/:' .. sock .. '> ')
         and clock.monotonic() - start_time < time_quota do
     local cur_data = ph_client:read({timeout = 3.0})
     if cur_data ~= nil and cur_data ~= '' then
@@ -254,7 +255,7 @@ fiber.sleep(0.2)
 ph:signal(popen.signal.SIGINT)
 
 start_time = clock.monotonic()
-while string.endswith(output, prompt .. '^C\n---\n...\n\n' .. prompt) == false
+while not string.endswith(output, prompt .. '^C\n---\n...\n\n' .. prompt)
         and clock.monotonic() - start_time < time_quota do
     local data = ph:read({timeout = 1.0})
     if data ~= nil then
