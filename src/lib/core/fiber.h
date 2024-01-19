@@ -852,6 +852,10 @@ struct cord {
 	struct fiber *main_fiber;
 	/** An event triggered to cancel cord main fiber. */
 	ev_async cancel_event;
+	/** Number of alive client (non system) fibers. */
+	int client_fiber_count;
+	/** Fiber calling fiber_shutdown. NULL if there is no such. */
+	struct fiber *shutdown_fiber;
 };
 
 extern __thread struct cord *cord_ptr;
@@ -1242,6 +1246,14 @@ fiber_check_gc(void);
  */
 struct lua_State *
 fiber_lua_state(struct fiber *f);
+
+/** Change whether fiber is system or not. */
+void
+fiber_set_system(struct fiber *f, bool yesno);
+
+/** Cancel all client (non system) fibers and wait until they finished. */
+void
+fiber_shutdown(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */

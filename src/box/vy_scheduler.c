@@ -730,13 +730,20 @@ vy_scheduler_wait_checkpoint(struct vy_scheduler *scheduler)
 			/* A dump error occurred, abort checkpoint. */
 			struct error *e = diag_last_error(&scheduler->diag);
 			diag_set_error(diag_get(), e);
-			say_error("vinyl checkpoint failed: %s", e->errmsg);
-			return -1;
+			goto error;
 		}
 		fiber_cond_wait(&scheduler->dump_cond);
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
+			goto error;
+		}
 	}
 	say_info("vinyl checkpoint completed");
 	return 0;
+error:
+	say_error("vinyl checkpoint failed: %s",
+		  diag_last_error(diag_get())->errmsg);
+	return -1;
 }
 
 void
@@ -886,6 +893,7 @@ vy_deferred_delete_batch_process_f(struct cmsg *cmsg)
 	struct vy_deferred_delete_batch *batch = container_of(cmsg,
 				struct vy_deferred_delete_batch, cmsg);
 	struct vy_task *task = batch->task;
+	fiber_set_system(fiber(), true);
 	/*
 	 * Wait for memory quota if necessary before starting to
 	 * process the batch (we can't yield between statements).

@@ -230,6 +230,7 @@ failed.rpl_master = master
 failed.name = "failed"
 
 failed.deploy(True, wait=False)
+failed.crash_expected = True
 line = "ER_READONLY"
 if failed.logfile_pos.seek_wait(line):
     print("'{}' exists in server log".format(line))

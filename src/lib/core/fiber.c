@@ -1187,6 +1187,13 @@ fiber_loop(MAYBE_UNUSED void *data)
 		       assert(f != fiber);
 		       fiber_wakeup(f);
 	        }
+		if (!(fiber->flags & FIBER_IS_SYSTEM)) {
+			assert(cord()->client_fiber_count > 0);
+			cord()->client_fiber_count--;
+			if (cord()->shutdown_fiber != NULL &&
+			    cord()->client_fiber_count == 0)
+				fiber_wakeup(cord()->shutdown_fiber);
+		}
 		fiber_on_stop(fiber);
 		/* reset pending wakeups */
 		rlist_del(&fiber->state);
@@ -1590,6 +1597,8 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	fiber_gc_checker_init(fiber);
 	cord->next_fid++;
 	assert(cord->next_fid > FIBER_ID_MAX_RESERVED);
+	if (!(fiber->flags & FIBER_IS_SYSTEM))
+		cord()->client_fiber_count++;
 
 	return fiber;
 
@@ -1849,7 +1858,7 @@ cord_create(struct cord *cord, const char *name)
 	cord->sched.name = NULL;
 	fiber_set_name(&cord->sched, "sched");
 	cord->fiber = &cord->sched;
-	cord->sched.flags = FIBER_IS_RUNNING;
+	cord->sched.flags = FIBER_IS_RUNNING | FIBER_IS_SYSTEM;
 	cord->sched.max_slice = zero_slice;
 	cord->max_slice = default_slice;
 
@@ -1884,6 +1893,8 @@ cord_create(struct cord *cord, const char *name)
 	cord->sched.stack_watermark = NULL;
 #endif
 	signal_stack_init();
+	cord->shutdown_fiber = NULL;
+	cord->client_fiber_count = 0;
 }
 
 void
@@ -2338,4 +2349,39 @@ struct lua_State *
 fiber_lua_state(struct fiber *f)
 {
 	return f->storage.lua.stack;
+}
+
+void
+fiber_set_system(struct fiber *f, bool yesno)
+{
+	if (yesno) {
+		if (!(f->flags & FIBER_IS_SYSTEM)) {
+			f->flags |= FIBER_IS_SYSTEM;
+			assert(cord()->client_fiber_count > 0);
+			cord()->client_fiber_count--;
+			if (cord()->shutdown_fiber != NULL &&
+			    cord()->client_fiber_count == 0)
+				fiber_wakeup(cord()->shutdown_fiber);
+		}
+	} else {
+		if (f->flags & FIBER_IS_SYSTEM) {
+			f->flags &= ~FIBER_IS_SYSTEM;
+			cord()->client_fiber_count++;
+		}
+	}
+}
+
+void
+fiber_shutdown(void)
+{
+	assert(cord()->shutdown_fiber == NULL);
+	struct fiber *fiber;
+	rlist_foreach_entry(fiber, &cord()->alive, link) {
+		if (!(fiber->flags & FIBER_IS_SYSTEM))
+			fiber_cancel(fiber);
+	}
+	cord()->shutdown_fiber = fiber();
+	while (cord()->client_fiber_count != 0)
+		fiber_yield();
+	cord()->shutdown_fiber = NULL;
 }

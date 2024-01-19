@@ -346,6 +346,10 @@ vy_quota_use(struct vy_quota *q, enum vy_quota_consumer_type type,
 		diag_set(ClientError, ER_VY_QUOTA_TIMEOUT);
 		return -1;
 	}
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
 
 	double wait_time = ev_monotonic_now(loop()) - wait_start;
 	if (wait_time > q->too_long_threshold) {

@@ -73,7 +73,9 @@ fiber.clock = fiber_clock
 fiber.clock64 = fiber_clock64
 
 local stall = fiber.stall
+local fiber_set_system = fiber.set_system
 fiber.stall = nil
+fiber.set_system = nil
 
 local worker_next_task = nil
 local worker_last_task
@@ -101,15 +103,21 @@ local function worker_f()
     end
 end
 
+local worker_name = 'tasks_worker_fiber'
+
 local function worker_safe_f()
     pcall(worker_f)
     -- Worker_f never returns. If the execution is here, this
     -- fiber is probably canceled and now is not able to sleep.
     -- Create a new one.
     worker_fiber = fiber.new(worker_safe_f)
+    fiber_set_system(worker_fiber)
+    worker_fiber:name(worker_name)
 end
 
 worker_fiber = fiber.new(worker_safe_f)
+fiber_set_system(worker_fiber)
+worker_fiber:name(worker_name)
 
 local function worker_schedule_task(f, arg)
     local task = {f = f, arg = arg}
@@ -125,6 +133,7 @@ end
 -- Start from '_' to hide it from auto completion.
 fiber._internal = fiber._internal or {}
 fiber._internal.schedule_task = worker_schedule_task
+fiber._internal.set_system = fiber_set_system
 
 setmetatable(fiber, {__serialize = function(self)
     local res = table.copy(self)

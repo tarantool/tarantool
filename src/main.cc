@@ -1109,14 +1109,5 @@ main(int argc, char **argv)
 	free((void *)instance.name);
 	free((void *)instance.config);
 	tarantool_free();
-	ERROR_INJECT(ERRINJ_MAIN_MAKE_FILE_ON_RETURN, do {
-		int fd = open("tt_exit_file.txt.inprogress",
-			      O_WRONLY | O_CREAT | O_TRUNC, -1);
-		if (fd < 0)
-			break;
-		dprintf(fd, "ExitCode: %d\n", exit_code);
-		close(fd);
-		rename("tt_exit_file.txt.inprogress", "tt_exit_file.txt");
-	} while (false));
 	return exit_code;
 }

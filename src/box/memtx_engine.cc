@@ -1028,12 +1028,19 @@ checkpoint_f(va_list ap)
 		return -1;
 	}
 
-	struct mh_i32_t *temp_space_ids = mh_i32_new();
+	struct mh_i32_t *temp_space_ids;
 
 	say_info("saving snapshot `%s'", snap->filename);
-	ERROR_INJECT_SLEEP(ERRINJ_SNAP_WRITE_DELAY);
+	ERROR_INJECT_WHILE(ERRINJ_SNAP_WRITE_DELAY, {
+		fiber_sleep(0.001);
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
+			goto fail;
+		}
+	});
 	ERROR_INJECT(ERRINJ_SNAP_SKIP_ALL_ROWS, goto done);
 	struct space_read_view *space_rv;
+	temp_space_ids = mh_i32_new();
 	read_view_foreach_space(space_rv, &ckpt->rv) {
 		FiberGCChecker gc_check;
 		bool skip = false;

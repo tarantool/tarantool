@@ -238,7 +238,7 @@ test_run:wait_cond(function() return #fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.
 box.cfg{checkpoint_count = checkpoint_count}
 ---
 ...
-test_run:cmd("start server replica with wait=False")
+test_run:cmd("start server replica with wait=False, crash_expected=True")
 ---
 - true
 ...

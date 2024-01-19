@@ -63,7 +63,7 @@ fio.unlink(xlog)
 box.cfg{force_recovery = true}
 ---
 ...
-test_run:cmd("start server test with wait=False")
+test_run:cmd("start server test with wait=False, crash_expected=True")
 ---
 - true
 ...

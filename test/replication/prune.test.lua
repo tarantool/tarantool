@@ -66,7 +66,7 @@ test_run:cmd('eval replica1 "box.info.replication[1].upstream.message"')
 
 -- restart replica and check that replica isn't able to join to cluster
 test_run:cmd('stop server replica1')
-test_run:cmd('start server replica1 with args="true", wait=False')
+test_run:cmd('start server replica1 with args="true", wait=False, crash_expected=True')
 test_run:cmd('switch replica1')
 test_run:wait_upstream(1, {message_re = "Can't subscribe non%-anonymous replica"})
 test_run:cmd('switch default')

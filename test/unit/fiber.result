@@ -40,3 +40,9 @@ OutOfMemory: Failed to allocate 42 bytes in allocator for exception
 	*** fiber_test_leak: done ***
 	*** fiber_test_leak ***
 	*** fiber_test_leak: done ***
+	*** fiber_test_client_fiber_count ***
+	*** fiber_test_client_fiber_count: done ***
+	*** fiber_test_set_system ***
+	*** fiber_test_set_system: done ***
+	*** fiber_test_shutdown: done ***
+	*** fiber_test_shutdown ***

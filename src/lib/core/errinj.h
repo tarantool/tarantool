@@ -104,7 +104,6 @@ struct errinj {
 	_(ERRINJ_IPROTO_TX_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_WRITE_ERROR_DELAY, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_LOG_ROTATE, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_MAIN_MAKE_FILE_ON_RETURN, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_MEMTX_DELAY_GC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_NETBOX_DISABLE_ID, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_NETBOX_FLIP_FEATURE, ERRINJ_INT, {.iparam = -1}) \

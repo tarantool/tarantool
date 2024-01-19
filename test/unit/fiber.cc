@@ -581,6 +581,145 @@ fiber_test_leak_modes()
 	say_logger_free();
 }
 
+static void
+fiber_test_client_fiber_count(void)
+{
+	header();
+
+	int count = cord()->client_fiber_count;
+
+	struct fiber *fiber1 = fiber_new("fiber1", wait_cancel_f);
+	fail_unless(fiber1 != NULL);
+	fail_unless(++count == cord()->client_fiber_count);
+
+	struct fiber *fiber2 = fiber_new("fiber2", wait_cancel_f);
+	fail_unless(fiber2 != NULL);
+	fail_unless(++count == cord()->client_fiber_count);
+
+	struct fiber *fiber3 = fiber_new_system("fiber3", wait_cancel_f);
+	fail_unless(fiber3 != NULL);
+	fail_unless(count == cord()->client_fiber_count);
+
+	struct fiber *fiber4 = fiber_new_system("fiber4", wait_cancel_f);
+	fail_unless(fiber4 != NULL);
+	fail_unless(count == cord()->client_fiber_count);
+
+	fiber_set_joinable(fiber1, true);
+	fiber_cancel(fiber1);
+	fiber_join(fiber1);
+	fail_unless(--count == cord()->client_fiber_count);
+
+	fiber_set_joinable(fiber4, true);
+	fiber_cancel(fiber4);
+	fiber_join(fiber4);
+	fail_unless(count == cord()->client_fiber_count);
+
+	fiber_set_joinable(fiber2, true);
+	fiber_cancel(fiber2);
+	fiber_join(fiber2);
+	fail_unless(--count == cord()->client_fiber_count);
+
+	fiber_set_joinable(fiber3, true);
+	fiber_cancel(fiber3);
+	fiber_join(fiber3);
+	fail_unless(count == cord()->client_fiber_count);
+
+	footer();
+}
+
+static void
+fiber_test_set_system(void)
+{
+	header();
+
+	struct fiber *fiber1 = fiber_new("fiber1", wait_cancel_f);
+	fail_unless(fiber1 != NULL);
+	int count = cord()->client_fiber_count;
+
+	fiber_set_system(fiber1, true);
+	fail_unless(--count == cord()->client_fiber_count);
+	fail_unless((fiber1->flags & FIBER_IS_SYSTEM) != 0);
+
+	fiber_set_system(fiber1, true);
+	fail_unless(count == cord()->client_fiber_count);
+	fail_unless((fiber1->flags & FIBER_IS_SYSTEM) != 0);
+
+	fiber_set_system(fiber1, false);
+	fail_unless(++count == cord()->client_fiber_count);
+	fail_unless((fiber1->flags & FIBER_IS_SYSTEM) == 0);
+
+	fiber_set_system(fiber1, false);
+	fail_unless(count == cord()->client_fiber_count);
+	fail_unless((fiber1->flags & FIBER_IS_SYSTEM) == 0);
+
+	struct fiber *fiber2 = fiber_new_system("fiber2", wait_cancel_f);
+	fail_unless(fiber2 != NULL);
+	count = cord()->client_fiber_count;
+
+	fiber_set_system(fiber2, false);
+	fail_unless(++count == cord()->client_fiber_count);
+	fail_unless((fiber2->flags & FIBER_IS_SYSTEM) == 0);
+
+	fiber_set_system(fiber2, false);
+	fail_unless(count == cord()->client_fiber_count);
+	fail_unless((fiber2->flags & FIBER_IS_SYSTEM) == 0);
+
+	fiber_set_system(fiber2, true);
+	fail_unless(--count == cord()->client_fiber_count);
+	fail_unless((fiber2->flags & FIBER_IS_SYSTEM) != 0);
+
+	fiber_set_system(fiber2, true);
+	fail_unless(count == cord()->client_fiber_count);
+	fail_unless((fiber2->flags & FIBER_IS_SYSTEM) != 0);
+
+	fiber_set_joinable(fiber1, true);
+	fiber_cancel(fiber1);
+	fiber_join(fiber1);
+	fiber_set_joinable(fiber2, true);
+	fiber_cancel(fiber2);
+	fiber_join(fiber2);
+
+	footer();
+}
+
+static int
+hang_on_cancel_f(va_list ap)
+{
+	while (!fiber_is_cancelled())
+		fiber_yield();
+	fiber_set_system(fiber(), true);
+	while (true)
+		fiber_yield();
+	return 0;
+}
+
+static void
+fiber_test_shutdown(void)
+{
+	footer();
+
+	struct fiber *fiber1 = fiber_new("fiber1", wait_cancel_f);
+	fail_unless(fiber1 != NULL);
+	fiber_set_joinable(fiber1, true);
+	struct fiber *fiber2 = fiber_new_system("fiber2", wait_cancel_f);
+	fail_unless(fiber2 != NULL);
+	struct fiber *fiber3 = fiber_new("fiber3", hang_on_cancel_f);
+	fail_unless(fiber3 != NULL);
+
+	fiber_shutdown();
+	fail_unless((fiber1->flags & FIBER_IS_DEAD) != 0);
+	fail_unless((fiber2->flags & FIBER_IS_DEAD) == 0);
+	fail_unless((fiber3->flags & FIBER_IS_DEAD) == 0);
+
+	fiber_join(fiber1);
+
+	fiber_set_joinable(fiber2, true);
+	fiber_cancel(fiber2);
+	fiber_join(fiber2);
+
+	header();
+}
+
 static int
 main_f(va_list ap)
 {
@@ -597,6 +736,9 @@ main_f(va_list ap)
 	cord_cancel_and_join_test();
 	fiber_test_defaults();
 	fiber_test_leak_modes();
+	fiber_test_client_fiber_count();
+	fiber_test_set_system();
+	fiber_test_shutdown();
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }
@@ -611,7 +753,7 @@ int main()
 	memory_init();
 	fiber_init(fiber_cxx_invoke);
 	fiber_attr_create(&default_attr);
-	struct fiber *main = fiber_new_xc("main", main_f);
+	struct fiber *main = fiber_new_system_xc("main", main_f);
 	fiber_wakeup(main);
 	ev_run(loop(), 0);
 	fiber_free();

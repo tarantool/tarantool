@@ -24,7 +24,7 @@ end, 10)
 
 -- Restart the remote instance. This will make the first instance
 -- resubscribe without entering orphan mode.
-test_run:cmd('restart server rebootstrap2 with wait=False')
+test_run:cmd('restart server rebootstrap2 with wait=False, crash_expected=True')
 test_run:cmd('switch rebootstrap1')
 -- Wait until resubscribe is sent
 test_run:wait_cond(function()\

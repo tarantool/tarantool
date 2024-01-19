@@ -883,6 +883,17 @@ lbox_fiber_stall(struct lua_State *L)
 	return 0;
 }
 
+/** Make fiber system. Takes the fiber as a single argument. */
+static int
+lbox_fiber_set_system(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "fiber.set_system(id): bad arguments");
+	struct fiber *fiber = lbox_checkfiber(L, 1);
+	fiber_set_system(fiber, true);
+	return 0;
+}
+
 /** Helper for fiber slice parsing. */
 static struct fiber_slice
 lbox_fiber_slice_parse(struct lua_State *L, int idx)
@@ -1018,6 +1029,7 @@ static const struct luaL_Reg fiberlib[] = {
 	{"extend_slice", lbox_fiber_extend_slice},
 	/* Internal functions, to hide in fiber.lua. */
 	{"stall", lbox_fiber_stall},
+	{"set_system", lbox_fiber_set_system},
 	{NULL, NULL}
 };
 

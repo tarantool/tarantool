@@ -20,7 +20,6 @@ g.test_sigterm_during_initial_snapshot = function()
             -- uses usleep() which is a pthread cancellation point.
             TARANTOOL_RUN_BEFORE_BOX_CFG = [[
                 box.ctl.set_on_shutdown_timeout(1000)
-                box.error.injection.set('ERRINJ_MAIN_MAKE_FILE_ON_RETURN', true)
                 box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', true)
             ]]
         }
@@ -30,18 +29,7 @@ g.test_sigterm_during_initial_snapshot = function()
     t.helpers.retrying({}, function()
         assert(g.server:grep_log('saving snapshot', nil, {filename = logname}))
     end)
-    g.server.process:kill('TERM')
-    local path = fio.pathjoin(g.server.workdir, 'tt_exit_file.txt')
-    local exit_text
-    t.helpers.retrying({}, function()
-        local f = fio.open(path, 'O_RDONLY')
-        if f == nil then
-            error('could not open')
-        end
-        exit_text = f:read()
-        f:close()
-    end)
-    g.server.process = nil
     g.server:stop()
-    t.assert_str_contains(exit_text, 'ExitCode: 0\n')
+    local panic_msg = "failed to create a checkpoint"
+    t.assert(g.server:grep_log(panic_msg, nil, {filename = logname}))
 end
