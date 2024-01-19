@@ -198,7 +198,9 @@ _ = fiber.create(function() s:create_index('sk', {parts = {2, 'unsigned'}}) end)
 fiber.sleep(0.01)
 
 -- Should ignore the incomplete index on recovery.
-test_run:cmd('restart server default')
+-- Use KILL because server will hang on shutdown due to injection.
+-- We don't need graceful shutdown for the test anyway.
+test_run:cmd('restart server default with signal=KILL')
 
 s = box.space.test
 s.index[1] == nil

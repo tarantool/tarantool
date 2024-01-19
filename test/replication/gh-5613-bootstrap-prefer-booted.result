@@ -43,7 +43,7 @@ test_run:cmd('create server replica2 with script="replication/gh-5613-replica2.l
  | ---
  | - true
  | ...
-test_run:cmd('start server replica2 with wait=False')
+test_run:cmd('start server replica2 with wait=False, crash_expected=True')
  | ---
  | - true
  | ...

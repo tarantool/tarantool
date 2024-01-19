@@ -61,7 +61,9 @@ restart:
 			f->caller->flags |= FIBER_IS_READY;
 			assert(f->caller->caller == &cord->sched);
 		}
+		fiber_set_system(fiber(), false);
 		cmsg_deliver(msg);
+		fiber_set_system(fiber(), true);
 		fiber_check_gc();
 		/*
 		 * Normally fibers die after their function
@@ -131,7 +133,17 @@ fiber_pool_cb(ev_loop *loop, struct ev_watcher *watcher, int events)
 			f = rlist_shift_entry(&pool->idle, struct fiber, state);
 			fiber_call(f);
 		} else if (pool->size < pool->max_size) {
-			f = fiber_new(cord_name(cord()), fiber_pool_f);
+			/*
+			 * We don't want fibers to be cancellable by client
+			 * while they are in the pool. However system flag is
+			 * reset during processing message from pool endpoint
+			 * so that fiber is made cancellable back.
+			 *
+			 * If some message processing should not be cancellable
+			 * by client then it can just set system flag during
+			 * it's execution.
+			 */
+			f = fiber_new_system(cord_name(cord()), fiber_pool_f);
 			if (f == NULL) {
 				diag_log();
 				break;

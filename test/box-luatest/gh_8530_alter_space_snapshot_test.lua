@@ -49,6 +49,9 @@ g.test_build_index = function(cg)
         box.snapshot()
         t.assert_equals(f:status(), 'suspended')
     end)
+    -- Use KILL because server will hang on shutdown due to injection.
+    -- We don't need graceful shutdown for the test anyway.
+    cg.server.process:kill('KILL')
     cg.server:restart()
     cg.server:exec(function()
         local s = box.space.test
@@ -69,6 +72,9 @@ g.test_change_format = function(cg)
         box.snapshot()
         t.assert_equals(f:status(), 'suspended')
     end)
+    -- Use KILL because server will hang on shutdown due to injection.
+    -- We don't need graceful shutdown for the test anyway.
+    cg.server.process:kill('KILL')
     cg.server:restart()
     cg.server:exec(function()
         local s = box.space.test

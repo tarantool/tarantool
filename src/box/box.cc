@@ -4941,6 +4941,8 @@ bootstrap_from_master(struct replica *master)
 	try {
 		applier_resume_to_state(applier, APPLIER_READY,
 					TIMEOUT_INFINITY);
+	} catch (FiberIsCancelled *e) {
+		throw e;
 	} catch (...) {
 		return false;
 	}
@@ -4958,6 +4960,8 @@ bootstrap_from_master(struct replica *master)
 	try {
 		applier_resume_to_state(applier, APPLIER_FETCH_SNAPSHOT,
 					TIMEOUT_INFINITY);
+	} catch (FiberIsCancelled *e) {
+		throw e;
 	} catch (...) {
 		return false;
 	}
@@ -5926,6 +5930,14 @@ box_storage_shutdown()
 	if (!is_storage_initialized)
 		return;
 	iproto_shutdown();
+	/*
+	 * Finish client fibers after iproto_shutdown otherwise new fibers
+	 * can be started through new iproto requests. Also we should
+	 * finish client fibers before other subsystems shutdown so that
+	 * we won't need to handle requests from client fibers after/during
+	 * subsystem shutdown.
+	 */
+	fiber_shutdown();
 	replication_shutdown();
 }
 

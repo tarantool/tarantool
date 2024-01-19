@@ -414,23 +414,16 @@ box.schema.user.revoke('guest', 'replication')
 s:drop()
 
 --
--- Check that tarantool stops immediately even if a vinyl worker
--- thread is blocked (see gh-3225).
+-- Check that tarantool stops immediately if large snapshot write
+-- is in progress.
 --
 s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk')
-s:replace{1, 1}
-box.snapshot()
-
-errinj.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 9000)
-_ = fiber.create(function() s:get(1) end)
-
-s:replace{1, 2}
-
-errinj.set('ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT', 9000)
+for i = 1, 10000 do s:replace({i}) end
+errinj.set('ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT', 0.01)
 _ = fiber.create(function() box.snapshot() end)
 
-test_run:cmd("restart server default")
+test_run:cmd("restart server default") -- don't stuck
 box.space.test:drop()
 
 --

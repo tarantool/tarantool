@@ -137,7 +137,7 @@ test_run:cmd('stop server replica1')
 ---
 - true
 ...
-test_run:cmd('start server replica1 with args="true", wait=False')
+test_run:cmd('start server replica1 with args="true", wait=False, crash_expected=True')
 ---
 - true
 ...

@@ -57,7 +57,7 @@ box.cfg.force_recovery
 -- try to start the replica, ha-ha
 -- (replication should fail, some rows are missing)
 --
-test_run:cmd("start server replica with wait=False")
+test_run:cmd("start server replica with wait=False, crash_expected=True")
 test_run:cmd("switch replica")
 -- Need to wait for box.info.replication[1] defined, otherwise test-run fails to
 -- wait for the upstream status sometimes.

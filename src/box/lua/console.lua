@@ -985,7 +985,15 @@ local function client_handler(client, _peer)
     state:print(string.format("%-63s\n%-63s\n",
         "Tarantool ".. version.." (Lua console)",
         "type 'help' for interactive help"))
+    local on_shutdown = function()
+        -- Fiber is going to be cancelled on shutdown. Do not report
+        -- cancel induced error to the peer.
+        client:close();
+    end
+    state.fiber = fiber.self()
+    box.ctl.on_shutdown(on_shutdown)
     repl(state)
+    box.ctl.on_shutdown(nil, on_shutdown)
     session_internal.run_on_disconnect()
 end
 

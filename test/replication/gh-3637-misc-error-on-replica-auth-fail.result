@@ -49,6 +49,19 @@ vclock[0] = nil
 _ = test_run:wait_vclock('replica_auth', vclock)
 ---
 ...
+-- Wait server init script finish or server will panic on stop.
+test_run:switch('replica_auth')
+---
+- true
+...
+test_run:wait_cond(function() return _G.startup_finished == true end)
+---
+- true
+...
+test_run:switch('default')
+---
+- true
+...
 test_run:cmd("stop server replica_auth")
 ---
 - true

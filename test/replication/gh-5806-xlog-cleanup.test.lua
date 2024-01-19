@@ -78,7 +78,7 @@ assert(not box.info.gc().is_paused)
 
 --
 -- Start replica and wait for error.
-test_run:cmd('start server replica with wait=False, wait_load=False')
+test_run:cmd('start server replica with wait=False, wait_load=False, crash_expected=True')
 
 --
 -- Wait error to appear, 60 seconds should be more than enough,

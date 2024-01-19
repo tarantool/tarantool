@@ -157,6 +157,7 @@ local function exit(code)
     -- os.exit() never yields. After on_shutdown
     -- fiber completes, we will never wake up again.
     local TIMEOUT_INFINITY = 500 * 365 * 86400
+    fiber._internal.set_system(fiber.self())
     while true do fiber.sleep(TIMEOUT_INFINITY) end
 end
 rawset(os, "exit", exit)
