@@ -493,6 +493,20 @@ return schema.new('instance_config', schema.record({
                     }),
                 }),
             }),
+            watchers = schema.record({
+                reconnect_timeout = schema.scalar({
+                    type = 'number',
+                    -- default = 1.0 is applied right in the
+                    -- etcd source. See a comment above
+                    -- regarding defaults in config.etcd.
+                }),
+                reconnect_max_attempts = schema.scalar({
+                    type = 'integer',
+                    -- default = 10 is applied right in the
+                    -- etcd source. See a comment above
+                    -- regarding defaults in config.etcd.
+                }),
+            }),
             ssl = schema.record({
                 ssl_key = schema.scalar({
                     type = 'string',
