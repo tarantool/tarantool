@@ -94,6 +94,10 @@ g.test_config_enterprise = function()
                         unix_socket = 'six',
                     }
                 },
+                watchers = {
+                    reconnect_timeout = 2,
+                    reconnect_max_attempts = 3,
+                },
                 ssl = {
                     ssl_key = 'seven',
                     ca_path = 'eight',
