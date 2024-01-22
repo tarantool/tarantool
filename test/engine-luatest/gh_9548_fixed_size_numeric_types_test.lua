@@ -1,30 +1,34 @@
 local t = require('luatest')
 local server = require('luatest.server')
 
-local g = t.group('gh-9548', {{engine = 'memtx'}, {engine = 'vinyl'}})
-
-g.before_all(function(cg)
+local function before_all(cg)
     cg.server = server:new()
     cg.server:start()
-end)
+end
 
-g.after_all(function(cg)
+local function after_all(cg)
     cg.server:drop()
-end)
+end
 
-g.before_each(function(cg)
+local function before_each(cg)
     cg.server:exec(function(engine)
         box.schema.space.create('test', {engine = engine})
         box.space.test:create_index('pk')
     end, {cg.params.engine})
-end)
+end
 
-g.after_each(function(cg)
+local function after_each(cg)
     cg.server:exec(function()
         box.space.test:drop()
         box.schema.func.drop('foo', {if_exists = true})
     end)
-end)
+end
+
+local g1 = t.group('gh-9548-1', {{engine = 'memtx'}, {engine = 'vinyl'}})
+g1.before_all(before_all)
+g1.after_all(after_all)
+g1.before_each(before_each)
+g1.after_each(after_each)
 
 -- Test the limits of fixed-size unsigned integer types.
 local function test_fixed_size_unsigned(cg, params)
@@ -66,13 +70,13 @@ end
 
 -- Test the limits of fixed-size unsigned integer types.
 -- Tuple format doesn't contain fields accessed by JSON paths.
-g.test_fixed_size_unsigned_plain = function(cg)
+g1.test_fixed_size_unsigned_plain = function(cg)
     test_fixed_size_unsigned(cg, {has_indexed_json_path = false})
 end
 
 -- Test the limits of fixed-size unsigned integer types.
 -- Tuple format contains a field accessed by JSON path.
-g.test_fixed_size_unsigned_json = function(cg)
+g1.test_fixed_size_unsigned_json = function(cg)
     test_fixed_size_unsigned(cg, {has_indexed_json_path = true})
 end
 
@@ -139,19 +143,19 @@ end
 
 -- Test the limits of fixed-size signed integer types.
 -- Tuple format doesn't contain fields accessed by JSON paths.
-g.test_fixed_size_signed_plain = function(cg)
+g1.test_fixed_size_signed_plain = function(cg)
     test_fixed_size_signed(cg, {has_indexed_json_path = false})
 end
 
 -- Test the limits of fixed-size signed integer types.
 -- Tuple format contains a field accessed by JSON path.
-g.test_fixed_size_signed_json = function(cg)
+g1.test_fixed_size_signed_json = function(cg)
     test_fixed_size_signed(cg, {has_indexed_json_path = true})
 end
 
 -- Test fixed-size floating point types. There is no value range check.
 -- float32 can store only MP_FLOAT, and float64 can store only MP_DOUBLE.
-g.test_fixed_size_float = function(cg)
+g1.test_fixed_size_float = function(cg)
     cg.server:exec(function()
         local ffi = require('ffi')
         local s = box.space.test
@@ -173,7 +177,7 @@ g.test_fixed_size_float = function(cg)
 end
 
 -- Check that value range check works with nullable fields.
-g.test_nullable = function(cg)
+g1.test_nullable = function(cg)
     cg.server:exec(function()
         local s = box.space.test
         s:format({{name = 'pk',  type = 'unsigned'},
@@ -185,7 +189,7 @@ g.test_nullable = function(cg)
 end
 
 -- Check that value range check works with default field values.
-g.test_default_values = function(cg)
+g1.test_default_values = function(cg)
     cg.server:exec(function()
         box.schema.func.create('foo', {
             language = 'Lua',
@@ -208,7 +212,7 @@ g.test_default_values = function(cg)
 end
 
 -- Test space format change with various combinations of old/new field type.
-g.test_format_change = function(cg)
+g1.test_format_change = function(cg)
     cg.server:exec(function()
         local ffi = require('ffi')
         local s = box.space.test
@@ -319,4 +323,59 @@ g.test_format_change = function(cg)
             s:truncate()
         end
     end)
+end
+
+local g2 = t.group('gh-9548-2', {
+    {engine = 'memtx', index = 'tree', is_nullable = false},
+    {engine = 'memtx', index = 'tree', is_nullable = true},
+    {engine = 'memtx', index = 'hash', is_nullable = false},
+    {engine = 'vinyl', index = 'tree', is_nullable = false},
+    {engine = 'vinyl', index = 'tree', is_nullable = true}
+})
+g2.before_all(before_all)
+g2.after_all(after_all)
+g2.before_each(before_each)
+g2.after_each(after_each)
+
+-- Check that fixed-size numeric types can be indexed.
+g2.test_indexed = function(cg)
+    cg.server:exec(function(index_type, is_nullable)
+        local ffi = require('ffi')
+        local s = box.space.test
+        s:format({{name = 'pk',  type = 'unsigned', is_nullable = is_nullable},
+                  {name = 'i8',  type = 'int8',     is_nullable = is_nullable},
+                  {name = 'u8',  type = 'uint8',    is_nullable = is_nullable},
+                  {name = 'i16', type = 'int16',    is_nullable = is_nullable},
+                  {name = 'u16', type = 'uint16',   is_nullable = is_nullable},
+                  {name = 'i32', type = 'int32',    is_nullable = is_nullable},
+                  {name = 'u32', type = 'uint32',   is_nullable = is_nullable},
+                  {name = 'i64', type = 'int64',    is_nullable = is_nullable},
+                  {name = 'u64', type = 'uint64',   is_nullable = is_nullable},
+                  {name = 'f32', type = 'float32',  is_nullable = is_nullable},
+                  {name = 'f64', type = 'float64',  is_nullable = is_nullable}})
+        s:create_index('i8',  {type = index_type, parts = {{field = 'i8'}}})
+        s:create_index('u8',  {type = index_type, parts = {{field = 'u8'}}})
+        s:create_index('i16', {type = index_type, parts = {{field = 'i16'}}})
+        s:create_index('u16', {type = index_type, parts = {{field = 'u16'}}})
+        s:create_index('i32', {type = index_type, parts = {{field = 'i32'}}})
+        s:create_index('u32', {type = index_type, parts = {{field = 'u32'}}})
+        s:create_index('i64', {type = index_type, parts = {{field = 'i64'}}})
+        s:create_index('u64', {type = index_type, parts = {{field = 'u64'}}})
+        s:create_index('f32', {type = index_type, parts = {{field = 'f32'}}})
+        s:create_index('f64', {type = index_type, parts = {{field = 'f64'}}})
+
+        local tuple = {0, -40, 40, -2^14, 2^14, -2^30, 2^30, -2^35, 2^35,
+                       ffi.cast('float', -0.5), ffi.cast('double', -1e100)}
+        s:insert(tuple)
+        t.assert_equals(s.index.i8:get(-40), tuple)
+        t.assert_equals(s.index.u8:get(40), tuple)
+        t.assert_equals(s.index.i16:get(-2^14), tuple)
+        t.assert_equals(s.index.u16:get(2^14), tuple)
+        t.assert_equals(s.index.i32:get(-2^30), tuple)
+        t.assert_equals(s.index.u32:get(2^30), tuple)
+        t.assert_equals(s.index.i64:get(-2^35), tuple)
+        t.assert_equals(s.index.u64:get(2^35), tuple)
+        t.assert_equals(s.index.f32:get(ffi.cast('float', -0.5)), tuple)
+        t.assert_equals(s.index.f64:get(ffi.cast('double', -1e100)), tuple)
+    end, {cg.params.index, cg.params.is_nullable})
 end

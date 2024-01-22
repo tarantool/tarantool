@@ -131,6 +131,22 @@ mp_compare_bool(const char *field_a, const char *field_b)
 }
 
 static int
+mp_compare_float32(const char *field_a, const char *field_b)
+{
+	float a_val = mp_decode_float(&field_a);
+	float b_val = mp_decode_float(&field_b);
+	return COMPARE_RESULT(a_val, b_val);
+}
+
+static int
+mp_compare_float64(const char *field_a, const char *field_b)
+{
+	double a_val = mp_decode_double(&field_a);
+	double b_val = mp_decode_double(&field_b);
+	return COMPARE_RESULT(a_val, b_val);
+}
+
+static int
 mp_compare_as_double(const char *field_a, const char *field_b)
 {
 	double a_val = mp_read_as_double(field_a);
@@ -497,18 +513,30 @@ tuple_compare_field(const char *field_a, const char *field_b,
 {
 	switch (type) {
 	case FIELD_TYPE_UNSIGNED:
+	case FIELD_TYPE_UINT8:
+	case FIELD_TYPE_UINT16:
+	case FIELD_TYPE_UINT32:
+	case FIELD_TYPE_UINT64:
 		return mp_compare_uint(field_a, field_b);
 	case FIELD_TYPE_STRING:
 		return coll != NULL ?
 		       mp_compare_str_coll(field_a, field_b, coll) :
 		       mp_compare_str(field_a, field_b);
 	case FIELD_TYPE_INTEGER:
+	case FIELD_TYPE_INT8:
+	case FIELD_TYPE_INT16:
+	case FIELD_TYPE_INT32:
+	case FIELD_TYPE_INT64:
 		return mp_compare_integer_with_type(field_a,
 						    mp_typeof(*field_a),
 						    field_b,
 						    mp_typeof(*field_b));
 	case FIELD_TYPE_NUMBER:
 		return mp_compare_number(field_a, field_b);
+	case FIELD_TYPE_FLOAT32:
+		return mp_compare_float32(field_a, field_b);
+	case FIELD_TYPE_FLOAT64:
+		return mp_compare_float64(field_a, field_b);
 	case FIELD_TYPE_DOUBLE:
 		return mp_compare_as_double(field_a, field_b);
 	case FIELD_TYPE_BOOLEAN:
@@ -538,17 +566,29 @@ tuple_compare_field_with_type(const char *field_a, enum mp_type a_type,
 {
 	switch (type) {
 	case FIELD_TYPE_UNSIGNED:
+	case FIELD_TYPE_UINT8:
+	case FIELD_TYPE_UINT16:
+	case FIELD_TYPE_UINT32:
+	case FIELD_TYPE_UINT64:
 		return mp_compare_uint(field_a, field_b);
 	case FIELD_TYPE_STRING:
 		return coll != NULL ?
 		       mp_compare_str_coll(field_a, field_b, coll) :
 		       mp_compare_str(field_a, field_b);
 	case FIELD_TYPE_INTEGER:
+	case FIELD_TYPE_INT8:
+	case FIELD_TYPE_INT16:
+	case FIELD_TYPE_INT32:
+	case FIELD_TYPE_INT64:
 		return mp_compare_integer_with_type(field_a, a_type,
 						    field_b, b_type);
 	case FIELD_TYPE_NUMBER:
 		return mp_compare_number_with_type(field_a, a_type,
 						   field_b, b_type);
+	case FIELD_TYPE_FLOAT32:
+		return mp_compare_float32(field_a, field_b);
+	case FIELD_TYPE_FLOAT64:
+		return mp_compare_float64(field_a, field_b);
 	case FIELD_TYPE_DOUBLE:
 		return mp_compare_as_double(field_a, field_b);
 	case FIELD_TYPE_BOOLEAN:
@@ -1811,6 +1851,20 @@ field_hint_integer(const char *field)
 }
 
 static inline hint_t
+field_hint_float32(const char *field)
+{
+	assert(mp_typeof(*field) == MP_FLOAT);
+	return hint_double(mp_decode_float(&field));
+}
+
+static inline hint_t
+field_hint_float64(const char *field)
+{
+	assert(mp_typeof(*field) == MP_DOUBLE);
+	return hint_double(mp_decode_double(&field));
+}
+
+static inline hint_t
 field_hint_double(const char *field)
 {
 	return hint_double(mp_read_as_double(field));
@@ -1963,11 +2017,23 @@ field_hint(const char *field, struct coll *coll)
 	case FIELD_TYPE_BOOLEAN:
 		return field_hint_boolean(field);
 	case FIELD_TYPE_UNSIGNED:
+	case FIELD_TYPE_UINT8:
+	case FIELD_TYPE_UINT16:
+	case FIELD_TYPE_UINT32:
+	case FIELD_TYPE_UINT64:
 		return field_hint_unsigned(field);
 	case FIELD_TYPE_INTEGER:
+	case FIELD_TYPE_INT8:
+	case FIELD_TYPE_INT16:
+	case FIELD_TYPE_INT32:
+	case FIELD_TYPE_INT64:
 		return field_hint_integer(field);
 	case FIELD_TYPE_NUMBER:
 		return field_hint_number(field);
+	case FIELD_TYPE_FLOAT32:
+		return field_hint_float32(field);
+	case FIELD_TYPE_FLOAT64:
+		return field_hint_float64(field);
 	case FIELD_TYPE_DOUBLE:
 		return field_hint_double(field);
 	case FIELD_TYPE_STRING:
@@ -2109,6 +2175,36 @@ key_def_set_hint_func(struct key_def *def)
 		break;
 	case FIELD_TYPE_DATETIME:
 		key_def_set_hint_func<FIELD_TYPE_DATETIME>(def);
+		break;
+	case FIELD_TYPE_INT8:
+		key_def_set_hint_func<FIELD_TYPE_INT8>(def);
+		break;
+	case FIELD_TYPE_UINT8:
+		key_def_set_hint_func<FIELD_TYPE_UINT8>(def);
+		break;
+	case FIELD_TYPE_INT16:
+		key_def_set_hint_func<FIELD_TYPE_INT16>(def);
+		break;
+	case FIELD_TYPE_UINT16:
+		key_def_set_hint_func<FIELD_TYPE_UINT16>(def);
+		break;
+	case FIELD_TYPE_INT32:
+		key_def_set_hint_func<FIELD_TYPE_INT32>(def);
+		break;
+	case FIELD_TYPE_UINT32:
+		key_def_set_hint_func<FIELD_TYPE_UINT32>(def);
+		break;
+	case FIELD_TYPE_INT64:
+		key_def_set_hint_func<FIELD_TYPE_INT64>(def);
+		break;
+	case FIELD_TYPE_UINT64:
+		key_def_set_hint_func<FIELD_TYPE_UINT64>(def);
+		break;
+	case FIELD_TYPE_FLOAT32:
+		key_def_set_hint_func<FIELD_TYPE_FLOAT32>(def);
+		break;
+	case FIELD_TYPE_FLOAT64:
+		key_def_set_hint_func<FIELD_TYPE_FLOAT64>(def);
 		break;
 	default:
 		/* Invalid key definition. */

@@ -685,18 +685,10 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 		diag_set(ClientError, ER_NULLABLE_PRIMARY, space_name(space));
 		return -1;
 	}
-	/* Check that there are no ANY, ARRAY, MAP parts */
-	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		struct key_part *part = &key_def->parts[i];
-		if (part->type <= FIELD_TYPE_ANY ||
-		    part->type >= FIELD_TYPE_ARRAY) {
-			diag_set(ClientError, ER_MODIFY_INDEX,
-				 index_def->name, space_name(space),
-				 tt_sprintf("field type '%s' is not supported",
-					    field_type_strs[part->type]));
-			return -1;
-		}
-	}
+
+	if (index_def_check_field_types(index_def, space_name(space)) != 0)
+		return -1;
+
 	if (key_def->for_func_index) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
 			 "functional index");
