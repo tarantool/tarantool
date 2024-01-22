@@ -34,6 +34,7 @@
 #include "tuple_format.h"
 #include "json/json.h"
 #include "fiber.h"
+#include "tt_static.h"
 
 const char *index_type_strs[] = { "HASH", "TREE", "BITSET", "RTREE" };
 
@@ -251,6 +252,26 @@ index_def_check(struct index_def *index_def, const char *space_name)
 					 "same key part is indexed twice");
 				return -1;
 			}
+		}
+	}
+	return 0;
+}
+
+int
+index_def_check_field_types(struct index_def *index_def, const char *space_name)
+{
+	struct key_def *key_def = index_def->key_def;
+
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		enum field_type type = key_def->parts[i].type;
+
+		if (type == FIELD_TYPE_ANY || type == FIELD_TYPE_INTERVAL ||
+		    type == FIELD_TYPE_ARRAY || type == FIELD_TYPE_MAP) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name,
+				 tt_sprintf("field type '%s' is not supported",
+					    field_type_strs[type]));
+			return -1;
 		}
 	}
 	return 0;

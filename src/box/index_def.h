@@ -302,12 +302,24 @@ index_def_cmp(const struct index_def *key1, const struct index_def *key2);
  * Check a key definition for violation of various limits.
  *
  * @param index_def index definition
- * @param old_space space definition
+ * @param space_name space name
  * @retval 0 Success.
  * @retval -1 Error. Diag is set.
  */
 int
 index_def_check(struct index_def *index_def, const char *space_name);
+
+/**
+ * Check types of tuple fields indexed by `index_def'.
+ *
+ * @param index_def index definition
+ * @param space_name space name
+ * @retval 0 Success.
+ * @retval -1 Error. Diag is set.
+ */
+int
+index_def_check_field_types(struct index_def *index_def,
+			    const char *space_name);
 
 #if defined(__cplusplus)
 } /* extern "C" */
