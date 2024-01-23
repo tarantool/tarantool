@@ -9,6 +9,10 @@ inputs:
     required: false
     default: tt_cicd_reports
     description: VK Teams chat ID
+  job-name:
+    required: false
+    default: ''
+    description: Workflow job name
 
 runs:
   using: composite
@@ -34,4 +38,9 @@ runs:
       with:
         bot-token: ${{ inputs.bot-token }}
         chat-id: ${{ env.CHAT_ID }}
-        job-name: ${{ github.job }} (${{ join(matrix.*, ', ') }})
+        # Unfortunately, the ChristopherHX/github-act-runner agent evaluates
+        # `join(matrix.*, ', ')` to `Object` instead of `a, b, c`. So let's
+        # have the facility to specify the job name manually to avoid the issue.
+        job-name: ${{
+          inputs.job-name ||
+          format('{0} ({1})', github.job, join(matrix.*, ', ')) }}
