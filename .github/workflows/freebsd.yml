@@ -46,6 +46,12 @@ jobs:
         uses: ./.github/actions/report-job-status
         with:
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+          # Specify the job name manually to avoid the issue with evaluating
+          # `join(matrix.*, ', ')` in ./.github/actions/report-job-status.
+          job-name: ${{ format(
+            'freebsd ({0}, {1})',
+            matrix.freebsd-version,
+            matrix.tarantool-branch) }}
 
       - name: Calculate short name for Tarantool branch
         if: failure()
