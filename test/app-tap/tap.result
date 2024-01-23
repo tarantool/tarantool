@@ -145,16 +145,16 @@ not ok - failed subtests
     not ok - {1} and {2}
       ---
       path: //1
-      strict: false
-      expected: 2
       got: 1
+      expected: 2
+      strict: false
       ...
     not ok - {1,2,{3,4}} and {1,2,{3,5}}
       ---
       path: //3/2
-      strict: false
-      expected: 5
       got: 4
+      expected: 5
+      strict: false
       ...
     ok - {} and {a = box.NULL} strict = false
     ok - {a = box.NULL} and {} strict = false
@@ -165,57 +165,57 @@ not ok - failed subtests
     ok - {a = box.NULL} and {a = box.NULL} strict false
     not ok - {} and {a = box.NULL} strict = true
       ---
-      strict: true
-      expected: key a
       got: nil
+      expected: key a
+      strict: true
       ...
     not ok - {a = box.NULL} and {} strict = true
       ---
       path: //a
-      strict: true
-      expected: nil
       got: cdata
+      expected: nil
+      strict: true
       ...
     not ok - {a = box.NULL} and {b = box.NULL} strict = true
       ---
       path: //a
-      strict: true
-      expected: nil
       got: cdata
+      expected: nil
+      strict: true
       ...
     not ok - {a = box.NULL} and {b = box.NULL, c = box.NULL} strict = true
       ---
       path: //a
-      strict: true
-      expected: nil
       got: cdata
+      expected: nil
+      strict: true
       ...
     not ok - nil and box.NULL strict = true
       ---
-      got: nil
-      expected: cdata
       strict: true
+      expected: cdata
+      got: nil
       ...
     not ok - box.NULL and nil strict = true
       ---
-      got: cdata
-      expected: nil
       strict: true
+      expected: nil
+      got: cdata
       ...
     ok - {a = box.NULL} and {a = box.NULL} strict true
         # check strict flag inheritance
         1..2
         not ok - {} and {a = box.NULL} strict = true
           ---
-          strict: true
-          expected: key a
           got: nil
+          expected: key a
+          strict: true
           ...
         not ok - nil and box.NULL strict = true
           ---
-          got: nil
-          expected: cdata
           strict: true
+          expected: cdata
+          got: nil
           ...
         # check strict flag inheritance: end
     not ok - failed subtests
@@ -237,20 +237,20 @@ not ok - failed subtests
 ok - like
 not ok - compare {1, 2, 3} and '200'
   ---
-  strict: false
-  expected: '200'
   got:
   - 1
   - 2
   - 3
+  expected: '200'
+  strict: false
   ...
 not ok - compare '200' and {1, 2, 3}
   ---
-  strict: false
+  got: '200'
   expected:
   - 1
   - 2
   - 3
-  got: '200'
+  strict: false
   ...
 # failed subtest: 21

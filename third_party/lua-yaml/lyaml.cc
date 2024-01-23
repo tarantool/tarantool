@@ -630,8 +630,6 @@ static int yaml_is_flow_mode(struct lua_yaml_dumper *dumper) {
    return 0;
 }
 
-static void find_references(struct lua_yaml_dumper *dumper);
-
 static int dump_node(struct lua_yaml_dumper *dumper)
 {
    size_t len = 0;
@@ -652,8 +650,6 @@ static int dump_node(struct lua_yaml_dumper *dumper)
 
    int top = lua_gettop(dumper->L);
    luaL_checkfield(dumper->L, dumper->cfg, top, &field);
-   if (field.serialized)
-      find_references(dumper);
    switch(field.type) {
    case MP_UINT:
       snprintf(buf, sizeof(buf) - 1, "%" PRIu64, field.ival);
@@ -819,6 +815,113 @@ static void find_references(struct lua_yaml_dumper *dumper) {
    }
 }
 
+/**
+ * Replace object at `obj_index` on stack with materialized one if it
+ * is found in reftable at `reftable_index` on stack.
+ *
+ * Return true if replace is done and false otherwise.
+ */
+static bool
+materialize_try_reftable(lua_State *L, int obj_index, int reftable_index)
+{
+   assert(reftable_index > 0);
+   if (obj_index < 0)
+      obj_index = lua_gettop(L) + obj_index + 1;
+   lua_pushvalue(L, obj_index);
+   lua_gettable(L, reftable_index);
+   if (!lua_isnil(L, -1)) {
+      /* replace object with materialized one */
+      lua_replace(L, obj_index);
+      return true;
+   }
+   lua_pop(L, 1);
+   return false;
+}
+
+/**
+ * Call luaL_checkfield recursively for object and replace object on stack
+ * with result. Object is at `obj_index` on stack.
+ *
+ * In the process remember the already seen objects in reference table and
+ * check it before materializing next object. Thus the materialized table
+ * keeps the reference structure of the original table. Also the reference
+ * table is checked for luaL_checkfield result so that reference structure
+ * brought by __serialize is kept too. Reference table is at `reftable_index`
+ * on stack.
+ *
+ * Also tables of materialized object keep the hints of __serialize as the
+ * hints affects later serialization.
+ */
+static void
+materialize(struct lua_yaml_dumper *dumper, int obj_index, int reftable_index)
+{
+   struct luaL_field field;
+   lua_State *L = dumper->L;
+
+   assert(reftable_index > 0);
+   if (obj_index < 0)
+      obj_index = lua_gettop(L) + obj_index + 1;
+
+   /* copy original object */
+   lua_pushvalue(L, obj_index);
+   /* check if object is already materialized in reference table */
+   if (materialize_try_reftable(L, -1, reftable_index))
+      goto finish;
+   /* may replace object copy with unpacked value */
+   luaL_checkfield(L, dumper->cfg, -1, &field);
+
+   if (lua_type(L, -1) == LUA_TTABLE) {
+      /* check if table is already materialized in reference table */
+      if (materialize_try_reftable(L, -1, reftable_index))
+         goto finish;
+
+      /* create materialized table */
+      lua_newtable(L);
+      lua_insert(L, -2);
+      int materialized_index = lua_gettop(L) - 1;
+
+      /* save original object -> materialized table in reference table */
+      lua_pushvalue(L, obj_index);
+      lua_pushvalue(L, materialized_index);
+      lua_settable(L, reftable_index);
+      /* save unpacked table -> materialized table in reference table */
+      lua_pushvalue(L, -1);
+      lua_pushvalue(L, materialized_index);
+      lua_settable(L, reftable_index);
+
+      lua_pushnil(L);
+      while (lua_next(L, -2)) {
+         /* copy key for iteration */
+         lua_pushvalue(L, -2);
+         lua_insert(L, -3);
+         materialize(dumper, -1, reftable_index);
+         materialize(dumper, -2, reftable_index);
+         lua_settable(L, materialized_index);
+      }
+
+      /* copy __serialize in case it is a hint like "map" etc */
+      if (luaL_getmetafield(L, -1, LUAL_SERIALIZE) == 1) {
+         /* stack: hint */
+         if (lua_isstring(L, -1)) {
+            /* metatable for materialized table */
+            lua_newtable(L); /* stack: meta, hint */
+            /* copy __serialize to new metatable */
+            lua_pushstring(L, LUAL_SERIALIZE); /* stack: __ser..., meta, hint */
+            lua_pushvalue(L, -3); /* stack: hint, "__serialize", meta, hint */
+            lua_settable(L, -3); /* stack: meta, hint */
+            lua_setmetatable(L, materialized_index); /* stack: hint */
+         }
+         /* pop hint */
+         lua_pop(L, 1);
+      }
+      /* pop unpacked, left materialized table on stack */
+      lua_pop(L, 1);
+   }
+finish:
+   /* replace original table with materialized one */
+   lua_replace(L, obj_index);
+}
+
 int
 lua_yaml_encode(lua_State *L, struct luaL_serializer *serializer,
                 const char *tag_handle, const char *tag_prefix)
@@ -864,6 +967,9 @@ lua_yaml_encode(lua_State *L, struct luaL_serializer *serializer,
    dumper.anchortable_index = lua_gettop(L);
    dumper.anchor_number = 0;
    lua_pushvalue(L, 1); /* push copy of arg we're processing */
+   lua_newtable(L); /* push reference table for materialize */
+   materialize(&dumper, -2, lua_gettop(L));
+   lua_pop(L, 1); /* pop reference table for materialize */
    find_references(&dumper);
    dump_document(&dumper);
    if (dumper.error)

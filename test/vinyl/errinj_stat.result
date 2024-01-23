@@ -45,10 +45,10 @@ dump()
 ...
 i:stat().disk.compaction.queue -- none
 ---
-- bytes_compressed: <bytes_compressed>
+- bytes: 0
   pages: 0
+  bytes_compressed: <bytes_compressed>
   rows: 0
-  bytes: 0
 ...
 i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
 ---
@@ -66,10 +66,10 @@ dump()
 ...
 i:stat().disk.compaction.queue -- 30 statements
 ---
-- bytes_compressed: <bytes_compressed>
+- bytes: 411
   pages: 3
+  bytes_compressed: <bytes_compressed>
   rows: 30
-  bytes: 411
 ...
 i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
 ---
@@ -80,10 +80,10 @@ dump()
 ...
 i:stat().disk.compaction.queue -- 40 statements
 ---
-- bytes_compressed: <bytes_compressed>
+- bytes: 548
   pages: 4
+  bytes_compressed: <bytes_compressed>
   rows: 40
-  bytes: 548
 ...
 i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
 ---
@@ -94,10 +94,10 @@ dump()
 ...
 i:stat().disk.compaction.queue -- 50 statements
 ---
-- bytes_compressed: <bytes_compressed>
+- bytes: 685
   pages: 5
+  bytes_compressed: <bytes_compressed>
   rows: 50
-  bytes: 685
 ...
 i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
 ---
@@ -108,10 +108,10 @@ box.stat.reset() -- doesn't affect queue size
 ...
 i:stat().disk.compaction.queue -- 50 statements
 ---
-- bytes_compressed: <bytes_compressed>
+- bytes: 685
   pages: 5
+  bytes_compressed: <bytes_compressed>
   rows: 50
-  bytes: 685
 ...
 i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
 ---
@@ -126,10 +126,10 @@ while i:stat().disk.compaction.count < 2 do fiber.sleep(0.01) end
 ...
 i:stat().disk.compaction.queue -- none
 ---
-- bytes_compressed: <bytes_compressed>
+- bytes: 0
   pages: 0
+  bytes_compressed: <bytes_compressed>
   rows: 0
-  bytes: 0
 ...
 s:drop()
 ---

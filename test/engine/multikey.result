@@ -53,11 +53,11 @@ _ = s:create_index('idx2', {parts = {{3, 'str', path = '[1].fname'}, {3, 'str', 
 ...
 s:insert({1, {1, 2, 3}, {{fname='James', sname='Bond'}, {fname='Vasya', sname='Pupkin'}}})
 ---
-- [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
+- [1, [1, 2, 3], [{'sname': 'Bond', 'fname': 'James'}, {'sname': 'Pupkin', 'fname': 'Vasya'}]]
 ...
 s:insert({2, {3, 4, 5}, {{fname='Ivan', sname='Ivanych'}}})
 ---
-- [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
+- [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
 ...
 _ = s:create_index('arr_idx', {unique = true, parts = {{2, 'unsigned', path = '[*]'}}})
 ---
@@ -72,30 +72,30 @@ arr_idx = s:create_index('arr_idx', {unique = false, parts = {{2, 'unsigned', pa
 ...
 arr_idx:select()
 ---
-- - [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
-  - [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
-  - [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
-  - [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
-  - [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
-  - [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
+- - [1, [1, 2, 3], [{'sname': 'Bond', 'fname': 'James'}, {'sname': 'Pupkin', 'fname': 'Vasya'}]]
+  - [1, [1, 2, 3], [{'sname': 'Bond', 'fname': 'James'}, {'sname': 'Pupkin', 'fname': 'Vasya'}]]
+  - [1, [1, 2, 3], [{'sname': 'Bond', 'fname': 'James'}, {'sname': 'Pupkin', 'fname': 'Vasya'}]]
+  - [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
+  - [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
+  - [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
 ...
 idx:get({'James', 'Bond'})
 ---
-- [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
+- [1, [1, 2, 3], [{'sname': 'Bond', 'fname': 'James'}, {'sname': 'Pupkin', 'fname': 'Vasya'}]]
 ...
 idx:get({'Ivan', 'Ivanych'})
 ---
-- [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
+- [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
 ...
 idx:get({'Vasya', 'Pupkin'})
 ---
-- [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
+- [1, [1, 2, 3], [{'sname': 'Bond', 'fname': 'James'}, {'sname': 'Pupkin', 'fname': 'Vasya'}]]
 ...
 idx:select()
 ---
-- - [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
-  - [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
-  - [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
+- - [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
+  - [1, [1, 2, 3], [{'sname': 'Bond', 'fname': 'James'}, {'sname': 'Pupkin', 'fname': 'Vasya'}]]
+  - [1, [1, 2, 3], [{'sname': 'Bond', 'fname': 'James'}, {'sname': 'Pupkin', 'fname': 'Vasya'}]]
 ...
 s:insert({3, {1, 2}, {{fname='Vasya', sname='Pupkin'}}})
 ---
@@ -112,21 +112,21 @@ s:insert({4, {1}, {{fname='James', sname='Bond'}}})
 ...
 idx:select()
 ---
-- - [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
-  - [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
-  - [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
+- - [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
+  - [1, [1, 2, 3], [{'sname': 'Bond', 'fname': 'James'}, {'sname': 'Pupkin', 'fname': 'Vasya'}]]
+  - [1, [1, 2, 3], [{'sname': 'Bond', 'fname': 'James'}, {'sname': 'Pupkin', 'fname': 'Vasya'}]]
 ...
 -- Duplicates in multikey parts.
 s:insert({5, {1, 1, 1}, {{fname='A', sname='B'}, {fname='C', sname='D'}, {fname='A', sname='B'}}})
 ---
-- [5, [1, 1, 1], [{'fname': 'A', 'sname': 'B'}, {'fname': 'C', 'sname': 'D'}, {'fname': 'A',
-      'sname': 'B'}]]
+- [5, [1, 1, 1], [{'sname': 'B', 'fname': 'A'}, {'sname': 'D', 'fname': 'C'}, {'sname': 'B',
+      'fname': 'A'}]]
 ...
 arr_idx:select({1})
 ---
-- - [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
-  - [5, [1, 1, 1], [{'fname': 'A', 'sname': 'B'}, {'fname': 'C', 'sname': 'D'}, {
-        'fname': 'A', 'sname': 'B'}]]
+- - [1, [1, 2, 3], [{'sname': 'Bond', 'fname': 'James'}, {'sname': 'Pupkin', 'fname': 'Vasya'}]]
+  - [5, [1, 1, 1], [{'sname': 'B', 'fname': 'A'}, {'sname': 'D', 'fname': 'C'}, {
+        'sname': 'B', 'fname': 'A'}]]
 ...
 _ = s:delete(5)
 ---
@@ -134,7 +134,7 @@ _ = s:delete(5)
 -- Check that there is no garbage in index.
 arr_idx:select({1})
 ---
-- - [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
+- - [1, [1, 2, 3], [{'sname': 'Bond', 'fname': 'James'}, {'sname': 'Pupkin', 'fname': 'Vasya'}]]
 ...
 idx:get({'A', 'B'})
 ---
@@ -147,22 +147,22 @@ _ = idx:delete({'Vasya', 'Pupkin'})
 ...
 s:insert({6, {1, 2}, {{fname='Vasya', sname='Pupkin'}}})
 ---
-- [6, [1, 2], [{'fname': 'Vasya', 'sname': 'Pupkin'}]]
+- [6, [1, 2], [{'sname': 'Pupkin', 'fname': 'Vasya'}]]
 ...
 s:insert({7, {1}, {{fname='James', sname='Bond'}}})
 ---
-- [7, [1], [{'fname': 'James', 'sname': 'Bond'}]]
+- [7, [1], [{'sname': 'Bond', 'fname': 'James'}]]
 ...
 arr_idx:select({1})
 ---
-- - [6, [1, 2], [{'fname': 'Vasya', 'sname': 'Pupkin'}]]
-  - [7, [1], [{'fname': 'James', 'sname': 'Bond'}]]
+- - [6, [1, 2], [{'sname': 'Pupkin', 'fname': 'Vasya'}]]
+  - [7, [1], [{'sname': 'Bond', 'fname': 'James'}]]
 ...
 idx:select()
 ---
-- - [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
-  - [7, [1], [{'fname': 'James', 'sname': 'Bond'}]]
-  - [6, [1, 2], [{'fname': 'Vasya', 'sname': 'Pupkin'}]]
+- - [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
+  - [7, [1], [{'sname': 'Bond', 'fname': 'James'}]]
+  - [6, [1, 2], [{'sname': 'Pupkin', 'fname': 'Vasya'}]]
 ...
 -- Snapshot & recovery.
 box.snapshot()
@@ -181,24 +181,24 @@ arr_idx = s.index["arr_idx"]
 ...
 s:select()
 ---
-- - [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
-  - [6, [1, 2], [{'fname': 'Vasya', 'sname': 'Pupkin'}]]
-  - [7, [1], [{'fname': 'James', 'sname': 'Bond'}]]
+- - [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
+  - [6, [1, 2], [{'sname': 'Pupkin', 'fname': 'Vasya'}]]
+  - [7, [1], [{'sname': 'Bond', 'fname': 'James'}]]
 ...
 idx:select()
 ---
-- - [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
-  - [7, [1], [{'fname': 'James', 'sname': 'Bond'}]]
-  - [6, [1, 2], [{'fname': 'Vasya', 'sname': 'Pupkin'}]]
+- - [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
+  - [7, [1], [{'sname': 'Bond', 'fname': 'James'}]]
+  - [6, [1, 2], [{'sname': 'Pupkin', 'fname': 'Vasya'}]]
 ...
 arr_idx:select()
 ---
-- - [6, [1, 2], [{'fname': 'Vasya', 'sname': 'Pupkin'}]]
-  - [7, [1], [{'fname': 'James', 'sname': 'Bond'}]]
-  - [6, [1, 2], [{'fname': 'Vasya', 'sname': 'Pupkin'}]]
-  - [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
-  - [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
-  - [2, [3, 4, 5], [{'fname': 'Ivan', 'sname': 'Ivanych'}]]
+- - [6, [1, 2], [{'sname': 'Pupkin', 'fname': 'Vasya'}]]
+  - [7, [1], [{'sname': 'Bond', 'fname': 'James'}]]
+  - [6, [1, 2], [{'sname': 'Pupkin', 'fname': 'Vasya'}]]
+  - [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
+  - [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
+  - [2, [3, 4, 5], [{'sname': 'Ivanych', 'fname': 'Ivan'}]]
 ...
 s:drop()
 ---
@@ -221,8 +221,8 @@ idx = s:create_index('idx', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str',
 ...
 s:insert({1, 1, {{fname='A1', extra={sname='A2'}}, {fname='B1'}, {fname='C1', extra={sname='C2'}}}})
 ---
-- [1, 1, [{'fname': 'A1', 'extra': {'sname': 'A2'}}, {'fname': 'B1'}, {'fname': 'C1',
-      'extra': {'sname': 'C2'}}]]
+- [1, 1, [{'extra': {'sname': 'A2'}, 'fname': 'A1'}, {'fname': 'B1'}, {'extra': {
+        'sname': 'C2'}, 'fname': 'C1'}]]
 ...
 s:drop()
 ---

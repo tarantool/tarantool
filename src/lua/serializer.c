@@ -329,7 +329,6 @@ lua_field_try_serialize(struct lua_State *L, struct luaL_serializer *cfg,
 		if (luaL_tofield(L, cfg, -1, field) != 0)
 			return -1;
 		lua_replace(L, idx);
-		field->serialized = true;
 		return 0;
 	}
 	if (!lua_isstring(L, -1)) {
@@ -441,7 +440,6 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 	field->type = MP_NIL;
 	field->ext_type = MP_UNKNOWN_EXTENSION;
 	field->compact = false;
-	field->serialized = false;
 
 	if (index < 0)
 		index = lua_gettop(L) + index + 1;

@@ -99,8 +99,8 @@ box.func["function1.args"]
   id: 66
   takes_raw_args: false
   setuid: false
-  is_multikey: false
   is_deterministic: false
+  is_multikey: false
   name: function1.args
   language: C
 ...
@@ -587,8 +587,8 @@ func
   id: 66
   takes_raw_args: false
   setuid: false
-  is_multikey: false
   is_deterministic: false
+  is_multikey: false
   comment: Divide two values
   name: divide
   language: LUA
@@ -660,8 +660,8 @@ func
   id: 66
   takes_raw_args: false
   setuid: false
-  is_multikey: false
   is_deterministic: false
+  is_multikey: false
   name: function1.divide
   language: C
 ...

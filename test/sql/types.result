@@ -46,11 +46,11 @@ box.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a NUMBER, b INT, c TEXT, d SC
 ...
 box.space.t1:format()
 ---
-- [{'type': 'string', 'nullable_action': 'abort', 'name': 'id', 'is_nullable': false},
-  {'type': 'number', 'nullable_action': 'none', 'name': 'a', 'is_nullable': true},
-  {'type': 'integer', 'nullable_action': 'none', 'name': 'b', 'is_nullable': true},
-  {'type': 'string', 'nullable_action': 'none', 'name': 'c', 'is_nullable': true},
-  {'type': 'scalar', 'nullable_action': 'none', 'name': 'd', 'is_nullable': true}]
+- [{'type': 'string', 'is_nullable': false, 'nullable_action': 'abort', 'name': 'id'},
+  {'type': 'number', 'is_nullable': true, 'nullable_action': 'none', 'name': 'a'},
+  {'type': 'integer', 'is_nullable': true, 'nullable_action': 'none', 'name': 'b'},
+  {'type': 'string', 'is_nullable': true, 'nullable_action': 'none', 'name': 'c'},
+  {'type': 'scalar', 'is_nullable': true, 'nullable_action': 'none', 'name': 'd'}]
 ...
 box.execute("CREATE VIEW v1 AS SELECT b + a, b - a FROM t1;")
 ---
@@ -58,8 +58,8 @@ box.execute("CREATE VIEW v1 AS SELECT b + a, b - a FROM t1;")
 ...
 box.space.v1:format()
 ---
-- [{'type': 'number', 'nullable_action': 'none', 'name': 'COLUMN_1', 'is_nullable': true},
-  {'type': 'number', 'nullable_action': 'none', 'name': 'COLUMN_2', 'is_nullable': true}]
+- [{'type': 'number', 'is_nullable': true, 'nullable_action': 'none', 'name': 'COLUMN_1'},
+  {'type': 'number', 'is_nullable': true, 'nullable_action': 'none', 'name': 'COLUMN_2'}]
 ...
 -- gh-2494: index's part also features correct declared type.
 --
@@ -1004,9 +1004,9 @@ box.execute("INSERT INTO t1 VALUES (18446744073709551615);")
 ...
 box.execute("INSERT INTO t1 VALUES (NULL);")
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 1
-  row_count: 1
 ...
 box.space.t1:drop()
 ---
@@ -1762,12 +1762,12 @@ box.execute('CREATE TABLE t (i INT PRIMARY KEY AUTOINCREMENT, d DOUBLE);')
 ...
 box.execute('INSERT INTO t(d) VALUES (10), (-2.0), (3.3), (18000000000000000000);')
 ---
-- autoincrement_ids:
+- row_count: 4
+  autoincrement_ids:
   - 1
   - 2
   - 3
   - 4
-  row_count: 4
 ...
 box.execute('SELECT * FROM t;')
 ---
@@ -2167,15 +2167,15 @@ box.execute([[CREATE TABLE ts (a INT PRIMARY KEY AUTOINCREMENT, s SCALAR);]])
 ...
 box.execute([[INSERT INTO ti(i) VALUES (NULL);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 1
-  row_count: 1
 ...
 box.execute([[INSERT INTO ti(i) VALUES (11);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 2
-  row_count: 1
 ...
 box.execute([[INSERT INTO ti(i) VALUES (100000000000000000000000000000000.1e0);]])
 ---
@@ -2184,9 +2184,9 @@ box.execute([[INSERT INTO ti(i) VALUES (100000000000000000000000000000000.1e0);]
 ...
 box.execute([[INSERT INTO ti(i) VALUES (33.0);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 3
-  row_count: 1
 ...
 box.execute([[INSERT INTO ti(i) VALUES (true);]])
 ---
@@ -2217,15 +2217,15 @@ box.execute([[SELECT * FROM ti;]])
 ...
 box.execute([[INSERT INTO td(d) VALUES (NULL);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 1
-  row_count: 1
 ...
 box.execute([[INSERT INTO td(d) VALUES (11);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 2
-  row_count: 1
 ...
 box.execute([[INSERT INTO td(d) VALUES (100000000000000001);;]])
 ---
@@ -2234,9 +2234,9 @@ box.execute([[INSERT INTO td(d) VALUES (100000000000000001);;]])
 ...
 box.execute([[INSERT INTO td(d) VALUES (22.2);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 3
-  row_count: 1
 ...
 box.execute([[INSERT INTO td(d) VALUES (true);]])
 ---
@@ -2267,9 +2267,9 @@ box.execute([[SELECT * FROM td;]])
 ...
 box.execute([[INSERT INTO tb(b) VALUES (NULL);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 1
-  row_count: 1
 ...
 box.execute([[INSERT INTO tb(b) VALUES (11);]])
 ---
@@ -2283,9 +2283,9 @@ box.execute([[INSERT INTO tb(b) VALUES (22.2);]])
 ...
 box.execute([[INSERT INTO tb(b) VALUES (true);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 2
-  row_count: 1
 ...
 box.execute([[INSERT INTO tb(b) VALUES ('33');]])
 ---
@@ -2310,9 +2310,9 @@ box.execute([[SELECT * FROM tb;]])
 ...
 box.execute([[INSERT INTO tt(t) VALUES (NULL);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 1
-  row_count: 1
 ...
 box.execute([[INSERT INTO tt(t) VALUES (11);]])
 ---
@@ -2331,9 +2331,9 @@ box.execute([[INSERT INTO tt(t) VALUES (true);]])
 ...
 box.execute([[INSERT INTO tt(t) VALUES ('33');]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 2
-  row_count: 1
 ...
 box.execute([[INSERT INTO tt(t) VALUES (X'3434');]])
 ---
@@ -2353,9 +2353,9 @@ box.execute([[SELECT * FROM tt;]])
 ...
 box.execute([[INSERT INTO tv(v) VALUES (NULL);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 1
-  row_count: 1
 ...
 box.execute([[INSERT INTO tv(v) VALUES (11);]])
 ---
@@ -2379,9 +2379,9 @@ box.execute([[INSERT INTO tv(v) VALUES ('33');]])
 ...
 box.execute([[INSERT INTO tv(v) VALUES (X'3434');]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 2
-  row_count: 1
 ...
 box.execute([[SELECT * FROM tv;]])
 ---
@@ -2396,39 +2396,39 @@ box.execute([[SELECT * FROM tv;]])
 ...
 box.execute([[INSERT INTO ts(s) VALUES (NULL);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 1
-  row_count: 1
 ...
 box.execute([[INSERT INTO ts(s) VALUES (11);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 2
-  row_count: 1
 ...
 box.execute([[INSERT INTO ts(s) VALUES (22.2);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 3
-  row_count: 1
 ...
 box.execute([[INSERT INTO ts(s) VALUES (true);]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 4
-  row_count: 1
 ...
 box.execute([[INSERT INTO ts(s) VALUES ('33');]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 5
-  row_count: 1
 ...
 box.execute([[INSERT INTO ts(s) VALUES (X'3434');]])
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 6
-  row_count: 1
 ...
 box.execute([[SELECT * FROM ts;]])
 ---

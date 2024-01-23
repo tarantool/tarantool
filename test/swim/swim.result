@@ -136,9 +136,9 @@ s:cfg{gc_mode = 'off'}
 ...
 s.cfg
 ---
-- gc_mode: off
+- uri: 127.0.0.1:<port>
+  gc_mode: off
   uuid: 00000000-0000-1000-8000-000000000001
-  uri: 127.0.0.1:<port>
 ...
 s.cfg.gc_mode
 ---
@@ -1263,9 +1263,9 @@ m_list
 e_list
 ---
 - - is_new_version: true
-    is_update: true
-    is_new_uri: true
     is_new: true
+    is_new_uri: true
+    is_update: true
     is_new_incarnation: true
 ...
 ctx_list
@@ -1352,13 +1352,13 @@ e_list
 ---
 - - is_new: true
   - is_new_payload: true
+    is_update: true
     is_new_version: true
     is_new_incarnation: true
-    is_update: true
   - is_new_payload: true
+    is_update: true
     is_new_version: true
     is_new_incarnation: true
-    is_update: true
 ...
 ctx_list
 ---
@@ -1399,8 +1399,8 @@ m_list
 ...
 e_list
 ---
-- - is_new_status: true
-    is_update: true
+- - is_update: true
+    is_new_status: true
   - is_drop: true
 ...
 ctx_list

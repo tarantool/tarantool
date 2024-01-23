@@ -71,9 +71,9 @@ execute("SELECT c FROM t;")
  | - metadata:
  |   - span: c
  |     type: string
- |     is_nullable: true
- |     name: c
  |     collation: unicode_ci
+ |     name: c
+ |     is_nullable: true
  |   rows:
  |   - ['aSd']
  | ...
@@ -95,18 +95,18 @@ execute("SELECT id, a, c FROM t;")
  | - metadata:
  |   - span: id
  |     type: integer
- |     is_autoincrement: true
- |     name: id
  |     is_nullable: false
+ |     name: id
+ |     is_autoincrement: true
  |   - type: integer
  |     span: a
  |     name: a
  |     is_nullable: false
  |   - span: c
  |     type: string
- |     is_nullable: true
- |     name: c
  |     collation: unicode_ci
+ |     name: c
+ |     is_nullable: true
  |   rows:
  |   - [1, 1, 'aSd']
  | ...
@@ -115,18 +115,18 @@ execute("SELECT * FROM t;")
  | - metadata:
  |   - span: id
  |     type: integer
- |     is_autoincrement: true
- |     name: id
  |     is_nullable: false
+ |     name: id
+ |     is_autoincrement: true
  |   - type: integer
  |     span: a
  |     name: a
  |     is_nullable: false
  |   - span: c
  |     type: string
- |     is_nullable: true
- |     name: c
  |     collation: unicode_ci
+ |     name: c
+ |     is_nullable: true
  |   rows:
  |   - [1, 1, 'aSd']
  | ...
@@ -148,18 +148,18 @@ execute("SELECT *, id + 1 AS x, a AS y, c || 'abc' FROM t;")
  | - metadata:
  |   - span: id
  |     type: integer
- |     is_autoincrement: true
- |     name: id
  |     is_nullable: false
+ |     name: id
+ |     is_autoincrement: true
  |   - type: integer
  |     span: a
  |     name: a
  |     is_nullable: false
  |   - span: c
  |     type: string
- |     is_nullable: true
- |     name: c
  |     collation: unicode_ci
+ |     name: c
+ |     is_nullable: true
  |   - type: integer
  |     span: id + 1
  |     name: x

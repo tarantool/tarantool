@@ -274,7 +274,7 @@ r, _ = msgpack.decode_unchecked(ibuf.rpos)
 ...
 r
 ---
-- {96: {}, 48: [300]}
+- {48: [300], 96: {}}
 ...
 --
 -- Test error in __serialize.

@@ -277,8 +277,8 @@ tostring(future)
 ...
 future
 ---
-- xyz: abc
-  abc: 123
+- abc: 123
+  xyz: abc
 ...
 future:wait_result()
 ---

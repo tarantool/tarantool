@@ -71,13 +71,13 @@ box.execute("CREATE TRIGGER T2T AFTER INSERT ON T FOR EACH ROW BEGIN INSERT INTO
 ...
 box.space._space.index['name']:get('T')
 ---
-- [513, 1, 'T', 'memtx', 1, {}, [{'type': 'integer', 'nullable_action': 'abort', 'name': 'X',
-      'is_nullable': false}]]
+- [513, 1, 'T', 'memtx', 1, {}, [{'type': 'integer', 'is_nullable': false, 'nullable_action': 'abort',
+      'name': 'X'}]]
 ...
 box.space._space.index['name']:get('T_OUT')
 ---
-- [514, 1, 'T_OUT', 'memtx', 1, {}, [{'type': 'integer', 'nullable_action': 'abort',
-      'name': 'X', 'is_nullable': false}]]
+- [514, 1, 'T_OUT', 'memtx', 1, {}, [{'type': 'integer', 'is_nullable': false, 'nullable_action': 'abort',
+      'name': 'X'}]]
 ...
 t1t = box.space._trigger:get('T1T')
 ---

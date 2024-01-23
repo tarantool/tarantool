@@ -89,7 +89,7 @@ s:insert{7, 7, {town = 'London', FIO = {fname = "James"}}, 4, 5}
 ...
 s:insert{7, 7, {town = 'London', FIO = {fname = 'James', sname = 'Bond'}}, 4, 5}
 ---
-- [7, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+- [7, 7, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}, 4, 5]
 ...
 s:insert{7, 7, {town = 'London', FIO = {fname = 'James', sname = 'Bond'}}, 4, 5}
 ---
@@ -112,13 +112,13 @@ s:insert{7, 7, {town = 'Moscow', FIO = {fname = 'Max', sname = 'Isaev', data = "
 ...
 idx:select()
 ---
-- - [7, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+- - [7, 7, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}, 4, 5]
   - [7, 7, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'data': 'extra', 'sname': 'Isaev'}},
     4, 5]
 ...
 idx:min()
 ---
-- [7, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+- [7, 7, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}, 4, 5]
 ...
 idx:max()
 ---
@@ -200,7 +200,7 @@ sk3.path == sk4.path
 ...
 s:insert{{town = 'London', FIO = {fname = 'James', sname = 'Bond'}}, "mi6"}
 ---
-- [{'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 'mi6']
+- [{'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}, 'mi6']
 ...
 s:insert{{town = 'Moscow', FIO = {fname = 'Max', sname = 'Isaev', data = "extra"}}, "test"}
 ---
@@ -262,11 +262,11 @@ s:insert{1, 1, 7, {town = 'London', FIO = 1234}, 4, 5}
 ...
 s:insert{2, 2, 7, {town = 'London', FIO = {fname = 'James', sname = 'Bond'}}, 4, 5}
 ---
-- [2, 2, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+- [2, 2, 7, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}, 4, 5]
 ...
 s:insert{3, 3, 7, {town = 'London', FIO = {fname = 'James', sname = 'Bond'}}, 4, 5}
 ---
-- [3, 3, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+- [3, 3, 7, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}, 4, 5]
 ...
 s:insert{4, 4, 7, {town = 'London', FIO = {1,2,3}}, 4, 5}
 ---
@@ -322,17 +322,17 @@ t = s:insert{5, 5, 7, {town = 'Matrix', FIO = {fname = 'Agent', sname = 'Smith'}
 ...
 idx:select()
 ---
-- - [5, 5, 7, {'town': 'Matrix', 'FIO': {'fname': 'Agent', 'sname': 'Smith'}}, 4,
+- - [5, 5, 7, {'town': 'Matrix', 'FIO': {'sname': 'Smith', 'fname': 'Agent'}}, 4,
     5]
-  - [3, 3, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+  - [3, 3, 7, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}, 4, 5]
 ...
 idx:min()
 ---
-- [5, 5, 7, {'town': 'Matrix', 'FIO': {'fname': 'Agent', 'sname': 'Smith'}}, 4, 5]
+- [5, 5, 7, {'town': 'Matrix', 'FIO': {'sname': 'Smith', 'fname': 'Agent'}}, 4, 5]
 ...
 idx:max()
 ---
-- [3, 3, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+- [3, 3, 7, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}, 4, 5]
 ...
 idx:drop()
 ---
@@ -563,45 +563,45 @@ name = s:create_index('name', {parts = {{3, 'string', path = 'FIO.fname'}, {3, '
 ...
 s:insert{1, 1, {town = 'Moscow', FIO = {fname = 'Max', sname = 'Isaev'}}}
 ---
-- [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+- [1, 1, {'town': 'Moscow', 'FIO': {'sname': 'Isaev', 'fname': 'Max'}}]
 ...
 s:insert{1, 777, {town = 'London', FIO = {fname = 'James', sname = 'Bond'}}}
 ---
-- [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
+- [1, 777, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}]
 ...
 s:insert{1, 45, {town = 'Berlin', FIO = {fname = 'Richard', sname = 'Sorge'}}}
 ---
-- [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+- [1, 45, {'town': 'Berlin', 'FIO': {'sname': 'Sorge', 'fname': 'Richard'}}]
 ...
 s:insert{4, 45, {town = 'Berlin', FIO = {fname = 'Max', extra = 'Otto', sname = 'Stierlitz'}}}
 ---
-- [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
+- [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz', 'extra': 'Otto'}}]
 ...
 pk:select({1})
 ---
-- - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
-  - [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
-  - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+- - [1, 45, {'town': 'Berlin', 'FIO': {'sname': 'Sorge', 'fname': 'Richard'}}]
+  - [1, 777, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}]
+  - [1, 1, {'town': 'Moscow', 'FIO': {'sname': 'Isaev', 'fname': 'Max'}}]
 ...
 pk:select({1, 'Berlin'})
 ---
-- - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+- - [1, 45, {'town': 'Berlin', 'FIO': {'sname': 'Sorge', 'fname': 'Richard'}}]
 ...
 name:select({})
 ---
-- - [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
-  - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
-  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
-  - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+- - [1, 777, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}]
+  - [1, 1, {'town': 'Moscow', 'FIO': {'sname': 'Isaev', 'fname': 'Max'}}]
+  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz', 'extra': 'Otto'}}]
+  - [1, 45, {'town': 'Berlin', 'FIO': {'sname': 'Sorge', 'fname': 'Richard'}}]
 ...
 name:select({'Max'})
 ---
-- - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
-  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
+- - [1, 1, {'town': 'Moscow', 'FIO': {'sname': 'Isaev', 'fname': 'Max'}}]
+  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz', 'extra': 'Otto'}}]
 ...
 name:get({'Max', 'Stierlitz', 'Otto'})
 ---
-- [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
+- [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz', 'extra': 'Otto'}}]
 ...
 box.snapshot()
 ---
@@ -622,56 +622,56 @@ name = s.index["name"]
 ...
 pk:select({1})
 ---
-- - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
-  - [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
-  - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+- - [1, 45, {'town': 'Berlin', 'FIO': {'sname': 'Sorge', 'fname': 'Richard'}}]
+  - [1, 777, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}]
+  - [1, 1, {'town': 'Moscow', 'FIO': {'sname': 'Isaev', 'fname': 'Max'}}]
 ...
 pk:select({1, 'Berlin'})
 ---
-- - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+- - [1, 45, {'town': 'Berlin', 'FIO': {'sname': 'Sorge', 'fname': 'Richard'}}]
 ...
 name:select({})
 ---
-- - [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
-  - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
-  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
-  - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+- - [1, 777, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}]
+  - [1, 1, {'town': 'Moscow', 'FIO': {'sname': 'Isaev', 'fname': 'Max'}}]
+  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz', 'extra': 'Otto'}}]
+  - [1, 45, {'town': 'Berlin', 'FIO': {'sname': 'Sorge', 'fname': 'Richard'}}]
 ...
 name:select({'Max'})
 ---
-- - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
-  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
+- - [1, 1, {'town': 'Moscow', 'FIO': {'sname': 'Isaev', 'fname': 'Max'}}]
+  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz', 'extra': 'Otto'}}]
 ...
 name:get({'Max', 'Stierlitz', 'Otto'})
 ---
-- [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
+- [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz', 'extra': 'Otto'}}]
 ...
 s:replace{4, 45, {town = 'Berlin', FIO = {fname = 'Max', sname = 'Stierlitz'}}}
 ---
-- [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz'}}]
+- [4, 45, {'town': 'Berlin', 'FIO': {'sname': 'Stierlitz', 'fname': 'Max'}}]
 ...
 name:select({'Max', 'Stierlitz'})
 ---
-- - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz'}}]
+- - [4, 45, {'town': 'Berlin', 'FIO': {'sname': 'Stierlitz', 'fname': 'Max'}}]
 ...
 town = s:create_index('town', {unique = false, parts = {{3, 'string', path = 'town'}}})
 ---
 ...
 town:select({'Berlin'})
 ---
-- - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
-  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz'}}]
+- - [1, 45, {'town': 'Berlin', 'FIO': {'sname': 'Sorge', 'fname': 'Richard'}}]
+  - [4, 45, {'town': 'Berlin', 'FIO': {'sname': 'Stierlitz', 'fname': 'Max'}}]
 ...
 _ = s:delete({4, 'Berlin'})
 ---
 ...
 town:select({'Berlin'})
 ---
-- - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+- - [1, 45, {'town': 'Berlin', 'FIO': {'sname': 'Sorge', 'fname': 'Richard'}}]
 ...
 s:update({1, 'Berlin'}, {{"+", 2, 45}})
 ---
-- [1, 90, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+- [1, 90, {'town': 'Berlin', 'FIO': {'sname': 'Sorge', 'fname': 'Richard'}}]
 ...
 box.snapshot()
 ---
@@ -682,18 +682,18 @@ s:upsert({1, 90, {town = 'Berlin', FIO = {fname = 'X', sname = 'Y'}}}, {{'+', 2,
 ...
 town:select()
 ---
-- - [1, 91, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
-  - [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
-  - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+- - [1, 91, {'town': 'Berlin', 'FIO': {'sname': 'Sorge', 'fname': 'Richard'}}]
+  - [1, 777, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}]
+  - [1, 1, {'town': 'Moscow', 'FIO': {'sname': 'Isaev', 'fname': 'Max'}}]
 ...
 name:drop()
 ---
 ...
 town:select()
 ---
-- - [1, 91, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
-  - [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
-  - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+- - [1, 91, {'town': 'Berlin', 'FIO': {'sname': 'Sorge', 'fname': 'Richard'}}]
+  - [1, 777, {'town': 'London', 'FIO': {'sname': 'Bond', 'fname': 'James'}}]
+  - [1, 1, {'town': 'Moscow', 'FIO': {'sname': 'Isaev', 'fname': 'Max'}}]
 ...
 s:drop()
 ---
@@ -728,8 +728,8 @@ idx0 = s:create_index('idx2', {parts = {{3, 'str', path = '[1].fname'}, {3, 'str
 ...
 s:insert({5, {1, 1, 1}, {{fname='A', sname='B'}, {fname='C', sname='D'}, {fname='A', sname='B'}}})
 ---
-- [5, [1, 1, 1], [{'fname': 'A', 'sname': 'B'}, {'fname': 'C', 'sname': 'D'}, {'fname': 'A',
-      'sname': 'B'}]]
+- [5, [1, 1, 1], [{'sname': 'B', 'fname': 'A'}, {'sname': 'D', 'fname': 'C'}, {'sname': 'B',
+      'fname': 'A'}]]
 ...
 _ = s:delete(5)
 ---

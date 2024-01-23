@@ -241,8 +241,6 @@ struct luaL_field {
 	/* subtypes of MP_EXT */
 	enum mp_extension_type ext_type;
 	bool compact;                /* a flag used by YAML serializer */
-	/** Set if __serialize metamethod was called for this field. */
-	bool serialized;
 };
 
 /**

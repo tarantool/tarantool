@@ -375,14 +375,14 @@ box.execute('CREATE TRIGGER r2 INSTEAD OF UPDATE ON v FOR EACH ROW BEGIN INSERT 
 ...
 box.execute('INSERT INTO t VALUES (NULL, 1), (NULL, 1), (NULL, 1), (NULL, 2), (NULL, 3), (NULL, 3);')
 ---
-- autoincrement_ids:
+- row_count: 6
+  autoincrement_ids:
   - 1
   - 2
   - 3
   - 4
   - 5
   - 6
-  row_count: 6
 ...
 box.execute('DELETE FROM v;')
 ---

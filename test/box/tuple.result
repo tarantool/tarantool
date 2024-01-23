@@ -215,11 +215,11 @@ box.tuple.new{{'a', 'b'}, {'c', 'd'}, {'e', 'f'}}
 ...
 box.tuple.new{{1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6}}
 ---
-- [[1, 2], 'x', 'y', 'z', {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
+- [[1, 2], 'x', 'y', 'z', {'c': 3, 'd': 4}, {'f': 6, 'e': 5}]
 ...
 box.tuple.new{'x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6}}
 ---
-- ['x', 'y', 'z', [1, 2], {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
+- ['x', 'y', 'z', [1, 2], {'c': 3, 'd': 4}, {'f': 6, 'e': 5}]
 ...
 t=box.tuple.new{'a','b','c'}
 ---
@@ -517,9 +517,9 @@ gen, init, state = t:pairs()
 ...
 gen, init, state
 ---
-- gen: <tuple iterator>
-  param: ['a', 'b', 'c']
-- ['a', 'b', 'c']
+- param: &0 ['a', 'b', 'c']
+  gen: <tuple iterator>
+- *0
 - null
 ...
 state, val = gen(init, state)
@@ -624,17 +624,17 @@ r
 ...
 t:pairs(nil)
 ---
-- gen: <tuple iterator>
-  param: ['a', 'b', 'c']
-- ['a', 'b', 'c']
+- param: &0 ['a', 'b', 'c']
+  gen: <tuple iterator>
+- *0
 - null
 ...
 t:pairs("fdsaf")
 ---
 - state: fdsaf
+  param: &0 ['a', 'b', 'c']
   gen: <tuple iterator>
-  param: ['a', 'b', 'c']
-- ['a', 'b', 'c']
+- *0
 - fdsaf
 ...
 --------------------------------------------------------------------------------
@@ -1232,9 +1232,9 @@ s2:frommap({a="1", k="11"}):tomap({names_only = true})
   f: null
   c: null
   g: null
-  b: null
-  j: null
   k: '11'
+  j: null
+  b: null
   d: null
   h: null
   a: '1'

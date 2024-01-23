@@ -75,11 +75,11 @@ argparse({'tarantoolctl', 'start', 'instance', '-vovov'})
 - 1: tarantoolctl
   2: start
   3: instance
-  o:
-  - true
-  - true
   v:
   - true
+  - true
+  - true
+  o:
   - true
   - true
 ...

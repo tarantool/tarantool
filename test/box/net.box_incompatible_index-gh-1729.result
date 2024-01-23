@@ -30,24 +30,24 @@ c = net:connect(box.cfg.listen)
 c.space.test.index.primary.parts
 ---
 - - fieldno: 1
-    type: unsigned
     exclude_null: false
     is_nullable: false
+    type: unsigned
 ...
 c.space.test.index.covering.parts
 ---
 - - fieldno: 1
-    type: unsigned
     exclude_null: false
     is_nullable: false
+    type: unsigned
   - fieldno: 3
+    exclude_null: false
+    is_nullable: false
     type: string
-    exclude_null: false
-    is_nullable: false
   - fieldno: 2
-    type: unsigned
     exclude_null: false
     is_nullable: false
+    type: unsigned
 ...
 box.space.test:drop()
 ---

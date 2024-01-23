@@ -575,15 +575,15 @@ box.space.test.index.pk
     type: unsigned
     exclude_null: false
     is_nullable: false
+  id: 0
+  space_id: 512
+  type: TREE
+  name: pk
   options:
     page_size: 8192
     run_count_per_level: 2
     run_size_ratio: 3.5
     bloom_fpr: 0.05
-  id: 0
-  space_id: 512
-  type: TREE
-  name: pk
 ...
 box.space.test:drop()
 ---

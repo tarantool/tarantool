@@ -41,9 +41,9 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY AUTOINCREMENT);")
 ...
 box.execute("INSERT INTO t1 VALUES (NULL);")
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 1
-  row_count: 1
 ...
 box.snapshot()
 ---

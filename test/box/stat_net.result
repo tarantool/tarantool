@@ -8,25 +8,25 @@ test_run = env.new()
 test_run:cmd('restart server default')
 box.stat.net.SENT -- zero
 ---
-- total: 0
-  rps: 0
+- rps: 0
+  total: 0
 ...
 box.stat.net.RECEIVED -- zero
 ---
-- total: 0
-  rps: 0
+- rps: 0
+  total: 0
 ...
 box.stat.net.CONNECTIONS -- zero
 ---
-- current: 0
+- total: 0
+  current: 0
   rps: 0
-  total: 0
 ...
 box.stat.net.REQUESTS -- zero
 ---
-- current: 0
+- total: 0
+  current: 0
   rps: 0
-  total: 0
 ...
 space = box.schema.space.create('tweedledum')
 ---

@@ -937,8 +937,8 @@ tuple:tomap()
 - 1: 1
   2: 2
   3: 3
-  third: 3
   second: 2
+  third: 3
   first: 1
 ...
 -- Should be NULL

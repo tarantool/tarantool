@@ -3890,8 +3890,8 @@ s:create_index('sk', {parts = {{2, 'unsigned'}}})
  |   hint: true
  |   id: 1
  |   type: TREE
- |   space_id: 512
  |   name: sk
+ |   space_id: 512
  | ...
 
 ch1:put(true)

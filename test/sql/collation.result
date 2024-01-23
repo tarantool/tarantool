@@ -395,9 +395,9 @@ box.execute('CREATE TABLE t1 (s1 INT PRIMARY KEY, s0 VARCHAR(5) COLLATE "unicode
 ...
 box.execute("INSERT INTO t0(s1) VALUES ('a');")
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 1
-  row_count: 1
 ...
 box.execute("INSERT INTO t1 VALUES (1,'a');")
 ---
@@ -445,9 +445,9 @@ box.execute('CREATE TABLE t1 (s1 INT PRIMARY KEY, s0 VARCHAR(5) REFERENCES t0(s1
 ...
 box.execute("INSERT INTO t0(s1) VALUES ('a');")
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 1
-  row_count: 1
 ...
 box.execute("INSERT INTO t1 VALUES (1,'a');")
 ---

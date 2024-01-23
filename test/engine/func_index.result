@@ -276,13 +276,13 @@ e:unpack()
  | - code: 198
  |   base_type: ClientError
  |   type: ClientError
- |   prev: '[string "return function(tuple)                 local ..."]:1: attempt to
- |     call global ''require'' (a nil value)'
- |   message: 'Failed to build a key for functional index ''idx'' of space ''withdata'':
- |     can''t evaluate function'
  |   trace:
  |   - file: <filename>
  |     line: <line>
+ |   message: 'Failed to build a key for functional index ''idx'' of space ''withdata'':
+ |     can''t evaluate function'
+ |   prev: '[string "return function(tuple)                 local ..."]:1: attempt to
+ |     call global ''require'' (a nil value)'
  | ...
 e = e.prev
  | ---

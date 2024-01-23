@@ -47,8 +47,8 @@ s1:create_index('pk')
  |   hint: true
  |   id: 0
  |   type: TREE
- |   space_id: 512
  |   name: pk
+ |   space_id: 512
  | ...
 
 for i = 0, 10 do s1:replace{i} end

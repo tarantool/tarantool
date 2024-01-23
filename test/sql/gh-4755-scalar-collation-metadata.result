@@ -28,14 +28,14 @@ box.execute("SELECT * FROM SEQSCAN test;");
  | - metadata:
  |   - span: a
  |     type: scalar
- |     is_nullable: false
- |     name: a
  |     collation: unicode_ci
+ |     name: a
+ |     is_nullable: false
  |   - span: b
  |     type: string
- |     is_nullable: true
- |     name: b
  |     collation: unicode_ci
+ |     name: b
+ |     is_nullable: true
  |   rows: []
  | ...
 

@@ -110,7 +110,7 @@ result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ...
 result
 ---
-- {96: {}, 48: [1, 2, 3]}
+- {48: [1, 2, 3], 96: {}}
 ...
 box.schema.func.drop('long_function')
 ---

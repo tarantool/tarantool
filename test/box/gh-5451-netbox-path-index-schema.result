@@ -28,26 +28,26 @@ c = netbox.connect(box.cfg.listen)
 c.space.gh5451.index[0].parts
 ---
 - - fieldno: 1
-    path: path1
     type: unsigned
     exclude_null: false
     is_nullable: false
+    path: path1
 ...
 c.space.gh5451.index[1].parts
 ---
 - - fieldno: 2
-    path: path2
     type: unsigned
     exclude_null: false
     is_nullable: false
+    path: path2
 ...
 c.space.gh5451.index[2].parts
 ---
 - - fieldno: 3
-    path: '[*]'
     type: unsigned
     exclude_null: false
     is_nullable: false
+    path: '[*]'
 ...
 c:close()
 ---

@@ -31,43 +31,43 @@ s:get{1}:tomap()
 ---
 - 1: 1
   2: 1
-  abc: 1
   id: 1
+  abc: 1
 ...
 s:insert{2,3}:tomap()
 ---
 - 1: 2
   2: 3
-  abc: 3
   id: 2
+  abc: 3
 ...
 s:replace{2,14}:tomap()
 ---
 - 1: 2
   2: 14
-  abc: 14
   id: 2
+  abc: 14
 ...
 s:update(1, {{'+', 2, 10}}):tomap()
 ---
 - 1: 1
   2: 11
-  abc: 11
   id: 1
+  abc: 11
 ...
 s:select()[1]:tomap()
 ---
 - 1: 1
   2: 11
-  abc: 11
   id: 1
+  abc: 11
 ...
 s:delete({2}):tomap()
 ---
 - 1: 2
   2: 14
-  abc: 14
   id: 2
+  abc: 14
 ...
 -- Check that formats changes after reload.
 box.space.named:format({{name = "id2"}, {name="abc2"}})
@@ -77,8 +77,8 @@ s:select()[1]:tomap()
 ---
 - 1: 1
   2: 11
-  abc: 11
   id: 1
+  abc: 11
 ...
 cn:reload_schema()
 ---

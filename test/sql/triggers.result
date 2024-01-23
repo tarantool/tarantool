@@ -600,11 +600,11 @@ box.execute('INSERT INTO t1 VALUES (100);')
 ...
 box.execute('INSERT INTO t2 VALUES (NULL), (NULL), (NULL);')
 ---
-- autoincrement_ids:
+- row_count: 3
+  autoincrement_ids:
   - 1
   - 2
   - 3
-  row_count: 3
 ...
 box.execute('SELECT * FROM t1;')
 ---
@@ -633,11 +633,11 @@ box.execute('CREATE TRIGGER r2 AFTER INSERT ON t3 FOR EACH ROW BEGIN INSERT INTO
 ...
 box.execute('INSERT INTO t3 VALUES (NULL), (NULL), (NULL);')
 ---
-- autoincrement_ids:
+- row_count: 3
+  autoincrement_ids:
   - 1
   - 2
   - 3
-  row_count: 3
 ...
 box.execute('SELECT * FROM t1;')
 ---

@@ -222,15 +222,15 @@ ALTER TABLE self ADD b INT REFERENCES self(a)
  | ...
 INSERT INTO self(a,b) VALUES(1, NULL);
  | ---
- | - autoincrement_ids:
+ | - row_count: 1
+ |   autoincrement_ids:
  |   - 1
- |   row_count: 1
  | ...
 INSERT INTO self(a,b) VALUES(2, 1);
  | ---
- | - autoincrement_ids:
+ | - row_count: 1
+ |   autoincrement_ids:
  |   - 2
- |   row_count: 1
  | ...
 UPDATE self SET b = 2;
  | ---
@@ -269,15 +269,15 @@ ALTER TABLE autoinc_check ADD b INT PRIMARY KEY AUTOINCREMENT;
  | ...
 INSERT INTO autoinc_check(a) VALUES(1);
  | ---
- | - autoincrement_ids:
+ | - row_count: 1
+ |   autoincrement_ids:
  |   - 1
- |   row_count: 1
  | ...
 INSERT INTO autoinc_check(a) VALUES(1);
  | ---
- | - autoincrement_ids:
+ | - row_count: 1
+ |   autoincrement_ids:
  |   - 2
- |   row_count: 1
  | ...
 TRUNCATE TABLE autoinc_check;
  | ---

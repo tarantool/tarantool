@@ -272,7 +272,7 @@ result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ...
 result
 ---
-- {96: {}, 48: [1, 2, 3]}
+- {48: [1, 2, 3], 96: {}}
 ...
 c:call("echo", {}, {buffer = ibuf})
 ---
@@ -283,7 +283,7 @@ result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ...
 result
 ---
-- {96: {}, 48: []}
+- {48: [], 96: {}}
 ...
 c:call("echo", nil, {buffer = ibuf})
 ---
@@ -294,7 +294,7 @@ result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ...
 result
 ---
-- {96: {}, 48: []}
+- {48: [], 96: {}}
 ...
 -- call + skip_header
 c:call("echo", {1, 2, 3}, {buffer = ibuf, skip_header = true})
@@ -340,7 +340,7 @@ result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ...
 result
 ---
-- {96: {}, 48: []}
+- {48: [], 96: {}}
 ...
 c:eval("echo(...)", {}, {buffer = ibuf})
 ---
@@ -351,7 +351,7 @@ result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ...
 result
 ---
-- {96: {}, 48: []}
+- {48: [], 96: {}}
 ...
 c:eval("echo(...)", nil, {buffer = ibuf})
 ---
@@ -362,7 +362,7 @@ result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ...
 result
 ---
-- {96: {}, 48: []}
+- {48: [], 96: {}}
 ...
 -- eval + skip_header
 c:eval("echo(...)", {1, 2, 3}, {buffer = ibuf, skip_header = true})

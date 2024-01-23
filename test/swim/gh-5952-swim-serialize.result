@@ -86,9 +86,9 @@ getmetatable(event):__serialize()
 getmetatable(event).__serialize(event)
  | ---
  | - is_new_payload: true
+ |   is_update: true
  |   is_new_version: true
  |   is_new_incarnation: true
- |   is_update: true
  | ...
 
 s:delete()

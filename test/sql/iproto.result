@@ -492,9 +492,9 @@ cn:execute('insert into test values (1, 1)')
 ...
 cn:execute('insert into test values (null, 2)')
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 2
-  row_count: 1
 ...
 cn:execute('update test set a = 11 where id == 1')
 ---
@@ -502,20 +502,20 @@ cn:execute('update test set a = 11 where id == 1')
 ...
 cn:execute('insert into test values (100, 1), (null, 1), (120, 1), (null, 1)')
 ---
-- autoincrement_ids:
+- row_count: 4
+  autoincrement_ids:
   - 101
   - 121
-  row_count: 4
 ...
 cn:execute('insert into test values (null, 1), (null, 1), (null, 1), (null, 1), (null, 1)')
 ---
-- autoincrement_ids:
+- row_count: 5
+  autoincrement_ids:
   - 122
   - 123
   - 124
   - 125
   - 126
-  row_count: 5
 ...
 cn:execute('select * from seqscan test')
 ---
@@ -554,9 +554,9 @@ _ = box.space.test:on_replace(push_id)
 ...
 cn:execute('insert into test values (null, 1)')
 ---
-- autoincrement_ids:
+- row_count: 1
+  autoincrement_ids:
   - 127
-  row_count: 1
 ...
 box.execute('create table test3 (id int primary key autoincrement)')
 ---
@@ -567,12 +567,12 @@ box.schema.sequence.alter('test3', {min=-10000, step=-10})
 ...
 cn:execute('insert into test3 values (null), (null), (null), (null)')
 ---
-- autoincrement_ids:
+- row_count: 4
+  autoincrement_ids:
   - 1
   - -9
   - -19
   - -29
-  row_count: 4
 ...
 box.execute('drop table test')
 ---

@@ -17,12 +17,12 @@ CREATE TRIGGER r AFTER INSERT ON t FOR EACH ROW BEGIN SELECT 1; END
  | ...
 INSERT INTO t VALUES (1), (NULL), (10), (NULL), (NULL), (3), (NULL);
  | ---
- | - autoincrement_ids:
+ | - row_count: 7
+ |   autoincrement_ids:
  |   - 2
  |   - 11
  |   - 12
  |   - 13
- |   row_count: 7
  | ...
 SELECT * FROM SEQSCAN t;
  | ---
