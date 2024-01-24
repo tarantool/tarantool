@@ -374,10 +374,6 @@ function methods._post_apply(self)
             applier.post_apply(self)
         end
     end
-
-    if extras ~= nil then
-        extras.post_apply(self)
-    end
 end
 
 -- Set proper status depending on received alerts.
@@ -443,6 +439,9 @@ function methods._startup(self, instance_name, config_file)
 
     self:_post_apply()
     self:_set_status_based_on_alerts()
+    if extras ~= nil then
+        extras.post_apply(self)
+    end
 end
 
 function methods._print_env_list(self)
@@ -488,6 +487,9 @@ function methods._reload_noexc(self, opts)
     end
 
     self:_set_status_based_on_alerts()
+    if extras ~= nil then
+        extras.post_apply(self)
+    end
 
     return ok, err
 end
