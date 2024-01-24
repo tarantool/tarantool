@@ -641,6 +641,73 @@ g.test_extras_on_community_edition = function(g)
     })
 end
 
+-- Verify that extras.post_apply() will be called even if reload fails.
+g.test_extras_after_fail = function(g)
+    -- Tarantool EE has its own internal.config.extras module, so
+    -- the external one will be ignored (if it is not placed into
+    -- the `override` directory).
+    t.tarantool.skip_if_enterprise()
+
+    local dir = treegen.prepare_directory(g, {}, {})
+    local extras = string.dump(function()
+        local function post_apply(_config)
+            local config = require('config')
+            rawset(_G, 'foo', ('status = %s'):format(config:info().status))
+        end
+
+        return {
+            initialize = function() end,
+            post_apply = post_apply,
+        }
+    end)
+    treegen.write_script(dir, 'internal/config/extras.lua', extras)
+
+    local config = {
+        credentials = {
+            users = {
+                guest = {
+                    roles = {'super'},
+                },
+            },
+        },
+        iproto = {
+            listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}},
+        },
+        groups = {
+            ['group-001'] = {
+                replicasets = {
+                    ['replicaset-001'] = {
+                        instances = {
+                            ['instance-001'] = {},
+                        },
+                    },
+                },
+            },
+        },
+    }
+    local config_file = treegen.write_script(dir, 'config.yaml',
+                                             yaml.encode(config))
+    local opts = {
+        config_file = config_file,
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+
+    g.server:exec(function()
+        t.assert_equals(rawget(_G, 'foo'), 'status = ready')
+    end)
+
+    config.app = {file = 'one'}
+    treegen.write_script(dir, 'config.yaml', yaml.encode(config))
+    g.server:exec(function()
+        local config = require('config')
+        pcall(config.reload, config)
+        t.assert_equals(rawget(_G, 'foo'), 'status = check_errors')
+    end)
+end
+
 -- Verify that an instance name and a replicaset name are set from
 -- the cluster config topology, while a cluster name remains
 -- unset.
