@@ -5,8 +5,9 @@
  */
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
-#include "func.h"
+#include "small/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -21,6 +22,7 @@ enum func_holder_type {
 	FUNC_HOLDER_CONSTRAINT,
 	FUNC_HOLDER_SPACE_UPGRADE,
 	FUNC_HOLDER_FIELD_DEFAULT,
+	FUNC_HOLDER_TRIGGER,
 	FUNC_HOLDER_MAX,
 };
 
