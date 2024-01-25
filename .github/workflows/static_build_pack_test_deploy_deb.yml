@@ -1,0 +1,184 @@
+name: static_build_pack_test_deploy
+
+on:
+  workflow_call:
+    inputs:
+      arch:
+        description: Package platform
+        default: x86_64
+        required: false
+        type: string
+      test-matrix:
+        description: JSON matrix for packages testing
+        default: '{"include": [{"os": "ubuntu-focal"}, {"os": "ubuntu-jammy"}]}'
+        required: false
+        type: string
+      testlib-path:
+        description: Path to testlib
+        default: /usr/lib/tarantool-testlib/obj-x86_64-linux-gnu/
+        required: false
+        type: string
+      submodule:
+        description: Name of submodule to bump.
+        required: false
+        type: string
+      revision:
+        description: Git revision from submodule repository
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: [ self-hosted, Linux, '${{ inputs.arch }}', regular ]
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - uses: ./.github/actions/environment
+
+      - name: Optional submodule bump
+        if: ${{ inputs.submodule }}
+        uses: ./.github/actions/bump-submodule
+        with:
+          submodule: ${{ inputs.submodule }}
+          revision: ${{ inputs.revision }}
+
+      - name: Make static build packages
+        env:
+          OS: ubuntu
+          DIST: xenial
+          MAKE_CHECK: false
+          PRESERVE_ENVVARS: MAKE_CHECK
+          DOCKER_REPO: tarantool/testing
+        run: make -f .pack.mk package
+
+      - name: Upload deb packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: tarantool-deb-${{ inputs.arch }}
+          retention-days: 21
+          path: build/tarantool*.deb
+          if-no-files-found: error
+
+      - name: Send VK Teams message on failure
+        if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+
+  test:
+    runs-on: [ self-hosted, Linux, '${{ inputs.arch }}', regular ]
+
+    needs: build
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.test-matrix) }}
+
+    container:
+      image: packpack/packpack:${{ matrix.os }}
+      # Mount /dev to the container to be able to mount a disk image inside it
+      # for successful run of the .github/actions/environment action.
+      volumes:
+        - /dev:/dev
+      # Our testing expects that the init process (PID 1) will
+      # reap orphan processes. At least the following test leans
+      # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
+      # Add extra privileges to the container for successful run
+      # of the .github/actions/environment action.
+      options: '--init --privileged'
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      # Install the 'e2fsprogs' package that contains the 'mkfs' program needed
+      # for the 'environment' action bellow.
+      - name: Install e2fsprogs
+        run: |
+          apt update
+          apt -y install e2fsprogs
+
+      - uses: ./.github/actions/environment
+
+      - name: Install test dependencies
+        run: |
+          apt -y install \
+            python3 \
+            python3-gevent \
+            python3-yaml \
+            tzdata
+
+      - name: Download packages
+        uses: actions/download-artifact@v3
+        with:
+          name: tarantool-deb-${{ inputs.arch }}
+          path: build
+
+      - name: Install packages
+        run: apt -y install ./tarantool*.deb
+        working-directory: build
+
+      - name: Update list of available deb packages
+        run: apt update
+
+      - name: Run tests
+        run: |
+          # Tarantool packages don't provide `tarantoolctl` since series 3.
+          ./test-run.py \
+            --force \
+            --builddir ${{ inputs.testlib-path }} \
+            --executable /usr/bin/tarantool \
+            --exclude app-tap/tarantoolctl.test.lua
+        working-directory: test
+
+      - name: Send VK Teams message on failure
+        if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+
+  deploy:
+    if: startsWith(github.ref, 'refs/tags/') &&
+        !endsWith(github.ref, '-entrypoint')
+
+    runs-on: [ self-hosted, Linux, lightweight ]
+
+    needs: test
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Download deb packages
+        uses: actions/download-artifact@v3
+        with:
+          name: tarantool-deb-${{ inputs.arch }}
+          path: build
+
+      - name: Deploy packages
+        run: |
+          case ${{ github.ref }} in
+            refs/tags/*-alpha*|refs/tags/*-beta*|refs/tags/*-rc*)
+              REPO_TYPE=pre-release make -f .pack.mk deploy-static
+              ;;
+            refs/tags/*)
+              REPO_TYPE=release make -f .pack.mk deploy-static
+              ;;
+          esac
+        env:
+          RWS_AUTH: ${{ secrets.RWS_AUTH }}

@@ -1,23 +1,13 @@
 #!/usr/bin/make -f
 
-
 VERSION  := $(shell dpkg-parsechangelog|grep ^Version|awk '{print $$2}')
 UVERSION := $(shell echo $(VERSION)|sed 's/-[[:digit:]]\+$$//')
-
-ifneq ($(wildcard /usr/bin/dh_systemd_start),)
-WITH_SYSTEMD:=ON
-else
-WITH_SYSTEMD:=OFF
-endif
 
 DEB_CMAKE_EXTRA_FLAGS := \
 	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 	-DCMAKE_INSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
-	-DCMAKE_INSTALL_SYSCONFDIR=/etc \
 	-DCMAKE_INSTALL_LOCALSTATEDIR=/var \
-	-DENABLE_DIST=ON \
-	-DWITH_SYSVINIT=ON \
-	-DWITH_SYSTEMD=$(WITH_SYSTEMD)
+	-DBUILD_STATIC_WITH_BUNDLED_LIBS=ON
 
 # Append -DLUAJIT_ENABLE_GC64=ON flag if ${GC64} env variable is 'true'.
 ifeq ($(GC64), true)
@@ -28,13 +18,6 @@ ifneq ($(MAKE_CHECK), false)
 	DEB_MAKE_CHECK_TARGET := test-force
 endif
 
-# Install tarantool.service within tarantool-common package, but does not
-# install it within tarantool and tarantool-dev packages.
-DEB_DH_INSTALLINIT_ARGS                     := --name=tarantool
-DEB_DH_SYSTEMD_ENABLE_ARGS_tarantool        := --name=tarantool
-DEB_DH_SYSTEMD_ENABLE_ARGS_tarantool-common := --name=tarantool tarantool.service
-DEB_DH_SYSTEMD_START_ARGS_tarantool-common  := --no-restart-on-upgrade tarantool.service
-
 # Needed for proper backtraces in fiber.info()
 DEB_DH_STRIP_ARGS	        := -X/usr/bin/tarantool
 DPKG_EXPORT_BUILDFLAGS = 1
@@ -42,15 +25,6 @@ DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/buildflags.mk
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/cmake.mk
-
-debian/tarantool-common.install:
-ifneq ($(wildcard /usr/bin/dh_systemd_start),)
-	cp -p debian/tarantool-common.install.systemd.in $@
-else
-	cp -p debian/tarantool-common.install.sysvinit.in $@
-endif
-
-build-indep: debian/tarantool-common.install
 
 tarball: clean
 	git describe --long --always > VERSION
@@ -76,4 +50,5 @@ clean::
 	rm -f src/trivia/config.h
 
 install/tarantool::
-
+	mkdir -p debian/tarantool-testlib/usr/lib/tarantool-testlib
+	rsync -avz --include='*/' --include='*.so' --exclude='*' ./ debian/tarantool-testlib/usr/lib/tarantool-testlib/
