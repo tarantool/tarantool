@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "func.h"
+#include "func_adapter.h"
 #include "fiber.h"
 #include "assoc.h"
 #include "call.h"
@@ -616,4 +617,71 @@ func_call_no_access_check(struct func *base, struct port *args,
 	if (orig_credentials)
 		fiber_set_user(fiber(), orig_credentials);
 	return rc;
+}
+
+/**
+ * Specialization of func_adapter for persistent functions.
+ */
+struct func_adapter_func {
+	/**
+	 * Base class.
+	 */
+	struct func_adapter base;
+	/**
+	 * A holder for underlying func.
+	 */
+	struct func_cache_holder holder;
+};
+
+/**
+ * Call the function with ports. Access check is not performed.
+ */
+static int
+func_adapter_func_call(struct func_adapter *base, struct port *args, struct port *ret)
+{
+	struct func_adapter_func *func = (struct func_adapter_func *)base;
+
+	/* Create and use local ports if passed ones are NULL. */
+	struct port args_local, ret_local;
+	if (args == NULL) {
+		port_c_create(&args_local);
+		args = &args_local;
+	}
+	if (ret == NULL)
+		ret = &ret_local;
+
+	int rc = func_call_no_access_check(func->holder.func, args, ret);
+
+	/* Destroy local ports if they were used. */
+	if (args == &args_local)
+		port_destroy(args);
+	/* Port with returned values is initialized only on success. */
+	if (rc == 0 && ret == &ret_local)
+		port_destroy(ret);
+	return rc;
+}
+
+/**
+ * Virtual destructor.
+ */
+static void
+func_adapter_func_destroy(struct func_adapter *func_base)
+{
+	struct func_adapter_func *func = (struct func_adapter_func *)func_base;
+	func_unpin(&func->holder);
+	free(func);
+}
+
+struct func_adapter *
+func_adapter_func_create(struct func *pfunc, enum func_holder_type type)
+{
+	static const struct func_adapter_vtab vtab = {
+		.call = func_adapter_func_call,
+		.destroy = func_adapter_func_destroy,
+	};
+	struct func_adapter_func *func = xmalloc(sizeof(*func));
+	struct func_adapter base = {.vtab = &vtab};
+	func->base = base;
+	func_pin(pfunc, &func->holder, type);
+	return &func->base;
 }

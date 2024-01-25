@@ -36,6 +36,7 @@
 #include <stdbool.h>
 #include "small/rlist.h"
 #include "func_def.h"
+#include "func_cache.h"
 #include "user_def.h"
 #include "module_cache.h"
 
@@ -44,6 +45,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct func;
+struct func_adapter;
 
 /** Virtual method table for func object. */
 struct func_vtab {
@@ -132,6 +134,14 @@ func_call(struct func *func, struct port *args, struct port *ret)
  */
 int
 schema_module_reload(const char *package, const char *package_end);
+
+/**
+ * Creates func adapter for persistent function, never fails.
+ * Underlying function is pinned with holder of passed type,
+ * so it must be in func_cache while the func_adapter is alive.
+ */
+struct func_adapter *
+func_adapter_func_create(struct func *func, enum func_holder_type type);
 
 #if defined(__cplusplus)
 } /* extern "C" */

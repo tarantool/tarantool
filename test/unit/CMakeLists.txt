@@ -646,3 +646,8 @@ create_unit_test(PREFIX port
                            ${ICU_LIBRARIES}
                            ${LUAJIT_LIBRARIES}
 )
+
+create_unit_test(PREFIX func_adapter_func
+                 SOURCES func_adapter_func.c box_test_utils.c
+                 LIBRARIES box unit
+)

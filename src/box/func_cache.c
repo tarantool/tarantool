@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include "assoc.h"
+#include "func.h"
 
 /** ID -> func dictionary. */
 static struct mh_i32ptr_t *funcs;
@@ -17,6 +18,7 @@ const char *func_cache_holder_type_strs[FUNC_HOLDER_MAX] = {
 	[FUNC_HOLDER_CONSTRAINT] = "constraint",
 	[FUNC_HOLDER_SPACE_UPGRADE] = "space upgrade",
 	[FUNC_HOLDER_FIELD_DEFAULT] = "field default value",
+	[FUNC_HOLDER_TRIGGER] = "trigger",
 };
 
 void

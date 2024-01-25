@@ -3,6 +3,7 @@
  *
  * Copyright 2010-2023, Tarantool AUTHORS, please see AUTHORS file.
  */
+#include "func.h"
 #include "port.h"
 #include "engine.h"
 #include "tt_static.h"

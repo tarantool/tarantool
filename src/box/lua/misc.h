@@ -44,6 +44,7 @@ extern "C" {
 struct lua_State;
 struct read_view;
 struct key_def;
+struct port;
 
 char *
 lbox_encode_tuple_on_gc(struct lua_State *L, int idx, size_t *p_len);
