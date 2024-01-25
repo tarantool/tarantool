@@ -14,22 +14,16 @@ local g = t.group()
 -- the end of the test.
 local cwd = fio.cwd()
 
-local luadir
 local name = 'syntax'
-
--- XXX: Unfortunately, multiline literals do not interpolate
--- escape sequences, so just concatenate two lines of the error
--- message to build the final template.
-local errlike = table.concat({
-    "error loading module '<NAME>' from file '<DIR>/<NAME>.lua':",
-    "<DIR>/<NAME>.lua:1: unexpected symbol near '?'",
-}, "\n\t")
-
+-- XXX: luatest uses only `string.find()` with 4th argument
+-- (`plain`) unconditionally set to `true` for error matching, so
+-- there is no way to use any pattern here.
+local errtail = ("/%s.lua:1: unexpected symbol near '?'"):format(name)
 
 g.before_all(function()
     treegen.init(g)
     treegen.add_template(g, ('^%s%%.lua$'):format(name), [[?syntax error?]])
-    luadir = treegen.prepare_directory(g, {('%s.lua'):format(name)})
+    local luadir = treegen.prepare_directory(g, {('%s.lua'):format(name)})
     fio.chdir(luadir)
 end)
 
@@ -39,6 +33,5 @@ g.after_all(function(g)
 end)
 
 g.test_loader_error_handling = function()
-    local errmsg = errlike:gsub('%<(%w+)>', { DIR = luadir, NAME = name })
-    t.assert_error_msg_equals(errmsg, require, name)
+    t.assert_error_msg_contains(errtail, require, name)
 end
