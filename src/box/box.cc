@@ -5954,7 +5954,6 @@ box_storage_init(void)
 	engine_init();
 	schema_init();
 	replication_init(cfg_geti_default("replication_threads", 1));
-	port_init();
 	iproto_init(cfg_geti("iproto_threads"));
 	sql_init();
 	audit_log_init();
@@ -5987,7 +5986,6 @@ box_storage_free(void)
 	flightrec_free();
 	audit_log_free();
 	sql_built_in_functions_cache_free();
-	port_free();
 	/* fiber_pool_destroy(&tx_fiber_pool); */
 	is_storage_initialized = false;
 }
@@ -5996,6 +5994,7 @@ void
 box_init(void)
 {
 	iproto_constants_init();
+	port_init();
 	box_on_recovery_state_event =
 		event_get("box.ctl.on_recovery_state", true);
 	event_ref(box_on_recovery_state_event);
@@ -6081,6 +6080,7 @@ box_free(void)
 	box_on_recovery_state_event = NULL;
 	txn_event_trigger_free();
 	tuple_free();
+	port_free();
 	iproto_constants_free();
 	mempool_destroy(&sync_trigger_data_pool);
 	/* schema_module_free(); */
