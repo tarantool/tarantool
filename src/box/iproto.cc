@@ -42,7 +42,7 @@
 
 #include "version.h"
 #include "event.h"
-#include "func_adapter.h"
+#include "core/func_adapter.h"
 #include "fiber.h"
 #include "fiber_cond.h"
 #include "cbus.h"

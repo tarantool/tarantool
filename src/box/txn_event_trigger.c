@@ -5,7 +5,7 @@
  */
 #include "box/port.h"
 #include "core/assoc.h"
-#include "func_adapter.h"
+#include "core/func_adapter.h"
 #include "small/mempool.h"
 #include "txn.h"
 
