@@ -11,6 +11,60 @@
 #include "lua/utils.h"
 #include "tt_static.h"
 
+#include "box/port.h"
+
+#include "core/func_adapter.h"
+
+/**
+ * A wrapper over non-Lua trigger handlers.
+ * Must be pushed with 2 upvalues:
+ * 1. Event name
+ * 2. Trigger name
+ * Finds the trigger in event by name and calls it if it was found,
+ * an error is thrown otherwise.
+ */
+static int
+luaT_trigger_non_lua_handler(struct lua_State *L)
+{
+	const char *event_name = lua_tostring(L, lua_upvalueindex(1));
+	const char *trigger_name = lua_tostring(L, lua_upvalueindex(2));
+
+	struct func_adapter *trigger = NULL;
+	struct event *event = event_get(event_name, false);
+	if (event != NULL)
+		trigger = event_find_trigger(event, trigger_name);
+	if (trigger == NULL)
+		luaL_error(L, "Trigger was deleted");
+
+	struct port args, ret;
+	port_lua_create(&args, L);
+	int rc = func_adapter_call(trigger, &args, &ret);
+	port_destroy(&args);
+	if (rc != 0)
+		return luaT_error(L);
+
+	port_dump_lua(&ret, L, PORT_DUMP_LUA_MODE_FLAT);
+	port_destroy(&ret);
+	return lua_gettop(L);
+}
+
+/**
+ * Pushes handler to Lua.
+ */
+static void
+luaT_trigger_push_handler(struct lua_State *L, struct event *event,
+			  struct func_adapter *trigger,
+			  const char *trigger_name)
+{
+	if (func_adapter_is_lua(trigger)) {
+		func_adapter_lua_get_func(trigger, L);
+	} else {
+		lua_pushstring(L, event->name);
+		lua_pushstring(L, trigger_name);
+		lua_pushcclosure(L, luaT_trigger_non_lua_handler, 2);
+	}
+}
+
 /**
  * Sets a trigger with passed name to the passed event.
  * The first argument is event name, the second one is trigger name, the third
@@ -74,20 +128,11 @@ luaT_trigger_call(struct lua_State *L)
 	struct event *event = event_get(event_name, false);
 	if (event == NULL)
 		return 0;
-	int top = lua_gettop(L);
-	int narg = top - 1;
-	struct event_trigger_iterator it;
-	event_trigger_iterator_create(&it, event);
-	struct func_adapter *trigger = NULL;
-	const char *name = NULL;
-	int rc = 0;
-	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
-		func_adapter_lua_get_func(trigger, L);
-		for (int i = top - narg + 1; i <= top; ++i)
-			lua_pushvalue(L, i);
-		rc = luaT_call(L, narg, 0);
-	}
-	event_trigger_iterator_destroy(&it);
+	struct port args;
+	/* Arguments are passed starting from the second value. */
+	port_lua_create_at(&args, L, 2);
+	int rc = event_run_triggers(event, &args);
+	port_destroy(&args);
 	if (rc != 0)
 		return luaT_error(L);
 	return 0;
@@ -112,7 +157,7 @@ trigger_info_push_event(struct event *event, void *arg)
 		lua_createtable(L, 2, 0);
 		lua_pushstring(L, name);
 		lua_rawseti(L, -2, 1);
-		func_adapter_lua_get_func(trigger, L);
+		luaT_trigger_push_handler(L, event, trigger, name);
 		lua_rawseti(L, -2, 2);
 		lua_rawseti(L, -2, idx);
 	}
@@ -165,7 +210,8 @@ luaT_check_event_trigger_iterator(struct lua_State *L, int idx)
 }
 
 /**
- * Takes an iterator step.
+ * Takes an iterator step. Must be pushed with one upvalue which is pointer
+ * to size_t containing current iterator epoch.
  */
 static int
 luaT_trigger_iterator_next(struct lua_State *L)
@@ -176,7 +222,7 @@ luaT_trigger_iterator_next(struct lua_State *L)
 	const char *name = NULL;
 	if (event_trigger_iterator_next(it, &trigger, &name)) {
 		lua_pushstring(L, name);
-		func_adapter_lua_get_func(trigger, L);
+		luaT_trigger_push_handler(L, it->event, trigger, name);
 		return 2;
 	}
 	return 0;
@@ -348,7 +394,7 @@ luaT_event_reset_trigger_with_flags(struct lua_State *L, int bottom,
 		int idx = 0;
 		while (event_trigger_iterator_next(&it, &trigger, &name)) {
 			idx++;
-			func_adapter_lua_get_func(trigger, L);
+			luaT_trigger_push_handler(L, it.event, trigger, name);
 			lua_rawseti(L, -2, idx);
 		}
 		event_trigger_iterator_destroy(&it);
