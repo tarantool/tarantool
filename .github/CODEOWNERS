@@ -19,3 +19,6 @@
 # testing directories if there are other code owners.
 /src/box/lua/config/  @Totktonada
 /test/config-luatest/ @Totktonada @tarantool/devx
+# Sergey Bronnikov wants to track all the activities around the
+# fuzzing tests.
+/test/fuzz/ @ligurio
