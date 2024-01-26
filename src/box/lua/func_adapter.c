@@ -82,6 +82,13 @@ func_adapter_lua_destroy(struct func_adapter *func_base)
 	free(func);
 }
 
+bool
+func_adapter_is_lua(struct func_adapter *func)
+{
+	assert(func != NULL);
+	return func->vtab->destroy == func_adapter_lua_destroy;
+}
+
 void
 func_adapter_lua_get_func(struct func_adapter *func, lua_State *L)
 {
