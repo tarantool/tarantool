@@ -99,7 +99,6 @@
 #include "node_name.h"
 #include "tt_sort.h"
 #include "event.h"
-#include "func_adapter.h"
 #include "tweaks.h"
 
 static char status[64] = "unconfigured";
@@ -275,20 +274,11 @@ box_run_on_recovery_state(enum box_recovery_state state)
 {
 	assert(state >= 0 && state < box_recovery_state_MAX);
 	const char *state_str = box_recovery_state_strs[state];
-
-	const char *name = NULL;
-	struct func_adapter *trigger = NULL;
-	struct func_adapter_ctx ctx;
-	struct event_trigger_iterator it;
-	int rc = 0;
-	event_trigger_iterator_create(&it, box_on_recovery_state_event);
-	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
-		func_adapter_begin(trigger, &ctx);
-		func_adapter_push_str0(trigger, &ctx, state_str);
-		rc = func_adapter_call(trigger, &ctx);
-		func_adapter_end(trigger, &ctx);
-	}
-	event_trigger_iterator_destroy(&it);
+	struct port args;
+	port_c_create(&args);
+	port_c_add_str0(&args, state_str);
+	int rc = event_run_triggers(box_on_recovery_state_event, &args);
+	port_destroy(&args);
 	return rc;
 }
 
@@ -4867,20 +4857,12 @@ box_trigger_on_change(struct trigger *trigger, void *data)
 
 	if (!event_has_triggers(on_change_event))
 		return 0;
-	struct event_trigger_iterator it;
-	event_trigger_iterator_create(&it, on_change_event);
-	struct func_adapter *func = NULL;
-	const char *name = NULL;
-	struct func_adapter_ctx ctx;
-	while (event_trigger_iterator_next(&it, &func, &name)) {
-		func_adapter_begin(func, &ctx);
-		func_adapter_push_str0(func, &ctx, event->name);
-		int rc = func_adapter_call(func, &ctx);
-		func_adapter_end(func, &ctx);
-		if (rc != 0)
-			diag_log();
-	}
-	event_trigger_iterator_destroy(&it);
+
+	struct port args;
+	port_c_create(&args);
+	port_c_add_str0(&args, event->name);
+	event_run_triggers_no_fail(on_change_event, &args);
+	port_destroy(&args);
 	return 0;
 }
 

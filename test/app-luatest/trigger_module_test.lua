@@ -654,6 +654,10 @@ g.test_trigger_on_change_error = function()
         t.assert_equals(handler_fired_count, 4)
     end)
     local on_change = 'tarantool.trigger.on_change'
+    t.assert(test_server:grep_log(string.format(
+        "error while running trigger 'h1' on event '%s'", on_change)))
+    t.assert(test_server:grep_log(string.format(
+        "error while running trigger 'h2' on event '%s'", on_change)))
     t.assert(test_server:grep_log('handler_err1: ' .. on_change))
     t.assert(test_server:grep_log('handler_err2: ' .. on_change))
     t.assert(test_server:grep_log('handler_err1: test_event'))

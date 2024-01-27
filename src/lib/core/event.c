@@ -325,6 +325,37 @@ event_trigger_iterator_destroy(struct event_trigger_iterator *it)
 	it->curr = NULL;
 }
 
+int
+event_run_triggers(struct event *event, struct port *args)
+{
+	int rc = 0;
+	const char *name = NULL;
+	struct func_adapter *trigger = NULL;
+	struct event_trigger_iterator it;
+	event_trigger_iterator_create(&it, event);
+	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name))
+		rc = func_adapter_call(trigger, args, NULL);
+	event_trigger_iterator_destroy(&it);
+	return rc;
+}
+
+void
+event_run_triggers_no_fail(struct event *event, struct port *args)
+{
+	const char *name = NULL;
+	struct func_adapter *trigger = NULL;
+	struct event_trigger_iterator it;
+	event_trigger_iterator_create(&it, event);
+	while (event_trigger_iterator_next(&it, &trigger, &name)) {
+		if (func_adapter_call(trigger, args, NULL) != 0) {
+			say_error("error while running trigger '%s' "
+				  "on event '%s'", name, event->name);
+			diag_log();
+		}
+	}
+	event_trigger_iterator_destroy(&it);
+}
+
 struct event *
 event_get(const char *name, bool create_if_not_exist)
 {

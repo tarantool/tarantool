@@ -58,6 +58,7 @@
 #include "func_adapter.h"
 #include "lua/utils.h"
 #include "core/mp_ctx.h"
+#include "port.h"
 
 int
 access_check_space(struct space *space, user_access_t access)
@@ -842,6 +843,43 @@ index_name_by_id(struct space *space, uint32_t id)
 }
 
 /**
+ * Pushes arguments for replace triggers (on_replace, before_replace)
+ * to port_c. Transaction mustn't be aborted.
+ */
+static void
+space_push_replace_trigger_arguments(struct port *args, struct txn *txn)
+{
+	assert(txn_check_can_continue(txn) == 0);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	assert(stmt != NULL);
+
+	if (stmt->old_tuple != NULL)
+		port_c_add_tuple(args, stmt->old_tuple);
+	else
+		port_c_add_null(args);
+	if (stmt->new_tuple != NULL)
+		port_c_add_tuple(args, stmt->new_tuple);
+	else
+		port_c_add_null(args);
+	/* TODO: maybe the space object has to be here */
+	port_c_add_str0(args, space_name(stmt->space));
+	/* Operation type: INSERT/UPDATE/UPSERT/REPLACE/DELETE */
+	port_c_add_str0(args, iproto_type_name(stmt->type));
+	/* Pass xrow header and body to recovery triggers. */
+	if (stmt->space->run_recovery_triggers) {
+		struct xrow_header *row = stmt->row;
+		assert(row != NULL && row->header != NULL);
+		port_c_add_mp_object(args, row->header, row->header_end,
+				     &iproto_mp_ctx);
+		assert(row->bodycnt == 1);
+		const char *body = row->body[0].iov_base;
+		const char *body_end = body + row->body[0].iov_len;
+		port_c_add_mp_object(args, body, body_end,
+				     &iproto_mp_ctx);
+	}
+}
+
+/**
  * Run replace triggers from passed event. If argument update_tuple is true,
  * new tuple in current statement is updated after each trigger:
  * 1. the tuple is set to returned tuple,
@@ -854,15 +892,25 @@ static int
 space_run_replace_triggers(struct event *event, struct txn *txn,
 			   bool update_tuple)
 {
+	/** Return early if event has no triggers or if txn can't continue. */
+	if (!event_has_triggers(event))
+		return 0;
+	int rc = txn_check_can_continue(txn);
+	if (rc != 0)
+		return -1;
+
 	struct event_trigger_iterator it;
 	event_trigger_iterator_create(&it, event);
 	struct func_adapter *trigger = NULL;
 	const char *name = NULL;
-	struct func_adapter_ctx ctx;
-	int rc = 0;
+	struct port args, ret;
+	/* Don't pass port for returned values if we don't update tuple. */
+	struct port *ret_ptr = update_tuple ? &ret : NULL;
+	port_c_create(&args);
+	space_push_replace_trigger_arguments(&args, txn);
 	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
-		func_adapter_begin(trigger, &ctx);
-
+		bool has_ret = false;
+		uint32_t region_svp = region_used(&fiber()->gc);
 		/*
 		 * The transaction could be aborted while the previous trigger
 		 * was running (e.g. if the trigger callback yielded).
@@ -870,41 +918,12 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 		rc = txn_check_can_continue(txn);
 		if (rc != 0)
 			goto out;
-		struct txn_stmt *stmt = txn_current_stmt(txn);
-		assert(stmt != NULL);
-
-		/* Push arguments to a trigger. */
-		if (stmt->old_tuple != NULL)
-			func_adapter_push_tuple(trigger, &ctx, stmt->old_tuple);
-		else
-			func_adapter_push_null(trigger, &ctx);
-		if (stmt->new_tuple != NULL)
-			func_adapter_push_tuple(trigger, &ctx, stmt->new_tuple);
-		else
-			func_adapter_push_null(trigger, &ctx);
-		/* TODO: maybe the space object has to be here */
-		func_adapter_push_str0(trigger, &ctx, space_name(stmt->space));
-		/* Operation type: INSERT/UPDATE/UPSERT/REPLACE/DELETE */
-		func_adapter_push_str0(trigger, &ctx,
-				       iproto_type_name(stmt->type));
-		/* Pass xrow header and body to recovery triggers. */
-		if (stmt->space->run_recovery_triggers) {
-			struct mp_ctx mp_ctx_header, mp_ctx_body;
-			mp_ctx_copy(&mp_ctx_header, &iproto_mp_ctx);
-			mp_ctx_copy(&mp_ctx_body, &iproto_mp_ctx);
-			struct xrow_header *row = stmt->row;
-			assert(row != NULL && row->header != NULL);
-			func_adapter_push_msgpack_with_ctx(
-				trigger, &ctx, row->header, row->header_end,
-				&mp_ctx_header);
-			assert(row->bodycnt == 1);
-			const char *body = row->body[0].iov_base;
-			const char *body_end = body + row->body[0].iov_len;
-			func_adapter_push_msgpack_with_ctx(
-				trigger, &ctx, body, body_end, &mp_ctx_body);
-		}
-
-		rc = func_adapter_call(trigger, &ctx);
+		rc = func_adapter_call(trigger, &args, ret_ptr);
+		/*
+		 * We have returned values only if we update tuple and
+		 * the trigger hasn't failed.
+		 */
+		has_ret = update_tuple && rc == 0;
 		if (rc != 0 || !update_tuple)
 			goto out;
 
@@ -915,7 +934,7 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 		rc = txn_check_can_continue(txn);
 		if (rc != 0)
 			goto out;
-		stmt = txn_current_stmt(txn);
+		struct txn_stmt *stmt = txn_current_stmt(txn);
 		assert(stmt != NULL);
 
 		/*
@@ -923,12 +942,13 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 		 * See the function description for details.
 		 */
 		struct tuple *result = NULL;
-		if (func_adapter_is_tuple(trigger, &ctx)) {
-			func_adapter_pop_tuple(trigger, &ctx, &result);
-		} else if (func_adapter_is_empty(trigger, &ctx)) {
+		const struct port_c_entry *retvals = port_get_c_entries(&ret);
+		if (retvals == NULL) {
 			rc = 0;
 			goto out;
-		} else if (!func_adapter_is_null(trigger, &ctx)) {
+		} else if (retvals->type == PORT_C_ENTRY_TUPLE) {
+			result = retvals->tuple;
+		} else if (retvals->type != PORT_C_ENTRY_NULL) {
 			diag_set(ClientError, ER_BEFORE_REPLACE_RET);
 			rc = -1;
 			goto out;
@@ -955,11 +975,17 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 		if (stmt->new_tuple != NULL)
 			tuple_unref(stmt->new_tuple);
 		stmt->new_tuple = result;
-
+		/* Can't update values in port - destroy it and create again. */
+		port_destroy(&args);
+		port_c_create(&args);
+		space_push_replace_trigger_arguments(&args, txn);
 out:
-		func_adapter_end(trigger, &ctx);
+		if (has_ret)
+			port_destroy(&ret);
+		region_truncate(&fiber()->gc, region_svp);
 	}
 	event_trigger_iterator_destroy(&it);
+	port_destroy(&args);
 	return rc;
 }
 

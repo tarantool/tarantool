@@ -16,6 +16,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct func_adapter;
+struct port;
 struct trigger;
 
 /**
@@ -155,6 +156,22 @@ event_trigger_iterator_next(struct event_trigger_iterator *it,
  */
 void
 event_trigger_iterator_destroy(struct event_trigger_iterator *it);
+
+/**
+ * A handy shortcut that simply runs all triggers with passed arguments,
+ * ignores all returned values and stops on the first fail.
+ * NB: port with arguments must allow to be dumped several times.
+ */
+int
+event_run_triggers(struct event *event, struct port *args);
+
+/**
+ * A handy shortcut that simply runs all triggers with passed arguments,
+ * ignores all returned values and logs all errors rather than stopping.
+ * NB: port with arguments must allow to be dumped several times.
+ */
+void
+event_run_triggers_no_fail(struct event *event, struct port *args);
 
 /**
  * Finds an event by its name. Name must be a zero-terminated string.

@@ -3,12 +3,50 @@
  *
  * Copyright 2010-2023, Tarantool AUTHORS, please see AUTHORS file.
  */
+#include "box/port.h"
 #include "core/assoc.h"
 #include "func_adapter.h"
+#include "small/mempool.h"
 #include "txn.h"
 
 /** Global events, i.e. triggered by all transactions. */
 struct event *txn_global_events[txn_event_id_MAX];
+
+/**
+ * Data used to create txn iterators.
+ */
+struct txn_iterator_data {
+	/** First statement of the transaction. */
+	struct txn_stmt *first_stmt;
+	/**
+	 * Iterate only over statements with the given space id.
+	 * Or set to SPACE_ID_FILTER_ALL_SPACES for all spaces.
+	 */
+	int64_t space_id_filter;
+};
+
+/**
+ * Iterator over transaction statements used in triggers.
+ */
+struct txn_port_c_iterator {
+	/** Iterator next. */
+	port_c_iterator_next_f next;
+	/** Saved txn id. Is used to invalidate iterator. */
+	uint32_t txn_id;
+	/** Request number, starting from 1. */
+	uint32_t req_num;
+	/** Current statement of the transaction. */
+	struct txn_stmt *stmt;
+	/**
+	 * Iterate only over statements with the given space id.
+	 * Or set to SPACE_ID_FILTER_ALL_SPACES for all spaces.
+	 */
+	int64_t space_id_filter;
+};
+
+static_assert(
+	sizeof(struct txn_port_c_iterator) <= sizeof(struct port_c_iterator),
+	"The implementation should fit into abstract instance");
 
 void
 txn_event_trigger_init(void)
@@ -79,41 +117,38 @@ txn_event_add_space(struct txn *txn, struct space *space, int event_id)
 enum { SPACE_ID_FILTER_ALL_SPACES = -1 };
 
 /**
- * State of the iterator, which is passed to txn_iterator_next().
- */
-struct txn_iterator_state {
-	/** Request number, starting from 1. */
-	uint32_t req_num;
-	/** Current statement of the transaction. */
-	struct txn_stmt *stmt;
-	/**
-	 * Iterate only over statements with the given space id.
-	 * Or set to SPACE_ID_FILTER_ALL_SPACES for all spaces.
-	 */
-	int64_t space_id_filter;
-};
-
-/**
  * The iterator goes through every statement of the transaction.
+ * Before accessing statements, iterator checks if it in the same transaction.
+ * If the check fails, an error is returned.
  */
 static int
-txn_iterator_next(struct func_adapter *func, struct func_adapter_ctx *ctx,
-		  void *state)
+txn_iterator_next(struct port_c_iterator *it, struct port *out, bool *is_eof)
 {
-	struct txn_iterator_state *txn_state =
-		(struct txn_iterator_state *)state;
-	struct txn_stmt *stmt = txn_state->stmt;
+	struct txn_port_c_iterator *txn_it =
+		(struct txn_port_c_iterator *)it;
+	struct txn_stmt *stmt = txn_it->stmt;
+
+	struct txn *txn = in_txn();
+	if (txn == NULL || txn->id != txn_it->txn_id) {
+		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
+		return -1;
+	}
 
 	/* Skip unwanted spaces if space id filter is set. */
-	if (txn_state->space_id_filter != SPACE_ID_FILTER_ALL_SPACES) {
+	if (txn_it->space_id_filter != SPACE_ID_FILTER_ALL_SPACES) {
 		while (stmt != NULL &&
-		       space_id(stmt->space) != txn_state->space_id_filter) {
+		       space_id(stmt->space) != txn_it->space_id_filter) {
 			stmt = stailq_next_entry(stmt, next);
 		}
 	}
 
-	if (stmt == NULL)
+	if (stmt == NULL) {
+		*is_eof = true;
 		return 0;
+	}
+
+	*is_eof = false;
+	port_c_create(out);
 	/*
 	 * The iterator returns 4 values:
 	 *  1. An ordinal request number;
@@ -121,19 +156,34 @@ txn_iterator_next(struct func_adapter *func, struct func_adapter_ctx *ctx,
 	 *  3. The new value of the tuple;
 	 *  4. The ID of the space.
 	 */
-	func_adapter_push_double(func, ctx, txn_state->req_num++);
+	port_c_add_number(out, txn_it->req_num++);
 	if (stmt->old_tuple != NULL)
-		func_adapter_push_tuple(func, ctx, stmt->old_tuple);
+		port_c_add_tuple(out, stmt->old_tuple);
 	else
-		func_adapter_push_null(func, ctx);
+		port_c_add_null(out);
 	if (stmt->new_tuple != NULL)
-		func_adapter_push_tuple(func, ctx, stmt->new_tuple);
+		port_c_add_tuple(out, stmt->new_tuple);
 	else
-		func_adapter_push_null(func, ctx);
-	func_adapter_push_double(func, ctx, space_id(stmt->space));
+		port_c_add_null(out);
+	port_c_add_number(out, space_id(stmt->space));
 
-	txn_state->stmt = stailq_next_entry(stmt, next);
+	txn_it->stmt = stailq_next_entry(stmt, next);
 	return 0;
+}
+
+static void
+txn_iterator_create(void *base_data, struct port_c_iterator *it)
+{
+	struct txn_iterator_data *data = (struct txn_iterator_data *)base_data;
+	struct txn_port_c_iterator *txn_it =
+		(struct txn_port_c_iterator *)it;
+	txn_it->req_num = 1;
+	txn_it->stmt = data->first_stmt;
+	txn_it->space_id_filter = data->space_id_filter;
+	struct txn *txn = in_txn();
+	assert(txn != NULL);
+	txn_it->txn_id = txn->id;
+	txn_it->next = txn_iterator_next;
 }
 
 /**
@@ -149,9 +199,21 @@ run_triggers_general(struct txn *txn, struct txn_stmt *stmt,
 	int rc = 0;
 	const char *name = NULL;
 	struct func_adapter *trigger = NULL;
-	struct func_adapter_ctx ctx;
 	struct event_trigger_iterator it;
 	event_trigger_iterator_create(&it, event);
+
+	struct txn_iterator_data data = {
+		.first_stmt = stmt,
+		.space_id_filter = space_id,
+	};
+
+	/*
+	 * The trigger-functions has one parameter - an iterator over the
+	 * statements of the transaction.
+	 */
+	struct port args;
+	port_c_create(&args);
+	port_c_add_iterable(&args, &data, txn_iterator_create);
 
 	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
 		if (can_abort) {
@@ -164,20 +226,9 @@ run_triggers_general(struct txn *txn, struct txn_stmt *stmt,
 			if (rc != 0)
 				break;
 		}
-		/*
-		 * The trigger-function has one parameter - an iterator over the
-		 * statements of the transaction. The return value is ignored.
-		 */
-		struct txn_iterator_state state;
-		state.req_num = 1;
-		state.stmt = stmt;
-		state.space_id_filter = space_id;
-		func_adapter_begin(trigger, &ctx);
-		func_adapter_push_iterator(trigger, &ctx, &state,
-					   txn_iterator_next);
-		rc = func_adapter_call(trigger, &ctx);
-		func_adapter_end(trigger, &ctx);
+		rc = func_adapter_call(trigger, &args, NULL);
 	}
+	port_destroy(&args);
 	event_trigger_iterator_destroy(&it);
 	return rc;
 }
