@@ -31,8 +31,8 @@
 #include "box.h"
 #include "error.h"
 #include "event.h"
-#include "func_adapter.h"
 #include "journal.h"
+#include "port.h"
 #include "raft.h"
 #include "relay.h"
 #include "replication.h"
@@ -394,19 +394,7 @@ box_raft_process(struct raft_request *req, uint32_t source)
 int
 box_raft_run_on_election_triggers(void)
 {
-	const char *name = NULL;
-	struct func_adapter *trigger = NULL;
-	struct func_adapter_ctx ctx;
-	struct event_trigger_iterator it;
-	int rc = 0;
-	event_trigger_iterator_create(&it, box_raft_on_election_event);
-	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
-		func_adapter_begin(trigger, &ctx);
-		rc = func_adapter_call(trigger, &ctx);
-		func_adapter_end(trigger, &ctx);
-	}
-	event_trigger_iterator_destroy(&it);
-	return rc;
+	return event_run_triggers(box_raft_on_election_event, NULL);
 }
 
 static void

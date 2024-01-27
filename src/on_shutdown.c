@@ -164,10 +164,7 @@ static int
 on_shutdown_event_trigger_fiber_f(va_list ap)
 {
 	struct func_adapter *trigger = va_arg(ap, struct func_adapter *);
-	struct func_adapter_ctx ctx;
-	func_adapter_begin(trigger, &ctx);
-	int rc = func_adapter_call(trigger, &ctx);
-	func_adapter_end(trigger, &ctx);
+	int rc = func_adapter_call(trigger, NULL, NULL);
 	return rc;
 }
 

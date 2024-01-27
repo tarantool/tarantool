@@ -547,3 +547,60 @@ g.test_commit_rollback = function(cg)
         t.assert_is_not(cg.server:grep_log('error in on_rollback'), nil)
     end)
 end
+
+-- Check if the iterator is invalidated when it is saved to avoid use-after-free
+g.test_invalidate_saved_iterator = function(cg)
+    cg.server:exec(function(engine)
+        local trigger = require('trigger')
+
+        local opts = {engine = engine, id = 743}
+        local s = box.schema.space.create('bands', opts)
+        s:create_index('pk')
+        local function saved_iterator_is_empty_check(event, txn_finish)
+            local saved_iters = {}
+            local function handler(it)
+                table.insert(saved_iters, it)
+            end
+            local trigger_name_fmt = 'test_trigger[%d]'
+            local trigger_num = 10
+            for i = 1, trigger_num do
+                trigger.set(event, string.format(trigger_name_fmt, i), handler)
+            end
+            box.begin()
+            s:auto_increment{'The Rolling Stones', 1962}
+            s:auto_increment{'Pink Floyd', 1965}
+            s:delete{100500}
+            txn_finish()
+            t.assert_equals(#saved_iters, trigger_num,
+                "All triggers must save iterators")
+            local i = 0
+            local errmsg = 'The transaction the cursor belongs to has ended'
+            for _, saved_it in pairs(saved_iters) do
+                t.assert_error_msg_content_equals(errmsg, function()
+                    for _ in saved_it() do
+                        i = i + 1
+                    end
+                end)
+            end
+            t.assert_equals(i, 0, "Iterators shouldn't yield values")
+            for i = 1, trigger_num do
+                trigger.del(event, string.format(trigger_name_fmt, i))
+            end
+        end
+
+        local cases = {
+            {'box.on_commit', box.commit},
+            {'box.before_commit', box.commit},
+            {'box.on_rollback', box.rollback}
+        }
+        for _, case in pairs(cases) do
+            local event = case[1]
+            local txn_finish = case[2]
+            local event_by_id = string.format('%s.space[%d]', event, s.id)
+            local event_by_name = string.format('%s.space.%s', event, s.name)
+            saved_iterator_is_empty_check(event, txn_finish)
+            saved_iterator_is_empty_check(event_by_id, txn_finish)
+            saved_iterator_is_empty_check(event_by_name, txn_finish)
+        end
+    end, {cg.params.engine})
+end

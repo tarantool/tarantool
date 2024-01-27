@@ -30,7 +30,6 @@
  */
 #include "session.h"
 #include "fiber.h"
-#include "func_adapter.h"
 #include "fiber_cond.h"
 #include "sio.h"
 #include "memory.h"
@@ -46,6 +45,7 @@
 #include "tweaks.h"
 #include "event.h"
 #include "schema.h"
+#include "port.h"
 
 const char *session_type_strs[] = {
 	"background",
@@ -346,18 +346,7 @@ session_run_triggers(struct session *session, struct rlist *triggers,
 	int rc = trigger_run(triggers, NULL);
 	if (rc != 0)
 		goto out;
-
-	const char *name = NULL;
-	struct func_adapter *trigger = NULL;
-	struct func_adapter_ctx ctx;
-	struct event_trigger_iterator it;
-	event_trigger_iterator_create(&it, event);
-	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
-		func_adapter_begin(trigger, &ctx);
-		rc = func_adapter_call(trigger, &ctx);
-		func_adapter_end(trigger, &ctx);
-	}
-	event_trigger_iterator_destroy(&it);
+	rc = event_run_triggers(event, NULL);
 out:
 	/* Restore original credentials */
 	fiber_set_user(fiber, &session->credentials);
@@ -386,21 +375,12 @@ session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result)
 	if (trigger_run(&session_on_auth, (void *)result) != 0)
 		return -1;
 
-	const char *name = NULL;
-	struct func_adapter *trigger = NULL;
-	struct func_adapter_ctx ctx;
-	struct event_trigger_iterator it;
-	int rc = 0;
-	event_trigger_iterator_create(&it, session_on_auth_event);
-	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
-		func_adapter_begin(trigger, &ctx);
-		func_adapter_push_str(trigger, &ctx, result->user_name,
-				      result->user_name_len);
-		func_adapter_push_bool(trigger, &ctx, result->is_authenticated);
-		rc = func_adapter_call(trigger, &ctx);
-		func_adapter_end(trigger, &ctx);
-	}
-	event_trigger_iterator_destroy(&it);
+	struct port args;
+	port_c_create(&args);
+	port_c_add_str(&args, result->user_name, result->user_name_len);
+	port_c_add_bool(&args, result->is_authenticated);
+	int rc = event_run_triggers(session_on_auth_event, &args);
+	port_destroy(&args);
 	return rc;
 }
 
@@ -474,21 +454,13 @@ session_on_access_denied(struct trigger *trigger, void *data)
 	struct on_access_denied_ctx *data_ctx =
 		(struct on_access_denied_ctx *)data;
 
-	const char *name = NULL;
-	struct func_adapter *func = NULL;
-	struct func_adapter_ctx ctx;
-	struct event_trigger_iterator it;
-	int rc = 0;
-	event_trigger_iterator_create(&it, on_access_denied_event);
-	while (rc == 0 && event_trigger_iterator_next(&it, &func, &name)) {
-		func_adapter_begin(func, &ctx);
-		func_adapter_push_str0(func, &ctx, data_ctx->access_type);
-		func_adapter_push_str0(func, &ctx, data_ctx->object_type);
-		func_adapter_push_str0(func, &ctx, data_ctx->object_name);
-		rc = func_adapter_call(func, &ctx);
-		func_adapter_end(func, &ctx);
-	}
-	event_trigger_iterator_destroy(&it);
+	struct port args;
+	port_c_create(&args);
+	port_c_add_str0(&args, data_ctx->access_type);
+	port_c_add_str0(&args, data_ctx->object_type);
+	port_c_add_str0(&args, data_ctx->object_name);
+	int rc = event_run_triggers(on_access_denied_event, &args);
+	port_destroy(&args);
 	return rc;
 }
 

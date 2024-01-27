@@ -3036,25 +3036,20 @@ tx_run_override_triggers(struct event *event, const char *header,
 	enum iproto_handler_status rc = IPROTO_HANDLER_FALLBACK;
 	const char *name = NULL;
 	struct func_adapter *trigger = NULL;
-	struct func_adapter_ctx ctx;
+	struct port args, ret_port;
+	port_c_create(&args);
+	port_c_add_mp_object(&args, header, header_end, &iproto_mp_ctx);
+	port_c_add_mp_object(&args, body, body_end, &iproto_mp_ctx);
+
 	struct event_trigger_iterator it;
 	event_trigger_iterator_create(&it, event);
-
 	while (event_trigger_iterator_next(&it, &trigger, &name)) {
-		struct mp_ctx mp_ctx_header, mp_ctx_body;
-		mp_ctx_copy(&mp_ctx_header, &iproto_mp_ctx);
-		mp_ctx_copy(&mp_ctx_body, &iproto_mp_ctx);
-
-		func_adapter_begin(trigger, &ctx);
-		func_adapter_push_msgpack_with_ctx(trigger, &ctx, header,
-						   header_end, &mp_ctx_header);
-		func_adapter_push_msgpack_with_ctx(trigger, &ctx, body,
-						   body_end, &mp_ctx_body);
-		if (func_adapter_call(trigger, &ctx) == 0) {
-			if (func_adapter_is_bool(trigger, &ctx)) {
-				bool ok = false;
-				func_adapter_pop_bool(trigger, &ctx, &ok);
-				if (ok)
+		size_t region_svp = region_used(&fiber()->gc);
+		if (func_adapter_call(trigger, &args, &ret_port) == 0) {
+			const struct port_c_entry *ret =
+				port_get_c_entries(&ret_port);
+			if (ret != NULL && ret->type == PORT_C_ENTRY_BOOL) {
+				if (ret->boolean)
 					rc = IPROTO_HANDLER_OK;
 			} else {
 				diag_set(ClientError, ER_PROC_LUA,
@@ -3062,10 +3057,11 @@ tx_run_override_triggers(struct event *event, const char *header,
 					 "type: expected boolean");
 				rc = IPROTO_HANDLER_ERROR;
 			}
+			port_destroy(&ret_port);
 		} else {
 			rc = IPROTO_HANDLER_ERROR;
 		}
-		func_adapter_end(trigger, &ctx);
+		region_truncate(&fiber()->gc, region_svp);
 		if (rc != IPROTO_HANDLER_FALLBACK)
 			break;
 	}
