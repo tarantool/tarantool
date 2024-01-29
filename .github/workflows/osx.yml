@@ -17,34 +17,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        osx-version: [ 14 ]
+        osx-version: [ 13, 14 ]
         machine-arch: [ x86_64, aarch64 ]
         tarantool-branch:
           - 'master'
           - 'release/3.0'
           - 'release/2.11'
           - 'release/2.10'
-        build-type: [ debug, release, release-lto, static-cmake ]
-        include:
-          - osx-version: 13
-            machine-arch: x86_64
-            tarantool-branch: 'master'
-            build-type: release
-          - osx-version: 13
-            machine-arch: x86_64
-            tarantool-branch: 'release/3.0'
-            build-type: release
-          - osx-version: 13
-            machine-arch: x86_64
-            tarantool-branch: 'release/2.11'
-            build-type: release
-          - osx-version: 13
-            machine-arch: x86_64
-            tarantool-branch: 'release/2.10'
-            build-type: release
-
-    env:
-      BUILD_TYPE: ${{ matrix.build-type }}
+        build-type: [ debug, release ]
 
     steps:
       - name: Prepare checkout
@@ -62,14 +42,8 @@ jobs:
       - name: Install deps
         uses: ./.github/actions/install-deps-osx
 
-      - name: Enable LTO for build
-        if: endsWith(matrix.build-type, '-lto')
-        run: |
-          echo "BUILD_TYPE=${BUILD_TYPE/-lto/}" >> $GITHUB_ENV
-          echo "CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON" >> $GITHUB_ENV
-
       - name: Run testing
-        run: make -f .test.mk test-osx-${{ env.BUILD_TYPE }}
+        run: make -f .test.mk test-osx-${{ matrix.build-type }}
 
       - name: Send VK Teams message on failure
         if: failure()
@@ -117,7 +91,7 @@ jobs:
         #
         # For some reason, sometimes GitHub doesn't give the complete job list
         # and there is no chance to find the job and get its ID. At least, it
-        # has been noticed for this workflow with 36 parallel jobs.
+        # has been noticed for this workflow with 32 parallel jobs.
         #
         # It looks like the issue resides on the GitHub side and the simplest
         # way to resolve this is to ignore the failure and not fail the whole
