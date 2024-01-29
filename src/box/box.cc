@@ -5939,6 +5939,7 @@ box_storage_shutdown()
 	 */
 	fiber_shutdown();
 	replication_shutdown();
+	gc_shutdown();
 }
 
 void

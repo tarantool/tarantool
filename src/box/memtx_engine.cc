@@ -68,9 +68,6 @@
 /* sync snapshot every 16MB */
 #define SNAP_SYNC_INTERVAL	(1 << 24)
 
-static void
-checkpoint_cancel(struct checkpoint *ckpt);
-
 enum {
 	OBJSIZE_MIN = 16,
 	SLAB_SIZE = 16 * 1024 * 1024,
@@ -198,8 +195,6 @@ static void
 memtx_engine_shutdown(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-	if (memtx->checkpoint != NULL)
-		checkpoint_cancel(memtx->checkpoint);
 	mempool_destroy(&memtx->iterator_pool);
 	if (mempool_is_initialized(&memtx->rtree_iterator_pool))
 		mempool_destroy(&memtx->rtree_iterator_pool);
@@ -766,6 +761,8 @@ checkpoint_write_tuple(struct xlog *l, uint32_t space_id, uint32_t group_id,
 	row.body[0].iov_len = sizeof(body);
 	row.body[1].iov_base = (char *)data;
 	row.body[1].iov_len = size;
+	ERROR_INJECT_DOUBLE(ERRINJ_SNAP_WRITE_TIMEOUT, inj->dparam > 0,
+			    thread_sleep(inj->dparam));
 	return checkpoint_write_row(l, &row);
 }
 
@@ -774,8 +771,6 @@ struct checkpoint {
 	struct read_view rv;
 	/** Snapshot writer thread. */
 	struct cord cord;
-	/** True if tx thread is waiting for the snapshot writer thread. */
-	bool waiting_for_snap_thread;
 	/** The vclock of the snapshot file. */
 	struct vclock vclock;
 	/** Snapshot directory. */
@@ -876,7 +871,6 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 		free(ckpt);
 		return NULL;
 	}
-	ckpt->waiting_for_snap_thread = false;
 	struct xlog_opts opts = xlog_opts_default;
 	opts.rate_limit = snap_io_rate_limit;
 	opts.sync_interval = SNAP_SYNC_INTERVAL;
@@ -897,19 +891,6 @@ checkpoint_delete(struct checkpoint *ckpt)
 	read_view_close(&ckpt->rv);
 	xdir_destroy(&ckpt->dir);
 	free(ckpt);
-}
-
-static void
-checkpoint_cancel(struct checkpoint *ckpt)
-{
-	/*
-	 * Cancel the checkpoint thread if it's running and wait
-	 * for it to terminate so as to eliminate the possibility
-	 * of use-after-free.
-	 */
-	if (ckpt->waiting_for_snap_thread)
-		cord_cancel_and_join(&ckpt->cord);
-	checkpoint_delete(ckpt);
 }
 
 static int
@@ -1003,6 +984,12 @@ checkpoint_write_invalid_system_row(struct xlog *l)
 static int
 checkpoint_f(va_list ap)
 {
+#ifdef NDEBUG
+	enum { YIELD_LOOPS = 1000 };
+#else
+	enum { YIELD_LOOPS = 10 };
+#endif
+
 	int rc = 0;
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
 
@@ -1058,6 +1045,7 @@ checkpoint_f(va_list ap)
 			rc = -1;
 			break;
 		}
+		unsigned int loops = 0;
 		while (true) {
 			RegionGuard region_guard(&fiber()->gc);
 			struct read_view_tuple result;
@@ -1073,6 +1061,14 @@ checkpoint_f(va_list ap)
 						    result.data, result.size);
 			if (rc != 0)
 				break;
+			/* Yield to make thread cancellable. */
+			if (++loops % YIELD_LOOPS == 0)
+				fiber_sleep(0);
+			if (fiber_is_cancelled()) {
+				diag_set(FiberIsCancelled);
+				rc = -1;
+				break;
+			}
 		}
 		index_read_view_iterator_destroy(&it);
 		if (rc != 0)
@@ -1144,17 +1140,14 @@ memtx_engine_wait_checkpoint(struct engine *engine,
 	vclock_copy(&memtx->checkpoint->vclock, vclock);
 
 	if (cord_costart(&memtx->checkpoint->cord, "snapshot",
-			 checkpoint_f, memtx->checkpoint)) {
+			 checkpoint_f, memtx->checkpoint))
 		return -1;
-	}
-	memtx->checkpoint->waiting_for_snap_thread = true;
 
 	/* wait for memtx-part snapshot completion */
 	int result = cord_cojoin(&memtx->checkpoint->cord);
 	if (result != 0)
 		diag_log();
 
-	memtx->checkpoint->waiting_for_snap_thread = false;
 	return result;
 }
 
@@ -1177,7 +1170,6 @@ memtx_engine_commit_checkpoint(struct engine *engine,
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 
 	assert(memtx->checkpoint != NULL);
-	assert(!memtx->checkpoint->waiting_for_snap_thread);
 	assert(!xlog_is_open(&memtx->checkpoint->snap));
 
 	if (!memtx->checkpoint->touch) {
@@ -1211,7 +1203,6 @@ memtx_engine_abort_checkpoint(struct engine *engine)
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 
 	assert(memtx->checkpoint != NULL);
-	assert(!memtx->checkpoint->waiting_for_snap_thread);
 	assert(!xlog_is_open(&memtx->checkpoint->snap));
 
 	coio_call(memtx_engine_abort_checkpoint_f, &memtx->checkpoint->snap);

@@ -118,3 +118,47 @@ g.test_box_session_new_after_shutdown_started = function(cg)
         server:close()
     end)
 end
+
+local g_snap = t.group('snapshot')
+
+g_snap.before_each(function(cg)
+    cg.server = server:new()
+    cg.server:start()
+end)
+
+g_snap.after_each(function(cg)
+    if cg.server ~= nil then
+        cg.server:drop()
+    end
+end)
+
+-- Test shutdown does not hang due to memtx space snapshot in progress.
+g_snap.test_shutdown_during_memtx_snapshot = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        box.schema.create_space('test')
+        box.space.test:create_index('pk')
+        box.begin()
+        for i=1,10000 do
+            box.space.test:insert{i}
+        end
+        box.commit()
+        box.error.injection.set('ERRINJ_SNAP_WRITE_TIMEOUT', 0.01)
+        fiber.create(function()
+            box.snapshot()
+        end)
+    end)
+    t.helpers.retrying({}, function()
+        t.assert(cg.server:grep_log('saving snapshot'))
+    end)
+    -- Make random delay to check we are able to shutdown
+    -- with snapshot in progress at any time.
+    fiber.sleep(math.random() * 3)
+    local channel = fiber.channel()
+    fiber.create(function()
+        cg.server:stop()
+        channel:put('finished')
+    end)
+    t.assert(channel:get(60) ~= nil)
+end
