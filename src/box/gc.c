@@ -121,16 +121,29 @@ gc_init(on_garbage_collection_f on_garbage_collection)
 	gc.cleanup_fiber = fiber_new_system("gc", gc_cleanup_fiber_f);
 	if (gc.cleanup_fiber == NULL)
 		panic("failed to start garbage collection fiber");
+	fiber_set_joinable(gc.cleanup_fiber, true);
 
 	gc.checkpoint_fiber = fiber_new_system("checkpoint_daemon",
 					       gc_checkpoint_fiber_f);
 	if (gc.checkpoint_fiber == NULL)
 		panic("failed to start checkpoint daemon fiber");
+	fiber_set_joinable(gc.checkpoint_fiber, true);
 
 	gc.on_garbage_collection = on_garbage_collection;
 
 	fiber_start(gc.cleanup_fiber);
 	fiber_start(gc.checkpoint_fiber);
+}
+
+void
+gc_shutdown(void)
+{
+	fiber_cancel(gc.checkpoint_fiber);
+	fiber_cancel(gc.cleanup_fiber);
+	fiber_join(gc.checkpoint_fiber);
+	gc.checkpoint_fiber = NULL;
+	fiber_join(gc.cleanup_fiber);
+	gc.cleanup_fiber = NULL;
 }
 
 void
@@ -594,8 +607,10 @@ gc_checkpoint_fiber_f(va_list ap)
 			/* Periodic checkpointing is disabled. */
 			timeout = TIMEOUT_INFINITY;
 		}
-		if (!fiber_yield_timeout(timeout) &&
-		    !gc.checkpoint_is_pending) {
+		bool timed_out = fiber_yield_timeout(timeout);
+		if (fiber_is_cancelled())
+			break;
+		if (!timed_out && !gc.checkpoint_is_pending) {
 			/*
 			 * The checkpoint schedule has changed or the fiber has
 			 * been woken up spuriously.

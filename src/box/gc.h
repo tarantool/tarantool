@@ -224,6 +224,13 @@ void
 gc_init(on_garbage_collection_f on_garbage_collection);
 
 /**
+ * Prepare for freeing resources in gc_free while TX event loop is
+ * still running.
+ */
+void
+gc_shutdown(void);
+
+/**
  * Destroy the garbage collection state.
  */
 void
