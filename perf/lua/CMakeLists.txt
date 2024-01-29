@@ -28,7 +28,14 @@ endfunction()
 
 create_perf_lua_test(NAME 1mops_write)
 create_perf_lua_test(NAME box_select)
+create_perf_lua_test(NAME column_scan)
 create_perf_lua_test(NAME uri_escape_unescape)
+
+include_directories(${MSGPUCK_INCLUDE_DIRS})
+
+build_module(column_scan_module column_scan_module.c)
+target_link_libraries(column_scan_module msgpuck)
+add_dependencies(column_scan_perftest column_scan_module)
 
 add_custom_target(test-lua-perf
                   DEPENDS "${RUN_PERF_LUA_TESTS_LIST}"
