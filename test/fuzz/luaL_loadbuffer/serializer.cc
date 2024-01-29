@@ -26,6 +26,7 @@ namespace luajit_fuzzer {
 namespace {
 
 const std::string kCounterNamePrefix = "counter_";
+const std::string kNumberWrapperName = "always_number";
 
 PROTO_TOSTRING(Block, block);
 PROTO_TOSTRING(Chunk, chunk);
@@ -114,6 +115,18 @@ PROTO_TOSTRING(UnaryOperator, op);
 
 /** Identifier (Name). */
 PROTO_TOSTRING(Name, name);
+
+std::string
+NumberWrappedExpressionToString(const Expression &expr)
+{
+	std::string retval;
+	retval += kNumberWrapperName;
+	retval += "(";
+	retval += ExpressionToString(expr);
+	retval += ")";
+
+	return retval;
+}
 
 /**
  * Class that controls id creation for counters. Basically, a
@@ -695,12 +708,14 @@ PROTO_TOSTRING(ForCycleName, forcyclename)
 	std::string forcyclename_str = "for ";
 	forcyclename_str += NameToString(forcyclename.name());
 	forcyclename_str += " = ";
-	forcyclename_str += ExpressionToString(forcyclename.startexp());
+	forcyclename_str += NumberWrappedExpressionToString(
+		forcyclename.startexp());
 	forcyclename_str += ", ";
-	forcyclename_str += ExpressionToString(forcyclename.stopexp());
+	forcyclename_str += NumberWrappedExpressionToString(
+		forcyclename.stopexp());
 
 	if (forcyclename.has_stepexp())
-		forcyclename_str += ", " + ExpressionToString(
+		forcyclename_str += ", " + NumberWrappedExpressionToString(
 			forcyclename.stepexp());
 
 	forcyclename_str += " ";
