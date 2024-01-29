@@ -452,7 +452,15 @@ PROTO_TOSTRING(LastStatement, laststat)
 		break;
 	}
 
-	if (!laststat_str.empty() && laststat.has_semicolon())
+	/*
+	 * Add a semicolon when last statement is not empty
+	 * to avoid errors like:
+	 *
+	 * <preamble.lua>
+	 * (nil):Name0()
+	 * (nil)() -- ambiguous syntax (function call x new statement) near '('
+	 */
+	if (!laststat_str.empty())
 		laststat_str += "; ";
 
 	return laststat_str;
@@ -522,8 +530,15 @@ PROTO_TOSTRING(Statement, stat)
 		break;
 	}
 
-	if (stat.has_semicolon())
-		stat_str += "; ";
+	/*
+	 * Always add a semicolon regardless of grammar
+	 * to avoid errors like:
+	 *
+	 * <preamble.lua>
+	 * (nil):Name0()
+	 * (nil)() -- ambiguous syntax (function call x new statement) near '('
+	 */
+	stat_str += "; ";
 
 	return stat_str;
 }
