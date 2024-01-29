@@ -951,7 +951,12 @@ NESTED_PROTO_TOSTRING(ExpBinaryOpExp, binary, Expression)
 NESTED_PROTO_TOSTRING(UnaryOpExp, unary, Expression)
 {
 	std::string unary_str = UnaryOperatorToString(unary.unop());
-	unary_str += ExpressionToString(unary.exp());
+	/*
+	 * Add a whitespace before an expression with unary minus,
+	 * otherwise double hyphen comments the following code
+	 * and it breaks generated programs syntactically.
+	 */
+	unary_str += " " + ExpressionToString(unary.exp());
 	return unary_str;
 }
 
