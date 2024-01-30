@@ -34,6 +34,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "trivia/util.h"
+#include "xrow_update_field.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -45,6 +46,62 @@ enum {
 };
 
 struct tuple_format;
+struct tuple_dictionary;
+
+/** Update internal state */
+struct xrow_update {
+	/** Operations array. */
+	struct xrow_update_op *ops;
+	/** Length of ops. */
+	uint32_t op_count;
+	/**
+	 * Index base for MessagePack update operations. If update
+	 * is from Lua, then the base is 1. Otherwise 0. That
+	 * field exists because Lua uses 1-based array indexing,
+	 * and Lua-to-MessagePack encoder keeps this indexing when
+	 * encodes operations array. Index base allows not to
+	 * re-encode each Lua update with 0-based indexes.
+	 */
+	int index_base;
+	/**
+	 * A bitmask of all columns modified by this update. Only
+	 * the first level of a tuple is accounted here. I.e. if
+	 * a field [1][2][3] was updated, then only [1] is
+	 * reflected.
+	 */
+	uint64_t column_mask;
+	/** First level of update tree. It is always array. */
+	struct xrow_update_field root;
+};
+
+/**
+ * Initialize `xrow_update' structure.
+ */
+void
+xrow_update_init(struct xrow_update *update, int index_base);
+
+/**
+ * Read and check update operations and fill column mask.
+ *
+ * @param[out] update Update meta.
+ * @param expr MessagePack array of operations.
+ * @param expr_end End of the @a expr.
+ * @param dict Dictionary to lookup field number by a name.
+ * @param field_count_hint Field count in the updated tuple. If
+ *        there is no tuple at hand (for example, when we are
+ *        reading UPSERT operations), then 0 for field count will
+ *        do as a hint: the only effect of a wrong hint is
+ *        a possibly incorrect column_mask.
+ *        A correct field count results in an accurate
+ *        column mask calculation.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
+ */
+int
+xrow_update_read_ops(struct xrow_update *update, const char *expr,
+		     const char *expr_end, struct tuple_dictionary *dict,
+		     int32_t field_count_hint);
 
 int
 xrow_update_check_ops(const char *expr, const char *expr_end,
