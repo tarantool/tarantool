@@ -50,6 +50,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <assert.h>
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -704,7 +705,7 @@ rope_node_print(const struct rope_node *node, rope_visit_f print, void *cb_arg,
 	const char *padding[] = { "│   ", "   " };
 
 	rope_size_t child_prefix_len = strlen(prefix) + strlen(padding[0]) + 1;
-	char *child_prefix = malloc(child_prefix_len);
+	char *child_prefix = (char *)xmalloc(child_prefix_len);
 
 	if (node && (node->link[0] || node->link[1])) {
 		snprintf(child_prefix, child_prefix_len - 1,
