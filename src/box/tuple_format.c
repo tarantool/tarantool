@@ -1118,6 +1118,27 @@ tuple_check_constraint(struct tuple_format *format, const char *mp_data)
 	return 0;
 }
 
+int
+tuple_field_validate(struct tuple_format *format, struct tuple_field *field,
+		     const char *mp_data, const char *mp_data_end)
+{
+	bool allow_null = tuple_field_is_nullable(field) ||
+			  tuple_field_has_default(field);
+	if (!field_mp_type_is_compatible(field->type, mp_data, allow_null)) {
+		diag_set(ClientError, ER_FIELD_TYPE,
+			 tuple_field_path(field, format),
+			 field_type_strs[field->type],
+			 mp_type_strs[mp_typeof(*mp_data)]);
+		return -1;
+	}
+	if (tuple_field_type_is_fixed_int(field->type) &&
+	    tuple_field_check_fixed_int_range(format, field, mp_data) != 0)
+		return -1;
+	if (tuple_field_check_constraint(field, mp_data, mp_data_end) != 0)
+		return -1;
+	return 0;
+}
+
 static int
 tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 			     bool validate, struct field_map_builder *builder)
@@ -1158,22 +1179,8 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 		mp_next(&next_pos);
 		field = json_tree_entry(*token, struct tuple_field, token);
 		if (validate) {
-			bool allow_null = tuple_field_is_nullable(field) ||
-					  tuple_field_has_default(field);
-			if(!field_mp_type_is_compatible(field->type, pos,
-							allow_null)) {
-				diag_set(ClientError, ER_FIELD_TYPE,
-					 tuple_field_path(field, format),
-					 field_type_strs[field->type],
-					 mp_type_strs[mp_typeof(*pos)]);
-				goto error;
-			}
-			if (tuple_field_type_is_fixed_int(field->type) &&
-			    tuple_field_check_fixed_int_range(format, field,
-							      pos) != 0)
-				goto error;
-			if (tuple_field_check_constraint(field, pos,
-							 next_pos) != 0)
+			if (tuple_field_validate(format, field, pos,
+						 next_pos) != 0)
 				goto error;
 			bit_clear(required_fields, field->id);
 		}
@@ -1521,24 +1528,8 @@ tuple_format_iterator_next(struct tuple_format_iterator *it,
 		memcpy(it->multikey_required_fields,
 		       field->multikey_required_fields, it->required_fields_sz);
 	}
-	/*
-	 * Check if field mp_type is compatible with type
-	 * defined in format.
-	 */
-	bool is_nullable = tuple_field_is_nullable(field);
-	if (!field_mp_type_is_compatible(field->type, entry->data, is_nullable) != 0) {
-		diag_set(ClientError, ER_FIELD_TYPE,
-			 tuple_field_path(field, it->format),
-			 field_type_strs[field->type],
-			 mp_type_strs[mp_typeof(*entry->data)]);
-		return -1;
-	}
-	if (tuple_field_type_is_fixed_int(field->type) &&
-	    tuple_field_check_fixed_int_range(it->format, field,
-					      entry->data) != 0)
-		return -1;
-	if (tuple_field_check_constraint(field, entry->data,
-					 entry->data_end) != 0)
+	if (tuple_field_validate(it->format, field, entry->data,
+				 entry->data_end) != 0)
 		return -1;
 	bit_clear(it->multikey_frame != NULL ?
 		  it->multikey_required_fields : it->required_fields, field->id);

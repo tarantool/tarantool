@@ -719,6 +719,17 @@ tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 void
 tuple_format_to_mpstream(struct tuple_format *format, struct mpstream *stream);
 
+/**
+ * Checks that `mp_data' is compatible with the `field' type defined in format,
+ * checks that integer value is within an allowed range, also checks field
+ * constraints, etc.
+ *
+ * Returns 0 on success. On error, sets diag and returns -1.
+ */
+int
+tuple_field_validate(struct tuple_format *format, struct tuple_field *field,
+		     const char *mp_data, const char *mp_data_end);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
