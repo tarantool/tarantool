@@ -5234,7 +5234,7 @@ local_recovery(const struct vclock *checkpoint_vclock)
 		engine_begin_hot_standby_xc();
 		recovery_follow_local(recovery, &wal_stream.base, "hot_standby",
 				      cfg_getd("wal_dir_rescan_delay"));
-		while (true) {
+		while (!fiber_is_cancelled()) {
 			if (path_lock(wal_dir(), &wal_dir_lock))
 				diag_raise();
 			if (wal_dir_lock >= 0)
@@ -5242,6 +5242,7 @@ local_recovery(const struct vclock *checkpoint_vclock)
 			fiber_sleep(0.1);
 		}
 		recovery_stop_local(recovery);
+		fiber_testcancel();
 		recover_remaining_wals(recovery, &wal_stream.base, NULL, true);
 		if (wal_stream_has_unfinished_tx(&wal_stream)) {
 			diag_set(XlogError, "found a not finished transaction "

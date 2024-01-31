@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local fiber = require('fiber')
+local fio = require('fio')
 local t = require('luatest')
 
 local g = t.group()
@@ -132,6 +133,15 @@ g_snap.after_each(function(cg)
     end
 end)
 
+local function test_no_hang_on_shutdown(server)
+    local channel = fiber.channel()
+    fiber.create(function()
+        server:stop()
+        channel:put('finished')
+    end)
+    t.assert(channel:get(60) ~= nil)
+end
+
 -- Test shutdown does not hang due to memtx space snapshot in progress.
 g_snap.test_shutdown_during_memtx_snapshot = function(cg)
     t.tarantool.skip_if_not_debug()
@@ -155,10 +165,37 @@ g_snap.test_shutdown_during_memtx_snapshot = function(cg)
     -- Make random delay to check we are able to shutdown
     -- with snapshot in progress at any time.
     fiber.sleep(math.random() * 3)
-    local channel = fiber.channel()
-    fiber.create(function()
-        cg.server:stop()
-        channel:put('finished')
+    test_no_hang_on_shutdown(cg.server)
+end
+
+local g_standby = t.group('hot standby')
+
+g_standby.before_each(function(cg)
+    cg.main = server:new()
+    cg.main:start()
+    cg.standby = server:new({
+        workdir = cg.main.workdir,
+        box_cfg = {hot_standby = true},
+    })
+    cg.standby:start({wait_until_ready = false})
+end)
+
+g_standby.after_each(function(cg)
+    if cg.main ~= nil then
+        cg.main:drop()
+    end
+    if cg.standby ~= nil then
+        cg.standby:drop()
+    end
+end)
+
+-- Test shutdown does not hang if server is in hot standby mode.
+g_standby.test_shutdown_during_hot_standby = function(cg)
+    local log = fio.pathjoin(cg.standby.workdir, cg.standby.alias .. '.log')
+    t.helpers.retrying({}, function()
+        local standby_msg = 'Entering hot standby mode'
+        -- Cannot query log path as server is not listen in hot standby mode.
+        t.assert(cg.standby:grep_log(standby_msg, nil, {filename = log}))
     end)
-    t.assert(channel:get(60) ~= nil)
+    test_no_hang_on_shutdown(cg.standby)
 end
