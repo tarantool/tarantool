@@ -268,9 +268,6 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 		if (stop_vclock != NULL &&
 		    r->vclock.signature >= stop_vclock->signature)
 			return;
-		int64_t current_lsn = vclock_get(&r->vclock, row.replica_id);
-		if (row.lsn <= current_lsn)
-			continue; /* already applied, skip */
 
 		/*
 		 * All rows in xlog files have an assigned replica
@@ -278,6 +275,9 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 		 * are signed with a zero replica id.
 		 */
 		assert(row.replica_id != 0 || row.group_id == GROUP_LOCAL);
+		int64_t current_lsn = vclock_get(&r->vclock, row.replica_id);
+		if (row.lsn <= current_lsn)
+			continue; /* already applied, skip */
 		/*
 		 * We can promote the vclock either before or
 		 * after xstream_write(): it only makes any impact
