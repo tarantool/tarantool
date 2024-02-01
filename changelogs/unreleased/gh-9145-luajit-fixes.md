@@ -11,3 +11,12 @@ were fixed as part of this activity:
 * Ensured returned string is alive in `ffi.typeinfo()`.
 * Fixed the missing initialization of the internal structure, leading to a
   crash when recording a trace with an allocation of cdata.
+* Limited exponent range in number parsing by `2^20`.
+* Fixed double-emitting of `IR_NEWREF` when restoring sunk values for side
+  trace (gh-7937).
+* Fixed the `IR_HREFK` optimization for huge tables.
+* Fixed recording of the `__concat` metamethod.
+* Fixed the embedded bytecode loader.
+* Improved error reporting on stack overflow.
+* Fixed assertion on the Lua stack overflow for a stitched trace.
+* Fixed snapshoting of functions for non-base frames.
