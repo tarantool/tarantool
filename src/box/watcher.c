@@ -352,7 +352,7 @@ watchable_worker_f(va_list ap)
 		fiber_check_gc();
 		if (!watchable_run(watchable)) {
 			/* No more watchers to run, wait... */
-			fiber_sleep(TIMEOUT_INFINITY);
+			fiber_yield();
 		}
 	}
 	return 0;
