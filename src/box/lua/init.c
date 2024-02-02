@@ -160,6 +160,7 @@ extern char session_lua[],
 	config_instance_config_lua[],
 	config_source_env_lua[],
 	config_source_file_lua[],
+	config_source_roles_lua[],
 	config_utils_aboard_lua[],
 	config_utils_expression_lua[],
 	config_utils_file_lua[],
@@ -382,6 +383,10 @@ static const char *lua_sources[] = {
 	"config/source/file",
 	"internal.config.source.file",
 	config_source_file_lua,
+
+	"config/source/roles",
+	"internal.config.source.roles",
+	config_source_roles_lua,
 
 	"config/applier/app",
 	"internal.config.applier.app",

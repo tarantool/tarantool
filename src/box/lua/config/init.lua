@@ -150,6 +150,7 @@ function methods._initialize(self)
     self:_register_source(require('internal.config.source.env').new({
         env_var_suffix = 'default',
     }))
+    self:_register_source(require('internal.config.source.roles').new())
 end
 
 -- Collect data from configuration sources.

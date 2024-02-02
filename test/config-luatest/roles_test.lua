@@ -572,3 +572,241 @@ g.test_role_dependencies_stop_required_role = function(g)
                   '"one", "two" depend on it'
     })
 end
+
+-- Make sure that credentials properly loaded from roles.
+g.test_credentials_from_roles = function(g)
+    local one = string.dump(function()
+        local credentials = {
+            roles = {
+                myrole = {
+                    privileges = {{
+                        permissions = {
+                            'read',
+                            'write',
+                        },
+                        spaces = {'space_one'},
+                    }},
+                },
+            },
+            users = {
+                myuser = {
+                    privileges = {{
+                        permissions = {
+                            'execute',
+                        },
+                        functions = {'function_two'},
+                    }},
+                },
+            }
+        }
+
+        return {
+            credentials = credentials,
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    end)
+
+    local two = string.dump(function()
+        local credentials = [[
+            roles:
+              myrole_2:
+                privileges:
+                - permissions:
+                  - read
+                  - write
+                  universe: true
+            users:
+              myuser_2:
+                privileges:
+                - permissions:
+                  - execute
+                  lua_eval: true
+        ]]
+
+        return {
+            credentials = credentials,
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    end)
+
+    local verify = function()
+        local exp = {
+            roles = {
+                myrole = {
+                    privileges = {{
+                        permissions = {
+                            'read',
+                            'write',
+                        },
+                        spaces = {'space_one'},
+                    }},
+                },
+                myrole_2 = {
+                    privileges = {{
+                        permissions = {
+                            'read',
+                            'write',
+                        },
+                        universe = true,
+                    }},
+                },
+            },
+            users = {
+                guest = {
+                    roles = {'super'},
+                },
+                myuser = {
+                    privileges = {{
+                        permissions = {
+                            'execute',
+                        },
+                        functions = {'function_two'},
+                    }},
+                },
+                myuser_2 = {
+                    privileges = {{
+                        permissions = {
+                            'execute',
+                        },
+                        lua_eval = true,
+                    }},
+                },
+            }
+        }
+        t.assert_equals(require('config'):get('credentials'), exp)
+    end
+
+    helpers.success_case(g, {
+        roles = {one = one, two = two},
+        options = {
+            roles = {'one', 'two'},
+            credentials = {
+                users = {
+                    guest = {
+                        roles = {'super'},
+                    },
+                },
+            },
+        },
+        verify = verify,
+    })
+end
+
+-- Make sure that credentials loaded from roles cannot overwrite credentials
+-- from other sources and that credentials from later roles overwrites
+-- credentials from earlier roles.
+g.test_credentials_from_roles_merged = function(g)
+    local one = string.dump(function()
+        local credentials = {
+            users = {
+                myuser = {
+                    privileges = {{
+                        permissions = {'execute'},
+                        functions = {'function_two'},
+                    }},
+                    roles = {'super'},
+                },
+            },
+        }
+
+        return {
+            credentials = credentials,
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    end)
+
+    local two = string.dump(function()
+        local credentials = {
+            users = {
+                myuser = {
+                    privileges = {{
+                        permissions = {'write'},
+                        spaces = {'space_one'},
+                    }},
+                },
+            },
+        }
+
+        return {
+            credentials = credentials,
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    end)
+
+    local verify_only_roles = function()
+        local exp = {
+            -- Privileges from the second role.
+            privileges = {{
+                permissions = {'write'},
+                spaces = {'space_one'},
+            }},
+            -- Roles from the first role.
+            roles = {'super'},
+        }
+        t.assert_equals(require('config'):get('credentials.users.myuser'), exp)
+    end
+
+    helpers.success_case(g, {
+        roles = {one = one, two = two},
+        options = {
+            roles = {'one', 'two'},
+        },
+        verify = verify_only_roles,
+    })
+
+    local verify_roles_and_file = function()
+        local exp = {
+            privileges = {{
+                permissions = {'read'},
+                universe = true,
+            }},
+            roles = {'public'},
+        }
+        t.assert_equals(require('config'):get('credentials.users.myuser'), exp)
+    end
+
+    helpers.success_case(g, {
+        roles = {one = one, two = two},
+        options = {
+            roles = {'one', 'two'},
+            ['credentials.users.myuser'] = {
+                privileges = {{
+                    permissions = {'read'},
+                    universe = true,
+                }},
+                roles = {'public'},
+            },
+        },
+        verify = verify_roles_and_file,
+    })
+end
+
+-- Check that credentials from roles are validated.
+g.test_credentials_from_roles_error = function(g)
+    local one = string.dump(function()
+        return {
+            credentials = 'something',
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    end)
+
+    helpers.failure_case(g, {
+        roles = {one = one},
+        options = {
+            ['roles'] = {'one'}
+        },
+        exp_err = 'credentials from roles: invalid credentials in role ' ..
+            '"one": [cluster_config] credentials: Unexpected data type for ' ..
+            'a record: "string"'
+    })
+end
