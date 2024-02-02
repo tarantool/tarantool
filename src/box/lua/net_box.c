@@ -252,6 +252,8 @@ struct netbox_transport {
 	struct error *last_error;
 	/** Fiber doing I/O and dispatching responses. */
 	struct fiber *worker;
+	/** Signalled when the worker is stopped. */
+	struct fiber_cond on_worker_stop;
 	/**
 	 * Lua reference to the Lua state used by the worker fiber or
 	 * LUA_NOREF if the worker fiber isn't running.
@@ -544,6 +546,7 @@ netbox_transport_create(struct netbox_transport *transport)
 	transport->is_closing = false;
 	transport->last_error = NULL;
 	transport->worker = NULL;
+	fiber_cond_create(&transport->on_worker_stop);
 	transport->coro_ref = LUA_NOREF;
 	transport->self_ref = LUA_NOREF;
 	iostream_ctx_clear(&transport->io_ctx);
@@ -564,6 +567,7 @@ netbox_transport_destroy(struct netbox_transport *transport)
 	if (transport->last_error != NULL)
 		error_unref(transport->last_error);
 	assert(transport->worker == NULL);
+	fiber_cond_destroy(&transport->on_worker_stop);
 	assert(transport->coro_ref == LUA_NOREF);
 	assert(transport->self_ref == LUA_NOREF);
 	iostream_ctx_destroy(&transport->io_ctx);
@@ -3103,7 +3107,7 @@ netbox_worker_f(va_list ap)
 			(void)rc;
 			iostream_close(&transport->io);
 		}
-		if (transport->state == NETBOX_CLOSED)
+		if (fiber_is_cancelled())
 			break;
 		netbox_transport_set_error(transport);
 		transport->state = (reconnect_after > 0 ?
@@ -3115,7 +3119,14 @@ netbox_worker_f(va_list ap)
 			break;
 		}
 	}
+	if (transport->state != NETBOX_ERROR) {
+		box_error_raise(ER_NO_CONNECTION, "Connection closed");
+		netbox_transport_set_error(transport);
+		transport->state = NETBOX_CLOSED;
+		netbox_transport_on_state_change_pcall(transport, L);
+	}
 	transport->worker = NULL;
+	fiber_cond_broadcast(&transport->on_worker_stop);
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, transport->coro_ref);
 	transport->coro_ref = LUA_NOREF;
 	/* Careful: luaL_unref may delete this transport object. */
@@ -3171,17 +3182,16 @@ luaT_netbox_transport_start(struct lua_State *L)
  * Stops a worker fiber.
  *
  * Takes an optional boolean argument 'wait': if set the function will wait
- * for all pending requests to be sent.
+ * for all pending requests to be sent and for the connection to be closed.
+ * It is ignored if `stop` is being called from the worker fiber.
  */
 static int
 luaT_netbox_transport_stop(struct lua_State *L)
 {
 	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
-	bool wait = lua_toboolean(L, 2);
-	if (wait && fiber() != transport->worker &&
-	    transport->state != NETBOX_CLOSED &&
-	    transport->state != NETBOX_ERROR) {
-		transport->is_closing = true;
+	transport->is_closing = true;
+	bool wait = fiber() == transport->worker ? false : lua_toboolean(L, 2);
+	if (wait) {
 		/*
 		 * Here we are waiting until send buf became empty:
 		 * it is necessary to ensure that all requests are
@@ -3189,24 +3199,16 @@ luaT_netbox_transport_stop(struct lua_State *L)
 		 */
 		while (ibuf_used(&transport->send_buf) > 0)
 			fiber_cond_wait(&transport->on_send_buf_empty);
-		transport->is_closing = false;
-	}
-	/*
-	 * While we were waiting for the send buffer to be empty,
-	 * the state could change.
-	 */
-	if (transport->state != NETBOX_CLOSED &&
-	    transport->state != NETBOX_ERROR) {
-		box_error_raise(ER_NO_CONNECTION, "Connection closed");
-		netbox_transport_set_error(transport);
-		transport->state = NETBOX_CLOSED;
-		netbox_transport_on_state_change(transport, L);
 	}
 	/* Cancel the worker fiber. */
 	if (transport->worker != NULL) {
 		fiber_cancel(transport->worker);
 		/* Check if we cancelled ourselves. */
 		luaL_testcancel(L);
+	}
+	if (wait) {
+		while (transport->worker != NULL)
+			fiber_cond_wait(&transport->on_worker_stop);
 	}
 	return 0;
 }
