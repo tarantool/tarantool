@@ -1151,6 +1151,28 @@ error:
 	return -1;
 }
 
+/*
+ * During a worker fiber's yield, the connection could get closed. Testing that
+ * the worker was cancelled is not enough, since there could be an on_disconnect
+ * trigger that also yielded, so it didn't get cancelled.
+ *
+ * @param transport owner of the worker
+ *
+ * @retval  0 Success.
+ * @retval -1 Connection was closed.
+ */
+static int
+netbox_worker_check_after_yield(const struct netbox_transport *transport)
+{
+	if (fiber() == transport->worker && transport->state == NETBOX_CLOSED) {
+		assert(transport->last_error != NULL);
+		box_error_raise(ER_NO_CONNECTION, "%s",
+				transport->last_error->errmsg);
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * Reads data from the given socket until the limit is reached.
  * Returns 0 on success. On error returns -1 and sets diag.
@@ -1234,10 +1256,8 @@ netbox_transport_communicate(struct netbox_transport *transport, size_t limit)
 			box_error_raise(ER_NO_CONNECTION, "Error injection");
 			return -1;
 		});
-		if (fiber_is_cancelled()) {
-			diag_set(FiberIsCancelled);
+		if (netbox_worker_check_after_yield(transport) != 0)
 			return -1;
-		}
 	}
 io_error:
 	assert(!diag_is_empty(diag_get()));
@@ -2619,6 +2639,8 @@ netbox_transport_on_state_change(struct netbox_transport *transport,
 	if (error != NULL)
 		lua_pushstring(L, error->errmsg);
 	lua_call(L, error != NULL ? 3 : 2, 0);
+	if (netbox_worker_check_after_yield(transport) != 0)
+		luaT_error(L);
 }
 
 static int
@@ -2667,6 +2689,8 @@ netbox_transport_on_event(struct netbox_transport *transport,
 		assert(data == watch.data_end);
 	}
 	lua_call(L, watch.data != NULL ? 3 : 2, 0);
+	if (netbox_worker_check_after_yield(transport) != 0)
+		luaT_error(L);
 }
 
 /**
@@ -2795,6 +2819,8 @@ netbox_transport_dispatch_response(struct netbox_transport *transport,
 		lua_pushvalue(L, -3);
 		lua_call(L, 2, 0);
 		netbox_request_signal(request);
+		if (netbox_worker_check_after_yield(transport) != 0)
+			luaT_error(L);
 	}
 }
 
@@ -2859,6 +2885,8 @@ out:
 		lua_rawseti(L, -2, i++);
 	}
 	lua_call(L, 4, 0);
+	if (netbox_worker_check_after_yield(transport) != 0)
+		luaT_error(L);
 	return;
 unsupported:
 	say_verbose("IPROTO_ID command is not supported");
@@ -3016,6 +3044,8 @@ restart:
 	lua_rawgeti(L, schema_table_idx, BOX_VCOLLATION_ID);
 	lua_rawgeti(L, schema_table_idx, BOX_VSPACE_SEQUENCE_ID);
 	lua_call(L, 6, 0);
+	if (netbox_worker_check_after_yield(transport) != 0)
+		luaT_error(L);
 	/* Pop the schema table. */
 	lua_pop(L, 1);
 	return schema_version;
@@ -3088,8 +3118,10 @@ netbox_worker_f(va_list ap)
 	fiber()->storage.lua.stack = L;
 	const double reconnect_after = !uri_is_nil(&transport->opts.uri) ?
 				       transport->opts.reconnect_after : 0;
-	while (!fiber_is_cancelled()) {
+	while (netbox_worker_check_after_yield(transport) == 0) {
 		if (netbox_transport_connect(transport) == 0) {
+			if (netbox_worker_check_after_yield(transport) != 0)
+				break;
 			int rc = luaT_cpcall(L, netbox_connection_handler_f,
 					     transport);
 			/* The worker loop can only be broken by an error. */
