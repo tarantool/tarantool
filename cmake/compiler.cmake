@@ -155,10 +155,10 @@ endif()
 option(ENABLE_BUNDLED_LIBUNWIND "Bundled libunwind will be built"
        ${ENABLE_BUNDLED_LIBUNWIND_DEFAULT})
 
-# On macOS there is no '-static-libstdc++' flag and it's use will
-# raise following error:
-# error: argument unused during compilation: '-static-libstdc++'
-if(BUILD_STATIC AND NOT TARGET_OS_DARWIN)
+# In Clang there is no '-static-libstdc++' flag and its use will raise
+# the following error:
+#     clang: error: argument unused during compilation: '-static-libstdc++'
+if(BUILD_STATIC AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     # Static linking for c++ routines
     add_compile_flags("C;CXX" "-static-libstdc++")
 endif()
