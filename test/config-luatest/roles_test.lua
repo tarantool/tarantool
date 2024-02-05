@@ -572,3 +572,47 @@ g.test_role_dependencies_stop_required_role = function(g)
                   '"one", "two" depend on it'
     })
 end
+
+-- Make sure that role was started after config was fully loaded.
+g.test_role_started_and_stopped_after_config_loaded = function(g)
+    local one = string.dump(function()
+        local function apply()
+            local cfg = require('config')
+            local state = rawget(_G, 'state')
+            table.insert(state, {'start', cfg:info().status, cfg:get('roles')})
+        end
+
+        local function stop()
+            local cfg = require('config')
+            local state = rawget(_G, 'state')
+            table.insert(state, {'stop', cfg:info().status, cfg:get('roles')})
+        end
+
+        rawset(_G, 'state', {})
+
+        return {
+            validate = function() end,
+            apply = apply,
+            stop = stop,
+        }
+    end)
+    local verify = function()
+        local exp = {{'start', 'ready', {'one'}}}
+        t.assert_equals(rawget(_G, 'state'), exp)
+    end
+
+    local verify_2 = function()
+        local exp = {{'start', 'ready', {'one'}}, {'stop', 'ready'}}
+        t.assert_equals(rawget(_G, 'state'), exp)
+    end
+
+    helpers.reload_success_case(g, {
+        roles = {one = one},
+        options = {
+            ['roles'] = {'one'}
+        },
+        options_2 = {},
+        verify = verify,
+        verify_2 = verify_2,
+    })
+end

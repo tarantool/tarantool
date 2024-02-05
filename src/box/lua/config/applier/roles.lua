@@ -3,6 +3,10 @@ local log = require('internal.config.utils.log')
 local last_loaded = {}
 local last_roles_ordered = {}
 
+local function apply(_config)
+    log.verbose('roles.apply: do nothing')
+end
+
 local function stop_roles(roles_to_skip)
     local roles_to_stop = {}
     for id = #last_roles_ordered, 1, -1 do
@@ -44,7 +48,7 @@ local function stop_roles(roles_to_skip)
         end
     end
     for _, role_name in ipairs(roles_to_stop) do
-        log.verbose('roles.apply: stop role ' .. role_name)
+        log.verbose('roles.post_apply: stop role ' .. role_name)
         local ok, err = pcall(last_loaded[role_name].stop)
         if not ok then
             error(('Error stopping role %s: %s'):format(role_name, err), 0)
@@ -106,7 +110,7 @@ local function resort_roles(original_order, roles)
     return ordered
 end
 
-local function apply(config)
+local function post_apply(config)
     local configdata = config._configdata
     local role_names = configdata:get('roles', {use_default = true})
     if role_names == nil or next(role_names) == nil then
@@ -132,7 +136,7 @@ local function apply(config)
     for _, role_name in ipairs(roles_ordered) do
         local role = last_loaded[role_name]
         if not role then
-            log.verbose('roles.apply: load role ' .. role_name)
+            log.verbose('roles.post_apply: load role ' .. role_name)
             role = require(role_name)
             local funcs = {'validate', 'apply', 'stop'}
             for _, func_name in pairs(funcs) do
@@ -164,7 +168,7 @@ local function apply(config)
 
     -- Apply configs for all roles.
     for _, role_name in ipairs(roles_ordered) do
-        log.verbose('roles.apply: apply config for role ' .. role_name)
+        log.verbose('roles.post_apply: apply config for role ' .. role_name)
         local ok, err = pcall(loaded[role_name].apply, roles_cfg[role_name])
         if not ok then
             error(('Error applying role %s: %s'):format(role_name, err), 0)
@@ -178,4 +182,5 @@ end
 return {
     name = 'roles',
     apply = apply,
+    post_apply = post_apply,
 }
