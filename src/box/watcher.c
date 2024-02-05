@@ -136,6 +136,8 @@ watchable_worker_f(va_list);
 static void
 watchable_wakeup_worker(struct watchable *watchable)
 {
+	if (watchable->is_shutdown)
+		return;
 	if (watchable->worker == NULL) {
 		watchable->worker = fiber_new_system("box.watchable",
 						     watchable_worker_f);
@@ -143,6 +145,7 @@ watchable_wakeup_worker(struct watchable *watchable)
 			diag_log();
 			panic("failed to start box.watchable worker fiber");
 		}
+		fiber_set_joinable(watchable->worker, true);
 		watchable->worker->f_arg = watchable;
 	}
 	fiber_wakeup(watchable->worker);
@@ -182,7 +185,7 @@ watchable_schedule_node(struct watchable *watchable,
 	if (!rlist_empty(&node->idle_watchers)) {
 		rlist_splice_tail(&watchable->pending_watchers,
 				  &node->idle_watchers);
-		fiber_wakeup(watchable->worker);
+		watchable_wakeup_worker(watchable);
 	}
 }
 
@@ -364,15 +367,27 @@ watchable_create(struct watchable *watchable)
 	watchable->node_by_key = mh_strnptr_new();
 	rlist_create(&watchable->pending_watchers);
 	watchable->worker = NULL;
+	watchable->is_shutdown = false;
+}
+
+/**
+ * Shutdown watchable. After shutdown it still can be used but
+ * notifications are stopped.
+ */
+static void
+watchable_shutdown(struct watchable *watchable)
+{
+	watchable->is_shutdown = true;
+	if (watchable->worker != NULL) {
+		fiber_cancel(watchable->worker);
+		fiber_join(watchable->worker);
+		watchable->worker = NULL;
+	}
 }
 
 static void
 watchable_destroy(struct watchable *watchable)
 {
-	if (watchable->worker != NULL) {
-		fiber_cancel(watchable->worker);
-		watchable->worker = NULL;
-	}
 	struct mh_strnptr_t *h = watchable->node_by_key;
 	mh_int_t i;
 	mh_foreach(h, i) {
@@ -469,6 +484,12 @@ void
 box_watcher_init(void)
 {
 	watchable_create(&box_watchable);
+}
+
+void
+box_watcher_shutdown(void)
+{
+	watchable_shutdown(&box_watchable);
 }
 
 void

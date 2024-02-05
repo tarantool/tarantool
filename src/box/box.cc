@@ -5931,6 +5931,7 @@ box_storage_shutdown()
 	if (!is_storage_initialized)
 		return;
 	iproto_shutdown();
+	box_watcher_shutdown();
 	/*
 	 * Finish client fibers after iproto_shutdown otherwise new fibers
 	 * can be started through new iproto requests. Also we should
