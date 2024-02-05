@@ -470,13 +470,16 @@ test_parallel(void)
 }
 
 /**
+ * Checks that all functions are callable and work as usual after
+ * box_watcher_shutdown() except no notification are delivired.
+ *
  * Checks that box_watcher_free() properly unregisters all watchers.
  */
 static void
 test_free(void)
 {
 	header();
-	plan(7);
+	plan(17);
 
 	test_broadcast("foo", "bar");
 	test_broadcast("fuzz", "buzz");
@@ -497,17 +500,40 @@ test_free(void)
 	test_watcher_check_run_count(&w2, 1);
 	test_watcher_check_run_count(&w3, 1);
 
+	box_watcher_shutdown();
+
+	struct test_watcher w4, w5;
+	test_watcher_create(&w4);
+	test_watcher_create(&w5);
+
+	test_watcher_register(&w4, "foo");
+	test_watcher_register_with_flags(&w5, "foo", WATCHER_RUN_ASYNC);
+	test_watcher_check_run_count(&w4, 0);
+	test_watcher_check_run_count(&w5, 0);
+	test_watch_once("foo", "bar");
+
+	test_broadcast("foo", NULL);
+	test_watcher_check_run_count(&w1, 1);
+	test_watcher_check_run_count(&w2, 1);
+	test_watcher_check_run_count(&w3, 1);
+	test_watcher_check_run_count(&w4, 0);
+	test_watcher_check_run_count(&w5, 0);
+	test_watch_once("foo", NULL);
+
+	test_watcher_resume_sleeping(&w3);
 	box_watcher_free();
 
 	test_watcher_check_destroy_count(&w1, 1);
 	test_watcher_check_destroy_count(&w2, 1);
-	test_watcher_check_destroy_count(&w3, 0);
-	test_watcher_resume_sleeping(&w3);
 	test_watcher_check_destroy_count(&w3, 1);
+	test_watcher_check_destroy_count(&w4, 1);
+	test_watcher_check_destroy_count(&w5, 1);
 
 	test_watcher_destroy(&w1);
 	test_watcher_destroy(&w2);
 	test_watcher_destroy(&w3);
+	test_watcher_destroy(&w4);
+	test_watcher_destroy(&w5);
 
 	check_plan();
 	footer();

@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "small/rlist.h"
 
@@ -153,6 +154,8 @@ struct watchable {
 	struct rlist pending_watchers;
 	/** Background fiber that runs watcher callbacks. */
 	struct fiber *worker;
+	/** Set if watchable shutdown is started. */
+	bool is_shutdown;
 };
 
 /**
@@ -280,6 +283,13 @@ box_watch_once(const char *key, size_t key_len, const char **end);
 
 void
 box_watcher_init(void);
+
+/**
+ * Shutdown watcher. After shutdown API still can be used but notifications
+ * are stopped.
+ */
+void
+box_watcher_shutdown(void);
 
 void
 box_watcher_free(void);
