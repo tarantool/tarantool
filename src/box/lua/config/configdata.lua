@@ -217,6 +217,7 @@ function methods.sharding(self)
         'rebalancer_disbalance_threshold',
         'rebalancer_max_receiving',
         'rebalancer_max_sending',
+        'rebalancer_mode',
         'sync_timeout',
         'connection_outdate_delay',
         'failover_ping_timeout',

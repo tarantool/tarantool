@@ -299,6 +299,7 @@ g.test_defaults = function()
             rebalancer_disbalance_threshold = 1,
             rebalancer_max_receiving = 100,
             rebalancer_max_sending = 1,
+            rebalancer_mode = 'auto',
             sched_move_quota = 1,
             sched_ref_quota = 300,
             shard_index = "bucket_id",
