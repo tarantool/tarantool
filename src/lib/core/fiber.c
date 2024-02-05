@@ -1552,6 +1552,11 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	assert(fiber_attr != NULL);
 	cord_collect_garbage(cord);
 
+	if (cord->is_shutdown) {
+		diag_set(FiberIsCancelled);
+		return NULL;
+	}
+
 	if (fiber_is_reusable(fiber_attr->flags) && !rlist_empty(&cord->dead)) {
 		fiber = rlist_first_entry(&cord->dead, struct fiber, link);
 		rlist_move_entry(&cord->alive, fiber, link);
@@ -1895,6 +1900,7 @@ cord_create(struct cord *cord, const char *name)
 	signal_stack_init();
 	cord->shutdown_fiber = NULL;
 	cord->client_fiber_count = 0;
+	cord->is_shutdown = false;
 }
 
 void
@@ -2375,6 +2381,7 @@ void
 fiber_shutdown(void)
 {
 	assert(cord()->shutdown_fiber == NULL);
+	cord()->is_shutdown = true;
 	struct fiber *fiber;
 	rlist_foreach_entry(fiber, &cord()->alive, link) {
 		if (!(fiber->flags & FIBER_IS_SYSTEM))

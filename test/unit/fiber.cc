@@ -693,6 +693,19 @@ hang_on_cancel_f(va_list ap)
 	return 0;
 }
 
+static int
+new_fiber_on_shudown_f(va_list ap)
+{
+	while (!fiber_is_cancelled())
+		fiber_yield();
+	struct fiber *fiber = fiber_new("fiber_on_shutdown", wait_cancel_f);
+	fail_unless(fiber == NULL);
+	fail_unless(!diag_is_empty(diag_get()));
+	fail_unless(strcmp(diag_last_error(diag_get())->errmsg,
+			   "fiber is cancelled") == 0);
+	return 0;
+}
+
 static void
 fiber_test_shutdown(void)
 {
@@ -705,17 +718,29 @@ fiber_test_shutdown(void)
 	fail_unless(fiber2 != NULL);
 	struct fiber *fiber3 = fiber_new("fiber3", hang_on_cancel_f);
 	fail_unless(fiber3 != NULL);
+	struct fiber *fiber4 = fiber_new("fiber4", new_fiber_on_shudown_f);
+	fail_unless(fiber4 != NULL);
+	fiber_set_joinable(fiber4, true);
 
 	fiber_shutdown();
+
 	fail_unless((fiber1->flags & FIBER_IS_DEAD) != 0);
 	fail_unless((fiber2->flags & FIBER_IS_DEAD) == 0);
 	fail_unless((fiber3->flags & FIBER_IS_DEAD) == 0);
+	fail_unless((fiber4->flags & FIBER_IS_DEAD) != 0);
 
 	fiber_join(fiber1);
+	fiber_join(fiber4);
 
 	fiber_set_joinable(fiber2, true);
 	fiber_cancel(fiber2);
 	fiber_join(fiber2);
+
+	struct fiber *fiber5 = fiber_new("fiber5", wait_cancel_f);
+	fail_unless(fiber5 == NULL);
+	fail_unless(!diag_is_empty(diag_get()));
+	fail_unless(strcmp(diag_last_error(diag_get())->errmsg,
+			   "fiber is cancelled") == 0);
 
 	header();
 }

@@ -856,6 +856,9 @@ struct cord {
 	int client_fiber_count;
 	/** Fiber calling fiber_shutdown. NULL if there is no such. */
 	struct fiber *shutdown_fiber;
+	/** Whether shutdown is started. */
+	bool is_shutdown;
+
 };
 
 extern __thread struct cord *cord_ptr;
