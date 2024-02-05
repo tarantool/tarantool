@@ -28,6 +28,7 @@ elseif(UNIX)
         libgcc_s
         libpthread
         libsvace
+        libstdc++
     )
 else()
     message(FATAL_ERROR "Unknown platform")
