@@ -652,3 +652,55 @@ g.test_no_suitable_uri = function(g)
     local err = 'No suitable URI provided for instance "instance-001"'
     t.assert_str_contains(res.stderr, err)
 end
+
+-- Make sure that rebalancing will be disabled if rebalancer_mode == 'off', even
+-- if rebalancer sharding role is assigned.
+g.test_rebalancer_mode = function(g)
+    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        storage:
+          roles: [sharding]
+          password: "storage"
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        sharding:
+          login: 'storage'
+
+    sharding:
+      rebalancer_mode: off
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            sharding:
+              roles: [storage, rebalancer, router]
+            instances:
+              instance-001: {}
+    ]]
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = config_file,
+        chdir = dir,
+        alias = 'instance-001',
+    }
+    g.server = server:new(opts)
+    g.server:start()
+
+    -- Check that vshard option rebalancer_mode is set to the same value.
+    local res = g.server:eval('return vshard.storage.internal.current_cfg')
+    t.assert_equals(res.rebalancer_mode, 'off')
+
+    -- Check that rebalancer is not started.
+    res = g.server:eval('return vshard.storage.internal.rebalancer_service')
+    t.assert_equals(res, nil)
+end

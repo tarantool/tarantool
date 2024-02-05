@@ -1932,6 +1932,23 @@ return schema.new('instance_config', schema.record({
                 end
             end,
         }),
+        rebalancer_mode = schema.enum({
+            'manual',
+            'auto',
+            'off',
+        }, {
+            default = 'auto',
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope ~= 'global' then
+                    w.error('sharding.rebalancer_enabled must be defined in ' ..
+                            'the global scope.')
+                end
+            end,
+        }),
         rebalancer_disbalance_threshold = schema.scalar({
             type = 'number',
             default = 1,
