@@ -989,10 +989,12 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 const struct key_part *
 key_def_find_by_fieldno(const struct key_def *key_def, uint32_t fieldno)
 {
-	struct key_part part;
-	memset(&part, 0, sizeof(struct key_part));
-	part.fieldno = fieldno;
-	return key_def_find(key_def, &part);
+	const struct key_part *part = key_def->parts;
+	const struct key_part *end = part + key_def->part_count;
+	for (; part != end; part++)
+		if (part->fieldno == fieldno)
+			return part;
+	return NULL;
 }
 
 const struct key_part *

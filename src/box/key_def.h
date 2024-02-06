@@ -714,7 +714,9 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 		     uint32_t field_count, struct region *region);
 
 /**
- * Returns the part in index_def->parts for the specified fieldno.
+ * Returns the first part in index_def->parts for the specified fieldno.
+ * The part is returned regardless of whether it is indexed by JSON path or not.
+ *
  * If fieldno is not in index_def->parts returns NULL.
  */
 const struct key_part *
