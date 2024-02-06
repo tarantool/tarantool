@@ -1367,10 +1367,38 @@ test_tuple_compare_sequential_no_optional_parts_unique(bool ascending_key,
 	check_plan();
 }
 
+static void
+test_key_def_find_by_fieldno(void)
+{
+	plan(3);
+	header();
+
+	const struct key_part *key_part;
+	struct key_def *key_def = test_key_def_new(
+		"[{%s%u%s%s}{%s%u%s%s}{%s%u%s%s%s%s}]",
+		"field", 1, "type", "unsigned",
+		"field", 2, "type", "string",
+		"field", 3, "type", "string", "path", "foo");
+
+	key_part = key_def_find_by_fieldno(key_def, 2);
+	isnt(key_part, NULL, "field 2 (no path) found");
+
+	key_part = key_def_find_by_fieldno(key_def, 3);
+	isnt(key_part, NULL, "field 3 (with path) found");
+
+	key_part = key_def_find_by_fieldno(key_def, 100);
+	is(key_part, NULL, "field 100 not found");
+
+	key_def_delete(key_def);
+
+	footer();
+	check_plan();
+}
+
 static int
 test_main(void)
 {
-	plan(50);
+	plan(51);
 	header();
 
 	test_func_compare();
@@ -1423,6 +1451,7 @@ test_main(void)
 	test_key_compare_singlepart(true, false);
 	test_key_compare_singlepart(false, true);
 	test_key_compare_singlepart(false, false);
+	test_key_def_find_by_fieldno();
 
 	footer();
 	return check_plan();
