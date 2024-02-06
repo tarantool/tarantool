@@ -413,25 +413,30 @@ test_fromstring_invalid()
 	vclock_from_string(&va, (a));					\
 	vclock_from_string(&vb, (b));					\
 	vclock_from_string(&vexp, (exp));				\
-	vclock_##fun##_ignore0(&va, &vb);				\
+	vclock_##fun(&va, &vb);						\
 	is(vclock_compare(&va, &vexp), 0,				\
 	   #fun " between %s and %s is %s", a, b, exp);			\
 })
 
 int
-test_minmax_ignore0(void)
+test_minmax(void)
 {
-	plan(4);
+	plan(6);
 	header();
 
-	test(max, "{0: 1, 1: 17, 2: 3}", "{0: 10, 1: 5, 2: 7}",
+	test(max_ignore0, "{0: 1, 1: 17, 2: 3}", "{0: 10, 1: 5, 2: 7}",
 	     "{0: 1, 1: 17, 2: 7}");
-	test(min, "{0: 10, 1: 17, 2: 3}", "{0: 1, 1: 5, 2: 7}",
+	test(min_ignore0, "{0: 10, 1: 17, 2: 3}", "{0: 1, 1: 5, 2: 7}",
 	     "{0: 10, 1: 5, 2: 3}");
-	test(max, "{1: 1, 2: 1, 3: 1}", "{1: 100, 2: 100, 31: 100}",
+	test(max_ignore0, "{1: 1, 2: 1, 3: 1}", "{1: 100, 2: 100, 31: 100}",
 	     "{1: 100, 2: 100, 3: 1, 31: 100}");
-	test(min, "{1: 1, 2: 1, 3: 1}", "{1: 100, 2: 100, 31: 100}",
+	test(min_ignore0, "{1: 1, 2: 1, 3: 1}", "{1: 100, 2: 100, 31: 100}",
 	     "{1:1, 2: 1}");
+
+	test(max, "{0: 1, 1: 17, 2: 3}", "{0: 10, 1: 5, 2: 7}",
+	     "{0: 10, 1: 17, 2: 7}");
+	test(min, "{0: 10, 1: 17, 2: 3}", "{0: 1, 1: 5, 2: 7}",
+	     "{0: 1, 1: 5, 2: 3}");
 
 	footer();
 	return check_plan();
@@ -449,7 +454,7 @@ main(void)
 	test_tostring();
 	test_fromstring();
 	test_fromstring_invalid();
-	test_minmax_ignore0();
+	test_minmax();
 
 	return check_plan();
 }
