@@ -147,11 +147,13 @@ ok 4 - subtests
     ok 32 - fromstring "{1:20, 1:10}" => 12
 	*** test_fromstring_invalid: done ***
 ok 5 - subtests
-    1..4
-	*** test_minmax_ignore0 ***
-    ok 1 - max between {0: 1, 1: 17, 2: 3} and {0: 10, 1: 5, 2: 7} is {0: 1, 1: 17, 2: 7}
-    ok 2 - min between {0: 10, 1: 17, 2: 3} and {0: 1, 1: 5, 2: 7} is {0: 10, 1: 5, 2: 3}
-    ok 3 - max between {1: 1, 2: 1, 3: 1} and {1: 100, 2: 100, 31: 100} is {1: 100, 2: 100, 3: 1, 31: 100}
-    ok 4 - min between {1: 1, 2: 1, 3: 1} and {1: 100, 2: 100, 31: 100} is {1:1, 2: 1}
-	*** test_minmax_ignore0: done ***
+    1..6
+	*** test_minmax ***
+    ok 1 - max_ignore0 between {0: 1, 1: 17, 2: 3} and {0: 10, 1: 5, 2: 7} is {0: 1, 1: 17, 2: 7}
+    ok 2 - min_ignore0 between {0: 10, 1: 17, 2: 3} and {0: 1, 1: 5, 2: 7} is {0: 10, 1: 5, 2: 3}
+    ok 3 - max_ignore0 between {1: 1, 2: 1, 3: 1} and {1: 100, 2: 100, 31: 100} is {1: 100, 2: 100, 3: 1, 31: 100}
+    ok 4 - min_ignore0 between {1: 1, 2: 1, 3: 1} and {1: 100, 2: 100, 31: 100} is {1:1, 2: 1}
+    ok 5 - max between {0: 1, 1: 17, 2: 3} and {0: 10, 1: 5, 2: 7} is {0: 10, 1: 17, 2: 7}
+    ok 6 - min between {0: 10, 1: 17, 2: 3} and {0: 1, 1: 5, 2: 7} is {0: 1, 1: 5, 2: 3}
+	*** test_minmax: done ***
 ok 6 - subtests
