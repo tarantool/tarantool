@@ -451,16 +451,45 @@ test_tuple_validate_key_parts_raw(void)
 	check_plan();
 }
 
+static void
+test_key_def_find_by_fieldno(void)
+{
+	plan(3);
+	header();
+
+	const struct key_part *key_part;
+	struct key_def *key_def = test_key_def_new(
+		"[{%s%u%s%s}{%s%u%s%s}{%s%u%s%s%s%s}]",
+		"field", 1, "type", "unsigned",
+		"field", 2, "type", "string",
+		"field", 3, "type", "string", "path", "foo");
+
+	key_part = key_def_find_by_fieldno(key_def, 2);
+	isnt(key_part, NULL, "field 2 (no path) found");
+
+	key_part = key_def_find_by_fieldno(key_def, 3);
+	isnt(key_part, NULL, "field 3 (with path) found");
+
+	key_part = key_def_find_by_fieldno(key_def, 100);
+	is(key_part, NULL, "field 100 not found");
+
+	key_def_delete(key_def);
+
+	footer();
+	check_plan();
+}
+
 static int
 test_main(void)
 {
-	plan(4);
+	plan(5);
 	header();
 
 	test_func_compare();
 	test_func_compare_with_key();
 	test_tuple_extract_key_raw_slowpath_nullable();
 	test_tuple_validate_key_parts_raw();
+	test_key_def_find_by_fieldno();
 
 	footer();
 	return check_plan();
