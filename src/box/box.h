@@ -228,6 +228,12 @@ box_ro_reason(void);
  */
 int box_checkpoint(void);
 
+/**
+ * Make snapshot asynchronously.
+ */
+void
+box_checkpoint_async(void);
+
 typedef int (*box_backup_cb)(const char *path, void *arg);
 
 /**

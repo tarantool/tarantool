@@ -154,6 +154,8 @@ static int box_read_ffi_disable_count;
  */
 static bool is_box_configured = false;
 static bool is_storage_initialized = false;
+/** Set if storage shutdown is started. */
+static bool is_storage_shutdown = false;
 static bool is_ro = true;
 static fiber_cond ro_cond;
 
@@ -5606,11 +5608,16 @@ box_cfg(void)
 int
 box_checkpoint(void)
 {
-	/* Signal arrived before box.cfg{} */
-	if (! is_box_configured)
-		return 0;
-
+	assert(is_box_configured);
 	return gc_checkpoint();
+}
+
+void
+box_checkpoint_async(void)
+{
+	if (!is_box_configured || is_storage_shutdown)
+		return;
+	gc_trigger_checkpoint();
 }
 
 int
@@ -5968,6 +5975,7 @@ box_storage_shutdown()
 {
 	if (!is_storage_initialized)
 		return;
+	is_storage_shutdown = true;
 	iproto_shutdown();
 	box_watcher_shutdown();
 	/*

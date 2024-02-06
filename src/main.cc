@@ -126,28 +126,14 @@ tarantool_uptime(void)
 	return ev_monotonic_now(loop()) - start_time;
 }
 
-/**
- * Create a checkpoint from signal handler (SIGUSR1)
- */
-static int
-sig_checkpoint_f(va_list ap)
-{
-	(void)ap;
-	if (box_checkpoint() != 0)
-		diag_log();
-	return 0;
-}
-
 static void
-sig_checkpoint(ev_loop * /* loop */, struct ev_signal * /* w */,
-	     int /* revents */)
+signal_checkpoint(ev_loop *loop, struct ev_signal *w, int revents)
 {
-	struct fiber *f = fiber_new_system("checkpoint", sig_checkpoint_f);
-	if (f == NULL) {
-		say_warn("failed to allocate checkpoint fiber");
-		return;
-	}
-	fiber_wakeup(f);
+	(void)loop;
+	(void)w;
+	(void)revents;
+	say_info("got signal SIGUSR1, triggering checkpoint");
+	box_checkpoint_async();
 }
 
 static int
@@ -295,7 +281,7 @@ signal_init(void)
 	fiber_signal_init();
 	crash_signal_init();
 
-	ev_signal_init(&ev_sigs[0], sig_checkpoint, SIGUSR1);
+	ev_signal_init(&ev_sigs[0], signal_checkpoint, SIGUSR1);
 	ev_signal_init(&ev_sigs[1], signal_sigint_cb, SIGINT);
 	ev_signal_init(&ev_sigs[2], signal_cb, SIGTERM);
 	ev_signal_init(&ev_sigs[3], signal_sigwinch_cb, SIGWINCH);
