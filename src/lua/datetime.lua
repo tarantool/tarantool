@@ -881,11 +881,21 @@ end
     Parse datetime string given `strptime` like format.
     Returns constructed datetime object and length of accepted string.
 ]]
-local function datetime_parse_format(str, fmt)
+local function datetime_parse_format(str, fmt, tzname, offset)
     local date = ffi.new(datetime_t)
     local len = builtin.tnt_datetime_strptime(date, str, fmt)
     if len == 0 then
         error(("could not parse '%s' using '%s' format"):format(str, fmt))
+    end
+
+    local epoch = date.epoch
+    if tzname ~= nil then
+        offset, date.tzindex = parse_tzname(epoch, tzname)
+    end
+    offset = offset or 0
+    if offset ~= 0 then
+        date.epoch = utc_secs(epoch, offset)
+        date.tzoffset = offset
     end
     return date, tonumber(len)
 end
@@ -918,7 +928,7 @@ local function datetime_parse_from(str, obj)
         -- Effect of .tz overrides .tzoffset
         return datetime_parse_full(str, tzname, offset)
     else
-        return datetime_parse_format(str, fmt)
+        return datetime_parse_format(str, fmt, tzname, offset)
     end
 end
 
