@@ -1045,6 +1045,7 @@ g.test_wal_enterprise = function()
             dir_rescan_delay = 1,
             queue_max_size = 1,
             cleanup_delay = 1,
+            retention_period = 1,
             ext = {
                 old = true,
                 new = false,
@@ -1067,6 +1068,7 @@ g.test_wal_enterprise = function()
         dir_rescan_delay = 2,
         queue_max_size = 16777216,
         cleanup_delay = 14400,
+        retention_period = 0,
     }
     local res = instance_config:apply_default({}).wal
     t.assert_equals(res, exp)

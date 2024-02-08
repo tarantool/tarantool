@@ -245,6 +245,7 @@ g.test_defaults = function()
             dir_rescan_delay = 2,
             queue_max_size = 16777216,
             cleanup_delay = 14400,
+            retention_period = is_enterprise and 0 or nil,
         },
         console = {
             enabled = true,

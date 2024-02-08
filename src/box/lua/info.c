@@ -522,6 +522,15 @@ lbox_info_gc_call(struct lua_State *L)
 	lua_pushboolean(L, gc.is_paused);
 	lua_settable(L, -3);
 
+	lua_pushstring(L, "wal_retention_vclock");
+	struct vclock retention_vclock;
+	wal_get_retention_vclock(&retention_vclock);
+	if (vclock_is_set(&retention_vclock))
+		luaT_pushvclock(L, &retention_vclock);
+	else
+		luaL_pushnull(L);
+	lua_settable(L, -3);
+
 	lua_pushstring(L, "checkpoints");
 	lua_newtable(L);
 

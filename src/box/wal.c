@@ -418,6 +418,7 @@ tx_notify_checkpoint(struct cmsg *msg)
 static void
 wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 		  const char *wal_dirname, int64_t wal_max_size,
+		  double wal_retention_period,
 		  const struct tt_uuid *instance_uuid,
 		  wal_on_garbage_collection_f on_garbage_collection,
 		  wal_on_checkpoint_threshold_f on_checkpoint_threshold)
@@ -434,6 +435,11 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	struct xlog_opts opts = xlog_opts_default;
 	opts.sync_is_async = true;
 	xdir_create(&writer->wal_dir, wal_dirname, XLOG, instance_uuid, &opts);
+	/*
+	 * wal_retention_period must be set before gc is woken up.
+	 * Otherwise files which must be preserved can be deleted.
+	 */
+	xdir_set_retention_period(&writer->wal_dir, wal_retention_period);
 	xlog_clear(&writer->current_wal);
 	if (wal_mode == WAL_FSYNC)
 		writer->wal_dir.open_wflags |= O_SYNC;
@@ -538,15 +544,16 @@ wal_open(struct wal_writer *writer)
 
 int
 wal_init(enum wal_mode wal_mode, const char *wal_dirname,
-	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
+	 int64_t wal_max_size, double wal_retention_period,
+	 const struct tt_uuid *instance_uuid,
 	 wal_on_garbage_collection_f on_garbage_collection,
 	 wal_on_checkpoint_threshold_f on_checkpoint_threshold)
 {
 	/* Initialize the state. */
 	struct wal_writer *writer = &wal_writer_singleton;
 	wal_writer_create(writer, wal_mode, wal_dirname, wal_max_size,
-			  instance_uuid, on_garbage_collection,
-			  on_checkpoint_threshold);
+			  wal_retention_period, instance_uuid,
+			  on_garbage_collection, on_checkpoint_threshold);
 
 	/* Start WAL thread. */
 	if (cord_costart(&writer->cord, "wal", wal_writer_f, NULL) != 0)
@@ -680,6 +687,8 @@ wal_begin_checkpoint_f(struct cbus_call_msg *data)
 	if (xlog_is_open(&writer->current_wal) &&
 	    vclock_sum(&writer->current_wal.meta.vclock) !=
 	    vclock_sum(&writer->vclock)) {
+		xdir_set_retention_vclock(
+			&writer->wal_dir, &writer->current_wal.meta.vclock);
 		wal_xlog_close(&writer->current_wal);
 		/*
 		 * The next WAL will be created on the first write.
@@ -782,6 +791,59 @@ wal_set_queue_max_size(int64_t size)
 	journal_queue_set_max_size(size);
 }
 
+/** Retention delay configuration message. */
+struct wal_set_retention_period_msg {
+	/* The state of a synchronous cross-thread call. */
+	struct cbus_call_msg base;
+	/* New retention_period value. */
+	double retention_period;
+};
+
+static int
+wal_set_retention_period_f(struct cbus_call_msg *data)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	struct wal_set_retention_period_msg *msg;
+	msg = (struct wal_set_retention_period_msg *)data;
+	xdir_set_retention_period(&writer->wal_dir, msg->retention_period);
+	return 0;
+}
+
+void
+wal_set_retention_period(double period)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	struct wal_set_retention_period_msg msg;
+	msg.retention_period = period;
+	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe,
+		  &msg.base, wal_set_retention_period_f);
+}
+
+static int
+wal_get_retention_vclock_f(struct cbus_call_msg *data)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	struct wal_vclock_msg *msg = (struct wal_vclock_msg *)data;
+	xdir_get_retention_vclock(&writer->wal_dir, &msg->vclock);
+	return 0;
+}
+
+void
+wal_get_retention_vclock(struct vclock *vclock)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	if (vclock == NULL)
+		return;
+	if (writer->wal_dir.retention_period == 0) {
+		vclock_clear(vclock);
+		return;
+	}
+	struct wal_vclock_msg msg;
+	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe,
+		  &msg.base, wal_get_retention_vclock_f);
+	vclock_copy(vclock, &msg.vclock);
+}
+
 struct wal_gc_msg
 {
 	struct cbus_call_msg base;
@@ -854,6 +916,8 @@ wal_opt_rotate(struct wal_writer *writer)
 	 */
 	if (xlog_is_open(&writer->current_wal) &&
 	    writer->current_wal.offset >= writer->wal_max_size) {
+		xdir_set_retention_vclock(
+			&writer->wal_dir, &writer->current_wal.meta.vclock);
 		wal_xlog_close(&writer->current_wal);
 	}
 
@@ -893,6 +957,14 @@ wal_fallocate(struct wal_writer *writer, size_t len)
 	 * we must not delete WALs necessary for recovery.
 	 */
 	int64_t gc_lsn = vclock_sum(&writer->checkpoint_vclock);
+
+	struct vclock retention_vclock;
+	xdir_get_retention_vclock(&writer->wal_dir, &retention_vclock);
+	if (vclock_is_set(&retention_vclock)) {
+		int64_t retention_lsn = vclock_sum(&retention_vclock);
+		if (retention_lsn < gc_lsn)
+			gc_lsn = retention_lsn;
+	}
 
 	/*
 	 * The actual write size can be greater than the sum size
