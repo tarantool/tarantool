@@ -48,6 +48,7 @@ local _enterprise_keys = {
     password_enforce_specialchars = true,
     password_history_length = true,
     wal_ext = true,
+    wal_retention_period = true,
 }
 
 function cfg_filter(data)

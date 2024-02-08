@@ -226,6 +226,15 @@ gc_run_cleanup(void)
 		consumer = gc_tree_next(&gc.consumers, consumer);
 	}
 
+	/*
+	 * Acquire minimum vclock of a file, which is protected from garbage
+	 * collection by wal_retention_period option.
+	 */
+	struct vclock retention_vclock;
+	wal_get_retention_vclock(&retention_vclock);
+	if (vclock_is_set(&retention_vclock))
+		vclock_min(&min_vclock, &retention_vclock);
+
 	if (vclock_sum(&min_vclock) > vclock_sum(&gc.vclock)) {
 		vclock_copy(&gc.vclock, &min_vclock);
 		run_wal_gc = true;

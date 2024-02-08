@@ -1293,6 +1293,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'wal_cleanup_delay',
             default = 4 * 3600,
         }),
+        retention_period = enterprise_edition(schema.scalar({
+            type = 'number',
+            box_cfg = 'wal_retention_period',
+            default = 0,
+        })),
         -- box.cfg({wal_ext = <...>}) replaces the previous
         -- value without any merging. See explanation why it is
         -- important in the log.modules description.

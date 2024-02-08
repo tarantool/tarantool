@@ -79,6 +79,7 @@
 #include "box/lua/security.h"
 #include "box/lua/space_upgrade.h"
 #include "box/lua/wal_ext.h"
+#include "box/lua/wal_retention_period.h"
 #include "box/lua/trigger.h"
 #include "box/lua/config/utils/expression_lexer.h"
 #include "box/lua/failover.h"
@@ -896,6 +897,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_iproto_init(L);
 	box_lua_space_upgrade_init(L);
 	box_lua_audit_init(L);
+	box_lua_wal_retention_period_init(L);
 	box_lua_wal_ext_init(L);
 	box_lua_read_view_init(L);
 	box_lua_security_init(L);

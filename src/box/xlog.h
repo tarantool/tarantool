@@ -160,6 +160,11 @@ struct xdir {
 	 */
 	vclockset_t index;
 	/**
+	 * Number of seconds to delay garbage collection of files
+	 * after they are closed.
+	 */
+	double retention_period;
+	/**
 	 * Directory path.
 	 */
 	char dirname[PATH_MAX];
@@ -197,6 +202,27 @@ int
 xdir_check(struct xdir *dir);
 
 /**
+ * Set new value for retention_period, update expiration time
+ * of all existing files.
+ */
+void
+xdir_set_retention_period(struct xdir *xdir, double period);
+
+/**
+ * Return vclock (unless @vclock is NULL) of the oldest file,
+ * which is protected from garbage collection.
+ */
+void
+xdir_get_retention_vclock(struct xdir *xdir, struct vclock *vclock);
+
+/**
+ * Find requested @vclock in index of xdir and set its retention
+ * according to retention_period.
+ */
+void
+xdir_set_retention_vclock(struct xdir *xdir, struct vclock *vclock);
+
+/**
  * Return a file name based on directory type, vector clock
  * sum, and a suffix (.inprogress or not).
  */
@@ -215,7 +241,17 @@ static inline bool
 xdir_has_garbage(struct xdir *dir, int64_t signature)
 {
 	struct vclock *vclock = vclockset_first(&dir->index);
-	return vclock != NULL && vclock_sum(vclock) < signature;
+	if (vclock == NULL)
+		return false;
+
+	struct vclock retention;
+	xdir_get_retention_vclock(dir, &retention);
+	if (!vclock_is_set(&retention) ||
+	    vclock_compare(vclock, &retention) < 0)
+		return vclock_sum(vclock) < signature;
+
+	/** All files are protected from gc. */
+	return false;
 }
 
 /**
@@ -504,7 +540,7 @@ ssize_t
 xlog_fallocate(struct xlog *log, size_t size);
 
 /**
- * Write a row to xlog, 
+ * Write a row to xlog,
  *
  * @retval count of writen bytes
  * @retval -1 for error

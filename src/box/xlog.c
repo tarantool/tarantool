@@ -48,6 +48,7 @@
 #include "errinj.h"
 #include "salad/grp_alloc.h"
 #include "trivia/util.h"
+#include "retention_period.h"
 
 /*
  * FALLOC_FL_KEEP_SIZE flag has existed since fallocate() was
@@ -360,6 +361,7 @@ xdir_create(struct xdir *dir, const char *dirname, enum xdir_type type,
 		unreachable();
 	}
 	dir->type = type;
+	dir->retention_period = 0;
 }
 
 /**
@@ -420,16 +422,11 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	}
 
 	/*
-	 * Append the clock describing the file to the
-	 * directory index.
+	 * Append the clock describing the file to the directory index.
+	 * If retention feature is available (EE), then additional memory is
+	 * allocated. Time, when xlog protection should stop is saved there.
 	 */
-	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
-	if (vclock == NULL) {
-		diag_set(OutOfMemory, sizeof(*vclock), "malloc", "vclock");
-		xlog_cursor_close(&cursor, false);
-		return -1;
-	}
-
+	struct vclock *vclock = retention_vclock_new();
 	vclock_copy(vclock, &meta->vclock);
 	xlog_cursor_close(&cursor, false);
 	vclockset_insert(&dir->index, vclock);
@@ -628,6 +625,8 @@ xdir_scan(struct xdir *dir, bool is_dir_required)
 			i++;
 		}
 	}
+	/* Initialize expiration time of all files, saved inside index. */
+	retention_index_update(dir, 0);
 	rc = 0;
 
 exit:
@@ -649,6 +648,31 @@ xdir_check(struct xdir *dir)
 	return 0;
 }
 
+void
+xdir_set_retention_period(struct xdir *xdir, double period)
+{
+	double old_period = xdir->retention_period;
+	xdir->retention_period = period;
+	retention_index_update(xdir, old_period);
+}
+
+void
+xdir_get_retention_vclock(struct xdir *xdir, struct vclock *vclock)
+{
+	retention_index_get(&xdir->index, vclock);
+}
+
+void
+xdir_set_retention_vclock(struct xdir *xdir, struct vclock *vclock)
+{
+	if (xdir->retention_period == 0)
+		return;
+
+	struct vclock *find = vclockset_match(&xdir->index, vclock);
+	assert(vclock_compare(find, vclock) == 0);
+	retention_vclock_set(find, xdir->retention_period);
+}
+
 const char *
 xdir_format_filename(struct xdir *dir, int64_t signature,
 		enum log_suffix suffix)
@@ -665,6 +689,24 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 	unsigned rm_flags = XLOG_RM_VERBOSE;
 	if (flags & XDIR_GC_ASYNC)
 		rm_flags |= XLOG_RM_ASYNC;
+
+	struct vclock retention_vclock;
+	retention_index_get(&dir->index, &retention_vclock);
+	if (vclock_is_set(&retention_vclock) &&
+	    signature > vclock_sum(&retention_vclock)) {
+		/*
+		 * This should not normally happen and can be a reason of
+		 * xdir_retention misusage: retention_vclock must be always
+		 * checked before invoking garbage collection. As we cannot
+		 * return error code from this function (gc already updated
+		 * its vclock), the best we can do is warning.
+		 */
+		assert(false);
+		say_warn("Requested xdir gc vclock is greater than "
+			 "retention vclock. Using retention vclock instead");
+		signature = vclock_sum(&retention_vclock);
+	}
+
 	struct vclock *vclock;
 	while ((vclock = vclockset_first(&dir->index)) != NULL &&
 	       vclock_sum(vclock) < signature) {
@@ -727,9 +769,7 @@ xdir_remove_temporary_files(struct xdir *xdir)
 void
 xdir_add_vclock(struct xdir *xdir, const struct vclock *vclock)
 {
-	struct vclock *copy = malloc(sizeof(*vclock));
-	if (copy == NULL)
-		panic("failed to allocate vclock");
+	struct vclock *copy = retention_vclock_new();
 	vclock_copy(copy, vclock);
 	vclockset_insert(&xdir->index, copy);
 }

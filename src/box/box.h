@@ -362,6 +362,8 @@ box_init_say();
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+int box_set_wal_retention_period(void);
+
 typedef struct tuple box_tuple_t;
 
 bool
