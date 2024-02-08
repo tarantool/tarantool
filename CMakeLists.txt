@@ -354,19 +354,15 @@ endforeach()
 set(_libdirs)
 list(APPEND _libdirs "/usr/local/${MULTILIB}") # LuaRocks
 list(APPEND _libdirs "${CMAKE_INSTALL_FULL_LIBDIR}") # Install prefix
-if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/debian_version")
-    # gh-1085: LuaRocks on Debian uses lib instead of lib/x86_64-linux-gnu/
-    list(APPEND _libdirs "/usr/local/lib") # LuaRocks on Debian
-endif()
-if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/gentoo-release")
-    # LuaRocks on Gentoo
-    list(APPEND _libdirs "/usr/${MULTILIB}/lua/luarocks/lib")
-endif()
-if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/alpine-release")
-    # LuaRocks on Alpine
-    list(APPEND _libdirs "/usr/local/lib")
-endif()
-list(APPEND _libdirs "/usr/${MULTILIB}") # System packages
+# gh-1085: LuaRocks on Debian and Alpine uses lib instead
+# of lib/${ARCH}-linux-gnu/
+list(APPEND _libdirs "/usr/local/lib")
+# LuaRocks on Gentoo
+list(APPEND _libdirs "/usr/${MULTILIB}/lua/luarocks/lib")
+# System packages
+list(APPEND _libdirs "/usr/${MULTILIB}")
+# Add CPATH on Debian based systems depending on architecture
+list(APPEND _libdirs "/usr/lib/${CMAKE_HOST_SYSTEM_PROCESSOR}-linux-gnu")
 list(REMOVE_DUPLICATES _libdirs)
 set(MODULE_LIBPATH)
 foreach(dir
