@@ -132,6 +132,25 @@ iproto_wpos_create(struct iproto_wpos *wpos, struct obuf *out)
 	wpos->svp = obuf_create_svp(out);
 }
 
+/**
+ * Message sent when iproto thread dropped all connections that requested
+ * to be dropped.
+ */
+struct iproto_drop_finished {
+	/** Base structure. */
+	struct cmsg base;
+	/**
+	 * Generation a is a sequence number of iproto_drop_connections()
+	 * invocation.
+	 *
+	 * Generation is used to handle racy situation when previous invocation
+	 * of iproto_drop_connections() was failed and there is new invocation.
+	 * Message from previous invocation may be delivired and account
+	 * iproto thread as finished dropping connection which is not true.
+	 */
+	unsigned generation;
+};
+
 struct iproto_thread {
 	/**
 	 * Slab cache used for allocating memory for output network buffers
@@ -211,7 +230,7 @@ struct iproto_thread {
 	 * Message used to notify TX thread that all connections marked
 	 * to de dropped are dropped.
 	 */
-	struct cmsg drop_finished_msg;
+	struct iproto_drop_finished drop_finished_msg;
 	/**
 	 * If set then iproto thread shutdown is started and we should not
 	 * accept new connections.
@@ -234,6 +253,12 @@ struct iproto_thread {
 static struct fiber_cond drop_finished_cond;
 /** Count of iproto threads that are not finished connections drop yet. */
 static size_t drop_pending_thread_count;
+/**
+ * Generation is a sequence number of dropping connection invocation.
+ *
+ * See also `struct iproto_drop_finished`.
+ */
+static unsigned drop_generation;
 
 /**
  * IPROTO listen URIs. Set by box.cfg.listen.
@@ -390,6 +415,13 @@ struct iproto_cfg_msg: public cbus_call_msg
 			 * NULL if the function is called not from connection.
 			 */
 			struct iproto_connection *owner;
+			/**
+			 * Generation is sequence number of dropping
+			 * connection invocation.
+			 *
+			 * See also `struct iproto_drop_finished`.
+			 */
+			unsigned generation;
 		} drop_connections;
 	};
 	struct iproto_thread *iproto_thread;
@@ -854,6 +886,12 @@ struct iproto_connection
 	struct rlist in_connections;
 	/** Set if connection is being dropped. */
 	bool is_drop_pending;
+	/**
+	 * Generation is sequence number of dropping connection invocation.
+	 *
+	 * See also `struct iproto_drop_finished`.
+	 */
+	unsigned drop_generation;
 	/**
 	 * Messaged sent to TX to cancel all inprogress requests of the
 	 * connection.
@@ -1621,21 +1659,25 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 static void
 tx_process_drop_finished(struct cmsg *m)
 {
-	(void)m;
-	assert(drop_pending_thread_count > 0);
-	if (--drop_pending_thread_count == 0)
+	struct iproto_drop_finished *drop_finished =
+					(struct iproto_drop_finished *)m;
+	if (drop_finished->generation == drop_generation &&
+	    --drop_pending_thread_count == 0)
 		fiber_cond_signal(&drop_finished_cond);
 }
 
 /** Send message to TX thread to notify that connections drop is finished. */
 static void
-iproto_send_drop_finished(struct iproto_thread *iproto_thread)
+iproto_send_drop_finished(struct iproto_thread *iproto_thread,
+			  unsigned generation)
 {
 	static const struct cmsg_hop drop_finished_route[1] =
 					{{ tx_process_drop_finished, NULL }};
 
-	cmsg_init(&iproto_thread->drop_finished_msg, drop_finished_route);
-	cpipe_push(&iproto_thread->tx_pipe, &iproto_thread->drop_finished_msg);
+	cmsg_init(&iproto_thread->drop_finished_msg.base, drop_finished_route);
+	iproto_thread->drop_finished_msg.generation = generation;
+	cpipe_push(&iproto_thread->tx_pipe,
+		   &iproto_thread->drop_finished_msg.base);
 }
 
 /** Recycle a connection. */
@@ -1663,7 +1705,8 @@ iproto_connection_delete(struct iproto_connection *con)
 
 		assert(iproto_thread->drop_pending_connection_count > 0);
 		if (--iproto_thread->drop_pending_connection_count == 0)
-			iproto_send_drop_finished(iproto_thread);
+			iproto_send_drop_finished(iproto_thread,
+						  con->drop_generation);
 	}
 	mempool_free(&con->iproto_thread->iproto_connection_pool, con);
 }
@@ -3517,6 +3560,7 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		struct iproto_connection *con;
 		static const struct cmsg_hop cancel_route[1] =
 				{{ tx_process_cancel_inprogress, NULL }};
+		iproto_thread->drop_pending_connection_count = 0;
 		rlist_foreach_entry(con, &iproto_thread->connections,
 				    in_connections) {
 			/*
@@ -3534,6 +3578,8 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			 */
 			if (con != cfg_msg->drop_connections.owner) {
 				con->is_drop_pending = true;
+				con->drop_generation =
+					cfg_msg->drop_connections.generation;
 				iproto_thread->drop_pending_connection_count++;
 			}
 			if (con->state != IPROTO_CONNECTION_DESTROYED) {
@@ -3543,7 +3589,9 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			}
 		}
 		if (iproto_thread->drop_pending_connection_count == 0)
-			iproto_send_drop_finished(iproto_thread);
+			iproto_send_drop_finished(
+				iproto_thread,
+				cfg_msg->drop_connections.generation);
 		break;
 	}
 	default:
@@ -3604,8 +3652,8 @@ iproto_send_start_msg(void)
 		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
 }
 
-void
-iproto_drop_connections(void)
+int
+iproto_drop_connections(double timeout)
 {
 	static struct latch latch = LATCH_INITIALIZER(latch);
 	latch_lock(&latch);
@@ -3613,18 +3661,25 @@ iproto_drop_connections(void)
 	struct session *session = fiber_get_session(fiber());
 	if (session != NULL && session->type == SESSION_TYPE_BINARY)
 		owner = (struct iproto_connection *)session->meta.connection;
+	drop_generation++;
 	drop_pending_thread_count = iproto_threads_count;
 	for (int i = 0; i < iproto_threads_count; i++) {
 		struct iproto_cfg_msg *cfg_msg =
 			(struct iproto_cfg_msg *)xmalloc(sizeof(*cfg_msg));
 		iproto_cfg_msg_create(cfg_msg, IPROTO_CFG_DROP_CONNECTIONS);
 		cfg_msg->drop_connections.owner = owner;
+		cfg_msg->drop_connections.generation = drop_generation;
 		iproto_do_cfg_async(&iproto_threads[i], cfg_msg);
 	}
 
-	while (drop_pending_thread_count != 0)
-		fiber_cond_wait(&drop_finished_cond);
+	double deadline = ev_monotonic_now(loop()) + timeout;
+	while (drop_pending_thread_count != 0) {
+		if (fiber_cond_wait_deadline(&drop_finished_cond,
+					     deadline) != 0)
+			break;
+	}
 	latch_unlock(&latch);
+	return drop_pending_thread_count == 0 ? 0 : -1;
 }
 
 /** Send IPROTO_CFG_RESTART to all threads. */
@@ -3828,11 +3883,11 @@ iproto_req_handler_delete(struct iproto_req_handler *handler)
 	free(handler);
 }
 
-void
-iproto_shutdown(void)
+int
+iproto_shutdown(double timeout)
 {
 	assert(iproto_is_shutting_down);
-	iproto_drop_connections();
+	return iproto_drop_connections(timeout);
 }
 
 void
