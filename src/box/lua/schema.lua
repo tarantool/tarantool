@@ -102,17 +102,39 @@ ffi.cdef[[
 
     struct port {
         const struct port_vtab *vtab;
-        char pad[68];
+        char pad[74];
+    };
+
+    enum port_c_entry_type {
+        PORT_C_ENTRY_NULL,
+        PORT_C_ENTRY_DOUBLE,
+        PORT_C_ENTRY_TUPLE,
+        PORT_C_ENTRY_STR,
+        PORT_C_ENTRY_BOOL,
+        PORT_C_ENTRY_MP,
+        PORT_C_ENTRY_MP_OBJECT,
     };
 
     struct port_c_entry {
         struct port_c_entry *next;
+        enum port_c_entry_type type;
         union {
+            double number;
             struct tuple *tuple;
-            char *mp;
+            bool boolean;
+            struct {
+                const char *data;
+                uint32_t size;
+            } str;
+            struct {
+                const char *data;
+                uint32_t size;
+                union {
+                    struct tuple_format *mp_format;
+                    struct mp_ctx *mp_ctx;
+                };
+            } mp;
         };
-        uint32_t mp_size;
-        struct tuple_format *mp_format;
     };
 
     struct port_c {

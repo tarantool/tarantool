@@ -48,6 +48,7 @@
 #include "box/xrow.h"
 #include "core/diag.h"
 #include "core/fiber.h"
+#include "core/mp_ctx.h"
 #include "core/tt_static.h"
 #include "lua/utils.h"
 #include "lua/msgpack.h"
@@ -211,17 +212,51 @@ port_c_dump_lua(struct port *base, struct lua_State *L,
 	struct port_c_entry *pe = port->first;
 	const char *mp;
 	for (int i = 0; pe != NULL; pe = pe->next) {
-		if (pe->mp_size == 0) {
+		switch (pe->type) {
+		case PORT_C_ENTRY_NULL:
+			lua_pushnil(L);
+			break;
+		case PORT_C_ENTRY_NUMBER:
+			lua_pushnumber(L, pe->number);
+			break;
+		case PORT_C_ENTRY_BOOL:
+			lua_pushboolean(L, pe->boolean);
+			break;
+		case PORT_C_ENTRY_STR:
+			lua_pushlstring(L, pe->str.data,
+					pe->str.size);
+			break;
+		case PORT_C_ENTRY_TUPLE:
 			luaT_pushtuple(L, pe->tuple);
-		} else {
-			mp = pe->mp;
-			luamp_decode(L, luaL_msgpack_default, &mp);
-
-			if (pe->mp_format != NULL) {
-				assert(mp_typeof(*pe->mp) == MP_ARRAY);
-				lua_wrap_formatted_array(L, pe->mp_format);
+			break;
+		case PORT_C_ENTRY_MP_OBJECT:
+			if (pe->mp.ctx != NULL) {
+				struct mp_ctx ctx;
+				mp_ctx_copy(&ctx, pe->mp.ctx);
+				size_t size = pe->mp.size;
+				luamp_push_with_ctx(L, pe->mp.data,
+						    pe->mp.data + size,
+						    &ctx);
+			} else {
+				size_t size = pe->mp.size;
+				luamp_push(L, pe->mp.data,
+					   pe->mp.data + size);
 			}
-		}
+			break;
+		case PORT_C_ENTRY_MP:
+			mp = pe->mp.data;
+			luamp_decode(L, luaL_msgpack_default, &mp);
+			if (pe->mp.format != NULL) {
+				const char *mp_start = pe->mp.data;
+				assert(mp_typeof(*mp_start) == MP_ARRAY);
+				(void)mp_start;
+				lua_wrap_formatted_array(
+					L, pe->mp.format);
+			}
+			break;
+		default:
+			unreachable();
+		};
 		if (mode == PORT_DUMP_LUA_MODE_TABLE)
 			lua_rawseti(L, -2, ++i);
 	}

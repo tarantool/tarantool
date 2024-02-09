@@ -47,25 +47,92 @@
  */
 static struct mempool port_entry_pool;
 
+/**
+ * The pool is used by port_c to allocate mp_ctx objects because
+ * they are too large to store them right in entries.
+ */
+static struct mempool port_mp_ctx_pool;
+
 enum {
 	PORT_ENTRY_SIZE = sizeof(struct port_c_entry),
+	PORT_MP_CTX_SIZE = sizeof(struct mp_ctx),
 };
+
+static_assert(PORT_MP_CTX_SIZE > PORT_ENTRY_SIZE,
+	      "There would be no reason to create a separate mempool "
+	      "if mp_ctx fitted into port_c_entry");
+
+static void *
+port_c_data_xalloc(size_t size)
+{
+	assert(size > 0);
+	void *ptr = NULL;
+	/*
+	 * Alloc on a mempool is several times faster than
+	 * on the heap. And it perfectly fits small
+	 * MessagePack packets and strings.
+	 */
+	if (size <= PORT_ENTRY_SIZE)
+		ptr = xmempool_alloc(&port_entry_pool);
+	else if (size <= PORT_MP_CTX_SIZE)
+		ptr = xmempool_alloc(&port_mp_ctx_pool);
+	else
+		ptr = xmalloc(size);
+	return ptr;
+}
+
+static void
+port_c_data_free(void *ptr, size_t size)
+{
+	assert(size > 0);
+	if (size <= PORT_ENTRY_SIZE)
+		mempool_free(&port_entry_pool, ptr);
+	else if (size <= PORT_MP_CTX_SIZE)
+		mempool_free(&port_mp_ctx_pool, ptr);
+	else
+		free(ptr);
+}
 
 static inline void
 port_c_destroy_entry(struct port_c_entry *pe)
 {
 	/*
-	 * See port_c_add_*() for algorithm of how and where to
-	 * store data, to understand why it is freed differently.
+	 * See port_c_add_*() for algorithm of how and where to store data,
+	 * to understand why it is freed differently.
 	 */
-	if (pe->mp_size == 0)
+	switch (pe->type) {
+	case PORT_C_ENTRY_TUPLE:
 		tuple_unref(pe->tuple);
-	else if (pe->mp_size <= PORT_ENTRY_SIZE)
-		mempool_free(&port_entry_pool, pe->mp);
-	else
-		free(pe->mp);
-	if (pe->mp_format != NULL)
-		tuple_format_unref(pe->mp_format);
+		break;
+	case PORT_C_ENTRY_STR: {
+		size_t size = pe->str.size;
+		if (size > 0) {
+			void *data = (void *)pe->str.data;
+			port_c_data_free(data, size);
+		}
+		break;
+	}
+	case PORT_C_ENTRY_MP_OBJECT:
+	case PORT_C_ENTRY_MP: {
+		size_t size = pe->mp.size;
+		assert(size > 0);
+		void *data = (void *)pe->mp.data;
+		port_c_data_free(data, size);
+		if (pe->type == PORT_C_ENTRY_MP_OBJECT &&
+		    pe->mp.ctx != NULL) {
+			mp_ctx_destroy(pe->mp.ctx);
+			mempool_free(&port_mp_ctx_pool,
+				     pe->mp.ctx);
+		}
+		if (pe->type == PORT_C_ENTRY_MP &&
+		    pe->mp.format != NULL) {
+			tuple_format_unref(pe->mp.format);
+		}
+		break;
+	}
+	default:
+		break;
+	}
 }
 
 static void
@@ -104,7 +171,6 @@ port_c_new_entry(struct port_c *port)
 		port->last = e;
 	}
 	e->next = NULL;
-	e->mp_format = NULL;
 	++port->size;
 	return e;
 }
@@ -115,66 +181,110 @@ port_c_add_tuple(struct port *base, struct tuple *tuple)
 	struct port_c *port = (struct port_c *)base;
 	struct port_c_entry *pe = port_c_new_entry(port);
 	assert(pe != NULL);
-	/* 0 mp_size means the entry stores a tuple. */
-	pe->mp_size = 0;
+	pe->type = PORT_C_ENTRY_TUPLE;
 	pe->tuple = tuple;
 	tuple_ref(tuple);
 }
 
 /**
- * Helper function of port_c_add_mp etc.
- * Allocate a buffer of given size and add it to new entry of given port.
- * Never fails.
+ * Appends raw MsgPack to the port, it is copied.
+ * Returns the new entry containing MsgPack, never fails.
  */
-static char *
-port_c_prepare_mp(struct port *base, uint32_t size)
+static struct port_c_entry *
+port_c_add_mp_impl(struct port *base, const char *mp, const char *mp_end)
 {
+	assert(mp_end > mp);
 	struct port_c *port = (struct port_c *)base;
-	struct port_c_entry *pe;
-	assert(size > 0);
-	char *dst;
-	if (size <= PORT_ENTRY_SIZE) {
-		/*
-		 * Alloc on a mempool is several times faster than
-		 * on the heap. And it perfectly fits any
-		 * MessagePack number, a short string, a boolean.
-		 */
-		dst = xmempool_alloc(&port_entry_pool);
-	} else {
-		dst = xmalloc(size);
-	}
-	pe = port_c_new_entry(port);
+	size_t size = mp_end - mp;
+	struct port_c_entry *pe = port_c_new_entry(port);
 	assert(pe != NULL);
-	pe->mp = dst;
-	pe->mp_size = size;
-	return dst;
+	char *data = port_c_data_xalloc(size);
+	memcpy(data, mp, size);
+	pe->mp.data = data;
+	pe->mp.size = size;
+	pe->mp.format = NULL;
+	pe->type = PORT_C_ENTRY_MP;
+	return pe;
 }
 
 void
 port_c_add_mp(struct port *base, const char *mp, const char *mp_end)
 {
-	assert(mp_end > mp);
-	uint32_t mp_size = mp_end - mp;
-	char *dst = port_c_prepare_mp(base, mp_size);
-	memcpy(dst, mp, mp_end - mp);
+	port_c_add_mp_impl(base, mp, mp_end);
 }
 
 void
 port_c_add_formatted_mp(struct port *base, const char *mp, const char *mp_end,
 			struct tuple_format *format)
 {
-	port_c_add_mp(base, mp, mp_end);
-	struct port_c *port = (struct port_c *)base;
-	port->last->mp_format = format;
+	struct port_c_entry *pe = port_c_add_mp_impl(base, mp, mp_end);
+	pe->mp.format = format;
 	tuple_format_ref(format);
 }
 
 void
-port_c_add_str(struct port *base, const char *str, uint32_t len)
+port_c_add_mp_object(struct port *base, const char *mp, const char *mp_end,
+		     struct mp_ctx *ctx)
 {
-	uint32_t mp_size = mp_sizeof_str(len);
-	char *dst = port_c_prepare_mp(base, mp_size);
-	mp_encode_str(dst, str, len);
+	struct port_c_entry *pe = port_c_add_mp_impl(base, mp, mp_end);
+	pe->type = PORT_C_ENTRY_MP_OBJECT;
+	struct mp_ctx *mp_ctx = NULL;
+	if (ctx != NULL) {
+		mp_ctx = xmempool_alloc(&port_mp_ctx_pool);
+		mp_ctx_copy(mp_ctx, ctx);
+	}
+	pe->mp.ctx = mp_ctx;
+}
+
+void
+port_c_add_str(struct port *base, const char *data, size_t len)
+{
+	struct port_c *port = (struct port_c *)base;
+	struct port_c_entry *pe;
+	pe = port_c_new_entry(port);
+	assert(pe != NULL);
+	pe->type = PORT_C_ENTRY_STR;
+	char *str = NULL;
+	/*
+	 * Don't copy an empty string. Anyway, it is handy to have
+	 * a valid address as a "beginning" of the string - let's use
+	 * address of the entry for this purpose.
+	 */
+	if (len == 0) {
+		str = (char *)pe;
+	} else {
+		void *ptr = port_c_data_xalloc(len);
+		memcpy(ptr, data, len);
+		str = ptr;
+	}
+	pe->str.data = str;
+	pe->str.size = len;
+}
+
+void
+port_c_add_null(struct port *base)
+{
+	struct port_c *port = (struct port_c *)base;
+	struct port_c_entry *pe = port_c_new_entry(port);
+	pe->type = PORT_C_ENTRY_NULL;
+}
+
+void
+port_c_add_bool(struct port *base, bool val)
+{
+	struct port_c *port = (struct port_c *)base;
+	struct port_c_entry *pe = port_c_new_entry(port);
+	pe->type = PORT_C_ENTRY_BOOL;
+	pe->boolean = val;
+}
+
+void
+port_c_add_number(struct port *base, double val)
+{
+	struct port_c *port = (struct port_c *)base;
+	struct port_c_entry *pe = port_c_new_entry(port);
+	pe->type = PORT_C_ENTRY_NUMBER;
+	pe->number = val;
 }
 
 /**
@@ -191,24 +301,47 @@ port_c_dump_msgpack_impl(struct port *base, struct mpstream *stream,
 	struct port_c *port = (struct port_c *)base;
 	struct port_c_entry *pe;
 	for (pe = port->first; pe != NULL; pe = pe->next) {
-		uint32_t size = pe->mp_size;
-		if (size == 0) {
+		switch (pe->type) {
+		case PORT_C_ENTRY_NULL:
+			mpstream_encode_nil(stream);
+			break;
+		case PORT_C_ENTRY_NUMBER:
+			mpstream_encode_double(stream, pe->number);
+			break;
+		case PORT_C_ENTRY_BOOL:
+			mpstream_encode_bool(stream, pe->boolean);
+			break;
+		case PORT_C_ENTRY_STR:
+			mpstream_encode_strn(stream, pe->str.data,
+					     pe->str.size);
+			break;
+		case PORT_C_ENTRY_TUPLE: {
+			struct tuple *tuple = pe->tuple;
 			if (ctx != NULL) {
-				tuple_to_mpstream_as_ext(pe->tuple, stream);
+				tuple_to_mpstream_as_ext(tuple, stream);
 				struct mp_box_ctx *box_ctx =
 					mp_box_ctx_check(ctx);
 				tuple_format_map_add_format(
 					&box_ctx->tuple_format_map,
-					pe->tuple->format_id);
+					tuple->format_id);
 			} else {
 				uint32_t size;
 				const char *data =
-					tuple_data_range(pe->tuple, &size);
+					tuple_data_range(tuple, &size);
 				mpstream_memcpy(stream, data, size);
+				break;
 			}
-		} else {
-			mpstream_memcpy(stream, pe->mp, size);
+			break;
 		}
+		case PORT_C_ENTRY_MP_OBJECT:
+		case PORT_C_ENTRY_MP: {
+			size_t size = pe->mp.size;
+			mpstream_memcpy(stream, pe->mp.data, size);
+			break;
+		}
+		default:
+			unreachable();
+		};
 	}
 	mpstream_flush(stream);
 }
@@ -308,10 +441,12 @@ void
 port_init(void)
 {
 	mempool_create(&port_entry_pool, &cord()->slabc, PORT_ENTRY_SIZE);
+	mempool_create(&port_mp_ctx_pool, &cord()->slabc, PORT_MP_CTX_SIZE);
 }
 
 void
 port_free(void)
 {
 	mempool_destroy(&port_entry_pool);
+	mempool_destroy(&port_mp_ctx_pool);
 }

@@ -6,7 +6,9 @@
 #include "box/session.h"
 #include "box/tuple.h"
 #include "box/user.h"
+#include "core/assoc.h"
 #include "core/event.h"
+#include "core/mp_ctx.h"
 #include "core/port.h"
 #include "lua/init.h"
 #include "lua/minifio.h"
@@ -113,6 +115,29 @@ lua_table_unpack(struct lua_State *L)
 }
 
 /**
+ * A helper that checks if two object on the top of Lua stack have the same
+ * value by passed key. Compared objects are popped.
+ */
+static bool
+lua_equal_value_by_key(struct lua_State *L, const char *key)
+{
+	const char *text = "return function(a, b, k) "
+			   "    return a[k] == b[k] "
+			   "end";
+	int rc = luaT_dostring(L, text);
+	fail_if(rc != 0);
+	lua_insert(L, -3);
+	lua_pushstring(L, key);
+	rc = luaT_call(L, 3, 1);
+	if (rc != 0)
+		printf("%s\n", lua_tostring(L, -1));
+	fail_if(rc != 0);
+	bool res = lua_toboolean(L, -1);
+	lua_pop(L, 1);
+	return res;
+}
+
+/**
  * A handy helper to easily push Lua values to the Lua stack.
  * Argument values is a sequence of values written in Lua syntax.
  */
@@ -126,6 +151,9 @@ lua_push_values(struct lua_State *L, const char *values)
 
 /**
  * Checks if resulting Lua state is equal to expected one.
+ *
+ * When two MsgPack objects are compared, the translation is also checked:
+ * values by key "test_port_key" are compared.
  *
  * Tuples are compared by pointers, so if got_L contains a tuple,
  * expected_L must contain the same one.
@@ -150,6 +178,10 @@ test_check_lua_state(struct lua_State *got_L, struct lua_State *expected_L)
 			const char *other = luamp_get(L, i + top, &other_size);
 			test_check_mp_equal(mp, mp_size, other, other_size,
 					    /*no_header=*/false);
+			lua_pushvalue(L, i);
+			lua_pushvalue(L, i + top);
+			ok(lua_equal_value_by_key(L, "test_port_key"),
+			   "Translation check");
 		} else if (lua_istable(L, i)) {
 			lua_pushvalue(L, i);
 			lua_pushvalue(L, i + top);
@@ -336,11 +368,27 @@ struct port_c_contents {
 	const char *mp_map_end;
 };
 
+/**
+ * Long and medium string are used to cover all types of data allocation
+ * in port_c.
+ */
+static char test_port_c_long_str[200];
+static char test_port_c_medium_str[80];
+
+/**
+ * An mp_ctx providing translation for port_c tests.
+ */
+struct mp_ctx test_port_c_mp_ctx;
+
 static struct port_c_contents
 test_port_c_create(struct port *port)
 {
 	/* Prepare to fill - create all required objects. */
 	const char *str = "abc";
+	const char *medium_str = test_port_c_medium_str;
+	size_t medium_str_len = sizeof(test_port_c_medium_str);
+	const char *long_str = test_port_c_long_str;
+	size_t long_str_len = sizeof(test_port_c_long_str);
 
 	static char mp_arr_begin[32];
 	char *mp_arr = mp_arr_begin;
@@ -366,9 +414,17 @@ test_port_c_create(struct port *port)
 	/* Fill port with created objects. */
 	port_c_create(port);
 	port_c_add_str(port, str, strlen(str));
+	port_c_add_str(port, medium_str, medium_str_len);
+	port_c_add_str(port, long_str, long_str_len);
 	port_c_add_tuple(port, tuple);
 	port_c_add_mp(port, mp_arr_begin, mp_arr);
 	port_c_add_mp(port, mp_map_begin, mp_map);
+	port_c_add_null(port);
+	port_c_add_bool(port, true);
+	port_c_add_number(port, 3.14);
+	port_c_add_str0(port, str);
+	port_c_add_mp_object(port, mp_arr_begin, mp_arr, NULL);
+	port_c_add_mp_object(port, mp_map_begin, mp_map, &test_port_c_mp_ctx);
 
 	struct port_c_contents contents = {
 		.tuple = tuple,
@@ -383,7 +439,7 @@ test_port_c_create(struct port *port)
 static void
 test_port_c_dump_lua(void)
 {
-	plan(14);
+	plan(38);
 	header();
 
 	struct port port;
@@ -400,9 +456,20 @@ test_port_c_dump_lua(void)
 	struct port_c_contents contents = test_port_c_create(&port);
 
 	lua_pushstring(L, "abc");
+	lua_pushlstring(L, test_port_c_medium_str,
+			sizeof(test_port_c_medium_str));
+	lua_pushlstring(L, test_port_c_long_str, sizeof(test_port_c_long_str));
 	luaT_pushtuple(L, contents.tuple);
 	lua_push_values(L, "{'abc', 10, true, 42.12}");
 	lua_push_values(L, "{abc = 10, [5] = false}");
+	lua_push_values(L, "nil, true, 3.14, 'abc'");
+	luamp_push(L, contents.mp_arr, contents.mp_arr_end);
+
+	/* Push MsgPack object with context. */
+	struct mp_ctx expected_mp_ctx;
+	mp_ctx_copy(&expected_mp_ctx, &test_port_c_mp_ctx);
+	luamp_push_with_ctx(L, contents.mp_map, contents.mp_map_end,
+			    &expected_mp_ctx);
 
 	test_check_port_dump_lua_flat(&port, L);
 	test_check_port_dump_lua_table(&port, L);
@@ -414,10 +481,10 @@ test_port_c_dump_lua(void)
 static void
 test_port_c_all_msgpack_methods(void)
 {
-	plan(14);
+	plan(16);
 	header();
 
-	char buf[128];
+	char buf[512];
 	char *mp = buf;
 	mp = mp_encode_array(mp, 0);
 
@@ -430,15 +497,35 @@ test_port_c_all_msgpack_methods(void)
 
 	/* Rewind MsgPack cursor. */
 	mp = buf;
-	mp = mp_encode_array(mp, 4);
+	mp = mp_encode_array(mp, 12);
 
 	mp = mp_encode_str0(mp, "abc");
+	mp = mp_encode_str(mp, test_port_c_medium_str,
+			   sizeof(test_port_c_medium_str));
+	mp = mp_encode_str(mp, test_port_c_long_str,
+			   sizeof(test_port_c_long_str));
 
+	/* Encode tuple. */
 	uint32_t size;
 	const char *data = tuple_data_range(contents.tuple, &size);
 	memcpy(mp, data, size);
 	mp += size;
 
+	/* Encode MsgPack packets. */
+	size = contents.mp_arr_end - contents.mp_arr;
+	memcpy(mp, contents.mp_arr, size);
+	mp += size;
+
+	size = contents.mp_map_end - contents.mp_map;
+	memcpy(mp, contents.mp_map, size);
+	mp += size;
+
+	mp = mp_encode_nil(mp);
+	mp = mp_encode_bool(mp, true);
+	mp = mp_encode_double(mp, 3.14);
+	mp = mp_encode_str0(mp, "abc");
+
+	/* Encode MsgPack objects. */
 	size = contents.mp_arr_end - contents.mp_arr;
 	memcpy(mp, contents.mp_arr, size);
 	mp += size;
@@ -463,8 +550,30 @@ test_port_c(void)
 	plan(2);
 	header();
 
+	/* Initialize long and medium strings used in the tests. */
+	memset(test_port_c_long_str, 'a', sizeof(test_port_c_long_str));
+	memset(test_port_c_medium_str, 'b', sizeof(test_port_c_medium_str));
+
+	/* Initialize mp_ctx used in port_c tests. */
+	uint32_t key = 5;
+	const char *name = "test_port_key";
+	size_t name_len = strlen(name);
+	struct mh_strnu32_t *mp_key_translation = mh_strnu32_new();
+	struct mh_strnu32_node_t translation = {
+		.str = name,
+		.len = name_len,
+		.hash = lua_hash(name, name_len),
+		.val = key
+	};
+	mh_strnu32_put(mp_key_translation, &translation, NULL, NULL);
+	mp_ctx_create_default(&test_port_c_mp_ctx, mp_key_translation);
+
 	test_port_c_dump_lua();
 	test_port_c_all_msgpack_methods();
+
+	/* Deinitialize mp_ctx used in port_c tests. */
+	mp_ctx_destroy(&test_port_c_mp_ctx);
+	mh_strnu32_delete(mp_key_translation);
 
 	footer();
 	check_plan();
@@ -657,7 +766,7 @@ test_port_lua_all_msgpack_methods_impl(bool with_bottom)
 static void
 test_port_lua_all_msgpack_methods(void)
 {
-	plan(14);
+	plan(16);
 	header();
 	test_port_lua_all_msgpack_methods_impl(/*with_bottom=*/false);
 	footer();
@@ -667,7 +776,7 @@ test_port_lua_all_msgpack_methods(void)
 static void
 test_port_lua_all_msgpack_methods_with_bottom(void)
 {
-	plan(14);
+	plan(16);
 	header();
 	test_port_lua_all_msgpack_methods_impl(/*with_bottom=*/true);
 	footer();
@@ -761,7 +870,7 @@ test_port_msgpack_dump_lua(void)
 static void
 test_port_msgpack_all_msgpack_methods(void)
 {
-	plan(7);
+	plan(8);
 	header();
 
 	struct port port;
