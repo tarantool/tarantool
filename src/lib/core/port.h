@@ -43,6 +43,7 @@ struct lua_State;
 struct port;
 struct Mem;
 struct mp_ctx;
+struct port_c_entry;
 
 /**
  * Mode in which data is dumped from a port to a Lua stack (@sa
@@ -133,6 +134,16 @@ struct port_vtab {
 	 * implementation
 	 */
 	struct Mem *(*get_vdbemem)(struct port *port, uint32_t *size);
+	/**
+	 * Get the content of a port as a list of port_c_entry.
+	 * This API is used to easily process port contents from C.
+	 * If port is empty, NULL is returned.
+	 * The lifecycle of the returned value is the same as for
+	 * @get_msgpack method, i.e. it depends on particular
+	 * implementation. Anyway, returned entries mustn't be destroyed
+	 * since they don't own any resources.
+	 */
+	const struct port_c_entry *(*get_c_entries)(struct port *port);
 	/** Destroy a port and release associated resources. */
 	void (*destroy)(struct port *port);
 };
@@ -206,6 +217,12 @@ static inline struct Mem *
 port_get_vdbemem(struct port *port, uint32_t *size)
 {
 	return port->vtab->get_vdbemem(port, size);
+}
+
+static inline const struct port_c_entry *
+port_get_c_entries(struct port *port)
+{
+	return port->vtab->get_c_entries(port);
 }
 
 #if defined(__cplusplus)

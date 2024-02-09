@@ -101,6 +101,7 @@ ffi.cdef[[
     };
 
     enum port_c_entry_type {
+        PORT_C_ENTRY_UNKNOWN,
         PORT_C_ENTRY_NULL,
         PORT_C_ENTRY_DOUBLE,
         PORT_C_ENTRY_TUPLE,
