@@ -93,14 +93,28 @@ struct port_lua {
 	int ref;
 	/** Number of entries dumped to the port. */
 	int size;
+	/** Bottom index of values to be dumped. */
+	int bottom;
 };
 
 static_assert(sizeof(struct port_lua) <= sizeof(struct port),
 	      "sizeof(struct port_lua) must be <= sizeof(struct port)");
 
-/** Initialize a port to dump from Lua. */
+/**
+ * Initialize a port to dump from Lua stack starting from bottom index.
+ * For example, if Lua stack contains values A, B, C, D, E (from bottom to top),
+ * then calling this function with bottom set to 3 would result in creating
+ * a port containing C, D, E.
+ */
 void
-port_lua_create(struct port *port, struct lua_State *L);
+port_lua_create_at(struct port *port, struct lua_State *L, int bottom);
+
+/** Initialize a port to dump all values from Lua stack. */
+static inline void
+port_lua_create(struct port *port, struct lua_State *L)
+{
+	port_lua_create_at(port, L, 1);
+}
 
 /** Port implementation used with vdbe memory variables. */
 struct port_vdbemem {

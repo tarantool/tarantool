@@ -471,7 +471,6 @@ test_port_c(void)
 }
 
 /** Tests for port_lua. */
-
 struct port_lua_contents {
 	double number;
 	const char *str;
@@ -481,11 +480,15 @@ struct port_lua_contents {
 
 /**
  * Creates port_lua and fills it.
- * Flag push_cdata is required because MsgPack methods does
+ * Flag push_cdata is required because MsgPack methods do
  * not support tuples.
+ * Flag with_bottom is used to test both port_lua_create and
+ * port_lua_create_at which dumps Lua values starting from
+ * bottom index - if it is set, port is created with function
+ * port_lua_create_at with bottom greater than 1.
  */
 static struct port_lua_contents
-test_port_lua_create(struct port *port, bool push_cdata)
+test_port_lua_create(struct port *port, bool push_cdata, bool with_bottom)
 {
 	struct lua_State *L = lua_newthread(tarantool_L);
 
@@ -494,7 +497,13 @@ test_port_lua_create(struct port *port, bool push_cdata)
 	bool boolean = false;
 	const char *str = "abc";
 	struct tuple *tuple = NULL;
+	int bottom = 4;
 
+	if (with_bottom) {
+		/* Fill space under bottom with numbers. */
+		for (int i = 1; i < bottom; i++)
+			lua_pushnumber(L, i);
+	}
 	lua_pushnil(L);
 	luaL_pushnull(L);
 	lua_pushnumber(L, number);
@@ -512,7 +521,10 @@ test_port_lua_create(struct port *port, bool push_cdata)
 		tuple = tuple_new(tuple_format_runtime, mp_arr_begin, mp_arr);
 		luaT_pushtuple(L, tuple);
 	}
-	port_lua_create(port, L);
+	if (with_bottom)
+		port_lua_create_at(port, L, bottom);
+	else
+		port_lua_create(port, L);
 
 	struct port_lua_contents contents = {
 		.number = number,
@@ -523,33 +535,72 @@ test_port_lua_create(struct port *port, bool push_cdata)
 	return contents;
 }
 
+/**
+ * Creates an empty port_lua.
+ * Flag with_bottom is used to test both port_lua_create and
+ * port_lua_create_with_bottom.
+ */
+static void
+test_port_lua_create_empty(struct port *port, bool with_bottom)
+{
+	struct lua_State *L = lua_newthread(tarantool_L);
+	fail_if(lua_gettop(L) != 0);
+	int bottom = 3;
+
+	if (with_bottom) {
+		/* Fill space under bottom with numbers. */
+		for (int i = 1; i < bottom; i++)
+			lua_pushnumber(L, i);
+		port_lua_create_at(port, L, bottom);
+	} else {
+		port_lua_create(port, L);
+	}
+}
+
+/*
+ * Checks port_lua_dump_lua method.
+ * If flag with_bottom is true, all Lua stacks are created with
+ * port_lua_create_at method with bottom greater than 1.
+ */
+static void
+test_port_lua_dump_lua_impl(bool with_bottom)
+{
+	struct port port;
+	struct lua_State *empty_L = lua_newthread(tarantool_L);
+	fail_if(lua_gettop(empty_L) != 0);
+
+	test_port_lua_create_empty(&port, with_bottom);
+	test_check_port_dump_lua_flat(&port, empty_L);
+	port_destroy(&port);
+
+	test_port_lua_create(&port, /*push_cdata=*/true, with_bottom);
+	struct port_lua *port_lua = (struct port_lua *)&port;
+	struct lua_State *L = port_lua->L;
+	struct lua_State *copy_L = lua_newthread(tarantool_L);
+	int top = lua_gettop(L);
+	for (int i = port_lua->bottom; i <= top; i++)
+		lua_pushvalue(L, i);
+	lua_xmove(L, copy_L, top - port_lua->bottom + 1);
+	test_check_port_dump_lua_flat(&port, copy_L);
+	port_destroy(&port);
+}
+
 static void
 test_port_lua_dump_lua(void)
 {
 	plan(8);
 	header();
+	test_port_lua_dump_lua_impl(/*with_bottom=*/false);
+	footer();
+	check_plan();
+}
 
-	struct port port;
-	struct lua_State *empty_port_L = lua_newthread(tarantool_L);
-	fail_if(lua_gettop(empty_port_L) != 0);
-	struct lua_State *empty_L = lua_newthread(tarantool_L);
-	fail_if(lua_gettop(empty_L) != 0);
-
-	port_lua_create(&port, empty_port_L);
-	test_check_port_dump_lua_flat(&port, empty_L);
-	port_destroy(&port);
-
-	test_port_lua_create(&port, /*push_cdata=*/true);
-	struct port_lua *port_lua = (struct port_lua *)&port;
-	struct lua_State *L = port_lua->L;
-	struct lua_State *copy_L = lua_newthread(tarantool_L);
-	int size = lua_gettop(L);
-	for (int i = 1; i <= size; i++)
-		lua_pushvalue(L, i);
-	lua_xmove(L, copy_L, size);
-	test_check_port_dump_lua_flat(&port, copy_L);
-	port_destroy(&port);
-
+static void
+test_port_lua_dump_lua_with_bottom(void)
+{
+	plan(8);
+	header();
+	test_port_lua_dump_lua_impl(/*with_bottom=*/true);
 	footer();
 	check_plan();
 }
@@ -557,13 +608,12 @@ test_port_lua_dump_lua(void)
 /**
  * Checks port_lua_{dump,get}_msgpack methods.
  * The for loop is required because port_lua is truncated on dump or get.
+ * If flag with_bottom is true, all Lua stacks are created with
+ * port_lua_create_at method with bottom greater than 1.
  */
 static void
-test_port_lua_all_msgpack_methods(void)
+test_port_lua_all_msgpack_methods_impl(bool with_bottom)
 {
-	plan(14);
-	header();
-
 	test_check_msgpack_method checkers[] = {
 		test_check_port_get_msgpack,
 		test_check_port_dump_msgpack_no_header,
@@ -579,12 +629,13 @@ test_port_lua_all_msgpack_methods(void)
 		char *mp = buf;
 		mp = mp_encode_array(mp, 0);
 
-		port_lua_create(&port, empty_port_L);
+		test_port_lua_create_empty(&port, with_bottom);
 		checkers[i](&port, buf, mp - buf);
 		port_destroy(&port);
 
 		struct port_lua_contents contents =
-			test_port_lua_create(&port, /*push_cdata=*/false);
+			test_port_lua_create(&port, /*push_cdata=*/false,
+					     with_bottom);
 
 		/* Rewind MsgPack cursor. */
 		mp = buf;
@@ -601,7 +652,24 @@ test_port_lua_all_msgpack_methods(void)
 
 		port_destroy(&port);
 	}
+}
 
+static void
+test_port_lua_all_msgpack_methods(void)
+{
+	plan(14);
+	header();
+	test_port_lua_all_msgpack_methods_impl(/*with_bottom=*/false);
+	footer();
+	check_plan();
+}
+
+static void
+test_port_lua_all_msgpack_methods_with_bottom(void)
+{
+	plan(14);
+	header();
+	test_port_lua_all_msgpack_methods_impl(/*with_bottom=*/true);
 	footer();
 	check_plan();
 }
@@ -609,11 +677,13 @@ test_port_lua_all_msgpack_methods(void)
 static void
 test_port_lua(void)
 {
-	plan(2);
+	plan(4);
 	header();
 
 	test_port_lua_dump_lua();
+	test_port_lua_dump_lua_with_bottom();
 	test_port_lua_all_msgpack_methods();
+	test_port_lua_all_msgpack_methods_with_bottom();
 
 	footer();
 	check_plan();
