@@ -164,7 +164,8 @@ lbox_ctl_set_iproto_lockdown(struct lua_State *L)
 		lua_error(L);
 	}
 	bool new_val = lua_toboolean(L, 1);
-	security_set_iproto_lockdown(new_val);
+	if (security_set_iproto_lockdown(new_val) != 0)
+		return luaT_error(L);
 #else
 	lua_pushstring(L, "box.ctl.iproto_lockdown() is available only in "
 		       "Enterprise Edition builds.");
