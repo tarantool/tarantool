@@ -135,6 +135,8 @@ port_vdbemem_create(struct port *base, struct Mem *mem,
  * Type of value in port_c_entry.
  */
 enum port_c_entry_type {
+	/** Type for unsupported values. Is used in get_c_entries methods. */
+	PORT_C_ENTRY_UNKNOWN,
 	PORT_C_ENTRY_NULL,
 	PORT_C_ENTRY_NUMBER,
 	PORT_C_ENTRY_TUPLE,

@@ -669,6 +669,84 @@ port_lua_dump_plain(struct port *port, uint32_t *size);
 extern struct Mem *
 port_lua_get_vdbemem(struct port *base, uint32_t *size);
 
+const struct port_c_entry *
+port_lua_get_c_entries(struct port *base)
+{
+	struct port_lua *port = (struct port_lua *)base;
+	struct lua_State *L = port->L;
+	size_t size = lua_gettop(L) - port->bottom + 1;
+	if (size == 0)
+		return NULL;
+
+	struct port_c_entry *arr =
+		xregion_alloc_array(&fiber()->gc, struct port_c_entry, size);
+
+	/* Link the list. */
+	for (size_t i = 0; i < size - 1; i++)
+		arr[i].next = &arr[i + 1];
+	arr[size - 1].next = NULL;
+
+	/* Put values. */
+	for (size_t arr_idx = 0; arr_idx < size; arr_idx++) {
+		int lua_idx = arr_idx + port->bottom;
+		struct port_c_entry *e = &arr[arr_idx];
+		switch (lua_type(L, lua_idx)) {
+		case LUA_TNIL:
+			e->type = PORT_C_ENTRY_NULL;
+			break;
+		case LUA_TBOOLEAN:
+			e->type = PORT_C_ENTRY_BOOL;
+			e->boolean = lua_toboolean(L, lua_idx);
+			break;
+		case LUA_TNUMBER:
+			e->type = PORT_C_ENTRY_NUMBER;
+			e->number = lua_tonumber(L, lua_idx);
+			break;
+		case LUA_TSTRING: {
+			e->type = PORT_C_ENTRY_STR;
+			size_t len;
+			const char *data = lua_tolstring(L, lua_idx, &len);
+			e->str.data = data;
+			e->str.size = len;
+			break;
+		}
+		default: {
+			struct tuple *tuple = NULL;
+			tuple = luaT_istuple(L, lua_idx);
+			if (tuple != NULL) {
+				e->type = PORT_C_ENTRY_TUPLE;
+				e->tuple = tuple;
+				/*
+				 * Do not reference the tuple:
+				 * this entry does not own it.
+				 */
+				break;
+			}
+
+			size_t len;
+			const char *data = NULL;
+			data = luamp_get(L, lua_idx, &len);
+			if (data != NULL) {
+				e->type = PORT_C_ENTRY_MP_OBJECT;
+				e->mp.data = data;
+				e->mp.size = len;
+				e->mp.ctx = NULL;
+				break;
+			}
+
+			if (luaL_isnull(L, lua_idx)) {
+				e->type = PORT_C_ENTRY_NULL;
+				break;
+			}
+
+			/* Unsupported value. */
+			e->type = PORT_C_ENTRY_UNKNOWN;
+		}
+		}
+	}
+	return arr;
+}
+
 static const struct port_vtab port_lua_vtab = {
 	.dump_msgpack = port_lua_dump,
 	.dump_msgpack_16 = port_lua_dump_16,
@@ -676,6 +754,7 @@ static const struct port_vtab port_lua_vtab = {
 	.dump_plain = port_lua_dump_plain,
 	.get_msgpack = port_lua_get_msgpack,
 	.get_vdbemem = port_lua_get_vdbemem,
+	.get_c_entries = port_lua_get_c_entries,
 	.destroy = port_lua_destroy,
 };
 

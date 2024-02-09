@@ -389,6 +389,67 @@ typedef void
 (*test_check_msgpack_method)(struct port *port, const char *expected_mp,
 			     uint32_t expected_mp_size);
 
+/**
+ * Utils to check port_get_c_entries method.
+ */
+
+/**
+ * Checks that port dumps entries as expected.
+ * Argument expected can be NULL.
+ */
+static void
+test_check_port_get_c_entries(struct port *port, const struct port_c_entry *expected)
+{
+	const struct port_c_entry *got = port_get_c_entries(port);
+	if (expected == NULL) {
+		is(got, NULL, "No entries were expected");
+		return;
+	}
+	uint32_t region_svp = region_used(&fiber()->gc);
+	for (; got != NULL && expected != NULL;
+	     got = got->next, expected = expected->next) {
+		is(got->type, expected->type, "Types must be the same");
+		switch (got->type) {
+		case PORT_C_ENTRY_NULL:
+		case PORT_C_ENTRY_UNKNOWN:
+			break;
+		case PORT_C_ENTRY_BOOL:
+			is(got->boolean, expected->boolean,
+			   "Boolean values must be the same");
+			break;
+		case PORT_C_ENTRY_NUMBER:
+			is(got->number, expected->number,
+			   "Double values must be the same");
+			break;
+		case PORT_C_ENTRY_TUPLE:
+			/* The test expects *the same* tuple. */
+			is(got->tuple, expected->tuple,
+			   "Tuples must be the same");
+			break;
+		case PORT_C_ENTRY_STR:
+			is(got->str.size, expected->str.size,
+			   "Strings must have the same size");
+			is(memcmp(got->str.data, expected->str.data,
+				  got->str.size), 0,
+			   "Strings must be the same");
+			break;
+		case PORT_C_ENTRY_MP:
+		case PORT_C_ENTRY_MP_OBJECT:
+			is(got->mp.size, expected->mp.size,
+			   "MsgPack's must have the same size");
+			is(memcmp(got->mp.data, expected->mp.data,
+				  got->mp.size), 0,
+			   "MsgPack's must be the same");
+			break;
+		default:
+			ok(false, "Unexpected entry type");
+		}
+	}
+	ok(got == NULL && expected == NULL,
+	   "Both entries must have the same size");
+	region_truncate(&fiber()->gc, region_svp);
+}
+
 /** Tests for port_c. */
 
 struct port_c_contents {
@@ -642,9 +703,34 @@ test_port_c_all_msgpack_methods(void)
 }
 
 static void
-test_port_c(void)
+test_port_c_get_c_entries(void)
 {
 	plan(2);
+	header();
+
+	struct port port;
+	struct lua_State *L = lua_newthread(tarantool_L);
+	fail_if(lua_gettop(L) != 0);
+
+	/* Check if an empty port is dumped correctly. */
+	port_c_create(&port);
+	is(port_get_c_entries(&port), NULL, "Empty port has no entries");
+	port_destroy(&port);
+
+	struct port_c_contents contents = test_port_c_create(&port);
+	struct port_c *port_c = (struct port_c *)&port;
+	is(port_get_c_entries(&port), port_c->first,
+	   "port_c should simply return its first entry");
+	port_destroy(&port);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_port_c(void)
+{
+	plan(3);
 	header();
 
 	/* Initialize long and medium strings used in the tests. */
@@ -667,6 +753,7 @@ test_port_c(void)
 
 	test_port_c_dump_lua();
 	test_port_c_all_msgpack_methods();
+	test_port_c_get_c_entries();
 
 	/* Deinitialize mp_ctx used in port_c tests. */
 	mp_ctx_destroy(&test_port_c_mp_ctx);
@@ -688,13 +775,14 @@ struct port_lua_contents {
  * Creates port_lua and fills it.
  * Flag push_cdata is required because MsgPack methods do
  * not support tuples.
+ * Flag push_error is used to test a value unsupported by port_c_entry.
  * Flag with_bottom is used to test both port_lua_create and
  * port_lua_create_at which dumps Lua values starting from
  * bottom index - if it is set, port is created with function
  * port_lua_create_at with bottom greater than 1.
  */
 static struct port_lua_contents
-test_port_lua_create(struct port *port, bool push_cdata, bool with_bottom)
+test_port_lua_create(struct port *port, bool push_cdata, bool push_error, bool with_bottom)
 {
 	struct lua_State *L = lua_newthread(tarantool_L);
 
@@ -727,6 +815,9 @@ test_port_lua_create(struct port *port, bool push_cdata, bool with_bottom)
 		tuple = tuple_new(tuple_format_runtime, mp_arr_begin, mp_arr);
 		luaT_pushtuple(L, tuple);
 	}
+	if (push_error)
+		luaT_pusherror(L, BuildSystemError("abc", 42, "abc"));
+
 	if (with_bottom)
 		port_lua_create_at(port, L, bottom);
 	else
@@ -779,7 +870,8 @@ test_port_lua_dump_lua_impl(bool with_bottom)
 	test_check_port_dump_lua_flat(&port, empty_L);
 	port_destroy(&port);
 
-	test_port_lua_create(&port, /*push_cdata=*/true, with_bottom);
+	test_port_lua_create(&port, /*push_cdata=*/true, /*push_error=*/false,
+			     with_bottom);
 	struct port_lua *port_lua = (struct port_lua *)&port;
 	struct lua_State *L = port_lua->L;
 	struct lua_State *copy_L = lua_newthread(tarantool_L);
@@ -841,7 +933,7 @@ test_port_lua_all_msgpack_methods_impl(bool with_bottom)
 
 		struct port_lua_contents contents =
 			test_port_lua_create(&port, /*push_cdata=*/false,
-					     with_bottom);
+					    /*push_error=*/false, with_bottom);
 
 		/* Rewind MsgPack cursor. */
 		mp = buf;
@@ -880,16 +972,75 @@ test_port_lua_all_msgpack_methods_with_bottom(void)
 	check_plan();
 }
 
+/*
+ * Checks port_lua_get_c_entries method.
+ * If flag with_bottom is true, all Lua stacks are created with
+ * port_lua_create_at method with bottom greater than 1.
+ */
+static void
+test_port_lua_get_c_entries_impl(bool with_bottom)
+{
+	struct port port;
+	test_port_lua_create_empty(&port, with_bottom);
+	test_check_port_get_c_entries(&port, NULL);
+	port_destroy(&port);
+
+	struct port_lua_contents contents =
+		test_port_lua_create(&port, /*push_cdata=*/true,
+				     /*push_error=*/true, with_bottom);
+
+	struct port expected_port;
+	port_c_create(&expected_port);
+	port_c_add_null(&expected_port);
+	port_c_add_null(&expected_port);
+	port_c_add_number(&expected_port, contents.number);
+	port_c_add_str0(&expected_port, contents.str);
+	port_c_add_bool(&expected_port, false);
+	port_c_add_tuple(&expected_port, contents.tuple);
+
+	/* Imitate unknown value. */
+	port_c_add_null(&expected_port);
+	struct port_c *expected_port_c = (struct port_c *)&expected_port;
+	expected_port_c->last->type = PORT_C_ENTRY_UNKNOWN;
+
+	test_check_port_get_c_entries(&port,
+				      port_get_c_entries(&expected_port));
+
+	port_destroy(&port);
+}
+
+static void
+test_port_lua_get_c_entries(void)
+{
+	plan(14);
+	header();
+	test_port_lua_get_c_entries_impl(/*with_bottom=*/false);
+	footer();
+	check_plan();
+}
+
+static void
+test_port_lua_get_c_entries_with_bottom(void)
+{
+	plan(14);
+	header();
+	test_port_lua_get_c_entries_impl(/*with_bottom=*/true);
+	footer();
+	check_plan();
+}
+
 static void
 test_port_lua(void)
 {
-	plan(4);
+	plan(6);
 	header();
 
 	test_port_lua_dump_lua();
 	test_port_lua_dump_lua_with_bottom();
 	test_port_lua_all_msgpack_methods();
 	test_port_lua_all_msgpack_methods_with_bottom();
+	test_port_lua_get_c_entries();
+	test_port_lua_get_c_entries_with_bottom();
 
 	footer();
 	check_plan();

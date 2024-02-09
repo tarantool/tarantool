@@ -431,6 +431,13 @@ port_c_dump_lua(struct port *port, struct lua_State *L,
 extern struct Mem *
 port_c_get_vdbemem(struct port *base, uint32_t *size);
 
+const struct port_c_entry *
+port_c_get_c_entries(struct port *base)
+{
+	struct port_c *port = (struct port_c *)base;
+	return port->first;
+}
+
 const struct port_vtab port_c_vtab = {
 	.dump_msgpack = port_c_dump_msgpack_compatible,
 	.dump_msgpack_16 = port_c_dump_msgpack,
@@ -438,6 +445,7 @@ const struct port_vtab port_c_vtab = {
 	.dump_plain = NULL,
 	.get_msgpack = port_c_get_msgpack,
 	.get_vdbemem = port_c_get_vdbemem,
+	.get_c_entries = port_c_get_c_entries,
 	.destroy = port_c_destroy,
 };
 
