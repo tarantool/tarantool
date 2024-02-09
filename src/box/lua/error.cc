@@ -40,7 +40,43 @@ extern "C" {
 #include <errinj.h>
 
 #include "lua/utils.h"
+#include "lua/msgpack.h"
 #include "box/error.h"
+#include "mpstream/mpstream.h"
+
+/**
+ * Get key-value pair from Lua stack and set it as a payload field of the
+ * `error'. If the field with given key existed before, it is overwritten.
+ * The Lua value is encoded to MsgPack. Input stack: [-2] key; [-1] value.
+ */
+static void
+luaT_error_add_payload(lua_State *L, struct error *error)
+{
+	/* Ignore built-in error fields. */
+	const char *key = lua_tostring(L, -2);
+	static const char *const ignore_keys[] = {
+		"type", "message", "trace", "prev", "base_type",
+		"code", "reason", "errno", "custom_type"
+	};
+	for (size_t i = 0; i < lengthof(ignore_keys); i++) {
+		if (strcmp(key, ignore_keys[i]) == 0)
+			return;
+	}
+	struct region *gc = &fiber()->gc;
+	size_t used = region_used(gc);
+	struct mpstream stream;
+	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
+		      luamp_error, L);
+	if (luamp_encode(L, luaL_msgpack_default, &stream, -1) != 0) {
+		region_truncate(gc, used);
+		return;
+	}
+	mpstream_flush(&stream);
+	size_t size = region_used(gc) - used;
+	const char *mp_value = (const char *)xregion_join(gc, size);
+	error_payload_set_mp(&error->payload, key, mp_value, size);
+	region_truncate(gc, used);
+}
 
 /**
  * Parse Lua arguments (they can come as single table or as
@@ -117,7 +153,6 @@ luaT_error_create(lua_State *L, int top_base)
 		lua_getfield(L, top_base, "type");
 		if (!lua_isnil(L, -1))
 			custom_type = lua_tostring(L, -1);
-		lua_pop(L, 1);
 	} else {
 		return NULL;
 	}
@@ -133,7 +168,28 @@ raise:
 		}
 		line = info.currentline;
 	}
-	return box_error_new(file, line, code, custom_type, "%s", reason);
+	struct error *error;
+	error = box_error_new(file, line, code, custom_type, "%s", reason);
+	/*
+	 * Add custom payload fields to the `error' if any.
+	 */
+	if (top_type == LUA_TTABLE) {
+		/*
+		 * Table is in the stack at index `top', push the first key for
+		 * iteration over the table.
+		 */
+		lua_pushnil(L);
+		while (lua_next(L, top) != 0) {
+			int key_type = lua_type(L, -2);
+			if (key_type == LUA_TSTRING)
+				luaT_error_add_payload(L, error);
+			/* Remove the value, keep the key for next iteration. */
+			lua_pop(L, 1);
+		}
+		/* Remove the table. */
+		lua_pop(L, 1);
+	}
+	return error;
 }
 
 static int
