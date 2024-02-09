@@ -3618,15 +3618,23 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 	const char *data;
 	struct port_c_entry *pe;
 	for (pe = port->first; pe != NULL; pe = pe->next) {
-		if (pe->mp_size == 0) {
+		switch (pe->type) {
+		case PORT_C_ENTRY_TUPLE:
 			data = tuple_data(pe->tuple);
 			if (mp_decode_array(&data) != 1) {
 				diag_set(ClientError, ER_SQL_EXECUTE,
 					 "Unsupported type passed from C");
 				goto error;
 			}
-		} else {
-			data = pe->mp;
+			break;
+		case PORT_C_ENTRY_MP_OBJECT:
+		case PORT_C_ENTRY_MP:
+			data = pe->mp.data;
+			break;
+		default:
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "Unsupported type passed from C");
+			goto error;
 		}
 		uint32_t len;
 		mem_clear(&val[i]);

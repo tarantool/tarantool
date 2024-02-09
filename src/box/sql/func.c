@@ -2468,9 +2468,10 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 	struct tuple_format *format;
 	if (port->size > 0) {
 		struct port_c_entry *pe = port->first;
-		data = pe->mp;
-		mp_size = pe->mp_size;
-		format = pe->mp_format;
+		assert(pe->type == PORT_C_ENTRY_MP);
+		data = pe->mp.data;
+		mp_size = pe->mp.size;
+		format = pe->mp.format;
 	} else {
 		char *end = mp_encode_nil(buf);
 		data = buf;
