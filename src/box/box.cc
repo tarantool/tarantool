@@ -100,6 +100,7 @@
 #include "tt_sort.h"
 #include "event.h"
 #include "func_adapter.h"
+#include "tweaks.h"
 
 static char status[64] = "unconfigured";
 
@@ -243,6 +244,22 @@ static char box_feedback_host[BOX_FEEDBACK_HOST_MAX];
 
 /** Whether sending crash info to feedback URL is enabled. */
 static bool box_feedback_crash_enabled;
+
+#ifdef TEST_BUILD
+/**
+ * Set timeout to infinity in test build because first not all CI tests treat
+ * non zero exit code of Tarantool instance as failure currently. Also in
+ * luatest currently it is easier to test for no hanging rather then for
+ * Tarantool instance exit code.
+ */
+#define BOX_SHUTDOWN_TIMEOUT_DEFAULT TIMEOUT_INFINITY
+#else
+#define BOX_SHUTDOWN_TIMEOUT_DEFAULT 3.0
+#endif
+
+/** Timeout on waiting client related fibers to finish. */
+static double box_shutdown_timeout = BOX_SHUTDOWN_TIMEOUT_DEFAULT;
+TWEAK_DOUBLE(box_shutdown_timeout);
 
 static int
 box_run_on_recovery_state(enum box_recovery_state state)
@@ -5926,7 +5943,10 @@ box_storage_shutdown()
 {
 	if (!is_storage_initialized)
 		return;
-	iproto_shutdown();
+	if (iproto_shutdown(box_shutdown_timeout) != 0) {
+		diag_log();
+		panic("cannot gracefully shutdown iproto");
+	}
 }
 
 void
