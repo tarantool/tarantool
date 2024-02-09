@@ -193,16 +193,30 @@ iproto_free(void);
  * Drop all current connections. That is stop IO and cancel all inprogress
  * requests. Return when the requests are finished and connection is freed.
  * Concurrent calls are serialized.
+ *
+ * Drop can be interrupted by cancelling fiber or on timeout. In this case
+ * failure result code is returned. The function can be called again after
+ * failure.
+ *
+ * Return:
+ *   0 - success
+ *  -1 - failure (diag is set)
  */
-void
-iproto_drop_connections(void);
+int
+iproto_drop_connections(double timeout);
 
 /**
  * Prepare for freeing resources in iproto_free while TX event loop is still
  * running.
+ *
+ * If not finished in given timeout then failure result code is returned.
+ *
+ * Return:
+ *   0 - success
+ *  -1 - failure (diag is set)
  */
-void
-iproto_shutdown(void);
+int
+iproto_shutdown(double timeout);
 
 #if defined(__cplusplus)
 } /* extern "C" */
