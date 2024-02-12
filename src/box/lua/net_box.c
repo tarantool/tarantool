@@ -1275,6 +1275,17 @@ static int
 netbox_transport_send_and_recv(struct netbox_transport *transport,
 			       struct xrow_header *hdr)
 {
+	/*
+	 * When the worker fiber enters the Lua VM, garbage collection can be
+	 * triggered and the connection owning the worker could get closed (for
+	 * instance, when decoding the response). Unfortunately, we do not have
+	 * a convenient way to get notified about this event, so the best we can
+	 * do is check the connection state before doing any work.
+	 */
+	if (transport->state == NETBOX_CLOSED) {
+		box_error_raise(ER_NO_CONNECTION, "Connection closed");
+		return -1;
+	}
 	ibuf_consume(&transport->recv_buf, transport->last_msg_size);
 	while (true) {
 		size_t required;
