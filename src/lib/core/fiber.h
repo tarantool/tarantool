@@ -1254,9 +1254,17 @@ fiber_lua_state(struct fiber *f);
 void
 fiber_set_system(struct fiber *f, bool yesno);
 
-/** Cancel all client (non system) fibers and wait until they finished. */
-void
-fiber_shutdown(void);
+/**
+ * Cancel all client (non system) fibers and wait until they finished.
+ *
+ * If not finished in given timeout then failure result code is returned.
+ *
+ * Return:
+ *   0 - success
+ *  -1 - failure (diag is set)
+ */
+int
+fiber_shutdown(double timeout);
 
 #if defined(__cplusplus)
 } /* extern "C" */

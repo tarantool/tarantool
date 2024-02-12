@@ -426,6 +426,9 @@ local function metrics_collect_loop(self)
         if new_metric ~= nil then
             insert_metric(self, new_metric)
         end
+        if not pcall(fiber.testcancel) then
+            break
+        end
     end
     self.shutdown:put("stopped")
 end

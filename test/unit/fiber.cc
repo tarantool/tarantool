@@ -722,7 +722,8 @@ fiber_test_shutdown(void)
 	fail_unless(fiber4 != NULL);
 	fiber_set_joinable(fiber4, true);
 
-	fiber_shutdown();
+	int rc = fiber_shutdown(1000.0);
+	fail_unless(rc == 0);
 
 	fail_unless((fiber1->flags & FIBER_IS_DEAD) != 0);
 	fail_unless((fiber2->flags & FIBER_IS_DEAD) == 0);
