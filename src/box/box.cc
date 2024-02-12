@@ -6005,7 +6005,10 @@ box_storage_shutdown()
 	 * we won't need to handle requests from client fibers after/during
 	 * subsystem shutdown.
 	 */
-	fiber_shutdown();
+	if (fiber_shutdown(box_shutdown_timeout) != 0) {
+		diag_log();
+		panic("cannot gracefully shutdown client fibers");
+	}
 	replication_shutdown();
 	gc_shutdown();
 	engine_shutdown();

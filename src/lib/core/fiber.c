@@ -2377,8 +2377,8 @@ fiber_set_system(struct fiber *f, bool yesno)
 	}
 }
 
-void
-fiber_shutdown(void)
+int
+fiber_shutdown(double timeout)
 {
 	assert(cord()->shutdown_fiber == NULL);
 	cord()->is_shutdown = true;
@@ -2388,7 +2388,13 @@ fiber_shutdown(void)
 			fiber_cancel(fiber);
 	}
 	cord()->shutdown_fiber = fiber();
-	while (cord()->client_fiber_count != 0)
-		fiber_yield();
+	double deadline = ev_monotonic_now(loop()) + timeout;
+	while (cord()->client_fiber_count != 0) {
+		if (fiber_yield_deadline(deadline)) {
+			diag_set(TimedOut);
+			break;
+		}
+	}
 	cord()->shutdown_fiber = NULL;
+	return cord()->client_fiber_count == 0 ? 0 : -1;
 }

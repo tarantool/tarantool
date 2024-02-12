@@ -119,3 +119,27 @@ g.test_shutdown_of_hanging_iproto_request = function(cg)
     t.assert(cg.server:grep_log('cannot gracefully shutdown iproto', nil,
              {filename = log}))
 end
+
+-- Test shutdown does not hang if there is client fiber that
+-- cannot be cancelled.
+g.test_shutdown_of_hanging_client_fiber = function(cg)
+    cg.server:exec(function()
+        local log = require('log')
+        local fiber = require('fiber')
+        local tweaks = require('internal.tweaks')
+        tweaks.box_shutdown_timeout = 1.0
+        fiber.new(function()
+            log.info('going to sleep for test')
+            while true do
+                pcall(fiber.sleep, 1000)
+            end
+        end)
+    end)
+    t.helpers.retrying({}, function()
+        t.assert(cg.server:grep_log('going to sleep for test'))
+    end)
+    local log = fio.pathjoin(cg.server.workdir, cg.server.alias .. '.log')
+    test_no_hang_on_shutdown(cg.server)
+    t.assert(cg.server:grep_log('cannot gracefully shutdown client fibers', nil,
+             {filename = log}))
+end
