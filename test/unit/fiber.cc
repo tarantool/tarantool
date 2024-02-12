@@ -703,6 +703,12 @@ new_fiber_on_shudown_f(va_list ap)
 	fail_unless(!diag_is_empty(diag_get()));
 	fail_unless(strcmp(diag_last_error(diag_get())->errmsg,
 			   "fiber is cancelled") == 0);
+	struct fiber *system_fiber =
+			fiber_new_system("system_fiber_on_shutdown", noop_f);
+	fail_unless(system_fiber != NULL);
+	fiber_set_joinable(system_fiber, true);
+	fiber_start(system_fiber);
+	fiber_join(system_fiber);
 	return 0;
 }
 

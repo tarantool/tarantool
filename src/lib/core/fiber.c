@@ -1552,7 +1552,7 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	assert(fiber_attr != NULL);
 	cord_collect_garbage(cord);
 
-	if (cord->is_shutdown) {
+	if (cord->is_shutdown && !(fiber_attr->flags & FIBER_IS_SYSTEM)) {
 		diag_set(FiberIsCancelled);
 		return NULL;
 	}

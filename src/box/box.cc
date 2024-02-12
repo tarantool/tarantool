@@ -263,6 +263,10 @@ static bool box_feedback_crash_enabled;
 static double box_shutdown_timeout = BOX_SHUTDOWN_TIMEOUT_DEFAULT;
 TWEAK_DOUBLE(box_shutdown_timeout);
 
+/** Idle timeout for box fiber pool. */
+static double box_fiber_pool_idle_timeout = FIBER_POOL_IDLE_TIMEOUT;
+TWEAK_DOUBLE(box_fiber_pool_idle_timeout);
+
 static int
 box_run_on_recovery_state(enum box_recovery_state state)
 {
@@ -5898,7 +5902,7 @@ box_storage_init(void)
 	/* Join the cord interconnect as "tx" endpoint. */
 	fiber_pool_create(&tx_fiber_pool, "tx",
 			  IPROTO_MSG_MAX_MIN * IPROTO_FIBER_POOL_SIZE_FACTOR,
-			  FIBER_POOL_IDLE_TIMEOUT);
+			  box_fiber_pool_idle_timeout);
 	/* Add an extra endpoint for WAL wake up/rollback messages. */
 	cbus_endpoint_create(&tx_prio_endpoint, "tx_prio", tx_prio_cb,
 			     &tx_prio_endpoint);

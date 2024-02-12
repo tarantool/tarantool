@@ -86,3 +86,51 @@ g.test_shutdown_vinyl_dump_during_snapshot = function(cg)
     fiber.sleep(3)
     test_no_hang_on_shutdown(cg.server)
 end
+
+local g_cbus = t.group('cbus')
+
+g_cbus.before_each(function(cg)
+    cg.server = server:new({
+        env = {
+            TARANTOOL_RUN_BEFORE_BOX_CFG = [[
+                local tweaks = require('internal.tweaks')
+                tweaks.box_fiber_pool_idle_timeout = 0.01
+            ]]
+        }
+    })
+    cg.server:start()
+end)
+
+g_cbus.after_each(function(cg)
+    if cg.server ~= nil then
+        cg.server:drop()
+    end
+end)
+
+-- Same as test_shutdown_vinyl_dump but with extra tune to make
+-- sure cbus is able to spawn new fiber during shutdown.
+g_cbus.test_shutdown_with_cbus_no_idle_fibers = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        box.schema.create_space('test', {engine = 'vinyl'})
+        box.space.test:create_index('pk')
+        fiber.set_slice(100)
+        box.begin()
+        for i=1,10000 do
+            box.space.test:insert{i, i}
+        end
+        box.commit()
+        box.error.injection.set('ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT', 0.01)
+        fiber.new(function()
+            box.space.test:create_index('sk', {parts = {2}})
+            -- Delay client shutdown to extinct idle fibers in fibers pool.
+            fiber.sleep(1.0)
+        end)
+    end)
+    -- There are other yields before dump on vinyl index creation.
+    t.helpers.retrying({}, function()
+        t.assert(cg.server:grep_log('dump started'))
+    end)
+    test_no_hang_on_shutdown(cg.server)
+end
