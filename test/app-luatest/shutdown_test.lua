@@ -149,6 +149,7 @@ g_snap.test_shutdown_during_memtx_snapshot = function(cg)
         local fiber = require('fiber')
         box.schema.create_space('test')
         box.space.test:create_index('pk')
+        fiber.set_slice(100)
         box.begin()
         for i=1,10000 do
             box.space.test:insert{i}
