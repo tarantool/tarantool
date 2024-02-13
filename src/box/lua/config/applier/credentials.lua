@@ -427,6 +427,7 @@ local sync_tasks
 -- It is always in sync with the latest reload and has the following format:
 -- [obj_type][obj_name] = true/nil
 local target_object_map = {
+    ['role'] = {},
     ['space'] = {},
     ['function'] = {},
     ['sequence'] = {},
@@ -443,6 +444,8 @@ local function on_commit_trigger(iterator)
             obj_type = 'function'
         elseif space_id == box.schema.SEQUENCE_ID then
             obj_type = 'sequence'
+        elseif space_id == box.schema.USER_ID then
+            obj_type = 'role'
         else
             goto skip
         end
@@ -490,6 +493,8 @@ local function on_replace_trigger(old_obj, new_obj, obj_type, request_type)
         obj_type = 'function'
     elseif obj_type == '_sequence' then
         obj_type = 'sequence'
+    elseif obj_type == '_user' then
+        obj_type = 'role'
     else
         return
     end
@@ -539,6 +544,7 @@ local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
         return
     end
     if err.code ~= box.error.NO_SUCH_SPACE and
+            err.code ~= box.error.NO_SUCH_ROLE and
             err.code ~= box.error.NO_SUCH_FUNCTION and
             err.code ~= box.error.NO_SUCH_SEQUENCE then
         err = ('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q) failed: %s')
@@ -871,6 +877,7 @@ local function sync_credentials_worker()
 
             -- On config reload, drop the old list of registered objects.
             target_object_map = {
+                ['role'] = {},
                 ['space'] = {},
                 ['function'] = {},
                 ['sequence'] = {},
@@ -931,6 +938,7 @@ local function apply(config_module)
     -- Set trigger on after space/function/sequence creation.
     if not triggers_are_set then
         triggers_are_set = true
+        box.space._user:on_replace(on_replace_trigger)
         box.space._space:on_replace(on_replace_trigger)
         box.space._func:on_replace(on_replace_trigger)
         box.space._sequence:on_replace(on_replace_trigger)
