@@ -187,7 +187,7 @@ box.cfg{vinyl_timeout = 0.001}
 s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('i1', {parts = {1, 'unsigned'}})
 _ = s:create_index('i2', {parts = {2, 'unsigned'}})
-box.error.injection.set('ERRINJ_VY_DUMP_DELAY', true)
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT', 0.1)
 for i = 1, 1000 do s:replace{i, i} end
 _ = fiber.create(function() box.snapshot() end)
 fiber.sleep(0.01)
@@ -312,9 +312,8 @@ ret
 s:drop()
 
 --
--- gh-3412 - assertion failure at exit in case:
--- * there is a fiber waiting for quota
--- * there is a pending vylog write
+-- gh-3412 - assertion failure at exit in case there is a fiber waiting for
+-- quota
 --
 test_run:cmd("create server low_quota with script='vinyl/low_quota.lua'")
 test_run:cmd("start server low_quota with args='1048576'")
@@ -322,12 +321,6 @@ test_run:cmd('switch low_quota')
 _ = box.schema.space.create('test', {engine = 'vinyl'})
 _ = box.space.test:create_index('pk')
 box.error.injection.set('ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT', 0.01)
-fiber = require('fiber')
-pad = string.rep('x', 100 * 1024)
-_ = fiber.create(function() for i = 1, 11 do box.space.test:replace{i, pad} end end)
-repeat fiber.sleep(0.001) until box.cfg.vinyl_memory - box.stat.vinyl().memory.level0 < pad:len()
-test_run:cmd("restart server low_quota with args='1048576'")
-box.error.injection.set('ERRINJ_VY_LOG_FLUSH_DELAY', true)
 fiber = require('fiber')
 pad = string.rep('x', 100 * 1024)
 _ = fiber.create(function() for i = 1, 11 do box.space.test:replace{i, pad} end end)

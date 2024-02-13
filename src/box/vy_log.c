@@ -771,6 +771,7 @@ vy_log_init(const char *dir)
 					  vy_log_flusher_f);
 	if (vy_log.flusher == NULL)
 		panic("failed to allocate vylog flusher fiber");
+	fiber_set_joinable(vy_log.flusher, true);
 	fiber_wakeup(vy_log.flusher);
 }
 
@@ -807,7 +808,6 @@ vy_log_tx_flush(struct vy_log_tx *tx)
 		diag_set(ClientError, ER_INJECTION, "vinyl log flush");
 		return -1;
 	});
-	ERROR_INJECT_YIELD(ERRINJ_VY_LOG_FLUSH_DELAY);
 
 	int tx_size = 0;
 	struct vy_log_record *record;
@@ -923,6 +923,14 @@ vy_log_flusher_f(va_list va)
 }
 
 void
+vy_log_shutdown(void)
+{
+	fiber_cancel(vy_log.flusher);
+	fiber_join(vy_log.flusher);
+	vy_log.flusher = NULL;
+}
+
+void
 vy_log_free(void)
 {
 	struct vy_log_tx *tx, *next_tx;
@@ -931,6 +939,7 @@ vy_log_free(void)
 	stailq_create(&vy_log.pending_tx);
 	mempool_destroy(&vy_log.tx_pool);
 	xdir_destroy(&vy_log.dir);
+	latch_destroy(&vy_log.latch);
 	diag_destroy(&vy_log.tx_diag);
 }
 
