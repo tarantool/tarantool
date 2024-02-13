@@ -1766,3 +1766,92 @@ g.test_fix_status_change_with_pending_warnings = function(g)
         t.assert_equals(require('config'):info().status, 'ready')
     end)
 end
+
+-- Verify that it is possible to assign a credential role that does not exist.
+-- And that this role will be correctly assigned when it is created.
+g.test_give_nonexistent_role = function(g)
+    local config = cbuilder.new()
+        :add_instance('i-001', {})
+        :set_global_option('credentials.roles.role_one', {
+            roles = {'role_two'},
+        })
+        :config()
+
+    local replicaset = replicaset.new(g, config)
+    replicaset:start()
+
+    -- Verify that an alert is set for delayed privilege grants
+    -- for the given role.
+    replicaset['i-001']:exec(function()
+        local info = require('config'):info()
+        local exp = 'box.schema.role.grant("role_one", "execute", "role", ' ..
+            '"role_two") has failed because either the object has not been ' ..
+            'created yet, or the privilege write has failed (separate alert ' ..
+            'reported)'
+        t.assert_equals(info.status, 'check_warnings')
+        t.assert_equals(#info.alerts, 1)
+        t.assert_equals(info.alerts[1].type, 'warn')
+        t.assert_equals(tostring(info.alerts[1].message), exp)
+    end)
+
+    -- Verify that the alert is dropped after `role_two` is created.
+    replicaset['i-001']:exec(function()
+        box.schema.role.create('role_two')
+        local info = require('config'):info()
+        local exp = {{"execute", "role", "role_two"}}
+        t.assert_equals(info.status, 'ready')
+        t.assert_equals(#info.alerts, 0)
+        t.assert_equals(box.schema.role.info('role_one'), exp)
+    end)
+end
+
+-- Verify that alert does not go away if the user is created with a given name
+-- instead of a role.
+g.test_give_create_user_instead_of_role = function(g)
+    local config = cbuilder.new()
+        :add_instance('i-001', {})
+        :set_global_option('credentials.roles.role_one', {
+            roles = {'role_two'},
+        })
+        :config()
+
+    local replicaset = replicaset.new(g, config)
+    replicaset:start()
+
+    -- Verify that the alert is set.
+    replicaset['i-001']:exec(function()
+        local info = require('config'):info()
+        local exp = 'box.schema.role.grant("role_one", "execute", "role", ' ..
+            '"role_two") has failed because either the object has not been ' ..
+            'created yet, or the privilege write has failed (separate alert ' ..
+            'reported)'
+        t.assert_equals(info.status, 'check_warnings')
+        t.assert_equals(#info.alerts, 1)
+        t.assert_equals(info.alerts[1].type, 'warn')
+        t.assert_equals(tostring(info.alerts[1].message), exp)
+    end)
+
+    -- Verify that the alert is still present after creating user 'role_two'
+    -- instead of role 'role_two'.
+    replicaset['i-001']:exec(function()
+        box.schema.user.create('role_two')
+        local info = require('config'):info()
+        local exp = 'box.schema.role.grant("role_one", "execute", "role", ' ..
+            '"role_two") has failed because either the object has not been ' ..
+            'created yet, or the privilege write has failed (separate alert ' ..
+            'reported)'
+        t.assert_equals(info.status, 'check_warnings')
+        t.assert_equals(#info.alerts, 1)
+        t.assert_equals(info.alerts[1].type, 'warn')
+        t.assert_equals(tostring(info.alerts[1].message), exp)
+    end)
+
+    -- Verify that the alert is dropped after 'role_two' is created.
+    replicaset['i-001']:exec(function()
+        box.schema.user.drop('role_two')
+        box.schema.role.create('role_two')
+        local info = require('config'):info()
+        t.assert_equals(info.status, 'ready')
+        t.assert_equals(#info.alerts, 0)
+    end)
+end
