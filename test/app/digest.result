@@ -1,3 +1,10 @@
+-- Disable JIT due to #6097.
+jit.off()
+---
+...
+jit.flush()
+---
+...
 test_run = require('test_run').new()
 ---
 ...

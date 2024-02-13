@@ -1,3 +1,7 @@
+-- Disable JIT due to #6097.
+jit.off()
+jit.flush()
+
 test_run = require('test_run').new()
 test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua:<line>\"]: '")
 
