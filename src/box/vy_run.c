@@ -166,7 +166,13 @@ vy_run_env_stop_readers(struct vy_run_env *env)
 {
 	for (int i = 0; i < env->reader_pool_size; i++) {
 		struct vy_run_reader *reader = &env->reader_pool[i];
-		cord_cancel_and_join(&reader->cord);
+		cbus_stop_loop(&reader->reader_pipe);
+		cpipe_destroy(&reader->reader_pipe);
+	}
+	for (int i = 0; i < env->reader_pool_size; i++) {
+		struct vy_run_reader *reader = &env->reader_pool[i];
+		if (cord_join(&reader->cord) != 0)
+			panic_syserror("failed to join vinyl reader thread");
 	}
 	free(env->reader_pool);
 }
