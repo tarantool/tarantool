@@ -4376,14 +4376,22 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 			if (rc != 0)
 				break;
 		}
+		ERROR_INJECT_DOUBLE(ERRINJ_BUILD_INDEX_TIMEOUT, inj->dparam > 0,
+				    thread_sleep(inj->dparam));
 		/*
 		 * Read iterator yields only when it reads runs.
 		 * Yield periodically in order not to stall the
 		 * tx thread in case there are a lot of tuples in
 		 * mems or cache.
 		 */
-		if (++loops % VY_YIELD_LOOPS == 0)
+		if (++loops % VY_YIELD_LOOPS == 0) {
 			fiber_sleep(0);
+			if (fiber_is_cancelled()) {
+				diag_set(FiberIsCancelled);
+				rc = -1;
+				break;
+			}
+		}
 		if (ctx.is_failed) {
 			diag_move(&ctx.diag, diag_get());
 			rc = -1;

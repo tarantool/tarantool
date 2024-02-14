@@ -1335,6 +1335,8 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 			break;
 		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
 		(void) old_tuple;
+		ERROR_INJECT_DOUBLE(ERRINJ_BUILD_INDEX_TIMEOUT, inj->dparam > 0,
+				    thread_sleep(inj->dparam));
 		/*
 		 * All tuples stored in a memtx space must be
 		 * referenced by the primary index.
@@ -1363,6 +1365,11 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		 */
 		ERROR_INJECT_YIELD(ERRINJ_BUILD_INDEX_DELAY);
 		tuple_unref(state.cursor);
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
+			rc = -1;
+			break;
+		}
 		/*
 		 * The on_replace trigger may have failed
 		 * during the yield.
