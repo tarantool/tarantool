@@ -209,9 +209,8 @@ fiber_mprotect(void *addr, size_t len, int prot)
 		goto error;
 	}
 /*
- * TODO(gh-8423) Disable mprotect temporarily. Leak sanitizer does not work
- * well if memory is protected. We fail to remove protection due to the use of
- * `cord_cancel_and_join` to cancel cords.
+ * If we panic then fiber stacks remain protected which cause leak sanitizer
+ * failures. Disable memory protection under ASAN.
  */
 #ifndef ENABLE_ASAN
 	if (mprotect(addr, len, prot) != 0)
@@ -2239,29 +2238,6 @@ bool
 cord_is_main(void)
 {
 	return cord() == &main_cord;
-}
-
-void
-cord_cancel_and_join(struct cord *cord)
-{
-	assert(cord->id != 0);
-	tt_pthread_cancel(cord->id);
-	if (tt_pthread_join(cord->id, NULL) != 0)
-		panic("failed to join a canceled thread");
-	int old_cord_count = pm_atomic_fetch_sub(&cord_count, 1);
-	assert(old_cord_count > 0);
-	(void)old_cord_count;
-	/*
-	 * Can't destroy the cord safely. The cancellation could even happen
-	 * before the cord was properly initialized in its own thread. It might
-	 * be fixed if cord would be initialized before its thread is started.
-	 *
-	 * Also obviously even if the creation would be fine, the destruction
-	 * can't free everything. The cord could have some resources allocated
-	 * on the heap with pointers not stored anywhere in struct cord - they
-	 * can't be possibly located.
-	 */
-	memset(cord, 0, sizeof(*cord));
 }
 
 static NOINLINE int
