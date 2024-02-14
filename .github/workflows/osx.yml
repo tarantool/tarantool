@@ -14,6 +14,8 @@ jobs:
       - 'macos-${{ matrix.osx-version }}-self-hosted'
       - '${{ matrix.machine-arch }}'
 
+    timeout-minutes: 60
+
     strategy:
       fail-fast: false
       matrix:
