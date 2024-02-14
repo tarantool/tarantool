@@ -1,5 +1,6 @@
 local t = require('luatest')
 local compat = require('compat')
+local console = require('console')
 local json = require('json')
 local yaml = require('yaml')
 local tarantool = require('tarantool')
@@ -269,4 +270,45 @@ g.test_client_error_creation = function()
     -- Test passing excess payload fields works too.
     local e = box.error.new(box.error.TEST_TYPE_INT, 1, 2, 3, 4, 5)
     t.assert_equals(e.field, 1)
+end
+
+--
+-- Get tab completion for @s
+-- @param s string
+-- @return tab completion
+local function tabcomplete(s)
+    return console.completion_handler(s, 0, #s)
+end
+
+-- Test `box.error` autocompletion (gh-9107).
+g.test_autocomplete = function()
+    -- tabcomplete always uses global table
+    rawset(_G, 'err', box.error.new{'cur', foo = 777,
+                                    prev = box.error.new{'prev', bar = 777}})
+
+    local r = tabcomplete('err.')
+    t.assert_items_equals(r, {
+        'err.',
+        'err.raise(',
+        'err.foo',
+        'err.base_type',
+        'err.prev',
+        'err.message',
+        'err.match(',
+        'err.set_prev(',
+        'err.trace',
+        'err.type',
+        'err.unpack(',
+        'err.code',
+        'err.bar',
+    })
+
+    r = tabcomplete('err:')
+    t.assert_items_equals(r, {
+        'err:',
+        'err:match(',
+        'err:raise(',
+        'err:set_prev(',
+        'err:unpack(',
+    })
 end
