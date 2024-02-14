@@ -261,15 +261,6 @@ create_unit_test(PREFIX cbus_call
                  LIBRARIES core unit stat
 )
 
-include(CheckSymbolExists)
-check_symbol_exists(__GLIBC__ features.h GLIBC_USED)
-if (GLIBC_USED)
-    create_unit_test(PREFIX cbus_hang
-                     SOURCES cbus_hang.c core_test_utils.c
-                     LIBRARIES core unit stat
-    )
-endif ()
-
 create_unit_test(PREFIX coio
                  SOURCES coio.cc core_test_utils.c
                  LIBRARIES core eio bit uri unit

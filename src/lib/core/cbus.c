@@ -132,13 +132,6 @@ cbus_endpoint_poison_f(struct cmsg *msg)
 void
 cpipe_destroy(struct cpipe *pipe)
 {
-	/*
-	 * The thread should not be canceled while mutex is locked.
-	 * And everything else must be protected for consistency.
-	*/
-	int old_cancel_state;
-	tt_pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &old_cancel_state);
-
 	ev_async_stop(pipe->producer, &pipe->flush_input);
 
 	static const struct cmsg_hop route[1] = {
@@ -171,9 +164,6 @@ cpipe_destroy(struct cpipe *pipe)
 	 */
 	ev_async_send(endpoint->consumer, &endpoint->async);
 	tt_pthread_mutex_unlock(&endpoint->mutex);
-
-	tt_pthread_setcancelstate(old_cancel_state, NULL);
-
 	TRASH(pipe);
 }
 
@@ -291,17 +281,6 @@ cpipe_flush_cb(ev_loop *loop, struct ev_async *watcher, int events)
 	/* Trigger task processing when the queue becomes non-empty. */
 	bool output_was_empty;
 
-	/*
-	 * We need to set a thread cancellation guard, because
-	 * another thread may cancel the current thread
-	 * (write() is a cancellation point in ev_async_send)
-	 * and the activation of the ev_async watcher
-	 * through ev_async_send will fail.
-	 */
-
-	int old_cancel_state;
-	tt_pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &old_cancel_state);
-
 	tt_pthread_mutex_lock(&endpoint->mutex);
 	output_was_empty = stailq_empty(&endpoint->output);
 	/** Flush input */
@@ -315,8 +294,6 @@ cpipe_flush_cb(ev_loop *loop, struct ev_async *watcher, int events)
 
 		ev_async_send(endpoint->consumer, &endpoint->async);
 	}
-
-	tt_pthread_setcancelstate(old_cancel_state, NULL);
 }
 
 void

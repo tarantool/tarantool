@@ -72,15 +72,6 @@ cancel_dead_f(va_list ap)
 	return 0;
 }
 
-static int
-usleep_f(va_list ap)
-{
-	(void)ap;
-	while (true)
-		usleep(1000);
-	return 0;
-}
-
 static void NOINLINE
 stack_expand(unsigned long *ret, unsigned long nr_calls)
 {
@@ -445,29 +436,6 @@ cord_cojoin_cancel_test(void)
 }
 
 static void
-cord_cancel_and_join_test(void)
-{
-	header();
-	struct cord tcord;
-
-	/* Join an exited but not yet joined thread. */
-	memset(&tcord, 0, sizeof(tcord));
-	fail_if(cord_costart(&tcord, "test", noop_f, NULL) != 0);
-	/* Give the thread some time to exit. */
-	fiber_sleep(0.01);
-	cord_cancel_and_join(&tcord);
-
-	/* Cancel and join a hanging thread. */
-	memset(&tcord, 0, sizeof(tcord));
-	fail_if(cord_costart(&tcord, "test", usleep_f, NULL) != 0);
-	/* Give the thread some time to start. */
-	fiber_sleep(0.01);
-	cord_cancel_and_join(&tcord);
-
-	footer();
-}
-
-static void
 fiber_test_defaults()
 {
 	header();
@@ -765,7 +733,6 @@ main_f(va_list ap)
 	fiber_wait_on_deadline_test();
 	cord_cojoin_test();
 	cord_cojoin_cancel_test();
-	cord_cancel_and_join_test();
 	fiber_test_defaults();
 	fiber_test_leak_modes();
 	fiber_test_client_fiber_count();

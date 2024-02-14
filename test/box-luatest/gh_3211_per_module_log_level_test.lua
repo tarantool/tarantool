@@ -42,16 +42,12 @@ g2.before_each(function(cg)
     end, {cg.params.cfg_type})
 end)
 
-local function drop_server(cg)
-    -- TODO(gh-8423): Remove this workaround.
-    -- If log level is 'debug' during server:drop(), the test may hang on macOS
-    -- (see gh-8420).
-    cg.server:update_box_cfg({log_level = 'info',
-                             log_modules = {tarantool = 'info'}})
+g1.after_each(function(cg)
     cg.server:drop()
-end
-g1.after_each(drop_server)
-g2.after_each(drop_server)
+end)
+g2.after_each(function(cg)
+    cg.server:drop()
+end)
 
 -- Test log.new{...}
 g1.test_log_new = function(cg)

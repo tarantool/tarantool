@@ -61,12 +61,6 @@ leak:libc.so*
 # source: src/lib/salad/mhash.h
 leak:mh_i32ptr_new
 
-# test: replication/gh-3637-misc-error-on-replica-auth-fail.test.lua
-# source: src/lib/core/coio_task.c
-leak:coio_on_call
-# source: src/lib/salad/mhash.h
-leak:mh_i64ptr_new
-
 # test: sql-tap/gh2250-trigger-chain-limit.test.lua
 # source: src/lib/core/exception.cc
 leak:Exception::operator new
@@ -74,10 +68,6 @@ leak:Exception::operator new
 # test: vinyl/errinj.test.lua
 # source: src/lib/core/fiber.h
 leak:fiber_cxx_invoke
-
-# test: vinyl/recover.test.lua
-# source: src/lib/core/fiber.c
-leak:cord_costart_thread_func
 
 # TODO(gh-9213): remove when the issue is fixed
 leak:luaT_push_key_def

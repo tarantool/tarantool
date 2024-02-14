@@ -970,15 +970,6 @@ void
 cord_collect_garbage(struct cord *cord);
 
 /**
- * Pthread-cancel the thread and join it in a blocking way, without yielding.
- * That way is the only possible one if the event loop is already destroyed.
- * Should only be used as an emergency, because all the cord resources simply
- * leak.
- */
-void
-cord_cancel_and_join(struct cord *cord);
-
-/**
  * Return slab_cache suitable to use with tarantool/small library
  */
 static inline struct slab_cache *
