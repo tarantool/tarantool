@@ -559,16 +559,20 @@ local function sync_privileges(credentials, obj_to_sync)
                     obj_to_sync.type, obj_to_sync.name)
     end
 
-    -- Drop missed privilege alerts.
+    -- Prepare to drop missed privilege alerts.
     --
     -- The actual alerts will be issued in the sync() function
     -- below.
     --
     -- Important: we don't follow the `obj_to_sync` filter here
     -- for simplicity. Just revisit all the missed privilege
-    -- alerts: drop all of them and issue again the actual ones.
-    config._aboard:drop_if(function(_key, alert)
-        return alert._trait == 'missed_privilege'
+    -- alerts: mark all of them and issue again the actual ones.
+    -- The actual drop will occur later. New alerts, if any, are
+    -- issued before the drop.
+    config._aboard:each(function(_key, alert)
+        if alert._trait == 'missed_privilege' then
+            alert._trait = 'missed_privilege_obsolete'
+        end
     end)
 
     -- The privileges synchronization between A and B is performed in 3 steps:
@@ -676,6 +680,11 @@ local function sync_privileges(credentials, obj_to_sync)
     for name, role_def in pairs(credentials.roles or {}) do
         sync('role', name, role_def)
     end
+
+    -- Drop obsolete missed_privilege alerts.
+    config._aboard:drop_if(function(_key, alert)
+        return alert._trait == 'missed_privilege_obsolete'
+    end)
 end
 
 -- }}} Main sync logic

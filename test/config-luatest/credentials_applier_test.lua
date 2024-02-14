@@ -1712,3 +1712,57 @@ g.test_space_rename_rw2r = function(g)
         })
     end)
 end
+
+-- Verify that the config status does not change if there are pending
+-- alerts when some missed_privilege alerts are dropped.
+g.test_fix_status_change_with_pending_warnings = function(g)
+    -- Create a configuration with privileges for two missing spaces.
+    local config = cbuilder.new()
+        :add_instance('i-001', {})
+        :set_global_option('credentials.users.guest.privileges', {
+            {
+                permissions = {'read'},
+                spaces = {'one', 'two'},
+            },
+        })
+        :config()
+
+    local replicaset = replicaset.new(g, config)
+    replicaset:start()
+    define_warnings_function(replicaset['i-001'])
+
+    -- Verify that alerts are set for delayed privilege grants
+    -- for the given spaces and status is 'check_warnings'.
+    replicaset['i-001']:exec(function()
+        t.assert_equals(_G.warnings(), {
+            'one read',
+            'two read',
+        })
+        t.assert_equals(require('config'):info().status, 'check_warnings')
+    end)
+
+    -- Create space 'one'.
+    replicaset['i-001']:exec(function()
+        box.schema.space.create('one')
+    end)
+
+    -- Verify that the alerts regarding the space 'one' are gone,
+    -- but the status is still 'check_warnings'.
+    replicaset['i-001']:exec(function()
+        t.assert_equals(_G.warnings(), {
+            'two read',
+        })
+        t.assert_equals(require('config'):info().status, 'check_warnings')
+    end)
+
+    -- Create space 'two'.
+    replicaset['i-001']:exec(function()
+        box.schema.space.create('two')
+    end)
+
+    -- Verify than all alerts are gone and the status is 'ready'.
+    replicaset['i-001']:exec(function()
+        t.assert_equals(_G.warnings(), {})
+        t.assert_equals(require('config'):info().status, 'ready')
+    end)
+end

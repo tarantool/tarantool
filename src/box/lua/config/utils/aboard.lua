@@ -92,6 +92,13 @@ local function aboard_drop_if(self, filter_f)
     end
 end
 
+-- Traverse all alerts and apply the provided callback function to each of them.
+local function aboard_each(self, callback)
+    for key, alert in pairs(self._alerts) do
+        callback(key, alert)
+    end
+end
+
 -- Drop all the alerts.
 --
 -- The `on_drop` callback is NOT called.
@@ -156,6 +163,7 @@ local mt = {
     __index = {
         set = aboard_set,
         get = aboard_get,
+        each = aboard_each,
         drop = aboard_drop,
         drop_if = aboard_drop_if,
         clean = aboard_clean,
