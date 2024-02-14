@@ -193,12 +193,36 @@ local function error_serialize(err)
     end
 end
 
-local error_methods = {
+local error_methods
+
+local function error_autocomplete(err)
+    local err_unpacked = {}
+
+    local cur_err = err
+    while cur_err ~= nil do
+        for key, val in pairs(cur_err:unpack()) do
+            if err_unpacked[key] == nil then
+                err_unpacked[key] = val
+            end
+        end
+        cur_err = cur_err.prev
+    end
+
+    for key, method in pairs(error_methods) do
+        if not key:startswith('__') then
+            err_unpacked[key] = method
+        end
+    end
+    return err_unpacked
+end
+
+error_methods = {
     ["unpack"] = error_unpack;
     ["raise"] = error_raise;
     ["match"] = error_match; -- Tarantool 1.6 backward compatibility
     ["__serialize"] = error_serialize;
     ["set_prev"] = error_set_prev;
+    ["__autocomplete"] = error_autocomplete;
 }
 
 local function error_index(err, key)
