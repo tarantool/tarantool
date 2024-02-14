@@ -50,6 +50,8 @@ jobs:
 
     runs-on: ubuntu-20.04-self-hosted
 
+    timeout-minutes: 60
+
     steps:
       - name: Prepare checkout
         uses: tarantool/actions/prepare-checkout@master

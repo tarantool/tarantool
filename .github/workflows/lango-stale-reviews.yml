@@ -13,6 +13,7 @@ jobs:
       ORGANIZATION: Tarantool
       PROJECT_ID: 83
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python3

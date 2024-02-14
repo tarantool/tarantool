@@ -12,6 +12,8 @@ jobs:
 
     runs-on: freebsd-${{ matrix.freebsd-version }}-mcs
 
+    timeout-minutes: 60
+
     strategy:
       fail-fast: false
       matrix:

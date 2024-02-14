@@ -18,6 +18,8 @@ jobs:
   build:
     runs-on: [ self-hosted, Linux, '${{ inputs.arch }}', regular ]
 
+    timeout-minutes: 60
+
     steps:
       - name: Prepare checkout
         uses: tarantool/actions/prepare-checkout@master
@@ -70,6 +72,8 @@ jobs:
 
   test:
     runs-on: [ self-hosted, Linux, '${{ inputs.arch }}', regular ]
+
+    timeout-minutes: 60
 
     needs: build
 
@@ -174,6 +178,8 @@ jobs:
         !endsWith(github.ref, '-entrypoint')
 
     runs-on: [ self-hosted, Linux, lightweight ]
+
+    timeout-minutes: 60
 
     needs: test
 

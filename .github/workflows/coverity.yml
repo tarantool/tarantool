@@ -11,6 +11,8 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    timeout-minutes: 60
+
     container:
       image: docker.io/tarantool/testing:debian-buster
       # Our testing expects that the init process (PID 1) will
