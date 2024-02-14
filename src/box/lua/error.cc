@@ -79,6 +79,31 @@ luaT_error_add_payload(lua_State *L, struct error *error)
 }
 
 /**
+ * In case the error is constructed from a table, retrieves the reason.
+ *
+ * @param L Lua state
+ * @param index table index on Lua stack
+ *
+ * @return reason
+ * @retval "" failed to retrieve reason
+ */
+static const char *
+error_create_table_case_get_reason(lua_State *L, int index)
+{
+	lua_rawgeti(L, index, 1);
+	const char *reason = lua_tostring(L, -1);
+	if (reason != NULL)
+		return reason;
+	lua_getfield(L, index, "message");
+	reason = lua_tostring(L, -1);
+	if (reason != NULL)
+		return reason;
+	lua_getfield(L, index, "reason");
+	reason = lua_tostring(L, -1);
+	return reason != NULL ? reason : "";
+}
+
+/**
  * Parse Lua arguments (they can come as single table or as
  * separate members) and construct struct error with given values.
  *
@@ -146,10 +171,7 @@ luaT_error_create(lua_State *L, int top_base)
 		lua_getfield(L, top_base, "code");
 		if (!lua_isnil(L, -1))
 			code = lua_tonumber(L, -1);
-		lua_getfield(L, top_base, "reason");
-		reason = lua_tostring(L, -1);
-		if (reason == NULL)
-			reason = "";
+		reason = error_create_table_case_get_reason(L, top_base);
 		lua_getfield(L, top_base, "type");
 		if (!lua_isnil(L, -1))
 			custom_type = lua_tostring(L, -1);
