@@ -79,3 +79,15 @@ g.test_custom_payload = function()
         custom_type = "MyAppError",
     })
 end
+
+-- Test the `message` argument to the table constructor of `box.error.new`
+-- (gh-9102).
+g.test_error_new_message_arg = function()
+    local msg = 'message'
+    t.assert_equals(box.error.new{msg}.message, msg)
+    t.assert_equals(box.error.new{message = msg}.message, msg)
+    t.assert_equals(box.error.new{reason = msg}.message, msg)
+    t.assert_equals(box.error.new{msg, message = 'other'}.message, msg)
+    t.assert_equals(box.error.new{message = msg, reason = 'other'}.message, msg)
+    t.assert_equals(box.error.new{msg, reason = 'other'}.message, msg)
+end
