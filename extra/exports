@@ -193,6 +193,7 @@ crypto_stream_delete
 crypto_stream_new
 crypto_X509_get_default_cert_dir_env
 crypto_X509_get_default_cert_file_env
+crypto_RSA_PSS_verify
 csv_create
 csv_destroy
 csv_escape_field
