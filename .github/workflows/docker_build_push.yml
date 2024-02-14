@@ -10,6 +10,8 @@ jobs:
   build-push:
     runs-on: [ self-hosted, Linux, x86_64, regular ]
 
+    timeout-minutes: 60
+
     steps:
       - name: Prepare checkout
         uses: tarantool/actions/prepare-checkout@master
