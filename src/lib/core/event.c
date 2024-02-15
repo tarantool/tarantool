@@ -16,9 +16,6 @@
 /** Registry of all events: name -> event. */
 static struct mh_strnptr_t *event_registry;
 
-/** Cached event 'tarantool.trigger.on_change'. */
-static struct event *on_change_event;
-
 /** Internal triggers fired on event change. */
 RLIST_HEAD(on_change_triggers);
 
@@ -187,29 +184,12 @@ event_find_trigger(struct event *event, const char *name)
 
 /**
  * Fires on_change triggers. Must be called after the change is applied.
- * Each returned value is ignored, all thrown errors are logged.
  */
 static void
 event_run_on_change(struct event *event)
 {
 	int rc = trigger_run(&on_change_triggers, event);
-	assert(rc == 0);
-	if (!event_has_triggers(on_change_event))
-		return;
-	struct event_trigger_iterator it;
-	event_trigger_iterator_create(&it, on_change_event);
-	struct func_adapter *func = NULL;
-	const char *name = NULL;
-	struct func_adapter_ctx ctx;
-	while (event_trigger_iterator_next(&it, &func, &name)) {
-		func_adapter_begin(func, &ctx);
-		func_adapter_push_str0(func, &ctx, event->name);
-		rc = func_adapter_call(func, &ctx);
-		func_adapter_end(func, &ctx);
-		if (rc != 0)
-			diag_log();
-	}
-	event_trigger_iterator_destroy(&it);
+	VERIFY(rc == 0);
 }
 
 /** Detach the trigger from the event. */
@@ -388,18 +368,13 @@ void
 event_init(void)
 {
 	event_registry = mh_strnptr_new();
-	on_change_event = event_get("tarantool.trigger.on_change", true);
-	event_ref(on_change_event);
 }
 
 void
 event_free(void)
 {
 	assert(event_registry != NULL);
-	assert(on_change_event != NULL);
 	trigger_destroy(&on_change_triggers);
-	event_unref(on_change_event);
-	on_change_event = NULL;
 	struct mh_strnptr_t *h = event_registry;
 	mh_int_t i;
 	mh_foreach(h, i) {
