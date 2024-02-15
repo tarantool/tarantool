@@ -129,6 +129,7 @@ luaT_error_create(lua_State *L, int top_base)
 	const char *file = "";
 	unsigned line = 0;
 	lua_Debug info;
+	struct error *prev = NULL;
 	int top = lua_gettop(L);
 	int top_type = lua_type(L, top_base);
 	if (top >= top_base && (top_type == LUA_TNUMBER ||
@@ -175,6 +176,15 @@ luaT_error_create(lua_State *L, int top_base)
 		lua_getfield(L, top_base, "type");
 		if (!lua_isnil(L, -1))
 			custom_type = lua_tostring(L, -1);
+		lua_getfield(L, top_base, "prev");
+		if (!lua_isnil(L, -1)) {
+			prev = luaL_iserror(L, -1);
+			if (prev == NULL) {
+				luaL_error(L, "Invalid argument 'prev' (error "
+					   "expected, got %s)",
+					   lua_typename(L, lua_type(L, -1)));
+			}
+		}
 	} else {
 		return NULL;
 	}
@@ -192,6 +202,13 @@ raise:
 	}
 	struct error *error;
 	error = box_error_new(file, line, code, custom_type, "%s", reason);
+	/*
+	 * Set the previous error, if it was specified.
+	 */
+	if (prev != NULL) {
+		/* Cycle is not possible for the newly created error. */
+		VERIFY(error_set_prev(error, prev) == 0);
+	}
 	/*
 	 * Add custom payload fields to the `error' if any.
 	 */

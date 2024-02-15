@@ -1,6 +1,22 @@
 local t = require('luatest')
 local g = t.group()
 
+-- Test the `prev' argument to the table constructor of `box.error.new'
+-- (gh-9103).
+g.test_error_new_prev_arg = function()
+    local e1 = box.error.new({"errare"})
+    local e2 = box.error.new({"humanum", prev = e1})
+    local _, e3 = pcall(box.error, {"est", prev = e2})
+
+    t.assert_equals(e3.prev.prev.message, "errare")
+    t.assert_equals(e3.prev.message, "humanum")
+    t.assert_equals(e3.message, "est")
+
+    t.assert_error_msg_equals(
+        "Invalid argument 'prev' (error expected, got number)",
+        box.error.new, {prev = 333})
+end
+
 -- Test custom error payload (gh-9104).
 g.test_custom_payload = function()
     local uuid = require('uuid')
@@ -67,7 +83,6 @@ g.test_custom_payload = function()
         custom_type = "MyCustomType",
         errno = "MyErrno",
         trace = "MyTrace",
-        prev = "MyPrev",
     })
     unpacked = e:unpack()
     unpacked.trace = nil
