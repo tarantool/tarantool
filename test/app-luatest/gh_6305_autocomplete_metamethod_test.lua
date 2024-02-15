@@ -50,6 +50,14 @@ g.test__autocomplete = function()
                                                    'table11.second',
                                                    'table11.auto',
                                                    })
+   -- __autocomplete should also be looked up in __index
+   local autocompletion = function() return {auto = true} end
+   setmetatable(tab, {__index = {__autocomplete = autocompletion}})
+   t.assert_items_equals(tabcomplete('table11.'), {'table11.',
+                                                   'table11.first',
+                                                   'table11.second',
+                                                   'table11.auto',
+                                                   })
    -- __autocomplete supercedes __index, no completions from the latter
    setmetatable(tab, {__autocomplete = function() return {auto = true} end,
                       __index = {index = true}})
