@@ -114,12 +114,10 @@ local function error_set_prev(err, prev)
     if not ffi.istype('struct error', prev) and prev ~= nil then
         error("Usage: error1:set_prev(error2)")
     end
-    ffi.C.error_ref(err)
     local ok = ffi.C.error_set_prev(err, prev);
     if ok ~= 0 then
         error("Cycles are not allowed")
     end
-
 end
 
 local error_fields = {
