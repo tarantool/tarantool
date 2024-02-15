@@ -1108,6 +1108,17 @@ lua_rl_getcompletion(lua_State *L)
 	/* use __autocomplete metamethod if it's present */
 	lua_pushstring(L, "__autocomplete");
 	lua_rawget(L, -2);
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1);
+		/*
+		 * __autocomplete may not always be part of the metatable (e.g.,
+		 * in case of cdata), so we also want to trigger the __index
+		 * metamethod instead of simply doing a raw lookup in the
+		 * metatable.
+		 */
+		lua_pushstring(L, "__autocomplete");
+		lua_gettable(L, -3);
+	}
 	if (lua_isfunction(L, -1)) {
 		lua_replace(L, -2);
 		lua_insert(L, -2);
