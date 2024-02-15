@@ -84,6 +84,8 @@ struct event *session_on_connect_event;
 struct event *session_on_disconnect_event;
 struct event *session_on_auth_event;
 
+struct event *on_access_denied_event;
+
 static inline uint64_t
 sid_max(void)
 {
@@ -461,6 +463,37 @@ session_on_shutdown_f(void *arg)
 	return 0;
 }
 
+/**
+ * Runs user-defined on_access_denied triggers.
+ */
+static int
+session_on_access_denied(struct trigger *trigger, void *data)
+{
+	(void)trigger;
+	assert(on_access_denied_event != NULL);
+	struct on_access_denied_ctx *data_ctx =
+		(struct on_access_denied_ctx *)data;
+
+	const char *name = NULL;
+	struct func_adapter *func = NULL;
+	struct func_adapter_ctx ctx;
+	struct event_trigger_iterator it;
+	int rc = 0;
+	event_trigger_iterator_create(&it, on_access_denied_event);
+	while (rc == 0 && event_trigger_iterator_next(&it, &func, &name)) {
+		func_adapter_begin(func, &ctx);
+		func_adapter_push_str0(func, &ctx, data_ctx->access_type);
+		func_adapter_push_str0(func, &ctx, data_ctx->object_type);
+		func_adapter_push_str0(func, &ctx, data_ctx->object_name);
+		rc = func_adapter_call(func, &ctx);
+		func_adapter_end(func, &ctx);
+	}
+	event_trigger_iterator_destroy(&it);
+	return rc;
+}
+
+static TRIGGER(session_on_access_denied_trigger, session_on_access_denied);
+
 void
 session_init(void)
 {
@@ -476,6 +509,7 @@ session_init(void)
 	on_access_denied_event =
 		event_get("box.session.on_access_denied", true);
 	event_ref(on_access_denied_event);
+	trigger_add(&on_access_denied, &session_on_access_denied_trigger);
 	session_registry = mh_i64ptr_new();
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
 	credentials_create(&admin_credentials, admin_user);
@@ -488,6 +522,7 @@ session_init(void)
 void
 session_free(void)
 {
+	trigger_clear(&session_on_access_denied_trigger);
 	event_unref(session_on_connect_event);
 	session_on_connect_event = NULL;
 	event_unref(session_on_disconnect_event);

@@ -192,6 +192,9 @@ static struct cbus_endpoint tx_prio_endpoint;
 
 struct event *box_on_recovery_state_event;
 
+/** Cached event 'tarantool.trigger.on_change'. */
+static struct event *tarantool_trigger_on_change_event;
+
 /**
  * Recovery states supported by on_recovery_state triggers.
  * Are positioned in the order of appearance during initial box.cfg().
@@ -4849,6 +4852,40 @@ box_on_indexes_built(void)
 	box_run_on_recovery_state(RECOVERY_STATE_INDEXES_BUILT);
 }
 
+/**
+ * Runs all triggers from event 'tarantool.trigger.on_change' with one
+ * argument: name of the changed event.
+ * Each returned value is ignored, all thrown errors are logged.
+ */
+static int
+box_trigger_on_change(struct trigger *trigger, void *data)
+{
+	(void)trigger;
+	assert(tarantool_trigger_on_change_event != NULL);
+	struct event *on_change_event = tarantool_trigger_on_change_event;
+	struct event *event = (struct event *)data;
+
+	if (!event_has_triggers(on_change_event))
+		return 0;
+	struct event_trigger_iterator it;
+	event_trigger_iterator_create(&it, on_change_event);
+	struct func_adapter *func = NULL;
+	const char *name = NULL;
+	struct func_adapter_ctx ctx;
+	while (event_trigger_iterator_next(&it, &func, &name)) {
+		func_adapter_begin(func, &ctx);
+		func_adapter_push_str0(func, &ctx, event->name);
+		int rc = func_adapter_call(func, &ctx);
+		func_adapter_end(func, &ctx);
+		if (rc != 0)
+			diag_log();
+	}
+	event_trigger_iterator_destroy(&it);
+	return 0;
+}
+
+static TRIGGER(box_trigger_on_change_trigger, box_trigger_on_change);
+
 static void
 engine_init()
 {
@@ -6000,6 +6037,10 @@ box_init(void)
 	event_ref(box_on_recovery_state_event);
 	box_on_shutdown_event = event_get("box.ctl.on_shutdown", true);
 	event_ref(box_on_shutdown_event);
+	tarantool_trigger_on_change_event =
+		event_get("tarantool.trigger.on_change", true);
+	event_ref(tarantool_trigger_on_change_event);
+	event_on_change(&box_trigger_on_change_trigger);
 	txn_event_trigger_init();
 	msgpack_init();
 	fiber_cond_create(&ro_cond);
@@ -6076,8 +6117,11 @@ box_free(void)
 	box_watcher_free();
 	box_raft_free();
 	sequence_free();
+	trigger_clear(&box_trigger_on_change_trigger);
 	event_unref(box_on_recovery_state_event);
 	box_on_recovery_state_event = NULL;
+	event_unref(tarantool_trigger_on_change_event);
+	tarantool_trigger_on_change_event = NULL;
 	txn_event_trigger_free();
 	tuple_free();
 	port_free();
