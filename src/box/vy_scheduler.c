@@ -2066,13 +2066,19 @@ vy_scheduler_f(va_list va)
 {
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
 
-	while (!fiber_is_cancelled()) {
+	while (true) {
 		struct vy_task *task;
 		int tasks_done, tasks_failed;
 
 		fiber_check_gc();
 		vy_scheduler_complete_tasks(scheduler, &tasks_done,
 					    &tasks_failed);
+		/*
+		 * Tasks completion may yield thus check fiber cancel
+		 * status before any wait.
+		 */
+		if (fiber_is_cancelled())
+			break;
 		/*
 		 * Reset the timeout if we managed to successfully
 		 * complete at least one task.
