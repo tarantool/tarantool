@@ -127,3 +127,14 @@ g.test_methods_masking = function()
     t.assert_equals(e:unpack().set_prev, 'hack')
     t.assert_equals(e:unpack().__serialize, 'hack')
 end
+
+-- Test that payload fields of a cause are inherited by the effect (gh-9106).
+g.test_payload_inheritance = function()
+    local e1 = box.error.new({foo = 11, bar = 22})
+    local e2 = box.error.new({bar = 33, baz = 44, prev = e1})
+    local e3 = box.error.new({baz = 55, prev = e2})
+
+    t.assert_equals(e3.foo, 11) -- Inherited from e1.
+    t.assert_equals(e3.bar, 33) -- Inherited from e2.
+    t.assert_equals(e3.baz, 55) -- Own payload field.
+end
