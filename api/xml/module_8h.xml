@@ -97,7 +97,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" prot="public" static="no">
         <name>PACKAGE_VERSION</name>
-        <initializer>&quot;3.1.0-entrypoint-91-g1247ec5fb&quot;</initializer>
+        <initializer>&quot;3.1.0-entrypoint-102-ga2b736b8f&quot;</initializer>
         <briefdescription>
 <para>A string with major-minor-patch-commit-id identifier of the release, e.g. </para>
         </briefdescription>
@@ -258,7 +258,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1a83a0a80ad0559e26298ce670050609e2" prot="public" static="no">
         <name>MODULE_LIBPATH</name>
-        <initializer>&quot;/usr/local/lib/x86_64-linux-gnu/tarantool/?.so;/usr/local/lib/tarantool/?.so;/usr/lib/x86_64-linux-gnu/tarantool/?.so;/usr/local/lib/x86_64-linux-gnu/lua/5.1/?.so;/usr/local/lib/lua/5.1/?.so;/usr/lib/x86_64-linux-gnu/lua/5.1/?.so&quot;</initializer>
+        <initializer>&quot;/usr/local/lib/x86_64-linux-gnu/tarantool/?.so;/usr/local/lib/tarantool/?.so;/usr/lib/x86_64-linux-gnu/lua/luarocks/lib/tarantool/?.so;/usr/lib/x86_64-linux-gnu/tarantool/?.so;/usr/local/lib/x86_64-linux-gnu/lua/5.1/?.so;/usr/local/lib/lua/5.1/?.so;/usr/lib/x86_64-linux-gnu/lua/luarocks/lib/lua/5.1/?.so;/usr/lib/x86_64-linux-gnu/lua/5.1/?.so&quot;</initializer>
         <briefdescription>
 <para>A constant added to package.cpath in Lua to find *.so module files. </para>
         </briefdescription>
@@ -13263,7 +13263,7 @@ In case of an error set a diag and return NULL. </para>
 <codeline lineno="57" refid="module_8h_1ac5f2c7580fd5bf200c5027443420902f" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MAJOR<sp/>3</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="61" refid="module_8h_1a4ab155eaff0a115e522c1faae631196e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MINOR<sp/>1</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="65" refid="module_8h_1abd1dbec4fd6761084d3e0c05afe2b138" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_PATCH<sp/>0</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;3.1.0-entrypoint-91-g1247ec5fb&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;3.1.0-entrypoint-102-ga2b736b8f&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="71"><highlight class="normal"></highlight></codeline>
 <codeline lineno="76" refid="module_8h_1adb6d1259777e8f56c6260be6faed183e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>SYSCONF_DIR<sp/>&quot;etc&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="78" refid="module_8h_1a643b6b7ac15874197420e2adbea8b6bb" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>INSTALL_PREFIX<sp/>&quot;/usr/local&quot;</highlight><highlight class="normal"></highlight></codeline>
@@ -13278,7 +13278,7 @@ In case of an error set a diag and return NULL. </para>
 <codeline lineno="95" refid="module_8h_1a8114e8df5bc35951db601268ec25d600" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MODULE_LUADIR<sp/>&quot;/usr/local/share/tarantool&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="97" refid="module_8h_1a516a42b6eee771a85d83b371c0f22337" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MODULE_INCLUDEDIR<sp/>&quot;/usr/local/include/tarantool&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="99" refid="module_8h_1a5e471f2a326d5e86e09a56f9da3d383f" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MODULE_LUAPATH<sp/>&quot;/usr/local/share/tarantool/?.lua;/usr/local/share/tarantool/?/init.lua;/usr/share/tarantool/?.lua;/usr/share/tarantool/?/init.lua;/usr/local/share/lua/5.1/?.lua;/usr/local/share/lua/5.1/?/init.lua;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua&quot;</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="101" refid="module_8h_1a83a0a80ad0559e26298ce670050609e2" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MODULE_LIBPATH<sp/>&quot;/usr/local/lib/x86_64-linux-gnu/tarantool/?.so;/usr/local/lib/tarantool/?.so;/usr/lib/x86_64-linux-gnu/tarantool/?.so;/usr/local/lib/x86_64-linux-gnu/lua/5.1/?.so;/usr/local/lib/lua/5.1/?.so;/usr/lib/x86_64-linux-gnu/lua/5.1/?.so&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="101" refid="module_8h_1a83a0a80ad0559e26298ce670050609e2" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MODULE_LIBPATH<sp/>&quot;/usr/local/lib/x86_64-linux-gnu/tarantool/?.so;/usr/local/lib/tarantool/?.so;/usr/lib/x86_64-linux-gnu/lua/luarocks/lib/tarantool/?.so;/usr/lib/x86_64-linux-gnu/tarantool/?.so;/usr/local/lib/x86_64-linux-gnu/lua/5.1/?.so;/usr/local/lib/lua/5.1/?.so;/usr/lib/x86_64-linux-gnu/lua/luarocks/lib/lua/5.1/?.so;/usr/lib/x86_64-linux-gnu/lua/5.1/?.so&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="103" refid="module_8h_1a894125cfa770b79267d0eb49e83c2279" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>MODULE_LIBSUFFIX<sp/>&quot;.so&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="104"><highlight class="normal"></highlight></codeline>
 <codeline lineno="113"><highlight class="normal"></highlight><highlight class="preprocessor">#ifndef<sp/>__has_feature</highlight><highlight class="normal"></highlight></codeline>
