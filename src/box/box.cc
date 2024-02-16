@@ -1528,6 +1528,30 @@ box_check_wal_max_size(int64_t wal_max_size)
 	return wal_max_size;
 }
 
+/** Validate that wal_retention_period is >= 0. */
+static double
+box_check_wal_retention_period()
+{
+	double value = cfg_getd("experimental_wal_retention_period");
+	if (value < 0) {
+		diag_set(ClientError, ER_CFG,
+			 "experimental_wal_retention_period",
+			 "the value must be >= 0");
+		return -1;
+	}
+	return value;
+}
+
+/** Validate wal_retention_period and raise error, if needed. */
+static double
+box_check_wal_retention_period_xc()
+{
+	double value = box_check_wal_retention_period();
+	if (value < 0)
+		diag_raise();
+	return value;
+}
+
 static ssize_t
 box_check_memory_quota(const char *quota_name)
 {
@@ -1757,6 +1781,8 @@ box_check_config(void)
 	if (box_check_wal_queue_max_size() < 0)
 		diag_raise();
 	if (box_check_wal_cleanup_delay() < 0)
+		diag_raise();
+	if (box_check_wal_retention_period() < 0)
 		diag_raise();
 	if (box_check_memory_quota("memtx_memory") < 0)
 		diag_raise();
@@ -2819,6 +2845,16 @@ box_set_wal_cleanup_delay(void)
 	if (replication_anon)
 		delay = 0;
 	gc_set_wal_cleanup_delay(delay);
+	return 0;
+}
+
+int
+box_set_wal_retention_period(void)
+{
+	double delay = box_check_wal_retention_period();
+	if (delay < 0)
+		return -1;
+	wal_set_retention_period(delay);
 	return 0;
 }
 
@@ -5323,8 +5359,10 @@ box_storage_init(void)
 	int64_t wal_max_size = box_check_wal_max_size(
 		cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
+	double wal_retention_period = box_check_wal_retention_period_xc();
 	if (wal_init(wal_mode, cfg_gets("wal_dir"), wal_max_size,
-		     &INSTANCE_UUID, on_wal_garbage_collection,
+		     wal_retention_period, &INSTANCE_UUID,
+		     on_wal_garbage_collection,
 		     on_wal_checkpoint_threshold) != 0) {
 		diag_raise();
 	}

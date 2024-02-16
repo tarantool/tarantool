@@ -69,6 +69,7 @@
 #include "box/lua/merger.h"
 #include "box/lua/watcher.h"
 #include "box/lua/iproto.h"
+#include "box/lua/wal_retention_period.h"
 
 #include "mpstream/mpstream.h"
 
@@ -702,6 +703,9 @@ box_lua_init(struct lua_State *L)
 #endif
 #ifdef ENABLE_AUDIT_LOG
 	box_lua_audit_init(L);
+#endif
+#ifdef ENABLE_RETENTION_PERIOD
+	box_lua_wal_retention_period_init(L);
 #endif
 #ifdef ENABLE_WAL_EXT
 	box_lua_wal_ext_init(L);

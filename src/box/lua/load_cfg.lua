@@ -81,6 +81,12 @@ local function ifdef_security(value)
     end
 end
 
+local function ifdef_wal_retention_period(value)
+    if private.cfg_set_wal_retention_period ~= nil then
+        return value
+    end
+end
+
 -- all available options
 local default_cfg = {
     listen              = nil,
@@ -151,6 +157,7 @@ local default_cfg = {
     wal_dir_rescan_delay= 2,
     wal_queue_max_size  = 16 * 1024 * 1024,
     wal_cleanup_delay   = 4 * 3600,
+    experimental_wal_retention_period = ifdef_wal_retention_period(0),
     wal_ext             = ifdef_wal_ext(nil),
     force_recovery      = false,
     replication         = nil,
@@ -340,6 +347,7 @@ local template_cfg = {
     wal_max_size        = 'number',
     wal_dir_rescan_delay= 'number',
     wal_cleanup_delay   = 'number',
+    experimental_wal_retention_period = ifdef_wal_retention_period('number'),
     wal_ext             = ifdef_wal_ext('table'),
     force_recovery      = 'boolean',
     replication         = 'string, number, table',
@@ -467,6 +475,7 @@ local dynamic_cfg = {
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = nop,
     wal_cleanup_delay       = private.cfg_set_wal_cleanup_delay,
+    experimental_wal_retention_period = private.cfg_set_wal_retention_period,
     custom_proc_title       = function()
         require('title').update(box.cfg.custom_proc_title)
     end,
@@ -652,6 +661,7 @@ local dynamic_cfg_skip_at_load = {
     auth_delay              = ifdef_security(true),
     disable_guest           = ifdef_security(true),
     password_lifetime_days  = ifdef_security(true),
+    experimental_wal_retention_period = ifdef_wal_retention_period(true),
 }
 
 -- Options that are not part of dynamic_cfg_modules and applied individually
