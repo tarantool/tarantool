@@ -37,7 +37,7 @@ concurrency:
     startsWith(github.ref, 'refs/heads/release/') ||
     startsWith(github.ref, 'refs/tags/')) &&
     format('{0}-{1}', github.run_id, github.run_attempt) ||
-    format('{0}-{1}', github.workflow, github.ref) }}
+    format('{0}-{1}-integration', github.workflow, github.ref) }}
   cancel-in-progress: true
 
 jobs:
