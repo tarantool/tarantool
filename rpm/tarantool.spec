@@ -167,7 +167,7 @@ C and Lua/C modules.
          -DSYSTEMD_UNIT_DIR:PATH=%{_unitdir} \
          -DSYSTEMD_TMPFILES_DIR:PATH=%{_tmpfilesdir} \
 %endif
-%if 0%{?fedora} >= 33
+%if (0%{?fedora} >= 33 || 0%{?almalinux} >= 9)
          -DENABLE_LTO=ON \
 %endif
 %if %{_gc64} == "true"
