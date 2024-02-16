@@ -182,9 +182,14 @@ local function error_index(err, key)
     if getter ~= nil then
         return getter(err)
     end
-    local f = ffi.C.error_find_field(err, key)
-    if f ~= nil then
-        return mp_decode(f._data)
+    -- Look for a payload field, starting from the topmost error in the stack.
+    local cur_err = err
+    while cur_err ~= nil do
+        local f = ffi.C.error_find_field(cur_err, key)
+        if f ~= nil then
+            return mp_decode(f._data)
+        end
+        cur_err = cur_err.prev
     end
 end
 
