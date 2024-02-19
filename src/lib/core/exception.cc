@@ -218,7 +218,7 @@ LuajitError::LuajitError(const char *file, unsigned line,
 			 const char *msg)
 	: Exception(&type_LuajitError, file, line)
 {
-	snprintf(errmsg, sizeof(errmsg), "%s", msg ? msg : "");
+	error_format_msg(this, "%s", msg ? msg : "");
 }
 
 const struct type_info type_IllegalParams =
