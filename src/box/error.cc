@@ -248,10 +248,10 @@ XlogGapError::XlogGapError(const char *file, unsigned line,
 {
 	const char *s_from = vclock_to_string(from);
 	const char *s_to = vclock_to_string(to);
-	snprintf(errmsg, sizeof(errmsg),
-		 "Missing .xlog file between LSN %lld %s and %lld %s",
-		 (long long) vclock_sum(from), s_from ? s_from : "",
-		 (long long) vclock_sum(to), s_to ? s_to : "");
+	error_format_msg(this,
+			 "Missing .xlog file between LSN %lld %s and %lld %s",
+			 (long long)vclock_sum(from), s_from ? s_from : "",
+			 (long long)vclock_sum(to), s_to ? s_to : "");
 }
 
 struct error *

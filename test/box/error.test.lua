@@ -275,3 +275,7 @@ box.schema.func.drop('runtimeerror')
 --
 err = box.error.new('TestType', 'Message arg1: %s. Message arg2: %u', '1', 2)
 err.message
+
+-- gh-4975: errors in init scripts are stripped
+err = box.error.new('TestType', string.rep('a', 10000))
+string.len(err.message)
