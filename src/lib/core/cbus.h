@@ -109,8 +109,10 @@ cmsg_init(struct cmsg *msg, const struct cmsg_hop *route)
 void
 cmsg_deliver(struct cmsg *msg);
 
-/** A  uni-directional FIFO queue from one cord to another. */
-struct cpipe {
+/**
+ * A common part of `cpipe` and `lcpipe`.
+ */
+struct pipe_base {
 	/** Staging area for pushed messages */
 	struct stailq input;
 	/** Counters are useful for finer-grained scheduling. */
@@ -122,6 +124,17 @@ struct cpipe {
 	 */
 	int max_input;
 	/**
+	 * The cbus endpoint at the destination cord to handle
+	 * flushed messages.
+	 */
+	struct cbus_endpoint *endpoint;
+};
+
+/** A  uni-directional FIFO queue from one cord to another. */
+struct cpipe {
+	/** Base part of a pipe. */
+	struct pipe_base base;
+	/**
 	 * Rather than flushing input into the pipe
 	 * whenever a single message or a batch is
 	 * complete, do it once per event loop iteration
@@ -130,11 +143,6 @@ struct cpipe {
 	struct ev_async flush_input;
 	/** The event loop of the producer cord. */
 	struct ev_loop *producer;
-	/**
-	 * The cbus endpoint at the destination cord to handle
-	 * flushed messages.
-	 */
-	struct cbus_endpoint *endpoint;
 	/**
 	 * Triggers to call on flush event, if the input queue
 	 * is not empty.
@@ -173,13 +181,13 @@ cpipe_destroy(struct cpipe *pipe);
 static inline void
 cpipe_set_max_input(struct cpipe *pipe, int max_input)
 {
-	pipe->max_input = max_input;
+	pipe->base.max_input = max_input;
 }
 
 static inline void
 cpipe_deliver_now(struct cpipe *pipe)
 {
-	if (pipe->n_input > 0)
+	if (pipe->base.n_input > 0)
 		ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 
@@ -193,8 +201,8 @@ cpipe_flush_input(struct cpipe *pipe)
 	assert(loop() == pipe->producer);
 
 	/** Flush may be called with no input. */
-	if (pipe->n_input > 0) {
-		if (pipe->n_input < pipe->max_input) {
+	if (pipe->base.n_input > 0) {
+		if (pipe->base.n_input < pipe->base.max_input) {
 			/*
 			 * Not much input, can deliver all
 			 * messages at the end of the event loop
@@ -223,9 +231,9 @@ cpipe_push_input(struct cpipe *pipe, struct cmsg *msg)
 {
 	assert(loop() == pipe->producer);
 
-	stailq_add_tail_entry(&pipe->input, msg, fifo);
-	pipe->n_input++;
-	if (pipe->n_input >= pipe->max_input)
+	stailq_add_tail_entry(&pipe->base.input, msg, fifo);
+	pipe->base.n_input++;
+	if (pipe->base.n_input >= pipe->base.max_input)
 		ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 
@@ -239,8 +247,8 @@ static inline void
 cpipe_push(struct cpipe *pipe, struct cmsg *msg)
 {
 	cpipe_push_input(pipe, msg);
-	assert(pipe->n_input < pipe->max_input);
-	if (pipe->n_input == 1)
+	assert(pipe->base.n_input < pipe->base.max_input);
+	if (pipe->base.n_input == 1)
 		ev_feed_event(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 
@@ -298,6 +306,28 @@ cbus_free(void);
 int
 cbus_endpoint_create(struct cbus_endpoint *endpoint, const char *name,
 		     void (*fetch_cb)(ev_loop *, struct ev_watcher *, int), void *fetch_data);
+
+/**
+ * Allocate and initialize cbus endpoint.
+ * Endpoint initialized by ready for use defaults. Can be using by 3rtd party
+ * code.
+ * @param endpoint cbus endpoint dst
+ * @param name a destination name
+ * @retval 0 for success
+ * @retval 1 if endpoint with given name already registered
+ */
+int
+cbus_endpoint_new(struct cbus_endpoint **endpoint, const char *name);
+
+/**
+ * Delete cbus endpoint. Disconnect the cord from cbus and free endpoint data.
+ * @param endpoint cbus endpoint must have been allocated with a call to
+ * `cbus_endpoint_new`.
+ * @retval 0 for success
+ * @retval 1 if there is connected pipe or unhandled message`
+ */
+int
+cbus_endpoint_delete(struct cbus_endpoint *endpoint);
 
 /**
  * One round for message fetch and deliver */
@@ -465,6 +495,53 @@ void
 cbus_unpair(struct cpipe *dest_pipe, struct cpipe *src_pipe,
 	    void (*unpair_cb)(void *), void *unpair_arg,
 	    void (*process_cb)(struct cbus_endpoint *));
+
+/**
+ * A  uni-directional FIFO queue from any thread to cord.
+ * It is a light version of the cpipe, since some features are not needed for
+ * 3td party threads or they cannot be implemented.
+ *
+ */
+struct lcpipe {
+	/** Base part of a pipe. */
+	struct pipe_base base;
+};
+
+/**
+ * Create and initialize a pipe and connect it to the consumer.
+ * The call returns only when the consumer, identified by consumer name, has
+ * joined the bus.
+ **/
+struct lcpipe *
+lcpipe_new(const char *consumer);
+
+/**
+ * Destroy a pipe with freeing up occupied memory.
+ * @param pipe lcpipe must have been allocated with a call to `lcpipe_new`.
+ **/
+void
+lcpipe_delete(struct lcpipe *pipe);
+
+/**
+ * Flush all staged messages into the pipe and eventually to the
+ * consumer.
+ */
+void
+lcpipe_flush_input(struct lcpipe *pipe);
+
+/**
+ * Push a message into input queue without flushing.
+ * @param msg cbus message, pipe in message hop must be set at NULL.
+ */
+void
+lcpipe_push(struct lcpipe *pipe, struct cmsg *msg);
+
+/**
+ * Push a single message and flush input queue immediately.
+ * @param msg cbus message, pipe in message hop must be set at NULL.
+ */
+void
+lcpipe_push_now(struct lcpipe *pipe, struct cmsg *msg);
 
 #if defined(__cplusplus)
 } /* extern "C" */
