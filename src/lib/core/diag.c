@@ -31,6 +31,13 @@
 #include "diag.h"
 #include "fiber.h"
 
+/** True if the error message was dynamically allocated. */
+static bool
+error_msg_is_malloced(struct error *e)
+{
+	return e->errmsg != e->errmsg_buf;
+}
+
 void
 error_ref(struct error *e)
 {
@@ -53,6 +60,8 @@ error_unref(struct error *e)
 			to_delete->cause->effect = NULL;
 			to_delete->cause = NULL;
 		}
+		if (error_msg_is_malloced(to_delete))
+			free(to_delete->errmsg);
 		error_payload_destroy(&to_delete->payload);
 		to_delete->destroy(to_delete);
 		if (cause == NULL)
@@ -128,6 +137,7 @@ error_create(struct error *e,
 	if (file == NULL)
 		file = "";
 	error_set_location(e, file, line);
+	e->errmsg = e->errmsg_buf;
 	e->errmsg[0] = '\0';
 	e->cause = NULL;
 	e->effect = NULL;
@@ -158,17 +168,45 @@ error_format_msg(struct error *e, const char *format, ...)
 void
 error_append_msg(struct error *e, const char *format, ...)
 {
-	va_list ap;
-	va_start(ap, format);
-	int prefix_len = strlen(e->errmsg);
-	char *msg = e->errmsg + prefix_len;
-	vsnprintf(msg, sizeof(e->errmsg) - prefix_len, format, ap);
-	va_end(ap);
+	va_list ap1, ap2;
+	va_start(ap1, format);
+	va_copy(ap2, ap1);
+	int static_buf_size = sizeof(e->errmsg_buf);
+	int curr_len = strlen(e->errmsg);
+	int len = vsnprintf(NULL, 0, format, ap1);
+	int new_size = curr_len + len + 1;
+	va_end(ap1);
+
+	if (new_size > static_buf_size) {
+		char *new_buf = xmalloc(new_size);
+		memcpy(new_buf, e->errmsg, curr_len + 1);
+		if (error_msg_is_malloced(e))
+			free(e->errmsg);
+		e->errmsg = new_buf;
+	}
+	char *msg = e->errmsg + curr_len;
+	int new_len = vsnprintf(msg, len + 1, format, ap2);
+	VERIFY(new_len == len);
+	va_end(ap2);
 }
 
 void
 error_vformat_msg(struct error *e, const char *format, va_list ap)
 {
-	vsnprintf(e->errmsg, sizeof(e->errmsg), format, ap);
+	/* Copy the `ap' to call `vsnprintf' twice. */
+	va_list ap_copy;
+	va_copy(ap_copy, ap);
+	if (error_msg_is_malloced(e)) {
+		free(e->errmsg);
+		e->errmsg = e->errmsg_buf;
+	}
+	int static_buf_size = sizeof(e->errmsg_buf);
+	int len = vsnprintf(e->errmsg, static_buf_size, format, ap);
+	bool is_truncated = len >= static_buf_size;
+	if (is_truncated) {
+		e->errmsg = xmalloc(len + 1);
+		int new_len = vsnprintf(e->errmsg, len + 1, format, ap_copy);
+		VERIFY(new_len == len);
+	}
+	va_end(ap_copy);
 }
-

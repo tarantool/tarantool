@@ -95,10 +95,14 @@ struct error {
 	struct error_payload payload;
 	/** Line number. */
 	unsigned line;
-	/* Source file name. */
+	/** Source file name. */
 	char file[DIAG_FILENAME_MAX];
-	/* Error description. */
-	char errmsg[DIAG_ERRMSG_MAX];
+	/**
+	 * Error description. Points to the static buffer `errmsg_buf' if the
+	 * message fits into it, or to the dynamic buffer otherwise.
+	 */
+	char *errmsg;
+	char errmsg_buf[DIAG_ERRMSG_MAX];
 	/**
 	 * Link to the cause and effect of given error. The cause
 	 * creates the effect:
