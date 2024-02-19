@@ -482,6 +482,95 @@ test_error_code(void)
 	footer();
 }
 
+static void
+error_destroy(struct error *e)
+{
+	/* Intentionally left blank. */
+}
+
+static void
+test_error_format_msg(void)
+{
+	header();
+	plan(6);
+
+	char msg[DIAG_ERRMSG_MAX + 1];
+	struct error e;
+	error_create(&e, error_destroy, NULL, NULL, NULL, NULL, 0);
+	error_ref(&e);
+
+	/* Test largest message that fits into statically allocated buffer. */
+	for (size_t i = 0; i < DIAG_ERRMSG_MAX - 1; i++)
+		msg[i] = pseudo_random_in_range('a', 'z');
+	msg[DIAG_ERRMSG_MAX - 1] = '\0';
+	error_format_msg(&e, msg);
+	is(strcmp(box_error_message(&e), msg), 0, "errmsg is correct");
+	is(box_error_message(&e), e.errmsg_buf,
+	   "errmsg is statically allocated (%d characters)", strlen(msg));
+
+	/* This message doesn't fit into the static buffer. */
+	msg[DIAG_ERRMSG_MAX - 1] = '.';
+	msg[DIAG_ERRMSG_MAX] = '\0';
+	error_format_msg(&e, msg);
+	is(strcmp(box_error_message(&e), msg), 0, "errmsg is correct");
+	isnt(box_error_message(&e), e.errmsg_buf,
+	     "errmsg is dynamically allocated (%d characters)", strlen(msg));
+
+	/* This message fits into the static buffer again. */
+	msg[17] = '\0';
+	error_format_msg(&e, msg);
+	is(strcmp(box_error_message(&e), msg), 0, "errmsg is correct");
+	is(box_error_message(&e), e.errmsg_buf,
+	   "errmsg is statically allocated (%d characters)", strlen(msg));
+
+	error_unref(&e);
+
+	check_plan();
+	footer();
+}
+
+static void
+test_error_append_msg(void)
+{
+	header();
+	plan(5);
+
+	char msg[DIAG_ERRMSG_MAX];
+	struct error e;
+	error_create(&e, error_destroy, NULL, NULL, NULL, NULL, 0);
+	error_ref(&e);
+
+	error_format_msg(&e, "Message");
+	is(box_error_message(&e), e.errmsg_buf,
+	   "errmsg is statically allocated (%d characters)",
+	   strlen(box_error_message(&e)));
+
+	error_append_msg(&e, "/%s/%s/%d/", "foo", "bar", 123);
+	is(strcmp(box_error_message(&e), "Message/foo/bar/123/"), 0,
+	   "errmsg is correct");
+	is(box_error_message(&e), e.errmsg_buf,
+	   "errmsg is statically allocated (%d characters)",
+	   strlen(box_error_message(&e)));
+
+	for (size_t i = 0; i < DIAG_ERRMSG_MAX - 1; i++)
+		msg[i] = pseudo_random_in_range('a', 'z');
+	msg[DIAG_ERRMSG_MAX - 1] = '\0';
+	error_append_msg(&e, msg);
+	isnt(box_error_message(&e), e.errmsg_buf,
+	     "errmsg is dynamically allocated (%d characters)",
+	     strlen(box_error_message(&e)));
+
+	error_append_msg(&e, "%d/%d/%d", 1, 2, 3);
+	isnt(box_error_message(&e), e.errmsg_buf,
+	     "errmsg is dynamically allocated (%d characters)",
+	     strlen(box_error_message(&e)));
+
+	error_unref(&e);
+
+	check_plan();
+	footer();
+}
+
 static void *
 test_pthread_f(void *arg)
 {
@@ -521,7 +610,7 @@ int
 main(void)
 {
 	header();
-	plan(11);
+	plan(13);
 
 	random_init();
 	memory_init();
@@ -537,6 +626,8 @@ main(void)
 	test_payload_clear();
 	test_payload_move();
 	test_error_code();
+	test_error_format_msg();
+	test_error_append_msg();
 	test_pthread();
 
 	fiber_free();

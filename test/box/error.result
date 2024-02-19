@@ -1022,3 +1022,12 @@ err.message
  | ---
  | - 'Message arg1: 1. Message arg2: 2'
  | ...
+
+-- gh-4975: errors in init scripts are stripped
+err = box.error.new('TestType', string.rep('a', 10000))
+ | ---
+ | ...
+string.len(err.message)
+ | ---
+ | - 10000
+ | ...
