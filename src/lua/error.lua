@@ -1,6 +1,7 @@
 -- error.lua (internal file)
 
 local ffi = require('ffi')
+local json = require('json')
 local msgpack = require('msgpack')
 local compat = require('compat')
 
@@ -173,9 +174,23 @@ local function error_match(err, ...)
     return string.match(error_message(err), ...)
 end
 
+--
+-- Serialize an error (including the whole error stack) to its table
+-- representation.
+-- @param err error object
+-- @return error converted to table representation
 local function error_serialize(err)
-    -- Return an error message only in admin console to keep compatibility
-    return error_message(err)
+    if compat.box_error_serialize_verbose:is_new() then
+        local res = error_unpack(err)
+        local cur = res
+        while cur.prev ~= nil do
+            cur.prev = error_unpack(cur.prev)
+            cur = cur.prev
+        end
+        return res
+    else
+        return error_message(err)
+    end
 end
 
 local error_methods = {
@@ -216,9 +231,40 @@ local function error_concat(lhs, rhs)
     end
 end
 
+--
+-- Convert error to its string representation without accounting for the
+-- error's cause.
+-- @param err error object
+-- @return error's string representation
+local function error_to_string_wo_prev(err)
+    local err_unpacked = error_unpack(err)
+    err_unpacked.message = nil
+    err_unpacked.prev = nil
+    return string.format('%s %s', err.message, json.encode(err_unpacked))
+end
+
+--
+-- Convert an error to its string representation accounting for the whole error
+-- stack.
+-- @param err error object
+-- @return error's string representation
+local function error_to_string(err)
+    if compat.box_error_serialize_verbose:is_old() then
+        return error_message(err)
+    end
+
+    local cur = err
+    local error_stack = {}
+    while cur ~= nil do
+        table.insert(error_stack, 1, error_to_string_wo_prev(cur))
+        cur = cur.prev
+    end
+    return table.concat(error_stack, '\n')
+end
+
 local error_mt = {
     __index = error_index;
-    __tostring = error_message;
+    __tostring = error_to_string;
     __concat = error_concat;
 };
 

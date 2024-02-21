@@ -330,6 +330,7 @@ g.test_defaults = function()
             yaml_pretty_multiline = 'new',
             fiber_channel_close_mode = 'new',
             box_cfg_replication_sync_timeout = 'new',
+            box_error_serialize_verbose = 'old',
             sql_seq_scan_default = 'new',
             fiber_slice_default = 'new',
             box_info_cluster_meaning = 'new',
