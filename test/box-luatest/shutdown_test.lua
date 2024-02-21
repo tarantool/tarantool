@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local utils = require('luatest.utils')
+local justrun = require('test.justrun')
 local fio = require('fio')
 local popen = require('popen')
 local fiber = require('fiber')
@@ -72,6 +73,33 @@ g_crash.test_shutdown_during_snapshot_on_signal = function(cg)
     local status = handle:wait()
     t.assert_equals(status.state, 'exited')
     t.assert_equals(status.exit_code, 0)
+end
+
+-- Test shutdown when new iproto connection is accepted but
+-- not yet fully established.
+g_crash.test_shutdown_during_new_connection = function(cg)
+    local script = [[
+        local net = require('net.box')
+        local fiber = require('fiber')
+
+        local sock = 'unix/:./iproto.sock'
+        box.cfg{listen = sock}
+        local cond = fiber.cond()
+        local in_trigger = false
+        box.session.on_connect(function()
+            in_trigger = true
+            cond:signal()
+            fiber.sleep(1)
+        end)
+        net.connect(sock, {wait_connected = false})
+        while not in_trigger do
+            cond:wait()
+        end
+        os.exit()
+    ]]
+    local result = justrun.tarantool(cg.workdir, {}, {'-e', script},
+                                     {nojson = true, quote_args = true})
+    t.assert_equals(result.exit_code, 0)
 end
 
 local g = t.group()
