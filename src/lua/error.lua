@@ -174,6 +174,10 @@ local error_methods = {
 }
 
 local function error_index(err, key)
+    local method = error_methods[key]
+    if method ~= nil then
+        return method
+    end
     local getter = error_fields[key]
     if getter ~= nil then
         return getter(err)
@@ -182,7 +186,6 @@ local function error_index(err, key)
     if f ~= nil then
         return mp_decode(f._data)
     end
-    return error_methods[key]
 end
 
 local function error_concat(lhs, rhs)

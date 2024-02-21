@@ -106,3 +106,24 @@ g.test_error_new_message_arg = function()
     t.assert_equals(box.error.new{message = msg, reason = 'other'}.message, msg)
     t.assert_equals(box.error.new{msg, reason = 'other'}.message, msg)
 end
+
+-- Test that error's methods are not masked by the payload fields.
+g.test_methods_masking = function()
+    local e = box.error.new({
+        unpack = 'hack',
+        raise = 'hack',
+        match = 'hack',
+        set_prev = 'hack',
+        __serialize = 'hack',
+    })
+    t.assert_type(e.unpack, 'function')
+    t.assert_type(e.raise, 'function')
+    t.assert_type(e.match, 'function')
+    t.assert_type(e.set_prev, 'function')
+    t.assert_type(e.__serialize, 'function')
+    t.assert_equals(e:unpack().unpack, 'hack')
+    t.assert_equals(e:unpack().raise, 'hack')
+    t.assert_equals(e:unpack().match, 'hack')
+    t.assert_equals(e:unpack().set_prev, 'hack')
+    t.assert_equals(e:unpack().__serialize, 'hack')
+end
