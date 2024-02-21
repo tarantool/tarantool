@@ -918,6 +918,8 @@ struct iproto_connection
 	 * connection.
 	 */
 	struct cmsg cancel_msg;
+	/** Set if connection is accepted in TX. */
+	bool is_established;
 };
 
 /** Returns a string suitable for logging. */
@@ -1663,6 +1665,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	con->session = NULL;
 	con->is_in_replication = false;
 	con->is_drop_pending = false;
+	con->is_established = false;
 	rlist_create(&con->in_stop_list);
 	rlist_create(&con->tx.inprogress);
 	rlist_add_entry(&iproto_thread->connections, con, in_connections);
@@ -3329,6 +3332,11 @@ net_send_greeting(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
+	if (con->is_drop_pending) {
+		iproto_connection_close(con);
+		iproto_msg_delete(msg);
+		return;
+	}
 	if (msg->close_connection) {
 		struct obuf *out = msg->wpos.obuf;
 		int64_t nwr = iostream_writev(&con->io, out->iov,
@@ -3345,6 +3353,7 @@ net_send_greeting(struct cmsg *m)
 		iproto_msg_delete(msg);
 		return;
 	}
+	con->is_established = true;
 	con->wend = msg->wpos;
 	/*
 	 * Connect is synchronous, so no one could have been
@@ -3988,9 +3997,16 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			 * cannot close them as usual. Anyway we cancel
 			 * replication fibers as well and close connection
 			 * after replication is breaked.
+			 *
+			 * Do not close connection that is not yet
+			 * established. Otherwise session
+			 * on_connect/on_disconnect callbacks may be
+			 * executed in reverse order in case of yields
+			 * in on_connect callbacks.
 			 */
 			if (!con->is_in_replication &&
-			    con->state == IPROTO_CONNECTION_ALIVE)
+			    con->state == IPROTO_CONNECTION_ALIVE &&
+			    con->is_established)
 				iproto_connection_close(con);
 			/*
 			 * Do not wait deletion of connection that called
