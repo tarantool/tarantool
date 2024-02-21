@@ -49,26 +49,22 @@ type(c:eval('return box.error.new(box.error.UNKNOWN)')) -- string
 ---
 - string
 ...
--- msgpack.cfg options are applied to CALL result
-encode_load_metatables = msgpack.cfg.encode_load_metatables
----
-...
-encode_use_tostring = msgpack.cfg.encode_use_tostring
+-- msgpack.cfg options are applied to CALL result (i.e., msgpack.cfg options are
+-- propagated to the `call_serializer_no_error_ext` serializer).
+encode_invalid_numbers = msgpack.cfg.encode_invalid_numbers
 ---
 ...
 msgpack.cfg{                                                                \
-    encode_load_metatables = false,                                         \
-    encode_use_tostring = false,                                            \
+    encode_invalid_numbers = false,                                         \
 }
 ---
 ...
-type(c:eval('return box.error.new(box.error.UNKNOWN)')) -- error
+type(c:eval('return 0/0')) -- error
 ---
-- error: unsupported Lua type 'cdata'
+- error: number must not be NaN or Inf
 ...
 msgpack.cfg{                                                                \
-    encode_load_metatables = encode_load_metatables,                        \
-    encode_use_tostring = encode_use_tostring,                              \
+    encode_invalid_numbers = encode_invalid_numbers,                        \
 }
 ---
 ...

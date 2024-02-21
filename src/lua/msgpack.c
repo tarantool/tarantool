@@ -342,8 +342,9 @@ restart: /* used by MP_EXT of unidentified subtype */
 			break;
 		case MP_ERROR:
 			if (!cfg->encode_error_as_ext) {
-				field->ext_type = MP_UNKNOWN_EXTENSION;
-				goto convert;
+				mpstream_encode_str(stream,
+						    field->errorval->errmsg);
+				break;
 			}
 			bool is_encoded = luamp_encode_extension(L, top, stream,
 								 ctx, &type);
@@ -370,7 +371,6 @@ restart: /* used by MP_EXT of unidentified subtype */
 				/* Value has been packed by the trigger */
 				break;
 			}
-convert:
 			/* Try to convert value to serializable type */
 			if (luaL_convertfield(L, cfg, top, field) != 0)
 				goto error;

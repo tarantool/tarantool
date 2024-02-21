@@ -119,6 +119,14 @@ shown if it is 0. Note that 'base_type' is still accessible for error object.
 https://tarantool.io/compat/box_error_unpack_type_and_code
 ]]
 
+local BOX_ERROR_SERIALIZE_VERBOSE = [[
+Controls the verbosity of box.error's serialization. Before, only the error
+message was serialized, omitting all other potentially useful fields. Now, a
+more verbose representation is used.
+
+https://tarantool.io/compat/box_error_serialize_verbose
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -224,6 +232,12 @@ local options = {
         brief = BOX_ERROR_UNPACK_TYPE_AND_CODE_BRIEF,
         action = function() end
     },
+    box_error_serialize_verbose = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_ERROR_SERIALIZE_VERBOSE,
+        action = function() end,
+    }
 }
 
 -- Array with option names in order of addition.

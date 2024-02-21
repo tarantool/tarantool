@@ -1,5 +1,7 @@
 local t = require('luatest')
 local compat = require('compat')
+local json = require('json')
+local yaml = require('yaml')
 
 local g = t.group()
 
@@ -169,3 +171,80 @@ g.test_unpack = function()
     t.assert_equals(u.custom_type, nil)
     t.assert_equals(type(u.code), 'number')
 end
+
+local prevprev = box.error.new{reason = "prevprev"}
+local prev = box.error.new{reason = "prev", prev = prevprev}
+local cur = box.error.new{reason = "cur", prev = prev}
+
+-- Test the increased `box.error` serialization verbosity (gh-9105).
+g.test_increased_error_serialization_verbosity = function()
+    t.assert_equals(cur:__serialize(), tostring(cur))
+    t.assert_equals(yaml.encode(cur), yaml.encode(cur.message))
+    t.assert_equals(json.encode(cur), json.encode(cur.message))
+
+    t.assert_equals(compat.box_error_serialize_verbose.default, 'old')
+    compat.box_error_serialize_verbose = 'new'
+
+    local prevprev_serialized = prevprev:__serialize()
+    local prev_serialized = prev:__serialize()
+    local cur_serialized = cur:__serialize()
+
+    t.assert_equals(yaml.encode(cur), yaml.encode(cur_serialized))
+    t.assert_equals(json.encode(cur), json.encode(cur_serialized))
+
+    -- Test that serialization of error without `prev` field is equivalent to
+    -- `unpack`.
+    t.assert_equals(prevprev_serialized, prevprev:unpack())
+    -- Test that serialization of `prev` field works correctly.
+    t.assert_equals(prev_serialized.prev, prevprev_serialized)
+    t.assert_equals(cur_serialized.prev, prev_serialized)
+    -- Test that serialization of error with `prev` field is equivalent to
+    -- `unpack` except for the `prev` field.
+    local prev_unpacked = prev:unpack()
+    prev_serialized.prev = nil
+    prev_unpacked.prev = nil
+    t.assert_equals(prev_serialized, prev_unpacked)
+    local cur_unpacked = cur:unpack()
+    cur_serialized.prev = nil
+    cur_unpacked.prev = nil
+    t.assert_equals(cur_serialized, cur_unpacked)
+end
+
+g.after_test('test_increased_error_serialization_verbosity', function()
+    compat.box_error_serialize_verbose = 'default'
+end)
+
+-- Test the increased `box.error` string conversion verbosity (gh-9105).
+g.test_increased_error_string_conversion_verbosity = function()
+    t.assert_equals(tostring(cur), cur.message)
+
+    t.assert_equals(compat.box_error_serialize_verbose.default, 'old')
+    compat.box_error_serialize_verbose = 'new'
+
+    local prevprev_unpacked = prevprev:unpack()
+    prevprev_unpacked.message = nil
+    prevprev_unpacked = json.encode(prevprev_unpacked)
+    t.assert_equals(tostring(prevprev),
+                    string.format("%s %s",
+                                  prevprev.message, prevprev_unpacked))
+
+    local prev_unpacked = prev:unpack()
+    prev_unpacked.message = nil
+    prev_unpacked.prev = nil
+    prev_unpacked = json.encode(prev_unpacked)
+    local cur_unpacked = cur:unpack()
+    cur_unpacked.message = nil
+    cur_unpacked.prev = nil
+    cur_unpacked = json.encode(cur_unpacked)
+    t.assert_equals(tostring(cur),
+                    string.format("%s %s\n" ..
+                                  "%s %s\n" ..
+                                  "%s %s",
+                                  prevprev.message, prevprev_unpacked,
+                                  prev.message, prev_unpacked,
+                                  cur.message, cur_unpacked))
+end
+
+g.after_test('test_increased_error_string_conversion_verbosity', function()
+    compat.box_error_serialize_verbose = 'default'
+end)
