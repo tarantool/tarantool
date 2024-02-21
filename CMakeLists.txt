@@ -82,6 +82,7 @@ include(cmake/thread.cmake)
 include(cmake/hardening.cmake)
 include(cmake/prefix.cmake)
 include(cmake/SetFiberStackSize.cmake)
+include(cmake/MakePackages.cmake)
 
 add_compile_flags("C;CXX" ${HARDENING_FLAGS})
 set(DEPENDENCY_CFLAGS "${DEPENDENCY_CFLAGS} ${HARDENING_FLAGS}")
@@ -751,19 +752,6 @@ add_dependencies(build_bundled_libs misc)
 if(DEFINED EXTRA_DEPENDENCIES_CMAKE)
     include(${EXTRA_DEPENDENCIES_CMAKE})
 endif()
-
-# cpack config. called package.cmake to avoid
-# conflicts with the global CPack.cmake (On MacOS X
-# file names are case-insensitive)
-#
-include (cmake/package.cmake)
-#
-# RPM build environment
-# CPACK is only used for .tar.gz package generation.
-# To build an RPM we need a source package,
-# so rpm.cmake depends on package.cmake.
-#
-include (cmake/rpm.cmake)
 
 add_subdirectory(src)
 add_subdirectory(extra)
