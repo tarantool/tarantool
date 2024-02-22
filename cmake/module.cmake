@@ -41,7 +41,7 @@ function(rebuild_module_api)
     add_custom_target(api ALL DEPENDS ${dstfile})
     install(FILES ${dstfile}
             DESTINATION ${MODULE_INCLUDEDIR}
-            COMPONENT dev)
+            COMPONENT devfiles)
 endfunction()
 set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/module.h"
     PROPERTIES GENERATED TRUE HEADER_FILE_ONLY TRUE)

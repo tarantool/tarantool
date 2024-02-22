@@ -22,11 +22,11 @@ set(CPACK_RPM_COMPONENT_INSTALL ON)
 set(CPACK_DEB_COMPONENT_INSTALL ON)
 
 #---
-install(DIRECTORY build/tarantool-prefix/usr/local/share/man/man1 DESTINATION share/man/
-        USE_SOURCE_PERMISSIONS
-        COMPONENT server
-        EXCLUDE_FROM_ALL
-        FILES_MATCHING PATTERN "tarantool.1")
+#install(DIRECTORY build/tarantool-prefix/usr/local/share/man/man1 DESTINATION share/man/
+#        USE_SOURCE_PERMISSIONS
+#        COMPONENT server
+#        EXCLUDE_FROM_ALL
+#        FILES_MATCHING PATTERN "tarantool.1")
 #----
 
 install(FILES ${CMAKE_SOURCE_DIR}/README.md
@@ -34,7 +34,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/README.md
         COMPONENT server
         EXCLUDE_FROM_ALL)
 
-if (CPACK_PACKAGE_FORMAT STREQUAL "DEB")
+if (PACKAGE_FORMAT STREQUAL "DEB")
     install(FILES ${CMAKE_SOURCE_DIR}/AUTHORS
                   ${CMAKE_SOURCE_DIR}/debian/copyright
                   ${CMAKE_SOURCE_DIR}/LICENSE
@@ -45,7 +45,7 @@ if (CPACK_PACKAGE_FORMAT STREQUAL "DEB")
                   ${CMAKE_SOURCE_DIR}/debian/copyright
                   ${CMAKE_SOURCE_DIR}/LICENSE
             DESTINATION share/doc/tarantool-dev
-            COMPONENT dev
+            COMPONENT devfiles
             EXCLUDE_FROM_ALL)
 endif()
 
@@ -58,9 +58,17 @@ if (PACKAGE_FORMAT STREQUAL "RPM")
     install(FILES ${CMAKE_SOURCE_DIR}/AUTHORS
                   ${CMAKE_SOURCE_DIR}/LICENSE
             DESTINATION share/licenses/tarantool-devel
-            COMPONENT dev
+            COMPONENT devfiles
             EXCLUDE_FROM_ALL)
 endif()
+
+set(CPACK_GENERATOR "DEB;RPM")
+
+set(CPACK_STRIP_FILES YES)
+set(CPACK_INSTALL_DEFAULT_DIRECTORY_PERMISSIONS
+    OWNER_READ OWNER_WRITE OWNER_EXECUTE
+    GROUP_READ GROUP_EXECUTE
+    WORLD_READ WORLD_EXECUTE)
 
 set(CPACK_PACKAGE_NAME "tarantool")
 set(CPACK_PACKAGE_CONTACT "admin@tarantool.org")
@@ -73,13 +81,14 @@ set(CPACK_RPM_PACKAGE_LICENSE "BSD")
 
 set(CPACK_DEBIAN_PACKAGE_RELEASE "1")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Tarantool Team <admin@tarantool.org>")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS YES)
 
-set(TARANTOOL_SERVER_DESCRIPTION
+set(TARANTOOL_SERVER_PACKAGE_DESCRIPTION
 "Tarantool is a high performance in-memory database and Lua application server.
 Tarantool supports replication, online backup and stored procedures in Lua.
 The package provides Tarantool server binary.")
 
-set(TARANTOOL_DEV_DESCRIPTION
+set(TARANTOOL_DEVFILES_PACKAGE_DESCRIPTION
 "Tarantool is a high performance in-memory database and Lua application server.
 Tarantool supports replication, online backup and stored procedures in Lua.
 The package provides Tarantool server development files needed for pluggable
@@ -91,11 +100,11 @@ set(CPACK_RPM_SERVER_PACKAGE_SUMMARY "In-memory database and Lua application ser
 set(CPACK_RPM_SERVER_FILE_NAME
     tarantool-${CPACK_PACKAGE_VERSION}-${CPACK_RPM_PACKAGE_RELEASE}.${CPACK_RPM_PACKAGE_ARCHITECTURE}.rpm)
 
-set(CPACK_RPM_DEV_PACKAGE_NAME "tarantool-devel")
-set(CPACK_RPM_DEV_PACKAGE_GROUP "Applications/Databases")
-set(CPACK_RPM_DEV_PACKAGE_SUMMARY "Tarantool server development files")
-set(CPACK_RPM_DEV_PACKAGE_REQUIRES "tarantool = %{version}-%{release}")
-set(CPACK_RPM_DEV_FILE_NAME
+set(CPACK_RPM_DEVFILES_PACKAGE_NAME "tarantool-devel")
+set(CPACK_RPM_DEVFILES_PACKAGE_GROUP "Applications/Databases")
+set(CPACK_RPM_DEVFILES_PACKAGE_SUMMARY "Tarantool server development files")
+set(CPACK_RPM_DEVFILES_PACKAGE_REQUIRES "tarantool = %{version}-%{release}")
+set(CPACK_RPM_DEVFILES_FILE_NAME
     tarantool-devel-${CPACK_PACKAGE_VERSION}-${CPACK_RPM_PACKAGE_RELEASE}.${CPACK_RPM_PACKAGE_ARCHITECTURE}.rpm)
 
 set(CPACK_DEBIAN_SERVER_PACKAGE_NAME "tarantool")
@@ -103,10 +112,10 @@ set(CPACK_DEBIAN_SERVER_PACKAGE_SECTION "database")
 set(CPACK_DEBIAN_SERVER_FILE_NAME
     tarantool_${CPACK_PACKAGE_VERSION}-${CPACK_DEBIAN_PACKAGE_RELEASE}_${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}.deb)
 
-set(CPACK_DEBIAN_DEV_PACKAGE_NAME "tarantool-dev")
-set(CPACK_DEBIAN_DEV_PACKAGE_SECTION "libdevel")
-set(CPACK_DEBIAN_DEV_PACKAGE_DEPENDS "tarantool (= ${CPACK_PACKAGE_VERSION}-${CPACK_DEBIAN_PACKAGE_RELEASE})")
-set(CPACK_DEBIAN_DEV_FILE_NAME
+set(CPACK_DEBIAN_DEVFILES_PACKAGE_NAME "tarantool-dev")
+set(CPACK_DEBIAN_DEVFILES_PACKAGE_SECTION "libdevel")
+set(CPACK_DEBIAN_DEVFILES_PACKAGE_DEPENDS "tarantool (= ${CPACK_PACKAGE_VERSION}-${CPACK_DEBIAN_PACKAGE_RELEASE})")
+set(CPACK_DEBIAN_DEVFILES_FILE_NAME
     tarantool-dev_${CPACK_PACKAGE_VERSION}-${CPACK_DEBIAN_PACKAGE_RELEASE}_${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}.deb)
 
 set(CPACK_SOURCE_IGNORE_FILES
@@ -118,15 +127,14 @@ set(CPACK_RPM_SOURCE_PKG_BUILD_PARAMS "-DBUILD_STATIC_WITH_BUNDLED_LIBS=TRUE \
 
 include(CPack)
 
-cpack_add_component(dev
+cpack_add_component(devfiles
                     DISPLAY_NAME "Tarantool server development files"
-                    DESCRIPTION ${TARANTOOL_DEV_DESCRIPTION}
-                    GROUP dev)
-
+                    DESCRIPTION ${TARANTOOL_DEVFILES_PACKAGE_DESCRIPTION}
+                    GROUP devfiles)
 cpack_add_component(server
                     DISPLAY_NAME "Tarantool server binary"
-                    DESCRIPTION ${TARANTOOL_SERVER_DESCRIPTION}
+                    DESCRIPTION ${TARANTOOL_SERVER_PACKAGE_DESCRIPTION}
                     GROUP server)
 
-cpack_add_component_group(dev)
+cpack_add_component_group(devfiles)
 cpack_add_component_group(server)

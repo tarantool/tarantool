@@ -82,7 +82,7 @@ include(cmake/thread.cmake)
 include(cmake/hardening.cmake)
 include(cmake/prefix.cmake)
 include(cmake/SetFiberStackSize.cmake)
-include(cmake/MakePackages.cmake)
+include(cmake/Packaging.cmake)
 
 add_compile_flags("C;CXX" ${HARDENING_FLAGS})
 set(DEPENDENCY_CFLAGS "${DEPENDENCY_CFLAGS} ${HARDENING_FLAGS}")
@@ -524,7 +524,7 @@ add_dependencies(build_bundled_libs xxhash)
 if (ENABLE_BUNDLED_LIBCURL)
     install(DIRECTORY "${CURL_INCLUDE_DIRS}/curl"
             DESTINATION ${MODULE_INCLUDEDIR}
-            COMPONENT dev
+            COMPONENT devfiles
             FILES_MATCHING PATTERN "*.h")
 endif()
 
