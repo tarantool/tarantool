@@ -431,4 +431,4 @@ if(BUILD_STATIC AND OPENSSL_USE_STATIC_LIBS)
     )
 endif()
 
-install (TARGETS tarantool DESTINATION bin)
+install (TARGETS tarantool DESTINATION bin COMPONENT server)

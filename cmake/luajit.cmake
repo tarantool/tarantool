@@ -121,6 +121,7 @@ install(
         ${LUAJIT_SOURCE_ROOT}/src/luajit.h
         ${LUAJIT_SOURCE_ROOT}/src/lmisclib.h
     DESTINATION ${MODULE_INCLUDEDIR}
+    COMPONENT dev
 )
 
 # XXX: Since Tarantool use LuaJIT internals to implement all

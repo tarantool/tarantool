@@ -523,7 +523,8 @@ add_dependencies(build_bundled_libs xxhash)
 # Install headers.
 if (ENABLE_BUNDLED_LIBCURL)
     install(DIRECTORY "${CURL_INCLUDE_DIRS}/curl"
-            DESTINATION ${MODULE_FULL_INCLUDEDIR}
+            DESTINATION ${MODULE_INCLUDEDIR}
+            COMPONENT dev
             FILES_MATCHING PATTERN "*.h")
 endif()
 
