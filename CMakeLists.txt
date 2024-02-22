@@ -818,7 +818,7 @@ elseif(IS_DIRECTORY .git AND GIT)
     )
 endif()
 
-option(TEST_BUILD "Abort if memory leak is found." OFF)
+option(TEST_BUILD "Use defaults suited for tests" OFF)
 set(ABORT_ON_LEAK_DEFAULT ${TEST_BUILD})
 option(ABORT_ON_LEAK "Abort if memory leak is found." ${ABORT_ON_LEAK_DEFAULT})
 

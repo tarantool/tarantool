@@ -8,3 +8,8 @@ g.test_build_asan = function()
     local asan = b.flags:match('-fsanitize=[%a,]*address') ~= nil
     t.assert_equals(b.asan, asan)
 end
+
+g.test_build_test_build = function()
+    local b = tarantool.build
+    t.assert_equals(type(b.test_build), 'boolean')
+end
