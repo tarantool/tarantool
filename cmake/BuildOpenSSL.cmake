@@ -1,5 +1,5 @@
-set(OPENSSL_VERSION 1.1.1q)
-set(OPENSSL_HASH c685d239b6a6e1bd78be45624c092f51)
+set(OPENSSL_VERSION 3.2.1)
+set(OPENSSL_HASH c239213887804ba00654884918b37441)
 set(OPENSSL_PATCHES_DIR ${PROJECT_SOURCE_DIR}/patches)
 set(OPENSSL_INSTALL_DIR ${BUNDLED_LIBS_INSTALL_DIR}/openssl-prefix)
 set(OPENSSL_INCLUDE_DIR ${OPENSSL_INSTALL_DIR}/include)
@@ -31,11 +31,8 @@ ExternalProject_Add(bundled-openssl-project
         --prefix=<INSTALL_DIR>
         --libdir=lib
         no-shared
+        no-module
     INSTALL_COMMAND ${CMAKE_MAKE_PROGRAM} install_sw
-    PATCH_COMMAND patch -d <SOURCE_DIR> -p1 -i "${OPENSSL_PATCHES_DIR}/openssl-111q-gh-18720.patch"
-    COMMAND       patch -d <SOURCE_DIR> -p1 -i "${OPENSSL_PATCHES_DIR}/openssl-tarantool-security-27.patch"
-    COMMAND       patch -d <SOURCE_DIR> -p1 -i "${OPENSSL_PATCHES_DIR}/openssl-tarantool-security-54.patch"
-    COMMAND       patch -d <SOURCE_DIR> -p1 -i "${OPENSSL_PATCHES_DIR}/openssl-tarantool-security-90.patch"
     BUILD_BYPRODUCTS ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_SSL_LIBRARY}
 )
 
