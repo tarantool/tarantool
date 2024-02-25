@@ -166,6 +166,7 @@ extern char session_lua[],
 	config_utils_expression_lua[],
 	config_utils_file_lua[],
 	config_utils_log_lua[],
+	config_utils_odict_lua[],
 	config_utils_schema_lua[],
 	config_utils_snapshot_lua[],
 	config_utils_tabulate_lua[]
@@ -349,6 +350,10 @@ static const char *lua_sources[] = {
 	"config/utils/log",
 	"internal.config.utils.log",
 	config_utils_log_lua,
+
+	"config/utils/odict",
+	"internal.config.utils.odict",
+	config_utils_odict_lua,
 
 	"config/utils/aboard",
 	"internal.config.utils.aboard",
