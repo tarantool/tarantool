@@ -7,7 +7,7 @@
 [![GitHub Discussions][discussions-badge]][discussions-url]
 [![Stack Overflow][stackoverflow-badge]][stackoverflow-url]
 
-Translations:
+Переводы:
 
 - [English](https://github.com/tarantool/tarantool/blob/master/README.md)
 
