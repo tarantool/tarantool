@@ -6,13 +6,13 @@
 
 #pragma once
 
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
 
 /**
  * Incapsulates steps we should do to create a Lua state suitable
