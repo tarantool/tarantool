@@ -645,3 +645,13 @@ create_unit_test(PREFIX event
                  SOURCES event.c core_test_utils.c
                  LIBRARIES core unit
 )
+
+create_unit_test(PREFIX port
+                 SOURCES port.cc box_test_utils.c
+                 LIBRARIES unit box server core misc
+                           ${CURL_LIBRARIES}
+                           ${LIBYAML_LIBRARIES}
+                           ${READLINE_LIBRARIES}
+                           ${ICU_LIBRARIES}
+                           ${LUAJIT_LIBRARIES}
+)
