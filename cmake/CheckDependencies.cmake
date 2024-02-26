@@ -30,6 +30,10 @@ elseif(UNIX)
         libsvace
         libstdc++
     )
+    # See for details https://github.com/tarantool/tarantool/issues/9740
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND ENABLE_ASAN)
+        set(ALLOWLIST ${ALLOWLIST} libresolv)
+    endif()
 else()
     message(FATAL_ERROR "Unknown platform")
 endif()
