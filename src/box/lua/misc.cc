@@ -200,8 +200,6 @@ extern "C" void
 port_c_dump_lua(struct port *base, struct lua_State *L,
 		enum port_dump_lua_mode mode)
 {
-	assert(mode == PORT_DUMP_LUA_MODE_FLAT ||
-	       mode == PORT_DUMP_LUA_MODE_TABLE);
 	struct port_c *port = (struct port_c *)base;
 	if (mode == PORT_DUMP_LUA_MODE_MP_OBJECT) {
 		port_dump_lua_mp_object_mode_slow(base, L, &fiber()->gc,

@@ -121,12 +121,10 @@ g.test_tuple_constraint_basics = function(cg)
     test_lua(cg, {field=0})
     test_net(cg, {field=0})
 
-    --[[ Disabled until #6778 is fixed.
     --- Test after recovery from xlog.
     cg.server:restart()
     test_lua(cg, {field=0})
     test_net(cg, {field=0})
-    --]]
 
     --- Test after recovery from snap.
     cg.server:eval('box.snapshot()')
@@ -385,12 +383,10 @@ g.test_several_tuple_constraints = function(cg)
     test_lua(cg, {field=0})
     test_net(cg, {field=0})
 
-    --[[ Disabled until #6778 is fixed.
     --- Test after recovery from xlog.
     cg.server:restart()
     test_lua(cg, {field=0})
     test_net(cg, {field=0})
-    --]]
 
     --- Test after recovery from snap.
     cg.server:eval('box.snapshot()')
@@ -494,4 +490,72 @@ g.test_tuple_constraint_integrity = function(cg)
         t.assert_equals(s:select{}, {{1, 2, 300}, {100, 2, 3}})
 
     end, {engine})
+end
+
+-- Checks that function that takes raw args can be used as a tuple constraint
+g.test_tuple_constraint_takes_raw = function(cg)
+    local engine = cg.params.engine
+
+    table.insert(cg.cleanup, function()
+        cg.server:exec(function()
+            if box.space.test then box.space.test:drop() end
+            if box.func.tuple_constr1 then box.func.tuple_constr1:drop() end
+        end)
+    end)
+
+    cg.server:exec(function(engine)
+        local constr_tuple_body1 = "function(mp) " ..
+            "local tuple = mp[1] " ..
+            "local name = mp[2] " ..
+            "if name ~= 'tuple_constr1' then error('wrong name!') end " ..
+            "return tuple[1] + tuple[2] < 100 end"
+
+        local function func_opts(body)
+            return {language = 'LUA', is_deterministic = true, body = body,
+                    takes_raw_args = true}
+        end
+        box.schema.func.create('tuple_constr1', func_opts(constr_tuple_body1))
+
+        local fmt = {'id1', 'id2', 'id3'}
+        local s = box.schema.create_space('test', {engine=engine,
+                                                   format=fmt,
+                                                   constraint='tuple_constr1'})
+        s:create_index('pk')
+        box.schema.user.grant('guest', 'read,write', 'space', 'test')
+    end, {engine})
+
+    -- check accessing from lua
+    local function test_lua(cg, field4)
+        cg.server:exec(function(field4)
+            local s = box.space.test
+
+            t.assert_equals(s:replace{1, 2, 3, field4}, {1, 2, 3, field4})
+            t.assert_error_msg_content_equals(
+                "Check constraint 'tuple_constr1' failed for a tuple",
+                function() s:replace{100, 2, 3, field4} end
+            )
+            t.assert_error_msg_content_equals(
+                "Check constraint 'tuple_constr1' failed for a tuple",
+                function() s:replace{1, 200, 3, field4} end
+            )
+            t.assert_equals(s:select{}, {{1, 2, 3, field4}})
+        end, {field4})
+    end
+
+    -- check accessing from net.box
+    local function test_net(cg, field4)
+        local c = netbox.connect(cg.server.net_box_uri)
+        local s = c.space.test
+        t.assert_equals(s:replace{1, 2, 3, field4}, {1, 2, 3, field4})
+        t.assert_error_msg_content_equals(
+            "Check constraint 'tuple_constr1' failed for a tuple",
+            function() s:replace{100, 2, 3, field4} end)
+        t.assert_error_msg_content_equals(
+            "Check constraint 'tuple_constr1' failed for a tuple",
+            function() s:replace{1, 200, 3, field4} end)
+        t.assert_equals(s:select{}, {{1, 2, 3, field4}})
+     end
+
+    test_lua(cg)
+    test_net(cg)
 end
