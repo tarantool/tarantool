@@ -1066,6 +1066,8 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	struct vy_env *env = vy_env(space->engine);
 	struct txn *txn = in_txn();
 
+	if (tuple_format1_can_store_format2_tuples(format, space->format))
+		return 0;
 	/*
 	 * If this is local recovery, the space was checked before
 	 * restart so there's nothing we need to do.

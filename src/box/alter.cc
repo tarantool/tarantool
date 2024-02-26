@@ -1120,9 +1120,7 @@ CheckSpaceFormat::prepare(struct alter_space *alter)
 								     key_def))
 				diag_raise();
 		}
-		if (!tuple_format1_can_store_format2_tuples(new_format,
-							    old_format))
-			space_check_format_with_yield(old_space, new_format);
+		space_check_format_with_yield(old_space, new_format);
 	}
 }
 
