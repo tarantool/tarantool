@@ -21,14 +21,6 @@ set(CPACK_COMPONENTS_GROUPING ONE_PER_GROUP)
 set(CPACK_RPM_COMPONENT_INSTALL ON)
 set(CPACK_DEB_COMPONENT_INSTALL ON)
 
-#---
-#install(DIRECTORY build/tarantool-prefix/usr/local/share/man/man1 DESTINATION share/man/
-#        USE_SOURCE_PERMISSIONS
-#        COMPONENT server
-#        EXCLUDE_FROM_ALL
-#        FILES_MATCHING PATTERN "tarantool.1")
-#----
-
 install(FILES ${CMAKE_SOURCE_DIR}/README.md
         DESTINATION share/doc/tarantool
         COMPONENT server
@@ -71,6 +63,7 @@ set(CPACK_INSTALL_DEFAULT_DIRECTORY_PERMISSIONS
     WORLD_READ WORLD_EXECUTE)
 
 set(CPACK_PACKAGE_NAME "tarantool")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "In-memory database and Lua application server")
 set(CPACK_PACKAGE_CONTACT "admin@tarantool.org")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://tarantool.org")
 set(CPACK_PACKAGE_VERSION "$ENV{VERSION}")
@@ -117,13 +110,6 @@ set(CPACK_DEBIAN_DEVFILES_PACKAGE_SECTION "libdevel")
 set(CPACK_DEBIAN_DEVFILES_PACKAGE_DEPENDS "tarantool (= ${CPACK_PACKAGE_VERSION}-${CPACK_DEBIAN_PACKAGE_RELEASE})")
 set(CPACK_DEBIAN_DEVFILES_FILE_NAME
     tarantool-dev_${CPACK_PACKAGE_VERSION}-${CPACK_DEBIAN_PACKAGE_RELEASE}_${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}.deb)
-
-set(CPACK_SOURCE_IGNORE_FILES
-    "\\\\.git" "${CMAKE_SOURCE_DIR}/build"
-)
-set(CPACK_RPM_SOURCE_PKG_BUILD_PARAMS "-DBUILD_STATIC_WITH_BUNDLED_LIBS=TRUE \
-                                      -DLUAJIT_ENABLE_GC64=ON \
-                                      -DCMAKE_BUILD_TYPE=RelWithDebInfo")
 
 include(CPack)
 
