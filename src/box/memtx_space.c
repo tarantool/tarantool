@@ -1008,6 +1008,8 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 {
 	struct txn *txn = in_txn();
 
+	if (tuple_format1_can_store_format2_tuples(format, space->format))
+		return 0;
 	if (space->index_count == 0)
 		return 0;
 	struct index *pk = space->index[0];
