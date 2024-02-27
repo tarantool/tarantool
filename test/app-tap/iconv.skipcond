@@ -1,0 +1,5 @@
+import os
+
+# Disabled on RED OS due to missing character encodings (UTF-16, UTF-16BE, etc).
+if os.getenv('OS') == 'redos':
+    self.skip = 1
