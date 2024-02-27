@@ -321,6 +321,8 @@ run_on_schema_init_triggers(void)
 		func_adapter_end(trigger, &ctx);
 	}
 	event_trigger_iterator_destroy(&it);
+	if (rc != 0)
+		diag_log();
 }
 
 /**
