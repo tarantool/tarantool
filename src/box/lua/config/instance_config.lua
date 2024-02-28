@@ -2351,6 +2351,12 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'new',
         }),
+        box_error_unpack_type_and_code = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
     }),
 }, {
     -- This kind of validation cannot be implemented as the
