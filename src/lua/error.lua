@@ -2,6 +2,7 @@
 
 local ffi = require('ffi')
 local msgpack = require('msgpack')
+local compat = require('compat')
 
 local mp_decode = msgpack.decode_unchecked
 
@@ -142,6 +143,14 @@ local function error_unpack(err)
     for i = 0, payload._count - 1 do
         local f = fields[i]
         result[ffi.string(f._name)] = mp_decode(f._data)
+    end
+    -- Hide redundant fields from unpack output (gh-9101).
+    if compat.box_error_unpack_type_and_code:is_new() then
+        result.custom_type = nil
+        result.base_type = nil
+        if result.code == 0 then
+            result.code = nil
+        end
     end
     return result
 end

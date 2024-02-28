@@ -111,6 +111,14 @@ used as an error indicator in the box C API.
 https://tarantool.io/compat/box_space_max
 ]]
 
+local BOX_ERROR_UNPACK_TYPE_AND_CODE_BRIEF = [[
+Whether to show redundant fields in box.error.unpack(). The new behaviour
+is not to show 'base_type' and 'custom_type' fields. 'code' field is also not
+shown if it is 0. Note that 'base_type' is still accessible for error object.
+
+https://tarantool.io/compat/box_error_unpack_type_and_code
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -209,6 +217,12 @@ local options = {
         obsolete = nil,
         brief = BOX_SPACE_MAX_BRIEF,
         action = tweak_action('BOX_SPACE_MAX', 2147483647, 2147483646)
+    },
+    box_error_unpack_type_and_code = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_ERROR_UNPACK_TYPE_AND_CODE_BRIEF,
+        action = function() end
     },
 }
 

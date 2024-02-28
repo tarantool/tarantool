@@ -1,4 +1,6 @@
 local t = require('luatest')
+local compat = require('compat')
+
 local g = t.group()
 
 -- Test the `prev' argument to the table constructor of `box.error.new'
@@ -137,4 +139,33 @@ g.test_payload_inheritance = function()
     t.assert_equals(e3.foo, 11) -- Inherited from e1.
     t.assert_equals(e3.bar, 33) -- Inherited from e2.
     t.assert_equals(e3.baz, 55) -- Own payload field.
+end
+
+g.after_test('test_unpack', function()
+    compat.box_error_unpack_type_and_code = 'default'
+end)
+
+-- Test that redundant fields of error:unpack() are not serialized (gh-9101).
+g.test_unpack = function()
+    t.assert(compat.box_error_unpack_type_and_code.default, 'old')
+
+    compat.box_error_unpack_type_and_code = 'old'
+    local u = box.error.new{type = 'MyError', reason = 'foobar'}:unpack()
+    t.assert_equals(u.base_type, 'CustomError')
+    t.assert_equals(u.custom_type, 'MyError')
+    t.assert_equals(u.code, 0)
+    u = box.error.new(box.error.UNSUPPORTED, 'foo', 'bar'):unpack()
+    t.assert_equals(u.base_type, 'ClientError')
+    t.assert_equals(u.custom_type, nil)
+    t.assert_equals(type(u.code), 'number')
+
+    compat.box_error_unpack_type_and_code = 'new'
+    u = box.error.new{type = 'MyError', reason = 'foobar'}:unpack()
+    t.assert_equals(u.base_type, nil)
+    t.assert_equals(u.custom_type, nil)
+    t.assert_equals(u.code, nil)
+    u = box.error.new(box.error.UNSUPPORTED, 'foo', 'bar'):unpack()
+    t.assert_equals(u.base_type, nil)
+    t.assert_equals(u.custom_type, nil)
+    t.assert_equals(type(u.code), 'number')
 end
