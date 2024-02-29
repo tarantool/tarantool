@@ -1,0 +1,47 @@
+name: static_build_docker_deploy
+
+on:
+  workflow_call:
+
+jobs:
+  build-docker:
+    if: startsWith(github.ref, 'refs/tags/') &&
+      !endsWith(github.ref, '-entrypoint')
+
+    runs-on: [ self-hosted, Linux, regular ]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Get tag
+        run: echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker
+          file: ./docker/Dockerfile
+          build-args: TARANTOOL_VERSION=${{ env.GIT_TAG }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: tarantool/tarantool:${{ env.GIT_TAG }}
+
+      - name: Send VK Teams message on failure
+        if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}

@@ -82,3 +82,16 @@ jobs:
         ]
       }'
     secrets: inherit
+
+  build-docker:
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'full-ci' or 'static-build-ci' label is set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          contains(github.event.pull_request.labels.*.name, 'full-ci') ||
+          contains(github.event.pull_request.labels.*.name, 'static-build-ci') )
+
+    needs: [ packaging-x86_64, packaging-aarch64 ]
+
+    uses: ./.github/workflows/static_build_docker_deploy.yml
+    secrets: inherit
