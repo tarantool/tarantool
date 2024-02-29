@@ -328,7 +328,7 @@ luaL_checkfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 {
 	if (luaL_tofield(L, cfg, idx, field) < 0)
 		luaT_error(L);
-	if (field->type != MP_EXT || field->ext_type != MP_UNKNOWN_EXTENSION)
+	if (field->type != MP_EXT)
 		return;
 	if (luaL_convertfield(L, cfg, idx, field) != 0)
 		luaT_error(L);

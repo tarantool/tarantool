@@ -609,7 +609,7 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 {
 	if (idx < 0)
 		idx = lua_gettop(L) + idx + 1;
-	assert(field->type == MP_EXT && field->ext_type == MP_UNKNOWN_EXTENSION); /* must be called after tofield() */
+	assert(field->type == MP_EXT); /* must be called after tofield() */
 
 	if (cfg->encode_load_metatables) {
 		int type = lua_type(L, idx);
