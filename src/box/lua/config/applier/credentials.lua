@@ -317,7 +317,8 @@ end
 -- "sharding" role is created by default, the error may still appear even if the
 -- user does not make any changes. To partially avoid this problem, we do not
 -- create the "sharding" role if it is not in use. This is a temporary solution.
-local function sharding_role(configdata)
+local function sharding_role(config)
+    local configdata = config._configdata
     local roles = configdata:get('credentials.roles')
     local users = configdata:get('credentials.users')
     local has_sharding_role = false
@@ -335,17 +336,18 @@ local function sharding_role(configdata)
         return
     end
 
+    local credentials = {roles = {sharding = {}}}
     -- Add necessary privileges if storage sharding role is enabled.
     local sharding_roles = configdata:get('sharding.roles')
     if sharding_roles == nil or #sharding_roles == 0 then
-        return {}
+        return credentials
     end
     local is_storage = false
     for _, role in pairs(sharding_roles) do
         is_storage = is_storage or role == 'storage'
     end
     if not is_storage then
-        return {}
+        return credentials
     end
 
     local funcs = {}
@@ -361,13 +363,14 @@ local function sharding_role(configdata)
             table.insert(funcs, name)
         end
     end
-    return {
+    credentials.roles.sharding = {
         privileges = {{
             permissions = {'execute'},
             functions = funcs,
         }},
         roles = {'replication'},
     }
+    return credentials
 end
 
 -- Add credentials from src to desc.
@@ -427,10 +430,6 @@ local function get_credentials(config)
     credentials.roles['super'] = credentials.roles['super'] or {}
     credentials.roles['public'] = credentials.roles['public'] or {}
     credentials.roles['replication'] = credentials.roles['replication'] or {}
-
-    -- Add a semi-default role 'sharding'.
-    credentials.roles['sharding'] = credentials.roles['sharding'] or
-                                    sharding_role(configdata)
 
     credentials.users = credentials.users or {}
     credentials.users['guest'] = credentials.users['guest'] or {}
@@ -1009,6 +1008,10 @@ end
 local function apply(config_module)
     config = config_module
     set('config', config_module._configdata:get('credentials'))
+    local sharding_credentials = sharding_role(config_module)
+    if sharding_credentials ~= nil then
+        set('sharding', sharding_credentials)
+    end
 end
 
 return {
