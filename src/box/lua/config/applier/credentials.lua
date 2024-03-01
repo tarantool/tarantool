@@ -6,6 +6,9 @@ local fiber = require('fiber')
 -- Var is set with the first apply() call.
 local config
 
+-- All credentials that should be applied by this module.
+local all_creds = {}
+
 -- {{{ Sync helpers
 
 --[[
@@ -367,14 +370,37 @@ local function sharding_role(configdata)
     }
 end
 
--- Get the latest credentials configuration from the config and add empty
--- default users and roles configuration, if they are missing.
+-- Add credentials from src to desc.
+local function merge_creds(dest, src)
+    assert(dest ~= nil and type(dest) == 'table')
+    if src == nil then
+        return
+    end
+
+    for name, object in pairs(src) do
+        dest[name] = dest[name] or {privileges = {}, roles = {}}
+        dest[name].password = object.password or dest[name].password
+        for _, privilege in pairs(object.privileges or {}) do
+            table.insert(dest[name].privileges, privilege)
+        end
+        for _, role in pairs(object.roles or {}) do
+            table.insert(dest[name].roles, role)
+        end
+    end
+end
+
+-- Merge prepared credentials and add empty default users and roles
+-- configuration, if they are missing.
 local function get_credentials(config)
     local configdata = config._configdata
-    local credentials = configdata:get('credentials')
+    local credentials = {users = {}, roles = {}}
+    for _, partial_credentials in ipairs(all_creds) do
+        merge_creds(credentials.roles, partial_credentials.credentials.roles)
+        merge_creds(credentials.users, partial_credentials.credentials.users)
+    end
 
-    -- If credentials section in config is empty, skip applier.
-    if credentials == nil then
+    -- If there is no credentials to set, skip applier.
+    if next(credentials.roles) == nil and next(credentials.users) == nil then
         return {}
     end
 
@@ -913,8 +939,18 @@ local sync_credentials_fiber
 -- set for box.space._space/_func/_sequence.
 local triggers_are_set
 
-local function apply(config_module)
-    config = config_module
+-- Set credentials by source and invoke full credential synchronization to set
+-- the new credentials.
+local function set(source_name, credentials)
+    assert(credentials == nil or type(credentials) == 'table')
+    if type(source_name) ~= 'string' then
+        error('Name of credential source must be a string or nil', 0)
+    end
+    if all_creds[source_name] == nil then
+        all_creds[source_name] = {}
+        all_creds[#all_creds + 1] = all_creds[source_name]
+    end
+    all_creds[source_name].credentials = credentials or {}
 
     -- Create a fiber channel for scheduled tasks for sync worker.
     if not sync_tasks then
@@ -969,6 +1005,11 @@ local function apply(config_module)
 end
 
 -- }}} Applier
+
+local function apply(config_module)
+    config = config_module
+    set('config', config_module._configdata:get('credentials'))
+end
 
 return {
     name = 'credentials',
