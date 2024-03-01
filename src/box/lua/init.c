@@ -107,6 +107,7 @@ extern char session_lua[],
 	iproto_lua[],
 	checks_version_lua[],
 	checks_lua[],
+	access_control_lua[],
 	metrics_api_lua[],
 	metrics_cartridge_failover_lua[],
 	metrics_cartridge_issues_lua[],
@@ -373,6 +374,9 @@ static const char *lua_sources[] = {
 	"config/cluster_config",
 	"internal.config.cluster_config",
 	config_cluster_config_lua,
+
+	/* Currently this module has some dependencies on config modules. */
+	"box/access_control", "access_control", access_control_lua,
 
 	"config/configdata",
 	"internal.config.configdata",

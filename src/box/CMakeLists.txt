@@ -41,6 +41,7 @@ lua_source(lua_sources lua/key_def.lua key_def_lua)
 lua_source(lua_sources lua/merger.lua merger_lua)
 lua_source(lua_sources lua/iproto.lua iproto_lua)
 lua_source(lua_sources lua/mkversion.lua mkversion_lua)
+lua_source(lua_sources lua/access_control.lua access_control_lua)
 
 # {{{ config
 lua_source(lua_sources lua/config/applier/app.lua         config_applier_app_lua)

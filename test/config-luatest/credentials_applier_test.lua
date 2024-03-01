@@ -8,7 +8,7 @@ local replicaset = require('test.config-luatest.replicaset')
 
 local g = helpers.group()
 
-local internal = require('internal.config.applier.credentials')._internal
+local internal = require('access_control')._internal
 
 g.before_all(replicaset.init)
 g.after_each(replicaset.drop)
@@ -145,7 +145,7 @@ g.test_converters = function()
     t.assert_equals(internal.privileges_from_box(box_guest_privileges),
                     intermediate_guest_privileges)
 
-    t.assert_equals(internal.privileges_from_config(config_guest_data),
+    t.assert_equals(internal.privileges_from_data(config_guest_data),
                     intermediate_guest_privileges)
 
 
@@ -209,7 +209,7 @@ g.test_converters = function()
     t.assert_equals(internal.privileges_from_box(box_admin_privileges),
                     intermediate_admin_privileges)
 
-    t.assert_equals(internal.privileges_from_config(config_admin_data),
+    t.assert_equals(internal.privileges_from_data(config_admin_data),
                     intermediate_admin_privileges)
 
     local box_replication_privileges = {{
@@ -262,7 +262,7 @@ g.test_converters = function()
     t.assert_equals(internal.privileges_from_box(box_replication_privileges),
                     intermediate_replication_privileges)
 
-    t.assert_equals(internal.privileges_from_config(config_replication_data),
+    t.assert_equals(internal.privileges_from_data(config_replication_data),
                     intermediate_replication_privileges)
 
 
@@ -402,7 +402,7 @@ g.test_converters = function()
     t.assert_equals(internal.privileges_from_box(box_custom_privileges),
                     intermediate_custom_privileges)
 
-    t.assert_equals(internal.privileges_from_config(config_custom_data),
+    t.assert_equals(internal.privileges_from_data(config_custom_data),
                     intermediate_custom_privileges)
 end
 
@@ -589,10 +589,10 @@ g.test_sync_privileges = function(g)
         child:roundtrip(("box.schema.user.%s(%q, %q, %q, %q, %s)"):format(
                          action, name, perm, obj_type, obj_name, opts))
     end
-    child:roundtrip("applier = require('internal.config.applier.credentials')")
-    child:roundtrip("applier._internal.set_config({_aboard = " ..
-        "require('internal.config.utils.aboard').new()})")
-    child:roundtrip("sync_privileges =  applier._internal.sync_privileges")
+    child:roundtrip("access = require('access_control')")
+    child:roundtrip("access._set_aboard(" ..
+        "require('internal.config.utils.aboard').new())")
+    child:roundtrip("sync_privileges =  access._internal.sync_privileges")
     child:roundtrip("json = require('json')")
     child:roundtrip(("credentials = json.decode(%q)"):format(
                      json.encode(credentials)))
@@ -603,7 +603,7 @@ g.test_sync_privileges = function(g)
     local result_privileges = child:read_response()
 
     result_privileges = internal.privileges_from_box(result_privileges)
-    local config_privileges = internal.privileges_from_config(
+    local config_privileges = internal.privileges_from_data(
                                             credentials.users.myuser)
 
     config_privileges = internal.privileges_add_defaults(name, "user",
@@ -651,8 +651,8 @@ g.test_set_password = function(g)
         child:roundtrip(("myuser = %q"):format(name))
         child:roundtrip("box.schema.user.create(myuser)")
 
-        child:roundtrip("set_password = require('internal.config.applier." ..
-                        "credentials')._internal.set_password")
+        child:roundtrip("set_password = require('access_control')." ..
+                        "_internal.set_password")
 
         child:roundtrip("set_password(myuser, 'password1')")
 
@@ -691,8 +691,7 @@ g.test_remove_user_role = function(g)
         t.assert(ok, err)
         ok, err = pcall(box.schema.role.info, 'myrole')
         t.assert(ok, err)
-        local internal =
-                require('internal.config.applier.credentials')._internal
+        local internal = require('access_control')._internal
 
         local guest_perm = box.schema.user.info('guest')
         guest_perm = internal.privileges_from_box(guest_perm)
@@ -784,8 +783,7 @@ g.test_restore_defaults_for_default_user = function(g)
             }
         },
         verify = function()
-            local internal =
-                    require('internal.config.applier.credentials')._internal
+            local internal = require('access_control')._internal
 
             local default_identities = {{
                 'user', 'admin',
@@ -818,8 +816,7 @@ g.test_restore_defaults_for_default_user = function(g)
             }
         },
         verify_2 = function()
-            local internal =
-                    require('internal.config.applier.credentials')._internal
+            local internal = require('access_control')._internal
 
             local default_identities = {{
                 'user', 'admin',
@@ -875,8 +872,7 @@ g.test_sync_ro_rw = function(g)
         verify_2 = function()
             t.assert(box.info.ro)
 
-            local internal =
-                    require('internal.config.applier.credentials')._internal
+            local internal = require('access_control')._internal
 
             local perm = box.schema.user.info('guest')
             perm = internal.privileges_from_box(perm)
@@ -973,8 +969,7 @@ g.test_postpone_grants_till_creation = function(g)
             box.schema.func.create('myfunc2')
             box.schema.sequence.create('myseq3')
 
-            local internal =
-                    require('internal.config.applier.credentials')._internal
+            local internal = require('access_control')._internal
 
             local perm_1 = box.schema.user.info('myuser1')
             perm_1 = internal.privileges_from_box(perm_1)
@@ -1009,8 +1004,7 @@ g.test_postpone_grants_till_creation = function(g)
             box.schema.sequence.create('myseq1')
             box.schema.sequence.create('myseq2')
 
-            local internal =
-                    require('internal.config.applier.credentials')._internal
+            local internal = require('access_control')._internal
 
             local perm_1 = box.schema.user.info('myuser1')
             perm_1 = internal.privileges_from_box(perm_1)
@@ -1019,19 +1013,19 @@ g.test_postpone_grants_till_creation = function(g)
             perm_2 = internal.privileges_from_box(perm_2)
 
             local exp_perm_1 = iconfig.credentials.users.myuser1
-            exp_perm_1 = internal.privileges_from_config(exp_perm_1)
+            exp_perm_1 = internal.privileges_from_data(exp_perm_1)
             exp_perm_1 = internal.privileges_add_defaults('myuser1', 'user',
                                                           exp_perm_1)
 
             local exp_perm_2 = iconfig.credentials.users.myuser2
-            exp_perm_2 = internal.privileges_from_config(exp_perm_2)
+            exp_perm_2 = internal.privileges_from_data(exp_perm_2)
             exp_perm_2 = internal.privileges_add_defaults('myuser2', 'user',
                                                           exp_perm_2)
 
             t.assert_equals(perm_1, exp_perm_1)
             t.assert_equals(perm_2, exp_perm_2)
 
-            -- Recheck relevant permissions without privileges_from_config()
+            -- Recheck relevant permissions without privileges_from_data()
             -- and privileges_add_defaults() helper function, in case they
             -- are faulty.
             t.assert_equals(perm_1['space']['myspace1'],
@@ -1093,8 +1087,7 @@ g.test_postpone_grants_till_rename = function(g)
         verify = function()
             box.schema.space.create('myspace2')
 
-            local internal =
-                    require('internal.config.applier.credentials')._internal
+            local internal = require('access_control')._internal
 
             local perm_1 = box.schema.user.info('myuser1')
             perm_1 = internal.privileges_from_box(perm_1)
@@ -1153,8 +1146,7 @@ g.test_postpone_grants_till_rename = function(g)
         verify = function()
             box.schema.space.create('myspace1')
 
-            local internal =
-                    require('internal.config.applier.credentials')._internal
+            local internal = require('access_control')._internal
 
             local perm_1 = box.schema.user.info('myuser')
             perm_1 = internal.privileges_from_box(perm_1)
@@ -1178,19 +1170,18 @@ g.test_postpone_grants_till_rename = function(g)
         verify_2 = function(iconfig)
             box.schema.space.create('myspace1')
 
-            local internal =
-                    require('internal.config.applier.credentials')._internal
+            local internal = require('access_control')._internal
 
             local perm = box.schema.user.info('myuser')
             perm = internal.privileges_from_box(perm)
 
             local exp_perm = iconfig.credentials.users.myuser
-            exp_perm = internal.privileges_from_config(exp_perm)
+            exp_perm = internal.privileges_from_data(exp_perm)
             exp_perm = internal.privileges_add_defaults('myuser', 'user',
                                                         exp_perm)
             t.assert_equals(perm, exp_perm)
 
-            -- Recheck relevant permissions without privileges_from_config()
+            -- Recheck relevant permissions without privileges_from_data()
             -- and privileges_add_defaults() helper function, in case they
             -- are faulty.
             t.assert_equals(perm['space']['myspace1'],
@@ -1237,8 +1228,7 @@ g.test_postpone_grants_till_rename = function(g)
     helpers.success_case(g, {
         options = iconfig,
         verify = function(iconfig)
-            local internal =
-                    require('internal.config.applier.credentials')._internal
+            local internal = require('access_control')._internal
 
             local function check_sync()
 
@@ -1246,12 +1236,12 @@ g.test_postpone_grants_till_rename = function(g)
                 perm = internal.privileges_from_box(perm)
 
                 local exp_perm = iconfig.credentials.users.myuser
-                exp_perm = internal.privileges_from_config(exp_perm)
+                exp_perm = internal.privileges_from_data(exp_perm)
                 exp_perm = internal.privileges_add_defaults('myuser', 'user',
                                                             exp_perm)
                 t.assert_equals(perm, exp_perm)
 
-                -- Recheck relevant permissions without privileges_from_config()
+                -- Recheck relevant permissions without privileges_from_data()
                 -- and privileges_add_defaults() helper function, in case they
                 -- are faulty.
                 t.assert_equals(perm['space']['myspace1'],
