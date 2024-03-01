@@ -4,7 +4,7 @@ local digest = require('digest')
 local fiber = require('fiber')
 
 -- Var is set with the first apply() call.
-local config
+local aboard
 
 -- All credentials that should be applied by this module.
 local all_creds = {}
@@ -135,8 +135,8 @@ local function privileges_add_perm(obj_type, obj_names, perm, intermediate)
     end
 end
 
-local function privileges_from_config(config_data)
-    local privileges = config_data.privileges or {}
+local function privileges_from_data(data)
+    local privileges = data.privileges or {}
     assert(type(privileges) == 'table')
 
     local intermediate = {
@@ -167,7 +167,7 @@ local function privileges_from_config(config_data)
         end
     end
 
-    local roles = config_data.roles or {}
+    local roles = data.roles or {}
 
     for _, role_name in ipairs(roles) do
         -- Unlike spaces, functions and sequences, role is allowed to be
@@ -394,8 +394,7 @@ end
 
 -- Merge prepared credentials and add empty default users and roles
 -- configuration, if they are missing.
-local function get_credentials(config)
-    local configdata = config._configdata
+local function get_credentials()
     local credentials = {users = {}, roles = {}}
     for _, partial_credentials in ipairs(all_creds) do
         merge_creds(credentials.roles, partial_credentials.credentials.roles)
@@ -483,7 +482,7 @@ local function on_commit_trigger(iterator)
         if old_obj == nil or old_obj.name ~= new_obj.name then
             local obj_name = new_obj.name
 
-            -- Check that the object is present inside config.
+            -- Check that the object is present inside credential requests.
             if target_object_map[obj_type][obj_name] then
                 if not sync_tasks:is_full() then
                     sync_tasks:put({name = obj_name, type = obj_type})
@@ -536,7 +535,7 @@ local function on_replace_trigger(old_obj, new_obj, obj_type, request_type)
     end
 
     local obj_name = new_obj.name
-    -- Check that the object is present inside config.
+    -- Check that the object is present inside credential requests.
     if not target_object_map[obj_type][obj_name] then
         return
     end
@@ -575,7 +574,7 @@ local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
         err = ('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q) failed: %s')
               :format(role_or_user, grant_or_revoke, name, privs, obj_type,
                       obj_name, err)
-        config._aboard:set({type = 'error', message = err})
+        aboard:set({type = 'error', message = err})
     end
 end
 
@@ -600,7 +599,7 @@ local function sync_privileges(credentials, obj_to_sync)
     -- alerts: mark all of them and issue again the actual ones.
     -- The actual drop will occur later. New alerts, if any, are
     -- issued before the drop.
-    config._aboard:each(function(_key, alert)
+    aboard:each(function(_key, alert)
         if alert._trait == 'missed_privilege' then
             alert._trait = 'missed_privilege_obsolete'
         end
@@ -617,7 +616,7 @@ local function sync_privileges(credentials, obj_to_sync)
     -- revoked manually (e.g. with `box.schema.{user,role}.revoke()`).
     -- However, defaults should never be revoked, so target state B is enriched
     -- with them before step 3.
-    local function sync(role_or_user, name, config_privileges)
+    local function sync(role_or_user, name, privileges)
         assert(role_or_user == 'user' or role_or_user == 'role')
         if not obj_to_sync then
             log.verbose('credentials.apply: syncing privileges for %s %q',
@@ -626,10 +625,10 @@ local function sync_privileges(credentials, obj_to_sync)
 
         local box_privileges = box.schema[role_or_user].info(name)
 
-        config_privileges = privileges_from_config(config_privileges)
+        privileges = privileges_from_data(privileges)
         box_privileges = privileges_from_box(box_privileges)
 
-        local grants = privileges_subtract(config_privileges, box_privileges)
+        local grants = privileges_subtract(privileges, box_privileges)
 
         for _, to_grant in ipairs(grants) do
             -- Note that grants are filtered per object, if required.
@@ -640,10 +639,9 @@ local function sync_privileges(credentials, obj_to_sync)
             end
         end
 
-        config_privileges = privileges_add_defaults(name, role_or_user,
-                                                    config_privileges)
+        privileges = privileges_add_defaults(name, role_or_user, privileges)
 
-        local revokes = privileges_subtract(box_privileges, config_privileges)
+        local revokes = privileges_subtract(box_privileges, privileges)
 
         for _, to_revoke in ipairs(revokes) do
             -- Note that revokes are filtered per object, if required.
@@ -660,8 +658,7 @@ local function sync_privileges(credentials, obj_to_sync)
         -- configuration.
         box_privileges = box.schema[role_or_user].info(name)
         box_privileges = privileges_from_box(box_privileges)
-        local missed_grants = privileges_subtract(config_privileges,
-                                                  box_privileges)
+        local missed_grants = privileges_subtract(privileges, box_privileges)
 
         -- The most frequent scenario is when a privilege
         -- couldn't be granted, because the object (space/
@@ -696,7 +693,7 @@ local function sync_privileges(credentials, obj_to_sync)
             local privs = table.concat(grant.privs, ',')
             alert.message = msg:format(role_or_user, 'grant', name, privs,
                                        grant.obj_type, grant.obj_name)
-            config._aboard:set(alert)
+            aboard:set(alert)
         end
     end
 
@@ -713,7 +710,7 @@ local function sync_privileges(credentials, obj_to_sync)
     end
 
     -- Drop obsolete missed_privilege alerts.
-    config._aboard:drop_if(function(_key, alert)
+    aboard:drop_if(function(_key, alert)
         return alert._trait == 'missed_privilege_obsolete'
     end)
 end
@@ -788,7 +785,7 @@ local function set_password(user_name, password)
     if user_name == 'guest' then
         local message = 'credentials.apply: setting a password for ' ..
                         'the guest user is not allowed'
-        config._aboard:set({type = 'error', message = message})
+        aboard:set({type = 'error', message = message})
     end
 
     local auth_def = box.space._user.index.name:get({user_name})[5]
@@ -861,7 +858,7 @@ end
 -- is created or is being renamed to the config-provided name.
 local function register_objects(users_or_roles_config)
     for _name, config in pairs(users_or_roles_config or {}) do
-        local privileges = privileges_from_config(config)
+        local privileges = privileges_from_data(config)
         for obj_type in pairs(target_object_map) do
             for obj_name in pairs(privileges[obj_type] or {}) do
                 target_object_map[obj_type][obj_name] = true
@@ -908,7 +905,7 @@ local function sync_credentials_worker()
                 ['sequence'] = {},
             }
 
-            local credentials = get_credentials(config)
+            local credentials = get_credentials()
 
             register_objects(credentials.roles)
             register_objects(credentials.users)
@@ -924,7 +921,7 @@ local function sync_credentials_worker()
                 wait_sync:put('Done')
             end
         else
-            local credentials = get_credentials(config)
+            local credentials = get_credentials()
 
             box.atomic(sync_privileges, credentials, obj_to_sync)
         end
@@ -937,6 +934,11 @@ local sync_credentials_fiber
 -- One-shot flag. It indicates that on_replace triggers are
 -- set for box.space._space/_func/_sequence.
 local triggers_are_set
+
+-- Set aboard to use in this module.
+local function set_aboard(alerts_board)
+    aboard = alerts_board
+end
 
 -- Set credentials by source and invoke full credential synchronization to set
 -- the new credentials.
@@ -1006,7 +1008,7 @@ end
 -- }}} Applier
 
 local function apply(config_module)
-    config = config_module
+    aboard = config_module._aboard
     set('config', config_module._configdata:get('credentials'))
     local sharding_credentials = sharding_role(config_module)
     if sharding_credentials ~= nil then
@@ -1020,10 +1022,10 @@ return {
     -- Exported for testing purposes.
     _internal = {
         set_config = function(config_module)
-            config = config_module
+            set_aboard(config_module._aboard)
         end,
         privileges_from_box = privileges_from_box,
-        privileges_from_config = privileges_from_config,
+        privileges_from_config = privileges_from_data,
         privileges_subtract = privileges_subtract,
         privileges_add_defaults = privileges_add_defaults,
         sync_privileges = sync_privileges,
