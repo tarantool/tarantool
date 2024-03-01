@@ -1,9 +1,14 @@
+local instance_config = require('internal.config.instance_config')
 local log = require('internal.config.utils.log')
 local digest = require('digest')
 local fiber = require('fiber')
 
--- Var is set with the first apply() call.
-local aboard
+-- This variable will be used by config module to manage alerts.
+local aboard = {
+    set = function() end,
+    each = function() end,
+    drop_if = function() end,
+}
 
 -- All credentials that should be applied by this module.
 local all_creds = {}
@@ -866,19 +871,8 @@ local function set_aboard(alerts_board)
     aboard = alerts_board
 end
 
--- Set credentials by source and invoke full credential synchronization to set
--- the new credentials.
-local function set(source_name, credentials)
-    assert(credentials == nil or type(credentials) == 'table')
-    if type(source_name) ~= 'string' then
-        error('Name of credential source must be a string or nil', 0)
-    end
-    if all_creds[source_name] == nil then
-        all_creds[source_name] = {}
-        all_creds[#all_creds + 1] = all_creds[source_name]
-    end
-    all_creds[source_name].credentials = credentials or {}
-
+-- Invoke full credential synchronization to set the new credentials.
+local function invoke_sync()
     -- Create a fiber channel for scheduled tasks for sync worker.
     if not sync_tasks then
         -- There is no good reason to have the channel capacity limited,
@@ -931,10 +925,62 @@ local function set(source_name, credentials)
     end
 end
 
+-- Set credentials by source and invoke full credential synchronization to set
+-- the new credentials.
+local function set(source_name, credentials)
+    if type(source_name) ~= 'string' then
+        error('Name of privilege request source must be a string', 0)
+    end
+    if credentials ~= nil and type(credentials) ~= 'table' then
+        error('Wrong format of privilege requests', 0)
+    end
+    instance_config:validate({credentials = credentials})
+    if all_creds[source_name] == nil then
+        all_creds[source_name] = {}
+        all_creds[#all_creds + 1] = all_creds[source_name]
+    end
+    all_creds[source_name].credentials = credentials or {}
+    invoke_sync()
+end
+
+-- Return credential requests by the source name. Returns all credential
+-- requests if the source name is not specified.
+local function get(source_name)
+    if type(source_name) == 'string' then
+        return all_creds[source_name] and all_creds[source_name].credentials
+    end
+    if source_name ~= nil then
+        error('Name of privilege request source must be a string or nil', 0)
+    end
+    local res = {}
+    for k, v in pairs(all_creds) do
+        if type(k) == 'string' then
+            res[k] = v.credentials
+        end
+    end
+    return res
+end
+
+-- Drop credential requests requested by source.
+local function drop(source_name)
+    if type(source_name) ~= 'string' then
+        error('Name of privilege request source must be a string', 0)
+    end
+    if all_creds[source_name] == nil then
+        error(('Privilege request source %q does not ' ..
+               'exists'):format(source_name), 0)
+    end
+    all_creds[source_name].credentials = {}
+    all_creds[source_name] = nil
+    invoke_sync()
+end
+
 -- }}} Applier
 
 return {
     set = set,
+    get = get,
+    drop = drop,
     _set_aboard = set_aboard,
     -- Exported for testing purposes.
     _internal = {
