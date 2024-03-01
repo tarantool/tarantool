@@ -1,4 +1,5 @@
 local expression = require('internal.config.utils.expression')
+local access_control = require('access_control')
 local log = require('internal.config.utils.log')
 _G.vshard = nil
 
@@ -31,13 +32,18 @@ local function apply(config)
             is_router = true
         end
     end
+
+    local funcs = {}
     local cfg = configdata:sharding()
     if is_storage then
+        local vexports = require('vshard.storage.exports')
+        local exports = vexports.compile(vexports.log[#vexports.log])
+        for name in pairs(exports.funcs) do
+            table.insert(funcs, name)
+        end
         -- Start a watcher which will create all the necessary functions.
         if watcher == nil then
             local function deploy_funcs()
-                local vexports = require('vshard.storage.exports')
-                local exports = vexports.compile(vexports.log[#vexports.log])
                 vexports.deploy_funcs(exports)
             end
             watcher = box.watch('box.status', function(_, status)
@@ -59,6 +65,19 @@ local function apply(config)
         log.info('sharding: apply router config')
         _G.vshard.router.cfg(cfg)
     end
+
+    local credentials = {
+        roles = {
+            sharding = {
+                privileges = {{
+                    permissions = {'execute'},
+                    functions = funcs,
+                }},
+                roles = {'replication'},
+            }
+        }
+    }
+    access_control.set('sharding', credentials)
 end
 
 return {
