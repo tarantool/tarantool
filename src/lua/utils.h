@@ -530,6 +530,13 @@ int
 luaL_checkconstchar(struct lua_State *L, int idx, const char **res,
 		    uint32_t *cdata_type_p);
 
+/**
+ * Whether the object at the given valid index is in the table at
+ * the given valid index.
+ */
+bool
+luaT_hasfield(struct lua_State *L, int obj_index, int table_index);
+
 /* {{{ Helper functions to interact with a Lua iterator from C */
 
 /**

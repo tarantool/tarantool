@@ -241,8 +241,6 @@ struct luaL_field {
 	/* subtypes of MP_EXT */
 	enum mp_extension_type ext_type;
 	bool compact;                /* a flag used by YAML serializer */
-	/** Set if __serialize metamethod was called for this field. */
-	bool serialized;
 };
 
 /**
@@ -381,6 +379,44 @@ luaL_checkfinite(struct lua_State *L, struct luaL_serializer *cfg,
 	if (!cfg->decode_invalid_numbers && !isfinite(number))
 		luaL_error(L, "number must not be NaN or Inf");
 }
+
+/* {{{ luaT_reftable */
+
+/**
+ * Serialize the object at the given Lua stack index and all the
+ * descendant ones recursively and create a mapping from the
+ * original objects to the resulting ones.
+ *
+ * The mapping (a Lua table) is pushed on top of the Lua stack.
+ * The function returns amount of objects pushed to the stack: it
+ * is always 1.
+ *
+ * The serialization is performed using luaL_checkfield() with the
+ * provided configuration.
+ *
+ * A table that indirectly references itself is a valid input for
+ * this function: it tracks visited objects internally to break
+ * the cycle.
+ *
+ * If an error is raised by a __serialize or __tostring
+ * metamethod, it is raised by this function (not caught).
+ */
+int
+luaT_reftable_new(struct lua_State *L, struct luaL_serializer *cfg, int idx);
+
+/**
+ * Look for an object from top of the Lua stack in the reference
+ * table and, if found, replace it with the saved serialized
+ * object.
+ *
+ * If the object is not found, do nothing.
+ *
+ * The function leaves the stack size unchanged.
+ */
+void
+luaT_reftable_serialize(struct lua_State *L, int reftable_index);
+
+/* }}} luaT_reftable */
 
 int
 tarantool_lua_serializer_init(struct lua_State *L);
