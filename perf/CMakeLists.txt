@@ -69,6 +69,12 @@ create_perf_test(NAME tuple
 )
 create_perf_test_target(TARGET tuple)
 
+create_perf_test(NAME bps_tree
+                 SOURCES bps_tree.cc ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
+                 LIBRARIES core box tuple benchmark::benchmark
+)
+create_perf_test_target(TARGET bps_tree)
+
 create_perf_test(NAME light
                  SOURCES light.cc ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
                  LIBRARIES small benchmark::benchmark

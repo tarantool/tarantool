@@ -1,0 +1,5 @@
+#define SMALL_BLOCK_SIZE 128
+#define COMPARE_WITH_SPTREE_CHECK_BRANCHES_ELEM_LIMIT 1024
+#define TEST_COUNT_IN_LEAF 14
+#define TEST_COUNT_IN_INNER 10
+#include "bps_tree_generic.cc"

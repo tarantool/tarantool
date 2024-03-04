@@ -136,9 +136,17 @@ create_unit_test(PREFIX interval
                  SOURCES interval.c core_test_utils.c
                  LIBRARIES core unit
 )
-create_unit_test(PREFIX bps_tree
-                 SOURCES bps_tree.cc
-                 LIBRARIES small misc
+create_unit_test(PREFIX bps_tree_default
+                 SOURCES bps_tree_default.cc
+                 LIBRARIES unit small misc
+)
+create_unit_test(PREFIX bps_tree_inner_card
+                 SOURCES bps_tree_inner_card.cc
+                 LIBRARIES unit small misc
+)
+create_unit_test(PREFIX bps_tree_with_child_cards
+                 SOURCES bps_tree_with_child_cards.cc
+                 LIBRARIES unit small misc
 )
 create_unit_test(PREFIX bps_tree_iterator
                  SOURCES bps_tree_iterator.cc
