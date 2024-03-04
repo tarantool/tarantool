@@ -4,6 +4,10 @@
 #include <inttypes.h>
 #include <time.h>
 
+#ifdef BPS_BLOCK_CHILD_CARDS_ARRAY
+#define UNIT_TAP_COMPATIBLE 1
+#endif
+
 #include "unit.h"
 #include "sptree.h"
 #include "qsort_arg.h"
@@ -43,7 +47,7 @@ compare(type_t a, type_t b);
 
 /* true tree with true settings */
 #define BPS_TREE_NAME test
-#define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
+#define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE /* small specially for tests */
 #define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
 #define BPS_TREE_IS_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
@@ -85,7 +89,7 @@ static int compare_key(const elem_t &a, long b)
 }
 
 #define BPS_TREE_NAME struct_tree
-#define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
+#define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE /* small specially for tests */
 #define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
 #define BPS_TREE_IS_IDENTICAL(a, b) equal(a, b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
@@ -106,7 +110,7 @@ static int compare_key(const elem_t &a, long b)
 
 /* tree for approximate_count test */
 #define BPS_TREE_NAME approx
-#define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
+#define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE /* small specially for tests */
 #define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
 #define BPS_TREE_IS_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) ((a) < (b) ? -1 : (a) > (b) ? 1 : 0)
@@ -381,7 +385,7 @@ compare_with_sptree_check_branches()
 	test tree;
 	test_create(&tree, 0, extent_alloc, extent_free, &extents_count, NULL);
 
-	const int elem_limit = 1024;
+	const int elem_limit = COMPARE_WITH_SPTREE_CHECK_BRANCHES_ELEM_LIMIT;
 
 	for (int i = 0; i < elem_limit; i++) {
 		type_t v = (type_t)i;
@@ -685,6 +689,9 @@ white_box_test()
 	const int count_in_leaf = BPS_TREE_test_MAX_COUNT_IN_LEAF;
 	const int count_in_inner = BPS_TREE_test_MAX_COUNT_IN_INNER;
 
+	assert(count_in_leaf == TEST_COUNT_IN_LEAF);
+	assert(count_in_inner == TEST_COUNT_IN_INNER);
+
 	printf("full leaf:\n");
 	for (type_t i = 0; i < count_in_leaf; i++) {
 		test_insert(&tree, i, 0, 0);
@@ -841,6 +848,7 @@ approximate_count()
 	};
 
 	printf("Error count: %d\n", err_count);
+	fail_unless(err_count == 0);
 	printf("Count: %llu\n", (unsigned long long)count);
 
 	approx_destroy(&tree);
@@ -939,17 +947,24 @@ insert_successor_test()
 int
 main(void)
 {
+	plan(1);
+	header();
+
 	simple_check();
 	compare_with_sptree_check();
 	compare_with_sptree_check_branches();
 	bps_tree_debug_self_check();
 	loading_test();
+#ifndef BPS_BLOCK_CHILD_CARDS_ARRAY
 	printing_test();
+#endif
 	white_box_test();
 	approximate_count();
-	if (extents_count != 0)
-		fail("memory leak!", "true");
+	ok(extents_count == 0, "memory leak check");
 	insert_get_iterator();
 	delete_value_check();
 	insert_successor_test();
+
+	footer();
+	return check_plan();
 }

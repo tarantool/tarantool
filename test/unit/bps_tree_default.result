@@ -1,3 +1,5 @@
+1..1
+	*** main ***
 	*** simple_check ***
 Insert 1..X, remove 1..X
 Insert 1..X, remove X..1
@@ -278,9 +280,11 @@ Count: 10575
 Error count: 0
 Count: 10575
 	*** approximate_count: done ***
+ok 1 - memory leak check
 	*** insert_get_iterator ***
 	*** insert_get_iterator: done ***
 	*** delete_value_check ***
 	*** delete_value_check: done ***
 	*** insert_successor_test ***
 	*** insert_successor_test: done ***
+	*** main: done ***
