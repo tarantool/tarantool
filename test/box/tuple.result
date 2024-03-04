@@ -518,8 +518,8 @@ gen, init, state = t:pairs()
 gen, init, state
 ---
 - gen: <tuple iterator>
-  param: ['a', 'b', 'c']
-- ['a', 'b', 'c']
+  param: &0 ['a', 'b', 'c']
+- *0
 - null
 ...
 state, val = gen(init, state)
@@ -625,16 +625,16 @@ r
 t:pairs(nil)
 ---
 - gen: <tuple iterator>
-  param: ['a', 'b', 'c']
-- ['a', 'b', 'c']
+  param: &0 ['a', 'b', 'c']
+- *0
 - null
 ...
 t:pairs("fdsaf")
 ---
 - state: fdsaf
   gen: <tuple iterator>
-  param: ['a', 'b', 'c']
-- ['a', 'b', 'c']
+  param: &0 ['a', 'b', 'c']
+- *0
 - fdsaf
 ...
 --------------------------------------------------------------------------------

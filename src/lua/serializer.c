@@ -329,7 +329,6 @@ lua_field_try_serialize(struct lua_State *L, struct luaL_serializer *cfg,
 		if (luaL_tofield(L, cfg, -1, field) != 0)
 			return -1;
 		lua_replace(L, idx);
-		field->serialized = true;
 		return 0;
 	}
 	if (!lua_isstring(L, -1)) {
@@ -441,7 +440,6 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 	field->type = MP_NIL;
 	field->ext_type = MP_UNKNOWN_EXTENSION;
 	field->compact = false;
-	field->serialized = false;
 
 	if (index < 0)
 		index = lua_gettop(L) + index + 1;
@@ -650,6 +648,156 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 }
 
 /* }}} Fill luaL_field */
+
+/* {{{ luaT_reftable */
+
+/**
+ * Traversal context for creating a table of references from
+ * original objects to serialized ones.
+ */
+struct reftable_new_ctx {
+	/** Serialization options. */
+	struct luaL_serializer *cfg;
+	/** Index of a references table on the Lua stack. */
+	int reftable_index;
+	/** Index of a visited objects table on the Lua stack. */
+	int visited_index;
+};
+
+/**
+ * Serialize the object given at top of the Lua stack and all the
+ * descendant ones recursively and fill a mapping from the
+ * original objects to the resulting ones.
+ *
+ * The serialization is performed using luaL_checkfield().
+ *
+ * The function leaves the Lua stack size unchanged.
+ */
+static void
+luaT_reftable_new_impl(struct lua_State *L, struct reftable_new_ctx *ctx)
+{
+	struct luaL_field field;
+
+	/*
+	 * We're not interested in values that can't have
+	 * __serialize or __tostring metamethods.
+	 */
+	if (!lua_istable(L, -1) &&
+	    !luaL_iscdata(L, -1) &&
+	    !lua_isuserdata(L, -1))
+		return;
+
+	/*
+	 * Check if the object is already visited.
+	 *
+	 * Just to don't go into the infinite recursion.
+	 */
+	if (luaT_hasfield(L, -1, ctx->visited_index))
+		return;
+
+	/* Mark the object as visited. */
+	lua_pushvalue(L, -1);
+	lua_pushboolean(L, true);
+	lua_settable(L, ctx->visited_index);
+
+	/*
+	 * Check if the object is already saved in the reference
+	 * table.
+	 */
+	if (luaT_hasfield(L, -1, ctx->reftable_index))
+		return;
+
+	/*
+	 * Copy the original object and serialize it. The
+	 * luaL_checkfield() function replaces the value on the
+	 * Lua stack with the serialized one (or left it as is).
+	 */
+	lua_pushvalue(L, -1);
+	luaL_checkfield(L, ctx->cfg, -1, &field);
+
+	/*
+	 * Save {original object -> serialized object} in the
+	 * reference table.
+	 */
+	if (!lua_rawequal(L, -1, -2)) {
+		lua_pushvalue(L, -2); /* original object */
+		lua_pushvalue(L, -2); /* serialized object */
+		lua_settable(L, ctx->reftable_index);
+	}
+
+	/*
+	 * Check if the serialized object is already saved in the
+	 * reference table.
+	 */
+	if (luaT_hasfield(L, -1, ctx->reftable_index)) {
+		lua_pop(L, 1);
+		return;
+	}
+
+	/*
+	 * Go down into the recursion to analyze the fields if the
+	 * serialized object is a table.
+	 */
+	if (lua_istable(L, -1)) {
+		lua_pushnil(L);
+		while (lua_next(L, -2)) {
+			luaT_reftable_new_impl(L, ctx);
+			lua_pop(L, 1);
+			luaT_reftable_new_impl(L, ctx);
+		}
+	}
+
+	/* Pop the serialized value, leave the original one. */
+	lua_pop(L, 1);
+}
+
+int
+luaT_reftable_new(struct lua_State *L, struct luaL_serializer *cfg, int idx)
+{
+	/*
+	 * Fill the traversal context.
+	 *
+	 * Create a reference table and a visited objects table.
+	 */
+	struct reftable_new_ctx ctx;
+	ctx.cfg = cfg;
+	lua_newtable(L);
+	ctx.reftable_index = lua_gettop(L);
+	lua_newtable(L);
+	ctx.visited_index = lua_gettop(L);
+
+	/*
+	 * Copy the given object on top of the Lua stack and
+	 * traverse all its descendants recursively.
+	 *
+	 * Fill the reference table for all the met objects that
+	 * are changed by the serialization.
+	 */
+	lua_pushvalue(L, idx);
+	luaT_reftable_new_impl(L, &ctx);
+
+	/*
+	 * Pop the copy of the given object and the visited
+	 * objects table. Leave the reference table on the top.
+	 */
+	lua_pop(L, 2);
+
+	return 1;
+}
+
+void
+luaT_reftable_serialize(struct lua_State *L, int reftable_index)
+{
+	lua_pushvalue(L, -1);
+	lua_gettable(L, reftable_index);
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1);
+	} else {
+		lua_replace(L, -2);
+	}
+}
+
+/* }}} luaT_reftable */
 
 int
 tarantool_lua_serializer_init(struct lua_State *L)
