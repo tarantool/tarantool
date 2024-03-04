@@ -138,11 +138,11 @@ create_unit_test(PREFIX interval
 )
 create_unit_test(PREFIX bps_tree
                  SOURCES bps_tree.cc
-                 LIBRARIES small misc
+                 LIBRARIES small misc unit
 )
 create_unit_test(PREFIX bps_tree_iterator
                  SOURCES bps_tree_iterator.cc
-                 LIBRARIES small misc
+                 LIBRARIES small misc unit
 )
 create_unit_test(PREFIX bps_tree_view
                  SOURCES bps_tree_view.c
