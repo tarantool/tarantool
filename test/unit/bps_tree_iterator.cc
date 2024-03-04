@@ -4,6 +4,15 @@
 #include <time.h>
 #include <limits.h>
 
+/* Select the tree flavor to test. */
+#if defined(TEST_INNER_CARD)
+# define BPS_INNER_CARD
+#elif defined(TEST_INNER_CHILD_CARDS)
+# define BPS_INNER_CHILD_CARDS
+#elif !defined(TEST_DEFAULT)
+# error "Please define TEST_DEFAULT, TEST_INNER_CARD or TEST_INNER_CHILD_CARDS."
+#endif
+
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
@@ -17,7 +26,7 @@ static int compare(const elem_t &a, const elem_t &b);
 static int compare_key(const elem_t &a, long b);
 
 #define BPS_TREE_NAME test
-#define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
+#define BPS_TREE_BLOCK_SIZE 256 /* small value for tests */
 #define BPS_TREE_EXTENT_SIZE 1024 /* value is to low specially for tests */
 #define BPS_TREE_IS_IDENTICAL(a, b) equal(a, b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
@@ -439,6 +448,8 @@ iterator_freeze_check()
 			e.second = 0;
 			test_insert(&tree, e, 0, 0);
 			fail_if(test_debug_check(&tree));
+			fail_if(test_view_debug_check(&view1));
+			fail_if(test_view_debug_check(&view2));
 		}
 		int tested_count = 0;
 		while ((e = test_view_iterator_get_elem(&view1, &iterator1))) {
@@ -458,6 +469,7 @@ iterator_freeze_check()
 			e.second = 0;
 			test_delete(&tree, e);
 			fail_if(test_debug_check(&tree));
+			fail_if(test_view_debug_check(&view2));
 		}
 
 		tested_count = 0;

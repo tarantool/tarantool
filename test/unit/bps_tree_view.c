@@ -1,11 +1,20 @@
 #include <stddef.h>
 #include "trivia/util.h"
 
+/* Select the tree flavor to test. */
+#if defined(TEST_INNER_CARD)
+# define BPS_INNER_CARD
+#elif defined(TEST_INNER_CHILD_CARDS)
+# define BPS_INNER_CHILD_CARDS
+#elif !defined(TEST_DEFAULT)
+# error "Please define TEST_DEFAULT, TEST_INNER_CARD or TEST_INNER_CHILD_CARDS."
+#endif
+
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 #define BPS_TREE_NAME test_tree
-#define BPS_TREE_BLOCK_SIZE 128
+#define BPS_TREE_BLOCK_SIZE 256
 #define BPS_TREE_EXTENT_SIZE 1024
 #define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
 #define BPS_TREE_COMPARE(a, b, arg) ((a) < (b) ? -1 : ((a) > (b) ? 1 : 0))
@@ -14,6 +23,15 @@
 #define bps_tree_key_t int
 #define bps_tree_arg_t void *
 #include "salad/bps_tree.h"
+
+#define test_tree_do_create(tree) \
+	test_tree_create(tree, NULL, extent_alloc, extent_free, NULL, NULL)
+
+#define test_tree_do_insert(tree, val) \
+	fail_if(test_tree_insert((tree), (val), NULL, NULL) != 0)
+
+#define test_tree_view_do_debug_check(view) \
+	fail_if(test_tree_view_debug_check((view)))
 
 static void *
 extent_alloc(void *ctx)
@@ -30,18 +48,6 @@ extent_free(void *ctx, void *extent)
 }
 
 static void
-test_tree_do_create(struct test_tree *tree)
-{
-	test_tree_create(tree, NULL, extent_alloc, extent_free, NULL, NULL);
-}
-
-static void
-test_tree_do_insert(struct test_tree *tree, int val)
-{
-	fail_if(test_tree_insert(tree, val, NULL, NULL) != 0);
-}
-
-static void
 test_size(void)
 {
 	plan(4);
@@ -54,8 +60,10 @@ test_size(void)
 	test_tree_view_create(&view, &tree);
 	is(test_tree_view_size(&view), 0,
 	   "empty view size before tree change");
-	for (int i = 0; i < 1000; i++)
+	for (int i = 0; i < 1000; i++) {
 		test_tree_do_insert(&tree, i);
+		test_tree_view_do_debug_check(&view);
+	}
 	is(test_tree_view_size(&view), 0,
 	   "empty view size after tree change");
 	test_tree_view_destroy(&view);
@@ -65,8 +73,11 @@ test_size(void)
 	   "non-empty view size before tree change");
 	for (int i = 0; i < 1000; i++) {
 		test_tree_do_insert(&tree, i + 1000);
-		if (i % 2 == 0)
+		test_tree_view_do_debug_check(&view);
+		if (i % 2 == 0) {
 			test_tree_delete(&tree, i);
+			test_tree_view_do_debug_check(&view);
+		}
 	}
 	is(test_tree_view_size(&view), 1000,
 	   "non-empty view size after tree change");
@@ -94,8 +105,11 @@ test_find(void)
 
 	for (int i = 0; i < 1000; i++) {
 		test_tree_do_insert(&tree, i + 1000);
-		if (i % 2 == 0)
+		test_tree_view_do_debug_check(&view);
+		if (i % 2 == 0) {
 			test_tree_delete(&tree, i);
+			test_tree_view_do_debug_check(&view);
+		}
 	}
 
 	bool success = true;
@@ -135,8 +149,10 @@ test_first(void)
 	struct test_tree_iterator it = test_tree_view_first(&view);
 	int *p = test_tree_view_iterator_get_elem(&view, &it);
 	is(p, NULL, "empty view first before tree change");
-	for (int i = 0; i < 1000; i++)
+	for (int i = 0; i < 1000; i++) {
 		test_tree_do_insert(&tree, i);
+		test_tree_view_do_debug_check(&view);
+	}
 	it = test_tree_view_first(&view);
 	p = test_tree_view_iterator_get_elem(&view, &it);
 	is(p, NULL, "empty view first after tree change");
@@ -147,8 +163,10 @@ test_first(void)
 	p = test_tree_view_iterator_get_elem(&view, &it);
 	ok(p != NULL && *p == 0,
 	   "non-empty view first before tree change");
-	for (int i = 0; i < 100; i++)
+	for (int i = 0; i < 100; i++) {
 		test_tree_delete(&tree, i);
+		test_tree_view_do_debug_check(&view);
+	}
 	it = test_tree_view_first(&view);
 	p = test_tree_view_iterator_get_elem(&view, &it);
 	ok(p != NULL && *p == 0,
@@ -175,8 +193,10 @@ test_last(void)
 	struct test_tree_iterator it = test_tree_view_last(&view);
 	int *p = test_tree_view_iterator_get_elem(&view, &it);
 	is(p, NULL, "empty view last before tree change");
-	for (int i = 0; i < 1000; i++)
+	for (int i = 0; i < 1000; i++) {
 		test_tree_do_insert(&tree, i);
+		test_tree_view_do_debug_check(&view);
+	}
 	it = test_tree_view_last(&view);
 	p = test_tree_view_iterator_get_elem(&view, &it);
 	is(p, NULL, "empty view last after tree change");
@@ -187,8 +207,10 @@ test_last(void)
 	p = test_tree_view_iterator_get_elem(&view, &it);
 	ok(p != NULL && *p == 999,
 	   "non-empty view last before tree change");
-	for (int i = 900; i < 1000; i++)
+	for (int i = 900; i < 1000; i++) {
 		test_tree_delete(&tree, i);
+		test_tree_view_do_debug_check(&view);
+	}
 	it = test_tree_view_last(&view);
 	p = test_tree_view_iterator_get_elem(&view, &it);
 	ok(p != NULL && *p == 999,
@@ -217,7 +239,9 @@ test_lower_bound(void)
 
 	for (int i = 0; i < 1000; i++) {
 		test_tree_do_insert(&tree, i * 10);
+		test_tree_view_do_debug_check(&view);
 		test_tree_delete(&tree, i * 2);
+		test_tree_view_do_debug_check(&view);
 	}
 
 	bool exact;
@@ -265,7 +289,9 @@ test_upper_bound(void)
 
 	for (int i = 0; i < 1000; i++) {
 		test_tree_do_insert(&tree, i * 10);
+		test_tree_view_do_debug_check(&view);
 		test_tree_delete(&tree, i * 2);
+		test_tree_view_do_debug_check(&view);
 	}
 
 	bool exact;
@@ -314,10 +340,14 @@ test_iterator(void)
 	test_tree_view_create(&view, &tree);
 
 	for (int i = 0; i < 1000; i++) {
-		if (i % 6 == 0)
+		if (i % 6 == 0) {
 			test_tree_delete(&tree, i);
-		if (i % 5 == 0)
+			test_tree_view_do_debug_check(&view);
+		}
+		if (i % 5 == 0) {
 			test_tree_do_insert(&tree, i);
+			test_tree_view_do_debug_check(&view);
+		}
 	}
 
 	bool success = true;

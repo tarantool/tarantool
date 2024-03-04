@@ -25,11 +25,12 @@ function(create_unit_test)
     UNIT
     ""
     "PREFIX"
-    "SOURCES;LIBRARIES"
+    "SOURCES;LIBRARIES;COMPILE_DEFINITIONS"
     ${ARGN}
   )
   message(STATUS "Creating unit test ${UNIT_PREFIX}.test")
   add_executable(${UNIT_PREFIX}.test ${UNIT_SOURCES})
+  target_compile_definitions(${UNIT_PREFIX}.test PRIVATE ${UNIT_COMPILE_DEFINITIONS})
   target_link_libraries(${UNIT_PREFIX}.test ${UNIT_LIBRARIES})
   set(UNIT_TEST_TARGETS "${UNIT_TEST_TARGETS} ${UNIT_PREFIX}.test" PARENT_SCOPE)
 endfunction()
@@ -138,15 +139,58 @@ create_unit_test(PREFIX interval
 )
 create_unit_test(PREFIX bps_tree
                  SOURCES bps_tree.cc
-                 LIBRARIES small misc unit
+                 LIBRARIES unit small misc
+                 COMPILE_DEFINITIONS TEST_DEFAULT
+)
+create_unit_test(PREFIX bps_tree_inner_card
+                 SOURCES bps_tree.cc
+                 LIBRARIES unit small misc
+                 COMPILE_DEFINITIONS TEST_INNER_CARD
+)
+create_unit_test(PREFIX bps_tree_inner_child_cards
+                 SOURCES bps_tree.cc
+                 LIBRARIES unit small misc
+                 COMPILE_DEFINITIONS TEST_INNER_CHILD_CARDS
 )
 create_unit_test(PREFIX bps_tree_iterator
                  SOURCES bps_tree_iterator.cc
-                 LIBRARIES small misc unit
+                 LIBRARIES unit small misc
+                 COMPILE_DEFINITIONS TEST_DEFAULT
+)
+create_unit_test(PREFIX bps_tree_iterator_inner_card
+                 SOURCES bps_tree_iterator.cc
+                 LIBRARIES unit small misc
+                 COMPILE_DEFINITIONS TEST_INNER_CARD
+)
+create_unit_test(PREFIX bps_tree_iterator_inner_child_cards
+                 SOURCES bps_tree_iterator.cc
+                 LIBRARIES unit small misc
+                 COMPILE_DEFINITIONS TEST_INNER_CHILD_CARDS
 )
 create_unit_test(PREFIX bps_tree_view
                  SOURCES bps_tree_view.c
                  LIBRARIES small unit
+                 COMPILE_DEFINITIONS TEST_DEFAULT
+)
+create_unit_test(PREFIX bps_tree_view_inner_card
+                 SOURCES bps_tree_view.c
+                 LIBRARIES small unit
+                 COMPILE_DEFINITIONS TEST_INNER_CARD
+)
+create_unit_test(PREFIX bps_tree_view_inner_child_cards
+                 SOURCES bps_tree_view.c
+                 LIBRARIES small unit
+                 COMPILE_DEFINITIONS TEST_INNER_CHILD_CARDS
+)
+create_unit_test(PREFIX bps_tree_offset_api_inner_card
+                 SOURCES bps_tree_offset_api.cc
+                 LIBRARIES small unit
+                 COMPILE_DEFINITIONS TEST_INNER_CARD
+)
+create_unit_test(PREFIX bps_tree_offset_api_inner_child_cards
+                 SOURCES bps_tree_offset_api.cc
+                 LIBRARIES small unit
+                 COMPILE_DEFINITIONS TEST_INNER_CHILD_CARDS
 )
 create_unit_test(PREFIX rtree
                  SOURCES rtree.cc

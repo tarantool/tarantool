@@ -10,6 +10,26 @@
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
+/* Select the tree flavor to test. */
+#if defined(TEST_DEFAULT)
+# define SMALL_BLOCK_SIZE 128
+#elif defined(TEST_INNER_CARD)
+# define BPS_INNER_CARD
+# define SMALL_BLOCK_SIZE 128
+#elif defined(TEST_INNER_CHILD_CARDS)
+# define BPS_INNER_CHILD_CARDS
+/*
+ * Some branches lead to dummy rebalancing (moving data of zero size) when
+ * the block size is small because of integer arithmetic on reballancing.
+ * This raises assertions, because some data movement routines are designed
+ * to only move non-zero amount of data. Let's make the block size greater
+ * for this tree flavor to prevent this.
+ */
+# define SMALL_BLOCK_SIZE 256
+#else
+# error "Please define TEST_DEFAULT, TEST_INNER_CARD or TEST_INNER_CHILD_CARDS."
+#endif
+
 SPTREE_DEF(test, realloc, qsort_arg);
 
 typedef int64_t type_t;
@@ -41,7 +61,7 @@ compare(type_t a, type_t b);
 
 /* true tree with true settings */
 #define BPS_TREE_NAME test
-#define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
+#define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE /* small value for tests */
 #define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
 #define BPS_TREE_IS_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
@@ -83,7 +103,7 @@ static int compare_key(const elem_t &a, long b)
 }
 
 #define BPS_TREE_NAME struct_tree
-#define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
+#define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE /* small value for tests */
 #define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
 #define BPS_TREE_IS_IDENTICAL(a, b) equal(a, b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
@@ -104,7 +124,7 @@ static int compare_key(const elem_t &a, long b)
 
 /* tree for approximate_count test */
 #define BPS_TREE_NAME approx
-#define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
+#define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE /* small value for tests */
 #define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
 #define BPS_TREE_IS_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) ((a) < (b) ? -1 : (a) > (b) ? 1 : 0)
@@ -369,7 +389,7 @@ compare_with_sptree_check_branches()
 	test tree;
 	test_create(&tree, 0, extent_alloc, extent_free, &extents_count, NULL);
 
-	const int elem_limit = 1024;
+	const int elem_limit = 2048;
 
 	for (int i = 0; i < elem_limit; i++) {
 		type_t v = (type_t)i;
