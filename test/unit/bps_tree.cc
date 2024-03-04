@@ -682,51 +682,61 @@ white_box_test()
 	test tree;
 	test_create(&tree, 0, extent_alloc, extent_free, &extents_count, NULL);
 
-	assert(BPS_TREE_test_MAX_COUNT_IN_LEAF == 14);
-	assert(BPS_TREE_test_MAX_COUNT_IN_INNER == 10);
+	const int count_in_leaf = BPS_TREE_test_MAX_COUNT_IN_LEAF;
+	const int count_in_inner = BPS_TREE_test_MAX_COUNT_IN_INNER;
 
 	printf("full leaf:\n");
-	for (type_t i = 0; i < 14; i++) {
+	for (type_t i = 0; i < count_in_leaf; i++) {
 		test_insert(&tree, i, 0, 0);
 	}
 	test_print(&tree, TYPE_F);
+	fail_unless(tree.common.leaf_count == 1);
 
 	printf("split now:\n");
-	test_insert(&tree, 14, 0, 0);
+	test_insert(&tree, count_in_leaf, 0, 0);
 	test_print(&tree, TYPE_F);
+	fail_unless(tree.common.leaf_count == 2);
 
 	printf("full 2 leafs:\n");
-	for (type_t i = 15; i < 28; i++) {
+	for (type_t i = count_in_leaf + 1; i < count_in_leaf * 2; i++) {
 		test_insert(&tree, i, 0, 0);
 	}
 	test_print(&tree, TYPE_F);
+	fail_unless(tree.common.leaf_count == 2);
 
 	printf("split now:\n");
-	test_insert(&tree, 28, 0, 0);
+	test_insert(&tree, count_in_leaf * 2, 0, 0);
 	test_print(&tree, TYPE_F);
+	fail_unless(tree.common.leaf_count == 3);
 
 	printf("full 3 leafs:\n");
-	for (type_t i = 29; i < 42; i++) {
+	for (type_t i = count_in_leaf * 2 + 1; i < count_in_leaf * 3; i++) {
 		test_insert(&tree, i, 0, 0);
 	}
 	test_print(&tree, TYPE_F);
+	fail_unless(tree.common.leaf_count == 3);
 
 	printf("split now:\n");
-	test_insert(&tree, 42, 0, 0);
+	test_insert(&tree, count_in_leaf * 3, 0, 0);
 	test_print(&tree, TYPE_F);
+	fail_unless(tree.common.leaf_count == 4);
 
 	test_destroy(&tree);
+
 	test_create(&tree, 0, extent_alloc, extent_free, &extents_count, NULL);
-	type_t arr[140];
-	for (type_t i = 0; i < 140; i++)
+	type_t arr[count_in_leaf * count_in_inner];
+	for (type_t i = 0; i < count_in_leaf * count_in_inner; i++)
 		arr[i] = i;
-	test_build(&tree, arr, 140);
-	printf("full 10 leafs:\n");
+	test_build(&tree, arr, count_in_leaf * count_in_inner);
+	printf("full %d leafs:\n", count_in_inner);
 	test_print(&tree, TYPE_F);
+	fail_unless(tree.common.leaf_count == count_in_inner);
+	fail_unless(tree.common.inner_count == 1);
 
 	printf("2-level split now:\n");
-	test_insert(&tree, 140, 0, 0);
+	test_insert(&tree, count_in_leaf * count_in_inner, 0, 0);
 	test_print(&tree, TYPE_F);
+	fail_unless(tree.common.inner_count == 3);
 
 	test_destroy(&tree);
 
