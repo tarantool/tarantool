@@ -520,6 +520,14 @@ iproto_key_name(enum iproto_key key)
 	return iproto_key_strs[key];
 }
 
+static inline const char *
+iproto_raft_key_name(enum iproto_raft_key key)
+{
+	if (key >= iproto_raft_key_MAX)
+		return NULL;
+	return iproto_raft_key_strs[key];
+}
+
 /** A data manipulation request. */
 static inline bool
 iproto_type_is_dml(uint16_t type)
