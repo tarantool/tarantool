@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include <time.h>
 
-#ifdef BPS_BLOCK_CHILD_CARDS_ARRAY
+#ifdef BPS_INNER_CHILD_CARDS
 #define UNIT_TAP_COMPATIBLE 1
 #endif
 
@@ -190,6 +190,7 @@ simple_check()
 		test_insert(&tree, v, 0, 0);
 		if (test_debug_check(&tree)) {
 			test_print(&tree, TYPE_F);
+			printf("debug check = %08x", test_debug_check(&tree));
 			fail("debug check nonzero", "true");
 		}
 	}
@@ -689,6 +690,9 @@ white_box_test()
 	const int count_in_leaf = BPS_TREE_test_MAX_COUNT_IN_LEAF;
 	const int count_in_inner = BPS_TREE_test_MAX_COUNT_IN_INNER;
 
+	printf("Count in leaf: %d\n", count_in_leaf);
+	printf("Count in inner: %d\n", count_in_inner);
+
 	assert(count_in_leaf == TEST_COUNT_IN_LEAF);
 	assert(count_in_inner == TEST_COUNT_IN_INNER);
 
@@ -954,9 +958,11 @@ main(void)
 	compare_with_sptree_check();
 	compare_with_sptree_check_branches();
 	bps_tree_debug_self_check();
+#ifndef BPS_INNER_CARD
 	loading_test();
-#ifndef BPS_BLOCK_CHILD_CARDS_ARRAY
+#ifndef BPS_INNER_CHILD_CARDS
 	printing_test();
+#endif
 #endif
 	white_box_test();
 	approximate_count();
