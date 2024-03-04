@@ -140,6 +140,10 @@ create_unit_test(PREFIX bps_tree_default
                  SOURCES bps_tree_default.cc
                  LIBRARIES unit small misc
 )
+create_unit_test(PREFIX bps_tree_inner_card
+                 SOURCES bps_tree_inner_card.cc
+                 LIBRARIES unit small misc
+)
 create_unit_test(PREFIX bps_tree_with_child_cards
                  SOURCES bps_tree_with_child_cards.cc
                  LIBRARIES unit small misc
