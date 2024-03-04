@@ -744,6 +744,24 @@ luaL_checkconstchar(struct lua_State *L, int idx, const char **res,
 	return 0;
 }
 
+bool
+luaT_hasfield(struct lua_State *L, int obj_index, int table_index)
+{
+	/*
+	 * lua_pushvalue() changes the size of the Lua stack, so
+	 * calling lua_gettable() with a relative index would pick
+	 * up a wrong object.
+	 */
+	if (table_index < 0)
+		table_index += lua_gettop(L) + 1;
+
+	lua_pushvalue(L, obj_index);
+	lua_gettable(L, table_index);
+	bool res = !lua_isnil(L, -1);
+	lua_pop(L, 1);
+	return res;
+}
+
 lua_State *
 luaT_state(void)
 {

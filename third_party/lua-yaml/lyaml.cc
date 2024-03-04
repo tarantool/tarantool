@@ -99,6 +99,7 @@ struct lua_yaml_dumper {
 
    lua_State *outputL;
    luaL_Buffer yamlbuf;
+   int reftable_index;
 };
 
 /**
@@ -616,8 +617,6 @@ static int yaml_is_flow_mode(struct lua_yaml_dumper *dumper) {
    return 0;
 }
 
-static void find_references(struct lua_yaml_dumper *dumper);
-
 static int dump_node(struct lua_yaml_dumper *dumper)
 {
    size_t len = 0;
@@ -632,14 +631,13 @@ static int dump_node(struct lua_yaml_dumper *dumper)
    bool unused;
    (void) unused;
 
+   luaT_reftable_serialize(dumper->L, dumper->reftable_index);
    yaml_char_t *anchor = get_yaml_anchor(dumper);
    if (anchor && !*anchor)
       return 1;
 
    int top = lua_gettop(dumper->L);
    luaL_checkfield(dumper->L, dumper->cfg, top, &field);
-   if (field.serialized)
-      find_references(dumper);
    switch(field.type) {
    case MP_UINT:
       snprintf(buf, sizeof(buf) - 1, "%" PRIu64, field.ival);
@@ -773,9 +771,12 @@ static int append_output(void *arg, unsigned char *buf, size_t len) {
 }
 
 static void find_references(struct lua_yaml_dumper *dumper) {
-   int newval = -1, type = lua_type(dumper->L, -1);
-   if (type != LUA_TTABLE)
-      return;
+   int newval = -1;
+
+   lua_pushvalue(dumper->L, -1); /* push copy of table */
+   luaT_reftable_serialize(dumper->L, dumper->reftable_index);
+   if (lua_type(dumper->L, -1) != LUA_TTABLE)
+      goto done;
 
    lua_pushvalue(dumper->L, -1); /* push copy of table */
    lua_rawget(dumper->L, dumper->anchortable_index);
@@ -790,7 +791,7 @@ static void find_references(struct lua_yaml_dumper *dumper) {
       lua_rawset(dumper->L, dumper->anchortable_index);
    }
    if (newval)
-      return;
+      goto done;
 
    /* recursively process other table values */
    lua_pushnil(dumper->L);
@@ -799,6 +800,17 @@ static void find_references(struct lua_yaml_dumper *dumper) {
       lua_pop(dumper->L, 1);
       find_references(dumper); /* find references on key */
    }
+
+done:
+   /*
+    * Pop the serialized object, leave the original object on top
+    * of the Lua stack.
+    *
+    * NB: It is important for the cycle above: it assumes that
+    * table keys are not changed in the recursive call. Otherwise
+    * it would feed an incorrect key to lua_next().
+    */
+   lua_pop(dumper->L, 1);
 }
 
 int
@@ -845,12 +857,16 @@ lua_yaml_encode(lua_State *L, struct luaL_serializer *serializer,
    lua_newtable(L);
    dumper.anchortable_index = lua_gettop(L);
    dumper.anchor_number = 0;
+
+   luaT_reftable_new(L, dumper.cfg, 1);
+   dumper.reftable_index = lua_gettop(L);
+
    lua_pushvalue(L, 1); /* push copy of arg we're processing */
    find_references(&dumper);
    dump_document(&dumper);
    if (dumper.error)
       goto error;
-   lua_pop(L, 2); /* pop copied arg and anchor table */
+   lua_pop(L, 3); /* pop copied arg and anchor/ref tables */
 
    if (!yaml_stream_end_event_initialize(&ev) ||
        !yaml_emitter_emit(&dumper.emitter, &ev) ||
