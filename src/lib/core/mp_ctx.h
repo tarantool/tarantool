@@ -37,6 +37,12 @@ struct mp_ctx {
 	 */
 	void (*move)(struct mp_ctx *dst, struct mp_ctx *src);
 	/**
+	 * 'Virtual' copy. Copies @a src to @a dst.
+	 *
+	 * Cannot be `NULL`.
+	 */
+	void (*copy)(struct mp_ctx *dst, struct mp_ctx *src);
+	/**
 	 * Implementation dependent content. Needed to declare an abstract
 	 * MsgPack context instance on stack.
 	 */
@@ -46,22 +52,30 @@ struct mp_ctx {
 static inline void
 mp_ctx_create(struct mp_ctx *ctx, struct mh_strnu32_t *translation,
 	      void (*destroy)(struct mp_ctx *),
-	      void (*move)(struct mp_ctx *, struct mp_ctx *))
+	      void (*move)(struct mp_ctx *, struct mp_ctx *),
+	      void (*copy)(struct mp_ctx *, struct mp_ctx *))
 {
 	ctx->translation = translation;
 	ctx->destroy = destroy;
 	ctx->move = move;
+	ctx->copy = copy;
 }
 
 /**
- * Default 'virtual' move: swaps the contents of @a dst and @a src.
+ * Default 'virtual' move: moves the contents of @a dst to @a src.
  */
 void
 mp_ctx_move_default(struct mp_ctx *dst, struct mp_ctx *src);
 
 /**
- * Create @a ctx with default virtual methods (i.e., `NULL` destructor and
- * `mp_ctx_move_default` move).
+ * Default 'virtual' copy: copies the contents of @a dst to @a src.
+ */
+void
+mp_ctx_copy_default(struct mp_ctx *dst, struct mp_ctx *src);
+
+/**
+ * Create @a ctx with default virtual methods (i.e., `NULL` destructor,
+ * `mp_ctx_move_default` move and `mp_ctx_copy_default` copy).
  */
 static inline void
 mp_ctx_create_default(struct mp_ctx *ctx, struct mh_strnu32_t *translation)
@@ -69,6 +83,7 @@ mp_ctx_create_default(struct mp_ctx *ctx, struct mh_strnu32_t *translation)
 	ctx->translation = translation;
 	ctx->destroy = NULL;
 	ctx->move = mp_ctx_move_default;
+	ctx->copy = mp_ctx_copy_default;
 }
 
 static inline void
@@ -80,14 +95,25 @@ mp_ctx_destroy(struct mp_ctx *ctx)
 }
 
 /**
- * 'Virtual' move. Provides move constructor semantics, @dst must be a default
- * initialized context.
+ * 'Virtual' move. Provides move constructor semantics, @dst is supposed not to
+ * own any resources, hence it is not destroyed.
  */
 static inline void
 mp_ctx_move(struct mp_ctx *dst, struct mp_ctx *src)
 {
 	assert(src->move != NULL);
 	src->move(dst, src);
+}
+
+/**
+ * 'Virtual' copy. Provides copy constructor semantics, @dst is supposed not to
+ * own any resources, hence it is not destroyed.
+ */
+static inline void
+mp_ctx_copy(struct mp_ctx *dst, struct mp_ctx *src)
+{
+	assert(src->copy != NULL);
+	src->copy(dst, src);
 }
 
 #if defined(__cplusplus)

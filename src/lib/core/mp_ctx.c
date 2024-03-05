@@ -9,10 +9,21 @@
 void
 mp_ctx_move_default(struct mp_ctx *dst, struct mp_ctx *src)
 {
-	assert(dst->translation == NULL);
-	assert(dst->destroy == NULL);
-	assert(dst->move == mp_ctx_move_default);
-	SWAP(dst->translation, src->translation);
+	dst->translation = src->translation;
+	src->translation = NULL;
+	dst->destroy = src->destroy;
+	src->destroy = NULL;
+	dst->move = src->move;
+	src->move = NULL;
+	dst->copy = src->copy;
+	src->copy = NULL;
+}
+
+void
+mp_ctx_copy_default(struct mp_ctx *dst, struct mp_ctx *src)
+{
+	dst->translation = src->translation;
 	dst->destroy = src->destroy;
 	dst->move = src->move;
+	dst->copy = src->copy;
 }
