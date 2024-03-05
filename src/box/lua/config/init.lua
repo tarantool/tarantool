@@ -407,7 +407,6 @@ function methods._startup(self, instance_name, config_file)
     else
         self:_apply_on_startup({phase = 2})
     end
-    self:_set_status_based_on_alerts()
 
     self:_post_apply()
     self:_set_status_based_on_alerts()
@@ -449,7 +448,6 @@ function methods._reload_noexc(self, opts)
     local ok, err = pcall(function(opts)
         self:_store(self:_collect(opts))
         self:_apply()
-        self:_set_status_based_on_alerts()
         self:_post_apply()
     end, opts)
 

@@ -11,7 +11,7 @@ g.test_startup_success = function(g)
         local config = require('config')
         assert(config:get('app.cfg.foo') == 42)
         local info = config:info()
-        assert(info.status == 'ready')
+        assert(info.status == 'startup_in_progress')
         assert(#info.alerts == 0)
 
         _G.foo = 42
