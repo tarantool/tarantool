@@ -35,7 +35,12 @@
 #include <ctype.h>
 #include <lauxlib.h>
 
-struct mh_strnu32_t *iproto_key_translation;
+/**
+ * Translation table for iproto_default_mp_ctx.
+ */
+static struct mh_strnu32_t *iproto_key_translation;
+
+struct mp_ctx iproto_mp_ctx;
 
 /**
  * Pushes IPROTO constants generated from `IPROTO_FLAGS` onto Lua stack.
@@ -602,6 +607,7 @@ box_lua_iproto_init(struct lua_State *L)
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.iproto", 0);
 	push_iproto_constants(L);
 	push_iproto_protocol_features(L);
+	mp_ctx_create_default(&iproto_mp_ctx, iproto_key_translation);
 	static const struct luaL_Reg funcs[] = {
 		{"send", lbox_iproto_send},
 		{"encode_greeting", lbox_iproto_encode_greeting},
@@ -628,6 +634,7 @@ box_lua_iproto_init(struct lua_State *L)
 void
 box_lua_iproto_free(void)
 {
+	mp_ctx_destroy(&iproto_mp_ctx);
 	struct mh_strnu32_t *h = iproto_key_translation;
 	mh_int_t k;
 	mh_foreach(h, k)

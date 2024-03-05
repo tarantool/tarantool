@@ -890,10 +890,8 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 		/* Pass xrow header and body to recovery triggers. */
 		if (stmt->space->run_recovery_triggers) {
 			struct mp_ctx mp_ctx_header, mp_ctx_body;
-			mp_ctx_create_default(&mp_ctx_header,
-					      iproto_key_translation);
-			mp_ctx_create_default(&mp_ctx_body,
-					      iproto_key_translation);
+			mp_ctx_copy(&mp_ctx_header, &iproto_mp_ctx);
+			mp_ctx_copy(&mp_ctx_body, &iproto_mp_ctx);
 			struct xrow_header *row = stmt->row;
 			assert(row != NULL && row->header != NULL);
 			func_adapter_push_msgpack_with_ctx(
