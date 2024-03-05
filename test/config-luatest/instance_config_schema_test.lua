@@ -1583,6 +1583,7 @@ g.test_sharding = function()
             roles = {'router', 'storage'},
             lock = false,
             zone = 1,
+            weight = 1.5,
             sync_timeout = 2,
             connection_outdate_delay = 3,
             failover_ping_timeout = 4,
@@ -1623,6 +1624,7 @@ g.test_sharding = function()
         sched_ref_quota = 300,
         shard_index = "bucket_id",
         sync_timeout = 1,
+        weight = 1,
     }
     local res = instance_config:apply_default({}).sharding
     t.assert_equals(res, exp)

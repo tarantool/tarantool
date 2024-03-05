@@ -704,3 +704,50 @@ g.test_rebalancer_mode = function(g)
     res = g.server:eval('return vshard.storage.internal.rebalancer_service')
     t.assert_equals(res, nil)
 end
+
+-- Make sure the shrading.weight configuration parameter is set
+-- correctly in vshard.
+g.test_weight = function(g)
+    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        storage:
+          roles: [sharding]
+          password: "storage"
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        sharding:
+          login: 'storage'
+
+    sharding:
+      weight: 17
+      roles: [storage, rebalancer, router]
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001: {}
+    ]]
+    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = config_file,
+        chdir = dir,
+        alias = 'instance-001',
+    }
+    g.server = server:new(opts)
+    g.server:start()
+
+    -- Check that vshard option weight is set to the same value.
+    local res = g.server:eval("return vshard.router.static.current_cfg")
+    t.assert_equals(res.sharding['replicaset-001'].weight, 17)
+end

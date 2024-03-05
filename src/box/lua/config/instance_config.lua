@@ -1902,6 +1902,20 @@ return schema.new('instance_config', schema.record({
                 end
             end,
         }),
+        weight = schema.scalar({
+            type = 'number',
+            default = 1,
+            validate = function(data, w)
+                local scope = w.schema.computed.annotations.scope
+                if data == nil or scope == nil then
+                    return
+                end
+                if scope == 'instance' then
+                    w.error('sharding.weight cannot be defined in the ' ..
+                            'instance scope')
+                end
+            end,
+        }),
         -- TODO: Add validate.
         roles = schema.set({
             'router',
