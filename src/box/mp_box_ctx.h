@@ -26,6 +26,8 @@ struct mp_box_ctx {
 	void (*destroy)(struct mp_ctx *ctx);
 	/** See `mp_ctx::move`. */
 	void (*move)(struct mp_ctx *dst, struct mp_ctx *src);
+	/** See `mp_ctx::copy`. */
+	void (*copy)(struct mp_ctx *dst, struct mp_ctx *src);
 	/** Mapping of format identifiers to tuple formats. */
 	struct tuple_format_map tuple_format_map;
 };
@@ -45,6 +47,12 @@ mp_box_ctx_destroy(struct mp_ctx *ctx);
 void
 mp_box_ctx_move(struct mp_ctx *dst, struct mp_ctx *src);
 
+/**
+ * 'Virtual' copy stub. Must not be called.
+ */
+void
+mp_box_ctx_copy(struct mp_ctx *dst, struct mp_ctx *src);
+
 static inline struct mp_box_ctx *
 mp_box_ctx_check(struct mp_ctx *base)
 {
@@ -58,7 +66,7 @@ mp_box_ctx_create(struct mp_box_ctx *ctx, struct mh_strnu32_t *translation,
 		  const char *tuple_formats)
 {
 	mp_ctx_create((struct mp_ctx *)ctx, translation, mp_box_ctx_destroy,
-		      mp_box_ctx_move);
+		      mp_box_ctx_move, mp_box_ctx_copy);
 	if (tuple_formats == NULL) {
 		tuple_format_map_create_empty(&ctx->tuple_format_map);
 		return 0;
