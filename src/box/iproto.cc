@@ -3042,8 +3042,8 @@ tx_run_override_triggers(struct event *event, const char *header,
 
 	while (event_trigger_iterator_next(&it, &trigger, &name)) {
 		struct mp_ctx mp_ctx_header, mp_ctx_body;
-		mp_ctx_create_default(&mp_ctx_header, iproto_key_translation);
-		mp_ctx_create_default(&mp_ctx_body, iproto_key_translation);
+		mp_ctx_copy(&mp_ctx_header, &iproto_mp_ctx);
+		mp_ctx_copy(&mp_ctx_body, &iproto_mp_ctx);
 
 		func_adapter_begin(trigger, &ctx);
 		func_adapter_push_msgpack_with_ctx(trigger, &ctx, header,
