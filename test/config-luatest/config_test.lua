@@ -278,7 +278,7 @@ g.test_config_broadcast = function()
         local fiber = require('fiber')
         local status = ''
         box.watch('config.info', function(_, v) status = v.status end)
-        while status ~= 'ready' do
+        while not string.endswith(status, '_in_progress') do
             fiber.sleep(0.1)
         end
         print(status)
@@ -289,7 +289,7 @@ g.test_config_broadcast = function()
     local args = {'main.lua'}
     local res = justrun.tarantool(dir, {}, args, opts)
     t.assert_equals(res.exit_code, 0)
-    local exp = {'ready', 'ready', 'ready', 'ready'}
+    local exp = {'startup_in_progress', 'ready', 'reload_in_progress', 'ready'}
     t.assert_equals(res.stdout, table.concat(exp, "\n"))
 end
 
@@ -1391,5 +1391,45 @@ g.test_non_dynamic_alert = function(g)
                 },
             })
         end,
+    })
+end
+
+-- Verify that status now is changeg only after post apply.
+g.test_post_apply_status = function(cg)
+    local one = string.dump(function()
+        local function apply()
+            rawset(_G, 'status_roles', require('config'):info().status)
+        end
+
+        return {
+            validate = function() end,
+            apply = apply,
+            stop = function() end,
+        }
+    end)
+
+    local script = string.dump(function()
+        rawset(_G, 'status_app', require('config'):info().status)
+    end)
+
+    local function verify()
+        t.assert_equals(rawget(_G, 'status_app'), 'startup_in_progress')
+        t.assert_equals(rawget(_G, 'status_roles'), 'startup_in_progress')
+    end
+
+    local function verify_2()
+        t.assert_equals(rawget(_G, 'status_app'), 'reload_in_progress')
+        t.assert_equals(rawget(_G, 'status_roles'), 'reload_in_progress')
+    end
+
+    helpers.reload_success_case(cg, {
+        roles = {one = one},
+        script = script,
+        options = {
+            ['roles'] = {'one'},
+            ['app.file'] = 'main.lua',
+        },
+        verify = verify,
+        verify_2 = verify_2,
     })
 end
