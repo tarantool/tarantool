@@ -597,12 +597,15 @@ g.test_role_started_and_stopped_after_config_loaded = function(g)
         }
     end)
     local verify = function()
-        local exp = {{'start', 'ready', {'one'}}}
+        local exp = {{'start', 'startup_in_progress', {'one'}}}
         t.assert_equals(rawget(_G, 'state'), exp)
     end
 
     local verify_2 = function()
-        local exp = {{'start', 'ready', {'one'}}, {'stop', 'ready'}}
+        local exp = {
+            {'start', 'startup_in_progress', {'one'}},
+            {'stop', 'reload_in_progress'},
+        }
         t.assert_equals(rawget(_G, 'state'), exp)
     end
 
