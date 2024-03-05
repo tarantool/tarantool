@@ -215,6 +215,7 @@ g.test_sharding = helpers.run_as_script(function()
                     uri = exp_uri('storages', 'storages-a', 'storage-a-003'),
                 },
             },
+            weight = 1,
         },
         ['storages-b'] = {
             master = 'auto',
@@ -229,6 +230,7 @@ g.test_sharding = helpers.run_as_script(function()
                     uri = exp_uri('storages', 'storages-b', 'storage-b-003'),
                 },
             },
+            weight = 1,
         },
     })
 end)

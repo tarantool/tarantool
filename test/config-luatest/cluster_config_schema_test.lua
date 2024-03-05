@@ -304,6 +304,7 @@ g.test_defaults = function()
             sched_ref_quota = 300,
             shard_index = "bucket_id",
             sync_timeout = 1,
+            weight = 1,
         },
         audit_log = is_enterprise and {
             file = "var/log/{{ instance_name }}/audit.log",

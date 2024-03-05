@@ -147,6 +147,10 @@ function methods.sharding(self)
     for group_name, group in pairs(self._cconfig.groups) do
         for replicaset_name, value in pairs(group.replicasets) do
             local lock
+            local weight
+            -- For replicaset-level options, we need to get them from the any
+            -- instance of the replicaset.
+            local is_rs_options_set = false
             local replicaset_uuid
             local replicaset_cfg = {}
             local is_rebalancer = nil
@@ -160,8 +164,10 @@ function methods.sharding(self)
                                                            instance_name)
                 iconfig = instance_config:apply_default(iconfig)
                 iconfig = instance_config:apply_vars(iconfig, vars)
-                if lock == nil then
+                if not is_rs_options_set then
+                    is_rs_options_set = true
                     lock = instance_config:get(iconfig, 'sharding.lock')
+                    weight = instance_config:get(iconfig, 'sharding.weight')
                 end
                 if is_rebalancer == nil then
                     local roles = instance_config:get(iconfig, 'sharding.roles')
@@ -188,6 +194,7 @@ function methods.sharding(self)
                     uuid = replicaset_uuid,
                     master = 'auto',
                     lock = lock,
+                    weight = weight,
                 }
             end
         end
