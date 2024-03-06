@@ -805,12 +805,14 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 		goto end;
 	}
 	req.self_lsn = synchro_request_write(&req);
+	ERROR_INJECT(ERRINJ_LIMBO_WRITE_PROMOTE_SLEEP, { fiber_sleep(1); });
 	say_info("PROMOTE: write %s", synchro_request_to_string(&req));
 	txn_limbo_req_commit(limbo, &req);
 	limbo->is_writing_promote = false;
 
 	/* Immediately acknowledge our own write. */
 	int64_t prev_lsn, self_lsn = req.self_lsn;
+	ERROR_INJECT_YIELD(ERRINJ_LIMBO_PROMOTE_ACK_SLEEP);
 	txn_limbo_ack_already_seen(limbo, instance_id, self_lsn, &prev_lsn);
 	txn_limbo_ack_promote(limbo, instance_id, self_lsn, prev_lsn);
 
@@ -1148,6 +1150,7 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 	 * all pending transactions after its PROMOTE has been confirmed.
 	 */
 	if (txn_limbo_is_trying_to_promote(limbo)) {
+		ERROR_INJECT_YIELD(ERRINJ_LIMBO_PROMOTE_ACK_SLEEP);
 		latch_lock(&limbo->promote_latch);
 		txn_limbo_ack_promote(limbo, replica_id, lsn, prev_lsn);
 		latch_unlock(&limbo->promote_latch);
