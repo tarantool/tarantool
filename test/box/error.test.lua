@@ -70,7 +70,7 @@ t = {}
 test_run:cmd("setopt delimiter ';'")
 
 for k,v in pairs(box.error) do
-   if type(v) == 'number' then
+   if type(v) == 'number' and not k:startswith('TEST') then
     t[v] = 'box.error.'..tostring(k)
    end
 end;

@@ -790,7 +790,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 LIMIT x
     ]], {
         -- <limit-12.3>
-        1, "Can’t resolve field 'x'"
+        1, "Can't resolve field 'x'"
         -- </limit-12.3>
     })
 
@@ -800,7 +800,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 LIMIT 1 OFFSET x
     ]], {
         -- <limit-12.4>
-        1, "Can’t resolve field 'x'"
+        1, "Can't resolve field 'x'"
         -- </limit-12.4>
     })
 

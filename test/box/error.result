@@ -212,7 +212,7 @@ test_run:cmd("setopt delimiter ';'")
  | ...
 
 for k,v in pairs(box.error) do
-   if type(v) == 'number' then
+   if type(v) == 'number' and not k:startswith('TEST') then
     t[v] = 'box.error.'..tostring(k)
    end
 end;
@@ -287,6 +287,7 @@ t;
  |   64: box.error.INVALID_UUID
  |   65: box.error.REPLICASET_UUID_IS_RO
  |   66: box.error.INSTANCE_UUID_MISMATCH
+ |   67: box.error.REPLICA_ID_IS_RESERVED
  |   68: box.error.INVALID_ORDER
  |   69: box.error.MISSING_REQUEST_FIELD
  |   70: box.error.IDENTIFIER
@@ -402,6 +403,7 @@ t;
  |   180: box.error.SQL_STACK_OVERFLOW
  |   181: box.error.SQL_SELECT_WILDCARD
  |   182: box.error.SQL_STATEMENT_EMPTY
+ |   183: box.error.SQL_KEYWORD_IS_RESERVED
  |   184: box.error.SQL_SYNTAX_NEAR_TOKEN
  |   185: box.error.SQL_UNKNOWN_TOKEN
  |   186: box.error.SQL_PARSER_GENERIC

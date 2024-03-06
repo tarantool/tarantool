@@ -599,7 +599,7 @@ test:do_catchsql_test("6.10", [[
     SELECT * FROM x
 ]], {
     -- <6.10>
-    1, "Can’t resolve field 'c'"
+    1, "Can't resolve field 'c'"
     -- </6.10>
 })
 

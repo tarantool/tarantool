@@ -75,7 +75,7 @@ test:do_catchsql_test(
         SELECT node FROM listhash WHERE id="5000" LIMIT 1;
     ]], {
         -- <tkt3442-1.5>
-        1, "Can’t resolve field '5000'"
+        1, "Can't resolve field '5000'"
         -- </tkt3442-1.5>
     })
 

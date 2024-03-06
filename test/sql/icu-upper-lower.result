@@ -267,7 +267,7 @@ box.execute("select UPPER('1', 2)")
 box.execute("select UPPER(\"1\")")
 ---
 - null
-- Can’t resolve field '1'
+- Can't resolve field '1'
 ...
 box.execute("select UPPER()")
 ---

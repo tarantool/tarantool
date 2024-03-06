@@ -606,11 +606,39 @@ test_pthread(void)
 	footer();
 }
 
+static void
+test_undefined_error_code(void)
+{
+	header();
+#ifdef TEST_BUILD
+	plan(8);
+#else
+	plan(4);
+#endif
+
+	const struct errcode_record *record;
+	ok(strcmp(tnt_errcode_str(box_error_code_MAX), "ER_UNKNOWN") == 0);
+	ok(strcmp(tnt_errcode_desc(box_error_code_MAX), "Unknown error") == 0);
+	record = tnt_errcode_record(box_error_code_MAX);
+	ok(strcmp(record->errstr, "ER_UNKNOWN") == 0);
+	ok(strcmp(record->errdesc, "Unknown error") == 0);
+#ifdef TEST_BUILD
+	ok(strcmp(tnt_errcode_str(ER_TEST_FIRST - 1), "ER_UNKNOWN") == 0);
+	ok(strcmp(tnt_errcode_desc(ER_TEST_FIRST - 1), "Unknown error") == 0);
+	record = tnt_errcode_record(ER_TEST_FIRST - 1);
+	ok(strcmp(record->errstr, "ER_UNKNOWN") == 0);
+	ok(strcmp(record->errdesc, "Unknown error") == 0);
+#endif
+
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
 	header();
-	plan(13);
+	plan(14);
 
 	random_init();
 	memory_init();
@@ -629,6 +657,7 @@ main(void)
 	test_error_format_msg();
 	test_error_append_msg();
 	test_pthread();
+	test_undefined_error_code();
 
 	fiber_free();
 	memory_free();

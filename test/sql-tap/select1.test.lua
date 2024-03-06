@@ -1377,7 +1377,7 @@ test:do_catchsql2_test(
                 ORDER BY a;
             ]], {
                 -- <select1-6.23>
-                1,"Can’t resolve field 'x'"
+                1,"Can't resolve field 'x'"
                 -- </select1-6.23>
             })
 

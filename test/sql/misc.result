@@ -258,7 +258,7 @@ box.execute('EXPLAIN QUERY PLAN SELECT a, b FROM t1, t2 WHERE a = b;')
 box.execute('SELECT a;')
 ---
 - null
-- Can’t resolve field 'a'
+- Can't resolve field 'a'
 ...
 diag = box.error.last()
 ---
