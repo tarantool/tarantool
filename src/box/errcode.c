@@ -31,10 +31,8 @@
  */
 #include "errcode.h"
 
-#define ERRCODE_RECORD_MEMBER(s, d) {	\
-	.errstr = #s,			\
-	.errdesc = d			\
-},
+#define ERRCODE_RECORD_MEMBER(t, c, d) \
+	[c] = {#t,  d},
 
 struct errcode_record box_error_codes[box_error_code_MAX] = {
 	ERROR_CODES(ERRCODE_RECORD_MEMBER)
