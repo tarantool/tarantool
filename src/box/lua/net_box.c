@@ -3074,18 +3074,12 @@ netbox_connection_handler_f(struct lua_State *L)
 static int
 netbox_worker_f(va_list ap)
 {
-	struct netbox_transport *transport;
-	transport = va_arg(ap, struct netbox_transport *);
-	struct lua_State *L = va_arg(ap, struct lua_State *);
+	(void)ap;
+	struct netbox_transport *transport = fiber()->f_arg;
+	struct lua_State *L = fiber()->storage.lua.stack;
 	assert(transport->worker == fiber());
 	assert(transport->coro_ref != LUA_NOREF);
 	assert(transport->self_ref != LUA_NOREF);
-	/*
-	 * Code that needs a temporary fiber-local Lua state may save some time
-	 * and resources for creating a new state and use this one.
-	 */
-	assert(fiber()->storage.lua.stack == NULL);
-	fiber()->storage.lua.stack = L;
 	const double reconnect_after = !uri_is_nil(&transport->opts.uri) ?
 				       transport->opts.reconnect_after : 0;
 	while (!fiber_is_cancelled()) {
@@ -3150,7 +3144,14 @@ luaT_netbox_transport_start(struct lua_State *L)
 		transport->self_ref = LUA_NOREF;
 		return luaT_error(L);
 	}
-	fiber_start(transport->worker, transport, fiber_L);
+	transport->worker->f_arg = transport;
+	/*
+	 * Code that needs a temporary fiber-local Lua state may save some time
+	 * and resources for creating a new state and use this one.
+	 */
+	assert(transport->worker->storage.lua.stack == NULL);
+	transport->worker->storage.lua.stack = fiber_L;
+	fiber_wakeup(transport->worker);
 	return 0;
 }
 
