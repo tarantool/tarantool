@@ -47,5 +47,5 @@ box.execute("DROP TABLE t1")
 box.execute("CREATE TABLE tx (a INT, PRIMARY KEY (b));")
 ---
 - null
-- Can’t resolve field 'b'
+- Can't resolve field 'b'
 ...

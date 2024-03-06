@@ -897,7 +897,7 @@ test:do_catchsql_test(
     [[
         CREATE TABLE t11_9 (i INT, PRIMARY KEY(a AUTOINCREMENT), a INT);
     ]], {
-        1, "Can’t resolve field 'a'"
+        1, "Can't resolve field 'a'"
     })
 
 test:do_catchsql_test(

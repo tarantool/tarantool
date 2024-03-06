@@ -88,7 +88,7 @@ test:do_catchsql_test(
         SELECT y, COUNT(*) FROM t1 GROUP BY z ORDER BY y
     ]], {
         -- <select5-2.1.1>
-        1, "Can’t resolve field 'z'"
+        1, "Can't resolve field 'z'"
         -- </select5-2.1.1>
     })
 
@@ -128,7 +128,7 @@ test:do_catchsql_test(
         SELECT y, COUNT(*) FROM t1 GROUP BY y HAVING COUNT(*)<z ORDER BY y
     ]], {
         -- <select5-2.5>
-        1, "Can’t resolve field 'z'"
+        1, "Can't resolve field 'z'"
         -- </select5-2.5>
     })
 

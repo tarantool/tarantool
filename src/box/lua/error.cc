@@ -391,7 +391,8 @@ box_lua_error_init(struct lua_State *L) {
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.error", 0);
 	for (int i = 0; i < box_error_code_MAX; i++) {
 		const char *name = box_error_codes[i].errstr;
-		if (strstr(name, "UNUSED") || strstr(name, "RESERVED"))
+		/* Gap is reserved or deprecated error code. */
+		if (name == NULL)
 			continue;
 		assert(strncmp(name, "ER_", 3) == 0);
 		lua_pushnumber(L, i);

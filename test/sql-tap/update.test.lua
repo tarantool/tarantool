@@ -63,7 +63,7 @@ test:do_catchsql_test("update-3.2", [[
   UPDATE test1 SET f1=f3*2 WHERE f2==32
 ]], {
   -- <update-3.2>
-  1, "Can’t resolve field 'f3'"
+  1, "Can't resolve field 'f3'"
   -- </update-3.2>
 })
 
@@ -869,7 +869,7 @@ test:do_catchsql_test("update-9.3", [[
   UPDATE test1 SET f1=11 WHERE x=1025
 ]], {
   -- <update-9.3>
-  1, "Can’t resolve field 'x'"
+  1, "Can't resolve field 'x'"
   -- </update-9.3>
 })
 
