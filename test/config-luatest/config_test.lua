@@ -1433,3 +1433,238 @@ g.test_post_apply_status = function(cg)
         verify_2 = verify_2,
     })
 end
+
+-- Check that config:info('v2') works properly.
+g.test_info_new_version = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+
+    -- New source that sets meta.
+    local script = string.dump(function()
+        local yaml = require('yaml')
+        local file = require('internal.config.utils.file')
+
+        local methods = {}
+        local mt = {
+            __index = methods,
+        }
+
+        function methods.sync(self, config)
+            local data = file.universal_read('myconf.yaml', 'my config file')
+            local ok, res = pcall(yaml.decode, data)
+            if not ok then
+                error('Unable to parse my config file')
+            end
+            self._values = res
+            config:_meta('mysource', 'revision', self._revision)
+            self._revision = self._revision + 1
+        end
+
+        function methods.get(self)
+            return self._values
+        end
+
+        local function new()
+            return setmetatable({
+                name = 'mysource',
+                type = 'instance',
+                _values = {},
+                _revision = 1,
+            }, mt)
+        end
+
+        return {
+            new = new,
+        }
+    end)
+    treegen.write_script(dir, 'mysource.lua', script)
+
+    local myconf = [[
+        sql:
+          cache_size: 12345
+    ]]
+    treegen.write_script(dir, 'myconf.yaml', myconf)
+
+    local opts = {
+        config_file = 'config.yaml',
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+
+    -- Make sure the new source is loaded properly and the meta is set.
+    g.server:exec(function()
+        local config = require('config')
+        t.assert_equals(config:get('sql.cache_size'), 5242880)
+
+        config:_register_source(require('mysource').new())
+        config:reload()
+        t.assert_equals(config:get('sql.cache_size'), 12345)
+        local exp = {
+            mysource = {
+                revision = 1,
+            },
+        }
+        t.assert_equals(config:info().meta, exp)
+        t.assert_equals(config:info('v1').meta, exp)
+        exp = {
+            active = {
+                mysource = {
+                    revision = 1,
+                },
+            },
+            last = {
+                mysource = {
+                    revision = 1,
+                },
+            },
+        }
+        t.assert_equals(config:info('v2').meta, exp)
+    end)
+
+    -- Make sure the meta for config:info() is new and that config:info('v2')
+    -- contains both applied meta and unapplied new meta when reload failed
+    -- in apply phase.
+    myconf = [[
+        sql:
+          cache_size: true
+    ]]
+    treegen.write_script(dir, 'myconf.yaml', myconf)
+    g.server:exec(function()
+        local config = require('config')
+        t.assert_equals(config:get('sql.cache_size'), 12345)
+        pcall(config.reload, config)
+        t.assert_equals(config:get('sql.cache_size'), 12345)
+        local exp = {
+            mysource = {
+                revision = 2,
+            },
+        }
+        t.assert_equals(config:info().meta, exp)
+        t.assert_equals(config:info('v1').meta, exp)
+        exp = {
+            active = {
+                mysource = {
+                    revision = 1,
+                },
+            },
+            last = {
+                mysource = {
+                    revision = 2,
+                },
+            },
+        }
+        t.assert_equals(config:info('v2').meta, exp)
+    end)
+
+    -- Make sure the meta for config:info() is new and that config:info('v2')
+    -- contains both applied meta and unapplied new meta when reload failed
+    -- in post_apply phase.
+    myconf = [[
+        sql:
+          cache_size: 123
+        roles: [myrole]
+    ]]
+    treegen.write_script(dir, 'myconf.yaml', myconf)
+    g.server:exec(function()
+        local config = require('config')
+        t.assert_equals(config:get('sql.cache_size'), 12345)
+        t.assert_equals(config:get('roles'), nil)
+        local ok, err = pcall(config.reload, config)
+        t.assert(not ok)
+        t.assert_str_contains(err, "module 'myrole' not found")
+        -- If error in post_apply phase get() returns config of failed load.
+        t.assert_equals(config:get('sql.cache_size'), 123)
+        t.assert_equals(config:get('roles'), {'myrole'})
+        local exp = {
+            mysource = {
+                revision = 3,
+            },
+        }
+        t.assert_equals(config:info().meta, exp)
+        t.assert_equals(config:info('v1').meta, exp)
+        exp = {
+            active = {
+                mysource = {
+                    revision = 1,
+                },
+            },
+            last = {
+                mysource = {
+                    revision = 3,
+                },
+            },
+        }
+        t.assert_equals(config:info('v2').meta, exp)
+    end)
+
+    -- Make sure that in config:info('v2') both applied meta and unapplied new
+    -- meta are equal when reload is successful.
+    myconf = [[
+        sql:
+          cache_size: 100000
+    ]]
+    treegen.write_script(dir, 'myconf.yaml', myconf)
+    g.server:exec(function()
+        local config = require('config')
+        t.assert_equals(config:get('sql.cache_size'), 123)
+        t.assert_equals(config:get('roles'), {'myrole'})
+        config:reload()
+        t.assert_equals(config:get('sql.cache_size'), 100000)
+        t.assert_equals(config:get('roles'), nil)
+        local exp = {
+            mysource = {
+                revision = 4,
+            },
+        }
+        t.assert_equals(config:info().meta, exp)
+        t.assert_equals(config:info('v1').meta, exp)
+        exp = {
+            active = {
+                mysource = {
+                    revision = 4,
+                },
+            },
+            last = {
+                mysource = {
+                    revision = 4,
+                },
+            },
+        }
+        t.assert_equals(config:info('v2').meta, exp)
+    end)
+end
+
+-- Check that config:info() throws an error on unexpected argument.
+g.test_info_version_error = function(g)
+    local verify = function()
+        local config = require('config')
+        local exp = 'config:info() expects v1, v2 or nil as an argument, ' ..
+            'got "1"'
+        t.assert_error_msg_equals(exp, config.info, config, 1)
+    end
+
+    helpers.success_case(g, {
+        verify = verify,
+    })
+end

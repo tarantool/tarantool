@@ -410,6 +410,9 @@ function methods._startup(self, instance_name, config_file)
 
     self:_post_apply()
     self:_set_status_based_on_alerts()
+    if self._status == 'ready' or self._status == 'check_warnings' then
+        self._active_metadata = self._metadata
+    end
     if extras ~= nil then
         extras.post_apply(self)
     end
@@ -457,6 +460,9 @@ function methods._reload_noexc(self, opts)
     end
 
     self:_set_status_based_on_alerts()
+    if self._status == 'ready' or self._status == 'check_warnings' then
+        self._active_metadata = self._metadata
+    end
     if extras ~= nil then
         extras.post_apply(self)
     end
@@ -472,13 +478,36 @@ function methods.reload(self)
     end
 end
 
-function methods.info(self)
+function methods.info(self, version)
     selfcheck(self, 'info')
-    return {
-        alerts = self._aboard:alerts(),
+    version = version == nil and 'v1' or version
+    local info = {}
+    local alerts = self._aboard:alerts()
+    info['v1'] = {
+        alerts = alerts,
         meta = self._metadata,
         status = self._status,
     }
+    info['v2'] = {
+        alerts = alerts,
+        meta = {
+            active = self._active_metadata,
+            last = self._metadata,
+        },
+        status = self._status,
+    }
+    if info[version] ~= nil then
+        return info[version]
+    end
+
+    local supported_versions = {}
+    for key in pairs(info) do
+        table.insert(supported_versions, key)
+    end
+    table.sort(supported_versions)
+
+    error(('config:info() expects %s or nil as an argument, got %q'):format(
+        table.concat(supported_versions, ', '), version), 0)
 end
 
 -- The object is a singleton. The constructor should be called
