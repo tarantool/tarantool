@@ -832,10 +832,11 @@ if MP_DECIMAL is not None:
             cut -= 1
 
             if self_exp == 0:
-                for i in range(num_units, 0, -1):
-                    u = self_lsu[up]
+                for i in range(num_units):
+                    u = self_lsu[num_units - 1 - i]
                     for j in range(cut, -1, -1):
                         s += self.to_digit(u, j)
+                    cut = self.DECDPUN - 1
                 return s
 
             pre = self_digits + self_exp
@@ -863,7 +864,7 @@ if MP_DECIMAL is not None:
                         s += self.to_digit(u, cut)
                         cut -= 1
                 else:
-                    for i in range(pre, 0, -1):
+                    for _ in range(self_exp):
                         s += '0'
 
             else:
