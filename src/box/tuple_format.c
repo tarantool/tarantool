@@ -1176,14 +1176,19 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 	const char *next_pos = pos;
 	for (uint32_t i = 0; i < defined_field_count;
 	     i++, token++, pos = next_pos) {
-		mp_next(&next_pos);
 		field = json_tree_entry(*token, struct tuple_field, token);
-		if (validate) {
-			if (tuple_field_validate(format, field, pos,
-						 next_pos) != 0)
+		bool allow_null = tuple_field_is_nullable(field) ||
+				  tuple_field_has_default(field);
+		if (allow_null && mp_typeof(*pos) == MP_NIL) {
+			mp_decode_nil(&next_pos);
+		} else {
+			mp_next(&next_pos);
+			if (validate && tuple_field_validate(format, field, pos,
+							     next_pos) != 0)
 				goto error;
-			bit_clear(required_fields, field->id);
 		}
+		if (validate)
+			bit_clear(required_fields, field->id);
 		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL &&
 		    field_map_builder_set_slot(builder, field->offset_slot,
 					       pos - tuple, MULTIKEY_NONE,
