@@ -39,6 +39,7 @@
 #include "vclock/vclock.h"
 #include "schema.h"
 #include "ssl_error.h"
+#include "tuple.h"
 
 /* {{{ public API */
 
@@ -161,6 +162,66 @@ const char *rmean_error_strings[RMEAN_ERROR_LAST] = {
 	"ERROR"
 };
 
+/** Format client error with arguments in `ap` according to error format. */
+static void
+client_error_create(struct error *e, va_list ap)
+{
+	const struct errcode_record *r = tnt_errcode_record(e->code);
+	error_vformat_msg(e, r->errdesc, ap);
+	for (int i = 0; i < r->errfields_count; i++) {
+		switch (r->errfields[i].type) {
+		case ERRCODE_FIELD_TYPE_CHAR: {
+			char buf[2] = {(char)va_arg(ap, int), '\0'};
+			error_set_str(e, r->errfields[i].name, buf);
+			break;
+		}
+		case ERRCODE_FIELD_TYPE_INT:
+			error_set_int(e, r->errfields[i].name,
+				      va_arg(ap, int));
+			break;
+		case ERRCODE_FIELD_TYPE_UINT:
+			error_set_uint(e, r->errfields[i].name,
+				       va_arg(ap, unsigned));
+			break;
+		case ERRCODE_FIELD_TYPE_LONG:
+			error_set_int(e, r->errfields[i].name,
+				      va_arg(ap, long));
+			break;
+		case ERRCODE_FIELD_TYPE_ULONG:
+			error_set_uint(e, r->errfields[i].name,
+				       va_arg(ap, unsigned long));
+			break;
+		case ERRCODE_FIELD_TYPE_LLONG:
+			error_set_int(e, r->errfields[i].name,
+				      va_arg(ap, long long));
+			break;
+		case ERRCODE_FIELD_TYPE_ULLONG:
+			error_set_uint(e, r->errfields[i].name,
+				       va_arg(ap, unsigned long long));
+			break;
+		case ERRCODE_FIELD_TYPE_STRING:
+			error_set_str(e, r->errfields[i].name,
+				      va_arg(ap, const char *));
+			break;
+		case ERRCODE_FIELD_TYPE_MSGPACK: {
+			const char *mp = va_arg(ap, const char *);
+			const char *mp_end = mp;
+			mp_next(&mp_end);
+			error_set_mp(e, r->errfields[i].name, mp, mp_end - mp);
+			break;
+		}
+		case ERRCODE_FIELD_TYPE_TUPLE: {
+			struct tuple *tuple = va_arg(ap, struct tuple *);
+			error_set_mp(e, r->errfields[i].name, tuple_data(tuple),
+				     tuple_bsize(tuple));
+			break;
+		}
+		default:
+			assert(false);
+		}
+	}
+}
+
 const struct type_info type_ClientError =
 	make_type("ClientError", &type_Exception);
 
@@ -179,7 +240,7 @@ ClientError::ClientError(const char *file, unsigned line,
 {
 	va_list ap;
 	va_start(ap, errcode);
-	error_vformat_msg(this, tnt_errcode_desc(errcode), ap);
+	client_error_create(this, ap);
 	va_end(ap);
 }
 
@@ -190,9 +251,9 @@ BuildClientError(const char *file, unsigned line, uint32_t errcode, ...)
 		ClientError *e = new ClientError(file, line, ER_UNKNOWN);
 		va_list ap;
 		va_start(ap, errcode);
-		error_vformat_msg(e, tnt_errcode_desc(errcode), ap);
-		va_end(ap);
 		e->code = errcode;
+		client_error_create(e, ap);
+		va_end(ap);
 		return e;
 	} catch (OutOfMemory *e) {
 		return e;

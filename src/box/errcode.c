@@ -30,11 +30,58 @@
  * SUCH DAMAGE.
  */
 #include "errcode.h"
+#include "trivia/util.h"
 
-#define ERRCODE_RECORD_MEMBER(t, c, d) \
-	[c] = {#t, d},
+#define FIELDS_0() \
+		NULL, 0
+#define FIELDS_1(n1, t1) \
+		(const struct errcode_field[]) \
+		{{n1, t1}}, 1
+#define FIELDS_2(n1, t1, n2, t2) \
+		(const struct errcode_field[]) \
+		{{n1, t1}, {n2, t2}}, 2
+#define FIELDS_3(n1, t1, n2, t2, n3, t3) \
+		(const struct errcode_field[]) \
+		{{n1, t1}, {n2, t2}, {n3, t3}}}, 3
+#define FIELDS_4(n1, t1, n2, t2, n3, t3, n4, t4) \
+		(const struct errcode_field[]) \
+		{{n1, t1}, {n2, t2}, {n3, t3}, {n4, t4}}, 4
+#define FIELDS_5(n1, t1, n2, t2, n3, t3, n4, t4, n5, t5) \
+		(const struct errcode_field[]) \
+		{{n1, t1}, {n2, t2}, {n3, t3}, {n4, t4}, {n5, t5}}, 5
 
-struct errcode_record box_error_codes[box_error_code_MAX] = {
+#define GET_MACRO(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, NAME, ...) NAME
+#undef INCOMPLETE
+
+/**
+ * Without stub argument 'x' ##__VA_ARGS__ magic does not work with -std=c11.
+ */
+#define ERRCODE_FIELDS_AND_COUNT(x, ...) \
+		GET_MACRO(, ##__VA_ARGS__, \
+			  FIELDS_5, INCOMPLETE, \
+			  FIELDS_4, INCOMPLETE, \
+			  FIELDS_3, INCOMPLETE, \
+			  FIELDS_2, INCOMPLETE, \
+			  FIELDS_1, INCOMPLETE, \
+			  FIELDS_0)(__VA_ARGS__)
+
+/** Up to 5 fields are supported. */
+#define ERRCODE_RECORD_MEMBER(t, c, d, ...) \
+	[c] = {#t, d, ERRCODE_FIELDS_AND_COUNT(1, ##__VA_ARGS__)},
+
+/** Helper macro to describe field type of the error code. */
+#define CHAR ERRCODE_FIELD_TYPE_CHAR
+#define INT ERRCODE_FIELD_TYPE_INT
+#define UINT ERRCODE_FIELD_TYPE_UINT
+#define LONG ERRCODE_FIELD_TYPE_LONG
+#define ULONG ERRCODE_FIELD_TYPE_ULONG
+#define LLONG ERRCODE_FIELD_TYPE_LLONG
+#define UULONG ERRCODE_FIELD_TYPE_ULLONG
+#define STRING ERRCODE_FIELD_TYPE_STRING
+#define MSGPACK ERRCODE_FIELD_TYPE_MSGPACK
+#define TUPLE ERRCODE_FIELD_TYPE_TUPLE
+
+const struct errcode_record box_error_codes[box_error_code_MAX] = {
 	ERROR_CODES(ERRCODE_RECORD_MEMBER)
 };
 
