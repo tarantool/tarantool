@@ -522,6 +522,11 @@ s:delete{1}
 -- Invalid values.
 s:alter({field_count = box.NULL})
 s:alter({field_count = 'string'})
+-- exact_field_count is less than index_field_count.
+s:alter({field_count = 1})
+sk = s:create_index('sk', {parts = {2, 'unsigned'}})
+s:replace{1}
+sk:drop()
 
 -- Alter owner.
 owner1 = box.space._space:get{s.id}.owner

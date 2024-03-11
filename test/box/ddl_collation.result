@@ -141,22 +141,22 @@ box.space._collation:auto_increment{'test', 0, 'ICU'}
  | ---
  | - error: Tuple field 5 (locale) required by space format is missing
  | ...
-box.space._collation:auto_increment{'test', 'ADMIN', 'ICU', 'ru_RU'}
+box.space._collation:auto_increment{'test', 'ADMIN', 'ICU', 'ru_RU', setmap{}}
  | ---
  | - error: 'Tuple field 3 (owner) type does not match one required by operation: expected
  |     unsigned, got string'
  | ...
-box.space._collation:auto_increment{42, 0, 'ICU', 'ru_RU'}
+box.space._collation:auto_increment{42, 0, 'ICU', 'ru_RU', setmap{}}
  | ---
  | - error: 'Tuple field 2 (name) type does not match one required by operation: expected
  |     string, got unsigned'
  | ...
-box.space._collation:auto_increment{'test', 0, 42, 'ru_RU'}
+box.space._collation:auto_increment{'test', 0, 42, 'ru_RU', setmap{}}
  | ---
  | - error: 'Tuple field 4 (type) type does not match one required by operation: expected
  |     string, got unsigned'
  | ...
-box.space._collation:auto_increment{'test', 0, 'ICU', 42}
+box.space._collation:auto_increment{'test', 0, 'ICU', 42, setmap{}}
  | ---
  | - error: 'Tuple field 5 (locale) type does not match one required by operation: expected
  |     string, got unsigned'
