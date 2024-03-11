@@ -2,6 +2,7 @@ local t = require('luatest')
 local compat = require('compat')
 local json = require('json')
 local yaml = require('yaml')
+local tarantool = require('tarantool')
 
 local g = t.group()
 
@@ -248,3 +249,24 @@ end
 g.after_test('test_increased_error_string_conversion_verbosity', function()
     compat.box_error_serialize_verbose = 'default'
 end)
+
+-- Test ClientError arguments become payload fields (gh-9109).
+g.test_client_error_creation = function()
+    t.skip_if(not tarantool.build.test_build, 'build is not test one')
+
+    -- We don't check types when add payload from Lua.
+    local e = box.error.new(box.error.TEST_TYPE_CHAR, {x = 1, y = {}})
+    t.assert_equals(e.field, {x = 1, y = {}})
+
+    -- Test passing not all error payload fields works too.
+    local e = box.error.new(box.error.TEST_5_ARGS, 1, 2)
+    t.assert_equals(e.f1, 1)
+    t.assert_equals(e.f2, 2)
+    t.assert_equals(e.f3, nil)
+    t.assert_equals(e.f4, nil)
+    t.assert_equals(e.f5, nil)
+
+    -- Test passing excess payload fields works too.
+    local e = box.error.new(box.error.TEST_TYPE_INT, 1, 2, 3, 4, 5)
+    t.assert_equals(e.field, 1)
+end

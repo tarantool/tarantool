@@ -43,6 +43,7 @@ extern "C" {
 #include "lua/msgpack.h"
 #include "box/error.h"
 #include "mpstream/mpstream.h"
+#include "box/lua/tuple.h"
 
 /**
  * Set payload field of the `error' for the key `key` to value at stack index
@@ -138,13 +139,17 @@ luaT_error_create(lua_State *L, int top_base)
 	struct error *prev = NULL;
 	int top = lua_gettop(L);
 	int top_type = lua_type(L, top_base);
+	const struct errcode_record *record = NULL;
 	if (top >= top_base && (top_type == LUA_TNUMBER ||
 				top_type == LUA_TSTRING)) {
 		/* Shift of the "reason args". */
 		int shift = 1;
 		if (top_type == LUA_TNUMBER) {
 			code = lua_tonumber(L, top_base);
-			reason = tnt_errcode_desc(code);
+			record = tnt_errcode_record(code);
+			reason = record->errdesc;
+			if (record->errfields_count > 0)
+				goto raise;
 		} else {
 			custom_type = lua_tostring(L, top_base);
 			/*
@@ -238,6 +243,16 @@ raise:
 		}
 		/* Remove the table. */
 		lua_pop(L, 1);
+	}
+	if (record != NULL) {
+		int argidx = 0;
+		for (int i = top_base + 1;
+		     i <= top && argidx < record->errfields_count;
+		     i++, argidx++) {
+			luaT_error_payload_set(L, error,
+					       record->errfields[argidx].name,
+					       i);
+		}
 	}
 	return error;
 }
