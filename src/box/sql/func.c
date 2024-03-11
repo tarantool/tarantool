@@ -2506,9 +2506,7 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 	char *pos = sql_stmt_func_result_to_msgpack(stmt, &res_size, region);
 	if (pos == NULL)
 		goto error;
-	int rc = port_c_add_mp(ret, pos, pos + res_size);
-	if (rc != 0)
-		goto error;
+	port_c_add_mp(ret, pos, pos + res_size);
 
 	if (sql_step(stmt) != SQL_DONE)
 		goto error;

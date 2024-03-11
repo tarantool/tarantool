@@ -98,11 +98,7 @@ port_c_new_entry(struct port_c *port)
 		port->first = e;
 		port->last = e;
 	} else {
-		e = mempool_alloc(&port_entry_pool);
-		if (e == NULL) {
-			diag_set(OutOfMemory, sizeof(*e), "mempool_alloc", "e");
-			return NULL;
-		}
+		e = xmempool_alloc(&port_entry_pool);
 		port->last->next = e;
 		port->last = e;
 	}
@@ -112,24 +108,22 @@ port_c_new_entry(struct port_c *port)
 	return e;
 }
 
-int
+void
 port_c_add_tuple(struct port *base, struct tuple *tuple)
 {
 	struct port_c *port = (struct port_c *)base;
 	struct port_c_entry *pe = port_c_new_entry(port);
-	if (pe == NULL)
-		return -1;
+	assert(pe != NULL);
 	/* 0 mp_size means the entry stores a tuple. */
 	pe->mp_size = 0;
 	pe->tuple = tuple;
 	tuple_ref(tuple);
-	return 0;
 }
 
 /**
  * Helper function of port_c_add_mp etc.
  * Allocate a buffer of given size and add it to new entry of given port.
- * Return pointer to allocated buffer or NULL in case of error (diag set).
+ * Never fails.
  */
 static char *
 port_c_prepare_mp(struct port *base, uint32_t size)
@@ -144,65 +138,42 @@ port_c_prepare_mp(struct port *base, uint32_t size)
 		 * on the heap. And it perfectly fits any
 		 * MessagePack number, a short string, a boolean.
 		 */
-		dst = mempool_alloc(&port_entry_pool);
-		if (dst == NULL) {
-			diag_set(OutOfMemory, size, "mempool_alloc", "dst");
-			return NULL;
-		}
+		dst = xmempool_alloc(&port_entry_pool);
 	} else {
-		dst = malloc(size);
-		if (dst == NULL) {
-			diag_set(OutOfMemory, size, "malloc", "dst");
-			return NULL;
-		}
+		dst = xmalloc(size);
 	}
 	pe = port_c_new_entry(port);
-	if (pe != NULL) {
-		pe->mp = dst;
-		pe->mp_size = size;
-		return dst;
-	}
-	if (size <= PORT_ENTRY_SIZE)
-		mempool_free(&port_entry_pool, dst);
-	else
-		free(dst);
-	return NULL;
+	assert(pe != NULL);
+	pe->mp = dst;
+	pe->mp_size = size;
+	return dst;
 }
 
-int
+void
 port_c_add_mp(struct port *base, const char *mp, const char *mp_end)
 {
 	assert(mp_end > mp);
 	uint32_t mp_size = mp_end - mp;
 	char *dst = port_c_prepare_mp(base, mp_size);
-	if (dst == NULL)
-		return -1;
 	memcpy(dst, mp, mp_end - mp);
-	return 0;
 }
 
-int
+void
 port_c_add_formatted_mp(struct port *base, const char *mp, const char *mp_end,
 			struct tuple_format *format)
 {
-	int rc = port_c_add_mp(base, mp, mp_end);
-	if (rc != 0)
-		return rc;
+	port_c_add_mp(base, mp, mp_end);
 	struct port_c *port = (struct port_c *)base;
 	port->last->mp_format = format;
 	tuple_format_ref(format);
-	return 0;
 }
 
-int
+void
 port_c_add_str(struct port *base, const char *str, uint32_t len)
 {
 	uint32_t mp_size = mp_sizeof_str(len);
 	char *dst = port_c_prepare_mp(base, mp_size);
-	if (dst == NULL)
-		return -1;
 	mp_encode_str(dst, str, len);
-	return 0;
 }
 
 static int

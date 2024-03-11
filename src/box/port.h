@@ -173,11 +173,11 @@ void
 port_c_create(struct port *base);
 
 /** Append a tuple to the port. Tuple is referenced. */
-int
+void
 port_c_add_tuple(struct port *port, struct tuple *tuple);
 
 /** Append raw MessagePack to the port. It is copied. */
-int
+void
 port_c_add_mp(struct port *port, const char *mp, const char *mp_end);
 
 struct tuple_format;
@@ -186,12 +186,12 @@ struct tuple_format;
  * Append raw msgpack array to the port with given format.
  * Msgpack is copied, the format is referenced for port's lifetime.
  */
-int
+void
 port_c_add_formatted_mp(struct port *port, const char *mp, const char *mp_end,
 			struct tuple_format *format);
 
 /** Append a string to the port. The string is copied as msgpack string. */
-int
+void
 port_c_add_str(struct port *port, const char *str, uint32_t len);
 
 /** Method get_msgpack for struct port_c. */
