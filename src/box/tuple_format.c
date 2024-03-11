@@ -1153,29 +1153,31 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 			 (unsigned) format->exact_field_count);
 		return -1;
 	}
-	defined_field_count = MIN(defined_field_count,
-				  tuple_format_field_count(format));
 
-	void *required_fields = NULL;
-	uint32_t required_fields_sz = BITMAP_SIZE(format->total_field_count);
-	size_t region_svp = region_used(&fiber()->gc);
-
-	if (unlikely(defined_field_count == 0)) {
-		required_fields = format->required_fields;
-		goto end;
+	uint32_t format_field_count = tuple_format_field_count(format);
+	if (validate && defined_field_count < format->min_field_count) {
+		for (uint32_t i = defined_field_count;
+		     i < format_field_count; i++) {
+			struct tuple_field *field =
+				tuple_format_field(format, i);
+			assert(field != NULL);
+			if (bit_test(format->required_fields, field->id)) {
+				diag_set(ClientError, ER_FIELD_MISSING,
+					 tuple_field_path(field, format));
+				return -1;
+			}
+		}
 	}
 
-	if (validate) {
-		required_fields = xregion_alloc(region, required_fields_sz);
-		memcpy(required_fields, format->required_fields,
-		       required_fields_sz);
-	}
+	uint32_t field_count = MIN(defined_field_count, format_field_count);
+	if (unlikely(field_count == 0))
+		return 0;
 
+	size_t region_svp = region_used(region);
 	struct tuple_field *field;
 	struct json_token **token = format->fields.root.children;
 	const char *next_pos = pos;
-	for (uint32_t i = 0; i < defined_field_count;
-	     i++, token++, pos = next_pos) {
+	for (uint32_t i = 0; i < field_count; i++, token++, pos = next_pos) {
 		field = json_tree_entry(*token, struct tuple_field, token);
 		bool allow_null = tuple_field_is_nullable(field) ||
 				  tuple_field_has_default(field);
@@ -1187,8 +1189,6 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 							     next_pos) != 0)
 				goto error;
 		}
-		if (validate)
-			bit_clear(required_fields, field->id);
 		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL &&
 		    field_map_builder_set_slot(builder, field->offset_slot,
 					       pos - tuple, MULTIKEY_NONE,
@@ -1196,17 +1196,10 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 			goto error;
 		}
 	}
-
-end:
-	if (!validate)
-		return 0;
-
-	int ret = tuple_format_required_fields_validate(format, required_fields,
-							required_fields_sz);
-	region_truncate(&fiber()->gc, region_svp);
-	return ret;
+	region_truncate(region, region_svp);
+	return 0;
 error:
-	region_truncate(&fiber()->gc, region_svp);
+	region_truncate(region, region_svp);
 	return -1;
 }
 

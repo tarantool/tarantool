@@ -44,10 +44,10 @@ box.internal.collation.drop('test')
 
 box.space._collation:auto_increment{'test'}
 box.space._collation:auto_increment{'test', 0, 'ICU'}
-box.space._collation:auto_increment{'test', 'ADMIN', 'ICU', 'ru_RU'}
-box.space._collation:auto_increment{42, 0, 'ICU', 'ru_RU'}
-box.space._collation:auto_increment{'test', 0, 42, 'ru_RU'}
-box.space._collation:auto_increment{'test', 0, 'ICU', 42}
+box.space._collation:auto_increment{'test', 'ADMIN', 'ICU', 'ru_RU', setmap{}}
+box.space._collation:auto_increment{42, 0, 'ICU', 'ru_RU', setmap{}}
+box.space._collation:auto_increment{'test', 0, 42, 'ru_RU', setmap{}}
+box.space._collation:auto_increment{'test', 0, 'ICU', 42, setmap{}}
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}} --ok
 err, res = pcall(function() return box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}} end)
 assert(res.code == box.error.TUPLE_FOUND)

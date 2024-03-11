@@ -1307,6 +1307,20 @@ s:alter({field_count = 'string'})
 ---
 - error: Illegal parameters, options parameter 'field_count' should be of type number
 ...
+-- exact_field_count is less than index_field_count.
+s:alter({field_count = 1})
+---
+...
+sk = s:create_index('sk', {parts = {2, 'unsigned'}})
+---
+...
+s:replace{1}
+---
+- error: Tuple field 2 required by space format is missing
+...
+sk:drop()
+---
+...
 -- Alter owner.
 owner1 = box.space._space:get{s.id}.owner
 ---
