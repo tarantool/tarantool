@@ -130,7 +130,7 @@ create_unit_test(PREFIX datetime
 )
 create_unit_test(PREFIX error
                  SOURCES error.c core_test_utils.c
-                 LIBRARIES unit core box_error
+                 LIBRARIES unit core tuple box_error
 )
 create_unit_test(PREFIX interval
                  SOURCES interval.c core_test_utils.c

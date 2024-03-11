@@ -13,6 +13,7 @@
 #include "random.h"
 #include "ssl_error.h"
 #include "vclock/vclock.h"
+#include "box/tuple.h"
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
@@ -611,9 +612,9 @@ test_undefined_error_code(void)
 {
 	header();
 #ifdef TEST_BUILD
-	plan(8);
+	plan(10);
 #else
-	plan(4);
+	plan(5);
 #endif
 
 	const struct errcode_record *record;
@@ -622,27 +623,158 @@ test_undefined_error_code(void)
 	record = tnt_errcode_record(box_error_code_MAX);
 	ok(strcmp(record->errstr, "ER_UNKNOWN") == 0);
 	ok(strcmp(record->errdesc, "Unknown error") == 0);
+	ok(record->errfields == NULL && record->errfields_count == 0);
 #ifdef TEST_BUILD
 	ok(strcmp(tnt_errcode_str(ER_TEST_FIRST - 1), "ER_UNKNOWN") == 0);
 	ok(strcmp(tnt_errcode_desc(ER_TEST_FIRST - 1), "Unknown error") == 0);
 	record = tnt_errcode_record(ER_TEST_FIRST - 1);
 	ok(strcmp(record->errstr, "ER_UNKNOWN") == 0);
 	ok(strcmp(record->errdesc, "Unknown error") == 0);
+	ok(record->errfields == NULL && record->errfields_count == 0);
 #endif
 
 	check_plan();
 	footer();
 }
 
+#ifdef TEST_BUILD
+
+/* Test ClientError arguments become payload fields (gh-9109). */
+static void
+test_client_error_creation(void)
+{
+	header();
+	plan(26);
+
+	/* Test CHAR argument type */
+	const char *s;
+	struct error *e;
+	diag_set(ClientError, ER_TEST_TYPE_CHAR, 'c');
+	e = diag_last_error(diag_get());
+	s = error_get_str(e, "field");
+	ok(s != NULL && strcmp(s, "c") == 0);
+
+	/* Test INT argument type */
+	int64_t i;
+	diag_set(ClientError, ER_TEST_TYPE_INT, 1);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "field", &i) && i == 1);
+	diag_set(ClientError, ER_TEST_TYPE_INT, INT_MAX);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "field", &i) && i == INT_MAX);
+	diag_set(ClientError, ER_TEST_TYPE_INT, INT_MIN);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "field", &i) && i == INT_MIN);
+
+	/* Test UINT argument type */
+	uint64_t u;
+	diag_set(ClientError, ER_TEST_TYPE_UINT, 1);
+	e = diag_last_error(diag_get());
+	ok(error_get_uint(e, "field", &u) && u == 1);
+	diag_set(ClientError, ER_TEST_TYPE_UINT, UINT_MAX);
+	e = diag_last_error(diag_get());
+	ok(error_get_uint(e, "field", &u) && u == UINT_MAX);
+
+	/* Test LONG argument type */
+	diag_set(ClientError, ER_TEST_TYPE_LONG, 1);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "field", &i) && i == 1);
+	diag_set(ClientError, ER_TEST_TYPE_LONG, LONG_MAX);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "field", &i) && i == LONG_MAX);
+	diag_set(ClientError, ER_TEST_TYPE_LONG, LONG_MIN);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "field", &i) && i == LONG_MIN);
+
+	/* Test ULONG argument type */
+	diag_set(ClientError, ER_TEST_TYPE_ULONG, 1);
+	e = diag_last_error(diag_get());
+	ok(error_get_uint(e, "field", &u) && u == 1);
+	diag_set(ClientError, ER_TEST_TYPE_ULONG, ULONG_MAX);
+	e = diag_last_error(diag_get());
+	ok(error_get_uint(e, "field", &u) && u == ULONG_MAX);
+
+	/* Test LLONG argument type */
+	diag_set(ClientError, ER_TEST_TYPE_LLONG, 1);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "field", &i) && i == 1);
+	diag_set(ClientError, ER_TEST_TYPE_LLONG, LLONG_MAX);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "field", &i) && i == LLONG_MAX);
+	diag_set(ClientError, ER_TEST_TYPE_LLONG, LLONG_MIN);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "field", &i) && i == LLONG_MIN);
+
+	/* Test ULLONG argument type */
+	diag_set(ClientError, ER_TEST_TYPE_ULLONG, 1);
+	e = diag_last_error(diag_get());
+	ok(error_get_uint(e, "field", &u) && u == 1);
+	diag_set(ClientError, ER_TEST_TYPE_ULLONG, ULLONG_MAX);
+	e = diag_last_error(diag_get());
+	ok(error_get_uint(e, "field", &u) && u == ULLONG_MAX);
+
+	/* Test STRING argument type */
+	diag_set(ClientError, ER_TEST_TYPE_STRING, "hello");
+	e = diag_last_error(diag_get());
+	s = error_get_str(e, "field");
+	ok(s != NULL && strcmp(s, "hello") == 0);
+
+	/* Test MSGPACK argument type */
+	char mp_buf[128];
+	size_t size = mp_format(mp_buf, lengthof(mp_buf), "[%d, %s]", 42, "hi");
+	uint32_t mp_size;
+	const char *mp;
+	diag_set(ClientError, ER_TEST_TYPE_MSGPACK, mp_buf);
+	e = diag_last_error(diag_get());
+	mp = error_get_mp(e, "field", &mp_size);
+	ok(mp_size == size);
+	ok(s != NULL && memcmp(mp, mp_buf, mp_size) == 0);
+
+	/* Test TUPLE argument type */
+	struct tuple *tuple = tuple_new(tuple_format_runtime, mp_buf,
+					mp_buf + size);
+	diag_set(ClientError, ER_TEST_TYPE_TUPLE, tuple);
+	tuple_delete(tuple);
+	e = diag_last_error(diag_get());
+	mp = error_get_mp(e, "field", &mp_size);
+	ok(mp_size == size);
+	ok(s != NULL && memcmp(mp, mp_buf, mp_size) == 0);
+
+	/* Test maximum argument number supported. */
+	diag_set(ClientError, ER_TEST_5_ARGS, 1, 2, 3, 4, 5);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "f1", &i) && i == 1);
+	ok(error_get_int(e, "f2", &i) && i == 2);
+	ok(error_get_int(e, "f3", &i) && i == 3);
+	ok(error_get_int(e, "f4", &i) && i == 4);
+	ok(error_get_int(e, "f5", &i) && i == 5);
+
+	check_plan();
+	footer();
+}
+
+#endif
+
+static uint32_t
+field_name_hash_impl(const char *str, uint32_t len)
+{
+	return str[0] + len;
+}
+
 int
 main(void)
 {
 	header();
+#ifdef TEST_BUILD
+	plan(15);
+#else
 	plan(14);
+#endif
 
 	random_init();
 	memory_init();
 	fiber_init(fiber_c_invoke);
+	tuple_init(field_name_hash_impl);
 
 	test_payload_field_str();
 	test_payload_field_uint();
@@ -658,7 +790,11 @@ main(void)
 	test_error_append_msg();
 	test_pthread();
 	test_undefined_error_code();
+#ifdef TEST_BUILD
+	test_client_error_creation();
+#endif
 
+	tuple_free();
 	fiber_free();
 	memory_free();
 	random_free();
