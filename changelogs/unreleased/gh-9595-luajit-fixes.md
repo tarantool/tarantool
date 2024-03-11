@@ -12,3 +12,4 @@ were fixed as part of this activity:
 * Fixed recording of `setmetatable()` with `nil` as the second argument.
 * Fixed recording of `select()` in case with negative first argument.
 * Fixed use-def analysis for child upvalues.
+* Fixed recording of the `__concat()` metamethod for vararg and `pcall` frames.
