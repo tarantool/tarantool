@@ -3631,13 +3631,15 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 API_EXPORT int
 box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple)
 {
-	return port_c_add_tuple(ctx->port, tuple);
+	port_c_add_tuple(ctx->port, tuple);
+	return 0;
 }
 
 API_EXPORT int
 box_return_mp(box_function_ctx_t *ctx, const char *mp, const char *mp_end)
 {
-	return port_c_add_mp(ctx->port, mp, mp_end);
+	port_c_add_mp(ctx->port, mp, mp_end);
+	return 0;
 }
 
 /* schema_find_id()-like method using only public API */
@@ -3866,9 +3868,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 			offset--;
 			continue;
 		}
-		rc = port_c_add_tuple(port, tuple);
-		if (rc != 0)
-			break;
+		port_c_add_tuple(port, tuple);
 		found++;
 		/*
 		 * Refresh the pointer to the space, because the space struct

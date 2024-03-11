@@ -102,7 +102,8 @@ sql_row_to_port(struct Vdbe *stmt, struct region *region, struct port *port)
 	if (tuple == NULL)
 		goto error;
 	region_truncate(region, svp);
-	return port_c_add_tuple(port, tuple);
+	port_c_add_tuple(port, tuple);
+	return 0;
 
 error:
 	region_truncate(region, svp);
