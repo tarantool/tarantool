@@ -11,7 +11,15 @@ const size_t NUM_TEST_TUPLES = 4096;
 enum data_format {
 	/** 5 fields (UINT, STR, NIL, UINT, UINT) + 0-95 optional UINTs. */
 	FORMAT_BASIC,
+	/** 1000 UINT fields, 990 of them are NIL. */
+	FORMAT_SPARSE,
 };
+
+static uint32_t
+test_field_name_hash(const char *str, uint32_t len)
+{
+	return str[0] + len;
+}
 
 /** Class that creates and destroys memtx engine. */
 class MemtxEngine {
@@ -29,7 +37,7 @@ private:
 		memory_init();
 		fiber_init(fiber_c_invoke);
 		region_alloc(&fiber()->gc, 4);
-		tuple_init(NULL);
+		tuple_init(test_field_name_hash);
 
 		memset(&memtx, 0, sizeof(memtx));
 
@@ -108,6 +116,55 @@ private:
 	struct tuple_format *fmt;
 };
 
+template<>
+class TupleFormat<FORMAT_SPARSE> {
+public:
+	static TupleFormat &instance()
+	{
+		/* Initialize MemtxEngine prior to TupleFormat. */
+		MemtxEngine::instance();
+		static TupleFormat instance;
+		return instance;
+	}
+	size_t field_count() { return FIELD_COUNT; }
+	struct tuple_format *format() { return fmt; }
+private:
+	TupleFormat()
+	{
+		struct memtx_engine *memtx = MemtxEngine::instance().engine();
+		struct key_def *kd = MemtxEngine::instance().key_def();
+
+		char names[FIELD_COUNT][sizeof("f999")];
+		struct field_def fields[FIELD_COUNT];
+		for (size_t i = 0; i < FIELD_COUNT; i++) {
+			sprintf(names[i], "f%03zu", i);
+			fields[i] = field_def_default;
+			fields[i].name = names[i];
+			fields[i].type = FIELD_TYPE_UNSIGNED;
+			fields[i].is_nullable = true;
+			fields[i].nullable_action = ON_CONFLICT_ACTION_NONE;
+		}
+		struct tuple_dictionary *dict =
+			tuple_dictionary_new(fields, FIELD_COUNT);
+		if (dict == NULL)
+			abort();
+		fmt = tuple_format_new(&memtx_tuple_format_vtab, memtx, &kd, 1,
+				       fields, FIELD_COUNT, FIELD_COUNT, dict,
+				       false, false, NULL, 0, NULL, 0);
+		if (fmt == NULL)
+			abort();
+		tuple_format_ref(fmt);
+		tuple_dictionary_unref(dict);
+	}
+	~TupleFormat()
+	{
+		tuple_format_unref(fmt);
+	}
+
+	static const size_t FIELD_COUNT = 1000;
+	struct tuple_format *fmt;
+};
+
 // Generator of random msgpack array.
 template<data_format F>
 class MpData;
@@ -143,6 +200,39 @@ public:
 	}
 private:
 	static const size_t MAX_TUPLE_DATA_SIZE = 512;
+	char data[MAX_TUPLE_DATA_SIZE];
+	char *data_end;
+};
+
+template<>
+class MpData<FORMAT_SPARSE> {
+public:
+	const char *begin() const { return data; }
+	const char *end() const { return data_end; }
+	MpData()
+	{
+		size_t field_count =
+			TupleFormat<FORMAT_SPARSE>::instance().field_count();
+		std::vector<bool> is_non_null(field_count);
+		for (size_t i = 0; i < FIELD_COUNT_NON_NULL; i++)
+			is_non_null[rand() % field_count] = true;
+
+		data_end = data;
+		data_end = mp_encode_array(data_end, field_count);
+		for (size_t i = 0; i < field_count; i++) {
+			if (is_non_null[i]) {
+				uint64_t r = (uint64_t)rand() * 1024 + rand();
+				data_end = mp_encode_uint(data_end, r);
+			} else {
+				data_end = mp_encode_nil(data_end);
+			}
+		}
+		if (data_end - data > MAX_TUPLE_DATA_SIZE)
+			abort();
+	}
+private:
+	static const size_t FIELD_COUNT_NON_NULL = 10;
+	static const size_t MAX_TUPLE_DATA_SIZE = 2048;
 	char data[MAX_TUPLE_DATA_SIZE];
 	char *data_end;
 };
@@ -227,6 +317,7 @@ bench_tuple_new(benchmark::State& state)
 }
 
 BENCHMARK_TEMPLATE(bench_tuple_new, FORMAT_BASIC);
+BENCHMARK_TEMPLATE(bench_tuple_new, FORMAT_SPARSE);
 
 // memtx_tuple_delete benchmark.
 template<data_format F>
