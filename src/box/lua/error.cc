@@ -45,37 +45,43 @@ extern "C" {
 #include "mpstream/mpstream.h"
 
 /**
- * Get key-value pair from Lua stack and set it as a payload field of the
- * `error'. If the field with given key existed before, it is overwritten.
- * The Lua value is encoded to MsgPack. Input stack: [-2] key; [-1] value.
+ * Set payload field of the `error' for the key `key` to value at stack index
+ * `index`. If the field with given key existed before, it is overwritten.
+ * The Lua value is encoded to MsgPack.
  */
 static void
-luaT_error_add_payload(lua_State *L, struct error *error)
+luaT_error_payload_set(lua_State *L, struct error *error, const char *key,
+		       int index)
 {
-	/* Ignore built-in error fields. */
-	const char *key = lua_tostring(L, -2);
-	static const char *const ignore_keys[] = {
-		"type", "message", "trace", "prev", "base_type",
-		"code", "reason", "errno", "custom_type"
-	};
-	for (size_t i = 0; i < lengthof(ignore_keys); i++) {
-		if (strcmp(key, ignore_keys[i]) == 0)
-			return;
-	}
 	struct region *gc = &fiber()->gc;
 	size_t used = region_used(gc);
 	struct mpstream stream;
 	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
 		      luamp_error, L);
-	if (luamp_encode(L, luaL_msgpack_default, &stream, -1) != 0) {
+	if (luamp_encode(L, luaL_msgpack_default, &stream, index) != 0) {
 		region_truncate(gc, used);
 		return;
 	}
 	mpstream_flush(&stream);
 	size_t size = region_used(gc) - used;
 	const char *mp_value = (const char *)xregion_join(gc, size);
-	error_payload_set_mp(&error->payload, key, mp_value, size);
+	error_set_mp(error, key, mp_value, size);
 	region_truncate(gc, used);
+}
+
+/** Return whether key `key` is built-in field. */
+static bool
+luaT_error_is_builtin_field(const char *key)
+{
+	static const char *const ignore_keys[] = {
+		"type", "message", "trace", "prev", "base_type",
+		"code", "reason", "errno", "custom_type"
+	};
+	for (size_t i = 0; i < lengthof(ignore_keys); i++) {
+		if (strcmp(key, ignore_keys[i]) == 0)
+			return true;
+	}
+	return false;
 }
 
 /**
@@ -220,8 +226,13 @@ raise:
 		lua_pushnil(L);
 		while (lua_next(L, top) != 0) {
 			int key_type = lua_type(L, -2);
-			if (key_type == LUA_TSTRING)
-				luaT_error_add_payload(L, error);
+			if (key_type == LUA_TSTRING) {
+				const char *key = lua_tostring(L, -2);
+				/* Ignore built-in error fields. */
+				if (!luaT_error_is_builtin_field(key))
+					luaT_error_payload_set(L, error, key,
+							       -1);
+			}
 			/* Remove the value, keep the key for next iteration. */
 			lua_pop(L, 1);
 		}
