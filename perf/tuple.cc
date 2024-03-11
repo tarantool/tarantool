@@ -7,9 +7,13 @@
 #include <benchmark/benchmark.h>
 
 const size_t NUM_TEST_TUPLES = 4096;
-const size_t MAX_TUPLE_DATA_SIZE = 512;
 
-// Class that creates and destroys tuple format for private memtx engine.
+enum data_format {
+	/** 5 fields (UINT, STR, NIL, UINT, UINT) + 0-95 optional UINTs. */
+	FORMAT_BASIC,
+};
+
+/** Class that creates and destroys memtx engine. */
 class MemtxEngine {
 public:
 	static MemtxEngine &instance()
@@ -17,7 +21,7 @@ public:
 		static MemtxEngine instance;
 		return instance;
 	}
-	struct tuple_format *format() { return fmt; }
+	struct memtx_engine *engine() { return &memtx; }
 	struct key_def *key_def() { return kd; }
 private:
 	MemtxEngine()
@@ -54,14 +58,10 @@ private:
 		kdp.fieldno = 4;
 		kdp.type = FIELD_TYPE_UNSIGNED;
 		kd = key_def_new(&kdp, 1, 0);
-		fmt = simple_tuple_format_new(&memtx_tuple_format_vtab,
-					      &memtx, &kd, 1);
-		tuple_format_ref(fmt);
 	}
 	~MemtxEngine()
 	{
 		key_def_delete(kd);
-		tuple_format_unref(fmt);
 		tuple_free();
 		SmallAlloc::destroy();
 		slab_cache_destroy(&memtx.slab_cache);
@@ -72,11 +72,48 @@ private:
 
 	struct memtx_engine memtx;
 	struct key_def *kd;
+};
+
+/** Class that creates and destroys tuple format. */
+template<data_format F>
+class TupleFormat;
+
+template<>
+class TupleFormat<FORMAT_BASIC> {
+public:
+	static TupleFormat &instance()
+	{
+		/* Initialize MemtxEngine prior to TupleFormat. */
+		MemtxEngine::instance();
+		static TupleFormat instance;
+		return instance;
+	}
+	struct tuple_format *format() { return fmt; }
+private:
+	TupleFormat()
+	{
+		struct memtx_engine *memtx = MemtxEngine::instance().engine();
+		struct key_def *kd = MemtxEngine::instance().key_def();
+		fmt = simple_tuple_format_new(&memtx_tuple_format_vtab, memtx,
+					      &kd, 1);
+		if (fmt == NULL)
+			abort();
+		tuple_format_ref(fmt);
+	}
+	~TupleFormat()
+	{
+		tuple_format_unref(fmt);
+	}
+
 	struct tuple_format *fmt;
 };
 
 // Generator of random msgpack array.
-class MpData {
+template<data_format F>
+class MpData;
+
+template<>
+class MpData<FORMAT_BASIC> {
 public:
 	const char *begin() const { return data; }
 	const char *end() const { return data_end; }
@@ -105,11 +142,13 @@ public:
 			abort();
 	}
 private:
+	static const size_t MAX_TUPLE_DATA_SIZE = 512;
 	char data[MAX_TUPLE_DATA_SIZE];
 	char *data_end;
 };
 
 // Generator of set of random msgpack arrays.
+template<data_format F>
 class MpDataSet {
 public:
 	static MpDataSet &instance()
@@ -117,19 +156,20 @@ public:
 		static MpDataSet instance;
 		return instance;
 	}
-	const MpData &operator[](size_t i) const { return data[i]; }
+	const MpData<F> &operator[](size_t i) const { return data[i]; }
 private:
-	MpData data[NUM_TEST_TUPLES];
+	MpData<F> data[NUM_TEST_TUPLES];
 };
 
 // Generator of a set of random tuples.
+template<data_format F>
 class TestTuples {
 public:
 	TestTuples()
 	{
-		format = MemtxEngine::instance().format();
+		format = TupleFormat<F>::instance().format();
 		tuple_format_ref(format);
-		MpDataSet &dataset = MpDataSet::instance();
+		MpDataSet<F> &dataset = MpDataSet<F>::instance();
 
 		for (size_t i = 0; i < NUM_TEST_TUPLES; i++) {
 			data[i] = box_tuple_new(format,
@@ -153,13 +193,14 @@ private:
 };
 
 // box_tuple_new benchmark.
+template<data_format F>
 static void
 bench_tuple_new(benchmark::State& state)
 {
 	size_t total_count = 0;
 
-	struct tuple_format *format = MemtxEngine::instance().format();
-	MpDataSet &dataset = MpDataSet::instance();
+	struct tuple_format *format = TupleFormat<F>::instance().format();
+	MpDataSet<F> &dataset = MpDataSet<F>::instance();
 	struct tuple *tuples[NUM_TEST_TUPLES];
 	size_t i = 0;
 
@@ -185,16 +226,17 @@ bench_tuple_new(benchmark::State& state)
 		tuple_unref(tuples[k]);
 }
 
-BENCHMARK(bench_tuple_new);
+BENCHMARK_TEMPLATE(bench_tuple_new, FORMAT_BASIC);
 
 // memtx_tuple_delete benchmark.
+template<data_format F>
 static void
 bench_tuple_delete(benchmark::State& state)
 {
 	size_t total_count = 0;
 
-	struct tuple_format *format = MemtxEngine::instance().format();
-	MpDataSet &dataset = MpDataSet::instance();
+	struct tuple_format *format = TupleFormat<F>::instance().format();
+	MpDataSet<F> &dataset = MpDataSet<F>::instance();
 	struct tuple *tuples[NUM_TEST_TUPLES];
 
 	size_t i = NUM_TEST_TUPLES;
@@ -220,12 +262,13 @@ bench_tuple_delete(benchmark::State& state)
 		tuple_unref(tuples[k]);
 }
 
-BENCHMARK(bench_tuple_delete);
+BENCHMARK_TEMPLATE(bench_tuple_delete, FORMAT_BASIC);
 
+template<data_format F>
 static void
 bench_tuple_ref_unref_low(benchmark::State& state)
 {
-	TestTuples tuples;
+	TestTuples<F> tuples;
 	size_t total_count = 0;
 	const size_t NUM_REFS = 32;
 	for (auto _ : state) {
@@ -240,12 +283,13 @@ bench_tuple_ref_unref_low(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK(bench_tuple_ref_unref_low);
+BENCHMARK_TEMPLATE(bench_tuple_ref_unref_low, FORMAT_BASIC);
 
+template<data_format F>
 static void
 bench_tuple_ref_unref_high(benchmark::State& state)
 {
-	TestTuples tuples;
+	TestTuples<F> tuples;
 	size_t total_count = 0;
 	const size_t NUM_REFS = 1024;
 	for (auto _ : state) {
@@ -260,13 +304,14 @@ bench_tuple_ref_unref_high(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK(bench_tuple_ref_unref_high);
+BENCHMARK_TEMPLATE(bench_tuple_ref_unref_high, FORMAT_BASIC);
 
 // struct tuple member access benchmark.
+template<data_format F>
 static void
 tuple_access_members(benchmark::State& state)
 {
-	TestTuples tuples;
+	TestTuples<F> tuples;
 	size_t i = 0;
 	size_t total_count = 0;
 	for (auto _ : state) {
@@ -285,13 +330,14 @@ tuple_access_members(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK(tuple_access_members);
+BENCHMARK_TEMPLATE(tuple_access_members, FORMAT_BASIC);
 
 // tuple_data benchmark.
+template<data_format F>
 static void
 tuple_access_data(benchmark::State& state)
 {
-	TestTuples tuples;
+	TestTuples<F> tuples;
 	size_t i = 0;
 	size_t total_count = 0;
 	for (auto _ : state) {
@@ -306,13 +352,14 @@ tuple_access_data(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK(tuple_access_data);
+BENCHMARK_TEMPLATE(tuple_access_data, FORMAT_BASIC);
 
 // tuple_data_range benchmark.
+template<data_format F>
 static void
 tuple_access_data_range(benchmark::State& state)
 {
-	TestTuples tuples;
+	TestTuples<F> tuples;
 	size_t i = 0;
 	size_t total_count = 0;
 	for (auto _ : state) {
@@ -329,13 +376,14 @@ tuple_access_data_range(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK(tuple_access_data_range);
+BENCHMARK_TEMPLATE(tuple_access_data_range, FORMAT_BASIC);
 
 // benchmark of access of non-indexed field.
+template<data_format F>
 static void
 tuple_access_unindexed_field(benchmark::State& state)
 {
-	TestTuples tuples;
+	TestTuples<F> tuples;
 	size_t i = 0;
 	size_t total_count = 0;
 	for (auto _ : state) {
@@ -350,13 +398,14 @@ tuple_access_unindexed_field(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK(tuple_access_unindexed_field);
+BENCHMARK_TEMPLATE(tuple_access_unindexed_field, FORMAT_BASIC);
 
 // benchmark of access of indexed field.
+template<data_format F>
 static void
 tuple_access_indexed_field(benchmark::State& state)
 {
-	TestTuples tuples;
+	TestTuples<F> tuples;
 	size_t i = 0;
 	size_t total_count = 0;
 	for (auto _ : state) {
@@ -372,13 +421,14 @@ tuple_access_indexed_field(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK(tuple_access_indexed_field);
+BENCHMARK_TEMPLATE(tuple_access_indexed_field, FORMAT_BASIC);
 
 // benchmark of tuple compare.
+template<data_format F>
 static void
 tuple_tuple_compare(benchmark::State& state)
 {
-	TestTuples tuples;
+	TestTuples<F> tuples;
 	size_t i = 0;
 	size_t j = 0;
 	struct key_def *kd = MemtxEngine::instance().key_def();
@@ -400,13 +450,14 @@ tuple_tuple_compare(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK(tuple_tuple_compare);
+BENCHMARK_TEMPLATE(tuple_tuple_compare, FORMAT_BASIC);
 
 // benchmark of tuple hints compare.
+template<data_format F>
 static void
 tuple_tuple_compare_hint(benchmark::State& state)
 {
-	TestTuples tuples;
+	TestTuples<F> tuples;
 	size_t i = 0;
 	size_t j = 0;
 	struct key_def *kd = MemtxEngine::instance().key_def();
@@ -430,7 +481,7 @@ tuple_tuple_compare_hint(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK(tuple_tuple_compare_hint);
+BENCHMARK_TEMPLATE(tuple_tuple_compare_hint, FORMAT_BASIC);
 
 BENCHMARK_MAIN();
 
