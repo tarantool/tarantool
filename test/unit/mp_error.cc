@@ -463,7 +463,7 @@ static void
 test_payload(void)
 {
 	header();
-	plan(11);
+	plan(13);
 	char buffer[2048];
 	memset(buffer, 0, sizeof(buffer));
 
@@ -481,6 +481,9 @@ test_payload(void)
 	struct tt_uuid uuid;
 	tt_uuid_create(&uuid);
 	error_set_uuid(e, "key6", &uuid);
+	char mp[128];
+	size_t mp_size = mp_format(mp, lengthof(mp), "[%d, %s]", 7, "bye");
+	error_set_mp(e, "key7", mp, mp_size);
 
 	mp_encode_error(buffer, e);
 	error_unref(e);
@@ -509,6 +512,11 @@ test_payload(void)
 	struct tt_uuid val_uuid;
 	ok(error_get_uuid(e, "key6", &val_uuid) &&
 	   tt_uuid_is_equal(&uuid, &val_uuid), "key uuid");
+	uint32_t val_mp_size;
+	const char *val_mp = error_get_mp(e, "key7", &val_mp_size);
+	ok(val_mp_size == mp_size, "key msgpack size");
+	ok(val_mp != NULL &&
+	   memcmp(val_mp, mp, mp_size) == 0, "key msgpack data");
 
 	error_unref(e);
 
