@@ -16,6 +16,11 @@ local check_param = utils.check_param
 local check_param_table = utils.check_param_table
 local update_param_table = utils.update_param_table
 
+local DEFAULT_ORIGIN = ''
+-- We use the field ID instead of the field name so we don't need to upgrade
+-- the schema to use _origins option.
+local PRIV_OPTS_FIELD_ID = 6
+
 local function setmap(table)
     return setmetatable(table, { __serialize = 'map' })
 end
@@ -3427,6 +3432,56 @@ box.schema.user.exists = function(name)
     end
 end
 
+-- Return expanded origins from the given tuple.
+local function origins_from_tuple(tuple)
+    if tuple == nil then
+        return {[DEFAULT_ORIGIN] = 0}
+    end
+    if tuple[PRIV_OPTS_FIELD_ID] == nil or
+       tuple[PRIV_OPTS_FIELD_ID].origins == nil then
+        return {[DEFAULT_ORIGIN] = tuple.privilege}
+    end
+    return tuple[PRIV_OPTS_FIELD_ID].origins
+end
+
+-- Return total privileges from the given origins.
+local function privilege_from_origins(origins)
+    local new_privilege = 0
+    for _, privilege in pairs(origins) do
+        new_privilege = bit.bor(new_privilege, privilege)
+    end
+    return new_privilege
+end
+
+-- Return resulting opts from the given origins.
+local function opts_from_origins(origins)
+    local normalized_origins = {}
+    for name, privilege in pairs(origins) do
+        if privilege ~= 0 then
+            normalized_origins[name] = privilege
+        end
+    end
+    assert(next(normalized_origins) ~= nil)
+    -- If only default origin present, we do not need opts.
+    if normalized_origins[DEFAULT_ORIGIN] ~= nil and
+       next(normalized_origins, next(normalized_origins)) == nil then
+        return nil
+    end
+    return {origins = normalized_origins}
+end
+
+local function grant_error(name, object_name, object_type, privilege)
+    if object_type == 'role' and object_name ~= '' and
+       privilege == 'execute' then
+        box.error(box.error.ROLE_GRANTED, name, object_name)
+    end
+    if not is_singleton_object_type(object_type) then
+        object_name = string.format(" '%s'", object_name)
+    end
+    box.error(box.error.PRIV_GRANTED, name, privilege, object_type,
+              object_name)
+end
+
 local function grant(uid, name, privilege, object_type,
                      object_name, options)
     -- From user point of view, role is the same thing
@@ -3453,35 +3508,77 @@ local function grant(uid, name, privilege, object_type,
     else
         options.grantor = user_or_role_resolve(options.grantor)
     end
+    if options._origin == nil then
+        options._origin = DEFAULT_ORIGIN
+    elseif type(options._origin) ~= 'string' then
+        box.error(box.error.ILLEGAL_PARAMS, "options parameter '_origin' " ..
+                  "should be of type 'string'")
+    end
     local _priv = box.space[box.schema.PRIV_ID]
     local _vpriv = box.space[box.schema.VPRIV_ID]
     -- add the granted privilege to the current set
-    local tuple = _vpriv:get{uid, object_type, oid}
-    local old_privilege
-    if tuple ~= nil then
-        old_privilege = tuple.privilege
-    else
-        old_privilege = 0
-    end
-    privilege_hex = bit.bor(privilege_hex, old_privilege)
-    privilege_hex = tonumber(ffi.cast('uint32_t', privilege_hex))
+    local origins = origins_from_tuple(_vpriv:get({uid, object_type, oid}))
+
     -- do not execute a replace if it does not change anything
     -- XXX bug if we decide to add a grant option: new grantor
     -- replaces the old one, old grantor is lost
-    if privilege_hex ~= old_privilege then
-        _priv:replace{options.grantor, uid, object_type, oid, privilege_hex}
-    elseif not options.if_not_exists then
-            if object_type == 'role' and object_name ~= '' and
-               privilege == 'execute' then
-                box.error(box.error.ROLE_GRANTED, name, object_name)
-            else
-                if not is_singleton_object_type(object_type) then
-                    object_name = string.format(" '%s'", object_name)
-                end
-                box.error(box.error.PRIV_GRANTED, name, privilege,
-                          object_type, object_name)
-            end
+    local old_privilege = origins[options._origin] or 0
+    if bit.band(bit.bnot(old_privilege), privilege_hex) ~= 0 then
+        -- Update given privileges by origin.
+        origins[options._origin] = bit.bor(old_privilege, privilege_hex)
+    else
+        -- No new privileges can be given.
+        if options.if_not_exists then
+            return
+        end
+        grant_error(name, object_name, object_type, privilege)
     end
+
+    local new_privilege = privilege_from_origins(origins)
+    local opts = opts_from_origins(origins)
+    _priv:replace({options.grantor, uid, object_type, oid, new_privilege, opts})
+end
+
+local function revoke_error(name, object_name, object_type, privilege, origin,
+                            tuple)
+    local total_privileges = tuple == nil and 0 or tuple.privilege
+    local new_privilege = privilege_check(privilege, object_type)
+    local prev_origin
+    local reason
+    local code
+    if bit.band(new_privilege, total_privileges) == 0 then
+        prev_origin = nil
+    else
+        prev_origin = origin == '' and 'default' or origin
+    end
+
+    if object_type == 'role' and object_name ~= '' and
+       privilege == 'execute' then
+        local msg
+        code = box.error.ROLE_NOT_GRANTED
+        if prev_origin == nil then
+            msg = "User '%s' does not have role '%s'"
+        else
+            msg = "User '%s' does not have role '%s' provided by %s origin"
+        end
+        reason = msg:format(name, object_name, prev_origin)
+    else
+        local msg
+        code = box.error.PRIV_NOT_GRANTED
+        if prev_origin == nil then
+            msg = "User '%s' does not have %s access on %s '%s'"
+        else
+            msg = "User '%s' does not have %s access on %s '%s' provided by " ..
+                  "%s origin"
+        end
+        reason = msg:format(name, privilege, object_type, object_name,
+                            prev_origin)
+    end
+    box.error({
+        code = code,
+        reason = reason,
+        prev_origin = prev_origin,
+    })
 end
 
 local function revoke(uid, name, privilege, object_type, object_name, options)
@@ -3500,42 +3597,42 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
     end
     local privilege_hex = privilege_check(privilege, object_type)
     options = options or {}
+    if options._origin == nil then
+        options._origin = DEFAULT_ORIGIN
+    elseif type(options._origin) ~= 'string' then
+        box.error(box.error.ILLEGAL_PARAMS, "options parameter '_origin' " ..
+                  "should be of type 'string'")
+    end
     local oid = object_resolve(object_type, object_name)
     local _priv = box.space[box.schema.PRIV_ID]
     local _vpriv = box.space[box.schema.VPRIV_ID]
     local tuple = _vpriv:get{uid, object_type, oid}
     -- system privileges of admin and guest can't be revoked
-    if tuple == nil then
+
+    local origins = origins_from_tuple(tuple)
+    local old_privilege = origins[options._origin] or 0
+    if bit.band(old_privilege, privilege_hex) == 0 then
+        -- Privileges cannot be revoked.
         if options.if_exists then
             return
         end
-        if object_type == 'role' and object_name ~= '' and
-           privilege == 'execute' then
-            box.error(box.error.ROLE_NOT_GRANTED, name, object_name)
-        else
-            box.error(box.error.PRIV_NOT_GRANTED, name, privilege,
-                      object_type, object_name)
-        end
+        revoke_error(name, object_name, object_type, privilege, options._origin,
+                     tuple)
     end
-    local old_privilege = tuple.privilege
+    assert(tuple ~= nil)
     local grantor = tuple.grantor
     -- sic:
     -- a user may revoke more than he/she granted
     -- (erroneous user input)
     --
-    privilege_hex = bit.band(old_privilege, bit.bnot(privilege_hex))
-    -- give an error if we're not revoking anything
-    if privilege_hex == old_privilege then
-        if options.if_exists then
-            return
-        end
-        box.error(box.error.PRIV_NOT_GRANTED, name, privilege,
-                  object_type, object_name)
-    end
-    if privilege_hex ~= 0 then
-        _priv:replace{grantor, uid, object_type, oid, privilege_hex}
+    origins[options._origin] = bit.band(old_privilege, bit.bnot(privilege_hex))
+
+    local new_privilege = privilege_from_origins(origins)
+    if new_privilege == 0 then
+        _priv:delete({uid, object_type, oid})
     else
-        _priv:delete{uid, object_type, oid}
+        local opts = opts_from_origins(origins)
+        _priv:replace({grantor, uid, object_type, oid, new_privilege, opts})
     end
 end
 
