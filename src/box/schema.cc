@@ -32,6 +32,7 @@
 #include "sequence.h"
 #include "assoc.h"
 #include "alter.h"
+#include "box.h"
 #include "scoped_guard.h"
 #include "user.h"
 #include "vclock/vclock.h"
@@ -171,12 +172,14 @@ dd_check_is_disabled(void)
 	 *    modify the schema, in particular drop a system space;
 	 *  - in the applier fiber so that it can replicate changes done by
 	 *    a schema upgrade on the master;
+	 *  - during bootstrap so that DDL operations can be performed when
+	 *    generating new bootstrap snapshot;
 	 *  - during recovery so that DDL records written to the WAL can be
 	 *    replayed.
 	 */
 	return fiber() == schema_upgrade_fiber ||
 	       current_session()->type == SESSION_TYPE_APPLIER ||
-	       recovery_state != FINISHED_RECOVERY;
+	       !box_is_configured() || recovery_state != FINISHED_RECOVERY;
 }
 
 static int
