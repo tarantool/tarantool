@@ -50,14 +50,16 @@ end
 
 -- {{{ Helpers
 
--- Collect names of all the instances in replicaset-001 of
--- group-001 in the alphabetical order.
+-- Collect names of all the instances defined in the config
+-- in the alphabetical order.
 local function instance_names_from_config(config)
-    local group = config.groups['group-001']
-    local replicaset = group.replicasets['replicaset-001']
     local instance_names = {}
-    for name, _ in pairs(replicaset.instances) do
-        table.insert(instance_names, name)
+    for _, group in pairs(config.groups) do
+        for _, replicaset in pairs(group.replicasets) do
+            for name, _ in pairs(replicaset.instances) do
+                table.insert(instance_names, name)
+            end
+        end
     end
     table.sort(instance_names)
     return instance_names
@@ -77,7 +79,7 @@ local function cluster_size(self)
     return #self._servers
 end
 
--- Start all the instances of replicaset-001 (from group-001).
+-- Start all the instances.
 local function cluster_start(self, opts)
     self:each(function(server)
         server:start({wait_until_ready = false})
@@ -90,12 +92,6 @@ local function cluster_start(self, opts)
     self:each(function(server)
         server:wait_until_ready()
     end)
-
-    self:each(function(server)
-        server:exec(function()
-            t.assert_equals(box.info.replicaset.name, 'replicaset-001')
-        end)
-    end)
 end
 
 -- Start the given instance.
@@ -103,10 +99,6 @@ local function cluster_start_instance(self, instance_name)
     local server = self._server_map[instance_name]
     assert(server ~= nil)
     server:start()
-
-    server:exec(function()
-        t.assert_equals(box.info.replicaset.name, 'replicaset-001')
-    end)
 end
 
 local function cluster_stop(self)
@@ -203,8 +195,8 @@ local function new(g, config, server_opts)
     local config_file = treegen.write_script(dir, config_file_rel,
                                              yaml.encode(config))
 
-    -- Collect names of all the instances in replicaset-001 of
-    -- group-001 in the alphabetical order.
+    -- Collect names of all the instances defined in the config
+    -- in the alphabetical order.
     local instance_names = instance_names_from_config(config)
 
     -- Generate luatest server options.
@@ -254,8 +246,8 @@ local function startup_error(g, config, exp_err)
     local config_file = treegen.write_script(dir, config_file_rel,
                                              yaml.encode(config))
 
-    -- Collect names of all the instances in replicaset-001 of
-    -- group-001 in the alphabetical order.
+    -- Collect names of all the instances defined in the config
+    -- in the alphabetical order.
     local instance_names = instance_names_from_config(config)
 
     for _, name in ipairs(instance_names) do
