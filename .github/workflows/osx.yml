@@ -31,7 +31,7 @@ jobs:
         uses: tarantool/actions/prepare-checkout@master
 
       - name: Sources checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ matrix.tarantool-branch }}
           fetch-depth: 0
