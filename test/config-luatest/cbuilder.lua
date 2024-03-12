@@ -12,23 +12,8 @@
 --     :add_instance('instance-003', {})
 --     :config()
 --
--- The instances are added into replicaset-001 in group-001.
---
--- The default credentials and iproto options are added to
--- setup replication and to allow a test to connect to the
--- instances.
---
--- There is a few other methods:
---
--- * :set_replicaset_option('foo.bar', value)
--- * :set_instance_option('instance-001', 'foo.bar', value)
---
--- All the methods supports chaining (returns the builder object
--- back).
---
--- Beware: It is written to construct a configuration with a
--- single replicaset. The module can be extended to a more general
--- case using methods that stores current group/replicaset.
+-- By default, all instances are added to replicaset-001 in group-001,
+-- but it's possible to select a different replicaset and/or group:
 --
 -- local config = cbuilder_new()
 --     :use_group('group-001')
@@ -45,7 +30,17 @@
 --
 --     :config()
 --
--- It is not implemented yet.
+-- The default credentials and iproto options are added to
+-- setup replication and to allow a test to connect to the
+-- instances.
+--
+-- There is a few other methods:
+--
+-- * :set_replicaset_option('foo.bar', value)
+-- * :set_instance_option('instance-001', 'foo.bar', value)
+--
+-- All the methods supports chaining (returns the builder object
+-- back).
 
 local fun = require('fun')
 local cluster_config = require('internal.config.cluster_config')
@@ -93,18 +88,30 @@ local base_config = {
     },
 }
 
+-- Select a group for following calls.
+local function cbuilder_use_group(self, group_name)
+    self._group = group_name
+    return self
+end
+
+-- Select a replicaset for following calls.
+local function cbuilder_use_replicaset(self, replicaset_name)
+    self._replicaset = replicaset_name
+    return self
+end
+
 local function cbuilder_set_global_option(self, path, value)
     assert(type(path) == 'string')
     cluster_config:set(self._config, path, value)
     return self
 end
 
--- Set an option for replicaset-001.
+-- Set an option for the selected replicaset.
 local function cbuilder_set_replicaset_option(self, path, value)
     assert(type(path) == 'string')
     path = fun.chain({
-        'groups', 'group-001',
-        'replicasets', 'replicaset-001',
+        'groups', self._group,
+        'replicasets', self._replicaset,
     }, path:split('.')):totable()
 
     -- <schema object>:set() validation is too tight. Workaround
@@ -129,12 +136,12 @@ local function cbuilder_set_replicaset_option(self, path, value)
     return self
 end
 
--- Set an option of a particular instance.
+-- Set an option of a particular instance in the selected replicaset.
 local function cbuilder_set_instance_option(self, instance_name, path, value)
     assert(type(path) == 'string')
     path = fun.chain({
-        'groups', 'group-001',
-        'replicasets', 'replicaset-001',
+        'groups', self._group,
+        'replicasets', self._replicaset,
         'instances', instance_name,
     }, path:split('.')):totable()
 
@@ -142,14 +149,11 @@ local function cbuilder_set_instance_option(self, instance_name, path, value)
     return self
 end
 
--- Add an instance with the given options.
---
--- All the instances are added into replicaset 'replicaset-001' of
--- group 'group-001'.
+-- Add an instance with the given options to the selected replicaset.
 local function cbuilder_add_instance(self, instance_name, iconfig)
     local path = {
-        'groups', 'group-001',
-        'replicasets', 'replicaset-001',
+        'groups', self._group,
+        'replicasets', self._replicaset,
         'instances', instance_name,
     }
     cluster_config:set(self._config, path, iconfig)
@@ -162,6 +166,8 @@ local function cbuilder_config(self)
 end
 
 local cbuilder_mt = {
+    use_group = cbuilder_use_group,
+    use_replicaset = cbuilder_use_replicaset,
     set_global_option = cbuilder_set_global_option,
     set_replicaset_option = cbuilder_set_replicaset_option,
     set_instance_option = cbuilder_set_instance_option,
@@ -175,6 +181,8 @@ local function cbuilder_new(config)
     config = table.deepcopy(config or base_config)
     return setmetatable({
         _config = config,
+        _group = 'group-001',
+        _replicaset = 'replicaset-001',
     }, cbuilder_mt)
 end
 
