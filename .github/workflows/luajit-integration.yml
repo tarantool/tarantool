@@ -55,7 +55,7 @@ jobs:
         uses: tarantool/actions/prepare-checkout@master
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: tarantool/tarantool
           fetch-depth: 0

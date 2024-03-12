@@ -19,7 +19,7 @@ jobs:
         run: echo "/usr/local/git/bin" | tee -a $GITHUB_PATH
       - name: cleanup workspace
         run: docker run -w /source -v ${PWD}:/source -i centos:8 /bin/bash -c "chown -R $(id -u):$(id -g) * .[^.]*"
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: test
         env:
           BENCH: 'linkbench'
