@@ -1,13 +1,13 @@
 local uuid = require('uuid')
 local t = require('luatest')
 local cbuilder = require('test.config-luatest.cbuilder')
-local replicaset = require('test.config-luatest.replicaset')
+local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
 
-g.before_all(replicaset.init)
-g.after_each(replicaset.drop)
-g.after_all(replicaset.clean)
+g.before_all(cluster.init)
+g.after_each(cluster.drop)
+g.after_all(cluster.clean)
 
 g.test_basic = function(g)
     local config = cbuilder.new()
@@ -24,15 +24,15 @@ g.test_basic = function(g)
             }
         })
         :config()
-    local rs = replicaset.new(g, config)
-    rs:start()
+    local cluster = cluster.new(g, config)
+    cluster:start()
 
-    rs['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(box.info.name, 'i-001')
         t.assert_equals(require('config'):info().alerts, {})
     end)
 
-    rs['i-002']:exec(function()
+    cluster['i-002']:exec(function()
         t.assert_equals(box.info.name, 'i-002')
         t.assert_equals(require('config'):info().alerts, {})
     end)
