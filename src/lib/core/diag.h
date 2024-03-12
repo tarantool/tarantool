@@ -200,6 +200,18 @@ error_set_uuid(struct error *e, const char *name, const struct tt_uuid *value)
 	error_payload_set_uuid(&e->payload, name, value);
 }
 
+static inline const char *
+error_get_mp(const struct error *e, const char *name, uint32_t *size)
+{
+	return error_payload_get_mp(&e->payload, name, size);
+}
+
+static inline void
+error_set_mp(struct error *e, const char *name, const char *src, uint32_t size)
+{
+	error_payload_set_mp(&e->payload, name, src, size);
+}
+
 static inline void
 error_clear_field(struct error *e, const char *name)
 {
