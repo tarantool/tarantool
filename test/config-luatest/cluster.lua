@@ -1,28 +1,28 @@
--- Replicaset management utils.
+-- Cluster management utils.
 --
 -- Add the following code into a test file.
 --
 -- | local g = t.group()
 -- |
--- | g.before_all(replicaset.init)
--- | g.after_each(replicaset.drop)
--- | g.after_all(replicaset.clean)
+-- | g.before_all(cluster.init)
+-- | g.after_each(cluster.drop)
+-- | g.after_all(cluster.clean)
 --
 -- It properly initializes the module and cleans up all the
 -- resources between and after test cases.
 --
 -- Usage (success case):
 --
--- | local replicaset = replicaset_new(g, config)
--- | replicaset:start()
--- | replicaset['instance-001']:exec(<...>)
--- | replicaset:each(function(server)
+-- | local cluster = cluster_new(g, config)
+-- | cluster:start()
+-- | cluster['instance-001']:exec(<...>)
+-- | cluster:each(function(server)
 -- |     server:exec(<...>)
 -- | end)
 --
 -- Usage (failure case):
 --
--- | replicaset.startup_error(g, config, error_message)
+-- | cluster.startup_error(g, config, error_message)
 
 local fun = require('fun')
 local yaml = require('yaml')
@@ -37,14 +37,14 @@ end
 
 -- Stop all the managed instances using <server>:drop().
 local function drop(g)
-    if g.replicaset ~= nil then
-        g.replicaset:drop()
+    if g.cluster ~= nil then
+        g.cluster:drop()
     end
-    g.replicaset = nil
+    g.cluster = nil
 end
 
 local function clean(g)
-    assert(g.replicaset == nil)
+    assert(g.cluster == nil)
     treegen.clean(g)
 end
 
@@ -65,20 +65,20 @@ end
 
 -- }}} Helpers
 
--- {{{ Replicaset management
+-- {{{ Cluster management
 
-local function replicaset_each(self, f)
+local function cluster_each(self, f)
     fun.iter(self._servers):each(function(server)
         f(server)
     end)
 end
 
-local function replicaset_size(self)
+local function cluster_size(self)
     return #self._servers
 end
 
 -- Start all the instances of replicaset-001 (from group-001).
-local function replicaset_start(self, opts)
+local function cluster_start(self, opts)
     self:each(function(server)
         server:start({wait_until_ready = false})
     end)
@@ -99,7 +99,7 @@ local function replicaset_start(self, opts)
 end
 
 -- Start the given instance.
-local function replicaset_start_instance(self, instance_name)
+local function cluster_start_instance(self, instance_name)
     local server = self._server_map[instance_name]
     assert(server ~= nil)
     server:start()
@@ -109,13 +109,13 @@ local function replicaset_start_instance(self, instance_name)
     end)
 end
 
-local function replicaset_stop(self)
+local function cluster_stop(self)
     for _, server in ipairs(self._servers or {}) do
         server:stop()
     end
 end
 
-local function replicaset_drop(self)
+local function cluster_drop(self)
     for _, server in ipairs(self._servers or {}) do
         server:drop()
     end
@@ -123,13 +123,13 @@ local function replicaset_drop(self)
     self._server_map = nil
 end
 
--- Sync the replicaset object with the new config.
+-- Sync the cluster object with the new config.
 --
 -- It performs the following actions.
 --
 -- * Write the new config into the config file.
 -- * Update the internal list of instances.
-local function replicaset_sync(self, config)
+local function cluster_sync(self, config)
     local instance_names = instance_names_from_config(config)
 
     treegen.write_script(self._dir, self._config_file_rel,
@@ -147,7 +147,7 @@ local function replicaset_sync(self, config)
 end
 
 -- Reload configuration on all the instances.
-local function replicaset_reload(self, config)
+local function cluster_reload(self, config)
     -- Rewrite the configuration file if a new config is provided.
     if config ~= nil then
         treegen.write_script(self._dir, self._config_file_rel,
@@ -171,17 +171,17 @@ local function replicaset_reload(self, config)
 end
 
 local methods = {
-    each = replicaset_each,
-    size = replicaset_size,
-    start = replicaset_start,
-    start_instance = replicaset_start_instance,
-    stop = replicaset_stop,
-    drop = replicaset_drop,
-    sync = replicaset_sync,
-    reload = replicaset_reload,
+    each = cluster_each,
+    size = cluster_size,
+    start = cluster_start,
+    start_instance = cluster_start_instance,
+    stop = cluster_stop,
+    drop = cluster_drop,
+    sync = cluster_sync,
+    reload = cluster_reload,
 }
 
-local replicaset_mt = {
+local cluster_mt = {
     __index = function(self, k)
         if methods[k] ~= nil then
             return methods[k]
@@ -194,7 +194,7 @@ local replicaset_mt = {
 }
 
 local function new(g, config, server_opts)
-    assert(g.replicaset == nil)
+    assert(g.cluster == nil)
 
     -- Prepare a temporary directory and write a configuration
     -- file.
@@ -228,22 +228,22 @@ local function new(g, config, server_opts)
         server_map[name] = server
     end
 
-    -- Create a replicaset object and store it in 'g'.
-    g.replicaset = setmetatable({
+    -- Create a cluster object and store it in 'g'.
+    g.cluster = setmetatable({
         _servers = servers,
         _server_map = server_map,
         _dir = dir,
         _config_file_rel = config_file_rel,
         _server_opts = server_opts,
-    }, replicaset_mt)
-    return g.replicaset
+    }, cluster_mt)
+    return g.cluster
 end
 
 -- }}} Replicaset management
 
 -- {{{ Replicaset that can't start
 
--- Starts a all instance of a replicaset from the given config and
+-- Starts a all instance of a cluster from the given config and
 -- ensure that all the instances fails to start and reports the
 -- given error message.
 local function startup_error(g, config, exp_err)

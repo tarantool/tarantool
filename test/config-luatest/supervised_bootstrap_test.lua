@@ -3,13 +3,13 @@ local fio = require('fio')
 local socket = require('socket')
 local t = require('luatest')
 local cbuilder = require('test.config-luatest.cbuilder')
-local replicaset = require('test.config-luatest.replicaset')
+local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
 
-g.before_all(replicaset.init)
-g.after_each(replicaset.drop)
-g.after_all(replicaset.clean)
+g.before_all(cluster.init)
+g.after_each(cluster.drop)
+g.after_all(cluster.clean)
 
 g.test_basic = function(g)
     local config = cbuilder.new()
@@ -20,11 +20,11 @@ g.test_basic = function(g)
         :add_instance('i-003', {})
         :config()
 
-    local replicaset = replicaset.new(g, config)
-    replicaset:start({wait_until_ready = false})
+    local cluster = cluster.new(g, config)
+    cluster:start({wait_until_ready = false})
 
     -- Connect to a text console.
-    local control_path = fio.pathjoin(replicaset._dir,
+    local control_path = fio.pathjoin(cluster._dir,
         'var/run/i-002/tarantool.control')
     local s = t.helpers.retrying({timeout = 60}, function()
         local s, err = socket.tcp_connect('unix/', control_path)
@@ -54,12 +54,12 @@ g.test_basic = function(g)
     s:close()
 
     -- Wait till all the servers will finish the bootstrap.
-    replicaset:each(function(server)
+    cluster:each(function(server)
         server:wait_until_ready()
     end)
 
     -- Verify that all the instances are healthy.
-    replicaset:each(function(server)
+    cluster:each(function(server)
         t.helpers.retrying({timeout = 60}, function()
             server:exec(function()
                 t.assert_equals(box.info.status, 'running')
@@ -69,7 +69,7 @@ g.test_basic = function(g)
 
     -- Verify that the given instance was acted as a bootstrap
     -- leader.
-    replicaset['i-002']:exec(function()
+    cluster['i-002']:exec(function()
         t.assert_equals(box.info.id, 1)
     end)
 end

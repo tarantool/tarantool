@@ -1,12 +1,12 @@
 local t = require('luatest')
 local cbuilder = require('test.config-luatest.cbuilder')
-local replicaset = require('test.config-luatest.replicaset')
+local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
 
-g.before_all(replicaset.init)
-g.after_each(replicaset.drop)
-g.after_all(replicaset.clean)
+g.before_all(cluster.init)
+g.after_each(cluster.drop)
+g.after_all(cluster.clean)
 
 -- Ease writing of a long error message in a code.
 local function toline(s)
@@ -46,21 +46,21 @@ g.test_basic = function(g)
         })
         :config()
 
-    local replicaset = replicaset.new(g, config)
-    replicaset:start()
+    local cluster = cluster.new(g, config)
+    cluster:start()
 
     -- Verify that all the instances are healthy.
-    replicaset:each(function(server)
+    cluster:each(function(server)
         server:exec(function()
             t.assert_equals(box.info.status, 'running')
         end)
     end)
 
     -- Verify that the anonymous replicas are actually anonymous.
-    replicaset['instance-004']:exec(function()
+    cluster['instance-004']:exec(function()
         t.assert_equals(box.info.id, 0)
     end)
-    replicaset['instance-005']:exec(function()
+    cluster['instance-005']:exec(function()
         t.assert_equals(box.info.id, 0)
     end)
 end
@@ -92,14 +92,14 @@ g.test_no_anonymous_upstream = function(g)
         })
         :config()
 
-    local replicaset = replicaset.new(g, config)
-    replicaset:start()
+    local cluster = cluster.new(g, config)
+    cluster:start()
 
      -- Verify that the anonymous replicas are actually anonymous.
-    replicaset['instance-004']:exec(function()
+    cluster['instance-004']:exec(function()
         t.assert_equals(box.info.id, 0)
     end)
-    replicaset['instance-005']:exec(function()
+    cluster['instance-005']:exec(function()
         t.assert_equals(box.info.id, 0)
     end)
 
@@ -108,7 +108,7 @@ g.test_no_anonymous_upstream = function(g)
     -- NB: We can check box.info.replication as well, but it just
     -- adds extra code and doesn't improve coverage of upstream
     -- list construction logic.
-    replicaset:each(function(server)
+    cluster:each(function(server)
         server:exec(function()
             t.assert_equals(box.cfg.replication, {
                 {
@@ -155,14 +155,14 @@ g.test_supervised_mode_bootstrap_leader_not_anon = function(g)
         })
         :config()
 
-    local replicaset = replicaset.new(g, config)
-    replicaset:start()
+    local cluster = cluster.new(g, config)
+    cluster:start()
 
     -- Verify that instance-001 (anonymous replica) is
     -- successfully started. An attempt to make it writable (to
     -- use as a bootstrap leader) would lead to a startup error.
     t.helpers.retrying({timeout = 60}, function()
-        replicaset['instance-001']:exec(function()
+        cluster['instance-001']:exec(function()
             t.assert_equals(box.info.status, 'running')
         end)
     end)
@@ -170,7 +170,7 @@ g.test_supervised_mode_bootstrap_leader_not_anon = function(g)
     -- Verify that instance-002 is the bootstrap leader.
     --
     -- NB: An instance with box.info.id = 1 is a bootstrap leader.
-    replicaset['instance-002']:exec(function()
+    cluster['instance-002']:exec(function()
         t.assert_equals(box.info.id, 1)
     end)
 end
@@ -197,7 +197,7 @@ g.test_all_anonymous = function(g)
         })
         :config()
 
-    replicaset.startup_error(g, config, toline([[
+    cluster.startup_error(g, config, toline([[
         All the instances of replicaset "replicaset-001" of group "group-001"
         are configured as anonymous replicas; it effectively means that the
         whole replicaset is read-only; moreover, it means that default
@@ -234,7 +234,7 @@ g.test_anonymous_replica_rw_mode = function(g)
         })
         :config()
 
-    replicaset.startup_error(g, config, toline([[
+    cluster.startup_error(g, config, toline([[
         database.mode = "rw" is set for instance "instance-004" of replicaset
         "replicaset-001" of group "group-001", but this option cannot be used
         together with replication.anon = true
@@ -261,7 +261,7 @@ g.test_anonymous_replica_leader = function(g)
         })
         :config()
 
-    replicaset.startup_error(g, config, toline([[
+    cluster.startup_error(g, config, toline([[
         replication.anon = true is set for instance "instance-004" of replicaset
         "replicaset-001" of group "group-001" that is configured as a leader; a
         leader can not be an anonymous replica
@@ -297,7 +297,7 @@ g.test_anonymous_replica_election_mode_other_than_off = function(g)
             })
             :config()
 
-        replicaset.startup_error(g, config, error_t:format(election_mode))
+        cluster.startup_error(g, config, error_t:format(election_mode))
     end
 end
 
@@ -324,8 +324,8 @@ g.test_anonymous_replica_election_mode_off = function(g)
         })
         :config()
 
-    local replicaset = replicaset.new(g, config)
-    replicaset:start()
+    local cluster = cluster.new(g, config)
+    cluster:start()
 
     local function verify_election_mode_candidate()
         t.assert_equals(box.cfg.election_mode, 'candidate')
@@ -337,11 +337,11 @@ g.test_anonymous_replica_election_mode_off = function(g)
 
     -- Verify that non-anonymous instances have election mode
     -- 'candidate', while anonymous replicas are 'off'.
-    replicaset['instance-001']:exec(verify_election_mode_candidate)
-    replicaset['instance-002']:exec(verify_election_mode_candidate)
-    replicaset['instance-003']:exec(verify_election_mode_candidate)
-    replicaset['instance-004']:exec(verify_election_mode_off)
-    replicaset['instance-005']:exec(verify_election_mode_off)
+    cluster['instance-001']:exec(verify_election_mode_candidate)
+    cluster['instance-002']:exec(verify_election_mode_candidate)
+    cluster['instance-003']:exec(verify_election_mode_candidate)
+    cluster['instance-004']:exec(verify_election_mode_off)
+    cluster['instance-005']:exec(verify_election_mode_off)
 end
 
 -- Verify that an anonymous replica can join a replicaset that has
@@ -356,24 +356,24 @@ g.test_join_anonymous_replica_to_all_ro_replicaset = function(g)
         :config()
 
     -- Bootstrap the replicaset.
-    local replicaset = replicaset.new(g, config)
-    replicaset:start()
+    local cluster = cluster.new(g, config)
+    cluster:start()
 
     -- Unset the leader -- make all the instances read-only.
     local new_config = cbuilder.new(config)
         :set_replicaset_option('leader', nil)
         :config()
-    replicaset:reload(new_config)
+    cluster:reload(new_config)
 
     -- Verify that the instances actually enter read-only mode.
-    replicaset:each(function(server)
+    cluster:each(function(server)
         server:exec(function()
             t.assert_equals(box.info.ro, true)
         end)
     end)
 
     -- Add a new anonymous replica into the config and reflect it
-    -- in the replicaset object. Start the replica.
+    -- in the cluster object. Start the replica.
     local new_config_2 = cbuilder.new(new_config)
         :add_instance('instance-004', {
             replication = {
@@ -381,13 +381,13 @@ g.test_join_anonymous_replica_to_all_ro_replicaset = function(g)
             },
         })
         :config()
-    replicaset:sync(new_config_2)
-    replicaset:start_instance('instance-004')
+    cluster:sync(new_config_2)
+    cluster:start_instance('instance-004')
 
     -- Verify that the new instance is an anonymous replica and
     -- that it is synchronized with instance-{001,002,003}.
     t.helpers.retrying({timeout = 60}, function()
-        replicaset['instance-004']:exec(function()
+        cluster['instance-004']:exec(function()
             t.assert_equals(box.info.id, 0)
             t.assert_equals(box.info.status, 'running')
             t.assert_equals(box.space._cluster:count(), 3)
