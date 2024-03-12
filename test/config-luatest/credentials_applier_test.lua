@@ -4,15 +4,15 @@ local t = require('luatest')
 local treegen = require('test.treegen')
 local helpers = require('test.config-luatest.helpers')
 local cbuilder = require('test.config-luatest.cbuilder')
-local replicaset = require('test.config-luatest.replicaset')
+local cluster = require('test.config-luatest.cluster')
 
 local g = helpers.group()
 
 local internal = require('internal.config.applier.credentials')._internal
 
-g.before_all(replicaset.init)
-g.after_each(replicaset.drop)
-g.after_all(replicaset.clean)
+g.before_all(cluster.init)
+g.after_each(cluster.drop)
+g.after_all(cluster.clean)
 
 -- Collect delayed grant alerts and transform to
 -- '<space> <permission>' form.
@@ -1513,14 +1513,14 @@ g.test_space_rename_rw2rw = function(g)
         })
         :config()
 
-    local replicaset = replicaset.new(g, config)
-    replicaset:start()
-    define_warnings_function(replicaset['i-001'])
-    define_assert_priv_function(replicaset['i-001'])
+    local cluster = cluster.new(g, config)
+    cluster:start()
+    define_warnings_function(cluster['i-001'])
+    define_assert_priv_function(cluster['i-001'])
 
     -- Verify that alerts are set for delayed privilege grants
     -- for the given spaces.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(_G.warnings(), {
             'dest read',
             'dest write',
@@ -1530,16 +1530,16 @@ g.test_space_rename_rw2rw = function(g)
     end)
 
     -- Create space 'src'.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         box.schema.space.create('src')
         box.space.src:create_index('pk')
     end)
 
     -- Verify that privileges are granted for the space 'src'.
-    replicaset['i-001']:call('assert_priv', {'src', 'read,write'})
+    cluster['i-001']:call('assert_priv', {'src', 'read,write'})
 
     -- Verify that the alerts regarding the space 'src' are gone.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(_G.warnings(), {
             'dest read',
             'dest write',
@@ -1547,19 +1547,19 @@ g.test_space_rename_rw2rw = function(g)
     end)
 
     -- Rename 'src' to 'dest'.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         box.space.src:rename('dest')
     end)
 
     -- Verify that the proper privileges are kept for the space
     -- 'dest'.
-    replicaset['i-001']:call('assert_priv', {'dest', 'read,write'})
+    cluster['i-001']:call('assert_priv', {'dest', 'read,write'})
 
     -- Verify that the alert regarding the 'dest' space is gone.
     --
     -- Also verify that the alerts are set for the space 'src',
     -- which is gone after the rename.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(_G.warnings(), {
             'src read',
             'src write',
@@ -1589,14 +1589,14 @@ g.test_space_rename_r2rw = function(g)
         })
         :config()
 
-    local replicaset = replicaset.new(g, config)
-    replicaset:start()
-    define_warnings_function(replicaset['i-001'])
-    define_assert_priv_function(replicaset['i-001'])
+    local cluster = cluster.new(g, config)
+    cluster:start()
+    define_warnings_function(cluster['i-001'])
+    define_assert_priv_function(cluster['i-001'])
 
     -- Verify that alerts are set for delayed privilege grants
     -- for the given spaces.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(_G.warnings(), {
             'dest read',
             'dest write',
@@ -1605,16 +1605,16 @@ g.test_space_rename_r2rw = function(g)
     end)
 
     -- Create space 'src'.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         box.schema.space.create('src')
         box.space.src:create_index('pk')
     end)
 
     -- Verify that privileges are granted for the space 'src'.
-    replicaset['i-001']:call('assert_priv', {'src', 'read'})
+    cluster['i-001']:call('assert_priv', {'src', 'read'})
 
     -- Verify that the alerts regarding the space 'src' are gone.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(_G.warnings(), {
             'dest read',
             'dest write',
@@ -1622,18 +1622,18 @@ g.test_space_rename_r2rw = function(g)
     end)
 
     -- Rename 'src' to 'dest'.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         box.space.src:rename('dest')
     end)
 
     -- Verify privileges are adjusted for the space 'dest'.
-    replicaset['i-001']:call('assert_priv', {'dest', 'read,write'})
+    cluster['i-001']:call('assert_priv', {'dest', 'read,write'})
 
     -- Verify that the alerts regarding the 'dest' space are gone.
     --
     -- Also verify that the alert is set for the space 'src',
     -- which is gone after the rename.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(_G.warnings(), {
             'src read',
         })
@@ -1662,14 +1662,14 @@ g.test_space_rename_rw2r = function(g)
         })
         :config()
 
-    local replicaset = replicaset.new(g, config)
-    replicaset:start()
-    define_warnings_function(replicaset['i-001'])
-    define_assert_priv_function(replicaset['i-001'])
+    local cluster = cluster.new(g, config)
+    cluster:start()
+    define_warnings_function(cluster['i-001'])
+    define_assert_priv_function(cluster['i-001'])
 
     -- Verify that alerts are set for delayed privilege grants
     -- for the given spaces.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(_G.warnings(), {
             'dest read',
             'src read',
@@ -1678,34 +1678,34 @@ g.test_space_rename_rw2r = function(g)
     end)
 
     -- Create space 'src'.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         box.schema.space.create('src')
         box.space.src:create_index('pk')
     end)
 
     -- Verify that privileges are granted for the space 'src'.
-    replicaset['i-001']:call('assert_priv', {'src', 'read,write'})
+    cluster['i-001']:call('assert_priv', {'src', 'read,write'})
 
     -- Verify that the alerts regarding the space 'src' are gone.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(_G.warnings(), {
             'dest read',
         })
     end)
 
     -- Rename 'src' to 'dest'.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         box.space.src:rename('dest')
     end)
 
     -- Verify privileges are adjusted for the space 'dest'.
-    replicaset['i-001']:call('assert_priv', {'dest', 'read'})
+    cluster['i-001']:call('assert_priv', {'dest', 'read'})
 
     -- Verify that the alert regarding the 'dest' space is gone.
     --
     -- Also verify that the alerts are set for the space 'src',
     -- which is gone after the rename.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(_G.warnings(), {
             'src read',
             'src write',
@@ -1727,13 +1727,13 @@ g.test_fix_status_change_with_pending_warnings = function(g)
         })
         :config()
 
-    local replicaset = replicaset.new(g, config)
-    replicaset:start()
-    define_warnings_function(replicaset['i-001'])
+    local cluster = cluster.new(g, config)
+    cluster:start()
+    define_warnings_function(cluster['i-001'])
 
     -- Verify that alerts are set for delayed privilege grants
     -- for the given spaces and status is 'check_warnings'.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(_G.warnings(), {
             'one read',
             'two read',
@@ -1742,13 +1742,13 @@ g.test_fix_status_change_with_pending_warnings = function(g)
     end)
 
     -- Create space 'one'.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         box.schema.space.create('one')
     end)
 
     -- Verify that the alerts regarding the space 'one' are gone,
     -- but the status is still 'check_warnings'.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(_G.warnings(), {
             'two read',
         })
@@ -1756,12 +1756,12 @@ g.test_fix_status_change_with_pending_warnings = function(g)
     end)
 
     -- Create space 'two'.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         box.schema.space.create('two')
     end)
 
     -- Verify than all alerts are gone and the status is 'ready'.
-    replicaset['i-001']:exec(function()
+    cluster['i-001']:exec(function()
         t.assert_equals(_G.warnings(), {})
         t.assert_equals(require('config'):info().status, 'ready')
     end)

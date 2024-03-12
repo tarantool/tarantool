@@ -3,13 +3,13 @@ local compat = require('compat')
 local instance_config = require('internal.config.instance_config')
 local t = require('luatest')
 local cbuilder = require('test.config-luatest.cbuilder')
-local replicaset = require('test.config-luatest.replicaset')
+local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
 
-g.before_all(replicaset.init)
-g.after_each(replicaset.drop)
-g.after_all(replicaset.clean)
+g.before_all(cluster.init)
+g.after_each(cluster.drop)
+g.after_all(cluster.clean)
 
 -- These options can't be changed on reload.
 local non_dynamic = {
@@ -42,12 +42,12 @@ end
 
 -- Verify that the given compat option has the given effective
 -- value.
-local function verify(replicaset, option_name, exp)
+local function verify(cluster, option_name, exp)
     if exp == 'default' then
         exp = compat._options()[option_name].default
     end
 
-    replicaset['instance-001']:exec(function(option_name, exp)
+    cluster['instance-001']:exec(function(option_name, exp)
         local compat = require('compat')
 
         local res = compat[option_name]:is_new() and 'new' or 'old'
@@ -57,13 +57,13 @@ end
 
 -- Write a new config file with the given compat option and reload
 -- the configuration.
-local function switch(replicaset, option_name, startup_config, v)
+local function switch(cluster, option_name, startup_config, v)
     local config = cbuilder.new(startup_config)
         :set_instance_option('instance-001', 'compat', {
             [option_name] = v ~= 'default' and v or box.NULL,
         })
         :config()
-    replicaset:reload(config)
+    cluster:reload(config)
 end
 
 -- Start an instance with the given compat option value and verify
@@ -78,10 +78,10 @@ local function gen_startup_case(option_name, v)
             })
             :config()
 
-        local replicaset = replicaset.new(g, startup_config)
-        replicaset:start()
+        local cluster = cluster.new(g, startup_config)
+        cluster:start()
 
-        verify(replicaset, option_name, v)
+        verify(cluster, option_name, v)
     end
 end
 
@@ -93,19 +93,19 @@ local function gen_reload_case(option_name)
             :add_instance('instance-001', {})
             :config()
 
-        local replicaset = replicaset.new(g, startup_config)
-        replicaset:start()
+        local cluster = cluster.new(g, startup_config)
+        cluster:start()
 
-        verify(replicaset, option_name, 'default')
+        verify(cluster, option_name, 'default')
 
-        switch(replicaset, option_name, startup_config, 'old')
-        verify(replicaset, option_name, 'old')
+        switch(cluster, option_name, startup_config, 'old')
+        verify(cluster, option_name, 'old')
 
-        switch(replicaset, option_name, startup_config, 'new')
-        verify(replicaset, option_name, 'new')
+        switch(cluster, option_name, startup_config, 'new')
+        verify(cluster, option_name, 'new')
 
-        switch(replicaset, option_name, startup_config, 'default')
-        verify(replicaset, option_name, 'default')
+        switch(cluster, option_name, startup_config, 'default')
+        verify(cluster, option_name, 'default')
     end
 end
 
@@ -122,19 +122,19 @@ local function gen_reload_failure_case(option_name, startup_value, reload_value)
             })
             :config()
 
-        local replicaset = replicaset.new(g, startup_config)
-        replicaset:start()
+        local cluster = cluster.new(g, startup_config)
+        cluster:start()
 
         -- Attempt to switch the option to another value.
         local exp_err = non_dynamic[option_name].error
-        t.assert_error_msg_content_equals(exp_err, switch, replicaset,
+        t.assert_error_msg_content_equals(exp_err, switch, cluster,
             option_name, startup_config, reload_value)
 
         -- Verify that the value remains the same.
-        verify(replicaset, option_name, startup_value)
+        verify(cluster, option_name, startup_value)
 
         -- Verify that config module reports an error.
-        replicaset['instance-001']:exec(function(exp_err)
+        cluster['instance-001']:exec(function(exp_err)
             local config = require('config')
 
             local info = config:info()
@@ -156,8 +156,8 @@ local function gen_reload_failure_case(option_name, startup_value, reload_value)
         end, {exp_err})
 
         -- Verify that things can be repaired using config:reload()
-        switch(replicaset, option_name, startup_config, startup_value)
-        replicaset['instance-001']:exec(function()
+        switch(cluster, option_name, startup_config, startup_value)
+        cluster['instance-001']:exec(function()
             local config = require('config')
 
             local info = config:info()
@@ -185,15 +185,15 @@ local function gen_reload_success_case(option_name, startup_value, reload_value)
             })
             :config()
 
-        local replicaset = replicaset.new(g, startup_config)
-        replicaset:start()
+        local cluster = cluster.new(g, startup_config)
+        cluster:start()
 
         -- Verify that the option is switched successfully.
-        switch(replicaset, option_name, startup_config, reload_value)
-        verify(replicaset, option_name, reload_value)
+        switch(cluster, option_name, startup_config, reload_value)
+        verify(cluster, option_name, reload_value)
 
         -- Verify that config module doesn't report an error.
-        replicaset['instance-001']:exec(function()
+        cluster['instance-001']:exec(function()
             local config = require('config')
 
             local info = config:info()

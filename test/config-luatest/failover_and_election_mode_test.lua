@@ -9,13 +9,13 @@
 
 local t = require('luatest')
 local cbuilder = require('test.config-luatest.cbuilder')
-local replicaset = require('test.config-luatest.replicaset')
+local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
 
-g.before_all(replicaset.init)
-g.after_each(replicaset.drop)
-g.after_all(replicaset.clean)
+g.before_all(cluster.init)
+g.after_each(cluster.drop)
+g.after_all(cluster.clean)
 
 -- Ease writing of a long error message in a code.
 local function toline(s)
@@ -89,7 +89,7 @@ local function failure_case(failover, election_mode)
             failover = 'off'
         end
 
-        replicaset.startup_error(g, config, error_t:format(
+        cluster.startup_error(g, config, error_t:format(
             election_mode, failover))
     end
 end
@@ -99,10 +99,10 @@ end
 local function success_case(failover, election_mode)
     return function(g)
         local config = build_config(failover, election_mode)
-        local replicaset = replicaset.new(g, config)
-        replicaset:start()
+        local cluster = cluster.new(g, config)
+        cluster:start()
 
-        replicaset['instance-004']:exec(function(failover, election_mode)
+        cluster['instance-004']:exec(function(failover, election_mode)
             -- The effective default value is 'off' or
             -- 'candidate'.
             if election_mode == nil then
