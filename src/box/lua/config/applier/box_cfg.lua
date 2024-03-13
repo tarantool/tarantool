@@ -665,7 +665,7 @@ local function apply(config)
             local has_rw = false
             if failover == 'off' then
                 for _, peer_name in ipairs(configdata:peers()) do
-                    local opts = {peer = peer_name, use_default = true}
+                    local opts = {instance = peer_name, use_default = true}
                     local mode = configdata:get('database.mode', opts)
                     -- NB: The default is box.NULL that is
                     -- interpreted as 'ro' for a replicaset with
