@@ -28,7 +28,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "unit.h"
 #include "exception.h"
 #include "fiber.h"
 #include "memory.h"
@@ -42,6 +41,9 @@
 
 #include "box/error.h"
 #include "box/mp_error.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 enum {
 	MP_ERROR_STACK = 0x00
