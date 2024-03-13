@@ -1042,6 +1042,7 @@ e:unpack();
 - code: 1
   base_type: ClientError
   type: ClientError
+  details: oh my
   message: Illegal parameters, oh my
   trace:
   - file: '[string "function err() box.error(box.error.ILLEGAL_PA..."]'

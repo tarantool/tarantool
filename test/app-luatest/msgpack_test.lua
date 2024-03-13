@@ -598,6 +598,11 @@ g_error_details.test_error_details = function(cg)
             prev = v
             err = err.prev
         end
+        err = expected
+        while err ~= nil do
+            err.details = err.message
+            err = err.prev
+        end
         t.assert_equals(actual, expected)
     end
     check_error('\xc1', {

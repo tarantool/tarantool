@@ -3510,11 +3510,14 @@ local function grant_error(name, object_name, object_type, privilege)
        privilege == 'execute' then
         box.error(box.error.ROLE_GRANTED, name, object_name)
     end
+    local object_repr
     if not is_singleton_object_type(object_type) then
-        object_name = string.format(" '%s'", object_name)
+        object_repr = string.format("%s '%s'", object_type, object_name)
+    else
+        object_repr = object_type
     end
-    box.error(box.error.PRIV_GRANTED, name, privilege, object_type,
-              object_name)
+    box.error(box.error.PRIV_GRANTED, name, privilege, object_repr,
+              object_type, object_name)
 end
 
 local function grant(uid, name, privilege, object_type,

@@ -571,7 +571,8 @@ sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
 			const char *str = expr->pLeft->u.zToken;
 			if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
 				errcode = ER_HEX_LITERAL_MAX;
-			diag_set(ClientError, errcode, "-", str);
+			diag_set(ClientError, errcode,
+				 tt_sprintf("%s%s", "-", str));
 			parser->is_aborted = true;
 			break;
 		}
@@ -586,7 +587,7 @@ sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
 		const char *str = expr->u.zToken;
 		if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
 			errcode = ER_HEX_LITERAL_MAX;
-		diag_set(ClientError, errcode, "", str);
+		diag_set(ClientError, errcode, str);
 		parser->is_aborted = true;
 		break;
 	}

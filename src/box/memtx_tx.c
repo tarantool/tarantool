@@ -1709,10 +1709,9 @@ memtx_tx_check_dup(struct tuple *new_tuple, struct tuple *old_tuple,
 	if (errcode != 0) {
 		if (errcode == ER_TUPLE_FOUND) {
 			diag_set(ClientError, errcode,
-				 index->def->name,
-				 space_name(space),
-				 tuple_str(dup_tuple),
-				 tuple_str(new_tuple));
+				 index->def->name, space_name(space),
+				 tuple_str(dup_tuple), tuple_str(new_tuple),
+				 dup_tuple, new_tuple);
 		} else {
 			diag_set(ClientError, errcode, space_name(space));
 		}

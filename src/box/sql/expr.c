@@ -1286,13 +1286,13 @@ expr_new_variable(struct Parse *parse, const struct Token *spec,
 		if (id->z - spec->z != 1) {
 			diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
 				 parse->line_count, spec->z - parse->zTail + 1,
-				 spec->n, spec->z);
+				 tt_cstr(spec->z, spec->n));
 			parse->is_aborted = true;
 			return NULL;
 		}
 		if (spec->z[0] == '#' && sqlIsdigit(id->z[0])) {
 			diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN,
-				 parse->line_count, spec->n, spec->z);
+				 parse->line_count, tt_cstr(spec->z, spec->n));
 			parse->is_aborted = true;
 			return NULL;
 		}
@@ -3197,7 +3197,8 @@ expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
 		else
 			value = strtoull(z, NULL, 16);
 		if (errno != 0) {
-			diag_set(ClientError, ER_HEX_LITERAL_MAX, sign, z,
+			diag_set(ClientError, ER_HEX_LITERAL_MAX,
+				 tt_sprintf("%s%s", sign, z),
 				 strlen(z) - 2, 16);
 			parse->is_aborted = true;
 			return;
@@ -3207,7 +3208,8 @@ expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
 		bool unused;
 		if (sql_atoi64(z, &value, &unused, len) != 0 ||
 		    (is_neg && (uint64_t) value > (uint64_t) INT64_MAX + 1)) {
-			diag_set(ClientError, ER_INT_LITERAL_MAX, sign, z);
+			diag_set(ClientError, ER_INT_LITERAL_MAX,
+				 tt_sprintf("%s%s", sign, z));
 			parse->is_aborted = true;
 			return;
 		}
@@ -3931,7 +3933,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					diag_set(ClientError,
 						 ER_FUNC_WRONG_ARG_COUNT,
 						 func->def->name,
-						 "at least two", nFarg);
+						 "at least two", nFarg, 2,
+						 SQL_MAX_FUNCTION_ARG);
 					pParse->is_aborted = true;
 					break;
 				}
@@ -3960,7 +3963,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					diag_set(ClientError,
 						 ER_FUNC_WRONG_ARG_COUNT,
 						 func->def->name,
-						 "at least one", nFarg);
+						 "at least one", nFarg, 1,
+						 SQL_MAX_FUNCTION_ARG);
 					pParse->is_aborted = true;
 					break;
 				}

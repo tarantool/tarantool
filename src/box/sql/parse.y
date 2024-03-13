@@ -33,11 +33,12 @@
   UNUSED_PARAMETER(yymajor);  /* Silence some compiler warnings */
   assert( TOKEN.z[0] );  /* The tokenizer always gives us a token */
   if (yypParser->is_fallback_failed && TOKEN.isReserved) {
+    const char *token = tt_cstr(TOKEN.z, TOKEN.n);
     diag_set(ClientError, ER_SQL_KEYWORD_IS_RESERVED, pParse->line_count,
-             pParse->line_pos, TOKEN.n, TOKEN.z, TOKEN.n, TOKEN.z);
+             pParse->line_pos, token, token);
   } else {
-    diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN, pParse->line_count, TOKEN.n,
-             TOKEN.z);
+    diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN, pParse->line_count,
+             tt_cstr(TOKEN.z, TOKEN.n));
   }
   pParse->is_aborted = true;
 }
@@ -272,8 +273,9 @@ columnlist ::= tcons.
 %type nm {Token}
 nm(A) ::= id(A). {
   if(A.isReserved) {
+    const char *token = tt_cstr(A.z, A.n);
     diag_set(ClientError, ER_SQL_KEYWORD_IS_RESERVED, pParse->line_count,
-             pParse->line_pos, A.n, A.z, A.n, A.z);
+             pParse->line_pos, token, token);
     pParse->is_aborted = true;
   }
 }
@@ -1497,8 +1499,8 @@ cmd ::= PRAGMA nm(X) LP nm(Y) DOT nm(Z) RP.  {
 }
 cmd ::= FUNCTION_KW(T) expr(E). {
   if (!pParse->is_expr) {
-    diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN, pParse->line_count, T.n,
-             T.z);
+    diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN, pParse->line_count,
+             tt_cstr(T.z, T.n));
     pParse->is_aborted = true;
     return;
   }
