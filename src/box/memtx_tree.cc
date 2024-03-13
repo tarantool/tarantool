@@ -1161,7 +1161,9 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 						 base->def->name,
 						 space_name(sp),
 						 tuple_str(dup_data.tuple),
-						 tuple_str(new_data.tuple));
+						 tuple_str(new_data.tuple),
+						 dup_data.tuple,
+						 new_data.tuple);
 				} else {
 					diag_set(ClientError, errcode,
 						 space_name(sp));
@@ -1229,10 +1231,10 @@ memtx_tree_index_replace_multikey_one(struct memtx_tree_index<true> *index,
 		if (sp != NULL) {
 			if (errcode == ER_TUPLE_FOUND) {
 				diag_set(ClientError, errcode,
-					 index->base.def->name,
-					 space_name(sp),
+					 index->base.def->name, space_name(sp),
 					 tuple_str(dup_data.tuple),
-					 tuple_str(new_data.tuple));
+					 tuple_str(new_data.tuple),
+					 dup_data.tuple, new_data.tuple);
 			} else {
 				diag_set(ClientError, errcode,
 	     				 index->base.def->name,

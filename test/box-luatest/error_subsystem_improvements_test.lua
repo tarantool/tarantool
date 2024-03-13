@@ -4,8 +4,20 @@ local console = require('console')
 local json = require('json')
 local yaml = require('yaml')
 local tarantool = require('tarantool')
+local server = require('luatest.server')
 
 local g = t.group()
+
+g.before_all(function(cg)
+    cg.server = server:new()
+    cg.server:start()
+end)
+
+g.after_all(function(cg)
+    if cg.server ~= nil then
+        cg.server:drop()
+    end
+end)
 
 -- Test the `prev' argument to the table constructor of `box.error.new'
 -- (gh-9103).
@@ -390,3 +402,42 @@ g.test_error_message_with_named_code_arg = function()
     t.assert_equals(box.error.new{type = 'My', code = code,
                                   reason = 'wtf'}.type, 'My')
 end
+
+g.before_test('test_tuple_found_payload', function(cg)
+    cg.server:exec(function()
+        box.schema.space.create('test')
+        box.space.test:create_index('primary')
+    end)
+end)
+
+-- gh-6166: test old and new tuple are available in error object.
+g.test_tuple_found_payload = function(cg)
+    cg.server:exec(function()
+        -- Make MsgPack tuple length larger than TT_STATIC_BUF_LEN
+        -- so that tuple in formatted string will be truncated.
+        local t1 = {1, string.rep('x', 2048)}
+        local t2 = {1, string.rep('y', 2048)}
+        box.space.test:insert(t1)
+        local ok, actual = pcall(box.space.test.insert, box.space.test, t2)
+        t.assert_not(ok)
+        actual = actual:unpack()
+        t.assert_equals(type(actual), 'table')
+        t.assert_str_matches(actual.message,
+                             '^Duplicate key exists in unique index.*$')
+        actual.message = nil
+        t.assert_covers(actual, {
+            space = 'test',
+            index = 'primary',
+            old_tuple = t1,
+            new_tuple = t2,
+        })
+    end)
+end
+
+g.after_test('test_tuple_found_payload', function(cg)
+    cg.server:exec(function()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+    end)
+end)

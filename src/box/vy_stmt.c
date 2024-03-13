@@ -184,7 +184,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t data_offset, uint32_t bsize)
 	uint32_t total_size = data_offset + bsize;
 	if (unlikely(total_size > env->max_tuple_size)) {
 		diag_set(ClientError, ER_VINYL_MAX_TUPLE_SIZE,
-			 (unsigned) total_size);
+			 (unsigned)total_size, env->max_tuple_size);
 		error_log(diag_last_error(diag_get()));
 		return NULL;
 	}

@@ -1024,6 +1024,8 @@ tuple_format_required_fields_validate(struct tuple_format *format,
 				      void *required_fields,
 				      uint32_t required_fields_sz);
 
+#define ERROR_MSG(r, v) "expected [%" r "..%" r "], got %" v
+
 /**
  * Check if integer value in `mp_data' is within an allowed range for the given
  * `field' type.
@@ -1035,7 +1037,9 @@ tuple_field_check_fixed_int_range(struct tuple_format *format,
 				  const char *mp_data)
 {
 	assert(tuple_field_type_is_fixed_int(field->type));
-	const char *min_str, *max_str, *val_str;
+	const char *details;
+	char mp_min[16], mp_max[16];
+	const char *mp_value = mp_data;
 	enum mp_type mp_type = mp_typeof(*mp_data);
 	if (mp_type == MP_NIL)
 		return 0;
@@ -1044,21 +1048,21 @@ tuple_field_check_fixed_int_range(struct tuple_format *format,
 	if (field_type_is_fixed_signed[field->type]) {
 		int64_t min = field_type_min_value[field->type];
 		int64_t max = field_type_max_value[field->type];
+		mp_encode_int(mp_min, min);
+		mp_encode_uint(mp_max, max);
 		if (mp_type == MP_INT) {
 			int64_t value = mp_decode_int(&mp_data);
 			if (value < min || value > max) {
-				min_str = tt_sprintf("%" PRId64, min);
-				max_str = tt_sprintf("%" PRId64, max);
-				val_str = tt_sprintf("%" PRId64, value);
+				details = tt_sprintf(ERROR_MSG(PRId64, PRId64),
+						     min, max, value);
 				goto error;
 			}
 		} else {
 			assert(mp_type == MP_UINT);
 			uint64_t value = mp_decode_uint(&mp_data);
 			if (value > (uint64_t)max) {
-				min_str = tt_sprintf("%" PRId64, min);
-				max_str = tt_sprintf("%" PRId64, max);
-				val_str = tt_sprintf("%" PRIu64, value);
+				details = tt_sprintf(ERROR_MSG(PRId64, PRIu64),
+						     min, max, value);
 				goto error;
 			}
 		}
@@ -1068,10 +1072,11 @@ tuple_field_check_fixed_int_range(struct tuple_format *format,
 		uint64_t value = mp_decode_uint(&mp_data);
 		uint64_t min = field_type_min_value[field->type];
 		uint64_t max = field_type_max_value[field->type];
+		mp_encode_uint(mp_min, min);
+		mp_encode_uint(mp_max, max);
 		if (value > max) {
-			min_str = tt_sprintf("%" PRIu64, min);
-			max_str = tt_sprintf("%" PRIu64, max);
-			val_str = tt_sprintf("%" PRIu64, value);
+			details = tt_sprintf(ERROR_MSG(PRIu64, PRIu64),
+					     min, max, value);
 			goto error;
 		}
 	}
@@ -1079,9 +1084,11 @@ tuple_field_check_fixed_int_range(struct tuple_format *format,
 error:
 	diag_set(ClientError, ER_FIELD_VALUE_OUT_OF_RANGE,
 		 tuple_field_path(field, format), field_type_strs[field->type],
-		 min_str, max_str, val_str);
+		 details, mp_value, mp_min, mp_max);
 	return -1;
 }
+
+#undef ERROR_MSG
 
 /**
  * Check constraints of one particular @a field.

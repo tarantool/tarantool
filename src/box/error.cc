@@ -378,6 +378,7 @@ AccessDeniedError::AccessDeniedError(const char *file, unsigned int line,
 	error_set_str(this, "object_type", object_type);
 	error_set_str(this, "object_name", object_name);
 	error_set_str(this, "access_type", access_type);
+	error_set_str(this, "user", user_name);
 }
 
 struct error *
