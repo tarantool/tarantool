@@ -79,7 +79,7 @@ jobs:
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
 
       - name: artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: alpine-3.16

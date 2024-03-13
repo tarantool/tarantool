@@ -76,7 +76,7 @@ jobs:
         with:
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
       - name: upload crash
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure() && steps.build.outcome == 'success'
         with:
           name: ${{ matrix.sanitizer }}-artifacts
