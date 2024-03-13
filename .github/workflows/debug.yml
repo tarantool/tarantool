@@ -97,7 +97,7 @@ jobs:
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
 
       - name: Collect artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: failure-logs
