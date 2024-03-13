@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Check out the etcd-client module
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/etcd-client
           token: ${{ secrets.PRIVATE_REPO_ACCESS_TOKEN }}
