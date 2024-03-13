@@ -68,7 +68,7 @@ jobs:
           PRESERVE_ENVVARS: 'MAKE_CHECK,${{ env.PRESERVE_ENVVARS }}'
         run: make -f .pack.mk package
       - name: 'Upload build artifacts'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tarantool-${{ env.OS }}-${{ env.DIST }}-${{ steps.get_sha.outputs.sha }}
           retention-days: 21
@@ -78,7 +78,7 @@ jobs:
           if-no-files-found: error
       - name: 'Upload logs if the build failed'
         if: failure() && steps.run_build.conclusion == 'failure'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tarantool-build-log-${{ env.OS }}-${{ env.DIST }}-${{ steps.get_sha.outputs.sha }}
           retention-days: 21
