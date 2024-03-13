@@ -17,27 +17,28 @@ box.error({code = 123, reason = 'test'})
  | ---
  | - error: test
  | ...
-box.error(box.error.ILLEGAL_PARAMS, "bla bla")
+box.error(box.error.ILLEGAL_PARAMS, "foo")
  | ---
- | - error: Illegal parameters, bla bla
+ | - error: Illegal parameters, foo
  | ...
 box.error()
  | ---
- | - error: Illegal parameters, bla bla
+ | - error: Illegal parameters, foo
  | ...
 e = box.error.last()
  | ---
  | ...
 e
  | ---
- | - Illegal parameters, bla bla
+ | - Illegal parameters, foo
  | ...
 e:unpack()
  | ---
  | - code: 1
  |   base_type: ClientError
  |   type: ClientError
- |   message: Illegal parameters, bla bla
+ |   details: foo
+ |   message: Illegal parameters, foo
  |   trace:
  |   - file: '[C]'
  |     line: 4294967295
@@ -52,11 +53,11 @@ e.code
  | ...
 e.message
  | ---
- | - Illegal parameters, bla bla
+ | - Illegal parameters, foo
  | ...
 tostring(e)
  | ---
- | - Illegal parameters, bla bla
+ | - Illegal parameters, foo
  | ...
 e = nil
  | ---
@@ -224,9 +225,7 @@ t;
  |   1: box.error.ILLEGAL_PARAMS
  |   2: box.error.MEMORY_ISSUE
  |   3: box.error.TUPLE_FOUND
- |   4: box.error.TUPLE_NOT_FOUND
  |   5: box.error.UNSUPPORTED
- |   6: box.error.NONMASTER
  |   7: box.error.READONLY
  |   8: box.error.INJECTION
  |   9: box.error.CREATE_SPACE
@@ -241,7 +240,6 @@ t;
  |   18: box.error.KEY_PART_TYPE
  |   19: box.error.EXACT_MATCH
  |   20: box.error.INVALID_MSGPACK
- |   21: box.error.PROC_RET
  |   22: box.error.TUPLE_NOT_ARRAY
  |   23: box.error.FIELD_TYPE
  |   24: box.error.INDEX_PART_TYPE_MISMATCH
@@ -288,15 +286,11 @@ t;
  |   65: box.error.REPLICASET_UUID_IS_RO
  |   66: box.error.INSTANCE_UUID_MISMATCH
  |   67: box.error.REPLICA_ID_IS_RESERVED
- |   68: box.error.INVALID_ORDER
  |   69: box.error.MISSING_REQUEST_FIELD
  |   70: box.error.IDENTIFIER
  |   71: box.error.DROP_FUNCTION
  |   72: box.error.ITERATOR_TYPE
  |   73: box.error.REPLICA_MAX
- |   74: box.error.INVALID_XLOG
- |   75: box.error.INVALID_XLOG_NAME
- |   76: box.error.INVALID_XLOG_ORDER
  |   77: box.error.NO_CONNECTION
  |   78: box.error.TIMEOUT
  |   79: box.error.ACTIVE_TRANSACTION
@@ -323,9 +317,7 @@ t;
  |   100: box.error.FUNCTION_LANGUAGE
  |   101: box.error.RTREE_RECT
  |   102: box.error.PROC_C
- |   103: box.error.UNKNOWN_RTREE_INDEX_DISTANCE_TYPE
  |   104: box.error.PROTOCOL
- |   105: box.error.UPSERT_UNIQUE_SECONDARY_KEY
  |   106: box.error.WRONG_INDEX_RECORD
  |   107: box.error.WRONG_INDEX_PARTS
  |   108: box.error.WRONG_INDEX_OPTIONS
@@ -338,7 +330,6 @@ t;
  |   115: box.error.SYSTEM
  |   116: box.error.LOADING
  |   117: box.error.CONNECTION_TO_SELF
- |   118: box.error.KEY_PART_IS_TOO_LONG
  |   119: box.error.COMPRESSION
  |   120: box.error.CHECKPOINT_IN_PROGRESS
  |   121: box.error.SUB_STMT_MAX
@@ -376,7 +367,6 @@ t;
  |   153: box.error.NO_SUCH_FIELD_NAME_IN_SPACE
  |   154: box.error.TRANSACTION_YIELD
  |   155: box.error.NO_SUCH_GROUP
- |   156: box.error.SQL_BIND_VALUE
  |   157: box.error.SQL_BIND_TYPE
  |   158: box.error.SQL_BIND_PARAMETER_MAX
  |   159: box.error.SQL_EXECUTE
@@ -388,7 +378,6 @@ t;
  |   165: box.error.NO_SUCH_MODULE
  |   166: box.error.NO_SUCH_COLLATION
  |   167: box.error.CREATE_FK_CONSTRAINT
- |   168: box.error.DROP_FK_CONSTRAINT
  |   169: box.error.NO_SUCH_CONSTRAINT
  |   170: box.error.CONSTRAINT_EXISTS
  |   171: box.error.SQL_TYPE_MISMATCH
@@ -407,16 +396,13 @@ t;
  |   184: box.error.SQL_SYNTAX_NEAR_TOKEN
  |   185: box.error.SQL_UNKNOWN_TOKEN
  |   186: box.error.SQL_PARSER_GENERIC
- |   187: box.error.SQL_ANALYZE_ARGUMENT
  |   188: box.error.SQL_COLUMN_COUNT_MAX
  |   189: box.error.HEX_LITERAL_MAX
  |   190: box.error.INT_LITERAL_MAX
  |   191: box.error.SQL_PARSER_LIMIT
  |   192: box.error.INDEX_DEF_UNSUPPORTED
- |   193: box.error.CK_DEF_UNSUPPORTED
  |   194: box.error.MULTIKEY_INDEX_MISMATCH
  |   195: box.error.CREATE_CK_CONSTRAINT
- |   196: box.error.CK_CONSTRAINT_FAILED
  |   197: box.error.SQL_COLUMN_COUNT
  |   198: box.error.FUNC_INDEX_FUNC
  |   199: box.error.FUNC_INDEX_FORMAT
@@ -435,7 +421,6 @@ t;
  |   212: box.error.SEQUENCE_NOT_STARTED
  |   213: box.error.NO_SUCH_SESSION_SETTING
  |   214: box.error.UNCOMMITTED_FOREIGN_SYNC_TXNS
- |   215: box.error.SYNC_MASTER_MISMATCH
  |   216: box.error.SYNC_QUORUM_TIMEOUT
  |   217: box.error.SYNC_ROLLBACK
  |   218: box.error.TUPLE_METADATA_IS_TOO_BIG

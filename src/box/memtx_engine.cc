@@ -1819,7 +1819,8 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 		goto end;
 	});
 	if (unlikely(total > memtx->max_tuple_size)) {
-		diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE, total);
+		diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE, total,
+			 memtx->max_tuple_size);
 		error_log(diag_last_error(diag_get()));
 		goto end;
 	}
