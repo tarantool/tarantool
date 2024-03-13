@@ -91,6 +91,16 @@ local function selfcheck(self, method_name)
     end
 end
 
+local function initcheck(self, method_name, cluster_or_instance)
+    if self._status ~= 'uninitialized' then
+        return
+    end
+
+    assert(self._configdata_applied == nil)
+    local fmt_str = 'config:%s(): no %s config available yet'
+    error(fmt_str:format(method_name, cluster_or_instance), 0)
+end
+
 local function broadcast(self)
     box.broadcast('config.info', self:info())
 end
@@ -423,13 +433,22 @@ function methods._print_env_list(self)
     io.stdout:write(env_source:_env_list())
 end
 
-function methods.get(self, path)
+-- Note: There is a difference between missing opts.instance and
+-- opts.instance that is equal to the given instance name. The
+-- former returns an instance configuration taking into account
+-- instance configuration sources (environment variables). The
+-- latter takes into account only cluster configuration, so the
+-- environment variables are ignored.
+function methods.get(self, path, opts)
     selfcheck(self, 'get')
-    if self._status == 'uninitialized' then
-        assert(self._configdata_applied == nil)
-        error('config:get(): no instance config available yet', 0)
-    end
-    return self._configdata_applied:get(path, {use_default = true})
+    initcheck(self, 'get', 'instance')
+
+    opts = opts or {}
+
+    return self._configdata_applied:get(path, {
+        instance = opts.instance,
+        use_default = true,
+    })
 end
 
 function methods._reload_noexc(self, opts)
@@ -508,6 +527,55 @@ function methods.info(self, version)
 
     error(('config:info() expects %s or nil as an argument, got %q'):format(
         table.concat(supported_versions, ', '), version), 0)
+end
+
+-- Cluster configuration (internal method).
+--
+-- It is given as is after merging from all the configuration
+-- sources. Default values are NOT applied. Variables are NOT
+-- substituted.
+--
+-- Use config:get() to receive an instance config for a particular
+-- instance with applied defaults and substituted variables.
+function methods._cconfig(self)
+    selfcheck(self, '_cconfig')
+    initcheck(self, '_cconfig', 'cluster')
+
+    return self._configdata_applied:cconfig()
+end
+
+-- List all instances of the cluster.
+--
+-- Returns a table of the following format.
+--
+-- {
+--     [<instance_name>] = {
+--         instance_name = <...>,
+--         replicaset_name = <...>,
+--         group_name = <...>,
+--     },
+--     <...>
+-- }
+function methods.instances(self)
+    selfcheck(self, 'instances')
+    initcheck(self, 'instances', 'cluster')
+
+    local res = {}
+
+    for group_name, group in pairs(self:_cconfig().groups or {}) do
+        for replicaset_name, replicaset in pairs(group.replicasets or {}) do
+            for instance_name, _ in pairs(replicaset.instances or {}) do
+                assert(res[instance_name] == nil)
+                res[instance_name] = {
+                    instance_name = instance_name,
+                    replicaset_name = replicaset_name,
+                    group_name = group_name,
+                }
+            end
+        end
+    end
+
+    return res
 end
 
 -- The object is a singleton. The constructor should be called

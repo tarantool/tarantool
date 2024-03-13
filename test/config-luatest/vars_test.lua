@@ -123,7 +123,8 @@ g.test_peer = helpers.run_as_script(function()
             instance_name, 'tarantool.iproto'}, '/')
     end
 
-    local res = configdata:get('iproto.listen', {peer = 'instance-002'})[1].uri
+    local opts = {instance = 'instance-002'}
+    local res = configdata:get('iproto.listen', opts)[1].uri
     t.assert_equals(res, exp_uri('group-001', 'replicaset-001', 'instance-002'))
 end)
 

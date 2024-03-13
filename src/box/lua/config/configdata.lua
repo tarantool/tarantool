@@ -11,16 +11,16 @@ local cluster_config = require('internal.config.cluster_config')
 local snapshot = require('internal.config.utils.snapshot')
 
 local function choose_iconfig(self, opts)
-    if opts ~= nil and opts.peer ~= nil then
-        local peers = self._peers
-        local peer = peers[opts.peer]
-        if peer == nil then
-            error(('Unknown peer %q'):format(opts.peer), 0)
+    if opts ~= nil and opts.instance ~= nil then
+        local instances = self._instances
+        local instance = instances[opts.instance]
+        if instance == nil then
+            error(('Unknown instance %q'):format(opts.instance), 0)
         end
         if opts ~= nil and opts.use_default then
-            return peer.iconfig_def
+            return instance.iconfig_def
         end
-        return peer.iconfig
+        return instance.iconfig
     end
 
     if opts ~= nil and opts.use_default then
@@ -36,7 +36,7 @@ local methods = {}
 --
 -- opts:
 --     use_default: boolean
---     peer: string
+--     instance: string
 function methods.get(self, path, opts)
     local data = choose_iconfig(self, opts)
     return instance_config:get(data, path)
@@ -46,7 +46,7 @@ end
 --
 -- opts:
 --     use_default: boolean
---     peer: string
+--     instance: string
 function methods.filter(self, f, opts)
     local data = choose_iconfig(self, opts)
     return instance_config:filter(data, f)
@@ -70,8 +70,14 @@ function methods.names(self)
     }
 end
 
-local function instance_sharding(iconfig, instance_name)
-    local roles = instance_config:get(iconfig, 'sharding.roles')
+-- Generate a part of a vshard configuration that relates to
+-- a particular instance.
+--
+-- opts:
+--     use_default: boolean
+--     instance: string
+function methods._instance_sharding(self, opts)
+    local roles = self:get('sharding.roles', opts)
     if roles == nil or #roles == 0 then
         return nil
     end
@@ -83,11 +89,12 @@ local function instance_sharding(iconfig, instance_name)
     if not is_storage then
         return nil
     end
-    local zone = instance_config:get(iconfig, 'sharding.zone')
-    local uri = instance_config:instance_uri(iconfig, 'sharding')
+    local zone = self:get('sharding.zone', opts)
+    local uri = instance_config:instance_uri(choose_iconfig(self, opts),
+        'sharding')
     if uri == nil then
         local err = 'No suitable URI provided for instance %q'
-        error(err:format(instance_name), 0)
+        error(err:format(opts.instance), 0)
     end
     --
     -- Currently, vshard does not accept URI without a username. So if we got a
@@ -100,9 +107,9 @@ local function instance_sharding(iconfig, instance_name)
         u.login = 'guest'
         uri = urilib.format(u, true)
     end
-    local uuid = instance_config:get(iconfig, 'database.instance_uuid')
+    local uuid = self:get('database.instance_uuid', opts)
 
-    local user = instance_config:get(iconfig, {'credentials', 'users', u.login})
+    local user = self:get({'credentials', 'users', u.login}, opts)
     --
     -- If the user is not described in the credentials, this may mean that the
     -- user already exists and may have all the necessary privileges. If not, an
@@ -121,7 +128,7 @@ local function instance_sharding(iconfig, instance_name)
             end
             for _, role_name in pairs(roles) do
                 local path = {'credentials', 'roles', role_name, 'roles'}
-                if check_sharding_role(instance_config:get(iconfig, path)) then
+                if check_sharding_role(self:get(path, opts)) then
                     return true
                 end
             end
@@ -144,7 +151,7 @@ end
 function methods.sharding(self)
     local sharding = {}
     local rebalancers = {}
-    for group_name, group in pairs(self._cconfig.groups) do
+    for _, group in pairs(self._cconfig.groups) do
         for replicaset_name, value in pairs(group.replicasets) do
             local lock
             local weight
@@ -155,22 +162,17 @@ function methods.sharding(self)
             local replicaset_cfg = {}
             local is_rebalancer = nil
             for instance_name, _ in pairs(value.instances) do
-                local vars = {
-                    instance_name = instance_name,
-                    replicaset_name = replicaset_name,
-                    group_name = group_name,
+                local opts = {
+                    instance = instance_name,
+                    use_default = true,
                 }
-                local iconfig = cluster_config:instantiate(self._cconfig,
-                                                           instance_name)
-                iconfig = instance_config:apply_default(iconfig)
-                iconfig = instance_config:apply_vars(iconfig, vars)
                 if not is_rs_options_set then
                     is_rs_options_set = true
-                    lock = instance_config:get(iconfig, 'sharding.lock')
-                    weight = instance_config:get(iconfig, 'sharding.weight')
+                    lock = self:get('sharding.lock', opts)
+                    weight = self:get('sharding.weight', opts)
                 end
                 if is_rebalancer == nil then
-                    local roles = instance_config:get(iconfig, 'sharding.roles')
+                    local roles = self:get('sharding.roles', opts)
                     for _, role in pairs(roles) do
                         is_rebalancer = is_rebalancer or role == 'rebalancer'
                     end
@@ -178,11 +180,11 @@ function methods.sharding(self)
                         table.insert(rebalancers, replicaset_name)
                     end
                 end
-                local isharding = instance_sharding(iconfig, instance_name)
+                local isharding = self:_instance_sharding(opts)
                 if isharding ~= nil then
                     if replicaset_uuid == nil then
-                        replicaset_uuid = instance_config:get(iconfig,
-                            'database.replicaset_uuid')
+                        replicaset_uuid = self:get('database.replicaset_uuid',
+                            opts)
                     end
                     replicaset_cfg[instance_name] = isharding
                 end
@@ -261,6 +263,64 @@ end
 function methods.bootstrap_leader_name(self)
     assert(self._failover == 'supervised')
     return self._bootstrap_leader_name
+end
+
+-- Calculate an instance configuration for each instance of the
+-- given cluster.
+local function build_instances(cconfig)
+    assert(type(cconfig) == 'table')
+
+    local res = {}
+
+    for group_name, group in pairs(cconfig.groups or {}) do
+        for replicaset_name, replicaset in pairs(group.replicasets or {}) do
+            for instance_name, _ in pairs(replicaset.instances or {}) do
+                assert(res[instance_name] == nil)
+
+                -- Build config for each instance from the cluster
+                -- config. Build a config with applied defaults as well.
+                local iconfig = cluster_config:instantiate(cconfig,
+                    instance_name)
+                local iconfig_def = instance_config:apply_default(iconfig)
+
+                -- Substitute variables according to the instance,
+                -- replicaset, group names.
+                local vars = {
+                    instance_name = instance_name,
+                    replicaset_name = replicaset_name,
+                    group_name = group_name,
+                }
+                iconfig = instance_config:apply_vars(iconfig, vars)
+                iconfig_def = instance_config:apply_vars(iconfig_def, vars)
+
+                res[instance_name] = {
+                    replicaset_name = replicaset_name,
+                    iconfig = iconfig,
+                    iconfig_def = iconfig_def,
+                }
+            end
+        end
+    end
+
+    return res
+end
+
+-- Filter out peers (instances of our replicaset) from all the
+-- instances of the cluster.
+local function build_peers(instances, replicaset_name)
+    assert(type(instances) == 'table')
+    assert(type(replicaset_name) == 'string')
+
+    local res = {}
+
+    for instance_name, def in pairs(instances) do
+        assert(res[instance_name] == nil)
+        if def.replicaset_name == replicaset_name then
+            res[instance_name] = def
+        end
+    end
+
+    return res
 end
 
 -- Returns instance_uuid and replicaset_uuid, saved in config.
@@ -362,6 +422,18 @@ function methods.missing_names(self)
     end
 
     return missing_names
+end
+
+-- Cluster configuration.
+--
+-- It is given as is after merging from all the configuration
+-- sources. Default values are NOT applied. Variables are NOT
+-- substituted.
+--
+-- Use :get() to receive an instance config for a particular
+-- instance with applied defaults and substituted variables.
+function methods.cconfig(self)
+    return self._cconfig
 end
 
 local mt = {
@@ -681,33 +753,10 @@ local function new(iconfig, cconfig, instance_name)
     local instance_uuid = instance_config:get(iconfig_def,
         'database.instance_uuid')
 
-    -- Save instance configs of the peers from the same replicaset.
-    local peers = {}
-    for peer_name, _ in pairs(found.replicaset.instances) do
-        -- Build config for each peer from the cluster config.
-        -- Build a config with applied defaults as well.
-        local peer_iconfig = cluster_config:instantiate(cconfig, peer_name)
-        local peer_iconfig_def = instance_config:apply_default(peer_iconfig)
-
-        -- Substitute variables according to the instance name
-        -- of the peer.
-        --
-        -- The replicaset and group names are same as for the
-        -- current instance.
-        local peer_vars = {
-            instance_name = peer_name,
-            replicaset_name = found.replicaset_name,
-            group_name = found.group_name,
-        }
-        peer_iconfig = instance_config:apply_vars(peer_iconfig, peer_vars)
-        peer_iconfig_def = instance_config:apply_vars(peer_iconfig_def,
-            peer_vars)
-
-        peers[peer_name] = {
-            iconfig = peer_iconfig,
-            iconfig_def = peer_iconfig_def,
-        }
-    end
+    -- Save instance configs for all instances of the cluster and
+    -- save instance from our replicaset separately.
+    local instances = build_instances(cconfig)
+    local peers = build_peers(instances, found.replicaset_name)
 
     -- Make the order of the peers predictable and the same on all
     -- instances in the replicaset.
@@ -818,6 +867,7 @@ local function new(iconfig, cconfig, instance_name)
         _peer_names = peer_names,
         _replicaset_uuid = replicaset_uuid,
         _instance_uuid = instance_uuid,
+        _instances = instances,
         _peers = peers,
         _group_name = found.group_name,
         _replicaset_name = found.replicaset_name,
