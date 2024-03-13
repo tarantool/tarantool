@@ -55,7 +55,7 @@ jobs:
       test-matrix: '{
         "include": [
           {"os": "debian-buster"}, {"os": "debian-bullseye"},
-          {"os": "centos-7"}, {"os": "centos-8"},
+          {"os": "centos-8"},
           {"os": "fedora-35"}, {"os": "fedora-36"},
           {"os": "ubuntu-focal"}, {"os": "ubuntu-jammy"}
         ]
@@ -76,7 +76,7 @@ jobs:
       test-matrix: '{
         "include": [
           {"os": "debian-buster"}, {"os": "debian-bullseye"},
-          {"os": "centos-7"}, {"os": "centos-8"},
+          {"os": "centos-8"},
           {"os": "fedora-35"}, {"os": "fedora-36"},
           {"os": "ubuntu-focal"}, {"os": "ubuntu-jammy"}
         ]
