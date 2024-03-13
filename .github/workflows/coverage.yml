@@ -108,14 +108,14 @@ jobs:
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
 
       - name: Collect coverage info
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage
           retention-days: 21
           path: ./coverage.info
 
       - name: Collect failure logs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: failure-logs

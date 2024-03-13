@@ -39,7 +39,7 @@ jobs:
         working-directory: static-build/tarantool-prefix/src/tarantool-build/
 
       - name: Upload deb packages
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tarantool-deb-${{ inputs.arch }}
           retention-days: 21
@@ -47,7 +47,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload rpm packages
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tarantool-rpm-${{ inputs.arch }}
           retention-days: 21
@@ -55,7 +55,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload test libraries
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tarantool-test-libs-${{ inputs.arch }}
           retention-days: 21
@@ -123,14 +123,14 @@ jobs:
       - uses: ./.github/actions/environment
 
       - name: Download packages
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: tarantool-${{
             env.PACKAGE_MANAGER == 'apt' && 'deb' || 'rpm' }}-${{ inputs.arch }}
           path: build
 
       - name: Download test libraries
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: tarantool-test-libs-${{ inputs.arch }}
           path: build
@@ -186,13 +186,13 @@ jobs:
           fetch-depth: 0
 
       - name: Download deb packages
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: tarantool-deb-${{ inputs.arch }}
           path: build
 
       - name: Download rpm packages
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: tarantool-rpm-${{ inputs.arch }}
           path: build
