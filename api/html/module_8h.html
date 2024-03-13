@@ -121,7 +121,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abd1dbec4fd6761084d3e0c05afe2b138">PACKAGE_VERSION_PATCH</a>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.1.0-entrypoint-142-g8aff2ede2&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.1.0-entrypoint-151-g3978d54bd&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <a href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">More...</a><br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adb6d1259777e8f56c6260be6faed183e"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#adb6d1259777e8f56c6260be6faed183e">SYSCONF_DIR</a>&#160;&#160;&#160;&quot;etc&quot;</td></tr>
@@ -595,567 +595,567 @@ Enumerations</h2></td></tr>
 <tr class="memdesc:a2693ce4bd8fa71e8ac1e5272fc64d17e"><td class="mdescLeft">&#160;</td><td class="mdescRight">public  <a href="module_8h.html#a2693ce4bd8fa71e8ac1e5272fc64d17e">More...</a><br /></td></tr>
 <tr class="separator:a2693ce4bd8fa71e8ac1e5272fc64d17e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a029e9d16d637a97b37560ccf24c4adce"><td class="memItemLeft" align="right" valign="top"><a id="a029e9d16d637a97b37560ccf24c4adce"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a029e9d16d637a97b37560ccf24c4adce">box_error_code</a> { <br />
-&#160;&#160;<b>ER_UNKNOWN</b>
+&#160;&#160;<b>ER_UNKNOWN</b> = 0
 , <br />
-&#160;&#160;<b>ER_ILLEGAL_PARAMS</b>
+&#160;&#160;<b>ER_ILLEGAL_PARAMS</b> = 1
 , <br />
-&#160;&#160;<b>ER_MEMORY_ISSUE</b>
+&#160;&#160;<b>ER_MEMORY_ISSUE</b> = 2
 , <br />
-&#160;&#160;<b>ER_TUPLE_FOUND</b>
+&#160;&#160;<b>ER_TUPLE_FOUND</b> = 3
 , <br />
-&#160;&#160;<b>ER_TUPLE_NOT_FOUND</b>
+&#160;&#160;<b>ER_TUPLE_NOT_FOUND</b> = 4
 , <br />
-&#160;&#160;<b>ER_UNSUPPORTED</b>
+&#160;&#160;<b>ER_UNSUPPORTED</b> = 5
 , <br />
-&#160;&#160;<b>ER_NONMASTER</b>
+&#160;&#160;<b>ER_NONMASTER</b> = 6
 , <br />
-&#160;&#160;<b>ER_READONLY</b>
+&#160;&#160;<b>ER_READONLY</b> = 7
 , <br />
-&#160;&#160;<b>ER_INJECTION</b>
+&#160;&#160;<b>ER_INJECTION</b> = 8
 , <br />
-&#160;&#160;<b>ER_CREATE_SPACE</b>
+&#160;&#160;<b>ER_CREATE_SPACE</b> = 9
 , <br />
-&#160;&#160;<b>ER_SPACE_EXISTS</b>
+&#160;&#160;<b>ER_SPACE_EXISTS</b> = 10
 , <br />
-&#160;&#160;<b>ER_DROP_SPACE</b>
+&#160;&#160;<b>ER_DROP_SPACE</b> = 11
 , <br />
-&#160;&#160;<b>ER_ALTER_SPACE</b>
+&#160;&#160;<b>ER_ALTER_SPACE</b> = 12
 , <br />
-&#160;&#160;<b>ER_INDEX_TYPE</b>
+&#160;&#160;<b>ER_INDEX_TYPE</b> = 13
 , <br />
-&#160;&#160;<b>ER_MODIFY_INDEX</b>
+&#160;&#160;<b>ER_MODIFY_INDEX</b> = 14
 , <br />
-&#160;&#160;<b>ER_LAST_DROP</b>
+&#160;&#160;<b>ER_LAST_DROP</b> = 15
 , <br />
-&#160;&#160;<b>ER_TUPLE_FORMAT_LIMIT</b>
+&#160;&#160;<b>ER_TUPLE_FORMAT_LIMIT</b> = 16
 , <br />
-&#160;&#160;<b>ER_DROP_PRIMARY_KEY</b>
+&#160;&#160;<b>ER_DROP_PRIMARY_KEY</b> = 17
 , <br />
-&#160;&#160;<b>ER_KEY_PART_TYPE</b>
+&#160;&#160;<b>ER_KEY_PART_TYPE</b> = 18
 , <br />
-&#160;&#160;<b>ER_EXACT_MATCH</b>
+&#160;&#160;<b>ER_EXACT_MATCH</b> = 19
 , <br />
-&#160;&#160;<b>ER_INVALID_MSGPACK</b>
+&#160;&#160;<b>ER_INVALID_MSGPACK</b> = 20
 , <br />
-&#160;&#160;<b>ER_PROC_RET</b>
+&#160;&#160;<b>ER_PROC_RET</b> = 21
 , <br />
-&#160;&#160;<b>ER_TUPLE_NOT_ARRAY</b>
+&#160;&#160;<b>ER_TUPLE_NOT_ARRAY</b> = 22
 , <br />
-&#160;&#160;<b>ER_FIELD_TYPE</b>
+&#160;&#160;<b>ER_FIELD_TYPE</b> = 23
 , <br />
-&#160;&#160;<b>ER_INDEX_PART_TYPE_MISMATCH</b>
+&#160;&#160;<b>ER_INDEX_PART_TYPE_MISMATCH</b> = 24
 , <br />
-&#160;&#160;<b>ER_UPDATE_SPLICE</b>
+&#160;&#160;<b>ER_UPDATE_SPLICE</b> = 25
 , <br />
-&#160;&#160;<b>ER_UPDATE_ARG_TYPE</b>
+&#160;&#160;<b>ER_UPDATE_ARG_TYPE</b> = 26
 , <br />
-&#160;&#160;<b>ER_FORMAT_MISMATCH_INDEX_PART</b>
+&#160;&#160;<b>ER_FORMAT_MISMATCH_INDEX_PART</b> = 27
 , <br />
-&#160;&#160;<b>ER_UNKNOWN_UPDATE_OP</b>
+&#160;&#160;<b>ER_UNKNOWN_UPDATE_OP</b> = 28
 , <br />
-&#160;&#160;<b>ER_UPDATE_FIELD</b>
+&#160;&#160;<b>ER_UPDATE_FIELD</b> = 29
 , <br />
-&#160;&#160;<b>ER_FUNCTION_TX_ACTIVE</b>
+&#160;&#160;<b>ER_FUNCTION_TX_ACTIVE</b> = 30
 , <br />
-&#160;&#160;<b>ER_KEY_PART_COUNT</b>
+&#160;&#160;<b>ER_KEY_PART_COUNT</b> = 31
 , <br />
-&#160;&#160;<b>ER_PROC_LUA</b>
+&#160;&#160;<b>ER_PROC_LUA</b> = 32
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_PROC</b>
+&#160;&#160;<b>ER_NO_SUCH_PROC</b> = 33
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_TRIGGER</b>
+&#160;&#160;<b>ER_NO_SUCH_TRIGGER</b> = 34
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_INDEX_ID</b>
+&#160;&#160;<b>ER_NO_SUCH_INDEX_ID</b> = 35
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_SPACE</b>
+&#160;&#160;<b>ER_NO_SUCH_SPACE</b> = 36
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_FIELD_NO</b>
+&#160;&#160;<b>ER_NO_SUCH_FIELD_NO</b> = 37
 , <br />
-&#160;&#160;<b>ER_EXACT_FIELD_COUNT</b>
+&#160;&#160;<b>ER_EXACT_FIELD_COUNT</b> = 38
 , <br />
-&#160;&#160;<b>ER_FIELD_MISSING</b>
+&#160;&#160;<b>ER_FIELD_MISSING</b> = 39
 , <br />
-&#160;&#160;<b>ER_WAL_IO</b>
+&#160;&#160;<b>ER_WAL_IO</b> = 40
 , <br />
-&#160;&#160;<b>ER_MORE_THAN_ONE_TUPLE</b>
+&#160;&#160;<b>ER_MORE_THAN_ONE_TUPLE</b> = 41
 , <br />
-&#160;&#160;<b>ER_ACCESS_DENIED</b>
+&#160;&#160;<b>ER_ACCESS_DENIED</b> = 42
 , <br />
-&#160;&#160;<b>ER_CREATE_USER</b>
+&#160;&#160;<b>ER_CREATE_USER</b> = 43
 , <br />
-&#160;&#160;<b>ER_DROP_USER</b>
+&#160;&#160;<b>ER_DROP_USER</b> = 44
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_USER</b>
+&#160;&#160;<b>ER_NO_SUCH_USER</b> = 45
 , <br />
-&#160;&#160;<b>ER_USER_EXISTS</b>
+&#160;&#160;<b>ER_USER_EXISTS</b> = 46
 , <br />
-&#160;&#160;<b>ER_CREDS_MISMATCH</b>
+&#160;&#160;<b>ER_CREDS_MISMATCH</b> = 47
 , <br />
-&#160;&#160;<b>ER_UNKNOWN_REQUEST_TYPE</b>
+&#160;&#160;<b>ER_UNKNOWN_REQUEST_TYPE</b> = 48
 , <br />
-&#160;&#160;<b>ER_UNKNOWN_SCHEMA_OBJECT</b>
+&#160;&#160;<b>ER_UNKNOWN_SCHEMA_OBJECT</b> = 49
 , <br />
-&#160;&#160;<b>ER_CREATE_FUNCTION</b>
+&#160;&#160;<b>ER_CREATE_FUNCTION</b> = 50
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_FUNCTION</b>
+&#160;&#160;<b>ER_NO_SUCH_FUNCTION</b> = 51
 , <br />
-&#160;&#160;<b>ER_FUNCTION_EXISTS</b>
+&#160;&#160;<b>ER_FUNCTION_EXISTS</b> = 52
 , <br />
-&#160;&#160;<b>ER_BEFORE_REPLACE_RET</b>
+&#160;&#160;<b>ER_BEFORE_REPLACE_RET</b> = 53
 , <br />
-&#160;&#160;<b>ER_MULTISTATEMENT_TRANSACTION</b>
+&#160;&#160;<b>ER_MULTISTATEMENT_TRANSACTION</b> = 54
 , <br />
-&#160;&#160;<b>ER_TRIGGER_EXISTS</b>
+&#160;&#160;<b>ER_TRIGGER_EXISTS</b> = 55
 , <br />
-&#160;&#160;<b>ER_USER_MAX</b>
+&#160;&#160;<b>ER_USER_MAX</b> = 56
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_ENGINE</b>
+&#160;&#160;<b>ER_NO_SUCH_ENGINE</b> = 57
 , <br />
-&#160;&#160;<b>ER_RELOAD_CFG</b>
+&#160;&#160;<b>ER_RELOAD_CFG</b> = 58
 , <br />
-&#160;&#160;<b>ER_CFG</b>
+&#160;&#160;<b>ER_CFG</b> = 59
 , <br />
-&#160;&#160;<b>ER_SAVEPOINT_EMPTY_TX</b>
+&#160;&#160;<b>ER_SAVEPOINT_EMPTY_TX</b> = 60
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_SAVEPOINT</b>
+&#160;&#160;<b>ER_NO_SUCH_SAVEPOINT</b> = 61
 , <br />
-&#160;&#160;<b>ER_UNKNOWN_REPLICA</b>
+&#160;&#160;<b>ER_UNKNOWN_REPLICA</b> = 62
 , <br />
-&#160;&#160;<b>ER_REPLICASET_UUID_MISMATCH</b>
+&#160;&#160;<b>ER_REPLICASET_UUID_MISMATCH</b> = 63
 , <br />
-&#160;&#160;<b>ER_INVALID_UUID</b>
+&#160;&#160;<b>ER_INVALID_UUID</b> = 64
 , <br />
-&#160;&#160;<b>ER_REPLICASET_UUID_IS_RO</b>
+&#160;&#160;<b>ER_REPLICASET_UUID_IS_RO</b> = 65
 , <br />
-&#160;&#160;<b>ER_INSTANCE_UUID_MISMATCH</b>
+&#160;&#160;<b>ER_INSTANCE_UUID_MISMATCH</b> = 66
 , <br />
-&#160;&#160;<b>ER_REPLICA_ID_IS_RESERVED</b>
+&#160;&#160;<b>ER_REPLICA_ID_IS_RESERVED</b> = 67
 , <br />
-&#160;&#160;<b>ER_INVALID_ORDER</b>
+&#160;&#160;<b>ER_INVALID_ORDER</b> = 68
 , <br />
-&#160;&#160;<b>ER_MISSING_REQUEST_FIELD</b>
+&#160;&#160;<b>ER_MISSING_REQUEST_FIELD</b> = 69
 , <br />
-&#160;&#160;<b>ER_IDENTIFIER</b>
+&#160;&#160;<b>ER_IDENTIFIER</b> = 70
 , <br />
-&#160;&#160;<b>ER_DROP_FUNCTION</b>
+&#160;&#160;<b>ER_DROP_FUNCTION</b> = 71
 , <br />
-&#160;&#160;<b>ER_ITERATOR_TYPE</b>
+&#160;&#160;<b>ER_ITERATOR_TYPE</b> = 72
 , <br />
-&#160;&#160;<b>ER_REPLICA_MAX</b>
+&#160;&#160;<b>ER_REPLICA_MAX</b> = 73
 , <br />
-&#160;&#160;<b>ER_INVALID_XLOG</b>
+&#160;&#160;<b>ER_INVALID_XLOG</b> = 74
 , <br />
-&#160;&#160;<b>ER_INVALID_XLOG_NAME</b>
+&#160;&#160;<b>ER_INVALID_XLOG_NAME</b> = 75
 , <br />
-&#160;&#160;<b>ER_INVALID_XLOG_ORDER</b>
+&#160;&#160;<b>ER_INVALID_XLOG_ORDER</b> = 76
 , <br />
-&#160;&#160;<b>ER_NO_CONNECTION</b>
+&#160;&#160;<b>ER_NO_CONNECTION</b> = 77
 , <br />
-&#160;&#160;<b>ER_TIMEOUT</b>
+&#160;&#160;<b>ER_TIMEOUT</b> = 78
 , <br />
-&#160;&#160;<b>ER_ACTIVE_TRANSACTION</b>
+&#160;&#160;<b>ER_ACTIVE_TRANSACTION</b> = 79
 , <br />
-&#160;&#160;<b>ER_CURSOR_NO_TRANSACTION</b>
+&#160;&#160;<b>ER_CURSOR_NO_TRANSACTION</b> = 80
 , <br />
-&#160;&#160;<b>ER_CROSS_ENGINE_TRANSACTION</b>
+&#160;&#160;<b>ER_CROSS_ENGINE_TRANSACTION</b> = 81
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_ROLE</b>
+&#160;&#160;<b>ER_NO_SUCH_ROLE</b> = 82
 , <br />
-&#160;&#160;<b>ER_ROLE_EXISTS</b>
+&#160;&#160;<b>ER_ROLE_EXISTS</b> = 83
 , <br />
-&#160;&#160;<b>ER_CREATE_ROLE</b>
+&#160;&#160;<b>ER_CREATE_ROLE</b> = 84
 , <br />
-&#160;&#160;<b>ER_INDEX_EXISTS</b>
+&#160;&#160;<b>ER_INDEX_EXISTS</b> = 85
 , <br />
-&#160;&#160;<b>ER_SESSION_CLOSED</b>
+&#160;&#160;<b>ER_SESSION_CLOSED</b> = 86
 , <br />
-&#160;&#160;<b>ER_ROLE_LOOP</b>
+&#160;&#160;<b>ER_ROLE_LOOP</b> = 87
 , <br />
-&#160;&#160;<b>ER_GRANT</b>
+&#160;&#160;<b>ER_GRANT</b> = 88
 , <br />
-&#160;&#160;<b>ER_PRIV_GRANTED</b>
+&#160;&#160;<b>ER_PRIV_GRANTED</b> = 89
 , <br />
-&#160;&#160;<b>ER_ROLE_GRANTED</b>
+&#160;&#160;<b>ER_ROLE_GRANTED</b> = 90
 , <br />
-&#160;&#160;<b>ER_PRIV_NOT_GRANTED</b>
+&#160;&#160;<b>ER_PRIV_NOT_GRANTED</b> = 91
 , <br />
-&#160;&#160;<b>ER_ROLE_NOT_GRANTED</b>
+&#160;&#160;<b>ER_ROLE_NOT_GRANTED</b> = 92
 , <br />
-&#160;&#160;<b>ER_MISSING_SNAPSHOT</b>
+&#160;&#160;<b>ER_MISSING_SNAPSHOT</b> = 93
 , <br />
-&#160;&#160;<b>ER_CANT_UPDATE_PRIMARY_KEY</b>
+&#160;&#160;<b>ER_CANT_UPDATE_PRIMARY_KEY</b> = 94
 , <br />
-&#160;&#160;<b>ER_UPDATE_INTEGER_OVERFLOW</b>
+&#160;&#160;<b>ER_UPDATE_INTEGER_OVERFLOW</b> = 95
 , <br />
-&#160;&#160;<b>ER_GUEST_USER_PASSWORD</b>
+&#160;&#160;<b>ER_GUEST_USER_PASSWORD</b> = 96
 , <br />
-&#160;&#160;<b>ER_TRANSACTION_CONFLICT</b>
+&#160;&#160;<b>ER_TRANSACTION_CONFLICT</b> = 97
 , <br />
-&#160;&#160;<b>ER_UNSUPPORTED_PRIV</b>
+&#160;&#160;<b>ER_UNSUPPORTED_PRIV</b> = 98
 , <br />
-&#160;&#160;<b>ER_LOAD_FUNCTION</b>
+&#160;&#160;<b>ER_LOAD_FUNCTION</b> = 99
 , <br />
-&#160;&#160;<b>ER_FUNCTION_LANGUAGE</b>
+&#160;&#160;<b>ER_FUNCTION_LANGUAGE</b> = 100
 , <br />
-&#160;&#160;<b>ER_RTREE_RECT</b>
+&#160;&#160;<b>ER_RTREE_RECT</b> = 101
 , <br />
-&#160;&#160;<b>ER_PROC_C</b>
+&#160;&#160;<b>ER_PROC_C</b> = 102
 , <br />
-&#160;&#160;<b>ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE</b>
+&#160;&#160;<b>ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE</b> = 103
 , <br />
-&#160;&#160;<b>ER_PROTOCOL</b>
+&#160;&#160;<b>ER_PROTOCOL</b> = 104
 , <br />
-&#160;&#160;<b>ER_UPSERT_UNIQUE_SECONDARY_KEY</b>
+&#160;&#160;<b>ER_UPSERT_UNIQUE_SECONDARY_KEY</b> = 105
 , <br />
-&#160;&#160;<b>ER_WRONG_INDEX_RECORD</b>
+&#160;&#160;<b>ER_WRONG_INDEX_RECORD</b> = 106
 , <br />
-&#160;&#160;<b>ER_WRONG_INDEX_PARTS</b>
+&#160;&#160;<b>ER_WRONG_INDEX_PARTS</b> = 107
 , <br />
-&#160;&#160;<b>ER_WRONG_INDEX_OPTIONS</b>
+&#160;&#160;<b>ER_WRONG_INDEX_OPTIONS</b> = 108
 , <br />
-&#160;&#160;<b>ER_WRONG_SCHEMA_VERSION</b>
+&#160;&#160;<b>ER_WRONG_SCHEMA_VERSION</b> = 109
 , <br />
-&#160;&#160;<b>ER_MEMTX_MAX_TUPLE_SIZE</b>
+&#160;&#160;<b>ER_MEMTX_MAX_TUPLE_SIZE</b> = 110
 , <br />
-&#160;&#160;<b>ER_WRONG_SPACE_OPTIONS</b>
+&#160;&#160;<b>ER_WRONG_SPACE_OPTIONS</b> = 111
 , <br />
-&#160;&#160;<b>ER_UNSUPPORTED_INDEX_FEATURE</b>
+&#160;&#160;<b>ER_UNSUPPORTED_INDEX_FEATURE</b> = 112
 , <br />
-&#160;&#160;<b>ER_VIEW_IS_RO</b>
+&#160;&#160;<b>ER_VIEW_IS_RO</b> = 113
 , <br />
-&#160;&#160;<b>ER_NO_TRANSACTION</b>
+&#160;&#160;<b>ER_NO_TRANSACTION</b> = 114
 , <br />
-&#160;&#160;<b>ER_SYSTEM</b>
+&#160;&#160;<b>ER_SYSTEM</b> = 115
 , <br />
-&#160;&#160;<b>ER_LOADING</b>
+&#160;&#160;<b>ER_LOADING</b> = 116
 , <br />
-&#160;&#160;<b>ER_CONNECTION_TO_SELF</b>
+&#160;&#160;<b>ER_CONNECTION_TO_SELF</b> = 117
 , <br />
-&#160;&#160;<b>ER_KEY_PART_IS_TOO_LONG</b>
+&#160;&#160;<b>ER_KEY_PART_IS_TOO_LONG</b> = 118
 , <br />
-&#160;&#160;<b>ER_COMPRESSION</b>
+&#160;&#160;<b>ER_COMPRESSION</b> = 119
 , <br />
-&#160;&#160;<b>ER_CHECKPOINT_IN_PROGRESS</b>
+&#160;&#160;<b>ER_CHECKPOINT_IN_PROGRESS</b> = 120
 , <br />
-&#160;&#160;<b>ER_SUB_STMT_MAX</b>
+&#160;&#160;<b>ER_SUB_STMT_MAX</b> = 121
 , <br />
-&#160;&#160;<b>ER_COMMIT_IN_SUB_STMT</b>
+&#160;&#160;<b>ER_COMMIT_IN_SUB_STMT</b> = 122
 , <br />
-&#160;&#160;<b>ER_ROLLBACK_IN_SUB_STMT</b>
+&#160;&#160;<b>ER_ROLLBACK_IN_SUB_STMT</b> = 123
 , <br />
-&#160;&#160;<b>ER_DECOMPRESSION</b>
+&#160;&#160;<b>ER_DECOMPRESSION</b> = 124
 , <br />
-&#160;&#160;<b>ER_INVALID_XLOG_TYPE</b>
+&#160;&#160;<b>ER_INVALID_XLOG_TYPE</b> = 125
 , <br />
-&#160;&#160;<b>ER_ALREADY_RUNNING</b>
+&#160;&#160;<b>ER_ALREADY_RUNNING</b> = 126
 , <br />
-&#160;&#160;<b>ER_INDEX_FIELD_COUNT_LIMIT</b>
+&#160;&#160;<b>ER_INDEX_FIELD_COUNT_LIMIT</b> = 127
 , <br />
-&#160;&#160;<b>ER_LOCAL_INSTANCE_ID_IS_READ_ONLY</b>
+&#160;&#160;<b>ER_LOCAL_INSTANCE_ID_IS_READ_ONLY</b> = 128
 , <br />
-&#160;&#160;<b>ER_BACKUP_IN_PROGRESS</b>
+&#160;&#160;<b>ER_BACKUP_IN_PROGRESS</b> = 129
 , <br />
-&#160;&#160;<b>ER_READ_VIEW_ABORTED</b>
+&#160;&#160;<b>ER_READ_VIEW_ABORTED</b> = 130
 , <br />
-&#160;&#160;<b>ER_INVALID_INDEX_FILE</b>
+&#160;&#160;<b>ER_INVALID_INDEX_FILE</b> = 131
 , <br />
-&#160;&#160;<b>ER_INVALID_RUN_FILE</b>
+&#160;&#160;<b>ER_INVALID_RUN_FILE</b> = 132
 , <br />
-&#160;&#160;<b>ER_INVALID_VYLOG_FILE</b>
+&#160;&#160;<b>ER_INVALID_VYLOG_FILE</b> = 133
 , <br />
-&#160;&#160;<b>ER_CASCADE_ROLLBACK</b>
+&#160;&#160;<b>ER_CASCADE_ROLLBACK</b> = 134
 , <br />
-&#160;&#160;<b>ER_VY_QUOTA_TIMEOUT</b>
+&#160;&#160;<b>ER_VY_QUOTA_TIMEOUT</b> = 135
 , <br />
-&#160;&#160;<b>ER_PARTIAL_KEY</b>
+&#160;&#160;<b>ER_PARTIAL_KEY</b> = 136
 , <br />
-&#160;&#160;<b>ER_TRUNCATE_SYSTEM_SPACE</b>
+&#160;&#160;<b>ER_TRUNCATE_SYSTEM_SPACE</b> = 137
 , <br />
-&#160;&#160;<b>ER_LOAD_MODULE</b>
+&#160;&#160;<b>ER_LOAD_MODULE</b> = 138
 , <br />
-&#160;&#160;<b>ER_VINYL_MAX_TUPLE_SIZE</b>
+&#160;&#160;<b>ER_VINYL_MAX_TUPLE_SIZE</b> = 139
 , <br />
-&#160;&#160;<b>ER_WRONG_DD_VERSION</b>
+&#160;&#160;<b>ER_WRONG_DD_VERSION</b> = 140
 , <br />
-&#160;&#160;<b>ER_WRONG_SPACE_FORMAT</b>
+&#160;&#160;<b>ER_WRONG_SPACE_FORMAT</b> = 141
 , <br />
-&#160;&#160;<b>ER_CREATE_SEQUENCE</b>
+&#160;&#160;<b>ER_CREATE_SEQUENCE</b> = 142
 , <br />
-&#160;&#160;<b>ER_ALTER_SEQUENCE</b>
+&#160;&#160;<b>ER_ALTER_SEQUENCE</b> = 143
 , <br />
-&#160;&#160;<b>ER_DROP_SEQUENCE</b>
+&#160;&#160;<b>ER_DROP_SEQUENCE</b> = 144
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_SEQUENCE</b>
+&#160;&#160;<b>ER_NO_SUCH_SEQUENCE</b> = 145
 , <br />
-&#160;&#160;<b>ER_SEQUENCE_EXISTS</b>
+&#160;&#160;<b>ER_SEQUENCE_EXISTS</b> = 146
 , <br />
-&#160;&#160;<b>ER_SEQUENCE_OVERFLOW</b>
+&#160;&#160;<b>ER_SEQUENCE_OVERFLOW</b> = 147
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_INDEX_NAME</b>
+&#160;&#160;<b>ER_NO_SUCH_INDEX_NAME</b> = 148
 , <br />
-&#160;&#160;<b>ER_SPACE_FIELD_IS_DUPLICATE</b>
+&#160;&#160;<b>ER_SPACE_FIELD_IS_DUPLICATE</b> = 149
 , <br />
-&#160;&#160;<b>ER_CANT_CREATE_COLLATION</b>
+&#160;&#160;<b>ER_CANT_CREATE_COLLATION</b> = 150
 , <br />
-&#160;&#160;<b>ER_WRONG_COLLATION_OPTIONS</b>
+&#160;&#160;<b>ER_WRONG_COLLATION_OPTIONS</b> = 151
 , <br />
-&#160;&#160;<b>ER_NULLABLE_PRIMARY</b>
+&#160;&#160;<b>ER_NULLABLE_PRIMARY</b> = 152
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_FIELD_NAME_IN_SPACE</b>
+&#160;&#160;<b>ER_NO_SUCH_FIELD_NAME_IN_SPACE</b> = 153
 , <br />
-&#160;&#160;<b>ER_TRANSACTION_YIELD</b>
+&#160;&#160;<b>ER_TRANSACTION_YIELD</b> = 154
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_GROUP</b>
+&#160;&#160;<b>ER_NO_SUCH_GROUP</b> = 155
 , <br />
-&#160;&#160;<b>ER_SQL_BIND_VALUE</b>
+&#160;&#160;<b>ER_SQL_BIND_VALUE</b> = 156
 , <br />
-&#160;&#160;<b>ER_SQL_BIND_TYPE</b>
+&#160;&#160;<b>ER_SQL_BIND_TYPE</b> = 157
 , <br />
-&#160;&#160;<b>ER_SQL_BIND_PARAMETER_MAX</b>
+&#160;&#160;<b>ER_SQL_BIND_PARAMETER_MAX</b> = 158
 , <br />
-&#160;&#160;<b>ER_SQL_EXECUTE</b>
+&#160;&#160;<b>ER_SQL_EXECUTE</b> = 159
 , <br />
-&#160;&#160;<b>ER_UPDATE_DECIMAL_OVERFLOW</b>
+&#160;&#160;<b>ER_UPDATE_DECIMAL_OVERFLOW</b> = 160
 , <br />
-&#160;&#160;<b>ER_SQL_BIND_NOT_FOUND</b>
+&#160;&#160;<b>ER_SQL_BIND_NOT_FOUND</b> = 161
 , <br />
-&#160;&#160;<b>ER_ACTION_MISMATCH</b>
+&#160;&#160;<b>ER_ACTION_MISMATCH</b> = 162
 , <br />
-&#160;&#160;<b>ER_VIEW_MISSING_SQL</b>
+&#160;&#160;<b>ER_VIEW_MISSING_SQL</b> = 163
 , <br />
-&#160;&#160;<b>ER_FOREIGN_KEY_CONSTRAINT</b>
+&#160;&#160;<b>ER_FOREIGN_KEY_CONSTRAINT</b> = 164
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_MODULE</b>
+&#160;&#160;<b>ER_NO_SUCH_MODULE</b> = 165
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_COLLATION</b>
+&#160;&#160;<b>ER_NO_SUCH_COLLATION</b> = 166
 , <br />
-&#160;&#160;<b>ER_CREATE_FK_CONSTRAINT</b>
+&#160;&#160;<b>ER_CREATE_FK_CONSTRAINT</b> = 167
 , <br />
-&#160;&#160;<b>ER_DROP_FK_CONSTRAINT</b>
+&#160;&#160;<b>ER_DROP_FK_CONSTRAINT</b> = 168
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_CONSTRAINT</b>
+&#160;&#160;<b>ER_NO_SUCH_CONSTRAINT</b> = 169
 , <br />
-&#160;&#160;<b>ER_CONSTRAINT_EXISTS</b>
+&#160;&#160;<b>ER_CONSTRAINT_EXISTS</b> = 170
 , <br />
-&#160;&#160;<b>ER_SQL_TYPE_MISMATCH</b>
+&#160;&#160;<b>ER_SQL_TYPE_MISMATCH</b> = 171
 , <br />
-&#160;&#160;<b>ER_ROWID_OVERFLOW</b>
+&#160;&#160;<b>ER_ROWID_OVERFLOW</b> = 172
 , <br />
-&#160;&#160;<b>ER_DROP_COLLATION</b>
+&#160;&#160;<b>ER_DROP_COLLATION</b> = 173
 , <br />
-&#160;&#160;<b>ER_ILLEGAL_COLLATION_MIX</b>
+&#160;&#160;<b>ER_ILLEGAL_COLLATION_MIX</b> = 174
 , <br />
-&#160;&#160;<b>ER_SQL_NO_SUCH_PRAGMA</b>
+&#160;&#160;<b>ER_SQL_NO_SUCH_PRAGMA</b> = 175
 , <br />
-&#160;&#160;<b>ER_SQL_CANT_RESOLVE_FIELD</b>
+&#160;&#160;<b>ER_SQL_CANT_RESOLVE_FIELD</b> = 176
 , <br />
-&#160;&#160;<b>ER_INDEX_EXISTS_IN_SPACE</b>
+&#160;&#160;<b>ER_INDEX_EXISTS_IN_SPACE</b> = 177
 , <br />
-&#160;&#160;<b>ER_INCONSISTENT_TYPES</b>
+&#160;&#160;<b>ER_INCONSISTENT_TYPES</b> = 178
 , <br />
-&#160;&#160;<b>ER_SQL_SYNTAX_WITH_POS</b>
+&#160;&#160;<b>ER_SQL_SYNTAX_WITH_POS</b> = 179
 , <br />
-&#160;&#160;<b>ER_SQL_STACK_OVERFLOW</b>
+&#160;&#160;<b>ER_SQL_STACK_OVERFLOW</b> = 180
 , <br />
-&#160;&#160;<b>ER_SQL_SELECT_WILDCARD</b>
+&#160;&#160;<b>ER_SQL_SELECT_WILDCARD</b> = 181
 , <br />
-&#160;&#160;<b>ER_SQL_STATEMENT_EMPTY</b>
+&#160;&#160;<b>ER_SQL_STATEMENT_EMPTY</b> = 182
 , <br />
-&#160;&#160;<b>ER_SQL_KEYWORD_IS_RESERVED</b>
+&#160;&#160;<b>ER_SQL_KEYWORD_IS_RESERVED</b> = 183
 , <br />
-&#160;&#160;<b>ER_SQL_SYNTAX_NEAR_TOKEN</b>
+&#160;&#160;<b>ER_SQL_SYNTAX_NEAR_TOKEN</b> = 184
 , <br />
-&#160;&#160;<b>ER_SQL_UNKNOWN_TOKEN</b>
+&#160;&#160;<b>ER_SQL_UNKNOWN_TOKEN</b> = 185
 , <br />
-&#160;&#160;<b>ER_SQL_PARSER_GENERIC</b>
+&#160;&#160;<b>ER_SQL_PARSER_GENERIC</b> = 186
 , <br />
-&#160;&#160;<b>ER_SQL_ANALYZE_ARGUMENT</b>
+&#160;&#160;<b>ER_SQL_ANALYZE_ARGUMENT</b> = 187
 , <br />
-&#160;&#160;<b>ER_SQL_COLUMN_COUNT_MAX</b>
+&#160;&#160;<b>ER_SQL_COLUMN_COUNT_MAX</b> = 188
 , <br />
-&#160;&#160;<b>ER_HEX_LITERAL_MAX</b>
+&#160;&#160;<b>ER_HEX_LITERAL_MAX</b> = 189
 , <br />
-&#160;&#160;<b>ER_INT_LITERAL_MAX</b>
+&#160;&#160;<b>ER_INT_LITERAL_MAX</b> = 190
 , <br />
-&#160;&#160;<b>ER_SQL_PARSER_LIMIT</b>
+&#160;&#160;<b>ER_SQL_PARSER_LIMIT</b> = 191
 , <br />
-&#160;&#160;<b>ER_INDEX_DEF_UNSUPPORTED</b>
+&#160;&#160;<b>ER_INDEX_DEF_UNSUPPORTED</b> = 192
 , <br />
-&#160;&#160;<b>ER_CK_DEF_UNSUPPORTED</b>
+&#160;&#160;<b>ER_CK_DEF_UNSUPPORTED</b> = 193
 , <br />
-&#160;&#160;<b>ER_MULTIKEY_INDEX_MISMATCH</b>
+&#160;&#160;<b>ER_MULTIKEY_INDEX_MISMATCH</b> = 194
 , <br />
-&#160;&#160;<b>ER_CREATE_CK_CONSTRAINT</b>
+&#160;&#160;<b>ER_CREATE_CK_CONSTRAINT</b> = 195
 , <br />
-&#160;&#160;<b>ER_CK_CONSTRAINT_FAILED</b>
+&#160;&#160;<b>ER_CK_CONSTRAINT_FAILED</b> = 196
 , <br />
-&#160;&#160;<b>ER_SQL_COLUMN_COUNT</b>
+&#160;&#160;<b>ER_SQL_COLUMN_COUNT</b> = 197
 , <br />
-&#160;&#160;<b>ER_FUNC_INDEX_FUNC</b>
+&#160;&#160;<b>ER_FUNC_INDEX_FUNC</b> = 198
 , <br />
-&#160;&#160;<b>ER_FUNC_INDEX_FORMAT</b>
+&#160;&#160;<b>ER_FUNC_INDEX_FORMAT</b> = 199
 , <br />
-&#160;&#160;<b>ER_FUNC_INDEX_PARTS</b>
+&#160;&#160;<b>ER_FUNC_INDEX_PARTS</b> = 200
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_FIELD_NAME</b>
+&#160;&#160;<b>ER_NO_SUCH_FIELD_NAME</b> = 201
 , <br />
-&#160;&#160;<b>ER_FUNC_WRONG_ARG_COUNT</b>
+&#160;&#160;<b>ER_FUNC_WRONG_ARG_COUNT</b> = 202
 , <br />
-&#160;&#160;<b>ER_BOOTSTRAP_READONLY</b>
+&#160;&#160;<b>ER_BOOTSTRAP_READONLY</b> = 203
 , <br />
-&#160;&#160;<b>ER_SQL_FUNC_WRONG_RET_COUNT</b>
+&#160;&#160;<b>ER_SQL_FUNC_WRONG_RET_COUNT</b> = 204
 , <br />
-&#160;&#160;<b>ER_FUNC_INVALID_RETURN_TYPE</b>
+&#160;&#160;<b>ER_FUNC_INVALID_RETURN_TYPE</b> = 205
 , <br />
-&#160;&#160;<b>ER_SQL_PARSER_GENERIC_WITH_POS</b>
+&#160;&#160;<b>ER_SQL_PARSER_GENERIC_WITH_POS</b> = 206
 , <br />
-&#160;&#160;<b>ER_REPLICA_NOT_ANON</b>
+&#160;&#160;<b>ER_REPLICA_NOT_ANON</b> = 207
 , <br />
-&#160;&#160;<b>ER_CANNOT_REGISTER</b>
+&#160;&#160;<b>ER_CANNOT_REGISTER</b> = 208
 , <br />
-&#160;&#160;<b>ER_SESSION_SETTING_INVALID_VALUE</b>
+&#160;&#160;<b>ER_SESSION_SETTING_INVALID_VALUE</b> = 209
 , <br />
-&#160;&#160;<b>ER_SQL_PREPARE</b>
+&#160;&#160;<b>ER_SQL_PREPARE</b> = 210
 , <br />
-&#160;&#160;<b>ER_WRONG_QUERY_ID</b>
+&#160;&#160;<b>ER_WRONG_QUERY_ID</b> = 211
 , <br />
-&#160;&#160;<b>ER_SEQUENCE_NOT_STARTED</b>
+&#160;&#160;<b>ER_SEQUENCE_NOT_STARTED</b> = 212
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_SESSION_SETTING</b>
+&#160;&#160;<b>ER_NO_SUCH_SESSION_SETTING</b> = 213
 , <br />
-&#160;&#160;<b>ER_UNCOMMITTED_FOREIGN_SYNC_TXNS</b>
+&#160;&#160;<b>ER_UNCOMMITTED_FOREIGN_SYNC_TXNS</b> = 214
 , <br />
-&#160;&#160;<b>ER_SYNC_MASTER_MISMATCH</b>
+&#160;&#160;<b>ER_SYNC_MASTER_MISMATCH</b> = 215
 , <br />
-&#160;&#160;<b>ER_SYNC_QUORUM_TIMEOUT</b>
+&#160;&#160;<b>ER_SYNC_QUORUM_TIMEOUT</b> = 216
 , <br />
-&#160;&#160;<b>ER_SYNC_ROLLBACK</b>
+&#160;&#160;<b>ER_SYNC_ROLLBACK</b> = 217
 , <br />
-&#160;&#160;<b>ER_TUPLE_METADATA_IS_TOO_BIG</b>
+&#160;&#160;<b>ER_TUPLE_METADATA_IS_TOO_BIG</b> = 218
 , <br />
-&#160;&#160;<b>ER_XLOG_GAP</b>
+&#160;&#160;<b>ER_XLOG_GAP</b> = 219
 , <br />
-&#160;&#160;<b>ER_TOO_EARLY_SUBSCRIBE</b>
+&#160;&#160;<b>ER_TOO_EARLY_SUBSCRIBE</b> = 220
 , <br />
-&#160;&#160;<b>ER_SQL_CANT_ADD_AUTOINC</b>
+&#160;&#160;<b>ER_SQL_CANT_ADD_AUTOINC</b> = 221
 , <br />
-&#160;&#160;<b>ER_QUORUM_WAIT</b>
+&#160;&#160;<b>ER_QUORUM_WAIT</b> = 222
 , <br />
-&#160;&#160;<b>ER_INTERFERING_PROMOTE</b>
+&#160;&#160;<b>ER_INTERFERING_PROMOTE</b> = 223
 , <br />
-&#160;&#160;<b>ER_ELECTION_DISABLED</b>
+&#160;&#160;<b>ER_ELECTION_DISABLED</b> = 224
 , <br />
-&#160;&#160;<b>ER_TXN_ROLLBACK</b>
+&#160;&#160;<b>ER_TXN_ROLLBACK</b> = 225
 , <br />
-&#160;&#160;<b>ER_NOT_LEADER</b>
+&#160;&#160;<b>ER_NOT_LEADER</b> = 226
 , <br />
-&#160;&#160;<b>ER_SYNC_QUEUE_UNCLAIMED</b>
+&#160;&#160;<b>ER_SYNC_QUEUE_UNCLAIMED</b> = 227
 , <br />
-&#160;&#160;<b>ER_SYNC_QUEUE_FOREIGN</b>
+&#160;&#160;<b>ER_SYNC_QUEUE_FOREIGN</b> = 228
 , <br />
-&#160;&#160;<b>ER_UNABLE_TO_PROCESS_IN_STREAM</b>
+&#160;&#160;<b>ER_UNABLE_TO_PROCESS_IN_STREAM</b> = 229
 , <br />
-&#160;&#160;<b>ER_UNABLE_TO_PROCESS_OUT_OF_STREAM</b>
+&#160;&#160;<b>ER_UNABLE_TO_PROCESS_OUT_OF_STREAM</b> = 230
 , <br />
-&#160;&#160;<b>ER_TRANSACTION_TIMEOUT</b>
+&#160;&#160;<b>ER_TRANSACTION_TIMEOUT</b> = 231
 , <br />
-&#160;&#160;<b>ER_ACTIVE_TIMER</b>
+&#160;&#160;<b>ER_ACTIVE_TIMER</b> = 232
 , <br />
-&#160;&#160;<b>ER_TUPLE_FIELD_COUNT_LIMIT</b>
+&#160;&#160;<b>ER_TUPLE_FIELD_COUNT_LIMIT</b> = 233
 , <br />
-&#160;&#160;<b>ER_CREATE_CONSTRAINT</b>
+&#160;&#160;<b>ER_CREATE_CONSTRAINT</b> = 234
 , <br />
-&#160;&#160;<b>ER_FIELD_CONSTRAINT_FAILED</b>
+&#160;&#160;<b>ER_FIELD_CONSTRAINT_FAILED</b> = 235
 , <br />
-&#160;&#160;<b>ER_TUPLE_CONSTRAINT_FAILED</b>
+&#160;&#160;<b>ER_TUPLE_CONSTRAINT_FAILED</b> = 236
 , <br />
-&#160;&#160;<b>ER_CREATE_FOREIGN_KEY</b>
+&#160;&#160;<b>ER_CREATE_FOREIGN_KEY</b> = 237
 , <br />
-&#160;&#160;<b>ER_FOREIGN_KEY_INTEGRITY</b>
+&#160;&#160;<b>ER_FOREIGN_KEY_INTEGRITY</b> = 238
 , <br />
-&#160;&#160;<b>ER_FIELD_FOREIGN_KEY_FAILED</b>
+&#160;&#160;<b>ER_FIELD_FOREIGN_KEY_FAILED</b> = 239
 , <br />
-&#160;&#160;<b>ER_COMPLEX_FOREIGN_KEY_FAILED</b>
+&#160;&#160;<b>ER_COMPLEX_FOREIGN_KEY_FAILED</b> = 240
 , <br />
-&#160;&#160;<b>ER_WRONG_SPACE_UPGRADE_OPTIONS</b>
+&#160;&#160;<b>ER_WRONG_SPACE_UPGRADE_OPTIONS</b> = 241
 , <br />
-&#160;&#160;<b>ER_NO_ELECTION_QUORUM</b>
+&#160;&#160;<b>ER_NO_ELECTION_QUORUM</b> = 242
 , <br />
-&#160;&#160;<b>ER_SSL</b>
+&#160;&#160;<b>ER_SSL</b> = 243
 , <br />
-&#160;&#160;<b>ER_SPLIT_BRAIN</b>
+&#160;&#160;<b>ER_SPLIT_BRAIN</b> = 244
 , <br />
-&#160;&#160;<b>ER_OLD_TERM</b>
+&#160;&#160;<b>ER_OLD_TERM</b> = 245
 , <br />
-&#160;&#160;<b>ER_INTERFERING_ELECTIONS</b>
+&#160;&#160;<b>ER_INTERFERING_ELECTIONS</b> = 246
 , <br />
-&#160;&#160;<b>ER_ITERATOR_POSITION</b>
+&#160;&#160;<b>ER_ITERATOR_POSITION</b> = 247
 , <br />
-&#160;&#160;<b>ER_DEFAULT_VALUE_TYPE</b>
+&#160;&#160;<b>ER_DEFAULT_VALUE_TYPE</b> = 248
 , <br />
-&#160;&#160;<b>ER_UNKNOWN_AUTH_METHOD</b>
+&#160;&#160;<b>ER_UNKNOWN_AUTH_METHOD</b> = 249
 , <br />
-&#160;&#160;<b>ER_INVALID_AUTH_DATA</b>
+&#160;&#160;<b>ER_INVALID_AUTH_DATA</b> = 250
 , <br />
-&#160;&#160;<b>ER_INVALID_AUTH_REQUEST</b>
+&#160;&#160;<b>ER_INVALID_AUTH_REQUEST</b> = 251
 , <br />
-&#160;&#160;<b>ER_WEAK_PASSWORD</b>
+&#160;&#160;<b>ER_WEAK_PASSWORD</b> = 252
 , <br />
-&#160;&#160;<b>ER_OLD_PASSWORD</b>
+&#160;&#160;<b>ER_OLD_PASSWORD</b> = 253
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_SESSION</b>
+&#160;&#160;<b>ER_NO_SUCH_SESSION</b> = 254
 , <br />
-&#160;&#160;<b>ER_WRONG_SESSION_TYPE</b>
+&#160;&#160;<b>ER_WRONG_SESSION_TYPE</b> = 255
 , <br />
-&#160;&#160;<b>ER_PASSWORD_EXPIRED</b>
+&#160;&#160;<b>ER_PASSWORD_EXPIRED</b> = 256
 , <br />
-&#160;&#160;<b>ER_AUTH_DELAY</b>
+&#160;&#160;<b>ER_AUTH_DELAY</b> = 257
 , <br />
-&#160;&#160;<b>ER_AUTH_REQUIRED</b>
+&#160;&#160;<b>ER_AUTH_REQUIRED</b> = 258
 , <br />
-&#160;&#160;<b>ER_SQL_SEQ_SCAN</b>
+&#160;&#160;<b>ER_SQL_SEQ_SCAN</b> = 259
 , <br />
-&#160;&#160;<b>ER_NO_SUCH_EVENT</b>
+&#160;&#160;<b>ER_NO_SUCH_EVENT</b> = 260
 , <br />
-&#160;&#160;<b>ER_BOOTSTRAP_NOT_UNANIMOUS</b>
+&#160;&#160;<b>ER_BOOTSTRAP_NOT_UNANIMOUS</b> = 261
 , <br />
-&#160;&#160;<b>ER_CANT_CHECK_BOOTSTRAP_LEADER</b>
+&#160;&#160;<b>ER_CANT_CHECK_BOOTSTRAP_LEADER</b> = 262
 , <br />
-&#160;&#160;<b>ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL</b>
+&#160;&#160;<b>ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL</b> = 263
 , <br />
-&#160;&#160;<b>ER_NIL_UUID</b>
+&#160;&#160;<b>ER_NIL_UUID</b> = 264
 , <br />
-&#160;&#160;<b>ER_WRONG_FUNCTION_OPTIONS</b>
+&#160;&#160;<b>ER_WRONG_FUNCTION_OPTIONS</b> = 265
 , <br />
-&#160;&#160;<b>ER_MISSING_SYSTEM_SPACES</b>
+&#160;&#160;<b>ER_MISSING_SYSTEM_SPACES</b> = 266
 , <br />
-&#160;&#160;<b>ER_CLUSTER_NAME_MISMATCH</b>
+&#160;&#160;<b>ER_CLUSTER_NAME_MISMATCH</b> = 267
 , <br />
-&#160;&#160;<b>ER_REPLICASET_NAME_MISMATCH</b>
+&#160;&#160;<b>ER_REPLICASET_NAME_MISMATCH</b> = 268
 , <br />
-&#160;&#160;<b>ER_INSTANCE_NAME_DUPLICATE</b>
+&#160;&#160;<b>ER_INSTANCE_NAME_DUPLICATE</b> = 269
 , <br />
-&#160;&#160;<b>ER_INSTANCE_NAME_MISMATCH</b>
+&#160;&#160;<b>ER_INSTANCE_NAME_MISMATCH</b> = 270
 , <br />
-&#160;&#160;<b>ER_SCHEMA_NEEDS_UPGRADE</b>
+&#160;&#160;<b>ER_SCHEMA_NEEDS_UPGRADE</b> = 271
 , <br />
-&#160;&#160;<b>ER_SCHEMA_UPGRADE_IN_PROGRESS</b>
+&#160;&#160;<b>ER_SCHEMA_UPGRADE_IN_PROGRESS</b> = 272
 , <br />
-&#160;&#160;<b>ER_DEPRECATED</b>
+&#160;&#160;<b>ER_DEPRECATED</b> = 273
 , <br />
-&#160;&#160;<b>ER_UNCONFIGURED</b>
+&#160;&#160;<b>ER_UNCONFIGURED</b> = 274
 , <br />
-&#160;&#160;<b>ER_CREATE_DEFAULT_FUNC</b>
+&#160;&#160;<b>ER_CREATE_DEFAULT_FUNC</b> = 275
 , <br />
-&#160;&#160;<b>ER_DEFAULT_FUNC_FAILED</b>
+&#160;&#160;<b>ER_DEFAULT_FUNC_FAILED</b> = 276
 , <br />
-&#160;&#160;<b>ER_INVALID_DEC</b>
+&#160;&#160;<b>ER_INVALID_DEC</b> = 277
 , <br />
-&#160;&#160;<b>ER_IN_ANOTHER_PROMOTE</b>
+&#160;&#160;<b>ER_IN_ANOTHER_PROMOTE</b> = 278
 , <br />
-&#160;&#160;<b>ER_SHUTDOWN</b>
+&#160;&#160;<b>ER_SHUTDOWN</b> = 279
 , <br />
-&#160;&#160;<b>ER_FIELD_VALUE_OUT_OF_RANGE</b>
+&#160;&#160;<b>ER_FIELD_VALUE_OUT_OF_RANGE</b> = 280
 , <br />
 &#160;&#160;<b>box_error_code_MAX</b>
 <br />
@@ -2202,7 +2202,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mo
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.1.0-entrypoint-142-g8aff2ede2&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.1.0-entrypoint-151-g3978d54bd&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -10370,7 +10370,7 @@ the fiber is not joined yet (panic if not).</dd></dl>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Wed Mar 13 2024 08:21:56 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Wed Mar 13 2024 12:50:45 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>

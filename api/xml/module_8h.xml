@@ -97,7 +97,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" prot="public" static="no">
         <name>PACKAGE_VERSION</name>
-        <initializer>&quot;3.1.0-entrypoint-142-g8aff2ede2&quot;</initializer>
+        <initializer>&quot;3.1.0-entrypoint-151-g3978d54bd&quot;</initializer>
         <briefdescription>
 <para>A string with major-minor-patch-commit-id identifier of the release, e.g. </para>
         </briefdescription>
@@ -2006,6 +2006,7 @@
         <name>box_error_code</name>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcead62756b0ef341430c318e631713512dc" prot="public">
           <name>ER_UNKNOWN</name>
+          <initializer>= 0</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2013,6 +2014,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea083785e356837f4303efb5294c0fcf25" prot="public">
           <name>ER_ILLEGAL_PARAMS</name>
+          <initializer>= 1</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2020,6 +2022,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3148df88f7c2ac93774e87f732aaa5ee" prot="public">
           <name>ER_MEMORY_ISSUE</name>
+          <initializer>= 2</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2027,6 +2030,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea555ec8745bbad48c3ca3eacdc189c946" prot="public">
           <name>ER_TUPLE_FOUND</name>
+          <initializer>= 3</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2034,6 +2038,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea915cf379edd725b9e2fca241275af237" prot="public">
           <name>ER_TUPLE_NOT_FOUND</name>
+          <initializer>= 4</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2041,6 +2046,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea18f0b006529c8960bc7afc8555c43118" prot="public">
           <name>ER_UNSUPPORTED</name>
+          <initializer>= 5</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2048,6 +2054,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceab3758597613f16aeb557c3642e8b63ed" prot="public">
           <name>ER_NONMASTER</name>
+          <initializer>= 6</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2055,6 +2062,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac1d18087eba24577c745d2f407216763" prot="public">
           <name>ER_READONLY</name>
+          <initializer>= 7</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2062,6 +2070,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea795138f05d99522d4d9164647e70cb54" prot="public">
           <name>ER_INJECTION</name>
+          <initializer>= 8</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2069,6 +2078,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7d5818c3d9be87d07d5ef4976f3bf171" prot="public">
           <name>ER_CREATE_SPACE</name>
+          <initializer>= 9</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2076,6 +2086,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1c51665a15567a23818bb9f9ae997592" prot="public">
           <name>ER_SPACE_EXISTS</name>
+          <initializer>= 10</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2083,6 +2094,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea52847681ecc21b03359aee4e45561099" prot="public">
           <name>ER_DROP_SPACE</name>
+          <initializer>= 11</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2090,6 +2102,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea522a6590530df738e72bef3ffffa4ceb" prot="public">
           <name>ER_ALTER_SPACE</name>
+          <initializer>= 12</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2097,6 +2110,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae035090b06ee956c3956e2ec3a80819a" prot="public">
           <name>ER_INDEX_TYPE</name>
+          <initializer>= 13</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2104,6 +2118,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea22b12f501d3ba37794f49edb71272615" prot="public">
           <name>ER_MODIFY_INDEX</name>
+          <initializer>= 14</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2111,6 +2126,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7331c3c0e9746481f46313638289bad9" prot="public">
           <name>ER_LAST_DROP</name>
+          <initializer>= 15</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2118,6 +2134,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea22de5f99ce56a257db455ae1bec5ccc1" prot="public">
           <name>ER_TUPLE_FORMAT_LIMIT</name>
+          <initializer>= 16</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2125,6 +2142,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea49ca969a2a007412fadf57209de4e83c" prot="public">
           <name>ER_DROP_PRIMARY_KEY</name>
+          <initializer>= 17</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2132,6 +2150,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5a55ddcc3c2b1d7fd00c1d0e6b6e2f78" prot="public">
           <name>ER_KEY_PART_TYPE</name>
+          <initializer>= 18</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2139,6 +2158,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea737d869ee35f9a30896f7a431fb7820e" prot="public">
           <name>ER_EXACT_MATCH</name>
+          <initializer>= 19</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2146,6 +2166,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3bed78a895978f985c4175e5f7add9a4" prot="public">
           <name>ER_INVALID_MSGPACK</name>
+          <initializer>= 20</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2153,6 +2174,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea089d7a2f7a86ca6b41c6d81daa93bed8" prot="public">
           <name>ER_PROC_RET</name>
+          <initializer>= 21</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2160,6 +2182,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac95c00dd2a6e6b2c00f94f4c86827a60" prot="public">
           <name>ER_TUPLE_NOT_ARRAY</name>
+          <initializer>= 22</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2167,6 +2190,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea8566015030ef6c9358d1c8de84997354" prot="public">
           <name>ER_FIELD_TYPE</name>
+          <initializer>= 23</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2174,6 +2198,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaec78f6c6801993be56674cab8c03a10c" prot="public">
           <name>ER_INDEX_PART_TYPE_MISMATCH</name>
+          <initializer>= 24</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2181,6 +2206,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6e08daeedafc6b6c27a30d28e1b4c7b0" prot="public">
           <name>ER_UPDATE_SPLICE</name>
+          <initializer>= 25</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2188,6 +2214,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaeb3d713a18373881dc0edaba61c4af45" prot="public">
           <name>ER_UPDATE_ARG_TYPE</name>
+          <initializer>= 26</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2195,6 +2222,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1470af30949764265336ac82d0fada57" prot="public">
           <name>ER_FORMAT_MISMATCH_INDEX_PART</name>
+          <initializer>= 27</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2202,6 +2230,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa9c66a7cade20a35b8488725a8ce820e" prot="public">
           <name>ER_UNKNOWN_UPDATE_OP</name>
+          <initializer>= 28</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2209,6 +2238,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6e8d29c4e259e5a054a78a6f941bb6e0" prot="public">
           <name>ER_UPDATE_FIELD</name>
+          <initializer>= 29</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2216,6 +2246,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf3f0d8ade3c8e46d5a6c61bf3fa01ae8" prot="public">
           <name>ER_FUNCTION_TX_ACTIVE</name>
+          <initializer>= 30</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2223,6 +2254,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea42a453366abe6ac41fbdbcaa66e6f5bc" prot="public">
           <name>ER_KEY_PART_COUNT</name>
+          <initializer>= 31</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2230,6 +2262,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceab4ad4d4958b12e8781c8487e40e8f74e" prot="public">
           <name>ER_PROC_LUA</name>
+          <initializer>= 32</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2237,6 +2270,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac017215ce215ee8a12639c8b7c81aac9" prot="public">
           <name>ER_NO_SUCH_PROC</name>
+          <initializer>= 33</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2244,6 +2278,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea472ad97a11cef075c155134e4cda5902" prot="public">
           <name>ER_NO_SUCH_TRIGGER</name>
+          <initializer>= 34</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2251,6 +2286,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9120706b962660717ccd4596bd097b22" prot="public">
           <name>ER_NO_SUCH_INDEX_ID</name>
+          <initializer>= 35</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2258,6 +2294,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf6a8ea01c74a4403c565d0658f9f4129" prot="public">
           <name>ER_NO_SUCH_SPACE</name>
+          <initializer>= 36</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2265,6 +2302,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa14309045d0e450b74c42b349fb4aae1" prot="public">
           <name>ER_NO_SUCH_FIELD_NO</name>
+          <initializer>= 37</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2272,6 +2310,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf9060d625dfb665537bf3ec39c1d0b6d" prot="public">
           <name>ER_EXACT_FIELD_COUNT</name>
+          <initializer>= 38</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2279,6 +2318,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea95d6c495b13373efbdec9578c2cc0f26" prot="public">
           <name>ER_FIELD_MISSING</name>
+          <initializer>= 39</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2286,6 +2326,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa6ff6ed88c3f4bdb1b54677cae7655e6" prot="public">
           <name>ER_WAL_IO</name>
+          <initializer>= 40</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2293,6 +2334,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1328ef0f8682f590ea0911db19cfc476" prot="public">
           <name>ER_MORE_THAN_ONE_TUPLE</name>
+          <initializer>= 41</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2300,6 +2342,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac4dcd43183c95741c9e77c7f889ca593" prot="public">
           <name>ER_ACCESS_DENIED</name>
+          <initializer>= 42</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2307,6 +2350,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea64c45b86c425a4e26301274a52f69312" prot="public">
           <name>ER_CREATE_USER</name>
+          <initializer>= 43</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2314,6 +2358,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea55679bb71c755ac0257ca128a297a984" prot="public">
           <name>ER_DROP_USER</name>
+          <initializer>= 44</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2321,6 +2366,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0c0deeaff648cf677945f747bd18ba7f" prot="public">
           <name>ER_NO_SUCH_USER</name>
+          <initializer>= 45</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2328,6 +2374,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcead4dff6d559cc784b715f1d877d49f843" prot="public">
           <name>ER_USER_EXISTS</name>
+          <initializer>= 46</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2335,6 +2382,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceafdd482d7d08269cf9bd8e8ea2dc60d3b" prot="public">
           <name>ER_CREDS_MISMATCH</name>
+          <initializer>= 47</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2342,6 +2390,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9ea6d40263cfa80cce7fbb0f5dbd8ae6" prot="public">
           <name>ER_UNKNOWN_REQUEST_TYPE</name>
+          <initializer>= 48</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2349,6 +2398,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea38d5a4bf290665417189dcb4f5de0e7d" prot="public">
           <name>ER_UNKNOWN_SCHEMA_OBJECT</name>
+          <initializer>= 49</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2356,6 +2406,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea00afe88d993452ecb57bd2f0be78606b" prot="public">
           <name>ER_CREATE_FUNCTION</name>
+          <initializer>= 50</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2363,6 +2414,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac84d49703711e511d91d49edd06154f5" prot="public">
           <name>ER_NO_SUCH_FUNCTION</name>
+          <initializer>= 51</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2370,6 +2422,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5f97d70b658bef8efd7d44e5336c8f50" prot="public">
           <name>ER_FUNCTION_EXISTS</name>
+          <initializer>= 52</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2377,6 +2430,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea853c238c6bfd81fbe0af889f7dd1fcf1" prot="public">
           <name>ER_BEFORE_REPLACE_RET</name>
+          <initializer>= 53</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2384,6 +2438,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceacfa83feb9c515e8970164977c227343a" prot="public">
           <name>ER_MULTISTATEMENT_TRANSACTION</name>
+          <initializer>= 54</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2391,6 +2446,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea82438877d2ad82fc2375b99682b9bdd0" prot="public">
           <name>ER_TRIGGER_EXISTS</name>
+          <initializer>= 55</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2398,6 +2454,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf95ab9c663e55898207b85fd61872d60" prot="public">
           <name>ER_USER_MAX</name>
+          <initializer>= 56</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2405,6 +2462,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae7e52ace70161560a252257435c081b2" prot="public">
           <name>ER_NO_SUCH_ENGINE</name>
+          <initializer>= 57</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2412,6 +2470,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea732ca2c4d1eca1da0301ab6786c5eda0" prot="public">
           <name>ER_RELOAD_CFG</name>
+          <initializer>= 58</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2419,6 +2478,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae5865d06fcf35d099f775a77911cb1da" prot="public">
           <name>ER_CFG</name>
+          <initializer>= 59</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2426,6 +2486,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf9db722401d00e11dc98f40ad99f89b3" prot="public">
           <name>ER_SAVEPOINT_EMPTY_TX</name>
+          <initializer>= 60</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2433,6 +2494,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea83c059fca85f85fa5a7e7702e7bf4eb3" prot="public">
           <name>ER_NO_SUCH_SAVEPOINT</name>
+          <initializer>= 61</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2440,6 +2502,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3709ada2cbee1d56a71de7e969663425" prot="public">
           <name>ER_UNKNOWN_REPLICA</name>
+          <initializer>= 62</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2447,6 +2510,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5da84c579837d52cd965317665839c55" prot="public">
           <name>ER_REPLICASET_UUID_MISMATCH</name>
+          <initializer>= 63</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2454,6 +2518,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea09b6b42b6817cd0bfdc6c889e440fa97" prot="public">
           <name>ER_INVALID_UUID</name>
+          <initializer>= 64</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2461,6 +2526,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceab518df09cd1999351eb89495f085dd17" prot="public">
           <name>ER_REPLICASET_UUID_IS_RO</name>
+          <initializer>= 65</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2468,6 +2534,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceab9962e533ce417e1612ec2860ae312c5" prot="public">
           <name>ER_INSTANCE_UUID_MISMATCH</name>
+          <initializer>= 66</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2475,6 +2542,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1d4143517a7caaa1336eca47fdaf2feb" prot="public">
           <name>ER_REPLICA_ID_IS_RESERVED</name>
+          <initializer>= 67</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2482,6 +2550,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea17074dca146150d7c41ec9fc955d6b67" prot="public">
           <name>ER_INVALID_ORDER</name>
+          <initializer>= 68</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2489,6 +2558,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3eb60fdf45a736a67bd1c4e379286ff9" prot="public">
           <name>ER_MISSING_REQUEST_FIELD</name>
+          <initializer>= 69</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2496,6 +2566,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea58d6ae05846e90c0adc6da50b022c2ce" prot="public">
           <name>ER_IDENTIFIER</name>
+          <initializer>= 70</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2503,6 +2574,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea920a6d9e8fd17a2f16df53b6ca4f622b" prot="public">
           <name>ER_DROP_FUNCTION</name>
+          <initializer>= 71</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2510,6 +2582,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf31717ec0b20bc4b4cdc28c704331da2" prot="public">
           <name>ER_ITERATOR_TYPE</name>
+          <initializer>= 72</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2517,6 +2590,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9616f6384423a5ede047dcb8a040cd01" prot="public">
           <name>ER_REPLICA_MAX</name>
+          <initializer>= 73</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2524,6 +2598,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0109fd41527db809bb9a42c317cd9152" prot="public">
           <name>ER_INVALID_XLOG</name>
+          <initializer>= 74</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2531,6 +2606,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7a1a0c5f9ac263c0e9ec0be60a5aaf3d" prot="public">
           <name>ER_INVALID_XLOG_NAME</name>
+          <initializer>= 75</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2538,6 +2614,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac33adee25aff444453494e2fd91c3fe2" prot="public">
           <name>ER_INVALID_XLOG_ORDER</name>
+          <initializer>= 76</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2545,6 +2622,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1a7fd03f9987c782bd6aed5716efccf3" prot="public">
           <name>ER_NO_CONNECTION</name>
+          <initializer>= 77</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2552,6 +2630,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac4c2c8fe486838aee543ee531df62f60" prot="public">
           <name>ER_TIMEOUT</name>
+          <initializer>= 78</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2559,6 +2638,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea374a879f5062c4e25b06129a2c9030b6" prot="public">
           <name>ER_ACTIVE_TRANSACTION</name>
+          <initializer>= 79</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2566,6 +2646,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea18d9dbea9dc137920bb2b57ec48b32d5" prot="public">
           <name>ER_CURSOR_NO_TRANSACTION</name>
+          <initializer>= 80</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2573,6 +2654,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea62de48ef00c6ebd24f8fd6ebe2bfc248" prot="public">
           <name>ER_CROSS_ENGINE_TRANSACTION</name>
+          <initializer>= 81</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2580,6 +2662,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6e40f96042f5e46b51024400d9e0e58c" prot="public">
           <name>ER_NO_SUCH_ROLE</name>
+          <initializer>= 82</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2587,6 +2670,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea4a11282742a05bf1e57529b2189f1eb4" prot="public">
           <name>ER_ROLE_EXISTS</name>
+          <initializer>= 83</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2594,6 +2678,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaea89ae2d186ceba5790899969558d940" prot="public">
           <name>ER_CREATE_ROLE</name>
+          <initializer>= 84</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2601,6 +2686,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea90f6c2fcdbb2b411bdba75e1645b0f15" prot="public">
           <name>ER_INDEX_EXISTS</name>
+          <initializer>= 85</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2608,6 +2694,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3208768c2f7f1a5e3be524c0f03798fe" prot="public">
           <name>ER_SESSION_CLOSED</name>
+          <initializer>= 86</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2615,6 +2702,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcead121cdef9ddd55d0e9b6eabf51bcee6d" prot="public">
           <name>ER_ROLE_LOOP</name>
+          <initializer>= 87</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2622,6 +2710,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea95ef86782b0864d455507d1c5f6627b9" prot="public">
           <name>ER_GRANT</name>
+          <initializer>= 88</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2629,6 +2718,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaedf54374271a016ac5ae60cc04d3d322" prot="public">
           <name>ER_PRIV_GRANTED</name>
+          <initializer>= 89</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2636,6 +2726,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcead95ff3ab7d7eafad1ecea0f6e999b213" prot="public">
           <name>ER_ROLE_GRANTED</name>
+          <initializer>= 90</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2643,6 +2734,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1afc5f6db602c0134e922bc5b84d93ba" prot="public">
           <name>ER_PRIV_NOT_GRANTED</name>
+          <initializer>= 91</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2650,6 +2742,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf79a84184dc400b57904b2a5b9223db6" prot="public">
           <name>ER_ROLE_NOT_GRANTED</name>
+          <initializer>= 92</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2657,6 +2750,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaca35862162578745def43259c8cea9a7" prot="public">
           <name>ER_MISSING_SNAPSHOT</name>
+          <initializer>= 93</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2664,6 +2758,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3c2df12a782304296d68a46829166bf0" prot="public">
           <name>ER_CANT_UPDATE_PRIMARY_KEY</name>
+          <initializer>= 94</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2671,6 +2766,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea29444ca5432c290c29bac32d8b140cbd" prot="public">
           <name>ER_UPDATE_INTEGER_OVERFLOW</name>
+          <initializer>= 95</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2678,6 +2774,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea03bc242c7dcdec40a3cc0d85e8bee350" prot="public">
           <name>ER_GUEST_USER_PASSWORD</name>
+          <initializer>= 96</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2685,6 +2782,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea42b4986788e6887f9120d6f1ee10db0a" prot="public">
           <name>ER_TRANSACTION_CONFLICT</name>
+          <initializer>= 97</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2692,6 +2790,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea413741374af7ce9c0cc24f26933f0742" prot="public">
           <name>ER_UNSUPPORTED_PRIV</name>
+          <initializer>= 98</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2699,6 +2798,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea149c88e1407b23310ef5fb72b7574480" prot="public">
           <name>ER_LOAD_FUNCTION</name>
+          <initializer>= 99</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2706,6 +2806,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea90078819e285c954279b732836440b52" prot="public">
           <name>ER_FUNCTION_LANGUAGE</name>
+          <initializer>= 100</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2713,6 +2814,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa3086ed7c8c02c4f049dac180b318a9d" prot="public">
           <name>ER_RTREE_RECT</name>
+          <initializer>= 101</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2720,6 +2822,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1857821a588fc39761c07c29481080cf" prot="public">
           <name>ER_PROC_C</name>
+          <initializer>= 102</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2727,6 +2830,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae6b2172e36fabaf0af5246bcc92de31c" prot="public">
           <name>ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE</name>
+          <initializer>= 103</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2734,6 +2838,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea45c1723eef247a5af5a119ab71c0043a" prot="public">
           <name>ER_PROTOCOL</name>
+          <initializer>= 104</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2741,6 +2846,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac5833a6888748c8ef30c2f9f8e889d83" prot="public">
           <name>ER_UPSERT_UNIQUE_SECONDARY_KEY</name>
+          <initializer>= 105</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2748,6 +2854,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9e9a7d636fba092f8a2fd1a35f12dd8a" prot="public">
           <name>ER_WRONG_INDEX_RECORD</name>
+          <initializer>= 106</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2755,6 +2862,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae32d3117d0d019bdd04b8b0a8633bd00" prot="public">
           <name>ER_WRONG_INDEX_PARTS</name>
+          <initializer>= 107</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2762,6 +2870,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaeea5ee0f4101c259b2d06b8ea781938a" prot="public">
           <name>ER_WRONG_INDEX_OPTIONS</name>
+          <initializer>= 108</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2769,6 +2878,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceab42a48e07d8d3d71adabbbff0839e816" prot="public">
           <name>ER_WRONG_SCHEMA_VERSION</name>
+          <initializer>= 109</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2776,6 +2886,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea4d931e88433922b8d810fd18615373c5" prot="public">
           <name>ER_MEMTX_MAX_TUPLE_SIZE</name>
+          <initializer>= 110</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2783,6 +2894,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa5f3eea8b4660fac9264383e38ce47f5" prot="public">
           <name>ER_WRONG_SPACE_OPTIONS</name>
+          <initializer>= 111</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2790,6 +2902,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac22fcd757993f94e299bc672bab878e6" prot="public">
           <name>ER_UNSUPPORTED_INDEX_FEATURE</name>
+          <initializer>= 112</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2797,6 +2910,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcead657d5d5ccc5636a5cd9180d2cea2386" prot="public">
           <name>ER_VIEW_IS_RO</name>
+          <initializer>= 113</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2804,6 +2918,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea87496538b30889fc137828b91acfe220" prot="public">
           <name>ER_NO_TRANSACTION</name>
+          <initializer>= 114</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2811,6 +2926,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1003a54aec6e4fe46c3aec03673a9e1c" prot="public">
           <name>ER_SYSTEM</name>
+          <initializer>= 115</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2818,6 +2934,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea21be1f7fc9bf0f08ff52161a579f8a26" prot="public">
           <name>ER_LOADING</name>
+          <initializer>= 116</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2825,6 +2942,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5bd74b209dcd29667742ce38fde44a51" prot="public">
           <name>ER_CONNECTION_TO_SELF</name>
+          <initializer>= 117</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2832,6 +2950,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0800b7500ad5ff81209464aef6a035da" prot="public">
           <name>ER_KEY_PART_IS_TOO_LONG</name>
+          <initializer>= 118</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2839,6 +2958,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3e0e230fb0cf8e09e4aac8c250ea952d" prot="public">
           <name>ER_COMPRESSION</name>
+          <initializer>= 119</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2846,6 +2966,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9c6cadbe15ab1c5261ac8b4a35a4714f" prot="public">
           <name>ER_CHECKPOINT_IN_PROGRESS</name>
+          <initializer>= 120</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2853,6 +2974,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6c6aedacd84bf451c16d9a89223ff6ef" prot="public">
           <name>ER_SUB_STMT_MAX</name>
+          <initializer>= 121</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2860,6 +2982,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac8b64f4feeb720545a2ae0afae8d0eb1" prot="public">
           <name>ER_COMMIT_IN_SUB_STMT</name>
+          <initializer>= 122</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2867,6 +2990,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceafbe5bf91dfdbff8eb580df5741b4660e" prot="public">
           <name>ER_ROLLBACK_IN_SUB_STMT</name>
+          <initializer>= 123</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2874,6 +2998,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6050e8f152b5c1752a30952ec4fa2119" prot="public">
           <name>ER_DECOMPRESSION</name>
+          <initializer>= 124</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2881,6 +3006,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf89045733c8c2ccec1333c58c9f8f5bb" prot="public">
           <name>ER_INVALID_XLOG_TYPE</name>
+          <initializer>= 125</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2888,6 +3014,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceab0cc876ce6716d6a1ee5ef09fa348628" prot="public">
           <name>ER_ALREADY_RUNNING</name>
+          <initializer>= 126</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2895,6 +3022,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaeb1eed1958e10749eaf05a3bf5bb5a27" prot="public">
           <name>ER_INDEX_FIELD_COUNT_LIMIT</name>
+          <initializer>= 127</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2902,6 +3030,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5ba2ad54d33036978a0f0e899bc3aca2" prot="public">
           <name>ER_LOCAL_INSTANCE_ID_IS_READ_ONLY</name>
+          <initializer>= 128</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2909,6 +3038,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea88b5084c59d879e5247301b97bbbcb7d" prot="public">
           <name>ER_BACKUP_IN_PROGRESS</name>
+          <initializer>= 129</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2916,6 +3046,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa099f2423ed8e5d216d85ce0d42df8fd" prot="public">
           <name>ER_READ_VIEW_ABORTED</name>
+          <initializer>= 130</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2923,6 +3054,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9f5a968d32b043fb3553ef8f78375ace" prot="public">
           <name>ER_INVALID_INDEX_FILE</name>
+          <initializer>= 131</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2930,6 +3062,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceabf81e6613688bb226ab3c4be2009cf44" prot="public">
           <name>ER_INVALID_RUN_FILE</name>
+          <initializer>= 132</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2937,6 +3070,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea26adba54df85dc51f772427e4a5e9f70" prot="public">
           <name>ER_INVALID_VYLOG_FILE</name>
+          <initializer>= 133</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2944,6 +3078,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6b35bdc81293123ff88b1f3919b9fb0f" prot="public">
           <name>ER_CASCADE_ROLLBACK</name>
+          <initializer>= 134</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2951,6 +3086,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5c7c4405e7cf553cfe1247fb12f74aba" prot="public">
           <name>ER_VY_QUOTA_TIMEOUT</name>
+          <initializer>= 135</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2958,6 +3094,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea573b21d06f15def6e9578d673963e404" prot="public">
           <name>ER_PARTIAL_KEY</name>
+          <initializer>= 136</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2965,6 +3102,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae46de37772287cd5faac752f62e0d018" prot="public">
           <name>ER_TRUNCATE_SYSTEM_SPACE</name>
+          <initializer>= 137</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2972,6 +3110,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7e11217b14f48b0fa0fd877f75de3567" prot="public">
           <name>ER_LOAD_MODULE</name>
+          <initializer>= 138</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2979,6 +3118,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac8bce7455d4683dcf5cfa44884dbc8d0" prot="public">
           <name>ER_VINYL_MAX_TUPLE_SIZE</name>
+          <initializer>= 139</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2986,6 +3126,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaac60db5ab42a7dd06fc16b0eccda0a1d" prot="public">
           <name>ER_WRONG_DD_VERSION</name>
+          <initializer>= 140</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -2993,6 +3134,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0c4689e8a3b3908a0de425d0290d2402" prot="public">
           <name>ER_WRONG_SPACE_FORMAT</name>
+          <initializer>= 141</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3000,6 +3142,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea64b424a8d9ccbe5701f9b112b1c2fcd8" prot="public">
           <name>ER_CREATE_SEQUENCE</name>
+          <initializer>= 142</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3007,6 +3150,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea41064625e521d4eeb5e3c87f7b8b4786" prot="public">
           <name>ER_ALTER_SEQUENCE</name>
+          <initializer>= 143</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3014,6 +3158,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae676020ca55b44176733f39a3d6a2da9" prot="public">
           <name>ER_DROP_SEQUENCE</name>
+          <initializer>= 144</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3021,6 +3166,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea08399b98cf8706937e03036ad8297537" prot="public">
           <name>ER_NO_SUCH_SEQUENCE</name>
+          <initializer>= 145</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3028,6 +3174,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea8fa905c01bb1f6a98ba8d98af23d055f" prot="public">
           <name>ER_SEQUENCE_EXISTS</name>
+          <initializer>= 146</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3035,6 +3182,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7043454cee73d828806ec129d172d5ef" prot="public">
           <name>ER_SEQUENCE_OVERFLOW</name>
+          <initializer>= 147</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3042,6 +3190,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea63ceb1cabf2541c8c83332c3eb8332ec" prot="public">
           <name>ER_NO_SUCH_INDEX_NAME</name>
+          <initializer>= 148</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3049,6 +3198,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6d8071cef36d2698647bdcd142f9adfb" prot="public">
           <name>ER_SPACE_FIELD_IS_DUPLICATE</name>
+          <initializer>= 149</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3056,6 +3206,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcead0ad593f996633d2411313d0493fdbe9" prot="public">
           <name>ER_CANT_CREATE_COLLATION</name>
+          <initializer>= 150</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3063,6 +3214,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf8ea54cba1179b19a3b75d47e2c7115c" prot="public">
           <name>ER_WRONG_COLLATION_OPTIONS</name>
+          <initializer>= 151</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3070,6 +3222,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea07c82a7355d5e4cf3153b0e689acee76" prot="public">
           <name>ER_NULLABLE_PRIMARY</name>
+          <initializer>= 152</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3077,6 +3230,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea05b34f26c19b8af31ccbd7f889b9b17c" prot="public">
           <name>ER_NO_SUCH_FIELD_NAME_IN_SPACE</name>
+          <initializer>= 153</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3084,6 +3238,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9f739a6e120a09b2b0046edf0cfb3ac0" prot="public">
           <name>ER_TRANSACTION_YIELD</name>
+          <initializer>= 154</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3091,6 +3246,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea735b42f2294e8467d623625b8c50b543" prot="public">
           <name>ER_NO_SUCH_GROUP</name>
+          <initializer>= 155</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3098,6 +3254,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcead0da7ffa82be066164170d022a689c35" prot="public">
           <name>ER_SQL_BIND_VALUE</name>
+          <initializer>= 156</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3105,6 +3262,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea522740aba34c6a88ec6aabc37113c85a" prot="public">
           <name>ER_SQL_BIND_TYPE</name>
+          <initializer>= 157</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3112,6 +3270,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7910a7a8bcfbfad15844c166c78e2c62" prot="public">
           <name>ER_SQL_BIND_PARAMETER_MAX</name>
+          <initializer>= 158</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3119,6 +3278,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea684064fad4ec40672e10787ed5f3a60c" prot="public">
           <name>ER_SQL_EXECUTE</name>
+          <initializer>= 159</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3126,6 +3286,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6e520286b8bd67c551bb87ba49222333" prot="public">
           <name>ER_UPDATE_DECIMAL_OVERFLOW</name>
+          <initializer>= 160</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3133,6 +3294,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea01b6603015f20a7e0184e4f7eadbd12f" prot="public">
           <name>ER_SQL_BIND_NOT_FOUND</name>
+          <initializer>= 161</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3140,6 +3302,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5f038a585fcae10709249377f8b7f4be" prot="public">
           <name>ER_ACTION_MISMATCH</name>
+          <initializer>= 162</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3147,6 +3310,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea747e12007154b4c180543d14ffc76b4a" prot="public">
           <name>ER_VIEW_MISSING_SQL</name>
+          <initializer>= 163</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3154,6 +3318,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaff4253eceede5aeca219590a908e3201" prot="public">
           <name>ER_FOREIGN_KEY_CONSTRAINT</name>
+          <initializer>= 164</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3161,6 +3326,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceab203312f057184ed72fcfd00aa8b4c23" prot="public">
           <name>ER_NO_SUCH_MODULE</name>
+          <initializer>= 165</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3168,6 +3334,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea46aa939f52b9939e2903d247873a7c23" prot="public">
           <name>ER_NO_SUCH_COLLATION</name>
+          <initializer>= 166</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3175,6 +3342,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea43238f1f0927ff19457893cb8e25200b" prot="public">
           <name>ER_CREATE_FK_CONSTRAINT</name>
+          <initializer>= 167</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3182,6 +3350,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea4c0535984616a0a31717d1a59c575a57" prot="public">
           <name>ER_DROP_FK_CONSTRAINT</name>
+          <initializer>= 168</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3189,6 +3358,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea374f1f90c5500e9efb0de348cbe3477c" prot="public">
           <name>ER_NO_SUCH_CONSTRAINT</name>
+          <initializer>= 169</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3196,6 +3366,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0cc32167aa4648da9c1d65ed4ccce952" prot="public">
           <name>ER_CONSTRAINT_EXISTS</name>
+          <initializer>= 170</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3203,6 +3374,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9ff993c472bde67c522284cfd419e927" prot="public">
           <name>ER_SQL_TYPE_MISMATCH</name>
+          <initializer>= 171</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3210,6 +3382,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea52739eb7c01f9e47142ceeb9c392ffec" prot="public">
           <name>ER_ROWID_OVERFLOW</name>
+          <initializer>= 172</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3217,6 +3390,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea065d1b212088d5882f17a65838d60db4" prot="public">
           <name>ER_DROP_COLLATION</name>
+          <initializer>= 173</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3224,6 +3398,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5443e14be7d0aaadddb7e9c4c34e095c" prot="public">
           <name>ER_ILLEGAL_COLLATION_MIX</name>
+          <initializer>= 174</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3231,6 +3406,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea65fd916e9afe0aa5ca741bd36a31f757" prot="public">
           <name>ER_SQL_NO_SUCH_PRAGMA</name>
+          <initializer>= 175</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3238,6 +3414,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3f3ade07101d53aeb191d9d66466594d" prot="public">
           <name>ER_SQL_CANT_RESOLVE_FIELD</name>
+          <initializer>= 176</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3245,6 +3422,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea8116ecbea1268d416f0d3cce564bf3b1" prot="public">
           <name>ER_INDEX_EXISTS_IN_SPACE</name>
+          <initializer>= 177</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3252,6 +3430,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaec57275bca21926754b51da182d9e2ac" prot="public">
           <name>ER_INCONSISTENT_TYPES</name>
+          <initializer>= 178</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3259,6 +3438,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea581ea5051161d97de42c5c5e92ff96be" prot="public">
           <name>ER_SQL_SYNTAX_WITH_POS</name>
+          <initializer>= 179</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3266,6 +3446,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf5f498039f3124061c9023208b4f7880" prot="public">
           <name>ER_SQL_STACK_OVERFLOW</name>
+          <initializer>= 180</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3273,6 +3454,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea579993d04e95dea402d489b1dbee248a" prot="public">
           <name>ER_SQL_SELECT_WILDCARD</name>
+          <initializer>= 181</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3280,6 +3462,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac0a020589f6684e82ea59e02795a36db" prot="public">
           <name>ER_SQL_STATEMENT_EMPTY</name>
+          <initializer>= 182</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3287,6 +3470,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceacc1b0e4897c68eeaca955565c82cac3c" prot="public">
           <name>ER_SQL_KEYWORD_IS_RESERVED</name>
+          <initializer>= 183</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3294,6 +3478,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea24b3cefe8cc47c465c70b73fe537a67e" prot="public">
           <name>ER_SQL_SYNTAX_NEAR_TOKEN</name>
+          <initializer>= 184</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3301,6 +3486,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea924c8cfee2407be1203faa40f7f1f238" prot="public">
           <name>ER_SQL_UNKNOWN_TOKEN</name>
+          <initializer>= 185</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3308,6 +3494,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcead09b554f77913f17410db8c3754b5217" prot="public">
           <name>ER_SQL_PARSER_GENERIC</name>
+          <initializer>= 186</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3315,6 +3502,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae76bd1d5930efea0ec8ca35c9839641b" prot="public">
           <name>ER_SQL_ANALYZE_ARGUMENT</name>
+          <initializer>= 187</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3322,6 +3510,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea23ac384e56a5e927abdd5804d128aad4" prot="public">
           <name>ER_SQL_COLUMN_COUNT_MAX</name>
+          <initializer>= 188</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3329,6 +3518,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6f1fd79526b209362ce013a22e2d723c" prot="public">
           <name>ER_HEX_LITERAL_MAX</name>
+          <initializer>= 189</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3336,6 +3526,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7d1bbe93ce888acabf83d9b346494141" prot="public">
           <name>ER_INT_LITERAL_MAX</name>
+          <initializer>= 190</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3343,6 +3534,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae652b715f3cc3aee94127b8440ac5d06" prot="public">
           <name>ER_SQL_PARSER_LIMIT</name>
+          <initializer>= 191</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3350,6 +3542,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea73ef90a6080802dd16b73b104b8cab1d" prot="public">
           <name>ER_INDEX_DEF_UNSUPPORTED</name>
+          <initializer>= 192</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3357,6 +3550,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae46d46eee3cef67dd4ab3c052d774235" prot="public">
           <name>ER_CK_DEF_UNSUPPORTED</name>
+          <initializer>= 193</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3364,6 +3558,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea76199c6573c0bfbbebf58606958d9df8" prot="public">
           <name>ER_MULTIKEY_INDEX_MISMATCH</name>
+          <initializer>= 194</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3371,6 +3566,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6a32a015ebf77e6b5bc8cf914e3aa197" prot="public">
           <name>ER_CREATE_CK_CONSTRAINT</name>
+          <initializer>= 195</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3378,6 +3574,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceabde3762d024c4e2c8527932aba98ad33" prot="public">
           <name>ER_CK_CONSTRAINT_FAILED</name>
+          <initializer>= 196</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3385,6 +3582,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1bcd10399a70ee0864efc46883908d7e" prot="public">
           <name>ER_SQL_COLUMN_COUNT</name>
+          <initializer>= 197</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3392,6 +3590,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae03a5b95cebb018fe49cf8de81dd2ff3" prot="public">
           <name>ER_FUNC_INDEX_FUNC</name>
+          <initializer>= 198</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3399,6 +3598,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea61e72ff2abb5899b80f74c445e983bfe" prot="public">
           <name>ER_FUNC_INDEX_FORMAT</name>
+          <initializer>= 199</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3406,6 +3606,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea57e2d341dfc9819ffb404fd4338e2e7e" prot="public">
           <name>ER_FUNC_INDEX_PARTS</name>
+          <initializer>= 200</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3413,6 +3614,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae955a3f97c67fe89485256a1ffeeea20" prot="public">
           <name>ER_NO_SUCH_FIELD_NAME</name>
+          <initializer>= 201</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3420,6 +3622,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceade200f155bb7cdce93323bb8d2ccd245" prot="public">
           <name>ER_FUNC_WRONG_ARG_COUNT</name>
+          <initializer>= 202</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3427,6 +3630,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea8abeba1f393b54ccfcbdfd5ba847ec55" prot="public">
           <name>ER_BOOTSTRAP_READONLY</name>
+          <initializer>= 203</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3434,6 +3638,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac718aad6ca5e03e6c01ac8d3e3e4b6c6" prot="public">
           <name>ER_SQL_FUNC_WRONG_RET_COUNT</name>
+          <initializer>= 204</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3441,6 +3646,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae793affb3fc872253f2ce9caa856fe9d" prot="public">
           <name>ER_FUNC_INVALID_RETURN_TYPE</name>
+          <initializer>= 205</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3448,6 +3654,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6beca8e8d99f1229f3f13a2fcb0f868a" prot="public">
           <name>ER_SQL_PARSER_GENERIC_WITH_POS</name>
+          <initializer>= 206</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3455,6 +3662,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6aebf59aac47776f688f300a9ee5ac83" prot="public">
           <name>ER_REPLICA_NOT_ANON</name>
+          <initializer>= 207</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3462,6 +3670,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaece5c9efd6f0416c846adcc564a78c06" prot="public">
           <name>ER_CANNOT_REGISTER</name>
+          <initializer>= 208</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3469,6 +3678,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea178c1a96f43cdf1b134824a9b83ad484" prot="public">
           <name>ER_SESSION_SETTING_INVALID_VALUE</name>
+          <initializer>= 209</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3476,6 +3686,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5bbe7569e7e8f657ee9c3b0c83aa154b" prot="public">
           <name>ER_SQL_PREPARE</name>
+          <initializer>= 210</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3483,6 +3694,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea475dc0a1c860f5cca6f4144300a9c67c" prot="public">
           <name>ER_WRONG_QUERY_ID</name>
+          <initializer>= 211</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3490,6 +3702,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea8fe70ca66da0a94c8ca25bcb8837778e" prot="public">
           <name>ER_SEQUENCE_NOT_STARTED</name>
+          <initializer>= 212</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3497,6 +3710,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea49148e98dd73539583105ea413d67b59" prot="public">
           <name>ER_NO_SUCH_SESSION_SETTING</name>
+          <initializer>= 213</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3504,6 +3718,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceab03bc47e7cc942821b5e175e693381e5" prot="public">
           <name>ER_UNCOMMITTED_FOREIGN_SYNC_TXNS</name>
+          <initializer>= 214</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3511,6 +3726,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5370f24400b8108535d9c889f94f0f1b" prot="public">
           <name>ER_SYNC_MASTER_MISMATCH</name>
+          <initializer>= 215</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3518,6 +3734,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea30ee0328a4ec96fd10878f814346baed" prot="public">
           <name>ER_SYNC_QUORUM_TIMEOUT</name>
+          <initializer>= 216</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3525,6 +3742,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf6df328177a7c0c4154b411c28a93e9f" prot="public">
           <name>ER_SYNC_ROLLBACK</name>
+          <initializer>= 217</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3532,6 +3750,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa73a3a41e4f8be85aca19e367f981bb2" prot="public">
           <name>ER_TUPLE_METADATA_IS_TOO_BIG</name>
+          <initializer>= 218</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3539,6 +3758,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceada3e3fa0dc070238a8bce57e22272db6" prot="public">
           <name>ER_XLOG_GAP</name>
+          <initializer>= 219</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3546,6 +3766,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf93980dd4fa15c85cab21bca3f7603b5" prot="public">
           <name>ER_TOO_EARLY_SUBSCRIBE</name>
+          <initializer>= 220</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3553,6 +3774,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea31e0b8cedaf1d6e82d152ad2be1c18ed" prot="public">
           <name>ER_SQL_CANT_ADD_AUTOINC</name>
+          <initializer>= 221</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3560,6 +3782,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5fd2167154958c73d208649094ca8012" prot="public">
           <name>ER_QUORUM_WAIT</name>
+          <initializer>= 222</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3567,6 +3790,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6f65989ef9d8425d729bf6aeb1b4375f" prot="public">
           <name>ER_INTERFERING_PROMOTE</name>
+          <initializer>= 223</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3574,6 +3798,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3c27d16822947799f5d149f43bf11567" prot="public">
           <name>ER_ELECTION_DISABLED</name>
+          <initializer>= 224</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3581,6 +3806,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0f2030060a4ddede6b6d5d8fab72cb3b" prot="public">
           <name>ER_TXN_ROLLBACK</name>
+          <initializer>= 225</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3588,6 +3814,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea287116ae41635c03ce0132b17e71ab4b" prot="public">
           <name>ER_NOT_LEADER</name>
+          <initializer>= 226</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3595,6 +3822,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcead4f4cfb57af0e9a24e8d8a41bb968a78" prot="public">
           <name>ER_SYNC_QUEUE_UNCLAIMED</name>
+          <initializer>= 227</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3602,6 +3830,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae089af5716644f49c17fceea0f44cfa7" prot="public">
           <name>ER_SYNC_QUEUE_FOREIGN</name>
+          <initializer>= 228</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3609,6 +3838,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea85a93f7750c3f4abb509112cc51e0895" prot="public">
           <name>ER_UNABLE_TO_PROCESS_IN_STREAM</name>
+          <initializer>= 229</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3616,6 +3846,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceab073831bb95e9eb308cce785c6862f70" prot="public">
           <name>ER_UNABLE_TO_PROCESS_OUT_OF_STREAM</name>
+          <initializer>= 230</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3623,6 +3854,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceafba3cfa2e3bc0e40f85797ebccd649f6" prot="public">
           <name>ER_TRANSACTION_TIMEOUT</name>
+          <initializer>= 231</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3630,6 +3862,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceacad5760f6062f78225d089ff8b2547a7" prot="public">
           <name>ER_ACTIVE_TIMER</name>
+          <initializer>= 232</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3637,6 +3870,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceafe0e2c075245303179aef51a774771fe" prot="public">
           <name>ER_TUPLE_FIELD_COUNT_LIMIT</name>
+          <initializer>= 233</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3644,6 +3878,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea8cc1c5078db7cbc94cd10036084e611e" prot="public">
           <name>ER_CREATE_CONSTRAINT</name>
+          <initializer>= 234</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3651,6 +3886,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaaba2ab2deb9153b34e10797141ac9c73" prot="public">
           <name>ER_FIELD_CONSTRAINT_FAILED</name>
+          <initializer>= 235</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3658,6 +3894,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceab46f001b620208758133167ff294ca2b" prot="public">
           <name>ER_TUPLE_CONSTRAINT_FAILED</name>
+          <initializer>= 236</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3665,6 +3902,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea17940b07aca950ebc0b34f45b7785205" prot="public">
           <name>ER_CREATE_FOREIGN_KEY</name>
+          <initializer>= 237</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3672,6 +3910,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea08db02725182ffae03e91ada4096bb40" prot="public">
           <name>ER_FOREIGN_KEY_INTEGRITY</name>
+          <initializer>= 238</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3679,6 +3918,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0c08eb283fc40c385236a5fef9415be0" prot="public">
           <name>ER_FIELD_FOREIGN_KEY_FAILED</name>
+          <initializer>= 239</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3686,6 +3926,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf1df2e650922fad4cb2fbb97ef8d5996" prot="public">
           <name>ER_COMPLEX_FOREIGN_KEY_FAILED</name>
+          <initializer>= 240</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3693,6 +3934,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0a6b5cbf11ca044b0d447586fa8604e4" prot="public">
           <name>ER_WRONG_SPACE_UPGRADE_OPTIONS</name>
+          <initializer>= 241</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3700,6 +3942,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea94537a522f8e390eb99b1b8ce9e1bd81" prot="public">
           <name>ER_NO_ELECTION_QUORUM</name>
+          <initializer>= 242</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3707,6 +3950,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea599a4e6fb86a67ce24a447a3bb22f4e8" prot="public">
           <name>ER_SSL</name>
+          <initializer>= 243</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3714,6 +3958,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea2e39dc86371cf258a9726e4157efea20" prot="public">
           <name>ER_SPLIT_BRAIN</name>
+          <initializer>= 244</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3721,6 +3966,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6f4b88c5868e6ccb1124d51de716cb31" prot="public">
           <name>ER_OLD_TERM</name>
+          <initializer>= 245</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3728,6 +3974,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9b5f44b8d3958e8334ae8c34b9d05598" prot="public">
           <name>ER_INTERFERING_ELECTIONS</name>
+          <initializer>= 246</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3735,6 +3982,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6afc6c264922421724fdb61d5844a35d" prot="public">
           <name>ER_ITERATOR_POSITION</name>
+          <initializer>= 247</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3742,6 +3990,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0028cf36d083fe2c4ca0060aaae04254" prot="public">
           <name>ER_DEFAULT_VALUE_TYPE</name>
+          <initializer>= 248</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3749,6 +3998,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea39764ddc62dfb5284c74f8dc6fa936c7" prot="public">
           <name>ER_UNKNOWN_AUTH_METHOD</name>
+          <initializer>= 249</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3756,6 +4006,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceab7e5aaead63564d8ea582774ca74d551" prot="public">
           <name>ER_INVALID_AUTH_DATA</name>
+          <initializer>= 250</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3763,6 +4014,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac486e673abf714f37a4e4b8a7fcbd591" prot="public">
           <name>ER_INVALID_AUTH_REQUEST</name>
+          <initializer>= 251</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3770,6 +4022,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaebc20044d48764367ec15e54161dd67c" prot="public">
           <name>ER_WEAK_PASSWORD</name>
+          <initializer>= 252</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3777,6 +4030,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcead92218f2962283ee58422b6a1ff1f236" prot="public">
           <name>ER_OLD_PASSWORD</name>
+          <initializer>= 253</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3784,6 +4038,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea28b46886771b03d96f60c7f7dd1116d1" prot="public">
           <name>ER_NO_SUCH_SESSION</name>
+          <initializer>= 254</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3791,6 +4046,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa26c4b9db0c28b7d483674781cdab096" prot="public">
           <name>ER_WRONG_SESSION_TYPE</name>
+          <initializer>= 255</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3798,6 +4054,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7ad556c2f7adfb0536fda04e3e8dd4c9" prot="public">
           <name>ER_PASSWORD_EXPIRED</name>
+          <initializer>= 256</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3805,6 +4062,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf8a8e24a9c3604258184e579acd96a04" prot="public">
           <name>ER_AUTH_DELAY</name>
+          <initializer>= 257</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3812,6 +4070,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea00c31e2286976c43dee405d67c578efe" prot="public">
           <name>ER_AUTH_REQUIRED</name>
+          <initializer>= 258</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3819,6 +4078,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea20bfc0ebaf39178141ab4addc752a405" prot="public">
           <name>ER_SQL_SEQ_SCAN</name>
+          <initializer>= 259</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3826,6 +4086,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea731bfc3c0f47a9d995a22a402f8cdc0f" prot="public">
           <name>ER_NO_SUCH_EVENT</name>
+          <initializer>= 260</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3833,6 +4094,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaae4b8d23aada5db104d86038f5b7d2ba" prot="public">
           <name>ER_BOOTSTRAP_NOT_UNANIMOUS</name>
+          <initializer>= 261</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3840,6 +4102,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea4ff4ad2803bfb403673099d627fee475" prot="public">
           <name>ER_CANT_CHECK_BOOTSTRAP_LEADER</name>
+          <initializer>= 262</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3847,6 +4110,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea608ad73b6ce310712bd9e0bc29f0eb4c" prot="public">
           <name>ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL</name>
+          <initializer>= 263</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3854,6 +4118,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaaf3680ad4d7c8dd8baf2343835f5a57c" prot="public">
           <name>ER_NIL_UUID</name>
+          <initializer>= 264</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3861,6 +4126,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea239a05101944323ad6fcaf7ca5b7fa5d" prot="public">
           <name>ER_WRONG_FUNCTION_OPTIONS</name>
+          <initializer>= 265</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3868,6 +4134,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcead171fb352f7ef7a0af8ca47239c19a54" prot="public">
           <name>ER_MISSING_SYSTEM_SPACES</name>
+          <initializer>= 266</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3875,6 +4142,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa5d4077b86e6854e0a9d2bcd6c5044c4" prot="public">
           <name>ER_CLUSTER_NAME_MISMATCH</name>
+          <initializer>= 267</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3882,6 +4150,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcead7297ca7c91b50ce3fcc8b3007a19ea4" prot="public">
           <name>ER_REPLICASET_NAME_MISMATCH</name>
+          <initializer>= 268</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3889,6 +4158,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac9569e7aade2c60f8b8ef8b4952c510d" prot="public">
           <name>ER_INSTANCE_NAME_DUPLICATE</name>
+          <initializer>= 269</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3896,6 +4166,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaae80c04fbbd48c9e8d93fe46e2cbd0ee" prot="public">
           <name>ER_INSTANCE_NAME_MISMATCH</name>
+          <initializer>= 270</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3903,6 +4174,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceac4c039ba89e54899024f9191785978d4" prot="public">
           <name>ER_SCHEMA_NEEDS_UPGRADE</name>
+          <initializer>= 271</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3910,6 +4182,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea38e91997aa6deab10e6f735b1b0ab7e2" prot="public">
           <name>ER_SCHEMA_UPGRADE_IN_PROGRESS</name>
+          <initializer>= 272</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3917,6 +4190,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea2d832ae90b7ba0407a80b186d19edc0e" prot="public">
           <name>ER_DEPRECATED</name>
+          <initializer>= 273</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3924,6 +4198,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea779d0a945aa3f0394a3e6a50b95da6c9" prot="public">
           <name>ER_UNCONFIGURED</name>
+          <initializer>= 274</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3931,6 +4206,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf77675547d9c9a76a2b584dda0e1417c" prot="public">
           <name>ER_CREATE_DEFAULT_FUNC</name>
+          <initializer>= 275</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3938,6 +4214,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceae486cedbba191958e3b58c46294d9d69" prot="public">
           <name>ER_DEFAULT_FUNC_FAILED</name>
+          <initializer>= 276</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3945,6 +4222,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea868f49acf1dd09596e8550c6f415c8d4" prot="public">
           <name>ER_INVALID_DEC</name>
+          <initializer>= 277</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3952,6 +4230,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea20fe453a264ae79a9919e91b8886c979" prot="public">
           <name>ER_IN_ANOTHER_PROMOTE</name>
+          <initializer>= 278</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3959,6 +4238,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0deee8c4296920e4b286fe6d49725e53" prot="public">
           <name>ER_SHUTDOWN</name>
+          <initializer>= 279</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -3966,6 +4246,7 @@
         </enumvalue>
         <enumvalue id="module_8h_1a029e9d16d637a97b37560ccf24c4adceada2d5d365cc46ae05e04145b31059cff" prot="public">
           <name>ER_FIELD_VALUE_OUT_OF_RANGE</name>
+          <initializer>= 280</initializer>
           <briefdescription>
           </briefdescription>
           <detaileddescription>
@@ -13263,7 +13544,7 @@ In case of an error set a diag and return NULL. </para>
 <codeline lineno="57" refid="module_8h_1ac5f2c7580fd5bf200c5027443420902f" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MAJOR<sp/>3</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="61" refid="module_8h_1a4ab155eaff0a115e522c1faae631196e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MINOR<sp/>1</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="65" refid="module_8h_1abd1dbec4fd6761084d3e0c05afe2b138" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_PATCH<sp/>0</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;3.1.0-entrypoint-142-g8aff2ede2&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;3.1.0-entrypoint-151-g3978d54bd&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="71"><highlight class="normal"></highlight></codeline>
 <codeline lineno="76" refid="module_8h_1adb6d1259777e8f56c6260be6faed183e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>SYSCONF_DIR<sp/>&quot;etc&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="78" refid="module_8h_1a643b6b7ac15874197420e2adbea8b6bb" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>INSTALL_PREFIX<sp/>&quot;/usr/local&quot;</highlight><highlight class="normal"></highlight></codeline>
@@ -14347,7 +14628,7 @@ In case of an error set a diag and return NULL. </para>
 <codeline lineno="3646"><highlight class="normal"><ref refid="module_8h_1a5e3652cae8b48c1ad174f0b06bbd06d0" kindref="member">API_EXPORT</ref><sp/><ref refid="structbox__decimal" kindref="compound">box_decimal_t</ref><sp/>*</highlight></codeline>
 <codeline lineno="3647" refid="module_8h_1a53f6c9c6047142026a2e3727e4e43a24" refkind="member"><highlight class="normal"><ref refid="module_8h_1a53f6c9c6047142026a2e3727e4e43a24" kindref="member">luaT_isdecimal</ref>(</highlight><highlight class="keyword">struct</highlight><highlight class="normal"><sp/>lua_State<sp/>*L,<sp/></highlight><highlight class="keywordtype">int</highlight><highlight class="normal"><sp/>index);</highlight></codeline>
 <codeline lineno="3648"><highlight class="normal"></highlight></codeline>
-<codeline lineno="3650" refid="module_8h_1a029e9d16d637a97b37560ccf24c4adce" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">enum</highlight><highlight class="normal"><sp/><ref refid="module_8h_1a029e9d16d637a97b37560ccf24c4adce" kindref="member">box_error_code</ref><sp/>{<sp/>ER_UNKNOWN,<sp/>ER_ILLEGAL_PARAMS,<sp/>ER_MEMORY_ISSUE,<sp/>ER_TUPLE_FOUND,<sp/>ER_TUPLE_NOT_FOUND,<sp/>ER_UNSUPPORTED,<sp/>ER_NONMASTER,<sp/>ER_READONLY,<sp/>ER_INJECTION,<sp/>ER_CREATE_SPACE,<sp/>ER_SPACE_EXISTS,<sp/>ER_DROP_SPACE,<sp/>ER_ALTER_SPACE,<sp/>ER_INDEX_TYPE,<sp/>ER_MODIFY_INDEX,<sp/>ER_LAST_DROP,<sp/>ER_TUPLE_FORMAT_LIMIT,<sp/>ER_DROP_PRIMARY_KEY,<sp/>ER_KEY_PART_TYPE,<sp/>ER_EXACT_MATCH,<sp/>ER_INVALID_MSGPACK,<sp/>ER_PROC_RET,<sp/>ER_TUPLE_NOT_ARRAY,<sp/>ER_FIELD_TYPE,<sp/>ER_INDEX_PART_TYPE_MISMATCH,<sp/>ER_UPDATE_SPLICE,<sp/>ER_UPDATE_ARG_TYPE,<sp/>ER_FORMAT_MISMATCH_INDEX_PART,<sp/>ER_UNKNOWN_UPDATE_OP,<sp/>ER_UPDATE_FIELD,<sp/>ER_FUNCTION_TX_ACTIVE,<sp/>ER_KEY_PART_COUNT,<sp/>ER_PROC_LUA,<sp/>ER_NO_SUCH_PROC,<sp/>ER_NO_SUCH_TRIGGER,<sp/>ER_NO_SUCH_INDEX_ID,<sp/>ER_NO_SUCH_SPACE,<sp/>ER_NO_SUCH_FIELD_NO,<sp/>ER_EXACT_FIELD_COUNT,<sp/>ER_FIELD_MISSING,<sp/>ER_WAL_IO,<sp/>ER_MORE_THAN_ONE_TUPLE,<sp/>ER_ACCESS_DENIED,<sp/>ER_CREATE_USER,<sp/>ER_DROP_USER,<sp/>ER_NO_SUCH_USER,<sp/>ER_USER_EXISTS,<sp/>ER_CREDS_MISMATCH,<sp/>ER_UNKNOWN_REQUEST_TYPE,<sp/>ER_UNKNOWN_SCHEMA_OBJECT,<sp/>ER_CREATE_FUNCTION,<sp/>ER_NO_SUCH_FUNCTION,<sp/>ER_FUNCTION_EXISTS,<sp/>ER_BEFORE_REPLACE_RET,<sp/>ER_MULTISTATEMENT_TRANSACTION,<sp/>ER_TRIGGER_EXISTS,<sp/>ER_USER_MAX,<sp/>ER_NO_SUCH_ENGINE,<sp/>ER_RELOAD_CFG,<sp/>ER_CFG,<sp/>ER_SAVEPOINT_EMPTY_TX,<sp/>ER_NO_SUCH_SAVEPOINT,<sp/>ER_UNKNOWN_REPLICA,<sp/>ER_REPLICASET_UUID_MISMATCH,<sp/>ER_INVALID_UUID,<sp/>ER_REPLICASET_UUID_IS_RO,<sp/>ER_INSTANCE_UUID_MISMATCH,<sp/>ER_REPLICA_ID_IS_RESERVED,<sp/>ER_INVALID_ORDER,<sp/>ER_MISSING_REQUEST_FIELD,<sp/>ER_IDENTIFIER,<sp/>ER_DROP_FUNCTION,<sp/>ER_ITERATOR_TYPE,<sp/>ER_REPLICA_MAX,<sp/>ER_INVALID_XLOG,<sp/>ER_INVALID_XLOG_NAME,<sp/>ER_INVALID_XLOG_ORDER,<sp/>ER_NO_CONNECTION,<sp/>ER_TIMEOUT,<sp/>ER_ACTIVE_TRANSACTION,<sp/>ER_CURSOR_NO_TRANSACTION,<sp/>ER_CROSS_ENGINE_TRANSACTION,<sp/>ER_NO_SUCH_ROLE,<sp/>ER_ROLE_EXISTS,<sp/>ER_CREATE_ROLE,<sp/>ER_INDEX_EXISTS,<sp/>ER_SESSION_CLOSED,<sp/>ER_ROLE_LOOP,<sp/>ER_GRANT,<sp/>ER_PRIV_GRANTED,<sp/>ER_ROLE_GRANTED,<sp/>ER_PRIV_NOT_GRANTED,<sp/>ER_ROLE_NOT_GRANTED,<sp/>ER_MISSING_SNAPSHOT,<sp/>ER_CANT_UPDATE_PRIMARY_KEY,<sp/>ER_UPDATE_INTEGER_OVERFLOW,<sp/>ER_GUEST_USER_PASSWORD,<sp/>ER_TRANSACTION_CONFLICT,<sp/>ER_UNSUPPORTED_PRIV,<sp/>ER_LOAD_FUNCTION,<sp/>ER_FUNCTION_LANGUAGE,<sp/>ER_RTREE_RECT,<sp/>ER_PROC_C,<sp/>ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE,<sp/>ER_PROTOCOL,<sp/>ER_UPSERT_UNIQUE_SECONDARY_KEY,<sp/>ER_WRONG_INDEX_RECORD,<sp/>ER_WRONG_INDEX_PARTS,<sp/>ER_WRONG_INDEX_OPTIONS,<sp/>ER_WRONG_SCHEMA_VERSION,<sp/>ER_MEMTX_MAX_TUPLE_SIZE,<sp/>ER_WRONG_SPACE_OPTIONS,<sp/>ER_UNSUPPORTED_INDEX_FEATURE,<sp/>ER_VIEW_IS_RO,<sp/>ER_NO_TRANSACTION,<sp/>ER_SYSTEM,<sp/>ER_LOADING,<sp/>ER_CONNECTION_TO_SELF,<sp/>ER_KEY_PART_IS_TOO_LONG,<sp/>ER_COMPRESSION,<sp/>ER_CHECKPOINT_IN_PROGRESS,<sp/>ER_SUB_STMT_MAX,<sp/>ER_COMMIT_IN_SUB_STMT,<sp/>ER_ROLLBACK_IN_SUB_STMT,<sp/>ER_DECOMPRESSION,<sp/>ER_INVALID_XLOG_TYPE,<sp/>ER_ALREADY_RUNNING,<sp/>ER_INDEX_FIELD_COUNT_LIMIT,<sp/>ER_LOCAL_INSTANCE_ID_IS_READ_ONLY,<sp/>ER_BACKUP_IN_PROGRESS,<sp/>ER_READ_VIEW_ABORTED,<sp/>ER_INVALID_INDEX_FILE,<sp/>ER_INVALID_RUN_FILE,<sp/>ER_INVALID_VYLOG_FILE,<sp/>ER_CASCADE_ROLLBACK,<sp/>ER_VY_QUOTA_TIMEOUT,<sp/>ER_PARTIAL_KEY,<sp/>ER_TRUNCATE_SYSTEM_SPACE,<sp/>ER_LOAD_MODULE,<sp/>ER_VINYL_MAX_TUPLE_SIZE,<sp/>ER_WRONG_DD_VERSION,<sp/>ER_WRONG_SPACE_FORMAT,<sp/>ER_CREATE_SEQUENCE,<sp/>ER_ALTER_SEQUENCE,<sp/>ER_DROP_SEQUENCE,<sp/>ER_NO_SUCH_SEQUENCE,<sp/>ER_SEQUENCE_EXISTS,<sp/>ER_SEQUENCE_OVERFLOW,<sp/>ER_NO_SUCH_INDEX_NAME,<sp/>ER_SPACE_FIELD_IS_DUPLICATE,<sp/>ER_CANT_CREATE_COLLATION,<sp/>ER_WRONG_COLLATION_OPTIONS,<sp/>ER_NULLABLE_PRIMARY,<sp/>ER_NO_SUCH_FIELD_NAME_IN_SPACE,<sp/>ER_TRANSACTION_YIELD,<sp/>ER_NO_SUCH_GROUP,<sp/>ER_SQL_BIND_VALUE,<sp/>ER_SQL_BIND_TYPE,<sp/>ER_SQL_BIND_PARAMETER_MAX,<sp/>ER_SQL_EXECUTE,<sp/>ER_UPDATE_DECIMAL_OVERFLOW,<sp/>ER_SQL_BIND_NOT_FOUND,<sp/>ER_ACTION_MISMATCH,<sp/>ER_VIEW_MISSING_SQL,<sp/>ER_FOREIGN_KEY_CONSTRAINT,<sp/>ER_NO_SUCH_MODULE,<sp/>ER_NO_SUCH_COLLATION,<sp/>ER_CREATE_FK_CONSTRAINT,<sp/>ER_DROP_FK_CONSTRAINT,<sp/>ER_NO_SUCH_CONSTRAINT,<sp/>ER_CONSTRAINT_EXISTS,<sp/>ER_SQL_TYPE_MISMATCH,<sp/>ER_ROWID_OVERFLOW,<sp/>ER_DROP_COLLATION,<sp/>ER_ILLEGAL_COLLATION_MIX,<sp/>ER_SQL_NO_SUCH_PRAGMA,<sp/>ER_SQL_CANT_RESOLVE_FIELD,<sp/>ER_INDEX_EXISTS_IN_SPACE,<sp/>ER_INCONSISTENT_TYPES,<sp/>ER_SQL_SYNTAX_WITH_POS,<sp/>ER_SQL_STACK_OVERFLOW,<sp/>ER_SQL_SELECT_WILDCARD,<sp/>ER_SQL_STATEMENT_EMPTY,<sp/>ER_SQL_KEYWORD_IS_RESERVED,<sp/>ER_SQL_SYNTAX_NEAR_TOKEN,<sp/>ER_SQL_UNKNOWN_TOKEN,<sp/>ER_SQL_PARSER_GENERIC,<sp/>ER_SQL_ANALYZE_ARGUMENT,<sp/>ER_SQL_COLUMN_COUNT_MAX,<sp/>ER_HEX_LITERAL_MAX,<sp/>ER_INT_LITERAL_MAX,<sp/>ER_SQL_PARSER_LIMIT,<sp/>ER_INDEX_DEF_UNSUPPORTED,<sp/>ER_CK_DEF_UNSUPPORTED,<sp/>ER_MULTIKEY_INDEX_MISMATCH,<sp/>ER_CREATE_CK_CONSTRAINT,<sp/>ER_CK_CONSTRAINT_FAILED,<sp/>ER_SQL_COLUMN_COUNT,<sp/>ER_FUNC_INDEX_FUNC,<sp/>ER_FUNC_INDEX_FORMAT,<sp/>ER_FUNC_INDEX_PARTS,<sp/>ER_NO_SUCH_FIELD_NAME,<sp/>ER_FUNC_WRONG_ARG_COUNT,<sp/>ER_BOOTSTRAP_READONLY,<sp/>ER_SQL_FUNC_WRONG_RET_COUNT,<sp/>ER_FUNC_INVALID_RETURN_TYPE,<sp/>ER_SQL_PARSER_GENERIC_WITH_POS,<sp/>ER_REPLICA_NOT_ANON,<sp/>ER_CANNOT_REGISTER,<sp/>ER_SESSION_SETTING_INVALID_VALUE,<sp/>ER_SQL_PREPARE,<sp/>ER_WRONG_QUERY_ID,<sp/>ER_SEQUENCE_NOT_STARTED,<sp/>ER_NO_SUCH_SESSION_SETTING,<sp/>ER_UNCOMMITTED_FOREIGN_SYNC_TXNS,<sp/>ER_SYNC_MASTER_MISMATCH,<sp/>ER_SYNC_QUORUM_TIMEOUT,<sp/>ER_SYNC_ROLLBACK,<sp/>ER_TUPLE_METADATA_IS_TOO_BIG,<sp/>ER_XLOG_GAP,<sp/>ER_TOO_EARLY_SUBSCRIBE,<sp/>ER_SQL_CANT_ADD_AUTOINC,<sp/>ER_QUORUM_WAIT,<sp/>ER_INTERFERING_PROMOTE,<sp/>ER_ELECTION_DISABLED,<sp/>ER_TXN_ROLLBACK,<sp/>ER_NOT_LEADER,<sp/>ER_SYNC_QUEUE_UNCLAIMED,<sp/>ER_SYNC_QUEUE_FOREIGN,<sp/>ER_UNABLE_TO_PROCESS_IN_STREAM,<sp/>ER_UNABLE_TO_PROCESS_OUT_OF_STREAM,<sp/>ER_TRANSACTION_TIMEOUT,<sp/>ER_ACTIVE_TIMER,<sp/>ER_TUPLE_FIELD_COUNT_LIMIT,<sp/>ER_CREATE_CONSTRAINT,<sp/>ER_FIELD_CONSTRAINT_FAILED,<sp/>ER_TUPLE_CONSTRAINT_FAILED,<sp/>ER_CREATE_FOREIGN_KEY,<sp/>ER_FOREIGN_KEY_INTEGRITY,<sp/>ER_FIELD_FOREIGN_KEY_FAILED,<sp/>ER_COMPLEX_FOREIGN_KEY_FAILED,<sp/>ER_WRONG_SPACE_UPGRADE_OPTIONS,<sp/>ER_NO_ELECTION_QUORUM,<sp/>ER_SSL,<sp/>ER_SPLIT_BRAIN,<sp/>ER_OLD_TERM,<sp/>ER_INTERFERING_ELECTIONS,<sp/>ER_ITERATOR_POSITION,<sp/>ER_DEFAULT_VALUE_TYPE,<sp/>ER_UNKNOWN_AUTH_METHOD,<sp/>ER_INVALID_AUTH_DATA,<sp/>ER_INVALID_AUTH_REQUEST,<sp/>ER_WEAK_PASSWORD,<sp/>ER_OLD_PASSWORD,<sp/>ER_NO_SUCH_SESSION,<sp/>ER_WRONG_SESSION_TYPE,<sp/>ER_PASSWORD_EXPIRED,<sp/>ER_AUTH_DELAY,<sp/>ER_AUTH_REQUIRED,<sp/>ER_SQL_SEQ_SCAN,<sp/>ER_NO_SUCH_EVENT,<sp/>ER_BOOTSTRAP_NOT_UNANIMOUS,<sp/>ER_CANT_CHECK_BOOTSTRAP_LEADER,<sp/>ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL,<sp/>ER_NIL_UUID,<sp/>ER_WRONG_FUNCTION_OPTIONS,<sp/>ER_MISSING_SYSTEM_SPACES,<sp/>ER_CLUSTER_NAME_MISMATCH,<sp/>ER_REPLICASET_NAME_MISMATCH,<sp/>ER_INSTANCE_NAME_DUPLICATE,<sp/>ER_INSTANCE_NAME_MISMATCH,<sp/>ER_SCHEMA_NEEDS_UPGRADE,<sp/>ER_SCHEMA_UPGRADE_IN_PROGRESS,<sp/>ER_DEPRECATED,<sp/>ER_UNCONFIGURED,<sp/>ER_CREATE_DEFAULT_FUNC,<sp/>ER_DEFAULT_FUNC_FAILED,<sp/>ER_INVALID_DEC,<sp/>ER_IN_ANOTHER_PROMOTE,<sp/>ER_SHUTDOWN,<sp/>ER_FIELD_VALUE_OUT_OF_RANGE,<sp/>box_error_code_MAX<sp/>};</highlight></codeline>
+<codeline lineno="3650" refid="module_8h_1a029e9d16d637a97b37560ccf24c4adce" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">enum</highlight><highlight class="normal"><sp/><ref refid="module_8h_1a029e9d16d637a97b37560ccf24c4adce" kindref="member">box_error_code</ref><sp/>{<sp/>ER_UNKNOWN<sp/>=<sp/>0,<sp/>ER_ILLEGAL_PARAMS<sp/>=<sp/>1,<sp/>ER_MEMORY_ISSUE<sp/>=<sp/>2,<sp/>ER_TUPLE_FOUND<sp/>=<sp/>3,<sp/>ER_TUPLE_NOT_FOUND<sp/>=<sp/>4,<sp/>ER_UNSUPPORTED<sp/>=<sp/>5,<sp/>ER_NONMASTER<sp/>=<sp/>6,<sp/>ER_READONLY<sp/>=<sp/>7,<sp/>ER_INJECTION<sp/>=<sp/>8,<sp/>ER_CREATE_SPACE<sp/>=<sp/>9,<sp/>ER_SPACE_EXISTS<sp/>=<sp/>10,<sp/>ER_DROP_SPACE<sp/>=<sp/>11,<sp/>ER_ALTER_SPACE<sp/>=<sp/>12,<sp/>ER_INDEX_TYPE<sp/>=<sp/>13,<sp/>ER_MODIFY_INDEX<sp/>=<sp/>14,<sp/>ER_LAST_DROP<sp/>=<sp/>15,<sp/>ER_TUPLE_FORMAT_LIMIT<sp/>=<sp/>16,<sp/>ER_DROP_PRIMARY_KEY<sp/>=<sp/>17,<sp/>ER_KEY_PART_TYPE<sp/>=<sp/>18,<sp/>ER_EXACT_MATCH<sp/>=<sp/>19,<sp/>ER_INVALID_MSGPACK<sp/>=<sp/>20,<sp/>ER_PROC_RET<sp/>=<sp/>21,<sp/>ER_TUPLE_NOT_ARRAY<sp/>=<sp/>22,<sp/>ER_FIELD_TYPE<sp/>=<sp/>23,<sp/>ER_INDEX_PART_TYPE_MISMATCH<sp/>=<sp/>24,<sp/>ER_UPDATE_SPLICE<sp/>=<sp/>25,<sp/>ER_UPDATE_ARG_TYPE<sp/>=<sp/>26,<sp/>ER_FORMAT_MISMATCH_INDEX_PART<sp/>=<sp/>27,<sp/>ER_UNKNOWN_UPDATE_OP<sp/>=<sp/>28,<sp/>ER_UPDATE_FIELD<sp/>=<sp/>29,<sp/>ER_FUNCTION_TX_ACTIVE<sp/>=<sp/>30,<sp/>ER_KEY_PART_COUNT<sp/>=<sp/>31,<sp/>ER_PROC_LUA<sp/>=<sp/>32,<sp/>ER_NO_SUCH_PROC<sp/>=<sp/>33,<sp/>ER_NO_SUCH_TRIGGER<sp/>=<sp/>34,<sp/>ER_NO_SUCH_INDEX_ID<sp/>=<sp/>35,<sp/>ER_NO_SUCH_SPACE<sp/>=<sp/>36,<sp/>ER_NO_SUCH_FIELD_NO<sp/>=<sp/>37,<sp/>ER_EXACT_FIELD_COUNT<sp/>=<sp/>38,<sp/>ER_FIELD_MISSING<sp/>=<sp/>39,<sp/>ER_WAL_IO<sp/>=<sp/>40,<sp/>ER_MORE_THAN_ONE_TUPLE<sp/>=<sp/>41,<sp/>ER_ACCESS_DENIED<sp/>=<sp/>42,<sp/>ER_CREATE_USER<sp/>=<sp/>43,<sp/>ER_DROP_USER<sp/>=<sp/>44,<sp/>ER_NO_SUCH_USER<sp/>=<sp/>45,<sp/>ER_USER_EXISTS<sp/>=<sp/>46,<sp/>ER_CREDS_MISMATCH<sp/>=<sp/>47,<sp/>ER_UNKNOWN_REQUEST_TYPE<sp/>=<sp/>48,<sp/>ER_UNKNOWN_SCHEMA_OBJECT<sp/>=<sp/>49,<sp/>ER_CREATE_FUNCTION<sp/>=<sp/>50,<sp/>ER_NO_SUCH_FUNCTION<sp/>=<sp/>51,<sp/>ER_FUNCTION_EXISTS<sp/>=<sp/>52,<sp/>ER_BEFORE_REPLACE_RET<sp/>=<sp/>53,<sp/>ER_MULTISTATEMENT_TRANSACTION<sp/>=<sp/>54,<sp/>ER_TRIGGER_EXISTS<sp/>=<sp/>55,<sp/>ER_USER_MAX<sp/>=<sp/>56,<sp/>ER_NO_SUCH_ENGINE<sp/>=<sp/>57,<sp/>ER_RELOAD_CFG<sp/>=<sp/>58,<sp/>ER_CFG<sp/>=<sp/>59,<sp/>ER_SAVEPOINT_EMPTY_TX<sp/>=<sp/>60,<sp/>ER_NO_SUCH_SAVEPOINT<sp/>=<sp/>61,<sp/>ER_UNKNOWN_REPLICA<sp/>=<sp/>62,<sp/>ER_REPLICASET_UUID_MISMATCH<sp/>=<sp/>63,<sp/>ER_INVALID_UUID<sp/>=<sp/>64,<sp/>ER_REPLICASET_UUID_IS_RO<sp/>=<sp/>65,<sp/>ER_INSTANCE_UUID_MISMATCH<sp/>=<sp/>66,<sp/>ER_REPLICA_ID_IS_RESERVED<sp/>=<sp/>67,<sp/>ER_INVALID_ORDER<sp/>=<sp/>68,<sp/>ER_MISSING_REQUEST_FIELD<sp/>=<sp/>69,<sp/>ER_IDENTIFIER<sp/>=<sp/>70,<sp/>ER_DROP_FUNCTION<sp/>=<sp/>71,<sp/>ER_ITERATOR_TYPE<sp/>=<sp/>72,<sp/>ER_REPLICA_MAX<sp/>=<sp/>73,<sp/>ER_INVALID_XLOG<sp/>=<sp/>74,<sp/>ER_INVALID_XLOG_NAME<sp/>=<sp/>75,<sp/>ER_INVALID_XLOG_ORDER<sp/>=<sp/>76,<sp/>ER_NO_CONNECTION<sp/>=<sp/>77,<sp/>ER_TIMEOUT<sp/>=<sp/>78,<sp/>ER_ACTIVE_TRANSACTION<sp/>=<sp/>79,<sp/>ER_CURSOR_NO_TRANSACTION<sp/>=<sp/>80,<sp/>ER_CROSS_ENGINE_TRANSACTION<sp/>=<sp/>81,<sp/>ER_NO_SUCH_ROLE<sp/>=<sp/>82,<sp/>ER_ROLE_EXISTS<sp/>=<sp/>83,<sp/>ER_CREATE_ROLE<sp/>=<sp/>84,<sp/>ER_INDEX_EXISTS<sp/>=<sp/>85,<sp/>ER_SESSION_CLOSED<sp/>=<sp/>86,<sp/>ER_ROLE_LOOP<sp/>=<sp/>87,<sp/>ER_GRANT<sp/>=<sp/>88,<sp/>ER_PRIV_GRANTED<sp/>=<sp/>89,<sp/>ER_ROLE_GRANTED<sp/>=<sp/>90,<sp/>ER_PRIV_NOT_GRANTED<sp/>=<sp/>91,<sp/>ER_ROLE_NOT_GRANTED<sp/>=<sp/>92,<sp/>ER_MISSING_SNAPSHOT<sp/>=<sp/>93,<sp/>ER_CANT_UPDATE_PRIMARY_KEY<sp/>=<sp/>94,<sp/>ER_UPDATE_INTEGER_OVERFLOW<sp/>=<sp/>95,<sp/>ER_GUEST_USER_PASSWORD<sp/>=<sp/>96,<sp/>ER_TRANSACTION_CONFLICT<sp/>=<sp/>97,<sp/>ER_UNSUPPORTED_PRIV<sp/>=<sp/>98,<sp/>ER_LOAD_FUNCTION<sp/>=<sp/>99,<sp/>ER_FUNCTION_LANGUAGE<sp/>=<sp/>100,<sp/>ER_RTREE_RECT<sp/>=<sp/>101,<sp/>ER_PROC_C<sp/>=<sp/>102,<sp/>ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE<sp/>=<sp/>103,<sp/>ER_PROTOCOL<sp/>=<sp/>104,<sp/>ER_UPSERT_UNIQUE_SECONDARY_KEY<sp/>=<sp/>105,<sp/>ER_WRONG_INDEX_RECORD<sp/>=<sp/>106,<sp/>ER_WRONG_INDEX_PARTS<sp/>=<sp/>107,<sp/>ER_WRONG_INDEX_OPTIONS<sp/>=<sp/>108,<sp/>ER_WRONG_SCHEMA_VERSION<sp/>=<sp/>109,<sp/>ER_MEMTX_MAX_TUPLE_SIZE<sp/>=<sp/>110,<sp/>ER_WRONG_SPACE_OPTIONS<sp/>=<sp/>111,<sp/>ER_UNSUPPORTED_INDEX_FEATURE<sp/>=<sp/>112,<sp/>ER_VIEW_IS_RO<sp/>=<sp/>113,<sp/>ER_NO_TRANSACTION<sp/>=<sp/>114,<sp/>ER_SYSTEM<sp/>=<sp/>115,<sp/>ER_LOADING<sp/>=<sp/>116,<sp/>ER_CONNECTION_TO_SELF<sp/>=<sp/>117,<sp/>ER_KEY_PART_IS_TOO_LONG<sp/>=<sp/>118,<sp/>ER_COMPRESSION<sp/>=<sp/>119,<sp/>ER_CHECKPOINT_IN_PROGRESS<sp/>=<sp/>120,<sp/>ER_SUB_STMT_MAX<sp/>=<sp/>121,<sp/>ER_COMMIT_IN_SUB_STMT<sp/>=<sp/>122,<sp/>ER_ROLLBACK_IN_SUB_STMT<sp/>=<sp/>123,<sp/>ER_DECOMPRESSION<sp/>=<sp/>124,<sp/>ER_INVALID_XLOG_TYPE<sp/>=<sp/>125,<sp/>ER_ALREADY_RUNNING<sp/>=<sp/>126,<sp/>ER_INDEX_FIELD_COUNT_LIMIT<sp/>=<sp/>127,<sp/>ER_LOCAL_INSTANCE_ID_IS_READ_ONLY<sp/>=<sp/>128,<sp/>ER_BACKUP_IN_PROGRESS<sp/>=<sp/>129,<sp/>ER_READ_VIEW_ABORTED<sp/>=<sp/>130,<sp/>ER_INVALID_INDEX_FILE<sp/>=<sp/>131,<sp/>ER_INVALID_RUN_FILE<sp/>=<sp/>132,<sp/>ER_INVALID_VYLOG_FILE<sp/>=<sp/>133,<sp/>ER_CASCADE_ROLLBACK<sp/>=<sp/>134,<sp/>ER_VY_QUOTA_TIMEOUT<sp/>=<sp/>135,<sp/>ER_PARTIAL_KEY<sp/>=<sp/>136,<sp/>ER_TRUNCATE_SYSTEM_SPACE<sp/>=<sp/>137,<sp/>ER_LOAD_MODULE<sp/>=<sp/>138,<sp/>ER_VINYL_MAX_TUPLE_SIZE<sp/>=<sp/>139,<sp/>ER_WRONG_DD_VERSION<sp/>=<sp/>140,<sp/>ER_WRONG_SPACE_FORMAT<sp/>=<sp/>141,<sp/>ER_CREATE_SEQUENCE<sp/>=<sp/>142,<sp/>ER_ALTER_SEQUENCE<sp/>=<sp/>143,<sp/>ER_DROP_SEQUENCE<sp/>=<sp/>144,<sp/>ER_NO_SUCH_SEQUENCE<sp/>=<sp/>145,<sp/>ER_SEQUENCE_EXISTS<sp/>=<sp/>146,<sp/>ER_SEQUENCE_OVERFLOW<sp/>=<sp/>147,<sp/>ER_NO_SUCH_INDEX_NAME<sp/>=<sp/>148,<sp/>ER_SPACE_FIELD_IS_DUPLICATE<sp/>=<sp/>149,<sp/>ER_CANT_CREATE_COLLATION<sp/>=<sp/>150,<sp/>ER_WRONG_COLLATION_OPTIONS<sp/>=<sp/>151,<sp/>ER_NULLABLE_PRIMARY<sp/>=<sp/>152,<sp/>ER_NO_SUCH_FIELD_NAME_IN_SPACE<sp/>=<sp/>153,<sp/>ER_TRANSACTION_YIELD<sp/>=<sp/>154,<sp/>ER_NO_SUCH_GROUP<sp/>=<sp/>155,<sp/>ER_SQL_BIND_VALUE<sp/>=<sp/>156,<sp/>ER_SQL_BIND_TYPE<sp/>=<sp/>157,<sp/>ER_SQL_BIND_PARAMETER_MAX<sp/>=<sp/>158,<sp/>ER_SQL_EXECUTE<sp/>=<sp/>159,<sp/>ER_UPDATE_DECIMAL_OVERFLOW<sp/>=<sp/>160,<sp/>ER_SQL_BIND_NOT_FOUND<sp/>=<sp/>161,<sp/>ER_ACTION_MISMATCH<sp/>=<sp/>162,<sp/>ER_VIEW_MISSING_SQL<sp/>=<sp/>163,<sp/>ER_FOREIGN_KEY_CONSTRAINT<sp/>=<sp/>164,<sp/>ER_NO_SUCH_MODULE<sp/>=<sp/>165,<sp/>ER_NO_SUCH_COLLATION<sp/>=<sp/>166,<sp/>ER_CREATE_FK_CONSTRAINT<sp/>=<sp/>167,<sp/>ER_DROP_FK_CONSTRAINT<sp/>=<sp/>168,<sp/>ER_NO_SUCH_CONSTRAINT<sp/>=<sp/>169,<sp/>ER_CONSTRAINT_EXISTS<sp/>=<sp/>170,<sp/>ER_SQL_TYPE_MISMATCH<sp/>=<sp/>171,<sp/>ER_ROWID_OVERFLOW<sp/>=<sp/>172,<sp/>ER_DROP_COLLATION<sp/>=<sp/>173,<sp/>ER_ILLEGAL_COLLATION_MIX<sp/>=<sp/>174,<sp/>ER_SQL_NO_SUCH_PRAGMA<sp/>=<sp/>175,<sp/>ER_SQL_CANT_RESOLVE_FIELD<sp/>=<sp/>176,<sp/>ER_INDEX_EXISTS_IN_SPACE<sp/>=<sp/>177,<sp/>ER_INCONSISTENT_TYPES<sp/>=<sp/>178,<sp/>ER_SQL_SYNTAX_WITH_POS<sp/>=<sp/>179,<sp/>ER_SQL_STACK_OVERFLOW<sp/>=<sp/>180,<sp/>ER_SQL_SELECT_WILDCARD<sp/>=<sp/>181,<sp/>ER_SQL_STATEMENT_EMPTY<sp/>=<sp/>182,<sp/>ER_SQL_KEYWORD_IS_RESERVED<sp/>=<sp/>183,<sp/>ER_SQL_SYNTAX_NEAR_TOKEN<sp/>=<sp/>184,<sp/>ER_SQL_UNKNOWN_TOKEN<sp/>=<sp/>185,<sp/>ER_SQL_PARSER_GENERIC<sp/>=<sp/>186,<sp/>ER_SQL_ANALYZE_ARGUMENT<sp/>=<sp/>187,<sp/>ER_SQL_COLUMN_COUNT_MAX<sp/>=<sp/>188,<sp/>ER_HEX_LITERAL_MAX<sp/>=<sp/>189,<sp/>ER_INT_LITERAL_MAX<sp/>=<sp/>190,<sp/>ER_SQL_PARSER_LIMIT<sp/>=<sp/>191,<sp/>ER_INDEX_DEF_UNSUPPORTED<sp/>=<sp/>192,<sp/>ER_CK_DEF_UNSUPPORTED<sp/>=<sp/>193,<sp/>ER_MULTIKEY_INDEX_MISMATCH<sp/>=<sp/>194,<sp/>ER_CREATE_CK_CONSTRAINT<sp/>=<sp/>195,<sp/>ER_CK_CONSTRAINT_FAILED<sp/>=<sp/>196,<sp/>ER_SQL_COLUMN_COUNT<sp/>=<sp/>197,<sp/>ER_FUNC_INDEX_FUNC<sp/>=<sp/>198,<sp/>ER_FUNC_INDEX_FORMAT<sp/>=<sp/>199,<sp/>ER_FUNC_INDEX_PARTS<sp/>=<sp/>200,<sp/>ER_NO_SUCH_FIELD_NAME<sp/>=<sp/>201,<sp/>ER_FUNC_WRONG_ARG_COUNT<sp/>=<sp/>202,<sp/>ER_BOOTSTRAP_READONLY<sp/>=<sp/>203,<sp/>ER_SQL_FUNC_WRONG_RET_COUNT<sp/>=<sp/>204,<sp/>ER_FUNC_INVALID_RETURN_TYPE<sp/>=<sp/>205,<sp/>ER_SQL_PARSER_GENERIC_WITH_POS<sp/>=<sp/>206,<sp/>ER_REPLICA_NOT_ANON<sp/>=<sp/>207,<sp/>ER_CANNOT_REGISTER<sp/>=<sp/>208,<sp/>ER_SESSION_SETTING_INVALID_VALUE<sp/>=<sp/>209,<sp/>ER_SQL_PREPARE<sp/>=<sp/>210,<sp/>ER_WRONG_QUERY_ID<sp/>=<sp/>211,<sp/>ER_SEQUENCE_NOT_STARTED<sp/>=<sp/>212,<sp/>ER_NO_SUCH_SESSION_SETTING<sp/>=<sp/>213,<sp/>ER_UNCOMMITTED_FOREIGN_SYNC_TXNS<sp/>=<sp/>214,<sp/>ER_SYNC_MASTER_MISMATCH<sp/>=<sp/>215,<sp/>ER_SYNC_QUORUM_TIMEOUT<sp/>=<sp/>216,<sp/>ER_SYNC_ROLLBACK<sp/>=<sp/>217,<sp/>ER_TUPLE_METADATA_IS_TOO_BIG<sp/>=<sp/>218,<sp/>ER_XLOG_GAP<sp/>=<sp/>219,<sp/>ER_TOO_EARLY_SUBSCRIBE<sp/>=<sp/>220,<sp/>ER_SQL_CANT_ADD_AUTOINC<sp/>=<sp/>221,<sp/>ER_QUORUM_WAIT<sp/>=<sp/>222,<sp/>ER_INTERFERING_PROMOTE<sp/>=<sp/>223,<sp/>ER_ELECTION_DISABLED<sp/>=<sp/>224,<sp/>ER_TXN_ROLLBACK<sp/>=<sp/>225,<sp/>ER_NOT_LEADER<sp/>=<sp/>226,<sp/>ER_SYNC_QUEUE_UNCLAIMED<sp/>=<sp/>227,<sp/>ER_SYNC_QUEUE_FOREIGN<sp/>=<sp/>228,<sp/>ER_UNABLE_TO_PROCESS_IN_STREAM<sp/>=<sp/>229,<sp/>ER_UNABLE_TO_PROCESS_OUT_OF_STREAM<sp/>=<sp/>230,<sp/>ER_TRANSACTION_TIMEOUT<sp/>=<sp/>231,<sp/>ER_ACTIVE_TIMER<sp/>=<sp/>232,<sp/>ER_TUPLE_FIELD_COUNT_LIMIT<sp/>=<sp/>233,<sp/>ER_CREATE_CONSTRAINT<sp/>=<sp/>234,<sp/>ER_FIELD_CONSTRAINT_FAILED<sp/>=<sp/>235,<sp/>ER_TUPLE_CONSTRAINT_FAILED<sp/>=<sp/>236,<sp/>ER_CREATE_FOREIGN_KEY<sp/>=<sp/>237,<sp/>ER_FOREIGN_KEY_INTEGRITY<sp/>=<sp/>238,<sp/>ER_FIELD_FOREIGN_KEY_FAILED<sp/>=<sp/>239,<sp/>ER_COMPLEX_FOREIGN_KEY_FAILED<sp/>=<sp/>240,<sp/>ER_WRONG_SPACE_UPGRADE_OPTIONS<sp/>=<sp/>241,<sp/>ER_NO_ELECTION_QUORUM<sp/>=<sp/>242,<sp/>ER_SSL<sp/>=<sp/>243,<sp/>ER_SPLIT_BRAIN<sp/>=<sp/>244,<sp/>ER_OLD_TERM<sp/>=<sp/>245,<sp/>ER_INTERFERING_ELECTIONS<sp/>=<sp/>246,<sp/>ER_ITERATOR_POSITION<sp/>=<sp/>247,<sp/>ER_DEFAULT_VALUE_TYPE<sp/>=<sp/>248,<sp/>ER_UNKNOWN_AUTH_METHOD<sp/>=<sp/>249,<sp/>ER_INVALID_AUTH_DATA<sp/>=<sp/>250,<sp/>ER_INVALID_AUTH_REQUEST<sp/>=<sp/>251,<sp/>ER_WEAK_PASSWORD<sp/>=<sp/>252,<sp/>ER_OLD_PASSWORD<sp/>=<sp/>253,<sp/>ER_NO_SUCH_SESSION<sp/>=<sp/>254,<sp/>ER_WRONG_SESSION_TYPE<sp/>=<sp/>255,<sp/>ER_PASSWORD_EXPIRED<sp/>=<sp/>256,<sp/>ER_AUTH_DELAY<sp/>=<sp/>257,<sp/>ER_AUTH_REQUIRED<sp/>=<sp/>258,<sp/>ER_SQL_SEQ_SCAN<sp/>=<sp/>259,<sp/>ER_NO_SUCH_EVENT<sp/>=<sp/>260,<sp/>ER_BOOTSTRAP_NOT_UNANIMOUS<sp/>=<sp/>261,<sp/>ER_CANT_CHECK_BOOTSTRAP_LEADER<sp/>=<sp/>262,<sp/>ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL<sp/>=<sp/>263,<sp/>ER_NIL_UUID<sp/>=<sp/>264,<sp/>ER_WRONG_FUNCTION_OPTIONS<sp/>=<sp/>265,<sp/>ER_MISSING_SYSTEM_SPACES<sp/>=<sp/>266,<sp/>ER_CLUSTER_NAME_MISMATCH<sp/>=<sp/>267,<sp/>ER_REPLICASET_NAME_MISMATCH<sp/>=<sp/>268,<sp/>ER_INSTANCE_NAME_DUPLICATE<sp/>=<sp/>269,<sp/>ER_INSTANCE_NAME_MISMATCH<sp/>=<sp/>270,<sp/>ER_SCHEMA_NEEDS_UPGRADE<sp/>=<sp/>271,<sp/>ER_SCHEMA_UPGRADE_IN_PROGRESS<sp/>=<sp/>272,<sp/>ER_DEPRECATED<sp/>=<sp/>273,<sp/>ER_UNCONFIGURED<sp/>=<sp/>274,<sp/>ER_CREATE_DEFAULT_FUNC<sp/>=<sp/>275,<sp/>ER_DEFAULT_FUNC_FAILED<sp/>=<sp/>276,<sp/>ER_INVALID_DEC<sp/>=<sp/>277,<sp/>ER_IN_ANOTHER_PROMOTE<sp/>=<sp/>278,<sp/>ER_SHUTDOWN<sp/>=<sp/>279,<sp/>ER_FIELD_VALUE_OUT_OF_RANGE<sp/>=<sp/>280,<sp/>box_error_code_MAX<sp/>};</highlight></codeline>
 <codeline lineno="3651"><highlight class="normal"></highlight><highlight class="preprocessor">#if<sp/>defined(__cplusplus)</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="3652"><highlight class="normal">}<sp/></highlight><highlight class="comment">/*<sp/>extern<sp/>&quot;C&quot;<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="3653"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>defined(__cplusplus)<sp/>*/</highlight><highlight class="preprocessor"></highlight><highlight class="normal"></highlight></codeline>
