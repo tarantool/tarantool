@@ -1718,3 +1718,16 @@ g.test_failover = function()
     local res = instance_config:apply_default({}).failover
     t.assert_equals(res, exp)
 end
+
+g.test_labels = function()
+    local iconfig = {
+        labels = {
+            foo = 'true',
+            bar = 'false',
+        },
+    }
+
+    instance_config:validate(iconfig)
+
+    t.assert_equals(instance_config:apply_default({}).labels, nil)
+end
