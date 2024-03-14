@@ -1161,10 +1161,9 @@ vdbe_emit_create_function(struct Parse *parser, int reg_id, const char *name,
 	struct Vdbe *v = sqlGetVdbe(parser);
 	sqlVdbeAddOp4(v, OP_String8, 0, name_reg, 0, sql_xstrdup(name),
 		      P4_DYNAMIC);
-	const char *err = tt_sprintf("Function '%s' already exists", name);
 	vdbe_emit_halt_with_presence_test(parser, BOX_FUNC_ID,
 					  BOX_FUNC_FIELD_NAME, name_reg, 1,
-					  ER_FUNCTION_EXISTS, err, false,
+					  ER_FUNCTION_EXISTS, name, false,
 					  OP_NoConflict);
 	sqlVdbeAddOp3(v, OP_NextSystemSpaceId, BOX_FUNC_ID,
 		      regs + BOX_FUNC_FIELD_ID, BOX_FUNC_FIELD_ID);
@@ -1400,13 +1399,11 @@ vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
 							   space->def->name);
 		if (is_alter) {
 			int errcode = ER_SQL_CANT_ADD_AUTOINC;
-			const char *error_msg =
-				tt_sprintf(tnt_errcode_desc(errcode),
-					   space->def->name);
 			vdbe_emit_halt_with_presence_test(parse,
 							  BOX_SEQUENCE_ID, 2,
 							  reg_seq_rec + 3, 1,
-							  errcode, error_msg,
+							  errcode,
+							  space->def->name,
 							  false, OP_NoConflict);
 		}
 		sqlVdbeAddOp2(v, OP_SInsert, BOX_SEQUENCE_ID, reg_seq_rec);
@@ -1510,11 +1507,9 @@ sqlEndTable(struct Parse *pParse)
 	int name_reg = ++pParse->nMem;
 	sqlVdbeAddOp4(pParse->pVdbe, OP_String8, 0, name_reg, 0,
 		      sql_xstrdup(new_space->def->name), P4_DYNAMIC);
-	const char *error_msg = tt_sprintf(tnt_errcode_desc(ER_SPACE_EXISTS),
-					   new_space->def->name);
 	bool no_err = pParse->create_table_def.base.if_not_exist;
 	vdbe_emit_halt_with_presence_test(pParse, BOX_SPACE_ID, 2, name_reg, 1,
-					  ER_SPACE_EXISTS, error_msg,
+					  ER_SPACE_EXISTS, new_space->def->name,
 					  (no_err != 0), OP_NoConflict);
 	int reg_space_id = getNewSpaceId(pParse);
 	vdbe_emit_space_create(pParse, reg_space_id, name_reg, new_space);
@@ -1594,12 +1589,10 @@ sql_create_view(struct Parse *parse_context)
 	int name_reg = ++parse_context->nMem;
 	sqlVdbeAddOp4(parse_context->pVdbe, OP_String8, 0, name_reg, 0,
 		      space_name, P4_DYNAMIC);
-	const char *error_msg =
-		tt_sprintf(tnt_errcode_desc(ER_SPACE_EXISTS), space_name);
 	bool no_err = create_entity_def->if_not_exist;
 	vdbe_emit_halt_with_presence_test(parse_context, BOX_SPACE_ID, 2,
 					  name_reg, 1, ER_SPACE_EXISTS,
-					  error_msg, (no_err != 0),
+					  space_name, (no_err != 0),
 					  OP_NoConflict);
 	vdbe_emit_space_create(parse_context, getNewSpaceId(parse_context),
 			       name_reg, space);

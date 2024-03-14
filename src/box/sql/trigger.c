@@ -95,17 +95,15 @@ sql_trigger_begin(struct Parse *parse)
 	if (!parse->parse_only) {
 		struct Vdbe *v = sqlGetVdbe(parse);
 		sqlVdbeCountChanges(v);
-		const char *error_msg =
-			tt_sprintf(tnt_errcode_desc(ER_TRIGGER_EXISTS),
-				   trigger_name);
 		int name_reg = ++parse->nMem;
 		sqlVdbeAddOp4(parse->pVdbe, OP_String8, 0, name_reg, 0,
 			      sql_xstrdup(trigger_name), P4_DYNAMIC);
 		bool no_err = create_def->if_not_exist;
 		vdbe_emit_halt_with_presence_test(parse, BOX_TRIGGER_ID, 0,
 						  name_reg, 1,
-						  ER_TRIGGER_EXISTS, error_msg,
-						  (no_err != 0), OP_NoConflict);
+						  ER_TRIGGER_EXISTS,
+						  trigger_name, (no_err != 0),
+						  OP_NoConflict);
 	}
 
 	/* Build the Trigger object. */
@@ -335,14 +333,11 @@ sql_drop_trigger(struct Parse *parser)
 
 	assert(name->nSrc == 1);
 	const char *trigger_name = name->a[0].zName;
-	const char *error_msg =
-		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_TRIGGER),
-			   trigger_name);
 	int name_reg = ++parser->nMem;
 	sqlVdbeAddOp4(v, OP_String8, 0, name_reg, 0, sql_xstrdup(trigger_name),
 		      P4_DYNAMIC);
 	vdbe_emit_halt_with_presence_test(parser, BOX_TRIGGER_ID, 0, name_reg,
-					  1, ER_NO_SUCH_TRIGGER, error_msg,
+					  1, ER_NO_SUCH_TRIGGER, trigger_name,
 					  no_err, OP_Found);
 	vdbe_code_drop_trigger(parser, trigger_name, true);
 	sqlSrcListDelete(name);
