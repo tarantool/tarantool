@@ -2378,6 +2378,15 @@ return schema.new('instance_config', schema.record({
             default = 'old',
         }),
     }),
+    -- Instance labels.
+    labels = schema.map({
+        key = schema.scalar({
+            type = 'string',
+        }),
+        value = schema.scalar({
+            type = 'string',
+        }),
+    }),
 }, {
     -- This kind of validation cannot be implemented as the
     -- 'validate' annotation of a particular schema node. There
