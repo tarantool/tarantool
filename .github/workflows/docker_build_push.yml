@@ -1,19 +1,21 @@
-name: static_build_docker_deploy
+name: docker-build-push
 
 on:
   workflow_call:
 
 jobs:
-  build-docker:
-    if: startsWith(github.ref, 'refs/tags/') &&
-      !endsWith(github.ref, '-entrypoint')
-
-    runs-on: [ self-hosted, Linux, regular ]
+  build-push:
+    runs-on: [ self-hosted, Linux, x86_64, regular ]
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - uses: ./.github/actions/environment
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -30,7 +32,7 @@ jobs:
       - name: Get tag
         run: echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
 
-      - name: Build and push
+      - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: ./docker
