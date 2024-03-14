@@ -530,7 +530,10 @@ case OP_Goto: {             /* jump */
  * text description of the error.
  */
 case OP_SetDiag: {             /* jump */
-	box_error_set(__FILE__, __LINE__, pOp->p1, pOp->p4.z);
+	assert(pOp->p1 == ER_TRIGGER_EXISTS || pOp->p1 == ER_NO_SUCH_TRIGGER ||
+	       pOp->p1 == ER_SPACE_EXISTS || pOp->p1 == ER_FUNCTION_EXISTS ||
+	       pOp->p1 == ER_SQL_CANT_ADD_AUTOINC || pOp->p1 == ER_SQL_EXECUTE);
+	diag_set(ClientError, pOp->p1, pOp->p4.z);
 	if (pOp->p2 != 0)
 		goto jump_to_p2;
 	break;

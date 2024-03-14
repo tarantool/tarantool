@@ -4309,15 +4309,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 		assert(!ExprHasProperty(pExpr, EP_IntValue));
 		if (pExpr->on_conflict_action == ON_CONFLICT_ACTION_IGNORE) {
-			sqlVdbeAddOp4(v, OP_Halt, 0,
-					  ON_CONFLICT_ACTION_IGNORE, 0,
-					  pExpr->u.zToken, 0);
+			sqlVdbeAddOp2(v, OP_Halt, 0, ON_CONFLICT_ACTION_IGNORE);
 		} else {
-			const char *err =
-				tt_sprintf(tnt_errcode_desc(ER_SQL_EXECUTE),
-					   pExpr->u.zToken);
-			sqlVdbeAddOp4(v, OP_SetDiag, ER_SQL_EXECUTE, 0, 0, err,
-				      P4_STATIC);
+			sqlVdbeAddOp4(v, OP_SetDiag, ER_SQL_EXECUTE, 0, 0,
+				      sql_xstrdup(pExpr->u.zToken), P4_DYNAMIC);
 			sqlVdbeAddOp2(v, OP_Halt, -1,
 				      pExpr->on_conflict_action);
 		}

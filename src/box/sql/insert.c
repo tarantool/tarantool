@@ -795,13 +795,11 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct space *space,
 		case ON_CONFLICT_ACTION_ABORT:
 		case ON_CONFLICT_ACTION_ROLLBACK:
 		case ON_CONFLICT_ACTION_FAIL:
-			err = tt_sprintf(tnt_errcode_desc(ER_SQL_EXECUTE),
-					 tt_sprintf("NOT NULL constraint "\
-						    "failed: %s.%s", def->name,
-						    def->fields[i].name));
+			err = tt_sprintf("NOT NULL constraint failed: %s.%s",
+					 def->name, def->fields[i].name);
 			addr = sqlVdbeAddOp1(v, OP_NotNull, new_tuple_reg + i);
-			sqlVdbeAddOp4(v, OP_SetDiag, ER_SQL_EXECUTE, 0, 0, err,
-				      P4_STATIC);
+			sqlVdbeAddOp4(v, OP_SetDiag, ER_SQL_EXECUTE, 0, 0,
+				      sql_xstrdup(err), P4_DYNAMIC);
 			sqlVdbeAddOp2(v, OP_Halt, -1, on_conflict_nullable);
 			sqlVdbeJumpHere(v, addr);
 			break;

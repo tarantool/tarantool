@@ -2276,9 +2276,8 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 		sqlVdbeAddOp2(v, OP_Integer, 0, r1);
 		sqlVdbeAddOp3(v, OP_Ge, r1, positive_limit_label, iLimit);
 		/* Otherwise return an error and stop */
-		const char *err = tt_sprintf(tnt_errcode_desc(ER_SQL_EXECUTE),
-					     "Only positive integers are "\
-					     "allowed in the LIMIT clause");
+		const char *err = "Only positive integers are allowed in the "
+				  "LIMIT clause";
 		sqlVdbeResolveLabel(v, halt_label);
 		sqlVdbeAddOp4(v, OP_SetDiag, ER_SQL_EXECUTE, 0, 0, err,
 			      P4_STATIC);
@@ -2308,10 +2307,8 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 				sqlVdbeAddOp2(v, OP_Integer, 1, r1);
 				int no_err = sqlVdbeMakeLabel(v);
 				sqlVdbeAddOp3(v, OP_Eq, iLimit, no_err, r1);
-				err = tnt_errcode_desc(ER_SQL_EXECUTE);
-				err = tt_sprintf(err, "Expression subquery "\
-						 "could be limited only "\
-						 "with 1");
+				err = "Expression subquery could be limited "
+				      "only with 1";
 				sqlVdbeAddOp4(v, OP_SetDiag, ER_SQL_EXECUTE, 0,
 					      0, err, P4_STATIC);
 				sqlVdbeAddOp1(v, OP_Halt, -1);
@@ -2335,9 +2332,8 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 
             		sqlVdbeAddOp3(v, OP_Ge, r1, positive_offset_label, iOffset);
 			/* Otherwise return an error and stop */
-			err = tt_sprintf(tnt_errcode_desc(ER_SQL_EXECUTE),
-					 "Only positive integers are allowed "\
-					 "in the OFFSET clause");
+			err = "Only positive integers are allowed in the "
+			      "OFFSET clause";
 			sqlVdbeResolveLabel(v, offset_error_label);
 			sqlVdbeAddOp4(v, OP_SetDiag, ER_SQL_EXECUTE, 0, 0, err,
 				      P4_STATIC);
@@ -5506,9 +5502,7 @@ vdbe_code_raise_on_multiple_rows(struct Parse *parser, int limit_reg, int end_ma
 	int r1 = sqlGetTempReg(parser);
 	sqlVdbeAddOp2(v, OP_Integer, 0, r1);
 	sqlVdbeAddOp3(v, OP_Ne, r1, end_mark, limit_reg);
-	const char *error = tt_sprintf(tnt_errcode_desc(ER_SQL_EXECUTE),
-				       "Expression subquery returned more "\
-				       "than 1 row");
+	const char *error = "Expression subquery returned more than 1 row";
 	sqlVdbeAddOp4(v, OP_SetDiag, ER_SQL_EXECUTE, 0, 0, error, P4_STATIC);
 	sqlVdbeAddOp1(v, OP_Halt, -1);
 	sqlReleaseTempReg(parser, r1);
