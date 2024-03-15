@@ -1,0 +1,15 @@
+credentials:
+  users:
+    guest:
+      roles: [ super ]
+
+iproto:
+  listen:
+    - uri: localhost:3301
+
+groups:
+  group-001:
+    replicasets:
+      replicaset-001:
+        instances:
+          master: { }

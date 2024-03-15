@@ -1,0 +1,24 @@
+credentials:
+  users:
+    guest:
+      roles: [ super ]
+
+groups:
+  group-001:
+    replicasets:
+      replicaset-001:
+        instances:
+          master:
+            iproto:
+              listen:
+                - uri: master:3301
+            database:
+              mode: rw
+          replica-1:
+            iproto:
+              listen:
+                - uri: replica-1:3302
+          replica-2:
+            iproto:
+              listen:
+                - uri: replica-2:3303

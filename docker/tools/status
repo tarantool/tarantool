@@ -1,0 +1,18 @@
+#!/bin/sh
+
+RUN_DIR="/var/run/tarantool"
+TT_CONSOLE_SOCKET_DEFAULT="${RUN_DIR}/${TT_APP_NAME}/${TT_INSTANCE_NAME}/tarantool.control"
+STATUS_CODE=$(
+    tt connect "${TT_CONSOLE_SOCKET:-${TT_CONSOLE_SOCKET_DEFAULT}}" -f- 1>/dev/null <<EOF
+\q
+EOF
+    echo $?
+)
+
+if [ "${STATUS_CODE}" = "0" ]; then
+    echo "running"
+    exit 0
+else
+    echo "not running"
+    exit "${STATUS_CODE}"
+fi
