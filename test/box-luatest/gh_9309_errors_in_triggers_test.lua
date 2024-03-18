@@ -175,8 +175,6 @@ g.after_test('test_net_box_triggers_error', function()
     g.client = nil
 end)
 
--- Cannot test on_disconnect triggers because of
--- https://github.com/tarantool/luatest/issues/356
 g.test_net_box_triggers_error = function()
     g.client:exec(function(uri)
         local net = require('net.box')
@@ -187,6 +185,12 @@ g.test_net_box_triggers_error = function()
         conn:wait_connected()
         -- Error is raised when the connection is used
         t.assert_error_msg_content_equals(errmsg, conn.call, conn, 'abc')
+
+        conn = net.connect(uri, {wait_connected = true})
+        errmsg = 'net.box on_disconnect error'
+        -- Error is logged - it will be checked later
+        conn:on_disconnect(function() error(errmsg) end)
+        conn:close()
 
         conn = net.connect(uri, {wait_connected = false})
         t.assert_equals(conn.state, 'initial')
@@ -203,6 +207,7 @@ g.test_net_box_triggers_error = function()
     end, {g.server.net_box_uri})
     g.server:drop()
 
+    t.assert(g.client:grep_log("net.box on_disconnect error"))
     t.assert(g.client:grep_log("net.box on_shutdown error"))
     g.client:drop()
 end
