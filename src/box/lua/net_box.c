@@ -333,6 +333,12 @@ struct netbox_request {
 	 * the response hasn't been received yet.
 	 */
 	struct error *error;
+	/**
+	 * Lua reference to the connection object if the request is asynchronous
+	 * or LUA_NOREF if the request is synchronous. Used to prevent garbage
+	 * collection in case the user discards the connection.
+	 */
+	int remote_ref;
 };
 
 static const char netbox_transport_typename[] = "net.box.transport";
@@ -358,6 +364,7 @@ netbox_request_destroy(struct netbox_request *request)
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, request->index_ref);
 	if (request->error != NULL)
 		error_unref(request->error);
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, request->remote_ref);
 }
 
 /**
@@ -2315,6 +2322,7 @@ luaT_netbox_transport_make_request(struct lua_State *L, int idx,
 	request->index_ref = LUA_NOREF;
 	request->result_ref = LUA_NOREF;
 	request->error = NULL;
+	request->remote_ref = LUA_NOREF;
 	netbox_request_register(request, transport);
 	return 0;
 }
@@ -2323,9 +2331,13 @@ static int
 luaT_netbox_transport_perform_async_request(struct lua_State *L)
 {
 	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
+	/* The connection object. */
+	assert(lua_istable(L, 2));
 	struct netbox_request *request = lua_newuserdata(L, sizeof(*request));
-	if (luaT_netbox_transport_make_request(L, 2, transport, request) != 0)
+	if (luaT_netbox_transport_make_request(L, 3, transport, request) != 0)
 		return luaT_push_nil_and_error(L);
+	lua_pushvalue(L, 2);
+	request->remote_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	luaL_getmetatable(L, netbox_request_typename);
 	lua_setmetatable(L, -2);
 	return 1;
