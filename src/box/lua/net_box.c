@@ -3187,14 +3187,11 @@ luaT_netbox_transport_stop(struct lua_State *L)
 		box_error_raise(ER_NO_CONNECTION, "Connection closed");
 		netbox_transport_set_error(transport);
 		transport->state = NETBOX_CLOSED;
-		netbox_transport_on_state_change(transport, L);
+		netbox_transport_on_state_change_pcall(transport, L);
 	}
 	/* Cancel the worker fiber. */
-	if (transport->worker != NULL) {
+	if (transport->worker != NULL)
 		fiber_cancel(transport->worker);
-		/* Check if we cancelled ourselves. */
-		luaL_testcancel(L);
-	}
 	return 0;
 }
 
