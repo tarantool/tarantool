@@ -644,7 +644,7 @@ static void
 test_client_error_creation(void)
 {
 	header();
-	plan(26);
+	plan(35);
 
 	/* Test CHAR argument type */
 	const char *s;
@@ -740,7 +740,25 @@ test_client_error_creation(void)
 	ok(mp_size == size);
 	ok(s != NULL && memcmp(mp, mp_buf, mp_size) == 0);
 
-	/* Test maximum argument number supported. */
+	/* Test different number of error arguments. */
+	diag_set(ClientError, ER_TEST_2_ARGS, 1, 2);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "f1", &i) && i == 1);
+	ok(error_get_int(e, "f2", &i) && i == 2);
+
+	diag_set(ClientError, ER_TEST_3_ARGS, 1, 2, 3);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "f1", &i) && i == 1);
+	ok(error_get_int(e, "f2", &i) && i == 2);
+	ok(error_get_int(e, "f3", &i) && i == 3);
+
+	diag_set(ClientError, ER_TEST_4_ARGS, 1, 2, 3, 4);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "f1", &i) && i == 1);
+	ok(error_get_int(e, "f2", &i) && i == 2);
+	ok(error_get_int(e, "f3", &i) && i == 3);
+	ok(error_get_int(e, "f4", &i) && i == 4);
+
 	diag_set(ClientError, ER_TEST_5_ARGS, 1, 2, 3, 4, 5);
 	e = diag_last_error(diag_get());
 	ok(error_get_int(e, "f1", &i) && i == 1);
