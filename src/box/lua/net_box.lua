@@ -775,7 +775,7 @@ function remote_methods:_request_impl(method, opts, format, stream_id, ...)
             if opts.on_push or opts.on_push_ctx then
                 error('To handle pushes in an async request use future:pairs()')
             end
-            return transport:perform_async_request(buffer, skip_header,
+            return transport:perform_async_request(self, buffer, skip_header,
                                                    return_raw, table.insert,
                                                    {}, format, stream_id,
                                                    method, ...)
