@@ -287,7 +287,11 @@ local function new_sm(uri_or_fd, opts)
                    state == 'closed' then
                 if was_connected then
                     remote._is_connected = false
-                    remote._on_disconnect:run(remote)
+                    local ok, trigger_err = pcall(remote._on_disconnect.run,
+                                                  remote._on_disconnect, remote)
+                    if not ok then
+                        log.error(trigger_err)
+                    end
                 end
                 -- A server may exit after initiating a graceful shutdown but
                 -- before all clients close their connections (for example, on
