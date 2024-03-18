@@ -95,11 +95,14 @@ struct errcode_record {
 	_(ER_TEST_TYPE_LONG, 10004,		"Test error", "field", LONG) \
 	_(ER_TEST_TYPE_ULONG, 10005,		"Test error", "field", ULONG) \
 	_(ER_TEST_TYPE_LLONG, 10006,		"Test error", "field", LLONG) \
-	_(ER_TEST_TYPE_ULLONG, 10007,		"Test error", "field", UULONG) \
+	_(ER_TEST_TYPE_ULLONG, 10007,		"Test error", "field", ULLONG) \
 	_(ER_TEST_TYPE_STRING, 10008,		"Test error", "field", STRING) \
 	_(ER_TEST_TYPE_MSGPACK, 10009,		"Test error", "field", MSGPACK) \
 	_(ER_TEST_TYPE_TUPLE, 10010,		"Test error", "field", TUPLE) \
-	_(ER_TEST_5_ARGS, 10011,		"Test error", "f1", INT, "f2", INT, "f3", INT, "f4", INT, "f5", INT) \
+	_(ER_TEST_2_ARGS, 10011,		"Test error", "f1", INT, "f2", INT) \
+	_(ER_TEST_3_ARGS, 10012,		"Test error", "f1", INT, "f2", INT, "f3", INT) \
+	_(ER_TEST_4_ARGS, 10013,		"Test error", "f1", INT, "f2", INT, "f3", INT, "f4", INT) \
+	_(ER_TEST_5_ARGS, 10014,		"Test error", "f1", INT, "f2", INT, "f3", INT, "f4", INT, "f5", INT) \
 
 #else
 #define TEST_ERROR_CODES(_)

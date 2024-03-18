@@ -42,7 +42,7 @@
 		{{n1, t1}, {n2, t2}}, 2
 #define FIELDS_3(n1, t1, n2, t2, n3, t3) \
 		(const struct errcode_field[]) \
-		{{n1, t1}, {n2, t2}, {n3, t3}}}, 3
+		{{n1, t1}, {n2, t2}, {n3, t3}}, 3
 #define FIELDS_4(n1, t1, n2, t2, n3, t3, n4, t4) \
 		(const struct errcode_field[]) \
 		{{n1, t1}, {n2, t2}, {n3, t3}, {n4, t4}}, 4
@@ -76,7 +76,7 @@
 #define LONG ERRCODE_FIELD_TYPE_LONG
 #define ULONG ERRCODE_FIELD_TYPE_ULONG
 #define LLONG ERRCODE_FIELD_TYPE_LLONG
-#define UULONG ERRCODE_FIELD_TYPE_ULLONG
+#define ULLONG ERRCODE_FIELD_TYPE_ULLONG
 #define STRING ERRCODE_FIELD_TYPE_STRING
 #define MSGPACK ERRCODE_FIELD_TYPE_MSGPACK
 #define TUPLE ERRCODE_FIELD_TYPE_TUPLE
