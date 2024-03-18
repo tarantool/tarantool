@@ -1165,7 +1165,11 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
 
     self.schema_version = schema_version
     self.space = sl
-    self._on_schema_reload:run(self)
+    local ok, err = pcall(self._on_schema_reload.run, self._on_schema_reload,
+                          self)
+    if not ok then
+        log.error(err)
+    end
 end
 
 local function nothing_or_data(value)
