@@ -324,6 +324,7 @@ local function new_sm(uri, opts)
         end
         if what == 'state_changed' then
             local state, err = ...
+            remote.state, remote.error = state, err
             local was_connected = remote._is_connected
             if state == 'active' then
                 if not was_connected then
@@ -348,7 +349,6 @@ local function new_sm(uri, opts)
                 -- time we finish running on_shutdown triggers.
                 remote._shutdown_pending = nil
             end
-            remote.state, remote.error = state, err
             if state == 'error_reconnect' then
                 -- Repeat the same error in verbose log only.
                 -- Else the error clogs the log. See gh-3175.
