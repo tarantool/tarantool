@@ -288,6 +288,7 @@ static int saved_point = 0;
 
 static int console_hide_prompt_ref = LUA_NOREF;
 static int console_show_prompt_ref = LUA_NOREF;
+static int gettable_ref = LUA_NOREF;
 
 /**
  * Don't attempt to hide/show prompt in certain readline states.
@@ -983,6 +984,13 @@ tarantool_lua_console_init(struct lua_State *L)
 	console_hide_prompt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	lua_pushcfunction(L, lbox_console_show_prompt);
 	console_show_prompt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+	/*
+	 * Compile a Lua wrapper for table indexation. For sanity, verify that
+	 * it compiles successfully.
+	 */
+	VERIFY(luaT_dostring(L, "return function(t, k) return t[k] end") == 0);
+	gettable_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 }
 
 /*
@@ -1116,8 +1124,14 @@ lua_rl_getcompletion(lua_State *L)
 		 * metamethod instead of simply doing a raw lookup in the
 		 * metatable.
 		 */
+		lua_rawgeti(L, LUA_REGISTRYINDEX, gettable_ref);
+		lua_pushvalue(L, -3);
 		lua_pushstring(L, "__autocomplete");
-		lua_gettable(L, -3);
+		if (lua_pcall(L, 2, 1, 0) != 0) {
+			/* pcall returns an error to the stack */
+			lua_pop(L, 1);
+			return 0;
+		}
 	}
 	if (lua_isfunction(L, -1)) {
 		lua_replace(L, -2);

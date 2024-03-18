@@ -58,6 +58,12 @@ g.test__autocomplete = function()
                                                    'table11.second',
                                                    'table11.auto',
                                                    })
+   -- __index function can throw an error - should be Ok
+   setmetatable(tab, {__index = function() error('test error') end})
+   t.assert_items_equals(tabcomplete('table11.'), {'table11.',
+                                                   'table11.first',
+                                                   'table11.second',
+                                                   })
    -- __autocomplete supercedes __index, no completions from the latter
    setmetatable(tab, {__autocomplete = function() return {auto = true} end,
                       __index = {index = true}})
