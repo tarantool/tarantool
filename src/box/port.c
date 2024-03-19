@@ -43,7 +43,8 @@
 
 /**
  * The pool is used by port_c to allocate entries and to store
- * result data when it fits into an object from the pool.
+ * result data when it fits into an object from the pool. Also,
+ * it is used to store `struct port_c_iterator`.
  */
 static struct mempool port_entry_pool;
 
@@ -287,6 +288,17 @@ port_c_add_number(struct port *base, double val)
 	pe->number = val;
 }
 
+void
+port_c_add_iterable(struct port *base, void *data,
+		    port_c_iterator_create_f create)
+{
+	struct port_c *port = (struct port_c *)base;
+	struct port_c_entry *pe = port_c_new_entry(port);
+	pe->type = PORT_C_ENTRY_ITERABLE;
+	pe->iterable.data = data;
+	pe->iterable.iterator_create = create;
+}
+
 /**
  * Dumps port contents as a sequence of MsgPack object to mpstream (without
  * array header), mpstream is flushed.
@@ -302,6 +314,8 @@ port_c_dump_msgpack_impl(struct port *base, struct mpstream *stream,
 	struct port_c_entry *pe;
 	for (pe = port->first; pe != NULL; pe = pe->next) {
 		switch (pe->type) {
+		/** Encode unsupported types as nil. */
+		case PORT_C_ENTRY_ITERABLE:
 		case PORT_C_ENTRY_NULL:
 			mpstream_encode_nil(stream);
 			break;

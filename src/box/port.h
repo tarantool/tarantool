@@ -142,6 +142,70 @@ enum port_c_entry_type {
 	PORT_C_ENTRY_BOOL,
 	PORT_C_ENTRY_MP,
 	PORT_C_ENTRY_MP_OBJECT,
+	PORT_C_ENTRY_ITERABLE,
+};
+
+struct port_c_iterator;
+
+/**
+ * Type of function that can be used as an iterator_create method in port_c.
+ * It is called only when the port is still alive.
+ */
+typedef void
+(*port_c_iterator_create_f)(void *data, struct port_c_iterator *it);
+
+/**
+ * Type of function that can be used as an iterator_next method in port_c.
+ * The iterator is passed as the first argument.
+ * The port to yield values is passed as the second argument.
+ * The third argument is a pointer to a flag which is set when the iterator
+ * is exhausted.
+ * Function must return 0 in the case of success. If eof is not reached,
+ * port `out` must be initialized, otherwise it mustn't.
+ * Also, the function can be called even after eof was reached - in this
+ * case it must work correctly and consistently return eof.
+ * In the case of error, port out must not be initialized, diag must be set
+ * and -1 must be returned.
+ */
+typedef int
+(*port_c_iterator_next_f)(struct port_c_iterator *it, struct port *out,
+			  bool *is_eof);
+
+/**
+ * An iterable object stored in port_c.
+ * When it is dumped, an iterator is created and is dumped instead of
+ * this object. Is dumped only when it is possible, for example, we cannot
+ * pack iterator to MsgPack, so it is dumped as MP_NIL there.
+ *
+ * When the object is added to port_c, it must stay alive as long as port can
+ * be dumped. It's quite possible than the created iterator will be still
+ * alive after the port and the object will be destroyed, so this situation
+ * must be handled by the author of the iterable object.
+ */
+struct port_c_iterable {
+	/**
+	 * Creates an iterator.
+	 * Mustn't be NULL.
+	 */
+	port_c_iterator_create_f iterator_create;
+	/** The iterable object itself. */
+	void *data;
+};
+
+/**
+ * An iterator created by port_c_iterable.
+ */
+struct port_c_iterator {
+	/**
+	 * Advances iterator and yields values.
+	 * Mustn't be NULL.
+	 */
+	port_c_iterator_next_f next;
+	/**
+	 * Implementation dependent content.
+	 * Needed to allocate an abstract iterator.
+	 */
+	char padding[32];
 };
 
 /**
@@ -191,6 +255,8 @@ struct port_c_entry {
 				struct mp_ctx *ctx;
 			};
 		} mp;
+		/** Iterable object. */
+		struct port_c_iterable iterable;
 	};
 };
 
@@ -263,6 +329,14 @@ port_c_add_bool(struct port *base, bool val);
 /** Append a numeric value to the port. */
 void
 port_c_add_number(struct port *base, double val);
+
+/**
+ * Append an iterable object to the port.
+ * See description of `struct port_c_iterable` for details.
+ */
+void
+port_c_add_iterable(struct port *base, void *data,
+		    port_c_iterator_create_f create);
 
 /** Method get_msgpack for struct port_c. */
 const char *

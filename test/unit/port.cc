@@ -1,6 +1,7 @@
 #include "lua_test_utils.h"
 
 #include "box/lua/call.h"
+#include "box/lua/misc.h"
 #include "box/lua/tuple.h"
 #include "box/port.h"
 #include "box/session.h"
@@ -150,6 +151,25 @@ lua_push_values(struct lua_State *L, const char *values)
 }
 
 /**
+ * Collects iterator and replaces it with a resulting table.
+ */
+static void
+lua_collect_iterator(struct lua_State *L, int idx)
+{
+	const char *text = "return function(iter) "
+			   "local res = {} "
+			   "for i in iter() do table.insert(res, i) end "
+			   "return res "
+			   "end";
+	int rc = luaT_dostring(L, text);
+	fail_if(rc != 0);
+	lua_pushvalue(L, idx);
+	rc = luaT_call(L, 1, 1);
+	fail_if(rc != 0);
+	lua_replace(L, idx);
+}
+
+/**
  * Checks if resulting Lua state is equal to expected one.
  *
  * When two MsgPack objects are compared, the translation is also checked:
@@ -157,6 +177,10 @@ lua_push_values(struct lua_State *L, const char *values)
  *
  * Tuples are compared by pointers, so if got_L contains a tuple,
  * expected_L must contain the same one.
+ *
+ * Cfunctions are considered to be iterators (now we dump iterator
+ * as a closure), iterators are collected into a table and it is
+ * compared to the expected one.
  */
 static void
 test_check_lua_state(struct lua_State *got_L, struct lua_State *expected_L)
@@ -169,7 +193,14 @@ test_check_lua_state(struct lua_State *got_L, struct lua_State *expected_L)
 		struct tuple *tuple = luaT_istuple(L, i);
 		size_t mp_size = 0;
 		const char *mp = luamp_get(L, i, &mp_size);
-		if (tuple != NULL) {
+		if (lua_iscfunction(L, i + top)) {
+			/* If got_L had cfunction, it is iterator. */
+			lua_collect_iterator(L, i + top);
+			lua_pushvalue(L, i);
+			lua_pushvalue(L, i + top);
+			ok(lua_table_equal(L),
+			   "Collected iterator must match expected table");
+		} else if (tuple != NULL) {
 			struct tuple *other = luaT_istuple(L, i + top);
 			fail_if(other == NULL);
 			is(tuple, other, "The same tuple is expected");
@@ -380,6 +411,60 @@ static char test_port_c_medium_str[80];
  */
 struct mp_ctx test_port_c_mp_ctx;
 
+/**
+ * Iterable object. Contains range of values to yield.
+ */
+struct test_port_c_iterator_data {
+	int curr;
+	int limit;
+};
+
+/**
+ * Test iterator itself.
+ * The iterator yields integers from [curr, limit].
+ */
+struct test_port_c_iterator {
+	port_c_iterator_next_f next;
+	int curr;
+	int limit;
+};
+
+/**
+ * Test iterator next method.
+ * Yields and increments `state->curr` until it has reached `state->limit`.
+ */
+static int
+test_port_c_iterator_next(struct port_c_iterator *base_it, struct port *out,
+			  bool *is_eof)
+{
+	struct test_port_c_iterator *it =
+		(struct test_port_c_iterator *)base_it;
+	if (it->curr >= it->limit) {
+		*is_eof = true;
+		return 0;
+	}
+	*is_eof = false;
+	port_c_create(out);
+	port_c_add_number(out, it->curr++);
+	return 0;
+}
+
+/**
+ * Creates test iterator.
+ * Allocates and initializes state.
+ */
+static void
+test_port_c_iterator_create(void *base_data, struct port_c_iterator *base_it)
+{
+	struct test_port_c_iterator_data *data =
+		(struct test_port_c_iterator_data *)base_data;
+	struct test_port_c_iterator *it =
+		(struct test_port_c_iterator *)base_it;
+	it->next = test_port_c_iterator_next;
+	it->curr = data->curr;
+	it->limit = data->limit;
+}
+
 static struct port_c_contents
 test_port_c_create(struct port *port)
 {
@@ -411,6 +496,12 @@ test_port_c_create(struct port *port)
 	struct tuple *tuple =
 		tuple_new(tuple_format_runtime, mp_arr_begin, mp_arr);
 
+	struct test_port_c_iterator_data *iterator_data =
+		(struct test_port_c_iterator_data *)
+			xmalloc(sizeof(*iterator_data));
+	iterator_data->curr = 1;
+	iterator_data->limit = 10;
+
 	/* Fill port with created objects. */
 	port_c_create(port);
 	port_c_add_str(port, str, strlen(str));
@@ -425,6 +516,7 @@ test_port_c_create(struct port *port)
 	port_c_add_str0(port, str);
 	port_c_add_mp_object(port, mp_arr_begin, mp_arr, NULL);
 	port_c_add_mp_object(port, mp_map_begin, mp_map, &test_port_c_mp_ctx);
+	port_c_add_iterable(port, iterator_data, test_port_c_iterator_create);
 
 	struct port_c_contents contents = {
 		.tuple = tuple,
@@ -439,7 +531,7 @@ test_port_c_create(struct port *port)
 static void
 test_port_c_dump_lua(void)
 {
-	plan(38);
+	plan(40);
 	header();
 
 	struct port port;
@@ -470,6 +562,8 @@ test_port_c_dump_lua(void)
 	mp_ctx_copy(&expected_mp_ctx, &test_port_c_mp_ctx);
 	luamp_push_with_ctx(L, contents.mp_map, contents.mp_map_end,
 			    &expected_mp_ctx);
+	/* Collected iterator. */
+	lua_push_values(L, "{1, 2, 3, 4, 5, 6 ,7 ,8, 9}");
 
 	test_check_port_dump_lua_flat(&port, L);
 	test_check_port_dump_lua_table(&port, L);
@@ -497,7 +591,7 @@ test_port_c_all_msgpack_methods(void)
 
 	/* Rewind MsgPack cursor. */
 	mp = buf;
-	mp = mp_encode_array(mp, 12);
+	mp = mp_encode_array(mp, 13);
 
 	mp = mp_encode_str0(mp, "abc");
 	mp = mp_encode_str(mp, test_port_c_medium_str,
@@ -533,6 +627,9 @@ test_port_c_all_msgpack_methods(void)
 	size = contents.mp_map_end - contents.mp_map;
 	memcpy(mp, contents.mp_map, size);
 	mp += size;
+
+	/* Iterator is not supported by MsgPack so it will be dumped as nil. */
+	mp = mp_encode_nil(mp);
 
 	fail_if(mp > buf + lengthof(buf));
 
@@ -931,6 +1028,7 @@ main(void)
 	lua_pop(L, 1);
 	box_lua_tuple_init(L);
 	box_lua_call_init(L);
+	box_lua_misc_init(L);
 	lua_table_equal_init(L);
 
 	/*
