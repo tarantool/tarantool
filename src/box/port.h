@@ -206,10 +206,8 @@ port_free(void);
 
 /**
  * Encodes the port's content into the msgpack array.
- * Returns 1 (amount of results) in the case of success,
- * -1 otherwise.
  */
-int
+void
 port_c_dump_msgpack_wrapped(struct port *port, struct obuf *out,
 			    struct mp_ctx *ctx);
 
