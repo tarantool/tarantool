@@ -12,3 +12,5 @@ were fixed as part of this activity:
 * Fixed recording of `setmetatable()` with `nil` as the second argument.
 * Fixed recording of `select()` in case with negative first argument.
 * Fixed use-def analysis for child upvalues.
+* OSX/iOS/ARM64: Fix bytecode embedding in Mach-O object file.
+* OSX/iOS/ARM64: Fix generation of Mach-O object files.
