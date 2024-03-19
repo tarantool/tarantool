@@ -197,6 +197,79 @@ lua_wrap_formatted_array(struct lua_State *L, struct tuple_format *format)
 	lua_setmetatable(L, -2);
 }
 
+/**
+ * Advances the iterator - invokes iterator_next() with a saved state.
+ * For details, see description of port_c_push_iterator_lua().
+ */
+static int
+port_c_iterator_next_lua(lua_State *L)
+{
+	struct port_c_iterator *iter =
+		(struct port_c_iterator *)lua_touserdata(L, 1);
+	bool is_eof = false;
+	struct port port;
+	int rc = iter->next(iter, &port, &is_eof);
+	if (rc != 0)
+		luaT_error(L);
+	if (is_eof)
+		return 0;
+	int top_svp = lua_gettop(L);
+	port_dump_lua(&port, L, PORT_DUMP_LUA_MODE_FLAT);
+	port_destroy(&port);
+	return lua_gettop(L) - top_svp;
+}
+
+/**
+ * Typename for Lua representation of port_c_iterator.
+ */
+static const char *port_c_iterator_lua_name = "port_c_iterator";
+
+/**
+ * Metatable for Lua representation of port_c_iterator.
+ */
+static const struct luaL_Reg port_c_iterator_lua_meta[] = {
+	{"__call", port_c_iterator_next_lua},
+	{NULL, NULL}
+};
+
+/**
+ * The function should be called as a closure with one upvalue:
+ * port_c_iterator stored as userdata.
+ * For details, see description of port_c_push_iterator_lua().
+ */
+static int
+port_c_iterator_start_lua(lua_State *L)
+{
+	lua_pushvalue(L, lua_upvalueindex(1));
+	return 1;
+}
+
+/**
+ * Pushes an iterator created by passed iterable object to Lua stack.
+ *
+ * Iterators in Lua are implemented as usual functions (or closures), which
+ * return the next element. So this function pushes a closure, that returns an
+ * actual iterator - a callable userdata, which is a wrapper over iterator_next.
+ * That's how it looks from Lua:
+ * function(iter)
+ *     for v1, v2 in iter() do
+ *         process(v1, v2)
+ *     end
+ * end
+ */
+static void
+port_c_iterator_push_lua(struct lua_State *L, port_c_iterable *iterable)
+{
+	struct port_c_iterator *iter =
+		(struct port_c_iterator *)lua_newuserdata(L, sizeof(*iter));
+	luaL_getmetatable(L, port_c_iterator_lua_name);
+	lua_setmetatable(L, -2);
+	/* Wrap iterator into closure. */
+	lua_pushcclosure(L, port_c_iterator_start_lua, 1);
+	/* Actually initialize the iterator. */
+	iterable->iterator_create(iterable->data, iter);
+}
+
 extern "C" void
 port_c_dump_lua(struct port *base, struct lua_State *L,
 		enum port_dump_lua_mode mode)
@@ -254,6 +327,10 @@ port_c_dump_lua(struct port *base, struct lua_State *L,
 					L, pe->mp.format);
 			}
 			break;
+		case PORT_C_ENTRY_ITERABLE: {
+			port_c_iterator_push_lua(L, &pe->iterable);
+			break;
+		}
 		default:
 			unreachable();
 		};
@@ -486,4 +563,7 @@ box_lua_misc_init(struct lua_State *L)
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 0);
 	luaL_setfuncs(L, boxlib_internal, 0);
 	lua_pop(L, 1);
+
+	luaL_register_type(L, port_c_iterator_lua_name,
+			   port_c_iterator_lua_meta);
 }

@@ -113,6 +113,17 @@ ffi.cdef[[
         PORT_C_ENTRY_BOOL,
         PORT_C_ENTRY_MP,
         PORT_C_ENTRY_MP_OBJECT,
+        PORT_C_ENTRY_MP_ITERABLE,
+    };
+
+    struct port_c_iterator;
+
+    typedef void
+    (*port_c_iterator_create_f)(void *data, struct port_c_iterator *it);
+
+    struct port_c_iterable {
+        port_c_iterator_create_f iterator_create;
+        void *data;
     };
 
     struct port_c_entry {
@@ -134,6 +145,7 @@ ffi.cdef[[
                     struct mp_ctx *mp_ctx;
                 };
             } mp;
+            struct port_c_iterable iterable;
         };
     };
 
