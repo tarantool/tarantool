@@ -12,3 +12,9 @@ were fixed as part of this activity:
 * Fixed recording of `setmetatable()` with `nil` as the second argument.
 * Fixed recording of `select()` in case with negative first argument.
 * Fixed use-def analysis for child upvalues.
+* Added the `cc` file type for saving bytecode.
+* Fixed C file generation in `jit.bcsave`.
+* Fixed trace error handling during trace stitching.
+* Fixed recording of the `__concat` metamethod for vararg or protected frames.
+* Fixed recording of a side trace returning to a lower frame with a maximum
+  possible frame size.
