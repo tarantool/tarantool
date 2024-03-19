@@ -195,6 +195,13 @@ g.test_net_replicaset_gc = function(cg)
     local rs = net_replicaset.connect(connect_cfg)
     local info = rs:call_leader('box.info')
     t.assert_equals(info.ro, false)
+    local status = {}
+    local watcher = rs:watch_leader('box.status', function(_key, value)
+        status = value
+    end)
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(status.is_ro, false)
+    end)
 
     local weak_ref = setmetatable({rs = rs}, {__mode = 'v'})
     -- Test also that replicaset internals also collected.
@@ -202,17 +209,218 @@ g.test_net_replicaset_gc = function(cg)
         weak_ref[instance_name] = instance
         weak_ref[instance_name .. '_conn'] = instance.conn
     end
+    weak_ref.watcher = watcher
 
+    watcher:unregister()
+    watcher = nil
     rs = nil
     -- Calm down luacheck about unused values.
     t.assert(rs == nil)
+    t.assert(watcher == nil)
     collectgarbage()
     -- Double collect to avoid possible resurrection effects.
     collectgarbage()
-    -- Check reference to replicaset explicitly.
+    -- Check reference to replicaset and watcher explicitly.
     t.assert(weak_ref.rs == nil)
+    t.assert(weak_ref.watcher == nil)
     -- Check all other references too.
     for _, v in pairs(weak_ref) do
         t.assert(v == nil)
     end
+end
+
+-- Test watch_leader method.
+g.test_watch_leader = function(cg)
+    local config = test_config()
+    local cluster = cluster.new(cg, config)
+    cluster:start()
+    local net_replicaset = require('internal.net.replicaset')
+    local connect_cfg = get_connect_cfg(cluster)
+
+    -- Set initial value to event 'key1'.
+    cluster:each(function(server)
+        if server.alias:startswith('storage') then
+            server:exec(function()
+                if not box.info.ro then
+                    box.broadcast('key1', 1)
+                else
+                    box.broadcast('key1', 2)
+                end
+            end)
+        end
+    end)
+
+    -- Subscribe and check that event was received only from leader.
+    local rs = net_replicaset.connect(connect_cfg)
+    local info = rs:call_leader('box.info')
+    local leader_name = info.name
+    local key1_value = 0
+    local key2_value = 0
+    local long_call_count = 0
+    local long_wait = false
+
+    local function func1(key, value, instance_name)
+        t.assert_equals(key, 'key1')
+        t.assert_equals(instance_name, leader_name)
+        if value then
+            key1_value = bit.bor(key1_value, value)
+        end
+    end
+    local watcher1 = rs:watch_leader('key1', func1)
+
+    local function func2(key, value, instance_name)
+        t.assert_equals(key, 'key2')
+        t.assert_equals(instance_name, leader_name)
+        if value then
+            key2_value = bit.bor(key2_value, value)
+        end
+    end
+    local watcher2 = rs:watch_leader('key2', func2)
+
+    local function long_func(_key, _value, instance_name)
+        t.assert_equals(instance_name, leader_name)
+        long_call_count = long_call_count + 1
+        long_wait = true
+        -- Don't leave until somebody resets long_wait.
+        while long_wait do
+            require('fiber').sleep(0.1)
+        end
+    end
+    local long_watcher = rs:watch_leader('long', long_func)
+
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(key1_value, 1)
+    end)
+    t.assert_equals(key2_value, 0)
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(long_call_count, 1)
+    end)
+
+    -- Set initial value to event 'key2' and update 'key1' and 'long'.
+    cluster:each(function(server)
+        if server.alias:startswith('storage') then
+            server:exec(function()
+                if not box.info.ro then
+                    box.broadcast('key1', 4)
+                    box.broadcast('key2', 8)
+                else
+                    box.broadcast('key1', 16)
+                    box.broadcast('key2', 32)
+                end
+                box.broadcast('long', math.random())
+            end)
+        end
+    end)
+
+    -- Check that events was received only from leader.
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(key1_value, 1 + 4)
+        t.assert_equals(key2_value, 8)
+        t.assert_equals(long_call_count, 1)
+    end)
+
+    -- Change the leader.
+    leader_name = get_another_storage_name(leader_name)
+    cluster[leader_name]:exec(function()
+        box.ctl.promote()
+    end)
+
+    -- Check that events was received after the leader change.
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(key1_value, 1 + 4 + 16)
+        t.assert_equals(key2_value, 8 + 32)
+        t.assert_equals(long_call_count, 1)
+    end)
+    long_wait = false
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(long_call_count, 2)
+    end)
+
+    -- Set new values again.
+    cluster:each(function(server)
+        if server.alias:startswith('storage') then
+            server:exec(function()
+                if not box.info.ro then
+                    box.broadcast('key1', 64)
+                    box.broadcast('key2', 128)
+                else
+                    box.broadcast('key1', 256)
+                    box.broadcast('key2', 512)
+                end
+                box.broadcast('long', math.random())
+            end)
+        end
+    end)
+
+    -- Check that events was received from the leader.
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(key1_value, 1 + 4 + 16 + 64)
+        t.assert_equals(key2_value, 8 + 32 + 128)
+        t.assert_equals(long_call_count, 2)
+    end)
+    long_wait = false
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(long_call_count, 3)
+    end)
+
+    -- Unregister watcher1 and check that there no more updates.
+    watcher1:unregister()
+
+    -- Set new values again.
+    cluster:each(function(server)
+        if server.alias:startswith('storage') then
+            server:exec(function()
+                if not box.info.ro then
+                    box.broadcast('key1', 1024)
+                    box.broadcast('key2', 2048)
+                else
+                    box.broadcast('key1', 4096)
+                    box.broadcast('key2', 8192)
+                end
+            end)
+        end
+    end)
+
+    -- Check that events1 was not while event2 was received from the leader.
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(key1_value, 1 + 4 + 16 + 64)
+        t.assert_equals(key2_value, 8 + 32 + 128 + 2048)
+    end)
+
+    -- Change the leader again.
+    leader_name = get_another_storage_name(leader_name)
+    cluster[leader_name]:exec(function()
+        box.ctl.promote()
+    end)
+
+    -- Set new values again.
+    cluster:each(function(server)
+        if server.alias:startswith('storage') then
+            server:exec(function()
+                if not box.info.ro then
+                    box.broadcast('key1', 1024)
+                    box.broadcast('key2', 16)
+                else
+                    box.broadcast('key1', 4096)
+                    box.broadcast('key2', 64)
+                end
+            end)
+        end
+    end)
+
+    -- Check that events1 was not while event2 was received from the leader.
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(key1_value, 1 + 4 + 16 + 64)
+        t.assert_equals(key2_value, 8 + 32 + 128 + 2048 + 16)
+        t.assert_equals(long_call_count, 3)
+    end)
+    long_wait = false
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(long_call_count, 4)
+    end)
+
+    watcher1:unregister()
+    watcher2:unregister()
+    long_watcher:unregister()
+    rs:close()
 end

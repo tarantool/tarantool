@@ -104,6 +104,94 @@ function replicaset_methods:call_leader(func, args, opts)
     end
 end
 
+local watcher_methods = {}
+
+local watcher_mt = {
+    __index = watcher_methods,
+}
+
+-- Check that the first argument is a valid watcher.
+local function watcher_check(watcher, method)
+    if getmetatable(watcher) ~= watcher_mt then
+        local fmt = 'Use watcher:%s(...) instead of watcher.%s(...)'
+        error(string.format(fmt, method, method))
+    end
+end
+
+-- Stop watching the key.
+function watcher_methods.unregister(watcher)
+    watcher_check(watcher, 'unregister')
+    if watcher.handle then
+        watcher.handle:unregister()
+        watcher.handle = nil
+    end
+    if watcher.replicaset then
+        watcher.replicaset.leader_watchers[watcher] = nil
+        watcher.replicaset = nil
+    end
+    watcher.key = nil
+    watcher.func = nil
+end
+
+-- Get closure with `key`, `value` arguments that calls user watcher function
+-- with extended signature (with the third `instance_name` argument).
+-- In addition the closure uses guard preventing concurrent execution of func.
+local function wrap_watcher_function(watcher, instance)
+    local instance_name = instance.instance_name
+    return function(key, value)
+        while watcher.is_executing do
+            watcher.execute_cond:wait()
+        end
+        -- Check that the watcher was not unregistered while we was waiting.
+        if watcher.handle then
+            watcher.is_executing = true
+            -- Don't care about error and result, it doesn't affect anything.
+            pcall(watcher.func, key, value, instance_name)
+            watcher.is_executing = false
+        end
+        watcher.execute_cond:signal()
+    end
+end
+
+-- Subscribe to `key` event on the leader of the replicaset.
+-- When the key value is updated the callback `func` will be called like that:
+-- func(key, value, instance_name).
+function replicaset_methods:watch_leader(key, func)
+    replicaset_check(self, 'watch_leader')
+    local watcher = {
+        replicaset = self,
+        key = key,
+        func = func,
+        -- Guard that prevents concurrent execution of func.
+        is_executing = false,
+        execute_cond = fiber.cond(),
+    }
+    local leader_instance = self.leader_instance
+    if leader_instance then
+        local wwfunc = wrap_watcher_function(watcher, leader_instance)
+        watcher.handle = leader_instance.conn:watch(watcher.key, wwfunc)
+    end
+    self.leader_watchers[watcher] = watcher
+    return setmetatable(watcher, watcher_mt)
+end
+
+-- Unregister all leader watchers from old leader (leader count becomes not 1).
+local function replicaset_unbind_watchers(replicaset)
+    for _, watcher in pairs(replicaset.leader_watchers) do
+        watcher.handle:unregister()
+        watcher.handle = nil
+    end
+end
+
+-- Register all leader watchers to the new leader (leader count becomes 1).
+local function replicaset_rebind_watchers(replicaset)
+    local leader_instance = replicaset.leader_instance
+    for _, watcher in pairs(replicaset.leader_watchers) do
+        local wwfunc = wrap_watcher_function(watcher, leader_instance)
+        watcher.handle = leader_instance.conn:watch(watcher.key, wwfunc)
+    end
+end
+
 -- Close all backend connections.
 function replicaset_methods:close()
     replicaset_check(self, 'close')
@@ -126,6 +214,7 @@ local function on_instance_status_change(replicaset, instance, status)
 
     if status_count.rw ~= 1 and replicaset.leader_instance then
         replicaset.leader_instance = nil
+        replicaset_unbind_watchers(replicaset)
     elseif status_count.rw == 1 and not replicaset.leader_instance then
         if status == 'rw' then
             replicaset.leader_instance = instance
@@ -137,6 +226,7 @@ local function on_instance_status_change(replicaset, instance, status)
                 end
             end
         end
+        replicaset_rebind_watchers(replicaset)
     end
 end
 
@@ -177,6 +267,8 @@ local function connect_by_cfg(cfg)
         status_count = {rw = 0, ro = 0, unknown = 0},
         -- Reference to the only RW instance (if there is only).
         leader_instance = nil,
+        -- Watchers that were added with 'watch_leader' method.
+        leader_watchers = {},
         -- Conditional var that broadcast if any instance status is changed.
         wait_status_cond = fiber.cond(),
     }
