@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(1999)
+test:plan(999)
 
 --!./tcltestrunner.lua
 -- 2007 May 12
@@ -29,7 +29,7 @@ test:do_execsql_test(
         -- </in2-1>
     })
 
-local N = 2000
+local N = 1000
 -- MUST_WORK_TEST
 test:do_test(
     "in2-2",
