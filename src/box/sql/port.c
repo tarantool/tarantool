@@ -270,8 +270,7 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out, struct mp_ctx *ctx)
 			return -1;
 		}
 		pos = mp_encode_uint(pos, IPROTO_DATA);
-		if (port_c_dump_msgpack_wrapped(port, out, ctx) < 0)
-			return -1;
+		port_c_dump_msgpack_wrapped(port, out, ctx);
 		break;
 	}
 	case DML_EXECUTE: {

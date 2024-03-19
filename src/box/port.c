@@ -37,6 +37,7 @@
 #include <fiber.h>
 #include "errinj.h"
 #include "mpstream/mpstream.h"
+#include "mp_tuple.h"
 #include "tweaks.h"
 #include "box/mp_box_ctx.h"
 
@@ -176,8 +177,16 @@ port_c_add_str(struct port *base, const char *str, uint32_t len)
 	mp_encode_str(dst, str, len);
 }
 
-static int
-port_c_dump_msgpack(struct port *base, struct obuf *out, struct mp_ctx *ctx)
+/**
+ * Dumps port contents as a sequence of MsgPack object to mpstream (without
+ * array header), mpstream is flushed.
+ * If ctx is passed, it must be instance of mp_box_ctx, and all tuples are
+ * dumped as MP_EXT and their formats are added to the ctx. Otherwise, all
+ * tuples are dumped as MP_ARRAY.
+ */
+static void
+port_c_dump_msgpack_impl(struct port *base, struct mpstream *stream,
+			 struct mp_ctx *ctx)
 {
 	struct port_c *port = (struct port_c *)base;
 	struct port_c_entry *pe;
@@ -185,27 +194,33 @@ port_c_dump_msgpack(struct port *base, struct obuf *out, struct mp_ctx *ctx)
 		uint32_t size = pe->mp_size;
 		if (size == 0) {
 			if (ctx != NULL) {
-				if (tuple_to_obuf_as_ext(pe->tuple, out) != 0)
-					return -1;
+				tuple_to_mpstream_as_ext(pe->tuple, stream);
 				struct mp_box_ctx *box_ctx =
 					mp_box_ctx_check(ctx);
 				tuple_format_map_add_format(
 					&box_ctx->tuple_format_map,
 					pe->tuple->format_id);
-			} else if (tuple_to_obuf(pe->tuple, out) != 0) {
-				return -1;
+			} else {
+				uint32_t size;
+				const char *data =
+					tuple_data_range(pe->tuple, &size);
+				mpstream_memcpy(stream, data, size);
 			}
-		} else if (obuf_dup(out, pe->mp, size) != size) {
-			diag_set(OutOfMemory, size, "obuf_dup", "data");
-			return -1;
+		} else {
+			mpstream_memcpy(stream, pe->mp, size);
 		}
-		ERROR_INJECT(ERRINJ_PORT_DUMP, {
-			diag_set(OutOfMemory,
-				 size == 0 ? tuple_size(pe->tuple) : size,
-				 "obuf_dup", "data");
-			return -1;
-		});
 	}
+	mpstream_flush(stream);
+}
+
+static int
+port_c_dump_msgpack(struct port *base, struct obuf *out, struct mp_ctx *ctx)
+{
+	struct port_c *port = (struct port_c *)base;
+	struct mpstream stream;
+	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
+		      mpstream_panic_cb, NULL);
+	port_c_dump_msgpack_impl(base, &stream, ctx);
 	return port->size;
 }
 
@@ -215,21 +230,16 @@ port_c_dump_msgpack(struct port *base, struct obuf *out, struct mp_ctx *ctx)
 static bool c_func_iproto_multireturn = true;
 TWEAK_BOOL(c_func_iproto_multireturn);
 
-int
+void
 port_c_dump_msgpack_wrapped(struct port *base, struct obuf *out,
 			    struct mp_ctx *ctx)
 {
 	struct port_c *port = (struct port_c *)base;
-	char *size_buf = obuf_alloc(out, mp_sizeof_array(port->size));
-	if (size_buf == NULL) {
-		diag_set(OutOfMemory, mp_sizeof_array(port->size), "obuf_alloc",
-			 "size_buf");
-		return -1;
-	}
-	mp_encode_array(size_buf, port->size);
-	if (port_c_dump_msgpack(base, out, ctx) < 0)
-		return -1;
-	return 1;
+	struct mpstream stream;
+	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
+		      mpstream_panic_cb, NULL);
+	mpstream_encode_array(&stream, port->size);
+	port_c_dump_msgpack_impl(base, &stream, ctx);
 }
 
 /**
@@ -241,17 +251,13 @@ static int
 port_c_dump_msgpack_compatible(struct port *base, struct obuf *out,
 			       struct mp_ctx *ctx)
 {
-	if (c_func_iproto_multireturn)
+	if (c_func_iproto_multireturn) {
 		return port_c_dump_msgpack(base, out, ctx);
-	else
-		return port_c_dump_msgpack_wrapped(base, out, ctx);
-}
-
-/** Callback to forward and error from mpstream methods. */
-static inline void
-set_encode_error(void *error_ctx)
-{
-	*(bool *)error_ctx = true;
+	} else {
+		port_c_dump_msgpack_wrapped(base, out, ctx);
+		/* One element (the array) was dumped. */
+		return 1;
+	}
 }
 
 const char *
@@ -260,37 +266,13 @@ port_c_get_msgpack(struct port *base, uint32_t *size)
 	struct port_c *port = (struct port_c *)base;
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
-	bool is_error = false;
 	struct mpstream stream;
 	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
-		      set_encode_error, &is_error);
+		      mpstream_panic_cb, NULL);
 	mpstream_encode_array(&stream, port->size);
-	struct port_c_entry *pe;
-	for (pe = port->first; pe != NULL; pe = pe->next) {
-		const char *data;
-		uint32_t len;
-		if (pe->mp_size == 0) {
-			data = tuple_data(pe->tuple);
-			len = tuple_bsize(pe->tuple);
-		} else {
-			data = pe->mp;
-			len = pe->mp_size;
-		}
-		mpstream_memcpy(&stream, data, len);
-	}
-	mpstream_flush(&stream);
-	if (is_error) {
-		diag_set(OutOfMemory, stream.pos - stream.buf,
-			 "mpstream_flush", "stream");
-		return NULL;
-	}
+	port_c_dump_msgpack_impl(base, &stream, NULL);
 	*size = region_used(region) - used;
-	const char *res = region_join(region, *size);
-	if (res == NULL) {
-		region_truncate(region, used);
-		diag_set(OutOfMemory, *size, "region_join", "res");
-		return NULL;
-	}
+	const char *res = xregion_join(region, *size);
 	mp_tuple_assert(res, res + *size);
 	return res;
 }
