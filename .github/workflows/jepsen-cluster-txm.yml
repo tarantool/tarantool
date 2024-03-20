@@ -9,6 +9,8 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    timeout-minutes: 60
+
     container:
       image: docker.io/tarantool/testing:debian-buster
       ports:

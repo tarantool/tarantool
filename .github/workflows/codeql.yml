@@ -27,6 +27,8 @@ jobs:
 
     runs-on: ubuntu-20.04-self-hosted
 
+    timeout-minutes: 60
+
     container:
       image: docker.io/tarantool/testing:ubuntu-focal
       # Mount /dev to the container to be able to mount a disk image inside it

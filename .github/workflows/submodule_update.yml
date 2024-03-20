@@ -18,6 +18,8 @@ jobs:
 
     runs-on: [ self-hosted, Linux, x86_64, flavor-1-2 ]
 
+    timeout-minutes: 60
+
     container:
       image: docker.io/tarantool/testing:ubuntu-focal
 

@@ -40,6 +40,8 @@ jobs:
 
     runs-on: ubuntu-20.04-self-hosted
 
+    timeout-minutes: 60
+
     container:
       image: docker.io/tarantool/testing:ubuntu-focal
 
@@ -70,6 +72,8 @@ jobs:
 
     runs-on: ubuntu-20.04-self-hosted
 
+    timeout-minutes: 60
+
     container:
       image: docker.io/tarantool/testing:ubuntu-focal
 
@@ -99,6 +103,8 @@ jobs:
           !contains(github.event.pull_request.labels.*.name, 'notest') )
 
     runs-on: ubuntu-20.04-self-hosted
+
+    timeout-minutes: 60
 
     container:
       image: docker.io/tarantool/testing:ubuntu-jammy

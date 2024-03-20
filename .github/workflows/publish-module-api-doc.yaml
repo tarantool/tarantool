@@ -32,6 +32,8 @@ jobs:
   build-api-doc:
     runs-on: ubuntu-latest
 
+    timeout-minutes: 60
+
     # Run on push to the tarantool/tarantool repository or on pull request
     # if the 'notest' label is not set.
     if: github.repository == 'tarantool/tarantool' &&
