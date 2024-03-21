@@ -176,3 +176,24 @@ g.test_sources_priority = function(g)
         t.assert_equals(config:get('log.syslog.identity'), 'from env default')
     end)
 end
+
+g.test_empty_sources = function()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local test_cases = {
+        "",
+        "--- null\n...\n",
+    }
+
+    for _, case in ipairs(test_cases) do
+        treegen.write_script(dir, 'single.yaml', case)
+
+        local exp = "No cluster config received from the given " ..
+                    "configuration sources."
+
+        local args = {'--name', 'instance-001', '--config', 'single.yaml'}
+        local res = justrun.tarantool(dir, {}, args, {stderr = true})
+
+        t.assert_equals(res.exit_code, 1)
+        t.assert_str_contains(res.stderr, exp)
+    end
+end
