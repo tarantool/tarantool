@@ -333,6 +333,7 @@ g.test_defaults = function()
             fiber_channel_close_mode = 'new',
             box_cfg_replication_sync_timeout = 'new',
             box_error_serialize_verbose = 'old',
+            box_cfg_replication_synchro_timeout = 'old',
             sql_seq_scan_default = 'new',
             fiber_slice_default = 'new',
             box_info_cluster_meaning = 'new',

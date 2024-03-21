@@ -2304,6 +2304,12 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'new',
         }),
+        box_cfg_replication_synchro_timeout = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
         sql_seq_scan_default = schema.enum({
             'old',
             'new',

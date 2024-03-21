@@ -57,6 +57,7 @@
 #include "wal.h"		/* wal_collect_garbage() */
 #include "checkpoint_schedule.h"
 #include "txn_limbo.h"
+#include "replication.h"
 
 struct gc_state gc;
 
@@ -522,7 +523,18 @@ gc_do_checkpoint(bool is_scheduled)
 	 * Wait the confirms on all "sync" transactions before
 	 * create a snapshot.
 	 */
-	rc = txn_limbo_wait_confirm(&txn_limbo);
+	double timeout;
+	if (replication_synchro_timeout_enabled) {
+		timeout = replication_synchro_timeout;
+	} else {
+		timeout = TIMEOUT_INFINITY;
+		if (!txn_limbo_is_empty(&txn_limbo)) {
+			say_info("checkpoint will be reached as soon as "
+				 "synchronous transactions in the queue "
+				 "are committed or rolled back");
+		}
+	}
+	rc = txn_limbo_wait_confirm(&txn_limbo, timeout);
 	if (rc != 0)
 		goto out;
 

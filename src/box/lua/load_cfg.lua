@@ -8,6 +8,7 @@ local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
 local compat = require('compat')
+local tweaks = require('internal.tweaks')
 
 local function nop() end
 
@@ -410,6 +411,37 @@ local template_cfg = {
 
     metrics = 'table',
 }
+
+local replication_synchro_timeout_brief = [[
+Sets the default value for box.cfg.replication_synchro_timeout.
+Old is 5 seconds, new is infinity.
+
+https://tarantool.io/compat/box_cfg_replication_synchro_timeout
+]]
+
+compat.add_option({
+    name = 'box_cfg_replication_synchro_timeout',
+    default = 'old',
+    obsolete = nil,
+    brief = replication_synchro_timeout_brief,
+    action = function(is_new)
+        if is_locked() or box_is_configured then
+            error("The compat  option 'box_cfg_replication_synchro_timeout' " ..
+                  "takes effect only before the initial box.cfg() call")
+        end
+        if is_new then
+            template_cfg['replication_synchro_timeout'] = nil
+            default_cfg['replication_synchro_timeout'] = nil
+            pre_load_cfg['replication_synchro_timeout'] = nil
+        else
+            template_cfg['replication_synchro_timeout'] = 'number'
+            default_cfg['replication_synchro_timeout'] = 5
+            pre_load_cfg['replication_synchro_timeout'] = nil
+        end
+        tweaks['replication_synchro_timeout_enabled'] = not is_new
+    end,
+    run_action_now = true,
+})
 
 local function normalize_uri_list_for_replication(port_list)
     if type(port_list) == 'table' then

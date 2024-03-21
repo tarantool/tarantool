@@ -445,7 +445,7 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req);
  * during confirm timeout or fail.
  */
 int
-txn_limbo_wait_confirm(struct txn_limbo *limbo);
+txn_limbo_wait_confirm(struct txn_limbo *limbo, double timeout);
 
 /**
  * Wait until the last transaction in the limbo is finished and gets its result.

@@ -289,7 +289,8 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	double start_time = fiber_clock();
 	while (true) {
 		double deadline = start_time + replication_synchro_timeout;
-		double timeout = deadline - fiber_clock();
+		double timeout = replication_synchro_timeout_enabled ?
+			deadline - fiber_clock() : TIMEOUT_INFINITY;
 		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
 		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
@@ -794,13 +795,12 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 }
 
 int
-txn_limbo_wait_confirm(struct txn_limbo *limbo)
+txn_limbo_wait_confirm(struct txn_limbo *limbo, double timeout)
 {
 	if (txn_limbo_is_empty(limbo))
 		return 0;
 	bool is_rollback;
-	if (txn_limbo_wait_last_txn(limbo, &is_rollback,
-				    replication_synchro_timeout) != 0) {
+	if (txn_limbo_wait_last_txn(limbo, &is_rollback, timeout) != 0) {
 		diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
 		return -1;
 	}
