@@ -1650,6 +1650,22 @@ box_check_wal_queue_max_size(void)
 	return size;
 }
 
+/** Check replication_synchro_queue_max_size option validity. */
+static int64_t
+box_check_replication_synchro_queue_max_size(void)
+{
+	int64_t size = cfg_geti64("replication_synchro_queue_max_size");
+	if (size < 0) {
+		diag_set(ClientError, ER_CFG,
+			 "replication_synchro_queue_max_size",
+			 "replication_synchro_queue_max_size must be >= 0");
+	}
+	/* Unlimited. */
+	if (size == 0)
+		size = INT64_MAX;
+	return size;
+}
+
 static double
 box_check_wal_cleanup_delay(void)
 {
@@ -1973,6 +1989,8 @@ box_check_config(void)
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 	if (box_check_wal_queue_max_size() < 0)
+		diag_raise();
+	if (box_check_replication_synchro_queue_max_size() < 0)
 		diag_raise();
 	if (box_check_wal_cleanup_delay() < 0)
 		diag_raise();
@@ -3240,6 +3258,22 @@ box_set_wal_queue_max_size(void)
 	if (size < 0)
 		return -1;
 	wal_set_queue_max_size(size);
+	return 0;
+}
+
+int
+box_set_replication_synchro_queue_max_size(void)
+{
+	int64_t size = box_check_replication_synchro_queue_max_size();
+	if (size < 0)
+		return -1;
+	if (size != INT64_MAX && recovery_state != FINISHED_RECOVERY) {
+		say_info("The option replication_synchro_queue_max_size will "
+			 "actually take effect after the recovery is finished");
+		txn_limbo_set_max_size(&txn_limbo, INT64_MAX);
+		return 0;
+	}
+	txn_limbo_set_max_size(&txn_limbo, size);
 	return 0;
 }
 
@@ -5161,6 +5195,8 @@ bootstrap_master(void)
 	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_AUTO)
 		check_bootstrap_unanimity();
 	engine_bootstrap_xc();
+	if (box_set_replication_synchro_queue_max_size() != 0)
+		diag_raise();
 
 	uint32_t replica_id = 1;
 	box_insert_replica_record(replica_id, &INSTANCE_UUID,
@@ -5254,6 +5290,8 @@ bootstrap_from_master(struct replica *master)
 	}
 	/* Finalize the new replica */
 	engine_end_recovery_xc();
+	if (box_set_replication_synchro_queue_max_size() != 0)
+		diag_raise();
 
 	/* Switch applier to initial state */
 	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
@@ -5657,6 +5695,8 @@ box_cfg_xc(void)
 	if (box_set_replication_synchro_quorum() != 0)
 		diag_raise();
 	if (box_set_replication_synchro_timeout() != 0)
+		diag_raise();
+	if (box_set_replication_synchro_queue_max_size() != 0)
 		diag_raise();
 	box_set_replication_sync_timeout();
 	if (box_check_instance_name(cfg_instance_name) != 0)

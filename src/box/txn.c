@@ -1148,12 +1148,18 @@ txn_commit_nop(struct txn *txn)
 static int
 txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req)
 {
+	uint32_t origin_id = req->rows[0]->replica_id;
+	if (origin_id == 0 && txn_limbo.size >= txn_limbo.max_size) {
+		diag_set(ClientError, ER_SYNC_QUEUE_FULL);
+		return -1;
+	}
+
 	/*
 	 * Remote rows, if any, come before local rows, so check for originating
 	 * instance id in the first row.
 	 */
-	uint32_t origin_id = req->rows[0]->replica_id;
-	txn->limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
+	txn->limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn,
+					    req->approx_len);
 	if (txn->limbo_entry == NULL)
 		return -1;
 	return 0;
