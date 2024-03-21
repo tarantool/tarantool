@@ -1668,3 +1668,107 @@ g.test_info_version_error = function(g)
         verify = verify,
     })
 end
+
+-- Ensure that the configuration module does not revoke privilege credentials
+-- that it has not granted.
+g.test_do_no_revoke_user_privs = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = {
+        credentials = {
+            users = {
+                guest = {
+                    roles = {'super'},
+                },
+            },
+        },
+        iproto = {
+            listen = {{
+                uri = 'unix/:./{{ instance_name }}.iproto',
+            }},
+        },
+        groups = {
+            ['group-001'] = {
+                replicasets = {
+                    ['replicaset-001'] = {
+                        instances = {
+                            ['instance-001'] = {},
+                        },
+                    },
+                },
+            },
+        },
+    }
+    treegen.write_script(dir, 'config.yaml', yaml.encode(config))
+    local opts = {
+        config_file = 'config.yaml',
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+
+    -- Create a space for which privileges will be checked.
+    g.server:exec(function()
+        box.schema.space.create('a')
+    end)
+
+    -- Create a role and grant it some privileges using config and
+    -- box.schema.user.grant().
+    config.credentials.roles = {myrole = {
+            privileges = {{
+                permissions = {'read', 'write'},
+                spaces = {'a'},
+            }},
+        },
+    }
+    treegen.write_script(dir, 'config.yaml', yaml.encode(config))
+    g.server:exec(function()
+        local config = require('config')
+        config:reload()
+        local config_privs = config:get('credentials.roles.myrole')
+        local exp = {
+            privileges = {{
+                permissions = {"read", "write"},
+                spaces = {"a"},
+            }},
+        }
+        t.assert_equals(config_privs, exp)
+        local actual_privs = box.schema.role.info('myrole')
+        exp = {{"read,write", "space", "a"}}
+        t.assert_equals(actual_privs, exp)
+
+        box.schema.role.grant('myrole', 'read,create', 'space', 'a')
+        actual_privs = box.schema.role.info('myrole')
+        exp = {{"read,write,create", "space", "a"}}
+        t.assert_equals(actual_privs, exp)
+    end)
+
+    -- Change the privileges granted by config. Ensure that privileges
+    -- that were not granted by the configuration, as well as
+    -- privileges that were not granted solely by the configuration,
+    -- are not revoked on reload.
+    config.credentials.roles = {myrole = {
+            privileges = {{
+                permissions = {'drop', 'read'},
+                spaces = {'a'},
+            }},
+        },
+    }
+    treegen.write_script(dir, 'config.yaml', yaml.encode(config))
+    g.server:exec(function()
+        local config = require('config')
+        config:reload()
+        local config_privs = config:get('credentials.roles.myrole')
+        local exp = {
+            privileges = {{
+                permissions = {"drop", "read"},
+                spaces = {"a"},
+            }},
+        }
+        t.assert_equals(config_privs, exp)
+
+        local actual_privs = box.schema.role.info('myrole')
+        exp = {{"read,create,drop", "space", "a"}}
+        t.assert_equals(actual_privs, exp)
+    end)
+end
