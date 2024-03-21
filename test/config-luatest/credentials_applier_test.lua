@@ -72,338 +72,168 @@ local function define_assert_priv_function(server)
 end
 
 g.test_converters = function()
-    -- Guest privileges in format provided by box.schema.{user,role}.info()
-    local box_guest_privileges = {{
-            'execute',
-            'role',
-            'public',
-        }, {
-            'session,usage',
-            'universe',
-        }, {
-            'execute',
-            'lua_call',
-        }, {
-            'execute',
-            'lua_eval',
-        }
-    }
-
-    -- Guest privileges in format provided by config schema
-    local config_guest_data = {
-        privileges = {{
-                permissions = {
-                    'session',
-                    'usage'
-                },
-                universe = true,
-            }, {
-                permissions = {
-                    'execute',
-                },
-                lua_eval = true,
-                lua_call = {
-                    'all'
-                },
-            }
-        },
+    local credentials = {
         roles = {
-            'public'
-        },
-    }
-
-    -- Guest privileges in format of intermediate representation
-    local intermediate_guest_privileges = {
-        ['user'] = {},
-        ['role'] = {
-            ['public'] = {
-                ['execute'] = true
-            }
-        },
-        ['space'] = {},
-        ['function'] = {},
-        ['sequence'] = {},
-        ['universe'] = {
-            [''] = {
-                ['session'] = true,
-                ['usage'] = true,
-            }
-        },
-        ['lua_eval'] = {
-            [''] = {
-                ['execute'] = true,
-            },
-        },
-        ['lua_call'] = {
-            [''] = {
-                ['execute'] = true,
-            },
-        },
-        ['sql'] = {},
-    }
-
-    t.assert_equals(internal.privileges_from_box(box_guest_privileges),
-                    intermediate_guest_privileges)
-
-    t.assert_equals(internal.privileges_from_config(config_guest_data),
-                    intermediate_guest_privileges)
-
-
-    local box_admin_privileges = {{
-            'read,write,execute,session,usage,create,drop,alter,reference,' ..
-            'trigger,insert,update,delete',
-            'universe'
-        },
-    }
-
-    local config_admin_data = {
-        privileges = {{
-                permissions = {
-                    'read',
-                    'write',
-                    'execute',
-                    'session',
-                    'usage',
-                    'create',
-                    'drop',
-                    'alter',
-                    'reference',
-                    'trigger',
-                    'insert',
-                    'update',
-                    'delete',
+            myrole = {
+                roles = {'super'},
+                privileges = {
+                    {
+                        permissions = {'read'},
+                        spaces = {'_priv'},
+                    },
+                    {
+                        permissions = {'execute'},
+                        functions = {'box.schema.user.info'},
+                    },
                 },
-                universe = true,
+            },
+        },
+        users = {
+            myuser = {
+                roles = {'myrole', 'replication'},
+                privileges = {
+                    {
+                        permissions = {'read', 'drop'},
+                        spaces = {'_space', '_index'},
+                    },
+                    {
+                        permissions = {'write', 'create'},
+                        spaces = {'_func', '_space'},
+                    },
+                    {
+                        permissions = {'write'},
+                        sequences = {''},
+                    },
+                    {
+                        permissions = {'execute'},
+                        functions = {'LUA'},
+                        sql = {'all'},
+                        lua_call = {'all'},
+                        lua_eval = true,
+                    },
+                },
+            },
+            guest = {
+                roles = {'super'},
+            },
+        },
+    }
+
+    local function verify()
+        local config = require('config')
+        local credentials = require('internal.config.applier.credentials')
+        local internal = credentials._internal
+        local box_privs = internal.privileges_from_box
+        local cfg_privs = internal.privileges_from_config
+
+        -- Intermediate representation of myrole privileges.
+        local exp = {
+            ['user'] = {},
+            ['role'] = {
+                super = {
+                    execute = true,
+                },
+            },
+            ['space'] = {
+                _priv = {
+                    read = true,
+                },
+            },
+            ['function'] = {
+                ['box.schema.user.info'] = {
+                    execute = true,
+                }
+            },
+            ['sequence'] = {},
+            ['universe'] = {},
+            ['lua_eval'] = {},
+            ['lua_call'] = {},
+            ['sql'] = {},
+        }
+        t.assert_equals(box_privs('myrole'), exp)
+        t.assert_equals(cfg_privs(config:get('credentials.roles.myrole')), exp)
+
+        -- Intermediate representation of guest privileges.
+        exp = {
+            ['user'] = {},
+            ['role'] = {
+                super = {
+                    execute = true,
+                },
+            },
+            ['space'] = {},
+            ['function'] = {},
+            ['sequence'] = {},
+            ['universe'] = {},
+            ['lua_eval'] = {},
+            ['lua_call'] = {},
+            ['sql'] = {},
+        }
+        t.assert_equals(box_privs('guest'), exp)
+        t.assert_equals(cfg_privs(config:get('credentials.users.guest')), exp)
+
+        -- Intermediate representation of myuser privileges.
+        exp = {
+            ['user'] = {},
+            ['role'] = {
+                myrole = {
+                    execute = true,
+                },
+                replication = {
+                    execute = true,
+                },
+            },
+            ['space'] = {
+                _func = {
+                    create = true,
+                    write = true,
+                },
+                _index = {
+                    drop = true,
+                    read = true,
+                },
+                _space = {
+                    create = true,
+                    write = true,
+                    drop = true,
+                    read = true,
+                },
+            },
+            ['function'] = {
+                LUA = {
+                    execute = true,
+                },
+            },
+            ['sequence'] = {
+                [''] = {
+                    write = true,
+                },
+            },
+            ['universe'] = {},
+            ['lua_eval'] = {
+                [''] = {
+                    execute = true,
+                },
+            },
+            ['lua_call'] = {
+                [''] = {
+                    execute = true,
+                },
+            },
+            ['sql'] = {
+                [''] = {
+                    execute = true,
+                },
             },
         }
-    }
+        t.assert_equals(box_privs('myuser'), exp)
+        t.assert_equals(cfg_privs(config:get('credentials.users.myuser')), exp)
+    end
 
-    local intermediate_admin_privileges = {
-        ['user'] = {},
-        ['role'] = {},
-        ['space'] = {},
-        ['function'] = {},
-        ['sequence'] = {},
-        ['universe'] = {
-            [''] = {
-                ['read'] = true,
-                ['write'] = true,
-                ['execute'] = true,
-                ['session'] = true,
-                ['usage'] = true,
-                ['create'] = true,
-                ['drop'] = true,
-                ['alter'] = true,
-                ['reference'] = true,
-                ['trigger'] = true,
-                ['insert'] = true,
-                ['update'] = true,
-                ['delete'] = true,
-            }
-        },
-        ['lua_eval'] = {},
-        ['lua_call'] = {},
-        ['sql'] = {},
-    }
-
-    t.assert_equals(internal.privileges_from_box(box_admin_privileges),
-                    intermediate_admin_privileges)
-
-    t.assert_equals(internal.privileges_from_config(config_admin_data),
-                    intermediate_admin_privileges)
-
-    local box_replication_privileges = {{
-            'write',
-            'space',
-            '_cluster',
-        }, {
-            'read',
-            'universe',
-        },
-    }
-
-    local config_replication_data = {
-        privileges = {{
-                permissions = {
-                    'write'
-                },
-                spaces = {
-                    '_cluster',
-                },
-            }, {
-                permissions = {
-                    'read'
-                },
-                universe = true,
-            },
-        }
-    }
-
-    local intermediate_replication_privileges = {
-        ['user'] = {},
-        ['role'] = {},
-        ['space'] = {
-            ['_cluster'] = {
-                ['write'] = true,
-            },
-        },
-        ['function'] = {},
-        ['sequence'] = {},
-        ['universe'] = {
-            [''] = {
-                ['read'] = true,
-            },
-        },
-        ['lua_eval'] = {},
-        ['lua_call'] = {},
-        ['sql'] = {},
-    }
-
-    t.assert_equals(internal.privileges_from_box(box_replication_privileges),
-                    intermediate_replication_privileges)
-
-    t.assert_equals(internal.privileges_from_config(config_replication_data),
-                    intermediate_replication_privileges)
-
-
-    local box_custom_privileges = {{
-            'read,write',
-            'space',
-        }, {
-            'read,write',
-            'sequence',
-            'myseq1',
-        }, {
-            'read,write',
-            'sequence',
-            'myseq2',
-        }, {
-            'execute',
-            'function',
-            'myfunc1',
-        }, {
-            'execute',
-            'function',
-            'myfunc2',
-        }, {
-            'read',
-            'universe',
-        }, {
-            'execute',
-            'role',
-            'myrole1',
-        }, {
-            'execute',
-            'role',
-            'myrole2',
-        }, {
-            'execute',
-            'role',
-            'public',
-        }, {
-            'execute',
-            'lua_call',
-        },
-    }
-
-    local config_custom_data = {
-        privileges = {{
-                permissions = {
-                    'read',
-                    'write',
-                },
-                spaces = {
-                    'all',
-                },
-                sequences = {
-                    'myseq1',
-                    'myseq2',
-                },
-            }, {
-                permissions = {
-                    'execute',
-                },
-                functions = {
-                    'myfunc1',
-                    'myfunc2',
-                },
-            }, {
-                permissions = {
-                    'read',
-                },
-                universe = true,
-            }, {
-                permissions = {
-                    'execute',
-                },
-                lua_call = {
-                    'all'
-                },
-            },
-        },
-        roles = {
-            'myrole1',
-            'myrole2',
-            'public',
-        }
-    }
-
-    local intermediate_custom_privileges = {
-        ['user'] = {},
-        ['role'] = {
-            ['myrole1'] = {
-                ['execute'] = true,
-            },
-            ['myrole2'] = {
-                ['execute'] = true,
-            },
-            ['public'] = {
-                ['execute'] = true,
-            },
-        },
-        ['space'] = {
-            [''] = {
-                ['read'] = true,
-                ['write'] = true,
-            },
-        },
-        ['function'] = {
-            ['myfunc1'] = {
-                ['execute'] = true,
-            },
-            ['myfunc2'] = {
-                ['execute'] = true,
-            },
-        },
-        ['sequence'] = {
-            ['myseq1'] = {
-                ['read'] = true,
-                ['write'] = true,
-            },
-            ['myseq2'] = {
-                ['read'] = true,
-                ['write'] = true,
-            },
-        },
-        ['universe'] = {
-            [''] = {
-                ['read'] = true,
-            },
-        },
-        ['lua_eval'] = {},
-        ['lua_call'] = {
-            [''] = {
-                ['execute'] = true,
-            },
-        },
-        ['sql'] = {},
-    }
-
-    t.assert_equals(internal.privileges_from_box(box_custom_privileges),
-                    intermediate_custom_privileges)
-
-    t.assert_equals(internal.privileges_from_config(config_custom_data),
-                    intermediate_custom_privileges)
+    helpers.success_case(g, {
+        options = {credentials = credentials},
+        verify = verify,
+    })
 end
 
 g.test_privileges_subtract = function()
@@ -472,65 +302,6 @@ g.test_privileges_subtract = function()
     t.assert_items_equals(internal.privileges_subtract(target, current), lack)
 end
 
-g.test_privileges_add_defaults = function(g)
-    local cases = {
-        {'user', 'guest'},
-        {'user', 'admin'},
-        {'user', '<newly_created>'},
-        {'role', 'public'},
-        {'role', 'replication'},
-        {'role', 'super'},
-        {'role', '<newly_created>'},
-    }
-
-    for _, case in ipairs(cases) do
-        local role_or_user, name = unpack(case)
-
-        -- Disable hide/show prompt functionality, because it
-        -- breaks a command echo check. The reason is that the
-        -- 'scheduled next checkpoint' log message is issued from
-        -- a background fiber.
-        local child = it.new({
-            env = {
-                TT_CONSOLE_HIDE_SHOW_PROMPT = 'false',
-            },
-        })
-
-        local dir = treegen.prepare_directory(g, {}, {})
-
-        child:execute_command(("box.cfg{work_dir = %q}"):format(dir))
-        child:read_response()
-        if name == '<newly_created>' then
-            name = 'somerandomname'
-            child:execute_command(("box.schema.%s.create('%s')"):format(
-                                   role_or_user, name))
-            child:read_response()
-        end
-        child:execute_command(("box.schema.%s.info('%s')"):format(role_or_user,
-                                                                  name))
-        local box_privileges = child:read_response()
-        box_privileges = internal.privileges_from_box(box_privileges)
-
-        local defaults = {
-            ['user'] = {},
-            ['role'] = {},
-            ['space'] = {},
-            ['function'] = {},
-            ['sequence'] = {},
-            ['universe'] = {},
-            ['lua_eval'] = {},
-            ['lua_call'] = {},
-            ['sql'] = {},
-        }
-        defaults = internal.privileges_add_defaults(name, role_or_user,
-                                                    defaults)
-
-        t.assert_equals(defaults, box_privileges)
-
-        child:close()
-    end
-end
-
 g.test_sync_privileges = function(g)
     local box_configuration = {{
             "grant", "read", "universe", ""
@@ -590,24 +361,18 @@ g.test_sync_privileges = function(g)
                          action, name, perm, obj_type, obj_name, opts))
     end
     child:roundtrip("applier = require('internal.config.applier.credentials')")
-    child:roundtrip("applier._internal.set_config({_aboard = " ..
-        "require('internal.config.utils.aboard').new()})")
-    child:roundtrip("sync_privileges =  applier._internal.sync_privileges")
+    child:roundtrip("internal = applier._internal")
+    child:roundtrip("aboard = require('internal.config.utils.aboard').new()")
+    child:roundtrip("internal.set_config({_aboard = aboard})")
+    child:roundtrip("sync_privileges = internal.sync_privileges")
     child:roundtrip("json = require('json')")
-    child:roundtrip(("credentials = json.decode(%q)"):format(
-                     json.encode(credentials)))
-    child:roundtrip(("sync_privileges(credentials)")
-                    :format(name))
+    child:roundtrip(("priv = json.decode(%q)"):format(json.encode(credentials)))
+    child:roundtrip("sync_privileges(priv)")
 
-    child:execute_command(("box.schema.user.info('%s')"):format(name))
+    child:execute_command(("internal.privileges_from_box('%s')"):format(name))
     local result_privileges = child:read_response()
-
-    result_privileges = internal.privileges_from_box(result_privileges)
     local config_privileges = internal.privileges_from_config(
                                             credentials.users.myuser)
-
-    config_privileges = internal.privileges_add_defaults(name, "user",
-                                                         config_privileges)
 
     t.assert_equals(result_privileges, config_privileges)
 
@@ -694,19 +459,13 @@ g.test_remove_user_role = function(g)
         local internal =
                 require('internal.config.applier.credentials')._internal
 
-        local guest_perm = box.schema.user.info('guest')
-        guest_perm = internal.privileges_from_box(guest_perm)
-
+        local guest_perm = internal.privileges_from_box('guest')
         t.assert(guest_perm['role']['super'].execute)
 
-        local user_perm = box.schema.user.info('myuser')
-        user_perm = internal.privileges_from_box(user_perm)
-
+        local user_perm = internal.privileges_from_box('myuser')
         t.assert(user_perm['universe'][''].execute)
 
-        local role_perm = box.schema.role.info('myrole')
-        role_perm = internal.privileges_from_box(role_perm)
-
+        local role_perm = internal.privileges_from_box('myrole')
         t.assert(role_perm['universe'][''].read)
         t.assert(role_perm['universe'][''].write)
     end
@@ -754,9 +513,9 @@ g.test_remove_user_role = function(g)
     })
 end
 
-g.test_restore_defaults_for_default_user = function(g)
+g.test_remove_excessive_privs_for_default_user = function(g)
     -- Verify that if the default users and roles are not present in config
-    -- their excessive privileges are revoked (restored to built-in defaults).
+    -- their excessive privileges granted by the config are revoked.
 
     helpers.reload_success_case(g, {
         options = {
@@ -784,27 +543,12 @@ g.test_restore_defaults_for_default_user = function(g)
             }
         },
         verify = function()
-            local internal =
-                    require('internal.config.applier.credentials')._internal
-
-            local default_identities = {{
-                'user', 'admin',
-            }, {
-                'user', 'guest',
-            }, {
-                'role', 'super',
-            }, {
-                'role', 'public',
-            }, {
-                'role', 'replication',
-            },}
-
-            for _, id in ipairs(default_identities) do
-                local user_or_role, name = unpack(id)
-
-                local perm = box.schema[user_or_role].info(name)
-                perm = internal.privileges_from_box(perm)
-
+            local credentials = require('internal.config.applier.credentials')
+            local internal = credentials._internal
+            local default_identities = {'admin', 'guest', 'super', 'public',
+                                        'replication'}
+            for _, name in ipairs(default_identities) do
+                local perm = internal.privileges_from_box(name)
                 t.assert_equals(perm['role']['dummy'], {execute = true})
             end
         end,
@@ -818,27 +562,12 @@ g.test_restore_defaults_for_default_user = function(g)
             }
         },
         verify_2 = function()
-            local internal =
-                    require('internal.config.applier.credentials')._internal
-
-            local default_identities = {{
-                'user', 'admin',
-            }, {
-                'user', 'guest',
-            }, {
-                'role', 'super',
-            }, {
-                'role', 'public',
-            }, {
-                'role', 'replication',
-            },}
-
-            for _, id in ipairs(default_identities) do
-                local user_or_role, name = unpack(id)
-
-                local perm = box.schema[user_or_role].info(name)
-                perm = internal.privileges_from_box(perm)
-
+            local credentials = require('internal.config.applier.credentials')
+            local internal = credentials._internal
+            local default_identities = {'admin', 'guest', 'super', 'public',
+                                        'replication'}
+            for _, name in ipairs(default_identities) do
+                local perm = internal.privileges_from_box(name)
                 t.assert_not_equals(perm['role']['dummy'], {execute = true})
             end
         end,
@@ -878,9 +607,7 @@ g.test_sync_ro_rw = function(g)
             local internal =
                     require('internal.config.applier.credentials')._internal
 
-            local perm = box.schema.user.info('guest')
-            perm = internal.privileges_from_box(perm)
-
+            local perm = internal.privileges_from_box('guest')
             t.assert_not_equals(perm['role']['dummy'], {execute = true})
 
             box.cfg{read_only = false}
@@ -891,9 +618,7 @@ g.test_sync_ro_rw = function(g)
             retrying(
                 {timeout = 10, delay = 0.5},
                 function()
-                    local perm = box.schema.user.info('guest')
-                    perm = internal.privileges_from_box(perm)
-
+                    local perm = internal.privileges_from_box('guest')
                     t.assert_equals(perm['role']['dummy'], {execute = true})
                 end
             )
@@ -976,11 +701,8 @@ g.test_postpone_grants_till_creation = function(g)
             local internal =
                     require('internal.config.applier.credentials')._internal
 
-            local perm_1 = box.schema.user.info('myuser1')
-            perm_1 = internal.privileges_from_box(perm_1)
-
-            local perm_2 = box.schema.user.info('myuser2')
-            perm_2 = internal.privileges_from_box(perm_2)
+            local perm_1 = internal.privileges_from_box('myuser1')
+            local perm_2 = internal.privileges_from_box('myuser2')
 
             t.assert_equals(perm_1['space']['myspace1'],
                                 {read = true, write = true})
@@ -1012,21 +734,14 @@ g.test_postpone_grants_till_creation = function(g)
             local internal =
                     require('internal.config.applier.credentials')._internal
 
-            local perm_1 = box.schema.user.info('myuser1')
-            perm_1 = internal.privileges_from_box(perm_1)
-
-            local perm_2 = box.schema.user.info('myuser2')
-            perm_2 = internal.privileges_from_box(perm_2)
+            local perm_1 = internal.privileges_from_box('myuser1')
+            local perm_2 = internal.privileges_from_box('myuser2')
 
             local exp_perm_1 = iconfig.credentials.users.myuser1
             exp_perm_1 = internal.privileges_from_config(exp_perm_1)
-            exp_perm_1 = internal.privileges_add_defaults('myuser1', 'user',
-                                                          exp_perm_1)
 
             local exp_perm_2 = iconfig.credentials.users.myuser2
             exp_perm_2 = internal.privileges_from_config(exp_perm_2)
-            exp_perm_2 = internal.privileges_add_defaults('myuser2', 'user',
-                                                          exp_perm_2)
 
             t.assert_equals(perm_1, exp_perm_1)
             t.assert_equals(perm_2, exp_perm_2)
@@ -1096,16 +811,12 @@ g.test_postpone_grants_till_rename = function(g)
             local internal =
                     require('internal.config.applier.credentials')._internal
 
-            local perm_1 = box.schema.user.info('myuser1')
-            perm_1 = internal.privileges_from_box(perm_1)
-
+            local perm_1 = internal.privileges_from_box('myuser1')
             t.assert_equals(perm_1['space']['myspace1'], nil)
 
             box.space['myspace2']:rename('myspace1')
 
-            local perm_2 = box.schema.user.info('myuser1')
-            perm_2 = internal.privileges_from_box(perm_2)
-
+            local perm_2 = internal.privileges_from_box('myuser1')
             t.assert_equals(perm_2['space']['myspace1'],
                                 {read = true, write = true})
 
@@ -1156,9 +867,7 @@ g.test_postpone_grants_till_rename = function(g)
             local internal =
                     require('internal.config.applier.credentials')._internal
 
-            local perm_1 = box.schema.user.info('myuser')
-            perm_1 = internal.privileges_from_box(perm_1)
-
+            local perm_1 = internal.privileges_from_box('myuser')
             t.assert_equals(perm_1['space']['myspace1'],
                                 {read = true})
 
@@ -1166,9 +875,7 @@ g.test_postpone_grants_till_rename = function(g)
 
             box.space['myspace1']:rename('myspace2')
 
-            local perm_2 = box.schema.user.info('myuser')
-            perm_2 = internal.privileges_from_box(perm_2)
-
+            local perm_2 = internal.privileges_from_box('myuser')
             t.assert_equals(perm_2['space']['myspace2'],
                                 {read = true, write = true})
 
@@ -1181,13 +888,9 @@ g.test_postpone_grants_till_rename = function(g)
             local internal =
                     require('internal.config.applier.credentials')._internal
 
-            local perm = box.schema.user.info('myuser')
-            perm = internal.privileges_from_box(perm)
-
+            local perm = internal.privileges_from_box('myuser')
             local exp_perm = iconfig.credentials.users.myuser
             exp_perm = internal.privileges_from_config(exp_perm)
-            exp_perm = internal.privileges_add_defaults('myuser', 'user',
-                                                        exp_perm)
             t.assert_equals(perm, exp_perm)
 
             -- Recheck relevant permissions without privileges_from_config()
@@ -1242,13 +945,9 @@ g.test_postpone_grants_till_rename = function(g)
 
             local function check_sync()
 
-                local perm = box.schema.user.info('myuser')
-                perm = internal.privileges_from_box(perm)
-
+                local perm = internal.privileges_from_box('myuser')
                 local exp_perm = iconfig.credentials.users.myuser
                 exp_perm = internal.privileges_from_config(exp_perm)
-                exp_perm = internal.privileges_add_defaults('myuser', 'user',
-                                                            exp_perm)
                 t.assert_equals(perm, exp_perm)
 
                 -- Recheck relevant permissions without privileges_from_config()
