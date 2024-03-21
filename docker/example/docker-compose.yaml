@@ -1,0 +1,46 @@
+services:
+  instance-001:
+    image: tarantool/tarantool:3.0.1
+    container_name: tarantool-instance-001
+    volumes:
+      - ./app:/opt/tarantool/app
+      - ./data:/var/lib/tarantool
+    environment:
+      - TT_APP_NAME=app
+      - TT_INSTANCE_NAME=instance-001
+    networks:
+      - tarantool
+    ports:
+      - "3301:3301"
+
+  instance-002:
+    image: tarantool/tarantool:3.0.1
+    container_name: tarantool-instance-002
+    volumes:
+      - ./app:/opt/tarantool/app
+      - ./data:/var/lib/tarantool
+    environment:
+      - TT_APP_NAME=app
+      - TT_INSTANCE_NAME=instance-002
+    networks:
+      - tarantool
+    ports:
+      - "3302:3301"
+
+  instance-003:
+    image: tarantool/tarantool:3.0.1
+    container_name: tarantool-instance-003
+    volumes:
+      - ./app:/opt/tarantool/app
+      - ./data:/var/lib/tarantool
+    environment:
+      - TT_APP_NAME=app
+      - TT_INSTANCE_NAME=instance-003
+    networks:
+      - tarantool
+    ports:
+      - "3303:3301"
+
+networks:
+  tarantool:
+    driver: bridge
