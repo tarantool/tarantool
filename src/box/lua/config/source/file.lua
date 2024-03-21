@@ -26,6 +26,12 @@ function methods.sync(self, config_module, _iconfig)
             config_module._config_file, res))
     end
 
+    -- YAML returns `nil` or `box.NULL` on empty file,
+    -- while config sources should be {} if empty.
+    if res == nil then
+        res = {}
+    end
+
     self._values = res
 end
 
