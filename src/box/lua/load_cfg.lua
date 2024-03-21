@@ -185,6 +185,7 @@ local default_cfg = {
     replication_sync_lag = 10,
     replication_sync_timeout = 0,
     replication_synchro_quorum = "N / 2 + 1",
+    replication_synchro_queue_max_size = 0,
     replication_synchro_timeout = 5,
     replication_connect_timeout = 30,
     replication_connect_quorum = nil, -- connect all
@@ -373,6 +374,7 @@ local template_cfg = {
     checkpoint_interval = 'number',
     checkpoint_wal_threshold = 'number',
     wal_queue_max_size  = 'number',
+    replication_synchro_queue_max_size = 'number',
     checkpoint_count    = 'number',
     read_only           = 'boolean',
     hot_standby         = 'boolean',
@@ -501,6 +503,8 @@ local dynamic_cfg = {
     checkpoint_interval     = private.cfg_set_checkpoint_interval,
     checkpoint_wal_threshold = private.cfg_set_checkpoint_wal_threshold,
     wal_queue_max_size      = private.cfg_set_wal_queue_max_size,
+    replication_synchro_queue_max_size =
+        private.cfg_set_replication_synchro_queue_max_size,
     worker_pool_threads     = private.cfg_set_worker_pool_threads,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = nop,
@@ -638,6 +642,7 @@ local dynamic_cfg_order = {
     replication_synchro_timeout = 150,
     replication_connect_timeout = 150,
     replication_connect_quorum  = 150,
+    replication_synchro_queue_max_size = 150,
     -- Apply bootstrap_strategy before replication, but after
     -- replication_connect_quorum. The latter might influence its value.
     bootstrap_strategy      = 175,
@@ -683,6 +688,7 @@ local dynamic_cfg_skip_at_load = {
     replication_sync_timeout = true,
     replication_synchro_quorum = true,
     replication_synchro_timeout = true,
+    replication_synchro_queue_max_size = true,
     replication_skip_conflict = true,
     replication_anon        = true,
     bootstrap_strategy      = true,
