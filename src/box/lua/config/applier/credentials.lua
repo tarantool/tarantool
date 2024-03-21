@@ -6,7 +6,60 @@ local fiber = require('fiber')
 -- Var is set with the first apply() call.
 local config
 
+local PRIV_OPTS_FIELD_ID = 6
+local CONFIG_ORIGIN = 'config'
+
 -- {{{ Sync helpers
+
+local function decode_privilege(privileges_mask)
+    local privs_map = {
+        read      = box.priv.R,
+        write     = box.priv.W,
+        execute   = box.priv.X,
+        session   = box.priv.S,
+        usage     = box.priv.U,
+        create    = box.priv.C,
+        drop      = box.priv.D,
+        alter     = box.priv.A,
+        reference = box.priv.REFERENECE,
+        trigger   = box.priv.TRIGGER,
+        insert    = box.priv.INSERT,
+        update    = box.priv.UPDATE,
+        delete    = box.priv.DELETE
+    }
+    local privileges = {}
+    for priv_name, priv_mask in pairs(privs_map) do
+        if bit.band(privileges_mask, priv_mask) ~= 0 then
+            privileges[priv_name] = true
+        end
+    end
+    return privileges
+end
+
+local function obj_name_by_type_and_id(obj_type, obj_id)
+    if type(obj_id) == 'string' then
+        return obj_id
+    end
+    local singleton_object_types = {
+        ['universe'] = true,
+        ['lua_eval'] = true,
+        ['sql'] = true,
+    }
+    if singleton_object_types[obj_type] then
+        return ''
+    end
+    if obj_type == 'user' or obj_type == 'role' then
+        return box.space._user:get({obj_id}).name
+    end
+    if obj_type == 'space' then
+        return box.space._space:get({obj_id}).name
+    end
+    if obj_type == 'function' then
+        return box.space._func:get({obj_id}).name
+    end
+    assert(obj_type == 'sequence')
+    return box.space._sequence:get({obj_id}).name
+end
 
 --[[
 This intermediate representation is a formatted set of
@@ -77,10 +130,7 @@ Examples:
 
 ]]--
 
-local function privileges_from_box(privileges)
-    privileges = privileges or {}
-    assert(type(privileges) == 'table')
-
+local function privileges_from_box(name)
     local res = {
         ['user'] = {},
         ['role'] = {},
@@ -93,17 +143,20 @@ local function privileges_from_box(privileges)
         ['sql'] = {},
     }
 
-    for _, priv in ipairs(privileges) do
-        local perms, obj_type, obj_name = unpack(priv)
-        obj_name = obj_name or ''
-
-        res[obj_type][obj_name] = res[obj_type][obj_name] or {}
-
-        for _, perm in ipairs(perms:split(',')) do
-            res[obj_type][obj_name][perm] = true
+    local grantee = box.space._user.index.name:get({name})
+    if grantee == nil then
+        return res
+    end
+    for _, tuple in pairs(box.space._priv:select({grantee.id})) do
+        local opts = tuple[PRIV_OPTS_FIELD_ID]
+        local privileges = opts ~= nil and opts.origins ~= nil and
+              opts.origins[CONFIG_ORIGIN]
+        if privileges then
+            local obj_type = tuple.object_type
+            local obj_name = obj_name_by_type_and_id(obj_type, tuple.object_id)
+            res[obj_type][obj_name] = decode_privilege(privileges)
         end
     end
-
     return res
 end
 
@@ -212,91 +265,6 @@ local function privileges_subtract(target, current)
     return lacking
 end
 
-local function privileges_add_defaults(name, role_or_user, intermediate)
-    local res = table.deepcopy(intermediate)
-
-    if role_or_user == 'user' then
-        if name == 'guest' then
-            privileges_add_perm('role', 'public', 'execute', res)
-
-            privileges_add_perm('universe', '', 'session', res)
-            privileges_add_perm('universe', '', 'usage', res)
-
-        elseif name == 'admin' then
-            privileges_add_perm('universe', '', 'read', res)
-            privileges_add_perm('universe', '', 'write', res)
-            privileges_add_perm('universe', '', 'execute', res)
-            privileges_add_perm('universe', '', 'session', res)
-            privileges_add_perm('universe', '', 'usage', res)
-            privileges_add_perm('universe', '', 'create', res)
-            privileges_add_perm('universe', '', 'drop', res)
-            privileges_add_perm('universe', '', 'alter', res)
-            privileges_add_perm('universe', '', 'reference', res)
-            privileges_add_perm('universe', '', 'trigger', res)
-            privileges_add_perm('universe', '', 'insert', res)
-            privileges_add_perm('universe', '', 'update', res)
-            privileges_add_perm('universe', '', 'delete', res)
-
-        else
-            -- Newly created user:
-            privileges_add_perm('role', 'public', 'execute', res)
-
-            privileges_add_perm('universe', '', 'session', res)
-            privileges_add_perm('universe', '', 'usage', res)
-
-            privileges_add_perm('user', name, 'alter', res)
-        end
-
-    elseif role_or_user == 'role' then
-        -- luacheck: ignore 542 empty if branch
-        if name == 'public' then
-            privileges_add_perm('function', 'box.schema.user.info', 'execute',
-                                res)
-            privileges_add_perm('function', 'LUA', 'read', res)
-
-            privileges_add_perm('space', '_vcollation', 'read', res)
-            privileges_add_perm('space', '_vspace', 'read', res)
-            privileges_add_perm('space', '_vsequence', 'read', res)
-            privileges_add_perm('space', '_vindex', 'read', res)
-            privileges_add_perm('space', '_vfunc', 'read', res)
-            privileges_add_perm('space', '_vuser', 'read', res)
-            privileges_add_perm('space', '_vpriv', 'read', res)
-            privileges_add_perm('space', '_vspace_sequence', 'read', res)
-
-            privileges_add_perm('space', '_truncate', 'write', res)
-
-            privileges_add_perm('space', '_session_settings', 'read', res)
-            privileges_add_perm('space', '_session_settings', 'write', res)
-
-        elseif name == 'replication' then
-            privileges_add_perm('space', '_cluster', 'write', res)
-            privileges_add_perm('universe', '', 'read', res)
-
-        elseif name == 'super' then
-            privileges_add_perm('universe', '', 'read', res)
-            privileges_add_perm('universe', '', 'write', res)
-            privileges_add_perm('universe', '', 'execute', res)
-            privileges_add_perm('universe', '', 'session', res)
-            privileges_add_perm('universe', '', 'usage', res)
-            privileges_add_perm('universe', '', 'create', res)
-            privileges_add_perm('universe', '', 'drop', res)
-            privileges_add_perm('universe', '', 'alter', res)
-            privileges_add_perm('universe', '', 'reference', res)
-            privileges_add_perm('universe', '', 'trigger', res)
-            privileges_add_perm('universe', '', 'insert', res)
-            privileges_add_perm('universe', '', 'update', res)
-            privileges_add_perm('universe', '', 'delete', res)
-
-        else
-            -- Newly created role has NO permissions.
-        end
-    else
-        assert(false, 'neither role nor user provided')
-    end
-
-    return res
-end
-
 --
 -- Create a credential sharding role if it is assigned to any user or role and
 -- has not been declared in 'credentials.roles'.
@@ -391,11 +359,10 @@ local function get_credentials(config)
     -- * admin
     --
     -- These roles and users have according privileges pre-granted by design.
-    -- Credentials applier adds such privileges with `priviliges_add_default()`
-    -- when syncing. So, for the excessive (non-default) privs to be removed,
-    -- these roles and users must be present inside configuration at least in a
-    -- form of an empty table. Otherwise, the privileges will be left unchanged,
-    -- similar to all used-defined roles and users.
+    -- These roles are added to the credentials to ensure that if a default
+    -- user or a default role was granted some privileges by the config,
+    -- those privileges would be dropped when the role/user is removed from
+    -- the config.
 
     credentials.roles = credentials.roles or {}
     credentials.roles['super'] = credentials.roles['super'] or {}
@@ -535,7 +502,8 @@ local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
     -- Try to apply the action immediately. If the object doesn't exist,
     -- the sync will be applied inside the trigger on object creation/rename.
     local ok, err = pcall(box.schema[role_or_user][grant_or_revoke],
-                          name, privs, obj_type, obj_name)
+                          name, privs, obj_type, obj_name,
+                          {_origin = CONFIG_ORIGIN})
 
     if ok then
         log.verbose('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q)',
@@ -582,17 +550,11 @@ local function sync_privileges(credentials, obj_to_sync)
         end
     end)
 
-    -- The privileges synchronization between A and B is performed in 3 steps:
-    -- 1. Grant all privileges that are present in B,
-    --    but not present in A (`grant(B - A)`).
-    -- 2. Add default privileges to B (`B = B + defaults`).
-    -- 3. Revoke all privileges that are not present in B,
-    --    but present in A (`revoke(A - B)).
-    --
-    -- Default privileges are not granted on step 1, so they stay revoked if
-    -- revoked manually (e.g. with `box.schema.{user,role}.revoke()`).
-    -- However, defaults should never be revoked, so target state B is enriched
-    -- with them before step 3.
+    -- The privileges synchronization performed in 2 steps:
+    -- 1. Grant all privileges that are present in config and were not granted
+    --    by the config before.
+    -- 2. Revoke all privileges that are not present in config and were granted
+    --    by the config before.
     local function sync(role_or_user, name, config_privileges)
         assert(role_or_user == 'user' or role_or_user == 'role')
         if not obj_to_sync then
@@ -600,10 +562,8 @@ local function sync_privileges(credentials, obj_to_sync)
                         role_or_user, name)
         end
 
-        local box_privileges = box.schema[role_or_user].info(name)
-
+        local box_privileges = privileges_from_box(name)
         config_privileges = privileges_from_config(config_privileges)
-        box_privileges = privileges_from_box(box_privileges)
 
         local grants = privileges_subtract(config_privileges, box_privileges)
 
@@ -615,9 +575,6 @@ local function sync_privileges(credentials, obj_to_sync)
                                     to_grant.obj_type, to_grant.obj_name)
             end
         end
-
-        config_privileges = privileges_add_defaults(name, role_or_user,
-                                                    config_privileges)
 
         local revokes = privileges_subtract(box_privileges, config_privileges)
 
@@ -634,8 +591,7 @@ local function sync_privileges(credentials, obj_to_sync)
         -- Collect updated information about privileges in the
         -- database and recalculate the difference from the target
         -- configuration.
-        box_privileges = box.schema[role_or_user].info(name)
-        box_privileges = privileges_from_box(box_privileges)
+        box_privileges = privileges_from_box(name)
         local missed_grants = privileges_subtract(config_privileges,
                                                   box_privileges)
 
@@ -983,7 +939,6 @@ return {
         privileges_from_box = privileges_from_box,
         privileges_from_config = privileges_from_config,
         privileges_subtract = privileges_subtract,
-        privileges_add_defaults = privileges_add_defaults,
         sync_privileges = sync_privileges,
         set_password = set_password,
     },
