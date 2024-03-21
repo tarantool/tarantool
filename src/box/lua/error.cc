@@ -111,6 +111,33 @@ error_create_table_case_get_reason(lua_State *L, int index)
 }
 
 /**
+ * Set the error location information (file, line) to Lua stack frame at
+ * the given level. Level 1 is the Lua function that called this function.
+ * If level is <= 0 or the function failed to get the location information,
+ * the location is cleared.
+ */
+static void
+set_error_trace(lua_State *L, int level, struct error *error)
+{
+	const char *file = "";
+	unsigned line = 0;
+	lua_Debug info;
+	if (level > 0 &&
+	    lua_getstack(L, level, &info) &&
+	    lua_getinfo(L, "Sl", &info)) {
+		if (*info.short_src) {
+			file = info.short_src;
+		} else if (*info.source) {
+			file = info.source;
+		} else {
+			file = "eval";
+		}
+		line = info.currentline;
+	}
+	error_set_location(error, file, line);
+}
+
+/**
  * Parse Lua arguments (they can come as single table or as
  * separate members) and construct struct error with given values.
  *
@@ -120,12 +147,19 @@ error_create_table_case_get_reason(lua_State *L, int index)
  * with custom type and desired message.
  *
  *     box.error(code, reason args)
- *     box.error({code = num, reason = string, ...})
+ *     box.error({code = num, reason = string, ...}[, level])
  *     box.error(type, reason format string, reason args)
- *     box.error({type = string, code = num, reason = string, ...})
+ *     box.error({type = string, code = num, reason = string, ...}[, level])
  *
  * In case one of arguments is missing its corresponding field
  * in struct error is filled with default value.
+ *
+ * The optional 'level' argument has the same meaning as in the built-in Lua
+ * function 'error' - it specifies how to get the error location (file, line),
+ * which is stored in the 'trace' payload field. With level 1 (the default),
+ * the error location is where 'box.error' was called. Level 2 points the error
+ * to where the function that called 'box.error' was called, and so on. Passing
+ * level 0 avoids addition of location information to the error payload.
  */
 static struct error *
 luaT_error_create(lua_State *L, int top_base)
@@ -133,9 +167,7 @@ luaT_error_create(lua_State *L, int top_base)
 	uint32_t code = 0;
 	const char *custom_type = NULL;
 	const char *reason = NULL;
-	const char *file = "";
-	unsigned line = 0;
-	lua_Debug info;
+	int level = 1;
 	struct error *prev = NULL;
 	int top = lua_gettop(L);
 	int top_type = lua_type(L, top_base);
@@ -179,7 +211,14 @@ luaT_error_create(lua_State *L, int top_base)
 			/* Missing arguments to format string */
 			return NULL;
 		}
-	} else if (top == top_base && top_type == LUA_TTABLE) {
+	} else if (top >= top_base && top_type == LUA_TTABLE) {
+		if (top > top_base + 1)
+			return NULL;
+		if (!lua_isnoneornil(L, top_base + 1)) {
+			if (lua_type(L, top_base + 1) != LUA_TNUMBER)
+				return NULL;
+			level = lua_tointeger(L, top_base + 1);
+		}
 		lua_getfield(L, top_base, "code");
 		if (!lua_isnil(L, -1))
 			code = lua_tonumber(L, -1);
@@ -201,18 +240,9 @@ luaT_error_create(lua_State *L, int top_base)
 	}
 
 raise:
-	if (lua_getstack(L, 1, &info) && lua_getinfo(L, "Sl", &info)) {
-		if (*info.short_src) {
-			file = info.short_src;
-		} else if (*info.source) {
-			file = info.source;
-		} else {
-			file = "eval";
-		}
-		line = info.currentline;
-	}
 	struct error *error;
-	error = box_error_new(file, line, code, custom_type, "%s", reason);
+	error = box_error_new(NULL, 0, code, custom_type, "%s", reason);
+	set_error_trace(L, level, error);
 	/*
 	 * Set the previous error, if it was specified.
 	 */
@@ -229,7 +259,7 @@ raise:
 		 * iteration over the table.
 		 */
 		lua_pushnil(L);
-		while (lua_next(L, top) != 0) {
+		while (lua_next(L, top_base) != 0) {
 			int key_type = lua_type(L, -2);
 			if (key_type == LUA_TSTRING) {
 				const char *key = lua_tostring(L, -2);
@@ -260,26 +290,33 @@ raise:
 static int
 luaT_error_call(lua_State *L)
 {
-	if (lua_gettop(L) <= 1) {
+	int top = lua_gettop(L);
+	if (top <= 1) {
 		/* Re-throw saved exceptions if any. */
 		if (box_error_last())
 			return luaT_error(L);
 		return 0;
 	}
-	struct error *e = NULL;
-	if (lua_gettop(L) == 2) {
-		e = luaL_iserror(L, 2);
-		if (e != NULL) {
-			/* Re-set error to diag area. */
-			diag_set_error(&fiber()->diag, e);
-			return lua_error(L);
+	struct error *e = luaL_iserror(L, 2);
+	if (e != NULL) {
+		if (top > 3)
+			goto bad_arg;
+		/* Update the error location if the level is specified. */
+		if (!lua_isnoneornil(L, 3)) {
+			if (lua_type(L, 3) != LUA_TNUMBER)
+				goto bad_arg;
+			int level = lua_tointeger(L, 3);
+			set_error_trace(L, level, e);
 		}
+	} else {
+		e = luaT_error_create(L, 2);
+		if (e == NULL)
+			goto bad_arg;
 	}
-	e = luaT_error_create(L, 2);
-	if (e == NULL)
-		return luaL_error(L, "box.error(): bad arguments");
 	diag_set_error(&fiber()->diag, e);
 	return luaT_error(L);
+bad_arg:
+	return luaL_error(L, "box.error(): bad arguments");
 }
 
 static int
@@ -301,11 +338,9 @@ luaT_error_last(lua_State *L)
 static int
 luaT_error_new(lua_State *L)
 {
-	struct error *e;
-	if (lua_gettop(L) == 0 || (e = luaT_error_create(L, 1)) == NULL) {
-		return luaL_error(L, "Usage: box.error.new(code, args) or "\
-				  "box.error.new(type, args)");
-	}
+	struct error *e = luaT_error_create(L, 1);
+	if (e == NULL)
+		return luaL_error(L, "box.error.new(): bad arguments");
 	lua_settop(L, 0);
 	luaT_pusherror(L, e);
 	return 1;

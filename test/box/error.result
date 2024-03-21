@@ -106,7 +106,7 @@ e
  | ...
 box.error.new()
  | ---
- | - error: 'Usage: box.error.new(code, args) or box.error.new(type, args)'
+ | - error: 'box.error.new(): bad arguments'
  | ...
 
 --
@@ -559,7 +559,7 @@ assert(box.error.last() == nil)
 --
 box.error.new(err)
  | ---
- | - error: 'Usage: box.error.new(code, args) or box.error.new(type, args)'
+ | - error: 'box.error.new(): bad arguments'
  | ...
 
 -- box.error() is supposed to re-throw last diagnostic error.
