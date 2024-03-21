@@ -733,6 +733,7 @@ txn_complete_fail(struct txn *txn)
 		txn->limbo_entry = NULL;
 	}
 	txn->status = TXN_ABORTED;
+	txn_set_flags(txn, TXN_IS_ROLLED_BACK);
 	struct txn_stmt *stmt;
 	stailq_reverse(&txn->stmts);
 	stailq_foreach_entry(stmt, &txn->stmts, next)
