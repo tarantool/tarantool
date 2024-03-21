@@ -424,6 +424,7 @@ struct errcode_record {
 	_(ER_REPLICASET_NOT_FOUND, 281,		"The replicaset was not found by its name") \
 	_(ER_REPLICASET_NO_WRITABLE, 282,	"Writable instance was not found in replicaset") \
 	_(ER_REPLICASET_MORE_THAN_ONE_WRITABLE, 283, "More than one writable was found in replicaset") \
+	_(ER_TXN_COMMIT, 284,			"Transaction was committed") \
 	/** \
 	 * XXX: Formatted strings above are for compatibility. Use only \
 	 * error message without formatters for newly added error codes. \

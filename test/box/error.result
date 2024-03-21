@@ -489,6 +489,7 @@ t;
  |   281: box.error.REPLICASET_NOT_FOUND
  |   282: box.error.REPLICASET_NO_WRITABLE
  |   283: box.error.REPLICASET_MORE_THAN_ONE_WRITABLE
+ |   284: box.error.TXN_COMMIT
  | ...
 
 test_run:cmd("setopt delimiter ''");
