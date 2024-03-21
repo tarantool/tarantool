@@ -1786,8 +1786,8 @@ g.test_set_nonexistent_role = function(g)
         local info = require('config'):info()
         local exp = 'box.schema.role.grant("role_one", "execute", "role", ' ..
             '"role_two") has failed because either the object has not been ' ..
-            'created yet, or the privilege write has failed (separate alert ' ..
-            'reported)'
+            'created yet, a database schema upgrade has not been performed, ' ..
+            'or the privilege write has failed (separate alert reported)'
         t.assert_equals(info.status, 'check_warnings')
         t.assert_equals(#info.alerts, 1)
         t.assert_equals(info.alerts[1].type, 'warn')
@@ -1823,8 +1823,8 @@ g.test_set_user_instead_of_role = function(g)
         local info = require('config'):info()
         local exp = 'box.schema.user.grant("user_one", "execute", "role", ' ..
             '"role_two") has failed because either the object has not been ' ..
-            'created yet, or the privilege write has failed (separate alert ' ..
-            'reported)'
+            'created yet, a database schema upgrade has not been performed, ' ..
+            'or the privilege write has failed (separate alert reported)'
         t.assert_equals(info.status, 'check_warnings')
         t.assert_equals(#info.alerts, 1)
         t.assert_equals(info.alerts[1].type, 'warn')
@@ -1838,8 +1838,8 @@ g.test_set_user_instead_of_role = function(g)
         local info = require('config'):info()
         local exp = 'box.schema.user.grant("user_one", "execute", "role", ' ..
             '"role_two") has failed because either the object has not been ' ..
-            'created yet, or the privilege write has failed (separate alert ' ..
-            'reported)'
+            'created yet, a database schema upgrade has not been performed, ' ..
+            'or the privilege write has failed (separate alert reported)'
         t.assert_equals(info.status, 'check_warnings')
         t.assert_equals(#info.alerts, 1)
         t.assert_equals(info.alerts[1].type, 'warn')
