@@ -1458,6 +1458,8 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 		(struct memtx_tree_index<true> *)base;
 	struct index_def *index_def = index->base.def;
 	assert(index_def->key_def->for_func_index);
+	/* Make sure that key_def is not multikey - we rely on it below. */
+	assert(!index_def->key_def->is_multikey);
 
 	int rc = -1;
 	struct region *region = &fiber()->gc;
@@ -1475,8 +1477,11 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 		int err = 0;
 		struct tuple *key;
 		struct func_key_undo *undo;
+		struct key_def *key_def = index_def->key_def;
 		while ((err = key_list_iterator_next(&it, &key)) == 0 &&
 			key != NULL) {
+			if (tuple_key_is_excluded(key, key_def, MULTIKEY_NONE))
+				continue;
 			/* Perform insertion, log it in list. */
 			undo = func_key_undo_new(region);
 			if (undo == NULL) {
@@ -1764,6 +1769,8 @@ memtx_tree_func_index_build_next(struct index *base, struct tuple *tuple)
 		(struct memtx_tree_index<true> *)base;
 	struct index_def *index_def = index->base.def;
 	assert(index_def->key_def->for_func_index);
+	/* Make sure that key_def is not multikey - we rely on it below. */
+	assert(!index_def->key_def->is_multikey);
 
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
@@ -1773,9 +1780,12 @@ memtx_tree_func_index_build_next(struct index *base, struct tuple *tuple)
 				     memtx->func_key_format) != 0)
 		return -1;
 
+	struct key_def *key_def = index_def->key_def;
 	struct tuple *key;
 	uint32_t insert_idx = index->build_array_size;
 	while (key_list_iterator_next(&it, &key) == 0 && key != NULL) {
+		if (tuple_key_is_excluded(key, key_def, MULTIKEY_NONE))
+			continue;
 		if (memtx_tree_index_build_array_append(index, tuple,
 							(hint_t)key) != 0)
 			goto error;
