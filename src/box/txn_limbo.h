@@ -51,6 +51,8 @@ struct txn_limbo_entry {
 	struct rlist in_queue;
 	/** Transaction, waiting for a quorum. */
 	struct txn *txn;
+	/** Journal entry. */
+	const struct journal_entry *req;
 	/**
 	 * LSN of the transaction by the originator's vclock
 	 * component. May be -1 in case the transaction is not
@@ -230,6 +232,10 @@ struct txn_limbo {
 	 * can't be any inconsistencies.
 	 */
 	bool do_validate;
+	/** Maximal size of entries enqueued in txn_limbo.queue (in bytes). */
+	int64_t max_size;
+	/** Current approximate size of txn_limbo.queue. */
+	int64_t size;
 };
 
 /**
@@ -243,6 +249,37 @@ static inline bool
 txn_limbo_is_empty(struct txn_limbo *limbo)
 {
 	return rlist_empty(&limbo->queue);
+}
+
+/**
+ * Check whether the queue size limit is reached.
+ * If the queue is full, we must wait for some of the entries to be written
+ * before continuing to replicate more entries.
+ */
+static inline bool
+txn_limbo_queue_is_full(struct txn_limbo *limbo)
+{
+	return limbo->size >= limbo->max_size;
+}
+
+/** Increase queue size on a new write request. */
+static inline void
+txn_limbo_queue_on_append(struct txn_limbo *limbo,
+			  const struct txn_limbo_entry *entry)
+{
+	limbo->size += entry->req->approx_len;
+	limbo->len++;
+}
+
+/** Decrease queue size once write request is complete. */
+static inline void
+txn_limbo_queue_on_remove(struct txn_limbo *limbo,
+			  const struct txn_limbo_entry *entry)
+{
+	limbo->size -= entry->req->approx_len;
+	assert(limbo->size >= 0);
+	limbo->len--;
+	assert(limbo->len >= 0);
 }
 
 bool
@@ -294,7 +331,8 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo);
  * The limbo entry is allocated on the transaction's region.
  */
 struct txn_limbo_entry *
-txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn);
+txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
+		 const struct journal_entry *entry);
 
 /** Remove the entry from the limbo, mark as rolled back. */
 void
@@ -472,6 +510,10 @@ txn_limbo_unfence(struct txn_limbo *limbo);
  */
 void
 txn_limbo_init();
+
+/** Set maximal journal queue size in bytes. */
+void
+txn_limbo_queue_set_max_size(int64_t size);
 
 #if defined(__cplusplus)
 }

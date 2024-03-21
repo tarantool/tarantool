@@ -501,6 +501,7 @@ t;
  |   278: box.error.IN_ANOTHER_PROMOTE
  |   279: box.error.SHUTDOWN
  |   280: box.error.FIELD_VALUE_OUT_OF_RANGE
+ |   281: box.error.REPLICATION_SYNCHRO_QUEUE_IS_FULL
  | ...
 
 test_run:cmd("setopt delimiter ''");
