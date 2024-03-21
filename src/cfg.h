@@ -56,6 +56,12 @@ bool
 cfg_isnumber(const char *param);
 
 /**
+ * Test if cfg parameter is a box.NULL.
+ */
+bool
+cfg_isnull(const char *param);
+
+/**
  * Gets boolean parameter of cfg.
  * Returns false in case of nil
  */

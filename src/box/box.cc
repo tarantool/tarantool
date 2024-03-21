@@ -1446,6 +1446,14 @@ box_check_replication_synchro_quorum(void)
 static double
 box_check_replication_synchro_timeout(void)
 {
+	if (!replication_synchro_timeout_enabled) {
+		if (!cfg_isnull("replication_synchro_timeout")) {
+			diag_set(ClientError, ER_DEPRECATED,
+				 "Option 'replication_synchro_timeout'");
+			return -1;
+		}
+		return 0;
+	}
 	double timeout = cfg_getd("replication_synchro_timeout");
 	if (timeout <= 0) {
 		diag_set(ClientError, ER_CFG, "replication_synchro_timeout",
@@ -3053,12 +3061,16 @@ box_promote(void)
 	if (is_leader)
 		return 0;
 	switch (box_election_mode) {
-	case ELECTION_MODE_OFF:
-		if (box_try_wait_confirm(2 * replication_synchro_timeout) != 0)
+	case ELECTION_MODE_OFF: {
+		double timeout = replication_synchro_timeout_enabled ?
+			2 * replication_synchro_timeout :
+			replication_disconnect_timeout();
+		if (box_try_wait_confirm(timeout) != 0)
 			return -1;
 		if (box_trigger_elections() != 0)
 			return -1;
 		break;
+	}
 	case ELECTION_MODE_VOTER:
 		assert(raft->state == RAFT_STATE_FOLLOWER);
 		diag_set(ClientError, ER_UNSUPPORTED, "election_mode='voter'",
@@ -3074,7 +3086,9 @@ box_promote(void)
 		unreachable();
 	}
 
-	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
+	double timeout = replication_synchro_timeout_enabled ?
+		replication_synchro_timeout : replication_disconnect_timeout();
+	int64_t wait_lsn = box_wait_limbo_acked(timeout);
 	if (wait_lsn < 0)
 		return -1;
 
@@ -3126,9 +3140,14 @@ box_demote(void)
 		return 0;
 	if (box_trigger_elections() != 0)
 		return -1;
-	if (box_try_wait_confirm(2 * replication_synchro_timeout) < 0)
+	double timeout = replication_synchro_timeout_enabled ?
+		2 * replication_synchro_timeout :
+		replication_disconnect_timeout();
+	if (box_try_wait_confirm(timeout) < 0)
 		return -1;
-	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
+	timeout = replication_synchro_timeout_enabled ?
+		replication_synchro_timeout : replication_disconnect_timeout();
+	int64_t wait_lsn = box_wait_limbo_acked(timeout);
 	if (wait_lsn < 0)
 		return -1;
 	return box_issue_demote(wait_lsn);

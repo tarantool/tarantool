@@ -8,6 +8,7 @@ local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
 local compat = require('compat')
+local tweaks = require('internal.tweaks')
 
 local function nop() end
 
@@ -248,6 +249,13 @@ returns. Set before first box.cfg{} call in order for the option to take effect.
 https://tarantool.io/compat/box_cfg_replication_sync_timeout
 ]]
 
+local replication_synchro_timeout_brief = [[
+Sets the default value for box.cfg.replication_synchro_timeout.
+Old is 5 seconds, new is infinity.
+
+https://tarantool.io/compat/box_cfg_replication_synchro_timeout
+]]
+
 -- A list of box.cfg options whose defaults are managed by compat.
 local compat_options = {
     {
@@ -257,6 +265,18 @@ local compat_options = {
         newval = 0,
         obsolete = nil,
         default = 'new',
+    },
+    {
+        name = 'replication_synchro_timeout',
+        brief = replication_synchro_timeout_brief,
+        oldval = 5,
+        newval = box.NULL,
+        obsolete = nil,
+        dynamic = true,
+        default = 'old',
+        tweak_name = 'replication_synchro_timeout_enabled',
+        new_tweak_value = false,
+        old_tweak_value = true,
     },
 }
 
@@ -268,13 +288,23 @@ for _, option in ipairs(compat_options) do
         obsolete = option.obsolete,
         brief = option.brief,
         action = function(is_new)
-            if is_locked() or box_is_configured then
+            if not option.dynamic and (is_locked() or box_is_configured) then
                 error("The compat  option '" .. option_name .. "' takes " ..
                       "effect only before the initial box.cfg() call")
             end
-            local val = is_new and option.newval or option.oldval
+            local val = option.oldval
+            if is_new then
+                val = option.newval
+            end
             default_cfg[option.name] = val
             pre_load_cfg[option.name] = val
+            if option.tweak_name ~= nil then
+                if is_new then
+                    tweaks[option.tweak_name] = option.new_tweak_value
+                else
+                    tweaks[option.tweak_name] = option.old_tweak_value
+                end
+            end
         end,
         run_action_now = true,
     })
@@ -642,6 +672,7 @@ local dynamic_cfg_order = {
     replication_synchro_timeout = 150,
     replication_connect_timeout = 150,
     replication_connect_quorum  = 150,
+    replication_synchro_queue_max_size = 150,
     -- Apply bootstrap_strategy before replication, but after
     -- replication_connect_quorum. The latter might influence its value.
     bootstrap_strategy      = 175,

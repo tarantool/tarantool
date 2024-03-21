@@ -472,7 +472,9 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	 * Start sending data only when the latest sync
 	 * transaction is confirmed.
 	 */
-	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
+	double timeout = replication_synchro_timeout_enabled ?
+		replication_synchro_timeout : replication_disconnect_timeout();
+	if (txn_limbo_wait_confirm(&txn_limbo, timeout) != 0)
 		diag_raise();
 
 	struct synchro_request req;
