@@ -546,7 +546,8 @@ local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
     if err.code ~= box.error.NO_SUCH_SPACE and
             err.code ~= box.error.NO_SUCH_ROLE and
             err.code ~= box.error.NO_SUCH_FUNCTION and
-            err.code ~= box.error.NO_SUCH_SEQUENCE then
+            err.code ~= box.error.NO_SUCH_SEQUENCE and
+            err.code ~= box.error.SCHEMA_NEEDS_UPGRADE then
         err = ('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q) failed: %s')
               :format(role_or_user, grant_or_revoke, name, privs, obj_type,
                       obj_name, err)
@@ -667,6 +668,7 @@ local function sync_privileges(credentials, obj_to_sync)
             }
             local msg = 'box.schema.%s.%s(%q, %q, %q, %q) has failed ' ..
                 'because either the object has not been created yet, ' ..
+                'a database schema upgrade has not been performed, ' ..
                 'or the privilege write has failed (separate alert reported)'
             local privs = table.concat(grant.privs, ',')
             alert.message = msg:format(role_or_user, 'grant', name, privs,
