@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(111)
+test:plan(112)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -53,6 +53,7 @@ invalid('memtx_sort_threads', 'all')
 invalid('memtx_sort_threads', -1)
 invalid('memtx_sort_threads', 0)
 invalid('memtx_sort_threads', 257)
+invalid('replication_synchro_queue_max_size', -1)
 
 local function invalid_combinations(name, val)
     local status, result = pcall(box.cfg, val)

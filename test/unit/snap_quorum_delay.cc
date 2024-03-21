@@ -107,7 +107,7 @@ txn_process_func(va_list ap)
 	 * and call txn_commit (or another) later.
 	 */
 	struct txn_limbo_entry *entry = txn_limbo_append(&txn_limbo,
-							 instance_id, txn);
+		instance_id, txn, 0);
 	/*
 	 * The trigger is used to verify that the transaction has been
 	 * completed.

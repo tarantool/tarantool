@@ -1464,6 +1464,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'replication_synchro_timeout',
             default = 5,
         }),
+        synchro_queue_max_size = schema.scalar({
+            type = 'integer',
+            box_cfg = 'replication_synchro_queue_max_size',
+            default = 16 * 1024 * 1024,
+        }),
         connect_timeout = schema.scalar({
             type = 'number',
             box_cfg = 'replication_connect_timeout',

@@ -228,6 +228,7 @@ g.test_defaults = function()
             threads = 1,
             timeout = 1,
             synchro_timeout = 5,
+            synchro_queue_max_size = 16777216,
             connect_timeout = 30,
             sync_timeout = box.NULL,
             sync_lag = 10,
