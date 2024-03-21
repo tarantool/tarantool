@@ -435,6 +435,7 @@ struct errcode_record {
 	_(ER_INVALID_VCLOCK, 288,		"Invalid vclock", "value", STRING) \
 	_(ER_ARROW_IPC_ENCODE, 289,		"Failed to encode Arrow IPC data", "method", STRING, "details", STRING) \
 	_(ER_ARROW_IPC_DECODE, 290,		"Failed to decode Arrow IPC data", "method", STRING, "details", STRING) \
+	_(ER_SYNC_QUEUE_FULL, 291,		"The synchronous transaction queue is full") \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*
