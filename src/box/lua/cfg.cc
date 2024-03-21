@@ -178,6 +178,14 @@ lbox_cfg_set_wal_queue_max_size(struct lua_State *L)
 }
 
 static int
+lbox_cfg_set_replication_synchro_queue_max_size(struct lua_State *L)
+{
+	if (box_set_replication_synchro_queue_max_size() != 0)
+		luaT_error(L);
+	return 0;
+}
+
+static int
 lbox_cfg_set_wal_cleanup_delay(struct lua_State *L)
 {
 	if (box_set_wal_cleanup_delay() < 0)
@@ -505,6 +513,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_checkpoint_interval", lbox_cfg_set_checkpoint_interval},
 		{"cfg_set_checkpoint_wal_threshold", lbox_cfg_set_checkpoint_wal_threshold},
 		{"cfg_set_wal_queue_max_size", lbox_cfg_set_wal_queue_max_size},
+		{"cfg_set_replication_synchro_queue_max_size", lbox_cfg_set_replication_synchro_queue_max_size},
 		{"cfg_set_wal_cleanup_delay", lbox_cfg_set_wal_cleanup_delay},
 		{"cfg_set_read_only", lbox_cfg_set_read_only},
 		{"cfg_set_memtx_memory", lbox_cfg_set_memtx_memory},
