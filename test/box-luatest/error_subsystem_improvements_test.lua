@@ -284,6 +284,29 @@ g.test_client_error_creation = function()
     t.assert_equals(e.f1, 1)
     t.assert_equals(e.f2, 'five')
     t.assert_equals(e.f3, 3)
+
+    -- Test if field name is "" then respective positional argument
+    -- is printed in formatted string message but not become payload.
+    --
+    -- We don't support creation of errors with 'l' modifiers in format string.
+    local fields_count = function(e)
+        local c = 0
+        for _, _ in pairs(e:unpack()) do c = c + 1 end
+        return c
+    end
+    local ref = box.error.new(box.error.TEST_FIRST)
+    local e = box.error.new(box.error.TEST_OMIT_TYPE_CHAR, string.byte('x'))
+    t.assert_equals(e.message, 'Test error x')
+    t.assert_equals(fields_count(e), fields_count(ref))
+    local e = box.error.new(box.error.TEST_OMIT_TYPE_INT, 1)
+    t.assert_equals(e.message, 'Test error 1')
+    t.assert_equals(fields_count(e), fields_count(ref))
+    local e = box.error.new(box.error.TEST_OMIT_TYPE_UINT, 2)
+    t.assert_equals(e.message, 'Test error 2')
+    t.assert_equals(fields_count(e), fields_count(ref))
+    local e = box.error.new(box.error.TEST_OMIT_TYPE_STRING, 'str')
+    t.assert_equals(e.message, 'Test error str')
+    t.assert_equals(fields_count(e), fields_count(ref))
 end
 
 --

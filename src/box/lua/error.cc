@@ -277,9 +277,9 @@ raise:
 		for (int i = top_base + 1;
 		     i <= top && argidx < record->errfields_count;
 		     i++, argidx++) {
-			luaT_error_payload_set(L, error,
-					       record->errfields[argidx].name,
-					       i);
+			const char *name = record->errfields[argidx].name;
+			if (name[0] != '\0')
+				luaT_error_payload_set(L, error, name, i);
 		}
 	}
 	return error;

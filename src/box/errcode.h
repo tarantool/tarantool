@@ -105,19 +105,39 @@ struct errcode_record {
 	_(ER_TEST_5_ARGS, 10103,		"Test error", "f1", INT, "f2", INT, "f3", INT, "f4", INT, "f5", INT) \
 	_(ER_TEST_FORMAT_MSG, 10200,		"Test error %i %s", "f1", INT, "f2", STRING) \
 	_(ER_TEST_FORMAT_MSG_FEWER, 10201,	"Test error %i %s", "f1", INT, "f2", STRING, "f3", INT) \
+	_(ER_TEST_OMIT_TYPE_CHAR, 10300,	"Test error %c", "", CHAR) \
+	_(ER_TEST_OMIT_TYPE_INT, 10301,		"Test error %i", "", INT) \
+	_(ER_TEST_OMIT_TYPE_UINT, 10302,	"Test error %u", "", UINT) \
+	_(ER_TEST_OMIT_TYPE_LONG, 10303,	"Test error %li", "", LONG) \
+	_(ER_TEST_OMIT_TYPE_ULONG, 10304,	"Test error %lu", "", ULONG) \
+	_(ER_TEST_OMIT_TYPE_LLONG, 10305,	"Test error %lli", "", LLONG) \
+	_(ER_TEST_OMIT_TYPE_ULLONG, 10306,	"Test error %llu", "", ULLONG) \
+	_(ER_TEST_OMIT_TYPE_STRING, 10307,	"Test error %s", "", STRING) \
 
 #else
 #define TEST_ERROR_CODES(_)
 #endif
 
-/*
- * To add a new error code to Tarantool, extend this array.
+/**
+ * Tarantool error codes.
  *
- * !IMPORTANT! Currently you need to manually update the user
- * guide (doc/user/errcode.xml) with each added error code.
- * Please don't forget to do it!
+ * Error description is:
+ *   _(<token>, <error_code>, <format_string>,  <payload_fields>)
+ * where:
+ *   token		- the enum constant name for <error_code>
+ *   error_code		- error code value
+ *   format_string	- format string used for error creation, varargs will
+ *			  be used with this format string
+ *   payload fields	- variable number of <NAME>, <TYPE> pairs describing
+ *			  how varargs passed on error creation will be
+ *			  added as error payload
+ *
+ * In payload fields <NAME> is a string literal and <TYPE> is from
+ * enum errcode_field_type. Yet to be consise use short defines like
+ * CHAR etc instead of enum. If <NAME> is "" then the that positional
+ * argument will be passed to formatted string but will not be added as
+ * error payload.
  */
-
 #define ERROR_CODES(_) \
 	_(ER_UNKNOWN, 0,			"Unknown error") \
 	_(ER_ILLEGAL_PARAMS, 1,			"Illegal parameters, %s") \
