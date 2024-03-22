@@ -72,61 +72,64 @@ static_assert(BOX_INVALID_NAME_MAX <= BOX_NAME_MAX,
 
 /**
  * List of system space definitions in the following format:
- * (name, identifier).
+ * (name, identifier, is_sync),
+ * where is_sync determines whether synchronous replication is enabled for this
+ * system space when the synchronous queue is claimed. If is_sync is false, a
+ * reason must be supplied after the space definition comment.
  */
-#define SYSTEM_SPACES(_) /* (name, id) */ \
-	/** Space id of _vinyl_deferred_delete. */ \
-	_(VINYL_DEFERRED_DELETE, 257) \
+#define SYSTEM_SPACES(_) /* (name, id, is_sync) */ \
+	/** Space id of _vinyl_deferred_delete. Local space. */ \
+	_(VINYL_DEFERRED_DELETE, 257, false) \
 	/** Space id of _schema. */ \
-	_(SCHEMA, 272) \
+	_(SCHEMA, 272, true) \
 	/** Space id of _collation. */ \
-	_(COLLATION, 276) \
+	_(COLLATION, 276, true) \
 	/** Space id of _vcollation. */ \
-	_(VCOLLATION, 277) \
+	_(VCOLLATION, 277, true) \
 	/** Space id of _space. */ \
-	_(SPACE, 280) \
+	_(SPACE, 280, true) \
 	/** Space id of _vspace view. */ \
-	_(VSPACE, 281) \
+	_(VSPACE, 281, true) \
 	/** Space id of _sequence. */ \
-	_(SEQUENCE, 284) \
-	/** Space id of _sequence_data. */ \
-	_(SEQUENCE_DATA, 285) \
+	_(SEQUENCE, 284, true) \
+	/** Space id of _sequence_data. Synchronized by space operations. */ \
+	_(SEQUENCE_DATA, 285, false) \
 	/** Space id of _vsequence view. */ \
-	_(VSEQUENCE, 286) \
+	_(VSEQUENCE, 286, true) \
 	/** Space id of _index. */ \
-	_(INDEX, 288) \
+	_(INDEX, 288, true) \
 	/** Space id of _vindex view. */ \
-	_(VINDEX, 289) \
+	_(VINDEX, 289, true) \
 	/** Space id of _func. */ \
-	_(FUNC, 296) \
+	_(FUNC, 296, true) \
 	/** Space id of _vfunc view. */ \
-	_(VFUNC, 297) \
+	_(VFUNC, 297, true) \
 	/** Space id of _user. */ \
-	_(USER, 304) \
+	_(USER, 304, true) \
 	/** Space id of _vuser view. */ \
-	_(VUSER, 305) \
+	_(VUSER, 305, true) \
 	/** Space id of _priv. */ \
-	_(PRIV, 312) \
+	_(PRIV, 312, true) \
 	/** Space id of _vpriv view. */ \
-	_(VPRIV, 313) \
+	_(VPRIV, 313, true) \
 	/** Space id of _cluster. */ \
-	_(CLUSTER, 320) \
+	_(CLUSTER, 320, true) \
 	/** Space id of _trigger. */ \
-	_(TRIGGER, 328) \
+	_(TRIGGER, 328, true) \
 	/** Space id of _truncate. */ \
-	_(TRUNCATE, 330) \
+	_(TRUNCATE, 330, true) \
 	/** Space id of _space_sequence. */ \
-	_(SPACE_SEQUENCE, 340) \
+	_(SPACE_SEQUENCE, 340, true) \
 	/** Space id of _vspace_sequence. */ \
-	_(VSPACE_SEQUENCE, 341) \
+	_(VSPACE_SEQUENCE, 341, true) \
 	/** Space id of _fk_constraint. */ \
-	_(FK_CONSTRAINT, 356) \
+	_(FK_CONSTRAINT, 356, true) \
 	/** Space id of _ck_contraint. */ \
-	_(CK_CONSTRAINT, 364) \
+	_(CK_CONSTRAINT, 364, true) \
 	/** Space id of _func_index. */ \
-	_(FUNC_INDEX, 372) \
+	_(FUNC_INDEX, 372, true) \
 	/** Space id of _session_settings. */ \
-	_(SESSION_SETTINGS, 380) \
+	_(SESSION_SETTINGS, 380, true) \
 
 /** System space identifier definition. */
 #define SYSTEM_SPACE_MEMBER(name, id, ...) BOX_ ## name ## _ID = id,

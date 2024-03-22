@@ -2423,6 +2423,12 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'old',
         }),
+        box_consider_system_spaces_synchronous = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
     }),
     -- Instance labels.
     labels = schema.map({

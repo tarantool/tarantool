@@ -731,6 +731,10 @@ space_delete(struct space *space);
 int
 space_foreach(int (*func)(struct space *sp, void *udata), void *udata);
 
+/** Update the state of synchronous replication for system spaces. */
+void
+system_spaces_update_is_sync_state(bool is_sync);
+
 /**
  * Dump space definition (key definitions, key count)
  * for ALTER.
