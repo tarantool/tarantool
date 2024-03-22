@@ -5,7 +5,11 @@ local t = require('luatest')
 local g = t.group('with-names')
 
 local function wait_for_death(instance)
-    t.helpers.retrying({}, function()
+    -- NB: The address sanitizer may take some time to generate
+    -- its report and all this time the process is alive. It takes
+    -- more than the default retrying() timeout (5 seconds) in
+    -- some circumstances.
+    t.helpers.retrying({timeout = 60}, function()
         assert(not instance.process:is_alive())
     end)
     -- Nullify already dead process or server:drop() fails.
