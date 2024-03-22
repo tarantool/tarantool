@@ -644,7 +644,7 @@ static void
 test_client_error_creation(void)
 {
 	header();
-	plan(42);
+	plan(58);
 
 	/* Test CHAR argument type */
 	const char *s;
@@ -676,7 +676,7 @@ test_client_error_creation(void)
 	ok(error_get_uint(e, "field", &u) && u == UINT_MAX);
 
 	/* Test LONG argument type */
-	diag_set(ClientError, ER_TEST_TYPE_LONG, 1);
+	diag_set(ClientError, ER_TEST_TYPE_LONG, 1L);
 	e = diag_last_error(diag_get());
 	ok(error_get_int(e, "field", &i) && i == 1);
 	diag_set(ClientError, ER_TEST_TYPE_LONG, LONG_MAX);
@@ -687,7 +687,7 @@ test_client_error_creation(void)
 	ok(error_get_int(e, "field", &i) && i == LONG_MIN);
 
 	/* Test ULONG argument type */
-	diag_set(ClientError, ER_TEST_TYPE_ULONG, 1);
+	diag_set(ClientError, ER_TEST_TYPE_ULONG, 1UL);
 	e = diag_last_error(diag_get());
 	ok(error_get_uint(e, "field", &u) && u == 1);
 	diag_set(ClientError, ER_TEST_TYPE_ULONG, ULONG_MAX);
@@ -695,7 +695,7 @@ test_client_error_creation(void)
 	ok(error_get_uint(e, "field", &u) && u == ULONG_MAX);
 
 	/* Test LLONG argument type */
-	diag_set(ClientError, ER_TEST_TYPE_LLONG, 1);
+	diag_set(ClientError, ER_TEST_TYPE_LLONG, 1LL);
 	e = diag_last_error(diag_get());
 	ok(error_get_int(e, "field", &i) && i == 1);
 	diag_set(ClientError, ER_TEST_TYPE_LLONG, LLONG_MAX);
@@ -706,7 +706,7 @@ test_client_error_creation(void)
 	ok(error_get_int(e, "field", &i) && i == LLONG_MIN);
 
 	/* Test ULLONG argument type */
-	diag_set(ClientError, ER_TEST_TYPE_ULLONG, 1);
+	diag_set(ClientError, ER_TEST_TYPE_ULLONG, 1ULL);
 	e = diag_last_error(diag_get());
 	ok(error_get_uint(e, "field", &u) && u == 1);
 	diag_set(ClientError, ER_TEST_TYPE_ULLONG, ULLONG_MAX);
@@ -786,6 +786,43 @@ test_client_error_creation(void)
 	ok(s != NULL && strcmp(s, "seven") == 0);
 	ok(error_get_int(e, "f3", &i) && i == 3);
 	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 1 seven") == 0);
+
+	/*
+	 * Test if field name is "" then respective positional argument
+	 * is printed in formatted string message but not become payload.
+	 */
+	diag_set(ClientError, ER_TEST_OMIT_TYPE_CHAR, 'x');
+	e = diag_last_error(diag_get());
+	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error x") == 0);
+	ok(e->payload.count == 0);
+	diag_set(ClientError, ER_TEST_OMIT_TYPE_INT, 1);
+	e = diag_last_error(diag_get());
+	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 1") == 0);
+	ok(e->payload.count == 0);
+	diag_set(ClientError, ER_TEST_OMIT_TYPE_UINT, 2);
+	e = diag_last_error(diag_get());
+	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 2") == 0);
+	ok(e->payload.count == 0);
+	diag_set(ClientError, ER_TEST_OMIT_TYPE_LONG, 3L);
+	e = diag_last_error(diag_get());
+	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 3") == 0);
+	ok(e->payload.count == 0);
+	diag_set(ClientError, ER_TEST_OMIT_TYPE_ULONG, 4UL);
+	e = diag_last_error(diag_get());
+	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 4") == 0);
+	ok(e->payload.count == 0);
+	diag_set(ClientError, ER_TEST_OMIT_TYPE_LLONG, 5LL);
+	e = diag_last_error(diag_get());
+	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 5") == 0);
+	ok(e->payload.count == 0);
+	diag_set(ClientError, ER_TEST_OMIT_TYPE_ULLONG, 6ULL);
+	e = diag_last_error(diag_get());
+	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 6") == 0);
+	ok(e->payload.count == 0);
+	diag_set(ClientError, ER_TEST_OMIT_TYPE_STRING, "str");
+	e = diag_last_error(diag_get());
+	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error str") == 0);
+	ok(e->payload.count == 0);
 
 	check_plan();
 	footer();
