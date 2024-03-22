@@ -270,6 +270,20 @@ g.test_client_error_creation = function()
     -- Test passing excess payload fields works too.
     local e = box.error.new(box.error.TEST_TYPE_INT, 1, 2, 3, 4, 5)
     t.assert_equals(e.field, 1)
+
+    -- Test format string is supported in message.
+    local e = box.error.new(box.error.TEST_FORMAT_MSG, 1, 'two')
+    t.assert_equals(e.message, 'Test error 1 two')
+    t.assert_equals(e.f1, 1)
+    t.assert_equals(e.f2, 'two')
+
+    -- Test number of arguments of format string may be less
+    -- then number of payload arguments.
+    local e = box.error.new(box.error.TEST_FORMAT_MSG_FEWER, 1, 'five', 3)
+    t.assert_equals(e.message, 'Test error 1 five')
+    t.assert_equals(e.f1, 1)
+    t.assert_equals(e.f2, 'five')
+    t.assert_equals(e.f3, 3)
 end
 
 --

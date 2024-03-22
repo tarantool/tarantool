@@ -167,7 +167,10 @@ static void
 client_error_create(struct error *e, va_list ap)
 {
 	const struct errcode_record *r = tnt_errcode_record(e->code);
-	error_vformat_msg(e, r->errdesc, ap);
+	va_list ap_copy;
+	va_copy(ap_copy, ap);
+	error_vformat_msg(e, r->errdesc, ap_copy);
+	va_end(ap_copy);
 	for (int i = 0; i < r->errfields_count; i++) {
 		switch (r->errfields[i].type) {
 		case ERRCODE_FIELD_TYPE_CHAR: {

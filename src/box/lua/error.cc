@@ -148,8 +148,6 @@ luaT_error_create(lua_State *L, int top_base)
 			code = lua_tonumber(L, top_base);
 			record = tnt_errcode_record(code);
 			reason = record->errdesc;
-			if (record->errfields_count > 0)
-				goto raise;
 		} else {
 			custom_type = lua_tostring(L, top_base);
 			/*
