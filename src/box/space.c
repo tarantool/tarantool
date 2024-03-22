@@ -59,6 +59,25 @@
 #include "lua/utils.h"
 #include "core/mp_ctx.h"
 #include "port.h"
+#include "tweaks.h"
+#include "txn_limbo.h"
+
+/**
+ * Controls whether to consider system spaces indefinitely synchronous when the
+ * synchronous queue is claimed.
+ */
+bool box_consider_system_spaces_synchronous;
+TWEAK_BOOL(box_consider_system_spaces_synchronous);
+
+#define SYNC_SYSTEM_SPACE_ID(name, id, is_sync) is_sync ? name : BOX_ID_NIL,
+
+/*
+ * System spaces for which synchronous replication is enabled when the
+ * synchronous queue is claimed.
+ */
+static uint32_t sync_system_space_ids[] = {
+	SYSTEM_SPACES(SYNC_SYSTEM_SPACE_ID)
+};
 
 int
 access_check_space(struct space *space, user_access_t access)
@@ -621,7 +640,10 @@ space_create(struct space *space, struct engine *engine,
 	rlist_create(&space->memtx_stories);
 	rlist_create(&space->alter_stmts);
 	space->lua_ref = LUA_NOREF;
-	space->state.is_sync = space->def->opts.is_sync;
+	space->state.is_sync = space->def->opts.is_sync ||
+			       (box_consider_system_spaces_synchronous &&
+				space_is_system(space) &&
+				txn_limbo_has_owner(&txn_limbo));
 	return 0;
 
 fail_free_indexes:
@@ -1397,6 +1419,34 @@ space_execute_dml(struct space *space, struct txn *txn,
 		*result = NULL;
 	}
 	return 0;
+}
+
+void
+system_spaces_update_is_sync_state(bool is_sync)
+{
+	if (!box_consider_system_spaces_synchronous)
+		return;
+
+	for (size_t i = 0; i < lengthof(sync_system_space_ids); ++i) {
+		uint32_t space_id = sync_system_space_ids[i];
+		if (space_id == BOX_ID_NIL)
+			continue;
+		struct space *space = space_by_id(space_id);
+		/*
+		 * Some system spaces can be absent in an older version of the
+		 * schema.
+		 */
+		if (space == NULL)
+			continue;
+		assert(space != NULL);
+		space->state.is_sync = space->def->opts.is_sync || is_sync;
+		assert(space->lua_ref != LUA_NOREF);
+		lua_rawgeti(tarantool_L, LUA_REGISTRYINDEX, space->lua_ref);
+		lua_getfield(tarantool_L, -1, "state");
+		lua_pushboolean(tarantool_L, space->state.is_sync);
+		lua_setfield(tarantool_L, -2, "is_sync");
+		lua_pop(tarantool_L, 2);
+	}
 }
 
 /* {{{ Virtual method stubs */

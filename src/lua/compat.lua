@@ -127,6 +127,16 @@ more verbose representation is used.
 https://tarantool.io/compat/box_error_serialize_verbose
 ]]
 
+local BOX_CONSIDER_SYSTEM_SPACES_SYNCHRONOUS = [[
+Controls whether to consider system spaces synchronous when the
+synchronous queue is claimed, regardless of the user-provided `is_sync` option.
+Either enables synchronous replication for system spaces when the synchronous
+queue is claimed, overriding the user-provided 'is_sync' space option, or falls
+back to the user-provided 'is_sync' space option.
+
+https://tarantool.io/compat/box_consider_system_spaces_synchronous
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -237,7 +247,14 @@ local options = {
         obsolete = nil,
         brief = BOX_ERROR_SERIALIZE_VERBOSE,
         action = function() end,
-    }
+    },
+    box_consider_system_spaces_synchronous = {
+      default = 'old',
+      obsolete = nil,
+      brief = BOX_CONSIDER_SYSTEM_SPACES_SYNCHRONOUS,
+      action = tweak_action('box_consider_system_spaces_synchronous', false,
+                            true)
+    },
 }
 
 -- Array with option names in order of addition.
