@@ -4,7 +4,17 @@
 local NEW = true
 local OLD = false
 
+local ffi = require('ffi')
 local tweaks = require('internal.tweaks')
+
+ffi.cdef[[
+    /**
+     * Update the state of synchronous replication for system spaces from the
+     * compat action.
+     */
+    void
+    system_spaces_update_is_sync_state_from_compat(void)
+]]
 
 local options_format = {
     default        = 'string',
@@ -127,6 +137,16 @@ more verbose representation is used.
 https://tarantool.io/compat/box_error_serialize_verbose
 ]]
 
+local BOX_CONSIDER_SYSTEM_SPACES_SYNCHRONOUS = [[
+Controls whether to consider system spaces synchronous when the
+synchronous queue is claimed, regardless of the user-provided `is_sync` option.
+Either enables synchronous replication for system spaces when the synchronous
+queue is claimed, overriding the user-provided 'is_sync' space option, or falls
+back to the user-provided 'is_sync' space option.
+
+https://tarantool.io/compat/box_consider_system_spaces_synchronous
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -137,6 +157,10 @@ local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
         end
     end
 end
+
+-- Create the tweak action once here and pass it to the closure below.
+local box_consider_system_spaces_synchronous_tweak_action =
+    tweak_action('box_consider_system_spaces_synchronous', false, true)
 
 -- Contains options descriptions in following format:
 -- * default  (string)
@@ -237,7 +261,16 @@ local options = {
         obsolete = nil,
         brief = BOX_ERROR_SERIALIZE_VERBOSE,
         action = function() end,
-    }
+    },
+    box_consider_system_spaces_synchronous = {
+      default = 'old',
+      obsolete = nil,
+      brief = BOX_CONSIDER_SYSTEM_SPACES_SYNCHRONOUS,
+      action = function(is_new)
+            box_consider_system_spaces_synchronous_tweak_action(is_new)
+            ffi.C.system_spaces_update_is_sync_state_from_compat()
+      end
+    },
 }
 
 -- Array with option names in order of addition.
