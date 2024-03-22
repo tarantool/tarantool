@@ -644,7 +644,7 @@ static void
 test_client_error_creation(void)
 {
 	header();
-	plan(35);
+	plan(42);
 
 	/* Test CHAR argument type */
 	const char *s;
@@ -766,6 +766,26 @@ test_client_error_creation(void)
 	ok(error_get_int(e, "f3", &i) && i == 3);
 	ok(error_get_int(e, "f4", &i) && i == 4);
 	ok(error_get_int(e, "f5", &i) && i == 5);
+
+	/* Test format string is supported in message. */
+	diag_set(ClientError, ER_TEST_FORMAT_MSG, 1, "two");
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "f1", &i) && i == 1);
+	s = error_get_str(e, "f2");
+	ok(s != NULL && strcmp(s, "two") == 0);
+	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 1 two") == 0);
+
+	/*
+	 * Test number of arguments of format string may be less
+	 * then number of payload arguments.
+	 */
+	diag_set(ClientError, ER_TEST_FORMAT_MSG_FEWER, 1, "seven", 3);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "f1", &i) && i == 1);
+	s = error_get_str(e, "f2");
+	ok(s != NULL && strcmp(s, "seven") == 0);
+	ok(error_get_int(e, "f3", &i) && i == 3);
+	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 1 seven") == 0);
 
 	check_plan();
 	footer();

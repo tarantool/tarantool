@@ -99,10 +99,12 @@ struct errcode_record {
 	_(ER_TEST_TYPE_STRING, 10008,		"Test error", "field", STRING) \
 	_(ER_TEST_TYPE_MSGPACK, 10009,		"Test error", "field", MSGPACK) \
 	_(ER_TEST_TYPE_TUPLE, 10010,		"Test error", "field", TUPLE) \
-	_(ER_TEST_2_ARGS, 10011,		"Test error", "f1", INT, "f2", INT) \
-	_(ER_TEST_3_ARGS, 10012,		"Test error", "f1", INT, "f2", INT, "f3", INT) \
-	_(ER_TEST_4_ARGS, 10013,		"Test error", "f1", INT, "f2", INT, "f3", INT, "f4", INT) \
-	_(ER_TEST_5_ARGS, 10014,		"Test error", "f1", INT, "f2", INT, "f3", INT, "f4", INT, "f5", INT) \
+	_(ER_TEST_2_ARGS, 10100,		"Test error", "f1", INT, "f2", INT) \
+	_(ER_TEST_3_ARGS, 10101,		"Test error", "f1", INT, "f2", INT, "f3", INT) \
+	_(ER_TEST_4_ARGS, 10102,		"Test error", "f1", INT, "f2", INT, "f3", INT, "f4", INT) \
+	_(ER_TEST_5_ARGS, 10103,		"Test error", "f1", INT, "f2", INT, "f3", INT, "f4", INT, "f5", INT) \
+	_(ER_TEST_FORMAT_MSG, 10200,		"Test error %i %s", "f1", INT, "f2", STRING) \
+	_(ER_TEST_FORMAT_MSG_FEWER, 10201,	"Test error %i %s", "f1", INT, "f2", STRING, "f3", INT) \
 
 #else
 #define TEST_ERROR_CODES(_)
