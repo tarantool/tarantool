@@ -27,7 +27,11 @@ g.test_unknown_request_type = function(cg)
     local s = cg.server
     s:start{wait_until_ready = false}
     local log = fio.pathjoin(s.workdir, s.alias .. '.log')
-    t.helpers.retrying({}, function()
+    -- NB: The address sanitizer may take some time to generate
+    -- its report and all this time the process is alive. It takes
+    -- more than the default retrying() timeout (5 seconds) in
+    -- some circumstances.
+    t.helpers.retrying({timeout = 60}, function()
         t.assert_not_equals(s:grep_log("can't initialize storage: " ..
                                        "Unknown request type 777", nil,
                                        {filename = log}), nil)
@@ -62,7 +66,8 @@ g.test_invalid_non_insert_request = function(cg)
     local s = cg.server
     s:start{wait_until_ready = false}
     local log = fio.pathjoin(s.workdir, s.alias .. '.log')
-    t.helpers.retrying({}, function()
+    -- NB: See a comment in test_unknown_request_type.
+    t.helpers.retrying({timeout = 60}, function()
         t.assert_not_equals(s:grep_log("can't initialize storage: " ..
                                        "Invalid MsgPack %- raft body", nil,
                                        {filename = log}), nil)
@@ -97,7 +102,8 @@ g.test_invalid_user_space_request = function(cg)
     local s = cg.server
     s:start{wait_until_ready = false}
     local log = fio.pathjoin(s.workdir, s.alias .. '.log')
-    t.helpers.retrying({}, function()
+    -- NB: See a comment in test_unknown_request_type.
+    t.helpers.retrying({timeout = 60}, function()
         t.assert_not_equals(s:grep_log("can't initialize storage: " ..
                                        "Space '777' does not exist", nil,
                                        {filename = log}), nil)
@@ -133,7 +139,8 @@ g.test_first_corrupted_request = function(cg)
     s.box_cfg = {force_recovery = true}
     s:start({wait_until_ready = false})
     local log = fio.pathjoin(s.workdir, s.alias .. '.log')
-    t.helpers.retrying({}, function()
+    -- NB: See a comment in test_unknown_request_type.
+    t.helpers.retrying({timeout = 60}, function()
         t.assert_not_equals(s:grep_log("can't initialize storage: " ..
                                        "can't parse row", nil,
                                        {filename = log}), nil)
@@ -167,7 +174,8 @@ g.test_second_corrupted_request = function(cg)
     local s = cg.server
     s:start({wait_until_ready = false})
     local log = fio.pathjoin(s.workdir, s.alias .. '.log')
-    t.helpers.retrying({}, function()
+    -- NB: See a comment in test_unknown_request_type.
+    t.helpers.retrying({timeout = 60}, function()
         t.assert_not_equals(s:grep_log("can't initialize storage: " ..
                                        "can't parse row", nil,
                                        {filename = log}), nil)
@@ -202,7 +210,8 @@ g.test_empty_snapshot = function(cg)
     s.box_cfg = {force_recovery = true}
     s:start({wait_until_ready = false})
     local log = fio.pathjoin(s.workdir, s.alias .. '.log')
-    t.helpers.retrying({}, function()
+    -- NB: See a comment in test_unknown_request_type.
+    t.helpers.retrying({timeout = 60}, function()
         t.assert_not_equals(s:grep_log("can't initialize storage: " ..
                                        "Snapshot has no system spaces", nil,
                                        {filename = log}), nil)
@@ -237,7 +246,8 @@ g.test_only_user_space_request = function(cg)
     s.box_cfg = {force_recovery = true}
     s:start({wait_until_ready = false})
     local log = fio.pathjoin(s.workdir, s.alias .. '.log')
-    t.helpers.retrying({}, function()
+    -- NB: See a comment in test_unknown_request_type.
+    t.helpers.retrying({timeout = 60}, function()
         t.assert_not_equals(s:grep_log("can't initialize storage: " ..
                                        "Snapshot has no system spaces", nil,
                                        {filename = log}), nil)
