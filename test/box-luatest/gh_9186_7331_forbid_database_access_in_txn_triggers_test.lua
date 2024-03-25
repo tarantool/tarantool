@@ -27,10 +27,14 @@ g.test_database_access_in_txn_triggers = function(cg)
         -- Create user to check DCL
         box.schema.user.create('test_user')
 
+        -- A global savepoint used to test rollback_to_savepoint, set later
+        local svp = nil
+
         -- Checker for old triggers (box.on_commit and box.on_rollback)
         local function check_case_old(trigger, action, finalizer, expected_err)
             box.begin()
             s:replace{0, 0}
+            svp = box.savepoint()
             local err = nil
             local function trigger_f()
                 local _, errmsg = pcall(action)
@@ -51,6 +55,7 @@ g.test_database_access_in_txn_triggers = function(cg)
             trigger.set(event, "test_trigger", trigger_f)
 
             box.begin()
+            svp = box.savepoint()
             s:replace{0, 0}
             finalizer()
 
@@ -85,7 +90,13 @@ g.test_database_access_in_txn_triggers = function(cg)
             end,
             function()
                 box.schema.user.revoke('test_user', 'read,write', 'space', 's')
-            end
+            end,
+
+            -- TCL
+            function() box.commit() end,
+            function() box.rollback() end,
+            function() box.rollback_to_savepoint(svp) end,
+            function() box.savepoint() end,
         }
 
         for _, case in pairs(cases) do

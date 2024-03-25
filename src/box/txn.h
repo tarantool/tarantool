@@ -581,6 +581,34 @@ txn_check_can_continue(struct txn *txn)
 	return 0;
 }
 
+/**
+ * Checks if the transaction can be completed (rollback or commit).
+ * There are cases when transaction cannot be continued (txn_check_can_continue
+ * will return error) but it's allowed to try to commit or rollback it.
+ * Example: when MVCC aborts a transaction due to conflict, the result is
+ * not observed by user. So he cannot execute new statements in the transaction
+ * but we cannot forbid to try to commit the transaction - only then the error
+ * will be observed and the transaction will be actually completed (rolled back
+ * due to conflict). But after the attempt to commit the transaction, we must
+ * forbid to try to complete it again - it will lead to UB.
+ * Returns 0 if true. Otherwise, sets diag and returns -1.
+ */
+static inline int
+txn_check_can_complete(struct txn *txn)
+{
+	enum txn_status status = txn->status;
+	if (status == TXN_ABORTED && txn_has_flag(txn, TXN_IS_ROLLED_BACK)) {
+		/* Cannot complete already rolled back transaction. */
+		diag_set(ClientError, ER_TXN_ROLLBACK);
+		return -1;
+	} else if (status == TXN_COMMITTED) {
+		/* Cannot complete already committed transaction. */
+		diag_set(ClientError, ER_TXN_COMMIT);
+		return -1;
+	}
+	return 0;
+}
+
 /* Pointer to the current transaction (if any) */
 static inline struct txn *
 in_txn(void)
