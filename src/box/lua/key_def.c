@@ -345,6 +345,58 @@ luaT_key_def_extract_key(struct lua_State *L, int idx)
 }
 
 int
+luaT_key_def_validate_key(struct lua_State *L, int idx)
+{
+	struct key_def *key_def = luaT_is_key_def(L, idx);
+	assert(key_def != NULL);
+
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	const char *key = luaT_tuple_encode(L, -1, NULL);
+	if (key == NULL ||
+	    box_key_def_validate_key(key_def, key, NULL) != 0) {
+		region_truncate(region, region_svp);
+		return luaT_error(L);
+	}
+	region_truncate(region, region_svp);
+	return 0;
+}
+
+int
+luaT_key_def_validate_full_key(struct lua_State *L, int idx)
+{
+	struct key_def *key_def = luaT_is_key_def(L, idx);
+	assert(key_def != NULL);
+
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	const char *key = luaT_tuple_encode(L, -1, NULL);
+	if (key == NULL ||
+	    box_key_def_validate_full_key(key_def, key, NULL) != 0) {
+		region_truncate(region, region_svp);
+		return luaT_error(L);
+	}
+	region_truncate(region, region_svp);
+	return 0;
+}
+
+int
+luaT_key_def_validate_tuple(struct lua_State *L, int idx)
+{
+	struct key_def *key_def = luaT_is_key_def(L, idx);
+	assert(key_def != NULL);
+
+	struct tuple *tuple = luaT_key_def_check_tuple(L, key_def, -1);
+	if (tuple == NULL)
+		return luaT_error(L);
+	int rc = box_key_def_validate_tuple(key_def, tuple);
+	tuple_unref(tuple);
+	if (rc != 0)
+		return luaT_error(L);
+	return 0;
+}
+
+int
 luaT_key_def_compare(struct lua_State *L, int idx)
 {
 	struct key_def *key_def = luaT_is_key_def(L, idx);
@@ -413,6 +465,38 @@ luaT_key_def_compare_with_key(struct lua_State *L, int idx)
 }
 
 int
+luaT_key_def_compare_keys(struct lua_State *L, int idx)
+{
+	struct key_def *key_def = luaT_is_key_def(L, idx);
+	assert(key_def != NULL);
+
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+
+	const char *key_a = luaT_tuple_encode(L, -2, NULL);
+	if (key_a == NULL ||
+	    box_key_def_validate_key(key_def, key_a, NULL) != 0) {
+		region_truncate(region, region_svp);
+		return luaT_error(L);
+	}
+	uint32_t part_count_a = mp_decode_array(&key_a);
+
+	const char *key_b = luaT_tuple_encode(L, -1, NULL);
+	if (key_b == NULL ||
+	    box_key_def_validate_key(key_def, key_b, NULL) != 0) {
+		region_truncate(region, region_svp);
+		return luaT_error(L);
+	}
+	uint32_t part_count_b = mp_decode_array(&key_b);
+
+	int rc = key_compare(key_a, part_count_a, HINT_NONE,
+			     key_b, part_count_b, HINT_NONE, key_def);
+	region_truncate(region, region_svp);
+	lua_pushinteger(L, rc);
+	return 1;
+}
+
+int
 luaT_key_def_merge(struct lua_State *L, int idx_a, int idx_b)
 {
 	struct key_def *key_def_a = luaT_is_key_def(L, idx_a);
@@ -444,6 +528,42 @@ lbox_key_def_extract_key(struct lua_State *L)
 }
 
 /**
+ * key_def:validate_key(key)
+ * Stack: [1] key_def; [2] key.
+ */
+static int
+lbox_key_def_validate_key(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2 || luaT_is_key_def(L, 1) == NULL)
+		return luaL_error(L, "Usage: key_def:validate_key(key)");
+	return luaT_key_def_validate_key(L, 1);
+}
+
+/**
+ * key_def:validate_full_key(key)
+ * Stack: [1] key_def; [2] key.
+ */
+static int
+lbox_key_def_validate_full_key(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2 || luaT_is_key_def(L, 1) == NULL)
+		return luaL_error(L, "Usage: key_def:validate_full_key(key)");
+	return luaT_key_def_validate_full_key(L, 1);
+}
+
+/**
+ * key_def:validate_tuple(key)
+ * Stack: [1] key_def; [2] tuple.
+ */
+static int
+lbox_key_def_validate_tuple(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2 || luaT_is_key_def(L, 1) == NULL)
+		return luaL_error(L, "Usage: key_def:validate_tuple(tuple)");
+	return luaT_key_def_validate_tuple(L, 1);
+}
+
+/**
  * key_def:compare(tuple_a, tuple_b)
  * Stack: [1] key_def; [2] tuple_a; [3] tuple_b.
  */
@@ -469,6 +589,20 @@ lbox_key_def_compare_with_key(struct lua_State *L)
 				     "tuple, key)");
 	}
 	return luaT_key_def_compare_with_key(L, 1);
+}
+
+/**
+ * key_def:compare_keys(key_a, key_b)
+ * Stack: [1] key_def; [2] key_a; [3] key_b.
+ */
+static int
+lbox_key_def_compare_keys(struct lua_State *L)
+{
+	if (lua_gettop(L) != 3 || luaT_is_key_def(L, 1) == NULL) {
+		return luaL_error(L, "Usage: key_def:compare_keys("
+				     "key_a, key_b)");
+	}
+	return luaT_key_def_compare_keys(L, 1);
 }
 
 /**
@@ -562,8 +696,12 @@ luaopen_key_def(struct lua_State *L)
 	static const struct luaL_Reg meta[] = {
 		{"new", lbox_key_def_new},
 		{"extract_key", lbox_key_def_extract_key},
+		{"validate_key", lbox_key_def_validate_key},
+		{"validate_full_key", lbox_key_def_validate_full_key},
+		{"validate_tuple", lbox_key_def_validate_tuple},
 		{"compare", lbox_key_def_compare},
 		{"compare_with_key", lbox_key_def_compare_with_key},
+		{"compare_keys", lbox_key_def_compare_keys},
 		{"merge", lbox_key_def_merge},
 		{"totable", lbox_key_def_to_table},
 		{NULL, NULL}

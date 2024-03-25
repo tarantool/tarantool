@@ -73,6 +73,27 @@ int
 luaT_key_def_extract_key(struct lua_State *L, int idx);
 
 /**
+ * Check that key matches given key definition.
+ * Raise error if not.
+ */
+int
+luaT_key_def_validate_key(struct lua_State *L, int idx);
+
+/**
+ * Check that full key matches given key definition.
+ * Raise error if not.
+ */
+int
+luaT_key_def_validate_full_key(struct lua_State *L, int idx);
+
+/**
+ * Check that tuple matches given key definition.
+ * Raise error if not.
+ */
+int
+luaT_key_def_validate_tuple(struct lua_State *L, int idx);
+
+/**
  * Compare tuples using the key definition.
  * Push 0  if key_fields(tuple_a) == key_fields(tuple_b)
  *      <0 if key_fields(tuple_a) < key_fields(tuple_b)
@@ -93,6 +114,15 @@ luaT_key_def_compare(struct lua_State *L, int idx);
  */
 int
 luaT_key_def_compare_with_key(struct lua_State *L, int idx);
+
+/**
+ * Compare keys using the key definition.
+ * Push 0  if parts(key_a) == parts(key_b)
+ *      <0 if parts(key_a) < parts(key_b)
+ *      >0 if parts(key_a) > parts(key_b)
+ */
+int
+luaT_key_def_compare_keys(struct lua_State *L, int idx);
 
 /**
  * Construct and export to LUA a new key definition with a set

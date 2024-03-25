@@ -52,6 +52,146 @@ g.test_extract_key = function(cg)
     end)
 end
 
+-- Test index_object.parts:validate_key(key)
+g.test_validate_key = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.space.create('test')
+        local pk = s:create_index('pk', {parts = {4, 'unsigned', 2, 'string'}})
+        local errmsg
+
+        t.assert_error_msg_content_equals(
+            'Usage: index.parts:validate_key(key)',
+            pk.parts.validate_key)
+        t.assert_error_msg_content_equals(
+            'Usage: index.parts:validate_key(key)',
+            pk.parts.validate_key, pk.parts)
+        t.assert_error_msg_content_equals(
+            'A tuple or a table expected, got number',
+            pk.parts.validate_key, pk.parts, 0)
+
+        errmsg = "Supplied key type of part 0 does not match " ..
+                 "index part type: expected unsigned"
+        t.assert_error_msg_content_equals(
+            errmsg, pk.parts.validate_key, pk.parts, {'a', 'b'})
+        t.assert_error_msg_content_equals(
+            errmsg, pk.parts.validate_key, pk.parts, box.tuple.new({'a', 'b'}))
+
+        errmsg = "Supplied key type of part 1 does not match " ..
+                 "index part type: expected string"
+        t.assert_error_msg_equals(
+            errmsg, pk.parts.validate_key, pk.parts, {1, 2})
+        t.assert_error_msg_equals(
+            errmsg, pk.parts.validate_key, pk.parts, box.tuple.new({1, 2}))
+
+        errmsg = "Invalid key part count (expected [0..2], got 3)"
+        t.assert_error_msg_equals(
+            errmsg, pk.parts.validate_key, pk.parts, {1, 'a', 1})
+        t.assert_error_msg_equals(
+            errmsg, pk.parts.validate_key, pk.parts, box.tuple.new({1, 'a', 1}))
+
+        pk.parts:validate_key({})
+        pk.parts:validate_key({1})
+        pk.parts:validate_key({1, 'a'})
+        pk.parts:validate_key(box.tuple.new({}))
+        pk.parts:validate_key(box.tuple.new({1}))
+        pk.parts:validate_key(box.tuple.new({1, 'a'}))
+    end)
+end
+
+-- Test index_object.parts:validate_full_key(key)
+g.test_validate_full_key = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.space.create('test')
+        local pk = s:create_index('pk', {parts = {4, 'unsigned', 2, 'string'}})
+        local errmsg
+
+        t.assert_error_msg_content_equals(
+            'Usage: index.parts:validate_full_key(key)',
+            pk.parts.validate_full_key)
+        t.assert_error_msg_content_equals(
+            'Usage: index.parts:validate_full_key(key)',
+            pk.parts.validate_full_key, pk.parts)
+        t.assert_error_msg_content_equals(
+            'A tuple or a table expected, got number',
+            pk.parts.validate_full_key, pk.parts, 0)
+
+        errmsg = "Supplied key type of part 0 does not match " ..
+                 "index part type: expected unsigned"
+        t.assert_error_msg_content_equals(errmsg, pk.parts.validate_full_key,
+                                          pk.parts, {'a', 'b'})
+        t.assert_error_msg_content_equals(errmsg, pk.parts.validate_full_key,
+                                          pk.parts, box.tuple.new({'a', 'b'}))
+
+        errmsg = "Supplied key type of part 1 does not match " ..
+                 "index part type: expected string"
+        t.assert_error_msg_equals(
+            errmsg, pk.parts.validate_full_key, pk.parts, {1, 2})
+        t.assert_error_msg_equals(
+            errmsg, pk.parts.validate_full_key, pk.parts, box.tuple.new({1, 2}))
+
+        errmsg = "Invalid key part count in an exact match (expected 2, got 1)"
+        t.assert_error_msg_equals(
+            errmsg, pk.parts.validate_full_key, pk.parts, {1})
+        t.assert_error_msg_equals(
+            errmsg, pk.parts.validate_full_key, pk.parts, box.tuple.new({1}))
+
+        errmsg = "Invalid key part count in an exact match (expected 2, got 3)"
+        t.assert_error_msg_equals(errmsg, pk.parts.validate_full_key, pk.parts,
+                                  {1, 'a', 1})
+        t.assert_error_msg_equals(errmsg, pk.parts.validate_full_key, pk.parts,
+                                  box.tuple.new({1, 'a', 1}))
+
+        pk.parts:validate_full_key({1, 'a'})
+        pk.parts:validate_full_key(box.tuple.new({1, 'a'}))
+    end)
+end
+
+-- Test index_object.parts:validate_tuple(tuple)
+g.test_validate_tuple = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.space.create('test')
+        local pk = s:create_index('pk', {parts = {4, 'unsigned', 2, 'string'}})
+        local errmsg
+
+        t.assert_error_msg_content_equals(
+            'Usage: index.parts:validate_tuple(tuple)',
+            pk.parts.validate_tuple)
+        t.assert_error_msg_content_equals(
+            'Usage: index.parts:validate_tuple(tuple)',
+            pk.parts.validate_tuple, pk.parts)
+        t.assert_error_msg_content_equals(
+            'A tuple or a table expected, got number',
+            pk.parts.validate_tuple, pk.parts, 0)
+
+        errmsg = "Supplied key type of part 0 does not match " ..
+                 "index part type: expected unsigned"
+        t.assert_error_msg_content_equals(
+            errmsg, pk.parts.validate_tuple, pk.parts,
+            {box.NULL, 'a', box.NULL, 'b'})
+        t.assert_error_msg_content_equals(
+            errmsg, pk.parts.validate_tuple, pk.parts,
+            box.tuple.new({box.NULL, 'a', box.NULL, 'b'}))
+
+        errmsg = "Supplied key type of part 1 does not match " ..
+                 "index part type: expected string"
+        t.assert_error_msg_equals(
+            errmsg, pk.parts.validate_tuple, pk.parts,
+            {box.NULL, 1, box.NULL, 2})
+        t.assert_error_msg_equals(
+            errmsg, pk.parts.validate_tuple, pk.parts,
+            box.tuple.new({box.NULL, 1, box.NULL, 2}))
+
+        errmsg = "Tuple field [4] required by space format is missing"
+        t.assert_error_msg_equals(errmsg, pk.parts.validate_tuple, pk.parts,
+                                  {1, 2})
+        t.assert_error_msg_equals(errmsg, pk.parts.validate_tuple, pk.parts,
+                                  box.tuple.new({1, 2}))
+
+        pk.parts:validate_tuple({box.NULL, 'a', box.NULL, 1})
+        pk.parts:validate_tuple(box.tuple.new({box.NULL, 'a', box.NULL, 1}))
+    end)
+end
+
 -- Test index_object.parts:compare(tuple_a, tuple_b)
 g.test_compare = function(cg)
     cg.server:exec(function()
@@ -118,6 +258,100 @@ g.test_compare_with_key = function(cg)
         t.assert_error_msg_content_equals(
             'multikey path is unsupported',
             mk.parts.compare_with_key, mk.parts, tuple, {'x', 1})
+    end)
+end
+
+-- Test index_object.parts:compare_keys(key_a, key_b)
+g.test_compare_keys = function(cg)
+    cg.server:exec(function()
+        local json = require('json')
+
+        local s = box.schema.space.create('test')
+        local pk = s:create_index('pk', {parts = {4, 'unsigned', 2, 'string'}})
+        local errmsg
+
+        t.assert_error_msg_equals(
+            "Usage: index.parts:compare_keys(key_a, key_b)",
+            pk.parts.compare_keys)
+        t.assert_error_msg_equals(
+            "Usage: index.parts:compare_keys(key_a, key_b)",
+            pk.parts.compare_keys, pk.parts)
+        t.assert_error_msg_equals(
+            "Usage: index.parts:compare_keys(key_a, key_b)",
+            pk.parts.compare_keys, pk.parts, {})
+        t.assert_error_msg_equals(
+            "A tuple or a table expected, got number",
+            pk.parts.compare_keys, pk.parts, 0, {})
+        t.assert_error_msg_equals(
+            "A tuple or a table expected, got number",
+            pk.parts.compare_keys, pk.parts, {}, 0)
+
+        errmsg = "Supplied key type of part 0 does not match " ..
+                 "index part type: expected unsigned"
+        t.assert_error_msg_equals(errmsg, pk.parts.compare_keys, pk.parts,
+                                  {'a', 'b'}, {})
+        t.assert_error_msg_equals(errmsg, pk.parts.compare_keys, pk.parts,
+                                  box.tuple.new({'a', 'b'}), {})
+        t.assert_error_msg_equals(errmsg, pk.parts.compare_keys, pk.parts,
+                                  {}, {'a', 'b'})
+        t.assert_error_msg_equals(errmsg, pk.parts.compare_keys, pk.parts,
+                                  {}, box.tuple.new({'a', 'b'}))
+
+        errmsg = "Supplied key type of part 1 does not match " ..
+                 "index part type: expected string"
+        t.assert_error_msg_equals(errmsg, pk.parts.compare_keys, pk.parts,
+                                  {1, 2}, {})
+        t.assert_error_msg_equals(errmsg, pk.parts.compare_keys, pk.parts,
+                                  box.tuple.new({1, 2}), {})
+        t.assert_error_msg_equals(errmsg, pk.parts.compare_keys, pk.parts,
+                                  {}, {1, 2})
+        t.assert_error_msg_equals(errmsg, pk.parts.compare_keys, pk.parts,
+                                  {}, box.tuple.new({1, 2}))
+
+        errmsg = "Invalid key part count (expected [0..2], got 3)"
+        t.assert_error_msg_equals(errmsg, pk.parts.compare_keys, pk.parts,
+                                  {1, 'a', 1}, {})
+        t.assert_error_msg_equals(errmsg, pk.parts.compare_keys, pk.parts,
+                                  box.tuple.new({1, 'a', 1}), {})
+        t.assert_error_msg_equals(errmsg, pk.parts.compare_keys, pk.parts,
+                                  {}, {1, 'a', 1})
+        t.assert_error_msg_equals(errmsg, pk.parts.compare_keys, pk.parts,
+                                  {}, box.tuple.new({1, 'a', 1}))
+
+        for _, v in ipairs({
+            {{}, {}, 0},
+            {{}, {1}, 0},
+            {{}, {1, 'a'}, 0},
+            {{1}, {}, 0},
+            {{1}, {1}, 0},
+            {{1}, {1, 'a'}, 0},
+            {{1, 'a'}, {}, 0},
+            {{1, 'a'}, {1}, 0},
+            {{1, 'a'}, {1, 'a'}, 0},
+            {{2}, {1}, 1},
+            {{2}, {1, 'a'}, 1},
+            {{2}, {3}, -1},
+            {{2}, {3, 'a'}, -1},
+            {{2, 'b'}, {1}, 1},
+            {{2, 'b'}, {1, 'a'}, 1},
+            {{2, 'b'}, {2, 'a'}, 1},
+            {{2, 'b'}, {3}, -1},
+            {{2, 'b'}, {3, 'a'}, -1},
+            {{2, 'b'}, {2, 'c'}, -1},
+        }) do
+            local key_a, key_b, ret = unpack(v)
+            local msg = string.format('compare(%s, %s)',
+                                      json.encode(key_a), json.encode(key_b))
+            t.assert_equals(pk.parts:compare_keys(key_a, key_b),
+                            ret, msg)
+            t.assert_equals(pk.parts:compare_keys(box.tuple.new(key_a), key_b),
+                            ret, msg)
+            t.assert_equals(pk.parts:compare_keys(key_a, box.tuple.new(key_b)),
+                            ret, msg)
+            t.assert_equals(pk.parts:compare_keys(box.tuple.new(key_a),
+                                                  box.tuple.new(key_b)),
+                            ret, msg)
+        end
     end)
 end
 
