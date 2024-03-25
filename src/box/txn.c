@@ -1280,6 +1280,8 @@ box_txn_commit(void)
 		diag_set(ClientError, ER_COMMIT_IN_SUB_STMT);
 		return -1;
 	}
+	if (txn_check_can_complete(txn) != 0)
+		return -1;
 	return txn_commit(txn);
 }
 
@@ -1289,10 +1291,12 @@ box_txn_rollback(void)
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return 0;
-	if (txn && txn->in_sub_stmt) {
+	if (txn->in_sub_stmt) {
 		diag_set(ClientError, ER_ROLLBACK_IN_SUB_STMT);
 		return -1;
 	}
+	if (txn_check_can_complete(txn) != 0)
+		return -1;
 	assert(txn->signature == TXN_SIGNATURE_UNKNOWN);
 	txn->signature = TXN_SIGNATURE_ROLLBACK;
 	txn_rollback(txn); /* doesn't throw */
@@ -1475,6 +1479,13 @@ box_txn_savepoint(void)
 		diag_set(ClientError, ER_NO_TRANSACTION);
 		return NULL;
 	}
+	/*
+	 * Creating a savepoint does not create any statements in
+	 * the transaction, so check if the transaction can be completed
+	 * is sufficient.
+	 */
+	if (txn_check_can_complete(txn) != 0)
+		return NULL;
 	return txn_savepoint_new(txn, NULL);
 }
 
@@ -1500,6 +1511,13 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 		diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
 		return -1;
 	}
+	/*
+	 * Rollback to savepoint does not create any statements in
+	 * the transaction, so check if the transaction can be completed
+	 * is sufficient.
+	 */
+	if (txn_check_can_complete(txn) != 0)
+		return -1;
 	txn_rollback_to_svp(txn, svp->stmt, true);
 	/* Discard from list all newer savepoints. */
 	RLIST_HEAD(discard);
