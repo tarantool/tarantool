@@ -240,6 +240,47 @@ lbox_index_parts_extract_key(struct lua_State *L)
 }
 
 /**
+ * index.parts:validate_key(key)
+ * Stack: [1] unused; [2] key.
+ * key_def is passed in the upvalue.
+ */
+static int
+lbox_index_parts_validate_key(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2)
+		return luaL_error(L, "Usage: index.parts:validate_key(key)");
+	return luaT_key_def_validate_key(L, lua_upvalueindex(1));
+}
+
+/**
+ * index.parts:validate_full_key(key)
+ * Stack: [1] unused; [2] key.
+ * key_def is passed in the upvalue.
+ */
+static int
+lbox_index_parts_validate_full_key(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2)
+		return luaL_error(L, "Usage: index.parts:validate_full_key("
+				     "key)");
+	return luaT_key_def_validate_full_key(L, lua_upvalueindex(1));
+}
+
+/**
+ * index.parts:validate_tuple(key)
+ * Stack: [1] unused; [2] tuple.
+ * key_def is passed in the upvalue.
+ */
+static int
+lbox_index_parts_validate_tuple(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2)
+		return luaL_error(L, "Usage: index.parts:validate_tuple("
+				     "tuple)");
+	return luaT_key_def_validate_tuple(L, lua_upvalueindex(1));
+}
+
+/**
  * index.parts:compare(tuple_a, tuple_b)
  * Stack: [1] unused; [2] tuple_a; [3] tuple_b.
  * key_def is passed in the upvalue.
@@ -267,6 +308,21 @@ lbox_index_parts_compare_with_key(struct lua_State *L)
 				     "tuple, key)");
 	}
 	return luaT_key_def_compare_with_key(L, lua_upvalueindex(1));
+}
+
+/**
+ * index.parts:compare_keys(key_a, key_b)
+ * Stack: [1] unused; [2] key_a; [3] key_b.
+ * key_def is passed in the upvalue.
+ */
+static int
+lbox_index_parts_compare_keys(struct lua_State *L)
+{
+	if (lua_gettop(L) != 3) {
+		return luaL_error(L, "Usage: index.parts:compare_keys("
+				     "key_a, key_b)");
+	}
+	return luaT_key_def_compare_keys(L, lua_upvalueindex(1));
 }
 
 /**
@@ -321,24 +377,42 @@ luaT_add_index_parts_methods(struct lua_State *L, const struct key_def *key_def)
 	lua_newtable(L);
 	int idx_index = lua_gettop(L);
 
-	/* Push 4 references to cdata onto the stack, one for each closure. */
 	luaT_push_key_def(L, key_def);
-	lua_pushvalue(L, -1);
-	lua_pushvalue(L, -1);
-	lua_pushvalue(L, -1);
+	int idx_key_def = lua_gettop(L);
 
+	lua_pushvalue(L, idx_key_def);
 	lua_pushcclosure(L, &lbox_index_parts_extract_key, 1);
 	lua_setfield(L, idx_index, "extract_key");
 
+	lua_pushvalue(L, idx_key_def);
+	lua_pushcclosure(L, &lbox_index_parts_validate_key, 1);
+	lua_setfield(L, idx_index, "validate_key");
+
+	lua_pushvalue(L, idx_key_def);
+	lua_pushcclosure(L, &lbox_index_parts_validate_full_key, 1);
+	lua_setfield(L, idx_index, "validate_full_key");
+
+	lua_pushvalue(L, idx_key_def);
+	lua_pushcclosure(L, &lbox_index_parts_validate_tuple, 1);
+	lua_setfield(L, idx_index, "validate_tuple");
+
+	lua_pushvalue(L, idx_key_def);
 	lua_pushcclosure(L, &lbox_index_parts_compare, 1);
 	lua_setfield(L, idx_index, "compare");
 
+	lua_pushvalue(L, idx_key_def);
 	lua_pushcclosure(L, &lbox_index_parts_compare_with_key, 1);
 	lua_setfield(L, idx_index, "compare_with_key");
 
+	lua_pushvalue(L, idx_key_def);
+	lua_pushcclosure(L, &lbox_index_parts_compare_keys, 1);
+	lua_setfield(L, idx_index, "compare_keys");
+
+	lua_pushvalue(L, idx_key_def);
 	lua_pushcclosure(L, &lbox_index_parts_merge, 1);
 	lua_setfield(L, idx_index, "merge");
 
+	lua_pop(L, 1); /* key_def */
 	lua_setfield(L, -2, "__index");
 	lua_setmetatable(L, -2);
 }
