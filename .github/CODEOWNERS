@@ -1,21 +1,4 @@
-# Documentation team is in charge of changelogs.
-# No changes should go w/o approval by doc team
-/changelogs/ @tarantool/doc
-/.github/    @tarantool/devx
-/test/       @tarantool/devx
-/.test.mk    @tarantool/devx
-/test-run/   @tarantool/devx
 # Alexander Turenko wants to track all the activities around the
 # declarative configuration.
-#
-# NB: GitHub's code owners documentation states the following.
-#
-# > If you want to match two or more code owners with the same
-# > pattern, all the code owners must be on the same line. If the
-# > code owners are not on the same line, the pattern matches only
-# > the last mentioned code owner.
-#
-# As result @tarantool/devx should to be added explicitly here for
-# testing directories if there are other code owners.
 /src/box/lua/config/  @Totktonada
-/test/config-luatest/ @Totktonada @tarantool/devx
+/test/config-luatest/ @Totktonada
