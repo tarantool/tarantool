@@ -7,6 +7,9 @@
 [![GitHub Discussions][discussions-badge]][discussions-url]
 [![Stack Overflow][stackoverflow-badge]][stackoverflow-url]
 
+Translations:
+- [Русский](https://github.com/tarantool/tarantool/blob/master/README_ru.md)
+
 [Tarantool][tarantool-url] is an in-memory computing platform consisting of a
 database and an application server.
 
