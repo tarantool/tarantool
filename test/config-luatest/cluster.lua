@@ -85,13 +85,17 @@ local function cluster_start(self, opts)
         server:start({wait_until_ready = false})
     end)
 
-    if opts ~= nil and not opts.wait_until_ready then
-        return
+    -- wait_until_ready is true by default.
+    local wait_until_ready = true
+    if opts ~= nil and opts.wait_until_ready ~= nil then
+        wait_until_ready = opts.wait_until_ready
     end
 
-    self:each(function(server)
-        server:wait_until_ready()
-    end)
+    if wait_until_ready then
+        self:each(function(server)
+            server:wait_until_ready()
+        end)
+    end
 end
 
 -- Start the given instance.
