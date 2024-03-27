@@ -1,4 +1,4 @@
-name: static_build_pack_test_deploy
+name: packaging-build-test-deploy
 
 on:
   workflow_call:

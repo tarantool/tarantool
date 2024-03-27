@@ -1,0 +1,89 @@
+name: docker-build-push
+
+on:
+  workflow_call:
+
+env:
+  DOCKERHUB_API: https://hub.docker.com/v2
+
+jobs:
+  build-push:
+    runs-on: [ self-hosted, Linux, x86_64, regular ]
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/environment
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compose image tags
+        run: |
+          REPO=tarantool/tarantool
+          case ${{ github.ref }} in
+            refs/tags/*-alpha*|refs/tags/*-beta*|refs/tags/*-rc*)
+              echo "TAGS=${REPO}:${{ github.ref_name }}" >> $GITHUB_ENV
+              ;;
+            refs/tags/*)
+              MAJOR=$(echo ${{ github.ref_name }} | cut -f1 -d.)
+              MINOR=$(echo ${{ github.ref_name }} | cut -f2 -d.)
+              MAJOR_MINOR=${MAJOR}.${MINOR}
+              TAGS=${REPO}:${{ github.ref_name }},${REPO}:${MAJOR_MINOR}
+              echo "TAGS=${TAGS}" >> $GITHUB_ENV
+
+              # Add the major version tag (3, 4, 5, etc.) to the image if tag
+              # {major_version}.{minor_version + 1} does not exist.
+              # Let's say we have 3.1.0 release, and it is the latest release of
+              # Tarantool. According to this fact, we have the existing image on
+              # Docker Hub with three tags: 3.1.0, 3.1, 3.
+              # If 3.0.2 release is created, the corresponding image will be
+              # pushed to Docker Hub with tags 3.0.2, 3.0, and tag 3 will not
+              # be pushed since tag 3.1 exists and tag 3 should point to the
+              # same image which tag 3.1 points to.
+              MAJOR_MINOR_UP=${MAJOR}.$((MINOR + 1))
+              if curl \
+                  --location \
+                  --silent \
+                  --show-error \
+                  --retry 5 \
+                  --retry-delay 5 \
+                  --request GET \
+                  ${DOCKERHUB_API}/repositories/${REPO}/tags/${MAJOR_MINOR_UP} \
+                  | grep -o "tag '${MAJOR_MINOR_UP}' not found"; then
+                echo "adding tag '${REPO}:${MAJOR}'"
+                echo "adding tag '${REPO}:latest'"
+                TAGS=${TAGS},${REPO}:${MAJOR},${REPO}:latest
+                echo "TAGS=${TAGS}" >> $GITHUB_ENV
+              fi
+              ;;
+          esac
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker
+          file: ./docker/Dockerfile
+          build-args: TARANTOOL_VERSION=${{ github.ref_name }}
+          platforms: linux/amd64,linux/arm64
+          no-cache: true
+          push: true
+          tags: ${{ env.TAGS }}
+
+      - name: Send VK Teams message on failure
+        if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
