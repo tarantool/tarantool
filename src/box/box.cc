@@ -3690,11 +3690,17 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 int
 box_process1(struct request *request, box_tuple_t **result)
 {
-	if (box_check_slice() != 0)
-		return -1;
 	struct space *space = space_cache_find(request->space_id);
+	const char *tuple = request->tuple;
+	const char *tuple_end = request->tuple_end;
+	const char *key = request->key;
+	const char *key_end = request->key_end;
+	uint32_t id;
+
 	if (space == NULL)
-		return -1;
+		goto error;
+	if (box_check_slice() != 0)
+		goto error;
 	/*
 	 * Allow to write to data-temporary and local spaces in the read-only
 	 * mode. To handle space truncation and/or ddl operations on temporary
@@ -3702,7 +3708,7 @@ box_process1(struct request *request, box_tuple_t **result)
 	 * _index system spaces till the on_replace trigger is called, when
 	 * we know which spaces are concerned.
 	 */
-	uint32_t id = space_id(space);
+	id = space_id(space);
 	if (is_ro_summary &&
 	    id != BOX_TRUNCATE_ID &&
 	    id != BOX_SPACE_ID &&
@@ -3710,7 +3716,7 @@ box_process1(struct request *request, box_tuple_t **result)
 	    !space_is_data_temporary(space) &&
 	    !space_is_local(space) &&
 	    box_check_writable() != 0)
-		return -1;
+		goto error;
 	if (space_is_memtx(space)) {
 		/*
 		 * Due to on_init_schema triggers set on system spaces,
@@ -3726,11 +3732,33 @@ box_process1(struct request *request, box_tuple_t **result)
 				"box.ctl.is_recovery_finished() "
 				"to check that snapshot recovery was completed");
 			diag_log();
-			return -1;
+			goto error;
 		}
 	}
 
-	return box_process_rw(request, space, result);
+	if (box_process_rw(request, space, result) != 0)
+		goto error;
+	return 0;
+error:
+	struct error *e = diag_last_error(diag_get());
+	if (tuple != NULL)
+		error_set_mp(e, "tuple", tuple, tuple_end - tuple);
+	/* space pointer can be invalid at this point. */
+	space = space_by_id(request->space_id);
+	if (space != NULL)
+		error_set_str(e, "space", space->def->name);
+	if (request->index_id != 0) {
+		assert(request->key != NULL);
+		assert(request->key_end != NULL);
+		error_set_mp(e, "key", key, key_end - key);
+		if (space != NULL) {
+			struct index *index = space_index(space,
+							  request->index_id);
+			if (index != NULL)
+				error_set_str(e, "index", index->def->name);
+		}
+	}
+	return -1;
 }
 
 void
@@ -3791,7 +3819,15 @@ box_select(uint32_t space_id, uint32_t index_id,
 	   const char **packed_pos, const char **packed_pos_end,
 	   bool update_pos, struct port *port)
 {
-	(void)key_end;
+	struct space *space;
+	struct index *index;
+	struct iterator *it = NULL;
+	const char *key_array = key;
+	int rc = 0;
+	uint32_t found = 0;
+	enum iterator_type type;
+	uint32_t part_count;
+
 	assert(!update_pos || (packed_pos != NULL && packed_pos_end != NULL));
 	assert(packed_pos == NULL || packed_pos_end != NULL);
 
@@ -3801,50 +3837,46 @@ box_select(uint32_t space_id, uint32_t index_id,
 		diag_set(ClientError, ER_ILLEGAL_PARAMS,
 			 "Invalid iterator type");
 		diag_log();
-		return -1;
+		goto fail;
 	}
 
-	struct space *space = space_cache_find(space_id);
+	space = space_cache_find(space_id);
 	if (space == NULL)
-		return -1;
+		goto fail;
 	if (access_check_space(space, PRIV_R) != 0)
-		return -1;
-	struct index *index = index_find(space, index_id);
+		goto fail;
+	index = index_find(space, index_id);
 	if (index == NULL)
-		return -1;
+		goto fail;
 
-	enum iterator_type type = (enum iterator_type) iterator;
-	const char *key_array = key;
-	uint32_t part_count = key ? mp_decode_array(&key) : 0;
+	type = (enum iterator_type)iterator;
+	part_count = key ? mp_decode_array(&key) : 0;
 	if (key_validate(index->def, type, key, part_count))
-		return -1;
+		goto fail;
 	const char *pos, *pos_end;
 	if (box_iterator_position_unpack(*packed_pos, *packed_pos_end,
 					 index->def->cmp_def, key, part_count,
 					 type, &pos, &pos_end) != 0)
-		return -1;
+		goto fail;
 
 	box_run_on_select(space, index, type, key_array);
 
 	ERROR_INJECT(ERRINJ_TESTING, {
 		diag_set(ClientError, ER_INJECTION, "ERRINJ_TESTING");
-		return -1;
+		goto fail;
 	});
 
 	struct txn *txn;
 	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
-		return -1;
+		goto fail;
 
-	struct iterator *it = index_create_iterator_after(index, type, key,
-							  part_count, pos);
+	it = index_create_iterator_after(index, type, key, part_count, pos);
 	if (it == NULL) {
 		txn_end_ro_stmt(txn, &svp);
-		return -1;
+		goto fail;
 	}
 
-	int rc = 0;
-	uint32_t found = 0;
 	struct tuple *tuple;
 	port_c_create(port);
 	while (found < limit) {
@@ -3885,8 +3917,21 @@ box_select(uint32_t space_id, uint32_t index_id,
 	iterator_delete(it);
 	return 0;
 fail:
-	iterator_delete(it);
-	port_destroy(port);
+	if (it != NULL) {
+		iterator_delete(it);
+		port_destroy(port);
+	}
+	struct error *e = diag_last_error(diag_get());
+	error_set_str(e, "operation", "select");
+	error_set_mp(e, "key", key_array, key_end - key_array);
+	/* space and index pointers can be invalid at this point. */
+	space = space_by_id(space_id);
+	if (space != NULL) {
+		error_set_str(e, "space", space->def->name);
+		index = space_index(space, index_id);
+		if (index != NULL)
+			error_set_str(e, "index", index->def->name);
+	}
 	return -1;
 }
 
@@ -3917,7 +3962,12 @@ box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
 	request.space_id = space_id;
 	request.tuple = tuple;
 	request.tuple_end = tuple_end;
-	return box_process1(&request, result);
+	int rc = box_process1(&request, result);
+	if (rc != 0) {
+		struct error *e = diag_last_error(diag_get());
+		error_set_str(e, "operation", "insert");
+	}
+	return rc;
 }
 
 API_EXPORT int
@@ -3931,7 +3981,12 @@ box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
 	request.space_id = space_id;
 	request.tuple = tuple;
 	request.tuple_end = tuple_end;
-	return box_process1(&request, result);
+	int rc = box_process1(&request, result);
+	if (rc != 0) {
+		struct error *e = diag_last_error(diag_get());
+		error_set_str(e, "operation", "replace");
+	}
+	return rc;
 }
 
 API_EXPORT int
@@ -3946,7 +4001,12 @@ box_delete(uint32_t space_id, uint32_t index_id, const char *key,
 	request.index_id = index_id;
 	request.key = key;
 	request.key_end = key_end;
-	return box_process1(&request, result);
+	int rc = box_process1(&request, result);
+	if (rc != 0) {
+		struct error *e = diag_last_error(diag_get());
+		error_set_str(e, "operation", "delete");
+	}
+	return rc;
 }
 
 API_EXPORT int
@@ -3967,7 +4027,12 @@ box_update(uint32_t space_id, uint32_t index_id, const char *key,
 	/** Legacy: in case of update, ops are passed in in request tuple */
 	request.tuple = ops;
 	request.tuple_end = ops_end;
-	return box_process1(&request, result);
+	int rc = box_process1(&request, result);
+	if (rc != 0) {
+		struct error *e = diag_last_error(diag_get());
+		error_set_str(e, "operation", "update");
+	}
+	return rc;
 }
 
 API_EXPORT int
@@ -3987,7 +4052,13 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 	request.tuple = tuple;
 	request.tuple_end = tuple_end;
 	request.index_base = index_base;
-	return box_process1(&request, result);
+	int rc = box_process1(&request, result);
+	if (rc != 0) {
+		struct error *e = diag_last_error(diag_get());
+		error_set_str(e, "operation", "upsert");
+		error_set_mp(e, "ops", ops, ops_end - ops);
+	}
+	return rc;
 }
 
 /**

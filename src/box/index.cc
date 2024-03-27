@@ -297,35 +297,50 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 {
 	assert(key != NULL && key_end != NULL && result != NULL);
 	mp_tuple_assert(key, key_end);
-	if (box_check_slice() != 0)
-		return -1;
 	struct space *space;
 	struct index *index;
+	const char *key_array = key;
+	uint32_t part_count;
+	int rc;
 	if (check_index(space_id, index_id, &space, &index) != 0)
-		return -1;
+		goto error;
+	if (box_check_slice() != 0)
+		goto error;
 	if (!index->def->opts.is_unique) {
 		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
-		return -1;
+		goto error;
 	}
-	const char *key_array = key;
-	uint32_t part_count = mp_decode_array(&key);
+	part_count = mp_decode_array(&key);
 	if (exact_key_validate(index->def->key_def, key, part_count))
-		return -1;
+		goto error;
 	box_run_on_select(space, index, ITER_EQ, key_array);
 	/* Start transaction in the engine. */
 	struct txn *txn;
 	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
-		return -1;
-	int rc = index_get(index, key, part_count, result);
+		goto error;
+	rc = index_get(index, key, part_count, result);
 	txn_end_ro_stmt(txn, &svp);
 	if (rc != 0)
-		return -1;
+		goto error;
 	/* Count statistics. */
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 	if (*result != NULL)
 		tuple_bless(*result);
 	return 0;
+error:
+	struct error *e = diag_last_error(diag_get());
+	error_set_str(e, "operation", "get");
+	error_set_mp(e, "key", key_array, key_end - key_array);
+	/* space and index pointers can be invalid at this point. */
+	space = space_by_id(space_id);
+	if (space != NULL) {
+		error_set_str(e, "space", space->def->name);
+		index = space_index(space, index_id);
+		if (index != NULL)
+			error_set_str(e, "index", index->def->name);
+	}
+	return -1;
 }
 
 int
@@ -336,30 +351,45 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 	mp_tuple_assert(key, key_end);
 	struct space *space;
 	struct index *index;
+	const char *key_array = key;
+	uint32_t part_count;
+	struct txn *txn;
+	struct txn_ro_savepoint svp;
+	int rc;
 	if (check_index(space_id, index_id, &space, &index) != 0)
-		return -1;
+		goto error;
 	if (index->def->type != TREE) {
 		/* Show nice error messages in Lua. */
 		diag_set(UnsupportedIndexFeature, index->def, "min()");
-		return -1;
+		goto error;
 	}
-	const char *key_array = key;
-	uint32_t part_count = mp_decode_array(&key);
+	part_count = mp_decode_array(&key);
 	if (key_validate(index->def, ITER_GE, key, part_count))
-		return -1;
+		goto error;
 	box_run_on_select(space, index, ITER_GE, key_array);
 	/* Start transaction in the engine. */
-	struct txn *txn;
-	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
-		return -1;
-	int rc = index_min(index, key, part_count, result);
+		goto error;
+	rc = index_min(index, key, part_count, result);
 	txn_end_ro_stmt(txn, &svp);
 	if (rc != 0)
-		return -1;
+		goto error;
 	if (*result != NULL)
 		tuple_bless(*result);
 	return 0;
+error:
+	struct error *e = diag_last_error(diag_get());
+	error_set_str(e, "operation", "min");
+	error_set_mp(e, "key", key_array, key_end - key_array);
+	/* space and index pointers can be invalid at this point. */
+	space = space_by_id(space_id);
+	if (space != NULL) {
+		error_set_str(e, "space", space->def->name);
+		index = space_index(space, index_id);
+		if (index != NULL)
+			error_set_str(e, "index", index->def->name);
+	}
+	return -1;
 }
 
 int
@@ -370,30 +400,45 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 	assert(result != NULL);
 	struct space *space;
 	struct index *index;
+	const char *key_array = key;
+	uint32_t part_count;
+	struct txn *txn;
+	struct txn_ro_savepoint svp;
+	int rc;
 	if (check_index(space_id, index_id, &space, &index) != 0)
-		return -1;
+		goto error;
 	if (index->def->type != TREE) {
 		/* Show nice error messages in Lua. */
 		diag_set(UnsupportedIndexFeature, index->def, "max()");
-		return -1;
+		goto error;
 	}
-	const char *key_array = key;
-	uint32_t part_count = mp_decode_array(&key);
+	part_count = mp_decode_array(&key);
 	if (key_validate(index->def, ITER_LE, key, part_count))
-		return -1;
+		goto error;
 	box_run_on_select(space, index, ITER_LE, key_array);
 	/* Start transaction in the engine. */
-	struct txn *txn;
-	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
-		return -1;
-	int rc = index_max(index, key, part_count, result);
+		goto error;
+	rc = index_max(index, key, part_count, result);
 	txn_end_ro_stmt(txn, &svp);
 	if (rc != 0)
-		return -1;
+		goto error;
 	if (*result != NULL)
 		tuple_bless(*result);
 	return 0;
+error:
+	struct error *e = diag_last_error(diag_get());
+	error_set_str(e, "operation", "max");
+	error_set_mp(e, "key", key_array, key_end - key_array);
+	/* space and index pointers can be invalid at this point. */
+	space = space_by_id(space_id);
+	if (space != NULL) {
+		error_set_str(e, "space", space->def->name);
+		index = space_index(space, index_id);
+		if (index != NULL)
+			error_set_str(e, "index", index->def->name);
+	}
+	return -1;
 }
 
 ssize_t
@@ -402,29 +447,47 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 {
 	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
+	enum iterator_type itype;
+	struct space *space;
+	struct index *index;
+	const char *key_array = key;
+	uint32_t part_count;
+	struct txn *txn;
+	struct txn_ro_savepoint svp;
+	ssize_t count;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		goto error;
+	/* Check after resolving ids to fill nice error details. */
 	if (type < 0 || type >= iterator_type_MAX) {
 		diag_set(ClientError, ER_ILLEGAL_PARAMS,
 			 "Invalid iterator type");
-		return -1;
+		goto error;
 	}
-	enum iterator_type itype = (enum iterator_type) type;
-	struct space *space;
-	struct index *index;
-	if (check_index(space_id, index_id, &space, &index) != 0)
-		return -1;
-	uint32_t part_count = mp_decode_array(&key);
+	itype = (enum iterator_type)type;
+	part_count = mp_decode_array(&key);
 	if (key_validate(index->def, itype, key, part_count))
-		return -1;
+		goto error;
 	/* Start transaction in the engine. */
-	struct txn *txn;
-	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
-		return -1;
-	ssize_t count = index_count(index, itype, key, part_count);
+		goto error;
+	count = index_count(index, itype, key, part_count);
 	txn_end_ro_stmt(txn, &svp);
 	if (count < 0)
-		return -1;
+		goto error;
 	return count;
+error:
+	struct error *e = diag_last_error(diag_get());
+	error_set_str(e, "operation", "count");
+	error_set_mp(e, "key", key_array, key_end - key_array);
+	/* space and index pointers can be invalid at this point. */
+	space = space_by_id(space_id);
+	if (space != NULL) {
+		error_set_str(e, "space", space->def->name);
+		index = space_index(space, index_id);
+		if (index != NULL)
+			error_set_str(e, "index", index->def->name);
+	}
+	return -1;
 }
 
 /* }}} */
@@ -438,35 +501,33 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 {
 	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
-	if (type < 0 || type >= iterator_type_MAX) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
-			 "Invalid iterator type");
-		return NULL;
-	}
 	enum iterator_type itype = (enum iterator_type) type;
 	struct space *space;
 	struct index *index;
-	if (check_index(space_id, index_id, &space, &index) != 0)
-		return NULL;
 	const char *key_array = key;
-	assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
-	uint32_t part_count = mp_decode_array(&key);
-	if (key_validate(index->def, itype, key, part_count))
-		return NULL;
+	uint32_t part_count;
 	const char *pos, *pos_end;
 	char *pos_buf = NULL;
 	uint32_t pos_buf_size = 0;
 	uint32_t region_svp = region_used(&fiber()->gc);
-	auto pos_guard =
-		make_scoped_guard([&pos_buf, &pos_buf_size, region_svp] {
-			region_truncate(&fiber()->gc, region_svp);
-			if (pos_buf != NULL)
-				runtime_memory_free(pos_buf, pos_buf_size);
-		});
+	struct txn *txn;
+	struct txn_ro_savepoint svp;
+	struct iterator *it;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		goto error;
+	if (type < 0 || type >= iterator_type_MAX) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "Invalid iterator type");
+		goto error;
+	}
+	assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
+	part_count = mp_decode_array(&key);
+	if (key_validate(index->def, itype, key, part_count))
+		goto error;
 	if (box_iterator_position_unpack(packed_pos, packed_pos_end,
 					 index->def->cmp_def, key, part_count,
 					 type, &pos, &pos_end) != 0)
-		return NULL;
+		goto error;
 	if (pos != NULL) {
 		pos_buf_size = pos_end - pos;
 		pos_buf = (char *)xruntime_memory_alloc(pos_buf_size);
@@ -475,21 +536,33 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 		pos_end = pos_buf + pos_buf_size;
 	}
 	box_run_on_select(space, index, itype, key_array);
-	struct txn *txn;
-	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
-		return NULL;
-	struct iterator *it = index_create_iterator_after(index, itype, key,
-							  part_count, pos);
+		goto error;
+	it = index_create_iterator_after(index, itype, key, part_count, pos);
 	txn_end_ro_stmt(txn, &svp);
 	if (it == NULL)
-		return NULL;
+		goto error;
 	it->pos_buf = pos_buf;
 	it->pos_buf_size = pos_buf_size;
-	pos_guard.is_active = false;
 	region_truncate(&fiber()->gc, region_svp);
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 	return it;
+error:
+	struct error *e = diag_last_error(diag_get());
+	error_set_str(e, "operation", "pairs");
+	error_set_mp(e, "key", key_array, key_end - key_array);
+	/* space and index pointers can be invalid at this point. */
+	space = space_by_id(space_id);
+	if (space != NULL) {
+		error_set_str(e, "space", space->def->name);
+		index = space_index(space, index_id);
+		if (index != NULL)
+			error_set_str(e, "index", index->def->name);
+	}
+	region_truncate(&fiber()->gc, region_svp);
+	if (pos_buf != NULL)
+		runtime_memory_free(pos_buf, pos_buf_size);
+	return NULL;
 }
 
 box_iterator_t *

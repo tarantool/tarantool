@@ -4,8 +4,20 @@ local console = require('console')
 local json = require('json')
 local yaml = require('yaml')
 local tarantool = require('tarantool')
+local server = require('luatest.server')
 
 local g = t.group()
+
+g.before_all(function(cg)
+    cg.server = server:new()
+    cg.server:start()
+end)
+
+g.after_all(function(cg)
+    if cg.server ~= nil then
+        cg.server:drop()
+    end
+end)
 
 -- Test the `prev' argument to the table constructor of `box.error.new'
 -- (gh-9103).
@@ -349,3 +361,131 @@ g.test_autocomplete = function()
         'err:unpack(',
     })
 end
+
+g.before_test('test_box_operations_details', function(cg)
+    cg.server:exec(function()
+        local test = box.schema.create_space('test')
+        test:create_index('primary')
+        test:create_index('secondary', {parts = {2, 'unsigned', 1, 'unsigned'}})
+    end)
+end)
+
+g.test_box_operations_details = function(cg)
+    cg.server:exec(function()
+        -- XXX. This is temporary.
+        require('test.box-luatest.extra_assertions')
+
+        local test = box.space.test
+        local secondary = box.space.test.index.secondary
+
+        t.assert_error_covers({
+            operation = 'select',
+            space = 'test',
+            index = 'secondary',
+            key = {1, 2, 3},
+            message = 'Invalid key part count (expected [0..2], got 3)'
+        }, secondary.select, secondary, {1, 2, 3})
+
+        -- Test index:get().
+        -- gh-7223: test we add details for this particular error.
+        t.assert_error_covers({
+            operation = 'get',
+            space = 'test',
+            index = 'secondary',
+            key = {1},
+            message = 'Invalid key part count in an exact match ' ..
+                      '(expected 2, got 1)',
+        }, secondary.get, secondary, {1})
+
+        -- Test space:insert().
+        t.assert_error_covers({
+            operation = 'insert',
+            space = 'test',
+            tuple = {3},
+            message = 'Tuple field 2 required by space format is missing',
+        }, test.insert, test, {3})
+
+        -- Test space:replace().
+        t.assert_error_covers({
+            operation = 'replace',
+            space = 'test',
+            tuple = {4},
+            message = 'Tuple field 2 required by space format is missing',
+        }, test.replace, test, {4})
+
+        -- Test index:delete().
+        t.assert_error_covers({
+            operation = 'delete',
+            space = 'test',
+            index = 'secondary',
+            key = {1, 2, 3},
+            message = 'Invalid key part count in an exact match ' ..
+                      '(expected 2, got 3)',
+        }, secondary.delete, secondary, {1, 2, 3})
+
+        -- Test index:update().
+        t.assert_error_covers({
+            operation = 'update',
+            space = 'test',
+            index = 'secondary',
+            key = {1, 2, 3},
+            -- Legacy: in case of update, ops are passed in request tuple.
+            tuple = {{'+', 1, 11}},
+            message = 'Invalid key part count in an exact match ' ..
+                      '(expected 2, got 3)',
+        }, secondary.update, secondary, {1, 2, 3}, {{'+', 1, 11}})
+
+        -- Test index:upsert().
+        t.assert_error_covers({
+            operation = 'upsert',
+            space = 'test',
+            tuple = {1},
+            ops = {{'+', 1, 11}},
+            message = 'Tuple field 2 required by space format is missing',
+        }, test.upsert, test, {1}, {{'+', 1, 11}})
+
+        -- Test index:count().
+        t.assert_error_covers({
+            operation = 'count',
+            space = 'test',
+            index = 'secondary',
+            key = {1, 2, 3},
+            message = 'Invalid key part count (expected [0..2], got 3)',
+        }, secondary.count, secondary, {1, 2, 3})
+
+        -- Test index:min().
+        t.assert_error_covers({
+            operation = 'min',
+            space = 'test',
+            index = 'secondary',
+            key = {1, 2, 3},
+            message = 'Invalid key part count (expected [0..2], got 3)',
+        }, secondary.min, secondary, {1, 2, 3})
+
+        -- Test index:max().
+        t.assert_error_covers({
+            operation = 'max',
+            space = 'test',
+            index = 'secondary',
+            key = {1, 2, 3},
+            message = 'Invalid key part count (expected [0..2], got 3)',
+        }, secondary.max, secondary, {1, 2, 3})
+
+        -- Test index:pairs().
+        t.assert_error_covers({
+            operation = 'pairs',
+            space = 'test',
+            index = 'secondary',
+            key = {1, 2, 3},
+            message = 'Invalid key part count (expected [0..2], got 3)',
+        }, secondary.pairs, secondary, {1, 2, 3})
+    end)
+end
+
+g.after_test('test_box_operations_details', function(cg)
+    cg.server:exec(function()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+    end)
+end)
