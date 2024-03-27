@@ -349,3 +349,44 @@ g.test_autocomplete = function()
         'err:unpack(',
     })
 end
+
+-- Test that box.error{code = ..} generates message from errcode (gh-9876).
+g.test_error_message_with_named_code_arg = function()
+    local code = box.error.TRANSACTION_CONFLICT
+    local message = 'Transaction has been aborted by conflict'
+    local unk_code = 100500
+    local unk_message = 'Unknown error'
+    local type = 'ClientError'
+
+    -- Reference behavior.
+    t.assert_equals(box.error.new(code).message, message)
+    t.assert_equals(box.error.new(code).type, type)
+    t.assert_equals(box.error.new(unk_code).message, unk_message)
+    t.assert_equals(box.error.new(unk_code).type, type)
+
+    -- Usage of named arguments must lead to similar result.
+    t.assert_equals(box.error.new{code = code}.message, message)
+    t.assert_equals(box.error.new{code = code}.type, type)
+    t.assert_equals(box.error.new{code = unk_code}.message, unk_message)
+    t.assert_equals(box.error.new{code = unk_code}.type, type)
+
+    -- By default the code is 0, so it's Unknown error.
+    t.assert_equals(box.error.new{}.message, unk_message)
+    t.assert_equals(box.error.new{}.type, type)
+
+    -- Explicit specifying or message must have priority.
+    t.assert_equals(box.error.new{code = code, reason = 'wtf'}.message, 'wtf')
+    t.assert_equals(box.error.new{code = code, reason = 'wtf'}.type, type)
+    t.assert_equals(box.error.new{code = code, message = 'wtf'}.message, 'wtf')
+    t.assert_equals(box.error.new{code = code, message = 'wtf'}.type, type)
+
+    -- Custom errors are not affected.
+    t.assert_equals(box.error.new{type = 'My'}.message, '')
+    t.assert_equals(box.error.new{type = 'My'}.type, 'My')
+    t.assert_equals(box.error.new{type = 'My', code = code}.message, '')
+    t.assert_equals(box.error.new{type = 'My', code = code}.type, 'My')
+    t.assert_equals(box.error.new{type = 'My', code = code,
+                                  reason = 'wtf'}.message, 'wtf')
+    t.assert_equals(box.error.new{type = 'My', code = code,
+                                  reason = 'wtf'}.type, 'My')
+end
