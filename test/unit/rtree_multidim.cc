@@ -2,12 +2,14 @@
 #include <time.h>
 #include <algorithm>
 
-#include "unit.h"
 #include "salad/rtree.h"
 #include "../../src/lib/salad/rtree.h"
 
 #include <vector>
 #include <set>
+
+#include "unit.h"
+
 using namespace std;
 
 const uint32_t extent_size = 1024 * 16;
