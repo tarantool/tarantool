@@ -90,12 +90,15 @@ luaT_error_is_builtin_field(const char *key)
  *
  * @param L Lua state
  * @param index table index on Lua stack
+ * @param code error code
+ * @param custom_type custom type name or NULL if not specified (ClientError)
  *
  * @return reason
  * @retval "" failed to retrieve reason
  */
 static const char *
-error_create_table_case_get_reason(lua_State *L, int index)
+error_create_table_case_get_reason(lua_State *L, int index,
+				   uint32_t code, const char *custom_type)
 {
 	lua_rawgeti(L, index, 1);
 	const char *reason = lua_tostring(L, -1);
@@ -107,6 +110,11 @@ error_create_table_case_get_reason(lua_State *L, int index)
 		return reason;
 	lua_getfield(L, index, "reason");
 	reason = lua_tostring(L, -1);
+	if (reason != NULL)
+		return reason;
+	/* If ClientError has no reason - take description by code. */
+	if (custom_type == NULL)
+		reason = tnt_errcode_desc(code);
 	return reason != NULL ? reason : "";
 }
 
@@ -220,10 +228,11 @@ luaT_error_create(lua_State *L, int top_base)
 		lua_getfield(L, top_base, "code");
 		if (!lua_isnil(L, -1))
 			code = lua_tonumber(L, -1);
-		reason = error_create_table_case_get_reason(L, top_base);
 		lua_getfield(L, top_base, "type");
 		if (!lua_isnil(L, -1))
 			custom_type = lua_tostring(L, -1);
+		reason = error_create_table_case_get_reason(L, top_base,
+							    code, custom_type);
 		lua_getfield(L, top_base, "prev");
 		if (!lua_isnil(L, -1)) {
 			prev = luaL_iserror(L, -1);
