@@ -32,11 +32,12 @@ box.space._schema:replace{'version', 123}
  | ...
 box.space._schema:replace{'replicaset_uuid'}
  | ---
- | - error: 'Invalid UUID: (null)'
+ | - error: Field 2 was not found in the tuple
  | ...
 box.space._schema:replace{'replicaset_uuid', 666}
  | ---
- | - error: 'Invalid UUID: (null)'
+ | - error: 'Tuple field 2 type does not match one required by operation: expected string,
+ |     got unsigned'
  | ...
 box.space._schema:replace{'asd'}
  | ---
