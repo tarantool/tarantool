@@ -96,6 +96,22 @@ local function cluster_start(self, opts)
             server:wait_until_ready()
         end)
     end
+
+    -- wait_until_running is equal to wait_until_ready by default.
+    local wait_until_running = wait_until_ready
+    if opts ~= nil and opts.wait_until_running ~= nil then
+        wait_until_running = opts.wait_until_running
+    end
+
+    if wait_until_running then
+        self:each(function(server)
+            server:exec(function()
+                t.helpers.retrying({timeout = 60}, function()
+                    t.assert_equals(box.info.status, 'running')
+                end)
+            end)
+        end)
+    end
 end
 
 -- Start the given instance.
