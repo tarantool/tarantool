@@ -12,4 +12,4 @@ groups:
     replicasets:
       replicaset-001:
         instances:
-          master: { }
+          instance-001: { }
