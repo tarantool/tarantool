@@ -5,7 +5,7 @@ credentials:
 
 iproto:
   listen:
-    - uri: localhost:3301
+    - uri: 0.0.0.0:3301
 
 groups:
   group-001:
