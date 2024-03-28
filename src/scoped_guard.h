@@ -32,39 +32,58 @@
  * SUCH DAMAGE.
  */
 #include <stdlib.h>
+#include <type_traits>
+#include <utility>
 
-template <typename Functor>
+template<typename Functor>
 struct ScopedGuard {
-	Functor f;
-	bool is_active;
+	static_assert(noexcept(std::declval<Functor>()()),
+		      "Functor has to be noexcept");
 
-	explicit ScopedGuard(const Functor& fun)
-		: f(fun), is_active(true) {
-		/* nothing */
+	explicit ScopedGuard(const Functor & fun) noexcept(
+		std::is_nothrow_move_constructible<Functor>::value)
+		: is_active(true), f(fun) { }
+
+	explicit ScopedGuard(Functor && fun) noexcept(
+		std::is_nothrow_move_constructible<Functor>::value)
+		: is_active(true), f(std::move(fun)) { }
+
+	ScopedGuard(ScopedGuard && guard) noexcept(
+		std::is_nothrow_move_constructible<Functor>::value)
+		: is_active(guard.is_active), f(std::move(guard.f)) {
+		guard.reset();
 	}
 
-	ScopedGuard(ScopedGuard&& guard)
-		: f(guard.f), is_active(true) {
-		guard.is_active = false;
-		abort();
+	ScopedGuard &operator=(ScopedGuard &&guard) noexcept(
+		std::swap(std::declval<Functor>(), std::declval<Functor>())) {
+		std::swap(f, guard.f);
+		is_active = guard.is_active;
+		guard.reset();
+
+		return *this;
 	}
 
-	~ScopedGuard()
-	{
+	~ScopedGuard() noexcept {
 		if (is_active)
 			f();
 	}
 
+	void reset() noexcept { is_active = false; }
+
+	/* True if destructor and reset were not called */
+	bool is_active;
+
 private:
-	explicit ScopedGuard(const ScopedGuard&) = delete;
-	ScopedGuard& operator=(const ScopedGuard&) = delete;
+	ScopedGuard(const ScopedGuard &) = delete;
+	ScopedGuard &operator=(const ScopedGuard &) = delete;
+
+	/* User-defined functor that will be called in the destructor */
+	Functor f;
 };
 
-template <typename Functor>
-inline ScopedGuard<Functor>
-make_scoped_guard(Functor guard)
-{
-	return ScopedGuard<Functor>(guard);
+template<typename Functor>
+inline ScopedGuard<Functor> make_scoped_guard(Functor &&guard) {
+	return ScopedGuard<Functor>(std::forward<Functor>(guard));
 }
 
 #endif /* TARANTOOL_SCOPED_GUARD_H_INCLUDED */
