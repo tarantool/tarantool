@@ -848,6 +848,15 @@ LIGHT(grow)(struct LIGHT(common) *ht)
 {
 	assert(!matras_is_read_view_created(ht->view));
 	assert(ht->empty_slot == LIGHT(end));
+	/*
+	 * The number UINT32_MAX has a special meaning (see LIGHT(end)), hence
+	 * it can not be used as a record identifier. Given that the table is
+	 * enlarged by 8 records (see LIGHT_GROW_INCREMENT), the maximum table
+	 * size is limited by (2^32)-8 records.
+	 */
+	if ((size_t)ht->table_size + LIGHT_GROW_INCREMENT >= UINT32_MAX)
+		return -1;
+
 	uint32_t new_slot;
 	struct LIGHT(record) *new_record = (struct LIGHT(record) *)
 		matras_alloc_range(ht->mtable, &new_slot, LIGHT_GROW_INCREMENT);

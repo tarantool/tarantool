@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include <vector>
 #include <time.h>
+#include <core/random.h>
 
 #include "unit.h"
 
@@ -344,16 +345,72 @@ slot_in_big_table_test()
 	footer();
 }
 
+/**
+ * Insert nearly 2^32 records into the hash table.
+ */
+static void
+max_capacity_test()
+{
+	/*
+	 * XXX: The test is disabled, because it requires 64 GB of RAM.
+	 */
+	return;
+
+	header();
+
+	/* The maximum number of records that can be stored in the table. */
+	const size_t data_count = (size_t)UINT32_MAX + 1 - LIGHT_GROW_INCREMENT;
+
+	struct light_core ht;
+	light_create(&ht, light_extent_size, my_light_alloc, my_light_free,
+		     &extents_count, 0);
+
+	uint64_t seed[4];
+	random_bytes((char *)seed, sizeof(seed));
+
+	/* Test light_insert(). */
+	xoshiro_srand(seed);
+	for (size_t i = 0; i < data_count; i++) {
+		hash_value_t val = xoshiro_random();
+		hash_t id = light_insert(&ht, hash(val), val);
+		fail_if(id == light_end);
+		if ((i & 0xfffff) == 0)
+			printf("%f%%\n", i * 100.0 / data_count);
+	}
+	/* Try to exceed the maximum capacity. */
+	hash_value_t val = xoshiro_random();
+	hash_t id = light_insert(&ht, hash(val), val);
+	fail_if(id != light_end);
+
+	/* Test light_find(). */
+	xoshiro_srand(seed);
+	for (size_t i = 0; i < data_count; i++) {
+		hash_value_t val = xoshiro_random();
+		hash_t id = light_find(&ht, hash(val), val);
+		fail_if(id == light_end);
+		if ((i & 0xfffff) == 0)
+			printf("%f%%\n", i * 100.0 / data_count);
+	}
+
+	light_destroy(&ht);
+
+	footer();
+}
+
 int
 main(int, const char**)
 {
-	srand(time(0));
+	random_init();
+
 	simple_test();
 	collision_test();
 	iterator_test();
 	iterator_freeze_check();
 	slot_in_big_table_test();
+	max_capacity_test();
 
 	if (extents_count != 0)
 		fail("memory leak!", "true");
+
+	random_free();
 }
