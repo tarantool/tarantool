@@ -41,6 +41,10 @@ macro(curl_build)
     # Let's disable testing for curl to save build time.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DBUILD_TESTING=OFF")
 
+    # Let's disable building documentation for curl to save build time.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_CURL_MANUAL=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DBUILD_LIBCURL_DOCS=OFF")
+
     # Setup use of openssl, use the same OpenSSL library
     # for libcurl as is used for tarantool itself.
     get_filename_component(FOUND_OPENSSL_ROOT_DIR ${OPENSSL_INCLUDE_DIR} DIRECTORY)
@@ -141,6 +145,7 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGTCP2=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGHTTP3=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_QUICHE=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_OPENSSL_QUIC=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_HTTP=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_PROXY=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_IPV6=ON")
