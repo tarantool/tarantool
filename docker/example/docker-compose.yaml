@@ -1,7 +1,7 @@
 services:
   instance-001:
     image: tarantool/tarantool:3.0.1
-    container_name: tarantool-instance-001
+    container_name: app-instance-001
     volumes:
       - ./app:/opt/tarantool/app
       - ./data:/var/lib/tarantool
@@ -15,7 +15,7 @@ services:
 
   instance-002:
     image: tarantool/tarantool:3.0.1
-    container_name: tarantool-instance-002
+    container_name: app-instance-002
     volumes:
       - ./app:/opt/tarantool/app
       - ./data:/var/lib/tarantool
@@ -29,7 +29,7 @@ services:
 
   instance-003:
     image: tarantool/tarantool:3.0.1
-    container_name: tarantool-instance-003
+    container_name: app-instance-003
     volumes:
       - ./app:/opt/tarantool/app
       - ./data:/var/lib/tarantool
