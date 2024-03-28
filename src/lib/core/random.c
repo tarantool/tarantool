@@ -148,6 +148,15 @@ xoshiro_random(void)
 	return result;
 }
 
+void
+xoshiro_srand(uint64_t *seed)
+{
+	state[0] = seed[0];
+	state[1] = seed[1];
+	state[2] = seed[2];
+	state[3] = seed[3];
+}
+
 const char *
 xoshiro_state_str(void)
 {
