@@ -440,6 +440,16 @@ void
 httpc_set_accept_encoding(struct httpc_request *req, const char *encoding);
 
 /**
+ * Specify http protocol version for request
+ * @param req request
+ * @param version - http version to use for this request
+ * Version can be 1.1, 2, 2-tls or 2-prior-knowledge
+ * @see https://curl.se/libcurl/c/CURLOPT_HTTP_VERSION.html
+ */
+int
+httpc_set_http_version(struct httpc_request *req, const char *version);
+
+/**
  * Enable a chunked io interface for the request. It allows to
  * send and receive data via chunks.
  *

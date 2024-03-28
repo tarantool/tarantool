@@ -525,6 +525,8 @@ end
 --
 --      accept_encoding - enables automatic decompression of HTTP responses;
 --
+--      http_version - describes an http version;
+--
 --      chunked - enables chunked io interface;
 --
 --      params - a table with query parameters;
