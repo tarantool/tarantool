@@ -64,7 +64,7 @@ Mount these directories as volumes:
 
 ```console
 $ docker run \
-  --name mytarantool \
+  --name app-instance-001 \
   -p 3301:3301 -d \
   tarantool/tarantool
 ```
@@ -76,12 +76,12 @@ outside world.
 ### Connect to a running Tarantool instance
 
 ```console
-$ docker exec -t -i mytarantool console
+$ docker exec -t -i app-instance-001 console
 ```
 
-This will open an interactive admin console on the running instance named
-`mytarantool`. You can safely detach from it anytime, the server will continue
-running.
+This will open an interactive admin console on the running container named
+`app-instance-001`. You can safely detach from it anytime, the server will
+continue running.
 
 This `console` doesn't require authentication, because it uses a local UNIX
 domain socket in the container to connect to Tarantool. However, it requires
@@ -97,16 +97,35 @@ The simplest way to provide application code is to mount your code directory to
 
 ```console
 $ docker run \
-  --name mytarantool \
+  --name app-instance-001 \
   -p 3301:3301 -d \
-  -v /path/to/my/app:/opt/tarantool \
-  tarantool/tarantool \
-  tarantool /opt/tarantool/app.lua
+  -v /path/to/my/app/instances.enabled:/opt/tarantool \
+  -e TT_APP_NAME=app \
+  -e TT_INSTANCE_NAME=instance-001 \
+  tarantool/tarantool
 ```
 
-Here, `/path/to/my/app` is the host directory containing Lua code and `app.lua`
-is the entry point of your application. Note that for your code to run, you must
-execute the main script explicitly, which is done in the last line.
+Here, `/path/to/my/app` is the host directory containing an application. Its
+content may be, for example, the following:
+
+```console
++-- bin
++-- distfiles
++-- include
++-- instances.enabled
+|   +-- app
+|       +-- config.yaml
+|       +-- init.lua
+|       +-- instances.yaml
+|       +-- app-scm-1.rockspec
++-- modules
++-- templates
++-- tt.yaml
+```
+
+See the [Creating and developing an application][develop-app] guide for details.
+
+[develop-app]: https://www.tarantool.io/en/doc/latest/book/admin/instance_config/#admin-instance-config-develop-app
 
 ### Build your own image
 
@@ -114,14 +133,25 @@ To pack and distribute an image with your code, create your own `Dockerfile`:
 
 ```dockerfile
 FROM tarantool/tarantool:3.1.0
-COPY app.lua /opt/tarantool
-CMD ["tarantool", "/opt/tarantool/app.lua"]
+COPY instances.enabled /opt/tarantool
+ENV TT_APP_NAME=app
+CMD ["tarantool"]
 ```
 
 Then build it with:
 
 ```console
-$ docker build -t company/appname:tag .
+$ docker build -t company/app:tag .
+```
+
+And run a Tarantool instance:
+
+```console
+$ docker run \
+  --name app-instance-001 \
+  -p 3301:3301 -d \
+  -e TT_INSTANCE_NAME=instance-001 \
+  company/app:tag
 ```
 
 We recommend building from an image with a precise tag, for example, `3.1.0`,

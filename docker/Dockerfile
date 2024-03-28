@@ -6,7 +6,7 @@ ARG TARANTOOL_DOWNLOAD_BASE_URL="https://download.tarantool.org/tarantool"
 ARG TARANTOOL_APT_SOURCES_FILE="/etc/apt/sources.list.d/tarantool.list"
 
 ENV TT_APP_NAME="default"
-ENV TT_INSTANCE_NAME="master"
+ENV TT_INSTANCE_NAME="instance-001"
 
 RUN if [ -z "${TARANTOOL_VERSION}" ]; then \
         echo "ERROR: TARANTOOL_VERSION is not defined"; \
