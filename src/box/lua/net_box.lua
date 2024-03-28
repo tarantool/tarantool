@@ -277,6 +277,7 @@ local function new_sm(uri_or_fd, opts)
         end
         if what == 'state_changed' then
             local state, err = ...
+            remote.state, remote.error = state, err
             local was_connected = remote._is_connected
             if state == 'active' then
                 if not was_connected then
@@ -287,7 +288,11 @@ local function new_sm(uri_or_fd, opts)
                    state == 'closed' then
                 if was_connected then
                     remote._is_connected = false
-                    remote._on_disconnect:run(remote)
+                    local ok, trigger_err = pcall(remote._on_disconnect.run,
+                                                  remote._on_disconnect, remote)
+                    if not ok then
+                        log.error(trigger_err)
+                    end
                 end
                 -- A server may exit after initiating a graceful shutdown but
                 -- before all clients close their connections (for example, on
@@ -297,7 +302,6 @@ local function new_sm(uri_or_fd, opts)
                 -- time we finish running on_shutdown triggers.
                 remote._shutdown_pending = nil
             end
-            remote.state, remote.error = state, err
             if state == 'error_reconnect' then
                 -- Repeat the same error in verbose log only.
                 -- Else the error clogs the log. See gh-3175.
@@ -1161,7 +1165,11 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
 
     self.schema_version = schema_version
     self.space = sl
-    self._on_schema_reload:run(self)
+    local ok, err = pcall(self._on_schema_reload.run, self._on_schema_reload,
+                          self)
+    if not ok then
+        log.error(err)
+    end
 end
 
 local function nothing_or_data(value)
