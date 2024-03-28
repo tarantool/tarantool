@@ -106,6 +106,10 @@ enum txn_flag {
 	 * rolled back at commit.
 	 */
 	TXN_IS_ABORTED_BY_TIMEOUT = 0x100,
+	/*
+	 * Transaction has been rolled back so it cannot be continued.
+	 */
+	TXN_IS_ROLLED_BACK = 0x200,
 };
 
 enum {
@@ -554,6 +558,8 @@ txn_flags_to_error_code(struct txn *txn)
 		return ER_TRANSACTION_YIELD;
 	else if (txn_has_flag(txn, TXN_IS_ABORTED_BY_TIMEOUT))
 		return ER_TRANSACTION_TIMEOUT;
+	else if (txn_has_flag(txn, TXN_IS_ROLLED_BACK))
+		return ER_TXN_ROLLBACK;
 	return ER_UNKNOWN;
 }
 
@@ -564,8 +570,32 @@ txn_flags_to_error_code(struct txn *txn)
 static inline int
 txn_check_can_continue(struct txn *txn)
 {
-	if (txn->status == TXN_ABORTED) {
+	enum txn_status status = txn->status;
+	if (status == TXN_ABORTED) {
 		diag_set(ClientError, txn_flags_to_error_code(txn));
+		return -1;
+	} else if (status == TXN_COMMITTED) {
+		diag_set(ClientError, ER_TXN_COMMIT);
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Checks if TCL statements can be executed in the given transaction.
+ * Returns 0 if true. Otherwise, sets diag and returns -1.
+ */
+static inline int
+txn_check_can_tcl(struct txn *txn)
+{
+	enum txn_status status = txn->status;
+	if (status == TXN_ABORTED && txn_has_flag(txn, TXN_IS_ROLLED_BACK)) {
+		/* Cannot execute TCL in already rolled back transaction. */
+		diag_set(ClientError, ER_TXN_ROLLBACK);
+		return -1;
+	} else if (status == TXN_COMMITTED) {
+		/* Cannot execute TCL in already committed transaction. */
+		diag_set(ClientError, ER_TXN_COMMIT);
 		return -1;
 	}
 	return 0;
