@@ -161,8 +161,8 @@ create_unit_test(PREFIX rtree_multidim
                  LIBRARIES salad small
 )
 create_unit_test(PREFIX light
-                 SOURCES light.cc
-                 LIBRARIES small
+                 SOURCES light.cc core_test_utils.c
+                 LIBRARIES core small
 )
 create_unit_test(PREFIX light_view
                  SOURCES light_view.c
