@@ -60,6 +60,14 @@ real_random(void);
 uint64_t
 xoshiro_random(void);
 
+/**
+ * Sets the `seed` for a new sequence of pseudo-random integers to be returned
+ * by xoshiro_random(). These sequences are repeatable by calling xoshiro_srand
+ * with the same seed value.
+ */
+void
+xoshiro_srand(uint64_t *seed);
+
 const char *
 xoshiro_state_str(void);
 
