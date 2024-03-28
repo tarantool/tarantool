@@ -364,6 +364,15 @@ luaT_httpc_request(lua_State *L)
 		httpc_set_accept_encoding(req, lua_tostring(L, -1));
 	lua_pop(L, 1);
 
+	lua_getfield(L, 5, "http_version");
+	if (!lua_isnil(L, -1)) {
+		if (httpc_set_http_version(req, lua_tostring(L, -1))) {
+			httpc_request_delete(req);
+			return luaT_error(L);
+		}
+	}
+	lua_pop(L, 1);
+
 	bool chunked = false;
 	lua_getfield(L, 5, "chunked");
 	if (!lua_isnil(L, -1) && lua_isboolean(L, -1))

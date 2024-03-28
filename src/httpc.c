@@ -464,6 +464,29 @@ httpc_set_accept_encoding(struct httpc_request *req, const char *encoding)
 #endif
 }
 
+int
+httpc_set_http_version(struct httpc_request *req, const char *version)
+{
+	if (strcmp(version, "1.1") == 0) {
+		curl_easy_setopt(req->curl_request.easy, CURLOPT_HTTP_VERSION,
+				 (long)CURL_HTTP_VERSION_1_1);
+	} else if (strcmp(version, "2") == 0) {
+		curl_easy_setopt(req->curl_request.easy, CURLOPT_HTTP_VERSION,
+				 (long)CURL_HTTP_VERSION_2);
+	} else if (strcmp(version, "2-tls") == 0) {
+		curl_easy_setopt(req->curl_request.easy, CURLOPT_HTTP_VERSION,
+				 (long)CURL_HTTP_VERSION_2TLS);
+	} else if (strcmp(version, "2-prior-knowledge") == 0) {
+		curl_easy_setopt(req->curl_request.easy, CURLOPT_HTTP_VERSION,
+				 (long)CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE);
+	} else {
+		diag_set(IllegalParams, "Not a supported http version: %s",
+			 version);
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * The callback to call after a CURL request is completed.
  */
