@@ -420,6 +420,9 @@ struct errcode_record {
 	_(ER_IN_ANOTHER_PROMOTE, 278,		"box.ctl.promote() is already running") \
 	_(ER_SHUTDOWN, 279,			"Server is shutting down") \
 	_(ER_FIELD_VALUE_OUT_OF_RANGE, 280,	"The value of field %s exceeds the supported range for type '%s': expected [%s..%s], got %s") \
+	_(ER_REPLICASET_NOT_FOUND, 281,		"The replicaset was not found by its name") \
+	_(ER_REPLICASET_NO_WRITABLE, 282,	"Writable instance was not found in replicaset") \
+	_(ER_REPLICASET_MORE_THAN_ONE_WRITABLE, 283, "More than one writable was found in replicaset") \
 	TEST_ERROR_CODES(_)
 
 /*
