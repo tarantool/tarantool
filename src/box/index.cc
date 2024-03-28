@@ -56,6 +56,11 @@ UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
 	error_format_msg(this, tnt_errcode_desc(code), index_def->name,
 			 index_type_strs[index_def->type],
 			 space->def->name, space->def->engine_name, what);
+	error_set_str(this, "index", index_def->name);
+	error_set_str(this, "index_type", index_type_strs[index_def->type]);
+	error_set_str(this, "space", space->def->name);
+	error_set_str(this, "engine", space->def->engine_name);
+	error_set_str(this, "feature", what);
 }
 
 struct error *

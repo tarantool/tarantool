@@ -174,7 +174,7 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 	return lua_gettop(L) - top;
 
 no_such_proc:
-	diag_set(ClientError, ER_NO_SUCH_PROC, name_end - name, name);
+	diag_set(ClientError, ER_NO_SUCH_PROC, tt_cstr(name, name_end - name));
 	return -1;
 }
 

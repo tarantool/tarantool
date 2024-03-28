@@ -2220,7 +2220,8 @@ find_built_in_func(struct Expr *expr, struct sql_func_dictionary *dict)
 			str = tt_sprintf("at least %d", argc_min);
 		else
 			str = tt_sprintf("from %d to %d", argc_min, argc_max);
-		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, name, str, n);
+		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, name, str, n,
+			 argc_min, argc_max);
 		return NULL;
 	}
 	struct func *func = find_compatible(expr, dict, CHECK_TYPE_EXACT);
@@ -2270,7 +2271,7 @@ sql_func_find(struct Expr *expr)
 	assert(argc >= 0);
 	if (argc != n) {
 		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, name,
-			 tt_sprintf("%d", argc), n);
+			 tt_sprintf("%d", argc), n, argc, argc);
 		return NULL;
 	}
 	return func;

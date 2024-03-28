@@ -49,8 +49,12 @@
 #define FIELDS_5(n1, t1, n2, t2, n3, t3, n4, t4, n5, t5) \
 		(const struct errcode_field[]) \
 		{{n1, t1}, {n2, t2}, {n3, t3}, {n4, t4}, {n5, t5}}, 5
+#define FIELDS_6(n1, t1, n2, t2, n3, t3, n4, t4, n5, t5, n6, t6) \
+		(const struct errcode_field[]) \
+		{{n1, t1}, {n2, t2}, {n3, t3}, {n4, t4}, {n5, t5}, {n6, t6}}, 6
 
-#define GET_MACRO(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, NAME, ...) NAME
+#define GET_MACRO(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, \
+		  NAME, ...) NAME
 #undef INCOMPLETE
 
 /**
@@ -58,6 +62,7 @@
  */
 #define ERRCODE_FIELDS_AND_COUNT(x, ...) \
 		GET_MACRO(, ##__VA_ARGS__, \
+			  FIELDS_6, INCOMPLETE, \
 			  FIELDS_5, INCOMPLETE, \
 			  FIELDS_4, INCOMPLETE, \
 			  FIELDS_3, INCOMPLETE, \
@@ -65,7 +70,7 @@
 			  FIELDS_1, INCOMPLETE, \
 			  FIELDS_0)(__VA_ARGS__)
 
-/** Up to 5 fields are supported. */
+/** Number of fields supported is given by last FIELDS_<N>. */
 #define ERRCODE_RECORD_MEMBER(t, c, d, ...) \
 	[c] = {#t, d, ERRCODE_FIELDS_AND_COUNT(1, ##__VA_ARGS__)},
 

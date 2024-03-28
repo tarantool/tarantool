@@ -5,7 +5,7 @@ space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
 box.error({code = 123, reason = 'test'})
-box.error(box.error.ILLEGAL_PARAMS, "bla bla")
+box.error(box.error.ILLEGAL_PARAMS, "foo")
 box.error()
 e = box.error.last()
 e

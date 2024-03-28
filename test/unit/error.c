@@ -644,7 +644,7 @@ static void
 test_client_error_creation(void)
 {
 	header();
-	plan(58);
+	plan(64);
 
 	/* Test CHAR argument type */
 	const char *s;
@@ -766,6 +766,15 @@ test_client_error_creation(void)
 	ok(error_get_int(e, "f3", &i) && i == 3);
 	ok(error_get_int(e, "f4", &i) && i == 4);
 	ok(error_get_int(e, "f5", &i) && i == 5);
+
+	diag_set(ClientError, ER_TEST_6_ARGS, 1, 2, 3, 4, 5, 6);
+	e = diag_last_error(diag_get());
+	ok(error_get_int(e, "f1", &i) && i == 1);
+	ok(error_get_int(e, "f2", &i) && i == 2);
+	ok(error_get_int(e, "f3", &i) && i == 3);
+	ok(error_get_int(e, "f4", &i) && i == 4);
+	ok(error_get_int(e, "f5", &i) && i == 5);
+	ok(error_get_int(e, "f6", &i) && i == 6);
 
 	/* Test format string is supported in message. */
 	diag_set(ClientError, ER_TEST_FORMAT_MSG, 1, "two");

@@ -564,8 +564,8 @@ sqlRunParser(Parse * pParse, const char *zSql)
 			if (tokenType == TK_ILLEGAL) {
 				diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
 					 pParse->line_count, pParse->line_pos,
-					 pParse->sLastToken.n,
-					 pParse->sLastToken.z);
+					 tt_cstr(pParse->sLastToken.z,
+						 pParse->sLastToken.n));
 				pParse->is_aborted = true;
 				break;
 			}

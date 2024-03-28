@@ -127,20 +127,14 @@ field_foreign_key_failed(const struct tuple_constraint *constr,
 			 const struct tuple_field *field,
 			 const char *message)
 {
-	struct error *err;
 	const char *field_path = NULL;
 	if (field != NULL) {
 		field_path = tuple_field_path(field, constr->space->format);
-		err = diag_set(ClientError, ER_FIELD_FOREIGN_KEY_FAILED,
-			       constr->def.name, field_path, message);
+		diag_set(ClientError, ER_FIELD_FOREIGN_KEY_FAILED,
+			 constr->def.name, field_path, message, field->id);
 	} else {
-		err = diag_set(ClientError, ER_COMPLEX_FOREIGN_KEY_FAILED,
-			       constr->def.name, message);
-	}
-	error_set_str(err, "name", constr->def.name);
-	if (field != NULL) {
-		error_set_str(err, "field_path", field_path);
-		error_set_uint(err, "field_id", field->id);
+		diag_set(ClientError, ER_COMPLEX_FOREIGN_KEY_FAILED,
+			 constr->def.name, message);
 	}
 }
 
