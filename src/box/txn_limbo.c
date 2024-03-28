@@ -59,6 +59,14 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->frozen_reasons = 0;
 	limbo->is_frozen_until_promotion = true;
 	limbo->do_validate = false;
+	limbo->max_size = 16 * 1024 * 1024; /* 16 megabytes */
+	limbo->size = 0;
+}
+
+void
+txn_limbo_queue_set_max_size(int64_t size)
+{
+	txn_limbo.max_size = size;
 }
 
 static inline bool
@@ -120,7 +128,8 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo)
 }
 
 struct txn_limbo_entry *
-txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
+txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
+		 const struct journal_entry *req)
 {
 	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
 	assert(limbo == &txn_limbo);
@@ -166,12 +175,13 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 		return NULL;
 	}
 	e->txn = txn;
+	e->req = req;
 	e->lsn = -1;
 	e->ack_count = 0;
 	e->is_commit = false;
 	e->is_rollback = false;
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
-	limbo->len++;
+	txn_limbo_queue_on_append(limbo, e);
 	return e;
 }
 
@@ -181,7 +191,7 @@ txn_limbo_remove(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	assert(!rlist_empty(&entry->in_queue));
 	assert(txn_limbo_first_entry(limbo) == entry);
 	rlist_del_entry(entry, in_queue);
-	limbo->len--;
+	txn_limbo_queue_on_remove(limbo, entry);
 }
 
 static inline void
@@ -192,7 +202,7 @@ txn_limbo_pop(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	assert(entry->is_rollback);
 
 	rlist_del_entry(entry, in_queue);
-	limbo->len--;
+	txn_limbo_queue_on_remove(limbo, entry);
 	++limbo->rollback_count;
 }
 
@@ -279,7 +289,8 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	double start_time = fiber_clock();
 	while (true) {
 		double deadline = start_time + replication_synchro_timeout;
-		double timeout = deadline - fiber_clock();
+		double timeout = replication_synchro_timeout_enabled ?
+			deadline - fiber_clock() : TIMEOUT_INFINITY;
 		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
 		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
@@ -784,13 +795,12 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 }
 
 int
-txn_limbo_wait_confirm(struct txn_limbo *limbo)
+txn_limbo_wait_confirm(struct txn_limbo *limbo, double timeout)
 {
 	if (txn_limbo_is_empty(limbo))
 		return 0;
 	bool is_rollback;
-	if (txn_limbo_wait_last_txn(limbo, &is_rollback,
-				    replication_synchro_timeout) != 0) {
+	if (txn_limbo_wait_last_txn(limbo, &is_rollback, timeout) != 0) {
 		diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
 		return -1;
 	}

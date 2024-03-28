@@ -8,6 +8,7 @@ local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
 local compat = require('compat')
+local tweaks = require('internal.tweaks')
 
 local function nop() end
 
@@ -156,6 +157,7 @@ local default_cfg = {
     wal_max_size        = 256 * 1024 * 1024,
     wal_dir_rescan_delay= 2,
     wal_queue_max_size  = 16 * 1024 * 1024,
+    replication_synchro_queue_max_size = 16 * 1024 * 1024,
     wal_cleanup_delay   = 4 * 3600,
     wal_retention_period = ifdef_wal_retention_period(0),
     wal_ext             = ifdef_wal_ext(nil),
@@ -373,6 +375,7 @@ local template_cfg = {
     checkpoint_interval = 'number',
     checkpoint_wal_threshold = 'number',
     wal_queue_max_size  = 'number',
+    replication_synchro_queue_max_size = 'number',
     checkpoint_count    = 'number',
     read_only           = 'boolean',
     hot_standby         = 'boolean',
@@ -408,6 +411,37 @@ local template_cfg = {
 
     metrics = 'table',
 }
+
+local replication_synchro_timeout_brief = [[
+Sets the default value for box.cfg.replication_synchro_timeout.
+Old is 5 seconds, new is infinity.
+
+https://tarantool.io/compat/box_cfg_replication_synchro_timeout
+]]
+
+compat.add_option({
+    name = 'box_cfg_replication_synchro_timeout',
+    default = 'old',
+    obsolete = nil,
+    brief = replication_synchro_timeout_brief,
+    action = function(is_new)
+        if is_locked() or box_is_configured then
+            error("The compat  option 'box_cfg_replication_synchro_timeout' " ..
+                  "takes effect only before the initial box.cfg() call")
+        end
+        if is_new then
+            template_cfg['replication_synchro_timeout'] = nil
+            default_cfg['replication_synchro_timeout'] = nil
+            pre_load_cfg['replication_synchro_timeout'] = nil
+        else
+            template_cfg['replication_synchro_timeout'] = 'number'
+            default_cfg['replication_synchro_timeout'] = 5
+            pre_load_cfg['replication_synchro_timeout'] = nil
+        end
+        tweaks['replication_synchro_timeout_enabled'] = not is_new
+    end,
+    run_action_now = true,
+})
 
 local function normalize_uri_list_for_replication(port_list)
     if type(port_list) == 'table' then
@@ -501,6 +535,8 @@ local dynamic_cfg = {
     checkpoint_interval     = private.cfg_set_checkpoint_interval,
     checkpoint_wal_threshold = private.cfg_set_checkpoint_wal_threshold,
     wal_queue_max_size      = private.cfg_set_wal_queue_max_size,
+    replication_synchro_queue_max_size =
+        private.cfg_set_replication_synchro_queue_max_size,
     worker_pool_threads     = private.cfg_set_worker_pool_threads,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = nop,

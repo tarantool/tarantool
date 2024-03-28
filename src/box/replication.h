@@ -197,6 +197,13 @@ extern int replication_synchro_quorum;
 extern double replication_synchro_timeout;
 
 /**
+ * Part of internal.tweaks.replication_synchro_timeout_enabled.
+ * Indicates whether the replication_synchro_timeout option
+ * (deprecated since 7486) is enabled or not.
+ */
+extern bool replication_synchro_timeout_enabled;
+
+/**
  * Max time to wait for appliers to synchronize before entering
  * the orphan mode.
  */
