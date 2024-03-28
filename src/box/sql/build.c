@@ -1152,7 +1152,7 @@ vdbe_emit_create_function(struct Parse *parser, int reg_id, const char *name,
 			  const char *body)
 {
 	/*
-	 * Occupy registers for 20 fields: each member in _func space plus one
+	 * Occupy registers for 21 fields: each member in _func space plus one
 	 * for final msgpack tuple.
 	 */
 	const int reg_count = box_func_field_MAX + 1;
@@ -1205,6 +1205,11 @@ vdbe_emit_create_function(struct Parse *parser, int reg_id, const char *name,
 		      P4_STATIC);
 	sqlVdbeAddOp4(v, OP_String8, 0, regs + BOX_FUNC_FIELD_LAST_ALTERED, 0,
 		      "", P4_STATIC);
+	char *trigger = buf;
+	buf = mp_encode_array(trigger, 0);
+	sqlVdbeAddOp4(v, OP_Blob, buf - trigger,
+		      regs + BOX_FUNC_FIELD_TRIGGER, SQL_SUBTYPE_MSGPACK,
+		      trigger, P4_STATIC);
 	sqlVdbeAddOp3(v, OP_MakeRecord, regs, box_func_field_MAX,
 		      regs + box_func_field_MAX);
 	sqlVdbeAddOp2(v, OP_SInsert, BOX_FUNC_ID, regs + box_func_field_MAX);

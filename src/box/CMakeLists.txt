@@ -237,6 +237,7 @@ set(box_sources
     space_def.c
     sequence.c
     func.c
+    func_adapter.c
     func_cache.c
     func_def.c
     field_default_func.c

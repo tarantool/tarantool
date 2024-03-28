@@ -59,7 +59,8 @@ box.space._space:select{}
         'type': 'boolean'}, {'name': 'is_sandboxed', 'type': 'boolean'}, {'name': 'is_null_call',
         'type': 'boolean'}, {'name': 'exports', 'type': 'array'}, {'name': 'opts',
         'type': 'map'}, {'name': 'comment', 'type': 'string'}, {'name': 'created',
-        'type': 'string'}, {'name': 'last_altered', 'type': 'string'}]]
+        'type': 'string'}, {'name': 'last_altered', 'type': 'string'}, {'name': 'trigger',
+        'type': 'array'}]]
   - [297, 1, '_vfunc', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid',
         'type': 'unsigned'}, {'name': 'language', 'type': 'string'}, {'name': 'body',
@@ -69,7 +70,8 @@ box.space._space:select{}
         'type': 'boolean'}, {'name': 'is_sandboxed', 'type': 'boolean'}, {'name': 'is_null_call',
         'type': 'boolean'}, {'name': 'exports', 'type': 'array'}, {'name': 'opts',
         'type': 'map'}, {'name': 'comment', 'type': 'string'}, {'name': 'created',
-        'type': 'string'}, {'name': 'last_altered', 'type': 'string'}]]
+        'type': 'string'}, {'name': 'last_altered', 'type': 'string'}, {'name': 'trigger',
+        'type': 'array'}]]
   - [304, 1, '_user', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
         'type': 'string'}, {'name': 'auth', 'type': 'map'}, {'name': 'auth_history',
@@ -181,7 +183,7 @@ box.space._user:select{}
 for _, v in box.space._func:pairs{} do r = {} table.insert(r, v:update({{"=", 18, ""}, {"=", 19, ""}})) return r end
 ---
 - - [1, 1, 'box.schema.user.info', 0, 'LUA', '', 'function', [], 'any', 'none', 'none',
-    false, false, true, ['LUA'], {}, '', '', '']
+    false, false, true, ['LUA'], {}, '', '', '', []]
 ...
 box.space._priv:select{}
 ---

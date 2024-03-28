@@ -11,6 +11,79 @@
 #include "lua/utils.h"
 #include "tt_static.h"
 
+#include "box/port.h"
+
+#include "core/func_adapter.h"
+
+/**
+ * A wrapper over non-Lua trigger handlers.
+ * Must be pushed with 3 upvalues:
+ * 1. Trigger itself represented as func_adapter
+ * 2. Pointer to userdata containing current epoch.
+ * 3. Epoch in which the handler was pushed.
+ * If actual and saved epochs are not equal, the error is thrown
+ * because we cannot guarantee if the trigger is still valid.
+ */
+static int
+luaT_trigger_non_lua_handler(struct lua_State *L)
+{
+	struct func_adapter *func =
+		(struct func_adapter *)lua_touserdata(L, lua_upvalueindex(1));
+	size_t *actual_epoch = lua_touserdata(L, lua_upvalueindex(2));
+	size_t epoch = lua_tonumber(L, lua_upvalueindex(3));
+	if (*actual_epoch != epoch)
+		luaL_error(L, "Handler was invalidated: it mustn't be saved");
+	struct port args, ret;
+	port_lua_create(&args, L);
+	bool fiber_storage_is_used = fiber()->storage.lua.stack == L;
+	/*
+	 * Prevent using the same Lua-stack in trigger because port_lua
+	 * doesn't allow to dump it to the same stack as the underlying one.
+	 */
+	if (fiber_storage_is_used)
+		fiber()->storage.lua.stack = NULL;
+	int rc = func_adapter_call(func, &args, &ret);
+	/* Restore fiber storage. */
+	if (fiber_storage_is_used)
+		fiber()->storage.lua.stack = L;
+	if (rc != 0)
+		return luaT_error(L);
+
+	port_dump_lua(&ret, L, PORT_DUMP_LUA_MODE_FLAT);
+	port_destroy(&ret);
+	return lua_gettop(L);
+}
+
+/**
+ * Pushes handler to Lua.
+ * Value at epoch_idx must be a pointer to userdata containing current epoch.
+ * If handler is not Lua-object, actual and saved epoch values are compared
+ * when it is called in order to invalidate handler when it's not referenced
+ * by iterator.
+ */
+static void
+luaT_trigger_push_handler(struct lua_State *L, struct func_adapter *trigger,
+			  int epoch_idx, size_t epoch)
+{
+	if (func_adapter_is_lua(trigger)) {
+		func_adapter_lua_get_func(trigger, L);
+	} else {
+		lua_pushlightuserdata(L, trigger);
+		lua_pushvalue(L, epoch_idx);
+		lua_pushnumber(L, epoch);
+		lua_pushcclosure(L, luaT_trigger_non_lua_handler, 3);
+	}
+}
+
+static void
+luaT_trigger_push_handler_info(struct lua_State *L, struct func_adapter *trigger)
+{
+	if (func_adapter_is_lua(trigger))
+		func_adapter_lua_get_func(trigger, L);
+	else
+		lua_pushstring(L, "non-Lua handler");
+}
+
 /**
  * Sets a trigger with passed name to the passed event.
  * The first argument is event name, the second one is trigger name, the third
@@ -57,7 +130,7 @@ luaT_trigger_del(struct lua_State *L)
 	struct func_adapter *old = event_find_trigger(event, trigger_name);
 	if (old == NULL)
 		return 0;
-	func_adapter_lua_get_func(old, L);
+	luaT_trigger_push_handler_info(L, old);
 	event_reset_trigger(event, trigger_name, NULL);
 	return 1;
 }
@@ -79,20 +152,62 @@ luaT_trigger_call(struct lua_State *L)
 	struct event *event = event_get(event_name, false);
 	if (event == NULL)
 		return 0;
-	int top = lua_gettop(L);
-	int narg = top - 1;
+	int nargs = lua_gettop(L) - 1;
+
+	/*
+	 * If the function is called on Lua-stack from fiber storage, create
+	 * new thread because we cannot dump port_lua to the same stack as
+	 * the underlying one, and it's cheaper to leave fiber storage stack
+	 * to triggers - they won't have to create their own stacks then.
+	 *
+	 * If we have no args, port won't be created, so we don't need to
+	 * create a stack.
+	 */
+	struct lua_State *args_L = L;
+	int args_coro_ref = LUA_REFNIL;
+	if (nargs > 0) {
+		if (fiber()->storage.lua.stack == L) {
+			args_L = luaT_newthread(tarantool_L);
+			if (args_L == NULL)
+				panic("Cannot create Lua thread");
+			args_coro_ref = luaL_ref(tarantool_L,
+						 LUA_REGISTRYINDEX);
+		}
+		lua_xmove(L, args_L, nargs);
+	}
+
+	/*
+	 * Create port_lua starting from the index after current top because
+	 * arguments are popped on call, so we have to push them before each
+	 * trigger.
+	 * If we have no arguments, port is not created.
+	 */
+	struct port *args = NULL;
+	struct port args_port;
+	if (nargs > 0) {
+		port_lua_create_at(&args_port, args_L, lua_gettop(args_L) + 1);
+		args = &args_port;
+	}
+
 	struct event_trigger_iterator it;
 	event_trigger_iterator_create(&it, event);
 	struct func_adapter *trigger = NULL;
 	const char *name = NULL;
 	int rc = 0;
 	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
-		func_adapter_lua_get_func(trigger, L);
-		for (int i = top - narg + 1; i <= top; ++i)
-			lua_pushvalue(L, i);
-		rc = luaT_call(L, narg, 0);
+		/*
+		 * Push arguments before each trigger - they will be popped when
+		 * the trigger is invoked. If nargs is 0, loop won't be started.
+		 */
+		for (int i = 1; i <= nargs; i++)
+			lua_pushvalue(args_L, i);
+		rc = func_adapter_call(trigger, args, NULL);
 	}
 	event_trigger_iterator_destroy(&it);
+	if (args != NULL)
+		port_destroy(args);
+
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, args_coro_ref);
 	if (rc != 0)
 		return luaT_error(L);
 	return 0;
@@ -117,7 +232,7 @@ trigger_info_push_event(struct event *event, void *arg)
 		lua_createtable(L, 2, 0);
 		lua_pushstring(L, name);
 		lua_rawseti(L, -2, 1);
-		func_adapter_lua_get_func(trigger, L);
+		luaT_trigger_push_handler_info(L, trigger);
 		lua_rawseti(L, -2, 2);
 		lua_rawseti(L, -2, idx);
 	}
@@ -170,18 +285,23 @@ luaT_check_event_trigger_iterator(struct lua_State *L, int idx)
 }
 
 /**
- * Takes an iterator step.
+ * Takes an iterator step. Must be pushed with one upvalue which is pointer
+ * to size_t containing current iterator epoch.
  */
 static int
 luaT_trigger_iterator_next(struct lua_State *L)
 {
+	int epoch_idx = lua_upvalueindex(1);
+	size_t *epoch = lua_touserdata(L, epoch_idx);
+	assert(epoch != NULL);
+	++*epoch;
 	struct event_trigger_iterator *it =
 		luaT_check_event_trigger_iterator(L, 1);
 	struct func_adapter *trigger = NULL;
 	const char *name = NULL;
 	if (event_trigger_iterator_next(it, &trigger, &name)) {
 		lua_pushstring(L, name);
-		func_adapter_lua_get_func(trigger, L);
+		luaT_trigger_push_handler(L, trigger, epoch_idx, *epoch);
 		return 2;
 	}
 	return 0;
@@ -226,7 +346,9 @@ luaT_trigger_pairs(struct lua_State *L)
 		lua_pushcfunction(L, luaT_trigger_iterator_next_exhausted);
 		return 1;
 	}
-	lua_pushcfunction(L, luaT_trigger_iterator_next);
+	size_t *epoch = lua_newuserdata(L, sizeof(size_t));
+	*epoch = 0;
+	lua_pushcclosure(L, luaT_trigger_iterator_next, 1);
 	struct event_trigger_iterator *it = lua_newuserdata(L, sizeof(*it));
 	event_trigger_iterator_create(it, event);
 	luaL_getmetatable(L, event_trigger_iterator_typename);
@@ -353,7 +475,7 @@ luaT_event_reset_trigger_with_flags(struct lua_State *L, int bottom,
 		int idx = 0;
 		while (event_trigger_iterator_next(&it, &trigger, &name)) {
 			idx++;
-			func_adapter_lua_get_func(trigger, L);
+			luaT_trigger_push_handler_info(L, trigger);
 			lua_rawseti(L, -2, idx);
 		}
 		event_trigger_iterator_destroy(&it);

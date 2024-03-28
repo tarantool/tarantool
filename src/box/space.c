@@ -55,7 +55,7 @@
 #include "field_default_func.h"
 #include "wal_ext.h"
 #include "coll_id_cache.h"
-#include "func_adapter.h"
+#include "core/func_adapter.h"
 #include "lua/utils.h"
 #include "core/mp_ctx.h"
 #include "port.h"
