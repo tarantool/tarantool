@@ -112,7 +112,80 @@ local function filter(opts)
     return candidates
 end
 
+local function get_connection(all_candidates, prefer_local)
+    local candidates = table.copy(all_candidates)
+    if prefer_local ~= false then
+        local candidate_idx = nil
+        for n, candidate in ipairs(candidates) do
+            if candidate == box.info.name then
+                candidate_idx = n
+                local conn = connect(box.info.name, {wait_connected = false})
+                if conn:wait_connected() then
+                    return conn
+                end
+                break
+            end
+        end
+        if candidate_idx ~= nil then
+            table.remove(candidates, candidate_idx)
+        end
+    end
+
+    while #candidates > 0 do
+        local n = math.random(#candidates)
+        local instance_name = table.remove(candidates, n)
+        local conn = connect(instance_name, {wait_connected = false})
+        if conn:wait_connected() then
+            return conn
+        end
+    end
+    return nil
+end
+
+local function call(func_name, args, opts)
+    checks('string', '?table', {
+        labels = '?table',
+        roles = '?table',
+        prefer_local = '?boolean',
+        -- The following options passed directly to net.box.call().
+        timeout = '?',
+        buffer = '?',
+        on_push = '?function',
+        on_push_ctx = '?',
+        is_async = '?boolean',
+    })
+    opts = opts or {}
+
+    local candidates_opts = {
+        labels = opts.labels,
+        roles = opts.roles,
+    }
+    local candidates = filter(candidates_opts)
+    if next(candidates) == nil then
+        local msg = "Couldn't execute function %s: no candidates are " ..
+                    "available with these conditions"
+        error(msg:format(func_name), 0)
+    end
+
+    local conn = get_connection(candidates, opts.prefer_local)
+    if conn == nil then
+        local msg = "Couldn't execute function %s: connection to " ..
+                    "candidates failed"
+        error(msg:format(func_name), 0)
+    end
+
+    local net_box_call_opts = {
+        timeout = opts.timeout,
+        buffer = opts.buffer,
+        on_push = opts.on_push,
+        on_push_ctx = opts.on_push_ctx,
+        is_async = opts.is_async,
+    }
+    return conn:call(func_name, args, net_box_call_opts)
+end
+
 return {
     connect = connect,
     filter = filter,
+    call = call,
 }

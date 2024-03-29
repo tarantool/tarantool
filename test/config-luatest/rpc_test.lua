@@ -204,3 +204,122 @@ g.test_filter = function(g)
     g.server_3:exec(check)
     g.server_4:exec(check)
 end
+
+g.test_call = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001:
+                roles: [one]
+                database:
+                  mode: rw
+                labels:
+                  l1: 'first'
+                  l2: 'second'
+              instance-002: {}
+          replicaset-002:
+            instances:
+              instance-003:
+                roles: [one]
+                database:
+                  mode: rw
+                labels:
+                  l2: 'second'
+              instance-004:
+                roles: [one]
+                labels:
+                  l1: 'first'
+                  l3: 'second'
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+
+    local role = string.dump(function()
+        local function f1()
+            return box.info.name
+        end
+
+        local function f2(a, b, c)
+            return a + b * c
+        end
+
+        rawset(_G, 'f1', f1)
+        rawset(_G, 'f2', f2)
+
+        return {
+            stop = function() end,
+            apply = function() end,
+            validate = function() end,
+        }
+    end)
+    treegen.write_script(dir, 'one.lua', role)
+
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = 'config.yaml',
+        chdir = dir,
+    }
+    g.server_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+    g.server_2 = server:new(fun.chain(opts, {alias = 'instance-002'}):tomap())
+    g.server_3 = server:new(fun.chain(opts, {alias = 'instance-003'}):tomap())
+    g.server_4 = server:new(fun.chain(opts, {alias = 'instance-004'}):tomap())
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_2:start({wait_until_ready = false})
+    g.server_3:start({wait_until_ready = false})
+    g.server_4:start({wait_until_ready = false})
+
+    g.server_1:wait_until_ready()
+    g.server_2:wait_until_ready()
+    g.server_3:wait_until_ready()
+    g.server_4:wait_until_ready()
+
+    -- Make sure module pool is working.
+    local function check()
+        local connpool = require('experimental.connpool')
+        local opts = {
+            labels = {l1 = 'first'},
+            roles = {'one'},
+        }
+        local candidates = connpool.filter(opts)
+
+        local is_candidate = false
+        for _, candidate_name in ipairs(candidates) do
+            is_candidate = is_candidate or candidate_name == box.info.name
+        end
+
+        t.assert(not is_candidate or box.info.name == 'instance-001' or
+                 box.info.name == 'instance-004')
+
+        if is_candidate then
+            t.assert(opts.prefer_local == nil)
+            t.assert_equals(connpool.call('f1', nil, opts), box.info.name)
+            opts.prefer_local = true
+            t.assert_equals(connpool.call('f1', nil, opts), box.info.name)
+        else
+            t.assert(opts.prefer_local == nil)
+            t.assert_items_include(candidates, {connpool.call('f1', nil, opts)})
+            opts.prefer_local = true
+            t.assert_items_include(candidates, {connpool.call('f1', nil, opts)})
+        end
+
+        t.assert_equals(connpool.call('f2', {1,2,3}, {roles = {'one'}}), 7)
+    end
+
+    g.server_1:exec(check)
+    g.server_2:exec(check)
+    g.server_3:exec(check)
+    g.server_4:exec(check)
+end
