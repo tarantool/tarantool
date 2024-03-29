@@ -578,6 +578,28 @@ function methods.instances(self)
     return res
 end
 
+function methods.instance_uri(self, uri_type, opts)
+    selfcheck(self, 'instance_uri')
+    initcheck(self, 'instance_uri', 'cluster')
+    uri_type = uri_type == nil and 'peer' or uri_type
+    if uri_type ~= 'peer' and uri_type ~= 'sharding' then
+        error(('Expected "peer" or "sharding", got %q'):format(uri_type), 0)
+    end
+    opts = opts == nil and {} or opts
+    if type(opts) ~= 'table' then
+        error(('Expected table, got %s'):format(type(opts)), 0)
+    end
+    if opts.instance ~= nil and type(opts.instance) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.instance)), 0)
+    end
+
+    local uri_opts = {
+        instance = opts.instance,
+        use_default = true,
+    }
+    return self._configdata_applied:_instance_uri(uri_type, uri_opts)
+end
+
 -- The object is a singleton. The constructor should be called
 -- only once.
 local function new()
