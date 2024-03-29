@@ -55,6 +55,64 @@ local function connect(instance_name, opts)
     return conn
 end
 
+local function is_roles_match(expected_roles, present_roles)
+    if expected_roles == nil or next(expected_roles) == nil then
+        return true
+    end
+    if present_roles == nil or next(present_roles) == nil then
+        return false
+    end
+
+    local roles = {}
+    for _, present_role_name in pairs(present_roles) do
+        roles[present_role_name] = true
+    end
+    for _, expected_role_name in pairs(expected_roles) do
+        if roles[expected_role_name] == nil then
+            return false
+        end
+    end
+    return true
+end
+
+local function is_labels_match(expected_labels, present_labels)
+    if expected_labels == nil or next(expected_labels) == nil then
+        return true
+    end
+    if present_labels == nil or next(present_labels) == nil then
+        return false
+    end
+
+    for label, value in pairs(expected_labels) do
+        if present_labels[label] ~= value then
+            return false
+        end
+    end
+    return true
+end
+
+local function is_candidate_match(instance_name, opts)
+    assert(opts ~= nil and type(opts) == 'table')
+    local get_opts = {instance = instance_name}
+    return is_roles_match(opts.roles, config:get('roles', get_opts)) and
+           is_labels_match(opts.labels, config:get('labels', get_opts))
+end
+
+local function filter(opts)
+    checks({
+        labels = '?table',
+        roles = '?table',
+    })
+    local candidates = {}
+    for instance_name in pairs(config:instances()) do
+        if is_candidate_match(instance_name, opts or {}) then
+            table.insert(candidates, instance_name)
+        end
+    end
+    return candidates
+end
+
 return {
     connect = connect,
+    filter = filter,
 }
