@@ -170,16 +170,16 @@ extern char session_lua[],
 	config_utils_odict_lua[],
 	config_utils_schema_lua[],
 	config_utils_snapshot_lua[],
-	config_utils_tabulate_lua[]
+	config_utils_tabulate_lua[],
 #if ENABLE_CONFIG_EXTRAS
-	,
 	config_source_etcd_lua[],
 	config_storage_init_lua[],
 	config_source_storage_lua[],
-	config_extras_lua[]
+	config_extras_lua[],
 #endif
-	;
 	/* }}} config */
+
+	experimental_connpool_lua[];
 
 /**
  * List of box's built-in modules written using Lua.
@@ -454,6 +454,10 @@ static const char *lua_sources[] = {
 #endif
 
 	/* }}} config */
+
+	"experimental/connpool",
+	"experimental.connpool",
+	experimental_connpool_lua,
 
 	FAILOVER_LUA_MODULES
 

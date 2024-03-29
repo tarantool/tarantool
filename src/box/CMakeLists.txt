@@ -76,6 +76,8 @@ if (ENABLE_CONFIG_EXTRAS)
 endif()
 # }}} config
 
+lua_source(lua_sources lua/experimental/connpool.lua      experimental_connpool_lua)
+
 if (ENABLE_FAILOVER)
     lua_multi_source(lua_sources ${FAILOVER_LUA_SOURCES})
 endif()
