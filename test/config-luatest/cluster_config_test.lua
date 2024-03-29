@@ -149,3 +149,135 @@ g.test_errors = function(g)
         end)
     end)
 end
+
+g.test_instance_uri_success = function(g)
+    local peer = {
+        advertise = {
+            peer = {
+                login = "replicator",
+                password = "secret",
+                uri = "unix/:./i-003.iproto",
+            },
+        },
+    }
+    local sharding = {
+        advertise = {
+            sharding = {
+                login = 'sharding_user',
+                password = 'sharding_password',
+                uri = "unix/:./i-005-sharding.iproto",
+            },
+        },
+    }
+    local config = cbuilder.new()
+        :use_group('g-001')
+        :set_global_option('credentials.users.sharding_user.password', 'secret')
+
+        :use_replicaset('r-001')
+        :add_instance('i-001', {database = {mode = 'rw'}})
+        :add_instance('i-002', {})
+
+        :use_replicaset('r-002')
+        :add_instance('i-003', {database = {mode = 'rw'}, iproto = peer})
+        :add_instance('i-004', {})
+
+        :use_group('g-002')
+
+        :use_replicaset('r-003')
+        :add_instance('i-005', {iproto = sharding})
+        :add_instance('i-006', {database = {mode = 'rw'}})
+
+        :config()
+
+    local cluster = cluster.new(g, config)
+    cluster:start()
+
+    local function check()
+        local config = require('config')
+        local exp = {
+            login = "replicator",
+            password = "secret",
+            uri = ("unix/:./%s.iproto"):format(box.info.name),
+        }
+        local exp_sharding = {
+            login = 'sharding_user',
+            password = "sharding_password",
+            uri = "unix/:./i-005-sharding.iproto",
+        }
+        t.assert_equals(config:instance_uri(), exp)
+        t.assert_equals(config:instance_uri('peer'), exp)
+        t.assert_equals(config:instance_uri('sharding'),
+                        box.info.name == 'i-005' and exp_sharding or exp)
+
+        exp.uri = "unix/:./i-001.iproto"
+        local opts = {instance = 'i-001'}
+        t.assert_equals(config:instance_uri(nil, opts), exp)
+        t.assert_equals(config:instance_uri('peer', opts), exp)
+        t.assert_equals(config:instance_uri('sharding', opts), exp)
+
+        exp.uri = "unix/:./i-002.iproto"
+        opts.instance = 'i-002'
+        t.assert_equals(config:instance_uri(nil, opts), exp)
+        t.assert_equals(config:instance_uri('peer', opts), exp)
+        t.assert_equals(config:instance_uri('sharding', opts), exp)
+
+        exp.uri = "unix/:./i-003.iproto"
+        opts.instance = 'i-003'
+        t.assert_equals(config:instance_uri(nil, opts), exp)
+        t.assert_equals(config:instance_uri('peer', opts), exp)
+        t.assert_equals(config:instance_uri('sharding', opts), exp)
+
+        exp.uri = "unix/:./i-004.iproto"
+        opts.instance = 'i-004'
+        t.assert_equals(config:instance_uri(nil, opts), exp)
+        t.assert_equals(config:instance_uri('peer', opts), exp)
+        t.assert_equals(config:instance_uri('sharding', opts), exp)
+
+        exp.uri = "unix/:./i-005.iproto"
+        opts.instance = 'i-005'
+        t.assert_equals(config:instance_uri(nil, opts), exp)
+        t.assert_equals(config:instance_uri('peer', opts), exp)
+        t.assert_equals(config:instance_uri('sharding', opts), exp_sharding)
+
+        exp.uri = "unix/:./i-006.iproto"
+        opts.instance = 'i-006'
+        t.assert_equals(config:instance_uri(nil, opts), exp)
+        t.assert_equals(config:instance_uri('peer', opts), exp)
+        t.assert_equals(config:instance_uri('sharding', opts), exp)
+    end
+
+    cluster['i-001']:exec(check)
+    cluster['i-002']:exec(check)
+    cluster['i-003']:exec(check)
+    cluster['i-004']:exec(check)
+    cluster['i-005']:exec(check)
+    cluster['i-006']:exec(check)
+end
+
+g.test_instance_uri_errors = function(g)
+    local config = cbuilder.new()
+        :add_instance('i-001', {})
+        :config()
+
+    local cluster = cluster.new(g, config)
+    cluster:start()
+
+    cluster['i-001']:exec(function()
+        local config = require('config')
+
+        local exp_err = 'Expected "peer" or "sharding", got "1"'
+        t.assert_error_msg_equals(exp_err, function()
+            config:instance_uri(1)
+        end)
+
+        exp_err = 'Expected table, got number'
+        t.assert_error_msg_equals(exp_err, function()
+            config:instance_uri(nil, 1)
+        end)
+
+        exp_err = 'Expected string, got number'
+        t.assert_error_msg_equals(exp_err, function()
+            config:instance_uri(nil, {instance = 1})
+        end)
+    end)
+end

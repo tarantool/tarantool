@@ -70,6 +70,11 @@ function methods.names(self)
     }
 end
 
+function methods._instance_uri(self, uri_type, opts)
+    assert(uri_type == 'peer' or uri_type == 'sharding')
+    return instance_config:instance_uri(choose_iconfig(self, opts), uri_type)
+end
+
 -- Generate a part of a vshard configuration that relates to
 -- a particular instance.
 --
@@ -90,8 +95,7 @@ function methods._instance_sharding(self, opts)
         return nil
     end
     local zone = self:get('sharding.zone', opts)
-    local uri = instance_config:instance_uri(choose_iconfig(self, opts),
-        'sharding')
+    local uri = self:_instance_uri('sharding', opts)
     if uri == nil then
         local err = 'No suitable URI provided for instance %q'
         error(err:format(opts.instance), 0)
