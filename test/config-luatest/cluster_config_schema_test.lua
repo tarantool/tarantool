@@ -325,6 +325,10 @@ g.test_defaults = function()
             call_timeout = 1,
             lease_interval = 30,
             renew_interval = 10,
+            stateboard = {
+                renew_interval = 2,
+                keepalive_interval = 10,
+            },
         },
         compat = {
             json_escape_forward_slash = 'new',
