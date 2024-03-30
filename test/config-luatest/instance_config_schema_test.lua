@@ -1702,6 +1702,10 @@ g.test_failover = function()
             call_timeout = 2,
             lease_interval = 10,
             renew_interval = 1,
+            stateboard = {
+                renew_interval = 1,
+                keepalive_interval = 5,
+            },
         },
     }
 
@@ -1714,6 +1718,10 @@ g.test_failover = function()
         call_timeout = 1,
         lease_interval = 30,
         renew_interval = 10,
+        stateboard = {
+            renew_interval = 2,
+            keepalive_interval = 10,
+        },
     }
     local res = instance_config:apply_default({}).failover
     t.assert_equals(res, exp)

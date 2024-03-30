@@ -2272,6 +2272,33 @@ return schema.new('instance_config', schema.record({
             type = 'number',
             default = 10,
         }),
+        -- Configure how to work with a remote storage, where
+        -- failover coordinators leave its state information.
+        --
+        -- Currently, the state storage is the same as a remote
+        -- configuration storage. The URIs and connection options
+        -- are configured in the `config.etcd` or the
+        -- `config.storage` section.
+        stateboard = schema.record({
+            -- How often information in the stateboard is updated.
+            renew_interval = schema.scalar({
+                type = 'number',
+                default = 2,
+            }),
+            -- How long a transient state information is stored.
+            --
+            -- Beware: it affects how fast a coordinator assumes
+            -- that the previous active coordinator is gone.
+            --
+            -- The option should be smaller than
+            -- failover.lease_interval. Otherwise the coordinator
+            -- switching causes replicaset leaders to go to the
+            -- read-only mode for some time interval.
+            keepalive_interval = schema.scalar({
+                type = 'number',
+                default = 10,
+            }),
+        })
     }),
     -- Compatibility options.
     compat = schema.record({
