@@ -529,11 +529,14 @@ LIGHT(slot)(const struct LIGHT(common) *ht, uint32_t hash)
 {
 	uint32_t cover_mask = ht->cover_mask;
 	uint32_t res = hash & cover_mask;
-	uint32_t probe = (ht->table_size - res - 1) >> 31;
+	/*
+	 * Calculate the following expression without branch instructions:
+	 * probe = res >= ht->table_size;
+	 */
+	uint32_t probe = ((size_t)ht->table_size - res - 1) >> 63;
 	uint32_t shift = __builtin_ctz(~(cover_mask >> 1));
 	res ^= (probe << shift);
 	return res;
-
 }
 
 /**
