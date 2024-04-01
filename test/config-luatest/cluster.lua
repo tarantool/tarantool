@@ -54,9 +54,9 @@ end
 -- in the alphabetical order.
 local function instance_names_from_config(config)
     local instance_names = {}
-    for _, group in pairs(config.groups) do
-        for _, replicaset in pairs(group.replicasets) do
-            for name, _ in pairs(replicaset.instances) do
+    for _, group in pairs(config.groups or {}) do
+        for _, replicaset in pairs(group.replicasets or {}) do
+            for name, _ in pairs(replicaset.instances or {}) do
                 table.insert(instance_names, name)
             end
         end
@@ -206,6 +206,7 @@ local cluster_mt = {
 }
 
 local function new(g, config, server_opts)
+    assert(config._config == nil, "Please provide cbuilder.new():config()")
     assert(g.cluster == nil)
 
     -- Prepare a temporary directory and write a configuration
@@ -259,6 +260,7 @@ end
 -- ensure that all the instances fails to start and reports the
 -- given error message.
 local function startup_error(g, config, exp_err)
+    assert(config._config == nil, "Please provide cbuilder.new():config()")
     -- Prepare a temporary directory and write a configuration
     -- file.
     local dir = treegen.prepare_directory(g, {}, {})
