@@ -731,11 +731,31 @@ local function validate_anon(found, peers, failover, leader)
     end
 end
 
+local function validate_misplacing(cconfig)
+    for group_name, group_cfg in pairs(cconfig.groups) do
+        if group_cfg.replicasets == nil or
+                next(group_cfg.replicasets) == nil then
+            error(('group %q should include at ' ..
+                   'least one replicaset.'):format(group_name), 0)
+        end
+
+        for replicaset_name, replicaset_cfg in pairs(group_cfg.replicasets) do
+            if replicaset_cfg.instances == nil or
+                    next(replicaset_cfg.instances) == nil then
+                error(('replicaset %q should include at ' ..
+                       'least one instance.'):format(replicaset_name), 0)
+            end
+        end
+    end
+end
+
 local function new(iconfig, cconfig, instance_name)
     -- Find myself in a cluster config, determine peers in the same
     -- replicaset.
     local found = cluster_config:find_instance(cconfig, instance_name)
     assert(found ~= nil)
+
+    validate_misplacing(cconfig)
 
     -- Precalculate configuration with applied defaults.
     local iconfig_def = instance_config:apply_default(iconfig)

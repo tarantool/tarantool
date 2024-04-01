@@ -281,3 +281,33 @@ g.test_instance_uri_errors = function(g)
         end)
     end)
 end
+
+-- Attempt to pass an empty group and an empty replicaset.
+g.test_misplace_option = function(g)
+    local config = cbuilder.new()
+        :use_group('g-001')
+
+        :use_replicaset('r-001')
+        :add_instance('i-001', {})
+
+        :use_group('sharding')
+        :set_group_option('roles', {'storage'})
+        :config()
+
+    cluster.startup_error(g, config, "group \"sharding\" should " ..
+                                     "include at least one replicaset.")
+
+    local config = cbuilder.new()
+        :use_group('g-001')
+
+        :use_replicaset('r-001')
+        :add_instance('i-001', {})
+
+        :use_replicaset('sharding')
+        :set_replicaset_option('roles', {'storage'})
+
+        :config()
+
+    cluster.startup_error(g, config, "replicaset \"sharding\" should " ..
+                                     "include at least one instance.")
+end
