@@ -6,3 +6,5 @@
 	*** iterator_test: done ***
 	*** iterator_freeze_check ***
 	*** iterator_freeze_check: done ***
+	*** slot_in_big_table_test ***
+	*** slot_in_big_table_test: done ***
