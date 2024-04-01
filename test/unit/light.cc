@@ -321,6 +321,29 @@ iterator_freeze_check()
 	footer();
 }
 
+/**
+ * Check that LIGHT(slot)() is correctly calculated for table sizes > 2^31.
+ */
+static void
+slot_in_big_table_test()
+{
+	header();
+
+	struct light_core ht;
+	light_create(&ht, light_extent_size, my_light_alloc, my_light_free,
+		     &extents_count, 0);
+
+	ht.common.table_size = 4000000000;
+	ht.common.cover_mask = 0xffffffff;
+	uint32_t hash = 0x00031337;
+	uint32_t slot = light_slot(&ht.common, hash);
+	fail_if(slot != 0x00031337);
+
+	light_destroy(&ht);
+
+	footer();
+}
+
 int
 main(int, const char**)
 {
@@ -329,6 +352,8 @@ main(int, const char**)
 	collision_test();
 	iterator_test();
 	iterator_freeze_check();
+	slot_in_big_table_test();
+
 	if (extents_count != 0)
 		fail("memory leak!", "true");
 }
