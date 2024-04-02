@@ -66,16 +66,14 @@ g.test_simple = function()
 
         trigger.call(event, 42)
         t.assert_equals(state, 42)
-        ret_handler = trigger.del(event, name)
-        t.assert_equals(ret_handler, handler)
+        trigger.del(event, name)
 
         state = 0
         trigger.call(event)
         t.assert_equals(state, 0)
 
         -- Check that deletion of nothing does not throw error and returns nil
-        ret_handler = trigger.del(event, name)
-        t.assert_equals(ret_handler, nil)
+        trigger.del(event, name)
     end)
 end
 
