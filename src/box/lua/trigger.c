@@ -42,7 +42,7 @@ luaT_trigger_set(struct lua_State *L)
 /**
  * Deletes a trigger with passed name from passed event.
  * The first argument is event name, the second one is trigger name.
- * Returns deleted trigger handler.
+ * Returns no values.
  */
 static int
 luaT_trigger_del(struct lua_State *L)
@@ -52,14 +52,9 @@ luaT_trigger_del(struct lua_State *L)
 	const char *event_name = luaL_checkstring(L, 1);
 	const char *trigger_name = luaL_checkstring(L, 2);
 	struct event *event = event_get(event_name, false);
-	if (event == NULL)
-		return 0;
-	struct func_adapter *old = event_find_trigger(event, trigger_name);
-	if (old == NULL)
-		return 0;
-	func_adapter_lua_get_func(old, L);
-	event_reset_trigger(event, trigger_name, NULL);
-	return 1;
+	if (event != NULL)
+		event_reset_trigger(event, trigger_name, NULL);
+	return 0;
 }
 
 /**
