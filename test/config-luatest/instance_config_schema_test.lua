@@ -527,6 +527,7 @@ for case_name, case in pairs({
         advertise = {uri = '0.0.0.0:3301'},
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.%s.uri',
+            'bad URI "0.0.0.0:3301"',
             'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
         }, ': '),
     },
@@ -534,6 +535,7 @@ for case_name, case in pairs({
         advertise = {uri = '0.0.0.0:3301', login = 'user'},
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.%s.uri',
+            'bad URI "0.0.0.0:3301"',
             'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
         }, ': '),
     },
@@ -541,6 +543,7 @@ for case_name, case in pairs({
         advertise = {uri = '0.0.0.0:3301', login = 'user', password = 'pass'},
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.%s.uri',
+            'bad URI "0.0.0.0:3301"',
             'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
         }, ': '),
     },
@@ -548,6 +551,7 @@ for case_name, case in pairs({
         advertise = {uri = '[::]:3301'},
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.%s.uri',
+            'bad URI "[::]:3301"',
             'in6addr_any (::) cannot be used to create a client socket',
         }, ': '),
     },
@@ -555,6 +559,7 @@ for case_name, case in pairs({
         advertise = {uri = '[::]:3301', login = 'user'},
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.%s.uri',
+            'bad URI "[::]:3301"',
             'in6addr_any (::) cannot be used to create a client socket',
         }, ': '),
     },
@@ -562,6 +567,7 @@ for case_name, case in pairs({
         advertise = {uri = '[::]:3301', login = 'user', password = 'pass'},
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.%s.uri',
+            'bad URI "[::]:3301"',
             'in6addr_any (::) cannot be used to create a client socket',
         }, ': '),
     },
@@ -569,6 +575,7 @@ for case_name, case in pairs({
         advertise = {uri = 'localhost:0'},
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.%s.uri',
+            'bad URI "localhost:0"',
             'An URI with zero port cannot be used to create a client socket',
         }, ': '),
     },
@@ -576,6 +583,7 @@ for case_name, case in pairs({
         advertise = {uri = 'localhost:0', login = 'user'},
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.%s.uri',
+            'bad URI "localhost:0"',
             'An URI with zero port cannot be used to create a client socket',
         }, ': '),
     },
@@ -583,6 +591,7 @@ for case_name, case in pairs({
         advertise = {uri = 'localhost:0', login = 'user', password = 'pass'},
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.%s.uri',
+            'bad URI "localhost:0"',
             'An URI with zero port cannot be used to create a client socket',
         }, ': '),
     },
@@ -625,6 +634,7 @@ for case_name, case in pairs({
         advertise = '0.0.0.0:3301',
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.client',
+            'bad URI "0.0.0.0:3301"',
             'INADDR_ANY (0.0.0.0) cannot be used to create a client socket',
         }, ': '),
     },
@@ -632,6 +642,7 @@ for case_name, case in pairs({
         advertise = '[::]:3301',
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.client',
+            'bad URI "[::]:3301"',
             'in6addr_any (::) cannot be used to create a client socket',
         }, ': '),
     },
@@ -639,6 +650,7 @@ for case_name, case in pairs({
         advertise = 'localhost:0',
         exp_err_msg = table.concat({
             '[instance_config] iproto.advertise.client',
+            'bad URI "localhost:0"',
             'An URI with zero port cannot be used to create a client socket',
         }, ': '),
     },
