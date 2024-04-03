@@ -212,7 +212,7 @@ local function validate_uri_field(has_login_field, used_to_connect)
         if used_to_connect then
             local ok, err = uri_is_suitable_to_connect(uri)
             if not ok then
-                w.error(err)
+                w.error("bad URI %q: %s", data, err)
             end
         end
     end
