@@ -5,6 +5,7 @@ local uuid = require('uuid')
 local urilib = require('uri')
 local fio = require('fio')
 local file = require('internal.config.utils.file')
+local log = require('internal.config.utils.log')
 
 -- List of annotations:
 --
@@ -224,20 +225,29 @@ end
 --
 -- See the uri_is_suitable_to_connect() method in the instance
 -- schema object for details.
-local function find_suitable_uri_to_connect(listen)
+local function find_suitable_uri_to_connect(listen, opts)
+    local opts = opts or {}
+    assert(opts.log_prefix == nil or type(opts.log_prefix) == 'string')
+
     for _, u in ipairs(listen) do
         assert(u.uri ~= nil)
         local uri = urilib.parse(u.uri)
-        if uri ~= nil and uri_is_suitable_to_connect(uri) then
-            -- The urilib.format() call has the second optional
-            -- argument `write_password`. Let's assume that the
-            -- given URIs are to listen on them and so have no
-            -- user/password.
-            --
-            -- NB: We need to format the URI back to construct the
-            -- 'uri' field. urilib.parse() creates separate 'host'
-            -- and 'service'.
-            return urilib.format(uri), u.params
+        if uri ~= nil then
+            local ok, err = uri_is_suitable_to_connect(uri)
+            if ok then
+                -- The urilib.format() call has the second optional
+                -- argument `write_password`. Let's assume that the
+                -- given URIs are to listen on them and so have no
+                -- user/password.
+                --
+                -- NB: We need to format the URI back to construct the
+                -- 'uri' field. urilib.parse() creates separate 'host'
+                -- and 'service'.
+                return urilib.format(uri), u.params
+            elseif opts.log_prefix then
+                log.warn(("%sunsuitable URI %q: %s")
+                                :format(opts.log_prefix, u.uri, err))
+            end
         end
     end
     return nil
@@ -264,7 +274,7 @@ local function find_password(self, iconfig, username)
     return nil
 end
 
-local function instance_uri(self, iconfig, advertise_type)
+local function instance_uri(self, iconfig, advertise_type, opts)
     assert(advertise_type == 'peer' or advertise_type == 'sharding')
 
     -- An effective value of iproto.advertise.sharding defaults to
@@ -288,7 +298,7 @@ local function instance_uri(self, iconfig, advertise_type)
             return nil
         end
         uri = table.copy(uri)
-        uri.uri, uri.params = find_suitable_uri_to_connect(listen)
+        uri.uri, uri.params = find_suitable_uri_to_connect(listen, opts)
     end
     -- No URI found for the given instance.
     if uri.uri == nil then

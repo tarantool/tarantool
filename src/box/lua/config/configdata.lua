@@ -84,7 +84,8 @@ local function instance_sharding(iconfig, instance_name)
         return nil
     end
     local zone = instance_config:get(iconfig, 'sharding.zone')
-    local uri = instance_config:instance_uri(iconfig, 'sharding')
+    local log_opts = {log_prefix = "sharding configuration: "}
+    local uri = instance_config:instance_uri(iconfig, 'sharding', log_opts)
     if uri == nil then
         local err = 'No suitable URI provided for instance %q'
         error(err:format(instance_name), 0)
