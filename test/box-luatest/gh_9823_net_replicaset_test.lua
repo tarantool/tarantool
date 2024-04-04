@@ -180,8 +180,8 @@ g.test_net_replicaset_basics = function(cg)
     t.helpers.retrying({timeout = 10, delay = 0.1}, function()
         info = rs:call_leader('box.info')
         t.assert_equals(info.ro, false)
-    end)
         t.assert_equals(info.name, new_leader_name)
+    end)
 end
 
 -- Test that replicaset is deleted successfully by GC.
