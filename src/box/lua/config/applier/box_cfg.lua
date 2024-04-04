@@ -36,7 +36,8 @@ local function peer_uris(configdata)
         -- A user may configure a custom data flow using
         -- `replication.peers` option.
         if not is_anon then
-            local uri = instance_config:instance_uri(iconfig_def, 'peer')
+            local uri = instance_config:instance_uri(iconfig_def, 'peer',
+                {log_prefix = "replicaset dataflow configuration: "})
             if uri == nil then
                 log.info('%s: instance %q has no iproto.advertise.peer or ' ..
                     'iproto.listen URI suitable to create a client socket',
