@@ -184,9 +184,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea083785e356837f4303efb5294c0fcf25" kind="enumvalue"><name>ER_ILLEGAL_PARAMS</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3148df88f7c2ac93774e87f732aaa5ee" kind="enumvalue"><name>ER_MEMORY_ISSUE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea555ec8745bbad48c3ca3eacdc189c946" kind="enumvalue"><name>ER_TUPLE_FOUND</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea915cf379edd725b9e2fca241275af237" kind="enumvalue"><name>ER_TUPLE_NOT_FOUND</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea18f0b006529c8960bc7afc8555c43118" kind="enumvalue"><name>ER_UNSUPPORTED</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceab3758597613f16aeb557c3642e8b63ed" kind="enumvalue"><name>ER_NONMASTER</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac1d18087eba24577c745d2f407216763" kind="enumvalue"><name>ER_READONLY</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea795138f05d99522d4d9164647e70cb54" kind="enumvalue"><name>ER_INJECTION</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7d5818c3d9be87d07d5ef4976f3bf171" kind="enumvalue"><name>ER_CREATE_SPACE</name></member>
@@ -201,7 +199,6 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5a55ddcc3c2b1d7fd00c1d0e6b6e2f78" kind="enumvalue"><name>ER_KEY_PART_TYPE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea737d869ee35f9a30896f7a431fb7820e" kind="enumvalue"><name>ER_EXACT_MATCH</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3bed78a895978f985c4175e5f7add9a4" kind="enumvalue"><name>ER_INVALID_MSGPACK</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea089d7a2f7a86ca6b41c6d81daa93bed8" kind="enumvalue"><name>ER_PROC_RET</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac95c00dd2a6e6b2c00f94f4c86827a60" kind="enumvalue"><name>ER_TUPLE_NOT_ARRAY</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea8566015030ef6c9358d1c8de84997354" kind="enumvalue"><name>ER_FIELD_TYPE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaec78f6c6801993be56674cab8c03a10c" kind="enumvalue"><name>ER_INDEX_PART_TYPE_MISMATCH</name></member>
@@ -248,15 +245,11 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceab518df09cd1999351eb89495f085dd17" kind="enumvalue"><name>ER_REPLICASET_UUID_IS_RO</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceab9962e533ce417e1612ec2860ae312c5" kind="enumvalue"><name>ER_INSTANCE_UUID_MISMATCH</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1d4143517a7caaa1336eca47fdaf2feb" kind="enumvalue"><name>ER_REPLICA_ID_IS_RESERVED</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea17074dca146150d7c41ec9fc955d6b67" kind="enumvalue"><name>ER_INVALID_ORDER</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3eb60fdf45a736a67bd1c4e379286ff9" kind="enumvalue"><name>ER_MISSING_REQUEST_FIELD</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea58d6ae05846e90c0adc6da50b022c2ce" kind="enumvalue"><name>ER_IDENTIFIER</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea920a6d9e8fd17a2f16df53b6ca4f622b" kind="enumvalue"><name>ER_DROP_FUNCTION</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf31717ec0b20bc4b4cdc28c704331da2" kind="enumvalue"><name>ER_ITERATOR_TYPE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9616f6384423a5ede047dcb8a040cd01" kind="enumvalue"><name>ER_REPLICA_MAX</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0109fd41527db809bb9a42c317cd9152" kind="enumvalue"><name>ER_INVALID_XLOG</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7a1a0c5f9ac263c0e9ec0be60a5aaf3d" kind="enumvalue"><name>ER_INVALID_XLOG_NAME</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac33adee25aff444453494e2fd91c3fe2" kind="enumvalue"><name>ER_INVALID_XLOG_ORDER</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1a7fd03f9987c782bd6aed5716efccf3" kind="enumvalue"><name>ER_NO_CONNECTION</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac4c2c8fe486838aee543ee531df62f60" kind="enumvalue"><name>ER_TIMEOUT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea374a879f5062c4e25b06129a2c9030b6" kind="enumvalue"><name>ER_ACTIVE_TRANSACTION</name></member>
@@ -283,9 +276,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea90078819e285c954279b732836440b52" kind="enumvalue"><name>ER_FUNCTION_LANGUAGE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa3086ed7c8c02c4f049dac180b318a9d" kind="enumvalue"><name>ER_RTREE_RECT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1857821a588fc39761c07c29481080cf" kind="enumvalue"><name>ER_PROC_C</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceae6b2172e36fabaf0af5246bcc92de31c" kind="enumvalue"><name>ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea45c1723eef247a5af5a119ab71c0043a" kind="enumvalue"><name>ER_PROTOCOL</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac5833a6888748c8ef30c2f9f8e889d83" kind="enumvalue"><name>ER_UPSERT_UNIQUE_SECONDARY_KEY</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9e9a7d636fba092f8a2fd1a35f12dd8a" kind="enumvalue"><name>ER_WRONG_INDEX_RECORD</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceae32d3117d0d019bdd04b8b0a8633bd00" kind="enumvalue"><name>ER_WRONG_INDEX_PARTS</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaeea5ee0f4101c259b2d06b8ea781938a" kind="enumvalue"><name>ER_WRONG_INDEX_OPTIONS</name></member>
@@ -298,7 +289,6 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1003a54aec6e4fe46c3aec03673a9e1c" kind="enumvalue"><name>ER_SYSTEM</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea21be1f7fc9bf0f08ff52161a579f8a26" kind="enumvalue"><name>ER_LOADING</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5bd74b209dcd29667742ce38fde44a51" kind="enumvalue"><name>ER_CONNECTION_TO_SELF</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0800b7500ad5ff81209464aef6a035da" kind="enumvalue"><name>ER_KEY_PART_IS_TOO_LONG</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3e0e230fb0cf8e09e4aac8c250ea952d" kind="enumvalue"><name>ER_COMPRESSION</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9c6cadbe15ab1c5261ac8b4a35a4714f" kind="enumvalue"><name>ER_CHECKPOINT_IN_PROGRESS</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6c6aedacd84bf451c16d9a89223ff6ef" kind="enumvalue"><name>ER_SUB_STMT_MAX</name></member>
@@ -336,7 +326,6 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea05b34f26c19b8af31ccbd7f889b9b17c" kind="enumvalue"><name>ER_NO_SUCH_FIELD_NAME_IN_SPACE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9f739a6e120a09b2b0046edf0cfb3ac0" kind="enumvalue"><name>ER_TRANSACTION_YIELD</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea735b42f2294e8467d623625b8c50b543" kind="enumvalue"><name>ER_NO_SUCH_GROUP</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcead0da7ffa82be066164170d022a689c35" kind="enumvalue"><name>ER_SQL_BIND_VALUE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea522740aba34c6a88ec6aabc37113c85a" kind="enumvalue"><name>ER_SQL_BIND_TYPE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7910a7a8bcfbfad15844c166c78e2c62" kind="enumvalue"><name>ER_SQL_BIND_PARAMETER_MAX</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea684064fad4ec40672e10787ed5f3a60c" kind="enumvalue"><name>ER_SQL_EXECUTE</name></member>
@@ -348,7 +337,6 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceab203312f057184ed72fcfd00aa8b4c23" kind="enumvalue"><name>ER_NO_SUCH_MODULE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea46aa939f52b9939e2903d247873a7c23" kind="enumvalue"><name>ER_NO_SUCH_COLLATION</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea43238f1f0927ff19457893cb8e25200b" kind="enumvalue"><name>ER_CREATE_FK_CONSTRAINT</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea4c0535984616a0a31717d1a59c575a57" kind="enumvalue"><name>ER_DROP_FK_CONSTRAINT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea374f1f90c5500e9efb0de348cbe3477c" kind="enumvalue"><name>ER_NO_SUCH_CONSTRAINT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0cc32167aa4648da9c1d65ed4ccce952" kind="enumvalue"><name>ER_CONSTRAINT_EXISTS</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9ff993c472bde67c522284cfd419e927" kind="enumvalue"><name>ER_SQL_TYPE_MISMATCH</name></member>
@@ -367,16 +355,13 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea24b3cefe8cc47c465c70b73fe537a67e" kind="enumvalue"><name>ER_SQL_SYNTAX_NEAR_TOKEN</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea924c8cfee2407be1203faa40f7f1f238" kind="enumvalue"><name>ER_SQL_UNKNOWN_TOKEN</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcead09b554f77913f17410db8c3754b5217" kind="enumvalue"><name>ER_SQL_PARSER_GENERIC</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceae76bd1d5930efea0ec8ca35c9839641b" kind="enumvalue"><name>ER_SQL_ANALYZE_ARGUMENT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea23ac384e56a5e927abdd5804d128aad4" kind="enumvalue"><name>ER_SQL_COLUMN_COUNT_MAX</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6f1fd79526b209362ce013a22e2d723c" kind="enumvalue"><name>ER_HEX_LITERAL_MAX</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7d1bbe93ce888acabf83d9b346494141" kind="enumvalue"><name>ER_INT_LITERAL_MAX</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceae652b715f3cc3aee94127b8440ac5d06" kind="enumvalue"><name>ER_SQL_PARSER_LIMIT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea73ef90a6080802dd16b73b104b8cab1d" kind="enumvalue"><name>ER_INDEX_DEF_UNSUPPORTED</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceae46d46eee3cef67dd4ab3c052d774235" kind="enumvalue"><name>ER_CK_DEF_UNSUPPORTED</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea76199c6573c0bfbbebf58606958d9df8" kind="enumvalue"><name>ER_MULTIKEY_INDEX_MISMATCH</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6a32a015ebf77e6b5bc8cf914e3aa197" kind="enumvalue"><name>ER_CREATE_CK_CONSTRAINT</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceabde3762d024c4e2c8527932aba98ad33" kind="enumvalue"><name>ER_CK_CONSTRAINT_FAILED</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1bcd10399a70ee0864efc46883908d7e" kind="enumvalue"><name>ER_SQL_COLUMN_COUNT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceae03a5b95cebb018fe49cf8de81dd2ff3" kind="enumvalue"><name>ER_FUNC_INDEX_FUNC</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea61e72ff2abb5899b80f74c445e983bfe" kind="enumvalue"><name>ER_FUNC_INDEX_FORMAT</name></member>
@@ -395,7 +380,6 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea8fe70ca66da0a94c8ca25bcb8837778e" kind="enumvalue"><name>ER_SEQUENCE_NOT_STARTED</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea49148e98dd73539583105ea413d67b59" kind="enumvalue"><name>ER_NO_SUCH_SESSION_SETTING</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceab03bc47e7cc942821b5e175e693381e5" kind="enumvalue"><name>ER_UNCOMMITTED_FOREIGN_SYNC_TXNS</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea5370f24400b8108535d9c889f94f0f1b" kind="enumvalue"><name>ER_SYNC_MASTER_MISMATCH</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea30ee0328a4ec96fd10878f814346baed" kind="enumvalue"><name>ER_SYNC_QUORUM_TIMEOUT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf6df328177a7c0c4154b411c28a93e9f" kind="enumvalue"><name>ER_SYNC_ROLLBACK</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa73a3a41e4f8be85aca19e367f981bb2" kind="enumvalue"><name>ER_TUPLE_METADATA_IS_TOO_BIG</name></member>

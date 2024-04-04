@@ -121,7 +121,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abd1dbec4fd6761084d3e0c05afe2b138">PACKAGE_VERSION_PATCH</a>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.1.0-entrypoint-217-g1e86e0a42&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.1.0-entrypoint-220-g7410a4f0f&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <a href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">More...</a><br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adb6d1259777e8f56c6260be6faed183e"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#adb6d1259777e8f56c6260be6faed183e">SYSCONF_DIR</a>&#160;&#160;&#160;&quot;etc&quot;</td></tr>
@@ -603,11 +603,7 @@ Enumerations</h2></td></tr>
 , <br />
 &#160;&#160;<b>ER_TUPLE_FOUND</b> = 3
 , <br />
-&#160;&#160;<b>ER_TUPLE_NOT_FOUND</b> = 4
-, <br />
 &#160;&#160;<b>ER_UNSUPPORTED</b> = 5
-, <br />
-&#160;&#160;<b>ER_NONMASTER</b> = 6
 , <br />
 &#160;&#160;<b>ER_READONLY</b> = 7
 , <br />
@@ -636,8 +632,6 @@ Enumerations</h2></td></tr>
 &#160;&#160;<b>ER_EXACT_MATCH</b> = 19
 , <br />
 &#160;&#160;<b>ER_INVALID_MSGPACK</b> = 20
-, <br />
-&#160;&#160;<b>ER_PROC_RET</b> = 21
 , <br />
 &#160;&#160;<b>ER_TUPLE_NOT_ARRAY</b> = 22
 , <br />
@@ -731,8 +725,6 @@ Enumerations</h2></td></tr>
 , <br />
 &#160;&#160;<b>ER_REPLICA_ID_IS_RESERVED</b> = 67
 , <br />
-&#160;&#160;<b>ER_INVALID_ORDER</b> = 68
-, <br />
 &#160;&#160;<b>ER_MISSING_REQUEST_FIELD</b> = 69
 , <br />
 &#160;&#160;<b>ER_IDENTIFIER</b> = 70
@@ -742,12 +734,6 @@ Enumerations</h2></td></tr>
 &#160;&#160;<b>ER_ITERATOR_TYPE</b> = 72
 , <br />
 &#160;&#160;<b>ER_REPLICA_MAX</b> = 73
-, <br />
-&#160;&#160;<b>ER_INVALID_XLOG</b> = 74
-, <br />
-&#160;&#160;<b>ER_INVALID_XLOG_NAME</b> = 75
-, <br />
-&#160;&#160;<b>ER_INVALID_XLOG_ORDER</b> = 76
 , <br />
 &#160;&#160;<b>ER_NO_CONNECTION</b> = 77
 , <br />
@@ -801,11 +787,7 @@ Enumerations</h2></td></tr>
 , <br />
 &#160;&#160;<b>ER_PROC_C</b> = 102
 , <br />
-&#160;&#160;<b>ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE</b> = 103
-, <br />
 &#160;&#160;<b>ER_PROTOCOL</b> = 104
-, <br />
-&#160;&#160;<b>ER_UPSERT_UNIQUE_SECONDARY_KEY</b> = 105
 , <br />
 &#160;&#160;<b>ER_WRONG_INDEX_RECORD</b> = 106
 , <br />
@@ -830,8 +812,6 @@ Enumerations</h2></td></tr>
 &#160;&#160;<b>ER_LOADING</b> = 116
 , <br />
 &#160;&#160;<b>ER_CONNECTION_TO_SELF</b> = 117
-, <br />
-&#160;&#160;<b>ER_KEY_PART_IS_TOO_LONG</b> = 118
 , <br />
 &#160;&#160;<b>ER_COMPRESSION</b> = 119
 , <br />
@@ -907,8 +887,6 @@ Enumerations</h2></td></tr>
 , <br />
 &#160;&#160;<b>ER_NO_SUCH_GROUP</b> = 155
 , <br />
-&#160;&#160;<b>ER_SQL_BIND_VALUE</b> = 156
-, <br />
 &#160;&#160;<b>ER_SQL_BIND_TYPE</b> = 157
 , <br />
 &#160;&#160;<b>ER_SQL_BIND_PARAMETER_MAX</b> = 158
@@ -930,8 +908,6 @@ Enumerations</h2></td></tr>
 &#160;&#160;<b>ER_NO_SUCH_COLLATION</b> = 166
 , <br />
 &#160;&#160;<b>ER_CREATE_FK_CONSTRAINT</b> = 167
-, <br />
-&#160;&#160;<b>ER_DROP_FK_CONSTRAINT</b> = 168
 , <br />
 &#160;&#160;<b>ER_NO_SUCH_CONSTRAINT</b> = 169
 , <br />
@@ -969,8 +945,6 @@ Enumerations</h2></td></tr>
 , <br />
 &#160;&#160;<b>ER_SQL_PARSER_GENERIC</b> = 186
 , <br />
-&#160;&#160;<b>ER_SQL_ANALYZE_ARGUMENT</b> = 187
-, <br />
 &#160;&#160;<b>ER_SQL_COLUMN_COUNT_MAX</b> = 188
 , <br />
 &#160;&#160;<b>ER_HEX_LITERAL_MAX</b> = 189
@@ -981,13 +955,9 @@ Enumerations</h2></td></tr>
 , <br />
 &#160;&#160;<b>ER_INDEX_DEF_UNSUPPORTED</b> = 192
 , <br />
-&#160;&#160;<b>ER_CK_DEF_UNSUPPORTED</b> = 193
-, <br />
 &#160;&#160;<b>ER_MULTIKEY_INDEX_MISMATCH</b> = 194
 , <br />
 &#160;&#160;<b>ER_CREATE_CK_CONSTRAINT</b> = 195
-, <br />
-&#160;&#160;<b>ER_CK_CONSTRAINT_FAILED</b> = 196
 , <br />
 &#160;&#160;<b>ER_SQL_COLUMN_COUNT</b> = 197
 , <br />
@@ -1024,8 +994,6 @@ Enumerations</h2></td></tr>
 &#160;&#160;<b>ER_NO_SUCH_SESSION_SETTING</b> = 213
 , <br />
 &#160;&#160;<b>ER_UNCOMMITTED_FOREIGN_SYNC_TXNS</b> = 214
-, <br />
-&#160;&#160;<b>ER_SYNC_MASTER_MISMATCH</b> = 215
 , <br />
 &#160;&#160;<b>ER_SYNC_QUORUM_TIMEOUT</b> = 216
 , <br />
@@ -2208,7 +2176,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mo
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.1.0-entrypoint-217-g1e86e0a42&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.1.0-entrypoint-220-g7410a4f0f&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -10376,7 +10344,7 @@ the fiber is not joined yet (panic if not).</dd></dl>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Thu Apr 4 2024 09:27:26 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Thu Apr 4 2024 10:53:27 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>
