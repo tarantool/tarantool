@@ -448,6 +448,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea7ab1b2c59ef5a617b49bc8dbec7c9052" kind="enumvalue"><name>ER_REPLICASET_NOT_FOUND</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceab812041428eff0f888bf27d06470fa52" kind="enumvalue"><name>ER_REPLICASET_NO_WRITABLE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea760deaceea8de7f3f7076d0b9649d08e" kind="enumvalue"><name>ER_REPLICASET_MORE_THAN_ONE_WRITABLE</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea71816f8457795eed640a054d84728174" kind="enumvalue"><name>ER_TXN_COMMIT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
