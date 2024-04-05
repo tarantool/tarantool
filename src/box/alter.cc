@@ -370,7 +370,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 			 "malloc", "key_part_def");
 		return NULL;
 	}
-	auto key_def_guard = make_scoped_guard([&] {
+	auto key_def_guard = make_scoped_guard([&]() noexcept {
 		free(part_def);
 		if (key_def != NULL)
 			key_def_delete(key_def);
@@ -391,7 +391,9 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 			      &opts, key_def, space_index_key_def(space, 0));
 	if (index_def == NULL)
 		return NULL;
-	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
+	auto index_def_guard = make_scoped_guard([=]() noexcept {
+		index_def_delete(index_def);
+	});
 	if (index_def_check(index_def, space_name(space)) != 0)
 		return NULL;
 	if (space_check_index_def(space, index_def) != 0)
@@ -572,13 +574,15 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 			      field_count, format, format_len);
 	if (def == NULL)
 		return NULL;
-	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
+	auto def_guard = make_scoped_guard([=]() noexcept {
+		space_def_delete(def);
+	});
 	struct engine *engine = engine_find(def->engine_name);
 	if (engine == NULL)
 		return NULL;
 	if (engine_check_space_def(engine, def) != 0)
 		return NULL;
-	def_guard.is_active = false;
+	def_guard.reset();
 	return def;
 }
 
@@ -973,7 +977,7 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	alter_stmt.old_tuple = stmt->old_tuple;
 	alter_stmt.new_tuple = stmt->new_tuple;
 	rlist_add_entry(&stmt->space->alter_stmts, &alter_stmt, link);
-	auto alter_stmt_guard = make_scoped_guard([&] {
+	auto alter_stmt_guard = make_scoped_guard([&]() noexcept {
 		rlist_del_entry(&alter_stmt, link);
 	});
 	/**
@@ -1093,7 +1097,9 @@ space_check_format_with_yield(struct space *space,
 	assert(txn != NULL);
 	(void) txn_can_yield(txn, true);
 	auto yield_guard =
-		make_scoped_guard([=] { txn_can_yield(txn, false); });
+		make_scoped_guard([=]() noexcept {
+			txn_can_yield(txn, false);
+		});
 	space_check_format_xc(space, format);
 }
 
@@ -1388,7 +1394,9 @@ space_build_index_with_yield(struct space *old_space, struct space *new_space,
 	assert(txn != NULL);
 	(void) txn_can_yield(txn, true);
 	auto yield_guard =
-		make_scoped_guard([=] { txn_can_yield(txn, false); });
+		make_scoped_guard([=]() noexcept {
+			txn_can_yield(txn, false);
+		});
 	space_build_index_xc(old_space, new_space, new_index);
 }
 
@@ -1761,7 +1769,9 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 					old_def->type, &old_def->opts,
 					old_def->key_def, alter->pk_def);
 		index_def_update_optionality(new_def, min_field_count);
-		auto guard = make_scoped_guard([=] { index_def_delete(new_def); });
+		auto guard = make_scoped_guard([=]() noexcept {
+			index_def_delete(new_def);
+		});
 		if (!index_def_change_requires_rebuild(old_index, new_def))
 			try {
 				(void) new ModifyIndex(alter, old_index, new_def);
@@ -1774,7 +1784,7 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 			} catch (Exception *e) {
 				return -1;
 			}
-		guard.is_active = false;
+		guard.reset();
 	}
 	return 0;
 }
@@ -2108,7 +2118,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		if (def == NULL)
 			return -1;
 		auto def_guard =
-			make_scoped_guard([=] { space_def_delete(def); });
+			make_scoped_guard([=]() noexcept {
+				space_def_delete(def);
+			});
 		if (access_check_ddl(def->name, def->uid, NULL,
 				     SC_SPACE, PRIV_C) != 0)
 			return -1;
@@ -2146,7 +2158,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			struct Select *select = sql_view_compile(def->opts.sql);
 			if (select == NULL)
 				return -1;
-			auto select_guard = make_scoped_guard([=] {
+			auto select_guard = make_scoped_guard([=]() noexcept {
 				sql_select_delete(select);
 			});
 			if (update_view_references(select, 1) != 0)
@@ -2163,7 +2175,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			if (on_rollback_view == NULL)
 				return -1;
 			txn_stmt_on_rollback(stmt, on_rollback_view);
-			select_guard.is_active = false;
+			select_guard.reset();
 		}
 	} else if (new_tuple == NULL) { /* DELETE */
 		if (access_check_ddl(old_space->def->name, old_space->def->uid,
@@ -2246,7 +2258,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				sql_view_compile(old_space->def->opts.sql);
 			if (select == NULL)
 				return -1;
-			auto select_guard = make_scoped_guard([=] {
+			auto select_guard = make_scoped_guard([=]() noexcept {
 				sql_select_delete(select);
 			});
 			struct trigger *on_commit_view =
@@ -2276,7 +2288,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		if (def == NULL)
 			return -1;
 		auto def_guard =
-			make_scoped_guard([=] { space_def_delete(def); });
+			make_scoped_guard([=]() noexcept {
+				space_def_delete(def);
+			});
 		if (access_check_ddl(def->name, def->uid, old_space->access,
 				     SC_SPACE, PRIV_A) != 0)
 			return -1;
@@ -2332,7 +2346,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		if (alter == NULL)
 			return -1;
 		auto alter_guard =
-			make_scoped_guard([=] {alter_space_delete(alter);});
+			make_scoped_guard([=]() noexcept {
+				alter_space_delete(alter);
+			});
 		/*
 		 * Calculate a new min_field_count. It can be
 		 * changed by resetting space:format(), if an old
@@ -2360,7 +2376,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		} catch (Exception *e) {
 			return -1;
 		}
-		def_guard.is_active = false;
+		def_guard.reset();
 		/* Create MoveIndex ops for all space indexes. */
 		if (alter_space_move_indexes(alter, 0,
 		    old_space->index_id_max + 1) != 0)
@@ -2372,7 +2388,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		} catch (Exception *e) {
 			return -1;
 		}
-		alter_guard.is_active = false;
+		alter_guard.reset();
 	}
 	return 0;
 }
@@ -2498,7 +2514,9 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	if (alter == NULL)
 		return -1;
 	auto scoped_guard =
-		make_scoped_guard([=] { alter_space_delete(alter); });
+		make_scoped_guard([=]() noexcept {
+			alter_space_delete(alter);
+		});
 
 	/*
 	 * Handle the following 4 cases:
@@ -2540,7 +2558,9 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		if (index_def == NULL)
 			return -1;
 		auto index_def_guard =
-			make_scoped_guard([=] { index_def_delete(index_def); });
+			make_scoped_guard([=]() noexcept {
+				index_def_delete(index_def);
+			});
 		/*
 		 * To detect which key parts are optional,
 		 * min_field_count is required. But
@@ -2603,7 +2623,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			} catch (Exception *e) {
 				return -1;
 			}
-			index_def_guard.is_active = false;
+			index_def_guard.reset();
 		} else {
 			/*
 			 * Operation can be done without index rebuild,
@@ -2616,7 +2636,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			} catch (Exception *e) {
 				return -1;
 			}
-			index_def_guard.is_active = false;
+			index_def_guard.reset();
 		}
 	}
 	/*
@@ -2632,7 +2652,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	} catch (Exception *e) {
 		return -1;
 	}
-	scoped_guard.is_active = false;
+	scoped_guard.reset();
 	return 0;
 }
 
@@ -2716,7 +2736,9 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	if (alter == NULL)
 		return -1;
 	auto scoped_guard =
-		make_scoped_guard([=] { alter_space_delete(alter); });
+		make_scoped_guard([=]() noexcept {
+			alter_space_delete(alter);
+		});
 
 	/*
 	 * Modify the WAL header to prohibit
@@ -2747,7 +2769,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	} catch (Exception *e) {
 		return -1;
 	}
-	scoped_guard.is_active = false;
+	scoped_guard.reset();
 	return 0;
 }
 
@@ -2878,7 +2900,9 @@ user_def_new_from_tuple(struct tuple *tuple)
 	if (identifier_check(name, name_len) != 0)
 		return NULL;
 	struct user_def *user = user_def_new(uid, owner, type, name, name_len);
-	auto def_guard = make_scoped_guard([=] { user_def_delete(user); });
+	auto def_guard = make_scoped_guard([=]() noexcept {
+		user_def_delete(user);
+	});
 	/*
 	 * AUTH_DATA field in _user space should contain
 	 * chap-sha1 -> base64_encode(sha1(sha1(password), 0).
@@ -2911,7 +2935,7 @@ user_def_new_from_tuple(struct tuple *tuple)
 	    tuple_field_u64(tuple, BOX_USER_FIELD_LAST_MODIFIED,
 			    &user->last_modified) != 0)
 		return NULL;
-	def_guard.is_active = false;
+	def_guard.reset();
 	return user;
 }
 
@@ -2933,14 +2957,16 @@ user_cache_alter_user(struct trigger *trigger, void * /* event */)
 	struct user_def *user = user_def_new_from_tuple(tuple);
 	if (user == NULL)
 		return -1;
-	auto def_guard = make_scoped_guard([=] { user_def_delete(user); });
+	auto def_guard = make_scoped_guard([=]() noexcept {
+		user_def_delete(user);
+	});
 	/* Can throw if, e.g. too many users. */
 	try {
 		user_cache_replace(user);
 	} catch (Exception *e) {
 		return -1;
 	}
-	def_guard.is_active = false;
+	def_guard.reset();
 	return 0;
 }
 
@@ -2967,7 +2993,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		if (access_check_ddl(user->name, user->owner, NULL,
 				     user->type, PRIV_C) != 0)
 			return -1;
-		auto def_guard = make_scoped_guard([=] {
+		auto def_guard = make_scoped_guard([=]() noexcept {
 			user_def_delete(user);
 		});
 		try {
@@ -2975,7 +3001,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		} catch (Exception *e) {
 			return -1;
 		}
-		def_guard.is_active = false;
+		def_guard.reset();
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(user_cache_remove_user, new_tuple);
 		if (on_rollback == NULL)
@@ -3025,7 +3051,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		if (access_check_ddl(user->name, user->uid, old_user->access,
 				     old_user->def->type, PRIV_A) != 0)
 			return -1;
-		auto def_guard = make_scoped_guard([=] {
+		auto def_guard = make_scoped_guard([=]() noexcept {
 			user_def_delete(user);
 		});
 		try {
@@ -3033,7 +3059,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		} catch (Exception *e) {
 			return -1;
 		}
-		def_guard.is_active = false;
+		def_guard.reset();
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(user_cache_alter_user, old_tuple);
 		if (on_rollback == NULL)
@@ -3150,7 +3176,9 @@ func_def_new_from_tuple(struct tuple *tuple)
 	struct func_def *def = func_def_new(fid, uid, name, name_len,
 					    language, body, body_len,
 					    comment, comment_len);
-	auto def_guard = make_scoped_guard([=] { func_def_delete(def); });
+	auto def_guard = make_scoped_guard([=]() noexcept {
+		func_def_delete(def);
+	});
 	if (field_count > BOX_FUNC_FIELD_SETUID) {
 		uint32_t out;
 		if (tuple_field_u32(tuple, BOX_FUNC_FIELD_SETUID, &out) != 0)
@@ -3261,7 +3289,7 @@ func_def_new_from_tuple(struct tuple *tuple)
 	}
 	if (func_def_check(def) != 0)
 		return NULL;
-	def_guard.is_active = false;
+	def_guard.reset();
 	return def;
 }
 
@@ -3318,7 +3346,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		struct func_def *def = func_def_new_from_tuple(new_tuple);
 		if (def == NULL)
 			return -1;
-		auto def_guard = make_scoped_guard([=] {
+		auto def_guard = make_scoped_guard([=]() noexcept {
 			func_def_delete(def);
 		});
 		if (access_check_ddl(def->name, def->uid, NULL,
@@ -3395,7 +3423,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		 * definition to support upgrade script.
 		 */
 		struct func_def *old_def = NULL, *new_def = NULL;
-		auto guard = make_scoped_guard([&old_def, &new_def] {
+		auto guard = make_scoped_guard([&old_def, &new_def]() noexcept {
 			free(old_def);
 			free(new_def);
 		});
@@ -4682,7 +4710,7 @@ sequence_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 		diag_set(OutOfMemory, sz, "malloc", "sequence");
 		return NULL;
 	}
-	auto def_guard = make_scoped_guard([=] { free(def); });
+	auto def_guard = make_scoped_guard([=]() noexcept { free(def); });
 	memcpy(def->name, name, name_len);
 	def->name[name_len] = '\0';
 	if (tuple_field_u32(tuple, BOX_SEQUENCE_FIELD_ID, &(def->id)) != 0)
@@ -4716,7 +4744,7 @@ sequence_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 			 "start must be between min and max");
 		return NULL;
 	}
-	def_guard.is_active = false;
+	def_guard.reset();
 	return def;
 }
 
@@ -4789,7 +4817,9 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 	struct tuple *new_tuple = stmt->new_tuple;
 
 	struct sequence_def *new_def = NULL;
-	auto def_guard = make_scoped_guard([&new_def] { free(new_def); });
+	auto def_guard = make_scoped_guard([&new_def]() noexcept {
+		free(new_def);
+	});
 
 	struct sequence *seq;
 	if (old_tuple == NULL && new_tuple != NULL) {		/* INSERT */
@@ -4870,7 +4900,7 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 		txn_stmt_on_rollback(stmt, on_rollback);
 	}
 
-	def_guard.is_active = false;
+	def_guard.reset();
 	if (trigger_run(&on_alter_sequence, seq) != 0)
 		return -1;
 	return 0;
@@ -5117,7 +5147,7 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 		if (sequence_field_from_tuple(space, tuple, &sequence_path,
 					      &sequence_fieldno) != 0)
 			return -1;
-		auto sequence_path_guard = make_scoped_guard([=] {
+		auto sequence_path_guard = make_scoped_guard([=]() noexcept {
 			free(sequence_path);
 		});
 		if (seq->is_generated) {
@@ -5140,7 +5170,7 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 		space->sequence_fieldno = sequence_fieldno;
 		free(space->sequence_path);
 		space->sequence_path = sequence_path;
-		sequence_path_guard.is_active = false;
+		sequence_path_guard.reset();
 		txn_stmt_on_rollback(stmt, on_rollback);
 	} else {					/* DELETE */
 		struct trigger *on_rollback;
@@ -5290,7 +5320,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 		if (new_trigger == NULL)
 			return -1;
 
-		auto new_trigger_guard = make_scoped_guard([=] {
+		auto new_trigger_guard = make_scoped_guard([=]() noexcept {
 			sql_trigger_delete(new_trigger);
 		});
 
@@ -5335,7 +5365,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 			on_rollback->data = new_trigger;
 			on_rollback->run = on_create_trigger_rollback;
 		}
-		new_trigger_guard.is_active = false;
+		new_trigger_guard.reset();
 	}
 
 	txn_stmt_on_rollback(stmt, on_rollback);
@@ -5436,7 +5466,9 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 	alter = alter_space_new(space);
 	if (alter == NULL)
 		return -1;
-	auto scoped_guard = make_scoped_guard([=] {alter_space_delete(alter);});
+	auto scoped_guard = make_scoped_guard([=]() noexcept {
+		alter_space_delete(alter);
+	});
 	if (alter_space_move_indexes(alter, 0, index->def->iid) != 0)
 		return -1;
 	if (func != NULL) {
@@ -5464,7 +5496,7 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 		return -1;
 	}
 
-	scoped_guard.is_active = false;
+	scoped_guard.reset();
 	return 0;
 }
 
