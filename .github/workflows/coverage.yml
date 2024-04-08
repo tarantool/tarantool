@@ -91,6 +91,8 @@ jobs:
         run: make -f .test.mk test-coverage
 
       - name: Upload coverage results to coveralls.io
+        # Avoid interference with the coverage of a submodule.
+        if: ${{ !inputs.submodule }}
         run: |
           coveralls-lcov \
             --service-name=github \
