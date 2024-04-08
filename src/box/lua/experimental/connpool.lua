@@ -192,9 +192,22 @@ local function filter(opts)
     return dynamic_candidates
 end
 
-local function get_connection(all_candidates, prefer_local)
-    local candidates = table.copy(all_candidates)
-    if prefer_local ~= false then
+local function get_connection(opts)
+    local mode = nil
+    if opts.mode == 'ro' or opts.mode == 'rw' then
+        mode = opts.mode
+    end
+    local candidates_opts = {
+        labels = opts.labels,
+        roles = opts.roles,
+        mode = mode,
+    }
+    local candidates = filter(candidates_opts)
+    if next(candidates) == nil then
+        return nil, "no candidates are available with these conditions"
+    end
+
+    if opts.prefer_local ~= false then
         local candidate_idx = nil
         for n, candidate in ipairs(candidates) do
             if candidate == box.info.name then
@@ -219,7 +232,7 @@ local function get_connection(all_candidates, prefer_local)
             return conn
         end
     end
-    return nil
+    return nil, "connection to candidates failed"
 end
 
 local function call(func_name, args, opts)
@@ -227,6 +240,7 @@ local function call(func_name, args, opts)
         labels = '?table',
         roles = '?table',
         prefer_local = '?boolean',
+        mode = '?string',
         -- The following options passed directly to net.box.call().
         timeout = '?',
         buffer = '?',
@@ -235,23 +249,21 @@ local function call(func_name, args, opts)
         is_async = '?boolean',
     })
     opts = opts or {}
-
-    local candidates_opts = {
-        labels = opts.labels,
-        roles = opts.roles,
-    }
-    local candidates = filter(candidates_opts)
-    if next(candidates) == nil then
-        local msg = "Couldn't execute function %s: no candidates are " ..
-                    "available with these conditions"
-        error(msg:format(func_name), 0)
+    if opts.mode ~= nil and opts.mode ~= 'ro' and opts.mode ~= 'rw' then
+        local msg = 'Expected nil, "ro" or "rw", got "%s"'
+        error(msg:format(opts.mode), 0)
     end
 
-    local conn = get_connection(candidates, opts.prefer_local)
+    local conn_opts = {
+        labels = opts.labels,
+        roles = opts.roles,
+        prefer_local = opts.prefer_local,
+        mode = opts.mode,
+    }
+    local conn, err = get_connection(conn_opts)
     if conn == nil then
-        local msg = "Couldn't execute function %s: connection to " ..
-                    "candidates failed"
-        error(msg:format(func_name), 0)
+        local msg = "Couldn't execute function %s: %s"
+        error(msg:format(func_name, err), 0)
     end
 
     local net_box_call_opts = {

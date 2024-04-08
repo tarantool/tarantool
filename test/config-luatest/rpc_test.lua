@@ -426,3 +426,96 @@ g.test_call = function(g)
     g.server_3:exec(check)
     g.server_4:exec(check)
 end
+
+g.test_call_mode = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+
+    roles: [one]
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001:
+                database:
+                  mode: rw
+                labels:
+                  l1: 'first'
+              instance-002: {}
+          replicaset-002:
+            replication:
+              failover: manual
+            leader: 'instance-003'
+            instances:
+              instance-003: {}
+              instance-004:
+                labels:
+                  l1: 'first'
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+
+    local role = string.dump(function()
+        local function f()
+            return box.info.name
+        end
+
+        rawset(_G, 'f', f)
+
+        return {
+            stop = function() end,
+            apply = function() end,
+            validate = function() end,
+        }
+    end)
+    treegen.write_script(dir, 'one.lua', role)
+
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = 'config.yaml',
+        chdir = dir,
+    }
+    g.server_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+    g.server_2 = server:new(fun.chain(opts, {alias = 'instance-002'}):tomap())
+    g.server_3 = server:new(fun.chain(opts, {alias = 'instance-003'}):tomap())
+    g.server_4 = server:new(fun.chain(opts, {alias = 'instance-004'}):tomap())
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_2:start({wait_until_ready = false})
+    g.server_3:start({wait_until_ready = false})
+    g.server_4:start({wait_until_ready = false})
+
+    g.server_1:wait_until_ready()
+    g.server_2:wait_until_ready()
+    g.server_3:wait_until_ready()
+    g.server_4:wait_until_ready()
+
+    local function check()
+        local connpool = require('experimental.connpool')
+        local opts = {
+            labels = {l1 = 'first'},
+            mode = 'rw',
+        }
+        t.assert_equals(connpool.call('f', nil, opts), 'instance-001')
+
+        opts = {
+            mode = 'ro',
+        }
+        local exp_list = {'instance-002', 'instance-004'}
+        t.assert_items_include(exp_list, {connpool.call('f', nil, opts)})
+    end
+
+    g.server_1:exec(check)
+    g.server_2:exec(check)
+    g.server_3:exec(check)
+    g.server_4:exec(check)
+end
