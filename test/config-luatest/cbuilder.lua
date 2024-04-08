@@ -106,6 +106,17 @@ local function cbuilder_set_global_option(self, path, value)
     return self
 end
 
+-- Set an option for the selected group.
+local function cbuilder_set_group_option(self, path, value)
+    assert(type(path) == 'string')
+    path = fun.chain({
+        'groups', self._group,
+    }, path:split('.')):totable()
+
+    cluster_config:set(self._config, path, value)
+    return self
+end
+
 -- Set an option for the selected replicaset.
 local function cbuilder_set_replicaset_option(self, path, value)
     assert(type(path) == 'string')
@@ -169,6 +180,7 @@ local cbuilder_mt = {
     use_group = cbuilder_use_group,
     use_replicaset = cbuilder_use_replicaset,
     set_global_option = cbuilder_set_global_option,
+    set_group_option = cbuilder_set_group_option,
     set_replicaset_option = cbuilder_set_replicaset_option,
     set_instance_option = cbuilder_set_instance_option,
     add_instance = cbuilder_add_instance,
