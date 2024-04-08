@@ -451,7 +451,9 @@ g.test_call_mode = function(g)
                   mode: rw
                 labels:
                   l1: 'first'
-              instance-002: {}
+              instance-002:
+                labels:
+                  l2: 'second'
           replicaset-002:
             replication:
               failover: manual
@@ -461,6 +463,7 @@ g.test_call_mode = function(g)
               instance-004:
                 labels:
                   l1: 'first'
+                  l2: 'second'
     ]]
     treegen.write_script(dir, 'config.yaml', config)
 
@@ -512,6 +515,41 @@ g.test_call_mode = function(g)
         }
         local exp_list = {'instance-002', 'instance-004'}
         t.assert_items_include(exp_list, {connpool.call('f', nil, opts)})
+
+        opts = {
+            labels = {l1 = 'first'},
+            mode = 'prefer_ro',
+        }
+        t.assert_equals(connpool.call('f', nil, opts), 'instance-004')
+
+        opts = {
+            labels = {l1 = 'first'},
+            mode = 'prefer_rw',
+        }
+        t.assert_equals(connpool.call('f', nil, opts), 'instance-001')
+
+        -- Make sure 'prefer_*' mode will execute call on non-preferred
+        --  instance, if there is no preferred instance.
+        opts = {
+            labels = {l2 = 'second'},
+            mode = 'prefer_rw',
+        }
+        exp_list = {'instance-002', 'instance-004'}
+        t.assert_items_include(exp_list, {connpool.call('f', nil, opts)})
+
+        -- Make sure that "prefer_local" has a lower priority than the
+        -- "prefer_*" mode.
+        opts = {
+            labels = {l1 = 'first'},
+            mode = 'prefer_rw',
+            prefer_local = true,
+        }
+        t.assert_equals(connpool.call('f', nil, opts), 'instance-001')
+
+        local exp_err = 'Expected nil, "ro", "rw", "prefer_ro" or ' ..
+                        '"prefer_rw", got "something"'
+        opts = {mode = 'something'}
+        t.assert_error_msg_equals(exp_err, connpool.call, 'f', nil, opts)
     end
 
     g.server_1:exec(check)

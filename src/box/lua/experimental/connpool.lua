@@ -207,29 +207,60 @@ local function get_connection(opts)
         return nil, "no candidates are available with these conditions"
     end
 
-    if opts.prefer_local ~= false then
-        local candidate_idx = nil
-        for n, candidate in ipairs(candidates) do
-            if candidate == box.info.name then
-                candidate_idx = n
-                local conn = connect(box.info.name, {wait_connected = false})
-                if conn:wait_connected() then
-                    return conn
-                end
-                break
+    -- Initialize the weight of each candidate.
+    local weights = {}
+    if opts.mode == 'prefer_rw' or opts.mode == 'prefer_ro' then
+        candidates = connect_to_candidates(candidates)
+    end
+    for _, instance_name in pairs(candidates) do
+        weights[instance_name] = 0
+    end
+
+    -- Increase weights of candidates preferred by mode.
+    if opts.mode == 'prefer_rw' or opts.mode == 'prefer_ro' then
+        local mode = opts.mode == 'prefer_ro' and 'ro' or 'rw'
+        local weight_mode = 2
+        for _, instance_name in pairs(candidates) do
+            local conn = connections[instance_name]
+            assert(conn ~= nil)
+            if conn:mode() == mode then
+                weights[instance_name] = weights[instance_name] + weight_mode
             end
-        end
-        if candidate_idx ~= nil then
-            table.remove(candidates, candidate_idx)
         end
     end
 
-    while #candidates > 0 do
-        local n = math.random(#candidates)
-        local instance_name = table.remove(candidates, n)
-        local conn = connect(instance_name, {wait_connected = false})
-        if conn:wait_connected() then
-            return conn
+    -- Increase weight of local candidate.
+    if opts.prefer_local ~= false then
+        local weight_local = 1
+        if weights[box.info.name] ~= nil then
+            weights[box.info.name] = weights[box.info.name] + weight_local
+        end
+    end
+
+    -- Select candidate by weight.
+    while next(weights) ~= nil do
+        local max_weight = 0
+        for _, weight in pairs(weights) do
+            if weight > max_weight then
+                max_weight = weight
+            end
+        end
+        local preferred_candidates = {}
+        for instance_name, weight in pairs(weights) do
+            if weight == max_weight then
+                table.insert(preferred_candidates, instance_name)
+            end
+        end
+        while #preferred_candidates > 0 do
+            local n = math.random(#preferred_candidates)
+            local instance_name = table.remove(preferred_candidates, n)
+            local conn = connect(instance_name, {wait_connected = false})
+            if conn:wait_connected() then
+                return conn
+            end
+        end
+        for _, instance_name in pairs(preferred_candidates) do
+            weights[instance_name] = nil
         end
     end
     return nil, "connection to candidates failed"
@@ -249,8 +280,10 @@ local function call(func_name, args, opts)
         is_async = '?boolean',
     })
     opts = opts or {}
-    if opts.mode ~= nil and opts.mode ~= 'ro' and opts.mode ~= 'rw' then
-        local msg = 'Expected nil, "ro" or "rw", got "%s"'
+    if opts.mode ~= nil and opts.mode ~= 'ro' and opts.mode ~= 'rw' and
+       opts.mode ~= 'prefer_ro' and opts.mode ~= 'prefer_rw' then
+        local msg = 'Expected nil, "ro", "rw", "prefer_ro" or "prefer_rw", ' ..
+                    'got "%s"'
         error(msg:format(opts.mode), 0)
     end
 
