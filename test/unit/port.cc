@@ -880,13 +880,15 @@ test_port_lua_dump_lua_impl(bool with_bottom)
 		lua_pushvalue(L, i);
 	lua_xmove(L, copy_L, top - port_lua->bottom + 1);
 	test_check_port_dump_lua_flat(&port, copy_L);
+	/* Dump twice to check if it is allowed. */
+	test_check_port_dump_lua_flat(&port, copy_L);
 	port_destroy(&port);
 }
 
 static void
 test_port_lua_dump_lua(void)
 {
-	plan(8);
+	plan(15);
 	header();
 	test_port_lua_dump_lua_impl(/*with_bottom=*/false);
 	footer();
@@ -896,7 +898,7 @@ test_port_lua_dump_lua(void)
 static void
 test_port_lua_dump_lua_with_bottom(void)
 {
-	plan(8);
+	plan(15);
 	header();
 	test_port_lua_dump_lua_impl(/*with_bottom=*/true);
 	footer();
@@ -905,7 +907,6 @@ test_port_lua_dump_lua_with_bottom(void)
 
 /**
  * Checks port_lua_{dump,get}_msgpack methods.
- * The for loop is required because port_lua is truncated on dump or get.
  * If flag with_bottom is true, all Lua stacks are created with
  * port_lua_create_at method with bottom greater than 1.
  */
@@ -918,38 +919,38 @@ test_port_lua_all_msgpack_methods_impl(bool with_bottom)
 		test_check_port_dump_lua_mp_object,
 	};
 
-	for (size_t i = 0; i < lengthof(checkers); i++) {
-		struct port port;
-		struct lua_State *empty_port_L = lua_newthread(tarantool_L);
-		fail_if(lua_gettop(empty_port_L) != 0);
+	struct port port;
+	struct lua_State *empty_port_L = lua_newthread(tarantool_L);
+	fail_if(lua_gettop(empty_port_L) != 0);
 
-		char buf[256];
-		char *mp = buf;
-		mp = mp_encode_array(mp, 0);
+	char buf[256];
+	char *mp = buf;
+	mp = mp_encode_array(mp, 0);
 
-		test_port_lua_create_empty(&port, with_bottom);
+	test_port_lua_create_empty(&port, with_bottom);
+	for (size_t i = 0; i < lengthof(checkers); i++)
 		checkers[i](&port, buf, mp - buf);
-		port_destroy(&port);
+	port_destroy(&port);
 
-		struct port_lua_contents contents =
-			test_port_lua_create(&port, /*push_cdata=*/false,
-					    /*push_error=*/false, with_bottom);
+	struct port_lua_contents contents =
+		test_port_lua_create(&port, /*push_cdata=*/false,
+				     /*push_error=*/false, with_bottom);
 
-		/* Rewind MsgPack cursor. */
-		mp = buf;
-		mp = mp_encode_array(mp, 5);
-		mp = mp_encode_nil(mp);
-		mp = mp_encode_nil(mp);
-		mp = mp_encode_double(mp, contents.number);
-		mp = mp_encode_str0(mp, contents.str);
-		mp = mp_encode_bool(mp, false);
+	/* Rewind MsgPack cursor. */
+	mp = buf;
+	mp = mp_encode_array(mp, 5);
+	mp = mp_encode_nil(mp);
+	mp = mp_encode_nil(mp);
+	mp = mp_encode_double(mp, contents.number);
+	mp = mp_encode_str0(mp, contents.str);
+	mp = mp_encode_bool(mp, false);
 
-		fail_if(mp > buf + lengthof(buf));
+	fail_if(mp > buf + lengthof(buf));
 
+	for (size_t i = 0; i < lengthof(checkers); i++)
 		checkers[i](&port, buf, mp - buf);
 
-		port_destroy(&port);
-	}
+	port_destroy(&port);
 }
 
 static void
