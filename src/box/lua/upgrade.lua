@@ -2137,7 +2137,9 @@ end
 box.schema.downgrade_issues = function(version)
     return downgrade_impl(version, true)
 end
-box.internal.bootstrap = bootstrap;
+box.internal.bootstrap = function()
+    run_upgrade(bootstrap)
+end
 box.internal.schema_needs_upgrade = builtin.box_schema_needs_upgrade
 box.internal.get_snapshot_version = get_snapshot_version;
 box.internal.set_recovery_triggers = set_recovery_triggers;
