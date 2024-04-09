@@ -507,21 +507,6 @@ index_find(struct space *space, uint32_t index_id)
 }
 
 /**
- * Wrapper around index_find() which checks that
- * the found index is unique.
- */
-static inline struct index *
-index_find_unique(struct space *space, uint32_t index_id)
-{
-	struct index *index = index_find(space, index_id);
-	if (index != NULL && !index->def->opts.is_unique) {
-		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
-		return NULL;
-	}
-	return index;
-}
-
-/**
  * Returns number of bytes used in memory by tuples in the space.
  */
 size_t
@@ -799,42 +784,6 @@ access_check_space_xc(struct space *space, user_access_t access)
 {
 	if (access_check_space(space, access) != 0)
 		diag_raise();
-}
-
-/**
- * Look up the index by id, and throw an exception if not found.
- */
-static inline struct index *
-index_find_xc(struct space *space, uint32_t index_id)
-{
-	struct index *index = index_find(space, index_id);
-	if (index == NULL)
-		diag_raise();
-	return index;
-}
-
-static inline struct index *
-index_find_unique_xc(struct space *space, uint32_t index_id)
-{
-	struct index *index = index_find_unique(space, index_id);
-	if (index == NULL)
-		diag_raise();
-	return index;
-}
-
-/**
- * Find an index in a system space. Throw an error
- * if we somehow deal with a non-memtx space (it can't
- * be used for system spaces.
- */
-static inline struct index *
-index_find_system_xc(struct space *space, uint32_t index_id)
-{
-	if (! space_is_memtx(space)) {
-		tnt_raise(ClientError, ER_UNSUPPORTED,
-			  space->engine->name, "system data");
-	}
-	return index_find_xc(space, index_id);
 }
 
 static inline void

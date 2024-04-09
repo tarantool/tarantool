@@ -342,14 +342,8 @@ session_settings_space_execute_update(struct space *space, struct txn *txn,
 
 	const char *new_key, *key = request->key;
 	uint32_t new_size, new_key_len, key_len = mp_decode_array(&key);
-	if (key_len == 0) {
-		diag_set(ClientError, ER_EXACT_MATCH, 1, 0);
+	if (exact_key_validate(pk_def, key, key_len) != 0)
 		return -1;
-	}
-	if (key_len > 1 || mp_typeof(*key) != MP_STR) {
-		diag_set(ClientError, ER_KEY_PART_TYPE, 0, "string");
-		return -1;
-	}
 	key = mp_decode_str(&key, &key_len);
 	key = tt_cstr(key, key_len);
 	sid = session_setting_find(key);
