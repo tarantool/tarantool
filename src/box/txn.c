@@ -339,11 +339,15 @@ txn_stmt_prepare_rollback_info(struct txn_stmt *stmt, struct tuple *old_tuple,
 }
 
 /*
- * Undo changes done by a statement and run the corresponding
- * rollback triggers.
+ * Run the statement's rollback triggers and undo changes done by the statement.
+ *
+ * Logically, we call triggers after running statements. These triggers can
+ * make significant changes (for instance, DDL triggers), so, for consistency,
+ * we should call the statement's `on_rollback` triggers before rolling back
+ * the corresponding statement.
  *
  * Note, a trigger set by a particular statement must be run right
- * after the statement is rolled back, because rollback triggers
+ * before the statement is rolled back, because rollback triggers
  * installed by DDL statements restore the schema cache, which is
  * necessary to roll back previous statements. For example, to roll
  * back a DML statement applied to a space whose index is dropped
@@ -353,12 +357,12 @@ txn_stmt_prepare_rollback_info(struct txn_stmt *stmt, struct tuple *old_tuple,
 static void
 txn_rollback_one_stmt(struct txn *txn, struct txn_stmt *stmt)
 {
-	if (txn->engine != NULL && stmt->space != NULL)
-		engine_rollback_statement(txn->engine, txn, stmt);
 	if (stmt->has_triggers && trigger_run(&stmt->on_rollback, stmt) != 0) {
 		diag_log();
 		panic("statement rollback trigger failed");
 	}
+	if (txn->engine != NULL && stmt->space != NULL)
+		engine_rollback_statement(txn->engine, txn, stmt);
 }
 
 static void
