@@ -796,6 +796,10 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
 	return 0;
 }
 
+/** Add payload fields with index details to the error. */
+void
+error_set_index(struct error *error, const struct index_def *index_def);
+
 /**
  * Initialize an index instance.
  * Note, this function copies the given index definition.
