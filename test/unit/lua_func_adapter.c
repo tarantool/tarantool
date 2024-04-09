@@ -640,10 +640,52 @@ test_translation(void)
 	check_plan();
 }
 
+/**
+ * The test checks if it's OK to pass arguments on Lua stack from current fiber.
+ * The case needs a separate check because func_adapter_lua can use Lua stack
+ * stored in fiber, but it's not allowed for port_lua to be dumped on the same
+ * stack as the underlying one.
+ */
+static void
+test_lua_args_on_fiber_stack(void)
+{
+	plan(3);
+	header();
+
+	int idx = generate_function("function(a, b) return a + b end");
+	fiber()->storage.lua.stack = tarantool_L;
+	struct func_adapter *func = func_adapter_lua_create(tarantool_L, idx);
+	uint32_t region_svp = region_used(&fiber()->gc);
+	int bottom = lua_gettop(tarantool_L) + 1;
+	lua_pushinteger(tarantool_L, 1);
+	lua_pushinteger(tarantool_L, 2);
+	struct port args, ret;
+	port_lua_create_at(&args, tarantool_L, bottom);
+	int rc = func_adapter_call(func, &args, &ret);
+	fail_if(rc != 0);
+
+	/* Destroy args early to check if ret has independent lifetime. */
+	port_destroy(&args);
+
+	int i = 0;
+	const struct port_c_entry *retval = port_get_c_entries(&ret);
+	ok(retval->type == PORT_C_ENTRY_NUMBER, "Expected number");
+	ok(number_eq(3, retval->number), "Returned value must be as expected");
+	is(retval->next, NULL, "Expected one value");
+	port_destroy(&ret);
+	func_adapter_destroy(func);
+	region_truncate(&fiber()->gc, region_svp);
+	lua_settop(tarantool_L, 0);
+	fiber()->storage.lua.stack = NULL;
+
+	footer();
+	check_plan();
+}
+
 static int
 test_lua_func_adapter(void)
 {
-	plan(12);
+	plan(13);
 	header();
 
 	test_numeric();
@@ -658,6 +700,7 @@ test_lua_func_adapter(void)
 	test_iterator();
 	test_iterator_error();
 	test_translation();
+	test_lua_args_on_fiber_stack();
 
 	footer();
 	return check_plan();
