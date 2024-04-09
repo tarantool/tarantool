@@ -361,6 +361,12 @@ port_lua_create_at(struct port *port, struct lua_State *L, int bottom)
 	port_lua->bottom = bottom;
 }
 
+bool
+port_is_lua(struct port *port)
+{
+	return port->vtab == &port_lua_vtab;
+}
+
 struct execute_lua_ctx {
 	int lua_ref;
 	const char *name;

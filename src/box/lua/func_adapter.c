@@ -36,6 +36,16 @@ func_adapter_lua_call(struct func_adapter *func, struct port *args, struct port 
 		(struct func_adapter_lua *)func;
 	int coro_ref = LUA_REFNIL;
 	struct lua_State *L = fiber_lua_state(fiber());
+	/*
+	 * Do not use Lua stack from fiber storage if it is used by args
+	 * because port_lua is not allowed to be dumped on the same Lua stack.
+	 */
+	if (args != NULL && port_is_lua(args)) {
+		struct port_lua *args_lua = (struct port_lua *)args;
+		struct lua_State *args_L = args_lua->L;
+		if (args_L == L)
+			L = NULL;
+	}
 	if (L == NULL) {
 		L = luaT_newthread(tarantool_L);
 		if (L == NULL)

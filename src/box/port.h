@@ -116,6 +116,10 @@ port_lua_create(struct port *port, struct lua_State *L)
 	port_lua_create_at(port, L, 1);
 }
 
+/** Returns true if the port is port_lua, false otherwise. */
+bool
+port_is_lua(struct port *port);
+
 /** Port implementation used with vdbe memory variables. */
 struct port_vdbemem {
     const struct port_vtab *vtab;
