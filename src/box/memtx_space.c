@@ -455,12 +455,12 @@ memtx_space_execute_delete(struct space *space, struct txn *txn,
 {
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/* Try to find the tuple by unique key. */
-	struct index *pk = index_find_unique(space, request->index_id);
+	struct index *pk = index_find(space, request->index_id);
 	if (pk == NULL)
 		return -1;
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
+	if (exact_key_validate(pk->def, key, part_count) != 0)
 		return -1;
 	struct tuple *old_tuple;
 	if (index_get_internal(pk, key, part_count, &old_tuple) != 0)
@@ -490,12 +490,12 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 {
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/* Try to find the tuple by unique key. */
-	struct index *pk = index_find_unique(space, request->index_id);
+	struct index *pk = index_find(space, request->index_id);
 	if (pk == NULL)
 		return -1;
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
+	if (exact_key_validate(pk->def, key, part_count) != 0)
 		return -1;
 	struct tuple *old_tuple;
 	if (index_get_internal(pk, key, part_count, &old_tuple) != 0)
@@ -550,7 +550,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 	if (tuple_validate_raw(space->format, request->tuple))
 		return -1;
 
-	struct index *index = index_find_unique(space, 0);
+	struct index *index = index_find(space, 0);
 	if (index == NULL)
 		return -1;
 

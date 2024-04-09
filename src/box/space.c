@@ -1071,7 +1071,7 @@ space_before_replace(struct space *space, struct txn *txn,
 	switch (type) {
 	case IPROTO_UPDATE:
 	case IPROTO_DELETE:
-		index = index_find_unique(space, request->index_id);
+		index = index_find(space, request->index_id);
 		if (index == NULL)
 			return -1;
 		key = request->key;
@@ -1103,7 +1103,7 @@ space_before_replace(struct space *space, struct txn *txn,
 		return 0;
 	}
 
-	if (exact_key_validate(index->def->key_def, key, part_count) != 0 ||
+	if (exact_key_validate(index->def, key, part_count) != 0 ||
 	    index_get(index, key, part_count, &old_tuple) != 0) {
 		region_truncate(&fiber()->gc, region_svp);
 		return -1;

@@ -146,10 +146,15 @@ key_validate(const struct index_def *index_def, enum iterator_type type,
 }
 
 int
-exact_key_validate(struct key_def *key_def, const char *key,
+exact_key_validate(struct index_def *index_def, const char *key,
 		   uint32_t part_count)
 {
 	assert(key != NULL || part_count == 0);
+	struct key_def *key_def = index_def->key_def;
+	if (!index_def->opts.is_unique) {
+		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
+		return -1;
+	}
 	if (key_def->part_count != part_count) {
 		diag_set(ClientError, ER_EXACT_MATCH, key_def->part_count,
 			 part_count);
@@ -157,20 +162,6 @@ exact_key_validate(struct key_def *key_def, const char *key,
 	}
 	const char *key_end;
 	return key_validate_parts(key_def, key, part_count, false, &key_end);
-}
-
-int
-exact_key_validate_nullable(struct key_def *key_def, const char *key,
-			    uint32_t part_count)
-{
-	assert(key != NULL || part_count == 0);
-	if (key_def->part_count != part_count) {
-		diag_set(ClientError, ER_EXACT_MATCH, key_def->part_count,
-			 part_count);
-		return -1;
-	}
-	const char *key_end;
-	return key_validate_parts(key_def, key, part_count, true, &key_end);
 }
 
 char *
@@ -308,13 +299,9 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 	struct index *index;
 	if (check_index(space_id, index_id, &space, &index) != 0)
 		return -1;
-	if (!index->def->opts.is_unique) {
-		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
-		return -1;
-	}
 	const char *key_array = key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (exact_key_validate(index->def->key_def, key, part_count))
+	if (exact_key_validate(index->def, key, part_count) != 0)
 		return -1;
 	box_run_on_select(space, index, ITER_EQ, key_array);
 	/* Start transaction in the engine. */
@@ -686,7 +673,10 @@ iterator_position_validate(const char *pos, uint32_t pos_part_count,
 {
 	int cmp;
 	/* Position must be compatible with the index. */
-	if (exact_key_validate_nullable(cmp_def, pos, pos_part_count) != 0)
+	if (cmp_def->part_count != pos_part_count)
+		goto fail;
+	const char *pos_end;
+	if (key_validate_parts(cmp_def, pos, pos_part_count, true, &pos_end) != 0)
 		goto fail;
 	/* Position msut meet the search criteria. */
 	cmp = key_compare(pos, pos_part_count, HINT_NONE,

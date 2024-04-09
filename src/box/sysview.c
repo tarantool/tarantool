@@ -161,11 +161,7 @@ sysview_index_get(struct index *base, const char *key,
 	struct index *pk = index_find(source, index->source_index_id);
 	if (pk == NULL)
 		return -1;
-	if (!pk->def->opts.is_unique) {
-		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
-		return -1;
-	}
-	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
+	if (exact_key_validate(pk->def, key, part_count) != 0)
 		return -1;
 	struct tuple *tuple;
 	if (index_get(pk, key, part_count, &tuple) != 0)
