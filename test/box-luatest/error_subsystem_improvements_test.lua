@@ -449,3 +449,144 @@ g.test_error_name = function()
     local e = box.error.new(box.error.ILLEGAL_PARAMS, 'foo')
     t.assert_equals(e.name, 'ILLEGAL_PARAMS')
 end
+
+g.test_dml_key_validation_errors = function(cg)
+    cg.server:exec(function()
+        local test = box.schema.create_space('test')
+        local index
+        test:create_index('primary')
+
+        -- Test non exact key match for non RTREE index.
+        index = test:create_index('tree', {
+            parts = {1, 'unsigned', 2, 'unsigned'}
+        })
+        t.assert_error_covers({
+            space = 'test',
+            index = 'tree',
+            space_id = test.id,
+            index_id = index.id,
+            key = {1, 2, 3},
+            message = 'Invalid key part count (expected [0..2], got 3)'
+        }, index.select, index, {1, 2, 3})
+        t.assert_error_covers({
+            space = 'test',
+            index = 'tree',
+            space_id = test.id,
+            index_id = index.id,
+            key = {1, 'foo'},
+            message = 'Supplied key type of part 1 does not match ' ..
+                      'index part type: expected unsigned'
+        }, index.select, index, {1, 'foo'})
+        index:drop()
+
+        index = test:create_index('hash', {
+            type = 'HASH',
+            parts = {1, 'unsigned', 2, 'unsigned'}
+        })
+        t.assert_error_covers({
+            space = 'test',
+            index = 'hash',
+            space_id = test.id,
+            index_id = index.id,
+            key = {11},
+            message = 'HASH index  does not support selects via a partial ' ..
+                      'key (expected 2 parts, got 1). Please Consider ' ..
+                      'changing index type to TREE.'
+        }, index.select, index, {11})
+        index:drop()
+
+        -- Test non exact key match for RTREE index.
+        index = test:create_index('rtree', {type = 'RTREE',
+                                    unique = false,
+                                    parts = {2, 'array'}})
+        t.assert_error_covers({
+            space = 'test',
+            index = 'rtree',
+            space_id = test.id,
+            index_id = index.id,
+            key = {1, 2, 3},
+            message = 'Invalid key part count (expected [0..4], got 3)'
+        }, index.select, index, {1, 2, 3})
+        t.assert_error_covers({
+            space = 'test',
+            index = 'rtree',
+            space_id = test.id,
+            index_id = index.id,
+            key = {'foo'},
+            message = 'Supplied key type of part 0 does not match index ' ..
+                      'part type: expected array'
+        }, index.select, index, {'foo'})
+        t.assert_error_covers({
+            space = 'test',
+            index = 'rtree',
+            space_id = test.id,
+            index_id = index.id,
+            key = {{1, 2, 3}},
+            message = 'RTree: Key must be an array with 2 (point) or 4 ' ..
+                      '(rectangle/box) numeric coordinates'
+        }, index.select, index, {{1, 2, 3}})
+        t.assert_error_covers({
+            space = 'test',
+            index = 'rtree',
+            space_id = test.id,
+            index_id = index.id,
+            key = {{1, 'foo'}},
+            message = 'Supplied key type of part 1 does not match index ' ..
+                      'part type: expected number'
+        }, index.select, index, {{1, 'foo'}})
+        t.assert_error_covers({
+            space = 'test',
+            index = 'rtree',
+            space_id = test.id,
+            index_id = index.id,
+            key = {1, 'foo'},
+            message = 'Supplied key type of part 1 does not match index ' ..
+                      'part type: expected number'
+        }, index.select, index, {1, 'foo'})
+        index:drop()
+
+        -- Test exact key match.
+        index = test:create_index('secondary', {
+            parts = {1, 'unsigned', 2, 'unsigned'}
+        })
+        t.assert_error_covers({
+            space = 'test',
+            index = 'secondary',
+            space_id = test.id,
+            index_id = index.id,
+            key = {1, 2, 3},
+            message = 'Invalid key part count in an exact match ' ..
+                      '(expected 2, got 3)'
+        }, index.get, index, {1, 2, 3})
+        t.assert_error_covers({
+            space = 'test',
+            index = 'secondary',
+            space_id = test.id,
+            index_id = index.id,
+            key = {1, 'foo'},
+            message = 'Supplied key type of part 1 does not match index ' ..
+                      'part type: expected unsigned'
+        }, index.get, index, {1, 'foo'})
+        index:drop()
+        index = test:create_index('secondary', {
+            parts = {1, 'unsigned', 2, 'unsigned'},
+            unique = false,
+        })
+        t.assert_error_covers({
+            space = 'test',
+            index = 'secondary',
+            space_id = test.id,
+            index_id = index.id,
+            message = "Get() doesn't support partial keys and non-unique " ..
+                      "indexes"
+        }, index.delete, index, {1, 2})
+    end)
+end
+
+g.after_test('test_dml_key_validation_errors', function(cg)
+    cg.server:exec(function()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+    end)
+end)

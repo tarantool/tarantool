@@ -74,10 +74,41 @@ BuildUnsupportedIndexFeature(const char *file, unsigned line,
 	}
 }
 
+/**
+ * Add key as the last error payload field with name "key". The key
+ * is MsgPack array without array prefix. The size of the array
+ * is given by part_count.
+ */
+static void
+error_set_key(struct error *error, const char *key, uint32_t part_count)
+{
+	const char *key_end = key;
+	for (uint32_t i = 0; i < part_count; i++)
+		mp_next(&key_end);
+	size_t region_svp = region_used(&fiber()->gc);
+	size_t key_buf_size = key_end - key + mp_sizeof_array(part_count);
+	char *key_buf = (char *)xregion_alloc(&fiber()->gc, key_buf_size);
+	char *key_pos = (char *)mp_encode_array(key_buf, part_count);
+	memcpy(key_pos, key, key_end - key);
+	error_set_mp(error, "key", key_buf, key_buf_size);
+	region_truncate(&fiber()->gc, region_svp);
+}
+
+void
+error_set_index(struct error *error, const struct index_def *index_def)
+{
+	error_set_str(error, "index", index_def->name);
+	error_set_uint(error, "index_id", index_def->iid);
+	struct space *space = space_by_id(index_def->space_id);
+	error_set_str(error, "space", space->def->name);
+	error_set_uint(error, "space_id", index_def->space_id);
+}
+
 int
 key_validate(const struct index_def *index_def, enum iterator_type type,
 	     const char *key, uint32_t part_count)
 {
+	const char *key_begin = key;
 	assert(key != NULL || part_count == 0);
 	if (part_count == 0) {
 		/*
@@ -97,28 +128,28 @@ key_validate(const struct index_def *index_def, enum iterator_type type,
 		if (part_count != 1 && part_count != d && part_count != d * 2) {
 			diag_set(ClientError, ER_KEY_PART_COUNT, d  * 2,
 				 part_count);
-			return -1;
+			goto error;
 		}
 		if (part_count == 1) {
 			if (key_part_validate(FIELD_TYPE_ARRAY, key, 0, false))
-				return -1;
+				goto error;
 			uint32_t array_size = mp_decode_array(&key);
 			if (array_size != d && array_size != d * 2) {
 				diag_set(ClientError, ER_RTREE_RECT, "Key", d,
 					 d * 2);
-				return -1;
+				goto error;
 			}
 			for (uint32_t part = 0; part < array_size; part++) {
 				if (key_part_validate(FIELD_TYPE_NUMBER, key,
-						      0, false))
-					return -1;
+						      part, false))
+					goto error;
 				mp_next(&key);
 			}
 		} else {
 			for (uint32_t part = 0; part < part_count; part++) {
 				if (key_part_validate(FIELD_TYPE_NUMBER, key,
 						      part, false))
-					return -1;
+					goto error;
 				mp_next(&key);
 			}
 		}
@@ -126,7 +157,7 @@ key_validate(const struct index_def *index_def, enum iterator_type type,
 		if (part_count > index_def->key_def->part_count) {
 			diag_set(ClientError, ER_KEY_PART_COUNT,
 				 index_def->key_def->part_count, part_count);
-			return -1;
+			goto error;
 		}
 
 		/* Partial keys are allowed only for TREE index type. */
@@ -135,14 +166,18 @@ key_validate(const struct index_def *index_def, enum iterator_type type,
 				 index_type_strs[index_def->type],
 				 index_def->key_def->part_count,
 				 part_count);
-			return -1;
+			goto error;
 		}
 		const char *key_end;
 		if (key_validate_parts(index_def->key_def, key,
 				       part_count, true, &key_end) != 0)
-			return -1;
+			goto error;
 	}
 	return 0;
+error:
+	error_set_index(diag_last_error(diag_get()), index_def);
+	error_set_key(diag_last_error(diag_get()), key_begin, part_count);
+	return -1;
 }
 
 int
@@ -153,15 +188,22 @@ exact_key_validate(struct index_def *index_def, const char *key,
 	struct key_def *key_def = index_def->key_def;
 	if (!index_def->opts.is_unique) {
 		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
+		error_set_index(diag_last_error(diag_get()), index_def);
 		return -1;
 	}
 	if (key_def->part_count != part_count) {
 		diag_set(ClientError, ER_EXACT_MATCH, key_def->part_count,
 			 part_count);
-		return -1;
+		goto error;
 	}
 	const char *key_end;
-	return key_validate_parts(key_def, key, part_count, false, &key_end);
+	if (key_validate_parts(key_def, key, part_count, false, &key_end) != 0)
+		goto error;
+	return 0;
+error:
+	error_set_key(diag_last_error(diag_get()), key, part_count);
+	error_set_index(diag_last_error(diag_get()), index_def);
+	return -1;
 }
 
 char *
