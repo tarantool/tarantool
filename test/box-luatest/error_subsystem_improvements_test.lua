@@ -63,6 +63,7 @@ g.test_custom_payload = function()
         code = 0,
         foo = 42,
         bar = "abc",
+        name = 'UNKNOWN',
     })
 
     -- Test `box.error()' with payload fields of various types.
@@ -350,6 +351,7 @@ g.test_autocomplete = function()
         'err.unpack(',
         'err.code',
         'err.bar',
+        'err.name',
     })
 
     r = tabcomplete('err:')
@@ -441,3 +443,9 @@ g.after_test('test_tuple_found_payload', function(cg)
         end
     end)
 end)
+
+-- Test error has 'name' field with error name.
+g.test_error_name = function()
+    local e = box.error.new(box.error.ILLEGAL_PARAMS, 'foo')
+    t.assert_equals(e.name, 'ILLEGAL_PARAMS')
+end

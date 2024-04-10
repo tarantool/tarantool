@@ -242,6 +242,8 @@ client_error_create(struct error *e, va_list ap)
 			assert(false);
 		}
 	}
+	assert(strncmp("ER_", r->errstr, 3) == 0);
+	error_set_str(e, "name", r->errstr + 3);
 }
 
 const struct type_info type_ClientError =

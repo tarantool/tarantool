@@ -637,6 +637,21 @@ test_undefined_error_code(void)
 	footer();
 }
 
+static void
+test_client_error_name(void)
+{
+	header();
+	plan(1);
+
+	diag_set(ClientError, ER_ILLEGAL_PARAMS, "foo");
+	struct error *e = diag_last_error(diag_get());
+	const char *s = error_get_str(e, "name");
+	ok(s != NULL && strcmp(s, "ILLEGAL_PARAMS") == 0);
+
+	check_plan();
+	footer();
+}
+
 #ifdef TEST_BUILD
 
 /* Test ClientError arguments become payload fields (gh-9109). */
@@ -800,38 +815,41 @@ test_client_error_creation(void)
 	 * Test if field name is "" then respective positional argument
 	 * is printed in formatted string message but not become payload.
 	 */
+	diag_set(ClientError, ER_TEST_FIRST);
+	e = diag_last_error(diag_get());
+	int ref_payload_count = e->payload.count;
 	diag_set(ClientError, ER_TEST_OMIT_TYPE_CHAR, 'x');
 	e = diag_last_error(diag_get());
 	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error x") == 0);
-	ok(e->payload.count == 0);
+	ok(e->payload.count == ref_payload_count);
 	diag_set(ClientError, ER_TEST_OMIT_TYPE_INT, 1);
 	e = diag_last_error(diag_get());
 	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 1") == 0);
-	ok(e->payload.count == 0);
+	ok(e->payload.count == ref_payload_count);
 	diag_set(ClientError, ER_TEST_OMIT_TYPE_UINT, 2);
 	e = diag_last_error(diag_get());
 	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 2") == 0);
-	ok(e->payload.count == 0);
+	ok(e->payload.count == ref_payload_count);
 	diag_set(ClientError, ER_TEST_OMIT_TYPE_LONG, 3L);
 	e = diag_last_error(diag_get());
 	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 3") == 0);
-	ok(e->payload.count == 0);
+	ok(e->payload.count == ref_payload_count);
 	diag_set(ClientError, ER_TEST_OMIT_TYPE_ULONG, 4UL);
 	e = diag_last_error(diag_get());
 	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 4") == 0);
-	ok(e->payload.count == 0);
+	ok(e->payload.count == ref_payload_count);
 	diag_set(ClientError, ER_TEST_OMIT_TYPE_LLONG, 5LL);
 	e = diag_last_error(diag_get());
 	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 5") == 0);
-	ok(e->payload.count == 0);
+	ok(e->payload.count == ref_payload_count);
 	diag_set(ClientError, ER_TEST_OMIT_TYPE_ULLONG, 6ULL);
 	e = diag_last_error(diag_get());
 	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error 6") == 0);
-	ok(e->payload.count == 0);
+	ok(e->payload.count == ref_payload_count);
 	diag_set(ClientError, ER_TEST_OMIT_TYPE_STRING, "str");
 	e = diag_last_error(diag_get());
 	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error str") == 0);
-	ok(e->payload.count == 0);
+	ok(e->payload.count == ref_payload_count);
 
 	check_plan();
 	footer();
@@ -850,9 +868,9 @@ main(void)
 {
 	header();
 #ifdef TEST_BUILD
-	plan(15);
+	plan(16);
 #else
-	plan(14);
+	plan(15);
 #endif
 
 	random_init();
@@ -874,6 +892,7 @@ main(void)
 	test_error_append_msg();
 	test_pthread();
 	test_undefined_error_code();
+	test_client_error_name();
 #ifdef TEST_BUILD
 	test_client_error_creation();
 #endif

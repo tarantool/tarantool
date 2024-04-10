@@ -279,10 +279,11 @@ e:unpack()
  |     call global ''require'' (a nil value)'
  |   message: 'Failed to build a key for functional index ''idx'' of space ''withdata'':
  |     can''t evaluate function'
+ |   space: withdata
  |   index: idx
  |   type: ClientError
  |   details: can't evaluate function
- |   space: withdata
+ |   name: FUNC_INDEX_FUNC
  |   trace:
  |   - file: <filename>
  |     line: <line>
