@@ -34,7 +34,8 @@ e
  | ...
 e:unpack()
  | ---
- | - code: 1
+ | - name: ILLEGAL_PARAMS
+ |   code: 1
  |   base_type: ClientError
  |   type: ClientError
  |   details: foo

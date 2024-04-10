@@ -290,6 +290,8 @@ raise:
 			if (name[0] != '\0')
 				luaT_error_payload_set(L, error, name, i);
 		}
+		assert(strncmp("ER_", record->errstr, 3) == 0);
+		error_set_str(error, "name", record->errstr + 3);
 	}
 	return error;
 }

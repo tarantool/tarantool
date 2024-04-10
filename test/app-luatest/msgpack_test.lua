@@ -587,6 +587,8 @@ g_error_details.test_error_details = function(cg)
             v.type = nil
             t.assert_equals(v.code, box.error.INVALID_MSGPACK)
             v.code = nil
+            t.assert_equals(v.name, 'INVALID_MSGPACK')
+            v.name = nil
             if v.message:startswith(errmsg_prefix) then
                 v.message = v.message:sub(#errmsg_prefix + 1)
             end
