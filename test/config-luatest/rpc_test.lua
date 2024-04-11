@@ -135,6 +135,8 @@ g.test_filter = function(g)
               instance-002:
                 labels:
                   l1: 'one'
+      group-002:
+        replicasets:
           replicaset-002:
             instances:
               instance-003:
@@ -203,6 +205,18 @@ g.test_filter = function(g)
 
         exp = {}
         opts = {labels = {l1 = 'one_one', l2 = 'two'}, roles = {'r1'}}
+        t.assert_items_equals(connpool.filter(opts), exp)
+
+        exp = {"instance-004"}
+        opts = {roles = {'r1'}, instances = {'instance-002', 'instance-004'}}
+        t.assert_items_equals(connpool.filter(opts), exp)
+
+        exp = {"instance-003", "instance-004"}
+        opts = {replicasets = {'replicaset-002', 'a_replicaset'}}
+        t.assert_items_equals(connpool.filter(opts), exp)
+
+        exp = {"instance-001"}
+        opts = {roles = {'r1'}, groups = {'group-001', 'some_group'}}
         t.assert_items_equals(connpool.filter(opts), exp)
 
         exp = {"instance-001", "instance-002", "instance-003", "instance-004"}
@@ -333,6 +347,8 @@ g.test_call = function(g)
                   l1: 'first'
                   l2: 'second'
               instance-002: {}
+      group-002:
+        replicasets:
           replicaset-002:
             instances:
               instance-003:
@@ -419,6 +435,15 @@ g.test_call = function(g)
         end
 
         t.assert_equals(connpool.call('f2', {1,2,3}, {roles = {'one'}}), 7)
+
+        opts = {roles = {'one'}, instances = {'instance-003', 'instance-100'}}
+        t.assert_equals(connpool.call('f1', nil, opts), 'instance-003')
+
+        opts = {labels = {l1 = 'first'}, replicasets = {'replicaset-002'}}
+        t.assert_equals(connpool.call('f1', nil, opts), 'instance-004')
+
+        opts = {roles = {'one'}, groups = {'group-001'}}
+        t.assert_equals(connpool.call('f1', nil, opts), 'instance-001')
     end
 
     g.server_1:exec(check)

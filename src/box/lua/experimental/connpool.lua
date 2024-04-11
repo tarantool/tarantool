@@ -93,6 +93,42 @@ local function connect_to_candidates(candidates)
     return connected_candidates
 end
 
+local function is_group_match(expected_groups, present_group)
+    if expected_groups == nil or next(expected_groups) == nil then
+        return true
+    end
+    for _, group in pairs(expected_groups) do
+        if group == present_group then
+            return true
+        end
+    end
+    return false
+end
+
+local function is_replicaset_match(expected_replicasets, present_replicaset)
+    if expected_replicasets == nil or next(expected_replicasets) == nil then
+        return true
+    end
+    for _, replicaset in pairs(expected_replicasets) do
+        if replicaset == present_replicaset then
+            return true
+        end
+    end
+    return false
+end
+
+local function is_instance_match(expected_instances, present_instance)
+    if expected_instances == nil or next(expected_instances) == nil then
+        return true
+    end
+    for _, instance in pairs(expected_instances) do
+        if instance == present_instance then
+            return true
+        end
+    end
+    return false
+end
+
 local function is_roles_match(expected_roles, present_roles)
     if expected_roles == nil or next(expected_roles) == nil then
         return true
@@ -129,10 +165,13 @@ local function is_labels_match(expected_labels, present_labels)
     return true
 end
 
-local function is_candidate_match_static(instance_name, opts)
+local function is_candidate_match_static(names, opts)
     assert(opts ~= nil and type(opts) == 'table')
-    local get_opts = {instance = instance_name}
-    return is_roles_match(opts.roles, config:get('roles', get_opts)) and
+    local get_opts = {instance = names.instance_name}
+    return is_group_match(opts.groups, names.group_name) and
+           is_replicaset_match(opts.replicasets, names.replicaset_name) and
+           is_instance_match(opts.instances, names.instance_name) and
+           is_roles_match(opts.roles, config:get('roles', get_opts)) and
            is_labels_match(opts.labels, config:get('labels', get_opts))
 end
 
@@ -152,6 +191,9 @@ end
 
 local function filter(opts)
     checks({
+        groups = '?table',
+        replicasets = '?table',
+        instances = '?table',
         labels = '?table',
         roles = '?table',
         mode = '?string',
@@ -162,6 +204,9 @@ local function filter(opts)
         error(msg:format(opts.mode), 0)
     end
     local static_opts = {
+        groups = opts.groups,
+        replicasets = opts.replicasets,
+        instances = opts.instances,
         labels = opts.labels,
         roles = opts.roles,
     }
@@ -171,8 +216,8 @@ local function filter(opts)
 
     -- First, select candidates using the information from the config.
     local static_candidates = {}
-    for instance_name in pairs(config:instances()) do
-        if is_candidate_match_static(instance_name, static_opts) then
+    for instance_name, names in pairs(config:instances()) do
+        if is_candidate_match_static(names, static_opts) then
             table.insert(static_candidates, instance_name)
         end
     end
@@ -198,6 +243,9 @@ local function get_connection(opts)
         mode = opts.mode
     end
     local candidates_opts = {
+        groups = opts.groups,
+        replicasets = opts.replicasets,
+        instances = opts.instances,
         labels = opts.labels,
         roles = opts.roles,
         mode = mode,
@@ -268,6 +316,9 @@ end
 
 local function call(func_name, args, opts)
     checks('string', '?table', {
+        groups = '?table',
+        replicasets = '?table',
+        instances = '?table',
         labels = '?table',
         roles = '?table',
         prefer_local = '?boolean',
@@ -288,6 +339,9 @@ local function call(func_name, args, opts)
     end
 
     local conn_opts = {
+        groups = opts.groups,
+        replicasets = opts.replicasets,
+        instances = opts.instances,
         labels = opts.labels,
         roles = opts.roles,
         prefer_local = opts.prefer_local,
