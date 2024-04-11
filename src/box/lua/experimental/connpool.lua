@@ -49,8 +49,8 @@ local function connect(instance_name, opts)
     -- If opts.wait_connected is not false we wait until the connection is
     -- established or an error occurs (including a timeout error).
     if opts.wait_connected ~= false and conn:wait_connected() == false then
-        local msg = 'Unable to connect to instance %q: connection timeout'
-        error(msg:format(instance_name), 0)
+        local msg = 'Unable to connect to instance %q: %s'
+        error(msg:format(instance_name, conn.error), 0)
     end
     return conn
 end

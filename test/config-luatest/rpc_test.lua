@@ -42,6 +42,9 @@ g.test_connect = function(g)
                 database:
                   mode: rw
               instance-004: {}
+          replicaset-003:
+            instances:
+              instance-005: {}
     ]]
     treegen.write_script(dir, 'config.yaml', config)
 
@@ -54,6 +57,8 @@ g.test_connect = function(g)
     g.server_2 = server:new(fun.chain(opts, {alias = 'instance-002'}):tomap())
     g.server_3 = server:new(fun.chain(opts, {alias = 'instance-003'}):tomap())
     g.server_4 = server:new(fun.chain(opts, {alias = 'instance-004'}):tomap())
+    -- The instance-005 instance is not started to check if the correct error
+    -- is returned.
 
     g.server_1:start({wait_until_ready = false})
     g.server_2:start({wait_until_ready = false})
@@ -90,6 +95,11 @@ g.test_connect = function(g)
         t.assert(conn2 == connpool.connect('instance-002'))
         t.assert(conn3 == connpool.connect('instance-003'))
         t.assert(conn4 == connpool.connect('instance-004'))
+
+        local ok, err = pcall(connpool.connect, 'instance-005')
+        t.assert_not(ok)
+        t.assert(err:startswith('Unable to connect to instance "instance-005"'))
+        t.assert(err:endswith('No such file or directory'))
     end
 
     g.server_1:exec(check_conn)
