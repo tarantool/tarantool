@@ -18,3 +18,6 @@ were fixed as part of this activity:
 * Fixed recording of the `__concat` metamethod for vararg or protected frames.
 * Fixed recording of a side trace returning to a lower frame with a maximum
   possible frame size.
+* Fixed `debug.setmetatable()` and `lua_setmetatable()` with enabled
+  `jit.dump()`.
+* Fixed recording of side traces with a down-recursion.
