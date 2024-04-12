@@ -1196,12 +1196,10 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 							     next_pos) != 0)
 				goto error;
 		}
-		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL &&
-		    field_map_builder_set_slot(builder, field->offset_slot,
-					       pos - tuple, MULTIKEY_NONE,
-					       0, NULL) != 0) {
-			goto error;
-		}
+		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL)
+			field_map_builder_set_slot(builder, field->offset_slot,
+						   pos - tuple, MULTIKEY_NONE,
+						   0, NULL);
 	}
 	region_truncate(region, region_svp);
 	return 0;
@@ -1216,9 +1214,7 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 		       bool validate, struct field_map_builder *builder)
 {
 	struct region *region = &fiber()->gc;
-	if (field_map_builder_create(builder, format->field_map_size,
-				     region) != 0)
-		return -1;
+	field_map_builder_create(builder, format->field_map_size, region);
 
 	if (validate && tuple_check_constraint(format, tuple) != 0)
 		return -1;
@@ -1246,11 +1242,13 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 	       entry.data != NULL) {
 		if (entry.field == NULL)
 			continue;
-		if (entry.field->offset_slot != TUPLE_OFFSET_SLOT_NIL &&
-		    field_map_builder_set_slot(builder, entry.field->offset_slot,
-					entry.data - tuple, entry.multikey_idx,
-					entry.multikey_count, region) != 0)
-			return -1;
+		if (entry.field->offset_slot != TUPLE_OFFSET_SLOT_NIL)
+			field_map_builder_set_slot(builder,
+						   entry.field->offset_slot,
+						   entry.data - tuple,
+						   entry.multikey_idx,
+						   entry.multikey_count,
+						   region);
 	}
 	return entry.data == NULL ? 0 : -1;
 }
@@ -1350,13 +1348,8 @@ tuple_format_iterator_create(struct tuple_format_iterator *it,
 	if (validate)
 		it->required_fields_sz = BITMAP_SIZE(format->total_field_count);
 	uint32_t total_sz = frames_sz + 2 * it->required_fields_sz;
-	struct mp_frame *frames = region_aligned_alloc(region, total_sz,
-						       alignof(frames[0]));
-	if (frames == NULL) {
-		diag_set(OutOfMemory, total_sz, "region",
-			 "tuple_format_iterator");
-		return -1;
-	}
+	struct mp_frame *frames = xregion_aligned_alloc(region, total_sz,
+							alignof(frames[0]));
 	mp_stack_create(&it->stack, format->fields_depth, frames);
 	bool key_parts_only =
 		(flags & TUPLE_FORMAT_ITERATOR_KEY_PARTS_ONLY) != 0;

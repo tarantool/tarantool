@@ -184,11 +184,8 @@ field_map_get_offset(const uint32_t *field_map, int32_t offset_slot,
  *
  * Routine uses region to perform memory allocation for internal
  * structures.
- *
- * Returns 0 on success. In case of memory allocation error sets
- * diag message and returns -1.
  */
-int
+void
 field_map_builder_create(struct field_map_builder *builder,
 			 uint32_t minimal_field_map_size,
 			 struct region *region);
@@ -213,7 +210,7 @@ field_map_builder_slot_extent_new(struct field_map_builder *builder,
  * The offset_slot argument must be negative and offset must be
  * positive (by definition).
  */
-static inline int
+static inline void
 field_map_builder_set_slot(struct field_map_builder *builder,
 			   int32_t offset_slot, uint32_t offset,
 			   int32_t multikey_idx, uint32_t multikey_count,
@@ -235,12 +232,9 @@ field_map_builder_set_slot(struct field_map_builder *builder,
 		} else {
 			extent = field_map_builder_slot_extent_new(builder,
 					offset_slot, multikey_count, region);
-			if (extent == NULL)
-				return -1;
 		}
 		extent->offset[multikey_idx] = offset;
 	}
-	return 0;
 }
 
 /**

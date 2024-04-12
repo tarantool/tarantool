@@ -452,9 +452,7 @@ vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
 		return NULL;
 	}
 	struct field_map_builder builder;
-	if (field_map_builder_create(&builder, format->field_map_size,
-				     region) != 0)
-		goto out;
+	field_map_builder_create(&builder, format->field_map_size, region);
 	/*
 	 * Perform simultaneous parsing of the tuple and
 	 * format::fields tree traversal to copy indexed field
@@ -488,11 +486,12 @@ vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
 		}
 		/* Initialize field_map with data offset. */
 		uint32_t offset_slot = entry.field->offset_slot;
-		if (offset_slot != TUPLE_OFFSET_SLOT_NIL &&
-		    field_map_builder_set_slot(&builder, offset_slot,
-					pos - data, entry.multikey_idx,
-					entry.multikey_count, region) != 0)
-			goto out;
+		if (offset_slot != TUPLE_OFFSET_SLOT_NIL)
+			field_map_builder_set_slot(&builder, offset_slot,
+						   pos - data,
+						   entry.multikey_idx,
+						   entry.multikey_count,
+						   region);
 		/* Copy field data. */
 		if (entry.field->type == FIELD_TYPE_ARRAY) {
 			pos = mp_encode_array(pos, entry.count);
