@@ -914,6 +914,53 @@ g.test_downgrade_schema_max_id = function(cg)
     end)
 end
 
+------------------------------
+-- Check downgrade from 2.11.4
+------------------------------
+local function test_downgrade_drop_persistent_gc_state(version)
+    local helper = require('test.box-luatest.downgrade_helper')
+    local space_id = box.schema.GC_CONSUMERS_ID
+    local _priv = box.space._priv
+
+    local function check_before_downgrade()
+        t.assert_not_equals(box.space._gc_consumers, nil)
+        t.assert_equals(#_priv.index.object:select{'space', space_id}, 1)
+        t.assert_equals(#box.space._gc_consumers:select{}, 1)
+    end
+
+    local function check_after_downgrade()
+        t.assert_equals(box.space._gc_consumers, nil)
+        t.assert_equals(_priv.index.object:select{'space', space_id}, {})
+    end
+
+    local replica_uuid = require('uuid').str()
+    box.space._cluster:insert{2, replica_uuid}
+
+    -- Check if nothing changes after downgrade to version that supports
+    -- the feature
+    local app_version = helper.app_version(version)
+    t.assert_equals(box.schema.downgrade_issues(app_version), {})
+    box.schema.downgrade(app_version)
+    check_before_downgrade()
+
+    -- Check if downgrade_issues are not collected and downgrade
+    -- actually doesn't happen
+    local prev_version = helper.prev_version(app_version)
+    t.assert_equals(box.schema.downgrade_issues(prev_version), {})
+    check_before_downgrade()
+
+    -- Check if downgrade works correctly and gc_consumer is dropped
+    -- automatically. Test 2 times for idempotence.
+    for _ = 1, 2 do
+        box.schema.downgrade(prev_version)
+        check_after_downgrade()
+    end
+end
+
+g.test_downgrade_drop_persistent_gc_state_2_11_4 = function(cg)
+    cg.server:exec(test_downgrade_drop_persistent_gc_state, {'2.11.4'})
+end
+
 -----------------------------
 -- Check downgrade from 3.0.0
 -----------------------------
@@ -971,6 +1018,48 @@ g.test_downgrade_global_names = function(cg)
         t.assert_equals(format[3].name, 'name')
         box.schema.downgrade(prev_version)
         t.assert_equals(#box.space._cluster:format(), 2)
+    end)
+end
+
+g.test_downgrade_add_persistent_gc_state = function(cg)
+    cg.server:exec(function()
+        -- Start test with Tarantool 3.0.0 schema
+        box.schema.downgrade('3.0.0')
+        local helper = require('test.box-luatest.downgrade_helper')
+        local space_id = box.schema.GC_CONSUMERS_ID
+        local _priv = box.space._priv
+
+        local function check_before_downgrade()
+            t.assert_equals(box.space._space:get(space_id), nil)
+            t.assert_equals(_priv.index.object:select{'space', space_id}, {})
+        end
+
+        local function check_after_downgrade()
+            t.assert_not_equals(box.space._space:get(space_id), nil)
+            t.assert_equals(#_priv.index.object:select{'space', space_id}, 1)
+        end
+
+        -- Make sure there is no persistent gc state at the start
+        check_before_downgrade()
+
+        -- Check if nothing changes after downgrade to current version
+        local app_version = helper.app_version('3.0.0')
+        t.assert_equals(box.schema.downgrade_issues(app_version), {})
+        box.schema.downgrade(app_version)
+        check_before_downgrade()
+
+        -- Check if downgrade_issues are not collected and downgrade
+        -- actually doesn't happen
+        local prev_version = helper.prev_version(app_version)
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {})
+        check_before_downgrade()
+
+        -- Check if downgrade works correctly and gc_consumer is dropped
+        -- automatically. Test 2 times for idempotence.
+        for _ = 1, 2 do
+            box.schema.downgrade(prev_version)
+            check_after_downgrade()
+        end
     end)
 end
 
@@ -1043,4 +1132,12 @@ g.test_downgrade_func_trigger = function(cg)
             check_after_downgrade()
         end
     end)
+end
+
+-----------------------------
+-- Check downgrade from 3.2.0
+-----------------------------
+
+g.test_downgrade_drop_persistent_gc_state_3_2_0 = function(cg)
+    cg.server:exec(test_downgrade_drop_persistent_gc_state, {'3.2.0'})
 end
