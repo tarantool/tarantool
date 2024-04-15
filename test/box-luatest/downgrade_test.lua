@@ -1044,3 +1044,51 @@ g.test_downgrade_func_trigger = function(cg)
         end
     end)
 end
+
+-----------------------------
+-- Check downgrade from 3.3.0
+-----------------------------
+
+g.test_downgrade_drop_gc_consumers = function(cg)
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+        local space_id = box.schema.GC_CONSUMERS_ID
+        local _priv = box.space._priv
+        local map = setmetatable({}, {__serialize = 'map'})
+
+        local function check_before_downgrade()
+            t.assert_not_equals(box.space._gc_consumers, nil)
+            t.assert_equals(#_priv.index.object:select{'space', space_id}, 1)
+            t.assert_equals(#box.space._gc_consumers:select{}, 1)
+        end
+
+        local function check_after_downgrade()
+            t.assert_equals(box.space._gc_consumers, nil)
+            t.assert_equals(_priv.index.object:select{'space', space_id}, {})
+        end
+
+        local replica_uuid = require('uuid').str()
+        box.space._cluster:insert{2, replica_uuid}
+        box.space._gc_consumers:replace{replica_uuid, map, map}
+
+        -- Check if nothing changes after downgrade to version that supports
+        -- the feature
+        local app_version = helper.app_version('3.3.0')
+        t.assert_equals(box.schema.downgrade_issues(app_version), {})
+        box.schema.downgrade(app_version)
+        check_before_downgrade()
+
+        -- Check if downgrade_issues are not collected and downgrade
+        -- actually doesn't happen
+        local prev_version = helper.prev_version('3.3.0')
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {})
+        check_before_downgrade()
+
+        -- Check if downgrade works correctly and gc_consumer is dropped
+        -- automatically. Test 2 times for idempotence.
+        for _ = 1, 2 do
+            box.schema.downgrade(prev_version)
+            check_after_downgrade()
+        end
+    end)
+end
