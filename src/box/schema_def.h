@@ -130,6 +130,8 @@ static_assert(BOX_INVALID_NAME_MAX <= BOX_NAME_MAX,
 	_(FUNC_INDEX, 372, true) \
 	/** Space id of _session_settings. */ \
 	_(SESSION_SETTINGS, 380, true) \
+	/** Space id of _gc_consumers. */ \
+	_(GC_CONSUMERS, 388, false) \
 
 /** System space identifier definition. */
 #define SYSTEM_SPACE_MEMBER(name, id, ...) BOX_ ## name ## _ID = id,
@@ -231,6 +233,13 @@ enum {
 enum {
 	BOX_SCHEMA_FIELD_KEY = 0,
 	BOX_SCHEMA_FIELD_VALUE = 1,
+};
+
+/** _gc_consumers fields. */
+enum {
+	BOX_GC_CONSUMERS_FIELD_UUID = 0,
+	BOX_GC_CONSUMERS_FIELD_VCLOCK = 1,
+	BOX_GC_CONSUMERS_FIELD_OPTS = 2,
 };
 
 /** _cluster fields. */
