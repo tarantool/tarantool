@@ -1421,6 +1421,41 @@ local function upgrade_to_3_1_0()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 3.2.0
+--------------------------------------------------------------------------------
+
+local function create_persistent_gc_state()
+    local _space = box.space[box.schema.SPACE_ID]
+    local _index = box.space[box.schema.INDEX_ID]
+    local _priv = box.space[box.schema.PRIV_ID]
+    local space_id = box.schema.GC_CONSUMERS_ID
+    local opts = {group_id = 1}
+
+    -- We should create space and its index atomically so that we can
+    -- rely only on the fact that the space is created
+    box.atomic(function()
+        log.info("create space _gc_consumers")
+        local format = {{name = 'uuid', type = 'string'},
+                        {name = 'vclock', type = 'map', is_nullable = true},
+                        {name = 'opts', type = 'map', is_nullable = true}}
+        _space:insert{space_id, ADMIN, '_gc_consumers', 'memtx', 0, opts, format}
+
+        log.info("create primary index for space _gc_consumers")
+        _index:insert{space_id, 0, 'primary', 'tree', { unique = true },
+                    {{0, 'string'}}}
+
+        -- replication can create persistent gc consumers
+        log.info("grant read,write on space _gc_consumers to replication")
+        local priv = box.priv.R + box.priv.W
+        _priv:replace{ADMIN, REPLICATION, 'space', box.schema.GC_CONSUMERS_ID, priv}
+    end)
+end
+
+local function upgrade_to_3_2_0()
+    create_persistent_gc_state()
+end
+
+--------------------------------------------------------------------------------
 
 local handlers = {
     {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5},
@@ -1444,6 +1479,7 @@ local handlers = {
     {version = mkversion(2, 11, 1), func = upgrade_to_2_11_1},
     {version = mkversion(3, 0, 0), func = upgrade_to_3_0_0},
     {version = mkversion(3, 1, 0), func = upgrade_to_3_1_0},
+    {version = mkversion(3, 2, 0), func = upgrade_to_3_2_0},
 }
 builtin.box_init_latest_dd_version_id(handlers[#handlers].version.id)
 
@@ -2003,6 +2039,44 @@ local function downgrade_from_3_1_0(issue_handler)
     drop_trigger_from_func(issue_handler)
 end
 
+--------------------------------------------------------------------------------
+-- Tarantool 3.2.0
+--------------------------------------------------------------------------------
+
+local function drop_persistent_gc_state(issue_handler)
+    -- GC consumers are created by Tarantool, not users, so the space
+    -- can be dropped even if some persistent consumers are left
+    if issue_handler.dry_run then
+        return
+    end
+
+    local _space = box.space[box.schema.SPACE_ID]
+    local _index = box.space[box.schema.INDEX_ID]
+    local _priv = box.space[box.schema.PRIV_ID]
+    local space_id = box.schema.GC_CONSUMERS_ID
+
+    -- We should drop space and its index atomically so that we can
+    -- rely only on the fact that the space is created.
+    box.atomic(function()
+        log.info("dropping all privileges for _gc_consumers")
+        for _, v in _priv.index.object:pairs{'space', space_id} do
+            -- Extract parts of primary key in space _priv
+            local key = {v[2], v[3], v[4]}
+            _priv:delete(key)
+        end
+
+        log.info("dropping primary index of _gc_consumers")
+        _index:delete{space_id, 0}
+
+        log.info("dropping space _gc_consumers")
+        _space:delete{space_id}
+    end)
+end
+
+local function downgrade_from_3_2_0(issue_handler)
+    drop_persistent_gc_state(issue_handler)
+end
+
 -- Versions should be ordered from newer to older.
 --
 -- Every step can be called in 2 modes. In dry_run mode (issue_handler.dry_run
@@ -2020,6 +2094,7 @@ end
 -- if schema version is 2.10.0.
 --
 local downgrade_handlers = {
+    {version = mkversion(3, 2, 0), func = downgrade_from_3_2_0},
     {version = mkversion(3, 1, 0), func = downgrade_from_3_1_0},
     {version = mkversion(3, 0, 0), func = downgrade_from_3_0_0},
     {version = mkversion(2, 11, 1), func = downgrade_from_2_11_1},
@@ -2104,8 +2179,10 @@ local downgrade_versions = {
     "2.10.5",
     "2.11.0",
     "2.11.1",
+    "2.11.4",
     "3.0.0",
     "3.1.0",
+    "3.2.0",
     -- DOWNGRADE VERSIONS END
 }
 
