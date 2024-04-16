@@ -234,7 +234,7 @@ struct errcode_record {
 	_(ER_PRIV_NOT_GRANTED, 91,		"User '%s' does not have %s access on %s '%s'", "user", STRING, "privilege", STRING, "object_type", STRING, "object", STRING) \
 	_(ER_ROLE_NOT_GRANTED, 92,		"User '%s' does not have role '%s'", "user", STRING, "role", STRING) \
 	_(ER_MISSING_SNAPSHOT, 93,		"Can't find snapshot") \
-	_(ER_CANT_UPDATE_PRIMARY_KEY, 94,	"Attempt to modify a tuple field which is part of primary index in space '%s'", "space", STRING) \
+	_(ER_CANT_UPDATE_PRIMARY_KEY, 94,	"Attempt to modify a tuple field which is part of primary index in space '%s'", "space", STRING, "space_id", UINT, "old_tuple", TUPLE, "new_tuple", TUPLE, "ops", MSGPACK) \
 	_(ER_UPDATE_INTEGER_OVERFLOW, 95,	"Integer overflow when performing '%c' operation on field %s", "operation", CHAR, "field", STRING) \
 	_(ER_GUEST_USER_PASSWORD, 96,		"Setting password for guest user has no effect") \
 	_(ER_TRANSACTION_CONFLICT, 97,		"Transaction has been aborted by conflict") \
