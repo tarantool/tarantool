@@ -436,8 +436,10 @@ memtx_space_execute_replace(struct space *space, struct txn *txn,
 	struct tuple *new_tuple =
 		space->format->vtab.tuple_new(space->format, request->tuple,
 					      request->tuple_end);
-	if (new_tuple == NULL)
+	if (new_tuple == NULL) {
+		error_set_space(diag_last_error(diag_get()), space->def);
 		return -1;
+	}
 	tuple_ref(new_tuple);
 
 	if (memtx_space_replace_tuple(space, stmt, NULL, new_tuple,
@@ -525,8 +527,10 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 		space->format->vtab.tuple_new(format, new_data,
 					      new_data + new_size);
 	region_truncate(&fiber()->gc, region_svp);
-	if (new_tuple == NULL)
+	if (new_tuple == NULL) {
+		error_set_index(diag_last_error(diag_get()), pk->def);
 		return -1;
+	}
 	tuple_ref(new_tuple);
 
 	if (memtx_space_replace_tuple(space, stmt, old_tuple, new_tuple,
@@ -547,8 +551,10 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 	 * Check all tuple fields: we should produce an error on
 	 * malformed tuple even if upsert turns into an update.
 	 */
-	if (tuple_validate_raw(space->format, request->tuple))
+	if (tuple_validate_raw(space->format, request->tuple)) {
+		error_set_space(diag_last_error(diag_get()), space->def);
 		return -1;
+	}
 
 	struct index *index = index_find(space, 0);
 	if (index == NULL)
@@ -629,8 +635,11 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 			space->format->vtab.tuple_new(format, new_data,
 						      new_data + new_size);
 		region_truncate(&fiber()->gc, region_svp);
-		if (new_tuple == NULL)
+		if (new_tuple == NULL) {
+			error_set_space(diag_last_error(diag_get()),
+					space->def);
 			return -1;
+		}
 		tuple_ref(new_tuple);
 
 		struct index *pk = space->index[0];

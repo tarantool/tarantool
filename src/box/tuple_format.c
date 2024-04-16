@@ -1217,7 +1217,7 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 	field_map_builder_create(builder, format->field_map_size, region);
 
 	if (validate && tuple_check_constraint(format, tuple) != 0)
-		return -1;
+		goto error;
 
 	if (tuple_format_field_count(format) == 0)
 		return 0; /* Nothing to initialize */
@@ -1227,8 +1227,10 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 	 * tuple field traversal may be simplified.
 	 */
 	if (format->fields_depth == 1) {
-		return tuple_field_map_create_plain(format, tuple, validate,
-						    builder);
+		if (tuple_field_map_create_plain(format, tuple, validate,
+						 builder) != 0)
+			goto error;
+		return 0;
 	}
 
 	uint32_t field_count;
@@ -1236,7 +1238,7 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 	uint8_t flags = validate ? TUPLE_FORMAT_ITERATOR_VALIDATE : 0;
 	if (tuple_format_iterator_create(&it, format, tuple, flags,
 					 &field_count, region) != 0)
-		return -1;
+		goto error;
 	struct tuple_format_iterator_entry entry;
 	while (tuple_format_iterator_next(&it, &entry) == 0 &&
 	       entry.data != NULL) {
@@ -1250,7 +1252,15 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 						   entry.multikey_count,
 						   region);
 	}
-	return entry.data == NULL ? 0 : -1;
+	if (entry.data != NULL)
+		goto error;
+	return 0;
+error:;
+	const char *tuple_end = tuple;
+	mp_next(&tuple_end);
+	struct error *e = diag_last_error(diag_get());
+	error_set_mp(e, "tuple", tuple, tuple_end - tuple);
+	return -1;
 }
 
 uint32_t

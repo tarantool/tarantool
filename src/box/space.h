@@ -746,6 +746,14 @@ space_dump_def(const struct space *space, struct rlist *key_list);
 void
 space_fill_index_map(struct space *space);
 
+/** Add info about space to the error. */
+static inline void
+error_set_space(struct error *error, struct space_def *def)
+{
+	error_set_str(error, "space", def->name);
+	error_set_uint(error, "space_id", def->id);
+}
+
 /*
  * Virtual method stubs.
  */
