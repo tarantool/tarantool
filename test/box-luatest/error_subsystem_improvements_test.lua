@@ -590,3 +590,226 @@ g.after_test('test_dml_key_validation_errors', function(cg)
         end
     end)
 end)
+
+g.test_dml_tuple_validation_errors = function(cg)
+    cg.server:exec(function()
+
+        -- Test simple tuple validation errors.
+        local test = box.schema.create_space('test', {field_count = 5})
+        test:create_index('primary')
+        t.assert_error_covers({
+            tuple = {1, 2},
+            message = 'Tuple field count 2 does not match space field count 5'
+        }, test.insert, test, {1, 2})
+        test:drop()
+        local test = box.schema.create_space('test', {format = {
+            {'f1', 'number'}, {'f2', 'number'}, {'f3', 'number'},
+        }})
+        test:create_index('primary')
+        t.assert_error_covers({
+            tuple = {3, 4},
+            message = 'Tuple field 3 (f3) required by space format is missing'
+        }, test.insert, test, {3, 4})
+        t.assert_error_covers({
+            tuple = {5, 'foo', 6},
+            message = 'Tuple field 2 (f2) type does not match one required ' ..
+                      'by operation: expected number, got string'
+        }, test.insert, test, {5, 'foo', 6})
+        test:drop()
+        local test = box.schema.create_space('test', {format = {
+            {'f1', 'number'}, {'f2', 'int8'},
+        }})
+        test:create_index('primary')
+        t.assert_error_covers({
+            tuple = {7, 300},
+            message = "The value of field 2 (f2) exceeds the supported " ..
+                       "range for type 'int8': expected [-128..127], got 300"
+        }, test.insert, test, {7, 300})
+        test:drop()
+
+        -- Test foreign key constraint errors.
+        local foreign = box.schema.create_space('foreign', {format = {
+            {'id', 'number'},
+            {'extra_id', 'number'},
+        }})
+        foreign:create_index('primary')
+        foreign:create_index('secondary', {parts = {1, 'number', 2, 'number'}})
+        local test = box.schema.create_space('test', {format = {
+            {name = 'id', type = 'number'},
+            {name = 'link', foreign_key = {space = 'foreign', field = 'id'}}
+        }})
+        t.assert_error_covers({
+            tuple = {1, 2},
+            message = "Foreign key constraint 'foreign' failed for field " ..
+                      "'2 (link)': foreign tuple was not found",
+        }, test.insert, test, {1, 2})
+        test:drop()
+        local test = box.schema.create_space('test', {
+            format = {{'foreign_id', 'number'}, {'foreign_extra_id', 'number'}},
+            foreign_key = {
+                space = 'foreign',
+                field = {foreign_id = 'id', foreign_extra_id = 'extra_id'},
+            },
+        })
+        t.assert_error_covers({
+            tuple = {3, 4},
+            message = "Foreign key constraint 'foreign' failed: foreign " ..
+                      "tuple was not found",
+        }, test.insert, test, {3, 4})
+        test:drop()
+        foreign:drop()
+
+        -- Test tuple/fields constraint errors.
+        box.schema.func.create('some_constraint', {
+            language = 'LUA', is_deterministic = true,
+            body = [[function(_, v) return v < 10 end]],
+        })
+        local test = box.schema.create_space('test', {format = {
+            {name = 'id', type = 'number'},
+            {name = 'value', type = 'number', constraint = 'some_constraint'}
+        }})
+        t.assert_error_covers({
+            tuple = {1, 11},
+            message = "Check constraint 'some_constraint' failed for field " ..
+                      "'2 (value)'"
+        }, test.insert, test, {1, 11})
+        test:drop()
+        box.schema.func.drop('some_constraint')
+        box.schema.func.create('some_constraint', {
+            language = 'LUA', is_deterministic = true,
+            body = [[function(t) return t[1] ~= t[2] end]],
+        })
+        local test = box.schema.create_space('test', {
+            format = {
+                {name = 'id', type = 'number'},
+                {name = 'value', type = 'number'},
+            },
+            constraint = 'some_constraint',
+        })
+        t.assert_error_covers({
+            tuple = {7, 7},
+            message = "Check constraint 'some_constraint' failed for a tuple",
+        }, test.insert, test, {7, 7})
+        test:drop()
+        box.schema.func.drop('some_constraint')
+
+        -- Test some errors when format has JSON path spec.
+        local test = box.schema.create_space('test', {field_count = 5})
+        foreign:create_index('primary')
+        test:create_index('secondary', {parts = {
+            {1, 'number'}, {2, 'str', path = 'x.y'}
+        }})
+        t.assert_error_covers({
+            tuple = {1, {x = {y = 2}}},
+            message = 'Tuple field count 2 does not match space field count 5',
+        }, test.insert, test, {1, {x = {y = 2}}})
+        test:drop()
+        local test = box.schema.create_space('test')
+        foreign:create_index('primary')
+        test:create_index('secondary', {parts = {
+            {1, 'number'}, {2, 'str', path = 'x.y'}
+        }})
+        t.assert_error_covers({
+            tuple = {3, {x = {z = 4}}},
+            message = 'Tuple field [2]["x"]["y"] required by space ' ..
+                      'format is missing',
+        }, test.insert, test, {3, {x = {z = 4}}})
+        test:drop()
+    end)
+end
+
+g.after_test('test_dml_tuple_validation_errors', function(cg)
+    cg.server:exec(function()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+        if box.space.foreign ~= nil then
+            box.space.foreign:drop()
+        end
+        box.schema.func.drop('some_constraint', {if_exists = true})
+    end)
+end)
+
+local g_engine = t.group('engine', {{engine = 'memtx'}, {engine = 'vinyl'}})
+
+g_engine.before_all(function(cg)
+    cg.server = server:new()
+    cg.server:start()
+end)
+
+g_engine.after_all(function(cg)
+    if cg.server ~= nil then
+        cg.server:drop()
+    end
+end)
+
+g_engine.test_dml_tuple_validation_errors_space_field = function(cg)
+    cg.server:exec(function(params)
+        local test = box.schema.create_space('test', {
+            format = {{'f1', 'unsigned'}, {'f2', 'unsigned'}},
+            engine = params.engine,
+        })
+        test:create_index('primary')
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            message = 'Tuple field 2 (f2) type does not match one required ' ..
+                      'by operation: expected unsigned, got string',
+        }, test.insert, test, {1, 'foo'})
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            message = 'Tuple field 2 (f2) type does not match one required ' ..
+                      'by operation: expected unsigned, got string',
+        }, test.replace, test, {1, 'foo'})
+        test:replace({1, 2})
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            index = 'primary',
+            index_id = 0,
+            message = 'Tuple field 2 (f2) type does not match one required ' ..
+                      'by operation: expected unsigned, got string',
+        }, test.update, test, 1, {{'=', 2, 'foo'}})
+
+    end, {cg.params})
+end
+
+g_engine.after_test('test_dml_tuple_validation_errors_space_field', function(cg)
+    cg.server:exec(function()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+    end)
+end)
+
+g.test_dml_tuple_validation_errors_space_field_upsert = function(cg)
+    cg.server:exec(function()
+        local test = box.schema.create_space('test', {
+            format = {{'f1', 'unsigned'}, {'f2', 'unsigned'}},
+        })
+        test:create_index('primary')
+        test:replace({1, 2})
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            message = 'Tuple field 2 (f2) type does not match one required ' ..
+                      'by operation: expected unsigned, got string',
+        }, test.upsert, test, {1, 3}, {{'=', 2, 'foo'}})
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            message = 'Tuple field 2 (f2) type does not match one required ' ..
+                      'by operation: expected unsigned, got string',
+        }, test.upsert, test, {2, 'foo'}, {{'=', 2, 4}})
+        test:drop()
+    end)
+end
+
+g.after_test('test_dml_tuple_validation_errors_space_field_upsert', function(cg)
+    cg.server:exec(function()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+    end)
+end)

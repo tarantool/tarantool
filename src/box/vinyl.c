@@ -1908,6 +1908,7 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 */
 	if (tuple_validate_raw(pk->mem_format, new_tuple)) {
 		region_truncate(&fiber()->gc, region_svp);
+		error_set_index(diag_last_error(diag_get()), pk->base.def);
 		return -1;
 	}
 	stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
@@ -2209,8 +2210,10 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return -1;
 	if (vy_is_committed(env, pk))
 		return 0;
-	if (tuple_validate_raw(pk->mem_format, request->tuple))
+	if (tuple_validate_raw(pk->mem_format, request->tuple)) {
+		error_set_space(diag_last_error(diag_get()), space->def);
 		return -1;
+	}
 	/* First insert into the primary index. */
 	stmt->new_tuple = vy_stmt_new_insert(pk->mem_format, request->tuple,
 					     request->tuple_end);
@@ -2258,8 +2261,10 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return 0;
 
 	/* Validate and create a statement for the new tuple. */
-	if (tuple_validate_raw(pk->mem_format, request->tuple))
+	if (tuple_validate_raw(pk->mem_format, request->tuple)) {
+		error_set_space(diag_last_error(diag_get()), space->def);
 		return -1;
+	}
 	stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, request->tuple,
 					      request->tuple_end);
 	if (stmt->new_tuple == NULL)
