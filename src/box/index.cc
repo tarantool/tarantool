@@ -221,7 +221,8 @@ index_check_dup(struct index *index, struct tuple *old_tuple,
 			struct space *space = space_by_id(index->def->space_id);
 			assert(space != NULL);
 			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-				 space->def->name);
+				 space->def->name, space->def->id,
+				 old_tuple, new_tuple, NULL);
 			return -1;
 		}
 	} else { /* dup_tuple != NULL */

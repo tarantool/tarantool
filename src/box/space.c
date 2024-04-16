@@ -1273,7 +1273,8 @@ after_old_tuple_lookup:;
 	    tuple_compare(old_tuple, HINT_NONE, new_tuple, HINT_NONE,
 			  pk->def->key_def) != 0) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-			 space->def->name);
+			 space->def->name, space->def->id, old_tuple, new_tuple,
+			 NULL);
 		rc = -1;
 		goto out;
 	}

@@ -368,8 +368,13 @@ session_settings_space_execute_update(struct space *space, struct txn *txn,
 				       column_mask)) {
 		if (key_len != new_key_len ||
 		    memcmp(key, new_key, key_len) != 0) {
+			struct tuple *old_tuple =
+				tuple_new(format, old_data, old_data_end);
 			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-				 space_name(space));
+				 space_name(space), space_id(space),
+				 old_tuple, *result,
+				 NULL);
+			tuple_delete(old_tuple);
 			goto finish;
 		}
 	}

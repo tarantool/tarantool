@@ -813,3 +813,77 @@ g.after_test('test_dml_tuple_validation_errors_space_field_upsert', function(cg)
         end
     end)
 end)
+
+g.test_dml_update_primary_key = function(cg)
+    cg.server:exec(function()
+        local test = box.schema.create_space('test')
+        test:create_index('primary')
+        test:replace({1, 2})
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            old_tuple = {1, 2},
+            new_tuple = {3, 2},
+            message = "Attempt to modify a tuple field which is part of " ..
+                      "primary index in space 'test'",
+        }, test.update, test, {1}, {{'=', 1, 3}})
+
+        local update_pk = function(_, new)
+            return box.tuple.update(new, {{'+', 1, 1}})
+        end
+        test:before_replace(update_pk)
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            old_tuple = {1, 2},
+            new_tuple = {2, 3},
+            message = "Attempt to modify a tuple field which is part of " ..
+                      "primary index in space 'test'",
+        }, test.replace, test, {1, 3})
+        test:before_replace(nil, update_pk)
+        test.index.primary:drop()
+
+        test:create_index('primary', {type = 'HASH'})
+        test:replace({1, 2})
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            old_tuple = {1, 2},
+            new_tuple = {3, 2},
+            message = "Attempt to modify a tuple field which is part of " ..
+                      "primary index in space 'test'",
+        }, test.update, test, {1}, {{'=', 1, 3}})
+        test:drop()
+
+        local space = box.space._session_settings
+        space:update('sql_full_metadata', {{'=', 2, false}})
+        t.assert_error_covers({
+            space = '_session_settings',
+            space_id = space.id,
+            old_tuple = {'sql_full_metadata', false},
+            new_tuple = {'foo', false},
+            message = "Attempt to modify a tuple field which is part of " ..
+                      "primary index in space '_session_settings'",
+        }, space.update, space, 'sql_full_metadata', {{'=', 1, 'foo'}})
+
+        local test = box.schema.create_space('test', {engine = 'vinyl'})
+        test:create_index('primary')
+        test:replace({1, 2})
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            old_tuple = {1, 2},
+            new_tuple = {3, 2},
+            message = "Attempt to modify a tuple field which is part of " ..
+                      "primary index in space 'test'",
+        }, test.update, test, {1}, {{'=', 1, 3}})
+    end)
+end
+
+g.after_test('test_dml_update_primary_key', function(cg)
+    cg.server:exec(function()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+    end)
+end)
