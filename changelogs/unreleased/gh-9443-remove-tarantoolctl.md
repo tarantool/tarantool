@@ -1,4 +1,4 @@
-## feature/tools
+## tools
 
 * `tarantoolctl` has been removed. Systemd, sysvinit and logrotate
   scripts based on it were also removed. All this functionality is covered by the `tt` utility.
