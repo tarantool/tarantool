@@ -1238,7 +1238,10 @@ memtx_tx_story_unlink_top_common(struct memtx_story *story, uint32_t idx)
 		unreachable();
 		panic("failed to rebind story in index");
 	}
-	assert(story->tuple == removed);
+	assert(story->tuple == removed ||
+	       (removed == NULL && tuple_key_is_excluded(story->tuple,
+							 index->def->key_def,
+							 MULTIKEY_NONE)));
 	story->link[idx].in_index = NULL;
 	if (old_story != NULL)
 		old_story->link[idx].in_index = index;
@@ -1407,7 +1410,13 @@ memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 					unreachable();
 					panic("failed to rollback change");
 				}
-				assert(story->tuple == removed);
+				struct key_def *key_def = index->def->key_def;
+				assert(story->tuple == removed ||
+				       (removed == NULL &&
+					tuple_key_is_excluded(story->tuple,
+							      key_def,
+							      MULTIKEY_NONE)));
+				(void)key_def;
 				link->in_index = NULL;
 				/*
 				 * All tuples in pk are referenced.
@@ -1482,7 +1491,13 @@ memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
 					unreachable();
 					panic("failed to rollback change");
 				}
-				assert(story->tuple == removed);
+				struct key_def *key_def = index->def->key_def;
+				assert(story->tuple == removed ||
+				       (removed == NULL &&
+					tuple_key_is_excluded(story->tuple,
+							      key_def,
+							      MULTIKEY_NONE)));
+				(void)key_def;
 				link->in_index = NULL;
 				/*
 				 * All tuples in pk are referenced.
@@ -2008,12 +2023,18 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	/* Process replacement in indexes. */
 	struct tuple *directly_replaced[space->index_count];
 	struct tuple *direct_successor[space->index_count];
+	bool tuple_excluded[space->index_count];
 	uint32_t directly_replaced_count = 0;
 	for (uint32_t i = 0; i < space->index_count; i++) {
 		struct index *index = space->index[i];
 		struct tuple **replaced = &directly_replaced[i];
 		struct tuple **successor = &direct_successor[i];
-		if (index_replace(index, NULL, new_tuple,
+		*replaced = *successor = NULL;
+		tuple_excluded[i] = tuple_key_is_excluded(new_tuple,
+							  index->def->key_def,
+							  MULTIKEY_NONE);
+		if (!tuple_excluded[i] &&
+		    index_replace(index, NULL, new_tuple,
 				  DUP_REPLACE_OR_INSERT,
 				  replaced, successor) != 0)
 		{
@@ -2048,12 +2069,13 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	for (uint32_t i = 0; i < space->index_count; i++) {
 		struct tuple *next = directly_replaced[i];
 		struct tuple *succ = direct_successor[i];
-		if (next == NULL) {
+		if (next == NULL && !tuple_excluded[i]) {
 			/* Collect conflicts. */
 			memtx_tx_handle_gap_write(space, add_story, succ, i);
 			memtx_tx_handle_point_hole_write(space, add_story, i);
 			memtx_tx_story_link_top(add_story, NULL, i, true);
-		} else {
+		}
+		if (next != NULL) {
 			/* Form chains. */
 			struct memtx_story *next_story = next_pk_story;
 			if (next != next_pk) {
