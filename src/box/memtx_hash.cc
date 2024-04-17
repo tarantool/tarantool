@@ -386,29 +386,14 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 				 "hash_table", "key");
 			return -1;
 		}
-		uint32_t errcode = replace_check_dup(old_tuple,
-						     dup_tuple, mode);
-		if (errcode) {
+		if (index_check_dup(base, old_tuple, new_tuple,
+				    dup_tuple, mode) != 0) {
 			light_index_delete(hash_table, pos);
 			if (dup_tuple) {
 				uint32_t pos = light_index_insert(hash_table, h, dup_tuple);
 				if (pos == light_index_end) {
 					panic("Failed to allocate memory in "
 					      "recover of int hash_table");
-				}
-			}
-			struct space *sp = space_cache_find(base->def->space_id);
-			if (sp != NULL) {
-				if (errcode == ER_TUPLE_FOUND){
-					diag_set(ClientError, errcode,
-						 base->def->name,
-						 space_name(sp),
-						 tuple_str(dup_tuple),
-						 tuple_str(new_tuple),
-						 dup_tuple, new_tuple);
-				} else {
-					diag_set(ClientError, errcode,
-						 space_name(sp));
 				}
 			}
 			return -1;

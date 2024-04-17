@@ -206,6 +206,45 @@ error:
 	return -1;
 }
 
+int
+index_check_dup(struct index *index, struct tuple *old_tuple,
+		struct tuple *new_tuple, struct tuple *dup_tuple,
+		enum dup_replace_mode mode)
+{
+	if (dup_tuple == NULL) {
+		if (mode == DUP_REPLACE) {
+			assert(old_tuple != NULL);
+			/*
+			 * dup_replace_mode is DUP_REPLACE, and
+			 * a tuple with the same key is not found.
+			 */
+			struct space *space = space_by_id(index->def->space_id);
+			assert(space != NULL);
+			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
+				 space->def->name);
+			return -1;
+		}
+	} else { /* dup_tuple != NULL */
+		if (dup_tuple != old_tuple &&
+		    (old_tuple != NULL || mode == DUP_INSERT)) {
+			/*
+			 * There is a duplicate of new_tuple,
+			 * and it's not old_tuple: we can't
+			 * possibly delete more than one tuple
+			 * at once.
+			 */
+			struct space *space = space_by_id(index->def->space_id);
+			assert(space != NULL);
+			diag_set(ClientError, ER_TUPLE_FOUND,
+				 index->def->name, space->def->name,
+				 tuple_str(dup_tuple), tuple_str(new_tuple),
+				 dup_tuple, new_tuple);
+			return -1;
+		}
+	}
+	return 0;
+}
+
 char *
 box_tuple_extract_key(box_tuple_t *tuple, uint32_t space_id, uint32_t index_id,
 		      uint32_t *key_size)
