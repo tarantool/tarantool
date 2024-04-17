@@ -268,6 +268,10 @@ relay_send(struct relay *relay, struct xrow_header *packet);
 static void
 relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row);
 
+/** One iteration of the subscription loop - bump heartbeats, TX endpoints. */
+static void
+relay_subscribe_update(struct relay *relay);
+
 /** Process a single row from the WAL stream. */
 static void
 relay_process_row(struct xstream *stream, struct xrow_header *row);
@@ -321,10 +325,10 @@ relay_send_heartbeat_on_timeout(struct relay *relay);
 
 /** A callback for recovery to send heartbeats while scanning a WAL. */
 static void
-relay_yield_and_send_heartbeat(struct xstream *stream)
+relay_subscribe_on_wal_yield_f(struct xstream *stream)
 {
 	struct relay *relay = container_of(stream, struct relay, stream);
-	relay_send_heartbeat_on_timeout(relay);
+	relay_subscribe_update(relay);
 	fiber_sleep(0);
 }
 
@@ -954,6 +958,20 @@ relay_check_status_needs_update(struct relay *relay)
 	cpipe_push(&relay->tx_pipe, &status_msg->msg);
 }
 
+static void
+relay_subscribe_update(struct relay *relay)
+{
+	/*
+	 * The fiber can be woken by IO cancel, by a timeout of status messaging
+	 * or by an acknowledge to status message. Handle cbus messages first.
+	 */
+	struct errinj *inj = errinj(ERRINJ_RELAY_FROM_TX_DELAY, ERRINJ_BOOL);
+	if (inj == NULL || !inj->bparam)
+		cbus_process(&relay->tx_endpoint);
+	relay_send_heartbeat_on_timeout(relay);
+	relay_check_status_needs_update(relay);
+}
+
 /**
  * A libev callback invoked when a relay client socket is ready
  * for read. This currently only happens when the client closes
@@ -988,6 +1006,11 @@ relay_subscribe_f(va_list ap)
 		trigger_add(&relay->r->on_close_log, &on_close_log);
 
 	/* Setup WAL watcher for sending new rows to the replica. */
+	struct errinj *inj = errinj(ERRINJ_RELAY_WAL_START_DELAY, ERRINJ_BOOL);
+	while (inj != NULL && inj->bparam) {
+		fiber_sleep(0.01);
+		xstream_yield(&relay->stream);
+	}
 	wal_set_watcher(&relay->wal_watcher, relay->wal_endpoint.name,
 			relay_process_wal_event, cbus_process);
 
@@ -1010,32 +1033,17 @@ relay_subscribe_f(va_list ap)
 	 * Run the event loop until the connection is broken
 	 * or an error occurs.
 	 */
+	inj = errinj(ERRINJ_RELAY_REPORT_INTERVAL, ERRINJ_DOUBLE);
 	while (!fiber_is_cancelled()) {
 		FiberGCChecker gc_check;
 		double timeout = replication_timeout;
-		struct errinj *inj = errinj(ERRINJ_RELAY_REPORT_INTERVAL,
-					    ERRINJ_DOUBLE);
 		if (inj != NULL && inj->dparam != 0)
 			timeout = inj->dparam;
 
 		fiber_cond_wait_deadline(&relay->reader_cond,
 					 relay->last_row_time + timeout);
-
-		/*
-		 * The fiber can be woken by IO cancel, by a timeout of
-		 * status messaging or by an acknowledge to status message.
-		 * Handle cbus messages first.
-		 */
-		inj = errinj(ERRINJ_RELAY_FROM_TX_DELAY, ERRINJ_BOOL);
-		if (inj == NULL || !inj->bparam)
-			cbus_process(&relay->tx_endpoint);
 		cbus_process(&relay->wal_endpoint);
-		relay_send_heartbeat_on_timeout(relay);
-		/*
-		 * Check that the vclock has been updated and the previous
-		 * status message is delivered
-		 */
-		relay_check_status_needs_update(relay);
+		relay_subscribe_update(relay);
 	}
 
 	/*
@@ -1103,7 +1111,7 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 	if (replica_version_id < version_id(2, 6, 0) || replica->anon)
 		sent_raft_term = UINT64_MAX;
 	relay_start(relay, io, sync, relay_process_row,
-		    relay_yield_and_send_heartbeat, sent_raft_term);
+		    relay_subscribe_on_wal_yield_f, sent_raft_term);
 	replica_on_relay_follow(replica);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
