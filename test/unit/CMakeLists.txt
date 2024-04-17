@@ -217,8 +217,8 @@ create_unit_test(PREFIX bloom
                  LIBRARIES salad
 )
 create_unit_test(PREFIX vclock
-                 SOURCES vclock.cc
-                 LIBRARIES vclock unit
+                 SOURCES vclock.cc core_test_utils.c
+                 LIBRARIES vclock xrow unit
 )
 create_unit_test(PREFIX xrow
                  SOURCES xrow.cc core_test_utils.c
