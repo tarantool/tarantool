@@ -765,36 +765,13 @@ struct index_read_view_iterator {
 };
 
 /**
- * Check if replacement of an old tuple with a new one is
- * allowed.
+ * Check if replacement of an old tuple with a new one is allowed.
+ * Return 0 on success, -1 on error (diag is set).
  */
-static inline uint32_t
-replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
-		  enum dup_replace_mode mode)
-{
-	if (dup_tuple == NULL) {
-		if (mode == DUP_REPLACE) {
-			assert(old_tuple != NULL);
-			/*
-			 * dup_replace_mode is DUP_REPLACE, and
-			 * a tuple with the same key is not found.
-			 */
-			return ER_CANT_UPDATE_PRIMARY_KEY;
-		}
-	} else { /* dup_tuple != NULL */
-		if (dup_tuple != old_tuple &&
-		    (old_tuple != NULL || mode == DUP_INSERT)) {
-			/*
-			 * There is a duplicate of new_tuple,
-			 * and it's not old_tuple: we can't
-			 * possibly delete more than one tuple
-			 * at once.
-			 */
-			return ER_TUPLE_FOUND;
-		}
-	}
-	return 0;
-}
+int
+index_check_dup(struct index *index, struct tuple *old_tuple,
+		struct tuple *new_tuple, struct tuple *dup_tuple,
+		enum dup_replace_mode mode);
 
 /** Add payload fields with index details to the error. */
 void

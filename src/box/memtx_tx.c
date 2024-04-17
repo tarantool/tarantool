@@ -1711,31 +1711,6 @@ memtx_tx_story_find_visible_tuple(struct memtx_story *story, struct txn *tnx,
 }
 
 /**
- * replace_check_dup wrapper, that follows usual return code convention and
- * sets diag in case of error.
- */
-static int
-memtx_tx_check_dup(struct tuple *new_tuple, struct tuple *old_tuple,
-		   struct tuple *dup_tuple, enum dup_replace_mode mode,
-		   struct index *index, struct space *space)
-{
-	uint32_t errcode;
-	errcode = replace_check_dup(old_tuple, dup_tuple, mode);
-	if (errcode != 0) {
-		if (errcode == ER_TUPLE_FOUND) {
-			diag_set(ClientError, errcode,
-				 index->def->name, space_name(space),
-				 tuple_str(dup_tuple), tuple_str(new_tuple),
-				 dup_tuple, new_tuple);
-		} else {
-			diag_set(ClientError, errcode, space_name(space));
-		}
-		return -1;
-	}
-	return 0;
-}
-
-/**
  * Track the fact that transaction @a txn have read @a story in @a space.
  * This fact could lead this transaction to read view or conflict state.
  */
@@ -1831,8 +1806,8 @@ check_dup(struct txn_stmt *stmt, struct tuple *new_tuple,
 						  is_own_change);
 	}
 
-	if (memtx_tx_check_dup(new_tuple, *old_tuple, visible_replaced,
-			       mode, space->index[0], space) != 0) {
+	if (index_check_dup(space->index[0], *old_tuple, new_tuple,
+			    visible_replaced, mode) != 0) {
 		memtx_tx_track_read(txn, space, visible_replaced);
 		return -1;
 	}
@@ -1862,9 +1837,8 @@ check_dup(struct txn_stmt *stmt, struct tuple *new_tuple,
 							  &unused);
 		}
 
-		if (memtx_tx_check_dup(new_tuple, visible_replaced, visible,
-				       DUP_INSERT, space->index[i],
-				       space) != 0) {
+		if (index_check_dup(space->index[i], visible_replaced,
+				    new_tuple, visible, DUP_INSERT) != 0) {
 			memtx_tx_track_read(txn, space, visible);
 			return -1;
 		}

@@ -1148,27 +1148,11 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 			return -1;
 		}
 
-		uint32_t errcode = replace_check_dup(old_tuple,
-						     dup_data.tuple, mode);
-		if (errcode) {
+		if (index_check_dup(base, old_tuple, new_tuple,
+				    dup_data.tuple, mode) != 0) {
 			memtx_tree_delete(&index->tree, new_data);
 			if (dup_data.tuple != NULL)
 				memtx_tree_insert(&index->tree, dup_data, NULL, NULL);
-			struct space *sp = space_cache_find(base->def->space_id);
-			if (sp != NULL) {
-				if (errcode == ER_TUPLE_FOUND) {
-					diag_set(ClientError, errcode,
-						 base->def->name,
-						 space_name(sp),
-						 tuple_str(dup_data.tuple),
-						 tuple_str(new_data.tuple),
-						 dup_data.tuple,
-						 new_data.tuple);
-				} else {
-					diag_set(ClientError, errcode,
-						 space_name(sp));
-				}
-			}
 			return -1;
 		}
 		*successor = suc_data.tuple;
@@ -1213,7 +1197,6 @@ memtx_tree_index_replace_multikey_one(struct memtx_tree_index<true> *index,
 			 "replace");
 		return -1;
 	}
-	int errcode = 0;
 	if (dup_data.tuple == new_tuple) {
 		/*
 		 * When tuple contains the same key multiple
@@ -1221,26 +1204,12 @@ memtx_tree_index_replace_multikey_one(struct memtx_tree_index<true> *index,
 		 * out of the index.
 		 */
 		*is_multikey_conflict = true;
-	} else if ((errcode = replace_check_dup(old_tuple, dup_data.tuple,
-					        mode)) != 0) {
+	} else if (index_check_dup(&index->base, old_tuple, new_tuple,
+				   dup_data.tuple, mode) != 0) {
 		/* Rollback replace. */
 		memtx_tree_delete(&index->tree, new_data);
 		if (dup_data.tuple != NULL)
 			memtx_tree_insert(&index->tree, dup_data, NULL, NULL);
-		struct space *sp = space_cache_find(index->base.def->space_id);
-		if (sp != NULL) {
-			if (errcode == ER_TUPLE_FOUND) {
-				diag_set(ClientError, errcode,
-					 index->base.def->name, space_name(sp),
-					 tuple_str(dup_data.tuple),
-					 tuple_str(new_data.tuple),
-					 dup_data.tuple, new_data.tuple);
-			} else {
-				diag_set(ClientError, errcode,
-	     				 index->base.def->name,
-	     				 space_name(sp));
-			}
-		}
 		return -1;
 	}
 	*replaced_data = dup_data;
