@@ -887,3 +887,149 @@ g.after_test('test_dml_update_primary_key', function(cg)
         end
     end)
 end)
+
+g.test_dml_update_error = function(cg)
+    cg.server:exec(function()
+        local test = box.schema.create_space('test')
+        test:create_index('primary')
+        test:replace({1, 2})
+        local ops = {}
+        for i = 1,5000 do ops[i] = {'+', 2, 1} end
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            index = 'primary',
+            index_id = 0,
+            ops = ops,
+            message = 'Illegal parameters, too many operations for update'
+        }, test.update, test, {1}, ops)
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            index = 'primary',
+            index_id = 0,
+            ops = {{'+', 2, 'foo'}},
+            message = "Argument type in operation '+' on field 2 does not " ..
+                      "match field type: expected a number",
+        }, test.update, test, {1}, {{'+', 2, 'foo'}})
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            index = 'primary',
+            index_id = 0,
+            ops = {{':', 2, 2, 1, 'foo'}},
+            tuple = {1, 2},
+            message = "Argument type in operation ':' on field 2 does not " ..
+                      "match field type: expected a string"
+        }, test.update, test, {1}, {{':', 2, 2, 1, 'foo'}})
+
+        local dummy = function(_, new) return new end
+        test:before_replace(dummy)
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            index = 'primary',
+            index_id = 0,
+            ops = {{'+', 2, 'foo'}},
+            message = "Argument type in operation '+' on field 2 does not " ..
+                      "match field type: expected a number"
+        }, test.update, test, {1}, {{'+', 2, 'foo'}})
+        test:before_replace(nil, dummy)
+        test:drop()
+
+        local space = box.space._session_settings
+        space:update('sql_full_metadata', {{'=', 2, false}})
+        t.assert_error_covers({
+            space = '_session_settings',
+            space_id = space.id,
+            index = 'primary',
+            index_id = 0,
+            ops = {{'+', 2, 'foo'}},
+            message = "Argument type in operation '+' on field 2 does not " ..
+                      "match field type: expected a number"
+        }, space.update, space, 'sql_full_metadata', {{'+', 2, 'foo'}})
+
+        local test = box.schema.create_space('test', {engine = 'vinyl'})
+        test:create_index('primary')
+        test:replace({1, 2})
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            index = 'primary',
+            index_id = 0,
+            ops = {{'+', 2, 'foo'}},
+            message = "Argument type in operation '+' on field 2 does not " ..
+                      "match field type: expected a number",
+        }, test.update, test, {1}, {{'+', 2, 'foo'}})
+    end)
+end
+
+g.after_test('test_dml_update_error', function(cg)
+    cg.server:exec(function()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+    end)
+end)
+
+g.test_dml_upsert_error = function(cg)
+    cg.server:exec(function()
+        local test = box.schema.create_space('test', {engine = 'vinyl'})
+        test:create_index('primary')
+        test:replace({1, 2})
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            ops = {{'=', 7}},
+            message = 'Unknown UPDATE operation #1: wrong number of ' ..
+                      'arguments, expected 3, got 2',
+        }, test.upsert, test, {5}, {{'=', 7}})
+
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            ops = {{'=', 5}},
+            message = 'Unknown UPDATE operation #1: wrong number of ' ..
+                      'arguments, expected 3, got 2',
+        }, test.upsert, test, {1}, {{'=', 5}})
+
+        local dummy = function(_, new) return new end
+        test:before_replace(dummy)
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            ops = {{'=', 7}},
+            message = 'Unknown UPDATE operation #1: wrong number of ' ..
+                      'arguments, expected 3, got 2',
+        }, test.upsert, test, {5}, {{'=', 7}})
+
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            ops = {{'=', 5}},
+            message = 'Unknown UPDATE operation #1: wrong number of ' ..
+                      'arguments, expected 3, got 2',
+        }, test.upsert, test, {1}, {{'=', 5}})
+        test:before_replace(nil, dummy)
+        test:drop()
+
+        local test = box.schema.create_space('test', {engine = 'vinyl'})
+        test:create_index('primary')
+        test:replace({1, 2})
+        t.assert_error_covers({
+            space = 'test',
+            space_id = test.id,
+            ops = {{'=', 7}},
+            message = 'Unknown UPDATE operation #1: wrong number of ' ..
+                      'arguments, expected 3, got 2',
+        }, test.upsert, test, {5}, {{'=', 7}})
+    end)
+end
+
+g.after_test('test_dml_upsert_error', function(cg)
+    cg.server:exec(function()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+    end)
+end)

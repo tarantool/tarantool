@@ -1142,8 +1142,11 @@ after_old_tuple_lookup:;
 					       old_data_end,
 					       space->format, &new_size,
 					       request->index_base, NULL);
-		if (new_data == NULL)
+		if (new_data == NULL) {
+			error_set_index(diag_last_error(diag_get()),
+					index->def);
 			return -1;
+		}
 		new_data_end = new_data + new_size;
 		break;
 	case IPROTO_DELETE:
@@ -1165,8 +1168,11 @@ after_old_tuple_lookup:;
 			if (xrow_update_check_ops(request->ops,
 						  request->ops_end,
 						  space->format,
-						  request->index_base) != 0)
+						  request->index_base) != 0) {
+				error_set_space(diag_last_error(diag_get()),
+						space->def);
 				return -1;
+			}
 			break;
 		}
 		old_data = tuple_data_range(old_tuple, &old_size);
@@ -1176,6 +1182,11 @@ after_old_tuple_lookup:;
 					       space->format, &new_size,
 					       request->index_base, false,
 					       NULL);
+		if (new_data == NULL) {
+			error_set_space(diag_last_error(diag_get()),
+					space->def);
+			return -1;
+		}
 		new_data_end = new_data + new_size;
 		break;
 	default:

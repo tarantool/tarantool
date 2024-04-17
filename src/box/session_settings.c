@@ -356,8 +356,10 @@ session_settings_space_execute_update(struct space *space, struct txn *txn,
 				       old_data, old_data_end, format,
 				       &new_size, request->index_base,
 				       &column_mask);
-	if (new_data == NULL)
+	if (new_data == NULL) {
+		error_set_index(diag_last_error(diag_get()), pk_def);
 		goto finish;
+	}
 	*result = box_tuple_new(format, new_data, new_data + new_size);
 	if (*result == NULL)
 		goto finish;
