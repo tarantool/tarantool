@@ -136,6 +136,7 @@ include_directories(${ZSTD_INCLUDE_DIRS})
 include_directories(${PROJECT_BINARY_DIR}/src/box/sql)
 include_directories(${PROJECT_BINARY_DIR}/src/box)
 include_directories(${EXTRA_CORE_INCLUDE_DIRS})
+include_directories(${EXTRA_SALAD_INCLUDE_DIRS})
 include_directories(${EXTRA_BOX_INCLUDE_DIRS})
 
 add_library(box_error STATIC error.cc errcode.c mp_error.cc)
