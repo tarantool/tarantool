@@ -106,20 +106,16 @@ xrow_update_read_ops(struct xrow_update *update, const char *expr,
 		     const char *expr_end, struct tuple_dictionary *dict,
 		     int32_t field_count_hint)
 {
-	if (mp_typeof(*expr) != MP_ARRAY) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
-			 "update operations must be an "
-			 "array {{op,..}, {op,..}}");
-		return -1;
-	}
+	const char *expr_begin = expr;
 	uint64_t column_mask = 0;
+	assert(mp_typeof(*expr) == MP_ARRAY);
 	/* number of operations */
 	update->op_count = mp_decode_array(&expr);
 
 	if (update->op_count > BOX_UPDATE_OP_CNT_MAX) {
 		diag_set(ClientError, ER_ILLEGAL_PARAMS,
 			 "too many operations for update");
-		return -1;
+		goto error;
 	}
 
 	if (update->op_count > 0) {
@@ -135,7 +131,7 @@ xrow_update_read_ops(struct xrow_update *update, const char *expr,
 	for (int i = 1; op < ops_end; op++, i++) {
 		if (xrow_update_op_decode(op, i, update->index_base, dict,
 					  &expr) != 0)
-			return -1;
+			goto error;
 		/*
 		 * Continue collecting the changed columns
 		 * only if there are unset bits in the mask.
@@ -223,14 +219,13 @@ xrow_update_read_ops(struct xrow_update *update, const char *expr,
 		}
 	}
 
-	/* Check the remainder length, the request must be fully read. */
-	if (expr != expr_end) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
-			 "can't unpack update operations");
-		return -1;
-	}
+	assert(expr == expr_end);
 	update->column_mask = column_mask;
 	return 0;
+error:;
+	struct error *e = diag_last_error(diag_get());
+	error_set_mp(e, "ops", expr_begin, expr_end - expr_begin);
+	return -1;
 }
 
 /**
@@ -338,8 +333,12 @@ xrow_update_execute(const char *expr,const char *expr_end,
 				 field_count) != 0)
 		goto error;
 	if (xrow_update_do_ops(&update, header, old_data, old_data_end,
-			       field_count) != 0)
+			       field_count) != 0) {
+		struct error *e = diag_last_error(diag_get());
+		error_set_mp(e, "ops", expr, expr_end - expr);
+		error_set_mp(e, "tuple", header, old_data_end - header);
 		goto error;
+	}
 	if (column_mask)
 		*column_mask = update.column_mask;
 

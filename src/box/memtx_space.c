@@ -520,8 +520,10 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 		xrow_update_execute(request->tuple, request->tuple_end,
 				    old_data, old_data + bsize, format,
 				    &new_size, request->index_base, NULL);
-	if (new_data == NULL)
+	if (new_data == NULL) {
+		error_set_index(diag_last_error(diag_get()), pk->def);
 		return -1;
+	}
 
 	struct tuple *new_tuple =
 		space->format->vtab.tuple_new(format, new_data,
@@ -600,6 +602,8 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		 */
 		if (xrow_update_check_ops(request->ops, request->ops_end,
 					  format, request->index_base) != 0) {
+			error_set_space(diag_last_error(diag_get()),
+					space->def);
 			return -1;
 		}
 		new_tuple =
@@ -628,8 +632,11 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 					    format, &new_size,
 					    request->index_base, false,
 					    &column_mask);
-		if (new_data == NULL)
+		if (new_data == NULL) {
+			error_set_space(diag_last_error(diag_get()),
+					space->def);
 			return -1;
+		}
 
 		new_tuple =
 			space->format->vtab.tuple_new(format, new_data,

@@ -1900,8 +1900,10 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 					old_tuple, old_tuple_end,
 					pk->mem_format, &new_size,
 					request->index_base, &column_mask);
-	if (new_tuple == NULL)
+	if (new_tuple == NULL) {
+		error_set_index(diag_last_error(diag_get()), pk->base.def);
 		return -1;
+	}
 	new_tuple_end = new_tuple + new_size;
 	/*
 	 * Check that the new tuple matches the space format and
@@ -2098,6 +2100,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	/* Check update operations. */
 	if (xrow_update_check_ops(request->ops, request->ops_end,
 				  pk->mem_format, request->index_base) != 0) {
+		error_set_space(diag_last_error(diag_get()), space->def);
 		return -1;
 	}
 	if (request->index_base != 0) {
