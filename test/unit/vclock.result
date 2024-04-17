@@ -1,4 +1,4 @@
-1..6
+1..8
     1..40
 	*** test_compare ***
     ok 1 - compare (), () => 0
@@ -157,3 +157,26 @@ ok 5 - subtests
     ok 6 - min between {0: 10, 1: 17, 2: 3} and {0: 1, 1: 5, 2: 7} is {0: 1, 1: 5, 2: 3}
 	*** test_minmax: done ***
 ok 6 - subtests
+    1..7
+	*** test_mp ***
+    ok 1 - Case must pass successfully
+    ok 2 - Case must pass successfully
+    ok 3 - Case must pass successfully
+    ok 4 - Case must pass successfully
+    ok 5 - Case must pass successfully
+    ok 6 - Case must pass successfully
+    ok 7 - Case must pass successfully
+	*** test_mp: done ***
+ok 7 - subtests
+    1..8
+	*** test_mp_invalid ***
+    ok 1 - Decoder must fail
+    ok 2 - Decoder must fail
+    ok 3 - Decoder must fail
+    ok 4 - Decoder must fail
+    ok 5 - Decoder must fail
+    ok 6 - Decoder must fail
+    ok 7 - Decoder must fail
+    ok 8 - Decoder must fail
+	*** test_mp_invalid: done ***
+ok 8 - subtests

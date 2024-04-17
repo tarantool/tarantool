@@ -34,7 +34,9 @@ extern "C" {
 
 #include <stdarg.h>
 
+#include "msgpuck.h"
 #include "vclock/vclock.h"
+#include "xrow.h"
 
 #define str2(x) #x
 #define str(x) str2(x)
@@ -444,10 +446,89 @@ test_minmax(void)
 
 #undef test
 
+static inline int
+test_mp_one(uint32_t count, const int64_t *lsns)
+{
+	char buf[VCLOCK_STR_LEN_MAX];
+
+	struct vclock vclock;
+	vclock_create(&vclock);
+	for (uint32_t node_id = 0; node_id < count; node_id++) {
+		if (lsns[node_id] >= 0)
+			vclock_reset(&vclock, node_id, lsns[node_id]);
+	}
+
+	const char *buf_end = mp_encode_vclock_ignore0(buf, &vclock);
+	fail_unless(buf_end - buf < VCLOCK_STR_LEN_MAX);
+
+	const char *cursor = buf;
+	struct vclock result;
+	int rc = mp_decode_vclock_ignore0(&cursor, &result);
+	return (rc != 0 || vclock_compare_ignore0(&vclock, &result) != 0 ||
+		vclock_get(&result, 0) != 0);
+}
+
+#define test(xa) ({							\
+	const int64_t a[] = {xa};					\
+	is(test_mp_one(sizeof(a) / sizeof(*a), a), 0,			\
+	   "Case must pass successfully");				\
+})
+
+int
+test_mp(void)
+{
+	plan(7);
+	header();
+
+	test(arg());
+	test(arg(1));
+	test(arg(0, 1));
+	test(arg(1, 1, 1));
+	test(arg(0, 1));
+	test(arg(1, -1, 1, -1, 1, -1, -1, -1, 1, 1, -1, -1, 1, 1));
+	test(arg(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16));
+
+	footer();
+	return check_plan();
+}
+
+#undef test
+
+#define test(format, ...) ({						\
+	char buf[VCLOCK_STR_LEN_MAX];					\
+	size_t res = mp_format(buf, sizeof(buf), format, __VA_ARGS__);		\
+	fail_if(res == 0 || res > sizeof(buf));				\
+	const char *cursor = buf;					\
+	struct vclock result;						\
+	int rc = mp_decode_vclock_ignore0(&cursor, &result);		\
+	isnt(rc, 0, "Decoder must fail");				\
+})
+
+int
+test_mp_invalid(void)
+{
+	plan(8);
+	header();
+
+	test("{%u%u}", 100, 10);
+	test("{%u%u}", VCLOCK_MAX, 10);
+	test("{%u%llu}", 1, UINT64_MAX);
+	test("{%d%u}", -1, 10);
+	test("{%u%d}", 10, -1);
+	test("{%s%u}", "key", 10);
+	test("{%u%s}", 10, "value");
+	test("[%u%u]", 1, 2);
+
+	footer();
+	return check_plan();
+}
+
+#undef test
+
 int
 main(void)
 {
-	plan(6);
+	plan(8);
 
 	test_compare();
 	test_isearch();
@@ -455,6 +536,8 @@ main(void)
 	test_fromstring();
 	test_fromstring_invalid();
 	test_minmax();
+	test_mp();
+	test_mp_invalid();
 
 	return check_plan();
 }
