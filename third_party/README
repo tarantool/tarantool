@@ -60,3 +60,9 @@ How to update murmur hash
 
 wget http://smhasher.googlecode.com/svn/trunk/PMurHash.c -O PMurHash.c
 wget http://smhasher.googlecode.com/svn/trunk/PMurHash.h -O PMurHash.h
+
+How to update arrow/abi.h
+=========================
+
+Get the header from
+git@github.com:apache/arrow.git cpp/src/arrow/c/abi.h
