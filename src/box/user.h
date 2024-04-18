@@ -34,6 +34,7 @@
 #include "user_def.h"
 #include "small/region.h"
 #include "diag.h"
+#include "port.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -220,16 +221,40 @@ int
 role_check(struct user *grantee, struct user *role);
 
 /**
+ * Data required for reloading of privileges (see `user_reload_privs`). Used by
+ * `on_replace` and `on_rollback` triggers of the `_priv` space.
+ */
+struct priv_reload_info {
+	/**
+	 * All tuples of the `_priv` space, selected either from the
+	 * `before_replace` or from the `on_replace` triggers.
+	 */
+	struct port all_tuples;
+	/**
+	 * Primary key definition of the of `_priv` space used for filtering
+	 * tuples in `user_reload_privs`.
+	 */
+	struct key_def *pk_key_def;
+	/**
+	 * Privilege definition used to rollback change from `on_rollback`
+	 * triggers.
+	 */
+	struct tuple *tuple;
+};
+
+/**
  * Grant a role to a user or another role.
  */
 int
-role_grant(struct user *grantee, struct user *role);
+role_grant(struct user *grantee, struct user *role,
+	   struct priv_reload_info *reload_info);
 
 /**
  * Revoke a role from a user or another role.
  */
 int
-role_revoke(struct user *grantee, struct user *role);
+role_revoke(struct user *grantee, struct user *role,
+	    struct priv_reload_info *reload_info);
 
 /**
  * Grant or revoke a single privilege to a user or role
@@ -237,7 +262,8 @@ role_revoke(struct user *grantee, struct user *role);
  * role if this role.
  */
 int
-priv_grant(struct user *grantee, struct priv_def *priv);
+priv_grant(struct user *grantee, struct priv_def *priv,
+	   struct priv_reload_info *reload_info);
 
 int
 priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple);

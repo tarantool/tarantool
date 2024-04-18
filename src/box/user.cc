@@ -404,7 +404,7 @@ user_set_effective_access(struct user *user)
  * Reload user privileges and re-grant them.
  */
 static int
-user_reload_privs(struct user *user)
+user_reload_privs(struct user *user, struct priv_reload_info *reload_info)
 {
 	if (user->is_dirty == false)
 		return 0;
@@ -424,31 +424,21 @@ user_reload_privs(struct user *user)
 	privset_new(&user->privs);
 	/* Load granted privs from _priv space. */
 	{
-		struct space *space = space_cache_find(BOX_PRIV_ID);
-		if (space == NULL)
-			return -1;
-		char key[6];
+		const struct port_c_entry *entry =
+			port_get_c_entries(&reload_info->all_tuples);
 		/** Primary key - by user id */
-		if (!space_is_memtx(space)) {
-			diag_set(ClientError, ER_UNSUPPORTED,
-			          space->engine->name, "system data");
-			return -1;
-		}
-		struct index *index = index_find(space, 0);
-		if (index == NULL)
-			return -1;
+		char key[6];
 		mp_encode_uint(key, user->def->uid);
-
-		struct iterator *it = index_create_iterator(index, ITER_EQ,
-							       key, 1);
-		if (it == NULL)
-			return -1;
-		IteratorGuard iter_guard(it);
-
-		struct tuple *tuple;
-		if (iterator_next(it, &tuple) != 0)
-			return -1;
-		while (tuple != NULL) {
+		for (; entry != NULL; entry = entry->next) {
+			assert(entry->type == PORT_C_ENTRY_TUPLE);
+			struct tuple *tuple = entry->tuple;
+			struct key_def *key_def = reload_info->pk_key_def;
+			int cmp = tuple_compare_with_key(tuple, HINT_NONE, key,
+							 1, HINT_NONE, key_def);
+			if (cmp < 0)
+				continue;
+			else if (cmp > 0)
+				break;
 			struct priv_def priv;
 			if (priv_def_create_from_tuple(&priv, tuple) != 0)
 				return -1;
@@ -458,8 +448,6 @@ user_reload_privs(struct user *user)
 			 */
 			if (priv.object_type != SC_ROLE || !(priv.access & PRIV_X))
 				user_grant_priv(user, &priv);
-			if (iterator_next(it, &tuple) != 0)
-				return -1;
 		}
 	}
 	{
@@ -750,7 +738,8 @@ role_check(struct user *grantee, struct user *role)
  * this user/role is a part of.
  */
 int
-rebuild_effective_grants(struct user *grantee)
+rebuild_effective_grants(struct user *grantee,
+			 struct priv_reload_info *reload_info)
 {
 	/*
 	 * Recurse over all roles to which grantee is granted
@@ -801,7 +790,7 @@ rebuild_effective_grants(struct user *grantee)
 			struct user_map indirect_edges = user->roles;
 			user_map_minus(&indirect_edges, &transitive_closure);
 			if (user_map_is_empty(&indirect_edges)) {
-				if (user_reload_privs(user) != 0)
+				if (user_reload_privs(user, reload_info) != 0)
 					return -1;
 				user_map_union(&next_layer, &user->users);
 			} else {
@@ -833,11 +822,12 @@ rebuild_effective_grants(struct user *grantee)
  * this role was granted to.
  */
 int
-role_grant(struct user *grantee, struct user *role)
+role_grant(struct user *grantee, struct user *role,
+	   struct priv_reload_info *reload_info)
 {
 	user_map_set(&role->users, grantee->auth_token);
 	user_map_set(&grantee->roles, role->auth_token);
-	if (rebuild_effective_grants(grantee) != 0)
+	if (rebuild_effective_grants(grantee, reload_info) != 0)
 		return -1;
 	return 0;
 }
@@ -847,17 +837,19 @@ role_grant(struct user *grantee, struct user *role)
  * Rebuild effective privileges of the grantee.
  */
 int
-role_revoke(struct user *grantee, struct user *role)
+role_revoke(struct user *grantee, struct user *role,
+	    struct priv_reload_info *reload_info)
 {
 	user_map_clear(&role->users, grantee->auth_token);
 	user_map_clear(&grantee->roles, role->auth_token);
-	if (rebuild_effective_grants(grantee) != 0)
+	if (rebuild_effective_grants(grantee, reload_info) != 0)
 		return -1;
 	return 0;
 }
 
 int
-priv_grant(struct user *grantee, struct priv_def *priv)
+priv_grant(struct user *grantee, struct priv_def *priv,
+	   struct priv_reload_info *reload_info)
 {
 	struct access *object = access_get(priv);
 	if (object == NULL)
@@ -872,7 +864,7 @@ priv_grant(struct user *grantee, struct priv_def *priv)
 	struct access *access = &object[grantee->auth_token];
 	access->granted = priv->access;
 	access_put(priv, object);
-	if (rebuild_effective_grants(grantee) != 0)
+	if (rebuild_effective_grants(grantee, reload_info) != 0)
 		return -1;
 	return 0;
 }

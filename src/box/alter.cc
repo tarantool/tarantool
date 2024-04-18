@@ -3893,7 +3893,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
  * data.
  */
 static int
-grant_or_revoke(struct priv_def *priv)
+grant_or_revoke(struct priv_def *priv, struct priv_reload_info *reload_info)
 {
 	struct user *grantee = user_by_id(priv->grantee_id);
 	if (grantee == NULL)
@@ -3907,14 +3907,14 @@ grant_or_revoke(struct priv_def *priv)
 		if (role == NULL || role->def->type != SC_ROLE)
 			return 0;
 		if (priv->access) {
-			if (role_grant(grantee, role) != 0)
+			if (role_grant(grantee, role, reload_info) != 0)
 				return -1;
 		} else {
-			if (role_revoke(grantee, role) != 0)
+			if (role_revoke(grantee, role, reload_info) != 0)
 				return -1;
 		}
 	} else {
-		if (priv_grant(grantee, priv) != 0)
+		if (priv_grant(grantee, priv, reload_info) != 0)
 			return -1;
 	}
 	return 0;
@@ -3925,12 +3925,13 @@ static int
 revoke_priv(struct trigger *trigger, void *event)
 {
 	(void) event;
-	struct tuple *tuple = (struct tuple *)trigger->data;
 	struct priv_def priv;
-	if (priv_def_create_from_tuple(&priv, tuple) != 0)
+	struct priv_reload_info *reload_info =
+		(struct priv_reload_info *)trigger->data;
+	if (priv_def_create_from_tuple(&priv, reload_info->tuple) != 0)
 		return -1;
 	priv.access = 0;
-	if (grant_or_revoke(&priv) != 0)
+	if (grant_or_revoke(&priv, reload_info) != 0)
 		return -1;
 	return 0;
 }
@@ -3940,12 +3941,107 @@ static int
 modify_priv(struct trigger *trigger, void *event)
 {
 	(void) event;
-	struct tuple *tuple = (struct tuple *)trigger->data;
 	struct priv_def priv;
-	if (priv_def_create_from_tuple(&priv, tuple) != 0 ||
-	    grant_or_revoke(&priv) != 0)
+	struct priv_reload_info *reload_info =
+		(struct priv_reload_info *)trigger->data;
+	if (priv_def_create_from_tuple(&priv, reload_info->tuple) != 0 ||
+	    grant_or_revoke(&priv, reload_info) != 0)
 		return -1;
 	return 0;
+}
+
+/**
+ * Select all tuples from the primary index of the `_priv` space into a port.
+ */
+static int
+priv_reload_info_select_all_tuples(struct priv_reload_info *reload_info,
+				   struct index *index)
+{
+	struct iterator *it = index_create_iterator(index, ITER_ALL, NULL, 0);
+	if (it == NULL)
+		return -1;
+	port_c_create(&reload_info->all_tuples);
+	struct tuple *tuple;
+	int rc;
+	while (true) {
+		rc = iterator_next(it, &tuple);
+		if (rc != 0 || tuple == NULL)
+			break;
+		port_c_add_tuple(&reload_info->all_tuples, tuple);
+	}
+	iterator_delete(it);
+	return rc;
+}
+
+/**
+ * Select all tuples from the primary index of the `_priv` space into a port,
+ * replacing the new tuple with the old tuple from the transaction statement,
+ * effectively selecting all tuples before replace.
+ */
+static int
+priv_reload_info_select_all_tuples_for_rollback(
+	struct priv_reload_info *reload_info, struct index *index,
+	struct txn_stmt *stmt)
+{
+	struct iterator *it = index_create_iterator(index, ITER_ALL, NULL, 0);
+	if (it == NULL)
+		return -1;
+	struct port *port = &reload_info->all_tuples;
+	port_c_create(port);
+	struct tuple *tuple;
+	int rc;
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+	bool inserted_old_tuple = false;
+	if (new_tuple != NULL) {
+		while (true) {
+			rc = iterator_next(it, &tuple);
+			if (rc != 0 || tuple == NULL)
+				break;
+			if (tuple == new_tuple && old_tuple != NULL) {
+				port_c_add_tuple(port, old_tuple);
+				inserted_old_tuple = true;
+			} else if (tuple != new_tuple) {
+				port_c_add_tuple(port, tuple);
+			}
+		}
+	} else {
+		assert(old_tuple != NULL);
+		while (true) {
+			rc = iterator_next(it, &tuple);
+			if (rc != 0 || tuple == NULL)
+				break;
+			int cmp = tuple_compare(tuple, HINT_NONE, old_tuple,
+						HINT_NONE,
+						reload_info->pk_key_def);
+			assert(cmp != 0);
+			if (cmp > 0 && !inserted_old_tuple) {
+				port_c_add_tuple(port, old_tuple);
+				inserted_old_tuple = true;
+			}
+			port_c_add_tuple(port, tuple);
+		}
+		if (!inserted_old_tuple) {
+			port_c_add_tuple(port, old_tuple);
+			inserted_old_tuple = true;
+		}
+	}
+	assert(old_tuple == NULL || inserted_old_tuple);
+	iterator_delete(it);
+	return rc;
+}
+
+static struct priv_reload_info *
+priv_reload_info_create_for_rollback(struct txn *txn, struct index *index)
+{
+	struct priv_reload_info *reload_info =
+		xregion_alloc_object(&txn->region, typeof(*reload_info));
+	reload_info->pk_key_def = index->def->key_def;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	if (priv_reload_info_select_all_tuples_for_rollback(reload_info, index,
+							    stmt) != 0)
+		return NULL;
+	return reload_info;
 }
 
 /**
@@ -3960,39 +4056,66 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	struct priv_def priv;
-
+	struct space *space = space_cache_find(BOX_PRIV_ID);
+	assert(space != NULL);
+	struct index *index = index_find(space, 0);
+	assert(index != NULL);
+	struct priv_reload_info reload_info;
+	reload_info.pk_key_def = index->def->key_def;
+	reload_info.tuple = NULL;
+	if (priv_reload_info_select_all_tuples(&reload_info, index) != 0)
+		return -1;
+	auto reload_info_guard = make_scoped_guard([&reload_info]() {
+		port_destroy(&reload_info.all_tuples);
+	});
+	struct priv_reload_info *reload_info_for_rollback =
+		priv_reload_info_create_for_rollback(txn, index);
+	if (reload_info_for_rollback == NULL)
+		return -1;
+	int rc = 0;
+	auto reload_info_for_rollback_guard =
+		make_scoped_guard([reload_info_for_rollback, &rc]() {
+		if (rc != 0)
+			port_destroy(&reload_info_for_rollback->all_tuples);
+	});
 	if (new_tuple != NULL && old_tuple == NULL) {	/* grant */
 		if (priv_def_create_from_tuple(&priv, new_tuple) != 0 ||
 		    priv_def_check(&priv, PRIV_GRANT) != 0 ||
-		    grant_or_revoke(&priv) != 0)
-			return -1;
+		    grant_or_revoke(&priv, &reload_info) != 0)
+			return rc = -1;
+		reload_info_for_rollback->tuple = new_tuple;
 		struct trigger *on_rollback =
-			txn_alter_trigger_new(revoke_priv, new_tuple);
+			txn_alter_trigger_new(revoke_priv,
+					      reload_info_for_rollback);
 		if (on_rollback == NULL)
-			return -1;
+			return rc = -1;
 		txn_stmt_on_rollback(stmt, on_rollback);
 	} else if (new_tuple == NULL) {                /* revoke */
 		assert(old_tuple);
 		if (priv_def_create_from_tuple(&priv, old_tuple) != 0 ||
 		    priv_def_check(&priv, PRIV_REVOKE) != 0)
-			return -1;
+			return rc = -1;
 		priv.access = 0;
-		if (grant_or_revoke(&priv) != 0)
+		if (grant_or_revoke(&priv, &reload_info) != 0)
 			return -1;
+		reload_info_for_rollback->tuple = old_tuple;
 		struct trigger *on_rollback =
-			txn_alter_trigger_new(modify_priv, old_tuple);
+			txn_alter_trigger_new(modify_priv,
+					      reload_info_for_rollback);
 		if (on_rollback == NULL)
-			return -1;
+			return rc = -1;
 		txn_stmt_on_rollback(stmt, on_rollback);
 	} else {                                       /* modify */
 		if (priv_def_create_from_tuple(&priv, new_tuple) != 0 ||
 		    priv_def_check(&priv, PRIV_GRANT) != 0 ||
-		    grant_or_revoke(&priv) != 0)
-			return -1;
+		    grant_or_revoke(&priv, &reload_info) != 0)
+			return rc = -1;
+		reload_info_for_rollback->tuple = old_tuple;
 		struct trigger *on_rollback =
-			txn_alter_trigger_new(modify_priv, old_tuple);
+			txn_alter_trigger_new(modify_priv,
+					      reload_info_for_rollback);
 		if (on_rollback == NULL)
-			return -1;
+			return rc = -1;
 		txn_stmt_on_rollback(stmt, on_rollback);
 	}
 	return 0;
