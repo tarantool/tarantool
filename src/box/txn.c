@@ -944,7 +944,7 @@ txn_journal_entry_new(struct txn *txn)
 				return NULL;
 			}
 			txn_set_flags(txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
-		} else if (!txn_limbo_is_empty(&txn_limbo)) {
+		} else if (!txn_limbo_is_empty(&txn_limbo) && !txn_is_fully_local(txn)) {
 			/*
 			 * There some sync entries on the
 			 * fly thus wait for their completion
