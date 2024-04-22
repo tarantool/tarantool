@@ -659,7 +659,7 @@ static void
 test_client_error_creation(void)
 {
 	header();
-	plan(64);
+	plan(67);
 
 	/* Test CHAR argument type */
 	const char *s;
@@ -850,6 +850,23 @@ test_client_error_creation(void)
 	e = diag_last_error(diag_get());
 	ok(e->errmsg != NULL && strcmp(e->errmsg, "Test error str") == 0);
 	ok(e->payload.count == ref_payload_count);
+
+	/*
+	 * Test if argument for payload-only field is NULL then it is
+	 * not added.
+	 */
+	diag_set(ClientError, ER_TEST_TYPE_STRING, NULL);
+	e = diag_last_error(diag_get());
+	s = error_get_str(e, "field");
+	ok(s == NULL);
+	diag_set(ClientError, ER_TEST_TYPE_MSGPACK, NULL);
+	e = diag_last_error(diag_get());
+	mp = error_get_mp(e, "field", &mp_size);
+	ok(mp == NULL);
+	diag_set(ClientError, ER_TEST_TYPE_TUPLE, NULL);
+	e = diag_last_error(diag_get());
+	mp = error_get_mp(e, "field", &mp_size);
+	ok(mp == NULL);
 
 	check_plan();
 	footer();

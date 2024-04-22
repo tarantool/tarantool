@@ -219,7 +219,7 @@ client_error_create(struct error *e, va_list ap)
 		}
 		case ERRCODE_FIELD_TYPE_STRING: {
 			const char *s = va_arg(ap, const char *);
-			if (set_payload)
+			if (set_payload && s != NULL)
 				error_set_str(e, name, s);
 			break;
 		}
@@ -227,15 +227,18 @@ client_error_create(struct error *e, va_list ap)
 			const char *mp = va_arg(ap, const char *);
 			const char *mp_end = mp;
 			assert(set_payload);
-			mp_next(&mp_end);
-			error_set_mp(e, name, mp, mp_end - mp);
+			if (mp != NULL) {
+				mp_next(&mp_end);
+				error_set_mp(e, name, mp, mp_end - mp);
+			}
 			break;
 		}
 		case ERRCODE_FIELD_TYPE_TUPLE: {
 			struct tuple *tuple = va_arg(ap, struct tuple *);
 			assert(set_payload);
-			error_set_mp(e, name, tuple_data(tuple),
-				     tuple_bsize(tuple));
+			if (tuple != NULL)
+				error_set_mp(e, name, tuple_data(tuple),
+					     tuple_bsize(tuple));
 			break;
 		}
 		default:
