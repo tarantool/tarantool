@@ -1030,7 +1030,9 @@ g.test_downgrade_func_trigger = function(cg)
         check_before_downgrade(true)
 
         -- Drop the functions with trigger and check if downgrade collects
-        -- no issues and works correctly
+        -- no issues and works correctly. Upgrade is needed to be able to
+        -- drop the functions.
+        box.schema.upgrade()
         box.func.trigger1:drop()
         box.func.trigger2:drop()
         t.assert_equals(box.schema.downgrade_issues(prev_version), {})
