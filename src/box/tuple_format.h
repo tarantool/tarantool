@@ -497,6 +497,19 @@ tuple_format_has_defaults(const struct tuple_format *format)
 	return format->default_field_count > 0;
 }
 
+/**
+ * Return true if format has at least one field with a functional default value.
+ */
+static inline bool
+tuple_format_has_default_funcs(struct tuple_format *format)
+{
+	for (size_t i = 0; i < format->default_field_count; ++i) {
+		if (tuple_field_has_default_func(tuple_format_field(format, i)))
+			return true;
+	}
+	return false;
+}
+
 typedef struct tuple_format box_tuple_format_t;
 
 /** \cond public */

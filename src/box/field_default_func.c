@@ -44,12 +44,17 @@ field_default_func_verify(struct func *func)
 static int
 field_default_func_call_impl(struct field_default_func *default_func,
 			     const char *arg_data, uint32_t arg_size,
-			     const char **ret_data, uint32_t *ret_size)
+			     struct tuple *source, const char **ret_data,
+			     uint32_t *ret_size)
 {
 	struct port out_port, in_port;
 	port_c_create(&in_port);
-	if (arg_data != NULL)
+	if (arg_data != NULL) {
 		port_c_add_mp(&in_port, arg_data, arg_data + arg_size);
+	} else {
+		port_c_add_null(&in_port);
+	}
+	port_c_add_tuple(&in_port, source);
 
 	int rc = func_call_no_access_check(default_func->holder.func,
 					   &in_port, &out_port);

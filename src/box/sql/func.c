@@ -2467,8 +2467,8 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 	const char *data;
 	uint32_t mp_size;
 	struct tuple_format *format;
-	if (port->size > 0) {
-		struct port_c_entry *pe = port->first;
+	struct port_c_entry *pe = port->first;
+	if (pe->type != PORT_C_ENTRY_NULL) {
 		assert(pe->type == PORT_C_ENTRY_MP);
 		data = pe->mp.data;
 		mp_size = pe->mp.size;

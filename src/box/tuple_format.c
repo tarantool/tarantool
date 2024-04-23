@@ -34,6 +34,7 @@
 #include "json/json.h"
 #include "coll_id_cache.h"
 #include "trivia/util.h"
+#include "tuple.h"
 #include "tuple_builder.h"
 #include "tuple_constraint.h"
 #include "field_default_func.h"
@@ -1559,6 +1560,11 @@ tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 	tuple_builder_new(&builder, &fiber()->gc);
 	size_t region_svp = region_used(&fiber()->gc);
 	bool is_tuple_changed = false;
+	struct tuple *source = NULL;
+	if (tuple_format_has_default_funcs(format)) {
+		source = tuple_new(tuple_format_runtime, *data, *data_end);
+		tuple_ref(source);
+	}
 	/*
 	 * Process fields that are present in both the format and the tuple.
 	 * Break prematurely when all defaults are applied.
@@ -1581,9 +1587,10 @@ tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 			const char *ret_data;
 			uint32_t ret_size;
 			if (field_default_func_call(&d->func, d->data,
-						    d->size, &ret_data,
+						    d->size, source, &ret_data,
 						    &ret_size) != 0) {
 				region_truncate(&fiber()->gc, region_svp);
+				tuple_unref(source);
 				return -1;
 			}
 			tuple_builder_add(&builder, ret_data, ret_size, 1);
@@ -1608,9 +1615,10 @@ tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 			const char *ret_data;
 			uint32_t ret_size;
 			if (field_default_func_call(&d->func, d->data,
-						    d->size, &ret_data,
+						    d->size, source, &ret_data,
 						    &ret_size) != 0) {
 				region_truncate(&fiber()->gc, region_svp);
+				tuple_unref(source);
 				return -1;
 			}
 			tuple_builder_add(&builder, ret_data, ret_size, 1);
@@ -1623,6 +1631,8 @@ tuple_format_apply_defaults(struct tuple_format *format, const char **data,
 			tuple_builder_add_nil(&builder);
 		}
 	}
+	if (source != NULL)
+		tuple_unref(source);
 	/*
 	 * Return if no fields were changed.
 	 */
