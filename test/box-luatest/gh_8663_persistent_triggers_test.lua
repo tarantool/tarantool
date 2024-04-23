@@ -283,21 +283,16 @@ g.test_replicated_non_idempotent_trigger = function(g)
         box.space.weights:replace{'elephant', 4000}
         box.space.weights:replace{'crocodile', 600}
     end)
+    -- Wait for the trigger and the space to arrive on the second server
+    g.server2:wait_for_vclock_of(g.server1)
     g.server2:exec(function()
-        -- Wait for a trigger to arrive
-        while box.func['example.replicated_trigger'] == nil do
-            require('fiber').sleep(0)
-        end
         box.space.weights:replace{'cat', 6}
         box.space.weights:replace{'dog', 10}
     end)
 
-    -- Check result
+    -- Wait for the writes to arrive on the first server
+    g.server1:wait_for_vclock_of(g.server2)
     local check_case = function(expected_result)
-        -- Wait for both servers
-        while box.space.weights:count() ~= 4 do
-            require('fiber').sleep(0)
-        end
         t.assert_equals(box.space.weights:select(nil, {fullscan=true}),
             expected_result)
     end
