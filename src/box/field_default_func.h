@@ -22,7 +22,8 @@ struct field_default_func {
 	/** Call function with given argument. */
 	int (*call)(struct field_default_func *default_func,
 		    const char *arg_data, uint32_t arg_size,
-		    const char **ret_data, uint32_t *ret_size);
+		    struct tuple *source, const char **ret_data,
+		    uint32_t *ret_size);
 	/** Destructor. */
 	void (*destroy)(struct field_default_func *func);
 };
@@ -38,10 +39,11 @@ struct field_default_func {
 static inline int
 field_default_func_call(struct field_default_func *default_func,
 			const char *arg_data, uint32_t arg_size,
-			const char **ret_data, uint32_t *ret_size)
+			struct tuple *source, const char **ret_data,
+			uint32_t *ret_size)
 {
-	return default_func->call(default_func, arg_data, arg_size, ret_data,
-				  ret_size);
+	return default_func->call(default_func, arg_data, arg_size, source,
+				  ret_data, ret_size);
 }
 
 static inline void
