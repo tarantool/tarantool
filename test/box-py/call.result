@@ -48,7 +48,7 @@ call  f1 ()
         "reason": "unsupported Lua type 'function'"
     }
 }
-call  box.error (33333, 'Hey!')
+call  box.error (33333,)
 {
     "error": {
         "code": "U", 
