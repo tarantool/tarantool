@@ -22,7 +22,7 @@ call("f1")
 
 # A test case for https://github.com/tarantool/tarantool/issues/44
 # IPROTO required!
-call("box.error", 33333, "Hey!")
+call("box.error", 33333)
 
 print("""
 # A test case for Bug#103491

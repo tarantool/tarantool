@@ -154,7 +154,7 @@ set_error_trace(lua_State *L, int level, struct error *error)
  * and type or the 'type' (string) for create a CustomError error
  * with custom type and desired message.
  *
- *     box.error(code, reason args)
+ *     box.error(code, reason args[, level])
  *     box.error({code = num, reason = string, ...}[, level])
  *     box.error(type, reason format string, reason args)
  *     box.error({type = string, code = num, reason = string, ...}[, level])
@@ -188,6 +188,13 @@ luaT_error_create(lua_State *L, int top_base)
 			code = lua_tonumber(L, top_base);
 			record = tnt_errcode_record(code);
 			reason = record->errdesc;
+
+			int level_pos = top_base + record->errfields_count + 1;
+			if (!lua_isnoneornil(L, level_pos)) {
+				if (lua_type(L, level_pos) != LUA_TNUMBER)
+					return NULL;
+				level = lua_tointeger(L, level_pos);
+			}
 		} else {
 			custom_type = lua_tostring(L, top_base);
 			/*

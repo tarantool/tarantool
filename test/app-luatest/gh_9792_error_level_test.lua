@@ -40,6 +40,17 @@ g.test_invalid_args = function()
     t.assert_error_msg_equals(errmsg, box.error.new, arg, 'x')
     t.assert_error_msg_equals(errmsg, box.error.new, arg, '1')
     t.assert_error_msg_equals(errmsg, box.error.new, arg, 1, 2)
+
+    local errcode = box.error.TEST_TYPE_INT
+    -- Raising a new code error with a bad level argument.
+    errmsg = 'box.error(): bad arguments'
+    t.assert_error_msg_equals(errmsg, box.error, errcode, 1, 'x')
+    t.assert_error_msg_equals(errmsg, box.error, errcode, 1, '1')
+
+    -- Creating a new code error with a bad level argument.
+    errmsg = 'box.error.new(): bad arguments'
+    t.assert_error_msg_equals(errmsg, box.error.new, errcode, 1, 'x')
+    t.assert_error_msg_equals(errmsg, box.error.new, errcode, 1, '1')
 end
 
 g.test_raise = function()
@@ -124,6 +135,28 @@ g.test_raise = function()
     check_trace(func3, line2, err, 2)
 
     check_trace(func3, line3, err, 3)
+
+    -- Raising an errcode error.
+    local errcode = box.error.ILLEGAL_PARAMS
+    check_trace(func1, line1, errcode, 'foo')
+    check_trace(func1, line1, errcode, 'foo', nil)
+    check_trace(func2, line1, errcode, 'foo')
+    check_trace(func2, line1, errcode, 'foo', nil)
+    check_trace(func3, line1, errcode, 'foo')
+    check_trace(func3, line1, errcode, 'foo', nil)
+
+    check_no_trace(func1, errcode, 'foo', 0)
+    check_no_trace(func2, errcode, 'foo', 0)
+    check_no_trace(func3, errcode, 'foo', 0)
+
+    check_trace(func1, line1, errcode, 'foo', 1)
+    check_trace(func2, line1, errcode, 'foo', 1)
+    check_trace(func3, line1, errcode, 'foo', 1)
+
+    check_trace(func2, line2, errcode, 'foo', 2)
+    check_trace(func3, line2, errcode, 'foo', 2)
+
+    check_trace(func3, line3, errcode, 'foo', 3)
 end
 
 g.test_new = function()
@@ -183,4 +216,25 @@ g.test_new = function()
     check_trace(func3, line2, err, 2)
 
     check_trace(func3, line3, err, 3)
+
+    local errcode = box.error.ILLEGAL_PARAMS
+    check_trace(func1, line1, errcode, 'foo')
+    check_trace(func1, line1, errcode, 'foo', nil)
+    check_trace(func2, line1, errcode, 'foo')
+    check_trace(func2, line1, errcode, 'foo', nil)
+    check_trace(func3, line1, errcode, 'foo')
+    check_trace(func3, line1, errcode, 'foo', nil)
+
+    check_no_trace(func1, errcode, 'foo', 0)
+    check_no_trace(func2, errcode, 'foo', 0)
+    check_no_trace(func3, errcode, 'foo', 0)
+
+    check_trace(func1, line1, errcode, 'foo', 1)
+    check_trace(func2, line1, errcode, 'foo', 1)
+    check_trace(func3, line1, errcode, 'foo', 1)
+
+    check_trace(func2, line2, errcode, 'foo', 2)
+    check_trace(func3, line2, errcode, 'foo', 2)
+
+    check_trace(func3, line3, errcode, 'foo', 3)
 end
