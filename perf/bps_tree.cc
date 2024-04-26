@@ -360,7 +360,6 @@ test_build(benchmark::State &state, size_t count)
 }
 
 generate_benchmarks_size(build, 1000000);
-generate_benchmarks_size(build, 10000000);
 
 template<class tree, class KeyGen>
 static void
@@ -382,7 +381,6 @@ test_find_first(benchmark::State &state, size_t count)
 }
 
 generate_benchmarks_size(find_first, 1000000);
-generate_benchmarks_size(find_first, 10000000);
 
 generate_benchmarks_height(find_first, 1);
 generate_benchmarks_height(find_first, 2);
@@ -397,7 +395,6 @@ test_find_last(benchmark::State &state, size_t count)
 }
 
 generate_benchmarks_size(find_last, 1000000);
-generate_benchmarks_size(find_last, 10000000);
 
 generate_benchmarks_height(find_last, 1);
 generate_benchmarks_height(find_last, 2);
@@ -412,7 +409,6 @@ test_find_inc(benchmark::State &state, size_t count)
 }
 
 generate_benchmarks_size(find_inc, 1000000);
-generate_benchmarks_size(find_inc, 10000000);
 
 generate_benchmarks_height(find_inc, 1);
 generate_benchmarks_height(find_inc, 2);
@@ -427,7 +423,6 @@ test_find_dec(benchmark::State &state, size_t count)
 }
 
 generate_benchmarks_size(find_dec, 1000000);
-generate_benchmarks_size(find_dec, 10000000);
 
 generate_benchmarks_height(find_dec, 1);
 generate_benchmarks_height(find_dec, 2);
@@ -442,7 +437,6 @@ test_find_rand(benchmark::State &state, size_t count)
 }
 
 generate_benchmarks_size(find_rand, 1000000);
-generate_benchmarks_size(find_rand, 10000000);
 
 generate_benchmarks_height(find_rand, 1);
 generate_benchmarks_height(find_rand, 2);
@@ -479,7 +473,6 @@ test_delete_insert_first(benchmark::State &state, size_t count)
 }
 
 generate_benchmarks_size(delete_insert_first, 1000000);
-generate_benchmarks_size(delete_insert_first, 10000000);
 
 generate_benchmarks_height(delete_insert_first, 1);
 generate_benchmarks_height(delete_insert_first, 2);
@@ -494,7 +487,6 @@ test_delete_insert_last(benchmark::State &state, size_t count)
 }
 
 generate_benchmarks_size(delete_insert_last, 1000000);
-generate_benchmarks_size(delete_insert_last, 10000000);
 
 generate_benchmarks_height(delete_insert_last, 1);
 generate_benchmarks_height(delete_insert_last, 2);
@@ -509,7 +501,6 @@ test_delete_insert_inc(benchmark::State &state, size_t count)
 }
 
 generate_benchmarks_size(delete_insert_inc, 1000000);
-generate_benchmarks_size(delete_insert_inc, 10000000);
 
 generate_benchmarks_height(delete_insert_inc, 1);
 generate_benchmarks_height(delete_insert_inc, 2);
@@ -524,7 +515,6 @@ test_delete_insert_dec(benchmark::State &state, size_t count)
 }
 
 generate_benchmarks_size(delete_insert_dec, 1000000);
-generate_benchmarks_size(delete_insert_dec, 10000000);
 
 generate_benchmarks_height(delete_insert_dec, 1);
 generate_benchmarks_height(delete_insert_dec, 2);
@@ -539,7 +529,6 @@ test_delete_insert_rand(benchmark::State &state, size_t count)
 }
 
 generate_benchmarks_size(delete_insert_rand, 1000000);
-generate_benchmarks_size(delete_insert_rand, 10000000);
 
 generate_benchmarks_height(delete_insert_rand, 1);
 generate_benchmarks_height(delete_insert_rand, 2);
@@ -576,7 +565,7 @@ test_insert_first(benchmark::State &state, size_t count)
 	test_insert<tree>(state, count, DecrementingKey(count));
 }
 
-generate_benchmarks_size_iterations(insert_first, 10000000);
+generate_benchmarks_size_iterations(insert_first, 1000000);
 
 template<class tree>
 static void
@@ -585,7 +574,7 @@ test_insert_last(benchmark::State &state, size_t count)
 	test_insert<tree>(state, count, IncrementingKey(count));
 }
 
-generate_benchmarks_size_iterations(insert_last, 10000000);
+generate_benchmarks_size_iterations(insert_last, 1000000);
 
 template<class tree>
 static void
@@ -594,7 +583,7 @@ test_insert_rand(benchmark::State &state, size_t count)
 	test_insert<tree>(state, count, RandomKey(count));
 }
 
-generate_benchmarks_size_iterations(insert_rand, 10000000);
+generate_benchmarks_size_iterations(insert_rand, 1000000);
 
 template<class tree, class KeyGen>
 static void
@@ -615,7 +604,7 @@ test_delete_first(benchmark::State &state, size_t count)
 	test_delete<tree>(state, count, IncrementingKey(count));
 }
 
-generate_benchmarks_size_iterations(delete_first, 10000000);
+generate_benchmarks_size_iterations(delete_first, 1000000);
 
 template<class tree>
 static void
@@ -624,7 +613,7 @@ test_delete_last(benchmark::State &state, size_t count)
 	test_delete<tree>(state, count, DecrementingKey(count));
 }
 
-generate_benchmarks_size_iterations(delete_last, 10000000);
+generate_benchmarks_size_iterations(delete_last, 1000000);
 
 template<class tree>
 static void
@@ -633,7 +622,7 @@ test_delete_rand(benchmark::State &state, size_t count)
 	test_delete<tree>(state, count, RandomKey(count));
 }
 
-generate_benchmarks_size_iterations(delete_rand, 10000000);
+generate_benchmarks_size_iterations(delete_rand, 1000000);
 
 BENCHMARK_MAIN();
 
