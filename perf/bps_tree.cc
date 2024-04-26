@@ -4,13 +4,16 @@
 #include <inttypes.h>
 #include <time.h>
 #include <random>
+#include <memory>
 
 #include <benchmark/benchmark.h>
 #include <trivia/util.h>
 
+#define BPS_TREE_NO_DEBUG 1
+
 /* A simple test tree. */
 
-#define tree_i64_EXTENT_SIZE 2048
+#define tree_i64_EXTENT_SIZE 8192
 #define tree_i64_elem_t int64_t
 #define tree_i64_key_t int64_t
 #define BPS_TREE_NAME tree_i64_t
@@ -30,6 +33,83 @@
 #undef BPS_TREE_COMPARE_KEY
 #undef bps_tree_elem_t
 #undef bps_tree_key_t
+
+/* Tree with child cardinalities of inner blocks. */
+
+#define BPS_INNER_CHILD_CARDS
+#define treecc_i64_EXTENT_SIZE 8192
+#define treecc_i64_elem_t int64_t
+#define treecc_i64_key_t int64_t
+#define BPS_TREE_NAME treecc_i64_t
+#define BPS_TREE_BLOCK_SIZE 512
+#define BPS_TREE_EXTENT_SIZE treecc_i64_EXTENT_SIZE
+#define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
+#define BPS_TREE_COMPARE(a, b, arg) ((a) - (b))
+#define BPS_TREE_COMPARE_KEY(a, b, arg) ((a) - (b))
+#define bps_tree_elem_t treecc_i64_elem_t
+#define bps_tree_key_t treecc_i64_key_t
+#include "salad/bps_tree.h"
+#undef BPS_TREE_NAME
+#undef BPS_TREE_BLOCK_SIZE
+#undef BPS_TREE_EXTENT_SIZE
+#undef BPS_TREE_IS_IDENTICAL
+#undef BPS_TREE_COMPARE
+#undef BPS_TREE_COMPARE_KEY
+#undef bps_tree_elem_t
+#undef bps_tree_key_t
+#undef BPS_INNER_CHILD_CARDS
+
+/* Tree with inner block cardinalities. */
+
+#define BPS_INNER_CARD
+#define treeic_i64_EXTENT_SIZE 8192
+#define treeic_i64_elem_t int64_t
+#define treeic_i64_key_t int64_t
+#define BPS_TREE_NAME treeic_i64_t
+#define BPS_TREE_BLOCK_SIZE 512
+#define BPS_TREE_EXTENT_SIZE treeic_i64_EXTENT_SIZE
+#define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
+#define BPS_TREE_COMPARE(a, b, arg) ((a) - (b))
+#define BPS_TREE_COMPARE_KEY(a, b, arg) ((a) - (b))
+#define bps_tree_elem_t treeic_i64_elem_t
+#define bps_tree_key_t treeic_i64_key_t
+#include "salad/bps_tree.h"
+#undef BPS_TREE_NAME
+#undef BPS_TREE_BLOCK_SIZE
+#undef BPS_TREE_EXTENT_SIZE
+#undef BPS_TREE_IS_IDENTICAL
+#undef BPS_TREE_COMPARE
+#undef BPS_TREE_COMPARE_KEY
+#undef bps_tree_elem_t
+#undef bps_tree_key_t
+#undef BPS_INNER_CARD
+
+/* Tree with inner block cardinalities and child cardinalities. */
+
+#define BPS_INNER_CHILD_CARDS
+#define BPS_INNER_CARD
+#define treebo_i64_EXTENT_SIZE 8192
+#define treebo_i64_elem_t int64_t
+#define treebo_i64_key_t int64_t
+#define BPS_TREE_NAME treebo_i64_t
+#define BPS_TREE_BLOCK_SIZE 512
+#define BPS_TREE_EXTENT_SIZE treebo_i64_EXTENT_SIZE
+#define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
+#define BPS_TREE_COMPARE(a, b, arg) ((a) - (b))
+#define BPS_TREE_COMPARE_KEY(a, b, arg) ((a) - (b))
+#define bps_tree_elem_t treebo_i64_elem_t
+#define bps_tree_key_t treebo_i64_key_t
+#include "salad/bps_tree.h"
+#undef BPS_TREE_NAME
+#undef BPS_TREE_BLOCK_SIZE
+#undef BPS_TREE_EXTENT_SIZE
+#undef BPS_TREE_IS_IDENTICAL
+#undef BPS_TREE_COMPARE
+#undef BPS_TREE_COMPARE_KEY
+#undef bps_tree_elem_t
+#undef bps_tree_key_t
+#undef BPS_INNER_CARD
+#undef BPS_INNER_CHILD_CARDS
 
 /**
  * Generate the benchmark variations required.
@@ -57,7 +137,10 @@
 
 /* Meant to create specified benchmarks for all trees. */
 #define generate_benchmarks(generator, func, arg) \
-	generator(tree_i64, func, arg)
+	generator(tree_i64, func, arg); \
+	generator(treecc_i64, func, arg); \
+	generator(treeic_i64, func, arg); \
+	generator(treebo_i64, func, arg)
 
 /* Create size-based benchmarks for all trees. */
 #define generate_benchmarks_size(func, size) \
@@ -81,16 +164,19 @@
  */
 template<int EXTENT_SIZE>
 class DummyAllocator {
-	std::vector<char> m_buf;
+	std::unique_ptr<char[]> m_buf;
+	size_t m_buf_size;
 	size_t m_pos = 0;
 
 public:
 	DummyAllocator(size_t size)
-		: m_buf(((size + EXTENT_SIZE - 1) / EXTENT_SIZE) * EXTENT_SIZE)
 	{
-		/* Any BPS Tree requires 3 extents on the first insert. */
-		if (m_buf.size() < EXTENT_SIZE * 3)
-			m_buf.resize(EXTENT_SIZE * 3);
+		m_buf_size = ((size + EXTENT_SIZE - 1) / EXTENT_SIZE) *
+			     EXTENT_SIZE;
+		/* The calculated size is incorrect for small trees. */
+		if (m_buf_size < EXTENT_SIZE * 10)
+			m_buf_size = EXTENT_SIZE * 10;
+		m_buf = std::unique_ptr<char[]>(new char[m_buf_size]);
 	}
 
 	void
@@ -105,7 +191,7 @@ public:
 		DummyAllocator *self = (DummyAllocator *)ctx;
 		void *result = (void *)&self->m_buf[self->m_pos];
 		self->m_pos += EXTENT_SIZE;
-		if (unlikely(self->m_pos > self->m_buf.size())) {
+		if (unlikely(self->m_pos > self->m_buf_size)) {
 			fprintf(stderr, "Ouf of bounds allocation.\n");
 			exit(-1);
 		}
@@ -160,6 +246,9 @@ public: \
 
 /* The class must be created for each instantiated BPS tree to test it. */
 CREATE_TREE_CLASS(tree_i64);
+CREATE_TREE_CLASS(treecc_i64);
+CREATE_TREE_CLASS(treeic_i64);
+CREATE_TREE_CLASS(treebo_i64);
 
 /**
  * Value generators to make key-independent benchmarks.
@@ -223,6 +312,34 @@ public:
 };
 
 /**
+ * Utility functions.
+ */
+
+template<class tree>
+static std::unique_ptr<typename tree::elem_t[]>
+sorted_elems(size_t size)
+{
+	auto arr = std::unique_ptr<typename tree::elem_t[]>(
+		new typename tree::elem_t[size]);
+	for (size_t i = 0; i < size; i++)
+		arr[i] = i;
+	return arr;
+}
+
+template<class tree>
+static void
+create(typename tree::tree_t &t, size_t size,
+       typename tree::Allocator &allocator)
+{
+	auto arr = sorted_elems<tree>(size);
+	tree::create(&t, 0, allocator.alloc, allocator.free, &allocator, NULL);
+	if (tree::build(&t, &arr[0], size) == -1) {
+		fprintf(stderr, "Tree build has failed.\n");
+		exit(-1);
+	}
+}
+
+/**
  * The benchmarks.
  */
 
@@ -230,16 +347,13 @@ template<class tree>
 static void
 test_build(benchmark::State &state, size_t count)
 {
-	std::vector<typename tree::elem_t> arr;
-	for (size_t i = 0; i < count; i++)
-		arr.emplace_back(i);
-
+	auto arr = sorted_elems<tree>(count);
 	typename tree::Allocator allocator(count);
 	for (auto _ : state) {
 		typename tree::tree_t t;
 		tree::create(&t, 0, allocator.alloc, allocator.free,
 			     &allocator, NULL);
-		tree::build(&t, &arr.front(), count);
+		tree::build(&t, &arr[0], count);
 		tree::destroy(&t);
 		allocator.reset();
 	}
@@ -252,16 +366,9 @@ template<class tree, class KeyGen>
 static void
 test_find(benchmark::State &state, size_t count, KeyGen kg)
 {
-	std::vector<typename tree::elem_t> arr;
-	for (size_t i = 0; i < count; i++)
-		arr.emplace_back(i);
-
-	typename tree::Allocator allocator(count);
-
 	typename tree::tree_t t;
-	tree::create(&t, 0, allocator.alloc, allocator.free,
-		     &allocator, NULL);
-	tree::build(&t, &arr.front(), count);
+	typename tree::Allocator allocator(count);
+	create<tree>(t, count, allocator);
 	for (auto _ : state)
 		benchmark::DoNotOptimize(tree::find(&t, kg()));
 	tree::destroy(&t);
@@ -352,17 +459,10 @@ template<class tree, class KeyGen>
 static void
 test_delete_insert(benchmark::State &state, size_t count, KeyGen kg)
 {
-	std::vector<typename tree::elem_t> arr;
-	for (size_t i = 0; i < count; i++)
-		arr.emplace_back(i);
-
-	typename tree::Allocator allocator(count);
-
 	typename tree::tree_t t;
-	tree::create(&t, 0, allocator.alloc, allocator.free,
-		     &allocator, NULL);
-	tree::build(&t, &arr.front(), count);
+	typename tree::Allocator allocator(count);
 	typename tree::elem_t replaced, successor;
+	create<tree>(t, count, allocator);
 	for (auto _ : state) {
 		typename tree::elem_t elem(kg());
 		tree::delete_(&t, elem);
@@ -500,16 +600,9 @@ template<class tree, class KeyGen>
 static void
 test_delete(benchmark::State &state, size_t count, KeyGen kg)
 {
-	std::vector<typename tree::elem_t> arr;
-	for (size_t i = 0; i < count; i++)
-		arr.emplace_back(i);
-
-	typename tree::Allocator allocator(count);
-
 	typename tree::tree_t t;
-	tree::create(&t, 0, allocator.alloc, allocator.free,
-		     &allocator, NULL);
-	tree::build(&t, &arr.front(), count);
+	typename tree::Allocator allocator(count);
+	create<tree>(t, count, allocator);
 	for (auto _ : state)
 		tree::delete_(&t, kg());
 	tree::destroy(&t);
