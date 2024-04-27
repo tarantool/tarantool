@@ -285,13 +285,17 @@ function mt.close(self)
     self.ph:close()
 end
 
--- Run a command and assert response.
-function mt.roundtrip(self, command, expected)
+-- Run a command and return its response.
+--
+-- If an expected value is provided, verify that the response
+-- equals to it.
+function mt.roundtrip(self, command, ...)
     self:execute_command(command)
     local response = self:read_response()
-    if expected ~= nil then
-        t.assert_equals(response, expected)
+    if select('#', ...) > 0 then
+        t.assert_equals(response, (...))
     end
+    return response
 end
 
 -- }}} Instance methods
