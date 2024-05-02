@@ -6470,7 +6470,7 @@ bps_tree_print_inner(const struct bps_tree_common *tree,
 							block->child_ids[0]);
 #ifdef BPS_INNER_CARD
 	bps_tree_print_indent(indent);
-	printf("Cardinality: %lu\n", block->card);
+	printf("Cardinality: %lld\n", (long long)block->card);
 #endif
 	bps_tree_print_block(tree, next, indent + 1, elem_fmt);
 	for (bps_tree_pos_t i = 0; i < block->header.size - 1; i++) {
