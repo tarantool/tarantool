@@ -1626,13 +1626,30 @@ box_check_wal_queue_max_size(void)
 	return size;
 }
 
+/**
+ * If set, raise an error on any attempt to set wal_cleanup_delay to
+ * non-zero value.
+ */
+static bool wal_cleanup_delay_is_disabled = false;
+TWEAK_BOOL(wal_cleanup_delay_is_disabled);
+
 static double
 box_check_wal_cleanup_delay(void)
 {
+	const double default_value = 4 * 3600;
 	double value = cfg_getd("wal_cleanup_delay");
 	if (value < 0) {
 		diag_set(ClientError, ER_CFG, "wal_cleanup_delay",
 			 "value must be >= 0");
+		return -1;
+	}
+	/* Non-zero and non-default value is detected - say a warning. */
+	if (value > 0 && value != default_value)
+		say_warn_once("Option wal_cleanup_delay is deprecated.");
+
+	if (value > 0 && wal_cleanup_delay_is_disabled) {
+		diag_set(ClientError, ER_DEPRECATED,
+			 "Option wal_cleanup_delay");
 		return -1;
 	}
 
@@ -5652,6 +5669,30 @@ box_cfg_xc(void)
 	 */
 	if (dd_version_id > version_id(2, 10, 1))
 		txn_limbo_filter_enable(&txn_limbo);
+
+	/*
+	 * If we have no space _gc_consumers, wal_cleanup_delay is set to zero
+	 * and we have registered replicas (except for self), we should set
+	 * wal_cleanup_delay to non-zero value to prevent xlogs from being
+	 * deleted.
+	 * Note that we do this after recovery - space _gc_consumers is
+	 * recovered then if it was in snapshot.
+	 */
+	if (!gc_consumer_is_persistent() &&
+	    box_check_wal_cleanup_delay() == 0 &&
+	    replicaset.registered_count > 1) {
+		int wal_cleanup_delay_default = 4 * 3600;
+		say_warn("Current schema does not support persistent WAL GC "
+			 "state, so wal_cleanup_delay option is automatically "
+			 "set to %d to prevent xlogs needed for replicas from "
+			 "being cleaned up. Please re-configure it after "
+			 "schema upgrade if it is needed.",
+			 wal_cleanup_delay_default);
+		gc_set_wal_cleanup_delay(4 * 3600);
+	} else {
+		if (box_set_wal_cleanup_delay() != 0)
+			diag_raise();
+	}
 
 	title("running");
 	say_info("ready to accept requests");

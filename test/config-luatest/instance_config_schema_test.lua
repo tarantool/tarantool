@@ -1042,7 +1042,7 @@ g.test_wal = function()
         max_size = 268435456,
         dir_rescan_delay = 2,
         queue_max_size = 16777216,
-        cleanup_delay = 14400,
+        cleanup_delay = box.NULL,
     }
     local res = instance_config:apply_default({}).wal
     t.assert_equals(res, exp)
@@ -1351,6 +1351,10 @@ g.test_box_cfg_coverage = function()
         -- The effective default is determined depending of
         -- the replication.failover option.
         election_mode = true,
+
+        -- The effective default is determined depending on
+        -- the box_cfg_wal_cleanup_delay compat option.
+        wal_cleanup_delay = true,
     }
 
     local log_prefix = 'test_box_cfg_coverage'

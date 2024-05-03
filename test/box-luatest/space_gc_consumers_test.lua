@@ -4,9 +4,13 @@ local cluster = require('luatest.replica_set')
 
 local g = t.group('Upgrade', {{version = '2.11.0'}, {version = '3.0.0'}})
 
+local WARNING_PATTERN = 'W> Current schema does not support persistent ' ..
+    'WAL GC state, so wal_cleanup_delay option'
+
 g.before_each(function(cg)
     cg.server = server:new({
         datadir = 'test/box-luatest/upgrade/' .. cg.params.version,
+        box_cfg = {wal_cleanup_delay = 0, log_level = 4}
     })
     cg.server:start()
 end)
@@ -28,6 +32,7 @@ g.test_upgrade = function(cg)
         t.assert_not_equals(box.space._space:get(space_id), nil)
         t.assert_equals(#_priv.index.object:select{'space', space_id}, 1)
     end)
+    t.assert_not(cg.server:grep_log(WARNING_PATTERN))
 end
 
 g = t.group('Cluster upgrade', {{version = '2.11.0'}, {version = '3.0.0'}})
@@ -43,6 +48,8 @@ g.before_each(function(cg)
         replication_timeout = 0.1,
         replication = replicaset,
         election_mode = 'candidate',
+        wal_cleanup_delay = 0,
+        log_level = 4,
     }
     cg.servers = {}
     for i = 1, 3 do
@@ -65,6 +72,11 @@ g.after_each(function(cg)
 end)
 
 g.test_cluster_upgrade = function(cg)
+    -- Zero wal_cleanup_delay value should be replaced with default
+    for _, s in pairs(cg.servers) do
+        t.assert(s:grep_log(WARNING_PATTERN))
+    end
+
     t.helpers.retrying({}, function(cg)
         t.assert_not_equals(cg.cluster:get_leader(), nil)
     end, cg)
@@ -86,6 +98,7 @@ g.test_cluster_upgrade = function(cg)
             local consumers_num = servers_num - 1
             t.assert_equals(#box.space._gc_consumers:select(), consumers_num)
         end, {#cg.servers})
+        t.assert(s:grep_log(WARNING_PATTERN))
     end
 end
 
