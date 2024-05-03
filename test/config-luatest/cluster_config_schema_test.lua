@@ -244,7 +244,6 @@ g.test_defaults = function()
             max_size = 268435456,
             dir_rescan_delay = 2,
             queue_max_size = 16777216,
-            cleanup_delay = 14400,
             retention_period = is_enterprise and 0 or nil,
         },
         console = {
@@ -350,6 +349,7 @@ g.test_defaults = function()
             box_space_max = 'new',
             box_error_unpack_type_and_code = 'old',
             console_session_scope_vars = 'old',
+            wal_cleanup_delay_deprecation = 'old',
         },
     }
     local res = cluster_config:apply_default({})

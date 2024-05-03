@@ -1303,7 +1303,8 @@ return schema.new('instance_config', schema.record({
         cleanup_delay = schema.scalar({
             type = 'number',
             box_cfg = 'wal_cleanup_delay',
-            default = 4 * 3600,
+            -- No default value here - the option is deprecated
+            -- and shouldn't be used by default.
         }),
         retention_period = enterprise_edition(schema.scalar({
             type = 'number',
@@ -2422,6 +2423,12 @@ return schema.new('instance_config', schema.record({
             default = 'old',
         }),
         box_consider_system_spaces_synchronous = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
+        wal_cleanup_delay_deprecation = schema.enum({
             'old',
             'new',
         }, {

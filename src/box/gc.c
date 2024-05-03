@@ -125,7 +125,7 @@ gc_init(on_garbage_collection_f on_garbage_collection)
 	/* Don't delete any files until recovery is complete. */
 	gc.min_checkpoint_count = INT_MAX;
 
-	gc.wal_cleanup_delay = TIMEOUT_INFINITY;
+	gc.wal_cleanup_delay = 4 * 3600;
 	gc.delay_ref = 0;
 	gc.is_paused = true;
 	say_info("wal/engine cleanup is paused");
