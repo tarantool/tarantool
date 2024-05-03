@@ -1042,7 +1042,6 @@ g.test_wal = function()
         max_size = 268435456,
         dir_rescan_delay = 2,
         queue_max_size = 16777216,
-        cleanup_delay = 14400,
     }
     local res = instance_config:apply_default({}).wal
     t.assert_equals(res, exp)
@@ -1080,7 +1079,6 @@ g.test_wal_enterprise = function()
         max_size = 268435456,
         dir_rescan_delay = 2,
         queue_max_size = 16777216,
-        cleanup_delay = 14400,
         retention_period = 0,
     }
     local res = instance_config:apply_default({}).wal
@@ -1354,6 +1352,8 @@ g.test_box_cfg_coverage = function()
         -- The effective default is determined depending on
         -- the compat.box_cfg_replication_sync_timeout option.
         replication_sync_timeout = true,
+        -- The option is deprecated so it has no default value.
+        wal_cleanup_delay = true,
     }
 
     local log_prefix = 'test_box_cfg_coverage'

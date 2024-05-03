@@ -156,7 +156,7 @@ local default_cfg = {
     wal_max_size        = 256 * 1024 * 1024,
     wal_dir_rescan_delay= 2,
     wal_queue_max_size  = 16 * 1024 * 1024,
-    wal_cleanup_delay   = 4 * 3600,
+    wal_cleanup_delay   = nil,
     wal_retention_period = ifdef_wal_retention_period(0),
     wal_ext             = ifdef_wal_ext(nil),
     force_recovery      = false,
@@ -504,7 +504,14 @@ local dynamic_cfg = {
     worker_pool_threads     = private.cfg_set_worker_pool_threads,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = nop,
-    wal_cleanup_delay       = private.cfg_set_wal_cleanup_delay,
+    wal_cleanup_delay       = function()
+        if compat.wal_cleanup_delay_deprecation:is_old() then
+            log.warn("Option wal_cleanup_delay is deprecated.")
+        else
+            box.error(box.error.DEPRECATED, "Option wal_cleanup_delay")
+        end
+        private.cfg_set_wal_cleanup_delay()
+    end,
     wal_retention_period    = private.cfg_set_wal_retention_period,
     custom_proc_title       = function()
         require('title').update(box.cfg.custom_proc_title)
