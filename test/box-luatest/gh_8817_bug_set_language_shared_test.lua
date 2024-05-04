@@ -1,4 +1,3 @@
-local fio = require('fio')
 local t = require('luatest')
 local server = require('luatest.server')
 local it = require('test.interactive_tarantool')
@@ -10,34 +9,11 @@ g.before_all(function()
     g.server = server:new({alias = 'test-gh-8817-server'})
     g.server:start()
 
-    local socket_path = fio.pathjoin(g.server.workdir, 'admin.socket')
-    local listen_command  = "require('console').listen('%s')"
-    local connect_command = "require('console').connect('%s')"
-
-    listen_command  = listen_command:format(socket_path)
-    connect_command = connect_command:format(socket_path)
-
     -- Listen on the server.
-    g.server:eval(listen_command)
+    g.server:eval("require('console').listen('unix/:./tarantool.control')")
 
-    g.first_client = it:new()
-    g.second_client = it:new()
-
-    -- Create first connection to the server.
-    g.first_client:execute_command(connect_command)
-    t.assert_equals(
-        g.first_client:read_response(),
-        true
-    )
-    g.first_client:set_prompt(('unix/:%s> '):format(socket_path))
-
-    -- Create second connection to the server.
-    g.second_client:execute_command(connect_command)
-    t.assert_equals(
-        g.second_client:read_response(),
-        true
-    )
-    g.second_client:set_prompt(('unix/:%s> '):format(socket_path))
+    g.first_client = it.connect(g.server)
+    g.second_client = it.connect(g.server)
 
     -- Make sure that box.session.id are different on test clients.
     g.first_client:execute_command("box.session.id()")
