@@ -340,15 +340,7 @@ g.test_sync_privileges = function(g)
         },
     }
 
-    -- Disable hide/show prompt functionality, because it breaks
-    -- a command echo check. The reason is that the 'scheduled
-    -- next checkpoint' log message is issued from a background
-    -- fiber.
-    local child = it.new({
-        env = {
-            TT_CONSOLE_HIDE_SHOW_PROMPT = 'false',
-        },
-    })
+    local child = it.new()
     local dir = treegen.prepare_directory(g, {}, {})
     child:roundtrip(("box.cfg{work_dir = %q}"):format(dir))
 
@@ -395,15 +387,7 @@ g.test_set_password = function(g)
             t.tarantool.skip_if_not_enterprise()
         end
 
-        -- Disable hide/show prompt functionality, because it
-        -- breaks a command echo check. The reason is that the
-        -- 'scheduled next checkpoint' log message is issued from
-        -- a background fiber.
-        local child = it.new({
-            env = {
-                TT_CONSOLE_HIDE_SHOW_PROMPT = 'false',
-            },
-        })
+        local child = it.new()
 
         local dir = treegen.prepare_directory(g, {}, {})
         local socket = "unix/:./test_socket.iproto"

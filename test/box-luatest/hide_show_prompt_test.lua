@@ -8,7 +8,10 @@ local g = t.group()
 -- It does not check that tarantool preserves current input line
 -- and cursor position.
 g.test_basic_print = function()
-    local child = it.new({args = {'-l', 'fiber'}})
+    local child = it.new({
+        args = {'-l', 'fiber'},
+        env = {TT_CONSOLE_HIDE_SHOW_PROMPT = 'true'},
+    })
 
     child:execute_command([[
         _ = fiber.create(function()
@@ -35,7 +38,10 @@ end
 -- We don't check for presence of 'flood' lines in the log, but
 -- verify that prompt on stdout is shown and hid.
 g.test_basic_log = function()
-    local child = it.new({args = {'-l', 'fiber', '-l', 'log'}})
+    local child = it.new({
+        args = {'-l', 'fiber', '-l', 'log'},
+        env = {TT_CONSOLE_HIDE_SHOW_PROMPT = 'true'},
+    })
 
     child:execute_command([[
         _ = fiber.create(function()
