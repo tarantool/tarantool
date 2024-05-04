@@ -5,7 +5,10 @@ local g = t.group()
 
 -- Checks that `print` throwing an error is handled correctly.
 g.test_basic_print_with_exception = function()
-    local child = it.new({args = {'-l', 'fiber'}})
+    local child = it.new({
+        args = {'-l', 'fiber'},
+        env = {TT_CONSOLE_HIDE_SHOW_PROMPT = 'true'},
+    })
 
     child:execute_command([[
         _ = fiber.create(function()
