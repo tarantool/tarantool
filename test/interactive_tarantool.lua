@@ -333,6 +333,13 @@ function M._new_internal(opts)
             -- (because the command in the echo output will be
             -- trimmed).
             INPUTRC = '/dev/null',
+            -- Disable hide/show prompt functionality, because it
+            -- may break a command echo check.
+            --
+            -- For example, it occurs on the 'scheduled next
+            -- checkpoint' log message, which is issued from a
+            -- background fiber.
+            TT_CONSOLE_HIDE_SHOW_PROMPT = 'false',
         }, env):tomap(),
     })
 
