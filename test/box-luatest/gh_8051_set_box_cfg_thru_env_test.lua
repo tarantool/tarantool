@@ -1,4 +1,3 @@
-local fun = require('fun')
 local server = require('luatest.server')
 local treegen = require('test.treegen')
 local it = require('test.interactive_tarantool')
@@ -28,13 +27,6 @@ g.after_all(function(g)
     treegen.clean(g)
 end)
 
--- Disable hide/show prompt functionality, because it breaks a
--- command echo check. The reason is that the 'scheduled next
--- checkpoint' log message is issued from a background fiber.
-local env_default = {
-    TT_CONSOLE_HIDE_SHOW_PROMPT = 'false',
-}
-
 g.test_json_table_curly_bracket = function()
     local env = {["TT_METRICS"] = '{"labels":{"alias":"gh_8051"},' ..
                                   '"include":"all","exclude":["vinyl"]}'}
@@ -47,9 +39,9 @@ end
 
 g.test_json_table_square_bracket = function(g)
     g.child = it.new({
-        env = fun.chain(env_default, {
+        env = {
             TT_LISTEN = '["localhost:0"]',
-        }):tomap(),
+        },
     })
 
     local command = ('box.cfg({work_dir = %q})'):format(g.dir)
@@ -70,9 +62,9 @@ end
 
 g.test_format_error = function(g)
     g.child = it.new({
-        env = fun.chain(env_default, {
+        env = {
             TT_LOG_MODULES = 'aaa=info,bbb',
-        }):tomap(),
+        },
     })
 
     local command = ('box.cfg({work_dir = %q})'):format(g.dir)
@@ -82,9 +74,9 @@ end
 
 g.test_format_error_empty_key = function()
     g.child = it.new({
-        env = fun.chain(env_default, {
+        env = {
             TT_LOG_MODULES = 'aaa=info,=error',
-        }):tomap(),
+        },
     })
 
     local command = ('box.cfg({work_dir = %q})'):format(g.dir)
