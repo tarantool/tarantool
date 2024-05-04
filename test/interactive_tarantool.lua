@@ -2,6 +2,7 @@
 -- mode.
 
 local fun = require('fun')
+local fio = require('fio')
 local fiber = require('fiber')
 local log = require('log')
 local yaml = require('yaml')
@@ -21,6 +22,36 @@ local mt = {}
 mt.__index = mt
 
 local dbg_header = tnt.package .. " debugger " .. tnt.version
+
+-- {{{ General-purpose utils
+
+-- Join paths in an intuitive way.
+--
+-- If a component is nil, it is skipped.
+--
+-- If a component is an absolute path, it skips all the previous
+-- components.
+--
+-- The wrapper is written for two components for simplicity.
+--
+-- NB: Copied from test/luatest_helpers/server.lua.
+local function pathjoin(a, b)
+    -- No first path -- skip it.
+    if a == nil then
+        return b
+    end
+    -- No second path -- skip it.
+    if b == nil then
+        return a
+    end
+    -- The absolute path is checked explicitly due to gh-8816.
+    if b:startswith('/') then
+        return b
+    end
+    return fio.pathjoin(a, b)
+end
+
+-- }}} General-purpose utils
 
 -- {{{ Instance methods
 
@@ -388,6 +419,49 @@ function M.new(opts)
 
     -- Log child's stderr.
     res:_start_stderr_logger()
+
+    return res
+end
+
+-- Create a new tarantool process and connect its console to
+-- the given server.
+--
+-- The first parameter is a luatest.server object.
+--
+-- The second parameter (opts) is the same as in new().
+function M.connect(server, opts)
+    local known_paths = {
+        -- A default control socket place of tarantool started
+        -- from a YAML configuration.
+        pathjoin(server.chdir, 'var/run/{{ alias }}/tarantool.control'),
+        -- A short socket path is convenient if console.listen()
+        -- is called on the instance manually.
+        pathjoin(server.workdir, 'tarantool.control'),
+    }
+
+    -- Pick up a first existing console socket path from the list.
+    local err = ''
+    local socket_path
+    for _, known_path in ipairs(known_paths) do
+        known_path = known_path:gsub('{{ alias }}', server.alias)
+        if fio.path.exists(known_path) then
+            socket_path = known_path
+            break
+        end
+        err = err .. ('%s: no such file\n'):format(known_path)
+    end
+    if socket_path == nil then
+        error(err)
+    end
+
+    -- Start tarantool and connect its console to the given
+    -- server.
+    local res = M.new(opts)
+    local cmd = ("require('console').connect('%s')"):format(socket_path)
+    res:roundtrip(cmd, true)
+
+    -- Adjust expected prompt to correctly process command's echo.
+    res:set_prompt(('unix/:%s> '):format(socket_path))
 
     return res
 end
