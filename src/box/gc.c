@@ -923,7 +923,7 @@ gc_consumer_perstistent_update_impl(const struct tt_uuid *uuid, const struct vcl
 	ops_end = mp_encode_array(ops_end, 3);
 	ops_end = mp_encode_str0(ops_end, "=");
 	ops_end = mp_encode_uint(ops_end, 1);
-	ops_end = mp_encode_vclock_ignore0(ops_end, vclock);
+	ops_end = mp_encode_vclock(ops_end, vclock);
 	assert((unsigned long)(ops_end - ops_buf) < sizeof(ops_buf));
 
 	return box_update(BOX_GC_CONSUMERS_ID, 0, key_buf, key_end,
@@ -1113,7 +1113,7 @@ gc_consumer_def_new_from_tuple(struct tuple *tuple, struct region *region)
 			tuple, BOX_GC_CONSUMERS_FIELD_VCLOCK, MP_MAP);
 		if (mp_vclock == NULL)
 			return NULL;
-		if (mp_decode_vclock_ignore0(&mp_vclock, &def->vclock) != 0) {
+		if (mp_decode_vclock(&mp_vclock, &def->vclock) != 0) {
 			diag_set(ClientError, ER_INVALID_VCLOCK);
 			return NULL;
 		}
@@ -1295,7 +1295,7 @@ on_create_dd_gc_consumers_primary_index(void)
 		char *data = tuple_buf;
 		data = mp_encode_array(data, 2);
 		data = mp_encode_str0(data, tt_uuid_str(&consumer->uuid));
-		data = mp_encode_vclock_ignore0(data, &consumer->vclock);
+		data = mp_encode_vclock(data, &consumer->vclock);
 		assert((size_t)(data - tuple_buf) < sizeof(tuple_buf));
 
 		if (box_insert(BOX_GC_CONSUMERS_ID, tuple_buf, data, NULL) != 0)

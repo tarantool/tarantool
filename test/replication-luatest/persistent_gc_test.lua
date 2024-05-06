@@ -150,7 +150,9 @@ g.test_gc_consumer_is_updated_by_relay = function(cg)
             t.helpers.retrying({}, function()
                 local consumers = box.space._gc_consumers:select{}
                 t.assert_equals(#consumers, 1)
-                t.assert_equals(consumers[1].vclock, vclock)
+                local consumer_vclock = consumers[1].vclock
+                consumer_vclock[0] = nil
+                t.assert_equals(consumer_vclock, vclock)
             end)
         end, {saved_vclock})
         -- Trigger snapshot and check if old xlogs were deleted
@@ -186,9 +188,13 @@ g.test_gc_consumer_update_retry = function(cg)
         vclock[0] = nil
         local consumers = box.space._gc_consumers:select{}
         t.assert_equals(#consumers, 1)
-        t.assert_equals(consumers[1].vclock, vclock)
+        local consumer_vclock = consumers[1].vclock
+        consumer_vclock[0] = nil
+        t.assert_equals(consumer_vclock, vclock)
         t.assert_equals(#box.info.gc().consumers, 1)
-        t.assert_equals(box.info.gc().consumers[1].vclock, vclock)
+        local info_vclock = box.info.gc().consumers[1].vclock
+        info_vclock[0] = nil
+        t.assert_equals(info_vclock, vclock)
     end, {saved_vclock})
     cg.master:exec(function()
         box.error.injection.set('ERRINJ_WAL_GC_PERSIST_FIBER', false)
@@ -200,7 +206,9 @@ g.test_gc_consumer_update_retry = function(cg)
             t.helpers.retrying({}, function()
                 local consumers = box.space._gc_consumers:select{}
                 t.assert_equals(#consumers, 1)
-                t.assert_equals(consumers[1].vclock, vclock)
+                local consumer_vclock = consumers[1].vclock
+                consumer_vclock[0] = nil
+                t.assert_equals(consumer_vclock, vclock)
             end)
         end, {actual_vclock})
     end)
@@ -230,8 +238,10 @@ g.test_gc_consumer_is_not_updated_without_replica = function(cg)
         -- Consumer hasn't changed - replica is disabled
         local consumers = box.space._gc_consumers:select{}
         t.assert_equals(#consumers, 1)
+        local consumer_vclock = consumers[1].vclock
+        consumer_vclock[0] = nil
         vclock[0] = nil
-        t.assert_equals(consumers[1].vclock, vclock)
+        t.assert_equals(consumer_vclock, vclock)
     end, {saved_vclock})
     check_xlog(cg.master.workdir, saved_lsn)
 end

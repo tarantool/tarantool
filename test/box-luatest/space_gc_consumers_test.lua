@@ -496,7 +496,9 @@ g.test_gc_consumers_concurrency = function(cg)
             local persisted_vclock =
                 box.space._gc_consumers:get(replica_uuid)[2]
             persisted_vclock[0] = nil
-            t.assert_equals(box.info.gc().consumers[1].vclock, persisted_vclock)
+            local info_vclock = box.info.gc().consumers[1].vclock
+            info_vclock[0] = nil
+            t.assert_equals(info_vclock, persisted_vclock)
         end
     end)
 end

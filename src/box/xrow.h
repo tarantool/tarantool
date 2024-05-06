@@ -739,14 +739,14 @@ mp_sizeof_vclock_ignore0(const struct vclock *vclock);
 
 /** Encode a vclock to a buffer as MP_MAP. Never fails. */
 char *
-mp_encode_vclock_ignore0(char *data, const struct vclock *vclock);
+mp_encode_vclock(char *data, const struct vclock *vclock);
 
 /**
  * Decode a vclock from MsgPack data, it should be MP_MAP.
  * Returns -1 on error, diag is NOT set.
  */
 int
-mp_decode_vclock_ignore0(const char **data, struct vclock *vclock);
+mp_decode_vclock(const char **data, struct vclock *vclock);
 
 /** Encode vclock. */
 void

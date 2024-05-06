@@ -73,15 +73,17 @@ mp_sizeof_vclock_ignore0(const struct vclock *vclock)
 					     mp_sizeof_uint(UINT64_MAX));
 }
 
-char *
-mp_encode_vclock_ignore0(char *data, const struct vclock *vclock)
+static char *
+mp_encode_vclock_impl(char *data, const struct vclock *vclock, bool ignore0)
 {
-	data = mp_encode_map(data, vclock_size_ignore0(vclock));
+	uint32_t size = ignore0 ? vclock_size_ignore0(vclock) :
+		vclock_size(vclock);
+	data = mp_encode_map(data, size);
 	struct vclock_iterator it;
 	vclock_iterator_init(&it, vclock);
 	struct vclock_c replica;
 	replica = vclock_iterator_next(&it);
-	if (replica.id == 0)
+	if (ignore0 && replica.id == 0)
 		replica = vclock_iterator_next(&it);
 	for ( ; replica.id < VCLOCK_MAX; replica = vclock_iterator_next(&it)) {
 		data = mp_encode_uint(data, replica.id);
@@ -90,7 +92,19 @@ mp_encode_vclock_ignore0(char *data, const struct vclock *vclock)
 	return data;
 }
 
-static int
+char *
+mp_encode_vclock(char *data, const struct vclock *vclock)
+{
+	return mp_encode_vclock_impl(data, vclock, /*ignore0=*/false);
+}
+
+static char *
+mp_encode_vclock_ignore0(char *data, const struct vclock *vclock)
+{
+	return mp_encode_vclock_impl(data, vclock, /*ignore0=*/true);
+}
+
+int
 mp_decode_vclock(const char **data, struct vclock *vclock)
 {
 	if (mp_typeof(**data) != MP_MAP)
@@ -111,7 +125,7 @@ mp_decode_vclock(const char **data, struct vclock *vclock)
 	return 0;
 }
 
-int
+static int
 mp_decode_vclock_ignore0(const char **data, struct vclock *vclock)
 {
 	if (mp_decode_vclock(data, vclock) != 0)
