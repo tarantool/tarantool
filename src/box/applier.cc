@@ -660,6 +660,7 @@ applier_connect(struct applier *applier)
 				&greeting);
 
 	applier->last_row_time = ev_monotonic_now(loop());
+	applier->txn_last_tm = 0;
 
 	if (applier->version_id != greeting.version_id) {
 		say_info("remote master %s at %s running Tarantool %u.%u.%u",
