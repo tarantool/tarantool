@@ -288,7 +288,6 @@ replica_new(void)
 	trigger_create(&replica->on_applier_state,
 		       replica_on_applier_state_f, NULL, NULL);
 	replica->applier_sync_state = APPLIER_DISCONNECTED;
-	replica->applier_txn_last_tm = 0;
 	latch_create(&replica->order_latch);
 	return replica;
 }

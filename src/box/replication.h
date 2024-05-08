@@ -379,11 +379,6 @@ struct replica {
 	 * separate from applier.
 	 */
 	enum applier_state applier_sync_state;
-	/**
-	 * Applier's last written to WAL transaction timestamp.
-	 * Needed for relay lagging statistics.
-	 */
-	double applier_txn_last_tm;
 	/* The latch is used to order replication requests. */
 	struct latch order_latch;
 };
