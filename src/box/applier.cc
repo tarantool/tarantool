@@ -1254,8 +1254,8 @@ static void
 replica_txn_wal_write_cb(struct replica_cb_data *rcb)
 {
 	struct replica *r = replica_by_id(rcb->replica_id);
-	if (likely(r != NULL))
-		r->applier_txn_last_tm = rcb->txn_last_tm;
+	if (likely(r != NULL && r->applier != NULL))
+		r->applier->txn_last_tm = rcb->txn_last_tm;
 }
 
 static int
@@ -1735,9 +1735,7 @@ applier_signal_ack(struct applier *applier)
 		 * timestamp in tm field. If user delete the node from _cluster
 		 * space, we obtain a nil pointer here.
 		 */
-		struct replica *r = replica_by_id(applier->instance_id);
-		applier->ack_msg.txn_last_tm = (r == NULL ? 0 :
-						r->applier_txn_last_tm);
+		applier->ack_msg.txn_last_tm = applier->txn_last_tm;
 		applier->ack_msg.vclock_sync = applier->last_vclock_sync;
 		applier->ack_msg.term = box_raft()->term;
 		vclock_copy(&applier->ack_msg.vclock, &replicaset.vclock);
