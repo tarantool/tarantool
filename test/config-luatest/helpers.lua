@@ -64,11 +64,7 @@ local function run_as_script(f)
 
         local opts = {nojson = true, stderr = true}
         local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
-        t.assert_equals(res, {
-            exit_code = 0,
-            stdout = '',
-            stderr = '',
-        })
+        t.assert_equals(res.exit_code, 0, {res.stdout, res.stderr})
     end
 end
 

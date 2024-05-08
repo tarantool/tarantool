@@ -1084,3 +1084,10 @@ g.after_test('test_netbox_call_trace', function(cg)
         end
     end)
 end)
+
+g.test_trace_checked = function()
+   local st, res = pcall(t.assert_error,
+                         tarantool._internal.raise_incorrect_trace)
+   t.assert(not st)
+   t.assert_str_contains(res.message, 'Unexpected error trace');
+end

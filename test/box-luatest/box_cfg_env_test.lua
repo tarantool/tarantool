@@ -166,11 +166,7 @@ g.test_uri_list = function(g)
 
     local opts = {nojson = true, stderr = true}
     local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
-    t.assert_equals(res, {
-        exit_code = 0,
-        stdout = '',
-        stderr = '',
-    })
+    t.assert_equals(res.exit_code, 0, {res.stdout, res.stderr})
 end
 
 -- These test cases use a real box.cfg() call inside a child

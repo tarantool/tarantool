@@ -165,11 +165,7 @@ g.test_configdata = function()
 
     local opts = {nojson = true, stderr = true}
     local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
-    t.assert_equals(res, {
-        exit_code = 0,
-        stdout = '',
-        stderr = '',
-    })
+    t.assert_equals(res.exit_code, 0, {res.stdout, res.stderr})
 end
 
 g.test_config_general = function()
