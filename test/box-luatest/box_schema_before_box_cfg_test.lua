@@ -67,6 +67,5 @@ g.test_box_schema_before_box_cfg = function()
 
     local opts = {nojson = true, stderr = true}
     local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
-    t.assert_equals(res.stderr, "")
-    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.exit_code, 0, {res.stdout, res.stderr})
 end

@@ -75,7 +75,8 @@ g.test_prevote_fail = function(g)
     --        the corresponding bit in leader_witness_map is cleared.
     --     3. Break last applier and make sure, that election isn't started.
     --
-    luatest.assert_equals(g.replica_set:get_leader(), g.server1)
+    luatest.assert_equals(g.replica_set:get_leader():get_instance_id(),
+                          g.server1:get_instance_id())
     local old_term = g.server1:get_election_term()
     g.server3:exec(function()
         box.cfg({election_mode = 'candidate'})
