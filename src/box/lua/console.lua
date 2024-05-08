@@ -19,6 +19,7 @@ ffi.cdef[[
 
 local internal = require('console.lib')
 local session_internal = box.internal.session
+local compat = require('compat')
 local fiber = require('fiber')
 local socket = require('socket')
 local log = require('log')
@@ -30,6 +31,26 @@ local help = require('help').help
 
 local DEFAULT_CONNECT_TIMEOUT = 10
 local PUSH_TAG_HANDLE = '!push!'
+
+local CONSOLE_SESSION_SCOPE_VARS_BRIEF = [[
+Whether a console session has its own variable scope.
+
+In the old behavior, all the non-local variable assignments from the console
+are written to globals.
+
+In the new behavior, they're written to a variable scope attached to the console
+session.
+
+https://tarantool.io/compat/console_session_scope_vars
+]]
+
+compat.add_option({
+    name = 'console_session_scope_vars',
+    default = 'old',
+    obsolete = nil,
+    brief = CONSOLE_SESSION_SCOPE_VARS_BRIEF,
+    action = function() end,
+})
 
 --
 -- Default output handler set to YAML for backward
@@ -394,6 +415,19 @@ local function table_pack(...)
     return {n = select('#', ...), ...}
 end
 
+local function create_env_on_demand(storage)
+    if compat.console_session_scope_vars:is_old() then
+        return
+    end
+    if storage.env ~= nil then
+        return
+    end
+    storage.env = setmetatable({}, {
+        -- Read from globals if there is no local variable.
+        __index = _G,
+    })
+end
+
 --
 -- Evaluate command on local instance
 --
@@ -415,9 +449,10 @@ local function local_eval(storage, line)
     -- stack. If the chunk is a statement, it won't compile. In that
     -- case try to run the original string.
     --
-    local fun, errmsg = loadstring("return "..line)
+    create_env_on_demand(storage)
+    local fun, errmsg = loadstring("return "..line, nil, nil, storage.env)
     if not fun then
-        fun, errmsg = loadstring(line)
+        fun, errmsg = loadstring(line, nil, nil, storage.env)
     end
     if not fun then
         return format(false, errmsg)
