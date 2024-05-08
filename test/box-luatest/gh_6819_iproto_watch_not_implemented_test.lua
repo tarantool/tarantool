@@ -71,7 +71,7 @@ g.test_iproto_watch_reported_but_not_implemented = function()
     g.server:exec(function(err_count_1)
         t.helpers.retrying({}, function()
             local err_count_2 = box.stat.ERROR.total
-            t.assert_equals(err_count_2 - err_count_1, 3)
+            t.assert_equals(err_count_2 - err_count_1, 4)
         end)
     end, {err_count_1})
     conn:close()
