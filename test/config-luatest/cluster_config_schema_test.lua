@@ -348,6 +348,7 @@ g.test_defaults = function()
             box_tuple_extension = 'new',
             box_space_max = 'new',
             box_error_unpack_type_and_code = 'old',
+            console_session_scope_vars = 'old',
         },
     }
     local res = cluster_config:apply_default({})

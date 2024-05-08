@@ -2414,6 +2414,12 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'old',
         }),
+        console_session_scope_vars = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
     }),
     -- Instance labels.
     labels = schema.map({
