@@ -356,6 +356,7 @@ relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	relay->last_heartbeat_time = relay->last_row_time;
 	/* Never send rows for REPLICA_ID_NIL to anyone */
 	relay->id_filter = 1 << REPLICA_ID_NIL;
+	memset(&relay->status_msg, 0, sizeof(relay->status_msg));
 }
 
 void
@@ -769,6 +770,11 @@ relay_process_ack(struct relay *relay, double tm)
 	 */
 	const struct vclock *prev_vclock = &relay->status_msg.vclock;
 	const struct vclock *next_vclock = &relay->last_recv_ack.vclock;
+	/*
+	 * Both vclocks are confirmed by the same applier, sequentially. They
+	 * can't go down.
+	 */
+	assert(vclock_compare(prev_vclock, next_vclock) <= 0);
 	if (vclock_get(prev_vclock, instance_id) <
 	    vclock_get(next_vclock, instance_id))
 		relay->txn_lag = ev_now(loop()) - tm;
