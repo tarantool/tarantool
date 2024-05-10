@@ -1719,6 +1719,11 @@ applier_signal_ack(struct applier *applier)
 		 * space, we obtain a nil pointer here.
 		 */
 		applier->ack_msg.txn_last_tm = applier->txn_last_tm;
+		/*
+		 * Send each timestamp only once. New timestamp is treated by
+		 * relay like something new was acked from that specific relay.
+		 */
+		applier->txn_last_tm = 0;
 		applier->ack_msg.vclock_sync = applier->last_vclock_sync;
 		applier->ack_msg.term = box_raft()->term;
 		vclock_copy(&applier->ack_msg.vclock, &replicaset.vclock);
