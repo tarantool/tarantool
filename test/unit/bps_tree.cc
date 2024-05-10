@@ -26,8 +26,12 @@
  * for this tree flavor to prevent this.
  */
 # define SMALL_BLOCK_SIZE 256
+#elif defined(TEST_BLOCK_PARENT_AND_POS)
+# define BPS_BLOCK_PARENT_AND_POS
+# define SMALL_BLOCK_SIZE 128
 #else
-# error "Please define TEST_DEFAULT, TEST_INNER_CARD or TEST_INNER_CHILD_CARDS."
+# error "Please define TEST_DEFAULT, TEST_INNER_CARD, TEST_INNER_CHILD_CARDS"
+	" or TEST_BLOCK_PARENT_AND_POS."
 #endif
 
 SPTREE_DEF(test, realloc, qsort_arg);

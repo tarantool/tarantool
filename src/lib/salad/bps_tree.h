@@ -330,6 +330,13 @@
  */
 
 /**
+ * A switch to include parent block ID and the current block pos in
+ * it in all blocks.
+ *
+ * #define BPS_BLOCK_PARENT_AND_POS
+ */
+
+/**
  * A switch that enables collection of executions of different
  * branches of code. Used only for debug purposes, I hope you
  * will not use it. Nevertheless, to turn it on,
@@ -524,6 +531,8 @@ typedef int64_t bps_tree_block_card_t;
 #define bps_tree_get_children_card _bps_tree(get_children_card)
 #define bps_tree_get_first_children_card _bps_tree(get_first_children_card)
 #define bps_tree_get_last_children_card _bps_tree(get_last_children_card)
+#define bps_tree_set_block_parent _bps_tree(set_block_parent)
+#define bps_tree_alter_children_parent _bps_tree(alter_children_parent)
 #define bps_tree_insert_into_leaf _bps_tree(insert_into_leaf)
 #define bps_tree_insert_into_inner _bps_tree(insert_into_inner)
 #define bps_tree_delete_from_leaf _bps_tree(delete_from_leaf)
@@ -1372,6 +1381,16 @@ bps_tree_debug_check_internal_functions(bool assertme);
 #define BPS_TREE_CARD_UP_INNER(...)
 #endif
 
+#ifdef BPS_BLOCK_PARENT_AND_POS
+#define BPS_TREE_SET_BLOCK_PARENT(tree, block_id, parent_id) \
+	bps_tree_set_block_parent(tree, block_id, parent_id)
+#define BPS_TREE_ALTER_CHILDREN_PARENT(tree, path_elem, pos, num) \
+	bps_tree_alter_children_parent(tree, path_elem, pos, num)
+#else
+#define BPS_TREE_SET_BLOCK_PARENT(...) ((void)0)
+#define BPS_TREE_ALTER_CHILDREN_PARENT(...) ((void)0)
+#endif
+
 /**
  * The config-dependent block information.
  */
@@ -1401,6 +1420,10 @@ struct bps_block {
 	bps_tree_pos_t type;
 	/* Count of elements for leaf, and of children for inner nodes */
 	bps_tree_pos_t size;
+#ifdef BPS_BLOCK_PARENT_AND_POS
+	/* ID of the parent block. */
+	bps_tree_block_id_t parent_id;
+#endif
 };
 
 /**
@@ -1414,7 +1437,10 @@ enum bps_tree_max_sizes {
 	BPS_TREE_MAX_COUNT_IN_INNER =
 		(BPS_TREE_BLOCK_SIZE - sizeof(struct bps_block)
 #ifdef BPS_INNER_CARD
-		 - sizeof(bps_tree_block_card_t) - 4 /* Padding. */
+		 - sizeof(bps_tree_block_card_t)
+# ifndef BPS_BLOCK_PARENT_AND_POS
+		 - 4 /* Padding. */
+# endif
 #endif
 		 ) / (sizeof(bps_tree_elem_t) + sizeof(bps_tree_block_id_t)
 #ifdef BPS_INNER_CHILD_CARDS
@@ -1656,6 +1682,12 @@ bps_tree_build(struct bps_tree *t, bps_tree_elem_t *sorted_array,
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
 	bps_tree_block_card_t level_card[BPS_TREE_MAX_DEPTH] = {0};
 #endif
+#ifdef BPS_BLOCK_PARENT_AND_POS
+	bps_tree_block_id_t parent_ids[BPS_TREE_MAX_DEPTH] = {0};
+	/* No level has a known parent initially. */
+	for (int i = 0; i < BPS_TREE_MAX_DEPTH; i++)
+		parent_ids[i] = (bps_tree_block_id_t)-1;
+#endif
 	struct bps_inner *parents[BPS_TREE_MAX_DEPTH];
 	level_count = leaf_count;
 	for (bps_tree_block_id_t i = 0; i < depth - 1; i++) {
@@ -1709,6 +1741,10 @@ bps_tree_build(struct bps_tree *t, bps_tree_elem_t *sorted_array,
 				}
 				parents[i]->header.type = BPS_TREE_BT_INNER;
 				parents[i]->header.size = 0;
+#ifdef BPS_BLOCK_PARENT_AND_POS
+				/* Parent ID of i-level blocks. */
+				parent_ids[i] = new_id;
+#endif
 				inner_count++;
 			}
 			parents[i]->child_ids[parents[i]->header.size] =
@@ -1722,6 +1758,9 @@ bps_tree_build(struct bps_tree *t, bps_tree_elem_t *sorted_array,
 			}
 		}
 
+#ifdef BPS_BLOCK_PARENT_AND_POS
+		leaf->header.parent_id = parent_ids[0];
+#endif
 		bps_tree_elem_t insert_value = current[leaf->header.size - 1];
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
 		bps_tree_block_card_t insert_card = leaf->header.size;
@@ -1747,6 +1786,10 @@ bps_tree_build(struct bps_tree *t, bps_tree_elem_t *sorted_array,
 #ifdef BPS_INNER_CARD
 				parents[i]->card = level_card[i];
 #endif
+#ifdef BPS_BLOCK_PARENT_AND_POS
+				parents[i]->header.parent_id = parent_ids[i + 1];
+				parent_ids[i] = 0;
+#endif
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
 				insert_card = level_card[i];
 				level_card[i] = 0;
@@ -1767,6 +1810,9 @@ bps_tree_build(struct bps_tree *t, bps_tree_elem_t *sorted_array,
 		assert(level_block_count[i] == 0);
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
 		assert(level_card[i] == 0);
+#endif
+#ifdef BPS_BLOCK_PARENT_AND_POS
+		assert(parent_ids[i] == 0);
 #endif
 		assert(parents[i] == 0);
 	}
@@ -3366,6 +3412,9 @@ bps_tree_create_leaf(struct bps_tree_common *tree, bps_tree_block_id_t *id)
 	if (!res)
 		res = (struct bps_leaf *)matras_alloc(tree->matras, id);
 	res->header.type = BPS_TREE_BT_LEAF;
+#ifdef BPS_BLOCK_PARENT_AND_POS
+	res->header.parent_id = (bps_tree_block_id_t)-1;
+#endif
 	tree->leaf_count++;
 	return res;
 }
@@ -3381,6 +3430,9 @@ bps_tree_create_inner(struct bps_tree_common *tree, bps_tree_block_id_t *id)
 	if (!res)
 		res = (struct bps_inner *)matras_alloc(tree->matras, id);
 	res->header.type = BPS_TREE_BT_INNER;
+#ifdef BPS_BLOCK_PARENT_AND_POS
+	res->header.parent_id = (bps_tree_block_id_t)-1;
+#endif
 	tree->inner_count++;
 	return res;
 }
@@ -3460,6 +3512,9 @@ bps_tree_collect_path(struct bps_tree_common *tree, bps_tree_elem_t new_elem,
 {
 	*exact = false;
 
+#ifdef BPS_BLOCK_PARENT_AND_POS
+	bps_tree_block_id_t prev_id = (bps_tree_block_id_t)-1;
+#endif
 	struct bps_inner_path_elem *prev_ext = 0;
 	bps_tree_pos_t prev_pos = 0;
 	struct bps_block *block = bps_tree_root(tree);
@@ -3494,6 +3549,9 @@ bps_tree_collect_path(struct bps_tree_common *tree, bps_tree_elem_t new_elem,
 			max_elem_block_id = block_id;
 			max_elem_pos = pos;
 		}
+#ifdef BPS_BLOCK_PARENT_AND_POS
+		prev_id = block_id;
+#endif
 		block_id = inner->child_ids[pos];
 		block = bps_tree_restore_block(tree, block_id);
 		prev_pos = pos;
@@ -3868,6 +3926,38 @@ bps_tree_card_up_leaf_impl(struct bps_leaf_path_elem *leaf_path_elem,
 
 #endif
 
+#ifdef BPS_BLOCK_PARENT_AND_POS
+
+/**
+ * @brief Set the block's parent ID.
+ */
+static inline void
+bps_tree_set_block_parent(struct bps_tree_common *tree,
+			  bps_tree_block_id_t block_id,
+			  bps_tree_block_id_t parent_id)
+{
+	/* exclusive behaviuor for debug checks */
+	if (tree->root_id == (bps_tree_block_id_t)-1)
+		return;
+	bps_tree_touch_block(tree, block_id)->parent_id = parent_id;
+}
+
+/**
+ * @brief Actualize parent IDs of children from \p pos to \p pos + \p num.
+ */
+static inline void
+bps_tree_alter_children_parent(struct bps_tree_common *tree,
+			       struct bps_inner_path_elem *inner_path_elem,
+			       bps_tree_pos_t pos, bps_tree_pos_t num)
+{
+	struct bps_inner *inner = inner_path_elem->block;
+	bps_tree_block_id_t inner_id = inner_path_elem->block_id;
+	for (bps_tree_pos_t i = pos; i < pos + num; i++)
+		bps_tree_set_block_parent(tree, inner->child_ids[i], inner_id);
+}
+
+#endif
+
 /**
  * @breif Insert an element into leaf block. There must be enough space.
  */
@@ -3936,6 +4026,8 @@ bps_tree_insert_into_inner(struct bps_tree_common *tree,
 	inner->header.size++;
 
 	BPS_TREE_CARD_UP_INNER(inner_path_elem, +block_info.card);
+	BPS_TREE_SET_BLOCK_PARENT(tree, block_info.id,
+				  inner_path_elem->block_id);
 }
 
 /**
@@ -4093,6 +4185,8 @@ bps_tree_move_elems_to_right_inner(struct bps_tree_common *tree,
 	BPS_TREE_CARD_UP_INNER(a_inner_path_elem, -moved_card);
 	BPS_TREE_CARD_UP_INNER(b_inner_path_elem, +moved_card);
 #endif
+
+	BPS_TREE_ALTER_CHILDREN_PARENT(tree, b_inner_path_elem, 0, num);
 }
 
 /**
@@ -4176,6 +4270,9 @@ bps_tree_move_elems_to_left_inner(struct bps_tree_common *tree,
 	BPS_TREE_CARD_UP_INNER(a_inner_path_elem, +moved_card);
 	BPS_TREE_CARD_UP_INNER(b_inner_path_elem, -moved_card);
 #endif
+
+	BPS_TREE_ALTER_CHILDREN_PARENT(tree, a_inner_path_elem,
+				       a->header.size - num, num);
 }
 
 /**
@@ -4392,6 +4489,12 @@ bps_tree_insert_and_move_elems_to_right_inner(
 	BPS_TREE_CARD_UP_INNER(a_inner_path_elem, a_diff);
 	BPS_TREE_CARD_UP_INNER(b_inner_path_elem, b_diff);
 #endif
+
+	if (pos < a->header.size) {
+		BPS_TREE_SET_BLOCK_PARENT(tree, block_info.id,
+					  a_inner_path_elem->block_id);
+	}
+	BPS_TREE_ALTER_CHILDREN_PARENT(tree, b_inner_path_elem, 0, num);
 }
 
 /**
@@ -4626,6 +4729,13 @@ bps_tree_insert_and_move_elems_to_left_inner(
 	BPS_TREE_CARD_UP_INNER(a_inner_path_elem, a_diff);
 	BPS_TREE_CARD_UP_INNER(b_inner_path_elem, b_diff);
 #endif
+
+	if (pos >= num) {
+		BPS_TREE_SET_BLOCK_PARENT(tree, block_info.id,
+					  b_inner_path_elem->block_id);
+	}
+	BPS_TREE_ALTER_CHILDREN_PARENT(tree, a_inner_path_elem,
+				       a->header.size - num, num);
 }
 
 /**
@@ -5233,6 +5343,10 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 		new_root->child_cards[0] = total - nc2;
 		new_root->child_cards[1] = nc2;
 #endif
+#ifdef BPS_BLOCK_PARENT_AND_POS
+		leaf_path_elem->block->header.parent_id = new_root_id;
+		new_path_elem.block->header.parent_id = new_root_id;
+#endif
 #ifdef BPS_INNER_CARD
 		new_root->card = total;
 #endif
@@ -5587,6 +5701,12 @@ bps_tree_process_insert_inner(struct bps_tree_common *tree,
 					   new_path_elem.unpropagated_card;
 		new_root->child_cards[1] = new_path_elem.unpropagated_card;
 #endif
+
+#ifdef BPS_BLOCK_PARENT_AND_POS
+		inner_path_elem->block->header.parent_id = new_root_id;
+		new_path_elem.block->header.parent_id = new_root_id;
+#endif
+
 #ifdef BPS_INNER_CARD
 		/* Filled by bps_tree_insert_and_move_elems_to_right_inner. */
 		assert(new_path_elem.unpropagated_card > 0);
@@ -6001,6 +6121,7 @@ bps_tree_process_delete_inner(struct bps_tree_common *tree,
 		assert(inner_path_elem->parent == 0);
 		tree->depth--;
 		tree->root_id = inner_path_elem->block->child_ids[0];
+		BPS_TREE_SET_BLOCK_PARENT(tree, tree->root_id, (bps_tree_block_id_t)-1);
 		bps_tree_dispose_inner(tree, inner_path_elem->block,
 				inner_path_elem->block_id);
 		BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0xF);
@@ -6259,10 +6380,17 @@ bps_tree_debug_check_block(const struct bps_tree_common *tree,
 			   int level, bps_tree_block_card_t *calc_count,
 			   bps_tree_block_id_t *expected_prev_id,
 			   bps_tree_block_id_t *expected_this_id,
+			   bps_tree_block_id_t expected_parent_id,
 			   bool check_fullness)
 {
 	if (block->type != BPS_TREE_BT_LEAF && block->type != BPS_TREE_BT_INNER)
 		return 0x10;
+#ifdef BPS_BLOCK_PARENT_AND_POS
+	if (block->parent_id != expected_parent_id)
+		return 0x20000000;
+#else
+	(void)expected_parent_id;
+#endif
 	if (block->type == BPS_TREE_BT_LEAF) {
 		struct bps_leaf *leaf = (struct bps_leaf *)(block);
 		int result = 0;
@@ -6342,7 +6470,7 @@ bps_tree_debug_check_block(const struct bps_tree_common *tree,
 				bps_tree_restore_block(tree,
 						       inner->child_ids[i]),
 				inner->child_ids[i], level - 1, &child_card,
-				expected_prev_id, expected_this_id,
+				expected_prev_id, expected_this_id, id,
 				check_fullness_next);
 #ifdef BPS_INNER_CHILD_CARDS
 			if (inner->child_cards[i] != child_card)
@@ -6388,8 +6516,7 @@ bps_tree_debug_check_impl(const struct bps_tree_common *tree)
 	result |= bps_tree_debug_check_block(tree, root, tree->root_id,
 					     tree->depth, &calc_count,
 					     &expected_prev_id,
-					     &expected_this_id,
-					     false);
+					     &expected_this_id, -1, false);
 	assert(calc_count >= 0);
 	if (expected_this_id != (bps_tree_block_id_t)(-1))
 		result |= 0x40000;
@@ -6494,6 +6621,7 @@ bps_tree_print_block(const struct bps_tree_common *tree,
 		     const struct bps_block *block,
 		     int indent, const char *elem_fmt)
 {
+	bps_tree_print_indent(indent);
 	if (block->type == BPS_TREE_BT_INNER)
 		bps_tree_print_inner(tree,
 				     (const struct bps_inner *)block,
@@ -7981,6 +8109,8 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_get_children_card
 #undef bps_tree_get_first_children_card
 #undef bps_tree_get_last_children_card
+#undef bps_tree_set_block_parent
+#undef bps_tree_alter_children_parent
 #undef bps_tree_insert_into_leaf
 #undef bps_tree_insert_into_inner
 #undef bps_tree_delete_from_leaf
