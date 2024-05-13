@@ -111,9 +111,7 @@ static int
 coio_on_start(void *data)
 {
 	(void) data;
-	struct cord *cord = (struct cord *)calloc(sizeof(struct cord), 1);
-	if (!cord)
-		return -1;
+	struct cord *cord = xcalloc(1, sizeof(struct cord));
 	cord_create(cord, "coio");
 	return 0;
 }
