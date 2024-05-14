@@ -52,6 +52,8 @@ compat.add_option({
     action = function() end,
 })
 
+local M = {}
+
 --
 -- Default output handler set to YAML for backward
 -- compatibility reason.
@@ -174,7 +176,7 @@ local function parse_output(value)
     return nil, fmt, opts, local_eos
 end
 
-local function set_default_output(value)
+function M.set_default_output(value)
     if value == nil then
         error("Nil output value passed")
     end
@@ -186,7 +188,7 @@ local function set_default_output(value)
     default_output_format["opts"] = opts
 end
 
-local function get_default_output(...)
+function M.get_default_output(...)
     local args = ...
     if args ~= nil then
         error("Arguments provided while prohibited")
@@ -236,7 +238,7 @@ end
 --
 -- Set/get current console EOS value from
 -- currently active output format.
-local function console_eos(eos_value)
+function M.eos(eos_value)
     if not eos_value then
         return tostring(current_eos())
     end
@@ -268,7 +270,7 @@ end
 --
 -- Set delimiter
 --
-local function delimiter(delim)
+function M.delimiter(delim)
     local self = fiber.self().storage.console
     if self == nil then
         error("console.delimiter(): need existing console")
@@ -288,7 +290,7 @@ local function set_delimiter(_storage, value)
         return error('Can not install delimiter for net box sessions')
     end
     value = value or ''
-    return delimiter(value)
+    return M.delimiter(value)
 end
 
 local function set_language(storage, value)
@@ -475,7 +477,7 @@ local function local_eval(storage, line)
     return format(unpack(res, 1, res.n))
 end
 
-local function eval(line)
+function M.eval(line)
     return local_eval(box.session.storage, line)
 end
 
@@ -859,7 +861,7 @@ local function repl(self)
     fiber.self().storage.console = nil
 end
 
-local function on_start(foo)
+function M.on_start(foo)
     if foo == nil or type(foo) == 'function' then
         repl_mt.__index.on_start = foo
         return
@@ -867,7 +869,7 @@ local function on_start(foo)
     error('Wrong type of on_start hook: ' .. type(foo))
 end
 
-local function on_client_disconnect(foo)
+function M.on_client_disconnect(foo)
     if foo == nil or type(foo) == 'function' then
         repl_mt.__index.on_client_disconnect = foo
         return
@@ -878,7 +880,7 @@ end
 --
 --
 --
-local function ac(yes_no)
+function M.ac(yes_no)
     local self = fiber.self().storage.console
     if self == nil then
         error("console.ac(): need existing console")
@@ -890,7 +892,7 @@ end
 -- Start REPL on stdin
 --
 local started = false
-local function start()
+function M.start()
     if started then
         error("console is already started")
     end
@@ -935,7 +937,7 @@ end
 --
 -- Connect to remote instance
 --
-local function connect(uri, opts)
+function M.connect(uri, opts)
     opts = opts or {}
 
     local self = fiber.self().storage.console
@@ -1035,7 +1037,7 @@ end
 --
 -- Start admin console
 --
-local function listen(uri)
+function M.listen(uri)
     local host, port
     if uri == nil then
         host = 'unix/'
@@ -1057,17 +1059,6 @@ local function listen(uri)
     return s
 end
 
-return {
-    start = start;
-    eval = eval;
-    delimiter = delimiter;
-    set_default_output = set_default_output;
-    get_default_output = get_default_output;
-    eos = console_eos;
-    ac = ac;
-    connect = connect;
-    listen = listen;
-    on_start = on_start;
-    on_client_disconnect = on_client_disconnect;
-    completion_handler = internal.completion_handler;
-}
+M.completion_handler = internal.completion_handler
+
+return M
