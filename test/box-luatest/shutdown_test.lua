@@ -171,3 +171,20 @@ g.test_shutdown_of_hanging_client_fiber = function(cg)
     t.assert(cg.server:grep_log('cannot gracefully shutdown client fibers', nil,
              {filename = log}))
 end
+
+-- Let's test we free tuples on index drop and immediate shutdown, before
+-- memtx gc fiber have a chance to free all tuples. That is we take care
+-- too free tuples during shutdown. The actual test is done by LSAN.
+-- This way we make sure other tests in similar situation are not flaky
+-- under ASAN.
+g.test_shutdown_memtx_gc_free_tuples = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        box.schema.create_space('test')
+        box.space.test:create_index('pk')
+        box.space.test:insert{1}
+        box.error.injection.set('ERRINJ_MEMTX_DELAY_GC', true)
+        box.space.test.index.pk:drop()
+    end)
+    server:stop()
+end

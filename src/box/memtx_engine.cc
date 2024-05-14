@@ -88,7 +88,10 @@ static inline struct tuple *
 memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 			 const char *end, bool validate);
 
-template <class ALLOC>
+static void
+memtx_engine_run_gc(struct memtx_engine *memtx, bool *stop);
+
+template<class ALLOC>
 static void
 memtx_alloc_init(void)
 {
@@ -189,6 +192,25 @@ memtx_build_secondary_keys(struct space *space, void *param)
 	}
 	memtx_space->replace = memtx_space_replace_all_keys;
 	return 0;
+}
+
+/**
+ * Memtx shutdown. Shutdown stops all internal fiber. Yields.
+ */
+static void
+memtx_engine_shutdown(struct engine *engine)
+{
+	struct memtx_engine *memtx = (struct memtx_engine *)engine;
+	fiber_cancel(memtx->gc_fiber);
+	fiber_join(memtx->gc_fiber);
+	memtx->gc_fiber = NULL;
+
+#ifdef ENABLE_ASAN
+	/* We check for memory leaks in ASAN. */
+	bool stop = false;
+	while (!stop)
+		memtx_engine_run_gc(memtx, &stop);
+#endif
 }
 
 static void
@@ -1371,7 +1393,7 @@ memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 
 static const struct engine_vtab memtx_engine_vtab = {
 	/* .free = */ memtx_engine_free,
-	/* .shutdown = */ generic_engine_shutdown,
+	/* .shutdown = */ memtx_engine_shutdown,
 	/* .create_space = */ memtx_engine_create_space,
 	/* .create_read_view = */ memtx_engine_create_read_view,
 	/* .prepare_join = */ memtx_engine_prepare_join,
@@ -1428,7 +1450,7 @@ memtx_engine_gc_f(va_list va)
 	while (!fiber_is_cancelled()) {
 		FiberGCChecker gc_check;
 		bool stop;
-		ERROR_INJECT_YIELD(ERRINJ_MEMTX_DELAY_GC);
+		ERROR_INJECT_YIELD_CANCELLABLE(ERRINJ_MEMTX_DELAY_GC, return 0);
 		memtx_engine_run_gc(memtx, &stop);
 		if (stop) {
 			fiber_yield_timeout(TIMEOUT_INFINITY);
@@ -1525,6 +1547,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	memtx->gc_fiber = fiber_new_system("memtx.gc", memtx_engine_gc_f);
 	if (memtx->gc_fiber == NULL)
 		goto fail;
+	fiber_set_joinable(memtx->gc_fiber, true);
 
 	/*
 	 * Currently we have two quota consumers: tuple and index allocators.
