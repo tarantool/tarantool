@@ -4962,6 +4962,8 @@ box_cfg_xc(void)
 	box_set_replication_sync_timeout();
 	box_set_replication_skip_conflict();
 	box_set_replication_anon();
+	if (box_set_wal_queue_max_size() != 0)
+		diag_raise();
 	/*
 	 * Must be set before opening the server port, because it may be
 	 * requested by a client before the configuration is completed.
