@@ -5510,6 +5510,8 @@ box_cfg_xc(void)
 	box_set_replication_skip_conflict();
 	if (box_check_instance_name(cfg_instance_name) != 0)
 		diag_raise();
+	if (box_set_wal_queue_max_size() != 0)
+		diag_raise();
 	cfg_replication_anon = box_check_replication_anon();
 	box_broadcast_ballot();
 	/*
