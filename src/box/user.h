@@ -222,12 +222,13 @@ int
 role_revoke(struct user *grantee, struct user *role);
 
 /**
- * Grant or revoke a single privilege to a user or role
- * and re-evaluate effective access of all users of this
- * role if this role.
+ * Grant or revoke a single privilege to a user or role and re-evaluate
+ * effective access of all users of this role if this role. For the purpose of
+ * the rolled back statement, please refer to `user_reload_privs`.
  */
 int
-priv_grant(struct user *grantee, struct priv_def *priv);
+priv_grant(struct user *grantee, struct priv_def *priv,
+	   struct txn_stmt *rolled_back_stmt);
 
 int
 priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple);
