@@ -3890,10 +3890,11 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 
 /**
  * Update a metadata cache object with the new access
- * data.
+ * data. For the purpose of the rolled back statement, please refer to
+ * `user_reload_privs`.
  */
 static int
-grant_or_revoke(struct priv_def *priv)
+grant_or_revoke(struct priv_def *priv, struct txn_stmt *rolled_back_stmt)
 {
 	struct user *grantee = user_by_id(priv->grantee_id);
 	if (grantee == NULL)
@@ -3914,7 +3915,7 @@ grant_or_revoke(struct priv_def *priv)
 				return -1;
 		}
 	} else {
-		if (priv_grant(grantee, priv) != 0)
+		if (priv_grant(grantee, priv, rolled_back_stmt) != 0)
 			return -1;
 	}
 	return 0;
@@ -3924,13 +3925,12 @@ grant_or_revoke(struct priv_def *priv)
 static int
 revoke_priv(struct trigger *trigger, void *event)
 {
-	(void) event;
 	struct tuple *tuple = (struct tuple *)trigger->data;
 	struct priv_def priv;
 	if (priv_def_create_from_tuple(&priv, tuple) != 0)
 		return -1;
 	priv.access = 0;
-	if (grant_or_revoke(&priv) != 0)
+	if (grant_or_revoke(&priv, (struct txn_stmt *)event) != 0)
 		return -1;
 	return 0;
 }
@@ -3939,11 +3939,10 @@ revoke_priv(struct trigger *trigger, void *event)
 static int
 modify_priv(struct trigger *trigger, void *event)
 {
-	(void) event;
 	struct tuple *tuple = (struct tuple *)trigger->data;
 	struct priv_def priv;
 	if (priv_def_create_from_tuple(&priv, tuple) != 0 ||
-	    grant_or_revoke(&priv) != 0)
+	    grant_or_revoke(&priv, (struct txn_stmt *)event) != 0)
 		return -1;
 	return 0;
 }
@@ -3964,7 +3963,7 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 	if (new_tuple != NULL && old_tuple == NULL) {	/* grant */
 		if (priv_def_create_from_tuple(&priv, new_tuple) != 0 ||
 		    priv_def_check(&priv, PRIV_GRANT) != 0 ||
-		    grant_or_revoke(&priv) != 0)
+		    grant_or_revoke(&priv, NULL) != 0)
 			return -1;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(revoke_priv, new_tuple);
@@ -3977,7 +3976,7 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 		    priv_def_check(&priv, PRIV_REVOKE) != 0)
 			return -1;
 		priv.access = 0;
-		if (grant_or_revoke(&priv) != 0)
+		if (grant_or_revoke(&priv, NULL) != 0)
 			return -1;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(modify_priv, old_tuple);
@@ -3987,7 +3986,7 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 	} else {                                       /* modify */
 		if (priv_def_create_from_tuple(&priv, new_tuple) != 0 ||
 		    priv_def_check(&priv, PRIV_GRANT) != 0 ||
-		    grant_or_revoke(&priv) != 0)
+		    grant_or_revoke(&priv, NULL) != 0)
 			return -1;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(modify_priv, old_tuple);

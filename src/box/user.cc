@@ -41,6 +41,7 @@
 #include "sequence.h"
 #include "trivia/util.h"
 #include "tt_static.h"
+#include "txn.h"
 
 struct universe universe;
 static struct user users[BOX_USER_MAX];
@@ -401,10 +402,31 @@ user_set_effective_access(struct user *user)
 }
 
 /**
- * Reload user privileges and re-grant them.
+ * Reload a single user privilege from a privilege tuple.
  */
 static int
-user_reload_privs(struct user *user)
+user_reload_priv(struct user *user, struct tuple *tuple)
+{
+	struct priv_def priv;
+	if (priv_def_create_from_tuple(&priv, tuple) != 0)
+		return -1;
+	/**
+	 * Skip role grants, we're only
+	 * interested in real objects.
+	 */
+	if (priv.object_type != SC_ROLE || !(priv.access & PRIV_X))
+		user_grant_priv(user, &priv);
+	return 0;
+}
+
+/**
+ * Reload user privileges and re-grant them. If a rolled back statement is
+ * passed, the privileges are reloaded as part of the rollback process, so we
+ * must account for the changes made by the statement and use the old data
+ * (which will be the actual data after rollback).
+ */
+static int
+user_reload_privs(struct user *user, struct txn_stmt *rolled_back_stmt)
 {
 	if (user->is_dirty == false)
 		return 0;
@@ -444,23 +466,42 @@ user_reload_privs(struct user *user)
 		if (it == NULL)
 			return -1;
 		IteratorGuard iter_guard(it);
-
+		bool in_rollback = rolled_back_stmt != NULL;
+		struct tuple *old_tuple = in_rollback ?
+			rolled_back_stmt->old_tuple : NULL;
+		struct tuple *new_tuple = in_rollback ?
+			rolled_back_stmt->new_tuple : NULL;
+		assert(!in_rollback || old_tuple != NULL || new_tuple != NULL);
+		struct key_def *key_def = index->def->key_def;
+		int cmp_old = old_tuple != NULL ?
+			      tuple_compare_with_key(old_tuple, HINT_NONE, key,
+						     1, HINT_NONE, key_def) : 0;
+		int cmp_new = new_tuple != NULL && old_tuple == NULL ?
+			      tuple_compare_with_key(new_tuple, HINT_NONE, key,
+						     1, HINT_NONE, key_def) : 0;
+		if (cmp_old != 0 || cmp_new != 0)
+			in_rollback = false;
+		assert(old_tuple == NULL || new_tuple == NULL ||
+		       tuple_compare(new_tuple, HINT_NONE, old_tuple, HINT_NONE,
+				     key_def) == 0);
 		struct tuple *tuple;
 		if (iterator_next(it, &tuple) != 0)
 			return -1;
 		while (tuple != NULL) {
-			struct priv_def priv;
-			if (priv_def_create_from_tuple(&priv, tuple) != 0)
+			if (in_rollback && tuple == new_tuple) {
+				tuple = old_tuple;
+				if (tuple == NULL)
+					goto next_tuple;
+			}
+			if (user_reload_priv(user, tuple) != 0)
 				return -1;
-			/**
-			 * Skip role grants, we're only
-			 * interested in real objects.
-			 */
-			if (priv.object_type != SC_ROLE || !(priv.access & PRIV_X))
-				user_grant_priv(user, &priv);
+next_tuple:
 			if (iterator_next(it, &tuple) != 0)
 				return -1;
 		}
+		if (in_rollback && new_tuple == NULL &&
+		    user_reload_priv(user, old_tuple) != 0)
+			return -1;
 	}
 	{
 		/* Take into account privs granted through roles. */
@@ -746,11 +787,13 @@ role_check(struct user *grantee, struct user *role)
 }
 
 /**
- * Re-calculate effective grants of the linked subgraph
- * this user/role is a part of.
+ * Re-calculate effective grants of the linked subgraph this user/role is a
+ * part of. For the purpose of the rolled back statement, please refer to
+ * `user_reload_privs`.
  */
 int
-rebuild_effective_grants(struct user *grantee)
+rebuild_effective_grants(struct user *grantee,
+			 struct txn_stmt *rolled_back_stmt)
 {
 	/*
 	 * Recurse over all roles to which grantee is granted
@@ -801,7 +844,8 @@ rebuild_effective_grants(struct user *grantee)
 			struct user_map indirect_edges = user->roles;
 			user_map_minus(&indirect_edges, &transitive_closure);
 			if (user_map_is_empty(&indirect_edges)) {
-				if (user_reload_privs(user) != 0)
+				if (user_reload_privs(user,
+						      rolled_back_stmt) != 0)
 					return -1;
 				user_map_union(&next_layer, &user->users);
 			} else {
@@ -837,7 +881,7 @@ role_grant(struct user *grantee, struct user *role)
 {
 	user_map_set(&role->users, grantee->auth_token);
 	user_map_set(&grantee->roles, role->auth_token);
-	if (rebuild_effective_grants(grantee) != 0)
+	if (rebuild_effective_grants(grantee, NULL) != 0)
 		return -1;
 	return 0;
 }
@@ -851,13 +895,14 @@ role_revoke(struct user *grantee, struct user *role)
 {
 	user_map_clear(&role->users, grantee->auth_token);
 	user_map_clear(&grantee->roles, role->auth_token);
-	if (rebuild_effective_grants(grantee) != 0)
+	if (rebuild_effective_grants(grantee, NULL) != 0)
 		return -1;
 	return 0;
 }
 
 int
-priv_grant(struct user *grantee, struct priv_def *priv)
+priv_grant(struct user *grantee, struct priv_def *priv,
+	   struct txn_stmt *rolled_back_stmt)
 {
 	struct access *object = access_get(priv);
 	if (object == NULL)
@@ -872,7 +917,7 @@ priv_grant(struct user *grantee, struct priv_def *priv)
 	struct access *access = &object[grantee->auth_token];
 	access->granted = priv->access;
 	access_put(priv, object);
-	if (rebuild_effective_grants(grantee) != 0)
+	if (rebuild_effective_grants(grantee, rolled_back_stmt) != 0)
 		return -1;
 	return 0;
 }
