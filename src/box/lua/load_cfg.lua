@@ -651,6 +651,7 @@ local dynamic_cfg_skip_at_load = {
     replication_anon        = true,
     bootstrap_strategy      = true,
     wal_dir_rescan_delay    = true,
+    wal_queue_max_size      = true,
     custom_proc_title       = true,
     force_recovery          = true,
     instance_uuid           = true,
