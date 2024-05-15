@@ -41,6 +41,9 @@ are written to globals.
 In the new behavior, they're written to a variable scope attached to the console
 session.
 
+Also, a couple of built-in modules are added into the initial console variable
+scope in the new behavior.
+
 https://tarantool.io/compat/console_session_scope_vars
 ]]
 
@@ -417,6 +420,61 @@ local function table_pack(...)
     return {n = select('#', ...), ...}
 end
 
+local initial_env
+
+-- Get initial console environment.
+--
+-- If the console_session_scope_vars compat option is set to new,
+-- each console session has its own variable scope (environment)
+-- created before execution of a first command.
+--
+-- This environment initially contains a couple of frequently used
+-- built-in modules. A non-local variable assignment within a
+-- command modifies the environment.
+--
+-- The initial environment is returned by console.initial_env().
+-- It is a table that may be modified by a user or completely
+-- replaced with a new table using console.set_initial_env().
+-- These calls don't affect existing console sessions, only ones
+-- that are created afterwards.
+function M.initial_env()
+    if initial_env == nil then
+        initial_env = {
+            clock     = require('clock'),
+            compat    = require('compat'),
+            config    = require('config'),
+            datetime  = require('datetime'),
+            decimal   = require('decimal'),
+            ffi       = require('ffi'),
+            fiber     = require('fiber'),
+            fio       = require('fio'),
+            fun       = require('fun'),
+            json      = require('json'),
+            log       = require('log'),
+            msgpack   = require('msgpack'),
+            popen     = require('popen'),
+            uuid      = require('uuid'),
+            varbinary = require('varbinary'),
+            yaml      = require('yaml'),
+        }
+    end
+    return initial_env
+end
+
+-- Set initial console environment.
+--
+-- Accepts a table or a nil value. If the value is nil, the
+-- initial environment is reset to a default value.
+--
+-- See console.initial_env() for details.
+function M.set_initial_env(env)
+    if type(env) ~= 'table' and type(env) ~= 'nil' then
+        error(('console.set_initial_env: expected table or nil, got %s'):format(
+            type(env)), 2)
+    end
+    initial_env = env
+end
+
 local function create_env_on_demand(storage)
     if compat.console_session_scope_vars:is_old() then
         return
@@ -424,7 +482,7 @@ local function create_env_on_demand(storage)
     if storage.env ~= nil then
         return
     end
-    storage.env = setmetatable({}, {
+    storage.env = setmetatable(table.copy(M.initial_env()), {
         -- Read from globals if there is no local variable.
         __index = _G,
     })
