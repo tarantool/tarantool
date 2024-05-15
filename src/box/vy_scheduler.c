@@ -1840,19 +1840,28 @@ retry:
 	if (!lsm->is_dumping && lsm->pin_count == 0 &&
 	    vy_lsm_generation(lsm) == scheduler->dump_generation) {
 		/*
+		 * The code below may yield. Take a reference to the LSM tree
+		 * to make sure it isn't deleted in the meantime.
+		 */
+		vy_lsm_ref(lsm);
+		/*
 		 * Dump is in progress and there is an LSM tree that
 		 * contains data that must be dumped at the current
 		 * round. Try to create a task for it.
 		 */
 		if (worker == NULL) {
 			worker = vy_worker_pool_get(&scheduler->dump_pool);
-			if (worker == NULL)
+			if (worker == NULL) {
+				vy_lsm_unref(lsm);
 				return 0; /* all workers are busy */
+			}
 		}
 		if (vy_task_dump_new(scheduler, worker, lsm, ptask) != 0) {
 			vy_worker_pool_put(worker);
+			vy_lsm_unref(lsm);
 			return -1;
 		}
+		vy_lsm_unref(lsm);
 		if (*ptask != NULL)
 			return 0; /* new task */
 		/*
@@ -1909,15 +1918,24 @@ retry:
 		goto no_task; /* nothing to do */
 	if (vy_lsm_compaction_priority(lsm) <= 1)
 		goto no_task; /* nothing to do */
+	/*
+	 * The code below may yield. Take a reference to the LSM tree
+	 * to make sure it isn't deleted in the meantime.
+	 */
+	vy_lsm_ref(lsm);
 	if (worker == NULL) {
 		worker = vy_worker_pool_get(&scheduler->compaction_pool);
-		if (worker == NULL)
+		if (worker == NULL) {
+			vy_lsm_unref(lsm);
 			return 0; /* all workers are busy */
+		}
 	}
 	if (vy_task_compaction_new(scheduler, worker, lsm, ptask) != 0) {
 		vy_worker_pool_put(worker);
+		vy_lsm_unref(lsm);
 		return -1;
 	}
+	vy_lsm_unref(lsm);
 	if (*ptask == NULL)
 		goto retry; /* LSM tree dropped or range split/coalesced */
 	return 0; /* new task */
