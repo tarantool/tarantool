@@ -920,7 +920,7 @@ g.test_dml_update_error = function(cg)
             ops = {{':', 2, 2, 1, 'foo'}},
             tuple = {1, 2},
             message = "Argument type in operation ':' on field 2 does not " ..
-                      "match field type: expected a string"
+                      "match field type: expected a string or varbinary"
         }, test.update, test, {1}, {{':', 2, 2, 1, 'foo'}})
 
         local dummy = function(_, new) return new end
