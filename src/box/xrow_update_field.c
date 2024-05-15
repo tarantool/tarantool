@@ -237,14 +237,25 @@ xrow_update_mp_read_scalar(const char **expr,
 		ret->type = XUPDATE_TYPE_FLOAT;
 		ret->flt = mp_decode_float(expr);
 		break;
-	case MP_STR: {
+	case MP_STR:
+	case MP_BIN:
+	{
 		ret->type = XUPDATE_TYPE_STR;
 		struct xrow_update_string *str = &ret->str;
-		str->array[0].data = mp_decode_str(expr, &str->array[0].length);
-		memset(&str->array[1], 0, sizeof(str->array[1]) * 2);
-		ret->str.type = XROW_UPDATE_STRING_SINGLE;
-		break;
+		if (mp_typeof(**expr) == MP_STR) {
+			str->array[0].data =
+				mp_decode_str(expr, &str->array[0].length);
+			str->store_type = XUPDATE_STORE_TYPE_STR;
+		} else {
+			assert(mp_typeof(**expr) == MP_BIN);
+			str->array[0].data =
+				mp_decode_bin(expr, &str->array[0].length);
+			str->store_type = XUPDATE_STORE_TYPE_BIN;
 		}
+		memset(&str->array[1], 0, sizeof(str->array[1]) * 2);
+		str->type = XROW_UPDATE_STRING_SINGLE;
+		break;
+	}
 	case MP_EXT:
 		len = mp_decode_extl(expr, &ext_type);
 		if (ext_type == MP_DECIMAL) {
@@ -258,6 +269,10 @@ xrow_update_mp_read_scalar(const char **expr,
 	}
 }
 
+/**
+ * Decode string or varbinary argument of update operation.
+ * Set error and return -1 if it's not a string or varbinary.
+ */
 static inline int
 xrow_update_mp_read_str(struct xrow_update_op *op, const char **expr,
 			uint32_t *len, const char **ret)
@@ -265,8 +280,11 @@ xrow_update_mp_read_str(struct xrow_update_op *op, const char **expr,
 	if (mp_typeof(**expr) == MP_STR) {
 		*ret = mp_decode_str(expr, len);
 		return 0;
+	} else if (mp_typeof(**expr) == MP_BIN) {
+		*ret = mp_decode_bin(expr, len);
+		return 0;
 	}
-	return xrow_update_err_arg_type(op, "a string");
+	return xrow_update_err_arg_type(op, "a string or varbinary");
 }
 
 /* }}} read_arg helpers. */
@@ -423,7 +441,16 @@ xrow_update_scalar_sizeof(const struct xrow_update_scalar *scalar)
 	case XUPDATE_TYPE_DECIMAL:
 		return mp_sizeof_decimal(&scalar->dec);
 	case XUPDATE_TYPE_STR:
-		return mp_sizeof_str(xrow_update_string_size(&scalar->str));
+	{
+		int data_length = xrow_update_string_size(&scalar->str);
+		if (scalar->str.store_type == XUPDATE_STORE_TYPE_STR) {
+			return mp_sizeof_str(data_length);
+		} else {
+			assert(scalar->str.store_type ==
+			       XUPDATE_STORE_TYPE_BIN);
+			return mp_sizeof_bin(data_length);
+		}
+	}
 	case XUPDATE_TYPE_NONE:
 	default:
 		unreachable();
@@ -568,7 +595,7 @@ xrow_update_op_do_splice(struct xrow_update_op *op,
 	struct xrow_update_arg_splice *arg = &op->arg.splice;
 
 	if (scalar->type != XUPDATE_TYPE_STR)
-		return xrow_update_err_arg_type(op, "a string");
+		return xrow_update_err_arg_type(op, "a string or varbinary");
 
 	struct xrow_update_string *str = &scalar->str;
 	int32_t str_len = xrow_update_string_size(str);
@@ -620,12 +647,12 @@ xrow_update_op_do_splice(struct xrow_update_op *op,
 /* {{{ store_op */
 
 /**
- * Store string rope representation as MsgPack.
+ * Store string or varbinary rope representation as MsgPack.
  *
  * @param str A string.
  * @param out A pointer to output buffer.
  *
- * @return Output buffer position after encoded string.
+ * @return Output buffer position after encoded string (or varbinary).
  */
 static char *
 xrow_update_store_string(const struct xrow_update_string *str, char *out);
@@ -695,7 +722,12 @@ xrow_update_string_store_leaf(const char *data, size_t size, void *cb_arg)
 static char *
 xrow_update_store_string(const struct xrow_update_string *str, char *out)
 {
-	out = mp_encode_strl(out, xrow_update_string_size(str));
+	if (str->store_type == XUPDATE_STORE_TYPE_STR) {
+		out = mp_encode_strl(out, xrow_update_string_size(str));
+	} else {
+		assert(str->store_type == XUPDATE_STORE_TYPE_BIN);
+		out = mp_encode_binl(out, xrow_update_string_size(str));
+	}
 	if (str->type < XROW_UPDATE_STRING_ROPE) {
 		for (size_t i = 0; i < lengthof(str->array); i++) {
 			memcpy(out, str->array[i].data, str->array[i].length);

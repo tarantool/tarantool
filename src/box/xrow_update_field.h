@@ -112,8 +112,19 @@ enum xrow_update_scalar_type {
 	XUPDATE_TYPE_FLOAT = 3,
 	/** struct int96_num */
 	XUPDATE_TYPE_INT = 4,
-	/** xrow_update_string */
+	/** xrow_update_string for MP_STR and MP_BIN */
 	XUPDATE_TYPE_STR = 5,
+};
+
+/**
+ * Store type of string (in terms of msgpack it would be MP_STR or MP_BIN)
+ * from which the string was read and to which it should be stored.
+ */
+enum xrow_update_str_store_type {
+	/** MP_STR */
+	XUPDATE_STORE_TYPE_STR,
+	/** MP_BIN */
+	XUPDATE_STORE_TYPE_BIN,
 };
 
 /**
@@ -146,7 +157,7 @@ struct xrow_update_string_chunk {
 };
 
 /**
- * String value.
+ * String or varbinary value.
  */
 struct xrow_update_string {
 	union {
@@ -166,6 +177,8 @@ struct xrow_update_string {
 	};
 	/** String value type. See enum definition for details. */
 	enum xrow_update_string_type type;
+	/** Store type. See enum definition for details. */
+	enum xrow_update_str_store_type store_type;
 };
 
 /**
