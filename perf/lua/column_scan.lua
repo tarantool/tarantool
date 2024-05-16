@@ -104,7 +104,7 @@ box.once('init', function()
             end
         end
         s:insert(tuple)
-        if i % 1000 then
+        if i % 1000 == 0 then
             box.commit()
             local pct = math.floor(100 * i / params.row_count)
             if pct ~= pct_complete then
