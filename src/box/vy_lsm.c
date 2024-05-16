@@ -142,6 +142,31 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 
 	struct key_def *key_def = key_def_dup(index_def->key_def);
 	struct key_def *cmp_def = key_def_dup(index_def->cmp_def);
+	/*
+	 * A unique nullable key definition extended with primary key parts
+	 * (cmp_def) assumes that two tuples are equal *without* comparing
+	 * primary key fields if all secondary key fields are equal and not
+	 * nulls, see tuple_compare_slowpath(). This is a hack required to
+	 * ignore the uniqueness constraint for nulls in memtx. The memtx
+	 * engine can't use the secondary key definition as is (key_def) for
+	 * comparing tuples in the index tree, as it does for a non-nullable
+	 * unique index, because this wouldn't allow insertion of any
+	 * duplicates, including nulls. It couldn't use cmp_def without this
+	 * hack, either, because then conflicting tuples with the same
+	 * secondary key fields would always compare as not equal due to
+	 * different primary key parts.
+	 *
+	 * For Vinyl, this hack isn't required because it explicitly skips
+	 * the uniqueness check if any of the indexed fields are nulls, see
+	 * vy_check_is_unique_secondary(). Furthermore, this hack is harmful
+	 * because Vinyl relies on the fact that two tuples compare as equal by
+	 * cmp_def if and only if *all* key fields (both secondary and primary)
+	 * are equal. For example, this is used in the transaction manager,
+	 * which overwrites statements equal by cmp_def, see vy_tx_set_entry().
+	 *
+	 * We disable this hack by resetting unique_part_count in cmp_def.
+	 */
+	cmp_def->unique_part_count = cmp_def->part_count;
 
 	lsm->cmp_def = cmp_def;
 	lsm->key_def = key_def;
