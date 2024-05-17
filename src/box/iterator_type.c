@@ -44,6 +44,8 @@ const char *iterator_type_strs[] = {
 	/* [ITER_BITS_ALL_NOT_SET] = */ "BITS_ALL_NOT_SET",
 	/* [ITER_OVERLAPS] = */ "OVERLAPS",
 	/* [ITER_NEIGHBOR] = */ "NEIGHBOR",
+	/* [ITER_NP] = */ "NP",
+	/* [ITER_PP] = */ "PP",
 };
 
 static_assert(sizeof(iterator_type_strs) / sizeof(const char *) ==
