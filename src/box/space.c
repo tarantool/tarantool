@@ -516,15 +516,6 @@ space_index_def(struct space *space, int n)
 	return space->index[n]->def;
 }
 
-const char *
-index_name_by_id(struct space *space, uint32_t id)
-{
-	struct index *index = space_index(space, id);
-	if (index != NULL)
-		return index->def->name;
-	return NULL;
-}
-
 /**
  * Run BEFORE triggers and foreign key constraint checks registered for a space.
  * If a trigger changes the current statement, this function updates the
