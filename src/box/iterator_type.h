@@ -72,7 +72,9 @@ enum iterator_type {
 	ITER_BITS_ANY_SET     =  8, /* at least one x's bit is set         */
 	ITER_BITS_ALL_NOT_SET =  9, /* all bits are not set                */
 	ITER_OVERLAPS         = 10, /* key overlaps x                      */
-	ITER_NEIGHBOR         = 11, /* tuples in distance ascending order from specified point */
+	ITER_NEIGHBOR         = 11, /* tuples as they move away from x point */
+	ITER_NP               = 12, /* next prefix, ASC order              */
+	ITER_PP               = 13, /* previous prefix, DESC order         */
 	iterator_type_MAX
 };
 
@@ -81,21 +83,25 @@ enum iterator_type {
 extern const char *iterator_type_strs[];
 
 /**
- * Determine a direction of the given iterator type.
- * That is -1 for REQ, LT and LE and +1 for all others.
+ * Determine whether direction of given iterator type is reverse,
+ * That is true for REQ, LT and LE etc and false for all others.
+ */
+static inline bool
+iterator_type_is_reverse(enum iterator_type type)
+{
+	const unsigned reverse = (1u << ITER_REQ) | (1u << ITER_LT) |
+				 (1u << ITER_LE) | (1u << ITER_PP);
+	return reverse & (1u << type);
+}
+
+/**
+ * Determine a direction of given iterator type.
+ * That is -1 for REQ, LT and LE etc and +1 for all others.
  */
 static inline int
 iterator_direction(enum iterator_type type)
 {
-	const unsigned reverse =
-		(1u << ITER_REQ) | (1u << ITER_LT) | (1u << ITER_LE);
-	return (reverse & (1u << type)) ? -1 : 1;
-}
-
-static inline bool
-iterator_type_is_reverse(enum iterator_type type)
-{
-	return type == ITER_REQ || type == ITER_LT || type == ITER_LE;
+	return iterator_type_is_reverse(type) ? -1 : 1;
 }
 
 #if defined(__cplusplus)
