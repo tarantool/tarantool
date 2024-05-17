@@ -2183,8 +2183,13 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		diag_log();
 		/*
 		 * Upsert is skipped, to match the semantics of
-		 * vy_lsm_upsert().
+		 * vy_lsm_upsert(). Clear the statement so that
+		 * vy_build_on_replace() doesn't try to apply it.
 		 */
+		tuple_unref(stmt->old_tuple);
+		tuple_unref(stmt->new_tuple);
+		stmt->old_tuple = NULL;
+		stmt->new_tuple = NULL;
 		return 0;
 	}
 	return vy_perform_update(env, tx, stmt, space, pk, column_mask);
