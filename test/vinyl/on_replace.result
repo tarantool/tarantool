@@ -788,8 +788,8 @@ space:upsert({1, 1, 1}, {{'+', 2, 1}}) -- must fail
 ...
 old_tuple, new_tuple
 ---
+- [1, 1, 1]
 - [1, 1, 2]
-- [1, 2, 2]
 ...
 space:upsert({4, 4, 4}, {{'!', 4, 400}})
 ---
