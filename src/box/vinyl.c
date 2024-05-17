@@ -1508,8 +1508,6 @@ vy_get_by_raw_key(struct vy_lsm *lsm, struct vy_tx *tx,
  * of the primary index.
  * @param tx         Current transaction.
  * @param rv         Read view.
- * @param space_name Space name.
- * @param index_name Index name.
  * @param lsm        LSM tree corresponding to the index.
  * @param stmt       New tuple.
  *
@@ -1518,7 +1516,6 @@ vy_get_by_raw_key(struct vy_lsm *lsm, struct vy_tx *tx,
  */
 static inline int
 vy_check_is_unique_primary(struct vy_tx *tx, const struct vy_read_view **rv,
-			   const char *space_name, const char *index_name,
 			   struct vy_lsm *lsm, struct tuple *stmt)
 {
 	assert(lsm->index_id == 0);
@@ -1529,8 +1526,11 @@ vy_check_is_unique_primary(struct vy_tx *tx, const struct vy_read_view **rv,
 	if (vy_get(lsm, tx, rv, stmt, &found))
 		return -1;
 	if (found != NULL) {
-		diag_set(ClientError, ER_TUPLE_FOUND, index_name, space_name,
-			 tuple_str(found), tuple_str(stmt), found, stmt);
+		struct index *index = &lsm->base;
+		struct space *space = space_by_id(index->def->space_id);
+		diag_set(ClientError, ER_TUPLE_FOUND, index->def->name,
+			 space_name(space), tuple_str(found), tuple_str(stmt),
+			 found, stmt);
 		tuple_unref(found);
 		return -1;
 	}
@@ -1539,7 +1539,6 @@ vy_check_is_unique_primary(struct vy_tx *tx, const struct vy_read_view **rv,
 
 static int
 vy_check_is_unique_secondary_one(struct vy_tx *tx, const struct vy_read_view **rv,
-				 const char *space_name, const char *index_name,
 				 struct vy_lsm *lsm, struct tuple *stmt,
 				 int multikey_idx)
 {
@@ -1577,8 +1576,11 @@ vy_check_is_unique_secondary_one(struct vy_tx *tx, const struct vy_read_view **r
 		return 0;
 	}
 	if (found != NULL) {
-		diag_set(ClientError, ER_TUPLE_FOUND, index_name, space_name,
-			 tuple_str(found), tuple_str(stmt), found, stmt);
+		struct index *index = &lsm->base;
+		struct space *space = space_by_id(index->def->space_id);
+		diag_set(ClientError, ER_TUPLE_FOUND, index->def->name,
+			 space_name(space), tuple_str(found), tuple_str(stmt),
+			 found, stmt);
 		tuple_unref(found);
 		return -1;
 	}
@@ -1590,8 +1592,6 @@ vy_check_is_unique_secondary_one(struct vy_tx *tx, const struct vy_read_view **r
  * of a secondary index.
  * @param tx         Current transaction.
  * @param rv         Read view.
- * @param space_name Space name.
- * @param index_name Index name.
  * @param lsm        LSM tree corresponding to the index.
  * @param stmt       New tuple.
  *
@@ -1600,19 +1600,16 @@ vy_check_is_unique_secondary_one(struct vy_tx *tx, const struct vy_read_view **r
  */
 static int
 vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
-			     const char *space_name, const char *index_name,
 			     struct vy_lsm *lsm, struct tuple *stmt)
 {
 	assert(lsm->opts.is_unique);
 	if (!lsm->cmp_def->is_multikey) {
-		return vy_check_is_unique_secondary_one(tx, rv,
-				space_name, index_name, lsm, stmt,
-				MULTIKEY_NONE);
+		return vy_check_is_unique_secondary_one(tx, rv, lsm, stmt,
+							MULTIKEY_NONE);
 	}
 	int count = tuple_multikey_count(stmt, lsm->cmp_def);
 	for (int i = 0; i < count; ++i) {
-		if (vy_check_is_unique_secondary_one(tx, rv,
-				space_name, index_name, lsm, stmt, i) != 0)
+		if (vy_check_is_unique_secondary_one(tx, rv, lsm, stmt, i) != 0)
 			return -1;
 	}
 	return 0;
@@ -1658,9 +1655,7 @@ vy_check_is_unique(struct vy_env *env, struct vy_tx *tx,
 	if (space_needs_check_unique_constraint(space, 0) &&
 	    vy_stmt_type(stmt) == IPROTO_INSERT) {
 		struct vy_lsm *lsm = vy_lsm(space->index[0]);
-		if (vy_check_is_unique_primary(tx, rv, space_name(space),
-					       index_name_by_id(space, 0),
-					       lsm, stmt) != 0)
+		if (vy_check_is_unique_primary(tx, rv, lsm, stmt) != 0)
 			return -1;
 	}
 
@@ -1675,9 +1670,7 @@ vy_check_is_unique(struct vy_env *env, struct vy_tx *tx,
 		if (key_update_can_be_skipped(lsm->key_def->column_mask,
 					      column_mask))
 			continue;
-		if (vy_check_is_unique_secondary(tx, rv, space_name(space),
-						 index_name_by_id(space, i),
-						 lsm, stmt) != 0)
+		if (vy_check_is_unique_secondary(tx, rv, lsm, stmt) != 0)
 			return -1;
 	}
 	return 0;
@@ -3932,12 +3925,6 @@ struct vy_build_ctx {
 	 * if this flag is set.
 	 */
 	bool check_unique_constraint;
-	/**
-	 * Names of the altered space and the new index.
-	 * Used for error reporting.
-	 */
-	const char *space_name;
-	const char *index_name;
 	/** Set in case a build error occurred. */
 	bool is_failed;
 	/** Container for storing errors. */
@@ -3969,7 +3956,6 @@ vy_build_on_replace(struct trigger *trigger, void *event)
 	/* Check key uniqueness if necessary. */
 	if (ctx->check_unique_constraint && stmt->new_tuple != NULL &&
 	    vy_check_is_unique_secondary(tx, vy_tx_read_view(tx),
-					 ctx->space_name, ctx->index_name,
 					 lsm, stmt->new_tuple) != 0)
 		goto err;
 
@@ -4042,7 +4028,6 @@ vy_build_insert_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
  */
 static int
 vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
-		      const char *space_name, const char *index_name,
 		      struct tuple_format *new_format,
 		      bool check_unique_constraint, struct tuple *tuple)
 {
@@ -4083,9 +4068,8 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 	 */
 	if (check_unique_constraint) {
 		vy_mem_pin(mem);
-		rc = vy_check_is_unique_secondary(NULL,
-				&env->xm->p_committed_read_view,
-				space_name, index_name, lsm, stmt);
+		rc = vy_check_is_unique_secondary(
+			NULL, &env->xm->p_committed_read_view, lsm, stmt);
 		vy_mem_unpin(mem);
 		if (rc != 0) {
 			tuple_unref(stmt);
@@ -4331,8 +4315,6 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	ctx.lsm = new_lsm;
 	ctx.format = new_format;
 	ctx.check_unique_constraint = check_unique_constraint;
-	ctx.space_name = space_name(src_space);
-	ctx.index_name = new_index->def->name;
 	ctx.is_failed = false;
 	diag_create(&ctx.diag);
 	trigger_create(&on_replace, vy_build_on_replace, &ctx, NULL);
@@ -4374,10 +4356,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 		 * in which case we would insert an outdated tuple.
 		 */
 		if (vy_stmt_lsn(tuple) <= build_lsn) {
-			rc = vy_build_insert_tuple(env, new_lsm,
-						   space_name(src_space),
-						   new_index->def->name,
-						   new_format,
+			rc = vy_build_insert_tuple(env, new_lsm, new_format,
 						   check_unique_constraint,
 						   tuple);
 			if (rc != 0)
