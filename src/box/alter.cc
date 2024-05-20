@@ -1720,7 +1720,16 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 {
 	struct space *old_space = alter->old_space;
 	bool is_min_field_count_changed;
-	if (old_space->format != NULL) {
+	if (old_space->def->opts.upgrade_def != NULL) {
+		/*
+		 * When space upgrade completes, we should unconditionally
+		 * update optionality because current min_field_count value
+		 * of a format respects min_field_count of format which space
+		 * had before upgrade. It was needed to correctly index both
+		 * old and new tuples.
+		 */
+		is_min_field_count_changed = true;
+	} else if (old_space->format != NULL) {
 		is_min_field_count_changed =
 			old_space->format->min_field_count !=
 			alter->new_min_field_count;
@@ -2355,6 +2364,19 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 						     old_space->index_count,
 						     def->fields,
 						     def->field_count);
+		/*
+		 * In the case of space upgrade both old and new tuples will
+		 * be indexed, so new_min_field_count should be the minimal
+		 * min_field_count of old and new formats.
+		 * Space upgrade does a replace in this space without
+		 * upgrade_def on completion, so actual min_field_count will
+		 * be set when space upgrade completes.
+		 */
+		if (def->opts.upgrade_def != NULL) {
+			alter->new_min_field_count = MIN(
+				alter->new_min_field_count,
+				old_space->format->min_field_count);
+		}
 		try {
 			(void) new CheckSpaceFormat(alter);
 			(void) new ModifySpace(alter, def);
