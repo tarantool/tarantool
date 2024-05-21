@@ -20,11 +20,15 @@ local params = require('internal.argparse').parse(arg, {
     {'nodes', 'number'},
     {'nohint', 'boolean'},
     {'ops', 'number'},
+    {'output_format', 'string'},
+    {'output', 'string'},
     {'sync', 'boolean'},
     {'transaction', 'number'},
     {'wal_mode', 'string'},
     {'warmup', 'number'},
 })
+
+local bench = require('benchmark').init(params)
 
 local test_dir = fio.tempdir()
 
@@ -299,19 +303,16 @@ for i = 1, num_fibers do
     end -- the loop is needed for backward compatibility with 1.7
 end
 
--- stop timer for master
-local len = {
-    clock.time()-timer_begin[1],
-    clock.proc()-timer_begin[2]
-}
-
 ops_done = box.info.lsn - ops_done
 
+-- stop timer for master
+local res = bench:add_result('1mops_master', clock.time() - timer_begin[1],
+                             clock.proc() - timer_begin[2], ops_done)
+
 print(string.format('# master done %d ops in time: %f, cpu: %f',
-                    ops_done, len[1], len[2]))
-print('# master average speed', math.floor(ops_done / len[1]), 'ops/sec')
+                    ops_done, res.real_time, res.cpu_time))
+print('# master average speed', res.items_per_second, 'ops/sec')
 print('# master peak speed', math.floor(max_rps), 'ops/sec')
-print('1mops_master_rps', math.floor(max_rps))
 
 -- wait for all replicas and kill them
 if nodes > 1 then
@@ -330,19 +331,18 @@ if nodes > 1 then
         end
     end
     -- stop timer for replicas
-    len = {
-        clock.time()-timer_begin[1],
-        clock.proc()-timer_begin[2]
-    }
+    res = bench:add_result('1mops_replica', clock.time() - timer_begin[1],
+                           clock.proc() - timer_begin[2], ops_done)
 
     print(string.format('# replicas done %d ops in time: %f, cpu: %f',
-                        ops_done, len[1], len[2]))
-    print('1mops_replica_rps', math.floor(ops_done / len[1]))
+                        ops_done, res.real_time, res.cpu_time))
 
     for _, replica in pairs(nodes_ph) do
         replica:kill()
         replica:wait()
     end
 end
+
+bench:dump_results()
 
 exit(0)
