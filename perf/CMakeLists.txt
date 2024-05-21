@@ -1,5 +1,8 @@
 set(CMAKE_CXX_STANDARD 14)
 
+set(PERF_OUTPUT_DIR ${PROJECT_BINARY_DIR}/perf/output)
+file(MAKE_DIRECTORY ${PERF_OUTPUT_DIR})
+
 add_subdirectory(lua)
 
 find_package(benchmark QUIET)
@@ -40,6 +43,8 @@ function(create_perf_test_target)
   message(STATUS "Creating C performance test ${PERF_TARGET}_perftest")
   add_custom_target(${PERF_TARGET}_perftest
                     COMMAND "$<TARGET_FILE:${PERF_TARGET}.perftest>"
+                            "--benchmark_out_format=json"
+                            "--benchmark_out=${PERF_OUTPUT_DIR}/${PERF_TARGET}.json"
                     DEPENDS ${PERF_TARGET}.perftest
                     COMMENT Running ${PERF_TARGET}_perftest
   )

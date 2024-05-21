@@ -43,6 +43,7 @@ extra/Makefile
 extra/*/Makefile
 perf/Makefile
 perf/lua/Makefile
+perf/output/
 test/Makefile
 test/*/Makefile
 test/*/*/Makefile
