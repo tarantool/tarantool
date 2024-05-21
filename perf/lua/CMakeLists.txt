@@ -23,6 +23,8 @@ function(create_perf_lua_test)
                     COMMAND env
                       LUA_PATH="${LUA_PATH}"
                       ${TARANTOOL_BIN} ${TEST_PATH}
+                        --output="${PERF_OUTPUT_DIR}/${PERF_NAME}.json"
+                        --output_format=json
                     COMMENT Running ${PERF_NAME}_perftest
                     DEPENDS tarantool ${TEST_PATH}
                     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
