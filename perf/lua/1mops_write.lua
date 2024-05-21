@@ -11,11 +11,38 @@ local math = require('math')
 local json = require('json')
 local fio = require('fio')
 
-local params = require('internal.argparse').parse(arg, {
+-- XXX: This benchmark should be able to work standalone without
+-- any provided libraries or set LUA_PATH. Add stubs for that
+-- case.
+local benchmark_is_available, benchmark = pcall(require, 'benchmark')
+
+local USAGELINE = [[
+
+ Usage: tarantool 1mops_write.lua [options]
+
+]]
+
+local HELP = [[
+   engine <string, 'memtx'>   - select engine type
+   fibers <number, 50>        - number of fibers to run simultaneously
+   help (same as -h)          - print this message
+   index <string, 'HASH'>     - select index type
+   nodes <number, 1>          - number of nodes to test one-way replication
+   nohint <boolean>           - to turn the index hints off
+   ops <number, 10000000>     - total amount of replaces to be performed
+   sync <boolean>             - to turn the synchro replication on
+   transaction <number, 150>  - number of replaces in one transaction
+   wal_mode <string, 'write'> - WAL synchronization mode
+   warmup <number, 10>        - percent of ops to skip before measurement
+
+ Being run without options, this benchmark tests the HASH index of the memtx
+ engine by running 50 fibers that replace 150 integers, using each as a primary
+ key. Refer to the 'fiber_load' function in sources to change the workload.
+]]
+
+local parsed_params = {
     {'engine', 'string'},
     {'fibers', 'number'},
-    {'help', 'boolean'},
-    {'h', 'boolean'},
     {'index', 'string'},
     {'nodes', 'number'},
     {'nohint', 'boolean'},
@@ -24,7 +51,28 @@ local params = require('internal.argparse').parse(arg, {
     {'transaction', 'number'},
     {'wal_mode', 'string'},
     {'warmup', 'number'},
-})
+}
+
+local params
+local bench
+
+local function dump_benchmark_results(res)
+    print(('%s %d rps'):format(res.name, res.items_per_second))
+end
+
+if benchmark_is_available then
+    params = benchmark.argparse(arg, parsed_params, HELP)
+    bench = benchmark.new(params)
+else
+    table.insert(parsed_params, {'h', 'boolean'})
+    table.insert(parsed_params, {'help', 'boolean'})
+    params = require('internal.argparse').parse(arg, parsed_params)
+    if params.h or params.help then
+        print(USAGELINE .. HELP)
+        os.exit(0)
+    end
+    bench = {}
+end
 
 local test_dir = fio.tempdir()
 
@@ -50,33 +98,6 @@ local function exit(res, details)
         test_dir = nil
     end
     os.exit(res)
-end
-
-if params.help or params.h then
-    print([[
-
- Usage: taskset 0xef tarantool 1mops_write.lua [options]
-
- Options can be used with '--', followed by the value if it's not
- a boolean option. The options list with default values:
-
-   engine <string, 'memtx'>   - select engine type
-   fibers <number, 50>        - number of fibers to run simultaneously
-   help (same as -h)          - print this message
-   index <string, 'HASH'>     - select index type
-   nodes <number, 1>          - number of nodes to test one-way replication
-   nohint <boolean>           - to turn the index hints off
-   ops <number, 10000000>     - total amount of replaces to be performed
-   sync <boolean>             - to turn the synchro replication on
-   transaction <number, 150>  - number of replaces in one transaction
-   wal_mode <string, 'write'> - WAL synchronization mode
-   warmup <number, 10>        - percent of ops to skip before measurement
-
- Being run without options tests the HASH index of memtx engine by
- running of 50 fibers that replace 150 integers using each as a primary
- key. Refer to the 'fiber_load' function below to change the workload.
-]])
-    exit(0)
 end
 
 -- turn true to test the synchronous replication
@@ -299,19 +320,36 @@ for i = 1, num_fibers do
     end -- the loop is needed for backward compatibility with 1.7
 end
 
--- stop timer for master
-local len = {
-    clock.time()-timer_begin[1],
-    clock.proc()-timer_begin[2]
-}
-
 ops_done = box.info.lsn - ops_done
 
+-- stop timer for master
+local res
+local real_time = clock.time() - timer_begin[1]
+local cpu_time = clock.proc() - timer_begin[2]
+if benchmark_is_available then
+    res = bench:add_result('1mops_master', {
+        real_time = real_time,
+        cpu_time = cpu_time,
+        items = ops_done,
+    })
+else
+    res = {
+        name = '1mops_master',
+        real_time = real_time,
+        cpu_time = cpu_time,
+        items = ops_done,
+    }
+    res.items_per_second = ops_done / res.real_time
+end
+
 print(string.format('# master done %d ops in time: %f, cpu: %f',
-                    ops_done, len[1], len[2]))
-print('# master average speed', math.floor(ops_done / len[1]), 'ops/sec')
+                    ops_done, res.real_time, res.cpu_time))
+print('# master average speed', res.items_per_second, 'ops/sec')
 print('# master peak speed', math.floor(max_rps), 'ops/sec')
-print('1mops_master_rps', math.floor(max_rps))
+-- Dump results early if there is no module for it.
+if not benchmark_is_available then
+    dump_benchmark_results(res)
+end
 
 -- wait for all replicas and kill them
 if nodes > 1 then
@@ -330,19 +368,40 @@ if nodes > 1 then
         end
     end
     -- stop timer for replicas
-    len = {
-        clock.time()-timer_begin[1],
-        clock.proc()-timer_begin[2]
-    }
+    local real_time_replica = clock.time() - timer_begin[1]
+    local cpu_time_replica = clock.proc() - timer_begin[2]
+    if benchmark_is_available then
+        res = bench:add_result('1mops_replica', {
+            real_time = real_time_replica,
+            cpu_time = cpu_time_replica,
+            items = ops_done,
+        })
+    else
+        res = {
+            name = '1mops_replica',
+            real_time = real_time_replica,
+            cpu_time = cpu_time_replica,
+            items = ops_done,
+        }
+        res.items_per_second = ops_done / res.real_time
+    end
+
 
     print(string.format('# replicas done %d ops in time: %f, cpu: %f',
-                        ops_done, len[1], len[2]))
-    print('1mops_replica_rps', math.floor(ops_done / len[1]))
+                        ops_done, res.real_time, res.cpu_time))
+    -- Dump results early if there is no module for it.
+    if not benchmark_is_available then
+        dump_benchmark_results(res)
+    end
 
     for _, replica in pairs(nodes_ph) do
         replica:kill()
         replica:wait()
     end
+end
+
+if benchmark_is_available then
+    bench:dump_results()
 end
 
 exit(0)
