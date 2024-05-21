@@ -1033,3 +1033,14 @@ g.after_test('test_dml_upsert_error', function(cg)
         end
     end)
 end)
+
+g.test_error_is = function()
+    t.assert(box.error.is(box.error.new(box.error.UNKNOWN)))
+    t.assert(box.error.is(box.error.new(box.error.UNKNOWN)), 'foo')
+
+    t.assert_not(box.error.is(nil))
+    t.assert_not(box.error.is(1))
+    t.assert_not(box.error.is('foo'))
+    t.assert_not(box.error.is('foo'), 'bar')
+    t.assert_not(box.error.is(box.tuple.new({1, 'foo'})))
+end

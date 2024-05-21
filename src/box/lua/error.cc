@@ -382,6 +382,14 @@ luaT_error_set(struct lua_State *L)
 	return 0;
 }
 
+/** Return whether first argument is box error. */
+static int
+luaT_error_is(struct lua_State *L)
+{
+	lua_pushboolean(L, lua_gettop(L) >= 1 && luaL_iserror(L, 1) != NULL);
+	return 1;
+}
+
 static int
 lbox_errinj_set(struct lua_State *L)
 {
@@ -497,6 +505,10 @@ box_lua_error_init(struct lua_State *L) {
 		{
 			lua_pushcfunction(L, luaT_error_set);
 			lua_setfield(L, -2, "set");
+		}
+		{
+			lua_pushcfunction(L, luaT_error_is);
+			lua_setfield(L, -2, "is");
 		}
 		lua_setfield(L, -2, "__index");
 	}
