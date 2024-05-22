@@ -1,26 +1,33 @@
 --
 -- The test measures run time of various space select operations.
 --
--- Output format:
--- <test-case> <run-time-nanoseconds>
---
--- Options:
--- --pattern <string>  run only tests matching the pattern; it's possible
---                     to specify more than one pattern separated by '|',
---                     for example, 'get|select'
--- --read_view         use a read view
---
+-- Output format (console):
+-- <test-case> <iterations-per-second>
 
 local clock = require('clock')
 local fiber = require('fiber')
+local benchmark = require('benchmark')
 
-local params = require('internal.argparse').parse(arg, {
+local USAGE = [[
+   pattern <string>           - run only tests matching the pattern; it's
+                                possible to specify more than one pattern
+                                separated by '|', for example, 'get|select'
+   read_view <boolean, false> - use a read view
+
+ Being run without options, this benchmark measures the performance of
+ various space select (get, select, pairs) operations.
+]]
+
+local params = benchmark.argparse(arg, {
     {'pattern', 'string'},
     {'read_view', 'boolean'},
-})
+}, USAGE)
+
 if params.pattern then
     params.pattern = string.split(params.pattern, '|')
 end
+
+local bench = benchmark.new(params)
 
 box.cfg({log_level = 'error'})
 box.once('perf_select_init', function()
@@ -222,11 +229,20 @@ local TESTS = {
     },
 }
 
+local function single_run(func)
+    local real_time_start = clock.time()
+    local cpu_time_start = clock.proc()
+    func()
+    local delta_real = clock.time() - real_time_start
+    local delta_cpu = clock.proc() - cpu_time_start
+    return delta_real, delta_cpu
+end
+
 --
 -- Runs the given test case function in a loop.
 -- Returns the average time it takes to run the function once.
 --
-local function bench(test)
+local function run_bench(test)
     local warmup_runs = 1e2 / 4
     local test_runs = 1e2
     local iters_per_run = 1e4
@@ -236,19 +252,26 @@ local function bench(test)
             func()
         end
     end
-    local test_time = 0
+    local real_time = 0
+    local cpu_time = 0
     for i = 1, warmup_runs + test_runs do
         for _ = 1, 5 do
             collectgarbage('collect')
             jit.flush()
             fiber.yield()
         end
-        local t = clock.bench(run)[1]
+        local delta_real, delta_cpu = single_run(run)
         if i > warmup_runs then
-            test_time = test_time + t
+            real_time = real_time + delta_real
+            cpu_time = cpu_time + delta_cpu
         end
     end
-    return test_time / test_runs / iters_per_run
+    local iterations = test_runs * iters_per_run
+    bench:add_result(test.name, {
+        real_time = real_time,
+        cpu_time = cpu_time,
+        items = iterations
+    })
 end
 
 for _, test in ipairs(TESTS) do
@@ -263,9 +286,10 @@ for _, test in ipairs(TESTS) do
         end
     end
     if not skip then
-        local t = bench(test)
-        print(string.format('%s %d', test.name, t * 1e9))
+        run_bench(test)
     end
 end
+
+bench:dump_results()
 
 os.exit(0)
