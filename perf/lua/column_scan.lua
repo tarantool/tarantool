@@ -5,9 +5,11 @@
 -- <test-case> <run-time-seconds>
 --
 -- Options:
--- --engine <string>         space engine to use for the test
 -- --column_count <number>   number of columns in the test space
+-- --engine <string>         space engine to use for the test
 -- --row_count <number>      number of rows in the test space
+-- --output <string>         file to output
+-- --output_format <string>  console (default)|json
 -- --use_read_view           use a read view
 -- --use_scanner_api         use the column scanner API
 --
@@ -23,8 +25,10 @@ local log = require('log')
 local tarantool = require('tarantool')
 
 local params = require('internal.argparse').parse(arg, {
-    {'engine', 'string'},
     {'column_count', 'number'},
+    {'engine', 'string'},
+    {'output', 'string'},
+    {'output_format', 'string'},
     {'row_count', 'number'},
     {'use_read_view', 'boolean'},
     {'use_scanner_api', 'boolean'},
@@ -39,6 +43,8 @@ params.column_count = params.column_count or DEFAULT_COLUMN_COUNT
 params.row_count = params.row_count or DEFAULT_ROW_COUNT
 params.use_read_view = params.use_read_view or false
 params.use_scanner_api = params.use_scanner_api or false
+
+local bench = require('benchmark').init(params)
 
 local BUILDDIR = fio.abspath(fio.pathjoin(os.getenv('BUILDDIR') or '.'))
 local MODULEPATH = fio.pathjoin(BUILDDIR, 'perf', 'lua',
@@ -144,13 +150,25 @@ local TESTS = {
     },
 }
 
+local function run_test(test)
+    local func = test.func
+    local real_time_start = clock.time()
+    local cpu_time_start = clock.proc()
+    func()
+    local delta_real = clock.time() - real_time_start
+    local delta_cpu = clock.proc() - cpu_time_start
+    bench:add_result(test.name, delta_real, delta_cpu, params.row_count)
+end
+
 test_module.init()
 fiber.set_max_slice(9000)
 
 for _, test in ipairs(TESTS) do
     log.info('Running test %s...', test.name)
     test.func() -- warmup
-    print(string.format('%s %.3f', test.name, clock.bench(test.func)[1]))
+    run_test(test)
 end
+
+bench:dump_results()
 
 os.exit(0)
