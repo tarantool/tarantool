@@ -178,6 +178,8 @@
     <member refid="module_8h_1a2693ce4bd8fa71e8ac1e5272fc64d17ea7932b409a1ac013cf61882260176e7b7" kind="enumvalue"><name>ITER_BITS_ALL_NOT_SET</name></member>
     <member refid="module_8h_1a2693ce4bd8fa71e8ac1e5272fc64d17ea7061ef582ade83934ff59be90e9d2506" kind="enumvalue"><name>ITER_OVERLAPS</name></member>
     <member refid="module_8h_1a2693ce4bd8fa71e8ac1e5272fc64d17ea5ba34edc565f08fc941fa73e517bc413" kind="enumvalue"><name>ITER_NEIGHBOR</name></member>
+    <member refid="module_8h_1a2693ce4bd8fa71e8ac1e5272fc64d17ead46e2a3c1bd12eb0fc89a22eedc6714d" kind="enumvalue"><name>ITER_NP</name></member>
+    <member refid="module_8h_1a2693ce4bd8fa71e8ac1e5272fc64d17ea5770a0ac3893ffc783c4b391a8f3eed1" kind="enumvalue"><name>ITER_PP</name></member>
     <member refid="module_8h_1a2693ce4bd8fa71e8ac1e5272fc64d17ea092f494fc2a6fa3346a2b3a322efc66e" kind="enumvalue"><name>iterator_type_MAX</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adce" kind="enum"><name>box_error_code</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcead62756b0ef341430c318e631713512dc" kind="enumvalue"><name>ER_UNKNOWN</name></member>
