@@ -1,15 +1,8 @@
 --
 -- The test measures run time of space full scan.
 --
--- Output format:
--- <test-case> <run-time-seconds>
---
--- Options:
--- --engine <string>         space engine to use for the test
--- --column_count <number>   number of columns in the test space
--- --row_count <number>      number of rows in the test space
--- --use_read_view           use a read view
--- --use_scanner_api         use the column scanner API
+-- Output format (console):
+-- <test-case> <rows-per-second>
 --
 -- NOTE: The test requires a C module. Set the BUILDDIR environment variable to
 -- the tarantool build directory if using out-of-source build.
@@ -21,14 +14,26 @@ local fio = require('fio')
 local ffi = require('ffi')
 local log = require('log')
 local tarantool = require('tarantool')
+local benchmark = require('benchmark')
 
-local params = require('internal.argparse').parse(arg, {
-    {'engine', 'string'},
+local USAGE = [[
+   column_count <number, 100>       - number of columns in the test space
+   engine <string, 'memtx'>         - space engine to use for the test
+   row_count <number, 1000000>      - number of rows in the test space
+   use_read_view <boolean, false>   - use a read view
+   use_scanner_api <boolean, false> - use the column scanner API
+
+ Being run without options, this benchmark measures the run time of a full scan
+ from the space.
+]]
+
+local params = benchmark.argparse(arg, {
     {'column_count', 'number'},
+    {'engine', 'string'},
     {'row_count', 'number'},
     {'use_read_view', 'boolean'},
     {'use_scanner_api', 'boolean'},
-})
+}, USAGE)
 
 local DEFAULT_ENGINE = 'memtx'
 local DEFAULT_COLUMN_COUNT = 100
@@ -39,6 +44,8 @@ params.column_count = params.column_count or DEFAULT_COLUMN_COUNT
 params.row_count = params.row_count or DEFAULT_ROW_COUNT
 params.use_read_view = params.use_read_view or false
 params.use_scanner_api = params.use_scanner_api or false
+
+local bench = benchmark.new(params)
 
 local BUILDDIR = fio.abspath(fio.pathjoin(os.getenv('BUILDDIR') or '.'))
 local MODULEPATH = fio.pathjoin(BUILDDIR, 'perf', 'lua',
@@ -144,13 +151,29 @@ local TESTS = {
     },
 }
 
+local function run_test(test)
+    local func = test.func
+    local real_time_start = clock.time()
+    local cpu_time_start = clock.proc()
+    func()
+    local delta_real = clock.time() - real_time_start
+    local delta_cpu = clock.proc() - cpu_time_start
+    bench:add_result(test.name, {
+        real_time = delta_real,
+        cpu_time = delta_cpu,
+        items = params.row_count,
+    })
+end
+
 test_module.init()
 fiber.set_max_slice(9000)
 
 for _, test in ipairs(TESTS) do
     log.info('Running test %s...', test.name)
     test.func() -- warmup
-    print(string.format('%s %.3f', test.name, clock.bench(test.func)[1]))
+    run_test(test)
 end
+
+bench:dump_results()
 
 os.exit(0)
