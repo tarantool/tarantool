@@ -173,7 +173,8 @@ g.test_net_replicaset_basics = function(cg)
     -- Change the leader.
     local new_leader_name = get_another_storage_name(leader_name)
     cluster[new_leader_name]:exec(function()
-        box.ctl.promote()
+        t.helpers.retrying({timeout = 10, delay = 0.1}, box.ctl.promote)
+        box.ctl.wait_rw()
     end)
 
     -- Check rebind to the new leader.
@@ -236,6 +237,19 @@ g.test_watch_leader = function(cg)
     cluster:start()
     local net_replicaset = require('internal.net.replicaset')
     local connect_cfg = get_connect_cfg(cluster)
+
+    -- Wait for the leader.
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        local leader_count = 0
+        cluster:each(function(server)
+            if server.alias:startswith('storage') then
+                leader_count = leader_count + server:exec(function()
+                    return box.info.ro and 0 or 1
+                end)
+            end
+        end)
+        t.assert_equals(leader_count, 1)
+    end)
 
     -- Set initial value to event 'key1'.
     cluster:each(function(server)
@@ -322,7 +336,8 @@ g.test_watch_leader = function(cg)
     -- Change the leader.
     leader_name = get_another_storage_name(leader_name)
     cluster[leader_name]:exec(function()
-        box.ctl.promote()
+        t.helpers.retrying({timeout = 10, delay = 0.1}, box.ctl.promote)
+        box.ctl.wait_rw()
     end)
 
     -- Check that events was received after the leader change.
@@ -390,7 +405,15 @@ g.test_watch_leader = function(cg)
     -- Change the leader again.
     leader_name = get_another_storage_name(leader_name)
     cluster[leader_name]:exec(function()
-        box.ctl.promote()
+        t.helpers.retrying({timeout = 10, delay = 0.1}, box.ctl.promote)
+        box.ctl.wait_rw()
+    end)
+
+    -- Check that events1 was not while event2 was received from the leader.
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(key1_value, 1 + 4 + 16 + 64)
+        t.assert_equals(key2_value, 8 + 32 + 128 + 2048 + 8192)
+        t.assert_equals(long_call_count, 3)
     end)
 
     -- Set new values again.
@@ -411,7 +434,7 @@ g.test_watch_leader = function(cg)
     -- Check that events1 was not while event2 was received from the leader.
     t.helpers.retrying({timeout = 10, delay = 0.1}, function()
         t.assert_equals(key1_value, 1 + 4 + 16 + 64)
-        t.assert_equals(key2_value, 8 + 32 + 128 + 2048 + 16)
+        t.assert_equals(key2_value, 8 + 32 + 128 + 2048 + 8192 + 16)
         t.assert_equals(long_call_count, 3)
     end)
     long_wait = false
