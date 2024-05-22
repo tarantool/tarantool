@@ -1,9 +1,16 @@
--- It is recommended to run benchmark using taskset for stable results.
--- taskset -c 1 tarantool uri_escape_unescape.lua
-
 local uri = require("uri")
 local clock = require("clock")
 local t = require("tarantool")
+local benchmark = require("benchmark")
+
+local USAGE = [[
+ This benchmark measures the performance of URI decoding and encoding
+ for the chunk with many symbols to be escaped.
+]]
+
+local params = benchmark.argparse(arg, {}, USAGE)
+
+local bench = benchmark.new(params)
 
 local _, _, build_type = string.match(t.build.target, "^(.+)-(.+)-(.+)$")
 if build_type == "Debug" then
@@ -29,18 +36,39 @@ local decode_sample = uri.escape(encode_sample, escape_opts)
 --     exit the parent trace.
 jit.opt.start("hotloop=1", "hotexit=1")
 
-local cycles = 10^3
-local start = clock.monotonic()
-for _ = 1, cycles do
-    uri.escape(encode_sample)
-end
-local encode_time = cycles / (clock.monotonic() - start)
+local CYCLES = 10^3
 
-start = clock.monotonic()
-for _ = 1, cycles do
-    uri.unescape(decode_sample)
-end
-local decode_time = cycles / (clock.monotonic() - start)
+local tests = {{
+    name = "uri.escape",
+    payload = function()
+        for _ = 1, CYCLES do
+            uri.escape(encode_sample)
+        end
+    end,
+}, {
+    name = "uri.unescape",
+    payload = function()
+        for _ = 1, CYCLES do
+            uri.unescape(decode_sample)
+        end
+    end,
+}}
 
-print(("uri.escape   %.2f  runs/sec"):format(encode_time))
-print(("uri.unescape %.2f  runs/sec"):format(decode_time))
+local function run_test(testname, func)
+    local real_time = clock.time()
+    local cpu_time = clock.proc()
+    func()
+    local real_delta = clock.time() - real_time
+    local cpu_delta = clock.proc() - cpu_time
+    bench:add_result(testname, {
+        real_time = real_delta,
+        cpu_time = cpu_delta,
+        items = CYCLES,
+    })
+end
+
+for _, test in ipairs(tests) do
+    run_test(test.name, test.payload)
+end
+
+bench:dump_results()
