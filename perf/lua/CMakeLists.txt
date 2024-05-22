@@ -1,6 +1,8 @@
 set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
 set(RUN_PERF_LUA_TESTS_LIST "")
 
+set(LUA_PATH "${CMAKE_CURRENT_SOURCE_DIR}/?.lua\;\;")
+
 function(create_perf_lua_test)
   set(prefix PERF)
   set(noValues)
@@ -18,7 +20,9 @@ function(create_perf_lua_test)
   message(STATUS "Creating Lua performance test ${PERF_NAME}_perftest")
   set(TEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/${PERF_NAME}.lua)
   add_custom_target(${PERF_NAME}_perftest
-                    COMMAND ${TARANTOOL_BIN} ${TEST_PATH}
+                    COMMAND ${CMAKE_COMMAND} -E env
+                      LUA_PATH="${LUA_PATH}"
+                      ${TARANTOOL_BIN} ${TEST_PATH}
                     COMMENT Running ${PERF_NAME}_perftest
                     DEPENDS tarantool ${TEST_PATH}
                     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
