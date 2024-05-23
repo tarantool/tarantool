@@ -133,7 +133,7 @@ end
 
 local TESTS = {
     {
-        name = 'sum,first',
+        name = 'sum_first',
         func = function()
             local result = test_funcs.sum(box.space.test.id, 0, 0)
             local row_count = ffi.cast('uint64_t', params.row_count)
@@ -141,7 +141,7 @@ local TESTS = {
         end,
     },
     {
-        name = 'sum,last',
+        name = 'sum_last',
         func = function()
             local result = test_funcs.sum(box.space.test.id, 0,
                                            params.column_count - 1)
