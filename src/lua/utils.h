@@ -54,6 +54,8 @@ extern "C" {
 #include <lj_meta.h>
 
 #include "lua/error.h"
+#include "error.h"
+#include "diag.h"
 
 struct lua_State;
 struct ibuf;
@@ -576,6 +578,38 @@ void luaL_iterator_delete(struct luaL_iterator *it);
 
 int
 tarantool_lua_utils_init(struct lua_State *L);
+
+/** Same as luaL_checkstring but raises box error. **/
+const char *
+luaT_checkstring(struct lua_State *L, int index);
+
+/** Same as luaL_checklstring but raises box error. **/
+const char *
+luaT_checklstring(struct lua_State *L, int index, size_t *len);
+
+/** Same as luaL_checkint but raises box error. **/
+int
+luaT_checkint(struct lua_State *L, int index);
+
+/** Same as luaL_checknumber but raises box error. **/
+double
+luaT_checknumber(struct lua_State *L, int index);
+
+/** Same as luaL_checkudata but raises box error. **/
+void *
+luaT_checkudata(struct lua_State *L, int index, const char *name);
+
+/** Same as luaL_checktype but raises box error. **/
+void
+luaT_checktype(struct lua_State *L, int index, int expected);
+
+/** Same as luaL_checkint64 but raises box error. **/
+int64_t
+luaT_checkint64(struct lua_State *L, int idx);
+
+/** Same as luaL_optint but raises box error. **/
+int
+luaT_optint(struct lua_State *L, int index, int deflt);
 
 #if defined(__cplusplus)
 } /* extern "C" */
