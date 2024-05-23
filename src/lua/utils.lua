@@ -151,4 +151,43 @@ function utils.box_check_configured()
     end
 end
 
+-- Checks if value() is valid expression.
+function utils.is_callable(value)
+    if type(value) == 'function' then
+        return true
+    end
+    local mt = debug.getmetatable(value)
+    if mt ~= nil and type(mt.__call) == 'function' then
+        return true
+    end
+    return false
+end
+
+--
+-- Return args as table with 'n' set to args number.
+--
+function utils.table_pack(...)
+    return {n = select('#', ...), ...}
+end
+
+--
+-- Call fn with given variable number of arguments. In case of error
+-- if error is box.error then update trace frame to the given level.
+-- If level is nil then trace frame will not be updated.
+--
+function utils.call_at(level, fn, ...)
+    local res = utils.table_pack(pcall(fn, ...))
+    if not res[1] then
+        local err = res[2]
+        if box.error.is(err) then
+            box.error(err, level and level + 1)
+        else
+            -- Keep original trace and append trace of level + 1 as
+            -- in case of box.error.
+            error(tostring(err), level and level + 1)
+        end
+    end
+    return unpack(res, 2, res.n)
+end
+
 return utils

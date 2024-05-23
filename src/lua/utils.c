@@ -1135,3 +1135,95 @@ void cord_on_yield(void)
 		exit(EXIT_FAILURE);
 	}
 }
+
+const char *
+luaT_checkstring(struct lua_State *L, int index)
+{
+	const char *name = lua_tostring(L, index);
+	if (name == NULL) {
+		diag_set(IllegalParams, "expected string as %d argument",
+			 index);
+		luaT_error(L);
+	}
+	return name;
+}
+
+const char *
+luaT_checklstring(struct lua_State *L, int index, size_t *len)
+{
+	const char *name = lua_tolstring(L, index, len);
+	if (name == NULL) {
+		diag_set(IllegalParams, "expected string as %d argument",
+			 index);
+		luaT_error(L);
+	}
+	return name;
+}
+
+int
+luaT_checkint(struct lua_State *L, int index)
+{
+	int ok;
+	int i = lua_tointegerx(L, index, &ok);
+	if (!ok) {
+		diag_set(IllegalParams, "expected integer as %d argument",
+			 index);
+		luaT_error(L);
+	}
+	return i;
+}
+
+double
+luaT_checknumber(struct lua_State *L, int index)
+{
+	int ok;
+	double d = lua_tonumberx(L, index, &ok);
+	if (!ok) {
+		diag_set(IllegalParams, "expected number as %d argument",
+			 index);
+		luaT_error(L);
+	}
+	return d;
+}
+
+void *
+luaT_checkudata(struct lua_State *L, int index, const char *name)
+{
+	void *udata = luaL_testudata(L, index, name);
+	if (udata == NULL) {
+		diag_set(IllegalParams, "expected %s as %d argument",
+			 name, index);
+		luaT_error(L);
+	}
+	return udata;
+}
+
+void
+luaT_checktype(struct lua_State *L, int index, int expected)
+{
+	int actual = lua_type(L, index);
+	if (actual != expected) {
+		diag_set(IllegalParams, "expected %s as %d argument",
+			 lua_typename(L, expected), index);
+		luaT_error(L);
+	}
+}
+
+int64_t
+luaT_checkint64(struct lua_State *L, int idx)
+{
+	int64_t result;
+	if (luaL_convertint64(L, idx, false, &result) != 0) {
+		diag_set(IllegalParams, "expected int64_t as %d argument", idx);
+		luaT_error(L);
+	}
+	return result;
+}
+
+int
+luaT_optint(struct lua_State *L, int index, int deflt)
+{
+	if (lua_isnoneornil(L, index))
+		return deflt;
+	return luaT_checkint(L, index);
+}

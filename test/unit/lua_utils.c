@@ -171,10 +171,305 @@ test_tointeger_strict(lua_State *L)
 	check_plan();
 }
 
+static int
+checkstring_cb(lua_State *L)
+{
+	lua_pushboolean(L, true);
+	luaT_checkstring(L, -1);
+	return 0;
+}
+
+static void
+test_checkstring(lua_State *L)
+{
+	plan(6);
+	header();
+
+	const char *str;
+
+	lua_pushstring(L, "foo");
+	str = luaT_checkstring(L, -1);
+	ok(strcmp(str, "foo") == 0, "got '%s'", str);
+	lua_pop(L, 1);
+
+	lua_pushnumber(L, 11);
+	str = luaT_checkstring(L, -1);
+	ok(strcmp(str, "11") == 0, "got '%s'", str);
+	lua_pop(L, 1);
+
+	lua_pushnumber(L, 36.6);
+	str = luaT_checkstring(L, -1);
+	ok(strcmp(str, "36.6") == 0, "got '%s'", str);
+	lua_pop(L, 1);
+
+	ok(lua_cpcall(L, checkstring_cb, NULL) == LUA_ERRRUN, "error status");
+	struct error *err = luaL_iserror(L, -1);
+	ok(err != NULL, "not NULL");
+	ok(strcmp(err->errmsg, "expected string as -1 argument") == 0,
+	   "got '%s'", err->errmsg);
+	lua_pop(L, 1);
+
+	footer();
+	check_plan();
+}
+
+static int
+checklstring_cb(lua_State *L)
+{
+	lua_pushboolean(L, true);
+	size_t len;
+	luaT_checklstring(L, -1, &len);
+	return 0;
+}
+
+static void
+test_checklstring(lua_State *L)
+{
+	plan(9);
+	header();
+
+	const char *str;
+	size_t len;
+
+	lua_pushstring(L, "foo");
+	str = luaT_checklstring(L, -1, &len);
+	ok(strcmp(str, "foo") == 0, "got '%s'", str);
+	ok(strlen("foo") == len, "got %zd", len);
+	lua_pop(L, 1);
+
+	lua_pushnumber(L, 11);
+	str = luaT_checklstring(L, -1, &len);
+	ok(strcmp(str, "11") == 0, "got '%s'", str);
+	ok(strlen("11") == len, "got %zd", len);
+	lua_pop(L, 1);
+
+	lua_pushnumber(L, 36.6);
+	str = luaT_checklstring(L, -1, &len);
+	ok(strcmp(str, "36.6") == 0, "got '%s'", str);
+	ok(strlen("36.6") == len, "got %zd", len);
+	lua_pop(L, 1);
+
+	ok(lua_cpcall(L, checklstring_cb, NULL) == LUA_ERRRUN, "error status");
+	struct error *err = luaL_iserror(L, -1);
+	ok(err != NULL, "not NULL");
+	ok(strcmp(err->errmsg, "expected string as -1 argument") == 0,
+	   "got '%s'", err->errmsg);
+	lua_pop(L, 1);
+
+	footer();
+	check_plan();
+}
+
+static int
+checkint_cb(lua_State *L)
+{
+	lua_pushnil(L);
+	luaT_checkint(L, -1);
+	return 0;
+}
+
+static void
+test_checkint(lua_State *L)
+{
+	plan(6);
+	header();
+
+	int i;
+
+	lua_pushnumber(L, 11);
+	i = luaT_checkint(L, -1);
+	ok(i == 11, "got %d", i);
+	lua_pop(L, 1);
+
+	lua_pushnumber(L, 36.6);
+	i = luaT_checkint(L, -1);
+	ok(i == 36, "got %d", i);
+	lua_pop(L, 1);
+
+	lua_pushstring(L, "36.6");
+	i = luaT_checkint(L, -1);
+	ok(i == 36, "got %d", i);
+	lua_pop(L, 1);
+
+	ok(lua_cpcall(L, checkint_cb, NULL) == LUA_ERRRUN, "error status");
+	struct error *err = luaL_iserror(L, -1);
+	ok(err != NULL, "not NULL");
+	ok(strcmp(err->errmsg, "expected integer as -1 argument") == 0,
+	   "got '%s'", err->errmsg);
+	lua_pop(L, 1);
+
+	footer();
+	check_plan();
+}
+
+static int
+checknumber_cb(lua_State *L)
+{
+	lua_pushboolean(L, false);
+	luaT_checknumber(L, -1);
+	return 0;
+}
+
+static void
+test_checknumber(lua_State *L)
+{
+	plan(6);
+	header();
+
+	double f;
+
+	lua_pushnumber(L, 11);
+	f = luaT_checknumber(L, -1);
+	ok(f == 11, "got %f", f);
+	lua_pop(L, 1);
+
+	lua_pushnumber(L, 36.6);
+	f = luaT_checknumber(L, -1);
+	ok(f == 36.6, "got %f", f);
+	lua_pop(L, 1);
+
+	lua_pushstring(L, "36.6");
+	f = luaT_checknumber(L, -1);
+	ok(f == 36.6, "got %f", f);
+	lua_pop(L, 1);
+
+	ok(lua_cpcall(L, checknumber_cb, NULL) == LUA_ERRRUN, "error status");
+	struct error *err = luaL_iserror(L, -1);
+	ok(err != NULL, "not NULL");
+	ok(strcmp(err->errmsg, "expected number as -1 argument") == 0,
+	   "got '%s'", err->errmsg);
+	lua_pop(L, 1);
+
+	footer();
+	check_plan();
+}
+
+static int
+checkudata_udata_cb(lua_State *L)
+{
+	lua_newuserdata(L, 1);
+	luaL_getmetatable(L, "test_udata_2");
+	lua_setmetatable(L, -2);
+	luaT_checkudata(L, -1, "test_udata_1");
+	return 0;
+}
+
+static int
+checkudata_string_cb(lua_State *L)
+{
+	lua_pushstring(L, "foo");
+	luaT_checkudata(L, -1, "test_udata_1");
+	return 0;
+}
+
+static void
+test_checkudata(lua_State *L)
+{
+	plan(7);
+	header();
+
+	static const struct luaL_Reg meta[] = {{ NULL, NULL }};
+	const char *name_1 = "test_udata_1";
+	const char *name_2 = "test_udata_2";
+	luaL_register_type(L, name_1, meta);
+	luaL_register_type(L, name_2, meta);
+
+	void *p = lua_newuserdata(L, 1);
+	luaL_getmetatable(L, name_1);
+	lua_setmetatable(L, -2);
+
+	void *r = luaT_checkudata(L, -1, name_1);
+	ok(r == p, "expected %p, got %p", p, r);
+	lua_pop(L, 1);
+
+	ok(lua_cpcall(L, checkudata_udata_cb, NULL) == LUA_ERRRUN,
+	   "error status");
+	struct error *err = luaL_iserror(L, -1);
+	ok(err != NULL, "not NULL");
+	ok(strcmp(err->errmsg, "expected test_udata_1 as -1 argument") == 0,
+	   "got '%s'", err->errmsg);
+	lua_pop(L, 1);
+
+	ok(lua_cpcall(L, checkudata_string_cb, NULL) == LUA_ERRRUN,
+	   "error status");
+	err = luaL_iserror(L, -1);
+	ok(err != NULL, "not NULL");
+	ok(strcmp(err->errmsg, "expected test_udata_1 as -1 argument") == 0,
+	   "got '%s'", err->errmsg);
+	lua_pop(L, 1);
+
+	footer();
+	check_plan();
+}
+
+static int
+checktype_cb(lua_State *L)
+{
+	lua_pushstring(L, "foo");
+	luaT_checktype(L, -1, LUA_TNUMBER);
+	return 0;
+}
+
+static void
+test_checktype(lua_State *L)
+{
+	plan(3);
+	header();
+
+	lua_pushstring(L, "foo");
+	luaT_checktype(L, -1, LUA_TSTRING);
+	lua_pop(L, 1);
+
+	ok(lua_cpcall(L, checktype_cb, NULL) == LUA_ERRRUN, "error status");
+	struct error *err = luaL_iserror(L, -1);
+	ok(err != NULL, "not NULL");
+	ok(strcmp(err->errmsg, "expected number as -1 argument") == 0,
+	   "got '%s'", err->errmsg);
+	lua_pop(L, 1);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_optint(lua_State *L)
+{
+	plan(5);
+	header();
+
+	int i;
+
+	lua_pushnumber(L, 11);
+	i = luaT_optint(L, -1, 17);
+	ok(i == 11, "got %d", i);
+	lua_pop(L, 1);
+
+	lua_pushnumber(L, 36.6);
+	i = luaT_optint(L, -1, 17);
+	ok(i == 36, "got %d", i);
+	lua_pop(L, 1);
+
+	lua_pushstring(L, "36.6");
+	i = luaT_optint(L, -1, 17);
+	ok(i == 36, "got %d", i);
+	lua_pop(L, 1);
+
+	lua_pushnil(L);
+	i = luaT_optint(L, -1, 17);
+	ok(i == 17, "got %d", i);
+	lua_pop(L, 1);
+
+	i = luaT_optint(L, 1, 17);
+	ok(i == 17, "got %d", i);
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(5);
+	plan(12);
 	header();
 
 	struct lua_State *L = luaL_newstate();
@@ -188,6 +483,13 @@ main(void)
 	test_dostring(L);
 	test_tolstring_strict(L);
 	test_tointeger_strict(L);
+	test_checkstring(L);
+	test_checklstring(L);
+	test_checkint(L);
+	test_checknumber(L);
+	test_checkudata(L);
+	test_checktype(L);
+	test_optint(L);
 
 	fiber_free();
 	memory_free();

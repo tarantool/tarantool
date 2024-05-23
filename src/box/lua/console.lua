@@ -28,6 +28,7 @@ local urilib = require('uri')
 local yaml = require('yaml')
 local net_box = require('net.box')
 local help = require('help').help
+local utils = require('internal.utils')
 
 local DEFAULT_CONNECT_TIMEOUT = 10
 local PUSH_TAG_HANDLE = '!push!'
@@ -413,13 +414,6 @@ local function get_command(line)
     return nil
 end
 
---
--- return args as table with 'n' set to args number
---
-local function table_pack(...)
-    return {n = select('#', ...), ...}
-end
-
 local initial_env
 
 -- Get initial console environment.
@@ -519,7 +513,7 @@ local function local_eval(storage, line)
     end
     -- box.is_in_txn() is stubbed to throw a error before call to box.cfg{}
     local in_txn_before = ffi.C.box_txn()
-    local res = table_pack(pcall(fun))
+    local res = utils.table_pack(pcall(fun))
     --
     -- Rollback if transaction was began in the failed expression.
     --
