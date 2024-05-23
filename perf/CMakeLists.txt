@@ -3,7 +3,11 @@ set(CMAKE_CXX_STANDARD 14)
 set(PERF_OUTPUT_DIR ${PROJECT_BINARY_DIR}/perf/output)
 file(MAKE_DIRECTORY ${PERF_OUTPUT_DIR})
 
+set(BENCH_RESULTS "")
+
 add_subdirectory(lua)
+
+set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
 
 find_package(benchmark QUIET)
 if (NOT ${benchmark_FOUND})
@@ -41,14 +45,30 @@ function(create_perf_test_target)
                         "${multiValues}"
                         ${ARGN})
   message(STATUS "Creating C performance test ${PERF_TARGET}_perftest")
-  add_custom_target(${PERF_TARGET}_perftest
-                    COMMAND "$<TARGET_FILE:${PERF_TARGET}.perftest>"
-                            "--benchmark_out_format=json"
-                            "--benchmark_out=${PERF_OUTPUT_DIR}/${PERF_TARGET}.json"
-                    DEPENDS ${PERF_TARGET}.perftest
-                    COMMENT Running ${PERF_TARGET}_perftest
+
+  set(BENCH_RESULT ${PERF_OUTPUT_DIR}/${PERF_TARGET}.json)
+  set(BENCH_TARGET ${PERF_TARGET}_perftest)
+  set(BENCH_RESULT_TARGET ${BENCH_TARGET}_result)
+
+  # XXX: We need to provide two different targets with the same
+  # command: the first (BENCH_TARGET) is run unconditionally
+  # regardless of whether there are files with benchmark results
+  # or not, and the second target (BENCH_RESULT_TARGET) is run
+  # only if the corresponding file is omitted. The COMMAND_LIST
+  # variable contains the same command for these targets.
+  set(COMMAND_LIST
+        COMMAND "$<TARGET_FILE:${PERF_TARGET}.perftest>"
+                "--benchmark_out_format=json"
+                "--benchmark_out=${BENCH_RESULT}"
+        DEPENDS ${PERF_TARGET}.perftest
+        COMMENT Running ${BENCH_TARGET}
   )
-  set(RUN_PERF_C_TESTS_LIST ${RUN_PERF_C_TESTS_LIST} ${PERF_TARGET}_perftest PARENT_SCOPE)
+  add_custom_command(OUTPUT ${BENCH_RESULT} ${COMMAND_LIST})
+  add_custom_target(${BENCH_RESULT_TARGET} DEPENDS ${BENCH_RESULT})
+  add_custom_target(${BENCH_TARGET} ${COMMAND_LIST})
+
+  set(RUN_PERF_C_TESTS_LIST ${RUN_PERF_C_TESTS_LIST} ${BENCH_TARGET} PARENT_SCOPE)
+  set(BENCH_RESULTS ${BENCH_RESULT_TARGET} ${BENCH_RESULTS} PARENT_SCOPE)
 endfunction()
 
 function(create_perf_test)
@@ -102,4 +122,16 @@ add_custom_target(test-c-perf
 add_custom_target(test-perf
                   DEPENDS test-c-perf test-lua-perf
                   COMMENT "Running performance tests"
+)
+
+
+set(PERF_SUMMARY ${PERF_OUTPUT_DIR}/summary.txt)
+add_custom_target(test-perf-aggregate
+                  DEPENDS ${BENCH_RESULTS}
+                  BYPRODUCTS ${PERF_SUMMARY}
+                  COMMENT "Aggregate performance test results into ${PERF_SUMMARY}"
+                  COMMAND ${TARANTOOL_BIN} ${CMAKE_CURRENT_SOURCE_DIR}/tools/aggregate.lua
+                    --output=${PERF_SUMMARY}
+                    --input_dir=${PERF_OUTPUT_DIR}
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
