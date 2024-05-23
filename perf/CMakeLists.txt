@@ -5,6 +5,16 @@ file(MAKE_DIRECTORY ${PERF_OUTPUT_DIR})
 
 add_subdirectory(lua)
 
+set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
+add_custom_target(test-perf-aggregate
+                  DEPENDS test-c-perf test-lua-perf
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                  COMMAND ${TARANTOOL_BIN} ${CMAKE_CURRENT_SOURCE_DIR}/tools/aggregate.lua
+                    --output=${PERF_OUTPUT_DIR}/perf_summary.txt
+                    --input_dir=${PERF_OUTPUT_DIR}
+                  COMMENT "Aggregate performance test results"
+)
+
 find_package(benchmark QUIET)
 if (NOT ${benchmark_FOUND})
     message(AUTHOR_WARNING "Google Benchmark library was not found")
@@ -14,7 +24,7 @@ if (NOT ${benchmark_FOUND})
                       COMMENT ${MSG}
     )
     add_custom_target(test-perf
-                      DEPENDS test-c-perf test-lua-perf
+                      DEPENDS test-perf-aggregate
                       COMMENT "Running performance tests"
     )
     return()
@@ -100,6 +110,6 @@ add_custom_target(test-c-perf
 )
 
 add_custom_target(test-perf
-                  DEPENDS test-c-perf test-lua-perf
+                  DEPENDS test-perf-aggregate
                   COMMENT "Running performance tests"
 )
