@@ -29,7 +29,7 @@ end)
 g.test_min = function(cg)
     cg.server:exec(function()
         local s = box.space.test
-        t.assert_error_msg_content_equals(
+        t.assert_error_msg_equals(
             "Use index:min(...) instead of index.min(...)",
             s.index.primary.min)
         t.assert_equals(s.index.primary:min(), {1, 1})
@@ -42,7 +42,7 @@ end
 g.test_max = function(cg)
     cg.server:exec(function()
         local s = box.space.test
-        t.assert_error_msg_content_equals(
+        t.assert_error_msg_equals(
             "Use index:max(...) instead of index.max(...)",
             s.index.primary.max)
         t.assert_equals(s.index.primary:max(), {10, 1})
@@ -55,7 +55,7 @@ end
 g.test_random = function(cg)
     cg.server:exec(function()
         local s = box.space.test
-        t.assert_error_msg_content_equals(
+        t.assert_error_msg_equals(
             "Use index:random(...) instead of index.random(...)",
             s.index.primary.random)
         t.assert_equals(s.index.primary:random(1), {2, 5})
@@ -68,13 +68,13 @@ end
 g.test_get = function(cg)
     cg.server:exec(function()
         local s = box.space.test
-        t.assert_error_msg_content_equals(
+        t.assert_error_msg_equals(
             "Use index:get(...) instead of index.get(...)",
             s.index.primary.get)
-        t.assert_error_msg_content_equals(
+        t.assert_error_msg_equals(
             "Invalid key part count in an exact match (expected 1, got 0)",
             s.index.primary.get, s.index.primary)
-        t.assert_error_msg_content_equals(
+        t.assert_error_msg_equals(
             "Get() doesn't support partial keys and non-unique indexes",
             s.index.secondary.get, s.index.secondary, 1)
         t.assert_equals(s:get(1), {1, 1})
@@ -85,10 +85,10 @@ end
 g.test_select = function(cg)
     cg.server:exec(function()
         local s = box.space.test
-        t.assert_error_msg_content_equals(
+        t.assert_error_msg_equals(
             "Use index:select(...) instead of index.select(...)",
             s.index.primary.select)
-        t.assert_error_msg_content_equals(
+        t.assert_error_msg_equals(
             "Unknown iterator type 'foo'",
             s.index.primary.select, s.index.primary,  {}, {iterator = 'foo'})
         t.assert_equals(s:select(2, {iterator = 'lt'}), {{1, 1}})
@@ -101,14 +101,15 @@ g.test_pairs = function(cg)
     cg.server:exec(function()
         local fun = require('fun')
         local s = box.space.test
-        t.assert_error_msg_content_equals(
+        t.assert_error_msg_equals(
             "Use index:pairs(...) instead of index.pairs(...)",
             s.index.primary.pairs)
-        t.assert_error_msg_content_equals(
+        t.assert_error_msg_equals(
             "Unknown iterator type 'foo'",
             s.index.primary.pairs, s.index.primary,  {}, {iterator = 'foo'})
         local gen = s.index.secondary:pairs(2)
-        t.assert_error_msg_content_equals("usage: next(param, state)", gen)
+        t.assert_error_msg_equals(
+            "Usage: next(param, state)", gen)
         t.assert_equals(fun.totable(s:pairs(2, {iterator = 'lt'})), {{1, 1}})
         t.assert_equals(fun.totable(s.index.primary:pairs(1)), {{1, 1}})
         t.assert_equals(fun.totable(s.index.secondary:pairs(1)),

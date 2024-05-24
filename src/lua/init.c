@@ -354,10 +354,13 @@ static int
 lbox_tarantool_debug_getsources(struct lua_State *L)
 {
 	int index = lua_gettop(L);
-	if (index != 1)
-		luaL_error(L, "getsources() function expects one argument");
+	if (index != 1) {
+		diag_set(IllegalParams,
+			 "getsources() function expects one argument");
+		luaT_error(L);
+	}
 	size_t len = 0;
-	const char *modname = luaL_checklstring(L, index, &len);
+	const char *modname = luaT_checklstring(L, index, &len);
 	if (len <= 0)
 		goto ret_nil;
 	const char *code = tarantool_debug_getsources(modname);
@@ -376,21 +379,29 @@ ret_nil:
 static int
 lbox_tonumber64(struct lua_State *L)
 {
-	luaL_checkany(L, 1);
-	int base = luaL_optint(L, 2, -1);
-	luaL_argcheck(L, (2 <= base && base <= 36) || base == -1, 2,
-		      "base out of range");
+	if (lua_gettop(L) < 1) {
+		diag_set(IllegalParams, "Usage: tonumber64(arg)");
+		luaT_error(L);
+	}
+	int base = luaT_optint(L, 2, -1);
+	if ((base < 2 || base > 36) && base != -1) {
+		diag_set(IllegalParams,
+			 "invalid argument 2, base out of range");
+		luaT_error(L);
+	}
 	switch (lua_type(L, 1)) {
 	case LUA_TNUMBER:
 		base = (base == -1 ? 10 : base);
-		if (base != 10)
-			return luaL_argerror(L, 1, "string expected");
+		if (base != 10) {
+			diag_set(IllegalParams, "argument 1 is not a string");
+			return luaT_error(L);
+		}
 		lua_settop(L, 1); /* return original value as is */
 		return 1;
 	case LUA_TSTRING:
 	{
 		size_t argl = 0;
-		const char *arg = luaL_checklstring(L, 1, &argl);
+		const char *arg = luaT_checklstring(L, 1, &argl);
 		/* Trim whitespaces at begin/end */
 		while (argl > 0 && isspace(arg[argl - 1])) {
 			argl--;
@@ -475,8 +486,10 @@ skip:		base = (base == -1 ? 10 : base);
 	case LUA_TCDATA:
 	{
 		base = (base == -1 ? 10 : base);
-		if (base != 10)
-			return luaL_argerror(L, 1, "string expected");
+		if (base != 10) {
+			diag_set(IllegalParams, "argument 1 is not a string");
+			return luaT_error(L);
+		}
 		uint32_t ctypeid = 0;
 		luaL_checkcdata(L, 1, &ctypeid);
 		if (ctypeid >= CTID_INT8 && ctypeid <= CTID_DOUBLE) {

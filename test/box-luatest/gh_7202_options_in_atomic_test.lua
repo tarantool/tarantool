@@ -58,17 +58,17 @@ g.test_atomic_options = function()
             "(keys or values)",
             box.atomic, {txn_isolation = 'wtf'}, f)
 
-        t.assert_error_msg_contains(
-            "attempt to call a nil value",
+        t.assert_error_msg_equals(
+            "Usage: box.atomic([opts, ]tx-function[, function-arguments]",
             box.atomic, {})
 
         -- Different invalid function objects
-        t.assert_error_msg_contains(
-            "attempt to call a table value",
+        t.assert_error_msg_equals(
+            "Usage: box.atomic([opts, ]tx-function[, function-arguments]",
             box.atomic, {}, {})
 
-        t.assert_error_msg_contains(
-            "attempt to call a nil value",
-            box.atomic, {})
+        t.assert_error_msg_equals(
+            "Usage: box.atomic([opts, ]tx-function[, function-arguments]",
+            box.atomic, {}, 7)
     end)
 end

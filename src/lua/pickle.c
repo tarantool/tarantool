@@ -58,7 +58,7 @@ luaL_region_dup(struct lua_State *L, struct region *region,
 static int
 lbox_pack(struct lua_State *L)
 {
-	const char *format = luaL_checkstring(L, 1);
+	const char *format = luaT_checkstring(L, 1);
 	/* first arg comes second */
 	int i = 2;
 	int nargs = lua_gettop(L);
@@ -77,31 +77,43 @@ lbox_pack(struct lua_State *L)
 	double dbl;
 	float flt;
 	while (*format) {
-		if (i > nargs)
-			luaL_error(L, "pickle.pack: argument count does not match "
-				   "the format");
+		if (i > nargs) {
+			diag_set(IllegalParams,
+				 "pickle.pack: argument count does not match "
+				 "the format");
+			luaT_error(L);
+		}
 		luaL_checkfield(L, luaL_msgpack_default, i, &field);
 		switch (*format) {
 		case 'B':
 		case 'b':
 			/* signed and unsigned 8-bit integers */
-			if (field.type != MP_UINT && field.type != MP_INT)
-				luaL_error(L, "pickle.pack: expected 8-bit int");
+			if (field.type != MP_UINT && field.type != MP_INT) {
+				diag_set(IllegalParams,
+					 "pickle.pack: expected 8-bit int");
+				luaT_error(L);
+			}
 
 			luaL_region_dup(L, buf, &field.ival, sizeof(uint8_t));
 			break;
 		case 'S':
 		case 's':
 			/* signed and unsigned 16-bit integers */
-			if (field.type != MP_UINT && field.type != MP_INT)
-				luaL_error(L, "pickle.pack: expected 16-bit int");
+			if (field.type != MP_UINT && field.type != MP_INT) {
+				diag_set(IllegalParams,
+					 "pickle.pack: expected 16-bit int");
+				luaT_error(L);
+			}
 
 			luaL_region_dup(L, buf, &field.ival, sizeof(uint16_t));
 			break;
 		case 'n':
 			/* signed and unsigned 16-bit big endian integers */
-			if (field.type != MP_UINT && field.type != MP_INT)
-				luaL_error(L, "pickle.pack: expected 16-bit int");
+			if (field.type != MP_UINT && field.type != MP_INT) {
+				diag_set(IllegalParams,
+					 "pickle.pack: expected 16-bit int");
+				luaT_error(L);
+			}
 
 			field.ival = (uint16_t) htons((uint16_t) field.ival);
 			luaL_region_dup(L, buf, &field.ival, sizeof(uint16_t));
@@ -109,15 +121,21 @@ lbox_pack(struct lua_State *L)
 		case 'I':
 		case 'i':
 			/* signed and unsigned 32-bit integers */
-			if (field.type != MP_UINT && field.type != MP_INT)
-				luaL_error(L, "pickle.pack: expected 32-bit int");
+			if (field.type != MP_UINT && field.type != MP_INT) {
+				diag_set(IllegalParams,
+					 "pickle.pack: expected 32-bit int");
+				luaT_error(L);
+			}
 
 			luaL_region_dup(L, buf, &field.ival, sizeof(uint32_t));
 			break;
 		case 'N':
 			/* signed and unsigned 32-bit big endian integers */
-			if (field.type != MP_UINT && field.type != MP_INT)
-				luaL_error(L, "pickle.pack: expected 32-bit int");
+			if (field.type != MP_UINT && field.type != MP_INT) {
+				diag_set(IllegalParams,
+					 "pickle.pack: expected 32-bit int");
+				luaT_error(L);
+			}
 
 			field.ival = htonl(field.ival);
 			luaL_region_dup(L, buf, &field.ival, sizeof(uint32_t));
@@ -125,16 +143,22 @@ lbox_pack(struct lua_State *L)
 		case 'L':
 		case 'l':
 			/* signed and unsigned 64-bit integers */
-			if (field.type != MP_UINT && field.type != MP_INT)
-				luaL_error(L, "pickle.pack: expected 64-bit int");
+			if (field.type != MP_UINT && field.type != MP_INT) {
+				diag_set(IllegalParams,
+					 "pickle.pack: expected 64-bit int");
+				luaT_error(L);
+			}
 
 			luaL_region_dup(L, buf, &field.ival, sizeof(uint64_t));
 			break;
 		case 'Q':
 		case 'q':
 			/* signed and unsigned 64-bit integers */
-			if (field.type != MP_UINT && field.type != MP_INT)
-				luaL_error(L, "pickle.pack: expected 64-bit int");
+			if (field.type != MP_UINT && field.type != MP_INT) {
+				diag_set(IllegalParams,
+					 "pickle.pack: expected 64-bit int");
+				luaT_error(L);
+			}
 
 			field.ival = bswap_u64(field.ival);
 			luaL_region_dup(L, buf,  &field.ival, sizeof(uint64_t));
@@ -152,13 +176,15 @@ lbox_pack(struct lua_State *L)
 		{
 			/* A sequence of bytes */
 			size_t len;
-			str = luaL_checklstring(L, i, &len);
+			str = luaT_checklstring(L, i, &len);
 			luaL_region_dup(L, buf, str, len);
 			break;
 		}
 		default:
-			luaL_error(L, "pickle.pack: unsupported pack "
-				   "format specifier '%c'", *format);
+			diag_set(IllegalParams,
+				 "pickle.pack: unsupported pack "
+				 "format specifier '%c'", *format);
+			luaT_error(L);
 		}
 		i++;
 		format++;
@@ -181,20 +207,27 @@ static int
 lbox_unpack(struct lua_State *L)
 {
 	size_t format_size = 0;
-	const char *format = luaL_checklstring(L, 1, &format_size);
+	const char *format = luaT_checklstring(L, 1, &format_size);
 	const char *f = format;
 
 	size_t str_size = 0;
-	const char *str =  luaL_checklstring(L, 2, &str_size);
+	const char *str = luaT_checklstring(L, 2, &str_size);
 	const char *end = str + str_size;
 	const char *s = str;
 
 	int save_stacksize = lua_gettop(L);
 
-#define CHECK_SIZE(cur) if (unlikely((cur) >= end)) {	                \
-	luaL_error(L, "pickle.unpack('%c'): got %d bytes (expected: %d+)",	\
-		   *f, (int) (end - str), (int) 1 + ((cur) - str));	\
-}
+#define CHECK_SIZE(cur) \
+	do { \
+		if (unlikely((cur) >= end)) { \
+			diag_set(IllegalParams, \
+				 "pickle.unpack('%c'): got %td bytes " \
+				 "(expected: %td+)", \
+				 *f, end - str, cur - str + 1); \
+			luaT_error(L); \
+		} \
+	} while (0)
+
 	while (*f) {
 		switch (*f) {
 		case 'b':
@@ -248,8 +281,10 @@ lbox_unpack(struct lua_State *L)
 			s = end;
 			break;
 		default:
-			luaL_error(L, "pickle.unpack: unsupported "
-				   "format specifier '%c'", *f);
+			diag_set(IllegalParams,
+				 "pickle.unpack: unsupported "
+				 "format specifier '%c'", *f);
+			luaT_error(L);
 		}
 		f++;
 	}
@@ -257,9 +292,11 @@ lbox_unpack(struct lua_State *L)
 	assert(s <= end);
 
 	if (s != end) {
-		luaL_error(L, "pickle.unpack('%s'): too many bytes: "
-			   "unpacked %d, total %d",
-			   format, s - str, str_size);
+		diag_set(IllegalParams,
+			 "pickle.unpack('%s'): too many bytes: "
+			 "unpacked %td, total %zd", format, s - str,
+			 str_size);
+		luaT_error(L);
 	}
 
 	return lua_gettop(L) - save_stacksize;

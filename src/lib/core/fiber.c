@@ -545,12 +545,6 @@ fiber_start(struct fiber *callee, ...)
 	va_end(callee->f_data);
 }
 
-bool
-fiber_checkstack(void)
-{
-	return false;
-}
-
 static void
 fiber_make_ready(struct fiber *f)
 {

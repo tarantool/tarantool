@@ -12,11 +12,11 @@ tostring(c)
 -- args validation
 c.wait()
 ---
-- error: 'usage: cond:wait([timeout])'
+- error: 'Usage: cond:wait([timeout])'
 ...
 c.wait('1')
 ---
-- error: 'bad argument #1 to ''?'' (fiber.cond expected, got string)'
+- error: 'Usage: cond:wait([timeout])'
 ...
 c:wait('1')
 ---
@@ -24,7 +24,7 @@ c:wait('1')
 ...
 c:wait(-1)
 ---
-- error: 'usage: cond:wait([timeout])'
+- error: 'Usage: cond:wait([timeout])'
 ...
 -- timeout
 c:wait(0.1)

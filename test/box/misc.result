@@ -293,7 +293,7 @@ tonumber64(1), 1
 -- Testing 64bit
 tonumber64()
 ---
-- error: 'bad argument #1 to ''?'' (value expected)'
+- error: 'Usage: tonumber64(arg)'
 ...
 tonumber64('invalid number')
 ---
@@ -473,15 +473,15 @@ tonumber64('  0b1  ') == 1
 ...
 tonumber64('  0b1  ', 'badbase')
 ---
-- error: 'bad argument #2 to ''?'' (number expected, got string)'
+- error: expected integer as 2 argument
 ...
 tonumber64('  0b1  ', 123) -- big base
 ---
-- error: 'bad argument #2 to ''?'' (base out of range)'
+- error: invalid argument 2, base out of range
 ...
 tonumber64('12345', 123) -- big base
 ---
-- error: 'bad argument #2 to ''?'' (base out of range)'
+- error: invalid argument 2, base out of range
 ...
 tonumber64('0xfffff') == 1048575
 ---
@@ -619,87 +619,87 @@ tonumber64(ffi.new('double', 10))
 -- number/cdata with custom `base` - is not supported
 tonumber64(100, 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(100LL, 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(-100LL, 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(100ULL, 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('char', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('short', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('int', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('int8_t', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('int16_t', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('int32_t', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('int64_t', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('unsigned char', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('unsigned short', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('unsigned int', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('unsigned int', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('uint8_t', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('uint16_t', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('uint32_t', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('uint64_t', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('float', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 tonumber64(ffi.new('double', 10), 2)
 ---
-- error: 'bad argument #1 to ''?'' (string expected)'
+- error: argument 1 is not a string
 ...
 -- invalid types - return nil
 ffi.cdef("struct __tonumber64_test {};")

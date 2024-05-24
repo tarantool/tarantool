@@ -33,13 +33,14 @@ local SESSION_NEW_OPTS = {
 
 session.new = function(opts)
     opts = opts or {}
-    utils.check_param_table(opts, SESSION_NEW_OPTS)
+    utils.check_param_table(opts, SESSION_NEW_OPTS, 2)
     if opts.type ~= nil and opts.type ~= 'binary' then
         box.error(box.error.ILLEGAL_PARAMS,
                   "invalid session type '" .. opts.type .. "', " ..
-                  "the only supported type is 'binary'")
+                  "the only supported type is 'binary'", 2)
     end
-    local sid = box.iproto.internal.session_new(opts.fd, opts.user)
+    local sid = utils.call_at(2, box.iproto.internal.session_new, opts.fd,
+                              opts.user)
     -- It's okay to set the session storage after creating the session
     -- because session_new doesn't yield so no one could possibly access
     -- the uninitialized storage yet.

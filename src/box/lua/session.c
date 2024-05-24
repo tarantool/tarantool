@@ -171,11 +171,15 @@ lbox_session_su(struct lua_State *L)
 	if (box_check_configured() != 0)
 		luaT_error(L);
 	int top = lua_gettop(L);
-	if (top < 1)
-		luaL_error(L, "session.su(): bad arguments");
+	if (top < 1) {
+		diag_set(IllegalParams, "session.su(): bad arguments");
+		luaT_error(L);
+	}
 	struct session *session = current_session();
-	if (session == NULL)
-		luaL_error(L, "session.su(): session does not exist");
+	if (session == NULL) {
+		diag_set(IllegalParams, "session.su(): session does not exist");
+		luaT_error(L);
+	}
 	struct user *user;
 	if (lua_type(L, 1) == LUA_TSTRING) {
 		size_t len;
@@ -194,7 +198,7 @@ lbox_session_su(struct lua_State *L)
 		fiber_set_user(fiber(), &session->credentials);
 		return 0; /* su */
 	}
-	luaL_checktype(L, 2, LUA_TFUNCTION);
+	luaT_checktype(L, 2, LUA_TFUNCTION);
 
 	struct credentials su_credentials;
 	struct credentials *old_credentials = fiber()->storage.credentials;
@@ -218,12 +222,14 @@ lbox_session_su(struct lua_State *L)
 static int
 lbox_session_exists(struct lua_State *L)
 {
-	if (lua_gettop(L) > 1)
-		luaL_error(L, "session.exists(sid): bad arguments");
+	if (lua_gettop(L) > 1) {
+		diag_set(IllegalParams, "session.exists(sid): bad arguments");
+		luaT_error(L);
+	}
 
 	struct session *session;
 	if (lua_gettop(L) == 1)
-		session = session_find(luaL_checkint64(L, -1));
+		session = session_find(luaT_checkint64(L, -1));
 	else
 		session = current_session();
 	lua_pushboolean(L, session != NULL);
@@ -236,16 +242,20 @@ lbox_session_exists(struct lua_State *L)
 static int
 lbox_session_fd(struct lua_State *L)
 {
-	if (lua_gettop(L) > 1)
-		luaL_error(L, "session.fd(sid): bad arguments");
+	if (lua_gettop(L) > 1) {
+		diag_set(IllegalParams, "session.fd(sid): bad arguments");
+		luaT_error(L);
+	}
 
 	struct session *session;
 	if (lua_gettop(L) == 1)
-		session = session_find(luaL_checkint64(L, -1));
+		session = session_find(luaT_checkint64(L, -1));
 	else
 		session = current_session();
-	if (session == NULL)
-		luaL_error(L, "session.fd(): session does not exist");
+	if (session == NULL) {
+		diag_set(IllegalParams, "session.fd(): session does not exist");
+		luaT_error(L);
+	}
 	lua_pushinteger(L, session_fd(session));
 	return 1;
 }
@@ -257,16 +267,21 @@ lbox_session_fd(struct lua_State *L)
 static int
 lbox_session_peer(struct lua_State *L)
 {
-	if (lua_gettop(L) > 1)
-		luaL_error(L, "session.peer(sid): bad arguments");
+	if (lua_gettop(L) > 1) {
+		diag_set(IllegalParams, "session.peer(sid): bad arguments");
+		luaT_error(L);
+	}
 
 	struct session *session;
 	if (lua_gettop(L) == 1)
-		session = session_find(luaL_checkint(L, 1));
+		session = session_find(luaT_checkint(L, 1));
 	else
 		session = current_session();
-	if (session == NULL)
-		luaL_error(L, "session.peer(): session does not exist");
+	if (session == NULL) {
+		diag_set(IllegalParams,
+			 "session.peer(): session does not exist");
+		luaT_error(L);
+	}
 	const char *peer = session_peer(session);
 	if (peer == NULL) {
 		lua_pushnil(L); /* no associated peer */
@@ -341,8 +356,10 @@ static int
 lbox_session_push(struct lua_State *L)
 {
 	struct session *session = current_session();
-	if (lua_gettop(L) != 1)
-		return luaL_error(L, "Usage: box.session.push(data)");
+	if (lua_gettop(L) != 1) {
+		diag_set(IllegalParams, "Usage: box.session.push(data)");
+		luaT_error(L);
+	}
 	if (session_push_check_deprecation() != 0)
 		return luaT_error(L);
 	struct port port;

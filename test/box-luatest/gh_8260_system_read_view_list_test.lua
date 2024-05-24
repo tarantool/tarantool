@@ -29,8 +29,7 @@ g_object.test_usage = function(cg)
     cg.server:exec(function()
         local rv = rawget(_G, 'test_rv')
         t.assert_error_msg_equals(
-            'Use read_view:info(...) instead of read_view.info(...)',
-            rv.info)
+            'Use read_view:info(...) instead of read_view.info(...)', rv.info)
         t.assert_error_msg_equals(
             'Use read_view:close(...) instead of read_view.close(...)',
             rv.close)
@@ -161,10 +160,10 @@ g_status.test_close = function(cg)
         local l = box.read_view.list()
         t.assert_equals(#l, 1)
         local rv = l[1]
-        t.assert_error_msg_equals('read view is busy', rv.close, rv)
+        t.assert_error_msg_equals('The read view is busy', rv.close, rv)
         box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', false)
         t.assert(f:join())
-        t.assert_error_msg_equals('read view is closed', rv.close, rv)
+        t.assert_error_msg_equals('The read view is closed', rv.close, rv)
     end)
 end
 

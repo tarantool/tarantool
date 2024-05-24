@@ -114,15 +114,15 @@ end
 local function error_set_prev(err, prev)
     -- First argument must be error.
     if not ffi.istype('struct error', err) then
-        error("Usage: error1:set_prev(error2)")
+        box.error(box.error.ILLEGAL_PARAMS,"Usage: error1:set_prev(error2)", 2)
     end
     -- Second argument must be error or nil.
     if not ffi.istype('struct error', prev) and prev ~= nil then
-        error("Usage: error1:set_prev(error2)")
+        box.error(box.error.ILLEGAL_PARAMS, "Usage: error1:set_prev(error2)", 2)
     end
     local ok = ffi.C.error_set_prev(err, prev);
     if ok ~= 0 then
-        error("Cycles are not allowed")
+        box.error(box.error.ILLEGAL_PARAMS, "Cycles are not allowed", 2)
     end
 end
 
@@ -137,7 +137,7 @@ local error_fields = {
 
 local function error_unpack(err)
     if not ffi.istype('struct error', err) then
-        error("Usage: error:unpack()")
+        box.error(box.error.ILLEGAL_PARAMS, "Usage: error:unpack()", 2)
     end
     local result = {code = err.code}
     for key, getter in pairs(error_fields)  do
@@ -162,14 +162,14 @@ end
 
 local function error_raise(err)
     if not ffi.istype('struct error', err) then
-        error("Usage: error:raise()")
+        box.error(box.error.ILLEGAL_PARAMS, "Usage: error:raise()", 2)
     end
     error(err)
 end
 
 local function error_match(err, ...)
     if not ffi.istype('struct error', err) then
-        error("Usage: error:match()")
+        box.error(box.error.ILLEGAL_PARAMS, "Usage: error:match()", 2)
     end
     return string.match(error_message(err), ...)
 end
@@ -251,7 +251,8 @@ local function error_concat(lhs, rhs)
     elseif ffi.istype('struct error', rhs) then
         return lhs .. tostring(rhs)
     else
-       error('error_mt.__concat(): neither of args is an error')
+       box.error(box.error.ILLEGAL_PARAMS,
+                 'error_mt.__concat(): neither of args is an error', 2)
     end
 end
 

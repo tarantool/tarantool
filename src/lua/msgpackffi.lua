@@ -274,7 +274,7 @@ local function encode_error(buf, err)
     end
 end
 
-local function encode_r(buf, obj, level)
+local function encode_r(buf, obj, level, trace_level)
 ::restart::
     if type(obj) == "number" then
         -- Lua-way to check that number is an integer
@@ -288,8 +288,10 @@ local function encode_r(buf, obj, level)
     elseif type(obj) == "table" then
         if level >= msgpack.cfg.encode_max_depth then
             if not msgpack.cfg.encode_deep_as_nil then
-                error(string.format('Too high nest level - %d',
-                                    msgpack.cfg.encode_max_depth + 1))
+                box.error(box.error.PROC_LUA,
+                          string.format('Too high nest level - %d',
+                                        msgpack.cfg.encode_max_depth + 1),
+                          trace_level and trace_level + 1)
             end
             encode_nil(buf)
             return
@@ -314,20 +316,22 @@ local function encode_r(buf, obj, level)
             serialize == 'seq' or serialize == 'sequence' then
             encode_array(buf, array_count)
             for i=1,array_count,1 do
-                encode_r(buf, obj[i], level + 1)
+                encode_r(buf, obj[i], level + 1,
+                         trace_level and trace_level + 1)
             end
         elseif (serialize == nil and map_count > 0) or
             serialize == 'map' or serialize == 'mapping' then
             encode_map(buf, array_count + map_count)
             for key, val in pairs(obj) do
-                encode_r(buf, key, level + 1)
-                encode_r(buf, val, level + 1)
+                encode_r(buf, key, level + 1, trace_level and trace_level + 1)
+                encode_r(buf, val, level + 1, trace_level and trace_level + 1)
             end
         elseif type(serialize) == 'function' then
             obj = serialize(obj)
             goto restart
         else
-            error("Invalid __serialize value")
+            box.error(box.error.PROC_LUA, "Invalid __serialize value",
+                      trace_level and trace_level + 1)
         end
     elseif obj == nil then
         encode_nil(buf)
@@ -343,10 +347,14 @@ local function encode_r(buf, obj, level)
         if fun ~= nil then
             fun(buf, obj)
         else
-            error("can not encode FFI type: '"..ffi.typeof(obj).."'")
+            box.error(box.error.PROC_LUA,
+                      "can not encode FFI type: '"..ffi.typeof(obj).."'",
+                      trace_level and trace_level + 1)
         end
     else
-        error("can not encode Lua type: '"..type(obj).."'")
+        box.error(box.error.PROC_LUA,
+                  "can not encode Lua type: '"..type(obj).."'",
+                  trace_level and trace_level + 1)
     end
 end
 

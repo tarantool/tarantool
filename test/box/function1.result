@@ -545,11 +545,11 @@ func = box.func.divide
 ...
 func.call({4, 2})
 ---
-- error: 'builtin/box/schema.lua: Use func:call(...) instead of func.call(...)'
+- error: Use func:call(...) instead of func.call(...)
 ...
 func:call(4, 2)
 ---
-- error: 'builtin/box/schema.lua: Use func:call(table)'
+- error: 'Usage: func:call(table)'
 ...
 func:call()
 ---
@@ -595,7 +595,7 @@ func
 ...
 func.drop()
 ---
-- error: 'builtin/box/schema.lua: Use func:drop(...) instead of func.drop(...)'
+- error: Use func:drop(...) instead of func.drop(...)
 ...
 box.func.divide
 ---
@@ -621,7 +621,7 @@ func = box.func["function1.divide"]
 ...
 func:call(4, 2)
 ---
-- error: 'builtin/box/schema.lua: Use func:call(table)'
+- error: 'Usage: func:call(table)'
 ...
 func:call()
 ---

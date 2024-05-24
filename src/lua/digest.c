@@ -84,8 +84,10 @@ crc32_methods_update(lua_State *L)
 	size_t strl;
 	/* Get <string>. */
 	const char *str = lua_tolstring(L, 2, &strl);
-	if (str == NULL)
-		luaL_error(L, "Usage crc32:update(string)");
+	if (str == NULL) {
+		diag_set(IllegalParams, "Usage: crc32:update(string)");
+		luaT_error(L);
+	}
 	/* Get <self.value>. */
 	lua_getfield(L, 1, "value");
 	uint32_t crc32_begin = lua_tointeger(L, -1);
@@ -104,8 +106,10 @@ crc32___call(lua_State *L)
 	size_t strl;
 	/* Get <string>. */
 	const char *str = lua_tolstring(L, 2, &strl);
-	if (str == NULL)
-		luaL_error(L, "Usage digest.crc32(string)");
+	if (str == NULL) {
+		diag_set(IllegalParams, "Usage: digest.crc32(string)");
+		luaT_error(L);
+	}
 	/* Get <CRC32> upvalue. */
 	lua_pushvalue(L, lua_upvalueindex(1));
 	/* Get <CRC32.crc_begin>. */

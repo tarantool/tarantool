@@ -429,7 +429,7 @@ space.index['i1']:count()
 -- Test cases for #123: box.index.count does not check arguments properly
 space.index['i1']:count(function() end)
 ---
-- error: 'builtin/msgpackffi.lua..."]:<line>: can not encode Lua type: ''function'''
+- error: 'can not encode Lua type: ''function'''
 ...
 space:drop()
 ---
@@ -854,143 +854,143 @@ pk = space:create_index('primary')
 ...
 space.len()
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:len(...) instead of space.len(...)'
+- error: Use space:len(...) instead of space.len(...)
 ...
 space.count({}, {iterator = 'EQ'})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:count(...) instead of space.count(...)'
+- error: Use space:count(...) instead of space.count(...)
 ...
 space.bsize()
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:bsize(...) instead of space.bsize(...)'
+- error: Use space:bsize(...) instead of space.bsize(...)
 ...
 space.get({1})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:get(...) instead of space.get(...)'
+- error: Use space:get(...) instead of space.get(...)
 ...
 space.select({}, {iterator = 'GE'})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:select(...) instead of space.select(...)'
+- error: Use space:select(...) instead of space.select(...)
 ...
 space.insert({1, 2, 3})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:insert(...) instead of space.insert(...)'
+- error: Use space:insert(...) instead of space.insert(...)
 ...
 space.replace({1, 2, 3})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:replace(...) instead of space.replace(...)'
+- error: Use space:replace(...) instead of space.replace(...)
 ...
 space.put({1, 2, 3})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:replace(...) instead of space.replace(...)'
+- error: Use space:replace(...) instead of space.replace(...)
 ...
 space.update({1}, {})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:update(...) instead of space.update(...)'
+- error: Use space:update(...) instead of space.update(...)
 ...
 space.upsert({1, 2, 3}, {})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:upsert(...) instead of space.upsert(...)'
+- error: Use space:upsert(...) instead of space.upsert(...)
 ...
 space.delete({1})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:delete(...) instead of space.delete(...)'
+- error: Use space:delete(...) instead of space.delete(...)
 ...
 space.auto_increment({'hello'})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:auto_increment(...) instead of space.auto_increment(...)'
+- error: Use space:auto_increment(...) instead of space.auto_increment(...)
 ...
 space.pairs({}, {iterator = 'EQ'})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:pairs(...) instead of space.pairs(...)'
+- error: Use space:pairs(...) instead of space.pairs(...)
 ...
 space.truncate()
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:truncate(...) instead of space.truncate(...)'
+- error: Use space:truncate(...) instead of space.truncate(...)
 ...
 space.format({})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:format(...) instead of space.format(...)'
+- error: Use space:format(...) instead of space.format(...)
 ...
 space.drop()
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:drop(...) instead of space.drop(...)'
+- error: Use space:drop(...) instead of space.drop(...)
 ...
 space.rename()
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:rename(...) instead of space.rename(...)'
+- error: Use space:rename(...) instead of space.rename(...)
 ...
 space.create_index('secondary')
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:create_index(...) instead of space.create_index(...)'
+- error: Use space:create_index(...) instead of space.create_index(...)
 ...
 space.run_triggers(false)
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:run_triggers(...) instead of space.run_triggers(...)'
+- error: Use space:run_triggers(...) instead of space.run_triggers(...)
 ...
 pk.len()
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:len(...) instead of index.len(...)'
+- error: Use index:len(...) instead of index.len(...)
 ...
 pk.bsize()
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:bsize(...) instead of index.bsize(...)'
+- error: Use index:bsize(...) instead of index.bsize(...)
 ...
 pk.min()
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:min(...) instead of index.min(...)'
+- error: Use index:min(...) instead of index.min(...)
 ...
 pk.min({})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:min(...) instead of index.min(...)'
+- error: Use index:min(...) instead of index.min(...)
 ...
 pk.max()
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:max(...) instead of index.max(...)'
+- error: Use index:max(...) instead of index.max(...)
 ...
 pk.max({})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:max(...) instead of index.max(...)'
+- error: Use index:max(...) instead of index.max(...)
 ...
 pk.random(42)
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:random(...) instead of index.random(...)'
+- error: Use index:random(...) instead of index.random(...)
 ...
 pk.pairs({}, {iterator = 'EQ'})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:pairs(...) instead of index.pairs(...)'
+- error: Use index:pairs(...) instead of index.pairs(...)
 ...
 pk.count({}, {iterator = 'EQ'})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:count(...) instead of index.count(...)'
+- error: Use index:count(...) instead of index.count(...)
 ...
 pk.get({1})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:get(...) instead of index.get(...)'
+- error: Use index:get(...) instead of index.get(...)
 ...
 pk.select({}, {iterator = 'GE'})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:select(...) instead of index.select(...)'
+- error: Use index:select(...) instead of index.select(...)
 ...
 pk.update({1}, {})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:update(...) instead of index.update(...)'
+- error: Use index:update(...) instead of index.update(...)
 ...
 pk.delete({1})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:delete(...) instead of index.delete(...)'
+- error: Use index:delete(...) instead of index.delete(...)
 ...
 pk.drop()
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:drop(...) instead of index.drop(...)'
+- error: Use index:drop(...) instead of index.drop(...)
 ...
 pk.rename("newname")
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:rename(...) instead of index.rename(...)'
+- error: Use index:rename(...) instead of index.rename(...)
 ...
 pk.alter({})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:alter(...) instead of index.alter(...)'
+- error: Use index:alter(...) instead of index.alter(...)
 ...
 space:drop()
 ---

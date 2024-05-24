@@ -4,7 +4,7 @@ pickle = require('pickle')
 ...
 pickle.pack()
 ---
-- error: 'bad argument #1 to ''?'' (string expected, got no value)'
+- error: expected string as 1 argument
 ...
 pickle.pack(1)
 ---

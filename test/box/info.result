@@ -143,11 +143,11 @@ box.info().ro == box.info.server.ro
 --
 box.ctl.wait_ro("abc") -- invalid argument
 ---
-- error: 'bad argument #1 to ''?'' (number expected, got string)'
+- error: expected number as 1 argument
 ...
 box.ctl.wait_rw("def") -- invalid argument
 ---
-- error: 'bad argument #1 to ''?'' (number expected, got string)'
+- error: expected number as 1 argument
 ...
 box.info.ro -- false
 ---

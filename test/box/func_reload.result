@@ -230,7 +230,7 @@ c:call("reload.test_reload_fail")
 ...
 box.schema.func.reload()
 ---
-- error: 'bad argument #1 to ''?'' (string expected, got no value)'
+- error: expected string as 1 argument
 ...
 box.schema.func.reload("non-existing")
 ---

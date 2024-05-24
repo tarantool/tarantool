@@ -54,12 +54,14 @@ luaL_iserror(struct lua_State *L, int narg)
 }
 
 struct error *
-luaL_checkerror(struct lua_State *L, int narg)
+luaT_checkerror(struct lua_State *L, int narg)
 {
 	struct error *error = luaL_iserror(L, narg);
 	if (error == NULL)  {
-		luaL_error(L, "Invalid argument #%d (error expected, got %s)",
-			   narg, lua_typename(L, lua_type(L, narg)));
+		diag_set(IllegalParams,
+			 "Invalid argument #%d (error expected, got %s)",
+			 narg, lua_typename(L, lua_type(L, narg)));
+		luaT_error(L);
 	}
 	return error;
 }
@@ -67,7 +69,7 @@ luaL_checkerror(struct lua_State *L, int narg)
 static int
 luaL_error_gc(struct lua_State *L)
 {
-	struct error *error = luaL_checkerror(L, 1);
+	struct error *error = luaT_checkerror(L, 1);
 	error_unref(error);
 	return 0;
 }

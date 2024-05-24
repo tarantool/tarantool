@@ -424,7 +424,7 @@ value
 s:replace{35}
 f = function() return gen(param, state) end
 _, errmsg = pcall(f)
-errmsg:match('usage: next%(param, state%)')
+errmsg:match('Usage: next%(param, state%)')
 value
 
 s:drop()

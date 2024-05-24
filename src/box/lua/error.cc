@@ -217,9 +217,11 @@ luaT_error_create(lua_State *L, int top_base)
 		if (!lua_isnil(L, -1)) {
 			prev = luaL_iserror(L, -1);
 			if (prev == NULL) {
-				luaL_error(L, "Invalid argument 'prev' (error "
-					   "expected, got %s)",
-					   lua_typename(L, lua_type(L, -1)));
+				diag_set(IllegalParams,
+					 "Invalid argument 'prev' (error "
+					 "expected, got %s)",
+					 lua_typename(L, lua_type(L, -1)));
+				luaT_error(L);
 			}
 		}
 	} else {
@@ -312,8 +314,10 @@ bad_arg:
 static int
 luaT_error_last(lua_State *L)
 {
-	if (lua_gettop(L) >= 1)
-		luaL_error(L, "box.error.last(): bad arguments");
+	if (lua_gettop(L) >= 1) {
+		diag_set(IllegalParams, "box.error.last(): bad arguments");
+		luaT_error(L);
+	}
 
 	struct error *e = box_error_last();
 	if (e == NULL) {
@@ -329,8 +333,10 @@ static int
 luaT_error_new(lua_State *L)
 {
 	struct error *e = luaT_error_create(L, 1);
-	if (e == NULL)
-		return luaL_error(L, "box.error.new(): bad arguments");
+	if (e == NULL) {
+		diag_set(IllegalParams, "box.error.new(): bad arguments");
+		return luaT_error(L);
+	}
 	lua_settop(L, 0);
 	luaT_pusherror(L, e);
 	return 1;
@@ -339,8 +345,10 @@ luaT_error_new(lua_State *L)
 static int
 luaT_error_clear(lua_State *L)
 {
-	if (lua_gettop(L) >= 1)
-		luaL_error(L, "box.error.clear(): bad arguments");
+	if (lua_gettop(L) >= 1) {
+		diag_set(IllegalParams, "box.error.clear(): bad arguments");
+		luaT_error(L);
+	}
 
 	box_error_clear();
 	return 0;
@@ -349,9 +357,11 @@ luaT_error_clear(lua_State *L)
 static int
 luaT_error_set(struct lua_State *L)
 {
-	if (lua_gettop(L) == 0)
-		return luaL_error(L, "Usage: box.error.set(error)");
-	struct error *e = luaL_checkerror(L, 1);
+	if (lua_gettop(L) == 0) {
+		diag_set(IllegalParams, "Usage: box.error.set(error)");
+		return luaT_error(L);
+	}
+	struct error *e = luaT_checkerror(L, 1);
 	diag_set_error(&fiber()->diag, e);
 	return 0;
 }
@@ -367,7 +377,7 @@ luaT_error_is(struct lua_State *L)
 static int
 lbox_errinj_set(struct lua_State *L)
 {
-	char *name = (char*)luaL_checkstring(L, 1);
+	char *name = (char *)luaT_checkstring(L, 1);
 	struct errinj *errinj;
 	errinj = errinj_by_name(name);
 	if (errinj == NULL) {
@@ -380,7 +390,7 @@ lbox_errinj_set(struct lua_State *L)
 		errinj->bparam = lua_toboolean(L, 2);
 		break;
 	case ERRINJ_INT:
-		errinj->iparam = luaL_checkint64(L, 2);
+		errinj->iparam = luaT_checkint64(L, 2);
 		break;
 	case ERRINJ_DOUBLE:
 		errinj->dparam = lua_tonumber(L, 2);
@@ -416,7 +426,7 @@ lbox_errinj_push_value(struct lua_State *L, const struct errinj *e)
 static int
 lbox_errinj_get(struct lua_State *L)
 {
-	char *name = (char*)luaL_checkstring(L, 1);
+	char *name = (char *)luaT_checkstring(L, 1);
 	struct errinj *e = errinj_by_name(name);
 	if (e != NULL)
 		return lbox_errinj_push_value(L, e);

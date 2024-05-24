@@ -55,7 +55,7 @@ lbox_ctl_wait_ro(struct lua_State *L)
 	int index = lua_gettop(L);
 	double timeout = TIMEOUT_INFINITY;
 	if (index > 0)
-		timeout = luaL_checknumber(L, 1);
+		timeout = luaT_checknumber(L, 1);
 	if (box_wait_ro(true, timeout) != 0)
 		return luaT_error(L);
 	return 0;
@@ -67,7 +67,7 @@ lbox_ctl_wait_rw(struct lua_State *L)
 	int index = lua_gettop(L);
 	double timeout = TIMEOUT_INFINITY;
 	if (index > 0)
-		timeout = luaL_checknumber(L, 1);
+		timeout = luaT_checknumber(L, 1);
 	if (box_wait_ro(false, timeout) != 0)
 		return luaT_error(L);
 	return 0;
@@ -136,15 +136,15 @@ lbox_ctl_set_on_shutdown_timeout(struct lua_State *L)
 {
 	int index = lua_gettop(L);
 	if (index != 1) {
-		lua_pushstring(L, "function expected one argument");
-		lua_error(L);
+		diag_set(IllegalParams, "function expected one argument");
+		luaT_error(L);
 	}
 
-	double wait_time = luaL_checknumber(L, 1);
+	double wait_time = luaT_checknumber(L, 1);
 	if (wait_time <= 0) {
-		lua_pushstring(L, "on_shutdown timeout must be greater "
-			       "then zero");
-		lua_error(L);
+		diag_set(IllegalParams,
+			 "on_shutdown timeout must be greater then zero");
+		luaT_error(L);
 	}
 
 	on_shutdown_trigger_timeout = wait_time;
@@ -160,16 +160,18 @@ lbox_ctl_set_iproto_lockdown(struct lua_State *L)
 #if defined(ENABLE_SECURITY)
 	int index = lua_gettop(L);
 	if (index != 1 || !lua_isboolean(L, 1)) {
-		lua_pushstring(L, "function expected one boolean argument");
-		lua_error(L);
+		diag_set(IllegalParams,
+			 "function expected one boolean argument");
+		luaT_error(L);
 	}
 	bool new_val = lua_toboolean(L, 1);
 	if (security_set_iproto_lockdown(new_val) != 0)
 		return luaT_error(L);
 #else
-	lua_pushstring(L, "box.ctl.iproto_lockdown() is available only in "
-		       "Enterprise Edition builds.");
-	lua_error(L);
+	diag_set(IllegalParams,
+		 "box.ctl.iproto_lockdown() is available only in "
+		 "Enterprise Edition builds.");
+	luaT_error(L);
 #endif
 	return 0;
 }

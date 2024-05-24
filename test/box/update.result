@@ -464,7 +464,7 @@ s:insert{1, 2, 3}
 ...
 s:update({1})
 ---
-- error: Usage index:update(key, ops)
+- error: 'Usage: index:update(key, ops)'
 ...
 s:update({1}, {'=', 1, 1})
 ---
@@ -813,7 +813,7 @@ s:update({0}, {{'+', 2, -0x4000000000000001ll}})  -- overflow
 -- some wrong updates --
 s:update({0}, 0)
 ---
-- error: Usage index:update(key, ops)
+- error: 'Usage: index:update(key, ops)'
 ...
 s:update({0}, {'+', 2, 2})
 ---

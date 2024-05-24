@@ -29,7 +29,7 @@ raise_error_at(lua_State *L)
 static int
 error_trace(lua_State *L)
 {
-	struct error *e = luaL_checkerror(L, 1);
+	struct error *e = luaT_checkerror(L, 1);
 
 	lua_createtable(L, 0, 2);
 	lua_pushstring(L, "file");

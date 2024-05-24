@@ -4,6 +4,6 @@ local utils = require('internal.utils')
 -- in Lua.
 box.tuple.format.new = function(format)
     utils.check_param(format, 'format', 'table')
-    format = box.internal.space.normalize_format(nil, nil, format)
+    format = box.internal.space.normalize_format(nil, nil, format, 2)
     return box.internal.tuple_format.new(format)
 end

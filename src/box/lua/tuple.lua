@@ -107,24 +107,24 @@ local encode_fix = msgpackffi.internal.encode_fix
 local encode_array = msgpackffi.internal.encode_array
 local encode_r = msgpackffi.internal.encode_r
 
-local tuple_encode = function(tmpbuf, obj)
+local tuple_encode = function(tmpbuf, obj, level)
     if obj == nil then
         encode_fix(tmpbuf, 0x90, 0)  -- empty array
     elseif is_tuple(obj) then
-        encode_r(tmpbuf, obj, 1)
+        encode_r(tmpbuf, obj, 1, level and level + 1)
     elseif type(obj) == "table" then
         local obj_size = #obj
         if obj_size == 0 and not rawequal(next(obj), nil) then
             -- dictionary cannot represent a tuple
-            return box.error(box.error.TUPLE_NOT_ARRAY)
+            box.error(box.error.TUPLE_NOT_ARRAY, level and level + 1)
         end
         encode_array(tmpbuf, obj_size)
         for i = 1, obj_size, 1 do
-            encode_r(tmpbuf, obj[i], 1)
+            encode_r(tmpbuf, obj[i], 1, level and level + 1)
         end
     else
         encode_fix(tmpbuf, 0x90, 1)  -- array of one element
-        encode_r(tmpbuf, obj, 1)
+        encode_r(tmpbuf, obj, 1, level and level + 1)
     end
     return tmpbuf.rpos, tmpbuf.wpos
 end
