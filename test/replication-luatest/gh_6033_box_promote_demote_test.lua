@@ -108,6 +108,11 @@ end
 local function cluster_reinit(g)
     box_cfg_update(g.cluster.servers, g.box_cfg)
     wait_sync(g.cluster.servers)
+    for _, server in ipairs(g.cluster.servers) do
+        server:exec(function()
+            box.ctl.demote()
+        end)
+    end
 end
 
 local function cluster_stop(g)
