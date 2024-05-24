@@ -759,6 +759,42 @@ lbox_info_hostname(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_info_config(struct lua_State *L)
+{
+	/* require('config'):info('v2') */
+	lua_getglobal(L, "require");
+	lua_pushliteral(L, "config");
+	if (lua_pcall(L, 1, 1, 0) != 0)
+		goto error;
+	/* Stack: config. */
+	lua_getfield(L, -1, "info");
+	/* Stack: config, config.info. */
+	lua_insert(L, -2);
+	/* Stack: config.info, config. */
+	lua_pushliteral(L, "v2");
+	/* Stack: config.info, config, 'v2'. */
+	if (lua_pcall(L, 2, 1, 0) != 0)
+		goto error;
+	return 1;
+
+error:
+	/*
+	 * An error shouldn't occur by construction.
+	 *
+	 * However, box.info() is an important call and we
+	 * shouldn't fail it in any circumstances, including a
+	 * problem in the config:info() implementation.
+	 *
+	 * So, we don't raise an error here and place it to the
+	 * result instead.
+	 */
+	lua_newtable(L);
+	lua_insert(L, -2);
+	lua_setfield(L, -2, "error");
+	return 1;
+}
+
 static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"id", lbox_info_id},
 	{"uuid", lbox_info_uuid},
@@ -784,6 +820,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"synchro", lbox_info_synchro},
 	{"schema_version", lbox_schema_version},
 	{"hostname", lbox_info_hostname},
+	{"config", lbox_info_config},
 	{NULL, NULL}
 };
 
