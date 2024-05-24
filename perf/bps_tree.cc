@@ -120,6 +120,7 @@
 	type##_##func##_size_##size(benchmark::State &state) \
 	{ \
 		test_##func<type>(state, size); \
+		state.SetItemsProcessed(size); \
 	} \
 	BENCHMARK(type##_##func##_size_##size)
 
@@ -128,6 +129,7 @@
 	type##_##func##_height_##height(benchmark::State &state) \
 	{ \
 		test_##func<type>(state, type::height_##height##_max_size); \
+		state.SetItemsProcessed(type::height_##height##_max_size); \
 	} \
 	BENCHMARK(type##_##func##_height_##height)
 
