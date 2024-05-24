@@ -2754,9 +2754,8 @@ box_demote(void)
 			return 0;
 		if (txn_limbo.owner_id != instance_id)
 			return 0;
-		if (raft->state != RAFT_STATE_LEADER)
-			return 0;
-		return box_trigger_elections();
+		box_raft_leader_step_off();
+		return 0;
 	}
 
 	assert(raft->state == RAFT_STATE_FOLLOWER);
