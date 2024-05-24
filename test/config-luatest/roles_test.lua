@@ -619,3 +619,20 @@ g.test_role_started_and_stopped_after_config_loaded = function(g)
         verify_2 = verify_2,
     })
 end
+
+-- Ensure that a descriptive error is raised if the given module
+-- is not a table.
+g.test_role_is_not_a_table = function(g)
+    local myrole = string.dump(function()
+        return 42
+    end)
+
+    helpers.failure_case(g, {
+        roles = {myrole = myrole},
+        options = {
+            ['roles'] = {'myrole'}
+        },
+        exp_err = 'Unable to use module myrole as a role: ' ..
+            'expected table, got number',
+    })
+end

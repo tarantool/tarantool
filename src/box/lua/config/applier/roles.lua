@@ -138,6 +138,11 @@ local function post_apply(config)
         if not role then
             log.verbose('roles.post_apply: load role ' .. role_name)
             role = require(role_name)
+            if type(role) ~= 'table' then
+                local err = 'Unable to use module %s as a role: ' ..
+                    'expected table, got %s'
+                error(err:format(role_name, type(role)), 0)
+            end
             local funcs = {'validate', 'apply', 'stop'}
             for _, func_name in pairs(funcs) do
                 if type(role[func_name]) ~= 'function' then
