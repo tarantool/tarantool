@@ -79,6 +79,7 @@ table.sort(t)
 t
 ---
 - - cluster
+  - config
   - election
   - gc
   - hostname
