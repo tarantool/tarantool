@@ -447,7 +447,7 @@ execute_lua_eval(lua_State *L)
 	uint32_t expr_len = ctx->name_len;
 	if (luaL_loadbuffer(L, expr, expr_len, "=eval")) {
 		diag_set(LuajitError, lua_tostring(L, -1));
-		luaT_error(L);
+		luaT_error_at(L, 0);
 	}
 
 	/* Unpack arguments */

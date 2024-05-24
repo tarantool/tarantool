@@ -93,15 +93,44 @@ luaT_pusherror(struct lua_State *L, struct error *e)
 	luaL_setcdatagc(L, -2);
 }
 
+void
+luaT_error_set_trace(lua_State *L, int level, struct error *error)
+{
+	const char *file = "";
+	unsigned line = 0;
+	lua_Debug info;
+	if (level > 0 &&
+	    lua_getstack(L, level, &info) &&
+	    lua_getinfo(L, "Sl", &info)) {
+		if (*info.short_src) {
+			file = info.short_src;
+		} else if (*info.source) {
+			file = info.source;
+		} else {
+			file = "eval";
+		}
+		line = info.currentline;
+	}
+	error_set_location(error, file, line);
+}
+
 int
-luaT_error(lua_State *L)
+luaT_error_at(lua_State *L, int level)
 {
 	struct error *e = diag_last_error(&fiber()->diag);
 	assert(e != NULL);
+	if (level > 0)
+		luaT_error_set_trace(L, level, e);
 	luaT_pusherror(L, e);
 	lua_error(L);
 	unreachable();
 	return 0;
+}
+
+int
+luaT_error(lua_State *L)
+{
+	return luaT_error_at(L, 1);
 }
 
 int

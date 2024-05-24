@@ -638,6 +638,15 @@ create_unit_test(PREFIX lua_utils
                            ${READLINE_LIBRARIES}
 )
 
+create_unit_test(PREFIX lua_error
+                 SOURCES lua_error.c
+                 LIBRARIES unit core server
+                           ${LUAJIT_LIBRARIES}
+                           ${CURL_LIBRARIES}
+                           ${LIBYAML_LIBRARIES}
+                           ${READLINE_LIBRARIES}
+)
+
 create_unit_test(PREFIX lua_msgpack
                  SOURCES lua_msgpack.c
                  LIBRARIES unit core server
