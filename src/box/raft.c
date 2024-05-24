@@ -302,13 +302,7 @@ box_raft_fence(void)
 	raft_resign(raft);
 }
 
-/**
- * Resign RAFT leadership and freeze limbo regardless of
- * box_election_fencing_mode. It waits until the elections
- * begin. After the death-timeout expires, it starts a new
- * round of elections.
- */
-static void
+void
 box_raft_leader_step_off(void)
 {
 	struct raft *raft = box_raft();

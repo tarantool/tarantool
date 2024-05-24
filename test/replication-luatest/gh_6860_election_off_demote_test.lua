@@ -15,6 +15,7 @@ local function replicaset_create(g)
             server.build_listen_uri('server2', g.replicaset.id),
         },
     }
+    g.replication = box_cfg.replication
     g.server1 = g.replicaset:build_and_add_server({
         alias = 'server1', box_cfg = box_cfg
     })
@@ -111,9 +112,21 @@ g.test_election_off_demote_other_no_leader = function(g)
     end)
     -- Server-2 sees that the queue is owned by server-1.
     g.server2:wait_for_synchro_queue_term(g.server1:get_election_term())
+    g.server2:update_box_cfg{replication = ''}
     g.server1:exec(function()
         box.ctl.demote()
+        -- Bump the election term while leaving the synchro queue term intact.
+        local msg = "Not enough peers connected to start elections: 1 out " ..
+                     "of minimal required 2"
+        t.assert_error_msg_content_equals(msg, box.ctl.promote)
+        t.assert_equals(box.info.election.term, box.info.synchro.queue.term + 1)
         box.cfg{election_mode = 'off'}
+    end)
+    g.server2:update_box_cfg({replication = g.replication})
+    g.server2:exec(function()
+        t.helpers.retrying({timeout = 10, delay = 0.5}, function()
+            t.assert_not_equals(box.info.status, "orphan")
+        end)
     end)
     -- Server-2 sees that server-1 is no longer a leader. But the queue still
     -- belongs to the latter.
