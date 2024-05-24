@@ -32,7 +32,13 @@ e
  | ---
  | - foo
  | ...
-e:unpack()
+u = e:unpack()
+ | ---
+ | ...
+u.trace[1].line = nil
+ | ---
+ | ...
+u
  | ---
  | - name: ILLEGAL_PARAMS
  |   code: 0
@@ -40,8 +46,7 @@ e:unpack()
  |   type: IllegalParams
  |   message: foo
  |   trace:
- |   - file: '[C]'
- |     line: 4294967295
+ |   - file: builtin/box/console.lua
  | ...
 e.type
  | ---

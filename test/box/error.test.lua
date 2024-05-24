@@ -9,7 +9,9 @@ box.error(box.error.ILLEGAL_PARAMS, "foo")
 box.error()
 e = box.error.last()
 e
-e:unpack()
+u = e:unpack()
+u.trace[1].line = nil
+u
 e.type
 e.code
 e.message
