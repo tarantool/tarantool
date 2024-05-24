@@ -24,7 +24,7 @@ test:ok(session.exists(session.id()), "session is created")
 test:isnil(session.peer(session.id()), "session.peer")
 test:ok(session.exists(), "session.exists")
 local _, err = pcall(session.exists, 1, 2, 3)
-test:is(err, "session.exists(sid): bad arguments", "exists bad args #2")
+test:is(tostring(err), "session.exists(sid): bad arguments", "exists bad args #2")
 test:ok(not session.exists(1234567890), "session doesn't exist")
 
 -- check session.id()

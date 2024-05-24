@@ -217,7 +217,7 @@ box.atomic(tx);
 function tx_error(space)
     space:auto_increment{'third'}
     space:auto_increment{'fourth'}
-    error("some error")
+    box.error(box.error.ILLEGAL_PARAMS, "some error")
 end;
 box.atomic(tx_error, space);
 

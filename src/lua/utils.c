@@ -278,8 +278,10 @@ void *
 luaL_checkcdata(struct lua_State *L, int idx, uint32_t *ctypeid)
 {
 	void *cdata = luaL_tocpointer(L, idx, ctypeid);
-	if (cdata == NULL)
-		luaL_error(L, "expected cdata as %d argument", idx);
+	if (cdata == NULL) {
+		diag_set(IllegalParams, "expected cdata as %d argument", idx);
+		luaT_error(L);
+	}
 	return cdata;
 }
 

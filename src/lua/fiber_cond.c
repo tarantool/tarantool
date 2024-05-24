@@ -35,6 +35,7 @@
 
 #include "lua/utils.h"
 #include "fiber.h"
+#include "diag.h"
 
 #include <fiber_cond.h>
 
@@ -44,8 +45,6 @@ static int
 luaT_fiber_cond_new(struct lua_State *L)
 {
 	struct fiber_cond *e = lua_newuserdata(L, sizeof(*e));
-	if (e == NULL)
-		luaL_error(L, "fiber.cond: not enough memory");
 	fiber_cond_create(e);
 	luaL_getmetatable(L, cond_typename);
 	lua_setmetatable(L, -2);
@@ -57,7 +56,7 @@ luaT_isfibercond(struct lua_State *L, int index)
 {
 	if (index > lua_gettop(L))
 		return NULL;
-	return luaL_checkudata(L, index, cond_typename);
+	return luaL_testudata(L, index, cond_typename);
 }
 
 struct fiber_cond *
@@ -65,9 +64,10 @@ luaT_checkfibercond(struct lua_State *L, int index)
 {
 	struct fiber_cond *fiber_cond = luaT_isfibercond(L, index);
 	if (fiber_cond == NULL) {
-		luaL_error(L, "Invalid argument #%d "
-			   "(fiber.cond expected, got %s)", index,
-			   lua_typename(L, lua_type(L, index)));
+		diag_set(IllegalParams,
+			 "Invalid argument #%d (fiber.cond expected, got %s)",
+			 index, lua_typename(L, lua_type(L, index)));
+		luaT_error(L);
 	}
 	return fiber_cond;
 }
@@ -76,8 +76,10 @@ static int
 luaT_fiber_cond_gc(struct lua_State *L)
 {
 	struct fiber_cond *fiber_cond = luaT_isfibercond(L, 1);
-	if (fiber_cond == NULL)
-		luaL_error(L, "usage: cond:destroy()");
+	if (fiber_cond == NULL) {
+		diag_set(IllegalParams, "Usage: cond:destroy()");
+		luaT_error(L);
+	}
 	fiber_cond_destroy(fiber_cond);
 	return 0;
 }
@@ -86,8 +88,10 @@ static int
 luaT_fiber_cond_signal(struct lua_State *L)
 {
 	struct fiber_cond *fiber_cond = luaT_isfibercond(L, 1);
-	if (fiber_cond == NULL)
-		luaL_error(L, "usage: cond:signal()");
+	if (fiber_cond == NULL) {
+		diag_set(IllegalParams, "Usage: cond:signal()");
+		luaT_error(L);
+	}
 	fiber_cond_signal(fiber_cond);
 	return 0;
 }
@@ -96,8 +100,10 @@ static int
 luaT_fiber_cond_broadcast(struct lua_State *L)
 {
 	struct fiber_cond *fiber_cond = luaT_isfibercond(L, 1);
-	if (fiber_cond == NULL)
-		luaL_error(L, "usage: cond:broadcast()");
+	if (fiber_cond == NULL) {
+		diag_set(IllegalParams, "Usage: cond:broadcast()");
+		luaT_error(L);
+	}
 	fiber_cond_broadcast(fiber_cond);
 	return 0;
 }
@@ -107,13 +113,16 @@ luaT_fiber_cond_wait(struct lua_State *L)
 {
 	int rc;
 	struct fiber_cond *e = luaT_isfibercond(L, 1);
-	if (e == NULL)
-		luaL_error(L, "usage: cond:wait([timeout])");
+	if (e == NULL) {
+		diag_set(IllegalParams, "Usage: cond:wait([timeout])");
+		luaT_error(L);
+	}
 	ev_tstamp timeout = TIMEOUT_INFINITY;
 	if (!lua_isnoneornil(L, 2)) {
 		if (!lua_isnumber(L, 2) ||
 		    (timeout = lua_tonumber(L, 2)) < .0) {
-			luaL_error(L, "usage: cond:wait([timeout])");
+			diag_set(IllegalParams, "Usage: cond:wait([timeout])");
+			luaT_error(L);
 		}
 	}
 	rc = fiber_cond_wait_timeout(e, timeout);
@@ -127,8 +136,10 @@ static int
 luaT_fiber_cond_tostring(struct lua_State *L)
 {
 	struct fiber_cond *cond = luaT_checkfibercond(L, 1);
-	if (cond == NULL)
-		luaL_error(L, "usage: tostring(cond)");
+	if (cond == NULL) {
+		diag_set(IllegalParams, "Usage: tostring(cond)");
+		luaT_error(L);
+	}
 	lua_pushstring(L, "cond");
 	return 1;
 }

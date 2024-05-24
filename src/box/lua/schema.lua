@@ -15,6 +15,7 @@ local compat = require('compat')
 local check_param = utils.check_param
 local check_param_table = utils.check_param_table
 local update_param_table = utils.update_param_table
+local call_at = utils.call_at
 
 local DEFAULT_ORIGIN = ''
 -- We use the field ID instead of the field name so we don't need to upgrade
@@ -242,13 +243,13 @@ local function role_resolve(name_or_id)
     end
 end
 
-local function user_resolve(name_or_id)
+local function user_resolve(name_or_id, level)
     local _vuser = box.space[box.schema.VUSER_ID]
     local tuple
     if type(name_or_id) == 'string' then
         tuple = _vuser.index.name:get{name_or_id}
     elseif type(name_or_id) ~= 'nil' then
-        tuple = _vuser:get{name_or_id}
+        tuple = call_at(level + 1, _vuser.get, _vuser, {name_or_id})
     end
     if tuple == nil or tuple.type ~= 'user' then
         return nil
@@ -318,12 +319,12 @@ local txn_isolation_level_map = create_txn_isolation_level_map()
 box.internal.txn_isolation_level_map = txn_isolation_level_map
 
 -- Convert to numeric the value of txn isolation level, raise if failed.
-local function normalize_txn_isolation_level(txn_isolation)
+local function normalize_txn_isolation_level(txn_isolation, level)
     txn_isolation = txn_isolation_level_map[txn_isolation]
     if txn_isolation == nil then
         box.error(box.error.ILLEGAL_PARAMS,
                   "txn_isolation must be one of box.txn_isolation_level" ..
-                  " (keys or values)")
+                  " (keys or values)", level and level + 1)
     end
     return txn_isolation
 end
@@ -331,20 +332,23 @@ end
 box.internal.normalize_txn_isolation_level = normalize_txn_isolation_level
 
 local begin_options = {
-    timeout = function(timeout)
+    timeout = function(timeout, level)
         if type(timeout) ~= "number" or timeout <= 0 then
             box.error(box.error.ILLEGAL_PARAMS,
-                      "timeout must be a number greater than 0")
+                      "timeout must be a number greater than 0",
+                      level + 1)
         end
         return true
     end,
     txn_isolation = normalize_txn_isolation_level,
-    is_sync = function(is_sync)
+    is_sync = function(is_sync, level)
         if type(is_sync) ~= "boolean" then
-            box.error(box.error.ILLEGAL_PARAMS, "is_sync must be a boolean")
+            box.error(box.error.ILLEGAL_PARAMS, "is_sync must be a boolean",
+                      level + 1)
         end
         if is_sync == false then
-            box.error(box.error.ILLEGAL_PARAMS, "is_sync can only be true")
+            box.error(box.error.ILLEGAL_PARAMS, "is_sync can only be true",
+                      level + 1)
         end
         return true
     end,
@@ -354,7 +358,7 @@ box.begin = function(options)
     local timeout
     local txn_isolation
     local is_sync
-    check_param_table(options, begin_options)
+    check_param_table(options, begin_options, 2)
     if options then
         timeout = options.timeout
         txn_isolation = options.txn_isolation and
@@ -362,7 +366,7 @@ box.begin = function(options)
         is_sync = options.is_sync
     end
     if builtin.box_txn_begin() == -1 then
-        box.error()
+        box.error(box.error.last(), 2)
     end
     if timeout then
         assert(builtin.box_txn_set_timeout(timeout) == 0)
@@ -370,7 +374,7 @@ box.begin = function(options)
     if txn_isolation and
        internal.txn_set_isolation(txn_isolation) ~= 0 then
         box.rollback()
-        box.error()
+        box.error(box.error.last(), 2)
     end
     if is_sync then
         builtin.box_txn_make_sync()
@@ -405,17 +409,25 @@ end
 box.savepoint = function()
     local csavepoint = builtin.box_txn_savepoint()
     if csavepoint == nil then
-        box.error()
+        box.error(box.error.last(), 2)
     end
     return { csavepoint=csavepoint, txn_id=builtin.box_txn_id() }
 end
 
-local function atomic_tail(status, ...)
+local function atomic_tail(level, status, ...)
     if not status then
         box.rollback()
-        error((...), 2)
+        local err = (...)
+        if box.error.is(err) then
+            -- This will update box.error trace to proper value.
+            box.error(err, level + 1)
+        else
+            -- Keep original trace and append trace of level + 1 as
+            -- in case of box.error.
+            error(tostring(err), level + 1)
+        end
     end
-    box.commit()
+    call_at(level + 1, box.commit)
     return ...
 end
 
@@ -430,18 +442,26 @@ box.atomic = function(arg0, arg1, ...)
         local mt = debug.getmetatable(arg0)
         arg0_is_noncallable_table = mt == nil or mt.__call == nil
     end
+    local usage = 'Usage: box.atomic([opts, ]tx-function[, function-arguments]'
     if arg0_is_noncallable_table then
-        box.begin(arg0)
-        return atomic_tail(pcall(arg1, ...))
+        if not utils.is_callable(arg1) then
+            box.error(box.error.ILLEGAL_PARAMS, usage, 2)
+        end
+        call_at(2, box.begin, arg0)
+        return atomic_tail(1, pcall(arg1, ...))
     else
+        if not utils.is_callable(arg0) then
+            box.error(box.error.ILLEGAL_PARAMS, usage, 2)
+        end
         box.begin()
-        return atomic_tail(pcall(arg0, arg1, ...))
+        return atomic_tail(1, pcall(arg0, arg1, ...))
     end
 end
 
 -- Wrap a function into transaction if none is active.
 local function atomic_wrapper(func)
     return function(...)
+        utils.box_check_configured(2)
         -- No reason to start a transaction if one is active already.
         if box.is_in_txn() then
             return func(...)
@@ -459,7 +479,7 @@ end
 --  a table with function names and/or consraint name:function name pairs.
 -- In case of error box.error.ILLEGAL_PARAMS is raised, and @a error_prefix
 --  is added before string message.
-local function normalize_constraint(constr, error_prefix)
+local function normalize_constraint(constr, error_prefix, level)
     if type(constr) == 'string' then
         -- Short form of field constraint - just name of func,
         -- e.g.: {...constraint = "func_name"}
@@ -467,7 +487,7 @@ local function normalize_constraint(constr, error_prefix)
         if not found then
             box.error(box.error.ILLEGAL_PARAMS,
                       error_prefix .. "constraint function " ..
-                      "was not found by name '" .. constr .. "'")
+                      "was not found by name '" .. constr .. "'", level + 1)
         end
         -- normalize form of constraint.
         return {[constr] = found.id}
@@ -481,13 +501,14 @@ local function normalize_constraint(constr, error_prefix)
                 box.error(box.error.ILLEGAL_PARAMS,
                           error_prefix .. "constraint function " ..
                           "is expected to be a string, " ..
-                          "but got " .. type(constr_func))
+                          "but got " .. type(constr_func), level + 1)
             end
             local found = box.space._func.index.name:get(constr_func)
             if not found then
                 box.error(box.error.ILLEGAL_PARAMS,
                           error_prefix .. "constraint function " ..
-                          "was not found by name '" .. constr_func .. "'")
+                          "was not found by name '" .. constr_func .. "'",
+                          level + 1)
             end
             local constr_name = nil
             if type(constr_key) == 'number' then
@@ -501,7 +522,7 @@ local function normalize_constraint(constr, error_prefix)
                 box.error(box.error.ILLEGAL_PARAMS,
                           error_prefix .. "constraint name " ..
                           "is expected to be a string, " ..
-                          "but got " .. type(constr_key))
+                          "but got " .. type(constr_key), level + 1)
             end
             -- normalize form of constraint pair.
             result[constr_name] = found.id
@@ -511,7 +532,8 @@ local function normalize_constraint(constr, error_prefix)
     elseif constr then
         -- unrecognized form of constraint.
         box.error(box.error.ILLEGAL_PARAMS,
-                  error_prefix .. "constraint must be string or table")
+                  error_prefix .. "constraint must be string or table",
+                  level + 1)
     end
     return nil
 end
@@ -524,21 +546,25 @@ end
 --  foreign field mapping.
 -- If fkey_same_space, the foreign key refers to the same space.
 local function normalize_foreign_key_one(def, error_prefix, is_complex,
-                                         fkey_same_space)
+                                         fkey_same_space, level)
     if def.field == nil then
         box.error(box.error.ILLEGAL_PARAMS,
-                  error_prefix .. "foreign key: field must be specified")
+                  error_prefix .. "foreign key: field must be specified",
+                  level + 1)
     end
     if def.space ~= nil and
        type(def.space) ~= 'string' and type(def.space) ~= 'number' then
         box.error(box.error.ILLEGAL_PARAMS,
-                  error_prefix .. "foreign key: space must be string or number")
+                  error_prefix .. "foreign key: space must be string or number",
+                  level + 1)
     end
     local field = def.field
     if not is_complex then
         if type(field) ~= 'string' and type(field) ~= 'number' then
             box.error(box.error.ILLEGAL_PARAMS,
-                      error_prefix .. "foreign key: field must be string or number")
+                      error_prefix ..
+                      "foreign key: field must be string or number",
+                      level + 1)
         end
         if type(field) == 'number' then
             -- convert to zero-based index.
@@ -548,7 +574,7 @@ local function normalize_foreign_key_one(def, error_prefix, is_complex,
         if type(field) ~= 'table' then
             box.error(box.error.ILLEGAL_PARAMS,
                       error_prefix .. "foreign key: field must be a table " ..
-                      "with local field -> foreign field mapping")
+                      "with local field -> foreign field mapping", level + 1)
         end
         local count = 0
         local converted = {}
@@ -557,7 +583,7 @@ local function normalize_foreign_key_one(def, error_prefix, is_complex,
             if type(k) ~= 'string' and type(k) ~= 'number' then
                 box.error(box.error.ILLEGAL_PARAMS,
                           error_prefix .. "foreign key: local field must be "
-                          .. "string or number")
+                          .. "string or number", level + 1)
             end
             if type(k) == 'number' then
                 -- convert to zero-based index.
@@ -566,7 +592,7 @@ local function normalize_foreign_key_one(def, error_prefix, is_complex,
             if type(v) ~= 'string' and type(v) ~= 'number' then
                 box.error(box.error.ILLEGAL_PARAMS,
                           error_prefix .. "foreign key: foreign field must be "
-                          .. "string or number")
+                          .. "string or number", level + 1)
             end
             if type(v) == 'number' then
                 -- convert to zero-based index.
@@ -577,20 +603,20 @@ local function normalize_foreign_key_one(def, error_prefix, is_complex,
         if count < 1 then
             box.error(box.error.ILLEGAL_PARAMS,
                       error_prefix .. "foreign key: field must be a table " ..
-                      "with local field -> foreign field mapping")
+                      "with local field -> foreign field mapping", level + 1)
         end
         field = setmap(converted)
     end
     if not box.space[def.space] and not fkey_same_space then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: space " .. tostring(def.space)
-                  .. " was not found")
+                  .. " was not found", level + 1)
     end
     for k in pairs(def) do
         if k ~= 'space' and k ~= 'field' then
             box.error(box.error.ILLEGAL_PARAMS, error_prefix ..
                       "foreign key: unexpected parameter '" ..
-                      tostring(k) .. "'")
+                      tostring(k) .. "'", level + 1)
         end
     end
     if fkey_same_space then
@@ -613,14 +639,14 @@ end
 -- In case of error box.error.ILLEGAL_PARAMS is raised, and @a error_prefix
 --  is added before string message.
 local function normalize_foreign_key(space_id, space_name, fkey, error_prefix,
-                                     is_complex)
+                                     is_complex, level)
     if fkey == nil then
         return nil
     end
     if type(fkey) ~= 'table' then
         -- unrecognized form
         box.error(box.error.ILLEGAL_PARAMS,
-                  error_prefix .. "foreign key must be a table")
+                  error_prefix .. "foreign key must be a table", level + 1)
     end
     if fkey.field ~= nil and
         (type(fkey.space) ~= 'table' or type(fkey.field) ~= 'table') then
@@ -629,7 +655,7 @@ local function normalize_foreign_key(space_id, space_name, fkey, error_prefix,
                                  fkey.space == space_id or
                                  fkey.space == space_name)
         fkey = normalize_foreign_key_one(fkey, error_prefix, is_complex,
-                                         fkey_same_space)
+                                         fkey_same_space, level)
         local fkey_name = fkey_same_space and (space_name or 'unknown') or
                           box.space[fkey.space].name
         return {[fkey_name] = fkey}
@@ -639,41 +665,42 @@ local function normalize_foreign_key(space_id, space_name, fkey, error_prefix,
     for k,v in pairs(fkey) do
         if type(k) ~= 'string' then
             box.error(box.error.ILLEGAL_PARAMS,
-                      error_prefix .. "foreign key name must be a string")
+                      error_prefix .. "foreign key name must be a string",
+                      level + 1)
         end
         if type(v) ~= 'table' then
             -- unrecognized form
             box.error(box.error.ILLEGAL_PARAMS,
                       error_prefix .. "foreign key definition must be a table "
-                      .. "with 'space' and 'field' members")
+                      .. "with 'space' and 'field' members", level + 1)
         end
         local fkey_same_space = (v.space == nil or
                                  v.space == space_id or
                                  v.space == space_name)
         v = normalize_foreign_key_one(v, error_prefix, is_complex,
-                                      fkey_same_space)
+                                      fkey_same_space, level)
         result[k] = v
     end
     return result
 end
 
 -- Check and normalize field default function.
-local function normalize_default_func(func_name, error_prefix)
+local function normalize_default_func(func_name, error_prefix, level)
     if type(func_name) ~= 'string' then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "field default function name is expected " ..
-                  "to be a string, but got " .. type(func_name))
+                  "to be a string, but got " .. type(func_name), level + 1)
     end
     local found = box.space._func.index.name:get(func_name)
     if not found then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "field default function was not found by " ..
-                  "name '" .. func_name .. "'")
+                  "name '" .. func_name .. "'", level + 1)
     end
     return found.id
 end
 
-local function normalize_format(space_id, space_name, format)
+local function normalize_format(space_id, space_name, format, level)
     local result = {}
     for i, given in ipairs(format) do
         local field = {}
@@ -698,17 +725,22 @@ local function normalize_format(space_id, space_name, format)
                     if not coll then
                         box.error(box.error.ILLEGAL_PARAMS,
                             "format[" .. i .. "]: collation " ..
-                            "was not found by name '" .. v .. "'")
+                            "was not found by name '" .. v .. "'",
+                            level + 1)
                     end
                     field[k] = coll.id
                 elseif k == 'constraint' then
-                    field[k] = normalize_constraint(v, "format[" .. i .. "]: ")
+                    field[k] = normalize_constraint(v, "format[" .. i .. "]: ",
+                                                    level + 1)
                 elseif k == 'foreign_key' then
                     field[k] = normalize_foreign_key(space_id, space_name,
-                                                     v, "format[" .. i .. "]: ")
+                                                     v, "format[" .. i .. "]: ",
+                                                     false,
+                                                     level + 1)
                 elseif k == 'default_func' then
                     field[k] = normalize_default_func(v,
-                                                      "format[" .. i .. "]: ")
+                                                      "format[" .. i .. "]: ",
+                                                      level + 1)
                 else
                     field[k] = v
                 end
@@ -716,13 +748,15 @@ local function normalize_format(space_id, space_name, format)
         end
         if type(field.name) ~= 'string' then
             box.error(box.error.ILLEGAL_PARAMS,
-                "format[" .. i .. "]: name (string) is expected")
+                      "format[" .. i .. "]: name (string) is expected",
+                      level + 1)
         end
         if field.type == nil then
             field.type = 'any'
         elseif type(field.type) ~= 'string' then
             box.error(box.error.ILLEGAL_PARAMS,
-                "format[" .. i .. "]: type must be a string")
+                      "format[" .. i .. "]: type must be a string",
+                      level + 1)
         end
         table.insert(result, field)
     end
@@ -771,7 +805,7 @@ local space_types = {
     'data-temporary',
     'temporary',
 }
-local function check_space_type(space_type)
+local function check_space_type(space_type, level)
     if space_type == nil then
         return
     end
@@ -782,12 +816,13 @@ local function check_space_type(space_type)
     end
     box.error(box.error.ILLEGAL_PARAMS,
               "unknown space type, must be one of: '" ..
-              table.concat(space_types, "', '") .. "'.")
+              table.concat(space_types, "', '") .. "'.", level + 1)
 end
 
 box.schema.space = {}
 box.schema.space.create = function(name, options)
-    check_param(name, 'name', 'string')
+    utils.box_check_configured(2)
+    check_param(name, 'name', 'string', 2)
     local options_template = {
         if_not_exists = 'boolean',
         engine = 'string',
@@ -807,12 +842,12 @@ box.schema.space.create = function(name, options)
         engine = 'memtx',
         field_count = 0,
     }
-    check_param_table(options, options_template)
+    check_param_table(options, options_template, 2)
     options = update_param_table(options, options_defaults)
-    check_space_type(options.type)
+    check_space_type(options.type, 2)
     if options.type ~= nil and options.temporary ~= nil then
         box.error(box.error.ILLEGAL_PARAMS,
-                  "only one of 'type' or 'temporary' may be specified")
+                  "only one of 'type' or 'temporary' may be specified", 2)
     end
     if options.engine == 'vinyl' then
         options = update_param_table(options, {
@@ -825,7 +860,7 @@ box.schema.space.create = function(name, options)
         if options.if_not_exists then
             return box.space[name], "not created"
         else
-            box.error(box.error.SPACE_EXISTS, name)
+            box.error(box.error.SPACE_EXISTS, name, 2)
         end
     end
     local id = options.id
@@ -836,15 +871,15 @@ box.schema.space.create = function(name, options)
     if options.user then
         uid = user_or_role_resolve(options.user)
         if uid == nil then
-            box.error(box.error.NO_SUCH_USER, options.user)
+            box.error(box.error.NO_SUCH_USER, options.user, 2)
         end
     end
     local format = options.format and options.format or {}
-    check_param(format, 'format', 'table')
-    format = normalize_format(id, name, format)
-    local constraint = normalize_constraint(options.constraint, '')
+    check_param(format, 'format', 'table', 2)
+    format = normalize_format(id, name, format, 2)
+    local constraint = normalize_constraint(options.constraint, '', 2)
     local foreign_key = normalize_foreign_key(id, name, options.foreign_key, '',
-                                              true)
+                                              true, 2)
     -- filter out global parameters from the options array
     local space_options = setmap({
         group_id = options.is_local and 1 or nil,
@@ -855,8 +890,9 @@ box.schema.space.create = function(name, options)
         constraint = constraint,
         foreign_key = foreign_key,
     })
-    _space:insert{id, uid, name, options.engine, options.field_count,
-        space_options, format}
+    call_at(2, _space.insert, _space,
+            {id, uid, name, options.engine, options.field_count, space_options,
+             format})
 
     feedback_save_event('create_space')
     return box.space[id], "created"
@@ -864,35 +900,36 @@ end
 
 -- space format - the metadata about space fields
 function box.schema.space.format(id, format)
+    utils.box_check_configured(2)
     local _space = box.space._space
     local _vspace = box.space._vspace
-    check_param(id, 'id', 'number')
+    check_param(id, 'id', 'number', 2)
 
     local tuple = _vspace:get(id)
     if tuple == nil then
-        box.error(box.error.NO_SUCH_SPACE, '#' .. tostring(id))
+        box.error(box.error.NO_SUCH_SPACE, '#' .. tostring(id), 2)
     end
 
     if format == nil then
         return denormalize_format(tuple.format)
     else
-        check_param(format, 'format', 'table')
-        format = normalize_format(id, tuple.name, format)
-        _space:update(id, {{'=', 7, format}})
+        check_param(format, 'format', 'table', 2)
+        format = normalize_format(id, tuple.name, format, 2)
+        call_at(2, _space.update, _space, id, {{'=', 7, format}})
     end
 end
 
 function box.schema.space.upgrade(id)
-    check_param(id, 'id', 'number')
-    box.error(box.error.UNSUPPORTED, "Community edition", "space upgrade")
+    check_param(id, 'id', 'number', 2)
+    box.error(box.error.UNSUPPORTED, "Community edition", "space upgrade", 2)
 end
 
 box.schema.create_space = box.schema.space.create
 
 box.schema.space.drop = atomic_wrapper(function(space_id, space_name, opts)
-    check_param(space_id, 'space_id', 'number')
+    check_param(space_id, 'space_id', 'number', 2)
     opts = opts or {}
-    check_param_table(opts, { if_exists = 'boolean' })
+    check_param_table(opts, { if_exists = 'boolean' }, 2)
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
     local _trigger = box.space[box.schema.TRIGGER_ID]
@@ -936,7 +973,7 @@ box.schema.space.drop = atomic_wrapper(function(space_id, space_name, opts)
             space_name = '#'..tostring(space_id)
         end
         if not opts.if_exists then
-            box.error(box.error.NO_SUCH_SPACE, space_name)
+            box.error(box.error.NO_SUCH_SPACE, space_name, 2)
         end
     end
 
@@ -944,11 +981,12 @@ box.schema.space.drop = atomic_wrapper(function(space_id, space_name, opts)
 end)
 
 box.schema.space.rename = function(space_id, space_name)
-    check_param(space_id, 'space_id', 'number')
-    check_param(space_name, 'space_name', 'string')
+    utils.box_check_configured(2)
+    check_param(space_id, 'space_id', 'number', 2)
+    check_param(space_name, 'space_name', 'string', 2)
 
     local _space = box.space[box.schema.SPACE_ID]
-    _space:update(space_id, {{"=", 3, space_name}})
+    call_at(2, _space.update, _space, space_id, {{"=", 3, space_name}})
 end
 
 local alter_space_template = {
@@ -965,11 +1003,12 @@ local alter_space_template = {
 }
 
 box.schema.space.alter = function(space_id, options)
+    utils.box_check_configured(2)
     local space = box.space[space_id]
     if not space then
-        box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
+        box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id), 2)
     end
-    check_param_table(options, alter_space_template)
+    check_param_table(options, alter_space_template, 2)
 
     local _space = box.space._space
     local tuple = _space:get({space.id})
@@ -979,7 +1018,7 @@ box.schema.space.alter = function(space_id, options)
     if options.user then
         owner = user_or_role_resolve(options.user)
         if not owner then
-            box.error(box.error.NO_SUCH_USER, options.user)
+            box.error(box.error.NO_SUCH_USER, options.user, 2)
         end
     else
         owner = tuple.owner
@@ -990,7 +1029,7 @@ box.schema.space.alter = function(space_id, options)
     local flags = tuple.flags
 
     if options.type ~= nil then
-        check_space_type(options.type)
+        check_space_type(options.type, 2)
         flags.type = options.type
     end
 
@@ -1008,7 +1047,7 @@ box.schema.space.alter = function(space_id, options)
 
     local format
     if options.format ~= nil then
-        format = normalize_format(space_id, tuple.name, options.format)
+        format = normalize_format(space_id, tuple.name, options.format, 2)
     else
         format = tuple.format
     end
@@ -1017,7 +1056,7 @@ box.schema.space.alter = function(space_id, options)
         if table.equals(options.constraint, {}) then
             options.constraint = nil
         end
-        flags.constraint = normalize_constraint(options.constraint, '')
+        flags.constraint = normalize_constraint(options.constraint, '', 2)
     end
 
     if options.foreign_key ~= nil then
@@ -1025,7 +1064,8 @@ box.schema.space.alter = function(space_id, options)
             options.foreign_key = nil
         end
         flags.foreign_key = normalize_foreign_key(space_id, name,
-                                                  options.foreign_key, '', true)
+                                                  options.foreign_key, '', true,
+                                                  2)
     end
 
     tuple = tuple:totable()
@@ -1034,34 +1074,38 @@ box.schema.space.alter = function(space_id, options)
     tuple[5] = field_count
     tuple[6] = flags
     tuple[7] = format
-    _space:replace(tuple)
+    call_at(2, _space.replace, _space, tuple)
 end
 
 box.schema.index = {}
 
-local function update_index_parts_1_6_0(parts)
+local function update_index_parts_1_6_0(parts, level)
     local result = {}
     if #parts % 2 ~= 0 then
         box.error(box.error.ILLEGAL_PARAMS,
-                  "options.parts: expected field_no (number), type (string) pairs")
+                  "options.parts: expected field_no (number), type (string) pairs",
+                  level + 1)
     end
     local i = 0
     for _ in pairs(parts) do
         i = i + 1
         if parts[i] == nil then
             box.error(box.error.ILLEGAL_PARAMS,
-                      "options.parts: expected field_no (number), type (string) pairs")
+                      "options.parts: expected field_no (number), type (string) pairs",
+                      level + 1)
         end
         if i % 2 == 0 then
             goto continue
         end
         if type(parts[i]) ~= "number" then
             box.error(box.error.ILLEGAL_PARAMS,
-                      "options.parts: expected field_no (number), type (string) pairs")
+                      "options.parts: expected field_no (number), type (string) pairs",
+                      level + 1)
         elseif parts[i] == 0 then
             -- Lua uses one-based field numbers but _space is zero-based
             box.error(box.error.ILLEGAL_PARAMS,
-                      "invalid index parts: field_no must be one-based")
+                      "invalid index parts: field_no must be one-based",
+                      level + 1)
         end
         if type(parts[i + 1]) ~= "string" then
             box.error(box.error.ILLEGAL_PARAMS,
@@ -1090,7 +1134,7 @@ end
 -- field 1-based index or full JSON path. A particular case of a
 -- full JSON path is the format field name.
 --
-local function format_field_resolve(format, path, what)
+local function format_field_resolve(format, path, what, level)
     assert(type(path) == 'number' or type(path) == 'string')
     local idx
     local relative_path = nil
@@ -1134,31 +1178,31 @@ local function format_field_resolve(format, path, what)
     -- Can't resolve field index by path.
     assert(idx == nil)
     box.error(box.error.ILLEGAL_PARAMS, what .. ": " ..
-              "field was not found by name '" .. path .. "'")
+              "field was not found by name '" .. path .. "'", level + 1)
 
 ::done::
     if idx <= 0 then
         box.error(box.error.ILLEGAL_PARAMS, what .. ": " ..
-                  "field (number) must be one-based")
+                  "field (number) must be one-based", level + 1)
     end
     return idx - 1, relative_path
 end
 
-local function update_index_parts(format, parts)
+local function update_index_parts(format, parts, level)
     if type(parts) ~= "table" then
         box.error(box.error.ILLEGAL_PARAMS,
-        "options.parts parameter should be a table")
+        "options.parts parameter should be a table", level + 1)
     end
     if #parts == 0 then
         box.error(box.error.ILLEGAL_PARAMS,
-        "options.parts must have at least one part")
+        "options.parts must have at least one part", level + 1)
     end
     if type(parts[1]) == 'number' and
             (parts[2] == nil or type(parts[2]) == 'string') then
         if parts[3] == nil then
             parts = {parts} -- one part only
         else
-            parts = update_index_parts_1_6_0(parts)
+            parts = update_index_parts_1_6_0(parts, 2, level + 1)
         end
     end
 
@@ -1168,7 +1212,7 @@ local function update_index_parts(format, parts)
         i = i + 1
         if parts[i] == nil then
             box.error(box.error.ILLEGAL_PARAMS,
-                    "options.parts: unexpected option(s)")
+                    "options.parts: unexpected option(s)", level + 1)
         end
         local part = {}
         if type(parts[i]) ~= "table" then
@@ -1188,7 +1232,8 @@ local function update_index_parts(format, parts)
                     end
                     if not coll then
                         box.error(box.error.ILLEGAL_PARAMS,
-                            "options.parts[" .. i .. "]: collation was not found by name '" .. v .. "'")
+                            "options.parts[" .. i .. "]: collation was not " ..
+                            "found by name '" .. v .. "'", level + 1)
                     end
                     part[k] = coll[1]
                 elseif k == 'is_nullable' then
@@ -1197,7 +1242,7 @@ local function update_index_parts(format, parts)
                     if type(v) ~= 'boolean' then
                         box.error(box.error.ILLEGAL_PARAMS,
                                 "options.parts[" .. i .. "]: " ..
-                                "type (boolean) is expected")
+                                "type (boolean) is expected", level + 1)
                     end
                     part[k] = v
                 else
@@ -1207,12 +1252,13 @@ local function update_index_parts(format, parts)
         end
         if type(part.field) == 'number' or type(part.field) == 'string' then
             local idx, path = format_field_resolve(format, part.field,
-                                                   "options.parts[" .. i .. "]")
+                                                   "options.parts[" .. i .. "]",
+                                                   level + 1)
             part.field = idx
             part.path = path or part.path
         else
             box.error(box.error.ILLEGAL_PARAMS, "options.parts[" .. i .. "]: " ..
-                      "field (name or number) is expected")
+                      "field (name or number) is expected", level + 1)
         end
         local fmt = format[part.field + 1]
         if part.type == nil then
@@ -1223,7 +1269,8 @@ local function update_index_parts(format, parts)
             end
         elseif type(part.type) ~= 'string' then
             box.error(box.error.ILLEGAL_PARAMS,
-                      "options.parts[" .. i .. "]: type (string) is expected")
+                      "options.parts[" .. i .. "]: type (string) is expected",
+                      level + 1)
         end
         if part.collation == nil and fmt then
             part.collation = fmt.collation
@@ -1234,13 +1281,14 @@ local function update_index_parts(format, parts)
             end
         elseif type(part.is_nullable) ~= 'boolean' then
             box.error(box.error.ILLEGAL_PARAMS,
-                      "options.parts[" .. i .. "]: type (boolean) is expected")
+                      "options.parts[" .. i .. "]: type (boolean) is expected",
+                      level + 1)
         end
         if (not part.is_nullable) and part.exclude_null then
             if part.is_nullable ~= nil then
                 box.error(box.error.ILLEGAL_PARAMS,
-                       "options.parts[" .. i .. "]: exclude_null=true and " ..
-                       "is_nullable=false are incompatible")
+                          "options.parts[" .. i .. "]: exclude_null=true " ..
+                          "and is_nullable=false are incompatible", level + 1)
             end
             part.is_nullable = true
         end
@@ -1259,7 +1307,8 @@ local function update_index_parts(format, parts)
             end
             if parts[i][first_illegal_index] ~= nil then
                 box.error(box.error.ILLEGAL_PARAMS,
-                        "options.parts[" .. i .. "]: unexpected option " .. parts[i][first_illegal_index])
+                          "options.parts[" .. i .. "]: unexpected option " ..
+                          parts[i][first_illegal_index], level + 1)
             end
         end
         table.insert(result, part)
@@ -1288,7 +1337,8 @@ end
 -- Raise an error if a sequence isn't compatible with a given
 -- index definition.
 --
-local function space_sequence_check(sequence, parts, space_name, index_name)
+local function space_sequence_check(sequence, parts, space_name, index_name,
+                                    level)
     local sequence_part = nil
     if sequence.field ~= nil then
         sequence.path = sequence.path or ''
@@ -1303,7 +1353,7 @@ local function space_sequence_check(sequence, parts, space_name, index_name)
         end
         if sequence_part == nil then
             box.error(box.error.MODIFY_INDEX, index_name, space_name,
-                      "sequence field must be a part of the index")
+                      "sequence field must be a part of the index", level + 1)
         end
     else
         -- If the sequence field is omitted, use the first
@@ -1316,7 +1366,8 @@ local function space_sequence_check(sequence, parts, space_name, index_name)
     local t = sequence_part.type or sequence_part[2]
     if t ~= 'integer' and t ~= 'unsigned' then
         box.error(box.error.MODIFY_INDEX, index_name, space_name,
-                  "sequence cannot be used with a non-integer key")
+                  "sequence cannot be used with a non-integer key",
+                  level + 1)
     end
 end
 
@@ -1328,7 +1379,7 @@ end
 --
 local function space_sequence_alter_prepare(format, parts, options,
                                             space_id, index_id,
-                                            space_name, index_name)
+                                            space_name, index_name, level)
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
 
     -- A sequence can only be attached to a primary index.
@@ -1338,7 +1389,7 @@ local function space_sequence_alter_prepare(format, parts, options,
             return nil
         end
         box.error(box.error.MODIFY_INDEX, index_name, space_name,
-                  "sequence cannot be used with a secondary key")
+                  "sequence cannot be used with a secondary key", level + 1)
     end
 
     -- Look up the currently attached sequence, if any.
@@ -1359,7 +1410,8 @@ local function space_sequence_alter_prepare(format, parts, options,
         -- No sequence option, just check that the old sequence
         -- is compatible with the new index definition.
         if old_sequence ~= nil and old_sequence.field ~= nil then
-            space_sequence_check(old_sequence, parts, space_name, index_name)
+            space_sequence_check(old_sequence, parts, space_name, index_name,
+                                 level + 1)
         end
         return nil
     end
@@ -1389,19 +1441,21 @@ local function space_sequence_alter_prepare(format, parts, options,
         if new_sequence.id ~= nil then
             local id = sequence_resolve(new_sequence.id)
             if id == nil then
-                box.error(box.error.NO_SUCH_SEQUENCE, new_sequence.id)
+                box.error(box.error.NO_SUCH_SEQUENCE, new_sequence.id,
+                          level + 1)
             end
             local tuple = _space_sequence.index.sequence:select(id)[1]
             if tuple ~= nil and tuple.is_generated then
                 box.error(box.error.ALTER_SPACE, space_name,
-                          "can not attach generated sequence")
+                          "can not attach generated sequence", level + 1)
             end
             new_sequence.id = id
         end
         -- Resolve the sequence field.
         if new_sequence.field ~= nil then
             local field, path = format_field_resolve(format, new_sequence.field,
-                                                     "sequence field")
+                                                     "sequence field",
+                                                     level + 1)
             new_sequence.field = field
             new_sequence.path = path
         end
@@ -1418,7 +1472,8 @@ local function space_sequence_alter_prepare(format, parts, options,
         end
         -- Check that the sequence is compatible with
         -- the index definition.
-        space_sequence_check(new_sequence, parts, space_name, index_name)
+        space_sequence_check(new_sequence, parts, space_name, index_name,
+                             level + 1)
         -- If sequence id is omitted, we are supposed to create
         -- a new auto-generated sequence for the given space.
         if new_sequence.id == nil then
@@ -1534,22 +1589,22 @@ local create_index_template = table.deepcopy(alter_index_template)
 create_index_template.if_not_exists = "boolean"
 
 -- Find a function id by given function name
-local function func_id_by_name(func_name)
+local function func_id_by_name(func_name, level)
     local func = box.space._func.index.name:get(func_name)
     if func == nil then
-        box.error(box.error.NO_SUCH_FUNCTION, func_name)
+        box.error(box.error.NO_SUCH_FUNCTION, func_name, level + 1)
     end
     return func.id
 end
 box.internal.func_id_by_name = func_id_by_name -- for space.upgrade
 
 box.schema.index.create = atomic_wrapper(function(space_id, name, options)
-    check_param(space_id, 'space_id', 'number')
-    check_param(name, 'name', 'string')
-    check_param_table(options, create_index_template)
+    check_param(space_id, 'space_id', 'number', 2)
+    check_param(name, 'name', 'string', 2)
+    check_param_table(options, create_index_template, 2)
     local space = box.space[space_id]
     if not space then
-        box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
+        box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id), 2)
     end
     local format = space:format()
 
@@ -1588,7 +1643,7 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
     options = update_param_table(options, options_defaults)
     if options.hint and options.func then
         box.error(box.error.MODIFY_INDEX, name, space.name,
-                "functional index can't use hints")
+                "functional index can't use hints", 2)
     end
 
     local _index = box.space[box.schema.INDEX_ID]
@@ -1597,7 +1652,7 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
         if options.if_not_exists then
             return space.index[name], "not created"
         else
-            box.error(box.error.INDEX_EXISTS, name)
+            box.error(box.error.INDEX_EXISTS, name, 2)
         end
     end
 
@@ -1615,7 +1670,7 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
             end
         end
     end
-    local parts = update_index_parts(format, options.parts)
+    local parts = update_index_parts(format, options.parts, 2)
     -- create_index() options contains type, parts, etc,
     -- stored separately. Remove these members from index_opts
     local index_opts = {
@@ -1649,14 +1704,14 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
     parts = try_simplify_index_parts(parts)
     if options.hint and is_multikey_index(parts) then
         box.error(box.error.MODIFY_INDEX, name, space.name,
-                "multikey index can't use hints")
+                  "multikey index can't use hints", 2)
     end
     if index_opts.func ~= nil and type(index_opts.func) == 'string' then
-        index_opts.func = func_id_by_name(index_opts.func)
+        index_opts.func = func_id_by_name(index_opts.func, 2)
     end
     local sequence_proxy = space_sequence_alter_prepare(format, parts, options,
                                                         space_id, iid,
-                                                        space.name, name)
+                                                        space.name, name, 2)
     _index:insert{space_id, iid, name, options.type, index_opts, parts}
     space_sequence_alter_commit(sequence_proxy)
     if index_opts.func ~= nil then
@@ -1669,8 +1724,8 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
 end)
 
 box.schema.index.drop = atomic_wrapper(function(space_id, index_id)
-    check_param(space_id, 'space_id', 'number')
-    check_param(index_id, 'index_id', 'number')
+    check_param(space_id, 'space_id', 'number', 2)
+    check_param(index_id, 'index_id', 'number', 2)
     if index_id == 0 then
         local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
         -- This is needed to support dropping temporary spaces
@@ -1695,27 +1750,28 @@ box.schema.index.drop = atomic_wrapper(function(space_id, index_id)
 end)
 
 box.schema.index.rename = function(space_id, index_id, name)
-    check_param(space_id, 'space_id', 'number')
-    check_param(index_id, 'index_id', 'number')
-    check_param(name, 'name', 'string')
+    utils.box_check_configured(2)
+    check_param(space_id, 'space_id', 'number', 2)
+    check_param(index_id, 'index_id', 'number', 2)
+    check_param(name, 'name', 'string', 2)
 
     local _index = box.space[box.schema.INDEX_ID]
-    _index:update({space_id, index_id}, {{"=", 3, name}})
+    call_at(2, _index.update, _index, {space_id, index_id}, {{"=", 3, name}})
 end
 
 box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
     local space = box.space[space_id]
     if space == nil then
-        box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
+        box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id), 2)
     end
     if space.index[index_id] == nil then
-        box.error(box.error.NO_SUCH_INDEX_ID, index_id, space.name)
+        box.error(box.error.NO_SUCH_INDEX_ID, index_id, space.name, 2)
     end
     if options == nil then
         return
     end
 
-    check_param_table(options, alter_index_template)
+    check_param_table(options, alter_index_template, 2)
 
     if type(space_id) ~= "number" then
         space_id = space.id
@@ -1736,9 +1792,9 @@ box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
             end
         end
         if not can_update then
-            box.error(box.error.PROC_LUA,
+            box.error(box.error.ILLEGAL_PARAMS,
                       "Don't know how to update both id and" ..
-                       cant_update_fields)
+                       cant_update_fields, 2)
         end
         local ops = {}
         local function add_op(value, field_no)
@@ -1780,25 +1836,24 @@ box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
     end
     if options.hint and options.func then
         box.error(box.error.MODIFY_INDEX, space.index[index_id].name,
-                                          space.name,
-                "functional index can't use hints")
+                  space.name, "functional index can't use hints", 2)
     end
     if options.parts then
-        parts = update_index_parts(format, options.parts)
+        parts = update_index_parts(format, options.parts, 2)
         -- save parts in old format if possible
         parts = try_simplify_index_parts(parts)
     end
     if options.hint and is_multikey_index(parts) then
         box.error(box.error.MODIFY_INDEX, space.index[index_id].name,
-                                          space.name,
-                "multikey index can't use hints")
+                  space.name, "multikey index can't use hints", 2)
     end
     if index_opts.func ~= nil and type(index_opts.func) == 'string' then
-        index_opts.func = func_id_by_name(index_opts.func)
+        index_opts.func = func_id_by_name(index_opts.func, 2)
     end
     local sequence_proxy = space_sequence_alter_prepare(format, parts, options,
                                                         space_id, index_id,
-                                                        space.name, options.name)
+                                                        space.name,
+                                                        options.name, 2)
     _index:replace{space_id, index_id, options.name, options.type,
                    index_opts, parts}
     if index_opts.func ~= nil then
@@ -1828,7 +1883,7 @@ ffi.metatype(iterator_t, {
 })
 
 local iterator_gen_luac = function(param, state) -- luacheck: no unused args
-    local tuple = internal.iterator_next(state)
+    local tuple = internal.iterator_next(state, 2)
     if tuple ~= nil then
         return state, tuple -- new state, value
     else
@@ -1861,11 +1916,11 @@ local iterator_gen = function(param, state) -- luacheck: no unused args
         Please check out http://www.lua.org/pil/7.3.html for details.
     --]]
     if not ffi.istype(iterator_t, state) then
-        error('usage: next(param, state)')
+        box.error(box.error.ILLEGAL_PARAMS, 'Usage: next(param, state)', 2)
     end
     -- next() modifies state in-place
     if builtin.box_iterator_next(state, ptuple) ~= 0 then
-        return box.error() -- error
+        box.error(box.error.last(), 2)
     elseif ptuple[0] ~= nil then
         return state, tuple_bless(ptuple[0]) -- new state, value
     else
@@ -1878,10 +1933,11 @@ local port = ffi.new('struct port')
 local port_c = ffi.cast('struct port_c *', port)
 
 -- Helper function to check space:method() usage
-local function check_space_arg(space, method)
+local function check_space_arg(space, method, level)
     if type(space) ~= 'table' or (space.id == nil and space.name == nil) then
         local fmt = 'Use space:%s(...) instead of space.%s(...)'
-        error(string.format(fmt, method, method))
+        box.error(box.error.ILLEGAL_PARAMS, string.format(fmt, method, method),
+                  level and level + 1)
     end
 end
 box.internal.check_space_arg = check_space_arg -- for net.box
@@ -1889,27 +1945,29 @@ box.internal.check_space_arg = check_space_arg -- for net.box
 -- Helper function for nicer error messages
 -- in some cases when space object is misused
 -- Takes time so should not be used for DML.
-local function check_space_exists(space)
+local function check_space_exists(space, level)
     local s = box.space[space.id]
     if s == nil then
-        box.error(box.error.NO_SUCH_SPACE, space.name)
+        box.error(box.error.NO_SUCH_SPACE, space.name, level + 1)
     end
 end
 
 -- Helper function to check index:method() usage
-local function check_index_arg(index, method)
+local function check_index_arg(index, method, level)
     if type(index) ~= 'table' or (index.id == nil and index.name == nil) then
         local fmt = 'Use index:%s(...) instead of index.%s(...)'
-        error(string.format(fmt, method, method))
+        box.error(box.error.ILLEGAL_PARAMS, string.format(fmt, method, method),
+                  level and level + 1)
     end
 end
 box.internal.check_index_arg = check_index_arg -- for net.box
 
 -- Helper function to check that space have primary key and return it
-local function check_primary_index(space)
+local function check_primary_index(space, level)
     local pk = space.index[0]
     if pk == nil then
-        box.error(box.error.NO_SUCH_INDEX_ID, 0, space.name)
+        box.error(box.error.NO_SUCH_INDEX_ID, 0, space.name,
+                  level and level + 1)
     end
     return pk
 end
@@ -1924,10 +1982,10 @@ box.internal.schema_version = function()
     return box.info.schema_version
 end
 
-local function check_iterator_type(opts, key_is_nil)
+local function check_iterator_type(opts, key_is_nil, level)
     local opts_type = type(opts)
     if opts ~= nil and opts_type ~= "table" and opts_type ~= "string" and opts_type ~= "number" then
-        box.error(box.error.ITERATOR_TYPE, opts)
+        box.error(box.error.ITERATOR_TYPE, opts, level and level + 1)
     end
 
     local itype
@@ -1937,17 +1995,19 @@ local function check_iterator_type(opts, key_is_nil)
         elseif type(opts.iterator) == "string" then
             itype = box.index[string.upper(opts.iterator)]
             if itype == nil then
-                box.error(box.error.ITERATOR_TYPE, opts.iterator)
+                box.error(box.error.ITERATOR_TYPE, opts.iterator,
+                          level and level + 1)
             end
         else
-            box.error(box.error.ITERATOR_TYPE, tostring(opts.iterator))
+            box.error(box.error.ITERATOR_TYPE, tostring(opts.iterator),
+                      level and level + 1)
         end
     elseif opts_type == "number" then
         itype = opts
     elseif opts_type == "string" then
         itype = box.index[string.upper(opts)]
         if itype == nil then
-            box.error(box.error.ITERATOR_TYPE, opts)
+            box.error(box.error.ITERATOR_TYPE, opts, level and level + 1)
         end
     else
         -- Use ALL for {} and nil keys and EQ for other keys
@@ -1956,15 +2016,15 @@ local function check_iterator_type(opts, key_is_nil)
     return itype
 end
 
-local function check_pairs_opts(opts, key_is_nil)
-    local iterator = check_iterator_type(opts, key_is_nil)
+local function check_pairs_opts(opts, key_is_nil, level)
+    local iterator = check_iterator_type(opts, key_is_nil, level and level + 1)
     local after = nil
     if opts ~= nil and type(opts) == "table" then
         if opts.after ~= nil then
             after = opts.after
             if after ~= nil and type(after) ~= "string" and type(after) ~= "table"
               and not is_tuple(after) then
-                box.error(box.error.ITERATOR_POSITION)
+                box.error(box.error.ITERATOR_POSITION, level and level + 1)
             end
         end
     end
@@ -1988,7 +2048,7 @@ local iterator_pos_end = ffi.new('const char *[1]')
 --
 -- Returns true on success. On failure, sets box.error and returns false.
 --
-local function iterator_pos_set(index, pos, ibuf)
+local function iterator_pos_set(index, pos, ibuf, level)
     if pos == nil then
         iterator_pos[0] = nil
         iterator_pos_end[0] = nil
@@ -1999,7 +2059,7 @@ local function iterator_pos_set(index, pos, ibuf)
         return true
     else
         ibuf:consume(ibuf.wpos - ibuf.rpos)
-        local tuple, tuple_end = tuple_encode(ibuf, pos)
+        local tuple, tuple_end = tuple_encode(ibuf, pos, level + 1)
         return builtin.box_index_tuple_position(
                 index.space_id, index.id, tuple, tuple_end,
                 iterator_pos, iterator_pos_end) == 0
@@ -2028,19 +2088,19 @@ setmetatable(base_index_mt, {
 })
 -- __len and __index
 base_index_mt.len = function(index)
-    check_index_arg(index, 'len')
+    check_index_arg(index, 'len', 2)
     local ret = builtin.box_index_len(index.space_id, index.id)
     if ret == -1 then
-        box.error()
+        box.error(box.error.last(), 2)
     end
     return tonumber(ret)
 end
 -- index.bsize
 base_index_mt.bsize = function(index)
-    check_index_arg(index, 'bsize')
+    check_index_arg(index, 'bsize', 2)
     local ret = builtin.box_index_bsize(index.space_id, index.id)
     if ret == -1 then
-        box.error()
+        box.error(box.error.last(), 2)
     end
     return tonumber(ret)
 end
@@ -2311,14 +2371,14 @@ base_index_mt.min_ffi = function(index, key)
     if builtin.box_read_ffi_is_disabled then
         return base_index_mt.min_luac(index, key)
     end
-    check_index_arg(index, 'min')
+    check_index_arg(index, 'min', 2)
     local ibuf = cord_ibuf_take()
-    local pkey, pkey_end = tuple_encode(ibuf, key)
+    local pkey, pkey_end = tuple_encode(ibuf, key, 2)
     local nok = builtin.box_index_min(index.space_id, index.id, pkey, pkey_end,
                                       ptuple) ~= 0
     cord_ibuf_put(ibuf)
     if nok then
-        box.error() -- error
+        box.error(box.error.last(), 2)
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
     else
@@ -2326,7 +2386,7 @@ base_index_mt.min_ffi = function(index, key)
     end
 end
 base_index_mt.min_luac = function(index, key)
-    check_index_arg(index, 'min')
+    check_index_arg(index, 'min', 2)
     key = keify(key)
     return internal.min(index.space_id, index.id, key);
 end
@@ -2334,14 +2394,14 @@ base_index_mt.max_ffi = function(index, key)
     if builtin.box_read_ffi_is_disabled then
         return base_index_mt.max_luac(index, key)
     end
-    check_index_arg(index, 'max')
+    check_index_arg(index, 'max', 2)
     local ibuf = cord_ibuf_take()
-    local pkey, pkey_end = tuple_encode(ibuf, key)
+    local pkey, pkey_end = tuple_encode(ibuf, key, 2)
     local nok = builtin.box_index_max(index.space_id, index.id, pkey, pkey_end,
                                       ptuple) ~= 0
     cord_ibuf_put(ibuf)
     if nok then
-        box.error() -- error
+        box.error(box.error.last(), 2)
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
     else
@@ -2349,7 +2409,7 @@ base_index_mt.max_ffi = function(index, key)
     end
 end
 base_index_mt.max_luac = function(index, key)
-    check_index_arg(index, 'max')
+    check_index_arg(index, 'max', 2)
     key = keify(key)
     return internal.max(index.space_id, index.id, key);
 end
@@ -2357,11 +2417,11 @@ base_index_mt.random_ffi = function(index, rnd)
     if builtin.box_read_ffi_is_disabled then
         return base_index_mt.random_luac(index, rnd)
     end
-    check_index_arg(index, 'random')
+    check_index_arg(index, 'random', 2)
     rnd = rnd or math.random()
     if builtin.box_index_random(index.space_id, index.id, rnd,
                                 ptuple) ~= 0 then
-        box.error() -- error
+        box.error(box.error.last(), 2)
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
     else
@@ -2369,18 +2429,18 @@ base_index_mt.random_ffi = function(index, rnd)
     end
 end
 base_index_mt.random_luac = function(index, rnd)
-    check_index_arg(index, 'random')
+    check_index_arg(index, 'random', 2)
     rnd = rnd or math.random()
     return internal.random(index.space_id, index.id, rnd);
 end
 -- iteration
 base_index_mt.pairs_ffi = function(index, key, opts)
-    check_index_arg(index, 'pairs')
+    check_index_arg(index, 'pairs', 2)
     local ibuf = cord_ibuf_take()
-    local pkey, pkey_end = tuple_encode(ibuf, key)
+    local pkey, pkey_end = tuple_encode(ibuf, key, 2)
     local svp = builtin.box_region_used()
-    local itype, after = check_pairs_opts(opts, pkey + 1 >= pkey_end)
-    local ok = iterator_pos_set(index, after, ibuf)
+    local itype, after = check_pairs_opts(opts, pkey + 1 >= pkey_end, 2)
+    local ok = iterator_pos_set(index, after, ibuf, 2)
     local keybuf = ffi.string(pkey, pkey_end - pkey)
     cord_ibuf_put(ibuf)
     local cdata
@@ -2392,41 +2452,41 @@ base_index_mt.pairs_ffi = function(index, key, opts)
     end
     builtin.box_region_truncate(svp)
     if cdata == nil then
-        box.error()
+        box.error(box.error.last(), 2)
     end
     return fun.wrap(iterator_gen, keybuf,
         ffi.gc(cdata, builtin.box_iterator_free))
 end
 base_index_mt.pairs_luac = function(index, key, opts)
-    check_index_arg(index, 'pairs')
+    check_index_arg(index, 'pairs', 2)
     key = keify(key)
-    local itype, after = check_pairs_opts(opts, #key == 0)
+    local itype, after = check_pairs_opts(opts, #key == 0, 2)
     local keymp = msgpack.encode(key)
     local keybuf = ffi.string(keymp, #keymp)
     local cdata = internal.iterator(index.space_id, index.id, itype, keymp,
-        after);
+        after, 2);
     return fun.wrap(iterator_gen_luac, keybuf,
         ffi.gc(cdata, builtin.box_iterator_free))
 end
 
 -- index subtree size
 base_index_mt.count_ffi = function(index, key, opts)
-    check_index_arg(index, 'count')
+    check_index_arg(index, 'count', 2)
     local ibuf = cord_ibuf_take()
-    local pkey, pkey_end = tuple_encode(ibuf, key)
-    local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
+    local pkey, pkey_end = tuple_encode(ibuf, key, 2)
+    local itype = check_iterator_type(opts, pkey + 1 >= pkey_end, 2);
     local count = builtin.box_index_count(index.space_id, index.id,
         itype, pkey, pkey_end);
     cord_ibuf_put(ibuf)
     if count == -1 then
-        box.error()
+        box.error(box.error.last(), 2)
     end
     return tonumber(count)
 end
 base_index_mt.count_luac = function(index, key, opts)
-    check_index_arg(index, 'count')
+    check_index_arg(index, 'count', 2)
     key = keify(key)
-    local itype = check_iterator_type(opts, #key == 0);
+    local itype = check_iterator_type(opts, #key == 0, 2);
     return internal.count(index.space_id, index.id, itype, key);
 end
 
@@ -2434,14 +2494,14 @@ base_index_mt.get_ffi = function(index, key)
     if builtin.box_read_ffi_is_disabled then
         return base_index_mt.get_luac(index, key)
     end
-    check_index_arg(index, 'get')
+    check_index_arg(index, 'get', 2)
     local ibuf = cord_ibuf_take()
-    local key, key_end = tuple_encode(ibuf, key)
+    local key, key_end = tuple_encode(ibuf, key, 2)
     local nok = builtin.box_index_get(index.space_id, index.id, key, key_end,
                                       ptuple) ~= 0
     cord_ibuf_put(ibuf)
     if nok then
-        return box.error() -- error
+        box.error(box.error.last(), 2)
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
     else
@@ -2449,15 +2509,16 @@ base_index_mt.get_ffi = function(index, key)
     end
 end
 base_index_mt.get_luac = function(index, key)
-    check_index_arg(index, 'get')
+    check_index_arg(index, 'get', 2)
     key = keify(key)
     return internal.get(index.space_id, index.id, key)
 end
 
-local function check_select_opts(opts, key_is_nil)
+local function check_select_opts(opts, key_is_nil, level)
     local offset = 0
     local limit = 4294967295
-    local iterator = check_iterator_type(opts, key_is_nil)
+    local iterator = check_iterator_type(opts, key_is_nil,
+                                         level and level + 1)
     local fullscan = false
     local after = nil
     local fetch_pos = false
@@ -2475,7 +2536,7 @@ local function check_select_opts(opts, key_is_nil)
             after = opts.after
             if type(after) ~= "string" and type(after) ~= "table" and
                     not is_tuple(after) then
-                box.error(box.error.ITERATOR_POSITION)
+                box.error(box.error.ITERATOR_POSITION, level and level + 1)
             end
         end
         if opts.fetch_pos ~= nil then
@@ -2509,20 +2570,20 @@ base_index_mt.select_ffi = function(index, key, opts)
     if builtin.box_read_ffi_is_disabled then
         return base_index_mt.select_luac(index, key, opts)
     end
-    check_index_arg(index, 'select')
+    check_index_arg(index, 'select', 2)
     local ibuf = cord_ibuf_take()
-    local key, key_end = tuple_encode(ibuf, key)
+    local key, key_end = tuple_encode(ibuf, key, 2)
     local key_is_nil = key + 1 >= key_end
     local new_position = nil
     local iterator, offset, limit, fullscan, after, fetch_pos =
-        check_select_opts(opts, key_is_nil)
+        check_select_opts(opts, key_is_nil, 2)
     local sid = index.space_id
     if is_select_long(sid, key_is_nil, iterator, limit, offset,
                       fullscan) then
         log_long_select(box.space[sid])
     end
     local region_svp = builtin.box_region_used()
-    local nok = not iterator_pos_set(index, after, ibuf)
+    local nok = not iterator_pos_set(index, after, ibuf, 2)
     if not nok then
         nok = builtin.box_select_ffi(sid, index.id, key, key_end,
                                      iterator_pos, iterator_pos_end, fetch_pos,
@@ -2535,7 +2596,7 @@ base_index_mt.select_ffi = function(index, key, opts)
     builtin.box_region_truncate(region_svp)
     cord_ibuf_put(ibuf)
     if nok then
-        return box.error()
+        box.error(box.error.last(), 2)
     end
 
     local ret = {}
@@ -2552,11 +2613,11 @@ base_index_mt.select_ffi = function(index, key, opts)
 end
 
 base_index_mt.select_luac = function(index, key, opts)
-    check_index_arg(index, 'select')
+    check_index_arg(index, 'select', 2)
     local key = keify(key)
     local key_is_nil = #key == 0
     local iterator, offset, limit, fullscan, after, fetch_pos =
-        check_select_opts(opts, key_is_nil)
+        check_select_opts(opts, key_is_nil, 2)
     local sid = index.space_id
     if is_select_long(sid, key_is_nil, iterator, limit, offset,
                       fullscan) then
@@ -2567,11 +2628,11 @@ base_index_mt.select_luac = function(index, key, opts)
 end
 
 base_index_mt.update = function(index, key, ops)
-    check_index_arg(index, 'update')
+    check_index_arg(index, 'update', 2)
     return internal.update(index.space_id, index.id, keify(key), ops);
 end
 base_index_mt.delete = function(index, key)
-    check_index_arg(index, 'delete')
+    check_index_arg(index, 'delete', 2)
     return internal.delete(index.space_id, index.id, keify(key));
 end
 
@@ -2584,31 +2645,31 @@ base_index_mt.compact = function(index)
 end
 
 base_index_mt.drop = function(index)
-    check_index_arg(index, 'drop')
+    check_index_arg(index, 'drop', 2)
     return box.schema.index.drop(index.space_id, index.id)
 end
 base_index_mt.rename = function(index, name)
-    check_index_arg(index, 'rename')
+    check_index_arg(index, 'rename', 2)
     return box.schema.index.rename(index.space_id, index.id, name)
 end
 base_index_mt.alter = function(index, options)
-    check_index_arg(index, 'alter')
+    check_index_arg(index, 'alter', 2)
     if index.id == nil or index.space_id == nil then
-        box.error(box.error.PROC_LUA, "Usage: index:alter{opts}")
+        box.error(box.error.ILLEGAL_PARAMS, "Usage: index:alter{opts}", 2)
     end
     return box.schema.index.alter(index.space_id, index.id, options)
 end
 base_index_mt.tuple_pos = function(index, tuple)
-    check_index_arg(index, 'tuple_pos')
+    check_index_arg(index, 'tuple_pos', 2)
     local region_svp = builtin.box_region_used()
     local ibuf = cord_ibuf_take()
-    local data, data_end = tuple_encode(ibuf, tuple)
+    local data, data_end = tuple_encode(ibuf, tuple, 2)
     local nok = builtin.box_index_tuple_position(index.space_id, index.id,
                                                  data, data_end, iterator_pos,
                                                  iterator_pos_end) ~= 0
     cord_ibuf_put(ibuf)
     if nok then
-        box.error()
+        box.error(box.error.last(), 2)
     end
     local ret = ffi.string(iterator_pos[0],
                            iterator_pos_end[0] - iterator_pos[0])
@@ -2629,7 +2690,7 @@ memtx_index_mt.__ipairs = memtx_index_mt.pairs
 
 local space_mt = {}
 space_mt.len = function(space)
-    check_space_arg(space, 'len')
+    check_space_arg(space, 'len', 2)
     local pk = space.index[0]
     if pk == nil then
         return 0 -- empty space without indexes, return 0
@@ -2637,7 +2698,7 @@ space_mt.len = function(space)
     return space.index[0]:len()
 end
 space_mt.count = function(space, key, opts)
-    check_space_arg(space, 'count')
+    check_space_arg(space, 'count', 2)
     local pk = space.index[0]
     if pk == nil then
         return 0 -- empty space without indexes, return 0
@@ -2645,67 +2706,68 @@ space_mt.count = function(space, key, opts)
     return pk:count(key, opts)
 end
 space_mt.bsize = function(space)
-    check_space_arg(space, 'bsize')
+    check_space_arg(space, 'bsize', 2)
     local s = builtin.space_by_id(space.id)
     if s == nil then
-        box.error(box.error.NO_SUCH_SPACE, space.name)
+        box.error(box.error.NO_SUCH_SPACE, space.name, 2)
     end
     return builtin.space_bsize(s)
 end
 
 space_mt.get = function(space, key)
-    check_space_arg(space, 'get')
-    return check_primary_index(space):get(key)
+    check_space_arg(space, 'get', 2)
+    return check_primary_index(space, 2):get(key)
 end
 space_mt.select = function(space, key, opts)
-    check_space_arg(space, 'select')
-    return check_primary_index(space):select(key, opts)
+    check_space_arg(space, 'select', 2)
+    return check_primary_index(space, 2):select(key, opts)
 end
 space_mt.fselect = function(space, key, opts, fselect_opts)
-    check_space_arg(space, 'select')
-    return check_primary_index(space):fselect(key, opts, fselect_opts)
+    check_space_arg(space, 'select', 2)
+    return check_primary_index(space, 2):fselect(key, opts, fselect_opts)
 end
 space_mt.gselect = function(space, key, opts, fselect_opts)
-    check_space_arg(space, 'select')
-    return check_primary_index(space):gselect(key, opts, fselect_opts)
+    check_space_arg(space, 'select', 2)
+    return check_primary_index(space, 2):gselect(key, opts, fselect_opts)
 end
 space_mt.jselect = function(space, key, opts, fselect_opts)
-    check_space_arg(space, 'select')
-    return check_primary_index(space):jselect(key, opts, fselect_opts)
+    check_space_arg(space, 'select', 2)
+    return check_primary_index(space, 2):jselect(key, opts, fselect_opts)
 end
 space_mt.insert = function(space, tuple)
-    check_space_arg(space, 'insert')
+    check_space_arg(space, 'insert', 2)
     return internal.insert(space.id, tuple);
 end
 space_mt.replace = function(space, tuple)
-    check_space_arg(space, 'replace')
+    check_space_arg(space, 'replace', 2)
     return internal.replace(space.id, tuple);
 end
 space_mt.put = space_mt.replace; -- put is an alias for replace
 space_mt.update = function(space, key, ops)
-    check_space_arg(space, 'update')
-    return check_primary_index(space):update(key, ops)
+    check_space_arg(space, 'update', 2)
+    return check_primary_index(space, 2):update(key, ops)
 end
 space_mt.upsert = function(space, tuple_key, ops, deprecated)
-    check_space_arg(space, 'upsert')
+    check_space_arg(space, 'upsert', 2)
     if deprecated ~= nil then
         local msg = "Error: extra argument in upsert call: "
         msg = msg .. tostring(deprecated)
         msg = msg .. ". Usage :upsert(tuple, operations)"
-        box.error(box.error.PROC_LUA, msg)
+        box.error(box.error.ILLEGAL_PARAMS, msg, 2)
     end
     return internal.upsert(space.id, tuple_key, ops);
 end
 space_mt.delete = function(space, key)
-    check_space_arg(space, 'delete')
-    return check_primary_index(space):delete(key)
+    check_space_arg(space, 'delete', 2)
+    return check_primary_index(space, 2):delete(key)
 end
 -- Assumes that spaceno has a TREE (NUM) primary key
 -- inserts a tuple after getting the next value of the
 -- primary key and returns it back to the user
 space_mt.auto_increment = function(space, tuple)
-    check_space_arg(space, 'auto_increment')
-    local max_tuple = check_primary_index(space):max()
+    check_space_arg(space, 'auto_increment', 2)
+    local pk = check_primary_index(space, 2)
+    local max_tuple = call_at(2, pk.max, pk)
     local max = 0
     if max_tuple ~= nil then
         max = max_tuple[1]
@@ -2714,7 +2776,7 @@ space_mt.auto_increment = function(space, tuple)
     return space:insert(tuple)
 end
 space_mt.pairs = function(space, key, opts)
-    check_space_arg(space, 'pairs')
+    check_space_arg(space, 'pairs', 2)
     local pk = space.index[0]
     if pk == nil then
         -- empty space without indexes, return empty iterator
@@ -2725,42 +2787,42 @@ end
 space_mt.__pairs = space_mt.pairs -- Lua 5.2 compatibility
 space_mt.__ipairs = space_mt.pairs -- Lua 5.2 compatibility
 space_mt.truncate = function(space)
-    check_space_arg(space, 'truncate')
+    check_space_arg(space, 'truncate', 2)
     return internal.truncate(space.id)
 end
 space_mt.format = function(space, format)
-    check_space_arg(space, 'format')
+    check_space_arg(space, 'format', 2)
     return box.schema.space.format(space.id, format)
 end
 space_mt.upgrade = function(space, ...)
-    check_space_arg(space, 'upgrade')
+    check_space_arg(space, 'upgrade', 2)
     return box.schema.space.upgrade(space.id, ...)
 end
 space_mt.drop = function(space)
-    check_space_arg(space, 'drop')
-    check_space_exists(space)
+    check_space_arg(space, 'drop', 2)
+    check_space_exists(space, 2)
     return box.schema.space.drop(space.id, space.name)
 end
 space_mt.rename = function(space, name)
-    check_space_arg(space, 'rename')
-    check_space_exists(space)
+    check_space_arg(space, 'rename', 2)
+    check_space_exists(space, 2)
     return box.schema.space.rename(space.id, name)
 end
 space_mt.alter = function(space, options)
-    check_space_arg(space, 'alter')
-    check_space_exists(space)
+    check_space_arg(space, 'alter', 2)
+    check_space_exists(space, 2)
     return box.schema.space.alter(space.id, options)
 end
 space_mt.create_index = function(space, name, options)
-    check_space_arg(space, 'create_index')
-    check_space_exists(space)
+    check_space_arg(space, 'create_index', 2)
+    check_space_exists(space, 2)
     return box.schema.index.create(space.id, name, options)
 end
 space_mt.run_triggers = function(space, yesno)
-    check_space_arg(space, 'run_triggers')
+    check_space_arg(space, 'run_triggers', 2)
     local s = builtin.space_by_id(space.id)
     if s == nil then
-        box.error(box.error.NO_SUCH_SPACE, space.name)
+        box.error(box.error.NO_SUCH_SPACE, space.name, 2)
     end
     builtin.space_run_triggers(s, yesno)
 end
@@ -2801,7 +2863,7 @@ local function wrap_schema_object_mt(name)
 end
 
 function box.schema.space.bless(space)
-    utils.box_check_configured()
+    utils.box_check_configured(2)
     local index_mt_name
     if space.engine == 'vinyl' then
         index_mt_name = 'vinyl_index_mt'
@@ -2831,7 +2893,7 @@ sequence_mt.current = function(self)
     local ai64 = ffi.new('int64_t[1]')
     local rc = builtin.box_sequence_current(self.id, ai64)
     if rc < 0 then
-        box.error(box.error.last())
+        box.error(box.error.last(), 2)
     end
     return ai64[0]
 end
@@ -2845,18 +2907,18 @@ sequence_mt.reset = function(self)
 end
 
 sequence_mt.alter = function(self, opts)
-    box.schema.sequence.alter(self.id, opts)
+    return box.schema.sequence.alter(self.id, opts)
 end
 
 sequence_mt.drop = function(self)
-    box.schema.sequence.drop(self.id)
+    return box.schema.sequence.drop(self.id)
 end
 
 box.sequence = {}
 box.schema.sequence = {}
 
 function box.schema.sequence.bless(seq)
-    utils.box_check_configured()
+    utils.box_check_configured(2)
     setmetatable(seq, {__index = sequence_mt})
 end
 
@@ -2876,9 +2938,10 @@ local alter_sequence_options = table.deepcopy(sequence_options)
 alter_sequence_options.name = 'string'
 
 box.schema.sequence.create = function(name, opts)
+    utils.box_check_configured(2)
     opts = opts or {}
-    check_param(name, 'name', 'string')
-    check_param_table(opts, create_sequence_options)
+    check_param(name, 'name', 'string', 2)
+    check_param_table(opts, create_sequence_options, 2)
     local ascending = not opts.step or opts.step > 0
     local options_defaults = {
         step = 1,
@@ -2892,21 +2955,23 @@ box.schema.sequence.create = function(name, opts)
     local id = sequence_resolve(name)
     if id ~= nil then
         if not opts.if_not_exists then
-            box.error(box.error.SEQUENCE_EXISTS, name)
+            box.error(box.error.SEQUENCE_EXISTS, name, 2)
         end
         return box.sequence[name], 'not created'
     end
     local _sequence = box.space[box.schema.SEQUENCE_ID]
-    _sequence:auto_increment{session.euid(), name, opts.step, opts.min,
-                             opts.max, opts.start, opts.cache, opts.cycle}
+    call_at(2, _sequence.auto_increment, _sequence,
+            {session.euid(), name, opts.step, opts.min, opts.max, opts.start,
+             opts.cache, opts.cycle})
     return box.sequence[name]
 end
 
 box.schema.sequence.alter = function(name, opts)
-    check_param_table(opts, alter_sequence_options)
+    utils.box_check_configured(2)
+    check_param_table(opts, alter_sequence_options, 2)
     local id, tuple = sequence_resolve(name)
     if id == nil then
-        box.error(box.error.NO_SUCH_SEQUENCE, name)
+        box.error(box.error.NO_SUCH_SEQUENCE, name, 2)
     end
     if opts == nil then
         return
@@ -2916,17 +2981,18 @@ box.schema.sequence.alter = function(name, opts)
         seq.start, seq.cache, seq.cycle = tuple:unpack()
     opts = update_param_table(opts, seq)
     local _sequence = box.space[box.schema.SEQUENCE_ID]
-    _sequence:replace{seq.id, seq.uid, opts.name, opts.step, opts.min,
-                      opts.max, opts.start, opts.cache, opts.cycle}
+    call_at(2, _sequence.replace, _sequence,
+            {seq.id, seq.uid, opts.name, opts.step, opts.min, opts.max,
+             opts.start, opts.cache, opts.cycle})
 end
 
 box.schema.sequence.drop = atomic_wrapper(function(name, opts)
     opts = opts or {}
-    check_param_table(opts, {if_exists = 'boolean'})
+    check_param_table(opts, {if_exists = 'boolean'}, 2)
     local id = sequence_resolve(name)
     if id == nil then
         if not opts.if_exists then
-            box.error(box.error.NO_SUCH_SEQUENCE, name)
+            box.error(box.error.NO_SUCH_SEQUENCE, name, 2)
         end
         return
     end
@@ -3037,13 +3103,13 @@ compat.add_option({
 -- Resolve privilege hex by name and check
 -- that bits are allowed for this object type
 --
-local function privilege_check(privilege, object_type)
+local function privilege_check(privilege, object_type, level)
     local priv_hex = privilege_resolve(privilege)
     if priv_object_combo[object_type] == nil then
-        box.error(box.error.UNKNOWN_SCHEMA_OBJECT, object_type)
+        box.error(box.error.UNKNOWN_SCHEMA_OBJECT, object_type, level + 1)
     elseif type(priv_hex) ~= 'number' or priv_hex == 0 or
            bit.band(priv_hex, priv_object_combo[object_type] or 0) ~= priv_hex then
-        box.error(box.error.UNSUPPORTED_PRIV, object_type, privilege)
+        box.error(box.error.UNSUPPORTED_PRIV, object_type, privilege, level + 1)
     end
     return priv_hex
 end
@@ -3103,10 +3169,10 @@ local function is_singleton_object_type(object_type)
     return singleton_object_types[object_type]
 end
 
-local function object_resolve(object_type, object_name)
+local function object_resolve(object_type, object_name, level)
     if object_name ~= nil and type(object_name) ~= 'string'
             and type(object_name) ~= 'number' then
-        box.error(box.error.ILLEGAL_PARAMS, "wrong object name type")
+        box.error(box.error.ILLEGAL_PARAMS, "wrong object name type", level + 1)
     end
     if is_singleton_object_type(object_type) then
         return 0
@@ -3120,7 +3186,7 @@ local function object_resolve(object_type, object_name)
         end
         local space = box.space[object_name]
         if  space == nil then
-            box.error(box.error.NO_SUCH_SPACE, object_name)
+            box.error(box.error.NO_SUCH_SPACE, object_name, level + 1)
         end
         return space.id
     end
@@ -3138,7 +3204,7 @@ local function object_resolve(object_type, object_name)
         if func then
             return func.id
         else
-            box.error(box.error.NO_SUCH_FUNCTION, object_name)
+            box.error(box.error.NO_SUCH_FUNCTION, object_name, level + 1)
         end
     end
     if object_type == 'sequence' then
@@ -3147,7 +3213,7 @@ local function object_resolve(object_type, object_name)
         end
         local seq = sequence_resolve(object_name)
         if seq == nil then
-            box.error(box.error.NO_SUCH_SEQUENCE, object_name)
+            box.error(box.error.NO_SUCH_SEQUENCE, object_name, level + 1)
         end
         return seq
     end
@@ -3165,16 +3231,16 @@ local function object_resolve(object_type, object_name)
         if role_or_user and role_or_user.type == object_type then
             return role_or_user.id
         elseif object_type == 'role' then
-            box.error(box.error.NO_SUCH_ROLE, object_name)
+            box.error(box.error.NO_SUCH_ROLE, object_name, level + 1)
         else
-            box.error(box.error.NO_SUCH_USER, object_name)
+            box.error(box.error.NO_SUCH_USER, object_name, level + 1)
         end
     end
 
-    box.error(box.error.UNKNOWN_SCHEMA_OBJECT, object_type)
+    box.error(box.error.UNKNOWN_SCHEMA_OBJECT, object_type, level + 1)
 end
 
-local function object_name(object_type, object_id)
+local function object_name(object_type, object_id, level)
     if is_singleton_object_type(object_type) or object_id == '' then
         return ""
     end
@@ -3191,13 +3257,14 @@ local function object_name(object_type, object_id)
     elseif object_type == 'role' or object_type == 'user' then
         space = box.space._vuser
     else
-        box.error(box.error.UNKNOWN_SCHEMA_OBJECT, object_type)
+        box.error(box.error.UNKNOWN_SCHEMA_OBJECT, object_type, level + 1)
     end
     return space:get{object_id}.name
 end
 
 box.schema.func = {}
 box.schema.func.create = function(name, opts)
+    utils.box_check_configured(2)
     opts = opts or {}
     check_param_table(opts, { setuid = 'boolean',
                               if_not_exists = 'boolean',
@@ -3209,13 +3276,13 @@ box.schema.func.create = function(name, opts)
                               comment = 'string',
                               param_list = 'table', returns = 'string',
                               exports = 'table', opts = 'table',
-                              trigger = 'string, table'})
+                              trigger = 'string, table'}, 2)
     local _func = box.space[box.schema.FUNC_ID]
     local _vfunc = box.space[box.schema.VFUNC_ID]
     local func = _vfunc.index.name:get{name}
     if func then
         if not opts.if_not_exists then
-            box.error(box.error.FUNCTION_EXISTS, name)
+            box.error(box.error.FUNCTION_EXISTS, name, 2)
         end
         return
     end
@@ -3239,18 +3306,19 @@ box.schema.func.create = function(name, opts)
     if opts.takes_raw_args then
         opts.opts.takes_raw_args = opts.takes_raw_args
     end
-    _func:auto_increment{session.euid(), name, opts.setuid, opts.language,
-                         opts.body, opts.routine_type, opts.param_list,
-                         opts.returns, opts.aggregate, opts.sql_data_access,
-                         opts.is_deterministic, opts.is_sandboxed,
-                         opts.is_null_call, opts.exports, opts.opts,
-                         opts.comment, opts.created, opts.last_altered,
-                         opts.trigger}
+    call_at(2, _func.auto_increment, _func,
+            {session.euid(), name, opts.setuid, opts.language,
+             opts.body, opts.routine_type, opts.param_list,
+             opts.returns, opts.aggregate, opts.sql_data_access,
+             opts.is_deterministic, opts.is_sandboxed,
+             opts.is_null_call, opts.exports, opts.opts,
+             opts.comment, opts.created, opts.last_altered,
+             opts.trigger})
 end
 
 box.schema.func.drop = atomic_wrapper(function(name, opts)
     opts = opts or {}
-    check_param_table(opts, { if_exists = 'boolean' })
+    check_param_table(opts, { if_exists = 'boolean' }, 2)
     local _func = box.space[box.schema.FUNC_ID]
     local _vfunc = box.space[box.schema.VFUNC_ID]
     local fid
@@ -3265,7 +3333,7 @@ box.schema.func.drop = atomic_wrapper(function(name, opts)
     end
     if fid == nil then
         if not opts.if_exists then
-            box.error(box.error.NO_SUCH_FUNCTION, name)
+            box.error(box.error.NO_SUCH_FUNCTION, name, 2)
         end
         return
     end
@@ -3274,6 +3342,7 @@ box.schema.func.drop = atomic_wrapper(function(name, opts)
 end)
 
 function box.schema.func.exists(name_or_id)
+    utils.box_check_configured(2)
     local _vfunc = box.space[box.schema.VFUNC_ID]
     local tuple = nil
     if type(name_or_id) == 'string' then
@@ -3285,31 +3354,32 @@ function box.schema.func.exists(name_or_id)
 end
 
 -- Helper function to check func:method() usage
-local function check_func_arg(func, method)
+local function check_func_arg(func, method, level)
     if type(func) ~= 'table' or func.name == nil then
         local fmt = 'Use func:%s(...) instead of func.%s(...)'
-        error(string.format(fmt, method, method))
+        box.error(box.error.ILLEGAL_PARAMS,
+                  string.format(fmt, method, method), level + 1)
     end
 end
 
 local func_mt = {}
 
 func_mt.drop = function(func, opts)
-    check_func_arg(func, 'drop')
-    box.schema.func.drop(func.name, opts)
+    check_func_arg(func, 'drop', 2)
+    return box.schema.func.drop(func.name, opts)
 end
 
 func_mt.call = function(func, args)
-    check_func_arg(func, 'call')
+    check_func_arg(func, 'call', 2)
     args = args or {}
     if type(args) ~= 'table' then
-        error('Use func:call(table)')
+        box.error(box.error.ILLEGAL_PARAMS, 'Usage: func:call(table)', 2)
     end
     return box.schema.func.call(func.name, unpack(args, 1, table.maxn(args)))
 end
 
 function box.schema.func.bless(func)
-    utils.box_check_configured()
+    utils.box_check_configured(2)
     setmetatable(func, {__index = func_mt})
 end
 
@@ -3321,22 +3391,22 @@ box.internal.collation.create = function(name, coll_type, locale, opts)
     opts = opts or setmap{}
     if type(name) ~= 'string' then
         box.error(box.error.ILLEGAL_PARAMS,
-        "name (first arg) must be a string")
+                  "name (first arg) must be a string", 2)
     end
     if type(coll_type) ~= 'string' then
         box.error(box.error.ILLEGAL_PARAMS,
-        "type (second arg) must be a string")
+                  "type (second arg) must be a string", 2)
     end
     if type(locale) ~= 'string' then
         box.error(box.error.ILLEGAL_PARAMS,
-        "locale (third arg) must be a string")
+                  "locale (third arg) must be a string", 2)
     end
     if type(opts) ~= 'table' then
         box.error(box.error.ILLEGAL_PARAMS,
-        "options (fourth arg) must be a table or nil")
+                  "options (fourth arg) must be a table or nil", 2)
     end
     local lua_opts = {if_not_exists = opts.if_not_exists }
-    check_param_table(lua_opts, {if_not_exists = 'boolean'})
+    check_param_table(lua_opts, {if_not_exists = 'boolean'}, 2)
     opts.if_not_exists = nil
     local collation_defaults = {
         strength = "tertiary",
@@ -3351,12 +3421,13 @@ box.internal.collation.create = function(name, coll_type, locale, opts)
             return
         end
     end
-    _coll:auto_increment{name, session.euid(), coll_type, locale, opts}
+    call_at(2, _coll.auto_increment, _coll,
+            {name, session.euid(), coll_type, locale, opts})
 end
 
 box.internal.collation.drop = function(name, opts)
     opts = opts or {}
-    check_param_table(opts, { if_exists = 'boolean' })
+    check_param_table(opts, { if_exists = 'boolean' }, 2)
 
     local _coll = box.space[box.schema.COLLATION_ID]
     if opts.if_exists then
@@ -3365,7 +3436,7 @@ box.internal.collation.drop = function(name, opts)
             return
         end
     end
-    _coll.index.name:delete{name}
+    call_at(2, _coll.index.name.delete, _coll.index.name, {name})
 end
 
 box.internal.collation.exists = function(name)
@@ -3383,7 +3454,7 @@ end
 box.schema.user = {}
 
 box.schema.user.password = function(password)
-    utils.box_check_configured()
+    utils.box_check_configured(2)
     return internal.prepare_auth(box.cfg.auth_type, password)
 end
 
@@ -3401,52 +3472,58 @@ local function prepare_auth_history(uid)
     end
 end
 
-local function check_password(password, auth_history)
+local function check_password(password, auth_history, level)
     if internal.check_password ~= nil then
-        internal.check_password(password, auth_history)
+        internal.check_password(password, auth_history, level and level + 1)
     end
 end
 
-local function chpasswd(uid, new_password)
+local function chpasswd(uid, new_password, level)
     local _user = box.space[box.schema.USER_ID]
     local auth_history = prepare_auth_history(uid)
-    check_password(new_password, auth_history)
-    _user:update({uid}, {{'=', 5, prepare_auth_list(new_password)},
-                         {'=', 6, auth_history},
-                         {'=', 7, math.floor(fiber.time())}})
+    check_password(new_password, auth_history, level and level + 1)
+    call_at(level and level + 1, _user.update, _user, {uid},
+            {{'=', 5, prepare_auth_list(new_password)},
+             {'=', 6, auth_history},
+             {'=', 7, math.floor(fiber.time())}})
 end
 
 box.schema.user.passwd = function(name, new_password)
+    utils.box_check_configured(2)
     if name == nil then
-        box.error(box.error.PROC_LUA, "Usage: box.schema.user.passwd([user,] password)")
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "Usage: box.schema.user.passwd([user,] password)", 2)
     end
     if new_password == nil then
         -- change password for current user
         new_password = name
-        box.session.su('admin', chpasswd, session.uid(), new_password)
+        call_at(2, box.session.su, 'admin', chpasswd, session.uid(),
+                new_password)
     else
         -- change password for other user
-        local uid = user_resolve(name)
+        local uid = user_resolve(name, 2)
         if uid == nil then
-            box.error(box.error.NO_SUCH_USER, name)
+            box.error(box.error.NO_SUCH_USER, name, 2)
         end
-        return chpasswd(uid, new_password)
+        return chpasswd(uid, new_password, 1)
     end
 end
 
 box.schema.user.create = atomic_wrapper(function(name, opts)
+    utils.box_check_configured(2)
     local uid = user_or_role_resolve(name)
     opts = opts or {}
-    check_param_table(opts, { password = 'string', if_not_exists = 'boolean' })
+    local template = {password = 'string', if_not_exists = 'boolean'}
+    check_param_table(opts, template, 2)
     if uid then
         if not opts.if_not_exists then
-            box.error(box.error.USER_EXISTS, name)
+            box.error(box.error.USER_EXISTS, name, 2)
         end
         return
     end
     local auth_list
     if opts.password then
-        check_password(opts.password)
+        check_password(opts.password, nil, 2)
         auth_list = prepare_auth_list(opts.password)
     else
         auth_list = setmap({})
@@ -3467,7 +3544,8 @@ box.schema.user.create = atomic_wrapper(function(name, opts)
 end)
 
 box.schema.user.exists = function(name)
-    if user_resolve(name) then
+    utils.box_check_configured(2)
+    if user_resolve(name, 2) then
         return true
     else
         return false
@@ -3512,10 +3590,10 @@ local function opts_from_origins(origins)
     return {origins = normalized_origins}
 end
 
-local function grant_error(name, object_name, object_type, privilege)
+local function grant_error(name, object_name, object_type, privilege, level)
     if object_type == 'role' and object_name ~= '' and
        privilege == 'execute' then
-        box.error(box.error.ROLE_GRANTED, name, object_name)
+        box.error(box.error.ROLE_GRANTED, name, object_name, level + 1)
     end
     local object_repr
     if not is_singleton_object_type(object_type) then
@@ -3524,10 +3602,10 @@ local function grant_error(name, object_name, object_type, privilege)
         object_repr = object_type
     end
     box.error(box.error.PRIV_GRANTED, name, privilege, object_repr,
-              object_type, object_name)
+              object_type, object_name, level + 1)
 end
 
-local function grant(uid, name, privilege, object_type,
+local function grant(level, uid, name, privilege, object_type,
                      object_name, options)
     -- From user point of view, role is the same thing
     -- as a privilege. Allow syntax grant(user, role).
@@ -3544,9 +3622,9 @@ local function grant(uid, name, privilege, object_type,
             object_name = ''
         end
     end
-    local privilege_hex = privilege_check(privilege, object_type)
+    local privilege_hex = privilege_check(privilege, object_type, level + 1)
 
-    local oid = object_resolve(object_type, object_name)
+    local oid = object_resolve(object_type, object_name, level + 1)
     options = options or {}
     if options.grantor == nil then
         options.grantor = session.euid()
@@ -3557,7 +3635,7 @@ local function grant(uid, name, privilege, object_type,
         options._origin = DEFAULT_ORIGIN
     elseif type(options._origin) ~= 'string' then
         box.error(box.error.ILLEGAL_PARAMS, "options parameter '_origin' " ..
-                  "should be of type 'string'")
+                  "should be of type 'string'", level + 1)
     end
     local _priv = box.space[box.schema.PRIV_ID]
     local _vpriv = box.space[box.schema.VPRIV_ID]
@@ -3576,18 +3654,20 @@ local function grant(uid, name, privilege, object_type,
         if options.if_not_exists then
             return
         end
-        grant_error(name, object_name, object_type, privilege)
+        grant_error(name, object_name, object_type, privilege, level + 1)
     end
 
     local new_privilege = privilege_from_origins(origins)
     local opts = opts_from_origins(origins)
-    _priv:replace({options.grantor, uid, object_type, oid, new_privilege, opts})
+    call_at(level + 1, _priv.replace, _priv,
+            {options.grantor, uid, object_type, oid, new_privilege,
+             opts})
 end
 
 local function revoke_error(name, object_name, object_type, privilege, origin,
-                            tuple)
+                            tuple, level)
     local total_privileges = tuple == nil and 0 or tuple.privilege
-    local new_privilege = privilege_check(privilege, object_type)
+    local new_privilege = privilege_check(privilege, object_type, level + 1)
     local prev_origin
     local reason
     local code
@@ -3623,10 +3703,11 @@ local function revoke_error(name, object_name, object_type, privilege, origin,
         code = code,
         reason = reason,
         prev_origin = prev_origin,
-    })
+    }, level + 1)
 end
 
-local function revoke(uid, name, privilege, object_type, object_name, options)
+local function revoke(level, uid, name, privilege, object_type, object_name,
+                      options)
     -- From user point of view, role is the same thing
     -- as a privilege. Allow syntax revoke(user, role).
     if object_name == nil then
@@ -3640,15 +3721,15 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
             object_name = ''
         end
     end
-    local privilege_hex = privilege_check(privilege, object_type)
+    local privilege_hex = privilege_check(privilege, object_type, level + 1)
     options = options or {}
     if options._origin == nil then
         options._origin = DEFAULT_ORIGIN
     elseif type(options._origin) ~= 'string' then
         box.error(box.error.ILLEGAL_PARAMS, "options parameter '_origin' " ..
-                  "should be of type 'string'")
+                  "should be of type 'string'", level + 1)
     end
-    local oid = object_resolve(object_type, object_name)
+    local oid = object_resolve(object_type, object_name, level + 1)
     local _priv = box.space[box.schema.PRIV_ID]
     local _vpriv = box.space[box.schema.VPRIV_ID]
     local tuple = _vpriv:get{uid, object_type, oid}
@@ -3662,7 +3743,7 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
             return
         end
         revoke_error(name, object_name, object_type, privilege, options._origin,
-                     tuple)
+                     tuple, level + 1)
     end
     assert(tuple ~= nil)
     local grantor = tuple.grantor
@@ -3674,14 +3755,15 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
 
     local new_privilege = privilege_from_origins(origins)
     if new_privilege == 0 then
-        _priv:delete({uid, object_type, oid})
+        call_at(level + 1, _priv.delete, _priv, {uid, object_type, oid})
     else
         local opts = opts_from_origins(origins)
-        _priv:replace({grantor, uid, object_type, oid, new_privilege, opts})
+        call_at(level + 1, _priv.replace, _priv,
+                {grantor, uid, object_type, oid, new_privilege, opts})
     end
 end
 
-local function drop(uid)
+local function drop(uid, level)
     -- recursive delete of user data
     local _vpriv = box.space[box.schema.VPRIV_ID]
     local spaces = box.space[box.schema.VSPACE_ID].index.owner:select{uid}
@@ -3695,7 +3777,7 @@ local function drop(uid)
     -- if this is a role, revoke this role from whoever it was granted to
     local grants = _vpriv.index.object:select{'role', uid}
     for _, tuple in pairs(grants) do
-        revoke(tuple.grantee, tuple.grantee, uid)
+        revoke(level + 1, tuple.grantee, tuple.grantee, uid)
     end
     local sequences = box.space[box.schema.VSEQUENCE_ID].index.owner:select{uid}
     for _, tuple in pairs(sequences) do
@@ -3713,90 +3795,94 @@ local function drop(uid)
     for _, tuple in pairs(privs) do
         -- we need an additional box.session.su() here, because of
         -- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
-        box.session.su("admin", revoke, uid, uid, tuple.privilege,
+        box.session.su("admin", revoke, level + 2, uid, uid, tuple.privilege,
                        tuple.object_type, tuple.object_id)
     end
     box.space[box.schema.USER_ID]:delete{uid}
 end
 
 box.schema.user.grant = function(user_name, ...)
-    local uid = user_resolve(user_name)
+    utils.box_check_configured(2)
+    local uid = user_resolve(user_name, 2)
     if uid == nil then
-        box.error(box.error.NO_SUCH_USER, user_name)
+        box.error(box.error.NO_SUCH_USER, user_name, 2)
     end
-    return grant(uid, user_name, ...)
+    return grant(1, uid, user_name, ...)
 end
 
 box.schema.user.revoke = function(user_name, ...)
-    local uid = user_resolve(user_name)
+    utils.box_check_configured(2)
+    local uid = user_resolve(user_name, 2)
     if uid == nil then
-        box.error(box.error.NO_SUCH_USER, user_name)
+        box.error(box.error.NO_SUCH_USER, user_name, 2)
     end
-    return revoke(uid, user_name, ...)
+    return revoke(1, uid, user_name, ...)
 end
 
 box.schema.user.enable = function(user)
-    box.schema.user.grant(user, "session,usage", "universe", nil,
-                            {if_not_exists = true})
+    return box.schema.user.grant(user, "session,usage", "universe", nil,
+                                 {if_not_exists = true})
 end
 
 box.schema.user.disable = function(user)
-    box.schema.user.revoke(user, "session,usage", "universe", nil,
-                            {if_exists = true})
+    return box.schema.user.revoke(user, "session,usage", "universe", nil,
+                                  {if_exists = true})
 end
 
 box.schema.user.drop = atomic_wrapper(function(name, opts)
     opts = opts or {}
-    check_param_table(opts, { if_exists = 'boolean' })
-    local uid = user_resolve(name)
+    check_param_table(opts, { if_exists = 'boolean' }, 2)
+    local uid = user_resolve(name, 2)
     if uid ~= nil then
         if uid >= box.schema.SYSTEM_USER_ID_MIN and
            uid <= box.schema.SYSTEM_USER_ID_MAX then
             -- gh-1205: box.schema.user.info fails
             box.error(box.error.DROP_USER, name,
-                      "the user or the role is a system")
+                      "the user or the role is a system", 2)
         end
         if uid == box.session.uid() or uid == box.session.euid() then
             box.error(box.error.DROP_USER, name,
-                      "the user is active in the current session")
+                      "the user is active in the current session", 2)
         end
-        return drop(uid)
+        return drop(uid, 1)
     end
     if not opts.if_exists then
-        box.error(box.error.NO_SUCH_USER, name)
+        box.error(box.error.NO_SUCH_USER, name, 2)
     end
     return
 end)
 
-local function info(id)
+local function info(id, level)
     local _priv = box.space._vpriv
     local privs = {}
     for _, v in pairs(_priv:select{id}) do
         table.insert(
             privs,
             {privilege_name(v.privilege), v.object_type,
-             object_name(v.object_type, v.object_id)}
+             object_name(v.object_type, v.object_id, level + 1)}
         )
     end
     return privs
 end
 
 box.schema.user.info = function(user_name)
+    utils.box_check_configured(2)
     local uid
     if user_name == nil then
         uid = box.session.euid()
     else
-        uid = user_resolve(user_name)
+        uid = user_resolve(user_name, 2)
         if uid == nil then
-            box.error(box.error.NO_SUCH_USER, user_name)
+            box.error(box.error.NO_SUCH_USER, user_name, 2)
         end
     end
-    return info(uid)
+    return info(uid, 2)
 end
 
 box.schema.role = {}
 
 box.schema.role.exists = function(name)
+    utils.box_check_configured(2)
     if role_resolve(name) then
         return true
     else
@@ -3805,68 +3891,75 @@ box.schema.role.exists = function(name)
 end
 
 box.schema.role.create = function(name, opts)
+    utils.box_check_configured(2)
     opts = opts or {}
-    check_param_table(opts, { if_not_exists = 'boolean' })
+    check_param_table(opts, { if_not_exists = 'boolean' }, 2)
     local uid = user_or_role_resolve(name)
     if uid then
         if not opts.if_not_exists then
-            box.error(box.error.ROLE_EXISTS, name)
+            box.error(box.error.ROLE_EXISTS, name, 2)
         end
         return
     end
     local _user = box.space[box.schema.USER_ID]
-    _user:auto_increment{session.euid(), name, 'role', setmap({}), {},
-                         math.floor(fiber.time())}
+    call_at(2, _user.auto_increment, _user,
+            {session.euid(), name, 'role', setmap({}), {},
+             math.floor(fiber.time())})
 end
 
 box.schema.role.drop = atomic_wrapper(function(name, opts)
     opts = opts or {}
-    check_param_table(opts, { if_exists = 'boolean' })
+    check_param_table(opts, { if_exists = 'boolean' }, 2)
     local uid = role_resolve(name)
     if uid == nil then
         if not opts.if_exists then
-            box.error(box.error.NO_SUCH_ROLE, name)
+            box.error(box.error.NO_SUCH_ROLE, name, 2)
         end
         return
     end
     if uid >= box.schema.SYSTEM_USER_ID_MIN and
        uid <= box.schema.SYSTEM_USER_ID_MAX or uid == box.schema.SUPER_ROLE_ID then
         -- gh-1205: box.schema.user.info fails
-        box.error(box.error.DROP_USER, name, "the user or the role is a system")
+        box.error(box.error.DROP_USER, name,
+                  "the user or the role is a system", 2)
     end
-    return drop(uid)
+    return drop(uid, 1)
 end)
 
-local function role_check_grant_revoke_of_sys_priv(priv)
+local function role_check_grant_revoke_of_sys_priv(level, priv)
     priv = string.lower(priv)
     if (type(priv) == 'string' and (priv:match("session") or priv:match("usage"))) or
         (type(priv) == "number" and (bit.band(priv, 8) ~= 0 or bit.band(priv, 16) ~= 0)) then
-        box.error(box.error.GRANT, "system privilege can not be granted to role")
+        box.error(box.error.GRANT,
+                  "system privilege can not be granted to role", level + 1)
     end
 end
 
 box.schema.role.grant = function(user_name, ...)
+    utils.box_check_configured(2)
     local uid = role_resolve(user_name)
     if uid == nil then
-        box.error(box.error.NO_SUCH_ROLE, user_name)
+        box.error(box.error.NO_SUCH_ROLE, user_name, 2)
     end
-    role_check_grant_revoke_of_sys_priv(...)
-    return grant(uid, user_name, ...)
+    role_check_grant_revoke_of_sys_priv(2, ...)
+    return grant(1, uid, user_name, ...)
 end
 box.schema.role.revoke = function(user_name, ...)
+    utils.box_check_configured(2)
     local uid = role_resolve(user_name)
     if uid == nil then
-        box.error(box.error.NO_SUCH_ROLE, user_name)
+        box.error(box.error.NO_SUCH_ROLE, user_name, 2)
     end
-    role_check_grant_revoke_of_sys_priv(...)
-    return revoke(uid, user_name, ...)
+    role_check_grant_revoke_of_sys_priv(2, ...)
+    return revoke(1, uid, user_name, ...)
 end
 box.schema.role.info = function(role_name)
+    utils.box_check_configured(2)
     local rid = role_resolve(role_name)
     if rid == nil then
-        box.error(box.error.NO_SUCH_ROLE, role_name)
+        box.error(box.error.NO_SUCH_ROLE, role_name, 2)
     end
-    return info(rid)
+    return info(rid, 2)
 end
 
 --
@@ -3874,7 +3967,8 @@ end
 --
 box.once = function(key, func, ...)
     if type(key) ~= 'string' or type(func) ~= 'function' then
-        box.error(box.error.ILLEGAL_PARAMS, "Usage: box.once(key, func, ...)")
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "Usage: box.once(key, func, ...)", 2)
     end
 
     local key = "once"..key
@@ -3909,10 +4003,11 @@ end
 
 setmetatable(box.space, { __serialize = box_space_mt })
 
-local function check_read_view_arg(rv, method)
+local function check_read_view_arg(rv, method, level)
     if type(rv) ~= 'table' then
         local fmt = 'Use read_view:%s(...) instead of read_view.%s(...)'
-        error(string.format(fmt, method, method), 3)
+        box.error(box.error.ILLEGAL_PARAMS,
+                  string.format(fmt, method, method), level + 1)
     end
 end
 
@@ -3929,7 +4024,7 @@ local read_view_methods = {}
 --  - 'status' - 'open' or 'closed'.
 --
 function read_view_methods:info()
-    check_read_view_arg(self, 'info')
+    check_read_view_arg(self, 'info', 2)
     return {
         id = self.id,
         name = self.name,
@@ -3944,19 +4039,19 @@ end
 --
 -- Function stub. Implemented in Tarantool EE.
 --
-function box.internal.read_view_close()
-    error('read view is busy', 3)
+function box.internal.read_view_close(self, level)
+    box.error(box.error.READ_VIEW_BUSY, level + 1)
 end
 
 --
 -- Closes a read view.
 --
 function read_view_methods:close()
-    check_read_view_arg(self, 'close')
+    check_read_view_arg(self, 'close', 2)
     if self.status == 'closed' then
-        error('read view is closed', 2)
+        box.error(box.error.READ_VIEW_CLOSED, 2)
     end
-    box.internal.read_view_close(self)
+    box.internal.read_view_close(self, 2)
 end
 
 local read_view_properties = {
@@ -3992,7 +4087,7 @@ box.read_view = {}
 -- Function stub. Implemented in Tarantool EE.
 --
 function box.read_view.open()
-    box.error(box.error.UNSUPPORTED, "Community edition", "read view")
+    box.error(box.error.UNSUPPORTED, "Community edition", "read view", 2)
 end
 
 --

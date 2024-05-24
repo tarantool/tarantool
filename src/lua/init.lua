@@ -144,7 +144,7 @@ end
 dostring = function(s, ...)
     local chunk, message = loadstring(s)
     if chunk == nil then
-        error(message, 2)
+        box.error(box.error.PROC_LUA, message, 2)
     end
     return chunk(...)
 end

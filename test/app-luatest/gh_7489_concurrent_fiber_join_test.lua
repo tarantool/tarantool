@@ -61,7 +61,7 @@ g2.test_concurrent_fiber_join = function()
        -- 6. This join should raise an error, because f1 should be already
        -- joined by the first joiner.
        -- In case of a bug, it may hang trying to join f2 instead of f1
-       return not st and err == error_message
+       return not st and tostring(err) == error_message
     end
     -- 1. Create two joiners and one joinee fibers, but do not start them
     local j1 = fiber.new(joiner_f1)

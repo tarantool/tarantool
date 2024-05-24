@@ -48,31 +48,31 @@ digest.sha512()
 ...
 digest.md4_hex()
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.md4_hex(string)'
+- error: 'Usage: digest.md4_hex(string)'
 ...
 digest.md5_hex()
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.md5_hex(string)'
+- error: 'Usage: digest.md5_hex(string)'
 ...
 digest.sha1_hex()
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.sha1_hex(string)'
+- error: 'Usage: digest.sha1_hex(string)'
 ...
 digest.sha224_hex()
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.sha224_hex(string)'
+- error: 'Usage: digest.sha224_hex(string)'
 ...
 digest.sha256_hex()
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.sha256_hex(string)'
+- error: 'Usage: digest.sha256_hex(string)'
 ...
 digest.sha384_hex()
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.sha384_hex(string)'
+- error: 'Usage: digest.sha384_hex(string)'
 ...
 digest.sha512_hex()
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.sha512_hex(string)'
+- error: 'Usage: digest.sha512_hex(string)'
 ...
 --
 -- gh-1561: Bad checksum on non-string types
@@ -225,7 +225,7 @@ digest.sha512_hex('tarantool')
 ...
 digest.md5_hex(123)
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.md5_hex(string)'
+- error: 'Usage: digest.md5_hex(string)'
 ...
 digest.md5_hex('123')
 ---
@@ -233,7 +233,7 @@ digest.md5_hex('123')
 ...
 digest.md5_hex(true)
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.md5_hex(string)'
+- error: 'Usage: digest.md5_hex(string)'
 ...
 digest.md5_hex('true')
 ---
@@ -241,15 +241,15 @@ digest.md5_hex('true')
 ...
 digest.md5_hex(nil)
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.md5_hex(string)'
+- error: 'Usage: digest.md5_hex(string)'
 ...
 digest.md5_hex()
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.md5_hex(string)'
+- error: 'Usage: digest.md5_hex(string)'
 ...
 digest.crc32()
 ---
-- error: Usage digest.crc32(string)
+- error: 'Usage: digest.crc32(string)'
 ...
 digest.crc32_update(4294967295, '')
 ---
@@ -339,27 +339,27 @@ digest.base64_decode(b) == s
 ...
 digest.base64_decode(nil)
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.base64_decode(string)'
+- error: 'Usage: digest.base64_decode(string)'
 ...
 digest.base64_encode(nil)
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.base64_encode(string[, table])'
+- error: 'Usage: digest.base64_encode(string[, table])'
 ...
 digest.base64_encode(123)
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.base64_encode(string[, table])'
+- error: 'Usage: digest.base64_encode(string[, table])'
 ...
 digest.base64_decode(123)
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.base64_decode(string)'
+- error: 'Usage: digest.base64_decode(string)'
 ...
 digest.guava('hello', 0)
 ---
-- error: 'bad argument #1 to ''?'' (cannot convert ''string'' to ''uint64_t'')'
+- error: state should be a number
 ...
 digest.guava(1, 'nope_')
 ---
-- error: 'bad argument #2 to ''?'' (cannot convert ''string'' to ''int'')'
+- error: buckets should be a number
 ...
 digest.guava(10863919174838991, 11)
 ---
@@ -375,7 +375,7 @@ digest.guava(1673758223894951030, 11)
 ...
 digest.urandom()
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.urandom(len)'
+- error: 'Usage: digest.urandom(len)'
 ...
 #digest.urandom(0)
 ---
@@ -655,19 +655,19 @@ digest.xxhash64.new(1):result()
 -- String is expected as input value.
 digest.xxhash32(1)
 ---
-- error: Usage digest.xxhash32(string[, unsigned number])
+- error: 'Usage: digest.xxhash32(string[, unsigned number])'
 ...
 digest.xxhash64(1)
 ---
-- error: Usage digest.xxhash64(string[, unsigned number])
+- error: 'Usage: digest.xxhash64(string[, unsigned number])'
 ...
 digest.xxhash32.new():update(1)
 ---
-- error: Usage xxhash32:update(string)
+- error: 'Usage: xxhash32:update(string)'
 ...
 digest.xxhash64.new():update(1)
 ---
-- error: Usage xxhash64:update(string)
+- error: 'Usage: xxhash64:update(string)'
 ...
 -- Seed is an optional second argument (default = 0).
 digest.xxhash32('12345')

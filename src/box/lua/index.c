@@ -47,8 +47,10 @@ static uint32_t CTID_STRUCT_ITERATOR_PTR = 0;
 static int
 lbox_insert(lua_State *L)
 {
-	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1))
-		return luaL_error(L, "Usage space:insert(tuple)");
+	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1)) {
+		diag_set(IllegalParams, "Usage: space:insert(tuple)");
+		return luaT_error(L);
+	}
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	size_t tuple_len;
@@ -66,8 +68,10 @@ lbox_insert(lua_State *L)
 static int
 lbox_replace(lua_State *L)
 {
-	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1))
-		return luaL_error(L, "Usage space:replace(tuple)");
+	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1)) {
+		diag_set(IllegalParams, "Usage: space:replace(tuple)");
+		return luaT_error(L);
+	}
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	size_t tuple_len;
@@ -87,8 +91,10 @@ lbox_index_update(lua_State *L)
 {
 	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
 	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL) ||
-	    (lua_type(L, 4) != LUA_TTABLE && luaT_istuple(L, 4) == NULL))
-		return luaL_error(L, "Usage index:update(key, ops)");
+	    (lua_type(L, 4) != LUA_TTABLE && luaT_istuple(L, 4) == NULL)) {
+		diag_set(IllegalParams, "Usage: index:update(key, ops)");
+		return luaT_error(L);
+	}
 
 	int rc = -1;
 	uint32_t space_id = lua_tonumber(L, 1);
@@ -116,8 +122,10 @@ lbox_upsert(lua_State *L)
 {
 	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) ||
 	    (lua_type(L, 2) != LUA_TTABLE && luaT_istuple(L, 2) == NULL) ||
-	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL))
-		return luaL_error(L, "Usage space:upsert(tuple_key, ops)");
+	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL)) {
+		diag_set(IllegalParams, "Usage: space:upsert(tuple_key, ops)");
+		return luaT_error(L);
+	}
 
 	int rc = -1;
 	uint32_t space_id = lua_tonumber(L, 1);
@@ -143,8 +151,10 @@ static int
 lbox_index_delete(lua_State *L)
 {
 	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL))
-		return luaL_error(L, "Usage space:delete(key)");
+	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL)) {
+		diag_set(IllegalParams, "Usage: space:delete(key)");
+		return luaT_error(L);
+	}
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
@@ -164,8 +174,11 @@ static int
 lbox_index_random(lua_State *L)
 {
 	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    !lua_isnumber(L, 3))
-		return luaL_error(L, "Usage index.random(space_id, index_id, rnd)");
+	    !lua_isnumber(L, 3)) {
+		diag_set(IllegalParams,
+			 "Usage: index.random(space_id, index_id, rnd)");
+		return luaT_error(L);
+	}
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
@@ -180,8 +193,11 @@ lbox_index_random(lua_State *L)
 static int
 lbox_index_get(lua_State *L)
 {
-	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
-		return luaL_error(L, "Usage index.get(space_id, index_id, key)");
+	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
+		diag_set(IllegalParams,
+			 "Usage: index.get(space_id, index_id, key)");
+		return luaT_error(L);
+	}
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
@@ -200,8 +216,11 @@ lbox_index_get(lua_State *L)
 static int
 lbox_index_min(lua_State *L)
 {
-	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
-		return luaL_error(L, "usage index.min(space_id, index_id, key)");
+	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
+		diag_set(IllegalParams,
+			 "Usage: index.min(space_id, index_id, key)");
+		return luaT_error(L);
+	}
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
@@ -220,8 +239,11 @@ lbox_index_min(lua_State *L)
 static int
 lbox_index_max(lua_State *L)
 {
-	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
-		return luaL_error(L, "usage index.max(space_id, index_id, key)");
+	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
+		diag_set(IllegalParams,
+			 "Usage: index.max(space_id, index_id, key)");
+		return luaT_error(L);
+	}
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
@@ -242,8 +264,10 @@ lbox_index_count(lua_State *L)
 {
 	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
 	    !lua_isnumber(L, 3)) {
-		return luaL_error(L, "usage index.count(space_id, index_id, "
-		       "iterator, key)");
+		diag_set(IllegalParams,
+			 "Usage: index.count(space_id, index_id, "
+			 "iterator, key)");
+		return luaT_error(L);
 	}
 
 	uint32_t space_id = lua_tonumber(L, 1);
@@ -280,15 +304,19 @@ box_index_init_iterator_types(struct lua_State *L, int idx)
 static int
 lbox_index_iterator(lua_State *L)
 {
-	if (lua_gettop(L) != 5 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    !lua_isnumber(L, 3))
-		return luaL_error(L, "usage index.iterator(space_id, index_id, "
-				     "type, key, after)");
+	if (lua_gettop(L) != 6 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    !lua_isnumber(L, 3)) {
+		diag_set(IllegalParams,
+			 "Usage: index.iterator(space_id, index_id, "
+			 "type, key, after, level)");
+		return luaT_error(L);
+	}
 
 	uint32_t svp = region_used(&fiber()->gc);
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
 	uint32_t iterator = lua_tonumber(L, 3);
+	int level = lua_tonumber(L, 6);
 	size_t mpkey_len;
 	const char *mpkey = lua_tolstring(L, 4, &mpkey_len); /* Key encoded by Lua */
 	struct iterator *it = NULL;
@@ -311,26 +339,32 @@ lbox_index_iterator(lua_State *L)
 	return 1;
 error:
 	region_truncate(&fiber()->gc, svp);
-	return luaT_error(L);
+	return luaT_error_at(L, level);
 }
 
 static int
 lbox_iterator_next(lua_State *L)
 {
 	/* first argument is key buffer */
-	if (lua_gettop(L) < 1 || lua_type(L, 1) != LUA_TCDATA)
-		return luaL_error(L, "usage: next(param, state)");
+	if (lua_gettop(L) < 1 || lua_type(L, 1) != LUA_TCDATA) {
+		diag_set(IllegalParams, "Usage: next(param, state)");
+		return luaT_error(L);
+	}
 
 	assert(CTID_STRUCT_ITERATOR_PTR != 0);
 	uint32_t ctypeid;
 	void *data = luaL_checkcdata(L, 1, &ctypeid);
-	if (ctypeid != CTID_STRUCT_ITERATOR_PTR)
-		return luaL_error(L, "usage: next(param, state)");
+	if (ctypeid != CTID_STRUCT_ITERATOR_PTR) {
+		diag_set(IllegalParams, "Usage: next(param, state)");
+		return luaT_error(L);
+	}
+	int level = lua_tonumber(L, 2);
+	assert(level > 0);
 
 	struct iterator *itr = *(struct iterator **) data;
 	struct tuple *tuple;
 	if (box_iterator_next(itr, &tuple) != 0)
-		return luaT_error(L);
+		return luaT_error_at(L, level);
 	return luaT_pushtupleornil(L, tuple);
 }
 
@@ -351,8 +385,11 @@ lbox_truncate(struct lua_State *L)
 static int
 lbox_index_stat(lua_State *L)
 {
-	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
-		return luaL_error(L, "usage index.info(space_id, index_id)");
+	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
+		diag_set(IllegalParams,
+			 "Usage: index.info(space_id, index_id)");
+		return luaT_error(L);
+	}
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
@@ -367,8 +404,11 @@ lbox_index_stat(lua_State *L)
 static int
 lbox_index_compact(lua_State *L)
 {
-	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
-		return luaL_error(L, "usage index.compact(space_id, index_id)");
+	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
+		diag_set(IllegalParams,
+			 "Usage: index.compact(space_id, index_id)");
+		return luaT_error(L);
+	}
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);

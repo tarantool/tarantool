@@ -429,6 +429,8 @@ struct errcode_record {
 	 * XXX: Formatted strings above are for compatibility. Use only \
 	 * error message without formatters for newly added error codes. \
 	 */ \
+	_(ER_READ_VIEW_BUSY, 285,		"The read view is busy") \
+	_(ER_READ_VIEW_CLOSED, 286,		"The read view is closed") \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*

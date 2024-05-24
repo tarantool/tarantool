@@ -89,8 +89,6 @@ assert(box.error.last() == err)
 --
 box.error.set(1)
 box.error.set(nil)
-box.error.set(box.error.last())
-assert(box.error.last() == err)
 -- Check that box.error.new() does not set error to diag.
 --
 box.error.clear()

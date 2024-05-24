@@ -235,7 +235,15 @@ local function gen_legacy_loader(searchers, index)
         local loaded, err = loader(data, name)
         local message = ("error loading module '%s' from file '%s':\n\t%s")
                         :format(name, data, err)
-        return assert(loaded, message)
+        if loaded then
+            return loaded
+        else
+            if _G.box and _G.box.error then
+                box.error(box.error.PROC_LUA, message, 3)
+            else
+                error(message, 3)
+            end
+        end
     end
 end
 

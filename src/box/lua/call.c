@@ -1078,7 +1078,7 @@ lbox_module_reload(lua_State *L)
 {
 	if (box_check_configured() != 0)
 		return luaT_error(L);
-	const char *name = luaL_checkstring(L, 1);
+	const char *name = luaT_checkstring(L, 1);
 	if (box_module_reload(name) != 0)
 		return luaT_error(L);
 	return 0;

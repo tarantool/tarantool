@@ -1132,9 +1132,6 @@ fiber_check_slice(void)
 	return 0;
 }
 
-bool
-fiber_checkstack(void);
-
 /**
  * @brief yield & check for timeout
  * @return true if timeout exceeded

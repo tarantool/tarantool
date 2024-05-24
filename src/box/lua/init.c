@@ -755,9 +755,11 @@ lbox_backup_start(struct lua_State *L)
 {
 	int checkpoint_idx = 0;
 	if (lua_gettop(L) > 0) {
-		checkpoint_idx = luaL_checkint(L, 1);
-		if (checkpoint_idx < 0)
-			return luaL_error(L, "invalid checkpoint index");
+		checkpoint_idx = luaT_checkint(L, 1);
+		if (checkpoint_idx < 0) {
+			diag_set(IllegalParams, "invalid checkpoint index");
+			return luaT_error(L);
+		}
 	}
 	lua_newtable(L);
 	struct lbox_backup_arg arg = {

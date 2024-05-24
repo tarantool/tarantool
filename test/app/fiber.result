@@ -288,7 +288,7 @@ fiber.find(920)
 ...
 fiber.find()
 ---
-- error: 'fiber.find(id): bad arguments'
+- error: 'Usage: fiber.find(id)'
 ...
 fiber.find('test')
 ---
@@ -417,11 +417,11 @@ fiber.sleep(0.0001)
 ...
 fiber.sleep('hello')
 ---
-- error: 'fiber.sleep(delay): bad arguments'
+- error: 'Usage: fiber.sleep(delay)'
 ...
 fiber.sleep(box, 0.001)
 ---
-- error: 'fiber.sleep(delay): bad arguments'
+- error: 'Usage: fiber.sleep(delay)'
 ...
 -- test fiber.self()
 f = fiber.self()
@@ -448,8 +448,7 @@ f==g
 -- arguments to fiber.create
 f = fiber.create(print('hello'))
 ---
-- error: '[string "f = fiber.create(print(''hello'')) "]:1: fiber.create(function,
-    ...): bad arguments'
+- error: 'fiber.create(function, ...): bad arguments'
 ...
 -- test passing arguments in and out created fiber
 res = {}
@@ -502,15 +501,15 @@ res
 --  test fiber.status functions: invalid arguments
 fiber.status(1)
 ---
-- error: 'bad argument #1 to ''?'' (fiber expected, got number)'
+- error: expected fiber as 1 argument
 ...
 fiber.status('fafa-gaga')
 ---
-- error: 'bad argument #1 to ''?'' (fiber expected, got string)'
+- error: expected fiber as 1 argument
 ...
 fiber.status(nil)
 ---
-- error: 'bad argument #1 to ''?'' (fiber expected, got nil)'
+- error: expected fiber as 1 argument
 ...
 -- test fiber.cancel
 function r() fiber.sleep(1000) end
@@ -678,7 +677,7 @@ fiber.self().storage.key -- our local storage is not affected by f
 pcall(function(f) return f.storage end, f)
 ---
 - false
-- '[string "return pcall(function(f) return f.storage end..."]:1: the fiber is dead'
+- the fiber is dead
 ...
 --
 -- Test that local storage is garbage collected when fiber is died

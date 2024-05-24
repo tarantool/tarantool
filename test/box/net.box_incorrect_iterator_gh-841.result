@@ -114,7 +114,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use space:insert(...) instead of space.insert(...)'
+- error: Use space:insert(...) instead of space.insert(...)
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---

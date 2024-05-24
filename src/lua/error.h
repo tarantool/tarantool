@@ -82,8 +82,15 @@ luaT_pusherror(struct lua_State *L, struct error *e);
 struct error *
 luaL_iserror(struct lua_State *L, int narg);
 
+/**
+ * Return argument on stack converted to struct error if it is box error.
+ * Otherwise raise error.
+ *
+ * @param narg argument position on stack
+ * @return argument converted
+ */
 struct error *
-luaL_checkerror(struct lua_State *L, int narg);
+luaT_checkerror(struct lua_State *L, int narg);
 
 void
 tarantool_lua_error_init(struct lua_State *L);

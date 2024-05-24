@@ -689,7 +689,7 @@ index = s:create_index('primary', { type = 'hash' })
 -- correct error on misuse of alter
 s.index.primary.alter({unique=false})
 ---
-- error: 'builtin/box/schema.lua..."]:<line>: Use index:alter(...) instead of index.alter(...)'
+- error: Use index:alter(...) instead of index.alter(...)
 ...
 s.index.primary:alter({unique=false})
 ---
