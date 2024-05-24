@@ -43,12 +43,22 @@ extern uint32_t CTID_CONST_STRUCT_ERROR_REF;
 struct error;
 
 /**
- * Re-throws the last Tarantool error as a Lua object.
+ * Re-throws the last Tarantool error as a Lua object. Set trace frame
+ * of to the caller of Lua C API.
+ *
  * \sa lua_error()
  * \sa box_error_last()
  */
 LUA_API int
 luaT_error(lua_State *L);
+
+/**
+ * Same as luaT_error but set error trace frame according to given level.
+ * luaT_error same as this function with level equal to 1. If level is 0
+ * then error trace is unchanged.
+ */
+int
+luaT_error_at(lua_State *L, int level);
 
 /**
  * Return nil as the first return value and an error as the
@@ -77,6 +87,15 @@ luaL_checkerror(struct lua_State *L, int narg);
 
 void
 tarantool_lua_error_init(struct lua_State *L);
+
+/**
+ * Set the error location information (file, line) to Lua stack frame at
+ * the given level. Level 1 is the Lua function that called this function.
+ * If level is <= 0 or the function failed to get the location information,
+ * the location is cleared.
+ */
+void
+luaT_error_set_trace(lua_State *L, int level, struct error *error);
 
 #if defined(__cplusplus)
 } /* extern "C" */

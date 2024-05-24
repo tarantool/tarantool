@@ -1050,3 +1050,37 @@ g.test_illegal_params = function()
     t.assert_equals(e.type, 'IllegalParams')
     t.assert_equals(e.message, 'foo')
 end
+
+g.test_netbox_call_trace = function(cg)
+    local netbox = require('net.box')
+    local file = debug.getinfo(1, 'S').short_src
+    local line = debug.getinfo(1, 'l').currentline + 4
+    cg.server:exec(function()
+        box.schema.create_space('test')
+        rawset(_G, 'test_func', function()
+            box.space.test:insert({})
+        end)
+    end)
+
+    local function test_error(file, line, fn, ...)
+        local ok, err = pcall(fn, ...)
+        t.assert_not(ok)
+        t.assert(box.error.is(err))
+        t.assert_equals(err.message, "No index #0 is defined in space 'test'")
+        local trace = err.trace[1]
+        t.assert_equals(trace.line, line)
+        t.assert_equals(trace.file, file)
+    end
+
+    local c = netbox.connect(cg.server.net_box_uri)
+    test_error('eval', 3, c.eval, c, '\n\nbox.space.test:insert({})')
+    test_error(file, line, c.call, c, 'test_func')
+end
+
+g.after_test('test_netbox_call_trace', function(cg)
+    cg.server:exec(function()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+    end)
+end)
