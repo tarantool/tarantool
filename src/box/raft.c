@@ -300,6 +300,19 @@ box_raft_fence(void)
 	raft_resign(raft);
 }
 
+void
+box_raft_leader_step_off(void)
+{
+	struct raft *raft = box_raft();
+	if (!raft->is_enabled || raft->state != RAFT_STATE_LEADER)
+		return;
+
+	/* It will be unfenced the next time new term is written. */
+	txn_limbo_fence(&txn_limbo);
+	raft_resign(raft);
+	raft_restore(raft);
+}
+
 /**
  * Configure the raft node according to whether it has a quorum of connected
  * peers or not. It can't start elections, when it doesn't.
