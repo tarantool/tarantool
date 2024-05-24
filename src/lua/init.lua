@@ -194,6 +194,43 @@ local function run_preload()
     end
 end
 
+--
+-- List of modules (by path) which are required to use box.error and
+-- set trace properly.
+--
+local trace_check_required_modules = {
+    ['builtin/box/schema.lua'] = true,
+    ['builtin/box/session.lua'] = true,
+    ['builtin/digest.lua'] = true,
+    ['builtin/error.lua'] = true,
+    ['builtin/tarantool.lua']= true,
+}
+
+--
+-- Return true if module with given `path` is required to use box.error
+-- to indicate error and error trace should be set the module function
+-- invocation place.
+--
+local function trace_check_is_required(path)
+    return trace_check_required_modules[path] ~= nil
+end
+
+--
+-- Raise box error with trace not pointing to the place of this function
+-- invocation.
+--
+local function raise_incorrect_trace()
+    box.error(box.error.UNKNOWN, 1)
+end
+
+--
+-- This module is expected to raise box errors only. Raise non box error
+-- for testing purpuses.
+--
+local function raise_non_box_error()
+    error('foo bar')
+end
+
 -- Extract all fields from a table except ones that start from
 -- the underscore.
 --
@@ -219,6 +256,9 @@ local tarantool_lua = {
         strip_cwd_from_path = strip_cwd_from_path,
         module_name_from_filename = module_name_from_filename,
         run_preload = run_preload,
+        trace_check_is_required = trace_check_is_required,
+        raise_incorrect_trace = raise_incorrect_trace,
+        raise_non_box_error = raise_non_box_error,
     },
 }
 -- tarantool module is already registered by src/lua/init.c

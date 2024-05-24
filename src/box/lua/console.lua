@@ -29,6 +29,7 @@ local yaml = require('yaml')
 local net_box = require('net.box')
 local help = require('help').help
 local utils = require('internal.utils')
+local tarantool = require('tarantool')
 
 local DEFAULT_CONNECT_TIMEOUT = 10
 local PUSH_TAG_HANDLE = '!push!'
@@ -414,6 +415,59 @@ local function get_command(line)
     return nil
 end
 
+--
+-- Create wrapper for a function.
+--
+-- Without a wrapper function will be called using xpcall and the box.error
+-- trace frame will be at pcall implementation. Thus the trace test will be not
+-- strict enough (it can be any pcall beneath console pcall).
+--
+local function wrapped_call(fn)
+    return function()
+        -- With `return fn()` wrapper does not work due to tail call
+        -- optimization.
+        local res = utils.table_pack(fn())
+        return unpack(res, 1, res.n)
+    end
+end
+
+-- Calculates trace pointing to the fn() in wrapped_call.
+local function get_wrapped_trace()
+    local fun = wrapped_call(function()
+        box.error(box.error.UNKNOWN, 2)
+    end)
+    local _, err = pcall(fun)
+    return err.trace[1]
+end
+
+-- Calculates trace pointing to the fn() in wrapped_call.
+local wrapped_trace = get_wrapped_trace()
+assert(wrapped_trace.file == 'builtin/box/console.lua')
+
+--
+-- This function is intended to be used with xpcall and wrapped_call.
+-- Returns {err, info} where `info` is debug info for frame calling function
+-- wrapped in wrapped_call and `err` is just original error.
+--
+-- `info` is used to find the module that raises an error.
+--
+local function eval_error_handler(err)
+    local level = 2
+    local info = debug.getinfo(level, 'Sl')
+    -- Find place of xpcall.
+    while info ~= nil do
+        if info.short_src == wrapped_trace.file and
+           info.currentline == wrapped_trace.line then
+            break
+        end
+        level = level + 1
+        info = debug.getinfo(level, 'Sl')
+    end
+    -- Corresponds to the frame of function executed in console.
+    info = debug.getinfo(level - 1, 'S')
+    return {err = err, info = info}
+end
+
 local initial_env
 
 -- Get initial console environment.
@@ -511,9 +565,11 @@ local function local_eval(storage, line)
     if not fun then
         return format(false, errmsg)
     end
+    -- Wrapper is required to check error trace. See below.
+    fun = wrapped_call(fun)
     -- box.is_in_txn() is stubbed to throw a error before call to box.cfg{}
     local in_txn_before = ffi.C.box_txn()
-    local res = utils.table_pack(pcall(fun))
+    local res = utils.table_pack(xpcall(fun, eval_error_handler))
     --
     -- Rollback if transaction was began in the failed expression.
     --
@@ -524,6 +580,37 @@ local function local_eval(storage, line)
     --
     if not res[1] and not in_txn_before and ffi.C.box_txn() then
         box.rollback()
+    end
+    --
+    -- In case of errors we set box.error trace frame to the place of box API
+    -- call by client (gh-9914). This should be tested. The idea is to use
+    -- existing diff tests that use console for test script execution. Let
+    -- check if trace frame is correct.
+    --
+    -- It is hard to fix box.error trace for all API at once so we will fix it
+    -- per module basis.
+    --
+    if tarantool.build.test_build and not res[1] and
+       tarantool._internal.trace_check_is_required(res[2].info.short_src) then
+        local err = res[2].err
+        if not box.error.is(err) then
+            return format(false, {err, 'Warning, box error expected'})
+        end
+        local trace = err.trace[1]
+        if not table.equals(trace, wrapped_trace) then
+            return format(false, {err, 'Warning, unexpected trace', trace})
+        end
+    end
+    if not res[1] then
+        local err = res[2].err
+        -- Unfortunately due to introduced wrapper (see above) if module
+        -- raises non box error then trace information apperead breaking
+        -- existing tests. Let's temporarily counteract by stripping
+        -- this information.
+        if type(err) == 'string' then
+            err = string.gsub(err, '^builtin/box/console.lua:%d+: ', '')
+        end
+        res[2] = err
     end
     -- specify length to preserve trailing nils
     return format(unpack(res, 1, res.n))
