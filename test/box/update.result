@@ -468,7 +468,7 @@ s:update({1})
 ...
 s:update({1}, {'=', 1, 1})
 ---
-- error: Illegal parameters, update operation must be an array {op,..}
+- error: update operation must be an array {op,..}
 ...
 s:drop()
 ---
@@ -817,12 +817,11 @@ s:update({0}, 0)
 ...
 s:update({0}, {'+', 2, 2})
 ---
-- error: Illegal parameters, update operation must be an array {op,..}
+- error: update operation must be an array {op,..}
 ...
 s:update({0}, {{}})
 ---
-- error: Illegal parameters, update operation must be an array {op,..}, got empty
-    array
+- error: update operation must be an array {op,..}, got empty array
 ...
 s:update({0}, {{'+'}})
 ---
@@ -852,7 +851,7 @@ s:update({0}, {{'+', '+', '+'}})
 ...
 s:update({0}, {{0, 0, 0}})
 ---
-- error: Illegal parameters, update operation name must be a string
+- error: update operation name must be a string
 ...
 -- test for https://github.com/tarantool/tarantool/issues/1142
 -- broken WAL during upsert
@@ -2296,7 +2295,7 @@ _ = s:delete{1}
 -- Check deep fields.
 _ = s:create_index('deep_sk', {'field3', 'double', path = '[1].key1.key2[2]'})
 ---
-- error: Illegal parameters, unexpected option '1'
+- error: unexpected option '1'
 ...
 _ = s:replace{1, dbl1, {{key1 = {key2 = {1, dbl1}}}}}
 ---

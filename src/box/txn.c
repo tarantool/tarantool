@@ -1343,7 +1343,7 @@ int
 box_txn_set_timeout(double timeout)
 {
 	if (timeout <= 0) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+		diag_set(IllegalParams,
 			 "timeout must be a number greater than 0");
 		return -1;
 	}
@@ -1421,8 +1421,7 @@ int
 box_txn_set_isolation(uint32_t level)
 {
 	if (level >= txn_isolation_level_MAX) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
-			 "unknown isolation level");
+		diag_set(IllegalParams, "unknown isolation level");
 		return -1;
 	}
 	struct txn *txn = in_txn();

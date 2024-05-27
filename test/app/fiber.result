@@ -949,9 +949,9 @@ test_run:grep_log("default", "FiberIsCancelled") == nil
 _ = fiber.create(function() box.error(box.error.ILLEGAL_PARAMS, 'oh my') end)
 ---
 ...
-test_run:grep_log("default", "ER_ILLEGAL_PARAMS:[^\n]*")
+test_run:grep_log("default", "IllegalParams:[^\n]*")
 ---
-- 'ER_ILLEGAL_PARAMS: Illegal parameters, oh my'
+- 'IllegalParams: oh my'
 ...
 -- #1734 fiber.name irt dead fibers
 fiber.create(function()end):name()
@@ -1040,11 +1040,10 @@ st;
 e:unpack();
 ---
 - name: ILLEGAL_PARAMS
-  code: 1
-  base_type: ClientError
-  type: ClientError
-  details: oh my
-  message: Illegal parameters, oh my
+  code: 0
+  base_type: IllegalParams
+  type: IllegalParams
+  message: oh my
   trace:
   - file: '[string "function err() box.error(box.error.ILLEGAL_PA..."]'
     line: 1

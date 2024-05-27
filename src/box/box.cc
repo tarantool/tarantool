@@ -3798,8 +3798,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
 	if (iterator < 0 || iterator >= iterator_type_MAX) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
-			 "Invalid iterator type");
+		diag_set(IllegalParams, "Invalid iterator type");
 		diag_log();
 		return -1;
 	}

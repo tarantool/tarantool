@@ -141,7 +141,7 @@ struct errcode_record {
  */
 #define ERROR_CODES(_) \
 	_(ER_UNKNOWN, 0,			"Unknown error") \
-	_(ER_ILLEGAL_PARAMS, 1,			"Illegal parameters, %s", "details", STRING) \
+	_(ER_ILLEGAL_PARAMS, 1,			"%s", "", STRING) \
 	_(ER_MEMORY_ISSUE, 2,			"Failed to allocate %u bytes in %s for %s") \
 	_(ER_TUPLE_FOUND, 3,			"Duplicate key exists in unique index \"%s\" in space \"%s\" with old tuple - %s and new tuple - %s", "index", STRING, "space", STRING, "", STRING, "", STRING, "old_tuple", TUPLE, "new_tuple", TUPLE) \
 	/* ER_TUPLE_NOT_FOUND, 4, Unused */ \

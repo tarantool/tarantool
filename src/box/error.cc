@@ -92,18 +92,18 @@ static struct error *
 box_error_new_va(const char *file, unsigned line, uint32_t code,
 		 const char *custom_type, const char *fmt, va_list ap)
 {
-	if (custom_type == NULL) {
-		struct error *e = BuildClientError(file, line, ER_UNKNOWN);
+	struct error *e;
+	if (custom_type != NULL) {
+		e = BuildCustomError(file, line, custom_type, code);
+	} else if (code == ER_ILLEGAL_PARAMS) {
+		e = BuildIllegalParams(file, line, "");
+	} else {
+		e = BuildClientError(file, line, ER_UNKNOWN);
 		ClientError *client_error = type_cast(ClientError, e);
 		client_error->code = code;
-		error_vformat_msg(e, fmt, ap);
-		return e;
-	} else {
-		struct error *e = BuildCustomError(file, line, custom_type,
-						   code);
-		error_vformat_msg(e, fmt, ap);
-		return e;
 	}
+	error_vformat_msg(e, fmt, ap);
+	return e;
 }
 
 struct error *
@@ -266,6 +266,12 @@ ClientError::ClientError(const char *file, unsigned line,
 struct error *
 BuildClientError(const char *file, unsigned line, uint32_t errcode, ...)
 {
+	assert(errcode != ER_ILLEGAL_PARAMS); /* use IllegalParams */
+	assert(errcode != ER_MEMORY_ISSUE); /* use OutOfMemory */
+	assert(errcode != ER_SYSTEM); /* use SystemError */
+	assert(errcode != ER_SSL); /* use SSLError */
+	assert(errcode != ER_XLOG_GAP); /* use XlogGapError */
+	assert(errcode != ER_ACCESS_DENIED); /* use AccessDeniedError */
 	ClientError *e = new ClientError(file, line, ER_UNKNOWN);
 	va_list ap;
 	va_start(ap, errcode);
@@ -288,6 +294,8 @@ ClientError::get_errcode(const struct error *e)
 	ClientError *client_error = type_cast(ClientError, e);
 	if (client_error)
 		return client_error->errcode();
+	if (type_cast(IllegalParams, e))
+		return ER_ILLEGAL_PARAMS;
 	if (type_cast(OutOfMemory, e))
 		return ER_MEMORY_ISSUE;
 	if (type_cast(SystemError, e))

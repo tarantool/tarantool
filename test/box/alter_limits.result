@@ -102,7 +102,7 @@ assert(res.code == box.error.TUPLE_FOUND)
 -- stupid space id
 box.schema.space.create('tweedledee', { id = 'tweedledee' })
 ---
-- error: Illegal parameters, options parameter 'id' should be of type number
+- error: options parameter 'id' should be of type number
 ...
 s:drop()
 ---
@@ -424,7 +424,7 @@ index = s:create_index('test', { type = 'bitset', parts = {1, 'unsigned', 2, 'un
 -- part count must be positive
 index = s:create_index('test', { type = 'hash', parts = {}})
 ---
-- error: Illegal parameters, options.parts must have at least one part
+- error: options.parts must have at least one part
 ...
 -- unknown field type
 index = s:create_index('test', { type = 'hash', parts = { 2, 'nosuchtype' }})
@@ -463,7 +463,7 @@ index = s:create_index('test', { type = 'rtree', parts = { 2, 'map' }})
 -- bad field no
 index = s:create_index('test', { type = 'hash', parts = { 'qq', 'nosuchtype' }})
 ---
-- error: 'Illegal parameters, options.parts[1]: field was not found by name ''qq'''
+- error: 'options.parts[1]: field was not found by name ''qq'''
 ...
 -- big field no
 index = s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX, 'unsigned' }})

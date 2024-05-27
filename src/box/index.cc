@@ -473,8 +473,7 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
 	if (type < 0 || type >= iterator_type_MAX) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
-			 "Invalid iterator type");
+		diag_set(IllegalParams, "Invalid iterator type");
 		return -1;
 	}
 	enum iterator_type itype = (enum iterator_type) type;
@@ -509,8 +508,7 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
 	if (type < 0 || type >= iterator_type_MAX) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
-			 "Invalid iterator type");
+		diag_set(IllegalParams, "Invalid iterator type");
 		return NULL;
 	}
 	enum iterator_type itype = (enum iterator_type) type;

@@ -474,8 +474,7 @@ lbox_commit(lua_State *L)
 			goto box_commit;
 
 		if (lua_type(L, 1) != LUA_TTABLE) {
-			diag_set(IllegalParams, "Illegal parameters, options "
-				 "should be a table");
+			diag_set(IllegalParams, "options should be a table");
 			return luaT_error(L);
 		}
 		/* Get is_sync */
@@ -485,16 +484,14 @@ lbox_commit(lua_State *L)
 			goto box_commit;
 
 		if (!lua_isboolean(L, -1)) {
-			diag_set(IllegalParams, "Illegal parameters, is_sync "
-				 "must be a boolean");
+			diag_set(IllegalParams, "is_sync must be a boolean");
 			return luaT_error(L);
 		}
 		bool is_sync = lua_toboolean(L, lua_gettop(L));
 		lua_pop(L, 1);
 
 		if (!is_sync) {
-			diag_set(IllegalParams, "Illegal parameters, is_sync "
-				 "can only be true");
+			diag_set(IllegalParams, "is_sync can only be true");
 			return luaT_error(L);
 		}
 		box_txn_make_sync();

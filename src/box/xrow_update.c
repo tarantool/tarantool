@@ -113,8 +113,7 @@ xrow_update_read_ops(struct xrow_update *update, const char *expr,
 	update->op_count = mp_decode_array(&expr);
 
 	if (update->op_count > BOX_UPDATE_OP_CNT_MAX) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
-			 "too many operations for update");
+		diag_set(IllegalParams, "too many operations for update");
 		goto error;
 	}
 

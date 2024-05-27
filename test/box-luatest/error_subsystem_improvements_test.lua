@@ -901,7 +901,7 @@ g.test_dml_update_error = function(cg)
             index = 'primary',
             index_id = 0,
             ops = ops,
-            message = 'Illegal parameters, too many operations for update'
+            message = 'too many operations for update'
         }, test.update, test, {1}, ops)
         t.assert_error_covers({
             space = 'test',
@@ -1043,4 +1043,10 @@ g.test_error_is = function()
     t.assert_not(box.error.is('foo'))
     t.assert_not(box.error.is('foo'), 'bar')
     t.assert_not(box.error.is(box.tuple.new({1, 'foo'})))
+end
+
+g.test_illegal_params = function()
+    local e = box.error.new(box.error.ILLEGAL_PARAMS, "foo")
+    t.assert_equals(e.type, 'IllegalParams')
+    t.assert_equals(e.message, 'foo')
 end

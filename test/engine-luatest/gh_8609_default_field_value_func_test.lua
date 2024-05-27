@@ -187,7 +187,7 @@ g.test_errors = function(cg)
         local format = {{name = 'f1', default_func = 666}}
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, format[1]: field default function name is " ..
+            "format[1]: field default function name is " ..
             "expected to be a string, but got number",
             s.format, s, format)
 
@@ -198,7 +198,7 @@ g.test_errors = function(cg)
             end)
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, format[1]: field default function was not " ..
+            "format[1]: field default function was not " ..
             "found by name 'func1'",
             s.format, s, {{name = 'f1', default_func = 'func1'}})
 

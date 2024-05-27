@@ -4,31 +4,31 @@ test_run = require('test_run').new()
 -- Options check on create.
 box.schema.sequence.create('test', {abc = 'abc'})
 ---
-- error: Illegal parameters, unexpected option 'abc'
+- error: unexpected option 'abc'
 ...
 box.schema.sequence.create('test', {step = 'a'})
 ---
-- error: Illegal parameters, options parameter 'step' should be of type number
+- error: options parameter 'step' should be of type number
 ...
 box.schema.sequence.create('test', {min = 'b'})
 ---
-- error: Illegal parameters, options parameter 'min' should be of type number
+- error: options parameter 'min' should be of type number
 ...
 box.schema.sequence.create('test', {max = 'c'})
 ---
-- error: Illegal parameters, options parameter 'max' should be of type number
+- error: options parameter 'max' should be of type number
 ...
 box.schema.sequence.create('test', {start = true})
 ---
-- error: Illegal parameters, options parameter 'start' should be of type number
+- error: options parameter 'start' should be of type number
 ...
 box.schema.sequence.create('test', {cycle = 123})
 ---
-- error: Illegal parameters, options parameter 'cycle' should be of type boolean
+- error: options parameter 'cycle' should be of type boolean
 ...
 box.schema.sequence.create('test', {name = 'test'})
 ---
-- error: Illegal parameters, unexpected option 'name'
+- error: unexpected option 'name'
 ...
 box.schema.sequence.create('test', {step = 0})
 ---
@@ -49,34 +49,34 @@ _ = box.schema.sequence.create('test')
 ...
 box.schema.sequence.alter('test', {abc = 'abc'})
 ---
-- error: Illegal parameters, unexpected option 'abc'
+- error: unexpected option 'abc'
 ...
 box.schema.sequence.alter('test', {step = 'a'})
 ---
-- error: Illegal parameters, options parameter 'step' should be of type number
+- error: options parameter 'step' should be of type number
 ...
 box.schema.sequence.alter('test', {min = 'b'})
 ---
-- error: Illegal parameters, options parameter 'min' should be of type number
+- error: options parameter 'min' should be of type number
 ...
 box.schema.sequence.alter('test', {max = 'c'})
 ---
-- error: Illegal parameters, options parameter 'max' should be of type number
+- error: options parameter 'max' should be of type number
 ...
 box.schema.sequence.alter('test', {start = true})
 ---
-- error: Illegal parameters, options parameter 'start' should be of type number
+- error: options parameter 'start' should be of type number
 ...
 box.schema.sequence.alter('test', {cycle = 123})
 ---
-- error: Illegal parameters, options parameter 'cycle' should be of type boolean
+- error: options parameter 'cycle' should be of type boolean
 ...
 box.schema.sequence.alter('test', {name = 'test'})
 ---
 ...
 box.schema.sequence.alter('test', {if_not_exists = false})
 ---
-- error: Illegal parameters, unexpected option 'if_not_exists'
+- error: unexpected option 'if_not_exists'
 ...
 box.schema.sequence.alter('test', {step = 0})
 ---
@@ -636,7 +636,7 @@ s:create_index('pk', {sequence = {field = 2}}) -- error
 ...
 s:create_index('pk', {sequence = {field = 'no.such.field'}}) -- error
 ---
-- error: 'Illegal parameters, sequence field: field was not found by name ''no.such.field'''
+- error: 'sequence field: field was not found by name ''no.such.field'''
 ...
 s:create_index('pk', {parts = {1, 'unsigned', 2, 'string'}, sequence = {field = 2}}) -- error
 ---

@@ -29,8 +29,7 @@ g.test_legacy_opts = function()
     end))
     -- Value type is checked.
     t.assert_error_msg_equals(
-        "Illegal parameters, options parameter 'is_multikey' should be of " ..
-        "type boolean",
+        "options parameter 'is_multikey' should be of type boolean",
         function()
             g.server:exec(function()
                 box.schema.func.create('test', {is_multikey = 'test'})

@@ -333,8 +333,7 @@ net_g.test_net_box_invalid_position = function(cg)
     _, pos = s:select(nil, {limit=1, fetch_pos=true})
     t.assert_error_msg_equals(msg, sk.select, sk, nil, {after=pos})
     t.assert_error_msg_equals(msg, sk.select, sk, nil, {after={0, 'Zero'}})
-    msg = "Illegal parameters, options parameter 'after'" ..
-        " should be of type string, table, tuple"
+    msg = "options parameter 'after' should be of type string, table, tuple"
     t.assert_error_msg_equals(msg, sk.select, sk, nil, {after=15})
     t.assert_equals(sk:select(nil, {after={1}}), s:select())
 end

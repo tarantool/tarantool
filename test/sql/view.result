@@ -77,7 +77,7 @@ box.space._space:replace(v1);
 -- Views can't be created via space_create().
 box.schema.create_space('view', {view = true})
 ---
-- error: Illegal parameters, unexpected option 'view'
+- error: unexpected option 'view'
 ...
 -- Space referenced by a view can't be renamed.
 box.execute("ALTER TABLE t1 RENAME TO new_name;")

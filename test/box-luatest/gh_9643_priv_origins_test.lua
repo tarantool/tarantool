@@ -68,8 +68,7 @@ g.test_origins_in_privs = function(cg)
 
         local ok, err = pcall(grant, 'myuser', 'read', 'space', 'myspace',
                               {_origin = 1})
-        local exp_err = "Illegal parameters, options parameter '_origin' " ..
-            "should be of type 'string'"
+        local exp_err = "options parameter '_origin' should be of type 'string'"
         t.assert(not ok)
         t.assert_equals(err.message, exp_err)
         t.assert_equals(get_privilege_and_origins(), {exp_priv, exp_orig})
@@ -97,8 +96,7 @@ g.test_origins_in_privs = function(cg)
         -- Check revoke with origins.
         ok, err = pcall(revoke, 'myuser', 'read', 'space', 'myspace',
                         {_origin = true})
-        exp_err = "Illegal parameters, options parameter '_origin' should " ..
-            "be of type 'string'"
+        exp_err = "options parameter '_origin' should be of type 'string'"
         t.assert(not ok)
         t.assert_equals(err.message, exp_err)
         t.assert_equals(get_privilege_and_origins(), {exp_priv, exp_orig})

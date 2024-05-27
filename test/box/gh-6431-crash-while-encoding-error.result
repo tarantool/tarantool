@@ -17,25 +17,25 @@ v = {123, e, 'abc'}
  | ...
 box.tuple.new(v)
  | ---
- | - [123, 'Illegal parameters, test', 'abc']
+ | - [123, 'test', 'abc']
  | ...
 t = msgpack.decode(msgpack.encode(v))
  | ---
  | ...
 t
  | ---
- | - [123, 'Illegal parameters, test', 'abc']
+ | - [123, 'test', 'abc']
  | ...
 json.encode(v)
  | ---
- | - '[123,"Illegal parameters, test","abc"]'
+ | - '[123,"test","abc"]'
  | ...
 yaml.encode(v)
  | ---
  | - |
  |   ---
  |   - 123
- |   - Illegal parameters, test
+ |   - test
  |   - abc
  |   ...
  | ...

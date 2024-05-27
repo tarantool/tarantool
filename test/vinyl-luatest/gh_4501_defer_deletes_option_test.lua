@@ -35,13 +35,13 @@ g.test_option = function()
             "should be of type boolean",
             box.cfg, {vinyl_defer_deletes = "foo"})
         t.assert_error_msg_content_equals(
-            "Illegal parameters, options parameter 'defer_deletes' " ..
+            "options parameter 'defer_deletes' " ..
             "should be of type boolean",
             box.schema.space.create, 'test',
             {engine = 'vinyl', defer_deletes = "foo"})
         s = box.schema.space.create('test', {engine = 'vinyl'})
         t.assert_error_msg_content_equals(
-            "Illegal parameters, options parameter 'defer_deletes' " ..
+            "options parameter 'defer_deletes' " ..
             "should be of type boolean",
             s.alter, s, {defer_deletes = "foo"})
         s:drop()

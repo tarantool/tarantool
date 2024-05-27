@@ -119,7 +119,7 @@ for k = 2, ups_cnt do ups_ops[k] = {'+', k, 1} end
  | ...
 s:upsert({1}, ups_ops)
  | ---
- | - error: Illegal parameters, too many operations for update
+ | - error: too many operations for update
  | ...
 s:select()
  | ---

@@ -18,7 +18,7 @@ g.test_box_tuple_format_new = function()
     t.assert(box.tuple.format.is(box.tuple.format.new{}))
     t.assert_not(box.tuple.format.is(777))
 
-    local err_msg = "Illegal parameters, format should be a table"
+    local err_msg = "format should be a table"
     t.assert_error_msg_content_equals(err_msg, function ()
         box.tuple.format.new(777)
     end)
@@ -64,7 +64,7 @@ end)
 -- Checks that box.tuple.format serialization works as expected.
 g.test_box_tuple_format_serialization = function(cg)
     cg.server:exec(function()
-        local err_msg = "Illegal parameters, format should be a table"
+        local err_msg = "format should be a table"
         t.assert_error_msg_content_equals(err_msg, function()
             box.tuple.format.new()
         end)
@@ -176,11 +176,11 @@ g.test_box_tuple_new_with_format = function(cg)
         t.assert_equals(tuple:tomap{names_only = true}, {field = 1})
         tuple = box.tuple.new({1, 'str'}, {format = f})
         t.assert_equals(tuple:tomap{names_only = true}, {field = 1})
-        err_msg = "Illegal parameters, options should be a table"
+        err_msg = "options should be a table"
         t.assert_error_msg_content_equals(err_msg, function()
             box.tuple.new({'str'}, 'fmt')
         end)
-        err_msg = "Illegal parameters, format should be a table"
+        err_msg = "format should be a table"
         t.assert_error_msg_content_equals(err_msg, function()
             box.tuple.new({'str'}, {})
         end)
@@ -198,7 +198,7 @@ g.test_box_tuple_new_with_format = function(cg)
         box.space.s:drop()
         box.tuple.format.new{{'field', foreign_key = {field = 1}}}
         box.tuple.format.new{{'field', foreign_key = {fk = {field = 1}}}}
-        err_msg = 'Illegal parameters, format[1]: foreign key: space ' ..
+        err_msg = 'format[1]: foreign key: space ' ..
                   'nonexistent was not found'
         t.assert_error_msg_content_equals(err_msg, function()
             box.tuple.format.new{{'field', foreign_key = {space = 'nonexistent',
@@ -223,7 +223,7 @@ g.test_box_tuple_new_with_compat = function(cg)
     cg.server:exec(function()
         local compat = require('compat')
 
-        local err_msg = 'Illegal parameters, options should be a table'
+        local err_msg = 'options should be a table'
         t.assert_error_msg_content_equals(err_msg, function()
             box.tuple.new(1, 2)
         end)

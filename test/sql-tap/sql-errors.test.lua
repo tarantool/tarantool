@@ -414,7 +414,7 @@ test:do_catchsql_test(
         SELECT LIKELIHOOD(1, 2);
 	]], {
 		-- <sql-errors-1.36>
-        1,"Illegal parameters, second argument to LIKELIHOOD() must be a constant between 0.0 and 1.0"
+        1,"second argument to LIKELIHOOD() must be a constant between 0.0 and 1.0"
 		-- </sql-errors-1.36>
 	})
 

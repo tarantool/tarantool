@@ -40,27 +40,27 @@ g.test_bad_complex_foreign_key = function(cg)
         end
         local opts = space_opts({space=false,field={}})
         t.assert_error_msg_content_equals(
-            "Illegal parameters, foreign key: space must be string or number",
+            "foreign key: space must be string or number",
             function() box.schema.create_space('city', opts) end
         )
         local opts = space_opts({space='country',field='country_id'})
         t.assert_error_msg_content_equals(
-            "Illegal parameters, foreign key: field must be a table with local field -> foreign field mapping",
+            "foreign key: field must be a table with local field -> foreign field mapping",
             function() box.schema.create_space('city', opts) end
         )
         opts = space_opts({space='country',field={}})
         t.assert_error_msg_content_equals(
-            "Illegal parameters, foreign key: field must be a table with local field -> foreign field mapping",
+            "foreign key: field must be a table with local field -> foreign field mapping",
             function() box.schema.create_space('city', opts) end
         )
         opts = space_opts({space='country',field={[false]='country_id'}})
         t.assert_error_msg_content_equals(
-            "Illegal parameters, foreign key: local field must be string or number",
+            "foreign key: local field must be string or number",
             function() box.schema.create_space('city', opts) end
         )
         opts = space_opts({space='country',field={c_id=false}})
         t.assert_error_msg_content_equals(
-            "Illegal parameters, foreign key: foreign field must be string or number",
+            "foreign key: foreign field must be string or number",
             function() box.schema.create_space('city', opts) end
         )
         opts = space_opts({[string.rep('a', 66666)]={space='country',field={p_id='planet_id', c_id='country_id'}}})

@@ -7,7 +7,7 @@ local g = t.group()
 
 g.test_bad_utf8_in_error_msg1 = function()
     local res = console.eval("box.error.new(box.error.ILLEGAL_PARAMS, 'bad: \x80')")
-    local ref = "---\n- \"Illegal parameters, bad: \\x80\"\n...\n"
+    local ref = "---\n- \"bad: \\x80\"\n...\n"
     t.assert_equals(res, ref)
 end
 

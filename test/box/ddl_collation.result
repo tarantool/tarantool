@@ -13,23 +13,23 @@ function setmap(table) return setmetatable(table, { __serialize = 'map' }) end
 
 box.internal.collation.create('test')
  | ---
- | - error: Illegal parameters, type (second arg) must be a string
+ | - error: type (second arg) must be a string
  | ...
 box.internal.collation.create('test', 'ICU')
  | ---
- | - error: Illegal parameters, locale (third arg) must be a string
+ | - error: locale (third arg) must be a string
  | ...
 box.internal.collation.create(42, 'ICU', 'ru_RU')
  | ---
- | - error: Illegal parameters, name (first arg) must be a string
+ | - error: name (first arg) must be a string
  | ...
 box.internal.collation.create('test', 42, 'ru_RU')
  | ---
- | - error: Illegal parameters, type (second arg) must be a string
+ | - error: type (second arg) must be a string
  | ...
 box.internal.collation.create('test', 'ICU', 42)
  | ---
- | - error: Illegal parameters, locale (third arg) must be a string
+ | - error: locale (third arg) must be a string
  | ...
 box.internal.collation.create('test', 'nothing', 'ru_RU')
  | ---
@@ -53,11 +53,11 @@ box.internal.collation.drop('nothing') -- allowed
  | ...
 box.internal.collation.create('test', 'ICU', 'ru_RU', 42)
  | ---
- | - error: Illegal parameters, options (fourth arg) must be a table or nil
+ | - error: options (fourth arg) must be a table or nil
  | ...
 box.internal.collation.create('test', 'ICU', 'ru_RU', 'options')
  | ---
- | - error: Illegal parameters, options (fourth arg) must be a table or nil
+ | - error: options (fourth arg) must be a table or nil
  | ...
 box.internal.collation.create('test', 'ICU', 'ru_RU', {ping='pong'})
  | ---

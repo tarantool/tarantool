@@ -159,32 +159,32 @@ g.test_wrong_tuple_constraint = function(cg)
             {language = 'LUA', is_deterministic = true})
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, constraint function was not found by name 'tuple_constr4'",
+            "constraint function was not found by name 'tuple_constr4'",
             box.schema.create_space, 'test',
             {engine = engine, constraint = "tuple_constr4"})
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, constraint function was not found by name 'tuple_constr4'",
+            "constraint function was not found by name 'tuple_constr4'",
             box.schema.create_space, 'test',
             {engine = engine, constraint = {"tuple_constr4"}})
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, constraint function was not found by name 'tuple_constr4'",
+            "constraint function was not found by name 'tuple_constr4'",
             box.schema.create_space, 'test',
             {engine = engine, constraint = {check = "tuple_constr4"}})
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, options parameter 'constraint' should be one of types: string, table",
+            "options parameter 'constraint' should be one of types: string, table",
             box.schema.create_space, 'test',
             {engine = engine, constraint = 666})
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, constraint function is expected to be a string, but got number",
+            "constraint function is expected to be a string, but got number",
             box.schema.create_space, 'test',
             {engine = engine, constraint = {666}})
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, constraint function is expected to be a string, but got number",
+            "constraint function is expected to be a string, but got number",
             box.schema.create_space, 'test',
             {engine = engine, constraint = {name=666}})
 
@@ -232,27 +232,27 @@ g.test_wrong_tuple_constraint = function(cg)
         local s = box.space.test
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, constraint function was not found by name 'tuple_constr4'",
+            "constraint function was not found by name 'tuple_constr4'",
             function() s:alter({constraint = "tuple_constr4"}) end)
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, constraint function was not found by name 'tuple_constr4'",
+            "constraint function was not found by name 'tuple_constr4'",
             function() s:alter({constraint = {"tuple_constr4"}}) end)
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, constraint function was not found by name 'tuple_constr4'",
+            "constraint function was not found by name 'tuple_constr4'",
             function() s:alter({constraint = {check = "tuple_constr4"}}) end)
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, options parameter 'constraint' should be one of types: string, table",
+            "options parameter 'constraint' should be one of types: string, table",
             function() s:alter({constraint = 666}) end)
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, constraint function is expected to be a string, but got number",
+            "constraint function is expected to be a string, but got number",
             function() s:alter({constraint = {666}}) end)
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, constraint function is expected to be a string, but got number",
+            "constraint function is expected to be a string, but got number",
             function() s:alter({constraint = {name=666}}) end)
 
         t.assert_error_msg_content_equals(

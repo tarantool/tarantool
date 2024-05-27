@@ -79,7 +79,7 @@ test:ok(not status and result:match('Please call box.cfg{}'),
     'exception on unconfigured box')
 
 status, result = pcall(box.error, box.error.ILLEGAL_PARAMS, 'xx')
-test:ok(not status and result.code == box.error.ILLEGAL_PARAMS, "box.error without box.cfg")
+test:ok(not status and result.type == 'IllegalParams', "box.error without box.cfg")
 status, result = pcall(function() return box.runtime.info() end)
 test:ok(status and type(result) == 'table', "box.runtime without box.cfg")
 status, result = pcall(function() return box.index.EQ end)

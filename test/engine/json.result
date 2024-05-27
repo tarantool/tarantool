@@ -140,11 +140,11 @@ s:format(format)
 ...
 s:create_index('pk_invalid', {parts = {{']sad.FIO["sname"]', 'str'}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field was not found by name '']sad.FIO["sname"]'''
+- error: 'options.parts[1]: field was not found by name '']sad.FIO["sname"]'''
 ...
 s:create_index('pk_unexistent', {parts = {{'unexistent.FIO["sname"]', 'str'}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field was not found by name ''unexistent.FIO["sname"]'''
+- error: 'options.parts[1]: field was not found by name ''unexistent.FIO["sname"]'''
 ...
 pk = s:create_index('pk', {parts = {{'data.FIO["sname"]', 'str'}}})
 ---

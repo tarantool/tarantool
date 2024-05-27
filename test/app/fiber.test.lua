@@ -379,7 +379,7 @@ test_run:grep_log("default", "FiberIsCancelled") == nil
 
 -- must show in the log
 _ = fiber.create(function() box.error(box.error.ILLEGAL_PARAMS, 'oh my') end)
-test_run:grep_log("default", "ER_ILLEGAL_PARAMS:[^\n]*")
+test_run:grep_log("default", "IllegalParams:[^\n]*")
 
 -- #1734 fiber.name irt dead fibers
 fiber.create(function()end):name()

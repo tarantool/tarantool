@@ -2021,8 +2021,7 @@ pk = s:create_index('primary', {parts={1, 'number'}})
 ...
 sk1 = s:create_index('sk1', {parts={{2, 'number', is_nullable=false, exclude_null=true}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: exclude_null=true and is_nullable=false
-    are incompatible'
+- error: 'options.parts[1]: exclude_null=true and is_nullable=false are incompatible'
 ...
 sk1 = s:create_index('sk1', {parts={{2, 'number', exclude_null=true}}})
 ---
@@ -2160,8 +2159,7 @@ sk1:select{}
 -- Alter to the wrong format
 sk1:alter({parts={{2, 'number', is_nullable=false, exclude_null=true}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: exclude_null=true and is_nullable=false
-    are incompatible'
+- error: 'options.parts[1]: exclude_null=true and is_nullable=false are incompatible'
 ...
 sk1.parts
 ---
@@ -2503,7 +2501,7 @@ sk:drop()
 ...
 sk = s:create_index('sk', {parts = {2, is_nullable=true, 3}})
 ---
-- error: 'Illegal parameters, options.parts: unexpected option(s)'
+- error: 'options.parts: unexpected option(s)'
 ...
 sk.parts
 ---

@@ -300,15 +300,15 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		lua_pushnil(L);
 		lua_next(L, -2);
 		if (! lua_isstring(L, -2)) {
-			diag_set(ClientError, ER_ILLEGAL_PARAMS, "name of the "\
+			diag_set(IllegalParams, "name of the "
 				 "parameter should be a string.");
 			return -1;
 		}
 		/* Check that the table is one-row sized. */
 		lua_pushvalue(L, -2);
 		if (lua_next(L, -4) != 0) {
-			diag_set(ClientError, ER_ILLEGAL_PARAMS, "SQL bind "\
-				 "named parameter should be a table with "\
+			diag_set(IllegalParams, "SQL bind "
+				 "named parameter should be a table with "
 				 "one key - {name = value}");
 			return -1;
 		}

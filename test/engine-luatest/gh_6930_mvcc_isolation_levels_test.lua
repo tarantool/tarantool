@@ -18,7 +18,7 @@ end)
 g.test_mvcc_isolation_level_errors = function(cg)
     cg.server:exec(function()
         t.assert_error_msg_content_equals(
-            "Illegal parameters, txn_isolation must be one of " ..
+            "txn_isolation must be one of " ..
             "box.txn_isolation_level (keys or values)",
             function() box.begin{txn_isolation = 'avadakedavra'} end)
         t.assert_error_msg_content_equals(
@@ -26,7 +26,7 @@ g.test_mvcc_isolation_level_errors = function(cg)
             "be one of box.txn_isolation_level (keys or values)",
             function() box.cfg{txn_isolation = 'avadakedavra'} end)
         t.assert_error_msg_content_equals(
-            "Illegal parameters, txn_isolation must be one of " ..
+            "txn_isolation must be one of " ..
             "box.txn_isolation_level (keys or values)",
             function() box.begin{txn_isolation = false} end)
         t.assert_error_msg_content_equals(
@@ -34,7 +34,7 @@ g.test_mvcc_isolation_level_errors = function(cg)
             "should be one of types string, number",
             function() box.cfg{txn_isolation = false} end)
         t.assert_error_msg_content_equals(
-            "Illegal parameters, txn_isolation must be one of " ..
+            "txn_isolation must be one of " ..
             "box.txn_isolation_level (keys or values)",
             function() box.begin{txn_isolation = 8} end)
         t.assert_error_msg_content_equals(
