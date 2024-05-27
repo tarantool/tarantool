@@ -455,7 +455,7 @@ static void
 test_error_code(void)
 {
 	header();
-	plan(9);
+	plan(10);
 
 	diag_set(ClientError, ER_READONLY);
 	is(box_error_code(box_error_last()), ER_READONLY, "ClientError");
@@ -478,6 +478,9 @@ test_error_code(void)
 	is(box_error_code(box_error_last()), ER_XLOG_GAP, "XlogGapError");
 	diag_set(FiberIsCancelled);
 	is(box_error_code(box_error_last()), ER_PROC_LUA, "FiberIsCancelled");
+	diag_set(IllegalParams, "foo");
+	is(box_error_code(box_error_last()), ER_ILLEGAL_PARAMS,
+	   "IllegalParams");
 
 	check_plan();
 	footer();
@@ -643,10 +646,10 @@ test_client_error_name(void)
 	header();
 	plan(1);
 
-	diag_set(ClientError, ER_ILLEGAL_PARAMS, "foo");
+	diag_set(ClientError, ER_UNSUPPORTED, "foo", "bar");
 	struct error *e = diag_last_error(diag_get());
 	const char *s = error_get_str(e, "name");
-	ok(s != NULL && strcmp(s, "ILLEGAL_PARAMS") == 0);
+	ok(s != NULL && strcmp(s, "UNSUPPORTED") == 0);
 
 	check_plan();
 	footer();

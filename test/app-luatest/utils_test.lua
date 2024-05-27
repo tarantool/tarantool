@@ -4,9 +4,9 @@ local t = require('luatest')
 local g = t.group()
 
 g.test_check_param = function()
-    t.assert_error_msg_equals("Illegal parameters, foo should be a string",
+    t.assert_error_msg_equals("foo should be a string",
                               utils.check_param, 42, "foo", 'string')
-    t.assert_error_msg_equals("Illegal parameters, foo should be a number",
+    t.assert_error_msg_equals("foo should be a number",
                               utils.check_param, '42', "foo", 'number')
     t.assert(pcall(utils.check_param, '42', 'foo', 'string'))
     t.assert(pcall(utils.check_param, 42, 'foo', 'number'))
@@ -22,17 +22,17 @@ g.test_check_param_table = function()
             return box.tuple.is(opt), 'tuple'
         end
     }
-    t.assert_error_msg_equals("Illegal parameters, options should be a table",
+    t.assert_error_msg_equals("options should be a table",
                               utils.check_param_table, 'foo', opts)
-    t.assert_error_msg_equals("Illegal parameters, unexpected option 'foo'",
+    t.assert_error_msg_equals("unexpected option 'foo'",
                               utils.check_param_table, {foo = 'bar'}, opts)
-    t.assert_error_msg_equals("Illegal parameters, options parameter " ..
+    t.assert_error_msg_equals("options parameter " ..
                               "'tuple_opt' should be of type tuple",
                               utils.check_param_table, {tuple_opt = {}}, opts)
-    t.assert_error_msg_equals("Illegal parameters, options parameter " ..
+    t.assert_error_msg_equals("options parameter " ..
                               "'str_opt' should be of type string",
                               utils.check_param_table, {str_opt = 42}, opts)
-    t.assert_error_msg_equals("Illegal parameters, options parameter " ..
+    t.assert_error_msg_equals("options parameter " ..
                               "'str_num_opt' should be one of types: " ..
                               "string,number",
                               utils.check_param_table, {str_num_opt = {}}, opts)

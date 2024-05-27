@@ -60,19 +60,19 @@ box.commit()
 -- Check arguments for 'box.begin'
 box.begin(1)
 ---
-- error: Illegal parameters, options should be a table
+- error: options should be a table
 ...
 box.begin({timeout = 0})
 ---
-- error: Illegal parameters, timeout must be a number greater than 0
+- error: timeout must be a number greater than 0
 ...
 box.begin({timeout = -1})
 ---
-- error: Illegal parameters, timeout must be a number greater than 0
+- error: timeout must be a number greater than 0
 ...
 box.begin({timeout = "5"})
 ---
-- error: Illegal parameters, timeout must be a number greater than 0
+- error: timeout must be a number greater than 0
 ...
 -- Check new configuration option 'txn_timeout'
 box.cfg({txn_timeout = 0})

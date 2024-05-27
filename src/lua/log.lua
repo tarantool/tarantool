@@ -484,7 +484,7 @@ local log_main
 -- Create a logger with a custom name.
 local function log_new(name)
     if type(name) ~= 'string' then
-        error('Illegal parameters, name should be a string')
+        box.error(box.error.ILLEGAL_PARAMS, 'name should be a string')
     end
 
     if log_registry[name] ~= nil then

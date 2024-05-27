@@ -82,7 +82,7 @@ local encode_error_as_ext = msgpack.cfg.encode_error_as_ext
 test:is(encode_error_as_ext, true, 'encode_error_as_ext is true by default')
 msgpack.cfg{encode_error_as_ext = false}
 local err = c:eval('return box.error.new(box.error.ILLEGAL_PARAMS, "test")')
-test:is(err, 'Illegal parameters, test',
+test:is(err, 'test',
         'error is encoded as string if encode_error_as_ext is false')
 msgpack.cfg{encode_error_as_ext = encode_error_as_ext}
 

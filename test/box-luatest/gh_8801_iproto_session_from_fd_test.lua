@@ -61,47 +61,39 @@ end
 g.test_invalid_args = function(cg)
     cg.server:exec(function()
         t.assert_error_msg_equals(
-            "Illegal parameters, options should be a table",
+            "options should be a table",
             box.session.new, 'foo')
         t.assert_error_msg_equals(
-            "Illegal parameters, unexpected option 'foo'",
+            "unexpected option 'foo'",
             box.session.new, {foo = 'bar'})
         t.assert_error_msg_equals(
-            "Illegal parameters, " ..
             "options parameter 'type' should be of type string",
             box.session.new, {type = 0})
         t.assert_error_msg_equals(
-            "Illegal parameters, invalid session type 'foo', " ..
-            "the only supported type is 'binary'",
+            "invalid session type 'foo', the only supported type is 'binary'",
             box.session.new, {type = 'foo'})
         t.assert_error_msg_equals(
-            "Illegal parameters, options parameter 'fd' is mandatory",
+            "options parameter 'fd' is mandatory",
             box.session.new, {})
         t.assert_error_msg_equals(
-            "Illegal parameters, " ..
             "options parameter 'fd' should be of type number",
             box.session.new, {fd = 'foo'})
         t.assert_error_msg_equals(
-            "Illegal parameters, " ..
             "options parameter 'fd' must be nonnegative integer",
             box.session.new, {fd = -1})
         t.assert_error_msg_equals(
-            "Illegal parameters, " ..
             "options parameter 'fd' must be nonnegative integer",
             box.session.new, {fd = 2 ^ 31})
         t.assert_error_msg_equals(
-            "Illegal parameters, " ..
             "options parameter 'fd' must be nonnegative integer",
             box.session.new, {fd = 1.5})
         t.assert_error_msg_equals(
-            "Illegal parameters, " ..
             "options parameter 'user' should be of type string",
             box.session.new, {user = 0})
         t.assert_error_msg_equals(
             "User 'foo' is not found",
             box.session.new, {fd = 0, user = 'foo'})
         t.assert_error_msg_equals(
-            "Illegal parameters, " ..
             "options parameter 'storage' should be of type table",
             box.session.new, {storage = 'foo'})
     end)

@@ -19,46 +19,45 @@ box.error({code = 123, reason = 'test'})
  | ...
 box.error(box.error.ILLEGAL_PARAMS, "foo")
  | ---
- | - error: Illegal parameters, foo
+ | - error: foo
  | ...
 box.error()
  | ---
- | - error: Illegal parameters, foo
+ | - error: foo
  | ...
 e = box.error.last()
  | ---
  | ...
 e
  | ---
- | - Illegal parameters, foo
+ | - foo
  | ...
 e:unpack()
  | ---
  | - name: ILLEGAL_PARAMS
- |   code: 1
- |   base_type: ClientError
- |   type: ClientError
- |   details: foo
- |   message: Illegal parameters, foo
+ |   code: 0
+ |   base_type: IllegalParams
+ |   type: IllegalParams
+ |   message: foo
  |   trace:
  |   - file: '[C]'
  |     line: 4294967295
  | ...
 e.type
  | ---
- | - ClientError
+ | - IllegalParams
  | ...
 e.code
  | ---
- | - 1
+ | - 0
  | ...
 e.message
  | ---
- | - Illegal parameters, foo
+ | - foo
  | ...
 tostring(e)
  | ---
- | - Illegal parameters, foo
+ | - foo
  | ...
 e = nil
  | ---

@@ -396,8 +396,7 @@ space:insert({10})
 ...
 space:upsert({3}, {{}, {'='}}) -- incorrect ops
 ---
-- error: Illegal parameters, update operation must be an array {op,..}, got empty
-    array
+- error: update operation must be an array {op,..}, got empty array
 ...
 space:insert({15})
 ---
@@ -551,8 +550,7 @@ space:insert({100, '100', '100', 100})
 ...
 space:update({2, 'a'}, {{}})
 ---
-- error: Illegal parameters, update operation must be an array {op,..}, got empty
-    array
+- error: update operation must be an array {op,..}, got empty array
 ...
 box.commit()
 ---

@@ -183,7 +183,7 @@ s:update({{'sql_full_metadata'}}, {{'=', 'value', true}})
 
 s:update('sql_full_metadata', {'=', 'value', true})
  | ---
- | - error: Illegal parameters, update operation must be an array {op,..}
+ | - error: update operation must be an array {op,..}
  | ...
 s:update('sql_full_metadata', {{'=', 'value', true}, {'=', 2, true}})
  | ---
@@ -191,8 +191,7 @@ s:update('sql_full_metadata', {{'=', 'value', true}, {'=', 2, true}})
  | ...
 s:update('sql_full_metadata', {{}})
  | ---
- | - error: Illegal parameters, update operation must be an array {op,..}, got empty
- |     array
+ | - error: update operation must be an array {op,..}, got empty array
  | ...
 s:update('sql_full_metadata', {{'='}})
  | ---
@@ -245,16 +244,16 @@ s:update('sql_full_metadata', {{'#', 'value', 2}})
  | ...
 s:update('sql_full_metadata', {{1, 'value', true}})
  | ---
- | - error: Illegal parameters, update operation name must be a string
+ | - error: update operation name must be a string
  | ...
 s:update('sql_full_metadata', {{{1}, 'value', true}})
  | ---
- | - error: Illegal parameters, update operation name must be a string
+ | - error: update operation name must be a string
  | ...
 
 s:update('sql_full_metadata', {{'=', {'value'}, true}})
  | ---
- | - error: Illegal parameters, field id must be a number or a string
+ | - error: field id must be a number or a string
  | ...
 s:update('sql_full_metadata', {{'=', 1, 'new_key'}})
  | ---

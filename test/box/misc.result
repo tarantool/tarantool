@@ -1116,13 +1116,11 @@ i = s:create_index('test1', {parts = {1, 'unsigned', distance=3}})
 ...
 i = s:create_index('test1', {parts = {2, 'string', 3, 'string', unique=false}})
 ---
-- error: 'Illegal parameters, options.parts: expected field_no (number), type (string)
-    pairs'
+- error: 'options.parts: expected field_no (number), type (string) pairs'
 ...
 i = s:create_index('test1', {parts = {2, 'string', 3, 'string', distance=3}})
 ---
-- error: 'Illegal parameters, options.parts: expected field_no (number), type (string)
-    pairs'
+- error: 'options.parts: expected field_no (number), type (string) pairs'
 ...
 i = s:create_index('test1', {parts = {{1,'int', distance=3}, {field=2, type='int'}}})
 ---
@@ -1134,32 +1132,31 @@ i = s:create_index('test1', {parts = {{1,'int'}, {field=2, type='int', type='has
 ...
 i = s:create_index('test1', {parts = {{1,'int'}, {2, field=2, type='int'}}})
 ---
-- error: 'Illegal parameters, options.parts[2]: unexpected option 2'
+- error: 'options.parts[2]: unexpected option 2'
 ...
 i = s:create_index('test1', {parts = {{1,'int'}, {field=2, type='int', 'asd'}}})
 ---
-- error: 'Illegal parameters, options.parts[2]: unexpected option asd'
+- error: 'options.parts[2]: unexpected option asd'
 ...
 i = s:create_index('test1', {parts = {1,'int', 'asd'}})
 ---
-- error: 'Illegal parameters, options.parts: expected field_no (number), type (string)
-    pairs'
+- error: 'options.parts: expected field_no (number), type (string) pairs'
 ...
 i = s:create_index('test1', {parts = {{1, 'int'}, {2, 'int', 'asd'}}})
 ---
-- error: 'Illegal parameters, options.parts[2]: unexpected option asd'
+- error: 'options.parts[2]: unexpected option asd'
 ...
 i = s:create_index('test1', {parts = {{2, type='unsigned', 'asd'}, {1, 'int'}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: unexpected option asd'
+- error: 'options.parts[1]: unexpected option asd'
 ...
 i = s:create_index('test1', {parts = {{1, 'int'}, {2, 'asd', type='unsigned'}}})
 ---
-- error: 'Illegal parameters, options.parts[2]: unexpected option asd'
+- error: 'options.parts[2]: unexpected option asd'
 ...
 i = s:create_index('test1', {parts = {{'asd', 2, type='unsigned'}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field was not found by name ''asd'''
+- error: 'options.parts[1]: field was not found by name ''asd'''
 ...
 i = s:create_index('test1', {parts = {{1, 'int'}, {2, type='asd'}}})
 ---

@@ -2111,8 +2111,7 @@ test(t, {{'?', 3, 3}}, {{1, '1', 1, '1'}})
 -- ignoring ops for insert upsert
 test({2, '2', 2, '2'}, {{}}, {{1, '1', 1, '1'}})
 ---
-- error: Illegal parameters, update operation must be an array {op,..}, got empty
-    array
+- error: update operation must be an array {op,..}, got empty array
 ...
 test({3, '3', 3, '3'}, {{'+', 3, 3}}, {{1, '1', 1, '1'}, {3, '3', 3, '3'}})
 ---

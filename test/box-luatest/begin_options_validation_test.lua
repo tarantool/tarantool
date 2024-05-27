@@ -17,13 +17,13 @@ end)
 g.test_begin_options_validation = function()
     g.server:exec(function()
         t.assert_error_msg_content_equals(
-            "Illegal parameters, unexpected option 'foo'",
+            "unexpected option 'foo'",
             box.begin, {foo = "bar"})
         t.assert_error_msg_content_equals(
-            "Illegal parameters, timeout must be a number greater than 0",
+            "timeout must be a number greater than 0",
             box.begin, {timeout = "not-a-number"})
         t.assert_error_msg_content_equals(
-            "Illegal parameters, timeout must be a number greater than 0",
+            "timeout must be a number greater than 0",
             box.begin, {timeout = 0})
     end)
 end

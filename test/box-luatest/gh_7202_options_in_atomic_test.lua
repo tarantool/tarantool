@@ -47,14 +47,13 @@ g.test_atomic_options = function()
             {box.txn_isolation_level.READ_COMMITTED, {'table'}, 1, 2})
 
         -- Different invalid options
-        t.assert_error_msg_equals("Illegal parameters, unexpected option 'aa'",
+        t.assert_error_msg_equals("unexpected option 'aa'",
             box.atomic, {aa = 'bb'}, f)
 
-        t.assert_error_msg_equals("Illegal parameters, unexpected option 'aa'",
+        t.assert_error_msg_equals("unexpected option 'aa'",
             box.atomic, {txn_isolation = 0, aa = 'bb'}, f)
 
         t.assert_error_msg_equals(
-            "Illegal parameters, " ..
             "txn_isolation must be one of box.txn_isolation_level " ..
             "(keys or values)",
             box.atomic, {txn_isolation = 'wtf'}, f)

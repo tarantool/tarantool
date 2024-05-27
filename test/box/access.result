@@ -834,20 +834,20 @@ box.schema.func.drop('dummy')
 -- gh-664 roles: accepting bad syntax for create
 box.schema.user.create('user', 'blah')
 ---
-- error: Illegal parameters, options should be a table
+- error: options should be a table
 ...
 box.schema.user.drop('user', 'blah')
 ---
-- error: Illegal parameters, options should be a table
+- error: options should be a table
 ...
 -- gh-664 roles: accepting bad syntax for create
 box.schema.func.create('func', 'blah')
 ---
-- error: Illegal parameters, options should be a table
+- error: options should be a table
 ...
 box.schema.func.drop('blah', 'blah')
 ---
-- error: Illegal parameters, options should be a table
+- error: options should be a table
 ...
 -- gh-758 attempt to set password for user guest
 box.schema.user.passwd('guest', 'sesame')
@@ -1726,7 +1726,7 @@ box.schema.user.drop("tester")
 -- gh-3146 gotcha for granting universe with options
 box.schema.user.grant("guest", "read", "universe", {if_not_exists = true})
 ---
-- error: Illegal parameters, wrong object name type
+- error: wrong object name type
 ...
 box.schema.user.grant("guest", "read", "universe", "useless name")
 ---
@@ -1742,11 +1742,11 @@ box.schema.user.grant("guest", "read", "universe", nil, {if_not_exists = true})
 ...
 box.schema.user.grant("guest", "read", "universe", {}, {if_not_exists = true})
 ---
-- error: Illegal parameters, wrong object name type
+- error: wrong object name type
 ...
 box.schema.user.revoke("guest", "read", "universe", {if_exists = true})
 ---
-- error: Illegal parameters, wrong object name type
+- error: wrong object name type
 ...
 box.schema.user.revoke("guest", "read", "universe", "useless name")
 ---
@@ -1762,7 +1762,7 @@ box.schema.user.revoke("guest", "read", "universe", nil, {if_exists = true})
 ...
 box.schema.user.revoke("guest", "read", "universe", {}, {if_exists = true})
 ---
-- error: Illegal parameters, wrong object name type
+- error: wrong object name type
 ...
 --
 -- Check that box.schema.* api is available to non-super user

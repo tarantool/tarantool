@@ -182,11 +182,11 @@ g.test_field_foreign_key_local = function(cg)
 
         -- Alter of 'is_local' should be prohibited in any case.
         t.assert_error_msg_content_equals(
-            "Illegal parameters, unexpected option 'is_local'",
+            "unexpected option 'is_local'",
             country.alter, country, {is_local = not country_is_local}
         )
         t.assert_error_msg_content_equals(
-            "Illegal parameters, unexpected option 'is_local'",
+            "unexpected option 'is_local'",
             city.alter, city, {is_local = not city_is_local}
         )
 

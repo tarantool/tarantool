@@ -208,13 +208,12 @@ static int
 lbox_iproto_session_new(struct lua_State *L)
 {
 	if (lua_isnoneornil(L, 1)) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
-			 "options parameter 'fd' is mandatory");
+		diag_set(IllegalParams, "options parameter 'fd' is mandatory");
 		return luaT_error(L);
 	}
 	int fd;
 	if (!luaL_tointeger_strict(L, 1, &fd) || fd < 0) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+		diag_set(IllegalParams,
 			 "options parameter 'fd' must be nonnegative integer");
 		return luaT_error(L);
 	}

@@ -36,7 +36,6 @@ end)
 print('pcall with box.error():', status, msg)
 print('pcall with box.error(): typeof', ffi.typeof(msg))
 print('pcall with box.error(): .type', msg.type)
-print('pcall with box.error(): .code', msg.code)
 print('pcall with box.error(): .message', msg.message)
 -- Tarantool 1.6 backward compatibility
 print('pcall with box.error(): .match()', msg:match('some'))

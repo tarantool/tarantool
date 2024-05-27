@@ -4472,7 +4472,7 @@ iterate('tweedledum', 'i3', 2, 4, box.index.LT, 'tid_996', 'to', 'many', 'keys')
 -------------------------------------------------------------------------------
 space.index['primary']:pairs({}, {iterator = 666 })
 ---
-- error: Illegal parameters, Invalid iterator type
+- error: Invalid iterator type
 ...
 -- Test cases for #123: box.index.count does not check arguments properly
 status, msg = pcall(function() space.index['primary']:pairs(function() end, { iterator = box.index.EQ }) end)

@@ -146,7 +146,10 @@ dump_row_hex(const char *start, const char *end) {
  * Sets diag and dumps the row body if present.
  */
 #define xrow_on_decode_err(row, what, desc_str) do {\
-	diag_set(ClientError, what, desc_str);\
+	if (what == ER_ILLEGAL_PARAMS) \
+		diag_set(IllegalParams, desc_str);\
+	else \
+		diag_set(ClientError, what, desc_str);\
 	if (row->bodycnt > 0) {\
 		dump_row_hex(row->body[0].iov_base,\
 			     row->body[0].iov_base + row->body[0].iov_len);\

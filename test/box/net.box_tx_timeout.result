@@ -67,7 +67,7 @@ space = stream.space.test
 -- Check invalid timeout for transaction using raw request
 conn:_request('BEGIN', nil, nil, stream._stream_id, -1)
 ---
-- error: Illegal parameters, timeout must be a number greater than 0
+- error: timeout must be a number greater than 0
 ...
 -- Check arguments for 'stream:begin'
 stream:begin(1)

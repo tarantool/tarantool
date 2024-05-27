@@ -472,7 +472,7 @@ assert(res.code == box.error.TUPLE_FOUND)
 ...
 box.schema.space.drop('auto')
 ---
-- error: Illegal parameters, space_id should be a number
+- error: space_id should be a number
 ...
 box.schema.space.create('auto_original', {id = auto.id})
 ---
@@ -517,34 +517,34 @@ s:drop()
 -- ------------------------------------------------------------------
 s = box.schema.space.create(42)
 ---
-- error: Illegal parameters, name should be a string
+- error: name should be a string
 ...
 s = box.schema.space.create("test", "bug")
 ---
-- error: Illegal parameters, options should be a table
+- error: options should be a table
 ...
 s = box.schema.space.create("test", {unknown = 'param'})
 ---
-- error: Illegal parameters, unexpected option 'unknown'
+- error: unexpected option 'unknown'
 ...
 s = box.schema.space.create("test")
 ---
 ...
 index = s:create_index('primary', {unique = true, parts = {0, 'unsigned', 1, 'string'}})
 ---
-- error: 'Illegal parameters, invalid index parts: field_no must be one-based'
+- error: 'invalid index parts: field_no must be one-based'
 ...
 index = s:create_index('primary', {unique = true, parts = {'unsigned', 1, 'string', 2}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field was not found by name ''unsigned'''
+- error: 'options.parts[1]: field was not found by name ''unsigned'''
 ...
 index = s:create_index('primary', {unique = true, parts = 'bug'})
 ---
-- error: Illegal parameters, options parameter 'parts' should be of type table
+- error: options parameter 'parts' should be of type table
 ...
 index = s:create_index('test', {unique = true, parts = {1, 'unsigned'}, mmap = true})
 ---
-- error: Illegal parameters, unexpected option 'mmap'
+- error: unexpected option 'mmap'
 ...
 s:drop()
 ---
@@ -1236,7 +1236,7 @@ pk = s:create_index('pk')
 -- Bad usage.
 s:alter({unknown = true})
 ---
-- error: Illegal parameters, unexpected option 'unknown'
+- error: unexpected option 'unknown'
 ...
 ok, err = pcall(s.alter, {})
 ---
@@ -1301,11 +1301,11 @@ s:delete{1}
 -- Invalid values.
 s:alter({field_count = box.NULL})
 ---
-- error: Illegal parameters, options parameter 'field_count' should be of type number
+- error: options parameter 'field_count' should be of type number
 ...
 s:alter({field_count = 'string'})
 ---
-- error: Illegal parameters, options parameter 'field_count' should be of type number
+- error: options parameter 'field_count' should be of type number
 ...
 -- exact_field_count is less than index_field_count.
 s:alter({field_count = 1})
@@ -1365,13 +1365,11 @@ box.schema.user.drop('test')
 -- Invalid values.
 s:alter({user = box.NULL})
 ---
-- error: 'Illegal parameters, options parameter ''user'' should be one of types: string,
-    number'
+- error: 'options parameter ''user'' should be one of types: string, number'
 ...
 s:alter({user = true})
 ---
-- error: 'Illegal parameters, options parameter ''user'' should be one of types: string,
-    number'
+- error: 'options parameter ''user'' should be one of types: string, number'
 ...
 s:alter({user = 'not_existing'})
 ---
@@ -1417,15 +1415,15 @@ s:delete{1}
 -- Invalid values.
 s:alter({format = box.NULL})
 ---
-- error: Illegal parameters, options parameter 'format' should be of type table
+- error: options parameter 'format' should be of type table
 ...
 s:alter({format = true})
 ---
-- error: Illegal parameters, options parameter 'format' should be of type table
+- error: options parameter 'format' should be of type table
 ...
 s:alter({format = {{{1, 2, 3, 4}}}})
 ---
-- error: 'Illegal parameters, format[1]: name (string) is expected'
+- error: 'format[1]: name (string) is expected'
 ...
 --
 -- Alter data-temporary.
@@ -1463,11 +1461,11 @@ assert(not s.temporary)
 -- Invalid values.
 s:alter({temporary = box.NULL})
 ---
-- error: Illegal parameters, options parameter 'temporary' should be of type boolean
+- error: options parameter 'temporary' should be of type boolean
 ...
 s:alter({temporary = 100})
 ---
-- error: Illegal parameters, options parameter 'temporary' should be of type boolean
+- error: options parameter 'temporary' should be of type boolean
 ...
 --
 -- Alter is_sync.
@@ -1521,11 +1519,11 @@ assert(not s.is_sync)
 -- Invalid values.
 s:alter({is_sync = box.NULL})
 ---
-- error: Illegal parameters, options parameter 'is_sync' should be of type boolean
+- error: options parameter 'is_sync' should be of type boolean
 ...
 s:alter({is_sync = 100})
 ---
-- error: Illegal parameters, options parameter 'is_sync' should be of type boolean
+- error: options parameter 'is_sync' should be of type boolean
 ...
 s:replace{1}
 ---
@@ -1598,11 +1596,11 @@ assert(s.name == 'test')
 -- Invalid values.
 s:alter({name = box.NULL})
 ---
-- error: Illegal parameters, options parameter 'name' should be of type string
+- error: options parameter 'name' should be of type string
 ...
 s:alter({name = 100})
 ---
-- error: Illegal parameters, options parameter 'name' should be of type string
+- error: options parameter 'name' should be of type string
 ...
 s:drop()
 ---

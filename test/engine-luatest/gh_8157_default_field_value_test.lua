@@ -148,11 +148,11 @@ g.test_errors = function(cg)
 
         -- Check upsert with a wrong update operation.
         t.assert_error_msg_content_equals(
-            'Illegal parameters, update operation must be an array {op,..}',
+            'update operation must be an array {op,..}',
             s.upsert, s, {0}, {'bad'})
         s:insert{0}
         t.assert_error_msg_content_equals(
-            'Illegal parameters, update operation must be an array {op,..}',
+            'update operation must be an array {op,..}',
             s.upsert, s, {0}, {'bad'})
 
         -- Check "duplicate key exists" error messages.

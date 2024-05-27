@@ -104,7 +104,7 @@ test:do_catchsql_test(
         SELECT LIKELIHOOD(123, 1.000001e0);
     ]], {
         -- <func3-5.8>
-        1, "Illegal parameters, second argument to LIKELIHOOD() must be a "..
+        1, "second argument to LIKELIHOOD() must be a "..
         "constant between 0.0 and 1.0"
         -- </func3-5.8>
     })
@@ -115,7 +115,7 @@ test:do_catchsql_test(
         SELECT LIKELIHOOD(123, -0.000001e0);
     ]], {
         -- <func3-5.9>
-        1, "Illegal parameters, second argument to LIKELIHOOD() must be a "..
+        1, "second argument to LIKELIHOOD() must be a "..
         "constant between 0.0 and 1.0"
         -- </func3-5.9>
     })
@@ -126,7 +126,7 @@ test:do_catchsql_test(
         SELECT LIKELIHOOD(123, 0.5e0 + 0.3e0);
     ]], {
         -- <func3-5.10>
-        1, "Illegal parameters, second argument to LIKELIHOOD() must be a "..
+        1, "second argument to LIKELIHOOD() must be a "..
         "constant between 0.0 and 1.0"
         -- </func3-5.10>
     })

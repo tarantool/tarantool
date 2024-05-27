@@ -882,7 +882,7 @@ s:create_index('h1', {type = 'hAsh'}).hint
 ...
 s:create_index('t2', {type = 'trEE', hint = 'true'})
 ---
-- error: Illegal parameters, options parameter 'hint' should be of type boolean
+- error: options parameter 'hint' should be of type boolean
 ...
 s:create_index('t2', {type = 'TREE', hint = true}).hint
 ---

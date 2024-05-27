@@ -813,18 +813,18 @@ xrow_update_op_decode(struct xrow_update_op *op, int op_num, int index_base,
 		      struct tuple_dictionary *dict, const char **expr)
 {
 	if (mp_typeof(**expr) != MP_ARRAY) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS, "update operation "
-			 "must be an array {op,..}");
+		diag_set(IllegalParams,
+			 "update operation must be an array {op,..}");
 		return -1;
 	}
 	uint32_t len, arg_count = mp_decode_array(expr);
 	if (arg_count < 1) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS, "update operation "\
+		diag_set(IllegalParams, "update operation "
 			 "must be an array {op,..}, got empty array");
 		return -1;
 	}
 	if (mp_typeof(**expr) != MP_STR) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+		diag_set(IllegalParams,
 			 "update operation name must be a string");
 		return -1;
 	}
@@ -901,7 +901,7 @@ xrow_update_op_decode(struct xrow_update_op *op, int op_num, int index_base,
 		break;
 	}
 	default:
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+		diag_set(IllegalParams,
 			 "field id must be a number or a string");
 		return -1;
 	}

@@ -189,50 +189,43 @@ g.test_wrong_field_constraint = function(cg)
 
     cg.server:exec(function()
         t.assert_error_msg_content_equals(
-            "Illegal parameters, format[1]: " ..
-            "constraint function was not found by name 'field_constr4'",
+            "format[1]: constraint function was not found by name 'field_constr4'",
             function()
                 box.space.test:format({{"id1", constraint = "field_constr4"}, {"id2"}})
             end)
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, format[1]: " ..
-            "constraint function was not found by name 'field_constr4'",
+            "format[1]: constraint function was not found by name 'field_constr4'",
             function()
                 box.space.test:format({{"id1", constraint = "field_constr4"}, {"id2"}})
             end)
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, format[1]: " ..
-            "constraint function was not found by name 'field_constr4'",
+            "format[1]: constraint function was not found by name 'field_constr4'",
             function()
                 box.space.test:format({{"id1", constraint = {"field_constr4"}}, {"id2"}})
             end)
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, format[1]: " ..
-            "constraint function was not found by name 'field_constr4'",
+            "format[1]: constraint function was not found by name 'field_constr4'",
             function()
                 box.space.test:format({{"id1", constraint = {field_constr1="field_constr4"}}, {"id2"}})
             end)
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, format[1]: " ..
-            "constraint must be string or table",
+            "format[1]: constraint must be string or table",
             function()
                 box.space.test:format({{"id1", constraint = 666}, {"id2"}})
             end)
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, format[1]: " ..
-            "constraint function is expected to be a string, but got number",
+            "format[1]: constraint function is expected to be a string, but got number",
             function()
                 box.space.test:format({{"id1", constraint = {666}}, {"id2"}})
             end)
 
         t.assert_error_msg_content_equals(
-            "Illegal parameters, format[1]: " ..
-            "constraint function is expected to be a string, but got number",
+            "format[1]: constraint function is expected to be a string, but got number",
             function()
                 box.space.test:format({{"id1", constraint = {name=666}}, {"id2"}})
             end)
@@ -476,7 +469,7 @@ g.test_field_constraint_integrity = function(cg)
 
         t.assert_equals(s:format(), {})
         t.assert_error_msg_content_equals(
-            "Illegal parameters, format[1]: constraint function was not found by name 'unknown_constr'",
+            "format[1]: constraint function was not found by name 'unknown_constr'",
             function() s:format{{"id1", constraint='unknown_constr'}} end
         )
         t.assert_equals(s:format(), {})

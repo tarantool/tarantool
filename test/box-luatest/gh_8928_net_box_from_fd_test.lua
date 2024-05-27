@@ -31,21 +31,15 @@ end)
 
 -- Checks errors raised on invalid arguments.
 g.test_invalid_args = function()
+    t.assert_error_msg_equals("fd should be a number", net.from_fd)
+    t.assert_error_msg_equals( "options should be a table", net.from_fd, 0, 0)
     t.assert_error_msg_equals(
-        "Illegal parameters, fd should be a number",
-        net.from_fd)
-    t.assert_error_msg_equals(
-        "Illegal parameters, options should be a table",
-        net.from_fd, 0, 0)
-    t.assert_error_msg_equals(
-        "Illegal parameters, unexpected option 'foo'",
+        "unexpected option 'foo'",
         net.from_fd, 0, {foo = 'bar'})
     t.assert_error_msg_equals(
-        "Illegal parameters, " ..
         "options parameter 'user' should be of type string",
         net.from_fd, 0, {user = 123})
     t.assert_error_msg_equals(
-        "Illegal parameters, " ..
         "options parameter 'fetch_schema' should be of type boolean",
         net.from_fd, 0, {fetch_schema = 'foo'})
     t.assert_error_msg_equals(

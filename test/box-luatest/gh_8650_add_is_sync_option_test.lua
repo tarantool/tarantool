@@ -49,7 +49,7 @@ g.test_box_begin_commit_is_sync = function(cg)
         box.commit({is_sync = true})
     end)
 
-    local err_msg = "Illegal parameters, is_sync can only be true"
+    local err_msg = "is_sync can only be true"
     t.assert_error_msg_content_equals(err_msg, function()
         cg.master:exec(function()
             box.begin({is_sync = false})
@@ -66,7 +66,7 @@ g.test_box_begin_commit_is_sync = function(cg)
         end)
     end)
 
-    err_msg = "Illegal parameters, is_sync must be a boolean"
+    err_msg = "is_sync must be a boolean"
     t.assert_error_msg_content_equals(err_msg, function()
         cg.master:exec(function()
             box.begin({is_sync = "foo"})
@@ -137,7 +137,7 @@ g.test_box_atomic_is_sync = function(cg)
         end)
     end)
 
-    local err_msg = "Illegal parameters, is_sync can only be true"
+    local err_msg = "is_sync can only be true"
     t.assert_error_msg_content_equals(err_msg, function()
         cg.master:exec(function()
             box.atomic({is_sync = false}, function()
@@ -147,7 +147,7 @@ g.test_box_atomic_is_sync = function(cg)
         end)
     end)
 
-    err_msg = "Illegal parameters, is_sync must be a boolean"
+    err_msg = "is_sync must be a boolean"
     t.assert_error_msg_content_equals(err_msg, function()
         cg.master:exec(function()
             box.atomic({is_sync = "foo"}, function()
@@ -219,7 +219,7 @@ g.test_iproto_is_sync = function(cg)
     end)
 
     -- Throwing iproto errors if is_sync is set incorrectly
-    local err_msg = "Illegal parameters, is_sync can only be true"
+    local err_msg = "is_sync can only be true"
     t.assert_error_msg_content_equals(err_msg, function()
         inject_iproto_begin_or_commit(s, 'BEGIN', false)
     end)
@@ -229,7 +229,7 @@ g.test_iproto_is_sync = function(cg)
         inject_iproto_begin_or_commit(s, 'BEGIN', 'foo')
     end)
 
-    err_msg = "Illegal parameters, is_sync can only be true"
+    err_msg = "is_sync can only be true"
     t.assert_error_msg_content_equals(err_msg, function()
         inject_iproto_begin_or_commit(s, 'COMMIT', false)
     end)
@@ -322,7 +322,7 @@ g.test_commit_opts = function(cg)
 
     -- Commit options are set incorrectly
     s:begin()
-    local err_msg = "Illegal parameters, unexpected option 'is_sync'"
+    local err_msg = "unexpected option 'is_sync'"
     t.assert_error_msg_content_equals(err_msg, function()
         s:commit({is_sync = true, is_async = false})
     end)
@@ -330,13 +330,13 @@ g.test_commit_opts = function(cg)
         s:commit({is_async = false, is_sync = false})
     end)
 
-    err_msg = "Illegal parameters, options are either in the wrong order or " ..
+    err_msg = "options are either in the wrong order or " ..
               "mixed up"
     t.assert_error_msg_content_equals(err_msg, function()
         s:commit({is_async = false}, {is_sync = false})
     end)
 
-    err_msg = "Illegal parameters, options should be a table"
+    err_msg = "options should be a table"
     t.assert_error_msg_content_equals(err_msg, function()
         s:commit({}, 123)
     end)

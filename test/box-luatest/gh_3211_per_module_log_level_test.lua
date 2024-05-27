@@ -54,9 +54,9 @@ g1.test_log_new = function(cg)
     cg.server:exec(function()
         local log = require('log')
         t.assert_error_msg_content_equals(
-            "Illegal parameters, name should be a string", log.new)
+            "name should be a string", log.new)
         t.assert_error_msg_content_equals(
-            "Illegal parameters, name should be a string", log.new, 123)
+            "name should be a string", log.new, 123)
 
         local log1 = log.new('module1')
         local log2 = log.new('module2')

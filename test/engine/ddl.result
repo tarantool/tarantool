@@ -295,11 +295,11 @@ space = box.schema.space.create('test', {engine = engine})
 ...
 pk = space:create_index('pk', {parts={{field1 = 1, type = 'unsigned'}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field (name or number) is expected'
+- error: 'options.parts[1]: field (name or number) is expected'
 ...
 pk = space:create_index('pk', {parts={{field = 0, type = 'unsigned'}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field (number) must be one-based'
+- error: 'options.parts[1]: field (number) must be one-based'
 ...
 pk = space:create_index('pk', {parts={{field = 1, type = 'const char *'}}})
 ---
@@ -636,14 +636,14 @@ s:drop()
 --
 s = box.schema.space.create('test', { engine = engine, format = "format" })
 ---
-- error: Illegal parameters, options parameter 'format' should be of type table
+- error: options parameter 'format' should be of type table
 ...
 format = { { name = 100 } }
 ---
 ...
 s = box.schema.space.create('test', { engine = engine, format = format })
 ---
-- error: 'Illegal parameters, format[1]: name (string) is expected'
+- error: 'format[1]: name (string) is expected'
 ...
 long = string.rep('a', box.schema.NAME_MAX + 1)
 ---
@@ -667,7 +667,7 @@ format = { setmetatable({}, { __serialize = 'map' }) }
 ...
 s = box.schema.space.create('test', { engine = engine, format = format })
 ---
-- error: 'Illegal parameters, format[1]: name (string) is expected'
+- error: 'format[1]: name (string) is expected'
 ...
 -- Ensure the format is updated after index drop.
 format = { { name = 'id', type = 'unsigned' } }
@@ -948,15 +948,15 @@ s = box.schema.space.create('test', { engine = engine })
 ...
 s:create_index('test', {parts = {'test'}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+- error: 'options.parts[1]: field was not found by name ''test'''
 ...
 s:create_index('test', {parts = {{'test'}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+- error: 'options.parts[1]: field was not found by name ''test'''
 ...
 s:create_index('test', {parts = {{field = 'test'}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+- error: 'options.parts[1]: field was not found by name ''test'''
 ...
 s:create_index('test', {parts = {1}}).parts
 ---
@@ -977,15 +977,15 @@ s:format{{'test1', 'integer'}, 'test2', {'test3', 'integer'}, {'test4','scalar'}
 ...
 s:create_index('test', {parts = {'test'}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+- error: 'options.parts[1]: field was not found by name ''test'''
 ...
 s:create_index('test', {parts = {{'test'}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+- error: 'options.parts[1]: field was not found by name ''test'''
 ...
 s:create_index('test', {parts = {{field = 'test'}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+- error: 'options.parts[1]: field was not found by name ''test'''
 ...
 s:create_index('test1', {parts = {'test1'}}).parts
 ---

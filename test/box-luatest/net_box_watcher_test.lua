@@ -35,9 +35,9 @@ g.test_invalid_args = function(cg)
         conn.watch_once)
     t.assert_error_msg_equals("key must be a string",
                               conn.watch_once, conn, 123)
-    t.assert_error_msg_equals("Illegal parameters, options should be a table",
+    t.assert_error_msg_equals("options should be a table",
                               conn.watch_once, conn, 'abc', 123)
-    t.assert_error_msg_equals("Illegal parameters, unexpected option 'foo'",
+    t.assert_error_msg_equals("unexpected option 'foo'",
                               conn.watch_once, conn, 'abc', {foo = 'bar'})
     conn:close()
 end

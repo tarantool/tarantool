@@ -3,19 +3,19 @@ fiber = require('fiber')
 ...
 box.once()
 ---
-- error: 'Illegal parameters, Usage: box.once(key, func, ...)'
+- error: 'Usage: box.once(key, func, ...)'
 ...
 box.once("key")
 ---
-- error: 'Illegal parameters, Usage: box.once(key, func, ...)'
+- error: 'Usage: box.once(key, func, ...)'
 ...
 box.once("key", "key")
 ---
-- error: 'Illegal parameters, Usage: box.once(key, func, ...)'
+- error: 'Usage: box.once(key, func, ...)'
 ...
 box.once("key", nil)
 ---
-- error: 'Illegal parameters, Usage: box.once(key, func, ...)'
+- error: 'Usage: box.once(key, func, ...)'
 ...
 box.once("key", function() end)
 ---

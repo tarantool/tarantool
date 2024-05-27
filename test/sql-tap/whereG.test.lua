@@ -192,7 +192,7 @@ test:do_catchsql_test(
            AND album.aid=track.aid;
     ]], {
         -- <whereG-2.1>
-        1, "Illegal parameters, second argument to LIKELIHOOD() must be a constant between 0.0 and 1.0"
+        1, "second argument to LIKELIHOOD() must be a constant between 0.0 and 1.0"
         -- </whereG-2.1>
     })
 
@@ -206,7 +206,7 @@ test:do_catchsql_test(
            AND album.aid=track.aid;
     ]], {
         -- <whereG-2.2>
-        1, "Illegal parameters, second argument to LIKELIHOOD() must be a constant between 0.0 and 1.0"
+        1, "second argument to LIKELIHOOD() must be a constant between 0.0 and 1.0"
         -- </whereG-2.2>
     })
 
@@ -220,7 +220,7 @@ test:do_catchsql_test(
            AND album.aid=track.aid;
     ]], {
         -- <whereG-2.3>
-        1, "Illegal parameters, second argument to LIKELIHOOD() must be a constant between 0.0 and 1.0"
+        1, "second argument to LIKELIHOOD() must be a constant between 0.0 and 1.0"
         -- </whereG-2.3>
     })
 
