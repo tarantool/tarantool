@@ -4,6 +4,7 @@ local replica_set = require('luatest.replica_set')
 
 local g = t.group('gh_9748')
 local delay = 0.1
+local wait_timeout = 60
 
 g.before_all(function(cg)
     cg.replica_set = replica_set:new({})
@@ -62,7 +63,7 @@ g.test_lag_on_master_restart = function(cg)
         box.space.test:replace{2}
     end)
     cg.server1:start()
-    t.helpers.retrying({}, function()
+    t.helpers.retrying({timeout = wait_timeout}, function()
         cg.server2:assert_follows_upstream(cg.server1:get_instance_id())
     end)
     cg.server1:exec(function(id)
@@ -107,7 +108,7 @@ g.test_lag_from_third_node = function(cg)
     -- Retry, because with a non-huge replication timeout the replicas sometimes
     -- might timeout when the system is slow, and that would make downstream lag
     -- disappear, breaking the test.
-    t.helpers.retrying({}, test_lag_from_third_node, cg)
+    t.helpers.retrying({timeout = wait_timeout}, test_lag_from_third_node, cg)
 end
 
 --
@@ -127,6 +128,7 @@ local function test_lag_is_local_to_sender(cg)
         require('fiber').sleep(delay)
         box.cfg{replication = replication}
     end, {delay, {cg.replication[1], cg.replication[2]}})
+    cg.server1:wait_for_downstream_to(cg.server2)
     -- server1 -> server2 -> server3
     cg.server3:update_box_cfg{replication = {cg.replication[2]}}
     cg.server2:wait_for_downstream_to(cg.server3)
@@ -148,7 +150,8 @@ g.test_lag_is_local_to_sender = function(cg)
     -- Retry, because with a non-huge replication timeout the replicas sometimes
     -- might timeout when the system is slow, and that would make downstream lag
     -- disappear, breaking the test.
-    t.helpers.retrying({}, test_lag_is_local_to_sender, cg)
+    t.helpers.retrying({timeout = wait_timeout}, test_lag_is_local_to_sender,
+                       cg)
 end
 
 --
@@ -170,12 +173,12 @@ g.test_lag_no_update_when_replica_follows_third_node = function(cg)
         box.space.test:replace{1}
         return box.info.vclock
     end)
-    cg.server1:exec(function(id, vclock, lag)
-        t.helpers.retrying({}, function()
+    cg.server1:exec(function(id, vclock, lag, timeout)
+        t.helpers.retrying({timeout = timeout}, function()
             require('log').info(box.info.replication[id].downstream)
             t.assert_equals(box.info.replication[id].downstream.vclock, vclock,
                             'Server2 did not ack server3 vclock to server1')
         end)
         t.assert_equals(box.info.replication[id].downstream.lag, lag)
-    end, {cg.server2:get_instance_id(), vclock, lag})
+    end, {cg.server2:get_instance_id(), vclock, lag, wait_timeout})
 end
