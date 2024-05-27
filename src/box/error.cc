@@ -79,13 +79,11 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 {
 	struct error *e = BuildClientError(file, line, ER_UNKNOWN);
 	ClientError *client_error = type_cast(ClientError, e);
-	if (client_error) {
-		client_error->code = code;
-		va_list ap;
-		va_start(ap, fmt);
-		error_vformat_msg(e, fmt, ap);
-		va_end(ap);
-	}
+	client_error->code = code;
+	va_list ap;
+	va_start(ap, fmt);
+	error_vformat_msg(e, fmt, ap);
+	va_end(ap);
 	diag_set_error(&fiber()->diag, e);
 	return -1;
 }
@@ -97,19 +95,13 @@ box_error_new_va(const char *file, unsigned line, uint32_t code,
 	if (custom_type == NULL) {
 		struct error *e = BuildClientError(file, line, ER_UNKNOWN);
 		ClientError *client_error = type_cast(ClientError, e);
-		if (client_error != NULL) {
-			client_error->code = code;
-			error_vformat_msg(e, fmt, ap);
-		}
+		client_error->code = code;
+		error_vformat_msg(e, fmt, ap);
 		return e;
 	} else {
 		struct error *e = BuildCustomError(file, line, custom_type,
 						   code);
-		CustomError *custom_error = type_cast(CustomError, e);
-		if (custom_error != NULL) {
-			error_vformat_msg(e, fmt, ap);
-		}
-
+		error_vformat_msg(e, fmt, ap);
 		return e;
 	}
 }
@@ -274,17 +266,13 @@ ClientError::ClientError(const char *file, unsigned line,
 struct error *
 BuildClientError(const char *file, unsigned line, uint32_t errcode, ...)
 {
-	try {
-		ClientError *e = new ClientError(file, line, ER_UNKNOWN);
-		va_list ap;
-		va_start(ap, errcode);
-		e->code = errcode;
-		client_error_create(e, ap);
-		va_end(ap);
-		return e;
-	} catch (OutOfMemory *e) {
-		return e;
-	}
+	ClientError *e = new ClientError(file, line, ER_UNKNOWN);
+	va_list ap;
+	va_start(ap, errcode);
+	e->code = errcode;
+	client_error_create(e, ap);
+	va_end(ap);
+	return e;
 }
 
 void
@@ -318,15 +306,11 @@ const struct type_info type_XlogError = make_type("XlogError", &type_Exception);
 struct error *
 BuildXlogError(const char *file, unsigned line, const char *format, ...)
 {
-	try {
-		va_list ap;
-		va_start(ap, format);
-		XlogError *e = new XlogError(file, line, format, ap);
-		va_end(ap);
-		return e;
-	} catch (OutOfMemory *e) {
-		return e;
-	}
+	va_list ap;
+	va_start(ap, format);
+	XlogError *e = new XlogError(file, line, format, ap);
+	va_end(ap);
+	return e;
 }
 
 const struct type_info type_XlogGapError =
@@ -348,11 +332,7 @@ struct error *
 BuildXlogGapError(const char *file, unsigned line,
 		  const struct vclock *from, const struct vclock *to)
 {
-	try {
-		return new XlogGapError(file, line, from, to);
-	} catch (OutOfMemory *e) {
-		return e;
-	}
+	return new XlogGapError(file, line, from, to);
 }
 
 struct rlist on_access_denied = RLIST_HEAD_INITIALIZER(on_access_denied);
@@ -392,13 +372,9 @@ BuildAccessDeniedError(const char *file, unsigned int line,
 		       const char *object_name,
 		       const char *user_name)
 {
-	try {
-		return new AccessDeniedError(file, line, access_type,
-					     object_type, object_name,
-					     user_name);
-	} catch (OutOfMemory *e) {
-		return e;
-	}
+	return new AccessDeniedError(file, line, access_type,
+				     object_type, object_name,
+				     user_name);
 }
 
 const struct type_info type_CustomError =
@@ -422,9 +398,5 @@ struct error *
 BuildCustomError(const char *file, unsigned int line, const char *custom_type,
 		 uint32_t errcode)
 {
-	try {
-		return new CustomError(file, line, custom_type, errcode);
-	} catch (OutOfMemory *e) {
-		return e;
-	}
+	return new CustomError(file, line, custom_type, errcode);
 }

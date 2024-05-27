@@ -67,11 +67,7 @@ struct error *
 BuildUnsupportedIndexFeature(const char *file, unsigned line,
 			     struct index_def *index_def, const char *what)
 {
-	try {
-		return new UnsupportedIndexFeature(file, line, index_def, what);
-	} catch (OutOfMemory *e) {
-		return e;
-	}
+	return new UnsupportedIndexFeature(file, line, index_def, what);
 }
 
 /**
