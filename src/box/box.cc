@@ -4329,6 +4329,26 @@ box_process_fetch_snapshot(struct iostream *io,
 	coio_write_xrow(io, &row);
 }
 
+/**
+ * Replica vclock is used in gc state and recovery initialization - need to
+ * replace the remote 0-th component with the own one. This doesn't break
+ * recovery: it finds the WAL with a vclock strictly less than replia clock in
+ * all components except the 0th one.
+ *
+ * Note, that it would be bad to set 0-th component to a smaller value (like
+ * zero) - it would unnecessarily require additional WALs, which may have
+ * already been deleted.
+ *
+ * Speaking of gc, remote instances' local vclock components are not used by
+ * consumers at all.
+ */
+static void
+box_localize_vclock(const struct vclock *remote, struct vclock *local)
+{
+	vclock_copy(local, remote);
+	vclock_reset(local, 0, vclock_get(&replicaset.vclock, 0));
+}
+
 void
 box_process_register(struct iostream *io, const struct xrow_header *header)
 {
@@ -4385,10 +4405,10 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 			  "wal_mode = 'none'");
 	}
 
-	/* @sa box_process_subscribe(). */
-	vclock_reset(&req.vclock, 0, vclock_get(&replicaset.vclock, 0));
+	struct vclock start_vclock;
+	box_localize_vclock(&req.vclock, &start_vclock);
 	struct gc_consumer *gc = gc_consumer_register(
-		&req.vclock, "replica %s", tt_uuid_str(&req.instance_uuid));
+		&start_vclock, "replica %s", tt_uuid_str(&req.instance_uuid));
 	if (gc == NULL)
 		diag_raise();
 	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
@@ -4405,13 +4425,12 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
 	vclock_copy(&stop_vclock, &replicaset.vclock);
-
 	/*
-	 * Feed replica with WALs in range
-	 * (req.vclock, stop_vclock) so that it gets its
-	 * registration.
+	 * Feed replica with WALs up to the REGISTER itself so that it gets own
+	 * registration entry.
 	 */
-	relay_final_join(replica, io, header->sync, &req.vclock, &stop_vclock);
+	relay_final_join(replica, io, header->sync, &start_vclock,
+			 &stop_vclock);
 	say_info("final data sent.");
 
 	RegionGuard region_guard(&fiber()->gc);
@@ -4692,6 +4711,8 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
 			  "wal_mode = 'none'");
 	}
+	struct vclock start_vclock;
+	box_localize_vclock(&req.vclock, &start_vclock);
 	/*
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,
@@ -4744,23 +4765,6 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		sent_raft_term = req.term;
 	}
 	/*
-	 * Replica vclock is used in gc state and recovery
-	 * initialization, so we need to replace the remote 0-th
-	 * component with our own one. This doesn't break
-	 * recovery: it finds the WAL with a vclock strictly less
-	 * than replia clock in all components except the 0th one.
-	 * This leads to finding the correct WAL, if it exists,
-	 * since we do not need to recover local rows (the ones,
-	 * that contribute to the 0-th vclock component).
-	 * Note, that it would be bad to set 0-th vclock component
-	 * to a smaller value, since it would unnecessarily
-	 * require additional WALs, which may have already been
-	 * deleted.
-	 * Speaking of gc, remote instances' local vclock
-	 * components are not used by consumers at all.
-	 */
-	vclock_reset(&req.vclock, 0, vclock_get(&replicaset.vclock, 0));
-	/*
 	 * Process SUBSCRIBE request via replication relay
 	 * Send current recovery vector clock as a marker
 	 * of the "current" state of the master. When
@@ -4772,7 +4776,7 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * a stall in updates (in this case replica may hang
 	 * indefinitely).
 	 */
-	relay_subscribe(replica, io, header->sync, &req.vclock,
+	relay_subscribe(replica, io, header->sync, &start_vclock,
 			req.version_id, req.id_filter, sent_raft_term);
 }
 
