@@ -80,6 +80,10 @@ test-perf: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
 
 test-perf: build run-perf-test
 
+.PHONY: test-perf-aggregate
+test-perf-aggregate:
+	cmake --build ${BUILD_DIR} --target test-perf-aggregate
+
 # *_ASAN variables are common part of respective variables for all ASAN builds.
 CMAKE_PARAMS_ASAN = -DENABLE_WERROR=ON \
                     -DENABLE_ASAN=ON \
