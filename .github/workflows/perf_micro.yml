@@ -52,6 +52,10 @@ jobs:
 
     timeout-minutes: 60
 
+    env:
+        PERF_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+        PERF_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+
     steps:
       - name: Prepare checkout
         uses: tarantool/actions/prepare-checkout@master
@@ -72,6 +76,27 @@ jobs:
           revision: ${{ inputs.revision }}
       - name: test
         run: make -f .test.mk test-perf
+      - name: Aggregate benchmark results
+        run: make -f .test.mk test-perf-aggregate
+      - name: Send statistics to InfluxDB
+        # TODO: For now, use the debug bucket for this PoC.
+        # --silent -o /dev/null: Prevent dumping any reply part
+        # in the output in case of an error.
+        # --fail: Exit with the 22 error code is status >= 400.
+        # --write-out: See the reason for the failure, if any.
+        # --retry, --retry-delay: To avoid losing the results of
+        # running after such a long job, try to retry sending the
+        # results.
+        run: >
+          curl --request POST
+          "${{ secrets.INFLUXDB_URL }}/api/v2/write?org=tarantool&bucket=perf-debug&precision=s"
+          --write-out "%{http_code}"
+          --retry 5
+          --retry-delay 5
+          --connect-timeout 120
+          --fail --silent -o /dev/null
+          --header "Authorization: Token ${{ secrets.INFLUXDB_TOKEN_DEBUG }}"
+          --data-binary @./perf/output/summary.txt
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
