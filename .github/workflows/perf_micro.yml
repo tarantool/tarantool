@@ -72,6 +72,19 @@ jobs:
           revision: ${{ inputs.revision }}
       - name: test
         run: make -f .test.mk test-perf
+      - name: Send statistics to InfluxDB
+        # TODO: For now, use the debug bucket for this PoC.
+        # --silent -o /dev/null: Prevent dumping any reply part
+        # in the output in case of an error.
+        # --fail: Exit with the 22 error code is status >= 400.
+        # -w: See the reason for the failure, if any.
+        run: |
+          curl --request POST \
+          "${{ secrets.INFLUXDB_URL }}/api/v2/write?org=tarantool&bucket=perf-debug&precision=s" \
+          --fail --silent -o /dev/null \
+          -w "%{http_code}" \
+          --header "Authorization: Token ${{ secrets.INFLUXDB_TOKEN_DEBUG }}" \
+          --data-binary ./perf_output/perf_summary.txt
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
