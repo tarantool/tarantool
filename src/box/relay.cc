@@ -1115,27 +1115,6 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 	assert(replica->anon || replica->id != REPLICA_ID_NIL);
 	struct relay *relay = replica->relay;
 	assert(relay->state != RELAY_FOLLOW);
-	/*
-	 * Register the replica with the garbage collector.
-	 * In case some of the replica's WAL files were deleted, it might
-	 * subscribe with a smaller vclock than the master remembers, so
-	 * recreate the gc consumer unconditionally to make sure it holds
-	 * the correct vclock.
-	 */
-	if (!replica->anon) {
-		bool had_gc = false;
-		if (replica->gc != NULL) {
-			gc_consumer_unregister(replica->gc);
-			had_gc = true;
-		}
-		replica->gc = gc_consumer_register(replica_clock, "replica %s",
-						   tt_uuid_str(&replica->uuid));
-		if (replica->gc == NULL)
-			diag_raise();
-		if (!had_gc)
-			gc_delay_unref();
-	}
-
 	if (replica_version_id < version_id(2, 6, 0) || replica->anon)
 		sent_raft_term = UINT64_MAX;
 	relay_start(relay, io, sync, relay_process_row,

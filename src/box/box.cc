@@ -4269,6 +4269,26 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
 	/*
+	 * Register the replica with the garbage collector.
+	 * In case some of the replica's WAL files were deleted, it might
+	 * subscribe with a smaller vclock than the master remembers, so
+	 * recreate the gc consumer unconditionally to make sure it holds
+	 * the correct vclock.
+	 */
+	if (!replica->anon) {
+		bool had_gc = false;
+		if (replica->gc != NULL) {
+			gc_consumer_unregister(replica->gc);
+			had_gc = true;
+		}
+		replica->gc = gc_consumer_register(&start_vclock, "replica %s",
+						   tt_uuid_str(&replica->uuid));
+		if (replica->gc == NULL)
+			diag_raise();
+		if (!had_gc)
+			gc_delay_unref();
+	}
+	/*
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,
 	 * and identify ourselves with our own replica id.
