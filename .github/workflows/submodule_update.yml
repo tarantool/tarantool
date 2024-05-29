@@ -57,7 +57,7 @@ jobs:
 
       - name: Send VK Teams message on failure
         if: failure()
-        uses: ./.github/actions/report-job-status
+        uses: ./tarantool/.github/actions/report-job-status
         with:
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
 
@@ -85,7 +85,7 @@ jobs:
         with:
           repository: 'tarantool/sdk'
           github_token: ${{ secrets.EE_UPDATE_SUBMODULE_TOKEN }}
-          checkout_branch: 'master'
+          checkout_branch: '1.x-2.x'
           # Same branch name pattern as used in sdk_test workflow
           feature_branch: ${{ env.SDK_FEATURE_BRANCH }}
           submodule: ${{ env.SDK_SUBMODULE }}
@@ -103,8 +103,13 @@ jobs:
             which is the HEAD of branch
             tarantool/tarantool@${{ github.ref_name }}.
 
+      - if: failure()
+        uses: actions/checkout@v4
+        with:
+          path: fail/tarantool
+
       - name: Send VK Teams message on failure
         if: failure()
-        uses: ./.github/actions/report-job-status
+        uses: ./fail/tarantool/.github/actions/report-job-status
         with:
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
