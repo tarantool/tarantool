@@ -59,6 +59,7 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->frozen_reasons = 0;
 	limbo->is_frozen_until_promotion = true;
 	limbo->do_validate = false;
+	limbo->confirm_lag = 0;
 }
 
 static inline bool
@@ -497,6 +498,8 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			continue;
 		}
 		e->is_commit = true;
+		if (txn_has_flag(e->txn, TXN_WAIT_ACK))
+			limbo->confirm_lag = fiber_clock() - e->insertion_time;
 		e->txn->limbo_entry = NULL;
 		txn_limbo_remove(limbo, e);
 		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);

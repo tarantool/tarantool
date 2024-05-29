@@ -232,6 +232,11 @@ struct txn_limbo {
 	 * can't be any inconsistencies.
 	 */
 	bool do_validate;
+	/**
+	 * The time that the latest successfully confirmed entry waited for
+	 * quorum.
+	 */
+	double confirm_lag;
 };
 
 /**
