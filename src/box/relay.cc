@@ -552,7 +552,7 @@ relay_final_join(struct replica *replica, struct iostream *io, uint64_t sync,
 	/*
 	 * Save the first vclock as 'received'. Because it was really received.
 	 */
-	vclock_copy(&relay->last_recv_ack.vclock, start_vclock);
+	vclock_copy_ignore0(&relay->last_recv_ack.vclock, start_vclock);
 	relay->r = recovery_new(wal_dir(), false, start_vclock);
 	vclock_copy(&relay->stop_vclock, stop_vclock);
 
@@ -780,6 +780,7 @@ relay_reader_f(va_list ap)
 		while (!fiber_is_cancelled()) {
 			FiberGCChecker gc_check;
 			struct xrow_header xrow;
+			ERROR_INJECT_YIELD(ERRINJ_RELAY_READ_ACK_DELAY);
 			coio_read_xrow_timeout_xc(relay->io, &ibuf, &xrow,
 					replication_disconnect_timeout());
 			xrow_decode_applier_heartbeat_xc(&xrow, last_recv_ack);
@@ -1113,11 +1114,10 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 	/*
 	 * Save the first vclock as 'received'. Because it was really received.
 	 */
-	vclock_copy(&relay->last_recv_ack.vclock, start_vclock);
+	vclock_copy_ignore0(&relay->last_recv_ack.vclock, start_vclock);
 	relay->r = recovery_new(wal_dir(), false, start_vclock);
-	vclock_copy(&relay->tx.vclock, start_vclock);
+	vclock_copy_ignore0(&relay->tx.vclock, start_vclock);
 	relay->version_id = replica_version_id;
-
 	relay->id_filter |= replica_id_filter;
 
 	struct cord cord;
