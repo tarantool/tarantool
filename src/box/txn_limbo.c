@@ -170,6 +170,7 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	e->ack_count = 0;
 	e->is_commit = false;
 	e->is_rollback = false;
+	e->insertion_time = fiber_clock();
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
 	limbo->len++;
 	return e;

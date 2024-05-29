@@ -69,6 +69,8 @@ struct txn_limbo_entry {
 	 */
 	bool is_commit;
 	bool is_rollback;
+	/** When this entry was added to the queue. */
+	double insertion_time;
 };
 
 static inline bool
