@@ -202,6 +202,13 @@ vclock_copy(struct vclock *dst, const struct vclock *src)
 			 sizeof(*dst->lsn) * max_pos);
 }
 
+static inline void
+vclock_copy_ignore0(struct vclock *dst, const struct vclock *src)
+{
+	vclock_copy(dst, src);
+	vclock_reset(dst, 0, 0);
+}
+
 static inline uint32_t
 vclock_size(const struct vclock *vclock)
 {
