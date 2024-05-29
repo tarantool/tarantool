@@ -740,6 +740,8 @@ lbox_info_synchro(struct lua_State *L)
 		lua_pushnumber(L, now - oldest_entry->insertion_time);
 	}
 	lua_setfield(L, -2, "age");
+	lua_pushnumber(L, queue->confirm_lag);
+	lua_setfield(L, -2, "confirm_lag");
 	lua_setfield(L, -2, "queue");
 
 	return 1;
