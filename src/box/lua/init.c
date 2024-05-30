@@ -179,7 +179,7 @@ extern char session_lua[],
 #endif
 	/* }}} config */
 
-	experimental_connpool_lua[];
+	connpool_lua[];
 
 /**
  * List of box's built-in modules written using Lua.
@@ -455,9 +455,9 @@ static const char *lua_sources[] = {
 
 	/* }}} config */
 
-	"experimental/connpool",
+	"connpool",
 	"experimental.connpool",
-	experimental_connpool_lua,
+	connpool_lua,
 
 	FAILOVER_LUA_MODULES
 
