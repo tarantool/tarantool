@@ -55,6 +55,11 @@ box_tuple_seek(box_tuple_iterator_t *it, uint32_t field_no);
 const char *
 box_tuple_next(box_tuple_iterator_t *it);
 
+typedef struct tuple_format box_tuple_format_t;
+
+box_tuple_format_t *
+box_tuple_format(box_tuple_t *tuple);
+
 /** \endcond public */
 
 box_tuple_t *
@@ -319,6 +324,18 @@ local function tuple_field_by_path(tuple, path)
     return internal.tuple.tuple_field_by_path(tuple, path)
 end
 
+local function tuple_format(tuple)
+    tuple_check(tuple, "tuple:get_format()");
+    local ret = {}
+    for _, field in tuple:ipairs() do
+        local value = {}
+        value.name = field
+        value.type = type(field)
+        table.insert(ret, value)
+    end
+    return setmetatable(ret, msgpackffi.array_mt)
+end
+
 local methods = {
     ["next"]        = tuple_next;
     ["ipairs"]      = tuple_ipairs;
@@ -332,6 +349,7 @@ local methods = {
     ["update"]      = tuple_update;
     ["upsert"]      = tuple_upsert;
     ["bsize"]       = tuple_bsize;
+    ["get_format"]  = tuple_format;
     ["tomap"]       = internal.tuple.tuple_to_map;
     ["info"]        = internal.tuple.info;
 }
