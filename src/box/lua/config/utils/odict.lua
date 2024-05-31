@@ -65,7 +65,7 @@ local function gen(od, prev_key)
 
     -- The previous key is nil only on the first call of the
     -- generator function.
-    local id = prev_key == nil and 0 or ctx.key2id[prev_key]
+    local id = type(prev_key) == 'nil' and 0 or ctx.key2id[prev_key]
     -- NB: This assert doesn't catch all the kinds of changes
     -- during an iteration. It rather verifies a precondition
     -- for the following cycle.
@@ -80,7 +80,7 @@ local function gen(od, prev_key)
         -- id2key may contain a stalled entry, because __newindex
         -- is not called on assignment of an existing field,
         -- including assignment to nil.
-        if key ~= nil and od[key] ~= nil then
+        if type(key) ~= 'nil' and od[key] ~= nil then
             return key, od[key]
         end
     end
@@ -148,11 +148,11 @@ local function reindex(od, ctx)
     for id = 1, old_max_id do
         local key = ctx.id2key[id]
         -- Drop the given key-id pair from the key<->id mappings.
-        if key ~= nil then
+        if type(key) ~= 'nil' then
             release(ctx, key)
         end
         -- Add the new key-id pair into the key<->id mappings.
-        if key ~= nil and od[key] ~= nil then
+        if type(key) ~= 'nil' and od[key] ~= nil then
             track(ctx, key)
         end
     end
