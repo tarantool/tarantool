@@ -1,4 +1,5 @@
 local fun = require('fun')
+local ffi = require('ffi')
 local odict = require('internal.config.utils.odict')
 local t = require('luatest')
 
@@ -115,6 +116,41 @@ g.test_pairs_delete_and_set = function()
         {'c', 3},
         {'b', 4},
     })
+end
+
+-- Using cdata as a key is unusual, but it is legal in LuaJIT.
+--
+-- There is a potential pitfall: ffi.new('void *') == nil. Let's
+-- verify that we handle such a key correctly.
+g.test_null_as_key = function()
+    local od = odict.new()
+
+    local nulls = {
+        ffi.new('void *'),
+        ffi.new('void *'),
+        ffi.new('void *'),
+    }
+
+    od[nulls[1]] = 1
+    od[nulls[2]] = 2
+    od[nulls[3]] = 3
+
+    local res = {}
+    for k, v in odict.pairs(od) do
+        table.insert(res, {k, v})
+    end
+
+    -- It doesn't differentiate nulls.
+    t.assert_equals(res, {
+        {nulls[1], 1},
+        {nulls[2], 2},
+        {nulls[3], 3},
+    })
+
+    -- It does.
+    t.assert(rawequal(res[1][1], nulls[1]))
+    t.assert(rawequal(res[2][1], nulls[2]))
+    t.assert(rawequal(res[3][1], nulls[3]))
 end
 
 -- {{{ Helpers for reindexing test cases
