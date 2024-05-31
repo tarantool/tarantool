@@ -106,17 +106,15 @@ lbox_tuple_format_tostring(struct lua_State *L)
 	return 1;
 }
 
-/*
- * Returns the format clause with which this tuple format was created.
- */
-static int
-lbox_tuple_format_serialize(struct lua_State *L)
+int
+box_tuple_format_serialize_impl(struct lua_State *L,
+				struct tuple_format *format)
 {
-	struct tuple_format *format = luaT_check_tuple_format(L, 1);
 	if (format->data == NULL) {
 		lua_createtable(L, 0, 0);
 		return 1;
 	}
+
 	const char *data = format->data;
 	luamp_decode(L, luaL_msgpack_default, &data);
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal.space", 1);
@@ -125,6 +123,16 @@ lbox_tuple_format_serialize(struct lua_State *L)
 	lua_pushvalue(L, -2);
 	lua_call(L, 1, 1);
 	return 1;
+}
+
+/*
+ * Returns the format clause with which this tuple format was created.
+ */
+static int
+lbox_tuple_format_serialize(struct lua_State *L)
+{
+	struct tuple_format *format = luaT_check_tuple_format(L, 1);
+	return box_tuple_format_serialize_impl(L, format);
 }
 
 /*

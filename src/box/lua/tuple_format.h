@@ -28,6 +28,13 @@ luaT_check_tuple_format(struct lua_State *L, int narg);
 void
 box_lua_tuple_format_init(struct lua_State *L);
 
+/**
+ * Returns the clause for the given format.
+ */
+int
+box_tuple_format_serialize_impl(struct lua_State *L,
+				struct tuple_format *format);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

@@ -332,6 +332,7 @@ local methods = {
     ["update"]      = tuple_update;
     ["upsert"]      = tuple_upsert;
     ["bsize"]       = tuple_bsize;
+    ["format"]      = box.tuple.format;
     ["tomap"]       = internal.tuple.tuple_to_map;
     ["info"]        = internal.tuple.info;
 }

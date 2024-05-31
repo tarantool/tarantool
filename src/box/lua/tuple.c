@@ -757,6 +757,23 @@ lbox_tuple_info(lua_State *L)
 	return 1;
 }
 
+/**
+ * Push to Lua stack an array with the information about a format of a tuple.
+ * Elements of the array are maps
+ * {'name' = 'field_name', 'type' = 'field_type'}.
+ */
+static int
+lbox_tuple_get_format(lua_State *L)
+{
+	int argc = lua_gettop(L);
+	if (argc != 1)
+		luaL_error(L, "Usage: tuple:format()");
+
+	struct tuple *tuple = luaT_checktuple(L, 1);
+	struct tuple_format *format = tuple_format(tuple);
+	return box_tuple_format_serialize_impl(L, format);
+}
+
 static const struct luaL_Reg lbox_tuple_meta[] = {
 	{"__gc", lbox_tuple_gc},
 	{"tostring", lbox_tuple_to_string},
@@ -766,6 +783,7 @@ static const struct luaL_Reg lbox_tuple_meta[] = {
 	{"tuple_field_by_path", lbox_tuple_field_by_path},
 	{"new", lbox_tuple_new},
 	{"info", lbox_tuple_info},
+	{"tuple_get_format", lbox_tuple_get_format},
 	{NULL, NULL}
 };
 
