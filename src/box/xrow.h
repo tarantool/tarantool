@@ -365,16 +365,36 @@ struct synchro_request {
 	 */
 	int64_t lsn;
 	/**
+	 * LSN of the row containing this request.
+	 * Never encoded, only used for applying PROMOTE requests.
+	 */
+	int64_t self_lsn;
+	/**
 	 * The new term the instance issuing this request is in. Only used for
 	 * PROMOTE and DEMOTE requests.
 	 */
 	uint64_t term;
+	/**
+	 * Term of the preceding PROMOTE request.
+	 * This helps us maintain a linked list of pending PROMOTE requests,
+	 * which we may apply in order once the last one is confirmed
+	 * in the current term.
+	 */
+	uint64_t prev_term;
 	/**
 	 * Confirmed lsns of all the previous limbo owners. Only used for
 	 * PROMOTE and DEMOTE requests.
 	 */
 	struct vclock *confirmed_vclock;
 };
+
+/**
+ * Format synchro_request to a human-readable string representation.
+ * @param req the request to be formatted.
+ * @retval formatted string stored in a static buffer.
+ */
+const char *
+synchro_request_to_string(const struct synchro_request *req);
 
 /**
  * Encode synchronous replication request.

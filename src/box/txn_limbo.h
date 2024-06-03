@@ -33,6 +33,7 @@
 #include "vclock/vclock.h"
 #include "latch.h"
 #include "errinj.h"
+#include "xrow.h"
 
 #include <stdint.h>
 
@@ -41,7 +42,25 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct txn;
-struct synchro_request;
+
+/**
+ * A synchro request which is applied iff its author managed to
+ * gather a quorum in the corresponding raft term.
+ */
+struct pending_promote {
+	/**
+	 * Used by txn_limbo to stage pending synchro requests.
+	 */
+	struct rlist link;
+	/**
+	 * Number of ACKs, i.e. how many replicas acknowledged this request.
+	 */
+	int ack_count;
+	/**
+	 * The request itself.
+	 */
+	struct synchro_request req;
+};
 
 /**
  * Transaction and its quorum metadata, to be stored in limbo.
@@ -157,6 +176,11 @@ struct txn_limbo {
 	 */
 	uint64_t promote_greatest_term;
 	/**
+	 * The in-memory storage of pending PROMOTE requests.
+	 * Every item in this list is struct synchro_request.
+	 */
+	struct rlist pending_promotes;
+	/**
 	 * To order access to the promote data.
 	 */
 	struct latch promote_latch;
@@ -192,11 +216,6 @@ struct txn_limbo {
 	 * by the 'reversed rollback order' rule - contradiction.
 	 */
 	bool is_in_rollback;
-	/**
-	 * Savepoint of confirmed LSN. To rollback to in case the current
-	 * synchro command (promote/demote/...) fails.
-	 */
-	int64_t svp_confirmed_lsn;
 	union {
 		/**
 		 * Whether the limbo is frozen. This mode prevents CONFIRMs and
@@ -288,6 +307,13 @@ txn_limbo_replica_confirmed_lsn(const struct txn_limbo *limbo,
 {
 	return vclock_get(&limbo->confirmed_vclock, replica_id);
 }
+
+/**
+ * Check if this instance is currently trying to become a R/W leader
+ * in the current term, i.e. it has already authored a PROMOTE request.
+ */
+bool
+txn_limbo_is_trying_to_promote(struct txn_limbo *limbo);
 
 /**
  * Return the last synchronous transaction in the limbo or NULL when it is

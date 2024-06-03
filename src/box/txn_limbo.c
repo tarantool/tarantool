@@ -38,6 +38,19 @@
 #include "tt_static.h"
 #include "session.h"
 
+static bool
+txn_limbo_ack_already_seen(struct txn_limbo *limbo, uint32_t replica_id,
+			   int64_t lsn, int64_t *prev_lsn);
+
+static void
+txn_limbo_apply_promote(struct txn_limbo *limbo,
+			const struct synchro_request *req,
+			uint32_t new_limbo_owner);
+
+static void
+txn_limbo_ack_promote(struct txn_limbo *limbo, uint32_t replica_id,
+		      int64_t lsn, int64_t prev_lsn);
+
 struct txn_limbo txn_limbo;
 
 static inline void
@@ -51,11 +64,11 @@ txn_limbo_create(struct txn_limbo *limbo)
 	vclock_create(&limbo->promote_term_map);
 	vclock_create(&limbo->confirmed_vclock);
 	limbo->promote_greatest_term = 0;
+	rlist_create(&limbo->pending_promotes);
 	latch_create(&limbo->promote_latch);
 	limbo->confirmed_lsn = 0;
 	limbo->rollback_count = 0;
 	limbo->is_in_rollback = false;
-	limbo->svp_confirmed_lsn = -1;
 	limbo->frozen_reasons = 0;
 	limbo->is_frozen_until_promotion = true;
 	limbo->do_validate = false;
@@ -120,6 +133,41 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo)
 	return NULL;
 }
 
+/**
+ * Find a currently active PROMOTE request in a list, if any;
+ * i.e. the one authored by this instance in the current term.
+ */
+static struct pending_promote *
+txn_limbo_get_active_promote(struct rlist *reqs)
+{
+	if (rlist_empty(reqs))
+		return NULL;
+
+	struct pending_promote *last =
+		rlist_last_entry(reqs, typeof(*last), link);
+
+	/*
+	 * We're only interested in a scenario where the current
+	 * instance is the leader waiting for a quorum on its
+	 * PROMOTE request (the last one in the queue).
+	 *
+	 * Furthermore, the quorum only matters if we
+	 * reach it within the current term.
+	 */
+	if (last->req.origin_id != instance_id ||
+	    last->req.term < box_raft()->volatile_term)
+		return NULL;
+
+	return last;
+}
+
+bool
+txn_limbo_is_trying_to_promote(struct txn_limbo *limbo)
+{
+	struct rlist *queue = &limbo->pending_promotes;
+	return txn_limbo_get_active_promote(queue);
+}
+
 struct txn_limbo_entry *
 txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 {
@@ -132,6 +180,10 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	 */
 	assert(txn->signature == TXN_SIGNATURE_UNKNOWN);
 	assert(txn->status == TXN_PREPARED);
+	if (txn_limbo_is_trying_to_promote(limbo)) {
+		diag_set(ClientError, ER_SYNC_QUEUE_UNCLAIMED);
+		return NULL;
+	}
 	if (limbo->is_in_rollback) {
 		/*
 		 * Cascading rollback. It is impossible to commit the
@@ -363,6 +415,11 @@ void
 txn_limbo_checkpoint(const struct txn_limbo *limbo, struct synchro_request *req,
 		     struct vclock *vclock)
 {
+	/* For simplicity we prohibit checkpoints during leadership changes. */
+	if (!rlist_empty((struct rlist *)&limbo->pending_promotes))
+		say_warn("limbo checkpoint: cannot capture pending PROMOTEs");
+
+	memset(req, 0, sizeof(*req));
 	req->type = IPROTO_RAFT_PROMOTE;
 	req->replica_id = limbo->owner_id;
 	req->lsn = limbo->confirmed_lsn;
@@ -372,8 +429,8 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo, struct synchro_request *req,
 	req->confirmed_vclock = vclock;
 }
 
-/** Write a request to WAL. */
-static void
+/** Write a request to WAL and return its own LSN. */
+static int64_t
 synchro_request_write(const struct synchro_request *req)
 {
 	/*
@@ -382,9 +439,25 @@ synchro_request_write(const struct synchro_request *req)
 	 */
 	char body[XROW_BODY_LEN_MAX];
 	struct xrow_header row;
+	char buf[sizeof(struct journal_entry) + sizeof(struct xrow_header *)];
+
+	struct journal_entry *entry = (struct journal_entry *)buf;
+	entry->rows[0] = &row;
+
 	xrow_encode_synchro(&row, body, req);
-	if (journal_write_row(&row) == 0)
-		return;
+
+	journal_entry_create(entry, 1, xrow_approx_len(&row),
+			     journal_entry_fiber_wakeup_cb, fiber());
+
+	if (journal_write(entry) != 0)
+		goto fail;
+	if (entry->res < 0) {
+		diag_set_journal_res(entry->res);
+		goto fail;
+	}
+	/* This is the LSN we may want to confirm. */
+	return entry->rows[0]->lsn;
+fail:
 	diag_log();
 	/*
 	 * XXX: the stub is supposed to be removed once it is defined what to do
@@ -393,25 +466,8 @@ synchro_request_write(const struct synchro_request *req)
 	 * in rollback mode. Then provide a hook to call manually when WAL
 	 * problems are fixed. Or retry automatically with some period.
 	 */
-	panic("Could not write a synchro request to WAL: lsn = %lld, "
-	      "type = %s\n", (long long)req->lsn, iproto_type_name(req->type));
-}
-
-/** Create a request for a specific limbo and write it to WAL. */
-static void
-txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
-			uint64_t term, struct vclock *vclock)
-{
-	assert(lsn >= 0);
-
-	struct synchro_request req = {
-		.type = type,
-		.replica_id = limbo->owner_id,
-		.lsn = lsn,
-		.term = term,
-		.confirmed_vclock = vclock,
-	};
-	synchro_request_write(&req);
+	panic("Could not write a synchro request to WAL: %s",
+	      synchro_request_to_string(req));
 }
 
 /**
@@ -421,16 +477,105 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 static void
 txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
-	assert(lsn > limbo->confirmed_lsn);
-	assert(!limbo->is_in_rollback);
-	limbo->confirmed_lsn = lsn;
-	vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
-	txn_limbo_write_synchro(limbo, IPROTO_RAFT_CONFIRM, lsn, 0, NULL);
+	/* Prevent duplicate CONFIRMs by bumping the counters early. */
+	vclock_follow(&limbo->confirmed_vclock, instance_id, lsn);
+	if (limbo->owner_id == instance_id) {
+		assert(lsn > limbo->confirmed_lsn);
+		assert(!limbo->is_in_rollback);
+		limbo->confirmed_lsn = lsn;
+	}
+
+	synchro_request_write(&(struct synchro_request) {
+		.type = IPROTO_RAFT_CONFIRM,
+		.replica_id = instance_id,
+		.lsn = lsn,
+	});
+}
+
+static void
+txn_limbo_log_status(struct txn_limbo *limbo)
+{
+	say_info("PROMOTE: limbo owner_id: %u, "
+		 "lsn: %" PRIi64 ", term: %" PRIu64,
+		 limbo->owner_id, limbo->confirmed_lsn,
+		 limbo->promote_greatest_term);
+}
+
+/**
+ * Confirm a queue (history) of PROMOTE requests on the leader's behalf.
+ * All the matching requests will be applied in order.
+ */
+static void
+txn_limbo_confirm_promote(struct txn_limbo *limbo,
+			  uint32_t origin_id, int64_t lsn)
+{
+	assert(latch_is_locked(&limbo->promote_latch));
+
+	say_info("PROMOTE: read %s for lsn %" PRIi64 " from %u",
+		 iproto_type_name(IPROTO_RAFT_CONFIRM), lsn, origin_id);
+
+	struct rlist *queue = &limbo->pending_promotes;
+
+	uint64_t prev_term = 0;
+	struct pending_promote *item, *tmp, *confirmed = NULL;
+	rlist_foreach_entry_safe_reverse(item, queue, link, tmp) {
+		/*
+		 * Find the latest matching request; Then, drop all
+		 * requests which can no longer belong to the history
+		 * (i.e. unreachable from the confirmed one).
+		 */
+		if (confirmed != NULL) {
+			if (item->req.term == prev_term) {
+				prev_term = item->req.prev_term;
+				continue;
+			}
+
+			say_info("PROMOTE: drop obsolete %s",
+				 synchro_request_to_string(&item->req));
+
+			rlist_del_entry(item, link);
+			free(item);
+
+		} else if (item->req.origin_id == origin_id &&
+			   item->req.self_lsn <= lsn) {
+			say_info("PROMOTE: confirm %s",
+				 synchro_request_to_string(&item->req));
+
+			confirmed = item;
+			prev_term = item->req.prev_term;
+		}
+	}
+
+	/*
+	 * If we couldn't find the entry, it means that the CONFIRM is
+	 * obsolete. This is fine, because it implies that the PROMOTE
+	 * has already been applied as a part of a longer history.
+	 */
+	if (confirmed != NULL) {
+		/* Process all confirmed PROMOTE requests in order. */
+		rlist_foreach_entry_safe(item, queue, link, tmp) {
+			struct synchro_request *req = &item->req;
+			txn_limbo_apply_promote(limbo, req, req->origin_id);
+			rlist_del_entry(item, link);
+			free(item);
+
+			if (item == confirmed)
+				break;
+		}
+
+		txn_limbo_log_status(limbo);
+		if (rlist_empty(queue))
+			say_info("PROMOTE: queue is now empty");
+	} else {
+		say_info("PROMOTE: nothing to confirm "
+			 "via lsn %" PRIu64 " from %u",
+			 lsn, origin_id);
+	}
 }
 
 /** Confirm all the entries <= @a lsn. */
 static void
-txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
+txn_limbo_confirm_txn(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(limbo->owner_id != REPLICA_ID_NIL || txn_limbo_is_empty(limbo));
 	assert(limbo == &txn_limbo);
@@ -505,6 +650,38 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 	}
 }
 
+static void
+txn_limbo_read_confirm(struct txn_limbo *limbo,
+		       const struct synchro_request *req)
+{
+	/*
+	 * If a leadership transition is currently taking place,
+	 * we should try to apply this CONFIRM to one of the queued
+	 * PROMOTE requests (works for both leader & follower).
+	 *
+	 * The following property holds for every CONFIRM-for-PROMOTE:
+	 *  - Either promote_queue is not empty;
+	 *  - Or the corresponding PROMOTE has already been applied
+	 *    as a part of a longer history of *another* instance,
+	 *    meaning that its CONFIRM-for-PROMOTE will be nopified
+	 *    upon arrival in applier_synchro_filter_tx.
+	 */
+	if (!rlist_empty(&limbo->pending_promotes))
+		txn_limbo_confirm_promote(limbo, req->origin_id, req->lsn);
+	/*
+	 * Otherwise, we may confirm regular transactions.
+	 */
+	else if (limbo->owner_id == req->replica_id)
+		txn_limbo_confirm_txn(limbo, req->lsn);
+	/*
+	 * Finally, this must be a bug (e.g. broken snapshots).
+	 */
+	else
+		say_crit("BUG: read a strange %s "
+			 "(possibly for a vanished PROMOTE)",
+			 synchro_request_to_string(req));
+}
+
 /**
  * Write a rollback message to WAL. After it's written all the
  * transactions following the current one and waiting for
@@ -513,10 +690,16 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 static void
 txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 {
+	assert(limbo->owner_id == instance_id);
 	assert(lsn > limbo->confirmed_lsn);
 	assert(!limbo->is_in_rollback);
+
 	limbo->is_in_rollback = true;
-	txn_limbo_write_synchro(limbo, IPROTO_RAFT_ROLLBACK, lsn, 0, NULL);
+	synchro_request_write(&(struct synchro_request) {
+		.type = IPROTO_RAFT_ROLLBACK,
+		.replica_id = instance_id,
+		.lsn = lsn,
+	});
 	limbo->is_in_rollback = false;
 }
 
@@ -553,10 +736,10 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 	}
 }
 
-int
-txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
+static void
+txn_limbo_make_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term,
+		       struct synchro_request *req)
 {
-	assert(latch_is_locked(&limbo->promote_latch));
 	/*
 	 * We make sure that promote is only written once everything this
 	 * instance has may be confirmed.
@@ -564,39 +747,173 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
 	assert(e == NULL || e->lsn <= lsn);
 	(void) e;
-	struct synchro_request req = {
+
+	/*
+	 * The PROMOTE request we're about to write depends on
+	 * the previous one if it exists. It's an inductive property.
+	 */
+	struct rlist *queue = &limbo->pending_promotes;
+	struct pending_promote *last = !rlist_empty(queue)
+		? rlist_last_entry(queue, typeof(*last), link)
+		: NULL;
+
+	uint64_t greatest_term = limbo->promote_greatest_term;
+	*req = (struct synchro_request) {
 		.type = IPROTO_RAFT_PROMOTE,
-		.replica_id = limbo->owner_id,
 		.origin_id = instance_id,
-		.lsn = lsn,
 		.term = term,
+		/* These fields require extra tinkering with: */
+		.prev_term  = last ? last->req.term : greatest_term,
+		.replica_id = last ? last->req.origin_id : limbo->owner_id,
+		.lsn        = last ? last->req.self_lsn : lsn,
 		/*
 		 * Confirmed_vclock is only persisted in checkpoints. It doesn't
 		 * appear in WALs and replication.
 		 */
 		.confirmed_vclock = NULL,
 	};
+}
+
+int
+txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
+{
+	assert(latch_is_locked(&limbo->promote_latch));
+
+	struct synchro_request req;
+	txn_limbo_make_promote(limbo, lsn, term, &req);
+
 	if (txn_limbo_req_prepare(limbo, &req) < 0)
 		return -1;
-	synchro_request_write(&req);
+	req.self_lsn = synchro_request_write(&req);
+	say_info("PROMOTE: write %s", synchro_request_to_string(&req));
 	txn_limbo_req_commit(limbo, &req);
+
+	/* Immediately acknowledge our own write. */
+	int64_t prev_lsn, self_lsn = req.self_lsn;
+	txn_limbo_ack_already_seen(limbo, instance_id, self_lsn, &prev_lsn);
+	txn_limbo_ack_promote(limbo, instance_id, self_lsn, prev_lsn);
+
 	return 0;
 }
 
 /**
- * Process a PROMOTE request, i.e. confirm all entries <= @a req.lsn and
- * rollback all entries > @a req.lsn.
+ * Compatibility function for processing a single legacy PROMOTE request.
+ * This is needed during a transition to the new promote logic.
  */
-static void
-txn_limbo_read_promote(struct txn_limbo *limbo, uint32_t replica_id,
-		       int64_t lsn)
+static bool
+txn_limbo_read_promote_compat(struct txn_limbo *limbo,
+			      const struct synchro_request *req)
 {
-	txn_limbo_read_confirm(limbo, lsn);
-	txn_limbo_read_rollback(limbo, lsn + 1);
+	assert(latch_is_locked(&limbo->promote_latch));
+	assert(req->type == IPROTO_RAFT_PROMOTE);
+
+	/*
+	 * term == 0 means it's a request from
+	 * the bootstrap snapshot, so we may skip it.
+	 */
+	if (req->term == 0)
+		return true;
+
+	if (req->confirmed_vclock != NULL) {
+		say_info("PROMOTE: restore from a snapshot %s",
+			 synchro_request_to_string(req));
+		txn_limbo_apply_promote(limbo, req, req->origin_id);
+		txn_limbo_log_status(limbo);
+		return true;
+	}
+
+	return false;
+}
+
+static void
+txn_limbo_read_promote(struct txn_limbo *limbo,
+		       const struct synchro_request *req)
+{
+	struct rlist *queue = &limbo->pending_promotes;
+
+	/* Try finding a position for an insertion. */
+	struct pending_promote *item;
+	rlist_foreach_entry_reverse(item, queue, link)
+		if (item->req.term <= req->term)
+			break;
+
+	uint64_t last_term = rlist_entry_is_head(item, queue, link)
+		? limbo->promote_greatest_term
+		: item->req.term;
+
+	if (last_term >= req->term)
+		panic("BUG: invalid term %" PRIu64 " in %s; "
+		      "(should be > %" PRIu64 ")", req->term,
+		      synchro_request_to_string(req), last_term);
+
+	assert(req->confirmed_vclock == NULL);
+	struct pending_promote *last = xmalloc(sizeof(*last));
+	last->ack_count = 0;
+	last->req = *req;
+
+	say_info("PROMOTE: insert %s to the queue",
+		 synchro_request_to_string(req));
+
+	rlist_add_entry(&item->link, last, link);
+}
+
+/** Apply a single PROMOTE request. */
+static void
+txn_limbo_apply_promote(struct txn_limbo *limbo,
+			const struct synchro_request *req,
+			uint32_t new_limbo_owner)
+{
+	assert(latch_is_locked(&limbo->promote_latch));
+
+	say_info("PROMOTE: apply %s", synchro_request_to_string(req));
+	uint64_t term = req->term;
+	uint32_t origin = req->origin_id;
+
+	/*
+	 * Now that we're sure this PROMOTE "has happened", we may finally
+	 * apply its term as well; meaning that any row from an older
+	 * term will be nopified in applier_synchro_filter_tx.
+	 *
+	 * Delaying the term application gives every instance a chance
+	 * to catch up with a deposed leader, who may be several
+	 * transactions ahead of the others.
+	 */
+	if (txn_limbo_replica_term(limbo, origin) < term) {
+		vclock_follow(&limbo->promote_term_map, origin, term);
+		if (limbo->promote_greatest_term < term) {
+			limbo->promote_greatest_term = term;
+			limbo->is_frozen_until_promotion = false;
+			if (box_raft()->volatile_term <= term)
+				txn_limbo_unfence(limbo);
+		}
+	}
+
+	txn_limbo_confirm_txn(limbo, req->lsn);
+	txn_limbo_read_rollback(limbo, req->lsn + 1);
 	assert(txn_limbo_is_empty(limbo));
-	limbo->owner_id = replica_id;
-	limbo->confirmed_lsn = vclock_get(&limbo->confirmed_vclock,
-					  replica_id);
+
+	/*
+	 * Non-null confirmed_vclock means we're restoring from a snapshot.
+	 * Note that the reverse isn't always true, because bootstrap snapshot
+	 * doesn't contain confirmed_vclock.
+	 */
+	uint64_t confirmed_lsn;
+	if (req->confirmed_vclock != NULL) {
+		vclock_copy(&limbo->confirmed_vclock, req->confirmed_vclock);
+		confirmed_lsn = vclock_get(&limbo->confirmed_vclock, origin);
+	} else if (new_limbo_owner == REPLICA_ID_NIL) {
+		/* txn_limbo_confirm_txn will update confirmed_vclock. */
+		confirmed_lsn = 0;
+	} else {
+		assert(req->self_lsn > 0);
+		confirmed_lsn = req->self_lsn;
+		/* We use vclock_reset here due to txn_limbo_write_confirm. */
+		vclock_reset(&limbo->confirmed_vclock, origin, confirmed_lsn);
+	}
+
+	limbo->confirmed_lsn = confirmed_lsn;
+	limbo->owner_id = new_limbo_owner;
+
 	box_update_ro_summary();
 }
 
@@ -617,7 +934,7 @@ txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 	};
 	if (txn_limbo_req_prepare(limbo, &req) < 0)
 		return -1;
-	synchro_request_write(&req);
+	req.self_lsn = synchro_request_write(&req);
 	txn_limbo_req_commit(limbo, &req);
 	return 0;
 }
@@ -625,46 +942,105 @@ txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 /**
  * Process a DEMOTE request, which's like PROMOTE, but clears the limbo
  * ownership.
- * @sa txn_limbo_read_promote.
  */
 static void
-txn_limbo_read_demote(struct txn_limbo *limbo, int64_t lsn)
+txn_limbo_read_demote(struct txn_limbo *limbo,
+		      const struct synchro_request *req)
 {
-	return txn_limbo_read_promote(limbo, REPLICA_ID_NIL, lsn);
+	/*
+	 * We don't want to fully support DEMOTE in election_mode=off,
+	 * but this impl will fix many tests for a relatively small price.
+	 */
+	struct rlist *queue = &limbo->pending_promotes;
+	if (!rlist_empty(queue)) {
+		say_warn("ignoring %s due to non-empty PROMOTE queue",
+			 synchro_request_to_string(req));
+		return;
+	}
+	txn_limbo_apply_promote(limbo, req, REPLICA_ID_NIL);
+	txn_limbo_log_status(limbo);
 }
 
-void
-txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
+/**
+ * Check if we've already seen an ACK for an lsn from replica_id.
+ * Return a previously ACKed lsn from replica_id via prev_lsn.
+ */
+static bool
+txn_limbo_ack_already_seen(struct txn_limbo *limbo, uint32_t replica_id,
+			   int64_t lsn, int64_t *prev_lsn)
 {
-	if (rlist_empty(&limbo->queue))
+	*prev_lsn = vclock_get(&limbo->vclock, replica_id);
+	if (lsn <= *prev_lsn)
+		return true;
+	vclock_follow(&limbo->vclock, replica_id, lsn);
+	return false;
+}
+
+/**
+ * Check if we should CONFIRM any PROMOTE requests
+ * and write a dedicated RAFT_CONFIRM entry if that's the case.
+ */
+static void
+txn_limbo_maybe_confirm_promotes(struct txn_limbo *limbo)
+{
+	assert(latch_is_locked(&limbo->promote_latch));
+
+	struct rlist *queue = &limbo->pending_promotes;
+	struct pending_promote *last = txn_limbo_get_active_promote(queue);
+	if (last == NULL)
 		return;
-	if (txn_limbo_is_frozen(limbo))
+
+	int quorum = replicaset_healthy_quorum();
+	if (last->ack_count < quorum)
+		return;
+
+	int64_t confirm_lsn = last->req.self_lsn;
+
+	txn_limbo_write_confirm(limbo, confirm_lsn);
+	txn_limbo_confirm_promote(limbo, instance_id, confirm_lsn);
+}
+
+static void
+txn_limbo_ack_promote(struct txn_limbo *limbo, uint32_t replica_id,
+		      int64_t lsn, int64_t prev_lsn)
+{
+	assert(latch_is_locked(&limbo->promote_latch));
+
+	struct rlist *queue = &limbo->pending_promotes;
+	struct pending_promote *last = txn_limbo_get_active_promote(queue);
+	if (last == NULL)
+		return;
+
+	assert(last->req.self_lsn > 0);
+	bool is_first_ack =
+		last->req.self_lsn > prev_lsn &&
+		last->req.self_lsn <= lsn;
+
+	/*
+	 * We should only consider the first sufficient ACK from an instance.
+	 * Otherwise bad things might happen, e.g. gaining more
+	 * ACKs than theoretically possible.
+	 */
+	if (!is_first_ack)
+		return;
+
+	assert(last->ack_count >= 0);
+	last->ack_count++;
+
+	say_info("PROMOTE: ack (%d/%d) for %s via lsn %" PRIi64 " from %u",
+		 last->ack_count, replicaset_healthy_quorum(),
+		 synchro_request_to_string(&last->req), lsn, replica_id);
+
+	txn_limbo_maybe_confirm_promotes(limbo);
+}
+
+static void
+txn_limbo_ack_txn(struct txn_limbo *limbo, int64_t lsn, int64_t prev_lsn)
+{
+	if (rlist_empty(&limbo->queue) || txn_limbo_is_frozen(limbo))
 		return;
 	assert(!txn_limbo_is_ro(limbo));
-	/*
-	 * If limbo is currently writing a rollback, it means that the whole
-	 * queue will be rolled back. Because rollback is written only for
-	 * timeout. Timeout always happens first for the oldest entry, i.e.
-	 * first entry in the queue. The rollback will clear all the newer
-	 * entries. So in total the whole queue is dead already. Would be
-	 * strange to write CONFIRM for rolled back LSNs. Even though
-	 * probably it wouldn't break anything. Would be just 2 conflicting
-	 * decisions for the same LSNs.
-	 */
-	if (limbo->is_in_rollback)
-		return;
-	assert(limbo->owner_id != REPLICA_ID_NIL);
-	int64_t prev_lsn = vclock_get(&limbo->vclock, replica_id);
-	/*
-	 * One of the reasons why can happen - the remote instance is not
-	 * read-only and wrote something under its own insance_id. For qsync
-	 * that most likely means that the remote instance decided to take over
-	 * the limbo ownership, and the current node is going to become a
-	 * replica very soon.
-	 */
-	if (lsn == prev_lsn)
-		return;
-	vclock_follow(&limbo->vclock, replica_id, lsn);
+
 	struct txn_limbo_entry *e;
 	int64_t confirm_lsn = -1;
 	rlist_foreach_entry(e, &limbo->queue, in_queue) {
@@ -686,10 +1062,59 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 			confirm_lsn = e->lsn;
 		}
 	}
+
 	if (confirm_lsn == -1 || confirm_lsn <= limbo->confirmed_lsn)
 		return;
+
 	txn_limbo_write_confirm(limbo, confirm_lsn);
-	txn_limbo_read_confirm(limbo, confirm_lsn);
+	txn_limbo_confirm_txn(limbo, confirm_lsn);
+}
+
+void
+txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
+{
+	/*
+	 * If limbo is currently writing a rollback, it means that the whole
+	 * queue will be rolled back. Because rollback is written only for
+	 * timeout. Timeout always happens first for the oldest entry, i.e.
+	 * first entry in the queue. The rollback will clear all the newer
+	 * entries. So in total the whole queue is dead already. Would be
+	 * strange to write CONFIRM for rolled back LSNs. Even though
+	 * probably it wouldn't break anything. Would be just 2 conflicting
+	 * decisions for the same LSNs.
+	 *
+	 * Furthermore, this is also set during txn_limbo_write_promote;
+	 * Which is why we'd like to postpone ACK accounting to prevent
+	 * race conditions.
+	 */
+	if (limbo->is_in_rollback)
+		return;
+
+	int64_t prev_lsn;
+	if (txn_limbo_ack_already_seen(limbo, replica_id, lsn, &prev_lsn))
+		return;
+
+	/*
+	 * If this instance is currently trying to become a limbo owner,
+	 * we should first try to apply this ACK to its active PROMOTE
+	 * request (i.e. one of the queued ones).
+	 *
+	 * Even if it's really an ACK for a regular transaction, it
+	 * doesn't matter anymore. The next limbo owner will take care of
+	 * all pending transactions after its PROMOTE has been confirmed.
+	 */
+	if (txn_limbo_is_trying_to_promote(limbo)) {
+		latch_lock(&limbo->promote_latch);
+		txn_limbo_ack_promote(limbo, replica_id, lsn, prev_lsn);
+		latch_unlock(&limbo->promote_latch);
+	}
+	/*
+	 * Otherwise, we may acknowledge regular transactions
+	 * provided that we're the current limbo owner. Do note
+	 * that this function will check if the limbo is frozen!
+	 */
+	else if (limbo->owner_id == instance_id)
+		txn_limbo_ack_txn(limbo, lsn, prev_lsn);
 }
 
 /**
@@ -774,6 +1199,11 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 int
 txn_limbo_wait_confirm(struct txn_limbo *limbo)
 {
+	/* Make sure we don't have any pending PROMOTE requests. */
+	if (!rlist_empty(&limbo->pending_promotes)) {
+		diag_set(ClientError, ER_SYNC_QUEUE_UNCLAIMED);
+		return -1;
+	}
 	if (txn_limbo_is_empty(limbo))
 		return 0;
 	bool is_rollback;
@@ -852,13 +1282,7 @@ txn_limbo_wait_persisted(struct txn_limbo *limbo)
 static const char *
 reject_str(const struct synchro_request *req)
 {
-	const char *type_name = iproto_type_name(req->type);
-
-	return tt_sprintf("RAFT: rejecting %s (%d) request from origin_id %u "
-			  "replica_id %u term %llu",
-			  type_name ? type_name : "UNKNOWN", req->type,
-			  req->origin_id, req->replica_id,
-			  (long long)req->term);
+	return tt_sprintf("RAFT: rejecting %s", synchro_request_to_string(req));
 }
 
 /**
@@ -876,25 +1300,12 @@ txn_limbo_filter_generic(struct txn_limbo *limbo,
 	/*
 	 * Zero replica_id is allowed for PROMOTE packets only.
 	 */
-	if (req->replica_id == REPLICA_ID_NIL) {
-		if (req->type != IPROTO_RAFT_PROMOTE) {
-			say_error("%s. Zero replica_id detected",
-				  reject_str(req));
-			diag_set(ClientError, ER_UNSUPPORTED, "Replication",
-				 "synchronous requests with zero replica_id");
-			return -1;
-		}
-	}
-	if (req->replica_id != limbo->owner_id) {
-		/*
-		 * Incoming packets should esteem limbo owner,
-		 * if it doesn't match it means the sender
-		 * missed limbo owner migrations and is out of date.
-		 */
-		say_error("%s. Limbo owner mismatch, owner_id %u",
-			  reject_str(req), limbo->owner_id);
-		diag_set(ClientError, ER_SPLIT_BRAIN,
-			 "got a request from a foreign synchro queue owner");
+	if (req->replica_id == REPLICA_ID_NIL &&
+	    req->type != IPROTO_RAFT_PROMOTE) {
+		say_error("%s. Zero replica_id detected",
+			  reject_str(req));
+		diag_set(ClientError, ER_UNSUPPORTED, "Replication",
+			 "synchronous requests with zero replica_id");
 		return -1;
 	}
 
@@ -902,7 +1313,7 @@ txn_limbo_filter_generic(struct txn_limbo *limbo,
 }
 
 /**
- * A common filter for all synchro requests, checking that request operates
+ * A common filter which checks that the request operates
  * over a valid lsn range.
  */
 static int
@@ -985,8 +1396,41 @@ txn_limbo_filter_queue_boundaries(struct txn_limbo *limbo,
 	return 0;
 }
 
+static int
+txn_limbo_filter_queue_owner(struct txn_limbo *limbo,
+			     const struct synchro_request *req)
+{
+	/*
+	 * Incoming packets should esteem limbo owner,
+	 * if it doesn't match it means the sender
+	 * missed limbo owner migrations and is out of date.
+	 */
+	if (req->replica_id != limbo->owner_id) {
+		say_error("%s. Limbo owner mismatch, owner_id %u",
+			  reject_str(req), limbo->owner_id);
+		diag_set(ClientError, ER_SPLIT_BRAIN,
+			 "got a request from a foreign synchro queue owner");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+txn_limbo_filter_queue(struct txn_limbo *limbo,
+		       const struct synchro_request *req)
+{
+	if (txn_limbo_filter_queue_owner(limbo, req) < 0)
+		return -1;
+
+	if (txn_limbo_filter_queue_boundaries(limbo, req) < 0)
+		return -1;
+
+	return 0;
+}
+
 /**
- * Filter CONFIRM and ROLLBACK packets.
+ * A filter for CONFIRM and ROLLBACK packets.
  */
 static int
 txn_limbo_filter_confirm_rollback(struct txn_limbo *limbo,
@@ -994,8 +1438,8 @@ txn_limbo_filter_confirm_rollback(struct txn_limbo *limbo,
 {
 	assert(latch_is_locked(&limbo->promote_latch));
 	assert(limbo->do_validate);
-	assert(req->type == IPROTO_RAFT_CONFIRM ||
-	       req->type == IPROTO_RAFT_ROLLBACK);
+	(void)limbo;
+
 	/*
 	 * Zero LSN is allowed for PROMOTE and DEMOTE requests only.
 	 */
@@ -1006,10 +1450,46 @@ txn_limbo_filter_confirm_rollback(struct txn_limbo *limbo,
 		return -1;
 	}
 
-	return txn_limbo_filter_queue_boundaries(limbo, req);
+	return 0;
 }
 
-/** A filter PROMOTE and DEMOTE packets. */
+/** A filter for CONFIRM packets. */
+static int
+txn_limbo_filter_confirm(struct txn_limbo *limbo,
+			 const struct synchro_request *req)
+{
+	if (txn_limbo_filter_confirm_rollback(limbo, req) < 0)
+		return -1;
+
+	/*
+	 * If PROMOTE queue is not empty, this might be a
+	 * CONFIRM-for-PROMOTE, which should bypass all ownership
+	 * and bounds checks. Even if that's not the case,
+	 * it will just be ignored by txn_limbo_ack_promote.
+	 *
+	 * On the other hand, once we've applied a certain
+	 * PROMOTE request, promote_greatest_term must have
+	 * been updated, too. This means that each untimely
+	 * row from a previous leader will just be nopified.
+	 */
+	if (rlist_empty(&limbo->pending_promotes))
+		return txn_limbo_filter_queue(limbo, req);
+
+	return 0;
+}
+
+/** A filter for ROLLBACK packets. */
+static int
+txn_limbo_filter_rollback(struct txn_limbo *limbo,
+			  const struct synchro_request *req)
+{
+	if (txn_limbo_filter_confirm_rollback(limbo, req) < 0)
+		return -1;
+
+	return txn_limbo_filter_queue(limbo, req);
+}
+
+/** A filter for PROMOTE and DEMOTE packets. */
 static int
 txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 				const struct synchro_request *req)
@@ -1017,6 +1497,8 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 	assert(latch_is_locked(&limbo->promote_latch));
 	assert(limbo->do_validate);
 	assert(iproto_type_is_promote_request(req->type));
+	(void)limbo;
+
 	/*
 	 * PROMOTE and DEMOTE packets must not have zero
 	 * term supplied, otherwise it is a broken packet.
@@ -1024,25 +1506,85 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 	if (req->term == 0) {
 		say_error("%s. Zero term detected", reject_str(req));
 		diag_set(ClientError, ER_UNSUPPORTED,
-			 "Replication", "PROMOTE/DEMOTE with a zero term");
+			 "Replication",
+			 "PROMOTE/DEMOTE with a zero term");
 		return -1;
 	}
+
+	/* Check that prev_term < term, always. */
+	if (req->prev_term >= req->term) {
+		say_error("%s. prev_term >= term detected", reject_str(req));
+		diag_set(ClientError, ER_SPLIT_BRAIN,
+			 "Replication",
+			 "PROMOTE/DEMOTE with prev_term >= term");
+		return -1;
+	}
+
+	return 0;
+}
+
+/** A filter for PROMOTE packets. */
+static int
+txn_limbo_filter_promote(struct txn_limbo *limbo,
+			 const struct synchro_request *req)
+{
+	if (txn_limbo_filter_promote_demote(limbo, req) < 0)
+		return -1;
+
+	bool found_prev_term = false;
 
 	/*
-	 * If the term is already seen it means it comes
-	 * from a node which didn't notice new elections,
-	 * thus been living in subdomain and its data is
-	 * no longer consistent.
+	 * The first PROMOTE since promote_greatest_term
+	 * will have to commit & rollback whatever is in
+	 * the limbo using its req->lsn.
+	 *
+	 * The rest are only going to update the owner etc.
 	 */
-	if (limbo->promote_greatest_term >= req->term) {
-		say_error("%s. Max term seen is %llu", reject_str(req),
-			  (long long)limbo->promote_greatest_term);
+	if (req->prev_term == limbo->promote_greatest_term) {
+		found_prev_term = true;
+		if (txn_limbo_filter_queue(limbo, req) < 0)
+			return -1;
+	}
+
+	/* Check for duplicate term or unknown prev_term. */
+	struct pending_promote *item;
+	struct rlist *queue = &limbo->pending_promotes;
+	rlist_foreach_entry_reverse(item, queue, link) {
+		if (req->term == item->req.term) {
+			say_error("%s. Duplicate term detected",
+				  reject_str(req));
+			diag_set(ClientError, ER_SPLIT_BRAIN,
+				 "Replication",
+				 "PROMOTE with a duplicate term");
+		}
+		if (req->prev_term == item->req.term) {
+			found_prev_term = true;
+			break;
+		}
+	}
+
+	if (!found_prev_term) {
+		say_error("%s. Unknown prev_term detected", reject_str(req));
 		diag_set(ClientError, ER_SPLIT_BRAIN,
-			 "got a PROMOTE/DEMOTE with an obsolete term");
+			 "Replication", "PROMOTE with an unknown prev_term");
 		return -1;
 	}
 
-	return txn_limbo_filter_queue_boundaries(limbo, req);
+	return 0;
+}
+
+/** A filter for DEMOTE packets. */
+static int
+txn_limbo_filter_demote(struct txn_limbo *limbo,
+			const struct synchro_request *req)
+{
+	if (txn_limbo_filter_promote_demote(limbo, req) < 0)
+		return -1;
+
+	if (txn_limbo_filter_queue(limbo, req) < 0)
+		return -1;
+
+	return 0;
 }
 
 /** A fine-grained filter checking specific request type constraints. */
@@ -1060,11 +1602,13 @@ txn_limbo_filter_request(struct txn_limbo *limbo,
 		return -1;
 	switch (req->type) {
 	case IPROTO_RAFT_CONFIRM:
+		return txn_limbo_filter_confirm(limbo, req);
 	case IPROTO_RAFT_ROLLBACK:
-		return txn_limbo_filter_confirm_rollback(limbo, req);
+		return txn_limbo_filter_rollback(limbo, req);
 	case IPROTO_RAFT_PROMOTE:
+		return txn_limbo_filter_promote(limbo, req);
 	case IPROTO_RAFT_DEMOTE:
-		return txn_limbo_filter_promote_demote(limbo, req);
+		return txn_limbo_filter_demote(limbo, req);
 	default:
 		unreachable();
 	}
@@ -1103,19 +1647,6 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 	case IPROTO_RAFT_ROLLBACK:
 		limbo->is_in_rollback = false;
 		break;
-	case IPROTO_RAFT_PROMOTE:
-	case IPROTO_RAFT_DEMOTE: {
-		assert(limbo->svp_confirmed_lsn == -1);
-		limbo->svp_confirmed_lsn = limbo->confirmed_lsn;
-		limbo->confirmed_lsn = req->lsn;
-		vclock_reset(&limbo->confirmed_vclock, limbo->owner_id,
-			     req->lsn);
-		break;
-	}
-	/*
-	 * XXX: ideally all requests should go through req_* methods. To unify
-	 * their work from applier and locally.
-	 */
 	}
 	return 0;
 }
@@ -1127,33 +1658,9 @@ txn_limbo_req_rollback(struct txn_limbo *limbo,
 	assert(latch_is_locked(&limbo->promote_latch));
 	switch (req->type) {
 	case IPROTO_RAFT_PROMOTE:
-	case IPROTO_RAFT_DEMOTE: {
-		assert(limbo->is_in_rollback);
-		assert(limbo->svp_confirmed_lsn >= 0);
-		limbo->confirmed_lsn = limbo->svp_confirmed_lsn;
-		vclock_reset(&limbo->confirmed_vclock, limbo->owner_id,
-			     limbo->svp_confirmed_lsn);
-		limbo->svp_confirmed_lsn = -1;
+	case IPROTO_RAFT_DEMOTE:
 		limbo->is_in_rollback = false;
 		break;
-	}
-	/*
-	 * XXX: ideally all requests should go through req_* methods. To unify
-	 * their work from applier and locally.
-	 */
-	default: {
-		break;
-	}
-	}
-}
-
-/** Unfreeze the limbo encountering the first new PROMOTE after a restart. */
-static inline void
-txn_limbo_unfreeze_on_first_promote(struct txn_limbo *limbo)
-{
-	if (box_is_configured()) {
-		limbo->is_frozen_until_promotion = false;
-		box_update_ro_summary();
 	}
 }
 
@@ -1163,52 +1670,29 @@ txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 	assert(latch_is_locked(&limbo->promote_latch));
 	switch (req->type) {
 	case IPROTO_RAFT_PROMOTE:
-	case IPROTO_RAFT_DEMOTE: {
-		assert(limbo->svp_confirmed_lsn >= 0);
-		assert(limbo->is_in_rollback);
-		limbo->svp_confirmed_lsn = -1;
+	case IPROTO_RAFT_DEMOTE:
 		limbo->is_in_rollback = false;
 		break;
 	}
-	default: {
-		break;
-	}
-	}
-
-	uint64_t term = req->term;
-	uint32_t origin = req->origin_id;
-	if (txn_limbo_replica_term(limbo, origin) < term) {
-		vclock_follow(&limbo->promote_term_map, origin, term);
-		if (term > limbo->promote_greatest_term) {
-			limbo->promote_greatest_term = term;
-			if (iproto_type_is_promote_request(req->type)) {
-				if (term >= box_raft()->volatile_term)
-					txn_limbo_unfence(limbo);
-				txn_limbo_unfreeze_on_first_promote(&txn_limbo);
-			}
-		}
-	}
-	if (req->confirmed_vclock != NULL)
-		vclock_copy(&limbo->confirmed_vclock, req->confirmed_vclock);
 
 	int64_t lsn = req->lsn;
 	switch (req->type) {
 	case IPROTO_RAFT_CONFIRM:
-		txn_limbo_read_confirm(limbo, lsn);
+		txn_limbo_read_confirm(limbo, req);
 		break;
 	case IPROTO_RAFT_ROLLBACK:
 		txn_limbo_read_rollback(limbo, lsn);
 		break;
 	case IPROTO_RAFT_PROMOTE:
-		txn_limbo_read_promote(limbo, req->origin_id, lsn);
+		if (!txn_limbo_read_promote_compat(limbo, req))
+			txn_limbo_read_promote(limbo, req);
 		break;
 	case IPROTO_RAFT_DEMOTE:
-		txn_limbo_read_demote(limbo, lsn);
+		txn_limbo_read_demote(limbo, req);
 		break;
 	default:
 		unreachable();
 	}
-	return;
 }
 
 int
@@ -1244,7 +1728,7 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 	}
 	if (confirm_lsn > limbo->confirmed_lsn && !limbo->is_in_rollback) {
 		txn_limbo_write_confirm(limbo, confirm_lsn);
-		txn_limbo_read_confirm(limbo, confirm_lsn);
+		txn_limbo_confirm_txn(limbo, confirm_lsn);
 	}
 	/*
 	 * Wakeup all the others - timed out will rollback. Also

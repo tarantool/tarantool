@@ -620,13 +620,12 @@ tx_status_update(struct cmsg *msg)
 	 */
 	raft_process_term(box_raft(), status->term, ack.source);
 	/*
-	 * Let pending synchronous transactions know, which of
-	 * them were successfully sent to the replica. Acks are
-	 * collected only by the transactions originator (which is
-	 * the single master in 100% so far). Other instances wait
-	 * for master's CONFIRM message instead.
+	 * Let pending synchronous transactions and PROMOTE requests
+	 * know which of them were successfully sent to the replica.
+	 * This function will keep track of seen LSNs and perform
+	 * all the necessary limbo ownership-related checks.
 	 */
-	if (txn_limbo.owner_id == instance_id && !anon) {
+	if (!anon) {
 		txn_limbo_ack(&txn_limbo, ack.source,
 			      vclock_get(ack.vclock, instance_id));
 	}

@@ -1299,6 +1299,12 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
 		map_size++;
 	}
 
+	if (req->prev_term != 0) {
+		pos = mp_encode_uint(pos, IPROTO_PREV_TERM);
+		pos = mp_encode_uint(pos, req->prev_term);
+		map_size++;
+	}
+
 	if (req->confirmed_vclock != NULL) {
 		pos = mp_encode_uint(pos, IPROTO_VCLOCK);
 		pos = mp_encode_vclock_ignore0(pos, req->confirmed_vclock);
@@ -1360,6 +1366,9 @@ bad_msgpack:
 		case IPROTO_TERM:
 			req->term = mp_decode_uint(&d);
 			break;
+		case IPROTO_PREV_TERM:
+			req->prev_term = mp_decode_uint(&d);
+			break;
 		case IPROTO_VCLOCK:
 			if (vclock == NULL)
 				mp_next(&d);
@@ -1374,8 +1383,67 @@ bad_msgpack:
 
 	req->type = row->type;
 	req->origin_id = row->replica_id;
+	req->self_lsn = row->lsn;
 
 	return 0;
+}
+
+const char *
+synchro_request_to_string(const struct synchro_request *req)
+{
+	char buf[1024];
+	int size = sizeof(buf);
+	char *pos = buf;
+	int rc;
+
+	rc = snprintf(pos, size, "{type: %s", iproto_type_name(req->type));
+	assert(rc >= 0 && rc < size);
+	pos += rc;
+	size -= rc;
+
+	rc = snprintf(pos, size, ", replica_id: %u", req->replica_id);
+	assert(rc >= 0 && rc < size);
+	pos += rc;
+	size -= rc;
+
+	rc = snprintf(pos, size, ", origin_id: %u", req->origin_id);
+	assert(rc >= 0 && rc < size);
+	pos += rc;
+	size -= rc;
+
+	rc = snprintf(pos, size, ", lsn: %" PRIi64, req->lsn);
+	assert(rc >= 0 && rc < size);
+	pos += rc;
+	size -= rc;
+
+	rc = snprintf(pos, size, ", self_lsn: %" PRIi64, req->self_lsn);
+	assert(rc >= 0 && rc < size);
+	pos += rc;
+	size -= rc;
+
+	rc = snprintf(pos, size, ", term: %" PRIu64, req->term);
+	assert(rc >= 0 && rc < size);
+	pos += rc;
+	size -= rc;
+
+	rc = snprintf(pos, size, ", prev_term: %" PRIi64, req->prev_term);
+	assert(rc >= 0 && rc < size);
+	pos += rc;
+	size -= rc;
+
+	if (req->confirmed_vclock != NULL) {
+		rc = snprintf(pos, size, ", confirmed_vclock: %s",
+			      vclock_to_string(req->confirmed_vclock));
+		assert(rc >= 0 && rc < size);
+		pos += rc;
+		size -= rc;
+	}
+
+	rc = snprintf(pos, size, "}");
+	assert(rc >= 0 && rc < size);
+	pos += rc;
+
+	return tt_cstr(buf, pos - buf);
 }
 
 void

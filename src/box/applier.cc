@@ -1522,9 +1522,11 @@ applier_synchro_filter_tx(struct stailq *rows)
 		return 0;
 
 	/*
-	 * We do not nopify promotion/demotion and most of confirm/rollback.
-	 * Such syncrhonous requests should be filtered by txn_limbo to detect
-	 * possible split brain situations.
+	 * Usually, we do not nopify promotion/demotion and confirm/rollback.
+	 * Such synchronous requests should be filtered by txn_limbo to detect
+	 * possible split brain situations. However, certain stale requests
+	 * from obsolete raft terms should be nopified to maintain the
+	 * cluster's integrity.
 	 *
 	 * This means the only filtered out transactions are synchronous ones or
 	 * the ones depending on them.
@@ -1565,6 +1567,11 @@ applier_synchro_filter_tx(struct stailq *rows)
 		 */
 		switch (row->type) {
 		case IPROTO_RAFT_PROMOTE:
+			/* Nopify if it's a stale PROMOTE. */
+			if (item->req.synchro.term <
+			    txn_limbo.promote_greatest_term)
+				break;
+			FALLTHROUGH;
 		case IPROTO_RAFT_DEMOTE:
 			return 0;
 		case IPROTO_RAFT_CONFIRM:
@@ -1580,6 +1587,10 @@ applier_synchro_filter_tx(struct stailq *rows)
 		}
 	}
 	stailq_foreach_entry(item, rows, next) {
+		if (iproto_type_is_synchro_request(item->row.type)) {
+			struct synchro_request *req = &item->req.synchro;
+			say_info("nopify %s", synchro_request_to_string(req));
+		}
 		row = &item->row;
 		row->type = IPROTO_NOP;
 		row->bodycnt = 0;
