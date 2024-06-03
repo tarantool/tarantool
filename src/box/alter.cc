@@ -4128,6 +4128,15 @@ on_replace_cluster_clear_id(struct trigger *trigger, void * /* event */)
 	return 0;
 }
 
+/** Update the synchronous replication quorum. */
+static int
+on_replace_cluster_update_quorum(struct trigger * /* trigger */,
+				 void * /* event */)
+{
+	box_update_replication_synchro_quorum();
+	return 0;
+}
+
 /**
  * A trigger invoked on replace in the space _cluster,
  * which contains cluster configuration.
@@ -4203,6 +4212,15 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool", msg);
 			return -1;
 		}
+		/*
+		 * Update the quorum only after commit. Otherwise the replica
+		 * would have to ack its own insertion.
+		 */
+		struct trigger *on_commit = txn_alter_trigger_new(
+			on_replace_cluster_update_quorum, NULL);
+		if (on_commit == NULL)
+			return -1;
+		txn_stmt_on_commit(stmt, on_commit);
 		struct trigger *on_rollback = txn_alter_trigger_new(
 			on_replace_cluster_clear_id, NULL);
 		if (on_rollback == NULL)

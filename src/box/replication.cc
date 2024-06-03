@@ -360,7 +360,6 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 	say_info("assigned id %d to replica %s",
 		 replica->id, tt_uuid_str(&replica->uuid));
 	replica->anon = false;
-	box_update_replication_synchro_quorum();
 	box_broadcast_ballot();
 }
 
