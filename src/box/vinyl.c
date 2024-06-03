@@ -3100,10 +3100,21 @@ vy_join_send_tuple(struct xstream *stream, uint32_t space_id,
 	return xstream_write(stream, &row);
 }
 
+#if defined(ENABLE_CHECKPOINT_JOIN)
+#include "vinyl_checkpoint_join.c"
+#else /* !defined(ENABLE_CHECKPOINT_JOIN) */
+#define vinyl_engine_checkpoint_join generic_engine_join
+#endif /* !defined(ENABLE_CHECKPOINT_JOIN) */
+
 static int
-vinyl_engine_join(struct engine *engine, void *arg, struct xstream *stream)
+vinyl_engine_join(struct engine *engine, void *arg,
+		  struct engine_checkpoint_cursor *cur, struct xstream *stream)
 {
-	(void)engine;
+	if (cur != NULL && cur->is_checkpoint_join)
+		/* Join from files. */
+		return vinyl_engine_checkpoint_join(engine, arg, cur, stream);
+
+	/* Join from read-view. */
 	int loops = 0;
 	struct vy_join_ctx *ctx = arg;
 	struct vy_join_entry *join_entry;

@@ -511,7 +511,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	}
 
 	/* Send read view to the replica. */
-	engine_join_xc(&ctx, &relay->stream);
+	engine_join_xc(&ctx, NULL, &relay->stream);
 }
 
 int

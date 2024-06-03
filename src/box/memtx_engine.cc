@@ -1354,10 +1354,38 @@ memtx_join_f(va_list ap)
 	return rc;
 }
 
-static int
-memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
+#if defined(ENABLE_CHECKPOINT_JOIN)
+#include "memtx_checkpoint_join.c"
+#else /* !defined(ENABLE_CHECKPOINT_JOIN) */
+
+#define memtx_engine_checkpoint_join generic_engine_join
+
+int
+memtx_engine_recover_synchro(struct memtx_engine *memtx,
+			     const struct vclock *vclock,
+			     struct raft_request *raft_req,
+			     struct synchro_request *synchro_req)
 {
-	(void)engine;
+	(void)memtx;
+	(void)vclock;
+	(void)raft_req;
+	(void)synchro_req;
+	diag_set(ClientError, ER_UNSUPPORTED, "Tarantool CE",
+		 "recovering synchro states from snapshot");
+	return -1;
+}
+
+#endif /* !defined(ENABLE_CHECKPOINT_JOIN) */
+
+static int
+memtx_engine_join(struct engine *engine, void *arg,
+		  struct engine_checkpoint_cursor *cur, struct xstream *stream)
+{
+	if (cur != NULL && cur->is_checkpoint_join)
+		/* Join from files. */
+		return memtx_engine_checkpoint_join(engine, arg, cur, stream);
+
+	/* Join from read-view. */
 	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
 	ctx->stream = stream;
 	/*

@@ -235,14 +235,16 @@ fail:
 }
 
 int
-engine_join(struct engine_join_ctx *ctx, struct xstream *stream)
+engine_join(struct engine_join_ctx *ctx, struct engine_checkpoint_cursor *cur,
+	    struct xstream *stream)
 {
 	ERROR_INJECT_YIELD(ERRINJ_ENGINE_JOIN_DELAY);
 
 	int i = 0;
 	struct engine *engine;
 	engine_foreach(engine) {
-		if (engine->vtab->join(engine, ctx->array[i], stream) != 0)
+		void *ctx_object = ctx->array != NULL ? ctx->array[i] : NULL;
+		if (engine->vtab->join(engine, ctx_object, cur, stream) != 0)
 			return -1;
 		i++;
 	}
@@ -300,10 +302,13 @@ generic_engine_prepare_join(struct engine *engine, void **ctx)
 }
 
 int
-generic_engine_join(struct engine *engine, void *ctx, struct xstream *stream)
+generic_engine_join(struct engine *engine, void *ctx,
+		    struct engine_checkpoint_cursor *cursor,
+		    struct xstream *stream)
 {
 	(void)engine;
 	(void)ctx;
+	(void)cursor;
 	(void)stream;
 	return 0;
 }
