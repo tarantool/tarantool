@@ -1017,6 +1017,7 @@ checkpoint_f(va_list ap)
 
 	struct mh_i32_t *temp_space_ids;
 
+	bool is_synchro_written = false;
 	say_info("saving snapshot `%s'", snap->filename);
 	ERROR_INJECT_WHILE(ERRINJ_SNAP_WRITE_DELAY, {
 		fiber_sleep(0.001);
@@ -1036,6 +1037,22 @@ checkpoint_f(va_list ap)
 		});
 		if (skip)
 			continue;
+		/*
+		 * Raft and limbo states are written right after system spaces
+		 * but before user ones. This is needed to reduce the time,
+		 * needed to acquire states from the checkpoint, which is used
+		 * during checkpoint join.
+		 */
+		if (!is_synchro_written && !space_id_is_system(space_rv->id)) {
+			rc = checkpoint_write_raft(snap, &ckpt->raft);
+			if (rc != 0)
+				break;
+			rc = checkpoint_write_synchro(snap,
+						      &ckpt->synchro_state);
+			if (rc != 0)
+				break;
+			is_synchro_written = true;
+		}
 		struct index_read_view *index_rv =
 			space_read_view_index(space_rv, 0);
 		assert(index_rv != NULL);
@@ -1093,10 +1110,17 @@ checkpoint_f(va_list ap)
 		if (checkpoint_write_invalid_system_row(snap) != 0)
 			goto fail;
 	});
-	if (checkpoint_write_raft(snap, &ckpt->raft) != 0)
-		goto fail;
-	if (checkpoint_write_synchro(snap, &ckpt->synchro_state) != 0)
-		goto fail;
+	/*
+	 * There may be no user data (e.g. when only RAFT_PROMOTE is written),
+	 * write limbo and raft states right after system spaces, at the end
+	 * of the checkpoint.
+	 */
+	if (!is_synchro_written) {
+		if (checkpoint_write_raft(snap, &ckpt->raft) != 0)
+			goto fail;
+		if (checkpoint_write_synchro(snap, &ckpt->synchro_state) != 0)
+			goto fail;
+	}
 	goto done;
 done:
 	if (xlog_close(snap) != 0)
