@@ -4418,9 +4418,27 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 
 /** Unregister the replica affected by the change. */
 static int
-on_replace_cluster_clear_id(struct trigger *trigger, void * /* event */)
+on_replace_cluster_clear_id(struct trigger *trigger, void *event)
 {
-	replica_clear_id((struct replica *)trigger->data);
+	struct replica *replica = (struct replica *)trigger->data;
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
+	(void)stmt;
+	if (replica->id == instance_id) {
+		assert(stmt->row->replica_id != 0 ||
+		       recovery_state != FINISHED_RECOVERY);
+		if (recovery_state == FINISHED_RECOVERY) {
+			diag_set(ClientError, ER_LOCAL_INSTANCE_ID_IS_READ_ONLY,
+				 (unsigned)instance_id);
+			struct diag *diag = diag_get();
+			replicaset_foreach(replica) {
+				if (replica->applier != NULL)
+					applier_kill(replica->applier,
+						     diag_last_error(diag));
+			}
+			diag_clear(diag);
+		}
+	}
+	replica_clear_id(replica);
 	return 0;
 }
 
@@ -4680,18 +4698,18 @@ on_replace_dd_cluster_insert(const struct replica_def *new_def)
 static int
 on_replace_dd_cluster_delete(const struct replica_def *old_def)
 {
+	struct txn_stmt *stmt = txn_current_stmt(in_txn());
 	/*
-	 * It's okay to delete the instance id while it is joining to a cluster
-	 * as long as the id is set by the time bootstrap is complete. Deletion
-	 * can be coming from the master when the latter tried to purge dead
-	 * replicas from _cluster.
+	 * It's okay to delete the instance id when the deletion is coming from
+	 * the master or doing recovery (i.e., after we already applied the
+	 * deletion from the master).
 	 */
-	if (!replicaset.is_joining && old_def->id == instance_id) {
+	if (old_def->id == instance_id && stmt->row->replica_id == 0 &&
+	    recovery_state == FINISHED_RECOVERY) {
 		diag_set(ClientError, ER_LOCAL_INSTANCE_ID_IS_READ_ONLY,
 			 (unsigned)old_def->id);
 		return -1;
 	}
-	struct txn_stmt *stmt = txn_current_stmt(in_txn());
 	struct replica *replica = replica_by_id(old_def->id);
 	if (replica == NULL) {
 		/*
