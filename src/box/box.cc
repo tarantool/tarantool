@@ -4701,6 +4701,10 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		if (replica->id != REPLICA_ID_NIL)
 			tnt_raise(ClientError, ER_PROTOCOL, "Can't subscribe "
 				  "an anonymous replica having an ID assigned");
+		if (!replica->anon)
+			tnt_raise(ClientError, ER_PROTOCOL, "Can't subscribe "
+				  "a previously deleted non-anonymous replica "
+				  "as an anonymous replica");
 	} else if (!req.is_anon &&
 		   (replica == NULL || replica->id == REPLICA_ID_NIL)) {
 		/*

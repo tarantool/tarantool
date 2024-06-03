@@ -416,7 +416,6 @@ replica_clear_id(struct replica *replica)
 	--replicaset.registered_count;
 	gc_delay_unref();
 	if (replica->id == instance_id) {
-		assert(replicaset.is_joining);
 		instance_id = REPLICA_ID_NIL;
 		box_broadcast_id();
 	} else {

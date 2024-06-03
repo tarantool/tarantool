@@ -1652,6 +1652,10 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 	struct latch *latch = (replica ? &replica->order_latch :
 			       &replicaset.applier.order_latch);
 	latch_lock(latch);
+	if (fiber_is_cancelled()) {
+		rc = -1;
+		goto finish;
+	}
 	if (vclock_get(&replicaset.applier.vclock,
 		       last_row->replica_id) >= last_row->lsn) {
 		goto finish;
