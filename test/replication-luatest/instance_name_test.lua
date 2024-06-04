@@ -4,6 +4,8 @@ local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group('with-names')
 
+local wait_timeout = 60
+
 local function wait_for_death(instance)
     -- NB: The address sanitizer may take some time to generate
     -- its report and all this time the process is alive. It takes
@@ -591,7 +593,7 @@ end
 -- Test, that replica doesn't hang on name apply.
 g_no_name.test_replica_hang = function(lg)
     lg.master:exec(function()
-        box.space._cluster:update(2, {{'=', 3, 'replica'}})
+        box.space._cluster:update(2, {{'=', 'name', 'replica'}})
     end)
 
     -- Wait for INSTANCE_NAME to be set.
@@ -599,5 +601,90 @@ g_no_name.test_replica_hang = function(lg)
     lg.replica:exec(function()
         -- Test, that no hang happens.
         box.cfg{instance_name = 'replica'}
+    end)
+
+    -- Cleanup.
+    lg.replica:update_box_cfg{force_recovery = true}
+    lg.master:exec(function()
+        box.space._cluster:update(2, {{'#', 'name', 1}})
+    end)
+    lg.replica:wait_for_vclock_of(lg.master)
+    lg.replica:exec(function()
+        box.cfg{instance_name = box.NULL}
+        box.cfg{force_recovery = false}
+    end)
+end
+
+--
+-- gh-9916: txns being applied from the master during the name change process
+-- could crash the replica or cause "double LSN" error in release.
+--
+g_no_name.test_txns_replication_during_name_setting = function(lg)
+    t.tarantool.skip_if_not_debug()
+    lg.master:exec(function()
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+    end)
+    lg.replica:wait_for_vclock_of(lg.master)
+    lg.replica:exec(function()
+        box.error.injection.set("ERRINJ_WAL_DELAY_COUNTDOWN", 0)
+    end)
+    lg.master:exec(function()
+        box.space.test:replace{1}
+    end)
+    local replica_id = lg.replica:exec(function(timeout)
+        -- One txn from master is being applied by the replica. Not yet
+        -- reflected in its vclock.
+        t.helpers.retrying({timeout = timeout}, function()
+            if box.error.injection.get("ERRINJ_WAL_DELAY") then
+                return
+            end
+            error("No txn from master")
+        end)
+        local fiber = require('fiber')
+        -- Send registration request while having a remote txn being committed
+        -- from the same master.
+        local f = fiber.create(function()
+            box.cfg{instance_name = 'replica'}
+        end)
+        f:set_joinable(true)
+        rawset(_G, 'test_f', f)
+        return box.info.id
+    end, {wait_timeout})
+    lg.master:exec(function(timeout, id)
+        -- Registration request is received.
+        t.helpers.retrying({timeout = timeout}, function()
+            if box.space._cluster:get{id}.name == 'replica' then
+                return
+            end
+            error("No name request from replica")
+        end)
+        -- Bump the LSN again. To make it easier later to wait when the replica
+        -- gets all previous data from the master.
+        box.space.test:replace{2}
+    end, {wait_timeout, replica_id})
+    lg.replica:exec(function()
+        box.error.injection.set("ERRINJ_WAL_DELAY", false)
+        local ok, err = _G.test_f:join()
+        _G.test_f = nil
+        t.assert_equals(err, nil)
+        t.assert(ok)
+        t.assert(box.info.name, 'replica')
+    end)
+    lg.replica:wait_for_vclock_of(lg.master)
+    lg.replica:exec(function()
+        t.assert(box.space.test:get{2}, {2})
+    end)
+
+    -- Cleanup.
+    lg.replica:update_box_cfg{force_recovery = true}
+    lg.master:exec(function()
+        box.space.test:drop()
+        box.space._cluster:update(2, {{'#', 'name', 1}})
+    end)
+    lg.replica:wait_for_vclock_of(lg.master)
+    lg.replica:exec(function()
+        box.cfg{instance_name = box.NULL}
+        box.cfg{force_recovery = false}
     end)
 end
