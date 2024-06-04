@@ -181,6 +181,10 @@ applier_fiber_new(struct applier *applier, const char *name, fiber_func func,
 	return f;
 }
 
+/** Apply all rows in the rows queue as a single transaction. */
+static int
+applier_apply_tx(struct applier *applier, struct stailq *rows);
+
 /*
  * Fiber function to write vclock to replication master.
  * To track connection status, replica answers master
@@ -1000,8 +1004,23 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 						  next)->row);
 			break;
 		}
-		if (apply_final_join_tx(applier->instance_id, &rows) != 0)
-			diag_raise();
+		if (recovery_state < FINISHED_RECOVERY) {
+			/*
+			 * Register during recovery means the joining is still
+			 * in progress and is at its final stage.
+			 */
+			if (apply_final_join_tx(applier->instance_id, &rows) != 0)
+				diag_raise();
+		} else {
+			/*
+			 * Register after recovery means the instance is already
+			 * functional, but is becoming non-anonymous or is
+			 * changing its name. Transactions coming from such
+			 * registration are no different than during subscribe.
+			 */
+			if (applier_apply_tx(applier, &rows) != 0)
+				diag_raise();
+		}
 	}
 
 	return row_count;
@@ -1618,11 +1637,6 @@ applier_process_heartbeat(struct applier *applier, struct applier_tx_row *txr)
 	return 0;
 }
 
-/**
- * Apply all rows in the rows queue as a single transaction.
- *
- * Return 0 for success or -1 in case of an error.
- */
 static int
 applier_apply_tx(struct applier *applier, struct stailq *rows)
 {
