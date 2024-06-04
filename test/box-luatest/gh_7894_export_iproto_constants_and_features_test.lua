@@ -86,6 +86,9 @@ local reference_table = {
         INDEX_NAME = 0x5f,
         TUPLE_FORMATS = 0x60,
         IS_SYNC = 0x61,
+        CHECKPOINT_JOIN = 0x62,
+        CHECKPOINT_VCLOCK = 0x63,
+        CHECKPOINT_LSN = 0x64,
     },
 
     -- `iproto_metadata_key` enumeration.

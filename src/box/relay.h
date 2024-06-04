@@ -42,6 +42,8 @@ struct relay;
 struct replica;
 struct tt_uuid;
 struct vclock;
+struct engine_checkpoint_cursor;
+struct gc_checkpoint_ref;
 
 enum relay_state {
 	/**
@@ -120,12 +122,25 @@ relay_push_raft(struct relay *relay, const struct raft_request *req);
  *
  * @param io        client connection
  * @param sync      sync from incoming JOIN request
- * @param vclock[out] vclock of the read view sent to the replica
+ * @param vclock[out] vclock of the read view or checkpoint sent to the replica
  * @param replica_version_id peer's version
+ * @param cursor    engine cursor used during checkpoint initial join
  */
 void
 relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
-		   uint32_t replica_version_id);
+		   uint32_t replica_version_id,
+		   struct engine_checkpoint_cursor *cursor);
+
+/**
+ * Create gc reference for a snapshot, which is going to be used during
+ * checkpoint initial join.
+ *
+ * @param cursor  engine cursor used during checkpoint initial join
+ * @param gc      gc reference to be set
+ */
+int
+relay_prepare_checkpoint_for_join(struct engine_checkpoint_cursor *cursor,
+				  struct gc_checkpoint_ref *gc);
 
 /**
  * Send final JOIN rows to the replica.

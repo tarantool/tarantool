@@ -4327,12 +4327,27 @@ box_process_fetch_snapshot(struct iostream *io,
 			  "wal_mode = 'none'");
 	}
 
-	say_info("sending current read-view to replica at %s", sio_socketname(io->fd));
-
+	/** Used for checkpoint initial join. */
+	struct engine_checkpoint_cursor cursor = {
+		.is_checkpoint_join = req.is_checkpoint_join,
+		.vclock = &req.checkpoint_vclock,
+		.last_lsn = req.checkpoint_lsn,
+		.lsn_counter = 0,
+	};
+	struct gc_checkpoint_ref gc;
+	auto gc_guard = make_scoped_guard([&] {
+		gc_unref_checkpoint(&gc);
+	});
+	gc_guard.is_active = false;
+	if (cursor.is_checkpoint_join) {
+		if (relay_prepare_checkpoint_for_join(&cursor, &gc) != 0)
+			diag_raise();
+		gc_guard.is_active = true;
+	}
 	/* Send the snapshot data to the instance. */
 	struct vclock start_vclock;
-	relay_initial_join(io, header->sync, &start_vclock, req.version_id);
-	say_info("read-view sent.");
+	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
+			   &cursor);
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -4588,7 +4603,8 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * Initial stream: feed replica with dirty data from engines.
 	 */
 	struct vclock start_vclock;
-	relay_initial_join(io, header->sync, &start_vclock, req.version_id);
+	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
+			   NULL);
 	say_info("initial data sent.");
 	/**
 	 * Register the replica after sending the last row but before sending

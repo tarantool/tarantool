@@ -438,9 +438,48 @@ relay_cord_init(struct relay *relay)
 	rlist_create(&relay->current_tx);
 }
 
+#if defined(ENABLE_CHECKPOINT_JOIN)
+#include "relay_checkpoint_join.cc"
+#else /* !defined(ENABLE_CHECKPOINT_JOIN) */
+
+int
+relay_prepare_checkpoint_for_join(struct engine_checkpoint_cursor *cursor,
+				  struct gc_checkpoint_ref *gc)
+{
+	(void)cursor;
+	(void)gc;
+	diag_set(ClientError, ER_UNSUPPORTED, "Tarantool CE",
+		 "checkpoint snapshot fetching");
+	return -1;
+}
+
+/**
+ * Prepares vclock of the snapshot, which is going to be sent during
+ * initial join. Either takes the latest or the one, which is requested
+ * in the cursor. The function also recovers raft and limbo states from the
+ * checkpoint, they're going to be sent during JOIN_META.
+ */
+static int
+relay_prepare_checkpoint_initial_join(struct engine_checkpoint_cursor *cursor,
+				      struct vclock *vclock,
+				      struct raft_request *raft_req,
+				      struct synchro_request *synchro_req)
+{
+	(void)cursor;
+	(void)vclock;
+	(void)raft_req;
+	(void)synchro_req;
+	diag_set(ClientError, ER_UNSUPPORTED, "Tarantool CE",
+		 "checkpoint snapshot fetching");
+	return -1;
+}
+
+#endif /* !defined(ENABLE_CHECKPOINT_JOIN) */
+
 void
 relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
-		   uint32_t replica_version_id)
+		   uint32_t replica_version_id,
+		   struct engine_checkpoint_cursor *cursor)
 {
 	struct relay *relay = relay_new(NULL);
 	if (relay == NULL)
@@ -453,33 +492,50 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 		relay_delete(relay);
 	});
 
-	/* Freeze a read view in engines. */
-	struct engine_join_ctx ctx;
-	engine_prepare_join_xc(&ctx);
-	auto join_guard = make_scoped_guard([&] {
-		engine_complete_join(&ctx);
-	});
-
-	/*
-	 * Sync WAL to make sure that all changes visible from
-	 * the frozen read view are successfully committed and
-	 * obtain corresponding vclock.
-	 */
-	if (wal_sync(vclock) != 0)
-		diag_raise();
-
-	/*
-	 * Start sending data only when the latest sync
-	 * transaction is confirmed.
-	 */
-	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
-		diag_raise();
-
 	struct synchro_request req;
 	struct raft_request raft_req;
 	struct vclock limbo_vclock;
-	txn_limbo_checkpoint(&txn_limbo, &req, &limbo_vclock);
-	box_raft_checkpoint_local(&raft_req);
+	struct engine_join_ctx ctx;
+	ctx.array = NULL;
+	/*
+	 * Guard is defined prematurely, as it must exist in the global scope
+	 * of the function. It works only during read-view join.
+	 */
+	auto join_guard = make_scoped_guard([&] {
+		engine_complete_join(&ctx);
+	});
+	if (cursor != NULL && cursor->is_checkpoint_join) {
+		join_guard.is_active = false;
+		/** Checkpoint initial join is going to be done. */
+		int rc = relay_prepare_checkpoint_initial_join(cursor, vclock,
+							       &raft_req, &req);
+		if (rc != 0)
+			diag_raise();
+		say_info("sending checkpoint with vclock %s at signature %"
+			 PRId64 " to replica at %s", vclock_to_string(vclock),
+			 vclock_sum(vclock), sio_socketname(io->fd));
+	} else {
+		/* Freeze a read view in engines. */
+		engine_prepare_join_xc(&ctx);
+
+		/*
+		 * Sync WAL to make sure that all changes visible from
+		 * the frozen read view are successfully committed and
+		 * obtain corresponding vclock.
+		 */
+		if (wal_sync(vclock) != 0)
+			diag_raise();
+
+		/*
+		 * Start sending data only when the latest sync
+		 * transaction is confirmed.
+		 */
+		if (txn_limbo_wait_confirm(&txn_limbo) != 0)
+			diag_raise();
+
+		txn_limbo_checkpoint(&txn_limbo, &req, &limbo_vclock);
+		box_raft_checkpoint_local(&raft_req);
+	}
 
 	/* Respond to the JOIN request with the current vclock. */
 	struct xrow_header row;
@@ -511,7 +567,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	}
 
 	/* Send read view to the replica. */
-	engine_join_xc(&ctx, NULL, &relay->stream);
+	engine_join_xc(&ctx, cursor, &relay->stream);
 }
 
 int

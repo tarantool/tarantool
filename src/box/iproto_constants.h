@@ -218,7 +218,22 @@ extern const char *iproto_flag_bit_strs[];
 	/**
 	 * Flag indicating whether the transaction is synchronous.
 	 */								\
-	 _(IS_SYNC, 0x61, MP_BOOL)
+	 _(IS_SYNC, 0x61, MP_BOOL)					\
+	 /**
+	  * Flag indicating whether checkpoint join should be done.
+	  */								\
+	 _(CHECKPOINT_JOIN, 0x62, MP_BOOL)				\
+	 /**
+	  * Shows the signature of the checkpoint to read from.
+	  * Requires CHECKPOINT_JOIN to be true.
+	  */								\
+	 _(CHECKPOINT_VCLOCK, 0x63, MP_MAP)				\
+	 /**
+	  * Shows the last number of row client has. Server sends
+	  * all rows > IPROTO_CHECKPOINT_LSN. Requires CHECKPOINT_JOIN
+	  * to be true and CHECKPOINT_VCLOCK to be set.
+	  */								\
+	 _(CHECKPOINT_LSN, 0x64, MP_INT)				\
 
 #define IPROTO_KEY_MEMBER(s, v, ...) IPROTO_ ## s = v,
 

@@ -862,9 +862,8 @@ applier_fetch_snapshot(struct applier *applier)
 	struct iostream *io = &applier->io;
 	struct xrow_header row;
 
-	struct fetch_snapshot_request req = {
-		.version_id = tarantool_version_id(),
-	};
+	struct fetch_snapshot_request req;
+	req.version_id = tarantool_version_id();
 	RegionGuard region_guard(&fiber()->gc);
 	xrow_encode_fetch_snapshot(&row, &req);
 	coio_write_xrow(io, &row);
