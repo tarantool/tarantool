@@ -24,9 +24,9 @@ local decode_sample = uri.escape(encode_sample, escape_opts)
 -- iterations slower than next ones. To avoid such effect we can introduce
 -- "warmup" iterations, disable JIT at all or make JIT compilation
 -- aggressive from the beginning.
---   - hotloop=1 enables compilation in loops on first iteration.
---   - hotexit=1 enables faster compilation for root traces as well as side
---     traces.
+--   - hotloop=1 enables compilation in loops after the first iteration.
+--   - hotexit=1 enables faster compilation for side traces after
+--     exit the parent trace.
 jit.opt.start("hotloop=1", "hotexit=1")
 
 local cycles = 10^3
