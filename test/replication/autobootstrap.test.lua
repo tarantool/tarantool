@@ -38,6 +38,7 @@ _ = test_run:cmd("switch default")
 --
 
 vclock = test_run:get_cluster_vclock(SERVERS)
+vclock[0] = nil
 vclock2 = test_run:wait_cluster_vclock(SERVERS, vclock)
 vclock_diff(vclock1, vclock2)
 

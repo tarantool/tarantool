@@ -4447,11 +4447,11 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	coio_write_xrow(io, &row);
 
 	/*
-	 * Register the replica as a WAL GC consumer and unregister
-	 * temporary consumer.
+	 * Replica was registered as a WAL GC consumer on insert to _cluster,
+	 * so just advance its consumer now.
 	 */
-	gc_consumer_register(&replica->uuid, &stop_vclock, "replica %s",
-			     tt_uuid_str(&replica->uuid));
+	if (gc_consumer_update(&replica->uuid, &stop_vclock) != 0)
+		diag_raise();
 	gc_consumer_unregister_anonymous(gc_temporary);
 	gc_guard.is_active = false;
 }
@@ -4609,11 +4609,11 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	coio_write_xrow(io, &row);
 
 	/*
-	 * Register the replica as a WAL GC consumer and unregister
-	 * temporary consumer.
+	 * Replica was registered as a WAL GC consumer on insert to _cluster,
+	 * so just advance its consumer now.
 	 */
-	gc_consumer_register(&replica->uuid, &stop_vclock, "replica %s",
-			     tt_uuid_str(&replica->uuid));
+	if (gc_consumer_update(&replica->uuid, &stop_vclock) != 0)
+		diag_raise();
 	gc_consumer_unregister_anonymous(gc_temporary);
 	gc_guard.is_active = false;
 }
@@ -4670,7 +4670,8 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	struct replica *replica = replica_by_uuid(&req.instance_uuid);
 
 	if (!req.is_anon &&
-	    (replica == NULL || replica->id == REPLICA_ID_NIL)) {
+	    (replica == NULL || replica->id == REPLICA_ID_NIL ||
+	     !gc_consumer_is_registered(&replica->uuid))) {
 		/*
 		 * The instance is not anonymous, and is registered (at least it
 		 * claims so), but its ID is not delivered to the current
@@ -4681,6 +4682,11 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		 * nodes yet.
 		 * Also can happen when the replica is deleted from _cluster,
 		 * but still tries to subscribe. It won't have an ID here.
+		 * Moreover, non-anonymous replica having no consumer (and our
+		 * protocol implies that any registered replica has one) means
+		 * that record in _cluster wasn't committed yet because the
+		 * consumer is created on commit, so this case is considered as
+		 * too early subscribe as well.
 		 */
 		tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
 			  tt_uuid_str(&req.instance_uuid));
@@ -4725,16 +4731,9 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * recreate the gc consumer unconditionally to make sure it holds
 	 * the correct vclock.
 	 */
-	if (!replica->anon) {
-		if (!gc_consumer_is_registered(&replica->uuid)) {
-			gc_consumer_register(&replica->uuid, &start_vclock,
-					     "replica %s",
-					     tt_uuid_str(&replica->uuid));
-			gc_delay_unref();
-		} else {
-			gc_consumer_update(&replica->uuid, &start_vclock);
-		}
-	}
+	if (!replica->anon &&
+	    gc_consumer_update(&replica->uuid, &start_vclock) != 0)
+		diag_raise();
 	/*
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,

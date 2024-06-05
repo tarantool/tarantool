@@ -13,6 +13,7 @@ box.space.test:count()
 
 test_run:cmd('switch default')
 vclock1 = test_run:get_vclock('autobootstrap1')
+vclock1[0] = nil
 vclock2 = test_run:wait_cluster_vclock(SERVERS, vclock1)
 
 test_run:cmd("switch autobootstrap2")

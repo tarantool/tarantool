@@ -54,7 +54,10 @@ local function wait_downstream_updated(master, replica)
     local id = replica:get_instance_id()
     t.helpers.retrying({}, function()
         master:exec(function(id)
-            t.assert_equals(box.info.vclock,
+            -- Ignore local lsn
+            local vclock = table.deepcopy(box.info.vclock)
+            vclock[0] = nil
+            t.assert_equals(vclock,
                             box.info.replication[id].downstream.vclock,
                             "Downstream vclock is updated")
         end, {id})

@@ -379,6 +379,7 @@ g.test_internal_ballot = function(cg)
         box.space.test:insert{1}
         return box.info.vclock
     end)
+    vclock[0] = nil
     local ballot_key = box.iproto.ballot_key
     local expected = {
         [ballot_key.IS_RO_CFG] = true,
@@ -401,6 +402,8 @@ g.test_internal_ballot = function(cg)
     expected[ballot_key.IS_ANON] = false
     -- Replica registration bumps vclock.
     expected[ballot_key.VCLOCK] = cg.master:get_vclock()
+    expected[ballot_key.VCLOCK][0] = nil
+    print(require('json').encode(expected[ballot_key.VCLOCK]))
     table.insert(expected[ballot_key.REGISTERED_REPLICA_UUIDS],
                  cg.replica:get_instance_uuid())
     table.sort(expected[ballot_key.REGISTERED_REPLICA_UUIDS])
@@ -418,5 +421,6 @@ g.test_internal_ballot = function(cg)
     cg.replica:update_box_cfg{instance_name='replica-name'}
     expected[ballot_key.INSTANCE_NAME] = 'replica-name'
     expected[ballot_key.VCLOCK] = cg.master:get_vclock()
+    expected[ballot_key.VCLOCK][0] = nil
     cg.replica:exec(wait_ballot_updated_to, {expected})
 end
