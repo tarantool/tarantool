@@ -643,7 +643,7 @@ static void
 tx_gc_advance(struct cmsg *msg)
 {
 	struct relay_gc_msg *m = (struct relay_gc_msg *)msg;
-	gc_consumer_advance(m->relay->replica->gc, &m->vclock);
+	gc_consumer_advance(&m->relay->replica->uuid, &m->vclock);
 	free(m);
 }
 

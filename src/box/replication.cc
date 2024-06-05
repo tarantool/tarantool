@@ -297,7 +297,6 @@ replica_new(void)
 	replica->uuid = uuid_nil;
 	*replica->name = 0;
 	replica->applier = NULL;
-	replica->gc = NULL;
 	replica->is_applier_healthy = false;
 	replica->is_relay_healthy = false;
 	rlist_create(&replica->in_anon);
@@ -314,8 +313,9 @@ replica_delete(struct replica *replica)
 	assert(replica_is_orphan(replica));
 	if (replica->relay != NULL)
 		relay_delete(replica->relay);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
+	/* Drop consumer only if another replica does not own it. */
+	if (replica_by_uuid(&replica->uuid) == NULL)
+		gc_consumer_unregister(&replica->uuid);
 	TRASH(replica);
 	free(replica);
 }
@@ -361,14 +361,8 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		instance_id = replica_id;
 		box_broadcast_id();
 	} else if (replica->anon) {
-		/*
-		 * Set replica gc on its transition from
-		 * anonymous to a normal one.
-		 */
-		assert(replica->gc == NULL);
-		replica->gc = gc_consumer_register(&replicaset.vclock,
-						   "replica %s",
-						   tt_uuid_str(&replica->uuid));
+		gc_consumer_register(&replica->uuid, &replicaset.vclock,
+				     "replica %s", tt_uuid_str(&replica->uuid));
 	}
 	replicaset.replica_by_id[replica_id] = replica;
 	gc_delay_ref();
@@ -434,11 +428,8 @@ replica_clear_id(struct replica *replica)
 	 * job to replica_on_relay_stop, which will be called as soon as
 	 * the relay thread exits.
 	 */
-	if (replica->gc != NULL &&
-	    relay_get_state(replica->relay) != RELAY_FOLLOW) {
-		gc_consumer_unregister(replica->gc);
-		replica->gc = NULL;
-	}
+	if (relay_get_state(replica->relay) != RELAY_FOLLOW)
+		gc_consumer_unregister(&replica->uuid);
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
 		/*
@@ -1360,14 +1351,8 @@ replica_on_relay_stop(struct replica *replica)
 	 * WALs for it anymore. Unregister it with the garbage
 	 * collector then. See also replica_clear_id.
 	 */
-	if (replica->id == REPLICA_ID_NIL) {
-		if (!replica->anon) {
-			gc_consumer_unregister(replica->gc);
-			replica->gc = NULL;
-		} else {
-			assert(replica->gc == NULL);
-		}
-	}
+	if (replica->id == REPLICA_ID_NIL && !replica->anon)
+		gc_consumer_unregister(&replica->uuid);
 
 	replica_update_relay_health(replica);
 

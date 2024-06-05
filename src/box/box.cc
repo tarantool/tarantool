@@ -4407,11 +4407,17 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
-	struct gc_consumer *gc = gc_consumer_register(
-		&start_vclock, "replica %s", tt_uuid_str(&req.instance_uuid));
-	if (gc == NULL)
-		diag_raise();
-	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
+	/*
+	 * Register an anonymous consumer (not associated with replica) to hold
+	 * xlogs until replica is successfully registered.
+	 */
+	struct gc_consumer *gc_temporary =
+		gc_consumer_register_anonymous(&start_vclock,
+					       "replica %s register",
+					       tt_uuid_str(&req.instance_uuid));
+	auto gc_guard = make_scoped_guard([&] {
+		gc_consumer_unregister_anonymous(gc_temporary);
+	});
 
 	say_info("registering replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
@@ -4441,14 +4447,12 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	coio_write_xrow(io, &row);
 
 	/*
-	 * Advance the WAL consumer state to the position where
-	 * registration was complete and assign it to the
-	 * replica.
+	 * Register the replica as a WAL GC consumer and unregister
+	 * temporary consumer.
 	 */
-	gc_consumer_advance(gc, &stop_vclock);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
-	replica->gc = gc;
+	gc_consumer_register(&replica->uuid, &stop_vclock, "replica %s",
+			     tt_uuid_str(&replica->uuid));
+	gc_consumer_unregister_anonymous(gc_temporary);
 	gc_guard.is_active = false;
 }
 
@@ -4549,14 +4553,16 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 		}
 	}
 	/*
-	 * Register the replica as a WAL consumer so that
-	 * it can resume FINAL JOIN where INITIAL JOIN ends.
+	 * Register an anonymous consumer (not associated with replica) to hold
+	 * xlogs until replica is successfully joined the replicaset.
 	 */
-	struct gc_consumer *gc = gc_consumer_register(&replicaset.vclock,
-				"replica %s", tt_uuid_str(&req.instance_uuid));
-	if (gc == NULL)
-		diag_raise();
-	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
+	struct gc_consumer *gc_temporary =
+		gc_consumer_register_anonymous(&replicaset.vclock,
+					       "replica %s join",
+					       tt_uuid_str(&req.instance_uuid));
+	auto gc_guard = make_scoped_guard([&] {
+		gc_consumer_unregister_anonymous(gc_temporary);
+	});
 
 	say_info("joining replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
@@ -4603,13 +4609,12 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	coio_write_xrow(io, &row);
 
 	/*
-	 * Advance the WAL consumer state to the position where
-	 * FINAL JOIN ended and assign it to the replica.
+	 * Register the replica as a WAL GC consumer and unregister
+	 * temporary consumer.
 	 */
-	gc_consumer_advance(gc, &stop_vclock);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
-	replica->gc = gc;
+	gc_consumer_register(&replica->uuid, &stop_vclock, "replica %s",
+			     tt_uuid_str(&replica->uuid));
+	gc_consumer_unregister_anonymous(gc_temporary);
 	gc_guard.is_active = false;
 }
 
@@ -4721,15 +4726,9 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * the correct vclock.
 	 */
 	if (!replica->anon) {
-		bool had_gc = false;
-		if (replica->gc != NULL) {
-			gc_consumer_unregister(replica->gc);
-			had_gc = true;
-		}
-		replica->gc = gc_consumer_register(&start_vclock, "replica %s",
-						   tt_uuid_str(&replica->uuid));
-		if (replica->gc == NULL)
-			diag_raise();
+		bool had_gc = gc_consumer_is_registered(&replica->uuid);
+		gc_consumer_register(&replica->uuid, &start_vclock,
+				     "replica %s", tt_uuid_str(&replica->uuid));
 		if (!had_gc)
 			gc_delay_unref();
 	}
