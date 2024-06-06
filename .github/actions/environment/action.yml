@@ -94,8 +94,11 @@ runs:
         git submodule foreach --recursive 'git clean -xffd'
 
         # See for details: https://github.com/tarantool/tarantool/issues/7472.
-        # Do nothing on GitHub-hosted runners.
-        if ${{ runner.os == 'Linux' &&
+        # However, this workaround doesn't work on our aarch64 runners due to
+        # the following error:
+        #     mount: /tmp/luajit-test-vardir: mount failed: Operation not permitted
+        # Looks like it happens because our aarch64 runners are LXD containers.
+        if ${{ runner.os == 'Linux' && runner.arch != 'ARM64' &&
                !contains(runner.name, 'GitHub Actions') }}; then
             LUAJIT_TEST_VARDIR=/tmp/luajit-test-vardir
             LUAJIT_TEST_VARDIR_DISK=/tmp/luajit-test-vardir-disk/disk.ext4
