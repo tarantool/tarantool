@@ -157,7 +157,7 @@ applier_check_sync(struct applier *applier)
 	if (applier->state == APPLIER_SYNC &&
 	    applier->lag <= replication_sync_lag &&
 	    vclock_compare_ignore0(&applier->remote_vclock_at_subscribe,
-				   &replicaset.vclock) <= 0) {
+				   instance_vclock) <= 0) {
 		/* Applier is synced, switch to "follow". */
 		applier_set_state(applier, APPLIER_FOLLOW);
 	}
@@ -788,7 +788,7 @@ applier_wait_snapshot(struct applier *applier)
 		 * Used to initialize the replica's initial
 		 * vclock in bootstrap_from_master()
 		 */
-		xrow_decode_vclock_xc(&row, &replicaset.vclock);
+		xrow_decode_vclock_xc(&row, instance_vclock);
 	}
 
 	coio_read_xrow(io, ibuf, &row);
@@ -844,7 +844,7 @@ applier_wait_snapshot(struct applier *applier)
 				 * vclock yet, do it now. In 1.7+
 				 * this vclock is not used.
 				 */
-				xrow_decode_vclock_xc(&row, &replicaset.vclock);
+				xrow_decode_vclock_xc(&row, instance_vclock);
 			}
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
@@ -1234,7 +1234,7 @@ applier_rollback_by_wal_io(int64_t signature)
 	trigger_run(&replicaset.applier.on_rollback, NULL);
 
 	/* Rollback applier vclock to the committed one. */
-	vclock_copy(&replicaset.applier.vclock, &replicaset.vclock);
+	vclock_copy(&replicaset.applier.vclock, instance_vclock);
 }
 
 static int
@@ -1510,7 +1510,7 @@ apply_final_join_tx(uint32_t replica_id, struct stailq *rows)
 		&stailq_last_entry(rows, struct applier_tx_row, next)->row;
 	int rc = 0;
 	/* WAL isn't enabled yet, so follow vclock manually. */
-	vclock_follow_xrow(&replicaset.vclock, last_row);
+	vclock_follow_xrow(instance_vclock, last_row);
 	if (unlikely(iproto_type_is_synchro_request(txr->row.type))) {
 		rc = apply_synchro_req(replica_id, &txr->row,
 				       &txr->req.synchro);
@@ -1741,7 +1741,7 @@ applier_signal_ack(struct applier *applier)
 		applier->txn_last_tm = 0;
 		applier->ack_msg.vclock_sync = applier->last_vclock_sync;
 		applier->ack_msg.term = box_raft()->term;
-		vclock_copy(&applier->ack_msg.vclock, &replicaset.vclock);
+		vclock_copy(&applier->ack_msg.vclock, instance_vclock);
 		cmsg_init(&applier->ack_msg.base, applier->ack_route);
 		cpipe_push(&applier->applier_thread->thread_pipe,
 			   &applier->ack_msg.base);
@@ -2368,7 +2368,7 @@ applier_subscribe(struct applier *applier)
 
 	struct subscribe_request req;
 	memset(&req, 0, sizeof(req));
-	vclock_copy(&req.vclock, &replicaset.vclock);
+	vclock_copy(&req.vclock, instance_vclock);
 	ERROR_INJECT(ERRINJ_REPLICASET_VCLOCK, {
 		vclock_create(&req.vclock);
 	});

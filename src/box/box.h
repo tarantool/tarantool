@@ -57,12 +57,18 @@ struct vclock;
  * Pointer to TX thread local vclock.
  *
  * During recovery it points to the current recovery position.
- * Once recovery is complete, it is set to &replicaset.vclock.
+ * Once recovery is complete, it is set to instance_vclock.
  *
  * We need it for reporting the actual vclock in box.info while
  * the instance is in hot standby mode.
  */
 extern const struct vclock *box_vclock;
+/**
+ * Vclock of the instance as it is stored on disk. It means that during
+ * recovery this vclock points to the end of WAL, not to the current recovery
+ * position.
+ */
+extern struct vclock *instance_vclock;
 
 /**
  * Name of the authentication method that is currently used on

@@ -57,6 +57,7 @@
 #include "wal.h"
 #include "txn_limbo.h"
 #include "raft.h"
+#include "box.h"
 
 #include <stdlib.h>
 
@@ -584,7 +585,7 @@ relay_final_join(struct replica *replica, struct iostream *io, uint64_t sync,
 		     tnt_raise(ClientError, ER_INJECTION, "relay final join"));
 
 	ERROR_INJECT(ERRINJ_RELAY_FINAL_SLEEP, {
-		while (vclock_compare(stop_vclock, &replicaset.vclock) == 0)
+		while (vclock_compare(stop_vclock, instance_vclock) == 0)
 			fiber_sleep(0.001);
 	});
 }
@@ -1127,7 +1128,7 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 		replica_on_relay_stop(replica);
 	});
 
-	vclock_copy(&relay->local_vclock_at_subscribe, &replicaset.vclock);
+	vclock_copy(&relay->local_vclock_at_subscribe, instance_vclock);
 	/*
 	 * Save the first vclock as 'received'. Because it was really received.
 	 */
