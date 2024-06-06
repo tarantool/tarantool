@@ -256,7 +256,7 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 	(void)arg;
 	struct vy_slice *slice;
 	rlist_foreach_entry(slice, &range->slices, in_range)
-		vy_slice_wait_pinned(slice);
+		assert(slice->pin_count == 0);
 	vy_range_delete(range);
 	return NULL;
 }
