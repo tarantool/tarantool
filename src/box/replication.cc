@@ -180,12 +180,11 @@ replication_init(int num_threads)
 	memset(&replicaset, 0, sizeof(replicaset));
 	replica_hash_new(&replicaset.hash);
 	rlist_create(&replicaset.anon);
-	vclock_create(&replicaset.vclock);
 	fiber_cond_create(&replicaset.applier.cond);
 	latch_create(&replicaset.applier.order_latch);
 
 	vclock_create(&replicaset.applier.vclock);
-	vclock_copy(&replicaset.applier.vclock, &replicaset.vclock);
+	vclock_copy(&replicaset.applier.vclock, instance_vclock);
 	rlist_create(&replicaset.applier.on_rollback);
 	rlist_create(&replicaset.applier.on_wal_write);
 
@@ -350,7 +349,7 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		 * anonymous to a normal one.
 		 */
 		assert(replica->gc == NULL);
-		replica->gc = gc_consumer_register(&replicaset.vclock,
+		replica->gc = gc_consumer_register(instance_vclock,
 						   "replica %s",
 						   tt_uuid_str(&replica->uuid));
 	}
@@ -1036,8 +1035,7 @@ replicaset_needs_rejoin(struct replica **master)
 			continue;
 
 		const struct ballot *ballot = &applier->ballot;
-		if (vclock_compare(&ballot->gc_vclock,
-				   &replicaset.vclock) <= 0) {
+		if (vclock_compare(&ballot->gc_vclock, instance_vclock) <= 0) {
 			/*
 			 * There's at least one master that still stores
 			 * WALs needed by this instance. Proceed to local
@@ -1049,14 +1047,15 @@ replicaset_needs_rejoin(struct replica **master)
 		const char *uuid_str = tt_uuid_str(&replica->uuid);
 		const char *addr_str = sio_strfaddr(&applier->addr,
 						applier->addr_len);
-		const char *local_vclock_str = vclock_to_string(&replicaset.vclock);
+		const char *local_vclock_str =
+			vclock_to_string(instance_vclock);
 		const char *remote_vclock_str = vclock_to_string(&ballot->vclock);
 		const char *gc_vclock_str = vclock_to_string(&ballot->gc_vclock);
 
 		say_info("can't follow %s at %s: required %s available %s",
 			 uuid_str, addr_str, local_vclock_str, gc_vclock_str);
 
-		if (vclock_compare(&replicaset.vclock, &ballot->vclock) > 0) {
+		if (vclock_compare(instance_vclock, &ballot->vclock) > 0) {
 			/*
 			 * Replica has some rows that are not present on
 			 * the master. Don't rebootstrap as we don't want
