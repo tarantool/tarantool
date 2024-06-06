@@ -313,7 +313,7 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 		 * This will only fail if the mp_type is not numeric, which is
 		 * impossible here (see field_mp_plain_type_is_compatible).
 		 */
-		if (mp_read_double_lossy(&f, &value) == -1)
+		if (mp_read_double_lossy(field, &value) == -1)
 			unreachable();
 		char *double_msgpack_end = mp_encode_double(buf, value);
 		size = double_msgpack_end - buf;
