@@ -4726,11 +4726,14 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * the correct vclock.
 	 */
 	if (!replica->anon) {
-		bool had_gc = gc_consumer_is_registered(&replica->uuid);
-		gc_consumer_register(&replica->uuid, &start_vclock,
-				     "replica %s", tt_uuid_str(&replica->uuid));
-		if (!had_gc)
+		if (!gc_consumer_is_registered(&replica->uuid)) {
+			gc_consumer_register(&replica->uuid, &start_vclock,
+					     "replica %s",
+					     tt_uuid_str(&replica->uuid));
 			gc_delay_unref();
+		} else {
+			gc_consumer_update(&replica->uuid, &start_vclock);
+		}
 	}
 	/*
 	 * Send a response to SUBSCRIBE request, tell

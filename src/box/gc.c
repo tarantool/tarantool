@@ -764,26 +764,27 @@ gc_consumer_is_registered(const struct tt_uuid *uuid)
 }
 
 void
-gc_consumer_advance(const struct tt_uuid *uuid, const struct vclock *vclock)
+gc_consumer_update(const struct tt_uuid *uuid, const struct vclock *vclock)
 {
 	struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
 	if (consumer == NULL || consumer->is_inactive)
 		return;
 
-	int64_t signature = vclock_sum(vclock);
-	int64_t prev_signature = vclock_sum(&consumer->vclock);
-
-	assert(signature >= prev_signature);
-	if (signature == prev_signature)
+	if (vclock_compare_ignore0(&consumer->vclock, vclock) == 0)
 		return; /* nothing to do */
+
+	struct vclock old_vclock;
+	vclock_copy(&old_vclock, &consumer->vclock);
 
 	/*
 	 * Do not update the tree unless the tree invariant
 	 * is violated.
 	 */
-	struct gc_consumer *next = gc_tree_next(&gc.active_consumers, consumer);
-	bool update_tree = (next != NULL &&
-			    vclock_lex_compare(vclock, &next->vclock) >= 0);
+	struct gc_consumer *n = gc_tree_next(&gc.active_consumers, consumer);
+	struct gc_consumer *p = gc_tree_prev(&gc.active_consumers, consumer);
+	bool update_tree =
+		(n != NULL && vclock_lex_compare(vclock, &n->vclock) >= 0) ||
+		(p != NULL && vclock_lex_compare(vclock, &p->vclock) <= 0);
 
 	if (update_tree)
 		gc_tree_remove(&gc.active_consumers, consumer);
@@ -793,7 +794,9 @@ gc_consumer_advance(const struct tt_uuid *uuid, const struct vclock *vclock)
 	if (update_tree)
 		gc_tree_insert(&gc.active_consumers, consumer);
 
-	gc_schedule_cleanup();
+	/* Schedule cleanup only when new vclock is greater or incomparable. */
+	if (vclock_compare_ignore0(&consumer->vclock, &old_vclock) > 0)
+		gc_schedule_cleanup();
 }
 
 struct gc_consumer *
