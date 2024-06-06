@@ -413,6 +413,16 @@ gc_wait_cleanup(void)
 		fiber_cond_wait(&gc.cleanup_cond);
 }
 
+/**
+ * Returns true when the consumer is outdated - its vclock is either
+ * less than or incomparable with the wal gc vclock.
+ */
+static bool
+gc_consumer_is_outdated(struct gc_consumer *consumer)
+{
+	return vclock_compare_ignore0(&gc.vclock, &consumer->vclock) > 0;
+}
+
 void
 gc_advance(const struct vclock *vclock)
 {
@@ -433,7 +443,7 @@ gc_advance(const struct vclock *vclock)
 		 * either less than or incomparable with the wal
 		 * gc vclock.
 		 */
-		if (vclock_compare_ignore0(vclock, &consumer->vclock) <= 0) {
+		if (!gc_consumer_is_outdated(consumer)) {
 			consumer = next;
 			continue;
 		}
@@ -697,9 +707,10 @@ gc_consumer_register_impl(const struct tt_uuid *uuid,
 		consumer->uuid = uuid_nil;
 	}
 
-	consumer->is_inactive = false;
 	vclock_copy(&consumer->vclock, vclock);
-	gc_tree_insert(&gc.active_consumers, consumer);
+	consumer->is_inactive = gc_consumer_is_outdated(consumer);
+	if (!consumer->is_inactive)
+		gc_tree_insert(&gc.active_consumers, consumer);
 	return consumer;
 }
 
@@ -767,8 +778,18 @@ void
 gc_consumer_update(const struct tt_uuid *uuid, const struct vclock *vclock)
 {
 	struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
-	if (consumer == NULL || consumer->is_inactive)
+	if (consumer == NULL)
 		return;
+
+	/* If the consumer is inactive, activate it if needed. */
+	if (consumer->is_inactive) {
+		vclock_copy(&consumer->vclock, vclock);
+		consumer->is_inactive = gc_consumer_is_outdated(consumer);
+		if (!consumer->is_inactive)
+			gc_tree_insert(&gc.active_consumers, consumer);
+		/* Do not schedule cleanup - consumer didn't pin any xlogs. */
+		return;
+	}
 
 	if (vclock_compare_ignore0(&consumer->vclock, vclock) == 0)
 		return; /* nothing to do */
