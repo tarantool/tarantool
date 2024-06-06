@@ -451,6 +451,8 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceab812041428eff0f888bf27d06470fa52" kind="enumvalue"><name>ER_REPLICASET_NO_WRITABLE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea760deaceea8de7f3f7076d0b9649d08e" kind="enumvalue"><name>ER_REPLICASET_MORE_THAN_ONE_WRITABLE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea71816f8457795eed640a054d84728174" kind="enumvalue"><name>ER_TXN_COMMIT</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf5908af044b8dcd5d28db05177ac18b8" kind="enumvalue"><name>ER_READ_VIEW_BUSY</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcead6dbe2eef41eafa232935dd44d788b90" kind="enumvalue"><name>ER_READ_VIEW_CLOSED</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
@@ -539,6 +541,7 @@
     <member refid="module_8h_1a08ca887563c2bcd2e17ad199dac627b2" kind="function"><name>luaL_iscallable</name></member>
     <member refid="module_8h_1ac572fcff70dbc1c4c33339f1db082315" kind="function"><name>luaT_toibuf</name></member>
     <member refid="module_8h_1ae5e643c0eff90628dd8cb09ddd8dfc68" kind="function"><name>luaT_error</name></member>
+    <member refid="module_8h_1a8fccc46b7877086aefbcce5535e8b1cf" kind="function"><name>luaT_error_at</name></member>
     <member refid="module_8h_1aa1740670301221218d3780f2a4df33c6" kind="function"><name>luaT_push_nil_and_error</name></member>
     <member refid="module_8h_1aff9f0f763644cd5edc43ac632078b471" kind="function"><name>luaT_pusherror</name></member>
     <member refid="module_8h_1a94bf484fef1147b9e53323cd5082b505" kind="function"><name>box_txn_id</name></member>
