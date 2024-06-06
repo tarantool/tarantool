@@ -647,6 +647,8 @@ recovery_journal_write(struct journal *base,
 		       struct journal_entry *entry)
 {
 	struct recovery_journal *journal = (struct recovery_journal *) base;
+	for (int i = 0; i < entry->n_rows; ++i)
+		vclock_follow_xrow(journal->vclock, entry->rows[i]);
 	entry->res = vclock_sum(journal->vclock);
 	/*
 	 * Since there're no actual writes, fire a
@@ -732,6 +734,8 @@ wal_stream_apply_synchro_row(struct wal_stream *stream, struct xrow_header *row)
 		say_error("couldn't decode a synchro request");
 		return -1;
 	}
+	if (journal_write_row(row) != 0)
+		return -1;
 	return txn_limbo_process(&txn_limbo, &syn_req);
 }
 
@@ -749,6 +753,8 @@ wal_stream_apply_raft_row(struct wal_stream *stream, struct xrow_header *row)
 		say_error("couldn't decode a raft request");
 		return -1;
 	}
+	if (journal_write_row(row) != 0)
+		return -1;
 	box_raft_recover(&raft_req);
 	return 0;
 }
@@ -825,6 +831,12 @@ wal_stream_apply_dml_row(struct wal_stream *stream, struct xrow_header *row)
 			say_error("couldn't apply the request");
 			goto end_diag_request;
 		}
+	} else {
+		if (txn_begin_stmt(txn, NULL, request.type) != 0)
+			goto end_diag_request;
+		if (txn_commit_stmt(txn, &request))
+			goto end_diag_request;
+
 	}
 	assert(txn != NULL);
 	if (!row->is_commit)
@@ -5357,10 +5369,14 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	 * other engines.
 	 */
 	memtx_engine_recover_snapshot_xc(memtx, checkpoint_vclock);
-
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
-
-	recovery_journal_create(&recovery->vclock);
+	/*
+	 * Xlog starts after snapshot. Hence recovery vclock must point at the
+	 * end of snapshot (= checkpoint vclock).
+	 */
+	struct vclock recovery_vclock;
+	vclock_copy(&recovery_vclock, checkpoint_vclock);
+	recovery_journal_create(&recovery_vclock);
 	engine_begin_final_recovery_xc();
 	recover_remaining_wals(recovery, &wal_stream.base, NULL, false);
 	if (wal_stream_has_unfinished_tx(&wal_stream)) {
