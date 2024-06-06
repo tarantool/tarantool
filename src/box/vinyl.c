@@ -1408,6 +1408,11 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 	 * space.index.get({key}).
 	 */
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
+	/*
+	 * Make sure the LSM tree isn't deleted while we are
+	 * reading from it.
+	 */
+	vy_lsm_ref(lsm);
 
 	int rc;
 	struct vy_entry partial, entry;
@@ -1423,15 +1428,15 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 		 * Use point lookup for a full key.
 		 */
 		if (tx != NULL && vy_tx_track_point(tx, lsm, key) != 0)
-			return -1;
+			goto fail;
 		if (vy_point_lookup(lsm, tx, rv, key, &partial) != 0)
-			return -1;
+			goto fail;
 		if (lsm->index_id > 0 && partial.stmt != NULL) {
 			rc = vy_get_by_secondary_tuple(lsm, tx, rv,
 						       partial, &entry);
 			tuple_unref(partial.stmt);
 			if (rc != 0)
-				return -1;
+				goto fail;
 		} else {
 			entry = partial;
 		}
@@ -1457,7 +1462,7 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 		vy_read_iterator_cache_add(&itr, entry);
 	vy_read_iterator_close(&itr);
 	if (rc != 0)
-		return -1;
+		goto fail;
 out:
 	*result = entry.stmt;
 
@@ -1472,7 +1477,11 @@ out:
 	}
 	if (*result != NULL)
 		vy_stmt_counter_acct_tuple(&lsm->stat.get, *result);
+	vy_lsm_unref(lsm);
 	return 0;
+fail:
+	vy_lsm_unref(lsm);
+	return -1;
 }
 
 /**
@@ -3862,14 +3871,8 @@ vinyl_index_get(struct index *index, const char *key,
 		tx = &tx_autocommit;
 		vy_tx_create(env->xm, tx);
 	}
-	/*
-	 * Make sure the LSM tree isn't deleted while we are
-	 * reading from it.
-	 */
-	vy_lsm_ref(lsm);
 	int rc = vy_get_by_raw_key(lsm, tx, vy_tx_read_view(tx),
 				   key, part_count, ret);
-	vy_lsm_unref(lsm);
 	if (tx == &tx_autocommit)
 		vy_tx_destroy(tx);
 	if (rc != 0)
