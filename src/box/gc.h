@@ -373,11 +373,11 @@ void
 gc_consumer_unregister(struct gc_consumer *consumer);
 
 /**
- * Advance the vclock tracked by a consumer and
+ * Update the vclock tracked by a consumer and
  * invoke garbage collection if needed.
  */
 void
-gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock);
+gc_consumer_update(struct gc_consumer *consumer, const struct vclock *vclock);
 
 static inline void
 gc_consumer_name(struct gc_consumer *consumer, char *buf, size_t size)
