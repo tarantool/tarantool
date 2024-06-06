@@ -923,6 +923,11 @@ vinyl_index_update_def(struct index *index)
 {
 	struct vy_lsm *lsm = vy_lsm(index);
 	lsm->opts = index->def->opts;
+	/*
+	 * Sic: We copy key definitions in-place instead of reallocating them
+	 * because they may be used by read iterators by pointer, for example,
+	 * see vy_run_iterator.
+	 */
 	key_def_copy(lsm->key_def, index->def->key_def);
 	key_def_copy(lsm->cmp_def, index->def->cmp_def);
 }
@@ -954,7 +959,9 @@ vinyl_index_def_change_requires_rebuild(struct index *index,
 		return true;
 
 	assert(index_depends_on_pk(index));
+	const struct key_def *old_key_def = old_def->key_def;
 	const struct key_def *old_cmp_def = old_def->cmp_def;
+	const struct key_def *new_key_def = new_def->key_def;
 	const struct key_def *new_cmp_def = new_def->cmp_def;
 
 	/*
@@ -964,8 +971,15 @@ vinyl_index_def_change_requires_rebuild(struct index *index,
 	 * won't reveal such statements, but we may still need to
 	 * compare them to statements inserted after ALTER hence
 	 * we can't narrow field types without index rebuild.
+	 *
+	 * Sic: If secondary index key parts are extended with primary
+	 * index key parts, cmp_def (hence the sorting order) will stay
+	 * the same, but we still have to rebuild the index because
+	 * the new key_def has more parts so we can't update it in-place,
+	 * see vinyl_index_update_def().
 	 */
-	if (old_cmp_def->part_count != new_cmp_def->part_count)
+	if (old_key_def->part_count != new_key_def->part_count ||
+	    old_cmp_def->part_count != new_cmp_def->part_count)
 		return true;
 
 	for (uint32_t i = 0; i < new_cmp_def->part_count; i++) {
