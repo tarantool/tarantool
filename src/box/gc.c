@@ -392,6 +392,16 @@ gc_wait_cleanup(void)
 		fiber_cond_wait(&gc.cleanup_cond);
 }
 
+/**
+ * Returns true when the consumer is outdated - its vclock is either
+ * less than or incomparable with the wal gc vclock.
+ */
+static bool
+gc_consumer_is_outdated(struct gc_consumer *consumer)
+{
+	return vclock_compare_ignore0(&gc.vclock, &consumer->vclock) > 0;
+}
+
 void
 gc_advance(const struct vclock *vclock)
 {
@@ -412,7 +422,7 @@ gc_advance(const struct vclock *vclock)
 		 * either less than or incomparable with the wal
 		 * gc vclock.
 		 */
-		if (vclock_compare_ignore0(vclock, &consumer->vclock) <= 0) {
+		if (!gc_consumer_is_outdated(consumer)) {
 			consumer = next;
 			continue;
 		}
@@ -675,7 +685,9 @@ gc_consumer_register(const struct vclock *vclock, const char *name, const struct
 	consumer->uuid = *uuid;
 
 	vclock_copy(&consumer->vclock, vclock);
-	gc_tree_insert(&gc.active_consumers, consumer);
+	consumer->is_inactive = gc_consumer_is_outdated(consumer);
+	if (!consumer->is_inactive)
+		gc_tree_insert(&gc.active_consumers, consumer);
 	rlist_add_entry(&gc.consumers, consumer, in_consumers);
 	return consumer;
 }
@@ -694,11 +706,18 @@ gc_consumer_unregister(struct gc_consumer *consumer)
 void
 gc_consumer_update(struct gc_consumer *consumer, const struct vclock *vclock)
 {
-	if (consumer->is_inactive)
-		return;
-
 	if (vclock_lex_compare(&consumer->vclock, vclock) == 0)
 		return; /* nothing to do */
+
+	/* If the consumer is inactive, activate it if needed. */
+	if (consumer->is_inactive) {
+		vclock_copy(&consumer->vclock, vclock);
+		consumer->is_inactive = gc_consumer_is_outdated(consumer);
+		if (!consumer->is_inactive)
+			gc_tree_insert(&gc.active_consumers, consumer);
+		/* Do not schedule cleanup - consumer didn't pin any xlogs. */
+		return;
+	}
 
 	struct vclock old_vclock;
 	vclock_copy(&old_vclock, &consumer->vclock);
