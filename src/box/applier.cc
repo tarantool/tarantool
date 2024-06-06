@@ -1505,12 +1505,7 @@ apply_final_join_tx(uint32_t replica_id, struct stailq *rows)
 {
 	struct applier_tx_row *txr =
 		stailq_first_entry(rows, struct applier_tx_row, next);
-
-	struct xrow_header *last_row =
-		&stailq_last_entry(rows, struct applier_tx_row, next)->row;
 	int rc = 0;
-	/* WAL isn't enabled yet, so follow vclock manually. */
-	vclock_follow_xrow(instance_vclock, last_row);
 	if (unlikely(iproto_type_is_synchro_request(txr->row.type))) {
 		rc = apply_synchro_req(replica_id, &txr->row,
 				       &txr->req.synchro);
