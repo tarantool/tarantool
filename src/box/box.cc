@@ -4815,8 +4815,6 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	assert(memtx != NULL);
 
-	recovery_journal_create(&recovery->vclock);
-
 	/*
 	 * We explicitly request memtx to recover its
 	 * snapshot as a separate phase since it contains
@@ -4828,6 +4826,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
 
+	recovery_journal_create(&recovery->vclock);
 	engine_begin_final_recovery_xc();
 	recover_remaining_wals(recovery, &wal_stream.base, NULL, false);
 	if (wal_stream_has_unfinished_tx(&wal_stream)) {
