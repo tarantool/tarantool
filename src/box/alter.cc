@@ -4281,6 +4281,11 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 		if (on_commit == NULL)
 			return -1;
 		txn_stmt_on_commit(stmt, on_commit);
+		on_commit = txn_alter_trigger_new(
+			on_replace_cluster_update_quorum, replica);
+		if (on_commit == NULL)
+			return -1;
+		txn_stmt_on_commit(stmt, on_commit);
 	}
 	return 0;
 }
