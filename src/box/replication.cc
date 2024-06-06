@@ -448,7 +448,6 @@ replica_clear_id(struct replica *replica)
 		assert(!replica->anon);
 		replica_delete(replica);
 	}
-	box_update_replication_synchro_quorum();
 	box_broadcast_ballot();
 }
 
