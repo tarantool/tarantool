@@ -20,4 +20,5 @@ ffi.metatype(key_def_t, {
         return methods[key]
     end,
     __tostring = function(self) return "<struct key_def &>" end,
+    __len = key_def.part_count,
 })

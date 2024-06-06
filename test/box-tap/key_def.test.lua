@@ -198,7 +198,7 @@ local key_def_new_cases = {
 
 local test = tap.test('key_def')
 
-test:plan(#key_def_new_cases - 1 + 8)
+test:plan(#key_def_new_cases - 1 + 9)
 for _, case in ipairs(key_def_new_cases) do
     if type(case) == 'function' then
         case()
@@ -596,6 +596,22 @@ test:test('Usage errors', function(test)
     test:is_deeply({pcall(key_def_lib.totable)},
                    {false, 'Usage: key_def:totable()'},
                    'totable()')
+end)
+
+-- Check key_def:part_count
+test:test('Key_def part_count', function(test)
+    test:plan(4)
+    local kd = key_def_lib.new({
+        {fieldno = 2, type = 'unsigned'}, {fieldno = 4, type = 'string'}
+    })
+    test:ok(kd, 'instance created')
+    test:is(#kd, 2, 'part_count')
+
+    local kd = key_def_lib.new({
+        {fieldno = 22, type = 'string'},
+    })
+    test:ok(kd, 'instance created')
+    test:is(#kd, 1, 'part_count')
 end)
 
 os.exit(test:check() and 0 or 1)

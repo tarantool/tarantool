@@ -633,6 +633,19 @@ lbox_key_def_to_table(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * Return partitions count for key_def
+ */
+static int
+lbox_key_def_part_count(struct lua_State *L)
+{
+	struct key_def *key_def = luaT_is_key_def(L, 1);
+	if (key_def == NULL)
+		return luaL_error(L, "Usage: key_def:part_count()");
+	lua_pushinteger(L, key_def->part_count);
+	return 1;
+}
+
 int
 lbox_key_def_new(struct lua_State *L)
 {
@@ -704,6 +717,7 @@ luaopen_key_def(struct lua_State *L)
 		{"compare_keys", lbox_key_def_compare_keys},
 		{"merge", lbox_key_def_merge},
 		{"totable", lbox_key_def_to_table},
+		{"part_count", lbox_key_def_part_count},
 		{NULL, NULL}
 	};
 	luaT_newmodule(L, "key_def", meta);
