@@ -133,6 +133,18 @@ vy_apply_upsert_on_terminal_stmt(struct tuple *upsert, struct tuple *stmt,
 			continue;
 		}
 		/*
+		 * Result statement must satisfy space's format. Since upsert's
+		 * tuple correctness is already checked in vy_upsert(), let's
+		 * use its format to provide result verification.
+		 */
+		struct tuple_format *format = tuple_format(upsert);
+		if (tuple_validate_raw(format, exec_res) != 0) {
+			if (!suppress_error)
+				diag_log();
+			ups_ops = ups_ops_end;
+			continue;
+		}
+		/*
 		 * If it turns out that resulting tuple modifies primary
 		 * key, then simply ignore this upsert.
 		 */
@@ -148,17 +160,6 @@ vy_apply_upsert_on_terminal_stmt(struct tuple *upsert, struct tuple *stmt,
 			continue;
 		}
 		ups_ops = ups_ops_end;
-		/*
-		 * Result statement must satisfy space's format. Since upsert's
-		 * tuple correctness is already checked in vy_upsert(), let's
-		 * use its format to provide result verification.
-		 */
-		struct tuple_format *format = tuple_format(upsert);
-		if (tuple_validate_raw(format, exec_res) != 0) {
-			if (! suppress_error)
-				diag_log();
-			continue;
-		}
 		result_mp = exec_res;
 		result_mp_end = exec_res + mp_size;
 	}
