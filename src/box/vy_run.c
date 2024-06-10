@@ -1557,10 +1557,8 @@ vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct vy_entry *ret)
 
 	struct vy_run_iterator_pos next_pos;
 next:
-	if (vy_run_iterator_next_pos(itr, ITER_GE, &next_pos) != 0) {
-		vy_run_iterator_stop(itr);
+	if (vy_run_iterator_next_pos(itr, ITER_GE, &next_pos) != 0)
 		return 0;
-	}
 
 	struct vy_entry next;
 	if (vy_run_iterator_read(itr, next_pos, &next) != 0)
