@@ -2013,6 +2013,7 @@ end
 
 -- List of all Tarantool releases we can downgrade to.
 local downgrade_versions = {
+    -- DOWNGRADE VERSIONS BEGIN
     "2.8.2",
     "2.8.3",
     "2.8.4",
@@ -2025,6 +2026,7 @@ local downgrade_versions = {
     "2.11.0",
     "2.11.1",
     "2.11.2",
+    -- DOWNGRADE VERSIONS END
 }
 
 -- Downgrade or list downgrade issues depending of dry_run argument value.
