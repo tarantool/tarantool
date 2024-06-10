@@ -1,5 +1,6 @@
 local expression = require('internal.config.utils.expression')
 local log = require('internal.config.utils.log')
+local loaders = require('internal.loaders')
 local digest = require('digest')
 local fiber = require('fiber')
 
@@ -318,9 +319,10 @@ local function sharding_role(configdata)
     -- The error will be thrown later, in sharding.lua. Here we are simply
     -- trying to avoid the "module not found" error.
     --
-    local ok, vshard = pcall(require, 'vshard')
+    local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
     if ok and expression.eval('v >= 0.1.25', {v = vshard.consts.VERSION}) then
-        local vexports = require('vshard.storage.exports')
+        local vexports = loaders.require_first('vshard-ee.storage.exports',
+            'vshard.storage.exports')
         local exports = vexports.compile(vexports.log[#vexports.log])
         for name in pairs(exports.funcs) do
             table.insert(funcs, name)

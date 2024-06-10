@@ -45,7 +45,10 @@ local names = {
 }
 
 -- Start the database with sharding
-local vshard = require('vshard')
+local ok, vshard = pcall(require, 'vshard-ee')
+if not ok then
+    vshard = require('vshard')
+end
 vshard.storage.cfg(cfg, names[NAME])
 
 box.once("testapp", function()
