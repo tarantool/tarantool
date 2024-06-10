@@ -48,12 +48,12 @@ local function test_misc(test, s)
     test:is_deeply(result, {1}, "ibuf_decode result")
     test:ok(not st and e:match("null"), "null ibuf")
     st, e = pcall(s.decode, "\xd4\x0f\x00")
-    test:is(e, "Unsupported MsgPack extension type: 15",
-               "decode result for \\xd4\\x0f\\x00: " .. e)
+    test:is(tostring(e), "Unsupported MsgPack extension type: 15",
+            "decode result for \\xd4\\x0f\\x00: " .. e)
     test:ok(not st, "unsupported extension decode")
     st, e = pcall(s.decode, "\xd4\xfe\x00")
-    test:is(e, "Unsupported MsgPack extension type: -2",
-               "decode result for \\xd4\\xfe\\x00: " .. e)
+    test:is(tostring(e), "Unsupported MsgPack extension type: -2",
+            "decode result for \\xd4\\xfe\\x00: " .. e)
     test:ok(not st, "unsupported extension decode")
 end
 

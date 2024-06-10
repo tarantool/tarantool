@@ -1089,8 +1089,10 @@ lbox_func_call(struct lua_State *L)
 {
 	if (box_check_configured() != 0)
 		return luaT_error(L);
-	if (lua_gettop(L) < 1 || !lua_isstring(L, 1))
-		return luaL_error(L, "Use func:call(...)");
+	if (lua_gettop(L) < 1 || !lua_isstring(L, 1)) {
+		diag_set(IllegalParams, "Use func:call(...)");
+		return luaT_error(L);
+	}
 
 	size_t name_len;
 	const char *name = lua_tolstring(L, 1, &name_len);

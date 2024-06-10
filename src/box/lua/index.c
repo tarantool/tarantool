@@ -372,7 +372,7 @@ lbox_iterator_next(lua_State *L)
 static int
 lbox_truncate(struct lua_State *L)
 {
-	uint32_t space_id = luaL_checkinteger(L, 1);
+	uint32_t space_id = luaT_checkint(L, 1);
 	if (box_truncate(space_id) != 0)
 		return luaT_error(L);
 	return 0;
