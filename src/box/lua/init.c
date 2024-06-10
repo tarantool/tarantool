@@ -581,9 +581,11 @@ lbox_rollback_to_savepoint(struct lua_State *L)
 	struct txn_savepoint *svp;
 
 	if (lua_gettop(L) != 1 ||
-	    (svp = luaT_check_txn_savepoint(L, 1, &svp_txn_id)) == NULL)
-		return luaL_error(L,
-			"Usage: box.rollback_to_savepoint(savepoint)");
+	    (svp = luaT_check_txn_savepoint(L, 1, &svp_txn_id)) == NULL) {
+		diag_set(IllegalParams,
+			 "Usage: box.rollback_to_savepoint(savepoint)");
+		return luaT_error(L);
+	}
 
 	/*
 	 * Verify that we're in a transaction and that it is the
@@ -710,9 +712,10 @@ lbox_on_##name(struct lua_State *L) {                                          \
 	struct txn *txn = in_txn();                                            \
 	int top = lua_gettop(L);                                               \
 	if (top > 3 || txn == NULL) {                                          \
-		return luaL_error(L, "Usage inside a transaction: "            \
-				  "box.on_" #name "([new_function | nil, "     \
-				  "[old_function | nil], [name | nil]])");     \
+		diag_set(IllegalParams, "Usage inside a transaction: "         \
+			 "box.on_" #name "([new_function | nil, "              \
+			 "[old_function | nil], [name | nil]])");              \
+		return luaT_error(L);                                          \
 	}                                                                      \
 	txn_init_triggers(txn);                                                \
 	return lbox_trigger_reset(L, 1, &txn->on_##name, lbox_push_txn, NULL); \
@@ -839,8 +842,11 @@ luamp_decode_extension_box(struct lua_State *L, const char **data,
 	switch (ext_type) {
 	case MP_ERROR: {
 		struct error *err = error_unpack(data, len);
-		if (err == NULL)
-			luaL_error(L, "Can not parse an error from MsgPack");
+		if (err == NULL) {
+			diag_set(IllegalParams,
+				 "Can not parse an error from MsgPack");
+			luaT_error(L);
+		}
 		luaT_pusherror(L, err);
 		break;
 	}
@@ -858,12 +864,14 @@ luamp_decode_extension_box(struct lua_State *L, const char **data,
 		luaT_pushtuple(L, tuple);
 		break;
 tuple_err:
-		luaL_error(L, "Can not parse a tuple from MsgPack");
+		diag_set(IllegalParams, "Can not parse a tuple from MsgPack");
+		luaT_error(L);
 		break;
 	}
 	default:
-		luaL_error(L, "Unsupported MsgPack extension type: %d",
-			   ext_type);
+		diag_set(IllegalParams,
+			 "Unsupported MsgPack extension type: %d", ext_type);
+		luaT_error(L);
 	}
 }
 
