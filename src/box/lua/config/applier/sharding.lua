@@ -1,5 +1,6 @@
 local expression = require('internal.config.utils.expression')
 local log = require('internal.config.utils.log')
+local loaders = require('internal.loaders')
 _G.vshard = nil
 
 -- Watcher which will create all the necessary functions.
@@ -12,9 +13,9 @@ local function apply(config)
         return
     end
     -- Make sure vshard is available and its version is not too old.
-    local ok, vshard = pcall(require, 'vshard')
+    local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
     if not ok then
-        error('The vshard module is not available', 0)
+        error('The vshard-ee/vshard module is not available', 0)
     end
     if expression.eval('v < 0.1.25', {v = vshard.consts.VERSION}) then
         error('The vshard module is too old: the minimum supported version ' ..
@@ -36,7 +37,8 @@ local function apply(config)
         -- Start a watcher which will create all the necessary functions.
         if watcher == nil then
             local function deploy_funcs()
-                local vexports = require('vshard.storage.exports')
+                local vexports = loaders.require_first(
+                    'vshard-ee.storage.exports', 'vshard.storage.exports')
                 local exports = vexports.compile(vexports.log[#vexports.log])
                 vexports.deploy_funcs(exports)
             end

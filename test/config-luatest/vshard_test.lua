@@ -7,10 +7,17 @@ local helpers = require('test.config-luatest.helpers')
 
 local g = helpers.group()
 
-local has_vshard = pcall(require, 'vshard')
+local has_vshard = pcall(require, 'vshard-ee')
+if not has_vshard then
+    has_vshard = pcall(require, 'vshard')
+end
+
+local function skip_if_no_vshard()
+    t.skip_if(not has_vshard, 'Module "vshard-ee/vshard" is not available')
+end
 
 g.test_fixed_masters = function(g)
-    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    skip_if_no_vshard()
     local dir = treegen.prepare_directory(g, {}, {})
     local config = [[
     credentials:
@@ -258,7 +265,7 @@ g.test_fixed_masters = function(g)
 end
 
 g.test_rebalancer_role = function(g)
-    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    skip_if_no_vshard()
     local dir = treegen.prepare_directory(g, {}, {})
     local config = [[
     credentials:
@@ -422,7 +429,7 @@ g.test_rebalancer_role = function(g)
 end
 
 g.test_too_many_rebalancers = function(g)
-    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    skip_if_no_vshard()
     local dir = treegen.prepare_directory(g, {}, {})
     local config = [[
     credentials:
@@ -470,7 +477,7 @@ end
 -- credentials sharding role.
 --
 g.test_no_sharding_credentials_role_success = function(g)
-    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    skip_if_no_vshard()
     helpers.success_case(g, {
         options = {
             ['credentials.users.storage.roles'] = {'sharding'},
@@ -494,7 +501,7 @@ g.test_no_sharding_credentials_role_success = function(g)
 end
 
 g.test_no_sharding_credentials_role_error = function(g)
-    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    skip_if_no_vshard()
     local dir = treegen.prepare_directory(g, {}, {})
     local config = [[
     credentials:
@@ -536,7 +543,7 @@ end
 -- credentials, its credential sharding role is not checked.
 --
 g.test_no_storage_user = function(g)
-    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    skip_if_no_vshard()
     helpers.success_case(g, {
         options = {
             ['sharding.roles'] = {'storage', 'router'},
@@ -551,7 +558,7 @@ end
 
 -- Make sure that the credential sharding role has all necessary credentials.
 g.test_sharding_credentials_role = function(g)
-    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    skip_if_no_vshard()
     local dir = treegen.prepare_directory(g, {}, {})
     local config = [[
     credentials:
@@ -594,7 +601,10 @@ g.test_sharding_credentials_role = function(g)
         local role = box.space._user.index.name:get('sharding')
         local repl_id = box.space._user.index.name:get('replication').id
         t.assert(role ~= nil)
-        local vexports = require('vshard.storage.exports')
+        local ok, vexports = pcall(require, 'vshard-ee.storage.exports')
+        if not ok then
+            vexports = require('vshard.storage.exports')
+        end
         local exports = vexports.compile(vexports.log[#vexports.log])
 
         -- The role should have the necessary privileges.
@@ -618,7 +628,7 @@ g.test_sharding_credentials_role = function(g)
 end
 
 g.test_no_suitable_uri = function(g)
-    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    skip_if_no_vshard()
     local dir = treegen.prepare_directory(g, {}, {})
     local config = [[
     credentials:
@@ -656,7 +666,7 @@ end
 -- Make sure that rebalancing will be disabled if rebalancer_mode == 'off', even
 -- if rebalancer sharding role is assigned.
 g.test_rebalancer_mode = function(g)
-    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    skip_if_no_vshard()
     local dir = treegen.prepare_directory(g, {}, {})
     local config = [[
     credentials:
@@ -708,7 +718,7 @@ end
 -- Make sure the shrading.weight configuration parameter is set
 -- correctly in vshard.
 g.test_weight = function(g)
-    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    skip_if_no_vshard()
     local dir = treegen.prepare_directory(g, {}, {})
     local config = [[
     credentials:
