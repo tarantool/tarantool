@@ -826,10 +826,13 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr, struct vy_entry last,
 			struct vy_cache_node *node =
 				*vy_cache_tree_iterator_get_elem(tree, &pos);
 			int cmp = dir * vy_entry_compare(node->entry, key, def);
+			bool is_visible = vy_cache_iterator_stmt_is_visible(
+							itr, node->entry.stmt);
+			if (!is_visible)
+				*stop = false;
 			if (cmp < 0 || (cmp == 0 && !key_belongs))
 				break;
-			if (vy_cache_iterator_stmt_is_visible(
-					itr, node->entry.stmt)) {
+			if (is_visible) {
 				itr->curr_pos = pos;
 				if (itr->curr.stmt != NULL)
 					tuple_unref(itr->curr.stmt);
