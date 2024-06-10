@@ -512,6 +512,31 @@ _G.require = function(modname)
     return raw_require(modname)
 end
 
+-- Load first available module from the given ones.
+--
+-- It just calls `require()` on the provided arguments (in the
+-- given order) and once this call succeeds, the function returns
+-- its result.
+--
+-- If neither of the given modules can be `require`'d, an error is
+-- raised.
+local function require_first(...)
+    if select('#', ...) == 0 then
+        error('loaders.require_first expects at least one argument', 0)
+    end
+
+    for i = 1, select('#', ...) do
+        local module_name = select(i, ...)
+        local ok, res = pcall(require, module_name)
+        if ok then
+            return res
+        end
+    end
+
+    local modules_str = ('"%s"'):format(table.concat({...}, '", "'))
+    error(('neither of modules %s are found'):format(modules_str), 0)
+end
+
 return {
     ROCKS_LIB_PATH = ROCKS_LIB_PATH,
     ROCKS_LUA_PATH = ROCKS_LUA_PATH,
@@ -537,4 +562,5 @@ return {
     --
     -- Usage: loaders.no_package_loaded[modname] = true
     no_package_loaded = no_package_loaded,
+    require_first = require_first,
 }
