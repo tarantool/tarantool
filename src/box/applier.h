@@ -302,6 +302,13 @@ void
 applier_stop(struct applier *applier);
 
 /**
+ * Kill a client and optionally set an error for it (can be NULL). The client is
+ * expected to be alive.
+ */
+void
+applier_kill(struct applier *applier, struct error *error);
+
+/**
  * Allocate an instance of applier object, create applier and initialize
  * remote uri (copied to struct applier).
  *

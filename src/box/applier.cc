@@ -1788,12 +1788,8 @@ applier_on_rollback(struct trigger *trigger, void *event)
 	(void) event;
 	struct applier *applier = (struct applier *)trigger->data;
 	/* Setup a shared error. */
-	if (!diag_is_empty(&replicaset.applier.diag)) {
-		diag_set_error(&applier->diag,
-			       diag_last_error(&replicaset.applier.diag));
-	}
-	/* Stop the applier fiber. */
-	fiber_cancel(applier->fiber);
+	applier_kill(applier, diag_is_empty(&replicaset.applier.diag) ? NULL :
+			      diag_last_error(&replicaset.applier.diag));
 	return 0;
 }
 
@@ -2751,6 +2747,15 @@ applier_stop(struct applier *applier)
 	ERROR_INJECT_YIELD(ERRINJ_APPLIER_STOP_DELAY);
 	applier_set_state(applier, APPLIER_OFF);
 	applier->fiber = NULL;
+}
+
+void
+applier_kill(struct applier *applier, struct error *e)
+{
+	assert(applier->fiber != NULL);
+	if (e != NULL)
+		applier_set_last_error(applier, e);
+	fiber_cancel(applier->fiber);
 }
 
 struct applier *
