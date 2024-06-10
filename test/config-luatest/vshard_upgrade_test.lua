@@ -7,7 +7,10 @@ local fio = require('fio')
 
 local g = t.group()
 
-local has_vshard = pcall(require, 'vshard')
+local has_vshard = pcall(require, 'vshard-ee')
+if not has_vshard then
+    has_vshard = pcall(require, 'vshard')
+end
 
 --
 -- Test, that Tarantool upgrade with vshard happens without downtime:
@@ -20,7 +23,7 @@ local has_vshard = pcall(require, 'vshard')
 --     6. Vshard works after all names are applied.
 --
 g.before_all(function(g)
-    t.skip_if(not has_vshard, 'Module "vshard" is not available')
+    t.skip_if(not has_vshard, 'Module "vshard-ee/vshard" is not available')
     treegen.init(g)
     local uuids = {
         ['rs-001'] = 'cbf06940-0790-498b-948d-042b62cf3d29',
