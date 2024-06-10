@@ -761,6 +761,11 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 {
 	struct key_def *key_def = index_def->key_def;
 
+	if (index_def->opts.fast_offset) {
+		diag_set(ClientError, ER_UNSUPPORTED, "memtx",
+			 "logarithmic select with offset");
+		return -1;
+	}
 	if (key_def->is_nullable) {
 		if (index_def->iid == 0) {
 			diag_set(ClientError, ER_NULLABLE_PRIMARY,

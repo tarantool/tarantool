@@ -566,6 +566,9 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 			lua_setfield(L, -2, "hint");
 		}
 
+		lua_pushnil(L);
+		lua_setfield(L, -2, "fast_offset");
+
 		if (index_opts->func_id > 0) {
 			lua_pushstring(L, "func");
 			lua_newtable(L);

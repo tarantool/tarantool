@@ -52,6 +52,7 @@ const struct index_opts index_opts_default = {
 	/* .lsn                 = */ 0,
 	/* .func                = */ 0,
 	/* .hint                = */ INDEX_HINT_DEFAULT,
+	/* .fast_offset         = */ false,
 };
 
 /**
@@ -89,6 +90,7 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF("func", OPT_UINT32, struct index_opts, func_id),
 	OPT_DEF_LEGACY("sql"),
 	OPT_DEF_CUSTOM("hint", index_opts_parse_hint),
+	OPT_DEF("fast_offset", OPT_BOOL, struct index_opts, fast_offset),
 	OPT_END,
 };
 

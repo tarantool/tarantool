@@ -1542,6 +1542,7 @@ local index_options = {
     bloom_fpr = 'number',
     func = 'number, string',
     hint = 'boolean',
+    fast_offset = 'boolean',
 }
 
 local function jsonpaths_from_idx_parts(parts)
@@ -1684,6 +1685,7 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
             bloom_fpr = options.bloom_fpr,
             func = options.func,
             hint = options.hint,
+            fast_offset = options.fast_offset,
     }
     local field_type_aliases = {
         num = 'unsigned'; -- Deprecated since 1.7.2

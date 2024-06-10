@@ -678,6 +678,11 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 			 "hint is only reasonable with memtx tree index");
 		return -1;
 	}
+	if (index_def->opts.fast_offset) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "logarithmic select with offset");
+		return -1;
+	}
 
 	struct key_def *key_def = index_def->key_def;
 
