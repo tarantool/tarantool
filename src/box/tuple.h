@@ -1106,19 +1106,23 @@ tuple_field_raw_by_part(struct tuple_format *format, const char *data,
 			const uint32_t *field_map,
 			struct key_part *part, int multikey_idx)
 {
-	if (unlikely(part->format_epoch != format->epoch)) {
-		assert(format->epoch != 0);
-		part->format_epoch = format->epoch;
-		/*
-		 * Clear the offset slot cache, since it's stale.
-		 * The cache will be reset by the lookup.
-		 */
-		part->offset_slot_cache = TUPLE_OFFSET_SLOT_NIL;
+	int32_t *offset_slot_cache = NULL;
+	if (cord_is_main()) {
+		offset_slot_cache = &part->offset_slot_cache;
+		if (unlikely(part->format_epoch != format->epoch)) {
+			assert(format->epoch != 0);
+			part->format_epoch = format->epoch;
+			/*
+			 * Clear the offset slot cache, since it's stale.
+			 * The cache will be reset by the lookup.
+			 */
+			*offset_slot_cache = TUPLE_OFFSET_SLOT_NIL;
+		}
 	}
 	return tuple_field_raw_by_path(format, data, field_map, part->fieldno,
 				       part->path, part->path_len,
 				       TUPLE_INDEX_BASE,
-				       &part->offset_slot_cache, multikey_idx);
+				       offset_slot_cache, multikey_idx);
 }
 
 /**
