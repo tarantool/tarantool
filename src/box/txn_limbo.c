@@ -382,25 +382,9 @@ synchro_request_write(const struct synchro_request *req)
 	 */
 	char body[XROW_BODY_LEN_MAX];
 	struct xrow_header row;
-	char buf[sizeof(struct journal_entry) +
-		 sizeof(struct xrow_header *)];
-
-	struct journal_entry *entry = (struct journal_entry *)buf;
-	entry->rows[0] = &row;
-
 	xrow_encode_synchro(&row, body, req);
-
-	journal_entry_create(entry, 1, xrow_approx_len(&row),
-			     journal_entry_fiber_wakeup_cb, fiber());
-
-	if (journal_write(entry) != 0)
-		goto fail;
-	if (entry->res < 0) {
-		diag_set_journal_res(entry->res);
-		goto fail;
-	}
-	return;
-fail:
+	if (journal_write_row(&row) == 0)
+		return;
 	diag_log();
 	/*
 	 * XXX: the stub is supposed to be removed once it is defined what to do
