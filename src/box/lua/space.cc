@@ -464,11 +464,18 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 
 	/* space.is_sync */
 	lua_pushstring(L, "is_sync");
-	lua_pushboolean(L, space_is_sync(space));
+	lua_pushboolean(L, space->def->opts.is_sync);
 	lua_settable(L, i);
 
 	lua_pushstring(L, "enabled");
 	lua_pushboolean(L, space_index(space, 0) != 0);
+	lua_settable(L, i);
+
+	/* space.state table */
+	lua_pushstring(L, "state");
+	lua_createtable(L, 0, 1);
+	lua_pushboolean(L, space_is_sync(space));
+	lua_setfield(L, -2, "is_sync");
 	lua_settable(L, i);
 
 	/* space:on_replace */
