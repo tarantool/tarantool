@@ -621,6 +621,7 @@ space_create(struct space *space, struct engine *engine,
 	rlist_create(&space->memtx_stories);
 	rlist_create(&space->alter_stmts);
 	space->lua_ref = LUA_NOREF;
+	space->state.is_sync = space->def->opts.is_sync;
 	return 0;
 
 fail_free_indexes:
