@@ -593,6 +593,15 @@ enum vy_recovery_flag {
  * Create a recovery context from the metadata log created
  * by checkpoint with the given signature.
  *
+ * If the signature is -1, the function loads the metadata log corresponding
+ * to the last created checkpoint. Note, it isn't quite the same as passing
+ * vy_log_signature(). The latter opens a time window for a log rotation so
+ * it may load a stale metadata log while using -1 locks out concurrent log
+ * rotation and thus guarantees that the function loads the latest log.
+ * This is important if the caller writes new log records asynchronously
+ * (with vy_log_tx_try_commit()) basing on the recovered state and expects
+ * them to be recovered on the next execution.
+ *
  * For valid values of @flags, see vy_recovery_flag.
  *
  * Returns NULL on failure.
