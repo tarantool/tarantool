@@ -3257,7 +3257,7 @@ vinyl_engine_collect_garbage(struct engine *engine, const struct vclock *vclock)
 	vy_log_collect_garbage(vclock);
 
 	/* Cleanup run files. */
-	struct vy_recovery *recovery = vy_recovery_new(vy_log_signature(), 0);
+	struct vy_recovery *recovery = vy_recovery_new(-1, 0);
 	if (recovery == NULL) {
 		say_error("failed to recover vylog for garbage collection");
 		return;
