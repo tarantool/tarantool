@@ -996,8 +996,7 @@ static int
 vy_log_rebootstrap(void)
 {
 	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint),
-				   VY_RECOVERY_ABORT_REBOOTSTRAP);
+	recovery = vy_recovery_new(-1, VY_RECOVERY_ABORT_REBOOTSTRAP);
 	if (recovery == NULL)
 		return -1;
 
@@ -1162,8 +1161,7 @@ vy_log_begin_recovery(const struct vclock *vclock, bool force_recovery)
 	 * failed, and we need to mark rebootstrap as aborted.
 	 */
 	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint),
-				   VY_RECOVERY_ABORT_REBOOTSTRAP);
+	recovery = vy_recovery_new(-1, VY_RECOVERY_ABORT_REBOOTSTRAP);
 	if (recovery == NULL)
 		return NULL;
 
@@ -2456,6 +2454,7 @@ vy_recovery_new_locked(int64_t signature, int flags)
 	int rc;
 	struct vy_recovery *recovery;
 
+	assert(signature >= 0);
 	assert(latch_owner(&vy_log.latch) == fiber());
 	/*
 	 * Before proceeding to log recovery, make sure that all
@@ -2483,6 +2482,8 @@ vy_recovery_new(int64_t signature, int flags)
 {
 	/* Lock out concurrent writers while we are loading the log. */
 	latch_lock(&vy_log.latch);
+	if (signature < 0)
+		signature = vclock_sum(&vy_log.last_checkpoint);
 	struct vy_recovery *recovery;
 	recovery = vy_recovery_new_locked(signature, flags);
 	latch_unlock(&vy_log.latch);
