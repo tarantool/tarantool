@@ -61,7 +61,7 @@ jobs:
           submodules: recursive
           repository: tarantool/tarantool
           ref: ${{ inputs.submodule && 'master' || github.ref }}
-      - uses: ./.github/actions/environment
+      - uses: ./.github/actions/setup-build-env
       - name: Install deps
         uses: ./.github/actions/install-deps-debian
       - name: Optional submodule bump

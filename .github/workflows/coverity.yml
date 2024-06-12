@@ -15,10 +15,6 @@ jobs:
 
     container:
       image: docker.io/tarantool/testing:debian-buster
-      # Our testing expects that the init process (PID 1) will
-      # reap orphan processes. At least the following test leans
-      # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
-      options: '--init'
 
     steps:
       - name: Prepare checkout
@@ -27,7 +23,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      - uses: ./.github/actions/environment
+      - uses: ./.github/actions/setup-build-env
       - name: test
         run: make -f .test.mk test-coverity
         env:
