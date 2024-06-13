@@ -58,8 +58,8 @@ jobs:
           # We're using LXD containers as aarch64 runners. For some reason, OOM
           # killer just kills the compilation process when `make -j $(nproc)`.
           # The issue happens only with builds where LTO is enabled. It's found,
-          # that `-j6` works fine. The bigger value causes problems.
-          SMPFLAGS: '-j6'
+          # that `-j4` works fine. The bigger value causes problems.
+          SMPFLAGS: '-j4'
         uses: ./.github/actions/pack-and-deploy
       - name: Send VK Teams message on failure
         if: failure()
