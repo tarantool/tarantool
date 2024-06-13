@@ -435,6 +435,8 @@ ClearIdentifier(const std::string &identifier)
 		} else if (std::isalpha(c) || c == '_') {
 			has_first_not_digit = true;
 			cleared += c;
+		} else {
+			cleared += '_';
 		}
 	}
 	return cleared;
@@ -456,12 +458,13 @@ clamp(double number, double upper, double lower)
 }
 
 inline std::string
-ConvertToStringDefault(const std::string &s)
+ConvertToStringDefault(const std::string &s, bool sanitize = false)
 {
-	std::string ident = ClearIdentifier(s);
-	ident = clamp(ident);
+	std::string ident = clamp(s);
+	if (sanitize)
+		ident = ClearIdentifier(ident);
 	if (ident.empty())
-		return std::string(kDefaultIdent);
+		ident = std::string(kDefaultIdent);
 	return ident;
 }
 
@@ -951,7 +954,7 @@ NESTED_PROTO_TOSTRING(IndexWithName, indexname, Variable)
 {
 	std::string indexname_str = PrefixExpressionToString(
 		indexname.prefixexp());
-	std::string idx_str = ConvertToStringDefault(indexname.name());
+	std::string idx_str = ConvertToStringDefault(indexname.name(), true);
 	/* Prevent using reserved keywords as indices. */
 	if (KReservedLuaKeywords.find(idx_str) != KReservedLuaKeywords.end()) {
 		idx_str += "_1";
@@ -1196,8 +1199,12 @@ PROTO_TOSTRING(UnaryOperator, op)
  */
 PROTO_TOSTRING(Name, name)
 {
-	std::string ident = ConvertToStringDefault(name.name());
-	return ident + std::to_string(name.num() % kMaxIdentifiers);
+	std::string ident = ConvertToStringDefault(name.name(), true);
+	/* Identifier has default name, add an index. */
+	if (!ident.compare(kDefaultIdent)) {
+		ident += std::to_string(name.num() % kMaxIdentifiers);
+	}
+	return ident;
 }
 
 } /* namespace */
