@@ -893,9 +893,6 @@ static uint64_t
 applier_read_tx(struct applier *applier, struct stailq *rows,
 		const struct applier_read_ctx *ctx, double timeout);
 
-static int
-apply_final_join_tx(uint32_t replica_id, struct stailq *rows);
-
 /**
  * A helper struct to link xrow objects in a list.
  */
@@ -1011,23 +1008,8 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 						  next)->row);
 			break;
 		}
-		if (recovery_state < FINISHED_RECOVERY) {
-			/*
-			 * Register during recovery means the joining is still
-			 * in progress and is at its final stage.
-			 */
-			if (apply_final_join_tx(applier->instance_id, &rows) != 0)
-				diag_raise();
-		} else {
-			/*
-			 * Register after recovery means the instance is already
-			 * functional, but is becoming non-anonymous or is
-			 * changing its name. Transactions coming from such
-			 * registration are no different than during subscribe.
-			 */
-			if (applier_apply_tx(applier, &rows) != 0)
-				diag_raise();
-		}
+		if (applier_apply_tx(applier, &rows) != 0)
+			diag_raise();
 	}
 
 	return row_count;
@@ -1407,8 +1389,7 @@ applier_handle_raft_request(struct applier *applier, struct raft_request *req)
 }
 
 static int
-apply_plain_tx(uint32_t replica_id, struct stailq *rows,
-	       bool skip_conflict, bool use_triggers)
+apply_plain_tx(uint32_t replica_id, struct stailq *rows)
 {
 	/*
 	 * Explicitly begin the transaction so that we can
@@ -1425,7 +1406,7 @@ apply_plain_tx(uint32_t replica_id, struct stailq *rows,
 	stailq_foreach_entry(item, rows, next) {
 		struct xrow_header *row = &item->row;
 		int res = apply_request(&item->req.dml);
-		if (res != 0 && skip_conflict) {
+		if (res != 0 && replication_skip_conflict) {
 			struct error *e = diag_last_error(diag_get());
 			/*
 			 * In case of ER_TUPLE_FOUND error and enabled
@@ -1475,65 +1456,39 @@ apply_plain_tx(uint32_t replica_id, struct stailq *rows,
 	 */
 	if ((item->row.flags & IPROTO_FLAG_WAIT_ACK) != 0)
 		box_txn_make_sync();
-
-	if (use_triggers) {
-		/* We are ready to submit txn to wal. */
-		struct trigger *on_rollback, *on_wal_write;
-		size_t size;
-		on_rollback = region_alloc_object(&txn->region, typeof(*on_rollback),
-						  &size);
-		on_wal_write = region_alloc_object(&txn->region, typeof(*on_wal_write),
-						   &size);
-		if (on_rollback == NULL || on_wal_write == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc_object",
-				 "on_rollback/on_wal_write");
-			goto fail;
-		}
-
-		struct replica_cb_data *rcb;
-		rcb = region_alloc_object(&txn->region, typeof(*rcb), &size);
-		if (rcb == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc_object", "rcb");
-			goto fail;
-		}
-
-		trigger_create(on_rollback, applier_txn_rollback_cb, NULL, NULL);
-		txn_on_rollback(txn, on_rollback);
-
-		/*
-		 * We use *last* entry timestamp because ack comes up to
-		 * last entry in transaction. Same time this shows more
-		 * precise result because we're interested in how long
-		 * transaction traversed network + remote WAL bundle before
-		 * ack get received.
-		 */
-		rcb->replica_id = replica_id;
-		rcb->txn_last_tm = item->row.tm;
-
-		trigger_create(on_wal_write, applier_txn_wal_write_cb, rcb, NULL);
-		txn_on_wal_write(txn, on_wal_write);
+	size_t size;
+	struct trigger *on_rollback, *on_wal_write;
+	on_rollback = region_alloc_object(&txn->region, typeof(*on_rollback),
+					  &size);
+	on_wal_write = region_alloc_object(&txn->region, typeof(*on_wal_write),
+					   &size);
+	if (on_rollback == NULL || on_wal_write == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc_object",
+			 "on_rollback/on_wal_write");
+		goto fail;
 	}
-
+	struct replica_cb_data *rcb;
+	rcb = region_alloc_object(&txn->region, typeof(*rcb), &size);
+	if (rcb == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc_object", "rcb");
+		goto fail;
+	}
+	trigger_create(on_rollback, applier_txn_rollback_cb, NULL, NULL);
+	txn_on_rollback(txn, on_rollback);
+	/*
+	 * We use *last* entry timestamp because ack comes up to last entry in
+	 * transaction. Same time this shows more precise result because we're
+	 * interested in how long transaction traversed network + remote WAL
+	 * bundle before ack get received.
+	 */
+	rcb->replica_id = replica_id;
+	rcb->txn_last_tm = item->row.tm;
+	trigger_create(on_wal_write, applier_txn_wal_write_cb, rcb, NULL);
+	txn_on_wal_write(txn, on_wal_write);
 	return txn_commit_try_async(txn);
 fail:
 	txn_abort(txn);
 	return -1;
-}
-
-/** A simpler version of applier_apply_tx() for final join stage. */
-static int
-apply_final_join_tx(uint32_t replica_id, struct stailq *rows)
-{
-	struct applier_tx_row *txr =
-		stailq_first_entry(rows, struct applier_tx_row, next);
-	int rc = 0;
-	if (unlikely(iproto_type_is_synchro_request(txr->row.type))) {
-		rc = apply_synchro_req(replica_id, &txr->row,
-				       &txr->req.synchro);
-	} else {
-		rc = apply_plain_tx(replica_id, rows, false, false);
-	}
-	return rc;
 }
 
 /**
@@ -1728,8 +1683,7 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 		rc = apply_synchro_req(applier->instance_id, &txr->row,
 				       &txr->req.synchro);
 	} else {
-		rc = apply_plain_tx(applier->instance_id, rows,
-				    replication_skip_conflict, true);
+		rc = apply_plain_tx(applier->instance_id, rows);
 	}
 	if (rc != 0)
 		goto finish;
