@@ -6089,6 +6089,7 @@ box_storage_shutdown()
 		panic("cannot gracefully shutdown iproto");
 	}
 	replication_shutdown();
+	box_raft_shutdown();
 	gc_shutdown();
 	engine_shutdown();
 	fiber_pool_shutdown(&tx_fiber_pool);
