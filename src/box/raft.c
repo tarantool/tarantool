@@ -677,14 +677,19 @@ box_raft_init(void)
 }
 
 void
+box_raft_shutdown(void)
+{
+	if (box_raft_worker == NULL)
+		return;
+	fiber_cancel(box_raft_worker);
+	fiber_join(box_raft_worker);
+	box_raft_worker = NULL;
+}
+
+void
 box_raft_free(void)
 {
 	struct raft *raft = box_raft();
-	/*
-	 * Can't join the fiber, because the event loop is stopped already, and
-	 * yields are not allowed.
-	 */
-	box_raft_worker = NULL;
 	raft_destroy(raft);
 	/*
 	 * Invalidate so as box_raft() would fail if any usage attempt happens.

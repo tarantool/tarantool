@@ -164,6 +164,10 @@ box_raft_leader_step_off(void);
 void
 box_raft_init(void);
 
+/** Stop internal fibers. */
+void
+box_raft_shutdown(void);
+
 void
 box_raft_free(void);
 
