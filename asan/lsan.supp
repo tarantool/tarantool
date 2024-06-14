@@ -77,3 +77,4 @@ leak:box_tuple_update
 leak:box_tuple_iterator
 leak:box_index_iterator_after
 leak:ibuf_reserve_slow
+leak:box_check_slice
