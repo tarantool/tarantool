@@ -761,11 +761,6 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 {
 	struct key_def *key_def = index_def->key_def;
 
-	if (index_def->opts.fast_offset) {
-		diag_set(ClientError, ER_UNSUPPORTED, "memtx",
-			 "logarithmic select with offset");
-		return -1;
-	}
 	if (key_def->is_nullable) {
 		if (index_def->iid == 0) {
 			diag_set(ClientError, ER_NULLABLE_PRIMARY,
@@ -785,6 +780,13 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "HASH index must be unique");
+			return -1;
+		}
+		if (index_def->opts.fast_offset) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "HASH index does not support "
+				 "logarithmic select with offset");
 			return -1;
 		}
 		if (key_def->is_multikey) {
@@ -814,6 +816,13 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "RTREE index can not be unique");
+			return -1;
+		}
+		if (index_def->opts.fast_offset) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "RTREE index does not support "
+				 "logarithmic select with offset");
 			return -1;
 		}
 		if (key_def->parts[0].type != FIELD_TYPE_ARRAY) {
@@ -847,6 +856,13 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "BITSET can not be unique");
+			return -1;
+		}
+		if (index_def->opts.fast_offset) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "BITSET index does not support "
+				 "logarithmic select with offset");
 			return -1;
 		}
 		if (key_def->parts[0].type != FIELD_TYPE_UNSIGNED &&

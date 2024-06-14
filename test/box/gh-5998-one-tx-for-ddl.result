@@ -37,18 +37,19 @@ s1 = box.schema.space.create('s1')
  | ...
 s1:create_index('pk')
  | ---
- | - unique: true
+ | - fast_offset: false
+ |   id: 0
+ |   space_id: 512
+ |   unique: true
+ |   hint: true
+ |   type: TREE
+ |   name: pk
  |   parts:
  |   - fieldno: 1
  |     sort_order: asc
  |     type: unsigned
  |     exclude_null: false
  |     is_nullable: false
- |   hint: true
- |   id: 0
- |   type: TREE
- |   space_id: 512
- |   name: pk
  | ...
 
 for i = 0, 10 do s1:replace{i} end

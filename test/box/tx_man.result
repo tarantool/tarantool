@@ -3880,18 +3880,19 @@ _ = test_run:cmd("setopt delimiter ''");
 
 s:create_index('sk', {parts = {{2, 'unsigned'}}})
  | ---
- | - unique: true
+ | - fast_offset: false
+ |   id: 1
+ |   space_id: 512
+ |   unique: true
+ |   hint: true
+ |   type: TREE
+ |   name: sk
  |   parts:
  |   - fieldno: 2
  |     sort_order: asc
  |     type: unsigned
  |     exclude_null: false
  |     is_nullable: false
- |   hint: true
- |   id: 1
- |   type: TREE
- |   space_id: 512
- |   name: sk
  | ...
 
 ch1:put(true)

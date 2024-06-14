@@ -24,10 +24,28 @@ g.test_option = function()
     g.server:exec(function()
         local s = box.schema.space.create('test', {engine = 'memtx'})
 
-        -- Memtx does not support the fast_offset option.
+        -- Memtx TREE index supports the fast_offset option.
+        s:create_index('pk', {type = 'TREE', fast_offset = true})
+
+        -- Memtx HASH index does not support the fast_offset option.
         t.assert_error_msg_content_equals(
-            "memtx does not support logarithmic select with offset",
-            s.create_index, s, 'pk', {fast_offset = true})
+            "Can't create or modify index 'sk' in space 'test': " ..
+            "HASH index does not support logarithmic select with offset",
+            s.create_index, s, 'sk', {type = 'HASH', fast_offset = true})
+
+        -- Memtx RTREE index does not support the fast_offset option.
+        t.assert_error_msg_content_equals(
+            "Can't create or modify index 'sk' in space 'test': " ..
+            "RTREE index does not support logarithmic select with offset",
+            s.create_index, s, 'sk', {type = 'RTREE', fast_offset = true,
+                                      unique = false})
+
+        -- Memtx BITSET index does not support the fast_offset option.
+        t.assert_error_msg_content_equals(
+            "Can't create or modify index 'sk' in space 'test': " ..
+            "BITSET index does not support logarithmic select with offset",
+            s.create_index, s, 'sk', {type = 'BITSET', fast_offset = true,
+                                      unique = false})
 
         -- Can successfully create all indexes with fast_offset = false.
         s:create_index('k0', {type = 'TREE', fast_offset = false})
@@ -36,6 +54,13 @@ g.test_option = function()
                               unique = false, parts = {2, 'array'}})
         s:create_index('k3', {type = 'BITSET', fast_offset = false,
                               unique = false})
+
+        -- The indexes have the fast_offset expected.
+        t.assert_equals(s.index.pk.fast_offset, true)
+        t.assert_equals(s.index.k0.fast_offset, false)
+        t.assert_equals(s.index.k1.fast_offset, nil)
+        t.assert_equals(s.index.k2.fast_offset, nil)
+        t.assert_equals(s.index.k3.fast_offset, nil)
 
         s:drop()
 
@@ -48,6 +73,9 @@ g.test_option = function()
 
         -- Can successfully create vinyl index with fast_offset = false.
         s:create_index('pk', {fast_offset = false})
+
+        -- The index has the fast_offset expected.
+        t.assert_equals(s.index.pk.fast_offset, nil)
 
         s:drop()
     end)
