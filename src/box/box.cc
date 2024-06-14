@@ -5559,7 +5559,6 @@ box_cfg_xc(void)
 	if (box_set_replication_synchro_timeout() != 0)
 		diag_raise();
 	box_set_replication_sync_timeout();
-	box_set_replication_skip_conflict();
 	if (box_check_instance_name(cfg_instance_name) != 0)
 		diag_raise();
 	if (box_set_wal_queue_max_size() != 0)
@@ -5605,6 +5604,11 @@ box_cfg_xc(void)
 		/* Bootstrap a new instance */
 		bootstrap(&is_bootstrap_leader);
 	}
+	/*
+	 * During bootstrap from a remote master try not to ignore the
+	 * conflicts, neither during snapshot fetch, not join.
+	 */
+	box_set_replication_skip_conflict();
 	replicaset_state = REPLICASET_READY;
 
 	/*
