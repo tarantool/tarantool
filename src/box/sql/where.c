@@ -895,8 +895,10 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	index_opts_create(&opts);
 	const char *idx_name = "ephemeral index";
 	struct index_def *idx_def = index_def_new(space->def->id, 0, idx_name,
-						  strlen(idx_name), TREE, &opts,
-						  key_def, NULL);
+						  strlen(idx_name),
+						  space->def->name,
+						  space->def->engine_name,
+						  TREE, &opts, key_def, NULL);
 	key_def_delete(key_def);
 	if (idx_def == NULL) {
 		pParse->is_aborted = true;
@@ -2133,8 +2135,10 @@ tnt_error:
 
 		struct index_opts opts;
 		index_opts_create(&opts);
-		fake_index = index_def_new(space->def->id, 0,"fake_autoindex",
+		fake_index = index_def_new(space->def->id, 0, "fake_autoindex",
 					   sizeof("fake_autoindex") - 1,
+					   space->def->name,
+					   space->def->engine_name,
 					   TREE, &opts, key_def, NULL);
 		key_def_delete(key_def);
 		if (fake_index == NULL)

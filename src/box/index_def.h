@@ -33,6 +33,7 @@
 
 #include "key_def.h"
 #include "opt_def.h"
+#include "schema_def.h"
 #include "small/rlist.h"
 
 #if defined(__cplusplus)
@@ -160,19 +161,23 @@ index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
 
 /* Definition of an index. */
 struct index_def {
-	/* A link in key list. */
+	/** A link in key list. */
 	struct rlist link;
 	/** Ordinal index number in the index array. */
 	uint32_t iid;
-	/* Space id. */
+	/** Space id. */
 	uint32_t space_id;
+	/** Space name. */
+	char *space_name;
+	/** Engine name. */
+	char engine_name[ENGINE_NAME_MAX + 1];
 	/** Index name. */
 	char *name;
 	/** Index type. */
 	enum index_type type;
 	struct index_opts opts;
 
-	/* Index key definition. */
+	/** Index key definition. */
 	struct key_def *key_def;
 	/**
 	 * User-defined key definition, merged with the primary
@@ -275,7 +280,8 @@ index_def_list_add(struct rlist *index_def_list, struct index_def *index_def)
  */
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	      uint32_t name_len, enum index_type type,
+	      uint32_t name_len, const char *space_name,
+	      const char *engine_name, enum index_type type,
 	      const struct index_opts *opts,
 	      struct key_def *key_def, struct key_def *pk_def);
 

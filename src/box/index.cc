@@ -51,15 +51,14 @@ UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
 	unsigned line, struct index_def *index_def, const char *what)
 	: ClientError(file, line, ER_UNKNOWN)
 {
-	struct space *space = space_cache_find_xc(index_def->space_id);
 	code = ER_UNSUPPORTED_INDEX_FEATURE;
 	error_format_msg(this, tnt_errcode_desc(code), index_def->name,
 			 index_type_strs[index_def->type],
-			 space->def->name, space->def->engine_name, what);
+			 index_def->space_name, index_def->engine_name, what);
 	error_set_str(this, "index", index_def->name);
 	error_set_str(this, "index_type", index_type_strs[index_def->type]);
-	error_set_str(this, "space", space->def->name);
-	error_set_str(this, "engine", space->def->engine_name);
+	error_set_str(this, "space", index_def->space_name);
+	error_set_str(this, "engine", index_def->engine_name);
 	error_set_str(this, "feature", what);
 }
 
@@ -95,8 +94,7 @@ error_set_index(struct error *error, const struct index_def *index_def)
 {
 	error_set_str(error, "index", index_def->name);
 	error_set_uint(error, "index_id", index_def->iid);
-	struct space *space = space_by_id(index_def->space_id);
-	error_set_str(error, "space", space->def->name);
+	error_set_str(error, "space", index_def->space_name);
 	error_set_uint(error, "space_id", index_def->space_id);
 }
 
@@ -214,10 +212,8 @@ index_check_dup(struct index *index, struct tuple *old_tuple,
 			 * dup_replace_mode is DUP_REPLACE, and
 			 * a tuple with the same key is not found.
 			 */
-			struct space *space = space_by_id(index->def->space_id);
-			assert(space != NULL);
 			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-				 space->def->name, space->def->id,
+				 index->def->space_name, index->def->space_id,
 				 old_tuple, new_tuple, NULL);
 			return -1;
 		}
@@ -230,10 +226,8 @@ index_check_dup(struct index *index, struct tuple *old_tuple,
 			 * possibly delete more than one tuple
 			 * at once.
 			 */
-			struct space *space = space_by_id(index->def->space_id);
-			assert(space != NULL);
 			diag_set(ClientError, ER_TUPLE_FOUND,
-				 index->def->name, space->def->name,
+				 index->def->name, index->def->space_name,
 				 tuple_str(dup_tuple), tuple_str(new_tuple),
 				 dup_tuple, new_tuple);
 			return -1;

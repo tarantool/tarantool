@@ -94,7 +94,8 @@ test_basic()
 
 	struct index_opts index_opts = index_opts_default;
 	struct index_def *index_def =
-		index_def_new(512, 0, "primary", sizeof("primary") - 1, TREE,
+		index_def_new(512, 0, "primary", sizeof("primary") - 1,
+			      NULL, NULL, TREE,
 			      &index_opts, key_def, NULL);
 
 	struct vy_lsm *pk = vy_lsm_new(&lsm_env, &cache_env, &mem_env,

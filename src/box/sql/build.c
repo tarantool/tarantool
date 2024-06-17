@@ -2654,8 +2654,9 @@ index_fill_def(struct Parse *parse, struct index *index,
 	 * only for comparison routine. Meanwhile on front-end
 	 * side only definition is used.
 	 */
-	index->def = index_def_new(space_def->id, 0, name, name_len, TREE,
-				   &opts, key_def, NULL);
+	index->def = index_def_new(space_def->id, 0, name, name_len,
+				   space_def->name, space_def->engine_name,
+				   TREE, &opts, key_def, NULL);
 	if (index->def == NULL)
 		goto tnt_error;
 	index->def->iid = iid;

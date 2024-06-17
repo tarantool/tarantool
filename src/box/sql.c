@@ -378,28 +378,32 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 		parts[i].coll_id = info->coll_ids[j];
 	}
 
-	struct key_def *key_def = key_def_new(parts, part_count, 0);
-	if (key_def == NULL)
+	struct space_def *space_def = space_def_new_ephemeral(field_count,
+							      fields);
+	if (space_def == NULL)
 		return NULL;
+
+	struct key_def *key_def = key_def_new(parts, part_count, 0);
+	if (key_def == NULL) {
+		space_def_delete(space_def);
+		return NULL;
+	}
 
 	const char *name = "ephemer_idx";
 	struct index_def *index_def = index_def_new(0, 0, name, strlen(name),
+						    space_def->name,
+						    space_def->engine_name,
 						    TREE, &index_opts_default,
 						    key_def, NULL);
 	key_def_delete(key_def);
-	if (index_def == NULL)
+	if (index_def == NULL) {
+		space_def_delete(space_def);
 		return NULL;
+	}
 
 	struct rlist key_list;
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, index_def, link);
-
-	struct space_def *space_def = space_def_new_ephemeral(field_count,
-							      fields);
-	if (space_def == NULL) {
-		index_def_delete(index_def);
-		return NULL;
-	}
 
 	struct space *space = space_new_ephemeral(space_def, &key_list);
 	index_def_delete(index_def);
