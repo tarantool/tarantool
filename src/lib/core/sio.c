@@ -43,6 +43,10 @@
 #include "uri/uri.h"
 #include "errinj.h"
 
+#if TARGET_OS_DARWIN
+#include <sys/sysctl.h>
+#endif
+
 static_assert(SMALL_STATIC_SIZE > NI_MAXHOST + NI_MAXSERV,
 	      "static buffer should fit host name");
 
@@ -137,7 +141,31 @@ sio_listen_backlog()
 		if (rc == 1)
 			return backlog;
 	}
-#endif /* TARGET_OS_LINUX */
+#elif TARGET_OS_DARWIN
+	int somaxconn = 0;
+	size_t size = sizeof(somaxconn);
+	const char *name = "kern.ipc.somaxconn";
+	int rc = sysctlbyname(name, &somaxconn, &size, NULL, 0);
+	if (rc == 0) {
+		/*
+		 * From tests it appears that values > INT16_MAX
+		 * work strangely. For example, 32768 behaves
+		 * worse than 32767. Like if nothing was changed.
+		 * The suspicion is that listen() on Mac
+		 * internally uses int16_t or 'short' for storing
+		 * the queue size and it simply gets reset to
+		 * default on bigger values.
+		 */
+		if (somaxconn > INT16_MAX) {
+			say_warn("%s is too high (%d), "
+				 "truncated to %d", name,
+				 somaxconn, (int)INT16_MAX);
+			somaxconn = INT16_MAX;
+		}
+		return somaxconn;
+	}
+	say_syserror("couldn't get system's %s setting", name);
+#endif
 	return SOMAXCONN;
 }
 
