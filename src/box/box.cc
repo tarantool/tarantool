@@ -4831,7 +4831,8 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * indefinitely).
 	 */
 	relay_subscribe(replica, io, header->sync, &start_vclock,
-			req.version_id, req.id_filter, sent_raft_term);
+			req.version_id, req.id_filter, sent_raft_term,
+			!replica->anon);
 }
 
 void

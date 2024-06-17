@@ -161,6 +161,7 @@ relay_final_join(struct replica *replica, struct iostream *io, uint64_t sync,
 void
 relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 		const struct vclock *start_vclock, uint32_t replica_version_id,
-		uint32_t replica_id_filter, uint64_t sent_raft_term);
+		uint32_t replica_id_filter, uint64_t sent_raft_term,
+		bool with_gc_consumer);
 
 #endif /* TARANTOOL_REPLICATION_RELAY_H_INCLUDED */

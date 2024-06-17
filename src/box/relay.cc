@@ -196,6 +196,11 @@ struct relay {
 	enum relay_state state;
 	/** Whether relay should speed up the next heartbeat dispatch. */
 	bool need_new_vclock_sync;
+	/**
+	 * Whether relay should advance gc_consumer of replica,
+	 * used only on subscribe.
+	 */
+	bool with_gc_consumer;
 	struct {
 		/* Align to prevent false-sharing with tx thread */
 		alignas(CACHELINE_SIZE)
@@ -349,6 +354,7 @@ relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	relay->state = RELAY_FOLLOW;
 	relay->sent_raft_term = sent_raft_term;
 	relay->need_new_vclock_sync = false;
+	relay->with_gc_consumer = false;
 	relay->last_row_time = ev_monotonic_now(loop());
 	relay->tx_seen_time = relay->last_row_time;
 	relay->last_heartbeat_time = relay->last_row_time;
@@ -1065,13 +1071,11 @@ relay_subscribe_f(va_list ap)
 			     fiber_schedule_cb, fiber());
 
 	/*
-	 * Setup garbage collection trigger.
-	 * Not needed for anonymous replicas, since they
-	 * aren't registered with gc at all.
+	 * Setup garbage collection trigger if corresponding flag is set.
 	 */
 	struct trigger on_close_log;
 	trigger_create(&on_close_log, relay_on_close_log_f, relay, NULL);
-	if (!relay->replica->anon)
+	if (relay->with_gc_consumer)
 		trigger_add(&relay->r->on_close_log, &on_close_log);
 
 	/* Setup WAL watcher for sending new rows to the replica. */
@@ -1151,7 +1155,8 @@ relay_subscribe_f(va_list ap)
 void
 relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 		const struct vclock *start_vclock, uint32_t replica_version_id,
-		uint32_t replica_id_filter, uint64_t sent_raft_term)
+		uint32_t replica_id_filter, uint64_t sent_raft_term,
+		bool with_gc_consumer)
 {
 	assert(replica->anon || replica->id != REPLICA_ID_NIL);
 	struct relay *relay = replica->relay;
@@ -1175,6 +1180,7 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 	vclock_copy_ignore0(&relay->tx.vclock, start_vclock);
 	relay->version_id = replica_version_id;
 	relay->id_filter |= replica_id_filter;
+	relay->with_gc_consumer = with_gc_consumer;
 
 	struct cord cord;
 	int rc = cord_costart(&cord, "subscribe", relay_subscribe_f, relay);
