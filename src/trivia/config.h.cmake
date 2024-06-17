@@ -294,6 +294,7 @@
 #cmakedefine ENABLE_FAILOVER 1
 #cmakedefine ENABLE_INTEGRITY 1
 #cmakedefine ENABLE_CHECKPOINT_JOIN 1
+#cmakedefine ENABLE_GC_ANON 1
 
 #cmakedefine EXPORT_LIBCURL_SYMBOLS 1
 

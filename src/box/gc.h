@@ -35,11 +35,13 @@
 #include <stddef.h>
 #include <small/rlist.h>
 
+#include "clock_lowres.h"
 #include "fiber_cond.h"
 #include "vclock/vclock.h"
 #include "trivia/util.h"
 #include "checkpoint_schedule.h"
 #include "tt_uuid.h"
+#include "engine.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -106,6 +108,8 @@ struct gc_consumer {
 	struct vclock vclock;
 	/** See `is_async_updated` for details. */
 	struct vclock volatile_vclock;
+	/** Time of last usage aciuired by monotonic clock. */
+	double last_used_tm;
 	/**
 	 * This flag is set when the consumer was asynchronously updated.
 	 * In this case background fiber will persist `volatile_vclock`
@@ -117,6 +121,10 @@ struct gc_consumer {
 	 * deleted by the WAL thread on ENOSPC.
 	 */
 	bool is_inactive;
+	/**
+	 * This flag is set when the consumer retains snapshot along with WAL.
+	 */
+	bool with_snap;
 };
 
 typedef rb_tree(struct gc_consumer) gc_tree_t;
@@ -283,6 +291,12 @@ void
 gc_set_wal_cleanup_delay(double wal_cleanup_delay);
 
 /**
+ * Set a new value for `wal_anon_gc_timeout`.
+ */
+void
+gc_set_wal_anon_gc_timeout(double timeout);
+
+/**
  * Increment a reference to delay counter.
  */
 void
@@ -436,10 +450,42 @@ gc_consumer_update_async(const struct tt_uuid *uuid,
 			 const struct vclock *vclock);
 
 /**
+ * Synchronously retain checkpoint described by cursor, persistent
+ * state is updated.
+ */
+int
+gc_consumer_retain_checkpoint(const struct tt_uuid *uuid,
+			      struct engine_checkpoint_cursor *cursor);
+
+/**
+ * Synchronously release checkpoint, persistent state is updated.
+ */
+int
+gc_consumer_release_checkpoint(const struct tt_uuid *uuid);
+
+/**
  * Returns true if current schema supports persistent gc consumers.
  */
 bool
 gc_consumer_is_persistent(void);
+
+/**
+ * Prolong life of consumer.
+ */
+void
+gc_consumer_touch(const struct tt_uuid *uuid);
+
+/**
+ * Increase reference counter of consumer to prevent it from being deleted.
+ */
+void
+gc_consumer_ref(const struct tt_uuid *uuid);
+
+/**
+ * Decrease reference counter of consumer, delete if the counter has reached 0.
+ */
+void
+gc_consumer_unref(const struct tt_uuid *uuid);
 
 /**
  * The trigger invoked on replace in space _gc_consumers.

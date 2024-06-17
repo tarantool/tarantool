@@ -289,7 +289,8 @@ g.test_gc_consumers_on_replica_uuid_update = function(cg)
         box.space._cluster:replace{10, new_replica_uuid, 'name'}
         -- Consumer of old replica must be replaced with dummy consumer
         -- of the new one.
-        t.assert_equals(box.space._gc_consumers:select(), {{new_replica_uuid}})
+        t.assert_equals(box.space._gc_consumers:select(),
+            {{new_replica_uuid, nil, {}}})
     end)
 end
 

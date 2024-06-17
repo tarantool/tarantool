@@ -370,6 +370,9 @@ extern "C" {
 
 int box_set_wal_retention_period(void);
 
+int
+box_set_wal_anon_gc_timeout(void);
+
 typedef struct tuple box_tuple_t;
 
 bool

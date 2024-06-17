@@ -84,6 +84,7 @@
 #include "box/lua/config/utils/expression_lexer.h"
 #include "box/lua/failover.h"
 #include "box/lua/integrity.h"
+#include "box/lua/gc_anon.h"
 
 #include "mpstream/mpstream.h"
 
@@ -925,6 +926,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_trigger_init(L);
 	box_lua_integrity_init(L);
 	box_lua_expression_lexer_init(L);
+	box_lua_gc_anon_init(L);
 	luaopen_net_box(L);
 	lua_pop(L, 1);
 	tarantool_lua_console_init(L);

@@ -132,6 +132,9 @@ gc_checkpoint_delete(struct gc_checkpoint *checkpoint)
 }
 
 void
+gc_anon_init(void);
+
+void
 gc_init(on_garbage_collection_f on_garbage_collection)
 {
 	/* Don't delete any files until recovery is complete. */
@@ -171,6 +174,8 @@ gc_init(on_garbage_collection_f on_garbage_collection)
 	fiber_start(gc.cleanup_fiber);
 	fiber_start(gc.checkpoint_fiber);
 	fiber_start(gc.persist_fiber);
+
+	gc_anon_init();
 }
 
 void
@@ -212,6 +217,9 @@ gc_free(void)
 	}
 }
 
+static bool
+gc_checkpoint_is_retained(struct gc_checkpoint *checkpoint);
+
 /**
  * Invoke garbage collection in order to remove files left
  * from old checkpoints. The number of checkpoints saved by
@@ -237,6 +245,8 @@ gc_run_cleanup(void)
 			break;
 		if (!rlist_empty(&checkpoint->refs))
 			break; /* checkpoint is in use */
+		if (gc_checkpoint_is_retained(checkpoint))
+			break;
 		rlist_del_entry(checkpoint, in_checkpoints);
 		gc_checkpoint_delete(checkpoint);
 		gc.checkpoint_count--;
@@ -722,6 +732,8 @@ gc_consumer_register_impl(const struct tt_uuid *uuid,
 {
 	struct gc_consumer *consumer = xmalloc(sizeof(*consumer));
 	vsnprintf(consumer->name, GC_NAME_MAX, format, ap);
+	consumer->with_snap = false;
+	consumer->last_used_tm = clock_lowres_monotonic();
 
 	if (uuid != NULL && !tt_uuid_is_nil(uuid)) {
 		/* Unregister old consumer, if any. */
@@ -889,7 +901,7 @@ gc_consumer_register_dummy(const struct tt_uuid *uuid)
 		return 0;
 	}
 
-	return boxk(IPROTO_REPLACE, BOX_GC_CONSUMERS_ID, "[%s]",
+	return boxk(IPROTO_REPLACE, BOX_GC_CONSUMERS_ID, "[%sNIL{}]",
 		    tt_uuid_str(uuid));
 }
 
@@ -960,6 +972,15 @@ bool
 gc_consumer_is_persistent(void)
 {
 	return space_by_id(BOX_GC_CONSUMERS_ID) != NULL;
+}
+
+void
+gc_consumer_touch(const struct tt_uuid *uuid)
+{
+	struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
+	if (consumer == NULL)
+		return;
+	consumer->last_used_tm = clock_lowres_monotonic();
 }
 
 void
@@ -1073,10 +1094,13 @@ struct gc_consumer_def {
 	struct vclock vclock;
 	/** Is set if the consumer has vclock. */
 	bool has_vclock;
+	/** See gc_consumer::with_snap.  */
+	bool with_snap;
 };
 
 /** Mapping from tuple.opts to fields of gc_consumer_def. */
 const struct opt_def gc_consumer_def_opts_reg[] = {
+	OPT_DEF("with_snap", OPT_BOOL, struct gc_consumer_def, with_snap),
 	OPT_END,
 };
 
@@ -1192,10 +1216,18 @@ on_replace_dd_gc_consumers_commit(struct trigger *trigger, void *event)
 		} else {
 			/* Discard async updates on manual deactivation. */
 			gc_consumer_discard_async_updates(&data->uuid);
-			consumer->is_inactive = true;
-			gc_tree_remove(&gc.active_consumers, consumer);
+			if (!consumer->is_inactive) {
+				consumer->is_inactive = true;
+				gc_tree_remove(&gc.active_consumers, consumer);
+			}
 		}
 	}
+
+	struct gc_consumer *consumer = gc_consumer_by_uuid(&data->uuid);
+	if (consumer == NULL)
+		return 0;
+	consumer->with_snap = new_def->with_snap;
+
 	return 0;
 }
 
@@ -1313,3 +1345,57 @@ gc_consumer_iterator_next(struct gc_consumer_iterator *it)
 		it->curr = gc_tree_first(&gc.active_consumers);
 	return it->curr;
 }
+
+#ifdef ENABLE_GC_ANON
+#include "gc_anon.c"
+#else
+
+void
+gc_consumer_ref(const struct tt_uuid *uuid)
+{
+	(void)uuid;
+}
+
+void
+gc_consumer_unref(const struct tt_uuid *uuid)
+{
+	(void)uuid;
+}
+
+static bool
+gc_checkpoint_is_retained(struct gc_checkpoint *checkpoint)
+{
+	(void)checkpoint;
+	return false;
+}
+
+int
+gc_consumer_retain_checkpoint(const struct tt_uuid *uuid,
+			      struct engine_checkpoint_cursor *cursor)
+{
+	(void)uuid;
+	(void)cursor;
+	diag_set(ClientError, ER_UNSUPPORTED, "Community edition",
+		 "WAL GC consumers of checkpoints");
+	return -1;
+}
+
+int
+gc_consumer_release_checkpoint(const struct tt_uuid *uuid)
+{
+	(void)uuid;
+	diag_set(ClientError, ER_UNSUPPORTED, "Community edition",
+		 "WAL GC consumers of checkpoints");
+	return -1;
+}
+
+void
+gc_set_wal_anon_gc_timeout(double timeout)
+{
+	(void)timeout;
+}
+
+void
+gc_anon_init(void) {}
+
+#endif

@@ -246,6 +246,7 @@ g.test_defaults = function()
             queue_max_size = 16777216,
             cleanup_delay = box.NULL,
             retention_period = is_enterprise and 0 or nil,
+            anon_gc_timeout = is_enterprise and 60 * 60 or nil,
         },
         console = {
             enabled = true,

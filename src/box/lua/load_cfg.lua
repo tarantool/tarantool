@@ -84,6 +84,12 @@ local function ifdef_wal_retention_period(value)
     end
 end
 
+local function ifdef_wal_anon_gc_timeout(value)
+    if private.cfg_set_wal_anon_gc_timeout ~= nil then
+        return value
+    end
+end
+
 -- all available options
 local default_cfg = {
     listen              = nil,
@@ -159,6 +165,7 @@ local default_cfg = {
     wal_queue_max_size  = 16 * 1024 * 1024,
     wal_cleanup_delay   = 4 * 3600,
     wal_retention_period = ifdef_wal_retention_period(0),
+    wal_anon_gc_timeout = ifdef_wal_anon_gc_timeout(60 * 60),
     wal_ext             = ifdef_wal_ext(nil),
     force_recovery      = false,
     replication         = nil,
@@ -383,6 +390,7 @@ local template_cfg = {
     wal_dir_rescan_delay= 'number',
     wal_cleanup_delay   = 'number',
     wal_retention_period = ifdef_wal_retention_period('number'),
+    wal_anon_gc_timeout = ifdef_wal_anon_gc_timeout('number'),
     wal_ext             = ifdef_wal_ext('table'),
     force_recovery      = 'boolean',
     replication         = 'string, number, table',
@@ -532,6 +540,7 @@ local dynamic_cfg = {
     wal_dir_rescan_delay    = nop,
     wal_cleanup_delay       = private.cfg_set_wal_cleanup_delay,
     wal_retention_period    = private.cfg_set_wal_retention_period,
+    wal_anon_gc_timeout    = private.cfg_set_wal_anon_gc_timeout,
     custom_proc_title       = function()
         require('title').update(box.cfg.custom_proc_title)
     end,
@@ -730,6 +739,7 @@ local dynamic_cfg_skip_at_load = {
     secure_erasing          = ifdef_security(true),
     password_lifetime_days  = ifdef_security(true),
     wal_retention_period    = ifdef_wal_retention_period(true),
+    wal_anon_gc_timeout    = ifdef_wal_anon_gc_timeout(true),
     wal_cleanup_delay       = true,
 }
 

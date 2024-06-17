@@ -1311,6 +1311,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'wal_retention_period',
             default = 0,
         })),
+        anon_gc_timeout = enterprise_edition(schema.scalar({
+            type = 'number',
+            box_cfg = 'wal_anon_gc_timeout',
+            default = 60 * 60,
+        })),
         -- box.cfg({wal_ext = <...>}) replaces the previous
         -- value without any merging. See explanation why it is
         -- important in the log.modules description.

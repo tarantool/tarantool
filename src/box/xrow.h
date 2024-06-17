@@ -587,6 +587,15 @@ struct register_request {
 	char instance_name[NODE_NAME_SIZE_MAX];
 	/** Replica's vclock. */
 	struct vclock vclock;
+	/** Whether replica is anonymous. */
+	bool is_anon;
+	/**
+	 * For non-anonymous replica this flag has no effect and must be false.
+	 * For anonymous replica (`is_anon` is set) this flag controls whether
+	 * WAL GC consumer should be registered for the replica or unregistered.
+	 * If it's already registered - ???, if it already unregistered - no-op.
+	 */
+	bool is_persistent_gc;
 };
 
 /** Encode REGISTER request. */
@@ -617,6 +626,13 @@ struct subscribe_request {
 	uint32_t version_id;
 	/** Flag whether the replica is anon. */
 	bool is_anon;
+	/**
+	 * For non-anonymous replica this flag has no effect and must be false.
+	 * For anonymous replica this flag controls whether WAL GC consumer
+	 * should be updated. If it is set and consumer is not registered for
+	 * the replica, an error is thrown.
+	 */
+	bool is_persistent_gc;
 };
 
 /** Encode SUBSCRIBE request. */
@@ -668,10 +684,18 @@ int
 xrow_decode_join(const struct xrow_header *row, struct join_request *req);
 
 struct fetch_snapshot_request {
+	/** Replica's UUID. */
+	struct tt_uuid instance_uuid;
 	/** Replica's version. */
 	uint32_t version_id;
 	/** Flag indicating whether checkpoint join should be done. */
 	bool is_checkpoint_join;
+	/**
+	 * This flag controls whether WAL GC consumer should be updated.
+	 * If it is set and consumer is not registered for the replica, an
+	 * error is thrown.
+	 */
+	bool is_persistent_gc;
 	/** Checkpoint's vclock, signature of the snapshot. */
 	struct vclock checkpoint_vclock;
 	/** Checkpoint's lsn, the last row number client has. */

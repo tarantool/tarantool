@@ -2083,6 +2083,8 @@ struct replication_request {
 	uint32_t *id_filter;
 	/** IPROTO_SERVER_VERSION. */
 	uint32_t *version_id;
+	/** IPROTO_IS_PERSISTENT_GC. */
+	bool *is_persistent_gc;
 	/** IPROTO_REPLICA_ANON. */
 	bool *is_anon;
 	/** IPROTO_CHECKPOINT_JOIN. */
@@ -2256,6 +2258,16 @@ xrow_decode_replication_request(const struct xrow_header *row,
 			}
 			*req->is_anon = mp_decode_bool(&d);
 			break;
+		case IPROTO_IS_PERSISTENT_GC:
+			if (req->is_persistent_gc == NULL)
+				goto skip;
+			if (mp_typeof(*d) != MP_BOOL) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "invalid IS_PERSISTENT_GC flag");
+				return -1;
+			}
+			*req->is_persistent_gc = mp_decode_bool(&d);
+			break;
 		case IPROTO_ID_FILTER:
 			if (req->id_filter == NULL)
 				goto skip;
@@ -2332,6 +2344,8 @@ xrow_decode_register(const struct xrow_header *row,
 		.instance_uuid = &req->instance_uuid,
 		.instance_name = req->instance_name,
 		.vclock = &req->vclock,
+		.is_anon = &req->is_anon,
+		.is_persistent_gc = &req->is_persistent_gc,
 	};
 	return xrow_decode_replication_request(row, &base_req);
 }
@@ -2367,6 +2381,7 @@ xrow_decode_subscribe(const struct xrow_header *row,
 		.vclock = &req->vclock,
 		.version_id = &req->version_id,
 		.is_anon = &req->is_anon,
+		.is_persistent_gc = &req->is_persistent_gc,
 		.id_filter = &req->id_filter,
 	};
 	return xrow_decode_replication_request(row, &base_req);
@@ -2414,8 +2429,10 @@ xrow_decode_fetch_snapshot(const struct xrow_header *row,
 {
 	memset(req, 0, sizeof(*req));
 	struct replication_request base_req = {
+		.instance_uuid = &req->instance_uuid,
 		.version_id = &req->version_id,
 		.is_checkpoint_join = &req->is_checkpoint_join,
+		.is_persistent_gc = &req->is_persistent_gc,
 		.checkpoint_vclock = &req->checkpoint_vclock,
 		.checkpoint_lsn = &req->checkpoint_lsn,
 	};
@@ -2428,6 +2445,7 @@ xrow_decode_fetch_snapshot(const struct xrow_header *row,
 	req->is_checkpoint_join = false;
 	vclock_clear(&req->checkpoint_vclock);
 	req->checkpoint_lsn = -1;
+	req->instance_uuid = uuid_nil;
 	return xrow_decode_replication_request(row, &base_req);
 }
 

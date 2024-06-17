@@ -432,6 +432,7 @@ struct errcode_record {
 	_(ER_READ_VIEW_BUSY, 285,		"The read view is busy") \
 	_(ER_READ_VIEW_CLOSED, 286,		"The read view is closed") \
 	_(ER_INVALID_VCLOCK, 287,		"Invalid vclock") \
+	_(ER_MISSING_GC_CONSUMER, 288,		"Replica has no WAL GC consumer") \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*

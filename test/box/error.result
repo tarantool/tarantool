@@ -498,6 +498,7 @@ t;
  |   285: box.error.READ_VIEW_BUSY
  |   286: box.error.READ_VIEW_CLOSED
  |   287: box.error.INVALID_VCLOCK
+ |   288: box.error.MISSING_GC_CONSUMER
  | ...
 
 test_run:cmd("setopt delimiter ''");

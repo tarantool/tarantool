@@ -1710,6 +1710,19 @@ box_check_wal_retention_period_xc()
 	return value;
 }
 
+/** Validate that wal_anon_gc_timeout is >= 0. */
+static double
+box_check_wal_anon_gc_timeout()
+{
+	double value = cfg_getd("wal_anon_gc_timeout");
+	if (value < 0) {
+		diag_set(ClientError, ER_CFG, "wal_anon_gc_timeout",
+			 "the value must be >= 0");
+		return -1;
+	}
+	return value;
+}
+
 static ssize_t
 box_check_memory_quota(const char *quota_name)
 {
@@ -1970,6 +1983,8 @@ box_check_config(void)
 	if (box_check_wal_cleanup_delay() < 0)
 		diag_raise();
 	if (box_check_wal_retention_period() < 0)
+		diag_raise();
+	if (box_check_wal_anon_gc_timeout() < 0)
 		diag_raise();
 	if (box_check_memory_quota("memtx_memory") < 0)
 		diag_raise();
@@ -3263,6 +3278,16 @@ box_set_wal_retention_period(void)
 	return 0;
 }
 
+int
+box_set_wal_anon_gc_timeout(void)
+{
+	double timeout = box_check_wal_anon_gc_timeout();
+	if (timeout < 0)
+		return -1;
+	gc_set_wal_anon_gc_timeout(timeout);
+	return 0;
+}
+
 void
 box_set_vinyl_memory(void)
 {
@@ -4327,6 +4352,12 @@ box_process_fetch_snapshot(struct iostream *io,
 			  "wal_mode = 'none'");
 	}
 
+	if (req.is_persistent_gc && tt_uuid_is_nil(&req.instance_uuid)) {
+		tnt_raise(ClientError, ER_PROTOCOL,
+			  "Fetch snapshot with IS_PERSISTENT_GC option "
+			  "requires INSTANCE_UUID");
+	}
+
 	/** Used for checkpoint initial join. */
 	struct engine_checkpoint_cursor cursor = {
 		.is_checkpoint_join = req.is_checkpoint_join,
@@ -4344,6 +4375,35 @@ box_process_fetch_snapshot(struct iostream *io,
 			diag_raise();
 		gc_guard.is_active = true;
 	}
+
+	auto gc_consumer_ref_guard = make_scoped_guard([&] {
+		gc_consumer_unref(&req.instance_uuid);
+	});
+	gc_consumer_ref_guard.is_active = false;
+	if (req.is_persistent_gc) {
+		/*
+		 * Reference the consumer so that it cannot be deleted
+		 * while replica is connected.
+		 */
+		gc_consumer_ref(&req.instance_uuid);
+		gc_consumer_ref_guard.is_active = true;
+		if (req.is_checkpoint_join) {
+			if (gc_consumer_retain_checkpoint(&req.instance_uuid,
+							  &cursor) != 0)
+				diag_raise();
+		} else {
+			if (!gc_consumer_is_registered(&req.instance_uuid))
+				tnt_raise(ClientError, ER_MISSING_GC_CONSUMER);
+			gc_consumer_update(&req.instance_uuid,
+					   &replicaset.vclock);
+		}
+	}
+
+	struct errinj *inj = errinj(ERRINJ_IPROTO_FETCH_SNAPSHOT_DELAY,
+				    ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		fiber_sleep(inj->dparam);
+
 	/* Send the snapshot data to the instance. */
 	struct vclock start_vclock;
 	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
@@ -4359,6 +4419,27 @@ box_process_fetch_snapshot(struct iostream *io,
 	xrow_encode_vclock(&row, &stop_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
+
+	/*
+	 * Wait for reply to release snapshot if replica has consumer and
+	 * fetches checkpoint instead of read-view.
+	 */
+	if (req.is_persistent_gc && req.is_checkpoint_join) {
+		struct ibuf ibuf;
+		struct xrow_header ans;
+		ibuf_create(&ibuf, &cord()->slabc, 128);
+		auto ibuf_guard = make_scoped_guard([&]() {
+			ibuf_destroy(&ibuf);
+		});
+		coio_read_xrow(io, &ibuf, &ans);
+		if (ans.type != IPROTO_OK) {
+			tnt_raise(ClientError, ER_PROTOCOL,
+				  "Unexpected reply in the end of fetch "
+				  "snapshot");
+		}
+		if (gc_consumer_release_checkpoint(&req.instance_uuid) != 0)
+			diag_raise();
+	}
 }
 
 /**
@@ -4395,10 +4476,45 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	if (tt_uuid_is_equal(&req.instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
+	if (tt_uuid_is_nil(&req.instance_uuid))
+		tnt_raise(ClientError, ER_PROTOCOL,
+			  "IPROTO_REGISTER requires INSTANCE_UUID");
+
 	access_check_universe_xc(PRIV_R);
+
 	/*
-	 * We only get register requests from instances which need some actual
-	 * registration - name, id.
+	 * Anonymous request - it means that anonymous replica wants to modify
+	 * its WAL GC state.
+	 */
+	if (req.is_anon) {
+		int rc = 0;
+		if (req.is_persistent_gc) {
+			if (gc_consumer_is_registered(&req.instance_uuid)) {
+				/*
+				 * Prolong life of consumer if it's already
+				 * registered.
+				 */
+				gc_consumer_touch(&req.instance_uuid);
+			} else {
+				rc = gc_consumer_register_dummy(
+					&req.instance_uuid);
+			}
+		} else {
+			rc = gc_consumer_unregister(&req.instance_uuid);
+		}
+
+		if (rc != 0)
+			diag_raise();
+
+		struct xrow_header row;
+		row.sync = header->sync;
+		xrow_encode_type(&row, IPROTO_OK);
+		coio_write_xrow(io, &row);
+		return;
+	}
+	/*
+	 * We only get non-anonymous register requests from instances which
+	 * need some actual registration - name, id.
 	 */
 	struct replica *replica = replica_by_uuid(&req.instance_uuid);
 	bool need_id = false;
@@ -4696,6 +4812,12 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 			  "non-anonymous followers.");
 	}
 
+	if (req.is_persistent_gc && !req.is_anon) {
+		tnt_raise(ClientError, ER_PROTOCOL, "Option IS_PERSISTENT_GC "
+			  "can be used only for anonymous replicas, "
+			  "non-anonymous ones imply this attribute.");
+	}
+
 	/* Check permissions */
 	access_check_universe_xc(PRIV_R);
 
@@ -4728,6 +4850,11 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		tnt_raise(ClientError, ER_PROTOCOL, "Can't subscribe an "
 			  "anonymous replica having an ID assigned");
 	}
+	if (req.is_persistent_gc &&
+	    !gc_consumer_is_registered(&req.instance_uuid))
+		tnt_raise(ClientError, ER_MISSING_GC_CONSUMER);
+
+	bool has_persistent_gc = req.is_persistent_gc || !req.is_anon;
 	/*
 	 * Replica name mismatch is not considered a critical error. It can
 	 * happen if rename happened and then the replica reconnected. It won't
@@ -4757,6 +4884,13 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	}
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
+
+	/* Save UUID because replica can be deleted. */
+	struct tt_uuid replica_uuid = replica->uuid;
+	auto gc_guard = make_scoped_guard([&]() {
+		gc_consumer_unref(&replica_uuid);
+	});
+	gc_guard.is_active = false;
 	/*
 	 * Register the replica with the garbage collector.
 	 * In case some of the replica's WAL files were deleted, it might
@@ -4764,9 +4898,12 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * recreate the gc consumer unconditionally to make sure it holds
 	 * the correct vclock.
 	 */
-	if (!replica->anon &&
-	    gc_consumer_update(&replica->uuid, &start_vclock) != 0)
-		diag_raise();
+	if (has_persistent_gc) {
+		gc_consumer_ref(&replica->uuid);
+		gc_guard.is_active = true;
+		if (gc_consumer_update(&replica->uuid, &start_vclock) != 0)
+			diag_raise();
+	}
 	/*
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,
@@ -4832,7 +4969,7 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 */
 	relay_subscribe(replica, io, header->sync, &start_vclock,
 			req.version_id, req.id_filter, sent_raft_term,
-			!replica->anon);
+			has_persistent_gc);
 }
 
 void
