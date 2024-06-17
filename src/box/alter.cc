@@ -390,8 +390,9 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	if (key_def == NULL)
 		return NULL;
 	struct index_def *index_def =
-		index_def_new(id, index_id, name, name_len, type,
-			      &opts, key_def, space_index_key_def(space, 0));
+		index_def_new(id, index_id, name, name_len, space->def->name,
+			      space->def->engine_name, type, &opts, key_def,
+			      space_index_key_def(space, 0));
 	if (index_def == NULL)
 		return NULL;
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
@@ -1770,6 +1771,8 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 		 */
 		new_def = index_def_new(old_def->space_id, old_def->iid,
 					old_def->name, strlen(old_def->name),
+					old_def->space_name,
+					old_def->engine_name,
 					old_def->type, &old_def->opts,
 					old_def->key_def, alter->pk_def);
 		index_def_update_optionality(new_def, min_field_count);

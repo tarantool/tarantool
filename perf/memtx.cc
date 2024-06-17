@@ -160,8 +160,10 @@ private:
 		if (key_def == nullptr)
 			panic("failed to create new key definition");
 		tree_idx_def = ::index_def_new(sid, tree_index_id, "pk",
-					       std::strlen("pk"), TREE,
-					       &idx_opts, key_def,
+					       std::strlen("pk"),
+					       space_def->name,
+					       space_def->engine_name,
+					       TREE, &idx_opts, key_def,
 					       /*pk_def=*/nullptr);
 		if (tree_idx_def == nullptr)
 			panic("failed to create new index definition");

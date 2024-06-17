@@ -211,6 +211,11 @@ sc_space_new(uint32_t id, const char *name,
 	     uint32_t key_part_count,
 	     struct trigger *replace_trigger)
 {
+	struct space_def *def =
+		space_def_new_xc(id, ADMIN, 0, name, strlen(name), "memtx",
+				 strlen("memtx"), &space_opts_default, NULL, 0,
+				 NULL, 0);
+	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	struct key_def *key_def = key_def_new(key_parts, key_part_count, 0);
 	if (key_def == NULL)
 		diag_raise();
@@ -220,6 +225,8 @@ sc_space_new(uint32_t id, const char *name,
 						    0 /* index id */,
 						    "primary", /* name */
 						    strlen("primary"),
+						    def->name, /* space name */
+						    def->engine_name,
 						    TREE /* index type */,
 						    &index_opts_default,
 						    key_def, NULL);
@@ -227,11 +234,6 @@ sc_space_new(uint32_t id, const char *name,
 		diag_raise();
 	auto index_def_guard =
 		make_scoped_guard([=] { index_def_delete(index_def); });
-	struct space_def *def =
-		space_def_new_xc(id, ADMIN, 0, name, strlen(name), "memtx",
-				 strlen("memtx"), &space_opts_default, NULL, 0,
-				 NULL, 0);
-	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	struct rlist key_list;
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, index_def, link);
