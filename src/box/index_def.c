@@ -94,6 +94,7 @@ const struct opt_def index_opts_reg[] = {
 
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
+	      const char *space_name, const char* engine_name,
 	      uint32_t name_len, enum index_type type,
 	      const struct index_opts *opts,
 	      struct key_def *key_def, struct key_def *pk_def)
@@ -107,14 +108,23 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	}
 	def->name = strndup(name, name_len);
 	if (def->name == NULL) {
-		index_def_delete(def);
 		diag_set(OutOfMemory, name_len + 1, "malloc", "index_def name");
-		return NULL;
+		goto error;
 	}
-	if (identifier_check(def->name, name_len)) {
-		index_def_delete(def);
-		return NULL;
+	if (identifier_check(def->name, name_len))
+		goto error;
+	if (space_name != NULL) {
+		def->space_name = strdup(space_name);
+		if (def->space_name == NULL) {
+			diag_set(OutOfMemory, strlen(space_name) + 1, "malloc",
+				 "index_def space_name");
+			goto error;
+		}
 	}
+	memset(def->engine_name, 0, sizeof(def->engine_name));
+	if (engine_name != NULL)
+		strlcpy(def->engine_name, engine_name, ENGINE_NAME_MAX);
+
 	def->key_def = key_def_dup(key_def);
 	if (iid != 0) {
 		assert(pk_def != NULL);
@@ -136,6 +146,10 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->iid = iid;
 	def->opts = *opts;
 	return def;
+
+error:
+	index_def_delete(def);
+	return NULL;
 }
 
 struct index_def *
@@ -144,6 +158,9 @@ index_def_dup(const struct index_def *def)
 	struct index_def *dup = xmalloc(sizeof(*dup));
 	*dup = *def;
 	dup->name = xstrdup(def->name);
+	if (def->space_name != NULL)
+		dup->space_name = xstrdup(def->space_name);
+	strlcpy(dup->engine_name, def->engine_name, ENGINE_NAME_MAX);
 	dup->key_def = key_def_dup(def->key_def);
 	dup->cmp_def = key_def_dup(def->cmp_def);
 	dup->pk_def = key_def_dup(def->pk_def);
@@ -157,6 +174,7 @@ index_def_delete(struct index_def *index_def)
 {
 	index_opts_destroy(&index_def->opts);
 	free(index_def->name);
+	free(index_def->space_name);
 
 	if (index_def->key_def)
 		key_def_delete(index_def->key_def);

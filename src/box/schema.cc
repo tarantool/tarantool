@@ -219,6 +219,8 @@ sc_space_new(uint32_t id, const char *name,
 	struct index_def *index_def = index_def_new(id, /* space id */
 						    0 /* index id */,
 						    "primary", /* name */
+						    NULL, /* space name */
+						    NULL, /* engine name */
 						    strlen("primary"),
 						    TREE /* index type */,
 						    &index_opts_default,
