@@ -35,6 +35,7 @@
 #include "json/json.h"
 #include "fiber.h"
 #include "tt_static.h"
+#include "space_cache.h"
 
 const char *index_type_strs[] = { "HASH", "TREE", "BITSET", "RTREE" };
 
@@ -133,6 +134,7 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	}
 	def->type = type;
 	def->space_id = space_id;
+	def->space_name = NULL;
 	def->iid = iid;
 	def->opts = *opts;
 	return def;
@@ -144,6 +146,8 @@ index_def_dup(const struct index_def *def)
 	struct index_def *dup = xmalloc(sizeof(*dup));
 	*dup = *def;
 	dup->name = xstrdup(def->name);
+	if (def->space_name)
+		dup->space_name = xstrdup(def->space_name);
 	dup->key_def = key_def_dup(def->key_def);
 	dup->cmp_def = key_def_dup(def->cmp_def);
 	dup->pk_def = key_def_dup(def->pk_def);
@@ -157,6 +161,7 @@ index_def_delete(struct index_def *index_def)
 {
 	index_opts_destroy(&index_def->opts);
 	free(index_def->name);
+	free(index_def->space_name);
 
 	if (index_def->key_def)
 		key_def_delete(index_def->key_def);

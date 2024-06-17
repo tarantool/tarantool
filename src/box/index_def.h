@@ -166,6 +166,8 @@ struct index_def {
 	uint32_t iid;
 	/* Space id. */
 	uint32_t space_id;
+	/* Space name. */
+	char *space_name;
 	/** Index name. */
 	char *name;
 	/** Index type. */

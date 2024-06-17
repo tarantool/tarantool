@@ -580,6 +580,7 @@ space_create(struct space *space, struct engine *engine,
 		struct index *index = space_create_index(space, index_def);
 		if (index == NULL)
 			goto fail_free_indexes;
+		index->def->space_name = xstrdup(def->name);
 		space->index_map[index_def->iid] = index;
 		if (index_def->opts.is_unique)
 			bit_set(space->check_unique_constraint_map,
