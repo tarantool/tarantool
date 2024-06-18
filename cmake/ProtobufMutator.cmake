@@ -37,7 +37,7 @@ include_directories(${PROTOBUF_INCLUDE_DIRS})
 set(PROTOBUF_LIBRARIES protobuf)
 if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
   set(PROTOBUF_LIBRARIES protobufd)
-endif(CMAKE_BUILD_TYPE)
+endif()
 
 foreach(lib ${PROTOBUF_LIBRARIES})
   set(LIB_PROTOBUF_PATH ${PROTOBUF_INSTALL_DIR}/lib/lib${lib}.a)
