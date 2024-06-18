@@ -8,7 +8,7 @@ local json = require('json')
 local msgpack = require('msgpack')
 local TZ = date.TZ
 
-test:plan(39)
+test:plan(41)
 
 local INT_MAX = 2147483647
 
@@ -2102,6 +2102,30 @@ test:test("Time :set{day = -1} operations", function(test)
     test:is(tostring(ts:set{month = 3, day = 2}), '1904-03-02T00:00:00Z',
             '2 March')
     test:is(tostring(ts:set{day = -1}), '1904-03-31T00:00:00Z', '31 March')
+end)
+
+test:test("Parse datetime with specified seconds", function(test)
+    test:plan(12)
+    local dt = date.parse('01', {format = '%S'})
+    test:is(dt.isdst, false, 'unspecified isdst')
+    test:is(dt.nsec, 0, 'unspecified nsec')
+    test:is(dt.sec, 1, 'specified seconds')
+    test:is(dt.min, 0, 'unspecified minutes')
+    test:is(dt.yday, 1, 'unspecified yday')
+    test:is(dt.day, 1, 'unspecified day')
+    test:is(dt.wday, 5, 'unspecified wday')
+    test:is(dt.tzoffset, 0, 'unspecified tzoffset')
+    test:is(dt.month, 1, 'unspecified month')
+    test:is(dt.year, 1970, 'unspecified year')
+    test:is(dt.hour, 0, 'unspecified hours')
+    test:is(dt.timestamp, 1, 'timestamp')
+end)
+
+test:test("Parse datetime with unspecified seconds", function(test)
+    test:plan(2)
+    local dt = date.parse('01', {format = '%H'})
+    test:is(dt.sec, 0, 'uspecified sec')
+    test:is(dt.timestamp, 3600, 'timestamp')
 end)
 
 os.exit(test:check() and 0 or 1)
