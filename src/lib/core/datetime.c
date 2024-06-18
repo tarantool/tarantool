@@ -156,7 +156,15 @@ datetime_strptime(struct datetime *date, const char *buf, const char *fmt)
 	assert(date != NULL);
 	assert(fmt != NULL);
 	assert(buf != NULL);
-	struct tnt_tm t = { .tm_epoch = 0 };
+	struct tnt_tm t;
+	/* Set to Unix time. */
+	struct datetime dt = {
+		.epoch = 0,
+		.nsec = 0,
+		.tzindex = 0,
+		.tzoffset = 0,
+	};
+	datetime_to_tm(&dt, &t);
 	char *ret = tnt_strptime(buf, fmt, &t);
 	if (ret == NULL)
 		return 0;
