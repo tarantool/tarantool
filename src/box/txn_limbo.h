@@ -139,6 +139,20 @@ struct txn_limbo {
 	 */
 	struct fiber_cond wait_cond;
 	/**
+	 * A helper fiber for running blocking actions
+	 * related to txn_limbo_on_parameters_change.
+	 */
+	struct {
+		/** The worker for handling parameter changes. */
+		struct fiber *fiber;
+		/** Notifies the worker when there's more work to do. */
+		struct fiber_cond cond;
+		/** True if there's more work to do. */
+		bool has_work;
+		/** True if the worker is currently running. */
+		bool running;
+	} on_parameters_change;
+	/**
 	 * All components of the vclock are versions of the limbo
 	 * owner's LSN, how it is visible on other nodes. For
 	 * example, assume instance ID of the limbo is 1. Then
@@ -216,6 +230,10 @@ struct txn_limbo {
 	 * by the 'reversed rollback order' rule - contradiction.
 	 */
 	bool is_in_rollback;
+	/**
+	 * Set to true when the current instance is writing a PROMOTE request.
+	 */
+	bool is_writing_promote;
 	union {
 		/**
 		 * Whether the limbo is frozen. This mode prevents CONFIRMs and

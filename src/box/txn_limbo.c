@@ -60,6 +60,10 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->len = 0;
 	limbo->owner_id = REPLICA_ID_NIL;
 	fiber_cond_create(&limbo->wait_cond);
+	limbo->on_parameters_change.has_work = false;
+	limbo->on_parameters_change.running = false;
+	limbo->on_parameters_change.fiber = NULL;
+	fiber_cond_create(&limbo->on_parameters_change.cond);
 	vclock_create(&limbo->vclock);
 	vclock_create(&limbo->promote_term_map);
 	vclock_create(&limbo->confirmed_vclock);
@@ -69,6 +73,7 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->confirmed_lsn = 0;
 	limbo->rollback_count = 0;
 	limbo->is_in_rollback = false;
+	limbo->is_writing_promote = false;
 	limbo->frozen_reasons = 0;
 	limbo->is_frozen_until_promotion = true;
 	limbo->do_validate = false;
@@ -165,7 +170,8 @@ bool
 txn_limbo_is_trying_to_promote(struct txn_limbo *limbo)
 {
 	struct rlist *queue = &limbo->pending_promotes;
-	return txn_limbo_get_active_promote(queue);
+	return limbo->is_writing_promote ||
+	       txn_limbo_get_active_promote(queue);
 }
 
 struct txn_limbo_entry *
@@ -778,22 +784,29 @@ int
 txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 {
 	assert(latch_is_locked(&limbo->promote_latch));
+	int rc = -1;
 
 	struct synchro_request req;
 	txn_limbo_make_promote(limbo, lsn, term, &req);
 
-	if (txn_limbo_req_prepare(limbo, &req) < 0)
-		return -1;
+	limbo->is_writing_promote = true;
+	if (txn_limbo_req_prepare(limbo, &req) < 0) {
+		limbo->is_writing_promote = false;
+		goto end;
+	}
 	req.self_lsn = synchro_request_write(&req);
 	say_info("PROMOTE: write %s", synchro_request_to_string(&req));
 	txn_limbo_req_commit(limbo, &req);
+	limbo->is_writing_promote = false;
 
 	/* Immediately acknowledge our own write. */
 	int64_t prev_lsn, self_lsn = req.self_lsn;
 	txn_limbo_ack_already_seen(limbo, instance_id, self_lsn, &prev_lsn);
 	txn_limbo_ack_promote(limbo, instance_id, self_lsn, prev_lsn);
 
-	return 0;
+	rc = 0;
+end:
+	return rc;
 }
 
 /**
@@ -1708,9 +1721,19 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 	return 0;
 }
 
-void
-txn_limbo_on_parameters_change(struct txn_limbo *limbo)
+static void
+txn_limbo_on_parameters_change_handler(struct txn_limbo *limbo)
 {
+	/*
+	 * If replication_synchro_quorum has changed,
+	 * it might now be possible to commit the PROMOTE queue.
+	 */
+	if (txn_limbo_is_trying_to_promote(limbo)) {
+		latch_lock(&limbo->promote_latch);
+		txn_limbo_maybe_confirm_promotes(limbo);
+		latch_unlock(&limbo->promote_latch);
+		goto finish;
+	}
 	if (rlist_empty(&limbo->queue) || txn_limbo_is_frozen(limbo))
 		return;
 	struct txn_limbo_entry *e;
@@ -1730,6 +1753,7 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 		txn_limbo_write_confirm(limbo, confirm_lsn);
 		txn_limbo_confirm_txn(limbo, confirm_lsn);
 	}
+finish:
 	/*
 	 * Wakeup all the others - timed out will rollback. Also
 	 * there can be non-transactional waiters, such as CONFIRM
@@ -1738,6 +1762,54 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 	 * sync transactions can live on replica infinitely.
 	 */
 	fiber_cond_broadcast(&limbo->wait_cond);
+}
+
+static int
+txn_limbo_on_parameters_change_f(va_list va)
+{
+	struct txn_limbo *limbo = va_arg(va, struct txn_limbo *);
+
+	for (;;) {
+		say_info("handling parameter changes affecting the limbo");
+		txn_limbo_on_parameters_change_handler(limbo);
+
+		while (!limbo->on_parameters_change.has_work)
+			fiber_cond_wait(&limbo->on_parameters_change.cond);
+		limbo->on_parameters_change.has_work = false;
+	}
+
+	return 0;
+}
+
+static void
+txn_limbo_on_parameters_change_init(struct txn_limbo *limbo)
+{
+	struct fiber *fiber =
+		fiber_new_system("txn_limbo_on_parameters_change",
+				 txn_limbo_on_parameters_change_f);
+	if (fiber == NULL) {
+		diag_log();
+		panic("failed to create param change fiber");
+	}
+
+	limbo->on_parameters_change.has_work = false;
+	limbo->on_parameters_change.running = false;
+	limbo->on_parameters_change.fiber = fiber;
+
+	fiber_cond_create(&limbo->on_parameters_change.cond);
+}
+
+void
+txn_limbo_on_parameters_change(struct txn_limbo *limbo)
+{
+	if (!limbo->on_parameters_change.running) {
+		limbo->on_parameters_change.running = true;
+		assert(limbo->on_parameters_change.fiber != NULL);
+		fiber_start(limbo->on_parameters_change.fiber, limbo);
+	}
+
+	limbo->on_parameters_change.has_work = true;
+	fiber_cond_broadcast(&limbo->on_parameters_change.cond);
 }
 
 void
@@ -1774,4 +1846,5 @@ void
 txn_limbo_init(void)
 {
 	txn_limbo_create(&txn_limbo);
+	txn_limbo_on_parameters_change_init(&txn_limbo);
 }
