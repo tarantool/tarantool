@@ -329,7 +329,7 @@ txn_limbo_assign_local_lsn(struct txn_limbo *limbo,
  * remote transactions. The function exists to be used in a
  * context, where a transaction is not known whether it is local
  * or not. For example, when a transaction is committed not bound
- * to any fiber (txn_commit_try_async()), it can be created by applier
+ * to any fiber (txn_commit_submit()), it can be created by applier
  * (then it is remote) or by recovery (then it is local). Besides,
  * recovery can commit remote transactions as well, when works on
  * a replica - it will recover data received from master.

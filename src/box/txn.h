@@ -166,6 +166,17 @@ enum {
 	TXN_SIGNATURE_ABORT = JOURNAL_ENTRY_ERR_MIN - 4,
 };
 
+enum txn_commit_wait_mode {
+	/** Commit blocks until the txn is complete. */
+	TXN_COMMIT_WAIT_MODE_COMPLETE,
+	/**
+	 * Txn is sent to the journal is completed later asynchronously. Commit
+	 * returns right away. Unless the journal queue is full. Then the commit
+	 * is blocked until there is space in the queue.
+	 */
+	TXN_COMMIT_WAIT_MODE_SUBMIT,
+};
+
 /** \cond public */
 /**
  * When a transaction calls `commit`, this action can last for some time until
@@ -716,7 +727,7 @@ txn_abort(struct txn *txn);
  * freed.
  */
 int
-txn_commit_try_async(struct txn *txn);
+txn_commit_submit(struct txn *txn);
 
 /**
  * Most txns don't have triggers, and txn objects
