@@ -269,7 +269,7 @@ journal_write_row(struct xrow_header *row);
  * @return 0 if write was queued to a backend or -1 in case of an error.
  */
 static inline int
-journal_write_try_async(struct journal_entry *entry)
+journal_write_submit(struct journal_entry *entry)
 {
 	journal_queue_wait();
 	/*
@@ -288,7 +288,7 @@ journal_write_try_async(struct journal_entry *entry)
 static inline int
 journal_write(struct journal_entry *entry)
 {
-	if (journal_write_try_async(entry) != 0)
+	if (journal_write_submit(entry) != 0)
 		return -1;
 	while (!entry->is_complete)
 		fiber_yield();
