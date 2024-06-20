@@ -34,6 +34,9 @@
 extern "C" {
 #endif
 
+#include "small/lsregion.h"
+#include "memory.h"
+
 struct ibuf;
 struct iostream;
 struct xrow_header;
@@ -48,6 +51,53 @@ coio_read_xrow_timeout_xc(struct iostream *io, struct ibuf *in,
 void
 coio_write_xrow(struct iostream *io, const struct xrow_header *row);
 
+
+/** Written data size after which the stream should be flushed. */
+extern uint64_t xrow_stream_flush_size;
+
+/**
+ * A structure encapsulating writes made by relay. Collects the rows into a
+ * buffer and flushes it to the network as soon as its size reaches a specific
+ * threshold.
+ */
+struct xrow_stream {
+	/** A region storing rows buffered for dispatch. */
+	struct lsregion lsregion;
+	/** A growing identifier for lsregion allocations. */
+	int64_t lsr_id;
+	/** A savepoint used between flushes. */
+	struct lsregion_svp flush_pos;
+};
+
+/** Initialize the stream. */
+static inline void
+xrow_stream_create(struct xrow_stream *stream)
+{
+	lsregion_create(&stream->lsregion, &runtime);
+	stream->lsr_id = 0;
+	lsregion_svp_create(&stream->flush_pos);
+}
+
+static inline void
+xrow_stream_destroy(struct xrow_stream *stream)
+{
+	lsregion_destroy(&stream->lsregion);
+}
+
+/** Test whether the stream is full and needs a flush. */
+static inline bool
+xrow_stream_needs_flush(const struct xrow_stream *stream)
+{
+	return lsregion_used(&stream->lsregion) > xrow_stream_flush_size;
+}
+
+/** Write a row to the stream. */
+void
+xrow_stream_write(struct xrow_stream *stream, const struct xrow_header *row);
+
+/** Flush the stream contents to the given iostream. */
+int
+xrow_stream_flush(struct xrow_stream *stream, struct iostream *io);
 
 #if defined(__cplusplus)
 } /* extern "C" */
