@@ -42,6 +42,7 @@
 #include "core/say.h"
 #include "core/tt_uuid.h"
 #include "lj_trace.h"
+#include "lj_err.h"
 #include "lua/serializer.h"
 #include "trivia/util.h"
 #include "vclock/vclock.h"
@@ -686,9 +687,17 @@ luaT_toerror(lua_State *L)
 int
 luaT_call(struct lua_State *L, int nargs, int nreturns)
 {
-	if (lua_pcall(L, nargs, nreturns, 0))
-		return luaT_toerror(L);
-	return 0;
+	lua_pushnil(L);
+	for (int arg = 1; arg < nargs + 2; arg++) {
+		lua_pushvalue(L, -arg - 1);
+		lua_replace(L, -arg - 1);
+	}
+	lua_pushcfunction(L, luaT_toerror);
+	lua_replace(L, -nargs - 3);
+	int errfunc = lua_gettop(L) - nargs - 1;
+	int status = lua_pcall(L, nargs, nreturns, errfunc);
+	lua_remove(L, errfunc);
+	return status;
 }
 
 int
@@ -710,9 +719,13 @@ luaT_dostring(struct lua_State *L, const char *str)
 int
 luaT_cpcall(lua_State *L, lua_CFunction func, void *ud)
 {
-	if (lua_cpcall(L, func, ud))
-		return luaT_toerror(L);
-	return 0;
+	lua_pushcfunction(L, luaT_toerror);
+	int errfunc = lua_gettop(L);
+	lua_pushcfunction(L, func);
+	lua_pushlightuserdata(L, ud);
+	int status = lua_pcall(L, 1, 0, errfunc);
+	lua_remove(L, errfunc);
+	return status;
 }
 
 /**
