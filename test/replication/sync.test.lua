@@ -1,6 +1,8 @@
 fiber = require('fiber')
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
+tweaks = require('internal.tweaks')
+tweaks_xrow_stream_flush_size_default = tweaks.xrow_stream_flush_size
 
 test_run:cleanup_cluster()
 
@@ -31,6 +33,7 @@ function fill()
     end
     fiber.create(function()
         box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0.0025)
+        tweaks.xrow_stream_flush_size = 1
         test_run:wait_cond(function()
             local r = box.info.replication[2]
             return r ~= nil and r.downstream ~= nil and
@@ -63,7 +66,7 @@ test_run:cmd("switch replica")
 -- Since max allowed lag is small, all records should arrive
 -- by the time box.cfg() returns.
 --
-box.cfg{replication_sync_lag = 0.001}
+box.cfg{replication_sync_lag = 0.001, replication_sync_timeout = 300}
 box.cfg{replication = replication}
 box.space.test:count()
 box.info.status -- running
@@ -136,6 +139,7 @@ box.cfg{replication_sync_timeout = 10}
 
 test_run:cmd("switch default")
 box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0)
+tweaks.xrow_stream_flush_size = tweaks_xrow_stream_flush_size_default
 box.error.injection.set('ERRINJ_WAL_DELAY', true)
 test_run:cmd("setopt delimiter ';'")
 _ = fiber.create(function()
