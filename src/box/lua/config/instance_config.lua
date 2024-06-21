@@ -521,6 +521,9 @@ return schema.new('instance_config', schema.record({
                 ssl_key = schema.scalar({
                     type = 'string',
                 }),
+                ssl_cert = schema.scalar({
+                    type = 'string',
+                }),
                 ca_path = schema.scalar({
                     type = 'string',
                 }),
