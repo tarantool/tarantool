@@ -2942,7 +2942,7 @@ memtx_tx_on_space_delete(struct space *space)
 		 */
 		if (story->add_stmt != NULL)
 			memtx_tx_history_remove_stmt(story->add_stmt);
-		if (story->del_stmt != NULL)
+		while (story->del_stmt != NULL)
 			memtx_tx_history_remove_stmt(story->del_stmt);
 		memtx_tx_story_full_unlink_on_space_delete(story);
 		for (uint32_t i = 0; i < story->index_count; i++) {
