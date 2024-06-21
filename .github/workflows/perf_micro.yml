@@ -74,6 +74,8 @@ jobs:
         with:
           submodule: ${{ inputs.submodule }}
           revision: ${{ inputs.revision }}
+      - name: setup environment
+        run: sh ./perf/tools/setup_env.sh
       - name: test
         run: make -f .test.mk test-perf
       - name: Aggregate benchmark results
