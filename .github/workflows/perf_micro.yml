@@ -79,6 +79,11 @@ jobs:
       - name: Aggregate benchmark results
         run: make -f .test.mk test-perf-aggregate
       - name: Send statistics to InfluxDB
+        # Run on push to the 'master' and release branches or on
+        # non-fork pull requests (secrets are unavailable in fork
+        # pull requests).
+        if: github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository
         # TODO: For now, use the debug bucket for this PoC.
         # --silent -o /dev/null: Prevent dumping any reply part
         # in the output in case of an error.
