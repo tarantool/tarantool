@@ -100,8 +100,9 @@ g.test_config_enterprise = function()
                 },
                 ssl = {
                     ssl_key = 'seven',
-                    ca_path = 'eight',
-                    ca_file = 'nine',
+                    ssl_cert = 'eight',
+                    ca_path = 'nine',
+                    ca_file = 'ten',
                     verify_peer = true,
                     verify_host = false,
                 },
