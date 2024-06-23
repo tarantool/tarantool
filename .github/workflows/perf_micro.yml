@@ -76,6 +76,8 @@ jobs:
           revision: ${{ inputs.revision }}
       - name: test
         run: make -f .test.mk test-perf
+        with:
+          BENCH_CMD: "taskset 0xef"
       - name: Aggregate benchmark results
         run: make -f .test.mk test-perf-aggregate
       - name: Send statistics to InfluxDB
