@@ -34,7 +34,7 @@ function(create_perf_lua_test)
         COMMENT Running ${BENCH_TARGET}
         COMMAND ${CMAKE_COMMAND} -E env
           LUA_PATH="${LUA_PATH}"
-          ${TARANTOOL_BIN} ${TEST_PATH}
+          ${BENCH_CMD_SEPARATE} ${TARANTOOL_BIN} ${TEST_PATH}
             --output="${BENCH_RESULT}"
             --output_format=json
         DEPENDS tarantool ${PERF_DEPENDS} ${TEST_PATH}

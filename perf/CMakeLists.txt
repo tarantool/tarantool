@@ -5,6 +5,13 @@ file(MAKE_DIRECTORY ${PERF_OUTPUT_DIR})
 
 set(BENCH_RESULTS "")
 
+if (DEFINED ENV{BENCH_CMD})
+    set(BENCH_CMD "$ENV{BENCH_CMD}")
+endif()
+
+# Parse command-line arguments into a semicolon-separated list.
+separate_arguments(BENCH_CMD_SEPARATE UNIX_COMMAND ${BENCH_CMD})
+
 add_subdirectory(lua)
 
 set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
@@ -57,9 +64,9 @@ function(create_perf_test_target)
   # only if the corresponding file is omitted. The COMMAND_LIST
   # variable contains the same command for these targets.
   set(COMMAND_LIST
-        COMMAND "$<TARGET_FILE:${PERF_TARGET}.perftest>"
-                "--benchmark_out_format=json"
-                "--benchmark_out=${BENCH_RESULT}"
+        COMMAND ${BENCH_CMD_SEPARATE} $<TARGET_FILE:${PERF_TARGET}.perftest>
+                --benchmark_out_format=json
+                --benchmark_out="${BENCH_RESULT}"
         DEPENDS ${PERF_TARGET}.perftest
         COMMENT Running ${BENCH_TARGET}
   )
