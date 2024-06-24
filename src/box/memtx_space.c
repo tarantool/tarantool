@@ -1439,7 +1439,7 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 /**
  * Copy memory usage statistics to the newly altered space from the old space.
  * In case of DropIndex or TruncateIndex alter operations, the new space will be
- * empty, and tuple statistics must not be copied.
+ * empty, and tuple statistics must not be copied. Also notify MVCC about alter.
  */
 static void
 memtx_space_finish_alter(struct space *old_space, struct space *new_space)
@@ -1455,6 +1455,8 @@ memtx_space_finish_alter(struct space *old_space, struct space *new_space)
 		new_memtx_space->tuple_stat[TUPLE_ARENA_MALLOC] =
 			old_memtx_space->tuple_stat[TUPLE_ARENA_MALLOC];
 	}
+	if (!space_is_system(old_space))
+		memtx_tx_on_space_delete(old_space);
 }
 
 /* }}} DDL */
