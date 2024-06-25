@@ -107,7 +107,8 @@ journal_queue_wait(void)
 	++journal_queue.waiter_count;
 	rlist_add_tail_entry(&journal_queue.waiters, fiber(), state);
 	/*
-	 * Will be waken up by either queue emptying or a synchronous write.
+	 * Is woken up when this position in the queue should go into the next
+	 * journal batch.
 	 */
 	fiber_yield();
 	--journal_queue.waiter_count;

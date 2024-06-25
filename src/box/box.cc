@@ -662,8 +662,7 @@ static void
 recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
-	journal_create(&journal.base, recovery_journal_write,
-		       recovery_journal_write);
+	journal_create(&journal.base, recovery_journal_write);
 	journal.vclock = v;
 	journal_set(&journal.base);
 }
@@ -5627,7 +5626,7 @@ box_cfg_xc(void)
 	}
 
 	struct journal bootstrap_journal;
-	journal_create(&bootstrap_journal, NULL, bootstrap_journal_write);
+	journal_create(&bootstrap_journal, bootstrap_journal_write);
 	journal_set(&bootstrap_journal);
 	auto bootstrap_journal_guard = make_scoped_guard([] {
 		journal_set(NULL);
