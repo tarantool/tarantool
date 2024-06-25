@@ -212,6 +212,13 @@ enum gap_item_type {
 	 */
 	GAP_NEARBY,
 	/**
+	 * A transaction has completed a count of tuples matching a key and
+	 * iterator. After that any consequent delete or insert of any tuple
+	 * matching the key+iterator pair must lead to a conflict. Such an
+	 * item will be stored in index->read_gaps.
+	 */
+	GAP_COUNT,
+	/**
 	 * A transaction completed a full scan of unordered index. After that
 	 * any consequent write to any new place of the index must lead to
 	 * conflict. Such an item will be store in index->read_gaps.
@@ -268,6 +275,17 @@ struct full_scan_gap_item {
 };
 
 /**
+ * Derived class for count gap, @sa GAP_COUNT.
+ */
+struct count_gap_item {
+	/** Base class. */
+	struct nearby_gap_item base;
+};
+
+/* Count gap uses the same mempool as nearby gap. */
+static_assert(sizeof(struct count_gap_item) == sizeof(struct nearby_gap_item));
+
+/**
  * Initialize common part of gap item, except for in_read_gaps member,
  * which initialization is specific for gap item type.
  */
@@ -301,6 +319,14 @@ memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
  */
 static struct full_scan_gap_item *
 memtx_tx_full_scan_gap_item_new(struct txn *txn);
+
+/**
+ * Allocate and create count gap item.
+ * Note that in_read_gaps base member must be initialized later.
+ */
+static struct count_gap_item *
+memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
+			    const char *key, uint32_t part_count);
 
 /**
  * Helper structure for searching for point_hole_item in the hash table,
@@ -1769,6 +1795,90 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 	mh_point_holes_del(ht, pos, 0);
 }
 
+static bool
+memtx_tx_tuple_matches(struct index *index, struct tuple *tuple,
+		       enum iterator_type type, const char *key,
+		       uint32_t part_count)
+{
+	if (key == NULL) {
+		assert(part_count == 0);
+		assert(type == ITER_LE || type == ITER_GE);
+
+		/* An empty key matches to any tuple. */
+		return true;
+	}
+
+	struct key_def *def = index->def->key_def;
+	hint_t kh = key_hint(key, part_count, def);
+	hint_t th = tuple_hint(tuple, def);
+	int cmp = tuple_compare_with_key(tuple, th, key, part_count, kh, def);
+
+	bool equal_matches = type == ITER_EQ || type == ITER_REQ ||
+			     type == ITER_LE || type == ITER_GE;
+	bool less_matches = type == ITER_LT || type == ITER_LE;
+	bool greater_matches = type == ITER_GT || type == ITER_GE;
+
+	return (equal_matches && cmp == 0) ||
+	       (greater_matches && cmp > 0) ||
+	       (less_matches && cmp < 0);
+}
+
+/**
+ * Check for possible conflict relations with GAP_COUNT entries during insertion
+ * or deletion of tuple (with the corresponding @a story) in index @a ind. It is
+ * needed if and only if there was no replaced tuple in the index for insertion
+ * or in case of a deletion. It's the moment where we can search for count gaps
+ * and find conflict causes. If some transactions have counted tuples by the key
+ * and iterator matching the tuple - those transactions will be bind as readers
+ * of the tuple.
+ */
+static void
+memtx_tx_handle_counted_write(struct space *space, struct memtx_story *story,
+			      uint32_t ind)
+{
+	bool is_insert = story->del_stmt == NULL;
+
+	assert(story->link[ind].newer_story == NULL || !is_insert);
+
+	struct index *index = space->index[ind];
+
+	struct gap_item_base *item_base, *tmp;
+	rlist_foreach_entry_safe(item_base, &index->read_gaps,
+				 in_read_gaps, tmp) {
+		if (item_base->type != GAP_COUNT)
+			continue;
+		struct count_gap_item *item =
+			(struct count_gap_item *)item_base;
+
+		bool tuple_matches = memtx_tx_tuple_matches(
+			index, story->tuple, item->base.type,
+			item->base.key, item->base.part_count);
+
+		/*
+		 * Someone has counted tuples in the index by a key and iterator
+		 * matching to the inserted or deleted tuple, it's a conflict.
+		 */
+		if (tuple_matches) {
+			if (is_insert) {
+				/*
+				 * Record like the counted transaction had read
+				 * by a key matching the tuple and got nothing
+				 * there. Now this insertion is conflicting.
+				 */
+				memtx_tx_track_story_gap(item_base->txn,
+							 story, ind);
+			} else {
+				/*
+				 * Record like the counted transaction had read
+				 * the tuple. Now this deletion is conflicting.
+				 */
+				memtx_tx_track_read_story(item_base->txn,
+							  space, story);
+			}
+		}
+	}
+}
+
 /**
  * Record in TX manager that a transaction @txn have read a @tuple in @space.
  *
@@ -2032,6 +2142,18 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	for (uint32_t i = 0; i < space->index_count; i++) {
 		struct tuple *next = directly_replaced[i];
 		struct tuple *succ = direct_successor[i];
+		/*
+		 * The tuple was inserted as new according to the operating
+		 * transaction and it's not excluded from the index. It's
+		 * possible that the operation replaced a tuple in the index,
+		 * but, if so, the tuple is not visible to the inserter.
+		 */
+		if (old_tuple == NULL && !tuple_excluded[i])
+			memtx_tx_handle_counted_write(space, add_story, i);
+		/*
+		 * The tuple was inserted as new according to all currently
+		 * active transactions and it's not excluded from the index.
+		 */
 		if (next == NULL && !tuple_excluded[i]) {
 			/* Collect conflicts. */
 			memtx_tx_handle_gap_write(space, add_story, succ, i);
@@ -2133,6 +2255,19 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 	if (del_story->add_stmt != NULL)
 		stmt->is_own_change = del_story->add_stmt->txn == stmt->txn;
 	memtx_tx_story_link_deleted_by(del_story, stmt);
+
+	/*
+	 * The tuple is deleted from the space, let's see if anyone had
+	 * counted it in the indexes the tuple is contained in.
+	 */
+	struct space *space = stmt->space;
+	for (uint32_t i = 0; i < space->index_count; i++) {
+		if (!tuple_key_is_excluded(del_story->tuple,
+					   space->index[i]->def->key_def,
+					   MULTIKEY_NONE)) {
+			memtx_tx_handle_counted_write(space, del_story, i);
+		}
+	}
 
 	/* Notify statistics. */
 	if (!del_story->tuple_is_retained)
@@ -2901,6 +3036,7 @@ memtx_tx_delete_gap(struct gap_item_base *item)
 		pool = &txm.inplace_gap_item_mempoool;
 		break;
 	case GAP_NEARBY:
+	case GAP_COUNT:
 		pool = &txm.nearby_gap_item_mempoool;
 		break;
 	case GAP_FULL_SCAN:
@@ -3196,6 +3332,20 @@ memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
 }
 
 /**
+ * Allocate and create count gap item.
+ * Note that in_read_gaps base member must be initialized later.
+ */
+static struct count_gap_item *
+memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
+			    const char *key, uint32_t part_count)
+{
+	struct count_gap_item *item = (struct count_gap_item *)
+		memtx_tx_nearby_gap_item_new(txn, type, key, part_count);
+	item->base.base.type = GAP_COUNT;
+	return item;
+}
+
+/**
  * Allocate and create full scan gap item.
  * Note that in_read_gaps base member must be initialized later.
  */
@@ -3241,6 +3391,25 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 	} else {
 		rlist_add(&index->read_gaps, &item->base.in_read_gaps);
 	}
+	memtx_tx_story_gc();
+}
+
+/**
+ * Record in TX manager that a transaction @a txn have counted @a index by @a
+ * key and iterator @a type. This function must be used for queries that count
+ * tuples in indexes (for example, index:size or index:count).
+ */
+void
+memtx_tx_track_count_slow(struct txn *txn, struct index *index,
+			  enum iterator_type type, const char *key,
+			  uint32_t part_count)
+{
+	if (txn->status != TXN_INPROGRESS)
+		return;
+
+	struct count_gap_item *item =
+		memtx_tx_count_gap_item_new(txn, type, key, part_count);
+	rlist_add(&index->read_gaps, &item->base.base.in_read_gaps);
 	memtx_tx_story_gc();
 }
 
