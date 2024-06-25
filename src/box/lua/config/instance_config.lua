@@ -1,4 +1,4 @@
-local schema = require('internal.config.utils.schema')
+local schema = require('experimental.config.utils.schema')
 local tarantool = require('tarantool')
 local compat = require('compat')
 local uuid = require('uuid')

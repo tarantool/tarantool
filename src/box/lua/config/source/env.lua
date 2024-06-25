@@ -1,6 +1,6 @@
 local uri = require('uri')
 local fun = require('fun')
-local schema = require('internal.config.utils.schema')
+local schema = require('experimental.config.utils.schema')
 local tabulate = require('internal.config.utils.tabulate')
 local instance_config = require('internal.config.instance_config')
 
