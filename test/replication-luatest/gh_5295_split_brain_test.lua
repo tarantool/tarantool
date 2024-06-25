@@ -380,3 +380,99 @@ g_very_old_term.test_confirm = function( cg)
     cg.servers[1]:update_box_cfg({replication = cg.box_cfg.replication})
     cg.cluster:wait_for_fullmesh()
 end
+
+local function promote(instance)
+    instance:exec(function() box.ctl.promote() end)
+    instance:wait_for_election_leader()
+end
+
+local function test_promote_split_brain(cg, with_data)
+    if with_data then
+        cg.servers[1]:exec(function()
+            box.schema.create_space('test', {is_sync = true}):create_index('pk')
+        end)
+        cg.servers[2]:wait_for_vclock_of(cg.servers[1])
+        cg.servers[3]:wait_for_vclock_of(cg.servers[1])
+    end
+    for i = 2, 3 do
+        cg.servers[i]:exec(function()
+            box.cfg{election_mode = 'manual'}
+        end)
+    end
+
+    -- Third server is network partitioned.
+    local new_replication = {
+        cg.servers[1].net_box_uri,
+        cg.servers[2].net_box_uri,
+    }
+
+    cg.servers[3]:exec(update_replication, {})
+    cg.servers[1]:exec(update_replication, new_replication)
+    cg.servers[2]:exec(update_replication, new_replication)
+
+    -- Bump term on the first server, so that it is more, than term
+    -- of the third server after its promotion.
+    promote(cg.servers[2])
+    cg.servers[1]:exec(function(id)
+        -- Without this wait PROMOTE may be not executed and exit with TimedOut
+        -- error. Let's make sure, that server_1 known about new leader.
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.election.leader, id)
+        end)
+    end, {cg.servers[2]:get_instance_id()})
+    promote(cg.servers[1])
+    if with_data then
+        cg.servers[1]:exec(function()
+            box.space.test:replace({1, 's1'})
+        end)
+    end
+    cg.servers[3]:exec(function()
+        -- Otherwise it won't be able to start the promotion.
+        box.cfg{replication_synchro_quorum = 1}
+    end)
+    promote(cg.servers[3])
+    t.assert(cg.servers[3]:get_synchro_queue_term() <
+             cg.servers[1]:get_synchro_queue_term())
+    if with_data then
+        cg.servers[3]:exec(function()
+            box.space.test:replace({1, 's3'})
+        end)
+    end
+
+    -- Split-Brain should be noticed, when the first server manages to
+    -- connect to the third one.
+    cg.servers[1]:exec(update_replication, {
+        cg.servers[1].net_box_uri,
+        cg.servers[2].net_box_uri,
+        cg.servers[3].net_box_uri,
+    })
+    cg.servers[1]:exec(function(id)
+        local message = 'Split-Brain discovered'
+        t.helpers.retrying({timeout = 5}, function()
+            local info = box.info.replication[id]
+            t.assert_equals(info.upstream.status, 'stopped')
+            t.assert_str_contains(info.upstream.message, message)
+        end)
+    end, {cg.servers[3]:get_instance_id()})
+    if with_data then
+        cg.servers[1]:exec(function()
+            t.assert_equals(box.space.test:select(1), {{1, 's1'}})
+        end)
+        cg.servers[3]:exec(function()
+            t.assert_equals(box.space.test:select(1), {{1, 's3'}})
+        end)
+    end
+end
+
+g_very_old_term.test_promote_split_brain_without_data = function(cg)
+    -- Test, that we can detect split-brain even if none of the data CONFIRMs
+    -- from the previous terms are received.
+    test_promote_split_brain(cg, false)
+end
+
+g_very_old_term.test_promote_split_brain_without_data = function(cg)
+    -- Test, that replication won't be recovered after split-brain is
+    -- encountered. Data should remain the same, as it was before merging
+    -- separated parts.
+    test_promote_split_brain(cg, true)
+end
