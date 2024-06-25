@@ -397,9 +397,11 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index);
 }
 
+/** Helper of memtx_tx_index_invisible_count. */
 uint32_t
-memtx_tx_index_invisible_count_slow(struct txn *txn,
-				    struct space *space, struct index *index);
+memtx_tx_index_invisible_count_matching_slow(
+	struct txn *txn, struct space *space, struct index *index,
+	enum iterator_type type, const char *key, uint32_t part_count);
 
 /**
  * When MVCC engine is enabled, an index can contain temporary non-committed
@@ -417,7 +419,23 @@ memtx_tx_index_invisible_count(struct txn *txn,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return 0;
-	return memtx_tx_index_invisible_count_slow(txn, space, index);
+	return memtx_tx_index_invisible_count_matching_slow(txn, space, index,
+							    ITER_GE, NULL, 0);
+}
+
+/**
+ * Same as memtx_tx_index_invisible_count but only counts tuples matching to
+ * the given key and iterator.
+ */
+static inline uint32_t
+memtx_tx_index_invisible_count_matching(
+	struct txn *txn, struct space *space, struct index *index,
+	enum iterator_type type, const char *key, uint32_t part_count)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	return memtx_tx_index_invisible_count_matching_slow(
+		txn, space, index, type, key, part_count);
 }
 
 /**

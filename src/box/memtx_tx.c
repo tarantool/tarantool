@@ -2017,16 +2017,42 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 				   index->def->cmp_def->part_count;
 		bool is_eq = item->type == ITER_EQ || item->type == ITER_REQ;
 		bool is_e = item->type == ITER_LE || item->type == ITER_GE;
+
+		/*
+		 * The key+iterator pair matches to the new tuple and can match
+		 * to its predecessors, but it can also be matched with anything
+		 * else between this tuple and the successor (exclusively).
+		 */
 		bool need_split = item->key == NULL ||
 				  (dir * cmp > 0 && !is_eq) ||
 				  (!is_full_key && cmp == 0 && (is_e || is_eq));
+
+		/*
+		 * The key+iterator pair can only match the new tuple, and its
+		 * predecessors, but not the successor's predecessors anymore.
+		 */
 		bool need_move = !need_split &&
 				 ((dir < 0 && cmp > 0) ||
 				  (cmp > 0 && item->type == ITER_EQ) ||
-				  (cmp == 0 && ((dir < 0 && is_full_key) ||
+				  (cmp == 0 && ((is_eq && is_full_key) ||
+						(dir < 0 && is_full_key) ||
 						item->type == ITER_LT)));
+
+		/*
+		 * If none of the above is true, the key+iterator pair can only
+		 * match the tuples between the new tuple (inclusively) and the
+		 * successor (exclusively), need to keep everything as is.
+		 */
+
+		/*
+		 * The inserted tuple matches the key and iterator. That means
+		 * we've inserted a tuple at the place that was read by some TX
+		 * that found nothing there. So the reader must be conflicted
+		 * with us once we commit, let's track that.
+		 */
 		bool need_track = need_split ||
-				  (is_full_key && cmp == 0 && is_e);
+				  (is_full_key && cmp == 0 && (is_e || is_eq));
+
 		if (need_track)
 			memtx_tx_track_story_gap(item_base->txn, story, ind);
 		if (need_split) {
@@ -2991,8 +3017,9 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 }
 
 uint32_t
-memtx_tx_index_invisible_count_slow(struct txn *txn,
-				    struct space *space, struct index *index)
+memtx_tx_index_invisible_count_matching_slow(
+	struct txn *txn, struct space *space, struct index *index,
+	enum iterator_type type, const char *key, uint32_t part_count)
 {
 	uint32_t res = 0;
 	struct memtx_story *story;
@@ -3008,6 +3035,11 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 			continue;
 		}
 		assert(link->newer_story == NULL);
+
+		/* All tuples in the story chain share the same key. */
+		if (!memtx_tx_tuple_matches(index, story->tuple,
+					    type, key, part_count))
+			continue;
 
 		struct tuple *visible = NULL;
 		bool is_prepared_ok = detect_whether_prepared_ok(txn);
