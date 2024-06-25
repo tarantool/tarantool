@@ -69,61 +69,72 @@ static_assert(BOX_INVALID_NAME_MAX <= BOX_NAME_MAX,
 	      "invalid name max is less than name max");
 
 /** \cond public */
+
+/**
+ * List of system space definitions in the following format:
+ * (name, identifier).
+ */
+#define SYSTEM_SPACES(_) /* (name, id) */ \
+	/** Space id of _vinyl_deferred_delete. */ \
+	_(VINYL_DEFERRED_DELETE, 257) \
+	/** Space id of _schema. */ \
+	_(SCHEMA, 272) \
+	/** Space id of _collation. */ \
+	_(COLLATION, 276) \
+	/** Space id of _vcollation. */ \
+	_(VCOLLATION, 277) \
+	/** Space id of _space. */ \
+	_(SPACE, 280) \
+	/** Space id of _vspace view. */ \
+	_(VSPACE, 281) \
+	/** Space id of _sequence. */ \
+	_(SEQUENCE, 284) \
+	/** Space id of _sequence_data. */ \
+	_(SEQUENCE_DATA, 285) \
+	/** Space id of _vsequence view. */ \
+	_(VSEQUENCE, 286) \
+	/** Space id of _index. */ \
+	_(INDEX, 288) \
+	/** Space id of _vindex view. */ \
+	_(VINDEX, 289) \
+	/** Space id of _func. */ \
+	_(FUNC, 296) \
+	/** Space id of _vfunc view. */ \
+	_(VFUNC, 297) \
+	/** Space id of _user. */ \
+	_(USER, 304) \
+	/** Space id of _vuser view. */ \
+	_(VUSER, 305) \
+	/** Space id of _priv. */ \
+	_(PRIV, 312) \
+	/** Space id of _vpriv view. */ \
+	_(VPRIV, 313) \
+	/** Space id of _cluster. */ \
+	_(CLUSTER, 320) \
+	/** Space id of _trigger. */ \
+	_(TRIGGER, 328) \
+	/** Space id of _truncate. */ \
+	_(TRUNCATE, 330) \
+	/** Space id of _space_sequence. */ \
+	_(SPACE_SEQUENCE, 340) \
+	/** Space id of _vspace_sequence. */ \
+	_(VSPACE_SEQUENCE, 341) \
+	/** Space id of _fk_constraint. */ \
+	_(FK_CONSTRAINT, 356) \
+	/** Space id of _ck_contraint. */ \
+	_(CK_CONSTRAINT, 364) \
+	/** Space id of _func_index. */ \
+	_(FUNC_INDEX, 372) \
+	/** Space id of _session_settings. */ \
+	_(SESSION_SETTINGS, 380) \
+
+/** System space identifier definition. */
+#define SYSTEM_SPACE_MEMBER(name, id, ...) BOX_ ## name ## _ID = id,
+
 enum {
 	/** Start of the reserved range of system spaces. */
 	BOX_SYSTEM_ID_MIN = 256,
-	/** Space if of _vinyl_deferred_delete. */
-	BOX_VINYL_DEFERRED_DELETE_ID = 257,
-	/** Space id of _schema. */
-	BOX_SCHEMA_ID = 272,
-	/** Space id of _collation. */
-	BOX_COLLATION_ID = 276,
-	/** Space id of _vcollation. */
-	BOX_VCOLLATION_ID = 277,
-	/** Space id of _space. */
-	BOX_SPACE_ID = 280,
-	/** Space id of _vspace view. */
-	BOX_VSPACE_ID = 281,
-	/** Space id of _sequence. */
-	BOX_SEQUENCE_ID = 284,
-	/** Space id of _sequence_data. */
-	BOX_SEQUENCE_DATA_ID = 285,
-	/** Space id of _vsequence view. */
-	BOX_VSEQUENCE_ID = 286,
-	/** Space id of _index. */
-	BOX_INDEX_ID = 288,
-	/** Space id of _vindex view. */
-	BOX_VINDEX_ID = 289,
-	/** Space id of _func. */
-	BOX_FUNC_ID = 296,
-	/** Space id of _vfunc view. */
-	BOX_VFUNC_ID = 297,
-	/** Space id of _user. */
-	BOX_USER_ID = 304,
-	/** Space id of _vuser view. */
-	BOX_VUSER_ID = 305,
-	/** Space id of _priv. */
-	BOX_PRIV_ID = 312,
-	/** Space id of _vpriv view. */
-	BOX_VPRIV_ID = 313,
-	/** Space id of _cluster. */
-	BOX_CLUSTER_ID = 320,
-	/** Space id of _trigger. */
-	BOX_TRIGGER_ID = 328,
-	/** Space id of _truncate. */
-	BOX_TRUNCATE_ID = 330,
-	/** Space id of _space_sequence. */
-	BOX_SPACE_SEQUENCE_ID = 340,
-	/** Space id of _vspace_sequence. */
-	BOX_VSPACE_SEQUENCE_ID = 341,
-	/** Space id of _fk_constraint. */
-	BOX_FK_CONSTRAINT_ID = 356,
-	/** Space id of _ck_contraint. */
-	BOX_CK_CONSTRAINT_ID = 364,
-	/** Space id of _func_index. */
-	BOX_FUNC_INDEX_ID = 372,
-	/** Space id of _session_settings. */
-	BOX_SESSION_SETTINGS_ID = 380,
+	SYSTEM_SPACES(SYSTEM_SPACE_MEMBER)
 	/** End of the reserved range of system spaces. */
 	BOX_SYSTEM_ID_MAX = 511,
 	BOX_ID_NIL = 2147483647
