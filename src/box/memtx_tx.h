@@ -319,6 +319,34 @@ memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
 }
 
 /**
+ * Helper of memtx_tx_track_count.
+ */
+uint32_t
+memtx_tx_track_count_slow(struct txn *txn, struct space *space,
+			  struct index *index, enum iterator_type type,
+			  const char *key, uint32_t part_count);
+
+/**
+ * Record in TX manager that a transaction @a txn have counted @a index from @a
+ * space by @a key and iterator @a type. This function must be used for queries
+ * that count tuples in indexes (for example, index:size or index:count).
+ *
+ * NB: can trigger story garbage collection.
+ *
+ * @return the amount of invisible tuples counted.
+ */
+static inline uint32_t
+memtx_tx_track_count(struct txn *txn, struct space *space,
+		     struct index *index, enum iterator_type type,
+		     const char *key, uint32_t part_count)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	return memtx_tx_track_count_slow(txn, space, index,
+					 type, key, part_count);
+}
+
+/**
  * Helper of memtx_tx_track_full_scan.
  */
 void
