@@ -214,6 +214,8 @@ struct memtx_tree_index {
 	size_t build_array_size, build_array_alloc_size;
 	struct memtx_gc_task gc_task;
 	memtx_tree_iterator_t<USE_HINT> gc_iterator;
+	/** Whether index is functional. */
+	bool is_func;
 };
 
 /* {{{ Utilities. *************************************************/
@@ -826,12 +828,16 @@ memtx_tree_index_gc_run(struct memtx_gc_task *task, bool *done)
 	memtx_tree_t<USE_HINT> *tree = &index->tree;
 	memtx_tree_iterator_t<USE_HINT> *itr = &index->gc_iterator;
 
+	const bool is_func = index->is_func;
 	unsigned int loops = 0;
 	while (!memtx_tree_iterator_is_invalid(itr)) {
 		struct memtx_tree_data<USE_HINT> *res =
 			memtx_tree_iterator_get_elem(tree, itr);
 		memtx_tree_iterator_next(tree, itr);
-		tuple_unref(res->tuple);
+		if (is_func)
+			tuple_unref((struct tuple *)res->hint);
+		else
+			tuple_unref(res->tuple);
 		if (++loops >= YIELD_LOOPS) {
 			*done = false;
 			return;
@@ -867,11 +873,15 @@ memtx_tree_index_destroy(struct index *base)
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-	if (base->def->iid == 0) {
+	if (base->def->iid == 0 || index->is_func) {
 		/*
 		 * Primary index. We need to free all tuples stored
 		 * in the index, which may take a while. Schedule a
 		 * background task in order not to block tx thread.
+		 *
+		 * Functional index. For every tuple we need to
+		 * free all functional keys associated with this tuple.
+		 * Let's do it in background also.
 		 */
 		index->gc_task.vtab = get_memtx_tree_index_gc_vtab<USE_HINT>();
 		index->gc_iterator = memtx_tree_first(&index->tree);
@@ -2146,6 +2156,7 @@ memtx_tree_index_new_tpl(struct memtx_engine *memtx, struct index_def *def,
 
 	memtx_tree_create(&index->tree, cmp_def, memtx_index_extent_alloc,
 			  memtx_index_extent_free, memtx);
+	index->is_func = def->key_def->func_index_func != NULL;
 	return &index->base;
 }
 
@@ -2158,11 +2169,11 @@ memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 		if (def->key_def->func_index_func != NULL) {
 			vtab = get_memtx_tree_index_vtab
 				<MEMTX_TREE_VTAB_FUNC>();
-			use_hint = true;
 		} else {
 			vtab = get_memtx_tree_index_vtab
 				<MEMTX_TREE_VTAB_DISABLED>();
 		}
+		use_hint = true;
 	} else if (def->key_def->is_multikey) {
 		vtab = get_memtx_tree_index_vtab<MEMTX_TREE_VTAB_MULTIKEY>();
 		use_hint = true;
