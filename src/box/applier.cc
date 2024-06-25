@@ -1666,7 +1666,6 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 	struct xrow_header *last_row;
 	last_row = &stailq_last_entry(rows, struct applier_tx_row, next)->row;
 	struct replica *replica = replica_by_id(first_row->replica_id);
-	int rc = 0;
 	/*
 	 * In a full mesh topology, the same set of changes
 	 * may arrive via two concurrently running appliers.
@@ -1676,9 +1675,12 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 	struct latch *latch = (replica ? &replica->order_latch :
 			       &replicaset.applier.order_latch);
 	latch_lock(latch);
+	auto latch_guard = make_scoped_guard([&]{
+		latch_unlock(latch);
+	});
 	if (vclock_get(&replicaset.applier.vclock,
 		       last_row->replica_id) >= last_row->lsn) {
-		goto finish;
+		return 0;
 	} else if (vclock_get(&replicaset.applier.vclock,
 			      first_row->replica_id) >= first_row->lsn) {
 		/*
@@ -1699,6 +1701,7 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 			}
 		}
 	}
+	int rc = 0;
 	applier_synchro_filter_tx(rows);
 	if (unlikely(iproto_type_is_synchro_request(first_row->type))) {
 		/*
@@ -1714,13 +1717,11 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 				    replication_skip_conflict, true);
 	}
 	if (rc != 0)
-		goto finish;
+		return rc;
 
 	vclock_follow(&replicaset.applier.vclock, last_row->replica_id,
 		      last_row->lsn);
-finish:
-	latch_unlock(latch);
-	return rc;
+	return 0;
 }
 
 /**
