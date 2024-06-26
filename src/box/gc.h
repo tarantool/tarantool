@@ -88,8 +88,8 @@ struct gc_checkpoint_ref {
  * collection from removing WALs that are still in use.
  */
 struct gc_consumer {
-	/** Link in gc_state::consumers. */
-	gc_node_t node;
+	/** Link in gc_state::active_consumers. */
+	gc_node_t in_active_consumers;
 	/** UUID of object owning this consumer. */
 	struct tt_uuid uuid;
 	/** Human-readable name of object. */
@@ -101,6 +101,14 @@ struct gc_consumer {
 	 * deleted by the WAL thread on ENOSPC.
 	 */
 	bool is_inactive;
+	/**
+	 * Whether consumer does not belong to any object.
+	 */
+	bool is_orphan;
+	/**
+	 * Whether consumer should be persisted by background fiber.
+	 */
+	bool is_persistent;
 };
 
 typedef rb_tree(struct gc_consumer) gc_tree_t;
@@ -130,8 +138,8 @@ struct gc_state {
 	 * to the tail. Linked by gc_checkpoint::in_checkpoints.
 	 */
 	struct rlist checkpoints;
-	/** Registered consumers, linked by gc_consumer::node. */
-	gc_tree_t consumers;
+	/** Active consumers (that actually pin retain xlogs). */
+	gc_tree_t active_consumers;
 	/** Fiber responsible for periodic checkpointing. */
 	struct fiber *checkpoint_fiber;
 	/** Schedule of periodic checkpoints. */

@@ -83,7 +83,7 @@ gc_consumer_cmp(const struct gc_consumer *a, const struct gc_consumer *b)
 }
 
 rb_gen(MAYBE_UNUSED static inline, gc_tree_, gc_tree_t,
-       struct gc_consumer, node, gc_consumer_cmp);
+       struct gc_consumer, in_active_consumers, gc_consumer_cmp);
 
 /** Free a consumer object. */
 static void
@@ -114,7 +114,7 @@ gc_init(on_garbage_collection_f on_garbage_collection)
 
 	vclock_create(&gc.vclock);
 	rlist_create(&gc.checkpoints);
-	gc_tree_new(&gc.consumers);
+	gc_tree_new(&gc.active_consumers);
 	fiber_cond_create(&gc.cleanup_cond);
 	checkpoint_schedule_cfg(&gc.checkpoint_schedule, 0, 0);
 
@@ -161,11 +161,11 @@ gc_free(void)
 		gc_checkpoint_delete(checkpoint);
 	}
 	/* Free all registered consumers. */
-	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
+	struct gc_consumer *consumer = gc_tree_first(&gc.active_consumers);
 	while (consumer != NULL) {
-		struct gc_consumer *next = gc_tree_next(&gc.consumers,
+		struct gc_consumer *next = gc_tree_next(&gc.active_consumers,
 							consumer);
-		gc_tree_remove(&gc.consumers, consumer);
+		gc_tree_remove(&gc.active_consumers, consumer);
 		gc_consumer_delete(consumer);
 		consumer = next;
 	}
@@ -207,7 +207,7 @@ gc_run_cleanup(void)
 
 	/* Find the vclock of the oldest WAL row to keep. */
 	struct vclock min_vclock;
-	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
+	struct gc_consumer *consumer = gc_tree_first(&gc.active_consumers);
 	/*
 	 * Vclock of the oldest WAL row to keep is a by-component
 	 * minimum of all consumer vclocks and the oldest
@@ -223,7 +223,7 @@ gc_run_cleanup(void)
 		 * with a zero instance id (local rows).
 		 */
 		vclock_min_ignore0(&min_vclock, &consumer->vclock);
-		consumer = gc_tree_next(&gc.consumers, consumer);
+		consumer = gc_tree_next(&gc.active_consumers, consumer);
 	}
 
 	/*
@@ -405,9 +405,9 @@ gc_advance(const struct vclock *vclock)
 	 */
 	vclock_copy(&gc.vclock, vclock);
 
-	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
+	struct gc_consumer *consumer = gc_tree_first(&gc.active_consumers);
 	while (consumer != NULL) {
-		struct gc_consumer *next = gc_tree_next(&gc.consumers,
+		struct gc_consumer *next = gc_tree_next(&gc.active_consumers,
 							consumer);
 		/*
 		 * Remove all the consumers whose vclocks are
@@ -420,7 +420,7 @@ gc_advance(const struct vclock *vclock)
 		}
 		assert(!consumer->is_inactive);
 		consumer->is_inactive = true;
-		gc_tree_remove(&gc.consumers, consumer);
+		gc_tree_remove(&gc.active_consumers, consumer);
 
 		char consumer_name[GC_NAME_MAX];
 		gc_consumer_name(consumer, consumer_name, GC_NAME_MAX);
@@ -677,7 +677,7 @@ gc_consumer_register(const struct vclock *vclock, const char *name, const struct
 	consumer->uuid = *uuid;
 
 	vclock_copy(&consumer->vclock, vclock);
-	gc_tree_insert(&gc.consumers, consumer);
+	gc_tree_insert(&gc.active_consumers, consumer);
 	return consumer;
 }
 
@@ -685,7 +685,7 @@ void
 gc_consumer_unregister(struct gc_consumer *consumer)
 {
 	if (!consumer->is_inactive) {
-		gc_tree_remove(&gc.consumers, consumer);
+		gc_tree_remove(&gc.active_consumers, consumer);
 		gc_schedule_cleanup();
 	}
 	gc_consumer_delete(consumer);
@@ -708,17 +708,17 @@ gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock)
 	 * Do not update the tree unless the tree invariant
 	 * is violated.
 	 */
-	struct gc_consumer *next = gc_tree_next(&gc.consumers, consumer);
+	struct gc_consumer *next = gc_tree_next(&gc.active_consumers, consumer);
 	bool update_tree = (next != NULL &&
 			    vclock_lex_compare(vclock, &next->vclock) >= 0);
 
 	if (update_tree)
-		gc_tree_remove(&gc.consumers, consumer);
+		gc_tree_remove(&gc.active_consumers, consumer);
 
 	vclock_copy(&consumer->vclock, vclock);
 
 	if (update_tree)
-		gc_tree_insert(&gc.consumers, consumer);
+		gc_tree_insert(&gc.active_consumers, consumer);
 
 	gc_schedule_cleanup();
 }
@@ -727,8 +727,8 @@ struct gc_consumer *
 gc_consumer_iterator_next(struct gc_consumer_iterator *it)
 {
 	if (it->curr != NULL)
-		it->curr = gc_tree_next(&gc.consumers, it->curr);
+		it->curr = gc_tree_next(&gc.active_consumers, it->curr);
 	else
-		it->curr = gc_tree_first(&gc.consumers);
+		it->curr = gc_tree_first(&gc.active_consumers);
 	return it->curr;
 }
