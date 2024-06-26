@@ -90,6 +90,32 @@ check_uri_to_addr(void)
 }
 
 static void
+check_sio_socketname_addr(void)
+{
+	header();
+	plan(2);
+	struct sockaddr_storage base_storage;
+	struct sockaddr *base_addr = (struct sockaddr *)&base_storage;
+	socklen_t addrlen = sizeof(base_storage);
+
+	bool is_host_empty;
+	char base_addr_str[] = "192.0.2.255:1";
+	sio_uri_to_addr(base_addr_str, base_addr, &is_host_empty);
+
+	const char *name = sio_socketname_addr(-3,
+					       base_addr, addrlen);
+
+	is_str(name, "fd -3", "works for invalid fd");
+
+	name = sio_socketname_addr(3, base_addr, addrlen);
+	char expectedbase[] = "fd 3, aka 192.0.2.255:1";
+	is_str(name, expectedbase, "works for fd and base_addr only");
+
+	check_plan();
+	footer();
+}
+
+static void
 check_auto_bind(void)
 {
 	header();
@@ -118,9 +144,10 @@ main(void)
 	fiber_init(fiber_c_invoke);
 
 	header();
-	plan(2);
+	plan(3);
 	check_uri_to_addr();
 	check_auto_bind();
+	check_sio_socketname_addr();
 	int rc = check_plan();
 	footer();
 
