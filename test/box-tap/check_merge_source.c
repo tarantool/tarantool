@@ -94,7 +94,8 @@ lbox_check_merge_source_call_next(struct lua_State *L)
 
 	int top = lua_gettop(temporary_L);
 	int rc = merge_source_next(source, NULL, &tuple);
-	(void) tuple;
+	if (rc == 0 && tuple != NULL)
+		box_tuple_unref(tuple);
 	bool is_stack_even = lua_gettop(temporary_L) == top;
 	box_error_t *e = box_error_last();
 

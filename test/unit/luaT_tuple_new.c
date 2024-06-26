@@ -135,7 +135,6 @@ test_basic(struct lua_State *L)
 	check_tuple(tuple, another_format, lua_gettop(L) - top, "objects");
 
 	/* Clean up. */
-	tuple_format_delete(another_format);
 	lua_pop(L, 1);
 	assert(lua_gettop(L) == 0);
 
@@ -195,5 +194,10 @@ main()
 	box_lua_tuple_init(L);
 	lua_pop(L, 1);
 
-	return test_basic(L);
+	int rc = test_basic(L);
+	lua_close(L);
+	box_free();
+	event_free();
+
+	return rc;
 }

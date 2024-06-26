@@ -77,6 +77,7 @@ check_test_new(int *array, size_t array_size,
 	is(t->description[description_len], 0, "null-termination symbol");
 	is(memcmp(t->extra, extra, strlen(extra)), 0, "data");
 	is(t->extra[strlen(extra)], 0, "null-termination symbol");
+	free(t);
 
 	check_plan();
 	footer();

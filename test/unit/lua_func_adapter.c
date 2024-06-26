@@ -617,6 +617,7 @@ test_translation(void)
 	port_c_add_mp_object(&args, mp_buf, mp, &mp_ctx);
 	int rc = func_adapter_call(func, &args, &ret);
 	is(rc, 0, "Function must return successfully");
+	func_adapter_destroy(func);
 
 	const struct port_c_entry *retval = port_get_c_entries(&ret);
 	fail_if(retval == NULL);
