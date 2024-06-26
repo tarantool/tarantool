@@ -55,38 +55,39 @@ static_assert(SMALL_STATIC_SIZE > NI_MAXHOST + NI_MAXSERV,
  * checks and all.
  */
 static int
-sio_socketname_to_buffer(int fd, char *buf, int size)
+sio_socketname_to_buffer(int fd, const struct sockaddr *base_addr,
+			 socklen_t addrlen, char *buf, int size)
 {
 	int n = 0;
 	(void)n;
 	SNPRINT(n, snprintf, buf, size, "fd %d", fd);
 	if (fd < 0)
 		return 0;
-	struct sockaddr_storage addr;
-	socklen_t addrlen = sizeof(addr);
-	struct sockaddr *base_addr = (struct sockaddr *)&addr;
-	int rc = getsockname(fd, base_addr, &addrlen);
-	if (rc == 0) {
+	if (base_addr != NULL) {
 		SNPRINT(n, snprintf, buf, size, ", aka ");
 		SNPRINT(n, sio_addr_snprintf, buf, size, base_addr, addrlen);
 	}
-	addrlen = sizeof(addr);
-	rc = getpeername(fd, (struct sockaddr *) &addr, &addrlen);
+	struct sockaddr_storage peer_addr_storage;
+	addrlen = sizeof(peer_addr_storage);
+	struct sockaddr *peer_addr = (struct sockaddr *)&peer_addr_storage;
+	int rc = getpeername(fd, peer_addr, &addrlen);
 	if (rc == 0) {
 		SNPRINT(n, snprintf, buf, size, ", peer of ");
-		SNPRINT(n, sio_addr_snprintf, buf, size, base_addr, addrlen);
+		SNPRINT(n, sio_addr_snprintf, buf, size, peer_addr, addrlen);
 	}
 	return 0;
 }
 
-const char *
-sio_socketname(int fd)
+static const char *
+sio_socketname_addr(int fd, const struct sockaddr *base_addr,
+		    socklen_t addrlen)
 {
 	/* Preserve errno */
 	int save_errno = errno;
 	int name_size = SERVICE_NAME_MAXLEN;
 	char *name = static_alloc(name_size);
-	int rc = sio_socketname_to_buffer(fd, name, name_size);
+	int rc = sio_socketname_to_buffer(fd, base_addr, addrlen,
+					  name, name_size);
 	/*
 	 * Could fail only because of a bad format in snprintf, but it is not
 	 * bad, so should not fail.
@@ -96,6 +97,29 @@ sio_socketname(int fd)
 	/*
 	 * Restore the original errno, it might have been reset by
 	 * snprintf() or getsockname().
+	 */
+	errno = save_errno;
+	return name;
+}
+
+const char *
+sio_socketname(int fd)
+{
+	/* Preserve errno */
+	int save_errno = errno;
+	struct sockaddr_storage addr;
+	socklen_t addrlen = sizeof(addr);
+	struct sockaddr *base_addr = (struct sockaddr *)&addr;
+	int rc = getsockname(fd, base_addr, &addrlen);
+	const char *name;
+	if (rc == 0) {
+		name = sio_socketname_addr(fd, base_addr, addrlen);
+	} else {
+		name = sio_socketname_addr(fd, NULL, addrlen);
+	}
+	/*
+	 * Restore the original errno, it might have been reset by
+	 * getsockname().
 	 */
 	errno = save_errno;
 	return name;
@@ -245,7 +269,8 @@ sio_bind(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
 	int rc = bind(fd, addr, addrlen);
 	if (rc < 0)
-		diag_set(SocketError, sio_socketname(fd), "bind");
+		diag_set(SocketError, sio_socketname_addr(fd, addr, addrlen),
+			 "bind");
 	return rc;
 }
 
