@@ -118,6 +118,8 @@ int check_plan(void);
 #define is(a, b, ...)		_ok0((a) == (b), #a " == " #b, ##__VA_ARGS__)
 #define isnt(a, b, ...)		_ok0((a) != (b), #a " != " #b, ##__VA_ARGS__)
 
+#define is_str(a, b, fmt, args...) ok(strcmp(a, b) == 0, fmt, ##args)
+
 #if UNIT_TAP_COMPATIBLE
 
 #define header()					\

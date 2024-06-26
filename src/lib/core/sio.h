@@ -236,6 +236,16 @@ ssize_t sio_recvfrom(int fd, void *buf, size_t len, int flags,
 int
 sio_uri_to_addr(const char *uri, struct sockaddr *addr, bool *is_host_empty);
 
+/* internals, for unit testing */
+
+/**
+ * Return a string containing fd, base address and peer from arguments.
+ * Used mostly in error messages.
+ */
+const char *
+sio_socketname_addr(int fd, const struct sockaddr *base_addr,
+		    socklen_t addrlen);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
