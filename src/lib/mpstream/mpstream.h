@@ -101,6 +101,15 @@ mpstream_encode_uint(struct mpstream *stream, uint64_t num);
 void
 mpstream_encode_int(struct mpstream *stream, int64_t num);
 
+static inline void
+mpstream_encode_int64(struct mpstream *stream, int64_t num)
+{
+	if (num < 0)
+		mpstream_encode_int(stream, num);
+	else
+		mpstream_encode_uint(stream, num);
+}
+
 void
 mpstream_encode_float(struct mpstream *stream, float num);
 
