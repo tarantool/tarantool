@@ -362,7 +362,7 @@ static const char *lua_sources[] = {
 	config_utils_aboard_lua,
 
 	"config/utils/schema",
-	"internal.config.utils.schema",
+	"experimental.config.utils.schema",
 	config_utils_schema_lua,
 
 	"config/utils/tabulate",

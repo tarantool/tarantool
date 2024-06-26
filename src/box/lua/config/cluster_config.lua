@@ -1,4 +1,4 @@
-local schema = require('internal.config.utils.schema')
+local schema = require('experimental.config.utils.schema')
 local instance_config = require('internal.config.instance_config')
 local expression = require('internal.config.utils.expression')
 

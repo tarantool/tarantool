@@ -1,6 +1,6 @@
 local ffi = require('ffi')
 local fun = require('fun')
-local schema = require('internal.config.utils.schema')
+local schema = require('experimental.config.utils.schema')
 local t = require('luatest')
 
 local g = t.group()
