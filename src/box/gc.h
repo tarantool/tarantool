@@ -97,6 +97,8 @@ enum gc_consumer_type {
 struct gc_consumer {
 	/** Link in gc_state::active_consumers. */
 	gc_node_t in_active_consumers;
+	/** Link in gc_state::consumers. */
+	struct rlist in_consumers;
 	/** UUID of object owning this consumer. */
 	struct tt_uuid uuid;
 	/** The vclock tracked by this consumer. */
@@ -137,6 +139,11 @@ struct gc_state {
 	 * to the tail. Linked by gc_checkpoint::in_checkpoints.
 	 */
 	struct rlist checkpoints;
+	/**
+	 * All registered consumers. Since amount of consumers is expected to
+	 * be small, consumers are indexed by list.
+	 */
+	struct rlist consumers;
 	/** Active consumers (that actually retain xlogs). */
 	gc_tree_t active_consumers;
 	/** Fiber responsible for periodic checkpointing. */
