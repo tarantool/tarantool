@@ -569,11 +569,13 @@ lbox_info_gc_call(struct lua_State *L)
 
 	count = 0;
 	struct gc_consumer *consumer;
+	char consumer_name[GC_NAME_MAX];
 	while ((consumer = gc_consumer_iterator_next(&consumers)) != NULL) {
 		lua_createtable(L, 0, 3);
 
+		gc_consumer_name(consumer, consumer_name, GC_NAME_MAX);
 		lua_pushstring(L, "name");
-		lua_pushstring(L, consumer->name);
+		lua_pushstring(L, consumer_name);
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "vclock");

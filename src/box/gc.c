@@ -422,7 +422,9 @@ gc_advance(const struct vclock *vclock)
 		consumer->is_inactive = true;
 		gc_tree_remove(&gc.consumers, consumer);
 
-		say_crit("deactivated WAL consumer %s at %s", consumer->name,
+		char consumer_name[GC_NAME_MAX];
+		gc_consumer_name(consumer, consumer_name, GC_NAME_MAX);
+		say_crit("deactivated WAL consumer %s at %s", consumer_name,
 			 vclock_to_string(&consumer->vclock));
 
 		consumer = next;
@@ -662,7 +664,7 @@ gc_unref_checkpoint(struct gc_checkpoint_ref *ref)
 }
 
 struct gc_consumer *
-gc_consumer_register(const struct vclock *vclock, const char *format, ...)
+gc_consumer_register(const struct vclock *vclock, const char *name, const struct tt_uuid *uuid)
 {
 	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
 	if (consumer == NULL) {
@@ -671,10 +673,8 @@ gc_consumer_register(const struct vclock *vclock, const char *format, ...)
 		return NULL;
 	}
 
-	va_list ap;
-	va_start(ap, format);
-	vsnprintf(consumer->name, GC_NAME_MAX, format, ap);
-	va_end(ap);
+	strlcpy(consumer->object_name, name, GC_NAME_MAX);
+	consumer->uuid = *uuid;
 
 	vclock_copy(&consumer->vclock, vclock);
 	gc_tree_insert(&gc.consumers, consumer);

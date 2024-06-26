@@ -39,6 +39,8 @@
 #include "vclock/vclock.h"
 #include "trivia/util.h"
 #include "checkpoint_schedule.h"
+#include "tt_static.h"
+#include "tt_uuid.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -88,8 +90,10 @@ struct gc_checkpoint_ref {
 struct gc_consumer {
 	/** Link in gc_state::consumers. */
 	gc_node_t node;
-	/** Human-readable name. */
-	char name[GC_NAME_MAX];
+	/** UUID of object owning this consumer. */
+	struct tt_uuid uuid;
+	/** Human-readable name of object. */
+	char object_name[GC_NAME_MAX];
 	/** The vclock tracked by this consumer. */
 	struct vclock vclock;
 	/**
@@ -342,9 +346,9 @@ gc_unref_checkpoint(struct gc_checkpoint_ref *ref);
  * Returns a pointer to the new consumer object or NULL on
  * memory allocation failure.
  */
-CFORMAT(printf, 2, 3)
 struct gc_consumer *
-gc_consumer_register(const struct vclock *vclock, const char *format, ...);
+gc_consumer_register(const struct vclock *vclock, const char *name,
+		     const struct tt_uuid *uuid);
 
 /**
  * Unregister a consumer and invoke garbage collection
@@ -359,6 +363,13 @@ gc_consumer_unregister(struct gc_consumer *consumer);
  */
 void
 gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock);
+
+static inline void
+gc_consumer_name(struct gc_consumer *consumer, char *buf, size_t size)
+{
+	snprintf(buf, size, "%s %s", consumer->object_name,
+		 tt_uuid_str(&consumer->uuid));
+}
 
 /**
  * Iterator over registered consumers. The iterator is valid

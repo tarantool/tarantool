@@ -4408,7 +4408,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
 	struct gc_consumer *gc = gc_consumer_register(
-		&start_vclock, "replica %s", tt_uuid_str(&req.instance_uuid));
+		&start_vclock, "replica", &req.instance_uuid);
 	if (gc == NULL)
 		diag_raise();
 	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
@@ -4553,7 +4553,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * it can resume FINAL JOIN where INITIAL JOIN ends.
 	 */
 	struct gc_consumer *gc = gc_consumer_register(&replicaset.vclock,
-				"replica %s", tt_uuid_str(&req.instance_uuid));
+				"replica", &req.instance_uuid);
 	if (gc == NULL)
 		diag_raise();
 	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
@@ -4726,8 +4726,8 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 			gc_consumer_unregister(replica->gc);
 			had_gc = true;
 		}
-		replica->gc = gc_consumer_register(&start_vclock, "replica %s",
-						   tt_uuid_str(&replica->uuid));
+		replica->gc = gc_consumer_register(&start_vclock, "replica",
+						   &replica->uuid);
 		if (replica->gc == NULL)
 			diag_raise();
 		if (!had_gc)
