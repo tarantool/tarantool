@@ -39,6 +39,7 @@
 #include "vclock/vclock.h"
 #include "trivia/util.h"
 #include "checkpoint_schedule.h"
+#include "tt_uuid.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -82,16 +83,26 @@ struct gc_checkpoint_ref {
 };
 
 /**
+ * Type of an object a WAL GC consumer belongs to.
+ */
+enum gc_consumer_type {
+	GC_CONSUMER_REPLICA,
+	gc_consumer_type_MAX,
+};
+
+/**
  * The object of this type is used to prevent garbage
  * collection from removing WALs that are still in use.
  */
 struct gc_consumer {
 	/** Link in gc_state::consumers. */
 	gc_node_t node;
-	/** Human-readable name. */
-	char name[GC_NAME_MAX];
+	/** UUID of object owning this consumer. */
+	struct tt_uuid uuid;
 	/** The vclock tracked by this consumer. */
 	struct vclock vclock;
+	/** Type of object consumer belongs to. */
+	enum gc_consumer_type type;
 	/**
 	 * This flag is set if a WAL needed by this consumer was
 	 * deleted by the WAL thread on ENOSPC.
@@ -336,15 +347,16 @@ gc_unref_checkpoint(struct gc_checkpoint_ref *ref);
  *
  * This will stop garbage collection of WAL files newer than
  * @vclock until the consumer is unregistered or advanced.
- * @format... specifies a human-readable name of the consumer,
- * it will be used for listing the consumer in box.info.gc().
+ * @type specifies a type of object the consumer belongs to,
+ * @uuid specifies UUID of this object. They will be
+ * used for listing the consumer in box.info.gc().
  *
  * Returns a pointer to the new consumer object or NULL on
  * memory allocation failure.
  */
-CFORMAT(printf, 2, 3)
 struct gc_consumer *
-gc_consumer_register(const struct vclock *vclock, const char *format, ...);
+gc_consumer_register(const struct vclock *vclock, enum gc_consumer_type type,
+		     const struct tt_uuid *uuid);
 
 /**
  * Unregister a consumer and invoke garbage collection
@@ -359,6 +371,12 @@ gc_consumer_unregister(struct gc_consumer *consumer);
  */
 void
 gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock);
+
+/**
+ * Returns name of WAL GC consumer in format "<object name> <UUID>".
+ */
+const char *
+gc_consumer_name(struct gc_consumer *consumer);
 
 /**
  * Iterator over registered consumers. The iterator is valid
