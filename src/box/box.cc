@@ -1626,13 +1626,30 @@ box_check_wal_queue_max_size(void)
 	return size;
 }
 
+/**
+ * If set, raise an error on any attempt to set wal_cleanup_delay to
+ * non-zero value.
+ */
+static bool wal_cleanup_delay_is_disabled = false;
+TWEAK_BOOL(wal_cleanup_delay_is_disabled);
+
 static double
 box_check_wal_cleanup_delay(void)
 {
+	const double default_value = 4 * 3600;
 	double value = cfg_getd("wal_cleanup_delay");
 	if (value < 0) {
 		diag_set(ClientError, ER_CFG, "wal_cleanup_delay",
 			 "value must be >= 0");
+		return -1;
+	}
+	/* Non-zero and non-default value is detected - say a warning. */
+	if (value > 0 && value != default_value)
+		say_warn_once("Option wal_cleanup_delay is deprecated.");
+
+	if (value > 0 && wal_cleanup_delay_is_disabled) {
+		diag_set(ClientError, ER_DEPRECATED,
+			 "Option wal_cleanup_delay");
 		return -1;
 	}
 
@@ -4407,15 +4424,29 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
-	struct gc_consumer *gc = gc_consumer_register(
-		&start_vclock, "replica %s", tt_uuid_str(&req.instance_uuid));
-	if (gc == NULL)
-		diag_raise();
-	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
+	/*
+	 * Register an anonymous consumer (not associated with replica) to hold
+	 * xlogs until replica is successfully registered.
+	 */
+	struct gc_consumer *gc_temporary =
+		gc_consumer_register_anonymous(&start_vclock,
+					       "replica %s register",
+					       tt_uuid_str(&req.instance_uuid));
+	auto gc_guard = make_scoped_guard([&] {
+		gc_consumer_unregister_anonymous(gc_temporary);
+	});
 
 	say_info("registering replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
 	box_register_replica(&req.instance_uuid, req.instance_name);
+	/*
+	 * Replica was registered as a WAL GC consumer on insert to _cluster,
+	 * so just advance its consumer now.
+	 */
+	if (gc_consumer_update(&req.instance_uuid, &start_vclock) != 0)
+		diag_raise();
+	gc_consumer_unregister_anonymous(gc_temporary);
+	gc_guard.is_active = false;
 
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 
@@ -4440,16 +4471,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
-	/*
-	 * Advance the WAL consumer state to the position where
-	 * registration was complete and assign it to the
-	 * replica.
-	 */
-	gc_consumer_advance(gc, &stop_vclock);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
-	replica->gc = gc;
-	gc_guard.is_active = false;
+	gc_consumer_update_async(&replica->uuid, &stop_vclock);
 }
 
 void
@@ -4549,14 +4571,16 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 		}
 	}
 	/*
-	 * Register the replica as a WAL consumer so that
-	 * it can resume FINAL JOIN where INITIAL JOIN ends.
+	 * Register an anonymous consumer (not associated with replica) to hold
+	 * xlogs until replica is successfully joined the replicaset.
 	 */
-	struct gc_consumer *gc = gc_consumer_register(&replicaset.vclock,
-				"replica %s", tt_uuid_str(&req.instance_uuid));
-	if (gc == NULL)
-		diag_raise();
-	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
+	struct gc_consumer *gc_temporary =
+		gc_consumer_register_anonymous(&replicaset.vclock,
+					       "replica %s join",
+					       tt_uuid_str(&req.instance_uuid));
+	auto gc_guard = make_scoped_guard([&] {
+		gc_consumer_unregister_anonymous(gc_temporary);
+	});
 
 	say_info("joining replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
@@ -4572,6 +4596,14 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * OK - if the registration fails, the error reaches the client.
 	 */
 	box_register_replica(&req.instance_uuid, req.instance_name);
+	/*
+	 * Replica was registered as a WAL GC consumer on insert to _cluster,
+	 * so just advance its consumer now.
+	 */
+	if (gc_consumer_update(&req.instance_uuid, &start_vclock) != 0)
+		diag_raise();
+	gc_consumer_unregister_anonymous(gc_temporary);
+	gc_guard.is_active = false;
 
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 
@@ -4602,15 +4634,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
-	/*
-	 * Advance the WAL consumer state to the position where
-	 * FINAL JOIN ended and assign it to the replica.
-	 */
-	gc_consumer_advance(gc, &stop_vclock);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
-	replica->gc = gc;
-	gc_guard.is_active = false;
+	gc_consumer_update_async(&replica->uuid, &stop_vclock);
 }
 
 void
@@ -4665,7 +4689,8 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	struct replica *replica = replica_by_uuid(&req.instance_uuid);
 
 	if (!req.is_anon &&
-	    (replica == NULL || replica->id == REPLICA_ID_NIL)) {
+	    (replica == NULL || replica->id == REPLICA_ID_NIL ||
+	     !gc_consumer_is_registered(&replica->uuid))) {
 		/*
 		 * The instance is not anonymous, and is registered (at least it
 		 * claims so), but its ID is not delivered to the current
@@ -4676,6 +4701,11 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		 * nodes yet.
 		 * Also can happen when the replica is deleted from _cluster,
 		 * but still tries to subscribe. It won't have an ID here.
+		 * Moreover, non-anonymous replica having no consumer (and our
+		 * protocol implies that any registered replica has one) means
+		 * that record in _cluster wasn't committed yet because the
+		 * consumer is created on commit, so this case is considered as
+		 * too early subscribe as well.
 		 */
 		tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
 			  tt_uuid_str(&req.instance_uuid));
@@ -4720,19 +4750,9 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * recreate the gc consumer unconditionally to make sure it holds
 	 * the correct vclock.
 	 */
-	if (!replica->anon) {
-		bool had_gc = false;
-		if (replica->gc != NULL) {
-			gc_consumer_unregister(replica->gc);
-			had_gc = true;
-		}
-		replica->gc = gc_consumer_register(&start_vclock, "replica %s",
-						   tt_uuid_str(&replica->uuid));
-		if (replica->gc == NULL)
-			diag_raise();
-		if (!had_gc)
-			gc_delay_unref();
-	}
+	if (!replica->anon &&
+	    gc_consumer_update(&replica->uuid, &start_vclock) != 0)
+		diag_raise();
 	/*
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,
@@ -5651,6 +5671,30 @@ box_cfg_xc(void)
 	 */
 	if (dd_version_id > version_id(2, 10, 1))
 		txn_limbo_filter_enable(&txn_limbo);
+
+	/*
+	 * If we have no space _gc_consumers, wal_cleanup_delay is set to zero
+	 * and we have registered replicas (except for self), we should set
+	 * wal_cleanup_delay to non-zero value to prevent xlogs from being
+	 * deleted.
+	 * Note that we do this after recovery - space _gc_consumers is
+	 * recovered then if it was in snapshot.
+	 */
+	if (!gc_consumer_is_persistent() &&
+	    box_check_wal_cleanup_delay() == 0 &&
+	    replicaset.registered_count > 1) {
+		int wal_cleanup_delay_default = 4 * 3600;
+		say_warn("Current schema does not support persistent WAL GC "
+			 "state, so wal_cleanup_delay option is automatically "
+			 "set to %d to prevent xlogs needed for replicas from "
+			 "being cleaned up. Please re-configure it after "
+			 "schema upgrade if it is needed.",
+			 wal_cleanup_delay_default);
+		gc_set_wal_cleanup_delay(4 * 3600);
+	} else {
+		if (box_set_wal_cleanup_delay() != 0)
+			diag_raise();
+	}
 
 	title("running");
 	say_info("ready to accept requests");

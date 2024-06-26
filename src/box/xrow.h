@@ -727,6 +727,21 @@ int
 xrow_decode_applier_heartbeat(const struct xrow_header *row,
 			      struct applier_heartbeat *req);
 
+/** Return the number of bytes an encoded vclock takes. */
+uint32_t
+mp_sizeof_vclock_ignore0(const struct vclock *vclock);
+
+/** Encode a vclock to a buffer as MP_MAP. Never fails. */
+char *
+mp_encode_vclock_ignore0(char *data, const struct vclock *vclock);
+
+/**
+ * Decode a vclock from MsgPack data, it should be MP_MAP.
+ * Returns -1 on error, diag is NOT set.
+ */
+int
+mp_decode_vclock_ignore0(const char **data, struct vclock *vclock);
+
 /** Encode vclock. */
 void
 xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);

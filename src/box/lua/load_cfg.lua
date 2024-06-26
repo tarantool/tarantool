@@ -8,6 +8,7 @@ local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
 local compat = require('compat')
+local tweaks = require('internal.tweaks')
 
 local function nop() end
 
@@ -247,6 +248,16 @@ returns. Set before first box.cfg{} call in order for the option to take effect.
 https://tarantool.io/compat/box_cfg_replication_sync_timeout
 ]]
 
+local wal_cleanup_delay_brief = [[
+Sets the default value for box.cfg.wal_cleanup_delay.
+Old is 4 hours, new is 0 seconds. New behaviour allows Tarantool to
+delete old xlog files right after recovery. If Tarantool participates
+in a cluster, xlogs needed for other replicas will be retained by
+persistent WAL GC.
+
+https://tarantool.io/compat/box_cfg_wal_cleanup_delay
+]]
+
 -- A list of box.cfg options whose defaults are managed by compat.
 local compat_options = {
     {
@@ -256,6 +267,17 @@ local compat_options = {
         newval = 0,
         obsolete = nil,
         default = 'new',
+    },
+    {
+        name = 'wal_cleanup_delay',
+        brief = wal_cleanup_delay_brief,
+        oldval = 4 * 3600,
+        newval = 0,
+        obsolete = nil,
+        default = 'old',
+        tweak_name = 'wal_cleanup_delay_is_disabled',
+        new_tweak_value = true,
+        old_tweak_value = false,
     },
 }
 
@@ -274,6 +296,10 @@ for _, option in ipairs(compat_options) do
             local val = is_new and option.newval or option.oldval
             default_cfg[option.name] = val
             pre_load_cfg[option.name] = val
+            if option.tweak_name ~= nil then
+                tweaks[option.tweak_name] = is_new and option.new_tweak_value
+                    or option.old_tweak_value
+            end
         end,
         run_action_now = true,
     })
@@ -704,6 +730,7 @@ local dynamic_cfg_skip_at_load = {
     secure_erasing          = ifdef_security(true),
     password_lifetime_days  = ifdef_security(true),
     wal_retention_period    = ifdef_wal_retention_period(true),
+    wal_cleanup_delay       = true,
 }
 
 -- Options that are not part of dynamic_cfg_modules and applied individually

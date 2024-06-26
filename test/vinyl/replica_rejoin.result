@@ -55,11 +55,17 @@ files = test_run:eval("replica", "fio = require('fio') return fio.glob(fio.pathj
 _ = box.space.mem:replace{'files', files}
 ---
 ...
+replica_uuid = test_run:eval("replica", "return box.info.uuid")[1]
+---
+...
 test_run:cmd("stop server replica")
 ---
 - true
 ...
 -- Invoke garbage collector on the master.
+_ = box.space._gc_consumers:replace{replica_uuid}
+---
+...
 test_run:cmd("restart server default")
 box.cfg{wal_cleanup_delay = 0}
 ---
@@ -127,11 +133,17 @@ files = test_run:eval("replica", "fio = require('fio') return fio.glob(fio.pathj
 _ = box.space.mem:replace{'files', files}
 ---
 ...
+replica_uuid = test_run:eval("replica", "return box.info.uuid")[1]
+---
+...
 test_run:cmd("stop server replica")
 ---
 - true
 ...
 -- Invoke garbage collector on the master.
+_ = box.space._gc_consumers:replace{replica_uuid}
+---
+...
 test_run:cmd("restart server default")
 box.cfg{wal_cleanup_delay = 0}
 ---

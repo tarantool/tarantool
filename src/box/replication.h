@@ -408,8 +408,6 @@ struct replica {
 	struct applier *applier;
 	/** Relay thread. */
 	struct relay *relay;
-	/** Garbage collection state associated with the replica. */
-	struct gc_consumer *gc;
 	/** Link in the anon_replicas list. */
 	struct rlist in_anon;
 	/**

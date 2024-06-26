@@ -297,7 +297,6 @@ replica_new(void)
 	replica->uuid = uuid_nil;
 	*replica->name = 0;
 	replica->applier = NULL;
-	replica->gc = NULL;
 	replica->is_applier_healthy = false;
 	replica->is_relay_healthy = false;
 	rlist_create(&replica->in_anon);
@@ -314,8 +313,6 @@ replica_delete(struct replica *replica)
 	assert(replica_is_orphan(replica));
 	if (replica->relay != NULL)
 		relay_delete(replica->relay);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
 	TRASH(replica);
 	free(replica);
 }
@@ -360,15 +357,6 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		assert(instance_id == REPLICA_ID_NIL);
 		instance_id = replica_id;
 		box_broadcast_id();
-	} else if (replica->anon) {
-		/*
-		 * Set replica gc on its transition from
-		 * anonymous to a normal one.
-		 */
-		assert(replica->gc == NULL);
-		replica->gc = gc_consumer_register(&replicaset.vclock,
-						   "replica %s",
-						   tt_uuid_str(&replica->uuid));
 	}
 	replicaset.replica_by_id[replica_id] = replica;
 	gc_delay_ref();
@@ -426,19 +414,6 @@ replica_clear_id(struct replica *replica)
 	replica->id = REPLICA_ID_NIL;
 	say_info("removed replica %s", tt_uuid_str(&replica->uuid));
 
-	/*
-	 * The replica will never resubscribe so we don't need to keep
-	 * WALs for it anymore. Unregister it with the garbage collector
-	 * if the relay thread is stopped. In case the relay thread is
-	 * still running, it may need to access replica->gc so leave the
-	 * job to replica_on_relay_stop, which will be called as soon as
-	 * the relay thread exits.
-	 */
-	if (replica->gc != NULL &&
-	    relay_get_state(replica->relay) != RELAY_FOLLOW) {
-		gc_consumer_unregister(replica->gc);
-		replica->gc = NULL;
-	}
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
 		/*
@@ -1354,21 +1329,6 @@ replica_on_relay_follow(struct replica *replica)
 void
 replica_on_relay_stop(struct replica *replica)
 {
-	/*
-	 * If the replica was evicted from the cluster, or was not
-	 * even added there (anon replica), we don't need to keep
-	 * WALs for it anymore. Unregister it with the garbage
-	 * collector then. See also replica_clear_id.
-	 */
-	if (replica->id == REPLICA_ID_NIL) {
-		if (!replica->anon) {
-			gc_consumer_unregister(replica->gc);
-			replica->gc = NULL;
-		} else {
-			assert(replica->gc == NULL);
-		}
-	}
-
 	replica_update_relay_health(replica);
 
 	if (replica_is_orphan(replica)) {

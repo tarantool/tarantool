@@ -39,6 +39,7 @@
 #include "box/authentication.h"
 #include "box/box.h"
 #include "box/errcode.h"
+#include "box/gc.h"
 #include "box/lua/tuple.h"
 #include "box/port.h"
 #include "box/read_view.h"
@@ -373,6 +374,20 @@ lbox_generate_space_id(lua_State *L)
 	return 1;
 }
 
+static int
+lbox_deactivate_gc_consumer(lua_State *L)
+{
+	assert(lua_gettop(L) >= 1);
+	assert(lua_isstring(L, 1) == 1);
+	const char *uuid_str = lua_tostring(L, 1);
+	struct tt_uuid uuid;
+	if (tt_uuid_from_string(uuid_str, &uuid) != 0)
+		return luaT_error(L);
+	if (gc_consumer_deactivate(&uuid) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
 /* }}} */
 
 /** {{{ Helper that generates user auth data. **/
@@ -557,6 +572,7 @@ box_lua_misc_init(struct lua_State *L)
 		{"read_view_list", lbox_read_view_list},
 		{"read_view_status", lbox_read_view_status},
 		{"generate_space_id", lbox_generate_space_id},
+		{"deactivate_gc_consumer", lbox_deactivate_gc_consumer},
 		{NULL, NULL}
 	};
 
