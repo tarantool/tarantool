@@ -95,8 +95,8 @@ enum gc_consumer_type {
  * collection from removing WALs that are still in use.
  */
 struct gc_consumer {
-	/** Link in gc_state::consumers. */
-	gc_node_t node;
+	/** Link in gc_state::active_consumers. */
+	gc_node_t in_active_consumers;
 	/** UUID of object owning this consumer. */
 	struct tt_uuid uuid;
 	/** The vclock tracked by this consumer. */
@@ -137,8 +137,8 @@ struct gc_state {
 	 * to the tail. Linked by gc_checkpoint::in_checkpoints.
 	 */
 	struct rlist checkpoints;
-	/** Registered consumers, linked by gc_consumer::node. */
-	gc_tree_t consumers;
+	/** Active consumers (that actually retain xlogs). */
+	gc_tree_t active_consumers;
 	/** Fiber responsible for periodic checkpointing. */
 	struct fiber *checkpoint_fiber;
 	/** Schedule of periodic checkpoints. */
