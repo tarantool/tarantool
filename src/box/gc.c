@@ -116,6 +116,7 @@ gc_init(on_garbage_collection_f on_garbage_collection)
 
 	vclock_create(&gc.vclock);
 	rlist_create(&gc.checkpoints);
+	rlist_create(&gc.consumers);
 	gc_tree_new(&gc.active_consumers);
 	fiber_cond_create(&gc.cleanup_cond);
 	checkpoint_schedule_cfg(&gc.checkpoint_schedule, 0, 0);
@@ -163,13 +164,10 @@ gc_free(void)
 		gc_checkpoint_delete(checkpoint);
 	}
 	/* Free all registered consumers. */
-	struct gc_consumer *consumer = gc_tree_first(&gc.active_consumers);
-	while (consumer != NULL) {
-		struct gc_consumer *next = gc_tree_next(&gc.active_consumers,
-							consumer);
-		gc_tree_remove(&gc.active_consumers, consumer);
+	struct gc_consumer *consumer, *next_consumer;
+	rlist_foreach_entry_safe(consumer, &gc.consumers, in_consumers,
+				 next_consumer) {
 		gc_consumer_delete(consumer);
-		consumer = next;
 	}
 }
 
@@ -680,6 +678,7 @@ gc_consumer_register(const struct vclock *vclock, enum gc_consumer_type type,
 
 	vclock_copy(&consumer->vclock, vclock);
 	gc_tree_insert(&gc.active_consumers, consumer);
+	rlist_add_entry(&gc.consumers, consumer, in_consumers);
 	return consumer;
 }
 
@@ -690,6 +689,7 @@ gc_consumer_unregister(struct gc_consumer *consumer)
 		gc_tree_remove(&gc.active_consumers, consumer);
 		gc_schedule_cleanup();
 	}
+	rlist_del_entry(consumer, in_consumers);
 	gc_consumer_delete(consumer);
 }
 
