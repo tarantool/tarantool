@@ -57,6 +57,8 @@
 #include "wal.h"		/* wal_collect_garbage() */
 #include "checkpoint_schedule.h"
 #include "txn_limbo.h"
+#include "tt_uuid.h"
+#include "tt_static.h"
 
 struct gc_state gc;
 
@@ -422,7 +424,8 @@ gc_advance(const struct vclock *vclock)
 		consumer->is_inactive = true;
 		gc_tree_remove(&gc.consumers, consumer);
 
-		say_crit("deactivated WAL consumer %s at %s", consumer->name,
+		say_crit("deactivated WAL consumer %s at %s",
+			 gc_consumer_name(consumer),
 			 vclock_to_string(&consumer->vclock));
 
 		consumer = next;
@@ -662,7 +665,8 @@ gc_unref_checkpoint(struct gc_checkpoint_ref *ref)
 }
 
 struct gc_consumer *
-gc_consumer_register(const struct vclock *vclock, const char *format, ...)
+gc_consumer_register(const struct vclock *vclock, enum gc_consumer_type type,
+		     const struct tt_uuid *uuid)
 {
 	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
 	if (consumer == NULL) {
@@ -671,10 +675,8 @@ gc_consumer_register(const struct vclock *vclock, const char *format, ...)
 		return NULL;
 	}
 
-	va_list ap;
-	va_start(ap, format);
-	vsnprintf(consumer->name, GC_NAME_MAX, format, ap);
-	va_end(ap);
+	consumer->type = type;
+	consumer->uuid = *uuid;
 
 	vclock_copy(&consumer->vclock, vclock);
 	gc_tree_insert(&gc.consumers, consumer);
@@ -721,6 +723,18 @@ gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock)
 		gc_tree_insert(&gc.consumers, consumer);
 
 	gc_schedule_cleanup();
+}
+
+/** String representation of enum gc_consumer_type. */
+static const char * const gc_consumer_type_strs[] = {
+	[GC_CONSUMER_REPLICA] = "replica",
+};
+
+const char *
+gc_consumer_name(struct gc_consumer *consumer)
+{
+	return tt_sprintf("%s %s", gc_consumer_type_strs[consumer->type],
+			  tt_uuid_str(&consumer->uuid));
 }
 
 struct gc_consumer *
