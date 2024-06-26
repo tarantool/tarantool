@@ -643,6 +643,36 @@ local function get_usage()
         'path: nil/string/table)', 0)
 end
 
+-- Access a given nested field without checks against a schema.
+local function get_schemaless(data, ctx)
+    local cur = data
+
+    while #ctx.journey > 0 do
+        local requested_field = table.remove(ctx.journey, 1)
+        assert(requested_field ~= nil)
+
+        -- Indexing box.NULL/nil should return nil. There is no
+        -- reason to follow the path down, because the path is not
+        -- checked against a schema inside an 'any' scalar and no
+        -- errors are possible.
+        if cur == nil then
+            return nil
+        end
+
+        -- A primitive type can't be indexed.
+        if type(cur) ~= 'table' then
+            walkthrough_error(ctx, 'Attempt to index a non-table value ' ..
+                '(%s) by field %q', type(cur), requested_field)
+        end
+
+        -- Step down.
+        walkthrough_enter(ctx, requested_field)
+        cur = cur[requested_field]
+    end
+
+    return cur
+end
+
 local function get_impl(schema, data, ctx)
     -- The journey is finished. Return what is under the feet.
     if #ctx.journey == 0 then
@@ -655,7 +685,10 @@ local function get_impl(schema, data, ctx)
     local requested_field = ctx.journey[1]
     assert(requested_field ~= nil)
 
-    if is_scalar(schema) then
+    if is_scalar(schema) and schema.type == 'any' then
+        return get_schemaless(data, ctx)
+    elseif is_scalar(schema) then
+        assert(schema.type ~= 'any')
         walkthrough_error(ctx, 'Attempt to index a scalar value of type %s ' ..
             'by field %q', schema.type, requested_field)
     elseif schema.type == 'record' then
@@ -705,7 +738,8 @@ end
 -- ('foo.bar' works like foo?.bar in TypeScript).
 --
 -- The function checks the path against the schema: it doesn't
--- allow to use a non-existing field or index a scalar value.
+-- allow to use a non-existing field or index a scalar value
+-- (except 'any').
 --
 -- The path is either array-like table or a string in the dot
 -- notation.
@@ -720,9 +754,10 @@ end
 -- Nuances:
 --
 -- * Array indexing is not supported yet.
--- * A scalar of the 'any' type can't be indexed, even when it is
---   a table. It is OK to acquire the whole value of the 'any'
---   type.
+-- * A scalar of the 'any' type can be indexed if it is a table
+--   or nil/box.NULL. In this case a tail of the path that is
+--   inside the 'any' type is not checked against a schema.
+--   Indexing nil/box.NULL always returns nil.
 function methods.get(self, data, path)
     local schema = rawget(self, 'schema')
 
