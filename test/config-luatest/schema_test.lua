@@ -1102,6 +1102,49 @@ g.test_get_nested_any_in_record = function()
     t.assert_equals(s:get(data, 'foo.bar'), scalar_data)
 end
 
+-- Verify that :get() allows to get a nested value from a scalar
+-- of the any type.
+g.test_get_nested_in_any = function()
+    local s = schema.new('myschema', schema.scalar({type = 'any'}))
+
+    -- Existing data.
+    local data = {foo = {bar = 'baz'}}
+    t.assert_equals(s:get(data, 'foo'), {bar = 'baz'})
+    t.assert_equals(s:get(data, 'foo.bar'), 'baz')
+
+    -- Non-existing data. Verify that :get() works in the optional
+    -- chaining way.
+    local data = {}
+    t.assert_type(s:get(data, 'foo'), 'nil')
+    t.assert_type(s:get(data, 'foo.bar'), 'nil')
+
+    -- The same, but the non-existing field is box.NULL.
+    --
+    -- Indexing of nil/box.NULL gives nil.
+    local data = {foo = box.NULL}
+    t.assert_type(s:get(data, 'foo.bar'), 'nil')
+
+    -- The same, but nil/box.NULL is on the 'any' scalar level,
+    -- not inside.
+    local data = nil
+    t.assert_type(s:get(data, 'foo'), 'nil')
+    local data = box.NULL
+    t.assert_type(s:get(data, 'foo'), 'nil')
+
+    -- If the path points to box.NULL, it is returned as is (not
+    -- as nil).
+    local data = {foo = box.NULL}
+    t.assert_type(s:get(data, 'foo'), 'cdata')
+
+    -- Attempt to index a primitive value (except nil/box.NULL).
+    local exp_err_msg = '[myschema] foo.bar: Attempt to index a non-table ' ..
+        'value (number) by field "baz"'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = {foo = {bar = 42}}
+        s:get(data, 'foo.bar.baz')
+    end)
+end
+
 -- Index a map.
 g.test_get_nested_in_map = function()
     local s = schema.new('myschema', schema.map({
@@ -1211,21 +1254,12 @@ end
 
 -- Attempt to index a scalar value.
 g.test_get_index_scalar = function()
-    -- Indexing a scalar is forbidden.
+    -- Indexing a scalar is forbidden (except 'any').
     local s = schema.new('myschema', schema.scalar({type = 'string'}))
     local exp_err_msg = '[myschema] Attempt to index a scalar value of type ' ..
         'string by field "foo"'
     t.assert_error_msg_equals(exp_err_msg, function()
         local data = 5
-        s:get(data, 'foo')
-    end)
-
-    -- The scalar of the 'any' type is the same in this regard.
-    local s = schema.new('myschema', schema.scalar({type = 'any'}))
-    local exp_err_msg = '[myschema] Attempt to index a scalar value of type ' ..
-        'any by field "foo"'
-    t.assert_error_msg_equals(exp_err_msg, function()
-        local data = {foo = {bar = 'baz'}}
         s:get(data, 'foo')
     end)
 end
