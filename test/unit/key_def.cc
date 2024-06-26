@@ -337,6 +337,7 @@ test_func_compare_with_key(void)
 	key_def_delete(def);
 	key_def_delete(pk_def);
 	key_def_delete(cmp_def);
+	key_def_delete(model_def);
 
 	footer();
 	check_plan();
@@ -1253,7 +1254,7 @@ test_tuple_compare_sequential(bool ascending_key, bool is_nullable,
 	fail_unless(key_def->is_nullable == is_nullable);
 	fail_unless(key_def->has_optional_parts == has_optional_parts);
 
-	const char *funcname = (const char *)xstrdup(tt_sprintf(
+	char *funcname = (char *)xstrdup(tt_sprintf(
 		"tuple_compare_sequential<%s, %s, key_def: %s>", is_nullable ?
 		"true" : "false", has_optional_parts ? "true" : "false",
 		sort_order));
@@ -1268,6 +1269,7 @@ test_tuple_compare_sequential(bool ascending_key, bool is_nullable,
 
 	test_delete_cases(tuples_eq, tuples_gt);
 	key_def_delete(key_def);
+	free(funcname);
 
 	footer();
 	check_plan();
