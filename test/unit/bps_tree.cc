@@ -841,8 +841,9 @@ insert_get_iterator()
 	for (i = -2; i > -10000; i -= 2)
 		bps_insert_and_check(test, &tree, i, NULL);
 	for (i = -9999; i < 10000; i += 2)
-		bps_insert_and_check(test, &tree, i, NULL)
+		bps_insert_and_check(test, &tree, i, NULL);
 
+	test_destroy(&tree);
 	ok(true, "insert and get iterator");
 }
 

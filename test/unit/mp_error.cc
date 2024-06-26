@@ -382,6 +382,7 @@ test_fail_not_enough_fields()
 	uint32_t len = data - buffer;
 	const char *pos = buffer;
 	struct error *unpacked = error_unpack(&pos, len);
+	error_ref(unpacked);
 
 	isnt(unpacked, NULL, "check lack of fields");
 	is(strcmp(error_get_str(unpacked, "object_type"), err.ad_object_type),
@@ -389,6 +390,7 @@ test_fail_not_enough_fields()
 	is(strcmp(error_get_str(unpacked, "access_type"), err.ad_access_type),
 	   0, "access type");
 	is(error_get_str(unpacked, "object_name"), NULL, "object name");
+	error_unref(unpacked);
 	check_plan();
 	footer();
 }
