@@ -10,8 +10,6 @@
 #define URI_PARAM_MAX 10
 #define URI_PARAM_VALUE_MAX 10
 
-#define is_str(a, b, fmt, args...) ok(strcmp(a, b) == 0, fmt, ##args)
-
 static void
 sample_uri_create(struct uri *uri)
 {
