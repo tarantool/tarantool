@@ -101,9 +101,18 @@ box.space.test:count()
 test_run:cmd("switch default")
 
 -- Now garbage collection should resume and delete files left
--- from the old checkpoint.
+-- from the old checkpoint. Note that persistent updates of WAL GC
+-- can create a new xlog file, so xdir can contain either zero or one
+-- xlog files.
 wait_gc(1) or log.error(box.info.gc())
+wait_xlog(1) or wait_xlog(0) or log.error(fio.listdir('./master'))
+
+-- Trigger snapshot to check if last xlog file will be removed because
+-- it is not needed for replica - it contains only local writes (persistent
+-- WAL GC updates).
+box.snapshot()
 wait_xlog(0) or log.error(fio.listdir('./master'))
+
 --
 -- Check that the master doesn't delete xlog files sent to the
 -- replica until it receives a confirmation that the data has
