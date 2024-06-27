@@ -39,6 +39,8 @@
 #include "vclock/vclock.h"
 #include "trivia/util.h"
 #include "checkpoint_schedule.h"
+#include "tt_static.h"
+#include "tt_uuid.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -46,6 +48,7 @@ extern "C" {
 
 struct fiber;
 struct gc_consumer;
+struct trigger;
 
 enum { GC_NAME_MAX = 64 };
 
@@ -86,17 +89,29 @@ struct gc_checkpoint_ref {
  * collection from removing WALs that are still in use.
  */
 struct gc_consumer {
+	/** Link in gc_state::active_consumers. */
+	gc_node_t in_active_consumers;
 	/** Link in gc_state::consumers. */
-	gc_node_t node;
-	/** Human-readable name. */
-	char name[GC_NAME_MAX];
+	struct rlist in_consumers;
+	/** UUID of object owning this consumer. */
+	struct tt_uuid uuid;
+	/** Human-readable name of object. */
+	char object_name[GC_NAME_MAX];
 	/** The vclock tracked by this consumer. */
 	struct vclock vclock;
+	/** Asynchronously advanced vclock. */
+	struct vclock volatile_vclock;
+	/** Reference counter. */
+	uint32_t ref_count;
 	/**
 	 * This flag is set if a WAL needed by this consumer was
 	 * deleted by the WAL thread on ENOSPC.
 	 */
 	bool is_inactive;
+	/**
+	 * Whether consumer should be persisted by background fiber.
+	 */
+	bool is_persistent;
 };
 
 typedef rb_tree(struct gc_consumer) gc_tree_t;
@@ -126,8 +141,13 @@ struct gc_state {
 	 * to the tail. Linked by gc_checkpoint::in_checkpoints.
 	 */
 	struct rlist checkpoints;
-	/** Registered consumers, linked by gc_consumer::node. */
-	gc_tree_t consumers;
+	/**
+	 * All registered consumers. Since amount of consumers is expected to
+	 * be small, consumers are indexed by list.
+	 */
+	struct rlist consumers;
+	/** Active consumers (that actually pin retain xlogs). */
+	gc_tree_t active_consumers;
 	/** Fiber responsible for periodic checkpointing. */
 	struct fiber *checkpoint_fiber;
 	/** Schedule of periodic checkpoints. */
@@ -152,6 +172,25 @@ struct gc_state {
 	 * taken at that moment of time.
 	 */
 	int64_t cleanup_completed, cleanup_scheduled;
+	/**
+	 * Fiber that updates persistent WAL GC state
+	 * asynchronously.
+	 */
+	struct fiber *persist_fiber;
+	/**
+	 * Condition variable signaled by the persist fiber
+	 * whenever it completes or fails a round. Used to wait for
+	 * writes to complete.
+	 */
+	struct fiber_cond persist_cond;
+	/**
+	 * The following two members are used for scheduling
+	 * fiber persisting gc consumers. To trigger the fiber,
+	 * @scheduled is incremented. Whenever a round of garbage
+	 * collection completes, @completed is incremented. On
+	 * every failure @failed is incremented.
+	 */
+	uint64_t persist_completed, persist_scheduled, persist_failed;
 	/**
 	 * A counter to wait until all replicas are managed to
 	 * subscribe so that we can enable cleanup fiber to
@@ -342,9 +381,9 @@ gc_unref_checkpoint(struct gc_checkpoint_ref *ref);
  * Returns a pointer to the new consumer object or NULL on
  * memory allocation failure.
  */
-CFORMAT(printf, 2, 3)
 struct gc_consumer *
-gc_consumer_register(const struct vclock *vclock, const char *format, ...);
+gc_consumer_register(const struct vclock *vclock, const char *name,
+		     const struct tt_uuid *uuid);
 
 /**
  * Unregister a consumer and invoke garbage collection
@@ -354,11 +393,43 @@ void
 gc_consumer_unregister(struct gc_consumer *consumer);
 
 /**
- * Advance the vclock tracked by a consumer and
+ * Update the vclock tracked by a consumer and
  * invoke garbage collection if needed.
  */
 void
-gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock);
+gc_consumer_update(struct gc_consumer *consumer, const struct vclock *vclock);
+
+int
+gc_consumer_sync(struct gc_consumer *consumer);
+
+static inline void
+gc_consumer_name(struct gc_consumer *consumer, char *buf, size_t size)
+{
+	snprintf(buf, size, "%s %s", consumer->object_name,
+		 tt_uuid_str(&consumer->uuid));
+}
+
+bool
+gc_consumer_is_persistent(void);
+
+int
+gc_create_consumer(const struct tt_uuid *uuid, const char *name);
+
+int
+gc_erase_consumer(const struct tt_uuid *uuid);
+
+/**
+ * The trigger invoked on replace in space _gc_consumers.
+ */
+int
+on_replace_dd_gc_consumers(struct trigger *trigger, void *event);
+
+/**
+ * A callback that should be invoked when the primary index of space
+ * _gc_consumers is created.
+ */
+int
+on_create_dd_gc_consumers_primary_index(void);
 
 /**
  * Iterator over registered consumers. The iterator is valid

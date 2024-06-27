@@ -1446,6 +1446,16 @@ tuple_field_uuid(struct tuple *tuple, int fieldno, struct tt_uuid *out)
 }
 
 /**
+ * Returns true if tuple field is nil, does not set diag.
+ */
+static inline bool
+tuple_field_is_nil(struct tuple *tuple, int fieldno)
+{
+	const char *field = tuple_field(tuple, fieldno);
+	return field == NULL || mp_typeof(*field) == MP_NIL;
+}
+
+/**
  * Move a portion of reference counter from local_refs to external storage.
  * Must be called when local_refs need to be incremented, but it is already
  * at its storage limit (UINT8_MAX aka TUPLE_LOCAL_REF_MAX).

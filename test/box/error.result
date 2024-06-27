@@ -497,6 +497,7 @@ t;
  |   284: box.error.TXN_COMMIT
  |   285: box.error.READ_VIEW_BUSY
  |   286: box.error.READ_VIEW_CLOSED
+ |   287: box.error.INVALID_VCLOCK
  | ...
 
 test_run:cmd("setopt delimiter ''");

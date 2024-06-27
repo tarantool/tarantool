@@ -62,16 +62,15 @@ box.space.test:insert({1})
 box.snapshot()
 
 --
--- We need to restart the master node since otherwise
+-- We need to deactivate replica's gc consumer since otherwise
 -- the replica will be preventing us from removing old
--- xlog because it will be tracked by gc consumer which
--- kept in memory while master node is running.
+-- xlog.
 --
--- Once restarted we write a new record into master's
+-- After that, we write a new record into master's
 -- space and run snapshot which removes old xlog required
 -- by replica to subscribe leading to XlogGapError which
 -- we need to test.
-test_run:cmd('restart server master')
+_ = box.space._gc_consumers:replace({box.space._cluster:get(2)[2]})
 box.space.test:insert({2})
 box.snapshot()
 assert(not box.info.gc().is_paused)
@@ -98,11 +97,8 @@ test_run:cmd('delete server replica')
 --
 -- Case 2.
 --
--- Lets make sure we're not getting XlogGapError in
--- case if wal_cleanup_delay is used the code is almost
--- the same as for Case 1 except we don't disable cleanup
--- fiber but delay it up to a hour until replica is up
--- and running.
+-- Lets make sure we're not getting XlogGapError because
+-- persistent gc holds xlogs of replica.
 --
 
 test_run:cmd('create server master with script="replication/gh-5806-master.lua"')
@@ -139,7 +135,8 @@ box.snapshot()
 test_run:cmd('restart server master with args="3600"')
 box.space.test:insert({2})
 box.snapshot()
-assert(box.info.gc().is_paused)
+-- All replicas have gc_consumers - gc should not be paused
+assert(not box.info.gc().is_paused)
 
 test_run:cmd('start server replica')
 
@@ -156,26 +153,17 @@ test_run:cmd('cleanup server replica')
 test_run:cmd('delete server replica')
 --
 --
--- Case 3: Fill _cluster with replica but then delete
--- the replica so that master's cleanup leave in "paused"
--- state, and then simply decrease the timeout to make
--- cleanup fiber work again.
+-- Case 3: Fill _cluster with replica without actual connection
+-- so that gc_consumer won't be created. The master's cleanup should
+-- leave in "paused" state after restart, and then simply decrease the
+-- timeout to make cleanup fiber work again.
 --
 test_run:cmd('create server master with script="replication/gh-5806-master.lua"')
 test_run:cmd('start server master with args="3600"')
 
 test_run:switch('master')
-box.schema.user.grant('guest', 'replication')
-
-test_run:switch('default')
-test_run:cmd('create server replica with rpl_master=master,\
-              script="replication/replica.lua"')
-test_run:cmd('start server replica')
-
-test_run:switch('master')
-test_run:cmd('stop server replica')
-test_run:cmd('cleanup server replica')
-test_run:cmd('delete server replica')
+uuid = require('uuid')
+_ = box.space._cluster:replace{10, uuid.str()}
 
 test_run:cmd('restart server master with args="3600"')
 assert(box.info.gc().is_paused)
@@ -190,45 +178,21 @@ test_run:cmd('cleanup server master')
 test_run:cmd('delete server master')
 
 --
--- Case 4: Fill _cluster with replica but then delete
--- the replica so that master's cleanup leave in "paused"
--- state, and finally cleanup the _cluster to kick cleanup.
+-- Case 4: The same as case 3, but gc is continued because the replica
+-- is removed from _cluster instead of decreasing cleanup delay.
 --
 test_run:cmd('create server master with script="replication/gh-5806-master.lua"')
 test_run:cmd('start server master')
 
 test_run:switch('master')
-box.schema.user.grant('guest', 'replication')
+uuid = require('uuid')
+_ = box.space._cluster:replace{10, uuid.str()}
 
-test_run:switch('default')
-test_run:cmd('create server replica with rpl_master=master,\
-              script="replication/replica.lua"')
-test_run:cmd('start server replica')
-
-test_run:switch('default')
-master_uuid = test_run:eval('master', 'return box.info.uuid')[1]
-replica_uuid = test_run:eval('replica', 'return box.info.uuid')[1]
-master_cluster = test_run:eval('master', 'return box.space._cluster:select()')[1]
-assert(master_cluster[1][2] == master_uuid)
-assert(master_cluster[2][2] == replica_uuid)
-
-test_run:cmd('stop server replica')
-test_run:cmd('cleanup server replica')
-test_run:cmd('delete server replica')
-
-test_run:switch('master')
 test_run:cmd('restart server master with args="3600"')
 assert(box.info.gc().is_paused)
 
---
--- Drop the replica from _cluster and make sure
--- cleanup fiber is not paused anymore.
-test_run:switch('default')
-deleted_uuid = test_run:eval('master', 'return box.space._cluster:delete(2)')[1][2]
-assert(replica_uuid == deleted_uuid)
-
-test_run:switch('master')
-test_run:wait_cond(function() return not box.info.gc().is_paused end)
+_ = box.space._cluster:delete(10)
+assert(not box.info.gc().is_paused)
 
 test_run:switch('default')
 test_run:cmd('stop server master')

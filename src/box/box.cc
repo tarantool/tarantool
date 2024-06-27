@@ -4408,7 +4408,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
 	struct gc_consumer *gc = gc_consumer_register(
-		&start_vclock, "replica %s", tt_uuid_str(&req.instance_uuid));
+		&start_vclock, "replica", &req.instance_uuid);
 	if (gc == NULL)
 		diag_raise();
 	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
@@ -4422,6 +4422,11 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
 		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+
+	/* Persist consumer after registration. */
+	if (gc_consumer_sync(gc) != 0)
+		diag_raise();
+
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
 	vclock_copy(&stop_vclock, &replicaset.vclock);
@@ -4441,11 +4446,11 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	coio_write_xrow(io, &row);
 
 	/*
-	 * Advance the WAL consumer state to the position where
+	 * Update the WAL consumer state to the position where
 	 * registration was complete and assign it to the
 	 * replica.
 	 */
-	gc_consumer_advance(gc, &stop_vclock);
+	gc_consumer_update(gc, &stop_vclock);
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
 	replica->gc = gc;
@@ -4553,7 +4558,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * it can resume FINAL JOIN where INITIAL JOIN ends.
 	 */
 	struct gc_consumer *gc = gc_consumer_register(&replicaset.vclock,
-				"replica %s", tt_uuid_str(&req.instance_uuid));
+				"replica", &req.instance_uuid);
 	if (gc == NULL)
 		diag_raise();
 	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
@@ -4578,6 +4583,10 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
 		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+	
+	/* Persisting consumer after registration. */
+	if (gc_consumer_sync(gc) != 0)
+		diag_raise();
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -4603,10 +4612,10 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	coio_write_xrow(io, &row);
 
 	/*
-	 * Advance the WAL consumer state to the position where
+	 * Update the WAL consumer state to the position where
 	 * FINAL JOIN ended and assign it to the replica.
 	 */
-	gc_consumer_advance(gc, &stop_vclock);
+	gc_consumer_update(gc, &stop_vclock);
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
 	replica->gc = gc;
@@ -4721,17 +4730,15 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * the correct vclock.
 	 */
 	if (!replica->anon) {
-		bool had_gc = false;
-		if (replica->gc != NULL) {
-			gc_consumer_unregister(replica->gc);
-			had_gc = true;
-		}
-		replica->gc = gc_consumer_register(&start_vclock, "replica %s",
-						   tt_uuid_str(&replica->uuid));
-		if (replica->gc == NULL)
-			diag_raise();
-		if (!had_gc)
+		if (replica->gc == NULL) {
+			replica->gc = gc_consumer_register(
+				&start_vclock, "replica", &replica->uuid);
 			gc_delay_unref();
+		} else {
+			gc_consumer_update(replica->gc, &start_vclock);
+		}
+		/* Persist consumer before sending data. */
+		gc_consumer_sync(replica->gc);
 	}
 	/*
 	 * Send a response to SUBSCRIBE request, tell

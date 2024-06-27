@@ -124,6 +124,8 @@ enum {
 	BOX_FUNC_INDEX_ID = 372,
 	/** Space id of _session_settings. */
 	BOX_SESSION_SETTINGS_ID = 380,
+	/** Space id of _gc_consumers. */
+	BOX_GC_CONSUMERS_ID = 388,
 	/** End of the reserved range of system spaces. */
 	BOX_SYSTEM_ID_MAX = 511,
 	BOX_ID_NIL = 2147483647
@@ -217,6 +219,13 @@ enum {
 enum {
 	BOX_SCHEMA_FIELD_KEY = 0,
 	BOX_SCHEMA_FIELD_VALUE = 1,
+};
+
+/** _gc_consumers fields. */
+enum {
+	BOX_GC_CONSUMERS_FIELD_UUID = 0,
+	BOX_GC_CONSUMERS_FIELD_VCLOCK = 1,
+	BOX_GC_CONSUMERS_FIELD_OPTS = 2,
 };
 
 /** _cluster fields. */

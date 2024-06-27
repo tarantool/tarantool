@@ -178,6 +178,7 @@ struct errinj {
 	_(ERRINJ_WAL_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_DELAY_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_WAL_FALLOCATE, ERRINJ_INT, {.iparam = 0}) \
+	_(ERRINJ_WAL_GC_PERSIST_FIBER, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_IO, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_IO_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_WAL_ROTATE, ERRINJ_BOOL, {.bparam = false}) \
