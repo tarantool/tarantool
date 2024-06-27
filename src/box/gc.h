@@ -48,6 +48,7 @@ extern "C" {
 
 struct fiber;
 struct gc_consumer;
+struct trigger;
 
 enum { GC_NAME_MAX = 64 };
 
@@ -98,15 +99,15 @@ struct gc_consumer {
 	char object_name[GC_NAME_MAX];
 	/** The vclock tracked by this consumer. */
 	struct vclock vclock;
+	/** Asynchronously advanced vclock. */
+	struct vclock volatile_vclock;
+	/** Reference counter. */
+	uint32_t ref_count;
 	/**
 	 * This flag is set if a WAL needed by this consumer was
 	 * deleted by the WAL thread on ENOSPC.
 	 */
 	bool is_inactive;
-	/**
-	 * Whether consumer does not belong to any object.
-	 */
-	bool is_orphan;
 	/**
 	 * Whether consumer should be persisted by background fiber.
 	 */
@@ -171,6 +172,25 @@ struct gc_state {
 	 * taken at that moment of time.
 	 */
 	int64_t cleanup_completed, cleanup_scheduled;
+	/**
+	 * Fiber that updates persistent WAL GC state
+	 * asynchronously.
+	 */
+	struct fiber *persist_fiber;
+	/**
+	 * Condition variable signaled by the persist fiber
+	 * whenever it completes or fails a round. Used to wait for
+	 * writes to complete.
+	 */
+	struct fiber_cond persist_cond;
+	/**
+	 * The following two members are used for scheduling
+	 * fiber persisting gc consumers. To trigger the fiber,
+	 * @scheduled is incremented. Whenever a round of garbage
+	 * collection completes, @completed is incremented. On
+	 * every failure @failed is incremented.
+	 */
+	uint64_t persist_completed, persist_scheduled, persist_failed;
 	/**
 	 * A counter to wait until all replicas are managed to
 	 * subscribe so that we can enable cleanup fiber to
@@ -379,12 +399,37 @@ gc_consumer_unregister(struct gc_consumer *consumer);
 void
 gc_consumer_update(struct gc_consumer *consumer, const struct vclock *vclock);
 
+int
+gc_consumer_sync(struct gc_consumer *consumer);
+
 static inline void
 gc_consumer_name(struct gc_consumer *consumer, char *buf, size_t size)
 {
 	snprintf(buf, size, "%s %s", consumer->object_name,
 		 tt_uuid_str(&consumer->uuid));
 }
+
+bool
+gc_consumer_is_persistent(void);
+
+int
+gc_create_consumer(const struct tt_uuid *uuid, const char *name);
+
+int
+gc_erase_consumer(const struct tt_uuid *uuid);
+
+/**
+ * The trigger invoked on replace in space _gc_consumers.
+ */
+int
+on_replace_dd_gc_consumers(struct trigger *trigger, void *event);
+
+/**
+ * A callback that should be invoked when the primary index of space
+ * _gc_consumers is created.
+ */
+int
+on_create_dd_gc_consumers_primary_index(void);
 
 /**
  * Iterator over registered consumers. The iterator is valid

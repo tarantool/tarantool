@@ -25,9 +25,11 @@ test_run:cmd("create server replica with rpl_master=default, script='vinyl/repli
 test_run:cmd("start server replica")
 files = test_run:eval("replica", "fio = require('fio') return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*'))")[1]
 _ = box.space.mem:replace{'files', files}
+replica_uuid = test_run:eval("replica", "return box.info.uuid")[1]
 test_run:cmd("stop server replica")
 
 -- Invoke garbage collector on the master.
+_ = box.space._gc_consumers:replace{replica_uuid}
 test_run:cmd("restart server default")
 box.cfg{wal_cleanup_delay = 0}
 checkpoint_count = box.cfg.checkpoint_count
@@ -51,9 +53,11 @@ for _, f in ipairs(files) do ok = ok and not fio.path.exists(f) end
 ok
 files = test_run:eval("replica", "fio = require('fio') return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*'))")[1]
 _ = box.space.mem:replace{'files', files}
+replica_uuid = test_run:eval("replica", "return box.info.uuid")[1]
 test_run:cmd("stop server replica")
 
 -- Invoke garbage collector on the master.
+_ = box.space._gc_consumers:replace{replica_uuid}
 test_run:cmd("restart server default")
 box.cfg{wal_cleanup_delay = 0}
 checkpoint_count = box.cfg.checkpoint_count

@@ -4422,6 +4422,11 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
 		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+
+	/* Persist consumer after registration. */
+	if (gc_consumer_sync(gc) != 0)
+		diag_raise();
+
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
 	vclock_copy(&stop_vclock, &replicaset.vclock);
@@ -4578,6 +4583,10 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
 		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+	
+	/* Persisting consumer after registration. */
+	if (gc_consumer_sync(gc) != 0)
+		diag_raise();
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -4728,6 +4737,8 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		} else {
 			gc_consumer_update(replica->gc, &start_vclock);
 		}
+		/* Persist consumer before sending data. */
+		gc_consumer_sync(replica->gc);
 	}
 	/*
 	 * Send a response to SUBSCRIBE request, tell

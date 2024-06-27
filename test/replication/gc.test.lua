@@ -102,6 +102,7 @@ test_run:cmd("switch default")
 
 -- Now garbage collection should resume and delete files left
 -- from the old checkpoint.
+box.snapshot()
 wait_gc(1) or log.error(box.info.gc())
 wait_xlog(0) or log.error(fio.listdir('./master'))
 --
