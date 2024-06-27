@@ -1176,6 +1176,16 @@ struct on_rollback_trigger_with_data {
 static int
 memtx_build_on_replace(struct trigger *trigger, void *event)
 {
+	/*
+	 * If MVCC is enabled, all concurrent writes that we haven't read
+	 * will be conflicted, so simply do nothing here.
+	 * Moreover, concurrent transaction can be rolled back much later
+	 * than the index will be built so the memtx_ddl_state will be
+	 * invalid (it is allocated on stack in memtx_build_index).
+	 */
+	if (memtx_tx_manager_use_mvcc_engine)
+		return 0;
+
 	struct txn *txn = event;
 	struct memtx_ddl_state *state = trigger->data;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -1429,7 +1439,7 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 /**
  * Copy memory usage statistics to the newly altered space from the old space.
  * In case of DropIndex or TruncateIndex alter operations, the new space will be
- * empty, and tuple statistics must not be copied.
+ * empty, and tuple statistics must not be copied. Also notify MVCC about alter.
  */
 static void
 memtx_space_finish_alter(struct space *old_space, struct space *new_space)
@@ -1445,6 +1455,8 @@ memtx_space_finish_alter(struct space *old_space, struct space *new_space)
 		new_memtx_space->tuple_stat[TUPLE_ARENA_MALLOC] =
 			old_memtx_space->tuple_stat[TUPLE_ARENA_MALLOC];
 	}
+	if (!space_is_system(old_space))
+		memtx_tx_on_space_delete(old_space);
 }
 
 /* }}} DDL */
