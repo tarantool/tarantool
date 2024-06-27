@@ -62,6 +62,7 @@
 #include "node_name.h"
 #include "core/func_adapter.h"
 #include "relay.h"
+#include "gc.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -4352,6 +4353,18 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 				return -1;
 		}
 		data->fiber = fiber;
+		/*
+		 * When upgrading to 3.3.0, new local space _gc_consumers
+		 * is created on each replica and we need to fill it with
+		 * consumers of already connected replicas since they won't
+		 * be inserted to the space automatically.
+		 * We cannot do it in `box.schema.upgrade` procedure since
+		 * it's called on master and the space is created on each
+		 * replica.
+		 */
+		if (version == version_id(3, 3, 0) &&
+		    gc_persist_consumers() != 0)
+			return -1;
 	} else if (strcmp(key, "bootstrap_leader_uuid") == 0) {
 		struct tt_uuid *uuid = xregion_alloc_object(&txn->region,
 							    typeof(*uuid));
@@ -4638,6 +4651,14 @@ on_replace_dd_cluster_update(const struct replica_def *old_def,
 				 "own UUID update in _cluster");
 			return -1;
 		}
+		/*
+		 * Drop gc_consumer for the replaced replica.
+		 * See `on_replace_dd_cluster_delete` for explanation why we
+		 * don't drop consumer on recovery.
+		 */
+		if (recovery_state == FINISHED_RECOVERY &&
+		    gc_erase_consumer(&replica->uuid) != 0)
+			return -1;
 		if (on_replace_dd_cluster_set_uuid(replica, new_def) != 0)
 			return -1;
 		/* The replica was re-created. */
@@ -4734,6 +4755,16 @@ on_replace_dd_cluster_delete(const struct replica_def *old_def)
 		      "internally - %s", old_def->id,
 		      tt_uuid_str(&old_def->uuid), tt_uuid_str(&replica->uuid));
 	}
+	/*
+	 * Unregister gc consumer of the replica. No-op on recovery because
+	 * it's not safe to write to space during recovery and we don't need it
+	 * anyway: consumer either was already deleted if it's local recovery or
+	 * wasn't created at all if it's remote recovery since persistent
+	 * consumers are local.
+	 */
+	if (recovery_state == FINISHED_RECOVERY &&
+	    gc_erase_consumer(&replica->uuid) != 0)
+		return -1;
 	/*
 	 * Unregister only after commit. Otherwise if the transaction would be
 	 * rolled back, there might be already another replica taken the freed

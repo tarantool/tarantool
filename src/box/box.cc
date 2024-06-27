@@ -4476,6 +4476,11 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
 		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+
+	/* Persist consumer after registration. */
+	if (gc_consumer_persist(gc) != 0)
+		diag_raise();
+
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
 	vclock_copy(&stop_vclock, instance_vclock);
@@ -4638,6 +4643,10 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	if (replica == NULL)
 		tnt_raise(ClientError, ER_CANNOT_REGISTER);
 
+	/* Persist consumer after registration. */
+	if (gc_consumer_persist(gc) != 0)
+		diag_raise();
+
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
 	vclock_copy(&stop_vclock, instance_vclock);
@@ -4783,15 +4792,13 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * the correct vclock.
 	 */
 	if (!replica->anon) {
-		bool had_gc = false;
-		if (replica->gc != NULL) {
+		if (replica->gc != NULL)
 			gc_consumer_unregister(replica->gc);
-			had_gc = true;
-		}
 		replica->gc = gc_consumer_register(
 			&start_vclock, GC_CONSUMER_REPLICA, &replica->uuid);
-		if (!had_gc)
-			gc_delay_unref();
+		/* Persist consumer before sending data. */
+		if (gc_consumer_persist(replica->gc) != 0)
+			diag_raise();
 	}
 	/*
 	 * Send a response to SUBSCRIBE request, tell
@@ -5656,6 +5663,12 @@ box_cfg_xc(void)
 	 * value where local restore has already completed
 	 */
 	vclock_copy(&replicaset.applier.vclock, instance_vclock);
+
+	/*
+	 * Load persistent WAL GC consumers.
+	 */
+	if (gc_load_consumers() != 0)
+		diag_raise();
 
 	/*
 	 * Exclude self from GC delay because we care
