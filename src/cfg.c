@@ -77,6 +77,16 @@ cfg_isnumber(const char *param)
 }
 
 bool
+cfg_isnull(const char *param)
+{
+	cfg_get(param);
+	bool ret = !!luaL_iscdata(tarantool_L, -1) &&
+		(*(void **)luaL_tocpointer(tarantool_L, -1, NULL) == NULL);
+	lua_pop(tarantool_L, 1);
+	return ret;
+}
+
+bool
 cfg_getb(const char *param)
 {
 	cfg_get(param);
