@@ -23,7 +23,9 @@ g.test_box_internal_schema_version_deprecation = function(cg)
     local deprecation_warning =
         'box.internal.schema_version will be removed, please use box.info.schema_version instead'
     t.assert_is_not(cg.server:grep_log(deprecation_warning, 256), nil)
-    local log_file = g.server:exec(function() return box.cfg.log end)
+    local log_file = g.server:exec(function()
+        return rawget(_G, 'box_cfg_log_file') or box.cfg.log
+    end)
     fio.truncate(log_file)
     cg.server:exec(function()
         box.internal.schema_version()
