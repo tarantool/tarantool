@@ -294,11 +294,6 @@ struct replicaset {
 	 * to connect and those that failed to connect.
 	 */
 	struct rlist anon;
-	/**
-	 * This flag is set while the instance is bootstrapping
-	 * from a remote master.
-	 */
-	bool is_joining;
 	/* A number of anonymous replicas following this instance. */
 	int anon_count;
 	/**
