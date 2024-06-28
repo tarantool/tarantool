@@ -299,11 +299,6 @@ struct replicaset {
 	 * of the cluster as maintained by appliers.
 	 */
 	struct vclock vclock;
-	/**
-	 * This flag is set while the instance is bootstrapping
-	 * from a remote master.
-	 */
-	bool is_joining;
 	/* A number of anonymous replicas following this instance. */
 	int anon_count;
 	/**
