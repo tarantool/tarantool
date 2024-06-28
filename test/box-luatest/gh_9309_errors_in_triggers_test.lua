@@ -95,7 +95,9 @@ g.test_ctl_triggers_error = function()
         box.ctl.on_shutdown(function() error("on_shutdown error") end, nil)
     end)
 
-    local server_log_path = g.server:exec(function() return box.cfg.log end)
+    local server_log_path = g.server:exec(function()
+        return rawget(_G, 'box_cfg_log_file') or box.cfg.log
+    end)
     g.server:drop()
     t.assert(g.server:grep_log("on_shutdown error", nil,
         {filename = server_log_path}))
