@@ -417,7 +417,6 @@ replica_clear_id(struct replica *replica)
 	--replicaset.registered_count;
 	gc_delay_unref();
 	if (replica->id == instance_id) {
-		assert(replicaset.is_joining);
 		instance_id = REPLICA_ID_NIL;
 		box_broadcast_id();
 	} else {
@@ -667,12 +666,6 @@ replica_on_applier_state_f(struct trigger *trigger, void *event)
 			struct replica, on_applier_state);
 	replica_update_applier_health(replica);
 	switch (replica->applier->state) {
-	case APPLIER_WAIT_SNAPSHOT:
-		replicaset.is_joining = true;
-		break;
-	case APPLIER_JOINED:
-		replicaset.is_joining = false;
-		break;
 	case APPLIER_CONNECTED:
 		try {
 			if (tt_uuid_is_nil(&replica->uuid))

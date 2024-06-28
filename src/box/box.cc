@@ -4664,8 +4664,16 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	/* Check replica uuid */
 	struct replica *replica = replica_by_uuid(&req.instance_uuid);
 
-	if (!req.is_anon &&
-	    (replica == NULL || replica->id == REPLICA_ID_NIL)) {
+	if (req.is_anon && replica != NULL) {
+		if (replica->id != REPLICA_ID_NIL)
+			tnt_raise(ClientError, ER_PROTOCOL, "Can't subscribe "
+				  "an anonymous replica having an ID assigned");
+		if (!replica->anon)
+			tnt_raise(ClientError, ER_PROTOCOL, "Can't subscribe "
+				  "a previously deleted non-anonymous replica "
+				  "as an anonymous replica");
+	} else if (!req.is_anon &&
+		   (replica == NULL || replica->id == REPLICA_ID_NIL)) {
 		/*
 		 * The instance is not anonymous, and is registered (at least it
 		 * claims so), but its ID is not delivered to the current
@@ -4679,10 +4687,6 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		 */
 		tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
 			  tt_uuid_str(&req.instance_uuid));
-	}
-	if (req.is_anon && replica != NULL && replica->id != REPLICA_ID_NIL) {
-		tnt_raise(ClientError, ER_PROTOCOL, "Can't subscribe an "
-			  "anonymous replica having an ID assigned");
 	}
 	/*
 	 * Replica name mismatch is not considered a critical error. It can
