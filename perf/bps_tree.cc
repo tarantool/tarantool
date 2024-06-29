@@ -84,33 +84,6 @@
 #undef bps_tree_key_t
 #undef BPS_INNER_CARD
 
-/* Tree with inner block cardinalities and child cardinalities. */
-
-#define BPS_INNER_CHILD_CARDS
-#define BPS_INNER_CARD
-#define treebo_i64_EXTENT_SIZE 8192
-#define treebo_i64_elem_t int64_t
-#define treebo_i64_key_t int64_t
-#define BPS_TREE_NAME treebo_i64_t
-#define BPS_TREE_BLOCK_SIZE 512
-#define BPS_TREE_EXTENT_SIZE treebo_i64_EXTENT_SIZE
-#define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
-#define BPS_TREE_COMPARE(a, b, arg) ((a) - (b))
-#define BPS_TREE_COMPARE_KEY(a, b, arg) ((a) - (b))
-#define bps_tree_elem_t treebo_i64_elem_t
-#define bps_tree_key_t treebo_i64_key_t
-#include "salad/bps_tree.h"
-#undef BPS_TREE_NAME
-#undef BPS_TREE_BLOCK_SIZE
-#undef BPS_TREE_EXTENT_SIZE
-#undef BPS_TREE_IS_IDENTICAL
-#undef BPS_TREE_COMPARE
-#undef BPS_TREE_COMPARE_KEY
-#undef bps_tree_elem_t
-#undef bps_tree_key_t
-#undef BPS_INNER_CARD
-#undef BPS_INNER_CHILD_CARDS
-
 /**
  * Generate the benchmark variations required.
  */
@@ -141,8 +114,7 @@
 #define generate_benchmarks(generator, func, arg) \
 	generator(tree_i64, func, arg); \
 	generator(treecc_i64, func, arg); \
-	generator(treeic_i64, func, arg); \
-	generator(treebo_i64, func, arg)
+	generator(treeic_i64, func, arg)
 
 /* Create size-based benchmarks for all trees. */
 #define generate_benchmarks_size(func, size) \
@@ -250,7 +222,6 @@ public: \
 CREATE_TREE_CLASS(tree_i64);
 CREATE_TREE_CLASS(treecc_i64);
 CREATE_TREE_CLASS(treeic_i64);
-CREATE_TREE_CLASS(treebo_i64);
 
 /**
  * Value generators to make key-independent benchmarks.
