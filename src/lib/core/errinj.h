@@ -141,6 +141,7 @@ struct errinj {
 	_(ERRINJ_SWIM_FD_ONLY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TESTING, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TUPLE_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_TUPLE_ALLOC_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_TUPLE_FIELD, ERRINJ_BOOL, {.bparam = false}) \
         _(ERRINJ_TUPLE_FIELD_COUNT_LIMIT, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_TUPLE_FORMAT_COUNT, ERRINJ_INT, {.iparam = -1}) \

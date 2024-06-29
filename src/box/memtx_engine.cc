@@ -1841,6 +1841,10 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
 		goto end;
 	});
+	ERROR_INJECT_COUNTDOWN(ERRINJ_TUPLE_ALLOC_COUNTDOWN, {
+		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
+		goto end;
+	});
 	if (unlikely(total > memtx->max_tuple_size)) {
 		diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE, total,
 			 memtx->max_tuple_size);
