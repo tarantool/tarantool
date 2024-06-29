@@ -1302,6 +1302,12 @@ txn_limbo_filter_disable(struct txn_limbo *limbo)
 	latch_unlock(&limbo->promote_latch);
 }
 
+bool
+txn_limbo_has_owner(struct txn_limbo *limbo)
+{
+	return limbo->owner_id != REPLICA_ID_NIL;
+}
+
 void
 txn_limbo_init(void)
 {

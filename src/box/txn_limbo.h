@@ -474,6 +474,10 @@ txn_limbo_fence(struct txn_limbo *limbo);
 void
 txn_limbo_unfence(struct txn_limbo *limbo);
 
+/** Return whether limbo has an owner. */
+bool
+txn_limbo_has_owner(struct txn_limbo *limbo);
+
 /**
  * Initialize qsync engine.
  */
