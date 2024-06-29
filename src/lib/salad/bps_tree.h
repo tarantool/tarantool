@@ -449,24 +449,16 @@ typedef int64_t bps_tree_block_card_t;
 #define bps_tree_upper_bound_elem_impl _bps_tree(upper_bound_elem)
 #define bps_tree_upper_bound_elem _api_name(upper_bound_elem)
 #define bps_tree_view_upper_bound_elem _api_name(view_upper_bound_elem)
-#define bps_tree_lower_bound_get_offset_impl \
-	_api_name(lower_bound_get_offset_impl)
 #define bps_tree_lower_bound_get_offset _api_name(lower_bound_get_offset)
 #define bps_tree_view_lower_bound_get_offset  \
 	_api_name(view_lower_bound_get_offset)
-#define bps_tree_lower_bound_elem_get_offset_impl \
-	_api_name(lower_bound_elem_get_offset_impl)
 #define bps_tree_lower_bound_elem_get_offset \
 	_api_name(lower_bound_elem_get_offset)
 #define bps_tree_view_lower_bound_elem_get_offset  \
 	_api_name(view_lower_bound_elem_get_offset)
-#define bps_tree_upper_bound_get_offset_impl \
-	_api_name(upper_bound_get_offset_impl)
 #define bps_tree_upper_bound_get_offset _api_name(upper_bound_get_offset)
 #define bps_tree_view_upper_bound_get_offset  \
 	_api_name(view_upper_bound_get_offset)
-#define bps_tree_upper_bound_elem_get_offset_impl \
-	_api_name(upper_bound_elem_get_offset_impl)
 #define bps_tree_upper_bound_elem_get_offset \
 	_api_name(upper_bound_elem_get_offset)
 #define bps_tree_view_upper_bound_elem_get_offset  \
@@ -1082,7 +1074,7 @@ bps_tree_view_upper_bound_elem(const struct bps_tree_view *view,
 /**
  * @brief Same as bps_tree_lower_bound, but with additional argument.
  * @param[out] offset - offset to the element the iterator is pointing to,
- *                      untouched if the tree is empty.
+ *  0 if the tree is empty.
  */
 static inline struct bps_tree_iterator
 bps_tree_lower_bound_get_offset(const struct bps_tree *tree, bps_tree_key_t key,
@@ -1091,7 +1083,7 @@ bps_tree_lower_bound_get_offset(const struct bps_tree *tree, bps_tree_key_t key,
 /**
  * @brief Same as bps_tree_view_lower_bound, but with additional argument.
  * @param[out] offset - offset to the element the iterator is pointing to,
- *                      untouched if the tree is empty.
+ *  0 if the tree is empty.
  */
 static inline struct bps_tree_iterator
 bps_tree_view_lower_bound_get_offset(const struct bps_tree_view *view,
@@ -1101,7 +1093,7 @@ bps_tree_view_lower_bound_get_offset(const struct bps_tree_view *view,
 /**
  * @brief Same as bps_tree_upper_bound, but with additional argument.
  * @param[out] offset - offset to the element the iterator is pointing to,
- *                      untouched if the tree is empty.
+ *  0 if the tree is empty.
  */
 static inline struct bps_tree_iterator
 bps_tree_upper_bound_get_offset(const struct bps_tree *tree, bps_tree_key_t key,
@@ -1110,7 +1102,7 @@ bps_tree_upper_bound_get_offset(const struct bps_tree *tree, bps_tree_key_t key,
 /**
  * @brief Same as bps_tree_view_upper_bound, but with additional argument.
  * @param[out] offset - offset to the element the iterator is pointing to,
- *                      untouched if the tree is empty.
+ *  0 if the tree is empty.
  */
 static inline struct bps_tree_iterator
 bps_tree_view_upper_bound_get_offset(const struct bps_tree_view *view,
@@ -1120,7 +1112,7 @@ bps_tree_view_upper_bound_get_offset(const struct bps_tree_view *view,
 /**
  * @brief Same as bps_tree_lower_bound_elem, but with additional argument.
  * @param[out] offset - offset to the element the iterator is pointing to,
- *                      untouched if the tree is empty.
+ *  0 if the tree is empty.
  */
 static inline struct bps_tree_iterator
 bps_tree_lower_bound_elem_get_offset(const struct bps_tree *tree,
@@ -1130,7 +1122,7 @@ bps_tree_lower_bound_elem_get_offset(const struct bps_tree *tree,
 /**
  * @brief Same as bps_tree_view_lower_bound_elem, but with additional argument.
  * @param[out] offset - offset to the element the iterator is pointing to,
- *                          untouched if the tree is empty.
+ *  0 if the tree is empty.
  */
 static inline struct bps_tree_iterator
 bps_tree_view_lower_bound_elem_get_offset(const struct bps_tree_view *view,
@@ -1140,7 +1132,7 @@ bps_tree_view_lower_bound_elem_get_offset(const struct bps_tree_view *view,
 /**
  * @brief Same as bps_tree_upper_bound_elem, but with additional argument.
  * @param[out] offset - offset to the element the iterator is pointing to,
- *                      untouched if the tree is empty.
+ *  0 if the tree is empty.
  */
 static inline struct bps_tree_iterator
 bps_tree_upper_bound_elem_get_offset(const struct bps_tree *tree,
@@ -1150,7 +1142,7 @@ bps_tree_upper_bound_elem_get_offset(const struct bps_tree *tree,
 /**
  * @brief Same as bps_tree_view_upper_bound_elem, but with additional argument.
  * @param[out] offset - offset to the element the iterator is pointing to,
- *                      untouched if the tree is empty.
+ *  0 if the tree is empty.
  */
 static inline struct bps_tree_iterator
 bps_tree_view_upper_bound_elem_get_offset(const struct bps_tree_view *view,
@@ -2412,12 +2404,17 @@ bps_tree_view_last(const struct bps_tree_view *view)
  * @param exact - pointer to a bool value, that will be set to true if
  *  and element pointed by the iterator is equal to the key, false otherwise
  *  Pass NULL if you don't need that info.
+ * @param[out] offset - optional pointer to offset to the element the
+ *  iterator is pointing to, 0 if the tree is empty.
  * @return - Lower-bound iterator. Invalid if all elements are less than key.
  */
-static inline struct bps_tree_iterator
+static ALWAYS_INLINE struct bps_tree_iterator
 bps_tree_lower_bound_impl(const struct bps_tree_common *tree,
-			  bps_tree_key_t key, bool *exact)
+			  bps_tree_key_t key, bool *exact, size_t *offset)
 {
+	if (offset != NULL)
+		*offset = 0;
+
 	struct bps_tree_iterator res;
 	bool local_result;
 	if (!exact)
@@ -2438,6 +2435,13 @@ bps_tree_lower_bound_impl(const struct bps_tree_common *tree,
 						  key, exact);
 		block_id = inner->child_ids[pos];
 		block = bps_tree_restore_block(tree, block_id);
+
+#if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
+		if (offset != NULL) {
+			*offset += bps_tree_get_first_children_card(
+				tree, inner, pos);
+		}
+#endif
 	}
 
 	struct bps_leaf *leaf = (struct bps_leaf *)block;
@@ -2451,6 +2455,10 @@ bps_tree_lower_bound_impl(const struct bps_tree_common *tree,
 		res.block_id = block_id;
 		res.pos = pos;
 	}
+
+	if (offset != NULL)
+		*offset += pos;
+
 	return res;
 }
 
@@ -2458,14 +2466,14 @@ static inline struct bps_tree_iterator
 bps_tree_lower_bound(const struct bps_tree *tree, bps_tree_key_t key,
 		     bool *exact)
 {
-	return bps_tree_lower_bound_impl(&tree->common, key, exact);
+	return bps_tree_lower_bound_impl(&tree->common, key, exact, NULL);
 }
 
 static inline struct bps_tree_iterator
 bps_tree_view_lower_bound(const struct bps_tree_view *view, bps_tree_key_t key,
 			  bool *exact)
 {
-	return bps_tree_lower_bound_impl(&view->common, key, exact);
+	return bps_tree_lower_bound_impl(&view->common, key, exact, NULL);
 }
 
 /**
@@ -2475,13 +2483,18 @@ bps_tree_view_lower_bound(const struct bps_tree_view *view, bps_tree_key_t key,
  * @param exact - pointer to a bool value, that will be set to true if
  *  and element pointed by the (!)previous iterator is equal to the key,
  *  false otherwise. Pass NULL if you don't need that info.
+ * @param[out] offset - optional pointer to offset to the element the
+ *  iterator is pointing to, 0 if the tree is empty.
  * @return - Upper-bound iterator. Invalid if all elements are less or equal
  *  than the key.
  */
-static inline struct bps_tree_iterator
+static ALWAYS_INLINE struct bps_tree_iterator
 bps_tree_upper_bound_impl(const struct bps_tree_common *tree,
-			  bps_tree_key_t key, bool *exact)
+			  bps_tree_key_t key, bool *exact, size_t *offset)
 {
+	if (offset != NULL)
+		*offset = 0;
+
 	struct bps_tree_iterator res;
 	bool local_result;
 	if (!exact)
@@ -2505,6 +2518,13 @@ bps_tree_upper_bound_impl(const struct bps_tree_common *tree,
 			*exact = true;
 		block_id = inner->child_ids[pos];
 		block = bps_tree_restore_block(tree, block_id);
+
+#if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
+		if (offset != NULL) {
+			*offset += bps_tree_get_first_children_card(
+				tree, inner, pos);
+		}
+#endif
 	}
 
 	struct bps_leaf *leaf = (struct bps_leaf *)block;
@@ -2521,6 +2541,10 @@ bps_tree_upper_bound_impl(const struct bps_tree_common *tree,
 		res.block_id = block_id;
 		res.pos = pos;
 	}
+
+	if (offset != NULL)
+		*offset += pos;
+
 	return res;
 }
 
@@ -2528,14 +2552,14 @@ static inline struct bps_tree_iterator
 bps_tree_upper_bound(const struct bps_tree *tree, bps_tree_key_t key,
 		     bool *exact)
 {
-	return bps_tree_upper_bound_impl(&tree->common, key, exact);
+	return bps_tree_upper_bound_impl(&tree->common, key, exact, NULL);
 }
 
 static inline struct bps_tree_iterator
 bps_tree_view_upper_bound(const struct bps_tree_view *view, bps_tree_key_t key,
 			  bool *exact)
 {
-	return bps_tree_upper_bound_impl(&view->common, key, exact);
+	return bps_tree_upper_bound_impl(&view->common, key, exact, NULL);
 }
 
 /**
@@ -2546,12 +2570,17 @@ bps_tree_view_upper_bound(const struct bps_tree_view *view, bps_tree_key_t key,
  * @param exact - pointer to a bool value, that will be set to true if
  *  and element pointed by the iterator is equal to the key, false otherwise
  *  Pass NULL if you don't need that info.
+ * @param[out] offset - optional pointer to offset to the element the
+ *  iterator is pointing to, 0 if the tree is empty.
  * @return - Lower-bound iterator. Invalid if all elements are less than key.
  */
-static inline struct bps_tree_iterator
+static ALWAYS_INLINE struct bps_tree_iterator
 bps_tree_lower_bound_elem_impl(const struct bps_tree_common *tree,
-			       bps_tree_elem_t key, bool *exact)
+			       bps_tree_elem_t key, bool *exact, size_t *offset)
 {
+	if (offset != NULL)
+		*offset = 0;
+
 	struct bps_tree_iterator res;
 	bool local_result;
 	if (!exact)
@@ -2572,6 +2601,13 @@ bps_tree_lower_bound_elem_impl(const struct bps_tree_common *tree,
 						   key, exact);
 		block_id = inner->child_ids[pos];
 		block = bps_tree_restore_block(tree, block_id);
+
+#if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
+		if (offset != NULL) {
+			*offset += bps_tree_get_first_children_card(
+				tree, inner, pos);
+		}
+#endif
 	}
 
 	struct bps_leaf *leaf = (struct bps_leaf *)block;
@@ -2585,6 +2621,10 @@ bps_tree_lower_bound_elem_impl(const struct bps_tree_common *tree,
 		res.block_id = block_id;
 		res.pos = pos;
 	}
+
+	if (offset != NULL)
+		*offset += pos;
+
 	return res;
 }
 
@@ -2592,14 +2632,14 @@ static inline struct bps_tree_iterator
 bps_tree_lower_bound_elem(const struct bps_tree *tree, bps_tree_elem_t key,
 			  bool *exact)
 {
-	return bps_tree_lower_bound_elem_impl(&tree->common, key, exact);
+	return bps_tree_lower_bound_elem_impl(&tree->common, key, exact, NULL);
 }
 
 static inline struct bps_tree_iterator
 bps_tree_view_lower_bound_elem(const struct bps_tree_view *view,
 			       bps_tree_elem_t key, bool *exact)
 {
-	return bps_tree_lower_bound_elem_impl(&view->common, key, exact);
+	return bps_tree_lower_bound_elem_impl(&view->common, key, exact, NULL);
 }
 
 /**
@@ -2610,13 +2650,18 @@ bps_tree_view_lower_bound_elem(const struct bps_tree_view *view,
  * @param exact - pointer to a bool value, that will be set to true if
  *  and element pointed by the (!)previous iterator is equal to the key,
  *  false otherwise. Pass NULL if you don't need that info.
+ * @param[out] offset - optional pointer to offset to the element the
+ *  iterator is pointing to, 0 if the tree is empty.
  * @return - Upper-bound iterator. Invalid if all elements are less or equal
  *  than the key.
  */
-static inline struct bps_tree_iterator
+static ALWAYS_INLINE struct bps_tree_iterator
 bps_tree_upper_bound_elem_impl(const struct bps_tree_common *tree,
-			       bps_tree_elem_t key, bool *exact)
+			       bps_tree_elem_t key, bool *exact, size_t *offset)
 {
+	if (offset != NULL)
+		*offset = 0;
+
 	struct bps_tree_iterator res;
 	bool local_result;
 	if (!exact)
@@ -2640,6 +2685,13 @@ bps_tree_upper_bound_elem_impl(const struct bps_tree_common *tree,
 			*exact = true;
 		block_id = inner->child_ids[pos];
 		block = bps_tree_restore_block(tree, block_id);
+
+#if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
+		if (offset != NULL) {
+			*offset += bps_tree_get_first_children_card(
+				tree, inner, pos);
+		}
+#endif
 	}
 
 	struct bps_leaf *leaf = (struct bps_leaf *)block;
@@ -2656,6 +2708,10 @@ bps_tree_upper_bound_elem_impl(const struct bps_tree_common *tree,
 		res.block_id = block_id;
 		res.pos = pos;
 	}
+
+	if (offset != NULL)
+		*offset += pos;
+
 	return res;
 }
 
@@ -2663,74 +2719,23 @@ static inline struct bps_tree_iterator
 bps_tree_upper_bound_elem(const struct bps_tree *tree, bps_tree_elem_t key,
 			  bool *exact)
 {
-	return bps_tree_upper_bound_elem_impl(&tree->common, key, exact);
+	return bps_tree_upper_bound_elem_impl(&tree->common, key, exact, NULL);
 }
 
 static inline struct bps_tree_iterator
 bps_tree_view_upper_bound_elem(const struct bps_tree_view *view,
 			       bps_tree_elem_t key, bool *exact)
 {
-	return bps_tree_upper_bound_elem_impl(&view->common, key, exact);
+	return bps_tree_upper_bound_elem_impl(&view->common, key, exact, NULL);
 }
 
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
-
-/**
- * @brief Same as bps_tree_lower_bound_impl, but with additional argument.
- * @param[out] offset_arg - offset to the element the iterator is pointing to,
- *                          untouched if the tree is empty.
- */
-static inline struct bps_tree_iterator
-bps_tree_lower_bound_get_offset_impl(const struct bps_tree_common *tree,
-				     bps_tree_key_t key, bool *exact,
-				     size_t *offset_arg)
-{
-	struct bps_tree_iterator res;
-	size_t offset = 0;
-	bool local_result;
-	if (!exact)
-		exact = &local_result;
-	*exact = false;
-	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
-		res.block_id = (bps_tree_block_id_t)(-1);
-		res.pos = 0;
-		*offset_arg = 0;
-		return res;
-	}
-	struct bps_block *block = bps_tree_root(tree);
-	bps_tree_block_id_t block_id = tree->root_id;
-	for (bps_tree_block_id_t i = 0; i < tree->depth - 1; i++) {
-		struct bps_inner *inner = (struct bps_inner *)block;
-		bps_tree_pos_t pos = bps_tree_find_ins_point_key(
-			tree, inner->elems, inner->header.size - 1, key, exact);
-		offset += bps_tree_get_first_children_card(tree, inner, pos);
-		block_id = inner->child_ids[pos];
-		block = bps_tree_restore_block(tree, block_id);
-	}
-
-	struct bps_leaf *leaf = (struct bps_leaf *)block;
-	bps_tree_pos_t pos;
-	pos = bps_tree_find_ins_point_key(tree, leaf->elems, leaf->header.size,
-					  key, exact);
-	if (pos >= leaf->header.size) {
-		res.block_id = leaf->next_id;
-		res.pos = 0;
-		offset += leaf->header.size;
-	} else {
-		res.block_id = block_id;
-		res.pos = pos;
-		offset += pos;
-	}
-	*offset_arg = offset;
-	return res;
-}
 
 static inline struct bps_tree_iterator
 bps_tree_lower_bound_get_offset(const struct bps_tree *tree, bps_tree_key_t key,
 				bool *exact, size_t *offset)
 {
-	return bps_tree_lower_bound_get_offset_impl(&tree->common, key,
-						    exact, offset);
+	return bps_tree_lower_bound_impl(&tree->common, key, exact, offset);
 }
 
 static inline struct bps_tree_iterator
@@ -2738,74 +2743,14 @@ bps_tree_view_lower_bound_get_offset(const struct bps_tree_view *view,
 				     bps_tree_key_t key, bool *exact,
 				     size_t *offset)
 {
-	return bps_tree_lower_bound_get_offset_impl(&view->common, key,
-						    exact, offset);
-}
-
-/**
- * @brief Same as bps_tree_upper_bound_impl, but with additional argument.
- * @param[out] offset_arg - offset to the element the iterator is pointing to,
- *                          untouched if the tree is empty.
- */
-static inline struct bps_tree_iterator
-bps_tree_upper_bound_get_offset_impl(const struct bps_tree_common *tree,
-				     bps_tree_key_t key, bool *exact,
-				     size_t *offset_arg)
-{
-	struct bps_tree_iterator res;
-	size_t offset = 0;
-	bool local_result;
-	if (!exact)
-		exact = &local_result;
-	*exact = false;
-	bool exact_test;
-	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
-		res.block_id = (bps_tree_block_id_t)(-1);
-		res.pos = 0;
-		*offset_arg = 0;
-		return res;
-	}
-	struct bps_block *block = bps_tree_root(tree);
-	bps_tree_block_id_t block_id = tree->root_id;
-	for (bps_tree_block_id_t i = 0; i < tree->depth - 1; i++) {
-		struct bps_inner *inner = (struct bps_inner *)block;
-		bps_tree_pos_t pos;
-		pos = bps_tree_find_after_ins_point_key(tree, inner->elems,
-							inner->header.size - 1,
-							key, &exact_test);
-		if (exact_test)
-			*exact = true;
-		offset += bps_tree_get_first_children_card(tree, inner, pos);
-		block_id = inner->child_ids[pos];
-		block = bps_tree_restore_block(tree, block_id);
-	}
-
-	struct bps_leaf *leaf = (struct bps_leaf *)block;
-	bps_tree_pos_t pos;
-	pos = bps_tree_find_after_ins_point_key(tree, leaf->elems,
-						leaf->header.size,
-						key, &exact_test);
-	if (exact_test)
-		*exact = true;
-	if (pos >= leaf->header.size) {
-		res.block_id = leaf->next_id;
-		res.pos = 0;
-		offset += leaf->header.size;
-	} else {
-		res.block_id = block_id;
-		res.pos = pos;
-		offset += pos;
-	}
-	*offset_arg = offset;
-	return res;
+	return bps_tree_lower_bound_impl(&view->common, key, exact, offset);
 }
 
 static inline struct bps_tree_iterator
 bps_tree_upper_bound_get_offset(const struct bps_tree *tree, bps_tree_key_t key,
 				bool *exact, size_t *offset)
 {
-	return bps_tree_upper_bound_get_offset_impl(&tree->common, key,
-						    exact, offset);
+	return bps_tree_upper_bound_impl(&tree->common, key, exact, offset);
 }
 
 static inline struct bps_tree_iterator
@@ -2813,60 +2758,7 @@ bps_tree_view_upper_bound_get_offset(const struct bps_tree_view *view,
 				     bps_tree_key_t key, bool *exact,
 				     size_t *offset)
 {
-	return bps_tree_upper_bound_get_offset_impl(&view->common, key,
-						    exact, offset);
-}
-
-/**
- * @brief Same as bps_tree_upper_bound_elem_impl, but with additional argument.
- * @param[out] offset_arg - offset to the element the iterator is pointing to,
- *                          untouched if the tree is empty.
- */
-static inline struct bps_tree_iterator
-bps_tree_lower_bound_elem_get_offset_impl(const struct bps_tree_common *tree,
-					  bps_tree_elem_t key, bool *exact,
-					  size_t *offset_arg)
-{
-	struct bps_tree_iterator res;
-	size_t offset = 0;
-	bool local_result;
-	if (!exact)
-		exact = &local_result;
-	*exact = false;
-	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
-		res.block_id = (bps_tree_block_id_t)(-1);
-		res.pos = 0;
-		*offset_arg = 0;
-		return res;
-	}
-	struct bps_block *block = bps_tree_root(tree);
-	bps_tree_block_id_t block_id = tree->root_id;
-	for (bps_tree_block_id_t i = 0; i < tree->depth - 1; i++) {
-		struct bps_inner *inner = (struct bps_inner *)block;
-		bps_tree_pos_t pos;
-		pos = bps_tree_find_ins_point_elem(tree, inner->elems,
-						   inner->header.size - 1,
-						   key, exact);
-		offset += bps_tree_get_first_children_card(tree, inner, pos);
-		block_id = inner->child_ids[pos];
-		block = bps_tree_restore_block(tree, block_id);
-	}
-
-	struct bps_leaf *leaf = (struct bps_leaf *)block;
-	bps_tree_pos_t pos;
-	pos = bps_tree_find_ins_point_elem(tree, leaf->elems, leaf->header.size,
-					   key, exact);
-	if (pos >= leaf->header.size) {
-		res.block_id = leaf->next_id;
-		res.pos = 0;
-		offset += leaf->header.size;
-	} else {
-		res.block_id = block_id;
-		res.pos = pos;
-		offset += pos;
-	}
-	*offset_arg = offset;
-	return res;
+	return bps_tree_upper_bound_impl(&view->common, key, exact, offset);
 }
 
 static inline struct bps_tree_iterator
@@ -2874,8 +2766,8 @@ bps_tree_lower_bound_elem_get_offset(const struct bps_tree *tree,
 				     bps_tree_elem_t key, bool *exact,
 				     size_t *offset)
 {
-	return bps_tree_lower_bound_elem_get_offset_impl(&tree->common, key,
-							 exact, offset);
+	return bps_tree_lower_bound_elem_impl(&tree->common, key,
+					      exact, offset);
 }
 
 static inline struct bps_tree_iterator
@@ -2883,66 +2775,8 @@ bps_tree_view_lower_bound_elem_get_offset(const struct bps_tree_view *view,
 					  bps_tree_elem_t key, bool *exact,
 					  size_t *offset)
 {
-	return bps_tree_lower_bound_elem_get_offset_impl(&view->common, key,
-							 exact, offset);
-}
-
-/**
- * @brief Same as bps_tree_upper_bound_elem_impl, but with additional argument.
- * @param[out] offset_arg - offset to the element the iterator is pointing to,
- *                          untouched if the tree is empty.
- */
-static inline struct bps_tree_iterator
-bps_tree_upper_bound_elem_get_offset_impl(const struct bps_tree_common *tree,
-					  bps_tree_elem_t key, bool *exact,
-					  size_t *offset_arg)
-{
-	struct bps_tree_iterator res;
-	size_t offset = 0;
-	bool local_result;
-	if (!exact)
-		exact = &local_result;
-	*exact = false;
-	bool exact_test;
-	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
-		res.block_id = (bps_tree_block_id_t)(-1);
-		res.pos = 0;
-		*offset_arg = 0;
-		return res;
-	}
-	struct bps_block *block = bps_tree_root(tree);
-	bps_tree_block_id_t block_id = tree->root_id;
-	for (bps_tree_block_id_t i = 0; i < tree->depth - 1; i++) {
-		struct bps_inner *inner = (struct bps_inner *)block;
-		bps_tree_pos_t pos;
-		pos = bps_tree_find_after_ins_point_elem(tree, inner->elems,
-							 inner->header.size - 1,
-							 key, &exact_test);
-		if (exact_test)
-			*exact = true;
-		offset += bps_tree_get_first_children_card(tree, inner, pos);
-		block_id = inner->child_ids[pos];
-		block = bps_tree_restore_block(tree, block_id);
-	}
-
-	struct bps_leaf *leaf = (struct bps_leaf *)block;
-	bps_tree_pos_t pos;
-	pos = bps_tree_find_after_ins_point_elem(tree, leaf->elems,
-						 leaf->header.size,
-						 key, &exact_test);
-	if (exact_test)
-		*exact = true;
-	if (pos >= leaf->header.size) {
-		res.block_id = leaf->next_id;
-		res.pos = 0;
-		offset += leaf->header.size;
-	} else {
-		res.block_id = block_id;
-		res.pos = pos;
-		offset += pos;
-	}
-	*offset_arg = offset;
-	return res;
+	return bps_tree_lower_bound_elem_impl(&view->common, key,
+					      exact, offset);
 }
 
 static inline struct bps_tree_iterator
@@ -2950,8 +2784,8 @@ bps_tree_upper_bound_elem_get_offset(const struct bps_tree *tree,
 				     bps_tree_elem_t key, bool *exact,
 				     size_t *offset)
 {
-	return bps_tree_upper_bound_elem_get_offset_impl(&tree->common, key,
-							 exact, offset);
+	return bps_tree_upper_bound_elem_impl(&tree->common, key,
+					      exact, offset);
 }
 
 static inline struct bps_tree_iterator
@@ -2959,8 +2793,8 @@ bps_tree_view_upper_bound_elem_get_offset(const struct bps_tree_view *view,
 					  bps_tree_elem_t key, bool *exact,
 					  size_t *offset)
 {
-	return bps_tree_upper_bound_elem_get_offset_impl(&view->common, key,
-							 exact, offset);
+	return bps_tree_upper_bound_elem_impl(&view->common, key,
+					      exact, offset);
 }
 
 #endif
@@ -7815,16 +7649,12 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_upper_bound_elem_impl
 #undef bps_tree_upper_bound_elem
 #undef bps_tree_view_upper_bound_elem
-#undef bps_tree_lower_bound_get_offset_impl
 #undef bps_tree_lower_bound_get_offset
 #undef bps_tree_view_lower_bound_get_offset
-#undef bps_tree_lower_bound_elem_get_offset_impl
 #undef bps_tree_lower_bound_elem_get_offset
 #undef bps_tree_view_lower_bound_elem_get_offset
-#undef bps_tree_upper_bound_get_offset_impl
 #undef bps_tree_upper_bound_get_offset
 #undef bps_tree_view_upper_bound_get_offset
-#undef bps_tree_upper_bound_elem_get_offset_impl
 #undef bps_tree_upper_bound_elem_get_offset
 #undef bps_tree_view_upper_bound_elem_get_offset
 #undef bps_tree_approximate_count
