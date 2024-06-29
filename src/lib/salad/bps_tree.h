@@ -411,7 +411,6 @@ typedef int64_t bps_tree_block_card_t;
 #define bps_tree_find_impl _bps_tree(find)
 #define bps_tree_find _api_name(find)
 #define bps_tree_view_find _api_name(view_find)
-#define bps_tree_find_get_offset_impl _bps_tree(find_get_offset_impl)
 #define bps_tree_find_get_offset _api_name(find_get_offset)
 #define bps_tree_view_find_get_offset _api_name(view_find_get_offset)
 #define bps_tree_insert_impl _bps_tree(insert)
@@ -766,8 +765,7 @@ bps_tree_view_find(const struct bps_tree_view *view, bps_tree_key_t key);
 
 /**
  * @brief Same as bps_tree_find, but with additional argument.
- * @param[out] offset - the offset to the found element,
- *                      untouched if no element found.
+ * @param[out] offset - the offset to the found element, undefined if not found.
  */
 static inline bps_tree_elem_t *
 bps_tree_find_get_offset(struct bps_tree *tree, bps_tree_key_t key,
@@ -775,8 +773,7 @@ bps_tree_find_get_offset(struct bps_tree *tree, bps_tree_key_t key,
 
 /**
  * @brief Same as bps_tree_view_find, but with additional argument.
- * @param[out] offset - the offset to the found element,
- *                      untouched if no element found.
+ * @param[out] offset - the offset to the found element, undefined if not found.
  */
 static inline bps_tree_elem_t *
 bps_tree_view_find_get_offset(struct bps_tree_view *view, bps_tree_key_t key,
@@ -3218,16 +3215,22 @@ bps_tree_view_iterator_at(const struct bps_tree_view *view, size_t offset)
 #endif
 
 /**
- * @brief Find the first element that is equal to the key (comparator returns 0)
- * @param tree - pointer to a tree
- * @param key - key that will be compared with elements
- * @return pointer to the first equal element or NULL if not found
+ * @brief Find the first element that is equal to the key.
+ * @param tree - pointer to a tree.
+ * @param key - key that will be compared with elements.
+ * @param[out] offset - optional pointer to the offset to the found element.
+ * @return pointer to the first equal element or NULL if not found.
  */
-static inline bps_tree_elem_t *
-bps_tree_find_impl(const struct bps_tree_common *tree, bps_tree_key_t key)
+static ALWAYS_INLINE bps_tree_elem_t *
+bps_tree_find_impl(const struct bps_tree_common *tree, bps_tree_key_t key,
+		   size_t *offset)
 {
+	if (offset != NULL)
+		*offset = 0;
+
 	if (tree->root_id == (bps_tree_block_id_t)(-1))
 		return 0;
+
 	struct bps_block *block = bps_tree_root(tree);
 	bool exact = false;
 	for (bps_tree_block_id_t i = 0; i < tree->depth - 1; i++) {
@@ -3237,12 +3240,23 @@ bps_tree_find_impl(const struct bps_tree_common *tree, bps_tree_key_t key)
 						  inner->header.size - 1,
 						  key, &exact);
 		block = bps_tree_restore_block(tree, inner->child_ids[pos]);
+
+#if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
+		if (offset != NULL) {
+			*offset += bps_tree_get_first_children_card(
+				tree, inner, pos);
+		}
+#endif
 	}
 
 	struct bps_leaf *leaf = (struct bps_leaf *)block;
 	bps_tree_pos_t pos;
 	pos = bps_tree_find_ins_point_key(tree, leaf->elems, leaf->header.size,
 					  key, &exact);
+
+	if (offset != NULL)
+		*offset += pos;
+
 	if (exact)
 		return leaf->elems + pos;
 	else
@@ -3252,66 +3266,29 @@ bps_tree_find_impl(const struct bps_tree_common *tree, bps_tree_key_t key)
 static inline bps_tree_elem_t *
 bps_tree_find(const struct bps_tree *tree, bps_tree_key_t key)
 {
-	return bps_tree_find_impl(&tree->common, key);
+	return bps_tree_find_impl(&tree->common, key, NULL);
 }
 
 static inline bps_tree_elem_t *
 bps_tree_view_find(const struct bps_tree_view *view, bps_tree_key_t key)
 {
-	return bps_tree_find_impl(&view->common, key);
+	return bps_tree_find_impl(&view->common, key, NULL);
 }
 
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
-
-/**
- * @brief Same as bps_tree_find, but with additional argument.
- * @param[out] offset_arg - the offset to the found element,
- *                          untouched if no element found.
- */
-static inline bps_tree_elem_t *
-bps_tree_find_get_offset_impl(struct bps_tree_common *tree, bps_tree_key_t key,
-			      size_t *offset_arg)
-{
-	if (tree->root_id == (bps_tree_block_id_t)(-1))
-		return 0;
-	struct bps_block *block = bps_tree_root(tree);
-	bool exact = false;
-	size_t offset = 0;
-	for (bps_tree_block_id_t i = 0; i < tree->depth - 1; i++) {
-		struct bps_inner *inner = (struct bps_inner *)block;
-		bps_tree_pos_t pos;
-		pos = bps_tree_find_ins_point_key(tree, inner->elems,
-						  inner->header.size - 1,
-						  key, &exact);
-		offset += bps_tree_get_first_children_card(tree, inner, pos);
-		block = bps_tree_restore_block(tree, inner->child_ids[pos]);
-	}
-
-	struct bps_leaf *leaf = (struct bps_leaf *)block;
-	bps_tree_pos_t pos;
-	pos = bps_tree_find_ins_point_key(tree, leaf->elems, leaf->header.size,
-					  key, &exact);
-	offset += pos;
-	if (exact) {
-		*offset_arg = offset;
-		return leaf->elems + pos;
-	} else {
-		return 0;
-	}
-}
 
 static inline bps_tree_elem_t *
 bps_tree_find_get_offset(struct bps_tree *tree, bps_tree_key_t key,
 			 size_t *offset)
 {
-	return bps_tree_find_get_offset_impl(&tree->common, key, offset);
+	return bps_tree_find_impl(&tree->common, key, offset);
 }
 
 static inline bps_tree_elem_t *
 bps_tree_view_find_get_offset(struct bps_tree_view *view, bps_tree_key_t key,
 			      size_t *offset)
 {
-	return bps_tree_find_get_offset_impl(&view->common, key, offset);
+	return bps_tree_find_impl(&view->common, key, offset);
 }
 
 #endif
@@ -7800,7 +7777,6 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_find_impl
 #undef bps_tree_find
 #undef bps_tree_view_find
-#undef bps_tree_find_get_offset_impl
 #undef bps_tree_find_get_offset
 #undef bps_tree_view_find_get_offset
 #undef bps_tree_insert_impl
