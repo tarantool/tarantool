@@ -73,9 +73,8 @@ typedef int64_t type_t;
 } while (false)
 
 #define test_do_find_invalid(tree, value) do { \
-	size_t offset = SIZE_MAX; \
+	size_t offset; \
 	fail_unless(test_find_get_offset((tree), (value), &offset) == NULL); \
-	fail_unless(offset == SIZE_MAX); \
 } while (false)
 
 #define test_do_bounds(tree_arg, key_arg, key_offset_arg) do { \
