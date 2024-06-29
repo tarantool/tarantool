@@ -329,6 +329,10 @@
  * #define BPS_INNER_CARD
  */
 
+#if defined(BPS_INNER_CHILD_CARDS) && defined(BPS_INNER_CARD)
+#error "Only one of BPS_INNER_CHILD_CARDS and BPS_INNER_CARD supported"
+#endif
+
 /**
  * A switch that enables collection of executions of different
  * branches of code. Used only for debug purposes, I hope you
@@ -3710,7 +3714,7 @@ bps_tree_debug_memmove(void *dst_arg, void *src_arg, size_t num,
 }
 #endif
 
-#if defined(BPS_INNER_CHILD_CARDS) && !defined(BPS_INNER_CARD)
+#if defined(BPS_INNER_CHILD_CARDS)
 
 /**
  * @brief Alter the block cardinality and cardinalities of its parents
@@ -3763,7 +3767,7 @@ bps_tree_card_up_inner_impl(struct bps_inner_path_elem *inner_path_elem,
 	bps_tree_propagate_card(parent, pos_in_parent, diff);
 }
 
-#elif defined(BPS_INNER_CARD) && !defined(BPS_INNER_CHILD_CARD)
+#elif defined(BPS_INNER_CARD)
 
 /**
  * @brief Alter the inner block cardinality and cardinalities of its parents
@@ -3809,61 +3813,6 @@ bps_tree_card_up_leaf_impl(struct bps_leaf_path_elem *leaf_path_elem,
 		return;
 	}
 	bps_tree_propagate_card(leaf_path_elem->parent, diff);
-}
-
-#elif defined(BPS_INNER_CHILD_CARDS) && defined(BPS_INNER_CARD)
-
-/**
- * @brief Alter the inner block cardinality and cardinalities of its parents
- *        recursively.
- */
-static inline void
-bps_tree_propagate_card(struct bps_inner_path_elem *inner_path_elem0,
-			bps_tree_pos_t pos_in_parent0,
-			bps_tree_block_card_t diff)
-{
-	bps_tree_pos_t pos_in_parent = pos_in_parent0;
-	for (struct bps_inner_path_elem *inner_path_elem = inner_path_elem0;
-	     inner_path_elem; pos_in_parent = inner_path_elem->pos_in_parent,
-			      inner_path_elem = inner_path_elem->parent) {
-		inner_path_elem->block->child_cards[pos_in_parent] += diff;
-		inner_path_elem->block->card += diff;
-	}
-}
-
-/**
- * @brief Alter the inner block cardinality and cardinalities of its parents
- *        recursively.
- */
-static inline void
-bps_tree_card_up_inner_impl(struct bps_inner_path_elem *inner_path_elem,
-			    bps_tree_block_card_t diff)
-{
-	inner_path_elem->block->card += diff;
-	if (inner_path_elem->unpropagated_card >= 0) {
-		/* This block is not inserted yet, defer the propagation. */
-		inner_path_elem->unpropagated_card += diff;
-		return;
-	}
-	bps_tree_pos_t pos_in_parent = inner_path_elem->pos_in_parent;
-	bps_tree_propagate_card(inner_path_elem->parent, pos_in_parent, diff);
-}
-
-/**
- * @brief Alter the leaf block cardinality and cardinalities of its parents
- *        recursively.
- */
-static inline void
-bps_tree_card_up_leaf_impl(struct bps_leaf_path_elem *leaf_path_elem,
-			   bps_tree_block_card_t diff)
-{
-	if (leaf_path_elem->unpropagated_card >= 0) {
-		/* This block is not inserted yet, defer the propagation. */
-		leaf_path_elem->unpropagated_card += diff;
-		return;
-	}
-	bps_tree_pos_t pos_in_parent = leaf_path_elem->pos_in_parent;
-	bps_tree_propagate_card(leaf_path_elem->parent, pos_in_parent, diff);
 }
 
 #endif
