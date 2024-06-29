@@ -11,20 +11,6 @@ net_box = require('net.box')
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
---
--- Print all error keys in sorted order to minimize diff output
--- when new ones are merged in.
-ekeys = {}
-evals = {}
-for k, v in pairs(errinj.info()) do \
-    table.insert(ekeys, k)          \
-end
-table.sort(ekeys)
-for i, k in ipairs(ekeys) do         \
-    evals[i] = {[k] = errinj.get(k)} \
-end
-evals
-
 errinj.set("some-injection", true)
 errinj.set("some-injection") -- check error
 space:select{222444}
