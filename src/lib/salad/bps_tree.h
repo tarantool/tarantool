@@ -37,6 +37,7 @@
 #include <assert.h>
 #include <stdio.h> /* printf */
 #include "small/matras.h"
+#include <trivia/util.h> /* ALWAYS_INLINE */
 
 /* {{{ BPS-tree description */
 /**
@@ -413,6 +414,7 @@ typedef int64_t bps_tree_block_card_t;
 #define bps_tree_find_get_offset_impl _bps_tree(find_get_offset_impl)
 #define bps_tree_find_get_offset _api_name(find_get_offset)
 #define bps_tree_view_find_get_offset _api_name(view_find_get_offset)
+#define bps_tree_insert_impl _bps_tree(insert)
 #define bps_tree_insert _api_name(insert)
 #define bps_tree_insert_get_iterator _api_name(insert_get_iterator)
 #define bps_tree_insert_get_offset _api_name(insert_get_offset)
@@ -812,8 +814,7 @@ bps_tree_insert_get_iterator(struct bps_tree *tree, bps_tree_elem_t new_elem,
 
 /**
  * @brief Same as bps_tree_insert, but with different last argument.
- * @param[out] offset - the offset to the new element,
- *                      untouched if not inserted.
+ * @param[out] offset - the offset to the new element, undefined on failure.
  */
 static inline int
 bps_tree_insert_get_offset(struct bps_tree *tree, bps_tree_elem_t new_elem,
@@ -4933,6 +4934,8 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 	}
 
 	if (!bps_tree_reserve_blocks(tree, tree->depth + 1)) {
+		*inserted_in_block = (bps_tree_block_id_t)(-1);
+		*inserted_in_pos = 0;
 		return -1;
 	}
 	bps_tree_block_id_t new_block_id = (bps_tree_block_id_t)(-1);
@@ -5965,40 +5968,65 @@ bps_tree_process_delete_inner(struct bps_tree_common *tree,
 }
 
 /**
- * @brief Insert an element to the tree or replace an element in the tree
- * In case of replacing, if 'replaced' argument is not null, it'll
- * be filled with replaced element. In case of inserting it's left
- * intact.
- * Thus one can distinguish a real insert or replace by passing to
- * the function a pointer to some value; and if it was changed
- * during the function call, then the replace has happened.
- * Otherwise, it was an insert.
- * @param t - pointer to a tree
- * @param new_elem - inserting or replacing element
- * @replaced - optional pointer to an element that was replaced
- * @successor - optional pointer to an element before which the new
- *  element was inserted (untouched in case of replacement).
- * @return - 0 on success or -1 if memory allocation failed for insert
+ * @brief Insert an element to a tree or replace an element in the tree.
+ *
+ *  In case of replacing, if 'replaced' argument is not null, it'll be filled
+ *  with the replaced element. In case of inserting it's left intact. Thus,
+ *  one can distinguish a real insert or replace by passing to the function
+ *  a pointer to some value; and if it was changed during the function call,
+ *  then the replace has happened. Otherwise, it was an insert.
+ *
+ * @param t - pointer to the tree.
+ * @param new_elem - inserting or replacing element.
+ * @param replaced - optional pointer to an element that was replaced.
+ * @param[out] successor - optional pointer to an element before which the
+ *  new_elem was inserted (untouched in case of replacement).
+ * @param[out] offset - optional pointer to the offset to the new element.
+ * @return - 0 on success or -1 if memory allocation failed for insert.
  */
-static inline int
-bps_tree_insert(struct bps_tree *t, bps_tree_elem_t new_elem,
-		bps_tree_elem_t *replaced, bps_tree_elem_t *successor)
+static ALWAYS_INLINE int
+bps_tree_insert_impl(struct bps_tree *t, bps_tree_elem_t new_elem,
+		     bps_tree_elem_t *replaced, bps_tree_elem_t *successor,
+		     struct bps_tree_iterator *inserted_iterator,
+		     size_t *offset)
 {
+	if (offset != NULL)
+		*offset = 0;
+
 	struct bps_tree_common *tree = &t->common;
-	if (tree->root_id == (bps_tree_block_id_t)(-1))
-		return bps_tree_insert_first_elem(tree, new_elem);
+	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
+		int rc = bps_tree_insert_first_elem(tree, new_elem);
+
+		if (inserted_iterator != NULL) {
+			inserted_iterator->block_id = tree->first_id;
+			inserted_iterator->pos = 0;
+		}
+
+		return rc;
+	}
 
 	struct bps_inner_path_elem path[BPS_TREE_MAX_DEPTH];
 	struct bps_leaf_path_elem leaf_path_elem;
 	bool exact;
 	bps_tree_collect_path(tree, new_elem, path, &leaf_path_elem, &exact);
+
+#if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
+	if (offset != NULL)
+		*offset = bps_tree_calc_path_offset(tree, &leaf_path_elem);
+#endif
+
 	if (exact) {
+		if (inserted_iterator != NULL) {
+			inserted_iterator->block_id = leaf_path_elem.block_id;
+			inserted_iterator->pos = leaf_path_elem.insertion_point;
+		}
+
 		bps_tree_process_replace(tree, &leaf_path_elem, new_elem,
 					 replaced);
 		return 0;
 	} else {
-		bps_tree_block_id_t unused1;
-		bps_tree_pos_t unused2;
+		bps_tree_block_id_t inserted_block_id;
+		bps_tree_pos_t inserted_pos;
 
 		struct bps_leaf *leaf = leaf_path_elem.block;
 		if (successor != NULL && leaf != NULL &&
@@ -6006,80 +6034,45 @@ bps_tree_insert(struct bps_tree *t, bps_tree_elem_t new_elem,
 			bps_tree_pos_t pos = leaf_path_elem.insertion_point;
 			*successor = leaf->elems[pos];
 		}
-		return bps_tree_process_insert_leaf(tree, &leaf_path_elem,
-						    new_elem, &unused1,
-						    &unused2);
+
+		int rc = bps_tree_process_insert_leaf(
+			tree, &leaf_path_elem, new_elem,
+			&inserted_block_id, &inserted_pos);
+
+		if (inserted_iterator != NULL) {
+			inserted_iterator->block_id = inserted_block_id;
+			inserted_iterator->pos = inserted_pos;
+		}
+
+		return rc;
 	}
 }
 
-/**
- * @brief Same as bps_tree_insert, but with different last argument.
- * @param[out] inserted_iterator - iterator, positioned to the new element.
- */
+static inline int
+bps_tree_insert(struct bps_tree *t, bps_tree_elem_t new_elem,
+		bps_tree_elem_t *replaced, bps_tree_elem_t *successor)
+{
+	return bps_tree_insert_impl(t, new_elem, replaced,
+				    successor, NULL, NULL);
+}
+
 static inline int
 bps_tree_insert_get_iterator(struct bps_tree *t, bps_tree_elem_t new_elem,
 			     bps_tree_elem_t *replaced,
 			     struct bps_tree_iterator *inserted_iterator)
 {
-	struct bps_tree_common *tree = &t->common;
-	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
-		int rc = bps_tree_insert_first_elem(tree, new_elem);
-		inserted_iterator->block_id = tree->first_id;
-		inserted_iterator->pos = 0;
-		return rc;
-	}
-	struct bps_inner_path_elem path[BPS_TREE_MAX_DEPTH];
-	struct bps_leaf_path_elem leaf_path_elem;
-	bool exact;
-	bps_tree_collect_path(tree, new_elem, path, &leaf_path_elem, &exact);
-	if (exact) {
-		inserted_iterator->block_id = leaf_path_elem.block_id;
-		inserted_iterator->pos = leaf_path_elem.insertion_point;
-		bps_tree_process_replace(tree, &leaf_path_elem, new_elem,
-					 replaced);
-		return 0;
-	} else {
-		int rc = bps_tree_process_insert_leaf(tree, &leaf_path_elem,
-						      new_elem,
-						      &inserted_iterator->block_id,
-						      &inserted_iterator->pos);
-		return rc;
-	}
+	return bps_tree_insert_impl(t, new_elem, replaced, NULL,
+				    inserted_iterator, NULL);
 }
 
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
 
-/**
- * @brief Same as bps_tree_insert, but with different last argument.
- * @param[out] offset - the offset to the new element,
- *                      untouched if not inserted.
- */
 static inline int
 bps_tree_insert_get_offset(struct bps_tree *t, bps_tree_elem_t new_elem,
 			   bps_tree_elem_t *replaced, size_t *offset)
 {
-	struct bps_tree_common *tree = &t->common;
-	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
-		*offset = 0;
-		return bps_tree_insert_first_elem(tree, new_elem);
-	}
-	struct bps_inner_path_elem path[BPS_TREE_MAX_DEPTH];
-	struct bps_leaf_path_elem leaf_path_elem;
-	bool exact;
-	bps_tree_collect_path(tree, new_elem, path, &leaf_path_elem, &exact);
-	*offset = bps_tree_calc_path_offset(tree, &leaf_path_elem);
-	if (exact) {
-		bps_tree_process_replace(tree, &leaf_path_elem, new_elem,
-					 replaced);
-		return 0;
-	} else {
-		bps_tree_block_id_t unused1;
-		bps_tree_pos_t unused2;
-
-		return bps_tree_process_insert_leaf(tree, &leaf_path_elem,
-						    new_elem, &unused1,
-						    &unused2);
-	}
+	return bps_tree_insert_impl(t, new_elem, replaced,
+				    NULL, NULL, offset);
 }
 
 #endif
@@ -7826,6 +7819,7 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_find_get_offset_impl
 #undef bps_tree_find_get_offset
 #undef bps_tree_view_find_get_offset
+#undef bps_tree_insert_impl
 #undef bps_tree_insert
 #undef bps_tree_insert_get_iterator
 #undef bps_tree_insert_get_offset
