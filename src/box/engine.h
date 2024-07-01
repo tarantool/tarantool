@@ -49,6 +49,7 @@ struct space;
 struct space_def;
 struct vclock;
 struct xstream;
+struct engine_join_ctx;
 
 extern struct rlist engines;
 
@@ -121,17 +122,19 @@ struct engine_vtab {
 	 * Setup and return a context that will be used
 	 * on further steps.
 	 */
-	int (*prepare_join)(struct engine *engine, void **ctx);
+	int (*prepare_join)(struct engine *engine, struct engine_join_ctx *ctx);
 	/**
 	 * Feed the read view frozen on the previous step to
 	 * the given stream.
 	 */
-	int (*join)(struct engine *engine, void *ctx, struct xstream *stream);
+	int (*join)(struct engine *engine, struct engine_join_ctx *ctx,
+		    struct xstream *stream);
 	/**
 	 * Release the read view and free the context prepared
 	 * on the first step.
 	 */
-	void (*complete_join)(struct engine *engine, void *ctx);
+	void (*complete_join)(struct engine *engine,
+			      struct engine_join_ctx *ctx);
 	/**
 	 * Begin a new single or multi-statement transaction.
 	 * Called on first statement in a transaction, not when
@@ -313,8 +316,12 @@ struct engine_read_view {
 };
 
 struct engine_join_ctx {
+	/** Vclock to respond with. */
+	struct vclock *vclock;
+	/** Whether sending JOIN_META stage is required. */
+	bool send_meta;
 	/** Array of engine join contexts, one per each engine. */
-	void **array;
+	void **data;
 };
 
 /** Register engine engine instance. */
@@ -489,9 +496,10 @@ engine_reset_stat(void);
 struct engine_read_view *
 generic_engine_create_read_view(struct engine *engine,
 				const struct read_view_opts *opts);
-int generic_engine_prepare_join(struct engine *, void **);
-int generic_engine_join(struct engine *, void *, struct xstream *);
-void generic_engine_complete_join(struct engine *, void *);
+int generic_engine_prepare_join(struct engine *, struct engine_join_ctx *);
+int generic_engine_join(struct engine *, struct engine_join_ctx *,
+			struct xstream *);
+void generic_engine_complete_join(struct engine *, struct engine_join_ctx *);
 int generic_engine_begin(struct engine *, struct txn *);
 int generic_engine_begin_statement(struct engine *, struct txn *);
 int generic_engine_prepare(struct engine *, struct txn *);
