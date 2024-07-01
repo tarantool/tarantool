@@ -855,8 +855,22 @@ illegal_instruction(void)
 #ifdef ENABLE_ASAN
 # include <sanitizer/lsan_interface.h>
 # define LSAN_IGNORE_OBJECT(ptr) __lsan_ignore_object(ptr)
+
+/**
+ * Disable leak sanitizer. Leak check will not be performed on Tarantool
+ * exit.
+ */
+void
+lsan_turn_off(void);
+
 #else
 # define LSAN_IGNORE_OBJECT(ptr) ((void)ptr)
+
+static inline void
+lsan_turn_off(void)
+{
+}
+
 #endif
 
 #if defined(__cplusplus)

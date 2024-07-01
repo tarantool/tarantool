@@ -49,6 +49,11 @@
 #include "say.h"
 #include "tweaks.h"
 
+#ifdef ENABLE_ASAN
+/** If true then LSAN will not be run on Tarantool exit. */
+static bool lsan_is_turned_off = false;
+#endif
+
 /** Find a string in an array of strings.
  *
  * @param haystack  Array of strings. Either NULL
@@ -468,3 +473,20 @@ strtoupperdup(const char *s)
 	uppercase[len] = '\0';
 	return uppercase;
 }
+
+#ifdef ENABLE_ASAN
+
+/** The function is called by LSAN to check if it should report leaks. */
+int
+__lsan_is_turned_off(void)
+{
+	return lsan_is_turned_off ? 1 : 0;
+}
+
+void
+lsan_turn_off(void)
+{
+	lsan_is_turned_off = true;
+}
+
+#endif
