@@ -77,11 +77,19 @@ extern "C" {
 	 * tuple formats are received in IPROTO_TUPLE_FORMATS field.
 	 */								\
 	_(CALL_ARG_TUPLE_EXTENSION, 9)					\
+	/**
+	 *_(FETCH_SNAPSHOT_CHECKPOINT_CURSOR, 10) - only in EE:
+	 * IPROTO_IS_CHECKPOINT_JOIN, IPROTO_CHECKPOINT_VCLOCK and
+	 * IRPOTO_CHECKPOINT_LSN in FETCH_SNAPSHOT.
+	 */								\
 
 #define IPROTO_FEATURE_MEMBER(s, v) IPROTO_FEATURE_ ## s = v,
 
 enum iproto_feature_id {
 	IPROTO_FEATURES(IPROTO_FEATURE_MEMBER)
+#if defined(ENABLE_FETCH_SNAPSHOT_CHECKPOINT_CURSOR)
+	IPROTO_FEATURE_MEMBER(FETCH_SNAPSHOT_CHECKPOINT_CURSOR, 10)
+#endif /* defined(ENABLE_FETCH_SNAPSHOT_CHECKPOINT_CURSOR) */
 	iproto_feature_id_MAX
 };
 
@@ -101,7 +109,7 @@ struct iproto_features {
  * `box.iproto.protocol_version` needs to be updated correspondingly.
  */
 enum {
-	IPROTO_CURRENT_VERSION = 7,
+	IPROTO_CURRENT_VERSION = 8,
 };
 
 /**

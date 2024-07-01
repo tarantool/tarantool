@@ -4311,10 +4311,20 @@ box_process_fetch_snapshot(struct iostream *io,
 	}
 
 	say_info("sending current read-view to replica at %s", sio_socketname(io->fd));
+	/* Used for checkpoint initial join. */
+	struct checkpoint_cursor cursor;
+	struct checkpoint_cursor *cursor_ptr = NULL;
+	if (req.is_checkpoint_join) {
+		cursor.vclock = &req.checkpoint_vclock;
+		cursor.start_lsn = req.checkpoint_lsn;
+		cursor.lsn_counter = 0;
+		cursor_ptr = &cursor;
+	}
 
 	/* Send the snapshot data to the instance. */
 	struct vclock start_vclock;
-	relay_initial_join(io, header->sync, &start_vclock, req.version_id);
+	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
+			   cursor_ptr);
 	say_info("read-view sent.");
 
 	/* Remember master's vclock after the last request */
@@ -4324,7 +4334,7 @@ box_process_fetch_snapshot(struct iostream *io,
 	/* Send end of snapshot data marker */
 	struct xrow_header row;
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_vclock(&row, &stop_vclock);
+	xrow_encode_vclock_ignore0(&row, &stop_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 }
@@ -4436,7 +4446,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	RegionGuard region_guard(&fiber()->gc);
 	struct xrow_header row;
 	/* Send end of WAL stream marker */
-	xrow_encode_vclock(&row, &replicaset.vclock);
+	xrow_encode_vclock_ignore0(&row, &replicaset.vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -4565,7 +4575,8 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * Initial stream: feed replica with dirty data from engines.
 	 */
 	struct vclock start_vclock;
-	relay_initial_join(io, header->sync, &start_vclock, req.version_id);
+	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
+			   NULL);
 	say_info("initial data sent.");
 	/**
 	 * Register the replica after sending the last row but before sending
@@ -4585,7 +4596,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	/* Send end of initial stage data marker */
 	struct xrow_header row;
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_vclock(&row, &stop_vclock);
+	xrow_encode_vclock_ignore0(&row, &stop_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -4598,7 +4609,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	say_info("final data sent.");
 
 	/* Send end of WAL stream marker */
-	xrow_encode_vclock(&row, &replicaset.vclock);
+	xrow_encode_vclock_ignore0(&row, &replicaset.vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 

@@ -62,6 +62,7 @@
 #include "memtx_space_upgrade.h"
 #include "tt_sort.h"
 #include "assoc.h"
+#include "wal.h"
 
 #include <type_traits>
 
@@ -914,6 +915,17 @@ checkpoint_write_synchro(struct xlog *l, const struct synchro_request *req)
 	return checkpoint_write_row(l, &row);
 }
 
+static int
+checkpoint_write_system_data(struct xlog *l, const struct raft_request *raft,
+			     const struct synchro_request *synchro)
+{
+	if (checkpoint_write_raft(l, raft) != 0)
+		return -1;
+	if (checkpoint_write_synchro(l, synchro) != 0)
+		return -1;
+	return 0;
+}
+
 #ifndef NDEBUG
 /*
  * The functions defined below are used in tests to write a corrupted
@@ -1017,6 +1029,7 @@ checkpoint_f(va_list ap)
 
 	struct mh_i32_t *temp_space_ids;
 
+	bool is_synchro_written = false;
 	say_info("saving snapshot `%s'", snap->filename);
 	ERROR_INJECT_WHILE(ERRINJ_SNAP_WRITE_DELAY, {
 		fiber_sleep(0.001);
@@ -1036,6 +1049,19 @@ checkpoint_f(va_list ap)
 		});
 		if (skip)
 			continue;
+		/*
+		 * Raft and limbo states are written right after system spaces
+		 * but before user ones. This is needed to reduce the time,
+		 * needed to acquire states from the checkpoint, which is used
+		 * during checkpoint join.
+		 */
+		if (!is_synchro_written && !space_id_is_system(space_rv->id)) {
+			rc = checkpoint_write_system_data(snap, &ckpt->raft,
+							  &ckpt->synchro_state);
+			if (rc != 0)
+				break;
+			is_synchro_written = true;
+		}
 		struct index_read_view *index_rv =
 			space_read_view_index(space_rv, 0);
 		assert(index_rv != NULL);
@@ -1093,10 +1119,15 @@ checkpoint_f(va_list ap)
 		if (checkpoint_write_invalid_system_row(snap) != 0)
 			goto fail;
 	});
-	if (checkpoint_write_raft(snap, &ckpt->raft) != 0)
-		goto fail;
-	if (checkpoint_write_synchro(snap, &ckpt->synchro_state) != 0)
-		goto fail;
+	/*
+	 * There may be no user data (e.g. when only RAFT_PROMOTE is written),
+	 * write limbo and raft states right after system spaces, at the end
+	 * of the checkpoint.
+	 */
+	if (!is_synchro_written)
+		if (checkpoint_write_system_data(snap, &ckpt->raft,
+						 &ckpt->synchro_state) != 0)
+			goto fail;
 	goto done;
 done:
 	if (xlog_close(snap) != 0)
@@ -1234,6 +1265,84 @@ struct memtx_join_ctx {
 	struct xstream *stream;
 };
 
+static void
+send_join_meta(struct xstream *stream, const struct vclock *vclock,
+	       const bool send_meta, const struct raft_request *raft_req,
+	       const struct synchro_request *synchro_req)
+{
+	/* Respond to the JOIN request with the current vclock. */
+	struct xrow_header row;
+	/* Encoding replication request uses fiber()->gc region. */
+	RegionGuard region_guard(&fiber()->gc);
+	/*
+	 * Vclock is encoded with 0th component, as in case of checkpoint
+	 * join it corresponds to the vclock of the checkpoint, where 0th
+	 * component is essential, as otherwise signature won't be correct.
+	 * Client sends this vclock in IPROTO_CURSOR, when he wants to
+	 * continue fetching from the same checkpoint.
+	 */
+	xrow_encode_vclock(&row, vclock);
+	xstream_write(stream, &row);
+
+	/*
+	 * Version is present starting with 2.7.3, 2.8.2, 2.9.1
+	 * All these versions know of additional META stage of initial join.
+	 */
+	if (send_meta) {
+		/* Mark the beginning of the metadata stream. */
+		xrow_encode_type(&row, IPROTO_JOIN_META);
+		xstream_write(stream, &row);
+
+		xrow_encode_raft(&row, &fiber()->gc, raft_req);
+		xstream_write(stream, &row);
+
+		char body[XROW_BODY_LEN_MAX];
+		xrow_encode_synchro(&row, body, synchro_req);
+		row.replica_id = synchro_req->replica_id;
+		xstream_write(stream, &row);
+
+		/* Mark the end of the metadata stream. */
+		xrow_encode_type(&row, IPROTO_JOIN_SNAPSHOT);
+		xstream_write(stream, &row);
+	}
+}
+
+#if defined(ENABLE_FETCH_SNAPSHOT_CHECKPOINT_CURSOR)
+#include "memtx_checkpoint_join.c"
+#else /* !defined(ENABLE_FETCH_SNAPSHOT_CHECKPOINT_CURSOR) */
+
+static int
+memtx_engine_prepare_checkpoint_join(struct engine *engine,
+				     struct engine_join_ctx *ctx)
+{
+	(void)engine;
+	(void)ctx;
+	diag_set(ClientError, ER_UNSUPPORTED, "Tarantool CE",
+		 "checkpoint join");
+	return -1;
+}
+
+static int
+memtx_engine_checkpoint_join(struct engine *engine, struct engine_join_ctx *ctx,
+			     struct xstream *stream)
+{
+	(void)engine;
+	(void)ctx;
+	(void)stream;
+	unreachable();
+	return -1;
+}
+
+static void
+memtx_engine_complete_checkpoint_join(struct engine *engine,
+				      struct engine_join_ctx *ctx)
+{
+	(void)engine;
+	(void)ctx;
+}
+
+#endif /* !defined(ENABLE_FETCH_SNAPSHOT_CHECKPOINT_CURSOR) */
+
 /** Space filter for replica join. */
 static bool
 memtx_join_space_filter(struct space *space, void *arg)
@@ -1245,9 +1354,11 @@ memtx_join_space_filter(struct space *space, void *arg)
 }
 
 static int
-memtx_engine_prepare_join(struct engine *engine, void **arg)
+memtx_engine_prepare_join(struct engine *engine, struct engine_join_ctx *arg)
 {
-	(void)engine;
+	if (arg->cursor != NULL)
+		return memtx_engine_prepare_checkpoint_join(engine, arg);
+
 	struct memtx_join_ctx *ctx =
 		(struct memtx_join_ctx *)malloc(sizeof(*ctx));
 	if (ctx == NULL) {
@@ -1265,7 +1376,7 @@ memtx_engine_prepare_join(struct engine *engine, void **arg)
 		free(ctx);
 		return -1;
 	}
-	*arg = ctx;
+	arg->data[engine->id] = ctx;
 	return 0;
 }
 
@@ -1331,11 +1442,46 @@ memtx_join_f(va_list ap)
 }
 
 static int
-memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
+memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
+		  struct xstream *stream)
 {
+	if (arg->cursor != NULL)
+		return memtx_engine_checkpoint_join(engine, arg, stream);
+
 	(void)engine;
-	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
+	struct memtx_join_ctx *ctx =
+		(struct memtx_join_ctx *)arg->data[engine->id];
 	ctx->stream = stream;
+
+	struct vclock limbo_vclock;
+	struct raft_request raft_req;
+	struct synchro_request synchro_req;
+	/*
+	 * Sync WAL to make sure that all changes visible from
+	 * the frozen read view are successfully committed and
+	 * obtain corresponding vclock.
+	 *
+	 * This cannot be done in prepare_join, as we should not
+	 * yield between read-view creation. Moreover, wal syncing
+	 * should happen after creation of all engine's read-views.
+	 */
+	if (wal_sync(arg->vclock) != 0)
+		return -1;
+
+	/*
+	 * Start sending data only when the latest sync
+	 * transaction is confirmed.
+	 */
+	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
+		return -1;
+
+	txn_limbo_checkpoint(&txn_limbo, &synchro_req, &limbo_vclock);
+	box_raft_checkpoint_local(&raft_req);
+
+	/* Respond with vclock and JOIN_META. */
+	send_join_meta(stream, arg->vclock, arg->send_meta,
+		       &raft_req, &synchro_req);
+
 	/*
 	 * Memtx snapshot iterators are safe to use from another
 	 * thread and so we do so as not to consume too much of
@@ -1350,10 +1496,15 @@ memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
 }
 
 static void
-memtx_engine_complete_join(struct engine *engine, void *arg)
+memtx_engine_complete_join(struct engine *engine, struct engine_join_ctx *arg)
 {
-	(void)engine;
-	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
+	if (arg->cursor != NULL) {
+		memtx_engine_complete_checkpoint_join(engine, arg);
+		return;
+	}
+
+	struct memtx_join_ctx *ctx =
+		(struct memtx_join_ctx *)arg->data[engine->id];
 	read_view_close(&ctx->rv);
 	free(ctx);
 }
