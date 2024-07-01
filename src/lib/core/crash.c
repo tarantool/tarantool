@@ -191,6 +191,7 @@ crash_signal_cb(int signo, siginfo_t *siginfo, void *context)
 		fprintf(stderr, "Fatal %d while backtracing\n", signo);
 	}
 
+	lsan_enabled = false;
 	if (!crash_produce_coredump)
 		exit(EXIT_FAILURE);
 
