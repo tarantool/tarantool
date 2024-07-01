@@ -1687,18 +1687,19 @@ rtreespace = box.schema.create_space('rtree', {if_not_exists = true})
 ...
 rtreespace:create_index('pk', {if_not_exists = true})
 ---
-- unique: true
+- fast_offset: false
+  id: 0
+  space_id: 512
+  unique: true
+  hint: true
+  type: TREE
+  name: pk
   parts:
   - fieldno: 1
     sort_order: asc
     type: unsigned
     exclude_null: false
     is_nullable: false
-  hint: true
-  id: 0
-  type: TREE
-  space_id: 512
-  name: pk
 ...
 rtreespace:create_index('target', {type='rtree', dimension = 3, parts={2, 'array'},unique = false, if_not_exists = true,})
 ---

@@ -108,6 +108,10 @@ struct index_opts {
 	 * Use hint optimization for tree index.
 	 */
 	enum index_hint_cfg hint;
+	/**
+	 * Use logarithmic select with offset.
+	 */
+	bool fast_offset;
 };
 
 extern const struct index_opts index_opts_default;
@@ -155,6 +159,8 @@ index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
 		return o1->func_id - o2->func_id;
 	if (o1->hint != o2->hint)
 		return o1->hint - o2->hint;
+	if (o1->fast_offset != o2->fast_offset)
+		return o1->fast_offset - o2->fast_offset;
 	return 0;
 }
 

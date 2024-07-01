@@ -319,6 +319,31 @@ memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
 }
 
 /**
+ * Helper of memtx_tx_track_count.
+ */
+void
+memtx_tx_track_count_slow(struct txn *txn, struct index *index,
+			  enum iterator_type type, const char *key,
+			  uint32_t part_count);
+
+/**
+ * Record in TX manager that a transaction @a txn have counted @a index from @a
+ * space by @a key and iterator @a type. This function must be used for queries
+ * that count tuples in indexes (for example, index:size or index:count).
+ */
+static inline void
+memtx_tx_track_count(struct txn *txn, struct space *space,
+		     struct index *index, enum iterator_type type,
+		     const char *key, uint32_t part_count)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return;
+	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
+		return;
+	memtx_tx_track_count_slow(txn, index, type, key, part_count);
+}
+
+/**
  * Helper of memtx_tx_track_full_scan.
  */
 void
@@ -372,9 +397,11 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index);
 }
 
+/** Helper of memtx_tx_index_invisible_count. */
 uint32_t
-memtx_tx_index_invisible_count_slow(struct txn *txn,
-				    struct space *space, struct index *index);
+memtx_tx_index_invisible_count_matching_slow(
+	struct txn *txn, struct space *space, struct index *index,
+	enum iterator_type type, const char *key, uint32_t part_count);
 
 /**
  * When MVCC engine is enabled, an index can contain temporary non-committed
@@ -392,7 +419,23 @@ memtx_tx_index_invisible_count(struct txn *txn,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return 0;
-	return memtx_tx_index_invisible_count_slow(txn, space, index);
+	return memtx_tx_index_invisible_count_matching_slow(txn, space, index,
+							    ITER_GE, NULL, 0);
+}
+
+/**
+ * Same as memtx_tx_index_invisible_count but only counts tuples matching to
+ * the given key and iterator.
+ */
+static inline uint32_t
+memtx_tx_index_invisible_count_matching(
+	struct txn *txn, struct space *space, struct index *index,
+	enum iterator_type type, const char *key, uint32_t part_count)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	return memtx_tx_index_invisible_count_matching_slow(
+		txn, space, index, type, key, part_count);
 }
 
 /**

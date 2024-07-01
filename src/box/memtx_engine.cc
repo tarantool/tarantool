@@ -2014,6 +2014,8 @@ memtx_index_def_change_requires_rebuild(struct index *index,
 		return true;
 	if (old_def->opts.hint != new_def->opts.hint)
 		return true;
+	if (old_def->opts.fast_offset != new_def->opts.fast_offset)
+		return true;
 
 	const struct key_def *old_cmp_def, *new_cmp_def;
 	if (index_depends_on_pk(index)) {
