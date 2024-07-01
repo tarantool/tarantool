@@ -1086,6 +1086,36 @@ txn_limbo_filter_request(struct txn_limbo *limbo,
 	}
 }
 
+/**
+ * Update the state of synchronous replication for system spaces.
+ */
+static void
+txn_limbo_update_system_spaces_is_sync_state(struct txn_limbo *limbo,
+					     const struct synchro_request *req,
+					     bool is_rollback)
+{
+	/* Do not enable synchronous replication during bootstrap. */
+	if (req->origin_id == REPLICA_ID_NIL)
+		return;
+	uint16_t req_type = req->type;
+	assert(req_type == IPROTO_RAFT_PROMOTE ||
+	       req_type == IPROTO_RAFT_DEMOTE);
+	if (is_rollback) {
+		/* Reverse the request type. */
+		req_type = req_type == IPROTO_RAFT_PROMOTE ?
+			   IPROTO_RAFT_DEMOTE : IPROTO_RAFT_PROMOTE;
+	}
+	/* Synchronous replication is already enabled. */
+	if (!is_rollback && req_type == IPROTO_RAFT_PROMOTE &&
+	    limbo->owner_id != REPLICA_ID_NIL)
+		return;
+	/* Synchronous replication is already disabled. */
+	if (!is_rollback && req_type == IPROTO_RAFT_DEMOTE &&
+	    limbo->owner_id == REPLICA_ID_NIL)
+		return;
+	system_spaces_update_is_sync_state(req_type == IPROTO_RAFT_PROMOTE);
+}
+
 int
 txn_limbo_req_prepare(struct txn_limbo *limbo,
 		      const struct synchro_request *req)
@@ -1126,6 +1156,8 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 		limbo->confirmed_lsn = req->lsn;
 		vclock_reset(&limbo->confirmed_vclock, limbo->owner_id,
 			     req->lsn);
+		txn_limbo_update_system_spaces_is_sync_state(
+			limbo, req, /*is_rollback=*/false);
 		break;
 	}
 	/*
@@ -1150,6 +1182,8 @@ txn_limbo_req_rollback(struct txn_limbo *limbo,
 		vclock_reset(&limbo->confirmed_vclock, limbo->owner_id,
 			     limbo->svp_confirmed_lsn);
 		limbo->svp_confirmed_lsn = -1;
+		txn_limbo_update_system_spaces_is_sync_state(
+			limbo, req, /*is_rollback=*/true);
 		limbo->is_in_rollback = false;
 		break;
 	}
@@ -1300,6 +1334,12 @@ txn_limbo_filter_disable(struct txn_limbo *limbo)
 	latch_lock(&limbo->promote_latch);
 	limbo->do_validate = false;
 	latch_unlock(&limbo->promote_latch);
+}
+
+bool
+txn_limbo_has_owner(struct txn_limbo *limbo)
+{
+	return limbo->owner_id != REPLICA_ID_NIL;
 }
 
 void

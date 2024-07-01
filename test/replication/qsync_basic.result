@@ -11,6 +11,14 @@ s1.is_sync
  | ---
  | - true
  | ...
+s1.state.is_sync
+ | ---
+ | - true
+ | ...
+s1.is_sync == s1.state.is_sync
+ | ---
+ | - true
+ | ...
 pk = s1:create_index('pk')
  | ---
  | ...
@@ -33,6 +41,14 @@ s2 = box.schema.create_space('test2')
 s2.is_sync
  | ---
  | - false
+ | ...
+s2.state.is_sync
+ | ---
+ | - false
+ | ...
+s2.is_sync == s2.state.is_sync
+ | ---
+ | - true
  | ...
 
 -- Net.box takes sync into account.

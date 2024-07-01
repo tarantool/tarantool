@@ -284,6 +284,14 @@ struct space {
 	 * this object in sync. For more information see #9120.
 	 */
 	int lua_ref;
+	/** The effective state of this space. */
+	struct {
+		/**
+		 * The effective state of synchronous replication for this
+		 * space.
+		 */
+		bool is_sync;
+	} state;
 };
 
 /** Space alter statement. */
@@ -409,7 +417,7 @@ space_is_temporary(const struct space *space)
 static inline bool
 space_is_sync(const struct space *space)
 {
-	return space->def->opts.is_sync;
+	return space->state.is_sync;
 }
 
 /** Return replication group id of a space. */
@@ -722,6 +730,10 @@ space_delete(struct space *space);
  */
 int
 space_foreach(int (*func)(struct space *sp, void *udata), void *udata);
+
+/** Update the state of synchronous replication for system spaces. */
+void
+system_spaces_update_is_sync_state(bool is_sync);
 
 /**
  * Dump space definition (key definitions, key count)
