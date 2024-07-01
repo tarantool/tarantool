@@ -104,6 +104,8 @@ struct wal_writer
 	struct cpipe wal_pipe;
 	/** A memory pool for messages. */
 	struct mempool msg_pool;
+	/** Vclock to propagate on write. */
+	struct vclock *instance_vclock;
 	/**
 	 * A last journal entry submitted to write. This is a
 	 * 'rollback border'. When rollback starts, all
@@ -376,7 +378,7 @@ tx_complete_batch(struct cmsg *msg)
 		tx_complete_rollback();
 	}
 	/* Update the tx vclock to the latest written by wal. */
-	vclock_copy(&replicaset.vclock, &batch->vclock);
+	vclock_copy(writer->instance_vclock, &batch->vclock);
 	tx_schedule_queue(&batch->commit);
 	trigger_run(&wal_on_write, NULL);
 	mempool_free(&writer->msg_pool, container_of(msg, struct wal_msg, base));
@@ -421,9 +423,11 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 		  const char *wal_dirname, int64_t wal_max_size,
 		  double wal_retention_period,
 		  const struct tt_uuid *instance_uuid,
+		  struct vclock *instance_vclock,
 		  wal_on_garbage_collection_f on_garbage_collection,
 		  wal_on_checkpoint_threshold_f on_checkpoint_threshold)
 {
+	writer->instance_vclock = instance_vclock;
 	writer->wal_mode = wal_mode;
 	writer->wal_max_size = wal_max_size;
 
@@ -547,13 +551,14 @@ int
 wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	 int64_t wal_max_size, double wal_retention_period,
 	 const struct tt_uuid *instance_uuid,
+	 struct vclock *instance_vclock,
 	 wal_on_garbage_collection_f on_garbage_collection,
 	 wal_on_checkpoint_threshold_f on_checkpoint_threshold)
 {
 	/* Initialize the state. */
 	struct wal_writer *writer = &wal_writer_singleton;
 	wal_writer_create(writer, wal_mode, wal_dirname, wal_max_size,
-			  wal_retention_period, instance_uuid,
+			  wal_retention_period, instance_uuid, instance_vclock,
 			  on_garbage_collection, on_checkpoint_threshold);
 
 	/* Start WAL thread. */
@@ -572,7 +577,7 @@ wal_enable(void)
 	struct wal_writer *writer = &wal_writer_singleton;
 
 	/* Initialize the writer vclock from the recovery state. */
-	vclock_copy(&writer->vclock, &replicaset.vclock);
+	vclock_copy(&writer->vclock, writer->instance_vclock);
 
 	/*
 	 * Scan the WAL directory to build an index of all
@@ -1233,7 +1238,7 @@ done:
 	}
 	/*
 	 * Remember the vclock of the last successfully written row so
-	 * that we can update replicaset.vclock once this message gets
+	 * that we can update instance_vclock once this message gets
 	 * back to tx.
 	 */
 	vclock_copy(&wal_msg->vclock, &writer->vclock);
@@ -1415,7 +1420,7 @@ wal_write_none_async(struct journal *journal,
 	vclock_create(&vclock_diff);
 	wal_assign_lsn(&vclock_diff, &writer->vclock, entry);
 	vclock_merge(&writer->vclock, &vclock_diff);
-	vclock_copy(&replicaset.vclock, &writer->vclock);
+	vclock_copy(writer->instance_vclock, &writer->vclock);
 	entry->res = vclock_sum(&writer->vclock);
 	journal_async_complete(entry);
 	return 0;

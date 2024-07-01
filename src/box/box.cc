@@ -103,6 +103,15 @@
 
 static char status[64] = "unconfigured";
 
+/**
+ * Storage for WAL vclock. Not in-memory but specifically for what is the
+ * vclock of the end of WAL.
+ *
+ * It is encapsulated inside this file to protect it from any illegal changes
+ * by outside code.
+ */
+static struct vclock instance_vclock_storage;
+
 /** box.stat rmean */
 struct rmean *rmean_box;
 
@@ -115,7 +124,8 @@ struct rlist box_on_shutdown_trigger_list =
 
 struct event *box_on_shutdown_event = NULL;
 
-const struct vclock *box_vclock = &replicaset.vclock;
+const struct vclock *box_vclock = instance_vclock;
+const struct vclock *instance_vclock = &instance_vclock_storage;
 
 const char *box_auth_type;
 
@@ -324,10 +334,10 @@ box_broadcast_ballot_on_timeout(ev_loop *loop, ev_timer *timer, int events)
 	(void)timer;
 	(void)events;
 	static struct vclock broadcast_vclock;
-	if (vclock_compare_ignore0(&broadcast_vclock, &replicaset.vclock) == 0)
+	if (vclock_compare_ignore0(&broadcast_vclock, instance_vclock) == 0)
 		return;
 	box_broadcast_ballot();
-	vclock_copy(&broadcast_vclock, &replicaset.vclock);
+	vclock_copy(&broadcast_vclock, instance_vclock);
 }
 
 /**
@@ -637,6 +647,8 @@ recovery_journal_write(struct journal *base,
 		       struct journal_entry *entry)
 {
 	struct recovery_journal *journal = (struct recovery_journal *) base;
+	for (int i = 0; i < entry->n_rows; ++i)
+		vclock_follow_xrow(journal->vclock, entry->rows[i]);
 	entry->res = vclock_sum(journal->vclock);
 	/*
 	 * Since there're no actual writes, fire a
@@ -722,6 +734,8 @@ wal_stream_apply_synchro_row(struct wal_stream *stream, struct xrow_header *row)
 		say_error("couldn't decode a synchro request");
 		return -1;
 	}
+	if (journal_write_row(row) != 0)
+		return -1;
 	return txn_limbo_process(&txn_limbo, &syn_req);
 }
 
@@ -739,6 +753,8 @@ wal_stream_apply_raft_row(struct wal_stream *stream, struct xrow_header *row)
 		say_error("couldn't decode a raft request");
 		return -1;
 	}
+	if (journal_write_row(row) != 0)
+		return -1;
 	box_raft_recover(&raft_req);
 	return 0;
 }
@@ -815,6 +831,12 @@ wal_stream_apply_dml_row(struct wal_stream *stream, struct xrow_header *row)
 			say_error("couldn't apply the request");
 			goto end_diag_request;
 		}
+	} else {
+		if (txn_begin_stmt(txn, NULL, request.type) != 0)
+			goto end_diag_request;
+		if (txn_commit_stmt(txn, &request))
+			goto end_diag_request;
+
 	}
 	assert(txn != NULL);
 	if (!row->is_commit)
@@ -2659,7 +2681,7 @@ box_collect_confirmed_vclock(struct vclock *confirmed_vclock, double deadline)
 	 * We should check the vclock on self plus vclock_count - 1 remote
 	 * instances.
 	 */
-	vclock_copy(confirmed_vclock, &replicaset.vclock);
+	vclock_copy(confirmed_vclock, instance_vclock);
 	if (vclock_count <= 1)
 		return 0;
 
@@ -2739,7 +2761,7 @@ box_wait_vclock_f(struct trigger *trigger, void *event)
 	(void)event;
 	struct box_wait_vclock_data *data =
 		(struct box_wait_vclock_data *)trigger->data;
-	if (vclock_compare_ignore0(data->vclock, &replicaset.vclock) <= 0) {
+	if (vclock_compare_ignore0(data->vclock, instance_vclock) <= 0) {
 		data->is_ready = true;
 		fiber_wakeup(data->waiter);
 	}
@@ -2753,7 +2775,7 @@ box_wait_vclock_f(struct trigger *trigger, void *event)
 static int
 box_wait_vclock(const struct vclock *vclock, double deadline)
 {
-	if (vclock_compare_ignore0(vclock, &replicaset.vclock) <= 0)
+	if (vclock_compare_ignore0(vclock, instance_vclock) <= 0)
 		return 0;
 	struct trigger on_wal_write;
 	struct box_wait_vclock_data data = {
@@ -4319,7 +4341,7 @@ box_process_fetch_snapshot(struct iostream *io,
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
-	vclock_copy(&stop_vclock, &replicaset.vclock);
+	vclock_copy(&stop_vclock, instance_vclock);
 
 	/* Send end of snapshot data marker */
 	struct xrow_header row;
@@ -4346,7 +4368,7 @@ static void
 box_localize_vclock(const struct vclock *remote, struct vclock *local)
 {
 	vclock_copy(local, remote);
-	vclock_reset(local, 0, vclock_get(&replicaset.vclock, 0));
+	vclock_reset(local, 0, vclock_get(instance_vclock, 0));
 }
 
 void
@@ -4424,7 +4446,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 		tnt_raise(ClientError, ER_CANNOT_REGISTER);
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
-	vclock_copy(&stop_vclock, &replicaset.vclock);
+	vclock_copy(&stop_vclock, instance_vclock);
 	/*
 	 * Feed replica with WALs up to the REGISTER itself so that it gets own
 	 * registration entry.
@@ -4436,7 +4458,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	RegionGuard region_guard(&fiber()->gc);
 	struct xrow_header row;
 	/* Send end of WAL stream marker */
-	xrow_encode_vclock(&row, &replicaset.vclock);
+	xrow_encode_vclock(&row, instance_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -4552,8 +4574,8 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * Register the replica as a WAL consumer so that
 	 * it can resume FINAL JOIN where INITIAL JOIN ends.
 	 */
-	struct gc_consumer *gc = gc_consumer_register(&replicaset.vclock,
-				"replica %s", tt_uuid_str(&req.instance_uuid));
+	struct gc_consumer *gc = gc_consumer_register(
+		instance_vclock, "replica %s", tt_uuid_str(&req.instance_uuid));
 	if (gc == NULL)
 		diag_raise();
 	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
@@ -4581,7 +4603,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
-	vclock_copy(&stop_vclock, &replicaset.vclock);
+	vclock_copy(&stop_vclock, instance_vclock);
 	/* Send end of initial stage data marker */
 	struct xrow_header row;
 	RegionGuard region_guard(&fiber()->gc);
@@ -4598,7 +4620,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	say_info("final data sent.");
 
 	/* Send end of WAL stream marker */
-	xrow_encode_vclock(&row, &replicaset.vclock);
+	xrow_encode_vclock(&row, instance_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -4748,7 +4770,7 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 */
 	struct subscribe_response rsp;
 	memset(&rsp, 0, sizeof(rsp));
-	vclock_copy(&rsp.vclock, &replicaset.vclock);
+	vclock_copy(&rsp.vclock, instance_vclock);
 	rsp.replicaset_uuid = REPLICASET_UUID;
 	strlcpy(rsp.replicaset_name, REPLICASET_NAME, NODE_NAME_SIZE_MAX);
 	struct xrow_header row;
@@ -4810,7 +4832,7 @@ box_process_vote(struct ballot *ballot)
 	ballot->is_anon = cfg_replication_anon;
 	ballot->is_ro = is_ro_summary;
 	ballot->is_booted = is_box_configured;
-	vclock_copy(&ballot->vclock, &replicaset.vclock);
+	vclock_copy(&ballot->vclock, instance_vclock);
 	vclock_copy(&ballot->gc_vclock, &gc.vclock);
 	ballot->bootstrap_leader_uuid = bootstrap_leader_uuid;
 	if (*INSTANCE_NAME != '\0') {
@@ -4952,6 +4974,26 @@ bootstrap_journal_write(struct journal *base, struct journal_entry *entry)
 }
 
 /**
+ * Initial join rows are coming from a remote master and can include meta data
+ * like pure vclock updates.
+ */
+static int
+initial_join_journal_write(struct journal *base, struct journal_entry *entry)
+{
+	assert(entry->n_rows == 1);
+	struct xrow_header *row = entry->rows[0];
+	/*
+	 * During initial join the remote master sends vclock of the snapshot.
+	 * It goes into the journal vclock via the journal API so as applier
+	 * wouldn't have to touch the instance's vclock manually.
+	 */
+	if (row->type == IPROTO_OK &&
+	    xrow_decode_vclock(row, &instance_vclock_storage) != 0)
+		return -1;
+	return bootstrap_journal_write(base, entry);
+}
+
+/**
  * Wait until every remote peer that managed to connect chooses this node as its
  * bootstrap leader and fail otherwise.
  */
@@ -5089,7 +5131,13 @@ bootstrap_from_master(struct replica *master)
 	say_info("bootstrapping replica from %s at %s",
 		 tt_uuid_str(&master->uuid),
 		 sio_strfaddr(&applier->addr, applier->addr_len));
-
+	struct journal initial_join_journal;
+	journal_create(&initial_join_journal, NULL, initial_join_journal_write);
+	journal_set(&initial_join_journal);
+	struct journal *old_journal = current_journal;
+	auto initial_join_journal_guard = make_scoped_guard([old_journal] {
+		journal_set(old_journal);
+	});
 	/*
 	 * Send JOIN request to master
 	 * See box_process_join().
@@ -5112,14 +5160,15 @@ bootstrap_from_master(struct replica *master)
 					APPLIER_FETCHED_SNAPSHOT :
 					APPLIER_FINAL_JOIN;
 	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
-
+	initial_join_journal_guard.is_active = false;
+	journal_set(old_journal);
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
 
 	/*
 	 * Process final data (WALs).
 	 */
 	engine_begin_final_recovery_xc();
-	recovery_journal_create(&replicaset.vclock);
+	recovery_journal_create(&instance_vclock_storage);
 
 	if (!cfg_replication_anon) {
 		applier_resume_to_state(applier, APPLIER_JOINED,
@@ -5278,7 +5327,7 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	 */
 	box_vclock = &recovery->vclock;
 	auto guard = make_scoped_guard([&]{
-		box_vclock = &replicaset.vclock;
+		box_vclock = instance_vclock;
 		recovery_delete(recovery);
 	});
 
@@ -5288,10 +5337,10 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	 * so we must reflect this in replicaset vclock to
 	 * not attempt to apply these rows twice.
 	 */
-	recovery_scan(recovery, &replicaset.vclock, &gc.vclock,
+	recovery_scan(recovery, &instance_vclock_storage, &gc.vclock,
 		      &wal_stream.base);
 	box_broadcast_ballot();
-	say_info("instance vclock %s", vclock_to_string(&replicaset.vclock));
+	say_info("instance vclock %s", vclock_to_string(instance_vclock));
 
 	if (wal_dir_lock >= 0) {
 		if (box_listen() != 0)
@@ -5339,8 +5388,6 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	assert(memtx != NULL);
 
-	recovery_journal_create(&recovery->vclock);
-
 	/*
 	 * We explicitly request memtx to recover its
 	 * snapshot as a separate phase since it contains
@@ -5349,9 +5396,14 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	 * other engines.
 	 */
 	memtx_engine_recover_snapshot_xc(memtx, checkpoint_vclock);
-
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
-
+	/*
+	 * Xlog starts after snapshot. Hence recovery vclock must point at the
+	 * end of snapshot (= checkpoint vclock).
+	 */
+	struct vclock recovery_vclock;
+	vclock_copy(&recovery_vclock, checkpoint_vclock);
+	recovery_journal_create(&recovery_vclock);
 	engine_begin_final_recovery_xc();
 	recover_remaining_wals(recovery, &wal_stream.base, NULL, false);
 	if (wal_stream_has_unfinished_tx(&wal_stream)) {
@@ -5394,11 +5446,11 @@ local_recovery(const struct vclock *checkpoint_vclock)
 		 * Advance replica set vclock to reflect records
 		 * applied in hot standby mode.
 		 */
-		vclock_copy(&replicaset.vclock, &recovery->vclock);
+		vclock_copy(&instance_vclock_storage, &recovery->vclock);
 		if (box_listen() != 0)
 			diag_raise();
 		box_update_replication();
-	} else if (vclock_compare(&replicaset.vclock, &recovery->vclock) != 0) {
+	} else if (vclock_compare(instance_vclock, &recovery->vclock) != 0) {
 		/*
 		 * There are several reasons for a node to recover a vclock not
 		 * matching the one scanned initially:
@@ -5424,12 +5476,13 @@ local_recovery(const struct vclock *checkpoint_vclock)
 		const char *mismatch_str =
 			tt_sprintf("Replicaset vclock %s doesn't match "
 				   "recovered data %s",
-				   vclock_to_string(&replicaset.vclock),
+				   vclock_to_string(instance_vclock),
 				   vclock_to_string(&recovery->vclock));
 		if (box_is_force_recovery) {
 			say_warn("%s: ignoring, because 'force_recovery' "
 				 "configuration option is set.", mismatch_str);
-			vclock_copy(&replicaset.vclock, &recovery->vclock);
+			vclock_copy(&instance_vclock_storage,
+				    &recovery->vclock);
 		} else {
 			panic("Can't proceed. %s.", mismatch_str);
 		}
@@ -5528,7 +5581,6 @@ box_cfg_xc(void)
 	if (box_set_replication_synchro_timeout() != 0)
 		diag_raise();
 	box_set_replication_sync_timeout();
-	box_set_replication_skip_conflict();
 	if (box_check_instance_name(cfg_instance_name) != 0)
 		diag_raise();
 	if (box_set_wal_queue_max_size() != 0)
@@ -5574,13 +5626,18 @@ box_cfg_xc(void)
 		/* Bootstrap a new instance */
 		bootstrap(&is_bootstrap_leader);
 	}
+	/*
+	 * During bootstrap from a remote master try not to ignore the
+	 * conflicts, neither during snapshot fetch, not join.
+	 */
+	box_set_replication_skip_conflict();
 	replicaset_state = REPLICASET_READY;
 
 	/*
 	 * replicaset.applier.vclock is filled with real
 	 * value where local restore has already completed
 	 */
-	vclock_copy(&replicaset.applier.vclock, &replicaset.vclock);
+	vclock_copy(&replicaset.applier.vclock, instance_vclock);
 
 	/*
 	 * Exclude self from GC delay because we care
@@ -5629,7 +5686,7 @@ box_cfg_xc(void)
 	struct raft *raft = box_raft();
 	if (!cfg_replication_anon)
 		raft_cfg_instance_id(raft, instance_id);
-	raft_cfg_vclock(raft, &replicaset.vclock);
+	raft_cfg_vclock(raft, instance_vclock);
 
 	if (box_set_election_timeout() != 0)
 		diag_raise();
@@ -6007,7 +6064,7 @@ box_storage_init(void)
 	double wal_retention_period = box_check_wal_retention_period_xc();
 	if (wal_init(wal_mode, cfg_gets("wal_dir"), wal_max_size,
 		     wal_retention_period, &INSTANCE_UUID,
-		     on_wal_garbage_collection,
+		     &instance_vclock_storage, on_wal_garbage_collection,
 		     on_wal_checkpoint_threshold) != 0) {
 		diag_raise();
 	}

@@ -2737,7 +2737,7 @@ tx_process_misc(struct cmsg *m)
 				::schema_version);
 		break;
 	case IPROTO_VOTE_DEPRECATED:
-		iproto_reply_vclock(out, &replicaset.vclock, msg->header.sync,
+		iproto_reply_vclock(out, instance_vclock, msg->header.sync,
 				    ::schema_version);
 		break;
 	case IPROTO_VOTE:

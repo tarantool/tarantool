@@ -277,6 +277,10 @@ journal_write(struct journal_entry *entry)
 	return current_journal->write(current_journal, entry);
 }
 
+/** Write a single row in a blocking way. */
+int
+journal_write_row(struct xrow_header *row);
+
 /**
  * Queue a single entry to the journal in asynchronous way.
  *

@@ -109,6 +109,7 @@ int
 wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	 int64_t wal_max_size, double wal_retention_period,
 	 const struct tt_uuid *instance_uuid,
+	 struct vclock *instance_vclock,
 	 wal_on_garbage_collection_f on_garbage_collection,
 	 wal_on_checkpoint_threshold_f on_checkpoint_threshold);
 

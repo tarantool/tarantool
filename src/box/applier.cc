@@ -157,7 +157,7 @@ applier_check_sync(struct applier *applier)
 	if (applier->state == APPLIER_SYNC &&
 	    applier->lag <= replication_sync_lag &&
 	    vclock_compare_ignore0(&applier->remote_vclock_at_subscribe,
-				   &replicaset.vclock) <= 0) {
+				   instance_vclock) <= 0) {
 		/* Applier is synced, switch to "follow". */
 		applier_set_state(applier, APPLIER_FOLLOW);
 	}
@@ -180,6 +180,10 @@ applier_fiber_new(struct applier *applier, const char *name, fiber_func func,
 	fiber_set_joinable(f, is_joinable);
 	return f;
 }
+
+/** Apply all rows in the rows queue as a single transaction. */
+static int
+applier_apply_tx(struct applier *applier, struct stailq *rows);
 
 /*
  * Fiber function to write vclock to replication master.
@@ -779,12 +783,13 @@ applier_wait_snapshot(struct applier *applier)
 				  (uint32_t) row.type);
 		}
 		/*
-		 * Start vclock. The vclock of the checkpoint
-		 * the master is sending to the replica.
-		 * Used to initialize the replica's initial
-		 * vclock in bootstrap_from_master()
+		 * Start vclock. The vclock of the checkpoint the master is
+		 * sending to the replica. Used to initialize the replica's
+		 * initial vclock in bootstrap_from_master(). Let the journal
+		 * handle this update as a special request to bump vclock.
 		 */
-		xrow_decode_vclock_xc(&row, &replicaset.vclock);
+		if (journal_write_row(&row) != 0)
+			diag_raise();
 	}
 
 	coio_read_xrow(io, ibuf, &row);
@@ -840,7 +845,8 @@ applier_wait_snapshot(struct applier *applier)
 				 * vclock yet, do it now. In 1.7+
 				 * this vclock is not used.
 				 */
-				xrow_decode_vclock_xc(&row, &replicaset.vclock);
+				if (journal_write_row(&row) != 0)
+					diag_raise();
 			}
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
@@ -884,9 +890,6 @@ struct applier_read_ctx {
 static uint64_t
 applier_read_tx(struct applier *applier, struct stailq *rows,
 		const struct applier_read_ctx *ctx, double timeout);
-
-static int
-apply_final_join_tx(uint32_t replica_id, struct stailq *rows);
 
 /**
  * A helper struct to link xrow objects in a list.
@@ -1003,7 +1006,7 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 						  next)->row);
 			break;
 		}
-		if (apply_final_join_tx(applier->instance_id, &rows) != 0)
+		if (applier_apply_tx(applier, &rows) != 0)
 			diag_raise();
 	}
 
@@ -1220,7 +1223,7 @@ applier_rollback_by_wal_io(int64_t signature)
 	trigger_run(&replicaset.applier.on_rollback, NULL);
 
 	/* Rollback applier vclock to the committed one. */
-	vclock_copy(&replicaset.applier.vclock, &replicaset.vclock);
+	vclock_copy(&replicaset.applier.vclock, instance_vclock);
 }
 
 static int
@@ -1384,8 +1387,7 @@ applier_handle_raft_request(struct applier *applier, struct raft_request *req)
 }
 
 static int
-apply_plain_tx(uint32_t replica_id, struct stailq *rows,
-	       bool skip_conflict, bool use_triggers)
+apply_plain_tx(uint32_t replica_id, struct stailq *rows)
 {
 	/*
 	 * Explicitly begin the transaction so that we can
@@ -1402,7 +1404,7 @@ apply_plain_tx(uint32_t replica_id, struct stailq *rows,
 	stailq_foreach_entry(item, rows, next) {
 		struct xrow_header *row = &item->row;
 		int res = apply_request(&item->req.dml);
-		if (res != 0 && skip_conflict) {
+		if (res != 0 && replication_skip_conflict) {
 			struct error *e = diag_last_error(diag_get());
 			/*
 			 * In case of ER_TUPLE_FOUND error and enabled
@@ -1452,70 +1454,39 @@ apply_plain_tx(uint32_t replica_id, struct stailq *rows,
 	 */
 	if ((item->row.flags & IPROTO_FLAG_WAIT_ACK) != 0)
 		box_txn_make_sync();
-
-	if (use_triggers) {
-		/* We are ready to submit txn to wal. */
-		struct trigger *on_rollback, *on_wal_write;
-		size_t size;
-		on_rollback = region_alloc_object(&txn->region, typeof(*on_rollback),
-						  &size);
-		on_wal_write = region_alloc_object(&txn->region, typeof(*on_wal_write),
-						   &size);
-		if (on_rollback == NULL || on_wal_write == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc_object",
-				 "on_rollback/on_wal_write");
-			goto fail;
-		}
-
-		struct replica_cb_data *rcb;
-		rcb = region_alloc_object(&txn->region, typeof(*rcb), &size);
-		if (rcb == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc_object", "rcb");
-			goto fail;
-		}
-
-		trigger_create(on_rollback, applier_txn_rollback_cb, NULL, NULL);
-		txn_on_rollback(txn, on_rollback);
-
-		/*
-		 * We use *last* entry timestamp because ack comes up to
-		 * last entry in transaction. Same time this shows more
-		 * precise result because we're interested in how long
-		 * transaction traversed network + remote WAL bundle before
-		 * ack get received.
-		 */
-		rcb->replica_id = replica_id;
-		rcb->txn_last_tm = item->row.tm;
-
-		trigger_create(on_wal_write, applier_txn_wal_write_cb, rcb, NULL);
-		txn_on_wal_write(txn, on_wal_write);
+	size_t size;
+	struct trigger *on_rollback, *on_wal_write;
+	on_rollback = region_alloc_object(&txn->region, typeof(*on_rollback),
+					  &size);
+	on_wal_write = region_alloc_object(&txn->region, typeof(*on_wal_write),
+					   &size);
+	if (on_rollback == NULL || on_wal_write == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc_object",
+			 "on_rollback/on_wal_write");
+		goto fail;
 	}
-
+	struct replica_cb_data *rcb;
+	rcb = region_alloc_object(&txn->region, typeof(*rcb), &size);
+	if (rcb == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc_object", "rcb");
+		goto fail;
+	}
+	trigger_create(on_rollback, applier_txn_rollback_cb, NULL, NULL);
+	txn_on_rollback(txn, on_rollback);
+	/*
+	 * We use *last* entry timestamp because ack comes up to last entry in
+	 * transaction. Same time this shows more precise result because we're
+	 * interested in how long transaction traversed network + remote WAL
+	 * bundle before ack get received.
+	 */
+	rcb->replica_id = replica_id;
+	rcb->txn_last_tm = item->row.tm;
+	trigger_create(on_wal_write, applier_txn_wal_write_cb, rcb, NULL);
+	txn_on_wal_write(txn, on_wal_write);
 	return txn_commit_try_async(txn);
 fail:
 	txn_abort(txn);
 	return -1;
-}
-
-/** A simpler version of applier_apply_tx() for final join stage. */
-static int
-apply_final_join_tx(uint32_t replica_id, struct stailq *rows)
-{
-	struct applier_tx_row *txr =
-		stailq_first_entry(rows, struct applier_tx_row, next);
-
-	struct xrow_header *last_row =
-		&stailq_last_entry(rows, struct applier_tx_row, next)->row;
-	int rc = 0;
-	/* WAL isn't enabled yet, so follow vclock manually. */
-	vclock_follow_xrow(&replicaset.vclock, last_row);
-	if (unlikely(iproto_type_is_synchro_request(txr->row.type))) {
-		rc = apply_synchro_req(replica_id, &txr->row,
-				       &txr->req.synchro);
-	} else {
-		rc = apply_plain_tx(replica_id, rows, false, false);
-	}
-	return rc;
 }
 
 /**
@@ -1635,11 +1606,6 @@ applier_process_heartbeat(struct applier *applier, struct applier_tx_row *txr)
 	return 0;
 }
 
-/**
- * Apply all rows in the rows queue as a single transaction.
- *
- * Return 0 for success or -1 in case of an error.
- */
 static int
 applier_apply_tx(struct applier *applier, struct stailq *rows)
 {
@@ -1710,8 +1676,7 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 		rc = apply_synchro_req(applier->instance_id, &txr->row,
 				       &txr->req.synchro);
 	} else {
-		rc = apply_plain_tx(applier->instance_id, rows,
-				    replication_skip_conflict, true);
+		rc = apply_plain_tx(applier->instance_id, rows);
 	}
 	if (rc != 0)
 		goto finish;
@@ -1744,7 +1709,7 @@ applier_signal_ack(struct applier *applier)
 		applier->txn_last_tm = 0;
 		applier->ack_msg.vclock_sync = applier->last_vclock_sync;
 		applier->ack_msg.term = box_raft()->term;
-		vclock_copy(&applier->ack_msg.vclock, &replicaset.vclock);
+		vclock_copy(&applier->ack_msg.vclock, instance_vclock);
 		cmsg_init(&applier->ack_msg.base, applier->ack_route);
 		cpipe_push(&applier->applier_thread->thread_pipe,
 			   &applier->ack_msg.base);
@@ -2376,7 +2341,7 @@ applier_subscribe(struct applier *applier)
 
 	struct subscribe_request req;
 	memset(&req, 0, sizeof(req));
-	vclock_copy(&req.vclock, &replicaset.vclock);
+	vclock_copy(&req.vclock, instance_vclock);
 	ERROR_INJECT(ERRINJ_REPLICASET_VCLOCK, {
 		vclock_create(&req.vclock);
 	});

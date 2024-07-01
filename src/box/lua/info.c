@@ -198,7 +198,7 @@ lbox_pushreplica(lua_State *L, struct replica *replica)
 	lua_setfield(L, -2, "name");
 
 	lua_pushstring(L, "lsn");
-	luaL_pushuint64(L, vclock_get(&replicaset.vclock, replica->id));
+	luaL_pushuint64(L, vclock_get(instance_vclock, replica->id));
 	lua_settable(L, -3);
 
 	if (applier != NULL && applier->state != APPLIER_OFF) {
