@@ -147,6 +147,9 @@ g.test_async_old_term = function(cg)
     cg.split_replica:exec(write_promote)
     cg.main:exec(function() box.space.async:replace{1} end)
     reconnect_and_check_split_brain(cg)
+    -- gh-10073: assertion in latch fails after split brain.
+    cg.split_replica:exec(update_replication, {})
+    reconnect_and_check_split_brain(cg)
 end
 
 -- A conflicting sync transaction confirmation from an obsolete term means a
