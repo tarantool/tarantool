@@ -863,8 +863,14 @@ applier_fetch_snapshot(struct applier *applier)
 	struct iostream *io = &applier->io;
 	struct xrow_header row;
 
+	struct vclock vclock;
+	vclock_create(&vclock);
 	struct fetch_snapshot_request req = {
 		.version_id = tarantool_version_id(),
+		/* Applier doesn't support checkpoint join. */
+		.is_checkpoint_join = false,
+		.checkpoint_vclock = vclock,
+		.checkpoint_lsn = 0,
 	};
 	RegionGuard region_guard(&fiber()->gc);
 	xrow_encode_fetch_snapshot(&row, &req);

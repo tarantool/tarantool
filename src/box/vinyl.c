@@ -3029,6 +3029,42 @@ struct vy_join_ctx {
 	struct vy_read_view *rv;
 };
 
+#if defined(ENABLE_FETCH_SNAPSHOT_CHECKPOINT_CURSOR)
+#include "vinyl_checkpoint_join.c"
+#else /* !defined(ENABLE_FETCH_SNAPSHOT_CHECKPOINT_CURSOR) */
+
+static int
+vinyl_engine_prepare_checkpoint_join(struct engine *engine,
+				     struct engine_join_ctx *ctx)
+{
+	(void)engine;
+	(void)ctx;
+	diag_set(ClientError, ER_UNSUPPORTED, "Tarantool CE",
+		 "checkpoint join");
+	return -1;
+}
+
+static int
+vinyl_engine_checkpoint_join(struct engine *engine, struct engine_join_ctx *ctx,
+			     struct xstream *stream)
+{
+	(void)engine;
+	(void)ctx;
+	(void)stream;
+	unreachable();
+	return -1;
+}
+
+static void
+vinyl_engine_complete_checkpoint_join(struct engine *engine,
+				      struct engine_join_ctx *ctx)
+{
+	(void)engine;
+	(void)ctx;
+}
+
+#endif /* !defined(ENABLE_FETCH_SNAPSHOT_CHECKPOINT_CURSOR) */
+
 static int
 vy_join_add_space(struct space *space, void *arg)
 {
@@ -3063,6 +3099,9 @@ vy_join_add_space(struct space *space, void *arg)
 static int
 vinyl_engine_prepare_join(struct engine *engine, struct engine_join_ctx *arg)
 {
+	if (arg->cursor != NULL)
+		return vinyl_engine_prepare_checkpoint_join(engine, arg);
+
 	struct vy_env *env = vy_env(engine);
 	struct vy_join_ctx *ctx = malloc(sizeof(*ctx));
 	if (ctx == NULL) {
@@ -3104,7 +3143,9 @@ static int
 vinyl_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 		  struct xstream *stream)
 {
-	(void)engine;
+	if (arg->cursor != NULL)
+		return vinyl_engine_checkpoint_join(engine, arg, stream);
+
 	int loops = 0;
 	struct vy_join_ctx *ctx = arg->data[engine->id];
 	struct vy_join_entry *join_entry;
@@ -3130,6 +3171,11 @@ vinyl_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 static void
 vinyl_engine_complete_join(struct engine *engine, struct engine_join_ctx *arg)
 {
+	if (arg->cursor != NULL) {
+		vinyl_engine_complete_checkpoint_join(engine, arg);
+		return;
+	}
+
 	struct vy_env *env = vy_env(engine);
 	struct vy_join_ctx *ctx = arg->data[engine->id];
 	struct vy_join_entry *entry, *next;
