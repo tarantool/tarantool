@@ -413,7 +413,11 @@ _say_strerror(int errnum);
 				      format, ##__VA_ARGS__)
 /** \endcond public */
 
-#define panic_status(status, ...)	({ say(S_FATAL, NULL, __VA_ARGS__); exit(status); })
+#define panic_status(status, ...) ({\
+	say(S_FATAL, NULL, __VA_ARGS__); \
+	lsan_turn_off(); \
+	exit(status); \
+})
 #define panic(...)			panic_status(EXIT_FAILURE, __VA_ARGS__)
 #define panic_syserror(...)		({ \
 	say(S_FATAL, tt_strerror(errno), __VA_ARGS__); \
