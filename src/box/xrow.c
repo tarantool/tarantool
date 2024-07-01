@@ -2533,7 +2533,7 @@ xrow_decode_applier_heartbeat(const struct xrow_header *row,
 }
 
 void
-xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
+xrow_encode_vclock_ignore0(struct xrow_header *row, const struct vclock *vclock)
 {
 	const struct replication_request base_req = {
 		.vclock = (struct vclock *)vclock,
@@ -2542,7 +2542,7 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 }
 
 int
-xrow_decode_vclock(const struct xrow_header *row, struct vclock *vclock)
+xrow_decode_vclock_ignore0(const struct xrow_header *row, struct vclock *vclock)
 {
 	vclock_create(vclock);
 	struct replication_request base_req = {

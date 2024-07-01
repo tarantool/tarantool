@@ -784,7 +784,7 @@ applier_wait_snapshot(struct applier *applier)
 		 * Used to initialize the replica's initial
 		 * vclock in bootstrap_from_master()
 		 */
-		xrow_decode_vclock_xc(&row, &replicaset.vclock);
+		xrow_decode_vclock_ignore0_xc(&row, &replicaset.vclock);
 	}
 
 	coio_read_xrow(io, ibuf, &row);
@@ -840,7 +840,8 @@ applier_wait_snapshot(struct applier *applier)
 				 * vclock yet, do it now. In 1.7+
 				 * this vclock is not used.
 				 */
-				xrow_decode_vclock_xc(&row, &replicaset.vclock);
+				xrow_decode_vclock_ignore0_xc(
+					&row, &replicaset.vclock);
 			}
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
