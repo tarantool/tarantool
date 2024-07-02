@@ -111,6 +111,19 @@ static struct log log_boot = {
 	.syslog_ident = NULL,
 };
 
+/** Sets if isatty checks log_boot->fd and STDERR_FILENO */
+static int is_initialized = 0;
+
+/** Log color red */
+#define ANSI_COLOR_RED "\x1b[31m"
+/** Log color yellow */
+#define ANSI_COLOR_YELLOW "\x1b[33m"
+/** Log color reset */
+#define ANSI_COLOR_RESET "\x1b[0m"
+
+int
+color_enable(void);
+
 /** Default logger used after bootstrap. */
 static struct log log_std;
 
@@ -711,6 +724,10 @@ log_create(struct log *log, const char *init_str, int nonblock)
 		log->type = SAY_LOGGER_STDERR;
 		log->fd = STDERR_FILENO;
 	}
+	log->isatty = isatty(log->fd);
+	log->isatty_stdin = isatty(STDERR_FILENO);
+	log->color = color_enable();
+	is_initialized = 1;
 	if (log->type == SAY_LOGGER_FILE)
 		rlist_add_entry(&log_rotate_list, log, in_log_list);
 	else
@@ -1032,6 +1049,73 @@ format_syslog_header(char *buf, int len, int level,
  */
 enum { SAY_BUF_LEN_MAX = 16 * 1024 };
 static __thread char say_buf[SAY_BUF_LEN_MAX];
+
+/**
+ * Checks the environment variable `NO_COLOR`.
+ * Returns 0 if `NO_COLOR=1`, and 1 otherwise.
+ */
+int
+color_enable(void)
+{
+	char var_buf[2];
+	const char *envvar = getenv_safe("NO_COLOR", var_buf,
+					 sizeof(var_buf));
+	if (envvar != NULL && envvar[0] != '\0')
+		return envvar[0] == '1' ? 0 : 1;
+	return 1;
+}
+
+/**
+ * Wraps the content of the say_buf in ANSI color codes based on the
+ * provided level.
+ * This function is intended only for output to a terminal (tty).
+ *
+ * The color scheme is as follows:
+ *
+ *    LEVEL      | COLOR
+ *    ---------------------
+ *    S_FATAL    | RED
+ *    S_SYSERROR | RED
+ *    S_ERROR    | RED
+ *    S_CRIT     | RED
+ *    S_WARN     | YELLOW
+ *    S_INFO     | DEFAULT
+ *    S_VERBOSE  | DEFAULT
+ *    S_DEBUG    | DEFAULT
+ */
+static int
+wrap_buffer(int level, int size)
+{
+	if (level > S_WARN || size <= 0)
+		return size;
+
+	const char *color_prefix;
+	int color_prefix_len;
+
+	if (level < S_WARN) {
+		color_prefix = ANSI_COLOR_RED;
+		color_prefix_len = sizeof(ANSI_COLOR_RED) - 1;
+	} else if (level == S_WARN) {
+		color_prefix = ANSI_COLOR_YELLOW;
+		color_prefix_len = sizeof(ANSI_COLOR_YELLOW) - 1;
+	}
+
+	int total = color_prefix_len + size + sizeof(ANSI_COLOR_RESET) - 1;
+	if (total < SAY_BUF_LEN_MAX) {
+		int t = 0; /* the last character of the line is \n */
+		if (say_buf[size - 1] == '\n' && ++t)
+			size--;
+		memmove(say_buf + color_prefix_len, say_buf, size);
+		memcpy(say_buf, color_prefix, color_prefix_len);
+		memcpy(say_buf + color_prefix_len + size, ANSI_COLOR_RESET,
+		       sizeof(ANSI_COLOR_RESET) - 1);
+		if (t != 0)
+			say_buf[total - 1] = '\n';
+		say_buf[total] = '\0';
+		return total;
+	}
+	return size;
+}
 
 /**
  * Wrapper over write which ensures, that writes not more than buffer size.
@@ -1364,10 +1448,21 @@ log_vsay(struct log *log, int level, bool check_level, const char *module,
 	if (check_level && level > log->level)
 		goto out;
 
+	/* log_vsay can be called before log_create and use log_boot. */
+	if (is_initialized == 0) {
+		log->isatty = isatty(log->fd);
+		log->isatty_stdin = isatty(STDERR_FILENO);
+		log->color = color_enable();
+		is_initialized = 1;
+	}
+
 	total = format_log_entry(log, level, module, filename, line, error,
 				 format, ap);
 	if (total <= 0)
 		goto out;
+
+	if (log->isatty && log->type != SAY_LOGGER_BOOT && log->color)
+		total = wrap_buffer(level, total);
 
 	switch (log->type) {
 	case SAY_LOGGER_FILE:
@@ -1383,11 +1478,16 @@ log_vsay(struct log *log, int level, bool check_level, const char *module,
 		break;
 	case SAY_LOGGER_SYSLOG:
 		write_to_syslog(log, total);
-		if (level == S_FATAL && log->fd != STDERR_FILENO)
+		if (level == S_FATAL && log->fd != STDERR_FILENO) {
+			if (log->isatty == 0 && log->isatty_stdin && log->color)
+				total = wrap_buffer(level, total);
 			(void)safe_write(STDERR_FILENO, say_buf, total);
+		}
 		break;
 	case SAY_LOGGER_BOOT:
 	{
+		if (log->isatty_stdin && log->color)
+			total = wrap_buffer(level, total);
 		if (before_stderr_callback != NULL)
 			before_stderr_callback();
 		ssize_t r = safe_write(STDERR_FILENO, say_buf, total);
