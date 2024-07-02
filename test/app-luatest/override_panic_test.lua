@@ -4,6 +4,9 @@ local justrun = require('test.justrun')
 
 local g = t.group()
 
+-- The test needs color output disabled as it checks the reference output.
+os.setenv('NO_COLOR', '1')
+
 g.before_all(function(g)
     treegen.init(g)
 end)

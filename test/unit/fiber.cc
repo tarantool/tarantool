@@ -749,6 +749,9 @@ int main()
 	/* Page should be at least 4K */
 	assert(page_size >= PAGE_4K);
 
+	/* The test needs color output disabled as it checks the reference output */
+	setenv("NO_COLOR", "1", 0);
+
 	memory_init();
 	fiber_init(fiber_cxx_invoke);
 	fiber_attr_create(&default_attr);

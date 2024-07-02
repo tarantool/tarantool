@@ -63,6 +63,13 @@ enum say_level {
 	say_level_MAX
 };
 
+/** Log color red */
+#define ANSI_COLOR_RED "\x1b[31m"
+/** Log color yellow */
+#define ANSI_COLOR_YELLOW "\x1b[33m"
+/** Log color reset */
+#define ANSI_COLOR_RESET "\x1b[0m"
+
 /** Log formats */
 enum say_format {
 	SF_PLAIN,
@@ -163,6 +170,11 @@ typedef int (*log_format_func_t)(struct log *log, char *buf, int len, int level,
 struct log {
 	/** The current file descriptor. */
 	int fd;
+	/**
+	 * Indicates whether the current file is a terminal (tty).
+	 * This field is non-zero if the file descriptor refers to a terminal.
+	 */
+	int isatty;
 	/** The current log level. */
 	int level;
 	enum say_logger_type type;

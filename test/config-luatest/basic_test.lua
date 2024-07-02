@@ -8,6 +8,9 @@ local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
 local cbuilder = require('test.config-luatest.cbuilder')
 
+-- The test needs color output disabled as it checks the reference output.
+os.setenv('NO_COLOR', '1')
+
 local g = helpers.group()
 
 local function count_lines(s)

@@ -2,6 +2,9 @@ local t = require('luatest')
 local justrun = require('test.justrun')
 local treegen = require('test.treegen')
 
+-- The test needs color output disabled as it checks the reference output.
+os.setenv('NO_COLOR', '1')
+
 local g = t.group()
 
 g.before_all(function()
