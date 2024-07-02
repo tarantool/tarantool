@@ -88,14 +88,12 @@ luaL_testcancel(struct lua_State *L)
 static const char *fiberlib_name = "fiber";
 
 /**
- * Trigger invoked when the fiber has stopped execution of its
- * current request. Only purpose - delete storage.lua.fid_ref and
- * storage.lua.storage_ref keeping a reference of Lua
- * fiber and fiber.storage objects. Unlike Lua stack,
- * Lua fiber storage may be created not only for fibers born from
- * Lua land. For example, an IProto request may execute a Lua
- * function, which can create the storage. Trigger guarantees,
- * that even for non-Lua fibers the Lua storage is destroyed.
+ * Trigger invoked when the fiber is stopped. Only purpose - delete
+ * storage.lua.storage_ref keeping a reference of Lua fiber.storage object.
+ * Unlike Lua stack, Lua fiber storage may be created not only for fibers born
+ * from Lua land. For example, an IProto request may execute a Lua function,
+ * which can create the storage. Trigger guarantees, that even for non-Lua
+ * fibers the Lua storage is destroyed.
  */
 static int
 lbox_fiber_on_stop(struct trigger *trigger, void *event)
@@ -103,6 +101,16 @@ lbox_fiber_on_stop(struct trigger *trigger, void *event)
 	struct fiber *f = event;
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, f->storage.lua.storage_ref);
 	f->storage.lua.storage_ref = FIBER_LUA_NOREF;
+	trigger_clear(trigger);
+	free(trigger);
+	return 0;
+}
+
+/** Cleanup Lua fiber data when fiber is destroyed. */
+static int
+lbox_fiber_on_destroy(struct trigger *trigger, void *event)
+{
+	struct fiber *f = event;
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, f->storage.lua.fid_ref);
 	f->storage.lua.fid_ref = FIBER_LUA_NOREF;
 	trigger_clear(trigger);
@@ -118,13 +126,10 @@ lbox_pushfiber(struct lua_State *L, struct fiber *f)
 {
 	int fid_ref = f->storage.lua.fid_ref;
 	if (fid_ref == FIBER_LUA_NOREF) {
-		struct trigger *t = malloc(sizeof(*t));
-		if (t == NULL) {
-			diag_set(OutOfMemory, sizeof(*t), "malloc", "t");
-			luaT_error(L);
-		}
-		trigger_create(t, lbox_fiber_on_stop, NULL, (trigger_f0)free);
-		trigger_add(&f->on_stop, t);
+		struct trigger *on_destroy = xmalloc(sizeof(*on_destroy));
+		trigger_create(on_destroy, lbox_fiber_on_destroy, NULL,
+			       (trigger_f0)free);
+		trigger_add(&f->on_destroy, on_destroy);
 
 		uint64_t fid = f->fid;
 		/* create a new userdata */
@@ -642,6 +647,14 @@ lbox_fiber_storage(struct lua_State *L)
 	struct fiber *f = lbox_checkfiber(L, 1);
 	int storage_ref = f->storage.lua.storage_ref;
 	if (storage_ref == FIBER_LUA_NOREF) {
+		if (f->flags & FIBER_IS_DEAD) {
+			diag_set(IllegalParams, "the fiber is dead");
+			luaT_error(L);
+		}
+		struct trigger *on_stop = xmalloc(sizeof(*on_stop));
+		trigger_create(on_stop, lbox_fiber_on_stop, NULL,
+			       (trigger_f0)free);
+		trigger_add(&f->on_stop, on_stop);
 		lua_newtable(L); /* create local storage on demand */
 		storage_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 		f->storage.lua.storage_ref = storage_ref;

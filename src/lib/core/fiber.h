@@ -683,6 +683,8 @@ struct fiber {
 	 * request, even if they are never destroyed.
 	 */
 	struct rlist on_stop;
+	/** Triggers invoked before fiber is recycled. */
+	struct rlist on_destroy;
 	/**
 	 * The list of fibers awaiting for this fiber's timely
 	 * (or untimely) death.
