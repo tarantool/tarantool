@@ -57,3 +57,12 @@ g.test_gh_9406_shutdown_with_lingering_fiber_join = function()
     local cmd = string.format('%s -e "%s"', tarantool_bin, script)
     t.assert(os.execute(cmd) == 0)
 end
+
+g.test_gh_10187_no_memory_leak_on_dead_fiber_search = function()
+    local f = fiber.new(function() end)
+    f:set_joinable(true)
+    f:wakeup()
+    fiber.yield()
+    local x = fiber.find(f:id())
+    x:join()
+end
