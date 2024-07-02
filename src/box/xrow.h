@@ -154,8 +154,20 @@ xrow_approx_len(const struct xrow_header *row)
  * @post iovcnt <= XROW_IOVMAX
  */
 void
-xrow_header_encode(const struct xrow_header *header, uint64_t sync,
-		   size_t fixheader_len, struct iovec *out, int *iovcnt);
+xrow_encode(const struct xrow_header *header, uint64_t sync,
+	    size_t fixheader_len, struct iovec *out, int *iovcnt);
+
+/**
+ * Encode xrow header into a given buffer.
+ *
+ * @param header xrow.
+ * @param sync request sync number.
+ * @param data buffer. When set to NULL, simply count the needed data size.
+ *
+ * @return the exact space taken for encoding.
+ */
+size_t
+xrow_header_encode(const struct xrow_header *header, uint64_t sync, char *data);
 
 /**
  * Decode xrow from a binary packet
@@ -171,8 +183,8 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
  * @post *pos == end on success if @end_is_exact is set
  */
 int
-xrow_header_decode(struct xrow_header *header, const char **pos,
-		   const char *end, bool end_is_exact);
+xrow_decode(struct xrow_header *header, const char **pos,
+	    const char *end, bool end_is_exact);
 
 /**
  * DML request.
@@ -757,7 +769,7 @@ xrow_encode_type(struct xrow_header *row, uint16_t type);
 
 /**
  * Fast encode xrow header using the specified header fields.
- * It is faster than the xrow_header_encode, because uses
+ * It is faster than the xrow_encode, because uses
  * the predefined values for all fields of the header, defined
  * in the struct iproto_header_bin in iproto_port.cc. Because of
  * it, the implementation is placed in the same
@@ -771,7 +783,7 @@ xrow_encode_type(struct xrow_header *row, uint16_t type);
  * @param schema_version Schema version.
  * @param body_length Length of the body of the iproto message.
  *        Please, pass it without IPROTO_HEADER_LEN.
- * @see xrow_header_encode()
+ * @see xrow_encode()
  */
 void
 iproto_header_encode(char *data, uint16_t type, uint64_t sync,
@@ -1106,12 +1118,12 @@ vclock_follow_xrow(struct vclock* vclock, const struct xrow_header *row)
 #if defined(__cplusplus)
 } /* extern "C" */
 
-/** @copydoc xrow_header_decode. */
+/** @copydoc xrow_decode. */
 static inline void
-xrow_header_decode_xc(struct xrow_header *header, const char **pos,
-		      const char *end, bool end_is_exact)
+xrow_decode_xc(struct xrow_header *header, const char **pos,
+	       const char *end, bool end_is_exact)
 {
-	if (xrow_header_decode(header, pos, end, end_is_exact) < 0)
+	if (xrow_decode(header, pos, end, end_is_exact) < 0)
 		diag_raise();
 }
 

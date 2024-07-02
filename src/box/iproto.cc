@@ -1796,7 +1796,7 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 	struct cmsg_hop *route;
 	int rc;
 
-	if (xrow_header_decode(&msg->header, pos, reqend, true) != 0)
+	if (xrow_decode(&msg->header, pos, reqend, true) != 0)
 		goto error;
 	assert(*pos == reqend);
 

@@ -28,7 +28,7 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 		return -1;
 
 	struct xrow_header header;
-	xrow_header_decode(&header, &p, pe, false);
+	xrow_decode(&header, &p, pe, false);
 
 	return 0;
 }

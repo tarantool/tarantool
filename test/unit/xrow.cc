@@ -205,7 +205,7 @@ test_greeting()
 }
 
 void
-test_xrow_header_encode_decode()
+test_xrow_encode_decode()
 {
 	header();
 	/* Test all possible 3-bit combinations. */
@@ -214,8 +214,8 @@ test_xrow_header_encode_decode()
 	struct xrow_header header;
 	char buffer[2048];
 	char *pos = mp_encode_uint(buffer, 300);
-	is(xrow_header_decode(&header, (const char **) &pos,
-			      buffer + 100, true), -1, "bad msgpack end");
+	is(xrow_decode(&header, (const char **)&pos, buffer + 100, true), -1,
+	   "bad msgpack end");
 
 	header.type = 100;
 	header.replica_id = 200;
@@ -232,8 +232,7 @@ test_xrow_header_encode_decode()
 		header.wait_ack = opt_idx >> 2 & 0x01;
 		int iovcnt;
 		struct iovec vec[1];
-		xrow_header_encode(&header, sync, /*fixheader_len=*/200,
-				   vec, &iovcnt);
+		xrow_encode(&header, sync, /*fixheader_len=*/200, vec, &iovcnt);
 		is(1, iovcnt, "encode");
 		int fixheader_len = 200;
 		pos = (char *)vec[0].iov_base + fixheader_len;
@@ -256,7 +255,7 @@ test_xrow_header_encode_decode()
 		const char *const begin = pos;
 		const char *end = (const char *)vec[0].iov_base;
 		end += vec[0].iov_len;
-		is(xrow_header_decode(&decoded_header, &pos, end, true), 0,
+		is(xrow_decode(&decoded_header, &pos, end, true), 0,
 		   "header decode");
 		is(header.stream_id, decoded_header.stream_id, "decoded stream_id");
 		is(header.is_commit, decoded_header.is_commit, "decoded is_commit");
@@ -451,8 +450,8 @@ test_xrow_decode_unknown_key(void)
 	const char *end = buf + mp_format(buf, sizeof(buf), "{%u%s}",
 					  0xDEAD, "foobar");
 	struct xrow_header header;
-	is(xrow_header_decode(&header, &p, end, /*end_is_exact=*/true), 0,
-	   "xrow_header_decode");
+	is(xrow_decode(&header, &p, end, /*end_is_exact=*/true), 0,
+	   "xrow_decode");
 
 	memset(&header, 0, sizeof(header));
 	header.bodycnt = 1;
@@ -804,7 +803,7 @@ main(void)
 
 	test_iproto_constants();
 	test_greeting();
-	test_xrow_header_encode_decode();
+	test_xrow_encode_decode();
 	test_request_str();
 	test_xrow_fields();
 	test_xrow_encode_dml();
