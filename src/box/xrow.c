@@ -183,8 +183,8 @@ dump_row_hex(const char *start, const char *end) {
 } while (0)
 
 int
-xrow_header_decode(struct xrow_header *header, const char **pos,
-		   const char *end, bool end_is_exact)
+xrow_decode(struct xrow_header *header, const char **pos,
+	    const char *end, bool end_is_exact)
 {
 	memset(header, 0, sizeof(struct xrow_header));
 	const char *tmp = *pos;
@@ -308,15 +308,9 @@ xrow_decode_node_name(const char **pos, char *out)
 	return 0;
 }
 
-void
-xrow_header_encode(const struct xrow_header *header, uint64_t sync,
-		   size_t fixheader_len, struct iovec *out, int *iovcnt)
+size_t
+xrow_header_encode(const struct xrow_header *header, uint64_t sync, char *data)
 {
-	/* allocate memory for sign + header */
-	out->iov_base = xregion_alloc(&fiber()->gc, XROW_HEADER_LEN_MAX +
-				      fixheader_len);
-	char *data = (char *) out->iov_base + fixheader_len;
-
 	/* Header */
 	char *d = data + 1; /* Skip 1 byte for MP_MAP */
 	int map_size = 0;
@@ -426,7 +420,20 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 	ERROR_INJECT(ERRINJ_XLOG_WRITE_CORRUPTED_HEADER, {
 		*data = 0xc1;
 	});
-	out->iov_len = d - (char *) out->iov_base;
+
+	return d - data;
+}
+
+void
+xrow_encode(const struct xrow_header *header, uint64_t sync,
+	    size_t fixheader_len, struct iovec *out, int *iovcnt)
+{
+	/* allocate memory for sign + header */
+	out->iov_base = xregion_alloc(&fiber()->gc, XROW_HEADER_LEN_MAX +
+				      fixheader_len);
+	char *data = (char *)out->iov_base + fixheader_len;
+
+	out->iov_len = fixheader_len + xrow_header_encode(header, sync, data);
 	out++;
 
 	memcpy(out, header->body, sizeof(*out) * header->bodycnt);
@@ -1512,7 +1519,7 @@ void
 xrow_to_iovec(const struct xrow_header *row, struct iovec *out, int *iovcnt)
 {
 	assert(mp_sizeof_uint(UINT32_MAX) == 5);
-	xrow_header_encode(row, row->sync, /*fixheader_len=*/5, out, iovcnt);
+	xrow_encode(row, row->sync, /*fixheader_len=*/5, out, iovcnt);
 	ssize_t len = -5;
 	for (int i = 0; i < *iovcnt; i++)
 		len += out[i].iov_len;

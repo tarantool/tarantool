@@ -758,7 +758,7 @@ vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
 	const char *data_end = stmt_no + 1 < page->row_count ?
 			       page->data + page->row_index[stmt_no + 1] :
 			       page->data + page->unpacked_size;
-	return xrow_header_decode(xrow, &data, data_end, false);
+	return xrow_decode(xrow, &data, data_end, false);
 }
 
 /* {{{ vy_run_iterator vy_run_iterator support functions */
@@ -932,7 +932,7 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info,
 	struct xrow_header xrow;
 	data_pos = page->data + page_info->row_index_offset;
 	data_end = page->data + page_info->unpacked_size;
-	if (xrow_header_decode(&xrow, &data_pos, data_end, true) == -1)
+	if (xrow_decode(&xrow, &data_pos, data_end, true) == -1)
 		goto error;
 	if (xrow.type != VY_RUN_ROW_INDEX) {
 		diag_set(ClientError, ER_INVALID_RUN_FILE,

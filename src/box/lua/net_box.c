@@ -1286,9 +1286,8 @@ netbox_transport_send_and_recv(struct netbox_transport *transport,
 			required = size + len;
 			if (data_len >= required) {
 				const char *body_end = rpos + len;
-				int rc = xrow_header_decode(
-						hdr, &rpos, body_end,
-						/*end_is_exact=*/true);
+				int rc = xrow_decode(hdr, &rpos, body_end,
+						     /*end_is_exact=*/true);
 				transport->last_msg_size = body_end - bufpos;
 				return rc;
 			}
