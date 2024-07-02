@@ -1039,13 +1039,26 @@ format_syslog_header(char *buf, int len, int level,
 enum { SAY_BUF_LEN_MAX = 16 * 1024 };
 static __thread char say_buf[SAY_BUF_LEN_MAX];
 
+/** To disable ANSI color support set the `NO_COLOR`*/
+static int no_color = 0;
+
 /**
- * Wraps the content of the say_buf in ANSI color codes based on the provided level.
+ * Wraps the content of the say_buf in ANSI color codes based on the
+ * provided level.
  * This function is intended only for output to a terminal (tty).
  */
-int wrap_buffer(int level, int size)
+static int
+wrap_buffer(int level, int size)
 {
-    if (level > S_WARN || size <= 0)
+	char var_buf[5];
+	const char *envvar = getenv_safe("NO_COLOR", var_buf,
+					 sizeof(var_buf));
+	if (envvar != NULL && envvar[0] != '\0') {
+		no_color = 1;
+		return size;
+	}
+
+	if (level > S_WARN || size <= 0)
 		return size;
 
 	const char *color_prefix;
@@ -1059,11 +1072,12 @@ int wrap_buffer(int level, int size)
 		color_prefix_len = sizeof(ANSI_COLOR_YELLOW);
 	}
 
-	int total = color_prefix_len + size + sizeof(ANSI_COLOR_RESET);
+	int total = color_prefix_len + size + sizeof(ANSI_COLOR_RESET) - 1;
 	if (total < SAY_BUF_LEN_MAX) {
-		memmove(say_buf + color_prefix_len, say_buf, size);
-		memcpy(say_buf, color_prefix, color_prefix_len);
-		memcpy(say_buf + color_prefix_len + size, ANSI_COLOR_RESET, sizeof(ANSI_COLOR_RESET));
+		memmove(say_buf + color_prefix_len - 1, say_buf, size);
+		memcpy(say_buf, color_prefix, color_prefix_len - 1);
+		memcpy(say_buf + color_prefix_len + size - 1, ANSI_COLOR_RESET,
+			sizeof(ANSI_COLOR_RESET));
 		say_buf[total] = '\0';
 		return total;
 	}
@@ -1407,7 +1421,7 @@ log_vsay(struct log *log, int level, bool check_level, const char *module,
 	if (total <= 0)
 		goto out;
 
-	if (log->isatty || log->type == SAY_LOGGER_BOOT)
+	if ((log->isatty || log->type == SAY_LOGGER_BOOT) && no_color == 0)
 		total = wrap_buffer(level, total);
 
 	switch (log->type) {

@@ -63,10 +63,11 @@ enum say_level {
 	say_level_MAX
 };
 
-/** Log colors */
-
+/** Log color red */
 #define ANSI_COLOR_RED "\x1b[31m"
+/** Log color yellow */
 #define ANSI_COLOR_YELLOW "\x1b[33m"
+/** Log color reset */
 #define ANSI_COLOR_RESET "\x1b[0m"
 
 /** Log formats */
