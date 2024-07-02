@@ -319,6 +319,7 @@ log_rotate(struct log *log)
 	 * Remember, we are a signal handler.
 	 */
 	dup2(fd, log->fd);
+	log->isatty = isatty(log->fd);
 	close(fd);
 
 	log_set_nonblock(log);
@@ -480,6 +481,7 @@ log_pipe_init(struct log *log, const char *init_str)
 	pthread_sigmask(SIG_UNBLOCK, &mask, NULL);
 	close(pipefd[0]);
 	log->fd = pipefd[1];
+	log->isatty = isatty(log->fd);
 	return 0;
 }
 
@@ -504,6 +506,7 @@ log_file_init(struct log *log, const char *init_str)
 		return -1;
 	}
 	log->fd = fd;
+	log->isatty = isatty(log->fd);
 	return 0;
 }
 
@@ -613,6 +616,7 @@ log_syslog_connect(struct log *log)
 			log->fd = syslog_connect_unix("/var/run/syslog");
 
 	}
+	log->isatty = isatty(log->fd);
 	return log->fd;
 }
 
@@ -651,6 +655,7 @@ log_syslog_init(struct log *log, const char *init_str)
 		log->syslog_facility = opts.facility;
 	say_free_syslog_opts(&opts);
 	log->fd = log_syslog_connect(log);
+	log->isatty = isatty(log->fd);
 	if (log->fd < 0) {
 		diag_log();
 		/* syslog indent is freed in atexit(). */
@@ -710,6 +715,7 @@ log_create(struct log *log, const char *init_str, int nonblock)
 	} else {
 		log->type = SAY_LOGGER_STDERR;
 		log->fd = STDERR_FILENO;
+		log->isatty = isatty(log->fd);
 	}
 	if (log->type == SAY_LOGGER_FILE)
 		rlist_add_entry(&log_rotate_list, log, in_log_list);
@@ -1034,6 +1040,37 @@ enum { SAY_BUF_LEN_MAX = 16 * 1024 };
 static __thread char say_buf[SAY_BUF_LEN_MAX];
 
 /**
+ * Wraps the content of the say_buf in ANSI color codes based on the provided level.
+ * This function is intended only for output to a terminal (tty).
+ */
+int wrap_buffer(int level, int size)
+{
+    if (level > S_WARN || size <= 0)
+		return size;
+
+	const char *color_prefix;
+	int color_prefix_len;
+
+	if (level < S_WARN) {
+		color_prefix = ANSI_COLOR_RED;
+		color_prefix_len = sizeof(ANSI_COLOR_RED);
+	} else if (level == S_WARN) {
+		color_prefix = ANSI_COLOR_YELLOW;
+		color_prefix_len = sizeof(ANSI_COLOR_YELLOW);
+	}
+
+	int total = color_prefix_len + size + sizeof(ANSI_COLOR_RESET);
+	if (total < SAY_BUF_LEN_MAX) {
+		memmove(say_buf + color_prefix_len, say_buf, size);
+		memcpy(say_buf, color_prefix, color_prefix_len);
+		memcpy(say_buf + color_prefix_len + size, ANSI_COLOR_RESET, sizeof(ANSI_COLOR_RESET));
+		say_buf[total] = '\0';
+		return total;
+	}
+	return size;
+}
+
+/**
  * Wrapper over write which ensures, that writes not more than buffer size.
  */
 static ssize_t
@@ -1153,6 +1190,7 @@ write_to_syslog(struct log *log, int total)
 		if (log->fd >= 0)
 			close(log->fd);
 		log->fd = log_syslog_connect(log);
+		log->isatty = isatty(log->fd);
 		if (log->fd >= 0) {
 			log_set_nonblock(log);
 			/*
@@ -1368,6 +1406,9 @@ log_vsay(struct log *log, int level, bool check_level, const char *module,
 				 format, ap);
 	if (total <= 0)
 		goto out;
+
+	if (log->isatty || log->type == SAY_LOGGER_BOOT)
+		total = wrap_buffer(level, total);
 
 	switch (log->type) {
 	case SAY_LOGGER_FILE:
