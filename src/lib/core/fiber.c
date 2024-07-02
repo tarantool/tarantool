@@ -1034,6 +1034,7 @@ fiber_reset(struct fiber *fiber)
 {
 	rlist_create(&fiber->on_yield);
 	rlist_create(&fiber->on_stop);
+	rlist_create(&fiber->on_destroy);
 	clock_stat_reset(&fiber->clock_stat);
 }
 
@@ -1046,6 +1047,11 @@ fiber_recycle(struct fiber *fiber)
 	assert(diag_is_empty(&fiber->diag));
 	/* no pending wakeup */
 	assert(rlist_empty(&fiber->state));
+	assert(rlist_empty(&fiber->on_stop));
+	if (trigger_run(&fiber->on_destroy, fiber) != 0)
+		panic("on_destroy triggers can't fail");
+	/* On destroy triggers are expected to remove themselves. */
+	assert(rlist_empty(&fiber->on_destroy));
 	fiber_stack_recycle(fiber);
 	fiber_reset(fiber);
 	fiber->name[0] = '\0';
@@ -1642,6 +1648,7 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 	assert(f != cord->fiber);
 	trigger_destroy(&f->on_yield);
 	trigger_destroy(&f->on_stop);
+	trigger_destroy(&f->on_destroy);
 	rlist_del(&f->state);
 	rlist_del(&f->link);
 	rlist_del(&f->wake);

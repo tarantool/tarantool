@@ -57,3 +57,27 @@ g.test_gh_9406_shutdown_with_lingering_fiber_join = function()
     local cmd = string.format('%s -e "%s"', tarantool_bin, script)
     t.assert(os.execute(cmd) == 0)
 end
+
+g.test_gh_10187_no_memory_leak_on_dead_fiber_search = function()
+    local f = fiber.new(function() end)
+    f:set_joinable(true)
+    f:wakeup()
+    fiber.yield()
+    local x = fiber.find(f:id())
+    -- Check found the fiber object is the same as the one created after the
+    -- fiber became dead.
+    t.assert_equals(x, f)
+    -- Check we cannot access dead fiber storage.
+    t.assert_error_covers({
+        type = 'IllegalParams',
+        message = 'the fiber is dead',
+    }, x.__index, x, 'storage')
+    -- Check fiber object is GC after fiber is joined.
+    local weak_table = setmetatable({}, {__mode = 'v'})
+    weak_table.fiber = f
+    x:join()
+    f = nil -- luacheck: no unused
+    x = nil -- luacheck: no unused
+    collectgarbage()
+    t.assert_equals(weak_table.fiber, nil)
+end
