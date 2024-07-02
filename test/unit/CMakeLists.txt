@@ -182,6 +182,21 @@ create_unit_test(PREFIX bps_tree_view_inner_child_cards
                  LIBRARIES small unit
                  COMPILE_DEFINITIONS TEST_INNER_CHILD_CARDS
 )
+create_unit_test(PREFIX bps_tree_max_mem
+                 SOURCES bps_tree_max_mem.c
+                 LIBRARIES small unit
+                 COMPILE_DEFINITIONS TEST_DEFAULT
+)
+create_unit_test(PREFIX bps_tree_max_mem_inner_card
+                 SOURCES bps_tree_max_mem.c
+                 LIBRARIES small unit
+                 COMPILE_DEFINITIONS TEST_INNER_CARD
+)
+create_unit_test(PREFIX bps_tree_max_mem_inner_child_cards
+                 SOURCES bps_tree_max_mem.c
+                 LIBRARIES small unit
+                 COMPILE_DEFINITIONS TEST_INNER_CHILD_CARDS
+)
 create_unit_test(PREFIX bps_tree_offset_api_inner_card
                  SOURCES bps_tree_offset_api.cc
                  LIBRARIES small unit

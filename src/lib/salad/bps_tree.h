@@ -37,6 +37,7 @@
 #include <assert.h>
 #include <stdio.h> /* printf */
 #include "small/matras.h"
+#include <trivia/util.h> /* MIN, DIV_ROUND_UP */
 
 /* {{{ BPS-tree description */
 /**
@@ -415,6 +416,8 @@ typedef int64_t bps_tree_block_card_t;
 #define bps_tree_delete _api_name(delete)
 #define bps_tree_delete_value _api_name(delete_value)
 #define bps_tree_delete_get_offset _api_name(delete_get_offset)
+#define bps_tree_max_mem_insert_batch \
+	_api_name(max_mem_insert_batch)
 #define bps_tree_size_impl _bps_tree(size)
 #define bps_tree_size _api_name(size)
 #define bps_tree_view_size _api_name(view_size)
@@ -876,6 +879,18 @@ bps_tree_view_size(const struct bps_tree_view *view);
  */
 static inline size_t
 bps_tree_mem_used(const struct bps_tree *tree);
+
+/**
+ * Get the max amount of memory required to insert @a count consequent elements
+ * into a tree, including the possible read view overhead. This must be reviewed
+ * once the batched insertion is implemented.
+ *
+ * @param tree - pointer to the tree.
+ * @param count - the amount of elements to insert.
+ * @return - the max amount of extra memory required.
+ */
+static inline size_t
+bps_tree_max_mem_insert_batch(const struct bps_tree *t, size_t count);
 
 /**
  * @brief Get a random element in a tree.
@@ -1855,6 +1870,119 @@ bps_tree_mem_used(const struct bps_tree *tree)
 	size_t res = matras_extent_count(&tree->matras);
 	res *= BPS_TREE_EXTENT_SIZE;
 	return res;
+}
+
+/**
+ * Get the max amount of memory required to insert @a count consequent elements
+ * into a tree, including the possible read view overhead. This must be reviewed
+ * once the batched insertion is implemented.
+ *
+ * @param tree - pointer to the tree.
+ * @param count - the amount of elements to insert.
+ * @return - the max amount of extra memory required.
+ */
+static inline size_t
+bps_tree_max_mem_insert_batch(const struct bps_tree *t, size_t count)
+{
+	const struct bps_tree_common *tree = &t->common;
+
+	/*
+	 * The max amount of existing blocks to update comes in case of full N
+	 * level tree. Insertion into a leaf will cause a split with ballancing
+	 * elements over three old blocks and a new one, insertion of the new
+	 * block into a parent will cause another split touching three blocks
+	 * and creating a new one, etc. up to root. So on each level we have 3
+	 * blocks touched. Except for the root, because it's alone on its level
+	 * (thus, depth - 1 and + 1).
+	 */
+	size_t max_blocks_updated = tree->depth ? (tree->depth - 1) * 3 + 1 : 0;
+
+	/*
+	 * Following the case above, the last step of such insertion is split
+	 * of a root, creation of the root's neighbor and creating a new root.
+	 * Creation of the old root's neighbor is handled in the loop below,
+	 * let's count the possible new root here.
+	 */
+	size_t max_blocks_created = 1;
+
+	/*
+	 * In case of insertion of increasing keys into the BPS tree, the max
+	 * guaranteed block fullness is 3/4.
+	 */
+	size_t max_leafs_created =
+		DIV_ROUND_UP(count, BPS_TREE_MAX_COUNT_IN_LEAF * 3 / 4);
+
+	/* Any insertion into a full tree requires creation of a leaf. */
+	max_blocks_created += max_leafs_created;
+
+	/*
+	 * This loop creates at least one block per each tree level, which
+	 * correspond to the new inner blocks mentioned in the first comment:
+	 * even if the inserted element count could fit in a single leaf, we
+	 * would have to insert new block per each level in case of insertion
+	 * into a full tree.
+	 */
+	size_t max_inners_created = 0;
+	size_t next_inners = DIV_ROUND_UP(max_leafs_created,
+					  BPS_TREE_MAX_COUNT_IN_INNER * 3 / 4);
+	for (size_t i = 1; i < tree->depth; i++) {
+		max_inners_created += next_inners;
+		next_inners = DIV_ROUND_UP(next_inners,
+					   BPS_TREE_MAX_COUNT_IN_INNER * 3 / 4);
+	}
+
+	/*
+	 * It turns out, the tree height is to be increased as a result of the
+	 * insertion. So this may be seen as creation of a new tree of size @a
+	 * count, and insertion of a subtree of size @a tree->size into it (or
+	 * of two subtrees of the total size of the original tree in case of
+	 * insertion into the middle of the tree).
+	 *
+	 * This means that for each new tree level we may have to insert the
+	 * original tree subtrees into the blocks, which may require another
+	 * split and reballancing. The max amount of additional blocks on the
+	 * new levels is 2 (if the level is fully filled, and we insert 2
+	 * subtrees from the original tree into it at different places, it
+	 * will require two extra blocks on the level - one for each split).
+	 *
+	 * That is not required if the original tree size is 0 though.
+	 */
+	while (next_inners > 1) {
+		int extra_blocks = tree->size != 0 ? 2 : 0;
+		max_inners_created += next_inners + extra_blocks;
+		next_inners = DIV_ROUND_UP(next_inners,
+					   BPS_TREE_MAX_COUNT_IN_INNER * 3 / 4);
+	}
+
+	/* Count the inner blocks possibly created. */
+	max_blocks_created += max_inners_created;
+
+	/* Some blocks may be recycled. */
+	max_blocks_created -= MIN(tree->garbage_count, max_blocks_created);
+
+	/* The blocks are assumed to be distributed over extents optimally. */
+	size_t max_mem_required = DIV_ROUND_UP(max_blocks_created *
+					       BPS_TREE_BLOCK_SIZE,
+					       BPS_TREE_EXTENT_SIZE) *
+				  BPS_TREE_EXTENT_SIZE;
+
+	/*
+	 * If we have updated a block, we'll have to clone the matras root. In
+	 * addition to that, each updated block may be located in a separated
+	 * branch of the matras tree, so we may have to clone each next level.
+	 */
+	if (max_blocks_updated) {
+		max_mem_required += BPS_TREE_EXTENT_SIZE;   /* Matras root. */
+		max_mem_required += BPS_TREE_EXTENT_SIZE *
+				    max_blocks_updated * 2; /* Next levels. */
+	}
+
+	/* The empty tree requires 3 extents for initial matras levels. */
+	if (tree->size == 0)
+		max_mem_required += 3 * BPS_TREE_EXTENT_SIZE;
+
+	assert(max_mem_required % BPS_TREE_EXTENT_SIZE == 0);
+	return max_mem_required;
 }
 
 /**
@@ -7883,6 +8011,7 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_delete
 #undef bps_tree_delete_value
 #undef bps_tree_delete_get_offset
+#undef bps_tree_max_mem_insert_batch
 #undef bps_tree_size_impl
 #undef bps_tree_size
 #undef bps_tree_view_size
