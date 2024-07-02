@@ -1287,10 +1287,12 @@ run_script_f(va_list ap)
 	 * - stdin is TTY and there are no script (-e is considered as a script).
 	 */
 	if (interactive || debugging) {
+		bool color_suppressed = say_set_color_suppressed(true);
 		say_crit("%s%s %s\ntype 'help' for interactive help",
 			 tarantool_package(),
 			 debugging ? " debugger" : "",
 			 tarantool_version());
+		say_set_color_suppressed(color_suppressed);
 		/* get console.start */
 		lua_getfield(L, LUA_GLOBALSINDEX, "require");
 		lua_pushstring(L, debugging ? "luadebug" : "console");
