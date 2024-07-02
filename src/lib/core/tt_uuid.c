@@ -66,9 +66,6 @@ tt_uuid_create(struct tt_uuid *uu)
 #endif
 
 extern inline int
-tt_uuid_validate(struct tt_uuid *uu);
-
-extern inline int
 tt_uuid_from_string(const char *in, struct tt_uuid *uu);
 
 extern inline int
