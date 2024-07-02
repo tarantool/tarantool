@@ -1329,7 +1329,7 @@ box_txn_begin(void)
 }
 
 int
-box_txn_commit(void)
+box_txn_commit_ex(enum txn_commit_wait_mode wait_mode)
 {
 	struct txn *txn = in_txn();
 	/**
@@ -1346,7 +1346,13 @@ box_txn_commit(void)
 	}
 	if (txn_check_can_complete(txn) != 0)
 		return -1;
-	return txn_commit(txn);
+	return txn_commit_impl(txn, wait_mode);
+}
+
+int
+box_txn_commit(void)
+{
+	return box_txn_commit_ex(TXN_COMMIT_WAIT_MODE_COMPLETE);
 }
 
 int

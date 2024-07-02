@@ -1125,6 +1125,10 @@ API_EXPORT void
 box_txn_make_sync(void);
 /** \endcond public */
 
+/** Commit the current txn with the chosen wait mode. */
+int
+box_txn_commit_ex(enum txn_commit_wait_mode wait_mode);
+
 typedef struct txn_savepoint box_txn_savepoint_t;
 
 /**

@@ -471,37 +471,44 @@ static int
 lbox_commit(lua_State *L)
 {
 	int top = lua_gettop(L);
-	if (top >= 1) {
-		/* box.commit(nil) */
-		if (lua_isnil(L, 1))
-			goto box_commit;
-
-		if (lua_type(L, 1) != LUA_TTABLE) {
-			diag_set(IllegalParams, "options should be a table");
-			return luaT_error(L);
-		}
-		/* Get is_sync */
-		lua_getfield(L, 1, "is_sync");
-		/* box.commit({is_sync = nil}) */
-		if (lua_isnil(L, -1))
-			goto box_commit;
-
+	enum txn_commit_wait_mode wait_mode = TXN_COMMIT_WAIT_MODE_COMPLETE;
+	if (top == 0)
+		goto box_commit;
+	if (lua_isnil(L, 1))
+		goto box_commit;
+	if (lua_type(L, 1) != LUA_TTABLE) {
+		diag_set(IllegalParams, "options should be a table");
+		return luaT_error(L);
+	}
+	lua_getfield(L, 1, "is_sync");
+	if (!lua_isnil(L, -1)) {
 		if (!lua_isboolean(L, -1)) {
 			diag_set(IllegalParams, "is_sync must be a boolean");
 			return luaT_error(L);
 		}
 		bool is_sync = lua_toboolean(L, lua_gettop(L));
-		lua_pop(L, 1);
-
 		if (!is_sync) {
 			diag_set(IllegalParams, "is_sync can only be true");
 			return luaT_error(L);
 		}
 		box_txn_make_sync();
 	}
-
+	lua_getfield(L, 1, "wait");
+	if (!lua_isnil(L, -1)) {
+		const char *wait_mode_str = lua_tostring(L, -1);
+		if (wait_mode_str == NULL) {
+			/* Nop. */
+		} else if (strcmp(wait_mode_str, "complete") == 0) {
+			/* Nop. */
+		} else if (strcmp(wait_mode_str, "submit") == 0) {
+			wait_mode = TXN_COMMIT_WAIT_MODE_SUBMIT;
+		} else {
+			diag_set(IllegalParams, "unknown 'wait' mode");
+			return luaT_error(L);
+		}
+	}
 box_commit:
-	if (box_txn_commit() != 0)
+	if (box_txn_commit_ex(wait_mode) != 0)
 		return luaT_error(L);
 	return 0;
 }
