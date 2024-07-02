@@ -1365,8 +1365,7 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	/** don't write sync to the disk */
 	size_t region_svp = region_used(&fiber()->gc);
 	int iovcnt;
-	xrow_header_encode(packet, /*sync=*/0, /*fixheader_len=*/0,
-			   iov, &iovcnt);
+	xrow_encode(packet, /*sync=*/0, /*fixheader_len=*/0, iov, &iovcnt);
 	for (int i = 0; i < iovcnt; ++i) {
 		struct errinj *inj = errinj(ERRINJ_WAL_WRITE_PARTIAL,
 					    ERRINJ_INT);
@@ -1890,9 +1889,8 @@ xlog_tx_cursor_next_row(struct xlog_tx_cursor *tx_cursor,
 	if (ibuf_used(&tx_cursor->rows) == 0)
 		return 1;
 	/* Return row from xlog tx buffer */
-	int rc = xrow_header_decode(xrow,
-				    (const char **)&tx_cursor->rows.rpos,
-				    (const char *)tx_cursor->rows.wpos, false);
+	int rc = xrow_decode(xrow, (const char **)&tx_cursor->rows.rpos,
+			     (const char *)tx_cursor->rows.wpos, false);
 	if (rc != 0) {
 		diag_set(XlogError, "can't parse row");
 		/* Discard remaining row data */

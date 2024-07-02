@@ -56,12 +56,12 @@ g.test_notice_leader_hang_during_sync = function(cg)
     cg.server2:stop()
     -- Generate some data so that server2 starts syncing with the leader after
     -- restart. Generate transactions, to make sure heartbeats do not interfere
-    -- with transactions, and make relay sleep after each sent row to make sure
-    -- it takes server2 long enough to sync.
-    local old_term = cg.server1:exec(function()
+    -- with transactions, and make relay sleep after each sent transaction to
+    -- make sure it takes server2 long enough to sync.
+    local old_term, tweaks_default = cg.server1:exec(function()
         box.schema.space.create('test')
         box.space.test:create_index('pk')
-        for i = 1, 5 do
+        for i = 1, 25 do
             box.begin()
             for j = 1, 5 do
                 box.space.test:replace{j, i}
@@ -69,8 +69,11 @@ g.test_notice_leader_hang_during_sync = function(cg)
             box.commit()
         end
         box.error.injection.set('ERRINJ_RELAY_TIMEOUT',
-                                box.cfg.replication_timeout)
-        return box.info.election.term
+                                box.cfg.replication_timeout / 2)
+        local tweaks = require('internal.tweaks')
+        local tweaks_default = tweaks.xrow_stream_flush_size
+        tweaks.xrow_stream_flush_size = 1
+        return box.info.election.term, tweaks_default
     end)
     cg.server2.box_cfg.replication_sync_timeout = 0
     table.remove(cg.server2.box_cfg.replication, 3)
@@ -93,7 +96,11 @@ g.test_notice_leader_hang_during_sync = function(cg)
 
     -- Unblock server1.
     fio.open(cg.unique_filename, {'O_CREAT'}):close()
-    cg.server1:exec(function()
+    cg.server1:exec(function(tweaks_default)
         box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0)
-    end)
+        local tweaks = require('internal.tweaks')
+        if tweaks.xrow_stream_flush_size ~= nil then
+            tweaks.xrow_stream_flush_size = tweaks_default
+        end
+    end, {tweaks_default})
 end

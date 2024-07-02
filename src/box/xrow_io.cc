@@ -28,12 +28,15 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <sys/uio.h>
 #include "xrow_io.h"
 #include "xrow.h"
 #include "coio.h"
 #include "coio_buf.h"
+#include "errinj.h"
 #include "error.h"
 #include "msgpuck/msgpuck.h"
+#include "tweaks.h"
 
 void
 coio_read_xrow(struct iostream *io, struct ibuf *in, struct xrow_header *row)
@@ -57,8 +60,7 @@ coio_read_xrow(struct iostream *io, struct ibuf *in, struct xrow_header *row)
 	if (len > ibuf_used(in))
 		coio_breadn(io, in, len - ibuf_used(in));
 
-	xrow_header_decode_xc(row, (const char **) &in->rpos, in->rpos + len,
-			      true);
+	xrow_decode_xc(row, (const char **)&in->rpos, in->rpos + len, true);
 }
 
 void
@@ -88,8 +90,7 @@ coio_read_xrow_timeout_xc(struct iostream *io, struct ibuf *in,
 	if (len > ibuf_used(in))
 		coio_breadn_timeout(io, in, len - ibuf_used(in), delay);
 
-	xrow_header_decode_xc(row, (const char **) &in->rpos, in->rpos + len,
-			      true);
+	xrow_decode_xc(row, (const char **)&in->rpos, in->rpos + len, true);
 }
 
 
@@ -104,3 +105,54 @@ coio_write_xrow(struct iostream *io, const struct xrow_header *row)
 		diag_raise();
 }
 
+uint64_t xrow_stream_flush_size = 16384;
+TWEAK_UINT(xrow_stream_flush_size);
+
+void
+xrow_stream_write(struct xrow_stream *stream, const struct xrow_header *row)
+{
+	/* Fixheader - length of packet. */
+	size_t fixheader_len = mp_sizeof_uint(UINT32_MAX);
+	size_t len = 0;
+	len += xrow_header_sizeof(row, row->sync);
+	for (int i = 0; i < row->bodycnt; i++) {
+		len += row->body[i].iov_len;
+	}
+	char *data = (char *)xlsregion_alloc(&stream->lsregion,
+					     len + fixheader_len,
+					     ++stream->lsr_id);
+	*(data) = 0xce; /* MP_UINT32 */
+	store_u32(data + 1, mp_bswap_u32(len));
+	data = data + fixheader_len;
+	data += xrow_header_encode(row, row->sync, data);
+	for (int i = 0; i < row->bodycnt; i++) {
+		size_t l = row->body[i].iov_len;
+		memcpy(data, row->body[i].iov_base, l);
+		data += l;
+	}
+}
+
+int
+xrow_stream_flush(struct xrow_stream *stream, struct iostream *io)
+{
+	ssize_t to_flush = lsregion_used(&stream->lsregion);
+	/*
+	 * Might flush more than requested if data is added to the buffer
+	 * during the coio_writev yield.
+	 */
+	while (to_flush > 0) {
+		struct iovec iov[IOV_MAX];
+		int iovcnt = lengthof(iov);
+		int64_t gc_id = lsregion_to_iovec(&stream->lsregion, iov,
+						  &iovcnt, &stream->flush_pos);
+		ssize_t written = coio_writev(io, iov, iovcnt, 0);
+		if (written < 0)
+			return -1;
+		to_flush -= written;
+		lsregion_gc(&stream->lsregion, gc_id);
+	}
+	struct errinj *inj = errinj(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		fiber_sleep(inj->dparam);
+	return 0;
+}

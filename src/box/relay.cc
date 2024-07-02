@@ -111,6 +111,8 @@ struct relay_raft_msg {
 struct relay {
 	/** Replica connection */
 	struct iostream *io;
+	/** A stream to write rows to the remote peer. */
+	struct xrow_stream xrow_stream;
 	/** Request sync */
 	uint64_t sync;
 	/** Last ACK sent to the replica. */
@@ -367,6 +369,7 @@ relay_exit(struct relay *relay)
 	if (inj != NULL && inj->dparam > 0)
 		fiber_sleep(inj->dparam);
 
+	xrow_stream_destroy(&relay->xrow_stream);
 	/*
 	 * Destroy the recovery context. We MUST do it in
 	 * the relay thread, because it contains an xlog
@@ -436,6 +439,7 @@ relay_cord_init(struct relay *relay)
 	relay->lsr_id = 0;
 	relay->read_tsn = 0;
 	rlist_create(&relay->current_tx);
+	xrow_stream_create(&relay->xrow_stream);
 }
 
 void
@@ -448,7 +452,9 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 
 	relay_start(relay, io, sync, relay_send_initial_join_row, relay_yield,
 		    UINT64_MAX);
+	xrow_stream_create(&relay->xrow_stream);
 	auto relay_guard = make_scoped_guard([=] {
+		xrow_stream_destroy(&relay->xrow_stream);
 		relay_stop(relay);
 		relay_delete(relay);
 	});
@@ -486,7 +492,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	RegionGuard region_guard(&fiber()->gc);
 	xrow_encode_vclock(&row, vclock);
 	row.sync = sync;
-	coio_write_xrow(relay->io, &row);
+	xstream_write(&relay->stream, &row);
 
 	/*
 	 * Version is present starting with 2.7.3, 2.8.2, 2.9.1
@@ -512,6 +518,8 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 
 	/* Send read view to the replica. */
 	engine_join_xc(&ctx, &relay->stream);
+	if (xrow_stream_flush(&relay->xrow_stream, io) < 0)
+		diag_raise();
 }
 
 int
@@ -526,6 +534,8 @@ relay_final_join_f(va_list ap)
 	assert(relay->stream.write != NULL);
 	recover_remaining_wals(relay->r, &relay->stream,
 			       &relay->stop_vclock, true);
+	if (xrow_stream_flush(&relay->xrow_stream, relay->io) < 0)
+		diag_raise();
 	assert(vclock_compare(&relay->r->vclock, &relay->stop_vclock) == 0);
 	return 0;
 }
@@ -802,26 +812,25 @@ static inline void
 relay_send_heartbeat(struct relay *relay)
 {
 	struct xrow_header row;
-	try {
-		++relay->last_sent_ack.vclock_sync;
-		RegionGuard region_guard(&fiber()->gc);
-		xrow_encode_relay_heartbeat(&row, &relay->last_sent_ack);
-		/*
-		 * Do not encode timestamp if this heartbeat is sent in between
-		 * data rows so as to not affect replica's upstream lag.
-		 */
-		if (relay->last_row_time > relay->last_heartbeat_time)
-			row.tm = 0;
-		else
-			row.tm = ev_now(loop());
-		row.replica_id = instance_id;
-		relay->last_heartbeat_time = ev_monotonic_now(loop());
-		relay_send(relay, &row);
-		relay->need_new_vclock_sync = false;
-	} catch (Exception *e) {
-		relay_set_error(relay, e);
+	++relay->last_sent_ack.vclock_sync;
+	RegionGuard region_guard(&fiber()->gc);
+	xrow_encode_relay_heartbeat(&row, &relay->last_sent_ack);
+	/*
+	 * Do not encode timestamp if this heartbeat is sent in between
+	 * data rows so as to not affect replica's upstream lag.
+	 */
+	if (relay->last_row_time > relay->last_heartbeat_time)
+		row.tm = 0;
+	else
+		row.tm = ev_now(loop());
+	row.replica_id = instance_id;
+	relay->last_heartbeat_time = ev_monotonic_now(loop());
+	relay_send(relay, &row);
+	if (xrow_stream_flush(&relay->xrow_stream, relay->io) < 0) {
+		relay_set_error(relay, diag_last_error(diag_get()));
 		fiber_cancel(fiber());
 	}
+	relay->need_new_vclock_sync = false;
 }
 
 /**
@@ -1057,6 +1066,10 @@ relay_subscribe_f(va_list ap)
 					 relay->last_row_time + timeout);
 		cbus_process(&relay->wal_endpoint);
 		relay_subscribe_update(relay);
+		if (xrow_stream_flush(&relay->xrow_stream, relay->io) < 0) {
+			relay_set_error(relay, diag_last_error(diag_get()));
+			fiber_cancel(fiber());
+		}
 	}
 
 	/*
@@ -1133,13 +1146,10 @@ relay_send(struct relay *relay, struct xrow_header *packet)
 {
 	ERROR_INJECT_YIELD(ERRINJ_RELAY_SEND_DELAY);
 
+	struct xrow_stream *stream = &relay->xrow_stream;
 	packet->sync = relay->sync;
 	relay->last_row_time = ev_monotonic_now(loop());
-	coio_write_xrow(relay->io, packet);
-
-	struct errinj *inj = errinj(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE);
-	if (inj != NULL && inj->dparam > 0)
-		fiber_sleep(inj->dparam);
+	xrow_stream_write(stream, packet);
 }
 
 static void
@@ -1152,6 +1162,10 @@ relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row)
 	 */
 	if (row->group_id != GROUP_LOCAL)
 		relay_send(relay, row);
+	if (xrow_stream_needs_flush(&relay->xrow_stream) &&
+	    xrow_stream_flush(&relay->xrow_stream, relay->io) < 0) {
+		diag_raise();
+	}
 }
 
 /**
@@ -1162,16 +1176,16 @@ static void
 relay_raft_msg_push(struct cmsg *base)
 {
 	struct relay_raft_msg *msg = (struct relay_raft_msg *)base;
+	struct relay *relay = msg->relay;
 	struct xrow_header row;
 	RegionGuard region_guard(&fiber()->gc);
 	xrow_encode_raft(&row, &fiber()->gc, &msg->req);
-	try {
-		relay_send(msg->relay, &row);
-		msg->relay->sent_raft_term = msg->req.term;
-	} catch (Exception *e) {
-		relay_set_error(msg->relay, e);
+	relay_send(relay, &row);
+	if (xrow_stream_flush(&relay->xrow_stream, relay->io) < 0) {
+		relay_set_error(relay, diag_last_error(diag_get()));
 		fiber_cancel(fiber());
 	}
+	relay->sent_raft_term = msg->req.term;
 }
 
 static void
@@ -1325,6 +1339,10 @@ relay_send_tx(struct relay *relay)
 				 (long long) packet->lsn);
 		}
 		relay_send(relay, packet);
+	}
+	if (xrow_stream_needs_flush(&relay->xrow_stream) &&
+	    xrow_stream_flush(&relay->xrow_stream, relay->io) < 0) {
+		diag_raise();
 	}
 
 	rlist_create(&relay->current_tx);

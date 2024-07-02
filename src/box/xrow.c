@@ -157,8 +157,8 @@ dump_row_hex(const char *start, const char *end) {
 } while (0)
 
 int
-xrow_header_decode(struct xrow_header *header, const char **pos,
-		   const char *end, bool end_is_exact)
+xrow_decode(struct xrow_header *header, const char **pos,
+	    const char *end, bool end_is_exact)
 {
 	memset(header, 0, sizeof(struct xrow_header));
 	const char *tmp = *pos;
@@ -282,15 +282,95 @@ xrow_decode_node_name(const char **pos, char *out)
 	return 0;
 }
 
-void
-xrow_header_encode(const struct xrow_header *header, uint64_t sync,
-		   size_t fixheader_len, struct iovec *out, int *iovcnt)
+size_t
+xrow_header_sizeof(const struct xrow_header *header, uint64_t sync)
 {
-	/* allocate memory for sign + header */
-	out->iov_base = xregion_alloc(&fiber()->gc, XROW_HEADER_LEN_MAX +
-				      fixheader_len);
-	char *data = (char *) out->iov_base + fixheader_len;
+	/* MP_MAP. */
+	size_t total_size = 1;
+	int map_size = 0;
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_INVALID_KEY, {
+		total_size += mp_sizeof_bool(true);
+		total_size += mp_sizeof_uint(1);
+		map_size++;
+	});
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_INVALID_VALUE, {
+		total_size += mp_sizeof_uint(IPROTO_KEY);
+		total_size += mp_sizeof_uint(1);
+		map_size++;
+	});
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_UNKNOWN_KEY, {
+		total_size += mp_sizeof_uint(666);
+		total_size += mp_sizeof_uint(1);
+		map_size++;
+	});
 
+	uint32_t type = header->type;
+	ERROR_INJECT(ERRINJ_XLOG_WRITE_UNKNOWN_TYPE, {
+		type = 777;
+	});
+	if (true) {
+		total_size += mp_sizeof_uint(IPROTO_REQUEST_TYPE);
+		total_size += mp_sizeof_uint(type);
+		map_size++;
+	}
+
+	if (sync) {
+		total_size += mp_sizeof_uint(IPROTO_SYNC);
+		total_size += mp_sizeof_uint(sync);
+		map_size++;
+	}
+
+	if (header->replica_id) {
+		total_size += mp_sizeof_uint(IPROTO_REPLICA_ID);
+		total_size += mp_sizeof_uint(header->replica_id);
+		map_size++;
+	}
+
+	if (header->group_id) {
+		total_size += mp_sizeof_uint(IPROTO_GROUP_ID);
+		total_size += mp_sizeof_uint(header->group_id);
+		map_size++;
+	}
+
+	if (header->lsn) {
+		total_size += mp_sizeof_uint(IPROTO_LSN);
+		total_size += mp_sizeof_uint(header->lsn);
+		map_size++;
+	}
+
+	if (header->tm) {
+		total_size += mp_sizeof_uint(IPROTO_TIMESTAMP);
+		total_size += mp_sizeof_double(header->tm);
+		map_size++;
+	}
+	uint8_t flags_to_encode = header->flags & ~IPROTO_FLAG_COMMIT;
+	if (header->tsn != 0) {
+		if (header->tsn != header->lsn || !header->is_commit) {
+			total_size += mp_sizeof_uint(IPROTO_TSN);
+			total_size += mp_sizeof_uint(header->lsn - header->tsn);
+			map_size++;
+		}
+		if (header->is_commit && header->tsn != header->lsn) {
+			flags_to_encode |= IPROTO_FLAG_COMMIT;
+		}
+	}
+	if (header->stream_id != 0) {
+		total_size += mp_sizeof_uint(IPROTO_STREAM_ID);
+		total_size += mp_sizeof_uint(header->stream_id);
+		map_size++;
+	}
+	if (flags_to_encode != 0) {
+		total_size += mp_sizeof_uint(IPROTO_FLAGS);
+		total_size += mp_sizeof_uint(flags_to_encode);
+		map_size++;
+	}
+	assert(mp_sizeof_map(map_size) == 1);
+	return total_size;
+}
+
+size_t
+xrow_header_encode(const struct xrow_header *header, uint64_t sync, char *data)
+{
 	/* Header */
 	char *d = data + 1; /* Skip 1 byte for MP_MAP */
 	int map_size = 0;
@@ -400,7 +480,20 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 	ERROR_INJECT(ERRINJ_XLOG_WRITE_CORRUPTED_HEADER, {
 		*data = 0xc1;
 	});
-	out->iov_len = d - (char *) out->iov_base;
+
+	return d - data;
+}
+
+void
+xrow_encode(const struct xrow_header *header, uint64_t sync,
+	    size_t fixheader_len, struct iovec *out, int *iovcnt)
+{
+	/* allocate memory for sign + header */
+	out->iov_base = xregion_alloc(&fiber()->gc, XROW_HEADER_LEN_MAX +
+				      fixheader_len);
+	char *data = (char *)out->iov_base + fixheader_len;
+
+	out->iov_len = fixheader_len + xrow_header_encode(header, sync, data);
 	out++;
 
 	memcpy(out, header->body, sizeof(*out) * header->bodycnt);
@@ -1486,7 +1579,7 @@ void
 xrow_to_iovec(const struct xrow_header *row, struct iovec *out, int *iovcnt)
 {
 	assert(mp_sizeof_uint(UINT32_MAX) == 5);
-	xrow_header_encode(row, row->sync, /*fixheader_len=*/5, out, iovcnt);
+	xrow_encode(row, row->sync, /*fixheader_len=*/5, out, iovcnt);
 	ssize_t len = -5;
 	for (int i = 0; i < *iovcnt; i++)
 		len += out[i].iov_len;
