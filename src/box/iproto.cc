@@ -4304,17 +4304,21 @@ int
 iproto_shutdown(double timeout)
 {
 	assert(iproto_is_shutting_down);
-	return iproto_drop_connections(timeout);
+	if (iproto_drop_connections(timeout) != 0)
+		return -1;
+	for (int i = 0; i < iproto_threads_count; i++) {
+		cbus_stop_loop(&iproto_threads[i].net_pipe);
+		cpipe_destroy(&iproto_threads[i].net_pipe);
+		if (cord_join(&iproto_threads[i].net_cord) != 0)
+			panic_syserror("iproto cord join failed");
+	}
+	return 0;
 }
 
 void
 iproto_free(void)
 {
 	for (int i = 0; i < iproto_threads_count; i++) {
-		cbus_stop_loop(&iproto_threads[i].net_pipe);
-		cpipe_destroy(&iproto_threads[i].net_pipe);
-		if (cord_join(&iproto_threads[i].net_cord) != 0)
-			panic_syserror("iproto cord join failed");
 		mh_i32_delete(iproto_threads[i].req_handlers);
 		/*
 		 * Close socket descriptor to prevent hot standby instance

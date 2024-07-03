@@ -188,26 +188,21 @@ fiber_pool_create(struct fiber_pool *pool, const char *name, int max_pool_size,
 }
 
 void
-fiber_pool_destroy(struct fiber_pool *pool)
+fiber_pool_shutdown(struct fiber_pool *pool)
 {
-	/** Endpoint has connected pipes or unfetched messages */
 	cbus_endpoint_destroy(&pool->endpoint, NULL);
-	/**
-	 * At this point all messages are started to execution because last
-	 * cbus poison message was fired (endpoint_destroy condition).
-	 * We won't to have new messages from cbus and can send wakeup
-	 * to each idle fiber. In this case idle fiber can not fetch any
-	 * new message and will exit. We adjust idle_timeout to.
-	 */
-	pool->idle_timeout = 0;
-	struct fiber *idle_fiber;
-	rlist_foreach_entry(idle_fiber, &pool->idle, state)
-		fiber_wakeup(idle_fiber);
+	struct fiber *idle_fiber, *tmp;
+	rlist_foreach_entry_safe(idle_fiber, &pool->idle, state, tmp)
+		fiber_cancel(idle_fiber);
 	/**
 	 * Just wait on fiber exit condition until all fibers are done
 	 */
 	while (pool->size > 0)
 		fiber_cond_wait(&pool->worker_cond);
-	fiber_cond_destroy(&pool->worker_cond);
 }
 
+void
+fiber_pool_destroy(struct fiber_pool *pool)
+{
+	fiber_cond_destroy(&pool->worker_cond);
+}
