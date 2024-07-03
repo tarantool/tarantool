@@ -92,6 +92,10 @@ fiber_pool_create(struct fiber_pool *pool, const char *name, int max_pool_size,
 void
 fiber_pool_set_max_size(struct fiber_pool *pool, int new_max_size);
 
+/** Shutdown fiber pool. Finish all idle fibers left. */
+void
+fiber_pool_shutdown(struct fiber_pool *pool);
+
 /**
  * Destroy a fiber pool
  */

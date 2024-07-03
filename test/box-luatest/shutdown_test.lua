@@ -144,7 +144,7 @@ g.test_shutdown_of_hanging_iproto_request = function(cg)
     end)
     local log = fio.pathjoin(cg.server.workdir, cg.server.alias .. '.log')
     test_no_hang_on_shutdown(cg.server)
-    t.assert(cg.server:grep_log('cannot gracefully shutdown iproto', nil,
+    t.assert(cg.server:grep_log('cannot gracefully shutdown client fibers', nil,
              {filename = log}))
 end
 
@@ -187,4 +187,32 @@ g.test_shutdown_memtx_gc_free_tuples = function(cg)
         box.space.test.index.pk:drop()
     end)
     server:stop()
+end
+
+local g_idle_pool = t.group('idle pool')
+
+g_idle_pool.before_each(function(cg)
+    cg.server = server:new({
+        env = {
+            TARANTOOL_RUN_BEFORE_BOX_CFG = [[
+                local tweaks = require('internal.tweaks')
+                tweaks.box_fiber_pool_idle_timeout = 100
+            ]]
+        }
+    })
+    cg.server:start()
+end)
+
+g_idle_pool.after_each(function(cg)
+    if cg.server ~= nil then
+        cg.server:drop()
+    end
+end)
+
+-- Test shutdown with idle fiber in fiber pool.
+g_idle_pool.test_shutdown_fiber_pool_with_idle_fibers = function(cg)
+    t.tarantool.skip_if_not_debug()
+    -- Just to create idle fiber in pool after request.
+    cg.server:exec(function() end)
+    test_no_hang_on_shutdown(cg.server)
 end
