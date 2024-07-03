@@ -131,6 +131,8 @@ alloc_failure(const char *filename, int line, size_t size)
 #define xrealloc(ptr, size)	xalloc_impl((size), realloc, (ptr), (size))
 #define xstrdup(s)		xalloc_impl(strlen((s)) + 1, strdup, (s))
 #define xstrndup(s, n)		xalloc_impl((n) + 1, strndup, (s), (n))
+#define xaligned_alloc(size, align) \
+		xalloc_impl((size), aligned_alloc, (align), (size))
 #define xmempool_alloc(p)	xalloc_impl((p)->objsize, mempool_alloc, (p))
 #define xregion_alloc(p, size)	xalloc_impl((size), region_alloc, (p), (size))
 #define xregion_aligned_alloc(p, size, align) \

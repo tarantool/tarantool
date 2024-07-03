@@ -1,3 +1,4 @@
 ## feature/lua
 
-* Exposed `luaL_pushnull()` and `luaL_isnull()` functions via C module API.
+* Exposed the `luaL_pushnull()` and `luaL_isnull()` functions via the C
+  module API.

@@ -1,3 +1,5 @@
+enable_tnt_compile_flags()
+
 set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
 set(RUN_PERF_LUA_TESTS_LIST "")
 
@@ -59,6 +61,12 @@ build_module(column_scan_module column_scan_module.c)
 target_link_libraries(column_scan_module msgpuck)
 create_perf_lua_test(NAME column_scan
                      DEPENDS column_scan_module
+)
+
+build_module(column_insert_module column_insert_module.c)
+target_link_libraries(column_insert_module msgpuck)
+create_perf_lua_test(NAME column_insert
+                     DEPENDS column_insert_module
 )
 
 add_custom_target(test-lua-perf
