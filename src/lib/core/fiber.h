@@ -370,6 +370,7 @@ fiber_set_joinable(struct fiber *fiber, bool yesno);
  *
  * @pre FIBER_IS_JOINABLE flag is set (panic if not).
  * @pre the fiber is not joined yet (panic if not).
+ * @pre the fiber is different from current (panic if not).
  *
  * \param f fiber to be woken up
  * \return fiber function ret code
