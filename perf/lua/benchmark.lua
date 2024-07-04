@@ -34,6 +34,7 @@
 local json = require('json')
 local fio = require('fio')
 local argparse = require('internal.argparse')
+local tarantool = require('tarantool')
 
 local M = {}
 
@@ -45,7 +46,10 @@ local function format_report(bench)
         -- The output should have the same format as the Google
         -- Benchmark JSON output format:
         -- https://github.com/google/benchmark/blob/main/docs/user_guide.md
-        report = json.encode({benchmarks = results})
+        report = json.encode({
+            benchmarks = results,
+            context = bench.context,
+        })
     else
         assert(output_format == 'console', 'unknown output format')
         for _, res in ipairs(results) do
@@ -119,6 +123,29 @@ function M.argparse(arg, argtable, custom_help)
     return params
 end
 
+local function load_average()
+    local path = '/proc/loadavg'
+    local fh = assert(fio.open(path, {'O_RDONLY'}))
+    local loadavg_buf = fh:read(1024)
+    fh:close()
+    -- Format is '0.89 0.66 0.80 2/1576 1203510'.
+    local loadavg_re = '(%d+.%d+) (%d+.%d+) (%d+.%d+)'
+
+    return { loadavg_buf:gmatch(loadavg_re)() }
+end
+
+local function perf_context()
+    local ctx = {}
+    ctx.date = os.date('%Y-%m-%d %H:%M:%S')
+    ctx.load_avg = load_average()
+    ctx.tarantool_version = tarantool.version
+    ctx.build_target = tarantool.build.target
+    ctx.build_flags = tarantool.build.flags
+    ctx.host_name = io.popen('hostname'):read()
+
+    return ctx
+end
+
 function M.new(opts)
     assert(type(opts) == 'table', 'given argument should be a table')
     local output_format = opts.output_format or 'console'
@@ -126,6 +153,7 @@ function M.new(opts)
         output = opts.output,
         output_format = output_format:lower(),
         results = {},
+        context = perf_context(),
     }, {__index = {
         add_result = add_result,
         dump_results = dump_results,
