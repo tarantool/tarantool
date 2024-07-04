@@ -58,11 +58,8 @@ local function assert_console_works(cluster, config)
     t.assert_equals(eval(s, 'return 123'), 123)
 end
 
-local function assert_console_closed(_replicaset, _config)
-    -- TODO (gh-9535): Enable it after a fix in the console
-    -- applier. Now it doesn't stop old console sockets.
-    --
-    -- t.assert_error(connect, cluster, 'instance-001', config, 0.1)
+local function assert_console_closed(cluster, config)
+    t.assert_error(connect, cluster, 'i-001', config, 0.1)
 end
 
 -- Start, reload, change, return back, disable.
@@ -133,4 +130,29 @@ g.test_parent_dir_in_socket_path = function(g)
 
     cluster:reload(config)
     assert_console_works(cluster, config)
+end
+
+-- Re-open console by setting enable to false and true
+g.test_reopen_console = function(g)
+    local config = cbuilder.new()
+        :add_instance('i-001', {})
+        :config()
+    local cluster = cluster.new(g, config)
+    cluster:start()
+    assert_console_works(cluster, config)
+
+    local new_config = cbuilder.new(config)
+        :set_global_option('console.enabled', false)
+        :config()
+    cluster:reload(new_config)
+    assert_console_closed(cluster, config)
+    assert_console_closed(cluster, new_config)
+
+    local new_config_2 = cbuilder.new(new_config)
+        :set_global_option('console.enabled', true)
+        :config()
+    cluster:reload(new_config_2)
+    assert_console_works(cluster, config)
+    assert_console_works(cluster, new_config)
+    assert_console_works(cluster, new_config_2)
 end
