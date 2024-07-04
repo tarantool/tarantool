@@ -3297,21 +3297,23 @@ bps_tree_insert_first_elem(struct bps_tree_common *tree,
 /**
  * @brief Collect path to an element or to the place where it can be inserted
  */
-static inline void
+static ALWAYS_INLINE void
 bps_tree_collect_path(struct bps_tree_common *tree, bps_tree_elem_t new_elem,
 		      struct bps_inner_path_elem *path,
-		      struct bps_leaf_path_elem *leaf_path_elem, bool *exact)
+		      struct bps_leaf_path_elem *leaf_path_elem,
+		      bool *exact, bool touch_leaf)
 {
 	*exact = false;
 
 	struct bps_inner_path_elem *prev_ext = 0;
 	bps_tree_pos_t prev_pos = 0;
-	struct bps_block *block = bps_tree_root(tree);
+	struct bps_block *block = NULL;
 	bps_tree_block_id_t block_id = tree->root_id;
 	bps_tree_elem_t *max_elem_copy = &tree->max_elem;
 	bps_tree_block_id_t max_elem_block_id = (bps_tree_block_id_t)-1;
 	bps_tree_pos_t max_elem_pos = (bps_tree_pos_t)-1;
 	for (bps_tree_block_id_t i = 0; i < tree->depth - 1; i++) {
+		block = bps_tree_restore_block(tree, block_id);
 		struct bps_inner *inner = (struct bps_inner *)block;
 		bps_tree_pos_t pos;
 		if (*exact)
@@ -3339,11 +3341,12 @@ bps_tree_collect_path(struct bps_tree_common *tree, bps_tree_elem_t new_elem,
 			max_elem_pos = pos;
 		}
 		block_id = inner->child_ids[pos];
-		block = bps_tree_restore_block(tree, block_id);
 		prev_pos = pos;
 		prev_ext = path + i;
 	}
 
+	block = touch_leaf ? bps_tree_touch_block(tree, block_id)
+			   : bps_tree_restore_block(tree, block_id);
 	struct bps_leaf *leaf = (struct bps_leaf *)block;
 	bps_tree_pos_t pos;
 	if (*exact)
@@ -3408,8 +3411,7 @@ bps_tree_process_replace(struct bps_tree_common *tree,
 			 struct bps_leaf_path_elem *leaf_path_elem,
 			 bps_tree_elem_t new_elem, bps_tree_elem_t *replaced)
 {
-	leaf_path_elem->block = (struct bps_leaf *)
-		bps_tree_touch_block(tree, leaf_path_elem->block_id);
+	/* The block is touched in the bps_tree_collect_path.  */
 	struct bps_leaf *leaf = leaf_path_elem->block;
 	assert(leaf_path_elem->insertion_point < leaf->header.size);
 
@@ -3664,10 +3666,7 @@ bps_tree_insert_into_leaf(struct bps_tree_common *tree,
 			  struct bps_leaf_path_elem *leaf_path_elem,
 			  bps_tree_elem_t new_elem)
 {
-	/* exclusive behaviuor for debug checks */
-	if (tree->root_id != (bps_tree_block_id_t) -1)
-		leaf_path_elem->block = (struct bps_leaf *)
-		bps_tree_touch_block(tree, leaf_path_elem->block_id);
+	/* The block is touched in the bps_tree_collect_path.  */
 	struct bps_leaf *leaf = leaf_path_elem->block;
 	bps_tree_pos_t pos = leaf_path_elem->insertion_point;
 
@@ -4630,6 +4629,7 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 	 */
 	bps_tree_touch_path(tree, leaf_path_elem);
 #endif
+
 	if (bps_tree_leaf_free_size(leaf_path_elem->block)) {
 		bps_tree_insert_into_leaf(tree, leaf_path_elem, new_elem);
 		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x0);
@@ -4637,6 +4637,7 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 		*inserted_in_pos = leaf_path_elem->insertion_point;
 		return 0;
 	}
+
 #if !defined(BPS_INNER_CHILD_CARDS) && !defined(BPS_INNER_CARD)
 	bps_tree_touch_path(tree, leaf_path_elem);
 #endif
@@ -5826,7 +5827,8 @@ bps_tree_insert_impl(struct bps_tree *t, bps_tree_elem_t new_elem,
 	struct bps_inner_path_elem path[BPS_TREE_MAX_DEPTH];
 	struct bps_leaf_path_elem leaf_path_elem;
 	bool exact;
-	bps_tree_collect_path(tree, new_elem, path, &leaf_path_elem, &exact);
+	bps_tree_collect_path(tree, new_elem, path, &leaf_path_elem,
+			      &exact, true);
 
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
 	if (offset != NULL)
@@ -5918,7 +5920,8 @@ bps_tree_delete_impl(struct bps_tree *t, bps_tree_elem_t elem,
 	struct bps_inner_path_elem path[BPS_TREE_MAX_DEPTH];
 	struct bps_leaf_path_elem leaf_path_elem;
 	bool exact;
-	bps_tree_collect_path(tree, elem, path, &leaf_path_elem, &exact);
+	bps_tree_collect_path(tree, elem, path, &leaf_path_elem,
+			      &exact, false);
 
 	if (!exact)
 		return -1;
