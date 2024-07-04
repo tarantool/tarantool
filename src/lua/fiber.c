@@ -811,6 +811,8 @@ lbox_fiber_join(struct lua_State *L)
 
 	if (!(fiber->flags & FIBER_IS_JOINABLE))
 		luaL_error(L, "the fiber is not joinable");
+	if (fid == fiber()->fid)
+		luaL_error(L, "cannot join itself");
 	double timeout = TIMEOUT_INFINITY;
 	if (!lua_isnoneornil(L, 2)) {
 		if (!lua_isnumber(L, 2) ||

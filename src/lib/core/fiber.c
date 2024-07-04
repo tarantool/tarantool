@@ -764,6 +764,9 @@ fiber_join_timeout(struct fiber *fiber, double timeout)
 	if ((fiber->flags & FIBER_JOIN_BEEN_INVOKED) != 0)
 		panic("join of a joined fiber detected");
 
+	if (fiber() == fiber)
+		panic("cannot join itself");
+
 	/* Prohibit joining the fiber and changing its joinability. */
 	fiber->flags |= FIBER_JOIN_BEEN_INVOKED;
 
