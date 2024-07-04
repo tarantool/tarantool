@@ -81,3 +81,18 @@ g.test_gh_10187_no_memory_leak_on_dead_fiber_search = function()
     collectgarbage()
     t.assert_equals(weak_table.fiber, nil)
 end
+
+g.test_gh_10196_no_hang_on_self_join = function()
+    local f = fiber.new(function()
+        fiber.self():join()
+    end)
+    f:set_joinable(true)
+    f:wakeup()
+    fiber.yield()
+    local ok, res = f:join()
+    t.assert_not(ok)
+    t.assert_covers(res:unpack(), {
+        type = 'IllegalParams',
+        message = 'cannot join itself',
+    })
+end

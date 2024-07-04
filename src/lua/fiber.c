@@ -830,6 +830,10 @@ lbox_fiber_join(struct lua_State *L)
 		diag_set(IllegalParams, "the fiber is not joinable");
 		luaT_error(L);
 	}
+	if (fid == fiber()->fid) {
+		diag_set(IllegalParams, "cannot join itself");
+		luaT_error(L);
+	}
 	double timeout = TIMEOUT_INFINITY;
 	if (!lua_isnoneornil(L, 2)) {
 		if (!lua_isnumber(L, 2) ||
