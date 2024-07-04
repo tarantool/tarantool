@@ -3066,6 +3066,7 @@ tx_run_override_triggers(struct event *event, const char *header,
 			break;
 	}
 	event_trigger_iterator_destroy(&it);
+	port_destroy(&args);
 	return rc;
 }
 

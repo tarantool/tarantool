@@ -223,6 +223,8 @@ space_def_new_ephemeral(uint32_t exact_field_count, struct field_def *fields)
 void
 space_def_delete(struct space_def *def)
 {
+	if (def == NULL)
+		return;
 	field_def_array_delete(def->fields, def->field_count);
 	tuple_dictionary_unref(def->dict);
 	free(def->opts.sql);

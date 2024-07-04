@@ -706,6 +706,7 @@ space_delete(struct space *space)
 	}
 	free(space->index_map);
 	free(space->check_unique_constraint_map);
+	free(space->sequence_path);
 	if (space->format != NULL) {
 		space_cleanup_constraints(space);
 		space_unpin_defaults(space);
@@ -1210,10 +1211,12 @@ after_old_tuple_lookup:;
 				container_of(h, struct tuple_constraint,
 					     space_cache_holder);
 			assert(constr->def.type == CONSTR_FKEY);
-			if (tuple_constraint_fkey_check_delete(constr,
-							       old_tuple,
-							       new_tuple) != 0)
+			if (tuple_constraint_fkey_check_delete(
+					constr, old_tuple, new_tuple) != 0) {
+				if (new_tuple != NULL)
+					tuple_unref(new_tuple);
 				return -1;
+			}
 		}
 	}
 
