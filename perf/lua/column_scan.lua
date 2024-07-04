@@ -53,7 +53,11 @@ local MODULEPATH = fio.pathjoin(BUILDDIR, 'perf', 'lua',
 
 package.cpath = MODULEPATH .. ';' .. package.cpath
 
-local test_module = require('column_scan_module')
+local has_column_scan, test_module = pcall(require, 'column_scan_module')
+if not has_column_scan then
+    io.stderr:write('Lua module "column_scan_module" is not found.\n')
+    os.exit(1)
+end
 local test_funcs = {}
 
 for _, func_name in ipairs({'sum'}) do
