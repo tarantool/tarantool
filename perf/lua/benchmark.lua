@@ -34,6 +34,8 @@
 local json = require('json')
 local fio = require('fio')
 local argparse = require('internal.argparse')
+local tarantool = require('tarantool')
+local datetime = require('datetime')
 
 local M = {}
 
@@ -45,7 +47,10 @@ local function format_report(bench)
         -- The output should have the same format as the Google
         -- Benchmark JSON output format:
         -- https://github.com/google/benchmark/blob/main/docs/user_guide.md
-        report = json.encode({benchmarks = results})
+        report = json.encode({
+            benchmarks = results,
+            context = bench.context,
+        })
     else
         assert(output_format == 'console', 'unknown output format')
         for _, res in ipairs(results) do
@@ -119,6 +124,42 @@ function M.argparse(arg, argtable, custom_help)
     return params
 end
 
+local function load_average()
+    local path = '/proc/loadavg'
+    local fh = assert(fio.open(path, {'O_RDONLY'}))
+    local loadavg_buf = fh:read(1024)
+    fh:close()
+    -- Format is '0.89 0.66 0.80 2/1576 1203510'.
+    local loadavg_re = '(%d+.%d+) (%d+.%d+) (%d+.%d+)'
+
+    return { string.match(loadavg_buf, loadavg_re) }
+end
+
+-- The function return a ISO 8061 formatted datetime.
+--
+-- Google Benchmark reports contains a date in ISO 8061 format,
+-- example: 2013-07-01T17:55:13-07:00.
+-- See an implementation of `LocalDateTimeString()` in
+-- Google Benchmark library source code [1].
+--
+-- 1. https://github.com/google/benchmark/blob/65668db27365d29ca4890cb2102e81acb6585b43/src/timers.cc#L209
+-- @return e.g. 2024-07-18T10:06:59+0000
+local function iso_8061_timestamp()
+    local dt = os.date('*t')
+    return datetime.new(dt):format('%Y-%m-%dT%H:%M:%S%z')
+end
+
+local function perf_context()
+    return {
+        build_flags = tarantool.build.flags,
+        build_target = tarantool.build.target,
+        date = iso_8061_timestamp(),
+        host_name = io.popen('hostname'):read(),
+        load_avg = load_average(),
+        tarantool_version = tarantool.version,
+    }
+end
+
 function M.new(opts)
     assert(type(opts) == 'table', 'given argument should be a table')
     local output_format = opts.output_format or 'console'
@@ -126,6 +167,7 @@ function M.new(opts)
         output = opts.output,
         output_format = output_format:lower(),
         results = {},
+        context = perf_context(),
     }, {__index = {
         add_result = add_result,
         dump_results = dump_results,
