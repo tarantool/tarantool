@@ -496,6 +496,8 @@ typedef int64_t bps_tree_block_card_t;
 #define bps_tree_restore_block _bps_tree(restore_block)
 #define bps_tree_root _bps_tree(root)
 #define bps_tree_touch_block _bps_tree(touch_block)
+#define bps_tree_touch_leaf _bps_tree(touch_leaf)
+#define bps_tree_touch_inner _bps_tree(touch_inner)
 #define bps_tree_calc_path_offset _bps_tree(calc_path_offset)
 #define bps_tree_find_ins_point_key _bps_tree(find_ins_point_key)
 #define bps_tree_find_ins_point_elem _bps_tree(find_ins_point_elem)
@@ -1880,6 +1882,32 @@ bps_tree_touch_block(struct bps_tree_common *tree, bps_tree_block_id_t id)
 {
 	assert(!matras_is_read_view_created(tree->view));
 	return (struct bps_block *)matras_touch(tree->matras, id);
+}
+
+/**
+ * @brief Prepare the inner block for modification.
+ */
+static inline void
+bps_tree_touch_inner(struct bps_tree_common *tree,
+		     struct bps_inner_path_elem *inner)
+{
+	if (matras_needs_touch(tree->matras, inner->block_id)) {
+		inner->block = (struct bps_inner *)
+			matras_touch_no_check(tree->matras, inner->block_id);
+	}
+}
+
+/**
+ * @brief Prepare the leaf block for modification.
+ */
+static inline void
+bps_tree_touch_leaf(struct bps_tree_common *tree,
+		    struct bps_leaf_path_elem *leaf)
+{
+	if (matras_needs_touch(tree->matras, leaf->block_id)) {
+		leaf->block = (struct bps_leaf *)
+			matras_touch_no_check(tree->matras, leaf->block_id);
+	}
 }
 
 /**
@@ -3363,8 +3391,7 @@ bps_tree_touch_path(struct bps_tree_common *tree,
 	bps_tree_touch_leaf_path_max_elem(tree, leaf_path_elem);
 	for (struct bps_inner_path_elem *path = leaf_path_elem->parent;
 	     path; path = path->parent) {
-		path->block = (struct bps_inner *)
-			bps_tree_touch_block(tree, path->block_id);
+		bps_tree_touch_inner(tree, path);
 		if (path->max_elem_block_id == (bps_tree_block_id_t)-1)
 			continue;
 		struct bps_inner *holder = (struct bps_inner *)
@@ -3672,8 +3699,7 @@ bps_tree_insert_into_inner(struct bps_tree_common *tree,
 {
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1)
-		inner_path_elem->block = (struct bps_inner *)
-		bps_tree_touch_block(tree, inner_path_elem->block_id);
+		bps_tree_touch_inner(tree, inner_path_elem);
 	struct bps_inner *inner = inner_path_elem->block;
 
 	assert(pos >= 0);
@@ -3708,8 +3734,7 @@ bps_tree_delete_from_leaf(struct bps_tree_common *tree,
 {
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1)
-		leaf_path_elem->block = (struct bps_leaf *)
-		bps_tree_touch_block(tree, leaf_path_elem->block_id);
+		bps_tree_touch_leaf(tree, leaf_path_elem);
 	struct bps_leaf *leaf = leaf_path_elem->block;
 	bps_tree_pos_t pos = leaf_path_elem->insertion_point;
 
@@ -3740,8 +3765,7 @@ bps_tree_delete_from_inner(struct bps_tree_common *tree,
 {
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1)
-		inner_path_elem->block = (struct bps_inner *)
-		bps_tree_touch_block(tree, inner_path_elem->block_id);
+		bps_tree_touch_inner(tree, inner_path_elem);
 	struct bps_inner *inner = inner_path_elem->block;
 	bps_tree_pos_t pos = inner_path_elem->insertion_point;
 
@@ -3778,10 +3802,8 @@ bps_tree_move_elems_to_right_leaf(struct bps_tree_common *tree,
 {
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1) {
-		a_leaf_path_elem->block = (struct bps_leaf *)
-		bps_tree_touch_block(tree, a_leaf_path_elem->block_id);
-		b_leaf_path_elem->block = (struct bps_leaf *)
-		bps_tree_touch_block(tree, b_leaf_path_elem->block_id);
+		bps_tree_touch_leaf(tree, a_leaf_path_elem);
+		bps_tree_touch_leaf(tree, b_leaf_path_elem);
 	}
 	struct bps_leaf *a = a_leaf_path_elem->block;
 	struct bps_leaf *b = b_leaf_path_elem->block;
@@ -3817,10 +3839,8 @@ bps_tree_move_elems_to_right_inner(struct bps_tree_common *tree,
 {
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1) {
-		a_inner_path_elem->block = (struct bps_inner *)
-		bps_tree_touch_block(tree, a_inner_path_elem->block_id);
-		b_inner_path_elem->block = (struct bps_inner *)
-		bps_tree_touch_block(tree, b_inner_path_elem->block_id);
+		bps_tree_touch_inner(tree, a_inner_path_elem);
+		bps_tree_touch_inner(tree, b_inner_path_elem);
 	}
 	struct bps_inner *a = a_inner_path_elem->block;
 	struct bps_inner *b = b_inner_path_elem->block;
@@ -3867,10 +3887,8 @@ bps_tree_move_elems_to_left_leaf(struct bps_tree_common *tree,
 {
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1) {
-		a_leaf_path_elem->block = (struct bps_leaf *)
-		bps_tree_touch_block(tree, a_leaf_path_elem->block_id);
-		b_leaf_path_elem->block = (struct bps_leaf *)
-		bps_tree_touch_block(tree, b_leaf_path_elem->block_id);
+		bps_tree_touch_leaf(tree, a_leaf_path_elem);
+		bps_tree_touch_leaf(tree, b_leaf_path_elem);
 	}
 	struct bps_leaf *a = a_leaf_path_elem->block;
 	struct bps_leaf *b = b_leaf_path_elem->block;
@@ -3901,10 +3919,8 @@ bps_tree_move_elems_to_left_inner(struct bps_tree_common *tree,
 {
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1) {
-		a_inner_path_elem->block = (struct bps_inner *)
-		bps_tree_touch_block(tree, a_inner_path_elem->block_id);
-		b_inner_path_elem->block = (struct bps_inner *)
-		bps_tree_touch_block(tree, b_inner_path_elem->block_id);
+		bps_tree_touch_inner(tree, a_inner_path_elem);
+		bps_tree_touch_inner(tree, b_inner_path_elem);
 	}
 	struct bps_inner *a = a_inner_path_elem->block;
 	struct bps_inner *b = b_inner_path_elem->block;
@@ -3955,10 +3971,8 @@ bps_tree_insert_and_move_elems_to_right_leaf(
 {
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1) {
-		a_leaf_path_elem->block = (struct bps_leaf *)
-		bps_tree_touch_block(tree, a_leaf_path_elem->block_id);
-		b_leaf_path_elem->block = (struct bps_leaf *)
-		bps_tree_touch_block(tree, b_leaf_path_elem->block_id);
+		bps_tree_touch_leaf(tree, a_leaf_path_elem);
+		bps_tree_touch_leaf(tree, b_leaf_path_elem);
 	}
 	struct bps_leaf *a = a_leaf_path_elem->block;
 	struct bps_leaf *b = b_leaf_path_elem->block;
@@ -4028,10 +4042,8 @@ bps_tree_insert_and_move_elems_to_right_inner(
 {
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1) {
-		a_inner_path_elem->block = (struct bps_inner *)
-		bps_tree_touch_block(tree, a_inner_path_elem->block_id);
-		b_inner_path_elem->block = (struct bps_inner *)
-		bps_tree_touch_block(tree, b_inner_path_elem->block_id);
+		bps_tree_touch_inner(tree, a_inner_path_elem);
+		bps_tree_touch_inner(tree, b_inner_path_elem);
 	}
 	struct bps_inner *a = a_inner_path_elem->block;
 	struct bps_inner *b = b_inner_path_elem->block;
@@ -4171,10 +4183,8 @@ bps_tree_insert_and_move_elems_to_left_leaf(
 {
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1) {
-		a_leaf_path_elem->block = (struct bps_leaf *)
-		bps_tree_touch_block(tree, a_leaf_path_elem->block_id);
-		b_leaf_path_elem->block = (struct bps_leaf *)
-		bps_tree_touch_block(tree, b_leaf_path_elem->block_id);
+		bps_tree_touch_leaf(tree, a_leaf_path_elem);
+		bps_tree_touch_leaf(tree, b_leaf_path_elem);
 	}
 	struct bps_leaf *a = a_leaf_path_elem->block;
 	struct bps_leaf *b = b_leaf_path_elem->block;
@@ -4243,10 +4253,8 @@ bps_tree_insert_and_move_elems_to_left_inner(
 {
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1) {
-		a_inner_path_elem->block = (struct bps_inner *)
-		bps_tree_touch_block(tree, a_inner_path_elem->block_id);
-		b_inner_path_elem->block = (struct bps_inner *)
-		bps_tree_touch_block(tree, b_inner_path_elem->block_id);
+		bps_tree_touch_inner(tree, a_inner_path_elem);
+		bps_tree_touch_inner(tree, b_inner_path_elem);
 	}
 	struct bps_inner *a = a_inner_path_elem->block;
 	struct bps_inner *b = b_inner_path_elem->block;
@@ -4752,8 +4760,7 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 	bps_tree_block_id_t new_block_id = (bps_tree_block_id_t)(-1);
 	struct bps_leaf *new_leaf = bps_tree_create_leaf(tree, &new_block_id);
 
-	leaf_path_elem->block = (struct bps_leaf *)
-	bps_tree_touch_block(tree, leaf_path_elem->block_id);
+	bps_tree_touch_leaf(tree, leaf_path_elem);
 
 	if (leaf_path_elem->block->next_id != (bps_tree_block_id_t)(-1)) {
 		struct bps_leaf *next_leaf = (struct bps_leaf *)
@@ -7689,6 +7696,8 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_restore_block
 #undef bps_tree_root
 #undef bps_tree_touch_block
+#undef bps_tree_touch_leaf
+#undef bps_tree_touch_inner
 #undef bps_tree_calc_path_offset
 #undef bps_tree_find_ins_point_key
 #undef bps_tree_find_ins_point_elem
