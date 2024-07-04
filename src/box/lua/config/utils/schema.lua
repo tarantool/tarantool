@@ -798,9 +798,17 @@ end
 local function set_impl(schema, data, rhs, ctx)
     -- The journey is finished. Validate and return the new value.
     if #ctx.journey == 0 then
+        -- Validate `rhs` against the schema node.
+        --
+        -- Allow nil/box.NULL. We reach this code only when the
+        -- given `rhs` value is a field of a record or a map. The
+        -- fields are allowed to be nil/box.NULL.
+        --
         -- Call validate_impl() directly to don't construct a
         -- schema object.
-        validate_impl(schema, rhs, ctx)
+        if rhs ~= nil then
+            validate_impl(schema, rhs, ctx)
+        end
         return rhs
     end
 
@@ -810,26 +818,52 @@ local function set_impl(schema, data, rhs, ctx)
     if is_scalar(schema) then
         walkthrough_error(ctx, 'Attempt to index a scalar value of type %s ' ..
             'by field %q', schema.type, requested_field)
-    elseif schema.type == 'record' then
+    elseif schema.type == 'record' or schema.type == 'map' then
+        -- Traverse down a record/a map that has nil/box.NULL
+        -- value to create intermediate tables on the path to
+        -- `rhs` and to validate the path against the schema.
         walkthrough_enter(ctx, requested_field)
-        local field_def = schema.fields[requested_field]
-        if field_def == nil then
-            walkthrough_error(ctx, 'No such field in the schema')
+
+        -- A schema of the requested field.
+        local field_def
+        if schema.type == 'record' then
+            field_def = schema.fields[requested_field]
+            if field_def == nil then
+                walkthrough_error(ctx, 'No such field in the schema')
+            end
+        else
+            assert(schema.type == 'map')
+            field_def = schema.value
+        end
+        assert(field_def ~= nil)
+
+        -- Current value of the requested field.
+        local field_value
+        if data ~= nil then
+            walkthrough_assert_table(ctx, schema, data)
+            field_value = data[requested_field]
         end
 
-        walkthrough_assert_table(ctx, schema, data)
-        local field_value = data[requested_field] or {}
+        -- The value of the field may be changed to `rhs` or
+        -- from nil/box.NULL to a newly created table.
         table.remove(ctx.journey, 1)
-        data[requested_field] = set_impl(field_def, field_value, rhs, ctx)
-        return data
-    elseif schema.type == 'map' then
-        walkthrough_enter(ctx, requested_field)
-        local field_def = schema.value
+        local new_field_value = set_impl(field_def, field_value, rhs, ctx)
 
-        walkthrough_assert_table(ctx, schema, data)
-        local field_value = data[requested_field] or {}
-        table.remove(ctx.journey, 1)
-        data[requested_field] = set_impl(field_def, field_value, rhs, ctx)
+        if type(new_field_value) == 'nil' then
+            -- Delete the field. Keeps nil and box.NULL, modifies
+            -- a table. Never creates a new table.
+            if data ~= nil then -- table
+                data[requested_field] = nil
+            end
+        else
+            -- Assign the field. Replaces nil and box.NULL with
+            -- a newly created table, modifies a table.
+            if data == nil then -- nil or box.NULL
+                data = {}
+            end
+            data[requested_field] = new_field_value
+        end
+
         return data
     elseif schema.type == 'array' then
         -- TODO: Support 'foo[1]' and `{'foo', 1}` paths. See the
@@ -868,6 +902,40 @@ end
 -- * A scalar of the 'any' type can't be indexed, even when it is
 --   a table. It is OK to set the whole value of the 'any'
 --   type.
+-- * Assignment of a non-nil `rhs` value creates intermediate
+--   tables over the given `path` instead of nil or box.NULL
+--   values.
+--
+-- Field deletion
+-- --------------
+--
+-- If `rhs` is nil, it means deletion of the pointed field.
+--
+-- How it works (in examples):
+--
+-- Intermediate tables are not created:
+--
+--  | local myschema = <...>
+--  | local data = {}
+--  | myschema:set(data, 'foo.bar', nil)
+--  | -- data is {}, not {foo = {}}
+--
+-- Existing tables on the `path` are not removed:
+--
+--  | local myschema = <...>
+--  | local data = {
+--  |     instances = {
+--  |         foo = {x = 1},
+--  |         bar = {},
+--  |     },
+--  | }
+--  | myschema:set(data, 'instances.foo.x', nil)
+--  | -- data is {
+--  | --     instances = {
+--  | --         foo = {},
+--  | --         bar = {},
+--  | --     },
+--  | -- }
 function methods.set(self, data, path, rhs)
     local schema = rawget(self, 'schema')
 

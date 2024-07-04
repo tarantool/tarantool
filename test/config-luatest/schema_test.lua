@@ -1314,6 +1314,74 @@ g.test_set_record_field = function()
     t.assert_equals(data, {foo = {bar = 'mydata'}})
 end
 
+-- gh-10193: verify that record's field can be set to box.NULL.
+g.test_set_record_field_to_null = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    local data = {}
+    s:set(data, 'foo', box.NULL)
+    t.assert_type(data.foo, 'cdata')
+
+    local data = {}
+    s:set(data, 'foo.bar', box.NULL)
+    t.assert_type(data.foo, 'table')
+    t.assert_type(data.foo.bar, 'cdata')
+end
+
+-- gh-10190: verify that box.NULL record is replaced by a table if
+-- a nested field is set.
+g.test_set_over_null_record = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    local data = {foo = box.NULL}
+    s:set(data, 'foo.bar', 'mydata')
+    t.assert_equals(data, {foo = {bar = 'mydata'}})
+end
+
+-- gh-10194: verify that a record's field can be deleted.
+g.test_set_record_field_to_nil = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.record({
+            bar = schema.scalar({type = 'string'}),
+            baz = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    -- Basic scenario (no-op).
+    local data = {}
+    s:set(data, 'foo', nil)
+    t.assert_equals(data, {})
+
+    -- Basic scenario (actual deletion).
+    local data = {foo = {bar = 'x', baz = 'y'}}
+    s:set(data, 'foo.bar', nil)
+    t.assert_equals(data, {foo = {baz = 'y'}})
+
+    -- Don't create intermediate tables.
+    local data = {}
+    s:set(data, 'foo.bar', nil)
+    t.assert_equals(data, {})
+
+    -- Don't drop existing tables.
+    local data = {foo = {bar = 'x'}}
+    s:set(data, 'foo.bar', nil)
+    t.assert_equals(data, {foo = {}})
+
+    -- box.NULL is kept if a deletion of a nested field is
+    -- requested.
+    local data = {foo = box.NULL}
+    s:set(data, 'foo.bar', nil)
+    t.assert_type(data.foo, 'cdata')
+end
+
 -- Verify that there are no problems with composite data in a
 -- scalar of the any type.
 g.test_set_record_field_any = function()
@@ -1378,6 +1446,79 @@ g.test_set_map_field = function()
     local data = {}
     s:set(data, {'foo', 'bar'}, 'mydata')
     t.assert_equals(data, {foo = {bar = 'mydata'}})
+end
+
+-- gh-10193: verify that map's field can be set to box.NULL.
+g.test_set_map_field_to_null = function()
+    local s = schema.new('myschema', schema.map({
+        key = schema.scalar({type = 'string'}),
+        value = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    local data = {}
+    s:set(data, 'foo', box.NULL)
+    t.assert_type(data.foo, 'cdata')
+
+    local data = {}
+    s:set(data, 'foo.bar', box.NULL)
+    t.assert_type(data.foo, 'table')
+    t.assert_type(data.foo.bar, 'cdata')
+end
+
+-- gh-10190: verify that box.NULL map is replaced by a table if
+-- a nested field is set.
+g.test_set_over_null_map = function()
+    local s = schema.new('myschema', schema.map({
+        key = schema.scalar({type = 'string'}),
+        value = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    local data = {foo = box.NULL}
+    s:set(data, 'foo.bar', 'mydata')
+    t.assert_equals(data, {foo = {bar = 'mydata'}})
+end
+
+-- gh-10194: verify that a map's field can be deleted.
+g.test_set_map_field_to_nil = function()
+    local s = schema.new('myschema', schema.map({
+        key = schema.scalar({type = 'string'}),
+        value = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'string'}),
+        }),
+    }))
+
+    -- Basic scenario (no-op).
+    local data = {}
+    s:set(data, 'foo', nil)
+    t.assert_equals(data, {})
+
+    -- Basic scenario (actual deletion).
+    local data = {foo = {bar = 'x', baz = 'y'}}
+    s:set(data, 'foo.bar', nil)
+    t.assert_equals(data, {foo = {baz = 'y'}})
+
+    -- Don't create intermediate tables.
+    local data = {}
+    s:set(data, 'foo.bar', nil)
+    t.assert_equals(data, {})
+
+    -- Don't drop existing tables.
+    local data = {foo = {bar = 'x'}}
+    s:set(data, 'foo.bar', nil)
+    t.assert_equals(data, {foo = {}})
+
+    -- box.NULL is kept if a deletion of a nested field is
+    -- requested.
+    local data = {foo = box.NULL}
+    s:set(data, 'foo.bar', nil)
+    t.assert_type(data.foo, 'cdata')
 end
 
 -- Trigger improper API usage error.

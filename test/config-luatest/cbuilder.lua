@@ -125,24 +125,6 @@ local function cbuilder_set_replicaset_option(self, path, value)
         'replicasets', self._replicaset,
     }, path:split('.')):totable()
 
-    -- <schema object>:set() validation is too tight. Workaround
-    -- it. Maybe we should reconsider this :set() behavior in a
-    -- future.
-    if value == nil then
-        local cur = self._config
-        for i = 1, #path - 1 do
-            -- Create missed fields.
-            local component = path[i]
-            if cur[component] == nil then
-                cur[component] = {}
-            end
-
-            cur = cur[component]
-        end
-        cur[path[#path]] = value
-        return self
-    end
-
     cluster_config:set(self._config, path, value)
     return self
 end
