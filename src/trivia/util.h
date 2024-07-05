@@ -149,6 +149,8 @@ alloc_failure(const char *filename, int line, size_t size)
 #define xlsregion_alloc_object(lsregion, id, T) ({				\
 	(T *)xlsregion_aligned_alloc((lsregion), sizeof(T), alignof(T), (id));	\
 })
+#define xlsregion_reserve(p, size) \
+	xalloc_impl((size), lsregion_reserve, (p), (size))
 #define xregion_alloc_object(region, T) ({					\
 	(T *)xregion_aligned_alloc((region), sizeof(T), alignof(T));		\
 })
