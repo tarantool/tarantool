@@ -1515,8 +1515,8 @@ struct bps_inner_path_elem {
 	struct bps_inner_path_elem *parent;
 	/* Pointer to the sequent to the max element in the subtree */
 	bps_tree_elem_t *max_elem_copy;
-	/* Holder of max_elem_copy (block_id) */
-	bps_tree_block_id_t max_elem_block_id;
+	/* Holder of max_elem_copy (path elem) */
+	struct bps_inner_path_elem *max_elem_path;
 	/* Holder of max_elem_copy (pos) */
 	bps_tree_pos_t max_elem_pos;
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
@@ -1555,8 +1555,8 @@ struct bps_leaf_path_elem {
 	struct bps_inner_path_elem *parent;
 	/* A pointer to the sequent to the max element in the subtree */
 	bps_tree_elem_t *max_elem_copy;
-	/* Holder of max_elem_copy (block_id) */
-	bps_tree_block_id_t max_elem_block_id;
+	/* Holder of max_elem_copy (path elem) */
+	struct bps_inner_path_elem *max_elem_path;
 	/* Holder of max_elem_copy (pos) */
 	bps_tree_pos_t max_elem_pos;
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
@@ -3310,7 +3310,7 @@ bps_tree_collect_path(struct bps_tree_common *tree, bps_tree_elem_t new_elem,
 	struct bps_block *block = NULL;
 	bps_tree_block_id_t block_id = tree->root_id;
 	bps_tree_elem_t *max_elem_copy = &tree->max_elem;
-	bps_tree_block_id_t max_elem_block_id = (bps_tree_block_id_t)-1;
+	struct bps_inner_path_elem *max_elem_path = NULL;
 	bps_tree_pos_t max_elem_pos = (bps_tree_pos_t)-1;
 	for (bps_tree_block_id_t i = 0; i < tree->depth - 1; i++) {
 		block = bps_tree_restore_block(tree, block_id);
@@ -3329,7 +3329,7 @@ bps_tree_collect_path(struct bps_tree_common *tree, bps_tree_elem_t new_elem,
 		path[i].pos_in_parent = prev_pos;
 		path[i].parent = prev_ext;
 		path[i].max_elem_copy = max_elem_copy;
-		path[i].max_elem_block_id = max_elem_block_id;
+		path[i].max_elem_path = max_elem_path;
 		path[i].max_elem_pos = max_elem_pos;
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
 		path[i].unpropagated_card = -1;
@@ -3337,7 +3337,7 @@ bps_tree_collect_path(struct bps_tree_common *tree, bps_tree_elem_t new_elem,
 
 		if (pos < inner->header.size - 1) {
 			max_elem_copy = inner->elems + pos;
-			max_elem_block_id = block_id;
+			max_elem_path = &path[i];
 			max_elem_pos = pos;
 		}
 		block_id = inner->child_ids[pos];
@@ -3362,7 +3362,7 @@ bps_tree_collect_path(struct bps_tree_common *tree, bps_tree_elem_t new_elem,
 	leaf_path_elem->pos_in_parent = prev_pos;
 	leaf_path_elem->parent = prev_ext;
 	leaf_path_elem->max_elem_copy = max_elem_copy;
-	leaf_path_elem->max_elem_block_id = max_elem_block_id;
+	leaf_path_elem->max_elem_path = max_elem_path;
 	leaf_path_elem->max_elem_pos = max_elem_pos;
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
 	leaf_path_elem->unpropagated_card = -1;
@@ -3376,10 +3376,10 @@ static inline void
 bps_tree_touch_leaf_path_max_elem(struct bps_tree_common *tree,
 				  struct bps_leaf_path_elem *leaf_path_elem)
 {
-	if (leaf_path_elem->max_elem_block_id == (bps_tree_block_id_t)-1)
+	if (leaf_path_elem->max_elem_path == NULL)
 		return;
-	struct bps_inner *holder = (struct bps_inner *)
-		bps_tree_touch_block(tree, leaf_path_elem->max_elem_block_id);
+	struct bps_inner *holder = (struct bps_inner *)bps_tree_touch_block(
+		tree, leaf_path_elem->max_elem_path->block_id);
 	leaf_path_elem->max_elem_copy =
 		holder->elems + leaf_path_elem->max_elem_pos;
 }
@@ -3389,18 +3389,22 @@ bps_tree_touch_leaf_path_max_elem(struct bps_tree_common *tree,
  */
 static inline void
 bps_tree_touch_path(struct bps_tree_common *tree,
+		    struct bps_inner_path_elem *path,
 		    struct bps_leaf_path_elem *leaf_path_elem)
 {
-	bps_tree_touch_leaf_path_max_elem(tree, leaf_path_elem);
-	for (struct bps_inner_path_elem *path = leaf_path_elem->parent;
-	     path; path = path->parent) {
-		bps_tree_touch_inner(tree, path);
-		if (path->max_elem_block_id == (bps_tree_block_id_t)-1)
+	for (bps_tree_block_id_t i = 0; i < tree->depth - 1; i++) {
+		bps_tree_touch_inner(tree, &path[i]);
+		if (path[i].max_elem_path == NULL)
 			continue;
-		struct bps_inner *holder = (struct bps_inner *)
-			bps_tree_touch_block(tree, path->max_elem_block_id);
-		path->max_elem_copy = holder->elems + path->max_elem_pos;
+		struct bps_inner *holder = path[i].max_elem_path->block;
+		path[i].max_elem_copy = holder->elems + path[i].max_elem_pos;
 	}
+	if (leaf_path_elem->max_elem_path == NULL)
+		return;
+	/* The block is touched in the loop above. */
+	struct bps_inner *holder = leaf_path_elem->max_elem_path->block;
+	leaf_path_elem->max_elem_copy =
+		holder->elems + leaf_path_elem->max_elem_pos;
 }
 
 /**
@@ -4614,6 +4618,7 @@ bps_tree_process_insert_inner(struct bps_tree_common *tree,
  */
 static inline int
 bps_tree_process_insert_leaf(struct bps_tree_common *tree,
+			     struct bps_inner_path_elem *path,
 			     struct bps_leaf_path_elem *leaf_path_elem,
 			     bps_tree_elem_t new_elem,
 			     bps_tree_block_id_t *inserted_in_block,
@@ -4627,7 +4632,7 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 	 * ancestors to increment, so we have to touch them even if it's a
 	 * simple insertion.
 	 */
-	bps_tree_touch_path(tree, leaf_path_elem);
+	bps_tree_touch_path(tree, path, leaf_path_elem);
 #endif
 
 	if (bps_tree_leaf_free_size(leaf_path_elem->block)) {
@@ -4639,7 +4644,7 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 	}
 
 #if !defined(BPS_INNER_CHILD_CARDS) && !defined(BPS_INNER_CARD)
-	bps_tree_touch_path(tree, leaf_path_elem);
+	bps_tree_touch_path(tree, path, leaf_path_elem);
 #endif
 
 	struct bps_leaf_path_elem left_ext;
@@ -5401,6 +5406,7 @@ bps_tree_process_delete_inner(struct bps_tree_common *tree,
  */
 static inline void
 bps_tree_process_delete_leaf(struct bps_tree_common *tree,
+			     struct bps_inner_path_elem *path,
 			     struct bps_leaf_path_elem *leaf_path_elem)
 {
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
@@ -5411,7 +5417,7 @@ bps_tree_process_delete_leaf(struct bps_tree_common *tree,
 	 * ancestors to decrement, so we have to touch them even if it's a
 	 * simple deletion.
 	 */
-	bps_tree_touch_path(tree, leaf_path_elem);
+	bps_tree_touch_path(tree, path, leaf_path_elem);
 #endif
 
 	bps_tree_delete_from_leaf(tree, leaf_path_elem);
@@ -5423,7 +5429,7 @@ bps_tree_process_delete_leaf(struct bps_tree_common *tree,
 	}
 
 #if !defined(BPS_INNER_CHILD_CARDS) && !defined(BPS_INNER_CARD)
-	bps_tree_touch_path(tree, leaf_path_elem);
+	bps_tree_touch_path(tree, path, leaf_path_elem);
 #endif
 
 	struct bps_leaf_path_elem left_ext;
@@ -5856,7 +5862,7 @@ bps_tree_insert_impl(struct bps_tree *t, bps_tree_elem_t new_elem,
 		}
 
 		int rc = bps_tree_process_insert_leaf(
-			tree, &leaf_path_elem, new_elem,
+			tree, path, &leaf_path_elem, new_elem,
 			&inserted_block_id, &inserted_pos);
 
 		if (inserted_iterator != NULL) {
@@ -5942,7 +5948,7 @@ bps_tree_delete_impl(struct bps_tree *t, bps_tree_elem_t elem,
 	(void)offset;
 #endif
 
-	bps_tree_process_delete_leaf(tree, &leaf_path_elem);
+	bps_tree_process_delete_leaf(tree, path, &leaf_path_elem);
 	return 0;
 }
 
@@ -6363,7 +6369,7 @@ bps_tree_debug_check_insert_into_leaf(struct bps_tree_common *tree,
 			path_elem.block_id = 0;
 			path_elem.insertion_point = j;
 			path_elem.max_elem_copy = &max;
-			path_elem.max_elem_block_id = -1;
+			path_elem.max_elem_path = NULL;
 			path_elem.max_elem_pos = -1;
 
 			bps_tree_insert_into_leaf(tree, &path_elem, ins);
@@ -6420,7 +6426,7 @@ bps_tree_debug_check_delete_from_leaf(struct bps_tree_common *tree,
 			path_elem.block_id = 0;
 			path_elem.insertion_point = j;
 			path_elem.max_elem_copy = &max;
-			path_elem.max_elem_block_id = -1;
+			path_elem.max_elem_path = NULL;
 			path_elem.max_elem_pos = -1;
 
 			bps_tree_delete_from_leaf(tree, &path_elem);
@@ -6495,11 +6501,11 @@ bps_tree_debug_check_move_to_right_leaf(struct bps_tree_common *tree,
 				memset(&b_path_elem, 0, sizeof(b_path_elem));
 				a_path_elem.block = &a;
 				a_path_elem.max_elem_copy = &ma;
-				a_path_elem.max_elem_block_id = -1;
+				a_path_elem.max_elem_path = NULL;
 				a_path_elem.max_elem_pos = -1;
 				b_path_elem.block = &b;
 				b_path_elem.max_elem_copy = &mb;
-				b_path_elem.max_elem_block_id = -1;
+				b_path_elem.max_elem_path = NULL;
 				b_path_elem.max_elem_pos = -1;
 				a_path_elem.block_id = 0;
 				b_path_elem.block_id = 0;
@@ -6601,11 +6607,11 @@ bps_tree_debug_check_move_to_left_leaf(struct bps_tree_common *tree,
 				memset(&b_path_elem, 0, sizeof(b_path_elem));
 				a_path_elem.block = &a;
 				a_path_elem.max_elem_copy = &ma;
-				a_path_elem.max_elem_block_id = -1;
+				a_path_elem.max_elem_path = NULL;
 				a_path_elem.max_elem_pos = -1;
 				b_path_elem.block = &b;
 				b_path_elem.max_elem_copy = &mb;
-				b_path_elem.max_elem_block_id = -1;
+				b_path_elem.max_elem_path = NULL;
 				b_path_elem.max_elem_pos = -1;
 				a_path_elem.block_id = 0;
 				b_path_elem.block_id = 0;
@@ -6735,11 +6741,11 @@ bps_tree_debug_check_insert_and_move_to_right_leaf(struct bps_tree_common *tree,
 		memset(&b_path_elem, 0, sizeof(b_path_elem));
 		a_path_elem.block = &a;
 		a_path_elem.max_elem_copy = &ma;
-		a_path_elem.max_elem_block_id = -1;
+		a_path_elem.max_elem_path = NULL;
 		a_path_elem.max_elem_pos = -1;
 		b_path_elem.block = &b;
 		b_path_elem.max_elem_copy = &mb;
-		b_path_elem.max_elem_block_id = -1;
+		b_path_elem.max_elem_path = NULL;
 		b_path_elem.max_elem_pos = -1;
 		a_path_elem.insertion_point = k;
 		a_path_elem.block_id = 0;
@@ -6834,11 +6840,11 @@ bps_tree_debug_check_insert_and_move_to_left_leaf(struct bps_tree_common *tree,
 		memset(&b_path_elem, 0, sizeof(b_path_elem));
 		a_path_elem.block = &a;
 		a_path_elem.max_elem_copy = &ma;
-		a_path_elem.max_elem_block_id = -1;
+		a_path_elem.max_elem_path = NULL;
 		a_path_elem.max_elem_pos = -1;
 		b_path_elem.block = &b;
 		b_path_elem.max_elem_copy = &mb;
-		b_path_elem.max_elem_block_id = -1;
+		b_path_elem.max_elem_path = NULL;
 		b_path_elem.max_elem_pos = -1;
 		b_path_elem.insertion_point = k;
 		a_path_elem.block_id = 0;
@@ -6921,7 +6927,7 @@ bps_tree_debug_check_insert_into_inner(struct bps_tree_common *tree,
 			path_elem.block = &block;
 			path_elem.block_id = 0;
 			path_elem.max_elem_copy = &max;
-			path_elem.max_elem_block_id = -1;
+			path_elem.max_elem_path = NULL;
 			path_elem.max_elem_pos = -1;
 
 			for (unsigned int k = 0; k < i; k++) {
@@ -7009,7 +7015,7 @@ bps_tree_debug_check_delete_from_inner(struct bps_tree_common *tree,
 			path_elem.block_id = 0;
 			path_elem.insertion_point = j;
 			path_elem.max_elem_copy = &max;
-			path_elem.max_elem_block_id = -1;
+			path_elem.max_elem_path = NULL;
 			path_elem.max_elem_pos = -1;
 
 			bps_tree_delete_from_inner(tree, &path_elem);
@@ -7080,11 +7086,11 @@ bps_tree_debug_check_move_to_right_inner(struct bps_tree_common *tree,
 				memset(&b_path_elem, 0, sizeof(b_path_elem));
 				a_path_elem.block = &a;
 				a_path_elem.max_elem_copy = &ma;
-				a_path_elem.max_elem_block_id = -1;
+				a_path_elem.max_elem_path = NULL;
 				a_path_elem.max_elem_pos = -1;
 				b_path_elem.block = &b;
 				b_path_elem.max_elem_copy = &mb;
-				b_path_elem.max_elem_block_id = -1;
+				b_path_elem.max_elem_path = NULL;
 				b_path_elem.max_elem_pos = -1;
 				a_path_elem.block_id = 0;
 				b_path_elem.block_id = 0;
@@ -7206,11 +7212,11 @@ bps_tree_debug_check_move_to_left_inner(struct bps_tree_common *tree,
 				memset(&b_path_elem, 0, sizeof(b_path_elem));
 				a_path_elem.block = &a;
 				a_path_elem.max_elem_copy = &ma;
-				a_path_elem.max_elem_block_id = -1;
+				a_path_elem.max_elem_path = NULL;
 				a_path_elem.max_elem_pos = -1;
 				b_path_elem.block = &b;
 				b_path_elem.max_elem_copy = &mb;
-				b_path_elem.max_elem_block_id = -1;
+				b_path_elem.max_elem_path = NULL;
 				b_path_elem.max_elem_pos = -1;
 				a_path_elem.block_id = 0;
 				b_path_elem.block_id = 0;
@@ -7329,12 +7335,12 @@ bps_tree_debug_check_insert_and_move_to_right_inner(
 		memset(&b_path_elem, 0, sizeof(b_path_elem));
 		a_path_elem.block = &a;
 		a_path_elem.max_elem_copy = &a_max_elem;
-		a_path_elem.max_elem_block_id = -1;
+		a_path_elem.max_elem_path = NULL;
 		a_path_elem.max_elem_pos = -1;
 		a_path_elem.block_id = 0;
 		b_path_elem.block = &b;
 		b_path_elem.max_elem_copy = &b_max_elem;
-		b_path_elem.max_elem_block_id = -1;
+		b_path_elem.max_elem_path = NULL;
 		b_path_elem.max_elem_pos = -1;
 		b_path_elem.block_id = 0;
 
@@ -7458,12 +7464,12 @@ bps_tree_debug_check_insert_and_move_to_left_inner(struct bps_tree_common *tree,
 		memset(&b_path_elem, 0, sizeof(b_path_elem));
 		a_path_elem.block = &a;
 		a_path_elem.max_elem_copy = &a_max_elem;
-		a_path_elem.max_elem_block_id = -1;
+		a_path_elem.max_elem_path = NULL;
 		a_path_elem.max_elem_pos = -1;
 		a_path_elem.block_id = 0;
 		b_path_elem.block = &b;
 		b_path_elem.max_elem_copy = &b_max_elem;
-		b_path_elem.max_elem_block_id = -1;
+		b_path_elem.max_elem_path = NULL;
 		b_path_elem.max_elem_pos = -1;
 		b_path_elem.block_id = 0;
 
