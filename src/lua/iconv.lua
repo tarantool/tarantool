@@ -70,7 +70,6 @@ end
 
 local iconv_mt = {
     __call = iconv_convert,
-    __gc = ffi.C.tnt_iconv_close,
     __tostring = function(iconv) return string.format("iconv: %p", iconv) end
 }
 
@@ -84,6 +83,7 @@ local function iconv_new(to, from)
     if iconv == conv_rv_error then
         error('iconv: '..errno.strerror())
     end
+    ffi.gc(iconv, ffi.C.tnt_iconv_close)
     return iconv;
 end
 
