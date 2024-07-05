@@ -9,6 +9,7 @@
 #include "alter.h"
 #include "tuple.h"
 #include "wal_ext.h"
+#include "sql.h"
 
 /** ID -> space dictionary. */
 static struct mh_i32ptr_t *spaces;
@@ -45,6 +46,15 @@ space_cache_init(void)
 void
 space_cache_destroy(void)
 {
+	mh_int_t i;
+	mh_foreach(spaces, i) {
+		struct space *space = mh_i32ptr_node(spaces, i)->val;
+		/** Spaces can be interconnected through constraints. */
+		if (space->format != NULL)
+			space_cleanup_constraints(space);
+		sql_trigger_delete_all(space->sql_triggers);
+		space->sql_triggers = NULL;
+	}
 	while (mh_size(spaces) > 0) {
 		mh_int_t i = mh_first(spaces);
 

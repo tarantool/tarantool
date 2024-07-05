@@ -480,6 +480,12 @@ txn_limbo_unfence(struct txn_limbo *limbo);
 void
 txn_limbo_init();
 
+/**
+ * Denitialize qsync engine.
+ */
+void
+txn_limbo_destroy();
+
 #if defined(__cplusplus)
 }
 #endif /* defined(__cplusplus) */

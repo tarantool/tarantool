@@ -78,7 +78,9 @@ static void
 func_adapter_lua_destroy(struct func_adapter *func_base)
 {
 	struct func_adapter_lua *func = (struct func_adapter_lua *)func_base;
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, func->func_ref);
+	/* tarantool_L is freed on Tarantool shutdown. */
+	if (tarantool_L != NULL)
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, func->func_ref);
 	free(func);
 }
 

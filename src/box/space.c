@@ -222,10 +222,7 @@ space_reattach_constraints(struct space *space)
 	}
 }
 
-/**
- * Destroy constraints that are defined in @a space format.
- */
-static int
+int
 space_cleanup_constraints(struct space *space)
 {
 	struct tuple_format *format = space->format;
@@ -725,7 +722,9 @@ space_delete(struct space *space)
 	 */
 	assert(space->sql_triggers == NULL);
 	assert(rlist_empty(&space->space_cache_pin_list));
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, space->lua_ref);
+	/* tarantool_L is freed on Tarantool shutdown. */
+	if (tarantool_L != NULL)
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, space->lua_ref);
 	space->vtab->destroy(space);
 }
 

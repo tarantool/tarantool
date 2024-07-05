@@ -80,6 +80,10 @@ enum bootstrap_strategy bootstrap_strategy = BOOTSTRAP_STRATEGY_INVALID;
 
 enum replicaset_state replicaset_state = REPLICASET_BOOTSTRAP;
 
+/* Free replica resources. */
+static void
+replica_free(struct replica *replica);
+
 static int
 replica_compare_by_uuid(const struct replica *a, const struct replica *b)
 {
@@ -241,6 +245,16 @@ replication_shutdown(void)
 void
 replication_free(void)
 {
+	struct replica *replica, *next;
+	while (!rlist_empty(&replicaset.anon)) {
+		replica = rlist_shift_entry(&replicaset.anon,
+					    typeof(*replica), in_anon);
+		replica_free(replica);
+	}
+	replica_hash_foreach_safe(&replicaset.hash, replica, next) {
+		replica_hash_remove(&replicaset.hash, replica);
+		replica_free(replica);
+	}
 	diag_destroy(&replicaset.applier.diag);
 	trigger_destroy(&replicaset.on_ack);
 	trigger_destroy(&replicaset.on_relay_thread_start);
@@ -316,6 +330,17 @@ replica_delete(struct replica *replica)
 		relay_delete(replica->relay);
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
+	TRASH(replica);
+	free(replica);
+}
+
+static void
+replica_free(struct replica *replica)
+{
+	if (replica->relay != NULL)
+		relay_delete(replica->relay);
+	if (replica->applier != NULL)
+		applier_delete(replica->applier);
 	TRASH(replica);
 	free(replica);
 }

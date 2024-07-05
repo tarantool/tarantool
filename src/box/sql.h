@@ -115,6 +115,14 @@ void
 sql_trigger_delete(struct sql_trigger *trigger);
 
 /**
+ * Free AST pointed by the trigger and all the other triggers linked to it.
+ *
+ * @param trigger AST object.
+ */
+void
+sql_trigger_delete_all(struct sql_trigger *trigger);
+
+/**
  * Get server triggers list by space_id.
  * @param space_id valid Space ID.
  *

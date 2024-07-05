@@ -220,6 +220,12 @@ memtx_engine_free(struct engine *engine)
 	mempool_destroy(&memtx->iterator_pool);
 	if (mempool_is_initialized(&memtx->rtree_iterator_pool))
 		mempool_destroy(&memtx->rtree_iterator_pool);
+	void *p = memtx->reserved_extents;
+	while (p != NULL) {
+		void *next = *(void **)p;
+		mempool_free(&memtx->index_extent_pool, p);
+		p = next;
+	}
 	mempool_destroy(&memtx->index_extent_pool);
 	slab_cache_destroy(&memtx->index_slab_cache);
 	/*
@@ -1774,7 +1780,15 @@ memtx_engine_schedule_gc(struct memtx_engine *memtx,
 			 struct memtx_gc_task *task)
 {
 	stailq_add_tail_entry(&memtx->gc_queue, task, link);
-	fiber_wakeup(memtx->gc_fiber);
+	if (memtx->gc_fiber == NULL) {
+#ifdef ENABLE_ASAN
+		bool stop = false;
+		while (!stop)
+			memtx_engine_run_gc(memtx, &stop);
+#endif
+	} else {
+		fiber_wakeup(memtx->gc_fiber);
+	}
 }
 
 void
