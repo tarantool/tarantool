@@ -4,77 +4,10 @@
 # File format:
 #leak:*
 
-# test: app/crypto.test.lua
-# source: /usr/lib/x86_64-linux-gnu/libcrypto.so
-leak:CRYPTO_zalloc
+# to be removed in scope of gh-10532
+leak:sql_prepare_and_execute
+leak:sqlParser
 
-# test: all (feedback demon fails using cURL)
-# https://github.com/tarantool/tarantool-qa/issues/116
-# source: /lib/x86_64-linux-gnu/libcrypto.so
-leak:libcrypto.so*
-# source: /lib/x86_64-linux-gnu/libssl.so
-leak:libssl.so*
-
-# test: app-tap/http_client.test.lua
-# source: src/tarantool
-leak:Curl_setstropt
-leak:create_conn
-leak:Curl_conncache_add_conn
-leak:Curl_cache_addr
-leak:Curl_hash_init
-leak:Curl_hash_add
-leak:Curl_he2ai
-leak:Curl_open
-leak:Curl_resolver_init
-
-# test: app-tap/iconv.test.lua
-# source: /usr/lib/x86_64-linux-gnu/gconv/UTF-16.so
-leak:gconv_init
-
-# XXX: As a result of introducing ASan support in LuaJIT, in scope
-# of https://github.com/tarantool/tarantool/issues/5878 all lj_*
-# suppressions can be removed. Unfortunately, Lua global state
-# is not closed properly at Tarantool instance exit, so the
-# suppression for lj_BC_FUNCC is returned back (it was removed in
-# the scope of the commit 985548e4815a4cd73beb33acc60cf354e6eadd01
-# ("asan: suppress all LSAN warnings related to LuaJIT"). For more
-# info, see https://github.com/tarantool/tarantool/issues/3071.
-# source: src/main.cc (see <tarantool_free>)
-# source: src/lua/init.c (see <tarantool_lua_free>)
-leak:lj_BC_FUNCC
-
-# test: box/access.test.lua
-# test: box/access_bin.test.lua
-# test: box/access_misc.test.lua
-# source: src/box/error.cc
-leak:AccessDeniedError::AccessDeniedError
-
-# test: box/bitset.test.lua
-# source: src/lib/bitset/iterator.c
-leak:tt_bitset_iterator_init
-
-# test: box-py/args.test.py
-# source: /lib/x86_64-linux-gnu/libc.so*
-leak:libc.so*
-
-# test: box-tap/schema_mt.test.lua
-# source: src/lib/salad/mhash.h
-leak:mh_i32ptr_new
-
-# test: sql-tap/gh2250-trigger-chain-limit.test.lua
-# source: src/lib/core/exception.cc
-leak:Exception::operator new
-
-# test: vinyl/errinj.test.lua
-# source: src/lib/core/fiber.h
-leak:fiber_cxx_invoke
-
-# TODO(gh-9213): remove when the issue is fixed
-leak:luaT_push_key_def
-
-# TODO(gh-8890): remove when the issue is fixed
-leak:box_tuple_update
-leak:box_tuple_iterator
-leak:box_index_iterator_after
-leak:ibuf_reserve_slow
-leak:box_check_slice
+# to be removed in scope of gh-10184
+leak:lua_yaml_encode
+leak:l_load
