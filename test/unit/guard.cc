@@ -34,7 +34,7 @@ stack_break_f(char *frame_zero)
 	sum += block[(unsigned char) block[4]];
 
 	ptrdiff_t stack_diff = frame_curr - frame_zero;
-	if ((size_t)abs(stack_diff) < default_attr.stack_size)
+	if ((size_t)abs(stack_diff) < fiber_self()->stack_size)
 		sum += stack_break_f(frame_zero);
 	return sum;
 }
