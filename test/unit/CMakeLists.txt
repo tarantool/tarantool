@@ -142,6 +142,12 @@ create_unit_test(PREFIX bps_tree
                  LIBRARIES unit small misc
                  COMPILE_DEFINITIONS TEST_DEFAULT
 )
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set_source_files_properties(
+        bps_tree.cc
+        PROPERTIES COMPILE_FLAGS
+            "-Wno-vla-cxx-extension -Wno-unknown-warning-option")
+endif()
 create_unit_test(PREFIX bps_tree_inner_card
                  SOURCES bps_tree.cc
                  LIBRARIES unit small misc
