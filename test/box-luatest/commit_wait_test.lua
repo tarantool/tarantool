@@ -91,6 +91,23 @@ local test_basic_impl = function(cg, atomic_func_name)
         _G.wait_complete()
         t.assert_equals(_G.test_result, 1)
         t.assert_equals(box.space.test:select{}, {{1}, {2}})
+        --
+        -- Wait=none, works like submit when the journal queue isn't full.
+        --
+        _G.test_result = 0
+        csw = _G.fiber.self():csw()
+        atomic_func({wait = 'none'}, function()
+            box.space.test:replace{3}
+            _G.set_triggers()
+        end)
+        t.assert_equals(_G.fiber.self():csw(), csw)
+        t.assert_equals(_G.test_result, 0)
+        if are_txns_isolated then
+            t.assert_equals(box.space.test:select{}, {{1}, {2}})
+        end
+        _G.wait_complete()
+        t.assert_equals(_G.test_result, 1)
+        t.assert_equals(box.space.test:select{}, {{1}, {2}, {3}})
 
         box.space.test:truncate()
     end, {cg.are_txns_isolated, atomic_func_name})
@@ -182,6 +199,56 @@ g.test_full_journal_submit_commit = function(cg)
 end
 g.test_full_journal_submit_atomic = function(cg)
     test_full_journal_submit_impl(cg, 'real_atomic')
+end
+
+--
+-- Wait=none fails right away when the journal queue is full.
+--
+local function test_full_journal_none_impl(cg, atomic_func_name)
+    cg.server:exec(function(are_txns_isolated, atomic_func_name)
+        local atomic_func = _G[atomic_func_name]
+        local old_size = box.cfg.wal_queue_max_size
+        box.cfg{wal_queue_max_size = 1}
+        --
+        -- Take space in the queue.
+        --
+        local csw = _G.fiber.self():csw()
+        atomic_func({wait = 'submit'}, function() box.space.test:replace{1} end)
+        t.assert_equals(_G.fiber.self():csw(), csw)
+        if are_txns_isolated then
+            t.assert_equals(box.space.test:select{}, {})
+        end
+        --
+        -- Now any other txn won't fit.
+        --
+        _G.test_result = 0
+        csw = _G.fiber.self():csw()
+        t.assert_error_msg_contains('The WAL queue is full', atomic_func,
+            {wait = 'none'}, function()
+                box.space.test:replace{2}
+                _G.set_triggers()
+        end)
+        t.assert(not box.is_in_txn())
+        t.assert_equals(_G.fiber.self():csw(), csw)
+        t.assert_equals(_G.test_result, -1)
+        -- First txn is still in the queue.
+        if are_txns_isolated then
+            t.assert_equals(box.space.test:select{}, {})
+        else
+            t.assert_equals(box.space.test:select{}, {{1}})
+        end
+        -- Flush the journal using a blocking commit.
+        box.space.test:replace{3}
+        t.assert_equals(box.space.test:select{}, {{1}, {3}})
+
+        box.cfg{wal_queue_max_size = old_size}
+    end, {cg.are_txns_isolated, atomic_func_name})
+end
+g.test_full_journal_none_commit = function(cg)
+    test_full_journal_none_impl(cg, 'manual_atomic')
+end
+g.test_full_journal_none_atomic = function(cg)
+    test_full_journal_none_impl(cg, 'real_atomic')
 end
 
 --
