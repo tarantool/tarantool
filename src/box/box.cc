@@ -4437,6 +4437,12 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 			  "wal_mode = 'none'");
 	}
 
+	/* Unregister old consumer of replica. */
+	if (replica != NULL && replica->gc != NULL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
+
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
 	struct gc_consumer *gc = gc_consumer_register(
@@ -4478,8 +4484,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	 * replica.
 	 */
 	gc_consumer_advance(gc, &stop_vclock);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
+	assert(replica->gc == NULL);
 	replica->gc = gc;
 	gc_guard.is_active = false;
 }
@@ -4580,6 +4585,13 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 				  tt_uuid_str(&other->uuid));
 		}
 	}
+
+	/* Unregister old consumer of replica. */
+	if (replica != NULL && replica->gc != NULL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
+
 	/*
 	 * Register the replica as a WAL consumer so that
 	 * it can resume FINAL JOIN where INITIAL JOIN ends.
@@ -4640,8 +4652,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * FINAL JOIN ended and assign it to the replica.
 	 */
 	gc_consumer_advance(gc, &stop_vclock);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
+	assert(replica->gc == NULL);
 	replica->gc = gc;
 	gc_guard.is_active = false;
 }
