@@ -1225,7 +1225,7 @@ replicaset_needs_rejoin(struct replica **master)
 		say_info("can't follow %s at %s: required %s available %s",
 			 uuid_str, addr_str, local_vclock_str, gc_vclock_str);
 
-		if (vclock_compare(&replicaset.vclock, &ballot->vclock) > 0) {
+		if (vclock_compare_ignore0(&replicaset.vclock, &ballot->vclock) > 0) {
 			/*
 			 * Replica has some rows that are not present on
 			 * the master. Don't rebootstrap as we don't want
