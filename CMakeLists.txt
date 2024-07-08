@@ -82,6 +82,7 @@ include(cmake/thread.cmake)
 include(cmake/hardening.cmake)
 include(cmake/prefix.cmake)
 include(cmake/SetFiberStackSize.cmake)
+include(cmake/SetBuildParallelLevel.cmake)
 
 add_compile_flags("C;CXX" ${HARDENING_FLAGS})
 set(DEPENDENCY_CFLAGS "${DEPENDENCY_CFLAGS} ${HARDENING_FLAGS}")
