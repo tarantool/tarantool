@@ -1130,7 +1130,8 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 	if (req == NULL)
 		goto rollback_abort;
 	if (wait_mode != TXN_COMMIT_WAIT_MODE_COMPLETE) {
-		assert(wait_mode == TXN_COMMIT_WAIT_MODE_SUBMIT);
+		assert(wait_mode == TXN_COMMIT_WAIT_MODE_SUBMIT ||
+		       wait_mode == TXN_COMMIT_WAIT_MODE_NONE);
 		ERROR_INJECT(ERRINJ_TXN_COMMIT_ASYNC, {
 			diag_set(ClientError, ER_INJECTION,
 				 "txn commit async injection");
@@ -1147,6 +1148,11 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 		if (txn_has_flag(txn, TXN_WAIT_ACK) && is_original) {
 			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
 				 "Non-blocking commit of a synchronous txn");
+			goto rollback_abort;
+		}
+		if (wait_mode == TXN_COMMIT_WAIT_MODE_NONE &&
+		    journal_queue_is_full()) {
+			diag_set(ClientError, ER_WAL_QUEUE_FULL);
 			goto rollback_abort;
 		}
 	}

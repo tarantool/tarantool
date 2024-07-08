@@ -181,6 +181,11 @@ enum txn_commit_wait_mode {
 	 * is blocked until there is space in the queue.
 	 */
 	TXN_COMMIT_WAIT_MODE_SUBMIT,
+	/**
+	 * Same as submit, but full journal queue = instant fail and rollback.
+	 * It means commit with this mode never yields.
+	 */
+	TXN_COMMIT_WAIT_MODE_NONE,
 };
 
 /** \cond public */

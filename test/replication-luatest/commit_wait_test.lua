@@ -44,7 +44,7 @@ g.test_commit_wait_sync_txn = function(cg)
         box.space.test_sync:replace{1}
         box.commit({wait = 'complete'})
 
-        for _, mode in pairs{'submit'} do
+        for _, mode in pairs{'submit', 'none'} do
             box.begin()
             box.space.test_sync:replace{2}
             t.assert(box.is_in_txn())

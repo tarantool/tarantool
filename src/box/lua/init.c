@@ -502,6 +502,8 @@ lbox_commit(lua_State *L)
 			/* Nop. */
 		} else if (strcmp(wait_mode_str, "submit") == 0) {
 			wait_mode = TXN_COMMIT_WAIT_MODE_SUBMIT;
+		} else if (strcmp(wait_mode_str, "none") == 0) {
+			wait_mode = TXN_COMMIT_WAIT_MODE_NONE;
 		} else {
 			diag_set(IllegalParams, "unknown 'wait' mode");
 			return luaT_error(L);
