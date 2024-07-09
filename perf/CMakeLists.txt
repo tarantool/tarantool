@@ -4,6 +4,7 @@ set(PERF_OUTPUT_DIR ${PROJECT_BINARY_DIR}/perf/output)
 file(MAKE_DIRECTORY ${PERF_OUTPUT_DIR})
 
 set(BENCH_RESULTS "")
+set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
 
 if (DEFINED ENV{BENCH_CMD})
     set(BENCH_CMD "$ENV{BENCH_CMD}")
@@ -13,8 +14,6 @@ endif()
 separate_arguments(BENCH_CMD_SEPARATE UNIX_COMMAND ${BENCH_CMD})
 
 add_subdirectory(lua)
-
-set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
 
 find_package(benchmark QUIET)
 if (NOT ${benchmark_FOUND})
