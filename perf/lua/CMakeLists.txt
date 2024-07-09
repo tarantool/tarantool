@@ -1,6 +1,5 @@
 enable_tnt_compile_flags()
 
-set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
 set(RUN_PERF_LUA_TESTS_LIST "")
 
 set(LUA_PATH "${CMAKE_CURRENT_SOURCE_DIR}/?.lua\;\;")
