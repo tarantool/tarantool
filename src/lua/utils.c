@@ -799,6 +799,23 @@ luaT_toibuf(struct lua_State *L, int idx)
 	return NULL;
 }
 
+void
+luaL_pushnull(struct lua_State *L)
+{
+	lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_nil_ref);
+}
+
+bool
+luaL_isnull(struct lua_State *L, int idx)
+{
+	if (lua_type(L, idx) == LUA_TCDATA) {
+		uint32_t ctypeid;
+		void *cdata = luaL_tocpointer(L, idx, &ctypeid);
+		return ctypeid == CTID_P_VOID && *(void **)cdata == NULL;
+	}
+	return false;
+}
+
 int
 luaL_checkconstchar(struct lua_State *L, int idx, const char **res,
 		    uint32_t *cdata_type_p)

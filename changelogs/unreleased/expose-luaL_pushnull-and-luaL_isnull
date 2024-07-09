@@ -1,0 +1,3 @@
+## feature/lua
+
+* Exposed `luaL_pushnull()` and `luaL_isnull()` functions via C module API.

@@ -474,6 +474,22 @@ luaL_iscallable(lua_State *L, int idx);
 LUA_API box_ibuf_t *
 luaT_toibuf(struct lua_State *L, int idx);
 
+/**
+ * Push ffi's NULL (cdata<void *>: NULL) onto the stack.
+ * Can be used as replacement of nil in Lua tables.
+ * @param L stack
+ */
+LUA_API void
+luaL_pushnull(struct lua_State *L);
+
+/**
+ * Return true if the value at Lua stack is ffi's NULL (cdata<void *>: NULL).
+ * @param L stack
+ * @param idx stack index
+ */
+LUA_API bool
+luaL_isnull(struct lua_State *L, int idx);
+
 /** \endcond public */
 
 /**
@@ -482,34 +498,6 @@ luaT_toibuf(struct lua_State *L, int idx);
  */
 int
 luaT_toerror(lua_State *L);
-
-/**
- * Push ffi's NULL (cdata<void *>: NULL) onto the stack.
- * Can be used as replacement of nil in Lua tables.
- * @param L stack
- */
-static inline void
-luaL_pushnull(struct lua_State *L)
-{
-	lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_nil_ref);
-}
-
-/**
- * Return true if the value at Lua stack is ffi's NULL
- * (cdata<void *>: NULL).
- * @param L stack
- * @param idx stack index
- */
-static inline bool
-luaL_isnull(struct lua_State *L, int idx)
-{
-	if (lua_type(L, idx) == LUA_TCDATA) {
-		uint32_t ctypeid;
-		void *cdata = luaL_tocpointer(L, idx, &ctypeid);
-		return ctypeid == CTID_P_VOID && *(void **)cdata == NULL;
-	}
-	return false;
-}
 
 /**
  * @brief Creates a new Lua coroutine in a protected frame. If
