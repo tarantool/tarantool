@@ -922,6 +922,7 @@ lbox_fiber_stall(struct lua_State *L)
 {
 	(void) L;
 	fiber_yield();
+	luaL_testcancel(L);
 	return 0;
 }
 

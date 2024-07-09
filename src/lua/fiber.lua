@@ -100,25 +100,16 @@ local function worker_f()
             stall()
         end
         worker_next_task = task.next
-        task.f(task.arg)
+        pcall(task.f, task.arg)
         fiber.sleep(0)
     end
 end
 
 local worker_name = 'tasks_worker_fiber'
 
-local function worker_safe_f()
-    pcall(worker_f)
-    -- Worker_f never returns. If the execution is here, this
-    -- fiber is probably canceled and now is not able to sleep.
-    -- Create a new one.
-    worker_fiber = fiber.new(worker_safe_f)
-    fiber_set_system(worker_fiber)
-    worker_fiber:name(worker_name)
-end
-
-worker_fiber = fiber.new(worker_safe_f)
+worker_fiber = fiber.new(worker_f)
 fiber_set_system(worker_fiber)
+fiber_set_managed_shutdown(worker_fiber)
 worker_fiber:name(worker_name)
 
 local function worker_schedule_task(f, arg)
@@ -129,7 +120,10 @@ local function worker_schedule_task(f, arg)
         worker_last_task.next = task
     end
     worker_last_task = task
-    worker_fiber:wakeup()
+    -- Fiber is finished on shutdown as it has managed shutdown.
+    if worker_fiber:status() ~= 'dead' then
+        worker_fiber:wakeup()
+    end
 end
 
 -- Start from '_' to hide it from auto completion.
