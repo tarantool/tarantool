@@ -166,6 +166,54 @@ yaml_is_null(const char *str, size_t len)
    return false;
 }
 
+/**
+ * Verify whether a string represents a number literal in YAML.
+ *
+ * Non-standard:
+ *
+ * False-positives:
+ * - 'inf', 'nan' literals despite the case are parsed as numbers
+ *   (the standard specifies only 'inf', 'Inf', 'INF', 'nan',
+ *   'NaN', 'NAN').
+ * - 'infinity' (ignoring case) is considered a number.
+ * - Binary literals ('0b...') are considered numbers.
+ *
+ * Bugs:
+ * - Octal numbers are not supported.
+ *
+ * This function is used only in encoding for wrapping strings
+ * containing number literals in quotes to make YAML parser
+ * handle them as strings. It means false-positives will lead to
+ * extra quotation marks and are not dangerous at all.
+ *
+ * @param str Literal to check.
+ * @param len Length of @a str.
+ *
+ * @retval Whether @a str represents a number value.
+ */
+static inline bool
+yaml_is_number(const char *str, size_t len, struct lua_State *L)
+{
+   /*
+    * TODO: Should be implemented with the literal parser
+    * instead of using strtod() and lua_isnumber().
+    * Using parser will make it possible to remove the third
+    * argument.
+    */
+   if (len == 0)
+      return false;
+
+   if (lua_isnumber(L, -1))
+      return true;
+
+   char *endptr = NULL;
+   fpconv_strtod(str, &endptr);
+   if (endptr == str + len)
+      return true;
+
+   return false;
+}
+
 static void generate_error_message(struct lua_yaml_loader *loader) {
    char buf[256];
    luaL_Buffer b;
@@ -682,8 +730,9 @@ static int dump_node(struct lua_yaml_dumper *dumper)
    case MP_STR:
       str = field.sval.data;
       len = field.sval.len;
+
       if (yaml_is_null(str, len) || yaml_is_bool(str, len, &unused) ||
-          lua_isnumber(dumper->L, -1)) {
+          yaml_is_number(str, len, dumper->L)) {
          /*
           * The string is convertible to a null, a boolean or
           * a number, quote it to preserve its type.

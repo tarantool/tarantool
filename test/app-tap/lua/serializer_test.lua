@@ -236,7 +236,7 @@ local function test_boolean(test, s)
 end
 
 local function test_string(test, s)
-    test:plan(8)
+    test:plan(11)
     rt(test, s, "")
     rt(test, s, "abcde")
     rt(test, s, "Кудыкины горы") -- utf-8
@@ -245,6 +245,9 @@ local function test_string(test, s)
     rt(test, s, '$a\t $')
     rt(test, s, [[$a\t $]])
     rt(test, s, [[$a\\t $]])
+    rt(test, s, '9e123456789')
+    rt(test, s, 'infinity')
+    rt(test, s, 'NaN')
 end
 
 local function test_nil(test, s)
