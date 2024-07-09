@@ -1589,7 +1589,6 @@ function task_f(arg)                                                            
     if arg <= 3 then                                                            \
         fiber._internal.schedule_task(task_f, arg)                              \
     else                                                                        \
-        fiber.self():cancel()                                                   \
         error('Worker is broken')                                               \
     end                                                                         \
 end
