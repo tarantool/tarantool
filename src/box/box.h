@@ -68,7 +68,7 @@ extern const struct vclock *box_vclock;
  * recovery this vclock points to the end of WAL, not to the current recovery
  * position.
  */
-extern struct vclock *instance_vclock;
+extern const struct vclock *instance_vclock;
 
 /**
  * Name of the authentication method that is currently used on
@@ -105,6 +105,18 @@ extern bool box_is_force_recovery;
  */
 void
 box_init(void);
+
+/**
+ * Set instance's vclock to the given value. Works only if the instance vclock
+ * isn't already set. It must be initialized manually and explicitly this way
+ * when the instance boots from a snapshot - snapshot rows have no LSNs, so
+ * setting the instance vclock manually is the only way.
+ *
+ * It has to be a "public" API of box, because the snapshot can be remote, i.e.
+ * coming from the applier.
+ */
+void
+box_init_instance_vclock(const struct vclock *vclock);
 
 /**
  * Cleanup box library
