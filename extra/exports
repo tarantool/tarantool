@@ -261,8 +261,10 @@ luaL_checkuint64
 luaL_ctypeid
 luaL_iscallable
 luaL_iscdata
+luaL_isnull
 luaL_pushcdata
 luaL_pushint64
+luaL_pushnull
 luaL_pushuint64
 luaL_setcdatagc
 luaL_toint64

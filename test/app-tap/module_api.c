@@ -181,6 +181,15 @@ test_checkint64(lua_State *L)
 	return 1;
 }
 
+static int
+test_pushnull_isnull(lua_State *L)
+{
+	luaL_pushnull(L);
+	lua_pushnumber(L, 123);
+	lua_pushboolean(L, luaL_isnull(L, -2) && !luaL_isnull(L, -1));
+	return 1;
+}
+
 /* {{{ Helpers for `box_ibuf` C API test cases */
 
 static int
@@ -3368,6 +3377,7 @@ luaopen_module_api(lua_State *L)
 		{"test_pushint64", test_pushint64 },
 		{"test_checkuint64", test_checkuint64 },
 		{"test_checkint64", test_checkint64 },
+		{"test_pushnull_isnull", test_pushnull_isnull},
 		{"toibuf", test_toibuf},
 		{"test_touint64", test_touint64 },
 		{"test_toint64", test_toint64 },
