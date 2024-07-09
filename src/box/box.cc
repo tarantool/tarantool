@@ -125,7 +125,7 @@ struct rlist box_on_shutdown_trigger_list =
 struct event *box_on_shutdown_event = NULL;
 
 const struct vclock *box_vclock = instance_vclock;
-struct vclock *instance_vclock = &instance_vclock_storage;
+const struct vclock *instance_vclock = &instance_vclock_storage;
 
 const char *box_auth_type;
 
@@ -5107,7 +5107,12 @@ bootstrap_from_master(struct replica *master)
 		return false;
 	}
 	assert(applier->state == APPLIER_READY);
-
+	/*
+	 * In case of rejoin the vclock could be already set to send it in the
+	 * ballot and for other global things. Make it unset again so the
+	 * applier could "init" it again.
+	 */
+	vclock_clear(&instance_vclock_storage);
 	say_info("bootstrapping replica from %s at %s",
 		 tt_uuid_str(&master->uuid),
 		 sio_strfaddr(&applier->addr, applier->addr_len));
@@ -6101,6 +6106,14 @@ box_init(void)
 	crash_callback = box_crash_callback;
 	mempool_create(&sync_trigger_data_pool, &cord()->slabc,
 		       sizeof(struct sync_trigger_data));
+}
+
+void
+box_init_instance_vclock(const struct vclock *vclock)
+{
+	if (vclock_is_set(&instance_vclock_storage))
+		panic("Instance vclock can be initialized only once");
+	vclock_copy(&instance_vclock_storage, vclock);
 }
 
 /** Shutdown box storage i.e. stop parts that need TX loop running. */
