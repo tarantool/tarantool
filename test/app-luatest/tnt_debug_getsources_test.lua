@@ -46,6 +46,7 @@ local files = {
     'third_party/metrics/metrics/registry',
     'third_party/metrics/metrics/stash',
     'third_party/metrics/metrics/tarantool/clock',
+    'third_party/metrics/metrics/tarantool/config',
     'third_party/metrics/metrics/tarantool/cpu',
     'third_party/metrics/metrics/tarantool/event_loop',
     'third_party/metrics/metrics/tarantool/fibers',

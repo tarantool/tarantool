@@ -118,3 +118,6 @@ local test_root = fio.dirname(
 package.loaded['test.utils'].LUA_PATH = os.getenv('LUA_PATH') ..
     test_root .. '/?.lua;' ..
     test_root .. '/?/init.lua;'
+
+workaround_requires('test.tarantool3_helpers.server')
+workaround_requires('test.tarantool3_helpers.treegen')
