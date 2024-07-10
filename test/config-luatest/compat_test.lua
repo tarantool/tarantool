@@ -17,6 +17,10 @@ local non_dynamic = {
         error = "The compat  option 'box_cfg_replication_sync_timeout' " ..
             "takes effect only before the initial box.cfg() call",
     },
+    box_cfg_wal_cleanup_delay = {
+        error = "The compat  option 'box_cfg_wal_cleanup_delay' " ..
+            "takes effect only before the initial box.cfg() call",
+    },
 }
 
 -- Ensure that all the options from the compat module are present

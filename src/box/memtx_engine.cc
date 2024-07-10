@@ -1017,6 +1017,7 @@ checkpoint_f(va_list ap)
 
 	struct mh_i32_t *temp_space_ids;
 
+	bool is_synchro_written = false;
 	say_info("saving snapshot `%s'", snap->filename);
 	ERROR_INJECT_WHILE(ERRINJ_SNAP_WRITE_DELAY, {
 		fiber_sleep(0.001);
@@ -1036,6 +1037,22 @@ checkpoint_f(va_list ap)
 		});
 		if (skip)
 			continue;
+		/*
+		 * Raft and limbo states are written right after system spaces
+		 * but before user ones. This is needed to reduce the time,
+		 * needed to acquire states from the checkpoint, which is used
+		 * during checkpoint join.
+		 */
+		if (!is_synchro_written && !space_id_is_system(space_rv->id)) {
+			rc = checkpoint_write_raft(snap, &ckpt->raft);
+			if (rc != 0)
+				break;
+			rc = checkpoint_write_synchro(snap,
+						      &ckpt->synchro_state);
+			if (rc != 0)
+				break;
+			is_synchro_written = true;
+		}
 		struct index_read_view *index_rv =
 			space_read_view_index(space_rv, 0);
 		assert(index_rv != NULL);
@@ -1093,10 +1110,17 @@ checkpoint_f(va_list ap)
 		if (checkpoint_write_invalid_system_row(snap) != 0)
 			goto fail;
 	});
-	if (checkpoint_write_raft(snap, &ckpt->raft) != 0)
-		goto fail;
-	if (checkpoint_write_synchro(snap, &ckpt->synchro_state) != 0)
-		goto fail;
+	/*
+	 * There may be no user data (e.g. when only RAFT_PROMOTE is written),
+	 * write limbo and raft states right after system spaces, at the end
+	 * of the checkpoint.
+	 */
+	if (!is_synchro_written) {
+		if (checkpoint_write_raft(snap, &ckpt->raft) != 0)
+			goto fail;
+		if (checkpoint_write_synchro(snap, &ckpt->synchro_state) != 0)
+			goto fail;
+	}
 	goto done;
 done:
 	if (xlog_close(snap) != 0)
@@ -1330,10 +1354,38 @@ memtx_join_f(va_list ap)
 	return rc;
 }
 
-static int
-memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
+#if defined(ENABLE_CHECKPOINT_JOIN)
+#include "memtx_checkpoint_join.c"
+#else /* !defined(ENABLE_CHECKPOINT_JOIN) */
+
+#define memtx_engine_checkpoint_join generic_engine_join
+
+int
+memtx_engine_recover_synchro(struct memtx_engine *memtx,
+			     const struct vclock *vclock,
+			     struct raft_request *raft_req,
+			     struct synchro_request *synchro_req)
 {
-	(void)engine;
+	(void)memtx;
+	(void)vclock;
+	(void)raft_req;
+	(void)synchro_req;
+	diag_set(ClientError, ER_UNSUPPORTED, "Tarantool CE",
+		 "recovering synchro states from snapshot");
+	return -1;
+}
+
+#endif /* !defined(ENABLE_CHECKPOINT_JOIN) */
+
+static int
+memtx_engine_join(struct engine *engine, void *arg,
+		  struct engine_checkpoint_cursor *cur, struct xstream *stream)
+{
+	if (cur != NULL && cur->is_checkpoint_join)
+		/* Join from files. */
+		return memtx_engine_checkpoint_join(engine, arg, cur, stream);
+
+	/* Join from read-view. */
 	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
 	ctx->stream = stream;
 	/*

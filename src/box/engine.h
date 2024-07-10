@@ -88,6 +88,20 @@ struct engine_memory_stat {
 	size_t tx;
 };
 
+/**
+ * Cursor used during checkpoint initial join.
+ */
+struct engine_checkpoint_cursor {
+	/** Flag, which indicates, whether checkpoint join should be done. */
+	bool is_checkpoint_join;
+	/** Signature of the checkpoint to take data from. */
+	struct vclock *vclock;
+	/** Last checkpoint lsn client has */
+	int64_t last_lsn;
+	/** Counter, shared between engines */
+	int64_t lsn_counter;
+};
+
 typedef int
 engine_backup_cb(const char *path, void *arg);
 
@@ -126,7 +140,9 @@ struct engine_vtab {
 	 * Feed the read view frozen on the previous step to
 	 * the given stream.
 	 */
-	int (*join)(struct engine *engine, void *ctx, struct xstream *stream);
+	int (*join)(struct engine *engine, void *ctx,
+		    struct engine_checkpoint_cursor *cursor,
+		    struct xstream *stream);
 	/**
 	 * Release the read view and free the context prepared
 	 * on the first step.
@@ -454,7 +470,8 @@ int
 engine_prepare_join(struct engine_join_ctx *ctx);
 
 int
-engine_join(struct engine_join_ctx *ctx, struct xstream *stream);
+engine_join(struct engine_join_ctx *ctx,
+	    struct engine_checkpoint_cursor *cursor, struct xstream *stream);
 
 void
 engine_complete_join(struct engine_join_ctx *ctx);
@@ -490,7 +507,9 @@ struct engine_read_view *
 generic_engine_create_read_view(struct engine *engine,
 				const struct read_view_opts *opts);
 int generic_engine_prepare_join(struct engine *, void **);
-int generic_engine_join(struct engine *, void *, struct xstream *);
+int generic_engine_join(struct engine *engine, void *arg,
+			struct engine_checkpoint_cursor *cursor,
+			struct xstream *stream);
 void generic_engine_complete_join(struct engine *, void *);
 int generic_engine_begin(struct engine *, struct txn *);
 int generic_engine_begin_statement(struct engine *, struct txn *);
@@ -611,9 +630,10 @@ engine_prepare_join_xc(struct engine_join_ctx *ctx)
 }
 
 static inline void
-engine_join_xc(struct engine_join_ctx *ctx, struct xstream *stream)
+engine_join_xc(struct engine_join_ctx *ctx,
+	       struct engine_checkpoint_cursor *cursor, struct xstream *stream)
 {
-	if (engine_join(ctx, stream) != 0)
+	if (engine_join(ctx, cursor, stream) != 0)
 		diag_raise();
 }
 

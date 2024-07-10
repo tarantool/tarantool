@@ -59,6 +59,7 @@ for i = 1, 10 do box.space.test:replace{i, i % 3 == 0 and i * 10 or i} end
 -- Synchronize.
 test_run:cmd("switch default")
 vclock = test_run:get_cluster_vclock(SERVERS)
+vclock[0] = nil
 vclock2 = test_run:wait_cluster_vclock(SERVERS, vclock)
 
 -- Check that all replicas converged to the same data

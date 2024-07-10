@@ -100,6 +100,7 @@ struct errinj {
 	_(ERRINJ_IPROTO_CFG_LISTEN, ERRINJ_INT, {.iparam = 0}) \
 	_(ERRINJ_IPROTO_DISABLE_ID, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_DISABLE_WATCH, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_IPROTO_FETCH_SNAPSHOT_DELAY, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_IPROTO_FLIP_FEATURE, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_IPROTO_SET_VERSION, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_IPROTO_TX_DELAY, ERRINJ_BOOL, {.bparam = false}) \
@@ -178,6 +179,8 @@ struct errinj {
 	_(ERRINJ_WAL_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_DELAY_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_WAL_FALLOCATE, ERRINJ_INT, {.iparam = 0}) \
+	_(ERRINJ_WAL_GC_PERSIST_FIBER, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_GC_ANON_DELETE_EXPIRED, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_IO, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_IO_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_WAL_ROTATE, ERRINJ_BOOL, {.bparam = false}) \

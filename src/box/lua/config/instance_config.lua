@@ -1304,12 +1304,17 @@ return schema.new('instance_config', schema.record({
         cleanup_delay = schema.scalar({
             type = 'number',
             box_cfg = 'wal_cleanup_delay',
-            default = 4 * 3600,
+            default = box.NULL,
         }),
         retention_period = enterprise_edition(schema.scalar({
             type = 'number',
             box_cfg = 'wal_retention_period',
             default = 0,
+        })),
+        anon_gc_timeout = enterprise_edition(schema.scalar({
+            type = 'number',
+            box_cfg = 'wal_anon_gc_timeout',
+            default = 60 * 60,
         })),
         -- box.cfg({wal_ext = <...>}) replaces the previous
         -- value without any merging. See explanation why it is
@@ -2418,6 +2423,12 @@ return schema.new('instance_config', schema.record({
             default = 'old',
         }),
         console_session_scope_vars = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
+        box_cfg_wal_cleanup_delay = schema.enum({
             'old',
             'new',
         }, {

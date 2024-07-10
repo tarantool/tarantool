@@ -65,7 +65,7 @@ static_assert(IPROTO_DATA < 0x7f && IPROTO_METADATA < 0x7f &&
 	      IPROTO_SQL_INFO < 0x7f, "encoded IPROTO_BODY keys must fit into "\
 	      "one byte");
 
-static inline uint32_t
+uint32_t
 mp_sizeof_vclock_ignore0(const struct vclock *vclock)
 {
 	uint32_t size = vclock_size_ignore0(vclock);
@@ -73,15 +73,17 @@ mp_sizeof_vclock_ignore0(const struct vclock *vclock)
 					     mp_sizeof_uint(UINT64_MAX));
 }
 
-static inline char *
-mp_encode_vclock_ignore0(char *data, const struct vclock *vclock)
+static char *
+mp_encode_vclock_impl(char *data, const struct vclock *vclock, bool ignore0)
 {
-	data = mp_encode_map(data, vclock_size_ignore0(vclock));
+	uint32_t size = ignore0 ? vclock_size_ignore0(vclock) :
+		vclock_size(vclock);
+	data = mp_encode_map(data, size);
 	struct vclock_iterator it;
 	vclock_iterator_init(&it, vclock);
 	struct vclock_c replica;
 	replica = vclock_iterator_next(&it);
-	if (replica.id == 0)
+	if (ignore0 && replica.id == 0)
 		replica = vclock_iterator_next(&it);
 	for ( ; replica.id < VCLOCK_MAX; replica = vclock_iterator_next(&it)) {
 		data = mp_encode_uint(data, replica.id);
@@ -90,12 +92,24 @@ mp_encode_vclock_ignore0(char *data, const struct vclock *vclock)
 	return data;
 }
 
-static int
-mp_decode_vclock_ignore0(const char **data, struct vclock *vclock)
+char *
+mp_encode_vclock(char *data, const struct vclock *vclock)
 {
-	vclock_create(vclock);
+	return mp_encode_vclock_impl(data, vclock, /*ignore0=*/false);
+}
+
+static char *
+mp_encode_vclock_ignore0(char *data, const struct vclock *vclock)
+{
+	return mp_encode_vclock_impl(data, vclock, /*ignore0=*/true);
+}
+
+int
+mp_decode_vclock(const char **data, struct vclock *vclock)
+{
 	if (mp_typeof(**data) != MP_MAP)
 		return -1;
+	vclock_create(vclock);
 	uint32_t size = mp_decode_map(data);
 	for (uint32_t i = 0; i < size; i++) {
 		if (mp_typeof(**data) != MP_UINT)
@@ -104,13 +118,19 @@ mp_decode_vclock_ignore0(const char **data, struct vclock *vclock)
 		if (mp_typeof(**data) != MP_UINT)
 			return -1;
 		int64_t lsn = mp_decode_uint(data);
-		/*
-		 * Skip vclock[0] coming from the remote
-		 * instances.
-		 */
-		if (lsn > 0 && id != 0)
-			vclock_follow(vclock, id, lsn);
+		if (lsn < 0 || id >= VCLOCK_MAX)
+			return -1;
+		vclock_follow(vclock, id, lsn);
 	}
+	return 0;
+}
+
+static int
+mp_decode_vclock_ignore0(const char **data, struct vclock *vclock)
+{
+	if (mp_decode_vclock(data, vclock) != 0)
+		return -1;
+	vclock_reset(vclock, 0, 0);
 	return 0;
 }
 
@@ -2063,8 +2083,16 @@ struct replication_request {
 	uint32_t *id_filter;
 	/** IPROTO_SERVER_VERSION. */
 	uint32_t *version_id;
+	/** IPROTO_IS_PERSISTENT_GC. */
+	bool *is_persistent_gc;
 	/** IPROTO_REPLICA_ANON. */
 	bool *is_anon;
+	/** IPROTO_CHECKPOINT_JOIN. */
+	bool *is_checkpoint_join;
+	/** IPROTO_CHECKPOINT_VCLOCK. */
+	struct vclock *checkpoint_vclock;
+	/** IPROTO_CHECKPOINT_LSN. */
+	int64_t *checkpoint_lsn;
 };
 
 /** Encode a replication request template. */
@@ -2230,6 +2258,16 @@ xrow_decode_replication_request(const struct xrow_header *row,
 			}
 			*req->is_anon = mp_decode_bool(&d);
 			break;
+		case IPROTO_IS_PERSISTENT_GC:
+			if (req->is_persistent_gc == NULL)
+				goto skip;
+			if (mp_typeof(*d) != MP_BOOL) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "invalid IS_PERSISTENT_GC flag");
+				return -1;
+			}
+			*req->is_persistent_gc = mp_decode_bool(&d);
+			break;
 		case IPROTO_ID_FILTER:
 			if (req->id_filter == NULL)
 				goto skip;
@@ -2247,6 +2285,35 @@ id_filter_decode_err:		xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 					goto id_filter_decode_err;
 				*req->id_filter |= 1 << val;
 			}
+			break;
+		case IPROTO_CHECKPOINT_JOIN:
+			if (req->is_checkpoint_join == NULL)
+				goto skip;
+			if (mp_typeof(*d) != MP_BOOL) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "invalid CHECKPOINT_JOIN");
+				return -1;
+			}
+			*req->is_checkpoint_join = mp_decode_bool(&d);
+			break;
+		case IPROTO_CHECKPOINT_VCLOCK:
+			if (req->checkpoint_vclock == NULL)
+				goto skip;
+			if (mp_decode_vclock(&d, req->checkpoint_vclock) != 0) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "invalid CHECKPOINT_VCLOCK");
+				return -1;
+			}
+			break;
+		case IPROTO_CHECKPOINT_LSN:
+			if (req->checkpoint_lsn == NULL)
+				goto skip;
+			if (mp_typeof(*d) != MP_UINT) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "invalid CHECKPOINT_LSN");
+				return -1;
+			}
+			*req->checkpoint_lsn = mp_decode_uint(&d);
 			break;
 		default: skip:
 			mp_next(&d); /* value */
@@ -2277,6 +2344,8 @@ xrow_decode_register(const struct xrow_header *row,
 		.instance_uuid = &req->instance_uuid,
 		.instance_name = req->instance_name,
 		.vclock = &req->vclock,
+		.is_anon = &req->is_anon,
+		.is_persistent_gc = &req->is_persistent_gc,
 	};
 	return xrow_decode_replication_request(row, &base_req);
 }
@@ -2312,6 +2381,7 @@ xrow_decode_subscribe(const struct xrow_header *row,
 		.vclock = &req->vclock,
 		.version_id = &req->version_id,
 		.is_anon = &req->is_anon,
+		.is_persistent_gc = &req->is_persistent_gc,
 		.id_filter = &req->id_filter,
 	};
 	return xrow_decode_replication_request(row, &base_req);
@@ -2359,8 +2429,23 @@ xrow_decode_fetch_snapshot(const struct xrow_header *row,
 {
 	memset(req, 0, sizeof(*req));
 	struct replication_request base_req = {
+		.instance_uuid = &req->instance_uuid,
 		.version_id = &req->version_id,
+		.is_checkpoint_join = &req->is_checkpoint_join,
+		.is_persistent_gc = &req->is_persistent_gc,
+		.checkpoint_vclock = &req->checkpoint_vclock,
+		.checkpoint_lsn = &req->checkpoint_lsn,
 	};
+	/**
+	 * CHECKPOINT_JOIN, CHECKPOINT_VCLOCK and CHECKPOINT_LSN are optional
+	 * keys, they are used exclusively by CDC now, applier doesn't encode
+	 * them by default, so we need to set default values for vclock and
+	 * lsn before decoding.
+	 */
+	req->is_checkpoint_join = false;
+	vclock_clear(&req->checkpoint_vclock);
+	req->checkpoint_lsn = -1;
+	req->instance_uuid = uuid_nil;
 	return xrow_decode_replication_request(row, &base_req);
 }
 

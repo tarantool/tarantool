@@ -196,6 +196,11 @@ struct relay {
 	enum relay_state state;
 	/** Whether relay should speed up the next heartbeat dispatch. */
 	bool need_new_vclock_sync;
+	/**
+	 * Whether relay should advance gc_consumer of replica,
+	 * used only on subscribe.
+	 */
+	bool with_gc_consumer;
 	struct {
 		/* Align to prevent false-sharing with tx thread */
 		alignas(CACHELINE_SIZE)
@@ -349,6 +354,7 @@ relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	relay->state = RELAY_FOLLOW;
 	relay->sent_raft_term = sent_raft_term;
 	relay->need_new_vclock_sync = false;
+	relay->with_gc_consumer = false;
 	relay->last_row_time = ev_monotonic_now(loop());
 	relay->tx_seen_time = relay->last_row_time;
 	relay->last_heartbeat_time = relay->last_row_time;
@@ -438,9 +444,48 @@ relay_cord_init(struct relay *relay)
 	rlist_create(&relay->current_tx);
 }
 
+#if defined(ENABLE_CHECKPOINT_JOIN)
+#include "relay_checkpoint_join.cc"
+#else /* !defined(ENABLE_CHECKPOINT_JOIN) */
+
+int
+relay_prepare_checkpoint_for_join(struct engine_checkpoint_cursor *cursor,
+				  struct gc_checkpoint_ref *gc)
+{
+	(void)cursor;
+	(void)gc;
+	diag_set(ClientError, ER_UNSUPPORTED, "Tarantool CE",
+		 "checkpoint snapshot fetching");
+	return -1;
+}
+
+/**
+ * Prepares vclock of the snapshot, which is going to be sent during
+ * initial join. Either takes the latest or the one, which is requested
+ * in the cursor. The function also recovers raft and limbo states from the
+ * checkpoint, they're going to be sent during JOIN_META.
+ */
+static int
+relay_prepare_checkpoint_initial_join(struct engine_checkpoint_cursor *cursor,
+				      struct vclock *vclock,
+				      struct raft_request *raft_req,
+				      struct synchro_request *synchro_req)
+{
+	(void)cursor;
+	(void)vclock;
+	(void)raft_req;
+	(void)synchro_req;
+	diag_set(ClientError, ER_UNSUPPORTED, "Tarantool CE",
+		 "checkpoint snapshot fetching");
+	return -1;
+}
+
+#endif /* !defined(ENABLE_CHECKPOINT_JOIN) */
+
 void
 relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
-		   uint32_t replica_version_id)
+		   uint32_t replica_version_id,
+		   struct engine_checkpoint_cursor *cursor)
 {
 	struct relay *relay = relay_new(NULL);
 	if (relay == NULL)
@@ -453,33 +498,50 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 		relay_delete(relay);
 	});
 
-	/* Freeze a read view in engines. */
-	struct engine_join_ctx ctx;
-	engine_prepare_join_xc(&ctx);
-	auto join_guard = make_scoped_guard([&] {
-		engine_complete_join(&ctx);
-	});
-
-	/*
-	 * Sync WAL to make sure that all changes visible from
-	 * the frozen read view are successfully committed and
-	 * obtain corresponding vclock.
-	 */
-	if (wal_sync(vclock) != 0)
-		diag_raise();
-
-	/*
-	 * Start sending data only when the latest sync
-	 * transaction is confirmed.
-	 */
-	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
-		diag_raise();
-
 	struct synchro_request req;
 	struct raft_request raft_req;
 	struct vclock limbo_vclock;
-	txn_limbo_checkpoint(&txn_limbo, &req, &limbo_vclock);
-	box_raft_checkpoint_local(&raft_req);
+	struct engine_join_ctx ctx;
+	ctx.array = NULL;
+	/*
+	 * Guard is defined prematurely, as it must exist in the global scope
+	 * of the function. It works only during read-view join.
+	 */
+	auto join_guard = make_scoped_guard([&] {
+		engine_complete_join(&ctx);
+	});
+	if (cursor != NULL && cursor->is_checkpoint_join) {
+		join_guard.is_active = false;
+		/** Checkpoint initial join is going to be done. */
+		int rc = relay_prepare_checkpoint_initial_join(cursor, vclock,
+							       &raft_req, &req);
+		if (rc != 0)
+			diag_raise();
+		say_info("sending checkpoint with vclock %s at signature %"
+			 PRId64 " to replica at %s", vclock_to_string(vclock),
+			 vclock_sum(vclock), sio_socketname(io->fd));
+	} else {
+		/* Freeze a read view in engines. */
+		engine_prepare_join_xc(&ctx);
+
+		/*
+		 * Sync WAL to make sure that all changes visible from
+		 * the frozen read view are successfully committed and
+		 * obtain corresponding vclock.
+		 */
+		if (wal_sync(vclock) != 0)
+			diag_raise();
+
+		/*
+		 * Start sending data only when the latest sync
+		 * transaction is confirmed.
+		 */
+		if (txn_limbo_wait_confirm(&txn_limbo) != 0)
+			diag_raise();
+
+		txn_limbo_checkpoint(&txn_limbo, &req, &limbo_vclock);
+		box_raft_checkpoint_local(&raft_req);
+	}
 
 	/* Respond to the JOIN request with the current vclock. */
 	struct xrow_header row;
@@ -511,7 +573,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	}
 
 	/* Send read view to the replica. */
-	engine_join_xc(&ctx, &relay->stream);
+	engine_join_xc(&ctx, cursor, &relay->stream);
 }
 
 int
@@ -643,7 +705,7 @@ static void
 tx_gc_advance(struct cmsg *msg)
 {
 	struct relay_gc_msg *m = (struct relay_gc_msg *)msg;
-	gc_consumer_advance(m->relay->replica->gc, &m->vclock);
+	gc_consumer_update_async(&m->relay->replica->uuid, &m->vclock);
 	free(m);
 }
 
@@ -1009,13 +1071,11 @@ relay_subscribe_f(va_list ap)
 			     fiber_schedule_cb, fiber());
 
 	/*
-	 * Setup garbage collection trigger.
-	 * Not needed for anonymous replicas, since they
-	 * aren't registered with gc at all.
+	 * Setup garbage collection trigger if corresponding flag is set.
 	 */
 	struct trigger on_close_log;
 	trigger_create(&on_close_log, relay_on_close_log_f, relay, NULL);
-	if (!relay->replica->anon)
+	if (relay->with_gc_consumer)
 		trigger_add(&relay->r->on_close_log, &on_close_log);
 
 	/* Setup WAL watcher for sending new rows to the replica. */
@@ -1095,7 +1155,8 @@ relay_subscribe_f(va_list ap)
 void
 relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 		const struct vclock *start_vclock, uint32_t replica_version_id,
-		uint32_t replica_id_filter, uint64_t sent_raft_term)
+		uint32_t replica_id_filter, uint64_t sent_raft_term,
+		bool with_gc_consumer)
 {
 	assert(replica->anon || replica->id != REPLICA_ID_NIL);
 	struct relay *relay = replica->relay;
@@ -1119,6 +1180,7 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 	vclock_copy_ignore0(&relay->tx.vclock, start_vclock);
 	relay->version_id = replica_version_id;
 	relay->id_filter |= replica_id_filter;
+	relay->with_gc_consumer = with_gc_consumer;
 
 	struct cord cord;
 	int rc = cord_costart(&cord, "subscribe", relay_subscribe_f, relay);

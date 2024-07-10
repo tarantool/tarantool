@@ -1626,13 +1626,30 @@ box_check_wal_queue_max_size(void)
 	return size;
 }
 
+/**
+ * If set, raise an error on any attempt to set wal_cleanup_delay to
+ * non-zero value.
+ */
+static bool wal_cleanup_delay_is_disabled = false;
+TWEAK_BOOL(wal_cleanup_delay_is_disabled);
+
 static double
 box_check_wal_cleanup_delay(void)
 {
+	const double default_value = 4 * 3600;
 	double value = cfg_getd("wal_cleanup_delay");
 	if (value < 0) {
 		diag_set(ClientError, ER_CFG, "wal_cleanup_delay",
 			 "value must be >= 0");
+		return -1;
+	}
+	/* Non-zero and non-default value is detected - say a warning. */
+	if (value > 0 && value != default_value)
+		say_warn_once("Option wal_cleanup_delay is deprecated.");
+
+	if (value > 0 && wal_cleanup_delay_is_disabled) {
+		diag_set(ClientError, ER_DEPRECATED,
+			 "Option wal_cleanup_delay");
 		return -1;
 	}
 
@@ -1690,6 +1707,19 @@ box_check_wal_retention_period_xc()
 	double value = box_check_wal_retention_period();
 	if (value < 0)
 		diag_raise();
+	return value;
+}
+
+/** Validate that wal_anon_gc_timeout is >= 0. */
+static double
+box_check_wal_anon_gc_timeout()
+{
+	double value = cfg_getd("wal_anon_gc_timeout");
+	if (value < 0) {
+		diag_set(ClientError, ER_CFG, "wal_anon_gc_timeout",
+			 "the value must be >= 0");
+		return -1;
+	}
 	return value;
 }
 
@@ -1953,6 +1983,8 @@ box_check_config(void)
 	if (box_check_wal_cleanup_delay() < 0)
 		diag_raise();
 	if (box_check_wal_retention_period() < 0)
+		diag_raise();
+	if (box_check_wal_anon_gc_timeout() < 0)
 		diag_raise();
 	if (box_check_memory_quota("memtx_memory") < 0)
 		diag_raise();
@@ -3246,6 +3278,16 @@ box_set_wal_retention_period(void)
 	return 0;
 }
 
+int
+box_set_wal_anon_gc_timeout(void)
+{
+	double timeout = box_check_wal_anon_gc_timeout();
+	if (timeout < 0)
+		return -1;
+	gc_set_wal_anon_gc_timeout(timeout);
+	return 0;
+}
+
 void
 box_set_vinyl_memory(void)
 {
@@ -4310,12 +4352,62 @@ box_process_fetch_snapshot(struct iostream *io,
 			  "wal_mode = 'none'");
 	}
 
-	say_info("sending current read-view to replica at %s", sio_socketname(io->fd));
+	if (req.is_persistent_gc && tt_uuid_is_nil(&req.instance_uuid)) {
+		tnt_raise(ClientError, ER_PROTOCOL,
+			  "Fetch snapshot with IS_PERSISTENT_GC option "
+			  "requires INSTANCE_UUID");
+	}
+
+	/** Used for checkpoint initial join. */
+	struct engine_checkpoint_cursor cursor = {
+		.is_checkpoint_join = req.is_checkpoint_join,
+		.vclock = &req.checkpoint_vclock,
+		.last_lsn = req.checkpoint_lsn,
+		.lsn_counter = 0,
+	};
+	struct gc_checkpoint_ref gc;
+	auto gc_guard = make_scoped_guard([&] {
+		gc_unref_checkpoint(&gc);
+	});
+	gc_guard.is_active = false;
+	if (cursor.is_checkpoint_join) {
+		if (relay_prepare_checkpoint_for_join(&cursor, &gc) != 0)
+			diag_raise();
+		gc_guard.is_active = true;
+	}
+
+	auto gc_consumer_ref_guard = make_scoped_guard([&] {
+		gc_consumer_unref(&req.instance_uuid);
+	});
+	gc_consumer_ref_guard.is_active = false;
+	if (req.is_persistent_gc) {
+		/*
+		 * Reference the consumer so that it cannot be deleted
+		 * while replica is connected.
+		 */
+		gc_consumer_ref(&req.instance_uuid);
+		gc_consumer_ref_guard.is_active = true;
+		if (req.is_checkpoint_join) {
+			if (gc_consumer_retain_checkpoint(&req.instance_uuid,
+							  &cursor) != 0)
+				diag_raise();
+		} else {
+			if (!gc_consumer_is_registered(&req.instance_uuid))
+				tnt_raise(ClientError, ER_MISSING_GC_CONSUMER);
+			gc_consumer_update(&req.instance_uuid,
+					   &replicaset.vclock);
+		}
+	}
+
+	struct errinj *inj = errinj(ERRINJ_IPROTO_FETCH_SNAPSHOT_DELAY,
+				    ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		fiber_sleep(inj->dparam);
 
 	/* Send the snapshot data to the instance. */
 	struct vclock start_vclock;
-	relay_initial_join(io, header->sync, &start_vclock, req.version_id);
-	say_info("read-view sent.");
+	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
+			   &cursor);
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -4327,6 +4419,27 @@ box_process_fetch_snapshot(struct iostream *io,
 	xrow_encode_vclock(&row, &stop_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
+
+	/*
+	 * Wait for reply to release snapshot if replica has consumer and
+	 * fetches checkpoint instead of read-view.
+	 */
+	if (req.is_persistent_gc && req.is_checkpoint_join) {
+		struct ibuf ibuf;
+		struct xrow_header ans;
+		ibuf_create(&ibuf, &cord()->slabc, 128);
+		auto ibuf_guard = make_scoped_guard([&]() {
+			ibuf_destroy(&ibuf);
+		});
+		coio_read_xrow(io, &ibuf, &ans);
+		if (ans.type != IPROTO_OK) {
+			tnt_raise(ClientError, ER_PROTOCOL,
+				  "Unexpected reply in the end of fetch "
+				  "snapshot");
+		}
+		if (gc_consumer_release_checkpoint(&req.instance_uuid) != 0)
+			diag_raise();
+	}
 }
 
 /**
@@ -4363,10 +4476,45 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	if (tt_uuid_is_equal(&req.instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
+	if (tt_uuid_is_nil(&req.instance_uuid))
+		tnt_raise(ClientError, ER_PROTOCOL,
+			  "IPROTO_REGISTER requires INSTANCE_UUID");
+
 	access_check_universe_xc(PRIV_R);
+
 	/*
-	 * We only get register requests from instances which need some actual
-	 * registration - name, id.
+	 * Anonymous request - it means that anonymous replica wants to modify
+	 * its WAL GC state.
+	 */
+	if (req.is_anon) {
+		int rc = 0;
+		if (req.is_persistent_gc) {
+			if (gc_consumer_is_registered(&req.instance_uuid)) {
+				/*
+				 * Prolong life of consumer if it's already
+				 * registered.
+				 */
+				gc_consumer_touch(&req.instance_uuid);
+			} else {
+				rc = gc_consumer_register_dummy(
+					&req.instance_uuid);
+			}
+		} else {
+			rc = gc_consumer_unregister(&req.instance_uuid);
+		}
+
+		if (rc != 0)
+			diag_raise();
+
+		struct xrow_header row;
+		row.sync = header->sync;
+		xrow_encode_type(&row, IPROTO_OK);
+		coio_write_xrow(io, &row);
+		return;
+	}
+	/*
+	 * We only get non-anonymous register requests from instances which
+	 * need some actual registration - name, id.
 	 */
 	struct replica *replica = replica_by_uuid(&req.instance_uuid);
 	bool need_id = false;
@@ -4407,11 +4555,17 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
-	struct gc_consumer *gc = gc_consumer_register(
-		&start_vclock, "replica %s", tt_uuid_str(&req.instance_uuid));
-	if (gc == NULL)
-		diag_raise();
-	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
+	/*
+	 * Register an anonymous consumer (not associated with replica) to hold
+	 * xlogs until replica is successfully registered.
+	 */
+	struct gc_consumer *gc_temporary =
+		gc_consumer_register_anonymous(&start_vclock,
+					       "replica %s register",
+					       tt_uuid_str(&req.instance_uuid));
+	auto gc_guard = make_scoped_guard([&] {
+		gc_consumer_unregister_anonymous(gc_temporary);
+	});
 
 	say_info("registering replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
@@ -4441,14 +4595,12 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	coio_write_xrow(io, &row);
 
 	/*
-	 * Advance the WAL consumer state to the position where
-	 * registration was complete and assign it to the
-	 * replica.
+	 * Replica was registered as a WAL GC consumer on insert to _cluster,
+	 * so just advance its consumer now.
 	 */
-	gc_consumer_advance(gc, &stop_vclock);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
-	replica->gc = gc;
+	if (gc_consumer_update(&replica->uuid, &stop_vclock) != 0)
+		diag_raise();
+	gc_consumer_unregister_anonymous(gc_temporary);
 	gc_guard.is_active = false;
 }
 
@@ -4549,14 +4701,16 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 		}
 	}
 	/*
-	 * Register the replica as a WAL consumer so that
-	 * it can resume FINAL JOIN where INITIAL JOIN ends.
+	 * Register an anonymous consumer (not associated with replica) to hold
+	 * xlogs until replica is successfully joined the replicaset.
 	 */
-	struct gc_consumer *gc = gc_consumer_register(&replicaset.vclock,
-				"replica %s", tt_uuid_str(&req.instance_uuid));
-	if (gc == NULL)
-		diag_raise();
-	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
+	struct gc_consumer *gc_temporary =
+		gc_consumer_register_anonymous(&replicaset.vclock,
+					       "replica %s join",
+					       tt_uuid_str(&req.instance_uuid));
+	auto gc_guard = make_scoped_guard([&] {
+		gc_consumer_unregister_anonymous(gc_temporary);
+	});
 
 	say_info("joining replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
@@ -4565,7 +4719,8 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * Initial stream: feed replica with dirty data from engines.
 	 */
 	struct vclock start_vclock;
-	relay_initial_join(io, header->sync, &start_vclock, req.version_id);
+	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
+			   NULL);
 	say_info("initial data sent.");
 	/**
 	 * Register the replica after sending the last row but before sending
@@ -4603,13 +4758,12 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	coio_write_xrow(io, &row);
 
 	/*
-	 * Advance the WAL consumer state to the position where
-	 * FINAL JOIN ended and assign it to the replica.
+	 * Replica was registered as a WAL GC consumer on insert to _cluster,
+	 * so just advance its consumer now.
 	 */
-	gc_consumer_advance(gc, &stop_vclock);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
-	replica->gc = gc;
+	if (gc_consumer_update(&replica->uuid, &stop_vclock) != 0)
+		diag_raise();
+	gc_consumer_unregister_anonymous(gc_temporary);
 	gc_guard.is_active = false;
 }
 
@@ -4658,6 +4812,12 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 			  "non-anonymous followers.");
 	}
 
+	if (req.is_persistent_gc && !req.is_anon) {
+		tnt_raise(ClientError, ER_PROTOCOL, "Option IS_PERSISTENT_GC "
+			  "can be used only for anonymous replicas, "
+			  "non-anonymous ones imply this attribute.");
+	}
+
 	/* Check permissions */
 	access_check_universe_xc(PRIV_R);
 
@@ -4665,7 +4825,8 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	struct replica *replica = replica_by_uuid(&req.instance_uuid);
 
 	if (!req.is_anon &&
-	    (replica == NULL || replica->id == REPLICA_ID_NIL)) {
+	    (replica == NULL || replica->id == REPLICA_ID_NIL ||
+	     !gc_consumer_is_registered(&replica->uuid))) {
 		/*
 		 * The instance is not anonymous, and is registered (at least it
 		 * claims so), but its ID is not delivered to the current
@@ -4676,6 +4837,11 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		 * nodes yet.
 		 * Also can happen when the replica is deleted from _cluster,
 		 * but still tries to subscribe. It won't have an ID here.
+		 * Moreover, non-anonymous replica having no consumer (and our
+		 * protocol implies that any registered replica has one) means
+		 * that record in _cluster wasn't committed yet because the
+		 * consumer is created on commit, so this case is considered as
+		 * too early subscribe as well.
 		 */
 		tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
 			  tt_uuid_str(&req.instance_uuid));
@@ -4684,6 +4850,11 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		tnt_raise(ClientError, ER_PROTOCOL, "Can't subscribe an "
 			  "anonymous replica having an ID assigned");
 	}
+	if (req.is_persistent_gc &&
+	    !gc_consumer_is_registered(&req.instance_uuid))
+		tnt_raise(ClientError, ER_MISSING_GC_CONSUMER);
+
+	bool has_persistent_gc = req.is_persistent_gc || !req.is_anon;
 	/*
 	 * Replica name mismatch is not considered a critical error. It can
 	 * happen if rename happened and then the replica reconnected. It won't
@@ -4713,6 +4884,13 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	}
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
+
+	/* Save UUID because replica can be deleted. */
+	struct tt_uuid replica_uuid = replica->uuid;
+	auto gc_guard = make_scoped_guard([&]() {
+		gc_consumer_unref(&replica_uuid);
+	});
+	gc_guard.is_active = false;
 	/*
 	 * Register the replica with the garbage collector.
 	 * In case some of the replica's WAL files were deleted, it might
@@ -4720,18 +4898,11 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * recreate the gc consumer unconditionally to make sure it holds
 	 * the correct vclock.
 	 */
-	if (!replica->anon) {
-		bool had_gc = false;
-		if (replica->gc != NULL) {
-			gc_consumer_unregister(replica->gc);
-			had_gc = true;
-		}
-		replica->gc = gc_consumer_register(&start_vclock, "replica %s",
-						   tt_uuid_str(&replica->uuid));
-		if (replica->gc == NULL)
+	if (has_persistent_gc) {
+		gc_consumer_ref(&replica->uuid);
+		gc_guard.is_active = true;
+		if (gc_consumer_update(&replica->uuid, &start_vclock) != 0)
 			diag_raise();
-		if (!had_gc)
-			gc_delay_unref();
 	}
 	/*
 	 * Send a response to SUBSCRIBE request, tell
@@ -4797,7 +4968,8 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * indefinitely).
 	 */
 	relay_subscribe(replica, io, header->sync, &start_vclock,
-			req.version_id, req.id_filter, sent_raft_term);
+			req.version_id, req.id_filter, sent_raft_term,
+			has_persistent_gc);
 }
 
 void
@@ -5651,6 +5823,30 @@ box_cfg_xc(void)
 	 */
 	if (dd_version_id > version_id(2, 10, 1))
 		txn_limbo_filter_enable(&txn_limbo);
+
+	/*
+	 * If we have no space _gc_consumers, wal_cleanup_delay is set to zero
+	 * and we have registered replicas (except for self), we should set
+	 * wal_cleanup_delay to non-zero value to prevent xlogs from being
+	 * deleted.
+	 * Note that we do this after recovery - space _gc_consumers is
+	 * recovered then if it was in snapshot.
+	 */
+	if (!gc_consumer_is_persistent() &&
+	    box_check_wal_cleanup_delay() == 0 &&
+	    replicaset.registered_count > 1) {
+		int wal_cleanup_delay_default = 4 * 3600;
+		say_warn("Current schema does not support persistent WAL GC "
+			 "state, so wal_cleanup_delay option is automatically "
+			 "set to %d to prevent xlogs needed for replicas from "
+			 "being cleaned up. Please re-configure it after "
+			 "schema upgrade if it is needed.",
+			 wal_cleanup_delay_default);
+		gc_set_wal_cleanup_delay(4 * 3600);
+	} else {
+		if (box_set_wal_cleanup_delay() != 0)
+			diag_raise();
+	}
 
 	title("running");
 	say_info("ready to accept requests");

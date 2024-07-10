@@ -587,6 +587,15 @@ struct register_request {
 	char instance_name[NODE_NAME_SIZE_MAX];
 	/** Replica's vclock. */
 	struct vclock vclock;
+	/** Whether replica is anonymous. */
+	bool is_anon;
+	/**
+	 * For non-anonymous replica this flag has no effect and must be false.
+	 * For anonymous replica (`is_anon` is set) this flag controls whether
+	 * WAL GC consumer should be registered for the replica or unregistered.
+	 * If it's already registered - ???, if it already unregistered - no-op.
+	 */
+	bool is_persistent_gc;
 };
 
 /** Encode REGISTER request. */
@@ -617,6 +626,13 @@ struct subscribe_request {
 	uint32_t version_id;
 	/** Flag whether the replica is anon. */
 	bool is_anon;
+	/**
+	 * For non-anonymous replica this flag has no effect and must be false.
+	 * For anonymous replica this flag controls whether WAL GC consumer
+	 * should be updated. If it is set and consumer is not registered for
+	 * the replica, an error is thrown.
+	 */
+	bool is_persistent_gc;
 };
 
 /** Encode SUBSCRIBE request. */
@@ -668,8 +684,22 @@ int
 xrow_decode_join(const struct xrow_header *row, struct join_request *req);
 
 struct fetch_snapshot_request {
+	/** Replica's UUID. */
+	struct tt_uuid instance_uuid;
 	/** Replica's version. */
 	uint32_t version_id;
+	/** Flag indicating whether checkpoint join should be done. */
+	bool is_checkpoint_join;
+	/**
+	 * This flag controls whether WAL GC consumer should be updated.
+	 * If it is set and consumer is not registered for the replica, an
+	 * error is thrown.
+	 */
+	bool is_persistent_gc;
+	/** Checkpoint's vclock, signature of the snapshot. */
+	struct vclock checkpoint_vclock;
+	/** Checkpoint's lsn, the last row number client has. */
+	int64_t checkpoint_lsn;
 };
 
 /** Encode FETCH_SNAPSHOT request. */
@@ -726,6 +756,21 @@ xrow_encode_applier_heartbeat(struct xrow_header *row,
 int
 xrow_decode_applier_heartbeat(const struct xrow_header *row,
 			      struct applier_heartbeat *req);
+
+/** Return the number of bytes an encoded vclock takes. */
+uint32_t
+mp_sizeof_vclock_ignore0(const struct vclock *vclock);
+
+/** Encode a vclock to a buffer as MP_MAP. Never fails. */
+char *
+mp_encode_vclock(char *data, const struct vclock *vclock);
+
+/**
+ * Decode a vclock from MsgPack data, it should be MP_MAP.
+ * Returns -1 on error, diag is NOT set.
+ */
+int
+mp_decode_vclock(const char **data, struct vclock *vclock);
 
 /** Encode vclock. */
 void

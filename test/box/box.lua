@@ -49,6 +49,7 @@ local _enterprise_keys = {
     password_history_length = true,
     wal_ext = true,
     wal_retention_period = true,
+    wal_anon_gc_timeout = true,
 }
 
 function cfg_filter(data)

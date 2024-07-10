@@ -193,7 +193,7 @@ s = box.space.test
 for i = 1, 5 do s:replace{i} end
 ---
 ...
-vclock = test_run:get_vclock('default')
+vclock = test_run:get_vclock('default', {ignore_zero = true})
 ---
 ...
 test_run:wait_vclock('replica', vclock)

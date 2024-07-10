@@ -71,7 +71,7 @@ _ = box.space.test:on_replace(function(old, new) table.insert(t, new) end)
 test_run:cmd('switch default')
 s = box.space.test
 for i = 1, 5 do s:replace{i} end
-vclock = test_run:get_vclock('default')
+vclock = test_run:get_vclock('default', {ignore_zero = true})
 test_run:wait_vclock('replica', vclock)
 test_run:cmd("switch replica")
 t

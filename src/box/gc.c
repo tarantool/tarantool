@@ -57,6 +57,12 @@
 #include "wal.h"		/* wal_collect_garbage() */
 #include "checkpoint_schedule.h"
 #include "txn_limbo.h"
+#include "txn.h"
+#include "replication.h"
+#include "box.h"
+#include "tuple.h"
+#include "space_cache.h"
+#include "errinj.h"
 
 struct gc_state gc;
 
@@ -64,6 +70,8 @@ static int
 gc_cleanup_fiber_f(va_list);
 static int
 gc_checkpoint_fiber_f(va_list);
+static int
+gc_consumers_persist_fiber_f(va_list);
 
 /**
  * Comparator used for ordering gc_consumer objects
@@ -83,7 +91,29 @@ gc_consumer_cmp(const struct gc_consumer *a, const struct gc_consumer *b)
 }
 
 rb_gen(MAYBE_UNUSED static inline, gc_tree_, gc_tree_t,
-       struct gc_consumer, node, gc_consumer_cmp);
+       struct gc_consumer, in_active, gc_consumer_cmp);
+
+static int
+gc_consumer_compare_by_uuid(const struct gc_consumer *a,
+			    const struct gc_consumer *b)
+{
+	return tt_uuid_compare(&a->uuid, &b->uuid);
+}
+
+rb_gen(MAYBE_UNUSED static, gc_consumer_hash_, gc_tree_t,
+       struct gc_consumer, in_hash, gc_consumer_compare_by_uuid);
+
+static struct gc_consumer *
+gc_consumer_by_uuid(const struct tt_uuid *uuid)
+{
+	struct gc_consumer key;
+	key.uuid = *uuid;
+	return gc_consumer_hash_search(&gc.consumers_hash, &key);
+}
+
+#define gc_consumer_hash_foreach(hash, var) \
+	for (struct gc_consumer *(var) = gc_consumer_hash_first(hash); \
+	     (var) != NULL; (var) = gc_consumer_hash_next(hash, var))
 
 /** Free a consumer object. */
 static void
@@ -102,6 +132,9 @@ gc_checkpoint_delete(struct gc_checkpoint *checkpoint)
 }
 
 void
+gc_anon_init(void);
+
+void
 gc_init(on_garbage_collection_f on_garbage_collection)
 {
 	/* Don't delete any files until recovery is complete. */
@@ -114,7 +147,8 @@ gc_init(on_garbage_collection_f on_garbage_collection)
 
 	vclock_create(&gc.vclock);
 	rlist_create(&gc.checkpoints);
-	gc_tree_new(&gc.consumers);
+	gc_tree_new(&gc.active_consumers);
+	gc_consumer_hash_new(&gc.consumers_hash);
 	fiber_cond_create(&gc.cleanup_cond);
 	checkpoint_schedule_cfg(&gc.checkpoint_schedule, 0, 0);
 
@@ -129,10 +163,19 @@ gc_init(on_garbage_collection_f on_garbage_collection)
 		panic("failed to start checkpoint daemon fiber");
 	fiber_set_joinable(gc.checkpoint_fiber, true);
 
+	gc.persist_fiber = fiber_new_system("gc_consumers_persist_daemon",
+					    gc_consumers_persist_fiber_f);
+	if (gc.persist_fiber == NULL)
+		panic("failed to start gc consumers persist daemon fiber");
+	fiber_set_joinable(gc.persist_fiber, true);
+
 	gc.on_garbage_collection = on_garbage_collection;
 
 	fiber_start(gc.cleanup_fiber);
 	fiber_start(gc.checkpoint_fiber);
+	fiber_start(gc.persist_fiber);
+
+	gc_anon_init();
 }
 
 void
@@ -140,10 +183,13 @@ gc_shutdown(void)
 {
 	fiber_cancel(gc.checkpoint_fiber);
 	fiber_cancel(gc.cleanup_fiber);
+	fiber_cancel(gc.persist_fiber);
 	fiber_join(gc.checkpoint_fiber);
 	gc.checkpoint_fiber = NULL;
 	fiber_join(gc.cleanup_fiber);
 	gc.cleanup_fiber = NULL;
+	fiber_join(gc.persist_fiber);
+	gc.persist_fiber = NULL;
 }
 
 void
@@ -161,15 +207,18 @@ gc_free(void)
 		gc_checkpoint_delete(checkpoint);
 	}
 	/* Free all registered consumers. */
-	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
+	struct gc_consumer *consumer = gc_tree_first(&gc.active_consumers);
 	while (consumer != NULL) {
-		struct gc_consumer *next = gc_tree_next(&gc.consumers,
+		struct gc_consumer *next = gc_tree_next(&gc.active_consumers,
 							consumer);
-		gc_tree_remove(&gc.consumers, consumer);
+		gc_tree_remove(&gc.active_consumers, consumer);
 		gc_consumer_delete(consumer);
 		consumer = next;
 	}
 }
+
+static bool
+gc_checkpoint_is_retained(struct gc_checkpoint *checkpoint);
 
 /**
  * Invoke garbage collection in order to remove files left
@@ -196,6 +245,8 @@ gc_run_cleanup(void)
 			break;
 		if (!rlist_empty(&checkpoint->refs))
 			break; /* checkpoint is in use */
+		if (gc_checkpoint_is_retained(checkpoint))
+			break;
 		rlist_del_entry(checkpoint, in_checkpoints);
 		gc_checkpoint_delete(checkpoint);
 		gc.checkpoint_count--;
@@ -207,7 +258,7 @@ gc_run_cleanup(void)
 
 	/* Find the vclock of the oldest WAL row to keep. */
 	struct vclock min_vclock;
-	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
+	struct gc_consumer *consumer = gc_tree_first(&gc.active_consumers);
 	/*
 	 * Vclock of the oldest WAL row to keep is a by-component
 	 * minimum of all consumer vclocks and the oldest
@@ -223,7 +274,7 @@ gc_run_cleanup(void)
 		 * with a zero instance id (local rows).
 		 */
 		vclock_min_ignore0(&min_vclock, &consumer->vclock);
-		consumer = gc_tree_next(&gc.consumers, consumer);
+		consumer = gc_tree_next(&gc.active_consumers, consumer);
 	}
 
 	/*
@@ -394,6 +445,16 @@ gc_wait_cleanup(void)
 		fiber_cond_wait(&gc.cleanup_cond);
 }
 
+/**
+ * Returns true when the consumer is outdated - its vclock is either
+ * less than or incomparable with the wal gc vclock.
+ */
+static bool
+gc_consumer_is_outdated(struct gc_consumer *consumer)
+{
+	return vclock_compare_ignore0(&gc.vclock, &consumer->vclock) > 0;
+}
+
 void
 gc_advance(const struct vclock *vclock)
 {
@@ -405,22 +466,22 @@ gc_advance(const struct vclock *vclock)
 	 */
 	vclock_copy(&gc.vclock, vclock);
 
-	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
+	struct gc_consumer *consumer = gc_tree_first(&gc.active_consumers);
 	while (consumer != NULL) {
-		struct gc_consumer *next = gc_tree_next(&gc.consumers,
+		struct gc_consumer *next = gc_tree_next(&gc.active_consumers,
 							consumer);
 		/*
 		 * Remove all the consumers whose vclocks are
 		 * either less than or incomparable with the wal
 		 * gc vclock.
 		 */
-		if (vclock_compare_ignore0(vclock, &consumer->vclock) <= 0) {
+		if (!gc_consumer_is_outdated(consumer)) {
 			consumer = next;
 			continue;
 		}
 		assert(!consumer->is_inactive);
 		consumer->is_inactive = true;
-		gc_tree_remove(&gc.consumers, consumer);
+		gc_tree_remove(&gc.active_consumers, consumer);
 
 		say_crit("deactivated WAL consumer %s at %s", consumer->name,
 			 vclock_to_string(&consumer->vclock));
@@ -661,74 +722,680 @@ gc_unref_checkpoint(struct gc_checkpoint_ref *ref)
 	gc_schedule_cleanup();
 }
 
-struct gc_consumer *
-gc_consumer_register(const struct vclock *vclock, const char *format, ...)
+static void
+gc_consumer_unregister_impl(struct gc_consumer *consumer);
+
+static struct gc_consumer *
+gc_consumer_register_impl(const struct tt_uuid *uuid,
+			  const struct vclock *vclock,
+			  const char *format, va_list ap)
 {
-	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
-	if (consumer == NULL) {
-		diag_set(OutOfMemory, sizeof(*consumer),
-			 "malloc", "struct gc_consumer");
-		return NULL;
+	struct gc_consumer *consumer = xmalloc(sizeof(*consumer));
+	vsnprintf(consumer->name, GC_NAME_MAX, format, ap);
+	consumer->with_snap = false;
+	consumer->last_used_tm = clock_lowres_monotonic();
+
+	if (uuid != NULL && !tt_uuid_is_nil(uuid)) {
+		/* Unregister old consumer, if any. */
+		if (gc_consumer_is_registered(uuid))
+			gc_consumer_unregister_impl(gc_consumer_by_uuid(uuid));
+		consumer->uuid = *uuid;
+		gc_consumer_hash_insert(&gc.consumers_hash, consumer);
+	} else {
+		consumer->uuid = uuid_nil;
 	}
 
-	va_list ap;
-	va_start(ap, format);
-	vsnprintf(consumer->name, GC_NAME_MAX, format, ap);
-	va_end(ap);
-
-	vclock_copy(&consumer->vclock, vclock);
-	gc_tree_insert(&gc.consumers, consumer);
+	if (vclock != NULL) {
+		vclock_copy(&consumer->vclock, vclock);
+		vclock_copy(&consumer->volatile_vclock, vclock);
+	} else {
+		vclock_create(&consumer->vclock);
+		vclock_create(&consumer->volatile_vclock);
+	}
+	consumer->is_async_updated = false;
+	consumer->is_inactive = vclock == NULL ||
+		gc_consumer_is_outdated(consumer);
+	if (!consumer->is_inactive)
+		gc_tree_insert(&gc.active_consumers, consumer);
 	return consumer;
 }
 
-void
-gc_consumer_unregister(struct gc_consumer *consumer)
+static void
+gc_consumer_register_internal(const struct tt_uuid *uuid,
+			      const struct vclock *vclock,
+			      const char *format, ...)
 {
+	assert(uuid != NULL);
+	assert(!tt_uuid_is_nil(uuid));
+
+	va_list ap;
+	va_start(ap, format);
+	gc_consumer_register_impl(uuid, vclock, format, ap);
+	va_end(ap);
+}
+
+static void
+gc_consumer_register_dummy_internal(const struct tt_uuid *uuid,
+				    const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	gc_consumer_register_impl(uuid, NULL, format, ap);
+	va_end(ap);
+}
+
+struct gc_consumer *
+gc_consumer_register_anonymous(const struct vclock *vclock,
+			       const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	struct gc_consumer *consumer =
+		gc_consumer_register_impl(NULL, vclock, format, ap);
+	va_end(ap);
+	return consumer;
+}
+
+static void
+gc_consumer_unregister_impl(struct gc_consumer *consumer)
+{
+	assert(consumer != NULL);
 	if (!consumer->is_inactive) {
-		gc_tree_remove(&gc.consumers, consumer);
+		gc_tree_remove(&gc.active_consumers, consumer);
 		gc_schedule_cleanup();
 	}
+	if (!tt_uuid_is_nil(&consumer->uuid))
+		gc_consumer_hash_remove(&gc.consumers_hash, consumer);
 	gc_consumer_delete(consumer);
 }
 
 void
-gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock)
+gc_consumer_unregister_anonymous(struct gc_consumer *consumer)
 {
-	if (consumer->is_inactive)
+	assert(consumer != NULL);
+	gc_consumer_unregister_impl(consumer);
+}
+
+bool
+gc_consumer_is_registered(const struct tt_uuid *uuid)
+{
+	return gc_consumer_by_uuid(uuid) != NULL;
+}
+
+static void
+gc_consumer_update_impl(struct gc_consumer *consumer, const struct vclock *vclock)
+{
+	assert(consumer != NULL);
+	/* Update volatile vclock only if it is consistent with actual one. */
+	bool update_volatile_vclock =
+		vclock_compare(&consumer->vclock,
+			       &consumer->volatile_vclock) == 0;
+	/* If the consumer is inactive, activate it if needed. */
+	if (consumer->is_inactive) {
+		vclock_copy(&consumer->vclock, vclock);
+		if (update_volatile_vclock)
+			vclock_copy(&consumer->volatile_vclock, vclock);
+		consumer->is_inactive = gc_consumer_is_outdated(consumer);
+		if (!consumer->is_inactive)
+			gc_tree_insert(&gc.active_consumers, consumer);
+		/* Do not schedule cleanup - consumer didn't pin any xlogs. */
 		return;
+	}
 
-	int64_t signature = vclock_sum(vclock);
-	int64_t prev_signature = vclock_sum(&consumer->vclock);
-
-	assert(signature >= prev_signature);
-	if (signature == prev_signature)
+	if (vclock_compare_ignore0(&consumer->vclock, vclock) == 0)
 		return; /* nothing to do */
+
+	struct vclock old_vclock;
+	vclock_copy(&old_vclock, &consumer->vclock);
 
 	/*
 	 * Do not update the tree unless the tree invariant
 	 * is violated.
 	 */
-	struct gc_consumer *next = gc_tree_next(&gc.consumers, consumer);
-	bool update_tree = (next != NULL &&
-			    vclock_lex_compare(vclock, &next->vclock) >= 0);
+	struct gc_consumer *n = gc_tree_next(&gc.active_consumers, consumer);
+	struct gc_consumer *p = gc_tree_prev(&gc.active_consumers, consumer);
+	bool update_tree =
+		(n != NULL && vclock_lex_compare(vclock, &n->vclock) >= 0) ||
+		(p != NULL && vclock_lex_compare(vclock, &p->vclock) <= 0);
 
 	if (update_tree)
-		gc_tree_remove(&gc.consumers, consumer);
+		gc_tree_remove(&gc.active_consumers, consumer);
 
 	vclock_copy(&consumer->vclock, vclock);
+	if (update_volatile_vclock)
+		vclock_copy(&consumer->volatile_vclock, vclock);
 
 	if (update_tree)
-		gc_tree_insert(&gc.consumers, consumer);
+		gc_tree_insert(&gc.active_consumers, consumer);
 
-	gc_schedule_cleanup();
+	/* Schedule cleanup only when new vclock is greater or incomparable. */
+	if (vclock_compare_ignore0(&consumer->vclock, &old_vclock) > 0)
+		gc_schedule_cleanup();
+}
+
+/**
+ * Discards an asynchronous update of consumer with passed uuid, if any.
+ * If the update is being persisted right now, it is not discarded, but
+ * in this case the update is being committed, so any synchronous
+ * modification made after this function is called will be serialized
+ * after the in-progress update.
+ *
+ * All synchronous methods of gc consumers must use this function to prevent
+ * being overwritten by pending asynchronous updates.
+ */
+static void
+gc_consumer_discard_async_updates(const struct tt_uuid *uuid)
+{
+	struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
+	if (consumer != NULL)
+		consumer->is_async_updated = false;
+}
+
+int
+gc_consumer_register_dummy(const struct tt_uuid *uuid)
+{
+	gc_consumer_discard_async_updates(uuid);
+	if (!gc_consumer_is_persistent()) {
+		gc_consumer_register_dummy_internal(uuid, "replica %s",
+						    tt_uuid_str(uuid));
+		return 0;
+	}
+
+	return boxk(IPROTO_REPLACE, BOX_GC_CONSUMERS_ID, "[%sNIL{}]",
+		    tt_uuid_str(uuid));
+}
+
+int
+gc_consumer_unregister(const struct tt_uuid *uuid)
+{
+	gc_consumer_discard_async_updates(uuid);
+	if (!gc_consumer_is_persistent()) {
+		struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
+		if (consumer != NULL)
+			gc_consumer_unregister_impl(consumer);
+		return 0;
+	}
+
+	return boxk(IPROTO_DELETE, BOX_GC_CONSUMERS_ID, "[%s]",
+		    tt_uuid_str(uuid));
+}
+
+static int
+gc_consumer_perstistent_update_impl(const struct tt_uuid *uuid, const struct vclock *vclock)
+{
+	char key_buf[UUID_STR_LEN + 10];
+	char *key_end = key_buf;
+	key_end = mp_encode_array(key_end, 1);
+	key_end = mp_encode_str0(key_end, tt_uuid_str(uuid));
+	assert((unsigned long)(key_end - key_buf) < sizeof(key_buf));
+
+	char ops_buf[VCLOCK_STR_LEN_MAX + 20];
+	char *ops_end = ops_buf;
+	ops_end = mp_encode_array(ops_end, 1);
+	ops_end = mp_encode_array(ops_end, 3);
+	ops_end = mp_encode_str0(ops_end, "=");
+	ops_end = mp_encode_uint(ops_end, 1);
+	ops_end = mp_encode_vclock(ops_end, vclock);
+	assert((unsigned long)(ops_end - ops_buf) < sizeof(ops_buf));
+
+	return box_update(BOX_GC_CONSUMERS_ID, 0, key_buf, key_end,
+			  ops_buf, ops_end, 0, NULL);
+}
+
+int
+gc_consumer_update(const struct tt_uuid *uuid, const struct vclock *vclock)
+{
+	assert(in_txn() == NULL);
+	gc_consumer_discard_async_updates(uuid);
+	if (!gc_consumer_is_persistent()) {
+		struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
+		if (consumer != NULL)
+			gc_consumer_update_impl(consumer, vclock);
+		return 0;
+	}
+
+	struct txn *txn = txn_begin();
+	if (txn == NULL)
+		return -1;
+	txn_set_flags(txn, TXN_FORCE_ASYNC);
+
+	int rc = gc_consumer_perstistent_update_impl(uuid, vclock);
+
+	if (rc == 0)
+		rc = txn_commit(txn);
+	else
+		txn_abort(txn);
+	return rc;
+}
+
+bool
+gc_consumer_is_persistent(void)
+{
+	return space_by_id(BOX_GC_CONSUMERS_ID) != NULL;
+}
+
+void
+gc_consumer_touch(const struct tt_uuid *uuid)
+{
+	struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
+	if (consumer == NULL)
+		return;
+	consumer->last_used_tm = clock_lowres_monotonic();
+}
+
+void
+gc_consumer_update_async(const struct tt_uuid *uuid,
+			 const struct vclock *vclock)
+{
+	struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
+	if (consumer == NULL)
+		return;
+
+	if (!gc_consumer_is_persistent()) {
+		gc_consumer_update_impl(consumer, vclock);
+		return;
+	}
+
+	vclock_copy(&consumer->volatile_vclock, vclock);
+	consumer->is_async_updated = true;
+	/*
+	 * Do not wake up the background fiber if it's persisting
+	 * consumers right now because it may be waiting for a cbus
+	 * message, which doesn't tolerate spurious wakeups.
+	 */
+	if (gc.persist_scheduled++ == gc.persist_completed)
+		fiber_wakeup(gc.persist_fiber);
+}
+
+static int
+gc_consumers_persist_all(void)
+{
+	ERROR_INJECT(ERRINJ_WAL_GC_PERSIST_FIBER, {
+		diag_set(ClientError, ER_INJECTION, "WAL GC persist fiber");
+		return -1;
+	});
+	int rc = 0;
+	struct txn *txn = txn_begin();
+	if (txn == NULL)
+		return -1;
+	/* No need to wait limbo, so let's set TXN_FORCE_ASYNC here. */
+	txn_set_flags(txn, TXN_FORCE_ASYNC);
+
+	gc_consumer_hash_foreach(&gc.consumers_hash, consumer) {
+		struct vclock *old_vclock = &consumer->vclock;
+		struct vclock *new_vclock = &consumer->volatile_vclock;
+		struct tt_uuid *uuid = &consumer->uuid;
+
+		if (consumer->is_async_updated &&
+		    vclock_compare(old_vclock, new_vclock) != 0 &&
+		    gc_consumer_perstistent_update_impl(uuid, new_vclock) != 0)
+			goto fail;
+	}
+	rc = txn_commit(txn);
+	goto out;
+fail:
+	rc = -1;
+	txn_abort(txn);
+out:
+	return rc;
+}
+
+/* Retry updating persistent WAL GC state every N seconds. */
+enum {
+#ifndef NDEBUG
+	WAL_GC_PERSIST_FIBER_RETRY_TIMEOUT = 1,
+#else
+	WAL_GC_PERSIST_FIBER_RETRY_TIMEOUT = 10,
+#endif
+};
+
+static int
+gc_consumers_persist_fiber_f(va_list ap)
+{
+	(void)ap;
+	const double retry_timeout = WAL_GC_PERSIST_FIBER_RETRY_TIMEOUT;
+	bool say_once = false;
+	while (!fiber_is_cancelled()) {
+		fiber_check_gc();
+
+		int64_t delta = gc.persist_scheduled - gc.persist_completed;
+		if (delta == 0) {
+			/* No pending persist requests. */
+			fiber_sleep(TIMEOUT_INFINITY);
+			continue;
+		}
+		assert(delta > 0);
+
+		int rc = gc_consumers_persist_all();
+		if (rc == 0) {
+			say_once = false;
+		} else if (!fiber_is_cancelled()) {
+			/* Retry in the case of fail. */
+			if (!say_once) {
+				say_once = true;
+				say_error("Failed to advance WAL GC consumers, "
+					  "will retry after %.2lf seconds",
+					  retry_timeout);
+				diag_log();
+			}
+			fiber_sleep(retry_timeout);
+			continue;
+		}
+		gc.persist_completed += delta;
+	}
+	return 0;
+}
+
+/** GC consumer definition. */
+struct gc_consumer_def {
+	/** Instance UUID. */
+	struct tt_uuid uuid;
+	/** Instance vclock. */
+	struct vclock vclock;
+	/** Is set if the consumer has vclock. */
+	bool has_vclock;
+	/** See gc_consumer::with_snap.  */
+	bool with_snap;
+};
+
+/** Mapping from tuple.opts to fields of gc_consumer_def. */
+const struct opt_def gc_consumer_def_opts_reg[] = {
+	OPT_DEF("with_snap", OPT_BOOL, struct gc_consumer_def, with_snap),
+	OPT_END,
+};
+
+/**
+ * Fill gc_consumer_def with opts from the MsgPack map.
+ * Argument map can be NULL - default options are set in this case.
+ */
+static int
+gc_consumer_def_opts_decode(struct gc_consumer_def *def, const char *map,
+			    struct region *region)
+{
+	if (map == NULL)
+		return 0;
+	return opts_decode(def, gc_consumer_def_opts_reg, &map, region);
+}
+
+/** Build gc_consumer definition from a _gc_consumers' tuple. */
+static struct gc_consumer_def *
+gc_consumer_def_new_from_tuple(struct tuple *tuple, struct region *region)
+{
+	struct gc_consumer_def *def =
+		xregion_alloc_object(region, typeof(*def));
+	memset(def, 0, sizeof(*def));
+	if (tuple_field_uuid(tuple, BOX_GC_CONSUMERS_FIELD_UUID, &def->uuid) != 0)
+		return NULL;
+	if (tt_uuid_is_nil(&def->uuid)) {
+		diag_set(ClientError, ER_INVALID_UUID, tt_uuid_str(&def->uuid));
+		return NULL;
+	}
+	def->has_vclock =
+		!tuple_field_is_nil(tuple, BOX_GC_CONSUMERS_FIELD_VCLOCK);
+	if (def->has_vclock) {
+		const char *mp_vclock = tuple_field_with_type(
+			tuple, BOX_GC_CONSUMERS_FIELD_VCLOCK, MP_MAP);
+		if (mp_vclock == NULL)
+			return NULL;
+		if (mp_decode_vclock(&mp_vclock, &def->vclock) != 0) {
+			diag_set(ClientError, ER_INVALID_VCLOCK);
+			return NULL;
+		}
+	}
+	const char *opts = NULL;
+	if (tuple_field(tuple, BOX_GC_CONSUMERS_FIELD_OPTS) != NULL) {
+		opts = tuple_field_with_type(tuple, BOX_GC_CONSUMERS_FIELD_OPTS,
+					     MP_MAP);
+	}
+	if (gc_consumer_def_opts_decode(def, opts, region) != 0)
+		return NULL;
+	return def;
+}
+
+/**
+ * Data passed to transactional triggers of replace in _gc_consumers.
+ */
+struct gc_consumers_txn_trigger_data {
+	/*
+	 * Replica UUID. Is used instead of replica object because it can be
+	 * unregistered before the trigger is fired.
+	 */
+	struct tt_uuid uuid;
+	/*
+	 * Saved old definition of consumer.
+	 */
+	struct gc_consumer_def *old_def;
+	/*
+	 * Saved new definition of consumer.
+	 */
+	struct gc_consumer_def *new_def;
+};
+
+static int
+on_replace_dd_gc_consumers_commit(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct gc_consumers_txn_trigger_data *data =
+		(struct gc_consumers_txn_trigger_data *)trigger->data;
+	struct gc_consumer_def *old_def = data->old_def;
+	struct gc_consumer_def *new_def = data->new_def;
+
+	/* Unref GC delay on first non-dummy consumer. */
+	if (new_def != NULL && new_def->has_vclock &&
+	    (old_def == NULL || !old_def->has_vclock))
+		gc_delay_unref();
+
+	if (old_def == NULL) {
+		/*
+		 * INSERT
+		 * Despite the consumer just appeared, it can be already
+		 * registered. It can happen on schema upgrade - all replicas
+		 * had in-memory consumers until the space _gc_consumers is
+		 * created.
+		 */
+		if (!new_def->has_vclock) {
+			gc_consumer_register_dummy_internal(
+				&data->uuid, "replica %s",
+				tt_uuid_str(&data->uuid));
+		} else {
+			gc_consumer_register_internal(
+				&data->uuid, &new_def->vclock, "replica %s",
+				tt_uuid_str(&data->uuid));
+		}
+	} else if (new_def == NULL) {
+		/* DELETE */
+		assert(gc_consumer_is_registered(&data->uuid));
+		struct gc_consumer *consumer = gc_consumer_by_uuid(&data->uuid);
+		gc_consumer_unregister_impl(consumer);
+	} else {
+		/* UPDATE */
+		assert(gc_consumer_is_registered(&data->uuid));
+		struct gc_consumer *consumer = gc_consumer_by_uuid(&data->uuid);
+		if (new_def->has_vclock) {
+			gc_consumer_update_impl(consumer, &new_def->vclock);
+		} else {
+			/* Discard async updates on manual deactivation. */
+			gc_consumer_discard_async_updates(&data->uuid);
+			if (!consumer->is_inactive) {
+				consumer->is_inactive = true;
+				gc_tree_remove(&gc.active_consumers, consumer);
+			}
+		}
+	}
+
+	struct gc_consumer *consumer = gc_consumer_by_uuid(&data->uuid);
+	if (consumer == NULL)
+		return 0;
+	consumer->with_snap = new_def->with_snap;
+
+	return 0;
+}
+
+/**
+ * Note that due to concurrent nature of transactions it is unsafe
+ * to modify replica->gc right here and in on_rollback, so it is
+ * modified only in on_commit triggers - it is safe because they
+ * are called in order of transactions' serialization.
+ */
+int
+on_replace_dd_gc_consumers(struct trigger *trigger, void *event)
+{
+	(void)trigger;
+	struct txn *txn = (struct txn *)event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+	struct gc_consumer_def *old_def = NULL;
+	struct gc_consumer_def *new_def = NULL;
+	struct tt_uuid *replica_uuid = NULL;
+	if (old_tuple != NULL) {
+		old_def =
+			gc_consumer_def_new_from_tuple(old_tuple,
+						       &in_txn()->region);
+		if (old_def == NULL)
+			return -1;
+		replica_uuid = &old_def->uuid;
+	}
+	if (new_tuple != NULL) {
+		new_def =
+			gc_consumer_def_new_from_tuple(new_tuple,
+						       &in_txn()->region);
+		if (new_def == NULL)
+			return -1;
+		replica_uuid = &new_def->uuid;
+	}
+	assert(old_def != NULL || new_def != NULL);
+
+	/* Just making sure that both tuples have the same uuid. */
+	assert(old_def == NULL || new_def == NULL ||
+	       tt_uuid_is_equal(&old_def->uuid, &new_def->uuid));
+
+	/*
+	 * We cannot rely on the fact that the replica is still registered
+	 * in-memory because it can be dropped in the same transaction, and
+	 * replica_hash will be updated only on commit, so read row right
+	 * from the _cluster. It's important to lookup by uuid, not id,
+	 * to correctly handle the case when uuid of replica is updated
+	 * and id is the same.
+	 */
+	char key[UUID_STR_LEN + 10];
+	char *key_end = key;
+	key_end = mp_encode_array(key_end, 1);
+	key_end = mp_encode_str0(key_end, tt_uuid_str(replica_uuid));
+	assert((size_t)(key_end - key) < sizeof(key));
+	struct tuple *replica_row;
+	if (box_index_get(BOX_CLUSTER_ID, 1, key, key_end, &replica_row) != 0)
+		return -1;
+	bool replica_is_registered = replica_row != NULL;
+
+	if (replica_is_registered && new_def == NULL) {
+		diag_set(ClientError, ER_UNSUPPORTED, "gc_consumer",
+			 "delete while its replica is still registered");
+		return -1;
+	}
+
+	struct gc_consumers_txn_trigger_data *trg_data =
+		xregion_alloc_object(&in_txn()->region,
+				     struct gc_consumers_txn_trigger_data);
+	trg_data->uuid = *replica_uuid;
+	trg_data->old_def = old_def;
+	trg_data->new_def = new_def;
+
+	/* Actual work will be done on commit. */
+	struct trigger *on_commit = xregion_alloc_object(&in_txn()->region,
+							 struct trigger);
+	trigger_create(on_commit, on_replace_dd_gc_consumers_commit, trg_data,
+		       NULL);
+	txn_stmt_on_commit(stmt, on_commit);
+	return 0;
+}
+
+int
+on_create_dd_gc_consumers_primary_index(void)
+{
+	/*
+	 * No-op on recovery (both local and remote) - fill the space
+	 * only when it is created on upgrade.
+	 */
+	if (recovery_state != FINISHED_RECOVERY)
+		return 0;
+	/* Make sure we are in txn - yield won't happen and loop is safe. */
+	assert(in_txn() != NULL);
+	gc_consumer_hash_foreach(&gc.consumers_hash, consumer) {
+		/* Insert the consumer to _gc_consumers. */
+		char tuple_buf[VCLOCK_STR_LEN_MAX + UUID_STR_LEN + 30];
+		char *data = tuple_buf;
+		data = mp_encode_array(data, 2);
+		data = mp_encode_str0(data, tt_uuid_str(&consumer->uuid));
+		data = mp_encode_vclock(data, &consumer->vclock);
+		assert((size_t)(data - tuple_buf) < sizeof(tuple_buf));
+
+		if (box_insert(BOX_GC_CONSUMERS_ID, tuple_buf, data, NULL) != 0)
+			return -1;
+	}
+	return 0;
 }
 
 struct gc_consumer *
 gc_consumer_iterator_next(struct gc_consumer_iterator *it)
 {
 	if (it->curr != NULL)
-		it->curr = gc_tree_next(&gc.consumers, it->curr);
+		it->curr = gc_tree_next(&gc.active_consumers, it->curr);
 	else
-		it->curr = gc_tree_first(&gc.consumers);
+		it->curr = gc_tree_first(&gc.active_consumers);
 	return it->curr;
 }
+
+#ifdef ENABLE_GC_ANON
+#include "gc_anon.c"
+#else
+
+void
+gc_consumer_ref(const struct tt_uuid *uuid)
+{
+	(void)uuid;
+}
+
+void
+gc_consumer_unref(const struct tt_uuid *uuid)
+{
+	(void)uuid;
+}
+
+static bool
+gc_checkpoint_is_retained(struct gc_checkpoint *checkpoint)
+{
+	(void)checkpoint;
+	return false;
+}
+
+int
+gc_consumer_retain_checkpoint(const struct tt_uuid *uuid,
+			      struct engine_checkpoint_cursor *cursor)
+{
+	(void)uuid;
+	(void)cursor;
+	diag_set(ClientError, ER_UNSUPPORTED, "Community edition",
+		 "WAL GC consumers of checkpoints");
+	return -1;
+}
+
+int
+gc_consumer_release_checkpoint(const struct tt_uuid *uuid)
+{
+	(void)uuid;
+	diag_set(ClientError, ER_UNSUPPORTED, "Community edition",
+		 "WAL GC consumers of checkpoints");
+	return -1;
+}
+
+void
+gc_set_wal_anon_gc_timeout(double timeout)
+{
+	(void)timeout;
+}
+
+void
+gc_anon_init(void) {}
+
+#endif

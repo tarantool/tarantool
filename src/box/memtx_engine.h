@@ -56,6 +56,8 @@ struct read_view_tuple;
 struct tuple;
 struct tuple_format;
 struct memtx_tx_snapshot_cleaner;
+struct raft_request;
+struct synchro_request;
 
 /**
  * Recovery state of memtx engine.
@@ -233,6 +235,17 @@ memtx_engine_stat(struct memtx_engine *memtx, struct info_handler *h);
 int
 memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 			      const struct vclock *vclock);
+
+/**
+ * Recover raft and limbo states from snapshot with @vclock. This is
+ * done in separate thread. Used in checkpoint join to send states
+ * during JOIN_META.
+ */
+int
+memtx_engine_recover_synchro(struct memtx_engine *memtx,
+			     const struct vclock *vclock,
+			     struct raft_request *raft_req,
+			     struct synchro_request *synchro_req);
 
 void
 memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit);

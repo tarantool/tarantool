@@ -61,6 +61,7 @@
 #include "authentication.h"
 #include "node_name.h"
 #include "core/func_adapter.h"
+#include "gc.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -2029,6 +2030,31 @@ filter_temporary_ddl_stmt(struct txn *txn, const struct space_def *def)
 }
 
 /**
+ * The helper sets system trigger for a system space without surrogate space.
+ * If the space isn't system or has a surrogate space, it's no-op.
+ */
+static void
+on_replace_dd_space_set_system_trigger(struct space *space)
+{
+	if (space_id(space) == BOX_GC_CONSUMERS_ID) {
+		/*
+		 * Since the space can be re-created on upgrade, it's important
+		 * for each copy of space to have its own copy of trigger.
+		 * Otherwise two spaces may exist at the same time (e.g. applier
+		 * commits transactions asynchronously, so DDL dropping the
+		 * space won't be committed when the new copy is being created)
+		 * and dropping one of them (and the trigger as well) will lead
+		 * to crash.
+		 */
+		struct trigger *trigger =
+			(struct trigger *)xmalloc(sizeof(*trigger));
+		trigger_create(trigger, on_replace_dd_gc_consumers, NULL,
+			       (trigger_f0)free);
+		trigger_add(&space->on_replace, trigger);
+	}
+}
+
+/**
  * A trigger which is invoked on replace in a data dictionary
  * space _space.
  *
@@ -2126,6 +2152,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		struct space *space = space_new(def, &empty_list);
 		if (space == NULL)
 			return -1;
+		/**
+		 * Set on_replace system trigger for system spaces
+		 * that has no surrogate prototype (see schema_init
+		 * for details).
+		 */
+		on_replace_dd_space_set_system_trigger(space);
 		/**
 		 * The new space must be inserted in the space
 		 * cache right away to achieve linearisable
@@ -2401,6 +2433,19 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 }
 
 /**
+ * The helper fills system spaces that require it (for example, local
+ * system space may need to be filled on upgrade).
+ * If the space isn't system or doesn't need to be filled, it's no-op.
+ */
+static int
+on_replace_dd_index_fill_system_space(size_t space_id)
+{
+	if (space_id == BOX_GC_CONSUMERS_ID)
+		return on_create_dd_gc_consumers_primary_index();
+	return 0;
+}
+
+/**
  * Just like with _space, 3 major cases:
  *
  * - insert a tuple = addition of a new index. The
@@ -2655,6 +2700,13 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	} catch (Exception *e) {
 		return -1;
 	}
+	/*
+	 * Some system spaces required to be filled when their primary index
+	 * is created.
+	 */
+	if (iid == 0 && old_tuple == NULL &&
+	    on_replace_dd_index_fill_system_space(id) != 0)
+		return -1;
 	scoped_guard.is_active = false;
 	return 0;
 }
@@ -4613,10 +4665,16 @@ on_replace_dd_cluster_update(const struct replica_def *old_def,
 				 "own UUID update in _cluster");
 			return -1;
 		}
+		/* Drop gc_consumer for the replaced replica. */
+		if (gc_consumer_unregister(&replica->uuid) != 0)
+			return -1;
 		if (on_replace_dd_cluster_set_uuid(replica, new_def) != 0)
 			return -1;
 		/* The replica was re-created. */
 		replica = replica_by_id(new_def->id);
+		/* Create dummy consumer for the new replica. */
+		if (gc_consumer_register_dummy(&replica->uuid) != 0)
+			return -1;
 	}
 	return on_replace_dd_cluster_set_name(replica, new_def->name);
 }
@@ -4673,6 +4731,22 @@ on_replace_dd_cluster_insert(const struct replica_def *new_def)
 		replica = replicaset_add(new_def->id, &new_def->uuid);
 	on_rollback->data = replica;
 	txn_stmt_on_rollback(stmt, on_rollback);
+
+	/*
+	 * When recovering from local storage, gc_consumer for the created
+	 * replica will appear later, so here we should create dummy consumer
+	 * only after recovery or during remote recovery.
+	 * If consumers are not persistent, we should create in-memory one here.
+	 */
+	bool create_gc_consumer = recovery_state == FINISHED_RECOVERY ||
+		current_session()->type == SESSION_TYPE_APPLIER ||
+		!gc_consumer_is_persistent();
+	if (create_gc_consumer &&
+	    tt_uuid_compare(&INSTANCE_UUID, &new_def->uuid) != 0) {
+		if (gc_consumer_register_dummy(&replica->uuid) != 0)
+			return -1;
+	}
+
 	return on_replace_dd_cluster_set_name(replica, new_def->name);
 }
 
@@ -4709,6 +4783,9 @@ on_replace_dd_cluster_delete(const struct replica_def *old_def)
 		      "internally - %s", old_def->id,
 		      tt_uuid_str(&old_def->uuid), tt_uuid_str(&replica->uuid));
 	}
+	/* Unregister gc consumer of the replica. */
+	if (gc_consumer_unregister(&replica->uuid) != 0)
+		return -1;
 	/*
 	 * Unregister only after commit. Otherwise if the transaction would be
 	 * rolled back, there might be already another replica taken the freed
