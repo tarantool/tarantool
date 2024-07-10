@@ -666,12 +666,8 @@ struct gc_consumer *
 gc_consumer_register(const struct vclock *vclock, enum gc_consumer_type type,
 		     const struct tt_uuid *uuid)
 {
-	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
-	if (consumer == NULL) {
-		diag_set(OutOfMemory, sizeof(*consumer),
-			 "malloc", "struct gc_consumer");
-		return NULL;
-	}
+	struct gc_consumer *consumer = xmalloc(sizeof(*consumer));
+	memset(consumer, 0, sizeof(*consumer));
 
 	consumer->type = type;
 	consumer->uuid = *uuid;
