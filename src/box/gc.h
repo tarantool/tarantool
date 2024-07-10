@@ -358,8 +358,7 @@ gc_unref_checkpoint(struct gc_checkpoint_ref *ref);
  * @uuid specifies UUID of this object. They will be
  * used for listing the consumer in box.info.gc().
  *
- * Returns a pointer to the new consumer object or NULL on
- * memory allocation failure.
+ * Returns a pointer to the new consumer object, it never fails.
  */
 struct gc_consumer *
 gc_consumer_register(const struct vclock *vclock, enum gc_consumer_type type,
