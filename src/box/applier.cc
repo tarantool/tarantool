@@ -1524,7 +1524,7 @@ apply_final_join_tx(uint32_t replica_id, struct stailq *rows)
  * rows for txs following unconfirmed synchronous transactions.
  * The rows are replaced with NOPs to preserve the vclock consistency.
  */
-static void
+static int
 applier_synchro_filter_tx(struct stailq *rows)
 {
 	latch_lock(&txn_limbo.promote_latch);
@@ -1533,14 +1533,14 @@ applier_synchro_filter_tx(struct stailq *rows)
 	});
 	struct xrow_header *row;
 	/*
-	 * It  may happen that we receive the instance's rows via some third
+	 * It may happen that we receive the instance's rows via some third
 	 * node, so cannot check for applier->instance_id here.
 	 */
 	row = &stailq_last_entry(rows, struct applier_tx_row, next)->row;
 	uint64_t term = txn_limbo_replica_term(&txn_limbo, row->replica_id);
 	assert(term <= txn_limbo.promote_greatest_term);
 	if (term == txn_limbo.promote_greatest_term)
-		return;
+		return 0;
 
 	/*
 	 * We do not nopify promotion/demotion and most of confirm/rollback.
@@ -1557,15 +1557,16 @@ applier_synchro_filter_tx(struct stailq *rows)
 	struct applier_tx_row *item;
 	if (iproto_type_is_dml(row->type) && !row->wait_sync) {
 		if (txn_limbo.owner_id == REPLICA_ID_NIL)
-			return;
+			return 0;
 		stailq_foreach_entry(item, rows, next) {
 			row = &item->row;
 			if (row->type == IPROTO_NOP)
 				continue;
-			tnt_raise(ClientError, ER_SPLIT_BRAIN,
-				  "got an async transaction from an old term");
+			diag_set(ClientError, ER_SPLIT_BRAIN,
+				 "got an async transaction from an old term");
+			return -1;
 		}
-		return;
+		return 0;
 	} else if (iproto_type_is_synchro_request(row->type)) {
 		item = stailq_last_entry(rows, typeof(*item), next);
 		struct synchro_request req = item->req.synchro;
@@ -1586,14 +1587,14 @@ applier_synchro_filter_tx(struct stailq *rows)
 		switch (row->type) {
 		case IPROTO_RAFT_PROMOTE:
 		case IPROTO_RAFT_DEMOTE:
-			return;
+			return 0;
 		case IPROTO_RAFT_CONFIRM:
 			if (req.lsn > confirmed_lsn)
-				return;
+				return 0;
 			break;
 		case IPROTO_RAFT_ROLLBACK:
 			if (req.lsn <= confirmed_lsn)
-				return;
+				return 0;
 			break;
 		default:
 			unreachable();
@@ -1607,6 +1608,7 @@ applier_synchro_filter_tx(struct stailq *rows)
 		item->req.dml.header = row;
 		item->req.dml.type = IPROTO_NOP;
 	}
+	return 0;
 }
 
 /**
@@ -1699,7 +1701,10 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 			}
 		}
 	}
-	applier_synchro_filter_tx(rows);
+	rc = applier_synchro_filter_tx(rows);
+	if (rc != 0)
+		goto finish;
+
 	if (unlikely(iproto_type_is_synchro_request(first_row->type))) {
 		/*
 		 * Synchro messages are not transactions, in terms
