@@ -1148,6 +1148,13 @@ return schema.new('instance_config', schema.record({
             default = 5 * 1024 * 1024,
         }),
     }),
+    lua = schema.record({
+        memory = schema.scalar({
+            type = 'integer',
+            box_cfg = 'lua_memory',
+            default = 2 * 1024 * 1024 * 1024,
+        }),
+    }),
     memtx = schema.record({
         memory = schema.scalar({
             type = 'integer',

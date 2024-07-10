@@ -444,6 +444,8 @@ load_cfg(void)
 		}
 	}
 
+	box_set_lua_memory();
+
 	/*
 	 * pid file check must happen before logger init in order for the
 	 * error message to show in stderr
