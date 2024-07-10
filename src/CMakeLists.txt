@@ -104,6 +104,7 @@ lua_source(lua_sources ../third_party/metrics/metrics/quantile.lua metrics_quant
 lua_source(lua_sources ../third_party/metrics/metrics/registry.lua metrics_registry_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/stash.lua metrics_stash_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/tarantool/clock.lua metrics_tarantool_clock_lua)
+lua_source(lua_sources ../third_party/metrics/metrics/tarantool/config.lua metrics_tarantool_config_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/tarantool/cpu.lua metrics_tarantool_cpu_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/tarantool/event_loop.lua metrics_tarantool_event_loop_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/tarantool/fibers.lua metrics_tarantool_fibers_lua)
