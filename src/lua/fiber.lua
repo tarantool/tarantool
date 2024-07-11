@@ -74,8 +74,10 @@ fiber.clock64 = fiber_clock64
 
 local stall = fiber.stall
 local fiber_set_system = fiber.set_system
+local fiber_set_managed_shutdown = fiber.set_managed_shutdown
 fiber.stall = nil
 fiber.set_system = nil
+fiber.set_managed_shutdown = nil
 
 local worker_next_task = nil
 local worker_last_task
@@ -134,6 +136,7 @@ end
 fiber._internal = fiber._internal or {}
 fiber._internal.schedule_task = worker_schedule_task
 fiber._internal.set_system = fiber_set_system
+fiber._internal.set_managed_shutdown = fiber_set_managed_shutdown
 
 setmetatable(fiber, {__serialize = function(self)
     local res = table.copy(self)

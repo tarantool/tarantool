@@ -2357,6 +2357,12 @@ fiber_set_system(struct fiber *f, bool yesno)
 	}
 }
 
+void
+fiber_set_managed_shutdown(struct fiber *f)
+{
+	f->flags |= FIBER_MANAGED_SHUTDOWN;
+}
+
 int
 fiber_shutdown(double timeout)
 {
@@ -2364,6 +2370,8 @@ fiber_shutdown(double timeout)
 	cord()->is_shutdown = true;
 	struct fiber *fiber;
 	rlist_foreach_entry(fiber, &cord()->alive, link) {
+		if (fiber->flags & FIBER_MANAGED_SHUTDOWN)
+			fiber_set_system(fiber, false);
 		if (!(fiber->flags & FIBER_IS_SYSTEM))
 			fiber_cancel(fiber);
 	}

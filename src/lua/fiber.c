@@ -938,6 +938,20 @@ lbox_fiber_set_system(struct lua_State *L)
 	return 0;
 }
 
+/** Turn managed shutdown for fiber. Takes the fiber as single argument. */
+static int
+lbox_fiber_set_managed_shutdown(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1) {
+		diag_set(IllegalParams,
+			 "fiber.set_managed_shutdown(id): bad arguments");
+		luaT_error(L);
+	}
+	struct fiber *fiber = lbox_checkfiber(L, 1);
+	fiber_set_managed_shutdown(fiber);
+	return 0;
+}
+
 /** Helper for fiber slice parsing. */
 static struct fiber_slice
 lbox_fiber_slice_parse(struct lua_State *L, int idx)
@@ -1085,6 +1099,7 @@ static const struct luaL_Reg fiberlib[] = {
 	/* Internal functions, to hide in fiber.lua. */
 	{"stall", lbox_fiber_stall},
 	{"set_system", lbox_fiber_set_system},
+	{"set_managed_shutdown", lbox_fiber_set_managed_shutdown},
 	{NULL, NULL}
 };
 

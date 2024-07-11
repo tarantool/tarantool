@@ -695,6 +695,10 @@ fiber_test_shutdown(void)
 	struct fiber *fiber4 = fiber_new("fiber4", new_fiber_on_shudown_f);
 	fail_unless(fiber4 != NULL);
 	fiber_set_joinable(fiber4, true);
+	struct fiber *fiber6 = fiber_new_system("fiber6", wait_cancel_f);
+	fail_unless(fiber6 != NULL);
+	fiber_set_managed_shutdown(fiber6);
+	fiber_set_joinable(fiber6, true);
 
 	int rc = fiber_shutdown(1000.0);
 	fail_unless(rc == 0);
@@ -703,9 +707,11 @@ fiber_test_shutdown(void)
 	fail_unless((fiber2->flags & FIBER_IS_DEAD) == 0);
 	fail_unless((fiber3->flags & FIBER_IS_DEAD) == 0);
 	fail_unless((fiber4->flags & FIBER_IS_DEAD) != 0);
+	fail_unless((fiber6->flags & FIBER_IS_DEAD) != 0);
 
 	fiber_join(fiber1);
 	fiber_join(fiber4);
+	fiber_join(fiber6);
 
 	fiber_set_joinable(fiber2, true);
 	fiber_cancel(fiber2);

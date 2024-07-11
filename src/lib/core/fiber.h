@@ -175,6 +175,11 @@ enum {
 	 * once again nor can its joinability be changed.
 	 */
 	FIBER_JOIN_BEEN_INVOKED = 1 << 9,
+	/**
+	 * Makes sense only for system fibers. If flag is set then fiber
+	 * will be finished on fiber_shutdown().
+	 */
+	FIBER_MANAGED_SHUTDOWN = 1 << 10,
 	FIBER_DEFAULT_FLAGS	= 0
 };
 
@@ -1244,6 +1249,14 @@ fiber_lua_state(struct fiber *f);
 /** Change whether fiber is system or not. */
 void
 fiber_set_system(struct fiber *f, bool yesno);
+
+/**
+ * Turn managed shutdown on for system fiber. See FIBER_MANAGED_SHUTDOWN.
+ * It is should be used after fiber creation. Using it during shutdown does not
+ * work.
+ */
+void
+fiber_set_managed_shutdown(struct fiber *f);
 
 /**
  * Cancel all client (non system) fibers and wait until they finished.
