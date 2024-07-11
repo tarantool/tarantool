@@ -50,9 +50,6 @@ typedef struct {
 	bool block_mode;
 } lua_dumper_opts_t;
 
-void
-lua_serializer_init(struct lua_State *L);
-
 int
 lua_encode(lua_State *L, struct luaL_serializer *serializer,
 	   lua_dumper_opts_t *opts);
