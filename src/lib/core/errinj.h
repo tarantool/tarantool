@@ -230,6 +230,7 @@ void errinj_set_with_environment_vars(void);
 #  define ERROR_INJECT_WHILE(ID, CODE)
 #  define errinj(ID, TYPE) ((struct errinj *) NULL)
 #  define ERROR_INJECT_COUNTDOWN(ID, CODE)
+#  define ERROR_INJECT_YIELD_CANCELLABLE(ID, ON_CANCEL)
 #else
 #  /* Returns the error injection by id */
 #  define errinj(ID, TYPE) \
@@ -260,6 +261,14 @@ void errinj_set_with_environment_vars(void);
 		if (errinj(ID, ERRINJ_INT)->iparam-- == 0) {		\
 			CODE;						\
 		}							\
+	} while (0)
+#  define ERROR_INJECT_YIELD_CANCELLABLE(ID, ON_CANCEL) \
+	do { \
+		while (errinj(ID, ERRINJ_BOOL)->bparam) { \
+			fiber_sleep(0.001); \
+			if (fiber_is_cancelled()) \
+				ON_CANCEL; \
+		} \
 	} while (0)
 #endif
 
