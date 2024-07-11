@@ -3167,6 +3167,7 @@ luaT_netbox_transport_start(struct lua_State *L)
 		transport->self_ref = LUA_NOREF;
 		return luaT_error(L);
 	}
+	fiber_set_managed_shutdown(transport->worker);
 	transport->worker->f_arg = transport;
 	/*
 	 * Code that needs a temporary fiber-local Lua state may save some time

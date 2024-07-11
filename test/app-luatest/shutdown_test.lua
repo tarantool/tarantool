@@ -200,3 +200,31 @@ g_standby.test_shutdown_during_hot_standby = function(cg)
     end)
     test_no_hang_on_shutdown(cg.standby)
 end
+
+local g_netbox = t.group('netbox')
+
+g_netbox.before_each(function(cg)
+    cg.server = server:new()
+    cg.server:start()
+    cg.peer = server:new()
+    cg.peer:start()
+end)
+
+g_netbox.after_each(function(cg)
+    if cg.server ~= nil then
+        cg.server:drop()
+    end
+    if cg.peer ~= nil then
+        cg.peer:drop()
+    end
+end)
+
+-- Test shutdown with netbox connection.
+g_netbox.test_netbox_shutdown = function(cg)
+    cg.server:exec(function(uri)
+        local netbox = require('net.box')
+        local c = netbox.connect(uri)
+        rawset(_G, 'test_connection', c)
+    end, {cg.peer.net_box_uri})
+    test_no_hang_on_shutdown(cg.server)
+end
