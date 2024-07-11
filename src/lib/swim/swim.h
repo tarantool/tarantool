@@ -125,6 +125,13 @@ swim_set_codec(struct swim *swim, enum crypto_algo algo, enum crypto_mode mode,
 	       const char *key, int key_size);
 
 /**
+ * Delete asynchronously. Does not yield. Object is invalid after return
+ * from this function and should not be used.
+ */
+void
+swim_gc(struct swim *swim);
+
+/**
  * Stop listening and broadcasting messages, cleanup all internal
  * structures, free memory. The function yields. Actual deletion
  * happens after currently working triggers are done.

@@ -153,6 +153,20 @@ lua_swim_quit(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Delete asynchronously. Does not yield. Object is invalid after return
+ * from this function and should not be used.
+ */
+static int
+lua_swim_gc(struct lua_State *L)
+{
+	uint32_t ctypeid;
+	struct swim *s = *(struct swim **)luaL_checkcdata(L, 1, &ctypeid);
+	assert(ctypeid == ctid_swim_ptr);
+	swim_gc(s);
+	return 0;
+}
+
 void
 tarantool_lua_swim_init(struct lua_State *L)
 {
@@ -163,6 +177,7 @@ tarantool_lua_swim_init(struct lua_State *L)
 	static const struct luaL_Reg lua_swim_internal_methods [] = {
 		{"swim_new", lua_swim_new},
 		{"swim_delete", lua_swim_delete},
+		{"swim_gc", lua_swim_gc},
 		{"swim_quit", lua_swim_quit},
 		{"swim_on_member_event", lua_swim_on_member_event},
 		{"swim_on_member_event_normalize_arguments",
