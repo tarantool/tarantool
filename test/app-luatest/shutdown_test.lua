@@ -228,3 +228,26 @@ g_netbox.test_netbox_shutdown = function(cg)
     end, {cg.peer.net_box_uri})
     test_no_hang_on_shutdown(cg.server)
 end
+
+local g_swim = t.group('swim')
+
+g_swim.before_each(function(cg)
+    cg.server = server:new()
+    cg.server:start()
+end)
+
+g_swim.after_each(function(cg)
+    if cg.server ~= nil then
+        cg.server:drop()
+    end
+end)
+
+-- Test shutdown with swim instance.
+g_swim.test_swim_shutdown = function(cg)
+    cg.server:exec(function()
+        local swim = require('swim')
+        local s = swim.new({generation = 0})
+        rawset(_G, 'test_swim', s)
+    end)
+    test_no_hang_on_shutdown(cg.server)
+end

@@ -544,6 +544,8 @@ struct swim {
 	 * lines.
 	 */
 	struct swim_task round_step_task;
+	/* Whether event handler should free swim on exit. */
+	bool free_in_handler;
 };
 
 /** Put the member into a list of ACK waiters. */
@@ -628,7 +630,8 @@ swim_on_member_update(struct swim *swim, struct swim_member *member,
 			swim_member_ref(member);
 			stailq_add_tail_entry(&swim->event_queue, member,
 					      in_event_queue);
-			fiber_wakeup(swim->event_handler);
+			if (swim->event_handler != NULL)
+				fiber_wakeup(swim->event_handler);
 		}
 		member->events |= events;
 	}
@@ -1888,6 +1891,9 @@ swim_event_handler_f(va_list va)
 		}
 		swim_member_unref(m);
 	}
+	s->event_handler = NULL;
+	if (s->free_in_handler)
+		swim_delete(s);
 	return 0;
 }
 
@@ -1928,7 +1934,9 @@ swim_new(uint64_t generation)
 		return NULL;
 	}
 	fiber_set_joinable(swim->event_handler, true);
+	fiber_set_managed_shutdown(swim->event_handler);
 	fiber_start(swim->event_handler, swim);
+	swim->free_in_handler = false;
 	return swim;
 }
 
@@ -2203,11 +2211,8 @@ static inline void
 swim_kill_event_handler(struct swim *swim)
 {
 	struct fiber *f = swim->event_handler;
-	/*
-	 * Nullify so as not to keep pointer at a fiber when it is
-	 * reused.
-	 */
-	swim->event_handler = NULL;
+	if (f == NULL)
+		return;
 	fiber_cancel(f);
 	fiber_join(f);
 }
@@ -2215,8 +2220,7 @@ swim_kill_event_handler(struct swim *swim)
 void
 swim_delete(struct swim *swim)
 {
-	if (swim->event_handler != NULL)
-		swim_kill_event_handler(swim);
+	swim_kill_event_handler(swim);
 	struct ev_loop *l = swim_loop();
 	swim_scheduler_destroy(&swim->scheduler);
 	swim_ev_timer_stop(l, &swim->round_tick);
@@ -2243,6 +2247,14 @@ swim_delete(struct swim *swim)
 	trigger_destroy(&swim->on_member_event);
 	free(swim->shuffled);
 	free(swim);
+}
+
+void
+swim_gc(struct swim *swim)
+{
+	swim->free_in_handler = true;
+	fiber_set_joinable(swim->event_handler, false);
+	fiber_cancel(swim->event_handler);
 }
 
 /**
