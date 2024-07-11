@@ -1038,32 +1038,10 @@ lua_parse_opts(lua_State *L, lua_dumper_opts_t *opts)
 }
 
 /**
- * Initialize Lua serializer.
+ * Set Lua serializer.
  */
 void
-lua_serializer_init(struct lua_State *L)
+lua_serializer_set(struct luaL_serializer *serializer)
 {
-	/*
-	 * We don't export it as a module
-	 * for a while, so the library
-	 * is kept empty.
-	 */
-	static const luaL_Reg lualib[] = {
-		{
-			.name = NULL,
-		},
-	};
-
-	serializer_lua = luaL_newserializer(L, NULL, lualib);
-	serializer_lua->has_compact		= 1;
-	serializer_lua->encode_invalid_numbers	= 1;
-	serializer_lua->encode_load_metatables	= 1;
-	serializer_lua->encode_use_tostring	= 1;
-	serializer_lua->encode_invalid_as_nil	= 1;
-
-	/*
-	 * Keep a reference to this module so it
-	 * won't be unloaded.
-	 */
-	lua_setfield(L, -2, "formatter_lua");
+	serializer_lua = serializer;
 }

@@ -51,7 +51,7 @@ typedef struct {
 } lua_dumper_opts_t;
 
 void
-lua_serializer_init(struct lua_State *L);
+lua_serializer_set(struct luaL_serializer *serializer);
 
 int
 lua_encode(lua_State *L, struct luaL_serializer *serializer,

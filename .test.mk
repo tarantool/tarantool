@@ -90,7 +90,8 @@ CMAKE_PARAMS_ASAN = -DENABLE_WERROR=ON \
                     -DENABLE_UB_SANITIZER=ON \
                     -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=OFF \
                     -DENABLE_FUZZER=ON \
-                    -DTEST_BUILD=ON
+                    -DTEST_BUILD=ON \
+					-DLUAJIT_ENABLE_GC64=ON
 # Some checks are temporary suppressed in the scope of the issue
 # https://github.com/tarantool/tarantool/issues/4360:
 #   - ASAN: to suppress failures of memory error checks caught while tests run, the asan/asan.supp

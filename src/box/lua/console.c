@@ -970,7 +970,7 @@ tarantool_lua_console_init(struct lua_State *L)
 	lua_setfield(L, -2, "formatter_lua");
 
 	/* Output formatter in Lua mode */
-	lua_serializer_init(L);
+	lua_serializer_set(serializer_lua);
 
 	struct session_vtab console_session_vtab = {
 		.push	= console_session_push,
