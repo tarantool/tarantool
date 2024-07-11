@@ -670,7 +670,7 @@ vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
 	scheduler->stat.dump_count++;
 	scheduler->dump_complete_cb(scheduler,
 			min_generation - 1, dump_duration);
-	fiber_cond_signal(&scheduler->dump_cond);
+	fiber_cond_broadcast(&scheduler->dump_cond);
 }
 
 int
@@ -2068,7 +2068,7 @@ vy_scheduler_f(va_list va)
 		continue;
 error:
 		/* Abort pending checkpoint. */
-		fiber_cond_signal(&scheduler->dump_cond);
+		fiber_cond_broadcast(&scheduler->dump_cond);
 		/*
 		 * A task can fail either due to lack of memory or IO
 		 * error. In either case it is pointless to schedule
