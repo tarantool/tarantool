@@ -54,9 +54,6 @@ static_assert(DT_IVAL_TO_STRING_BUFSIZE > FPCONV_G_FMT_BUFSIZE,
 static_assert(DT_IVAL_TO_STRING_BUFSIZE > DT_TO_STRING_BUFSIZE,
 	      "Buffer is too small");
 
-/* Serializer for Lua output mode */
-static struct luaL_serializer *serializer_lua;
-
 enum {
 	NODE_NONE_BIT		= 0,
 	NODE_ROOT_BIT		= 1,
@@ -1041,35 +1038,4 @@ lua_parse_opts(lua_State *L, lua_dumper_opts_t *opts)
 	if (lua_isnumber(L, -1))
 		opts->indent_lvl = (int)lua_tonumber(L, -1);
 	lua_pop(L, 1);
-}
-
-/**
- * Initialize Lua serializer.
- */
-void
-lua_serializer_init(struct lua_State *L)
-{
-	/*
-	 * We don't export it as a module
-	 * for a while, so the library
-	 * is kept empty.
-	 */
-	static const luaL_Reg lualib[] = {
-		{
-			.name = NULL,
-		},
-	};
-
-	serializer_lua = luaL_newserializer(L, NULL, lualib);
-	serializer_lua->has_compact		= 1;
-	serializer_lua->encode_invalid_numbers	= 1;
-	serializer_lua->encode_load_metatables	= 1;
-	serializer_lua->encode_use_tostring	= 1;
-	serializer_lua->encode_invalid_as_nil	= 1;
-
-	/*
-	 * Keep a reference to this module so it
-	 * won't be unloaded.
-	 */
-	lua_setfield(L, -2, "formatter_lua");
 }
