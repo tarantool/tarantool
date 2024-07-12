@@ -633,14 +633,6 @@ sql_bind_parameter_lindex(struct Vdbe *v, const char *zName, int nName);
 #endif
 
 /*
- * GCC does not define the offsetof() macro so we'll have to do it
- * ourselves.
- */
-#ifndef offsetof
-#define offsetof(STRUCTURE,FIELD) ((int)((char*)&((STRUCTURE*)0)->FIELD))
-#endif
-
-/*
  * Macros to compute minimum and maximum of two numbers.
  */
 #ifndef MIN
