@@ -12,6 +12,7 @@
 
 local fun = require('fun')
 local json = require('json')
+local format_lua = require('console.lib').format_lua
 
 local methods = {}
 local schema_mt = {}
@@ -517,6 +518,14 @@ local function validate_by_node_function(schema, data, ctx)
     schema.validate(data, w)
 end
 
+-- Report an error if data is array but expected other type
+local function walkthrough_error_array(ctx, schema, data)
+    local status, _ = pcall(validate_table_is_array, data, ctx)
+    if not status or #data == 0 then return end
+    walkthrough_error(ctx, 'Unexpected data: Expected %q, got "array": %s',
+                schema.type, format_lua({}, data))
+end
+
 local function validate_impl(schema, data, ctx)
     if is_scalar(schema) then
         local scalar_def = scalars[schema.type]
@@ -529,6 +538,7 @@ local function validate_impl(schema, data, ctx)
         end
     elseif schema.type == 'record' then
         walkthrough_assert_table(ctx, schema, data)
+        walkthrough_error_array(ctx, schema, data)
 
         for field_name, field_def in pairs(schema.fields) do
             walkthrough_enter(ctx, field_name)
@@ -549,6 +559,7 @@ local function validate_impl(schema, data, ctx)
         end
     elseif schema.type == 'map' then
         walkthrough_assert_table(ctx, schema, data)
+        walkthrough_error_array(ctx, schema, data)
 
         for field_name, field_value in pairs(data) do
             walkthrough_enter(ctx, field_name)
@@ -1263,6 +1274,9 @@ local function merge_impl(schema, a, b, ctx)
         walkthrough_assert_table(ctx, schema, a)
         walkthrough_assert_table(ctx, schema, b)
 
+        walkthrough_error_array(ctx, schema, a)
+        walkthrough_error_array(ctx, schema, b)
+
         local res = {}
         for field_name, field_def in pairs(schema.fields) do
             walkthrough_enter(ctx, field_name)
@@ -1275,6 +1289,9 @@ local function merge_impl(schema, a, b, ctx)
     elseif schema.type == 'map' then
         walkthrough_assert_table(ctx, schema, a)
         walkthrough_assert_table(ctx, schema, b)
+
+        walkthrough_error_array(ctx, schema, a)
+        walkthrough_error_array(ctx, schema, b)
 
         local res = {}
         for field_name, a_field in pairs(a) do
