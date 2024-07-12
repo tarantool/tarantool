@@ -270,8 +270,12 @@ alloc_failure(const char *filename, int line, size_t size)
  * including padding if any.
  */
 #ifndef offsetof
-#define offsetof(type, member) ((size_t) &((type *)0)->member)
-#endif
+#  if __has_builtin(__builtin_offsetof)
+#    define offsetof(type, member) __builtin_offsetof(type, member)
+#  else
+#    define offsetof(type, member) ((size_t)&((type *)0)->member)
+#  endif
+#endif /* offsetof */
 
 /**
  * This macro is used to retrieve an enclosing structure from a pointer to
