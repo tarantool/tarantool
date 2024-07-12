@@ -747,6 +747,12 @@ g.test_validate_record = function()
         '[myschema] foo: Unexpected data for scalar "string"',
         'Expected "string", got "boolean"',
     }, ': '))
+
+    -- Bad case: field is an array.
+    assert_validate_error(
+        s, {1, 2, 3},
+        '[myschema] Unexpected data: Expected "record", got "array": [1,2,3]'
+    )
 end
 
 g.test_validate_map = function()
@@ -766,10 +772,19 @@ g.test_validate_map = function()
     assert_validate_compound_type_expects_only_table(s)
 
     -- Bad case: data of a wrong type is passed to a key.
-    assert_validate_error(s, {[1] = true}, table.concat({
-        '[myschema] [1]: Unexpected data for scalar "string"',
+    -- Since #gh-10241 #gh-10242 {[1] = <anything>} is defined as
+    -- an array because the key is the same as the index if it
+    -- were truly an array.
+    assert_validate_error(s, {[2] = true}, table.concat({
+        '[myschema] [2]: Unexpected data for scalar "string"',
         'Expected "string", got "number"',
     }, ': '))
+
+    -- Bad case: data is an array
+    assert_validate_error(
+        s, {1, 2, 3},
+        '[myschema] Unexpected data: Expected "map", got "array": [1,2,3]'
+    )
 
     -- Bad case: data of a wrong type is passed to a field value.
     assert_validate_error(s, {foo = true}, table.concat({
@@ -2837,6 +2852,14 @@ local function verify_merge(s)
     assert_type_equals(res, exp)
 end
 
+-- Verify that :merge() raises the given error on the given
+-- data.
+local function assert_merge_error(s, a, b, exp_err_msg)
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:merge(a, b)
+    end)
+end
+
 -- }}} Testing helpers for <schema object>:merge()
 
 -- {{{ <schema object>:merge()
@@ -2911,6 +2934,38 @@ g.test_merge_any = function()
 
     t.assert_equals(s:merge(a, b), b)
     t.assert_equals(s:merge(b, a), a)
+end
+
+-- When <schema object>:merge(a, b) was called and
+-- <schema object>.type = map we need to verify
+-- that `a` and `b` are both maps.
+g.test_bad_map_merge = function()
+    local scalar = schema.scalar({type = 'string'})
+    local s = schema.new('myschema', schema.map({key=scalar, value=scalar}))
+    assert_merge_error(
+        s, s, {1, 2, 3},
+        '[myschema] Unexpected data: Expected "map", got "array": [1,2,3]'
+    )
+    assert_merge_error(
+        s, {1, 2, 3}, s,
+        '[myschema] Unexpected data: Expected "map", got "array": [1,2,3]'
+    )
+end
+
+-- When <schema object>:merge(a, b) was called and
+-- <schema object>.type = record we need to verify
+-- that `a` and `b` are both records.
+g.test_bad_record_merge = function()
+    local scalar = schema.scalar({type = 'string'})
+    local s = schema.new('myschema', schema.record({foo=scalar, bar=scalar}))
+    assert_merge_error(
+        s, s, {1, 2, 3},
+        '[myschema] Unexpected data: Expected "record", got "array": [1,2,3]'
+    )
+    assert_merge_error(
+        s, {1, 2, 3}, s,
+        '[myschema] Unexpected data: Expected "record", got "array": [1,2,3]'
+    )
 end
 
 -- }}} <schema object>:merge()
