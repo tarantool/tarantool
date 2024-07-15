@@ -77,6 +77,12 @@ extern "C" {
 	 * tuple formats are received in IPROTO_TUPLE_FORMATS field.
 	 */								\
 	_(CALL_ARG_TUPLE_EXTENSION, 9)					\
+	/**
+	 * Cursor (for checkpoint join) in FETCH_SNAPSHOT support:
+	 * IPROTO_IS_CHECKPOINT_JOIN, IPROTO_CHECKPOINT_VCLOCK and
+	 * IRPOTO_CHECKPOINT_LSN.
+	 */								\
+	 _(FETCH_SNAPSHOT_CURSOR, 10)					\
 
 #define IPROTO_FEATURE_MEMBER(s, v) IPROTO_FEATURE_ ## s = v,
 
@@ -101,7 +107,7 @@ struct iproto_features {
  * `box.iproto.protocol_version` needs to be updated correspondingly.
  */
 enum {
-	IPROTO_CURRENT_VERSION = 7,
+	IPROTO_CURRENT_VERSION = 8,
 };
 
 /**
