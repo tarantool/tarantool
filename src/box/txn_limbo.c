@@ -123,7 +123,7 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo)
 struct txn_limbo_entry *
 txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 {
-	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
+	assert(txn_must_be_in_limbo(txn));
 	assert(limbo == &txn_limbo);
 	/*
 	 * Transactions should be added to the limbo before WAL write. Limbo
@@ -277,7 +277,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		goto complete;
 
 	assert(!txn_has_flag(entry->txn, TXN_IS_DONE));
-	assert(txn_has_flag(entry->txn, TXN_WAIT_SYNC));
+	assert(txn_must_be_in_limbo(entry->txn));
 	double start_time = fiber_clock();
 	while (true) {
 		double deadline = start_time + replication_synchro_timeout;

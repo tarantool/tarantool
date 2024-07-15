@@ -732,7 +732,7 @@ txn_complete_fail(struct txn *txn)
 	assert(txn->signature != TXN_SIGNATURE_UNKNOWN);
 	assert(in_txn() == txn);
 	if (txn->limbo_entry != NULL) {
-		assert(txn_has_flag(txn, TXN_WAIT_SYNC));
+		assert(txn_must_be_in_limbo(txn));
 		txn_limbo_abort(&txn_limbo, txn->limbo_entry);
 		txn->limbo_entry = NULL;
 	}
@@ -764,7 +764,7 @@ void
 txn_complete_success(struct txn *txn)
 {
 	assert(!txn_has_flag(txn, TXN_IS_DONE));
-	assert(!txn_has_flag(txn, TXN_WAIT_SYNC));
+	assert(!txn_must_be_in_limbo(txn));
 	assert(txn->signature >= 0);
 	assert(in_txn() == txn);
 #ifndef NDEBUG
@@ -840,7 +840,7 @@ txn_on_journal_write(struct journal_entry *entry)
 	}
 	if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
 		txn_run_wal_write_triggers(txn);
-	if (!txn_has_flag(txn, TXN_WAIT_SYNC)) {
+	if (!txn_must_be_in_limbo(txn)) {
 		txn_complete_success(txn);
 	} else {
 		int64_t lsn;
@@ -1092,7 +1092,7 @@ txn_commit_try_async(struct txn *txn)
 	if (req == NULL)
 		goto rollback;
 
-	if (txn_has_flag(txn, TXN_WAIT_SYNC) &&
+	if (txn_must_be_in_limbo(txn) &&
 	    txn_add_limbo_entry(txn, req) != 0) {
 		goto rollback;
 	}
@@ -1137,7 +1137,7 @@ txn_commit(struct txn *txn)
 	 * confirmed. Then they turn the async transaction into just a plain
 	 * txn not waiting for anything.
 	 */
-	if (txn_has_flag(txn, TXN_WAIT_SYNC) &&
+	if (txn_must_be_in_limbo(txn) &&
 	    txn_add_limbo_entry(txn, req) != 0) {
 		goto rollback_abort;
 	}
@@ -1149,7 +1149,7 @@ txn_commit(struct txn *txn)
 		diag_set_journal_res(req->res);
 		goto rollback_io;
 	}
-	if (txn_has_flag(txn, TXN_WAIT_SYNC)) {
+	if (txn_must_be_in_limbo(txn)) {
 		struct txn_limbo_entry *limbo_entry = txn->limbo_entry;
 		assert(limbo_entry->lsn > 0);
 		/*
