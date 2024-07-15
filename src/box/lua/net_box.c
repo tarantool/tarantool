@@ -82,7 +82,7 @@ enum {
 	/**
 	 * IPROTO protocol version supported by the netbox connector.
 	 */
-	NETBOX_IPROTO_VERSION = 7,
+	NETBOX_IPROTO_VERSION = 8,
 };
 
 /**

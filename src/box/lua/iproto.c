@@ -188,8 +188,10 @@ push_iproto_protocol_features(struct lua_State *L)
 		lua_newtable(L);
 	for (int i = 0; i < iproto_feature_id_MAX; i++) {
 		char *name = strtolowerdup(iproto_feature_id_strs[i]);
-		lua_pushboolean(L, true);
-		lua_setfield(L, -2, name);
+		if (iproto_features_test(&IPROTO_CURRENT_FEATURES, i)) {
+			lua_pushboolean(L, true);
+			lua_setfield(L, -2, name);
+		}
 		lua_pushinteger(L, i);
 		lua_setfield(L, -3, name);
 		free(name);

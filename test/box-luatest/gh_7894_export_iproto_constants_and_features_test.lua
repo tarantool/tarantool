@@ -3,6 +3,8 @@ local t = require('luatest')
 
 local g = t.group()
 
+local is_enterprise = t.tarantool.is_enterprise_package()
+
 g.before_all(function(cg)
     cg.server = server:new{
         alias   = 'dflt',
@@ -86,6 +88,9 @@ local reference_table = {
         INDEX_NAME = 0x5f,
         TUPLE_FORMATS = 0x60,
         IS_SYNC = 0x61,
+        IS_CHECKPOINT_JOIN = 0x62,
+        CHECKPOINT_VCLOCK = 0x63,
+        CHECKPOINT_LSN = 0x64,
     },
 
     -- `iproto_metadata_key` enumeration.
@@ -166,7 +171,7 @@ local reference_table = {
     },
 
     -- `IPROTO_CURRENT_VERSION` constant
-    protocol_version = 7,
+    protocol_version = 8,
 
     -- `feature_id` enumeration
     protocol_features = {
@@ -180,6 +185,7 @@ local reference_table = {
         dml_tuple_extension = true,
         call_ret_tuple_extension = true,
         call_arg_tuple_extension = true,
+        fetch_snapshot_cursor = is_enterprise and true or nil,
     },
     feature = {
         streams = 0,
@@ -192,6 +198,7 @@ local reference_table = {
         dml_tuple_extension = 7,
         call_ret_tuple_extension = 8,
         call_arg_tuple_extension = 9,
+        fetch_snapshot_cursor = 10,
     },
 }
 

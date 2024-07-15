@@ -62,6 +62,7 @@
 #include "memtx_space_upgrade.h"
 #include "tt_sort.h"
 #include "assoc.h"
+#include "wal.h"
 
 #include <type_traits>
 
@@ -245,10 +246,10 @@ memtx_engine_free(struct engine *engine)
 }
 
 /**
- * State of memtx engine snapshot recovery.
+ * Phase of memtx engine snapshot recovery.
  */
-enum snapshot_recovery_state {
-	/* Initial state. */
+enum snapshot_recovery_phase {
+	/* Initial phase. */
 	SNAPSHOT_RECOVERY_NOT_STARTED,
 	/* Set when at least one system space was recovered. */
 	RECOVERING_SYSTEM_SPACES,
@@ -259,6 +260,18 @@ enum snapshot_recovery_state {
 	DONE_RECOVERING_SYSTEM_SPACES,
 };
 
+/*
+ * State of memtx engine snapshot recovery.
+ */
+struct snapshot_recovery_state {
+	/* Phase of snapshot recovery. */
+	enum snapshot_recovery_phase phase;
+	/* Whether raft state was recovered. */
+	bool is_raft_recovered;
+	/* Whether limbo state was recovered. */
+	bool is_synchro_recovered;
+};
+
 /**
  * Recovers one xrow from snapshot.
  *
@@ -267,7 +280,7 @@ enum snapshot_recovery_state {
  */
 static int
 memtx_engine_recover_snapshot_row(struct xrow_header *row,
-				  enum snapshot_recovery_state *state);
+				  struct snapshot_recovery_state *state);
 
 int
 memtx_engine_recover_snapshot(struct memtx_engine *memtx,
@@ -288,11 +301,15 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	struct xrow_header row;
 	uint64_t row_count = 0;
 	bool force_recovery = false;
-	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
+	struct snapshot_recovery_state state = {
+		.phase = SNAPSHOT_RECOVERY_NOT_STARTED,
+		.is_raft_recovered = false,
+		.is_synchro_recovered = false,
+	};
 	while ((rc = xlog_cursor_next(&cursor, &row, force_recovery)) == 0) {
 		row.lsn = signature;
 		rc = memtx_engine_recover_snapshot_row(&row, &state);
-		if (state == DONE_RECOVERING_SYSTEM_SPACES)
+		if (state.phase == DONE_RECOVERING_SYSTEM_SPACES)
 			force_recovery = memtx->force_recovery;
 		if (rc < 0) {
 			if (!force_recovery)
@@ -327,10 +344,18 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	 * Snapshot entries are ordered by the space id, it means that if there
 	 * are no spaces, then all system spaces are definitely missing.
 	 */
-	if (state == SNAPSHOT_RECOVERY_NOT_STARTED) {
+	if (state.phase == SNAPSHOT_RECOVERY_NOT_STARTED) {
 		diag_set(ClientError, ER_MISSING_SYSTEM_SPACES);
 		return -1;
 	}
+	/*
+	 * When there's no user data in snap, snapshot_recovery_phase_update
+	 * won't throw an error. We must check it here one more time.
+	 */
+	if (!state.is_raft_recovered || !state.is_synchro_recovered) {
+		diag_set(ClientError, ER_MISSING_SYSTEM_DATA);
+		return -1;
+	};
 
 	return 0;
 }
@@ -365,20 +390,26 @@ memtx_engine_recover_synchro(const struct xrow_header *row)
 
 /** Checks and updates the snapshot recovery state. */
 static int
-snapshot_recovery_state_update(enum snapshot_recovery_state *state,
+snapshot_recovery_phase_update(struct snapshot_recovery_state *state,
 			       bool is_system_space_request)
 {
-	switch (*state) {
+	switch (state->phase) {
 	case SNAPSHOT_RECOVERY_NOT_STARTED:
 		if (!is_system_space_request) {
 			diag_set(ClientError, ER_MISSING_SYSTEM_SPACES);
 			return -1;
 		}
-		*state = RECOVERING_SYSTEM_SPACES;
+		state->phase = RECOVERING_SYSTEM_SPACES;
 		break;
 	case RECOVERING_SYSTEM_SPACES:
+		if (!is_system_space_request &&
+		    !(state->is_raft_recovered &&
+		      state->is_synchro_recovered)) {
+			diag_set(ClientError, ER_MISSING_SYSTEM_DATA);
+			return -1;
+		}
 		if (!is_system_space_request)
-			*state = DONE_RECOVERING_SYSTEM_SPACES;
+			state->phase = DONE_RECOVERING_SYSTEM_SPACES;
 		break;
 	case DONE_RECOVERING_SYSTEM_SPACES:
 		break;
@@ -388,16 +419,23 @@ snapshot_recovery_state_update(enum snapshot_recovery_state *state,
 
 static int
 memtx_engine_recover_snapshot_row(struct xrow_header *row,
-				  enum snapshot_recovery_state *state)
+				  struct snapshot_recovery_state *state)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	if (row->type != IPROTO_INSERT) {
-		if (snapshot_recovery_state_update(state, false) != 0)
-			return -1;
-		if (row->type == IPROTO_RAFT)
+		/*
+		 * Recovery state is not updated during raft and limbo
+		 * states recovery, as they're considered system rows
+		 * and force_recovery should not be applied to them.
+		 */
+		if (row->type == IPROTO_RAFT) {
+			state->is_raft_recovered = true;
 			return memtx_engine_recover_raft(row);
-		if (row->type == IPROTO_RAFT_PROMOTE)
+		}
+		if (row->type == IPROTO_RAFT_PROMOTE) {
+			state->is_synchro_recovered = true;
 			return memtx_engine_recover_synchro(row);
+		}
 		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 			 (uint32_t) row->type);
 		return -1;
@@ -407,7 +445,7 @@ memtx_engine_recover_snapshot_row(struct xrow_header *row,
 	if (xrow_decode_dml(row, &request, dml_request_key_map(row->type)) != 0)
 		return -1;
 	bool is_system_space_request = space_id_is_system(request.space_id);
-	if (snapshot_recovery_state_update(state, is_system_space_request) != 0)
+	if (snapshot_recovery_phase_update(state, is_system_space_request) != 0)
 		return -1;
 	struct space *space = space_cache_find(request.space_id);
 	if (space == NULL)
@@ -714,7 +752,11 @@ memtx_engine_bootstrap(struct engine *engine)
 
 	int rc;
 	struct xrow_header row;
-	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
+	struct snapshot_recovery_state state = {
+		.phase = SNAPSHOT_RECOVERY_NOT_STARTED,
+		.is_raft_recovered = false,
+		.is_synchro_recovered = false,
+	};
 	while ((rc = xlog_cursor_next(&cursor, &row, true)) == 0) {
 		rc = memtx_engine_recover_snapshot_row(&row, &state);
 		if (rc < 0)
@@ -936,6 +978,20 @@ checkpoint_write_synchro(struct xlog *l, const struct synchro_request *req)
 	return checkpoint_write_row(l, &row);
 }
 
+static int
+checkpoint_write_system_data(struct xlog *l, const struct raft_request *raft,
+			     const struct synchro_request *synchro)
+{
+	ERROR_INJECT(ERRINJ_SNAP_SKIP_SYSTEM_ROWS, {
+		return 0;
+	});
+	if (checkpoint_write_raft(l, raft) != 0)
+		return -1;
+	if (checkpoint_write_synchro(l, synchro) != 0)
+		return -1;
+	return 0;
+}
+
 #ifndef NDEBUG
 /*
  * The functions defined below are used in tests to write a corrupted
@@ -1039,6 +1095,7 @@ checkpoint_f(va_list ap)
 
 	struct mh_i32_t *temp_space_ids;
 
+	bool is_synchro_written = false;
 	say_info("saving snapshot `%s'", snap->filename);
 	ERROR_INJECT_WHILE(ERRINJ_SNAP_WRITE_DELAY, {
 		fiber_sleep(0.001);
@@ -1058,6 +1115,19 @@ checkpoint_f(va_list ap)
 		});
 		if (skip)
 			continue;
+		/*
+		 * Raft and limbo states are written right after system spaces
+		 * but before user ones. This is needed to reduce the time,
+		 * needed to acquire states from the checkpoint, which is used
+		 * during checkpoint join.
+		 */
+		if (!is_synchro_written && !space_id_is_system(space_rv->id)) {
+			rc = checkpoint_write_system_data(snap, &ckpt->raft,
+							  &ckpt->synchro_state);
+			if (rc != 0)
+				break;
+			is_synchro_written = true;
+		}
 		struct index_read_view *index_rv =
 			space_read_view_index(space_rv, 0);
 		assert(index_rv != NULL);
@@ -1103,10 +1173,6 @@ checkpoint_f(va_list ap)
 		if (checkpoint_write_corrupted_insert_row(snap) != 0)
 			goto fail;
 	});
-	ERROR_INJECT(ERRINJ_SNAP_WRITE_MISSING_SPACE_ROW, {
-		if (checkpoint_write_missing_space_row(snap) != 0)
-			goto fail;
-	});
 	ERROR_INJECT(ERRINJ_SNAP_WRITE_UNKNOWN_ROW_TYPE, {
 		if (checkpoint_write_unknown_row_type(snap) != 0)
 			goto fail;
@@ -1115,10 +1181,19 @@ checkpoint_f(va_list ap)
 		if (checkpoint_write_invalid_system_row(snap) != 0)
 			goto fail;
 	});
-	if (checkpoint_write_raft(snap, &ckpt->raft) != 0)
+	/*
+	 * There may be no user data (e.g. when only RAFT_PROMOTE is written),
+	 * write limbo and raft states right after system spaces, at the end
+	 * of the checkpoint.
+	 */
+	if (!is_synchro_written &&
+	    checkpoint_write_system_data(snap, &ckpt->raft,
+					 &ckpt->synchro_state) != 0)
 		goto fail;
-	if (checkpoint_write_synchro(snap, &ckpt->synchro_state) != 0)
-		goto fail;
+	ERROR_INJECT(ERRINJ_SNAP_WRITE_MISSING_SPACE_ROW, {
+		if (checkpoint_write_missing_space_row(snap) != 0)
+			goto fail;
+	});
 	goto done;
 done:
 	if (xlog_close(snap) != 0)
@@ -1256,6 +1331,81 @@ struct memtx_join_ctx {
 	struct xstream *stream;
 };
 
+/** Respond to the JOIN request with the current vclock. */
+static void
+send_join_header(struct xstream *stream, const struct vclock *vclock)
+{
+	struct xrow_header row;
+	/* Encoding replication request uses fiber()->gc region. */
+	RegionGuard region_guard(&fiber()->gc);
+	/*
+	 * Vclock is encoded with 0th component, as in case of checkpoint
+	 * join it corresponds to the vclock of the checkpoint, where 0th
+	 * component is essential, as otherwise signature won't be correct.
+	 * Client sends this vclock in IPROTO_CURSOR, when he wants to
+	 * continue fetching from the same checkpoint.
+	 */
+	xrow_encode_vclock(&row, vclock);
+	xstream_write(stream, &row);
+}
+
+static void
+send_join_meta(struct xstream *stream, const struct raft_request *raft_req,
+	       const struct synchro_request *synchro_req)
+{
+	struct xrow_header row;
+	/* Encoding raft request uses fiber()->gc region. */
+	RegionGuard region_guard(&fiber()->gc);
+
+	/* Mark the beginning of the metadata stream. */
+	xrow_encode_type(&row, IPROTO_JOIN_META);
+	xstream_write(stream, &row);
+
+	xrow_encode_raft(&row, &fiber()->gc, raft_req);
+	xstream_write(stream, &row);
+
+	char body[XROW_BODY_LEN_MAX];
+	xrow_encode_synchro(&row, body, synchro_req);
+	row.replica_id = synchro_req->replica_id;
+	xstream_write(stream, &row);
+}
+
+#if defined(ENABLE_FETCH_SNAPSHOT_CURSOR)
+#include "memtx_checkpoint_join.cc"
+#else /* !defined(ENABLE_FETCH_SNAPSHOT_CURSOR) */
+
+static int
+memtx_engine_prepare_checkpoint_join(struct engine *engine,
+				     struct engine_join_ctx *ctx)
+{
+	(void)engine;
+	(void)ctx;
+	diag_set(ClientError, ER_UNSUPPORTED, "Community edition",
+		 "checkpoint join");
+	return -1;
+}
+
+static int
+memtx_engine_checkpoint_join(struct engine *engine, struct engine_join_ctx *ctx,
+			     struct xstream *stream)
+{
+	(void)engine;
+	(void)ctx;
+	(void)stream;
+	unreachable();
+	return -1;
+}
+
+static void
+memtx_engine_complete_checkpoint_join(struct engine *engine,
+				      struct engine_join_ctx *ctx)
+{
+	(void)engine;
+	(void)ctx;
+}
+
+#endif /* !defined(ENABLE_FETCH_SNAPSHOT_CURSOR) */
+
 /** Space filter for replica join. */
 static bool
 memtx_join_space_filter(struct space *space, void *arg)
@@ -1267,9 +1417,11 @@ memtx_join_space_filter(struct space *space, void *arg)
 }
 
 static int
-memtx_engine_prepare_join(struct engine *engine, void **arg)
+memtx_engine_prepare_join(struct engine *engine, struct engine_join_ctx *arg)
 {
-	(void)engine;
+	if (arg->cursor != NULL)
+		return memtx_engine_prepare_checkpoint_join(engine, arg);
+
 	struct memtx_join_ctx *ctx =
 		(struct memtx_join_ctx *)malloc(sizeof(*ctx));
 	if (ctx == NULL) {
@@ -1287,7 +1439,7 @@ memtx_engine_prepare_join(struct engine *engine, void **arg)
 		free(ctx);
 		return -1;
 	}
-	*arg = ctx;
+	arg->data[engine->id] = ctx;
 	return 0;
 }
 
@@ -1353,11 +1505,51 @@ memtx_join_f(va_list ap)
 }
 
 static int
-memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
+memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
+		  struct xstream *stream)
 {
-	(void)engine;
-	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
+	if (arg->cursor != NULL)
+		return memtx_engine_checkpoint_join(engine, arg, stream);
+
+	struct memtx_join_ctx *ctx =
+		(struct memtx_join_ctx *)arg->data[engine->id];
 	ctx->stream = stream;
+
+	struct vclock limbo_vclock;
+	struct raft_request raft_req;
+	struct synchro_request synchro_req;
+	/*
+	 * Sync WAL to make sure that all changes visible from
+	 * the frozen read view are successfully committed and
+	 * obtain corresponding vclock.
+	 *
+	 * This cannot be done in prepare_join, as we should not
+	 * yield between read-view creation. Moreover, wal syncing
+	 * should happen after creation of all engine's read-views.
+	 */
+	if (wal_sync(arg->vclock) != 0)
+		return -1;
+
+	/*
+	 * Start sending data only when the latest sync
+	 * transaction is confirmed.
+	 */
+	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
+		return -1;
+
+	txn_limbo_checkpoint(&txn_limbo, &synchro_req, &limbo_vclock);
+	box_raft_checkpoint_local(&raft_req);
+
+	/* Respond with vclock and JOIN_META. */
+	send_join_header(stream, arg->vclock);
+	if (arg->send_meta) {
+		send_join_meta(stream, &raft_req, &synchro_req);
+		struct xrow_header row;
+		/* Mark the beginning of the data stream. */
+		xrow_encode_type(&row, IPROTO_JOIN_SNAPSHOT);
+		xstream_write(stream, &row);
+	}
+
 	/*
 	 * Memtx snapshot iterators are safe to use from another
 	 * thread and so we do so as not to consume too much of
@@ -1372,10 +1564,13 @@ memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
 }
 
 static void
-memtx_engine_complete_join(struct engine *engine, void *arg)
+memtx_engine_complete_join(struct engine *engine, struct engine_join_ctx *arg)
 {
-	(void)engine;
-	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
+	if (arg->cursor != NULL)
+		return memtx_engine_complete_checkpoint_join(engine, arg);
+
+	struct memtx_join_ctx *ctx =
+		(struct memtx_join_ctx *)arg->data[engine->id];
 	read_view_close(&ctx->rv);
 	free(ctx);
 }
