@@ -42,6 +42,7 @@ struct relay;
 struct replica;
 struct tt_uuid;
 struct vclock;
+struct checkpoint_cursor;
 
 enum relay_state {
 	/**
@@ -122,10 +123,12 @@ relay_push_raft(struct relay *relay, const struct raft_request *req);
  * @param sync      sync from incoming JOIN request
  * @param vclock[out] vclock of the read view sent to the replica
  * @param replica_version_id peer's version
+ * @param cursor    cursor for checkpoint join, if NULL - read-view join.
  */
 void
 relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
-		   uint32_t replica_version_id);
+		   uint32_t replica_version_id,
+		   struct checkpoint_cursor *cursor);
 
 /**
  * Send final JOIN rows to the replica.
