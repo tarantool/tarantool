@@ -455,60 +455,17 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 
 	/* Freeze a read view in engines. */
 	struct engine_join_ctx ctx;
-	engine_prepare_join_xc(&ctx);
-	auto join_guard = make_scoped_guard([&] {
-		engine_complete_join(&ctx);
-	});
-
-	/*
-	 * Sync WAL to make sure that all changes visible from
-	 * the frozen read view are successfully committed and
-	 * obtain corresponding vclock.
-	 */
-	if (wal_sync(vclock) != 0)
-		diag_raise();
-
-	/*
-	 * Start sending data only when the latest sync
-	 * transaction is confirmed.
-	 */
-	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
-		diag_raise();
-
-	struct synchro_request req;
-	struct raft_request raft_req;
-	struct vclock limbo_vclock;
-	txn_limbo_checkpoint(&txn_limbo, &req, &limbo_vclock);
-	box_raft_checkpoint_local(&raft_req);
-
-	/* Respond to the JOIN request with the current vclock. */
-	struct xrow_header row;
-	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_vclock(&row, vclock);
-	row.sync = sync;
-	coio_write_xrow(relay->io, &row);
-
+	memset(&ctx, 0, sizeof(ctx));
 	/*
 	 * Version is present starting with 2.7.3, 2.8.2, 2.9.1
 	 * All these versions know of additional META stage of initial join.
 	 */
-	if (replica_version_id > 0) {
-		/* Mark the beginning of the metadata stream. */
-		xrow_encode_type(&row, IPROTO_JOIN_META);
-		xstream_write(&relay->stream, &row);
-
-		xrow_encode_raft(&row, &fiber()->gc, &raft_req);
-		xstream_write(&relay->stream, &row);
-
-		char body[XROW_BODY_LEN_MAX];
-		xrow_encode_synchro(&row, body, &req);
-		row.replica_id = req.replica_id;
-		xstream_write(&relay->stream, &row);
-
-		/* Mark the end of the metadata stream. */
-		xrow_encode_type(&row, IPROTO_JOIN_SNAPSHOT);
-		xstream_write(&relay->stream, &row);
-	}
+	ctx.send_meta = replica_version_id > 0;
+	ctx.vclock = vclock;
+	engine_prepare_join_xc(&ctx);
+	auto join_guard = make_scoped_guard([&] {
+		engine_complete_join(&ctx);
+	});
 
 	/* Send read view to the replica. */
 	engine_join_xc(&ctx, &relay->stream);
