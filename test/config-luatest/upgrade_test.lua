@@ -15,10 +15,25 @@ g.before_all(function(g)
 
     local config = {
         credentials = {
+            roles = {
+                manager = {
+                    privileges = {{
+                        permissions = {'read', 'write'},
+                        spaces = {'_space'},
+                    }},
+                },
+            },
             users = {
                 guest = {
                     privileges = {{
                         permissions = {'read'},
+                        spaces = {'_space'},
+                    }},
+                },
+                admin = {
+                    password = 'qwerty',
+                    privileges = {{
+                        permissions = {'read', 'write'},
                         spaces = {'_space'},
                     }},
                 },
@@ -70,15 +85,43 @@ end)
 
 g.test_upgrade = function()
     g.server:exec(function()
-        t.assert_equals(box.space._schema:get("version"), {'version', 2, 11, 0})
+        local netbox = require("net.box")
         local messages = {}
         for _, alert in pairs(require("config"):info().alerts) do
             table.insert(messages, alert.message)
         end
-        local exp = 'box.schema.user.grant("guest", "read", "space", ' ..
-            '"_space") has failed because either the object has not been ' ..
-            'created yet, a database schema upgrade has not been performed, ' ..
-            'or the privilege write has failed (separate alert reported)'
+        local exp = 'credentials: the database schema has an old version ' ..
+                    'and users/roles/privileges cannot be applied. '..
+                    'Consider executing box.schema.upgrade() to perform an '..
+                    'upgrade.'
         t.assert_items_include(messages, {exp})
+
+        t.assert_equals(box.space._schema:get("version"), {'version', 2, 11, 0})
+
+        box.schema.upgrade()
+        -- After upgrade privileges should be granted automatically.
+
+        exp = { 'read', 'space', '_space' }
+        t.assert_items_include(box.schema.user.info('guest'), {exp})
+
+        exp = { 'read,write', 'space', '_space' }
+        t.assert_items_include(box.schema.user.info('admin'), {exp})
+
+        -- Checks the password has been applied.
+        local conn = netbox.connect('unix/:./instance-001.iproto',
+                                    { user = 'admin', password = 'qwerty' })
+        t.assert(conn:eval('return true'))
+        conn:close()
+
+        exp = { 'read,write', 'space', '_space' }
+        t.assert_items_include(box.schema.role.info('manager'), {exp})
+
+        -- Check the alert has been dropped.
+        messages = {}
+        for _, alert in pairs(require("config"):info().alerts) do
+            table.insert(messages, alert.message)
+        end
+
+        t.assert_items_equals(messages, {})
     end)
 end
