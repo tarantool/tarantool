@@ -114,7 +114,7 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo)
 {
 	struct txn_limbo_entry *entry;
 	rlist_foreach_entry_reverse(entry, &limbo->queue, in_queue) {
-		if (txn_has_flag(entry->txn, TXN_WAIT_ACK))
+		if (txn_needs_ack(entry->txn))
 			return entry;
 	}
 	return NULL;
@@ -457,7 +457,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		 * it is last, it does not depend on a not finished sync
 		 * transaction anymore and can be confirmed right away.
 		 */
-		if (txn_has_flag(e->txn, TXN_WAIT_ACK)) {
+		if (txn_needs_ack(e->txn)) {
 			/* Sync transaction not covered by the confirmation. */
 			if (e->lsn > lsn)
 				break;
@@ -498,7 +498,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			continue;
 		}
 		e->is_commit = true;
-		if (txn_has_flag(e->txn, TXN_WAIT_ACK))
+		if (txn_needs_ack(e->txn))
 			limbo->confirm_lag = fiber_clock() - e->insertion_time;
 		e->txn->limbo_entry = NULL;
 		txn_limbo_remove(limbo, e);
@@ -545,7 +545,7 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 	struct txn_limbo_entry *e, *tmp;
 	struct txn_limbo_entry *last_rollback = NULL;
 	rlist_foreach_entry_reverse(e, &limbo->queue, in_queue) {
-		if (!txn_has_flag(e->txn, TXN_WAIT_ACK))
+		if (!txn_needs_ack(e->txn))
 			continue;
 		if (e->lsn < lsn)
 			break;
@@ -692,7 +692,7 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 		 * transactions are automatically committed right
 		 * after all the previous sync transactions are.
 		 */
-		if (!txn_has_flag(e->txn, TXN_WAIT_ACK)) {
+		if (!txn_needs_ack(e->txn)) {
 			continue;
 		} else if (e->lsn <= prev_lsn) {
 			continue;
@@ -1249,7 +1249,7 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 	int64_t confirm_lsn = -1;
 	rlist_foreach_entry(e, &limbo->queue, in_queue) {
 		assert(e->ack_count <= VCLOCK_MAX);
-		if (!txn_has_flag(e->txn, TXN_WAIT_ACK)) {
+		if (!txn_needs_ack(e->txn)) {
 			continue;
 		} else if (e->ack_count < replication_synchro_quorum) {
 			continue;

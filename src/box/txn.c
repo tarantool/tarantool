@@ -895,7 +895,7 @@ txn_journal_entry_new(struct txn *txn)
 
 	struct xrow_header **remote_row = req->rows;
 	struct xrow_header **local_row = req->rows + txn->n_applier_rows;
-	bool is_sync = txn_has_flag(txn, TXN_WAIT_ACK);
+	bool is_sync = txn_needs_ack(txn);
 
 	/*
 	 * A transaction which consists of NOPs solely should pass through the
@@ -947,7 +947,9 @@ txn_journal_entry_new(struct txn *txn)
 					 "transaction synchronously");
 				return NULL;
 			}
-			txn_set_flags(txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
+			if (!txn_needs_ack(txn))
+				txn_set_flags(txn, TXN_WAIT_ACK);
+			txn_set_flags(txn, TXN_WAIT_SYNC);
 		} else if (!txn_limbo_is_empty(&txn_limbo)) {
 			/*
 			 * There some sync entries on the
@@ -1155,7 +1157,7 @@ txn_commit(struct txn *txn)
 		 * another WAL write. Can't be done until it works
 		 * asynchronously.
 		 */
-		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
+		if (txn_needs_ack(txn)) {
 			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id,
 				      limbo_entry->lsn);
 		}
