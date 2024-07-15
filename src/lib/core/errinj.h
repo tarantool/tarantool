@@ -131,6 +131,7 @@ struct errinj {
 	_(ERRINJ_SNAP_COMMIT_FAIL, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_SKIP_ALL_ROWS, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_SKIP_DDL_ROWS, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_SNAP_SKIP_SYSTEM_ROWS, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_WRITE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_WRITE_CORRUPTED_INSERT_ROW, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_WRITE_INVALID_SYSTEM_ROW, ERRINJ_BOOL, {.bparam = false}) \

@@ -293,3 +293,72 @@ g.after_test('test_only_user_space_request', function(cg)
     cg.server:drop()
     cg.server = nil
 end)
+
+--
+-- Checks that force recovery does not work if raft and limbo states are
+-- missing but user data is present.
+--
+g.before_test('test_synchro_states_with_user_data', function(cg)
+    cg.server = server:new({alias = 'gh_ee_741_2'})
+    cg.server:start()
+    cg.server:exec(function()
+        box.schema.space.create('test'):create_index('pk')
+        box.space.test:insert{1}
+        box.error.injection.set('ERRINJ_SNAP_SKIP_SYSTEM_ROWS', true)
+        box.snapshot()
+    end)
+    cg.server:stop()
+end)
+
+g.test_synchro_states_with_user_data = function(cg)
+    local s = cg.server
+    s.box_cfg = {force_recovery = true}
+    s:start({wait_until_ready = false})
+    local log = fio.pathjoin(s.workdir, s.alias .. '.log')
+    -- NB: See a comment in test_unknown_request_type.
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert_not_equals(s:grep_log("can't initialize storage: " ..
+                                       "Snapshot has no system data", nil,
+                                       {filename = log}), nil)
+        t.assert_not(s.process:is_alive())
+    end)
+end
+
+g.after_test('test_synchro_states_with_user_data', function(cg)
+    cg.server:drop()
+    cg.server = nil
+end)
+
+--
+-- Checks that force recovery does not work if raft and limbo states are
+-- missing, only system data.
+--
+g.before_test('test_synchro_states_system_data_only', function(cg)
+    cg.server = server:new({alias = 'gh_ee_741_3'})
+    cg.server:start()
+    cg.server:exec(function()
+        box.space._schema:insert{'foo', 'bar'} -- bump LSN
+        box.error.injection.set('ERRINJ_SNAP_SKIP_SYSTEM_ROWS', true)
+        box.snapshot()
+    end)
+    cg.server:stop()
+end)
+
+g.test_synchro_states_system_data_only = function(cg)
+    local s = cg.server
+    s.box_cfg = {force_recovery = true}
+    s:start({wait_until_ready = false})
+    local log = fio.pathjoin(s.workdir, s.alias .. '.log')
+    -- NB: See a comment in test_unknown_request_type.
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert_not_equals(s:grep_log("can't initialize storage: " ..
+                                       "Snapshot has no system data", nil,
+                                       {filename = log}), nil)
+        t.assert_not(s.process:is_alive())
+    end)
+end
+
+g.after_test('test_synchro_states_system_data_only', function(cg)
+    cg.server:drop()
+    cg.server = nil
+end)

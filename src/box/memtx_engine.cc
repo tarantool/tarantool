@@ -224,10 +224,10 @@ memtx_engine_free(struct engine *engine)
 }
 
 /**
- * State of memtx engine snapshot recovery.
+ * Phase of memtx engine snapshot recovery.
  */
-enum snapshot_recovery_state {
-	/* Initial state. */
+enum snapshot_recovery_phase {
+	/* Initial phase. */
 	SNAPSHOT_RECOVERY_NOT_STARTED,
 	/* Set when at least one system space was recovered. */
 	RECOVERING_SYSTEM_SPACES,
@@ -238,6 +238,18 @@ enum snapshot_recovery_state {
 	DONE_RECOVERING_SYSTEM_SPACES,
 };
 
+/*
+ * State of memtx engine snapshot recovery.
+ */
+struct snapshot_recovery_state {
+	/* Phase of snapshot recovery. */
+	enum snapshot_recovery_phase phase;
+	/* Whether raft state was recovered. */
+	bool is_raft_recovered;
+	/* Whether limbo state was recovered. */
+	bool is_synchro_recovered;
+};
+
 /**
  * Recovers one xrow from snapshot.
  *
@@ -246,7 +258,7 @@ enum snapshot_recovery_state {
  */
 static int
 memtx_engine_recover_snapshot_row(struct xrow_header *row,
-				  enum snapshot_recovery_state *state);
+				  struct snapshot_recovery_state *state);
 
 int
 memtx_engine_recover_snapshot(struct memtx_engine *memtx,
@@ -267,11 +279,15 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	struct xrow_header row;
 	uint64_t row_count = 0;
 	bool force_recovery = false;
-	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
+	struct snapshot_recovery_state state = {
+		.phase = SNAPSHOT_RECOVERY_NOT_STARTED,
+		.is_raft_recovered = false,
+		.is_synchro_recovered = false,
+	};
 	while ((rc = xlog_cursor_next(&cursor, &row, force_recovery)) == 0) {
 		row.lsn = signature;
 		rc = memtx_engine_recover_snapshot_row(&row, &state);
-		if (state == DONE_RECOVERING_SYSTEM_SPACES)
+		if (state.phase == DONE_RECOVERING_SYSTEM_SPACES)
 			force_recovery = memtx->force_recovery;
 		if (rc < 0) {
 			if (!force_recovery)
@@ -306,10 +322,18 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	 * Snapshot entries are ordered by the space id, it means that if there
 	 * are no spaces, then all system spaces are definitely missing.
 	 */
-	if (state == SNAPSHOT_RECOVERY_NOT_STARTED) {
+	if (state.phase == SNAPSHOT_RECOVERY_NOT_STARTED) {
 		diag_set(ClientError, ER_MISSING_SYSTEM_SPACES);
 		return -1;
 	}
+	/*
+	 * When there's no user data in snap, snapshot_recovery_phase_update
+	 * won't throw an error. We must check it here one more time.
+	 */
+	if (!state.is_raft_recovered || !state.is_synchro_recovered) {
+		diag_set(ClientError, ER_MISSING_SYSTEM_DATA);
+		return -1;
+	};
 
 	return 0;
 }
@@ -344,20 +368,26 @@ memtx_engine_recover_synchro(const struct xrow_header *row)
 
 /** Checks and updates the snapshot recovery state. */
 static int
-snapshot_recovery_state_update(enum snapshot_recovery_state *state,
+snapshot_recovery_phase_update(struct snapshot_recovery_state *state,
 			       bool is_system_space_request)
 {
-	switch (*state) {
+	switch (state->phase) {
 	case SNAPSHOT_RECOVERY_NOT_STARTED:
 		if (!is_system_space_request) {
 			diag_set(ClientError, ER_MISSING_SYSTEM_SPACES);
 			return -1;
 		}
-		*state = RECOVERING_SYSTEM_SPACES;
+		state->phase = RECOVERING_SYSTEM_SPACES;
 		break;
 	case RECOVERING_SYSTEM_SPACES:
+		if (!is_system_space_request &&
+		    !(state->is_raft_recovered &&
+		      state->is_synchro_recovered)) {
+			diag_set(ClientError, ER_MISSING_SYSTEM_DATA);
+			return -1;
+		}
 		if (!is_system_space_request)
-			*state = DONE_RECOVERING_SYSTEM_SPACES;
+			state->phase = DONE_RECOVERING_SYSTEM_SPACES;
 		break;
 	case DONE_RECOVERING_SYSTEM_SPACES:
 		break;
@@ -367,7 +397,7 @@ snapshot_recovery_state_update(enum snapshot_recovery_state *state,
 
 static int
 memtx_engine_recover_snapshot_row(struct xrow_header *row,
-				  enum snapshot_recovery_state *state)
+				  struct snapshot_recovery_state *state)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	if (row->type != IPROTO_INSERT) {
@@ -376,10 +406,14 @@ memtx_engine_recover_snapshot_row(struct xrow_header *row,
 		 * states recovery, as they're considered system rows
 		 * and force_recovery should not be applied to them.
 		 */
-		if (row->type == IPROTO_RAFT)
+		if (row->type == IPROTO_RAFT) {
+			state->is_raft_recovered = true;
 			return memtx_engine_recover_raft(row);
-		if (row->type == IPROTO_RAFT_PROMOTE)
+		}
+		if (row->type == IPROTO_RAFT_PROMOTE) {
+			state->is_synchro_recovered = true;
 			return memtx_engine_recover_synchro(row);
+		}
 		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 			 (uint32_t) row->type);
 		return -1;
@@ -389,7 +423,7 @@ memtx_engine_recover_snapshot_row(struct xrow_header *row,
 	if (xrow_decode_dml(row, &request, dml_request_key_map(row->type)) != 0)
 		return -1;
 	bool is_system_space_request = space_id_is_system(request.space_id);
-	if (snapshot_recovery_state_update(state, is_system_space_request) != 0)
+	if (snapshot_recovery_phase_update(state, is_system_space_request) != 0)
 		return -1;
 	struct space *space = space_cache_find(request.space_id);
 	if (space == NULL)
@@ -696,7 +730,11 @@ memtx_engine_bootstrap(struct engine *engine)
 
 	int rc;
 	struct xrow_header row;
-	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
+	struct snapshot_recovery_state state = {
+		.phase = SNAPSHOT_RECOVERY_NOT_STARTED,
+		.is_raft_recovered = false,
+		.is_synchro_recovered = false,
+	};
 	while ((rc = xlog_cursor_next(&cursor, &row, true)) == 0) {
 		rc = memtx_engine_recover_snapshot_row(&row, &state);
 		if (rc < 0)
@@ -922,6 +960,9 @@ static int
 checkpoint_write_system_data(struct xlog *l, const struct raft_request *raft,
 			     const struct synchro_request *synchro)
 {
+	ERROR_INJECT(ERRINJ_SNAP_SKIP_SYSTEM_ROWS, {
+		return 0;
+	});
 	if (checkpoint_write_raft(l, raft) != 0)
 		return -1;
 	if (checkpoint_write_synchro(l, synchro) != 0)
@@ -1110,10 +1151,6 @@ checkpoint_f(va_list ap)
 		if (checkpoint_write_corrupted_insert_row(snap) != 0)
 			goto fail;
 	});
-	ERROR_INJECT(ERRINJ_SNAP_WRITE_MISSING_SPACE_ROW, {
-		if (checkpoint_write_missing_space_row(snap) != 0)
-			goto fail;
-	});
 	ERROR_INJECT(ERRINJ_SNAP_WRITE_UNKNOWN_ROW_TYPE, {
 		if (checkpoint_write_unknown_row_type(snap) != 0)
 			goto fail;
@@ -1131,6 +1168,10 @@ checkpoint_f(va_list ap)
 	    checkpoint_write_system_data(snap, &ckpt->raft,
 					 &ckpt->synchro_state) != 0)
 		goto fail;
+	ERROR_INJECT(ERRINJ_SNAP_WRITE_MISSING_SPACE_ROW, {
+		if (checkpoint_write_missing_space_row(snap) != 0)
+			goto fail;
+	});
 	goto done;
 done:
 	if (xlog_close(snap) != 0)
