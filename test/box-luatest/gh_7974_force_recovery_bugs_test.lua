@@ -9,8 +9,9 @@ g.before_all(function()
 end)
 
 --
--- Checks that force recovery works with snapshot containing no user spaces
--- and an unknown request type.
+-- Checks that force recovery does not work with snapshot containing no user
+-- spaces and an unknown request type, since the unknown request type is in the
+-- system part of the snap.
 --
 g.before_test('test_unknown_request_type', function(cg)
     cg.server = server:new({alias = 'gh_7974_1'})
@@ -25,6 +26,7 @@ end)
 
 g.test_unknown_request_type = function(cg)
     local s = cg.server
+    s.box_cfg = {force_recovery = true}
     s:start{wait_until_ready = false}
     local log = fio.pathjoin(s.workdir, s.alias .. '.log')
     -- NB: The address sanitizer may take some time to generate
@@ -37,9 +39,6 @@ g.test_unknown_request_type = function(cg)
                                        {filename = log}), nil)
         t.assert_not(s.process:is_alive())
     end)
-    s:stop()
-    s.box_cfg = {force_recovery = true}
-    t.assert(pcall(s.start, s))
 end
 
 g.after_test('test_unknown_request_type', function(cg)
@@ -48,7 +47,44 @@ g.after_test('test_unknown_request_type', function(cg)
 end)
 
 --
--- Checks that force recovery works with snapshot containing no user
+-- Checks that force recovery works with unknown request type in the middle
+-- of user data.
+--
+g.before_test('test_unknown_user_request_type', function(cg)
+    cg.server = server:new({alias = 'gh_ee_741_1'})
+    cg.server:start()
+    cg.server:exec(function()
+        box.schema.space.create('test'):create_index('pk')
+        box.space.test:insert({1})
+        box.error.injection.set('ERRINJ_SNAP_WRITE_UNKNOWN_ROW_TYPE', true)
+        box.snapshot()
+    end)
+    cg.server:stop()
+end)
+
+g.test_unknown_user_request_type = function(cg)
+    local s = cg.server
+    s:start{wait_until_ready = false}
+    local log = fio.pathjoin(s.workdir, s.alias .. '.log')
+    -- NB: See a comment in test_unknown_request_type.
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert_not_equals(s:grep_log("can't initialize storage: " ..
+                                       "Unknown request type 777", nil,
+                                       {filename = log}), nil)
+        t.assert_not(s.process:is_alive())
+    end)
+    s:stop()
+    s.box_cfg = {force_recovery = true}
+    t.assert(pcall(s.start, s))
+end
+
+g.after_test('test_unknown_user_request_type', function(cg)
+    cg.server:drop()
+    cg.server = nil
+end)
+
+--
+-- Checks that force recovery does not work with snapshot containing no user
 -- space requests and an invalid non-insert (raft) request type.
 --
 g.before_test('test_invalid_non_insert_request', function(cg)
@@ -64,6 +100,7 @@ end)
 
 g.test_invalid_non_insert_request = function(cg)
     local s = cg.server
+    s.box_cfg = {force_recovery = true}
     s:start{wait_until_ready = false}
     local log = fio.pathjoin(s.workdir, s.alias .. '.log')
     -- NB: See a comment in test_unknown_request_type.
@@ -73,9 +110,6 @@ g.test_invalid_non_insert_request = function(cg)
                                        {filename = log}), nil)
         t.assert_not(s.process:is_alive())
     end)
-    s:stop()
-    s.box_cfg = {force_recovery = true}
-    t.assert(pcall(s.start, s))
 end
 
 g.after_test('test_invalid_non_insert_request', function(cg)

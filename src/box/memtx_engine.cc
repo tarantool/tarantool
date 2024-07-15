@@ -371,8 +371,11 @@ memtx_engine_recover_snapshot_row(struct xrow_header *row,
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	if (row->type != IPROTO_INSERT) {
-		if (snapshot_recovery_state_update(state, false) != 0)
-			return -1;
+		/*
+		 * Recovery state is not updated during raft and limbo
+		 * states recovery, as they're considered system rows
+		 * and force_recovery should not be applied to them.
+		 */
 		if (row->type == IPROTO_RAFT)
 			return memtx_engine_recover_raft(row);
 		if (row->type == IPROTO_RAFT_PROMOTE)
