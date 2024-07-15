@@ -78,6 +78,16 @@ jobs:
         run: sh ./perf/tools/setup_env.sh
       - name: test
         run: make -f .test.mk test-perf
+        env:
+          # The taskset alone will pin all the process threads
+          # into a single (random) isolated CPU, see
+          # https://bugzilla.kernel.org/show_bug.cgi?id=116701.
+          # The workaround is using realtime scheduler for the
+          # isolated task using chrt, e. g.:
+          # sudo taskset 0xef chrt 50.
+          # But this makes the process use non-standard, real-time
+          # round-robin scheduling mechanism.
+          BENCH_CMD: "taskset 0xfe chrt 50"
       - name: Aggregate benchmark results
         run: make -f .test.mk test-perf-aggregate
       - name: Send statistics to InfluxDB

@@ -19,7 +19,8 @@ runs:
           libbenchmark-dev \
           autoconf \
           automake \
-          libtool
+          libtool \
+          util-linux
 
         luarocks install luacheck 0.26.1
         gem install coveralls-lcov
