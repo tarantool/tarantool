@@ -4324,7 +4324,7 @@ box_process_fetch_snapshot(struct iostream *io,
 	/* Send end of snapshot data marker */
 	struct xrow_header row;
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_vclock(&row, &stop_vclock);
+	xrow_encode_vclock_ignore0(&row, &stop_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 }
@@ -4436,7 +4436,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	RegionGuard region_guard(&fiber()->gc);
 	struct xrow_header row;
 	/* Send end of WAL stream marker */
-	xrow_encode_vclock(&row, &replicaset.vclock);
+	xrow_encode_vclock_ignore0(&row, &replicaset.vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -4585,7 +4585,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	/* Send end of initial stage data marker */
 	struct xrow_header row;
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_vclock(&row, &stop_vclock);
+	xrow_encode_vclock_ignore0(&row, &stop_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -4598,7 +4598,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	say_info("final data sent.");
 
 	/* Send end of WAL stream marker */
-	xrow_encode_vclock(&row, &replicaset.vclock);
+	xrow_encode_vclock_ignore0(&row, &replicaset.vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
