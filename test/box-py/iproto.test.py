@@ -490,8 +490,14 @@ print("""
 """)
 def print_id_response(resp):
     if resp["header"][IPROTO_CODE] == REQUEST_TYPE_OK:
+        features = resp["body"][IPROTO_FEATURES]
+        # Some features are available only in EE, so remove them
+        # from the list of features so that diff test passes.
+        # IPROTO_FEATURES_FETCH_SNAPSHOT_CURSOR - 10.
+        if 10 in features:
+            features.remove(10)
         print("version={}, features={}, auth_type={}".format(
-            resp["body"][IPROTO_VERSION], resp["body"][IPROTO_FEATURES],
+            resp["body"][IPROTO_VERSION], features,
             resp["body"].get(IPROTO_AUTH_TYPE, "").decode("utf-8")))
     else:
         print(str(resp["body"][IPROTO_ERROR].decode("utf-8")))
