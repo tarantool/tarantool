@@ -315,11 +315,25 @@ struct engine_read_view {
 	struct rlist link;
 };
 
+/**
+ * Cursor used during checkpoint initial join. Shared between engines.
+ */
+struct checkpoint_cursor {
+	/** Signature of the checkpoint to take data from. */
+	struct vclock *vclock;
+	/** Checkpoint lsn to start from. */
+	int64_t start_lsn;
+	/** Counter, shared between engines */
+	int64_t lsn_counter;
+};
+
 struct engine_join_ctx {
 	/** Vclock to respond with. */
 	struct vclock *vclock;
 	/** Whether sending JOIN_META stage is required. */
 	bool send_meta;
+	/** Checkpoint join cursor. */
+	struct checkpoint_cursor *cursor;
 	/** Array of engine join contexts, one per each engine. */
 	void **data;
 };
