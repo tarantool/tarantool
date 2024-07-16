@@ -458,7 +458,8 @@ relay_cord_init(struct relay *relay)
 
 void
 relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
-		   uint32_t replica_version_id)
+		   uint32_t replica_version_id,
+		   struct checkpoint_cursor *cursor)
 {
 	struct relay *relay = relay_new(NULL);
 	if (relay == NULL)
@@ -480,6 +481,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	 */
 	ctx.send_meta = replica_version_id > 0;
 	ctx.vclock = vclock;
+	ctx.cursor = cursor;
 	engine_prepare_join_xc(&ctx);
 	auto join_guard = make_scoped_guard([&] {
 		engine_complete_join(&ctx);

@@ -614,6 +614,12 @@ xrow_decode_join(const struct xrow_header *row, struct join_request *req);
 struct fetch_snapshot_request {
 	/** Replica's version. */
 	uint32_t version_id;
+	/** Flag indicating whether checkpoint join should be done. */
+	bool is_checkpoint_join;
+	/** Checkpoint's vclock, signature of the snapshot. */
+	struct vclock checkpoint_vclock;
+	/** Checkpoint's lsn, the row number to start from. */
+	uint64_t checkpoint_lsn;
 };
 
 /** Encode FETCH_SNAPSHOT request. */

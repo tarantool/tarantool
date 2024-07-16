@@ -3926,11 +3926,21 @@ box_process_fetch_snapshot(struct iostream *io,
 			  "wal_mode = 'none'");
 	}
 
-	say_info("sending current read-view to replica at %s", sio_socketname(io->fd));
+	say_info("sending read-view to replica at %s", sio_socketname(io->fd));
+	/* Used for checkpoint initial join. */
+	struct checkpoint_cursor cursor;
+	struct checkpoint_cursor *cursor_ptr = NULL;
+	if (req.is_checkpoint_join) {
+		memset(&cursor, 0, sizeof(cursor));
+		cursor.vclock = &req.checkpoint_vclock;
+		cursor.start_lsn = req.checkpoint_lsn;
+		cursor_ptr = &cursor;
+	}
 
 	/* Send the snapshot data to the instance. */
 	struct vclock start_vclock;
-	relay_initial_join(io, header->sync, &start_vclock, req.version_id);
+	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
+			   cursor_ptr);
 	say_info("read-view sent.");
 
 	/* Remember master's vclock after the last request */
@@ -4164,7 +4174,8 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * Initial stream: feed replica with dirty data from engines.
 	 */
 	struct vclock start_vclock;
-	relay_initial_join(io, header->sync, &start_vclock, req.version_id);
+	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
+			   NULL);
 	say_info("initial data sent.");
 
 	/**

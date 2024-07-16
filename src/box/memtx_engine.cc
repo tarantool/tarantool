@@ -1248,6 +1248,42 @@ send_join_meta(struct xstream *stream, const struct raft_request *raft_req,
 	xstream_write(stream, &row);
 }
 
+#if defined(ENABLE_FETCH_SNAPSHOT_CURSOR)
+#include "memtx_checkpoint_join.cc"
+#else /* !defined(ENABLE_FETCH_SNAPSHOT_CURSOR) */
+
+static int
+memtx_engine_prepare_checkpoint_join(struct engine *engine,
+				     struct engine_join_ctx *ctx)
+{
+	(void)engine;
+	(void)ctx;
+	diag_set(ClientError, ER_UNSUPPORTED, "Community edition",
+		 "checkpoint join");
+	return -1;
+}
+
+static int
+memtx_engine_checkpoint_join(struct engine *engine, struct engine_join_ctx *ctx,
+			     struct xstream *stream)
+{
+	(void)engine;
+	(void)ctx;
+	(void)stream;
+	unreachable();
+	return -1;
+}
+
+static void
+memtx_engine_complete_checkpoint_join(struct engine *engine,
+				      struct engine_join_ctx *ctx)
+{
+	(void)engine;
+	(void)ctx;
+}
+
+#endif /* !defined(ENABLE_FETCH_SNAPSHOT_CURSOR) */
+
 /** Space filter for replica join. */
 static bool
 memtx_join_space_filter(struct space *space, void *arg)
@@ -1261,6 +1297,9 @@ memtx_join_space_filter(struct space *space, void *arg)
 static int
 memtx_engine_prepare_join(struct engine *engine, struct engine_join_ctx *arg)
 {
+	if (arg->cursor != NULL)
+		return memtx_engine_prepare_checkpoint_join(engine, arg);
+
 	struct memtx_join_ctx *ctx =
 		(struct memtx_join_ctx *)malloc(sizeof(*ctx));
 	if (ctx == NULL) {
@@ -1341,6 +1380,9 @@ static int
 memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 		  struct xstream *stream)
 {
+	if (arg->cursor != NULL)
+		return memtx_engine_checkpoint_join(engine, arg, stream);
+
 	struct memtx_join_ctx *ctx =
 		(struct memtx_join_ctx *)arg->data[engine->id];
 	ctx->stream = stream;
@@ -1399,6 +1441,9 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 static void
 memtx_engine_complete_join(struct engine *engine, struct engine_join_ctx *arg)
 {
+	if (arg->cursor != NULL)
+		return memtx_engine_complete_checkpoint_join(engine, arg);
+
 	struct memtx_join_ctx *ctx =
 		(struct memtx_join_ctx *)arg->data[engine->id];
 	read_view_close(&ctx->rv);
