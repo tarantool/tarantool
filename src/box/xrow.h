@@ -676,6 +676,10 @@ void
 xrow_encode_vclock_ignore0(struct xrow_header *row,
 			   const struct vclock *vclock);
 
+/** Encode vclock including 0th component. */
+void
+xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
+
 /** Decode vclock ignoring 0th component. */
 int
 xrow_decode_vclock_ignore0(const struct xrow_header *row,

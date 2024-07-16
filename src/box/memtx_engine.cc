@@ -1218,7 +1218,14 @@ send_join_header(struct xstream *stream, const struct vclock *vclock)
 	struct xrow_header row;
 	/* Encoding replication request uses fiber()->gc region. */
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_vclock_ignore0(&row, vclock);
+	/*
+	 * Vclock is encoded with 0th component, as in case of checkpoint
+	 * join it corresponds to the vclock of the checkpoint, where 0th
+	 * component is essential, as otherwise signature won't be correct.
+	 * Client sends this vclock in IPROTO_CURSOR, when he wants to
+	 * continue fetching from the same checkpoint.
+	 */
+	xrow_encode_vclock(&row, vclock);
 	xstream_write(stream, &row);
 }
 
