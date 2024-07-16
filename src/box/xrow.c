@@ -2025,6 +2025,12 @@ struct replication_request {
 	uint32_t *version_id;
 	/** IPROTO_REPLICA_ANON. */
 	bool *is_anon;
+	/** IPROTO_IS_CHECKPOINT_JOIN. */
+	bool *is_checkpoint_join;
+	/** IPROTO_CHECKPOINT_VCLOCK. */
+	struct vclock *checkpoint_vclock;
+	/** IPROTO_CHECKPOINT_LSN. */
+	uint64_t *checkpoint_lsn;
 };
 
 /** Encode a replication request template. */
@@ -2190,6 +2196,36 @@ id_filter_decode_err:		xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 				*req->id_filter |= 1 << val;
 			}
 			break;
+		case IPROTO_IS_CHECKPOINT_JOIN:
+			if (req->is_checkpoint_join == NULL)
+				goto skip;
+			if (mp_typeof(*d) != MP_BOOL) {
+				xrow_on_decode_err(
+					row, ER_INVALID_MSGPACK,
+					"invalid IS_CHECKPOINT_JOIN");
+				return -1;
+			}
+			*req->is_checkpoint_join = mp_decode_bool(&d);
+			break;
+		case IPROTO_CHECKPOINT_VCLOCK:
+			if (req->checkpoint_vclock == NULL)
+				goto skip;
+			if (mp_decode_vclock(&d, req->checkpoint_vclock) != 0) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "invalid CHECKPOINT_VCLOCK");
+				return -1;
+			}
+			break;
+		case IPROTO_CHECKPOINT_LSN:
+			if (req->checkpoint_lsn == NULL)
+				goto skip;
+			if (mp_typeof(*d) != MP_UINT) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "invalid CHECKPOINT_LSN");
+				return -1;
+			}
+			*req->checkpoint_lsn = mp_decode_uint(&d);
+			break;
 		default: skip:
 			mp_next(&d); /* value */
 		}
@@ -2294,7 +2330,16 @@ xrow_decode_fetch_snapshot(const struct xrow_header *row,
 	memset(req, 0, sizeof(*req));
 	struct replication_request base_req = {
 		.version_id = &req->version_id,
+		.is_checkpoint_join = &req->is_checkpoint_join,
+		.checkpoint_vclock = &req->checkpoint_vclock,
+		.checkpoint_lsn = &req->checkpoint_lsn,
 	};
+	/*
+	 * Vclock must be cleared, as it sets -1 signature, which cannot be
+	 * done by memset above. This is done in order to distinguish not
+	 * initialized vclock from the zero one.
+	 */
+	vclock_clear(&req->checkpoint_vclock);
 	return xrow_decode_replication_request(row, &base_req);
 }
 
