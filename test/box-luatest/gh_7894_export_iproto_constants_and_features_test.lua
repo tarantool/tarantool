@@ -166,7 +166,7 @@ local reference_table = {
     },
 
     -- `IPROTO_CURRENT_VERSION` constant
-    protocol_version = 7,
+    protocol_version = 8,
 
     -- `feature_id` enumeration
     protocol_features = {
@@ -192,6 +192,7 @@ local reference_table = {
         dml_tuple_extension = 7,
         call_ret_tuple_extension = 8,
         call_arg_tuple_extension = 9,
+        fetch_snapshot_cursor = 10,
     },
 }
 

@@ -6072,6 +6072,7 @@ void
 box_init(void)
 {
 	iproto_constants_init();
+	iproto_features_init();
 	port_init();
 	box_on_recovery_state_event =
 		event_get("box.ctl.on_recovery_state", true);
