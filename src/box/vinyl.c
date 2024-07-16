@@ -3063,7 +3063,7 @@ vy_join_add_space(struct space *space, void *arg)
 }
 
 static int
-vinyl_engine_prepare_join(struct engine *engine, void **arg)
+vinyl_engine_prepare_join(struct engine *engine, struct engine_join_ctx *arg)
 {
 	struct vy_env *env = vy_env(engine);
 	struct vy_join_ctx *ctx = malloc(sizeof(*ctx));
@@ -3078,7 +3078,7 @@ vinyl_engine_prepare_join(struct engine *engine, void **arg)
 		free(ctx);
 		return -1;
 	}
-	*arg = ctx;
+	arg->data[engine->id] = ctx;
 	return space_foreach(vy_join_add_space, ctx);
 }
 
@@ -3103,11 +3103,11 @@ vy_join_send_tuple(struct xstream *stream, uint32_t space_id,
 }
 
 static int
-vinyl_engine_join(struct engine *engine, void *arg, struct xstream *stream)
+vinyl_engine_join(struct engine *engine, struct engine_join_ctx *arg,
+		  struct xstream *stream)
 {
-	(void)engine;
 	int loops = 0;
-	struct vy_join_ctx *ctx = arg;
+	struct vy_join_ctx *ctx = arg->data[engine->id];
 	struct vy_join_entry *join_entry;
 	rlist_foreach_entry(join_entry, &ctx->entries, in_ctx) {
 		struct vy_read_iterator *it = &join_entry->iterator;
@@ -3129,10 +3129,10 @@ vinyl_engine_join(struct engine *engine, void *arg, struct xstream *stream)
 }
 
 static void
-vinyl_engine_complete_join(struct engine *engine, void *arg)
+vinyl_engine_complete_join(struct engine *engine, struct engine_join_ctx *arg)
 {
 	struct vy_env *env = vy_env(engine);
-	struct vy_join_ctx *ctx = arg;
+	struct vy_join_ctx *ctx = arg->data[engine->id];
 	struct vy_join_entry *entry, *next;
 	rlist_foreach_entry_safe(entry, &ctx->entries, in_ctx, next) {
 		struct vy_lsm *lsm = entry->iterator.lsm;
