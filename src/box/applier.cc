@@ -789,7 +789,7 @@ applier_wait_snapshot(struct applier *applier)
 		 * vclock in bootstrap_from_master()
 		 */
 		struct vclock vclock;
-		xrow_decode_vclock_xc(&row, &vclock);
+		xrow_decode_vclock_ignore0_xc(&row, &vclock);
 		box_init_instance_vclock(&vclock);
 	}
 
@@ -847,7 +847,7 @@ applier_wait_snapshot(struct applier *applier)
 				 * this vclock is not used.
 				 */
 				struct vclock vclock;
-				xrow_decode_vclock_xc(&row, &vclock);
+				xrow_decode_vclock_ignore0_xc(&row, &vclock);
 				box_init_instance_vclock(&vclock);
 			}
 			break; /* end of stream */

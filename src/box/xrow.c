@@ -1990,7 +1990,7 @@ struct replication_request {
 	/** IPROTO_INSTANCE_UUID. */
 	struct tt_uuid *instance_uuid;
 	/** IPROTO_VCLOCK. */
-	struct vclock *vclock;
+	struct vclock *vclock_ignore0;
 	/** IPROTO_ID_FILTER. */
 	uint32_t *id_filter;
 	/** IPROTO_SERVER_VERSION. */
@@ -2007,8 +2007,8 @@ xrow_encode_replication_request(struct xrow_header *row,
 {
 	memset(row, 0, sizeof(*row));
 	size_t size = XROW_BODY_LEN_MAX;
-	if (req->vclock != NULL)
-		size += mp_sizeof_vclock_ignore0(req->vclock);
+	if (req->vclock_ignore0 != NULL)
+		size += mp_sizeof_vclock_ignore0(req->vclock_ignore0);
 	char *buf = xregion_alloc(&fiber()->gc, size);
 	/* Skip one byte for future map header. */
 	char *data = buf + 1;
@@ -2023,10 +2023,10 @@ xrow_encode_replication_request(struct xrow_header *row,
 		data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
 		data = xrow_encode_uuid(data, req->instance_uuid);
 	}
-	if (req->vclock != NULL) {
+	if (req->vclock_ignore0 != NULL) {
 		++map_size;
 		data = mp_encode_uint(data, IPROTO_VCLOCK);
-		data = mp_encode_vclock_ignore0(data, req->vclock);
+		data = mp_encode_vclock_ignore0(data, req->vclock_ignore0);
 	}
 	if (req->version_id != NULL) {
 		++map_size;
@@ -2104,9 +2104,10 @@ xrow_decode_replication_request(const struct xrow_header *row,
 			}
 			break;
 		case IPROTO_VCLOCK:
-			if (req->vclock == NULL)
+			if (req->vclock_ignore0 == NULL)
 				goto skip;
-			if (mp_decode_vclock_ignore0(&d, req->vclock) != 0) {
+			if (mp_decode_vclock_ignore0(
+					&d, req->vclock_ignore0) != 0) {
 				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 						   "invalid VCLOCK");
 				return -1;
@@ -2164,7 +2165,7 @@ xrow_encode_register(struct xrow_header *row,
 	struct register_request *cast = (struct register_request *)req;
 	const struct replication_request base_req = {
 		.instance_uuid = &cast->instance_uuid,
-		.vclock = &cast->vclock,
+		.vclock_ignore0 = &cast->vclock,
 	};
 	xrow_encode_replication_request(row, &base_req, IPROTO_REGISTER);
 }
@@ -2176,7 +2177,7 @@ xrow_decode_register(const struct xrow_header *row,
 	memset(req, 0, sizeof(*req));
 	struct replication_request base_req = {
 		.instance_uuid = &req->instance_uuid,
-		.vclock = &req->vclock,
+		.vclock_ignore0 = &req->vclock,
 	};
 	return xrow_decode_replication_request(row, &base_req);
 }
@@ -2189,7 +2190,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 	const struct replication_request base_req = {
 		.replicaset_uuid = &cast->replicaset_uuid,
 		.instance_uuid = &cast->instance_uuid,
-		.vclock = &cast->vclock,
+		.vclock_ignore0 = &cast->vclock,
 		.is_anon = &cast->is_anon,
 		.id_filter = &cast->id_filter,
 		.version_id = &cast->version_id,
@@ -2205,7 +2206,7 @@ xrow_decode_subscribe(const struct xrow_header *row,
 	struct replication_request base_req = {
 		.replicaset_uuid = &req->replicaset_uuid,
 		.instance_uuid = &req->instance_uuid,
-		.vclock = &req->vclock,
+		.vclock_ignore0 = &req->vclock,
 		.version_id = &req->version_id,
 		.is_anon = &req->is_anon,
 		.id_filter = &req->id_filter,
@@ -2427,20 +2428,20 @@ xrow_decode_applier_heartbeat(const struct xrow_header *row,
 }
 
 void
-xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
+xrow_encode_vclock_ignore0(struct xrow_header *row, const struct vclock *vclock)
 {
 	const struct replication_request base_req = {
-		.vclock = (struct vclock *)vclock,
+		.vclock_ignore0 = (struct vclock *)vclock,
 	};
 	xrow_encode_replication_request(row, &base_req, IPROTO_OK);
 }
 
 int
-xrow_decode_vclock(const struct xrow_header *row, struct vclock *vclock)
+xrow_decode_vclock_ignore0(const struct xrow_header *row, struct vclock *vclock)
 {
 	vclock_create(vclock);
 	struct replication_request base_req = {
-		.vclock = vclock,
+		.vclock_ignore0 = vclock,
 	};
 	return xrow_decode_replication_request(row, &base_req);
 }
@@ -2452,7 +2453,7 @@ xrow_encode_subscribe_response(struct xrow_header *row,
 	struct subscribe_response *cast = (struct subscribe_response *)rsp;
 	const struct replication_request base_req = {
 		.replicaset_uuid = &cast->replicaset_uuid,
-		.vclock = &cast->vclock,
+		.vclock_ignore0 = &cast->vclock,
 	};
 	xrow_encode_replication_request(row, &base_req, IPROTO_OK);
 }
@@ -2464,7 +2465,7 @@ xrow_decode_subscribe_response(const struct xrow_header *row,
 	memset(rsp, 0, sizeof(*rsp));
 	struct replication_request base_req = {
 		.replicaset_uuid = &rsp->replicaset_uuid,
-		.vclock = &rsp->vclock,
+		.vclock_ignore0 = &rsp->vclock,
 	};
 	return xrow_decode_replication_request(row, &base_req);
 }
