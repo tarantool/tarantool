@@ -540,6 +540,8 @@
     <member refid="module_8h_1acb0f168f5234ddb59713defe03029118" kind="function"><name>luaT_tolstring</name></member>
     <member refid="module_8h_1a08ca887563c2bcd2e17ad199dac627b2" kind="function"><name>luaL_iscallable</name></member>
     <member refid="module_8h_1ac572fcff70dbc1c4c33339f1db082315" kind="function"><name>luaT_toibuf</name></member>
+    <member refid="module_8h_1adeb6909b96e0c27329d9de8e05e6a805" kind="function"><name>luaL_pushnull</name></member>
+    <member refid="module_8h_1a9d39020c975535bd3b17446d866ee4c8" kind="function"><name>luaL_isnull</name></member>
     <member refid="module_8h_1ae5e643c0eff90628dd8cb09ddd8dfc68" kind="function"><name>luaT_error</name></member>
     <member refid="module_8h_1a8fccc46b7877086aefbcce5535e8b1cf" kind="function"><name>luaT_error_at</name></member>
     <member refid="module_8h_1aa1740670301221218d3780f2a4df33c6" kind="function"><name>luaT_push_nil_and_error</name></member>
