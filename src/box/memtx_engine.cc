@@ -62,6 +62,7 @@
 #include "memtx_space_upgrade.h"
 #include "tt_sort.h"
 #include "assoc.h"
+#include "wal.h"
 
 #include <type_traits>
 
@@ -1286,6 +1287,38 @@ struct memtx_join_ctx {
 	struct xstream *stream;
 };
 
+/** Respond to the JOIN request with the current vclock. */
+static void
+send_join_header(struct xstream *stream, const struct vclock *vclock)
+{
+	struct xrow_header row;
+	/* Encoding replication request uses fiber()->gc region. */
+	RegionGuard region_guard(&fiber()->gc);
+	xrow_encode_vclock(&row, vclock);
+	xstream_write(stream, &row);
+}
+
+static void
+send_join_meta(struct xstream *stream, const struct raft_request *raft_req,
+	       const struct synchro_request *synchro_req)
+{
+	struct xrow_header row;
+	/* Encoding raft request uses fiber()->gc region. */
+	RegionGuard region_guard(&fiber()->gc);
+
+	/* Mark the beginning of the metadata stream. */
+	xrow_encode_type(&row, IPROTO_JOIN_META);
+	xstream_write(stream, &row);
+
+	xrow_encode_raft(&row, &fiber()->gc, raft_req);
+	xstream_write(stream, &row);
+
+	char body[XROW_BODY_LEN_MAX];
+	xrow_encode_synchro(&row, body, synchro_req);
+	row.replica_id = synchro_req->replica_id;
+	xstream_write(stream, &row);
+}
+
 /** Space filter for replica join. */
 static bool
 memtx_join_space_filter(struct space *space, void *arg)
@@ -1297,9 +1330,8 @@ memtx_join_space_filter(struct space *space, void *arg)
 }
 
 static int
-memtx_engine_prepare_join(struct engine *engine, void **arg)
+memtx_engine_prepare_join(struct engine *engine, struct engine_join_ctx *arg)
 {
-	(void)engine;
 	struct memtx_join_ctx *ctx =
 		(struct memtx_join_ctx *)malloc(sizeof(*ctx));
 	if (ctx == NULL) {
@@ -1317,7 +1349,7 @@ memtx_engine_prepare_join(struct engine *engine, void **arg)
 		free(ctx);
 		return -1;
 	}
-	*arg = ctx;
+	arg->data[engine->id] = ctx;
 	return 0;
 }
 
@@ -1383,11 +1415,48 @@ memtx_join_f(va_list ap)
 }
 
 static int
-memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
+memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
+		  struct xstream *stream)
 {
-	(void)engine;
-	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
+	struct memtx_join_ctx *ctx =
+		(struct memtx_join_ctx *)arg->data[engine->id];
 	ctx->stream = stream;
+
+	struct vclock limbo_vclock;
+	struct raft_request raft_req;
+	struct synchro_request synchro_req;
+	/*
+	 * Sync WAL to make sure that all changes visible from
+	 * the frozen read view are successfully committed and
+	 * obtain corresponding vclock.
+	 *
+	 * This cannot be done in prepare_join, as we should not
+	 * yield between read-view creation. Moreover, wal syncing
+	 * should happen after creation of all engine's read-views.
+	 */
+	if (wal_sync(arg->vclock) != 0)
+		return -1;
+
+	/*
+	 * Start sending data only when the latest sync
+	 * transaction is confirmed.
+	 */
+	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
+		return -1;
+
+	txn_limbo_checkpoint(&txn_limbo, &synchro_req, &limbo_vclock);
+	box_raft_checkpoint_local(&raft_req);
+
+	/* Respond with vclock and JOIN_META. */
+	send_join_header(stream, arg->vclock);
+	if (arg->send_meta) {
+		send_join_meta(stream, &raft_req, &synchro_req);
+		struct xrow_header row;
+		/* Mark the beginning of the data stream. */
+		xrow_encode_type(&row, IPROTO_JOIN_SNAPSHOT);
+		xstream_write(stream, &row);
+	}
+
 	/*
 	 * Memtx snapshot iterators are safe to use from another
 	 * thread and so we do so as not to consume too much of
@@ -1402,10 +1471,10 @@ memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
 }
 
 static void
-memtx_engine_complete_join(struct engine *engine, void *arg)
+memtx_engine_complete_join(struct engine *engine, struct engine_join_ctx *arg)
 {
-	(void)engine;
-	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
+	struct memtx_join_ctx *ctx =
+		(struct memtx_join_ctx *)arg->data[engine->id];
 	read_view_close(&ctx->rv);
 	free(ctx);
 }
