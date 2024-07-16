@@ -92,6 +92,7 @@ local reference_table = {
         CHECKPOINT_VCLOCK = 0x63,
         CHECKPOINT_LSN = 0x64,
         PREV_TERM = 0x71,
+        WAIT_ACK = 0x72,
     },
 
     -- `iproto_metadata_key` enumeration.

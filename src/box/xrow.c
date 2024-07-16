@@ -1293,6 +1293,12 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
 	pos = mp_encode_uint(pos, req->lsn);
 	map_size++;
 
+	if (req->wait_ack) {
+		pos = mp_encode_uint(pos, IPROTO_WAIT_ACK);
+		pos = mp_encode_bool(pos, req->wait_ack);
+		map_size++;
+	}
+
 	if (req->term != 0) {
 		pos = mp_encode_uint(pos, IPROTO_TERM);
 		pos = mp_encode_uint(pos, req->term);
@@ -1363,6 +1369,9 @@ bad_msgpack:
 		case IPROTO_LSN:
 			req->lsn = mp_decode_uint(&d);
 			break;
+		case IPROTO_WAIT_ACK:
+			req->wait_ack = mp_decode_bool(&d);
+			break;
 		case IPROTO_TERM:
 			req->term = mp_decode_uint(&d);
 			break;
@@ -1397,6 +1406,11 @@ synchro_request_to_string(const struct synchro_request *req)
 	int rc;
 
 	rc = snprintf(pos, size, "{type: %s", iproto_type_name(req->type));
+	assert(rc >= 0 && rc < size);
+	pos += rc;
+	size -= rc;
+
+	rc = snprintf(pos, size, ", wait_ack: %c", req->wait_ack ? 't' : 'f');
 	assert(rc >= 0 && rc < size);
 	pos += rc;
 	size -= rc;

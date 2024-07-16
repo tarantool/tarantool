@@ -767,6 +767,7 @@ txn_limbo_make_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term,
 	*req = (struct synchro_request) {
 		.type = IPROTO_RAFT_PROMOTE,
 		.origin_id = instance_id,
+		.wait_ack = true,
 		.term = term,
 		/* These fields require extra tinkering with: */
 		.prev_term  = last ? last->req.term : greatest_term,
@@ -827,9 +828,8 @@ txn_limbo_read_promote_compat(struct txn_limbo *limbo,
 	if (req->term == 0)
 		return true;
 
-	if (req->confirmed_vclock != NULL) {
-		say_info("PROMOTE: restore from a snapshot %s",
-			 synchro_request_to_string(req));
+	if (!req->wait_ack) {
+		say_info("PROMOTE: non-ack %s", synchro_request_to_string(req));
 		txn_limbo_apply_promote(limbo, req, req->origin_id);
 		txn_limbo_log_status(limbo);
 		return true;
@@ -1575,6 +1575,10 @@ txn_limbo_filter_promote(struct txn_limbo *limbo,
 			break;
 		}
 	}
+
+	/* Fallback for legacy PROMOTE requests which don't have prev_term. */
+	if (!req->wait_ack)
+		found_prev_term = true;
 
 	if (!found_prev_term) {
 		say_error("%s. Unknown prev_term detected", reject_str(req));

@@ -237,7 +237,8 @@ extern const char *iproto_flag_bit_strs[];
 	/**
 	 * Extra keys used in pending RAFT_PROMOTE requests.
 	 */								\
-	_(PREV_TERM, 0x71, MP_UINT)
+	_(PREV_TERM, 0x71, MP_UINT)					\
+	_(WAIT_ACK, 0x72, MP_BOOL)
 
 #define IPROTO_KEY_MEMBER(s, v, ...) IPROTO_ ## s = v,
 

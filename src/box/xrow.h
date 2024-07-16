@@ -343,6 +343,12 @@ struct synchro_request {
 	 */
 	uint16_t type;
 	/**
+	 * True if this request requires quorum, false otherwise.
+	 * This field did not exist prior to the "pending promotes" patch.
+	 * Only used for PROMOTE requests.
+	 */
+	bool wait_ack;
+	/**
 	 * ID of the instance owning the pending transactions.
 	 * Note, it may be not the same instance, who created this
 	 * request. An instance can make an operation on foreign
