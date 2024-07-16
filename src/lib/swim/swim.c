@@ -2252,6 +2252,10 @@ swim_delete(struct swim *swim)
 void
 swim_gc(struct swim *swim)
 {
+	if (swim->event_handler == NULL) {
+		swim_delete(swim);
+		return;
+	}
 	swim->free_in_handler = true;
 	fiber_set_joinable(swim->event_handler, false);
 	fiber_cancel(swim->event_handler);
