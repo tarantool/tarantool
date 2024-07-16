@@ -1218,7 +1218,7 @@ send_join_header(struct xstream *stream, const struct vclock *vclock)
 	struct xrow_header row;
 	/* Encoding replication request uses fiber()->gc region. */
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_vclock(&row, vclock);
+	xrow_encode_vclock_ignore0(&row, vclock);
 	xstream_write(stream, &row);
 }
 

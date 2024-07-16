@@ -671,13 +671,15 @@ int
 xrow_decode_applier_heartbeat(const struct xrow_header *row,
 			      struct applier_heartbeat *req);
 
-/** Encode vclock. */
+/** Encode vclock ignoring 0th component. */
 void
-xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
+xrow_encode_vclock_ignore0(struct xrow_header *row,
+			   const struct vclock *vclock);
 
-/** Decode vclock. */
+/** Decode vclock ignoring 0th component. */
 int
-xrow_decode_vclock(const struct xrow_header *row, struct vclock *vclock);
+xrow_decode_vclock_ignore0(const struct xrow_header *row,
+			   struct vclock *vclock);
 
 /**
  * Encode any bodyless message.
@@ -1164,11 +1166,12 @@ xrow_decode_relay_heartbeat_xc(const struct xrow_header *row,
 		diag_raise();
 }
 
-/** @copydoc xrow_decode_vclock. */
+/** @copydoc xrow_decode_vclock_ignore0. */
 static inline void
-xrow_decode_vclock_xc(const struct xrow_header *row, struct vclock *vclock)
+xrow_decode_vclock_ignore0_xc(const struct xrow_header *row,
+			      struct vclock *vclock)
 {
-	if (xrow_decode_vclock(row, vclock) != 0)
+	if (xrow_decode_vclock_ignore0(row, vclock) != 0)
 		diag_raise();
 }
 
