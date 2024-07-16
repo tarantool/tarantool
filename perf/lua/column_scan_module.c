@@ -63,7 +63,7 @@ sum_iterator_rv_lua_func(struct lua_State *L)
 	if (space == NULL)
 		return luaT_error(L);
 	box_raw_read_view_index_t *index =
-		box_raw_read_view_index_by_id(space, 0);
+		box_raw_read_view_index_by_id(space, index_id);
 	if (index == NULL)
 		return luaT_error(L);
 	char key[8];
@@ -153,7 +153,7 @@ sum_scanner_rv_lua_func(struct lua_State *L)
 	if (space == NULL)
 		return luaT_error(L);
 	box_raw_read_view_index_t *index =
-		box_raw_read_view_index_by_id(space, 0);
+		box_raw_read_view_index_by_id(space, index_id);
 	if (index == NULL)
 		return luaT_error(L);
 	char key[8];
