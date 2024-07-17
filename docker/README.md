@@ -5,7 +5,7 @@
 - [What's on board](#whats-on-board)
   - [Data directories](#data-directories)
   - [Convenience tools](#convenience-tools)
-- [How to use image](#how-to-use-image)
+- [How to use an image](#how-to-use-an-image)
   - [Start a Tarantool instance](#start-a-tarantool-instance)
   - [Connect to a running Tarantool instance](#connect-to-a-running-tarantool-instance)
   - [Add application code with a volume mount](#add-application-code-with-a-volume-mount)
@@ -38,9 +38,9 @@ The `tarantool/tarantool` image contains the `tarantool` and `tt` executables.
 There are also a few [convenience tools](#convenience-tools) that make use of
 the fact that there is only one Tarantool instance running in the container.
 
-The Docker image come in one flavor, based on the `ubuntu:22.04` image.
+The Docker image comes in one flavor, based on the `ubuntu:22.04` image.
 The image is built and published on Docker Hub for each Tarantool release as
-well as for alpha, beta and release candidate versions.
+well as for alpha, beta, and release candidate versions.
 
 ### Data directories
 
@@ -48,17 +48,17 @@ Mount these directories as volumes:
 
 - `/var/lib/tarantool` contains operational data (snapshots, xlogs, etc.).
 
-- `/opt/tarantool` is the directory for Lua application code.
+- `/opt/tarantool` is the directory for the Lua application code.
 
 ### Convenience tools
 
 - `console` -- opens an administrative console to a running Tarantool instance.
 
 - `status` -- returns `running` output and zero status code if Tarantool has
-  been initialized and is operating normally. Otherwise, returns `not running`
-  output and non-zero status code.
+  been initialized and operates normally. Otherwise, `status` returns the `not running`
+  output and a non-zero status code.
 
-## How to use image
+## How to use an image
 
 ### Start a Tarantool instance
 
@@ -170,15 +170,15 @@ release has been created.
 
 ### Example
 
-Let's say we have `3.1.0` release, and it is the latest release of Tarantool.
+Let's say we have the `3.1.0` release, and it is the latest release of Tarantool.
 According to this fact, we have the image on Docker Hub with three tags:
-`3.1.0`, `3.1`, `3`.
+`3.1.0`, `3.1`, and `3`.
 
-If `3.1.1` release is created, the corresponding image will be pushed to Docker
-Hub with tags `3.1.1`, `3.1`, `3`, i.e, tags `3.1` and `3` will be re-pushed.
+If the `3.1.1` release is created, the corresponding image will be pushed to Docker
+Hub with tags `3.1.1`, `3.1`, `3`. In this case, tags `3.1` and `3` will be updated.
 
-If `3.2.0` release is created, the corresponding image will be pushed to Docker
-Hub with tags `3.2.0`, `3.2`, `3`, i.e, tag `3` will be re-pushed.
+If the `3.2.0` release is created, the corresponding image will be pushed to Docker Hub
+with the tags `3.2.0`, `3.2`, and `3`, thereby updating the tag `3`.
 
 ## Reporting problems and getting help
 
