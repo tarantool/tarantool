@@ -1268,7 +1268,16 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 
 		trigger_create(&on_replace, memtx_build_on_replace, &state,
 			       NULL);
-		trigger_add(&src_space->on_replace, &on_replace);
+		/*
+		 * If MVCC is enabled, all concurrent writes that we haven't
+		 * read will be conflicted, so we don't need to set the trigger.
+		 * Moreover, concurrent transaction can be rolled back much
+		 * later than the index will be built so the memtx_ddl_state
+		 * will be invalid in this case since it's allocated on stack
+		 * of this function.
+		 */
+		if (!memtx_tx_manager_use_mvcc_engine)
+			trigger_add(&src_space->on_replace, &on_replace);
 	}
 
 	/*
