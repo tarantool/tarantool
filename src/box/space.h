@@ -284,6 +284,7 @@ struct space {
 	 * this object in sync. For more information see #9120.
 	 */
 	int lua_ref;
+	uint32_t alter_count;
 };
 
 /** Space alter statement. */

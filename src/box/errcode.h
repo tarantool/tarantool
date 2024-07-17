@@ -431,6 +431,7 @@ struct errcode_record {
 	 */ \
 	_(ER_READ_VIEW_BUSY, 285,		"The read view is busy") \
 	_(ER_READ_VIEW_CLOSED, 286,		"The read view is closed") \
+	_(ER_ALTER_IN_PROGRESS, 287,		"Can't modify space that is being altered", "name", STRING) \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*
