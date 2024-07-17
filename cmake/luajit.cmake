@@ -39,6 +39,8 @@ set(LUAJIT_SMART_STRINGS ON CACHE BOOL
     "Harder string hashing function" FORCE)
 set(LUAJIT_TEST_BINARY $<TARGET_FILE:tarantool> CACHE STRING
     "Lua implementation to be used for tests (tarantool)" FORCE)
+set(LUAJIT_USE_GDBJIT ON CACHE BOOL
+    "GDB JIT support" FORCE)
 set(LUAJIT_USE_TEST OFF CACHE BOOL
     "Generate <test> target" FORCE)
 
@@ -138,6 +140,9 @@ add_definitions(-DLUAJIT_SMART_STRINGS=1)
 # The same is done for LUAJIT_ENABLE_GC64 but under the condition.
 if(LUAJIT_ENABLE_GC64)
     add_definitions(-DLUAJIT_ENABLE_GC64)
+endif()
+if(LUAJIT_USE_GDBJIT)
+    add_definitions(-DLUAJIT_USE_GDBJIT)
 endif()
 # XXX: Tarantool can't be built with FFI machinery disabled, since
 # there are lots of internals implemented with it. Hence, forbid
