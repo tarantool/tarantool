@@ -34,3 +34,8 @@ end
 g.test_check_interval_encode_ffi = function()
     t.assert_equals(bin, msgpackffi.encode(val))
 end
+
+g.test_is_interval = function()
+    t.assert(itv.is_interval(val))
+    t.assert_not(itv.is_interval({}))
+end

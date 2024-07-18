@@ -1303,6 +1303,7 @@ ffi.metatype(interval_t, {
 
 local interval_mt = {
     new     = interval_new,
+    is_interval = is_interval,
 }
 
 return setmetatable(
