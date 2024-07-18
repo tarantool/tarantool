@@ -662,6 +662,38 @@ txn_is_distributed(struct txn *txn)
 		txn->n_new_rows != txn->n_local_rows);
 }
 
+bool
+txn_is_fully_temporary(struct txn *txn)
+{
+	if (!txn_is_nop(txn))
+		return false;
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &txn->stmts, next) {
+		if (stmt->space != NULL &&
+		    stmt->space->def->opts.type == SPACE_TYPE_DATA_TEMPORARY)
+			return false;
+	}
+	return true;
+}
+
+bool
+txn_is_fully_remote(struct txn *txn)
+{
+	if (txn->n_new_rows != 0)
+		return false;
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &txn->stmts, next) {
+		/*
+		 * Allow DDL on data-temporary spaces, since we allow only fully
+		 * temporary transactions to continue.
+		 */
+		if (stmt->row == NULL && stmt->space != NULL &&
+		    space_is_data_temporary(stmt->space))
+			return false;
+	}
+	return true;
+}
+
 /**
  * End a statement.
  */
