@@ -1073,7 +1073,7 @@ txn_prepare(struct txn *txn)
 static bool
 txn_commit_nop(struct txn *txn)
 {
-	if (txn->n_new_rows + txn->n_applier_rows == 0) {
+	if (txn_is_nop(txn)) {
 		/*
 		 * A transcation without any new rows may still have
 		 * on_commit triggers, for example if it's a ddl operation
