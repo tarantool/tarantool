@@ -792,6 +792,8 @@ vy_scheduler_end_checkpoint(struct vy_scheduler *scheduler)
 		return;
 
 	scheduler->checkpoint_in_progress = false;
+	fiber_cond_broadcast(&scheduler->dump_cond);
+
 	if (scheduler->dump_pending) {
 		/*
 		 * Dump was triggered while checkpoint was
