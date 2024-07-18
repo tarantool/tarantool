@@ -1073,6 +1073,13 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 
 		ERROR_INJECT_YIELD(ERRINJ_CHECK_FORMAT_DELAY);
 
+		ERROR_INJECT_COUNTDOWN(ERRINJ_CHECK_FORMAT_DELAY_COUNTDOWN, {
+			struct errinj *e =
+				errinj(ERRINJ_CHECK_FORMAT_DELAY, ERRINJ_BOOL);
+			e->bparam = true;
+			ERROR_INJECT_YIELD(ERRINJ_CHECK_FORMAT_DELAY);
+		});
+
 		tuple_unref(state.cursor);
 		if (state.rc != 0) {
 			rc = -1;
