@@ -909,6 +909,12 @@ txn_is_fully_local(const struct txn *txn)
 	       txn->n_applier_rows == 0;
 }
 
+static inline bool
+txn_is_nop(const struct txn *txn)
+{
+	return txn->n_new_rows + txn->n_applier_rows == 0;
+}
+
 /**
  * Mark @a stmt as temporary by removing the associated stmt->row
  * and update @a txn accordingly.
