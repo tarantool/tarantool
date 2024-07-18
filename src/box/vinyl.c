@@ -1150,6 +1150,12 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 		if (++loops % VY_YIELD_LOOPS == 0)
 			fiber_sleep(0);
 		ERROR_INJECT_YIELD(ERRINJ_CHECK_FORMAT_DELAY);
+		ERROR_INJECT_COUNTDOWN(ERRINJ_CHECK_FORMAT_DELAY_COUNTDOWN, {
+			struct errinj *e =
+				errinj(ERRINJ_CHECK_FORMAT_DELAY, ERRINJ_BOOL);
+			e->bparam = true;
+			ERROR_INJECT_YIELD(ERRINJ_CHECK_FORMAT_DELAY);
+		});
 		if (ctx.is_failed) {
 			diag_move(&ctx.diag, diag_get());
 			rc = -1;

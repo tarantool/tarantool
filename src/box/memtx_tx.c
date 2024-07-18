@@ -683,6 +683,19 @@ memtx_tx_acquire_ddl(struct txn *tx)
 	(void) txn_can_yield(tx, false);
 }
 
+/**
+ * Fully temporary and remote transactions cannot possibly conflict each other
+ * by definition, so we can filter them out when aborting transactions for DDL.
+ * Temporary space transactions are a always nop, since they never have WAL rows
+ * associated with them.
+ */
+static bool
+memtx_tx_filter_temporary_and_remote_txs(struct txn *txn1, struct txn *txn2)
+{
+	return (txn_is_fully_temporary(txn1) && txn_is_fully_remote(txn2)) ||
+	       (txn_is_fully_remote(txn1) && txn_is_fully_temporary(txn2));
+}
+
 void
 memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
 {
@@ -694,6 +707,9 @@ memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
 			continue;
 		if (to_be_aborted->status != TXN_INPROGRESS &&
 		    to_be_aborted->status != TXN_IN_READ_VIEW)
+			continue;
+		if (memtx_tx_filter_temporary_and_remote_txs(ddl_owner,
+							     to_be_aborted))
 			continue;
 		to_be_aborted->status = TXN_ABORTED;
 		txn_set_flags(to_be_aborted, TXN_IS_CONFLICTED);
