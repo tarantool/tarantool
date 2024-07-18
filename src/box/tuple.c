@@ -868,12 +868,37 @@ tuple_snprint(char *buf, int size, struct tuple *tuple)
 	return total;
 }
 
+int
+key_snprint(char *buf, int size, const char *key, uint32_t part_count)
+{
+	int total = 0;
+	const char *data = key;
+	SNPRINT(total, snprintf, buf, size, "[");
+	for (uint32_t i = 0; i < part_count; i++) {
+		SNPRINT(total, mp_snprint, buf, size, data);
+		mp_next(&data);
+		if (i != part_count - 1)
+			SNPRINT(total, snprintf, buf, size, ", ");
+	}
+	SNPRINT(total, snprintf, buf, size, "]");
+	return total;
+}
+
 const char *
 tuple_str(struct tuple *tuple)
 {
 	char *buf = tt_static_buf();
 	if (tuple_snprint(buf, TT_STATIC_BUF_LEN, tuple) < 0)
 		return "<failed to format tuple>";
+	return buf;
+}
+
+const char *
+key_str(const char *key, uint32_t part_count)
+{
+	char *buf = tt_static_buf();
+	if (key_snprint(buf, TT_STATIC_BUF_LEN, key, part_count) < 0)
+		return "<failed to format key>";
 	return buf;
 }
 

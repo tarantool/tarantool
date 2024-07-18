@@ -756,6 +756,16 @@ const char *
 tuple_str(struct tuple *tuple);
 
 /**
+ * Format a key into string using a static buffer.
+ * Useful for debugger. Example: [1, 2, "string"]
+ * @param key to format (without the MP_ARRAY header)
+ * @param key part count
+ * @return formatted null-terminated string
+ */
+const char *
+key_str(const char *key, uint32_t part_count);
+
+/**
  * Format msgpack into string using a static buffer.
  * Useful for debugger. Example: [1, 2, "string"]
  * @param msgpack to format
