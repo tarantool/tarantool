@@ -112,6 +112,12 @@ relay_trigger_vclock_sync(struct relay *relay, uint64_t *vclock_sync,
 void
 relay_push_raft(struct relay *relay, const struct raft_request *req);
 
+/**
+ * Cancel the relay.
+ */
+void
+relay_cancel(struct relay *relay);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

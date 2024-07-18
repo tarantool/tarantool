@@ -61,6 +61,7 @@
 #include "authentication.h"
 #include "node_name.h"
 #include "core/func_adapter.h"
+#include "relay.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -4434,6 +4435,8 @@ on_replace_cluster_clear_id(struct trigger *trigger, void *event)
 				if (replica->applier != NULL)
 					applier_kill(replica->applier,
 						     diag_last_error(diag));
+				if (replica->relay != NULL)
+					relay_cancel(replica->relay);
 			}
 			diag_clear(diag);
 		}

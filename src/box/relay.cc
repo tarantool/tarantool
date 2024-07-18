@@ -232,6 +232,11 @@ struct relay {
 		 */
 		bool is_raft_push_sent;
 	} tx;
+	/**
+	 * The fiber handling the subscribe request: the corresponding relay can
+	 * be cancelled through it.
+	 */
+	struct fiber *subscribe_fiber;
 };
 
 struct diag*
@@ -1079,6 +1084,7 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 	vclock_copy_ignore0(&relay->tx.vclock, start_vclock);
 	relay->version_id = replica_version_id;
 	relay->id_filter |= replica_id_filter;
+	relay->subscribe_fiber = fiber();
 
 	struct cord cord;
 	int rc = cord_costart(&cord, "subscribe", relay_subscribe_f, relay);
@@ -1165,6 +1171,13 @@ relay_push_raft(struct relay *relay, const struct raft_request *req)
 	msg->relay = relay;
 	relay->tx.is_raft_push_pending = true;
 	relay_push_raft_msg(relay);
+}
+
+void
+relay_cancel(struct relay *relay)
+{
+	if (relay->subscribe_fiber != NULL)
+		fiber_cancel(relay->subscribe_fiber);
 }
 
 /** Check if a row should be sent to a remote replica. */
