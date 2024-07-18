@@ -89,8 +89,6 @@ test-perf-aggregate:
 CMAKE_PARAMS_ASAN = -DENABLE_WERROR=ON \
                     -DENABLE_ASAN=ON \
                     -DENABLE_UB_SANITIZER=ON \
-                    -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=OFF \
-                    -DENABLE_FUZZER=ON \
                     -DTEST_BUILD=ON
 # Some checks are temporary suppressed in the scope of the issue
 # https://github.com/tarantool/tarantool/issues/4360:

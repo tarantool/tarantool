@@ -5,9 +5,16 @@
 #leak:*
 
 # to be removed in scope of gh-10532
-leak:sql_prepare_and_execute
+leak:index_def_new
+leak:sql_create_view
 leak:sqlParser
+leak:sql_prepare_and_execute
 
 # to be removed in scope of gh-10184
 leak:lua_yaml_encode
 leak:l_load
+
+# to be removed in scope of gh-10565
+leak:lbox_console_format_yaml
+leak:yaml_parser_initialize
+leak:yaml_emitter_initialize
