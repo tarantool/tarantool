@@ -32,19 +32,26 @@ test_run:cmd('create server replica2 with '..                                   
 test_run:cmd('start server replica2')
 
 test_run:switch('master')
-box.error.injection.set('ERRINJ_WAL_DELAY', true)
+box.error.injection.set('ERRINJ_REPLICA_JOIN_DELAY', true)
 
 test_run:switch('replica1')
 _ = require('fiber').create(function() box.cfg{replication_anon = false} end)
 str = string.format('registering replica %s', box.info.uuid):gsub('-', '%%-')
-_ = test_run:wait_log('master', str)
+test_run:wait_log('master', str) ~= nil
 
 test_run:switch('replica2')
 _ = require('fiber').create(function() box.cfg{replication_anon = false} end)
 str = string.format('registering replica %s', box.info.uuid):gsub('-', '%%-')
-_ = test_run:wait_log('master', str)
+test_run:wait_log('master', str) ~= nil
 
 test_run:switch('master')
+box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+box.error.injection.set('ERRINJ_REPLICA_JOIN_DELAY', false)
+test_run:cmd("setopt delimiter ';'")
+test_run:wait_cond(function()
+    return box.error.injection.get('ERRINJ_WAL_DELAY')
+end)
+test_run:cmd("setopt delimiter ''");
 box.error.injection.set('ERRINJ_WAL_DELAY', false)
 
 test_run:switch('replica1')

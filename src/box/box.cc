@@ -4466,9 +4466,8 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 
 	say_info("registering replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
-	box_register_replica(&req.instance_uuid, req.instance_name);
-
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
+	box_register_replica(&req.instance_uuid, req.instance_name);
 
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
