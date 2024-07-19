@@ -1,0 +1,35 @@
+name: Set up Test Env for LuaJIT
+
+description: Set up an environment for a LuaJIT test routine
+
+runs:
+  using: composite
+  steps:
+    - run: |
+        # See for details: https://github.com/tarantool/tarantool/issues/7472.
+        # Run only on self-hosted Linux runners.
+        if ${{ runner.os == 'Linux' &&
+               !contains(runner.name, 'GitHub Actions') }}; then
+            LUAJIT_TEST_VARDIR=/tmp/luajit-test-vardir
+            LUAJIT_TEST_VARDIR_DISK=/tmp/luajit-test-vardir-disk/disk.ext4
+
+            # Create ${LUAJIT_TEST_VARDIR}.
+            umount ${LUAJIT_TEST_VARDIR} || true
+            rm -rf ${LUAJIT_TEST_VARDIR}
+            mkdir -p ${LUAJIT_TEST_VARDIR}
+
+            # Create a 1GB file (disk image).
+            mkdir -p $(dirname ${LUAJIT_TEST_VARDIR_DISK})
+            dd if=/dev/zero of=${LUAJIT_TEST_VARDIR_DISK} bs=4096 count=256000
+
+            # Format this file as an ext4 filesystem.
+            mkfs -t ext4 -q ${LUAJIT_TEST_VARDIR_DISK} -F
+
+            # Mount this filesystem to ${LUAJIT_TEST_VARDIR}.
+            mount -o loop,rw,usrquota,grpquota \
+                ${LUAJIT_TEST_VARDIR_DISK} \
+                ${LUAJIT_TEST_VARDIR}
+
+            echo LUAJIT_TEST_VARDIR=${LUAJIT_TEST_VARDIR} | tee -a $GITHUB_ENV
+        fi
+      shell: bash

@@ -1,0 +1,10 @@
+name: Set up Build and Test Env
+
+description: Set up an environment for build and test routines
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup-build-env
+    - uses: ./.github/actions/setup-test-env-luajit
+    - uses: ./.github/actions/setup-test-env
