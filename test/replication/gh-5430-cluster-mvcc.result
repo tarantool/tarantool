@@ -56,7 +56,7 @@ test_run:switch('master')
  | ---
  | - true
  | ...
-box.error.injection.set('ERRINJ_WAL_DELAY', true)
+box.error.injection.set('ERRINJ_REPLICA_JOIN_DELAY', true)
  | ---
  | - ok
  | ...
@@ -71,8 +71,9 @@ _ = require('fiber').create(function() box.cfg{replication_anon = false} end)
 str = string.format('registering replica %s', box.info.uuid):gsub('-', '%%-')
  | ---
  | ...
-_ = test_run:wait_log('master', str)
+test_run:wait_log('master', str) ~= nil
  | ---
+ | - true
  | ...
 
 test_run:switch('replica2')
@@ -85,13 +86,32 @@ _ = require('fiber').create(function() box.cfg{replication_anon = false} end)
 str = string.format('registering replica %s', box.info.uuid):gsub('-', '%%-')
  | ---
  | ...
-_ = test_run:wait_log('master', str)
+test_run:wait_log('master', str) ~= nil
  | ---
+ | - true
  | ...
 
 test_run:switch('master')
  | ---
  | - true
+ | ...
+box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+ | ---
+ | - ok
+ | ...
+box.error.injection.set('ERRINJ_REPLICA_JOIN_DELAY', false)
+ | ---
+ | - ok
+ | ...
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+test_run:wait_cond(function()
+    return box.error.injection.get('ERRINJ_WAL_DELAY')
+end)
+test_run:cmd("setopt delimiter ''");
+ | ---
  | ...
 box.error.injection.set('ERRINJ_WAL_DELAY', false)
  | ---
