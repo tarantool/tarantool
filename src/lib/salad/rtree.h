@@ -67,7 +67,7 @@ typedef rb_tree(struct rtree_neighbor) rtnt_t;
 enum {
 	/** Maximal possible R-tree height */
 	RTREE_MAX_HEIGHT = 16,
-	/** Maximal possible R-tree height */
+	/** Maximal possible R-tree dimension */
 	RTREE_MAX_DIMENSION = 20
 };
 
