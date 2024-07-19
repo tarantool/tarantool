@@ -139,6 +139,15 @@ struct txn_limbo {
 	 */
 	struct fiber_cond wait_cond;
 	/**
+	 * Number of times txn_limbo_write_promote has completed.
+	 * NOTE: this keeps track of both successful & unsuccessful calls.
+	 */
+	uint64_t write_promote_count;
+	/*
+	 * Condition to wait for completion of txn_limbo_write_promote.
+	 */
+	struct fiber_cond write_promote_cond;
+	/**
 	 * A helper fiber for running blocking actions
 	 * related to txn_limbo_on_parameters_change.
 	 */
@@ -484,6 +493,21 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo, struct synchro_request *req,
  */
 int
 txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
+
+/**
+ * Get the total number of txn_limbo_write_promote calls.
+ */
+uint64_t
+txn_limbo_promote_attempts(struct txn_limbo *limbo);
+
+/**
+ * Wait until total number of txn_limbo_write_promote calls reaches `count`.
+ * This does not necessarily mean all those writes succeeded.
+ * Returns 0 on success, -1 if timeout or fiber is cancelled.
+ */
+int
+txn_limbo_wait_promote_attempts(struct txn_limbo *limbo,
+				uint64_t count, double timeout);
 
 /**
  * Write a DEMOTE request.

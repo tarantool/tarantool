@@ -60,6 +60,8 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->len = 0;
 	limbo->owner_id = REPLICA_ID_NIL;
 	fiber_cond_create(&limbo->wait_cond);
+	limbo->write_promote_count = 0;
+	fiber_cond_create(&limbo->write_promote_cond);
 	limbo->on_parameters_change.has_work = false;
 	limbo->on_parameters_change.running = false;
 	limbo->on_parameters_change.fiber = NULL;
@@ -89,6 +91,10 @@ txn_limbo_is_frozen(const struct txn_limbo *limbo)
 bool
 txn_limbo_is_ro(struct txn_limbo *limbo)
 {
+	/* limbo is RO when the leadership transition is taking place. */
+	if (!rlist_empty(&limbo->pending_promotes))
+		return true;
+	/* limbo is RO when it's assigned a different owner or frozen. */
 	return limbo->owner_id != REPLICA_ID_NIL &&
 	       (limbo->owner_id != instance_id || txn_limbo_is_frozen(limbo));
 }
@@ -577,6 +583,9 @@ txn_limbo_confirm_promote(struct txn_limbo *limbo,
 			 "via lsn %" PRIu64 " from %u",
 			 lsn, origin_id);
 	}
+
+	/* Account for all rlist deletions. */
+	box_update_ro_summary();
 }
 
 /** Confirm all the entries <= @a lsn. */
@@ -807,7 +816,28 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 
 	rc = 0;
 end:
+	/* Notify possible waiters. */
+	limbo->write_promote_count++;
+	fiber_cond_broadcast(&limbo->write_promote_cond);
+
 	return rc;
+}
+
+uint64_t
+txn_limbo_promote_attempts(struct txn_limbo *limbo)
+{
+	return limbo->write_promote_count;
+}
+
+int
+txn_limbo_wait_promote_attempts(struct txn_limbo *limbo,
+				uint64_t count, double timeout)
+{
+	struct fiber_cond *cond = &limbo->write_promote_cond;
+	while (limbo->write_promote_count < count)
+		if (fiber_cond_wait_timeout(cond, timeout) != 0)
+			return -1;
+	return 0;
 }
 
 /**
@@ -868,6 +898,7 @@ txn_limbo_read_promote(struct txn_limbo *limbo,
 		 synchro_request_to_string(req));
 
 	rlist_add_entry(&item->link, last, link);
+	box_update_ro_summary();
 }
 
 /** Apply a single PROMOTE request. */

@@ -3055,13 +3055,20 @@ box_promote(void)
 	if (txn_limbo_is_trying_to_promote(&txn_limbo))
 		return 0;
 
+	int64_t wait_lsn;
+	uint64_t promote_attempts;
 	switch (box_election_mode) {
 	case ELECTION_MODE_OFF:
 		if (box_try_wait_confirm(2 * replication_synchro_timeout) != 0)
 			return -1;
 		if (box_trigger_elections() != 0)
 			return -1;
-		break;
+		wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
+		if (wait_lsn < 0)
+			return -1;
+		if (box_issue_promote(wait_lsn) != 0)
+			return -1;
+		return 0;
 	case ELECTION_MODE_VOTER:
 		assert(raft->state == RAFT_STATE_FOLLOWER);
 		diag_set(ClientError, ER_UNSUPPORTED, "election_mode='voter'",
@@ -3071,17 +3078,17 @@ box_promote(void)
 	case ELECTION_MODE_CANDIDATE:
 		if (raft->state == RAFT_STATE_LEADER)
 			return 0;
+		promote_attempts = txn_limbo_promote_attempts(&txn_limbo);
 		is_in_box_promote = false;
-		return box_raft_try_promote();
+		if (box_raft_try_promote() != 0)
+			return -1;
+		txn_limbo_wait_promote_attempts(&txn_limbo,
+						promote_attempts + 1,
+						TIMEOUT_INFINITY);
+		return 0;
 	default:
 		unreachable();
 	}
-
-	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
-	if (wait_lsn < 0)
-		return -1;
-
-	return box_issue_promote(wait_lsn);
 }
 
 int
@@ -5704,6 +5711,7 @@ box_cfg_xc(void)
 	title("running");
 	say_info("ready to accept requests");
 
+	bool wait_promote = false;
 	if (!is_bootstrap_leader) {
 		replicaset_sync();
 	} else if (box_election_mode == ELECTION_MODE_CANDIDATE ||
@@ -5727,6 +5735,7 @@ box_cfg_xc(void)
 		}
 		assert(rc == 0);
 		(void)rc;
+		wait_promote = true;
 	}
 
 	/* box.cfg.read_only is not read yet. */
@@ -5744,6 +5753,14 @@ box_cfg_xc(void)
 	 * box.ctl.wait_ro() call.
 	 */
 	fiber_sleep(0);
+
+	/* If necessary, wait until PROMOTE has been applied. */
+	if (wait_promote) {
+		double timeout = TIMEOUT_INFINITY;
+		txn_limbo_wait_promote_attempts(&txn_limbo, 1, timeout);
+		while (txn_limbo_is_trying_to_promote(&txn_limbo))
+			fiber_sleep(0);
+	}
 }
 
 void
