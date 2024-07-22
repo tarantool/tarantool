@@ -1187,6 +1187,17 @@ vy_task_dump_complete(struct vy_task *task)
 
 	assert(lsm->is_dumping);
 
+	/*
+	 * The LSM tree could have been dropped while we were writing the new
+	 * run. In this case we should discard the run without committing to
+	 * vylog, because all the information about the LSM tree and its runs
+	 * could have already been garbage collected from vylog.
+	 */
+	if (lsm->is_dropped) {
+		vy_run_unref(new_run);
+		goto delete_mems;
+	}
+
 	if (vy_run_is_empty(new_run)) {
 		/*
 		 * In case the run is empty, we can discard the run
