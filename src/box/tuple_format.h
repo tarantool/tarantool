@@ -50,8 +50,7 @@ extern "C" {
 void
 tuple_format_free();
 
-enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
-enum { FORMAT_REF_MAX = INT32_MAX};
+enum { FORMAT_ID_MAX = UINT16_MAX };
 
 /*
  * We don't pass TUPLE_INDEX_BASE around dynamically all the time,
@@ -228,7 +227,7 @@ struct tuple_format {
 	/** Pointer to engine-specific data. */
 	void *engine;
 	/** Identifier */
-	uint16_t id;
+	uint32_t id;
 	/**
 	 * Hash computed from this format. Does not include the
 	 * tuple dictionary. Used only for sharing formats among
@@ -242,7 +241,7 @@ struct tuple_format {
 	 */
 	uint64_t epoch;
 	/** Reference counter */
-	int refs;
+	int64_t refs;
 	/**
 	 * Tuples of this format belong to a data-temporary space and
 	 * hence can be freed immediately while checkpointing is
@@ -395,7 +394,6 @@ tuple_format_delete(struct tuple_format *format);
 static inline void
 tuple_format_ref(struct tuple_format *format)
 {
-	assert((uint64_t)format->refs + 1 <= FORMAT_REF_MAX);
 	format->refs++;
 }
 
