@@ -1124,7 +1124,7 @@ relay_raft_msg_push(struct cmsg *base)
 	struct relay_raft_msg *msg = (struct relay_raft_msg *)base;
 	struct xrow_header row;
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_raft_local(&row, &fiber()->gc, &msg->req);
+	xrow_encode_raft(&row, &fiber()->gc, &msg->req);
 	try {
 		relay_send(msg->relay, &row);
 		msg->relay->sent_raft_term = msg->req.term;

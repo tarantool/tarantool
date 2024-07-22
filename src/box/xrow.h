@@ -403,9 +403,17 @@ void
 xrow_encode_raft_local(struct xrow_header *row, struct region *region,
 		       const struct raft_request *r);
 
+void
+xrow_encode_raft(struct xrow_header *row, struct region *region,
+		 const struct raft_request *r);
+
 int
 xrow_decode_raft_local(const struct xrow_header *row, struct raft_request *r,
 		       struct vclock *vclock);
+
+int
+xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
+		 struct vclock *vclock);
 
 /**
  * CALL/EVAL request.

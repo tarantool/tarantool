@@ -4813,7 +4813,7 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		 */
 		struct raft_request req;
 		box_raft_checkpoint_remote(&req);
-		xrow_encode_raft_local(&row, &fiber()->gc, &req);
+		xrow_encode_raft(&row, &fiber()->gc, &req);
 		coio_write_xrow(io, &row);
 		sent_raft_term = req.term;
 	}

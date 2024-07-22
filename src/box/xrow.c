@@ -1450,6 +1450,13 @@ xrow_encode_raft_local(struct xrow_header *row, struct region *region,
 	xrow_encode_raft_impl(row, region, r, GROUP_LOCAL);
 }
 
+void
+xrow_encode_raft(struct xrow_header *row, struct region *region,
+		 const struct raft_request *r)
+{
+	xrow_encode_raft_impl(row, region, r, GROUP_DEFAULT);
+}
+
 static int
 xrow_decode_raft_impl(const struct xrow_header *row, struct raft_request *r,
 		      struct vclock *vclock, enum group_id group_id)
@@ -1520,6 +1527,13 @@ xrow_decode_raft_local(const struct xrow_header *row, struct raft_request *r,
 		       struct vclock *vclock)
 {
 	return xrow_decode_raft_impl(row, r, vclock, GROUP_LOCAL);
+}
+
+int
+xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
+		 struct vclock *vclock)
+{
+	return xrow_decode_raft_impl(row, r, vclock, GROUP_DEFAULT);
 }
 
 void

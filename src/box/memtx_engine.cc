@@ -1317,7 +1317,7 @@ send_join_meta(struct xstream *stream, const struct raft_request *raft_req,
 	xrow_encode_type(&row, IPROTO_JOIN_META);
 	xstream_write(stream, &row);
 
-	xrow_encode_raft_local(&row, &fiber()->gc, raft_req);
+	xrow_encode_raft(&row, &fiber()->gc, raft_req);
 	xstream_write(stream, &row);
 
 	char body[XROW_BODY_LEN_MAX];
