@@ -2024,7 +2024,7 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 		tuple_set_flag(tuple, TUPLE_IS_TEMPORARY);
 	tuple_format_ref(format);
 	raw = (char *) tuple + data_offset;
-	field_map_build(&builder, raw - field_map_size);
+	field_map_build(&builder, raw);
 	memcpy(raw, data, tuple_len);
 end:
 	region_truncate(region, region_svp);

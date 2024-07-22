@@ -849,10 +849,10 @@ tuple_validate(struct tuple_format *format, struct tuple *tuple)
  * @returns a field map for the tuple.
  * @sa tuple_field_map_create()
  */
-static inline const uint32_t *
+static inline const char *
 tuple_field_map(struct tuple *tuple)
 {
-	return (const uint32_t *) tuple_data(tuple);
+	return tuple_data(tuple);
 }
 
 /**
@@ -936,7 +936,7 @@ tuple_field_go_to_key(const char **field, const char *key, int len);
  */
 static inline const char *
 tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
-			const uint32_t *field_map, uint32_t fieldno,
+			const char *field_map, uint32_t fieldno,
 			const char *path, uint32_t path_len,
 			int index_base, int32_t *offset_slot_hint,
 			int multikey_idx)
@@ -1020,7 +1020,7 @@ parse:
  */
 static inline const char *
 tuple_field_raw(struct tuple_format *format, const char *tuple,
-		const uint32_t *field_map, uint32_t field_no)
+		const char *field_map, uint32_t field_no)
 {
 	if (likely(field_no < format->index_field_count)) {
 		int32_t offset_slot;
@@ -1087,7 +1087,7 @@ tuple_field(struct tuple *tuple, uint32_t fieldno)
  */
 const char *
 tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
-			     const uint32_t *field_map, const char *path,
+			     const char *field_map, const char *path,
 			     uint32_t path_len, uint32_t path_hash,
 			     int index_base);
 
@@ -1103,7 +1103,7 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
  */
 static inline const char *
 tuple_field_raw_by_part(struct tuple_format *format, const char *data,
-			const uint32_t *field_map,
+			const char *field_map,
 			struct key_part *part, int multikey_idx)
 {
 	int32_t *offset_slot_cache = NULL;
@@ -1152,7 +1152,7 @@ tuple_field_by_part(struct tuple *tuple, struct key_part *part,
  */
 uint32_t
 tuple_raw_multikey_count(struct tuple_format *format, const char *data,
-			 const uint32_t *field_map, struct key_def *key_def);
+			 const char *field_map, struct key_def *key_def);
 
 /**
  * Get count of multikey index keys in tuple by given multikey
