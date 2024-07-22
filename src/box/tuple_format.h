@@ -327,7 +327,7 @@ tuple_format_field(struct tuple_format *format, uint32_t fieldno)
 	return tuple_format_field_by_path(format, fieldno, NULL, 0, 0);
 }
 
-extern struct tuple_format **tuple_formats;
+extern struct tuple_format *tuple_formats[];
 
 static inline uint32_t
 tuple_format_id(struct tuple_format *format)
