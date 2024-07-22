@@ -327,6 +327,7 @@ public:
 		struct memtx_tuple_rv *rv = tuple_rv_last(tuple);
 		if (rv == nullptr ||
 		    memtx_tuple->version >= memtx_tuple_rv_version(rv)) {
+			tuple_field_map_destroy(tuple);
 			free(memtx_tuple, size);
 		} else {
 			stats.used_rv += size;
@@ -347,6 +348,7 @@ public:
 				      offsetof(struct memtx_tuple, base);
 			assert(stats.used_gc >= size);
 			stats.used_gc -= size;
+			tuple_field_map_destroy(&memtx_tuple->base);
 			free(memtx_tuple, size);
 		}
 		return !stailq_empty(&gc);

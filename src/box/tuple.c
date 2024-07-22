@@ -146,7 +146,7 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 		     data_offset, data_len, make_compact);
 	tuple_format_ref(format);
 	char *raw = (char *) tuple + data_offset;
-	field_map_build(&builder, raw);
+	field_map_build(&builder, raw, format, false);
 	memcpy(raw, data, data_len);
 end:
 	region_truncate(region, region_svp);

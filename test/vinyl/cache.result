@@ -1116,7 +1116,7 @@ s.index.i2:count()
 ...
 box.stat.vinyl().memory.tuple_cache -- should be about 200 KB
 ---
-- 218200
+- 218400
 ...
 s:drop()
 ---
