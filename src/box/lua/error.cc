@@ -388,12 +388,15 @@ lbox_errinj_set(struct lua_State *L)
 	switch (errinj->type) {
 	case ERRINJ_BOOL:
 		errinj->bparam = lua_toboolean(L, 2);
+		say_info("%s = %s", name, errinj->bparam ? "true" : "false");
 		break;
 	case ERRINJ_INT:
 		errinj->iparam = luaT_checkint64(L, 2);
+		say_info("%s = %lld", name, (long long)errinj->iparam);
 		break;
 	case ERRINJ_DOUBLE:
 		errinj->dparam = lua_tonumber(L, 2);
+		say_info("%s = %g", name, errinj->dparam);
 		break;
 	default:
 		lua_pushfstring(L, "error: unknown injection type '%s'", name);
