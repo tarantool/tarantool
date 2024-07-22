@@ -1985,7 +1985,7 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 
 	tuple_len = end - data;
 	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
-	total = sizeof(struct tuple) + field_map_size + tuple_len;
+	total = data_offset + tuple_len;
 
 	make_compact = tuple_can_be_compact(data_offset, tuple_len);
 	if (make_compact) {
@@ -2024,7 +2024,7 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 		tuple_set_flag(tuple, TUPLE_IS_TEMPORARY);
 	tuple_format_ref(format);
 	raw = (char *) tuple + data_offset;
-	field_map_build(&builder, raw);
+	field_map_build(&builder, raw, format, true);
 	memcpy(raw, data, tuple_len);
 end:
 	region_truncate(region, region_svp);

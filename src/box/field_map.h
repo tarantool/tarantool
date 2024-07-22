@@ -41,6 +41,8 @@ extern "C" {
 
 struct region;
 struct field_map_builder_slot;
+struct tuple_format;
+typedef uint16_t field_map_format_id_t;
 
 /**
  * A special value of multikey index that means that the key
@@ -156,6 +158,7 @@ static inline uint32_t
 field_map_get_offset(const char *field_map_ptr, int32_t offset_slot,
 		     int multikey_idx)
 {
+	field_map_ptr -= sizeof(field_map_format_id_t);
 	const uint32_t *field_map = (const uint32_t *)field_map_ptr;
 	/*
 	 * Can not access field_map as a normal uint32 array
@@ -239,22 +242,41 @@ field_map_builder_set_slot(struct field_map_builder *builder,
 }
 
 /**
- * Calculate the size of tuple field_map to be built.
+ * Size of tuple field_map not including field map format id.
  */
 static inline uint32_t
-field_map_build_size(struct field_map_builder *builder)
+field_map_base_size(struct field_map_builder *builder)
 {
 	return builder->slot_count * sizeof(uint32_t) +
 	       builder->extents_size;
 }
 
 /**
+ * Calculate the size of tuple field_map to be built.
+ */
+static inline uint32_t
+field_map_build_size(struct field_map_builder *builder)
+{
+	uint32_t size = field_map_base_size(builder);
+	if (size != 0)
+		size += sizeof(field_map_format_id_t);
+	return size;
+}
+
+/**
  * Write constructed field_map to the destination buffer field_map.
  *
  * The buffer must have at least field_map_build_size(builder) bytes.
+ *
+ * If field map in non-empty then it stores field map format id (taken
+ * from @a format), and also if @a ref_format is true then the format is
+ * referenced.
+ * So if ref_format is true then tuple_field_map_destroy must be called
+ * before the tuple is finally freed.
  */
 void
-field_map_build(struct field_map_builder *builder, char *field_map_ptr);
+field_map_build(struct field_map_builder *builder, char *field_map_ptr,
+		struct tuple_format *format, bool ref_format);
 
 #endif /* TARANTOOL_BOX_FIELD_MAP_H_INCLUDED */
 

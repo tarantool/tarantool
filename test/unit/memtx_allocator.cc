@@ -35,7 +35,7 @@ test_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	size_t size = sizeof(struct tuple);
 	struct tuple *tuple = MemtxAllocator<SmallAlloc>::alloc_tuple(size);
 	tuple_create(tuple, /*local_refs=*/0, tuple_format_id(format),
-		     /*data_offset=*/size, /*bsize=*/0, /*make_compact=*/true);
+		     /*data_offset=*/size, /*bsize=*/0, /*make_compact=*/false);
 	return tuple;
 }
 

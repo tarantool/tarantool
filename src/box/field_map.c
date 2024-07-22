@@ -30,6 +30,7 @@
  */
 #include "diag.h"
 #include "field_map.h"
+#include "tuple_format.h"
 #include "small/region.h"
 
 void
@@ -70,7 +71,8 @@ field_map_builder_slot_extent_new(struct field_map_builder *builder,
 }
 
 void
-field_map_build(struct field_map_builder *builder, char *field_map_ptr)
+field_map_build(struct field_map_builder *builder, char *field_map_ptr,
+		struct tuple_format *format, bool ref_format)
 {
 	/*
 	 * To initialize the field map and its extents, prepare
@@ -87,8 +89,16 @@ field_map_build(struct field_map_builder *builder, char *field_map_ptr)
 	 * The buffer size is assumed to be sufficient to write
 	 * field_map_build_size(builder) bytes there.
 	 */
+	uint32_t size = field_map_base_size(builder);
+	if (size == 0)
+		return;
+	field_map_format_id_t fmf_id = format->id;
+	field_map_ptr -= sizeof(fmf_id);
+	memcpy(field_map_ptr, &fmf_id, sizeof(fmf_id));
+	if (ref_format)
+		tuple_format_ref(format);
 	uint32_t *field_map = (uint32_t *)field_map_ptr;
-	char *extent_wptr = field_map_ptr - field_map_build_size(builder);
+	char *extent_wptr = field_map_ptr - size;
 	for (int32_t i = -1; i >= -(int32_t)builder->slot_count; i--) {
 		/*
 		 * Can not access field_map as a normal uint32
@@ -110,6 +120,5 @@ field_map_build(struct field_map_builder *builder, char *field_map_ptr)
 			extent_offset_sz);
 		extent_wptr += sizeof(uint32_t) + extent_offset_sz;
 	}
-	assert(extent_wptr == field_map_ptr - field_map_build_size(builder) +
-			      builder->extents_size);
+	assert(extent_wptr == field_map_ptr - size + builder->extents_size);
 }

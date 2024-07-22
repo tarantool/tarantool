@@ -789,6 +789,29 @@ tuple_format(struct tuple *tuple)
 	return format;
 }
 
+static inline struct tuple_format *
+tuple_field_map_format(const char *tuple_data)
+{
+	field_map_format_id_t fmf_id;
+	if ((intptr_t)tuple_data % 4 == 2)
+		fmf_id = 0;
+	else
+		memcpy(&fmf_id, tuple_data - sizeof(fmf_id), sizeof(fmf_id));
+	return tuple_format_by_id(fmf_id);
+}
+
+static inline void
+tuple_field_map_destroy(struct tuple *tuple)
+{
+	uint16_t offset = tuple_data_offset(tuple);
+	if (offset % 4 == 2)
+		return;
+	const char *data = (const char *)tuple + offset;
+	field_map_format_id_t fmf_id;
+	memcpy(&fmf_id, data - sizeof(fmf_id), sizeof(fmf_id));
+	tuple_format_unref(tuple_format_by_id(fmf_id));
+}
+
 /** Check that some fields in tuple are compressed */
 static inline bool
 tuple_is_compressed(struct tuple *tuple)
