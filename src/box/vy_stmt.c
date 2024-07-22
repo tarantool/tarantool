@@ -365,8 +365,8 @@ vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
 		goto end;
 	/* Copy MsgPack data */
 	char *raw = (char *) tuple_data(stmt);
+	field_map_build(&builder, raw);
 	char *wpos = raw;
-	field_map_build(&builder, wpos - field_map_size);
 	memcpy(wpos, tuple_begin, mpsize);
 	wpos += mpsize;
 	for (struct iovec *op = ops, *end = ops + op_count;
@@ -512,9 +512,8 @@ vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
 	if (stmt == NULL)
 		goto out;
 	char *stmt_data = (char *) tuple_data(stmt);
-	char *stmt_field_map_begin = stmt_data - field_map_size;
 	memcpy(stmt_data, data, bsize);
-	field_map_build(&builder, stmt_field_map_begin);
+	field_map_build(&builder, stmt_data);
 	vy_stmt_set_type(stmt, IPROTO_DELETE);
 	mp_tuple_assert(stmt_data, stmt_data + bsize);
 out:

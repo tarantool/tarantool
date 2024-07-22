@@ -153,9 +153,10 @@ struct field_map_builder_slot {
  * When a field is not in the data tuple, its offset is 0.
  */
 static inline uint32_t
-field_map_get_offset(const uint32_t *field_map, int32_t offset_slot,
+field_map_get_offset(const char *field_map_ptr, int32_t offset_slot,
 		     int multikey_idx)
 {
+	const uint32_t *field_map = (const uint32_t *)field_map_ptr;
 	/*
 	 * Can not access field_map as a normal uint32 array
 	 * because its alignment may be < 4 bytes. Need to use
@@ -253,7 +254,7 @@ field_map_build_size(struct field_map_builder *builder)
  * The buffer must have at least field_map_build_size(builder) bytes.
  */
 void
-field_map_build(struct field_map_builder *builder, char *buffer);
+field_map_build(struct field_map_builder *builder, char *field_map_ptr);
 
 #endif /* TARANTOOL_BOX_FIELD_MAP_H_INCLUDED */
 

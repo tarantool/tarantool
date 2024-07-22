@@ -146,7 +146,7 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 		     data_offset, data_len, make_compact);
 	tuple_format_ref(format);
 	char *raw = (char *) tuple + data_offset;
-	field_map_build(&builder, raw - field_map_size);
+	field_map_build(&builder, raw);
 	memcpy(raw, data, data_len);
 end:
 	region_truncate(region, region_svp);
@@ -574,7 +574,7 @@ tuple_go_to_path(const char **data, const char *path, uint32_t path_len,
 
 const char *
 tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
-			     const uint32_t *field_map, const char *path,
+			     const char *field_map, const char *path,
 			     uint32_t path_len, uint32_t path_hash,
 			     int index_base)
 {
@@ -631,8 +631,7 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
 
 uint32_t
 tuple_raw_multikey_count(struct tuple_format *format, const char *data,
-			       const uint32_t *field_map,
-			       struct key_def *key_def)
+			 const char *field_map, struct key_def *key_def)
 {
 	assert(key_def->is_multikey);
 	const char *array_raw =
