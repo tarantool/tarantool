@@ -44,10 +44,10 @@
 #include <PMurHash.h>
 
 /** Global table of tuple formats */
-struct tuple_format **tuple_formats;
+struct tuple_format *tuple_formats[FORMAT_ID_MAX + 1];
 static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 
-static uint32_t formats_size = 0, formats_capacity = 0;
+static uint32_t formats_size = 0;
 static uint64_t formats_epoch = 0;
 
 /**
@@ -660,27 +660,9 @@ static int
 tuple_format_register(struct tuple_format *format)
 {
 	if (recycled_format_ids != FORMAT_ID_NIL) {
-
 		format->id = (uint16_t) recycled_format_ids;
 		recycled_format_ids = (intptr_t) tuple_formats[recycled_format_ids];
 	} else {
-		if (formats_size == formats_capacity) {
-			uint32_t new_capacity = formats_capacity ?
-						formats_capacity * 2 : 16;
-			struct tuple_format **formats;
-			formats = (struct tuple_format **)
-				realloc(tuple_formats, new_capacity *
-						       sizeof(tuple_formats[0]));
-			if (formats == NULL) {
-				diag_set(OutOfMemory,
-					 sizeof(struct tuple_format), "malloc",
-					 "tuple_formats");
-				return -1;
-			}
-
-			formats_capacity = new_capacity;
-			tuple_formats = formats;
-		}
 		uint32_t formats_size_max = FORMAT_ID_MAX + 1;
 		struct errinj *inj = errinj(ERRINJ_TUPLE_FORMAT_COUNT,
 					    ERRINJ_INT);
@@ -688,7 +670,7 @@ tuple_format_register(struct tuple_format *format)
 			formats_size_max = inj->iparam;
 		if (formats_size >= formats_size_max) {
 			diag_set(ClientError, ER_TUPLE_FORMAT_LIMIT,
-				 (unsigned) formats_capacity);
+				 (unsigned)formats_size_max);
 			return -1;
 		}
 		format->id = formats_size++;
@@ -1290,10 +1272,8 @@ void
 tuple_format_init()
 {
 	tuple_formats_hash = mh_tuple_format_new();
-	tuple_formats = NULL;
 	recycled_format_ids = FORMAT_ID_NIL;
 	formats_size = 0;
-	formats_capacity = 0;
 }
 
 /** Destroy tuple format subsystem and free resourses */
@@ -1314,7 +1294,6 @@ tuple_format_free()
 			free(*format);
 		}
 	}
-	free(tuple_formats);
 	mh_tuple_format_delete(tuple_formats_hash);
 }
 
