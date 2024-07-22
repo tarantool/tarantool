@@ -1197,7 +1197,7 @@ box.snapshot()
 ...
 stat_diff(gstat(), st, 'scheduler')
 ---
-- dump_input: 103200
+- dump_input: 103400
   dump_output: 103592
   tasks_completed: 2
   dump_count: 1
@@ -1214,7 +1214,7 @@ box.snapshot()
 ...
 stat_diff(gstat(), st, 'scheduler')
 ---
-- dump_input: 10320
+- dump_input: 10340
   dump_output: 10411
   tasks_completed: 2
   dump_count: 1
@@ -1296,7 +1296,7 @@ st2 = i2:stat()
 ...
 s:bsize()
 ---
-- 52800
+- 52900
 ...
 i1:len(), i2:len()
 ---
@@ -1421,7 +1421,7 @@ st2 = i2:stat()
 ...
 s:bsize()
 ---
-- 106199
+- 106299
 ...
 i1:len(), i2:len()
 ---
