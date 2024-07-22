@@ -811,7 +811,8 @@ applier_wait_snapshot(struct applier *applier)
 					diag_raise();
 			} else if (iproto_type_is_raft_request(row.type)) {
 				struct raft_request req;
-				if (xrow_decode_raft(&row, &req, NULL) != 0)
+				if (xrow_decode_raft_local(&row,
+							   &req, NULL) != 0)
 					diag_raise();
 				box_raft_recover(&req);
 			} else if (row.type != IPROTO_JOIN_SNAPSHOT) {
@@ -1126,8 +1127,8 @@ applier_parse_tx_row(struct applier_tx_row *tx_row)
 			diag_raise();
 		}
 	} else if (iproto_type_is_raft_request(type)) {
-		if (xrow_decode_raft(row, &tx_row->req.raft.req,
-				     &tx_row->req.raft.vclock) != 0) {
+		if (xrow_decode_raft_local(row, &tx_row->req.raft.req,
+					   &tx_row->req.raft.vclock) != 0) {
 			diag_raise();
 		}
 	} else if (type == IPROTO_OK) {

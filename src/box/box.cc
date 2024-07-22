@@ -749,7 +749,7 @@ wal_stream_apply_raft_row(struct wal_stream *stream, struct xrow_header *row)
 	}
 	struct raft_request raft_req;
 	/* Vclock is never persisted in WAL by Raft. */
-	if (xrow_decode_raft(row, &raft_req, NULL) != 0) {
+	if (xrow_decode_raft_local(row, &raft_req, NULL) != 0) {
 		say_error("couldn't decode a raft request");
 		return -1;
 	}
@@ -4813,7 +4813,7 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		 */
 		struct raft_request req;
 		box_raft_checkpoint_remote(&req);
-		xrow_encode_raft(&row, &fiber()->gc, &req);
+		xrow_encode_raft_local(&row, &fiber()->gc, &req);
 		coio_write_xrow(io, &row);
 		sent_raft_term = req.term;
 	}
