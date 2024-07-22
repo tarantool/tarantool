@@ -12,7 +12,7 @@ spaces = {}
 ...
 box.schema.FORMAT_ID_MAX
 ---
-- 65534
+- 65535
 ...
 test_run:cmd("setopt delimiter ';'")
 ---
@@ -24,7 +24,7 @@ for k = 1, box.schema.FORMAT_ID_MAX, 1 do
     table.insert(spaces, s)
 end;
 ---
-- error: 'Tuple format limit reached: 65535'
+- error: 'Tuple format limit reached: 65536'
 ...
 #spaces > 65000;
 ---

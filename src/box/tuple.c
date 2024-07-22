@@ -369,6 +369,8 @@ tuple_init(field_name_hash_f hash)
 							/*names_only=*/false);
 	if (tuple_format_runtime == NULL)
 		return -1;
+	if (tuple_format_runtime->id != FORMAT_ID_RUNTIME)
+		panic("tuple_format_runtime must have id == FORMAT_ID_RUNTIME");
 
 	/* Make sure this one stays around. */
 	tuple_format_ref(tuple_format_runtime);
