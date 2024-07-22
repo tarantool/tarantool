@@ -2,6 +2,7 @@ local fiber = require('fiber')
 local clock = require('clock')
 local config = require('config')
 local checks = require('checks')
+local fun = require('fun')
 local netbox = require('net.box')
 
 local WATCHER_DELAY = 0.1
@@ -21,7 +22,12 @@ local function is_connection_valid(conn, opts)
     return true
 end
 
+local connection_mode_update_cond = nil
 local function connect(instance_name, opts)
+    if not connection_mode_update_cond then
+        connection_mode_update_cond = fiber.cond()
+    end
+
     checks('string', {
         connect_timeout = '?number',
         wait_connected = '?boolean',
@@ -58,6 +64,7 @@ local function connect(instance_name, opts)
         conn.mode = mode
         local function watch_status(_key, value)
             conn._mode = value.is_ro and 'ro' or 'rw'
+            connection_mode_update_cond:broadcast()
         end
         conn:watch('box.status', watch_status)
     end
@@ -71,24 +78,49 @@ local function connect(instance_name, opts)
     return conn
 end
 
+local function is_candidate_connected(candidate)
+    local conn = connections[candidate]
+    return conn and conn.state == 'active' and conn:mode() ~= nil
+end
+
+-- Checks whether the candidate has responded with success or
+-- with an error.
+local function is_candidate_checked(candidate)
+    local conn = connections[candidate]
+
+    return not conn or
+           is_candidate_connected(candidate) or
+           conn.state == 'error' or
+           conn.state == 'closed'
+end
+
 local function connect_to_candidates(candidates)
     local delay = WATCHER_DELAY
-    local conn_opts = {connect_timeout = WATCHER_TIMEOUT}
-    local connected_candidates = {}
+    local connect_deadline = clock.monotonic() + WATCHER_TIMEOUT
+
     for _, instance_name in pairs(candidates) do
-        local time_connect_end = clock.monotonic() + WATCHER_TIMEOUT
-        local ok, conn = pcall(connect, instance_name, conn_opts)
-        -- If state is not 'active', conn:mode() cannot become not nil.
-        if ok and conn.state == 'active' then
-            while conn:mode() == nil and clock.monotonic() < time_connect_end do
-                fiber.sleep(delay)
-            end
-            if conn:mode() ~= nil then
-                table.insert(connected_candidates, instance_name)
-            else
-                conn:close()
-            end
+        pcall(connect, instance_name, {
+            wait_connected = false,
+            connect_timeout = WATCHER_TIMEOUT
+        })
+    end
+
+    assert(connection_mode_update_cond ~= nil)
+
+    local connected_candidates = {}
+    while clock.monotonic() < connect_deadline do
+        connected_candidates = fun.iter(candidates)
+            :filter(is_candidate_connected)
+            :totable()
+
+        local all_checked = fun.iter(candidates)
+            :all(is_candidate_checked)
+
+        if all_checked then
+            return connected_candidates
         end
+
+        connection_mode_update_cond:wait(delay)
     end
     return connected_candidates
 end

@@ -2,6 +2,7 @@ local t = require('luatest')
 local fun = require('fun')
 local treegen = require('luatest.treegen')
 local server = require('luatest.server')
+local socket = require('socket')
 local helpers = require('test.config-luatest.helpers')
 
 local g = helpers.group()
@@ -13,6 +14,24 @@ end
 
 local function skip_if_no_vshard()
     t.skip_if(not has_vshard, 'Module "vshard-ee/vshard" is not available')
+end
+
+local function start_stub_servers(g, dir, instances)
+    g.stub_servers = g.stub_servers or {}
+    for _, instance in ipairs(instances) do
+        local uri = ('%s/%s.iproto'):format(dir, instance)
+        local s = socket.tcp_server('unix/', uri, function()
+            require('fiber').sleep(11000)
+        end)
+        t.assert(s)
+        g.stub_servers[instance] = s
+    end
+end
+
+local function stop_stub_servers(g)
+    for _, server in pairs(g.stub_servers) do
+        server:close()
+    end
 end
 
 g.test_connect = function(g)
@@ -419,6 +438,88 @@ g.test_filter_mode = function(g)
     g.server_4:exec(check)
 end
 
+g.test_filter_works_in_parallel = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        myuser:
+          password: "secret"
+          roles: [replication]
+          privileges:
+          - permissions: [execute]
+            universe: true
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        peer:
+          login: 'myuser'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001:
+                database:
+                  mode: rw
+          replicaset-002:
+            instances:
+              instance-002: {}
+              instance-003: {}
+              instance-004: {}
+              instance-005: {}
+    ]]
+    treegen.write_file(dir, 'config.yaml', config)
+
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = 'config.yaml',
+        chdir = dir,
+    }
+    g.server_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+
+    g.server_1:start({wait_until_ready = false})
+    start_stub_servers(g, dir, {
+        'instance-002',
+        'instance-003',
+        'instance-004',
+        'instance-005'
+    })
+
+    g.server_1:wait_until_ready()
+
+    local function check_filter()
+        local connpool = require('experimental.connpool')
+        local clock = require('clock')
+
+        -- The connection timeout for filter() is hardcoded in
+        -- connpool and equals to 10 seconds.
+        local CONNECT_TIMEOUT = 10
+
+        -- If the connection pool tries to connect in parallel, the
+        -- execution time is bounded with CONNECT_TIMEOUT plus some
+        -- small overhead.
+        --
+        -- Make sure we're trying to access the instances in parallel.
+        local opts = { mode = 'ro' }
+        local timestamp_before_filter = clock.monotonic()
+        t.assert_equals(connpool.filter(opts), {})
+        local elapsed_time = clock.monotonic() - timestamp_before_filter
+        t.assert_gt(elapsed_time, CONNECT_TIMEOUT / 2)
+        t.assert_lt(elapsed_time, CONNECT_TIMEOUT * 3 / 2)
+    end
+
+    g.server_1:exec(check_filter)
+end
+g.after_test('test_filter_works_in_parallel', function(g)
+    stop_stub_servers(g)
+end)
+
 g.test_call = function(g)
     local dir = treegen.prepare_directory({}, {})
     local config = [[
@@ -780,3 +881,99 @@ g.test_call_mode = function(g)
     g.server_3:exec(check)
     g.server_4:exec(check)
 end
+
+g.test_call_works_in_parallel = function(g)
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        myuser:
+          password: "secret"
+          roles: [replication]
+          privileges:
+          - permissions: [execute]
+            universe: true
+
+    roles: [one]
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        peer:
+          login: 'myuser'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001:
+                database:
+                  mode: rw
+          replicaset-002:
+            instances:
+              instance-002: {}
+              instance-003: {}
+              instance-004: {}
+              instance-005: {}
+    ]]
+    treegen.write_file(dir, 'config.yaml', config)
+
+    local role = string.dump(function()
+        local function f1()
+            return box.info.name
+        end
+
+        rawset(_G, 'f1', f1)
+
+        return {
+            stop = function() end,
+            apply = function() end,
+            validate = function() end,
+        }
+    end)
+    treegen.write_file(dir, 'one.lua', role)
+
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = 'config.yaml',
+        chdir = dir,
+    }
+    g.server_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+
+    g.server_1:start({wait_until_ready = false})
+    start_stub_servers(g, dir, {
+        'instance-002',
+        'instance-003',
+        'instance-004',
+        'instance-005'
+    })
+
+    g.server_1:wait_until_ready()
+
+    local function check_filter()
+        local connpool = require('experimental.connpool')
+        local clock = require('clock')
+
+        -- The connection timeout for filter() is hardcoded in
+        -- connpool and equals to 10 seconds.
+        local CONNECT_TIMEOUT = 10
+
+        -- call() internally uses filter(). Ensure it tries to
+        -- access sinstances in parallel.
+        local opts = { mode = 'prefer_ro' }
+        local timestamp_before_filter = clock.monotonic()
+        t.assert_equals(connpool.call('f1', nil, opts), 'instance-001')
+        local elapsed_time = clock.monotonic() - timestamp_before_filter
+        t.assert_gt(elapsed_time, CONNECT_TIMEOUT / 2)
+        t.assert_lt(elapsed_time, CONNECT_TIMEOUT * 3 / 2)
+    end
+
+    g.server_1:exec(check_filter)
+end
+g.after_test('test_call_works_in_parallel', function(g)
+    stop_stub_servers(g)
+end)
