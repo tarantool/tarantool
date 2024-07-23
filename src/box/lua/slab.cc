@@ -259,7 +259,7 @@ lbox_runtime_info(struct lua_State *L)
 	 * Lua GC heap size
 	 */
 	lua_pushstring(L, "lua");
-	lua_pushinteger(L, G(L)->gc.total);
+	lua_pushinteger(L, luaL_getgctotal(L));
 	lua_settable(L, -3);
 
 	luaL_pushuint64(L, tuple_runtime_memory_used());
