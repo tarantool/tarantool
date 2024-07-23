@@ -105,6 +105,7 @@ struct errinj {
 	_(ERRINJ_IPROTO_TX_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_WRITE_ERROR_DELAY, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_LIMBO_PROMOTE_ACK_SLEEP, ERRINJ_BOOL, {.bparam = false})\
+	_(ERRINJ_LIMBO_WRITE_PROMOTE_FAST_EXIT, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_LIMBO_WRITE_PROMOTE_SLEEP, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_LOG_ROTATE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_MEMTX_DELAY_GC, ERRINJ_BOOL, {.bparam = false}) \

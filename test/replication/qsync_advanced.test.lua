@@ -35,7 +35,7 @@ test_run:switch('default')
 box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 -- Testcase body.
 box.space.sync:insert{1} -- success
 test_run:switch('replica')
@@ -181,7 +181,7 @@ box.space.sync:select{} -- 1
 test_run:switch('replica')
 box.space.sync:select{} -- 1
 box.cfg{read_only=false} -- promote replica to master
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 test_run:switch('default')
 box.cfg{read_only=true} -- demote master to replica
 test_run:switch('replica')
@@ -194,7 +194,7 @@ t
 -- Revert cluster configuration.
 test_run:switch('default')
 box.cfg{read_only=false}
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 test_run:switch('replica')
 box.cfg{read_only=true}
 -- Testcase cleanup.

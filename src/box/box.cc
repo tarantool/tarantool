@@ -3082,6 +3082,16 @@ box_promote(void)
 		is_in_box_promote = false;
 		if (box_raft_try_promote() != 0)
 			return -1;
+		/*
+		 * XXX: this restores the previous buggy behavior: when
+		 * the function exists, it forcibly resets is_in_box_promote
+		 * even if the raft machine fiber is stuck on a write, which
+		 * should be protected by this flag.
+		 * This is needed for gh_6033_box_promote_demote_test.lua.
+		 */
+		ERROR_INJECT(ERRINJ_LIMBO_WRITE_PROMOTE_FAST_EXIT, {
+			return 0;
+		});
 		txn_limbo_wait_promote_attempts(&txn_limbo,
 						promote_attempts + 1,
 						TIMEOUT_INFINITY);
