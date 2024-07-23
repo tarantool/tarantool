@@ -154,6 +154,11 @@ struct vy_log {
 	/** Recovery context. */
 	struct vy_recovery *recovery;
 	/**
+	 * Set if the last checkpoint is known to contain bad records.
+	 * May be set only in the force_recovery mode.
+	 */
+	bool has_errors;
+	/**
 	 * Latch that syncs log writers against readers.
 	 * Needed so that we don't miss any records during
 	 * log rotation.
@@ -1112,8 +1117,10 @@ vy_log_begin_recovery(const struct vclock *vclock, bool force_recovery)
 	 * rebootstrap section, checkpoint (and hence rebootstrap)
 	 * failed, and we need to mark rebootstrap as aborted.
 	 */
-	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(-1, VY_RECOVERY_ABORT_REBOOTSTRAP);
+	int flags = VY_RECOVERY_ABORT_REBOOTSTRAP;
+	if (force_recovery)
+		flags |= VY_RECOVERY_IGNORE_ERRORS;
+	struct vy_recovery *recovery = vy_recovery_new(-1, flags);
 	if (recovery == NULL)
 		return NULL;
 
@@ -1131,6 +1138,7 @@ vy_log_begin_recovery(const struct vclock *vclock, bool force_recovery)
 
 	vy_log.next_id = recovery->max_id + 1;
 	vy_log.recovery = recovery;
+	vy_log.has_errors = recovery->has_errors;
 	return recovery;
 }
 
@@ -1201,8 +1209,17 @@ vy_log_rotate(const struct vclock *vclock)
 	 */
 	latch_lock(&vy_log.latch);
 
+	/*
+	 * If the old vylog was loaded with errors in the force_recovery mode,
+	 * we have to ignore them so that we can load it again to make a new
+	 * checkpoint.
+	 */
+	int flags = 0;
+	if (vy_log.has_errors)
+		flags |= VY_RECOVERY_IGNORE_ERRORS;
+
 	struct vy_recovery *recovery;
-	recovery = vy_recovery_new_locked(prev_signature, 0);
+	recovery = vy_recovery_new_locked(prev_signature, flags);
 	if (recovery == NULL)
 		goto fail;
 
@@ -1224,6 +1241,9 @@ vy_log_rotate(const struct vclock *vclock)
 
 	/* Add the new vclock to the xdir so that we can track it. */
 	xdir_add_vclock(&vy_log.dir, vclock);
+
+	/* Hopefully, the new checkpoint doesn't have errors. */
+	vy_log.has_errors = false;
 
 	latch_unlock(&vy_log.latch);
 	say_verbose("done rotating vylog");
@@ -2169,7 +2189,8 @@ vy_recovery_commit_rebootstrap(struct vy_recovery *recovery)
  * Fill index_id_hash with LSM trees recovered from vylog.
  */
 static int
-vy_recovery_build_index_id_hash(struct vy_recovery *recovery)
+vy_recovery_build_index_id_hash(struct vy_recovery *recovery,
+				bool force_recovery)
 {
 	struct mh_i64ptr_t *h = recovery->index_id_hash;
 	struct vy_lsm_recovery_info *lsm;
@@ -2215,7 +2236,7 @@ vy_recovery_build_index_id_hash(struct vy_recovery *recovery)
 				 tt_sprintf("LSM tree %u/%u created twice",
 					    (unsigned)space_id,
 					    (unsigned)index_id));
-			return -1;
+			goto bad_record;
 		}
 		if (hashed_lsm->create_lsn < 0 ||
 		    hashed_lsm->prepared != NULL) {
@@ -2223,9 +2244,16 @@ vy_recovery_build_index_id_hash(struct vy_recovery *recovery)
 				 tt_sprintf("LSM tree %u/%u prepared twice",
 					    (unsigned)space_id,
 					    (unsigned)index_id));
-			return -1;
+			goto bad_record;
 		}
 		hashed_lsm->prepared = lsm;
+		continue;
+bad_record:
+		if (!force_recovery)
+			return -1;
+		diag_log();
+		say_error("skipping invalid vylog record");
+		recovery->has_errors = true;
 	}
 	return 0;
 }
@@ -2248,6 +2276,7 @@ vy_recovery_new_f(va_list ap)
 	recovery->slice_hash = NULL;
 	recovery->max_id = -1;
 	recovery->in_rebootstrap = false;
+	recovery->has_errors = false;
 
 	recovery->index_id_hash = mh_i64ptr_new();
 	recovery->lsm_hash = mh_i64ptr_new();
@@ -2271,12 +2300,13 @@ vy_recovery_new_f(va_list ap)
 	int rc;
 	struct xrow_header row;
 	size_t region_svp = region_used(&fiber()->gc);
-	while ((rc = xlog_cursor_next(&cursor, &row, false)) == 0) {
+	bool force_recovery = (flags & VY_RECOVERY_IGNORE_ERRORS) != 0;
+	while ((rc = xlog_cursor_next(&cursor, &row, force_recovery)) == 0) {
 		struct vy_log_record record;
 		region_truncate(&fiber()->gc, region_svp);
 		rc = vy_log_record_decode(&record, &row);
 		if (rc < 0)
-			break;
+			goto bad_record;
 		say_verbose("load vylog record: %s",
 			    vy_log_record_str(&record));
 		if (record.type == VY_LOG_SNAPSHOT) {
@@ -2286,7 +2316,14 @@ vy_recovery_new_f(va_list ap)
 		}
 		rc = vy_recovery_process_record(recovery, &record);
 		if (rc < 0)
+			goto bad_record;
+		continue;
+bad_record:
+		if (!force_recovery)
 			break;
+		diag_log();
+		say_error("skipping invalid vylog record");
+		recovery->has_errors = true;
 	}
 	region_truncate(&fiber()->gc, region_svp);
 	if (rc < 0)
@@ -2301,7 +2338,7 @@ vy_recovery_new_f(va_list ap)
 			vy_recovery_commit_rebootstrap(recovery);
 	}
 
-	if (vy_recovery_build_index_id_hash(recovery) != 0)
+	if (vy_recovery_build_index_id_hash(recovery, force_recovery) != 0)
 		goto fail_free;
 out:
 	say_verbose("done loading vylog");
@@ -2531,6 +2568,38 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 	record.type = VY_LOG_SNAPSHOT;
 	if (vy_log_append_record(&xlog, &record) != 0)
 		goto err_write_xlog;
+
+	ERROR_INJECT(ERRINJ_VY_LOG_WRITE_BAD_RECORDS, {
+		/* LSM tree deleted but not registered. */
+		vy_log_record_init(&record);
+		record.type = VY_LOG_DROP_LSM;
+		record.lsm_id = 100501;
+		if (vy_log_append_record(&xlog, &record) != 0)
+			goto err_write_xlog;
+
+		/* Missing key definition. */
+		vy_log_record_init(&record);
+		record.type = VY_LOG_PREPARE_LSM;
+		record.lsm_id = 100502;
+		record.space_id = 12345;
+		if (vy_log_append_record(&xlog, &record) != 0)
+			goto err_write_xlog;
+
+		/* LSM tree prepared twice. */
+		vy_log_record_init(&record);
+		record.type = VY_LOG_PREPARE_LSM;
+		record.lsm_id = 100503;
+		record.space_id = 12345;
+		struct key_part_def part_def = key_part_def_default;
+		part_def.type = FIELD_TYPE_UNSIGNED;
+		record.key_parts = &part_def;
+		record.key_part_count = 1;
+		if (vy_log_append_record(&xlog, &record) != 0)
+			goto err_write_xlog;
+		record.lsm_id = 100504;
+		if (vy_log_append_record(&xlog, &record) != 0)
+			goto err_write_xlog;
+	});
 
 	ERROR_INJECT(ERRINJ_VY_LOG_FILE_RENAME, {
 		diag_set(ClientError, ER_INJECTION, "vinyl log file rename");
