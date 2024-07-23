@@ -183,21 +183,6 @@ struct vy_log {
 	 * linked by vy_log_tx::in_pending.
 	 */
 	struct stailq pending_tx;
-	/**
-	 * Flag set if vy_log_write() failed.
-	 *
-	 * It indicates that that the current transaction must be
-	 * aborted on vy_log_commit(). Thanks to this flag, we don't
-	 * need to add error handling code after each invocation of
-	 * vy_log_write(), instead we only check vy_log_commit()
-	 * return code.
-	 */
-	bool tx_failed;
-	/**
-	 * Diagnostic area where vy_log_write() error is stored,
-	 * only relevant if @tx_failed is set.
-	 */
-	struct diag tx_diag;
 };
 static struct vy_log vy_log;
 
@@ -333,7 +318,6 @@ vy_log_record_str(const struct vy_log_record *record)
 
 /**
  * Encode a log record into an xrow to be further written to an xlog.
- * Return 0 on success, -1 on failure.
  *
  * When stored in xlog, a vinyl metadata log has the following MsgPack
  * representation:
@@ -344,7 +328,7 @@ vy_log_record_str(const struct vy_log_record *record)
  * 'key': see vy_log_key enum
  * 'value': depends on 'key'
  */
-static int
+static void
 vy_log_record_encode(const struct vy_log_record *record,
 		     struct xrow_header *row)
 {
@@ -450,11 +434,7 @@ vy_log_record_encode(const struct vy_log_record *record,
 	/*
 	 * Encode record.
 	 */
-	char *tuple = region_alloc(&fiber()->gc, size);
-	if (tuple == NULL) {
-		diag_set(OutOfMemory, size, "region", "vy_log record");
-		return -1;
-	}
+	char *tuple = xregion_alloc(&fiber()->gc, size);
 	char *pos = tuple;
 	pos = mp_encode_array(pos, 2);
 	pos = mp_encode_uint(pos, record->type);
@@ -544,7 +524,6 @@ vy_log_record_encode(const struct vy_log_record *record,
 	memset(row, 0, sizeof(*row));
 	row->type = req.type;
 	xrow_encode_dml(&req, &fiber()->gc, row->body, &row->bodycnt);
-	return 0;
 }
 
 /**
@@ -621,15 +600,8 @@ vy_log_record_decode(struct vy_log_record *record,
 		case VY_LOG_KEY_DEF: {
 			struct region *region = &fiber()->gc;
 			uint32_t part_count = mp_decode_array(&pos);
-			size_t size;
-			struct key_part_def *parts =
-				region_alloc_array(region, typeof(parts[0]),
-						   part_count, &size);
-			if (parts == NULL) {
-				diag_set(OutOfMemory, size,
-					 "region_alloc_array", "parts");
-				return -1;
-			}
+			struct key_part_def *parts = xregion_alloc_array(
+				region, typeof(parts[0]), part_count);
 			if (key_def_decode_parts(parts, part_count, &pos,
 						 NULL, 0, region) != 0) {
 				diag_log();
@@ -668,6 +640,13 @@ vy_log_record_decode(struct vy_log_record *record,
 			break;
 		}
 	}
+	if (record->key_parts == NULL &&
+	    (record->type == VY_LOG_PREPARE_LSM ||
+	     record->type == VY_LOG_MODIFY_LSM)) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 "Bad record: missing key definition");
+		goto fail;
+	}
 	if (record->type == VY_LOG_CREATE_LSM) {
 		/*
 		 * We used to use LSN as unique LSM tree identifier
@@ -701,37 +680,20 @@ fail:
 static struct vy_log_record *
 vy_log_record_dup(struct region *pool, const struct vy_log_record *src)
 {
-	size_t used = region_used(pool);
-	size_t size;
-	struct vy_log_record *dst = region_alloc_object(pool, typeof(*dst),
-							&size);
-	if (dst == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_object", "dst");
-		goto err;
-	}
+	struct vy_log_record *dst = xregion_alloc_object(pool, typeof(*dst));
 	*dst = *src;
 	if (src->begin != NULL) {
 		const char *data = src->begin;
 		mp_next(&data);
-		size = data - src->begin;
-		dst->begin = region_alloc(pool, size);
-		if (dst->begin == NULL) {
-			diag_set(OutOfMemory, size, "region",
-				 "vy_log_record::begin");
-			goto err;
-		}
+		size_t size = data - src->begin;
+		dst->begin = xregion_alloc(pool, size);
 		memcpy((char *)dst->begin, src->begin, size);
 	}
 	if (src->end != NULL) {
 		const char *data = src->end;
 		mp_next(&data);
-		size = data - src->end;
-		dst->end = region_alloc(pool, size);
-		if (dst->end == NULL) {
-			diag_set(OutOfMemory, size, "region",
-				 "struct vy_log_record");
-			goto err;
-		}
+		size_t size = data - src->end;
+		dst->end = xregion_alloc(pool, size);
 		memcpy((char *)dst->end, src->end, size);
 	}
 	if (src->key_def != NULL) {
@@ -743,10 +705,6 @@ vy_log_record_dup(struct region *pool, const struct vy_log_record *src)
 		dst->key_def = NULL;
 	}
 	return dst;
-
-err:
-	region_truncate(pool, used);
-	return NULL;
 }
 
 void
@@ -758,7 +716,6 @@ vy_log_init(const char *dir)
 	mempool_create(&vy_log.tx_pool, cord_slab_cache(),
 		       sizeof(struct vy_log_tx));
 	stailq_create(&vy_log.pending_tx);
-	diag_create(&vy_log.tx_diag);
 	wal_init_vy_log();
 	fiber_cond_create(&vy_log.flusher_cond);
 	vy_log.flusher = fiber_new_system("vinyl.vylog_flusher",
@@ -771,11 +728,7 @@ vy_log_init(const char *dir)
 static struct vy_log_tx *
 vy_log_tx_new(void)
 {
-	struct vy_log_tx *tx = mempool_alloc(&vy_log.tx_pool);
-	if (tx == NULL) {
-		diag_set(OutOfMemory, sizeof(*tx), "mempool", "vy log tx");
-		return NULL;
-	}
+	struct vy_log_tx *tx = xmempool_alloc(&vy_log.tx_pool);
 	region_create(&tx->region, cord_slab_cache());
 	stailq_create(&tx->records);
 	return tx;
@@ -831,8 +784,7 @@ vy_log_tx_flush(struct vy_log_tx *tx)
 			record->gc_lsn = vy_log_signature();
 		assert(i < tx_size);
 		struct xrow_header *row = &rows[i];
-		if (vy_log_record_encode(record, row) < 0)
-			goto err;
+		vy_log_record_encode(record, row);
 		entry->rows[i] = row;
 		i++;
 	}
@@ -925,7 +877,6 @@ vy_log_free(void)
 	stailq_create(&vy_log.pending_tx);
 	mempool_destroy(&vy_log.tx_pool);
 	xdir_destroy(&vy_log.dir);
-	diag_destroy(&vy_log.tx_diag);
 }
 
 int
@@ -953,8 +904,8 @@ vy_log_open(struct xlog *xlog)
 	vy_log_record_init(&record);
 	record.type = VY_LOG_SNAPSHOT;
 	size_t region_svp = region_used(&fiber()->gc);
-	if (vy_log_record_encode(&record, &row) < 0 ||
-	    xlog_write_row(xlog, &row) < 0) {
+	vy_log_record_encode(&record, &row);
+	if (xlog_write_row(xlog, &row) < 0) {
 		region_truncate(&fiber()->gc, region_svp);
 		goto fail_close_xlog;
 	}
@@ -1313,13 +1264,8 @@ vy_log_backup_path(const struct vclock *vclock)
 void
 vy_log_tx_begin(void)
 {
-	assert(!vy_log.tx_failed);
 	assert(vy_log.tx == NULL);
 	vy_log.tx = vy_log_tx_new();
-	if (vy_log.tx == NULL) {
-		diag_move(diag_get(), &vy_log.tx_diag);
-		vy_log.tx_failed = true;
-	}
 	say_verbose("begin vylog transaction");
 }
 
@@ -1339,15 +1285,6 @@ vy_log_tx_commit(void)
 
 	struct vy_log_tx *tx = vy_log.tx;
 	vy_log.tx = NULL;
-
-	if (vy_log.tx_failed) {
-		diag_move(&vy_log.tx_diag, diag_get());
-		vy_log.tx_failed = false;
-		if (tx != NULL)
-			vy_log_tx_delete(tx);
-		goto err;
-	}
-
 	assert(tx != NULL);
 	/*
 	 * Before writing this transaction, flush all pending ones
@@ -1373,11 +1310,6 @@ err:
 void
 vy_log_tx_try_commit(void)
 {
-	if (vy_log.tx_failed) {
-		diag_move(&vy_log.tx_diag, diag_get());
-		diag_log();
-		panic("non-discardable vylog transaction failed");
-	}
 	assert(vy_log.tx != NULL);
 	stailq_add_tail_entry(&vy_log.pending_tx, vy_log.tx, in_pending);
 	fiber_cond_signal(&vy_log.flusher_cond);
@@ -1389,18 +1321,9 @@ void
 vy_log_write(const struct vy_log_record *record)
 {
 	say_verbose("write vylog record: %s", vy_log_record_str(record));
-
-	if (vy_log.tx_failed)
-		return;
-
 	assert(vy_log.tx != NULL);
 	struct vy_log_record *tx_record = vy_log_record_dup(&vy_log.tx->region,
 							    record);
-	if (tx_record == NULL) {
-		diag_move(diag_get(), &vy_log.tx_diag);
-		vy_log.tx_failed = true;
-		return;
-	}
 	stailq_add_tail_entry(&vy_log.tx->records, tx_record, in_tx);
 }
 
@@ -1476,10 +1399,8 @@ vy_recovery_lookup_slice(struct vy_recovery *recovery, int64_t slice_id)
  * key_part_def objects. This function is required because the
  * original key_part passed as an argument can have non-NULL
  * path fields referencing other memory fragments.
- *
- * Returns the key_part_def on success, NULL on error.
  */
-struct key_part_def *
+static struct key_part_def *
 vy_recovery_alloc_key_parts(const struct key_part_def *key_parts,
 			    uint32_t key_part_count)
 {
@@ -1488,12 +1409,7 @@ vy_recovery_alloc_key_parts(const struct key_part_def *key_parts,
 		new_parts_sz += key_parts[i].path != NULL ?
 				strlen(key_parts[i].path) + 1 : 0;
 	}
-	struct key_part_def *new_parts = malloc(new_parts_sz);
-	if (new_parts == NULL) {
-		diag_set(OutOfMemory, sizeof(*key_parts) * key_part_count,
-			 "malloc", "struct key_part_def");
-		return NULL;
-	}
+	struct key_part_def *new_parts = xmalloc(new_parts_sz);
 	memcpy(new_parts, key_parts, sizeof(*key_parts) * key_part_count);
 	char *path_pool =
 		(char *)new_parts + sizeof(*key_parts) * key_part_count;
@@ -1514,8 +1430,6 @@ vy_recovery_alloc_key_parts(const struct key_part_def *key_parts,
 /**
  * Allocate a new LSM tree with the given ID and add it to
  * the recovery context.
- *
- * Returns the new LSM tree on success, NULL on error.
  */
 static struct vy_lsm_recovery_info *
 vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
@@ -1524,23 +1438,8 @@ vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
 			  const struct key_part_def *key_parts,
 			  uint32_t key_part_count)
 {
-	if (key_parts == NULL) {
-		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("Missing key definition for LSM tree %lld",
-				    (long long)id));
-		return NULL;
-	}
-	struct vy_lsm_recovery_info *lsm = malloc(sizeof(*lsm));
-	if (lsm == NULL) {
-		diag_set(OutOfMemory, sizeof(*lsm),
-			 "malloc", "struct vy_lsm_recovery_info");
-		return NULL;
-	}
+	struct vy_lsm_recovery_info *lsm = xmalloc(sizeof(*lsm));
 	lsm->key_parts = vy_recovery_alloc_key_parts(key_parts, key_part_count);
-	if (lsm->key_parts == NULL) {
-		free(lsm);
-		return NULL;
-	}
 	struct mh_i64ptr_t *h = recovery->lsm_hash;
 	struct mh_i64ptr_node_t node = { id, lsm };
 	struct mh_i64ptr_node_t *old_node = NULL;
@@ -1600,10 +1499,8 @@ vy_recovery_prepare_lsm(struct vy_recovery *recovery, int64_t id,
 				    (long long)id));
 		return -1;
 	}
-	if (vy_recovery_do_create_lsm(recovery, id, space_id, index_id,
-				      group_id, key_parts,
-				      key_part_count) == NULL)
-		return -1;
+	vy_recovery_do_create_lsm(recovery, id, space_id, index_id,
+				  group_id, key_parts, key_part_count);
 	return 0;
 }
 
@@ -1637,11 +1534,15 @@ vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 			return -1;
 		}
 	} else {
+		if (key_parts == NULL) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("Missing key definition for "
+					    "LSM tree %lld", (long long)id));
+			return -1;
+		}
 		lsm = vy_recovery_do_create_lsm(recovery, id, space_id,
 						index_id, group_id,
 						key_parts, key_part_count);
-		if (lsm == NULL)
-			return -1;
 		lsm->dump_lsn = dump_lsn;
 	}
 
@@ -1677,8 +1578,6 @@ vy_recovery_modify_lsm(struct vy_recovery *recovery, int64_t id,
 	}
 	free(lsm->key_parts);
 	lsm->key_parts = vy_recovery_alloc_key_parts(key_parts, key_part_count);
-	if (lsm->key_parts == NULL)
-		return -1;
 	lsm->key_part_count = key_part_count;
 	lsm->modify_lsn = modify_lsn;
 	return 0;
@@ -1767,17 +1666,11 @@ vy_recovery_dump_lsm(struct vy_recovery *recovery,
 
 /**
  * Allocate a vinyl run with ID @run_id and insert it to the hash.
- * Return the new run on success, NULL on OOM.
  */
 static struct vy_run_recovery_info *
 vy_recovery_do_create_run(struct vy_recovery *recovery, int64_t run_id)
 {
-	struct vy_run_recovery_info *run = malloc(sizeof(*run));
-	if (run == NULL) {
-		diag_set(OutOfMemory, sizeof(*run),
-			 "malloc", "struct vy_run_recovery_info");
-		return NULL;
-	}
+	struct vy_run_recovery_info *run = xmalloc(sizeof(*run));
 	struct mh_i64ptr_t *h = recovery->run_hash;
 	struct mh_i64ptr_node_t node = { run_id, run };
 	struct mh_i64ptr_node_t *old_node = NULL;
@@ -1800,8 +1693,7 @@ vy_recovery_do_create_run(struct vy_recovery *recovery, int64_t run_id)
  * Handle a VY_LOG_PREPARE_RUN log record.
  * This function creates a new incomplete vinyl run with ID @run_id
  * and adds it to the list of runs of the LSM tree with ID @lsm_id.
- * Return 0 on success, -1 if run already exists, LSM tree not found,
- * or OOM.
+ * Return 0 on success, -1 if run already exists or LSM tree not found.
  */
 static int
 vy_recovery_prepare_run(struct vy_recovery *recovery, int64_t lsm_id,
@@ -1824,8 +1716,6 @@ vy_recovery_prepare_run(struct vy_recovery *recovery, int64_t lsm_id,
 	}
 	struct vy_run_recovery_info *run;
 	run = vy_recovery_do_create_run(recovery, run_id);
-	if (run == NULL)
-		return -1;
 	run->is_incomplete = true;
 	rlist_add_entry(&lsm->runs, run, in_lsm);
 	return 0;
@@ -1836,8 +1726,8 @@ vy_recovery_prepare_run(struct vy_recovery *recovery, int64_t lsm_id,
  * This function adds the vinyl run with ID @run_id to the list
  * of runs of the LSM tree with ID @sm_id and marks it committed.
  * If the run does not exist, it will be created.
- * Return 0 on success, -1 if LSM tree not found, run or LSM tree
- * is dropped, or OOM.
+ * Return 0 on success, -1 if LSM tree not found or if run or LSM tree
+ * is dropped.
  */
 static int
 vy_recovery_create_run(struct vy_recovery *recovery, int64_t lsm_id,
@@ -1860,11 +1750,8 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t lsm_id,
 				    (long long)run_id));
 		return -1;
 	}
-	if (run == NULL) {
+	if (run == NULL)
 		run = vy_recovery_do_create_run(recovery, run_id);
-		if (run == NULL)
-			return -1;
-	}
 	run->dump_lsn = dump_lsn;
 	run->dump_count = dump_count;
 	run->is_incomplete = false;
@@ -1930,7 +1817,7 @@ vy_recovery_forget_run(struct vy_recovery *recovery, int64_t run_id)
  * This function allocates a new vinyl range with ID @range_id,
  * inserts it to the hash, and adds it to the list of ranges of the
  * LSM tree with ID @lsm_id.
- * Return 0 on success, -1 on failure (ID collision or OOM).
+ * Return 0 on success, -1 on failure (ID collision).
  */
 static int
 vy_recovery_insert_range(struct vy_recovery *recovery, int64_t lsm_id,
@@ -1965,12 +1852,7 @@ vy_recovery_insert_range(struct vy_recovery *recovery, int64_t lsm_id,
 	size_t end_size = data - end;
 	size += end_size;
 
-	struct vy_range_recovery_info *range = malloc(size);
-	if (range == NULL) {
-		diag_set(OutOfMemory, size,
-			 "malloc", "struct vy_range_recovery_info");
-		return -1;
-	}
+	struct vy_range_recovery_info *range = xmalloc(size);
 	struct mh_i64ptr_t *h = recovery->range_hash;
 	struct mh_i64ptr_node_t node = { range_id, range };
 	mh_i64ptr_put(h, &node, NULL, NULL);
@@ -2027,7 +1909,7 @@ vy_recovery_delete_range(struct vy_recovery *recovery, int64_t range_id)
  * This function allocates a new slice with ID @slice_id for
  * the run with ID @run_id, inserts it into the hash, and adds
  * it to the list of slices of the range with ID @range_id.
- * Return 0 on success, -1 on failure (ID collision or OOM).
+ * Return 0 on success, -1 on failure (ID collision).
  */
 static int
 vy_recovery_insert_slice(struct vy_recovery *recovery, int64_t range_id,
@@ -2072,12 +1954,7 @@ vy_recovery_insert_slice(struct vy_recovery *recovery, int64_t range_id,
 	size_t end_size = data - end;
 	size += end_size;
 
-	struct vy_slice_recovery_info *slice = malloc(size);
-	if (slice == NULL) {
-		diag_set(OutOfMemory, size,
-			 "malloc", "struct vy_slice_recovery_info");
-		return -1;
-	}
+	struct vy_slice_recovery_info *slice = xmalloc(size);
 	struct mh_i64ptr_t *h = recovery->slice_hash;
 	struct mh_i64ptr_node_t node = { slice_id, slice };
 	mh_i64ptr_put(h, &node, NULL, NULL);
@@ -2355,13 +2232,7 @@ vy_recovery_new_f(va_list ap)
 
 	say_verbose("loading vylog %lld", (long long)signature);
 
-	struct vy_recovery *recovery = malloc(sizeof(*recovery));
-	if (recovery == NULL) {
-		diag_set(OutOfMemory, sizeof(*recovery),
-			 "malloc", "struct vy_recovery");
-		goto fail;
-	}
-
+	struct vy_recovery *recovery = xmalloc(sizeof(*recovery));
 	rlist_create(&recovery->lsms);
 	recovery->index_id_hash = NULL;
 	recovery->lsm_hash = NULL;
@@ -2434,7 +2305,6 @@ fail_close:
 	xlog_cursor_close(&cursor, false);
 fail_free:
 	vy_recovery_delete(recovery);
-fail:
 	return -1;
 }
 
@@ -2527,13 +2397,10 @@ vy_log_append_record(struct xlog *xlog, struct vy_log_record *record)
 
 	struct xrow_header row;
 	size_t region_svp = region_used(&fiber()->gc);
-	int ret = -1;
-	if (vy_log_record_encode(record, &row) < 0)
-		goto cleanup;
+	vy_log_record_encode(record, &row);
+	int ret = 0;
 	if (xlog_write_row(xlog, &row) < 0)
-		goto cleanup;
-	ret = 0;
-cleanup:
+		ret = -1;
 	region_truncate(&fiber()->gc, region_svp);
 	return ret;
 }
