@@ -315,6 +315,11 @@ struct vy_recovery {
 	 * seen matching VY_LOG_ABORT_REBOOTSTRAP.
 	 */
 	bool in_rebootstrap;
+	/**
+	 * Set there were errors encountered and skipped during recovery.
+	 * May be set only if the VY_RECOVERY_IGNORE_ERRORS flag was used.
+	 */
+	bool has_errors;
 };
 
 /** LSM tree info stored in a recovery context. */
@@ -587,6 +592,10 @@ enum vy_recovery_flag {
 	 * there's no VY_LOG_ABORT_REBOOTSTRAP record.
 	 */
 	VY_RECOVERY_ABORT_REBOOTSTRAP	= 1 << 1,
+	/**
+	 * Log and skip invalid rows (force recovery mode).
+	 */
+	VY_RECOVERY_IGNORE_ERRORS	= 1 << 2,
 };
 
 /**
