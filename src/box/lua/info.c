@@ -475,7 +475,7 @@ lbox_info_memory_call(struct lua_State *L)
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "lua");
-	lua_pushinteger(L, G(L)->gc.total);
+	lua_pushinteger(L, luaL_getgctotal(L));
 	lua_settable(L, -3);
 
 	return 1;
