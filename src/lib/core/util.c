@@ -49,6 +49,8 @@
 #include "say.h"
 #include "tweaks.h"
 
+bool lsan_enabled = true;
+
 /** Find a string in an array of strings.
  *
  * @param haystack  Array of strings. Either NULL
@@ -467,4 +469,10 @@ strtoupperdup(const char *s)
 		uppercase[i] = (char)toupper(s[i]);
 	uppercase[len] = '\0';
 	return uppercase;
+}
+
+int
+__lsan_is_turned_off(void)
+{
+	return lsan_enabled ? 0 : 1;
 }

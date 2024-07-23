@@ -41,6 +41,8 @@
  * so it's easier to test it from Lua then loading the Lua file in unit test.
  */
 
+static int test_result = 1;
+
 /**
  * This helper is placed here to be used in Lua helpers.
  * See actual description near the definition.
@@ -400,12 +402,12 @@ typedef void
 static void
 test_check_port_get_c_entries(struct port *port, const struct port_c_entry *expected)
 {
+	uint32_t region_svp = region_used(&fiber()->gc);
 	const struct port_c_entry *got = port_get_c_entries(port);
 	if (expected == NULL) {
 		is(got, NULL, "No entries were expected");
 		return;
 	}
-	uint32_t region_svp = region_used(&fiber()->gc);
 	for (; got != NULL && expected != NULL;
 	     got = got->next, expected = expected->next) {
 		is(got->type, expected->type, "Types must be the same");
@@ -458,6 +460,7 @@ struct port_c_contents {
 	const char *mp_arr_end;
 	const char *mp_map;
 	const char *mp_map_end;
+	void *iterator_data;
 };
 
 /**
@@ -585,6 +588,7 @@ test_port_c_create(struct port *port)
 		.mp_arr_end = mp_arr,
 		.mp_map = mp_map_begin,
 		.mp_map_end = mp_map,
+		.iterator_data = iterator_data,
 	};
 	return contents;
 }
@@ -628,6 +632,8 @@ test_port_c_dump_lua(void)
 
 	test_check_port_dump_lua_flat(&port, L);
 	test_check_port_dump_lua_table(&port, L);
+	port_destroy(&port);
+	free(contents.iterator_data);
 
 	footer();
 	check_plan();
@@ -697,6 +703,8 @@ test_port_c_all_msgpack_methods(void)
 	test_check_port_get_msgpack(&port, buf, mp - buf);
 	test_check_port_dump_msgpack(&port, buf, mp - buf, /*no_header=*/true);
 	test_check_port_dump_lua_mp_object(&port, buf, mp - buf);
+	port_destroy(&port);
+	free(contents.iterator_data);
 
 	footer();
 	check_plan();
@@ -722,6 +730,7 @@ test_port_c_get_c_entries(void)
 	is(port_get_c_entries(&port), port_c->first,
 	   "port_c should simply return its first entry");
 	port_destroy(&port);
+	free(contents.iterator_data);
 
 	footer();
 	check_plan();
@@ -1008,6 +1017,7 @@ test_port_lua_get_c_entries_impl(bool with_bottom)
 				      port_get_c_entries(&expected_port));
 
 	port_destroy(&port);
+	port_destroy(&expected_port);
 }
 
 static void
@@ -1148,8 +1158,8 @@ test_port_msgpack(void)
 	check_plan();
 }
 
-static void
-test_main(void)
+static int
+main_f(va_list ap)
 {
 	plan(3);
 	header();
@@ -1159,13 +1169,15 @@ test_main(void)
 	test_port_msgpack();
 
 	footer();
-	check_plan();
+	test_result = check_plan();
+	return 0;
 }
 
 int
 main(void)
 {
 	memory_init();
+	fiber_init(fiber_c_invoke);
 	tuple_init(NULL);
 	port_init();
 	event_init();
@@ -1206,12 +1218,18 @@ main(void)
 	fail_unless(luaT_dostring(
 			L, "mp = require('msgpack')") == 0);
 
-	test_main();
+	/* XXX: session cleanup tied to fiber stop (session_new_on_demand). */
+	struct fiber *main = fiber_new_system_xc("main", main_f);
+	fiber_wakeup(main);
+	ev_run(loop(), 0);
 
+	lua_close(tarantool_L);
 	session_free();
 	user_cache_free();
 	event_free();
 	port_free();
 	tuple_free();
+	fiber_free();
 	memory_free();
+	return test_result;
 }

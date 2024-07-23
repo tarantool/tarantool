@@ -850,6 +850,9 @@ illegal_instruction(void)
 }
 #endif
 
+/** If false then LSAN will not be run on Tarantool exit. */
+extern bool lsan_enabled;
+
 #ifdef ENABLE_ASAN
 # include <sanitizer/lsan_interface.h>
 # define LSAN_IGNORE_OBJECT(ptr) __lsan_ignore_object(ptr)

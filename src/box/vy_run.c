@@ -2196,6 +2196,7 @@ vy_run_writer_start_page(struct vy_run_writer *writer,
 	if (vy_page_info_create(page, writer->data_xlog.offset,
 				key, writer->cmp_def) != 0)
 		return -1;
+	run->info.page_count++;
 	xlog_tx_begin(&writer->data_xlog);
 	return 0;
 }
@@ -2219,7 +2220,7 @@ vy_run_writer_write_to_page(struct vy_run_writer *writer, struct vy_entry entry)
 	writer->last = entry;
 	vy_stmt_ref_if_possible(entry.stmt);
 	struct vy_run *run = writer->run;
-	struct vy_page_info *page = run->page_info + run->info.page_count;
+	struct vy_page_info *page = run->page_info + run->info.page_count - 1;
 	uint32_t *offset = (uint32_t *)ibuf_alloc(&writer->row_index_buf,
 						  sizeof(uint32_t));
 	if (offset == NULL) {
@@ -2247,7 +2248,8 @@ static int
 vy_run_writer_end_page(struct vy_run_writer *writer)
 {
 	struct vy_run *run = writer->run;
-	struct vy_page_info *page = run->page_info + run->info.page_count;
+	assert(run->info.page_count > 0);
+	struct vy_page_info *page = run->page_info + run->info.page_count - 1;
 
 	assert(page->row_count > 0);
 	assert(ibuf_used(&writer->row_index_buf) ==
@@ -2269,7 +2271,6 @@ vy_run_writer_end_page(struct vy_run_writer *writer)
 	if (written < 0)
 		return -1;
 	page->size = written;
-	run->info.page_count++;
 	vy_run_acct_page(run, page);
 	ibuf_reset(&writer->row_index_buf);
 	return 0;
