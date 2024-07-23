@@ -325,7 +325,7 @@ error:
 	return NULL;
 }
 
-int
+void
 key_def_dump_parts(const struct key_def *def, struct key_part_def *parts,
 		   struct region *region)
 {
@@ -339,12 +339,7 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts,
 		part_def->nullable_action = part->nullable_action;
 		part_def->coll_id = part->coll_id;
 		if (part->path != NULL) {
-			char *path = region_alloc(region, part->path_len + 1);
-			if (path == NULL) {
-				diag_set(OutOfMemory, part->path_len + 1,
-					 "region", "part_def->path");
-				return -1;
-			}
+			char *path = xregion_alloc(region, part->path_len + 1);
 			memcpy(path, part->path, part->path_len);
 			path[part->path_len] = '\0';
 			part_def->path = path;
@@ -352,7 +347,6 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts,
 			part_def->path = NULL;
 		}
 	}
-	return 0;
 }
 
  /* {{{ Module API helpers */
@@ -1146,16 +1140,10 @@ key_def_find_pk_in_cmp_def(const struct key_def *cmp_def,
 	size_t region_svp = region_used(region);
 
 	/* First, dump primary key parts as is. */
-	size_t size;
-	struct key_part_def *parts =
-		region_alloc_array(region, typeof(parts[0]), pk_def->part_count,
-				   &size);
-	if (parts == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "parts");
-		goto out;
-	}
-	if (key_def_dump_parts(pk_def, parts, region) != 0)
-		goto out;
+	struct key_part_def *parts = xregion_alloc_array(
+			region, typeof(parts[0]), pk_def->part_count);
+	key_def_dump_parts(pk_def, parts, region);
+
 	/*
 	 * Second, update field numbers to match the primary key
 	 * parts in a secondary key.
@@ -1170,7 +1158,6 @@ key_def_find_pk_in_cmp_def(const struct key_def *cmp_def,
 
 	/* Finally, allocate the new key definition. */
 	extracted_def = key_def_new(parts, pk_def->part_count, false);
-out:
 	region_truncate(region, region_svp);
 	return extracted_def;
 }
