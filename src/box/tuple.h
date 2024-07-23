@@ -1098,7 +1098,8 @@ parse:
 static inline const char *
 tuple_field(struct tuple *tuple, uint32_t fieldno)
 {
-	return tuple_field_raw(tuple_format(tuple), tuple_data(tuple),
+	const char *data = tuple_data(tuple);
+	return tuple_field_raw(tuple_field_map_format(data), data,
 			       tuple_field_map(tuple), fieldno);
 }
 
@@ -1171,7 +1172,8 @@ static inline const char *
 tuple_field_by_part(struct tuple *tuple, struct key_part *part,
 		    int multikey_idx)
 {
-	return tuple_field_raw_by_part(tuple_format(tuple), tuple_data(tuple),
+	const char *data = tuple_data(tuple);
+	return tuple_field_raw_by_part(tuple_field_map_format(data), data,
 				       tuple_field_map(tuple), part,
 				       multikey_idx);
 }
@@ -1199,7 +1201,8 @@ tuple_raw_multikey_count(struct tuple_format *format, const char *data,
 static inline uint32_t
 tuple_multikey_count(struct tuple *tuple, struct key_def *key_def)
 {
-	return tuple_raw_multikey_count(tuple_format(tuple), tuple_data(tuple),
+	const char *data = tuple_data(tuple);
+	return tuple_raw_multikey_count(tuple_field_map_format(data), data,
 					tuple_field_map(tuple), key_def);
 }
 
