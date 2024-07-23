@@ -21,6 +21,7 @@ local USAGE = [[
    engine <string, 'memtx'>         - space engine to use for the test
    row_count <number, 1000000>      - number of rows in the test space
    use_read_view <boolean, false>   - use a read view
+   use_arrow_api <boolean, false>   - use the arrow stream API
    use_scanner_api <boolean, false> - use the column scanner API
 
  Being run without options, this benchmark measures the run time of a full scan
@@ -32,6 +33,7 @@ local params = benchmark.argparse(arg, {
     {'engine', 'string'},
     {'row_count', 'number'},
     {'use_read_view', 'boolean'},
+    {'use_arrow_api', 'boolean'},
     {'use_scanner_api', 'boolean'},
 }, USAGE)
 
@@ -43,7 +45,13 @@ params.engine = params.engine or DEFAULT_ENGINE
 params.column_count = params.column_count or DEFAULT_COLUMN_COUNT
 params.row_count = params.row_count or DEFAULT_ROW_COUNT
 params.use_read_view = params.use_read_view or false
+params.use_arrow_api = params.use_arrow_api or false
 params.use_scanner_api = params.use_scanner_api or false
+
+if params.use_arrow_api and params.use_scanner_api then
+    io.stderr:write('--use_arrow_api and --use_scanner_api are incompatible.')
+    os.exit(1)
+end
 
 local bench = benchmark.new(params)
 
@@ -64,6 +72,8 @@ for _, func_name in ipairs({'sum'}) do
     local full_func_name
     if params.use_scanner_api then
         full_func_name = func_name .. '_scanner'
+    elseif params.use_arrow_api then
+        full_func_name = func_name .. '_arrow'
     else
         full_func_name = func_name .. '_iterator'
     end

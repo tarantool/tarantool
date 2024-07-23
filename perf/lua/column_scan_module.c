@@ -7,8 +7,10 @@
 
 #include "trivia/config.h"
 #include "trivia/util.h"
+#include "arrow/abi.h"
 
 #if defined(ENABLE_MEMCS_ENGINE)
+# define ENABLE_ARROW 1
 # define ENABLE_SCANNER 1
 #endif /* ENABLE_MEMCS_ENGINE */
 
@@ -97,6 +99,49 @@ sum_iterator_rv_lua_func(struct lua_State *L)
 }
 #endif /* defined(ENABLE_READ_VIEW) */
 
+#if defined(ENABLE_ARROW)
+static int
+sum_arrow_lua_func(struct lua_State *L)
+{
+	uint32_t space_id = luaL_checkinteger(L, 1);
+	uint32_t index_id = luaL_checkinteger(L, 2);
+	uint32_t field_no = luaL_checkinteger(L, 3);
+	char key[8];
+	char *key_end = mp_encode_array(key, 0);
+	uint32_t fields[] = {field_no};
+	uint32_t field_count = lengthof(fields);
+	box_arrow_options_t *options = box_arrow_options_new();
+	box_arrow_options_set_batch_row_count(options, 4096);
+	struct ArrowArrayStream stream;
+	int rc = box_index_arrow_stream(space_id, index_id, field_count, fields,
+					key, key_end, options, &stream);
+	if (rc != 0) {
+		box_arrow_options_delete(options);
+		return luaT_error(L);
+	}
+	uint64_t sum = 0;
+	struct ArrowArray array;
+	while (true) {
+		rc = stream.get_next(&stream, &array);
+		if (rc != 0 || array.n_children != 1)
+			break;
+		uint64_t *values = (uint64_t *)array.children[0]->buffers[1];
+		for (int i = 0; i < (int)array.children[0]->length; i++)
+			sum += values[i];
+		if (array.release != NULL)
+			array.release(&array);
+	}
+	stream.release(&stream);
+	box_arrow_options_delete(options);
+	if (array.release != NULL)
+		array.release(&array);
+	if (rc != 0)
+		return luaT_error(L);
+	luaL_pushuint64(L, sum);
+	return 1;
+}
+#endif /* defined(ENABLE_ARROW) */
+
 #if defined(ENABLE_SCANNER)
 static int
 sum_scanner_lua_func(struct lua_State *L)
@@ -138,6 +183,59 @@ sum_scanner_lua_func(struct lua_State *L)
 	return 1;
 }
 #endif /* defined(ENABLE_SCANNER) */
+
+#if defined(ENABLE_ARROW) && defined(ENABLE_READ_VIEW)
+static int
+sum_arrow_rv_lua_func(struct lua_State *L)
+{
+	if (rv == NULL)
+		return luaL_error(L, "run init() first");
+	uint32_t space_id = luaL_checkinteger(L, 1);
+	uint32_t index_id = luaL_checkinteger(L, 2);
+	uint32_t field_no = luaL_checkinteger(L, 3);
+	box_raw_read_view_space_t *space =
+		box_raw_read_view_space_by_id(rv, space_id);
+	if (space == NULL)
+		return luaT_error(L);
+	box_raw_read_view_index_t *index =
+		box_raw_read_view_index_by_id(space, index_id);
+	if (index == NULL)
+		return luaT_error(L);
+	char key[8];
+	char *key_end = mp_encode_array(key, 0);
+	uint32_t fields[] = {field_no};
+	uint32_t field_count = lengthof(fields);
+	box_arrow_options_t *options = box_arrow_options_new();
+	box_arrow_options_set_batch_row_count(options, 4096);
+	struct ArrowArrayStream stream;
+	int rc = box_raw_read_view_arrow_stream(index, field_count, fields,
+						key, key_end, options, &stream);
+	if (rc != 0) {
+		box_arrow_options_delete(options);
+		return luaT_error(L);
+	}
+	uint64_t sum = 0;
+	struct ArrowArray array;
+	while (true) {
+		rc = stream.get_next(&stream, &array);
+		if (rc != 0 || array.n_children != 1)
+			break;
+		uint64_t *values = (uint64_t *)array.children[0]->buffers[1];
+		for (int i = 0; i < (int)array.children[0]->length; i++)
+			sum += values[i];
+		if (array.release != NULL)
+			array.release(&array);
+	}
+	stream.release(&stream);
+	box_arrow_options_delete(options);
+	if (array.release != NULL)
+		array.release(&array);
+	if (rc != 0)
+		return luaT_error(L);
+	luaL_pushuint64(L, sum);
+	return 1;
+}
+#endif /* defined(ENABLE_ARROW) && defined(ENABLE_READ_VIEW) */
 
 #if defined(ENABLE_SCANNER) && defined(ENABLE_READ_VIEW)
 static int
@@ -211,9 +309,15 @@ luaopen_column_scan_module(struct lua_State *L)
 #if defined(ENABLE_READ_VIEW)
 		{"sum_iterator_rv", sum_iterator_rv_lua_func},
 #endif /* defined(ENABLE_READ_VIEW) */
+#if defined(ENABLE_ARROW)
+		{"sum_arrow", sum_arrow_lua_func},
+#endif /* defined(ENABLE_ARROW) */
 #if defined(ENABLE_SCANNER)
 		{"sum_scanner", sum_scanner_lua_func},
 #endif /* defined(ENABLE_SCANNER) */
+#if defined(ENABLE_ARROW) && defined(ENABLE_READ_VIEW)
+		{"sum_arrow_rv", sum_arrow_rv_lua_func},
+#endif /* defined(ENABLE_ARROW) && defined(ENABLE_READ_VIEW) */
 #if defined(ENABLE_SCANNER) && defined(ENABLE_READ_VIEW)
 		{"sum_scanner_rv", sum_scanner_rv_lua_func},
 #endif /* defined(ENABLE_SCANNER) && defined(ENABLE_READ_VIEW) */
