@@ -382,6 +382,12 @@ luaL_setcdatagc(struct lua_State *L, int idx)
 	lua_pop(L, 1);
 }
 
+size_t
+luaL_getgctotal(struct lua_State *L)
+{
+	return (lua_getgccount(L) * 1024ULL) + lua_gc(L, LUA_GCCOUNTB, 0);
+}
+
 /**
  * A helper to register a single type metatable.
  */

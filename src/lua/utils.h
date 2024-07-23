@@ -219,6 +219,13 @@ LUA_API void
 luaL_setcdatagc(struct lua_State *L, int idx);
 
 /**
+ * @brief Return size of currently allocated memory.
+ * @param L Lua State
+ */
+size_t
+luaL_getgctotal(struct lua_State *L);
+
+/**
 * @brief Return CTypeID (FFI) of given СDATA type
 * @param L Lua State
 * @param ctypename С type name as string (e.g. "struct request" or "uint32_t")
