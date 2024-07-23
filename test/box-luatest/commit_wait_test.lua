@@ -39,6 +39,7 @@ g.before_all(function(cg)
                 _G.test_cond:wait()
             end
         end)
+        rawset(_G, 'real_atomic', box.atomic)
         rawset(_G, 'manual_atomic', function(options, func)
             box.begin()
             local ok = pcall(func)
@@ -119,6 +120,26 @@ g.test_basic_commit = function(cg)
     end)
 end
 
+g.test_basic_atomic = function(cg)
+    test_basic_impl(cg, 'real_atomic')
+    cg.server:exec(function()
+        --
+        -- Unknown mode in atomic.
+        --
+        _G.test_result = 0
+        t.assert_equals(box.space.test:select{}, {})
+        local csw = _G.fiber.self():csw()
+        t.assert_error_msg_contains("unknown 'wait' mode", box.atomic,
+            {wait = 'trash'}, function()
+                box.space.test:replace{1}
+                _G.set_triggers()
+        end)
+        t.assert_equals(_G.fiber.self():csw(), csw)
+        t.assert_equals(_G.test_result, -1)
+        t.assert_equals(box.space.test:select{}, {})
+    end)
+end
+
 --
 -- Submit with the full journal queue is blocked until the queue gets free space
 -- and the txn is sent to the journal.
@@ -159,6 +180,9 @@ end
 g.test_full_journal_submit_commit = function(cg)
     test_full_journal_submit_impl(cg, 'manual_atomic')
 end
+g.test_full_journal_submit_atomic = function(cg)
+    test_full_journal_submit_impl(cg, 'real_atomic')
+end
 
 --
 -- Submit returns ok even if later the txn fails.
@@ -184,6 +208,9 @@ local function test_rollback_impl(cg, atomic_func_name)
 end
 g.test_rollback_commit = function(cg)
     test_rollback_impl(cg, 'manual_atomic')
+end
+g.test_rollback_atomic = function(cg)
+    test_rollback_impl(cg, 'real_atomic')
 end
 
 --
@@ -212,4 +239,7 @@ local function test_delay_impl(cg, atomic_func_name)
 end
 g.test_delay_commit = function(cg)
     test_delay_impl(cg, 'manual_atomic')
+end
+g.test_delay_atomic = function(cg)
+    test_delay_impl(cg, 'real_atomic')
 end
