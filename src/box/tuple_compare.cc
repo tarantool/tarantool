@@ -715,8 +715,8 @@ tuple_compare_slowpath(struct tuple *tuple_a, hint_t tuple_a_hint,
 	struct key_part *part = key_def->parts;
 	const char *tuple_a_raw = tuple_data(tuple_a);
 	const char *tuple_b_raw = tuple_data(tuple_b);
-	struct tuple_format *format_a = tuple_format(tuple_a);
-	struct tuple_format *format_b = tuple_format(tuple_b);
+	struct tuple_format *format_a = tuple_field_map_format(tuple_a_raw);
+	struct tuple_format *format_b = tuple_field_map_format(tuple_b_raw);
 	const char *field_map_a = tuple_field_map(tuple_a);
 	const char *field_map_b = tuple_field_map(tuple_b);
 	struct key_part *end;
@@ -824,8 +824,8 @@ tuple_compare_with_key_slowpath(struct tuple *tuple, hint_t tuple_hint,
 	if (!is_multikey && (rc = hint_cmp(tuple_hint, key_hint)) != 0)
 		return rc;
 	struct key_part *part = key_def->parts;
-	struct tuple_format *format = tuple_format(tuple);
 	const char *tuple_raw = tuple_data(tuple);
+	struct tuple_format *format = tuple_field_map_format(tuple_raw);
 	const char *field_map = tuple_field_map(tuple);
 	if (likely(part_count == 1)) {
 		const char *field;
@@ -1181,12 +1181,14 @@ struct TupleCompare
 		int rc = hint_cmp(tuple_a_hint, tuple_b_hint);
 		if (rc != 0)
 			return rc;
-		struct tuple_format *format_a = tuple_format(tuple_a);
-		struct tuple_format *format_b = tuple_format(tuple_b);
+		const char *data_a = tuple_data(tuple_a);
+		const char *data_b = tuple_data(tuple_b);
+		struct tuple_format *format_a = tuple_field_map_format(data_a);
+		struct tuple_format *format_b = tuple_field_map_format(data_b);
 		const char *field_a, *field_b;
-		field_a = tuple_field_raw(format_a, tuple_data(tuple_a),
+		field_a = tuple_field_raw(format_a, data_a,
 					  tuple_field_map(tuple_a), IDX);
-		field_b = tuple_field_raw(format_b, tuple_data(tuple_b),
+		field_b = tuple_field_raw(format_b, data_b,
 					  tuple_field_map(tuple_b), IDX);
 		return FieldCompare<IDX, TYPE, MORE_TYPES...>::
 			compare(tuple_a, tuple_b, format_a,
@@ -1203,10 +1205,12 @@ struct TupleCompare<0, TYPE, MORE_TYPES...> {
 		int rc = hint_cmp(tuple_a_hint, tuple_b_hint);
 		if (rc != 0)
 			return rc;
-		struct tuple_format *format_a = tuple_format(tuple_a);
-		struct tuple_format *format_b = tuple_format(tuple_b);
-		const char *field_a = tuple_data(tuple_a);
-		const char *field_b = tuple_data(tuple_b);
+		const char *data_a = tuple_data(tuple_a);
+		const char *data_b = tuple_data(tuple_b);
+		struct tuple_format *format_a = tuple_field_map_format(data_a);
+		struct tuple_format *format_b = tuple_field_map_format(data_b);
+		const char *field_a = data_a;
+		const char *field_b = data_b;
 		mp_decode_array(&field_a);
 		mp_decode_array(&field_b);
 		return FieldCompare<0, TYPE, MORE_TYPES...>::compare(tuple_a, tuple_b,
@@ -1368,8 +1372,9 @@ struct TupleCompareWithKey
 		int rc = hint_cmp(tuple_hint, key_hint);
 		if (rc != 0)
 			return rc;
-		struct tuple_format *format = tuple_format(tuple);
-		const char *field = tuple_field_raw(format, tuple_data(tuple),
+		const char *data = tuple_data(tuple);
+		struct tuple_format *format = tuple_field_map_format(data);
+		const char *field = tuple_field_raw(format, data,
 						    tuple_field_map(tuple),
 						    IDX);
 		return FieldCompareWithKey<FLD_ID, IDX, TYPE, MORE_TYPES...>::
@@ -1391,8 +1396,9 @@ struct TupleCompareWithKey<0, 0, TYPE, MORE_TYPES...>
 		int rc = hint_cmp(tuple_hint, key_hint);
 		if (rc != 0)
 			return rc;
-		struct tuple_format *format = tuple_format(tuple);
-		const char *field = tuple_data(tuple);
+		const char *data = tuple_data(tuple);
+		struct tuple_format *format = tuple_field_map_format(data);
+		const char *field = data;
 		mp_decode_array(&field);
 		return FieldCompareWithKey<0, 0, TYPE, MORE_TYPES...>::
 			compare(tuple, key, part_count,
@@ -1483,8 +1489,8 @@ func_index_compare(struct tuple *tuple_a, hint_t tuple_a_hint,
 	 */
 	const char *tuple_a_raw = tuple_data(tuple_a);
 	const char *tuple_b_raw = tuple_data(tuple_b);
-	struct tuple_format *format_a = tuple_format(tuple_a);
-	struct tuple_format *format_b = tuple_format(tuple_b);
+	struct tuple_format *format_a = tuple_field_map_format(tuple_a_raw);
+	struct tuple_format *format_b = tuple_field_map_format(tuple_b_raw);
 	const char *field_map_a = tuple_field_map(tuple_a);
 	const char *field_map_b = tuple_field_map(tuple_b);
 	const char *field_a, *field_b;
@@ -1545,7 +1551,7 @@ func_index_compare_with_key(struct tuple *tuple, hint_t tuple_hint,
 	 * func key, were already skipped.
 	 */
 	const char *tuple_raw = tuple_data(tuple);
-	struct tuple_format *format = tuple_format(tuple);
+	struct tuple_format *format = tuple_field_map_format(tuple_raw);
 	const char *field_map = tuple_field_map(tuple);
 	const char *field;
 	part_count = MIN(part_count, key_def->part_count);
