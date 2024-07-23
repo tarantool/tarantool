@@ -735,16 +735,10 @@ vy_log_record_dup(struct region *pool, const struct vy_log_record *src)
 		memcpy((char *)dst->end, src->end, size);
 	}
 	if (src->key_def != NULL) {
-		dst->key_parts =
-			region_alloc_array(pool, typeof(dst->key_parts[0]),
-					   src->key_def->part_count, &size);
-		if (dst->key_parts == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc_array",
-				 "def->key_parts");
-			goto err;
-		}
-		if (key_def_dump_parts(src->key_def, dst->key_parts, pool) != 0)
-			goto err;
+		dst->key_parts = xregion_alloc_array(
+				pool, typeof(dst->key_parts[0]),
+				src->key_def->part_count);
+		key_def_dump_parts(src->key_def, dst->key_parts, pool);
 		dst->key_part_count = src->key_def->part_count;
 		dst->key_def = NULL;
 	}
