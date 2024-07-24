@@ -1254,8 +1254,9 @@ static void
 memtx_engine_abort_checkpoint(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
+	if (memtx->checkpoint == NULL)
+		return;
 
-	assert(memtx->checkpoint != NULL);
 	assert(!xlog_is_open(&memtx->checkpoint->snap));
 
 	coio_call(memtx_engine_abort_checkpoint_f, &memtx->checkpoint->snap);
