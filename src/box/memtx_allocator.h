@@ -48,7 +48,7 @@ struct PACKED memtx_tuple {
 	 * copy-on-write mechanisms work.
 	 */
 	union {
-		struct {
+		struct PACKED {
 			/**
 			 * Most recent read view's version at the time
 			 * when the tuple was allocated.
@@ -61,6 +61,9 @@ struct PACKED memtx_tuple {
 		struct stailq_entry in_gc;
 	};
 };
+
+static_assert(sizeof(struct memtx_tuple) % 4 == 2,
+	      "required for tuple_has_extra");
 
 /**
  * List of tuples owned by a read view.

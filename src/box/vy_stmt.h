@@ -174,17 +174,19 @@ enum {
  *
  * Field 'operations' is used for storing operations of UPSERT statement.
  */
-struct vy_stmt {
+struct PACKED vy_stmt {
 	struct tuple base;
 	uint8_t type; /* IPROTO_INSERT/REPLACE/UPSERT/DELETE */
 	uint8_t flags;
+	int64_t lsn;
 	/**
 	 * Upserts count of the vinyl statement.
 	 * Only used for UPSERT statements allocated on lsregion, but always in
 	 * present in structure since it costs nothing.
 	 */
 	uint8_t n_upserts;
-	int64_t lsn;
+	/** Padding to make struct size of certain size. */
+	uint8_t reserved;
 	/**
 	 * Offsets array concatenated with MessagePack fields
 	 * array.
@@ -192,7 +194,8 @@ struct vy_stmt {
 	 */
 };
 
-static_assert(sizeof(struct vy_stmt) == 24, "Just to be sure");
+static_assert(sizeof(struct vy_stmt) == 22, "Just to be sure");
+static_assert(sizeof(struct vy_stmt) % 4 == 2, "required for tuple_has_extra");
 
 /** Get LSN of the vinyl statement. */
 static inline int64_t

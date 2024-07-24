@@ -1033,14 +1033,14 @@ for i = 1, 100 do s:get{i} end
 ...
 box.stat.vinyl().memory.tuple_cache
 ---
-- 107700
+- 107500
 ...
 box.cfg{vinyl_cache = 50 * 1000}
 ---
 ...
 box.stat.vinyl().memory.tuple_cache
 ---
-- 49542
+- 49450
 ...
 box.cfg{vinyl_cache = 0}
 ---
@@ -1116,7 +1116,7 @@ s.index.i2:count()
 ...
 box.stat.vinyl().memory.tuple_cache -- should be about 200 KB
 ---
-- 218400
+- 218200
 ...
 s:drop()
 ---

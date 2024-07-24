@@ -243,7 +243,7 @@ vy_stmt_dup_lsregion(struct tuple *stmt, struct lsregion *lsregion,
 {
 	size_t size = tuple_size(stmt);
 	struct tuple *mem_stmt;
-	const size_t align = alignof(struct vy_stmt);
+	const size_t align = MAX(alignof(struct vy_stmt), TUPLE_ALIGN);
 	mem_stmt = lsregion_aligned_alloc(lsregion, size, align, alloc_id);
 	if (mem_stmt == NULL) {
 		diag_set(OutOfMemory, size, "lsregion_aligned_alloc",
