@@ -188,8 +188,12 @@ box_check_writable(void);
 void
 box_set_ro(void);
 
-bool
+/** \cond public */
+
+API_EXPORT bool
 box_is_ro(void);
+
+/** \endcond public */
 
 bool
 box_is_orphan(void);
@@ -198,6 +202,8 @@ box_is_orphan(void);
 bool
 box_is_anon(void);
 
+/** \cond public */
+
 /**
  * Wait until the instance switches to a desired mode.
  * \param ro wait read-only if set or read-write if unset
@@ -205,8 +211,10 @@ box_is_anon(void);
  * \retval -1 timeout or fiber is cancelled
  * \retval 0 success
  */
-int
+API_EXPORT int
 box_wait_ro(bool ro, double timeout);
+
+/** \endcond public */
 
 /**
  * Switch this instance from 'orphan' to 'running' state or
@@ -233,12 +241,16 @@ box_do_set_orphan(bool orphan);
 void
 box_update_ro_summary(void);
 
+/** \cond public */
+
 /**
  * Get the reason why the instance is read only if it is. Can't be called on a
  * writable instance.
  */
-const char *
+API_EXPORT const char *
 box_ro_reason(void);
+
+/** \endcond public */
 
 /**
  * Iterate over all spaces and save them to the
@@ -768,6 +780,13 @@ box_iproto_send(uint64_t sid,
 API_EXPORT int
 box_iproto_override(uint32_t req_type, iproto_handler_t handler,
 		    iproto_handler_destroy_t destroy, void *ctx);
+
+/**
+ * Get self LSN component of box vclock, -1 if no one or bootstrap haven't
+ * succeeded.
+ */
+API_EXPORT int64_t
+box_info_lsn(void);
 
 /** \endcond public */
 
