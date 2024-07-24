@@ -104,7 +104,7 @@ g1.test_tuple_info_vinyl = function(cg)
         s:create_index('pk', {parts = {2}})
         t.assert_equals(s:insert{'v', 0}:info(),
                         { data_size = 4,
-                          header_size = 24,
+                          header_size = 22,
                           field_map_size = 4,
                           waste_size = 0,
                           arena = "malloc" }

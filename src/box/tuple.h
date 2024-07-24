@@ -406,6 +406,11 @@ enum tuple_flag {
 	tuple_flag_MAX,
 };
 
+enum {
+	/* Align that is required for tuples. */
+	TUPLE_ALIGN = 4,
+};
+
 /**
  * An atom of Tarantool storage. Represents MsgPack Array.
  * Tuple has the following structure:
@@ -417,6 +422,8 @@ enum tuple_flag {
  * +---------------------------------------data_offset
  *
  * Each 'off_i' is the offset to the i-th indexed field.
+ *
+ * Despite of being PACKED every tuple is required to have TUPLE_ALIGN align.
  */
 struct PACKED tuple
 {
@@ -458,6 +465,7 @@ struct PACKED tuple
 };
 
 static_assert(sizeof(struct tuple) == 10, "Just to be sure");
+static_assert(sizeof(struct tuple) % 4 == 2, "required for tuple_has_extra");
 
 /** Type of the arena where the tuple is allocated. */
 enum tuple_arena_type {
@@ -531,6 +539,9 @@ enum {
 	/** The size that is unused in struct tuple in compact mode. */
 	TUPLE_COMPACT_SAVINGS = sizeof(((struct tuple *)(NULL))->bsize_bulky),
 };
+
+static_assert((sizeof(struct tuple) - TUPLE_COMPACT_SAVINGS) % 4 == 2,
+	      "required for tuple_has_extra");
 
 /**
  * Check that data_offset is valid and can be stored in tuple.
@@ -650,6 +661,7 @@ tuple_is_compact(struct tuple *tuple)
 static inline uint16_t
 tuple_data_offset(struct tuple *tuple)
 {
+	assert((intptr_t)tuple % TUPLE_ALIGN == 0);
 	uint16_t res = tuple->data_offset_bsize_raw;
 	/*
 	 * We have two variants depending on high bit of res (res & 0x8000):
