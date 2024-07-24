@@ -81,6 +81,11 @@ if(ENABLE_ASAN)
         "Build LuaJIT with AddressSanitizer" FORCE)
 endif()
 
+if(ENABLE_UB_SANITIZER)
+    set(LUAJIT_USE_UBSAN ON CACHE BOOL
+        "Build LuaJIT with UndefinedBehaviourSanitizer" FORCE)
+endif()
+
 if(TARGET_OS_DARWIN AND NOT LUAJIT_ENABLE_GC64)
     # XXX: This is not the best idea to build LuaJIT on MacOS
     # with GC64 disabled. But nobody will stop you from this.
