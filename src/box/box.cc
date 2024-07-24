@@ -371,7 +371,7 @@ box_update_ro_summary(void)
 	box_broadcast_ballot();
 }
 
-const char *
+API_EXPORT const char *
 box_ro_reason(void)
 {
 	if (raft_is_ro(box_raft()))
@@ -545,7 +545,7 @@ box_set_ro(void)
 	box_update_ro_summary();
 }
 
-bool
+API_EXPORT bool
 box_is_ro(void)
 {
 	return is_ro_summary;
@@ -563,7 +563,7 @@ box_is_anon(void)
 	return instance_id == REPLICA_ID_NIL;
 }
 
-int
+API_EXPORT int
 box_wait_ro(bool ro, double timeout)
 {
 	double deadline = ev_monotonic_now(loop()) + timeout;
@@ -4210,6 +4210,24 @@ box_iproto_override(uint32_t req_type, iproto_handler_t handler,
 		    iproto_handler_destroy_t destroy, void *ctx)
 {
 	return iproto_override(req_type, handler, destroy, ctx);
+}
+
+API_EXPORT int64_t
+box_info_lsn(void)
+{
+	/*
+	 * Self can be NULL during bootstrap: entire box.info
+	 * bundle becomes available soon after entering box.cfg{}
+	 * and replication bootstrap relies on this as it looks
+	 * at box.info.status.
+	 */
+	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
+	if (self != NULL &&
+	    (self->id != REPLICA_ID_NIL || cfg_replication_anon)) {
+		return vclock_get(box_vclock, self->id);
+	} else {
+		return -1;
+	}
 }
 
 /**
