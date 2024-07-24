@@ -1132,6 +1132,8 @@ static void
 memtx_engine_abort_checkpoint(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
+	if (memtx->checkpoint == NULL)
+		return;
 
 	/**
 	 * An error in the other engine's first phase.
