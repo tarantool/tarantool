@@ -166,7 +166,7 @@ local reference_table = {
     },
 
     -- `IPROTO_CURRENT_VERSION` constant
-    protocol_version = 8,
+    protocol_version = 9,
 
     -- `feature_id` enumeration
     protocol_features = {
@@ -180,6 +180,7 @@ local reference_table = {
         dml_tuple_extension = true,
         call_ret_tuple_extension = true,
         call_arg_tuple_extension = true,
+        is_sync = true,
     },
     feature = {
         streams = 0,
@@ -193,6 +194,7 @@ local reference_table = {
         call_ret_tuple_extension = 8,
         call_arg_tuple_extension = 9,
         fetch_snapshot_cursor = 10,
+        is_sync = 11,
     },
 }
 

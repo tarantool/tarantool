@@ -23,7 +23,7 @@ c = net.connect(box.cfg.listen)
  | ...
 c.peer_protocol_version
  | ---
- | - 8
+ | - 9
  | ...
 print_features(c)
  | ---
@@ -32,6 +32,7 @@ print_features(c)
  |   error_extension: true
  |   call_arg_tuple_extension: true
  |   pagination: true
+ |   is_sync: true
  |   space_and_index_names: true
  |   streams: true
  |   watch_once: true
@@ -65,6 +66,7 @@ print_features(c)
  |   error_extension: false
  |   call_arg_tuple_extension: false
  |   pagination: false
+ |   is_sync: false
  |   space_and_index_names: false
  |   streams: false
  |   watch_once: false
@@ -119,6 +121,7 @@ print_features(c)
  |   error_extension: true
  |   call_arg_tuple_extension: true
  |   pagination: true
+ |   is_sync: true
  |   space_and_index_names: true
  |   streams: true
  |   watch_once: true
@@ -169,7 +172,7 @@ c.error -- error
  | ...
 c.peer_protocol_version
  | ---
- | - 8
+ | - 9
  | ...
 print_features(c)
  | ---
@@ -178,6 +181,7 @@ print_features(c)
  |   error_extension: true
  |   call_arg_tuple_extension: true
  |   pagination: true
+ |   is_sync: true
  |   space_and_index_names: true
  |   streams: true
  |   watch_once: true
@@ -201,7 +205,7 @@ c.error -- error
  | ...
 c.peer_protocol_version
  | ---
- | - 8
+ | - 9
  | ...
 print_features(c)
  | ---
@@ -210,6 +214,7 @@ print_features(c)
  |   error_extension: true
  |   call_arg_tuple_extension: true
  |   pagination: true
+ |   is_sync: true
  |   space_and_index_names: true
  |   streams: true
  |   watch_once: true
