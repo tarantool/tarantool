@@ -285,13 +285,7 @@ lbox_info_uuid(struct lua_State *L)
 static int
 lbox_info_lsn(struct lua_State *L)
 {
-	/* See comments in lbox_info_id */
-	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
-	if (self != NULL && (self->id != REPLICA_ID_NIL || replication_anon)) {
-		luaL_pushint64(L, vclock_get(box_vclock, self->id));
-	} else {
-		luaL_pushint64(L, -1);
-	}
+	luaL_pushint64(L, box_info_lsn());
 	return 1;
 }
 
