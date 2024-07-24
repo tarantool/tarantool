@@ -69,9 +69,11 @@ box_index_max
 box_index_min
 box_index_random
 box_index_tuple_position
+box_info_lsn
 box_insert
 box_iproto_override
 box_iproto_send
+box_is_ro
 box_iterator_free
 box_iterator_next
 box_key_def_delete
@@ -100,6 +102,7 @@ box_region_used
 box_replace
 box_return_mp
 box_return_tuple
+box_ro_reason
 box_schema_upgrade_begin
 box_schema_upgrade_end
 box_schema_version
@@ -150,6 +153,7 @@ box_txn_set_isolation
 box_txn_set_timeout
 box_update
 box_upsert
+box_wait_ro
 clock_monotonic
 clock_monotonic64
 clock_process
