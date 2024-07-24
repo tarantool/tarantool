@@ -82,7 +82,12 @@ extern "C" {
 	 * IPROTO_IS_CHECKPOINT_JOIN, IPROTO_CHECKPOINT_VCLOCK and
 	 * IRPOTO_CHECKPOINT_LSN.
 	 */								\
-	 _(FETCH_SNAPSHOT_CURSOR, 10)					\
+	_(FETCH_SNAPSHOT_CURSOR, 10)					\
+	/**
+	 * Synchronous transaction support:
+	 * IS_SYNC flag in IPROTO_BEGIN, IPROTO_COMMIT
+	 */								\
+	_(IS_SYNC, 11)							\
 
 #define IPROTO_FEATURE_MEMBER(s, v) IPROTO_FEATURE_ ## s = v,
 
@@ -107,7 +112,7 @@ struct iproto_features {
  * `box.iproto.protocol_version` needs to be updated correspondingly.
  */
 enum {
-	IPROTO_CURRENT_VERSION = 8,
+	IPROTO_CURRENT_VERSION = 9,
 };
 
 /**
