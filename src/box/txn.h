@@ -33,11 +33,11 @@
 
 #include <stdbool.h>
 #include "salad/stailq.h"
+#include "engine.h"
 #include "trigger.h"
 #include "fiber.h"
 #include "space.h"
 #include "journal.h"
-#include "tt_static.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -101,15 +101,19 @@ enum txn_flag {
 	 * committed due to conflict.
 	 */
 	TXN_IS_CONFLICTED = 0x80,
-	/*
+	/**
 	 * Transaction has been aborted by timeout so should be
 	 * rolled back at commit.
 	 */
 	TXN_IS_ABORTED_BY_TIMEOUT = 0x100,
-	/*
+	/**
 	 * Transaction has been rolled back so it cannot be continued.
 	 */
 	TXN_IS_ROLLED_BACK = 0x200,
+	/** Transaction has been started in at least one engine. */
+	TXN_IS_STARTED_IN_ENGINE = 0x400,
+	/** Transaction supports multiple engines. */
+	TXN_SUPPORTS_MULTI_ENGINE = 0x800,
 };
 
 enum {
@@ -273,6 +277,7 @@ struct txn_stmt {
 	/** Owner of that statement. */
 	struct txn *txn;
 	/** Undo info. */
+	struct engine *engine;
 	struct space *space;
 	struct tuple *old_tuple;
 	struct tuple *new_tuple;
@@ -472,10 +477,13 @@ struct txn {
 	struct stailq_entry *sub_stmt_begin[TXN_SUB_STMT_MAX + 1];
 	/** LSN of this transaction when written to WAL. */
 	int64_t signature;
-	/** Engine involved in multi-statement transaction. */
-	struct engine *engine;
-	/** Engine-specific transaction data */
-	void *engine_tx;
+	/**
+	 * Engines involved in multi-statement transaction. Indexed by
+	 * `engine::id'. If NULL, then the engine is not involved in txn.
+	 */
+	struct engine *engines[MAX_TX_ENGINE_COUNT];
+	/** Engine-specific transaction data. Indexed by `engine::id'. */
+	void *engines_tx[MAX_TX_ENGINE_COUNT];
 	/* A fiber to wake up when transaction is finished. */
 	struct fiber *fiber;
 	/** Timestampt of entry write start. */

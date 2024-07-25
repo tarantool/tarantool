@@ -298,6 +298,7 @@ txn_stmt_new(struct txn *txn)
 
 	/* Initialize members explicitly to save time on memset() */
 	stmt->txn = in_txn();
+	stmt->engine = NULL;
 	stmt->space = NULL;
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
@@ -363,8 +364,8 @@ txn_rollback_one_stmt(struct txn *txn, struct txn_stmt *stmt)
 		diag_log();
 		panic("statement rollback trigger failed");
 	}
-	if (txn->engine != NULL && stmt->space != NULL)
-		engine_rollback_statement(txn->engine, txn, stmt);
+	if (stmt->engine != NULL && stmt->space != NULL)
+		engine_rollback_statement(stmt->engine, txn, stmt);
 }
 
 /*
@@ -523,8 +524,8 @@ txn_begin(void)
 	txn->status = TXN_INPROGRESS;
 	txn->isolation = txn_default_isolation;
 	txn->signature = TXN_SIGNATURE_UNKNOWN;
-	txn->engine = NULL;
-	txn->engine_tx = NULL;
+	memset(&txn->engines, 0, sizeof(txn->engines));
+	memset(&txn->engines_tx, 0, sizeof(txn->engines_tx));
 	txn->is_schema_changed = false;
 	rlist_create(&txn->savepoints);
 	txn->fiber = NULL;
@@ -543,6 +544,11 @@ txn_begin(void)
 	 * if they are not supported.
 	 */
 	txn_set_flags(txn, TXN_CAN_YIELD);
+	/*
+	 * By default, all transactions support multiple engines. Any engine
+	 * without ENGINE_SUPPORTS_CROSS_ENGINE_TX will unset this flag.
+	 */
+	txn_set_flags(txn, TXN_SUPPORTS_MULTI_ENGINE);
 	memtx_tx_register_txn(txn);
 	rmean_collect(rmean_box, IPROTO_BEGIN, 1);
 	return txn;
@@ -553,17 +559,43 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn)
 {
 	if (engine->flags & ENGINE_BYPASS_TX)
 		return 0;
-	if (txn->engine == NULL) {
-		txn->engine = engine;
-		return engine_begin(engine, txn);
-	} else if (txn->engine != engine) {
-		/**
-		 * Only one engine can be used in
-		 * a multi-statement transaction currently.
-		 */
-		diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION);
+	if (txn->engines[engine->id] != NULL) {
+		assert(txn_has_flag(txn, TXN_IS_STARTED_IN_ENGINE));
+		assert(txn->engines[engine->id] == engine);
+		return 0;
+	}
+	if (!txn_has_flag(txn, TXN_IS_STARTED_IN_ENGINE)) {
+		if (engine_begin(engine, txn) != 0)
+			return -1;
+		txn_set_flags(txn, TXN_IS_STARTED_IN_ENGINE);
+		txn->engines[engine->id] = engine;
+		assert(txn_has_flag(txn, TXN_SUPPORTS_MULTI_ENGINE));
+		if (!(engine->flags & ENGINE_SUPPORTS_CROSS_ENGINE_TX))
+			txn_clear_flags(txn, TXN_SUPPORTS_MULTI_ENGINE);
+		return 0;
+	}
+	if (!(engine->flags & ENGINE_SUPPORTS_CROSS_ENGINE_TX)) {
+		diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION,
+			 engine->name);
 		return -1;
 	}
+	if (!txn_has_flag(txn, TXN_SUPPORTS_MULTI_ENGINE)) {
+		const char *name = NULL;
+		for (size_t i = 0; i < MAX_TX_ENGINE_COUNT; i++) {
+			if (txn->engines[i] != NULL &&
+			    !(txn->engines[i]->flags &
+			      ENGINE_SUPPORTS_CROSS_ENGINE_TX)) {
+				name = txn->engines[i]->name;
+				break;
+			}
+		}
+		assert(name != NULL);
+		diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION, name);
+		return -1;
+	}
+	if (engine_begin(engine, txn) != 0)
+		return -1;
+	txn->engines[engine->id] = engine;
 	return 0;
 }
 
@@ -605,6 +637,7 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 	if (txn_begin_in_engine(engine, txn) != 0)
 		goto fail;
 
+	stmt->engine = engine;
 	stmt->space = space;
 	stmt->type = type;
 	if (engine_begin_statement(engine, txn) != 0)
@@ -742,8 +775,10 @@ txn_complete_fail(struct txn *txn)
 	stailq_reverse(&txn->stmts);
 	stailq_foreach_entry(stmt, &txn->stmts, next)
 		txn_rollback_one_stmt(txn, stmt);
-	if (txn->engine != NULL)
-		engine_rollback(txn->engine, txn);
+	for (size_t i = 0; i < MAX_TX_ENGINE_COUNT; i++) {
+		if (txn->engines[i] != NULL)
+			engine_rollback(txn->engines[i], txn);
+	}
 	if (txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
 		if (trigger_run(&txn->on_rollback, txn_first_stmt(txn)) != 0) {
 			diag_log();
@@ -773,8 +808,10 @@ txn_complete_success(struct txn *txn)
 		assert(!stmt->has_triggers || rlist_empty(&stmt->on_commit));
 #endif
 	txn->status = TXN_COMMITTED;
-	if (txn->engine != NULL)
-		engine_commit(txn->engine, txn);
+	for (size_t i = 0; i < MAX_TX_ENGINE_COUNT; i++) {
+		if (txn->engines[i] != NULL)
+			engine_commit(txn->engines[i], txn);
+	}
 	if (txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
 		/*
 		 * Commit triggers must be run in the same order they were added
@@ -1003,12 +1040,18 @@ txn_prepare(struct txn *txn)
 	txn->psn = txn_next_psn++;
 
 	/*
-	 * Perform transaction conflict resolution. Engine == NULL when
-	 * we have a bunch of IPROTO_NOP statements.
+	 * Perform transaction conflict resolution.
 	 */
-	if (txn->engine != NULL) {
-		if (engine_prepare(txn->engine, txn) != 0) {
+	for (size_t i = 0; i < MAX_TX_ENGINE_COUNT; i++) {
+		if (txn->engines[i] != NULL &&
+		    engine_prepare(txn->engines[i], txn) != 0) {
 			txn->psn = 0;
+			/*
+			 * TODO(gh-1803): Call engine_rollback() here when
+			 * cross-engine support for Vinyl is implemented.
+			 */
+			for (size_t j = 0; j < i; j++)
+				assert(txn->engines[j] == NULL);
 			return -1;
 		}
 	}

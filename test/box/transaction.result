@@ -602,7 +602,7 @@ box.begin()
 box.space.test:truncate()
 box.space.vinyl:select{};
 ---
-- error: A multi-statement transaction can not use multiple storage engines
+- error: Storage engine 'vinyl' does not support cross-engine transactions
 ...
 -- A transaction is left open due to an exception in the Lua fragment
 box.rollback();
@@ -638,7 +638,7 @@ box.begin()
 box.space.test:truncate()
 box.space.vinyl:insert{2, 'truncate'};
 ---
-- error: A multi-statement transaction can not use multiple storage engines
+- error: Storage engine 'vinyl' does not support cross-engine transactions
 ...
 -- A transaction is left open due to an exception in the above fragment
 box.rollback();

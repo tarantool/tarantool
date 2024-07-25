@@ -42,12 +42,6 @@ RLIST_HEAD(engines);
 
 enum recovery_state recovery_state = RECOVERY_NOT_STARTED;
 
-/**
- * For simplicity, assume that the engine count can't exceed
- * the value of this constant.
- */
-enum { MAX_ENGINE_COUNT = 10 };
-
 /** Register engine instance. */
 void engine_register(struct engine *engine)
 {

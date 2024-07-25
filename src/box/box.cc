@@ -4947,9 +4947,22 @@ engine_init()
 				    cfg_geti("memtx_sort_threads"),
 				    box_on_indexes_built);
 	engine_register((struct engine *)memtx);
+	assert(memtx->base.id < MAX_TX_ENGINE_COUNT);
 	box_set_memtx_max_tuple_size();
 
 	memcs_engine_register();
+
+	struct engine *vinyl;
+	vinyl = vinyl_engine_new_xc(cfg_gets("vinyl_dir"),
+				    cfg_geti64("vinyl_memory"),
+				    cfg_geti("vinyl_read_threads"),
+				    cfg_geti("vinyl_write_threads"),
+				    box_is_force_recovery);
+	engine_register(vinyl);
+	assert(vinyl->id < MAX_TX_ENGINE_COUNT);
+	box_set_vinyl_max_tuple_size();
+	box_set_vinyl_cache();
+	box_set_vinyl_timeout();
 
 	struct sysview_engine *sysview = sysview_engine_new_xc();
 	engine_register((struct engine *)sysview);
@@ -4959,17 +4972,6 @@ engine_init()
 
 	struct engine *blackhole = blackhole_engine_new_xc();
 	engine_register(blackhole);
-
-	struct engine *vinyl;
-	vinyl = vinyl_engine_new_xc(cfg_gets("vinyl_dir"),
-				    cfg_geti64("vinyl_memory"),
-				    cfg_geti("vinyl_read_threads"),
-				    cfg_geti("vinyl_write_threads"),
-				    box_is_force_recovery);
-	engine_register((struct engine *)vinyl);
-	box_set_vinyl_max_tuple_size();
-	box_set_vinyl_cache();
-	box_set_vinyl_timeout();
 }
 
 /**

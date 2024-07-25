@@ -221,7 +221,7 @@ struct errcode_record {
 	_(ER_TIMEOUT, 78,			"Timeout exceeded") \
 	_(ER_ACTIVE_TRANSACTION, 79,		"Operation is not permitted when there is an active transaction ") \
 	_(ER_CURSOR_NO_TRANSACTION, 80,		"The transaction the cursor belongs to has ended") \
-	_(ER_CROSS_ENGINE_TRANSACTION, 81,	"A multi-statement transaction can not use multiple storage engines") \
+	_(ER_CROSS_ENGINE_TRANSACTION, 81,	"Storage engine '%s' does not support cross-engine transactions", "engine", STRING) \
 	_(ER_NO_SUCH_ROLE, 82,			"Role '%s' is not found", "role", STRING) \
 	_(ER_ROLE_EXISTS, 83,			"Role '%s' already exists", "role", STRING) \
 	_(ER_CREATE_ROLE, 84,			"Failed to create role '%s': %s", "role", STRING, "details", STRING) \
