@@ -1,5 +1,7 @@
 local ffi = require('ffi')
+local fio = require('fio')
 local wireformat = require('internal.protobuf.wireformat')
+local parser = require('internal.protobuf.parser')
 local protocol_mt
 -- These constants are used to define the boundaries of valid field ids.
 -- Described in more detail here:
@@ -657,6 +659,36 @@ end
 
 -- }}} Encoders
 
+local function import(filename)
+    local error_msg = ''
+    local fh
+    local paths = {
+        '/root/.luarocks/share/lua/5.1/',
+        '/root/.luarocks/share/lua/',
+        '/usr/local/share/tarantool/',
+        '/usr/share/tarantool/',
+        '/usr/local/share/lua/5.1/',
+        '/usr/share/lua/5.1/',
+    }
+    for _, path in pairs(paths) do
+         fh = fio.open(path .. filename, 'O_RDONLY')
+         if fh == nil then
+             error_msg = error_msg .. path .. filename .. '; '
+         else
+             break
+         end
+    end
+    if fh == nil then
+        error('Couldn`t find file: ' .. error_msg)
+    else
+        return fh
+    end
+end
+
+local function parse(filename)
+    return parser.parser(import(filename))
+end
+
 protocol_mt = {
     __index = {
         encode = encode,
@@ -667,4 +699,5 @@ return {
     message = message,
     enum = enum,
     protocol = protocol,
+    parse = parse,
 }
