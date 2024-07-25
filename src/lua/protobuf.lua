@@ -1,5 +1,6 @@
 local ffi = require('ffi')
 local wireformat = require('internal.protobuf.wireformat')
+local parser = require('internal.protobuf.parser')
 local protocol_mt
 -- These constants are used to define the boundaries of valid field ids.
 -- Described in more detail here:
@@ -657,6 +658,10 @@ end
 
 -- }}} Encoders
 
+local function parse(filename)
+    return parser.parser(filename)
+end
+
 protocol_mt = {
     __index = {
         encode = encode,
@@ -667,4 +672,5 @@ return {
     message = message,
     enum = enum,
     protocol = protocol,
+    parse = parse,
 }
