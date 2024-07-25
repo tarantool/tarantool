@@ -40,6 +40,20 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+enum {
+	/**
+	 * For simplicity, assume that the total engine count can't exceed
+	 * the value of this constant.
+	 */
+	MAX_ENGINE_COUNT = 10,
+	/**
+	 * Max number of engines involved in a multi-statement transaction.
+	 * This value must be greater than any `engine::id' of an engine
+	 * without `ENGINE_BYPASS_TX' flag.
+	 */
+	MAX_TX_ENGINE_COUNT = 3,
+};
+
 struct engine;
 struct engine_read_view;
 struct txn;
@@ -281,6 +295,10 @@ enum {
 	 * Engine setting this flag must support read views.
 	 */
 	ENGINE_JOIN_BY_MEMTX = 1 << 3,
+	/**
+	 * Set if the engine supports cross-engine transactions.
+	 */
+	ENGINE_SUPPORTS_CROSS_ENGINE_TX = 1 << 4,
 };
 
 struct engine {
@@ -338,7 +356,7 @@ struct engine_join_ctx {
 	void **data;
 };
 
-/** Register engine engine instance. */
+/** Register engine instance. */
 void engine_register(struct engine *engine);
 
 /** Call a visitor function on every registered engine. */

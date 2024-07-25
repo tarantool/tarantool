@@ -2364,7 +2364,7 @@ vinyl_space_execute_replace(struct space *space, struct txn *txn,
 {
 	assert(request->index_id == 0);
 	struct vy_env *env = vy_env(space->engine);
-	struct vy_tx *tx = txn->engine_tx;
+	struct vy_tx *tx = txn->engines_tx[space->engine->id];
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	int rc;
 	if (request->type == IPROTO_INSERT)
@@ -2382,7 +2382,7 @@ vinyl_space_execute_delete(struct space *space, struct txn *txn,
 			   struct request *request, struct tuple **result)
 {
 	struct vy_env *env = vy_env(space->engine);
-	struct vy_tx *tx = txn->engine_tx;
+	struct vy_tx *tx = txn->engines_tx[space->engine->id];
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	if (vy_delete(env, tx, stmt, space, request))
 		return -1;
@@ -2399,7 +2399,7 @@ vinyl_space_execute_update(struct space *space, struct txn *txn,
 			   struct request *request, struct tuple **result)
 {
 	struct vy_env *env = vy_env(space->engine);
-	struct vy_tx *tx = txn->engine_tx;
+	struct vy_tx *tx = txn->engines_tx[space->engine->id];
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	if (vy_update(env, tx, stmt, space, request) != 0)
 		return -1;
@@ -2412,7 +2412,7 @@ vinyl_space_execute_upsert(struct space *space, struct txn *txn,
                            struct request *request)
 {
 	struct vy_env *env = vy_env(space->engine);
-	struct vy_tx *tx = txn->engine_tx;
+	struct vy_tx *tx = txn->engines_tx[space->engine->id];
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	return vy_upsert(env, tx, stmt, space, request);
 }
@@ -2421,9 +2421,9 @@ static int
 vinyl_engine_begin(struct engine *engine, struct txn *txn)
 {
 	struct vy_env *env = vy_env(engine);
-	assert(txn->engine_tx == NULL);
-	txn->engine_tx = vy_tx_begin(env->xm, txn->isolation);
-	if (txn->engine_tx == NULL)
+	assert(txn->engines_tx[engine->id] == NULL);
+	txn->engines_tx[engine->id] = vy_tx_begin(env->xm, txn->isolation);
+	if (txn->engines_tx[engine->id] == NULL)
 		return -1;
 	return 0;
 }
@@ -2432,7 +2432,7 @@ static int
 vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 {
 	struct vy_env *env = vy_env(engine);
-	struct vy_tx *tx = txn->engine_tx;
+	struct vy_tx *tx = txn->engines_tx[engine->id];
 	assert(tx != NULL);
 
 	if (tx->write_size > 0 &&
@@ -2473,7 +2473,7 @@ static void
 vinyl_engine_commit(struct engine *engine, struct txn *txn)
 {
 	struct vy_env *env = vy_env(engine);
-	struct vy_tx *tx = txn->engine_tx;
+	struct vy_tx *tx = txn->engines_tx[engine->id];
 	assert(tx != NULL);
 
 	/*
@@ -2493,27 +2493,25 @@ vinyl_engine_commit(struct engine *engine, struct txn *txn)
 			   mem_used_after - mem_used_before);
 	vy_regulator_check_dump_watermark(&env->regulator);
 
-	txn->engine_tx = NULL;
+	txn->engines_tx[engine->id] = NULL;
 }
 
 static void
 vinyl_engine_rollback(struct engine *engine, struct txn *txn)
 {
-	(void)engine;
-	struct vy_tx *tx = txn->engine_tx;
+	struct vy_tx *tx = txn->engines_tx[engine->id];
 	if (tx == NULL)
 		return;
 
 	vy_tx_rollback(tx);
 
-	txn->engine_tx = NULL;
+	txn->engines_tx[engine->id] = NULL;
 }
 
 static int
 vinyl_engine_begin_statement(struct engine *engine, struct txn *txn)
 {
-	(void)engine;
-	struct vy_tx *tx = txn->engine_tx;
+	struct vy_tx *tx = txn->engines_tx[engine->id];
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	assert(tx != NULL);
 	return vy_tx_begin_statement(tx, stmt->space, &stmt->engine_savepoint);
@@ -2523,8 +2521,7 @@ static void
 vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
 				struct txn_stmt *stmt)
 {
-	(void)engine;
-	struct vy_tx *tx = txn->engine_tx;
+	struct vy_tx *tx = txn->engines_tx[engine->id];
 	assert(tx != NULL);
 	vy_tx_rollback_statement(tx, stmt->engine_savepoint);
 }
@@ -3654,7 +3651,9 @@ vinyl_iterator_check_tx(struct vinyl_iterator *it)
 		it->tx == NULL ||
 		/* Iterator was passed to another fiber. */
 		(it->tx != &it->tx_autocommit &&
-		 (in_txn() == NULL || it->tx != in_txn()->engine_tx));
+		 (in_txn() == NULL ||
+		  it->tx !=
+		  in_txn()->engines_tx[it->iterator.lsm->base.engine->id]));
 
 	if (no_transaction) {
 		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
@@ -3843,7 +3842,8 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 		return NULL;
 	}
 
-	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
+	struct vy_tx *tx = in_txn() ?
+			   in_txn()->engines_tx[base->engine->id] : NULL;
 	if (tx != NULL && tx->state == VINYL_TX_ABORT) {
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return NULL;
@@ -3919,7 +3919,8 @@ vinyl_index_get(struct index *index, const char *key,
 
 	struct vy_lsm *lsm = vy_lsm(index);
 	struct vy_env *env = vy_env(index->engine);
-	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
+	struct vy_tx *tx = in_txn() ?
+			   in_txn()->engines_tx[index->engine->id] : NULL;
 	if (tx != NULL && tx->state == VINYL_TX_ABORT) {
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
@@ -3973,9 +3974,9 @@ vy_build_on_replace(struct trigger *trigger, void *event)
 	struct txn *txn = event;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct vy_build_ctx *ctx = trigger->data;
-	struct vy_tx *tx = txn->engine_tx;
 	struct tuple_format *format = ctx->format;
 	struct vy_lsm *lsm = ctx->lsm;
+	struct vy_tx *tx = txn->engines_tx[lsm->base.engine->id];
 
 	if (ctx->is_failed)
 		return 0; /* already failed, nothing to do */
