@@ -309,7 +309,10 @@ uri_format(char *str, int len, const struct uri *uri, bool write_password)
 		SNPRINT(total, snprintf, str, len, "@");
 	}
 	if (uri->host != NULL) {
-		SNPRINT(total, snprintf, str, len, "%s", uri->host);
+		if (uri->host_hint == 2)
+			SNPRINT(total, snprintf, str, len, "[%s]", uri->host);
+		else
+			SNPRINT(total, snprintf, str, len, "%s", uri->host);
 	}
 	if (uri->service != NULL) {
 		if (uri->host != NULL) {

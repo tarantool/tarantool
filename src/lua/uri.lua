@@ -231,6 +231,16 @@ local function format(uri, write_password)
     uribuf.path = uri.path
     uribuf.query = uri.query
     uribuf.fragment = uri.fragment
+    -- The `uri_format` function needs the hint to enclose an IPv6
+    -- address into square brackets. So we must set the `host_hint`
+    -- to determine the type of `uri.host`.
+    if uri.ipv4 ~= nil then
+        uribuf.host_hint = 1
+    elseif uri.ipv6 ~= nil then
+        uribuf.host_hint = 2
+    else
+        uribuf.host_hint = 3
+    end
     fill_uribuf_params(uribuf, uri)
     local ibuf = cord_ibuf_take()
     local str = ibuf:alloc(1024)
