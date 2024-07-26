@@ -1722,7 +1722,14 @@ g.test_failover = function()
                 renew_interval = 1,
                 keepalive_interval = 5,
             },
-        },
+            replicasets = {
+                replicaset001 = {
+                    priority = {
+                        instance001 = 1
+                    }
+                }
+            }
+        }
     }
 
     instance_config:validate(iconfig)
