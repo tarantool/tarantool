@@ -2310,7 +2310,24 @@ return schema.new('instance_config', schema.record({
                 type = 'number',
                 default = 10,
             }),
-        })
+        }),
+        replicasets = schema.map({
+            -- Name of the replica.
+            key = schema.scalar({
+                type = 'string',
+            }),
+            value = schema.record({
+                -- Priorities for the supervised failover mode.
+                priority = schema.map({
+                    key = schema.scalar({
+                        type = 'string',
+                    }),
+                    value = schema.scalar({
+                        type = 'number',
+                    }),
+                }),
+            }),
+        }),
     }),
     -- Compatibility options.
     compat = schema.record({

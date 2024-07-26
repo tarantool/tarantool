@@ -594,6 +594,43 @@ local function validate_failover(found, peers, failover, leader)
     end
 end
 
+-- Validate failover section.
+local function validate_failover_config(instances, failover_config)
+    if failover_config == nil or failover_config.replicasets == nil then
+        return
+    end
+
+    local replicasets = {}
+    for _, def in pairs(instances) do
+        replicasets[def.replicaset_name] = true
+    end
+
+    for replicaset_name, replicaset in pairs(failover_config.replicasets) do
+        if replicasets[replicaset_name] == nil then
+            error(('replicaset %s specified in the failover configuration '..
+                   'doesn\'t exist'):format(replicaset_name), 0)
+        end
+
+        -- Validate the priority section of the specific replicasets.
+        for instance_name, _ in pairs(replicaset.priority or {}) do
+            if instances[instance_name] == nil then
+                error(('instance %s from replicaset %s specified in the '..
+                       'failover configuration doesn\'t exist')
+                      :format(instance_name, replicaset_name), 0)
+            end
+
+            local instance_replicaset = instances[instance_name].replicaset_name
+            if instance_replicaset ~= replicaset_name then
+                error(('instance %s from replicaset %s is specified in ' ..
+                       'the wrong replicaset %s in the failover ' ..
+                       'configuration section')
+                      :format(instance_name, instance_replicaset,
+                              replicaset_name), 0)
+            end
+        end
+    end
+end
+
 -- Verify replication.anon = true prerequisites.
 --
 -- First, it verifies that the given replicaset contains at least
@@ -802,6 +839,9 @@ local function new(iconfig, cconfig, instance_name)
     local failover = instance_config:get(iconfig_def, 'replication.failover')
     local leader = found.replicaset.leader
     validate_failover(found, peers, failover, leader)
+
+    local failover_config = instance_config:get(iconfig_def, 'failover')
+    validate_failover_config(instances, failover_config)
 
     local bootstrap_strategy = instance_config:get(iconfig_def,
         'replication.bootstrap_strategy')

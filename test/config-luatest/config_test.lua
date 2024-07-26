@@ -922,6 +922,125 @@ g.test_failover_supervised_constrainsts = function()
     })
 end
 
+g.test_failover_config = function()
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+
+        failover:
+          replicasets:
+            replicaset-002: []
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+                  instance-002: {}
+                  instance-003: {}
+    ]]
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
+    local env = {TT_LOG_LEVEL = 0}
+    local args = {'--name', 'instance-001', '--config', config_file}
+    local opts = {nojson = true, stderr = true}
+    local res = justrun.tarantool(dir, env, args, opts)
+    local exp = 'LuajitError: replicaset replicaset-002 specified in the ' ..
+                'failover configuration doesn\'t exist\nfatal error, ' ..
+                'exiting the event loop'
+
+    t.assert_equals(res.exit_code, 1)
+    t.assert_equals(res.stderr, exp)
+
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+
+        failover:
+          replicasets:
+            replicaset-001:
+              priority:
+                instance-004: 1
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+                  instance-002: {}
+                  instance-003: {}
+    ]]
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
+    local env = {TT_LOG_LEVEL = 0}
+    local args = {'--name', 'instance-001', '--config', config_file}
+    local opts = {nojson = true, stderr = true}
+    local res = justrun.tarantool(dir, env, args, opts)
+    local exp = 'LuajitError: instance instance-004 from replicaset ' ..
+                'replicaset-001 specified in the failover configuration ' ..
+                'doesn\'t exist\nfatal error, exiting the event loop'
+
+    t.assert_equals(res.exit_code, 1)
+    t.assert_equals(res.stderr, exp)
+
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+
+        failover:
+          replicasets:
+            replicaset-001:
+              priority:
+                instance-003: 1
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+                  instance-002: {}
+              replicaset-002:
+                instances:
+                  instance-003: {}
+    ]]
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
+    local env = {TT_LOG_LEVEL = 0}
+    local args = {'--name', 'instance-001', '--config', config_file}
+    local opts = {nojson = true, stderr = true}
+    local res = justrun.tarantool(dir, env, args, opts)
+    local exp = 'LuajitError: instance instance-003 from replicaset ' ..
+                'replicaset-002 is specified in the wrong replicaset ' ..
+                'replicaset-001 in the failover configuration section\n' ..
+                'fatal error, exiting the event loop'
+
+    t.assert_equals(res.exit_code, 1)
+    t.assert_equals(res.stderr, exp)
+
+end
+
 g.test_advertise_from_env = function(g)
     local dir = treegen.prepare_directory({}, {})
     local config = [[
