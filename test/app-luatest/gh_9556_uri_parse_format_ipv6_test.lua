@@ -55,3 +55,15 @@ g1.test_parse_urls_with_ipv6_addresses = function(cg)
         t.assert_equals(value, res[key], msg)
     end
 end
+
+
+g1.test_format_urls_with_ipv6_addresses = function(cg)
+    -- This test checks the correct formatting URIs containing IPv6 addresses.
+    local url = join_url(cg.params)
+    local res = uri.parse(url)
+    t.assert_not_equals(res, nil, string.format('Error while parsing %q', url))
+    t.assert_equals(type(res), 'table',
+                    string.format('uri.parse(%q) is not a table', url))
+    local u = uri.format(res)
+    t.assert_equals(url, u)
+end
