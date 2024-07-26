@@ -339,6 +339,7 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		bind->i64 = field.ival;
 		bind->bytes = sizeof(bind->i64);
 		break;
+	case MP_BIN:
 	case MP_STR:
 		/*
 		 * Data should be saved in allocated memory as it
@@ -360,9 +361,6 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 	case MP_BOOL:
 		bind->b = field.bval;
 		bind->bytes = sizeof(bind->b);
-		break;
-	case MP_BIN:
-		bind->s = mp_decode_bin(&field.sval.data, &bind->bytes);
 		break;
 	case MP_EXT:
 		if (field.ext_type == MP_UUID) {
