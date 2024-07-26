@@ -101,7 +101,7 @@ uri_raw_parse(struct uri_raw *uri, const char *p)
 			>{ s = p; }
 			%{ uri->host = s; uri->host_len = p - s;};
 
-		hex1_4 = ([0-9a-fa-f]{1,4});
+		hex1_4 = ([0-9a-fA-F]{1,4});
 
 		ip4addr = ((digit{1,3}) (("." digit{1,3}){3}));
 		ip4 = ip4addr
@@ -111,7 +111,7 @@ uri_raw_parse(struct uri_raw *uri, const char *p)
 
 		ip6	= ("[" (
 				((hex1_4?) ((":" (hex1_4?)){1,8})) |
-				("::" [ff][ff][ff][ff] ":" ip4addr))
+				("::" [fF][fF][fF][fF] ":" ip4addr))
 			>{ s = p; }
 			%{ uri->host = s; uri->host_len = p - s;
 				   uri->host_hint = 2; }
