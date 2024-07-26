@@ -81,6 +81,7 @@ struct errinj {
 	_(ERRINJ_BUILD_INDEX, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_BUILD_INDEX_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_BUILD_INDEX_ON_ROLLBACK_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_BUILD_INDEX_DISABLE_YIELD, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_BUILD_INDEX_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_CHECK_FORMAT_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_COIO_SENDFILE_CHUNK, ERRINJ_INT, {.iparam = -1}) \

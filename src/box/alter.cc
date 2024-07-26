@@ -751,6 +751,10 @@ struct alter_space {
 static struct alter_space *
 alter_space_new(struct space *old_space)
 {
+	if (old_space->alter_count != 0) {
+		diag_set(ClientError, ER_ALTER_IN_PROGRESS, old_space->def->name);
+		return NULL;
+	}
 	struct txn *txn = in_txn();
 	size_t size = sizeof(struct alter_space);
 	struct alter_space *alter = (struct alter_space *)
@@ -769,6 +773,7 @@ alter_space_new(struct space *old_space)
 	else
 		alter->new_min_field_count = 0;
 	alter->n_rows = txn_n_rows(txn);
+	old_space->alter_count++;
 	return alter;
 }
 
@@ -782,9 +787,13 @@ alter_space_delete(struct alter_space *alter)
 						     AlterSpaceOp, link);
 		delete op;
 	}
+	if (alter->old_space)
+		alter->old_space->alter_count--;
 	/* Delete the new space, if any. */
-	if (alter->new_space)
+	if (alter->new_space) {
+		alter->new_space->alter_count--;
 		space_delete(alter->new_space);
+	}
 	space_def_delete(alter->space_def);
 }
 
@@ -888,6 +897,7 @@ alter_space_commit(struct trigger *trigger, void *event)
 	}
 
 	struct space *space = alter->new_space;
+	space->alter_count--;
 	alter->new_space = NULL; /* for alter_space_delete(). */
 	/*
 	 * Delete the old version of the space, we are not
@@ -1011,6 +1021,7 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 * Sic: the triggers are not moved over yet.
 	 */
 	alter->new_space = space_new_xc(alter->space_def, &alter->key_list);
+	alter->new_space->alter_count++;
 	/*
 	 * Copy the replace function, the new space is at the same recovery
 	 * phase as the old one. This hack is especially necessary for

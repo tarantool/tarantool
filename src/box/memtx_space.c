@@ -1176,6 +1176,16 @@ struct on_rollback_trigger_with_data {
 static int
 memtx_build_on_replace(struct trigger *trigger, void *event)
 {
+	/*
+	 * If MVCC is enabled, all concurrent writes that we haven't read
+	 * will be conflicted, so simply do nothing here.
+	 * Moreover, concurrent transaction can be rolled back much later
+	 * than the index will be built so the memtx_ddl_state will be
+	 * invalid (it is allocated on stack in memtx_build_index).
+	 */
+	if (memtx_tx_manager_use_mvcc_engine)
+		return 0;
+
 	struct txn *txn = event;
 	struct memtx_ddl_state *state = trigger->data;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -1297,6 +1307,10 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	 * build will not work properly if primary key is HASH index.
 	 */
 	bool can_yield = pk->def->type != HASH;
+
+	inj = errinj(ERRINJ_BUILD_INDEX_DISABLE_YIELD, ERRINJ_BOOL);
+	if (inj != NULL && inj->bparam == true)
+		can_yield = false;
 
 	struct memtx_engine *memtx = (struct memtx_engine *)src_space->engine;
 	struct memtx_ddl_state state;

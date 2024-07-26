@@ -551,6 +551,7 @@ space_create(struct space *space, struct engine *engine,
 	rlist_create(&space->on_replace);
 	rlist_create(&space->coll_id_holders);
 	space->run_triggers = true;
+	space->alter_count = 0;
 
 	space->format = format;
 	if (format != NULL)

@@ -490,6 +490,10 @@ box_process_rw(struct request *request, struct space *space,
 	bool return_tuple = false;
 	struct txn *txn = in_txn();
 	bool is_autocommit = txn == NULL;
+	if (space->alter_count > 0) {
+		diag_set(ClientError, ER_ALTER_IN_PROGRESS, space->def->name);
+		return -1;
+	}
 	if (is_autocommit && (txn = txn_begin()) == NULL)
 		return -1;
 	assert(iproto_type_is_dml(request->type));
