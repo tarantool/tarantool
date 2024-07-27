@@ -240,6 +240,10 @@ replication_reconnect_interval(void)
 double
 replication_disconnect_timeout(void);
 
+/** Timeout to wait for confirmation of a synchronous transaction. */
+double
+replication_wait_confirm_timeout(void);
+
 void
 replication_init(int num_threads);
 

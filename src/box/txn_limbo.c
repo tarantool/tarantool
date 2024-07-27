@@ -808,7 +808,7 @@ txn_limbo_wait_confirm(struct txn_limbo *limbo)
 		return 0;
 	bool is_rollback;
 	if (txn_limbo_wait_last_txn(limbo, &is_rollback,
-				    replication_synchro_timeout) != 0) {
+				    replication_wait_confirm_timeout()) != 0) {
 		diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
 		return -1;
 	}
