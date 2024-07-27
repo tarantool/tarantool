@@ -1470,9 +1470,11 @@ static double
 box_check_replication_synchro_timeout(void)
 {
 	double timeout = cfg_getd("replication_synchro_timeout");
-	if (timeout <= 0) {
+	if (timeout == 0) {
+		return TIMEOUT_INFINITY;
+	} else if (timeout < 0) {
 		diag_set(ClientError, ER_CFG, "replication_synchro_timeout",
-			 "the value must be greater than zero");
+			 "the value must be greater than or equal to 0");
 		return -1;
 	}
 	return timeout;
@@ -3076,12 +3078,14 @@ box_promote(void)
 	if (is_leader)
 		return 0;
 	switch (box_election_mode) {
-	case ELECTION_MODE_OFF:
-		if (box_try_wait_confirm(2 * replication_synchro_timeout) != 0)
+	case ELECTION_MODE_OFF: {
+		double timeout = 2 * replication_wait_confirm_timeout();
+		if (box_try_wait_confirm(timeout) != 0)
 			return -1;
 		if (box_trigger_elections() != 0)
 			return -1;
 		break;
+	}
 	case ELECTION_MODE_VOTER:
 		assert(raft->state == RAFT_STATE_FOLLOWER);
 		diag_set(ClientError, ER_UNSUPPORTED, "election_mode='voter'",
@@ -3097,7 +3101,8 @@ box_promote(void)
 		unreachable();
 	}
 
-	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
+	double timeout = replication_wait_confirm_timeout();
+	int64_t wait_lsn = box_wait_limbo_acked(timeout);
 	if (wait_lsn < 0)
 		return -1;
 
@@ -3149,9 +3154,11 @@ box_demote(void)
 		return 0;
 	if (box_trigger_elections() != 0)
 		return -1;
-	if (box_try_wait_confirm(2 * replication_synchro_timeout) < 0)
+	double timeout = 2 * replication_wait_confirm_timeout();
+	if (box_try_wait_confirm(timeout) < 0)
 		return -1;
-	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
+	timeout = replication_wait_confirm_timeout();
+	int64_t wait_lsn = box_wait_limbo_acked(timeout);
 	if (wait_lsn < 0)
 		return -1;
 	return box_issue_demote(wait_lsn);

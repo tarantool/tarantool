@@ -104,6 +104,12 @@ replication_disconnect_timeout(void)
 	return replication_timeout * 4;
 }
 
+double
+replication_wait_confirm_timeout(void)
+{
+	return replication_synchro_timeout;
+}
+
 /**
  * Effective connect quorum values for bootstrap_strategy = "auto" on various
  * stages of replicaset life. Regardless of the returned quorum value, instance
