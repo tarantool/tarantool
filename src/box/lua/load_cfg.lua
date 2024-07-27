@@ -8,6 +8,7 @@ local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
 local compat = require('compat')
+local tweaks = require('internal.tweaks')
 
 local function nop() end
 
@@ -248,6 +249,26 @@ returns. Set before first box.cfg{} call in order for the option to take effect.
 https://tarantool.io/compat/box_cfg_replication_sync_timeout
 ]]
 
+local replication_synchro_timeout_brief = [[
+Sets the default value for box.cfg.replication_synchro_timeout.
+Old is 5 seconds, new is infinity.
+
+https://tarantool.io/compat/box_cfg_replication_synchro_timeout
+]]
+
+local function replication_synchro_timeout_applicable(is_new)
+    if is_new and box_is_configured and
+        box.cfg.replication_synchro_timeout ~= 0 then
+        local err_msg_fmt =
+            "The compat option box_cfg_replication_synchro_timeout switches" ..
+            " to new only if box.cfg.replication_synchro_timeout is 0," ..
+            " but it is %s now"
+        error(err_msg_fmt:format(box.cfg.replication_synchro_timeout))
+        return false
+    end
+    return true
+end
+
 -- A list of box.cfg options whose defaults are managed by compat.
 local compat_options = {
     {
@@ -257,6 +278,19 @@ local compat_options = {
         newval = 0,
         obsolete = nil,
         default = 'new',
+    },
+    {
+        name = 'replication_synchro_timeout',
+        brief = replication_synchro_timeout_brief,
+        oldval = 5,
+        newval = 0,
+        obsolete = nil,
+        dynamic = true,
+        default = 'old',
+        tweak_name = 'replication_synchro_timeout_enabled',
+        new_tweak_value = false,
+        old_tweak_value = true,
+        applicable = replication_synchro_timeout_applicable,
     },
 }
 
@@ -268,13 +302,22 @@ for _, option in ipairs(compat_options) do
         obsolete = option.obsolete,
         brief = option.brief,
         action = function(is_new)
-            if is_locked() or box_is_configured then
+            if not option.dynamic and (is_locked() or box_is_configured) then
                 error("The compat  option '" .. option_name .. "' takes " ..
                       "effect only before the initial box.cfg() call")
             end
-            local val = is_new and option.newval or option.oldval
-            default_cfg[option.name] = val
-            pre_load_cfg[option.name] = val
+            if option.applicable == nil or option.applicable(is_new) then
+                local val = is_new and option.newval or option.oldval
+                default_cfg[option.name] = val
+                pre_load_cfg[option.name] = val
+                if option.tweak_name ~= nil then
+                    if is_new then
+                        tweaks[option.tweak_name] = option.new_tweak_value
+                    else
+                        tweaks[option.tweak_name] = option.old_tweak_value
+                    end
+                end
+            end
         end,
         run_action_now = true,
     })

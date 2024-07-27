@@ -1472,6 +1472,10 @@ box_check_replication_synchro_timeout(void)
 	double timeout = cfg_getd("replication_synchro_timeout");
 	if (timeout == 0) {
 		return TIMEOUT_INFINITY;
+	} else if (!replication_synchro_timeout_enabled) {
+		diag_set(ClientError, ER_DEPRECATED,
+			 "Option 'replication_synchro_timeout'");
+		return -1;
 	} else if (timeout < 0) {
 		diag_set(ClientError, ER_CFG, "replication_synchro_timeout",
 			 "the value must be greater than or equal to 0");

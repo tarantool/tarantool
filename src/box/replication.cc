@@ -42,6 +42,7 @@
 #include "raft.h"
 #include "relay.h"
 #include "sio.h"
+#include "tweaks.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
@@ -57,7 +58,7 @@ double replication_connect_timeout = 30.0; /* seconds */
 int replication_connect_quorum = REPLICATION_CONNECT_QUORUM_ALL;
 double replication_sync_lag = 10.0; /* seconds */
 int replication_synchro_quorum = 1;
-double replication_synchro_timeout = 5.0; /* seconds */
+double replication_synchro_timeout = 0.0; /* seconds */
 double replication_sync_timeout = 300.0; /* seconds */
 bool replication_skip_conflict = false;
 int replication_threads = 1;
@@ -67,6 +68,9 @@ struct tt_uuid cfg_bootstrap_leader_uuid;
 struct uri cfg_bootstrap_leader_uri;
 char cfg_bootstrap_leader_name[NODE_NAME_SIZE_MAX];
 char cfg_instance_name[NODE_NAME_SIZE_MAX];
+
+bool replication_synchro_timeout_enabled = true;
+TWEAK_BOOL(replication_synchro_timeout_enabled);
 
 struct replicaset replicaset;
 
@@ -107,7 +111,8 @@ replication_disconnect_timeout(void)
 double
 replication_wait_confirm_timeout(void)
 {
-	return replication_synchro_timeout;
+	return replication_synchro_timeout_enabled ?
+	       replication_synchro_timeout : replication_disconnect_timeout();
 }
 
 /**

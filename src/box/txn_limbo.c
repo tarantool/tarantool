@@ -310,6 +310,12 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	assert(txn_has_flag(entry->txn, TXN_WAIT_SYNC));
 	double start_time = fiber_clock();
 	while (true) {
+		/*
+		 * replication_synchro_timeout is always equal to
+		 * TIMEOUT_INFINITY when compat option
+		 * box_cfg_replication_synchro_timeout is set to new.
+		 * So in this case there won't actually be a timeout here.
+		 */
 		double deadline = start_time + replication_synchro_timeout;
 		double timeout = deadline - fiber_clock();
 		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);

@@ -11,6 +11,11 @@ g.before_all(cluster.init)
 g.after_each(cluster.drop)
 g.after_all(cluster.clean)
 
+-- Don't check these options because they have complex switching rules.
+local skip_reload_case = {
+    box_cfg_replication_synchro_timeout = true,
+}
+
 -- These options can't be changed on reload.
 local non_dynamic = {
     box_cfg_replication_sync_timeout = {
@@ -216,40 +221,42 @@ for option_name, _ in pairs(compat._options()) do
         g[case_name_prefix .. v] = gen_startup_case(option_name, v)
     end
 
-    if non_dynamic[option_name] == nil then
-        -- Start without compat option and set it on reload.
-        g['test_reload_' .. option_name] = gen_reload_case(option_name)
-    else
-        -- Start with one option name and set another on reload (expect an
-        -- error).
-        --
-        -- Also verify that null and an effective default may be
-        -- used interchangeably and switching from one to another
-        -- on reload doesn't trigger any error.
-        local case_name_prefix = ('test_reload_%s_'):format(option_name)
-        g[case_name_prefix .. 'failure_old_to_new'] = gen_reload_failure_case(
-            option_name, 'old', 'new')
-        g[case_name_prefix .. 'failure_new_to_old'] = gen_reload_failure_case(
-            option_name, 'new', 'old')
-        local def = compat._options()[option_name].default
-        if def == 'old' then
-            g[case_name_prefix .. 'failure_default_to_new'] =
-                gen_reload_failure_case(option_name, 'default', 'new')
-            g[case_name_prefix .. 'failure_new_to_default'] =
-                gen_reload_failure_case(option_name, 'new', 'default')
-            g[case_name_prefix .. 'success_default_to_old'] =
-                gen_reload_success_case(option_name, 'default', 'old')
-            g[case_name_prefix .. 'success_old_to_default'] =
-                gen_reload_success_case(option_name, 'old', 'default')
+    if not skip_reload_case[option_name] then
+        if non_dynamic[option_name] == nil then
+            -- Start without compat option and set it on reload.
+            g['test_reload_' .. option_name] = gen_reload_case(option_name)
         else
-            g[case_name_prefix .. 'success_default_to_new'] =
-                gen_reload_success_case(option_name, 'default', 'new')
-            g[case_name_prefix .. 'success_new_to_default'] =
-                gen_reload_success_case(option_name, 'new', 'default')
-            g[case_name_prefix .. 'failure_default_to_old'] =
-                gen_reload_failure_case(option_name, 'default', 'old')
-            g[case_name_prefix .. 'failure_old_to_default'] =
-                gen_reload_failure_case(option_name, 'old', 'default')
+            -- Start with one option name and set another on reload (expect an
+            -- error).
+            --
+            -- Also verify that null and an effective default may be
+            -- used interchangeably and switching from one to another
+            -- on reload doesn't trigger any error.
+            local case_name_prefix = ('test_reload_%s_'):format(option_name)
+            g[case_name_prefix .. 'failure_old_to_new'] =
+                gen_reload_failure_case(option_name, 'old', 'new')
+            g[case_name_prefix .. 'failure_new_to_old'] =
+                gen_reload_failure_case(option_name, 'new', 'old')
+            local def = compat._options()[option_name].default
+            if def == 'old' then
+                g[case_name_prefix .. 'failure_default_to_new'] =
+                    gen_reload_failure_case(option_name, 'default', 'new')
+                g[case_name_prefix .. 'failure_new_to_default'] =
+                    gen_reload_failure_case(option_name, 'new', 'default')
+                g[case_name_prefix .. 'success_default_to_old'] =
+                    gen_reload_success_case(option_name, 'default', 'old')
+                g[case_name_prefix .. 'success_old_to_default'] =
+                    gen_reload_success_case(option_name, 'old', 'default')
+            else
+                g[case_name_prefix .. 'success_default_to_new'] =
+                    gen_reload_success_case(option_name, 'default', 'new')
+                g[case_name_prefix .. 'success_new_to_default'] =
+                    gen_reload_success_case(option_name, 'new', 'default')
+                g[case_name_prefix .. 'failure_default_to_old'] =
+                    gen_reload_failure_case(option_name, 'default', 'old')
+                g[case_name_prefix .. 'failure_old_to_default'] =
+                    gen_reload_failure_case(option_name, 'old', 'default')
+            end
         end
     end
 end
