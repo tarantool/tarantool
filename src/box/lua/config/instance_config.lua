@@ -1463,7 +1463,9 @@ return schema.new('instance_config', schema.record({
         synchro_timeout = schema.scalar({
             type = 'number',
             box_cfg = 'replication_synchro_timeout',
-            default = 5,
+            -- The effective default is determined depending of
+            -- the box_cfg_replication_synchro_timeout compat option.
+            default = box.NULL,
         }),
         synchro_queue_max_size = schema.scalar({
             type = 'integer',
@@ -2343,6 +2345,12 @@ return schema.new('instance_config', schema.record({
             'new',
         }, {
             default = 'new',
+        }),
+        box_cfg_replication_synchro_timeout = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
         }),
         sql_seq_scan_default = schema.enum({
             'old',
