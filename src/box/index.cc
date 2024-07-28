@@ -981,6 +981,32 @@ generic_index_create_iterator(struct index *base, enum iterator_type type,
 }
 
 
+struct iterator *
+generic_index_create_iterator_with_offset(struct index *base,
+					  enum iterator_type type,
+					  const char *key, uint32_t part_count,
+					  const char *pos, uint32_t offset)
+{
+	/* Create a reguar iterator. */
+	struct iterator *it = index_create_iterator_after(
+		base, type, key, part_count, pos);
+
+	/* Skip the required amount of tuples. */
+	for (size_t i = 0; i < offset; i++) {
+		if (box_check_slice() != 0)
+			goto fail;
+		struct tuple *skipped_tuple;
+		if (iterator_next(it, &skipped_tuple) != 0)
+			goto fail;
+		if (skipped_tuple == NULL)
+			return it;
+	}
+	return it;
+fail:
+	iterator_delete(it);
+	return NULL;
+}
+
 struct index_read_view *
 generic_index_create_read_view(struct index *index)
 {
