@@ -2392,6 +2392,8 @@ static const struct index_vtab memtx_tree_disabled_index_vtab = {
 	/* .get = */ generic_index_get,
 	/* .replace = */ disabled_index_replace,
 	/* .create_iterator = */ generic_index_create_iterator,
+	/* .create_iterator_with_offset = */
+	generic_index_create_iterator_with_offset,
 	/* .create_read_view = */ generic_index_create_read_view,
 	/* .stat = */ generic_index_stat,
 	/* .compact = */ generic_index_compact,
@@ -2455,6 +2457,8 @@ get_memtx_tree_index_vtab(void)
 				 memtx_tree_index_replace<USE_HINT>,
 		/* .create_iterator = */
 			memtx_tree_index_create_iterator<USE_HINT>,
+		/* .create_iterator_with_offset = */
+		generic_index_create_iterator_with_offset,
 		/* .create_read_view = */
 			memtx_tree_index_create_read_view<USE_HINT>,
 		/* .stat = */ generic_index_stat,
