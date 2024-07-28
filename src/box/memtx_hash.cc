@@ -276,6 +276,7 @@ memtx_hash_index_size(struct index *base)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct space *space = space_by_id(base->def->space_id);
+	memtx_tx_story_gc();
 	/* Substract invisible count. */
 	return light_index_count(&index->hash_table) -
 	       memtx_tx_index_invisible_count(in_txn(), space, base);
