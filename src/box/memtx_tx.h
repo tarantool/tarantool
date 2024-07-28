@@ -322,9 +322,10 @@ memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
  * Helper of memtx_tx_track_count.
  */
 uint32_t
-memtx_tx_track_count_slow(struct txn *txn, struct space *space,
-			  struct index *index, enum iterator_type type,
-			  const char *key, uint32_t part_count);
+memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
+				struct index *index, enum iterator_type type,
+				const char *key, uint32_t part_count,
+				struct tuple *until, hint_t until_hint);
 
 /**
  * Record in TX manager that a transaction @a txn have counted @a index from @a
@@ -342,8 +343,30 @@ memtx_tx_track_count(struct txn *txn, struct space *space,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return 0;
-	return memtx_tx_track_count_slow(txn, space, index,
-					 type, key, part_count);
+	return memtx_tx_track_count_until_slow(txn, space, index, type, key,
+					       part_count, NULL, HINT_NONE);
+}
+
+/**
+ * Record in TX manager that a transaction @a txn have counted @a index from @a
+ * space by @a key and iterator @a type @a until a tuple. This function must be
+ * used when all tuples matching the key and iterator until the given one are
+ * skipped by a transaction without reading (e. g. select with offset).
+ *
+ * NB: can trigger story garbage collection.
+ *
+ * @return the amount of invisible tuples counted.
+ */
+static inline uint32_t
+memtx_tx_track_count_until(struct txn *txn, struct space *space,
+			   struct index *index, enum iterator_type type,
+			   const char *key, uint32_t part_count,
+			   struct tuple *until, hint_t until_hint)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	return memtx_tx_track_count_until_slow(txn, space, index, type, key,
+					       part_count, until, until_hint);
 }
 
 /**
@@ -400,9 +423,14 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index);
 }
 
+/**
+ * Helper of invisible count functions.
+ */
 uint32_t
-memtx_tx_index_invisible_count_slow(struct txn *txn,
-				    struct space *space, struct index *index);
+memtx_tx_index_invisible_count_matching_until_slow(
+	struct txn *txn, struct space *space, struct index *index,
+	enum iterator_type type, const char *key, uint32_t part_count,
+	struct tuple *until, hint_t until_hint);
 
 /**
  * When MVCC engine is enabled, an index can contain temporary non-committed
@@ -411,8 +439,6 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
  * standalone observer.
  * The function calculates tje number of tuples that are physically present
  * in index, but have no visible value.
- *
- * NB: can trigger story garbage collection.
  */
 static inline uint32_t
 memtx_tx_index_invisible_count(struct txn *txn,
@@ -420,7 +446,46 @@ memtx_tx_index_invisible_count(struct txn *txn,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return 0;
-	return memtx_tx_index_invisible_count_slow(txn, space, index);
+	return memtx_tx_index_invisible_count_matching_until_slow(
+		txn, space, index, ITER_GE, NULL, 0, NULL, HINT_NONE);
+}
+
+/**
+ * Same as memtx_tx_index_invisible_count but only counts tuples matching to
+ * the given key and iterator up to the given tuple (exclusively) according to
+ * the index order.
+ *
+ * E. g. for index: [1, 2, 3, 4, 5], given all items in the index are invisible
+ * to the transaction, counting matching LE 3 until 1 will give 2 (3 and 2 will
+ * be counted, 1 will not since the count is exclusive).
+ */
+static inline uint32_t
+memtx_tx_index_invisible_count_matching_until(
+	struct txn *txn, struct space *space, struct index *index,
+	enum iterator_type type, const char *key, uint32_t part_count,
+	struct tuple *until, hint_t until_hint)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	return memtx_tx_index_invisible_count_matching_until_slow(
+		txn, space, index, type, key, part_count, until, until_hint);
+}
+
+/** Helper of memtx_tx_tuple_is_visible. */
+bool
+memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct index *index,
+				   struct tuple *tuple);
+
+/**
+ * Detect whether key of @a tuple from @a index is visible to @a txn.
+ */
+static inline bool
+memtx_tx_tuple_key_is_visible(struct txn *txn, struct index *index,
+			      struct tuple *tuple)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return true;
+	return memtx_tx_tuple_key_is_visible_slow(txn, index, tuple);
 }
 
 /**

@@ -277,7 +277,24 @@ struct full_scan_gap_item {
 /**
  * Derived class for count gap, @sa GAP_COUNT.
  */
-#define count_gap_item nearby_gap_item
+struct count_gap_item {
+	/** Base class. */
+	struct gap_item_base base;
+	/** The key. Can be NULL. */
+	const char *key;
+	/* Length of the key. */
+	uint32_t key_len;
+	/* Part count of the key. */
+	uint32_t part_count;
+	/** Search mode. */
+	enum iterator_type type;
+	/** Storage for short key. @key may point here. */
+	char short_key[16];
+	/** The bound tuple. */
+	struct tuple *until;
+	/** The bound tuple hint. */
+	hint_t until_hint;
+};
 
 /**
  * Initialize common part of gap item, except for in_read_gaps member,
@@ -320,7 +337,8 @@ memtx_tx_full_scan_gap_item_new(struct txn *txn);
  */
 static struct count_gap_item *
 memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
-			    const char *key, uint32_t part_count);
+			    const char *key, uint32_t part_count,
+			    struct tuple *until, hint_t until_hint);
 
 /**
  * Helper structure for searching for point_hole_item in the hash table,
@@ -580,6 +598,8 @@ struct tx_manager
 	struct memtx_tx_mempool inplace_gap_item_mempoool;
 	/** Mempool for nearby_gap_item objects. */
 	struct memtx_tx_mempool nearby_gap_item_mempoool;
+	/** Mempool for count_gap_item objects. */
+	struct memtx_tx_mempool count_gap_item_mempool;
 	/** Mempool for full_scan_gap_item objects. */
 	struct memtx_tx_mempool full_scan_gap_item_mempool;
 	/** List of all memtx_story objects. */
@@ -630,6 +650,9 @@ memtx_tx_manager_init()
 	memtx_tx_mempool_create(&txm.nearby_gap_item_mempoool,
 				sizeof(struct nearby_gap_item),
 				MEMTX_TX_ALLOC_TRACKER);
+	memtx_tx_mempool_create(&txm.count_gap_item_mempool,
+				sizeof(struct count_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
 	memtx_tx_mempool_create(&txm.full_scan_gap_item_mempool,
 				sizeof(struct full_scan_gap_item),
 				MEMTX_TX_ALLOC_TRACKER);
@@ -650,6 +673,7 @@ memtx_tx_manager_free()
 	mh_point_holes_delete(txm.point_holes);
 	memtx_tx_mempool_destroy(&txm.inplace_gap_item_mempoool);
 	memtx_tx_mempool_destroy(&txm.nearby_gap_item_mempoool);
+	memtx_tx_mempool_destroy(&txm.count_gap_item_mempool);
 	memtx_tx_mempool_destroy(&txm.full_scan_gap_item_mempool);
 }
 
@@ -1834,6 +1858,22 @@ memtx_tx_tuple_matches(struct key_def *def, struct tuple *tuple,
 }
 
 /**
+ * Check if @a tuple is positioned prior to @a until in @a index according
+ * to the iterator @a type direction and the given @a cmp_def.
+ */
+static bool
+memtx_tx_tuple_is_before(struct key_def *cmp_def, struct tuple *tuple,
+			 struct tuple *until, hint_t until_hint,
+			 enum iterator_type type)
+{
+	int dir = iterator_direction(type);
+	hint_t th = tuple_hint(tuple, cmp_def);
+	int until_cmp = tuple_compare(until, until_hint,
+				      tuple, th, cmp_def);
+	return dir * until_cmp > 0;
+}
+
+/**
  * Check for possible conflict relations with GAP_COUNT entries during insertion
  * or deletion of tuple (with the corresponding @a story) in index @a ind. It is
  * needed if and only if there was no replaced tuple in the index for insertion
@@ -1857,8 +1897,16 @@ memtx_tx_handle_counted_write(struct space *space, struct memtx_story *story,
 				 in_read_gaps, tmp) {
 		if (item_base->type != GAP_COUNT)
 			continue;
+
 		struct count_gap_item *item =
 			(struct count_gap_item *)item_base;
+
+		/* Check the border using the cmp_def. */
+		if (item->until != NULL &&
+		    !memtx_tx_tuple_is_before(index->def->cmp_def, story->tuple,
+					      item->until, item->until_hint,
+					      item->type))
+			continue;
 
 		bool tuple_matches = memtx_tx_tuple_matches(
 			index->def->key_def, story->tuple,
@@ -3027,12 +3075,37 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 } while (0)
 
 uint32_t
-memtx_tx_index_invisible_count_slow(struct txn *txn,
-				    struct space *space, struct index *index)
+memtx_tx_index_invisible_count_matching_until_slow(
+	struct txn *txn, struct space *space, struct index *index,
+	enum iterator_type type, const char *key, uint32_t part_count,
+	struct tuple *until, hint_t until_hint)
 {
+	struct key_def *key_def = index->def->key_def;
+	struct key_def *cmp_def = index->def->cmp_def;
+
+	/*
+	 * The border is only valid if it's located at or after the first
+	 * tuple in the index according to the iterator direction and key.
+	 */
+	assert(until == NULL ||
+	       memtx_tx_tuple_matches(key_def, until, type == ITER_EQ ?
+				      ITER_GE : type == ITER_REQ ? ITER_LE :
+				      type, key, part_count));
+
 	uint32_t res = 0;
 	struct memtx_story *story;
 	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
+		/* Check the border using the cmp_def. */
+		if (until != NULL &&
+		    !memtx_tx_tuple_is_before(cmp_def, story->tuple,
+					      until, until_hint, type))
+			continue;
+
+		/* All tuples in the story chain share the same key. */
+		if (!memtx_tx_tuple_matches(key_def, story->tuple,
+					    type, key, part_count))
+			continue;
+
 		struct tuple *visible = NULL;
 		bool is_prepared_ok = detect_whether_prepared_ok(txn);
 		bool unused;
@@ -3042,8 +3115,27 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 		if (visible == NULL)
 			res++;
 	});
-	memtx_tx_story_gc();
 	return res;
+}
+
+/**
+ * Detect whether key of @a tuple from @a index is visible to @a txn.
+ */
+bool
+memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct index *index,
+				   struct tuple *tuple)
+{
+	if (!tuple_has_flag(tuple, TUPLE_IS_DIRTY))
+		return true;
+
+	struct memtx_story *story = memtx_tx_story_get(tuple);
+	struct tuple *visible = NULL;
+	bool is_prepared_ok = detect_whether_prepared_ok(txn);
+	bool unused;
+	memtx_tx_story_find_visible_tuple(story, txn, index->dense_id,
+					  is_prepared_ok, &visible,
+					  &unused);
+	return visible != NULL;
 }
 
 /**
@@ -3060,8 +3152,10 @@ memtx_tx_delete_gap(struct gap_item_base *item)
 		pool = &txm.inplace_gap_item_mempoool;
 		break;
 	case GAP_NEARBY:
-	case GAP_COUNT:
 		pool = &txm.nearby_gap_item_mempoool;
+		break;
+	case GAP_COUNT:
+		pool = &txm.count_gap_item_mempool;
 		break;
 	case GAP_FULL_SCAN:
 		pool = &txm.full_scan_gap_item_mempool;
@@ -3369,16 +3463,31 @@ memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
 }
 
 /**
- * Allocate and create count gap item.
+ * Allocate and create count gap item. The @a until tuple's story must have
+ * a gap item from the @a txn transaction or be tracked by it, so the story
+ * is not deleted by the garbage collector and the tuple is not deleted (if
+ * it's not NULL).
+ *
  * Note that in_read_gaps base member must be initialized later.
  */
 static struct count_gap_item *
 memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
-			    const char *key, uint32_t part_count)
+			    const char *key, uint32_t part_count,
+			    struct tuple *until, hint_t until_hint)
 {
-	struct count_gap_item *item =
-		memtx_tx_nearby_gap_item_new(txn, type, key, part_count);
-	item->base.type = GAP_COUNT;
+	assert(until == NULL || tuple_has_flag(until, TUPLE_IS_DIRTY));
+
+	struct memtx_tx_mempool *pool = &txm.count_gap_item_mempool;
+	struct count_gap_item *item = memtx_tx_xmempool_alloc(txn, pool);
+	gap_item_base_create(&item->base, GAP_COUNT, txn);
+
+	item->type = type;
+	item->part_count = part_count;
+	item->key = memtx_tx_save_key(txn, key, part_count, item->short_key,
+				      sizeof(item->short_key), &item->key_len);
+	item->until = until;
+	item->until_hint = until_hint;
+
 	return item;
 }
 
@@ -3434,18 +3543,32 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 /**
  * Record in TX manager that a transaction @a txn have counted @a index of @a
  * space by @a key and iterator @a type. This function must be used for queries
- * that count tuples in indexes (for example, index:size or index:count).
+ * that count tuples in indexes (for example, index:size or index:count) or if
+ * tuples are skipped by a transaction without reading.
  *
  * @return the amount of invisible tuples counted.
  */
 uint32_t
-memtx_tx_track_count_slow(struct txn *txn, struct space *space,
-			  struct index *index, enum iterator_type type,
-			  const char *key, uint32_t part_count)
+memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
+				struct index *index, enum iterator_type type,
+				const char *key, uint32_t part_count,
+				struct tuple *until, hint_t until_hint)
 {
+	struct key_def *key_def = index->def->key_def;
+	struct key_def *cmp_def = index->def->cmp_def;
+
+	/*
+	 * The border is only valid if it's located at or after the first
+	 * tuple in the index according to the iterator direction and key.
+	 */
+	assert(until == NULL ||
+	       memtx_tx_tuple_matches(key_def, until, type == ITER_EQ ?
+				      ITER_GE : type == ITER_REQ ? ITER_LE :
+				      type, key, part_count));
+
 	if (txn != NULL && txn->status == TXN_INPROGRESS) {
-		struct count_gap_item *item =
-			memtx_tx_count_gap_item_new(txn, type, key, part_count);
+		struct count_gap_item *item = memtx_tx_count_gap_item_new(
+			txn, type, key, part_count, until, until_hint);
 		rlist_add(&index->read_gaps, &item->base.in_read_gaps);
 	}
 
@@ -3465,8 +3588,14 @@ memtx_tx_track_count_slow(struct txn *txn, struct space *space,
 	uint32_t invisible_count = 0;
 	struct memtx_story *story;
 	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
+		/* Check the border using the cmp_def. */
+		if (until != NULL &&
+		    !memtx_tx_tuple_is_before(cmp_def, story->tuple,
+					      until, until_hint, type))
+			continue;
+
 		/* All tuples in the story chain share the same key. */
-		if (!memtx_tx_tuple_matches(index->def->key_def, story->tuple,
+		if (!memtx_tx_tuple_matches(key_def, story->tuple,
 					    type, key, part_count))
 			continue;
 

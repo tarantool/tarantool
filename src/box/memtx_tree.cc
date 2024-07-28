@@ -314,6 +314,8 @@ struct tree_iterator {
 	enum iterator_type type;
 	struct memtx_tree_key_data<USE_HINT> after_data;
 	struct memtx_tree_key_data<USE_HINT> key_data;
+	/** The amount of tuples to skip after the iterator start. */
+	uint32_t skip;
 	/**
 	 * Data that was fetched last, needed to make iterators stable.
 	 * Contains NULL as pointer to tuple only if there was no data fetched.
@@ -773,6 +775,30 @@ prepare_start_prefix_iterator(struct memtx_tree_key_data<USE_HINT> *start_data,
 	return true;
 }
 
+/*
+ * Advance the @a iterator of @a tree for up to @a skip tuples, updates the @a
+ * curr_offset output parameter to the new (actualized) value.
+ */
+template<bool USE_HINT>
+static void
+memtx_tree_skip(const memtx_tree_t<USE_HINT> *tree,
+		memtx_tree_iterator_t<USE_HINT> *iterator,
+		size_t *curr_offset, size_t skip, bool reverse)
+{
+	/*
+	 * Normalize unsigned overflow to SIZE_MAX if expected. Beware, that
+	 * the curr_offset can be SIZE_MAX already (see the caller's body).
+	 *
+	 * The memtx_tree_iterator_at(SIZE_MAX) gives an invalid iterator.
+	 */
+	if (reverse && skip > *curr_offset + 1)
+		skip = *curr_offset + 1;
+	size_t new_offset = reverse ? *curr_offset - skip : *curr_offset + skip;
+
+	*iterator = memtx_tree_iterator_at(tree, new_offset);
+	*curr_offset = new_offset;
+};
+
 /**
  * Creates an iterator based on the given key, after data and iterator type.
  * Also updates @a start_data and iterator @a type as required.
@@ -781,6 +807,7 @@ prepare_start_prefix_iterator(struct memtx_tree_key_data<USE_HINT> *start_data,
  * @param start_data - the key to lookup with, may be updated;
  * @param after_data - the after key, can be empty if not required;
  * @param type - the lookup iterator type, may be updated;
+ * @param skip - the amount of tuples to skip after lookup;
  * @param region - the region to allocate a new @a start_data on if required.
  * @param[out] iterator - the result of the lookup;
  * @param[out] offset - the offset @a iterator points to;
@@ -797,7 +824,7 @@ static bool
 memtx_tree_lookup(memtx_tree_t<USE_HINT> *tree,
 		  struct memtx_tree_key_data<USE_HINT> *start_data,
 		  struct memtx_tree_key_data<USE_HINT> after_data,
-		  enum iterator_type *type, struct region *region,
+		  enum iterator_type *type, size_t skip, struct region *region,
 		  memtx_tree_iterator_t<USE_HINT> *iterator,
 		  size_t *offset, bool *equals,
 		  struct memtx_tree_data<USE_HINT> **initial_elem)
@@ -886,9 +913,25 @@ memtx_tree_lookup(memtx_tree_t<USE_HINT> *tree,
 		 * the tree are less (less or equal) to the key, and
 		 * iterator_prev call will convert the iterator to the
 		 * last position in the tree, that's what we need.
+		 *
+		 * We only step back if we don't need to skip tuples,
+		 * otherwise we will only need the current offset to
+		 * update the iterator.
 		 */
-		memtx_tree_iterator_prev(tree, iterator);
+		if (skip == 0)
+			memtx_tree_iterator_prev(tree, iterator);
 		--*offset; /* Unsigned underflow possible. */
+	}
+
+	/*
+	 * Skip the amount of tuples required. Here raw tuples are skipped,
+	 * but in case of multiple concurrent transactions, some of these
+	 * tuples might be invisible to the current one, this is handled on
+	 * the caller site.
+	 */
+	if (skip != 0) {
+		memtx_tree_skip(tree, iterator, offset, skip,
+				iterator_type_is_reverse(*type));
 	}
 	return true;
 }
@@ -920,8 +963,8 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	/* The flag is true if the found tuple equals to the key. */
 	bool equals;
 	struct memtx_tree_data<USE_HINT> *initial_elem;
-	if (!memtx_tree_lookup(tree, &start_data, it->after_data,
-			       &type, region, &it->tree_iterator,
+	if (!memtx_tree_lookup(tree, &start_data, it->after_data, &type,
+			       it->skip, region, &it->tree_iterator,
 			       &unused, &equals, &initial_elem))
 		return 0;
 
@@ -932,13 +975,46 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	struct tuple *successor = initial_elem ? initial_elem->tuple : NULL;
 
 	struct memtx_tree_data<USE_HINT> *res = initial_elem;
-	if (iterator_type_is_reverse(type))
+
+	/*
+	 * If the iterator type is not reverse and we don't skip tuples, the
+	 * initial_elem is the result of the first iteration step. Otherwise
+	 * the lookup function performs an extra step back or tuple skip, so
+	 * we need to actualize the current element after it.
+	 */
+	if (iterator_type_is_reverse(type) || it->skip != 0)
 		res = memtx_tree_iterator_get_elem(tree, &it->tree_iterator);
+
+	/*
+	 * If we have skipped raw tuples, some of them may be invisible to the
+	 * current transaction, let's skip further in this case.
+	 */
+	struct txn *txn = in_txn();
+	if (it->skip != 0 && res != NULL) {
+		size_t skip_more_visible =
+			memtx_tx_index_invisible_count_matching_until(
+				txn, space, index_base, type, start_data.key,
+				start_data.part_count, res->tuple, res->hint);
+
+		/* Skip more visible tuples. */
+		memtx_tree_iterator_t<USE_HINT> *iterator = &it->tree_iterator;
+		while (skip_more_visible != 0 && res != NULL) {
+			if (memtx_tx_tuple_key_is_visible(txn, index_base,
+							  res->tuple))
+				skip_more_visible--;
+			if (iterator_type_is_reverse(type))
+				memtx_tree_iterator_prev(tree, iterator);
+			else
+				memtx_tree_iterator_next(tree, iterator);
+			res = memtx_tree_iterator_get_elem(tree, iterator);
+		}
+	}
 
 	bool is_eq = type == ITER_EQ || type == ITER_REQ;
 
 	/* If we skip tuple, flag equals is not actual - need to refresh it. */
-	if (it->after_data.key != NULL && res != NULL && is_eq) {
+	if (((it->after_data.key != NULL && is_eq) || it->skip != 0) &&
+	    res != NULL) {
 		equals = tuple_compare_with_key(res->tuple, res->hint,
 						it->key_data.key,
 						it->key_data.part_count,
@@ -946,7 +1022,6 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 						index->base.def->key_def) == 0;
 	}
 
-	struct txn *txn = in_txn();
 	/*
 	 * Equality iterators requires exact key match: if the result does not
 	 * equal to the key, iteration ends.
@@ -972,6 +1047,43 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	 */
 	struct key_def *cmp_def = index->base.def->cmp_def;
 	bool key_is_full = start_data.part_count == cmp_def->part_count;
+	if (it->skip != 0) {
+		if (res == NULL || !eq_match) {
+			/*
+			 * We have stepped over some amount of tuples and got to
+			 * the end of the index or stepped over the matching set
+			 * (if iterator is EQ or REQ). Lets inform MVCC like we
+			 * have counted tuples in the index by our iterator and
+			 * key. Insertion or deletion of any matching tuple into
+			 * the index will conflict with us.
+			 */
+			memtx_tx_track_count(txn, space, index_base,
+					     type, start_data.key,
+					     start_data.part_count);
+
+		} else {
+			/*
+			 * We have stepped over some amount of tuples and got to
+			 * a tuple. Changing the amount of matching tuples prior
+			 * to the approached one must conflict with us, so lets
+			 * inform MVCC like we have counted tuples in the index
+			 * by our key and iterator until the approached tuple.
+			 *
+			 * The approached tuple itself is read above, so its
+			 * replacement or deletion is tracked already.
+			 */
+			memtx_tx_track_count_until(txn, space, index_base,
+						   type, start_data.key,
+						   start_data.part_count,
+						   res->tuple, res->hint);
+		}
+		/*
+		 * We track all the skipped tuples using one of count trackers,
+		 * so no extra tracking is required in this case, insertion or
+		 * deletion of a matching tuple will be caught.
+		 */
+		goto end;
+	}
 	if (key_is_full && !eq_match)
 		memtx_tx_track_point(txn, space, index_base, it->key_data.key);
 	/*
@@ -985,6 +1097,8 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 		memtx_tx_track_gap(txn, space, index_base, successor, type,
 				   start_data.key, MIN(start_data.part_count,
 				   index_base->def->key_def->part_count));
+
+end:
 	memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 
@@ -1124,6 +1238,7 @@ memtx_tree_index_size(struct index *base)
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
 	struct space *space = space_by_id(base->def->space_id);
+	memtx_tx_story_gc();
 	/* Substract invisible count. */
 	return memtx_tree_size(&index->tree) -
 	       memtx_tx_index_invisible_count(in_txn(), space, base);
@@ -1195,7 +1310,7 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 	size_t begin_offset;
 	bool equals;
 	struct memtx_tree_data<USE_HINT> *initial_elem;
-	if (!memtx_tree_lookup(tree, &start_data, null_after_data, &type,
+	if (!memtx_tree_lookup(tree, &start_data, null_after_data, &type, 0,
 			       region, &unused, &begin_offset, &equals,
 			       &initial_elem))
 		return 0;
@@ -1875,9 +1990,9 @@ end:
 
 template <bool USE_HINT>
 static struct iterator *
-memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
-				 const char *key, uint32_t part_count,
-				 const char *pos)
+memtx_tree_index_create_iterator_with_offset(
+	struct index *base, enum iterator_type type, const char *key,
+	uint32_t part_count, const char *pos, uint32_t offset)
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
@@ -1932,7 +2047,18 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 		it->after_data.key = NULL;
 		it->after_data.part_count = 0;
 	}
+	it->skip = offset;
 	return (struct iterator *)it;
+}
+
+template<bool USE_HINT>
+static struct iterator *
+memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
+				 const char *key, uint32_t part_count,
+				 const char *pos)
+{
+	return memtx_tree_index_create_iterator_with_offset<USE_HINT>(
+		base, type, key, part_count, pos, 0);
 }
 
 template <bool USE_HINT>
@@ -2458,7 +2584,7 @@ get_memtx_tree_index_vtab(void)
 		/* .create_iterator = */
 			memtx_tree_index_create_iterator<USE_HINT>,
 		/* .create_iterator_with_offset = */
-		generic_index_create_iterator_with_offset,
+		memtx_tree_index_create_iterator_with_offset<USE_HINT>,
 		/* .create_read_view = */
 			memtx_tree_index_create_read_view<USE_HINT>,
 		/* .stat = */ generic_index_stat,
