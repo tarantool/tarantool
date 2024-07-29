@@ -6,6 +6,15 @@ local helpers = require('test.config-luatest.helpers')
 
 local g = helpers.group()
 
+local has_vshard = pcall(require, 'vshard-ee')
+if not has_vshard then
+    has_vshard = pcall(require, 'vshard')
+end
+
+local function skip_if_no_vshard()
+    t.skip_if(not has_vshard, 'Module "vshard-ee/vshard" is not available')
+end
+
 g.test_connect = function(g)
     local dir = treegen.prepare_directory(g, {}, {})
     local config = [[
@@ -229,6 +238,94 @@ g.test_filter = function(g)
     g.server_4:exec(check)
 end
 
+g.test_filter_vshard = function(g)
+    skip_if_no_vshard()
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        storage:
+          roles: [sharding, super]
+          password: "storage"
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        sharding:
+          login: 'storage'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            sharding:
+              roles: [router]
+            instances:
+              instance-001:
+                database:
+                  mode: rw
+              instance-002: {}
+          replicaset-002:
+            sharding:
+              roles: [storage]
+            instances:
+              instance-003:
+                database:
+                  mode: rw
+              instance-004: {}
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = 'config.yaml',
+        chdir = dir,
+    }
+    g.server_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+    g.server_2 = server:new(fun.chain(opts, {alias = 'instance-002'}):tomap())
+    g.server_3 = server:new(fun.chain(opts, {alias = 'instance-003'}):tomap())
+    g.server_4 = server:new(fun.chain(opts, {alias = 'instance-004'}):tomap())
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_2:start({wait_until_ready = false})
+    g.server_3:start({wait_until_ready = false})
+    g.server_4:start({wait_until_ready = false})
+
+    g.server_1:wait_until_ready()
+    g.server_2:wait_until_ready()
+    g.server_3:wait_until_ready()
+    g.server_4:wait_until_ready()
+
+    local function check_conn()
+        local connpool = require('experimental.connpool')
+
+        local exp = {"instance-003", "instance-004"}
+        local opts = {sharding_roles = {'storage'}}
+        t.assert_items_equals(connpool.filter(opts), exp)
+
+        exp = {"instance-001", "instance-002"}
+        opts = {sharding_roles = {'router'}}
+        t.assert_items_equals(connpool.filter(opts), exp)
+
+        local exp_err = 'Unknown sharding role \"r1\" in connpool.filter() '..
+            'call. Expected one of the \"storage\", \"router\"'
+        opts = {sharding_roles = { 'r1' }}
+        t.assert_error_msg_equals(exp_err, connpool.filter, opts)
+
+        local exp_err = 'Filtering by the \"rebalancer\" role is not supported'
+        opts = {sharding_roles = { 'rebalancer' }}
+        t.assert_error_msg_equals(exp_err, connpool.filter, opts)
+    end
+
+    g.server_1:exec(check_conn)
+    g.server_2:exec(check_conn)
+    g.server_3:exec(check_conn)
+    g.server_4:exec(check_conn)
+end
+
 g.test_filter_mode = function(g)
     local dir = treegen.prepare_directory(g, {}, {})
     local config = [[
@@ -444,6 +541,107 @@ g.test_call = function(g)
 
         opts = {roles = {'one'}, groups = {'group-001'}}
         t.assert_equals(connpool.call('f1', nil, opts), 'instance-001')
+    end
+
+    g.server_1:exec(check)
+    g.server_2:exec(check)
+    g.server_3:exec(check)
+    g.server_4:exec(check)
+end
+
+g.test_call_vshard = function(g)
+    skip_if_no_vshard()
+
+    local dir = treegen.prepare_directory(g, {}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        storage:
+          roles: [sharding, super]
+          password: "storage"
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        sharding:
+          login: 'storage'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            sharding:
+              roles: [router]
+            instances:
+              instance-001:
+                roles: [one]
+                database:
+                  mode: rw
+              instance-002:
+                roles: [one]
+      group-002:
+        replicasets:
+          replicaset-002:
+            sharding:
+              roles: [storage]
+            instances:
+              instance-003:
+                roles: [one]
+                database:
+                  mode: rw
+              instance-004:
+                roles: [one]
+    ]]
+    treegen.write_script(dir, 'config.yaml', config)
+
+    local role = string.dump(function()
+        local function f1()
+            return box.info.name
+        end
+
+        rawset(_G, 'f1', f1)
+
+        return {
+            stop = function() end,
+            apply = function() end,
+            validate = function() end,
+        }
+    end)
+    treegen.write_script(dir, 'one.lua', role)
+
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = 'config.yaml',
+        chdir = dir,
+    }
+    g.server_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+    g.server_2 = server:new(fun.chain(opts, {alias = 'instance-002'}):tomap())
+    g.server_3 = server:new(fun.chain(opts, {alias = 'instance-003'}):tomap())
+    g.server_4 = server:new(fun.chain(opts, {alias = 'instance-004'}):tomap())
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_2:start({wait_until_ready = false})
+    g.server_3:start({wait_until_ready = false})
+    g.server_4:start({wait_until_ready = false})
+
+    g.server_1:wait_until_ready()
+    g.server_2:wait_until_ready()
+    g.server_3:wait_until_ready()
+    g.server_4:wait_until_ready()
+
+    local function check()
+        local connpool = require('experimental.connpool')
+
+        local exp = {"instance-003", "instance-004"}
+        local opts = {roles = {'one'}, sharding_roles = {'storage'}}
+        t.assert_items_include(exp, {connpool.call('f1', nil, opts)})
+
+        exp = {"instance-001", "instance-002"}
+        opts = {roles = {'one'}, sharding_roles = {'router'}}
+        t.assert_items_include(exp, {connpool.call('f1', nil, opts)})
     end
 
     g.server_1:exec(check)
