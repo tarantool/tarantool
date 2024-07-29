@@ -61,6 +61,7 @@ methods
   - max
   - max_by
   - maximum
+  - maximum_by
   - min
   - min_by
   - minimum
