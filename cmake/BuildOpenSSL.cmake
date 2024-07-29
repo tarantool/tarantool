@@ -34,6 +34,7 @@ ExternalProject_Add(bundled-openssl-project
         no-module
     INSTALL_COMMAND ${CMAKE_MAKE_PROGRAM} install_sw
     BUILD_BYPRODUCTS ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_SSL_LIBRARY}
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
 add_library(bundled-openssl-ssl STATIC IMPORTED GLOBAL)
