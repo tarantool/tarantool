@@ -28,6 +28,7 @@ ExternalProject_Add(bundled-zlib-project
         --prefix=<INSTALL_DIR>
         --static
     BUILD_BYPRODUCTS ${ZLIB_LIBRARY}
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
 add_library(bundled-zlib STATIC IMPORTED GLOBAL)
