@@ -172,6 +172,8 @@ local function is_candidate_match_static(names, opts)
            is_replicaset_match(opts.replicasets, names.replicaset_name) and
            is_instance_match(opts.instances, names.instance_name) and
            is_roles_match(opts.roles, config:get('roles', get_opts)) and
+           is_roles_match(opts.sharding_roles,
+                          config:get('sharding.roles', get_opts)) and
            is_labels_match(opts.labels, config:get('labels', get_opts))
 end
 
@@ -196,6 +198,7 @@ local function filter(opts)
         instances = '?table',
         labels = '?table',
         roles = '?table',
+        sharding_roles = '?table',
         mode = '?string',
     })
     opts = opts or {}
@@ -203,12 +206,27 @@ local function filter(opts)
         local msg = 'Expected nil, "ro" or "rw", got "%s"'
         error(msg:format(opts.mode), 0)
     end
+    if opts.sharding_roles ~= nil then
+        for _, sharding_role in ipairs(opts.sharding_roles) do
+            if sharding_role == 'rebalancer' then
+               error('Filtering by the \"rebalancer\" role is not supported',
+                     0)
+            elseif sharding_role ~= 'storage' and
+               sharding_role ~= 'router' then
+               local msg = 'Unknown sharding role \"%s\" in '..
+                           'connpool.filter() call. Expected one of the '..
+                           '\"storage\", \"router\"'
+               error(msg:format(sharding_role), 0)
+            end
+        end
+    end
     local static_opts = {
         groups = opts.groups,
         replicasets = opts.replicasets,
         instances = opts.instances,
         labels = opts.labels,
         roles = opts.roles,
+        sharding_roles = opts.sharding_roles
     }
     local dynamic_opts = {
         mode = opts.mode,
@@ -248,6 +266,7 @@ local function get_connection(opts)
         instances = opts.instances,
         labels = opts.labels,
         roles = opts.roles,
+        sharding_roles = opts.sharding_roles,
         mode = mode,
     }
     local candidates = filter(candidates_opts)
@@ -321,6 +340,7 @@ local function call(func_name, args, opts)
         instances = '?table',
         labels = '?table',
         roles = '?table',
+        sharding_roles = '?table',
         prefer_local = '?boolean',
         mode = '?string',
         -- The following options passed directly to net.box.call().
@@ -344,6 +364,7 @@ local function call(func_name, args, opts)
         instances = opts.instances,
         labels = opts.labels,
         roles = opts.roles,
+        sharding_roles = opts.sharding_roles,
         prefer_local = opts.prefer_local,
         mode = opts.mode,
     }
