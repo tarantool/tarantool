@@ -40,7 +40,7 @@ ExternalProject_Add(bundled-icu-project
         --disable-tests
         --disable-samples
     INSTALL_COMMAND
-        $(MAKE) install &&
+        ${CMAKE_MAKE_PROGRAM} install &&
         ${CMAKE_COMMAND} -E touch <BINARY_DIR>/uconfig.h &&
         cat <BINARY_DIR>/uconfig.h.prepend <INSTALL_DIR>/include/unicode/uconfig.h >> <BINARY_DIR>/uconfig.h &&
         ${CMAKE_COMMAND} -E copy_if_different <BINARY_DIR>/uconfig.h <INSTALL_DIR>/include/unicode/uconfig.h
