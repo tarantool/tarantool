@@ -89,7 +89,7 @@ obj_types:
  - 'lua_call'
  - 'sql'
 
-Note that 'lua_eval', 'lua_call', 'sql' and 'universe' are special,
+Note that 'lua_eval', 'sql' and 'universe' are special,
 they don't allow obj_name specialisation.
 
 obj_names:
