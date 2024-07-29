@@ -1236,12 +1236,9 @@ g.test_credentials = function()
             },
         },
     }
-    local err = '[instance_config] credentials.roles.myrole.privileges[1].' ..
-                'lua_call[1]: Got myfunc, but only the following values are ' ..
-                'allowed: all'
-    t.assert_error_msg_equals(err, function()
-        instance_config:validate(iconfig)
-    end)
+
+    res = instance_config:validate(iconfig)
+    t.assert_equals(res, nil)
 
     iconfig = {
         credentials = {
@@ -1259,6 +1256,8 @@ g.test_credentials = function()
             },
         },
     }
+
+    local err
     err = '[instance_config] credentials.users.myuser.privileges[1].sql[1]: ' ..
           'Got myfunc, but only the following values are allowed: all'
     t.assert_error_msg_equals(err, function()
