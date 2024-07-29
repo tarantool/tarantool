@@ -49,6 +49,7 @@ ExternalProject_Add(bundled-icu-project
     COMMAND       patch -d <SOURCE_DIR> -p1 -i "${ICU_PATCHES_DIR}/icu-tarantool-security-61.patch"
     COMMAND       patch -d <SOURCE_DIR> -p1 -i "${ICU_PATCHES_DIR}/icu-tarantool-security-96.patch"
     BUILD_BYPRODUCTS ${ICU_I18N_LIBRARY} ${ICU_UC_LIBRARY} ${ICU_DATA_LIBRARY}
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
 add_library(bundled-icu-i18n STATIC IMPORTED GLOBAL)
