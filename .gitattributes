@@ -8,3 +8,4 @@
 *.hpp diff=cpp
 *.c++ diff=cpp
 *.h++ diff=cpp
+src/lib/uri/uri_parser.c linguist-generated=true
