@@ -534,6 +534,18 @@ txn_has_flag(const struct txn *txn, enum txn_flag flag)
 	return (txn->flags & flag) != 0;
 }
 
+static inline bool
+txn_must_be_in_limbo(const struct txn *txn)
+{
+	return (txn->flags & TXN_WAIT_SYNC) != 0;
+}
+
+static inline bool
+txn_needs_ack(const struct txn *txn)
+{
+	return (txn->flags & TXN_WAIT_ACK) != 0;
+}
+
 static inline void
 txn_set_flags(struct txn *txn, unsigned int flags)
 {
