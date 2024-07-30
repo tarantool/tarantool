@@ -973,6 +973,7 @@ local function datetime_totable(self)
         isdst = datetime_isdst(self),
         nsec = self.nsec,
         tzoffset = self.tzoffset,
+        tz = self.tz,
     }
 end
 
