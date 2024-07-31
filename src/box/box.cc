@@ -100,6 +100,7 @@
 #include "tt_sort.h"
 #include "event.h"
 #include "tweaks.h"
+#include "rt_lua_call_access.h"
 
 static char status[64] = "unconfigured";
 
@@ -6120,6 +6121,7 @@ box_init(void)
 	box_watcher_init();
 	box_raft_init();
 	wal_ext_init();
+	rt_lua_call_access_init();
 	/*
 	 * Default built-in events to help users distinguish an event being not
 	 * supported from box.cfg not being called yet.
@@ -6199,6 +6201,7 @@ box_free(void)
 	tuple_free();
 	port_free();
 	iproto_constants_free();
+	rt_lua_call_access_destroy();
 	mempool_destroy(&sync_trigger_data_pool);
 	/* schema_module_free(); */
 	/* session_free(); */

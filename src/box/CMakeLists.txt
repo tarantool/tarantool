@@ -275,6 +275,7 @@ set(box_sources
     sql_stmt_cache.c
     wal.c
     call.c
+    rt_lua_call_access.c
     merger.c
     ibuf.c
     watcher.c
