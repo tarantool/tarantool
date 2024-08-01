@@ -498,6 +498,7 @@ t;
  |   285: box.error.READ_VIEW_BUSY
  |   286: box.error.READ_VIEW_CLOSED
  |   287: box.error.WAL_QUEUE_FULL
+ |   288: box.error.INVALID_OFFSET
  | ...
 
 test_run:cmd("setopt delimiter ''");

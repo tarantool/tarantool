@@ -266,6 +266,15 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 			 const char *packed_pos, const char *packed_pos_end);
 
 /**
+ * Same as box_index_iterator_after, but skips first @a offset tuples.
+ */
+box_iterator_t *
+box_index_iterator_with_offset(uint32_t space_id, uint32_t index_id, int type,
+			       const char *key, const char *key_end,
+			       const char *packed_pos,
+			       const char *packed_pos_end, uint32_t offset);
+
+/**
  * A helper for position extractors. Get packed position of tuple in
  * index by its cmp_def. Returned position is allocated on the fiber region.
  */

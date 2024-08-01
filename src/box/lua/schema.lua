@@ -49,10 +49,12 @@ ffi.cdef[[
     typedef struct iterator box_iterator_t;
 
     box_iterator_t *
-    box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
-                             const char *key, const char *key_end,
-                             const char *packed_pos,
-                             const char *packed_pos_end);
+    box_index_iterator_with_offset(uint32_t space_id, uint32_t index_id,
+                                   int type, const char *key,
+                                   const char *key_end,
+                                   const char *packed_pos,
+                                   const char *packed_pos_end,
+                                   uint32_t offset);
     int
     box_iterator_next(box_iterator_t *itr, box_tuple_t **result);
     void
@@ -2037,6 +2039,7 @@ end
 
 local function check_pairs_opts(opts, key_is_nil, level)
     local iterator = check_iterator_type(opts, key_is_nil, level and level + 1)
+    local offset = 0
     local after = nil
     if opts ~= nil and type(opts) == "table" then
         if opts.after ~= nil then
@@ -2046,8 +2049,14 @@ local function check_pairs_opts(opts, key_is_nil, level)
                 box.error(box.error.ITERATOR_POSITION, level and level + 1)
             end
         end
+        if opts.offset ~= nil then
+            offset = opts.offset
+            if type(offset) ~= "number" then
+                box.error(box.error.INVALID_OFFSET, level and level + 1)
+            end
+        end
     end
-    return iterator, after
+    return iterator, after, offset
 end
 
 box.internal.check_pairs_opts = check_pairs_opts
@@ -2458,16 +2467,16 @@ base_index_mt.pairs_ffi = function(index, key, opts)
     local ibuf = cord_ibuf_take()
     local pkey, pkey_end = tuple_encode(ibuf, key, 2)
     local svp = builtin.box_region_used()
-    local itype, after = check_pairs_opts(opts, pkey + 1 >= pkey_end, 2)
+    local itype, after, offset = check_pairs_opts(opts, pkey + 1 >= pkey_end, 2)
     local ok = iterator_pos_set(index, after, ibuf, 2)
     local keybuf = ffi.string(pkey, pkey_end - pkey)
     cord_ibuf_put(ibuf)
     local cdata
     if ok then
         local pkeybuf = ffi.cast('const char *', keybuf)
-        cdata = builtin.box_index_iterator_after(
+        cdata = builtin.box_index_iterator_with_offset(
                 index.space_id, index.id, itype, pkeybuf, pkeybuf + #keybuf,
-                iterator_pos[0], iterator_pos_end[0])
+                iterator_pos[0], iterator_pos_end[0], offset)
     end
     builtin.box_region_truncate(svp)
     if cdata == nil then
@@ -2479,11 +2488,11 @@ end
 base_index_mt.pairs_luac = function(index, key, opts)
     check_index_arg(index, 'pairs', 2)
     key = keify(key)
-    local itype, after = check_pairs_opts(opts, #key == 0, 2)
+    local itype, after, offset = check_pairs_opts(opts, #key == 0, 2)
     local keymp = msgpack.encode(key)
     local keybuf = ffi.string(keymp, #keymp)
     local cdata = internal.iterator(index.space_id, index.id, itype, keymp,
-        after, 2);
+        after, offset, 2);
     return fun.wrap(iterator_gen_luac, keybuf,
         ffi.gc(cdata, builtin.box_iterator_free))
 end

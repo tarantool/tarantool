@@ -213,12 +213,20 @@ g_generic.test_offset = function()
             -- The stringified key.
             local key_str = pp.tostring(key)
 
-            local opts = {iterator = it, offset = offset}
-            local result = sk:select(key, opts)
+            local comment = string.format(
+                '\nkey: %s,\noffset = %d,\niterator: %s,\nfile: %s,' ..
+                '\nline: %d,', key_str, offset, it, file, line)
 
-            t.assert_equals(result, expect, string.format('\nkey: %s,' ..
-                            '\noffset = %d,\niterator: %s,\nfile: %s,' ..
-                            '\nline: %d,', key_str, offset, it, file, line))
+            local opts = {iterator = it, offset = offset}
+
+            local result = sk:select(key, opts)
+            t.assert_equals(result, expect, comment)
+
+            local pairs_result = {}
+            for _, tuple in sk:pairs(key, opts) do
+                table.insert(pairs_result, tuple)
+            end
+            t.assert_equals(pairs_result, expect, comment)
         end
 
         -- Test the empty space.
@@ -245,6 +253,36 @@ g_generic.test_offset = function()
                 end
             end
         end
+    end)
+end
+
+g_generic.test_pairs_offset_error = function()
+    g_generic.server:exec(function()
+        -- Create and fill the space.
+        local s = box.schema.space.create('test')
+        local pk = s:create_index('pk')
+        local tuples = {{1}, {2}, {3}, {4}, {5}}
+        for _, tuple in ipairs(tuples) do
+            s:insert(tuple)
+        end
+
+        local msg = 'The offset is invalid'
+
+        -- Invalid: string offset.
+        t.assert_error_msg_equals(msg, pk.pairs, pk, nil, {offset = '1'})
+
+        -- Invalid: boolean offset.
+        t.assert_error_msg_equals(msg, pk.pairs, pk, nil, {offset = false})
+
+        -- Invalid: table offset.
+        t.assert_error_msg_equals(msg, pk.pairs, pk, nil, {offset = {}})
+
+        -- OK: number offset.
+        local pairs_result = {}
+        for _, tuple in pk:pairs(nil, {offset = 2}) do
+            table.insert(pairs_result, tuple)
+        end
+        t.assert_equals(pairs_result, {unpack(tuples, 3, #tuples)})
     end)
 end
 

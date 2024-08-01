@@ -304,11 +304,11 @@ box_index_init_iterator_types(struct lua_State *L, int idx)
 static int
 lbox_index_iterator(lua_State *L)
 {
-	if (lua_gettop(L) != 6 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    !lua_isnumber(L, 3)) {
+	if (lua_gettop(L) != 7 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    !lua_isnumber(L, 3) || !lua_isnumber(L, 6)) {
 		diag_set(IllegalParams,
 			 "Usage: index.iterator(space_id, index_id, "
-			 "type, key, after, level)");
+			 "type, key, after, offset, level)");
 		return luaT_error(L);
 	}
 
@@ -316,7 +316,8 @@ lbox_index_iterator(lua_State *L)
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
 	uint32_t iterator = lua_tonumber(L, 3);
-	int level = lua_tonumber(L, 6);
+	uint32_t offset = lua_tonumber(L, 6);
+	int level = lua_tonumber(L, 7);
 	size_t mpkey_len;
 	const char *mpkey = lua_tolstring(L, 4, &mpkey_len); /* Key encoded by Lua */
 	struct iterator *it = NULL;
@@ -325,9 +326,9 @@ lbox_index_iterator(lua_State *L)
 	if (lbox_index_normalize_position(L, 5, space_id, index_id,
 					  &packed_pos, &packed_pos_end) != 0)
 		goto error;
-	it = box_index_iterator_after(space_id, index_id, iterator, mpkey,
-				      mpkey + mpkey_len, packed_pos,
-				      packed_pos_end);
+	it = box_index_iterator_with_offset(space_id, index_id, iterator, mpkey,
+					    mpkey + mpkey_len, packed_pos,
+					    packed_pos_end, offset);
 
 	if (it == NULL)
 		goto error;

@@ -495,9 +495,10 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 /* {{{ Iterators ************************************************/
 
 box_iterator_t *
-box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
-			 const char *key, const char *key_end,
-			 const char *packed_pos, const char *packed_pos_end)
+box_index_iterator_with_offset(uint32_t space_id, uint32_t index_id, int type,
+			       const char *key, const char *key_end,
+			       const char *packed_pos,
+			       const char *packed_pos_end, uint32_t offset)
 {
 	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
@@ -541,8 +542,8 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return NULL;
-	struct iterator *it = index_create_iterator_after(index, itype, key,
-							  part_count, pos);
+	struct iterator *it = index_create_iterator_with_offset(
+		index, itype, key, part_count, pos, offset);
 	txn_end_ro_stmt(txn, &svp);
 	if (it == NULL)
 		return NULL;
@@ -552,6 +553,16 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 	region_truncate(&fiber()->gc, region_svp);
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 	return it;
+}
+
+box_iterator_t *
+box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
+			 const char *key, const char *key_end,
+			 const char *packed_pos, const char *packed_pos_end)
+{
+	return box_index_iterator_with_offset(space_id, index_id, type,
+					      key, key_end, packed_pos,
+					      packed_pos_end, 0);
 }
 
 box_iterator_t *
