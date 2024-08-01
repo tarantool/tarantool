@@ -208,3 +208,5 @@ endif()
 add_custom_target(fuzzers
                   DEPENDS ${FUZZ_TEST_TARGETS}
                   COMMENT "Build fuzzers")
+
+add_subdirectory(lua)
