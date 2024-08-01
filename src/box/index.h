@@ -256,14 +256,16 @@ box_tuple_extract_key(box_tuple_t *tuple, uint32_t space_id,
 /** \endcond public */
 
 /**
- * Allocate and initialize iterator for space_id, index_id. If packed_pos is
- * not NULL, iterator will start right after tuple with position, described by
- * this argument. A returned iterator must be destroyed by box_iterator_free().
+ * Allocate and initialize iterator for space_id, index_id and then skip @a
+ * offset tuples. If packed_pos is not NULL, iterator will start right after
+ * tuple with position, described by this argument. A returned iterator must
+ * be destroyed by box_iterator_free().
  */
 box_iterator_t *
-box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
-			 const char *key, const char *key_end,
-			 const char *packed_pos, const char *packed_pos_end);
+box_index_iterator_with_offset(uint32_t space_id, uint32_t index_id, int type,
+			       const char *key, const char *key_end,
+			       const char *packed_pos,
+			       const char *packed_pos_end, uint32_t offset);
 
 /**
  * A helper for position extractors. Get packed position of tuple in
@@ -342,7 +344,7 @@ struct iterator {
 	/**
 	 * Pointer to a buffer which was allocated for start position with
 	 * runtime_alloc. Will be freed on iterator_delete.
-	 * Needed for box_index_iterator_after.
+	 * Needed for box_index_iterator_with_offset.
 	 */
 	char *pos_buf;
 };

@@ -213,12 +213,20 @@ g_generic.test_offset = function()
             -- The stringified key.
             local key_str = pp.tostring(key)
 
-            local opts = {iterator = it, offset = offset}
-            local result = sk:select(key, opts)
+            local comment = string.format(
+                '\nkey: %s,\noffset = %d,\niterator: %s,\nfile: %s,' ..
+                '\nline: %d,', key_str, offset, it, file, line)
 
-            t.assert_equals(result, expect, string.format('\nkey: %s,' ..
-                            '\noffset = %d,\niterator: %s,\nfile: %s,' ..
-                            '\nline: %d,', key_str, offset, it, file, line))
+            local opts = {iterator = it, offset = offset}
+
+            local result = sk:select(key, opts)
+            t.assert_equals(result, expect, comment)
+
+            local pairs_result = {}
+            for _, tuple in sk:pairs(key, opts) do
+                table.insert(pairs_result, tuple)
+            end
+            t.assert_equals(pairs_result, expect, comment)
         end
 
         -- Test the empty space.
