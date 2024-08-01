@@ -20,24 +20,27 @@ include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
 include(CMakeParseArguments)
 
-message(STATUS "Add unit tests")
+message(STATUS "Add unit tests (C/C++)")
 function(create_unit_test)
   cmake_parse_arguments(
     UNIT
     ""
     "PREFIX"
-    "SOURCES;LIBRARIES;COMPILE_DEFINITIONS"
+    "SOURCES;DEPENDS;LIBRARIES;COMPILE_DEFINITIONS"
     ${ARGN}
   )
   add_executable(${UNIT_PREFIX}.test ${UNIT_SOURCES})
   target_compile_definitions(${UNIT_PREFIX}.test PRIVATE ${UNIT_COMPILE_DEFINITIONS})
   target_link_libraries(${UNIT_PREFIX}.test ${UNIT_LIBRARIES})
   set(UNIT_TEST_TARGETS "${UNIT_TEST_TARGETS} ${UNIT_PREFIX}.test" PARENT_SCOPE)
+  if (NOT UNIT_DEPENDS)
+    set(UNIT_DEPENDS ${UNIT_LIBRARIES})
+  endif ()
   # XXX: The call produces both test and target
   # <${UNIT_PREFIX}.test-deps> as a side effect.
   _add_test_suite_target(${UNIT_PREFIX}.test
     LABELS unit
-    DEPENDS ${UNIT_LIBRARIES} ${UNIT_PREFIX}.test
+    DEPENDS ${UNIT_DEPENDS}
   )
   # Every unit test is a self-contained program without
   # dependencies that does not require a special test environment.
@@ -433,15 +436,16 @@ create_unit_test(PREFIX luaT_tuple_new
                            ${LUAJIT_LIBRARIES}
 )
 
-create_unit_test(PREFIX luaL_iterator
-                 SOURCES luaL_iterator.c
-                 LIBRARIES unit server coll core misc
+set(luaL_iterator_DEPENDS unit server coll core misc
                            ${CURL_LIBRARIES}
                            ${LIBYAML_LIBRARIES}
                            ${READLINE_LIBRARIES}
                            ${ICU_LIBRARIES}
-                           ${LUAJIT_LIBRARIES}
-                           ${LIB_DL}
+                           ${LUAJIT_LIBRARIES})
+create_unit_test(PREFIX luaL_iterator
+                 SOURCES luaL_iterator.c
+                 LIBRARIES ${luaL_iterator_DEPENDS} ${LIB_DL}
+                 DEPENDS ${luaL_iterator_DEPENDS}
 )
 
 create_unit_test(PREFIX say
@@ -461,6 +465,7 @@ set(ITERATOR_TEST_LIBS core tuple xrow unit)
 create_unit_test(PREFIX vy_mem
                  SOURCES vy_mem.c ${ITERATOR_TEST_SOURCES} core_test_utils.c
                  LIBRARIES ${ITERATOR_TEST_LIBS} ${LIB_DL}
+                 DEPENDS ${ITERATOR_TEST_LIBS}
 )
 
 create_unit_test(PREFIX vy_point_lookup
@@ -499,16 +504,19 @@ create_unit_test(PREFIX vy_write_iterator
                          ${ITERATOR_TEST_SOURCES}
                          core_test_utils.c
                  LIBRARIES xlog ${ITERATOR_TEST_LIBS} ${LIB_DL}
+                 DEPENDS xlog ${ITERATOR_TEST_LIBS}
 )
 
 create_unit_test(PREFIX vy_cache
                  SOURCES vy_cache.c ${ITERATOR_TEST_SOURCES} core_test_utils.c
                  LIBRARIES ${ITERATOR_TEST_LIBS} ${LIB_DL}
+                 DEPENDS ${ITERATOR_TEST_LIBS}
 )
 
 create_unit_test(PREFIX coll
                  SOURCES coll.cpp core_test_utils.c
                  LIBRARIES coll unit misc ${LIB_DL}
+                 DEPENDS coll unit misc
 )
 
 create_unit_test(PREFIX tuple_bigref
@@ -525,6 +533,7 @@ create_unit_test(PREFIX checkpoint_schedule
                  SOURCES checkpoint_schedule.c
                          ${PROJECT_SOURCE_DIR}/src/box/checkpoint_schedule.c
                  LIBRARIES m unit
+                 DEPENDS unit
 )
 
 create_unit_test(PREFIX sio

@@ -8,6 +8,8 @@ add_library(fuzzer_config INTERFACE)
 
 find_program(SHELL sh)
 
+set(TEST_SUITE_NAME "fuzzing-c")
+
 target_compile_options(
     fuzzer_config
     INTERFACE
@@ -43,15 +45,15 @@ set(FUZZ_TEST_TARGETS "")
 set(DEFAULT_RUNS_NUMBER 5)
 
 string(JOIN " " DEFAULT_LIBFUZZER_OPTS
-  -max_total_time=60
-  -mutate_depth=20
-  -print_final_stats=1
-  -print_pcs=1
-  -reduce_inputs=1
-  -reload=1
-  -report_slow_units=5
-  -use_value_profile=1
-  -workers=${CMAKE_BUILD_PARALLEL_LEVEL}
+    -max_total_time=60
+    -mutate_depth=20
+    -print_final_stats=1
+    -print_pcs=1
+    -reduce_inputs=1
+    -reload=1
+    -report_slow_units=5
+    -use_value_profile=1
+    -workers=${CMAKE_BUILD_PARALLEL_LEVEL}
 )
 
 function(BuildLibFuzzerOptions fuzz_name outvar)
@@ -69,7 +71,7 @@ function(BuildLibFuzzerOptions fuzz_name outvar)
   set(${outvar} ${opts} PARENT_SCOPE)
 endfunction()
 
-message(STATUS "Add fuzzing tests")
+message(STATUS "Add fuzzing tests (C/C++)")
 function(create_fuzz_test)
   cmake_parse_arguments(
     FUZZ
@@ -82,7 +84,7 @@ function(create_fuzz_test)
   # XXX: The call produces both test and target
   # <${FUZZ_PREFIX}-deps> as a side effect.
   _add_test_suite_target(${FUZZ_PREFIX}
-    LABELS fuzz
+    LABELS ${TEST_SUITE_NAME}
     DEPENDS ${FUZZ_LIBRARIES} ${FUZZ_PREFIX}_fuzzer
   )
   # Use PUBLIC to force 'fuzzer_config' for all dependent targets.
@@ -94,7 +96,7 @@ function(create_fuzz_test)
            COMMAND $<TARGET_FILE:${FUZZ_PREFIX}_fuzzer> ${LibFuzzerOpts}
   )
   set_tests_properties(${test_title} PROPERTIES
-    LABELS fuzz
+    LABELS ${TEST_SUITE_NAME}
     DEPENDS ${FUZZ_PREFIX}-deps
   )
 endfunction()
