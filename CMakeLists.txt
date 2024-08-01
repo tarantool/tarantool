@@ -835,6 +835,8 @@ include (cmake/package.cmake)
 #
 include (cmake/rpm.cmake)
 
+set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
+
 add_subdirectory(src)
 add_subdirectory(extra)
 add_subdirectory(test)

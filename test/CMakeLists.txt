@@ -49,6 +49,9 @@ list(APPEND CTEST_FAIL_REGEXP
   "failed subtests"
 )
 
+string(RANDOM LENGTH 9 ALPHABET 0123456789 RANDOM_SEED)
+message(STATUS "Random seed is ${RANDOM_SEED}")
+
 add_subdirectory(app)
 add_subdirectory(app-tap)
 add_subdirectory(app-luatest/lib)
@@ -61,6 +64,7 @@ add_subdirectory(sql-luatest)
 if(ENABLE_FUZZER)
     add_subdirectory(fuzz)
 endif()
+add_subdirectory(fuzz/lua)
 add_subdirectory(unit)
 foreach(TEST_SUITE ${EXTRA_TEST_SUITES})
     add_subdirectory(
