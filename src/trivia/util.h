@@ -40,6 +40,7 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 #if defined(__cplusplus)
 extern "C" {
