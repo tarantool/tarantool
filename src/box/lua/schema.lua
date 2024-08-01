@@ -2515,6 +2515,23 @@ base_index_mt.count_luac = function(index, key, opts)
     return internal.count(index.space_id, index.id, itype, key);
 end
 
+-- 0-based iterator-relative offset of the first matching tuple. If such tuple
+-- does not exist, returns the offset at which it would be located if existed.
+--
+-- For an existing tuple, if index:offset_of(key, {iterator = it}) == N, then
+-- index:pairs(nil, {iterator = it, offset = N}) will start the iterator from
+-- the same tuple as index:pairs(key, {iterator = it})
+base_index_mt.offset_of = function(index, key, opts)
+    check_index_arg(index, 'offset_of', 2)
+    local itype = check_iterator_type(opts, #key == 0, 2)
+    if itype == box.index.EQ then
+        opts.iterator = box.index.GE
+    elseif itype == box.index.REQ then
+        opts.iterator = box.index.LE
+    end
+    return index:len() - index:count(key, opts)
+end
+
 base_index_mt.get_ffi = function(index, key)
     if builtin.box_read_ffi_is_disabled then
         return base_index_mt.get_luac(index, key)
@@ -2729,6 +2746,14 @@ space_mt.count = function(space, key, opts)
         return 0 -- empty space without indexes, return 0
     end
     return pk:count(key, opts)
+end
+space_mt.offset_of = function(space, key, opts)
+    check_space_arg(space, 'offset_of', 2)
+    local pk = space.index[0]
+    if pk == nil then
+        return 0 -- empty space without indexes, return 0
+    end
+    return pk:offset_of(key, opts)
 end
 space_mt.bsize = function(space)
     check_space_arg(space, 'bsize', 2)
