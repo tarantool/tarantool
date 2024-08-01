@@ -61,7 +61,7 @@ function(create_perf_lua_test)
   )
   set_tests_properties(${test_title} PROPERTIES
     ENVIRONMENT "LUA_PATH=${LUA_PATH}"
-    LABELS "${TEST_SUITE_NAME};performance"
+    LABELS "${TEST_SUITE_NAME};performance;long"
     DEPENDS ${BENCH_TARGET}-deps)
 endfunction()
 
