@@ -80,6 +80,9 @@ local reference_table = {
         TXN_ISOLATION = 0x59,
         VCLOCK_SYNC = 0x5a,
         AUTH_TYPE = 0x5b,
+        IS_CHECKPOINT_JOIN = 0x62,
+        CHECKPOINT_VCLOCK = 0x63,
+        CHECKPOINT_LSN = 0x64,
     },
 
     -- `iproto_metadata_key` enumeration.

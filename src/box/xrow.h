@@ -611,6 +611,27 @@ xrow_encode_join(struct xrow_header *row, const struct join_request *req);
 int
 xrow_decode_join(const struct xrow_header *row, struct join_request *req);
 
+struct fetch_snapshot_request {
+	/** Replica's version. */
+	uint32_t version_id;
+	/** Flag indicating whether checkpoint join should be done. */
+	bool is_checkpoint_join;
+	/** Checkpoint's vclock, signature of the snapshot. */
+	struct vclock checkpoint_vclock;
+	/** Checkpoint's lsn, the row number to start from. */
+	uint64_t checkpoint_lsn;
+};
+
+/** Encode FETCH_SNAPSHOT request. */
+void
+xrow_encode_fetch_snapshot(struct xrow_header *row,
+			   const struct fetch_snapshot_request *req);
+
+/** Decode FETCH_SNAPSHOT request. */
+int
+xrow_decode_fetch_snapshot(const struct xrow_header *row,
+			   struct fetch_snapshot_request *req);
+
 /**
  * Heartbeat from relay to applier. Follows the replication stream. Same
  * direction.
@@ -656,13 +677,19 @@ int
 xrow_decode_applier_heartbeat(const struct xrow_header *row,
 			      struct applier_heartbeat *req);
 
-/** Encode vclock. */
+/** Encode vclock ignoring 0th component. */
+void
+xrow_encode_vclock_ignore0(struct xrow_header *row,
+			   const struct vclock *vclock);
+
+/** Encode vclock including 0th component. */
 void
 xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
 
-/** Decode vclock. */
+/** Decode vclock ignoring 0th component. */
 int
-xrow_decode_vclock(const struct xrow_header *row, struct vclock *vclock);
+xrow_decode_vclock_ignore0(const struct xrow_header *row,
+			   struct vclock *vclock);
 
 /**
  * Encode any bodyless message.
@@ -1113,6 +1140,15 @@ xrow_decode_join_xc(const struct xrow_header *row, struct join_request *req)
 		diag_raise();
 }
 
+/** @copydoc xrow_decode_fetch_snapshot. */
+static inline void
+xrow_decode_fetch_snapshot_xc(const struct xrow_header *row,
+			      struct fetch_snapshot_request *req)
+{
+	if (xrow_decode_fetch_snapshot(row, req) != 0)
+		diag_raise();
+}
+
 /** @copydoc xrow_decode_register. */
 static inline void
 xrow_decode_register_xc(const struct xrow_header *row,
@@ -1140,11 +1176,12 @@ xrow_decode_relay_heartbeat_xc(const struct xrow_header *row,
 		diag_raise();
 }
 
-/** @copydoc xrow_decode_vclock. */
+/** @copydoc xrow_decode_vclock_ignore0. */
 static inline void
-xrow_decode_vclock_xc(const struct xrow_header *row, struct vclock *vclock)
+xrow_decode_vclock_ignore0_xc(const struct xrow_header *row,
+			      struct vclock *vclock)
 {
-	if (xrow_decode_vclock(row, vclock) != 0)
+	if (xrow_decode_vclock_ignore0(row, vclock) != 0)
 		diag_raise();
 }
 

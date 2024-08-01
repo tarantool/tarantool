@@ -789,7 +789,7 @@ applier_wait_snapshot(struct applier *applier)
 		 * vclock in bootstrap_from_master()
 		 */
 		struct vclock vclock;
-		xrow_decode_vclock_xc(&row, &vclock);
+		xrow_decode_vclock_ignore0_xc(&row, &vclock);
 		box_init_instance_vclock(&vclock);
 	}
 
@@ -847,7 +847,7 @@ applier_wait_snapshot(struct applier *applier)
 				 * this vclock is not used.
 				 */
 				struct vclock vclock;
-				xrow_decode_vclock_xc(&row, &vclock);
+				xrow_decode_vclock_ignore0_xc(&row, &vclock);
 				box_init_instance_vclock(&vclock);
 			}
 			break; /* end of stream */
@@ -870,8 +870,17 @@ applier_fetch_snapshot(struct applier *applier)
 	struct iostream *io = &applier->io;
 	struct xrow_header row;
 
-	memset(&row, 0, sizeof(row));
-	row.type = IPROTO_FETCH_SNAPSHOT;
+	struct vclock vclock;
+	vclock_create(&vclock);
+	struct fetch_snapshot_request req = {
+		.version_id = tarantool_version_id(),
+		/* Applier doesn't support checkpoint join. */
+		.is_checkpoint_join = false,
+		.checkpoint_vclock = vclock,
+		.checkpoint_lsn = 0,
+	};
+	RegionGuard region_guard(&fiber()->gc);
+	xrow_encode_fetch_snapshot(&row, &req);
 	coio_write_xrow(io, &row);
 
 	applier_set_state(applier, APPLIER_WAIT_SNAPSHOT);

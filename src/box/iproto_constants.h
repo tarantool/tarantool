@@ -194,6 +194,21 @@ extern const char *iproto_flag_bit_strs[];
 	 * authentication method.
 	 */								\
 	_(AUTH_TYPE, 0x5b, MP_STR)					\
+	 /**
+	  * Flag indicating whether checkpoint join should be done.
+	  */								\
+	 _(IS_CHECKPOINT_JOIN, 0x62, MP_BOOL)				\
+	 /**
+	  * Shows the signature of the checkpoint to read from.
+	  * Requires CHECKPOINT_JOIN to be true.
+	  */								\
+	 _(CHECKPOINT_VCLOCK, 0x63, MP_MAP)				\
+	 /**
+	  * Shows the lsn to start sending from. Server sends all rows
+	  * >= IPROTO_CHECKPOINT_LSN. Requires CHECKPOINT_JOIN to be
+	  * true and CHECKPOINT_VCLOCK to be set.
+	  */								\
+	 _(CHECKPOINT_LSN, 0x64, MP_UINT)				\
 
 #define IPROTO_KEY_MEMBER(s, v, ...) IPROTO_ ## s = v,
 

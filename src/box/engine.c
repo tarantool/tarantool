@@ -205,19 +205,11 @@ engine_backup(const struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 int
 engine_prepare_join(struct engine_join_ctx *ctx)
 {
-	ctx->array = calloc(MAX_ENGINE_COUNT, sizeof(void *));
-	if (ctx->array == NULL) {
-		diag_set(OutOfMemory, MAX_ENGINE_COUNT * sizeof(void *),
-			 "malloc", "engine join context");
-		return -1;
-	}
-	int i = 0;
+	ctx->data = xcalloc(MAX_ENGINE_COUNT, sizeof(void *));
 	struct engine *engine;
 	engine_foreach(engine) {
-		assert(i < MAX_ENGINE_COUNT);
-		if (engine->vtab->prepare_join(engine, &ctx->array[i]) != 0)
+		if (engine->vtab->prepare_join(engine, ctx) != 0)
 			goto fail;
-		i++;
 	}
 	return 0;
 fail:
@@ -230,12 +222,10 @@ engine_join(struct engine_join_ctx *ctx, struct xstream *stream)
 {
 	ERROR_INJECT_YIELD(ERRINJ_ENGINE_JOIN_DELAY);
 
-	int i = 0;
 	struct engine *engine;
 	engine_foreach(engine) {
-		if (engine->vtab->join(engine, ctx->array[i], stream) != 0)
+		if (engine->vtab->join(engine, ctx, stream) != 0)
 			return -1;
-		i++;
 	}
 	return 0;
 }
@@ -243,14 +233,11 @@ engine_join(struct engine_join_ctx *ctx, struct xstream *stream)
 void
 engine_complete_join(struct engine_join_ctx *ctx)
 {
-	int i = 0;
 	struct engine *engine;
 	engine_foreach(engine) {
-		if (ctx->array[i] != NULL)
-			engine->vtab->complete_join(engine, ctx->array[i]);
-		i++;
+		engine->vtab->complete_join(engine, ctx);
 	}
-	free(ctx->array);
+	free(ctx->data);
 }
 
 void
@@ -283,15 +270,15 @@ generic_engine_create_read_view(struct engine *engine,
 }
 
 int
-generic_engine_prepare_join(struct engine *engine, void **ctx)
+generic_engine_prepare_join(struct engine *engine, struct engine_join_ctx *ctx)
 {
-	(void)engine;
-	*ctx = NULL;
+	ctx->data[engine->id] = NULL;
 	return 0;
 }
 
 int
-generic_engine_join(struct engine *engine, void *ctx, struct xstream *stream)
+generic_engine_join(struct engine *engine, struct engine_join_ctx *ctx,
+		    struct xstream *stream)
 {
 	(void)engine;
 	(void)ctx;
@@ -300,7 +287,7 @@ generic_engine_join(struct engine *engine, void *ctx, struct xstream *stream)
 }
 
 void
-generic_engine_complete_join(struct engine *engine, void *ctx)
+generic_engine_complete_join(struct engine *engine, struct engine_join_ctx *ctx)
 {
 	(void)engine;
 	(void)ctx;
