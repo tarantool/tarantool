@@ -286,6 +286,114 @@ g_generic.test_pairs_offset_error = function()
     end)
 end
 
+g_generic.test_index_of = function()
+    g_generic.server:exec(function()
+        -- Create and fill the space.
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:insert({1})
+        s:insert({3})
+
+        -- A test wrapper to fit cases in single lines.
+        local function check(key, it, expect)
+            local pp = require('luatest.pp')
+
+            -- The location of the callee.
+            local file = debug.getinfo(2, 'S').source
+            local line = debug.getinfo(2, 'l').currentline
+
+            -- The stringified key.
+            local key_str = pp.tostring(key)
+
+            t.assert_equals(s:index_of(key, {iterator = it}), expect,
+                            string.format('\nkey: %s,\niterator: %s,' ..
+                                          '\nfile: %s,\nline: %d,',
+                                          key_str, it, file, line))
+        end
+
+        -- iterator = GE
+        check({0}, 'ge', 1) -- [<1>, 3]
+        check({1}, 'ge', 1) -- [<1>, 3]
+        check({2}, 'ge', 2) -- [1, <3>]
+        check({3}, 'ge', 2) -- [1, <3>]
+        check({4}, 'ge', 3) -- [1, 3, <...>]
+
+        -- iterator = GT
+        check({0}, 'gt', 1) -- [<1>, 3]
+        check({1}, 'gt', 2) -- [1, <3>]
+        check({2}, 'gt', 2) -- [1, <3>]
+        check({3}, 'gt', 3) -- [1, 3, <...>]
+        check({4}, 'gt', 3) -- [1, 3, <...>]
+
+        -- iterator = LE
+        check({0}, 'le', 3) -- [3, 1, <...>]
+        check({1}, 'le', 2) -- [3, <1>]
+        check({2}, 'le', 2) -- [3, <1>]
+        check({3}, 'le', 1) -- [<3>, 1]
+        check({4}, 'le', 1) -- [<3>, 1]
+
+        -- iterator = LT
+        check({0}, 'lt', 3) -- [3, 1, <...>]
+        check({1}, 'lt', 3) -- [3, 1, <...>]
+        check({2}, 'lt', 2) -- [3, <1>]
+        check({3}, 'lt', 2) -- [3, <1>]
+        check({4}, 'lt', 1) -- [<3>, 1]
+
+        -- iterator = EQ
+        check({0}, 'eq', 1) -- [<0>, 1, 3]
+        check({1}, 'eq', 1) -- [<1>, 3]
+        check({2}, 'eq', 2) -- [1, <2>, 3]
+        check({3}, 'eq', 2) -- [1, <3>]
+        check({4}, 'eq', 3) -- [1, 3, <4>]
+
+        -- iterator = REQ
+        check({0}, 'req', 3) -- [3, 1, <0>]
+        check({1}, 'req', 2) -- [3, <1>]
+        check({2}, 'req', 2) -- [3, <2>, 1]
+        check({3}, 'req', 1) -- [<3>, 1]
+        check({4}, 'req', 1) -- [<4>, 3, 1]
+
+        -- Create and fill an index of strings.
+        s.index.pk:drop()
+        s:create_index('pk', {parts = {1, 'string'}})
+        s:insert({'b'})
+        s:insert({'bb'})
+        s:insert({'bc'})
+        s:insert({'c'})
+        s:insert({'cc'})
+
+        -- iterator = NP
+        check({'a'},  'np', 1) -- [<b>, bb, bc, c, cc]
+        check({'ba'}, 'np', 2) -- [b, <bb>, bc, c, cc]
+        check({'bb'}, 'np', 3) -- [b, bb, <bc>, c, cc]
+        check({'b'},  'np', 4) -- [b, bb, bc, <c>, cc]
+        check({'ca'}, 'np', 5) -- [b, bb, bc, c, <cc>]
+        check({'c'},  'np', 6) -- [b, bb, bc, c, cc, <...>]
+
+        -- iterator = PP
+        check({'b'},  'pp', 6) -- [cc, c, bc, bb, b, <...>]
+        check({'bb'}, 'pp', 5) -- [cc, c, bc, bb, <b>]
+        check({'bc'}, 'pp', 4) -- [cc, c, bc, <bb>, b]
+        check({'bd'}, 'pp', 3) -- [cc, c, <bc>, bb, b]
+        check({'cc'}, 'pp', 2) -- [cc, <c>, bc, bb, b]
+        check({'cd'}, 'pp', 1) -- [<cc>, c, bc, bb, b]
+
+        -- Create and fill a multipart index.
+        s.index.pk:drop()
+        s:create_index('pk', {parts = {{1, 'unsigned'}, {2, 'unsigned'}}})
+        s:insert({1, 1})
+        s:insert({1, 2})
+        s:insert({2, 1})
+
+        check({1}, 'eq',  1) -- [<{1, 1}>, {1, 2}, {2, 1}]
+        check({1}, 'gt',  3) -- [{1, 1}, {1, 2}, <{2, 1}>]
+        check({1}, 'ge',  1) -- [<{1, 1}>, {1, 2}, {2, 1}]
+        check({1}, 'req', 2) -- [{2, 1}, <{1, 2}>, {1, 1}]
+        check({1}, 'lt',  4) -- [{2, 1}, {1, 2}, {1, 1}, <...>]
+        check({1}, 'le',  2) -- [{2, 1}, <{1, 2}>, {1, 1}]
+    end)
+end
+
 g_mvcc.test_count = function()
     g_mvcc.server:exec(function()
         -- The test space with fast offset PK.

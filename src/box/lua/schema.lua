@@ -2518,6 +2518,23 @@ base_index_mt.count_luac = function(index, key, opts)
     return internal.count(index.space_id, index.id, itype, key);
 end
 
+-- 1-based iterator-relative index of the first matching tuple. If such a tuple
+-- does not exist, returns the index at which it would be located if existed.
+--
+-- For an existing tuple, if index:index_of(key, {iterator = it}) == N, then
+-- index:pairs(nil, {iterator = it, offset = N - 1}) will start the iterator
+-- from the same tuple as index:pairs(key, {iterator = it})
+base_index_mt.index_of = function(index, key, opts)
+    check_index_arg(index, 'index_of', 2)
+    local itype = check_iterator_type(opts, #key == 0, 2)
+    if itype == box.index.EQ then
+        opts.iterator = box.index.GE
+    elseif itype == box.index.REQ then
+        opts.iterator = box.index.LE
+    end
+    return index:len() - index:count(key, opts) + 1
+end
+
 base_index_mt.get_ffi = function(index, key)
     if builtin.box_read_ffi_is_disabled then
         return base_index_mt.get_luac(index, key)
@@ -2732,6 +2749,14 @@ space_mt.count = function(space, key, opts)
         return 0 -- empty space without indexes, return 0
     end
     return pk:count(key, opts)
+end
+space_mt.index_of = function(space, key, opts)
+    check_space_arg(space, 'index_of', 2)
+    local pk = space.index[0]
+    if pk == nil then
+        return 1 -- empty space without indexes, return 1
+    end
+    return pk:index_of(key, opts)
 end
 space_mt.bsize = function(space)
     check_space_arg(space, 'bsize', 2)
