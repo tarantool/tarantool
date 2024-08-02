@@ -207,6 +207,54 @@ invalidate_tree_iterator(NS_USE_HINT::memtx_tree_iterator *itr)
 	*itr = NS_USE_HINT::memtx_tree_invalid_iterator();
 }
 
+template<bool USE_HINT>
+memtx_tree_iterator_t<USE_HINT>
+memtx_tree_first(memtx_tree_view_t<USE_HINT> *view)
+{
+	return memtx_tree_view_first(view);
+}
+
+template<bool USE_HINT>
+size_t
+memtx_tree_size(memtx_tree_view_t<USE_HINT> *view)
+{
+	return memtx_tree_view_size(view);
+}
+
+template<bool USE_HINT>
+bool
+memtx_tree_iterator_prev(memtx_tree_view_t<USE_HINT> *view,
+			 memtx_tree_iterator_t<USE_HINT> *it)
+{
+	return memtx_tree_view_iterator_prev(view, it);
+}
+
+template<bool USE_HINT>
+struct memtx_tree_data<USE_HINT> *
+memtx_tree_iterator_get_elem(memtx_tree_view_t<USE_HINT> *view,
+			     memtx_tree_iterator_t<USE_HINT> *it)
+{
+	return memtx_tree_view_iterator_get_elem(view, it);
+}
+
+template<bool USE_HINT>
+memtx_tree_iterator_t<USE_HINT>
+memtx_tree_upper_bound_get_offset(memtx_tree_view_t<USE_HINT> *view,
+				  struct memtx_tree_key_data<USE_HINT> *key,
+				  bool *exact, size_t *offset)
+{
+	return memtx_tree_view_upper_bound_get_offset(view, key, exact, offset);
+}
+
+template<bool USE_HINT>
+memtx_tree_iterator_t<USE_HINT>
+memtx_tree_lower_bound_get_offset(memtx_tree_view_t<USE_HINT> *view,
+				  struct memtx_tree_key_data<USE_HINT> *key,
+				  bool *exact, size_t *offset)
+{
+	return memtx_tree_view_lower_bound_get_offset(view, key, exact, offset);
+}
+
 template <bool USE_HINT>
 struct memtx_tree_index {
 	struct index base;
@@ -792,9 +840,9 @@ prepare_start_prefix_iterator(struct memtx_tree_key_data<USE_HINT> *start_data,
  * @retval true on success;
  * @retval false if the iteration must be stopped without an error.
  */
-template<bool USE_HINT>
+template<template<bool> class T, bool USE_HINT>
 static bool
-memtx_tree_lookup(memtx_tree_t<USE_HINT> *tree,
+memtx_tree_lookup(T<USE_HINT> *tree,
 		  struct memtx_tree_key_data<USE_HINT> *start_data,
 		  struct memtx_tree_key_data<USE_HINT> after_data,
 		  enum iterator_type *type, struct region *region,
