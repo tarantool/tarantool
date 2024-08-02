@@ -2351,16 +2351,18 @@ static int
 tree_read_view_iterator_start(struct tree_read_view_iterator<USE_HINT> *it,
 			      enum iterator_type type,
 			      const char *key, uint32_t part_count,
-			      const char *pos)
+			      const char *pos, uint32_t offset)
 {
 	assert(type == ITER_ALL);
 	assert(key == NULL);
 	assert(part_count == 0);
 	assert(pos == NULL);
+	assert(offset == 0);
 	(void)type;
 	(void)key;
 	(void)part_count;
 	(void)pos;
+	(void)offset;
 	struct tree_read_view<USE_HINT> *rv =
 		(struct tree_read_view<USE_HINT> *)it->base.index;
 	it->base.next_raw = tree_read_view_iterator_next_raw<USE_HINT>;
@@ -2405,14 +2407,13 @@ tree_read_view_iterator_position_func(struct index_read_view_iterator *it,
 						pos, size);
 }
 
-/** Implementation of create_iterator index_read_view callback. */
+/** Implementation of create_iterator_with_offset index_read_view callback. */
 template <bool USE_HINT>
 static int
-tree_read_view_create_iterator(struct index_read_view *base,
-			       enum iterator_type type,
-			       const char *key, uint32_t part_count,
-			       const char *pos,
-			       struct index_read_view_iterator *iterator)
+tree_read_view_create_iterator_with_offset(
+	struct index_read_view *base, enum iterator_type type, const char *key,
+	uint32_t part_count, const char *pos, uint32_t offset,
+	struct index_read_view_iterator *iterator)
 {
 	struct tree_read_view_iterator<USE_HINT> *it =
 		(struct tree_read_view_iterator<USE_HINT> *)iterator;
@@ -2434,7 +2435,20 @@ tree_read_view_create_iterator(struct index_read_view *base,
 		it->key_data.set_hint(HINT_NONE);
 	it->last = NULL;
 	invalidate_tree_iterator(&it->tree_iterator);
-	return tree_read_view_iterator_start(it, type, key, part_count, pos);
+	return tree_read_view_iterator_start(it, type, key, part_count,
+					     pos, offset);
+}
+
+/** Implementation of create_iterator index_read_view callback. */
+template<bool USE_HINT>
+static int
+tree_read_view_create_iterator(struct index_read_view *base,
+			       enum iterator_type type, const char *key,
+			       uint32_t part_count, const char *pos,
+			       struct index_read_view_iterator *iterator)
+{
+	return tree_read_view_create_iterator_with_offset<USE_HINT>(
+		base, type, key, part_count, pos, 0, iterator);
 }
 
 /** Implementation of create_read_view index callback. */
@@ -2446,6 +2460,8 @@ memtx_tree_index_create_read_view(struct index *base)
 		.free = tree_read_view_free<USE_HINT>,
 		.get_raw = tree_read_view_get_raw<USE_HINT>,
 		.create_iterator = tree_read_view_create_iterator<USE_HINT>,
+		.create_iterator_with_offset =
+			tree_read_view_create_iterator_with_offset<USE_HINT>,
 	};
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;

@@ -694,6 +694,13 @@ struct index_read_view_vtab {
 			   const char *key, uint32_t part_count,
 			   const char *pos,
 			   struct index_read_view_iterator *it);
+	/** The same as create_iterator but skip first @offset tuples. */
+	int
+	(*create_iterator_with_offset)(struct index_read_view *rv,
+				       enum iterator_type type,
+				       const char *key, uint32_t part_count,
+				       const char *pos, uint32_t offset,
+				       struct index_read_view_iterator *it);
 };
 
 /**
@@ -1022,6 +1029,18 @@ index_read_view_get_raw(struct index_read_view *rv,
 }
 
 static inline int
+index_read_view_create_iterator_with_offset(struct index_read_view *rv,
+					    enum iterator_type type,
+					    const char *key,
+					    uint32_t part_count,
+					    const char *pos, uint32_t offset,
+					    struct index_read_view_iterator *it)
+{
+	return rv->vtab->create_iterator_with_offset(rv, type, key, part_count,
+						     pos, offset, it);
+}
+
+static inline int
 index_read_view_create_iterator_after(struct index_read_view *rv,
 				      enum iterator_type type,
 				      const char *key, uint32_t part_count,
@@ -1102,6 +1121,12 @@ generic_index_create_iterator_with_offset(struct index *base,
 					  enum iterator_type type,
 					  const char *key, uint32_t part_count,
 					  const char *pos, uint32_t offset);
+int
+generic_index_read_view_create_iterator_with_offset(
+	struct index_read_view *base, enum iterator_type type,
+	const char *key, uint32_t part_count,
+	const char *pos, uint32_t offset,
+	struct index_read_view_iterator *it);
 int generic_index_build_next(struct index *, struct tuple *);
 void generic_index_end_build(struct index *);
 int
