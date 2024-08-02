@@ -659,6 +659,9 @@ struct index_read_view_vtab {
 	/** Free an index read view instance. */
 	void
 	(*free)(struct index_read_view *rv);
+	/* Count the amount of tuples mtching the key in the view. */
+	ssize_t (*count)(struct index_read_view *rv, enum iterator_type type,
+			 const char *key, uint32_t part_count);
 	/**
 	 * Look up a tuple by a full key in a read view.
 	 *
@@ -1061,6 +1064,10 @@ int generic_index_max(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_random(struct index *, uint32_t, struct tuple **);
 ssize_t generic_index_count(struct index *, enum iterator_type,
 			    const char *, uint32_t);
+ssize_t
+generic_index_read_view_count(struct index_read_view *rv,
+			      enum iterator_type type, const char *key,
+			      uint32_t part_count);
 int
 generic_index_get_internal(struct index *index, const char *key,
 			   uint32_t part_count, struct tuple **result);
