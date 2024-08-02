@@ -29,10 +29,7 @@ lua_code2 = [[function(tuple) return {tuple[1] + tuple[2], 2 * tuple[1] + tuple[
 box.schema.func.create('s_nonpersistent')
  | ---
  | ...
-box.schema.func.create('s_ivaliddef1', {body = lua_code, is_deterministic = false, is_sandboxed = true})
- | ---
- | ...
-box.schema.func.create('s_ivaliddef2', {body = lua_code, is_deterministic = true, is_sandboxed = false})
+box.schema.func.create('s_nondeterministic', {body = lua_code, is_deterministic = false, is_sandboxed = true})
  | ---
  | ...
 
@@ -60,20 +57,14 @@ _ = s:create_index('idx', {func = 6666, parts = {{1, 'unsigned'}}})
 -- Can't use non-persistent function in functional index.
 _ = s:create_index('idx', {func = box.func.s_nonpersistent.id, parts = {{1, 'unsigned'}}})
  | ---
- | - error: 'Wrong index options: referenced function doesn''t satisfy functional index
- |     function constraints'
+ | - error: 'Wrong index options: function ''s_nonpersistent'' doesn''t meet functional
+ |     index function criteria (stored, deterministic, written in Lua)'
  | ...
 -- Can't use non-deterministic function in functional index.
-_ = s:create_index('idx', {func = box.func.s_ivaliddef1.id, parts = {{1, 'unsigned'}}})
+_ = s:create_index('idx', {func = box.func.s_nondeterministic.id, parts = {{1, 'unsigned'}}})
  | ---
- | - error: 'Wrong index options: referenced function doesn''t satisfy functional index
- |     function constraints'
- | ...
--- Can't use non-sandboxed function in functional index.
-_ = s:create_index('idx', {func = box.func.s_ivaliddef2.id, parts = {{1, 'unsigned'}}})
- | ---
- | - error: 'Wrong index options: referenced function doesn''t satisfy functional index
- |     function constraints'
+ | - error: 'Wrong index options: function ''s_nondeterministic'' doesn''t meet functional
+ |     index function criteria (stored, deterministic, written in Lua)'
  | ...
 -- Can't use non-sequential parts in returned key definition.
 _ = s:create_index('idx', {func = box.func.ss.id, parts = {{1, 'unsigned'}, {3, 'unsigned'}}})
@@ -99,7 +90,7 @@ idx = s:create_index('idx', {unique = true, func = box.func.s.id, parts = {{1, '
  | ...
 box.schema.func.drop('s')
  | ---
- | - error: 'Can''t drop function 69: function has references'
+ | - error: 'Can''t drop function 68: function has references'
  | ...
 box.snapshot()
  | ---
@@ -109,7 +100,7 @@ test_run:cmd("restart server default")
  | 
 box.schema.func.drop('s')
  | ---
- | - error: 'Can''t drop function 69: function has references'
+ | - error: 'Can''t drop function 68: function has references'
  | ...
 s = box.space.withdata
  | ---

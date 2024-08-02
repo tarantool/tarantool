@@ -293,11 +293,12 @@ static int
 func_index_check_func(struct func *func) {
 	assert(func != NULL);
 	if (func->def->language != FUNC_LANGUAGE_LUA ||
-	    func->def->body == NULL || !func->def->is_deterministic ||
-	    !func->def->is_sandboxed) {
-		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-			 "referenced function doesn't satisfy "
-			 "functional index function constraints");
+	    func->def->body == NULL || !func->def->is_deterministic) {
+		const char *errmsg = tt_sprintf(
+			"function '%s' doesn't meet functional index "
+			"function criteria (stored, deterministic, written in Lua)",
+			func->def->name);
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, errmsg);
 		return -1;
 	}
 	return 0;

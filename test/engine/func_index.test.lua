@@ -10,8 +10,7 @@ s = box.schema.space.create('withdata', {engine = engine})
 lua_code = [[function(tuple) return {tuple[1] + tuple[2]} end]]
 lua_code2 = [[function(tuple) return {tuple[1] + tuple[2], 2 * tuple[1] + tuple[2]} end]]
 box.schema.func.create('s_nonpersistent')
-box.schema.func.create('s_ivaliddef1', {body = lua_code, is_deterministic = false, is_sandboxed = true})
-box.schema.func.create('s_ivaliddef2', {body = lua_code, is_deterministic = true, is_sandboxed = false})
+box.schema.func.create('s_nondeterministic', {body = lua_code, is_deterministic = false, is_sandboxed = true})
 
 box.schema.func.create('s', {body = lua_code, is_deterministic = true, is_sandboxed = true})
 box.schema.func.create('ss', {body = lua_code2, is_deterministic = true, is_sandboxed = true})
@@ -24,9 +23,7 @@ _ = s:create_index('idx', {func = 6666, parts = {{1, 'unsigned'}}})
 -- Can't use non-persistent function in functional index.
 _ = s:create_index('idx', {func = box.func.s_nonpersistent.id, parts = {{1, 'unsigned'}}})
 -- Can't use non-deterministic function in functional index.
-_ = s:create_index('idx', {func = box.func.s_ivaliddef1.id, parts = {{1, 'unsigned'}}})
--- Can't use non-sandboxed function in functional index.
-_ = s:create_index('idx', {func = box.func.s_ivaliddef2.id, parts = {{1, 'unsigned'}}})
+_ = s:create_index('idx', {func = box.func.s_nondeterministic.id, parts = {{1, 'unsigned'}}})
 -- Can't use non-sequential parts in returned key definition.
 _ = s:create_index('idx', {func = box.func.ss.id, parts = {{1, 'unsigned'}, {3, 'unsigned'}}})
 -- Can't use parts started not by 1 field.
