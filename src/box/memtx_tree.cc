@@ -207,6 +207,61 @@ invalidate_tree_iterator(NS_USE_HINT::memtx_tree_iterator *itr)
 	*itr = NS_USE_HINT::memtx_tree_invalid_iterator();
 }
 
+template<bool USE_HINT>
+memtx_tree_iterator_t<USE_HINT>
+memtx_tree_first(memtx_tree_view_t<USE_HINT> *view)
+{
+	return memtx_tree_view_first(view);
+}
+
+template<bool USE_HINT>
+memtx_tree_iterator_t<USE_HINT>
+memtx_tree_iterator_at(memtx_tree_view_t<USE_HINT> *view, size_t offset)
+{
+	return memtx_tree_view_iterator_at(view, offset);
+}
+
+template<bool USE_HINT>
+size_t
+memtx_tree_size(memtx_tree_view_t<USE_HINT> *view)
+{
+	return memtx_tree_view_size(view);
+}
+
+template<bool USE_HINT>
+bool
+memtx_tree_iterator_prev(memtx_tree_view_t<USE_HINT> *view,
+			 memtx_tree_iterator_t<USE_HINT> *it)
+{
+	return memtx_tree_view_iterator_prev(view, it);
+}
+
+template<bool USE_HINT>
+struct memtx_tree_data<USE_HINT> *
+memtx_tree_iterator_get_elem(memtx_tree_view_t<USE_HINT> *view,
+			     memtx_tree_iterator_t<USE_HINT> *it)
+{
+	return memtx_tree_view_iterator_get_elem(view, it);
+}
+
+template<bool USE_HINT>
+memtx_tree_iterator_t<USE_HINT>
+memtx_tree_upper_bound_get_offset(memtx_tree_view_t<USE_HINT> *view,
+				  struct memtx_tree_key_data<USE_HINT> *key,
+				  bool *exact, size_t *offset)
+{
+	return memtx_tree_view_upper_bound_get_offset(view, key, exact, offset);
+}
+
+template<bool USE_HINT>
+memtx_tree_iterator_t<USE_HINT>
+memtx_tree_lower_bound_get_offset(memtx_tree_view_t<USE_HINT> *view,
+				  struct memtx_tree_key_data<USE_HINT> *key,
+				  bool *exact, size_t *offset)
+{
+	return memtx_tree_view_lower_bound_get_offset(view, key, exact, offset);
+}
+
 template <bool USE_HINT>
 struct memtx_tree_index {
 	struct index base;
@@ -779,9 +834,9 @@ prepare_start_prefix_iterator(struct memtx_tree_key_data<USE_HINT> *start_data,
  * Advance the @a iterator of @a tree for up to @a skip tuples, updates the @a
  * curr_offset output parameter to the new (actualized) value.
  */
-template<bool USE_HINT>
+template<template<bool> class T, bool USE_HINT>
 static void
-memtx_tree_skip(const memtx_tree_t<USE_HINT> *tree,
+memtx_tree_skip(T<USE_HINT> *tree,
 		memtx_tree_iterator_t<USE_HINT> *iterator,
 		size_t *curr_offset, size_t skip, bool reverse)
 {
@@ -801,7 +856,9 @@ memtx_tree_skip(const memtx_tree_t<USE_HINT> *tree,
 
 /**
  * Creates an iterator based on the given key, after data and iterator type.
- * Also updates @a start_data and iterator @a type as required.
+ * Also updates @a start_data and iterator @a type as required. Approaches the
+ * target tuple if @a step is true, get to the tuple prior to the target one
+ * (by the iterator direction) otherwise.
  *
  * @param tree - the tree to lookup in;
  * @param start_data - the key to lookup with, may be updated;
@@ -819,9 +876,9 @@ memtx_tree_skip(const memtx_tree_t<USE_HINT> *tree,
  * @retval true on success;
  * @retval false if the iteration must be stopped without an error.
  */
-template<bool USE_HINT>
+template<bool step = true, template<bool> class T, bool USE_HINT>
 static bool
-memtx_tree_lookup(memtx_tree_t<USE_HINT> *tree,
+memtx_tree_lookup(T<USE_HINT> *tree,
 		  struct memtx_tree_key_data<USE_HINT> *start_data,
 		  struct memtx_tree_key_data<USE_HINT> after_data,
 		  enum iterator_type *type, size_t skip, struct region *region,
@@ -902,21 +959,34 @@ memtx_tree_lookup(memtx_tree_t<USE_HINT> *tree,
 	/* Save the element we approached on the initial lookup. */
 	*initial_elem = memtx_tree_iterator_get_elem(tree, iterator);
 
-	if (iterator_type_is_reverse(*type)) {
+	if ((step && iterator_type_is_reverse(*type)) ||
+	    (!step && !iterator_type_is_reverse(*type))) {
 		/*
-		 * Because of limitations of tree search API we use
-		 * lower_bound for LT search and upper_bound for LE and
-		 * REQ searches. In both cases we find a position to the
-		 * right of the target one. Let's make a step to the
-		 * left to reach target position.
-		 * If we found an invalid iterator all the elements in
-		 * the tree are less (less or equal) to the key, and
-		 * iterator_prev call will convert the iterator to the
-		 * last position in the tree, that's what we need.
+		 * lower_bound and upper_bound position the iterator to the key
+		 * >= and > the target one respectively, so for LT, LE and REQ
+		 * the found position is to the right of the target key while
+		 * for GT, GE and EQ it's at the target key.
 		 *
-		 * We only step back if we don't need to skip tuples,
-		 * otherwise we will only need the current offset to
-		 * update the iterator.
+		 * If we use this lookup function with regular tree iterators
+		 * (@a step == true), then we need to set the iterator to the
+		 * target tuple, because the function is used to perform the
+		 * first iteration step.
+		 *
+		 * So we need to step back for LT, LE and REQ types in his case.
+		 *
+		 * But if the function is used with read view iterators (when
+		 * @a step == false), then we need to approach the tuple prior
+		 * to the target one, cause the function is called during the
+		 * iterator creation, and the iterator's 'next' function will
+		 * *first* advance the iterator and *then* return the tuple.
+		 *
+		 * So we need to step back for GT, GE and EQ types in this case,
+		 * so the caller will approach the target tuple in the iterator
+		 * step method.
+		 *
+		 * Also, we only step back if we don't need to skip tuples,
+		 * otherwise we will only need the current offset to update
+		 * the iterator.
 		 */
 		if (skip == 0)
 			memtx_tree_iterator_prev(tree, iterator);
