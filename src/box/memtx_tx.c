@@ -3562,6 +3562,8 @@ struct memtx_tx_snapshot_cleaner_entry
 {
 	struct tuple *from;
 	struct tuple *to;
+	/* Does the @a from tuple present in the index. */
+	bool in_index;
 };
 
 #define mh_name _snapshot_cleaner
@@ -3596,6 +3598,7 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 		struct memtx_tx_snapshot_cleaner_entry entry;
 		entry.from = tuple;
 		entry.to = clean;
+		entry.in_index = story->link[0].in_index != NULL;
 		mh_snapshot_cleaner_put(ht,  &entry, NULL, 0);
 	}
 	struct space_alter_stmt *alter_stmt;
@@ -3603,6 +3606,7 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 		struct memtx_tx_snapshot_cleaner_entry entry;
 		entry.from = alter_stmt->new_tuple;
 		entry.to = alter_stmt->old_tuple;
+		entry.in_index = true;
 		mh_snapshot_cleaner_put(ht, &entry, NULL, 0);
 	}
 	cleaner->ht = ht;
@@ -3625,6 +3629,29 @@ memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
 		tuple = entry->to;
 	}
 	return tuple;
+}
+
+size_t
+memtx_tx_snapshot_invisible_count_matching_slow(
+	struct memtx_tx_snapshot_cleaner *cleaner,
+	struct key_def *def, enum iterator_type type,
+	const char *key, uint32_t part_count)
+{
+	assert(cleaner->ht != NULL);
+
+	size_t res = 0;
+	struct mh_snapshot_cleaner_t *ht = cleaner->ht;
+	mh_int_t i;
+	mh_foreach(ht, i) {
+		struct memtx_tx_snapshot_cleaner_entry *entry =
+			mh_snapshot_cleaner_node(ht, i);
+		if (!entry->in_index)
+			continue;
+		if (memtx_tx_tuple_matches(def, entry->from,
+					   type, key, part_count))
+			res++;
+	}
+	return res;
 }
 
 void
