@@ -1014,6 +1014,33 @@ fail:
 	return NULL;
 }
 
+int
+generic_index_read_view_create_iterator_with_offset(
+	struct index_read_view *rv, enum iterator_type type,
+	const char *key, uint32_t part_count,
+	const char *pos, uint32_t offset,
+	struct index_read_view_iterator *it)
+{
+	if (index_read_view_create_iterator_after(rv, type, key, part_count,
+						  pos, it) != 0)
+		return -1;
+
+	/* Skip the required amount of tuples. */
+	for (size_t i = 0; i < offset; i++) {
+		if (box_check_slice() != 0)
+			goto fail;
+		struct read_view_tuple skipped_tuple;
+		if (index_read_view_iterator_next_raw(it, &skipped_tuple) != 0)
+			goto fail;
+		if (skipped_tuple.data == NULL)
+			return 0;
+	}
+	return 0;
+fail:
+	index_read_view_iterator_destroy(it);
+	return -1;
+}
+
 struct index_read_view *
 generic_index_create_read_view(struct index *index)
 {
