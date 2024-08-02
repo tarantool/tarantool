@@ -936,6 +936,31 @@ generic_index_count(struct index *index, enum iterator_type type,
 	return count;
 }
 
+ssize_t
+generic_index_read_view_count(struct index_read_view *rv,
+			      enum iterator_type type, const char *key,
+			      uint32_t part_count)
+{
+	struct index_read_view_iterator it;
+	if (index_read_view_create_iterator(rv, type, key,
+					    part_count, &it) != 0)
+		return -1;
+	int rc = 0;
+	size_t count = 0;
+	struct read_view_tuple tuple;
+	while ((rc = index_read_view_iterator_next_raw(&it, &tuple)) == 0 &&
+	       tuple.data != NULL) {
+		rc = box_check_slice();
+		if (rc != 0)
+			break;
+		++count;
+	}
+	index_read_view_iterator_destroy(&it);
+	if (rc < 0)
+		return rc;
+	return count;
+}
+
 int
 generic_index_get_internal(struct index *index, const char *key,
 			   uint32_t part_count, struct tuple **result)
