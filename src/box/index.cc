@@ -1018,6 +1018,59 @@ fail:
 	return NULL;
 }
 
+#if defined(ENABLE_READ_VIEW)
+
+#include "index_read_view.h"
+
+int
+generic_index_read_view_create_iterator_with_offset(
+	struct index_read_view *rv, enum iterator_type type,
+	const char *key, uint32_t part_count,
+	const char *pos, uint32_t offset,
+	struct index_read_view_iterator *it)
+{
+	if (index_read_view_create_iterator_after(rv, type, key, part_count,
+						  pos, it) != 0)
+		return -1;
+
+	/* Skip the required amount of tuples. */
+	for (size_t i = 0; i < offset; i++) {
+		/* The fiber slice is checked in the next function. */
+		struct tuple *skipped_tuple;
+		if (box_index_read_view_iterator_next(it, &skipped_tuple) != 0)
+			goto fail;
+		if (skipped_tuple == NULL)
+			return 0;
+	}
+	return 0;
+
+fail:
+	index_read_view_iterator_destroy(it);
+	return -1;
+}
+
+#else /* !defined(ENABLE_READ_VIEW) */
+
+int
+generic_index_read_view_create_iterator_with_offset(
+	struct index_read_view *rv, enum iterator_type type,
+	const char *key, uint32_t part_count,
+	const char *pos, uint32_t offset,
+	struct index_read_view_iterator *it)
+{
+	(void)type;
+	(void)key;
+	(void)part_count;
+	(void)pos;
+	(void)offset;
+	(void)it;
+	diag_set(UnsupportedIndexFeature, rv->def,
+		 "index read view iterator with offset");
+	return -1;
+}
+
+#endif /* !defined(ENABLE_READ_VIEW) */
+
 struct index_read_view *
 generic_index_create_read_view(struct index *index)
 {

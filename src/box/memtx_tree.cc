@@ -2476,6 +2476,8 @@ memtx_tree_index_create_read_view(struct index *base)
 		.free = tree_read_view_free<USE_HINT>,
 		.get_raw = tree_read_view_get_raw<USE_HINT>,
 		.create_iterator = tree_read_view_create_iterator<USE_HINT>,
+		.create_iterator_with_offset =
+			generic_index_read_view_create_iterator_with_offset,
 	};
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
