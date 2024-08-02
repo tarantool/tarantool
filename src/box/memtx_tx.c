@@ -3681,3 +3681,7 @@ memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner)
 	if (cleaner->ht != NULL)
 		mh_snapshot_cleaner_delete(cleaner->ht);
 }
+
+#if defined(ENABLE_READ_VIEW)
+# include "memtx_tx_read_view.c"
+#endif /* defined(ENABLE_READ_VIEW) */

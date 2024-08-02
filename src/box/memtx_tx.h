@@ -553,6 +553,10 @@ memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner);
 API_EXPORT void
 memtx_tx_story_gc_step(void);
 
+#if defined(ENABLE_READ_VIEW)
+# include "memtx_tx_read_view.h"
+#endif /* defined(ENABLE_READ_VIEW) */
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
