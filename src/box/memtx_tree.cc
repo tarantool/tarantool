@@ -2300,6 +2300,14 @@ tree_read_view_free(struct index_read_view *base)
 # include "memtx_tree_read_view.cc"
 #else /* !defined(ENABLE_READ_VIEW) */
 
+template<bool USE_HINT>
+static ssize_t
+tree_read_view_count(struct index_read_view *rv, enum iterator_type type,
+		     const char *key, uint32_t part_count)
+{
+	return generic_index_read_view_count(rv, type, key, part_count);
+}
+
 template <bool USE_HINT>
 static int
 tree_read_view_get_raw(struct index_read_view *rv,
@@ -2458,6 +2466,7 @@ memtx_tree_index_create_read_view(struct index *base)
 {
 	static const struct index_read_view_vtab vtab = {
 		.free = tree_read_view_free<USE_HINT>,
+		.count = tree_read_view_count<USE_HINT>,
 		.get_raw = tree_read_view_get_raw<USE_HINT>,
 		.create_iterator = tree_read_view_create_iterator<USE_HINT>,
 		.create_iterator_with_offset =
