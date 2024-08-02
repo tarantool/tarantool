@@ -144,8 +144,8 @@ g.test_shutdown_of_hanging_iproto_request = function(cg)
     end)
     local log = fio.pathjoin(cg.server.workdir, cg.server.alias .. '.log')
     test_no_hang_on_shutdown(cg.server)
-    t.assert(cg.server:grep_log('cannot gracefully shutdown client fibers', nil,
-             {filename = log}))
+    t.assert(cg.server:grep_log('cannot gracefully shutdown iproto requests',
+             nil, {filename = log}))
 end
 
 -- Test shutdown does not hang if there is client fiber that
@@ -187,6 +187,87 @@ g.test_shutdown_memtx_gc_free_tuples = function(cg)
         box.space.test.index.pk:drop()
     end)
     server:stop()
+end
+
+g.test_shutdown_with_active_connection = function(cg)
+    -- Define helpers needed for the test
+    local function socket_connect(server)
+        local lsocket = require('socket')
+        local uri = require('uri')
+        local u = uri.parse(server.net_box_uri)
+        local s = lsocket.tcp_connect(u.host, u.service)
+        t.assert_not_equals(s, nil)
+        -- Skip the greeting.
+        s:read(box.iproto.GREETING_SIZE, 10)
+        return s
+    end
+    local function write_eval(s, expr)
+        local key = box.iproto.key
+        local header = {
+            [key.REQUEST_TYPE] = box.iproto.type.EVAL,
+            [key.SYNC] = 1,
+        }
+        local body = {
+            [key.EXPR] = expr,
+            [key.TUPLE] = {},
+        }
+        return s:write(box.iproto.encode_packet(header, body))
+    end
+
+    -- Delay shutdown for ~5 seconds
+    cg.server:exec(function()
+        local log = require('log')
+        local fiber = require('fiber')
+        local tweaks = require('internal.tweaks')
+        tweaks.box_shutdown_timeout = 30.0
+        fiber.new(function()
+            log.info('going to sleep for test')
+            local i = 0
+            while i < 5 do
+                pcall(fiber.sleep, 1)
+                i = i + 1
+            end
+        end)
+    end)
+
+    -- Start a fiber that will log a message when all client fibers
+    -- will be cancelled
+    cg.server:exec(function()
+        local log = require('log')
+        local fiber = require('fiber')
+        fiber.new(function()
+            pcall(fiber.sleep, 100)
+            log.info('Client fibers were cancelled')
+        end)
+    end)
+
+    -- Connect socket to Tarantool before shutting down
+    -- Net box is not suitable because it supports graceful shutdown
+    -- so we can't send a new request with it when Tarantool is shutting
+    -- down
+    local socket = socket_connect(cg.server)
+
+    -- Start stopping server
+    local f = fiber.create(function()
+        cg.server:stop()
+    end)
+    f:set_joinable(true)
+
+    -- Wait until Tarantool will cancel client fibers
+    local log = fio.pathjoin(cg.server.workdir, cg.server.alias .. '.log')
+    t.helpers.retrying({}, function()
+        t.assert(cg.server:grep_log('Client fibers were cancelled', nil,
+            {filename = log}))
+    end)
+
+    -- Send a request that could make Tarantool panic on shutdown
+    -- if it was accepted
+    local expr = "require('fiber').sleep(1000)"
+    write_eval(socket, expr)
+
+    -- Check if server is successfully stopped
+    local ok, err = f:join()
+    t.assert(ok, err)
 end
 
 local g_idle_pool = t.group('idle pool')
