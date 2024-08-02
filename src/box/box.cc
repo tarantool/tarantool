@@ -6187,6 +6187,14 @@ box_shutdown(void)
 	 */
 	box_watcher_shutdown();
 	/*
+	 * Iproto connections should be dropped before client fibers because
+	 * they can produce new ones in `tx_fiber_pool`.
+	 */
+	if (iproto_drop_connections(box_shutdown_timeout) != 0) {
+		diag_log();
+		panic("cannot gracefully shutdown iproto requests");
+	}
+	/*
 	 * Finish client fibers before other subsystems shutdown so that
 	 * we won't get unexpected request to shutdown subsystems from
 	 * client code.
