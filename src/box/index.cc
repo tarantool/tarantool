@@ -942,6 +942,47 @@ generic_index_count(struct index *index, enum iterator_type type,
 	return count;
 }
 
+#if defined(ENABLE_READ_VIEW)
+
+#include "index_read_view.h"
+
+ssize_t
+generic_index_read_view_count(struct index_read_view *rv,
+			      enum iterator_type type, const char *key,
+			      uint32_t part_count)
+{
+	struct index_read_view_iterator it;
+	if (index_read_view_create_iterator(rv, type, key,
+					    part_count, &it) != 0)
+		return -1;
+	int rc = 0;
+	size_t count = 0;
+	struct tuple *tuple = NULL;
+	while ((rc = box_index_read_view_iterator_next(&it, &tuple)) == 0 &&
+	       tuple != NULL)
+		++count;
+	index_read_view_iterator_destroy(&it);
+	if (rc < 0)
+		return rc;
+	return 0;
+}
+
+#else /* !defined(ENABLE_READ_VIEW) */
+
+ssize_t
+generic_index_read_view_count(struct index_read_view *rv,
+			      enum iterator_type type, const char *key,
+			      uint32_t part_count)
+{
+	(void)type;
+	(void)key;
+	(void)part_count;
+	diag_set(UnsupportedIndexFeature, rv->def, "read view count()");
+	return -1;
+}
+
+#endif /* !defined(ENABLE_READ_VIEW) */
+
 int
 generic_index_get_internal(struct index *index, const char *key,
 			   uint32_t part_count, struct tuple **result)
