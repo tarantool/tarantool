@@ -501,9 +501,10 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 /* {{{ Iterators ************************************************/
 
 box_iterator_t *
-box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
-			 const char *key, const char *key_end,
-			 const char *packed_pos, const char *packed_pos_end)
+box_index_iterator_with_offset(uint32_t space_id, uint32_t index_id, int type,
+			       const char *key, const char *key_end,
+			       const char *packed_pos,
+			       const char *packed_pos_end, uint32_t offset)
 {
 	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
@@ -547,8 +548,8 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return NULL;
-	struct iterator *it = index_create_iterator_after(index, itype, key,
-							  part_count, pos);
+	struct iterator *it = index_create_iterator_with_offset(
+		index, itype, key, part_count, pos, offset);
 	txn_end_ro_stmt(txn, &svp);
 	if (it == NULL)
 		return NULL;
@@ -558,6 +559,16 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 	region_truncate(&fiber()->gc, region_svp);
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 	return it;
+}
+
+box_iterator_t *
+box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
+			 const char *key, const char *key_end,
+			 const char *packed_pos, const char *packed_pos_end)
+{
+	return box_index_iterator_with_offset(space_id, index_id, type,
+					      key, key_end, packed_pos,
+					      packed_pos_end, 0);
 }
 
 box_iterator_t *
@@ -986,6 +997,32 @@ generic_index_create_iterator(struct index *base, enum iterator_type type,
 	return NULL;
 }
 
+
+struct iterator *
+generic_index_create_iterator_with_offset(struct index *base,
+					  enum iterator_type type,
+					  const char *key, uint32_t part_count,
+					  const char *pos, uint32_t offset)
+{
+	/* Create a reguar iterator. */
+	struct iterator *it = index_create_iterator_after(
+		base, type, key, part_count, pos);
+
+	/* Skip the required amount of tuples. */
+	for (size_t i = 0; i < offset; i++) {
+		if (box_check_slice() != 0)
+			goto fail;
+		struct tuple *skipped_tuple;
+		if (iterator_next(it, &skipped_tuple) != 0)
+			goto fail;
+		if (skipped_tuple == NULL)
+			return it;
+	}
+	return it;
+fail:
+	iterator_delete(it);
+	return NULL;
+}
 
 struct index_read_view *
 generic_index_create_read_view(struct index *index)
