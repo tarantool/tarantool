@@ -3690,6 +3690,8 @@ struct memtx_tx_snapshot_cleaner_entry
 {
 	struct tuple *from;
 	struct tuple *to;
+	/* Does the @a from tuple present in the PK. */
+	bool in_pk;
 };
 
 #define mh_name _snapshot_cleaner
@@ -3724,6 +3726,7 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 		struct memtx_tx_snapshot_cleaner_entry entry;
 		entry.from = tuple;
 		entry.to = clean;
+		entry.in_pk = story->link[0].in_index != NULL;
 		mh_snapshot_cleaner_put(ht,  &entry, NULL, 0);
 	}
 	struct space_alter_stmt *alter_stmt;
@@ -3731,6 +3734,7 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 		struct memtx_tx_snapshot_cleaner_entry entry;
 		entry.from = alter_stmt->new_tuple;
 		entry.to = alter_stmt->old_tuple;
+		entry.in_pk = false;
 		mh_snapshot_cleaner_put(ht, &entry, NULL, 0);
 	}
 	cleaner->ht = ht;
@@ -3753,6 +3757,63 @@ memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
 		tuple = entry->to;
 	}
 	return tuple;
+}
+
+size_t
+memtx_tx_snapshot_invisible_count_matching_until_slow(
+	struct memtx_tx_snapshot_cleaner *cleaner, struct index_def *index_def,
+	enum iterator_type type, const char *key, uint32_t part_count,
+	struct tuple *until, hint_t until_hint)
+{
+	assert(cleaner->ht != NULL);
+
+	struct key_def *key_def = index_def->key_def;
+	struct key_def *cmp_def = index_def->cmp_def;
+
+	/*
+	 * The border is only valid if it's located at or after the first
+	 * tuple in the index according to the iterator direction and key.
+	 */
+	assert(until == NULL ||
+	       memtx_tx_tuple_matches(key_def, until, type == ITER_EQ ?
+				      ITER_GE : type == ITER_REQ ? ITER_LE :
+				      type, key, part_count));
+
+	size_t res = 0;
+	struct mh_snapshot_cleaner_t *ht = cleaner->ht;
+	mh_int_t i;
+	mh_foreach(ht, i) {
+		struct memtx_tx_snapshot_cleaner_entry *entry =
+			mh_snapshot_cleaner_node(ht, i);
+
+		/* Not a tuple with a top story. */
+		if (!entry->in_pk)
+			continue;
+
+		/* Top story, but the tuple is excluded from the index. */
+		if (tuple_key_is_excluded(entry->from, key_def, MULTIKEY_NONE))
+			continue;
+
+		/* Not an invisible tuple. */
+		if (entry->to != NULL &&
+		    memtx_tx_snapshot_clarify_slow(cleaner, entry->to) != NULL)
+			continue;
+
+		/* Check the border using the cmp_def. */
+		if (until != NULL &&
+		    !memtx_tx_tuple_is_before(cmp_def, entry->from,
+					      until, until_hint, type))
+			continue;
+
+		/*
+		 * Finally, count the in-index, not excluded, invisible, being
+		 * before @a until (if any) and matching the given key tuple.
+		 */
+		if (memtx_tx_tuple_matches(key_def, entry->from,
+					   type, key, part_count))
+			res++;
+	}
+	return res;
 }
 
 void
