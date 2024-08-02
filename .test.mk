@@ -149,6 +149,35 @@ test-debug-asan: TEST_RUN_PARAMS += --test-timeout 620 \
                                     --server-start-timeout 610
 test-debug-asan: build run-luajit-test run-test
 
+# Release ASAN build with ASAN instrumentation of LuaJIT allocator
+
+.PHONY: test-release-asan-instrumentation
+# Copy of Release ASAN build
+test-release-asan-instrumentation: CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
+                                  -DLUAJIT_USE_ASAN_HARDENING=ON \
+                                  -DLUAJIT_ENABLE_GC64=ON \
+                                  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                                  -DFIBER_STACK_SIZE=640Kb
+test-release-asan-instrumentation: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
+test-release-asan-instrumentation: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
+test-release-asan-instrumentation: build run-luajit-test run-test
+
+# Debug ASAN build with ASAN instrumentation of LuaJIT allocator
+
+.PHONY: test-debug-asan-instrumentation
+# Copy of Debug ASAN build
+test-debug-asan-instrumentation: CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
+                                -DLUAJIT_USE_ASAN_HARDENING=ON \
+                                -DLUAJIT_ENABLE_GC64=ON \
+                                -DCMAKE_BUILD_TYPE=Debug \
+                                -DFIBER_STACK_SIZE=1280Kb
+test-debug-asan-instrumentation: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
+test-debug-asan-instrumentation: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
+test-debug-asan-instrumentation: TEST_RUN_PARAMS += --test-timeout 620 \
+                                    --no-output-timeout 630 \
+                                    --server-start-timeout 610
+test-debug-asan-instrumentation: build run-luajit-test run-test
+
 # Debug build
 
 .PHONY: test-debug
