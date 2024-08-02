@@ -480,6 +480,30 @@ memtx_tx_snapshot_clarify(struct memtx_tx_snapshot_cleaner *cleaner,
 	return memtx_tx_snapshot_clarify_slow(cleaner, tuple);
 }
 
+/** Helper of memtx_tx_snapshot_invisible_count_matching. */
+size_t
+memtx_tx_snapshot_invisible_count_matching_slow(
+	struct memtx_tx_snapshot_cleaner *cleaner,
+	struct key_def *def, enum iterator_type type,
+	const char *key, uint32_t part_count);
+
+/*
+ * Count the amount of invisible tuples matching to the given @a key and
+ * iterator @a type in the snapshot. The tuples are matched using the key
+ * @a def privided.
+ */
+static inline size_t
+memtx_tx_snapshot_invisible_count_matching(
+	struct memtx_tx_snapshot_cleaner *cleaner,
+	struct key_def *def, enum iterator_type type,
+	const char *key, uint32_t part_count)
+{
+	if (cleaner->ht == NULL)
+		return 0;
+	return memtx_tx_snapshot_invisible_count_matching_slow(
+		cleaner, def, type, key, part_count);
+}
+
 /**
  * Free resources.in shapshot @cleaner.
  */
