@@ -115,7 +115,9 @@ for _, eng in pairs{'memtx', 'vinyl'} do
                          'set'):format(eng))
         end
 
-        local log_file = g.server:eval('return box.cfg.log')
+        local log_file = g.server:exec(function()
+            return rawget(_G, 'box_cfg_log_file') or box.cfg.log
+        end)
         for _, call_fmt in pairs(dangerous_call_fmts) do
             local call = call_fmt:format(space)
             g.server:eval(call)
