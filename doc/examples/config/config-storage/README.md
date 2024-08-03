@@ -71,6 +71,15 @@ The data corresponding to the path contains the following fields:
 * `value`: any string.
 * `mod_revision`: unsigned number, last `revision` at which this
 value modification occurred.
+* An optional time until expiration. After this time mark, the data is
+  considered as deleted (since Tarantool 3.2).
+
+Since Tarantool version 3.2 keys could be added to the storage with the
+specified TTL. The keys guaranteed not to expire early, but they could live a
+bit longer than expected due to communications between replicas and master.
+
+Each expired key generates a delete event. This means that each expiration bumps
+the storage revision and wakes up watchers.
 
 ### Operations
 
@@ -89,10 +98,13 @@ means the operation will be performed for all values.
 #### Put
 
 To put the value by the path use
-`config.storage.put(path, value)`, where:
+`config.storage.put(path, value, opts)`, where:
 
 * `path`: string, path.
 * `value`: string.
+* `opts.ttl`: number, TTL in seconds. By default, keys will not expire.
+  This option is only supported for Tarantool versions >= 3.2. For older
+  versions, this option is ignored.
 
 ```lua
 config.storage.put('/foo/bar', 'v1')
@@ -108,6 +120,10 @@ config.storage.put('/foo/bar', 'v2')
 config.storage.put('/foo/bar', 'v2')
 ---
 - revision: 3
+...
+config.storage.put('/foo/bar', 'v3', {ttl = 60})
+---
+- revision: 4
 ...
 ```
 
@@ -225,6 +241,7 @@ Each operation is a list that contains `cmd` string as the
 first element and arguments. For example:
 ```lua
 {'put', '/foo/bar', 'v1'}
+{'put', '/foo/bar', 'v2', {ttl = 60}} -- Since version 3.2.
 {'delete', '/a/'}
 ```
 
@@ -313,6 +330,13 @@ config.storage.txn({
     is_success: false
   revision: 10
 ...
+
+-- Specified TTL for a key. Since version 3.2.
+config.storage.txn({
+    predicates = {{'revision', '==', revision}},
+    on_success = {{'put', '/a', 'v2', {ttl = 60}}}
+    on_failure = {{'put', '/b', 'v1', {ttl = 30}}}
+})
 ```
 
 ### Watchers
