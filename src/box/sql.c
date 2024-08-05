@@ -383,8 +383,8 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 		return NULL;
 
 	const char *name = "ephemer_idx";
-	struct index_def *index_def = index_def_new(0, 0, name, strlen(name),
-						    TREE, &index_opts_default,
+	struct index_def *index_def = index_def_new(0, 0, name, NULL, NULL,
+						    strlen(name), TREE, &index_opts_default,
 						    key_def, NULL);
 	key_def_delete(key_def);
 	if (index_def == NULL)

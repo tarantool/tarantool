@@ -576,8 +576,16 @@ space_create(struct space *space, struct engine *engine,
 			 "check_unique_constraint_map");
 		goto fail;
 	}
+
 	rlist_foreach_entry(index_def, key_list, link) {
-		struct index *index = space_create_index(space, index_def);
+		struct index_def *temp_def =
+			index_def_new(index_def->space_id, index_def->iid,
+				      index_def->name, def->name,
+				      def->engine_name, strlen(index_def->name),
+				      index_def->type, &index_def->opts,
+				      index_def->key_def, index_def->pk_def);
+		struct index *index = space_create_index(space, temp_def);
+		index_def_delete(temp_def);
 		if (index == NULL)
 			goto fail_free_indexes;
 		space->index_map[index_def->iid] = index;

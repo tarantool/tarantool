@@ -1549,11 +1549,9 @@ vy_check_is_unique_primary(struct vy_tx *tx, const struct vy_read_view **rv,
 	if (vy_get(lsm, tx, rv, stmt, &found))
 		return -1;
 	if (found != NULL) {
-		struct index *index = &lsm->base;
-		struct space *space = space_by_id(index->def->space_id);
-		diag_set(ClientError, ER_TUPLE_FOUND, index->def->name,
-			 space_name(space), tuple_str(found), tuple_str(stmt),
-			 found, stmt);
+		diag_set(ClientError, ER_TUPLE_FOUND, lsm->base.def->name,
+			 lsm->base.def->space_name, tuple_str(found),
+			 tuple_str(stmt), found, stmt);
 		tuple_unref(found);
 		return -1;
 	}
@@ -1599,11 +1597,9 @@ vy_check_is_unique_secondary_one(struct vy_tx *tx, const struct vy_read_view **r
 		return 0;
 	}
 	if (found != NULL) {
-		struct index *index = &lsm->base;
-		struct space *space = space_by_id(index->def->space_id);
-		diag_set(ClientError, ER_TUPLE_FOUND, index->def->name,
-			 space_name(space), tuple_str(found), tuple_str(stmt),
-			 found, stmt);
+		diag_set(ClientError, ER_TUPLE_FOUND, lsm->base.def->name,
+			 lsm->base.def->space_name, tuple_str(found),
+			 tuple_str(stmt), found, stmt);
 		tuple_unref(found);
 		return -1;
 	}
@@ -1806,7 +1802,7 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
  * @retval -1 Attempt to modify the primary key.
  */
 static inline int
-vy_check_update(struct space *space, const struct vy_lsm *pk,
+vy_check_update(const struct vy_lsm *pk,
 		struct tuple *old_tuple, struct tuple *new_tuple,
 		uint64_t column_mask)
 {
@@ -1814,8 +1810,8 @@ vy_check_update(struct space *space, const struct vy_lsm *pk,
 	    vy_stmt_compare(old_tuple, HINT_NONE, new_tuple,
 			    HINT_NONE, pk->key_def) != 0) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-			 space_name(space), space_id(space), old_tuple,
-			 new_tuple, NULL);
+			 pk->base.def->space_name, pk->base.def->space_id,
+			 old_tuple, new_tuple, NULL);
 		return -1;
 	}
 	return 0;
@@ -1935,7 +1931,7 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	region_truncate(&fiber()->gc, region_svp);
 	if (stmt->new_tuple == NULL)
 		return -1;
-	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple,
+	if (vy_check_update(pk, stmt->old_tuple, stmt->new_tuple,
 			    column_mask) != 0)
 		return -1;
 
@@ -2194,7 +2190,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	region_truncate(&fiber()->gc, region_svp);
 	if (stmt->new_tuple == NULL)
 		return -1;
-	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple,
+	if (vy_check_update(pk, stmt->old_tuple, stmt->new_tuple,
 			    column_mask) != 0) {
 		diag_log();
 		/*

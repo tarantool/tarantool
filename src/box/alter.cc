@@ -390,7 +390,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	if (key_def == NULL)
 		return NULL;
 	struct index_def *index_def =
-		index_def_new(id, index_id, name, name_len, type,
+		index_def_new(id, index_id, name, NULL, NULL, name_len, type,
 			      &opts, key_def, space_index_key_def(space, 0));
 	if (index_def == NULL)
 		return NULL;
@@ -1768,8 +1768,9 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 		 * Rebuild secondary indexes that depend on the
 		 * primary key since primary key parts have changed.
 		 */
-		new_def = index_def_new(old_def->space_id, old_def->iid,
-					old_def->name, strlen(old_def->name),
+		new_def = index_def_new(old_def->space_id, old_def->iid, old_def->name,
+					old_def->space_name, old_def->engine_name,
+					strlen(old_def->name),
 					old_def->type, &old_def->opts,
 					old_def->key_def, alter->pk_def);
 		index_def_update_optionality(new_def, min_field_count);
