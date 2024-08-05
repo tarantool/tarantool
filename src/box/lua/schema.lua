@@ -2454,7 +2454,7 @@ base_index_mt.pairs_ffi = function(index, key, opts)
     if cdata == nil then
         box.error(box.error.last(), 2)
     end
-    return fun.wrap(iterator_gen, keybuf,
+    return fun.wrap_stateful(iterator_gen, keybuf,
         ffi.gc(cdata, builtin.box_iterator_free))
 end
 base_index_mt.pairs_luac = function(index, key, opts)
@@ -2465,7 +2465,7 @@ base_index_mt.pairs_luac = function(index, key, opts)
     local keybuf = ffi.string(keymp, #keymp)
     local cdata = internal.iterator(index.space_id, index.id, itype, keymp,
         after, 2);
-    return fun.wrap(iterator_gen_luac, keybuf,
+    return fun.wrap_stateful(iterator_gen_luac, keybuf,
         ffi.gc(cdata, builtin.box_iterator_free))
 end
 
