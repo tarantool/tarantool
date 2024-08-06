@@ -32,23 +32,24 @@
 
 #define bit(c) (1ULL<<IPROTO_##c)
 const uint64_t iproto_body_key_map[IPROTO_TYPE_STAT_MAX] = {
-	0,                                                     /* unused */
-	bit(SPACE_ID) | bit(LIMIT) | bit(KEY),                 /* SELECT */
-	bit(SPACE_ID) | bit(TUPLE),                            /* INSERT */
-	bit(SPACE_ID) | bit(TUPLE),                            /* REPLACE */
-	bit(SPACE_ID) | bit(KEY) | bit(TUPLE),                 /* UPDATE */
-	bit(SPACE_ID) | bit(KEY),                              /* DELETE */
-	0,                                                     /* CALL_16 */
-	0,                                                     /* AUTH */
-	0,                                                     /* EVAL */
-	bit(SPACE_ID) | bit(OPS) | bit(TUPLE),                 /* UPSERT */
-	0,                                                     /* CALL */
-	0,                                                     /* EXECUTE */
-	0,                                                     /* NOP */
-	0,                                                     /* PREPARE */
-	0,                                                     /* BEGIN */
-	0,                                                     /* COMMIT */
-	0,                                                     /* ROLLBACK */
+	0,                                                    /* unused */
+	bit(SPACE_ID) | bit(LIMIT) | bit(KEY),                /* SELECT */
+	bit(SPACE_ID) | bit(TUPLE),                           /* INSERT */
+	bit(SPACE_ID) | bit(TUPLE),                           /* REPLACE */
+	bit(SPACE_ID) | bit(KEY) | bit(TUPLE),                /* UPDATE */
+	bit(SPACE_ID) | bit(KEY),                             /* DELETE */
+	0,                                                    /* CALL_16 */
+	0,                                                    /* AUTH */
+	0,                                                    /* EVAL */
+	bit(SPACE_ID) | bit(OPS) | bit(TUPLE),                /* UPSERT */
+	0,                                                    /* CALL */
+	0,                                                    /* EXECUTE */
+	0,                                                    /* NOP */
+	0,                                                    /* PREPARE */
+	0,                                                    /* BEGIN */
+	0,                                                    /* COMMIT */
+	0,                                                    /* ROLLBACK */
+	bit(SPACE_ID) | bit(ARROW),                           /* INSERT_ARROW */
 };
 #undef bit
 

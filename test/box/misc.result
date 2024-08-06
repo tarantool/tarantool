@@ -153,6 +153,7 @@ t;
   - INSERT
   - EVAL
   - ERROR
+  - INSERT_ARROW
   - CALL
   - BEGIN
   - PREPARE

@@ -499,6 +499,8 @@ t;
  |   286: box.error.READ_VIEW_CLOSED
  |   287: box.error.WAL_QUEUE_FULL
  |   288: box.error.INVALID_VCLOCK
+ |   289: box.error.ARROW_IPC_ENCODE
+ |   290: box.error.ARROW_IPC_DECODE
  | ...
 
 test_run:cmd("setopt delimiter ''");

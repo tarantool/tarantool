@@ -666,6 +666,31 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 	   const char *tuple_end, const char *ops, const char *ops_end,
 	   int index_base, box_tuple_t **result);
 
+struct ArrowArray;
+struct ArrowSchema;
+
+/**
+ * Executes a batch insert request.
+ *
+ * A record batch from the Arrow `array` is inserted into the space columns,
+ * whose names are provided by the Arrow `schema`. Column types in the schema
+ * must match the types of the corresponding fields in the space format.
+ *
+ * If a column is nullable in space format, it can be omitted. All non-nullable
+ * columns (including primary key parts) must be present in the batch.
+ *
+ * This function does not release neither `array` nor `schema`.
+ *
+ * \param space_id space identifier
+ * \param array input data in ArrowArray format
+ * \param schema definition of the input data in ArrowSchema format
+ * \retval 0 on success
+ * \retval -1 on error (check box_error_last())
+ */
+API_EXPORT int
+box_insert_arrow(uint32_t space_id, struct ArrowArray *array,
+		 struct ArrowSchema *schema);
+
 /**
  * Truncate space.
  *

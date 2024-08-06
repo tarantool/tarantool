@@ -73,6 +73,7 @@ box_index_tuple_position
 box_info_lsn
 box_init_latest_dd_version_id
 box_insert
+box_insert_arrow
 box_iproto_override
 box_iproto_send
 box_is_ro

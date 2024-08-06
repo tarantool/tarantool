@@ -670,8 +670,14 @@ local function test_box_ibuf(test, module)
     test:ok(module.box_ibuf(require('buffer').ibuf()), "box_ibuf API")
 end
 
+local function test_box_insert_arrow(test, module)
+    test:plan(1)
+    test:ok(module.box_insert_arrow(box.space.test.id),
+            "box_insert_arrow API")
+end
+
 require('tap').test("module_api", function(test)
-    test:plan(51)
+    test:plan(52)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -709,6 +715,7 @@ require('tap').test("module_api", function(test)
     test:test("box_iproto_send", test_box_iproto_send, module)
     test:test("box_iproto_override", test_box_iproto_override, module)
     test:test("box_ibuf", test_box_ibuf, module)
+    test:test("box_insert_arrow", test_box_insert_arrow, module)
 
     space:drop()
 end)
