@@ -15,6 +15,8 @@
 #include <lua.h>
 #include <lauxlib.h>
 
+#include "arrow/abi.h"
+
 #define STR2(x) #x
 #define STR(x) STR2(x)
 
@@ -3362,6 +3364,24 @@ test_fiber_basic_api(lua_State *L)
 	return 1;
 }
 
+static int
+test_box_insert_arrow(struct lua_State *L)
+{
+	fail_unless(lua_gettop(L) == 1);
+	fail_unless(lua_isnumber(L, 1));
+	uint32_t space_id = lua_tointeger(L, 1);
+	struct ArrowSchema schema;
+	struct ArrowArray array;
+	memset(&schema, 0, sizeof(schema));
+	memset(&array, 0, sizeof(array));
+
+	int rc = box_insert_arrow(space_id, &array, &schema);
+	fail_unless(rc == -1);
+	check_diag("ClientError", "memtx does not support arrow format");
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -3420,6 +3440,7 @@ luaopen_module_api(lua_State *L)
 		{"box_iproto_send", test_box_iproto_send},
 		{"box_iproto_override_set", test_box_iproto_override_set},
 		{"box_iproto_override_reset", test_box_iproto_override_reset},
+		{"box_insert_arrow", test_box_insert_arrow},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

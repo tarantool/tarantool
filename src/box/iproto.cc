@@ -1866,6 +1866,7 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 	case IPROTO_UPDATE:
 	case IPROTO_DELETE:
 	case IPROTO_UPSERT:
+	case IPROTO_INSERT_ARROW:
 		assert(type < sizeof(iproto_thread->dml_route) /
 			      sizeof(*iproto_thread->dml_route));
 		*route = iproto_thread->dml_route[type];
@@ -3655,6 +3656,7 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 	assert(dml_route[IPROTO_BEGIN] == NULL);
 	assert(dml_route[IPROTO_COMMIT] == NULL);
 	assert(dml_route[IPROTO_ROLLBACK] == NULL);
+	dml_route[IPROTO_INSERT_ARROW] = iproto_thread->process1_route;
 
 	iproto_thread->connect_route[0] =
 		{ tx_process_connect, &iproto_thread->net_pipe };

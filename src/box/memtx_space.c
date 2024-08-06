@@ -1493,6 +1493,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .execute_delete = */ memtx_space_execute_delete,
 	/* .execute_update = */ memtx_space_execute_update,
 	/* .execute_upsert = */ memtx_space_execute_upsert,
+	/* .execute_insert_arrow = */ generic_space_execute_insert_arrow,
 	/* .ephemeral_replace = */ memtx_space_ephemeral_replace,
 	/* .ephemeral_delete = */ memtx_space_ephemeral_delete,
 	/* .ephemeral_rowid_next = */ memtx_space_ephemeral_rowid_next,

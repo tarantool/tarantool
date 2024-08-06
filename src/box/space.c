@@ -62,6 +62,7 @@
 #include "tweaks.h"
 #include "txn_limbo.h"
 #include "sql.h"
+#include "arrow_ipc.h"
 
 /**
  * Controls whether to consider system spaces indefinitely synchronous when the
@@ -1341,6 +1342,49 @@ out:
 	return rc;
 }
 
+/**
+ * Executes an IPROTO_INSERT_ARROW request. The request contains the data in
+ * Arrow columnar format that can appear in two guises:
+ *  1. in-memory data structures (arrow_array and arrow_schema);
+ *  2. serialized for interprocess communication (arrow_ipc and arrow_ipc_end).
+ * Can return nonzero in case of error (diag is set).
+ */
+static int
+space_execute_insert_arrow(struct space *space, struct txn *txn,
+			   struct request *request)
+{
+	int rc;
+	struct region *gc = &fiber()->gc;
+	size_t gc_svp = region_used(gc);
+	bool do_ipc_decode = request->arrow_ipc != NULL;
+	struct ArrowArray *array = request->arrow_array;
+	struct ArrowSchema *schema = request->arrow_schema;
+
+	if (do_ipc_decode) {
+		assert(array == NULL);
+		assert(schema == NULL);
+		assert(request->arrow_ipc_end != NULL);
+		array = xregion_alloc_object(&fiber()->gc, struct ArrowArray);
+		schema = xregion_alloc_object(&fiber()->gc, struct ArrowSchema);
+		rc = arrow_ipc_decode(array, schema, request->arrow_ipc,
+				      request->arrow_ipc_end);
+		if (rc != 0)
+			goto eof;
+	}
+
+	rc = space->vtab->execute_insert_arrow(space, txn, array, schema);
+
+	if (do_ipc_decode) {
+		assert(array->release != NULL);
+		assert(schema->release != NULL);
+		array->release(array);
+		schema->release(schema);
+	}
+eof:
+	region_truncate(gc, gc_svp);
+	return rc;
+}
+
 int
 space_execute_dml(struct space *space, struct txn *txn,
 		  struct request *request, struct tuple **result)
@@ -1432,6 +1476,11 @@ space_execute_dml(struct space *space, struct txn *txn,
 		if (space->vtab->execute_upsert(space, txn, request) != 0)
 			return -1;
 		break;
+	case IPROTO_INSERT_ARROW:
+		*result = NULL;
+		if (space_execute_insert_arrow(space, txn, request) != 0)
+			return -1;
+		break;
 	default:
 		*result = NULL;
 	}
@@ -1481,6 +1530,19 @@ generic_space_bsize(struct space *space)
 {
 	(void)space;
 	return 0;
+}
+
+int
+generic_space_execute_insert_arrow(struct space *space, struct txn *txn,
+				   struct ArrowArray *array,
+				   struct ArrowSchema *schema)
+{
+	(void)txn;
+	(void)array;
+	(void)schema;
+	diag_set(ClientError, ER_UNSUPPORTED, space->engine->name,
+		 "arrow format");
+	return -1;
 }
 
 int

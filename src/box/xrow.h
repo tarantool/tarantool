@@ -211,6 +211,14 @@ struct request {
 	/** Insert/replace/upsert tuple or proc argument or update operations. */
 	const char *tuple;
 	const char *tuple_end;
+	/** The data in in-memory Arrow format. */
+	struct ArrowArray *arrow_array;
+	/** Arrow schema for @arrow_array. */
+	struct ArrowSchema *arrow_schema;
+	/** The data in serialized Arrow format. */
+	const char *arrow_ipc;
+	/** End of @arrow_ipc. */
+	const char *arrow_ipc_end;
 	/** Upsert operations. */
 	const char *ops;
 	const char *ops_end;

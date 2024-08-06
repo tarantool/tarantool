@@ -28,6 +28,7 @@ local basic_rq_types = {
     VOTE_DEPRECATED = box.iproto.type.VOTE_DEPRECATED,
     VOTE = box.iproto.type.VOTE,
     AUTH = box.iproto.type.AUTH,
+    INSERT_ARROW = box.iproto.type.INSERT_ARROW,
 }
 
 -- Grep server logs for error messages about unsupported request types.

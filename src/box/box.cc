@@ -4007,6 +4007,19 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 	return box_process1(&request, result);
 }
 
+API_EXPORT int
+box_insert_arrow(uint32_t space_id, struct ArrowArray *array,
+		 struct ArrowSchema *schema)
+{
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.type = IPROTO_INSERT_ARROW;
+	request.space_id = space_id;
+	request.arrow_array = array;
+	request.arrow_schema = schema;
+	return box_process1(&request, NULL);
+}
+
 /**
  * Trigger space truncation by bumping a counter
  * in _truncate space.

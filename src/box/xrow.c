@@ -42,6 +42,7 @@
 #include "trivia/util.h"
 #include "error.h"
 #include "mp_error.h"
+#include "mp_extension_types.h"
 #include "iproto_constants.h"
 #include "iproto_features.h"
 #include "mpstream/mpstream.h"
@@ -1021,6 +1022,16 @@ error:
 			request->index_name =
 				mp_decode_str(&value, &request->index_name_len);
 			break;
+		case IPROTO_ARROW: {
+			int8_t type;
+			uint32_t size;
+			const char *data = mp_decode_ext(&value, &type, &size);
+			if (type != MP_ARROW)
+				goto error;
+			request->arrow_ipc = data;
+			request->arrow_ipc_end = data + size;
+			break;
+		}
 		default:
 			break;
 		}
@@ -1111,8 +1122,10 @@ xrow_encode_dml(const struct request *request, struct region *region,
 	uint32_t tuple_len = request->tuple_end - request->tuple;
 	uint32_t old_tuple_len = request->old_tuple_end - request->old_tuple;
 	uint32_t new_tuple_len = request->new_tuple_end - request->new_tuple;
+	ssize_t arrow_len = request->arrow_ipc_end - request->arrow_ipc;
 	uint32_t len = MAP_LEN_MAX + key_len + ops_len + tuple_meta_len +
-		       tuple_len + old_tuple_len + new_tuple_len;
+		       tuple_len + old_tuple_len + new_tuple_len + arrow_len;
+	assert(request->arrow_ipc == NULL || arrow_len > 0);
 	char *begin = xregion_alloc(region, len);
 	char *pos = begin + 1;     /* skip 1 byte for MP_MAP */
 	int map_size = 0;
@@ -1180,6 +1193,13 @@ xrow_encode_dml(const struct request *request, struct region *region,
 		pos = mp_encode_uint(pos, IPROTO_NEW_TUPLE);
 		memcpy(pos, request->new_tuple, new_tuple_len);
 		pos += new_tuple_len;
+		map_size++;
+	}
+	if (request->arrow_ipc != NULL) {
+		assert(request->type == IPROTO_INSERT_ARROW);
+		pos = mp_encode_uint(pos, IPROTO_ARROW);
+		pos = mp_encode_ext(pos, MP_ARROW, request->arrow_ipc,
+				    arrow_len);
 		map_size++;
 	}
 
