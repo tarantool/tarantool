@@ -974,6 +974,7 @@ local function datetime_totable(self)
         nsec = self.nsec,
         tzoffset = self.tzoffset,
         tz = self.tz,
+        timestamp = self.timestamp,
     }
 end
 
