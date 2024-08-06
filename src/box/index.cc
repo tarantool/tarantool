@@ -937,6 +937,18 @@ generic_index_count(struct index *index, enum iterator_type type,
 	return count;
 }
 
+ssize_t
+generic_index_read_view_count(struct index_read_view *rv,
+			      enum iterator_type type, const char *key,
+			      uint32_t part_count)
+{
+	(void)type;
+	(void)key;
+	(void)part_count;
+	diag_set(UnsupportedIndexFeature, rv->def, "read view count()");
+	return -1;
+}
+
 int
 generic_index_get_internal(struct index *index, const char *key,
 			   uint32_t part_count, struct tuple **result)

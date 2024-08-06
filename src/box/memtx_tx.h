@@ -319,6 +319,34 @@ memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
 }
 
 /**
+ * Helper of memtx_tx_track_count.
+ */
+uint32_t
+memtx_tx_track_count_slow(struct txn *txn, struct space *space,
+			  struct index *index, enum iterator_type type,
+			  const char *key, uint32_t part_count);
+
+/**
+ * Record in TX manager that a transaction @a txn have counted @a index from @a
+ * space by @a key and iterator @a type. This function must be used for queries
+ * that count tuples in indexes (for example, index:size or index:count).
+ *
+ * NB: can trigger story garbage collection.
+ *
+ * @return the amount of invisible tuples counted.
+ */
+static inline uint32_t
+memtx_tx_track_count(struct txn *txn, struct space *space,
+		     struct index *index, enum iterator_type type,
+		     const char *key, uint32_t part_count)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	return memtx_tx_track_count_slow(txn, space, index,
+					 type, key, part_count);
+}
+
+/**
  * Helper of memtx_tx_track_full_scan.
  */
 void
@@ -450,6 +478,30 @@ memtx_tx_snapshot_clarify(struct memtx_tx_snapshot_cleaner *cleaner,
 	if (cleaner->ht == NULL)
 		return tuple;
 	return memtx_tx_snapshot_clarify_slow(cleaner, tuple);
+}
+
+/** Helper of memtx_tx_snapshot_invisible_count_matching. */
+size_t
+memtx_tx_snapshot_invisible_count_matching_slow(
+	struct memtx_tx_snapshot_cleaner *cleaner,
+	struct key_def *def, enum iterator_type type,
+	const char *key, uint32_t part_count);
+
+/*
+ * Count the amount of invisible tuples matching to the given @a key and
+ * iterator @a type in the snapshot. The tuples are matched using the key
+ * @a def privided.
+ */
+static inline size_t
+memtx_tx_snapshot_invisible_count_matching(
+	struct memtx_tx_snapshot_cleaner *cleaner,
+	struct key_def *def, enum iterator_type type,
+	const char *key, uint32_t part_count)
+{
+	if (cleaner->ht == NULL)
+		return 0;
+	return memtx_tx_snapshot_invisible_count_matching_slow(
+		cleaner, def, type, key, part_count);
 }
 
 /**
