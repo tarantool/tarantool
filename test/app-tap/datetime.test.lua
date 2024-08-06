@@ -151,7 +151,7 @@ test:test("Datetime API checks", function(test)
     local table_expected = {
         sec =  0, min = 0, wday = 5, day = 1, nsec = 0,
         isdst = false, yday = 1, tzoffset = 0, month = 1,
-        year = 1970, hour = 0, tz = ''
+        year = 1970, hour = 0, tz = '', timestamp = 0
     }
     test:is_deeply(local_totable(ts), table_expected, "correct :totable")
     local date_expected = date.new()
@@ -1829,11 +1829,11 @@ test:test("Parse strptime format", function(test)
 end)
 
 test:test("totable{}", function(test)
-    test:plan(78)
+    test:plan(79)
     local exp = {sec = 0, min = 0, wday = 5, day = 1,
                  nsec = 0, isdst = false, yday = 1,
                  tzoffset = 0, month = 1, year = 1970, hour = 0,
-                 tz = ''}
+                 tz = '', timestamp = 0}
     local ts = date.new()
     local totable = ts:totable()
     test:is_deeply(totable, exp, 'date:totable()')
@@ -1866,6 +1866,9 @@ test:test("totable{}", function(test)
         test:is(ts[key], osdate[key],
                 ('[%s]: %s == %s'):format(key, ts[key], osdate[key]))
     end
+
+    local dt = date.new({ timestamp = 100 })
+    test:is(dt:totable().timestamp, 100, 'date:totable() with timestamp')
 end)
 
 test:test('totable() with timezone', function(test)
