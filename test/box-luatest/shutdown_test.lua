@@ -249,10 +249,11 @@ g.test_shutdown_with_active_connection = function(cg)
 
     -- Start stopping server
     local stopped = false
-    fiber.create(function()
+    local f = fiber.create(function()
         cg.server:stop()
         stopped = true
     end)
+    f:set_joinable(true)
 
     -- Wait until Tarantool will cancel client fibers
     local log = fio.pathjoin(cg.server.workdir, cg.server.alias .. '.log')
@@ -267,9 +268,8 @@ g.test_shutdown_with_active_connection = function(cg)
     write_eval(socket, expr)
 
     -- Check if server is successfully stopped
-    t.helpers.retrying({}, function()
-        t.assert(stopped)
-    end)
+    local ok, err = f:join()
+    t.assert(ok, err)
 end
 
 local g_idle_pool = t.group('idle pool')
