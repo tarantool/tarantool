@@ -1719,8 +1719,21 @@ g.test_failover = function()
                 renew_interval = 1,
                 keepalive_interval = 5,
             },
-        },
+            replicasets = {
+                replicaset001 = {}
+            }
+        }
     }
+
+    if is_enterprise then
+        iconfig.failover.replicasets = {
+            replicaset001 = {
+                priority = {
+                    instance001 = 1
+                }
+            }
+        }
+    end
 
     instance_config:validate(iconfig)
     validate_fields(iconfig.failover, instance_config.schema.fields.failover)

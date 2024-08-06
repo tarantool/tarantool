@@ -594,6 +594,36 @@ local function validate_failover(found, peers, failover, leader)
     end
 end
 
+-- Validate failover section.
+local function validate_failover_config(cconfig, failover_config)
+    if not failover_config or not failover_config.replicasets then
+        return
+    end
+    for replicaset_name, replicaset in pairs(failover_config.replicasets) do
+        local replicaset_config = nil
+        for _, group in pairs(cconfig.groups) do
+            replicaset_config = group.replicasets and
+                group.replicasets[replicaset_name] or
+                replicaset_config
+        end
+
+        if not replicaset_config then
+            error(('replicaset %s specified in the failover configuration '..
+                   'doesn\'t exist'):format(replicaset_name), 0)
+        else
+            -- Validate the priority section of the specific replicasets.
+            for instance_name, _ in pairs(replicaset.priority) do
+                if not replicaset_config.instances or
+                   not replicaset_config.instances[instance_name] then
+                    error(('instance %s from replicaset %s specified in the '..
+                           'failover configuration doesn\'t exist')
+                          :format(instance_name, replicaset_name), 0)
+                end
+            end
+        end
+    end
+end
+
 -- Verify replication.anon = true prerequisites.
 --
 -- First, it verifies that the given replicaset contains at least
@@ -802,6 +832,9 @@ local function new(iconfig, cconfig, instance_name)
     local failover = instance_config:get(iconfig_def, 'replication.failover')
     local leader = found.replicaset.leader
     validate_failover(found, peers, failover, leader)
+
+    local failover_config = instance_config:get(iconfig_def, 'failover')
+    validate_failover_config(cconfig, failover_config)
 
     local bootstrap_strategy = instance_config:get(iconfig_def,
         'replication.bootstrap_strategy')
