@@ -53,6 +53,9 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->promote_greatest_term = 0;
 	latch_create(&limbo->promote_latch);
 	limbo->confirmed_lsn = 0;
+	limbo->confirmed_entry =
+		rlist_entry(&limbo->queue, struct txn_limbo_entry, in_queue);
+	limbo->confirmed_entry_is_valid = false;
 	limbo->rollback_count = 0;
 	limbo->is_in_rollback = false;
 	limbo->svp_confirmed_lsn = -1;
@@ -168,7 +171,6 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	}
 	e->txn = txn;
 	e->lsn = -1;
-	e->ack_count = 0;
 	e->is_commit = false;
 	e->is_rollback = false;
 	e->insertion_time = fiber_clock();
@@ -202,6 +204,14 @@ void
 txn_limbo_abort(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 {
 	entry->is_rollback = true;
+	if (entry == limbo->confirmed_entry) {
+		limbo->confirmed_entry = rlist_prev_entry(
+			limbo->confirmed_entry, in_queue);
+		limbo->confirmed_entry_is_valid = false;
+	} else if (entry == rlist_next_entry(limbo->confirmed_entry,
+					     in_queue)) {
+		limbo->confirmed_entry_is_valid = false;
+	}
 	/*
 	 * The simple rule about rollback/commit order applies
 	 * here as well: commit always in the order of WAL write,
@@ -241,18 +251,13 @@ txn_limbo_assign_local_lsn(struct txn_limbo *limbo,
 
 	entry->lsn = lsn;
 	/*
-	 * The entry just got its LSN after a WAL write. It could
-	 * happen that this LSN was already ACKed by some
-	 * replicas. Update the ACK counter to take them into
-	 * account.
+	 * The entry just got its LSN after a WAL write. It could happen
+	 * that this LSN was already ACKed by some replicas. The ACK count
+	 * may be incorrect, so confirmed_entry cannot be considered valid.
+	 * The ACK count will be updated at the next txn_limbo_confirm
+	 * invocation.
 	 */
-	struct vclock_iterator iter;
-	vclock_iterator_init(&iter, &limbo->vclock);
-	int ack_count = 0;
-	vclock_foreach(&iter, vc)
-		ack_count += vc.lsn >= lsn;
-	assert(ack_count >= entry->ack_count);
-	entry->ack_count = ack_count;
+	limbo->confirmed_entry_is_valid = false;
 }
 
 void
@@ -503,6 +508,14 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		limbo->confirmed_lsn = lsn;
 		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
 	}
+	if (!rlist_entry_is_head(limbo->confirmed_entry,
+				 &limbo->queue, in_queue) &&
+		limbo->confirmed_entry->lsn <= lsn) {
+		limbo->confirmed_entry =
+			rlist_entry(&limbo->queue,
+				    struct txn_limbo_entry, in_queue);
+		limbo->confirmed_entry_is_valid = false;
+	}
 }
 
 /**
@@ -633,6 +646,63 @@ txn_limbo_read_demote(struct txn_limbo *limbo, int64_t lsn)
 	return txn_limbo_read_promote(limbo, REPLICA_ID_NIL, lsn);
 }
 
+/**
+ * Check that some synchronous transactions have gathered quorum and
+ * write a confirmation entry of the last confirmed transaction.
+ */
+static void
+txn_limbo_confirm(struct txn_limbo *limbo)
+{
+	if (limbo->is_in_rollback)
+		return;
+	struct txn_limbo_entry *e;
+	if (!limbo->confirmed_entry_is_valid) {
+		/* Try to find the next valid confirmed_entry value. */
+		e = rlist_next_entry(limbo->confirmed_entry, in_queue);
+		if (rlist_entry_is_head(e, &limbo->queue, in_queue))
+			return;
+		for (; !rlist_entry_is_head(e, &limbo->queue, in_queue);
+		       e = rlist_next_entry(e, in_queue))
+			if (txn_has_flag(e->txn, TXN_WAIT_ACK) &&
+			    (e->lsn == -1 || e->lsn > limbo->confirmed_lsn))
+				break;
+		limbo->confirmed_entry = rlist_prev_entry(e, in_queue);
+		/*
+		 * There is no next transaction or the next transaction has no
+		 * lsn. Therefore, confirmed_entry cannot be considered valid.
+		 */
+		if (rlist_entry_is_head(e, &limbo->queue, in_queue) || e->lsn == -1)
+			return;
+		limbo->confirmed_entry_is_valid = true;
+		limbo->ack_count = vclock_count_ge(&limbo->vclock, e->lsn);
+	}
+	if (limbo->ack_count < replication_synchro_quorum)
+		return;
+	e = rlist_next_entry(limbo->confirmed_entry, in_queue);
+	/* Make sure confirmed_entry is valid. */
+	assert(!rlist_entry_is_head(e, &limbo->queue, in_queue));
+	assert(txn_has_flag(e->txn, TXN_WAIT_ACK));
+	assert(e->lsn != -1);
+	int32_t k = (int32_t)vclock_size(&limbo->vclock)
+		- replication_synchro_quorum;
+	int64_t confirm_lsn = (k < 0) ? 0 :
+		vclock_nth_element(&limbo->vclock, k);
+	assert(confirm_lsn != -1);
+	for (; !rlist_entry_is_head(e, &limbo->queue, in_queue);
+	       e = rlist_next_entry(e, in_queue))
+		if (e->lsn == -1 || e->lsn > confirm_lsn)
+			break;
+	limbo->confirmed_entry = rlist_prev_entry(e, in_queue);
+	/*
+	 * We have not made sure that the transaction following confirmed_entry
+	 * is synchronous. Therefore, confirmed_entry cannot be considered
+	 * valid.
+	 */
+	limbo->confirmed_entry_is_valid = false;
+	txn_limbo_write_confirm(limbo, confirm_lsn);
+	txn_limbo_read_confirm(limbo, confirm_lsn);
+}
+
 void
 txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 {
@@ -655,9 +725,10 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 		return;
 	assert(limbo->owner_id != REPLICA_ID_NIL);
 	int64_t prev_lsn = vclock_get(&limbo->vclock, replica_id);
+	assert(lsn >= prev_lsn);
 	/*
 	 * One of the reasons why can happen - the remote instance is not
-	 * read-only and wrote something under its own insance_id. For qsync
+	 * read-only and wrote something under its own instance_id. For qsync
 	 * that most likely means that the remote instance decided to take over
 	 * the limbo ownership, and the current node is going to become a
 	 * replica very soon.
@@ -665,31 +736,19 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 	if (lsn == prev_lsn)
 		return;
 	vclock_follow(&limbo->vclock, replica_id, lsn);
-	struct txn_limbo_entry *e;
-	int64_t confirm_lsn = -1;
-	rlist_foreach_entry(e, &limbo->queue, in_queue) {
-		assert(e->ack_count <= VCLOCK_MAX);
-		if (e->lsn > lsn)
-			break;
-		/*
-		 * Sync transactions need to collect acks. Async
-		 * transactions are automatically committed right
-		 * after all the previous sync transactions are.
-		 */
-		if (!txn_has_flag(e->txn, TXN_WAIT_ACK)) {
-			continue;
-		} else if (e->lsn <= prev_lsn) {
-			continue;
-		} else if (++e->ack_count < replication_synchro_quorum) {
-			continue;
-		} else {
-			confirm_lsn = e->lsn;
-		}
+
+	if (limbo->confirmed_entry_is_valid) {
+		struct txn_limbo_entry *e = rlist_next_entry(
+			limbo->confirmed_entry, in_queue);
+		/* Make sure confirmed_entry is valid. */
+		assert(!rlist_entry_is_head(e, &limbo->queue, in_queue));
+		assert(txn_has_flag(e->txn, TXN_WAIT_ACK));
+		assert(e->lsn != -1);
+		if (e->lsn <= prev_lsn || lsn < e->lsn)
+			return;
+		++limbo->ack_count;
 	}
-	if (confirm_lsn == -1 || confirm_lsn <= limbo->confirmed_lsn)
-		return;
-	txn_limbo_write_confirm(limbo, confirm_lsn);
-	txn_limbo_read_confirm(limbo, confirm_lsn);
+	txn_limbo_confirm(limbo);
 }
 
 /**
@@ -1229,23 +1288,8 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 {
 	if (rlist_empty(&limbo->queue) || txn_limbo_is_frozen(limbo))
 		return;
-	struct txn_limbo_entry *e;
-	int64_t confirm_lsn = -1;
-	rlist_foreach_entry(e, &limbo->queue, in_queue) {
-		assert(e->ack_count <= VCLOCK_MAX);
-		if (!txn_has_flag(e->txn, TXN_WAIT_ACK)) {
-			continue;
-		} else if (e->ack_count < replication_synchro_quorum) {
-			continue;
-		} else {
-			confirm_lsn = e->lsn;
-			assert(confirm_lsn > 0);
-		}
-	}
-	if (confirm_lsn > limbo->confirmed_lsn && !limbo->is_in_rollback) {
-		txn_limbo_write_confirm(limbo, confirm_lsn);
-		txn_limbo_read_confirm(limbo, confirm_lsn);
-	}
+	/* The replication_synchro_quorum value may have changed. */
+	txn_limbo_confirm(limbo);
 	/*
 	 * Wakeup all the others - timed out will rollback. Also
 	 * there can be non-transactional waiters, such as CONFIRM

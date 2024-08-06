@@ -58,11 +58,6 @@ struct txn_limbo_entry {
 	 */
 	int64_t lsn;
 	/**
-	 * Number of ACKs. Or in other words - how many replicas
-	 * confirmed receipt of the transaction.
-	 */
-	int ack_count;
-	/**
 	 * Result flags. Only one of them can be true. But both
 	 * can be false if the transaction is still waiting for
 	 * its resolution.
@@ -168,6 +163,30 @@ struct txn_limbo {
 	 * illegal.
 	 */
 	int64_t confirmed_lsn;
+	/**
+	 * The entry preceding the first unconfirmed synchronous transaction
+	 * or the last entry in the limbo if there are no unconfirmed
+	 * synchronous transactions yet.
+	 */
+	struct txn_limbo_entry *confirmed_entry;
+	/**
+	 * Whether the confirmed_entry value is valid. It is only valid if it
+	 * is immediately followed by a synchronous transaction. It may cease
+	 * to be valid after confirm or rollback. For example, it may be that
+	 * we have just collected confirmations for the last synchronous
+	 * transaction in the queue. After this, confirmed_entry will point to
+	 * the last transaction in the queue, regardless of whether it is
+	 * synchronous. Now we must wait until a new synchronous transaction
+	 * is queued and confirmed_entry is moved to the transaction preceding
+	 * it. Then confirmed_entry will be considered valid again.
+	 */
+	bool confirmed_entry_is_valid;
+	/**
+	 * Number of ACKs of the first unconfirmed synchronous transaction in
+	 * limbo (the transaction is the next one immediately after the
+	 * confirmed_entry).
+	 */
+	int ack_count;
 	/**
 	 * Total number of performed rollbacks. It used as a guard
 	 * to do some actions assuming all limbo transactions will
