@@ -248,6 +248,7 @@ _index:select{}
   - [372, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
   - [372, 1, 'fid', 'tree', {'unique': false}, [[2, 'unsigned']]]
   - [380, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
+  - [388, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
 ...
 -- modify indexes of a system space
 _index:delete{_index.id, 0}

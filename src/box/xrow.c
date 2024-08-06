@@ -65,7 +65,7 @@ static_assert(IPROTO_DATA < 0x7f && IPROTO_METADATA < 0x7f &&
 	      IPROTO_SQL_INFO < 0x7f, "encoded IPROTO_BODY keys must fit into "\
 	      "one byte");
 
-static inline uint32_t
+uint32_t
 mp_sizeof_vclock_ignore0(const struct vclock *vclock)
 {
 	uint32_t size = vclock_size_ignore0(vclock);
@@ -97,7 +97,7 @@ mp_encode_vclock_impl(char *data, const struct vclock *vclock, bool ignore0)
 	return data;
 }
 
-static inline char *
+char *
 mp_encode_vclock_ignore0(char *data, const struct vclock *vclock)
 {
 	data = mp_encode_map(data, vclock_size_ignore0(vclock));
@@ -125,13 +125,15 @@ mp_decode_vclock(const char **data, struct vclock *vclock)
 		if (mp_typeof(**data) != MP_UINT)
 			return -1;
 		int64_t lsn = mp_decode_uint(data);
+		if (lsn < 0 || id >= VCLOCK_MAX)
+			return -1;
 		if (lsn > 0)
 			vclock_follow(vclock, id, lsn);
 	}
 	return 0;
 }
 
-static int
+int
 mp_decode_vclock_ignore0(const char **data, struct vclock *vclock)
 {
 	if (mp_decode_vclock(data, vclock) != 0)

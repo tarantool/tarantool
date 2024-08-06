@@ -39,6 +39,7 @@
 #include "vclock/vclock.h"
 #include "trivia/util.h"
 #include "checkpoint_schedule.h"
+#include "tt_uuid.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -82,21 +83,44 @@ struct gc_checkpoint_ref {
 };
 
 /**
+ * Type of an object a WAL GC consumer belongs to.
+ */
+enum gc_consumer_type {
+	GC_CONSUMER_REPLICA,
+	gc_consumer_type_MAX,
+};
+
+/**
  * The object of this type is used to prevent garbage
  * collection from removing WALs that are still in use.
  */
 struct gc_consumer {
+	/** Link in gc_state::active_consumers. */
+	gc_node_t in_active_consumers;
 	/** Link in gc_state::consumers. */
-	gc_node_t node;
-	/** Human-readable name. */
-	char name[GC_NAME_MAX];
+	struct rlist in_consumers;
+	/** UUID of object owning this consumer. */
+	struct tt_uuid uuid;
 	/** The vclock tracked by this consumer. */
 	struct vclock vclock;
+	/** Type of object consumer belongs to. */
+	enum gc_consumer_type type;
 	/**
 	 * This flag is set if a WAL needed by this consumer was
 	 * deleted by the WAL thread on ENOSPC.
 	 */
 	bool is_inactive;
+	/** Whether consumer is stored in persistent state. */
+	bool is_persistent;
+	/**
+	 * Whether persistent state of consumer is consistent with
+	 * in-memory state - it has an impact only when `is_persistent`
+	 * is set. If the flag is not set, persistent state
+	 * should be updated.
+	 */
+	bool is_synced;
+	/** The flag is set when the consumer is not used by its owner. */
+	bool is_orphan;
 };
 
 typedef rb_tree(struct gc_consumer) gc_tree_t;
@@ -126,8 +150,13 @@ struct gc_state {
 	 * to the tail. Linked by gc_checkpoint::in_checkpoints.
 	 */
 	struct rlist checkpoints;
-	/** Registered consumers, linked by gc_consumer::node. */
-	gc_tree_t consumers;
+	/**
+	 * All registered consumers. Since amount of consumers is expected to
+	 * be small, consumers are indexed by list.
+	 */
+	struct rlist consumers;
+	/** Active consumers (that actually retain xlogs). */
+	gc_tree_t active_consumers;
 	/** Fiber responsible for periodic checkpointing. */
 	struct fiber *checkpoint_fiber;
 	/** Schedule of periodic checkpoints. */
@@ -152,6 +181,10 @@ struct gc_state {
 	 * taken at that moment of time.
 	 */
 	int64_t cleanup_completed, cleanup_scheduled;
+	/**
+	 * Fiber that updates persistent WAL GC state asynchronously.
+	 */
+	struct fiber *sync_fiber;
 	/**
 	 * A counter to wait until all replicas are managed to
 	 * subscribe so that we can enable cleanup fiber to
@@ -179,6 +212,10 @@ struct gc_state {
 	 * a checkpoint as soon as possible despite the schedule.
 	 */
 	bool checkpoint_is_pending;
+	/**
+	 * Is set when persistent WAL GC state needs to be updated.
+	 */
+	bool need_sync;
 };
 extern struct gc_state gc;
 
@@ -332,23 +369,27 @@ void
 gc_unref_checkpoint(struct gc_checkpoint_ref *ref);
 
 /**
- * Register a consumer.
+ * Register a consumer. It can be a newly allocated consumer, or a consumer
+ * loaded from persistent WAL GC state and waiting for registration.
+ * Only one consumer with given UUID can be registered at the same time.
  *
  * This will stop garbage collection of WAL files newer than
  * @vclock until the consumer is unregistered or advanced.
- * @format... specifies a human-readable name of the consumer,
- * it will be used for listing the consumer in box.info.gc().
+ * @type specifies a type of object the consumer belongs to,
+ * @uuid specifies UUID of this object. They will be
+ * used for listing the consumer in box.info.gc(), also UUID
+ * is used to ensure uniqueness of consumers.
  *
- * Returns a pointer to the new consumer object or NULL on
- * memory allocation failure.
+ * Returns a pointer to the consumer object, it never fails.
  */
-CFORMAT(printf, 2, 3)
 struct gc_consumer *
-gc_consumer_register(const struct vclock *vclock, const char *format, ...);
+gc_consumer_register(const struct vclock *vclock, enum gc_consumer_type type,
+		     const struct tt_uuid *uuid);
 
 /**
- * Unregister a consumer and invoke garbage collection
- * if needed.
+ * Unregister a consumer and invoke garbage collection if needed.
+ * If the consumer is persistent, it's not actually deleted and still
+ * retain xlogs.
  */
 void
 gc_consumer_unregister(struct gc_consumer *consumer);
@@ -359,6 +400,49 @@ gc_consumer_unregister(struct gc_consumer *consumer);
  */
 void
 gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock);
+
+/**
+ * Persist given consumer. If the function returns successfully, persistent
+ * WAL GC state is updated, otherwise it's not. If the consumer wasn't
+ * persistent, it becomes one. Since the function writes to a local space,
+ * it doesn't need to wait limbo, so it's safe to call it even when quorum
+ * cannot be collected.
+ *
+ * NB: the function mustn't be called inside active transaction.
+ */
+int
+gc_consumer_persist(struct gc_consumer *consumer);
+
+/**
+ * Deletes WAL GC consumer with given UUID from persistent state, in-memory
+ * consumer is deleted only if it's not used anymore. If the consumer does not
+ * exist or is not marked as persistent, the function tries to delete it from
+ * persistent WAL GC state anyway.
+ *
+ * NB: the function must be called inside active transaction.
+ */
+int
+gc_erase_consumer(const struct tt_uuid *uuid);
+
+/**
+ * Loads consumers from persistent WAL GC state, should be called
+ * on Tarantool configuration. Invalid consumers are logged and skipped.
+ */
+int
+gc_load_consumers(void);
+
+/**
+ * Fills space _gc_consumers with all persistent WAL GC consumers.
+ * The space needs to be filled when it is created on schema upgrade.
+ */
+int
+gc_persist_consumers(void);
+
+/**
+ * Returns name of WAL GC consumer in format "<object name> <UUID>".
+ */
+const char *
+gc_consumer_name(struct gc_consumer *consumer);
 
 /**
  * Iterator over registered consumers. The iterator is valid

@@ -365,9 +365,9 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		 * anonymous to a normal one.
 		 */
 		assert(replica->gc == NULL);
-		replica->gc = gc_consumer_register(instance_vclock,
-						   "replica %s",
-						   tt_uuid_str(&replica->uuid));
+		replica->gc = gc_consumer_register(
+			instance_vclock, GC_CONSUMER_REPLICA,
+			&replica->uuid);
 	}
 	replicaset.replica_by_id[replica_id] = replica;
 	gc_delay_ref();
