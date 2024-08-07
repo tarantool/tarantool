@@ -106,6 +106,12 @@ enum txn_flag {
 	 * rolled back at commit.
 	 */
 	TXN_IS_ABORTED_BY_TIMEOUT = 0x100,
+	/**
+	 * Transaction properly handles concurrent DDL operations.
+	 * If a transaction doesn't have this flag, it'll be aborted
+	 * by any DDL operation.
+	 */
+	TXN_HANDLES_DDL = 0x1000,
 };
 
 enum {

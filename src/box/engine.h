@@ -263,6 +263,12 @@ enum {
 	 * Set if the engine supports creation of a read view.
 	 */
 	ENGINE_SUPPORTS_READ_VIEW = 1 << 1,
+	/**
+	 * Set if the engine's transaction manager properly handles
+	 * concurrent DDL operations. A DDL operation will abort all
+	 * transactions for engines that don't have this flag set.
+	 */
+	ENGINE_TXM_HANDLES_DDL = 1 << 5,
 };
 
 struct engine {
