@@ -909,7 +909,7 @@ endif()
 
 if(TZDATA_VERSION STREQUAL "")
     # The current version of tzdata, must be update on bump.
-    set(TZDATA_VERSION 2022a)
+    set(TZDATA_VERSION 2026c)
     message(WARNING "Failed to determine tzdata version from Git tags. \
                      Using default version \"${TZDATA_VERSION}\".")
 endif()
