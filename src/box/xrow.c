@@ -1378,9 +1378,9 @@ bad_msgpack:
 	return 0;
 }
 
-void
-xrow_encode_raft(struct xrow_header *row, struct region *region,
-		 const struct raft_request *r)
+static void
+xrow_encode_raft_impl(struct xrow_header *row, struct region *region,
+		      const struct raft_request *r, enum group_id group_id)
 {
 	/*
 	 * Terms is encoded always. Sometimes the rest can be even ignored if
@@ -1420,7 +1420,7 @@ xrow_encode_raft(struct xrow_header *row, struct region *region,
 	memset(row, 0, sizeof(*row));
 	row->type = IPROTO_RAFT;
 	row->body[0].iov_base = buf;
-	row->group_id = GROUP_LOCAL;
+	row->group_id = group_id;
 	row->bodycnt = 1;
 	const char *begin = buf;
 
@@ -1450,13 +1450,27 @@ xrow_encode_raft(struct xrow_header *row, struct region *region,
 	row->body[0].iov_len = buf - begin;
 }
 
-int
-xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
-		 struct vclock *vclock)
+void
+xrow_encode_raft_local(struct xrow_header *row, struct region *region,
+		       const struct raft_request *r)
+{
+	xrow_encode_raft_impl(row, region, r, GROUP_LOCAL);
+}
+
+void
+xrow_encode_raft(struct xrow_header *row, struct region *region,
+		 const struct raft_request *r)
+{
+	xrow_encode_raft_impl(row, region, r, GROUP_DEFAULT);
+}
+
+static int
+xrow_decode_raft_impl(const struct xrow_header *row, struct raft_request *r,
+		      struct vclock *vclock, enum group_id group_id)
 {
 	if (row->type != IPROTO_RAFT)
 		goto bad_msgpack;
-	if (row->bodycnt != 1 || row->group_id != GROUP_LOCAL) {
+	if (row->bodycnt != 1 || row->group_id != group_id) {
 		diag_set(ClientError, ER_INVALID_MSGPACK,
 			 "malformed raft request");
 		return -1;
@@ -1513,6 +1527,20 @@ xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
 bad_msgpack:
 	xrow_on_decode_err(row, ER_INVALID_MSGPACK, "raft body");
 	return -1;
+}
+
+int
+xrow_decode_raft_local(const struct xrow_header *row, struct raft_request *r,
+		       struct vclock *vclock)
+{
+	return xrow_decode_raft_impl(row, r, vclock, GROUP_LOCAL);
+}
+
+int
+xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
+		 struct vclock *vclock)
+{
+	return xrow_decode_raft_impl(row, r, vclock, GROUP_DEFAULT);
 }
 
 void

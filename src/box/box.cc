@@ -749,7 +749,7 @@ wal_stream_apply_raft_row(struct wal_stream *stream, struct xrow_header *row)
 	}
 	struct raft_request raft_req;
 	/* Vclock is never persisted in WAL by Raft. */
-	if (xrow_decode_raft(row, &raft_req, NULL) != 0) {
+	if (xrow_decode_raft_local(row, &raft_req, NULL) != 0) {
 		say_error("couldn't decode a raft request");
 		return -1;
 	}
