@@ -2712,6 +2712,7 @@ vinyl_engine_new(const char *dir, size_t memory,
 
 	env->base.vtab = &vinyl_engine_vtab;
 	env->base.name = "vinyl";
+	env->base.flags = ENGINE_TXM_HANDLES_DDL;
 	return &env->base;
 }
 

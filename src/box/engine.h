@@ -299,6 +299,12 @@ enum {
 	 * Set if the engine supports cross-engine transactions.
 	 */
 	ENGINE_SUPPORTS_CROSS_ENGINE_TX = 1 << 4,
+	/**
+	 * Set if the engine's transaction manager properly handles
+	 * concurrent DDL operations. A DDL operation will abort all
+	 * transactions for engines that don't have this flag set.
+	 */
+	ENGINE_TXM_HANDLES_DDL = 1 << 5,
 };
 
 struct engine {
