@@ -543,6 +543,11 @@ txn_begin(void)
 	 * if they are not supported.
 	 */
 	txn_set_flags(txn, TXN_CAN_YIELD);
+	/*
+	 * A transaction is unaffected by concurrent DDL as long as it has
+	 * no statements.
+	 */
+	txn_set_flags(txn, TXN_HANDLES_DDL);
 	memtx_tx_register_txn(txn);
 	rmean_collect(rmean_box, IPROTO_BEGIN, 1);
 	return txn;
@@ -555,7 +560,10 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn)
 		return 0;
 	if (txn->engine == NULL) {
 		txn->engine = engine;
-		return engine_begin(engine, txn);
+		if (engine_begin(engine, txn) != 0)
+			return -1;
+		if ((engine->flags & ENGINE_TXM_HANDLES_DDL) == 0)
+			txn_clear_flags(txn, TXN_HANDLES_DDL);
 	} else if (txn->engine != engine) {
 		/**
 		 * Only one engine can be used in

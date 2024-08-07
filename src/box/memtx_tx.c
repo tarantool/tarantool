@@ -690,6 +690,8 @@ memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
 	rlist_foreach_entry(to_be_aborted, &txm.all_txs, in_all_txs) {
 		if (to_be_aborted == ddl_owner)
 			continue;
+		if (txn_has_flag(to_be_aborted, TXN_HANDLES_DDL))
+			continue;
 		if (to_be_aborted->status != TXN_INPROGRESS &&
 		    to_be_aborted->status != TXN_IN_READ_VIEW)
 			continue;

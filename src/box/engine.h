@@ -278,6 +278,12 @@ enum {
 	 * Engine setting this flag must support read views.
 	 */
 	ENGINE_JOIN_BY_MEMTX = 1 << 3,
+	/**
+	 * Set if the engine's transaction manager properly handles
+	 * concurrent DDL operations. A DDL operation will abort all
+	 * transactions for engines that don't have this flag set.
+	 */
+	ENGINE_TXM_HANDLES_DDL = 1 << 5,
 };
 
 struct engine {

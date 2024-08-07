@@ -110,6 +110,12 @@ enum txn_flag {
 	 * Transaction has been rolled back so it cannot be continued.
 	 */
 	TXN_IS_ROLLED_BACK = 0x200,
+	/**
+	 * Transaction properly handles concurrent DDL operations.
+	 * If a transaction doesn't have this flag, it'll be aborted
+	 * by any DDL operation.
+	 */
+	TXN_HANDLES_DDL = 0x1000,
 };
 
 enum {
