@@ -35,7 +35,10 @@ with all attributes.
 One may use this generated file directly (via include in C/C++) or generate
 different artifact which could be used from other language (i.e. Go, or Python).
 We guarantee that constants assigned to particular zone will be maintained in
-future. To simplify future updates we leave some holes in list.
+future. To simplify future updates we leave some holes in list. When the
+generated header already exists, the ids assigned there are reused as is, and
+newly appeared zones get ids from the spare range, so the ids stay stable
+across timezone database updates.
 
 Another artifact - is Lua config file, which defines table for converting of
 timezone index to the timezone name. e.g.
@@ -204,6 +207,18 @@ my %ZoneIds;    # number to name
 my %ZoneRevIds; # name to number
 my %Aliases;    # name to name
 
+my $stable_ids = 0;
+my %OldIds;     # name to id, ids assigned in the existing generated file
+my %OldZones;   # zone name to id, zones of the existing generated file
+my %OldAbbrevs; # abbreviation name to [id, offset, flags]
+my %OldAliases; # alias name to [id, target zone name]
+my %UsedIds;    # id to 1, already assigned ids
+my $next_free_id = 0;
+my %AbbrevOut;  # id to [offset, name, flags]
+my %UniqueOut;  # id to name
+my %AliasOut;   # alias name to [id, target zone name]
+my %UniqueById; # id to name, unique zones only
+
 sub read_zi_file($) {
     my $filename = shift;
     open( my $fh, '<:raw', $filename )
@@ -230,6 +245,69 @@ sub read_zi_file($) {
 my $out_h;
 my $out_lua;
 
+# Timezone ids must not exceed MAX_TZINDEX in src/lib/core/datetime.h.
+my $max_tzindex = 1024;
+
+# Read the existing generated file, if any, and reuse the ids assigned there.
+# It keeps the ids stable across timezone database updates, which is required
+# to not break datetime values already stored on disk, as their timezone index
+# is a part of the MessagePack format (see mp_datetime.c).
+sub read_existing_file() {
+    open( my $fh, '<:raw', $output_h_file ) or return;
+
+    while (<$fh>) {
+        my $id;
+        if ( my ( $a_id, $offset, $a_name, $flags ) =
+             /\bZONE_ABBREV\(\s*(\d+),\s*(-?\d+),\s*"([^"]+)",\s*(.*)\)\s*$/x )
+        {
+            $id = $a_id;
+            $OldAbbrevs{$a_name} = [ $id, $offset, $flags ];
+            $OldIds{$a_name}     = $id;
+        }
+        elsif ( my ( $z_id, $z_name ) =
+                /\bZONE_UNIQUE\(\s*(\d+),\s*"([^"]+)"\s*\)\s*$/x )
+        {
+            $id = $z_id;
+            $OldZones{$z_name} = $id;
+            $OldIds{$z_name}   = $id;
+        }
+        elsif ( my ( $l_id, $l_alias, $l_target ) =
+                /\bZONE_ALIAS\(\s*(\d+),\s*"([^"]+)",\s*"([^"]+)"\s*\)\s*$/x )
+        {
+            $id = $l_id;
+            $OldAliases{$l_alias} = [ $id, $l_target ];
+            $OldIds{$l_alias}     = $id;
+        }
+        else {
+            next;
+        }
+        $UsedIds{$id} = 1;
+    }
+    close($fh);
+    return unless %UsedIds;
+    $stable_ids   = 1;
+    $next_free_id = ( sort { $b <=> $a } keys %UsedIds )[0] + 1;
+}
+
+sub assign_new_id() {
+    while ( exists $UsedIds{$next_free_id} ) {
+        $next_free_id++;
+    }
+    die "too many timezone ids, raise MAX_TZINDEX in datetime.h"
+        if $next_free_id >= $max_tzindex;
+    $UsedIds{$next_free_id} = 1;
+    return $next_free_id;
+}
+
+# Return an id for the zone name, reusing the previously assigned one when the
+# generated file already exists, otherwise assign a new id from the spare range.
+sub assign_id {
+    my ( $name ) = @_;
+    return $OldIds{$name} if $stable_ids and exists $OldIds{$name};
+    return assign_new_id() if $stable_ids;
+    return next_id($name);
+}
+
 sub open_out_files() {
     open($out_h, ">$output_h_file") or
         die qq<Could not open '$output_h_file' for writing: '$!'>;
@@ -239,10 +317,21 @@ sub open_out_files() {
 
 # first we generate abbreviations list
 sub gen_abbrevs() {
+    my %abbrev;  # name -> [offset, flags]
+
     foreach my $encoded ( sort { $a <=> $b } keys %ZoneAbbrevs ) {
         my ( $flags, $offset, $name ) = @{ $ZoneAbbrevs{$encoded} };
-        my $nextid = next_id($name);
-        $ZoneIds{$nextid} = $name;
+        $abbrev{$name} = [ $offset, $flags ];
+    }
+    # keep abbreviations of the existing file
+    foreach my $name ( sort keys %OldAbbrevs ) {
+        next if exists $abbrev{$name};
+        $abbrev{$name} = [ $OldAbbrevs{$name}[1], $OldAbbrevs{$name}[2] ];
+    }
+    foreach my $name ( sort keys %abbrev ) {
+        my ( $offset, $flags ) = @{ $abbrev{$name} };
+        my $id = assign_id($name);
+        $ZoneIds{$id} = $name;
 
         if ( $flags != 0 ) {
             my @names;
@@ -255,27 +344,61 @@ sub gen_abbrevs() {
             $flags = join '|', @names;
         }
 
-        printf $out_h "ZONE_ABBREV(%4d, %4d, \"%s\", %s)\n",
-          $nextid, $offset, $name, $flags;
+        $AbbrevOut{$id} = [ $offset, $name, $flags ];
     }
 }
 
 # second we enumerate all known from main.zi primary zone names
 sub gen_primary_zones() {
-    foreach my $zonename (sort keys %ZoneNames) {
-        my $nextid = next_id($zonename);
-        $ZoneRevIds{$zonename} = $nextid;
-        $ZoneIds{$nextid} = $zonename;
-        printf $out_h "ZONE_UNIQUE(%4d, \"%s\")\n", $nextid, $zonename;
+    my %zone;    # name -> 1
+    $zone{$_} = 1 for keys %ZoneNames;
+    # keep zones of the existing file, they may become links or disappear
+    $zone{$_} = 1 for keys %OldZones;
+    foreach my $zonename ( sort keys %zone ) {
+        my $id = assign_id($zonename);
+        while ( exists $UniqueById{$id} ) {
+            warn "reassigning id $id for $zonename\n";
+            $id = assign_new_id();
+        }
+        $UniqueById{$id}       = $zonename;
+        $UniqueOut{$id}        = $zonename;
+        $ZoneRevIds{$zonename} = $id;
+        $ZoneIds{$id}          = $zonename;
     }
 }
 
 # third we enumerate all aliases for primary zones
 sub gen_aliases() {
+    my %alias;   # alias name -> target zone name
+
     foreach my $alias ( sort keys %Aliases ) {
-        my $zonename = $Aliases{$alias};
-        printf $out_h "ZONE_ALIAS(%4d, \"%s\", \"%s\")\n", $ZoneRevIds{$zonename},
-            $alias, $zonename;
+        next if defined $ZoneAbbrevNames{$alias};
+        next if exists $ZoneRevIds{$alias};
+        $alias{$alias} = $Aliases{$alias};
+    }
+    # keep aliases of the existing file
+    foreach my $alias ( sort keys %OldAliases ) {
+        next if exists $alias{$alias};
+        next if exists $ZoneRevIds{$alias};
+        $alias{$alias} = $OldAliases{$alias}[1];
+    }
+    foreach my $alias ( sort keys %alias ) {
+        my $target = $alias{$alias};
+        my $id;
+        if ( exists $OldIds{$alias} ) {
+            $id = $OldIds{$alias};
+        }
+        elsif ( $stable_ids and exists $ZoneRevIds{$target} ) {
+            $id = $ZoneRevIds{$target};
+        }
+        elsif ( $stable_ids ) {
+            $id = assign_new_id();
+        }
+        else {
+            $id = $ZoneRevIds{$target}
+                || die qq/Could not find id for alias target '$target'/;
+        }
+        $AliasOut{$alias} = [ $id, $target ];
     }
 }
 
@@ -285,6 +408,19 @@ sub gen_c_header() {
     gen_abbrevs();
     gen_primary_zones();
     gen_aliases();
+
+    foreach my $id ( sort { $a <=> $b } keys %AbbrevOut ) {
+        my ( $offset, $name, $flags ) = @{ $AbbrevOut{$id} };
+        printf $out_h "ZONE_ABBREV(%4d, %4d, \"%s\", %s)\n",
+          $id, $offset, $name, $flags;
+    }
+    foreach my $id ( sort { $a <=> $b } keys %UniqueOut ) {
+        printf $out_h "ZONE_UNIQUE(%4d, \"%s\")\n", $id, $UniqueOut{$id};
+    }
+    foreach my $alias ( sort keys %AliasOut ) {
+        my ( $id, $target ) = @{ $AliasOut{$alias} };
+        printf $out_h "ZONE_ALIAS(%4d, \"%s\", \"%s\")\n", $id, $alias, $target;
+    }
 }
 
 sub gen_lua_config() {
@@ -299,6 +435,7 @@ sub gen_lua_config() {
 
 read_abbrevs_file($zone_abbrevs_file);
 read_zi_file($tzdata_zi_file);
+read_existing_file();
 open_out_files();
 gen_c_header();
 gen_lua_config()
