@@ -5,6 +5,8 @@
 --
 s1 = box.schema.create_space('test1', {is_sync = true})
 s1.is_sync
+s1.state.is_sync
+s1.is_sync == s1.state.is_sync
 pk = s1:create_index('pk')
 box.ctl.promote()
 box.begin() s1:insert({1}) s1:insert({2}) box.commit()
@@ -13,6 +15,8 @@ s1:select{}
 -- Default is async.
 s2 = box.schema.create_space('test2')
 s2.is_sync
+s2.state.is_sync
+s2.is_sync == s2.state.is_sync
 
 -- Net.box takes sync into account.
 box.schema.user.grant('guest', 'super')

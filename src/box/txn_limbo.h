@@ -33,6 +33,7 @@
 #include "vclock/vclock.h"
 #include "latch.h"
 #include "errinj.h"
+#include "replication.h"
 
 #include <stdint.h>
 
@@ -473,6 +474,13 @@ txn_limbo_fence(struct txn_limbo *limbo);
  */
 void
 txn_limbo_unfence(struct txn_limbo *limbo);
+
+/** Return whether limbo has an owner. */
+static inline bool
+txn_limbo_has_owner(struct txn_limbo *limbo)
+{
+	return limbo->owner_id != REPLICA_ID_NIL;
+}
 
 /**
  * Initialize qsync engine.

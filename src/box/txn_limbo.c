@@ -1070,6 +1070,35 @@ txn_limbo_filter_request(struct txn_limbo *limbo,
 	}
 }
 
+/**
+ * Update the state of synchronous replication for system spaces.
+ */
+static void
+txn_limbo_update_system_spaces_is_sync_state(struct txn_limbo *limbo,
+					     const struct synchro_request *req,
+					     bool is_rollback)
+{
+	/* Do not enable synchronous replication during bootstrap. */
+	if (req->origin_id == REPLICA_ID_NIL)
+		return;
+	uint16_t req_type = req->type;
+	assert(req_type == IPROTO_RAFT_PROMOTE ||
+	       req_type == IPROTO_RAFT_DEMOTE);
+	bool is_promote = req_type == IPROTO_RAFT_PROMOTE;
+	/* Synchronous replication is already enabled. */
+	if (is_promote && limbo->owner_id != REPLICA_ID_NIL)
+		return;
+	/* Synchronous replication is already disabled. */
+	if (!is_promote && limbo->owner_id == REPLICA_ID_NIL) {
+		assert(!is_rollback);
+		return;
+	}
+	/* Flip operation types for a rollback. */
+	if (is_rollback)
+		is_promote = !is_promote;
+	system_spaces_update_is_sync_state(is_promote);
+}
+
 int
 txn_limbo_req_prepare(struct txn_limbo *limbo,
 		      const struct synchro_request *req)
@@ -1110,6 +1139,8 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 		limbo->confirmed_lsn = req->lsn;
 		vclock_reset(&limbo->confirmed_vclock, limbo->owner_id,
 			     req->lsn);
+		txn_limbo_update_system_spaces_is_sync_state(
+			limbo, req, /*is_rollback=*/false);
 		break;
 	}
 	/*
@@ -1134,6 +1165,8 @@ txn_limbo_req_rollback(struct txn_limbo *limbo,
 		vclock_reset(&limbo->confirmed_vclock, limbo->owner_id,
 			     limbo->svp_confirmed_lsn);
 		limbo->svp_confirmed_lsn = -1;
+		txn_limbo_update_system_spaces_is_sync_state(
+			limbo, req, /*is_rollback=*/true);
 		limbo->is_in_rollback = false;
 		break;
 	}

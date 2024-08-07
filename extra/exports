@@ -324,6 +324,7 @@ swim_self
 swim_set_codec
 swim_set_payload
 swim_size
+system_spaces_update_is_sync_state_from_compat
 tarantool_exit
 tarantool_lua_slab_cache
 tarantool_uptime
