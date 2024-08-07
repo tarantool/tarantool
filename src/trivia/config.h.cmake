@@ -23,6 +23,11 @@
  * release, e.g. 1.6.6-113-g8399d0e.
  */
 #define PACKAGE_VERSION "@TARANTOOL_VERSION@"
+/**
+ * A string with tag identifier of the tzdata release,
+ * e.g. 2024a.
+ */
+#define TZDATA_VERSION "@TZDATA_VERSION@"
 
 /** \endcond public */
 

@@ -818,6 +818,23 @@ elseif(IS_DIRECTORY .git AND GIT)
     )
 endif()
 
+set(TZDATA_VERSION "")
+set(TZCODE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/tz)
+if (EXISTS "${TZCODE_SOURCE_DIR}/.git" AND GIT)
+    execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags --dirty
+                    WORKING_DIRECTORY ${TZCODE_SOURCE_DIR}
+                    OUTPUT_VARIABLE TZDATA_VERSION
+                    RESULT_VARIABLE TZDATA_ERROR_CODE
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif()
+
+if(TZDATA_VERSION STREQUAL "")
+    # The current version of tzdata, must be update on bump.
+    set(TZDATA_VERSION 2022a)
+    message(WARNING "Failed to determine tzdata version from Git tags. \
+                     Using default version \"${TZDATA_VERSION}\".")
+endif()
+
 option(TEST_BUILD "Use defaults suited for tests" OFF)
 set(ABORT_ON_LEAK_DEFAULT ${TEST_BUILD})
 option(ABORT_ON_LEAK "Abort if memory leak is found." ${ABORT_ON_LEAK_DEFAULT})
