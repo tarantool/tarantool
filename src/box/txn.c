@@ -549,6 +549,11 @@ txn_begin(void)
 	 * without ENGINE_SUPPORTS_CROSS_ENGINE_TX will unset this flag.
 	 */
 	txn_set_flags(txn, TXN_SUPPORTS_MULTI_ENGINE);
+	/*
+	 * A transaction is unaffected by concurrent DDL as long as it has
+	 * no statements.
+	 */
+	txn_set_flags(txn, TXN_HANDLES_DDL);
 	memtx_tx_register_txn(txn);
 	rmean_collect(rmean_box, IPROTO_BEGIN, 1);
 	return txn;
@@ -564,38 +569,36 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn)
 		assert(txn->engines[engine->id] == engine);
 		return 0;
 	}
-	if (!txn_has_flag(txn, TXN_IS_STARTED_IN_ENGINE)) {
-		if (engine_begin(engine, txn) != 0)
+	if (txn_has_flag(txn, TXN_IS_STARTED_IN_ENGINE)) {
+		if ((engine->flags & ENGINE_SUPPORTS_CROSS_ENGINE_TX) == 0) {
+			diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION,
+				 engine->name);
 			return -1;
-		txn_set_flags(txn, TXN_IS_STARTED_IN_ENGINE);
-		txn->engines[engine->id] = engine;
-		assert(txn_has_flag(txn, TXN_SUPPORTS_MULTI_ENGINE));
-		if (!(engine->flags & ENGINE_SUPPORTS_CROSS_ENGINE_TX))
-			txn_clear_flags(txn, TXN_SUPPORTS_MULTI_ENGINE);
-		return 0;
-	}
-	if (!(engine->flags & ENGINE_SUPPORTS_CROSS_ENGINE_TX)) {
-		diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION,
-			 engine->name);
-		return -1;
-	}
-	if (!txn_has_flag(txn, TXN_SUPPORTS_MULTI_ENGINE)) {
-		const char *name = NULL;
-		for (size_t i = 0; i < MAX_TX_ENGINE_COUNT; i++) {
-			if (txn->engines[i] != NULL &&
-			    !(txn->engines[i]->flags &
-			      ENGINE_SUPPORTS_CROSS_ENGINE_TX)) {
-				name = txn->engines[i]->name;
-				break;
-			}
 		}
-		assert(name != NULL);
-		diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION, name);
-		return -1;
+		if (!txn_has_flag(txn, TXN_SUPPORTS_MULTI_ENGINE)) {
+			const char *name = NULL;
+			for (size_t i = 0; i < MAX_TX_ENGINE_COUNT; i++) {
+				if (txn->engines[i] != NULL &&
+				    (txn->engines[i]->flags &
+				     ENGINE_SUPPORTS_CROSS_ENGINE_TX) == 0) {
+					name = txn->engines[i]->name;
+					break;
+				}
+			}
+			assert(name != NULL);
+			diag_set(ClientError,
+				 ER_CROSS_ENGINE_TRANSACTION, name);
+			return -1;
+		}
 	}
 	if (engine_begin(engine, txn) != 0)
 		return -1;
 	txn->engines[engine->id] = engine;
+	txn_set_flags(txn, TXN_IS_STARTED_IN_ENGINE);
+	if ((engine->flags & ENGINE_SUPPORTS_CROSS_ENGINE_TX) == 0)
+		txn_clear_flags(txn, TXN_SUPPORTS_MULTI_ENGINE);
+	if ((engine->flags & ENGINE_TXM_HANDLES_DDL) == 0)
+		txn_clear_flags(txn, TXN_HANDLES_DDL);
 	return 0;
 }
 
