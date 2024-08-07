@@ -86,6 +86,12 @@ tarantool_version(void);
 uint32_t
 tarantool_version_id(void);
 
+/**
+ * Return tzdata version as string
+ */
+const char *
+tzdata_version(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

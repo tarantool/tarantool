@@ -49,3 +49,9 @@ tarantool_version_id(void)
 	return version_id(PACKAGE_VERSION_MAJOR, PACKAGE_VERSION_MINOR,
 			  PACKAGE_VERSION_PATCH);
 }
+
+const char *
+tzdata_version(void)
+{
+	return TZDATA_VERSION;
+}
