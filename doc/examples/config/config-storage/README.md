@@ -78,6 +78,18 @@ Since Tarantool version 3.2 keys could be added to the storage with the
 specified TTL. The keys guaranteed not to expire early, but they could live a
 bit longer than expected due to communications between replicas and master.
 
+To check if TTL requests are supported, use newly added field
+`config.storage.info.features.ttl`:
+```lua
+local info = conn.call('config.storage.info')
+if info.features == nil or not info.features.ttl then
+    error('TTL is not supported on the config storage server')
+end
+```
+Tarantool 3.2 needs the database schema upgrade to enable the TTL feature.
+Use `box.schema.upgrade()` and `box.snapshot()`. Also see the
+[upgrade guide](https://www.tarantool.io/en/doc/latest/admin/upgrades/).
+
 Each expired key generates a delete event. This means that each expiration bumps
 the storage revision and wakes up watchers.
 
