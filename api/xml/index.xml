@@ -525,6 +525,7 @@
     <member refid="module_8h_1a6016a29a15957c333f568d4059923fad" kind="function"><name>luaL_pushcdata</name></member>
     <member refid="module_8h_1a09b8d32a69bc903b97ee3379b34fb2af" kind="function"><name>luaL_checkcdata</name></member>
     <member refid="module_8h_1aa62fc5e919f74956a06a9b40fb24f691" kind="function"><name>luaL_setcdatagc</name></member>
+    <member refid="module_8h_1ac765ca13d67a265532e8fe4cceb4aa5a" kind="function"><name>luaL_getgctotal</name></member>
     <member refid="module_8h_1a5d1f07b7fe39b8bd9b7a87f7c84d5d73" kind="function"><name>luaL_ctypeid</name></member>
     <member refid="module_8h_1a498681c0c56f0aebe938004ab8947b0f" kind="function"><name>luaL_cdef</name></member>
     <member refid="module_8h_1a6439d4dd158b27d2567e1bfd6243e084" kind="function"><name>luaL_pushuint64</name></member>
