@@ -253,7 +253,8 @@ local function upgrade_to_1_7_5()
 end
 
 local function user_trig_1_7_5(_, tuple)
-    if tuple and not tuple[5] then
+    if tuple and
+       (tuple[5] == nil or type(tuple[5]) ~= 'table' or not next(tuple[5])) then
         tuple = tuple:update{{'=', 5, setmap({})}}
         log.info("Set empty password to %s '%s'", tuple[4], tuple[3])
     end
@@ -314,11 +315,27 @@ space_formats_1_7_5._vuser = space_formats_1_7_5._user
 space_formats_1_7_5._vpriv = space_formats_1_7_5._priv
 
 local function space_trig_1_7_5(_, tuple)
-    if tuple and space_formats_1_7_5[tuple[3]] and
-       not table.equals(space_formats_1_7_5[tuple[3]], tuple[7]) then
-        tuple = tuple:update{{'=', 7, space_formats_1_7_5[tuple[3]]}}
+    if tuple == nil then
+        return nil
+    end
+    if space_formats_1_7_5[tuple[3]] then
+        -- Update format of system spaces.
+        if not table.equals(space_formats_1_7_5[tuple[3]], tuple[7]) then
+            tuple = tuple:update{{'=', 7, space_formats_1_7_5[tuple[3]]}}
+            log.info("Update space '%s' format: new format %s", tuple[3],
+                json.encode(tuple[7]))
+        end
+    elseif tuple[7] and type(tuple[7]) == 'table' and next(tuple[7]) ~= nil and
+           tuple[7][1]['name'] == nil then
+        -- Update format of user spaces.
+        local format = tuple[7]
+        for _, f in ipairs(format) do
+            f['name'] = f[1]
+            f[1] = nil
+        end
+        tuple = tuple:update{{'=', 7, format}}
         log.info("Update space '%s' format: new format %s", tuple[3],
-                 json.encode(tuple[7]))
+            json.encode(tuple[7]))
     end
     return tuple
 end
