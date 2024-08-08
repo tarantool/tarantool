@@ -41,7 +41,7 @@ _ = box.schema.space.create('sync', {is_sync = true, engine = engine})
 _ = box.space.sync:create_index('pk')
  | ---
  | ...
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
  | ---
  | ...
 -- Write something to flush the current master's state to replica.

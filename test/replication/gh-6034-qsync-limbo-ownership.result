@@ -42,7 +42,7 @@ box.space.sync:insert{1} -- error.
  | - error: The synchronous transaction queue doesn't belong to any instance
  | ...
 
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
  | ---
  | ...
 assert(not box.info.ro)
@@ -107,7 +107,7 @@ assert(err.code == box.error.READONLY)
  | ...
 
 -- Promotion on the other node. Default should become ro.
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
  | ---
  | ...
 assert(not box.info.ro)
@@ -150,7 +150,7 @@ assert(err.code == box.error.READONLY)
  | - true
  | ...
 
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
  | ---
  | ...
 box.ctl.demote()

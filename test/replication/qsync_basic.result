@@ -14,7 +14,7 @@ s1.is_sync
 pk = s1:create_index('pk')
  | ---
  | ...
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
  | ---
  | ...
 box.begin() s1:insert({1}) s1:insert({2}) box.commit()
@@ -712,7 +712,7 @@ assert(box.info.lsn == old_lsn + 1)
  | ---
  | - true
  | ...
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
  | ---
  | ...
 

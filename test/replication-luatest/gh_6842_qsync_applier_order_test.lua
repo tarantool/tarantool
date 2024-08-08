@@ -127,7 +127,7 @@ end
 g.test_local_txn_during_remote_promote = function(g)
     -- Server 1 takes the synchro queue.
     g.server1:exec(function()
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
         box.cfg{
             -- To hang own transactions in the synchro queue.
             replication_synchro_quorum = 3,
@@ -201,7 +201,7 @@ end
 g.test_remote_promote_during_local_txn_including_it = function(g)
     -- Start synchro txns on server 1.
     local fids = g.server1:exec(function()
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
         local s = box.schema.create_space('test', {is_sync = true})
         s:create_index('pk')
         box.cfg{
@@ -229,7 +229,7 @@ g.test_remote_promote_during_local_txn_including_it = function(g)
             -- the promotion ASAP.
             replication_synchro_timeout = 0.001,
         }
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
         box.cfg{
             replication_synchro_quorum = 2,
             replication_synchro_timeout = 1000,
@@ -290,7 +290,7 @@ end
 g.test_remote_promote_during_local_txn_not_including_it = function(g)
     -- Start a synchro txn on server 1.
     local fids = g.server1:exec(function()
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
         local s = box.schema.create_space('test', {is_sync = true})
         s:create_index('pk')
         box.cfg{
@@ -314,7 +314,7 @@ g.test_remote_promote_during_local_txn_not_including_it = function(g)
         box.cfg{
             replication_synchro_quorum = 1,
         }
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
     end)
 
     -- Server 1 receives the PROMOTE.

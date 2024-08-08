@@ -729,6 +729,10 @@ lbox_info_synchro(struct lua_State *L)
 	lua_setfield(L, -2, "owner");
 	lua_pushboolean(L, latch_is_locked(&queue->promote_latch));
 	lua_setfield(L, -2, "busy");
+	luaL_pushuint64(L, queue->confirmed_lsn);
+	lua_setfield(L, -2, "confirmed_lsn");
+	luaT_pushvclock(L, &queue->confirmed_vclock);
+	lua_setfield(L, -2, "confirmed_vclock");
 	luaL_pushuint64(L, queue->promote_greatest_term);
 	lua_setfield(L, -2, "term");
 	if (queue->len == 0) {
@@ -743,6 +747,34 @@ lbox_info_synchro(struct lua_State *L)
 	lua_pushnumber(L, queue->confirm_lag);
 	lua_setfield(L, -2, "confirm_lag");
 	lua_setfield(L, -2, "queue");
+
+	/* Promote queue information. */
+	lua_createtable(L, 0, 2);
+	luaL_pushuint64(L, queue->promote_greatest_term);
+	lua_setfield(L, -2, "term");
+	lua_newtable(L);
+	int pos = 1;
+	struct pending_promote *item;
+	rlist_foreach_entry(item, &queue->pending_promotes, link) {
+		lua_createtable(L, 0, 7);
+		lua_pushinteger(L, item->req.replica_id);
+		lua_setfield(L, -2, "replica_id");
+		lua_pushinteger(L, item->req.origin_id);
+		lua_setfield(L, -2, "origin_id");
+		luaL_pushint64(L, item->req.self_lsn);
+		lua_setfield(L, -2, "self_lsn");
+		luaL_pushint64(L, item->req.lsn);
+		lua_setfield(L, -2, "lsn");
+		luaL_pushuint64(L, item->req.term);
+		lua_setfield(L, -2, "term");
+		luaL_pushuint64(L, item->req.prev_term);
+		lua_setfield(L, -2, "prev_term");
+		lua_pushinteger(L, item->ack_count);
+		lua_setfield(L, -2, "ack_count");
+		lua_rawseti(L, -2, pos++);
+	}
+	lua_setfield(L, -2, "items");
+	lua_setfield(L, -2, "promote_queue");
 
 	return 1;
 }

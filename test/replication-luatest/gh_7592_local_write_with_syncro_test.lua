@@ -27,7 +27,7 @@ g.before_each(function(cg)
     }
     cg.cluster:start()
     cg.master:exec(function()
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
         box.schema.space.create('sync', {is_sync = true})
         box.space.sync:create_index('pk')
         box.schema.space.create('loc', {is_local = true})

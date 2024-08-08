@@ -33,6 +33,7 @@
 #include "vclock/vclock.h"
 #include "latch.h"
 #include "errinj.h"
+#include "xrow.h"
 
 #include <stdint.h>
 
@@ -41,7 +42,25 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct txn;
-struct synchro_request;
+
+/**
+ * A synchro request which is applied iff its author managed to
+ * gather a quorum in the corresponding raft term.
+ */
+struct pending_promote {
+	/**
+	 * Used by txn_limbo to stage pending synchro requests.
+	 */
+	struct rlist link;
+	/**
+	 * Number of ACKs, i.e. how many replicas acknowledged this request.
+	 */
+	int ack_count;
+	/**
+	 * The request itself.
+	 */
+	struct synchro_request req;
+};
 
 /**
  * Transaction and its quorum metadata, to be stored in limbo.
@@ -120,6 +139,29 @@ struct txn_limbo {
 	 */
 	struct fiber_cond wait_cond;
 	/**
+	 * Number of times txn_limbo_write_promote has completed.
+	 * NOTE: this keeps track of both successful & unsuccessful calls.
+	 */
+	uint64_t write_promote_count;
+	/*
+	 * Condition to wait for completion of txn_limbo_write_promote.
+	 */
+	struct fiber_cond write_promote_cond;
+	/**
+	 * A helper fiber for running blocking actions
+	 * related to txn_limbo_on_parameters_change.
+	 */
+	struct {
+		/** The worker for handling parameter changes. */
+		struct fiber *fiber;
+		/** Notifies the worker when there's more work to do. */
+		struct fiber_cond cond;
+		/** True if there's more work to do. */
+		bool has_work;
+		/** True if the worker is currently running. */
+		bool running;
+	} on_parameters_change;
+	/**
 	 * All components of the vclock are versions of the limbo
 	 * owner's LSN, how it is visible on other nodes. For
 	 * example, assume instance ID of the limbo is 1. Then
@@ -157,6 +199,11 @@ struct txn_limbo {
 	 */
 	uint64_t promote_greatest_term;
 	/**
+	 * The in-memory storage of pending PROMOTE requests.
+	 * Every item in this list is struct synchro_request.
+	 */
+	struct rlist pending_promotes;
+	/**
 	 * To order access to the promote data.
 	 */
 	struct latch promote_latch;
@@ -193,10 +240,9 @@ struct txn_limbo {
 	 */
 	bool is_in_rollback;
 	/**
-	 * Savepoint of confirmed LSN. To rollback to in case the current
-	 * synchro command (promote/demote/...) fails.
+	 * Set to true when the current instance is writing a PROMOTE request.
 	 */
-	int64_t svp_confirmed_lsn;
+	bool is_writing_promote;
 	union {
 		/**
 		 * Whether the limbo is frozen. This mode prevents CONFIRMs and
@@ -288,6 +334,13 @@ txn_limbo_replica_confirmed_lsn(const struct txn_limbo *limbo,
 {
 	return vclock_get(&limbo->confirmed_vclock, replica_id);
 }
+
+/**
+ * Check if this instance is currently trying to become a R/W leader
+ * in the current term, i.e. it has already authored a PROMOTE request.
+ */
+bool
+txn_limbo_is_trying_to_promote(struct txn_limbo *limbo);
 
 /**
  * Return the last synchronous transaction in the limbo or NULL when it is
@@ -440,6 +493,21 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo, struct synchro_request *req,
  */
 int
 txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
+
+/**
+ * Get the total number of txn_limbo_write_promote calls.
+ */
+uint64_t
+txn_limbo_promote_attempts(struct txn_limbo *limbo);
+
+/**
+ * Wait until total number of txn_limbo_write_promote calls reaches `count`.
+ * This does not necessarily mean all those writes succeeded.
+ * Returns 0 on success, -1 if timeout or fiber is cancelled.
+ */
+int
+txn_limbo_wait_promote_attempts(struct txn_limbo *limbo,
+				uint64_t count, double timeout);
 
 /**
  * Write a DEMOTE request.

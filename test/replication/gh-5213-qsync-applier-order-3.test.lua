@@ -30,7 +30,7 @@ box.schema.user.grant('guest', 'super')
 
 s = box.schema.space.create('test', {is_sync = true})
 _ = s:create_index('pk')
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 
 test_run:cmd('create server replica1 with rpl_master=default,\
               script="replication/replica1.lua"')
@@ -85,13 +85,15 @@ end)
 test_run:switch('replica2')
 test_run:wait_lsn('replica2', 'default')
 box.cfg{                                                                        \
-    replication_synchro_quorum = 2,                                             \
+    replication_synchro_quorum = 1,                                             \
     replication_synchro_timeout = 1000,                                         \
 }
 -- Replica2 takes the limbo ownership and sends the transaction to the replica1.
 -- Along with the CONFIRM from the default node, which is still not applied
 -- on the replica1.
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
+box.info.id == box.info.synchro.queue.owner -- promote should've been applied
+box.cfg{replication_synchro_quorum = 2}
 fiber = require('fiber')
 f = fiber.new(function() box.space.test:replace{2} end)
 
@@ -121,7 +123,7 @@ test_run:cmd('stop server replica2')
 test_run:cmd('delete server replica2')
 -- Restore leadership to make the default instance writable.
 box.cfg{replication_synchro_quorum = 1}
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 s:drop()
 box.schema.user.revoke('guest', 'super')
 box.cfg{                                                                        \

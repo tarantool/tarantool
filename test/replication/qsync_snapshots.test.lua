@@ -23,7 +23,7 @@ test_run:switch('default')
 box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 -- Testcase body.
 box.space.sync:insert{1}
 box.space.sync:select{} -- 1

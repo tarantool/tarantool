@@ -79,7 +79,7 @@ _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
  | ---
  | ...
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
  | ---
  | ...
 -- Testcase body.
@@ -493,7 +493,7 @@ box.space.sync:select{} -- 1
 box.cfg{read_only=false} -- promote replica to master
  | ---
  | ...
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
  | ---
  | ...
 test_run:switch('default')
@@ -539,7 +539,7 @@ test_run:switch('default')
 box.cfg{read_only=false}
  | ---
  | ...
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
  | ---
  | ...
 test_run:switch('replica')

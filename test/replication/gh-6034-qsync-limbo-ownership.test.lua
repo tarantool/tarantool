@@ -17,7 +17,7 @@ box.space.async:insert{1} -- success.
 -- Synchro spaces aren't writeable
 box.space.sync:insert{1} -- error.
 
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 assert(not box.info.ro)
 assert(box.info.synchro.queue.owner == box.info.id)
 box.space.sync:insert{1} -- success.
@@ -39,7 +39,7 @@ assert(not ok)
 assert(err.code == box.error.READONLY)
 
 -- Promotion on the other node. Default should become ro.
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 assert(not box.info.ro)
 assert(box.info.synchro.queue.owner == box.info.id)
 box.space.sync:insert{2} -- success.
@@ -52,7 +52,7 @@ ok, err = pcall(box.space.sync.insert, box.space.sync, {3})
 assert(not ok)
 assert(err.code == box.error.READONLY)
 
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 box.ctl.demote()
 assert(not box.info.ro)
 box.space.sync:insert{3} -- still fails.

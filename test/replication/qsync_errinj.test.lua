@@ -12,7 +12,7 @@ test_run:cmd('start server replica with wait=True, wait_load=True')
 
 _ = box.schema.space.create('sync', {is_sync = true, engine = engine})
 _ = box.space.sync:create_index('pk')
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 
 --
 -- gh-5100: slow ACK sending shouldn't stun replica for the

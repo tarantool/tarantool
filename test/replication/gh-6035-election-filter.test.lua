@@ -38,7 +38,7 @@ box.cfg({                                       \
     election_mode = 'manual',                   \
 })
 
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 _ = box.schema.space.create("sync", {is_sync = true})
 _ = box.space.sync:create_index("pk")
 box.space.sync:insert{1}

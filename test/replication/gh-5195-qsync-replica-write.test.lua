@@ -18,7 +18,7 @@ test_run:cmd('start server replica with wait=True, wait_load=True')
 --
 _ = box.schema.space.create('sync', {engine = engine, is_sync = true})
 _ = box.space.sync:create_index('pk')
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 
 box.cfg{                                                                        \
     replication_synchro_timeout = 1000,                                         \

@@ -163,7 +163,7 @@ box.cfg{election_mode='manual'}
 test_run:wait_cond(function() return #election_tbl == 6 end)
 assert(election_tbl[6].state == 'follower')
 
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 
 test_run:wait_cond(function() return #election_tbl == 8 end)
 assert(election_tbl[7].state == 'candidate')

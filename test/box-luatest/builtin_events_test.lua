@@ -129,8 +129,8 @@ g.test_box_status = function(cg)
                     {is_ro = true, is_ro_cfg = false, status = 'running'})
 
     -- promotion should turn rm
-    cg.master:exec(function() box.ctl.promote() end)
-    t.helpers.retrying({}, function() t.assert_equals(result_no, 7) end)
+    cg.master:exec(function() box.ctl.promote(); box.ctl.wait_rw() end)
+    t.helpers.retrying({}, function() t.assert_ge(result_no, 7) end)
     t.assert_equals(result,
                     {is_ro = false, is_ro_cfg = false, status = 'running'})
 

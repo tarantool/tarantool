@@ -26,7 +26,7 @@ g_two_member_cluster.before_each(function(cg)
     end)
     -- Make `_cluster` space synchronous.
     cg.master:exec(function()
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
         box.space._cluster:alter{is_sync = true}
         box.schema.space.create('sync', {is_sync = true}):create_index('pk')
     end)
@@ -104,7 +104,7 @@ g_three_member_cluster.before_each(function(cg)
     }}
     cg.replica_set:start()
     cg.master:exec(function()
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
         box.space._cluster:alter{is_sync = true}
         box.schema.space.create('sync', {is_sync = true}):create_index('pk')
     end)

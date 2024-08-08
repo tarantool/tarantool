@@ -33,7 +33,7 @@ g.test_box_begin_commit_is_sync = function(cg)
     cg.master:exec(function()
         box.schema.space.create('test')
         box.space.test:create_index('pk')
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
 
         box.begin()
             box.space.test:insert{1, 'is_sync = false'}
@@ -125,7 +125,7 @@ g.test_box_atomic_is_sync = function(cg)
     cg.master:exec(function()
         box.schema.space.create('test')
         box.space.test:create_index('pk')
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
 
         box.atomic(function()
             box.space.test:insert{1, 'is_sync = false'}
@@ -215,7 +215,7 @@ g.test_iproto_is_sync = function(cg)
     cg.master:exec(function()
         box.schema.space.create('test')
         box.space.test:create_index('pk')
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
     end)
 
     -- Throwing iproto errors if is_sync is set incorrectly
@@ -292,7 +292,7 @@ g.test_commit_opts = function(cg)
     cg.master:exec(function()
         box.schema.space.create('test')
         box.space.test:create_index('pk')
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
     end)
 
     -- Commit options are set correctly
@@ -353,7 +353,7 @@ g.test_commit_local_space = function(cg)
         box.space.test:create_index('pk')
         box.schema.space.create('loc', {is_local = true})
         box.space.loc:create_index('pk')
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
         box.begin() box.space.loc:insert{1} box.commit()
     end)
 

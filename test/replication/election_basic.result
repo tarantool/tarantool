@@ -399,7 +399,7 @@ assert(election_tbl[6].state == 'follower')
  | - true
  | ...
 
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
  | ---
  | ...
 

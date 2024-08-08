@@ -234,6 +234,11 @@ extern const char *iproto_flag_bit_strs[];
 	  * true and CHECKPOINT_VCLOCK to be set.
 	  */								\
 	 _(CHECKPOINT_LSN, 0x64, MP_UINT)				\
+	/**
+	 * Extra keys used in pending RAFT_PROMOTE requests.
+	 */								\
+	_(PREV_TERM, 0x71, MP_UINT)					\
+	_(WAIT_ACK, 0x72, MP_BOOL)
 
 #define IPROTO_KEY_MEMBER(s, v, ...) IPROTO_ ## s = v,
 
@@ -518,6 +523,14 @@ iproto_key_name(enum iproto_key key)
 	if (key >= iproto_key_MAX)
 		return NULL;
 	return iproto_key_strs[key];
+}
+
+static inline const char *
+iproto_raft_key_name(enum iproto_raft_key key)
+{
+	if (key >= iproto_raft_key_MAX)
+		return NULL;
+	return iproto_raft_key_strs[key];
 }
 
 /** A data manipulation request. */
