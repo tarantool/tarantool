@@ -354,11 +354,16 @@ local begin_options = {
     end,
 }
 
-box.begin = function(options)
+local atomic_options = table.copy(begin_options)
+atomic_options.wait = function()
+    -- Let it be checked in C.
+    return true
+end
+
+local function box_begin_impl(options, level)
     local timeout
     local txn_isolation
     local is_sync
-    check_param_table(options, begin_options, 2)
     if options then
         timeout = options.timeout
         txn_isolation = options.txn_isolation and
@@ -366,7 +371,7 @@ box.begin = function(options)
         is_sync = options.is_sync
     end
     if builtin.box_txn_begin() == -1 then
-        box.error(box.error.last(), 2)
+        box.error(box.error.last(), level + 1)
     end
     if timeout then
         assert(builtin.box_txn_set_timeout(timeout) == 0)
@@ -374,11 +379,16 @@ box.begin = function(options)
     if txn_isolation and
        internal.txn_set_isolation(txn_isolation) ~= 0 then
         box.rollback()
-        box.error(box.error.last(), 2)
+        box.error(box.error.last(), level + 1)
     end
     if is_sync then
         builtin.box_txn_make_sync()
     end
+end
+
+box.begin = function(options)
+    check_param_table(options, begin_options, 2)
+    box_begin_impl(options, 2)
 end
 
 box.is_in_txn = builtin.box_txn
@@ -414,21 +424,28 @@ box.savepoint = function()
     return { csavepoint=csavepoint, txn_id=builtin.box_txn_id() }
 end
 
-local function atomic_tail(level, status, ...)
+local function atomic_tail(level, options, status, ...)
+    local err
     if not status then
-        box.rollback()
-        local err = (...)
-        if box.error.is(err) then
-            -- This will update box.error trace to proper value.
-            box.error(err, level + 1)
-        else
-            -- Keep original trace and append trace of level + 1 as
-            -- in case of box.error.
-            error(tostring(err), level + 1)
-        end
+        err = ...
+        goto fail
     end
-    call_at(level + 1, box.commit)
-    return ...
+    status, err = pcall(box.commit, options)
+    if not status then
+        goto fail
+    end
+    do return ... end
+
+::fail::
+    box.rollback()
+    if box.error.is(err) then
+        -- This will update box.error trace to proper value.
+        box.error(err, level + 1)
+    else
+        -- Keep original trace and append trace of level + 1 as
+        -- in case of box.error.
+        error(tostring(err), level + 1)
+    end
 end
 
 box.atomic = function(arg0, arg1, ...)
@@ -447,14 +464,16 @@ box.atomic = function(arg0, arg1, ...)
         if not utils.is_callable(arg1) then
             box.error(box.error.ILLEGAL_PARAMS, usage, 2)
         end
-        call_at(2, box.begin, arg0)
-        return atomic_tail(1, pcall(arg1, ...))
+        local options = arg0
+        check_param_table(options, atomic_options, 2)
+        box_begin_impl(options, 2)
+        return atomic_tail(1, options, pcall(arg1, ...))
     else
         if not utils.is_callable(arg0) then
             box.error(box.error.ILLEGAL_PARAMS, usage, 2)
         end
         box.begin()
-        return atomic_tail(1, pcall(arg0, arg1, ...))
+        return atomic_tail(1, nil, pcall(arg0, arg1, ...))
     end
 end
 

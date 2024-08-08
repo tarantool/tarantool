@@ -1491,7 +1491,7 @@ apply_plain_tx(uint32_t replica_id, struct stailq *rows)
 	rcb->txn_last_tm = item->row.tm;
 	trigger_create(on_wal_write, applier_txn_wal_write_cb, rcb, NULL);
 	txn_on_wal_write(txn, on_wal_write);
-	return txn_commit_try_async(txn);
+	return txn_commit_submit(txn);
 fail:
 	txn_abort(txn);
 	return -1;

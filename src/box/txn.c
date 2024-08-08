@@ -1115,65 +1115,47 @@ txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req)
 	return 0;
 }
 
-int
-txn_commit_try_async(struct txn *txn)
+static int
+txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 {
 	struct journal_entry *req;
-
-	ERROR_INJECT(ERRINJ_TXN_COMMIT_ASYNC, {
-		diag_set(ClientError, ER_INJECTION,
-			 "txn commit async injection");
-		goto rollback;
-	});
-
-	if (txn_prepare(txn) != 0)
-		goto rollback;
-
-	if (txn_commit_nop(txn))
-		return 0;
-
-	req = txn_journal_entry_new(txn);
-	if (req == NULL)
-		goto rollback;
-
-	if (txn_has_flag(txn, TXN_WAIT_SYNC) &&
-	    txn_add_limbo_entry(txn, req) != 0) {
-		goto rollback;
-	}
-
-	fiber_set_txn(fiber(), NULL);
-	if (journal_write_try_async(req) != 0) {
-		fiber_set_txn(fiber(), txn);
-		diag_log();
-		goto rollback;
-	}
-
-	return 0;
-
-rollback:
-	assert(txn->fiber == NULL);
-	txn_abort(txn);
-	return -1;
-}
-
-int
-txn_commit(struct txn *txn)
-{
-	struct journal_entry *req;
-
 	txn->fiber = fiber();
-
 	if (txn_prepare(txn) != 0)
 		goto rollback_abort;
-
 	if (txn_commit_nop(txn)) {
 		txn_free(txn);
 		return 0;
 	}
-
 	req = txn_journal_entry_new(txn);
 	if (req == NULL)
 		goto rollback_abort;
+	if (wait_mode != TXN_COMMIT_WAIT_MODE_COMPLETE) {
+		assert(wait_mode == TXN_COMMIT_WAIT_MODE_SUBMIT ||
+		       wait_mode == TXN_COMMIT_WAIT_MODE_NONE);
+		ERROR_INJECT(ERRINJ_TXN_COMMIT_ASYNC, {
+			diag_set(ClientError, ER_INJECTION,
+				 "txn commit async injection");
+			goto rollback_abort;
+		});
+		/*
+		 * The main reason why it is disabled is that the sync txn's
+		 * original instance wants to write CONFIRM. But it can't be
+		 * done asynchronously in the current code design. Also it is
+		 * logically strange to commit a synchronous transaction in an
+		 * async way, but the CONFIRM problem is the technical one.
+		 */
+		bool is_original = req->rows[0]->replica_id == 0;
+		if (txn_has_flag(txn, TXN_WAIT_ACK) && is_original) {
+			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
+				 "Non-blocking commit of a synchronous txn");
+			goto rollback_abort;
+		}
+		if (wait_mode == TXN_COMMIT_WAIT_MODE_NONE &&
+		    journal_queue_is_full()) {
+			diag_set(ClientError, ER_WAL_QUEUE_FULL);
+			goto rollback_abort;
+		}
+	}
 	/*
 	 * Do not cache the flag value in a variable. The flag might be deleted
 	 * during WAL write. This can happen for async transactions created
@@ -1185,10 +1167,19 @@ txn_commit(struct txn *txn)
 	    txn_add_limbo_entry(txn, req) != 0) {
 		goto rollback_abort;
 	}
-
 	fiber_set_txn(fiber(), NULL);
-	if (journal_write(req) != 0)
+	if (journal_write_submit(req) != 0) {
+		fiber_set_txn(fiber(), txn);
 		goto rollback_io;
+	}
+	if (wait_mode != TXN_COMMIT_WAIT_MODE_COMPLETE) {
+		if (txn_has_flag(txn, TXN_IS_DONE))
+			goto finish_done;
+		txn->fiber = NULL;
+		return 0;
+	}
+	while (!req->is_complete)
+		fiber_yield();
 	if (req->res < 0) {
 		diag_set_journal_res(req->res);
 		goto rollback_io;
@@ -1215,10 +1206,9 @@ txn_commit(struct txn *txn)
 			}
 		}
 	}
+finish_done:
 	assert(txn_has_flag(txn, TXN_IS_DONE));
 	assert(txn->signature >= 0);
-
-	/* Synchronous transactions are freed by the calling fiber. */
 	txn_free(txn);
 	return 0;
 
@@ -1237,6 +1227,18 @@ rollback:
 	}
 	txn_free(txn);
 	return -1;
+}
+
+int
+txn_commit_submit(struct txn *txn)
+{
+	return txn_commit_impl(txn, TXN_COMMIT_WAIT_MODE_SUBMIT);
+}
+
+int
+txn_commit(struct txn *txn)
+{
+	return txn_commit_impl(txn, TXN_COMMIT_WAIT_MODE_COMPLETE);
 }
 
 void
@@ -1333,7 +1335,7 @@ box_txn_begin(void)
 }
 
 int
-box_txn_commit(void)
+box_txn_commit_ex(enum txn_commit_wait_mode wait_mode)
 {
 	struct txn *txn = in_txn();
 	/**
@@ -1350,7 +1352,13 @@ box_txn_commit(void)
 	}
 	if (txn_check_can_complete(txn) != 0)
 		return -1;
-	return txn_commit(txn);
+	return txn_commit_impl(txn, wait_mode);
+}
+
+int
+box_txn_commit(void)
+{
+	return box_txn_commit_ex(TXN_COMMIT_WAIT_MODE_COMPLETE);
 }
 
 int

@@ -662,8 +662,7 @@ static void
 recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
-	journal_create(&journal.base, recovery_journal_write,
-		       recovery_journal_write);
+	journal_create(&journal.base, recovery_journal_write);
 	journal.vclock = v;
 	journal_set(&journal.base);
 }
@@ -857,11 +856,11 @@ wal_stream_apply_dml_row(struct wal_stream *stream, struct xrow_header *row)
 	 * the only fiber processing recovery will get stuck on the first
 	 * synchronous tx it meets until confirm timeout is reached and the tx
 	 * is rolled back, yielding an error.
-	 * Moreover, txn_commit_try_async() doesn't hurt at all during local
+	 * Moreover, txn_commit_submit() doesn't hurt at all during local
 	 * recovery, since journal_write is faked at this stage and returns
 	 * immediately.
 	 */
-	if (txn_commit_try_async(txn) != 0) {
+	if (txn_commit_submit(txn) != 0) {
 		/* Commit fail automatically leads to rollback. */
 		assert(in_txn() == NULL);
 		say_error("couldn't commit a recovery transaction");
@@ -5607,7 +5606,7 @@ box_cfg_xc(void)
 	}
 
 	struct journal bootstrap_journal;
-	journal_create(&bootstrap_journal, NULL, bootstrap_journal_write);
+	journal_create(&bootstrap_journal, bootstrap_journal_write);
 	journal_set(&bootstrap_journal);
 	auto bootstrap_journal_guard = make_scoped_guard([] {
 		journal_set(NULL);
