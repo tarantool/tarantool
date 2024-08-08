@@ -887,6 +887,26 @@ txn_is_fully_local(const struct txn *txn)
 	       txn->n_applier_rows == 0;
 }
 
+static inline bool
+txn_is_nop(const struct txn *txn)
+{
+	return txn->n_new_rows + txn->n_applier_rows == 0;
+}
+
+/**
+ * Check whether a transaction consists only of operations on fully temporary
+ * spaces.
+ */
+bool
+txn_is_fully_temporary(struct txn *txn);
+
+/**
+ * Check whether a transaction consists only of remote operations coming from
+ * the applier.
+ */
+bool
+txn_is_fully_remote(struct txn *txn);
+
 /**
  * Mark @a stmt as temporary by removing the associated stmt->row
  * and update @a txn accordingly.
