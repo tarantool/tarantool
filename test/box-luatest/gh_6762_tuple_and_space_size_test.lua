@@ -70,16 +70,16 @@ g1.test_tuple_info_memtx = function(cg)
         t.assert_equals(s:insert{string.rep('c', 251), 0}:info(),
                         { data_size = 255,
                           header_size = 6,
-                          field_map_size = 6,
-                          waste_size = 245,
+                          field_map_size = 3,
+                          waste_size = 248,
                           arena = "memtx" }
         )
         -- Bulky form of a tuple.
         t.assert_equals(s:insert{string.rep('b', 252), 1}:info(),
                         { data_size = 256,
                           header_size = 10,
-                          field_map_size = 6,
-                          waste_size = 240,
+                          field_map_size = 3,
+                          waste_size = 243,
                           arena = "memtx" }
         )
         -- malloc'ed tuple.
@@ -105,7 +105,7 @@ g1.test_tuple_info_vinyl = function(cg)
         t.assert_equals(s:insert{'v', 0}:info(),
                         { data_size = 4,
                           header_size = 22,
-                          field_map_size = 6,
+                          field_map_size = 3,
                           waste_size = 0,
                           arena = "malloc" }
         )
@@ -169,8 +169,8 @@ g2.test_space_stat_memtx = function(cg)
 
         local old_stat = { tuple = {  memtx = { data_size = 511,
                                                 header_size = 16,
-                                                field_map_size = 12,
-                                                waste_size = 485 },
+                                                field_map_size = 6,
+                                                waste_size = 491 },
                                      malloc = { data_size = 2200014,
                                                 header_size = 20,
                                                 field_map_size = 12,
@@ -178,8 +178,8 @@ g2.test_space_stat_memtx = function(cg)
                          }
         local new_stat = { tuple = {  memtx = { data_size = 517,
                                                 header_size = 22,
-                                                field_map_size = 18,
-                                                waste_size = 531 },
+                                                field_map_size = 9,
+                                                waste_size = 540 },
                                      malloc = { data_size = 1100007,
                                                 header_size = 10,
                                                 field_map_size = 6,
