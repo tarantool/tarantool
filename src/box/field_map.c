@@ -49,6 +49,7 @@ field_map_builder_create(struct field_map_builder *builder,
 	uint32_t sz = sizeof(builder->slots[0]) * builder->slot_count;
 	memset((char *)builder->slots, 0, sz);
 	builder->slots = builder->slots + builder->slot_count;
+	builder->offsets_binary_or = 0;
 }
 
 struct field_map_builder_slot_extent *
@@ -89,14 +90,24 @@ field_map_build(struct field_map_builder *builder, char *field_map_ptr,
 	 * The buffer size is assumed to be sufficient to write
 	 * field_map_build_size(builder) bytes there.
 	 */
-	uint32_t size = field_map_base_size(builder);
-	if (size == 0)
-		return;
+	if (builder->slot_count == 0 && builder->extents_size == 0)
+		return; /* No field map. */
 	field_map_format_id_t fmf_id = format->id;
 	field_map_ptr -= sizeof(fmf_id);
 	memcpy(field_map_ptr, &fmf_id, sizeof(fmf_id));
 	if (ref_format)
 		tuple_format_ref(format);
+
+	if (field_map_is_compact(builder)) {
+		uint8_t *field_map = (uint8_t *)field_map_ptr;
+		for (int32_t i = -1; i >= -(int32_t)builder->slot_count; i--) {
+			assert(!builder->slots[i].has_extent);
+			store_u8(&field_map[i], builder->slots[i].offset);
+		}
+		return;
+	}
+	uint32_t size = field_map_base_size32(builder);
+
 	uint32_t *field_map = (uint32_t *)field_map_ptr;
 	char *extent_wptr = field_map_ptr - size;
 	for (int32_t i = -1; i >= -(int32_t)builder->slot_count; i--) {
