@@ -32,6 +32,13 @@ rt_lua_call_access_destroy(void)
 }
 
 void
+rt_lua_call_access_reset(void)
+{
+	mh_access_clear(user_rt_access_cache);
+	mh_strnptr_clear(user_rt_universe_access_cache);
+}
+
+void
 grant_rt_access(const char *uname, uint32_t uname_len,
 		const char *fname, uint32_t fname_len)
 {

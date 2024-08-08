@@ -32,6 +32,12 @@ void
 rt_lua_call_access_destroy(void);
 
 /**
+ * Clear the user access cache.
+ */
+void
+rt_lua_call_access_reset(void);
+
+/**
  * Grant a access to lua_call function for a user.
  * @param uname Name of the user.
  * @param uname_len Length of the user name.

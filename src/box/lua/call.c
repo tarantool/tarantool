@@ -1270,6 +1270,15 @@ lbox_func_new_or_delete(struct trigger *trigger, void *event)
 }
 
 static int
+lbox_rt_lua_call_access_reset(struct lua_State *L)
+{
+	if (lua_gettop(L) != 0)
+		return luaL_error(L, "internal.clear_lua_call bad arguments.");
+	rt_lua_call_access_reset();
+	return 0;
+}
+
+static int
 lbox_grant_rt_access(struct lua_State *L)
 {
 	if (lua_gettop(L) != 2)
@@ -1342,6 +1351,7 @@ static const struct luaL_Reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},
 	{"module_reload", lbox_module_reload},
 	{"func_call", lbox_func_call},
+	{"reset_lua_call", lbox_rt_lua_call_access_reset},
 	{"grant_lua_call", lbox_grant_rt_access},
 	{"revoke_lua_call", lbox_revoke_rt_access},
 	{NULL, NULL}
