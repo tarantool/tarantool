@@ -197,6 +197,14 @@ extern int replication_synchro_quorum;
 extern double replication_synchro_timeout;
 
 /**
+ * Part of internal.tweaks.replication_synchro_timeout_enabled.
+ * Indicates whether the replication_synchro_timeout option
+ * (deprecated since https://github.com/tarantool/tarantool/issues/7486)
+ * is enabled or not.
+ */
+extern bool replication_synchro_timeout_enabled;
+
+/**
  * Max time to wait for appliers to synchronize before entering
  * the orphan mode.
  */
@@ -239,6 +247,10 @@ replication_reconnect_interval(void)
  */
 double
 replication_disconnect_timeout(void);
+
+/** Timeout to wait for confirmation of a synchronous transaction. */
+double
+replication_wait_confirm_timeout(void);
 
 void
 replication_init(int num_threads);

@@ -1469,9 +1469,15 @@ static double
 box_check_replication_synchro_timeout(void)
 {
 	double timeout = cfg_getd("replication_synchro_timeout");
-	if (timeout <= 0) {
+	if (timeout == 0) {
+		return TIMEOUT_INFINITY;
+	} else if (!replication_synchro_timeout_enabled) {
+		diag_set(ClientError, ER_DEPRECATED,
+			 "Option 'replication_synchro_timeout'");
+		return -1;
+	} else if (timeout < 0) {
 		diag_set(ClientError, ER_CFG, "replication_synchro_timeout",
-			 "the value must be greater than zero");
+			 "the value must be greater than or equal to 0");
 		return -1;
 	}
 	return timeout;
@@ -1641,6 +1647,22 @@ box_check_wal_queue_max_size(void)
 	if (size < 0) {
 		diag_set(ClientError, ER_CFG, "wal_queue_max_size",
 			 "wal_queue_max_size must be >= 0");
+	}
+	/* Unlimited. */
+	if (size == 0)
+		size = INT64_MAX;
+	return size;
+}
+
+/** Check replication_synchro_queue_max_size option validity. */
+static int64_t
+box_check_replication_synchro_queue_max_size(void)
+{
+	int64_t size = cfg_geti64("replication_synchro_queue_max_size");
+	if (size < 0) {
+		diag_set(ClientError, ER_CFG,
+			 "replication_synchro_queue_max_size",
+			 "replication_synchro_queue_max_size must be >= 0");
 	}
 	/* Unlimited. */
 	if (size == 0)
@@ -1971,6 +1993,8 @@ box_check_config(void)
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 	if (box_check_wal_queue_max_size() < 0)
+		diag_raise();
+	if (box_check_replication_synchro_queue_max_size() < 0)
 		diag_raise();
 	if (box_check_wal_cleanup_delay() < 0)
 		diag_raise();
@@ -3057,12 +3081,14 @@ box_promote(void)
 	if (is_leader)
 		return 0;
 	switch (box_election_mode) {
-	case ELECTION_MODE_OFF:
-		if (box_try_wait_confirm(2 * replication_synchro_timeout) != 0)
+	case ELECTION_MODE_OFF: {
+		double timeout = 2 * replication_wait_confirm_timeout();
+		if (box_try_wait_confirm(timeout) != 0)
 			return -1;
 		if (box_trigger_elections() != 0)
 			return -1;
 		break;
+	}
 	case ELECTION_MODE_VOTER:
 		assert(raft->state == RAFT_STATE_FOLLOWER);
 		diag_set(ClientError, ER_UNSUPPORTED, "election_mode='voter'",
@@ -3078,7 +3104,8 @@ box_promote(void)
 		unreachable();
 	}
 
-	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
+	double timeout = replication_wait_confirm_timeout();
+	int64_t wait_lsn = box_wait_limbo_acked(timeout);
 	if (wait_lsn < 0)
 		return -1;
 
@@ -3130,9 +3157,11 @@ box_demote(void)
 		return 0;
 	if (box_trigger_elections() != 0)
 		return -1;
-	if (box_try_wait_confirm(2 * replication_synchro_timeout) < 0)
+	double timeout = 2 * replication_wait_confirm_timeout();
+	if (box_try_wait_confirm(timeout) < 0)
 		return -1;
-	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
+	timeout = replication_wait_confirm_timeout();
+	int64_t wait_lsn = box_wait_limbo_acked(timeout);
 	if (wait_lsn < 0)
 		return -1;
 	return box_issue_demote(wait_lsn);
@@ -3238,6 +3267,16 @@ box_set_wal_queue_max_size(void)
 	if (size < 0)
 		return -1;
 	wal_set_queue_max_size(size);
+	return 0;
+}
+
+int
+box_set_replication_synchro_queue_max_size(void)
+{
+	int64_t size = box_check_replication_synchro_queue_max_size();
+	if (size < 0)
+		return -1;
+	txn_limbo_set_max_size(size, &txn_limbo);
 	return 0;
 }
 
@@ -5579,6 +5618,8 @@ box_cfg_xc(void)
 	if (box_check_instance_name(cfg_instance_name) != 0)
 		diag_raise();
 	if (box_set_wal_queue_max_size() != 0)
+		diag_raise();
+	if (box_set_replication_synchro_queue_max_size() != 0)
 		diag_raise();
 	cfg_replication_anon = box_check_replication_anon();
 	box_broadcast_ballot();

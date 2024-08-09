@@ -298,16 +298,7 @@ box.cfg.replication_synchro_timeout -- DOUBLE_MAX
 box.cfg{replication_synchro_timeout=-1} -- error
  | ---
  | - error: 'Incorrect value for option ''replication_synchro_timeout'': the value must
- |     be greater than zero'
- | ...
-box.cfg.replication_synchro_timeout -- old value
- | ---
- | - 9007199254740992
- | ...
-box.cfg{replication_synchro_timeout=0} -- error
- | ---
- | - error: 'Incorrect value for option ''replication_synchro_timeout'': the value must
- |     be greater than zero'
+ |     be greater than or equal to 0'
  | ...
 box.cfg.replication_synchro_timeout -- old value
  | ---

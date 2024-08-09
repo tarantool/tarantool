@@ -8,6 +8,7 @@ local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
 local compat = require('compat')
+local tweaks = require('internal.tweaks')
 
 local function nop() end
 
@@ -185,6 +186,7 @@ local default_cfg = {
     replication_sync_lag = 10,
     replication_sync_timeout = 0,
     replication_synchro_quorum = "N / 2 + 1",
+    replication_synchro_queue_max_size = 0,
     replication_synchro_timeout = 5,
     replication_connect_timeout = 30,
     replication_connect_quorum = nil, -- connect all
@@ -247,6 +249,26 @@ returns. Set before first box.cfg{} call in order for the option to take effect.
 https://tarantool.io/compat/box_cfg_replication_sync_timeout
 ]]
 
+local replication_synchro_timeout_brief = [[
+Sets the default value for box.cfg.replication_synchro_timeout.
+Old is 5 seconds, new is infinity.
+
+https://tarantool.io/compat/box_cfg_replication_synchro_timeout
+]]
+
+local function replication_synchro_timeout_applicable(is_new)
+    if is_new and box_is_configured and
+        box.cfg.replication_synchro_timeout ~= 0 then
+        local err_msg_fmt =
+            "The compat option box_cfg_replication_synchro_timeout switches" ..
+            " to new only if box.cfg.replication_synchro_timeout is 0," ..
+            " but it is %s now"
+        error(err_msg_fmt:format(box.cfg.replication_synchro_timeout))
+        return false
+    end
+    return true
+end
+
 -- A list of box.cfg options whose defaults are managed by compat.
 local compat_options = {
     {
@@ -256,6 +278,19 @@ local compat_options = {
         newval = 0,
         obsolete = nil,
         default = 'new',
+    },
+    {
+        name = 'replication_synchro_timeout',
+        brief = replication_synchro_timeout_brief,
+        oldval = 5,
+        newval = 0,
+        obsolete = nil,
+        dynamic = true,
+        default = 'old',
+        tweak_name = 'replication_synchro_timeout_enabled',
+        new_tweak_value = false,
+        old_tweak_value = true,
+        applicable = replication_synchro_timeout_applicable,
     },
 }
 
@@ -267,13 +302,22 @@ for _, option in ipairs(compat_options) do
         obsolete = option.obsolete,
         brief = option.brief,
         action = function(is_new)
-            if is_locked() or box_is_configured then
+            if not option.dynamic and (is_locked() or box_is_configured) then
                 error("The compat  option '" .. option_name .. "' takes " ..
                       "effect only before the initial box.cfg() call")
             end
-            local val = is_new and option.newval or option.oldval
-            default_cfg[option.name] = val
-            pre_load_cfg[option.name] = val
+            if option.applicable == nil or option.applicable(is_new) then
+                local val = is_new and option.newval or option.oldval
+                default_cfg[option.name] = val
+                pre_load_cfg[option.name] = val
+                if option.tweak_name ~= nil then
+                    if is_new then
+                        tweaks[option.tweak_name] = option.new_tweak_value
+                    else
+                        tweaks[option.tweak_name] = option.old_tweak_value
+                    end
+                end
+            end
         end,
         run_action_now = true,
     })
@@ -373,6 +417,7 @@ local template_cfg = {
     checkpoint_interval = 'number',
     checkpoint_wal_threshold = 'number',
     wal_queue_max_size  = 'number',
+    replication_synchro_queue_max_size = 'number',
     checkpoint_count    = 'number',
     read_only           = 'boolean',
     hot_standby         = 'boolean',
@@ -501,6 +546,8 @@ local dynamic_cfg = {
     checkpoint_interval     = private.cfg_set_checkpoint_interval,
     checkpoint_wal_threshold = private.cfg_set_checkpoint_wal_threshold,
     wal_queue_max_size      = private.cfg_set_wal_queue_max_size,
+    replication_synchro_queue_max_size =
+        private.cfg_set_replication_synchro_queue_max_size,
     worker_pool_threads     = private.cfg_set_worker_pool_threads,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = nop,
@@ -638,6 +685,7 @@ local dynamic_cfg_order = {
     replication_synchro_timeout = 150,
     replication_connect_timeout = 150,
     replication_connect_quorum  = 150,
+    replication_synchro_queue_max_size = 150,
     -- Apply bootstrap_strategy before replication, but after
     -- replication_connect_quorum. The latter might influence its value.
     bootstrap_strategy      = 175,
@@ -683,6 +731,7 @@ local dynamic_cfg_skip_at_load = {
     replication_sync_timeout = true,
     replication_synchro_quorum = true,
     replication_synchro_timeout = true,
+    replication_synchro_queue_max_size = true,
     replication_skip_conflict = true,
     replication_anon        = true,
     bootstrap_strategy      = true,

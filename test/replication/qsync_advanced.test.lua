@@ -112,8 +112,6 @@ box.cfg{replication_synchro_timeout=DOUBLE_MAX+1}
 box.cfg.replication_synchro_timeout -- DOUBLE_MAX
 box.cfg{replication_synchro_timeout=-1} -- error
 box.cfg.replication_synchro_timeout -- old value
-box.cfg{replication_synchro_timeout=0} -- error
-box.cfg.replication_synchro_timeout -- old value
 
 -- TX is in synchronous replication.
 -- Testcase setup.
