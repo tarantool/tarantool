@@ -260,7 +260,7 @@ struct tuple_format {
 	bool is_compressed;
 	/**
 	 * Size of minimal field map of tuple where each indexed
-	 * field has own offset slot (in bytes). The real tuple
+	 * field has own offset slot (count). The real tuple
 	 * field_map may be bigger in case of multikey indexes.
 	 * \sa struct field_map_builder
 	 */

@@ -593,8 +593,8 @@ tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 
 	assert(tuple_format_field(format, 0)->offset_slot == TUPLE_OFFSET_SLOT_NIL
 	       || json_token_is_multikey(&tuple_format_field(format, 0)->token));
-	size_t field_map_size = -current_slot * sizeof(uint32_t);
-	if (field_map_size > INT16_MAX) {
+	size_t field_map_size = -current_slot;
+	if (field_map_size  * sizeof(uint32_t) > INT16_MAX) {
 		/** tuple->data_offset is 15 bits */
 		diag_set(ClientError, ER_INDEX_FIELD_COUNT_LIMIT,
 			 -current_slot);
