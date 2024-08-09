@@ -208,8 +208,6 @@ vy_stmt_is_exact_key(struct tuple *stmt, struct key_def *cmp_def,
 static struct tuple *
 vy_stmt_alloc(struct tuple_format *format, uint32_t data_offset, uint32_t bsize)
 {
-	assert(data_offset >= sizeof(struct vy_stmt) + format->field_map_size);
-
 	if (tuple_check_data_offset(data_offset) != 0)
 		return NULL;
 

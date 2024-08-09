@@ -39,7 +39,7 @@ field_map_builder_create(struct field_map_builder *builder,
 			 struct region *region)
 {
 	builder->extents_size = 0;
-	builder->slot_count = minimal_field_map_size / sizeof(uint32_t);
+	builder->slot_count = minimal_field_map_size;
 	if (minimal_field_map_size == 0) {
 		builder->slots = NULL;
 		return;
