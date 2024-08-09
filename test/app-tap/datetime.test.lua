@@ -8,7 +8,7 @@ local json = require('json')
 local msgpack = require('msgpack')
 local TZ = date.TZ
 
-test:plan(41)
+test:plan(42)
 
 local INT_MAX = 2147483647
 
@@ -151,7 +151,7 @@ test:test("Datetime API checks", function(test)
     local table_expected = {
         sec =  0, min = 0, wday = 5, day = 1, nsec = 0,
         isdst = false, yday = 1, tzoffset = 0, month = 1,
-        year = 1970, hour = 0
+        year = 1970, hour = 0, tz = ''
     }
     test:is_deeply(local_totable(ts), table_expected, "correct :totable")
     local date_expected = date.new()
@@ -1832,7 +1832,8 @@ test:test("totable{}", function(test)
     test:plan(78)
     local exp = {sec = 0, min = 0, wday = 5, day = 1,
                  nsec = 0, isdst = false, yday = 1,
-                 tzoffset = 0, month = 1, year = 1970, hour = 0}
+                 tzoffset = 0, month = 1, year = 1970, hour = 0,
+                 tz = ''}
     local ts = date.new()
     local totable = ts:totable()
     test:is_deeply(totable, exp, 'date:totable()')
@@ -1864,6 +1865,51 @@ test:test("totable{}", function(test)
     for _, key in pairs({'wday', 'day', 'yday', 'month', 'year'}) do
         test:is(ts[key], osdate[key],
                 ('[%s]: %s == %s'):format(key, ts[key], osdate[key]))
+    end
+end)
+
+test:test('totable{} with timezone', function(test)
+    test:plan(6)
+
+    local DEFAULT_TZOFFSET = 0
+    local DEFAULT_TZ = ''
+
+    local MOSCOW_TZOFFSET = 180
+    local MOSCOW_TZ = 'Europe/Moscow'
+
+    local test_cases = {
+        -- Empty timezone values except tz.
+        {
+            dt = {tz = MOSCOW_TZ},
+            expected = {
+                tzoffset = MOSCOW_TZOFFSET,
+                tz = MOSCOW_TZ,
+            }
+        },
+        -- Empty timezone values except tzoffset.
+        {
+            dt = {tzoffset = MOSCOW_TZOFFSET},
+            expected = {
+                tzoffset = MOSCOW_TZOFFSET,
+                tz = '',
+            }
+        },
+        -- Empty timezone values.
+        {
+            dt = {},
+            expected = {
+                tz = DEFAULT_TZ,
+                tzoffset = DEFAULT_TZOFFSET,
+            },
+        },
+    }
+
+    for _, tc in pairs(test_cases) do
+        local dt_table = date.new(tc.dt):totable()
+        test:is(dt_table.tzoffset, tc.expected.tzoffset,
+                ('[tzoffset]: %s == %s'):format(dt_table.tzoffset, tc.expected.tzoffset))
+        test:is(dt_table.tz, tc.expected.tz,
+                ('[tz]: %s == %s'):format(dt_table.tz, tc.expected.tz))
     end
 end)
 
