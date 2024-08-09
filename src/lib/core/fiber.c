@@ -1480,6 +1480,17 @@ fiber_stack_create(struct fiber *fiber, const struct fiber_attr *fiber_attr,
 			 "runtime arena", "fiber stack");
 		return -1;
 	}
+
+	/*
+	 * Nowadays, most popular 64-bit platforms (x86_64, aarch64) require
+	 * that the stack be aligned on a 16-byte boundary (for SSE2 etc).
+	 * For simplicity and testability, we force this for all platforms.
+	 */
+	size_t data = (size_t)slab_data(fiber->stack_slab),
+	       capacity = slab_capacity(fiber->stack_slab);
+	void *stack_data_start = (void *)small_align(data, 16),
+	     *stack_data_end = (void *)small_align_down(data + capacity, 16);
+
 	void *guard;
 	/* Adjust begin and size for stack memory chunk. */
 	if (stack_direction < 0) {
@@ -1489,19 +1500,17 @@ fiber_stack_create(struct fiber *fiber, const struct fiber_attr *fiber_attr,
 		 * after protected page until end of memory chunk can be
 		 * used for coro stack usage.
 		 */
-		guard = page_align_up(slab_data(fiber->stack_slab));
+		guard = page_align_up(stack_data_start);
 		fiber->stack = guard + page_size;
-		fiber->stack_size = slab_data(fiber->stack_slab) + stack_size -
-				    fiber->stack;
+		fiber->stack_size = stack_data_end - fiber->stack;
 	} else {
 		/*
 		 * A stack grows up. Last page should be protected and
 		 * memory from begin of chunk until protected page can
 		 * be used for coro stack usage
 		 */
-		guard = page_align_down(fiber->stack_slab + stack_size) -
-			page_size;
-		fiber->stack = fiber->stack_slab + slab_sizeof();
+		guard = page_align_down(stack_data_end) - page_size;
+		fiber->stack = stack_data_start;
 		fiber->stack_size = guard - fiber->stack;
 	}
 
