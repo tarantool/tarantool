@@ -21,6 +21,10 @@ target_compile_options(
         ${CXXFLAGS}
         >
 )
+
+# `-stdlib=libstdc++` is required by ICU on OSS Fuzz.
+# `-lc++` is used by Centipede, so `-lc++` needs to come after
+# centipede's lib.
 target_link_libraries(
     fuzzer_config
     INTERFACE
@@ -30,9 +34,12 @@ target_link_libraries(
         -fprofile-instr-generate
         -fcoverage-mapping
         -g
+        -stdlib=libstdc++
         >
         $<$<BOOL:${OSS_FUZZ}>:
         $ENV{LIB_FUZZING_ENGINE}
+        -lc++
+        -stdlib=libstdc++
         >
 )
 
