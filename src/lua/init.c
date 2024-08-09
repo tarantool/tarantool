@@ -634,6 +634,10 @@ luaopen_tarantool(lua_State *L)
 	lua_pushstring(L, "build");
 	lua_newtable(L);
 
+	/* tzdata version */
+	lua_pushstring(L, tzdata_version());
+	lua_setfield(L, -2, "tzdata_version");
+
 	/* build.target */
 	lua_pushstring(L, "target");
 	lua_pushstring(L, BUILD_INFO);
