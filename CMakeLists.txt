@@ -28,6 +28,9 @@ find_program(LD ld)
 find_program(CTAGS ctags)
 find_program(LUACHECK luacheck ENV PATH)
 
+include (CTest)
+enable_testing()
+
 # Define PACKAGE macro in tarantool/config.h
 set(PACKAGE "Tarantool" CACHE STRING "Package name.")
 
@@ -40,6 +43,62 @@ if(NOT CMAKE_BUILD_TYPE)
         "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
         FORCE)
 endif()
+
+# CTEST_FLAGS is used by CMake targets in test suites.
+# XXX: CMake 3.17 introduces CMAKE_CTEST_ARGUMENTS that contains
+# CTest options and is used by `test` target.
+set(CTEST_FLAGS
+  --output-on-failure
+  --schedule-random
+  # Timeout in seconds. Most LuaJIT tests are fast. However,
+  # some tests can hang or execute infinite loop.
+  # Moreover, tests for instrumented Tarantool require more time.
+  # 30 minutes is a sane timeout.
+  --timeout 1800
+  --parallel ${CMAKE_BUILD_PARALLEL_LEVEL}
+)
+if(CMAKE_VERBOSE_MAKEFILE)
+  list(APPEND CTEST_FLAGS --verbose)
+endif()
+
+# It is not possible to add dependencies to `add_test()`
+# in CMake, see [1]. CMake 3.7 introduces FIXTURES_REQUIRED [2]
+# and FIXTURES_SETUP [3], but these test properties cannot be
+# used - this feature is unsupported in the current CMake version.
+# To workaround this, the function `add_test_suite_target` is
+# introduced. It adds a CMake target that builds testsuite's
+# prerequisites and CMake test that executes that target.
+#
+# 1. https://gitlab.kitware.com/cmake/cmake/-/issues/8774
+# 2. https://cmake.org/cmake/help/latest/prop_test/FIXTURES_REQUIRED.html
+# 3. https://cmake.org/cmake/help/latest/prop_test/FIXTURES_SETUP.html
+function(_add_test_suite_target target)
+  set(prefix ARG)
+  set(noValues)
+  set(singleValues LABELS)
+  set(multiValues DEPENDS)
+
+  # FIXME: if we update to CMake >= 3.5, can remove this line.
+  include(CMakeParseArguments)
+  cmake_parse_arguments(${prefix}
+                        "${noValues}"
+                        "${singleValues}"
+                        "${multiValues}"
+                        ${ARGN})
+
+  set(_DEPS_TARGET ${target}-deps)
+
+  add_custom_target(${_DEPS_TARGET} DEPENDS ${ARG_DEPENDS})
+
+  add_test(NAME ${_DEPS_TARGET}
+    COMMAND ${CMAKE_COMMAND}
+            --build ${CMAKE_BINARY_DIR}
+            --target ${_DEPS_TARGET}
+  )
+  set_tests_properties(${_DEPS_TARGET} PROPERTIES
+    LABELS ${ARG_LABELS}
+  )
+endfunction()
 
 #
 # Check submodules
@@ -82,6 +141,7 @@ include(cmake/thread.cmake)
 include(cmake/hardening.cmake)
 include(cmake/prefix.cmake)
 include(cmake/SetFiberStackSize.cmake)
+include(cmake/SetBuildParallelLevel.cmake)
 
 add_compile_flags("C;CXX" ${HARDENING_FLAGS})
 set(DEPENDENCY_CFLAGS "${DEPENDENCY_CFLAGS} ${HARDENING_FLAGS}")

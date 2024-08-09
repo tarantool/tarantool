@@ -1,5 +1,8 @@
 enable_tnt_compile_flags()
 
+set(CTEST_OUTPUT_ON_FAILURE TRUE)
+set(CTEST_PARALLEL_LEVEL 4)
+
 include_directories(${LUAJIT_INCLUDE_DIRS})
 include_directories(${MSGPUCK_INCLUDE_DIRS})
 
@@ -22,18 +25,6 @@ add_compile_flags("C;CXX"
 # unresolved symbols at build time.
 string(REPLACE "-Wl,--no-undefined" ""
     CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-
-if(POLICY CMP0037)
-    if(CMAKE_VERSION VERSION_LESS 3.11)
-        # cmake below 3.11 reserves name test. Use old policy.
-        # https://cmake.org/cmake/help/v3.11/release/3.11.html#other-changes
-        cmake_policy(SET CMP0037 OLD)
-    else()
-        # Starting from cmake 3.11 name test reserved in special
-        # cases and can be used as target name.
-        cmake_policy(SET CMP0037 NEW)
-    endif()
-endif(POLICY CMP0037)
 
 set(UNIT_TEST_TARGETS "")
 
@@ -60,14 +51,22 @@ endforeach()
 # builds ${CMAKE_CURRENT_BINARY_DIR} == ${PROJECT_SOURCE_DIR}/test and the
 # symlink already exists. It creates the symlink if the destination doesn't
 # exist.
+# TO BE REMOVED
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/small
     COMMAND ${CMAKE_COMMAND} -E create_symlink
         ${CMAKE_CURRENT_BINARY_DIR}/../src/lib/small/test/
         ${CMAKE_CURRENT_BINARY_DIR}/small
         COMMENT Create the symlink for libsmall test binaries)
 
+# TO BE REMOVED
 add_custom_target(symlink_libsmall_test_binaries ALL
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small)
+
+add_custom_target(build-unit-tests
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
+            ${UNIT_TEST_TARGETS}
+    COMMENT "Building unit tests"
+)
 
 add_custom_target(test-unit
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
@@ -99,8 +98,10 @@ add_custom_target(test-func-force
         --exclude unit/
         --force)
 
-add_custom_target(test
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
+add_custom_target(test-all
+    DEPENDS test
+            test-unit
+            test-func
             LuaJIT-test
             ${UNIT_TEST_TARGETS}
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
@@ -113,3 +114,18 @@ add_custom_target(test-force
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
         --builddir=${PROJECT_BINARY_DIR}
         --force)
+
+message(STATUS "Add integration tests")
+file(GLOB_RECURSE tests ${CMAKE_CURRENT_SOURCE_DIR} *.test.lua *.test.py)
+foreach(path ${tests})
+  get_filename_component(test_name ${path} NAME)
+  get_filename_component(basedir ${path} DIRECTORY)
+  get_filename_component(suite ${basedir} NAME)
+  add_test(NAME "test/${suite}/${test_name}"
+           COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+                   --builddir=${PROJECT_BINARY_DIR}
+                   --force
+                   ${path}
+  )
+  set_property(TEST "test/${suite}/${test_name}" PROPERTY LABELS integration)
+endforeach()

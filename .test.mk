@@ -53,7 +53,7 @@ install-test-deps:
 
 .PHONY: run-test
 run-test: install-test-deps
-	cd test && ${TEST_RUN_ENV} ./test-run.py --force --vardir ${VARDIR} ${TEST_RUN_PARAMS} ${TEST_RUN_EXTRA_PARAMS}
+	${TEST_RUN_ENV} cmake --build ${BUILD_DIR} --parallel --target test
 
 .PHONY: run-perf-test
 run-perf-test:
@@ -71,7 +71,7 @@ test-release: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
                              -DENABLE_WERROR=ON \
                              -DTEST_BUILD=ON
 
-test-release: build run-luajit-test run-test
+test-release: build run-test
 
 .PHONY: test-perf
 test-perf: CMAKE_ENV = BENCH_CMD="${BENCH_CMD}"
@@ -130,7 +130,7 @@ test-release-asan: CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
                                   -DFIBER_STACK_SIZE=640Kb
 test-release-asan: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
 test-release-asan: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
-test-release-asan: build run-luajit-test run-test
+test-release-asan: build run-test
 
 # Debug ASAN build
 
@@ -147,14 +147,14 @@ test-debug-asan: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
 test-debug-asan: TEST_RUN_PARAMS += --test-timeout 620 \
                                     --no-output-timeout 630 \
                                     --server-start-timeout 610
-test-debug-asan: build run-luajit-test run-test
+test-debug-asan: build run-test
 
 # Debug build
 
 .PHONY: test-debug
 test-debug: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug \
                            -DTEST_BUILD=ON
-test-debug: build run-luajit-test run-test
+test-debug: build run-test
 
 # Static build
 
@@ -163,7 +163,7 @@ test-static: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
                             -DENABLE_WERROR=ON \
                             -DBUILD_STATIC=ON \
                             -DTEST_BUILD=ON
-test-static: build run-luajit-test run-test
+test-static: build run-test
 
 # Static build (cmake)
 
@@ -173,7 +173,7 @@ test-static-cmake: BUILD_DIR = ${STATIC_DIR}
 test-static-cmake: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DTEST_BUILD=ON"
 test-static-cmake: LUAJIT_TEST_BUILD_DIR = ${STATIC_BIN_DIR}
 test-static-cmake: TEST_RUN_PARAMS = --builddir ${PWD}/${STATIC_BIN_DIR}
-test-static-cmake: build run-luajit-test run-test
+test-static-cmake: build run-test
 
 # Coverage build
 
@@ -184,7 +184,7 @@ test-coverage: CMAKE_PARAMS = -G Ninja \
                               -DTEST_BUILD=ON
 test-coverage: TEST_RUN_PARAMS += --long
 test-coverage: OUTPUT_FILE = coverage.info
-test-coverage: build run-luajit-test run-test
+test-coverage: build run-test
 	lcov --capture \
 	     --compat-libtool \
 	     --directory ${BUILD_DIR}/src/ \
@@ -216,14 +216,14 @@ pretest-osx:
 test-osx-release: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
                                  -DENABLE_WERROR=ON \
                                  -DTEST_BUILD=ON
-test-osx-release: prebuild-osx build run-luajit-test pretest-osx run-test
+test-osx-release: prebuild-osx build pretest-osx run-test
 
 # Debug build
 
 .PHONY: test-osx-debug
 test-osx-debug: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug \
                                -DTEST_BUILD=ON
-test-osx-debug: prebuild-osx build run-luajit-test pretest-osx run-test
+test-osx-debug: prebuild-osx build pretest-osx run-test
 
 # Static build
 
@@ -233,7 +233,7 @@ test-osx-static-cmake: BUILD_DIR = ${STATIC_DIR}
 test-osx-static-cmake: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DTEST_BUILD=ON"
 test-osx-static-cmake: LUAJIT_TEST_BUILD_DIR = ${STATIC_BIN_DIR}
 test-osx-static-cmake: TEST_RUN_PARAMS = --builddir ${PWD}/${STATIC_BIN_DIR}
-test-osx-static-cmake: prebuild-osx build run-luajit-test pretest-osx run-test
+test-osx-static-cmake: prebuild-osx build pretest-osx run-test
 
 ##############################
 # FreeBSD                    #
@@ -250,7 +250,7 @@ prebuild-freebsd:
 test-freebsd-release: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
                                      -DENABLE_WERROR=ON \
                                      -DTEST_BUILD=ON
-test-freebsd-release: prebuild-freebsd build run-luajit-test run-test
+test-freebsd-release: prebuild-freebsd build run-test
 
 ##############################
 # Jepsen testing             #
