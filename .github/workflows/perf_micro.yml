@@ -50,7 +50,7 @@ jobs:
 
     runs-on: ubuntu-20.04-self-hosted
 
-    timeout-minutes: 60
+    timeout-minutes: 180
 
     env:
         PERF_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
