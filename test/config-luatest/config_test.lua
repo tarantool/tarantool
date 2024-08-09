@@ -236,6 +236,54 @@ g.test_config_general = function()
     t.assert_equals(info.new[1].message, exp)
 end
 
+g.test_lua_memory = function()
+    local LUA_MEMORY = 1000000000
+    local dir = treegen.prepare_directory(g, {}, {})
+
+    local config = {
+        credentials = {
+            users = {
+                guest = {
+                    roles = {'super'},
+                },
+            },
+        },
+        lua = {
+            memory = LUA_MEMORY,
+        },
+        iproto = {
+            listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}},
+        },
+        groups = {
+            ['group-001'] = {
+                replicasets = {
+                    ['replicaset-001'] = {
+                        instances = {
+                            ['instance-001'] = {},
+                        },
+                    },
+                },
+            },
+        },
+    }
+    treegen.write_script(dir, 'config.yaml',
+        yaml.encode(config))
+    local script = [[
+        print(box.cfg.lua_memory)
+        os.exit(0)
+    ]]
+    treegen.write_script(dir, 'main.lua', script)
+
+    local env = {TT_LOG_LEVEL = 0}
+    local opts = {nojson = true, stderr = false}
+    local args = {'--name', 'instance-001', '--config', 'config.yaml',
+                  'main.lua'}
+    local res = justrun.tarantool(dir, env, args, opts)
+
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.stdout, table.concat({ LUA_MEMORY }, "\n"))
+end
+
 g.test_config_broadcast = function()
     local dir = treegen.prepare_directory(g, {}, {})
     local file_config = [[

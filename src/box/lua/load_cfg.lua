@@ -86,6 +86,7 @@ end
 -- all available options
 local default_cfg = {
     listen              = nil,
+    lua_memory          = 2 * 1024 * 1024 * 1024,
     memtx_memory        = 256 * 1024 *1024,
     strip_core          = true,
     memtx_min_tuple_size = 16,
@@ -287,6 +288,7 @@ end
 -- types here.
 local template_cfg = {
     listen              = 'string, number, table',
+    lua_memory          = 'number',
     memtx_memory        = 'number',
     strip_core          = 'boolean',
     memtx_min_tuple_size  = 'number',
@@ -487,6 +489,7 @@ local dynamic_cfg = {
     replication             = private.cfg_set_replication,
     io_collect_interval     = private.cfg_set_io_collect_interval,
     readahead               = private.cfg_set_readahead,
+    lua_memory              = private.cfg_set_lua_memory,
     too_long_threshold      = private.cfg_set_too_long_threshold,
     snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
     read_only               = private.cfg_set_read_only,

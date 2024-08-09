@@ -75,6 +75,8 @@ cfg_filter(box.cfg)
     - plain
   - - log_level
     - 5
+  - - lua_memory
+    - 2147483648
   - - memtx_allocator
     - <hidden>
   - - memtx_dir
