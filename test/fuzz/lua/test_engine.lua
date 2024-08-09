@@ -104,7 +104,6 @@ local err_pat_whitelist = {
     "Vinyl does not support rebuilding the primary index of a non%-empty space",
     "fiber is cancelled",
     "fiber slice is exceeded",
-    "A multi%-statement transaction can not use multiple storage engines",
     "Can not perform index build in a multi%-statement transaction",
     "Index '[%w_]+' %(HASH%) of space '[%w_]+' %(memtx%) does not support pagination",
     "Can't create or modify index '[%w_]+' in space '[%w_]+': primary key must be unique",
@@ -115,6 +114,8 @@ local err_pat_whitelist = {
     -- Blocked by tarantool#10262.
     "attempt to index local 'tuple' %(a nil value%)",
     "Failed to allocate %d+ bytes in [%w_]+ for [%w_]+",
+    "Storage engine 'memtx' does not support cross%-engine transactions",
+    "Storage engine 'vinyl' does not support cross%-engine transactions",
 }
 
 local function keys(t)

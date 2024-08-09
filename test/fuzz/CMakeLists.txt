@@ -21,6 +21,10 @@ target_compile_options(
         ${CXXFLAGS}
         >
 )
+
+# `-stdlib=libstdc++` is required by ICU on OSS Fuzz.
+# `-lc++` is used by Centipede, so `-lc++` needs to come after
+# centipede's lib.
 target_link_libraries(
     fuzzer_config
     INTERFACE
@@ -30,9 +34,12 @@ target_link_libraries(
         -fprofile-instr-generate
         -fcoverage-mapping
         -g
+        -stdlib=libstdc++
         >
         $<$<BOOL:${OSS_FUZZ}>:
         $ENV{LIB_FUZZING_ENGINE}
+        -lc++
+        -stdlib=libstdc++
         >
 )
 
@@ -92,6 +99,10 @@ create_fuzz_test(PREFIX mp_datetime
                  SOURCES mp_datetime_fuzzer.c
                  LIBRARIES core fuzzer_config
 )
+
+create_fuzz_test(PREFIX vclock_from_string
+                 SOURCES vclock_from_string_fuzzer.c
+                 LIBRARIES vclock fuzzer_config)
 
 # Building xrow library triggers building LuaJIT that doesn't support UBSan.
 # See https://github.com/tarantool/tarantool/issues/8473.
