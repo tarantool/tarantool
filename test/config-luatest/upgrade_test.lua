@@ -70,15 +70,21 @@ end)
 
 g.test_upgrade = function()
     g.server:exec(function()
-        t.assert_equals(box.space._schema:get("version"), {'version', 2, 11, 0})
         local messages = {}
         for _, alert in pairs(require("config"):info().alerts) do
             table.insert(messages, alert.message)
         end
-        local exp = 'box.schema.user.grant("guest", "read", "space", ' ..
-            '"_space") has failed because either the object has not been ' ..
-            'created yet, a database schema upgrade has not been performed, ' ..
-            'or the privilege write has failed (separate alert reported)'
+        local exp = 'credentials: the schema has an old version and user/'..
+                    'roles can not be loaded. Consider executing '..
+                    'box.schema.upgrade() to perform an upgrade.'
         t.assert_items_include(messages, {exp})
+
+        t.assert_equals(box.space._schema:get("version"), {'version', 2, 11, 0})
+
+        box.schema.upgrade()
+        -- After upgrade privileges should be granted automatically
+
+        local exp2 = { 'read', 'space', '_space' }
+        t.assert_items_include(box.schema.user.info('guest'), {exp2})
     end)
 end

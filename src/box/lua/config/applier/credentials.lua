@@ -3,6 +3,7 @@ local log = require('internal.config.utils.log')
 local loaders = require('internal.loaders')
 local digest = require('digest')
 local fiber = require('fiber')
+local mkversion = require('internal.mkversion')
 
 -- Var is set with the first apply() call.
 local config
@@ -516,8 +517,7 @@ local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
     if err.code ~= box.error.NO_SUCH_SPACE and
             err.code ~= box.error.NO_SUCH_ROLE and
             err.code ~= box.error.NO_SUCH_FUNCTION and
-            err.code ~= box.error.NO_SUCH_SEQUENCE and
-            err.code ~= box.error.SCHEMA_NEEDS_UPGRADE then
+            err.code ~= box.error.NO_SUCH_SEQUENCE then
         err = ('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q) failed: %s')
               :format(role_or_user, grant_or_revoke, name, privs, obj_type,
                       obj_name, err)
@@ -651,6 +651,34 @@ local function sync_privileges(credentials, obj_to_sync)
     config._aboard:drop_if(function(_key, alert)
         return alert._trait == 'missed_privilege_obsolete'
     end)
+end
+
+local schema_is_upgraded = false
+local schema_is_upgraded_cond
+
+local function update_schema_upgraded_status(version)
+    local schema_version = version or mkversion.get()
+    schema_is_upgraded = schema_version == mkversion.get_latest()
+
+    if schema_is_upgraded then
+        schema_is_upgraded_cond:broadcast()
+    end
+end
+
+local function credentials_upgrade_on_replace(old, new)
+    if old == nil or new == nil then
+        return
+    end
+
+    local latest_version = mkversion.get_latest()
+    local new_version = mkversion.from_tuple(new)
+
+    if new_version == latest_version then
+        box.on_commit(function()
+            update_schema_upgraded_status(new_version)
+        end)
+        box.space._schema:on_replace(nil, credentials_upgrade_on_replace)
+    end
 end
 
 -- }}} Main sync logic
@@ -809,6 +837,48 @@ end
 -- of main fiber in case of 'BLOCKING_FULL_SYNC'.
 local wait_sync
 
+local function sync_object(obj_to_sync)
+    if obj_to_sync.type == 'BLOCKING_FULL_SYNC' or
+        obj_to_sync.type == 'BACKGROUND_FULL_SYNC' then
+
+        if box.info.ro then
+            log.verbose('credentials: the database is in the read-only ' ..
+                'mode. Waiting for the read-write mode to set up the ' ..
+                'credentials given in the configuration. If another ' ..
+                'instance in the replicaset will write these new ' ..
+                'credentials, this instance will receive them and will ' ..
+                'skip further actions.')
+
+            box.ctl.wait_rw()
+        end
+
+        -- On config reload, drop the old list of registered objects.
+        target_object_map = {
+            ['role'] = {},
+            ['space'] = {},
+            ['function'] = {},
+            ['sequence'] = {},
+        }
+
+        local credentials = get_credentials(config)
+
+        register_objects(credentials.roles)
+        register_objects(credentials.users)
+
+        box.atomic(function()
+            create_roles(credentials.roles)
+            create_users(credentials.users)
+
+            sync_privileges(credentials)
+        end)
+
+    else
+        local credentials = get_credentials(config)
+
+        box.atomic(sync_privileges, credentials, obj_to_sync)
+    end
+end
+
 -- The worker gets synchronization commands from sync_tasks.
 -- If the instance is in RO mode, the worker will wait for it
 -- to be switched to RW.
@@ -819,49 +889,29 @@ local wait_sync
 -- {type = obj_type, name = obj_name} - perform a per-object sync, skip
 --                                      return message
 local function sync_credentials_worker()
+    fiber.self():name('sync_credentials', { truncate = true })
+
+    if not schema_is_upgraded then
+        config._aboard:set({
+            type = 'warn',
+            message = 'credentials: the schema has an old version ' ..
+                      'and user/roles can not be loaded. Consider executing ' ..
+                      'box.schema.upgrade() to perform an upgrade.'
+        })
+
+        schema_is_upgraded_cond:wait()
+        assert(schema_is_upgraded)
+    end
+
     while true do
         local obj_to_sync = sync_tasks:get()
 
-        if obj_to_sync.type == 'BLOCKING_FULL_SYNC' or
-                obj_to_sync.type == 'BACKGROUND_FULL_SYNC' then
+        local _, err = pcall(sync_object, obj_to_sync)
 
-            if box.info.ro then
-                log.verbose('credentials: the database is in the read-only ' ..
-                    'mode. Waiting for the read-write mode to set up the ' ..
-                    'credentials given in the configuration. If another ' ..
-                    'instance in the replicaset will write these new ' ..
-                    'credentials, this instance will receive them and will ' ..
-                    'skip further actions.')
-                box.ctl.wait_rw()
-            end
-
-            -- On config reload, drop the old list of registered objects.
-            target_object_map = {
-                ['role'] = {},
-                ['space'] = {},
-                ['function'] = {},
-                ['sequence'] = {},
-            }
-
-            local credentials = get_credentials(config)
-
-            register_objects(credentials.roles)
-            register_objects(credentials.users)
-
-            box.atomic(function()
-                create_roles(credentials.roles)
-                create_users(credentials.users)
-
-                sync_privileges(credentials)
-            end)
-
-            if obj_to_sync.type == 'BLOCKING_FULL_SYNC' then
-                wait_sync:put('Done')
-            end
-        else
-            local credentials = get_credentials(config)
-
-            box.atomic(sync_privileges, credentials, obj_to_sync)
+        if obj_to_sync.type == 'BLOCKING_FULL_SYNC' then
+            wait_sync:put(err or 'Done')
+        elseif err then
+            log.error(err)
         end
     end
 end
@@ -895,13 +945,20 @@ local function apply(config_module)
         wait_sync = fiber.channel()
     end
 
+    if not schema_is_upgraded_cond then
+        schema_is_upgraded_cond = fiber.cond()
+    end
+    update_schema_upgraded_status()
+
     -- Set trigger on after space/function/sequence creation.
     if not triggers_are_set then
         triggers_are_set = true
+
         box.space._user:on_replace(on_replace_trigger)
         box.space._space:on_replace(on_replace_trigger)
         box.space._func:on_replace(on_replace_trigger)
         box.space._sequence:on_replace(on_replace_trigger)
+        box.space._schema:on_replace(credentials_upgrade_on_replace)
     end
 
     -- Fiber is required here to have the credentials synced in the background
@@ -916,11 +973,14 @@ local function apply(config_module)
     -- If Tarantool is already in Read Write mode, credentials are still
     -- applied in the fiber to avoid possible concurrency issues, but the
     -- main applier fiber is blocked by `wait_sync`.
-    if not box.info.ro then
+    if not box.info.ro and schema_is_upgraded then
         -- Schedule a full sync with a result message on return.
         sync_tasks:put({type = 'BLOCKING_FULL_SYNC'})
 
-        wait_sync:get()
+        local sync_result = wait_sync:get()
+        if sync_result ~= 'Done' then
+            error(sync_result)
+        end
     else
         -- Schedule a full sync in the background. It will be executed
         -- when the instance switches to RW.
