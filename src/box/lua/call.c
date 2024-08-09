@@ -52,6 +52,7 @@
 #include "box/session.h"
 #include "box/iproto_features.h"
 #include "core/mp_ctx.h"
+#include "box/rt_lua_call_access.h"
 
 /**
  * Handlers identifiers to obtain lua_Cfunction reference from
@@ -1268,6 +1269,65 @@ lbox_func_new_or_delete(struct trigger *trigger, void *event)
 	return 0;
 }
 
+static int
+lbox_rt_lua_call_access_reset(struct lua_State *L)
+{
+	if (lua_gettop(L) != 0)
+		return luaL_error(L, "internal.clear_lua_call bad arguments.");
+	rt_lua_call_access_reset();
+	return 0;
+}
+
+static int
+lbox_grant_rt_access(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2)
+		return luaL_error(L, "internal.grant_lua_call bad arguments. "
+				  "Expected exactly two: user name and "
+				  "function name.");
+
+	struct credentials *grantor = effective_user();
+	struct user *grantor_user = user_find(grantor->uid);
+	if (grantor->uid != ADMIN && is_super(grantor_user) == 0)
+		return luaL_error(L, "internal.grant_lua_call only ADMIN or "
+				  "user with role SUPER can grant access.");
+
+	size_t grantee_name_len;
+	const char *grantee_name = luaL_checklstring(L, 1, &grantee_name_len);
+
+	size_t func_name_len;
+	const char *func_name = luaL_checklstring(L, 2, &func_name_len);
+
+	grant_rt_access(grantee_name,  (uint32_t)grantee_name_len,
+			func_name, (uint32_t)func_name_len);
+	return 0;
+}
+
+static int
+lbox_revoke_rt_access(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2)
+		return luaL_error(L, "internal.revoke_lua_call bad arguments. "
+				  "Expected exactly two: user name and "
+				  "function name.");
+
+	struct credentials *grantor = effective_user();
+	struct user *grantor_user = user_find(grantor->uid);
+	if (grantor->uid != ADMIN && is_super(grantor_user) == 0)
+		return luaL_error(L, "internal.revoke_lua_call only ADMIN or "
+				  "user with role SUPER can revoke access.");
+
+	size_t grantee_name_len;
+	const char *grantee_name = luaL_checklstring(L, 1, &grantee_name_len);
+
+	size_t func_name_len;
+	const char *func_name = luaL_checklstring(L, 2, &func_name_len);
+
+	revoke_rt_access(grantee_name,  (uint32_t)grantee_name_len,
+			 func_name, (uint32_t)func_name_len);
+	return 0;
+}
+
 static void
 call_serializer_update_options(void)
 {
@@ -1291,6 +1351,9 @@ static const struct luaL_Reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},
 	{"module_reload", lbox_module_reload},
 	{"func_call", lbox_func_call},
+	{"reset_lua_call", lbox_rt_lua_call_access_reset},
+	{"grant_lua_call", lbox_grant_rt_access},
+	{"revoke_lua_call", lbox_revoke_rt_access},
 	{NULL, NULL}
 };
 

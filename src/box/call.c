@@ -45,6 +45,7 @@
 #include "small/rlist.h"
 #include "tt_static.h"
 #include "box/mp_box_ctx.h"
+#include "rt_lua_call_access.h"
 
 struct rlist box_on_call = RLIST_HEAD_INITIALIZER(box_on_call);
 
@@ -173,6 +174,13 @@ access_check_lua_call(const char *name, uint32_t name_len)
 	access &= ~universe.access_lua_call[cr->auth_token].effective;
 	if (access == 0 && !tarantool_lua_is_builtin_global(name, name_len))
 		return 0;
+
+	/* Check for runtime access. */
+	uint32_t uname_len = 0;
+	const char *uname = user_name_by_id(cr->uid, &uname_len);
+	if (check_rt_access(uname, uname_len, name, name_len) == RT_ACCESS)
+		return 0;
+
 	/* Check for function access if the user has usage access. */
 	if ((access & PRIV_U) == 0) {
 		struct access *object = access_lua_call_find(name, name_len);

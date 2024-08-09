@@ -1572,7 +1572,6 @@ return schema.new('instance_config', schema.record({
                         lua_call = schema.array({
                             items = schema.scalar({
                                 type = 'string',
-                                allowed_values = {'all'},
                             }),
                         }),
                         sql = schema.array({
@@ -1638,7 +1637,6 @@ return schema.new('instance_config', schema.record({
                         lua_call = schema.array({
                             items = schema.scalar({
                                 type = 'string',
-                                allowed_values = {'all'},
                             }),
                         }),
                         sql = schema.array({

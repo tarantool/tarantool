@@ -189,6 +189,76 @@ mh_strnu32_find_str(struct mh_strnu32_t *h, const char *str, uint32_t len)
 	return mh_strnu32_find(h, &key, NULL);
 }
 
+/*
+ * Map: (const char *, uint32_t, const char *, uint32_t) => (void *)
+ */
+
+static inline uint32_t
+mh_access_hash(const char *uname, uint32_t uname_len,
+	       const char *fname, uint32_t fname_len)
+{
+	return mh_strn_hash(uname, uname_len) ^ mh_strn_hash(fname, fname_len);
+}
+
+#define mh_name _access
+
+/**
+ * Key of `mh_access_node_t` hash table.
+ */
+struct mh_access_key_t {
+	/* Key user name. */
+	const char *uname;
+	/* Key user name length. */
+	uint32_t uname_len;
+	/* Key function name. */
+	const char *fname;
+	/* Key function name length. */
+	uint32_t fname_len;
+	/* Key hash calculated using `mh_access_hash`. */
+	uint32_t hash;
+};
+
+#define mh_key_t struct mh_access_key_t *
+
+/**
+ * Node of `mh_access_node_t` hash table.
+ */
+struct mh_access_node_t {
+	/* Key user name. */
+	const char *uname;
+	/* Key user name length. */
+	uint32_t uname_len;
+	/* Key function name. */
+	const char *fname;
+	/* Key function name length. */
+	uint32_t fname_len;
+	/* Key hash calculated using `mh_access_hash`. */
+	uint32_t hash;
+	/* Mapped value. */
+	int val;
+};
+
+#define mh_node_t struct mh_access_node_t
+
+#define mh_arg_t void *
+#define mh_hash(a, arg) ((a)->hash)
+#define mh_hash_key(a, arg) ((a)->hash)
+#define mh_cmp(a, b, arg) ((a)->uname_len != (b)->uname_len || \
+			    (a)->fname_len != (b)->fname_len || \
+			    strncmp((a)->uname, (b)->uname, (a)->uname_len) || \
+			    strncmp((a)->fname, (b)->fname, (a)->fname_len))
+#define mh_cmp_key(a, b, arg) mh_cmp(a, b, arg)
+#include "salad/mhash.h"
+
+static inline mh_int_t
+mh_access_find_str(struct mh_access_t *h, const char *uname, uint32_t uname_len,
+		   const char *fname, uint32_t fname_len)
+{
+	uint32_t hash = mh_access_hash(uname, uname_len, fname, fname_len);
+	struct mh_access_key_t key = {uname, uname_len, fname, fname_len, hash};
+	return mh_access_find(h, &key, NULL);
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
