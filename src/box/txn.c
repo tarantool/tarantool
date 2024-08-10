@@ -978,6 +978,17 @@ txn_journal_entry_new(struct txn *txn)
 
 		req->approx_len += xrow_approx_len(stmt->row);
 	}
+	if (txn_limbo.is_running_on_split_brain_rollback_triggers) {
+		assert(txn_limbo.is_in_rollback);
+		if (!txn_is_fully_local(txn)) {
+			diag_set(IllegalParams,
+				 "Transactions from the "
+				 "box.ctl.on_replication_split_brain_rollback "
+				 "event trigger must be fully local");
+			return NULL;
+		}
+		txn_set_flags(txn, TXN_FORCE_ASYNC);
+	}
 	/*
 	 * There is no a check for all-local rows, because a local
 	 * space can't be synchronous. So if there is at least one
