@@ -38,8 +38,35 @@
 #include "tt_static.h"
 #include "session.h"
 #include "trivia/config.h"
+#include "func_adapter.h"
+#include "port.h"
+#include "tuple.h"
 
 struct txn_limbo txn_limbo;
+
+/**
+ * Data used to create txn iterators.
+ */
+struct txn_limbo_entry_iterator_data {
+	/** First statement of the transaction. */
+	struct txn_stmt *first_stmt;
+};
+
+/**
+ * Iterator over transaction statements used in triggers.
+ */
+struct txn_limbo_entry_port_c_iterator {
+	/** Iterator next. */
+	port_c_iterator_next_f next;
+	/** Current statement of the transaction. */
+	struct txn_stmt *stmt;
+	/** Request number, starting from 1. */
+	uint32_t req_num;
+};
+
+static_assert(
+	sizeof(struct txn_limbo_entry_port_c_iterator) <= sizeof(struct port_c_iterator),
+	"The implementation should fit into abstract instance");
 
 static int
 txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
@@ -134,6 +161,10 @@ txn_limbo_create(struct txn_limbo *limbo)
 		panic("failed to allocate synchronous queue worker fiber");
 	limbo->worker->f_arg = limbo;
 	fiber_set_joinable(limbo->worker, true);
+	limbo->on_split_brain_rollback =
+		event_get("box.ctl.on_replication_split_brain_rollback", true);
+	event_ref(limbo->on_split_brain_rollback);
+	limbo->is_running_on_split_brain_rollback_triggers = false;
 }
 
 void
@@ -153,6 +184,7 @@ txn_limbo_destroy(struct txn_limbo *limbo)
 		txn_free(entry->txn);
 	}
 	fiber_cond_destroy(&limbo->wait_cond);
+	event_unref(limbo->on_split_brain_rollback);
 	TRASH(limbo);
 }
 
@@ -1306,6 +1338,135 @@ txn_limbo_update_system_spaces_is_sync_state(struct txn_limbo *limbo,
 	system_spaces_update_is_sync_state(is_promote);
 }
 
+static int
+txn_limbo_entry_iterator_next(struct port_c_iterator *it, struct port *out,
+			      bool *is_eof)
+{
+	struct txn_limbo_entry_port_c_iterator *entry_it =
+		(struct txn_limbo_entry_port_c_iterator *)it;
+	struct txn_stmt *stmt = entry_it->stmt;
+	if (stmt == NULL) {
+		*is_eof = true;
+		return 0;
+	}
+
+	*is_eof = false;
+	struct xrow_header *row = stmt->row;
+	port_c_create(out);
+	/*
+	 * The iterator returns the following transaction statement information:
+	 *  1. An ordinal request number;
+	 *  2. The term during which the transaction occurred.
+	 *  3. The ID of the transaction;
+	 *  4. The ID of the limbo owner or 0 for local rows that are part of a
+	 *  global transaction;
+	 *  5. The LSN of the request.
+	 *  6. The ID of the space to which the request was applied.
+	 *  7. The request type.
+	 *  8. The argument of the request depending on the operation type
+	 *  9. An optional argument for the UPDATE/UPSERT request, may be nil.
+	 *  10. The tuple which was replaced by the operation, may be nil.
+	 *  11. The tuple created by the operation, may be nil.
+	 */
+	port_c_add_number(out, entry_it->req_num++);
+	port_c_add_number(out, (double)txn_limbo.promote_greatest_term);
+	port_c_add_number(out, (uint32_t)stmt->txn->id);
+	port_c_add_number(out, row->replica_id);
+	port_c_add_number(out, (uint32_t)row->lsn);
+	port_c_add_number(out, space_id(stmt->space));
+	port_c_add_number(out, row->type);
+
+	struct request request;
+	VERIFY(xrow_decode_dml(row, &request,
+			       dml_request_key_map(row->type)) == 0);
+	struct tuple_format *format = box_tuple_format_default();
+	if (request.key != NULL) {
+		struct tuple *tuple =
+			box_tuple_new(format, request.key, request.key_end);
+		if (tuple == NULL)
+			return -1;
+		port_c_add_tuple(out, tuple);
+	}
+	if (request.tuple != NULL) {
+		struct tuple *tuple =
+			box_tuple_new(format, request.tuple, request.tuple_end);
+		if (tuple == NULL)
+			return -1;
+		port_c_add_tuple(out, tuple);
+	}
+	if (request.ops != NULL) {
+		struct tuple *tuple =
+			box_tuple_new(format, request.ops, request.ops_end);
+		if (tuple == NULL)
+			return -1;
+		port_c_add_tuple(out, tuple);
+	}
+	if (request.type != IPROTO_UPDATE && request.type != IPROTO_UPSERT)
+		port_c_add_null(out);
+
+	if (stmt->old_tuple != NULL)
+		port_c_add_tuple(out, stmt->rollback_info.old_tuple);
+	else
+		port_c_add_null(out);
+	if (stmt->new_tuple != NULL)
+		port_c_add_tuple(out, stmt->rollback_info.new_tuple);
+	else
+		port_c_add_null(out);
+
+	entry_it->stmt = stailq_next_entry(stmt, next);
+	return 0;
+}
+
+static void
+txn_limbo_entry_iterator_create(void *base_data, struct port_c_iterator *it)
+{
+	struct txn_limbo_entry_port_c_iterator *entry_it =
+		(struct txn_limbo_entry_port_c_iterator *)it;
+	entry_it->next = txn_limbo_entry_iterator_next;
+	struct txn_limbo_entry_iterator_data *data =
+		(struct txn_limbo_entry_iterator_data *)base_data;
+	entry_it->stmt = data->first_stmt;
+	entry_it->req_num = 1;
+}
+
+static int
+on_split_brain_rollback_run_triggers(struct txn_limbo *limbo, int64_t lsn)
+{
+	struct txn_limbo_entry *last_rollback =
+		txn_limbo_last_rollback_entry(limbo, lsn);
+	if (last_rollback == NULL)
+		return 0;
+	struct txn_limbo_entry *e;
+	rlist_foreach_entry_reverse(e, &limbo->queue, in_queue) {
+		if (!txn_has_flag(e->txn, TXN_WAIT_ACK) ||
+		    e->txn->fiber != NULL)
+			continue;
+		struct txn_limbo_entry_iterator_data data = {
+			.first_stmt = txn_first_stmt(e->txn),
+		};
+		struct port args;
+		port_c_create(&args);
+		port_c_add_iterable(&args, &data,
+				    txn_limbo_entry_iterator_create);
+		struct event_trigger_iterator it;
+		event_trigger_iterator_create(&it,
+					      limbo->on_split_brain_rollback);
+		struct func_adapter *trigger = NULL;
+		const char *unused;
+		while (event_trigger_iterator_next(&it, &trigger, &unused)) {
+			if (func_adapter_call(trigger, &args, NULL) != 0) {
+				diag_set(ClientError, ER_SPLIT_BRAIN,
+					 "box.ctl.on_split_brain_rollback "
+					 "trigger failed");
+				return -1;
+			}
+		}
+		if (e == last_rollback)
+			break;
+	}
+	return 0;
+}
+
 int
 txn_limbo_req_prepare(struct txn_limbo *limbo,
 		      const struct synchro_request *req)
@@ -1333,6 +1494,22 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 		limbo->is_in_rollback = false;
 		return -1;
 	}
+	limbo->is_running_on_split_brain_rollback_triggers = true;
+	if (recovery_state == FINISHED_RECOVERY &&
+	    txn_limbo_is_owned_by_current_instance(limbo) &&
+	    /*
+	     * A demote request cannot rollback anything, and a rollback request
+	     * on the limbo owner can only be processed during recovery, so we
+	     * only care about promote requests.
+	     */
+	    req->type == IPROTO_RAFT_PROMOTE &&
+	    (on_split_brain_rollback_run_triggers(limbo, req->lsn + 1) != 0 ||
+	     (in_txn() != NULL && txn_commit(in_txn()) != 0))) {
+		limbo->is_running_on_split_brain_rollback_triggers = false;
+		limbo->is_in_rollback = false;
+		return -1;
+	}
+	limbo->is_running_on_split_brain_rollback_triggers = false;
 	/* Prepare for request execution and fine-grained filtering. */
 	switch (req->type) {
 	case IPROTO_RAFT_CONFIRM:
