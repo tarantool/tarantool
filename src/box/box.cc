@@ -440,7 +440,7 @@ box_check_writable(void)
 			error_set_uuid(e, "queue_owner_uuid", &r->uuid);
 			error_append_msg(e, " (%s)", tt_uuid_str(&r->uuid));
 		}
-		if (txn_limbo.owner_id == instance_id) {
+		if (txn_limbo_is_owned_by_current_instance(&txn_limbo)) {
 			if (txn_limbo.is_frozen_due_to_fencing) {
 				error_append_msg(e, " and is frozen due to "
 						    "fencing");
@@ -3065,7 +3065,7 @@ box_promote(void)
 	 */
 	bool is_leader =
 		txn_limbo_replica_term(&txn_limbo, instance_id) == raft->term &&
-		txn_limbo.owner_id == instance_id &&
+		txn_limbo_is_owned_by_current_instance(&txn_limbo) &&
 		!txn_limbo.is_frozen_until_promotion;
 	if (box_election_mode != ELECTION_MODE_OFF)
 		is_leader = is_leader && raft->state == RAFT_STATE_LEADER;
@@ -3122,7 +3122,7 @@ box_demote(void)
 		if (txn_limbo_replica_term(&txn_limbo, instance_id) !=
 		    raft->term)
 			return 0;
-		if (txn_limbo.owner_id != instance_id)
+		if (!txn_limbo_is_owned_by_current_instance(&txn_limbo))
 			return 0;
 		box_raft_leader_step_off();
 		return 0;
@@ -3142,7 +3142,7 @@ box_demote(void)
 	 * local promote(), or call demote() on the actual owner.
 	 */
 	if (txn_limbo.promote_greatest_term == raft->term &&
-	    txn_limbo.owner_id != instance_id)
+	    !txn_limbo_is_owned_by_current_instance(&txn_limbo))
 		return 0;
 	if (box_trigger_elections() != 0)
 		return -1;
