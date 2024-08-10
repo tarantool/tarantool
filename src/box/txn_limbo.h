@@ -499,6 +499,13 @@ txn_limbo_has_owner(struct txn_limbo *limbo)
 	return limbo->owner_id != REPLICA_ID_NIL;
 }
 
+/** Return whether limbo is owned by current instance. */
+static inline bool
+txn_limbo_is_owned_by_current_instance(const struct txn_limbo *limbo)
+{
+	return limbo->owner_id == instance_id;
+}
+
 /**
  * Initialize qsync engine.
  */
