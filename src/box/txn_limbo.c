@@ -38,8 +38,34 @@
 #include "tt_static.h"
 #include "session.h"
 #include "trivia/config.h"
+#include "func_adapter.h"
+#include "port.h"
+#include "tuple.h"
+#include "mpstream/mpstream.h"
 
 struct txn_limbo txn_limbo;
+
+/**
+ * Data used to create txn iterators.
+ */
+struct txn_limbo_entry_iterator_data {
+	/** First statement of the transaction. */
+	struct txn_stmt *first_stmt;
+};
+
+/**
+ * Iterator over transaction statements used in triggers.
+ */
+struct txn_limbo_entry_port_c_iterator {
+	/** Iterator next. */
+	port_c_iterator_next_f next;
+	/** Current statement of the transaction. */
+	struct txn_stmt *stmt;
+};
+
+static_assert(
+	sizeof(struct txn_limbo_entry_port_c_iterator) <= sizeof(struct port_c_iterator),
+	"The implementation should fit into abstract instance");
 
 static int
 txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
@@ -134,6 +160,9 @@ txn_limbo_create(struct txn_limbo *limbo)
 		panic("failed to allocate synchronous queue worker fiber");
 	limbo->worker->f_arg = limbo;
 	fiber_set_joinable(limbo->worker, true);
+	limbo->on_split_brain_rollback =
+		event_get("box.ctl.on_replication_split_brain_rollback", true);
+	event_ref(limbo->on_split_brain_rollback);
 }
 
 void
@@ -153,6 +182,7 @@ txn_limbo_destroy(struct txn_limbo *limbo)
 		txn_free(entry->txn);
 	}
 	fiber_cond_destroy(&limbo->wait_cond);
+	event_unref(limbo->on_split_brain_rollback);
 	TRASH(limbo);
 }
 
@@ -1306,6 +1336,132 @@ txn_limbo_update_system_spaces_is_sync_state(struct txn_limbo *limbo,
 	system_spaces_update_is_sync_state(is_promote);
 }
 
+static int
+txn_limbo_entry_iterator_next(struct port_c_iterator *it, struct port *out,
+			      bool *is_eof)
+{
+	struct txn_limbo_entry_port_c_iterator *entry_it =
+		(struct txn_limbo_entry_port_c_iterator *)it;
+	struct txn_stmt *stmt = entry_it->stmt;
+	if (stmt == NULL) {
+		*is_eof = true;
+		return 0;
+	}
+
+	*is_eof = false;
+	struct xrow_header *row = stmt->row;
+	port_c_create(out);
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	struct mpstream stream;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      mpstream_panic_cb, NULL);
+	mpstream_encode_map(&stream, 2);
+	mpstream_encode_str(&stream, "meta");
+	mpstream_encode_map(&stream, 3);
+	mpstream_encode_str(&stream, "replica_id");
+	mpstream_encode_uint(&stream, row->replica_id);
+	mpstream_encode_str(&stream, "lsn");
+	mpstream_encode_uint(&stream, row->lsn);
+	mpstream_encode_str(&stream, "term");
+	mpstream_encode_uint(&stream, txn_limbo.promote_greatest_term);
+	mpstream_encode_str(&stream, "statement");
+	struct request request;
+	VERIFY(xrow_decode_dml(row, &request,
+			       dml_request_key_map(row->type)) == 0);
+	size_t map_size = 2 + (request.key != NULL) +
+				     (request.tuple != NULL) +
+				     (request.ops != NULL) +
+				     (stmt->old_tuple != NULL) +
+				     (stmt->new_tuple != NULL);
+	mpstream_encode_map(&stream, map_size);
+	mpstream_encode_str(&stream, "op_type");
+	mpstream_encode_str(&stream, iproto_type_name(row->type));
+	mpstream_encode_str(&stream, "space_id");
+	mpstream_encode_uint(&stream, space_id(stmt->space));
+#define encode_request_field(field_name)				    \
+do {									    \
+	if (request.field_name != NULL) {				    \
+		mpstream_encode_str(&stream, #field_name);		    \
+		size_t len = request.field_name##_end - request.field_name; \
+		mpstream_memcpy(&stream, request.field_name, len);	    \
+	}								    \
+}									    \
+while (0)
+	encode_request_field(key);
+	encode_request_field(tuple);
+	encode_request_field(ops);
+#undef encode_request_field
+#define encode_stmt_tuple(tuple_name)				\
+do {								\
+	if (stmt->tuple_name != NULL) {				\
+		mpstream_encode_str(&stream, #tuple_name);	\
+		tuple_to_mpstream(stmt->tuple_name, &stream);	\
+	}							\
+}								\
+while (0)
+	encode_stmt_tuple(old_tuple);
+	encode_stmt_tuple(new_tuple);
+#undef encode_stmt_tuple
+	mpstream_flush(&stream);
+	size_t obj_size = region_used(region) - region_svp;
+	char *obj = xregion_join(region, obj_size);
+	port_c_add_mp(out, obj, obj + obj_size);
+	entry_it->stmt = stailq_next_entry(stmt, next);
+	return 0;
+}
+
+static void
+txn_limbo_entry_iterator_create(void *base_data, struct port_c_iterator *it)
+{
+	struct txn_limbo_entry_port_c_iterator *entry_it =
+		(struct txn_limbo_entry_port_c_iterator *)it;
+	entry_it->next = txn_limbo_entry_iterator_next;
+	struct txn_limbo_entry_iterator_data *data = base_data;
+	entry_it->stmt = data->first_stmt;
+}
+
+static int
+on_split_brain_rollback_run_triggers(struct txn_limbo *limbo, int64_t lsn)
+{
+	struct txn_limbo_entry *last_rollback =
+		txn_limbo_last_rollback_entry(limbo, lsn);
+	if (last_rollback == NULL)
+		return 0;
+	struct txn_limbo_entry *e;
+	struct region *region = &fiber()->gc;
+	rlist_foreach_entry_reverse(e, &limbo->queue, in_queue) {
+		if (e->txn->fiber != NULL)
+			continue;
+		struct txn_limbo_entry_iterator_data data = {
+			.first_stmt = txn_first_stmt(e->txn),
+		};
+		struct port args;
+		port_c_create(&args);
+		port_c_add_iterable(&args, &data,
+				    txn_limbo_entry_iterator_create);
+		struct event_trigger_iterator it;
+		event_trigger_iterator_create(&it,
+					      limbo->on_split_brain_rollback);
+		struct func_adapter *trigger = NULL;
+		const char *unused;
+		while (event_trigger_iterator_next(&it, &trigger, &unused)) {
+			size_t region_svp = region_used(region);
+			int rc = func_adapter_call(trigger, &args, NULL);
+			region_truncate(region, region_svp);
+			if (rc != 0) {
+				diag_set(ClientError, ER_SPLIT_BRAIN,
+					 "box.ctl.on_split_brain_rollback "
+					 "trigger failed");
+				return -1;
+			}
+		}
+		if (e == last_rollback)
+			break;
+	}
+	return 0;
+}
+
 int
 txn_limbo_req_prepare(struct txn_limbo *limbo,
 		      const struct synchro_request *req)
@@ -1332,6 +1488,32 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 	if (txn_limbo_filter_request(limbo, req) < 0) {
 		limbo->is_in_rollback = false;
 		return -1;
+	}
+	if (recovery_state == FINISHED_RECOVERY &&
+	    txn_limbo_is_owned_by_current_instance(limbo) &&
+	    /*
+	     * A demote request cannot rollback anything, and a rollback request
+	     * on the limbo owner can only be processed during recovery, so we
+	     * only care about promote requests.
+	     */
+	    req->type == IPROTO_RAFT_PROMOTE) {
+		struct txn *txn = txn_begin();
+		if (txn == NULL)
+			return -1;
+		/*
+		 * It is safe to allow the user to write to fully local spaces
+		 * during the execution of the trigger, bypassing the limbo. We
+		 * check that the transaction is fully local during preparation
+		 * for committing the transaction.
+		 */
+		txn_set_flags(txn, TXN_FORCE_ASYNC);
+		if (on_split_brain_rollback_run_triggers(limbo,
+							 req->lsn + 1) != 0 ||
+		    box_txn_commit() != 0) {
+			VERIFY(box_txn_rollback() == 0);
+			limbo->is_in_rollback = false;
+			return -1;
+		}
 	}
 	/* Prepare for request execution and fine-grained filtering. */
 	switch (req->type) {
