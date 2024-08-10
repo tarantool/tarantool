@@ -72,7 +72,8 @@ bool
 txn_limbo_is_ro(struct txn_limbo *limbo)
 {
 	return limbo->owner_id != REPLICA_ID_NIL &&
-	       (limbo->owner_id != instance_id || txn_limbo_is_frozen(limbo));
+	       (!txn_limbo_is_owned_by_current_instance(limbo) ||
+	        txn_limbo_is_frozen(limbo));
 }
 
 void
@@ -216,7 +217,7 @@ txn_limbo_assign_remote_lsn(struct txn_limbo *limbo,
 			    struct txn_limbo_entry *entry, int64_t lsn)
 {
 	assert(limbo->owner_id != REPLICA_ID_NIL);
-	assert(limbo->owner_id != instance_id);
+	assert(!txn_limbo_is_owned_by_current_instance(limbo));
 	assert(entry->lsn == -1);
 	assert(lsn > 0);
 	(void) limbo;
@@ -235,8 +236,7 @@ txn_limbo_assign_local_lsn(struct txn_limbo *limbo,
 			   struct txn_limbo_entry *entry, int64_t lsn)
 {
 	assert(limbo->owner_id != REPLICA_ID_NIL);
-	assert(limbo->owner_id == instance_id);
-	assert(entry->lsn == -1);
+	assert(txn_limbo_is_owned_by_current_instance(limbo));
 	assert(lsn > 0);
 
 	entry->lsn = lsn;
@@ -259,7 +259,7 @@ void
 txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
 		     int64_t lsn)
 {
-	if (limbo->owner_id == instance_id)
+	if (txn_limbo_is_owned_by_current_instance(limbo))
 		txn_limbo_assign_local_lsn(limbo, entry, lsn);
 	else
 		txn_limbo_assign_remote_lsn(limbo, entry, lsn);
@@ -688,7 +688,8 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 	}
 	if (confirm_lsn == -1 || confirm_lsn <= limbo->confirmed_lsn)
 		return;
-	txn_limbo_write_confirm(limbo, confirm_lsn);
+	if (txn_limbo_is_owned_by_current_instance(limbo))
+		txn_limbo_write_confirm(limbo, confirm_lsn);
 	txn_limbo_read_confirm(limbo, confirm_lsn);
 }
 
