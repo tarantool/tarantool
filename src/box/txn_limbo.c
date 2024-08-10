@@ -153,7 +153,7 @@ struct txn_limbo_entry *
 txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 		 size_t approx_len)
 {
-	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
+	assert(txn_has_flag(txn, TXN_IS_SYNC));
 	assert(limbo == &txn_limbo);
 	/*
 	 * Transactions should be added to the limbo before WAL write. Limbo
@@ -363,7 +363,8 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		e->txn->signature = TXN_SIGNATURE_QUORUM_TIMEOUT;
 		e->txn->limbo_entry = NULL;
 		txn_limbo_abort(limbo, e);
-		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
+		txn_clear_flags(e->txn, TXN_IS_SYNC | TXN_WAIT_SYNC |
+				TXN_WAIT_ACK);
 		txn_limbo_complete(e->txn, false);
 		if (e == entry)
 			break;
@@ -506,7 +507,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			 * the limbo entry on its own. This happens for txns
 			 * created in the applier.
 			 */
-			txn_clear_flags(e->txn, TXN_WAIT_SYNC);
+			txn_clear_flags(e->txn, TXN_IS_SYNC | TXN_WAIT_SYNC);
 			txn_limbo_remove(limbo, e);
 			/*
 			 * The limbo entry now should not be used by the owner
@@ -523,7 +524,8 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			limbo->confirm_lag = fiber_clock() - e->insertion_time;
 		e->txn->limbo_entry = NULL;
 		txn_limbo_remove(limbo, e);
-		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
+		txn_clear_flags(e->txn, TXN_IS_SYNC | TXN_WAIT_SYNC |
+				TXN_WAIT_ACK);
 		/*
 		 * Should be written to WAL by now. Confirm is always written
 		 * after the affected transactions.

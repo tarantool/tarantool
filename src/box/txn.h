@@ -120,6 +120,11 @@ enum txn_flag {
 	 * by any DDL operation.
 	 */
 	TXN_HANDLES_DDL = 0x1000,
+	/**
+	 * Transaction is stored in the synchronous queue until confirmation or
+	 * rollback.
+	 */
+	TXN_IS_SYNC = 0x2000,
 };
 
 enum {
