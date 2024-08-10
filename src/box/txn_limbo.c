@@ -30,7 +30,6 @@
  */
 #include "txn.h"
 #include "txn_limbo.h"
-#include "replication.h"
 #include "iproto_constants.h"
 #include "journal.h"
 #include "box.h"
@@ -100,7 +99,8 @@ bool
 txn_limbo_is_ro(struct txn_limbo *limbo)
 {
 	return limbo->owner_id != REPLICA_ID_NIL &&
-	       (limbo->owner_id != instance_id || txn_limbo_is_frozen(limbo));
+		(!txn_limbo_is_owned_by_current_instance(limbo) ||
+		txn_limbo_is_frozen(limbo));
 }
 
 /** Pop the first entry. */
@@ -275,7 +275,7 @@ txn_limbo_assign_remote_lsn(struct txn_limbo *limbo,
 			    struct txn_limbo_entry *entry, int64_t lsn)
 {
 	assert(limbo->owner_id != REPLICA_ID_NIL);
-	assert(limbo->owner_id != instance_id);
+	assert(!txn_limbo_is_owned_by_current_instance(limbo));
 	assert(entry->lsn == -1);
 	assert(lsn > 0);
 	(void) limbo;
@@ -297,7 +297,7 @@ txn_limbo_assign_local_lsn(struct txn_limbo *limbo,
 			   struct txn_limbo_entry *entry, int64_t lsn)
 {
 	assert(limbo->owner_id != REPLICA_ID_NIL);
-	assert(limbo->owner_id == instance_id);
+	assert(txn_limbo_is_owned_by_current_instance(limbo));
 	assert(entry->lsn == -1);
 	assert(lsn > 0);
 
@@ -310,7 +310,7 @@ void
 txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
 		     int64_t lsn)
 {
-	if (limbo->owner_id == instance_id)
+	if (txn_limbo_is_owned_by_current_instance(limbo))
 		txn_limbo_assign_local_lsn(limbo, entry, lsn);
 	else
 		txn_limbo_assign_remote_lsn(limbo, entry, lsn);
@@ -674,7 +674,7 @@ txn_limbo_read_demote(struct txn_limbo *limbo, int64_t lsn)
 static void
 txn_limbo_confirm(struct txn_limbo *limbo)
 {
-	assert(limbo->owner_id == instance_id);
+	assert(txn_limbo_is_owned_by_current_instance(limbo));
 	if (limbo->is_in_rollback)
 		return;
 	if (limbo->entry_to_confirm == NULL ||
@@ -1299,7 +1299,7 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 	if (rlist_empty(&limbo->queue) || txn_limbo_is_frozen(limbo))
 		return;
 	/* The replication_synchro_quorum value may have changed. */
-	if (limbo->owner_id == instance_id)
+	if (txn_limbo_is_owned_by_current_instance(limbo))
 		txn_limbo_confirm(limbo);
 	/*
 	 * Wakeup all the others - timed out will rollback. Also

@@ -78,7 +78,6 @@ enum process_type {
  * (to push a transaction to the limbo and simulate confirm).
  */
 const int fake_lsn = 1;
-extern "C" int instance_id;
 const int relay_id = 2;
 
 int
