@@ -345,8 +345,8 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		 * Data should be saved in allocated memory as it
 		 * will be poped from Lua stack.
 		 */
-		buf = xregion_alloc(region, field.sval.len + 1);
-		memcpy(buf, field.sval.data, field.sval.len + 1);
+		buf = xregion_alloc(region, field.sval.len);
+		memcpy(buf, field.sval.data, field.sval.len);
 		bind->s = buf;
 		bind->bytes = field.sval.len;
 		break;
