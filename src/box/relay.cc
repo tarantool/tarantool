@@ -408,6 +408,7 @@ relay_stop(struct relay *relay)
 	relay->txn_lag = 0;
 	relay->tx.txn_lag = 0;
 	relay->tx.vclock_sync = 0;
+	relay->subscribe_fiber = NULL;
 }
 
 void
