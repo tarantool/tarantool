@@ -17,6 +17,7 @@
     <member refid="module_8h_1a4ab155eaff0a115e522c1faae631196e" kind="define"><name>PACKAGE_VERSION_MINOR</name></member>
     <member refid="module_8h_1abd1dbec4fd6761084d3e0c05afe2b138" kind="define"><name>PACKAGE_VERSION_PATCH</name></member>
     <member refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" kind="define"><name>PACKAGE_VERSION</name></member>
+    <member refid="module_8h_1ad63a17703ee9303be2682b7bb08e7a9f" kind="define"><name>TZDATA_VERSION</name></member>
     <member refid="module_8h_1adb6d1259777e8f56c6260be6faed183e" kind="define"><name>SYSCONF_DIR</name></member>
     <member refid="module_8h_1a643b6b7ac15874197420e2adbea8b6bb" kind="define"><name>INSTALL_PREFIX</name></member>
     <member refid="module_8h_1a040141d0f88e012c0b915e3531fef5cc" kind="define"><name>BUILD_TYPE</name></member>
