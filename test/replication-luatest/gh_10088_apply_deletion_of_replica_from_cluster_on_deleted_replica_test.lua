@@ -103,6 +103,8 @@ g_three_member_cluster.before_each(function(cg)
         },
     }}
     cg.replica_set:start()
+    cg.replica:wait_for_downstream_to(cg.replica_to_be_deleted)
+    cg.replica_to_be_deleted:wait_for_downstream_to(cg.replica)
     cg.master:exec(function()
         box.ctl.promote()
         box.space._cluster:alter{is_sync = true}

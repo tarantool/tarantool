@@ -1653,6 +1653,7 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 			       &replicaset.applier.order_latch);
 	latch_lock(latch);
 	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
 		rc = -1;
 		goto finish;
 	}
