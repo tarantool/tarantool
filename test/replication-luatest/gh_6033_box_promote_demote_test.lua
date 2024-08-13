@@ -57,6 +57,9 @@ local function fiber_join(server, fiber)
 end
 
 local function wal_delay_start(server, countdown)
+    server:exec(function()
+        box.error.injection.set('ERRINJ_LIMBO_WRITE_PROMOTE_FAST_EXIT', true)
+    end)
     if countdown == nil then
         server:exec(function()
             box.error.injection.set('ERRINJ_WAL_DELAY', true)
@@ -439,48 +442,6 @@ g_common.test_limbo_full_interfering_promote = function(g)
     wait_sync(g.cluster.servers)
 end
 
--- Demoting should fail if it is interrupted from another server
--- while waiting for synchro queue being emptied.
-g_common.test_limbo_full_interfering_demote = function(g)
-    promote(g.server_1)
-    wait_sync(g.cluster.servers)
-
-    g.server_1:exec(function()
-        box.schema.create_space('test', {is_sync = true}):create_index('pk')
-    end)
-
-    box_cfg_update({g.server_1}, {
-        replication_synchro_quorum = 3,
-        replication_synchro_timeout = 1000,
-    })
-
-    box_cfg_update({g.server_2}, {
-        replication_synchro_timeout = 0.1,
-    })
-
-    g.server_1:exec(function()
-        local s = box.space.test
-        require('fiber').create(s.replace, s, {1})
-    end)
-    wait_sync(g.cluster.servers)
-
-    -- Start demoting server_1 and interrupt it from server_2
-    local f = demote_start(g.server_1)
-    local term = g.server_1:get_synchro_queue_term()
-    g.server_2:exec(function() pcall(box.ctl.promote) end)
-    g.server_1:wait_for_synchro_queue_term(term + 1)
-
-    local ok, err = fiber_join(g.server_1, f)
-    luatest.assert(not ok and err.code == box.error.INTERFERING_PROMOTE,
-        'Interfering demote fails')
-
-    wait_sync(g.cluster.servers)
-    promote(g.server_1)
-    g.server_1:exec(function() box.space.test:drop() end)
-    demote(g.server_1)
-    wait_sync(g.cluster.servers)
-end
-
 -- Promoting should fail if synchro queue replication timeouts during it
 g_common.test_fail_limbo_ack_promote = function(g)
     box_cfg_update({g.server_1}, {
@@ -489,12 +450,13 @@ g_common.test_fail_limbo_ack_promote = function(g)
     })
 
     box_cfg_update({g.server_2}, {
-        replication_synchro_quorum = 3,
+        replication_synchro_quorum = 1,
         replication_synchro_timeout = 1000,
     })
+    promote(g.server_2)
+    box_cfg_update({g.server_2}, {replication_synchro_quorum = 3})
 
     -- fill synchro queue on server_1
-    promote(g.server_2)
     g.server_2:exec(function()
         local s = box.schema.create_space('test', {is_sync = true})
         s:create_index('pk')

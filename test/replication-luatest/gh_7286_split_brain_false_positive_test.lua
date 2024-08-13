@@ -35,7 +35,7 @@ end)
 
 g.test_false_positive_split_brain = function(cg)
     cg.node1:exec(function()
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
         box.ctl.demote()
     end)
     cg.node2:wait_for_vclock_of(cg.node1)

@@ -243,6 +243,28 @@ wal_msg(struct cmsg *msg)
 	return msg->route == wal_request_route ? (struct wal_msg *) msg : NULL;
 }
 
+static void
+xlog_write_entry_inject_sleep(uint32_t type)
+{
+	(void)type;
+	ERROR_INJECT_INT(ERRINJ_WAL_DELAY_ON_XROW_TYPE, inj->iparam == type, {
+		say_warn("ERRINJ_WAL_DELAY_ON_XROW_TYPE triggered %d", type);
+		struct errinj *e = errinj(ERRINJ_WAL_DELAY_ON_XROW_TYPE_SLEEP,
+					  ERRINJ_BOOL);
+		e->bparam = true;
+		ERROR_INJECT_SLEEP(ERRINJ_WAL_DELAY_ON_XROW_TYPE_SLEEP);
+	});
+
+	/*
+	 * The idea is to trigger disk error when xrow with specified type
+	 * is being written.
+	 */
+	ERROR_INJECT_INT(ERRINJ_WAL_ERROR_ON_XROW_TYPE, inj->iparam == type, {
+		struct errinj *e = errinj(ERRINJ_WAL_WRITE_DISK, ERRINJ_BOOL);
+		e->bparam = true;
+	});
+}
+
 /** Write a request to a log in a single transaction. */
 static ssize_t
 xlog_write_entry(struct xlog *l, struct journal_entry *entry)
@@ -260,6 +282,7 @@ xlog_write_entry(struct xlog *l, struct journal_entry *entry)
 			say_warn("injected broken lsn: %lld",
 				 (long long) (*row)->lsn);
 		}
+		xlog_write_entry_inject_sleep((*row)->type);
 		if (xlog_write_row(l, *row) < 0) {
 			/*
 			 * Rollback all un-written rows

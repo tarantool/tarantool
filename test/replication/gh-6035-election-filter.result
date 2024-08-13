@@ -69,7 +69,7 @@ box.cfg({                                       \
  | ---
  | ...
 
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
  | ---
  | ...
 _ = box.schema.space.create("sync", {is_sync = true})

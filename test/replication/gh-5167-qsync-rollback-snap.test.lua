@@ -16,7 +16,7 @@ fiber = require('fiber')
 box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 1000}
 _ = box.schema.space.create('sync', {is_sync = true, engine = engine})
 _ = box.space.sync:create_index('pk')
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 -- Write something to flush the current master's state to replica.
 _ = box.space.sync:insert{1}
 _ = box.space.sync:delete{1}

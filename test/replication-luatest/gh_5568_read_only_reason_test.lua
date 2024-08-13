@@ -178,6 +178,7 @@ g.test_read_only_reason_election_has_leader = function(g)
         box.cfg{election_mode = 'voter'}
     end)
     g.master:wait_for_election_leader()
+    g.master:wait_for_synchro_queue_term(g.master:get_election_term())
     g.replica:wait_until_election_leader_found()
 
     local ok, err = g.replica:exec(function()
@@ -221,7 +222,7 @@ g.test_read_only_reason_synchro = function(g)
             replication_synchro_quorum = 2,
             replication_synchro_timeout = 1000000,
         }
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
     end)
 
     t.helpers.retrying({}, function()
@@ -280,6 +281,7 @@ g.test_read_only_reason_election_has_leader_no_uuid = function(g)
         }
     end)
     g.master:wait_for_election_leader()
+    g.master:wait_for_synchro_queue_term(g.master:get_election_term())
     g.replica:wait_until_election_leader_found()
     local leader_id = g.master:get_instance_id()
 
@@ -325,7 +327,7 @@ g.test_read_only_reason_synchro_no_uuid = function(g)
             replication_synchro_quorum = 2,
             replication_synchro_timeout = 1000000,
         }
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
         box.space._cluster:run_triggers(false)
         box.space._cluster:delete{box.info.id}
     end)

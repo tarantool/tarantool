@@ -48,7 +48,7 @@ _ = box.schema.space.create('sync', {is_sync = true, engine = engine})
 _ = _:create_index('pk')
 _ = box.schema.space.create('async', {is_sync=false, engine = engine})
 _ = _:create_index('pk')
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 -- Write something to flush the master state to replica.
 box.space.sync:replace{1}
 
@@ -97,7 +97,7 @@ test_run:switch('default')
 box.space.async:select{}
 box.space.sync:select{}
 
-box.ctl.promote()
+box.ctl.promote(); box.ctl.wait_rw()
 
 box.space.sync:drop()
 box.space.async:drop()

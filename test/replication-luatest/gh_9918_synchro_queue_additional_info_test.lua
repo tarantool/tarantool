@@ -25,7 +25,7 @@ g.before_each(function(cg)
     }
     cg.replica_set:start()
     cg.leader:exec(function()
-        box.ctl.promote()
+        box.ctl.promote(); box.ctl.wait_rw()
         local s = box.schema.space.create('s', {is_sync = true})
         s:create_index('pk')
         local as = box.schema.space.create('as', {is_sync = false})
