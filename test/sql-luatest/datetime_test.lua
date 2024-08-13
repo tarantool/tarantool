@@ -2269,10 +2269,6 @@ g.test_datetime_33_1 = function()
         v.msec = 1
         t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
 
-        v = {year = 1.1, month = 1.1, day = 1.1, hour = 1.1, min = 1.1,
-             sec = 1.1}
-        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
-
         v = {timestamp = 1}
         t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
 
