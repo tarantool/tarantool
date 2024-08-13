@@ -496,12 +496,28 @@ local function apply(config)
         --
         -- The RO/RW mode remains unchanged on reload.
         local am_i_bootstrap_leader = false
+        local is_bootstrapped =
+            snapshot.get_path(configdata._iconfig_def) == nil
+
         if is_startup then
             local instance_name = configdata:names().instance_name
+
             am_i_bootstrap_leader =
-                snapshot.get_path(configdata._iconfig_def) == nil and
+                is_bootstrapped and
                 instance_name == configdata:bootstrap_leader_name()
+
             box_cfg.read_only = not am_i_bootstrap_leader
+        end
+
+        local leader_rw_interval =
+            instance_config:get(configdata._iconfig_def,
+                                'failover.lease_interval')
+
+        if is_bootstrapped then
+            -- This variable is needed to determine the cases when
+            -- the RW mode was set not by the coordinator but by the
+            -- replicaset.
+            config._made_leader_rw_for_interval = leader_rw_interval
         end
 
         -- It is possible that an instance with the minimal
@@ -522,6 +538,14 @@ local function apply(config)
         -- If box.info.id != 1, then the replicaset was already
         -- bootstrapped and so we should go to RO.
         if am_i_bootstrap_leader then
+            fiber.new(function()
+                local name = 'config_revoke_recently_bootstrapped_status'
+                fiber.self():name(name)
+
+                fiber.sleep(leader_rw_interval)
+                box.cfg({read_only = true})
+            end)
+
             fiber.new(function()
                 local name = 'config_set_read_only_if_not_bootstrap_leader'
                 fiber.self():name(name, {truncate = true})
