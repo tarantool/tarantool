@@ -564,7 +564,8 @@ local function update_existing_users_to_1_7_5()
     local def_ids_to_update = {}
     for _, def in box.space._user:pairs() do
         local new_def = def:totable()
-        if new_def[5] == nil then
+        if new_def[5] == nil or type(new_def[5]) ~= 'table'
+           or not next(new_def[5]) then
             table.insert(def_ids_to_update, new_def[1])
         end
     end
@@ -631,9 +632,31 @@ local function update_space_formats_to_1_7_5()
     box.space._cluster:format(format)
 end
 
+local function update_user_space_formats_to_1_7_5()
+    local spaces_to_update = {}
+    for _, def in box.space._space:pairs() do
+        local new_def = def:totable()
+        local format = new_def[7]
+        if format and type(format) == 'table' and next(format) ~= nil and
+           format[1]['name'] == nil then
+            for _, f in ipairs(format) do
+                f['name'] = f[1]
+                f[1] = nil
+            end
+            table.insert(spaces_to_update, new_def)
+        end
+    end
+    for _, new_def in ipairs(spaces_to_update) do
+        box.space._space:replace(new_def)
+        log.info("Update space '%s' format: new format: %s", new_def[3],
+                 json.encode(new_def[7]))
+    end
+end
+
 local function upgrade_to_1_7_5()
     create_truncate_space()
     update_space_formats_to_1_7_5()
+    update_user_space_formats_to_1_7_5()
     update_existing_users_to_1_7_5()
 end
 
