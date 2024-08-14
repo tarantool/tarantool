@@ -1,6 +1,5 @@
 local schema = require('internal.config.utils.schema')
 local tarantool = require('tarantool')
-local compat = require('compat')
 local uuid = require('uuid')
 local urilib = require('uri')
 local fio = require('fio')
@@ -1473,8 +1472,9 @@ return schema.new('instance_config', schema.record({
         sync_timeout = schema.scalar({
             type = 'number',
             box_cfg = 'replication_sync_timeout',
-            default = compat.box_cfg_replication_sync_timeout:is_old()
-                and 300 or 0,
+            -- The effective default is determined depending on
+            -- the compat.box_cfg_replication_sync_timeout option.
+            default = box.NULL,
         }),
         sync_lag = schema.scalar({
             type = 'number',

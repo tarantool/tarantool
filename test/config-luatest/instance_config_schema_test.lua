@@ -1146,7 +1146,7 @@ g.test_replication = function()
         timeout = 1,
         synchro_timeout = 5,
         connect_timeout = 30,
-        sync_timeout = 0,
+        sync_timeout = box.NULL,
         sync_lag = 10,
         synchro_quorum = 'N / 2 + 1',
         skip_conflict = false,
@@ -1351,6 +1351,10 @@ g.test_box_cfg_coverage = function()
         -- The effective default is determined depending of
         -- the replication.failover option.
         election_mode = true,
+
+        -- The effective default is determined depending on
+        -- the compat.box_cfg_replication_sync_timeout option.
+        replication_sync_timeout = true,
     }
 
     local log_prefix = 'test_box_cfg_coverage'
