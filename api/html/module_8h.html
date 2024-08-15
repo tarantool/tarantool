@@ -121,7 +121,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abd1dbec4fd6761084d3e0c05afe2b138">PACKAGE_VERSION_PATCH</a>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.2.0-entrypoint-227-g12169c290&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.2.0-entrypoint-231-g371fa0dc0&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <a href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">More...</a><br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad63a17703ee9303be2682b7bb08e7a9f"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#ad63a17703ee9303be2682b7bb08e7a9f">TZDATA_VERSION</a>&#160;&#160;&#160;&quot;2022a&quot;</td></tr>
@@ -280,6 +280,13 @@ Macros</h2></td></tr>
 <tr class="memitem:a39929109aefade22a76048b9ac73bd8d"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a39929109aefade22a76048b9ac73bd8d">say_syserror</a>(format, ...)</td></tr>
 <tr class="memdesc:a39929109aefade22a76048b9ac73bd8d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Format and print a message to Tarantool log file.  <a href="module_8h.html#a39929109aefade22a76048b9ac73bd8d">More...</a><br /></td></tr>
 <tr class="separator:a39929109aefade22a76048b9ac73bd8d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa4ca483733f06b223d2619bdd00d88eb"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa4ca483733f06b223d2619bdd00d88eb">SYSTEM_SPACES</a>(_)</td></tr>
+<tr class="memdesc:aa4ca483733f06b223d2619bdd00d88eb"><td class="mdescLeft">&#160;</td><td class="mdescRight">public  <a href="module_8h.html#aa4ca483733f06b223d2619bdd00d88eb">More...</a><br /></td></tr>
+<tr class="separator:aa4ca483733f06b223d2619bdd00d88eb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1d431f403e328f17179166f8aee01d34"><td class="memItemLeft" align="right" valign="top"><a id="a1d431f403e328f17179166f8aee01d34"></a>
+#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a1d431f403e328f17179166f8aee01d34">SYSTEM_SPACE_MEMBER</a>(name,  id, ...)&#160;&#160;&#160;BOX_ ## name ## _ID = id,</td></tr>
+<tr class="memdesc:a1d431f403e328f17179166f8aee01d34"><td class="mdescLeft">&#160;</td><td class="mdescRight">System space identifier definition. <br /></td></tr>
+<tr class="separator:a1d431f403e328f17179166f8aee01d34"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aef61141a7db6fda3c9710bbc8c340e2e"><td class="memItemLeft" align="right" valign="top"><a id="aef61141a7db6fda3c9710bbc8c340e2e"></a>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aef61141a7db6fda3c9710bbc8c340e2e">box_error_raise</a>(code,  format, ...)&#160;&#160;&#160;	<a class="el" href="module_8h.html#aa6e6803bc4309c3f59b93e2709cb418b">box_error_set</a>(__FILE__, __LINE__, code, format, ##__VA_ARGS__)</td></tr>
 <tr class="memdesc:aef61141a7db6fda3c9710bbc8c340e2e"><td class="mdescLeft">&#160;</td><td class="mdescRight">A backward-compatible API define. <br /></td></tr>
@@ -498,64 +505,11 @@ Enumerations</h2></td></tr>
 <tr class="memitem:abc6126af1d45847bc59afa0aa3216b04"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom">{ <br />
 &#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a05cae1bfc9671a38779ffd9dde4d7f58">BOX_SYSTEM_ID_MIN</a> = 256
 , <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04ab14386b6fac3c938ed3a3b614510bb72">BOX_VINYL_DEFERRED_DELETE_ID</a> = 257
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a97f8ff937bc22208ebe19175eb0016a0">BOX_SCHEMA_ID</a> = 272
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a3bcd934a5e27f4aee628e875fd422af5">BOX_COLLATION_ID</a> = 276
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a3879bb29a2f51b4de4a923e4d6ba1b63">BOX_VCOLLATION_ID</a> = 277
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a2f5e17bb60cab866ec35b516c75c686a">BOX_SPACE_ID</a> = 280
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04abd4d512ca7fdebf9ec1a6bf7f11e1840">BOX_VSPACE_ID</a> = 281
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a43c8f5e53b0c9db9be2da424c152cec9">BOX_SEQUENCE_ID</a> = 284
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04ad41b03d39d656d7612c911d8a60582c3">BOX_SEQUENCE_DATA_ID</a> = 285
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04adb9d519142826402c9efc166df12428e">BOX_VSEQUENCE_ID</a> = 286
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a482bf0fb6fc52ff01f40edb92705c95f">BOX_INDEX_ID</a> = 288
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04ac27ac3d0508d4e5f19f91053f7971cb7">BOX_VINDEX_ID</a> = 289
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a744b39a5e9efc8559776daba88b01dd3">BOX_FUNC_ID</a> = 296
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a8cb7f39326f7dfc0afcf9dc32f5314da">BOX_VFUNC_ID</a> = 297
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a0f673849e4f92136273e92af04637e81">BOX_USER_ID</a> = 304
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04ab508bf1accff87e8422bb32785e505bb">BOX_VUSER_ID</a> = 305
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a1bbd73fc6936dfa1977c7ea18677c4f9">BOX_PRIV_ID</a> = 312
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a37bb51c69ca47d95c4ce5777c9640613">BOX_VPRIV_ID</a> = 313
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04ab05d38e39c97e255ecaf3e48db943d62">BOX_CLUSTER_ID</a> = 320
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04add17b7c9ec4c6322a8344e00e8c25c62">BOX_TRIGGER_ID</a> = 328
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a41c61daeecfce31f01f55ac6eb971f72">BOX_TRUNCATE_ID</a> = 330
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04ad4db1b50b1f6446f75a8db82e0327374">BOX_SPACE_SEQUENCE_ID</a> = 340
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04abe8471169b17b8ad853f4bd201c71785">BOX_VSPACE_SEQUENCE_ID</a> = 341
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a99e954bd1de658ba6586d7354fe06378">BOX_FK_CONSTRAINT_ID</a> = 356
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04ae97c7da44f193fcfea35afe2dfe98dc8">BOX_CK_CONSTRAINT_ID</a> = 364
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a5590980099004e7b53cd73cd5418f98b">BOX_FUNC_INDEX_ID</a> = 372
-, <br />
-&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a03e08a677af627a4199839a08b9020e8">BOX_SESSION_SETTINGS_ID</a> = 380
-, <br />
 &#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04abb87df1b61192ee3aea178534071b9cd">BOX_SYSTEM_ID_MAX</a> = 511
 , <br />
 &#160;&#160;<b>BOX_ID_NIL</b> = 2147483647
 <br />
  }</td></tr>
-<tr class="memdesc:abc6126af1d45847bc59afa0aa3216b04"><td class="mdescLeft">&#160;</td><td class="mdescRight">public  <a href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04">More...</a><br /></td></tr>
 <tr class="separator:abc6126af1d45847bc59afa0aa3216b04"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4dab01cb6470a8177e9618558523ff7b"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a4dab01cb6470a8177e9618558523ff7b">iproto_handler_status</a> { <br />
 &#160;&#160;<a class="el" href="module_8h.html#a4dab01cb6470a8177e9618558523ff7ba964fc0581c3169c5047abaebcbc6a190">IPROTO_HANDLER_OK</a>
@@ -2201,7 +2155,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mo
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.2.0-entrypoint-227-g12169c290&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.2.0-entrypoint-231-g371fa0dc0&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -2699,6 +2653,27 @@ enum <a class="el" href="module_8h.html#af667a90dfe6a8cc25b510af73d98bb82" title
 
 </div>
 </div>
+<a id="aa4ca483733f06b223d2619bdd00d88eb"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa4ca483733f06b223d2619bdd00d88eb">&#9670;&nbsp;</a></span>SYSTEM_SPACES</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define SYSTEM_SPACES</td>
+          <td>(</td>
+          <td class="paramtype">&#160;</td>
+          <td class="paramname">_</td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>public </p>
+<p>List of system space definitions in the following format: (name, identifier, is_sync), where is_sync determines whether synchronous replication is enabled for this system space when the synchronous queue is claimed. If is_sync is false, a reason must be supplied after the space definition comment. </p>
+
+</div>
+</div>
 <a id="ad63a17703ee9303be2682b7bb08e7a9f"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ad63a17703ee9303be2682b7bb08e7a9f">&#9670;&nbsp;</a></span>TZDATA_VERSION</h2>
 
@@ -2938,62 +2913,8 @@ enum <a class="el" href="module_8h.html#af667a90dfe6a8cc25b510af73d98bb82" title
         </tr>
       </table>
 </div><div class="memdoc">
-
-<p>public </p>
 <table class="fieldtable">
 <tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a05cae1bfc9671a38779ffd9dde4d7f58"></a>BOX_SYSTEM_ID_MIN&#160;</td><td class="fielddoc"><p>Start of the reserved range of system spaces. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04ab14386b6fac3c938ed3a3b614510bb72"></a>BOX_VINYL_DEFERRED_DELETE_ID&#160;</td><td class="fielddoc"><p>Space if of _vinyl_deferred_delete. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a97f8ff937bc22208ebe19175eb0016a0"></a>BOX_SCHEMA_ID&#160;</td><td class="fielddoc"><p>Space id of _schema. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a3bcd934a5e27f4aee628e875fd422af5"></a>BOX_COLLATION_ID&#160;</td><td class="fielddoc"><p>Space id of _collation. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a3879bb29a2f51b4de4a923e4d6ba1b63"></a>BOX_VCOLLATION_ID&#160;</td><td class="fielddoc"><p>Space id of _vcollation. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a2f5e17bb60cab866ec35b516c75c686a"></a>BOX_SPACE_ID&#160;</td><td class="fielddoc"><p>Space id of _space. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04abd4d512ca7fdebf9ec1a6bf7f11e1840"></a>BOX_VSPACE_ID&#160;</td><td class="fielddoc"><p>Space id of _vspace view. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a43c8f5e53b0c9db9be2da424c152cec9"></a>BOX_SEQUENCE_ID&#160;</td><td class="fielddoc"><p>Space id of _sequence. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04ad41b03d39d656d7612c911d8a60582c3"></a>BOX_SEQUENCE_DATA_ID&#160;</td><td class="fielddoc"><p>Space id of _sequence_data. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04adb9d519142826402c9efc166df12428e"></a>BOX_VSEQUENCE_ID&#160;</td><td class="fielddoc"><p>Space id of _vsequence view. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a482bf0fb6fc52ff01f40edb92705c95f"></a>BOX_INDEX_ID&#160;</td><td class="fielddoc"><p>Space id of _index. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04ac27ac3d0508d4e5f19f91053f7971cb7"></a>BOX_VINDEX_ID&#160;</td><td class="fielddoc"><p>Space id of _vindex view. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a744b39a5e9efc8559776daba88b01dd3"></a>BOX_FUNC_ID&#160;</td><td class="fielddoc"><p>Space id of _func. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a8cb7f39326f7dfc0afcf9dc32f5314da"></a>BOX_VFUNC_ID&#160;</td><td class="fielddoc"><p>Space id of _vfunc view. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a0f673849e4f92136273e92af04637e81"></a>BOX_USER_ID&#160;</td><td class="fielddoc"><p>Space id of _user. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04ab508bf1accff87e8422bb32785e505bb"></a>BOX_VUSER_ID&#160;</td><td class="fielddoc"><p>Space id of _vuser view. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a1bbd73fc6936dfa1977c7ea18677c4f9"></a>BOX_PRIV_ID&#160;</td><td class="fielddoc"><p>Space id of _priv. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a37bb51c69ca47d95c4ce5777c9640613"></a>BOX_VPRIV_ID&#160;</td><td class="fielddoc"><p>Space id of _vpriv view. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04ab05d38e39c97e255ecaf3e48db943d62"></a>BOX_CLUSTER_ID&#160;</td><td class="fielddoc"><p>Space id of _cluster. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04add17b7c9ec4c6322a8344e00e8c25c62"></a>BOX_TRIGGER_ID&#160;</td><td class="fielddoc"><p>Space id of _trigger. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a41c61daeecfce31f01f55ac6eb971f72"></a>BOX_TRUNCATE_ID&#160;</td><td class="fielddoc"><p>Space id of _truncate. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04ad4db1b50b1f6446f75a8db82e0327374"></a>BOX_SPACE_SEQUENCE_ID&#160;</td><td class="fielddoc"><p>Space id of _space_sequence. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04abe8471169b17b8ad853f4bd201c71785"></a>BOX_VSPACE_SEQUENCE_ID&#160;</td><td class="fielddoc"><p>Space id of _vspace_sequence. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a99e954bd1de658ba6586d7354fe06378"></a>BOX_FK_CONSTRAINT_ID&#160;</td><td class="fielddoc"><p>Space id of _fk_constraint. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04ae97c7da44f193fcfea35afe2dfe98dc8"></a>BOX_CK_CONSTRAINT_ID&#160;</td><td class="fielddoc"><p>Space id of _ck_contraint. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a5590980099004e7b53cd73cd5418f98b"></a>BOX_FUNC_INDEX_ID&#160;</td><td class="fielddoc"><p>Space id of _func_index. </p>
-</td></tr>
-<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a03e08a677af627a4199839a08b9020e8"></a>BOX_SESSION_SETTINGS_ID&#160;</td><td class="fielddoc"><p>Space id of _session_settings. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04abb87df1b61192ee3aea178534071b9cd"></a>BOX_SYSTEM_ID_MAX&#160;</td><td class="fielddoc"><p>End of the reserved range of system spaces. </p>
 </td></tr>
@@ -10509,7 +10430,7 @@ the fiber is not joined yet (panic if not).</dd></dl>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Thu Aug 15 2024 12:12:38 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Thu Aug 15 2024 14:57:56 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>

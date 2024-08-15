@@ -64,6 +64,8 @@
     <member refid="module_8h_1a01a0037b2d3389e850c9bd7d66996b42" kind="define"><name>say_verbose</name></member>
     <member refid="module_8h_1ab318c2435df2b04c7180df57a3c217ae" kind="define"><name>say_debug</name></member>
     <member refid="module_8h_1a39929109aefade22a76048b9ac73bd8d" kind="define"><name>say_syserror</name></member>
+    <member refid="module_8h_1aa4ca483733f06b223d2619bdd00d88eb" kind="define"><name>SYSTEM_SPACES</name></member>
+    <member refid="module_8h_1a1d431f403e328f17179166f8aee01d34" kind="define"><name>SYSTEM_SPACE_MEMBER</name></member>
     <member refid="module_8h_1aef61141a7db6fda3c9710bbc8c340e2e" kind="define"><name>box_error_raise</name></member>
     <member refid="module_8h_1afd0415940d06f795e1f4dcfd40dd6c5b" kind="define"><name>BOX_DECIMAL_STRING_BUFFER_SIZE</name></member>
     <member refid="module_8h_1af667a90dfe6a8cc25b510af73d98bb82" kind="enum"><name>say_level</name></member>
@@ -134,32 +136,6 @@
     <member refid="module_8h_1ac42b7e2d98df6589252f8ede07932619aad32695f29bf98295ae2df20a3974d46" kind="enumvalue"><name>on_conflict_action_MAX</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04" kind="enum"><name>@3</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a05cae1bfc9671a38779ffd9dde4d7f58" kind="enumvalue"><name>BOX_SYSTEM_ID_MIN</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04ab14386b6fac3c938ed3a3b614510bb72" kind="enumvalue"><name>BOX_VINYL_DEFERRED_DELETE_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a97f8ff937bc22208ebe19175eb0016a0" kind="enumvalue"><name>BOX_SCHEMA_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a3bcd934a5e27f4aee628e875fd422af5" kind="enumvalue"><name>BOX_COLLATION_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a3879bb29a2f51b4de4a923e4d6ba1b63" kind="enumvalue"><name>BOX_VCOLLATION_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a2f5e17bb60cab866ec35b516c75c686a" kind="enumvalue"><name>BOX_SPACE_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04abd4d512ca7fdebf9ec1a6bf7f11e1840" kind="enumvalue"><name>BOX_VSPACE_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a43c8f5e53b0c9db9be2da424c152cec9" kind="enumvalue"><name>BOX_SEQUENCE_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04ad41b03d39d656d7612c911d8a60582c3" kind="enumvalue"><name>BOX_SEQUENCE_DATA_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04adb9d519142826402c9efc166df12428e" kind="enumvalue"><name>BOX_VSEQUENCE_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a482bf0fb6fc52ff01f40edb92705c95f" kind="enumvalue"><name>BOX_INDEX_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04ac27ac3d0508d4e5f19f91053f7971cb7" kind="enumvalue"><name>BOX_VINDEX_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a744b39a5e9efc8559776daba88b01dd3" kind="enumvalue"><name>BOX_FUNC_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a8cb7f39326f7dfc0afcf9dc32f5314da" kind="enumvalue"><name>BOX_VFUNC_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a0f673849e4f92136273e92af04637e81" kind="enumvalue"><name>BOX_USER_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04ab508bf1accff87e8422bb32785e505bb" kind="enumvalue"><name>BOX_VUSER_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a1bbd73fc6936dfa1977c7ea18677c4f9" kind="enumvalue"><name>BOX_PRIV_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a37bb51c69ca47d95c4ce5777c9640613" kind="enumvalue"><name>BOX_VPRIV_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04ab05d38e39c97e255ecaf3e48db943d62" kind="enumvalue"><name>BOX_CLUSTER_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04add17b7c9ec4c6322a8344e00e8c25c62" kind="enumvalue"><name>BOX_TRIGGER_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a41c61daeecfce31f01f55ac6eb971f72" kind="enumvalue"><name>BOX_TRUNCATE_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04ad4db1b50b1f6446f75a8db82e0327374" kind="enumvalue"><name>BOX_SPACE_SEQUENCE_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04abe8471169b17b8ad853f4bd201c71785" kind="enumvalue"><name>BOX_VSPACE_SEQUENCE_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a99e954bd1de658ba6586d7354fe06378" kind="enumvalue"><name>BOX_FK_CONSTRAINT_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04ae97c7da44f193fcfea35afe2dfe98dc8" kind="enumvalue"><name>BOX_CK_CONSTRAINT_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a5590980099004e7b53cd73cd5418f98b" kind="enumvalue"><name>BOX_FUNC_INDEX_ID</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a03e08a677af627a4199839a08b9020e8" kind="enumvalue"><name>BOX_SESSION_SETTINGS_ID</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04abb87df1b61192ee3aea178534071b9cd" kind="enumvalue"><name>BOX_SYSTEM_ID_MAX</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a4816eb59cfbc3b8d480e61cab1cf26d4" kind="enumvalue"><name>BOX_ID_NIL</name></member>
     <member refid="module_8h_1a4dab01cb6470a8177e9618558523ff7b" kind="enum"><name>iproto_handler_status</name></member>
