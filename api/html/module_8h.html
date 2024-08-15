@@ -121,7 +121,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abd1dbec4fd6761084d3e0c05afe2b138">PACKAGE_VERSION_PATCH</a>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.2.0-entrypoint-231-g371fa0dc0&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.2.0-entrypoint-232-gf1c76b976&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <a href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">More...</a><br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad63a17703ee9303be2682b7bb08e7a9f"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#ad63a17703ee9303be2682b7bb08e7a9f">TZDATA_VERSION</a>&#160;&#160;&#160;&quot;2022a&quot;</td></tr>
@@ -1484,6 +1484,16 @@ void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="modu
 <tr class="memitem:a8b1e8f1e92bb906daefd5666e0ff2f4d"><td class="memItemLeft" align="right" valign="top">uint64_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a8b1e8f1e92bb906daefd5666e0ff2f4d">box_schema_version</a> (void)</td></tr>
 <tr class="memdesc:a8b1e8f1e92bb906daefd5666e0ff2f4d"><td class="mdescLeft">&#160;</td><td class="mdescRight">public  <a href="module_8h.html#a8b1e8f1e92bb906daefd5666e0ff2f4d">More...</a><br /></td></tr>
 <tr class="separator:a8b1e8f1e92bb906daefd5666e0ff2f4d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa62bc1dd0c418fe0031c32f44e048ce4"><td class="memItemLeft" align="right" valign="top"><a id="aa62bc1dd0c418fe0031c32f44e048ce4"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa62bc1dd0c418fe0031c32f44e048ce4">box_is_ro</a> (void)</td></tr>
+<tr class="memdesc:aa62bc1dd0c418fe0031c32f44e048ce4"><td class="mdescLeft">&#160;</td><td class="mdescRight">public <br /></td></tr>
+<tr class="separator:aa62bc1dd0c418fe0031c32f44e048ce4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adf6a73f9ce8d72029ea976cf2999ba30"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#adf6a73f9ce8d72029ea976cf2999ba30">box_wait_ro</a> (bool ro, double timeout)</td></tr>
+<tr class="memdesc:adf6a73f9ce8d72029ea976cf2999ba30"><td class="mdescLeft">&#160;</td><td class="mdescRight">public  <a href="module_8h.html#adf6a73f9ce8d72029ea976cf2999ba30">More...</a><br /></td></tr>
+<tr class="separator:adf6a73f9ce8d72029ea976cf2999ba30"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2d654c5f3f4a5e6cc4ed384a76509b67"><td class="memItemLeft" align="right" valign="top">const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a2d654c5f3f4a5e6cc4ed384a76509b67">box_ro_reason</a> (void)</td></tr>
+<tr class="memdesc:a2d654c5f3f4a5e6cc4ed384a76509b67"><td class="mdescLeft">&#160;</td><td class="mdescRight">public  <a href="module_8h.html#a2d654c5f3f4a5e6cc4ed384a76509b67">More...</a><br /></td></tr>
+<tr class="separator:a2d654c5f3f4a5e6cc4ed384a76509b67"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7fb00cd4eac4d388d58e9e5ef1ea1b3f"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a7fb00cd4eac4d388d58e9e5ef1ea1b3f">box_return_tuple</a> (<a class="el" href="module_8h.html#aa37ca06842be0fe827d5272493e2311f">box_function_ctx_t</a> *ctx, <a class="el" href="module_8h.html#a880c3e1e8e63b9a12353853fb6aefa3f">box_tuple_t</a> *tuple)</td></tr>
 <tr class="memdesc:a7fb00cd4eac4d388d58e9e5ef1ea1b3f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a tuple from stored C procedure.  <a href="module_8h.html#a7fb00cd4eac4d388d58e9e5ef1ea1b3f">More...</a><br /></td></tr>
 <tr class="separator:a7fb00cd4eac4d388d58e9e5ef1ea1b3f"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -1537,6 +1547,10 @@ void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="modu
 <tr class="memitem:a6f6d1752bccac95ed2d154a98c3fe9c7"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a6f6d1752bccac95ed2d154a98c3fe9c7">box_iproto_override</a> (uint32_t req_type, <a class="el" href="module_8h.html#a19dc8ff47cfc25ee92d0f74cdf459070">iproto_handler_t</a> handler, <a class="el" href="module_8h.html#aa9eb59c79a9b32bb8a23204e89bced9d">iproto_handler_destroy_t</a> destroy, void *ctx)</td></tr>
 <tr class="memdesc:a6f6d1752bccac95ed2d154a98c3fe9c7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sets an IPROTO request handler with the provided context for the given request type.  <a href="module_8h.html#a6f6d1752bccac95ed2d154a98c3fe9c7">More...</a><br /></td></tr>
 <tr class="separator:a6f6d1752bccac95ed2d154a98c3fe9c7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a672bcf1df35af10f617ccdcc71f760bd"><td class="memItemLeft" align="right" valign="top"><a id="a672bcf1df35af10f617ccdcc71f760bd"></a>
+int64_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a672bcf1df35af10f617ccdcc71f760bd">box_info_lsn</a> (void)</td></tr>
+<tr class="memdesc:a672bcf1df35af10f617ccdcc71f760bd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get self LSN component of box vclock, -1 if no one or bootstrap haven't succeeded. <br /></td></tr>
+<tr class="separator:a672bcf1df35af10f617ccdcc71f760bd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aab8b69829c8d89799a9fb0e5d360e84b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="module_8h.html#a2b04d0397e455b7ed42b530c1c1ea9e6">box_iterator_t</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aab8b69829c8d89799a9fb0e5d360e84b">box_index_iterator</a> (uint32_t space_id, uint32_t index_id, int type, const char *key, const char *key_end)</td></tr>
 <tr class="memdesc:aab8b69829c8d89799a9fb0e5d360e84b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocate and initialize iterator for space_id, index_id.  <a href="module_8h.html#aab8b69829c8d89799a9fb0e5d360e84b">More...</a><br /></td></tr>
 <tr class="separator:aab8b69829c8d89799a9fb0e5d360e84b"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -2155,7 +2169,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mo
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.2.0-entrypoint-231-g371fa0dc0&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.2.0-entrypoint-232-gf1c76b976&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -6450,6 +6464,27 @@ decimal result (<em>res</em>) </dd></dl>
 
 </div>
 </div>
+<a id="a2d654c5f3f4a5e6cc4ed384a76509b67"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2d654c5f3f4a5e6cc4ed384a76509b67">&#9670;&nbsp;</a></span>box_ro_reason()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const char* box_ro_reason </td>
+          <td>(</td>
+          <td class="paramtype">void&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>public </p>
+<p>Get the reason why the instance is read only if it is. Can't be called on a writable instance. </p>
+
+</div>
+</div>
 <a id="a8b1e8f1e92bb906daefd5666e0ff2f4d"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a8b1e8f1e92bb906daefd5666e0ff2f4d">&#9670;&nbsp;</a></span>box_schema_version()</h2>
 
@@ -8100,6 +8135,50 @@ box_tuple_position(it) == box_tuple_field_count(tuple) if returned value is NULL
 </div><!-- fragment --> </dd>
 <dd>
 <a class="el" href="module_8h.html#a9badf4d5cc54e424a157439fcb58b96a" title="Execute an UPDATE request.">box_update()</a> </dd></dl>
+
+</div>
+</div>
+<a id="adf6a73f9ce8d72029ea976cf2999ba30"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#adf6a73f9ce8d72029ea976cf2999ba30">&#9670;&nbsp;</a></span>box_wait_ro()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int box_wait_ro </td>
+          <td>(</td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>ro</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">double&#160;</td>
+          <td class="paramname"><em>timeout</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>public </p>
+<p>Wait until the instance switches to a desired mode. </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">ro</td><td>wait read-only if set or read-write if unset </td></tr>
+    <tr><td class="paramname">timeout</td><td>max time to wait </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="retval"><dt>Return values</dt><dd>
+  <table class="retval">
+    <tr><td class="paramname">-1</td><td>timeout or fiber is cancelled </td></tr>
+    <tr><td class="paramname">0</td><td>success </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
@@ -10430,7 +10509,7 @@ the fiber is not joined yet (panic if not).</dd></dl>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Thu Aug 15 2024 14:57:56 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Thu Aug 15 2024 14:58:29 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>
