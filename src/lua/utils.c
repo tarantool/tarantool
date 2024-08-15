@@ -128,7 +128,7 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 		/* Handle ctype __gc metamethod. Use the fast lookup here. */
 		cTValue *tv = lj_tab_getinth(cts->miscmap, -(int32_t)ctypeid);
 		if (tv && tvistab(tv) && (tv = lj_meta_fast(L, tabV(tv), MM_gc))) {
-			GCtab *t = cts->finalizer;
+			GCtab *t = tabref(G(L)->gcroot[GCROOT_FFI_FIN]);
 			if (gcref(t->metatable)) {
 				/* Add to finalizer table, if still enabled. */
 				copyTV(L, lj_tab_set(L, t, o), tv);
