@@ -1,8 +1,9 @@
 enable_tnt_compile_flags()
 
-set(RUN_PERF_LUA_TESTS_LIST "")
-
 set(LUA_PATH "${CMAKE_CURRENT_SOURCE_DIR}/?.lua\;\;")
+set(TEST_SUITE_NAME "performance-lua")
+
+message(STATUS "Add test suite ${TEST_SUITE_NAME}")
 
 function(create_perf_lua_test)
   set(prefix PERF)
@@ -18,8 +19,6 @@ function(create_perf_lua_test)
                         "${multiValues}"
                         ${ARGN})
 
-  message(STATUS "Creating Lua performance test ${PERF_NAME}_perftest")
-
   set(TEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/${PERF_NAME}.lua)
   set(BENCH_RESULT ${PERF_OUTPUT_DIR}/${PERF_NAME}.json)
   set(BENCH_TARGET ${PERF_NAME}_perftest)
@@ -31,6 +30,7 @@ function(create_perf_lua_test)
   # or not, and the second target (BENCH_RESULT_TARGET) is run
   # only if the corresponding file is omitted. The COMMAND_LIST
   # variable contains the same command for these targets.
+  set(TEST_DEPS tarantool ${PERF_DEPENDS} ${TEST_PATH})
   set(COMMAND_LIST
         COMMENT Running ${BENCH_TARGET}
         COMMAND ${CMAKE_COMMAND} -E env
@@ -38,15 +38,30 @@ function(create_perf_lua_test)
           ${BENCH_CMD_SEPARATE} ${TARANTOOL_BIN} ${TEST_PATH}
             --output="${BENCH_RESULT}"
             --output_format=json
-        DEPENDS tarantool ${PERF_DEPENDS} ${TEST_PATH}
+        DEPENDS ${TEST_DEPS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   )
+
   add_custom_command(OUTPUT ${BENCH_RESULT} ${COMMAND_LIST})
   add_custom_target(${BENCH_RESULT_TARGET} DEPENDS ${BENCH_RESULT})
   add_custom_target(${BENCH_TARGET} ${COMMAND_LIST})
 
-  set(RUN_PERF_LUA_TESTS_LIST ${RUN_PERF_LUA_TESTS_LIST} ${BENCH_TARGET} PARENT_SCOPE)
+  # XXX: The call produces both test and target
+  # <${PERF_NAME}-deps> as a side effect.
+  _add_test_suite_target(${PERF_NAME}
+    LABELS "${TEST_SUITE_NAME};performance;"
+    DEPENDS ${TEST_DEPS})
   set(BENCH_RESULTS ${BENCH_RESULT_TARGET} ${BENCH_RESULTS}  PARENT_SCOPE)
+  set(test_title "perf/lua/${PERF_NAME}.lua")
+  add_test(NAME ${test_title}
+           COMMAND ${TARANTOOL_BIN}
+                   ${CMAKE_CURRENT_SOURCE_DIR}/${PERF_NAME}.lua
+                   --output=${BENCH_RESULT} --output_format=json
+  )
+  set_tests_properties(${test_title} PROPERTIES
+    ENVIRONMENT "LUA_PATH=${LUA_PATH}"
+    LABELS "${TEST_SUITE_NAME};performance;"
+    DEPENDS ${BENCH_TARGET}-deps)
 endfunction()
 
 create_perf_lua_test(NAME 1mops_write)
@@ -70,7 +85,9 @@ create_perf_lua_test(NAME column_insert
 )
 
 add_custom_target(test-lua-perf
-                  DEPENDS "${RUN_PERF_LUA_TESTS_LIST}"
+                  COMMAND ${CMAKE_CTEST_COMMAND}
+                          ${TARANTOOL_PERF_CTEST_FLAGS}
+                          -L ${TEST_SUITE_NAME}
                   COMMENT "Running Lua performance tests"
 )
 

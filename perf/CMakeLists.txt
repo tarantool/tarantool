@@ -13,6 +13,16 @@ endif()
 # Parse command-line arguments into a semicolon-separated list.
 separate_arguments(BENCH_CMD_SEPARATE UNIX_COMMAND ${BENCH_CMD})
 
+set(TEST_SUITE_NAME "performance-c")
+
+list(APPEND TARANTOOL_PERF_CTEST_FLAGS
+    --parallel 0
+    # Always show test output with results.
+    --verbose
+    --output-on-failure
+    --no-tests=error
+)
+
 add_subdirectory(lua)
 
 if(ENABLE_BUNDLED_LIBBENCHMARK)
@@ -47,6 +57,15 @@ include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
 set(RUN_PERF_C_TESTS_LIST "")
 
+message(STATUS "Add test suite ${TEST_SUITE_NAME}")
+
+# XXX: The call produces both test and target
+# <${TEST_SUITE_NAME}-deps> as a side effect.
+_add_test_suite_target(${TEST_SUITE_NAME}
+  LABELS "${TEST_SUITE_NAME};performance;"
+  DEPENDS ${RUN_PERF_C_TESTS_LIST}
+)
+
 function(create_perf_test_target)
   set(prefix PERF)
   set(noValues)
@@ -60,7 +79,6 @@ function(create_perf_test_target)
                         "${singleValues}"
                         "${multiValues}"
                         ${ARGN})
-  message(STATUS "Creating C performance test ${PERF_TARGET}_perftest")
 
   set(BENCH_RESULT ${PERF_OUTPUT_DIR}/${PERF_TARGET}.json)
   set(BENCH_TARGET ${PERF_TARGET}_perftest)
@@ -84,7 +102,18 @@ function(create_perf_test_target)
   add_custom_target(${BENCH_TARGET} ${COMMAND_LIST})
 
   set(RUN_PERF_C_TESTS_LIST ${RUN_PERF_C_TESTS_LIST} ${BENCH_TARGET} PARENT_SCOPE)
+  add_dependencies(${TEST_SUITE_NAME}-deps ${PERF_TARGET}.perftest)
   set(BENCH_RESULTS ${BENCH_RESULT_TARGET} ${BENCH_RESULTS} PARENT_SCOPE)
+  set(test_title "perf/${PERF_TARGET}.cc")
+  add_test(NAME ${test_title}
+           COMMAND "$<TARGET_FILE:${PERF_TARGET}.perftest>"
+                   --benchmark_out_format=json
+                   --benchmark_out=${BENCH_RESULT}
+  )
+  set_tests_properties(${test_title} PROPERTIES
+    LABELS "${TEST_SUITE_NAME};performance;"
+    DEPENDS ${TEST_SUITE_NAME}-deps
+  )
 endfunction()
 
 function(create_perf_test)
@@ -131,13 +160,18 @@ create_perf_test(NAME memtx
 create_perf_test_target(TARGET memtx)
 
 add_custom_target(test-c-perf
+                  COMMAND ${CMAKE_CTEST_COMMAND}
+                          ${TARANTOOL_PERF_CTEST_FLAGS}
+                          -L ${TEST_SUITE_NAME}
                   DEPENDS ${RUN_PERF_C_TESTS_LIST}
                   COMMENT "Running C performance tests"
 )
 
 add_custom_target(test-perf
-                  DEPENDS test-c-perf test-lua-perf
-                  COMMENT "Running performance tests"
+                  COMMAND ${CMAKE_CTEST_COMMAND}
+                          ${TARANTOOL_PERF_CTEST_FLAGS}
+                          -L performance
+                  COMMENT "Running all performance tests"
 )
 
 
