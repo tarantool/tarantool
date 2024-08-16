@@ -430,6 +430,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea71816f8457795eed640a054d84728174" kind="enumvalue"><name>ER_TXN_COMMIT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf5908af044b8dcd5d28db05177ac18b8" kind="enumvalue"><name>ER_READ_VIEW_BUSY</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcead6dbe2eef41eafa232935dd44d788b90" kind="enumvalue"><name>ER_READ_VIEW_CLOSED</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea42bc12c23af2af3f28ca4ccec389bc52" kind="enumvalue"><name>ER_WAL_QUEUE_FULL</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
