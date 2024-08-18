@@ -1130,6 +1130,15 @@ API_EXPORT void
 box_txn_make_sync(void);
 /** \endcond public */
 
+/**
+ * Look at the flags row->flags. If the transaction is synchronous, then set
+ * is_sync = true (txn.c). This should only be done on replicas. The master sets
+ * these flags and independently decides whether the transaction is synchronous
+ * or not. All txn meta flags are set only for the last txn row.
+ */
+void
+box_txn_apply_xrow_flags(const struct xrow_header *row);
+
 /** Commit the current txn with the chosen wait mode. */
 int
 box_txn_commit_ex(enum txn_commit_wait_mode wait_mode);

@@ -1451,17 +1451,8 @@ apply_plain_tx(uint32_t replica_id, struct stailq *rows)
 	}
 
 	item = stailq_last_entry(rows, struct applier_tx_row, next);
-
-	/*
-	 * Look at the flags item->row->flags. If the transaction
-	 * is synchronous, then set is_sync = true (txn.c). This
-	 * should only be done on replicas. The master sets these
-	 * flags and independently decides whether the transaction
-	 * is synchronous or not. All txn meta flags are set only
-	 * for the last txn row.
-	 */
-	if ((item->row.flags & IPROTO_FLAG_WAIT_ACK) != 0)
-		box_txn_make_sync();
+	/* All txn meta flags are set only for the last txn row. */
+	box_txn_apply_xrow_flags(&item->row);
 	size_t size;
 	struct trigger *on_rollback, *on_wal_write;
 	on_rollback = region_alloc_object(&txn->region, typeof(*on_rollback),

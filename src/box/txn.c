@@ -1446,6 +1446,13 @@ box_txn_make_sync(void)
 	txn_set_flags(txn, TXN_WAIT_ACK);
 }
 
+void
+box_txn_apply_xrow_flags(const struct xrow_header *row)
+{
+	if (row->wait_ack)
+		box_txn_make_sync();
+}
+
 /** Wait for a linearization point for a transaction. */
 static int
 txn_make_linearizable(struct txn *txn)
