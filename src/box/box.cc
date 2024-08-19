@@ -1365,6 +1365,20 @@ box_check_replication_sync_lag(void)
 	return lag;
 }
 
+static enum split_brain_handling_mode
+box_check_replication_split_brain_handling_mode(void)
+{
+	const char *mode = cfg_gets("replication_split_brain_handling_mode");
+	if (strcmp(mode, "none") == 0)
+		return SPLIT_BRAIN_HANDLING_MODE_NONE;
+	else if (strcmp(mode, "rollback") == 0)
+		return SPLIT_BRAIN_HANDLING_MODE_ROLLBACK;
+	diag_set(ClientError, ER_CFG, "replication_split_brain_handling_mode",
+		 "the value must be one of the following strings: "
+		 "'none', 'rollback'");
+	return SPLIT_BRAIN_HANDLING_MODE_INVALID;
+}
+
 /**
  * Evaluate replication syncro quorum number from a formula.
  */
@@ -2223,6 +2237,19 @@ void
 box_set_replication_sync_lag(void)
 {
 	replication_sync_lag = box_check_replication_sync_lag();
+}
+
+int
+box_set_replication_split_brain_handling_mode(void)
+{
+	enum split_brain_handling_mode mode =
+		box_check_replication_split_brain_handling_mode();
+	if (mode == SPLIT_BRAIN_HANDLING_MODE_INVALID)
+		return -1;
+	bool do_confirm_async =
+		mode != SPLIT_BRAIN_HANDLING_MODE_NONE;
+	txn_limbo_set_do_confirm_async(&txn_limbo, do_confirm_async);
+	return 0;
 }
 
 void
@@ -5629,6 +5656,7 @@ box_cfg_xc(void)
 	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_LEGACY)
 		box_set_replication_connect_quorum();
 	box_set_replication_sync_lag();
+	box_set_replication_split_brain_handling_mode();
 	if (box_set_replication_synchro_quorum() != 0)
 		diag_raise();
 	if (box_set_replication_synchro_timeout() != 0)

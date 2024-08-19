@@ -208,9 +208,9 @@ void
 test_xrow_encode_decode()
 {
 	header();
-	/* Test all possible 3-bit combinations. */
-	const int bit_comb_count = 1 << 3;
-	plan(1 + bit_comb_count * 15);
+	/* Test all possible 4-bit combinations. */
+	const int bit_comb_count = 1 << 4;
+	plan(1 + bit_comb_count * 16);
 	struct xrow_header header;
 	char buffer[2048];
 	char *pos = mp_encode_uint(buffer, 300);
@@ -230,6 +230,7 @@ test_xrow_encode_decode()
 		header.is_commit = opt_idx & 0x01;
 		header.wait_sync = opt_idx >> 1 & 0x01;
 		header.wait_ack = opt_idx >> 2 & 0x01;
+		header.early_ack = opt_idx >> 3 & 0x01;
 		int iovcnt;
 		struct iovec vec[1];
 		xrow_encode(&header, sync, /*fixheader_len=*/200, vec, &iovcnt);
@@ -241,7 +242,7 @@ test_xrow_encode_decode()
 		 * header.is_commit flag isn't encoded, since this row looks
 		 * like a single-statement transaction.
 		 */
-		if (header.wait_sync || header.wait_ack)
+		if (header.wait_sync || header.wait_ack || header.early_ack)
 			exp_map_size += 1;
 		/* tsn is encoded explicitly in this case. */
 		if (!header.is_commit)
@@ -261,6 +262,8 @@ test_xrow_encode_decode()
 		is(header.is_commit, decoded_header.is_commit, "decoded is_commit");
 		is(header.wait_sync, decoded_header.wait_sync, "decoded wait_sync");
 		is(header.wait_ack, decoded_header.wait_ack, "decoded wait_ack");
+		is(header.early_ack, decoded_header.early_ack,
+		   "decoded early_ack");
 		is(header.type, decoded_header.type, "decoded type");
 		is(header.replica_id, decoded_header.replica_id, "decoded replica_id");
 		is(header.lsn, decoded_header.lsn, "decoded lsn");
@@ -330,7 +333,7 @@ static void
 test_xrow_fields()
 {
 	header();
-	plan(6);
+	plan(8);
 
 	struct xrow_header header;
 
@@ -348,14 +351,26 @@ test_xrow_fields()
 	is(header.flags, IPROTO_FLAG_WAIT_ACK, "header.wait_ack -> WAIT_ACK");
 	header.wait_ack = false;
 
+	header.early_ack = true;
+	is(header.flags, IPROTO_FLAG_EARLY_ACK,
+	   "header.early_ack -> EARLY_ACK");
+	header.early_ack = false;
+
 	header.flags = IPROTO_FLAG_COMMIT;
-	ok(header.is_commit && !header.wait_sync && !header.wait_ack, "COMMIT -> header.is_commit");
+	ok(header.is_commit && !header.wait_sync && !header.wait_ack &&
+	   !header.early_ack, "COMMIT -> header.is_commit");
 
 	header.flags = IPROTO_FLAG_WAIT_SYNC;
-	ok(!header.is_commit && header.wait_sync && !header.wait_ack, "WAIT_SYNC -> header.wait_sync");
+	ok(!header.is_commit && header.wait_sync && !header.wait_ack &&
+	   !header.early_ack, "WAIT_SYNC -> header.wait_sync");
 
 	header.flags = IPROTO_FLAG_WAIT_ACK;
-	ok(!header.is_commit && !header.wait_sync && header.wait_ack, "WAIT_ACK -> header.wait_ack");
+	ok(!header.is_commit && !header.wait_sync && header.wait_ack &&
+	   !header.early_ack, "WAIT_ACK -> header.wait_ack");
+
+	header.flags = IPROTO_FLAG_EARLY_ACK;
+	ok(!header.is_commit && !header.wait_sync && !header.wait_ack &&
+	   header.early_ack, "EARLY_ACK -> header.early_ack");
 
 	check_plan();
 	footer();

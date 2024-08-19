@@ -1525,7 +1525,8 @@ applier_synchro_filter_tx(struct stailq *rows)
 	 * a synchronous transaction, which is committed with quorum 1.
 	 */
 	struct applier_tx_row *item;
-	if (iproto_type_is_dml(row->type) && !row->wait_sync) {
+	if (iproto_type_is_dml(row->type) &&
+	    !row->wait_sync && !row->wait_ack) {
 		if (txn_limbo.owner_id == REPLICA_ID_NIL)
 			return 0;
 		stailq_foreach_entry(item, rows, next) {

@@ -106,9 +106,13 @@ struct xrow_header {
 			 */
 			bool wait_sync : 1;
 			/**
-			 * True for a synchronous transaction.
+			 * True for a transaction that will need a confirmation.
 			 */
 			bool wait_ack  : 1;
+			/**
+			 *
+			 */
+			bool early_ack : 1;
 		};
 	};
 

@@ -82,11 +82,12 @@ enum txn_flag {
 	 */
 	TXN_WAIT_SYNC = 0x10,
 	/**
-	 * Synchronous transaction 'waiting for ACKs' state before
-	 * commit. In this state it waits until it is replicated
-	 * onto a quorum of replicas, and only then finishes
-	 * commit and returns success to a user.
-	 * TXN_WAIT_SYNC is always set, if TXN_WAIT_ACK is set.
+	 * Transaction 'waiting for ACKs' state before commit. In this state it
+	 * waits until it is replicated onto a quorum of replicas, and only then
+	 * finishes commit. If it is a synchronous transaction, it acknowledges
+	 * the transaction to the user only after finishing commit. If it is an
+	 * asynchronous transaction, it acknowledges the transaction immediately
+	 * after it is written to the WAL (see TXN_EARLY_ACK).
 	 */
 	TXN_WAIT_ACK = 0x20,
 	/**
@@ -125,6 +126,12 @@ enum txn_flag {
 	 * rollback.
 	 */
 	TXN_IS_SYNC = 0x2000,
+	/**
+	 * Asynchronous transaction is acknowledged to the user immediately
+	 * after it is written to the WAL, but it is stored in the
+	 * synchronous queue until confirmation or rollback.
+	 */
+	TXN_EARLY_ACK = 0x4000,
 };
 
 enum {
@@ -1134,6 +1141,13 @@ box_txn_set_isolation(uint32_t level);
 API_EXPORT void
 box_txn_make_sync(void);
 /** \endcond public */
+
+/**
+ * Make an asynchronous transaction return success early, but keep it in the
+ * limbo until confirmation.
+ */
+void
+box_txn_make_early_ack(void);
 
 /**
  * Look at the flags row->flags. If the transaction is synchronous, then set

@@ -1129,6 +1129,7 @@ g.test_replication = function()
             sync_timeout = 1,
             sync_lag = 1,
             synchro_quorum = 1,
+            split_brain_handling_mode = 'none',
             skip_conflict = true,
             election_mode = 'off',
             election_timeout = 1,
@@ -1156,6 +1157,7 @@ g.test_replication = function()
         election_timeout = 5,
         election_fencing_mode = 'soft',
         bootstrap_strategy = 'auto',
+        split_brain_handling_mode = 'none',
     }
     local res = instance_config:apply_default({}).replication
     t.assert_equals(res, exp)
@@ -1356,6 +1358,10 @@ g.test_box_cfg_coverage = function()
         -- The effective default is determined depending on
         -- the compat.box_cfg_replication_sync_timeout option.
         replication_sync_timeout = true,
+
+         -- The effective default is determined depending on
+        -- the box_cfg_replication_synchro_timeout compat option.
+        replication_synchro_timeout = true,
     }
 
     local log_prefix = 'test_box_cfg_coverage'

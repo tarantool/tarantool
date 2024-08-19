@@ -232,6 +232,7 @@ g.test_defaults = function()
             connect_timeout = 30,
             sync_timeout = box.NULL,
             sync_lag = 10,
+            split_brain_handling_mode = 'none',
             synchro_quorum = 'N / 2 + 1',
             skip_conflict = false,
             election_mode = box.NULL,

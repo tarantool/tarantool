@@ -62,6 +62,8 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->confirm_lag = 0;
 	limbo->max_size = 0;
 	limbo->size = 0;
+	limbo->do_confirm_async = false;
+	limbo->pending_confirm_old_async = false;
 }
 
 void
@@ -331,9 +333,20 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	}
 
 	assert(!txn_limbo_is_empty(limbo));
-	if (txn_limbo_first_entry(limbo) != entry) {
+	struct txn_limbo_entry *e;
+	bool is_first_sync_entry = true;
+	rlist_foreach_entry(e, &limbo->queue, in_queue) {
+		if (e == entry)
+			break;
+		if (txn_has_flag(e->txn, TXN_WAIT_ACK) &&
+		    !txn_has_flag(e->txn, TXN_EARLY_ACK)) {
+			is_first_sync_entry = false;
+			break;
+		}
+	}
+	if (!is_first_sync_entry) {
 		/*
-		 * If this is not a first entry in the limbo, it
+		 * If this is not a first sync entry in the limbo, it
 		 * is definitely not a first timed out entry. And
 		 * since it managed to time out too, it means
 		 * there is currently another fiber writing
@@ -342,8 +355,6 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		 */
 		goto wait;
 	}
-
-	/* First in the queue is always a synchronous transaction. */
 	assert(entry->lsn > 0);
 	if (entry->lsn <= limbo->confirmed_lsn) {
 		/*
@@ -357,14 +368,14 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	}
 
 	txn_limbo_write_rollback(limbo, entry->lsn);
-	struct txn_limbo_entry *e, *tmp;
+	struct txn_limbo_entry *tmp;
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue,
 					 in_queue, tmp) {
 		e->txn->signature = TXN_SIGNATURE_QUORUM_TIMEOUT;
 		e->txn->limbo_entry = NULL;
 		txn_limbo_abort(limbo, e);
 		txn_clear_flags(e->txn, TXN_IS_SYNC | TXN_WAIT_SYNC |
-				TXN_WAIT_ACK);
+				TXN_WAIT_ACK | TXN_EARLY_ACK);
 		txn_limbo_complete(e->txn, false);
 		if (e == entry)
 			break;
@@ -473,6 +484,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 	assert(limbo->owner_id != REPLICA_ID_NIL || txn_limbo_is_empty(limbo));
 	assert(limbo == &txn_limbo);
 	struct txn_limbo_entry *e, *tmp;
+	bool confirmed_sync;
 	rlist_foreach_entry_safe(e, &limbo->queue, in_queue, tmp) {
 		/*
 		 * Check if it is an async transaction last in the queue. When
@@ -484,12 +496,13 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			if (e->lsn > lsn)
 				break;
 			/*
-			 * Sync transaction not yet received an LSN. Happens
-			 * only to local master transactions whose WAL write is
-			 * in progress.
+			 * Transaction not yet received an LSN. Can happen to
+			 * transactions whose WAL write is in progress.
 			 */
 			if (e->lsn == -1)
 				break;
+			if (!txn_has_flag(e->txn, TXN_EARLY_ACK))
+				confirmed_sync = true;
 		} else if (e->txn->signature == TXN_SIGNATURE_UNKNOWN) {
 			/*
 			 * A transaction might be covered by the CONFIRM even if
@@ -525,7 +538,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		e->txn->limbo_entry = NULL;
 		txn_limbo_remove(limbo, e);
 		txn_clear_flags(e->txn, TXN_IS_SYNC | TXN_WAIT_SYNC |
-				TXN_WAIT_ACK);
+				TXN_WAIT_ACK | TXN_EARLY_ACK);
 		/*
 		 * Should be written to WAL by now. Confirm is always written
 		 * after the affected transactions.
@@ -542,14 +555,29 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		limbo->confirmed_lsn = lsn;
 		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
 	}
+	if (!confirmed_sync || txn_limbo_is_empty(limbo))
+		return;
+	rlist_foreach_entry(e, &limbo->queue, in_queue) {
+		if (!txn_has_flag(e->txn, TXN_EARLY_ACK))
+			break;
+		assert(txn_has_flag(e->txn, TXN_WAIT_SYNC));
+		txn_clear_flags(e->txn, TXN_WAIT_SYNC);
+		if (e->txn->fiber != NULL)
+			fiber_wakeup(e->txn->fiber);
+	}
 }
 
 /** Confirm an LSN in the limbo. */
 static void
-txn_limbo_confirm_lsn(struct txn_limbo *limbo, int64_t confirm_lsn)
+txn_limbo_confirm_lsn(struct txn_limbo *limbo, int64_t confirm_lsn,
+		      bool is_sync_confirmed)
 {
-	txn_limbo_write_confirm(limbo, confirm_lsn);
-	txn_limbo_read_confirm(limbo, confirm_lsn);
+	if (is_sync_confirmed &&
+	    txn_limbo_is_owned_by_current_instance(limbo)) {
+		txn_limbo_write_confirm(limbo, confirm_lsn);
+	}
+	if (!is_sync_confirmed || txn_limbo_is_owned_by_current_instance(limbo))
+		txn_limbo_read_confirm(limbo, confirm_lsn);
 }
 
 /**
@@ -586,7 +614,8 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 		return;
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue, in_queue, tmp) {
 		txn_limbo_abort(limbo, e);
-		txn_clear_flags(e->txn, TXN_WAIT_ACK);
+		txn_clear_flags(e->txn, TXN_IS_SYNC | TXN_WAIT_SYNC |
+				TXN_WAIT_ACK | TXN_EARLY_ACK);
 		/*
 		 * Should be written to WAL by now. Rollback is always written
 		 * after the affected transactions.
@@ -687,7 +716,6 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 		return;
 	if (txn_limbo_is_frozen(limbo))
 		return;
-	assert(!txn_limbo_is_ro(limbo));
 	/*
 	 * If limbo is currently writing a rollback, it means that the whole
 	 * queue will be rolled back. Because rollback is written only for
@@ -709,19 +737,21 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 	 * the limbo ownership, and the current node is going to become a
 	 * replica very soon.
 	 */
-	if (lsn == prev_lsn)
+	if (lsn <= prev_lsn)
 		return;
 	vclock_follow(&limbo->vclock, replica_id, lsn);
 	struct txn_limbo_entry *e;
 	int64_t confirm_lsn = -1;
+	bool is_sync_confirmed = false;
 	rlist_foreach_entry(e, &limbo->queue, in_queue) {
 		assert(e->ack_count <= VCLOCK_MAX);
 		if (e->lsn > lsn)
 			break;
 		/*
-		 * Sync transactions need to collect acks. Async
-		 * transactions are automatically committed right
-		 * after all the previous sync transactions are.
+		 * Some transactions need to collect acks. If async transactions
+		 * are not confirmed (`do_confirm_async`), they are
+		 * automatically committed right after all the previous sync
+		 * transactions are.
 		 */
 		if (!txn_has_flag(e->txn, TXN_WAIT_ACK)) {
 			continue;
@@ -731,11 +761,13 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 			continue;
 		} else {
 			confirm_lsn = e->lsn;
+			if (!txn_has_flag(e->txn, TXN_EARLY_ACK))
+				is_sync_confirmed = true;
 		}
 	}
 	if (confirm_lsn == -1 || confirm_lsn <= limbo->confirmed_lsn)
 		return;
-	txn_limbo_confirm_lsn(limbo, confirm_lsn);
+	txn_limbo_confirm_lsn(limbo, confirm_lsn, is_sync_confirmed);
 }
 
 /**
@@ -958,22 +990,10 @@ txn_limbo_filter_queue_boundaries(struct txn_limbo *limbo,
 	int64_t lsn = req->lsn;
 	/*
 	 * Easy case - processed LSN matches the new one which comes inside
-	 * request, everything is consistent. This is allowed only for
-	 * PROMOTE/DEMOTE.
+	 * request, everything is consistent.
 	 */
-	if (limbo->confirmed_lsn == lsn) {
-		if (iproto_type_is_promote_request(req->type)) {
-			return 0;
-		} else {
-			say_error("%s. Duplicate request with confirmed lsn "
-				  "%lld = request lsn %lld", reject_str(req),
-				  (long long)limbo->confirmed_lsn,
-				  (long long)lsn);
-			diag_set(ClientError, ER_UNSUPPORTED, "Replication",
-				 "Duplicate CONFIRM/ROLLBACK request");
-			return -1;
-		}
-	}
+	if (limbo->confirmed_lsn == lsn)
+		return 0;
 
 	/*
 	 * Explicit split brain situation. Request comes in with an old LSN
@@ -1310,6 +1330,7 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 		return;
 	struct txn_limbo_entry *e;
 	int64_t confirm_lsn = -1;
+	bool is_sync_confirmed = false;
 	rlist_foreach_entry(e, &limbo->queue, in_queue) {
 		assert(e->ack_count <= VCLOCK_MAX);
 		if (!txn_has_flag(e->txn, TXN_WAIT_ACK)) {
@@ -1319,10 +1340,12 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 		} else {
 			confirm_lsn = e->lsn;
 			assert(confirm_lsn > 0);
+			if (!txn_has_flag(e->txn, TXN_EARLY_ACK))
+				is_sync_confirmed = true;
 		}
 	}
 	if (confirm_lsn > limbo->confirmed_lsn && !limbo->is_in_rollback)
-		txn_limbo_confirm_lsn(limbo, confirm_lsn);
+		txn_limbo_confirm_lsn(limbo, confirm_lsn, is_sync_confirmed);
 	/*
 	 * Wakeup all the others - timed out will rollback. Also
 	 * there can be non-transactional waiters, such as CONFIRM
@@ -1361,6 +1384,93 @@ txn_limbo_filter_disable(struct txn_limbo *limbo)
 	latch_lock(&limbo->promote_latch);
 	limbo->do_validate = false;
 	latch_unlock(&limbo->promote_latch);
+}
+
+static int64_t
+txn_limbo_confirm_old_async_entry(struct txn_limbo *limbo,
+				  struct txn_limbo_entry *e)
+{
+	assert(!txn_has_flag(e->txn, TXN_WAIT_SYNC));
+	unsigned old_async_entry_flags =
+		TXN_IS_SYNC | TXN_WAIT_ACK | TXN_EARLY_ACK;
+	assert((e->txn->flags & old_async_entry_flags) != 0);
+	e->is_commit = true;
+	e->txn->limbo_entry = NULL;
+	txn_limbo_remove(limbo, e);
+	txn_clear_flags(e->txn, old_async_entry_flags);
+	assert(e->txn->signature >= 0);
+	int64_t lsn = e->lsn;
+	txn_limbo_complete(e->txn, true);
+	return lsn;
+}
+
+void
+txn_limbo_confirm_old_async(struct txn_limbo *limbo, bool only_free_limbo_space)
+{
+	assert((!only_free_limbo_space && limbo->pending_confirm_old_async) ||
+	       txn_limbo_is_full(limbo));
+	struct txn_limbo_entry *e, *tmp;
+	int64_t confirmed_lsn = -1;
+	bool confirm_old_async_entries = true;
+	rlist_foreach_entry_safe(e, &limbo->queue, in_queue, tmp) {
+		if (txn_has_flag(e->txn, TXN_WAIT_SYNC)) {
+			if (only_free_limbo_space)
+				break;
+			confirm_old_async_entries = false;
+		} else if (e->lsn == -1) {
+			assert(e->txn->signature == TXN_SIGNATURE_UNKNOWN);
+			/*
+			 * We cannot do anything at this point: the asynchronous
+			 * transactions are being written to the WAL as early
+			 * ack transactions, so we can neither confirm them, nor
+			 * convert them to plain asynchronous transactions,
+			 * since they will be replicated as early ack
+			 * transactions.
+			 */
+			break;
+		}
+		if (confirm_old_async_entries) {
+			confirmed_lsn =
+				txn_limbo_confirm_old_async_entry(limbo, e);
+			if (only_free_limbo_space && !txn_limbo_is_full(limbo))
+				break;
+		} else if (txn_has_flag(e->txn, TXN_EARLY_ACK)) {
+			assert(txn_has_flag(e->txn, TXN_WAIT_ACK));
+			txn_clear_flags(e->txn, TXN_WAIT_ACK | TXN_EARLY_ACK);
+		}
+	}
+	if (limbo->confirmed_lsn < confirmed_lsn) {
+		limbo->confirmed_lsn = confirmed_lsn;
+		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id,
+			      confirmed_lsn);
+	}
+}
+
+static void
+txn_limbo_make_old_async_confirmable(struct txn_limbo *limbo)
+{
+	struct txn_limbo_entry *e, *tmp;
+	rlist_foreach_entry_safe(e, &limbo->queue, in_queue, tmp) {
+		if (!txn_is_fully_local(e->txn) &&
+		    !txn_has_flag(e->txn, TXN_WAIT_ACK)) {
+			assert(!txn_has_flag(e->txn, TXN_EARLY_ACK));
+			txn_set_flags(e->txn, TXN_WAIT_ACK | TXN_EARLY_ACK);
+		}
+	}
+}
+
+void
+txn_limbo_set_do_confirm_async(struct txn_limbo *limbo, bool do_confirm_async)
+{
+	bool make_old_async_confirmable = !limbo->pending_confirm_old_async &&
+					  !limbo->do_confirm_async &&
+					  do_confirm_async;
+	limbo->pending_confirm_old_async =
+		limbo->do_confirm_async && !do_confirm_async;
+	limbo->do_confirm_async = do_confirm_async;
+	if (!txn_limbo_has_owner(limbo) || !make_old_async_confirmable)
+		return;
+	txn_limbo_make_old_async_confirmable(limbo);
 }
 
 void

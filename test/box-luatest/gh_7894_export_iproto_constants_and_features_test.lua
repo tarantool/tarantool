@@ -22,6 +22,7 @@ local reference_table = {
         COMMIT = 0x01,
         WAIT_SYNC = 0x02,
         WAIT_ACK = 0x04,
+        EARLY_ACK = 0x08,
     },
 
     -- `iproto_key` enumeration.

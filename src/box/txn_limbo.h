@@ -34,6 +34,7 @@
 #include "latch.h"
 #include "errinj.h"
 #include "replication.h"
+#include "txn.h"
 
 #include <stdint.h>
 
@@ -246,6 +247,18 @@ struct txn_limbo {
 	int64_t max_size;
 	/** Current approximate size of txn_limbo.queue. */
 	int64_t size;
+	/**
+	 * Whether asynchronous transactions are kept in the limbo until
+	 * confirmation.
+	 */
+	bool do_confirm_async;
+	/**
+	 * Whether old asynchronous transactions waiting for confirmation should
+	 * be immediately confirmed after a new asynchronous transaction is
+	 * added to the synchronous queue. Set when `do_confirm_async`
+	 * transitions from true to false.
+	 */
+	bool pending_confirm_old_async;
 };
 
 /**
@@ -315,6 +328,13 @@ txn_limbo_replica_confirmed_lsn(const struct txn_limbo *limbo,
  */
 struct txn_limbo_entry *
 txn_limbo_last_synchro_entry(struct txn_limbo *limbo);
+
+static inline bool
+txn_limbo_has_synchro_entry(struct txn_limbo *limbo)
+{
+	return !txn_limbo_is_empty(limbo) &&
+	       txn_has_flag(txn_limbo_last_entry(limbo)->txn, TXN_WAIT_SYNC);
+}
 
 /**
  * Allocate, create, and append a new transaction to the limbo.
@@ -509,6 +529,12 @@ txn_limbo_is_owned_by_current_instance(const struct txn_limbo *limbo)
 	return limbo->owner_id == instance_id;
 }
 
+static inline bool
+txn_limbo_do_confirm_async(struct txn_limbo *limbo)
+{
+	return txn_limbo_has_owner(limbo) && limbo->do_confirm_async;
+}
+
 /**
  * Initialize qsync engine.
  */
@@ -518,6 +544,17 @@ txn_limbo_init();
 /** Set maximal limbo size in bytes. */
 void
 txn_limbo_set_max_size(int64_t size, struct txn_limbo *limbo);
+
+void
+txn_limbo_confirm_old_async(struct txn_limbo *limbo,
+			    bool only_free_limbo_space);
+
+/**
+ * Set whether asynchronous transactions should wait for confirmation in the
+ * limbo.
+ */
+void
+txn_limbo_set_do_confirm_async(struct txn_limbo *limbo, bool do_confirm_async);
 
 #if defined(__cplusplus)
 }

@@ -57,8 +57,13 @@ enum {
 	_(COMMIT, 0)							\
 	/** Set for the last row of a tx residing in limbo. */		\
 	_(WAIT_SYNC, 1)							\
-	/** Set for the last row of a synchronous tx. */		\
+	/** Set for the last row of a tx waiting for confirmation. */	\
 	_(WAIT_ACK, 2)							\
+	/**
+	 * Set for the last row of a tx that is immediately acknowledged to the
+	 * user.
+	 */	                                                        \
+	_(EARLY_ACK, 3)							\
 
 #define IPROTO_FLAG_MEMBER(s, v) IPROTO_FLAG_ ## s = 1ULL << (v),
 

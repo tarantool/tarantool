@@ -1498,6 +1498,13 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'replication_skip_conflict',
             default = false,
         }),
+        split_brain_handling_mode = schema.enum({
+            'none',
+            'rollback',
+        }, {
+            box_cfg = 'replication_split_brain_handling_mode',
+            default = 'none',
+        }),
         election_mode = schema.enum({
             'off',
             'voter',

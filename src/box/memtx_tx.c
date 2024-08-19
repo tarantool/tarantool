@@ -1622,10 +1622,16 @@ memtx_tx_story_insert_is_visible(struct memtx_story *story, struct txn *txn,
 {
 	*is_own_change = false;
 
-	if (story->add_stmt != NULL && story->add_stmt->txn == txn) {
-		/* Tuple is added by us (@txn). */
-		*is_own_change = true;
-		return true;
+	if (story->add_stmt != NULL) {
+		struct txn *add_stmt_txn = story->add_stmt->txn;
+		if (add_stmt_txn == txn) {
+			/* Tuple is added by us (@txn). */
+			*is_own_change = true;
+			return true;
+		} else if (txn_has_flag(add_stmt_txn, TXN_EARLY_ACK) &&
+			   add_stmt_txn->signature >= 0) {
+			return true; /* Tuple addition was acked to the user. */
+		}
 	}
 
 	int64_t rv_psn = INT64_MAX;
@@ -1678,6 +1684,10 @@ memtx_tx_story_delete_is_visible(struct memtx_story *story, struct txn *txn,
 	if (story->del_psn != 0 && story->del_stmt == NULL &&
 	    story->del_psn < rv_psn)
 		return true; /* Tuple is deleted by committed TX. */
+
+	if (story->del_stmt != NULL && story->del_stmt->txn->signature >= 0 &&
+	    txn_has_flag(story->del_stmt->txn, TXN_EARLY_ACK))
+		return true; /* Tuple deletion was acked to the user. */
 
 	return false;
 }

@@ -908,6 +908,16 @@ txn_on_journal_write(struct journal_entry *entry)
 			lsn = rows[i]->lsn;
 		}
 		txn_limbo_assign_lsn(&txn_limbo, txn->limbo_entry, lsn);
+		bool async_commit = txn->fiber == NULL;
+		/*
+		 * This ack cannot trigger a CONFIRM write since the entry was
+		 * either not yet replicated (if this was an asynchronous commit
+		 * on a master node), or this node is a replica, which never
+		 * writes a CONFIRM on its own. Thus, it safe to ack here.
+		 */
+		if (txn_has_flag(txn, TXN_EARLY_ACK) && async_commit)
+			txn_limbo_ack(&txn_limbo, instance_id,
+				      txn->limbo_entry->lsn);
 		if (txn->fiber != NULL)
 			fiber_wakeup(txn->fiber);
 	}
@@ -935,7 +945,13 @@ txn_journal_entry_new(struct txn *txn)
 
 	struct xrow_header **remote_row = req->rows;
 	struct xrow_header **local_row = req->rows + txn->n_applier_rows;
-	bool is_sync = txn_has_flag(txn, TXN_WAIT_ACK);
+	/*
+	 * At this point we can only get an early ack transaction from recovery
+	 * or replication, so it has already been categorized as an asynchronous
+	 * transaction.
+	 */
+	bool is_sync = txn_has_flag(txn, TXN_WAIT_ACK) &&
+		       !txn_has_flag(txn, TXN_EARLY_ACK);
 
 	/*
 	 * A transaction which consists of NOPs solely should pass through the
@@ -978,6 +994,7 @@ txn_journal_entry_new(struct txn *txn)
 	 */
 	if (!txn_has_flag(txn, TXN_FORCE_ASYNC) && !is_fully_nop) {
 		if (is_sync) {
+			assert(!txn_has_flag(txn, TXN_EARLY_ACK));
 			/*
 			 * Can't commit a fully local transaction synchronously.
 			 */
@@ -989,7 +1006,7 @@ txn_journal_entry_new(struct txn *txn)
 			}
 			txn_set_flags(txn, TXN_IS_SYNC | TXN_WAIT_SYNC |
 				      TXN_WAIT_ACK);
-		} else if (!txn_limbo_is_empty(&txn_limbo)) {
+		} else if (txn_limbo_has_synchro_entry(&txn_limbo)) {
 			/*
 			 * There some sync entries on the
 			 * fly thus wait for their completion
@@ -999,6 +1016,10 @@ txn_journal_entry_new(struct txn *txn)
 			 */
 			txn_set_flags(txn, TXN_IS_SYNC | TXN_WAIT_SYNC);
 		}
+		if (!is_sync && !txn_is_fully_local(txn) &&
+		    txn_limbo_do_confirm_async(&txn_limbo))
+			txn_set_flags(txn, TXN_IS_SYNC | TXN_WAIT_ACK |
+				      TXN_EARLY_ACK);
 	}
 
 	assert(remote_row == req->rows + txn->n_applier_rows);
@@ -1007,10 +1028,12 @@ txn_journal_entry_new(struct txn *txn)
 	static const uint8_t flags_map[] = {
 		[TXN_WAIT_SYNC] = IPROTO_FLAG_WAIT_SYNC,
 		[TXN_WAIT_ACK] = IPROTO_FLAG_WAIT_ACK,
+		[TXN_EARLY_ACK] = IPROTO_FLAG_EARLY_ACK,
 	};
 
 	req->flags |= flags_map[txn->flags & TXN_WAIT_SYNC];
 	req->flags |= flags_map[txn->flags & TXN_WAIT_ACK];
+	req->flags |= flags_map[txn->flags & TXN_EARLY_ACK];
 
 	return req;
 }
@@ -1108,6 +1131,27 @@ txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req)
 	uint32_t origin_id = req->rows[0]->replica_id;
 
 	/*
+	 * Confirmation of asynchronous entries was previously disabled, so the
+	 * first asynchronous transaction confirms old asynchronous transactions
+	 * and removes the `TXN_WAIT_ACK` and `TXN_EARLY_ACK` flags from
+	 * asynchronous transactions blocked by synchronous transactions.
+	 */
+	assert(!txn_has_flag(txn, TXN_EARLY_ACK) ||
+	       !txn_limbo.pending_confirm_old_async);
+	if (!txn_has_flag(txn, TXN_WAIT_ACK) &&
+	    txn_limbo.pending_confirm_old_async) {
+		txn_limbo_confirm_old_async(&txn_limbo,
+					    /*only_free_limbo_space=*/false);
+		txn_limbo.pending_confirm_old_async = false;
+	}
+	/*
+	 * Try to free up the limbo space for a new entry by confirming old
+	 * asynchronous entries that have the `TXN_EARLY_ACK` flag.
+	 */
+	if (txn_limbo_is_full(&txn_limbo))
+		txn_limbo_confirm_old_async(&txn_limbo,
+					    /*only_free_limbo_space=*/true);
+	/*
 	 * Do not limit limbo queue size during recovery, because otherwise
 	 * tarantool may fail during the process of the xlog files, if limbo
 	 * queue size exceeds max_size and user will have to pick up the
@@ -1128,6 +1172,23 @@ txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req)
 	if (txn->limbo_entry == NULL)
 		return -1;
 	return 0;
+}
+
+static int
+txn_wait_sync_in_limbo(struct txn *txn)
+{
+	assert(txn_has_flag(txn, TXN_EARLY_ACK));
+
+	if (!txn_has_flag(txn, TXN_WAIT_SYNC))
+		return 0;
+
+	int rc = 0;
+	while (rc == 0) {
+		rc = fiber_cond_wait(&txn_limbo.wait_cond);
+		if (!txn_has_flag(txn, TXN_WAIT_SYNC))
+			return 0;
+	}
+	return rc;
 }
 
 static int
@@ -1160,7 +1221,8 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 		 * async way, but the CONFIRM problem is the technical one.
 		 */
 		bool is_original = req->rows[0]->replica_id == 0;
-		if (txn_has_flag(txn, TXN_WAIT_ACK) && is_original) {
+		if (!txn_has_flag(txn, TXN_EARLY_ACK) &&
+		    txn_has_flag(txn, TXN_WAIT_ACK) && is_original) {
 			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
 				 "Non-blocking commit of a synchronous txn");
 			goto rollback_abort;
@@ -1171,6 +1233,7 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 			goto rollback_abort;
 		}
 	}
+	fiber_set_txn(fiber(), NULL);
 	/*
 	 * Do not cache the flag value in a variable. The flag might be deleted
 	 * during WAL write. This can happen for async transactions created
@@ -1180,9 +1243,9 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 	 */
 	if (txn_has_flag(txn, TXN_IS_SYNC) &&
 	    txn_add_limbo_entry(txn, req) != 0) {
+		fiber_set_txn(fiber(), txn);
 		goto rollback_abort;
 	}
-	fiber_set_txn(fiber(), NULL);
 	if (journal_write_submit(req) != 0) {
 		fiber_set_txn(fiber(), txn);
 		goto rollback_io;
@@ -1208,8 +1271,21 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 		 * asynchronously.
 		 */
 		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
-			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id,
+			assert(txn_limbo_is_owned_by_current_instance(
+				&txn_limbo));
+			txn_limbo_ack(&txn_limbo, instance_id,
 				      limbo_entry->lsn);
+		}
+		if (txn_has_flag(txn, TXN_EARLY_ACK)) {
+			if (txn_wait_sync_in_limbo(txn) != 0) {
+				txn->fiber = NULL;
+				return -1;
+			}
+			assert(!txn_has_flag(txn, TXN_WAIT_SYNC));
+			if (txn_has_flag(txn, TXN_IS_DONE))
+				goto finish_done;
+			txn->fiber = NULL;
+			return 0;
 		}
 		int rc = txn_limbo_wait_complete(&txn_limbo, limbo_entry);
 		if (rc < 0) {
@@ -1219,6 +1295,11 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 			} else {
 				goto rollback;
 			}
+		}
+		if (txn_has_flag(txn, TXN_EARLY_ACK)) {
+			txn_clear_flags(txn, TXN_WAIT_SYNC);
+			txn->fiber = NULL;
+			return 0;
 		}
 	}
 finish_done:
@@ -1454,10 +1535,20 @@ box_txn_make_sync(void)
 }
 
 void
+box_txn_make_early_ack(void)
+{
+	box_txn_set_flags_if_in_txn(TXN_IS_SYNC | TXN_WAIT_ACK | TXN_EARLY_ACK);
+}
+
+void
 box_txn_apply_xrow_flags(const struct xrow_header *row)
 {
-	if (row->wait_ack)
+	if (row->early_ack) {
+		assert(row->wait_ack);
+		box_txn_make_early_ack();
+	} else if (row->wait_ack) {
 		box_txn_make_sync();
+	}
 }
 
 /** Wait for a linearization point for a transaction. */

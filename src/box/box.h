@@ -374,6 +374,7 @@ void box_set_replication_connect_timeout(void);
 void box_set_replication_connect_quorum(void);
 void box_set_replication_sync_lag(void);
 void box_update_replication_synchro_quorum(void);
+int box_set_replication_split_brain_handling_mode(void);
 int box_set_replication_synchro_quorum(void);
 int box_set_replication_synchro_timeout(void);
 void box_set_replication_sync_timeout(void);
