@@ -627,7 +627,7 @@ tx_status_update(struct cmsg *msg)
 	 * the single master in 100% so far). Other instances wait
 	 * for master's CONFIRM message instead.
 	 */
-	if (txn_limbo_is_owned_by_current_instance(&txn_limbo) && !anon) {
+	if (!anon) {
 		txn_limbo_ack(&txn_limbo, ack.source,
 			      vclock_get(ack.vclock, instance_id));
 	}

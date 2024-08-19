@@ -640,7 +640,6 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 		return;
 	if (txn_limbo_is_frozen(limbo))
 		return;
-	assert(!txn_limbo_is_ro(limbo));
 	/*
 	 * If limbo is currently writing a rollback, it means that the whole
 	 * queue will be rolled back. Because rollback is written only for
@@ -913,22 +912,10 @@ txn_limbo_filter_queue_boundaries(struct txn_limbo *limbo,
 	int64_t lsn = req->lsn;
 	/*
 	 * Easy case - processed LSN matches the new one which comes inside
-	 * request, everything is consistent. This is allowed only for
-	 * PROMOTE/DEMOTE.
+	 * request, everything is consistent.
 	 */
-	if (limbo->confirmed_lsn == lsn) {
-		if (iproto_type_is_promote_request(req->type)) {
-			return 0;
-		} else {
-			say_error("%s. Duplicate request with confirmed lsn "
-				  "%lld = request lsn %lld", reject_str(req),
-				  (long long)limbo->confirmed_lsn,
-				  (long long)lsn);
-			diag_set(ClientError, ER_UNSUPPORTED, "Replication",
-				 "Duplicate CONFIRM/ROLLBACK request");
-			return -1;
-		}
-	}
+	if (limbo->confirmed_lsn == lsn)
+		return 0;
 
 	/*
 	 * Explicit split brain situation. Request comes in with an old LSN
@@ -1277,7 +1264,8 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 		}
 	}
 	if (confirm_lsn > limbo->confirmed_lsn && !limbo->is_in_rollback) {
-		txn_limbo_write_confirm(limbo, confirm_lsn);
+		if (txn_limbo_is_owned_by_current_instance(limbo))
+			txn_limbo_write_confirm(limbo, confirm_lsn);
 		txn_limbo_read_confirm(limbo, confirm_lsn);
 	}
 	/*
