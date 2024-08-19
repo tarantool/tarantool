@@ -24,7 +24,9 @@ local function new_varbinary(data, size)
         error('Usage: varbinary.new(str) or varbinary.new(ptr, size)', 2)
     end
     local bin = ffi.new(varbinary_t, size)
-    ffi.copy(bin, data, size)
+    if size ~= 0 then
+        ffi.copy(bin, data, size)
+    end
     return bin
 end
 
