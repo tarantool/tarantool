@@ -2870,36 +2870,37 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 	return res;
 }
 
+/**
+ * Run @a code on stories of tuples actually existing in @a index of @a space.
+ * Excluded tuples have their own chains consisting of the only excluded story,
+ * these are skipped since they are not actually inserted to index.
+ */
+#define memtx_tx_foreach_in_index_tuple_story(space, index, story, code) do {  \
+	rlist_foreach_entry(story, &(space)->memtx_stories, in_space_stories) {\
+		assert((index)->dense_id < story->index_count);		       \
+		struct memtx_story_link *link =				       \
+			&story->link[index->dense_id];			       \
+		if (link->in_index == NULL) {				       \
+			assert(link->newer_story != NULL);		       \
+			continue;					       \
+		}							       \
+		assert(link->newer_story == NULL);			       \
+		if (tuple_key_is_excluded(story->tuple, index->def->key_def,   \
+					  MULTIKEY_NONE)) {		       \
+			assert(link->older_story == NULL);		       \
+			continue;					       \
+		}							       \
+		code;							       \
+	}								       \
+} while (0)
+
 uint32_t
 memtx_tx_index_invisible_count_slow(struct txn *txn,
 				    struct space *space, struct index *index)
 {
 	uint32_t res = 0;
 	struct memtx_story *story;
-	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
-		assert(index->dense_id < story->index_count);
-		struct memtx_story_link *link = &story->link[index->dense_id];
-		/*
-		 * A history chain is represented by the top story, which is
-		 * stored in index.
-		 */
-		if (link->in_index == NULL) {
-			assert(link->newer_story != NULL);
-			continue;
-		}
-		assert(link->newer_story == NULL);
-
-		/*
-		 * Excluded tuples have their own chains consisting of the only
-		 * excluded story. Such stories must be skipped since they are
-		 * not actually inserted to index.
-		 */
-		if (tuple_key_is_excluded(story->tuple, index->def->key_def,
-					  MULTIKEY_NONE)) {
-			assert(link->older_story == NULL);
-			continue;
-		}
-
+	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
 		struct tuple *visible = NULL;
 		bool is_prepared_ok = detect_whether_prepared_ok(txn);
 		bool unused;
@@ -2908,7 +2909,7 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 						  &unused);
 		if (visible == NULL)
 			res++;
-	}
+	});
 	memtx_tx_story_gc();
 	return res;
 }
