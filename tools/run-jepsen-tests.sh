@@ -76,7 +76,7 @@ SSH_KEY_FILENAME="$HOME/.ssh/id_rsa"
 NODES_FILENAME="$BUILD_DIR/nodes"
 
 # build directory should be prepared before use
-[[ -d $BUILD_DIR ]] || mkdir -p $BUILD_DIR
+[[ -d $BUILD_DIR ]] || mkdir -p "$BUILD_DIR"
 
 # git must initialized before use even to any unknown user
 CI_COMMIT_SHA=$(git rev-parse HEAD)
@@ -84,33 +84,33 @@ CI_COMMIT_SHA=$(git rev-parse HEAD)
 # setup cleanup routine, which removes testing nodes by Terraform
 function cleanup {
     echo "Cleanup running ..."
-    cd $CUR_DIR
-    rm -f $NODES_FILENAME $SSH_KEY_FILENAME
+    cd "$CUR_DIR"
+    rm -f "$NODES_FILENAME" "$SSH_KEY_FILENAME"
     [[ -e $TERRAFORM_STATE ]] && \
-	terraform destroy -state=$TERRAFORM_STATE -auto-approve $TERRAFORM_CONFIG
+	terraform destroy -state="$TERRAFORM_STATE" -auto-approve "$TERRAFORM_CONFIG"
 }
 
 # set signal handler on script interrupts
 trap "{ cleanup; exit 255; }" SIGINT SIGTERM ERR
 
 # setup SSH home path with needed files
-[[ -d $HOME/.ssh ]] || mkdir -p $HOME/.ssh
-chmod 700 $HOME/.ssh
+[[ -d $HOME/.ssh ]] || mkdir -p "$HOME"/.ssh
+chmod 700 "$HOME"/.ssh
 
 # remove extra spaces from TF_VAR_ssh_key key at the end of lines
 SSH_KEY=$(echo -e "$TF_VAR_ssh_key" | sed 's# *$##g')
 
 # Create file with SSH private key, add it to SSH agent and
 # setup Terraform mandatory TF_VAR_ssh_key_path with its name.
-echo -e "${SSH_KEY//_/\\n}" >$SSH_KEY_FILENAME
-chmod 600 $SSH_KEY_FILENAME
+echo -e "${SSH_KEY//_/\\n}" >"$SSH_KEY_FILENAME"
+chmod 600 "$SSH_KEY_FILENAME"
 # reinitialize SSH agent
 eval "$(ssh-agent -s)"
-ssh-add $SSH_KEY_FILENAME
+ssh-add "$SSH_KEY_FILENAME"
 # check that SSH key added
 ssh-add -l
 export TF_VAR_ssh_key_path=$SSH_KEY_FILENAME
-export TF_VAR_ssh_key=$(cat $SSH_KEY_FILENAME)
+export TF_VAR_ssh_key=$(cat "$SSH_KEY_FILENAME")
 
 # setup Terraform mandatory TF_VAR_id variable to run the nodes
 if [[ -n ${CI_JOB_ID} ]]; then
@@ -130,27 +130,27 @@ export TF_VAR_instance_count
 ###########################
 
 # 1. initiate Terraform configuration for node setup
-terraform init $TERRAFORM_CONFIG
+terraform init "$TERRAFORM_CONFIG"
 
 # 2. setup node and create its configuration in $TERRAFORM_STATE file
-terraform apply -state=$TERRAFORM_STATE -auto-approve $TERRAFORM_CONFIG
+terraform apply -state="$TERRAFORM_STATE" -auto-approve "$TERRAFORM_CONFIG"
 
 # 3. print the schemas of the providers used in the configuration
-terraform providers $TERRAFORM_CONFIG
+terraform providers "$TERRAFORM_CONFIG"
 
 # 4. read an output variable from a Terraform state file and print the value
-terraform output -state=$TERRAFORM_STATE instance_names
+terraform output -state="$TERRAFORM_STATE" instance_names
 
 # 5. get IP of the node from Terraform state file
-terraform output -state=$TERRAFORM_STATE -json instance_ips | jq --raw-output '.[]' > $NODES_FILENAME
+terraform output -state="$TERRAFORM_STATE" -json instance_ips | jq --raw-output '.[]' > "$NODES_FILENAME"
 
 # 6. add nodes to SSH known hosts and check that they are reachable by SSH
-for node in $(cat $NODES_FILENAME) ; do
-    ssh -vvv -o "StrictHostKeyChecking=no" -o "BatchMode=yes" -i $SSH_KEY_FILENAME ubuntu@$node hostname
+cat "$NODES_FILENAME" | while read -r node; do
+    ssh -vvv -o "StrictHostKeyChecking=no" -o "BatchMode=yes" -i "$SSH_KEY_FILENAME" ubuntu@"$node" hostname
 done
 
 # 7. run Jepsen tests
-( cd $TESTS_DIR && lein run test-all --nodes-file $NODES_FILENAME --username ubuntu $LEIN_OPT --version $CI_COMMIT_SHA )
+( cd "$TESTS_DIR" && lein run test-all --nodes-file "$NODES_FILENAME" --username ubuntu "$LEIN_OPT" --version "$CI_COMMIT_SHA" )
 
 # post script cleanup
 cleanup

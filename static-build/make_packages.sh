@@ -25,7 +25,7 @@ echo "CMake args: ${CMAKE_TARANTOOL_ARGS}"
 echo "Package version: ${VERSION}"
 echo "Output dir: ${OUTPUT_DIR}"
 
-mkdir -p ${OUTPUT_DIR}
+mkdir -p "${OUTPUT_DIR}"
 
 # Run building in a Docker container with the proper user to get artifacts
 # with the correct permissions. If USER_ID is 0, then run as root. If USER_ID
@@ -33,10 +33,10 @@ mkdir -p ${OUTPUT_DIR}
 # host machine. That helps avoid problems with permissions of artifacts.
 if [ "${USER_ID}" = "0" ]; then
     docker run --rm --pull=always \
-        --env VERSION=${VERSION} \
+        --env VERSION="${VERSION}" \
         --env OUTPUT_DIR=/tarantool/build \
-        --volume $(pwd):/tarantool \
-        --volume ${OUTPUT_DIR}:/tarantool/build \
+        --volume "$(pwd)":/tarantool \
+        --volume "${OUTPUT_DIR}":/tarantool/build \
         --workdir /tarantool/static-build/ \
         packpack/packpack:centos-7 sh -c "
             cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" . &&
@@ -47,10 +47,10 @@ if [ "${USER_ID}" = "0" ]; then
             cpack3 -G RPM"
 else
     docker run --rm --pull=always \
-        --env VERSION=${VERSION} \
+        --env VERSION="${VERSION}" \
         --env OUTPUT_DIR=/tarantool/build \
-        --volume $(pwd):/tarantool \
-        --volume ${OUTPUT_DIR}:/tarantool/build \
+        --volume "$(pwd)":/tarantool \
+        --volume "${OUTPUT_DIR}":/tarantool/build \
         --workdir /tarantool/static-build/ \
         packpack/packpack:centos-7 sh -c "
             useradd -u ${USER_ID} tarantool;

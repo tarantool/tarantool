@@ -56,6 +56,7 @@ function(create_perf_test_target)
   set(BENCH_RESULT ${PERF_OUTPUT_DIR}/${PERF_TARGET}.json)
   set(BENCH_TARGET ${PERF_TARGET}_perftest)
   set(BENCH_RESULT_TARGET ${BENCH_TARGET}_result)
+  set(BENCH_REPETITIONS 10)
 
   # XXX: We need to provide two different targets with the same
   # command: the first (BENCH_TARGET) is run unconditionally
@@ -67,6 +68,7 @@ function(create_perf_test_target)
         COMMAND ${BENCH_CMD_SEPARATE} $<TARGET_FILE:${PERF_TARGET}.perftest>
                 --benchmark_out_format=json
                 --benchmark_out="${BENCH_RESULT}"
+                --benchmark_repetitions=${BENCH_REPETITIONS}
         DEPENDS ${PERF_TARGET}.perftest
         COMMENT Running ${BENCH_TARGET}
   )

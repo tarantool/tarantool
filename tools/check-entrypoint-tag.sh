@@ -39,13 +39,13 @@ error() {
 # Match digit only release tags like 2.10.0.
 pattern='^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'
 # Get most recent tag in the HEAD ancestry.
-tag=`git describe --abbrev=0`
+tag=$(git describe --abbrev=0)
 # If it is a release tag.
 if [[ "$tag" =~ $pattern ]]; then
     # Find the commit just after the release tag in the HEAD ancestry.
     # It is not tagged as entrypoint because it was not seen by the
     # describe command above.
-    entrypoint=`git rev-list HEAD ^$tag | tail -n1`
+    entrypoint=$(git rev-list HEAD "^$tag" | tail -n1)
     if [[ $entrypoint ]]; then
         error "Missing entrypoint tag for commit $entrypoint after release"\
               "tag $tag."
@@ -57,7 +57,7 @@ fi
 #########
 
 # Find current branch (report HEAD for 'detached HEAD' state).
-branch=`git rev-parse --abbrev-ref HEAD`
+branch=$(git rev-parse --abbrev-ref HEAD)
 if [[ "$branch" =~ ^(master|release/.*)$ ]]; then
     # We need to find the commit that starts this branch (i.e. that the first
     # commit on this branch after the commit that is common for two branches.)
@@ -72,10 +72,10 @@ if [[ "$branch" =~ ^(master|release/.*)$ ]]; then
     else
         not_remotes="--exclude origin/$branch --remotes=origin/release/* origin/master"
     fi
-    entrypoint=`git rev-list HEAD --not $not_remotes | tail -n1`
+    entrypoint=$(git rev-list HEAD --not "$not_remotes" | tail -n1)
     if [[ $entrypoint ]]; then
         # Check if entrypoint has annotated tag.
-        git describe --exact-match $entrypoint &>/dev/null || \
+        git describe --exact-match "$entrypoint" &>/dev/null || \
         error "Missing tag for commit $entrypoint after branching in"\
               "branch $branch."
     fi

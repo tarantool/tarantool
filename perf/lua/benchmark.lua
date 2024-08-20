@@ -72,7 +72,7 @@ local function dump_report(bench, text)
     end
 end
 
-local function add_result(bench, name, data)
+local function add_result(bench, name, data, i)
     local items_per_second = math.floor(data.items / data.real_time)
     local result = {
         name = name,
@@ -80,6 +80,14 @@ local function add_result(bench, name, data)
         cpu_time = data.cpu_time,
         iterations = data.items,
         items_per_second = items_per_second,
+        run_name = name,
+        family_index = i,
+        per_family_instance_index = 0,
+        run_type = 'iteration',
+        repetitions = 1,
+        repetition_index = 1,
+        threads = 1,
+        time_unit = 'ns',
     }
     table.insert(bench.results, result)
     return result

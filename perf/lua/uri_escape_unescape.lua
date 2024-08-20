@@ -54,7 +54,7 @@ local tests = {{
     end,
 }}
 
-local function run_test(testname, func)
+local function run_test(testname, func, i)
     local real_time = clock.time()
     local cpu_time = clock.proc()
     func()
@@ -64,11 +64,11 @@ local function run_test(testname, func)
         real_time = real_delta,
         cpu_time = cpu_delta,
         items = CYCLES,
-    })
+    }, i)
 end
 
-for _, test in ipairs(tests) do
-    run_test(test.name, test.payload)
+for i, test in ipairs(tests) do
+    run_test(test.name, test.payload, i - 1)
 end
 
 bench:dump_results()

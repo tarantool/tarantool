@@ -125,3 +125,51 @@ jobs:
         uses: ./.github/actions/report-job-status
         with:
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+
+  shellcheck:
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'notest' label is not set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          ( github.event_name == 'pull_request' &&
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
+
+    runs-on: ubuntu-20.04-self-hosted
+
+    timeout-minutes: 60
+
+    container:
+      image: docker.io/tarantool/testing:ubuntu-focal
+
+    steps:
+      - name: Install deps
+        uses: ./.github/actions/install-deps-debian
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Run ShellCheck
+        uses: reviewdog/action-shellcheck@v1
+        with:
+          github_token: ${{ secrets.github_token }}
+          reporter: github-pr-review
+          check_all_files_with_shebangs: "false"
+          pattern: |
+            *.bash
+            *.sh
+          exclude: |
+            */.git/*
+            ./third_party/*
+            ./test-run/*
+            ./static-build/make_packages.sh
+            ./tools/check-downgrade-versions.sh
+            ./tools/check-entrypoint-tag.sh
+            ./tools/check_push_master.sh
+            ./tools/run-jepsen-tests.sh
+      - name: Send VK Teams message on failure
+        if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}

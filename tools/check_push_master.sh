@@ -11,7 +11,7 @@ our_submodules="src/lib/msgpuck:src/lib/small:test-run"
 function check_submodule() {
     local submodule_path=$1
     local commit=$2
-    git "--git-dir=$(git rev-parse --show-toplevel)/$submodule_path/.git" branch -r --contains $commit | egrep " origin/master$" > /dev/null
+    git "--git-dir=$(git rev-parse --show-toplevel)/$submodule_path/.git" branch -r --contains "$commit" | egrep " origin/master$" > /dev/null
     local commit_is_from_master=$?
     [[ ":$our_submodules:" =~ ":$submodule_path:" ]]
     local it_is_our_submodule=$?
@@ -22,8 +22,8 @@ function check_submodule() {
 }
 
 while read -r line; do
-    check_submodule $line
-done <<<"`git "--git-dir=$(git rev-parse --show-toplevel)/.git" ls-tree -r HEAD | egrep "^[0-9]+ commit" | awk '{print $4 " " $3}'`"
+    check_submodule "$line"
+done <<<"$(git "--git-dir=$(git rev-parse --show-toplevel)/.git" ls-tree -r HEAD | egrep "^[0-9]+ commit" | awk '{print $4 " " $3}')"
 
 # Done
 exit $exit_status
