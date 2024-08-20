@@ -388,7 +388,7 @@ endif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 ##
 
 # URL of the backup storage to download bundled dependencies from.
-set(BACKUP_STORAGE https://distrib.hb.vkcs.cloud)
+set(BACKUP_STORAGE "https://distrib.hb.vkcloud-storage.ru" CACHE STRING "Source to download third party dependencies")
 
 set(EMBED_LUAZLIB ${BUILD_STATIC})
 
