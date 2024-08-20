@@ -2743,12 +2743,10 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
  * Do actual work.
  */
 static struct tuple *
-memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
-			    struct tuple *tuple, struct index *index,
+memtx_tx_story_clarify_impl(struct txn *txn, struct space *space,
+			    struct memtx_story *top_story, struct index *index,
 			    uint32_t mk_index, bool is_prepared_ok)
 {
-	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
-	struct memtx_story *top_story = memtx_tx_story_get(tuple);
 	struct memtx_story *story = top_story;
 	bool own_change = false;
 	struct tuple *result = NULL;
@@ -2810,6 +2808,21 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 		panic("multikey indexes are not supported int TX manager");
 	}
 	return result;
+}
+
+/**
+ * Helper of @sa memtx_tx_tuple_clarify.
+ * Do actual work.
+ */
+static struct tuple *
+memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
+			    struct tuple *tuple, struct index *index,
+			    uint32_t mk_index, bool is_prepared_ok)
+{
+	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
+	struct memtx_story *story = memtx_tx_story_get(tuple);
+	return memtx_tx_story_clarify_impl(txn, space, story, index,
+					   mk_index, is_prepared_ok);
 }
 
 /**
