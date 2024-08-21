@@ -2,7 +2,7 @@ local fun = require('fun')
 local fio = require('fio')
 local t = require('luatest')
 local treegen = require('luatest.treegen')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local helpers = require('test.config-luatest.helpers')
 local cluster_config = require('internal.config.cluster_config')
 

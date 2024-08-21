@@ -1,6 +1,6 @@
 local t = require('luatest')
 local treegen = require('luatest.treegen')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local replica_set = require('luatest.replica_set')
 local yaml = require('yaml')
 local uuid = require('uuid')
