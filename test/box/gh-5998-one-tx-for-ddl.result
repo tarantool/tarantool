@@ -129,6 +129,7 @@ _ = test_run:cmd("setopt delimiter ';'")
  | ...
 function create_user(name, channel)
     box.begin()
+    box.space._user:select()
     channel:get()
     box.schema.user.create(name)
     box.commit()
