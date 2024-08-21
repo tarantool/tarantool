@@ -6,7 +6,7 @@ local fun = require('fun')
 local t = require('luatest')
 local treegen = require('luatest.treegen')
 local replica_set = require('luatest.replica_set')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local yaml = require('yaml')
 
 local g_general = t.group('general')

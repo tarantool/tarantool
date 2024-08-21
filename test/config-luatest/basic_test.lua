@@ -4,7 +4,7 @@ local fio = require('fio')
 local t = require('luatest')
 local treegen = require('luatest.treegen')
 local justrun = require('luatest.justrun')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local helpers = require('test.config-luatest.helpers')
 local cbuilder = require('luatest.cbuilder')
 
