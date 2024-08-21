@@ -2902,6 +2902,17 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 		}
 		assert(link->newer_story == NULL);
 
+		/*
+		 * Excluded tuples have their own chains consisting of the only
+		 * excluded story. Such stories must be skipped since they are
+		 * not actually inserted to index.
+		 */
+		if (tuple_key_is_excluded(story->tuple, index->def->key_def,
+					  MULTIKEY_NONE)) {
+			assert(link->older_story == NULL);
+			continue;
+		}
+
 		struct tuple *visible = NULL;
 		bool is_prepared_ok = detect_whether_prepared_ok(txn);
 		bool unused;
