@@ -542,6 +542,14 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 	}
 }
 
+/** Confirm an LSN in the limbo. */
+static void
+txn_limbo_confirm_lsn(struct txn_limbo *limbo, int64_t confirm_lsn)
+{
+	txn_limbo_write_confirm(limbo, confirm_lsn);
+	txn_limbo_read_confirm(limbo, confirm_lsn);
+}
+
 /**
  * Write a rollback message to WAL. After it's written all the
  * transactions following the current one and waiting for
@@ -725,8 +733,7 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 	}
 	if (confirm_lsn == -1 || confirm_lsn <= limbo->confirmed_lsn)
 		return;
-	txn_limbo_write_confirm(limbo, confirm_lsn);
-	txn_limbo_read_confirm(limbo, confirm_lsn);
+	txn_limbo_confirm_lsn(limbo, confirm_lsn);
 }
 
 /**
@@ -1312,10 +1319,8 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 			assert(confirm_lsn > 0);
 		}
 	}
-	if (confirm_lsn > limbo->confirmed_lsn && !limbo->is_in_rollback) {
-		txn_limbo_write_confirm(limbo, confirm_lsn);
-		txn_limbo_read_confirm(limbo, confirm_lsn);
-	}
+	if (confirm_lsn > limbo->confirmed_lsn && !limbo->is_in_rollback)
+		txn_limbo_confirm_lsn(limbo, confirm_lsn);
 	/*
 	 * Wakeup all the others - timed out will rollback. Also
 	 * there can be non-transactional waiters, such as CONFIRM
