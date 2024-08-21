@@ -869,11 +869,18 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 	if (key_is_full && !eq_match)
 		memtx_tx_track_point(txn, space, index_base, it->key_data.key);
+	/*
+	 * Since MVCC operates with `key_def` of index but `start_data` can
+	 * contain key extracted with `cmp_def`, we should crop it by passing
+	 * `part_count` not greater than `key_def->part_count`.
+	 */
+	uint32_t key_part_count = index->base.def->key_def->part_count;
 	if (!key_is_full ||
 	    ((type == ITER_GE || type == ITER_LE) && !equals) ||
 	    (type == ITER_GT || type == ITER_LT))
 		memtx_tx_track_gap(txn, space, index_base, successor, type,
-				   start_data.key, start_data.part_count);
+				   start_data.key,
+				   MIN(start_data.part_count, key_part_count));
 	memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	return res == NULL || !eq_match || *ret != NULL ? 0 :
