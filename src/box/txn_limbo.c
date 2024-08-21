@@ -555,6 +555,14 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 	}
 }
 
+/** Confirm an LSN in the limbo. */
+static void
+txn_limbo_confirm_lsn(struct txn_limbo *limbo, int64_t confirm_lsn)
+{
+	txn_limbo_write_confirm(limbo, confirm_lsn);
+	txn_limbo_read_confirm(limbo, confirm_lsn);
+}
+
 /**
  * Write a rollback message to WAL. After it's written all the
  * transactions following the current one and waiting for
@@ -730,8 +738,7 @@ txn_limbo_confirm(struct txn_limbo *limbo)
 		}
 	}
 	assert(max_assigned_lsn != -1);
-	txn_limbo_write_confirm(limbo, max_assigned_lsn);
-	txn_limbo_read_confirm(limbo, max_assigned_lsn);
+	txn_limbo_confirm_lsn(limbo, max_assigned_lsn);
 }
 
 void
