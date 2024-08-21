@@ -1433,8 +1433,8 @@ box_txn_set_timeout(double timeout)
 	return 0;
 }
 
-void
-box_txn_make_sync(void)
+static void
+box_txn_set_flags_if_in_txn(unsigned int flags)
 {
 	struct txn *txn = in_txn();
 	/*
@@ -1444,7 +1444,13 @@ box_txn_make_sync(void)
 	if (!txn)
 		return;
 
-	txn_set_flags(txn, TXN_WAIT_ACK);
+	txn_set_flags(txn, flags);
+}
+
+void
+box_txn_make_sync(void)
+{
+	box_txn_set_flags_if_in_txn(TXN_WAIT_ACK);
 }
 
 void
