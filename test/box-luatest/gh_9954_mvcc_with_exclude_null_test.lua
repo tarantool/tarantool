@@ -107,3 +107,53 @@ g.test_mvcc_with_exclude_null_space_drop = function()
         box.space.test:drop()
     end)
 end
+
+-- gh-10396
+g.test_mvcc_with_exclude_null_count = function()
+    g.server:exec(function()
+        local space = box.schema.space.create("TEST", {
+            format = {
+                {name = "ID", type = "unsigned", is_nullable = false},
+                {name = "FLAG", type = "boolean", is_nullable = true},
+            },
+        })
+        space:create_index("ID", {
+            unique = true,
+            type = "TREE",
+            parts = {{field = "ID", type = "unsigned"}},
+        })
+        space:create_index("FLAG", {
+            unique = false,
+            type = "TREE",
+            parts = {{
+                field = "FLAG",
+                type = "boolean",
+                exclude_null = true,
+                is_nullable = true,
+            }},
+        })
+
+        -- Wrap into transaction so that stories won't be deleted
+        box.begin()
+        -- Insert excluded tuples and then replace half of them
+        -- with non-excluded ones
+        for i = 1, 100 do
+            space:replace{i, box.NULL}
+        end
+        for i = 1, 100, 2 do
+            space:replace{i, true}
+        end
+
+        -- Insert non-excluded tuples and then replace half of them
+        -- with excluded ones
+        for i = 101, 150 do
+            space:replace{i, false}
+        end
+        for i = 101, 150, 2 do
+            space:replace{i, box.NULL}
+        end
+        -- Check if count works correctly
+        t.assert_equals(space.index.FLAG:count({}, {iterator = 'ALL'}), 75)
+        box.commit()
+    end)
+end
