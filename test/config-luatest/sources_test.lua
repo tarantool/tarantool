@@ -5,7 +5,7 @@ local yaml = require('yaml')
 local treegen = require('luatest.treegen')
 local justrun = require('luatest.justrun')
 local source_file = require('internal.config.source.file').new()
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 local g = t.group()
 
