@@ -24,6 +24,7 @@ g.before_each(function(cg)
         box_cfg = box_cfg,
     }
     cg.replica_set:start()
+    cg.replica_set:wait_for_fullmesh()
     cg.leader:exec(function()
         box.ctl.promote()
         local s = box.schema.space.create('s', {is_sync = true})
@@ -31,7 +32,6 @@ g.before_each(function(cg)
         local as = box.schema.space.create('as', {is_sync = false})
         as:create_index('pk')
     end)
-    cg.replica_set:wait_for_fullmesh()
     cg.leader:wait_for_downstream_to(cg.replica)
 end)
 
