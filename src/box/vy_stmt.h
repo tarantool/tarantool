@@ -321,6 +321,14 @@ vy_stmt_is_empty_key(struct tuple *stmt)
 }
 
 /**
+ * Return true if there cannot be more than one tuple equal to
+ * the given vinyl statement in an index.
+ */
+bool
+vy_stmt_is_exact_key(struct tuple *stmt, struct key_def *cmp_def,
+		     struct key_def *key_def, bool is_unique);
+
+/**
  * Duplicate the statememnt.
  *
  * @param stmt statement

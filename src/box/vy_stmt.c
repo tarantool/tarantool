@@ -161,6 +161,39 @@ vy_simple_stmt_format_new(struct vy_stmt_env *env,
 				       env, keys, key_count);
 }
 
+bool
+vy_stmt_is_exact_key(struct tuple *stmt, struct key_def *cmp_def,
+		     struct key_def *key_def, bool is_unique)
+{
+	/* A tuple has all primary key parts => exact. */
+	if (!vy_stmt_is_key(stmt))
+		return true;
+	const char *data = tuple_data(stmt);
+	uint32_t part_count = mp_decode_array(&data);
+	/* Extended key (with primary key parts) => exact. */
+	if (part_count == cmp_def->part_count)
+		return true;
+	/* Non-unique index => not exact. */
+	if (!is_unique)
+		return false;
+	/* Partial key => not exact. */
+	if (part_count < key_def->part_count)
+		return false;
+	/*
+	 * For a unique nullable index, presence of all key parts doesn't
+	 * guarantee that the key is exact - we also have to check that
+	 * the key doesn't have nulls.
+	 */
+	if (!key_def->is_nullable)
+		return true;
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		if (mp_typeof(*data) == MP_NIL)
+			return false;
+		mp_next(&data);
+	}
+	return true;
+}
+
 /**
  * Allocate a vinyl statement object on base of the struct tuple
  * with malloc() and the reference counter equal to 1.
