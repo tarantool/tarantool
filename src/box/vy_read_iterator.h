@@ -63,6 +63,14 @@ struct vy_read_iterator {
 	 * checked to match the search key.
 	 */
 	bool need_check_eq;
+	/**
+	 * Set if (a) the iterator hasn't returned anything yet and (b) there
+	 * may be at most one tuple equal to the search key and the iterator
+	 * will return it if it exists (i.e. it's GE/LE/EQ/REQ). This flag
+	 * enables the optimization that skips deeper read sources if a tuple
+	 * exactly matching the search key is found.
+	 */
+	bool check_exact_match;
 	/** Set to true on the first iteration. */
 	bool is_started;
 	/**
