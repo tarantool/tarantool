@@ -1352,24 +1352,19 @@ memtx_tree_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 	return memtx_prepare_result_tuple(space, result);
 }
 
-template <bool USE_HINT>
-static ssize_t
-memtx_tree_index_count(struct index *base, enum iterator_type type,
-		       const char *key, uint32_t part_count)
+template<bool USE_HINT, template<bool> typename memtx_tree_or_view_t>
+size_t
+memtx_tree_index_count_impl(struct index_def *index_def,
+			    struct key_def *cmp_def,
+			    memtx_tree_or_view_t<USE_HINT> *tree,
+			    enum iterator_type type, const char *key,
+			    uint32_t part_count, struct index *track_index)
 {
-	assert((base->def->opts.hint == INDEX_HINT_ON) == USE_HINT);
+	assert((index_def->opts.hint == INDEX_HINT_ON) == USE_HINT);
 
 	struct region *region = &fiber()->gc;
 	RegionGuard region_guard(region);
 
-	struct memtx_tree_index<USE_HINT> *index =
-		(struct memtx_tree_index<USE_HINT> *)base;
-
-	if (canonicalize_lookup(base->def, &type, &key, part_count) == -1)
-		return -1;
-
-	memtx_tree_t<USE_HINT> *tree = &index->tree;
-	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	struct memtx_tree_key_data<USE_HINT> start_data;
 	start_data.key = key;
 	start_data.part_count = part_count;
@@ -1385,8 +1380,8 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 			       &initial_elem))
 		return 0;
 
-	struct txn *txn = in_txn();
-	struct space *space = space_by_id(base->def->space_id);
+	struct txn *txn = track_index ? in_txn() : NULL;
+	struct space *space = space_by_id(index_def->space_id);
 	size_t full_size = memtx_tree_size(tree);
 	size_t end_offset;
 
@@ -1398,8 +1393,10 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 		 * Inform MVCC like we have attempted to read a full key and
 		 * found nothing. Insertion of this exact key into the tree
 		 * will conflict with us.
+		 *
+		 * No-op in case if txn == NULL.
 		 */
-		memtx_tx_track_point(txn, space, base, start_data.key);
+		memtx_tx_track_point(txn, space, track_index, start_data.key);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		return 0; /* No tuple matching the full key. */
 	}
@@ -1416,8 +1413,10 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 		 * the tree is empty) and got nothing by our key and iterator.
 		 * If someone writes a matching tuple at the beginning of the
 		 * tree it will conflict with us.
+		 *
+		 * No-op in case if txn == NULL.
 		 */
-		memtx_tx_track_gap(txn, space, base, successor, type,
+		memtx_tx_track_gap(txn, space, track_index, successor, type,
 				   start_data.key, start_data.part_count);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		return 0; /* No tuples prior to the first one. */
@@ -1433,9 +1432,11 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 		 * nothing. If someone writes a tuple matching our key+iterator
 		 * pair at the end of the tree it will conflict with us. The
 		 * tree can be empty here.
+		 *
+		 * No-op in case if txn == NULL.
 		 */
-		memtx_tx_track_gap(txn, space, base, NULL, type, start_data.key,
-				   start_data.part_count);
+		memtx_tx_track_gap(txn, space, track_index, NULL, type,
+				   start_data.key, start_data.part_count);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		return 0; /* No tuples beyond the last one. */
 	}
@@ -1455,8 +1456,28 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 		end_offset = iterator_type_is_reverse(type) ? -1 : full_size;
 	}
 
-	size_t full_count = ((ssize_t)end_offset - begin_offset) *
-			    iterator_direction(type);
+	ssize_t full_count = ((ssize_t)end_offset - begin_offset) *
+			     iterator_direction(type);
+	assert(full_count >= 0);
+	return full_count;
+}
+
+template<bool USE_HINT>
+static ssize_t
+memtx_tree_index_count(struct index *base, enum iterator_type type,
+		       const char *key, uint32_t part_count)
+{
+	if (canonicalize_lookup(base->def, &type, &key, part_count) == -1)
+		return -1;
+
+	struct space *space = space_by_id(base->def->space_id);
+	struct index_def *index_def = base->def;
+	struct memtx_tree_index<USE_HINT> *index =
+		(struct memtx_tree_index<USE_HINT> *)base;
+	memtx_tree_t<USE_HINT> *tree = &index->tree;
+	struct key_def *cmp_def = memtx_tree_cmp_def(tree);
+	size_t full_count = memtx_tree_index_count_impl(
+		index_def, cmp_def, tree, type, key, part_count, base);
 
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 	/*
@@ -1466,8 +1487,8 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 	 *
 	 * It returns the amount of invisible counted tuples BTW.
 	 */
-	size_t invisible_count = memtx_tx_track_count(
-		txn, space, base, type, start_data.key, start_data.part_count);
+	size_t invisible_count = memtx_tx_track_count(in_txn(), space, base,
+						      type, key, part_count);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 
 	return full_count - invisible_count;
