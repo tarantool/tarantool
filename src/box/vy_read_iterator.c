@@ -52,6 +52,11 @@ struct vy_read_src {
 	};
 	/** Set if the iterator was started. */
 	bool is_started;
+	/**
+	 * Set if this is the last (deepest) source that may store tuples
+	 * matching the search criteria.
+	 */
+	bool is_last;
 	/** See vy_read_iterator->front_id. */
 	uint32_t front_id;
 	/** History of the key the iterator is positioned at. */
@@ -189,29 +194,6 @@ vy_read_iterator_cmp_stmt(struct vy_read_iterator *itr,
 }
 
 /**
- * Return true if the statement matches search criteria
- * and older sources don't need to be scanned.
- */
-static bool
-vy_read_iterator_is_exact_match(struct vy_read_iterator *itr,
-				struct vy_entry entry)
-{
-	enum iterator_type type = itr->iterator_type;
-	struct key_def *cmp_def = itr->lsm->cmp_def;
-
-	/*
-	 * If the index is unique and the search key is full,
-	 * we can avoid disk accesses on the first iteration
-	 * in case the key is found in memory.
-	 */
-	return itr->last.stmt == NULL && entry.stmt != NULL &&
-		(type == ITER_EQ || type == ITER_REQ ||
-		 type == ITER_GE || type == ITER_LE) &&
-		vy_stmt_is_full_key(itr->key.stmt, cmp_def) &&
-		vy_entry_compare(entry, itr->key, cmp_def) == 0;
-}
-
-/**
  * Check if the statement at which the given read source
  * is positioned precedes the current candidate for the
  * next key ('next') and update the latter if so.
@@ -234,13 +216,44 @@ vy_read_iterator_evaluate_src(struct vy_read_iterator *itr,
 	if (cmp <= 0)
 		src->front_id = itr->front_id;
 
-	itr->skipped_src = MAX(itr->skipped_src, src_id + 1);
+	if (src->is_last)
+		goto stop;
 
-	if (cmp < 0 && vy_history_is_terminal(&src->history) &&
-	    vy_read_iterator_is_exact_match(itr, entry)) {
-		itr->skipped_src = src_id + 1;
-		*stop = true;
+	if (itr->check_exact_match &&
+	    cmp < 0 && vy_history_is_terminal(&src->history)) {
+		/*
+		 * So this is a terminal statement that might be the first one
+		 * in the output and the iterator may return at most one tuple
+		 * equal to the search key. Let's check if this statement
+		 * equals the search key. If it is, there cannot be a better
+		 * candidate in deeper sources so we may skip them.
+		 *
+		 * No need to check for equality if it's EQ iterator because
+		 * it must have been already checked by the source iterator.
+		 * Sic: for REQ the check is still required (see need_check_eq).
+		 */
+		if (itr->iterator_type == ITER_EQ ||
+		    vy_entry_compare(entry, itr->key, itr->lsm->cmp_def) == 0) {
+			/*
+			 * If we get an exact match for EQ/REQ search, we don't
+			 * need to check deeper sources on next iterations so
+			 * mark this source last. Note that we might still need
+			 * to scan this source again though - if we encounter
+			 * a DELETE statement - because in this case there may
+			 * be a newer REPLACE statement for the same key in it.
+			 */
+			if (itr->iterator_type == ITER_EQ ||
+			    itr->iterator_type == ITER_REQ)
+				src->is_last = true;
+			goto stop;
+		}
 	}
+
+	itr->skipped_src = MAX(itr->skipped_src, src_id + 1);
+	return;
+stop:
+	itr->skipped_src = src_id + 1;
+	*stop = true;
 }
 
 /**
@@ -490,16 +503,6 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr);
 static NODISCARD int
 vy_read_iterator_advance(struct vy_read_iterator *itr)
 {
-	if (itr->last.stmt != NULL && (itr->iterator_type == ITER_EQ ||
-				       itr->iterator_type == ITER_REQ) &&
-	    vy_stmt_is_full_key(itr->key.stmt, itr->lsm->cmp_def)) {
-		/*
-		 * There may be one statement at max satisfying
-		 * EQ with a full key.
-		 */
-		itr->front_id++;
-		return 0;
-	}
 	/*
 	 * Restore the iterator position if the LSM tree has changed
 	 * since the last iteration or this is the first iteration.
@@ -778,6 +781,12 @@ vy_read_iterator_open_after(struct vy_read_iterator *itr, struct vy_lsm *lsm,
 		 */
 		itr->need_check_eq = true;
 	}
+
+	itr->check_exact_match =
+		(iterator_type == ITER_EQ || iterator_type == ITER_REQ ||
+		 iterator_type == ITER_GE || iterator_type == ITER_LE) &&
+		vy_stmt_is_exact_key(key.stmt, lsm->cmp_def, lsm->key_def,
+				     lsm->opts.is_unique);
 }
 
 /**
@@ -955,6 +964,7 @@ next_key:
 	       vy_stmt_type(entry.stmt) == IPROTO_INSERT ||
 	       vy_stmt_type(entry.stmt) == IPROTO_REPLACE);
 
+	itr->check_exact_match = false;
 	*result = entry;
 	return 0;
 }
