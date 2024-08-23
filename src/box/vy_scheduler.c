@@ -1305,7 +1305,16 @@ vy_task_dump_abort(struct vy_task *task)
 	error_log(e);
 	say_error("%s: dump failed", vy_lsm_name(lsm));
 
-	vy_run_discard(task->new_run);
+	/*
+	 * The LSM tree could have been dropped while we were writing the new
+	 * run. In this case we should discard the run without committing to
+	 * vylog, because all the information about the LSM tree and its runs
+	 * could have already been garbage collected from vylog.
+	 */
+	if (lsm->is_dropped)
+		vy_run_unref(task->new_run);
+	else
+		vy_run_discard(task->new_run);
 
 	lsm->is_dumping = false;
 	vy_scheduler_update_lsm(scheduler, lsm);
@@ -1633,7 +1642,16 @@ vy_task_compaction_abort(struct vy_task *task)
 	say_error("%s: failed to compact range %s",
 		  vy_lsm_name(lsm), vy_range_str(range));
 
-	vy_run_discard(task->new_run);
+	/*
+	 * The LSM tree could have been dropped while we were writing the new
+	 * run. In this case we should discard the run without committing to
+	 * vylog, because all the information about the LSM tree and its runs
+	 * could have already been garbage collected from vylog.
+	 */
+	if (lsm->is_dropped)
+		vy_run_unref(task->new_run);
+	else
+		vy_run_discard(task->new_run);
 
 	assert(heap_node_is_stray(&range->heap_node));
 	vy_range_heap_insert(&lsm->range_heap, range);
