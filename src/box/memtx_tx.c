@@ -1195,15 +1195,9 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 	rlist_splice(&new_link->read_gaps, &old_link->read_gaps);
 }
 
-/**
- * Unlink a @a story from history chain in @a index (in both directions),
- * where old_top was at the top of chain (that means that index itself
- * stores a pointer to story->tuple).
- * This function makes also changes in the index, replacing old_top->tuple
- * with the correct tuple (the next in chain, maybe NULL).
- */
 static void
-memtx_tx_story_unlink_top_common(struct memtx_story *story, uint32_t idx)
+memtx_tx_story_unlink_top_on_space_delete(struct memtx_story *story,
+					  uint32_t idx)
 {
 	assert(story != NULL);
 	assert(idx < story->index_count);
@@ -1248,48 +1242,10 @@ memtx_tx_story_unlink_top_common(struct memtx_story *story, uint32_t idx)
 			memtx_tx_ref_to_primary(old_story);
 		memtx_tx_unref_from_primary(story);
 	}
-}
 
-/**
- * Unlink a @a story from history chain in @a index (in both directions),
- * where old_top was at the top of chain (that means that index itself
- * stores a pointer to story->tuple).
- * This is a light version of function, intended for the case when the
- * appropriate change in the index will be done later by caller.
- */
-static void
-memtx_tx_story_unlink_top_common_light(struct memtx_story *story, uint32_t idx)
-{
-	assert(story != NULL);
-	assert(idx < story->index_count);
-	struct memtx_story_link *link = &story->link[idx];
-	assert(link->newer_story == NULL);
-	struct memtx_story *old_story = link->older_story;
+	/* Now simply unlink the story. */
 	if (old_story != NULL)
 		memtx_tx_story_unlink(story, old_story, idx);
-}
-
-/**
- * See description of `memtx_tx_story_unlink_top_common_light`.
- * Since the space is being deleted, we need to simply unlink the story.
- */
-static void
-memtx_tx_story_unlink_top_on_space_delete_light(struct memtx_story *story,
-						uint32_t idx)
-{
-	memtx_tx_story_unlink_top_common_light(story, idx);
-}
-
-/**
- * See description of `memtx_tx_story_unlink_top_common`.
- * Since the space is being deleted, we need to simply unlink the story.
- */
-static void
-memtx_tx_story_unlink_top_on_space_delete(struct memtx_story *story,
-					  uint32_t idx)
-{
-	memtx_tx_story_unlink_top_common(story, idx);
-	memtx_tx_story_unlink_top_on_space_delete_light(story, idx);
 }
 
 /**
