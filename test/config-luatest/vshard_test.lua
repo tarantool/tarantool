@@ -1,6 +1,6 @@
 local fun = require('fun')
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
@@ -18,7 +18,7 @@ end
 
 g.test_fixed_masters = function(g)
     skip_if_no_vshard()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -69,7 +69,7 @@ g.test_fixed_masters = function(g)
                 database:
                   mode: rw
     ]]
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
         config_file = config_file,
@@ -266,7 +266,7 @@ end
 
 g.test_rebalancer_role = function(g)
     skip_if_no_vshard()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -308,7 +308,7 @@ g.test_rebalancer_role = function(g)
             instances:
               instance-005: {}
     ]]
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
         config_file = config_file,
@@ -428,9 +428,9 @@ g.test_rebalancer_role = function(g)
     t.assert_equals(g.server_4:eval(exec), false)
 end
 
-g.test_too_many_rebalancers = function(g)
+g.test_too_many_rebalancers = function()
     skip_if_no_vshard()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -461,7 +461,7 @@ g.test_too_many_rebalancers = function(g)
             instances:
               instance-002: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
     local env = {LUA_PATH = os.environ()['LUA_PATH']}
     local opts = {nojson = true, stderr = true}
     local args = {'--name', 'instance-001', '--config', 'config.yaml'}
@@ -500,9 +500,9 @@ g.test_no_sharding_credentials_role_success = function(g)
     })
 end
 
-g.test_no_sharding_credentials_role_error = function(g)
+g.test_no_sharding_credentials_role_error = function()
     skip_if_no_vshard()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -529,7 +529,7 @@ g.test_no_sharding_credentials_role_error = function(g)
             instances:
               instance-001: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
     local opts = {nojson = true, stderr = true}
     local args = {'--name', 'instance-001', '--config', 'config.yaml'}
     local res = justrun.tarantool(dir, {}, args, opts)
@@ -559,7 +559,7 @@ end
 -- Make sure that the credential sharding role has all necessary credentials.
 g.test_sharding_credentials_role = function(g)
     skip_if_no_vshard()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -586,7 +586,7 @@ g.test_sharding_credentials_role = function(g)
             instances:
               instance-001: {}
     ]]
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
         config_file = config_file,
@@ -627,9 +627,9 @@ g.test_sharding_credentials_role = function(g)
     end)
 end
 
-g.test_no_suitable_uri = function(g)
+g.test_no_suitable_uri = function()
     skip_if_no_vshard()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -653,7 +653,7 @@ g.test_no_suitable_uri = function(g)
             instances:
               instance-001: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
     local env = {LUA_PATH = os.environ()['LUA_PATH']}
     local opts = {nojson = true, stderr = true}
     local args = {'--name', 'instance-001', '--config', 'config.yaml'}
@@ -667,7 +667,7 @@ end
 -- if rebalancer sharding role is assigned.
 g.test_rebalancer_mode = function(g)
     skip_if_no_vshard()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -696,7 +696,7 @@ g.test_rebalancer_mode = function(g)
             instances:
               instance-001: {}
     ]]
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
         config_file = config_file,
@@ -719,7 +719,7 @@ end
 -- correctly in vshard.
 g.test_weight = function(g)
     skip_if_no_vshard()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -747,7 +747,7 @@ g.test_weight = function(g)
             instances:
               instance-001: {}
     ]]
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
         config_file = config_file,

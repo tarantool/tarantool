@@ -27,12 +27,13 @@
 local fun = require('fun')
 local yaml = require('yaml')
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 local server = require('test.luatest_helpers.server')
 
+-- Temporary stub.
 local function init(g)
-    treegen.init(g)
+    assert(g)  -- temporary stub to not fail luacheck due to unused var
 end
 
 -- Stop all the managed instances using <server>:drop().
@@ -45,7 +46,6 @@ end
 
 local function clean(g)
     assert(g.cluster == nil)
-    treegen.clean(g)
 end
 
 -- {{{ Helpers
@@ -144,8 +144,7 @@ end
 local function cluster_sync(self, config)
     local instance_names = instance_names_from_config(config)
 
-    treegen.write_script(self._dir, self._config_file_rel,
-                         yaml.encode(config))
+    treegen.write_file(self._dir, self._config_file_rel, yaml.encode(config))
 
     for i, name in ipairs(instance_names) do
         if self._server_map[name] == nil then
@@ -162,8 +161,8 @@ end
 local function cluster_reload(self, config)
     -- Rewrite the configuration file if a new config is provided.
     if config ~= nil then
-        treegen.write_script(self._dir, self._config_file_rel,
-                             yaml.encode(config))
+        treegen.write_file(self._dir, self._config_file_rel,
+                           yaml.encode(config))
     end
 
     -- Reload config on all the instances.
@@ -211,10 +210,10 @@ local function new(g, config, server_opts)
 
     -- Prepare a temporary directory and write a configuration
     -- file.
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config_file_rel = 'config.yaml'
-    local config_file = treegen.write_script(dir, config_file_rel,
-                                             yaml.encode(config))
+    local config_file = treegen.write_file(dir, config_file_rel,
+                                           yaml.encode(config))
 
     -- Collect names of all the instances defined in the config
     -- in the alphabetical order.
@@ -260,13 +259,14 @@ end
 -- ensure that all the instances fails to start and reports the
 -- given error message.
 local function startup_error(g, config, exp_err)
+    assert(g)  -- temporary stub to not fail luacheck due to unused var
     assert(config._config == nil, "Please provide cbuilder.new():config()")
     -- Prepare a temporary directory and write a configuration
     -- file.
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config_file_rel = 'config.yaml'
-    local config_file = treegen.write_script(dir, config_file_rel,
-                                             yaml.encode(config))
+    local config_file = treegen.write_file(dir, config_file_rel,
+                                           yaml.encode(config))
 
     -- Collect names of all the instances defined in the config
     -- in the alphabetical order.

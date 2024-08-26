@@ -1,7 +1,7 @@
 local json = require('json')
 local it = require('test.interactive_tarantool')
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local helpers = require('test.config-luatest.helpers')
 local cbuilder = require('test.config-luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
@@ -302,7 +302,7 @@ g.test_privileges_subtract = function()
     t.assert_items_equals(internal.privileges_subtract(target, current), lack)
 end
 
-g.test_sync_privileges = function(g)
+g.test_sync_privileges = function()
     local box_configuration = {{
             "grant", "read", "universe", ""
         }, {
@@ -341,7 +341,7 @@ g.test_sync_privileges = function(g)
     }
 
     local child = it.new()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     child:roundtrip(("box.cfg{work_dir = %q}"):format(dir))
 
     local name = "myuser"
@@ -371,7 +371,7 @@ g.test_sync_privileges = function(g)
     child:close()
 end
 
-g.test_set_password = function(g)
+g.test_set_password = function()
 
     local auth_types = {
         'chap-sha1',
@@ -389,7 +389,7 @@ g.test_set_password = function(g)
 
         local child = it.new()
 
-        local dir = treegen.prepare_directory(g, {}, {})
+        local dir = treegen.prepare_directory({}, {})
         local socket = "unix/:./test_socket.iproto"
 
         child:roundtrip(("box.cfg{work_dir = %q, listen = %q, auth_type = %q}")

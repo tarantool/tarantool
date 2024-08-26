@@ -1,7 +1,7 @@
 local fun = require('fun')
 local fio = require('fio')
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
 local cluster_config = require('internal.config.cluster_config')
@@ -16,7 +16,7 @@ local g = helpers.group()
 -- It also contains one more conditional section, which is to be
 -- applied. It sets a custom process title, which is verified here.
 g.test_example = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config_file = fio.abspath('doc/examples/config/upgrade.yaml')
     local opts = {config_file = config_file, chdir = dir}
     g.server = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())

@@ -1,5 +1,5 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun').tarantool
 
 local g = t.group()
@@ -26,13 +26,8 @@ local script = string.dump(function() print(_VERSION) end)
 
 local rundir
 g.before_all(function()
-    treegen.init(g)
-    treegen.add_template(g, '^script%.lua$', script)
-    rundir = treegen.prepare_directory(g, {'script.lua'})
-end)
-
-g.after_all(function()
-    treegen.clean(g)
+    treegen.add_template('^script%.lua$', script)
+    rundir = treegen.prepare_directory({'script.lua'})
 end)
 
 local function simplerun(args)

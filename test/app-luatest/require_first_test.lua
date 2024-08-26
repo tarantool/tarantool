@@ -1,21 +1,18 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 
 local g = t.group()
 
-g.before_all(treegen.init)
-g.after_all(treegen.clean)
-
 -- A few test cases for the loaders.require_first() function.
 --
 -- Note: The loaders module is internal.
-g.test_basic = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(dir, 'a.lua', 'return {whoami = "a"}')
-    treegen.write_script(dir, 'b.lua', 'return {whoami = "b"}')
+g.test_basic = function()
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'a.lua', 'return {whoami = "a"}')
+    treegen.write_file(dir, 'b.lua', 'return {whoami = "b"}')
 
-    treegen.write_script(dir, 'main.lua', string.dump(function()
+    treegen.write_file(dir, 'main.lua', string.dump(function()
         local loaders = require('internal.loaders')
         local t = require('luatest')
 

@@ -1,5 +1,5 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local server = require('test.luatest_helpers.server')
 local yaml = require('yaml')
 local fun = require('fun')
@@ -8,8 +8,6 @@ local fio = require('fio')
 local g = t.group('set-names-automatically-on-upgrade')
 
 g.before_all(function(g)
-    treegen.init(g)
-
     g.uuids = {
         ['replicaset-001'] = 'cbf06940-0790-498b-948d-042b62cf3d29',
         ['instance-001'] =   '8a274925-a26d-47fc-9e1b-af88ce939412',
@@ -20,7 +18,7 @@ g.before_all(function(g)
     local datadir_1 = fio.abspath(fio.pathjoin(datadir_prefix, 'instance-001'))
     local datadir_2 = fio.abspath(fio.pathjoin(datadir_prefix, 'instance-002'))
 
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local workdir_1 = fio.pathjoin(dir, 'instance-001')
     local workdir_2 = fio.pathjoin(dir, 'instance-002')
 
@@ -74,7 +72,7 @@ g.before_all(function(g)
     }
 
     local cfg = yaml.encode(config)
-    local config_file = treegen.write_script(dir, 'cfg.yaml', cfg)
+    local config_file = treegen.write_file(dir, 'cfg.yaml', cfg)
     local opts = {config_file = config_file, chdir = dir}
     g.instance_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
     g.instance_2 = server:new(fun.chain(opts, {alias = 'instance-002'}):tomap())
@@ -88,7 +86,6 @@ end)
 g.after_all(function(g)
     g.instance_1:drop()
     g.instance_2:drop()
-    treegen.clean(g)
 end)
 
 local function assert_before_upgrade()

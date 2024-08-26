@@ -3,14 +3,12 @@ local yaml = require('yaml')
 local fio = require('fio')
 local cluster_config = require('internal.config.cluster_config')
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 local server = require('test.luatest_helpers.server')
 
 local function group(name, params)
     local g = t.group(name, params)
-
-    g.before_all(treegen.init)
 
     g.after_each(function(g)
         for k, v in pairs(table.copy(g)) do
@@ -21,15 +19,13 @@ local function group(name, params)
         end
     end)
 
-    g.after_all(treegen.clean)
-
     return g
 end
 
 local function run_as_script(f)
-    return function(g)
-        local dir = treegen.prepare_directory(g, {}, {})
-        treegen.write_script(dir, 'myluatest.lua', string.dump(function()
+    return function()
+        local dir = treegen.prepare_directory({}, {})
+        treegen.write_file(dir, 'myluatest.lua', string.dump(function()
             local t = require('luatest')
 
             -- Luatest raises a table as an error. If the error is
@@ -60,7 +56,7 @@ local function run_as_script(f)
 
             return t
         end))
-        treegen.write_script(dir, 'main.lua', string.dump(f))
+        treegen.write_file(dir, 'main.lua', string.dump(f))
 
         local opts = {nojson = true, stderr = true}
         local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
@@ -129,7 +125,7 @@ local simple_config = {
     },
 }
 
-local function prepare_case(g, opts)
+local function prepare_case(opts)
     local dir = opts.dir
     local roles = opts.roles
     local script = opts.script
@@ -137,17 +133,17 @@ local function prepare_case(g, opts)
     local env = opts.env
 
     if dir == nil then
-        dir = treegen.prepare_directory(g, {}, {})
+        dir = treegen.prepare_directory({}, {})
     end
 
     if roles ~= nil and next(roles) ~= nil then
         for name, body in pairs(roles) do
-            treegen.write_script(dir, name .. '.lua', body)
+            treegen.write_file(dir, name .. '.lua', body)
         end
     end
 
     if script ~= nil then
-        treegen.write_script(dir, 'main.lua', script)
+        treegen.write_file(dir, 'main.lua', script)
     end
 
     local config = simple_config
@@ -158,7 +154,7 @@ local function prepare_case(g, opts)
         end
     end
 
-    treegen.write_script(dir, 'config.yaml', yaml.encode(config))
+    treegen.write_file(dir, 'config.yaml', yaml.encode(config))
     local config_file = fio.pathjoin(dir, 'config.yaml')
 
     local server = {
@@ -214,7 +210,7 @@ end
 --   Environment variables to set for the child process.
 local function success_case(g, opts)
     local verify = assert(opts.verify)
-    local prepared = prepare_case(g, opts)
+    local prepared = prepare_case(opts)
     g.server = server:new(prepared.server)
     g.server:start()
     g.server:exec(verify, opts.verify_args)
@@ -235,10 +231,10 @@ end
 --
 --   An error that must be written into stderr by tarantool
 --   process.
-local function failure_case(g, opts)
+local function failure_case(opts)
     local exp_err = assert(opts.exp_err)
 
-    local prepared = prepare_case(g, opts)
+    local prepared = prepare_case(opts)
     local res = justrun.tarantool(unpack(prepared.justrun))
     t.assert_equals(res.exit_code, 1)
     t.assert_str_contains(res.stderr, exp_err)
@@ -287,7 +283,7 @@ local function reload_success_case(g, opts)
 
     local prepared = success_case(g, opts)
 
-    prepare_case(g, {
+    prepare_case({
         dir = prepared.dir,
         roles = roles_2,
         script = script_2,
@@ -337,7 +333,7 @@ local function reload_failure_case(g, opts)
 
     local prepared = success_case(g, opts)
 
-    prepare_case(g, {
+    prepare_case({
         dir = prepared.dir,
         roles = roles_2,
         script = script_2,
