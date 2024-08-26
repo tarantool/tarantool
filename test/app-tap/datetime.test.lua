@@ -8,7 +8,7 @@ local json = require('json')
 local msgpack = require('msgpack')
 local TZ = date.TZ
 
-test:plan(42)
+test:plan(43)
 
 local INT_MAX = 2147483647
 
@@ -1884,6 +1884,832 @@ test:test("Parse strptime format", function(test)
         local str, fmt, exp = unpack(row)
         local dt = date.parse(str, {format = fmt})
         test:is(tostring(dt), exp, ('parse %s via %s'):format(str, fmt))
+    end
+end)
+
+-- Parse string with a custom format, then format datetime object
+-- to a string with the same format and compare initial and
+-- resulted strings:
+--
+--   dt = datetime.parse(<str>, { format = <fmt> })
+--   dt:format(<fmt>) == <str>
+--
+test:test("Parse with a custom format and format back to string", function(test)
+    local formats = {
+        -- %a is replaced by national representation of the
+        -- abbreviated weekday name.
+        -- Note, works for 'Thu' only when date is not complete,
+        -- see tarantool/tarantool#10470.
+        {
+            buf = 'Thu',
+            fmt = '%a',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = '19-08-2023 Sat',
+            fmt = '%d-%m-%Y %a',
+            dt = date.new({year = 2023, month = 08, day = 19}),
+        },
+        {
+            buf = '20-08-2023 Sun',
+            fmt = '%d-%m-%Y %a',
+            dt = date.new({year = 2023, month = 08, day = 20}),
+        },
+        {
+            buf = '21-08-2023 Mon',
+            fmt = '%d-%m-%Y %a',
+            dt = date.new({year = 2023, month = 08, day = 21}),
+        },
+        {
+            buf = '22-08-2023 Tue',
+            fmt = '%d-%m-%Y %a',
+            dt = date.new({year = 2023, month = 08, day = 22}),
+        },
+        {
+            buf = '23-08-2023 Wed',
+            fmt = '%d-%m-%Y %a',
+            dt = date.new({year = 2023, month = 08, day = 23}),
+        },
+        {
+            buf = '24-08-2023 Thu',
+            fmt = '%d-%m-%Y %a',
+            dt = date.new({year = 2023, month = 08, day = 24}),
+        },
+        {
+            buf = '25-08-2023 Fri',
+            fmt = '%d-%m-%Y %a',
+            dt = date.new({year = 2023, month = 08, day = 25}),
+        },
+        -- %A is replaced by national representation of the full
+        -- weekday name.
+        -- Note, works for 'Thursday' only when date is not
+        -- complete, see tarantool/tarantool#10470.
+        {
+            buf = 'Thursday',
+            fmt  = '%A',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = '19-08-2023 Saturday',
+            fmt = '%d-%m-%Y %A',
+            dt = date.new({year = 2023, month = 08, day = 19}),
+        },
+        {
+            buf = '20-08-2023 Sunday',
+            fmt = '%d-%m-%Y %A',
+            dt = date.new({year = 2023, month = 08, day = 20}),
+        },
+        {
+            buf = '21-08-2023 Monday',
+            fmt = '%d-%m-%Y %A',
+            dt = date.new({year = 2023, month = 08, day = 21}),
+        },
+        {
+            buf = '22-08-2023 Tuesday',
+            fmt = '%d-%m-%Y %A',
+            dt = date.new({year = 2023, month = 08, day = 22}),
+        },
+        {
+            buf = '23-08-2023 Wednesday',
+            fmt = '%d-%m-%Y %A',
+            dt = date.new({year = 2023, month = 08, day = 23}),
+        },
+        {
+            buf = '24-08-2023 Thursday',
+            fmt = '%d-%m-%Y %A',
+            dt = date.new({year = 2023, month = 08, day = 24}),
+        },
+        {
+            buf = '25-08-2023 Friday',
+            fmt = '%d-%m-%Y %A',
+            dt = date.new({year = 2023, month = 08, day = 25}),
+        },
+        -- %b is replaced by national representation of the
+        -- abbreviated month name.
+        {
+            buf = 'Jan',
+            fmt = '%b',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = 'Feb',
+            fmt = '%b',
+            dt = date.new({year = 1970, month = 02, day = 01}),
+        },
+        {
+            buf = 'Mar',
+            fmt = '%b',
+            dt = date.new({year = 1970, month = 03, day = 01}),
+        },
+        {
+            buf = 'Apr',
+            fmt = '%b',
+            dt = date.new({year = 1970, month = 04, day = 01}),
+        },
+        {
+            buf = 'May',
+            fmt = '%b',
+            dt = date.new({year = 1970, month = 05, day = 01}),
+        },
+        {
+            buf = 'Jun',
+            fmt = '%b',
+            dt = date.new({year = 1970, month = 06, day = 01}),
+        },
+        {
+            buf = 'Jul',
+            fmt = '%b',
+            dt = date.new({year = 1970, month = 07, day = 01}),
+        },
+        {
+            buf = 'Aug',
+            fmt = '%b',
+            dt = date.new({year = 1970, month = 08, day = 01}),
+        },
+        {
+            buf = 'Sep',
+            fmt = '%b',
+            dt = date.new({year = 1970, month = 09, day = 01}),
+        },
+        {
+            buf = 'Oct',
+            fmt = '%b',
+            dt = date.new({year = 1970, month = 10, day = 01}),
+        },
+        {
+            buf = 'Nov',
+            fmt = '%b',
+            dt = date.new({year = 1970, month = 11, day = 01}),
+        },
+        {
+            buf = 'Dec',
+            fmt = '%b',
+            dt = date.new({year = 1970, month = 12, day = 01}),
+        },
+        -- %B is replaced by national representation of the full
+        -- month name.
+        {
+            buf = 'January',
+            fmt = '%B',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = 'February',
+            fmt = '%B',
+            dt = date.new({year = 1970, month = 02, day = 01}),
+        },
+        {
+            buf = 'March',
+            fmt = '%B',
+            dt = date.new({year = 1970, month = 03, day = 01}),
+        },
+        {
+            buf = 'April',
+            fmt = '%B',
+            dt = date.new({year = 1970, month = 04, day = 01}),
+        },
+        {
+            buf = 'May',
+            fmt = '%B',
+            dt = date.new({year = 1970, month = 05, day = 01}),
+        },
+        {
+            buf = 'June',
+            fmt = '%B',
+            dt = date.new({year = 1970, month = 06, day = 01}),
+        },
+        {
+            buf = 'July',
+            fmt = '%B',
+            dt = date.new({year = 1970, month = 07, day = 01}),
+        },
+        {
+            buf = 'August',
+            fmt = '%B',
+            dt = date.new({year = 1970, month = 08, day = 01}),
+        },
+        {
+            buf = 'September',
+            fmt = '%B',
+            dt = date.new({year = 1970, month = 09, day = 01}),
+        },
+        {
+            buf = 'October',
+            fmt = '%B',
+            dt = date.new({year = 1970, month = 10, day = 01}),
+        },
+        {
+            buf = 'November',
+            fmt = '%B',
+            dt = date.new({year = 1970, month = 11, day = 01}),
+        },
+        {
+            buf = 'December',
+            fmt = '%B',
+            dt = date.new({year = 1970, month = 12, day = 01}),
+        },
+        -- %c is replaced by national representation of time and
+        -- date.
+        {
+            buf = 'Thu Jan  1 03:00:00 1970',
+            fmt = '%c',
+            dt = date.new({year = 1970, month = 01, day = 01, hour = 3}),
+        },
+        -- %C is replaced by (year / 100) as decimal number;
+        -- single digits are preceded by a zero.
+        {
+            buf = '26-08-2024 20',
+            fmt = '%d-%m-%Y %C',
+            dt = date.new({year = 2024, month = 08, day = 26}),
+        },
+        {
+            buf = '20',
+            fmt = '%C',
+            dt = date.new({year = 2000, month = 01, day = 01}),
+        },
+        -- %d is replaced by the day of the month as a decimal
+        -- number (01-31).
+        {
+            buf = '01',
+            fmt = '%d',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = '31',
+            fmt = '%d',
+            dt = date.new({year = 1970, month = 01, day = 31}),
+        },
+        -- %D is equivalent to "%m/%d/%y".
+        {
+            buf = '09/09/04',
+            fmt = '%D',
+            dt = date.new({year = 2004, month = 09, day = 09}),
+        },
+        -- %e is replaced by the day of the month as a decimal
+        -- number (1-31); single digits are preceded by a blank.
+        {
+            buf = '30',
+            fmt = '%e',
+            dt = date.new({year = 1970, month = 01, day = 30}),
+        },
+        {
+            buf = ' 1',
+            fmt = '%e',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = '30',
+            fmt = '%e',
+            dt = date.new({year = 1970, month = 01, day = 30}),
+        },
+        -- %E is a POSIX locale extensions. The sequences %Ec %EC
+        -- %Ex %EX  %Ey %EY %Od %Oe %OH %OI %Om %OM %OS %Ou %OU
+        -- %OV %Ow %OW %Oy are supposed to provide alternate
+        -- representations.
+        -- %F is equivalent to "%Y-%m-%d".
+        {
+            buf = '1970-01-01T03:00:00.125+0300',
+            fmt = '%FT%T.%f%z',
+            dt = date.new({hour = 3, nsec = 125000000, tzoffset = 180}),
+        },
+        {
+            buf = '1970-01-01',
+            fmt = '%F',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        -- %f is replaced by the fractional seconds,
+        -- Tarantool-specific.
+        {
+            buf = '100',
+            fmt = '%f',
+            -- See https://github.com/tarantool/tarantool/issues/8569.
+            dt = date.new({
+                year = 1970, month = 01, day = 01, nsec = 100000000,
+            }),
+        },
+        -- %G is replaced by a year as a decimal number with
+        -- century. This year is the one that contains the greater
+        -- part of the week (Monday as the first day of the week).
+        {
+            buf = '2024',
+            fmt = '%G',
+            dt = date.new({year = 2024, month = 01, day = 01}),
+        },
+        -- %g is replaced by the same year as in "%G", but as
+        -- a decimal number without century (00-99).
+        -- Skipped, it is not possible to roundtrip.
+        -- %h, same as %b
+        {
+            buf = 'Jan',
+            fmt = '%h',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = 'Feb',
+            fmt = '%h',
+            dt = date.new({year = 1970, month = 02, day = 01}),
+        },
+        {
+            buf = 'Mar',
+            fmt = '%h',
+            dt = date.new({year = 1970, month = 03, day = 01}),
+        },
+        {
+            buf = 'Apr',
+            fmt = '%h',
+            dt = date.new({year = 1970, month = 04, day = 01}),
+        },
+        {
+            buf = 'May',
+            fmt = '%h',
+            dt = date.new({year = 1970, month = 05, day = 01}),
+        },
+        {
+            buf = 'Jun',
+            fmt = '%h',
+            dt = date.new({year = 1970, month = 06, day = 01}),
+        },
+        {
+            buf = 'Jul',
+            fmt = '%h',
+            dt = date.new({year = 1970, month = 07, day = 01}),
+        },
+        {
+            buf = 'Aug',
+            fmt = '%h',
+            dt = date.new({year = 1970, month = 08, day = 01}),
+        },
+        {
+            buf = 'Sep',
+            fmt = '%h',
+            dt = date.new({year = 1970, month = 09, day = 01}),
+        },
+        {
+            buf = 'Oct',
+            fmt = '%h',
+            dt = date.new({year = 1970, month = 10, day = 01}),
+        },
+        {
+            buf = 'Nov',
+            fmt = '%h',
+            dt = date.new({year = 1970, month = 11, day = 01}),
+        },
+        {
+            buf = 'Dec',
+            fmt = '%h',
+            dt = date.new({year = 1970, month = 12, day = 01}),
+        },
+        -- %H, is replaced by the hour (24-hour clock) as
+        -- a decimal number (00-23).
+        {
+            buf = '00',
+            fmt = '%H',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = '23',
+            fmt = '%H',
+            dt = date.new({year = 1970, month = 01, day = 01, hour = 23}),
+        },
+        -- %I is replaced by the hour (12-hour clock) as
+        -- a decimal number (01-12).
+        {
+            buf = '01',
+            fmt = '%I',
+            dt = date.new({year = 1970, month = 01, day = 01, hour = 01}),
+        },
+        {
+            buf = '12',
+            fmt = '%I',
+            dt = date.new({year = 1970, month = 01, day = 01, hour = 12}),
+        },
+        -- %j is replaced by the day of the year as a decimal
+        -- number (001-366).
+        {
+            buf = '001',
+            fmt = '%j',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = '31-12-2024 366',
+            fmt = '%d-%m-%Y %j',
+            dt = date.new({year = 2024, month = 12, day = 31}),
+        },
+        -- %k is replaced by the hour (24-hour clock) as
+        -- a decimal number (0-23); single digits are preceded
+        -- by a blank.
+        {
+            buf = ' 0',
+            fmt = '%k',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = '23',
+            fmt = '%k',
+            dt = date.new({year = 1970, month = 01, day = 01, hour = 23}),
+        },
+        -- %l is replaced by the hour (12-hour clock) as
+        -- a decimal number (1-12); single digits are preceded
+        -- by a blank.
+        {
+            buf = ' 1',
+            fmt = '%l',
+            dt = date.new({year = 1970, month = 01, day = 01, hour = 01}),
+        },
+        {
+            buf = '12',
+            fmt = '%l',
+            dt = date.new({year = 1970, month = 01, day = 01, hour = 12}),
+        },
+        -- %m is replaced by the month as a decimal number
+        -- (01-12).
+        {
+            buf = '01',
+            fmt = '%m',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = '12',
+            fmt = '%m',
+            dt = date.new({year = 1970, month = 12, day = 01}),
+        },
+        -- %M is replaced by the minute as a decimal number
+        -- (00-59).
+        {
+            buf = '00',
+            fmt = '%M',
+            dt = date.new({}),
+        },
+        {
+            buf = '59',
+            fmt = '%M',
+            dt = date.new({min = 59}),
+        },
+        -- %n is replaced by a newline.
+        {
+            buf = '\n',
+            fmt = '%n',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = '2025\n01\n13',
+            fmt = '%Y%n%m%n%d',
+            dt = date.new({year = 2025, month = 01, day = 13}),
+        },
+        -- %O the same as %E*, skipped.
+        -- %p is replaced by national representation of either
+        -- "ante meridiem" (a.m.) or "post meridiem" (p.m.) as
+        -- appropriate.
+        {
+            buf = 'PM',
+            fmt = '%p',
+            dt = date.new({year = 1970, month = 01, day = 01, hour = 12}),
+        },
+        {
+            buf = 'AM',
+            fmt = '%p',
+            dt = date.new({year = 1970, month = 01, day = 01, hour = 00}),
+        },
+        -- %r, same as "%I:%M:%S %p".
+        {
+            buf = '12:32:01 AM',
+            fmt = '%r',
+            dt = date.new({hour = 00, min = 32, sec = 01}),
+        },
+        {
+            buf = '12:32:01 PM',
+            fmt = '%r',
+            dt = date.new({hour = 12, min = 32, sec = 01}),
+        },
+        -- %R, same as "%H:%M".
+        {
+            buf = '23:59',
+            fmt = '%R',
+            dt = date.new({hour = 23, min = 59}),
+        },
+        {
+            buf = '00:00',
+            fmt = '%R',
+            dt = date.new({hour = 00, min = 00}),
+        },
+        -- %s is replaced by the number of seconds since the
+        -- Epoch, UTC (see mktime(3)).
+        {
+            buf = '26-08-2024 1724630400',
+            fmt = '%d-%m-%Y %s',
+            dt = date.new({year = 2024, month = 08, day = 26}),
+        },
+        -- %S is replaced by the second as a decimal number
+        -- (00-60).
+        {
+            buf = '00',
+            fmt = '%S',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = '59',
+            fmt = '%S',
+            dt = date.new({year = 1970, month = 01, day = 01, sec = 59}),
+        },
+        -- %t is replaced by a tab.
+        {
+            buf = '26-08-2024 \t',
+            fmt = '%d-%m-%Y %t',
+            dt = date.new({year = 2024, month = 08, day = 26}),
+        },
+        {
+            buf = '26\t08\t2024',
+            fmt = '%d%t%m%t%Y',
+            dt = date.new({year = 2024, month = 08, day = 26}),
+        },
+        -- %T, same as "%H:%M:%S".
+        {
+            buf = '00:00:00',
+            fmt = '%T',
+            dt = date.new({}),
+        },
+        {
+            buf = '23:59:59',
+            fmt = '%T',
+            dt = date.new({hour = 23, min = 59, sec = 59}),
+        },
+        -- %u is replaced by the weekday (Monday as the first day
+        -- of the week) as a decimal number (1-7).
+        -- Note, works for 4 ('Thursday') only when date is not
+        -- complete, see tarantool/tarantool#10470.
+        {
+            buf = '4',
+            fmt = '%u',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = '12-08-2024 1',
+            fmt = '%d-%m-%Y %u',
+            dt = date.new({year = 2024, month = 08, day = 12}),
+        },
+        {
+            buf = '13-08-2024 2',
+            fmt = '%d-%m-%Y %u',
+            dt = date.new({year = 2024, month = 08, day = 13}),
+        },
+        {
+            buf = '14-08-2024 3',
+            fmt = '%d-%m-%Y %u',
+            dt = date.new({year = 2024, month = 08, day = 14}),
+        },
+        {
+            buf = '15-08-2024 4',
+            fmt = '%d-%m-%Y %u',
+            dt = date.new({year = 2024, month = 08, day = 15}),
+        },
+        {
+            buf = '16-08-2024 5',
+            fmt = '%d-%m-%Y %u',
+            dt = date.new({year = 2024, month = 08, day = 16}),
+        },
+        {
+            buf = '17-08-2024 6',
+            fmt = '%d-%m-%Y %u',
+            dt = date.new({year = 2024, month = 08, day = 17}),
+        },
+        {
+            buf = '18-08-2024 7',
+            fmt = '%d-%m-%Y %u',
+            dt = date.new({year = 2024, month = 08, day = 18}),
+        },
+        -- %U is replaced by the week number of the year (Sunday
+        -- as the first day of the week) as a decimal number
+        -- (00-53).
+        {
+            buf = '01-01-2024 00',
+            fmt = '%d-%m-%Y %U',
+            dt = date.new({year = 2024, month = 01, day = 01}),
+        },
+        {
+            buf = '31-12-2023 53',
+            fmt = '%d-%m-%Y %U',
+            dt = date.new({year = 2023, month = 12, day = 31}),
+        },
+        -- %v, same as "%e-%b-%Y".
+        {
+            buf = ' 1-Jan-1970',
+            fmt = '%v',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        -- %V, unsupported by strptime(3).
+        -- %w is replaced by the weekday (Sunday as the first day
+        -- of the week) as a decimal number (0-6).
+        -- Note, works for 4 (Thursday) only when date is not
+        -- complete, see tarantool/tarantool#10470.
+        {
+            buf = '4',
+            fmt = '%w',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        {
+            buf = '25-08-2024 0',
+            fmt = '%d-%m-%Y %w',
+            dt = date.new({year = 2024, month = 08, day = 25}),
+        },
+        {
+            buf = '26-08-2024 1',
+            fmt = '%d-%m-%Y %w',
+            dt = date.new({year = 2024, month = 08, day = 26}),
+        },
+        {
+            buf = '27-08-2024 2',
+            fmt = '%d-%m-%Y %w',
+            dt = date.new({year = 2024, month = 08, day = 27}),
+        },
+        {
+            buf = '28-08-2024 3',
+            fmt = '%d-%m-%Y %w',
+            dt = date.new({year = 2024, month = 08, day = 28}),
+        },
+        {
+            buf = '29-08-2024 4',
+            fmt = '%d-%m-%Y %w',
+            dt = date.new({year = 2024, month = 08, day = 29}),
+        },
+        {
+            buf = '30-08-2024 5',
+            fmt = '%d-%m-%Y %w',
+            dt = date.new({year = 2024, month = 08, day = 30}),
+        },
+        {
+            buf = '31-08-2024 6',
+            fmt = '%d-%m-%Y %w',
+            dt = date.new({year = 2024, month = 08, day = 31}),
+        },
+        -- %W is replaced by the week number of the year (Monday
+        -- as the first day of the week) as a decimal number
+        -- (00-53).
+        -- Note, week number is not supported,
+        -- see tarantool/tarantool#10575.
+        -- First day of the first week of the year.
+        {
+            buf = '01-01-2024 01',
+            fmt = '%d-%m-%Y %W',
+            dt = date.new({year = 2024, month = 01, day = 01}),
+        },
+        -- Last day of the first week of the year.
+        {
+            buf = '07-01-2024 01',
+            fmt = '%d-%m-%Y %W',
+            dt = date.new({year = 2024, month = 01, day = 07}),
+        },
+        -- First day of the second week of the year.
+        {
+            buf = '08-01-2024 02',
+            fmt = '%d-%m-%Y %W',
+            dt = date.new({year = 2024, month = 01, day = 08}),
+        },
+        -- First day of the last week of the year.
+        {
+            buf = '23-12-2024 52',
+            fmt = '%d-%m-%Y %W',
+            dt = date.new({year = 2024, month = 12, day = 23}),
+        },
+        -- Last day of the last week of the year.
+        {
+            buf = '29-12-2024 52',
+            fmt = '%d-%m-%Y %W',
+            dt = date.new({year = 2024, month = 12, day = 29}),
+        },
+        -- Last day of the year.
+        {
+            buf = '31-12-2024 53',
+            fmt = '%d-%m-%Y %W',
+            dt = date.new({year = 2024, month = 12, day = 31}),
+        },
+        -- %x is replaced by national representation of the date.
+        {
+            buf = '01/01/70',
+            fmt = '%x',
+            dt = date.new({year = 1970, month = 01, day = 01}),
+        },
+        -- %X is replaced by national representation of the time.
+        {
+            buf = '00:00:00',
+            fmt = '%X',
+            dt = date.new({}),
+        },
+        {
+            buf = '23:59:59',
+            fmt = '%X',
+            dt = date.new({hour = 23, min = 59, sec = 59}),
+        },
+        -- %y is replaced by the year without century as a decimal
+        -- number (00-99).
+        {
+            buf = '00',
+            fmt = '%y',
+            dt = date.new({year = 2000, month = 01, day = 01}),
+        },
+        {
+            buf = '99',
+            fmt = '%y',
+            dt = date.new({year = 1999, month = 01, day = 01}),
+        },
+        -- %Y is replaced by the year with century as a decimal
+        -- number.
+        {
+            buf = '0000',
+            fmt = '%Y',
+            dt = date.new({year = 0000, month = 01, day = 01}),
+        },
+        {
+            buf = '3000',
+            fmt = '%Y',
+            dt = date.new({year = 3000, month = 01, day = 01}),
+        },
+        -- %z is replaced by the time zone offset from UTC;
+        -- a leading plus sign stands for east of UTC, a minus
+        -- sign for west of UTC, hours and minutes follow with
+        -- two digits each and no delimiter between them
+        -- (common form for RFC 822 date headers).
+        {
+            buf = '+0403',
+            fmt = '%z',
+            dt = date.new({tzoffset = 243}),
+        },
+        {
+            buf = '-0403',
+            fmt = '%z',
+            dt = date.new({tzoffset = -243}),
+        },
+        -- %Z is replaced by the time zone name.
+        {
+            buf = 'MSK',
+            fmt = '%Z',
+            dt = date.new({tzoffset = 180}),
+        },
+        -- %+ is replaced by national representation of the date
+        -- and time (the format is similar to that produced by
+        -- date(1)).
+        {
+            buf = 'Mon Aug 26 00:00:00  2024',
+            fmt = '%+',
+            dt = date.new({year = 2024, month = 08, day = 26}),
+        },
+        -- %% is replaced by `%'.
+        {
+            buf = '26%08%2024',
+            fmt = '%d%%%m%%%Y',
+            dt = date.new({year = 2024, month = 08, day = 26}),
+        },
+        -- Mixed.
+        {
+            buf = '26-08-24',
+            fmt = '%d-%m-%y',
+            dt = date.new({year = 2024, month = 08, day = 26}),
+        },
+        {
+            buf = '26-08-2024 \n',
+            fmt = '%d-%m-%Y %n',
+            dt = date.new({year = 2024, month = 08, day = 26}),
+        },
+        {
+            buf = '26-08-2024  6',
+            fmt = '%d-%m-%Y %l',
+            dt = date.new({year = 2024, month = 08, day = 26, hour = 6}),
+        },
+        {
+            buf = '26-08-2024  9',
+            fmt = '%d-%m-%Y %k',
+            dt = date.new({year = 2024, month = 08, day = 26, hour = 9}),
+        },
+        {
+            buf = '01/01/70',
+            fmt = '%m/%d/%y',
+            dt = date.new({}),
+        },
+        {
+            buf = '1970-01-01',
+            fmt = '%Y-%m-%d',
+            dt = date.new({}),
+        },
+        {
+            buf = '1970-01-01T0300+0300',
+            fmt = '%Y-%m-%dT%H%M%z',
+            dt = date.new({hour = 3, tzoffset = 180}),
+        },
+        {
+            buf = '1970-01-01T03:00:00+0300',
+            fmt = '%Y-%m-%dT%H:%M:%S%z',
+            dt = date.new({hour = 3, tzoffset = 180}),
+        },
+    }
+    test:plan(#formats * 3)
+    for _, tc in pairs(formats) do
+        local dt, parsed_syms = date.parse(tc.buf, {format = tc.fmt})
+        test:is(parsed_syms, #tc.buf,
+                ('%s: parse buffer is ok'):format(tc.fmt))
+        test:is(dt, tc.dt, ('%s, resulted dt is ok'):format(tc.fmt))
+        local dt_formatted = dt:format(tc.fmt)
+        local buf = tc.buf
+        test:is(dt_formatted, buf,
+                ('%s: format to %s'):format(tc.fmt, dt_formatted))
     end
 end)
 
