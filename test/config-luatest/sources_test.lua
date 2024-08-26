@@ -3,7 +3,7 @@ local fun = require('fun')
 local json = require('json')
 local yaml = require('yaml')
 local treegen = require('luatest.treegen')
-local justrun = require('test.justrun')
+local justrun = require('luatest.justrun')
 local source_file = require('internal.config.source.file').new()
 local server = require('test.luatest_helpers.server')
 

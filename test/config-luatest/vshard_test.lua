@@ -1,7 +1,7 @@
 local fun = require('fun')
 local t = require('luatest')
 local treegen = require('luatest.treegen')
-local justrun = require('test.justrun')
+local justrun = require('luatest.justrun')
 local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
 
