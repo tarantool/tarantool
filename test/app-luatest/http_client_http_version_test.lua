@@ -3,7 +3,7 @@
 -- scripts with testing workloads reside.
 
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 local socket = require('socket')
 
@@ -45,9 +45,6 @@ local expected = {
     },
 }
 
-http_version_group.before_all(treegen.init)
-http_version_group.after_all(treegen.clean)
-
 http_version_group.before_each(function(g)
     g.server = socket.tcp_server('127.0.0.1', 0, function(_s) end)
 end)
@@ -71,9 +68,9 @@ local http_request_script = string.dump(function()
 end)
 
 http_version_group.test_http_version = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local script_name = 'http_request.lua'
-    treegen.write_script(dir, script_name, http_request_script)
+    treegen.write_file(dir, script_name, http_request_script)
     local args = {script_name}
     local opts = {nojson = true, stderr = true}
     local env = {HTTP_SERVER_PORT = g.server:name().port}

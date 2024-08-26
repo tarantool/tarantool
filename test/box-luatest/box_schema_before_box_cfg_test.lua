@@ -1,13 +1,12 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 
 local g = t.group()
 
 g.test_box_schema_before_box_cfg = function()
-    treegen.init(g)
-    local dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(dir, 'main.lua', [[
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'main.lua', [[
         local t = require('luatest')
         local schema = box.schema
 

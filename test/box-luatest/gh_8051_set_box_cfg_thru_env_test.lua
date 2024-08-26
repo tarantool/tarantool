@@ -1,16 +1,12 @@
 local server = require('luatest.server')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local it = require('test.interactive_tarantool')
 
 local t = require('luatest')
 local g = t.group()
 
-g.before_all(function(g)
-    treegen.init(g)
-end)
-
 g.before_each(function(g)
-    g.dir = treegen.prepare_directory(g, {}, {})
+    g.dir = treegen.prepare_directory({}, {})
 end)
 
 g.after_each(function(g)
@@ -21,10 +17,6 @@ g.after_each(function(g)
     if g.server ~= nil then
        g.server:stop()
    end
-end)
-
-g.after_all(function(g)
-    treegen.clean(g)
 end)
 
 g.test_json_table_curly_bracket = function()

@@ -1,16 +1,8 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 
 local g = t.group()
-
-g.before_all(function(g)
-    treegen.init(g)
-end)
-
-g.after_all(function(g)
-    treegen.clean(g)
-end)
 
 -- Trigger luaT_newmodule() panic.
 --
@@ -20,14 +12,14 @@ end)
 -- already registered.
 --
 -- luaT_newmodule() must panic in the case.
-g.test_newmodule_panic = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(dir, 'override/fio.lua', [[
+g.test_newmodule_panic = function()
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'override/fio.lua', [[
         local loaders = require('internal.loaders')
         loaders.builtin.box = {}
         return loaders.builtin.fio
     ]])
-    treegen.write_script(dir, 'main.lua', '')
+    treegen.write_file(dir, 'main.lua', '')
     local opts = {nojson = true, stderr = true}
     local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
     t.assert_equals(res, {
@@ -58,12 +50,12 @@ end
 --
 -- luaT_setmodule() must panic if it meets attempt to register
 -- different values as the same built-in module.
-g.test_setmodule_panic = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(dir, 'override/fio.lua', [[
+g.test_setmodule_panic = function()
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'override/fio.lua', [[
         return {}
     ]])
-    treegen.write_script(dir, 'main.lua', '')
+    treegen.write_file(dir, 'main.lua', '')
     local opts = {nojson = true, stderr = true}
     local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
     t.assert_equals(res, {

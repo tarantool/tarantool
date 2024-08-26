@@ -1,5 +1,5 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local server = require('test.luatest_helpers.server')
 local yaml = require('yaml')
 local fio = require('fio')
@@ -7,9 +7,7 @@ local fio = require('fio')
 local g = t.group()
 
 g.before_all(function(g)
-    treegen.init(g)
-
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local data = 'test/box-luatest/upgrade/2.11.0/00000000000000000003.snap'
     fio.copyfile(data, dir)
 
@@ -71,7 +69,7 @@ g.before_all(function(g)
     }
 
     local cfg = yaml.encode(config)
-    treegen.write_script(dir, 'cfg.yaml', cfg)
+    treegen.write_file(dir, 'cfg.yaml', cfg)
     local opts = {config_file = 'cfg.yaml', chdir = dir, alias = 'instance-001'}
     g.server = server:new(opts)
 
@@ -80,7 +78,6 @@ end)
 
 g.after_all(function(g)
     g.server:drop()
-    treegen.clean(g)
 end)
 
 g.test_upgrade = function()

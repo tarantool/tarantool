@@ -2,15 +2,15 @@ local fun = require('fun')
 local yaml = require('yaml')
 local net_box = require('net.box')
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
 
 local g = helpers.group()
 
 local function setup(g, dir, config, env, opts)
-    local config_file = treegen.write_script(dir, 'config.yaml',
-                                             yaml.encode(config))
+    local config_file = treegen.write_file(dir, 'config.yaml',
+                                           yaml.encode(config))
     local opts = fun.chain({
         config_file = config_file,
         chdir = dir,
@@ -36,7 +36,7 @@ g.test_basic = function(g)
     config.iproto = nil
 
     -- Start the server.
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local net_box_uri = ('unix/:%s/var/run/%s/tarantool.iproto'):format(dir,
         'instance-001')
     setup(g, dir, config, {
@@ -59,7 +59,7 @@ end
 -- values.
 g.test_priority = function(g)
     -- Prepare a config with iproto.listen.
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local low_prio_uri = ('unix/:%s/unique1.iproto'):format(dir)
     local high_prio_uri = ('unix/:%s/unique2.iproto'):format(dir)
     local config = table.copy(helpers.simple_config)

@@ -1,7 +1,7 @@
 local fun = require('fun')
 local yaml = require('yaml')
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
 
@@ -11,13 +11,13 @@ local g = helpers.group()
 -- works good with `process.work_dir` option, which changes CWD of
 -- the instance.
 g.test_relative_config_path = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = table.copy(helpers.simple_config)
     config.process = {
         work_dir = 'x',
     }
     local config_file = 'config.yaml'
-    treegen.write_script(dir, config_file, yaml.encode(config))
+    treegen.write_file(dir, config_file, yaml.encode(config))
 
     -- Important: `--config <...>` is passed with a relative path.
     local opts = {config_file = config_file, chdir = dir}
