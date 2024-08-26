@@ -1,5 +1,5 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 
 local g = t.group()
@@ -11,7 +11,7 @@ local g = t.group()
 -- value.
 local OVERRIDE_SCRIPT_TEMPLATE = [[
 print(require('json').encode({
-    ['script'] = '<script>',
+    ['script'] = '<filename>',
     ['...'] = {...},
     ['arg[-1]'] = arg[-1],
     ['arg[0]'] = arg[0],
@@ -25,19 +25,14 @@ local MAIN_SCRIPT_TEMPLATE = [[
 local json = require('json').new()
 json.cfg({encode_use_tostring = true})
 print(json.encode({
-    ['script'] = '<script>',
+    ['script'] = '<filename>',
     ['<module_name>'] = require('<module_name>'),
 }))
 ]]
 
-g.before_all(function(g)
-    treegen.init(g)
-    treegen.add_template(g, '^override/.*%.lua$', OVERRIDE_SCRIPT_TEMPLATE)
-    treegen.add_template(g, '^main%.lua$', MAIN_SCRIPT_TEMPLATE)
-end)
-
-g.after_all(function(g)
-    treegen.clean(g)
+g.before_all(function()
+    treegen.add_template('^override/.*%.lua$', OVERRIDE_SCRIPT_TEMPLATE)
+    treegen.add_template('^main%.lua$', MAIN_SCRIPT_TEMPLATE)
 end)
 
 -- Test oracle.
@@ -137,10 +132,10 @@ for _, module_name in ipairs(override_cases) do
     local module_name_as_snake = table.concat(module_name:split('.'), '_')
     local case_name = ('test_override_%s'):format(module_name_as_snake)
 
-    g[case_name] = function(g)
+    g[case_name] = function()
         local scripts = {override_filename, 'main.lua'}
         local replacements = {module_name = module_name}
-        local dir = treegen.prepare_directory(g, scripts, replacements)
+        local dir = treegen.prepare_directory(scripts, replacements)
         local res = justrun.tarantool(dir, {}, {'main.lua'})
         local exp = expected_output(module_name)
         t.assert_equals(res, exp)
@@ -162,10 +157,10 @@ end
 for _, envvar in ipairs({'false', 'true', '0', '1', '', 'X'}) do
     local case_slug = envvar == '' and 'empty' or envvar:lower()
     local case_name = ('test_override_onoff_%s'):format(case_slug)
-    g[case_name] = function(g)
+    g[case_name] = function()
         local scripts = {'override/socket.lua', 'main.lua'}
         local replacements = {module_name = 'socket'}
-        local dir = treegen.prepare_directory(g, scripts, replacements)
+        local dir = treegen.prepare_directory(scripts, replacements)
         local env = {['TT_OVERRIDE_BUILTIN'] = envvar}
         local res = justrun.tarantool(dir, env, {'main.lua'})
         if parse_boolean(envvar, true) then
