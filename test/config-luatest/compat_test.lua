@@ -2,7 +2,7 @@ local fun = require('fun')
 local compat = require('compat')
 local instance_config = require('internal.config.instance_config')
 local t = require('luatest')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
@@ -58,7 +58,7 @@ end
 -- Write a new config file with the given compat option and reload
 -- the configuration.
 local function switch(cluster, option_name, startup_config, v)
-    local config = cbuilder.new(startup_config)
+    local config = cbuilder:new(startup_config)
         :set_instance_option('instance-001', 'compat', {
             [option_name] = v ~= 'default' and v or box.NULL,
         })
@@ -70,7 +70,7 @@ end
 -- that it is actually set.
 local function gen_startup_case(option_name, v)
     return function(g)
-        local startup_config = cbuilder.new()
+        local startup_config = cbuilder:new()
             :add_instance('instance-001', {
                 compat = {
                     [option_name] = v ~= 'default' and v or nil,
@@ -89,7 +89,7 @@ end
 -- with a reload and a verification of the effect.
 local function gen_reload_case(option_name)
     return function(g)
-        local startup_config = cbuilder.new()
+        local startup_config = cbuilder:new()
             :add_instance('instance-001', {})
             :config()
 
@@ -113,7 +113,7 @@ end
 -- an error.
 local function gen_reload_failure_case(option_name, startup_value, reload_value)
     return function(g)
-        local startup_config = cbuilder.new()
+        local startup_config = cbuilder:new()
             :add_instance('instance-001', {
                 compat = {
                     [option_name] = startup_value ~= 'default' and
@@ -176,7 +176,7 @@ end
 -- it to the second given value is successful.
 local function gen_reload_success_case(option_name, startup_value, reload_value)
     return function(g)
-        local startup_config = cbuilder.new()
+        local startup_config = cbuilder:new()
             :add_instance('instance-001', {
                 compat = {
                     [option_name] = startup_value ~= 'default' and

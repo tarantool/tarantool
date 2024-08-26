@@ -2,7 +2,7 @@ local yaml = require('yaml')
 local fio = require('fio')
 local socket = require('socket')
 local t = require('luatest')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
@@ -65,7 +65,7 @@ end
 -- Start, reload, change, return back, disable.
 g.test_basic = function(g)
     -- Start an instance and verify that the console works.
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
     local cluster = cluster.new(g, config)
@@ -77,7 +77,7 @@ g.test_basic = function(g)
     assert_console_works(cluster, config)
 
     -- Change the socket and verify that the new one appears.
-    local new_config = cbuilder.new(config)
+    local new_config = cbuilder:new(config)
         :set_global_option('console.socket', 'foo.control')
         :config()
     cluster:reload(new_config)
@@ -92,7 +92,7 @@ g.test_basic = function(g)
     assert_console_closed(cluster, new_config)
 
     -- Disable the console.
-    local new_config_2 = cbuilder.new(config)
+    local new_config_2 = cbuilder:new(config)
         :set_global_option('console.enabled', false)
         :config()
     cluster:reload(new_config_2)
@@ -103,7 +103,7 @@ end
 
 -- Start with some custom workinf directory and reload.
 g.test_custom_work_dir = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_global_option('process.work_dir', 'w')
         :add_instance('i-001', {})
         :config()
@@ -118,7 +118,7 @@ end
 
 -- As previous, but with `../` in the socket path.
 g.test_parent_dir_in_socket_path = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_global_option('process.work_dir', 'w')
         :set_global_option('console.socket', '../foo.control')
         :add_instance('i-001', {})
@@ -134,21 +134,21 @@ end
 
 -- Re-open console by setting enable to false and true
 g.test_reopen_console = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
     local cluster = cluster.new(g, config)
     cluster:start()
     assert_console_works(cluster, config)
 
-    local new_config = cbuilder.new(config)
+    local new_config = cbuilder:new(config)
         :set_global_option('console.enabled', false)
         :config()
     cluster:reload(new_config)
     assert_console_closed(cluster, config)
     assert_console_closed(cluster, new_config)
 
-    local new_config_2 = cbuilder.new(new_config)
+    local new_config_2 = cbuilder:new(new_config)
         :set_global_option('console.enabled', true)
         :config()
     cluster:reload(new_config_2)

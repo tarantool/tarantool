@@ -1,5 +1,5 @@
 local t = require('luatest')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
@@ -13,7 +13,7 @@ g.after_all(cluster.clean)
 -- * config:instances()
 -- * config:get(<...>, {instance = <...>})
 g.test_basic = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_global_option('replication.failover', 'election')
         :set_global_option('process.title', '{{ instance_name }}')
 
@@ -104,7 +104,7 @@ end
 -- takes into account configuration sources with the 'instance`
 -- type: 'env' and 'env (default)'. The latter doesn't.
 g.test_env = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_global_option('process.title', 'file')
         :add_instance('i-001', {})
         :config()
@@ -133,7 +133,7 @@ end
 
 -- Attempt to pass an unknown instance name into config:get().
 g.test_errors = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
 
@@ -169,7 +169,7 @@ g.test_instance_uri_success = function(g)
             },
         },
     }
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :use_group('g-001')
         :set_global_option('credentials.users.sharding_user.password', 'secret')
 
@@ -255,7 +255,7 @@ g.test_instance_uri_success = function(g)
 end
 
 g.test_instance_uri_errors = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
 
@@ -284,7 +284,7 @@ end
 
 -- Attempt to pass an empty group and an empty replicaset.
 g.test_misplace_option = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :use_group('g-001')
 
         :use_replicaset('r-001')
@@ -297,7 +297,7 @@ g.test_misplace_option = function(g)
     cluster.startup_error(g, config, "group \"sharding\" should " ..
                                      "include at least one replicaset.")
 
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :use_group('g-001')
 
         :use_replicaset('r-001')
