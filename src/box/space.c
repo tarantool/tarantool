@@ -671,10 +671,12 @@ after_old_tuple_lookup:;
 				container_of(h, struct tuple_constraint,
 					     space_cache_holder);
 			assert(constr->def.type == CONSTR_FKEY);
-			if (tuple_constraint_fkey_check_delete(constr,
-							       old_tuple,
-							       new_tuple) != 0)
+			if (tuple_constraint_fkey_check_delete(
+					constr, old_tuple, new_tuple) != 0) {
+				if (new_tuple != NULL)
+					tuple_unref(new_tuple);
 				return -1;
+			}
 		}
 	}
 
