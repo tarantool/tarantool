@@ -1,20 +1,12 @@
 local t = require('luatest')
 local fio = require('fio')
 local justrun = require('test.justrun')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 
 local g = t.group()
 
-g.before_all(function()
-    treegen.init(g)
-end)
-
-g.after_all(function()
-    treegen.clean(g)
-end)
-
 g.test_log_only_changed_options = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local script = [[
         box.cfg{log_level = 5, log = 'file:log.txt'}
         box.cfg{sql_cache_size = 1000}
@@ -27,7 +19,7 @@ g.test_log_only_changed_options = function()
         box.cfg{sql_cache_size = 1000}
         os.exit(0)
     ]]
-    treegen.write_script(dir, 'main.lua', script)
+    treegen.write_file(dir, 'main.lua', script)
 
     local env = {}
     local opts = {nojson = true, stderr = false}

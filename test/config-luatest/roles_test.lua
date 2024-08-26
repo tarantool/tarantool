@@ -231,7 +231,7 @@ g.test_role_stop_success = function(g)
 end
 
 -- Ensure that errors during config validation are handled correctly.
-g.test_role_validate_error = function(g)
+g.test_role_validate_error = function()
     local one = [[
         local function validate(cfg)
             error('something wrong', 0)
@@ -244,7 +244,7 @@ g.test_role_validate_error = function(g)
         }
     ]]
 
-    helpers.failure_case(g, {
+    helpers.failure_case({
         roles = {one = one},
         options = {
             ['roles_cfg'] = {one = 1},
@@ -255,7 +255,7 @@ g.test_role_validate_error = function(g)
 end
 
 -- Ensure that errors during role application are handled correctly.
-g.test_role_apply_error = function(g)
+g.test_role_apply_error = function()
     local one = [[
         local function apply(cfg)
             error('something wrong', 0)
@@ -268,7 +268,7 @@ g.test_role_apply_error = function(g)
         }
     ]]
 
-    helpers.failure_case(g, {
+    helpers.failure_case({
         roles = {one = one},
         options = {
             ['roles_cfg'] = {one = 1},
@@ -279,14 +279,14 @@ g.test_role_apply_error = function(g)
 end
 
 -- Make sure an error is raised if not all methods are present.
-g.test_role_no_method_error = function(g)
+g.test_role_no_method_error = function()
     local one = [[
         return {
             apply = function() end,
             stop = function() end,
         }
     ]]
-    helpers.failure_case(g, {
+    helpers.failure_case({
         roles = {one = one},
         options = {
             ['roles_cfg'] = {one = 1},
@@ -301,7 +301,7 @@ g.test_role_no_method_error = function(g)
             stop = function() end,
         }
     ]]
-    helpers.failure_case(g, {
+    helpers.failure_case({
         roles = {one = one},
         options = {
             ['roles_cfg'] = {one = 1},
@@ -316,7 +316,7 @@ g.test_role_no_method_error = function(g)
             apply = function() end,
         }
     ]]
-    helpers.failure_case(g, {
+    helpers.failure_case({
         roles = {one = one},
         options = {
             ['roles_cfg'] = {one = 1},
@@ -429,7 +429,7 @@ g.test_role_dependencies_success = function(g)
     })
 end
 
-g.test_role_dependencies_error_wrong_type = function(g)
+g.test_role_dependencies_error_wrong_type = function()
     local one = [[
         return {
             dependencies = 'two',
@@ -439,7 +439,7 @@ g.test_role_dependencies_error_wrong_type = function(g)
         }
     ]]
 
-    helpers.failure_case(g, {
+    helpers.failure_case({
         roles = {one = one},
         options = {
             ['roles'] = {'one'}
@@ -449,7 +449,7 @@ g.test_role_dependencies_error_wrong_type = function(g)
     })
 end
 
-g.test_role_dependencies_error_no_role = function(g)
+g.test_role_dependencies_error_no_role = function()
     local one = [[
         return {
             dependencies = {'two'},
@@ -459,7 +459,7 @@ g.test_role_dependencies_error_no_role = function(g)
         }
     ]]
 
-    helpers.failure_case(g, {
+    helpers.failure_case({
         roles = {one = one},
         options = {
             ['roles'] = {'one'}
@@ -469,7 +469,7 @@ g.test_role_dependencies_error_no_role = function(g)
     })
 end
 
-g.test_role_dependencies_error_self = function(g)
+g.test_role_dependencies_error_self = function()
     local one = [[
         return {
             dependencies = {'one'},
@@ -479,7 +479,7 @@ g.test_role_dependencies_error_self = function(g)
         }
     ]]
 
-    helpers.failure_case(g, {
+    helpers.failure_case({
         roles = {one = one},
         options = {
             ['roles'] = {'one'}
@@ -488,7 +488,7 @@ g.test_role_dependencies_error_self = function(g)
     })
 end
 
-g.test_role_dependencies_error_circular = function(g)
+g.test_role_dependencies_error_circular = function()
     local one = [[
         return {
             dependencies = {'two'},
@@ -507,7 +507,7 @@ g.test_role_dependencies_error_circular = function(g)
         }
     ]]
 
-    helpers.failure_case(g, {
+    helpers.failure_case({
         roles = {one = one, two = two},
         options = {
             ['roles'] = {'one', 'two'}
@@ -622,12 +622,12 @@ end
 
 -- Ensure that a descriptive error is raised if the given module
 -- is not a table.
-g.test_role_is_not_a_table = function(g)
+g.test_role_is_not_a_table = function()
     local myrole = string.dump(function()
         return 42
     end)
 
-    helpers.failure_case(g, {
+    helpers.failure_case({
         roles = {myrole = myrole},
         options = {
             ['roles'] = {'myrole'}

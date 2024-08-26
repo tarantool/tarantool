@@ -1,5 +1,5 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun').tarantool
 
 local g = t.group()
@@ -20,9 +20,8 @@ g.before_each(function()
     t.skip_if(not jit.status(), 'Test requires JIT enabled')
     t.skip_if(jit.os == 'BSD', 'Disabled on *BSD due to #4819')
 
-    treegen.init(g)
-    treegen.add_template(g, '^script%.lua$', script)
-    rundir = treegen.prepare_directory(g, {'script.lua'})
+    treegen.add_template('^script%.lua$', script)
+    rundir = treegen.prepare_directory({'script.lua'})
 end)
 
 g.test_jit_dump = function()

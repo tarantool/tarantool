@@ -1,6 +1,6 @@
 local t = require('luatest')
 local fun = require('fun')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
 
@@ -16,7 +16,7 @@ local function skip_if_no_vshard()
 end
 
 g.test_connect = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -55,7 +55,7 @@ g.test_connect = function(g)
             instances:
               instance-005: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
 
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
@@ -118,7 +118,7 @@ g.test_connect = function(g)
 end
 
 g.test_filter = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -158,7 +158,7 @@ g.test_filter = function(g)
                   l3: 'three'
                 roles: [r1]
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
 
     local role = string.dump(function()
         return {
@@ -167,8 +167,8 @@ g.test_filter = function(g)
             validate = function() end,
         }
     end)
-    treegen.write_script(dir, 'r1.lua', role)
-    treegen.write_script(dir, 'r2.lua', role)
+    treegen.write_file(dir, 'r1.lua', role)
+    treegen.write_file(dir, 'r2.lua', role)
 
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
@@ -240,7 +240,7 @@ end
 
 g.test_filter_vshard = function(g)
     skip_if_no_vshard()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -277,7 +277,7 @@ g.test_filter_vshard = function(g)
                   mode: rw
               instance-004: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
 
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
@@ -327,7 +327,7 @@ g.test_filter_vshard = function(g)
 end
 
 g.test_filter_mode = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -362,7 +362,7 @@ g.test_filter_mode = function(g)
             instances:
               instance-005: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
 
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
@@ -420,7 +420,7 @@ g.test_filter_mode = function(g)
 end
 
 g.test_call = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -460,7 +460,7 @@ g.test_call = function(g)
                   l1: 'first'
                   l3: 'second'
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
 
     local role = string.dump(function()
         local function f1()
@@ -480,7 +480,7 @@ g.test_call = function(g)
             validate = function() end,
         }
     end)
-    treegen.write_script(dir, 'one.lua', role)
+    treegen.write_file(dir, 'one.lua', role)
 
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
@@ -552,7 +552,7 @@ end
 g.test_call_vshard = function(g)
     skip_if_no_vshard()
 
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -595,7 +595,7 @@ g.test_call_vshard = function(g)
               instance-004:
                 roles: [one]
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
 
     local role = string.dump(function()
         local function f1()
@@ -610,7 +610,7 @@ g.test_call_vshard = function(g)
             validate = function() end,
         }
     end)
-    treegen.write_script(dir, 'one.lua', role)
+    treegen.write_file(dir, 'one.lua', role)
 
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
@@ -651,7 +651,7 @@ g.test_call_vshard = function(g)
 end
 
 g.test_call_mode = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -688,7 +688,7 @@ g.test_call_mode = function(g)
                   l1: 'first'
                   l2: 'second'
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
 
     local role = string.dump(function()
         local function f()
@@ -703,7 +703,7 @@ g.test_call_mode = function(g)
             validate = function() end,
         }
     end)
-    treegen.write_script(dir, 'one.lua', role)
+    treegen.write_file(dir, 'one.lua', role)
 
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},

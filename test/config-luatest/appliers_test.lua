@@ -1,6 +1,6 @@
 local t = require('luatest')
 local fio = require('fio')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 
 local g = t.group()
@@ -61,20 +61,12 @@ local appliers_script = [[
     os.exit(0)
 ]]
 
-g.before_all(function()
-    treegen.init(g)
-end)
-
-g.after_all(function()
-    treegen.clean(g)
-end)
-
 g.test_applier_mkdir = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local injection = [[
         print(config._configdata:get('wal.dir', {use_default = true}))
     ]]
-    treegen.write_script(dir, 'main.lua', appliers_script:format(injection))
+    treegen.write_file(dir, 'main.lua', appliers_script:format(injection))
 
     local env = {}
     local opts = {nojson = true, stderr = false}
@@ -85,11 +77,11 @@ g.test_applier_mkdir = function()
 end
 
 g.test_applier_box_cfg = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local injection = [[
         print(box.cfg.memtx_memory)
     ]]
-    treegen.write_script(dir, 'main.lua', appliers_script:format(injection))
+    treegen.write_file(dir, 'main.lua', appliers_script:format(injection))
 
     local env = {}
     local opts = {nojson = true, stderr = false}
@@ -99,13 +91,13 @@ g.test_applier_box_cfg = function()
 end
 
 g.test_applier_credentials = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local injection = [[
         local guest_id = box.space._user.index.name:get{'guest'}.id
         local super_id = box.space._user.index.name:get{'super'}.id
         print(box.space._priv:get{guest_id, 'role', super_id} ~= nil)
     ]]
-    treegen.write_script(dir, 'main.lua', appliers_script:format(injection))
+    treegen.write_file(dir, 'main.lua', appliers_script:format(injection))
 
     local env = {}
     local opts = {nojson = true, stderr = false}
@@ -115,7 +107,7 @@ g.test_applier_credentials = function()
 end
 
 g.test_applier_console = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local injection = [[
         local socket = require('socket')
         local data = config._configdata
@@ -125,7 +117,7 @@ g.test_applier_console = function()
         local expr = '(%a+) %d.%d.%d (%(%a+ %a+%))'
         print(table.concat({greeting:gmatch(expr)()}, ' '))
     ]]
-    treegen.write_script(dir, 'main.lua', appliers_script:format(injection))
+    treegen.write_file(dir, 'main.lua', appliers_script:format(injection))
 
     local env = {}
     local opts = {nojson = true, stderr = false}
@@ -135,12 +127,12 @@ g.test_applier_console = function()
 end
 
 g.test_applier_fiber = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local injection = [[
         fiber = require('fiber')
         print(fiber.top() ~= nil)
     ]]
-    treegen.write_script(dir, 'main.lua', appliers_script:format(injection))
+    treegen.write_file(dir, 'main.lua', appliers_script:format(injection))
 
     local env = {}
     local opts = {nojson = true, stderr = false}
@@ -150,11 +142,11 @@ g.test_applier_fiber = function()
 end
 
 g.test_applier_app = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local injection = ''
     local app_script = 'print("something")'
-    treegen.write_script(dir, 'main.lua', appliers_script:format(injection))
-    treegen.write_script(dir, 'script.lua', app_script)
+    treegen.write_file(dir, 'main.lua', appliers_script:format(injection))
+    treegen.write_file(dir, 'script.lua', app_script)
 
     local env = {}
     local opts = {nojson = true, stderr = false}

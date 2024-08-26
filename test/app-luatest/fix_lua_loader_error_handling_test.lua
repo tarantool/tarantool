@@ -1,5 +1,5 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local fio = require('fio')
 
 local g = t.group()
@@ -21,14 +21,12 @@ local name = 'syntax'
 local errtail = ("/%s.lua:1: unexpected symbol near '?'"):format(name)
 
 g.before_all(function()
-    treegen.init(g)
-    treegen.add_template(g, ('^%s%%.lua$'):format(name), [[?syntax error?]])
-    local luadir = treegen.prepare_directory(g, {('%s.lua'):format(name)})
+    treegen.add_template(('^%s%%.lua$'):format(name), [[?syntax error?]])
+    local luadir = treegen.prepare_directory({('%s.lua'):format(name)})
     fio.chdir(luadir)
 end)
 
-g.after_all(function(g)
-    treegen.clean(g)
+g.after_all(function()
     fio.chdir(cwd)
 end)
 
