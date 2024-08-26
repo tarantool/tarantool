@@ -8,7 +8,7 @@
 -- All the other cases are allowed.
 
 local t = require('luatest')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
@@ -53,7 +53,7 @@ local error_t = toline([[
 -- All the instances are in a replicaset with the given failover
 -- mode.
 local function build_config(failover, election_mode)
-    local cb = cbuilder.new()
+    local cb = cbuilder:new()
         :set_replicaset_option('replication.failover', failover)
         :add_instance('instance-001', {})
         :add_instance('instance-002', {})

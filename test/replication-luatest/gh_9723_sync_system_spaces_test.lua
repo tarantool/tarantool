@@ -1,4 +1,4 @@
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 local compat = require('compat')
 local fio = require('fio')
@@ -571,7 +571,7 @@ g_recovery.after_all(cluster.clean)
 g_recovery.after_each(cluster.drop)
 
 g_recovery.before_each(function(cg)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('server', {})
         :set_instance_option('server', 'compat', {
             box_consider_system_spaces_synchronous = 'new',
@@ -631,7 +631,7 @@ g_schema_upgrade.before_each(function(cg)
     fio.mktree(workdir)
     fio.copytree(datadir, workdir)
 
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('server', {
             compat = {box_consider_system_spaces_synchronous = 'new'},
             snapshot = {dir = workdir},

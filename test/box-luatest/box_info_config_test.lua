@@ -1,6 +1,6 @@
 local t = require('luatest')
 local server = require('luatest.server')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
@@ -41,7 +41,7 @@ end
 
 -- Verify box.info.config when tarantool is started from a config.
 g.test_with_config = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
     local cluster = cluster.new(g, config)
@@ -66,7 +66,7 @@ end
 
 -- box.info() should work always, even if config:info() is broken.
 g.test_broken_config_info = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
     local cluster = cluster.new(g, config)
@@ -93,7 +93,7 @@ end
 
 -- box.info() should work always, even if config module is broken.
 g.test_broken_config_module = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
     local cluster = cluster.new(g, config)

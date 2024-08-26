@@ -1,5 +1,5 @@
 local t = require('luatest')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
@@ -8,7 +8,7 @@ g.before_all(cluster.init)
 g.after_each(cluster.drop)
 g.after_all(cluster.clean)
 
-local base_config = cbuilder.new()
+local base_config = cbuilder:new()
     :add_instance('i-001', {})
     :set_global_option('credentials.users.alice')
     :set_global_option('credentials.users.alice.password', 'ALICE')
@@ -36,7 +36,7 @@ local function test_lua_call_direct_access()
 end
 
 g.test_user_lua_call = function(g)
-    local config = cbuilder.new(base_config)
+    local config = cbuilder:new(base_config)
         :config()
     config.credentials.users.alice.privileges = {
         {
@@ -50,7 +50,7 @@ g.test_user_lua_call = function(g)
 end
 
 g.test_role_lua_call = function(g)
-    local config = cbuilder.new(base_config)
+    local config = cbuilder:new(base_config)
         :set_global_option('credentials.roles.test.privileges', {})
         :config()
     config.credentials.roles.test.privileges = {
@@ -85,7 +85,7 @@ local function test_lua_call_universe_access()
 end
 
 g.test_lua_call_all = function(g)
-    local config = cbuilder.new(base_config)
+    local config = cbuilder:new(base_config)
         :config()
     config.credentials.users.alice.privileges = {
         {
@@ -99,7 +99,7 @@ g.test_lua_call_all = function(g)
 end
 
 g.test_lua_call_all_with_func = function()
-    local config = cbuilder.new(base_config)
+    local config = cbuilder:new(base_config)
         :config()
     config.credentials.users.alice.privileges = {
         {
@@ -113,7 +113,7 @@ g.test_lua_call_all_with_func = function()
 end
 
 g.test_lua_call_all_with_built_in_func = function()
-    local config = cbuilder.new(base_config)
+    local config = cbuilder:new(base_config)
         :config()
     config.credentials.users.alice.privileges = {
         {
@@ -149,7 +149,7 @@ local function test_lua_call_reload()
 end
 
 g.test_lua_call_reload = function()
-    local config = cbuilder.new(base_config)
+    local config = cbuilder:new(base_config)
         :config()
     config.credentials.users.alice.privileges = {
             {

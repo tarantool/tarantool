@@ -1,5 +1,5 @@
 local t = require('luatest')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
@@ -21,7 +21,7 @@ end
 -- construction is verified in a separate test case.
 g.test_basic = function(g)
     -- One master, two replicas, two anonymous replicas.
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_replicaset_option('replication.peers', {
             'replicator:secret@unix/:./instance-001.iproto',
             'replicator:secret@unix/:./instance-002.iproto',
@@ -72,7 +72,7 @@ g.test_no_anonymous_upstream = function(g)
     --
     -- NB: It is the same as config in `test_basic`, but has no
     -- `replication.peers` option.
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('instance-001', {
             database = {
                 mode = 'rw',
@@ -138,7 +138,7 @@ end
 g.test_supervised_mode_bootstrap_leader_not_anon = function(g)
     -- `failover: supervised` assigns a first non-anonymous
     -- instance as a bootstrap leader. The order is alphabetical.
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_replicaset_option('replication.failover', 'supervised')
         :add_instance('instance-001', {
             replication = {
@@ -179,7 +179,7 @@ end
 -- anonymous replicas refuse to start with a meaningful error
 -- message.
 g.test_all_anonymous = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('instance-001', {
             replication = {
                 anon = true,
@@ -216,7 +216,7 @@ end
 --
 -- replication.failover: off
 g.test_anonymous_replica_rw_mode = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('instance-001', {
             database = {
                 mode = 'rw',
@@ -248,7 +248,7 @@ end
 --
 -- replication.failover: manual
 g.test_anonymous_replica_leader = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_replicaset_option('replication.failover', 'manual')
         :set_replicaset_option('leader', 'instance-004')
         :add_instance('instance-001', {})
@@ -284,7 +284,7 @@ g.test_anonymous_replica_election_mode_other_than_off = function(g)
     ]])
 
     for _, election_mode in ipairs({'candidate', 'voter', 'manual'}) do
-        local config = cbuilder.new()
+        local config = cbuilder:new()
             :set_replicaset_option('replication.failover', 'election')
             :add_instance('instance-001', {})
             :add_instance('instance-002', {})
@@ -307,7 +307,7 @@ g.test_anonymous_replica_election_mode_off = function(g)
     -- Three non-anonymous instances, two anonymous replicas.
     --
     -- The replicaset is in `failover: election` mode.
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_replicaset_option('replication.failover', 'election')
         :add_instance('instance-001', {})
         :add_instance('instance-002', {})
@@ -347,7 +347,7 @@ end
 -- Verify that an anonymous replica can join a replicaset that has
 -- all the instances in read-only mode.
 g.test_join_anonymous_replica_to_all_ro_replicaset = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_replicaset_option('replication.failover', 'manual')
         :set_replicaset_option('leader', 'instance-001')
         :add_instance('instance-001', {})
@@ -360,7 +360,7 @@ g.test_join_anonymous_replica_to_all_ro_replicaset = function(g)
     cluster:start()
 
     -- Unset the leader -- make all the instances read-only.
-    local new_config = cbuilder.new(config)
+    local new_config = cbuilder:new(config)
         :set_replicaset_option('leader', nil)
         :config()
     cluster:reload(new_config)
@@ -374,7 +374,7 @@ g.test_join_anonymous_replica_to_all_ro_replicaset = function(g)
 
     -- Add a new anonymous replica into the config and reflect it
     -- in the cluster object. Start the replica.
-    local new_config_2 = cbuilder.new(new_config)
+    local new_config_2 = cbuilder:new(new_config)
         :add_instance('instance-004', {
             replication = {
                 anon = true,

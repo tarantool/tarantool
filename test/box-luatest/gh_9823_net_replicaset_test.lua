@@ -1,5 +1,5 @@
 local t = require('luatest')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
@@ -14,7 +14,7 @@ local function test_config()
     local sharding_role = {
         privileges = {{permissions = {'execute'}, universe = true}},
     }
-    local builder = cbuilder.new()
+    local builder = cbuilder:new()
     :set_global_option('credentials.roles.sharding', sharding_role)
     :set_global_option('credentials.users.storage.roles', {'sharding'})
     :set_global_option('credentials.users.storage.password', 'secret_storage')

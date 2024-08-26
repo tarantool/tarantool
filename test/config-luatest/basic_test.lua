@@ -6,7 +6,7 @@ local treegen = require('luatest.treegen')
 local justrun = require('luatest.justrun')
 local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 
 local g = helpers.group()
 
@@ -768,7 +768,7 @@ end
 -- Verify, that instance can recover from the xlogs using config.
 g.test_recovery_without_uuid = function(g)
     local dir = treegen.prepare_directory({}, {})
-    local cfg = cbuilder.new()
+    local cfg = cbuilder:new()
         :add_instance('instance-001', {
             database = {
                 mode = 'rw',

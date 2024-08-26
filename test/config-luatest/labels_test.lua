@@ -1,5 +1,5 @@
 local t = require('luatest')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
@@ -10,7 +10,7 @@ g.after_all(cluster.clean)
 
 -- Verify that instance labels are merged correctly.
 g.test_labels = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_replicaset_option('labels', {
             foo = 'true',
             bar = 'true',
