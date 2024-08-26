@@ -1,6 +1,6 @@
 local t = require('luatest')
 local it = require('test.interactive_tarantool')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
@@ -66,7 +66,7 @@ g.test_local_new_autorequire = function(g)
 end
 
 g.test_remote_old_no_autorequire = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_global_option('compat.console_session_scope_vars', 'old')
         :add_instance('i-001', {})
         :config()
@@ -78,7 +78,7 @@ g.test_remote_old_no_autorequire = function(g)
 end
 
 g.test_remote_new_autorequire = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_global_option('compat.console_session_scope_vars', 'new')
         :add_instance('i-001', {})
         :config()
@@ -91,7 +91,7 @@ end
 
 -- Add a variable into the initial console environment.
 g.test_remote_new_extend_env = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_global_option('compat.console_session_scope_vars', 'new')
         :add_instance('i-001', {})
         :config()
@@ -112,7 +112,7 @@ g.test_remote_new_extend_env = function(g)
 end
 
 g.test_remote_new_set_env_illegal_param = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_global_option('compat.console_session_scope_vars', 'new')
         :add_instance('i-001', {})
         :config()
@@ -130,7 +130,7 @@ end
 
 -- Set a user defined initial console environment.
 g.test_remote_new_set_env = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_global_option('compat.console_session_scope_vars', 'new')
         :add_instance('i-001', {})
         :config()

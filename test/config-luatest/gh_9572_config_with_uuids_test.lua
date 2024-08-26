@@ -1,6 +1,6 @@
 local uuid = require('uuid')
 local t = require('luatest')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
@@ -10,7 +10,7 @@ g.after_each(cluster.drop)
 g.after_all(cluster.clean)
 
 g.test_basic = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :set_replicaset_option('replication.failover', 'manual')
         :set_replicaset_option('leader', 'i-001')
         :add_instance('i-001', {

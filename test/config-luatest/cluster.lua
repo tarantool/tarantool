@@ -205,7 +205,7 @@ local cluster_mt = {
 }
 
 local function new(g, config, server_opts)
-    assert(config._config == nil, "Please provide cbuilder.new():config()")
+    assert(config._config == nil, "Please provide cbuilder:new():config()")
     assert(g.cluster == nil)
 
     -- Prepare a temporary directory and write a configuration
@@ -260,7 +260,7 @@ end
 -- given error message.
 local function startup_error(g, config, exp_err)
     assert(g)  -- temporary stub to not fail luacheck due to unused var
-    assert(config._config == nil, "Please provide cbuilder.new():config()")
+    assert(config._config == nil, "Please provide cbuilder:new():config()")
     -- Prepare a temporary directory and write a configuration
     -- file.
     local dir = treegen.prepare_directory({}, {})
