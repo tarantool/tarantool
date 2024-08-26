@@ -28,7 +28,7 @@ local fun = require('fun')
 local yaml = require('yaml')
 local t = require('luatest')
 local treegen = require('luatest.treegen')
-local justrun = require('test.justrun')
+local justrun = require('luatest.justrun')
 local server = require('test.luatest_helpers.server')
 
 -- Temporary stub.

@@ -4,7 +4,7 @@ local fio = require('fio')
 local cluster_config = require('internal.config.cluster_config')
 local t = require('luatest')
 local treegen = require('luatest.treegen')
-local justrun = require('test.justrun')
+local justrun = require('luatest.justrun')
 local server = require('test.luatest_helpers.server')
 
 local function group(name, params)
