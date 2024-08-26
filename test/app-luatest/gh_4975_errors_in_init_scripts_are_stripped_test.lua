@@ -1,5 +1,5 @@
 local t = require('luatest')
-local justrun = require('test.justrun')
+local justrun = require('luatest.justrun')
 
 local g = t.group('gh-4975')
 

@@ -1,6 +1,6 @@
 local t = require('luatest')
 local treegen = require('luatest.treegen')
-local justrun = require('test.justrun')
+local justrun = require('luatest.justrun')
 
 local g = t.group()
 

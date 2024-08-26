@@ -4,7 +4,7 @@
 
 local t = require('luatest')
 local treegen = require('luatest.treegen')
-local justrun = require('test.justrun')
+local justrun = require('luatest.justrun')
 local socket = require('socket')
 
 local wrong_version_group = t.group()
