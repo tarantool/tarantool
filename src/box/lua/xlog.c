@@ -337,6 +337,7 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 	}
 	/* Construct xlog object */
 	if (xlog_cursor_open(cur, filename) < 0) {
+		free(cur);
 		return luaT_error(L);
 	}
 	if (strncmp(cur->meta.filetype, "SNAP", 4) != 0 &&
