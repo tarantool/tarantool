@@ -1,21 +1,13 @@
 local t = require('luatest')
 local server = require('test.luatest_helpers.server')
 local helpers = require('test.config-luatest.helpers')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 local yaml = require('yaml')
 local json = require('json')
 local fio = require('fio')
 
 local g = t.group()
-
-g.before_all(function()
-    treegen.init(g)
-end)
-
-g.after_all(function()
-    treegen.clean(g)
-end)
 
 g.after_each(function()
     for k, v in pairs(g) do
@@ -159,9 +151,9 @@ local function verify_configdata()
 end
 
 g.test_configdata = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local script = string.dump(verify_configdata)
-    treegen.write_script(dir, 'main.lua', script)
+    treegen.write_file(dir, 'main.lua', script)
 
     local opts = {nojson = true, stderr = true}
     local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
@@ -169,7 +161,7 @@ g.test_configdata = function()
 end
 
 g.test_config_general = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local script = [[
         local json = require('json')
         local config = require('config')
@@ -221,7 +213,7 @@ g.test_config_general = function()
         print(json.encode(res))
         os.exit(0)
     ]]
-    treegen.write_script(dir, 'main.lua', script)
+    treegen.write_file(dir, 'main.lua', script)
 
     local env = {TT_LOG_LEVEL = 0}
     local opts = {nojson = true, stderr = false}
@@ -237,7 +229,7 @@ g.test_config_general = function()
 end
 
 g.test_config_broadcast = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local file_config = [[
         app:
           file: 'script.lua'
@@ -249,7 +241,7 @@ g.test_config_broadcast = function()
                 instances:
                   instance-001: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', file_config)
+    treegen.write_file(dir, 'config.yaml', file_config)
 
     local main = [[
         local fiber = require('fiber')
@@ -268,7 +260,7 @@ g.test_config_broadcast = function()
         print(status)
         os.exit(0)
     ]]
-    treegen.write_script(dir, 'main.lua', main)
+    treegen.write_file(dir, 'main.lua', main)
 
     local script = [[
         local fiber = require('fiber')
@@ -279,7 +271,7 @@ g.test_config_broadcast = function()
         end
         print(status)
     ]]
-    treegen.write_script(dir, 'script.lua', script)
+    treegen.write_file(dir, 'script.lua', script)
 
     local opts = {nojson = true, stderr = false}
     local args = {'main.lua'}
@@ -290,7 +282,7 @@ g.test_config_broadcast = function()
 end
 
 g.test_config_option = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local file_config = [[
         log:
           level: 7
@@ -306,7 +298,7 @@ g.test_config_option = function()
                 instances:
                   instance-001: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', file_config)
+    treegen.write_file(dir, 'config.yaml', file_config)
 
     local script = [[
         print(box.cfg.memtx_min_tuple_size)
@@ -314,7 +306,7 @@ g.test_config_option = function()
         print(box.cfg.log_level)
         os.exit(0)
     ]]
-    treegen.write_script(dir, 'main.lua', script)
+    treegen.write_file(dir, 'main.lua', script)
 
     local env = {TT_LOG_LEVEL = 0}
     local opts = {nojson = true, stderr = false}
@@ -326,7 +318,7 @@ g.test_config_option = function()
 end
 
 g.test_remaining_vinyl_options = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
         credentials:
           users:
@@ -358,7 +350,7 @@ g.test_remaining_vinyl_options = function()
                 instances:
                   instance-001: {}
     ]]
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     local opts = {
         config_file = config_file,
         alias = 'instance-001',
@@ -383,7 +375,7 @@ end
 
 g.test_feedback_options = function()
     t.skip_if(box.internal.feedback_daemon == nil, 'Feedback is disabled')
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
         credentials:
           users:
@@ -411,7 +403,7 @@ g.test_feedback_options = function()
                 instances:
                   instance-001: {}
     ]]
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     local opts = {
         config_file = config_file,
         alias = 'instance-001',
@@ -431,7 +423,7 @@ g.test_feedback_options = function()
 end
 
 g.test_memtx_sort_threads = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
         credentials:
           users:
@@ -453,7 +445,7 @@ g.test_memtx_sort_threads = function()
                 instances:
                   instance-001: {}
     ]]
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     local opts = {
         config_file = config_file,
         alias = 'instance-001',
@@ -486,7 +478,7 @@ g.test_memtx_sort_threads = function()
                 instances:
                   instance-001: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
     g.server:exec(function()
         local config = require('config')
         config:reload()
@@ -499,7 +491,7 @@ g.test_memtx_sort_threads = function()
 end
 
 g.test_bootstrap_leader = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
         credentials:
           users:
@@ -519,7 +511,7 @@ g.test_bootstrap_leader = function(g)
                 instances:
                   instance-001: {}
     ]]
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     local env = {TT_LOG_LEVEL = 0}
     local args = {'--name', 'instance-001', '--config', config_file}
     local opts = {nojson = true, stderr = true}
@@ -552,7 +544,7 @@ g.test_bootstrap_leader = function(g)
                 instances:
                   instance-001: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
     res = justrun.tarantool(dir, env, args, opts)
     exp = 'LuajitError: The \"bootstrap_leader\" option cannot be empty for '..
           'replicaset "replicaset-001" because "bootstrap_strategy" for '..
@@ -583,7 +575,7 @@ g.test_bootstrap_leader = function(g)
                 instances:
                   instance-001: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
     res = justrun.tarantool(dir, env, args, opts)
     exp = 'LuajitError: "bootstrap_leader" = "instance-002" option is set '..
           'for replicaset "replicaset-001" of group "group-001", but '..
@@ -614,7 +606,7 @@ g.test_bootstrap_leader = function(g)
                 instances:
                   instance-001: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
 
     opts = {config_file = config_file, alias = 'instance-001', chdir = dir}
     g.server = server:new(opts)
@@ -627,7 +619,7 @@ end
 
 g.test_flightrec_options = function()
     t.tarantool.skip_if_not_enterprise()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
         credentials:
           users:
@@ -657,7 +649,7 @@ g.test_flightrec_options = function()
                 instances:
                   instance-001: {}
     ]]
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     local opts = {
         config_file = config_file,
         alias = 'instance-001',
@@ -680,7 +672,7 @@ end
 
 g.test_security_options = function()
     t.tarantool.skip_if_not_enterprise()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     -- guest user is required for luatest.server helper to function properly,
     -- so it is enabled (`disable_guest: false`) unlike other options.
     local config = [[
@@ -715,7 +707,7 @@ g.test_security_options = function()
                 instances:
                   instance-001: {}
     ]]
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     local opts = {
         config_file = config_file,
         alias = 'instance-001',
@@ -740,7 +732,7 @@ g.test_security_options = function()
 end
 
 g.test_metrics_options_default = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
         credentials:
           users:
@@ -761,7 +753,7 @@ g.test_metrics_options_default = function()
     ]]
 
     -- Test defaults.
-    local config_file = treegen.write_script(dir, 'base_config.yaml', config)
+    local config_file = treegen.write_file(dir, 'base_config.yaml', config)
     local opts = {
         config_file = config_file,
         alias = 'instance-001',
@@ -777,7 +769,7 @@ g.test_metrics_options_default = function()
 end
 
 g.test_metrics_options = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
         credentials:
           users:
@@ -803,7 +795,7 @@ g.test_metrics_options = function()
                   instance-001: {}
     ]]
 
-    local config_file = treegen.write_script(dir, 'base_config.yaml', config)
+    local config_file = treegen.write_file(dir, 'base_config.yaml', config)
     local opts = {
         config_file = config_file,
         alias = 'instance-001',
@@ -820,7 +812,7 @@ end
 
 g.test_audit_options = function()
     t.tarantool.skip_if_not_enterprise()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
 
     local events = {
         'audit_enable', 'custom', 'auth_ok', 'auth_fail', 'disconnect',
@@ -865,7 +857,7 @@ end
 --
 -- "replication.bootstrap_strategy" = "auto" is supported, but
 -- other strategies aren't.
-g.test_failover_supervised_constrainsts = function(g)
+g.test_failover_supervised_constrainsts = function()
     local replicaset_prefix = 'groups.group-001.replicasets.replicaset-001'
     local instance_prefix = replicaset_prefix .. '.instances.instance-001'
 
@@ -882,7 +874,7 @@ g.test_failover_supervised_constrainsts = function(g)
 
     -- The "<replicaset>.leader" option is forbidden in the
     -- "supervised" failover mode.
-    helpers.failure_case(g, {
+    helpers.failure_case({
         options = {
             ['replication.failover'] = 'supervised',
             [replicaset_prefix .. '.leader'] = 'instance-001',
@@ -892,7 +884,7 @@ g.test_failover_supervised_constrainsts = function(g)
 
     -- The "database.mode" option is forbidden in the "supervised"
     -- failover mode.
-    helpers.failure_case(g, {
+    helpers.failure_case({
         options = {
             ['replication.failover'] = 'supervised',
             [instance_prefix .. '.database.mode'] = 'ro',
@@ -901,7 +893,7 @@ g.test_failover_supervised_constrainsts = function(g)
     })
 
     -- "replication.bootstrap_strategy" = "legacy" is forbidden.
-    helpers.failure_case(g, {
+    helpers.failure_case({
         options = {
             ['replication.failover'] = 'supervised',
             ['replication.bootstrap_strategy'] = 'legacy',
@@ -910,7 +902,7 @@ g.test_failover_supervised_constrainsts = function(g)
     })
 
     -- "replication.bootstrap_strategy" = "config" is forbidden.
-    helpers.failure_case(g, {
+    helpers.failure_case({
         options = {
             ['replication.failover'] = 'supervised',
             ['replication.bootstrap_strategy'] = 'config',
@@ -921,7 +913,7 @@ g.test_failover_supervised_constrainsts = function(g)
 
     -- "replication.bootstrap_strategy" = "supervised" is
     -- forbidden.
-    helpers.failure_case(g, {
+    helpers.failure_case({
         options = {
             ['replication.failover'] = 'supervised',
             ['replication.bootstrap_strategy'] = 'supervised',
@@ -931,7 +923,7 @@ g.test_failover_supervised_constrainsts = function(g)
 end
 
 g.test_advertise_from_env = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
         credentials:
           users:
@@ -950,7 +942,7 @@ g.test_advertise_from_env = function(g)
                 instances:
                   instance-001: {}
     ]]
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     local opts = {
         config_file = config_file,
         chdir = dir,
@@ -982,8 +974,8 @@ g.test_advertise_from_env = function(g)
     end)
 end
 
-g.test_listen_from_env = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+g.test_listen_from_env = function()
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
         credentials:
           users:
@@ -997,12 +989,12 @@ g.test_listen_from_env = function(g)
                 instances:
                   instance-001: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
     local script = [[
         print(require('yaml').encode(box.cfg.listen))
         os.exit(0)
     ]]
-    treegen.write_script(dir, 'main.lua', script)
+    treegen.write_file(dir, 'main.lua', script)
     local listen = {
         {
             uri = 'unix/:./instance-001_1.iproto',
@@ -1026,7 +1018,7 @@ g.test_listen_from_env = function(g)
 end
 
 g.test_iproto_listen_plain = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
 
     local verify = function()
         local res = {
@@ -1069,7 +1061,7 @@ g.test_iproto_listen_plain = function()
 end
 
 g.test_iproto_listen_to_advertise = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = yaml.encode({
         credentials = {
             users = {
@@ -1112,7 +1104,7 @@ g.test_iproto_listen_to_advertise = function()
             },
         },
     })
-    local config_file = treegen.write_script(dir, 'config.yaml', config)
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
     g.server_1 = server:new({config_file = config_file, chdir = dir,
                              alias = 'instance-001'})
     g.server_2 = server:new({config_file = config_file, chdir = dir,
@@ -1139,7 +1131,7 @@ end
 
 g.test_iproto_listen_ssl = function()
     t.tarantool.skip_if_enterprise()
-    helpers.failure_case(g, {
+    helpers.failure_case({
         options = {
             ['iproto.listen'] = {
                 {
@@ -1154,7 +1146,7 @@ end
 
 g.test_iproto_listen_ssl_enterprise = function()
     t.tarantool.skip_if_not_enterprise()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local passwd = '123qwe'
     local passwd_file = fio.pathjoin(dir, 'passwd.txt')
     local file = fio.open(passwd_file, {'O_WRONLY', 'O_CREAT'},
@@ -1208,7 +1200,7 @@ end
 
 g.test_replication_ssl_enterprise = function()
     t.tarantool.skip_if_not_enterprise()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local cert_dir = fio.pathjoin(fio.abspath(os.getenv('SOURCEDIR') or '.'),
                                   'test/enterprise-luatest/ssl_cert')
 
@@ -1313,8 +1305,8 @@ g.test_replication_ssl_enterprise = function()
             },
         },
     }
-    local config_file = treegen.write_script(dir, 'config.yaml',
-                                             yaml.encode(config))
+    local config_file = treegen.write_file(dir, 'config.yaml',
+                                           yaml.encode(config))
     g.server_1 = server:new({
         config_file = config_file,
         chdir = dir,
@@ -1432,7 +1424,7 @@ end
 
 -- Check that config:info('v2') works properly.
 g.test_info_new_version = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
 
     local config = [[
         credentials:
@@ -1452,7 +1444,7 @@ g.test_info_new_version = function(g)
                 instances:
                   instance-001: {}
     ]]
-    treegen.write_script(dir, 'config.yaml', config)
+    treegen.write_file(dir, 'config.yaml', config)
 
     -- New source that sets meta.
     local script = string.dump(function()
@@ -1492,13 +1484,13 @@ g.test_info_new_version = function(g)
             new = new,
         }
     end)
-    treegen.write_script(dir, 'mysource.lua', script)
+    treegen.write_file(dir, 'mysource.lua', script)
 
     local myconf = [[
         sql:
           cache_size: 12345
     ]]
-    treegen.write_script(dir, 'myconf.yaml', myconf)
+    treegen.write_file(dir, 'myconf.yaml', myconf)
 
     local opts = {
         config_file = 'config.yaml',
@@ -1545,7 +1537,7 @@ g.test_info_new_version = function(g)
         sql:
           cache_size: true
     ]]
-    treegen.write_script(dir, 'myconf.yaml', myconf)
+    treegen.write_file(dir, 'myconf.yaml', myconf)
     g.server:exec(function()
         local config = require('config')
         t.assert_equals(config:get('sql.cache_size'), 12345)
@@ -1581,7 +1573,7 @@ g.test_info_new_version = function(g)
           cache_size: 123
         roles: [myrole]
     ]]
-    treegen.write_script(dir, 'myconf.yaml', myconf)
+    treegen.write_file(dir, 'myconf.yaml', myconf)
     g.server:exec(function()
         local config = require('config')
         t.assert_equals(config:get('sql.cache_size'), 12345)
@@ -1620,7 +1612,7 @@ g.test_info_new_version = function(g)
         sql:
           cache_size: 100000
     ]]
-    treegen.write_script(dir, 'myconf.yaml', myconf)
+    treegen.write_file(dir, 'myconf.yaml', myconf)
     g.server:exec(function()
         local config = require('config')
         t.assert_equals(config:get('sql.cache_size'), 123)
@@ -1668,7 +1660,7 @@ end
 -- Ensure that the configuration module does not revoke privilege credentials
 -- that it has not granted.
 g.test_do_no_revoke_user_privs = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = {
         credentials = {
             users = {
@@ -1694,7 +1686,7 @@ g.test_do_no_revoke_user_privs = function(g)
             },
         },
     }
-    treegen.write_script(dir, 'config.yaml', yaml.encode(config))
+    treegen.write_file(dir, 'config.yaml', yaml.encode(config))
     local opts = {
         config_file = 'config.yaml',
         alias = 'instance-001',
@@ -1717,7 +1709,7 @@ g.test_do_no_revoke_user_privs = function(g)
             }},
         },
     }
-    treegen.write_script(dir, 'config.yaml', yaml.encode(config))
+    treegen.write_file(dir, 'config.yaml', yaml.encode(config))
     g.server:exec(function()
         local config = require('config')
         config:reload()
@@ -1750,7 +1742,7 @@ g.test_do_no_revoke_user_privs = function(g)
             }},
         },
     }
-    treegen.write_script(dir, 'config.yaml', yaml.encode(config))
+    treegen.write_file(dir, 'config.yaml', yaml.encode(config))
     g.server:exec(function()
         local config = require('config')
         config:reload()

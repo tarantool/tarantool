@@ -1,5 +1,5 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 
 local g = t.group()
@@ -20,21 +20,16 @@ local loaders = require('internal.loaders')
 
 print(json.encode({
     ['<module_name>'] = require('<module_name>'),
-    ['<script>'] = {
-        whoami = '<script>',
+    ['<filename>'] = {
+        whoami = '<filename>',
         initializing = loaders.initializing,
     }
 }))
 ]]
 
-g.before_all(function(g)
-    treegen.init(g)
-    treegen.add_template(g, '^override/.*%.lua$', OVERRIDE_SCRIPT_TEMPLATE)
-    treegen.add_template(g, '^main%.lua$', MAIN_SCRIPT_TEMPLATE)
-end)
-
-g.after_all(function(g)
-    treegen.clean(g)
+g.before_all(function()
+    treegen.add_template('^override/.*%.lua$', OVERRIDE_SCRIPT_TEMPLATE)
+    treegen.add_template('^main%.lua$', MAIN_SCRIPT_TEMPLATE)
 end)
 
 local function expected_output(module_name)
@@ -57,10 +52,10 @@ local function expected_output(module_name)
     }
 end
 
-g.test_initializing = function(g)
+g.test_initializing = function()
     local scripts = {'override/socket.lua', 'main.lua'}
     local replacements = {module_name = 'socket'}
-    local dir = treegen.prepare_directory(g, scripts, replacements)
+    local dir = treegen.prepare_directory(scripts, replacements)
     local res = justrun.tarantool(dir, {}, {'main.lua'})
     local exp = expected_output('socket')
     t.assert_equals(res, exp)

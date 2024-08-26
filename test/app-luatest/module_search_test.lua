@@ -1,14 +1,14 @@
 local fio = require('fio')
 
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 
 local g = t.group()
 
 local MODULE_SCRIPT_TEMPLATE = [[
 print(require('json').encode({
-    ['script'] = '<script>',
+    ['script'] = '<filename>',
 }))
 return {whoami = '<module_name>'}
 ]]
@@ -16,19 +16,14 @@ return {whoami = '<module_name>'}
 -- Print a result of the require call.
 local MAIN_SCRIPT_TEMPLATE = [[
 print(require('json').encode({
-    ['script'] = '<script>',
+    ['script'] = '<filename>',
     ['<module_name>'] = require('<module_name>'),
 }))
 ]]
 
-g.before_all(function(g)
-    treegen.init(g)
-    treegen.add_template(g, '^main%.lua$', MAIN_SCRIPT_TEMPLATE)
-    treegen.add_template(g, '^.*%.lua$', MODULE_SCRIPT_TEMPLATE)
-end)
-
-g.after_all(function(g)
-    treegen.clean(g)
+g.before_all(function()
+    treegen.add_template('^main%.lua$', MAIN_SCRIPT_TEMPLATE)
+    treegen.add_template('^.*%.lua$', MODULE_SCRIPT_TEMPLATE)
 end)
 
 local function expected_output(module_relpath, module_name)
@@ -75,10 +70,10 @@ for _, case in ipairs({
     local module_slug = module_relpath
         :gsub('^%.rocks/share/tarantool/', 'rocks/'):gsub('/', '_'):sub(1, -5)
 
-    g['test_' .. module_slug] = function(g)
+    g['test_' .. module_slug] = function()
         local scripts = {module_relpath, 'main.lua'}
         local replacements = {module_name = module_name}
-        local dir = treegen.prepare_directory(g, scripts, replacements)
+        local dir = treegen.prepare_directory(scripts, replacements)
         local main_script = fio.pathjoin(dir, 'main.lua')
         -- The current working directory is in the filesystem
         -- root, so the only way to reach the modules is to search

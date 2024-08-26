@@ -2,20 +2,12 @@ local t = require('luatest')
 local fun = require('fun')
 local json = require('json')
 local yaml = require('yaml')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local justrun = require('test.justrun')
 local source_file = require('internal.config.source.file').new()
 local server = require('test.luatest_helpers.server')
 
 local g = t.group()
-
-g.before_all(function()
-    treegen.init(g)
-end)
-
-g.after_all(function()
-    treegen.clean(g)
-end)
 
 g.after_each(function(g)
     if g.server ~= nil then
@@ -56,7 +48,7 @@ g.test_source_file = function()
 end
 
 g.test_source_env = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local script = [[
         local json = require('json')
         local source_env = require('internal.config.source.env').new({
@@ -65,7 +57,7 @@ g.test_source_env = function()
         source_env:sync({}, {})
         print(json.encode(source_env:get()))
     ]]
-    treegen.write_script(dir, 'main.lua', script)
+    treegen.write_file(dir, 'main.lua', script)
 
     local exp = {
         log = {
@@ -123,7 +115,7 @@ end
 -- | log.pipe            |  +  |      |      +      | env         |
 -- | log.syslog.identity |     |      |      +      | env default |
 g.test_sources_priority = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = {
         credentials = {
             users = {
@@ -153,8 +145,8 @@ g.test_sources_priority = function(g)
             },
         },
     }
-    local config_file = treegen.write_script(dir, 'config.yaml',
-                                             yaml.encode(config))
+    local config_file = treegen.write_file(dir, 'config.yaml',
+                                           yaml.encode(config))
     local opts = {
         config_file = config_file,
         chdir = dir,
@@ -178,14 +170,14 @@ g.test_sources_priority = function(g)
 end
 
 g.test_empty_sources = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local test_cases = {
         "",
         "--- null\n...\n",
     }
 
     for _, case in ipairs(test_cases) do
-        treegen.write_script(dir, 'single.yaml', case)
+        treegen.write_file(dir, 'single.yaml', case)
 
         local exp = "No cluster config received from the given " ..
                     "configuration sources."

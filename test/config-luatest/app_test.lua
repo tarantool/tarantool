@@ -44,19 +44,19 @@ end
 -- Start a script that is pointed by app.file or app.module.
 --
 -- Verify that an error in the script leads to a startup failure.
-g.test_startup_error = function(g)
+g.test_startup_error = function()
     local err_msg = 'Application is unable to start'
     local script = ([[
         error('%s', 0)
     ]]):format(err_msg)
 
-    helpers.failure_case(g, {
+    helpers.failure_case({
         script = script,
         options = {['app.file'] = 'main.lua'},
         exp_err = err_msg,
     })
 
-    helpers.failure_case(g, {
+    helpers.failure_case({
         script = script,
         options = {['app.module'] = 'main'},
         exp_err = err_msg,

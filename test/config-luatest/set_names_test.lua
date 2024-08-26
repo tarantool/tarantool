@@ -1,5 +1,5 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local server = require('test.luatest_helpers.server')
 local replica_set = require('luatest.replica_set')
 local yaml = require('yaml')
@@ -39,7 +39,6 @@ local function initialize_xlogs(g, uuids)
 end
 
 g.before_all(function(g)
-    treegen.init(g)
     g.uuids = {
         ['replicaset-001'] = uuid.str(),
         ['instance-001']   = uuid.str(),
@@ -91,8 +90,8 @@ g.before_all(function(g)
     }
 
     local cfg = yaml.encode(config)
-    local dir = treegen.prepare_directory(g, {}, {})
-    local config_file = treegen.write_script(dir, 'cfg.yaml', cfg)
+    local dir = treegen.prepare_directory({}, {})
+    local config_file = treegen.write_file(dir, 'cfg.yaml', cfg)
     local opts = {config_file = config_file, chdir = dir}
     g.instance_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
     g.instance_2 = server:new(fun.chain(opts, {alias = 'instance-002'}):tomap())
@@ -107,7 +106,6 @@ g.after_all(function(g)
     g.replica_set:drop()
     g.instance_1:drop()
     g.instance_2:drop()
-    treegen.clean(g)
 end)
 
 local function check_names(rs_name, name, names)

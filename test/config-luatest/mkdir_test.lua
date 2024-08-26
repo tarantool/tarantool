@@ -1,6 +1,6 @@
 local fio = require('fio')
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local helpers = require('test.config-luatest.helpers')
 
 local g = helpers.group()
@@ -38,7 +38,7 @@ end
 -- IOW, if the work_dir is a/b/c, we shouldn't create a/b/c/a/b/c
 -- at reload.
 g.test_work_dir = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
 
     local verify = loadstring(([[
         local fio = require('fio')
@@ -79,7 +79,7 @@ end
 -- See the comments in the verify() function in the test
 -- for details what exactly is verified.
 g.test_dirs_are_relative_to_work_dir = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
 
     local verify = loadstring(([[
         local fio = require('fio')
