@@ -1,6 +1,6 @@
 local server = require('luatest.server')
 local utils = require('luatest.utils')
-local justrun = require('test.justrun')
+local justrun = require('luatest.justrun')
 local fio = require('fio')
 local popen = require('popen')
 local fiber = require('fiber')

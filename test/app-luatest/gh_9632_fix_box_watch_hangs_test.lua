@@ -1,6 +1,6 @@
 local t = require('luatest')
 local fio = require('fio')
-local justrun = require('test.justrun').tarantool
+local justrun = require('luatest.justrun').tarantool
 
 local g = t.group()
 
