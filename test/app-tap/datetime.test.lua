@@ -34,9 +34,11 @@ local MAX_MSEC_RANGE = math.floor(MAX_NSEC_RANGE / 1e6)
 local incompat_types = 'incompatible types for datetime comparison'
 local only_integer_ts = 'only integer values allowed in timestamp'..
                         ' if nsec, usec, or msecs provided'
+local only_integer_msg = function(key)
+    return key .. ': integer value expected, but received number'
+end
 local only_one_of = 'only one of nsec, usec or msecs may be defined'..
                     ' simultaneously'
-local int_ival_exp = 'sec: integer value expected, but received number'
 local timestamp_and_ymd = 'timestamp is not allowed if year/month/day provided'
 local timestamp_and_hms = 'timestamp is not allowed if hour/min/sec provided'
 local str_or_num_exp = 'tzoffset: string or number expected, but received'
@@ -271,7 +273,7 @@ test:test("Simple date creation by attributes", function(test)
 end)
 
 test:test("Simple date creation by attributes - check failed", function(test)
-    test:plan(83)
+    test:plan(93)
 
     local boundary_checks = {
         {'year', {MIN_DATE_YEAR, MAX_DATE_YEAR}},
@@ -339,6 +341,16 @@ test:test("Simple date creation by attributes - check failed", function(test)
         {only_one_of, { nsec = 123456, msec = 123}},
         {only_one_of, { usec = 123, msec = 123}},
         {only_one_of, { nsec = 123456, usec = 123, msec = 123}},
+        {only_integer_msg('nsec'), { nsec = 1.1 }},
+        {only_integer_msg('msec'), { msec = 1.1 }},
+        {only_integer_msg('usec'), { usec = 1.1 }},
+        {only_integer_msg('tzoffset'), { tzoffset = 1.1 }},
+        {only_integer_msg('year'), { year = 1.1 }},
+        {only_integer_msg('month'), { month = 1.1 }},
+        {only_integer_msg('day'), { day = 1.1 }},
+        {only_integer_msg('hour'), { hour = 1.1 }},
+        {only_integer_msg('min'), { min = 1.1 }},
+        {only_integer_msg('sec'), { sec = 1.1 }},
         {only_integer_ts, { timestamp = 12345.125, usec = 123}},
         {only_integer_ts, { timestamp = 12345.125, msec = 123}},
         {only_integer_ts, { timestamp = 12345.125, nsec = 123}},
@@ -1169,9 +1181,9 @@ test:test("Time interval operations", function(test)
         {only_one_of, { nsec = 123456, msec = 123}},
         {only_one_of, { usec = 123, msec = 123}},
         {only_one_of, { nsec = 123456, usec = 123, msec = 123}},
-        {int_ival_exp, { sec = 12345.125, usec = 123}},
-        {int_ival_exp, { sec = 12345.125, msec = 123}},
-        {int_ival_exp, { sec = 12345.125, nsec = 123}},
+        {only_integer_msg('sec'), { sec = 12345.125, usec = 123}},
+        {only_integer_msg('sec'), { sec = 12345.125, msec = 123}},
+        {only_integer_msg('sec'), { sec = 12345.125, nsec = 123}},
     }
     for _, row in pairs(specific_errors) do
         local err_msg, obj = unpack(row)
@@ -1322,9 +1334,9 @@ test:test("Time intervals creation - range checks", function(test)
         {only_one_of, { nsec = 123456, msec = 123}},
         {only_one_of, { usec = 123, msec = 123}},
         {only_one_of, { nsec = 123456, usec = 123, msec = 123}},
-        {int_ival_exp, { sec = 12345.125, usec = 123}},
-        {int_ival_exp, { sec = 12345.125, msec = 123}},
-        {int_ival_exp, { sec = 12345.125, nsec = 123}},
+        {only_integer_msg('sec'), { sec = 12345.125, usec = 123}},
+        {only_integer_msg('sec'), { sec = 12345.125, msec = 123}},
+        {only_integer_msg('sec'), { sec = 12345.125, nsec = 123}},
         {table_expected('interval.new()', '2001-01-01'), '2001-01-01'},
         {table_expected('interval.new()', 20010101), 20010101},
         {range_check_error('year', 1e21, {-MAX_YEAR_RANGE, MAX_YEAR_RANGE}),
