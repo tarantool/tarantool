@@ -1031,16 +1031,19 @@ local function datetime_set(self, obj)
     local y = obj.year
     if y ~= nil then
         check_range(y, MIN_DATE_YEAR, MAX_DATE_YEAR, 'year')
+        check_integer(y, 'year')
         ymd = true
     end
     local M = obj.month
     if M ~= nil then
         check_range(M, 1, 12, 'month')
+        check_integer(M, 'month')
         ymd = true
     end
     local d = obj.day
     if d ~= nil then
         check_range(d, 1, 31, 'day', -1)
+        check_integer(d, 'day')
         ymd = true
     end
 
@@ -1052,16 +1055,19 @@ local function datetime_set(self, obj)
     local h = obj.hour
     if h ~= nil then
         check_range(h, 0, 23, 'hour')
+        check_integer(h, 'hour')
         hms = true
     end
     local m = obj.min
     if m ~= nil then
         check_range(m, 0, 59, 'min')
+        check_integer(m, 'min')
         hms = true
     end
     local sec = obj.sec
     if sec ~= nil then
         check_range(sec, 0, 60, 'sec')
+        check_integer(sec, 'sec')
         hms = true
     end
 
@@ -1075,12 +1081,15 @@ local function datetime_set(self, obj)
         end
         if usec ~= nil then
             check_range(usec, 0, 1e6, 'usec')
+            check_integer(usec, 'usec')
             self.nsec = usec * 1e3
         elseif msec ~= nil then
             check_range(msec, 0, 1e3, 'msec')
+            check_integer(msec, 'msec')
             self.nsec = msec * 1e6
         elseif nsec ~= nil then
             check_range(nsec, 0, 1e9, 'nsec')
+            check_integer(nsec, 'nsec')
             self.nsec = nsec
         end
     end
