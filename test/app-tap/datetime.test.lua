@@ -569,7 +569,7 @@ local function couldnt_parse(txt)
 end
 
 test:test("Check parsing of dates with invalid attributes", function(test)
-    test:plan(32)
+    test:plan(33)
 
     local boundary_checks = {
         {'month', {1, 12}},
@@ -601,6 +601,17 @@ test:test("Check parsing of dates with invalid attributes", function(test)
         txt = create_date_string{[attr_name] = right + 50}
         assert_raises(test, couldnt_parse(txt),
                       function() dt, len = date.parse(txt) end)
+    end
+
+    local specific_errors = {
+        {
+            only_integer_msg('tzoffset'),
+            { '1998-11-25', { format = '%Y-%m-%d', tzoffset = 1.1 } }
+        },
+    }
+    for _, row in pairs(specific_errors) do
+        local err_msg, attribs = unpack(row)
+        assert_raises(test, err_msg, function() date.parse(unpack(attribs)) end)
     end
 end)
 
@@ -2009,7 +2020,7 @@ end)
 
 
 test:test("Time invalid :set{} operations", function(test)
-    test:plan(84)
+    test:plan(94)
 
     local boundary_checks = {
         {'year', {MIN_DATE_YEAR, MAX_DATE_YEAR}},
@@ -2078,6 +2089,16 @@ test:test("Time invalid :set{} operations", function(test)
         {only_one_of, { nsec = 123456, msec = 123}},
         {only_one_of, { usec = 123, msec = 123}},
         {only_one_of, { nsec = 123456, usec = 123, msec = 123}},
+        {only_integer_msg('nsec'), { nsec = 1.1 }},
+        {only_integer_msg('msec'), { msec = 1.1 }},
+        {only_integer_msg('usec'), { usec = 1.1 }},
+        {only_integer_msg('tzoffset'), { tzoffset = 1.1 }},
+        {only_integer_msg('year'), { year = 1.1 }},
+        {only_integer_msg('month'), { month = 1.1 }},
+        {only_integer_msg('day'), { day = 1.1 }},
+        {only_integer_msg('hour'), { hour = 1.1 }},
+        {only_integer_msg('min'), { min = 1.1 }},
+        {only_integer_msg('sec'), { sec = 1.1 }},
         {only_integer_ts, { timestamp = 12345.125, usec = 123}},
         {only_integer_ts, { timestamp = 12345.125, msec = 123}},
         {only_integer_ts, { timestamp = 12345.125, nsec = 123}},
