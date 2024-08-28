@@ -973,6 +973,7 @@ memtx_tx_story_delete(struct memtx_story *story)
 {
 	assert(story->add_stmt == NULL);
 	assert(story->del_stmt == NULL);
+	assert(rlist_empty(&story->reader_list));
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		assert(story->link[i].newer_story == NULL);
 		assert(story->link[i].older_story == NULL);
@@ -2983,6 +2984,18 @@ memtx_tx_on_space_delete(struct space *space)
 							  in_read_gaps);
 				memtx_tx_delete_gap(item);
 			}
+		}
+		/*
+		 * Remove all read trackers since they point to the story that
+		 * is going to be deleted.
+		 */
+		while (!rlist_empty(&story->reader_list)) {
+			struct tx_read_tracker *tracker =
+				rlist_first_entry(&story->reader_list,
+						  struct tx_read_tracker,
+						  in_reader_list);
+			rlist_del(&tracker->in_reader_list);
+			rlist_del(&tracker->in_read_set);
 		}
 		memtx_tx_story_delete(story);
 	}
