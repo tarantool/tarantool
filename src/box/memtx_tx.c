@@ -2343,7 +2343,7 @@ memtx_tx_history_remove_added_story(struct txn_stmt *stmt)
 static void
 memtx_tx_history_remove_deleted_story(struct txn_stmt *stmt)
 {
-	memtx_tx_history_rollback_deleted_story(stmt);
+	memtx_tx_story_unlink_deleted_by(stmt->del_story, stmt);
 }
 
 /*
