@@ -913,9 +913,8 @@ local function datetime_parse_from(str, obj)
     end
     check_str_or_nil(fmt, 'datetime.parse()')
 
-    local offset
     if tzoffset ~= nil then
-        offset = get_timezone(tzoffset, 'tzoffset')
+        local offset = get_timezone(tzoffset, 'tzoffset')
         check_range(offset, -720, 840, 'tzoffset')
     end
 
@@ -923,16 +922,20 @@ local function datetime_parse_from(str, obj)
         check_str(tzname, 'datetime.parse()')
     end
 
+    local date, len
     if not fmt or fmt == '' or fmt == 'iso8601' or fmt == 'rfc3339' then
-        local date, len = datetime_parse_full(str)
-        -- Override timezone.
-        if date.tz == '' and date.tzoffset == 0 then
-            datetime_set(date, obj or {})
-        end
-        return date, tonumber(len)
+        date, len = datetime_parse_full(str)
     else
-        return datetime_parse_format(str, fmt)
+        date, len = datetime_parse_format(str, fmt)
     end
+
+    -- Override timezone, if it was not specified in a parsed
+    -- string.
+    if date.tz == '' and date.tzoffset == 0 then
+        datetime_set(date, { tzoffset = tzoffset, tz = tzname })
+    end
+
+    return date, len
 end
 
 --[[

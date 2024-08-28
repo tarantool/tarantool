@@ -424,7 +424,7 @@ test:test("Formatting limits", function(test)
 end)
 
 test:test("Simple tests for parser", function(test)
-    test:plan(12)
+    test:plan(14)
     test:ok(date.parse("1970-01-01T01:00:00Z") ==
             date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0})
     test:ok(date.parse("1970-01-01T01:00:00Z", {format = 'iso8601'}) ==
@@ -445,6 +445,10 @@ test:test("Simple tests for parser", function(test)
             date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=0})
     test:ok(date.parse("1970-01-01T01:00:00+01:00", {tzoffset = '+02:00'}) ==
             date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=60})
+    test:ok(date.parse('1998-11-25', { format = '%Y-%m-%d', tzoffset = 180 }) ==
+            date.new({ year = 1998, month = 11, day = 25, tzoffset = 180 }))
+    test:ok(date.parse('1998', { format = '%Y', tzoffset = '+03:00' }) ==
+            date.new({ year = 1998, tzoffset = 180 }))
 
     test:ok(date.parse("1970-01-01T02:00:00Z") <
             date.new{year=1970, mon=1, day=1, hour=2, min=0, sec=1})
