@@ -874,7 +874,7 @@ str_to_datetime(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_STR);
 	struct datetime dt;
-	if (datetime_parse_full(&dt, mem->z, mem->n, NULL, 0) <= 0)
+	if (datetime_parse_full(&dt, mem->z, mem->n) <= 0)
 		return -1;
 	mem_set_datetime(mem, &dt);
 	return 0;
