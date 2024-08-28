@@ -936,6 +936,7 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	space_pin_collations(alter->old_space);
 	space_pin_defaults(alter->old_space);
 	space_cache_replace(alter->new_space, alter->old_space);
+	SWAP(alter->new_space->sequence_path, alter->old_space->sequence_path);
 	alter_space_delete(alter);
 	return 0;
 }
@@ -1024,7 +1025,7 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 
 	alter->new_space->sequence = alter->old_space->sequence;
 	alter->new_space->sequence_fieldno = alter->old_space->sequence_fieldno;
-	alter->new_space->sequence_path = alter->old_space->sequence_path;
+	SWAP(alter->new_space->sequence_path, alter->old_space->sequence_path);
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
 
