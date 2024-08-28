@@ -935,9 +935,10 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	if (iterator_type_is_reverse(type))
 		res = memtx_tree_iterator_get_elem(tree, &it->tree_iterator);
 
+	bool is_eq = type == ITER_EQ || type == ITER_REQ;
+
 	/* If we skip tuple, flag equals is not actual - need to refresh it. */
-	if (it->after_data.key != NULL && res != NULL &&
-	    (type == ITER_EQ || type == ITER_REQ)) {
+	if (it->after_data.key != NULL && res != NULL && is_eq) {
 		equals = tuple_compare_with_key(res->tuple, res->hint,
 						it->key_data.key,
 						it->key_data.part_count,
@@ -950,7 +951,7 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	 * Equality iterators requires exact key match: if the result does not
 	 * equal to the key, iteration ends.
 	 */
-	bool eq_match = equals || (type != ITER_EQ && type != ITER_REQ);
+	bool eq_match = equals || !is_eq;
 	if (res != NULL && eq_match) {
 		tree_iterator_set_last(it, res);
 		tree_iterator_set_next_method(it);
@@ -978,13 +979,12 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	 * contain key extracted with `cmp_def`, we should crop it by passing
 	 * `part_count` not greater than `key_def->part_count`.
 	 */
-	uint32_t key_part_count = index->base.def->key_def->part_count;
 	if (!key_is_full ||
 	    ((type == ITER_GE || type == ITER_LE) && !equals) ||
 	    (type == ITER_GT || type == ITER_LT))
 		memtx_tx_track_gap(txn, space, index_base, successor, type,
-				   start_data.key,
-				   MIN(start_data.part_count, key_part_count));
+				   start_data.key, MIN(start_data.part_count,
+				   index_base->def->key_def->part_count));
 	memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 
