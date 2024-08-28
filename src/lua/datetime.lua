@@ -69,8 +69,7 @@ size_t tnt_datetime_to_string(const struct datetime * date, char *buf,
 size_t tnt_datetime_strftime(const struct datetime *date, char *buf,
                              uint32_t len, const char *fmt);
 ssize_t tnt_datetime_parse_full(struct datetime *date, const char *str,
-                                size_t len, const char *tzsuffix,
-                                int32_t offset);
+                                size_t len);
 ssize_t tnt_datetime_parse_tz(const char *str, size_t len, time_t base,
                               int16_t *tzoffset, int16_t *tzindex);
 size_t tnt_datetime_strptime(struct datetime *date, const char *buf,
@@ -305,6 +304,9 @@ local function bool2int(b)
     return b and 1 or 0
 end
 
+-- Forward declaration.
+local datetime_set
+
 local adjust_xlat = {
     none = builtin.DT_LIMIT,
     last = builtin.DT_SNAP,
@@ -453,10 +455,7 @@ local function datetime_isdst(obj)
     return builtin.tnt_datetime_isdst(obj)
 end
 
---[[
-    Parse timezone name similar way as datetime_parse_full parse
-    full literal.
-]]
+-- Parse timezone name.
 local function parse_tzname(base_epoch, tzname)
     check_str(tzname, 'parse_tzname()')
     local ptzindex = date_int16_stash_take()
@@ -872,10 +871,10 @@ end
        date [T] time [ ] time_zone
     Returns constructed datetime object and length of accepted string.
 ]]
-local function datetime_parse_full(str, tzname, offset)
+local function datetime_parse_full(str)
     check_str(str, 'datetime.parse()')
     local date = ffi.new(datetime_t)
-    local len = builtin.tnt_datetime_parse_full(date, str, #str, tzname, offset)
+    local len = builtin.tnt_datetime_parse_full(date, str, #str)
     if len > 0 then
         return date, tonumber(len)
     elseif len == -builtin.TZ_NYI then
@@ -914,7 +913,7 @@ local function datetime_parse_from(str, obj)
     end
     check_str_or_nil(fmt, 'datetime.parse()')
 
-    local offset = 0
+    local offset
     if tzoffset ~= nil then
         offset = get_timezone(tzoffset, 'tzoffset')
         check_range(offset, -720, 840, 'tzoffset')
@@ -925,8 +924,12 @@ local function datetime_parse_from(str, obj)
     end
 
     if not fmt or fmt == '' or fmt == 'iso8601' or fmt == 'rfc3339' then
-        -- Effect of .tz overrides .tzoffset
-        return datetime_parse_full(str, tzname, offset)
+        local date, len = datetime_parse_full(str)
+        -- Override timezone.
+        if date.tz == '' and date.tzoffset == 0 then
+            datetime_set(date, obj or {})
+        end
+        return date, tonumber(len)
     else
         return datetime_parse_format(str, fmt)
     end
@@ -1014,7 +1017,7 @@ local function datetime_hms_update(self, h, m, s)
     self.epoch = secs_day + h * 3600 + m * 60 + s
 end
 
-local function datetime_set(self, obj)
+function datetime_set(self, obj)
     check_date(self, 'datetime.set()')
     check_table(obj, "datetime.set()")
 
