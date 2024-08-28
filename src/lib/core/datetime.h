@@ -192,10 +192,6 @@ datetime_isdst(const struct datetime *date);
  * @param date output datetime value
  * @param str input text in relaxed ISO-8601 format (0-terminated)
  * @param len length of str buffer
- * @param tzsuffix timezone override, if you need to interpret
- *        date/time value as local. Pass NULL if you need to interpret it
- *        as UTC, or you provide meaningful suffix in the literal to be
- *        parsed.
  * @retval Upon successful completion returns length of accepted
  *         prefix substring. It's ok if there is some unaccepted trailer.
  *         Returns 0 only if text is not recognizable as date/time string.
@@ -203,8 +199,7 @@ datetime_isdst(const struct datetime *date);
  * @sa datetime_strptime()
  */
 ssize_t
-datetime_parse_full(struct datetime *date, const char *str, size_t len,
-		    const char *tzsuffix, int32_t offset);
+datetime_parse_full(struct datetime *date, const char *str, size_t len);
 
 /** Parse timezone suffix
  * @param str input text in relaxed ISO-8601 format (0-terminated)

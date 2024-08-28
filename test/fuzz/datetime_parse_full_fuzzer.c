@@ -15,7 +15,7 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	memcpy(buf, data, size);
 	buf[size] = '\0';
 	struct datetime date_expected;
-	datetime_parse_full(&date_expected, buf, size, NULL, 0);
+	datetime_parse_full(&date_expected, buf, size);
 	free(buf);
 
 	return 0;
