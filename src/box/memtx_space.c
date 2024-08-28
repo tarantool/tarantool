@@ -1463,6 +1463,23 @@ memtx_space_finish_alter(struct space *old_space, struct space *new_space)
 	}
 }
 
+/**
+ * Invalidate the space in transaction manager.
+ */
+static void
+memtx_space_invalidate(struct space *space)
+{
+	/*
+	 * Abort all concurrent transactions and invalidate space in MVCC
+	 * only if it is enabled. Otherwise, all concurrent transactions
+	 * will be aborted when DDL will be prepared.
+	 */
+	if (memtx_tx_manager_use_mvcc_engine) {
+		memtx_tx_abort_all_for_ddl(in_txn());
+		memtx_tx_invalidate_space(space, in_txn());
+	}
+}
+
 /* }}} DDL */
 
 static const struct space_vtab memtx_space_vtab = {
@@ -1487,7 +1504,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .prepare_alter = */ memtx_space_prepare_alter,
 	/* .finish_alter = */ memtx_space_finish_alter,
 	/* .prepare_upgrade = */ memtx_space_prepare_upgrade,
-	/* .invalidate = */ generic_space_invalidate,
+	/* .invalidate = */ memtx_space_invalidate,
 };
 
 struct space *

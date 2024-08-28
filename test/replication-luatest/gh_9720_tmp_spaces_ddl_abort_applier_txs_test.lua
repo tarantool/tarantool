@@ -94,7 +94,7 @@ g.test_fully_temporary_ddl_aborts_not_fully_remote_tx = function(cg)
         end)
         box.schema.space.create('tmp', {type = 'temporary'})
     end)
-    local msg = "Transaction committing DDL %(id=%d+%) has aborted " ..
+    local msg = "Transaction processing DDL %(id=%d+%) has aborted " ..
                 "another TX %(id=%d+%)"
     t.assert(cg.server2:grep_log(msg))
     cg.server2:exec(function()

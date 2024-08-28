@@ -716,6 +716,12 @@ memtx_tx_filter_temporary_and_remote_txs(struct txn *txn1, struct txn *txn2)
 	       (txn_is_fully_remote(txn1) && txn_is_fully_temporary(txn2));
 }
 
+/**
+ * Clean and clear all read lists of @a txn.
+ */
+static void
+memtx_tx_clear_txn_read_lists(struct txn *txn);
+
 void
 memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
 {
@@ -733,7 +739,8 @@ memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
 			continue;
 		to_be_aborted->status = TXN_ABORTED;
 		txn_set_flags(to_be_aborted, TXN_IS_CONFLICTED);
-		say_warn("Transaction committing DDL (id=%lld) has aborted "
+		memtx_tx_clear_txn_read_lists(to_be_aborted);
+		say_warn("Transaction processing DDL (id=%lld) has aborted "
 			 "another TX (id=%lld)", (long long) ddl_owner->id,
 			 (long long) to_be_aborted->id);
 	}
@@ -1236,51 +1243,8 @@ static void
 memtx_tx_story_unlink_top_on_space_delete(struct memtx_story *story,
 					  uint32_t idx)
 {
-	assert(story != NULL);
-	assert(idx < story->index_count);
 	struct memtx_story_link *link = &story->link[idx];
-
-	assert(link->newer_story == NULL);
-	/*
-	 * Note that link[idx].in_index may not be the same as
-	 * story->space->index[idx] in case space is going to be deleted
-	 * in memtx_tx_on_space_delete(): during space alter operation we
-	 * swap all indexes to the new space object and instead use dummy
-	 * structs.
-	 */
-	struct index *index = story->link[idx].in_index;
-
 	struct memtx_story *old_story = link->older_story;
-	assert(old_story == NULL || old_story->link[idx].in_index == NULL);
-	struct tuple *old_tuple = old_story == NULL ? NULL : old_story->tuple;
-	struct tuple *removed, *unused;
-	if (index_replace(index, story->tuple, old_tuple,
-			  DUP_INSERT, &removed, &unused) != 0) {
-		diag_log();
-		unreachable();
-		panic("failed to rebind story in index");
-	}
-	assert(story->tuple == removed ||
-	       (removed == NULL && tuple_key_is_excluded(story->tuple,
-							 index->def->key_def,
-							 MULTIKEY_NONE)));
-	story->link[idx].in_index = NULL;
-	if (old_story != NULL)
-		old_story->link[idx].in_index = index;
-
-	/*
-	 * A space holds references to all his tuples.
-	 * All tuples that are physically in the primary index are referenced.
-	 * Thus we have to reference the tuple that was added to the primary
-	 * index and dereference the tuple that was removed from it.
-	 */
-	if (idx == 0) {
-		if (old_story != NULL)
-			memtx_tx_ref_to_primary(old_story);
-		memtx_tx_unref_from_primary(story);
-	}
-
-	/* Now simply unlink the story. */
 	if (old_story != NULL)
 		memtx_tx_story_unlink(story, old_story, idx);
 }
@@ -1316,7 +1280,6 @@ memtx_tx_story_unlink_both_on_space_delete(struct memtx_story *story,
 	assert(idx < story->index_count);
 	struct memtx_story_link *link = &story->link[idx];
 	if (link->newer_story == NULL) {
-		assert(link->in_index != NULL);
 		memtx_tx_story_unlink_top_on_space_delete(story, idx);
 	} else {
 		memtx_tx_story_unlink_both_common(story, idx);
@@ -1366,11 +1329,7 @@ memtx_tx_story_reorder(struct memtx_story *story,
 }
 
 /**
- * Unlink @a story from all chains and remove corresponding tuple from
- * indexes if necessary: used in `memtx_tx_on_space_delete` — intentionally
- * violates the top of the history chain invariant (see
- * `memtx_tx_story_full_unlink_story_gc_step`), since all stories are deleted
- * anyways.
+ * Unlink @a story from all chains, must be already removed from the index.
  */
 static void
 memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
@@ -1378,38 +1337,7 @@ memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		struct memtx_story_link *link = &story->link[i];
 		if (link->newer_story == NULL) {
-			/*
-			 * We are at the top of the chain. That means
-			 * that story->tuple might be in index. If the story
-			 * actually deletes the tuple and is present in index,
-			 * it must be deleted from index.
-			 */
-			if (story->del_psn > 0 && link->in_index != NULL) {
-				struct index *index = link->in_index;
-				struct tuple *removed, *unused;
-				if (index_replace(index, story->tuple, NULL,
-						  DUP_INSERT,
-						  &removed, &unused) != 0) {
-					diag_log();
-					unreachable();
-					panic("failed to rollback change");
-				}
-				struct key_def *key_def = index->def->key_def;
-				assert(story->tuple == removed ||
-				       (removed == NULL &&
-					tuple_key_is_excluded(story->tuple,
-							      key_def,
-							      MULTIKEY_NONE)));
-				(void)key_def;
-				link->in_index = NULL;
-				/*
-				 * All tuples in pk are referenced.
-				 * Once removed it must be unreferenced.
-				 */
-				if (i == 0)
-					memtx_tx_unref_from_primary(story);
-			}
-
+			assert(link->in_index == NULL);
 			memtx_tx_story_unlink(story, link->older_story, i);
 		} else {
 			/* Just unlink from list */
@@ -2444,6 +2372,43 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 	memtx_tx_story_unlink_deleted_by(del_story, stmt);
 }
 
+/**
+ * The helper rolls back a statements that is empty - has no stories
+ * linked. It can happen due to several reasons:
+ * 1. MVCC hasn't created stories for the stmt. It happens when space is
+ *    ephemeral or when the statement has deleted nothing. In this case
+ *    helper does nothing.
+ * 2. MVCC created stories for the statement, but they were deleted due to
+ *    DDL - here are 3 types of such transactions. First one is concurrent
+ *    with DDL. We shouldn't roll them back because we have already handled
+ *    them on DDL. Second one is DDL itself (`is_schema_changed` flag is set)
+ *    since stories of all the DML operations that happened before DDL were
+ *    deleted. We must roll its statements back because now the space contain
+ *    all its tuples. Third type is transactions prepared before DDL. We've
+ *    also removed their stories on DDL, so here we should roll them back
+ *    without stories if they have failed to commit.
+ */
+void
+memtx_tx_history_rollback_empty_stmt(struct txn_stmt *stmt)
+{
+	struct tuple *old_tuple = stmt->rollback_info.old_tuple;
+	struct tuple *new_tuple = stmt->rollback_info.new_tuple;
+	if (!stmt->txn->is_schema_changed && stmt->txn->psn == 0)
+		return;
+	if (stmt->space->def->opts.is_ephemeral ||
+	    (old_tuple == NULL && new_tuple == NULL))
+		return;
+	for (size_t i = 0; i < stmt->space->index_count; i++) {
+		struct tuple *unused;
+		if (index_replace(stmt->space->index[i], new_tuple, old_tuple,
+				  DUP_REPLACE_OR_INSERT, &unused,
+				  &unused) != 0) {
+			panic("failed to rebind story in index on "
+			      "rollback of statement without story");
+		}
+	}
+}
+
 void
 memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 {
@@ -2468,6 +2433,8 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 		memtx_tx_history_rollback_added_story(stmt);
 	else if (stmt->del_story != NULL)
 		memtx_tx_history_rollback_deleted_story(stmt);
+	else
+		memtx_tx_history_rollback_empty_stmt(stmt);
 	assert(stmt->add_story == NULL && stmt->del_story == NULL);
 }
 
@@ -2505,7 +2472,8 @@ memtx_tx_history_remove_stmt(struct txn_stmt *stmt)
 		memtx_tx_history_remove_added_story(stmt);
 	if (stmt->del_story != NULL)
 		memtx_tx_history_remove_deleted_story(stmt);
-	stmt->engine_savepoint = NULL;
+	if (stmt->txn->status == TXN_ABORTED)
+		stmt->engine_savepoint = NULL;
 }
 
 /**
@@ -2795,12 +2763,6 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 	memtx_tx_story_gc();
 }
 
-/**
- * Clean and clear all read lists of @a txn.
- */
-static void
-memtx_tx_clear_txn_read_lists(struct txn *txn);
-
 void
 memtx_tx_prepare_finalize(struct txn *txn)
 {
@@ -3043,20 +3005,68 @@ memtx_tx_on_index_delete(struct index *index)
 }
 
 void
-memtx_tx_on_space_delete(struct space *space)
+memtx_tx_invalidate_space(struct space *space, struct txn *active_txn)
 {
+	struct memtx_story *story;
+	/*
+	 * Phase one: fill the indexes with actual tuples. Here we insert
+	 * all tuples visible to `active_txn`.
+	 */
+	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
+		assert(story->index_count == space->index_count);
+
+		for (uint32_t i = 0; i < story->index_count; i++) {
+			struct index *index = story->link[i].in_index;
+			if (index == NULL)
+				continue;
+
+			/* Mark as not in index. */
+			story->link[i].in_index = NULL;
+
+			/* Skip chains of excluded tuples. */
+			if (tuple_key_is_excluded(story->tuple,
+						  index->def->key_def,
+						  MULTIKEY_NONE))
+				continue;
+
+			struct tuple *new_tuple = NULL;
+			bool is_own_change;
+			memtx_tx_story_find_visible_tuple(story, active_txn, i,
+							  true, &new_tuple,
+							  &is_own_change);
+
+			/* Visible tuple is already in index - do nothing. */
+			if (new_tuple == story->tuple)
+				continue;
+
+			struct tuple *unused;
+			if (index_replace(index, story->tuple, new_tuple,
+					  DUP_REPLACE, &unused,
+					  &unused) != 0) {
+				diag_log();
+				unreachable();
+				panic("failed to rebind story in index on "
+				      "space invalidation");
+			}
+
+			if (i == 0) {
+				if (new_tuple != NULL) {
+					memtx_tx_ref_to_primary(
+						memtx_tx_story_get(new_tuple));
+				}
+				memtx_tx_unref_from_primary(story);
+			}
+		}
+	}
+
+	/*
+	 * Phase two: destroy all the stories. They are expected to be unlinked
+	 * from the indexes during the first phase.
+	 */
 	while (!rlist_empty(&space->memtx_stories)) {
-		struct memtx_story *story
-			= rlist_first_entry(&space->memtx_stories,
-					    struct memtx_story,
-					    in_space_stories);
-		/*
-		 * Space is to be altered (not necessarily dropped). Since
-		 * this operation is considered to be DDL, all other
-		 * transactions will be aborted anyway. We can't postpone
-		 * rollback till actual call of commit/rollback since stories
-		 * should be destroyed immediately.
-		 */
+		story = rlist_first_entry(&space->memtx_stories,
+					  struct memtx_story,
+					  in_space_stories);
 		if (story->add_stmt != NULL)
 			memtx_tx_history_remove_stmt(story->add_stmt);
 		while (story->del_stmt != NULL)
