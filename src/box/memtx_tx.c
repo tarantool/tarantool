@@ -3325,6 +3325,30 @@ memtx_tx_inplace_gap_item_new(struct txn *txn)
 	return item;
 }
 
+/*
+ * Saves the given @a key in the @a short_key buffer of size @a short_key_size
+ * if it fits or allocates a new one on the @a txn's region. Returns the key
+ * length in the @a key_len output parameter.
+ */
+static char *
+memtx_tx_save_key(struct txn *txn, const char *key, uint32_t part_count,
+		  char *short_key, size_t short_key_size, uint32_t *key_len)
+{
+	const char *tmp = key;
+	for (uint32_t i = 0; i < part_count; i++)
+		mp_next(&tmp);
+	*key_len = tmp - key;
+	if (part_count == 0)
+		return NULL;
+	char *result = short_key;
+	if (*key_len > short_key_size) {
+		result = memtx_tx_xregion_alloc(txn, *key_len,
+						MEMTX_TX_ALLOC_TRACKER);
+	}
+	memcpy(result, key, *key_len);
+	return result;
+}
+
 /**
  * Allocate and create nearby gap item.
  * Note that in_read_gaps base member must be initialized later.
@@ -3339,19 +3363,8 @@ memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
 
 	item->type = type;
 	item->part_count = part_count;
-	const char *tmp = key;
-	for (uint32_t i = 0; i < part_count; i++)
-		mp_next(&tmp);
-	item->key_len = tmp - key;
-	if (part_count == 0) {
-		item->key = NULL;
-	} else if (item->key_len <= sizeof(item->short_key)) {
-		item->key = item->short_key;
-	} else {
-		item->key = memtx_tx_xregion_alloc(txn, item->key_len,
-						   MEMTX_TX_ALLOC_TRACKER);
-	}
-	memcpy((char *)item->key, key, item->key_len);
+	item->key = memtx_tx_save_key(txn, key, part_count, item->short_key,
+				      sizeof(item->short_key), &item->key_len);
 	return item;
 }
 
