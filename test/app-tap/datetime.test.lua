@@ -45,6 +45,7 @@ local str_or_num_exp = 'tzoffset: string or number expected, but received'
 local numeric_exp = 'numeric value expected, but received '
 local expected_interval_but = 'expected interval or table, but received'
 local expected_datetime_but = 'expected datetime, interval or table, but received'
+local ambiguous_timezone = 'ambiguous timezone: both tzoffset and tz are specified'
 
 -- various error message generators
 local function exp_datetime(name, value)
@@ -424,7 +425,7 @@ test:test("Formatting limits", function(test)
 end)
 
 test:test("Simple tests for parser", function(test)
-    test:plan(14)
+    test:plan(19)
     test:ok(date.parse("1970-01-01T01:00:00Z") ==
             date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0})
     test:ok(date.parse("1970-01-01T01:00:00Z", {format = 'iso8601'}) ==
@@ -435,6 +436,8 @@ test:test("Simple tests for parser", function(test)
             date.parse("2020-01-01T01:00:00+00:00", {format = 'iso8601'}))
     test:ok(date.parse("1970-01-01T02:00:00+02:00") ==
             date.new{year=1970, mon=1, day=1, hour=2, min=0, sec=0, tzoffset=120})
+
+    -- Testcases with override timezone by setting tzoffset.
     test:ok(date.parse("1970-01-01T01:00:00", {tzoffset = 120}) ==
             date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=120})
     test:ok(date.parse("1970-01-01T01:00:00", {tzoffset = '+0200'}) ==
@@ -449,6 +452,33 @@ test:test("Simple tests for parser", function(test)
             date.new({ year = 1998, month = 11, day = 25, tzoffset = 180 }))
     test:ok(date.parse('1998', { format = '%Y', tzoffset = '+03:00' }) ==
             date.new({ year = 1998, tzoffset = 180 }))
+
+    -- Testcases with override timezone by setting tz.
+    -- Timezone is not specified in a parsed string.
+    test:ok(date.parse("1970-01-01T01:00:00", {tz = "MSK"}) ==
+            date.new{year = 1970, mon = 1, day = 1,
+                     hour = 1, min = 0, sec = 0, tzoffset=180,
+                    })
+    -- Timezone is specified in a parsed string as a military timezone.
+    test:ok(date.parse("1970-01-01T01:00:00Z", {tz = "Europe/Moscow"}) ==
+            date.new{
+                year = 1970, mon = 1, day = 1,
+                hour = 1, min = 0, sec = 0, tzoffset = 0
+            })
+    -- Timezone is specified in a parsed string as an offset.
+    test:ok(date.parse("1970-01-01T01:00:00+01:00", {tz = "Asia/Omsk"}) ==
+            date.new{
+                year = 1970, mon = 1, day = 1,
+                hour = 1, min = 0, sec = 0, tzoffset = 60,
+            })
+    -- Timezone is not specified in a parsed string and format is passed.
+    test:ok(date.parse("1998-11-25", { format = "%Y-%m-%d", tz = "MSK" }) ==
+            date.new{year = 1998, month = 11, day = 25, tzoffset = 180})
+
+    -- Both tz and tzoffset are passed.
+    assert_raises(test, ambiguous_timezone, function()
+                      date.parse('1998-11-25', { tzoffset = 100, tz = 'MSK'})
+                  end)
 
     test:ok(date.parse("1970-01-01T02:00:00Z") <
             date.new{year=1970, mon=1, day=1, hour=2, min=0, sec=1})

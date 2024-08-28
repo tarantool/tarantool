@@ -922,6 +922,10 @@ local function datetime_parse_from(str, obj)
         check_str(tzname, 'datetime.parse()')
     end
 
+    if tzoffset and tzname then
+        error("ambiguous timezone: both tzoffset and tz are specified")
+    end
+
     local date, len
     if not fmt or fmt == '' or fmt == 'iso8601' or fmt == 'rfc3339' then
         date, len = datetime_parse_full(str)
