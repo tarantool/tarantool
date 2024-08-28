@@ -755,6 +755,7 @@ space_delete(struct space *space)
 	space_reset_events(space);
 	if (space->upgrade != NULL)
 		space_upgrade_delete(space->upgrade);
+	free(space->sequence_path);
 	space_def_delete(space->def);
 	/*
 	 * SQL triggers should be deleted with on_replace_dd_triggers on
