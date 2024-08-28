@@ -302,8 +302,7 @@ parse_tz_suffix(const char *str, size_t len, time_t base,
 }
 
 ssize_t
-datetime_parse_full(struct datetime *date, const char *str, size_t len,
-		    const char *tzsuffix, int32_t offset)
+datetime_parse_full(struct datetime *date, const char *str, size_t len)
 {
 	size_t n;
 	dt_t dt;
@@ -311,6 +310,7 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
 	char c;
 	int sec_of_day = 0, nanosecond = 0;
 	int16_t tzindex = 0;
+	int32_t offset = 0;
 
 	n = dt_parse_iso_date(str, len, &dt);
 	if (n == 0)
@@ -337,19 +337,6 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
 	if (len <= 0)
 		goto exit;
 
-	/* now we have parsed enough of date literal, and we are
-	 * ready to consume timezone suffix, if overridden
-	 */
-	time_t base = dt_epoch(dt) + sec_of_day - offset * 60;
-	ssize_t l;
-	if (tzsuffix != NULL) {
-		l = parse_tz_suffix(tzsuffix, strlen(tzsuffix), base,
-				    &tzindex, &offset);
-		if (l < 0)
-			return l;
-		goto exit;
-	}
-
 	if (*str == ' ') {
 		str++;
 		len--;
@@ -357,7 +344,8 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
 	if (len <= 0)
 		goto exit;
 
-	l = parse_tz_suffix(str, len, base, &tzindex, &offset);
+	time_t base = dt_epoch(dt) + sec_of_day;
+	ssize_t l = parse_tz_suffix(str, len, base, &tzindex, &offset);
 	if (l < 0)
 		return l;
 	str += l;
