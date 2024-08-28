@@ -416,3 +416,59 @@ g.test_rollback_prepared_dml_and_ddl = function(cg)
         t.assert_equals(s:select{}, saved_select)
     end)
 end
+
+-- The test checks if DDL correctly handles stories of prepared statements
+-- on DDL
+-- gh-10474, case 2
+g.test_ddl_handles_prepared = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        box.schema.space.create('test')
+        box.space.test:create_index('pk')
+
+        box.space.test:replace{1}
+
+        local teardown = false
+
+        local function writer(do_not_commit)
+            box.begin{txn_isolation = 'read-committed'}
+            box.space.test:replace{1}
+            if do_not_commit then
+                while not teardown do
+                    fiber.sleep(0)
+                end
+                box.rollback()
+            else
+                box.commit()
+            end
+        end
+
+        box.error.injection.set('ERRINJ_WAL_DELAY', true)
+        -- Start preparing writers and then update the space
+        local fibers = {}
+        for _ = 1, 5 do
+            local f = fiber.create(writer)
+            f:set_joinable(true)
+            table.insert(fibers, f)
+            f = fiber.create(writer, true)
+            f:set_joinable(true)
+            table.insert(fibers, f)
+        end
+        local f = fiber.create(function()
+            box.space.test:format{{name = 'field1', type = 'scalar'}}
+        end)
+        f:set_joinable(true)
+
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+
+        -- Wait for DDL and DML are over and successful
+        local ok = f:join()
+        t.assert(ok)
+        teardown = true
+        for _, f in pairs(fibers) do
+            ok = f:join()
+            t.assert(ok)
+        end
+    end)
+end
