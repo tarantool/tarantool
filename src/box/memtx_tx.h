@@ -412,15 +412,15 @@ void
 memtx_tx_on_index_delete(struct index *index);
 
 /**
- * Notify manager the a space is deleted.
- * It's necessary because there is a chance that garbage collector hasn't
- * deleted all stories of that space and in that case some actions of
- * story's destructor are not applicable.
+ * Invalidate space in memtx tx: remove all the objects associated with
+ * space and its schema. The helper is supposed to be called when there is
+ * only one active transaction that is passed as `active_txn`. The indexes
+ * are populated with tuples according to what `active_txn` observes.
  *
  * NB: can trigger story garbage collection.
  */
 void
-memtx_tx_on_space_delete(struct space *space);
+memtx_tx_invalidate_space(struct space *space, struct txn *active_txn);
 
 /**
  * Create a snapshot cleaner.
