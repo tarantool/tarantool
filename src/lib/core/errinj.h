@@ -99,6 +99,7 @@ struct errinj {
 	_(ERRINJ_IPROTO_DISABLE_ID, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_DISABLE_WATCH, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_FLIP_FEATURE, ERRINJ_INT, {.iparam = -1}) \
+	_(ERRINJ_IPROTO_FLUSH_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_SET_VERSION, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_IPROTO_TX_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_WRITE_ERROR_DELAY, ERRINJ_BOOL, {.bparam = false})\
