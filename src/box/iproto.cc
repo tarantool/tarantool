@@ -705,6 +705,8 @@ struct iproto_connection
 	char salt[IPROTO_SALT_SIZE];
 	/** Iproto connection thread */
 	struct iproto_thread *iproto_thread;
+	/** Number of iproto requests in flight. */
+	size_t request_count;
 };
 
 /** Returns a string suitable for logging. */
@@ -774,6 +776,8 @@ iproto_check_msg_max(struct iproto_thread *iproto_thread)
 static inline void
 iproto_msg_delete(struct iproto_msg *msg)
 {
+	assert(msg->connection->request_count > 0);
+	msg->connection->request_count--;
 	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
 	mempool_free(&msg->connection->iproto_thread->iproto_msg_pool, msg);
 	iproto_resume(iproto_thread);
@@ -808,6 +812,7 @@ iproto_msg_new(struct iproto_connection *con)
 	msg->connection = con;
 	msg->stream = NULL;
 	rmean_collect(con->iproto_thread->rmean, IPROTO_REQUESTS, 1);
+	con->request_count++;
 	return msg;
 }
 
@@ -1079,6 +1084,13 @@ iproto_connection_input_buffer(struct iproto_connection *con)
 	 */
 	con->p_ibuf = new_ibuf;
 	return new_ibuf;
+}
+
+static inline bool
+iproto_is_flushed(struct iproto_connection *con)
+{
+	return con->wpos.obuf == con->wend.obuf &&
+		   con->wpos.svp.used == con->wend.svp.used;
 }
 
 /**
@@ -1386,6 +1398,11 @@ iproto_flush(struct iproto_connection *con)
 		return 0;
 	}
 	assert(begin->used < end->used);
+
+	ERROR_INJECT(ERRINJ_IPROTO_FLUSH_DELAY, {
+		return IOSTREAM_WANT_WRITE;
+	});
+
 	struct iovec iov[SMALL_OBUF_IOV_MAX+1];
 	struct iovec *src = obuf->iov;
 	int iovcnt = end->pos - begin->pos + 1;
@@ -1496,6 +1513,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	con->tx.is_push_pending = false;
 	con->tx.is_push_sent = false;
 	rmean_collect(iproto_thread->rmean, IPROTO_CONNECTIONS, 1);
+	con->request_count = 0;
 	return con;
 }
 
@@ -1580,7 +1598,8 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend,
 	bool request_is_not_for_stream;
 	bool request_is_only_for_stream;
 	bool is_replication_request;
-	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
+	struct iproto_connection *con = msg->connection;
+	struct iproto_thread *iproto_thread = con->iproto_thread;
 	mh_i32_t *handlers = iproto_thread->req_handlers;
 	mh_int_t handler;
 	struct cmsg_hop *route;
@@ -1614,8 +1633,18 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend,
 				 type == IPROTO_FETCH_SNAPSHOT ||
 				 type == IPROTO_REGISTER ||
 				 type == IPROTO_SUBSCRIBE;
-	if (is_replication_request)
+	if (is_replication_request) {
+		/**
+		 * Before processing a replication request, ensure that all
+		 * writing requests have been completely flushed to obuf.
+		 */
+		if (con->request_count > 1 || !iproto_is_flushed(con)) {
+			diag_set(ClientError, ER_PROTOCOL, "Can't process "
+				 "join/subscribe while there are pending requests");
+			goto error;
+		}
 		*stop_input = true;
+	}
 
 	handler = mh_i32_find(handlers, type, NULL);
 	if (handler != mh_end(handlers)) {
