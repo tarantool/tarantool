@@ -2116,14 +2116,16 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			ER_CREATE_SPACE : ER_ALTER_SPACE;
 		def = space_def_new_from_tuple(new_tuple, errcode, region);
 	}
+	auto def_guard = make_scoped_guard([=] {
+		if (def != NULL)
+			space_def_delete(def);
+	});
 	if (filter_temporary_ddl_stmt(txn, old_space != NULL ?
 				      old_space->def : def) != 0)
 		return -1;
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
 		if (def == NULL)
 			return -1;
-		auto def_guard =
-			make_scoped_guard([=] { space_def_delete(def); });
 		if (access_check_ddl(def->name, def->uid, NULL,
 				     SC_SPACE, PRIV_C) != 0)
 			return -1;
@@ -2290,8 +2292,6 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		}
 		if (def == NULL)
 			return -1;
-		auto def_guard =
-			make_scoped_guard([=] { space_def_delete(def); });
 		if (access_check_ddl(def->name, def->uid, old_space->access,
 				     SC_SPACE, PRIV_A) != 0)
 			return -1;
