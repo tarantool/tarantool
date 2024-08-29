@@ -920,6 +920,8 @@ struct iproto_connection
 	struct cmsg cancel_msg;
 	/** Set if connection is accepted in TX. */
 	bool is_established;
+	/** Number of iproto requests in flight. */
+	size_t request_count;
 };
 
 /** Returns a string suitable for logging. */
@@ -984,6 +986,8 @@ iproto_check_msg_max(struct iproto_thread *iproto_thread)
 static inline void
 iproto_msg_delete(struct iproto_msg *msg)
 {
+	assert(msg->connection->request_count > 0);
+	msg->connection->request_count--;
 	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
 	mempool_free(&msg->connection->iproto_thread->iproto_msg_pool, msg);
 	iproto_resume(iproto_thread);
@@ -1009,6 +1013,7 @@ iproto_msg_new(struct iproto_connection *con)
 	msg->stream = NULL;
 	msg->fiber = NULL;
 	rmean_collect(con->iproto_thread->rmean, IPROTO_REQUESTS, 1);
+	con->request_count++;
 	return msg;
 }
 
@@ -1019,6 +1024,7 @@ static inline void
 iproto_connection_feed_input(struct iproto_connection *con)
 {
 	assert(con->state == IPROTO_CONNECTION_ALIVE);
+	assert(!con->is_in_replication);
 	if (!ev_is_active(&con->input) && rlist_empty(&con->in_stop_list))
 		ev_feed_event(con->loop, &con->input, EV_CUSTOM);
 }
@@ -1030,6 +1036,7 @@ static inline void
 iproto_connection_feed_output(struct iproto_connection *con)
 {
 	assert(con->state == IPROTO_CONNECTION_ALIVE);
+	assert(!con->is_in_replication);
 	if (!ev_is_active(&con->output))
 		ev_feed_event(con->loop, &con->output, EV_CUSTOM);
 }
@@ -1283,6 +1290,13 @@ iproto_connection_input_buffer(struct iproto_connection *con)
 	return new_ibuf;
 }
 
+static inline bool
+iproto_is_flushed(struct iproto_connection *con)
+{
+	return con->wpos.obuf == con->wend.obuf &&
+		   con->wpos.svp.used == con->wend.svp.used;
+}
+
 /**
  * Check if message belongs to stream (stream_id != 0), and if it
  * is so create new stream or get stream from connection streams
@@ -1480,6 +1494,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 	assert(con->state == IPROTO_CONNECTION_ALIVE);
 	assert(rlist_empty(&con->in_stop_list));
 	assert(loop == con->loop);
+	assert(!con->is_in_replication);
 	/*
 	 * Throttle if there are too many pending requests,
 	 * otherwise we might deplete the fiber pool in tx
@@ -1563,6 +1578,11 @@ iproto_flush(struct iproto_connection *con)
 		return 0;
 	}
 	assert(begin->used < end->used);
+
+	ERROR_INJECT(ERRINJ_IPROTO_FLUSH_DELAY, {
+		return IOSTREAM_WANT_WRITE;
+	});
+
 	struct iovec iov[SMALL_OBUF_IOV_MAX+1];
 	struct iovec *src = obuf->iov;
 	int iovcnt = end->pos - begin->pos + 1;
@@ -1612,6 +1632,7 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 {
 	struct iproto_connection *con = (struct iproto_connection *) watcher->data;
 	assert(con->state == IPROTO_CONNECTION_ALIVE);
+	assert(!con->is_in_replication);
 	int rc;
 	while ((rc = iproto_flush(con)) <= 0) {
 		if (rc != 0) {
@@ -1676,6 +1697,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	con->tx.is_push_pending = false;
 	con->tx.is_push_sent = false;
 	rmean_collect(iproto_thread->rmean, IPROTO_CONNECTIONS, 1);
+	con->request_count = 0;
 	return con;
 }
 
@@ -1788,9 +1810,11 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 {
 	uint64_t stream_id;
 	uint32_t type;
+	bool is_replication_request;
 	bool request_is_not_for_stream;
 	bool request_is_only_for_stream;
-	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
+	struct iproto_connection *con = msg->connection;
+	struct iproto_thread *iproto_thread = con->iproto_thread;
 	mh_i32_t *handlers = iproto_thread->req_handlers;
 	mh_int_t handler;
 	struct cmsg_hop *route;
@@ -1820,14 +1844,27 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 		goto error;
 	}
 
-	msg->connection->is_in_replication = type == IPROTO_JOIN ||
-					     type == IPROTO_FETCH_SNAPSHOT ||
-					     type == IPROTO_REGISTER ||
-					     type == IPROTO_SUBSCRIBE;
+	is_replication_request = msg->header.type == IPROTO_JOIN ||
+				 msg->header.type == IPROTO_FETCH_SNAPSHOT ||
+				 msg->header.type == IPROTO_REGISTER ||
+				 msg->header.type == IPROTO_SUBSCRIBE;
+
+	if (is_replication_request) {
+		/**
+		 * Before processing a replication request, ensure that all
+		 * writing requests have been completely flushed to obuf.
+		 */
+		if (con->request_count > 1 || !iproto_is_flushed(con)) {
+			diag_set(ClientError, ER_PROTOCOL, "Can't process "
+				 "join/subscribe while there are pending requests");
+			goto error;
+		}
+		con->is_in_replication = true;
+	}
 
 	handler = mh_i32_find(handlers, type, NULL);
 	if (handler != mh_end(handlers)) {
-		assert(!msg->connection->is_in_replication);
+		assert(!con->is_in_replication);
 		cmsg_init(&msg->base, iproto_thread->override_route);
 		return;
 	}
