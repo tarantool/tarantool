@@ -2269,6 +2269,7 @@ applier_thread_detach_applier(struct cbus_call_msg *base)
 	lsregion_destroy(&applier->thread.lsr);
 	fiber_cond_destroy(&applier->thread.writer_cond);
 	ibuf_destroy(&applier->thread.ibuf);
+	diag_clear(&applier->thread.exit_msg.diag);
 
 	return 0;
 }
