@@ -2992,12 +2992,12 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		struct user_def *user = user_def_new_from_tuple(new_tuple);
 		if (user == NULL)
 			return -1;
-		if (access_check_ddl(user->name, user->owner, NULL,
-				     user->type, PRIV_C) != 0)
-			return -1;
 		auto def_guard = make_scoped_guard([=] {
 			user_def_delete(user);
 		});
+		if (access_check_ddl(user->name, user->owner, NULL,
+				     user->type, PRIV_C) != 0)
+			return -1;
 		try {
 			(void) user_cache_replace(user);
 		} catch (Exception *e) {
@@ -3050,12 +3050,12 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		struct user_def *user = user_def_new_from_tuple(new_tuple);
 		if (user == NULL)
 			return -1;
-		if (access_check_ddl(user->name, user->uid, old_user->access,
-				     old_user->def->type, PRIV_A) != 0)
-			return -1;
 		auto def_guard = make_scoped_guard([=] {
 			user_def_delete(user);
 		});
+		if (access_check_ddl(user->name, user->uid, old_user->access,
+				     old_user->def->type, PRIV_A) != 0)
+			return -1;
 		try {
 			user_cache_replace(user);
 		} catch (Exception *e) {
