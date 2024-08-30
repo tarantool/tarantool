@@ -10,9 +10,9 @@
 # has entrypoint tag (2.11.4-entrypoint).
 #
 # 2. After branching. For example we develop 3.0.0 in master. And decide
-# to create 3.0 branch. The first commint in 3.0 branch is required
-# to have some tag (like 3.0.0-rc1, 3.0.0 or whatever). The first commit after
-# fork in master branch is required to have  entrypoint tag (3.1.0-entrypoint).
+# to create 3.0 branch. The first commit after fork in master branch is
+# required to have  entrypoint tag (3.1.0-entrypoint). We do not require
+# the first commit in new branch to be tagged.
 #
 # Note that in both cases we do not check that entrypoint tag has proper
 # suffix or numbers.
@@ -58,26 +58,13 @@ fi
 
 # Find current branch (report HEAD for 'detached HEAD' state).
 branch=`git rev-parse --abbrev-ref HEAD`
-if [[ "$branch" =~ ^(master|release/.*)$ ]]; then
-    # We need to find the commit that starts this branch (i.e. that the first
-    # commit on this branch after the commit that is common for two branches.)
-    #
-    # In order to achieve this we find all the commits of this branch that
-    # are not on other branches from release/* && master set.
-    #
-    # Unfortunately I did not find a way to set arguments for git rev-list
-    # without this branch.
-    if [[ "$branch" = master ]]; then
-        not_remotes="--remotes=origin/release/*"
-    else
-        not_remotes="--exclude origin/$branch --remotes=origin/release/* origin/master"
-    fi
-    entrypoint=`git rev-list HEAD --not $not_remotes | tail -n1`
+if [[ "$branch" = master ]]; then
+    entrypoint=`git rev-list HEAD --not --remotes='origin/release/*' | tail -n1`
     if [[ $entrypoint ]]; then
         # Check if entrypoint has annotated tag.
         git describe --exact-match $entrypoint &>/dev/null || \
         error "Missing tag for commit $entrypoint after branching in"\
-              "branch $branch."
+              "master branch."
     fi
 fi
 
