@@ -6433,6 +6433,8 @@ box_shutdown(void)
 void
 box_free(void)
 {
+	/* References engine tuples. */
+	txn_limbo_free();
 	box_storage_free();
 	builtin_events_free();
 	security_free();
