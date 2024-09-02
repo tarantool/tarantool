@@ -995,4 +995,5 @@ void
 box_lua_free(void)
 {
 	box_lua_iproto_free();
+	box_lua_space_free();
 }
