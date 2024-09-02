@@ -490,6 +490,12 @@ txn_limbo_has_owner(struct txn_limbo *limbo)
 void
 txn_limbo_init();
 
+/**
+ * Denitialize qsync engine.
+ */
+void
+txn_limbo_free();
+
 #if defined(__cplusplus)
 }
 #endif /* defined(__cplusplus) */
