@@ -42,6 +42,7 @@
 #include "core/say.h"
 #include "core/tt_uuid.h"
 #include "lj_trace.h"
+#include "lua/alloc.h"
 #include "lua/serializer.h"
 #include "trivia/util.h"
 #include "vclock/vclock.h"
@@ -58,6 +59,18 @@ uint32_t CTID_VARBINARY;
 uint32_t CTID_UUID;
 uint32_t CTID_DATETIME = 0;
 uint32_t CTID_INTERVAL = 0;
+
+struct lua_State *
+luaT_newstate(void)
+{
+	struct lua_State *L = luaL_newstate();
+	if (L == NULL)
+		panic("failed to initialize Lua");
+
+	luaT_initalloc(L);
+
+	return L;
+}
 
 /** A copy of index2adr() from luajit/src/lj_api.c. */
 static TValue *

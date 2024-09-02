@@ -49,6 +49,7 @@
 #include "coio.h"
 #include "core/backtrace.h"
 #include "core/tt_static.h"
+#include "lua/alloc.h"
 #include "lua/backtrace.h"
 #include "lua/fiber.h"
 #include "lua/fiber_cond.h"
@@ -733,10 +734,7 @@ void
 tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 		   char **argv)
 {
-	lua_State *L = luaL_newstate();
-	if (L == NULL) {
-		panic("failed to initialize Lua");
-	}
+	lua_State *L = luaT_newstate();
 	luaL_openlibs(L);
 #ifndef LUAJIT_JIT_STATUS
 	(void)luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE | LUAJIT_MODE_OFF);
@@ -804,6 +802,7 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_lua_decimal_init(L);
 	tarantool_lua_compress_init(L);
 	tarantool_lua_trigger_init(L);
+	tarantool_lua_alloc_init(L);
 #ifdef ENABLE_BACKTRACE
 	luaM_sysprof_set_backtracer(fiber_backtracer);
 #endif

@@ -348,6 +348,7 @@ void
 box_check_config(void);
 
 int box_listen(void);
+void box_set_lua_memory(void);
 void box_set_replication(void);
 void box_set_io_collect_interval(void);
 void box_set_snap_io_rate_limit(void);

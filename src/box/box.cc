@@ -35,6 +35,7 @@
 #include <sys/utsname.h>
 #include <spawn.h>
 
+#include "lua/alloc.h"
 #include "lua/utils.h" /* lua_hash() */
 #include "fiber_pool.h"
 #include <say.h>
@@ -1155,6 +1156,18 @@ box_check_auth_type(void)
 	return method;
 }
 
+static ssize_t
+box_check_lua_memory(void)
+{
+	const int64_t lua_memory = cfg_geti64("lua_memory");
+	if (lua_memory < 0) {
+		diag_set(ClientError, ER_CFG, "lua_memory",
+			 "lua_memory must be >= 0");
+		return -1;
+	}
+	return lua_memory;
+}
+
 static enum election_mode
 box_check_election_mode(void)
 {
@@ -1938,6 +1951,8 @@ box_check_config(void)
 	uri_set_destroy(&uri_set);
 	if (box_check_auth_type() == NULL)
 		diag_raise();
+	if (box_check_lua_memory() < 0)
+		diag_raise();
 	if (box_check_instance_uuid(&uuid) != 0)
 		diag_raise();
 	if (box_check_replicaset_uuid(&uuid) != 0)
@@ -1993,6 +2008,15 @@ box_check_config(void)
 	if (box_check_txn_isolation() == txn_isolation_level_MAX)
 		diag_raise();
 	box_check_memtx_sort_threads();
+}
+
+void
+box_set_lua_memory(void)
+{
+	size_t amount = cfg_geti64("lua_memory");
+
+	if (luaT_setallocmemory(amount) != 0)
+		diag_raise();
 }
 
 int
