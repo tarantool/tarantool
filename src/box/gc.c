@@ -1081,6 +1081,7 @@ gc_load_consumers(void)
 		/* Unref WAL GC delay for each replica having a consumer. */
 		gc_delay_unref();
 	}
+	iterator_delete(it);
 	return rc;
 }
 
