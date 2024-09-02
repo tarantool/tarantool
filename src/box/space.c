@@ -61,6 +61,7 @@
 #include "port.h"
 #include "tweaks.h"
 #include "txn_limbo.h"
+#include "sql.h"
 
 /**
  * Controls whether to consider system spaces indefinitely synchronous when the
@@ -752,16 +753,12 @@ space_delete(struct space *space)
 	space_unpin_collations(space);
 	trigger_destroy(&space->before_replace);
 	trigger_destroy(&space->on_replace);
+	sql_trigger_delete_all(space->sql_triggers);
 	space_reset_events(space);
 	if (space->upgrade != NULL)
 		space_upgrade_delete(space->upgrade);
 	free(space->sequence_path);
 	space_def_delete(space->def);
-	/*
-	 * SQL triggers should be deleted with on_replace_dd_triggers on
-	 * deletion from corresponding system space.
-	 */
-	assert(space->sql_triggers == NULL);
 	assert(rlist_empty(&space->space_cache_pin_list));
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, space->lua_ref);
 	space->vtab->destroy(space);

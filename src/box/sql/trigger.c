@@ -298,6 +298,16 @@ sql_trigger_delete(struct sql_trigger *trigger)
 }
 
 void
+sql_trigger_delete_all(struct sql_trigger *trigger)
+{
+	while (trigger != NULL) {
+		struct sql_trigger *next = trigger->next;
+		sql_trigger_delete(trigger);
+		trigger = next;
+	}
+}
+
+void
 vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name,
 		       bool account_changes)
 {
