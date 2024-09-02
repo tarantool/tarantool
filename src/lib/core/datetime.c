@@ -47,6 +47,12 @@ local_secs(const struct datetime *date)
 	return (int64_t)date->epoch + date->tzoffset * 60;
 }
 
+static int
+is_integer(double num)
+{
+	return roundf(num) == num;
+}
+
 /**
  * Resolve tzindex encoded timezone from @sa date using Olson facilities.
  * @param[in] epoch decode input epoch time (in seconds).
@@ -1052,6 +1058,18 @@ map_field_to_dt_field(struct dt_fields *fields, const char **data)
 static int
 datetime_from_fields(struct datetime *dt, const struct dt_fields *fields)
 {
+	if (!is_integer(fields->year) ||
+	    !is_integer(fields->month) ||
+	    !is_integer(fields->day) ||
+	    !is_integer(fields->hour) ||
+	    !is_integer(fields->min) ||
+	    !is_integer(fields->sec) ||
+	    !is_integer(fields->msec) ||
+	    !is_integer(fields->usec) ||
+	    !is_integer(fields->nsec) ||
+	    !is_integer(fields->tzoffset))
+		return -1;
+
 	if (fields->count_usec > 1)
 		return -1;
 	double nsec = fields->msec * 1000000 + fields->usec * 1000 +
