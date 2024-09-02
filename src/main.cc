@@ -558,6 +558,8 @@ tarantool_free(void)
 	coio_shutdown();
 
 	box_lua_free();
+	/* Lua may have reference to engine tuples. */
+	tarantool_lua_free();
 	box_free();
 
 	title_free(main_argc, main_argv);
@@ -579,7 +581,6 @@ tarantool_free(void)
 	 * This doesn't work reliably since things
 	 * are too interconnected.
 	 */
-	tarantool_lua_free();
 	session_free();
 #endif
 	event_free();
