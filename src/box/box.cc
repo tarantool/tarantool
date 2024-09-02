@@ -6229,6 +6229,8 @@ box_free(void)
 	box_storage_free();
 	builtin_events_free();
 	security_free();
+	/* User auth references auth methods. */
+	user_cache_free();
 	auth_free();
 	wal_ext_free();
 	box_watcher_free();
@@ -6246,6 +6248,5 @@ box_free(void)
 	mempool_destroy(&sync_trigger_data_pool);
 	/* schema_module_free(); */
 	/* session_free(); */
-	/* user_cache_free(); */
 	/* space_cache_destroy(); */
 }

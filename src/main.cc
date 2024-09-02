@@ -581,7 +581,6 @@ tarantool_free(void)
 	 */
 	tarantool_lua_free();
 	session_free();
-	user_cache_free();
 #endif
 	event_free();
 	ssl_free();
