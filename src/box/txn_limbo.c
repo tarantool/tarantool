@@ -76,6 +76,20 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->do_validate = false;
 }
 
+static inline void
+txn_limbo_destroy(struct txn_limbo *limbo)
+{
+	struct txn_limbo_entry *entry;
+	while (!rlist_empty(&limbo->queue)) {
+		entry = rlist_shift_entry(&limbo->queue,
+					  typeof(*entry), in_queue);
+		entry->txn->limbo_entry = NULL;
+		txn_free(entry->txn);
+	}
+	fiber_cond_destroy(&limbo->wait_cond);
+	TRASH(limbo);
+}
+
 static inline bool
 txn_limbo_is_frozen(const struct txn_limbo *limbo)
 {
@@ -1331,4 +1345,10 @@ void
 txn_limbo_init(void)
 {
 	txn_limbo_create(&txn_limbo);
+}
+
+void
+txn_limbo_free(void)
+{
+	txn_limbo_destroy(&txn_limbo);
 }
