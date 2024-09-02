@@ -53,6 +53,12 @@ coll_id_cache_init(void)
 void
 coll_id_cache_destroy(void)
 {
+	while (mh_size(coll_id_cache) > 0) {
+		mh_int_t i = mh_first(coll_id_cache);
+		struct coll_id *coll_id = mh_i32ptr_node(coll_id_cache, i)->val;
+		coll_id_cache_delete(coll_id);
+		coll_id_delete(coll_id);
+	}
 	mh_strnptr_delete(coll_cache_name);
 	mh_i32ptr_delete(coll_id_cache);
 }
