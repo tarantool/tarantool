@@ -1097,15 +1097,6 @@ tarantool_lua_utils_init(struct lua_State *L)
 	return 0;
 }
 
-/*
- * XXX: There is already defined <panic> macro in say.h header
- * (included in diag.h). As a result the call below is misexpanded
- * and compilation fails with the corresponding error. To avoid
- * this error the macro is undefined since it's not used anymore
- * in scope of this translation unit.
- */
-#undef panic
-
 /**
  * This routine encloses the checks and actions to be done when
  * the running fiber yields the execution.
