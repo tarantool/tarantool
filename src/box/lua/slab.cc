@@ -52,6 +52,7 @@
 #include "small/small.h"
 #include "small/quota.h"
 #include "memory.h"
+#include "box/box.h"
 #include "box/engine.h"
 #include "box/memtx_engine.h"
 #include "box/allocator.h"
@@ -134,38 +135,28 @@ lbox_slab_stats(struct lua_State *L)
 static int
 lbox_slab_info(struct lua_State *L)
 {
-	struct memtx_engine *memtx;
-	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	uint64_t items_size = box_slab_info(BOX_SLAB_INFO_ITEMS_SIZE);
+	uint64_t items_used = box_slab_info(BOX_SLAB_INFO_ITEMS_USED);
+	uint64_t arena_size = box_slab_info(BOX_SLAB_INFO_ARENA_SIZE);
+	uint64_t arena_used = box_slab_info(BOX_SLAB_INFO_ARENA_USED);
+	uint64_t quota_size = box_slab_info(BOX_SLAB_INFO_QUOTA_SIZE);
+	uint64_t quota_used = box_slab_info(BOX_SLAB_INFO_QUOTA_USED);
 
-	struct allocator_stats stats;
-	memset(&stats, 0, sizeof(stats));
-
-	/*
-	 * List all slabs used for tuples and slabs used for
-	 * indexes, with their stats.
-	 */
 	lua_newtable(L);
-	allocators_stats(&stats);
-	struct mempool_stats index_stats;
-	mempool_stats(&memtx->index_extent_pool, &index_stats);
-
-	double ratio;
 	char ratio_buf[32];
-
-	ratio = 100 * ((double) (stats.small.used + stats.sys.used)
-		/ ((double) (stats.small.total + stats.sys.total) + 0.0001));
+	double ratio = 100 * ((double)items_used / (items_size + 0.0001));
 	snprintf(ratio_buf, sizeof(ratio_buf), "%0.2lf%%", ratio);
 
 	/** How much address space has been already touched */
 	lua_pushstring(L, "items_size");
-	luaL_pushuint64(L, stats.small.total + stats.sys.total);
+	luaL_pushuint64(L, items_size);
 	lua_settable(L, -3);
 	/**
 	 * How much of this formatted address space is used for
 	 * actual data.
 	 */
 	lua_pushstring(L, "items_used");
-	luaL_pushuint64(L, stats.small.used + stats.sys.used);
+	luaL_pushuint64(L, items_used);
 	lua_settable(L, -3);
 
 	/*
@@ -180,16 +171,6 @@ lbox_slab_info(struct lua_State *L)
 	/** How much address space has been already touched
 	 * (tuples and indexes) */
 	lua_pushstring(L, "arena_size");
-	/*
-	 * We could use totals.total + index_stats.total here,
-	 * but this would not account for slabs which are sitting
-	 * in slab cache or in the arena, available for reuse.
-	 * Make sure a simple formula:
-	 * items_used_ratio > 0.9 && arena_used_ratio > 0.9 &&
-	 * quota_used_ratio > 0.9 work as an indicator
-	 * for reaching Tarantool memory limit.
-	 */
-	size_t arena_size = memtx->arena.used;
 	luaL_pushuint64(L, arena_size);
 	lua_settable(L, -3);
 	/**
@@ -197,12 +178,10 @@ lbox_slab_info(struct lua_State *L)
 	 * data (tuples and indexes).
 	 */
 	lua_pushstring(L, "arena_used");
-	/** System allocator does not use arena. */
-	luaL_pushuint64(L, stats.small.used + index_stats.totals.used);
+	luaL_pushuint64(L, arena_used);
 	lua_settable(L, -3);
 
-	ratio = 100 * ((double) (stats.small.used + index_stats.totals.used)
-		       / (double)(arena_size + 1));
+	ratio = 100 * ((double)arena_used / (arena_size + 1));
 	snprintf(ratio_buf, sizeof(ratio_buf), "%0.1lf%%", ratio);
 
 	lua_pushstring(L, "arena_used_ratio");
@@ -214,7 +193,7 @@ lbox_slab_info(struct lua_State *L)
 	 * box.cfg.slab_alloc_arena, but in bytes
 	 */
 	lua_pushstring(L, "quota_size");
-	luaL_pushuint64(L, quota_total(&memtx->quota));
+	luaL_pushuint64(L, quota_size);
 	lua_settable(L, -3);
 
 	/*
@@ -222,7 +201,7 @@ lbox_slab_info(struct lua_State *L)
 	 * size of slabs in various slab caches.
 	 */
 	lua_pushstring(L, "quota_used");
-	luaL_pushuint64(L, quota_used(&memtx->quota));
+	luaL_pushuint64(L, quota_used);
 	lua_settable(L, -3);
 
 	/**
@@ -231,8 +210,7 @@ lbox_slab_info(struct lua_State *L)
 	 * factor, it's the quota that give you OOM error in the
 	 * end of the day.
 	 */
-	ratio = 100 * ((double) quota_used(&memtx->quota) /
-		 ((double) quota_total(&memtx->quota) + 0.0001));
+	ratio = 100 * ((double)quota_used / (quota_size + 0.0001));
 	snprintf(ratio_buf, sizeof(ratio_buf), "%0.2lf%%", ratio);
 
 	lua_pushstring(L, "quota_used_ratio");

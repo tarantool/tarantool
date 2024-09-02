@@ -117,6 +117,7 @@ box_sequence_reset
 box_sequence_set
 box_session_id
 box_session_push
+box_slab_info
 box_space_id_by_name
 box_truncate
 box_tuple_bsize

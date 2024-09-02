@@ -788,6 +788,22 @@ box_iproto_override(uint32_t req_type, iproto_handler_t handler,
 API_EXPORT int64_t
 box_info_lsn(void);
 
+/*! Codes for request memtx status information for box.slab.info. */
+enum box_slab_info_type {
+	BOX_SLAB_INFO_ITEMS_SIZE = 0, /*!< Allocated only for tuples. */
+	BOX_SLAB_INFO_ITEMS_USED = 1, /*!< Used only for tuples. */
+	BOX_SLAB_INFO_ARENA_SIZE = 2, /*!< Allocated for  tuples and indexes. */
+	BOX_SLAB_INFO_ARENA_USED = 3, /*!< Used for both tuples and indexes. */
+	BOX_SLAB_INFO_QUOTA_SIZE = 4, /*!< Memory limit for slab allocator. */
+	BOX_SLAB_INFO_QUOTA_USED = 5, /*!< Used by slab allocator. */
+};
+
+/**
+ * Get memtx status information for box.slab.info.
+ */
+API_EXPORT uint64_t
+box_slab_info(enum box_slab_info_type type);
+
 /** \endcond public */
 
 /**
