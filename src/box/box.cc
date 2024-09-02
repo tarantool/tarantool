@@ -6228,6 +6228,8 @@ box_free(void)
 {
 	/* References engines. */
 	space_cache_destroy();
+	/* References engine tuples. */
+	txn_limbo_free();
 	box_storage_free();
 	builtin_events_free();
 	security_free();

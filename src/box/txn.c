@@ -457,10 +457,7 @@ txn_new(void)
 	return txn;
 }
 
-/*
- * Free txn memory and return it to a cache.
- */
-inline static void
+void
 txn_free(struct txn *txn)
 {
 	assert(txn->limbo_entry == NULL);
