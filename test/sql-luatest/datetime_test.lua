@@ -2514,10 +2514,41 @@ g.test_datetime_33_3 = function()
         local dt = require('datetime')
         local dt1 = dt.new({year = 1})
         local sql = [[SELECT CAST({'year': 1.1} AS DATETIME);]]
-        t.assert_equals(box.execute(sql).rows, {{dt1}})
+        local _, err, res
+        _, err = box.execute(sql)
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"year": 1.1}) to datetime]]
+        t.assert_equals(err.message, res)
 
         sql = [[SELECT CAST({'year': 1.1e0} AS DATETIME);]]
-        t.assert_equals(box.execute(sql).rows, {{dt1}})
+        _, err = box.execute(sql)
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"year": 1.1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- The timestamp value should be integer if the fractional
+        -- part for the last second is set via the nsec.
+        sql = [[SELECT CAST({'timestamp': 1.1, 'nsec': 1} AS DATETIME);]]
+        _, err = box.execute(sql)
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"timestamp": 1.1, "nsec": 1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- The timestamp value should be integer if the fractional
+        -- part for the last second is set via the usec.
+        sql = [[SELECT CAST({'timestamp': 1.1, 'usec': 1} AS DATETIME);]]
+        _, err = box.execute(sql)
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"timestamp": 1.1, "usec": 1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- The timestamp value should be integer if the fractional
+        -- part for the last second is set via the msec.
+        sql = [[SELECT CAST({'timestamp': 1.1, 'msec': 1} AS DATETIME);]]
+        _, err = box.execute(sql)
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"timestamp": 1.1, "msec": 1}) to datetime]]
+        t.assert_equals(err.message, res)
 
         sql = [[SELECT CAST({'year': 1} AS DATETIME);]]
         t.assert_equals(box.execute(sql).rows, {{dt1}})
