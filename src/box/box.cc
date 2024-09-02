@@ -35,6 +35,7 @@
 #include <sys/utsname.h>
 #include <spawn.h>
 
+#include "box/allocator.h"
 #include "lua/utils.h" /* lua_hash() */
 #include "fiber_pool.h"
 #include <say.h>
@@ -4229,6 +4230,49 @@ box_info_lsn(void)
 	} else {
 		return -1;
 	}
+}
+
+/**
+ * Get memtx status information for box.slab.info
+ */
+API_EXPORT uint64_t
+box_slab_info(enum box_slab_info_type type)
+{
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+
+	struct allocator_stats stats;
+	memset(&stats, 0, sizeof(stats));
+
+	allocators_stats(&stats);
+	struct mempool_stats index_stats;
+	mempool_stats(&memtx->index_extent_pool, &index_stats);
+
+	switch (type) {
+	case BOX_SLAB_INFO_ITEMS_SIZE:
+		return stats.small.total + stats.sys.total;
+	case BOX_SLAB_INFO_ITEMS_USED:
+		return stats.small.used + stats.sys.used;
+	case BOX_SLAB_INFO_ARENA_SIZE:
+		/*
+		 * We could use stats.small.used + index_stats.total.used
+		 * here, but this would not account for slabs which are
+		 * sitting in slab cache or in the arena, available for reuse.
+		 * Make sure a simple formula: items_used_ratio > 0.9 &&
+		 * arena_used_ratio > 0.9 && quota_used_ratio > 0.9 work as
+		 * an indicator for reaching Tarantool memory limit.
+		 */
+		return memtx->arena.used;
+	case BOX_SLAB_INFO_ARENA_USED:
+		/** System allocator does not use arena. */
+		return stats.small.used + index_stats.totals.used;
+	case BOX_SLAB_INFO_QUOTA_SIZE:
+		return quota_total(&memtx->quota);
+	case BOX_SLAB_INFO_QUOTA_USED:
+		return quota_used(&memtx->quota);
+	default:
+		return 0;
+	};
 }
 
 /**
