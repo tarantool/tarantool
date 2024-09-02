@@ -1239,53 +1239,6 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 	rlist_splice(&new_link->read_gaps, &old_link->read_gaps);
 }
 
-static void
-memtx_tx_story_unlink_top_on_space_delete(struct memtx_story *story,
-					  uint32_t idx)
-{
-	struct memtx_story_link *link = &story->link[idx];
-	struct memtx_story *old_story = link->older_story;
-	if (old_story != NULL)
-		memtx_tx_story_unlink(story, old_story, idx);
-}
-
-/**
- * Unlink a @a story from history chain in @a index in both directions.
- * Handles case when the story is not on top of the history: simply remove from
- * list.
- */
-static void
-memtx_tx_story_unlink_both_common(struct memtx_story *story,
-				  uint32_t idx)
-{
-	assert(idx < story->index_count);
-	struct memtx_story_link *link = &story->link[idx];
-	struct memtx_story *newer_story = link->newer_story;
-	struct memtx_story *older_story = link->older_story;
-	memtx_tx_story_unlink(newer_story, story, idx);
-	memtx_tx_story_unlink(story, older_story, idx);
-	memtx_tx_story_link(newer_story, older_story, idx);
-}
-
-/**
- * Unlink a @a story from history chain in @a index in both directions.
- * If the story was in the top of history chain - unlink from top. Otherwise,
- * see description of `memtx_tx_story_unlink_both_common`.
- * Since the space is being deleted, we need to simply unlink the story.
- */
-static void
-memtx_tx_story_unlink_both_on_space_delete(struct memtx_story *story,
-					   uint32_t idx)
-{
-	assert(idx < story->index_count);
-	struct memtx_story_link *link = &story->link[idx];
-	if (link->newer_story == NULL) {
-		memtx_tx_story_unlink_top_on_space_delete(story, idx);
-	} else {
-		memtx_tx_story_unlink_both_common(story, idx);
-	}
-}
-
 /**
  * Change the order of stories in history chain.
  */
@@ -2183,28 +2136,6 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 }
 
 /*
- * Relink those who delete this story and make them delete older story.
- */
-static void
-memtx_tx_history_remove_story_del_stmts(struct memtx_story *story)
-{
-	struct memtx_story *old_story = story->link[0].older_story;
-	while (story->del_stmt) {
-		struct txn_stmt *del_stmt = story->del_stmt;
-
-		/* Unlink from old list in any case. */
-		story->del_stmt = del_stmt->next_in_del_list;
-		del_stmt->next_in_del_list = NULL;
-		del_stmt->del_story = NULL;
-
-		/* Link to old story's list. */
-		if (old_story != NULL)
-			memtx_tx_story_link_deleted_by(old_story,
-						       del_stmt);
-	}
-}
-
-/*
  * Abort with conflict all transactions that have read @a story.
  */
 static void
@@ -2436,44 +2367,6 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 	else
 		memtx_tx_history_rollback_empty_stmt(stmt);
 	assert(stmt->add_story == NULL && stmt->del_story == NULL);
-}
-
-/*
- * Completely remove statement that adds a story.
- */
-static void
-memtx_tx_history_remove_added_story(struct txn_stmt *stmt)
-{
-	assert(stmt->add_story != NULL);
-	assert(stmt->add_story->tuple == stmt->rollback_info.new_tuple);
-	struct memtx_story *story = stmt->add_story;
-	memtx_tx_history_remove_story_del_stmts(story);
-	for (uint32_t i = 0; i < story->index_count; i++)
-		memtx_tx_story_unlink_both_on_space_delete(story, i);
-	memtx_tx_story_unlink_added_by(story, stmt);
-}
-
-/*
- * Completely remove statement that deletes a story.
- */
-static void
-memtx_tx_history_remove_deleted_story(struct txn_stmt *stmt)
-{
-	memtx_tx_story_unlink_deleted_by(stmt->del_story, stmt);
-}
-
-/*
- * Completely (as opposed to rollback) remove statement from history.
- */
-static void
-memtx_tx_history_remove_stmt(struct txn_stmt *stmt)
-{
-	if (stmt->add_story != NULL)
-		memtx_tx_history_remove_added_story(stmt);
-	if (stmt->del_story != NULL)
-		memtx_tx_history_remove_deleted_story(stmt);
-	if (stmt->txn->status == TXN_ABORTED)
-		stmt->engine_savepoint = NULL;
 }
 
 /**
@@ -3068,9 +2961,10 @@ memtx_tx_invalidate_space(struct space *space, struct txn *active_txn)
 					  struct memtx_story,
 					  in_space_stories);
 		if (story->add_stmt != NULL)
-			memtx_tx_history_remove_stmt(story->add_stmt);
+			memtx_tx_story_unlink_added_by(story, story->add_stmt);
 		while (story->del_stmt != NULL)
-			memtx_tx_history_remove_stmt(story->del_stmt);
+			memtx_tx_story_unlink_deleted_by(story,
+							 story->del_stmt);
 		memtx_tx_story_full_unlink_on_space_delete(story);
 		for (uint32_t i = 0; i < story->index_count; i++) {
 			struct rlist *read_gaps = &story->link[i].read_gaps;
@@ -3095,6 +2989,23 @@ memtx_tx_invalidate_space(struct space *space, struct txn *active_txn)
 			rlist_del(&tracker->in_read_set);
 		}
 		memtx_tx_story_delete(story);
+	}
+
+	/*
+	 * Phase three: remove savepoints from all affected statements so that
+	 * they won't be rolled back because we already did it. Moreover, they
+	 * could access the old space that is going to be deleted leading to
+	 * use-after-free.
+	 */
+	struct txn *txn;
+	rlist_foreach_entry(txn, &txm.all_txs, in_all_txs) {
+		if (txn->status != TXN_ABORTED || txn->psn != 0)
+			continue;
+		struct txn_stmt *stmt;
+		stailq_foreach_entry(stmt, &txn->stmts, next) {
+			if (stmt->space == space)
+				stmt->engine_savepoint = NULL;
+		}
 	}
 }
 
