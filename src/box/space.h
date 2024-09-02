@@ -754,6 +754,10 @@ error_set_space(struct error *error, struct space_def *def)
 	error_set_uint(error, "space_id", def->id);
 }
 
+/** Destroy constraints that are defined in @a space format. */
+void
+space_cleanup_constraints(struct space *space);
+
 /*
  * Virtual method stubs.
  */

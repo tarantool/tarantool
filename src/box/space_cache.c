@@ -45,6 +45,12 @@ space_cache_init(void)
 void
 space_cache_destroy(void)
 {
+	mh_int_t i;
+	mh_foreach(spaces, i) {
+		struct space *space = mh_i32ptr_node(spaces, i)->val;
+		/** Spaces can be interconnected through constraints. */
+		space_cleanup_constraints(space);
+	}
 	while (mh_size(spaces) > 0) {
 		mh_int_t i = mh_first(spaces);
 

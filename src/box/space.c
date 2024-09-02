@@ -255,12 +255,12 @@ space_reattach_constraints(struct space *space)
 	}
 }
 
-/**
- * Destroy constraints that are defined in @a space format.
- */
-static int
+void
 space_cleanup_constraints(struct space *space)
 {
+	if (space->format == NULL)
+		return;
+
 	struct tuple_format *format = space->format;
 	for (size_t j = 0; j < format->constraint_count; j++) {
 		struct tuple_constraint *constr = &format->constraint[j];
@@ -273,7 +273,7 @@ space_cleanup_constraints(struct space *space)
 			constr->destroy(constr);
 		}
 	}
-	return 0;
+	return;
 }
 
 /**

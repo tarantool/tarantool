@@ -6226,6 +6226,8 @@ box_shutdown(void)
 void
 box_free(void)
 {
+	/* References engines. */
+	space_cache_destroy();
 	box_storage_free();
 	builtin_events_free();
 	security_free();
@@ -6248,5 +6250,4 @@ box_free(void)
 	mempool_destroy(&sync_trigger_data_pool);
 	/* schema_module_free(); */
 	/* session_free(); */
-	/* space_cache_destroy(); */
 }
