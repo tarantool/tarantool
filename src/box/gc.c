@@ -396,6 +396,8 @@ gc_delay_unref(void)
 static void
 gc_schedule_cleanup(void)
 {
+	if (gc.cleanup_fiber == NULL)
+		return;
 	/*
 	 * Do not wake up the background fiber if it's executing
 	 * the garbage collection procedure right now, because
