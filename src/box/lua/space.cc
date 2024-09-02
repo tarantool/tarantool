@@ -1025,3 +1025,9 @@ box_lua_space_init(struct lua_State *L)
 	luaL_setfuncs(L, space_internal_lib, 0);
 	lua_pop(L, 1);
 }
+
+void
+box_lua_space_free(void)
+{
+	trigger_clear(&on_alter_space_in_lua);
+}

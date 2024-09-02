@@ -760,7 +760,9 @@ space_delete(struct space *space)
 	free(space->sequence_path);
 	space_def_delete(space->def);
 	assert(rlist_empty(&space->space_cache_pin_list));
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, space->lua_ref);
+	/* tarantool_L is freed on Tarantool shutdown. */
+	if (tarantool_L != NULL)
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, space->lua_ref);
 	space->vtab->destroy(space);
 }
 
