@@ -472,3 +472,25 @@ g.test_ddl_handles_prepared = function(cg)
         end
     end)
 end
+
+-- The test covers the problem when already deleted space could be accessed
+-- by rollback of a deletion when another concurrent deletion was already
+-- prepared.
+-- Since the access is read-only and doesn't break anything, the test actually
+-- covers the problem only when ASAN is enabled.
+g.test_ddl_use_after_free_on_rollback_of_deletion = function(cg)
+    cg.server:exec(function()
+        local txn_proxy = require('test.box.lua.txn_proxy')
+        box.schema.space.create('test')
+        box.space.test:create_index('pk')
+        box.space.test:replace{1}
+
+        local tx = txn_proxy.new()
+        tx:begin()
+        tx('box.space.test:delete(1)')
+
+        box.space.test:delete(1)
+        box.space.test:create_index('sk')
+        tx:rollback()
+    end)
+end
