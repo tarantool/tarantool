@@ -278,12 +278,12 @@ create_unit_test(PREFIX coio
 if (ENABLE_BUNDLED_MSGPUCK)
     set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
     set_source_files_properties(
-        ${MSGPUCK_DIR}/test/msgpuck.c
+        ${MSGPUCK_DIR}/test/msgpuck.cc
         ${MSGPUCK_DIR}/test/test.c
         PROPERTIES COMPILE_FLAGS "-I${MSGPUCK_DIR}/test")
 
     create_unit_test(PREFIX msgpack
-                     SOURCES ${MSGPUCK_DIR}/test/msgpuck.c
+                     SOURCES ${MSGPUCK_DIR}/test/msgpuck.cc
                              ${MSGPUCK_DIR}/test/test.c
                      LIBRARIES ${MSGPUCK_LIBRARIES}
     )
