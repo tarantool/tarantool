@@ -205,19 +205,18 @@ memtx_engine_shutdown(struct engine *engine)
 	fiber_cancel(memtx->gc_fiber);
 	fiber_join(memtx->gc_fiber);
 	memtx->gc_fiber = NULL;
-
-#ifdef ENABLE_ASAN
-	/* We check for memory leaks in ASAN. */
-	bool stop = false;
-	while (!stop)
-		memtx_engine_run_gc(memtx, &stop);
-#endif
 }
 
 static void
 memtx_engine_free(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
+#ifdef ENABLE_ASAN
+	/* We check for memory leaks in ASAN. */
+	bool stop = false;
+	while (!stop)
+		memtx_engine_run_gc(memtx, &stop);
+#endif
 	mempool_destroy(&memtx->iterator_pool);
 	if (mempool_is_initialized(&memtx->rtree_iterator_pool))
 		mempool_destroy(&memtx->rtree_iterator_pool);
@@ -1930,7 +1929,8 @@ memtx_engine_schedule_gc(struct memtx_engine *memtx,
 			 struct memtx_gc_task *task)
 {
 	stailq_add_tail_entry(&memtx->gc_queue, task, link);
-	fiber_wakeup(memtx->gc_fiber);
+	if (memtx->gc_fiber != NULL)
+		fiber_wakeup(memtx->gc_fiber);
 }
 
 void
