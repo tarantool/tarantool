@@ -1,5 +1,7 @@
 build_module(gh_6986 gh_6986_c_constraint_test.c)
 target_link_libraries(gh_6986 msgpuck core)
+build_module(gh_9965 gh_9965_non_compact_mp.c)
+target_link_libraries(gh_9965 msgpuck)
 
 tarantool_make_lua_path(LUA_CPATH
   PATHS
@@ -14,7 +16,7 @@ message(STATUS "Add test suite ${TEST_SUITE_NAME}")
 # as a side effect.
 _add_test_suite_target(${TEST_SUITE_NAME}
   LABELS "${TEST_SUITE_NAME};regression;"
-  DEPENDS gh_6986
+  DEPENDS gh_6986 gh_9965
 )
 
 list(APPEND TEST_ENV
