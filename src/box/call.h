@@ -80,6 +80,23 @@ box_process_eval(struct call_request *request, struct port *port);
 int
 access_check_lua_call(const char *name, uint32_t name_len);
 
+/**
+ * Reset the user runtime privileges.
+ */
+void
+box_lua_call_runtime_priv_reset(void);
+
+/**
+ * Grant a access to lua_call function for a user.
+ * @param uname Name of the user.
+ * @param uname_len Length of the user name.
+ * @param fname Name of the function.
+ * @param fname_len Length of the function name.
+ */
+void
+box_lua_call_runtime_priv_grant(const char *uname, uint32_t uname_len,
+				const char *fname, uint32_t fname_len);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

@@ -1268,6 +1268,41 @@ lbox_func_new_or_delete(struct trigger *trigger, void *event)
 	return 0;
 }
 
+static int
+lbox_box_lua_call_runtime_priv_reset(struct lua_State *L)
+{
+	if (lua_gettop(L) != 0) {
+		diag_set(IllegalParams,
+			 "Usage: box.internal.lua_call_runtime_priv_reset()");
+		return luaT_error(L);
+	}
+
+	box_lua_call_runtime_priv_reset();
+	return 0;
+}
+
+static int
+lbox_box_lua_call_runtime_priv_grant(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2 || lua_type(L, 1) != LUA_TSTRING ||
+	    lua_type(L, 2) != LUA_TSTRING) {
+		diag_set(IllegalParams,
+			 "Usage: box.internal.lua_call_runtime_priv_grant(user, func)");
+		return luaT_error(L);
+	}
+
+	size_t grantee_name_len;
+	const char *grantee_name = luaL_checklstring(L, 1, &grantee_name_len);
+
+	size_t func_name_len;
+	const char *func_name = luaL_checklstring(L, 2, &func_name_len);
+
+	box_lua_call_runtime_priv_grant(grantee_name,
+					(uint32_t)grantee_name_len,
+					func_name, (uint32_t)func_name_len);
+	return 0;
+}
+
 static void
 call_serializer_update_options(void)
 {
@@ -1291,6 +1326,8 @@ static const struct luaL_Reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},
 	{"module_reload", lbox_module_reload},
 	{"func_call", lbox_func_call},
+	{"lua_call_runtime_priv_grant", lbox_box_lua_call_runtime_priv_grant},
+	{"lua_call_runtime_priv_reset", lbox_box_lua_call_runtime_priv_reset},
 	{NULL, NULL}
 };
 

@@ -6290,6 +6290,7 @@ box_free(void)
 	port_free();
 	iproto_constants_free();
 	mempool_destroy(&sync_trigger_data_pool);
+	box_lua_call_runtime_priv_reset();
 	/* schema_module_free(); */
 	/* session_free(); */
 }
