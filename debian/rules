@@ -3,9 +3,10 @@
 
 VERSION  := $(shell dpkg-parsechangelog|grep ^Version|awk '{print $$2}')
 UVERSION := $(shell echo $(VERSION)|sed 's/-[[:digit:]]\+$$//')
+CMAKE_BUILD_TYPE := $(shell echo $${CMAKE_BUILD_TYPE:-RelWithDebInfo})
 
 DEB_CMAKE_EXTRA_FLAGS := \
-	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+	-DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) \
 	-DCMAKE_INSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
 	-DCMAKE_INSTALL_SYSCONFDIR=/etc \
 	-DCMAKE_INSTALL_LOCALSTATEDIR=/var \

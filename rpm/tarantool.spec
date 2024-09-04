@@ -4,6 +4,11 @@
 # need to use cmake3 package to build Tarantool on old systems.
 %define use_cmake3 0%{?rhel} == 7
 
+%define _cmake_build_type "%{getenv:CMAKE_BUILD_TYPE}"
+%if %{_cmake_build_type} == ""
+%define _cmake_build_type RelWithDebInfo
+%endif
+
 # Get ${GC64} env variable which can keep the value of 'true' or 'false' to
 # enable or disable luajit gc64.
 %define _gc64 "%{getenv:GC64}"
@@ -140,7 +145,7 @@ C and Lua/C modules.
 %cmake \
 %endif
        -B . \
-         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+         -DCMAKE_BUILD_TYPE=%{_cmake_build_type} \
          -DCMAKE_INSTALL_LOCALSTATEDIR:PATH=%{_localstatedir} \
          -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
 %if 0%{?fedora} >= 33
