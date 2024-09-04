@@ -183,8 +183,10 @@ endif()
 
 add_compile_flags("C;CXX" "-fno-common")
 
-if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-# Remove VALGRIND code and assertions in *any* type of release build.
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_definitions("-Wp,-U_FORTIFY_SOURCE")
+else()
+    # Remove VALGRIND code and assertions in *any* type of release build.
     add_definitions("-DNDEBUG" "-DNVALGRIND")
 endif()
 
