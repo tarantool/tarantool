@@ -940,11 +940,16 @@ txn_on_journal_write(struct journal_entry *entry)
 	}
 	if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
 		txn_run_wal_write_triggers(txn);
+	int64_t lsn = txn_has_flag(txn, TXN_WAIT_SYNC) ||
+		      (!txn_has_flag(txn, TXN_FORCE_ASYNC) &&
+		       txn_limbo_has_owner(&txn_limbo) &&
+		       !txn_is_fully_local(txn)) ?
+		      txn_compute_limbo_lsn(txn, entry) : -1;
 	if (!txn_has_flag(txn, TXN_WAIT_SYNC)) {
 		txn_complete_success(txn);
+		txn_limbo_confirm_lsn(&txn_limbo, lsn);
 	} else {
-		txn_limbo_assign_lsn(&txn_limbo, txn->limbo_entry,
-				     txn_compute_limbo_lsn(txn, entry));
+		txn_limbo_assign_lsn(&txn_limbo, txn->limbo_entry, lsn);
 		if (txn->fiber != NULL)
 			fiber_wakeup(txn->fiber);
 	}

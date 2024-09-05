@@ -196,10 +196,10 @@ g.test_update_greatest_term_while_wal_sync = function(cg)
     -- The purpose of the test is to cover
     -- 'if (box_check_promote_term_intact(promote_term) != 0)' in
     -- 'box_wait_limbo_acked()' located immediately after 'wal_sync()' call.
-    -- For this we use a special injection - 'ERRINJ_WAL_SYNC_DELAY'.
+    -- For this we use a special injection - 'ERRINJ_WAL_SYNC_DELAY_COUNTDOWN'.
     local term = cg.replica:get_election_term()
     local f = cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_SYNC_DELAY', true)
+        box.error.injection.set('ERRINJ_WAL_SYNC_DELAY_COUNTDOWN', 1)
         box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
         local f = require('fiber').create(function()
             return pcall(box.ctl.promote)
@@ -245,7 +245,7 @@ g.test_txn_limbo_is_empty_while_wal_sync = function(cg)
     -- The purpose of the test is to cover
     -- 'if (txn_limbo_is_empty(&txn_limbo))' in
     -- 'box_wait_limbo_acked()' located immediately after 'wal_sync()' call.
-    -- For this we use a special injection - 'ERRINJ_WAL_SYNC_DELAY'.
+    -- For this we use a special injection - 'ERRINJ_WAL_SYNC_DELAY_COUNTDOWN'.
 
     -- If the master becomes a leader again, we will cover the condition
     -- from the previous test, and not what we want.
@@ -256,7 +256,7 @@ g.test_txn_limbo_is_empty_while_wal_sync = function(cg)
         }
     end)
     local f = cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_SYNC_DELAY', true)
+        box.error.injection.set('ERRINJ_WAL_SYNC_DELAY_COUNTDOWN', 1)
         box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
         local f = require('fiber').create(function()
             return pcall(box.ctl.promote)

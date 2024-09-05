@@ -649,6 +649,11 @@ wal_sync(struct vclock *vclock)
 			   wal_sync_f);
 	if (vclock != NULL)
 		vclock_copy(vclock, &msg.vclock);
+	ERROR_INJECT_COUNTDOWN(ERRINJ_WAL_SYNC_DELAY_COUNTDOWN, {
+		struct errinj *e =
+			errinj(ERRINJ_WAL_SYNC_DELAY, ERRINJ_BOOL);
+		e->bparam = true;
+	});
 	ERROR_INJECT_YIELD(ERRINJ_WAL_SYNC_DELAY);
 	return rc;
 }

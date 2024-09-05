@@ -55,7 +55,7 @@ test_run:switch('replica')
 -- Because ideally ROLLBACK should not be applied before written to WAL. That
 -- means count() will be > 0 until WAL write succeeds.
 test_run:wait_cond(function()                                                   \
-    return box.error.injection.get("ERRINJ_WAL_WRITE_COUNT") > wal_write_count  \
+    return box.info.synchro.queue.busy                                          \
 end)
 -- Now WAL rotation is done. Snapshot will fail, because will see that a
 -- rollback happened during that. Meaning that the rotated WAL contains

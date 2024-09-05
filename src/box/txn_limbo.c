@@ -37,6 +37,7 @@
 #include "raft.h"
 #include "tt_static.h"
 #include "session.h"
+#include "wal.h"
 
 struct txn_limbo txn_limbo;
 
@@ -489,6 +490,14 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			e->txn->limbo_entry = NULL;
 			e->txn = NULL;
 			continue;
+		} else if (!txn_is_fully_local(e->txn) && lsn < e->lsn) {
+			/*
+			 * Asynchronous transactions must also bump the
+			 * confirmation boundary for correct split-brain
+			 * detection.
+			 */
+			assert(!txn_has_flag(e->txn, TXN_WAIT_ACK));
+			lsn = e->lsn;
 		}
 		e->is_commit = true;
 		if (txn_has_flag(e->txn, TXN_WAIT_ACK))
@@ -813,39 +822,6 @@ txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout)
 	return 0;
 }
 
-static int
-txn_write_cb(struct trigger *trigger, void *event)
-{
-	(void)event;
-	struct fiber *fiber = (struct fiber *)trigger->data;
-	fiber_wakeup(fiber);
-	return 0;
-}
-
-/**
- * Wait until all the limbo entries receive an lsn.
- */
-static int
-txn_limbo_wait_persisted(struct txn_limbo *limbo)
-{
-	if (txn_limbo_is_empty(limbo))
-		return 0;
-	struct txn_limbo_entry *e = txn_limbo_last_entry(limbo);
-	while (e != NULL && e->lsn <= 0) {
-		struct trigger on_wal_write;
-		trigger_create(&on_wal_write, txn_write_cb, fiber(), NULL);
-		txn_on_wal_write(e->txn, &on_wal_write);
-		fiber_yield();
-		trigger_clear(&on_wal_write);
-		if (fiber_is_cancelled()) {
-			diag_set(FiberIsCancelled);
-			return -1;
-		}
-		e = txn_limbo_last_entry(limbo);
-	}
-	return 0;
-}
-
 /**
  * Fill the reject reason with request data.
  * The function is not reenterable, use with care.
@@ -1054,10 +1030,10 @@ txn_limbo_filter_request(struct txn_limbo *limbo,
 	if (!limbo->do_validate)
 		return 0;
 	/*
-	 * Wait until all the entries receive an lsn. The lsn will be
+	 * Wait until all preceding transactions receive an lsn. The lsn will be
 	 * used to determine whether filtered request is safe to apply.
 	 */
-	if (txn_limbo_wait_persisted(limbo) < 0)
+	if (wal_flush_journal_queue_and_sync() != 0)
 		return -1;
 	switch (req->type) {
 	case IPROTO_RAFT_CONFIRM:

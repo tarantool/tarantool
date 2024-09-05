@@ -186,6 +186,7 @@ struct errinj {
 	_(ERRINJ_WAL_ROTATE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_SYNC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_SYNC_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_SYNC_DELAY_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_WAL_WRITE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_WRITE_COUNT, ERRINJ_INT, {.iparam = 0}) \
 	_(ERRINJ_WAL_WRITE_DISK, ERRINJ_BOOL, {.bparam = false}) \
