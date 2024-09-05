@@ -871,6 +871,32 @@ txn_complete_success(struct txn *txn)
 	rmean_collect(rmean_box, IPROTO_COMMIT, 1);
 }
 
+/**
+ * Limbo LSN is taken from the last global row of a transaction. When this is a
+ * remote transaction (n_applier_rows > 0) we know for sure the last applier row
+ * is the last global row. Otherwise we need to find the last global row.
+ */
+static int64_t
+txn_compute_limbo_lsn(struct txn *txn, struct journal_entry *entry)
+{
+	if (txn->n_applier_rows > 0) {
+		return entry->rows[txn->n_applier_rows - 1]->lsn;
+	} else {
+		int i = entry->n_rows - 1;
+		struct xrow_header **rows = entry->rows;
+		/*
+		 * We don't care which lsn to choose for a fully local
+		 * transaction.
+		 */
+		if (!txn_is_fully_local(txn)) {
+			while (rows[i]->group_id == GROUP_LOCAL)
+				i--;
+			assert(i >= 0);
+		}
+		return rows[i]->lsn;
+	}
+}
+
 /** Callback invoked when the transaction's journal write is finished. */
 static void
 txn_on_journal_write(struct journal_entry *entry)
@@ -917,31 +943,8 @@ txn_on_journal_write(struct journal_entry *entry)
 	if (!txn_has_flag(txn, TXN_WAIT_SYNC)) {
 		txn_complete_success(txn);
 	} else {
-		int64_t lsn;
-		/*
-		 * Synchro lsn is taken from the last global row of a
-		 * transaction. When this is a remote transaction
-		 * (n_applier_rows > 0) we know for sure the last applier row is
-		 * the last global row. Otherwise we need to find the last
-		 * global row.
-		 */
-		if (txn->n_applier_rows > 0) {
-			lsn = entry->rows[txn->n_applier_rows - 1]->lsn;
-		} else {
-			int i = entry->n_rows - 1;
-			struct xrow_header **rows = entry->rows;
-			/*
-			 * We don't care which lsn to choose for a fully local
-			 * transaction.
-			 */
-			if (!txn_is_fully_local(txn)) {
-				while (rows[i]->group_id == GROUP_LOCAL)
-					i--;
-				assert(i >= 0);
-			}
-			lsn = rows[i]->lsn;
-		}
-		txn_limbo_assign_lsn(&txn_limbo, txn->limbo_entry, lsn);
+		txn_limbo_assign_lsn(&txn_limbo, txn->limbo_entry,
+				     txn_compute_limbo_lsn(txn, entry));
 		if (txn->fiber != NULL)
 			fiber_wakeup(txn->fiber);
 	}
