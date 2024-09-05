@@ -793,12 +793,12 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
  * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
  * Additionally *equal_key argument is set to true if the found value is
  * equal to given key (set to false otherwise).
- * @retval position in the page
  */
-static uint32_t
+static int
 vy_page_find_key(struct vy_page *page, struct vy_entry key,
 		 struct key_def *cmp_def, struct tuple_format *format,
-		 enum iterator_type iterator_type, bool *equal_key)
+		 enum iterator_type iterator_type, uint32_t *pos,
+		 bool *equal_key)
 {
 	uint32_t beg = 0;
 	uint32_t end = page->row_count;
@@ -811,7 +811,7 @@ vy_page_find_key(struct vy_page *page, struct vy_entry key,
 		struct vy_entry fnd_key = vy_page_stmt(page, mid, cmp_def,
 						       format);
 		if (fnd_key.stmt == NULL)
-			return end;
+			return -1;
 		int cmp = vy_entry_compare(fnd_key, key, cmp_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
@@ -821,7 +821,8 @@ vy_page_find_key(struct vy_page *page, struct vy_entry key,
 			end = mid;
 		tuple_unref(fnd_key.stmt);
 	}
-	return end;
+	*pos = end;
+	return 0;
 }
 
 /**
@@ -988,12 +989,11 @@ vy_page_read_cb(struct cbus_call_msg *base)
 		return -1;
 	if (vy_page_read(task->page, task->page_info, task->run, zdctx) != 0)
 		return -1;
-	if (task->key.stmt != NULL) {
-		task->pos_in_page = vy_page_find_key(task->page, task->key,
-						     task->cmp_def, task->format,
-						     task->iterator_type,
-						     &task->equal_found);
-	}
+	if (task->key.stmt != NULL &&
+	    vy_page_find_key(task->page, task->key, task->cmp_def,
+			     task->format, task->iterator_type,
+			     &task->pos_in_page, &task->equal_found) != 0)
+		return -1;
 	return 0;
 }
 
@@ -1024,10 +1024,11 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		page = itr->curr_page;
 	}
 	if (page != NULL) {
-		if (key.stmt != NULL)
-			*pos_in_page = vy_page_find_key(page, key, itr->cmp_def,
-							itr->format, iterator_type,
-							equal_found);
+		if (key.stmt != NULL &&
+		    vy_page_find_key(page, key, itr->cmp_def,
+				     itr->format, iterator_type,
+				     pos_in_page, equal_found) != 0)
+			return -1;
 		*result = page;
 		return 0;
 	}
@@ -2644,11 +2645,10 @@ vy_slice_stream_search(struct vy_stmt_stream *virt_stream)
 		return -1;
 
 	bool unused;
-	stream->pos_in_page = vy_page_find_key(stream->page,
-					       stream->slice->begin,
-					       stream->cmp_def,
-					       stream->format,
-					       ITER_GE, &unused);
+	if (vy_page_find_key(stream->page, stream->slice->begin,
+			     stream->cmp_def, stream->format, ITER_GE,
+			     &stream->pos_in_page, &unused) != 0)
+		return -1;
 
 	if (stream->pos_in_page == stream->page->row_count) {
 		/* The first tuple is in the beginning of the next page */
