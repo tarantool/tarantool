@@ -265,6 +265,15 @@ txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
 		txn_limbo_assign_remote_lsn(limbo, entry, lsn);
 }
 
+void
+txn_limbo_confirm_lsn(struct txn_limbo *limbo, int64_t lsn)
+{
+	if (limbo->confirmed_lsn < lsn) {
+		limbo->confirmed_lsn = lsn;
+		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
+	}
+}
+
 static void
 txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn);
 
@@ -494,15 +503,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		assert(e->txn->signature >= 0);
 		txn_limbo_complete(e->txn, true);
 	}
-	/*
-	 * Track CONFIRM lsn on replica in order to detect split-brain by
-	 * comparing existing confirm_lsn with the one arriving from a remote
-	 * instance.
-	 */
-	if (limbo->confirmed_lsn < lsn) {
-		limbo->confirmed_lsn = lsn;
-		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
-	}
+	txn_limbo_confirm_lsn(limbo, lsn);
 }
 
 /**

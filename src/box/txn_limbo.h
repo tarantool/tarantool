@@ -340,6 +340,13 @@ txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
 		     int64_t lsn);
 
 /**
+ * Track the confirmation boundary on the replica in order to detect split-brain
+ * by comparing the existing LSN with the one arriving from a remote instance.
+ */
+void
+txn_limbo_confirm_lsn(struct txn_limbo *limbo, int64_t lsn);
+
+/**
  * Ack all transactions up to the given LSN on behalf of the
  * replica with the specified ID.
  */
