@@ -1154,8 +1154,8 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 	}
 	lsm->range_tree_version++;
 
-	say_info("%s: split range %s by key %s", vy_lsm_name(lsm),
-		 vy_range_str(range), tuple_str(split_key.stmt));
+	say_verbose("%s: split range %s by key %s", vy_lsm_name(lsm),
+		    vy_range_str(range), tuple_str(split_key.stmt));
 
 	rlist_foreach_entry(slice, &range->slices, in_range)
 		vy_slice_wait_pinned(slice);
@@ -1242,8 +1242,8 @@ vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range)
 	vy_lsm_add_range(lsm, result);
 	lsm->range_tree_version++;
 
-	say_info("%s: coalesced ranges %s",
-		 vy_lsm_name(lsm), vy_range_str(result));
+	say_verbose("%s: coalesced ranges %s",
+		    vy_lsm_name(lsm), vy_range_str(result));
 	return true;
 
 fail_commit:

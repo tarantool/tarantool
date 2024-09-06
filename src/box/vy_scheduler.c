@@ -1321,7 +1321,7 @@ delete_mems:
 	assert(scheduler->dump_task_count > 0);
 	scheduler->dump_task_count--;
 
-	say_info("%s: dump completed", vy_lsm_name(lsm));
+	say_verbose("%s: dump completed", vy_lsm_name(lsm));
 
 	vy_scheduler_complete_dump(scheduler);
 	return 0;
@@ -1484,7 +1484,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 
 	scheduler->dump_task_count++;
 
-	say_info("%s: dump started", vy_lsm_name(lsm));
+	say_verbose("%s: dump started", vy_lsm_name(lsm));
 	*p_task = task;
 	return 0;
 
@@ -1669,8 +1669,8 @@ out:
 	vy_range_heap_insert(&lsm->range_heap, range);
 	vy_scheduler_update_lsm(scheduler, lsm);
 
-	say_info("%s: completed compacting range %s",
-		 vy_lsm_name(lsm), vy_range_str(range));
+	say_verbose("%s: completed compacting range %s",
+		    vy_lsm_name(lsm), vy_range_str(range));
 	return 0;
 }
 
@@ -1790,9 +1790,9 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	vy_range_heap_delete(&lsm->range_heap, range);
 	vy_scheduler_update_lsm(scheduler, lsm);
 
-	say_info("%s: started compacting range %s, runs %d/%d",
-		 vy_lsm_name(lsm), vy_range_str(range),
-                 range->compaction_priority, range->slice_count);
+	say_verbose("%s: started compacting range %s, runs %d/%d",
+		    vy_lsm_name(lsm), vy_range_str(range),
+		    range->compaction_priority, range->slice_count);
 	*p_task = task;
 	return 0;
 
