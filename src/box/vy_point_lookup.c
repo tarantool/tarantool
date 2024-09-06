@@ -198,6 +198,7 @@ vy_point_lookup_scan_slices(struct vy_lsm *lsm, const struct vy_read_view **rv,
 		slices[i++] = slice;
 	}
 	assert(i == slice_count);
+	ERROR_INJECT_YIELD(ERRINJ_VY_POINT_LOOKUP_DELAY);
 	int rc = 0;
 	for (i = 0; i < slice_count; i++) {
 		if (rc == 0 && !vy_history_is_terminal(history))
@@ -249,13 +250,6 @@ restart:
 	rc = vy_point_lookup_scan_slices(lsm, rv, key, &disk_history);
 	if (rc != 0)
 		goto done;
-
-	ERROR_INJECT(ERRINJ_VY_POINT_ITER_WAIT, {
-		while (mem_list_version == lsm->mem_list_version)
-			fiber_sleep(0.01);
-		/* Turn of the injection to avoid infinite loop */
-		errinj(ERRINJ_VY_POINT_ITER_WAIT, ERRINJ_BOOL)->bparam = false;
-	});
 
 	if (tx != NULL && tx->state == VINYL_TX_ABORT) {
 		/*
