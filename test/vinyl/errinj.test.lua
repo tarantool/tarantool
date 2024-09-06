@@ -241,23 +241,25 @@ i2 = s:create_index('sk', {parts = {2, 'uint'}, bloom_fpr = 0.5})
 for i = 1,10 do s:replace{i, i, 0} end
 
 test_run:cmd("setopt delimiter ';'")
-function worker()
+f = fiber.new(function()
     for i = 11,20,2 do
         s:upsert({i, i}, {{'=', 3, 1}})
-        errinj.set("ERRINJ_VY_POINT_ITER_WAIT", true)
+        errinj.set("ERRINJ_VY_POINT_LOOKUP_DELAY", true)
         i1:select{i}
         s:upsert({i + 1 ,i + 1}, {{'=', 3, 1}})
-        errinj.set("ERRINJ_VY_POINT_ITER_WAIT", true)
+        errinj.set("ERRINJ_VY_POINT_LOOKUP_DELAY", true)
         i2:select{i + 1}
     end
-end
+end);
+f:set_joinable(true);
+ok, err = nil;
+repeat
+    box.snapshot()
+    errinj.set("ERRINJ_VY_POINT_LOOKUP_DELAY", false)
+    ok, err = f:join(0.01)
+until ok;
 test_run:cmd("setopt delimiter ''");
-
-f = fiber.create(worker)
-
-while f:status() ~= 'dead' do box.snapshot() fiber.sleep(0.01) end
-
-errinj.set("ERRINJ_VY_POINT_ITER_WAIT", false)
+err -- nil
 s:drop()
 
 -- vinyl: vy_cache_add: Assertion `0' failed
@@ -290,21 +292,21 @@ s:drop()
 -- after the secondary index scan, but before a primary index
 -- lookup. It is ok, and the test checks this.
 --
-s = box.schema.create_space('test', {engine = 'vinyl'})
+s = box.schema.create_space('test', {engine = 'vinyl', defer_deletes = true})
 pk = s:create_index('pk')
-sk = s:create_index('sk', {parts = {{2, 'unsigned'}}})
+sk = s:create_index('sk', {unique = false, parts = {{2, 'unsigned'}}})
 s:replace{1, 1}
 s:replace{3, 3}
 box.snapshot()
 ret = nil
 function do_read() ret = sk:select({2}, {iterator = 'GE'}) end
-errinj.set("ERRINJ_VY_DELAY_PK_LOOKUP", true)
+errinj.set("ERRINJ_VY_POINT_LOOKUP_DELAY", true)
 _ = fiber.create(do_read)
 test_run:wait_cond(function() return sk:stat().disk.iterator.get.rows > 0 end, 60)
 pk:stat().disk.iterator.get.rows -- 0
 sk:stat().disk.iterator.get.rows -- 1
 s:replace{2, 2}
-errinj.set("ERRINJ_VY_DELAY_PK_LOOKUP", false)
+errinj.set("ERRINJ_VY_POINT_LOOKUP_DELAY", false)
 test_run:wait_cond(function() return pk:stat().get.rows > 0 end, 60)
 pk:stat().get.rows -- 1
 sk:stat().get.rows -- 1

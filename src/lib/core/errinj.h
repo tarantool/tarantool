@@ -148,7 +148,6 @@ struct errinj {
 	_(ERRINJ_TXN_LIMBO_BEGIN_DELAY, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_VYRUN_DATA_READ, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_COMPACTION_DELAY, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_VY_DELAY_PK_LOOKUP, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_DUMP_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_GC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_INDEX_DUMP, ERRINJ_INT, {.iparam = -1}) \
@@ -157,7 +156,7 @@ struct errinj {
 	_(ERRINJ_VY_LOG_FLUSH, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_LOG_FLUSH_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_LOG_WRITE_BAD_RECORDS, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_VY_POINT_ITER_WAIT, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_POINT_LOOKUP_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_QUOTA_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_READ_PAGE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
