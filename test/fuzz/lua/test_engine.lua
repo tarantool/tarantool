@@ -12,6 +12,7 @@ testing if it exists.
 Usage: tarantool test_engine.lua
 ]]
 
+local console = require('console')
 local fiber = require('fiber')
 local fio = require('fio')
 local fun = require('fun')
@@ -1371,6 +1372,10 @@ end
 
 local function run_test(num_workers, test_duration, test_dir,
                         engine_name, verbose_mode)
+
+    local socket_path = ('unix/:/%s/console.sock'):format(fio.abspath(test_dir))
+    console.listen(socket_path)
+    log.info(('console listen on %s'):format(socket_path))
 
     if fio.path.exists(test_dir) then
         cleanup_dir(test_dir)
