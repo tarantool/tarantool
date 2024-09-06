@@ -142,6 +142,13 @@
     <member refid="module_8h_1a4dab01cb6470a8177e9618558523ff7ba964fc0581c3169c5047abaebcbc6a190" kind="enumvalue"><name>IPROTO_HANDLER_OK</name></member>
     <member refid="module_8h_1a4dab01cb6470a8177e9618558523ff7ba3838e3dc0206744064024e6948f5f214" kind="enumvalue"><name>IPROTO_HANDLER_ERROR</name></member>
     <member refid="module_8h_1a4dab01cb6470a8177e9618558523ff7badb3e2b86bb68c8ef55af839fc59a63a5" kind="enumvalue"><name>IPROTO_HANDLER_FALLBACK</name></member>
+    <member refid="module_8h_1ad95be11a839742b838f48a05e15dc96f" kind="enum"><name>box_slab_info_type</name></member>
+    <member refid="module_8h_1ad95be11a839742b838f48a05e15dc96fa5035a467639de7b7878658bb6d5d6759" kind="enumvalue"><name>BOX_SLAB_INFO_ITEMS_SIZE</name></member>
+    <member refid="module_8h_1ad95be11a839742b838f48a05e15dc96fac05e5e1257324755fbb5b69a42a3162f" kind="enumvalue"><name>BOX_SLAB_INFO_ITEMS_USED</name></member>
+    <member refid="module_8h_1ad95be11a839742b838f48a05e15dc96fa011955c844200186269b1728c60072a9" kind="enumvalue"><name>BOX_SLAB_INFO_ARENA_SIZE</name></member>
+    <member refid="module_8h_1ad95be11a839742b838f48a05e15dc96faaf908670201e994b6fbb7a39bd0af778" kind="enumvalue"><name>BOX_SLAB_INFO_ARENA_USED</name></member>
+    <member refid="module_8h_1ad95be11a839742b838f48a05e15dc96fa1d115d2d78ba3a718b37952afc930716" kind="enumvalue"><name>BOX_SLAB_INFO_QUOTA_SIZE</name></member>
+    <member refid="module_8h_1ad95be11a839742b838f48a05e15dc96fa9727bdf5f628906b49ab0c65682d6a70" kind="enumvalue"><name>BOX_SLAB_INFO_QUOTA_USED</name></member>
     <member refid="module_8h_1a2693ce4bd8fa71e8ac1e5272fc64d17e" kind="enum"><name>iterator_type</name></member>
     <member refid="module_8h_1a2693ce4bd8fa71e8ac1e5272fc64d17ea8396fa34bbd5b7136bbbb9686f5e5615" kind="enumvalue"><name>ITER_EQ</name></member>
     <member refid="module_8h_1a2693ce4bd8fa71e8ac1e5272fc64d17ea99186231b0ac5ec676a71afc0612b934" kind="enumvalue"><name>ITER_REQ</name></member>
@@ -594,6 +601,7 @@
     <member refid="module_8h_1abcef363e704e69cb0cc4efb80c6a648e" kind="function"><name>box_iproto_send</name></member>
     <member refid="module_8h_1a6f6d1752bccac95ed2d154a98c3fe9c7" kind="function"><name>box_iproto_override</name></member>
     <member refid="module_8h_1a672bcf1df35af10f617ccdcc71f760bd" kind="function"><name>box_info_lsn</name></member>
+    <member refid="module_8h_1a38c3dfb46ae57e3f253db3be6b066636" kind="function"><name>box_slab_info</name></member>
     <member refid="module_8h_1aab8b69829c8d89799a9fb0e5d360e84b" kind="function"><name>box_index_iterator</name></member>
     <member refid="module_8h_1ae4361728e6abe6243e7f02b098e7b347" kind="function"><name>box_iterator_next</name></member>
     <member refid="module_8h_1a6f7fe762b15009de313fdf915378429c" kind="function"><name>box_iterator_free</name></member>

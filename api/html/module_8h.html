@@ -121,7 +121,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abd1dbec4fd6761084d3e0c05afe2b138">PACKAGE_VERSION_PATCH</a>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.3.0-entrypoint-43-g6fd454474&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.3.0-entrypoint-44-gbd510bb5c&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <a href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">More...</a><br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad63a17703ee9303be2682b7bb08e7a9f"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#ad63a17703ee9303be2682b7bb08e7a9f">TZDATA_VERSION</a>&#160;&#160;&#160;&quot;2022a&quot;</td></tr>
@@ -521,6 +521,21 @@ Enumerations</h2></td></tr>
  }</td></tr>
 <tr class="memdesc:a4dab01cb6470a8177e9618558523ff7b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return codes for IPROTO request handlers.  <a href="module_8h.html#a4dab01cb6470a8177e9618558523ff7b">More...</a><br /></td></tr>
 <tr class="separator:a4dab01cb6470a8177e9618558523ff7b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad95be11a839742b838f48a05e15dc96f"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#ad95be11a839742b838f48a05e15dc96f">box_slab_info_type</a> { <br />
+&#160;&#160;<a class="el" href="module_8h.html#ad95be11a839742b838f48a05e15dc96fa5035a467639de7b7878658bb6d5d6759">BOX_SLAB_INFO_ITEMS_SIZE</a> = 0
+, <br />
+&#160;&#160;<a class="el" href="module_8h.html#ad95be11a839742b838f48a05e15dc96fac05e5e1257324755fbb5b69a42a3162f">BOX_SLAB_INFO_ITEMS_USED</a> = 1
+, <br />
+&#160;&#160;<a class="el" href="module_8h.html#ad95be11a839742b838f48a05e15dc96fa011955c844200186269b1728c60072a9">BOX_SLAB_INFO_ARENA_SIZE</a> = 2
+, <br />
+&#160;&#160;<a class="el" href="module_8h.html#ad95be11a839742b838f48a05e15dc96faaf908670201e994b6fbb7a39bd0af778">BOX_SLAB_INFO_ARENA_USED</a> = 3
+, <br />
+&#160;&#160;<a class="el" href="module_8h.html#ad95be11a839742b838f48a05e15dc96fa1d115d2d78ba3a718b37952afc930716">BOX_SLAB_INFO_QUOTA_SIZE</a> = 4
+, <br />
+&#160;&#160;<a class="el" href="module_8h.html#ad95be11a839742b838f48a05e15dc96fa9727bdf5f628906b49ab0c65682d6a70">BOX_SLAB_INFO_QUOTA_USED</a> = 5
+<br />
+ }</td></tr>
+<tr class="separator:ad95be11a839742b838f48a05e15dc96f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2693ce4bd8fa71e8ac1e5272fc64d17e"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a2693ce4bd8fa71e8ac1e5272fc64d17e">iterator_type</a> { <br />
 &#160;&#160;<b>ITER_EQ</b> = 0
 , <br />
@@ -1555,6 +1570,10 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="modu
 int64_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a672bcf1df35af10f617ccdcc71f760bd">box_info_lsn</a> (void)</td></tr>
 <tr class="memdesc:a672bcf1df35af10f617ccdcc71f760bd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get self LSN component of box vclock, -1 if no one or bootstrap haven't succeeded. <br /></td></tr>
 <tr class="separator:a672bcf1df35af10f617ccdcc71f760bd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a38c3dfb46ae57e3f253db3be6b066636"><td class="memItemLeft" align="right" valign="top"><a id="a38c3dfb46ae57e3f253db3be6b066636"></a>
+uint64_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a38c3dfb46ae57e3f253db3be6b066636">box_slab_info</a> (enum <a class="el" href="module_8h.html#ad95be11a839742b838f48a05e15dc96f">box_slab_info_type</a> type)</td></tr>
+<tr class="memdesc:a38c3dfb46ae57e3f253db3be6b066636"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get memtx status information for box.slab.info. <br /></td></tr>
+<tr class="separator:a38c3dfb46ae57e3f253db3be6b066636"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aab8b69829c8d89799a9fb0e5d360e84b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="module_8h.html#a2b04d0397e455b7ed42b530c1c1ea9e6">box_iterator_t</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aab8b69829c8d89799a9fb0e5d360e84b">box_index_iterator</a> (uint32_t space_id, uint32_t index_id, int type, const char *key, const char *key_end)</td></tr>
 <tr class="memdesc:aab8b69829c8d89799a9fb0e5d360e84b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocate and initialize iterator for space_id, index_id.  <a href="module_8h.html#aab8b69829c8d89799a9fb0e5d360e84b">More...</a><br /></td></tr>
 <tr class="separator:aab8b69829c8d89799a9fb0e5d360e84b"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -2173,7 +2192,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mo
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.3.0-entrypoint-43-g6fd454474&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.3.0-entrypoint-44-gbd510bb5c&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -2935,6 +2954,35 @@ enum <a class="el" href="module_8h.html#af667a90dfe6a8cc25b510af73d98bb82" title
 <tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a05cae1bfc9671a38779ffd9dde4d7f58"></a>BOX_SYSTEM_ID_MIN&#160;</td><td class="fielddoc"><p>Start of the reserved range of system spaces. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04abb87df1b61192ee3aea178534071b9cd"></a>BOX_SYSTEM_ID_MAX&#160;</td><td class="fielddoc"><p>End of the reserved range of system spaces. </p>
+</td></tr>
+</table>
+
+</div>
+</div>
+<a id="ad95be11a839742b838f48a05e15dc96f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad95be11a839742b838f48a05e15dc96f">&#9670;&nbsp;</a></span>box_slab_info_type</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="module_8h.html#ad95be11a839742b838f48a05e15dc96f">box_slab_info_type</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Codes for request memtx status information for box.slab.info. </p>
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="ad95be11a839742b838f48a05e15dc96fa5035a467639de7b7878658bb6d5d6759"></a>BOX_SLAB_INFO_ITEMS_SIZE&#160;</td><td class="fielddoc"><p>Allocated only for tuples. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="ad95be11a839742b838f48a05e15dc96fac05e5e1257324755fbb5b69a42a3162f"></a>BOX_SLAB_INFO_ITEMS_USED&#160;</td><td class="fielddoc"><p>Used only for tuples. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="ad95be11a839742b838f48a05e15dc96fa011955c844200186269b1728c60072a9"></a>BOX_SLAB_INFO_ARENA_SIZE&#160;</td><td class="fielddoc"><p>Allocated for tuples and indexes. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="ad95be11a839742b838f48a05e15dc96faaf908670201e994b6fbb7a39bd0af778"></a>BOX_SLAB_INFO_ARENA_USED&#160;</td><td class="fielddoc"><p>Used for both tuples and indexes. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="ad95be11a839742b838f48a05e15dc96fa1d115d2d78ba3a718b37952afc930716"></a>BOX_SLAB_INFO_QUOTA_SIZE&#160;</td><td class="fielddoc"><p>Memory limit for slab allocator. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="ad95be11a839742b838f48a05e15dc96fa9727bdf5f628906b49ab0c65682d6a70"></a>BOX_SLAB_INFO_QUOTA_USED&#160;</td><td class="fielddoc"><p>Used by slab allocator. </p>
 </td></tr>
 </table>
 
@@ -10513,7 +10561,7 @@ the fiber is not joined yet (panic if not).</dd></dl>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Wed Sep 4 2024 10:26:25 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Fri Sep 6 2024 11:15:22 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>
