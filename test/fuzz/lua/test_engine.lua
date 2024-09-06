@@ -1161,9 +1161,8 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to true to delay lookup of tuple in primary index by
-    -- secondary key.
-    ERRINJ_VY_DELAY_PK_LOOKUP = {
+    -- Set to true to delay lookup of tuple by full key.
+    ERRINJ_VY_POINT_LOOKUP_DELAY = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },

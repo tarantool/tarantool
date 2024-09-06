@@ -3773,7 +3773,6 @@ next:
 		*ret = NULL;
 		goto out;
 	}
-	ERROR_INJECT_YIELD(ERRINJ_VY_DELAY_PK_LOOKUP);
 	/* Get the full tuple from the primary index. */
 	if (vy_get_by_secondary_tuple(lsm, it->tx, vy_tx_read_view(it->tx),
 				      partial, &entry) != 0)
