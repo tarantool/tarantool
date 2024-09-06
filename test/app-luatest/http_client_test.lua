@@ -24,8 +24,8 @@ local function merge(...)
 end
 
 local function start_server(sock_family)
-    if not sock_family == 'AF_INET' and
-       not sock_family == 'AF_UNIX' then
+    if sock_family ~= 'AF_INET' and
+       sock_family ~= 'AF_UNIX' then
         error(string.format('invalid socket family: %s', sock_family))
     end
     local url
