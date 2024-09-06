@@ -204,13 +204,13 @@ local cluster_mt = {
     end
 }
 
-local function new(g, config, server_opts)
+local function new(g, config, server_opts, opts)
     assert(config._config == nil, "Please provide cbuilder:new():config()")
     assert(g.cluster == nil)
 
     -- Prepare a temporary directory and write a configuration
     -- file.
-    local dir = treegen.prepare_directory({}, {})
+    local dir = opts and opts.dir or treegen.prepare_directory({}, {})
     local config_file_rel = 'config.yaml'
     local config_file = treegen.write_file(dir, config_file_rel,
                                            yaml.encode(config))
