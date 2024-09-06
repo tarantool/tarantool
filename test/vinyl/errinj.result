@@ -698,28 +698,38 @@ test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
-function worker()
+f = fiber.new(function()
     for i = 11,20,2 do
         s:upsert({i, i}, {{'=', 3, 1}})
-        errinj.set("ERRINJ_VY_POINT_ITER_WAIT", true)
+        errinj.set("ERRINJ_VY_POINT_LOOKUP_DELAY", true)
         i1:select{i}
         s:upsert({i + 1 ,i + 1}, {{'=', 3, 1}})
-        errinj.set("ERRINJ_VY_POINT_ITER_WAIT", true)
+        errinj.set("ERRINJ_VY_POINT_LOOKUP_DELAY", true)
         i2:select{i + 1}
     end
-end
+end);
+---
+...
+f:set_joinable(true);
+---
+...
+ok, err = nil;
+---
+...
+repeat
+    box.snapshot()
+    errinj.set("ERRINJ_VY_POINT_LOOKUP_DELAY", false)
+    ok, err = f:join(0.01)
+until ok;
+---
+...
 test_run:cmd("setopt delimiter ''");
 ---
+- true
 ...
-f = fiber.create(worker)
+err -- nil
 ---
-...
-while f:status() ~= 'dead' do box.snapshot() fiber.sleep(0.01) end
----
-...
-errinj.set("ERRINJ_VY_POINT_ITER_WAIT", false)
----
-- ok
+- null
 ...
 s:drop()
 ---
@@ -804,13 +814,13 @@ s:drop()
 -- after the secondary index scan, but before a primary index
 -- lookup. It is ok, and the test checks this.
 --
-s = box.schema.create_space('test', {engine = 'vinyl'})
+s = box.schema.create_space('test', {engine = 'vinyl', defer_deletes = true})
 ---
 ...
 pk = s:create_index('pk')
 ---
 ...
-sk = s:create_index('sk', {parts = {{2, 'unsigned'}}})
+sk = s:create_index('sk', {unique = false, parts = {{2, 'unsigned'}}})
 ---
 ...
 s:replace{1, 1}
@@ -831,7 +841,7 @@ ret = nil
 function do_read() ret = sk:select({2}, {iterator = 'GE'}) end
 ---
 ...
-errinj.set("ERRINJ_VY_DELAY_PK_LOOKUP", true)
+errinj.set("ERRINJ_VY_POINT_LOOKUP_DELAY", true)
 ---
 - ok
 ...
@@ -854,7 +864,7 @@ s:replace{2, 2}
 ---
 - [2, 2]
 ...
-errinj.set("ERRINJ_VY_DELAY_PK_LOOKUP", false)
+errinj.set("ERRINJ_VY_POINT_LOOKUP_DELAY", false)
 ---
 - ok
 ...
