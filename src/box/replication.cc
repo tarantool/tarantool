@@ -42,6 +42,7 @@
 #include "raft.h"
 #include "relay.h"
 #include "sio.h"
+#include "tweaks.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
@@ -67,6 +68,9 @@ struct tt_uuid cfg_bootstrap_leader_uuid;
 struct uri cfg_bootstrap_leader_uri;
 char cfg_bootstrap_leader_name[NODE_NAME_SIZE_MAX];
 char cfg_instance_name[NODE_NAME_SIZE_MAX];
+
+bool replication_synchro_timeout_rollback_enabled = true;
+TWEAK_BOOL(replication_synchro_timeout_rollback_enabled);
 
 struct replicaset replicaset;
 

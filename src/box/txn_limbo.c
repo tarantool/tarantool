@@ -324,9 +324,15 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	assert(txn_has_flag(entry->txn, TXN_WAIT_SYNC));
 	double start_time = fiber_clock();
 	while (true) {
-		double deadline = start_time + replication_synchro_timeout;
-		double timeout = deadline - fiber_clock();
-		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
+		int rc;
+		if (replication_synchro_timeout_rollback_enabled) {
+			double timeout = start_time +
+				replication_synchro_timeout - fiber_clock();
+			rc = fiber_cond_wait_timeout(
+				&limbo->wait_cond, timeout);
+		} else {
+			rc = fiber_cond_wait(&limbo->wait_cond);
+		}
 		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
 		if (rc != 0 && fiber_is_cancelled())

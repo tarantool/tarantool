@@ -404,7 +404,7 @@ local function prepare_file_path(self, iconfig, path)
     return rebase_file_path(base_dir, path)
 end
 
--- Read a config.context[name] variable depending of its "from"
+-- Read a config.context[name] variable depending on its "from"
 -- type.
 local function read_context_var_noexc(base_dir, def)
     if def.from == 'env' then
@@ -1504,7 +1504,7 @@ return schema.new('instance_config', schema.record({
             'candidate',
         }, {
             box_cfg = 'election_mode',
-            -- The effective default is determined depending of
+            -- The effective default is determined depending on
             -- the replication.failover option.
             default = box.NULL,
         }),
@@ -2451,6 +2451,12 @@ return schema.new('instance_config', schema.record({
             default = 'old',
         }),
         wal_cleanup_delay_deprecation = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
+        replication_synchro_timeout = schema.enum({
             'old',
             'new',
         }, {
