@@ -2885,19 +2885,6 @@ memtx_tx_delete_gap(struct gap_item_base *item)
 }
 
 void
-memtx_tx_on_index_delete(struct index *index)
-{
-	while (!rlist_empty(&index->read_gaps)) {
-		struct gap_item_base *item =
-			rlist_first_entry(&index->read_gaps,
-					  struct gap_item_base,
-					  in_read_gaps);
-		memtx_tx_delete_gap(item);
-	}
-	memtx_tx_story_gc();
-}
-
-void
 memtx_tx_invalidate_space(struct space *space, struct txn *active_txn)
 {
 	struct memtx_story *story;
@@ -3005,6 +2992,21 @@ memtx_tx_invalidate_space(struct space *space, struct txn *active_txn)
 		stailq_foreach_entry(stmt, &txn->stmts, next) {
 			if (stmt->space == space)
 				stmt->engine_savepoint = NULL;
+		}
+	}
+
+	/*
+	 * Phase four: remove all read trackers from the space indexes. Since
+	 * all concurrent transactions are aborted, we don't need them anymore.
+	 */
+	for (size_t i = 0; i < space->index_count; i++) {
+		struct index *index = space->index[i];
+		while (!rlist_empty(&index->read_gaps)) {
+			struct gap_item_base *item =
+				rlist_first_entry(&index->read_gaps,
+						  struct gap_item_base,
+						  in_read_gaps);
+			memtx_tx_delete_gap(item);
 		}
 	}
 }

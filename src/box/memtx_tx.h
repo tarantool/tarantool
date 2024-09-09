@@ -432,14 +432,6 @@ void
 memtx_tx_clean_txn(struct txn *txn);
 
 /**
- * Notify manager tha an index is deleted and free data, save in index.
- *
- * NB: can trigger story garbage collection.
- */
-void
-memtx_tx_on_index_delete(struct index *index);
-
-/**
  * Invalidate space in memtx tx: remove all the objects associated with
  * space and its schema. The helper is supposed to be called when there is
  * only one active transaction that is passed as `active_txn`. The indexes
