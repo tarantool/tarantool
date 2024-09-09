@@ -1177,10 +1177,14 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to timeout to fail vinyl index dump.
+    -- Set to index id to fail vinyl index dump.
     ERRINJ_VY_INDEX_DUMP = {
-        enable = enable_errinj_timeout,
-        disable = function() return -1 end,
+        enable = function(space)
+            return math.random(#space.index + 1) - 1
+        end,
+        disable = function()
+            return -1
+        end,
     },
     -- Set to true to fail materialization of vinyl index file.
     ERRINJ_VY_INDEX_FILE_RENAME = {
@@ -1197,11 +1201,10 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to timeout to inject before consuming vinyl memory
-    -- quota.
+    -- Set to true to inject delay before consuming vinyl memory quota.
     ERRINJ_VY_QUOTA_DELAY = {
-        enable = enable_errinj_timeout,
-        disable = disable_errinj_timeout,
+        enable = enable_errinj_boolean,
+        disable = disable_errinj_boolean,
     },
     -- Set to true to fail reading vinyl page from disk.
     ERRINJ_VY_READ_PAGE = {
@@ -1263,10 +1266,14 @@ local errinj_set = {
         enable = enable_errinj_timeout,
         disable = disable_errinj_timeout,
     },
-    -- Set to timeout to fail allocation of vinyl tuple.
+    -- Set to number of passes before failing allocation of vinyl tuple.
     ERRINJ_VY_STMT_ALLOC = {
-        enable = enable_errinj_timeout,
-        disable = disable_errinj_timeout,
+        enable = function()
+            return math.random(10)
+        end,
+        disable = function()
+            return -1
+        end,
     },
     -- Set to true to fail completion of vinyl dump/compaction.
     ERRINJ_VY_TASK_COMPLETE = {
@@ -1284,11 +1291,15 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to timeout to fail WAL write due to error allocating disk
-    -- space.
+    -- Set to number of failures before successful allocation of
+    -- disk space for WAL write.
     ERRINJ_WAL_FALLOCATE = {
-        enable = enable_errinj_timeout,
-        disable = disable_errinj_timeout,
+        enable = function()
+            return math.random(10)
+        end,
+        disable = function()
+            return 0
+        end,
     },
     -- Set to true to fail WAL write.
     ERRINJ_WAL_IO = {
@@ -1320,20 +1331,28 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to timeout to fail write to xlog file.
+    -- Set to number of bytes to buffer before failing write to xlog file.
     ERRINJ_WAL_WRITE_PARTIAL = {
-        enable = enable_errinj_timeout,
-        disable = disable_errinj_timeout,
+        enable = function()
+            return math.random(65536)
+        end,
+        disable = function()
+            return -1
+        end,
     },
     -- Set to true to fail xlog meta read.
     ERRINJ_XLOG_META = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to timeout to fail xlog data read.
+    -- Set to number of bytes to read before failing xlog data read.
     ERRINJ_XLOG_READ = {
-        enable = enable_errinj_timeout,
-        disable = disable_errinj_timeout,
+        enable = function()
+            return math.random(65536)
+        end,
+        disable = function()
+            return -1
+        end,
     },
     -- Set to true to delay xlog file materialization.
     ERRINJ_XLOG_RENAME_DELAY = {
