@@ -2876,6 +2876,14 @@ space_mt.run_triggers = function(space, yesno)
     end
     builtin.space_run_triggers(s, yesno)
 end
+space_mt.insert_arrow = function(space, arrow)
+    check_space_arg(space, 'insert_arrow', 2)
+    local s = builtin.space_by_id(space.id)
+    if s == nil then
+        box.error(box.error.NO_SUCH_SPACE, space.name, 2)
+    end
+    return internal.insert_arrow(space.id, arrow);
+end
 space_mt.frommap = box.internal.space.frommap
 space_mt.stat = box.internal.space.stat
 space_mt.__index = space_mt

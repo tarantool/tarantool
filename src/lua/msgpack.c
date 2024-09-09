@@ -46,6 +46,8 @@
 #include "core/decimal.h" /* decimal_unpack() */
 #include "core/mp_ctx.h"
 #include "core/tweaks.h"
+#include "core/arrow_record_batch.h"
+#include "lua/arrow_record_batch.h"
 #include "lua/decimal.h" /* luaT_newdecimal() */
 #include "mp_extension_types.h"
 #include "mp_uuid.h" /* mp_decode_uuid() */
@@ -519,6 +521,16 @@ luamp_decode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
 			VERIFY(interval_unpack(data, len, itv) != NULL);
 			return;
 		}
+		case MP_ARROW:
+		{
+			struct arrow_record_batch *arr =
+				luaT_new_arrow_record_batch(L);
+			if (arrow_record_batch_unpack(data, len, arr) == NULL) {
+				/* Diag is set by arrow_record_batch_unpack() */
+				luaT_error(L);
+			}
+			return;
+		}
 		default:
 			/* reset data to the extension header */
 			*data = svp;
@@ -530,7 +542,6 @@ luamp_decode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
 	}
 	return;
 }
-
 
 static int
 lua_msgpack_encode(lua_State *L)

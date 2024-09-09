@@ -38,6 +38,8 @@
 #include "box/lua/misc.h"
 #include "small/region.h"
 #include "fiber.h"
+#include "lua/arrow_record_batch.h"
+#include "core/arrow_record_batch.h"
 
 /** {{{ box.index Lua library: access to spaces and indexes
  */
@@ -419,6 +421,24 @@ lbox_index_compact(lua_State *L)
 	return 0;
 }
 
+static int
+lbox_insert_arrow(lua_State *L)
+{
+	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1)) {
+		diag_set(IllegalParams,
+			 "Usage: space:insert_arrow(arrow_record_batch)");
+		return luaT_error(L);
+	}
+	uint32_t space_id = lua_tonumber(L, 1);
+
+	struct arrow_record_batch *arrow = luaT_check_arrow_record_batch(L, 2);
+	int rc = box_insert_arrow(space_id, &arrow->array, &arrow->schema);
+	if (rc != 0)
+		return luaT_error(L);
+	lua_pushnil(L);
+	return 1;
+}
+
 /* }}} */
 
 void
@@ -452,6 +472,7 @@ box_lua_index_init(struct lua_State *L)
 		{"truncate", lbox_truncate},
 		{"stat", lbox_index_stat},
 		{"compact", lbox_index_compact},
+		{"insert_arrow", lbox_insert_arrow},
 		{NULL, NULL}
 	};
 
