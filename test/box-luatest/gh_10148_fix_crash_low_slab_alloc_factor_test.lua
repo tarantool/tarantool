@@ -28,6 +28,8 @@ end)
 
 g.test_low_slab_alloc_factor = function(cg)
     cg.server:exec(function()
+        local fiber = require('fiber')
+        fiber.set_max_slice(30)
         local test = box.schema.create_space('test')
         test:create_index('pri')
         for i=1,1000000 do
