@@ -64,3 +64,6 @@
 [submodule "third_party/metrics"]
 	path = third_party/metrics
 	url = https://github.com/tarantool/metrics.git
+[submodule "third_party/arrow/nanoarrow"]
+	path = third_party/arrow/nanoarrow
+	url = https://github.com/apache/arrow-nanoarrow.git
