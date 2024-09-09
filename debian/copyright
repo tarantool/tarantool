@@ -369,6 +369,10 @@ Files: third_party/arrow/abi.h
 Copyright: 2016-2024 The Apache Software Foundation
 License: Apache-2.0
 
+Files: third_party/arrow/nanoarrow/*
+Copyright: 2023-2024 The Apache Software Foundation
+License: Apache-2.0
+
 License: BSD-2-Clause
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions

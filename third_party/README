@@ -66,3 +66,9 @@ How to update arrow/abi.h
 
 Get the header from
 git@github.com:apache/arrow.git cpp/src/arrow/c/abi.h
+
+How to update arrow/nanoarrow
+=============================
+
+Run from project root dir:
+git submodule update --remote third_party/arrow/nanoarrow

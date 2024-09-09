@@ -134,6 +134,7 @@ add_custom_target(box_generate_lua_sources
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
 include_directories(${ZSTD_INCLUDE_DIRS})
+include_directories(${NANOARROW_INCLUDE_DIRS})
 include_directories(${PROJECT_BINARY_DIR}/src/box/sql)
 include_directories(${PROJECT_BINARY_DIR}/src/box)
 include_directories(${EXTRA_CORE_INCLUDE_DIRS})
