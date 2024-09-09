@@ -794,13 +794,13 @@ void
 index_delete(struct index *index)
 {
 	assert(index->refs == 0);
+	assert(rlist_empty(&index->read_gaps));
 	/*
 	 * Free index_def after destroying the index as
 	 * engine might still need it, e.g. to check if
 	 * the index is primary or secondary.
 	 */
 	struct index_def *def = index->def;
-	memtx_tx_on_index_delete(index);
 	index->vtab->destroy(index);
 	index_def_delete(def);
 }
