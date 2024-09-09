@@ -487,7 +487,7 @@ test:test("Simple tests for parser", function(test)
 end)
 
 test:test("Multiple tests for parser (with nanoseconds)", function(test)
-    test:plan(211)
+    test:plan(273)
     -- borrowed from
     -- github.com/chansen/p5-time-moment/blob/master/t/180_from_string.t
     local tests =
@@ -559,7 +559,8 @@ test:test("Multiple tests for parser (with nanoseconds)", function(test)
     for _, value in ipairs(tests) do
         local str, epoch, nsec, tzoffset, check
         str, epoch, nsec, tzoffset, check = unpack(value)
-        local dt = date.parse(str)
+        local dt, parsed_syms = date.parse(str)
+        test:is(parsed_syms, #str, 'all characters are parsed')
         test:is(dt.epoch, epoch, ('%s: dt.epoch == %d'):format(str, epoch))
         test:is(dt.nsec, nsec, ('%s: dt.nsec == %d'):format(str, nsec))
         test:is(dt.tzoffset, tzoffset, ('%s: dt.tzoffset == %d'):format(str, tzoffset))
@@ -577,7 +578,7 @@ local function create_date_string(date)
 end
 
 test:test("Check parsing of full supported years range", function(test)
-    test:plan(63)
+    test:plan(84)
     local valid_years = {
         -5879610, -5879000, -5800000, -2e6, -1e5, -1e4, -9999, -2000, -1000,
         0, 1, 1000, 1900, 1970, 2000, 9999,
@@ -586,7 +587,8 @@ test:test("Check parsing of full supported years range", function(test)
     local fmt = '%FT%T%z'
     for _, y in ipairs(valid_years) do
         local txt = ('%04d-06-22'):format(y)
-        local dt = date.parse(txt)
+        local dt, parsed_syms = date.parse(txt)
+        test:is(parsed_syms, #txt, 'all characters are parsed')
         test:isnt(dt, nil, dt)
         local out_txt = tostring(dt)
         local out_dt = date.parse(out_txt)
