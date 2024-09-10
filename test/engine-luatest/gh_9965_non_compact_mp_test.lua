@@ -226,3 +226,20 @@ g.test_non_compact_compare_mp_uint = function(cg)
         end
     end, {cg.params.engine})
 end
+
+g.test_memtx_hints = function(cg)
+    t.skip_if(cg.params.engine ~= 'memtx', 'hints are only in memtx')
+    cg.server:exec(function()
+        local s = box.schema.space.create('test')
+        s:create_index('pk', {parts = {{1, 'integer'}}, hint = true})
+        local key = 1
+        s:insert{key}
+        local mp_keys = _G.encode_num_in_all_int_ways(key)
+        for _, mp_key in pairs(mp_keys) do
+            local obj = _G.msgpack.object_from_raw('\x91' .. mp_key)
+            t.assert_error_msg_contains('Duplicate key', s.insert, s, obj)
+            local res = _G.space_get_c(s, 'pk', obj)
+            t.assert_equals(res, {key})
+        end
+    end)
+end
