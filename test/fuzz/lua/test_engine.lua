@@ -1024,6 +1024,21 @@ local function worker_func(id, space, test_gen, test_duration)
     return errors
 end
 
+-- Disabled all enabled error injections.
+local function disable_all_errinj(errinj, space)
+    local enabled_errinj = fun.iter(errinj):
+                           filter(function(i, x)
+                               if x.is_enabled then
+                                   return i
+                               end
+                           end):totable()
+    for _, errinj_name in pairs(enabled_errinj) do
+        local errinj_val = errinj[errinj_name].disable(space)
+        errinj[errinj_name].is_enabled = false
+        pcall(box.error.injection.set, errinj_name, errinj_val)
+    end
+end
+
 local function toggle_random_errinj(errinj, max_enabled, space)
     local enabled_errinj = fun.iter(errinj):
                            filter(function(i, x)
@@ -1444,6 +1459,7 @@ local function run_test(num_workers, test_duration, test_dir,
             end
         end
     end
+    disable_all_errinj(errinj_set, space)
 
     teardown(space)
 
