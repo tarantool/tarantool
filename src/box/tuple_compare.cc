@@ -1697,7 +1697,8 @@ hint_uint(uint64_t u)
 static inline hint_t
 hint_int(int64_t i)
 {
-	assert(i < 0);
+	if (i >= 0)
+		return hint_uint((uint64_t)i);
 	uint64_t val = (i <= HINT_VALUE_INT_MIN ? 0 : i - HINT_VALUE_INT_MIN);
 	return hint_create(MP_CLASS_NUMBER, val);
 }
