@@ -525,10 +525,73 @@ test_mp_invalid(void)
 
 #undef test
 
+#define test(s, n, expected) ({						\
+	struct vclock vc;						\
+	vclock_create(&vc);						\
+	vclock_from_string(&vc, (s));					\
+	is(vclock_nth_element(&vc, n), expected,			\
+		"vclock_nth_element \"%s\", %d => %d", s, n, expected);	\
+})
+
+static int
+test_nth_element(void)
+{
+	plan(11);
+	header();
+
+	test("{0: 1, 2: 3, 5: 7, 10: 3}", 2, 3);
+	test("{1: 4, 3: 2, 4: 8, 8: 6, 9: 7}", 3, 7);
+	test("{0: 10, 1: 11, 3: 12, 7: 13, 9: 14}", 1, 11);
+	test("{2: 5, 4: 6, 6: 7, 8: 8, 10: 9}", 3, 8);
+	test("{1: 9, 3: 1, 5: 2, 7: 3, 11: 4}", 2, 3);
+	test("{0: 0, 2: 2, 4: 4, 6: 6, 8: 8, 10: 10}", 5, 10);
+	test("{1: 3, 2: 6, 3: 9, 4: 12, 5: 15}", 3, 12);
+	test("{0: 10, 2: 20, 4: 30, 6: 40, 8: 50}", 2, 30);
+	test("{1: 2, 3: 4, 5: 6, 7: 8, 9: 10}", 4, 10);
+	test("{2: 1, 4: 2, 6: 3, 8: 4, 10: 5}", 1, 2);
+	test("{2: 5, 4: 6, 6: 7, 8: 8, 10: 9}", 5, -1);
+
+	footer();
+	return check_plan();
+}
+
+#undef test
+
+#define test(s, lsn, expected) ({					\
+	struct vclock vc;						\
+	vclock_create(&vc);						\
+	vclock_from_string(&vc, (s));					\
+	is(vclock_count_ge(&vc, lsn), expected,				\
+		"vclock_count_ge \"%s\", %d => %u", s, lsn, expected);	\
+})
+
+static int
+test_count_ge(void)
+{
+	plan(10);
+	header();
+
+	test("{0: 1, 2: 3, 5: 7, 10: 3}", 3, 3);
+	test("{1: 4, 3: 2, 4: 8, 8: 6, 9: 7}", 5, 3);
+	test("{0: 10, 1: 11, 3: 12, 7: 13, 9: 14}", 11, 4);
+	test("{2: 5, 4: 6, 6: 7, 8: 8, 10: 9}", 6, 4);
+	test("{1: 9, 3: 1, 5: 2, 7: 3, 11: 4}", 4, 2);
+	test("{0: 0, 2: 2, 4: 4, 6: 6, 8: 8, 10: 10}", 5, 3);
+	test("{1: 3, 2: 6, 3: 9, 4: 12, 5: 15}", 7, 3);
+	test("{0: 10, 2: 20, 4: 30, 6: 40, 8: 50}", 25, 3);
+	test("{1: 2, 3: 4, 5: 6, 7: 8, 9: 10}", 5, 3);
+	test("{2: 1, 4: 2, 6: 3, 8: 4, 10: 5}", 3, 3);
+
+	footer();
+	return check_plan();
+}
+
+#undef test
+
 int
 main(void)
 {
-	plan(8);
+	plan(10);
 
 	test_compare();
 	test_isearch();
@@ -538,6 +601,8 @@ main(void)
 	test_minmax();
 	test_mp();
 	test_mp_invalid();
+	test_nth_element();
+	test_count_ge();
 
 	return check_plan();
 }
