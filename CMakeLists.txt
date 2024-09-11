@@ -28,6 +28,7 @@ find_program(GIT git)
 find_program(LD ld)
 find_program(CTAGS ctags)
 find_program(LUACHECK luacheck ENV PATH)
+find_program(PYTHON python)
 
 include (CTest)
 enable_testing()
