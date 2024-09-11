@@ -52,15 +52,38 @@ list(APPEND CTEST_FAIL_REGEXP
 string(RANDOM LENGTH 9 ALPHABET 0123456789 RANDOM_SEED)
 message(STATUS "Random seed is ${RANDOM_SEED}")
 
+list(APPEND LUATEST_COMMAND_WITH_FLAGS
+    ${PROJECT_SOURCE_DIR}/test-run/lib/luatest/bin/luatest
+    --no-clean
+    --verbose
+    --no-capture
+    --output tap
+)
+
+tarantool_make_lua_path(LUATEST_LUA_PATH
+  PATHS
+    # Both paths below are used, some tests uses Lua modules from
+    # another test suites.
+    ${PROJECT_SOURCE_DIR}/?.lua
+    ${PROJECT_SOURCE_DIR}/?/init.lua
+    ${PROJECT_SOURCE_DIR}/test-run/lib/checks/?.lua
+    ${PROJECT_SOURCE_DIR}/test-run/lib/luatest/?/init.lua
+    ${PROJECT_SOURCE_DIR}/test-run/lib/luatest/?.lua
+)
+
 add_subdirectory(app)
 add_subdirectory(app-tap)
-add_subdirectory(app-luatest/lib)
+add_subdirectory(app-luatest)
 add_subdirectory(box)
 add_subdirectory(box-tap)
 add_subdirectory(box-luatest)
+add_subdirectory(config-luatest)
 add_subdirectory(engine-luatest)
+add_subdirectory(metrics-luatest)
+add_subdirectory(replication-luatest)
 add_subdirectory(sql-tap)
 add_subdirectory(sql-luatest)
+add_subdirectory(vinyl-luatest)
 if(ENABLE_FUZZER)
     add_subdirectory(fuzz)
 endif()
@@ -131,12 +154,29 @@ add_custom_target(test-force
         --force)
 
 message(STATUS "Add regression tests")
+list(APPEND EXECUTED_WITHOUT_TEST_RUN
+    app-luatest
+    box-luatest
+    config-luatest
+    engine-luatest
+    metrics-luatest
+    replication-luatest
+    sql-luatest
+    vinyl-luatest
+)
+
 file(GLOB_RECURSE tests ${PROJECT_SOURCE_DIR}/test
   *.test.lua *.test.py *_test.lua)
 foreach(test_path ${tests})
   get_filename_component(test_name ${test_path} NAME)
   get_filename_component(basedir ${test_path} DIRECTORY)
   get_filename_component(suite ${basedir} NAME)
+  # With CMake 3.3 or later, the `if` command supports
+  # an IN_LIST operator.
+  list (FIND EXECUTED_WITHOUT_TEST_RUN ${suite} _index)
+  if(${_index} GREATER -1)
+    continue()
+  endif()
   set(test_title "test/${suite}/${test_name}")
   # Salt is needed to avoid intersection in vardir paths for
   # different tests. Salt length equal to 1 is enough and remember
