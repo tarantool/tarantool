@@ -481,6 +481,18 @@ vclockset_match(vclockset_t *set, const struct vclock *key)
 	return vclockset_first(set);
 }
 
+/**
+ * Calculates the kth order statistic.
+ */
+int64_t
+vclock_nth_element(const struct vclock *vclock, uint32_t n);
+
+/**
+ * Count the number of components that are more than or equal to a given value.
+ */
+int
+vclock_count_ge(const struct vclock *vclock, int64_t lsn);
+
 #define vclockset_foreach(set, vclock) \
 	for ((vclock) = vclockset_first(set); \
 	     (vclock) != NULL; \
