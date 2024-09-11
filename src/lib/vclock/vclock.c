@@ -175,4 +175,36 @@ vclockset_node_compare(const struct vclock *a, const struct vclock *b)
 	return res;
 }
 
+int64_t
+vclock_nth_element(const struct vclock *vclock, uint32_t n)
+{
+	if (n >= vclock_size(vclock))
+		return -1;
+	struct vclock_iterator it1, it2;
+
+	vclock_iterator_init(&it1, vclock);
+	vclock_foreach(&it1, vc1) {
+		uint32_t le = 0, leq = 0;
+		vclock_iterator_init(&it2, vclock);
+		vclock_foreach(&it2, vc2) {
+			le += vc2.lsn < vc1.lsn;
+			leq += vc2.lsn <= vc1.lsn;
+		}
+		if (le <= n && n < leq)
+			return vc1.lsn;
+	}
+	unreachable();
+}
+
+int
+vclock_count_ge(const struct vclock *vclock, int64_t lsn)
+{
+	int count = 0;
+	struct vclock_iterator it;
+	vclock_iterator_init(&it, vclock);
+	vclock_foreach(&it, vc1)
+		count += vc1.lsn >= lsn;
+	return count;
+}
+
 rb_gen(, vclockset_, vclockset_t, struct vclock, link, vclockset_node_compare);
