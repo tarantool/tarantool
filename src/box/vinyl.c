@@ -2041,7 +2041,12 @@ request_normalize_ops(struct request *request)
 		switch (mp_typeof(*pos)) {
 		case MP_INT:
 			field_no = mp_decode_int(&pos);
-			ops_end = mp_encode_int(ops_end, field_no);
+			if (field_no < 0) {
+				ops_end = mp_encode_int(ops_end, field_no);
+				break;
+			}
+			field_no -= request->index_base;
+			ops_end = mp_encode_uint(ops_end, field_no);
 			break;
 		case MP_UINT:
 			field_no = mp_decode_uint(&pos);

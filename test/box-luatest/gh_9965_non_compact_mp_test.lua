@@ -17,9 +17,13 @@ g.before_all(function(cg)
         )
         local lib = box.lib.load('gh_9965_lib')
         local index_get_c = lib:load('index_get')
+        local index_upsert_c = lib:load('index_upsert')
         rawset(_G, 'test_lib', lib)
         rawset(_G, 'space_get_c', function(space, index, key)
             return index_get_c(space.id, space.index[index].id, key)
+        end)
+        rawset(_G, 'space_upsert_c', function(space, index, tuple, ops)
+            return index_upsert_c(space.id, space.index[index].id, tuple, ops)
         end)
 
         rawset(_G, 'encode_num_in_all_int_ways', function(num, flags)
@@ -238,4 +242,26 @@ g.test_memtx_hints = function(cg)
             t.assert_equals(res, {key})
         end
     end)
+end
+
+g.test_mp_int_in_upsert_ops = function(cg)
+    cg.server:exec(function(engine)
+        local s = box.schema.space.create('test', {engine = engine})
+        s:create_index('pk')
+        local num = 2
+        local mp_nums = _G.encode_num_in_all_int_ways(num)
+        for _, mp_num in pairs(mp_nums) do
+            -- {{'=', 2, 2}} encoded in a weird way.
+            local obj = _G.msgpack.object_from_raw(
+                '\x91\x93\xa1\x3d' .. mp_num .. mp_num)
+            t.assert_equals(obj:decode(), {{'=', num, num}})
+            box.begin()
+            _G.space_upsert_c(s, 'pk', {1}, obj)
+            t.assert_equals(s:get{1}, {1})
+            _G.space_upsert_c(s, 'pk', {1}, obj)
+            t.assert_equals(s:get{1}, {1, 2})
+            s:delete{1}
+            box.commit()
+        end
+    end, {cg.params.engine})
 end
