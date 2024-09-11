@@ -2071,7 +2071,12 @@ request_normalize_ops(struct request *request)
 			int str_pos;
 			if (mp_typeof(*pos) == MP_INT) {
 				str_pos = mp_decode_int(&pos);
-				ops_end = mp_encode_int(ops_end, str_pos);
+				if (str_pos < 0) {
+					ops_end = mp_encode_int(ops_end, str_pos);
+				} else {
+					str_pos -= request->index_base;
+					ops_end = mp_encode_uint(ops_end, str_pos);
+				}
 			} else {
 				str_pos = mp_decode_uint(&pos);
 				str_pos -= request->index_base;

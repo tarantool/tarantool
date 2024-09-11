@@ -263,5 +263,25 @@ g.test_mp_int_in_upsert_ops = function(cg)
             s:delete{1}
             box.commit()
         end
+        --
+        -- Splice numbers codecs.
+        --
+        local ops = {{':', 2, 2, 3, '123'}}
+        local num2 = 2
+        local num3 = 3
+        local mp_nums2 = _G.encode_num_in_all_int_ways(num2)
+        local mp_nums3 = _G.encode_num_in_all_int_ways(num3)
+        t.assert_equals(#mp_nums2, #mp_nums3)
+        t.assert(#mp_nums2 == 9)
+        for i = 1, #mp_nums2 do
+            s:replace{1, 'abcdef'}
+            local obj = _G.msgpack.object_from_raw(
+                '\x91' .. '\x95' .. '\xa1:' ..
+                mp_nums2[i] .. mp_nums2[i] .. mp_nums3[i] ..
+                '\xa3123')
+            t.assert_equals(obj:decode(), ops)
+            _G.space_upsert_c(s, 'pk', {1}, obj)
+            t.assert_equals(s:get{1}, {1, 'a123ef'})
+        end
     end, {cg.params.engine})
 end
