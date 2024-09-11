@@ -1,31 +1,15 @@
-include_directories(${MSGPUCK_INCLUDE_DIRS})
-build_module(gh_4799_lib gh_4799_fix_c_stored_functions_call.c)
-target_link_libraries(gh_4799_lib msgpuck)
-build_module(gh_6506_lib gh_6506_wakeup_writing_to_wal_fiber.c)
-build_module(gh_9131_lib gh_9131_net_box_self_call_stored_func.c)
-target_link_libraries(gh_9131_lib msgpuck)
-build_module(libcallnum libcallnum.c)
-
-tarantool_make_lua_path(LUA_CPATH
-  PATHS
-  ${CMAKE_CURRENT_BINARY_DIR}/?${CMAKE_SHARED_LIBRARY_SUFFIX}
-)
-
-set(TEST_SUITE_NAME "box-luatest")
+set(TEST_SUITE_NAME "replication-luatest")
 
 message(STATUS "Add test suite ${TEST_SUITE_NAME}")
 
-# XXX: The call produces both test and target <box-tap-deps>
-# as a side effect.
+# XXX: The call produces both test and target
+# <replication-luatest-deps> as a side effect.
 _add_test_suite_target(${TEST_SUITE_NAME}
   LABELS ${TEST_SUITE_NAME}
-  DEPENDS gh_4799_lib gh_6506_lib gh_9131_lib libcallnum
 )
 
 list(APPEND TEST_ENV
   "LUA_PATH=${LUATEST_LUA_PATH}"
-  "SOURCEDIR=${PROJECT_SOURCE_DIR}"
-  "BUILDDIR=${PROJECT_BINARY_DIR}"
   "VARDIR=${VARDIR}"
 )
 
@@ -56,17 +40,15 @@ foreach(test_path ${tests})
   )
 endforeach()
 
+# See test/replication-luatest/suite.ini.
 if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   set_tests_properties(
-    # See test/box-luatest/suite.ini.
-    test/box-luatest/gh_6819_iproto_watch_not_implemented_test.lua
+    test/replication-luatest/gh_5295_split_brain_test.lua
+    test/replication-luatest/gh_6033_box_promote_demote_test.lua
+    test/replication-luatest/gh_6036_qsync_order_test.lua
+    test/replication-luatest/gh_6842_qsync_applier_order_test.lua
+    test/replication-luatest/gh_7086_box_issue_promote_assert_test.lua
+    test/replication-luatest/gh_7253_election_long_wal_write_test.lua
     PROPERTIES DISABLED TRUE
   )
 endif()
-
-# See test/box-luatest/suite.ini.
-set_tests_properties(
-  test/box-luatest/gh_7605_qsort_recovery_test.lua
-  test/box-luatest/gh_7670_memtx_tx_manager_idx_rand_inconsistency_test.lua
-  PROPERTIES LABELS "long"
-)
