@@ -356,8 +356,8 @@ bench_tuple_new(benchmark::State& state)
 		tuple_unref(tuples[k]);
 }
 
-BENCHMARK_TEMPLATE(bench_tuple_new, FORMAT_BASIC);
-BENCHMARK_TEMPLATE(bench_tuple_new, FORMAT_SPARSE);
+BENCHMARK(bench_tuple_new<FORMAT_BASIC>);
+BENCHMARK(bench_tuple_new<FORMAT_SPARSE>);
 
 // memtx_tuple_delete benchmark.
 template<data_format F>
@@ -393,7 +393,7 @@ bench_tuple_delete(benchmark::State& state)
 		tuple_unref(tuples[k]);
 }
 
-BENCHMARK_TEMPLATE(bench_tuple_delete, FORMAT_BASIC);
+BENCHMARK(bench_tuple_delete<FORMAT_BASIC>);
 
 template<data_format F>
 static void
@@ -414,7 +414,7 @@ bench_tuple_ref_unref_low(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK_TEMPLATE(bench_tuple_ref_unref_low, FORMAT_BASIC);
+BENCHMARK(bench_tuple_ref_unref_low<FORMAT_BASIC>);
 
 template<data_format F>
 static void
@@ -435,7 +435,7 @@ bench_tuple_ref_unref_high(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK_TEMPLATE(bench_tuple_ref_unref_high, FORMAT_BASIC);
+BENCHMARK(bench_tuple_ref_unref_high<FORMAT_BASIC>);
 
 // struct tuple member access benchmark.
 template<data_format F>
@@ -461,7 +461,7 @@ tuple_access_members(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK_TEMPLATE(tuple_access_members, FORMAT_BASIC);
+BENCHMARK(tuple_access_members<FORMAT_BASIC>);
 
 // tuple_data benchmark.
 template<data_format F>
@@ -483,7 +483,7 @@ tuple_access_data(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK_TEMPLATE(tuple_access_data, FORMAT_BASIC);
+BENCHMARK(tuple_access_data<FORMAT_BASIC>);
 
 // tuple_data_range benchmark.
 template<data_format F>
@@ -507,7 +507,7 @@ tuple_access_data_range(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK_TEMPLATE(tuple_access_data_range, FORMAT_BASIC);
+BENCHMARK(tuple_access_data_range<FORMAT_BASIC>);
 
 // benchmark of access of non-indexed field.
 template<data_format F>
@@ -529,7 +529,7 @@ tuple_access_unindexed_field(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK_TEMPLATE(tuple_access_unindexed_field, FORMAT_BASIC);
+BENCHMARK(tuple_access_unindexed_field<FORMAT_BASIC>);
 
 // benchmark of access of indexed field.
 template<data_format F>
@@ -552,7 +552,7 @@ tuple_access_indexed_field(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK_TEMPLATE(tuple_access_indexed_field, FORMAT_BASIC);
+BENCHMARK(tuple_access_indexed_field<FORMAT_BASIC>);
 
 // benchmark of tuple compare.
 template<data_format F>
@@ -581,7 +581,7 @@ tuple_tuple_compare(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK_TEMPLATE(tuple_tuple_compare, FORMAT_BASIC);
+BENCHMARK(tuple_tuple_compare<FORMAT_BASIC>);
 
 // benchmark of tuple hints compare.
 template<data_format F>
@@ -612,7 +612,7 @@ tuple_tuple_compare_hint(benchmark::State& state)
 	state.SetItemsProcessed(total_count);
 }
 
-BENCHMARK_TEMPLATE(tuple_tuple_compare_hint, FORMAT_BASIC);
+BENCHMARK(tuple_tuple_compare_hint<FORMAT_BASIC>);
 
 BENCHMARK_MAIN();
 
