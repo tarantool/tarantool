@@ -562,16 +562,38 @@ mp_print_test(void)
 	check_plan();
 }
 
+static void
+interval_from_map_test(void)
+{
+	plan(2);
+	header();
+
+	struct interval iv;
+	char buffer[128];
+	int rc = mp_format(buffer, sizeof(buffer), "{%s%d}", "year", 100);
+	fail_if(rc >= (int)sizeof(buffer));
+	rc = interval_from_map(&iv, buffer);
+	is(rc, 0, "normal year");
+	const char *suboptimal_data =
+		"\x81\xa4year\xd3\x00\xff\xff\xff\xff\xff\xff\xff";
+	rc = interval_from_map(&iv, suboptimal_data);
+	is(rc, -1, "too big year inside mp_int");
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(6);
+	plan(7);
 	datetime_test();
 	tostring_datetime_test();
 	parse_date_test();
 	mp_datetime_unpack_valid_checks();
 	mp_datetime_test();
 	mp_print_test();
+	interval_from_map_test();
 
 	return check_plan();
 }
