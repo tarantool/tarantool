@@ -5,8 +5,51 @@
 #include <allocator.h>
 
 #include <benchmark/benchmark.h>
+#include <random>
 
-const size_t NUM_TEST_TUPLES = 4096;
+static const size_t NUM_TEST_TUPLES = 4096;
+
+struct random_generator {
+	random_generator() : generator(dev()), get_i(0)
+	{
+	}
+
+	uint64_t get()
+	{
+		int i = get_i;
+		get_i = (get_i + 1) % 4;
+		/*
+		 * The different int ranges don't grow linearly. Always using
+		 * the [0, UINT64_MAX] range mostly returns numbers >
+		 * UINT32_MAX, which isn't fair. To make the type distribution
+		 * more even the types are selected in round-robin. And only
+		 * inside each type the selection is random.
+		 */
+		switch (i) {
+		case 0:
+			return std::uniform_int_distribution<uint8_t>(
+				0, UINT8_MAX)(generator);
+		case 1:
+			return std::uniform_int_distribution<uint16_t>(
+				0, UINT16_MAX)(generator);
+		case 2:
+			return std::uniform_int_distribution<uint32_t>(
+				0, UINT32_MAX)(generator);
+		case 3:
+			return std::uniform_int_distribution<uint64_t>(
+				0, UINT64_MAX)(generator);
+		default:
+			unreachable();
+			return 0;
+		}
+	}
+
+	std::random_device dev;
+	std::mt19937 generator;
+	int get_i;
+};
+
+static random_generator random_gen;
 
 enum data_format {
 	/** 5 fields (UINT, STR, NIL, UINT, UINT) + 0-95 optional UINTs. */
@@ -176,9 +219,9 @@ public:
 	const char *end() const { return data_end; }
 	MpData()
 	{
-		uint64_t r1 = (uint64_t)rand() * 1024 + rand();
-		uint64_t r2 = (uint64_t)rand() * 1024 + rand();
-		uint64_t r3 = (uint64_t)rand() * 1024 + rand();
+		uint64_t r1 = random_gen.get();
+		uint64_t r2 = random_gen.get();
+		uint64_t r3 = random_gen.get();
 		const size_t common_size = 12 + mp_sizeof_uint(r1) +
 			mp_sizeof_uint(r2) + mp_sizeof_uint(r3);
 		size_t add_bytes = rand() % (MAX_TUPLE_DATA_SIZE - common_size);
@@ -221,8 +264,8 @@ public:
 		data_end = mp_encode_array(data_end, field_count);
 		for (size_t i = 0; i < field_count; i++) {
 			if (is_non_null[i]) {
-				uint64_t r = (uint64_t)rand() * 1024 + rand();
-				data_end = mp_encode_uint(data_end, r);
+				data_end = mp_encode_uint(data_end,
+							  random_gen.get());
 			} else {
 				data_end = mp_encode_nil(data_end);
 			}
