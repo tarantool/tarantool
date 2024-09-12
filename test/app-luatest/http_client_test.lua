@@ -59,6 +59,7 @@ local function start_server(sock_family)
 end
 
 g.before_each(function(cg)
+    t.skip_if(cg.params.sock_family == 'AF_UNIX', "gh-9854")
     local sock_family = cg.params.sock_family
     cg.server, cg.url, cg.opts = start_server(sock_family)
 end)
