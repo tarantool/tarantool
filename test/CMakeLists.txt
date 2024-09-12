@@ -80,6 +80,7 @@ add_subdirectory(box-tap)
 add_subdirectory(box-luatest)
 add_subdirectory(config-luatest)
 add_subdirectory(engine-luatest)
+add_subdirectory(engine-tap)
 add_subdirectory(metrics-luatest)
 add_subdirectory(replication-luatest)
 add_subdirectory(sql-tap)
@@ -167,12 +168,16 @@ add_custom_target(test-force-ctest
 
 list(APPEND EXECUTED_WITHOUT_TEST_RUN
     app-luatest
+    app-tap
     box-luatest
+    box-tap
     config-luatest
     engine-luatest
+    engine-tap
     metrics-luatest
     replication-luatest
     sql-luatest
+    sql-tap
     vinyl-luatest
 )
 
