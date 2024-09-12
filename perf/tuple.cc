@@ -571,6 +571,28 @@ tuple_tuple_compare(benchmark::State& state)
 
 BENCHMARK(tuple_tuple_compare<FORMAT_BASIC>);
 
+// benchmark of tuple hash.
+template<data_format F>
+static void
+tuple_tuple_hash(benchmark::State& state)
+{
+	BenchDataSimple<F> data;
+	size_t i = 0;
+	size_t total_count = 0;
+	for (auto _ : state) {
+		if (i == NUM_TEST_TUPLES) {
+			total_count += i;
+			i = 0;
+		}
+		benchmark::DoNotOptimize(tuple_hash(data.tuples[i], data.kd));
+		++i;
+	}
+	total_count += i;
+	state.SetItemsProcessed(total_count);
+}
+
+BENCHMARK(tuple_tuple_hash<FORMAT_BASIC>);
+
 // benchmark of tuple hints compare.
 template<data_format F>
 static void
