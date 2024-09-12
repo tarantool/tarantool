@@ -134,8 +134,6 @@ class TupleFormat<FORMAT_BASIC> {
 public:
 	static TupleFormat &instance()
 	{
-		/* Initialize MemtxEngine prior to TupleFormat. */
-		MemtxEngine::instance();
 		static TupleFormat instance;
 		return instance;
 	}
@@ -164,8 +162,6 @@ class TupleFormat<FORMAT_SPARSE> {
 public:
 	static TupleFormat &instance()
 	{
-		/* Initialize MemtxEngine prior to TupleFormat. */
-		MemtxEngine::instance();
 		static TupleFormat instance;
 		return instance;
 	}
@@ -617,6 +613,12 @@ tuple_tuple_compare_hint(benchmark::State& state)
 
 BENCHMARK_TEMPLATE(tuple_tuple_compare_hint, FORMAT_BASIC);
 
-BENCHMARK_MAIN();
+int
+main(int argc, char **argv)
+{
+	MemtxEngine::instance();
+	::benchmark::Initialize(&argc, argv);
+	::benchmark::RunSpecifiedBenchmarks();
+}
 
 #include "debug_warning.h"
