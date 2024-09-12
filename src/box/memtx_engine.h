@@ -186,6 +186,8 @@ struct memtx_engine {
 	 * Format used for allocating functional index keys.
 	 */
 	struct tuple_format *func_key_format;
+	/** Set of extents allocated using malloc. */
+	struct mh_ptr_t *malloc_extents;
 };
 
 struct memtx_gc_task;
