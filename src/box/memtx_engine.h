@@ -186,6 +186,8 @@ struct memtx_engine {
 	 * start.
 	 */
 	int sort_threads;
+	/** Set of extents allocated using malloc. */
+	struct mh_ptr_t *malloc_extents;
 };
 
 struct memtx_gc_task;
