@@ -22,7 +22,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      - uses: ./.github/actions/environment
+      - uses: ./.github/actions/setup-build-env
       - name: packaging
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
