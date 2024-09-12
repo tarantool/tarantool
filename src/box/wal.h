@@ -219,6 +219,16 @@ wal_mode(void);
 int
 wal_sync(struct vclock *vclock);
 
+/**
+ * A wrapper around `wal_sync` that ensures the journal queue is flushed.
+ */
+static inline int
+wal_flush_journal_queue_and_sync(void)
+{
+	journal_queue_flush();
+	return wal_sync(NULL);
+}
+
 struct wal_checkpoint {
 	struct cbus_call_msg base;
 	/**

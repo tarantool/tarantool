@@ -2896,8 +2896,7 @@ box_wait_limbo_acked(double timeout)
 	if (last_entry->lsn < 0) {
 		int64_t tid = last_entry->txn->id;
 
-		journal_queue_flush();
-		if (wal_sync(NULL) != 0)
+		if (wal_flush_journal_queue_and_sync() != 0)
 			return -1;
 
 		if (box_check_promote_term_intact(promote_term) != 0)
