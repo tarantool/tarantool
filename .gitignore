@@ -47,6 +47,7 @@ perf/output/
 test/Makefile
 test/*/Makefile
 test/*/*/Makefile
+test/*/*-workdir-*
 Doxyfile.API
 RPM
 *.src.rpm
