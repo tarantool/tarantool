@@ -1008,12 +1008,14 @@ txn_journal_entry_new(struct txn *txn)
 
 		req->approx_len += xrow_approx_len(stmt->row);
 	}
+	if (is_fully_nop)
+		txn_set_flags(txn, TXN_FORCE_ASYNC);
 	/*
 	 * There is no a check for all-local rows, because a local
 	 * space can't be synchronous. So if there is at least one
 	 * synchronous space, the transaction is not local.
 	 */
-	if (!txn_has_flag(txn, TXN_FORCE_ASYNC) && !is_fully_nop) {
+	if (!txn_has_flag(txn, TXN_FORCE_ASYNC)) {
 		if (is_sync) {
 			/*
 			 * Can't commit a fully local transaction synchronously.
