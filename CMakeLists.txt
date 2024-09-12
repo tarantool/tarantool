@@ -19,6 +19,7 @@ include(FindOptionalPackage)
 include(FindPackageMessage)
 include(ExternalProject)
 include(CheckPatch)
+include(MakeLuaPath)
 
 find_program(ECHO echo)
 find_program(CAT cat)
