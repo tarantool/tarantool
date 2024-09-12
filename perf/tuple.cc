@@ -577,6 +577,80 @@ tuple_tuple_compare(benchmark::State& state)
 
 BENCHMARK_TEMPLATE(tuple_tuple_compare, FORMAT_BASIC);
 
+static void
+tuple_tuple_hash_impl(benchmark::State &state, struct key_def *kd)
+{
+	struct tuple_format *format = TupleFormat<FORMAT_BASIC>::make(kd);
+	TestTuples<FORMAT_BASIC> tuples(format);
+	size_t i = 0;
+	size_t total_count = 0;
+	for (auto _ : state) {
+		if (i == NUM_TEST_TUPLES) {
+			total_count += i;
+			i = 0;
+		}
+		benchmark::DoNotOptimize(tuple_hash(tuples[i], kd));
+		++i;
+	}
+	total_count += i;
+	state.SetItemsProcessed(total_count);
+	tuple_format_unref(format);
+}
+
+static void
+tuple_tuple_hash_fast_one_uint(benchmark::State &state)
+{
+	struct key_part_def kdp = key_part_def_default;
+	kdp.fieldno = 0;
+	kdp.type = FIELD_TYPE_UNSIGNED;
+	struct key_def *kd = key_def_new(&kdp, 1, 0);
+	tuple_tuple_hash_impl(state, kd);
+	key_def_delete(kd);
+}
+
+BENCHMARK(tuple_tuple_hash_fast_one_uint);
+
+static void
+tuple_tuple_hash_fast_multiple_fields(benchmark::State &state)
+{
+	struct key_part_def kdp[2];
+	kdp[0] = key_part_def_default;
+	kdp[0].fieldno = 0;
+	kdp[0].type = FIELD_TYPE_UNSIGNED;
+	kdp[1] = key_part_def_default;
+	kdp[1].fieldno = 1;
+	kdp[1].type = FIELD_TYPE_STRING;
+	struct key_def *kd = key_def_new(kdp, 2, 0);
+	tuple_tuple_hash_impl(state, kd);
+	key_def_delete(kd);
+}
+
+BENCHMARK(tuple_tuple_hash_fast_multiple_fields);
+
+static void
+tuple_tuple_hash_slow(benchmark::State &state)
+{
+	struct key_part_def kdp[2];
+
+	kdp[0] = key_part_def_default;
+	kdp[0].fieldno = 0;
+	kdp[0].type = FIELD_TYPE_UNSIGNED;
+	kdp[0].is_nullable = true;
+	kdp[0].nullable_action = ON_CONFLICT_ACTION_NONE;
+
+	kdp[1] = key_part_def_default;
+	kdp[1].fieldno = 1;
+	kdp[1].type = FIELD_TYPE_STRING;
+	kdp[1].is_nullable = true;
+	kdp[1].nullable_action = ON_CONFLICT_ACTION_NONE;
+
+	struct key_def *kd = key_def_new(kdp, 2, 0);
+	tuple_tuple_hash_impl(state, kd);
+	key_def_delete(kd);
+}
+
+BENCHMARK(tuple_tuple_hash_slow);
+
 // benchmark of tuple hints compare.
 template<data_format F>
 static void
