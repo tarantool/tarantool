@@ -426,7 +426,12 @@ box.cfg{
 
 -- A lot of tests from sql-tap are very long and not designed to be limited
 require('fiber').set_max_slice(100500)
-local engine = test_run and test_run:get_cfg('engine') or 'memtx'
+-- Default value `memtx` was added to have ability to run a
+-- `sql-tap` test w/o `test-run.py`, see commit
+-- 84cb1e049272e20c8ad33c883c0f1d6fa0930698
+-- ('sql: increase time quota for selectG test on vinyl').
+local engine = test_run and test_run:get_cfg('engine') or
+               (os.getenv('TEST_ENGINE') or 'memtx')
 box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 box.space._session_settings:update('sql_seq_scan', {{'=', 2, true}})
 
