@@ -952,7 +952,7 @@ get_int32_from_mp(const char **data, int32_t *value)
 	switch (mp_typeof(**data)) {
 	case MP_INT: {
 		int64_t val = mp_decode_int(data);
-		if (val < INT32_MIN)
+		if (val < INT32_MIN || val > INT32_MAX)
 			return -1;
 		*value = val;
 		break;
