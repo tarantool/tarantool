@@ -32,13 +32,22 @@ local MAX_SINT32_LL = 2LL^31 - 1
 local MAX_SINT32_ULL = 2ULL^31 - 1
 local MAX_SINT64_ULL = 2ULL^63 - 1
 
+-- Acceptable protobuf types
+local WIRE_TYPE_VARINT = 0
+local WIRE_TYPE_I64 = 1
+local WIRE_TYPE_LEN = 2
+-- SGROUP (3) and EGROUP (4) are deprecated in proto3.
+local WIRE_TYPE_I32 = 5
+
 
 local int64_t = ffi.typeof('int64_t')
 local uint64_t = ffi.typeof('uint64_t')
 
 -- Forward declarations
 local encode
+local decode
 local encode_field
+local decode_field
 local validate_scalar
 
 local scalars = {}
@@ -53,6 +62,7 @@ scalars.float = {
         number = {-MAX_FLOAT, MAX_FLOAT},
     },
     encode = wireformat.encode_float,
+    decode = wireformat.decode_float,
 }
 
 scalars.fixed32 = {
@@ -65,6 +75,7 @@ scalars.fixed32 = {
         uint64 = {nil, MAX_UINT32_ULL},
     },
     encode = wireformat.encode_fixed32,
+    decode = wireformat.decode_fixed32,
 }
 
 scalars.sfixed32 = {
@@ -77,6 +88,7 @@ scalars.sfixed32 = {
         uint64 = {nil, MAX_SINT32_ULL},
     },
     encode = wireformat.encode_fixed32,
+    decode = wireformat.decode_sfixed32,
 }
 
 scalars.double = {
@@ -84,6 +96,7 @@ scalars.double = {
     encode_as_packed = true,
     integral_only = false,
     encode = wireformat.encode_double,
+    decode = wireformat.decode_double,
 }
 
 scalars.fixed64 = {
@@ -95,6 +108,7 @@ scalars.fixed64 = {
         int64 = {0LL, nil},
     },
     encode = wireformat.encode_fixed64,
+    decode = wireformat.decode_fixed64,
 }
 
 scalars.sfixed64 = {
@@ -106,12 +120,14 @@ scalars.sfixed64 = {
         uint64 = {nil, MAX_SINT64_ULL},
     },
     encode = wireformat.encode_fixed64,
+    decode = wireformat.decode_sfixed64,
 }
 
 scalars.string = {
     accept_type = 'string',
     encode_as_packed = false,
     encode = wireformat.encode_len,
+    decode = wireformat.decode_len,
 }
 
 scalars.bytes = scalars.string
@@ -126,6 +142,7 @@ scalars.int32 = {
         uint64 = {nil, MAX_SINT32_ULL},
     },
     encode = wireformat.encode_int,
+    decode = wireformat.decode_int,
 }
 
 scalars.sint32 = {
@@ -138,6 +155,7 @@ scalars.sint32 = {
         uint64 = {nil, MAX_SINT32_ULL},
     },
     encode = wireformat.encode_sint,
+    decode = wireformat.decode_sint,
 }
 
 scalars.uint32 = {
@@ -150,6 +168,7 @@ scalars.uint32 = {
         uint64 = {nil, MAX_UINT32_ULL},
     },
     encode = wireformat.encode_int,
+    decode = wireformat.decode_uint,
 }
 
 scalars.int64 = {
@@ -161,6 +180,7 @@ scalars.int64 = {
         uint64 = {nil, MAX_SINT64_ULL},
     },
     encode = wireformat.encode_int,
+    decode = wireformat.decode_int,
 }
 
 scalars.sint64 = {
@@ -172,6 +192,7 @@ scalars.sint64 = {
         uint64 = {nil, MAX_SINT64_ULL},
     },
     encode = wireformat.encode_sint,
+    decode = wireformat.decode_sint,
 }
 
 scalars.uint64 = {
@@ -183,12 +204,14 @@ scalars.uint64 = {
         int64 = {0LL, nil},
     },
     encode = wireformat.encode_int,
+    decode = wireformat.decode_uint,
 }
 
 scalars.bool = {
     accept_type = 'boolean',
     encode_as_packed = true,
     encode = wireformat.encode_int,
+    decode = wireformat.decode_bool,
 }
 
 -- }}} Scalar type definitions
@@ -500,6 +523,19 @@ local function validate_type(field_def, value, exp_type)
     return
 end
 
+local function validate_field_id(field_id)
+    if field_id < MIN_FIELD_ID or field_id > MAX_FIELD_ID then
+        error(('Id %d is out of range [%d; %d]'):format(
+            field_id, MIN_FIELD_ID, MAX_FIELD_ID))
+    end
+    if field_id >= RESERVED_FIELD_ID_MIN and
+        field_id <= RESERVED_FIELD_ID_MAX then
+        error(('Id %d is in reserved ' ..
+            'id range [%d, %d]'):format(field_id,
+            RESERVED_FIELD_ID_MIN, RESERVED_FIELD_ID_MAX))
+    end
+end
+
 local function validate_range(field_def, value, range)
     local min = range ~= nil and range[1] or nil
     local max = range ~= nil and range[2] or nil
@@ -542,6 +578,37 @@ validate_scalar = function(field_def, value)
                 or 'uint64'
         end
         validate_range(field_def, value, scalar_def.limits[value_type])
+    end
+end
+
+local function validate_decoded_type(protocol, field_def, wire_type)
+    local protobuf_wire_types = {[0] = 'varint', [1] = 'I64',
+        [2] = 'len', [5] = 'I32'}
+    if protobuf_wire_types[wire_type] == nil then
+        error(('Decoding data contains incorrect protobuf type: %d'):format(
+            wire_type))
+    end
+    if field_def == nil then
+        return
+    end
+    local exp_type = field_def.type
+    local exp_wire_type = WIRE_TYPE_VARINT
+    if exp_type == 'string' or exp_type == 'bytes' or field_def.repeated
+        and is_scalar(field_def) then
+            exp_wire_type = WIRE_TYPE_LEN
+    elseif exp_type == 'double' or exp_type == 'fixed64' or
+        exp_type == 'sfixed64' then
+            exp_wire_type = WIRE_TYPE_I64
+    elseif exp_type == 'float' or exp_type == 'fixed32' or
+        exp_type == 'sfixed32' then
+            exp_wire_type = WIRE_TYPE_I32
+    elseif not is_scalar(field_def) and is_message(protocol, field_def) then
+        exp_wire_type = WIRE_TYPE_LEN
+    end
+    if wire_type ~= exp_wire_type then
+        error(('Value for %q field was encoded as %q and can`t be decoded ' ..
+            'as %q'):format(field_def.name, protobuf_wire_types[wire_type],
+            protobuf_wire_types[exp_wire_type]))
     end
 end
 
@@ -657,9 +724,140 @@ end
 
 -- }}} Encoders
 
+-- {{{ Decoders
+
+local function read_unknown_field(ctx, type)
+    local res = string.sub(ctx.val, ctx.pos - 1, ctx.pos - 1)
+    local begin = ctx.pos
+    if type == WIRE_TYPE_LEN then
+        local len
+        len, ctx = wireformat.decode_int(ctx)
+        ctx.pos = ctx.pos + len
+    elseif type == WIRE_TYPE_I32 then
+        ctx.pos = ctx.pos + 4
+    elseif type == WIRE_TYPE_I64 then
+        ctx.pos = ctx.pos + 8
+    else
+        local _, res_ctx = wireformat.decode_int(ctx)
+        ctx = res_ctx
+    end
+    res = res .. string.sub(ctx.val, begin, ctx.pos - 1)
+    return res, ctx
+end
+
+local function decode_repeated(protocol, field_def, ctx)
+    local res = {}
+    local decode_from_packed = false
+    if is_scalar(field_def) then
+        local scalar_def = scalars[field_def.type]
+        decode_from_packed = scalar_def.encode_as_packed
+    end
+    if decode_from_packed then
+        local len
+        len, ctx = wireformat.decode_int(ctx)
+        local start_pos = ctx.pos
+        local value
+        while ctx.pos < start_pos + len do
+            value, ctx = decode_field(protocol, field_def, ctx, true)
+            table.insert(res, value)
+        end
+    else
+        repeat
+            local value, field_id
+            value, ctx = decode_field(protocol, field_def, ctx, true)
+            table.insert(res, value)
+            if ctx.pos > string.len(ctx.val) then
+                return res, ctx
+            else
+                local _, res_id, res_ctx = wireformat.decode_tag(ctx)
+                ctx = res_ctx
+                field_id = res_id
+            end
+        until field_id ~= field_def.id
+        ctx.pos = ctx.pos - 1
+    end
+    return res, ctx
+end
+
+decode_field = function(protocol, field_def, ctx, ignore_repeated)
+    local res
+    if field_def.repeated and not ignore_repeated then
+        res, ctx = decode_repeated(protocol, field_def, ctx)
+    elseif is_scalar(field_def) then
+        local scalar_def = scalars[field_def.type]
+        res, ctx = scalar_def.decode(ctx)
+        validate_scalar(field_def, res)
+    elseif is_enum(protocol, field_def) then
+        local value
+        value, ctx = wireformat.decode_int(ctx)
+        local curr_enum = protocol[field_def.type]
+        if curr_enum.value_by_id[value] then
+            res = curr_enum.value_by_id[value]
+        else
+            res = value
+        end
+    elseif is_message(protocol, field_def) then
+        local msg_data
+        msg_data, ctx = wireformat.decode_len(ctx)
+        res = decode(protocol, field_def.type, msg_data, ctx.set_default)
+    end
+    return res, ctx
+end
+
+decode = function(protocol, message_name, data, set_default)
+    local buf = {}
+    local ctx = {val = data, pos = 1, set_default = set_default}
+    local type, field_id
+    local message_def = protocol[message_name]
+    if message_def == nil then
+        error(('There is no message or enum named %q in the given protocol')
+            :format(message_name))
+    end
+    if message_def.type ~= 'message' then
+        assert(message_def.type == 'enum')
+        error(('Attempt to decode enum %q as a top level message'):format(
+            message_name))
+    end
+    local field_by_id = message_def.field_by_id
+    while ctx.pos <= string.len(ctx.val) do
+        -- Read tag from input get type and field_id
+        type, field_id, ctx = wireformat.decode_tag(ctx)
+        local field_def = field_by_id[field_id]
+        validate_field_id(field_id)
+        validate_decoded_type(protocol, field_def, type)
+        if field_def == nil then
+            local res
+            res, ctx = read_unknown_field(ctx, type)
+            if buf['_unknown_fields'] == nil then
+                buf['_unknown_fields'] = {}
+            end
+            table.insert(buf['_unknown_fields'], res)
+        else
+            buf[field_def.name], ctx = decode_field(protocol, field_def, ctx)
+        end
+    end
+    if set_default then
+        for field_id, _ in pairs(field_by_id) do
+            local field_def = field_by_id[field_id]
+            if buf[field_def.name] == nil then
+                if is_scalar(field_def) then
+                    buf[field_def.name] = wireformat.set_default(field_def.type)
+                elseif is_enum(protocol, field_def) then
+                    local curr_enum = protocol[field_def.type]
+                    buf[field_def.name] = curr_enum.value_by_id[0]
+                end
+            end
+        end
+    end
+    return buf
+end
+
+-- }}} Decoders
+
 protocol_mt = {
     __index = {
         encode = encode,
+        decode = decode,
     }
 }
 
