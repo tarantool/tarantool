@@ -8,7 +8,7 @@ tool.
 
 Run a Tarantool instance:
 
-$ tt start --name <instance name>
+$ tt start <app name>:<instance name>
 
 Connect to an instance:
 
@@ -125,7 +125,7 @@ tool.
 
 Run a Tarantool instance:
 
-$ tt start --name <instance name>
+$ tt start <app name>:<instance name>
 
 Connect to an instance:
 
