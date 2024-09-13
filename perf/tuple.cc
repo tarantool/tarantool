@@ -73,7 +73,6 @@ public:
 		return instance;
 	}
 	struct memtx_engine *engine() { return &memtx; }
-	struct key_def *key_def() { return kd; }
 private:
 	MemtxEngine()
 	{
@@ -104,15 +103,9 @@ private:
 		memtx_set_tuple_format_vtab("small");
 
 		memtx.max_tuple_size = 1024 * 1024;
-
-		struct key_part_def kdp{0};
-		kdp.fieldno = 4;
-		kdp.type = FIELD_TYPE_UNSIGNED;
-		kd = key_def_new(&kdp, 1, 0);
 	}
 	~MemtxEngine()
 	{
-		key_def_delete(kd);
 		tuple_free();
 		SmallAlloc::destroy();
 		slab_cache_destroy(&memtx.slab_cache);
@@ -122,7 +115,6 @@ private:
 	}
 
 	struct memtx_engine memtx;
-	struct key_def *kd;
 };
 
 /** Class that creates and destroys tuple format. */
@@ -132,46 +124,24 @@ class TupleFormat;
 template<>
 class TupleFormat<FORMAT_BASIC> {
 public:
-	static TupleFormat &instance()
-	{
-		static TupleFormat instance;
-		return instance;
-	}
-	struct tuple_format *format() { return fmt; }
-private:
-	TupleFormat()
+	static struct tuple_format *make(struct key_def *kd)
 	{
 		struct memtx_engine *memtx = MemtxEngine::instance().engine();
-		struct key_def *kd = MemtxEngine::instance().key_def();
-		fmt = simple_tuple_format_new(&memtx_tuple_format_vtab, memtx,
-					      &kd, 1);
+		struct tuple_format *fmt = simple_tuple_format_new(
+			&memtx_tuple_format_vtab, memtx, &kd, 1);
 		if (fmt == NULL)
 			abort();
 		tuple_format_ref(fmt);
+		return fmt;
 	}
-	~TupleFormat()
-	{
-		tuple_format_unref(fmt);
-	}
-
-	struct tuple_format *fmt;
 };
 
 template<>
 class TupleFormat<FORMAT_SPARSE> {
 public:
-	static TupleFormat &instance()
-	{
-		static TupleFormat instance;
-		return instance;
-	}
-	size_t field_count() { return FIELD_COUNT; }
-	struct tuple_format *format() { return fmt; }
-private:
-	TupleFormat()
+	static struct tuple_format *make(struct key_def *kd)
 	{
 		struct memtx_engine *memtx = MemtxEngine::instance().engine();
-		struct key_def *kd = MemtxEngine::instance().key_def();
 
 		std::vector<char[sizeof("f999")]> names(FIELD_COUNT);
 		std::vector<struct field_def> fields(FIELD_COUNT);
@@ -187,21 +157,18 @@ private:
 			tuple_dictionary_new(fields.data(), FIELD_COUNT);
 		if (dict == NULL)
 			abort();
-		fmt = tuple_format_new(&memtx_tuple_format_vtab, memtx, &kd, 1,
-				       fields.data(), FIELD_COUNT, FIELD_COUNT,
-				       dict, false, false, NULL, 0, NULL, 0);
+		struct tuple_format *fmt = tuple_format_new(
+			&memtx_tuple_format_vtab, memtx, &kd, 1, fields.data(),
+			FIELD_COUNT, FIELD_COUNT, dict, false, false, NULL, 0,
+			NULL, 0);
 		if (fmt == NULL)
 			abort();
 		tuple_format_ref(fmt);
 		tuple_dictionary_unref(dict);
-	}
-	~TupleFormat()
-	{
-		tuple_format_unref(fmt);
+		return fmt;
 	}
 
 	static const size_t FIELD_COUNT = 1000;
-	struct tuple_format *fmt;
 };
 
 // Generator of random msgpack array.
@@ -250,8 +217,7 @@ public:
 	const char *end() const { return data_end; }
 	MpData()
 	{
-		size_t field_count =
-			TupleFormat<FORMAT_SPARSE>::instance().field_count();
+		size_t field_count = TupleFormat<FORMAT_SPARSE>::FIELD_COUNT;
 		std::vector<bool> is_non_null(field_count);
 		for (size_t i = 0; i < FIELD_COUNT_NON_NULL; i++)
 			is_non_null[rand() % field_count] = true;
@@ -280,11 +246,6 @@ private:
 template<data_format F>
 class MpDataSet {
 public:
-	static MpDataSet &instance()
-	{
-		static MpDataSet instance;
-		return instance;
-	}
 	MpDataSet() : data(NUM_TEST_TUPLES) {}
 	const MpData<F> &operator[](size_t i) const { return data[i]; }
 private:
@@ -295,12 +256,9 @@ private:
 template<data_format F>
 class TestTuples {
 public:
-	TestTuples()
+	TestTuples(struct tuple_format *format)
 	{
-		format = TupleFormat<F>::instance().format();
-		tuple_format_ref(format);
-		MpDataSet<F> &dataset = MpDataSet<F>::instance();
-
+		MpDataSet<F> dataset;
 		for (size_t i = 0; i < NUM_TEST_TUPLES; i++) {
 			data[i] = box_tuple_new(format,
 						dataset[i].begin(),
@@ -313,13 +271,36 @@ public:
 		for (size_t i = 0; i < NUM_TEST_TUPLES; i++)
 			tuple_unref(data[i]);
 
-		tuple_format_unref(format);
 	}
 	struct tuple *operator[](size_t i) { return data[i]; }
 
 private:
-	struct tuple_format *format;
 	struct tuple *data[NUM_TEST_TUPLES];
+};
+
+template<data_format F>
+struct BenchDataSimple {
+	BenchDataSimple()
+		: kd([]() {
+			struct key_part_def kdp {0};
+			kdp.fieldno = 4;
+			kdp.type = FIELD_TYPE_UNSIGNED;
+			return key_def_new(&kdp, 1, 0);
+		} ())
+		, format(TupleFormat<F>::make(kd))
+		, tuples(format)
+	{
+	}
+
+	~BenchDataSimple()
+	{
+		tuple_format_unref(format);
+		key_def_delete(kd);
+	}
+
+	struct key_def *kd;
+	struct tuple_format *format;
+	TestTuples<F> tuples;
 };
 
 // box_tuple_new benchmark.
@@ -327,10 +308,14 @@ template<data_format F>
 static void
 bench_tuple_new(benchmark::State& state)
 {
+	struct key_part_def kdp {0};
+	kdp.fieldno = 4;
+	kdp.type = FIELD_TYPE_UNSIGNED;
+	struct key_def *kd = key_def_new(&kdp, 1, 0);
 	size_t total_count = 0;
 
-	struct tuple_format *format = TupleFormat<F>::instance().format();
-	MpDataSet<F> &dataset = MpDataSet<F>::instance();
+	struct tuple_format *format = TupleFormat<F>::make(kd);
+	MpDataSet<F> dataset;
 	struct tuple *tuples[NUM_TEST_TUPLES];
 	size_t i = 0;
 
@@ -354,6 +339,8 @@ bench_tuple_new(benchmark::State& state)
 
 	for (size_t k = 0; k < i; k++)
 		tuple_unref(tuples[k]);
+	tuple_format_unref(format);
+	key_def_delete(kd);
 }
 
 BENCHMARK_TEMPLATE(bench_tuple_new, FORMAT_BASIC);
@@ -364,10 +351,14 @@ template<data_format F>
 static void
 bench_tuple_delete(benchmark::State& state)
 {
+	struct key_part_def kdp {0};
+	kdp.fieldno = 4;
+	kdp.type = FIELD_TYPE_UNSIGNED;
+	struct key_def *kd = key_def_new(&kdp, 1, 0);
 	size_t total_count = 0;
 
-	struct tuple_format *format = TupleFormat<F>::instance().format();
-	MpDataSet<F> &dataset = MpDataSet<F>::instance();
+	struct tuple_format *format = TupleFormat<F>::make(kd);
+	MpDataSet<F> dataset;
 	struct tuple *tuples[NUM_TEST_TUPLES];
 
 	size_t i = NUM_TEST_TUPLES;
@@ -391,6 +382,8 @@ bench_tuple_delete(benchmark::State& state)
 
 	for (size_t k = i; k < NUM_TEST_TUPLES; k++)
 		tuple_unref(tuples[k]);
+	tuple_format_unref(format);
+	key_def_delete(kd);
 }
 
 BENCHMARK_TEMPLATE(bench_tuple_delete, FORMAT_BASIC);
@@ -399,16 +392,16 @@ template<data_format F>
 static void
 bench_tuple_ref_unref_low(benchmark::State& state)
 {
-	TestTuples<F> tuples;
+	BenchDataSimple<F> data;
 	size_t total_count = 0;
 	const size_t NUM_REFS = 32;
 	for (auto _ : state) {
 		for (size_t k = 0; k < NUM_REFS; k++)
 			for (size_t i = 0; i < NUM_TEST_TUPLES; i++)
-				tuple_ref(tuples[i]);
+				tuple_ref(data.tuples[i]);
 		for (size_t k = 0; k < NUM_REFS; k++)
 			for (size_t i = 0; i < NUM_TEST_TUPLES; i++)
-				tuple_unref(tuples[i]);
+				tuple_unref(data.tuples[i]);
 		total_count += NUM_REFS * NUM_TEST_TUPLES;
 	}
 	state.SetItemsProcessed(total_count);
@@ -420,16 +413,16 @@ template<data_format F>
 static void
 bench_tuple_ref_unref_high(benchmark::State& state)
 {
-	TestTuples<F> tuples;
+	BenchDataSimple<F> data;
 	size_t total_count = 0;
 	const size_t NUM_REFS = 1024;
 	for (auto _ : state) {
 		for (size_t k = 0; k < NUM_REFS; k++)
 			for (size_t i = 0; i < NUM_TEST_TUPLES; i++)
-				tuple_ref(tuples[i]);
+				tuple_ref(data.tuples[i]);
 		for (size_t k = 0; k < NUM_REFS; k++)
 			for (size_t i = 0; i < NUM_TEST_TUPLES; i++)
-				tuple_unref(tuples[i]);
+				tuple_unref(data.tuples[i]);
 		total_count += NUM_REFS * NUM_TEST_TUPLES;
 	}
 	state.SetItemsProcessed(total_count);
@@ -442,7 +435,7 @@ template<data_format F>
 static void
 tuple_access_members(benchmark::State& state)
 {
-	TestTuples<F> tuples;
+	BenchDataSimple<F> data;
 	size_t i = 0;
 	size_t total_count = 0;
 	for (auto _ : state) {
@@ -450,7 +443,7 @@ tuple_access_members(benchmark::State& state)
 			total_count += i;
 			i = 0;
 		}
-		struct tuple *t = tuples[i++];
+		struct tuple *t = data.tuples[i++];
 		// Previously tuple had is_dirty bit field, which was later
 		// replaced with tuple flags. So to avoid changing test
 		// semantics we check now if tuple has corresponding flag.
@@ -468,7 +461,7 @@ template<data_format F>
 static void
 tuple_access_data(benchmark::State& state)
 {
-	TestTuples<F> tuples;
+	BenchDataSimple<F> data;
 	size_t i = 0;
 	size_t total_count = 0;
 	for (auto _ : state) {
@@ -476,7 +469,7 @@ tuple_access_data(benchmark::State& state)
 			total_count += i;
 			i = 0;
 		}
-		struct tuple *t = tuples[i++];
+		struct tuple *t = data.tuples[i++];
 		benchmark::DoNotOptimize(*tuple_data(t));
 	}
 	total_count += i;
@@ -490,7 +483,7 @@ template<data_format F>
 static void
 tuple_access_data_range(benchmark::State& state)
 {
-	TestTuples<F> tuples;
+	BenchDataSimple<F> data;
 	size_t i = 0;
 	size_t total_count = 0;
 	for (auto _ : state) {
@@ -498,7 +491,7 @@ tuple_access_data_range(benchmark::State& state)
 			total_count += i;
 			i = 0;
 		}
-		struct tuple *t = tuples[i++];
+		struct tuple *t = data.tuples[i++];
 		uint32_t size;
 		benchmark::DoNotOptimize(*tuple_data_range(t, &size));
 		benchmark::DoNotOptimize(size);
@@ -514,7 +507,7 @@ template<data_format F>
 static void
 tuple_access_unindexed_field(benchmark::State& state)
 {
-	TestTuples<F> tuples;
+	BenchDataSimple<F> data;
 	size_t i = 0;
 	size_t total_count = 0;
 	for (auto _ : state) {
@@ -522,7 +515,7 @@ tuple_access_unindexed_field(benchmark::State& state)
 			total_count += i;
 			i = 0;
 		}
-		struct tuple *t = tuples[i++];
+		struct tuple *t = data.tuples[i++];
 		benchmark::DoNotOptimize(*tuple_field(t, 3));
 	}
 	total_count += i;
@@ -536,7 +529,7 @@ template<data_format F>
 static void
 tuple_access_indexed_field(benchmark::State& state)
 {
-	TestTuples<F> tuples;
+	BenchDataSimple<F> data;
 	size_t i = 0;
 	size_t total_count = 0;
 	for (auto _ : state) {
@@ -544,7 +537,7 @@ tuple_access_indexed_field(benchmark::State& state)
 			total_count += i;
 			i = 0;
 		}
-		struct tuple *t = tuples[i];
+		struct tuple *t = data.tuples[i];
 		benchmark::DoNotOptimize(*tuple_field(t, 4));
 		++i;
 	}
@@ -559,10 +552,9 @@ template<data_format F>
 static void
 tuple_tuple_compare(benchmark::State& state)
 {
-	TestTuples<F> tuples;
+	BenchDataSimple<F> data;
 	size_t i = 0;
 	size_t j = 0;
-	struct key_def *kd = MemtxEngine::instance().key_def();
 	size_t total_count = 0;
 	for (auto _ : state) {
 		if (i == NUM_TEST_TUPLES) {
@@ -571,9 +563,9 @@ tuple_tuple_compare(benchmark::State& state)
 		}
 		if (j >= NUM_TEST_TUPLES)
 			j -= NUM_TEST_TUPLES;
-		struct tuple *t1 = tuples[i];
-		struct tuple *t2 = tuples[j];
-		benchmark::DoNotOptimize(tuple_compare(t1, 0, t2, 0, kd));
+		struct tuple *t1 = data.tuples[i];
+		struct tuple *t2 = data.tuples[j];
+		benchmark::DoNotOptimize(tuple_compare(t1, 0, t2, 0, data.kd));
 		++i;
 		j += 3;
 	}
@@ -588,10 +580,9 @@ template<data_format F>
 static void
 tuple_tuple_compare_hint(benchmark::State& state)
 {
-	TestTuples<F> tuples;
+	BenchDataSimple<F> data;
 	size_t i = 0;
 	size_t j = 0;
-	struct key_def *kd = MemtxEngine::instance().key_def();
 	size_t total_count = 0;
 	for (auto _ : state) {
 		if (i == NUM_TEST_TUPLES) {
@@ -600,11 +591,12 @@ tuple_tuple_compare_hint(benchmark::State& state)
 		}
 		if (j >= NUM_TEST_TUPLES)
 			j -= NUM_TEST_TUPLES;
-		struct tuple *t1 = tuples[i];
-		struct tuple *t2 = tuples[j];
-		hint_t h1 = tuple_hint(t1, kd);
-		hint_t h2 = tuple_hint(t2, kd);
-		benchmark::DoNotOptimize(tuple_compare(t1, h1, t2, h2, kd));
+		struct tuple *t1 = data.tuples[i];
+		struct tuple *t2 = data.tuples[j];
+		hint_t h1 = tuple_hint(t1, data.kd);
+		hint_t h2 = tuple_hint(t2, data.kd);
+		benchmark::DoNotOptimize(tuple_compare(
+			t1, h1, t2, h2, data.kd));
 		++i;
 		j += 3;
 	}
