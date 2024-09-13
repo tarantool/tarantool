@@ -282,7 +282,7 @@ template<data_format F>
 struct BenchDataSimple {
 	BenchDataSimple()
 		: kd([]() {
-			struct key_part_def kdp {0};
+			struct key_part_def kdp = key_part_def_default;
 			kdp.fieldno = 4;
 			kdp.type = FIELD_TYPE_UNSIGNED;
 			return key_def_new(&kdp, 1, 0);
@@ -308,9 +308,11 @@ template<data_format F>
 static void
 bench_tuple_new(benchmark::State& state)
 {
-	struct key_part_def kdp {0};
+	struct key_part_def kdp = key_part_def_default;
 	kdp.fieldno = 4;
 	kdp.type = FIELD_TYPE_UNSIGNED;
+	kdp.is_nullable = true;
+	kdp.nullable_action = ON_CONFLICT_ACTION_NONE;
 	struct key_def *kd = key_def_new(&kdp, 1, 0);
 	size_t total_count = 0;
 
@@ -351,7 +353,7 @@ template<data_format F>
 static void
 bench_tuple_delete(benchmark::State& state)
 {
-	struct key_part_def kdp {0};
+	struct key_part_def kdp = key_part_def_default;
 	kdp.fieldno = 4;
 	kdp.type = FIELD_TYPE_UNSIGNED;
 	struct key_def *kd = key_def_new(&kdp, 1, 0);
