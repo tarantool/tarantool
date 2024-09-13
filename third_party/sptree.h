@@ -31,6 +31,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include <assert.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -43,6 +44,7 @@ extern "C" {
 typedef    uint32_t spnode_t;
 #define    SPNIL (0xffffffff)
 #define SPTREE_MIN_SIZE 64
+#define SPTREE_MAX_DEPTH 48
 
 typedef struct sptree_node_pointers {
     uint32_t    left;   /* sizeof(spnode_t) >= sizeof(sptree_node_pointers.left) !!! */
@@ -116,14 +118,13 @@ typedef struct sptree_##name {                                                  
     spnode_t                garbage_head;                                                 \
     spnode_t                size;                                                         \
     spnode_t                max_size;                                                     \
-    spnode_t                max_depth;                                                    \
 } sptree_##name;                                                                          \
                                                                                           \
 static spnode_t                                                                           \
 sptree_##name##_mktree(sptree_##name *t, spnode_t depth, spnode_t start, spnode_t end) {  \
     spnode_t    half = ( (end + start) >> 1 ), tmp;                                       \
                                                                                           \
-    if (depth > t->max_depth) t->max_depth = depth;                                       \
+    assert(depth <= SPTREE_MAX_DEPTH);                                                    \
                                                                                           \
     if ( half == start ||                                                                 \
             ( tmp = sptree_##name##_mktree(t, depth+1, start, half)) == half )            \
@@ -354,7 +355,7 @@ sptree_##name##_balance(sptree_##name *t, spnode_t node, spnode_t size) {       
 static inline int                                                                         \
 sptree_##name##_replace(sptree_##name *t, void *v, void **p_old) {                        \
     spnode_t    node, depth = 0;                                                          \
-    spnode_t    path[ t->max_depth + 2];                                                  \
+    spnode_t    path[ SPTREE_MAX_DEPTH + 1];                                              \
                                                                                           \
     if (t->root == SPNIL) {                                                               \
         _SET_SPNODE_LEFT(0, SPNIL);                                                       \
@@ -380,6 +381,7 @@ sptree_##name##_replace(sptree_##name *t, void *v, void **p_old) {              
             }                                                                             \
             path[depth] = parent;                                                         \
             depth++;                                                                      \
+            assert(depth <= SPTREE_MAX_DEPTH);                                            \
             if (r>0) {                                                                    \
                 if (_GET_SPNODE_RIGHT(parent) == SPNIL) {                                 \
                     /* extra element can be needed for current balance implementation*/   \
@@ -415,8 +417,6 @@ sptree_##name##_replace(sptree_##name *t, void *v, void **p_old) {              
     t->size++;                                                                            \
     if ( t->size > t->max_size )                                                          \
         t->max_size = t->size;                                                            \
-    if ( depth > t->max_depth )                                                           \
-        t->max_depth = depth;                                                             \
                                                                                           \
     if ( (double)depth > COUNTALPHA(t->size)) {                                           \
         spnode_t    parent;                                                               \
@@ -528,7 +528,7 @@ sptree_##name##_walk(sptree_##name *t, void* array, spnode_t limit, spnode_t off
     int         level = 0;                                                                \
     spnode_t    count= 0,                                                                 \
                 node,                                                                     \
-                stack[ t->max_depth + 1 ];                                                \
+                stack[ SPTREE_MAX_DEPTH + 1 ];                                            \
                                                                                           \
     if (t->root == SPNIL) return 0;                                                       \
     stack[0] = t->root;                                                                   \
@@ -561,7 +561,7 @@ static inline void                                                              
 sptree_##name##_walk_cb(sptree_##name *t, int (*cb)(void*, void*), void *cb_arg ) {       \
     int         level = 0;                                                                \
     spnode_t    node,                                                                     \
-                stack[ t->max_depth + 1 ];                                                \
+                stack[ SPTREE_MAX_DEPTH + 1 ];                                            \
                                                                                           \
     if (t->root == SPNIL) return;                                                         \
     stack[0] = t->root;                                                                   \
@@ -588,14 +588,13 @@ sptree_##name##_walk_cb(sptree_##name *t, int (*cb)(void*, void*), void *cb_arg 
 typedef struct sptree_##name##_iterator {                                                 \
     const sptree_##name        *t;                                                        \
     int                  level;                                                           \
-    spnode_t             max_depth;                                                       \
     spnode_t             stack[0];                                                        \
 } sptree_##name##_iterator;                                                               \
                                                                                           \
 static inline sptree_##name##_iterator *                                                  \
 sptree_##name##_iterator_alloc(sptree_##name *t) {                                        \
     sptree_##name##_iterator *i = (sptree_##name##_iterator *)                            \
-        realloc(NULL, sizeof(*i) + sizeof(spnode_t) * (t->max_depth + 1));                \
+        realloc(NULL, sizeof(*i) + sizeof(spnode_t) * (SPTREE_MAX_DEPTH + 1));            \
     if (i) {                                                                              \
         i->t = t;                                                                         \
         i->level = 0;                                                                     \
@@ -628,23 +627,20 @@ sptree_##name##_iterator_init_set(const sptree_##name *t, sptree_##name##_iterat
     spnode_t node;                                                                        \
     int      lastLevelEq = -1, cmp;                                                       \
                                                                                           \
-    if ((*i) == NULL || t->max_depth > (*i)->max_depth) {                                 \
+    if ((*i) == NULL) {                                                                   \
         sptree_##name##_iterator *new_i;                                                  \
         new_i = (sptree_##name##_iterator *) realloc(*i, sizeof(**i) +                    \
-                                       sizeof(spnode_t) * (t->max_depth + 31));           \
+                                       sizeof(spnode_t) * (SPTREE_MAX_DEPTH + 31));       \
         if (!new_i)                                                                       \
-            return sizeof(**i) + sizeof(spnode_t) * (t->max_depth + 31);                  \
+            return sizeof(**i) + sizeof(spnode_t) * (SPTREE_MAX_DEPTH + 31);              \
         *i = new_i;                                                                       \
     }                                                                                     \
                                                                                           \
     (*i)->t = t;                                                                          \
     (*i)->level = -1;                                                                     \
-    if (t->root == SPNIL) {                                                               \
-            (*i)->max_depth = 0; /* valgrind points out it's used in the check above ^.*/ \
+    if (t->root == SPNIL)                                                                 \
             return 0;                                                                     \
-    }                                                                                     \
                                                                                           \
-    (*i)->max_depth = t->max_depth;                                                       \
     (*i)->stack[0] = t->root;                                                             \
                                                                                           \
     node = t->root;                                                                       \
@@ -694,23 +690,21 @@ sptree_##name##_iterator_reverse_init_set(const sptree_##name *t,               
     spnode_t node;                                                                        \
     int      lastLevelEq = -1, cmp;                                                       \
                                                                                           \
-    if ((*i) == NULL || t->max_depth > (*i)->max_depth) {                                 \
+    if ((*i) == NULL) {                                                                   \
         sptree_##name##_iterator *new_i;                                                  \
         new_i = (sptree_##name##_iterator *) realloc(*i, sizeof(**i) +                    \
-                                       sizeof(spnode_t) * (t->max_depth + 31));           \
+                                       sizeof(spnode_t) * (SPTREE_MAX_DEPTH + 31));       \
         if (!new_i)                                                                       \
-            return sizeof(**i) + sizeof(spnode_t) * (t->max_depth + 31);                  \
+            return sizeof(**i) + sizeof(spnode_t) * (SPTREE_MAX_DEPTH + 31);              \
         *i = new_i;                                                                       \
     }                                                                                     \
                                                                                           \
     (*i)->t = t;                                                                          \
     (*i)->level = -1;                                                                     \
     if (t->root == SPNIL) {                                                               \
-            (*i)->max_depth = 0;                                                          \
             return 0;                                                                     \
     }                                                                                     \
                                                                                           \
-    (*i)->max_depth = t->max_depth;                                                       \
     (*i)->stack[0] = t->root;                                                             \
                                                                                           \
     node = t->root;                                                                       \
