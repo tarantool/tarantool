@@ -620,7 +620,7 @@ print_help(FILE *stream)
 		"\n"
 		"Run a Tarantool instance:\n"
 		"\n"
-		"$ tt start --name <instance name>\n"
+		"$ tt start <app name>:<instance name>\n"
 		"\n"
 		"Connect to an instance:\n"
 		"\n"
