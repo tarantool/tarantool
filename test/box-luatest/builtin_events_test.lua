@@ -382,6 +382,7 @@ g.test_internal_ballot = function(cg)
         return box.info.vclock
     end)
     vclock[0] = nil
+    old_vclock[0] = nil
     local ballot_key = box.iproto.ballot_key
     local expected = {
         [ballot_key.IS_RO_CFG] = true,

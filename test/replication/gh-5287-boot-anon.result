@@ -49,9 +49,10 @@ assert(box.space._cluster:len() == 1)
  | ---
  | - true
  | ...
-box.info.gc().consumers
+-- However, WAL GC consumer was created
+assert(#box.info.gc().consumers == 1)
  | ---
- | - []
+ | - true
  | ...
 box.info.replication_anon.count == 1
  | ---

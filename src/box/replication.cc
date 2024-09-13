@@ -374,12 +374,7 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		assert(instance_id == REPLICA_ID_NIL);
 		instance_id = replica_id;
 		box_broadcast_id();
-	} else if (replica->anon) {
-		/*
-		 * Set replica gc on its transition from
-		 * anonymous to a normal one.
-		 */
-		assert(replica->gc == NULL);
+	} else if (replica->anon && replica->gc == NULL) {
 		replica->gc = gc_consumer_register(
 			instance_vclock, GC_CONSUMER_REPLICA,
 			&replica->uuid);
@@ -1368,12 +1363,8 @@ replica_on_relay_stop(struct replica *replica)
 	 * collector then. See also replica_clear_id.
 	 */
 	if (replica->id == REPLICA_ID_NIL) {
-		if (!replica->anon) {
-			gc_consumer_unregister(replica->gc);
-			replica->gc = NULL;
-		} else {
-			assert(replica->gc == NULL);
-		}
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
 	}
 
 	replica_update_relay_health(replica);
