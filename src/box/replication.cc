@@ -284,7 +284,7 @@ replica_check_id(uint32_t replica_id)
 static bool
 replica_is_orphan(struct replica *replica)
 {
-	return replica->id == REPLICA_ID_NIL &&
+	return replica->id == REPLICA_ID_NIL && replica->gc == NULL &&
 	       !replica_has_connections(replica);
 }
 
@@ -328,8 +328,7 @@ replica_delete(struct replica *replica)
 		relay_delete(replica->relay);
 	if (replica->applier != NULL)
 		applier_delete(replica->applier);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
+	assert(replica->gc == NULL);
 	TRASH(replica);
 	free(replica);
 }
@@ -1368,12 +1367,8 @@ replica_on_relay_stop(struct replica *replica)
 	 * collector then. See also replica_clear_id.
 	 */
 	if (replica->id == REPLICA_ID_NIL) {
-		if (!replica->anon) {
-			gc_consumer_unregister(replica->gc);
-			replica->gc = NULL;
-		} else {
-			assert(replica->gc == NULL);
-		}
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
 	}
 
 	replica_update_relay_health(replica);
