@@ -52,6 +52,26 @@ extern "C" {
 #define mh_cmp_key(a, b, arg) ((a) != *(b))
 #include "salad/mhash.h"
 
+static inline uint32_t
+mh_ptr_hash(const void *ptr)
+{
+	uintptr_t u = (uintptr_t)ptr;
+	return u ^ (u >> 32);
+}
+
+/**
+ * Set: (void *)
+ */
+#define mh_name _ptr
+#define mh_key_t void *
+#define mh_node_t void *
+#define mh_arg_t void *
+#define mh_hash(a, arg) (mh_ptr_hash(*(a)))
+#define mh_hash_key(a, arg) (mh_ptr_hash(a))
+#define mh_cmp(a, b, arg) (*(a) != *(b))
+#define mh_cmp_key(a, b, arg) ((a) != *(b))
+#include "salad/mhash.h"
+
 /*
  * Map: (i32) => (void *)
  */
