@@ -494,3 +494,28 @@ g.test_ddl_use_after_free_on_rollback_of_deletion = function(cg)
         tx:rollback()
     end)
 end
+
+-- The test checks if tuple references are handled when rolling back
+-- statements without stories
+g.test_empty_stmt_tuple_ref = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.space.create('test')
+        s:create_index('pk', {parts = {{1}}})
+        for i = 1, 5 do
+            s:replace{i}
+        end
+        box.begin()
+        s:replace{1, 1}
+        s:replace{2, 2}
+        s:delete{2}
+        s:delete{3}
+        s:insert{6}
+        s:alter{is_sync = true}
+        box.rollback()
+        -- Collect garbage so that all tuples returned from DMLs
+        -- will be not referenced by Lua
+        collectgarbage('collect')
+        -- Check if all tuples are alive
+        t.assert_equals(s:select{}, {{1}, {2}, {3}, {4}, {5}})
+    end)
+end
