@@ -751,7 +751,7 @@ struct index_read_view_iterator_base {
 };
 
 /** Size of the index_read_view_iterator struct. */
-#define INDEX_READ_VIEW_ITERATOR_SIZE 72
+#define INDEX_READ_VIEW_ITERATOR_SIZE 80
 
 static_assert(sizeof(struct index_read_view_iterator_base) <=
 	      INDEX_READ_VIEW_ITERATOR_SIZE,
