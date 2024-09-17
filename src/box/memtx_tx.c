@@ -2657,8 +2657,10 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
  * Detect whether the transaction can see prepared, but unconfirmed commits.
  */
 static bool
-detect_whether_prepared_ok(struct txn *txn)
+detect_whether_prepared_ok(struct txn *txn, struct space *space)
 {
+	if (space_is_system(space))
+		return true;
 	if (txn == NULL)
 		return false;
 	else if (txn->isolation == TXN_ISOLATION_READ_COMMITTED)
@@ -2690,7 +2692,7 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 		memtx_tx_track_read(txn, space, tuple);
 		return tuple;
 	}
-	bool is_prepared_ok = detect_whether_prepared_ok(txn);
+	bool is_prepared_ok = detect_whether_prepared_ok(txn, space);
 	struct tuple *res =
 		memtx_tx_tuple_clarify_impl(txn, space, tuple, index, mk_index,
 					    is_prepared_ok);
@@ -2728,7 +2730,7 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 		}
 
 		struct tuple *visible = NULL;
-		bool is_prepared_ok = detect_whether_prepared_ok(txn);
+		bool is_prepared_ok = detect_whether_prepared_ok(txn, space);
 		bool unused;
 		memtx_tx_story_find_visible_tuple(story, txn, index->dense_id,
 						  is_prepared_ok, &visible,
