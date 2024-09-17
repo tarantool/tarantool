@@ -10,7 +10,7 @@ gen-zone-abbrevs.pl - generate list of timezones
 Options:
 
   first argument is zone-abbrevs.txt or it's equivalent
-  second argument is main.zi of it's equivalent
+  second argument is main.zi or it's equivalent
   third is a name of output header file (timezones.h by default)
   fourth is a name of output lua config (timezones.lua by default)
 
