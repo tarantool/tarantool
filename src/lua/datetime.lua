@@ -276,6 +276,9 @@ local function check_range(v, from, to, txt, extra)
     end
 end
 
+-- Forward declaration.
+local datetime_parse_full
+
 local function dt_from_ymd_checked(y, M, d)
     local pdt = date_dt_stash_take()
     local is_valid = builtin.tnt_dt_from_ymd_checked(y, M, d, pdt)
@@ -399,6 +402,32 @@ end
 -- since Rata Die date)
 local function local_dt(obj)
     return builtin.tnt_dt_from_rdn(local_rd(local_secs(obj)))
+end
+
+local function datetime_cmp(lhs, rhs)
+    if is_string(lhs) then
+        lhs = datetime_parse_full(lhs, nil, 0, true)
+    end
+    if is_string(rhs) then
+        rhs = datetime_parse_full(rhs, nil, 0, true)
+    end
+    if not is_datetime(lhs) or not is_datetime(rhs) then
+        error('incompatible types for datetime comparison', 3)
+    end
+    local sdiff = lhs.epoch - rhs.epoch
+    return sdiff ~= 0 and sdiff or (lhs.nsec - rhs.nsec)
+end
+
+local function datetime_eq(lhs, rhs)
+    return datetime_cmp(lhs, rhs) == 0
+end
+
+local function datetime_lt(lhs, rhs)
+    return datetime_cmp(lhs, rhs) < 0
+end
+
+local function datetime_le(lhs, rhs)
+    return datetime_cmp(lhs, rhs) <= 0
 end
 
 --[[
@@ -852,13 +881,14 @@ end
        date [T] time [ ] time_zone
     Returns constructed datetime object and length of accepted string.
 ]]
-local function datetime_parse_full(str, tzname, offset, parse_fully)
+function datetime_parse_full(str, tzname, offset, is_raising)
     check_str(str, 'datetime.parse()')
+    assert(type(is_raising) == 'boolean')
     local date = ffi.new(datetime_t)
     local len = builtin.tnt_datetime_parse_full(date, str, #str, tzname, offset)
     if len > 0 then
-        if parse_fully and len ~= #str then
-            goto couldnot_parse_fully
+        if is_raising and len ~= #str then
+            goto could_not_parse_fully
         else
             return date, tonumber(len)
         end
@@ -868,7 +898,7 @@ local function datetime_parse_full(str, tzname, offset, parse_fully)
         error(("could not parse '%s' - ambiguous timezone"):format(str))
     end
     -- len <= 0 or partially parsed
-::couldnot_parse_fully::
+::could_not_parse_fully::
     error(("could not parse '%s'"):format(str))
 end
 
@@ -911,40 +941,10 @@ local function datetime_parse_from(str, obj)
 
     if not fmt or fmt == '' or fmt == 'iso8601' or fmt == 'rfc3339' then
         -- Effect of .tz overrides .tzoffset
-        return datetime_parse_full(str, tzname, offset)
+        return datetime_parse_full(str, tzname, offset, false)
     else
         return datetime_parse_format(str, fmt)
     end
-end
-
-local function datetime_cmp(lhs, rhs, is_raising)
-    if is_string(lhs) then
-        lhs = datetime_parse_full(lhs, nil, 0, true)
-    end
-    if is_string(rhs) then
-        rhs = datetime_parse_full(rhs, nil, 0, true)
-    end
-    if not is_datetime(lhs) or not is_datetime(rhs) then
-        if is_raising then
-            error('incompatible types for datetime comparison', 3)
-        else
-            return nil
-        end
-    end
-    local sdiff = lhs.epoch - rhs.epoch
-    return sdiff ~= 0 and sdiff or (lhs.nsec - rhs.nsec)
-end
-
-local function datetime_eq(lhs, rhs)
-    return datetime_cmp(lhs, rhs, false) == 0
-end
-
-local function datetime_lt(lhs, rhs)
-    return datetime_cmp(lhs, rhs, true) < 0
-end
-
-local function datetime_le(lhs, rhs)
-    return datetime_cmp(lhs, rhs, true) <= 0
 end
 
 --[[

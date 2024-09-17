@@ -207,13 +207,18 @@ test:test("Default date creation and comparison", function(test)
     test:is(ts1, "1970-01-01T00:00:00Z", "ts1 == '1970-01-01T00:00:00Z'")
     test:is("1970-01-01T00:00:00Z", ts1, "'1970-01-01T00:00' == ts1")
 
-    test:isnt(ts1, nil, "ts1 != {}")
-    test:isnt(ts1, {}, "ts1 != {}")
-    test:isnt(ts1, 19700101, "ts1 != 19700101")
-
-    test:isnt(nil, ts1, "{} ~= ts1")
-    test:isnt({}, ts1 ,"{} ~= ts1")
-    test:isnt(19700101, ts1, "ts1 ~= ts1")
+    assert_raises(test, incompat_types,
+                  function() return ts1 == nil end)
+    assert_raises(test, incompat_types,
+                  function() return nil == ts1 end)
+    assert_raises(test, incompat_types,
+                  function() return ts1 == {} end)
+    assert_raises(test, incompat_types,
+                  function() return {} == ts1 end)
+    assert_raises(test, incompat_types,
+                  function() return ts1 == 19700101 end)
+    assert_raises(test, incompat_types,
+                  function() return 19700101 == ts1 end)
 
     test:is(ts1 < ts2, false, "not ts1 < ts2")
     test:is(ts1 > ts2, false, "not ts1 < ts2")
@@ -231,7 +236,8 @@ test:test("Default date creation and comparison", function(test)
     test:is(ts1 > '1970-01-01', false, "not ts1 > 1970-01-1")
     test:is(ts1 >= '1970-01-01', true, "ts1 >= 1970-01-1")
 
-    -- all comparisons operations are raising errors for invalid strings
+    -- All comparisons operations are raising errors for invalid
+    -- strings.
     assert_raises(test, couldnt_parse('x1970-01-01'),
                   function() return ts1 == 'x1970-01-01' end)
     assert_raises(test, couldnt_parse('x1970-01-01'),
@@ -245,9 +251,8 @@ test:test("Default date creation and comparison", function(test)
     assert_raises(test, couldnt_parse('x1970-01-01'),
                   function() return ts1 >= 'x1970-01-01' end)
 
-
-    -- check comparison errors -- ==, ~= not raise errors, other
-    -- comparison operators should raise
+    -- Check comparison errors `==`, `~=` not raise errors, other
+    -- comparison operators should raise.
     assert_raises(test, incompat_types, function() return ts1 < nil end)
     assert_raises(test, incompat_types, function() return ts1 < 123 end)
     assert_raises(test, incompat_types, function() return ts1 <= nil end)
@@ -308,7 +313,6 @@ test:test("Simple date creation by attributes - check failed", function(test)
         {'nsec', {0, 1e9}},
         {'tzoffset', {-720, 840}, str_or_num_exp},
     }
-    local ts = date.new()
 
     for _, row in pairs(boundary_checks) do
         local attr_name, bounds, expected_msg = unpack(row)
@@ -354,7 +358,7 @@ test:test("Simple date creation by attributes - check failed", function(test)
         assert_raises_like(test, expected_msg,
                            function() date.new{[attr_name] = {}} end)
         assert_raises_like(test, expected_msg,
-                           function() date.new{[attr_name] = ts} end)
+                           function() date.new{[attr_name] = newproxy()} end)
     end
 
     local specific_errors = {
@@ -574,7 +578,7 @@ test:test("Check parsing of full supported years range", function(test)
     for _, y in ipairs(valid_years) do
         local txt = ('%04d-06-22'):format(y)
         local dt = date.parse(txt)
-        test:isnt(dt, nil, dt)
+        test:ok(date.is_datetime(dt), dt)
         local out_txt = tostring(dt)
         local out_dt = date.parse(out_txt)
         test:is(dt, out_dt, ('default parse of %s (%s == %s)'):
@@ -600,11 +604,11 @@ test:test("Check parsing of dates with invalid attributes", function(test)
         local left, right = unpack(bounds)
         local txt = create_date_string{[attr_name] = left}
         local dt, len = date.parse(txt)
-        test:ok(dt ~= nil, dt)
+        test:ok(date.is_datetime(dt), dt)
         test:ok(len == #txt, len)
         local txt = create_date_string{[attr_name] = right}
         dt, len = date.parse(txt)
-        test:ok(dt ~= nil, dt)
+        test:ok(date.is_datetime(dt), dt)
         test:ok(len == #txt, len)
         -- expected error
         if left > 0 then
@@ -668,12 +672,12 @@ test:test("Parsing of timezone abbrevs", function(test)
 
     for zone, offset in pairs(zone_abbrevs) do
         local date_text = base_date .. zone
-        local date, len = date.parse(date_text)
-        test:isnt(date, nil, 'parse ' .. zone)
+        local dt, len = date.parse(date_text)
+        test:ok(date.is_datetime(dt), 'parse ' .. zone)
         test:ok(len > #base_date, 'length longer than ' .. #base_date)
-        test:is(1, tostring(date):find(exp_pattern), 'expected prefix')
-        test:is(date.tzoffset, offset, 'expected offset')
-        test:is(date.tz, zone, 'expected timezone name')
+        test:is(1, tostring(dt):find(exp_pattern), 'expected prefix')
+        test:is(dt.tzoffset, offset, 'expected offset')
+        test:is(dt.tz, zone, 'expected timezone name')
     end
 end)
 
@@ -714,20 +718,19 @@ test:test("Parsing of timezone names (tzindex)", function(test)
 
     for zone, index in pairs(zone_abbrevs) do
         local date_text = base_date .. zone
-        local date, len = date.parse(date_text)
-        print(zone, index)
-        test:isnt(date, nil, 'parse ' .. zone)
-        local tzname = date.tz
-        local tzindex = date.tzindex
+        local dt, len = date.parse(date_text)
+        test:ok(date.is_datetime(dt), 'parse ' .. zone)
+        local tzname = dt.tz
+        local tzindex = dt.tzindex
         test:is(tzindex, index, 'expected tzindex')
         test:is(tzname, zone, 'expected timezone name')
         test:is(TZ[tzindex], tzname, ('TZ[%d] => %s'):format(tzindex, tzname))
         test:is(TZ[tzname], tzindex, ('TZ[%s] => %d'):format(tzname, tzindex))
         test:ok(len > #base_date, 'length longer than ' .. #base_date)
-        local txt = tostring(date)
+        local txt = tostring(dt)
         test:is(1, txt:find(exp_pattern), 'expected prefix')
         test:is(zone, txt:sub(#txt - #zone + 1, #txt), 'sub of ' .. txt)
-        txt = date:format('%FT%T %Z')
+        txt = dt:format('%FT%T %Z')
         test:is(zone, txt:sub(#txt - #zone + 1, #txt), 'sub of ' .. txt)
     end
 end)
@@ -969,7 +972,7 @@ test:test("Datetime string parsing by format (detailed)", function(test)
         local fmt, check, value = unpack(row)
         if check > 0 then
             local res = date.parse(value, {format = fmt})
-            test:is(res ~= nil, true, ('parse of %s'):format(fmt))
+            test:ok(date.is_datetime(res), ('parse of %s'):format(fmt))
         end
     end
 end)
@@ -2097,7 +2100,7 @@ test:test("Time invalid :set{} operations", function(test)
         assert_raises_like(test, expected_msg,
                            function() ts:set{[attr_name] = {}} end)
         assert_raises_like(test, expected_msg,
-                           function() ts:set{[attr_name] = ts} end)
+                           function() ts:set{[attr_name] = newproxy()} end)
     end
 
     ts:set{year = 2021}
