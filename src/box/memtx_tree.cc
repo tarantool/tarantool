@@ -968,7 +968,8 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 				start_data.part_count, res->tuple, res->hint);
 		memtx_tree_iterator_t<USE_HINT> *iterator = &it->tree_iterator;
 		while (skip_more_visible != 0 && res != NULL) {
-			if (memtx_tx_tuple_key_is_visible(txn, index_base,
+			if (memtx_tx_tuple_key_is_visible(txn, space,
+							  index_base,
 							  res->tuple))
 				skip_more_visible--;
 			if (reverse)

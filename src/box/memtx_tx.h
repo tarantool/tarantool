@@ -475,19 +475,20 @@ memtx_tx_index_invisible_count_matching_until(
 
 /** Helper of memtx_tx_tuple_is_visible. */
 bool
-memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct index *index,
-				   struct tuple *tuple);
+memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct space *space,
+				   struct index *index, struct tuple *tuple);
 
 /**
- * Detect whether key of @a tuple from @a index is visible to @a txn.
+ * Detect whether key of @a tuple from @a index of @a space is visible
+ * to @a txn.
  */
 static inline bool
-memtx_tx_tuple_key_is_visible(struct txn *txn, struct index *index,
-			      struct tuple *tuple)
+memtx_tx_tuple_key_is_visible(struct txn *txn, struct space *space,
+			      struct index *index, struct tuple *tuple)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return true;
-	return memtx_tx_tuple_key_is_visible_slow(txn, index, tuple);
+	return memtx_tx_tuple_key_is_visible_slow(txn, space, index, tuple);
 }
 
 /**
