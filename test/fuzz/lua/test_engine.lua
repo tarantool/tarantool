@@ -112,8 +112,6 @@ local err_pat_whitelist = {
     "Get%(%) doesn't support partial keys and non%-unique indexes",
     "Index '[%w_]+' %(RTREE%) of space '[%w_]+' %(memtx%) does not support max%(%)",
     "Index '[%w_]+' %(RTREE%) of space '[%w_]+' %(memtx%) does not support min%(%)",
-    -- Blocked by tarantool#10262.
-    "attempt to index local 'tuple' %(a nil value%)",
     "Failed to allocate %d+ bytes in [%w_]+ for [%w_]+",
     "Storage engine 'memtx' does not support cross%-engine transactions",
     "Storage engine 'vinyl' does not support cross%-engine transactions",
