@@ -7,8 +7,8 @@ _ = space:create_index('pk')
 _ = box.space.test_trunc:create_index('i1', {type = 'hash', parts = {2, 'STR'}})
 _ = box.space.test_trunc:create_index('i2', {type = 'hash', parts = {2, 'STR'}})
 
-function test_trunc() space:truncate() ch:put(true) end
+function test_trunc() local ok, err = pcall(space.truncate, space) ch:put(ok or err) end
 
 _ = {fiber.create(test_trunc), fiber.create(test_trunc)}
-_ = {ch:get(), ch:get()}
+{ch:get(), ch:get()}
 space:drop()
