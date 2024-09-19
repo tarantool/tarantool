@@ -59,6 +59,7 @@ list(APPEND LUATEST_COMMAND_WITH_FLAGS
     # Disable output capturing.
     -c
     --output tap
+    --shuffle all:${RANDOM_SEED}
 )
 
 tarantool_make_lua_path(LUATEST_LUA_PATH
