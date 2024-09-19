@@ -41,6 +41,7 @@ foreach(test_path ${tests})
                    # see https://github.com/tarantool/test-run/issues/119.
                    -e "io.stdout:setvbuf('no')"
                    ${LUATEST_COMMAND_WITH_FLAGS}
+                   --shuffle all:${RANDOM_SEED}
                    ${test_title}
            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
   )
