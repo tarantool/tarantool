@@ -134,6 +134,9 @@ vy_point_lookup_scan_mems(struct vy_lsm *lsm, struct vy_tx *tx,
 					     &min_skipped_plsn) != 0)
 			return -1;
 	}
+	/*
+	 * Switch to read view if we skipped a prepared statement.
+	 */
 	if (tx != NULL && min_skipped_plsn != INT64_MAX) {
 		if (vy_tx_send_to_read_view(tx, min_skipped_plsn) != 0)
 			return -1;
