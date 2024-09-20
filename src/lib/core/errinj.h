@@ -257,7 +257,8 @@ void errinj_set_with_environment_vars(void);
 	} while (0)
 #  define ERROR_INJECT_COUNTDOWN(ID, CODE)				\
 	do {								\
-		if (errinj(ID, ERRINJ_INT)->iparam-- == 0) {		\
+		if (errinj(ID, ERRINJ_INT)->iparam >= 0 &&		\
+		    errinj(ID, ERRINJ_INT)->iparam-- == 0) {		\
 			CODE;						\
 		}							\
 	} while (0)
