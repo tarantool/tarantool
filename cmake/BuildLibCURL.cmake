@@ -43,6 +43,7 @@ macro(curl_build)
 
     # Let's disable building documentation for curl to save build time.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_CURL_MANUAL=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DBUILD_MISC_DOCS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DBUILD_LIBCURL_DOCS=OFF")
 
     # Setup use of openssl, use the same OpenSSL library
