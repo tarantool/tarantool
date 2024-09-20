@@ -924,8 +924,12 @@ generic_index_count(struct index *index, enum iterator_type type,
 	int rc = 0;
 	size_t count = 0;
 	struct tuple *tuple = NULL;
-	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL)
+	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL) {
+		rc = box_check_slice();
+		if (rc != 0)
+			break;
 		++count;
+	}
 	iterator_delete(it);
 	if (rc < 0)
 		return rc;
