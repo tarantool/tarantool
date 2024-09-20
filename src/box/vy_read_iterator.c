@@ -368,8 +368,7 @@ vy_read_iterator_scan_cache(struct vy_read_iterator *itr,
 
 static NODISCARD int
 vy_read_iterator_scan_mem(struct vy_read_iterator *itr, uint32_t mem_src,
-			  struct vy_entry *next, bool *stop,
-			  int64_t *min_skipped_plsn)
+			  struct vy_entry *next, bool *stop)
 {
 	int rc;
 	struct vy_read_src *src = &itr->src[mem_src];
@@ -390,7 +389,18 @@ vy_read_iterator_scan_mem(struct vy_read_iterator *itr, uint32_t mem_src,
 	if (rc < 0)
 		return -1;
 	vy_read_iterator_evaluate_src(itr, src, next, stop);
-	*min_skipped_plsn = MIN(*min_skipped_plsn, src_itr->min_skipped_plsn);
+	/*
+	 * Switch to read view if we skipped a prepared statement.
+	 */
+	if (itr->tx != NULL && src_itr->min_skipped_plsn != INT64_MAX) {
+		if (vy_tx_send_to_read_view(
+				itr->tx, src_itr->min_skipped_plsn) != 0)
+			return -1;
+		if (itr->tx->state == VINYL_TX_ABORT) {
+			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+			return -1;
+		}
+	}
 	return 0;
 }
 
@@ -430,6 +440,7 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr,
 	int rc;
 	int cmp;
 	struct vy_read_src *src = &itr->src[itr->mem_src];
+	struct vy_mem_iterator *src_itr = &src->mem_iterator;
 
 	/*
 	 * 'next' may refer to a statement in the memory source history,
@@ -440,8 +451,7 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr,
 	if (next_stmt_ref != NULL)
 		tuple_ref(next_stmt_ref);
 
-	rc = vy_mem_iterator_restore(&src->mem_iterator,
-				     itr->last, &src->history);
+	rc = vy_mem_iterator_restore(src_itr, itr->last, &src->history);
 	if (rc < 0)
 		goto out; /* memory allocation error */
 	if (rc == 0)
@@ -487,6 +497,18 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr,
 out:
 	if (next_stmt_ref != NULL)
 		tuple_unref(next_stmt_ref);
+	/*
+	 * Switch to read view if we skipped a prepared statement.
+	 */
+	if (itr->tx != NULL && src_itr->min_skipped_plsn != INT64_MAX) {
+		if (vy_tx_send_to_read_view(
+				itr->tx, src_itr->min_skipped_plsn) != 0)
+			return -1;
+		if (itr->tx->state == VINYL_TX_ABORT) {
+			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+			return -1;
+		}
+	}
 	return rc;
 }
 
@@ -533,19 +555,9 @@ restart:
 	if (stop)
 		goto done;
 
-	int64_t min_skipped_plsn = INT64_MAX;
 	for (uint32_t i = itr->mem_src; i < itr->disk_src && !stop; i++) {
-		if (vy_read_iterator_scan_mem(itr, i, &next, &stop,
-					      &min_skipped_plsn) != 0)
+		if (vy_read_iterator_scan_mem(itr, i, &next, &stop) != 0)
 			return -1;
-	}
-	if (itr->tx != NULL && min_skipped_plsn != INT64_MAX) {
-		if (vy_tx_send_to_read_view(itr->tx, min_skipped_plsn) != 0)
-			return -1;
-		if (itr->tx->state == VINYL_TX_ABORT) {
-			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
-			return -1;
-		}
 	}
 	if (stop)
 		goto done;
