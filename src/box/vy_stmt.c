@@ -754,6 +754,11 @@ vy_stmt_encode_secondary(struct tuple *value, struct key_def *cmp_def,
 struct tuple *
 vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format)
 {
+	ERROR_INJECT_COUNTDOWN(ERRINJ_VY_STMT_DECODE_COUNTDOWN, {
+		diag_set(ClientError, ER_INJECTION,
+			 "vinyl statement decode");
+		return NULL;
+	});
 	struct vy_stmt_env *env = format->engine;
 	struct request request;
 	uint64_t key_map = dml_request_key_map(xrow->type);

@@ -2672,11 +2672,12 @@ vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct vy_entry *ret)
 {
 	assert(virt_stream->iface->next == vy_slice_stream_next);
 	struct vy_slice_stream *stream = (struct vy_slice_stream *)virt_stream;
-	*ret = vy_entry_none();
 
 	/* If the slice is ended, return EOF */
-	if (stream->page_no > stream->slice->last_page_no)
+	if (stream->page_no > stream->slice->last_page_no) {
+		*ret = vy_entry_none();
 		return 0;
+	}
 
 	/* If current page is not already read, read it */
 	if (stream->page == NULL && vy_slice_stream_read_page(stream) != 0)
@@ -2693,6 +2694,7 @@ vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct vy_entry *ret)
 	    stream->page_no >= stream->slice->last_page_no &&
 	    vy_entry_compare(entry, stream->slice->end, stream->cmp_def) >= 0) {
 		tuple_unref(entry.stmt);
+		*ret = vy_entry_none();
 		return 0;
 	}
 
