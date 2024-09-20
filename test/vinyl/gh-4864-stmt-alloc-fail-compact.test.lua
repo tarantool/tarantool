@@ -47,7 +47,7 @@ assert(s.index.pk:stat().range_count == 1)
 assert(s.index.pk:stat().run_count == 2)
 
 errinj = box.error.injection
-errinj.set('ERRINJ_VY_STMT_ALLOC', 0)
+errinj.set('ERRINJ_VY_STMT_ALLOC_COUNTDOWN', 0)
 -- Should finish successfully despite vy_stmt_alloc() failure.
 -- Still split_range() fails, as a result we get one range
 -- instead two.
@@ -55,8 +55,8 @@ errinj.set('ERRINJ_VY_STMT_ALLOC', 0)
 compact(1)
 assert(s.index.pk:stat().range_count == 1)
 assert(s.index.pk:stat().run_count == 1)
-assert(errinj.get('ERRINJ_VY_STMT_ALLOC') == -1)
-errinj.set('ERRINJ_VY_STMT_ALLOC', -1)
+assert(errinj.get('ERRINJ_VY_STMT_ALLOC_COUNTDOWN') == -1)
+errinj.set('ERRINJ_VY_STMT_ALLOC_COUNTDOWN', -1)
 
 s:drop()
 
@@ -74,15 +74,15 @@ compact(1)
 dump()
 
 errinj = box.error.injection
-errinj.set('ERRINJ_VY_STMT_ALLOC', 5)
+errinj.set('ERRINJ_VY_STMT_ALLOC_COUNTDOWN', 5)
 -- Compaction of first range fails, so it is re-scheduled and
 -- then successfully finishes at the second attempt.
 --
 compact(2)
 assert(s.index.pk:stat().range_count == 2)
 assert(s.index.pk:stat().run_count == 2)
-assert(errinj.get('ERRINJ_VY_STMT_ALLOC') == -1)
-errinj.set('ERRINJ_VY_STMT_ALLOC', -1)
+assert(errinj.get('ERRINJ_VY_STMT_ALLOC_COUNTDOWN') == -1)
+errinj.set('ERRINJ_VY_STMT_ALLOC_COUNTDOWN', -1)
 -- Unthrottle scheduler to allow next dump.
 --
 errinj.set("ERRINJ_VY_SCHED_TIMEOUT", 0.0001)

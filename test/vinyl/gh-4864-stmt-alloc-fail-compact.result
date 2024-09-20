@@ -96,7 +96,7 @@ assert(s.index.pk:stat().run_count == 2)
 errinj = box.error.injection
  | ---
  | ...
-errinj.set('ERRINJ_VY_STMT_ALLOC', 0)
+errinj.set('ERRINJ_VY_STMT_ALLOC_COUNTDOWN', 0)
  | ---
  | - ok
  | ...
@@ -115,11 +115,11 @@ assert(s.index.pk:stat().run_count == 1)
  | ---
  | - true
  | ...
-assert(errinj.get('ERRINJ_VY_STMT_ALLOC') == -1)
+assert(errinj.get('ERRINJ_VY_STMT_ALLOC_COUNTDOWN') == -1)
  | ---
  | - true
  | ...
-errinj.set('ERRINJ_VY_STMT_ALLOC', -1)
+errinj.set('ERRINJ_VY_STMT_ALLOC_COUNTDOWN', -1)
  | ---
  | - ok
  | ...
@@ -156,7 +156,7 @@ dump()
 errinj = box.error.injection
  | ---
  | ...
-errinj.set('ERRINJ_VY_STMT_ALLOC', 5)
+errinj.set('ERRINJ_VY_STMT_ALLOC_COUNTDOWN', 5)
  | ---
  | - ok
  | ...
@@ -174,11 +174,11 @@ assert(s.index.pk:stat().run_count == 2)
  | ---
  | - true
  | ...
-assert(errinj.get('ERRINJ_VY_STMT_ALLOC') == -1)
+assert(errinj.get('ERRINJ_VY_STMT_ALLOC_COUNTDOWN') == -1)
  | ---
  | - true
  | ...
-errinj.set('ERRINJ_VY_STMT_ALLOC', -1)
+errinj.set('ERRINJ_VY_STMT_ALLOC_COUNTDOWN', -1)
  | ---
  | - ok
  | ...
