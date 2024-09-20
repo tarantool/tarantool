@@ -1282,7 +1282,7 @@ local errinj_set = {
         disable = disable_errinj_timeout,
     },
     -- Set to number of passes before failing allocation of vinyl tuple.
-    ERRINJ_VY_STMT_ALLOC = {
+    ERRINJ_VY_STMT_ALLOC_COUNTDOWN = {
         enable = function()
             return math.random(10)
         end,
