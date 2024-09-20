@@ -29,6 +29,6 @@ test_run:cmd('start server err_recovery with crash_expected=True')
 
 opts = {}
 opts.filename = 'errinj_recovery.log'
-test_run:grep_log('err_recovery', 'failed to open', 1000, opts) ~= nil
+test_run:grep_log('err_recovery', "Error injection 'vinyl run recover'", 1000, opts) ~= nil
 
 test_run:cmd('delete server err_recovery')
