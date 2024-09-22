@@ -546,6 +546,10 @@ txn_limbo_shutdown(void);
 void
 txn_limbo_set_max_size(struct txn_limbo *limbo, int64_t size);
 
+/** Wait for space in the limbo to add a new entry. */
+int
+txn_limbo_wait_for_space(struct txn_limbo *limbo);
+
 #if defined(__cplusplus)
 }
 #endif /* defined(__cplusplus) */
