@@ -236,10 +236,14 @@ static inline void
 txn_limbo_on_remove(struct txn_limbo *limbo,
 		    const struct txn_limbo_entry *entry)
 {
+	bool limbo_was_full = txn_limbo_is_full(limbo);
 	limbo->size -= entry->approx_len;
 	assert(limbo->size >= 0);
 	limbo->len--;
 	assert(limbo->len >= 0);
+	/* Wake up all fibers waiting to add a new limbo entry. */
+	if (limbo_was_full && !txn_limbo_is_full(limbo))
+		fiber_cond_broadcast(&limbo->wait_cond);
 }
 
 struct txn_limbo_entry *
@@ -422,10 +426,21 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	}
 
 	assert(!txn_limbo_is_empty(limbo));
-	if (txn_limbo_first_entry(limbo) != entry) {
+	struct txn_limbo_entry *e;
+	bool is_first_waiting_entry = true;
+	rlist_foreach_entry(e, &limbo->queue, in_queue) {
+		if (e == entry)
+			break;
+		if (txn_has_flag(e->txn, TXN_WAIT_ACK) &&
+		    e->txn->fiber != NULL) {
+			is_first_waiting_entry = false;
+			break;
+		}
+	}
+	if (!is_first_waiting_entry) {
 		/*
-		 * If this is not a first entry in the limbo, it
-		 * is definitely not a first timed out entry. And
+		 * If this is not the first waiting entry in the limbo, it
+		 * is definitely not the first timed out entry. And
 		 * since it managed to time out too, it means
 		 * there is currently another fiber writing
 		 * rollback, or waiting for confirmation WAL
@@ -448,7 +463,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	}
 
 	txn_limbo_write_rollback(limbo, entry->lsn);
-	struct txn_limbo_entry *e, *tmp;
+	struct txn_limbo_entry *tmp;
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue,
 					 in_queue, tmp) {
 		e->txn->signature = TXN_SIGNATURE_QUORUM_TIMEOUT;
@@ -1482,6 +1497,16 @@ txn_limbo_filter_disable(struct txn_limbo *limbo)
 	latch_lock(&limbo->promote_latch);
 	limbo->do_validate = false;
 	latch_unlock(&limbo->promote_latch);
+}
+
+int
+txn_limbo_wait_for_space(struct txn_limbo *limbo)
+{
+	while (txn_limbo_is_full(limbo)) {
+		if (fiber_cond_wait(&limbo->wait_cond) != 0)
+			return -1;
+	}
+	return 0;
 }
 
 void

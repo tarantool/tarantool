@@ -1150,12 +1150,17 @@ txn_commit_nop(struct txn *txn)
  * write completes.
  */
 static int
-txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req)
+txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req,
+		    enum txn_commit_wait_mode wait_mode)
 {
 	uint32_t origin_id = req->rows[0]->replica_id;
 	if (origin_id == 0 && txn_limbo_is_full(&txn_limbo)) {
-		diag_set(ClientError, ER_SYNC_QUEUE_FULL);
-		return -1;
+		if (wait_mode == TXN_COMMIT_WAIT_MODE_NONE) {
+			diag_set(ClientError, ER_SYNC_QUEUE_FULL);
+			return -1;
+		}
+		if (txn_limbo_wait_for_space(&txn_limbo) != 0)
+			return -1;
 	}
 
 	/*
@@ -1191,19 +1196,6 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 				 "txn commit async injection");
 			goto rollback_abort;
 		});
-		/*
-		 * The main reason why it is disabled is that the sync txn's
-		 * original instance wants to write CONFIRM. But it can't be
-		 * done asynchronously in the current code design. Also it is
-		 * logically strange to commit a synchronous transaction in an
-		 * async way, but the CONFIRM problem is the technical one.
-		 */
-		bool is_original = req->rows[0]->replica_id == 0;
-		if (txn_has_flag(txn, TXN_WAIT_ACK) && is_original) {
-			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
-				 "Non-blocking commit of a synchronous txn");
-			goto rollback_abort;
-		}
 		if (wait_mode == TXN_COMMIT_WAIT_MODE_NONE &&
 		    journal_queue_is_full()) {
 			diag_set(ClientError, ER_WAL_QUEUE_FULL);
@@ -1218,7 +1210,7 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 	 * txn not waiting for anything.
 	 */
 	if (txn_has_flag(txn, TXN_WAIT_SYNC) &&
-	    txn_add_limbo_entry(txn, req) != 0) {
+	    txn_add_limbo_entry(txn, req, wait_mode) != 0) {
 		goto rollback_abort;
 	}
 	fiber_set_txn(fiber(), NULL);

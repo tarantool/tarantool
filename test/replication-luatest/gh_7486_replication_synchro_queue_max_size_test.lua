@@ -55,8 +55,11 @@ g.test_master_synchro_queue_limited = function(cg)
     server_wait_synchro_queue_len_is_equal(cg.master, 1)
     cg.master:exec(function()
         t.assert_error_msg_content_equals(
-            'The synchronous transaction queue is full',
-            box.space.test.insert, box.space.test, {2})
+            'The synchronous transaction queue is full', function()
+                    box.atomic({wait = 'none'}, function()
+                        box.space.test:insert{2}
+                    end)
+                end)
         box.cfg{ replication_synchro_quorum = 1, }
         local ok, _ = _G.f:join()
         t.assert(ok)
@@ -82,8 +85,11 @@ g.test_max_size_update_dynamically = function(cg)
         box.cfg{ replication_synchro_queue_max_size = 1, }
         t.assert_equals(box.info.synchro.queue.len, 3)
         t.assert_error_msg_content_equals(
-            'The synchronous transaction queue is full',
-            box.space.test.insert, box.space.test, {0})
+            'The synchronous transaction queue is full', function()
+                    box.atomic({wait = 'none'}, function()
+                        box.space.test:insert{0}
+                    end)
+                end)
         box.cfg{ replication_synchro_quorum = 1, }
         for i = 1, _G.num_fibers do
             local ok, _ = _G.fibers_storage[i]:join()
