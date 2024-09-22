@@ -57,6 +57,12 @@ create_perf_lua_test(NAME uri_escape_unescape)
 
 include_directories(${MSGPUCK_INCLUDE_DIRS})
 
+build_module(benchmark_box_module benchmark_box_module.cc)
+target_link_libraries(benchmark_box_module msgpuck)
+create_perf_lua_test(NAME memtx_tree
+                     DEPENDS benchmark_box_module
+)
+
 build_module(column_scan_module column_scan_module.c)
 target_link_libraries(column_scan_module msgpuck)
 create_perf_lua_test(NAME column_scan
