@@ -83,7 +83,7 @@ local arg_verbose = params.verbose or false
 
 local seed = params.seed or os.time()
 math.randomseed(seed)
-log.info(string.format('Random seed: %d', seed))
+log.info('Random seed: %d', seed)
 
 -- The table contains a whitelist of errors that will be ignored
 -- by test. Each item is a Lua pattern, special characters
@@ -129,7 +129,7 @@ local function keys(t)
 end
 
 local function rmtree(path)
-    log.info(('CLEANUP %s'):format(path))
+    log.info('CLEANUP %s', path)
     if (fio.path.is_file(path) or fio.path.is_link(path)) then
         fio.unlink(path)
         return
@@ -992,12 +992,12 @@ local ops = {
 local function apply_op(space, op_name)
     local func = ops[op_name].func
     local args = { ops[op_name].args(space) }
-    log.info(('%s %s'):format(op_name, json.encode(args)))
+    log.info('%s %s', op_name, json.encode(args))
     local pcall_args = {func, space, unpack(args)}
     local ok, err = pcall(unpack(pcall_args))
     if ok ~= true then
-        log.info(('ERROR: opname "%s", err "%s", args %s'):
-                 format(op_name, err, json.encode(args)))
+        log.info('ERROR: opname "%s", err "%s", args %s',
+                 op_name, err, json.encode(args))
     end
     return err
 end
@@ -1005,7 +1005,7 @@ end
 local shared_gen_state
 
 local function worker_func(id, space, test_gen, test_duration)
-    log.info(('Worker #%d has started.'):format(id))
+    log.info('Worker #%d has started.', id)
     local start = os.clock()
     local gen, param, state = test_gen:unwrap()
     shared_gen_state = state
@@ -1020,7 +1020,7 @@ local function worker_func(id, space, test_gen, test_duration)
         local err = apply_op(space, operation_name)
         table.insert(errors, err)
     end
-    log.info(('Worker #%d has finished.'):format(id))
+    log.info('Worker #%d has finished.', id)
     return errors
 end
 
@@ -1046,8 +1046,8 @@ local function toggle_random_errinj(errinj, max_enabled, space)
                                    return i
                                end
                            end):totable()
-    log.info(('Enabled fault injections: %s'):format(
-             json.encode(enabled_errinj)))
+    log.info('Enabled fault injections: %s',
+             json.encode(enabled_errinj))
     local errinj_val, errinj_name
     if table.getn(enabled_errinj) >= max_enabled then
         errinj_name = oneof(enabled_errinj)
@@ -1058,11 +1058,11 @@ local function toggle_random_errinj(errinj, max_enabled, space)
         errinj_val = errinj[errinj_name].enable(space)
         errinj[errinj_name].is_enabled = true
     end
-    log.info(string.format('TOGGLE RANDOM ERROR INJECTION: %s -> %s',
-                           errinj_name, tostring(errinj_val)))
+    log.info('TOGGLE RANDOM ERROR INJECTION: %s -> %s',
+             errinj_name, tostring(errinj_val))
     local ok, err = pcall(box.error.injection.set, errinj_name, errinj_val)
     if not ok then
-        log.info(('Failed to toggle fault injection: %s'):format(err))
+        log.info('Failed to toggle fault injection: %s', err)
     end
 end
 
@@ -1408,7 +1408,7 @@ local function run_test(num_workers, test_duration, test_dir,
 
     local socket_path = fio.pathjoin(fio.abspath(test_dir), 'console.sock')
     console.listen(socket_path)
-    log.info(('console listen on %s'):format(socket_path))
+    log.info('console listen on %s', socket_path)
 
     if fio.path.exists(test_dir) then
         cleanup_dir(test_dir)
@@ -1447,7 +1447,7 @@ local function run_test(num_workers, test_duration, test_dir,
     for _, fb in ipairs(workers) do
         local ok, res = fiber.join(fb)
         if not ok then
-            log.info('ERROR: ' .. json.encode(res))
+            log.info('ERROR: %s', json.encode(res))
         end
         if fiber.status(fb) ~= 'dead' then
             fiber.kill(fb)
