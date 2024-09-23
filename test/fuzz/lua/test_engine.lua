@@ -1032,8 +1032,11 @@ local function disable_all_errinj(errinj, space)
                                    return i
                                end
                            end):totable()
+    log.info('Enabled fault injections: %s',
+             json.encode(enabled_errinj))
     for _, errinj_name in pairs(enabled_errinj) do
         local errinj_val = errinj[errinj_name].disable(space)
+        log.info('DISABLE ERROR INJECTION: %s', errinj_name)
         errinj[errinj_name].is_enabled = false
         pcall(box.error.injection.set, errinj_name, errinj_val)
     end
@@ -1437,29 +1440,30 @@ local function run_test(num_workers, test_duration, test_dir,
             toggle_random_errinj(errinj_set, max_errinj_in_parallel, space)
             fiber.sleep(2)
         end
+        disable_all_errinj(errinj_set, space)
         log.info('Fault injection fiber has finished.')
     end, arg_test_duration)
     errinj_f:set_joinable(true)
     errinj_f:name('ERRINJ')
-    table.insert(workers, errinj_f)
+
+    -- Stop the fault injection fiber first so that worker fibers can exit
+    -- without getting stuck on some random timeout injection.
+    local ok, res = fiber.join(errinj_f)
+    if not ok then
+        log.info('ERROR: %s', json.encode(res))
+    end
 
     local error_messages = {}
     for _, fb in ipairs(workers) do
-        local ok, res = fiber.join(fb)
+        ok, res = fiber.join(fb)
         if not ok then
             log.info('ERROR: %s', json.encode(res))
         end
-        if fiber.status(fb) ~= 'dead' then
-            fiber.kill(fb)
-        end
-        if type(res) == 'table' then
-            for _, v in ipairs(res) do
-                local msg = tostring(v)
-                error_messages[msg] = error_messages[msg] or 1
-            end
+        for _, v in ipairs(res) do
+            local msg = tostring(v)
+            error_messages[msg] = error_messages[msg] or 1
         end
     end
-    disable_all_errinj(errinj_set, space)
 
     teardown(space)
 
