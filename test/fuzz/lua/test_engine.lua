@@ -1458,10 +1458,11 @@ local function run_test(num_workers, test_duration, test_dir,
         ok, res = fiber.join(fb)
         if not ok then
             log.info('ERROR: %s', json.encode(res))
-        end
-        for _, v in ipairs(res) do
-            local msg = tostring(v)
-            error_messages[msg] = error_messages[msg] or 1
+        else
+            for _, v in ipairs(res) do
+                local msg = tostring(v)
+                error_messages[msg] = error_messages[msg] or 1
+            end
         end
     end
 
