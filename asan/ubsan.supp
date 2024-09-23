@@ -44,3 +44,11 @@
 # Also keep in mind that some of these warnings can only be
 # suppressed if the code is compiled with the appropriate
 # -fsanitize-recover=... option.
+
+# tarantool/tarantool#10631
+alignment:field_map_build
+alignment:src/box/applier.cc
+alignment:src/box/box.cc
+alignment:src/box/iproto.cc
+alignment:src/box/lua/info.c
+alignment:src/box/replication.cc
