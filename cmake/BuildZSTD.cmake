@@ -26,7 +26,7 @@ macro(zstd_build)
         third_party/zstd/lib/compress/zstd_compress_sequences.c
         third_party/zstd/lib/compress/zstd_compress_literals.c
     )
-    set(zstd_cflags "${DEPENDENCY_CFLAGS} -Ofast")
+    set(zstd_cflags "${DEPENDENCY_CFLAGS} -O3 -ffast-math")
     if (CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
         set(zstd_cflags "${zstd_cflags} -Wno-implicit-fallthrough")
     endif()
