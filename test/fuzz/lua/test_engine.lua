@@ -1408,16 +1408,15 @@ end
 
 local function run_test(num_workers, test_duration, test_dir,
                         engine_name, verbose_mode)
-
-    local socket_path = fio.pathjoin(fio.abspath(test_dir), 'console.sock')
-    console.listen(socket_path)
-    log.info('console listen on %s', socket_path)
-
     if fio.path.exists(test_dir) then
         cleanup_dir(test_dir)
     else
         fio.mkdir(test_dir)
     end
+
+    local socket_path = fio.pathjoin(fio.abspath(test_dir), 'console.sock')
+    console.listen(socket_path)
+    log.info('console listen on %s', socket_path)
 
     local workers = {}
     local space_id_func = counter()
