@@ -4303,12 +4303,6 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	struct vy_lsm *pk = vy_lsm(src_space->index[0]);
 	struct txn *txn = in_txn();
 
-	if (new_index->def->iid == 0 && !vy_lsm_is_empty(pk)) {
-		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-			 "rebuilding the primary index of a non-empty space");
-		return -1;
-	}
-
 	struct errinj *inj = errinj(ERRINJ_BUILD_INDEX, ERRINJ_INT);
 	if (inj != NULL && inj->iparam == (int)new_index->def->iid) {
 		diag_set(ClientError, ER_INJECTION, "build index");
@@ -4335,6 +4329,12 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 
 	if (!need_wal_sync && vy_lsm_is_empty(pk))
 		return 0; /* space is empty, nothing to do */
+
+	if (new_index->def->iid == 0) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "rebuilding the primary index of a non-empty space");
+		return -1;
+	}
 
 	if (txn_check_singlestatement(txn, "index build") != 0)
 		return -1;
