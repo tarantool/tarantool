@@ -3620,7 +3620,7 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 		return;
 	struct mh_snapshot_cleaner_t *ht = mh_snapshot_cleaner_new();
 	struct memtx_story *story;
-	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
+	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
 		struct tuple *tuple = story->tuple;
 		struct tuple *clean =
 			memtx_tx_tuple_clarify_impl(NULL, space, tuple, index,
@@ -3632,13 +3632,29 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 		entry.from = tuple;
 		entry.to = clean;
 		mh_snapshot_cleaner_put(ht,  &entry, NULL, 0);
-	}
-	struct space_alter_stmt *alter_stmt;
-	rlist_foreach_entry(alter_stmt, &space->alter_stmts, link) {
-		struct memtx_tx_snapshot_cleaner_entry entry;
-		entry.from = alter_stmt->new_tuple;
-		entry.to = alter_stmt->old_tuple;
-		mh_snapshot_cleaner_put(ht, &entry, NULL, 0);
+	});
+	/*
+	 * With MVCC off (box.cfg.memtx_use_mvcc_engine = false), a memtx space
+	 * read view may include a dirty (not committed to WAL) record. In order
+	 * to prevent such records from being written to a snapshot, we sync WAL
+	 * after creating a read view for a snapshot. The problem is it doesn't
+	 * work for long (yielding) DDL operations (e. g. building a new index)
+	 * because such operations yield before waiting on WAL. As a result, a
+	 * dirty DDL record could make it to a snapshot even though it may fail
+	 * eventually. To fix that, we keep track of all yielding DDL statements
+	 * using the alter statements and exclude them from a read view using
+	 * the memtx snapshot cleaner.
+	 *
+	 * This is not required in case the MVCC is on though.
+	 */
+	if (!memtx_tx_manager_use_mvcc_engine) {
+		struct space_alter_stmt *alter_stmt;
+		rlist_foreach_entry(alter_stmt, &space->alter_stmts, link) {
+			struct memtx_tx_snapshot_cleaner_entry entry;
+			entry.from = alter_stmt->new_tuple;
+			entry.to = alter_stmt->old_tuple;
+			mh_snapshot_cleaner_put(ht, &entry, NULL, 0);
+		}
 	}
 	cleaner->ht = ht;
 }
@@ -3650,16 +3666,13 @@ memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
 	assert(cleaner->ht != NULL);
 
 	struct mh_snapshot_cleaner_t *ht = cleaner->ht;
-	while (true) {
-		mh_int_t pos =  mh_snapshot_cleaner_find(ht, tuple, 0);
-		if (pos == mh_end(ht))
-			break;
-		struct memtx_tx_snapshot_cleaner_entry *entry =
-			mh_snapshot_cleaner_node(ht, pos);
-		assert(entry->from == tuple);
-		tuple = entry->to;
-	}
-	return tuple;
+	mh_int_t pos = mh_snapshot_cleaner_find(ht, tuple, 0);
+	if (pos == mh_end(ht))
+		return tuple;
+	struct memtx_tx_snapshot_cleaner_entry *entry =
+		mh_snapshot_cleaner_node(ht, pos);
+	assert(entry->from == tuple);
+	return entry->to;
 }
 
 void
