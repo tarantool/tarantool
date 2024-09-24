@@ -144,7 +144,7 @@ cpipe_destroy(struct cpipe *pipe)
 	cmsg_init(&poison->msg, route);
 	poison->endpoint = pipe->endpoint;
 	/*
-	 * Avoid the general purpose cpipe_push_input() since
+	 * Avoid the general purpose cpipe_push() since
 	 * we want to control the way the poison message is
 	 * delivered.
 	 */
