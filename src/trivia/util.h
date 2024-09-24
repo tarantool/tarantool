@@ -542,7 +542,8 @@ alloc_failure(const char *filename, int line, size_t size)
 
 void close_all_xcpt(int fdc, ...);
 
-#if defined(__GNUC__) && __GNUC__ >= 11
+#if (defined(__GNUC__) && __GNUC__ >= 11) || \
+	(defined(__clang__) && __clang_major__ >= 12)
 /** Import __gcov_dump function. */
 void
 __gcov_dump(void);
