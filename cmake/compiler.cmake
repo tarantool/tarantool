@@ -236,36 +236,28 @@ macro(enable_tnt_compile_flags)
     if (ENABLE_UB_SANITIZER)
         if (NOT CMAKE_COMPILER_IS_CLANG)
             message(FATAL_ERROR "Undefined behaviour sanitizer only available for clang")
-        else()
-            string_join("," SANITIZE_FLAGS
-                alignment bool bounds builtin enum float-cast-overflow
-                float-divide-by-zero function integer-divide-by-zero return
-                shift unreachable vla-bound
-            )
-
-            # Exclude "object-size".
+        endif()
+        # Use all needed checks from the UndefinedBehaviorSanitizer
+        # documentation:
+        # https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html.
+        string(JOIN "," UBSAN_IGNORE_OPTIONS
             # Gives compilation warnings when -O0 is used, which is always,
             # because some tests build with -O0.
-
-            # Exclude "pointer-overflow".
-            # Stailq data structure subtracts a positive value from NULL.
-
-            # Exclude "vptr".
+            object-size
+            # See https://github.com/tarantool/tarantool/issues/10742.
+            pointer-overflow
             # Intrusive data structures may abuse '&obj->member' on pointer
             # 'obj' which is not really a pointer at an object of its type.
             # For example, rlist uses '&item->member' expression in macro cycles
             # to check end of cycle, but on the last iteration 'item' points at
             # the list metadata head, not at an object of type stored in this
             # list.
-
-            # Exclude "implicit-signed-integer-truncation",
-            # "implicit-integer-sign-change", "signed-integer-overflow".
+            vptr
             # Integer overflow and truncation are disabled due to extensive
             # usage of this UB in SQL code to 'implement' some kind of int65_t.
-
-            # Exclude "null", "nonnull-attribute", "nullability-arg",
-            # "returns-nonnull-attribute", "nullability-assign",
-            # "nullability-return".
+            implicit-signed-integer-truncation
+            implicit-integer-sign-change
+            signed-integer-overflow
             # NULL checking is disabled, because this is not a UB and raises
             # lots of false-positive fails such as typeof(*obj) with
             # obj == NULL, or memcpy() with NULL argument and 0 size. All
@@ -274,11 +266,28 @@ macro(enable_tnt_compile_flags)
             # example, having "returns-nonnull-attribute" may lead to fail in
             # the typeof(*obj) when obj is NULL, even though there is nothing
             # related to return.
-
-            set(SANITIZE_FLAGS "-fsanitize=${SANITIZE_FLAGS} -fno-sanitize-recover=${SANITIZE_FLAGS}")
-
-            add_compile_flags("C;CXX" "${SANITIZE_FLAGS}")
-        endif()
+            null
+            nonnull-attribute
+            nullability-arg
+            returns-nonnull-attribute
+            nullability-assign
+            nullability-return
+            # Not interested in function type mismatch errors.
+            function
+        )
+        # XXX: To get nicer stack traces in error messages.
+        set(SANITIZE_FLAGS "${SANITIZE_FLAGS} -fno-omit-frame-pointer")
+        # Enable UndefinedBehaviorSanitizer support.
+        # This flag enables all supported options (the documentation
+        # on site is not correct about that moment, unfortunately)
+        # except float-divide-by-zero. Floating point division by zero
+        # behaviour is defined without -ffast-math and uses the
+        # IEEE 754 standard on which all NaN tagging is based.
+        set(SANITIZE_FLAGS "${SANITIZE_FLAGS} -fsanitize=undefined")
+        set(SANITIZE_FLAGS "${SANITIZE_FLAGS} -fno-sanitize=${UBSAN_IGNORE_OPTIONS}")
+        # Print a verbose error report and exit the program.
+        set(SANITIZE_FLAGS "${SANITIZE_FLAGS} -fno-sanitize-recover=undefined")
+        add_compile_flags("C;CXX" "${SANITIZE_FLAGS}")
     endif()
 
     if (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_GNUCXX)
