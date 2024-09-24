@@ -214,22 +214,6 @@ cpipe_flush_input(struct cpipe *pipe)
 }
 
 /**
- * Push a single message to the pipe input. The message is pushed
- * to a staging area. To be delivered, the input needs to be
- * flushed with cpipe_flush_input().
- */
-static inline void
-cpipe_push_input(struct cpipe *pipe, struct cmsg *msg)
-{
-	assert(loop() == pipe->producer);
-
-	stailq_add_tail_entry(&pipe->input, msg, fifo);
-	pipe->n_input++;
-	if (pipe->n_input >= pipe->max_input)
-		ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
-}
-
-/**
  * Push a single message and ensure it's delivered.
  * A combo of push_input + flush_input for cases when
  * it's not known at all whether there'll be other
@@ -238,9 +222,12 @@ cpipe_push_input(struct cpipe *pipe, struct cmsg *msg)
 static inline void
 cpipe_push(struct cpipe *pipe, struct cmsg *msg)
 {
-	cpipe_push_input(pipe, msg);
-	assert(pipe->n_input < pipe->max_input);
-	if (pipe->n_input == 1)
+	assert(loop() == pipe->producer);
+	stailq_add_tail_entry(&pipe->input, msg, fifo);
+	pipe->n_input++;
+	if (pipe->n_input >= pipe->max_input)
+		ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
+	else if (pipe->n_input == 1)
 		ev_feed_event(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 

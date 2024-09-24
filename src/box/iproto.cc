@@ -1378,7 +1378,7 @@ err_msgpack:
 
 		iproto_msg_prepare(msg, &pos, reqend);
 		if (iproto_msg_start_processing_in_stream(msg)) {
-			cpipe_push_input(&con->iproto_thread->tx_pipe, &msg->base);
+			cpipe_push(&con->iproto_thread->tx_pipe, &msg->base);
 			n_requests++;
 		}
 
@@ -1418,7 +1418,6 @@ err_msgpack:
 		 */
 		iproto_connection_feed_input(con);
 	}
-	cpipe_flush_input(&con->iproto_thread->tx_pipe);
 	return 0;
 }
 
@@ -3200,9 +3199,8 @@ iproto_msg_finish_processing_in_stream(struct iproto_msg *msg)
 		assert(stream->current != NULL);
 		stream->current->wpos = con->wpos;
 		con->iproto_thread->requests_in_stream_queue--;
-		cpipe_push_input(&con->iproto_thread->tx_pipe,
-				 &stream->current->base);
-		cpipe_flush_input(&con->iproto_thread->tx_pipe);
+		cpipe_push(&con->iproto_thread->tx_pipe,
+			   &stream->current->base);
 	}
 }
 
