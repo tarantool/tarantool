@@ -1343,7 +1343,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 	while (con->parse_size != 0 && !con->is_in_replication) {
 		if (iproto_check_msg_max(con->iproto_thread)) {
 			iproto_connection_stop_msg_max_limit(con);
-			cpipe_flush_input(&con->iproto_thread->tx_pipe);
+			cpipe_submit_flush(&con->iproto_thread->tx_pipe);
 			return 0;
 		}
 		const char *reqstart = in->wpos - con->parse_size;
@@ -1352,7 +1352,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		if (mp_typeof(*pos) != MP_UINT) {
 			errmsg = "packet length";
 err_msgpack:
-			cpipe_flush_input(&con->iproto_thread->tx_pipe);
+			cpipe_submit_flush(&con->iproto_thread->tx_pipe);
 			diag_set(ClientError, ER_INVALID_MSGPACK,
 				 errmsg);
 			return -1;
