@@ -176,12 +176,8 @@ cpipe_set_max_input(struct cpipe *pipe, int max_input)
 	pipe->max_input = max_input;
 }
 
-static inline void
-cpipe_flush(struct cpipe *pipe)
-{
-	if (pipe->n_input > 0)
-		ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
-}
+void
+cpipe_flush(struct cpipe *pipe);
 
 /**
  * Flush all staged messages into the pipe and eventually to the
@@ -207,8 +203,7 @@ cpipe_submit_flush(struct cpipe *pipe)
 			 * Wow, it's a lot of stuff piled up,
 			 * deliver immediately.
 			 */
-			ev_invoke(pipe->producer,
-				  &pipe->flush_input, EV_CUSTOM);
+			cpipe_flush(pipe);
 		}
 	}
 }
@@ -226,7 +221,7 @@ cpipe_push(struct cpipe *pipe, struct cmsg *msg)
 	stailq_add_tail_entry(&pipe->input, msg, fifo);
 	pipe->n_input++;
 	if (pipe->n_input >= pipe->max_input)
-		ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
+		cpipe_flush(pipe);
 	else if (pipe->n_input == 1)
 		ev_feed_event(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
