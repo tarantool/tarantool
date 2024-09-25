@@ -177,7 +177,7 @@ cpipe_set_max_input(struct cpipe *pipe, int max_input)
 }
 
 static inline void
-cpipe_deliver_now(struct cpipe *pipe)
+cpipe_flush(struct cpipe *pipe)
 {
 	if (pipe->n_input > 0)
 		ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
@@ -188,7 +188,7 @@ cpipe_deliver_now(struct cpipe *pipe)
  * consumer.
  */
 static inline void
-cpipe_flush_input(struct cpipe *pipe)
+cpipe_submit_flush(struct cpipe *pipe)
 {
 	assert(loop() == pipe->producer);
 

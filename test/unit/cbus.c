@@ -116,7 +116,7 @@ do_forced_flush(struct cmsg *m)
 	cmsg_init(&forced_flush_msg, &forced_flush_rote);
 	cmsg_init(&finish_msg, &finish_route);
 	cpipe_push(&pipe_to_main, &forced_flush_msg);
-	cpipe_flush_input(&pipe_to_main);
+	cpipe_submit_flush(&pipe_to_main);
 	cpipe_push(&pipe_to_main, &finish_msg);
 	expected_flushed_cnt = 1;
 }
