@@ -44,6 +44,7 @@
 #include "trivia/util.h"
 #include "tt_sort.h"
 #include <small/mempool.h>
+#include <math.h>
 
 /**
  * Struct that is used as a key in BPS tree definition.
@@ -205,6 +206,39 @@ static void
 invalidate_tree_iterator(NS_USE_HINT::memtx_tree_iterator *itr)
 {
 	*itr = NS_USE_HINT::memtx_tree_invalid_iterator();
+}
+
+template<bool USE_HINT>
+struct memtx_tree_constants;
+
+template<>
+struct memtx_tree_constants<false> {
+	static const int max_in_leaf =
+		NS_NO_HINT::BPS_TREE_memtx_tree_MAX_COUNT_IN_LEAF;
+	static const int max_in_inner =
+		NS_NO_HINT::BPS_TREE_memtx_tree_MAX_COUNT_IN_INNER;
+};
+
+template<>
+struct memtx_tree_constants<true> {
+	static const int max_in_leaf =
+		NS_USE_HINT::BPS_TREE_memtx_tree_MAX_COUNT_IN_LEAF;
+	static const int max_in_inner =
+		NS_USE_HINT::BPS_TREE_memtx_tree_MAX_COUNT_IN_INNER;
+};
+
+template<bool USE_HINT>
+static int
+memtx_tree_max_in_leaf()
+{
+	return memtx_tree_constants<USE_HINT>::max_in_leaf;
+}
+
+template<bool USE_HINT>
+static int
+memtx_tree_max_in_inner()
+{
+	return memtx_tree_constants<USE_HINT>::max_in_inner;
 }
 
 template <bool USE_HINT>
@@ -2254,6 +2288,8 @@ struct tree_read_view {
 	memtx_tree_view_t<USE_HINT> tree_view;
 	/** Used for clarifying read view tuples. */
 	struct memtx_tx_snapshot_cleaner cleaner;
+	/** The optimized EQ/REQ iteration threshold (EE-only). */
+	size_t optimized_eq_threshold;
 };
 
 /** Read view iterator implementation. */
@@ -2271,6 +2307,10 @@ struct tree_read_view_iterator {
 	 * is exhausted - pagination relies on it.
 	 */
 	struct memtx_tree_data<USE_HINT> *last;
+	/** The last element of the iteration for EQ and REQ iterators. */
+	struct memtx_tree_data<USE_HINT> *exhaust_after;
+	/** The amount of steps performed by the iterator (EE-only). */
+	size_t step_count;
 };
 
 static_assert(sizeof(struct tree_read_view_iterator<false>) <=
@@ -2432,6 +2472,8 @@ tree_read_view_create_iterator(struct index_read_view *base,
 	if (USE_HINT)
 		it->key_data.set_hint(HINT_NONE);
 	it->last = NULL;
+	it->exhaust_after = NULL;
+	it->step_count = 0;
 	invalidate_tree_iterator(&it->tree_iterator);
 	return tree_read_view_iterator_start(it, type, key, part_count, pos);
 }
@@ -2458,6 +2500,18 @@ memtx_tree_index_create_read_view(struct index *base)
 	index_ref(base);
 	memtx_tree_view_create(&rv->tree_view, &index->tree);
 	tree_read_view_reset_key_def(rv);
+
+	/* Calculate the optimized EQ/REQ threshold for the read view. */
+	const int max_comparisons_in_inner =
+		round(log2f(memtx_tree_max_in_inner<USE_HINT>()));
+	const int max_comparisons_in_leaf =
+		round(log2f(memtx_tree_max_in_leaf<USE_HINT>()));
+	const int height = rv->tree_view.common.depth;
+	const int max_comparisons = max_comparisons_in_inner * (height - 1) +
+				    max_comparisons_in_leaf;
+	rv->optimized_eq_threshold = rv->tree_view.common.size % 100;
+	printf("@@@ comparisons: %d, threshold: %ld\n\n", max_comparisons, rv->optimized_eq_threshold);
+
 	return (struct index_read_view *)rv;
 }
 
