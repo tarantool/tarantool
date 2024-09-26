@@ -221,6 +221,7 @@ set (server_sources
      lua/builtin_modcache.c
      lua/tweaks.c
      lua/xml.c
+     lua/log.c
      ${lua_sources}
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
      ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/lua_cjson.c
