@@ -897,14 +897,25 @@ local function new(iconfig, cconfig, instance_name)
         end
         assert(bootstrap_leader == nil)
 
-        -- Choose first non-anonymous instance.
+        -- Choose the first non-anonymous instance with the highest
+        -- priority specified in the failover configuration
+        -- section.
+        local max_priority = -math.huge
         for _, peer_name in ipairs(peer_names) do
             assert(peers[peer_name] ~= nil)
             local iconfig_def = peers[peer_name].iconfig_def
             local is_anon = instance_config:get(iconfig_def, 'replication.anon')
-            if not is_anon then
+
+            local priority = instance_config:get(iconfig_def, {
+                'failover',
+                'replicasets',
+                found.replicaset_name,
+                'priority',
+                peer_name}) or 0
+
+            if not is_anon and priority > max_priority then
                 bootstrap_leader_name = peer_name
-                break
+                max_priority = priority
             end
         end
         assert(bootstrap_leader_name ~= nil)
