@@ -1041,6 +1041,68 @@ g.test_failover_config = function()
 
 end
 
+g.test_failover_bootstrap_leader_considers_priorities = function()
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+
+        replication:
+          failover: 'supervised'
+
+        failover:
+          replicasets:
+            replicaset-001:
+              priority:
+                instance-002: 10
+                instance-003: 10
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+                  instance-002: {}
+                  instance-003: {}
+    ]]
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
+
+    g.server_1 = server:new({ config_file = config_file, chdir = dir,
+                              alias = 'instance-001' })
+    g.server_2 = server:new({ config_file = config_file, chdir = dir,
+                              alias = 'instance-002' })
+    g.server_3 = server:new({ config_file = config_file, chdir = dir,
+                              alias = 'instance-003' })
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_2:start({wait_until_ready = false})
+    g.server_3:start({wait_until_ready = false})
+
+    g.server_1:wait_until_ready()
+    g.server_2:wait_until_ready()
+    g.server_3:wait_until_ready()
+
+    g.server_1:exec(function()
+        t.assert_equals(box.info.ro, true)
+    end)
+
+    g.server_2:exec(function()
+        t.assert_equals(box.info.ro, false)
+    end)
+
+    g.server_3:exec(function()
+        t.assert_equals(box.info.ro, true)
+    end)
+end
+
 g.test_advertise_from_env = function(g)
     local dir = treegen.prepare_directory({}, {})
     local config = [[
