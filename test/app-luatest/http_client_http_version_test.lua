@@ -41,7 +41,7 @@ local expected = {
     },
     ['2-prior-knowledge'] = {
         http = '[HTTP/2] [1] OPENED stream',
-        https = 'ALPN: curl offers h2,http/1.1',
+        https = 'ALPN: curl offers h2',
     },
 }
 
