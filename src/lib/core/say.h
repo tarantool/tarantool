@@ -532,6 +532,13 @@ int
 say_format_json(struct log *log, char *buf, int len, int level,
 		const char *module, const char *filename, int line,
 		const char *error, const char *format, va_list ap);
+/**
+ * @TODO
+ */
+int
+say_format_json_v2(struct log *log, char *buf, int len, int level,
+		   const char *module, const char *filename, int line,
+		   const char *error, const char *format, va_list ap);
 int
 say_format_plain(struct log *log, char *buf, int len, int level,
 		const char *module, const char *filename, int line,

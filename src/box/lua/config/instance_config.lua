@@ -852,6 +852,20 @@ return schema.new('instance_config', schema.record({
             -- <schema object>:map().
             default = box.NULL,
         }),
+    -- @TODO don't allow to use log_fields_order with log_format = 'plain'
+        fields_order = schema.array({
+            items = schema.scalar({
+                type = 'string',
+            }),
+            box_cfg = 'log_fields_order',
+            default = box.NULL,
+        }),
+    -- @TODO don't allow to use log_context_generator with log_format = 'plain'
+        context_generator = schema.scalar({
+            type = 'string',
+            box_cfg = 'log_context_generator',
+            default = box.NULL,
+        }),
     }, {
         validate = function(log, w)
             if log.to == 'pipe' and log.pipe == nil then
@@ -2446,6 +2460,12 @@ return schema.new('instance_config', schema.record({
             default = 'old',
         }),
         wal_cleanup_delay_deprecation = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
+        log_rewrite_special_fields = schema.enum({
             'old',
             'new',
         }, {
