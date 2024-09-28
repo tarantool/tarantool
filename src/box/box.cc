@@ -6286,6 +6286,7 @@ box_storage_shutdown()
 	}
 	replication_shutdown();
 	box_raft_shutdown();
+	txn_limbo_shutdown();
 	gc_shutdown();
 	engine_shutdown();
 	fiber_pool_shutdown(&tx_fiber_pool);
