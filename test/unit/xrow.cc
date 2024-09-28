@@ -501,7 +501,7 @@ test_xrow_decode_unknown_key(void)
 	struct raft_request raft;
 	header.type = IPROTO_RAFT;
 	header.group_id = GROUP_LOCAL;
-	is(xrow_decode_raft(&header, &raft, /*vclock=*/NULL), 0,
+	is(xrow_decode_raft_local(&header, &raft, /*vclock=*/NULL), 0,
 	   "xrow_decode_raft");
 
 	struct ballot ballot;

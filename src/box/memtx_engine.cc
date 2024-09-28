@@ -348,7 +348,7 @@ memtx_engine_recover_raft(const struct xrow_header *row)
 	assert(row->type == IPROTO_RAFT);
 	struct raft_request req;
 	/* Vclock is never persisted in WAL by Raft. */
-	if (xrow_decode_raft(row, &req, NULL) != 0)
+	if (xrow_decode_raft_local(row, &req, NULL) != 0)
 		return -1;
 	box_raft_recover(&req);
 	return 0;
@@ -930,7 +930,7 @@ checkpoint_write_raft(struct xlog *l, const struct raft_request *req)
 	struct xrow_header row;
 	struct region *region = &fiber()->gc;
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_raft(&row, region, req);
+	xrow_encode_raft_local(&row, region, req);
 	if (checkpoint_write_row(l, &row) != 0)
 		return -1;
 	return 0;
