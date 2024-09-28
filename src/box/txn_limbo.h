@@ -161,13 +161,20 @@ struct txn_limbo {
 	 */
 	struct latch promote_latch;
 	/**
-	 * Maximal LSN gathered quorum and either already confirmed in WAL, or
-	 * whose confirmation is in progress right now. Any attempt to confirm
-	 * something smaller than this value can be safely ignored. Moreover,
-	 * any attempt to rollback something starting from <= this LSN is
-	 * illegal.
+	 * Maximal LSN that gathered quorum and has already been persisted in
+	 * the WAL. Any attempt to confirm something smaller than this value can
+	 * be safely ignored. Moreover, any attempt to rollback something
+	 * starting from <= this LSN is illegal.
 	 */
 	int64_t confirmed_lsn;
+	/**
+	 * Maximal LSN that gathered quorum and has not yet been persisted in
+	 * the WAL. No filtering can be performed based on this value. The
+	 * `worker` must always been woken up if this value is bumped separately
+	 * from the `confirmed_lsn` in order to asynchronously write a CONFIRM
+	 * request.
+	 */
+	int64_t volatile_confirmed_lsn;
 	/**
 	 * The first unconfirmed synchronous transaction in the current term.
 	 * Is NULL if there is no such transaction, or if the current instance
@@ -254,6 +261,14 @@ struct txn_limbo {
 	int64_t max_size;
 	/** Current approximate size of txn_limbo.queue. */
 	int64_t size;
+	/**
+	 * Asynchronously tries to close the gap between the `confirmed_lsn` and
+	 * the `volatile_confirmed_lsn` by writing a CONFIRM request to the WAL
+	 * and retrying it on failure. Must always be woken up when the
+	 * `volatile_confirmed_lsn` is updated separately from the
+	 * `confirmed_lsn`.
+	 */
+	struct fiber *worker;
 };
 
 /**
@@ -517,6 +532,9 @@ txn_limbo_init();
  */
 void
 txn_limbo_free();
+
+void
+txn_limbo_shutdown(void);
 
 /** Set maximal limbo size in bytes. */
 void
