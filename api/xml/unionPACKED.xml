@@ -1,14 +1,15 @@
 <?xml version='1.0' encoding='UTF-8' standalone='no'?>
-<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.8" xml:lang="en-US">
   <compounddef id="unionPACKED" kind="union" language="C++" prot="public">
     <compoundname>PACKED</compoundname>
     <includes refid="module_8h" local="no">module.h</includes>
-      <sectiondef kind="public-attrib">
+    <sectiondef kind="public-attrib">
       <memberdef kind="variable" id="unionPACKED_1ab16a07e887ef727e6085637bad928d45" prot="public" static="no" mutable="no">
         <type>uint32_t</type>
         <definition>uint32_t PACKED::fieldno</definition>
         <argsstring></argsstring>
         <name>fieldno</name>
+        <qualifiedname>PACKED::fieldno</qualifiedname>
         <briefdescription>
 <para>Index of a tuple field (zero based). </para>
         </briefdescription>
@@ -23,6 +24,7 @@
         <definition>uint32_t PACKED::flags</definition>
         <argsstring></argsstring>
         <name>flags</name>
+        <qualifiedname>PACKED::flags</qualifiedname>
         <briefdescription>
 <para>Flags, e.g. </para>
         </briefdescription>
@@ -38,6 +40,7 @@
         <definition>const char* PACKED::field_type</definition>
         <argsstring></argsstring>
         <name>field_type</name>
+        <qualifiedname>PACKED::field_type</qualifiedname>
         <briefdescription>
 <para>Type of the tuple field. </para>
         </briefdescription>
@@ -52,6 +55,7 @@
         <definition>const char* PACKED::collation</definition>
         <argsstring></argsstring>
         <name>collation</name>
+        <qualifiedname>PACKED::collation</qualifiedname>
         <briefdescription>
 <para>Collation name for string comparisons. </para>
         </briefdescription>
@@ -66,6 +70,7 @@
         <definition>const char* PACKED::path</definition>
         <argsstring></argsstring>
         <name>path</name>
+        <qualifiedname>PACKED::path</qualifiedname>
         <briefdescription>
 <para>JSON path to point a nested field. </para>
         </briefdescription>
@@ -80,10 +85,11 @@
         <location file="src/module.h" line="1948" column="12" bodyfile="src/module.h" bodystart="1948" bodyend="-1"/>
       </memberdef>
       <memberdef kind="variable" id="unionPACKED_1a6edcf6b5ce400f83345c6c108c93da4d" prot="public" static="no" mutable="no">
-        <type>struct PACKED::@4</type>
-        <definition>struct PACKED::@4 PACKED::@5</definition>
+        <type>struct <ref refid="unionPACKED" kindref="compound">PACKED</ref></type>
+        <definition>struct PACKED PACKED</definition>
         <argsstring></argsstring>
-        <name>@5</name>
+        <name></name>
+        <qualifiedname>PACKED</qualifiedname>
         <briefdescription>
         </briefdescription>
         <detaileddescription>
@@ -97,6 +103,7 @@
         <definition>char PACKED::padding[BOX_KEY_PART_DEF_T_SIZE]</definition>
         <argsstring>[BOX_KEY_PART_DEF_T_SIZE]</argsstring>
         <name>padding</name>
+        <qualifiedname>PACKED::padding</qualifiedname>
         <briefdescription>
 <para>Padding to guarantee certain size across different tarantool versions. </para>
         </briefdescription>
@@ -106,15 +113,15 @@
         </inbodydescription>
         <location file="src/module.h" line="1954" column="6" bodyfile="src/module.h" bodystart="1954" bodyend="-1"/>
       </memberdef>
-      </sectiondef>
+    </sectiondef>
     <briefdescription>
 <para>Public representation of a key part definition. </para>
     </briefdescription>
     <detaileddescription>
-<para>Usage: Allocate an array of such key parts, initialize each key part (call <ref refid="module_8h_1a52f751905f893144ead356172137e796" kindref="member">box_key_part_def_create()</ref> and set necessary fields), pass the array into <ref refid="module_8h_1a3591006ff571eb1ac2b05f5e41a8a8ca" kindref="member">box_key_def_new_v2()</ref> function.</para>
+<para>Usage: Allocate an array of such key parts, initialize each key part (call <ref refid="module_8h_1a52f751905f893144ead356172137e796" kindref="member">box_key_part_def_create()</ref> and set necessary fields), pass the array into <ref refid="module_8h_1a0ee0eb2d3a12d2588226a2a232f7b718" kindref="member">box_key_def_new_v2()</ref> function.</para>
 <para>Important: A module should call <ref refid="module_8h_1a52f751905f893144ead356172137e796" kindref="member">box_key_part_def_create()</ref> to initialize the structure with default values. There is no guarantee that all future default values for fields and flags will be remain the same.</para>
 <para>The idea of separation from internal &quot;struct key_part_def&quot; is to provide stable API and ABI for modules.</para>
-<para>New fields may be added into the end of the structure in later tarantool versions. Also new flags may be introduced within <emphasis>flags</emphasis> field. <emphasis>collation</emphasis> cannot be changed to a union (to reuse for some other value), because it is verified even for a non-string key part by <ref refid="module_8h_1a3591006ff571eb1ac2b05f5e41a8a8ca" kindref="member">box_key_def_new_v2()</ref>.</para>
+<para>New fields may be added into the end of the structure in later tarantool versions. Also new flags may be introduced within <emphasis>flags</emphasis> field. <emphasis>collation</emphasis> cannot be changed to a union (to reuse for some other value), because it is verified even for a non-string key part by <ref refid="module_8h_1a0ee0eb2d3a12d2588226a2a232f7b718" kindref="member">box_key_def_new_v2()</ref>.</para>
 <para>Fields that are unknown at given tarantool version are ignored in general, but filled with zeros when initialized. </para>
     </detaileddescription>
     <location file="src/module.h" line="1919" column="1" bodyfile="src/module.h" bodystart="1919" bodyend="1955"/>
