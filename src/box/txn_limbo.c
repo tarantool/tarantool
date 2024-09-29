@@ -422,8 +422,7 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo, struct synchro_request *req,
 	req->confirmed_vclock = vclock;
 }
 
-/** Write a request to WAL. */
-static void
+static int
 synchro_request_write(const struct synchro_request *req)
 {
 	/*
@@ -433,7 +432,14 @@ synchro_request_write(const struct synchro_request *req)
 	char body[XROW_BODY_LEN_MAX];
 	struct xrow_header row;
 	xrow_encode_synchro(&row, body, req);
-	if (journal_write_row(&row) == 0)
+	return journal_write_row(&row);
+}
+
+/** Write a request to WAL or panic. */
+static void
+synchro_request_write_or_panic(const struct synchro_request *req)
+{
+	if (synchro_request_write(req) == 0)
 		return;
 	diag_log();
 	/*
@@ -447,10 +453,11 @@ synchro_request_write(const struct synchro_request *req)
 	      "type = %s\n", (long long)req->lsn, iproto_type_name(req->type));
 }
 
-/** Create a request for a specific limbo and write it to WAL. */
+/** Create a request for a specific limbo and write it to WAL or panic. */
 static void
-txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
-			uint64_t term, struct vclock *vclock)
+txn_limbo_write_synchro_or_panic(struct txn_limbo *limbo, uint16_t type,
+				 int64_t lsn, uint64_t term,
+				 struct vclock *vclock)
 {
 	assert(lsn >= 0);
 
@@ -461,7 +468,7 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 		.term = term,
 		.confirmed_vclock = vclock,
 	};
-	synchro_request_write(&req);
+	synchro_request_write_or_panic(&req);
 }
 
 /**
@@ -574,7 +581,8 @@ txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 	assert(lsn > limbo->confirmed_lsn);
 	assert(!limbo->is_in_rollback);
 	limbo->is_in_rollback = true;
-	txn_limbo_write_synchro(limbo, IPROTO_RAFT_ROLLBACK, lsn, 0, NULL);
+	txn_limbo_write_synchro_or_panic(limbo, IPROTO_RAFT_ROLLBACK, lsn, 0,
+					 NULL);
 	limbo->is_in_rollback = false;
 }
 
@@ -636,7 +644,7 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 	};
 	if (txn_limbo_req_prepare(limbo, &req) < 0)
 		return -1;
-	synchro_request_write(&req);
+	synchro_request_write_or_panic(&req);
 	txn_limbo_req_commit(limbo, &req);
 	return 0;
 }
@@ -676,7 +684,7 @@ txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 	};
 	if (txn_limbo_req_prepare(limbo, &req) < 0)
 		return -1;
-	synchro_request_write(&req);
+	synchro_request_write_or_panic(&req);
 	txn_limbo_req_commit(limbo, &req);
 	return 0;
 }
