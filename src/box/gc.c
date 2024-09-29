@@ -890,7 +890,8 @@ gc_erase_consumer(const struct tt_uuid *uuid)
 	assert(in_txn() != NULL);
 	struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
 	if (!gc_schema_supports_persistent_consumers()) {
-		consumer->is_persistent = false;
+		if (consumer != NULL)
+			consumer->is_persistent = false;
 		return 0;
 	}
 
