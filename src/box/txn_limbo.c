@@ -387,9 +387,8 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo, struct synchro_request *req,
 	req->confirmed_vclock = vclock;
 }
 
-/** Write a request to WAL. */
-static void
-synchro_request_write(const struct synchro_request *req)
+static int
+synchro_request_write_without_error_handling(const struct synchro_request *req)
 {
 	/*
 	 * This is a synchronous commit so we can
@@ -398,7 +397,14 @@ synchro_request_write(const struct synchro_request *req)
 	char body[XROW_BODY_LEN_MAX];
 	struct xrow_header row;
 	xrow_encode_synchro(&row, body, req);
-	if (journal_write_row(&row) == 0)
+	return journal_write_row(&row);
+}
+
+/** Write a request to WAL. */
+static void
+synchro_request_write(const struct synchro_request *req)
+{
+	if (synchro_request_write_without_error_handling(req) == 0)
 		return;
 	diag_log();
 	/*
