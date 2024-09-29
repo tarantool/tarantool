@@ -939,38 +939,29 @@ end
 g.test_downgrade_global_names = function(cg)
     cg.server:exec(function()
         local helper = require('test.box-luatest.downgrade_helper')
+        local name = 'test'
         box.cfg{
             force_recovery = true,
-            cluster_name = 'test'
-        }
-        local prev_version = helper.prev_version(helper.app_version('3.0.0'))
-        local issues = box.schema.downgrade_issues(prev_version)
-        t.assert_str_contains(issues[1], 'Cluster name is set')
-        box.space._schema:delete{'cluster_name'}
-        box.cfg{
-            cluster_name = box.NULL,
-            replicaset_name = 'test'
-        }
-        issues = box.schema.downgrade_issues(prev_version)
-        t.assert_str_contains(issues[1], 'Replicaset name is set')
-        box.space._schema:delete{'replicaset_name'}
-        box.cfg{
-            replicaset_name = box.NULL,
-            instance_name = 'test',
-        }
-        issues = box.schema.downgrade_issues(prev_version)
-        t.assert_str_contains(issues[1], 'Instance name is set')
-        box.space._cluster:update({box.info.id}, {{'#', 'name', 1}})
-        box.cfg{
-            instance_name = box.NULL,
-            force_recovery = false,
+            cluster_name = name,
+            replicaset_name = name,
+            instance_name = name,
         }
 
+        local prev_version = helper.prev_version(helper.app_version('3.0.0'))
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {})
         local format = box.space._cluster:format()
         t.assert_equals(#format, 3)
         t.assert_equals(format[3].name, 'name')
+
         box.schema.downgrade(prev_version)
         t.assert_equals(#box.space._cluster:format(), 2)
+        local info = box.info
+        t.assert_equals(info.name, name)
+        t.assert_equals(box.space._cluster:get(1)[3], name)
+        t.assert_equals(info.replicaset.name, name)
+        t.assert_equals(box.space._schema:get('replicaset_name')[2], name)
+        t.assert_equals(info.cluster.name, 'test')
+        t.assert_equals(box.space._schema:get('cluster_name')[2], name)
     end)
 end
 

@@ -1967,23 +1967,6 @@ local function store_replicaset_uuid_in_old_way(issue_handler)
     change_replicaset_uuid_key('replicaset_uuid', 'cluster')
 end
 
--- Global names are stored in spaces. Can't silently delete them. It might break
--- the cluster. The user has to do it manually and carefully.
-local function check_names_are_not_set(issue_handler)
-    local _schema = box.space._schema
-    local msg_suffix = 'name is set. It is supported from version 3.0.0'
-    if _schema:get{'cluster_name'} ~= nil then
-        issue_handler('Cluster %s', msg_suffix)
-    end
-    if _schema:get{'replicaset_name'} ~= nil then
-        issue_handler('Replicaset %s', msg_suffix)
-    end
-    local row = box.space._cluster:get{box.info.id}
-    if row ~= nil and row.name ~= nil then
-        issue_handler('Instance %s', msg_suffix)
-    end
-end
-
 local function drop_instance_names(issue_handler)
     if issue_handler.dry_run then
         return
@@ -1998,7 +1981,9 @@ end
 
 local function downgrade_from_3_0_0(issue_handler)
     store_replicaset_uuid_in_old_way(issue_handler)
-    check_names_are_not_set(issue_handler)
+    -- It's allowed to downgrade with names set in order to simlify the
+    -- downgrade process. Names will properly work on schema 2.11, since
+    -- the DDL is allowed, even though they they're not in the format.
     drop_instance_names(issue_handler)
 end
 
