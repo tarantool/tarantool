@@ -76,16 +76,25 @@ endif()
 
 option(ENABLE_ASAN "Enable AddressSanitizer, a fast memory error detector based on compiler instrumentation" OFF)
 if (ENABLE_ASAN)
-    if (CMAKE_COMPILER_IS_GNUCC)
+    # AddressSanitizer has been added to GCC since version 4.8.0,
+    # see https://gcc.gnu.org/gcc-4.8/changes.html.
+    if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_C_COMPILER_VERSION VERSION_LESS 4.8.0)
         message(FATAL_ERROR
             "\n"
-            " Tarantool does not support GCC's AddressSanitizer. Use clang:\n"
+            " GCC has AddressSanitizer support since 4.8.0. Update GCC version\n"
+            " or use Clang:\n"
             " $ git clean -xfd; git submodule foreach --recursive git clean -xfd\n"
             " $ CC=clang CXX=clang++ cmake . <...> -DENABLE_ASAN=ON && make -j\n"
             "\n")
     endif()
 
-    set(CMAKE_REQUIRED_FLAGS "-fsanitize=address -fsanitize-blacklist=${PROJECT_SOURCE_DIR}/asan/asan.supp")
+    set(ASAN_FLAGS "-fsanitize=address")
+    if (CMAKE_C_COMPILER STREQUAL "Clang")
+        # Bug 61978 - implement blacklist for sanitizer,
+        # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=61978
+        set(ASAN_FLAGS "${ASAN_FLAGS} -fsanitize-blacklist=${PROJECT_SOURCE_DIR}/asan/asan.supp")
+    endif()
+    set(CMAKE_REQUIRED_FLAGS ${ASAN_FLAGS})
     check_c_source_compiles("int main(void) {
         #include <sanitizer/asan_interface.h>
         void *x;
@@ -108,5 +117,5 @@ if (ENABLE_ASAN)
         message(FATAL_ERROR "Cannot enable AddressSanitizer")
     endif()
 
-    add_compile_flags("C;CXX" -fsanitize=address -fsanitize-blacklist=${PROJECT_SOURCE_DIR}/asan/asan.supp)
+    add_compile_flags("C;CXX" ${ASAN_FLAGS})
 endif()
