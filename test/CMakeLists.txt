@@ -154,6 +154,16 @@ add_custom_target(test-force
         --force)
 
 message(STATUS "Add regression tests")
+add_custom_target(test-force-ctest
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
+            ${UNIT_TEST_TARGETS}
+    COMMAND ${CMAKE_CTEST_COMMAND} ${TARANTOOL_CTEST_FLAGS}
+        # Set the default test timeout in seconds.
+        --timeout 600
+        --label-exclude "\"performance|fuzzing\""
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
+    COMMENT "Running regression tests using CTest")
+
 list(APPEND EXECUTED_WITHOUT_TEST_RUN
     app-luatest
     box-luatest
