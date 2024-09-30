@@ -1133,14 +1133,27 @@ txn_commit_nop(struct txn *txn)
  * write completes.
  */
 static int
-txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req)
+txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req,
+		    enum txn_commit_wait_mode wait_mode)
 {
+	uint32_t origin_id = req->rows[0]->replica_id;
+	if (origin_id == 0 && txn_limbo.size >= txn_limbo.max_size) {
+		if (wait_mode == TXN_COMMIT_WAIT_MODE_NONE) {
+			diag_set(ClientError, ER_SYNC_QUEUE_FULL);
+			return -1;
+		}
+		while (txn_limbo.size >= txn_limbo.max_size) {
+			if (fiber_cond_wait(&txn_limbo.wait_cond) != 0)
+				return -1;
+		}
+	}
+
 	/*
 	 * Remote rows, if any, come before local rows, so check for originating
 	 * instance id in the first row.
 	 */
-	uint32_t origin_id = req->rows[0]->replica_id;
-	txn->limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
+	txn->limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn,
+					    req->approx_len);
 	if (txn->limbo_entry == NULL)
 		return -1;
 	return 0;
@@ -1168,19 +1181,6 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 				 "txn commit async injection");
 			goto rollback_abort;
 		});
-		/*
-		 * The main reason why it is disabled is that the sync txn's
-		 * original instance wants to write CONFIRM. But it can't be
-		 * done asynchronously in the current code design. Also it is
-		 * logically strange to commit a synchronous transaction in an
-		 * async way, but the CONFIRM problem is the technical one.
-		 */
-		bool is_original = req->rows[0]->replica_id == 0;
-		if (txn_has_flag(txn, TXN_WAIT_ACK) && is_original) {
-			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
-				 "Non-blocking commit of a synchronous txn");
-			goto rollback_abort;
-		}
 		if (wait_mode == TXN_COMMIT_WAIT_MODE_NONE &&
 		    journal_queue_is_full()) {
 			diag_set(ClientError, ER_WAL_QUEUE_FULL);
@@ -1195,7 +1195,7 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 	 * txn not waiting for anything.
 	 */
 	if (txn_has_flag(txn, TXN_WAIT_SYNC) &&
-	    txn_add_limbo_entry(txn, req) != 0) {
+	    txn_add_limbo_entry(txn, req, wait_mode) != 0) {
 		goto rollback_abort;
 	}
 	fiber_set_txn(fiber(), NULL);
@@ -1203,7 +1203,9 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 		fiber_set_txn(fiber(), txn);
 		goto rollback_io;
 	}
-	if (wait_mode != TXN_COMMIT_WAIT_MODE_COMPLETE) {
+	if ((!txn_has_flag(txn, TXN_WAIT_SYNC) ||
+	     txn_limbo.owner_id != instance_id) &&
+	    wait_mode != TXN_COMMIT_WAIT_MODE_COMPLETE) {
 		if (txn_has_flag(txn, TXN_IS_DONE))
 			goto finish_done;
 		txn->fiber = NULL;
@@ -1226,6 +1228,12 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
 			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id,
 				      limbo_entry->lsn);
+		}
+		if (wait_mode != TXN_COMMIT_WAIT_MODE_COMPLETE) {
+			if (txn_has_flag(txn, TXN_IS_DONE))
+				goto finish_done;
+			txn->fiber = NULL;
+			return 0;
 		}
 		int rc = txn_limbo_wait_complete(&txn_limbo, limbo_entry);
 		if (rc < 0) {

@@ -404,7 +404,7 @@ local function prepare_file_path(self, iconfig, path)
     return rebase_file_path(base_dir, path)
 end
 
--- Read a config.context[name] variable depending of its "from"
+-- Read a config.context[name] variable depending on its "from"
 -- type.
 local function read_context_var_noexc(base_dir, def)
     if def.from == 'env' then
@@ -1465,6 +1465,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'replication_synchro_timeout',
             default = 5,
         }),
+        synchro_queue_max_size = schema.scalar({
+            type = 'integer',
+            box_cfg = 'replication_synchro_queue_max_size',
+            default = 16 * 1024 * 1024,
+        }),
         connect_timeout = schema.scalar({
             type = 'number',
             box_cfg = 'replication_connect_timeout',
@@ -1499,7 +1504,7 @@ return schema.new('instance_config', schema.record({
             'candidate',
         }, {
             box_cfg = 'election_mode',
-            -- The effective default is determined depending of
+            -- The effective default is determined depending on
             -- the replication.failover option.
             default = box.NULL,
         }),
@@ -2354,6 +2359,12 @@ return schema.new('instance_config', schema.record({
             'new',
         }, {
             default = 'new',
+        }),
+        box_cfg_replication_synchro_timeout = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
         }),
         sql_seq_scan_default = schema.enum({
             'old',

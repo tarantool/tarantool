@@ -357,6 +357,7 @@ void box_set_checkpoint_count(void);
 void box_set_checkpoint_interval(void);
 void box_set_checkpoint_wal_threshold(void);
 int box_set_wal_queue_max_size(void);
+int box_set_replication_synchro_queue_max_size(void);
 int box_set_wal_cleanup_delay(void);
 void box_set_memtx_memory(void);
 void box_set_memtx_max_tuple_size(void);

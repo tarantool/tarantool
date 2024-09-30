@@ -197,6 +197,14 @@ extern int replication_synchro_quorum;
 extern double replication_synchro_timeout;
 
 /**
+ * Part of internal.tweaks.replication_synchro_timeout_rollback_enabled.
+ * Indicates whether the replication_synchro_timeout option rolls back
+ * transactions or it only used to wait confirmation in box_(promote/demote)
+ * and gc_do_checkpoint.
+ */
+extern bool replication_synchro_timeout_rollback_enabled;
+
+/**
  * Max time to wait for appliers to synchronize before entering
  * the orphan mode.
  */

@@ -100,6 +100,8 @@ cfg_filter(box.cfg)
  |     - 10
  |   - - replication_sync_timeout
  |     - <hidden>
+ |   - - replication_synchro_queue_max_size
+ |     - 16777216
  |   - - replication_synchro_quorum
  |     - N / 2 + 1
  |   - - replication_synchro_timeout
@@ -250,6 +252,8 @@ cfg_filter(box.cfg)
  |     - 10
  |   - - replication_sync_timeout
  |     - <hidden>
+ |   - - replication_synchro_queue_max_size
+ |     - 16777216
  |   - - replication_synchro_quorum
  |     - N / 2 + 1
  |   - - replication_synchro_timeout

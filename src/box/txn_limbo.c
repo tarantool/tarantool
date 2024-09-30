@@ -60,6 +60,14 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->is_frozen_until_promotion = true;
 	limbo->do_validate = false;
 	limbo->confirm_lag = 0;
+	limbo->max_size = 0;
+	limbo->size = 0;
+}
+
+void
+txn_limbo_set_max_size(struct txn_limbo *limbo, int64_t size)
+{
+	limbo->max_size = size;
 }
 
 static inline void
@@ -134,8 +142,31 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo)
 	return NULL;
 }
 
+/** Increase queue size on a new write request. */
+static inline void
+txn_limbo_on_append(struct txn_limbo *limbo,
+		    const struct txn_limbo_entry *entry)
+{
+	limbo->size += entry->approx_len;
+	limbo->len++;
+}
+
+/** Decrease queue size once write request is complete. */
+static inline void
+txn_limbo_on_remove(struct txn_limbo *limbo,
+		    const struct txn_limbo_entry *entry)
+{
+	limbo->size -= entry->approx_len;
+	assert(limbo->size >= 0);
+	limbo->len--;
+	assert(limbo->len >= 0);
+	/* Wake up all fiber waiting to add a new limbo entry. */
+	fiber_cond_broadcast(&limbo->wait_cond);
+}
+
 struct txn_limbo_entry *
-txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
+txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
+		 size_t approx_len)
 {
 	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
 	assert(limbo == &txn_limbo);
@@ -181,13 +212,14 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 		return NULL;
 	}
 	e->txn = txn;
+	e->approx_len = approx_len;
 	e->lsn = -1;
 	e->ack_count = 0;
 	e->is_commit = false;
 	e->is_rollback = false;
 	e->insertion_time = fiber_clock();
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
-	limbo->len++;
+	txn_limbo_on_append(limbo, e);
 	return e;
 }
 
@@ -197,7 +229,7 @@ txn_limbo_remove(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	assert(!rlist_empty(&entry->in_queue));
 	assert(txn_limbo_first_entry(limbo) == entry);
 	rlist_del_entry(entry, in_queue);
-	limbo->len--;
+	txn_limbo_on_remove(limbo, entry);
 }
 
 static inline void
@@ -208,7 +240,7 @@ txn_limbo_pop(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	assert(entry->is_rollback);
 
 	rlist_del_entry(entry, in_queue);
-	limbo->len--;
+	txn_limbo_on_remove(limbo, entry);
 	++limbo->rollback_count;
 }
 
@@ -294,9 +326,15 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	assert(txn_has_flag(entry->txn, TXN_WAIT_SYNC));
 	double start_time = fiber_clock();
 	while (true) {
-		double deadline = start_time + replication_synchro_timeout;
-		double timeout = deadline - fiber_clock();
-		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
+		int rc;
+		if (replication_synchro_timeout_rollback_enabled) {
+			double timeout = start_time +
+				replication_synchro_timeout - fiber_clock();
+			rc = fiber_cond_wait_timeout(
+				&limbo->wait_cond, timeout);
+		} else {
+			rc = fiber_cond_wait(&limbo->wait_cond);
+		}
 		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
 		if (rc != 0 && fiber_is_cancelled())

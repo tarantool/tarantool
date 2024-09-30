@@ -433,6 +433,7 @@ struct errcode_record {
 	_(ER_READ_VIEW_CLOSED, 286,		"The read view is closed") \
 	_(ER_WAL_QUEUE_FULL, 287,		"The WAL queue is full") \
 	_(ER_INVALID_VCLOCK, 288,		"Invalid vclock", "value", STRING) \
+	_(ER_SYNC_QUEUE_FULL, 289,		"The synchronous transaction queue is full") \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*

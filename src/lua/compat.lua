@@ -156,6 +156,13 @@ be retained by persistent WAL GC.
 https://tarantool.io/compat/wal_cleanup_delay_deprecation
 ]]
 
+local BOX_CFG_REPLICATION_SYNCHRO_TIMEOUT_COMPAT_BRIEF = [[
+Determines whether the replication_synchro_timeout option rolls back
+transactions or it only used to wait confirmation in promote/demote and
+gc-checkpointing.
+
+https://tarantool.io/compat/box_cfg_replication_synchro_timeout
+]]
 
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
@@ -286,6 +293,13 @@ local options = {
         obsolete = nil,
         brief = WAL_CLEANUP_DELAY_DEPRECATION_BRIEF,
         action = function() end,
+    },
+    box_cfg_replication_synchro_timeout = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_CFG_REPLICATION_SYNCHRO_TIMEOUT_COMPAT_BRIEF,
+        action = tweak_action(
+            'replication_synchro_timeout_rollback_enabled', true, false),
     },
 }
 

@@ -53,6 +53,10 @@ struct txn_limbo_entry {
 	/** Transaction, waiting for a quorum. */
 	struct txn *txn;
 	/**
+	 * Approximate size of this request when encoded.
+	 */
+	size_t approx_len;
+	/**
 	 * LSN of the transaction by the originator's vclock
 	 * component. May be -1 in case the transaction is not
 	 * written to WAL yet.
@@ -238,6 +242,10 @@ struct txn_limbo {
 	 * quorum.
 	 */
 	double confirm_lag;
+	/** Maximal size of entries enqueued in txn_limbo.queue (in bytes). */
+	int64_t max_size;
+	/** Current approximate size of txn_limbo.queue. */
+	int64_t size;
 };
 
 /**
@@ -302,7 +310,8 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo);
  * The limbo entry is allocated on the transaction's region.
  */
 struct txn_limbo_entry *
-txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn);
+txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
+		 size_t approx_len);
 
 /** Remove the entry from the limbo, mark as rolled back. */
 void
@@ -493,6 +502,10 @@ txn_limbo_init();
  */
 void
 txn_limbo_free();
+
+/** Set maximal limbo size in bytes. */
+void
+txn_limbo_set_max_size(struct txn_limbo *limbo, int64_t size);
 
 #if defined(__cplusplus)
 }
