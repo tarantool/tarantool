@@ -48,6 +48,9 @@ else()
   set(LUAJIT_USE_TEST ON CACHE BOOL "Generate <test> target" FORCE)
 endif()
 
+set(LUAJIT_TEST_DEPS "tarantool" CACHE STRING
+    "A list of target dependencies to be used for tests. (tarantool)" FORCE)
+
 # XXX: There is <strict> module enabled by default in Tarantool
 # built in Debug, so we need to tweak LuaJIT testing environment.
 # XXX: Also, this script "unloads" internal Tarantool's modules
