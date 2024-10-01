@@ -124,7 +124,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><b>PACKAGE_VERSION_PATCH</b>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0" id="r_aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.3.0-entrypoint-112-g7cf41a1bb&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0" id="r_aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.3.0-entrypoint-115-gbe34a8447&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad63a17703ee9303be2682b7bb08e7a9f" id="r_ad63a17703ee9303be2682b7bb08e7a9f"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#ad63a17703ee9303be2682b7bb08e7a9f">TZDATA_VERSION</a>&#160;&#160;&#160;&quot;2022a&quot;</td></tr>
@@ -1120,6 +1120,10 @@ Enumerations</h2></td></tr>
 , <br />
 &#160;&#160;<b>ER_INVALID_VCLOCK</b> = 288
 , <br />
+&#160;&#160;<b>ER_ARROW_IPC_ENCODE</b> = 289
+, <br />
+&#160;&#160;<b>ER_ARROW_IPC_DECODE</b> = 290
+, <br />
 &#160;&#160;<b>box_error_code_MAX</b>
 <br />
  }</td></tr>
@@ -1543,6 +1547,9 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>box_is_ro</b> (void)<
 <tr class="memitem:a268a03389cd856206f0ddfc90f3cbf84" id="r_a268a03389cd856206f0ddfc90f3cbf84"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a268a03389cd856206f0ddfc90f3cbf84">box_upsert</a> (uint32_t space_id, uint32_t index_id, const char *tuple, const char *tuple_end, const char *ops, const char *ops_end, int index_base, <a class="el" href="module_8h.html#a880c3e1e8e63b9a12353853fb6aefa3f">box_tuple_t</a> **result)</td></tr>
 <tr class="memdesc:a268a03389cd856206f0ddfc90f3cbf84"><td class="mdescLeft">&#160;</td><td class="mdescRight">Execute an UPSERT request.  <br /></td></tr>
 <tr class="separator:a268a03389cd856206f0ddfc90f3cbf84"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab554b65cb9819d6e231deaaf1e7874d5" id="r_ab554b65cb9819d6e231deaaf1e7874d5"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#ab554b65cb9819d6e231deaaf1e7874d5">box_insert_arrow</a> (uint32_t space_id, struct ArrowArray *array, struct ArrowSchema *schema)</td></tr>
+<tr class="memdesc:ab554b65cb9819d6e231deaaf1e7874d5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Executes a batch insert request.  <br /></td></tr>
+<tr class="separator:ab554b65cb9819d6e231deaaf1e7874d5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a20de21b171ded688588f1063ac04a9d3" id="r_a20de21b171ded688588f1063ac04a9d3"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a20de21b171ded688588f1063ac04a9d3">box_truncate</a> (uint32_t space_id)</td></tr>
 <tr class="memdesc:a20de21b171ded688588f1063ac04a9d3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Truncate space.  <br /></td></tr>
 <tr class="separator:a20de21b171ded688588f1063ac04a9d3"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -2195,7 +2202,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><b>log_write_flightrec
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.3.0-entrypoint-112-g7cf41a1bb&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.3.0-entrypoint-115-gbe34a8447&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -5408,6 +5415,60 @@ decimal result (<em>res</em>) </dd></dl>
 </dl>
 <dl class="section see"><dt>See also</dt><dd><div class="fragment"><div class="line">box.space[space_id]:insert(tuple) </div>
 </div><!-- fragment --> </dd></dl>
+
+</div>
+</div>
+<a id="ab554b65cb9819d6e231deaaf1e7874d5" name="ab554b65cb9819d6e231deaaf1e7874d5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab554b65cb9819d6e231deaaf1e7874d5">&#9670;&#160;</a></span>box_insert_arrow()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int box_insert_arrow </td>
+          <td>(</td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>space_id</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">struct ArrowArray *&#160;</td>
+          <td class="paramname"><em>array</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">struct ArrowSchema *&#160;</td>
+          <td class="paramname"><em>schema</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Executes a batch insert request. </p>
+<p>A record batch from the Arrow <code>array</code> is inserted into the space columns, whose names are provided by the Arrow <code>schema</code>. Column types in the schema must match the types of the corresponding fields in the space format.</p>
+<p>If a column is nullable in space format, it can be omitted. All non-nullable columns (including primary key parts) must be present in the batch.</p>
+<p>This function does not release neither <code>array</code> nor <code>schema</code>.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">space_id</td><td>space identifier </td></tr>
+    <tr><td class="paramname">array</td><td>input data in ArrowArray format </td></tr>
+    <tr><td class="paramname">schema</td><td>definition of the input data in ArrowSchema format </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="retval"><dt>Return values</dt><dd>
+  <table class="retval">
+    <tr><td class="paramname">0</td><td>on success </td></tr>
+    <tr><td class="paramname">-1</td><td>on error (check <a class="el" href="module_8h.html#a29b4ebee3bb9402fb8621b4e96b93b5d" title="Get the information about the last API call error.">box_error_last()</a>) </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
@@ -10564,7 +10625,7 @@ the fiber is not joined yet (panic if not).</dd></dl>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Sep 28 2024 01:07:12 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8
+Generated on Tue Oct 1 2024 11:35:46 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8
 </small></address>
 </body>
 </html>

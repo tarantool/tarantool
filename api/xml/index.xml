@@ -439,6 +439,8 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcead6dbe2eef41eafa232935dd44d788b90" kind="enumvalue"><name>ER_READ_VIEW_CLOSED</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea42bc12c23af2af3f28ca4ccec389bc52" kind="enumvalue"><name>ER_WAL_QUEUE_FULL</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea248cd860c82ecdf187ca338415b05b49" kind="enumvalue"><name>ER_INVALID_VCLOCK</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceada0bed9618bd2a943fc98779403751fb" kind="enumvalue"><name>ER_ARROW_IPC_ENCODE</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea70f07325046933f131bfd91230e56bc5" kind="enumvalue"><name>ER_ARROW_IPC_DECODE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
@@ -591,6 +593,7 @@
     <member refid="module_8h_1a740bf8f0f5f912dfa78221c9fe5f21bb" kind="function"><name>box_delete</name></member>
     <member refid="module_8h_1a9badf4d5cc54e424a157439fcb58b96a" kind="function"><name>box_update</name></member>
     <member refid="module_8h_1a268a03389cd856206f0ddfc90f3cbf84" kind="function"><name>box_upsert</name></member>
+    <member refid="module_8h_1ab554b65cb9819d6e231deaaf1e7874d5" kind="function"><name>box_insert_arrow</name></member>
     <member refid="module_8h_1a20de21b171ded688588f1063ac04a9d3" kind="function"><name>box_truncate</name></member>
     <member refid="module_8h_1a3e5fd9116818749f73bf868d4e780256" kind="function"><name>box_sequence_next</name></member>
     <member refid="module_8h_1a66ac5f1357a07acaae764e5d2e2e55fa" kind="function"><name>box_sequence_current</name></member>
