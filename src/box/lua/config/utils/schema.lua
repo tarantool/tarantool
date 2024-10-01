@@ -7,6 +7,7 @@
 -- * validate
 -- * default
 -- * apply_default_if
+-- * description
 --
 -- Others are just stored.
 
@@ -183,6 +184,7 @@ scalars.string = {
         return raw_value
     end,
     never_accept_number = true,
+    jsonschema = {type = 'string'},
 }
 
 scalars.number = {
@@ -203,6 +205,7 @@ scalars.number = {
         return res
     end,
     never_accept_number = false,
+    jsonschema = {type = 'number'},
 }
 
 -- TODO: This hack is needed until a union schema node will be
@@ -216,6 +219,7 @@ scalars['string, number'] = {
         return tonumber(raw_value) or raw_value
     end,
     never_accept_number = false,
+    jsonschema = {type = {'string', 'number'}},
 }
 scalars['number, string'] = {
     type = 'number, string',
@@ -226,6 +230,7 @@ scalars['number, string'] = {
         return tonumber(raw_value) or raw_value
     end,
     never_accept_number = false,
+    jsonschema = {type = {'string', 'number'}},
 }
 
 scalars.integer = {
@@ -255,6 +260,7 @@ scalars.integer = {
         return res
     end,
     never_accept_number = false,
+    jsonschema = {type = 'integer'},
 }
 
 scalars.boolean = {
@@ -277,6 +283,7 @@ scalars.boolean = {
             'variable %q, got %q'):format(env_var_name, raw_value), 0)
     end,
     never_accept_number = true,
+    jsonschema = {type = 'boolean'},
 }
 
 scalars.any = {
@@ -295,6 +302,7 @@ scalars.any = {
         return res
     end,
     never_accept_number = false,
+    jsonschema = {},
 }
 
 local function is_scalar(schema)
@@ -1598,6 +1606,83 @@ function methods.pairs(self)
 end
 
 -- }}} <schema object>:pairs()
+
+-- {{{ <schema object>:jsonschema()
+
+-- This function sets common fields such as `description`, `default`, and `enum`
+-- for a given schema object. These fields are typical in JSON schemas.
+local function set_common_jsonschema_fields(res, schema)
+    res.description = schema.description
+    res.default = schema.default
+    res.enum = schema.allowed_values
+    return setmetatable(res, {
+        __serialize = 'map',
+    })
+end
+
+local function jsonschema_impl(schema, ctx)
+    if is_scalar(schema) then
+        -- If the schema is a scalar type (string, number, etc.)
+        -- copy the corresponding JSON schema.
+        local scalar_copy = table.copy(scalars[schema.type].jsonschema)
+        return set_common_jsonschema_fields(scalar_copy, schema)
+    elseif schema.type == 'record' then
+        local properties = {}
+        for field_name, field_def in pairs(schema.fields) do
+            walkthrough_enter(ctx, field_name)
+            if type(field_name) ~= 'string' then
+                walkthrough_error(ctx, 'JSON does not support non-string keys')
+            end
+            properties[field_name] = jsonschema_impl(field_def, ctx)
+            walkthrough_leave(ctx)
+        end
+        return set_common_jsonschema_fields({
+            type = 'object',
+            properties = properties,
+            additionalProperties = false
+        }, schema)
+    elseif schema.type == 'map' then
+        walkthrough_enter(ctx, '*')
+        if schema.key.type ~= 'string' then
+            walkthrough_error(ctx, 'JSON does not support non-string keys')
+        end
+        local res = set_common_jsonschema_fields({
+            type = 'object',
+            additionalProperties = jsonschema_impl(schema.value, ctx)
+        }, schema)
+        walkthrough_leave(ctx)
+        return res
+    elseif schema.type == 'array' then
+        walkthrough_enter(ctx, '*')
+        local res = {
+            type = 'array',
+            items = jsonschema_impl(schema.items, ctx),
+        }
+        walkthrough_leave(ctx)
+        if schema.validate == validate_no_repeat then
+            res.uniqueItems = true
+        end
+        return set_common_jsonschema_fields(res, schema)
+    else
+        assert(false)
+    end
+end
+
+-- Convert a schema to JSON schema format.
+--
+-- This method generates a Lua table that represents the current schema
+-- in the JSON Schema format. It recursively processes the schema
+-- structure and transforms it into a format compliant with the
+-- JSON Schema specification.
+function methods.jsonschema(self)
+    local ctx = walkthrough_start(self, {})
+    local jsonschema = jsonschema_impl(rawget(self, 'schema'), ctx)
+    jsonschema['$schema'] = 'https://json-schema.org/draft/2020-12/schema'
+
+    return jsonschema
+end
+
+-- }}} <schema object>:jsonschema()
 
 -- {{{ Schema preprocessing
 
