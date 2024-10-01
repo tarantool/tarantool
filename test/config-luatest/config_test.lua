@@ -98,7 +98,22 @@ local function verify_configdata()
     t.assert_equals(data:get('iproto'), expected.iproto)
 
     local f = function(w) return w.schema.type == 'integer' end
+    local function remove_descriptions(tbl)
+        if type(tbl) ~= 'table' then
+            return
+        end
+
+        for key, value in pairs(tbl) do
+            if key == 'description' then
+                tbl[key] = nil
+            elseif type(value) == 'table' then
+                remove_descriptions(value)
+            end
+        end
+    end
+
     local filtered_data = data:filter(f):totable()
+    remove_descriptions(filtered_data)
     local expected_filtered_data = {
         {
             data = 2000,

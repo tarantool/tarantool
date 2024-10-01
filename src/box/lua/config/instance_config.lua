@@ -1,4 +1,5 @@
 local schema = require('experimental.config.utils.schema')
+local descriptions = require('internal.config.descriptions')
 local tarantool = require('tarantool')
 local uuid = require('uuid')
 local urilib = require('uri')
@@ -2591,4 +2592,7 @@ return schema.new('instance_config', schema.record({
         base_dir = base_dir,
         prepare_file_path = prepare_file_path,
     },
+    _extra_annotations = {
+        descriptions = descriptions.instance_descriptions,
+    }
 })

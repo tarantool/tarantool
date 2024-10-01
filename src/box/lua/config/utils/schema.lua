@@ -1856,6 +1856,60 @@ function schema_mt.__index(self, key)
     return rawget(self, key)
 end
 
+local function set_schema_annotations(schema, annotations)
+    local descriptions = annotations.descriptions
+
+    -- Set the descriptions for the given schema node based on the field
+    -- path accumulated in ctx.path.
+    local function set_description(schema, ctx)
+        local field_path = table.concat(ctx.path, '.')
+        local description = descriptions[field_path]
+
+        assert(description ~= nil or schema.description ~= nil,
+            string.format('Missing description for field %q. ' ..
+            'Make sure that `descriptions.lua` contains a ' ..
+            'description for this field.', field_path))
+            schema.description = description or schema.description
+    end
+
+    -- Set annotations for the given schema node based
+    -- on the field path accumulated in ctx.path.
+    --
+    -- TODO(gh-10691): Refactor to separate schema logic from
+    -- data validators, and assign validators here.
+    local function set_annotations(schema, ctx)
+        if descriptions ~= nil then
+            set_description(schema, ctx)
+        end
+    end
+
+    -- This function recursively traverses the schema and adds
+    -- annotations based on the fpath accumulated in ctx.path.
+    local function set_schema_annotations_impl(schema, ctx)
+        set_annotations(schema, ctx)
+        -- if schema is scalar do nothing
+        if schema.type == 'record' then
+            for field_name, field_def in pairs(schema.fields) do
+                table.insert(ctx.path, field_name)
+                set_schema_annotations_impl(field_def, ctx)
+                table.remove(ctx.path)
+            end
+        elseif schema.type == 'map' then
+            table.insert(ctx.path, '*')
+            set_schema_annotations_impl(schema.value, ctx)
+            table.remove(ctx.path)
+        elseif schema.type == 'array' then
+            table.insert(ctx.path, '*')
+            set_schema_annotations_impl(schema.items, ctx)
+            table.remove(ctx.path)
+        end
+        return schema
+    end
+
+    local ctx = {path = {}}
+    return set_schema_annotations_impl(schema, ctx)
+end
+
 -- Create a schema object.
 --
 -- Unlike a schema node it has a name, has methods defined in this
@@ -1863,6 +1917,7 @@ end
 local function new(name, schema, opts)
     local opts = opts or {}
     local instance_methods = opts.methods or {}
+    local extra_annotations = opts._extra_annotations
 
     assert(type(name) == 'string')
     assert(type(schema) == 'table')
@@ -1870,6 +1925,9 @@ local function new(name, schema, opts)
     local ctx = {
         annotation_stack = {},
     }
+    if extra_annotations ~= nil then
+        schema = set_schema_annotations(schema, extra_annotations)
+    end
     local preprocessed_schema = preprocess_schema(schema, ctx)
 
     return setmetatable({
