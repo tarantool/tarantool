@@ -367,18 +367,26 @@ static int
 luaT_trigger_list_run(struct lua_State *L)
 {
 	struct rlist *trigger_list = luaT_check_trigger_list(L, 1);
-	int top = lua_gettop(L);
-	struct lbox_trigger *trigger;
-	rlist_foreach_entry(trigger, trigger_list, base.link) {
-		/* Only lbox_trigger is expected to be here. */
-		assert(trigger->base.run == lbox_trigger_run);
-		lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
-		for (int i = 2; i <= top; i++)
-			lua_pushvalue(L, i);
-		if (luaT_call(L, top - 1, 0) != 0)
-			luaT_error(L);
-	}
+	if (trigger_run(trigger_list, L) != 0)
+		luaT_error(L);
 	return 0;
+}
+
+/**
+ * Push event passed to `trigger_run` to Lua stack.
+ * Event must be a Lua stack, containing trigger list itself at the first
+ * place and all the arguments starting from the second place.
+ */
+static int
+luaT_trigger_list_push_event(struct lua_State *L, void *event)
+{
+	struct lua_State *args_L = (struct lua_State *)event;
+	int top = lua_gettop(args_L);
+	int argn = top - 1;
+	for (int i = 2; i <= top; i++)
+		lua_pushvalue(args_L, i);
+	lua_xmove(args_L, L, argn);
+	return argn;
 }
 
 /**
@@ -389,7 +397,8 @@ static int
 luaT_trigger_list_call(struct lua_State *L)
 {
 	struct rlist *trigger_list = luaT_check_trigger_list(L, 1);
-	return lbox_trigger_reset(L, 2, trigger_list, NULL, NULL);
+	return lbox_trigger_reset(L, 2, trigger_list,
+				  luaT_trigger_list_push_event, NULL);
 }
 
 /**
