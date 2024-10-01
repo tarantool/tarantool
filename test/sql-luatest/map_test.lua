@@ -320,3 +320,21 @@ g.test_map_9 = function()
         t.assert_equals(box.execute(sql).rows, res)
     end)
 end
+
+-- Make sure that MAP values can be used as a bound variable.
+g.test_map_binding_local = function()
+    g.server:exec(function()
+        local sql = [[SELECT #a;]]
+        local arg = {{['#a'] = {abc = 2, [1] = 3}}}
+        local res = {abc = 2, [1] = 3}
+        t.assert_equals(box.execute(sql, arg).rows[1][1], res)
+    end)
+end
+
+g.test_map_binding_remote = function()
+    local conn = g.server.net_box
+    local ok, res = pcall(conn.execute, conn, [[SELECT #a;]],
+                          {{['#a'] = {abc = 2, [1] = 3}}})
+    t.assert_equals(ok, true)
+    t.assert_equals(res.rows[1][1], {abc = 2, [1] = 3})
+end
