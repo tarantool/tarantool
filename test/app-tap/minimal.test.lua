@@ -1,5 +1,7 @@
 #!/usr/bin/env tarantool
 
+local TARANTOOL_PATH = arg[-1]
+
 print('Hello, World!')
 
 --
@@ -19,7 +21,7 @@ script:close()
 
 io.flush()
 
-os.execute("tarantool ./script-args.lua 1 2 3")
+os.execute(("%s ./script-args.lua 1 2 3"):format(TARANTOOL_PATH))
 
 --
 -- LUA_PATH and LUA_CPATH argument handling
@@ -56,7 +58,7 @@ for _, env in ipairs({
     }) do
         local cmd = table.concat({
             ("%s='%s'"):format(env[1], res[2]),
-            ('tarantool %s'):format(env[2]),
+            ('%s %s'):format(TARANTOOL_PATH, env[2]),
         }, ' ')
         local fh = io.popen(cmd)
         local rv = fh:read():gsub('-', '%%-'):gsub('+', '%%+'):gsub('?', '%%?')
