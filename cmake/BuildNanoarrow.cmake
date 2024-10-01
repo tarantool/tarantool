@@ -1,7 +1,7 @@
 # A macro to build the bundled nanoarrow library
 macro(nanoarrow_build)
     set(NANOARROW_SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/arrow/nanoarrow/)
-    set(NANOARROW_INSTALL_DIR ${PROJECT_BINARY_DIR}/third_party/nanoarrow/)
+    set(NANOARROW_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/nanoarrow/)
     set(NANOARROW_INCLUDE_DIR ${NANOARROW_INSTALL_DIR}/include/)
 
     set(NANOARROW_CORE_LIBRARY ${NANOARROW_INSTALL_DIR}/lib/libnanoarrow.a)
