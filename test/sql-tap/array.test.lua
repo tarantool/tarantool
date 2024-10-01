@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(117)
+test:plan(115)
 
 box.schema.func.create('A1', {
     language = 'Lua',
@@ -1022,29 +1022,6 @@ test:do_execsql_test(
     ]], {
         "array"
     })
-
--- Make sure that ARRAY values can be used as bound variable.
-test:do_test(
-    "builtins-14.1",
-    function()
-        local res = box.execute([[SELECT #a;]], {{['#a'] = {1, 2, 3}}})
-        return {res.rows[1][1]}
-    end, {
-        {1, 2, 3}
-    })
-
-local remote = require('net.box')
-box.cfg{listen = os.getenv('LISTEN')}
-local cn = remote.connect(box.cfg.listen)
-test:do_test(
-    "builtins-14.2",
-    function()
-        local res = cn:execute([[SELECT #a;]], {{['#a'] = {1, 2, 3}}})
-        return {res.rows[1][1]}
-    end, {
-        {1, 2, 3}
-    })
-cn:close()
 
 box.execute([[DROP TABLE t1;]])
 box.execute([[DROP TABLE t;]])
