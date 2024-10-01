@@ -1,5 +1,5 @@
-local schema = require('experimental.config.utils.schema')
 local t = require('luatest')
+local schema = require('experimental.config.utils.schema')
 
 local g = t.group()
 
