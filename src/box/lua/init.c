@@ -162,6 +162,7 @@ extern char session_lua[],
 	config_applier_sharding_lua[],
 	config_applier_box_status_lua[],
 	config_cluster_config_lua[],
+	config_descriptions_lua[],
 	config_configdata_lua[],
 	config_init_lua[],
 	config_instance_config_lua[],
@@ -379,6 +380,10 @@ static const char *lua_sources[] = {
 	"config/utils/textutils",
 	"internal.config.utils.textutils",
 	config_utils_textutils_lua,
+
+	"config/descriptions",
+	"internal.config.descriptions",
+	config_descriptions_lua,
 
 	"config/instance_config",
 	"internal.config.instance_config",

@@ -809,3 +809,30 @@ g.test_isolated_scope = function()
     -- Validation against the instance config: accepted.
     instance_config:validate(data)
 end
+
+g.test_cluster_config_schema_description_completeness = function()
+    local function check_schema_description(schema, ctx)
+        local field_path = table.concat(ctx.path, '.')
+        t.assert(schema.description ~= nil,
+                 string.format('%q is missing description', field_path))
+        if schema.type == 'record' then
+            for field_name, field_def in pairs(schema.fields) do
+                table.insert(ctx.path, field_name)
+                check_schema_description(field_def, ctx)
+                table.remove(ctx.path)
+            end
+        elseif schema.type == 'map' then
+            table.insert(ctx.path, '*')
+            check_schema_description(schema.value, ctx)
+            table.remove(ctx.path)
+        elseif schema.type == 'array' then
+            table.insert(ctx.path, '*')
+            check_schema_description(schema.items, ctx)
+            table.remove(ctx.path)
+        end
+    end
+
+    local cluster_config_schema = rawget(cluster_config, 'schema')
+    t.assert(cluster_config_schema ~= nil)
+    check_schema_description(cluster_config_schema, {path = {}})
+end

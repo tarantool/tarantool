@@ -90,7 +90,7 @@ end
 -- - memprof.*, misc.*, sysprof.*, table.*, timezones -- unclear
 --   whether they're public
 -- - box, buffer, decimal, errno, fiber, fio, log, merger,
---   msgpackffi, strict, tarantool, yaml -- used during
+--   msgpackffi, strict, tarantool, yaml, fun -- used during
 --   tarantool's initialization in a way that doesn't allow to
 --   replace them with an arbitrary table
 -- - msgpack -- box.NULL is used in config/instance_config.lua
@@ -105,7 +105,6 @@ local override_cases = {
     'datetime',
     'digest',
     'error',
-    'fun',
     'help',
     'http.client',
     'iconv',
