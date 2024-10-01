@@ -159,6 +159,7 @@ extern char session_lua[],
 	config_applier_mkdir_lua[],
 	config_applier_roles_lua[],
 	config_applier_sharding_lua[],
+	config_annotations_lua[],
 	config_cluster_config_lua[],
 	config_configdata_lua[],
 	config_init_lua[],
@@ -372,6 +373,10 @@ static const char *lua_sources[] = {
 	"config/utils/tabulate",
 	"internal.config.utils.tabulate",
 	config_utils_tabulate_lua,
+
+	"config/annotations",
+	"internal.config.annotations",
+	config_annotations_lua,
 
 	"config/instance_config",
 	"internal.config.instance_config",

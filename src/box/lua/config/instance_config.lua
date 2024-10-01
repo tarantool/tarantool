@@ -1,4 +1,5 @@
 local schema = require('experimental.config.utils.schema')
+local annotations = require('internal.config.annotations')
 local tarantool = require('tarantool')
 local uuid = require('uuid')
 local urilib = require('uri')
@@ -455,7 +456,45 @@ local function feedback_validate(data, w)
     w.error('Tarantool is built without feedback reports sending support')
 end
 
-return schema.new('instance_config', schema.record({
+-- Set the annotations for the given schema object based on the field
+-- path accumulated in ctx.path.
+local function set_annotation(schema_obj, ctx)
+    local field_path = table.concat(ctx.path, '.')
+    if annotations[field_path] ~= nil then
+        schema_obj.description = annotations[field_path]
+    end
+end
+
+-- This function recursively traverses the schema and adds
+-- annotations based on the fpath accumulated in ctx.path.
+local function add_descriptions_impl(schema, ctx)
+    local schema_type = schema.type
+    set_annotation(schema, ctx)
+    -- if schema is scalar do nothing
+    if schema_type == 'record' then
+        for field_name, field_def in pairs(schema.fields) do
+            table.insert(ctx.path, field_name)
+            add_descriptions_impl(field_def, ctx)
+            table.remove(ctx.path)
+        end
+    elseif schema_type == 'map' then
+        table.insert(ctx.path, '*')
+        add_descriptions_impl(schema.value, ctx)
+        table.remove(ctx.path)
+    elseif schema_type == 'array' then
+        table.insert(ctx.path, '*')
+        add_descriptions_impl(schema.items, ctx)
+        table.remove(ctx.path)
+    end
+    return schema
+end
+
+local function add_descriptions(schema)
+    local ctx = {path = {}}
+    return add_descriptions_impl(schema, ctx)
+end
+
+return schema.new('instance_config', add_descriptions(schema.record({
     config = schema.record({
         reload = schema.enum({
             'auto',
@@ -2473,7 +2512,7 @@ return schema.new('instance_config', schema.record({
     --   reach from the 'validate' function of a nested schema
     --   node.
     validate = validate_outmost_record,
-}), {
+})), {
     methods = {
         instance_uri = instance_uri,
         apply_vars = apply_vars,

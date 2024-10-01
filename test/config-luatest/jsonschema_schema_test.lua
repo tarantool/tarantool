@@ -1,5 +1,7 @@
-local schema = require('experimental.config.utils.schema')
 local t = require('luatest')
+
+local schema = require('experimental.config.utils.schema')
+local cluster_config = require('internal.config.cluster_config')
 
 local g = t.group()
 

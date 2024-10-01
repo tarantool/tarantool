@@ -1,6 +1,7 @@
 local schema = require('experimental.config.utils.schema')
 local instance_config = require('internal.config.instance_config')
 local expression = require('internal.config.utils.expression')
+local annotations = require('internal.config.annotations')
 
 -- Extract a field from a table.
 --
@@ -171,6 +172,12 @@ local name = schema.scalar({
     end,
 })
 
+local function name_with_description(field_path)
+    local schema_obj = name
+    schema_obj.description = annotations[field_path]
+    return schema_obj
+end
+
 -- Nested cluster config. It is an auxiliary schema.
 --
 -- The cluster config has the following structure.
@@ -191,22 +198,36 @@ local schema_name = 'nested_cluster_config'
 local nested_cluster_config = schema.new(schema_name, record_from_fields({
     instance_config_with_scope('global'),
     groups = schema.map({
-        key = name,
+        key = name_with_description('groups.*'),
         value = record_from_fields({
             instance_config_with_scope('group'),
             replicasets = schema.map({
-                key = name,
+                key = name_with_description('groups.*.replicasets.*'),
                 value = record_from_fields({
-                    leader = schema.scalar({type = 'string'}),
-                    bootstrap_leader = schema.scalar({type = 'string'}),
+                    leader = schema.scalar({
+                        type = 'string',
+                        description =
+                            annotations['groups.*.replicasets.*.leader']
+                    }),
+                    bootstrap_leader = schema.scalar({
+                        type = 'string',
+                        description =
+                            annotations['groups.*.replicasets.*.'..
+                            'bootstrap_leader']
+                    }),
                     instance_config_with_scope('replicaset'),
                     instances = schema.map({
-                        key = name,
+                        key = name_with_description('groups.*.replicasets.*.'..
+                            'instances.* '),
                         value = instance_config_with_scope('instance'),
+                        description =
+                            annotations['groups.*.replicasets.*.instances']
                     }),
                 }),
+                description = annotations['groups.*.replicasets']
             }),
         }),
+        description = annotations['groups']
     }),
 }))
 
@@ -316,10 +337,17 @@ return schema.new('cluster_config', record_from_fields({
             -- are going to be merged into the main config
             -- (i.e. the validation is performed after the version
             -- comparison).
-            key = schema.scalar({type = 'string'}),
-            value = schema.scalar({type = 'any'}),
+            key = schema.scalar({
+                type = 'string',
+                description = annotations['conditional.*']
+            }),
+            value = schema.scalar({
+                type = 'any',
+                description = annotations['conditional.*.*']
+            }),
             validate = validate_conditional,
-        })
+        }),
+        description = annotations['conditional'],
     }),
     nested_cluster_config.schema,
 }), {
