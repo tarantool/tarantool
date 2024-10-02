@@ -597,6 +597,12 @@ function methods.instance_uri(self, uri_type, opts)
     return self._configdata_applied:_instance_uri(uri_type, uri_opts)
 end
 
+function methods.jsonschema(self)
+    selfcheck(self, 'jsonschema')
+
+    return cluster_config:jsonschema()
+end
+
 -- The object is a singleton. The constructor should be called
 -- only once.
 local function new()
