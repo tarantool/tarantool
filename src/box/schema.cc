@@ -120,10 +120,7 @@ box_schema_needs_upgrade(void)
 	assert(latest_dd_version_id != 0);
 	if (dd_version_id < latest_dd_version_id) {
 		diag_set(ClientError, ER_SCHEMA_NEEDS_UPGRADE,
-			 tt_sprintf("%u.%u.%u",
-				    version_id_major(dd_version_id),
-				    version_id_minor(dd_version_id),
-				    version_id_patch(dd_version_id)),
+			 version_id_to_string(dd_version_id),
 			 tarantool_version());
 		return true;
 	}

@@ -2712,9 +2712,8 @@ greeting_encode(char *greetingbuf, uint32_t version_id,
 		const struct tt_uuid *uuid, const char *salt, uint32_t salt_len)
 {
 	int h = IPROTO_GREETING_SIZE / 2;
-	int r = snprintf(greetingbuf, h + 1, "Tarantool %u.%u.%u (Binary) ",
-		version_id_major(version_id), version_id_minor(version_id),
-		version_id_patch(version_id));
+	int r = snprintf(greetingbuf, h + 1, "Tarantool %s (Binary) ",
+			 version_id_to_string(version_id));
 
 	assert(r + UUID_STR_LEN < h);
 	tt_uuid_to_string(uuid, greetingbuf + r);
