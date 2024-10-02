@@ -75,6 +75,10 @@ test_run:cmd("switch replica1")
  | ---
  | - true
  | ...
+-- index.count() checks fiber slice (gh-10553)
+require('fiber').set_max_slice(9000)
+ | ---
+ | ...
 test_run:cmd("setopt delimiter ';'")
  | ---
  | - true
