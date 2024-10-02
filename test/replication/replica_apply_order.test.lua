@@ -26,6 +26,8 @@ ch:get()
 
 errinj.set("ERRINJ_RELAY_FINAL_SLEEP", false)
 test_run:cmd("switch replica1")
+-- index.count() checks fiber slice (gh-10553)
+require('fiber').set_max_slice(9000)
 test_run:cmd("setopt delimiter ';'")
 function get_max_index_and_count()
     return box.space.test.index.primary:max()[1], box.space.test.index.primary:count()
