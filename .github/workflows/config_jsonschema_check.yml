@@ -1,0 +1,115 @@
+name: config_jsonschema_check
+
+on:
+  push:
+    branches:
+      - 'master'
+      - 'release/**'
+    tags:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      submodule:
+        description: Name of submodule to bump.
+        required: true
+        type: string
+      revision:
+        description: Git revision from submodule repository
+        required: true
+        type: string
+
+concurrency:
+  # Update of a developer branch cancels the previously scheduled workflow
+  # run for this branch. However, the 'master' branch, release branch, and
+  # tag workflow runs are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow run ID' +
+  # 'workflow run attempt' because it is a unique combination for any run.
+  # So it effectively discards grouping.
+  #
+  # Important: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push event.
+  group: ${{ (
+    github.ref == 'refs/heads/master' ||
+    startsWith(github.ref, 'refs/heads/release/') ||
+    startsWith(github.ref, 'refs/tags/')) &&
+    format('{0}-{1}', github.run_id, github.run_attempt) ||
+    format('{0}-{1}-config-jsonschema-check', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  jsonschema-check:
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'notest' label is not set.
+    if: github.repository_owner == 'tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          ( github.event_name == 'pull_request' &&
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
+
+    runs-on: ubuntu-20.04-self-hosted
+
+    timeout-minutes: 60
+
+    container:
+      image: docker.io/tarantool/testing:ubuntu-focal
+      # Mount /dev to the container to be able to mount a disk image inside it
+      # for successful run of the .github/actions/environment action.
+      volumes:
+        - /dev:/dev
+      # Our testing expects that the init process (PID 1) will
+      # reap orphan processes. At least the following test leans
+      # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
+      # Add extra privileges to the container for successful run
+      # of the .github/actions/environment action.
+      options: '--init --privileged'
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          repository: tarantool/tarantool
+          ref: ${{ inputs.submodule && 'master' || github.ref }}
+      - uses: ./.github/actions/environment
+      - name: Install deps
+        uses: ./.github/actions/install-deps-debian
+      - name: Optional submodule bump
+        if: ${{ inputs.submodule }}
+        uses: ./.github/actions/bump-submodule
+        with:
+          submodule: ${{ inputs.submodule }}
+          revision: ${{ inputs.revision }}
+      - name: Build
+        run: make -f .test.mk build
+
+      - name: Install jq, check-jsonschema
+        run: |
+          apt-get update
+          apt-get install jq python3-pip -y
+          pip3 install check-jsonschema
+      - name: Generate config schema
+        run: |
+          ./src/tarantool -l json -l config -e "print(json.encode(config:jsonschema()))" > config-schema.json
+      - name: Pretty format the schema
+        run: jq --sort-keys -M . config-schema.json > config-schema-pretty.json
+      - name: Validate schema against metaschema
+        run: |
+          check-jsonschema --check-metaschema config-schema-pretty.json
+      - name: Validate schema with an incorrect configuration
+        run: |
+          echo '{"foo": 42}' > incorrect-config.json
+          ! check-jsonschema --schemafile config-schema-pretty.json incorrect-config.json
+      - name: Validate schema with example configurations
+        run: |
+          for example in doc/examples/config/*.yaml doc/examples/config/*/*.yaml docker/example/app/config.yaml; do
+            check-jsonschema --schemafile config-schema-pretty.json "$example"
+          done
+      - name: Send VK Teams message on failure
+        if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
