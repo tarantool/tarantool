@@ -1101,12 +1101,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	}
 
 	sz = key_def_sizeof(new_part_count, sz);
-	struct key_def *new_def;
-	new_def = (struct key_def *)calloc(1, sz);
-	if (new_def == NULL) {
-		diag_set(OutOfMemory, sz, "malloc", "new_def");
-		return NULL;
-	}
+	struct key_def *new_def = xcalloc(1, sz);
 	new_def->part_count = new_part_count;
 	new_def->unique_part_count = new_part_count;
 	new_def->is_nullable = first->is_nullable || second->is_nullable;

@@ -270,13 +270,13 @@ index_def_list_add(struct rlist *index_def_list, struct index_def *index_def)
 
 /**
  * Create a new index definition.
+ * Does not validate identifier - caller must do it manually.
  *
  * @param key_def  key definition, must be fully built
  * @param pk_def   primary key definition, pass non-NULL
  *                 for secondary keys to construct
  *                 index_def::cmp_def
- * @retval not NULL Success.
- * @retval NULL     Memory error.
+ * Never fails, always returns non-NULL value.
  */
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
