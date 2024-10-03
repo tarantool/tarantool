@@ -394,8 +394,6 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 		index_def_new(id, index_id, name, name_len, space->def->name,
 			      space->def->engine_name, type, &opts, key_def,
 			      space_index_key_def(space, 0));
-	if (index_def == NULL)
-		return NULL;
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
 	if (index_def_check(index_def, space_name(space)) != 0)
 		return NULL;

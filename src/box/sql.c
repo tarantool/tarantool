@@ -396,10 +396,6 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 						    TREE, &index_opts_default,
 						    key_def, NULL);
 	key_def_delete(key_def);
-	if (index_def == NULL) {
-		space_def_delete(space_def);
-		return NULL;
-	}
 
 	struct rlist key_list;
 	rlist_create(&key_list);

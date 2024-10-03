@@ -900,10 +900,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 						  space->def->engine_name,
 						  TREE, &opts, key_def, NULL);
 	key_def_delete(key_def);
-	if (idx_def == NULL) {
-		pParse->is_aborted = true;
-		return;
-	}
 	pLoop->index_def = idx_def;
 
 	/* Create the automatic index */
@@ -2128,7 +2124,6 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 
 		struct key_def *key_def = key_def_new(&part, 1, 0);
 		if (key_def == NULL) {
-tnt_error:
 			pWInfo->pParse->is_aborted = true;
 			return -1;
 		}
@@ -2141,8 +2136,6 @@ tnt_error:
 					   space->def->engine_name,
 					   TREE, &opts, key_def, NULL);
 		key_def_delete(key_def);
-		if (fake_index == NULL)
-			goto tnt_error;
 		/* Special marker for  non-existent index. */
 		fake_index->iid = UINT32_MAX;
 		probe = fake_index;
