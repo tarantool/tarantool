@@ -3124,7 +3124,8 @@ memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
 		item->key = memtx_tx_xregion_alloc(txn, item->key_len,
 						   MEMTX_TX_ALLOC_TRACKER);
 	}
-	memcpy((char *)item->key, key, item->key_len);
+	if (item->key != NULL)
+		memcpy((char *)item->key, key, item->key_len);
 	return item;
 }
 
