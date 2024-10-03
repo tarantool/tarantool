@@ -230,8 +230,6 @@ sc_space_new(uint32_t id, const char *name,
 						    TREE /* index type */,
 						    &index_opts_default,
 						    key_def, NULL);
-	if (index_def == NULL)
-		diag_raise();
 	auto index_def_guard =
 		make_scoped_guard([=] { index_def_delete(index_def); });
 	struct rlist key_list;

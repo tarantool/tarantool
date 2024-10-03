@@ -103,10 +103,6 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	/* Use calloc to make index_def_delete() safe at all times. */
 	struct index_def *def = xcalloc(1, sizeof(*def));
 	def->name = xstrndup(name, name_len);
-	if (identifier_check(def->name, name_len)) {
-		index_def_delete(def);
-		return NULL;
-	}
 	if (space_name != NULL)
 		def->space_name = xstrdup(space_name);
 	memset(def->engine_name, 0, sizeof(def->engine_name));
@@ -120,10 +116,6 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 		if (opts->is_unique)
 			def->cmp_def->unique_part_count =
 				def->key_def->part_count;
-		if (def->cmp_def == NULL) {
-			index_def_delete(def);
-			return NULL;
-		}
 	} else {
 		def->cmp_def = key_def_dup(key_def);
 		def->pk_def = key_def_dup(key_def);
