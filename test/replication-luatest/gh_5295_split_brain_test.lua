@@ -161,6 +161,10 @@ g.test_bad_confirm_old_term = function(cg)
     reconnect_and_check_split_brain(cg)
 end
 
+g.before_test('test_good_confirm_old_term', function(cg)
+    cg.main:update_box_cfg{replication_synchro_timeout = 1000}
+end)
+
 -- Obsolete sync transaction confirmation might be fine when it doesn't
 -- contradict local history.
 g.test_good_confirm_old_term = function(cg)
@@ -186,6 +190,10 @@ g.test_good_confirm_old_term = function(cg)
     end)
     reconnect_and_check_no_split_brain(cg)
 end
+
+g.after_test('test_good_confirm_old_term', function(cg)
+    cg.main:update_box_cfg{replication_synchro_timeout = 0.01}
+end)
 
 -- A conflicting sync transaction rollback from an obsolete term means a
 -- split-brain.
@@ -309,6 +317,7 @@ g_very_old_term.before_each(function(cg)
     cg.box_cfg = {
         replication_timeout = 0.1,
         replication_synchro_quorum = 1,
+        replication_sync_timeout = 1000,
         replication = {
             server.build_listen_uri('server1', cg.cluster.id),
             server.build_listen_uri('server2', cg.cluster.id),
