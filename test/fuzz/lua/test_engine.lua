@@ -1097,11 +1097,6 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to true to fail index (re)build on alter.
-    ERRINJ_BUILD_INDEX_ON_ROLLBACK_ALLOC = {
-        enable = enable_errinj_boolean,
-        disable = disable_errinj_boolean,
-    },
     -- Set to timeout in seconds to inject after each tuple
     -- processed on index (re)build on alter.
     ERRINJ_BUILD_INDEX_TIMEOUT = {
