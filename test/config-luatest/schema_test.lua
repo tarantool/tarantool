@@ -749,6 +749,34 @@ g.test_validate_record = function()
     }, ': '))
 end
 
+-- Validate an array data against a record schema.
+g.test_validate_record_with_array_data = function()
+    -- Good case: an array is passed for a record with numeric
+    -- keys that has key 1.
+    local s = schema.new('myschema', schema.record({
+        [1] = schema.scalar({type = 'string'}),
+        [2] = schema.scalar({type = 'string'}),
+        [3] = schema.scalar({type = 'string'}),
+    }))
+    s:validate({'a', 'b', 'c'})
+
+    -- Bad case: numeric keys, but no key 1.
+    local s = schema.new('myschema', schema.record({
+        [2] = schema.scalar({type = 'string'}),
+        [3] = schema.scalar({type = 'string'}),
+    }))
+    assert_validate_error(s, {'a', 'b'},
+        '[myschema] Expected a record, got an array: ["a","b"]')
+
+    -- Bad case: string keys.
+    local s = schema.new('myschema', schema.record({
+        foo = schema.scalar({type = 'string'}),
+        bar = schema.scalar({type = 'string'}),
+    }))
+    assert_validate_error(s, {'a', 'b', 'c'},
+        '[myschema] Expected a record, got an array: ["a","b","c"]')
+end
+
 g.test_validate_map = function()
     local scalar_1 = schema.scalar({type = 'string'})
     local scalar_2 = schema.scalar({type = 'number'})
@@ -766,8 +794,11 @@ g.test_validate_map = function()
     assert_validate_compound_type_expects_only_table(s)
 
     -- Bad case: data of a wrong type is passed to a key.
-    assert_validate_error(s, {[1] = true}, table.concat({
-        '[myschema] [1]: Unexpected data for scalar "string"',
+    --
+    -- Note: {[1] = true} would trigger an array check, which is
+    -- verified in test_validate_map_with_array_data().
+    assert_validate_error(s, {[2] = true}, table.concat({
+        '[myschema] [2]: Unexpected data for scalar "string"',
         'Expected "string", got "number"',
     }, ': '))
 
@@ -776,6 +807,55 @@ g.test_validate_map = function()
         '[myschema] foo: Unexpected data for scalar "number"',
         'Expected "number", got "boolean"',
     }, ': '))
+end
+
+-- Validate an array data against a map schema.
+g.test_validate_map_with_array_data = function()
+    -- Good cases: an array is passed for a map that accepts
+    -- numeric keys.
+    for _, key_type in ipairs({
+        'number',
+        'number, string',
+        'string, number',
+        'integer',
+        'any'})
+    do
+        local s = schema.new('myschema', schema.map({
+            key = schema.scalar({type = key_type}),
+            value = schema.scalar({type = 'string'}),
+        }))
+        s:validate({'a', 'b', 'c'})
+    end
+
+    -- Define schema nodes of a composite type to use them as a
+    -- map key in the scenario below.
+    local record_node = schema.record({
+        foo = schema.scalar({type = 'string'}),
+    })
+    local map_node = schema.map({
+        key = schema.scalar({type = 'string'}),
+        value = schema.scalar({type = 'string'}),
+    })
+    local array_node = schema.array({
+        items = schema.scalar({type = 'string'}),
+    })
+
+    -- Bad cases: an array is passed for a map that doesn't accept
+    -- numeric keys: string, boolean, record, map, array.
+    for _, key_schema in ipairs({
+        schema.scalar({type = 'string'}),
+        schema.scalar({type = 'boolean'}),
+        record_node,
+        map_node,
+        array_node})
+    do
+        local s = schema.new('myschema', schema.map({
+            key = key_schema,
+            value = schema.scalar({type = 'string'}),
+        }))
+        assert_validate_error(s, {'a', 'b', 'c'},
+            '[myschema] Expected a map, got an array: ["a","b","c"]')
+    end
 end
 
 g.test_validate_array = function()
