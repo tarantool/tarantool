@@ -986,6 +986,18 @@ struct memtx_ddl_state {
 	struct tuple *cursor;
 	/* Primary key key_def to compare new tuples with cursor. */
 	struct key_def *cmp_def;
+	/*
+	 * List of all transactional triggers created by the DDL for concurrent
+	 * statements. They must be destroyed when the DDL is over since the
+	 * object is going to be invalidated. It is OK because all owners of
+	 * the triggers are already prepared and on their rollback the DDL
+	 * will be rolled back as well and on their commit we won't need the
+	 * triggers anymore.
+	 *
+	 * NB: must be used only without MVCC, otherwise something must have
+	 * gone wrong.
+	 */
+	struct rlist stmt_triggers;
 	struct diag diag;
 	int rc;
 };
@@ -1046,6 +1058,7 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	state.cmp_def = pk->def->key_def;
 	state.rc = 0;
 	diag_create(&state.diag);
+	rlist_create(&state.stmt_triggers);
 
 	struct trigger on_replace;
 	trigger_create(&on_replace, memtx_check_on_replace, &state, NULL);
@@ -1090,6 +1103,7 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	iterator_delete(it);
 	diag_destroy(&state.diag);
 	trigger_clear(&on_replace);
+	assert(rlist_empty(&state.stmt_triggers));
 	return rc;
 }
 
@@ -1121,21 +1135,35 @@ memtx_init_ephemeral_space(struct space *space)
 }
 
 /*
- * Ongoing index build state with statement used by
- * corresponding on_rollback triggers to prevent rollbacked changes appearance.
+ * Struct to allocate by memtx_build_on_replace trigger, contains
+ * transactional statement triggers with their data.
  */
-struct index_build_on_rollback_data {
+struct memtx_build_stmt_trigger {
+	/** Link in memtx_ddl_state::stmt_triggers. */
+	struct rlist in_state;
+	/** See memtx_build_on_replace_rollback. */
+	struct trigger on_rollback;
+	/** See memtx_build_on_replace_commit. */
+	struct trigger on_commit;
+	/** State of the DDL. */
 	struct memtx_ddl_state *state;
-	struct txn_stmt *stmt;
 };
 
+/**
+ * Rolls back a replace in the index that was done during its
+ * background build.
+ */
 static int
-memtx_build_on_replace_rollback(struct trigger *trigger, void *event)
+memtx_build_on_replace_rollback(struct trigger *base, void *event)
 {
-	(void)event;
-	struct index_build_on_rollback_data *data = trigger->data;
-	struct txn_stmt *stmt = data->stmt;
-	struct memtx_ddl_state *state = data->state;
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
+	struct memtx_build_stmt_trigger *trigger =
+		container_of(base, struct memtx_build_stmt_trigger,
+			     on_rollback);
+	struct memtx_ddl_state *state = trigger->state;
+
+	/* The trigger is fired and will be deleted - remove from the state. */
+	rlist_del_entry(trigger, in_state);
 	/*
 	 * Old tuple's format is valid if it exists.
 	 */
@@ -1171,14 +1199,19 @@ memtx_build_on_replace_rollback(struct trigger *trigger, void *event)
 	return 0;
 }
 
-/*
- * Struct to allocate by memtx_build_on_replace trigger
- * (on_rollback trigger with its data).
+/**
+ * Deletes the transactional statement triggers from
+ * memtx_ddl_state::stmt_triggers since they are going to be deleted.
  */
-struct on_rollback_trigger_with_data {
-	struct trigger on_rollback;
-	struct index_build_on_rollback_data data;
-};
+static int
+memtx_build_on_replace_commit(struct trigger *base, void *event)
+{
+	(void)event;
+	struct memtx_build_stmt_trigger *trigger =
+		container_of(base, struct memtx_build_stmt_trigger, on_commit);
+	rlist_del_entry(trigger, in_state);
+	return 0;
+}
 
 static int
 memtx_build_on_replace(struct trigger *trigger, void *event)
@@ -1231,30 +1264,18 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 	 * problem when rollbacked changes appears in
 	 * built-in-background index.
 	 */
-	struct on_rollback_trigger_with_data *on_rollback_associates = NULL;
-	struct errinj *inj = errinj(ERRINJ_BUILD_INDEX_ON_ROLLBACK_ALLOC,
-				    ERRINJ_BOOL);
-	if (inj == NULL || inj->bparam == false) {
-		on_rollback_associates = region_aligned_alloc(
-			&in_txn()->region,
-			sizeof(struct on_rollback_trigger_with_data),
-			alignof(struct on_rollback_trigger_with_data));
-	}
-	if (on_rollback_associates == NULL) {
-		diag_set(OutOfMemory,
-			 sizeof(struct on_rollback_trigger_with_data),
-			 "region_aligned_alloc",
-			 "struct on_rollback_trigger_with_data");
-		diag_move(diag_get(), &state->diag);
-		state->rc = -1;
-		return 0;
-	}
-	on_rollback_associates->data.stmt = stmt;
-	on_rollback_associates->data.state = state;
-	trigger_create(&on_rollback_associates->on_rollback,
-		       memtx_build_on_replace_rollback,
-		       &on_rollback_associates->data, NULL);
-	txn_stmt_on_rollback(stmt, &on_rollback_associates->on_rollback);
+	struct memtx_build_stmt_trigger *stmt_trigger =
+		xregion_alloc_object(&in_txn()->region,
+				     struct memtx_build_stmt_trigger);
+	rlist_add_entry(&state->stmt_triggers, stmt_trigger, in_state);
+	stmt_trigger->state = state;
+
+	trigger_create(&stmt_trigger->on_rollback,
+		       memtx_build_on_replace_rollback, NULL, NULL);
+	trigger_create(&stmt_trigger->on_commit,
+		       memtx_build_on_replace_commit, NULL, NULL);
+	txn_stmt_on_rollback(stmt, &stmt_trigger->on_rollback);
+	txn_stmt_on_commit(stmt, &stmt_trigger->on_commit);
 	return 0;
 }
 
@@ -1322,6 +1343,7 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		state.cmp_def = pk->def->key_def;
 		state.rc = 0;
 		diag_create(&state.diag);
+		rlist_create(&state.stmt_triggers);
 
 		trigger_create(&on_replace, memtx_build_on_replace, &state,
 			       NULL);
@@ -1421,6 +1443,11 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	}
 	iterator_delete(it);
 	if (can_yield) {
+		struct memtx_build_stmt_trigger *trg;
+		rlist_foreach_entry(trg, &state.stmt_triggers, in_state) {
+			trigger_clear(&trg->on_rollback);
+			trigger_clear(&trg->on_commit);
+		}
 		diag_destroy(&state.diag);
 		trigger_clear(&on_replace);
 	}
