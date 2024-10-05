@@ -426,7 +426,7 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 }
 
 /**
- * Helper of invisible count functions.
+ * Helper of memtx_tx_index_invisible_count_matching_until.
  */
 uint32_t
 memtx_tx_index_invisible_count_matching_until_slow(
@@ -436,30 +436,17 @@ memtx_tx_index_invisible_count_matching_until_slow(
 
 /**
  * When MVCC engine is enabled, an index can contain temporary non-committed
- * tuples that are not visible outside their transaction.
- * That's why internal index size can be greater than visible by
- * standalone observer.
- * The function calculates tje number of tuples that are physically present
- * in index, but have no visible value.
- */
-static inline uint32_t
-memtx_tx_index_invisible_count(struct txn *txn,
-			       struct space *space, struct index *index)
-{
-	if (!memtx_tx_manager_use_mvcc_engine)
-		return 0;
-	return memtx_tx_index_invisible_count_matching_until_slow(
-		txn, space, index, ITER_GE, NULL, 0, NULL, HINT_NONE);
-}
-
-/**
- * Same as memtx_tx_index_invisible_count but only counts tuples matching to
- * the given key and iterator up to the given tuple (exclusively) according to
- * the index order.
+ * tuples that are not visible outside their transaction. That's why internal
+ * index size can be greater than visible by standalone observer.
+ *
+ * The function calculates the number of tuples that are physically present
+ * in index, but have no visible value. But only tuples that match the given
+ * key and iterator type and are located strictly before the given @a until
+ * tuple according to the iterator order are counted.
  *
  * E. g. for index: [1, 2, 3, 4, 5], given all items in the index are invisible
  * to the transaction, counting matching LE 3 until 1 will give 2 (3 and 2 will
- * be counted, 1 will not since the count is exclusive).
+ * be counted, 1 will not since we count everything strictly before 1).
  */
 static inline uint32_t
 memtx_tx_index_invisible_count_matching_until(
