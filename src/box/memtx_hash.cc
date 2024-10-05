@@ -279,7 +279,7 @@ memtx_hash_index_size(struct index *base)
 	memtx_tx_story_gc();
 	/* Substract invisible count. */
 	return light_index_count(&index->hash_table) -
-	       memtx_tx_index_invisible_count(in_txn(), space, base);
+	       memtx_tx_track_count(in_txn(), space, base, ITER_GE, NULL, 0);
 }
 
 static ssize_t
