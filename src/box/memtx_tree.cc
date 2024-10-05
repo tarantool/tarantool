@@ -1082,7 +1082,7 @@ memtx_tree_index_size(struct index *base)
 	struct space *space = space_by_id(base->def->space_id);
 	/* Substract invisible count. */
 	return memtx_tree_size(&index->tree) -
-	       memtx_tx_index_invisible_count(in_txn(), space, base);
+	       memtx_tx_track_count(in_txn(), space, base, ITER_GE, NULL, 0);
 }
 
 template <bool USE_HINT>
