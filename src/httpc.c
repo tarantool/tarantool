@@ -601,7 +601,7 @@ httpc_request_io_read(struct httpc_request *req, char *buf, size_t len,
 
 		if (recv_len > remain) {
 			const size_t tocopy = recv_len - remain;
-			char *ptr = ibuf_alloc(&req->io_recv, tocopy);
+			char *ptr = xibuf_alloc(&req->io_recv, tocopy);
 			memcpy(ptr, recv + remain, tocopy);
 		}
 
@@ -649,7 +649,7 @@ httpc_request_io_write(struct httpc_request *req, const char *ptr, size_t len,
 
 	if (len > 0) {
 		ibuf_reset(&req->send);
-		char *buf = ibuf_alloc(&req->send, len);
+		char *buf = xibuf_alloc(&req->send, len);
 		memcpy(buf, ptr, len);
 	} else {
 		req->io_send_closed = true;
