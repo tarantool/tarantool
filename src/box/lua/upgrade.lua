@@ -1418,6 +1418,15 @@ local function upgrade_to_2_11_1()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 2.11.5
+--------------------------------------------------------------------------------
+local function upgrade_to_2_11_5()
+    -- NoOp. We need to bump schema version to distinguish which versions of
+    -- 2.11 release series correctly handle persistent names.
+    return
+end
+
+--------------------------------------------------------------------------------
 -- Tarantool 3.0.0
 --------------------------------------------------------------------------------
 local function change_replicaset_uuid_key(old_key, new_key)
@@ -1494,6 +1503,7 @@ local handlers = {
     {version = mkversion(2, 10, 5), func = upgrade_to_2_10_5},
     {version = mkversion(2, 11, 0), func = upgrade_to_2_11_0},
     {version = mkversion(2, 11, 1), func = upgrade_to_2_11_1},
+    {version = mkversion(2, 11, 5), func = upgrade_to_2_11_5},
     {version = mkversion(3, 0, 0), func = upgrade_to_3_0_0},
     {version = mkversion(3, 1, 0), func = upgrade_to_3_1_0},
 }
