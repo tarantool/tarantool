@@ -1406,7 +1406,15 @@ end
 local function upgrade_to_2_11_1()
     drop_schema_max_id()
 end
+
 --------------------------------------------------------------------------------
+-- Tarantool 2.11.5
+--------------------------------------------------------------------------------
+local function upgrade_to_2_11_5()
+    -- NoOp. We need to bump schema version to distinguish, where persistent
+    -- names properly work before box.schema.upgrade is called.
+    return
+end
 
 local handlers = {
     {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5},
@@ -1428,6 +1436,7 @@ local handlers = {
     {version = mkversion(2, 10, 5), func = upgrade_to_2_10_5},
     {version = mkversion(2, 11, 0), func = upgrade_to_2_11_0},
     {version = mkversion(2, 11, 1), func = upgrade_to_2_11_1},
+    {version = mkversion(2, 11, 5), func = upgrade_to_2_11_5},
 }
 
 -- Schema version of the snapshot.
@@ -2031,6 +2040,7 @@ local downgrade_versions = {
     "2.11.2",
     "2.11.3",
     "2.11.4",
+    "2.11.5",
     -- DOWNGRADE VERSIONS END
 }
 
