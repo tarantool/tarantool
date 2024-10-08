@@ -14,8 +14,14 @@
 #include "unit.h"
 
 #define BPS_TREE_NAME test_tree
+/**
+ * On COW matras make a copy of extent while API requires only copy a block.
+ * So bps tree may miss COW requests for its block but the block is copied
+ * accidentally and the test passes. To avoid this issue let's make extent and
+ * block the same size.
+ */
 #define BPS_TREE_BLOCK_SIZE 256
-#define BPS_TREE_EXTENT_SIZE 1024
+#define BPS_TREE_EXTENT_SIZE 256
 #define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
 #define BPS_TREE_COMPARE(a, b, arg) ((a) < (b) ? -1 : ((a) > (b) ? 1 : 0))
 #define BPS_TREE_COMPARE_KEY(a, b, arg) BPS_TREE_COMPARE(a, b, arg)
