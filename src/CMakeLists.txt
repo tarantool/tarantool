@@ -190,6 +190,7 @@ set (server_sources
      ssl_cert_paths_discover.c
      systemd.c
      version.c
+     lua/arrow_record_batch.c
      lua/digest.c
      lua/init.c
      lua/fiber.c

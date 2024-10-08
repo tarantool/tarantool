@@ -274,7 +274,7 @@ bad_header:
 	diag_set(ClientError, ER_INVALID_MSGPACK, "packet header");
 	goto dump;
 bad_body:
-	diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
+	diag_add_or_set(ClientError, ER_INVALID_MSGPACK, "packet body");
 dump:
 	dump_row_hex(start, end);
 	return -1;

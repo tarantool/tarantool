@@ -483,6 +483,14 @@ BuildSocketError(const char *file, unsigned line, const char *socketname,
 	e;								\
 })
 
+#define diag_add_or_set(class, ...) ({					\
+	if (diag_is_empty(diag_get())) {				\
+		diag_set(class, __VA_ARGS__);				\
+	} else {							\
+		diag_add(class, __VA_ARGS__);				\
+	}								\
+})
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
