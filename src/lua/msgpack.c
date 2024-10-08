@@ -519,6 +519,12 @@ luamp_decode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
 			VERIFY(interval_unpack(data, len, itv) != NULL);
 			return;
 		}
+		case MP_ARROW:
+		{
+			lua_pushlstring(L, *data, len);
+			*data += len;
+			return;
+		}
 		default:
 			/* reset data to the extension header */
 			*data = svp;
@@ -530,7 +536,6 @@ luamp_decode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
 	}
 	return;
 }
-
 
 static int
 lua_msgpack_encode(lua_State *L)
