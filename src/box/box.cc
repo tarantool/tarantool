@@ -4572,8 +4572,10 @@ bootstrap_master(const struct tt_uuid *replicaset_uuid)
 		diag_raise();
 
 	/* Make the initial checkpoint */
-	if (gc_checkpoint() != 0)
-		panic("failed to create a checkpoint");
+	if (gc_checkpoint() != 0) {
+		say_error("failed to create a checkpoint");
+		diag_raise();
+	}
 
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
@@ -4667,8 +4669,10 @@ bootstrap_from_master(struct replica *master)
 		diag_raise();
 
 	/* Make the initial checkpoint */
-	if (gc_checkpoint() != 0)
-		panic("failed to create a checkpoint");
+	if (gc_checkpoint() != 0) {
+		say_error("failed to create a checkpoint");
+		diag_raise();
+	}
 
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
 
