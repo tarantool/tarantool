@@ -24,7 +24,7 @@ g.test_on_disconnect_error_hangs_server = function(cg)
     local log_file = cg.server:exec(function()
         box.ctl.set_on_shutdown_timeout(1)
         -- `grep_log` will not be able to retrieve it after we drop the server.
-        return box.cfg.log
+        return rawget(_G, 'box_cfg_log_file') or box.cfg.log
     end)
     cg.server:drop()
     t.assert_not(cg.server:grep_log('on_shutdown triggers failed', 1024,
