@@ -48,7 +48,7 @@ struct PACKED memtx_tuple {
 	 * copy-on-write mechanisms work.
 	 */
 	union {
-		struct {
+		struct PACKED {
 			/**
 			 * Most recent read view's version at the time
 			 * when the tuple was allocated.
@@ -61,6 +61,9 @@ struct PACKED memtx_tuple {
 		struct stailq_entry in_gc;
 	};
 };
+
+static_assert(sizeof(struct memtx_tuple) % 4 == 2,
+	      "required for tuple_has_extra");
 
 /**
  * List of tuples owned by a read view.
@@ -324,6 +327,7 @@ public:
 		struct memtx_tuple_rv *rv = tuple_rv_last(tuple);
 		if (rv == nullptr ||
 		    memtx_tuple->version >= memtx_tuple_rv_version(rv)) {
+			tuple_field_map_destroy(tuple);
 			free(memtx_tuple, size);
 		} else {
 			stats.used_rv += size;
@@ -344,6 +348,7 @@ public:
 				      offsetof(struct memtx_tuple, base);
 			assert(stats.used_gc >= size);
 			stats.used_gc -= size;
+			tuple_field_map_destroy(&memtx_tuple->base);
 			free(memtx_tuple, size);
 		}
 		return !stailq_empty(&gc);

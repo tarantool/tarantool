@@ -43,10 +43,13 @@
 
 #include <PMurHash.h>
 
+/** The value of format->id if the format is not registered in global table. */
+enum { FORMAT_ID_NIL = UINT32_MAX };
+
 /** Global table of tuple formats */
 struct tuple_format *tuple_formats[FORMAT_ID_MAX + 1];
-static intptr_t recycled_format_ids = FORMAT_ID_NIL;
-
+/** Head index of tuple format free list. -1 if the list is empty. */
+static intptr_t recycled_format_ids = -1;
 static uint32_t formats_size = 0;
 static uint64_t formats_epoch = 0;
 
@@ -659,9 +662,10 @@ out:
 static int
 tuple_format_register(struct tuple_format *format)
 {
-	if (recycled_format_ids != FORMAT_ID_NIL) {
-		format->id = (uint16_t) recycled_format_ids;
-		recycled_format_ids = (intptr_t) tuple_formats[recycled_format_ids];
+	if (recycled_format_ids >= 0) {
+		format->id = (uint32_t)recycled_format_ids;
+		recycled_format_ids =
+			(intptr_t)tuple_formats[recycled_format_ids];
 	} else {
 		uint32_t formats_size_max = FORMAT_ID_MAX + 1;
 		struct errinj *inj = errinj(ERRINJ_TUPLE_FORMAT_COUNT,
@@ -1272,7 +1276,7 @@ void
 tuple_format_init()
 {
 	tuple_formats_hash = mh_tuple_format_new();
-	recycled_format_ids = FORMAT_ID_NIL;
+	recycled_format_ids = -1;
 	formats_size = 0;
 }
 
@@ -1281,7 +1285,7 @@ void
 tuple_format_free()
 {
 	/* Clear recycled ids. */
-	while (recycled_format_ids != FORMAT_ID_NIL) {
+	while (recycled_format_ids >= 0) {
 		uint16_t id = (uint16_t) recycled_format_ids;
 		recycled_format_ids = (intptr_t) tuple_formats[id];
 		tuple_formats[id] = NULL;
