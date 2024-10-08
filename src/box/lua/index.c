@@ -37,6 +37,7 @@
 #include "box/lua/tuple.h"
 #include "box/lua/misc.h"
 #include "small/region.h"
+#include "arrow_ipc.h"
 #include "fiber.h"
 
 /** {{{ box.index Lua library: access to spaces and indexes
@@ -419,6 +420,33 @@ lbox_index_compact(lua_State *L)
 	return 0;
 }
 
+static int
+lbox_insert_arrow(lua_State *L)
+{
+	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1) ||
+	    lua_type(L, 2) != LUA_TSTRING) {
+		diag_set(IllegalParams, "Usage: space:insert_arrow(arrow)");
+		return luaT_error(L);
+	}
+	uint32_t space_id = lua_tonumber(L, 1);
+
+	size_t len;
+	const char *data = lua_tolstring(L, 2, &len);
+	assert(data != NULL);
+	struct ArrowArray array;
+	struct ArrowSchema schema;
+	if (arrow_ipc_decode(&array, &schema, data, data + len) != 0)
+		return luaT_error(L);
+	int rc = box_insert_arrow(space_id, &array, &schema);
+	if (schema.release != NULL)
+		schema.release(&schema);
+	if (array.release != NULL)
+		array.release(&array);
+	if (rc != 0)
+		return luaT_error(L);
+	return 0;
+}
+
 /* }}} */
 
 void
@@ -452,6 +480,7 @@ box_lua_index_init(struct lua_State *L)
 		{"truncate", lbox_truncate},
 		{"stat", lbox_index_stat},
 		{"compact", lbox_index_compact},
+		{"insert_arrow", lbox_insert_arrow},
 		{NULL, NULL}
 	};
 
