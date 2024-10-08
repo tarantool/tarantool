@@ -12,6 +12,9 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct ArrowArray;
+struct ArrowSchema;
+
 /**
  * Check that the given buffer contains a valid Arrow record batch.
  * @param data The buffer containing a record batch in Arrow IPC format, without
@@ -22,6 +25,15 @@ extern "C" {
  */
 int
 mp_validate_arrow(const char *data, uint32_t len);
+
+/**
+ * Using a MsgPack representation of size `len' pointed to by `*data', unpack
+ * it to `array' and `schema'. The pointer is advanced. Can not fail, because
+ * the data must be validated in advance.
+ */
+void
+arrow_unpack(const char **data, uint32_t len, struct ArrowArray *array,
+	     struct ArrowSchema *schema);
 
 #if defined(__cplusplus)
 } /* extern "C" */
