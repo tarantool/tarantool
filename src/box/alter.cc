@@ -63,6 +63,7 @@
 #include "core/func_adapter.h"
 #include "relay.h"
 #include "gc.h"
+#include "wal.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -1095,9 +1096,13 @@ space_check_format_with_yield(struct space *space,
 {
 	struct txn *txn = in_txn();
 	assert(txn != NULL);
-	(void) txn_can_yield(txn, true);
+	txn_can_yield(txn, true);
 	auto yield_guard =
 		make_scoped_guard([=] { txn_can_yield(txn, false); });
+	if (txn_is_first_statement(txn)) {
+		if (wal_sync(NULL) != 0)
+			diag_raise();
+	}
 	space_check_format_xc(space, format);
 }
 
@@ -1390,9 +1395,13 @@ space_build_index_with_yield(struct space *old_space, struct space *new_space,
 {
 	struct txn *txn = in_txn();
 	assert(txn != NULL);
-	(void) txn_can_yield(txn, true);
+	txn_can_yield(txn, true);
 	auto yield_guard =
 		make_scoped_guard([=] { txn_can_yield(txn, false); });
+	if (txn_is_first_statement(txn)) {
+		if (wal_sync(NULL) != 0)
+			diag_raise();
+	}
 	space_build_index_xc(old_space, new_space, new_index);
 }
 
