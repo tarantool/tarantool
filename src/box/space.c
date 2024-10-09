@@ -58,11 +58,11 @@
 #include "func_adapter.h"
 #include "lua/utils.h"
 #include "core/mp_ctx.h"
+#include "core/arrow_ipc.h"
 #include "port.h"
 #include "tweaks.h"
 #include "txn_limbo.h"
 #include "sql.h"
-#include "arrow_ipc.h"
 
 /**
  * Controls whether to consider system spaces indefinitely synchronous when the

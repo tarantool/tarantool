@@ -439,6 +439,9 @@ struct error *
 BuildCryptoError(const char *file, unsigned line, const char *format, ...);
 struct error *
 BuildRaftError(const char *file, unsigned line, const char *format, ...);
+struct error *
+BuildSerializationError(const char *file, unsigned line, const char *format,
+			...);
 
 /**
  * Allocate and create new FileFormatError. In case of OOM return OutOfMemory.

@@ -259,6 +259,8 @@ error_build(struct mp_error *mp_error)
 		err = new SSLError();
 	} else if (strcmp(mp_error->type, "FileFormatError") == 0) {
 		err = new FileFormatError();
+	} else if (strcmp(mp_error->type, "SerializationError") == 0) {
+		err = new SerializationError();
 	} else {
 		err = new ClientError();
 	}
