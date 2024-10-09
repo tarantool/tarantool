@@ -296,6 +296,19 @@ FileFormatError::FileFormatError(const char *file, unsigned line,
 	va_end(ap);
 }
 
+const struct type_info type_SerializationError =
+	make_type("SerializationError", &type_Exception);
+
+SerializationError::SerializationError(const char *file, unsigned line,
+				       const char *format, ...)
+	: Exception(&type_SerializationError, file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(this, format, ap);
+	va_end(ap);
+}
+
 struct error *
 BuildOutOfMemory(const char *file, unsigned line,
 		 size_t amount, const char *allocator,
@@ -419,6 +432,18 @@ struct error *
 BuildFileFormatError(const char *file, unsigned line, const char *format, ...)
 {
 	FileFormatError *e = new FileFormatError(file, line, "");
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(e, format, ap);
+	va_end(ap);
+	return e;
+}
+
+struct error *
+BuildSerializationError(const char *file, unsigned line, const char *format,
+			...)
+{
+	SerializationError *e = new SerializationError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);

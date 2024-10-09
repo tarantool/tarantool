@@ -433,8 +433,8 @@ struct errcode_record {
 	_(ER_READ_VIEW_CLOSED, 286,		"The read view is closed") \
 	_(ER_WAL_QUEUE_FULL, 287,		"The WAL queue is full") \
 	_(ER_INVALID_VCLOCK, 288,		"Invalid vclock", "value", STRING) \
-	_(ER_ARROW_IPC_ENCODE, 289,		"Failed to encode Arrow IPC data", "method", STRING, "details", STRING) \
-	_(ER_ARROW_IPC_DECODE, 290,		"Failed to decode Arrow IPC data", "method", STRING, "details", STRING) \
+	/* ER_ARROW_IPC_ENCODE, 289, Unused */ \
+	/* ER_ARROW_IPC_DECODE, 290, Unused */ \
 	_(ER_SYNC_QUEUE_FULL, 291,		"The synchronous transaction queue is full") \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 

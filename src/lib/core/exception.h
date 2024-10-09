@@ -57,6 +57,8 @@ extern const struct type_info type_RaftError;
 extern const struct type_info type_FileFormatError;
 /* type_info for FiberSliceIsExceeded exception */
 extern const struct type_info type_FiberSliceIsExceeded;
+/* type_info for SerializationError exception */
+extern const struct type_info type_SerializationError;
 
 const char *
 exception_get_string(struct error *e, const struct method_info *method);
@@ -266,6 +268,18 @@ public:
 
 	FileFormatError()
 		: Exception(&type_FileFormatError, NULL, 0)
+	{
+	}
+	virtual void raise() { throw this; }
+};
+
+class SerializationError: public Exception {
+public:
+	SerializationError(const char *file, unsigned line,
+			   const char *format, ...);
+
+	SerializationError()
+		: Exception(&type_SerializationError, NULL, 0)
 	{
 	}
 	virtual void raise() { throw this; }
