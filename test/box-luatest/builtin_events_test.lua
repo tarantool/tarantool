@@ -72,6 +72,8 @@ g.test_box_status = function(cg)
     local watcher = c:watch('box.status',
                             function(name, state)
                                 t.assert_equals(name, 'box.status')
+                                -- Tested in the box-luatest/upgrade_to_3_0_0.
+                                state.dd_version = nil
                                 result = state
                                 result_no = result_no + 1
                             end)
