@@ -1,0 +1,54 @@
+# https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html#runtime-suppressions
+
+# See ubsan_checks.inc from the UBSAN source code for the list of
+# possible UBSAN checks, e.g.:
+# https://github.com/llvm/llvm-project/blob/main/compiler-rt/lib/ubsan/ubsan_checks.inc
+
+# This was produced with the following command, and output slightly edited.
+# curl -qL \
+#      https://raw.githubusercontent.com/llvm/llvm-project/refs/heads/main/compiler-rt/lib/ubsan/ubsan_checks.inc \
+#      | grep -Eo '"[^"]+")' | sed 's/[")]//g; s/^/# /g;' | sort | uniq
+#
+# alignment
+# bool
+# bounds
+# cfi
+# enum
+# float-cast-overflow
+# float-divide-by-zero
+# function
+# implicit-integer-sign-change
+# implicit-signed-integer-truncation
+# implicit-unsigned-integer-truncation
+# integer-divide-by-zero
+# invalid-builtin-use
+# invalid-objc-cast
+# nonnull-attribute
+# null
+# nullability-arg
+# nullability-assign
+# nullability-return
+# object-size
+# pointer-overflow
+# return
+# returns-nonnull-attribute
+# shift-base
+# shift-exponent
+# signed-integer-overflow
+# undefined
+# unreachable
+# unsigned-integer-overflow
+# vla-bound
+# vptr
+
+# Also keep in mind that some of these warnings can only be
+# suppressed if the code is compiled with the appropriate
+# -fsanitize-recover=... option.
+
+# tarantool/tarantool#10631
+alignment:field_map_build
+alignment:src/box/applier.cc
+alignment:src/box/box.cc
+alignment:src/box/iproto.cc
+alignment:src/box/lua/info.c
+alignment:src/box/replication.cc

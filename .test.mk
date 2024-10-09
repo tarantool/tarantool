@@ -97,7 +97,10 @@ CMAKE_PARAMS_ASAN = -DENABLE_WERROR=ON \
 #     the cmake/profile.cmake file.
 #   - LSAN: to suppress failures of memory leak checks caught while tests run, the asan/lsan.supp
 #     file is used.
+#   - UBSAN: to suppress failures of undefined behaviour checks
+#     caught while tests run, the asan/ubsan.supp file is used.
 TEST_RUN_ENV_ASAN = ASAN=ON \
+                    UBSAN_OPTIONS=suppressions=${PWD}/asan/ubsan.supp \
                     LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
                     ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:$\
                                  detect_invalid_pointer_pairs=1:symbolize=1:$\
