@@ -116,10 +116,10 @@ field_map_build(struct field_map_builder *builder, char *buffer)
 		/** Retrive memory for the extent. */
 		store_u32(&field_map[i], extent_wptr - (char *)field_map);
 		store_u32(extent_wptr, extent->size);
+		extent_wptr += sizeof(uint32_t);
 		uint32_t extent_offset_sz = extent->size * sizeof(uint32_t);
-		memcpy(&((uint32_t *) extent_wptr)[1], extent->offset,
-			extent_offset_sz);
-		extent_wptr += sizeof(uint32_t) + extent_offset_sz;
+		memcpy(extent_wptr, extent->offset, extent_offset_sz);
+		extent_wptr += extent_offset_sz;
 	}
 	assert(extent_wptr == buffer + builder->extents_size);
 }
