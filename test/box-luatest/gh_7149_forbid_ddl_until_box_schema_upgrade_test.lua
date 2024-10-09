@@ -35,8 +35,8 @@ g.test_ddl_ops = function()
     g.server:exec(function()
         -- DDL with old schema is forbidden.
         local errmsg = 'Your schema version is 2.10.4 while Tarantool ' ..
-                       box.info.version ..
-                       ' requires a more recent schema version. ' ..
+                       'feature SCHEMA_FEATURE_DDL_BEFORE_UPGRADE ' ..
+                       'requires schema version 2.11.1 or higher. ' ..
                        'Please, consider using box.schema.upgrade().'
         t.assert_error_msg_equals(errmsg, box.schema.user.create, 'gh_7149')
         t.assert_error_msg_equals(errmsg, box.schema.role.create, 'gh_7149')

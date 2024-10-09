@@ -2,7 +2,10 @@ local fio = require('fio')
 local replica_set = require('luatest.replica_set')
 local server = require('luatest.server')
 local t = require('luatest')
-local g = t.group()
+
+local g = t.group('with-names', t.helpers.matrix({
+    on_2_11_1 = {true, false},
+}))
 
 local function wait_for_death(instance)
     -- NB: The address sanitizer may take some time to generate
@@ -16,7 +19,7 @@ local function wait_for_death(instance)
     instance.process = nil
 end
 
-g.before_all = function(lg)
+g.before_all(function(lg)
     lg.replica_set = replica_set:new({})
     local box_cfg = {
         replication = {
@@ -27,21 +30,54 @@ g.before_all = function(lg)
         replication_sync_timeout = 300,
         replicaset_name = 'test-name',
     }
+    if lg.params.on_2_11_1 then
+        -- It's prohibited to start instance with name, when
+        -- there's no name in the snap.
+        box_cfg.replicaset_name = nil
+    end
     lg.master = lg.replica_set:build_and_add_server({
         alias = 'master',
         box_cfg = box_cfg,
+        datadir = lg.params.on_2_11_1 and
+            'test/replication-luatest/upgrade/2.11.1/master' or nil,
     })
     box_cfg.read_only = true
     lg.replica = lg.replica_set:build_and_add_server({
         alias = 'replica',
         box_cfg = box_cfg,
+        datadir = lg.params.on_2_11_1 and
+            'test/replication-luatest/upgrade/2.11.1/replica' or nil,
     })
     lg.replica_set:start()
-end
+    if lg.params.on_2_11_1 then
+        lg.master:exec(function()
+            -- Pretend to be the 2.11.5 version, since it's the first
+            -- 2.11 release, which will properly work with names.
+            box.space._schema:replace{'version', 2, 11, 5}
+            box.cfg{replicaset_name = 'test-name'}
+            t.assert_equals(box.info.replicaset.name, 'test-name')
+        end)
+        lg.replica:wait_for_vclock_of(lg.master)
+        lg.replica:exec(function()
+            box.cfg{replicaset_name = 'test-name'}
+            t.assert_equals(box.info.replicaset.name, 'test-name')
+        end)
+    end
+end)
 
-g.after_all = function(lg)
+g.after_all(function(lg)
+    if lg.params.on_2_11_1 then
+        lg.master:exec(function()
+            box.schema.upgrade()
+            t.assert_not(box.internal.schema_needs_upgrade())
+        end)
+        lg.replica:wait_for_vclock_of(lg.master)
+        lg.replica:exec(function()
+            t.assert_not(box.internal.schema_needs_upgrade())
+        end)
+    end
     lg.replica_set:drop()
-end
+end)
 
 g.test_local_errors = function(lg)
     lg.master:exec(function()

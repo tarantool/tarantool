@@ -3199,6 +3199,10 @@ func_def_new_from_tuple(struct tuple *tuple)
 			triggers = NULL;
 	}
 
+	if (triggers != NULL &&
+	    schema_check_feature(SCHEMA_FEATURE_PERSISTENT_TRIGGERS) != 0)
+		return NULL;
+
 	struct func_def *def = func_def_new(fid, uid, name, name_len,
 					    language, body, body_len,
 					    comment, comment_len, triggers);
