@@ -4152,6 +4152,7 @@ on_commit_dd_version(struct trigger *trigger, void * /* event */)
 	struct fiber *fiber = data->fiber;
 	if (fiber != NULL)
 		fiber_wakeup(fiber);
+	box_broadcast_status();
 	return 0;
 }
 

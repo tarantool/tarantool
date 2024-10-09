@@ -297,12 +297,6 @@ static void
 box_storage_init(void);
 
 /**
- * Broadcast the current instance status
- */
-static void
-box_broadcast_status(void);
-
-/**
  * A timer to broadcast the updated vclock. Doing this on each vclock update
  * would be too expensive.
  */
@@ -6022,18 +6016,20 @@ box_broadcast_id(void)
 	assert((size_t)(w - buf) < sizeof(buf));
 }
 
-static void
+void
 box_broadcast_status(void)
 {
 	char buf[1024];
 	char *w = buf;
-	w = mp_encode_map(w, 3);
+	w = mp_encode_map(w, 4);
 	w = mp_encode_str0(w, "is_ro");
 	w = mp_encode_bool(w, box_is_ro());
 	w = mp_encode_str0(w, "is_ro_cfg");
 	w = mp_encode_bool(w, cfg_geti("read_only"));
 	w = mp_encode_str0(w, "status");
 	w = mp_encode_str0(w, box_status());
+	w = mp_encode_str0(w, "dd_version");
+	w = mp_encode_str0(w, version_id_to_string(dd_version_id));
 
 	box_broadcast("box.status", strlen("box.status"), buf, w);
 

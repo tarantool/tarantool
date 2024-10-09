@@ -870,6 +870,12 @@ void
 box_broadcast_id(void);
 
 /**
+ * Broadcast the status of the instance.
+ */
+void
+box_broadcast_status(void);
+
+/**
  * Broadcast the current election state of RAFT machinery
  */
 void
