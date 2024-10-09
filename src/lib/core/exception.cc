@@ -296,6 +296,32 @@ FileFormatError::FileFormatError(const char *file, unsigned line,
 	va_end(ap);
 }
 
+const struct type_info type_EncodeError =
+	make_type("EncodeError", &type_Exception);
+
+EncodeError::EncodeError(const char *file, unsigned line, const char *format,
+			 ...)
+	: Exception(&type_EncodeError, file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(this, format, ap);
+	va_end(ap);
+}
+
+const struct type_info type_DecodeError =
+	make_type("DecodeError", &type_Exception);
+
+DecodeError::DecodeError(const char *file, unsigned line, const char *format,
+			 ...)
+	: Exception(&type_DecodeError, file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(this, format, ap);
+	va_end(ap);
+}
+
 struct error *
 BuildOutOfMemory(const char *file, unsigned line,
 		 size_t amount, const char *allocator,
@@ -423,5 +449,27 @@ BuildFileFormatError(const char *file, unsigned line, const char *format, ...)
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
 	va_end(ap);
+	return e;
+}
+
+struct error *
+BuildEncodeError(const char *file, unsigned line, const char *format,
+		 const char *details)
+{
+	EncodeError *e = new EncodeError(file, line, "%s encode error: %s",
+					 format, details);
+	error_payload_set_str(&e->payload, "format", format);
+	error_payload_set_str(&e->payload, "details", details);
+	return e;
+}
+
+struct error *
+BuildDecodeError(const char *file, unsigned line, const char *format,
+		 const char *details)
+{
+	DecodeError *e = new DecodeError(file, line, "%s decode error: %s",
+					 format, details);
+	error_payload_set_str(&e->payload, "format", format);
+	error_payload_set_str(&e->payload, "details", details);
 	return e;
 }

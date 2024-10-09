@@ -6,7 +6,6 @@
 #include "arrow_ipc.h"
 
 #include "diag.h"
-#include "error.h"
 #include "small/region.h"
 #include "nanoarrow/nanoarrow_ipc.h"
 
@@ -23,16 +22,14 @@ arrow_ipc_encode(struct ArrowArray *array, struct ArrowSchema *schema,
 	struct ArrowArrayView array_view;
 	rc = ArrowArrayViewInitFromSchema(&array_view, schema, &error);
 	if (rc != NANOARROW_OK) {
-		diag_set(ClientError, ER_ARROW_IPC_ENCODE,
-			 "ArrowArrayViewInitFromSchema", error.message);
+		diag_set(EncodeError, "Arrow", error.message);
 		return -1;
 	}
 
 	/* Set buffer sizes and data pointers from an array. */
 	rc = ArrowArrayViewSetArray(&array_view, array, &error);
 	if (rc != NANOARROW_OK) {
-		diag_set(ClientError, ER_ARROW_IPC_ENCODE,
-			 "ArrowArrayViewSetArray", error.message);
+		diag_set(EncodeError, "Arrow", error.message);
 		goto error1;
 	}
 
@@ -40,8 +37,7 @@ arrow_ipc_encode(struct ArrowArray *array, struct ArrowSchema *schema,
 	struct ArrowIpcOutputStream stream;
 	rc = ArrowIpcOutputStreamInitBuffer(&stream, &buffer);
 	if (rc != NANOARROW_OK) {
-		diag_set(ClientError, ER_ARROW_IPC_ENCODE,
-			 "ArrowIpcOutputStreamInitBuffer", NULL);
+		diag_set(EncodeError, "Arrow", tt_strerror(rc));
 		goto error1;
 	}
 
@@ -52,23 +48,20 @@ arrow_ipc_encode(struct ArrowArray *array, struct ArrowSchema *schema,
 	struct ArrowIpcWriter writer;
 	rc = ArrowIpcWriterInit(&writer, &stream);
 	if (rc != NANOARROW_OK) {
-		diag_set(ClientError, ER_ARROW_IPC_ENCODE, "ArrowIpcWriterInit",
-			 NULL);
+		diag_set(EncodeError, "Arrow", tt_strerror(rc));
 		stream.release(&stream);
 		goto error1;
 	}
 
 	rc = ArrowIpcWriterWriteSchema(&writer, schema, &error);
 	if (rc != NANOARROW_OK) {
-		diag_set(ClientError, ER_ARROW_IPC_ENCODE,
-			 "ArrowIpcWriterWriteSchema", error.message);
+		diag_set(EncodeError, "Arrow", error.message);
 		goto error2;
 	}
 
 	rc = ArrowIpcWriterWriteArrayView(&writer, &array_view, &error);
 	if (rc != NANOARROW_OK) {
-		diag_set(ClientError, ER_ARROW_IPC_ENCODE,
-			 "ArrowIpcWriterWriteArrayView", error.message);
+		diag_set(EncodeError, "Arrow", error.message);
 		goto error2;
 	}
 
@@ -99,8 +92,7 @@ arrow_ipc_decode(struct ArrowArray *array, struct ArrowSchema *schema,
 {
 	ssize_t size = data_end - data;
 	if (size <= 0) {
-		diag_set(ClientError, ER_ARROW_IPC_DECODE, NULL,
-			 "Unexpected data size");
+		diag_set(DecodeError, "Arrow", "unexpected data size");
 		return -1;
 	}
 
@@ -111,8 +103,7 @@ arrow_ipc_decode(struct ArrowArray *array, struct ArrowSchema *schema,
 
 	rc = ArrowBufferAppend(&buffer, data, size);
 	if (rc != NANOARROW_OK) {
-		diag_set(ClientError, ER_ARROW_IPC_DECODE, "ArrowBufferAppend",
-			 NULL);
+		diag_set(DecodeError, "Arrow", tt_strerror(rc));
 		ArrowBufferReset(&buffer);
 		return -1;
 	}
@@ -124,8 +115,7 @@ arrow_ipc_decode(struct ArrowArray *array, struct ArrowSchema *schema,
 	struct ArrowIpcInputStream input_stream;
 	rc = ArrowIpcInputStreamInitBuffer(&input_stream, &buffer);
 	if (rc != NANOARROW_OK) {
-		diag_set(ClientError, ER_ARROW_IPC_DECODE,
-			 "ArrowIpcInputStreamInitBuffer", NULL);
+		diag_set(DecodeError, "Arrow", tt_strerror(rc));
 		ArrowBufferReset(&buffer);
 		return -1;
 	}
@@ -137,23 +127,20 @@ arrow_ipc_decode(struct ArrowArray *array, struct ArrowSchema *schema,
 	struct ArrowArrayStream array_stream;
 	rc = ArrowIpcArrayStreamReaderInit(&array_stream, &input_stream, NULL);
 	if (rc != NANOARROW_OK) {
-		diag_set(ClientError, ER_ARROW_IPC_DECODE,
-			 "ArrowIpcArrayStreamReaderInit", NULL);
+		diag_set(DecodeError, "Arrow", tt_strerror(rc));
 		input_stream.release(&input_stream);
 		return -1;
 	}
 
 	rc = ArrowArrayStreamGetSchema(&array_stream, schema, &error);
 	if (rc != NANOARROW_OK) {
-		diag_set(ClientError, ER_ARROW_IPC_DECODE,
-			 "ArrowArrayStreamGetSchema", error.message);
+		diag_set(DecodeError, "Arrow", error.message);
 		goto error;
 	}
 
 	rc = ArrowArrayStreamGetNext(&array_stream, array, &error);
 	if (rc != NANOARROW_OK) {
-		diag_set(ClientError, ER_ARROW_IPC_DECODE,
-			 "ArrowArrayStreamGetNext", error.message);
+		diag_set(DecodeError, "Arrow", error.message);
 		schema->release(schema);
 		goto error;
 	}
