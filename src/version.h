@@ -39,6 +39,18 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 /**
+ * Version structure.
+ */
+struct version {
+	/** Major number. */
+	unsigned major;
+	/** Minor number. */
+	unsigned minor;
+	/** Patch number. */
+	unsigned patch;
+};
+
+/**
  * Pack version into uint32_t.
  * The highest byte or result means major version, next - minor,
  * middle - patch, last - revision.

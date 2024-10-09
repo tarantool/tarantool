@@ -36,6 +36,7 @@
 #include "error.h"
 #include "func_cache.h"
 #include "space_cache.h"
+#include "schema_def.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -51,6 +52,46 @@ extern uint32_t dd_version_id;
 
 /** Triggers invoked after schema initialization. */
 extern struct rlist on_schema_init;
+
+/**
+ * List of schema features, which are not available only since some schema
+ * version and should be blocked until box.schema.upgrade() is called.
+ *
+ * Feature description is:
+ *   _(<token>, <number>, <major>, <minor>, <patch>)
+ * where:
+ *   token			- the enum constant for the feature, also
+ *				  used in the error message.
+ *   number			- sequential number of the feature
+ *   major, minor, patch	- version number
+ *
+ * If schema version is less than 2.11.1, then all DDL is blocked until
+ * user upgrades at least to 2.11.1. This list consists of features,
+ * which appeared after 2.11.1 and which are blocked until some version.
+ *
+ * The only exception for now is persistent names feature. Even though
+ * they appeared in 3.0.0, we allow using them on schema version 2.11.5
+ * to simplify the upgrade process.
+ */
+#define SCHEMA_FEATURES(_) \
+	_(SCHEMA_FEATURE_DDL_BEFORE_UPGRADE, 0, 2, 11, 1) \
+	_(SCHEMA_FEATURE_PERSISTENT_NAMES, 1, 2, 11, 5) \
+	_(SCHEMA_FEATURE_PERSISTENT_TRIGGERS, 2, 3, 1, 0) \
+
+ENUM(schema_feature, SCHEMA_FEATURES);
+extern const char *schema_feature_strs[];
+extern const struct version schema_feature_version[];
+
+/**
+ * Checks whether the feature is available on the current schema.
+ *
+ * @param feature identifier of the feature.
+ *
+ * @retval 0 on success.
+ * @retval -1 on error.
+ */
+int
+schema_check_feature(enum schema_feature feature);
 
 /**
  * Returns true if data dictionary checks may be skipped by the current fiber.

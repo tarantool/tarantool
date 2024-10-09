@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
+#include "version.h"
 #include <stdbool.h>
 
 #if defined(__cplusplus)

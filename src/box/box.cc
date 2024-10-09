@@ -1549,6 +1549,8 @@ box_check_instance_uuid(struct tt_uuid *uuid)
 static int
 box_check_node_name(char *out, const char *cfg_name, bool set_diag)
 {
+	if (schema_check_feature(SCHEMA_FEATURE_PERSISTENT_NAMES) != 0)
+		return -1;
 	const char *name = cfg_gets(cfg_name);
 	if (name == NULL) {
 		*out = 0;

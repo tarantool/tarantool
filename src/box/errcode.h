@@ -411,7 +411,7 @@ struct errcode_record {
 	_(ER_REPLICASET_NAME_MISMATCH, 268,	"Replicaset name mismatch: name '%s' provided in config confilcts with the instance one '%s'", "actual", STRING, "expected", STRING) \
 	_(ER_INSTANCE_NAME_DUPLICATE, 269,	"Duplicate replica name %s, already occupied by %s", "value", STRING, "replica", STRING) \
 	_(ER_INSTANCE_NAME_MISMATCH, 270,	"Instance name mismatch: name '%s' provided in config confilcts with the instance one '%s'", "actual", STRING, "expected", STRING) \
-	_(ER_SCHEMA_NEEDS_UPGRADE, 271,		"Your schema version is %s while Tarantool %s requires a more recent schema version. Please, consider using box.schema.upgrade().", "schema_version", STRING, "tarantool_version", STRING) \
+	_(ER_SCHEMA_NEEDS_UPGRADE, 271,		"Your schema version is %s while Tarantool feature %s requires schema version %s or higher. Please, consider using box.schema.upgrade().", "schema_version", STRING, "feature_name", STRING, "tarantool_version", STRING) \
 	_(ER_SCHEMA_UPGRADE_IN_PROGRESS, 272,	"Schema upgrade is already in progress") \
 	_(ER_DEPRECATED, 273,			"%s is deprecated", "feature", STRING) \
 	_(ER_UNCONFIGURED, 274,			"Please call box.cfg{} first") \
