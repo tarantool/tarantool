@@ -3863,8 +3863,8 @@ iproto_init(int threads_count)
 	 * we don't need any accept functions.
 	 */
 	evio_service_create(loop(), &tx_binary, "tx_binary", NULL, NULL);
-	iproto_threads = (struct iproto_thread *)
-		xcalloc(threads_count, sizeof(struct iproto_thread));
+	iproto_threads = xalloc_array(struct iproto_thread, threads_count);
+	memset(iproto_threads, 0, sizeof(struct iproto_thread) * threads_count);
 	fiber_cond_create(&drop_finished_cond);
 
 	for (int i = 0; i < threads_count; i++, iproto_threads_count++) {
