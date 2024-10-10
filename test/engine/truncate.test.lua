@@ -80,12 +80,12 @@ s.index.i3:select()
 s:drop()
 
 --
--- Calling space.truncate concurrently.
+-- Calling space.truncate concurrently, simply check if it doesn't crash.
 --
 s = box.schema.create_space('test', {engine = engine})
 _ = s:create_index('pk')
 c = fiber.channel(5)
-for i = 1, 5 do fiber.create(function() s:truncate() c:put(true) end) end
+for i = 1, 5 do fiber.create(function() pcall(s.truncate, s) c:put(true) end) end
 for i = 1, 5 do c:get() end
 s:drop()
 

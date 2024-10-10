@@ -717,7 +717,16 @@ txn_alter_trigger_new(trigger_f run, void *data)
 	return trigger;
 }
 
+/**
+ * List of all alive alter_space objects.
+ */
+static RLIST_HEAD(alter_space_list);
+
 struct alter_space {
+	/** Link in alter_space_list. */
+	struct rlist in_list;
+	/** Transaction doing this alter. */
+	struct txn *txn;
 	/** List of alter operations */
 	struct rlist ops;
 	/** Definition of the new space - space_def. */
@@ -749,19 +758,37 @@ struct alter_space {
 	int n_rows;
 };
 
+/**
+ * Creates new alter_space object. Since concurrent alters of one space would
+ * be very complicated and are considered to be rare, they are disallowed, so
+ * the function returns an error in the case when there is already another
+ * alter of the same space started by another transaction. Also, returns an
+ * error on allocation failure.
+ */
 static struct alter_space *
 alter_space_new(struct space *old_space)
 {
 	struct txn *txn = in_txn();
+	struct alter_space *alter;
+	rlist_foreach_entry(alter, &alter_space_list, in_list) {
+		if (alter->txn != txn &&
+		    alter->old_space->def->id == old_space->def->id) {
+			diag_set(ClientError, ER_ALTER_SPACE,
+				 space_name(old_space),
+				 "the space is already being modified");
+			return NULL;
+		}
+	}
 	size_t size = sizeof(struct alter_space);
-	struct alter_space *alter = (struct alter_space *)
-		region_aligned_alloc(&in_txn()->region, size,
-				     alignof(struct alter_space));
+	alter = (struct alter_space *)region_aligned_alloc(
+		&txn->region, size, alignof(struct alter_space));
 	if (alter == NULL) {
 		diag_set(OutOfMemory, size, "region", "struct alter_space");
 		return NULL;
 	}
 	alter = (struct alter_space *)memset(alter, 0, size);
+	rlist_add_entry(&alter_space_list, alter, in_list);
+	alter->txn = txn;
 	rlist_create(&alter->ops);
 	alter->old_space = old_space;
 	alter->space_def = space_def_dup(alter->old_space->def);
@@ -777,6 +804,7 @@ alter_space_new(struct space *old_space)
 static void
 alter_space_delete(struct alter_space *alter)
 {
+	rlist_del_entry(alter, in_list);
 	/* Destroy the ops. */
 	while (! rlist_empty(&alter->ops)) {
 		AlterSpaceOp *op = rlist_shift_entry(&alter->ops,
@@ -794,64 +822,6 @@ AlterSpaceOp::AlterSpaceOp(struct alter_space *alter)
 	/* Add to the tail: operations must be processed in order. */
 	rlist_add_tail_entry(&alter->ops, this, link);
 }
-
-/**
- * This is a per-space lock which protects the space from
- * concurrent DDL. The current algorithm template for DDL is:
- * 1) Capture change of a system table in a on_replace
- *    trigger
- * 2) Build new schema object, e..g new struct space, and insert
- *    it in the cache - all the subsequent transactions will begin
- *    using this object
- * 3) Write the operation to WAL; this yields, giving a window to
- *    concurrent transactions to use the object, but if there is
- *    a rollback of WAL write, the roll back is *cascading*, so all
- *    subsequent transactions are rolled back first.
- * Step 2 doesn't yield most of the time - e.g. rename of
- * a column, or a compatible change of the format builds a new
- * space objects immediately. Some long operations run in
- * background, after WAL write: this is drop index, and, transitively,
- * drop space, so these don't yield either. But a few operations
- * need to do a long job *before* WAL write: this is create index and
- * deploy of the new format, which checks each space row to
- * conform with index/format constraints, row by row. So this lock
- * is here exactly for these operations. If we allow another DDL
- * against the same space to get in while these operations are in
- * progress, it will use old space object in the space cache, and
- * thus overwrite this transaction's space object, or, worse yet,
- * will get overwritten itself when a long-running DDL completes.
- *
- * Since we consider such concurrent operations to be rare, this
- * lock is optimistic: if there is a lock already, we simply throw
- * an exception.
- */
-class AlterSpaceLock {
-	/** Set of all taken locks. */
-	static struct mh_i32_t *registry;
-	/** Identifier of the space this lock is for. */
-	uint32_t space_id;
-public:
-	/** Take a lock for the altered space. */
-	AlterSpaceLock(struct alter_space *alter) {
-		if (registry == NULL) {
-			registry = mh_i32_new();
-		}
-		space_id = alter->old_space->def->id;
-		if (mh_i32_find(registry, space_id, NULL) != mh_end(registry)) {
-			tnt_raise(ClientError, ER_ALTER_SPACE,
-				  space_name(alter->old_space),
-				  "the space is already being modified");
-		}
-		mh_i32_put(registry, &space_id, NULL, NULL);
-	}
-	~AlterSpaceLock() {
-		mh_int_t k = mh_i32_find(registry, space_id, NULL);
-		assert(k != mh_end(registry));
-		mh_i32_del(registry, k, NULL);
-	}
-};
-
-struct mh_i32_t *AlterSpaceLock::registry;
 
 /**
  * Commit the alter.
@@ -980,14 +950,6 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	auto alter_stmt_guard = make_scoped_guard([&] {
 		rlist_del_entry(&alter_stmt, link);
 	});
-	/**
-	 * AlterSpaceOp::prepare() may perform a potentially long
-	 * lasting operation that may yield, e.g. building of a new
-	 * index. We really don't want the space to be replaced by
-	 * another DDL operation while this one is in progress so
-	 * we lock out all concurrent DDL for this space.
-	 */
-	AlterSpaceLock lock(alter);
 	/*
 	 * Prepare triggers while we may fail. Note, we don't have to
 	 * free them in case of failure, because they are allocated on
