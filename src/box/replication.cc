@@ -305,10 +305,6 @@ replica_new(void)
 			  "struct replica");
 	}
 	replica->relay = relay_new(replica);
-	if (replica->relay == NULL) {
-		free(replica);
-		diag_raise();
-	}
 	replica->id = 0;
 	replica->anon = false;
 	replica->uuid = uuid_nil;
