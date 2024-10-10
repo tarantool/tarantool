@@ -19,9 +19,6 @@ MAX_FILES ?= 4096
 VARDIR ?= /tmp/t
 TEST_RUN_PARAMS = --builddir ${PWD}/${BUILD_DIR}
 
-COVERITY_DIR = cov-int
-COVERITY_URL = https://scan.coverity.com/builds?project=tarantool%2Ftarantool
-
 CMAKE = ${CMAKE_ENV} cmake -S ${SRC_DIR} -B ${BUILD_DIR}
 CMAKE_BUILD = ${CMAKE_BUILD_ENV} cmake --build ${BUILD_DIR} --parallel ${NPROC}
 
@@ -270,40 +267,6 @@ test-jepsen: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
                             -DTEST_BUILD=ON
 test-jepsen: configure prebuild-jepsen
 	${CMAKE_BUILD} --target run-jepsen
-
-##############################
-# Coverity testing           #
-##############################
-
-.PHONY: build-coverity
-build-coverity: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                               -DENABLE_WERROR=ON \
-                               -DTEST_BUILD=ON
-build-coverity: CMAKE_BUILD_ENV = PATH=${PATH}:/cov-analysis/bin cov-build --dir ${COVERITY_DIR}
-build-coverity: configure
-	${CMAKE_BUILD}
-
-.PHONY: test-coverity
-test-coverity: build-coverity
-	tar czvf tarantool.tgz ${COVERITY_DIR}
-	if [ -n "$${COVERITY_TOKEN}" ]; then \
-		echo "Exporting code coverity information to scan.coverity.com"; \
-		curl --location \
-		     --fail \
-		     --silent \
-		     --show-error \
-		     --retry 5 \
-		     --retry-delay 5 \
-		     --form token=$${COVERITY_TOKEN} \
-		     --form email=tarantool@tarantool.org \
-		     --form file=@tarantool.tgz \
-		     --form version=$(shell git describe HEAD) \
-		     --form description="Tarantool Coverity" \
-		     ${COVERITY_URL}; \
-	else \
-		echo "Coverity token is not provided"; \
-		exit 1; \
-	fi
 
 ##############################
 # LuaJIT integration testing #
