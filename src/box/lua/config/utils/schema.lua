@@ -13,6 +13,9 @@
 local fun = require('fun')
 local json = require('json')
 
+local json_noexc = json.new()
+json_noexc.cfg({encode_use_tostring = true})
+
 local methods = {}
 local schema_mt = {}
 
@@ -71,6 +74,16 @@ local function walkthrough_error(ctx, message, ...)
     error(('%s%s'):format(error_prefix, message:format(...)), 0)
 end
 
+-- Generate an error supplemented by details from the given
+-- walkthrough context if the `ok` predicate is false.
+--
+-- See also walkthrough_error().
+local function walkthrough_assert(ctx, ok, message, ...)
+    if not ok then
+        walkthrough_error(ctx, message, ...)
+    end
+end
+
 -- Return a function that raises an error with a prefix formed
 -- from the given context.
 --
@@ -125,6 +138,10 @@ end
 --     -- Return a parsed/typecasted value of the given scalar
 --     -- type otherwise.
 --     fromenv = <function>,
+--
+--     -- If any number value definitely can't pass validation
+--     -- against the given scalar, this property is true.
+--     never_accept_number = <boolean>,
 -- }
 
 -- Verify whether the given value (data) has expected type and
@@ -165,6 +182,7 @@ scalars.string = {
     fromenv = function(_env_var_name, raw_value)
         return raw_value
     end,
+    never_accept_number = true,
 }
 
 scalars.number = {
@@ -184,6 +202,7 @@ scalars.number = {
         end
         return res
     end,
+    never_accept_number = false,
 }
 
 -- TODO: This hack is needed until a union schema node will be
@@ -196,6 +215,7 @@ scalars['string, number'] = {
     fromenv = function(_env_var_name, raw_value)
         return tonumber(raw_value) or raw_value
     end,
+    never_accept_number = false,
 }
 scalars['number, string'] = {
     type = 'number, string',
@@ -205,6 +225,7 @@ scalars['number, string'] = {
     fromenv = function(_env_var_name, raw_value)
         return tonumber(raw_value) or raw_value
     end,
+    never_accept_number = false,
 }
 
 scalars.integer = {
@@ -233,6 +254,7 @@ scalars.integer = {
         end
         return res
     end,
+    never_accept_number = false,
 }
 
 scalars.boolean = {
@@ -254,6 +276,7 @@ scalars.boolean = {
         error(('Unable to decode a boolean value from environment ' ..
             'variable %q, got %q'):format(env_var_name, raw_value), 0)
     end,
+    never_accept_number = true,
 }
 
 scalars.any = {
@@ -271,6 +294,7 @@ scalars.any = {
         end
         return res
     end,
+    never_accept_number = false,
 }
 
 local function is_scalar(schema)
@@ -437,7 +461,7 @@ end
 --   * all keys are numeric, without a fractional part
 --   * the lower key is 1
 --   * the higher key is equal to the number of items
-local function validate_table_is_array(data, ctx)
+local function table_is_array(data)
     assert(type(data) == 'table')
 
     -- Check that all the keys are numeric.
@@ -446,12 +470,10 @@ local function validate_table_is_array(data, ctx)
     local max_key = -1/0 -- -inf
     for k, _ in pairs(data) do
         if type(k) ~= 'number' then
-            walkthrough_error(ctx, 'An array contains a non-numeric ' ..
-                'key: %q', k)
+            return false, 'An array contains a non-numeric key: %q', k
         end
         if k - math.floor(k) ~= 0 then
-            walkthrough_error(ctx, 'An array contains a non-integral ' ..
-                'numeric key: %s', k)
+            return false, 'An array contains a non-integral numeric key: %s', k
         end
         key_count = key_count + 1
         min_key = math.min(min_key, k)
@@ -460,21 +482,104 @@ local function validate_table_is_array(data, ctx)
 
     -- An empty array is a valid array.
     if key_count == 0 then
-        return
+        return true
     end
 
     -- Check that the array starts from 1 and has no holes.
     if min_key ~= 1 then
-        walkthrough_error(ctx, 'An array must start from index 1, ' ..
-            'got min index %d', min_key)
+        return false, 'An array must start from index 1, got min index %d',
+            min_key
     end
 
     -- Check that the array has no holes.
     if max_key ~= key_count then
-        walkthrough_error(ctx, 'An array must not have holes, got ' ..
-            'a table with %d integer fields with max index %d', key_count,
-            max_key)
+        return false, 'An array must not have holes, got a table with %d ' ..
+            'integer fields with max index %d', key_count, max_key
     end
+
+    return true
+end
+
+-- Whether the given record or map definitely can't accept a
+-- non-empty array.
+--
+-- Returns true if any non-empty array definitely can't pass the
+-- schema's validation.
+--
+-- Returns false if this property can't be guaranteed.
+local function never_accept_nonempty_array(schema)
+    assert(schema.type == 'record' or schema.type == 'map')
+
+    -- An array with a fixed max length may be represented by a
+    -- record with numeric fields.
+    --
+    -- A record should have at least a field with the numeric key
+    -- 1 to be able to accept a non-empty array.
+    --
+    -- Example:
+    --
+    --  | local s = schema.new('foo', schema.record({
+    --  |     [1] = schema.scalar({type = 'string'}),
+    --  |     [2] = schema.scalar({type = 'string'}),
+    --  |     [3] = schema.scalar({type = 'string'}),
+    --  | }))
+    --  |
+    --  | s:validate({'a', 'b', 'c'}) -- OK
+    if schema.type == 'record' then
+        return schema.fields[1] == nil
+    end
+
+    -- If map's keys accept numeric values, then it is possible
+    -- that the map can accept a non-empty array value.
+    --
+    -- Example:
+    --
+    --  | local s = schema.new('foo', schema.map({
+    --  |     key = schema.scalar({type = 'integer'}),
+    --  |     value = schema.scalar({type = 'string'}),
+    --  | }))
+    --  |
+    --  | s:validate({'a', 'b', 'c'}) -- OK
+    assert(schema.type == 'map')
+    if not is_scalar(schema.key) then
+        return true
+    end
+    local scalar_def = scalars[schema.key.type]
+    assert(scalar_def ~= nil)
+    return scalar_def.never_accept_number
+end
+
+-- If a record or a map is known as discarding any non-empty
+-- array, but a non-empty array is given, report a user-friendly
+-- error.
+--
+-- This check is optional in the following sense: the same
+-- situation is caught and reported by records's unknown fields
+-- check and map's key type check (see validate_impl()). However,
+-- this function issues a better error message.
+local function validate_for_unexpected_array(schema, data, ctx)
+    assert(schema.type == 'record' or schema.type == 'map')
+
+    -- If a non-empty array is a possibly valid value for the
+    -- given schema, skip the check.
+    if not never_accept_nonempty_array(schema) then
+        return
+    end
+
+    -- The check is irrelevant if the data is empty.
+    if next(data) == nil then
+        return
+    end
+
+    -- If the data is not an array, we don't raise an error from
+    -- here. The data still can be invalid, but this is verified
+    -- by the next checks in validate_impl().
+    if not table_is_array(data) then
+        return
+    end
+
+    walkthrough_error(ctx, "Expected a %s, got an array: %s", schema.type,
+        json_noexc.encode(data))
 end
 
 -- Verify the given data against the `allowed_values` annotation
@@ -529,6 +634,7 @@ local function validate_impl(schema, data, ctx)
         end
     elseif schema.type == 'record' then
         walkthrough_assert_table(ctx, schema, data)
+        validate_for_unexpected_array(schema, data, ctx)
 
         for field_name, field_def in pairs(schema.fields) do
             walkthrough_enter(ctx, field_name)
@@ -549,6 +655,7 @@ local function validate_impl(schema, data, ctx)
         end
     elseif schema.type == 'map' then
         walkthrough_assert_table(ctx, schema, data)
+        validate_for_unexpected_array(schema, data, ctx)
 
         for field_name, field_value in pairs(data) do
             walkthrough_enter(ctx, field_name)
@@ -558,7 +665,7 @@ local function validate_impl(schema, data, ctx)
         end
     elseif schema.type == 'array' then
         walkthrough_assert_table(ctx, schema, data)
-        validate_table_is_array(data, ctx)
+        walkthrough_assert(ctx, table_is_array(data))
 
         for i, v in ipairs(data) do
             walkthrough_enter(ctx, i)
