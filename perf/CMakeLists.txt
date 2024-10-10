@@ -33,6 +33,7 @@ endif()
 include_directories(${MSGPUCK_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/src/box)
 include_directories(${PROJECT_SOURCE_DIR}/third_party)
+include_directories(${EXTRA_BOX_INCLUDE_DIRS})
 include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
 set(RUN_PERF_C_TESTS_LIST "")
