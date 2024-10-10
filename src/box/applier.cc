@@ -2130,7 +2130,7 @@ applier_init(void)
 						  sizeof(struct applier_thread *));
 	for (int i = 0; i < replication_threads; i++) {
 		struct applier_thread *thread =
-			(struct applier_thread *)xmalloc(sizeof(*thread));
+			xalloc_object(struct applier_thread);
 		applier_thread_create(thread);
 		applier_threads[i] = thread;
 	}
