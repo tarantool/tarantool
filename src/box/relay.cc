@@ -291,14 +291,7 @@ relay_new(struct replica *replica)
 	 * (Use clang UB Sanitizer, to make sure of this)
 	 */
 	assert((sizeof(struct relay) % alignof(struct relay)) == 0);
-	struct relay *relay = (struct relay *)
-		aligned_alloc(alignof(struct relay), sizeof(struct relay));
-	if (relay == NULL) {
-		diag_set(OutOfMemory, sizeof(struct relay), "aligned_alloc",
-			  "struct relay");
-		return NULL;
-	}
-
+	struct relay *relay = xalloc_object(struct relay);
 	memset(relay, 0, sizeof(struct relay));
 	relay->replica = replica;
 	relay->last_row_time = ev_monotonic_now(loop());
@@ -472,9 +465,6 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 		   struct checkpoint_cursor *cursor)
 {
 	struct relay *relay = relay_new(NULL);
-	if (relay == NULL)
-		diag_raise();
-
 	relay_start(relay, io, sync, relay_send_initial_join_row, relay_yield,
 		    UINT64_MAX);
 	xrow_stream_create(&relay->xrow_stream);
