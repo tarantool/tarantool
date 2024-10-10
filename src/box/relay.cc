@@ -31,7 +31,6 @@
 #include "relay.h"
 
 #include "trivia/config.h"
-#include "trivia/util.h" /** static_assert */
 #include "tt_static.h"
 #include "scoped_guard.h"
 #include "cbus.h"
@@ -58,8 +57,6 @@
 #include "txn_limbo.h"
 #include "raft.h"
 #include "box.h"
-
-#include <stdlib.h>
 
 /**
  * Cbus message to send status updates from relay to tx thread.
@@ -294,21 +291,13 @@ relay_new(struct replica *replica)
 	 * (Use clang UB Sanitizer, to make sure of this)
 	 */
 	assert((sizeof(struct relay) % alignof(struct relay)) == 0);
-	/*
-	 * According to posix_memalign requirements, align must be
-	 * multiple of sizeof(void *).
-	 */
-	static_assert(alignof(struct relay) % sizeof(void *) == 0,
-		      "align for posix_memalign function must be "
-		      "multiple of sizeof(void *)");
-	struct relay *relay = NULL;
-	if (posix_memalign((void **)&relay, alignof(struct relay),
-			   sizeof(struct relay)) != 0) {
+	struct relay *relay = (struct relay *)
+		aligned_alloc(alignof(struct relay), sizeof(struct relay));
+	if (relay == NULL) {
 		diag_set(OutOfMemory, sizeof(struct relay), "aligned_alloc",
 			  "struct relay");
 		return NULL;
 	}
-	assert(relay != NULL);
 
 	memset(relay, 0, sizeof(struct relay));
 	relay->replica = replica;
