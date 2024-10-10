@@ -10,7 +10,7 @@ fiber = require'fiber'
  | ---
  | ...
 
--- simple test for parallel ddl execution
+-- simple test for parallel ddl execution, gh-2783
 _ = box.schema.space.create('test'):create_index('pk')
  | ---
  | ...
@@ -25,15 +25,19 @@ test_run:cmd("setopt delimiter ';'")
  | ...
 
 function f1()
-    box.space.test:create_index('sec', {parts = {2, 'num'}})
-    ch:put(true)
+    local ok, err = pcall(function()
+        box.space.test:create_index('sec', {parts = {2, 'num'}})
+    end)
+    ch:put(ok or err)
 end;
  | ---
  | ...
 
 function f2()
-    box.space.test:create_index('third', {parts = {3, 'string'}})
-    ch:put(true)
+    local ok, err = pcall(function()
+        box.space.test:create_index('third', {parts = {3, 'string'}})
+    end)
+    ch:put(ok or err)
 end;
  | ---
  | ...
@@ -49,7 +53,7 @@ _ = {fiber.create(f1), fiber.create(f2)}
 
 ch:get()
  | ---
- | - true
+ | - 'Can''t modify space ''test'': the space is already being modified'
  | ...
 ch:get()
  | ---
