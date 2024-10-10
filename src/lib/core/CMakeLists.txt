@@ -28,6 +28,9 @@ set(core_sources
     random.c
     trigger.cc
     port.c
+    arrow_ipc.c
+    arrow_record_batch.c
+    mp_arrow.c
     decimal.c
     mp_decimal.c
     cord_buf.c
@@ -67,6 +70,7 @@ else()
 endif()
 
 include_directories(${OPENSSL_INCLUDE_DIR}
+                    ${NANOARROW_INCLUDE_DIRS}
                     ${EXTRA_CORE_INCLUDE_DIRS})
 
 if (TARGET_OS_NETBSD)
