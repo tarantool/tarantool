@@ -1,17 +1,13 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
+local textutils = require('internal.config.utils.textutils')
 
 local g = t.group()
 
 g.before_all(cluster.init)
 g.after_each(cluster.drop)
 g.after_all(cluster.clean)
-
--- Ease writing of a long error message in a code.
-local function toline(s)
-    return s:gsub('\n', ''):gsub(' +', ' '):strip()
-end
 
 -- Verify that an anonymous replica can be started and joined to
 -- a replicaset.
@@ -197,7 +193,7 @@ g.test_all_anonymous = function(g)
         })
         :config()
 
-    cluster.startup_error(g, config, toline([[
+    cluster.startup_error(g, config, textutils.toline([[
         All the instances of replicaset "replicaset-001" of group "group-001"
         are configured as anonymous replicas; it effectively means that the
         whole replicaset is read-only; moreover, it means that default
@@ -234,7 +230,7 @@ g.test_anonymous_replica_rw_mode = function(g)
         })
         :config()
 
-    cluster.startup_error(g, config, toline([[
+    cluster.startup_error(g, config, textutils.toline([[
         database.mode = "rw" is set for instance "instance-004" of replicaset
         "replicaset-001" of group "group-001", but this option cannot be used
         together with replication.anon = true
@@ -261,7 +257,7 @@ g.test_anonymous_replica_leader = function(g)
         })
         :config()
 
-    cluster.startup_error(g, config, toline([[
+    cluster.startup_error(g, config, textutils.toline([[
         replication.anon = true is set for instance "instance-004" of replicaset
         "replicaset-001" of group "group-001" that is configured as a leader; a
         leader can not be an anonymous replica
@@ -276,7 +272,7 @@ end
 --
 -- replication.failover: election
 g.test_anonymous_replica_election_mode_other_than_off = function(g)
-    local error_t = toline([[
+    local error_t = textutils.toline([[
         replication.election_mode = %q is set for instance "instance-004" of
         replicaset "replicaset-001" of group "group-001", but this option cannot
         be used together with replication.anon = true; consider setting

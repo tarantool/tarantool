@@ -4,6 +4,7 @@ local cluster_config = require('internal.config.cluster_config')
 local configdata = require('internal.config.configdata')
 local aboard = require('internal.config.utils.aboard')
 local tarantool = require('tarantool')
+local textutils = require('internal.config.utils.textutils')
 
 -- Tarantool Enterprise Edition has its own additions
 -- for config module.
@@ -37,30 +38,6 @@ end
 local extras = load_extras()
 
 -- {{{ Helpers
-
--- Remove indent from a text.
---
--- Similar to Python's textwrap.dedent().
---
--- It strips all newlines from beginning and all whitespace
--- characters from the end for convenience use with multiline
--- string literals ([[ <...> ]]).
-local function dedent(s)
-    local lines = s:lstrip('\n'):rstrip():split('\n')
-
-    local indent = math.huge
-    for _, line in ipairs(lines) do
-        if #line ~= 0 then
-            indent = math.min(indent, #line:match('^ *'))
-        end
-    end
-
-    local res = {}
-    for _, line in ipairs(lines) do
-        table.insert(res, line:sub(indent + 1))
-    end
-    return table.concat(res, '\n')
-end
 
 -- Extract all fields from a table except ones that start from
 -- the underscore.
@@ -269,7 +246,7 @@ function methods._store(self, iconfig, cconfig, source_info)
         local is_reload = self._status == 'reload_in_progress'
         local action = is_reload and 'Reload' or 'Startup'
         local source_info_str = table.concat(source_info, '\n')
-        error(dedent([[
+        error(textutils.dedent([[
             %s failure.
 
             No cluster config received from the given configuration sources.
@@ -292,7 +269,7 @@ function methods._store(self, iconfig, cconfig, source_info)
         local is_reload = self._status == 'reload_in_progress'
         local action = is_reload and 'Reload' or 'Startup'
         local source_info_str = table.concat(source_info, '\n')
-        error(dedent([[
+        error(textutils.dedent([[
             %s failure.
 
             Unable to find instance %q in the group/replicaset/instance
