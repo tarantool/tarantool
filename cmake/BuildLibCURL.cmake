@@ -45,6 +45,7 @@ macro(curl_build)
 
     # Let's disable testing for curl to save build time.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DBUILD_TESTING=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_TEST_BUNDLES=OFF")
 
     # Let's disable building documentation for curl to save build time.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_CURL_MANUAL=OFF")
@@ -176,6 +177,7 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_POP3=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_IMAP=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_MQTT=ON")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_IPFS=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SMTP=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_ALTSVC=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SRP=OFF")
@@ -211,7 +213,7 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_CURLDEBUG=${TARANTOOL_DEBUG}")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_DEBUG=${TARANTOOL_DEBUG}")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_MSH3=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_WEBSOCKETS=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_WEBSOCKETS=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_UNITY_BUILD=OFF")
     # Note that CMake build does not allow build curl and libcurl debug
     # enabled, see https://github.com/curl/curl/blob/master/docs/INSTALL.cmake
