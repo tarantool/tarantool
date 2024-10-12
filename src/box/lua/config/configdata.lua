@@ -486,7 +486,6 @@ local function validate_names(saved_names, config_names, iconfig)
     -- Fail early, if current UUID is not set, but no name is found
     -- inside the snapshot file. Ignore this failure, if replica is
     -- configured as anonymous, anon replicas cannot have names.
-    local iconfig = config_names.peers[config_names.instance_name].iconfig_def
     if not instance_config:get(iconfig, 'replication.anon') then
         if saved_names.instance_name == nil and
            config_names.instance_uuid == nil then
@@ -868,7 +867,6 @@ local function new(iconfig, cconfig, instance_name)
             -- UUIDs from config, generated one should not be used here.
             replicaset_uuid = replicaset_uuid,
             instance_uuid = instance_uuid,
-            peers = peers,
         }, iconfig_def)
     end
 
