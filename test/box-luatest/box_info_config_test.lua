@@ -31,6 +31,7 @@ g.test_with_script = function(g)
                     -- active configuration.
                     last = {},
                 },
+                hierarchy = {},
             })
         end
 
@@ -42,6 +43,8 @@ end
 -- Verify box.info.config when tarantool is started from a config.
 g.test_with_config = function(g)
     local config = cbuilder:new()
+        :use_group('g-001')
+        :use_replicaset('r-001')
         :add_instance('i-001', {})
         :config()
     local cluster = cluster.new(g, config)
@@ -55,6 +58,11 @@ g.test_with_config = function(g)
                 meta = {
                     active = {},
                     last = {},
+                },
+                hierarchy = {
+                    group = 'g-001',
+                    replicaset = 'r-001',
+                    instance = 'i-001',
                 },
             })
         end
