@@ -329,18 +329,6 @@ local function build_peers(instances, replicaset_name)
     return res
 end
 
--- Returns instance_uuid and replicaset_uuid, saved in config.
-local function find_uuids_by_name(peers, instance_name)
-    for name, peer in pairs(peers) do
-        if name == instance_name then
-            local iconfig = peer.iconfig_def
-            return instance_config:get(iconfig, 'database.instance_uuid'),
-                   instance_config:get(iconfig, 'database.replicaset_uuid')
-        end
-    end
-    return nil
-end
-
 local function find_peer_name_by_uuid(peers, instance_uuid)
     for name, peer in pairs(peers) do
         local uuid = instance_config:get(peer.iconfig_def,
@@ -874,14 +862,12 @@ local function new(iconfig, cconfig, instance_name)
     -- and during config reload.
     local saved_names = find_saved_names(iconfig_def)
     if saved_names ~= nil then
-        local config_instance_uuid, config_replicaset_uuid =
-            find_uuids_by_name(peers, instance_name)
         validate_names(saved_names, {
             replicaset_name = found.replicaset_name,
             instance_name = instance_name,
             -- UUIDs from config, generated one should not be used here.
-            replicaset_uuid = config_replicaset_uuid,
-            instance_uuid = config_instance_uuid,
+            replicaset_uuid = replicaset_uuid,
+            instance_uuid = instance_uuid,
             peers = peers,
         }, iconfig_def)
     end
