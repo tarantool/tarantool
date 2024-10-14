@@ -39,6 +39,9 @@ concurrency:
     format('{0}-{1}-config-jsonschema-check', github.workflow, github.ref) }}
   cancel-in-progress: true
 
+env:
+  CI_MAKE: make -f .pack.mk
+
 jobs:
   jsonschema-check:
     # Run on push to the 'master' and release branches of tarantool/tarantool
@@ -108,6 +111,13 @@ jobs:
           for example in doc/examples/config/*.yaml doc/examples/config/*/*.yaml docker/example/app/config.yaml; do
             check-jsonschema --schemafile config-schema-pretty.json "$example"
           done
+      - name: Deploy JSON Schema to S3
+        if: (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')) && !endsWith(github.ref, '-entrypoint')
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_S3_ENDPOINT_URL: ${{ secrets.AWS_S3_ENDPOINT_URL }}
+        run: ${CI_MAKE} schema-deploy
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
