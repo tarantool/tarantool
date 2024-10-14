@@ -310,7 +310,7 @@ g.test_box_iproto_override_nop_rq_type = function(cg)
                         [box.iproto.key.SQL_TEXT] = 'text'
                     }, {__serialize = 'map'})
         _G.test_cb_err(header, body, box.error.INVALID_MSGPACK,
-                       "Invalid MsgPack %- packet body")
+                       "Invalid MsgPack %- junk after packet body")
         box.iproto.override(box.iproto.type.NOP, nil)
     end)
 end

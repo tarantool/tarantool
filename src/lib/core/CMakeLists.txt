@@ -29,6 +29,7 @@ set(core_sources
     trigger.cc
     port.c
     arrow_ipc.c
+    mp_arrow.c
     decimal.c
     mp_decimal.c
     cord_buf.c

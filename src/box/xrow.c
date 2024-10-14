@@ -258,23 +258,32 @@ xrow_decode(struct xrow_header *header, const char **pos,
 	/* Restore transaction id from lsn and transaction serial number. */
 	header->tsn = header->lsn - header->tsn;
 
-	/* Nop requests aren't supposed to have a body. */
-	if (*pos < end && header->type != IPROTO_NOP) {
-		const char *body = *pos;
-		if (mp_check(pos, end))
-			goto bad_body;
-		header->bodycnt = 1;
-		header->body[0].iov_base = (void *) body;
-		header->body[0].iov_len = *pos - body;
+	if (*pos == end) {
+		/* No body, nothing to validate. */
+		return 0;
 	}
-	if (end_is_exact && *pos < end)
-		goto bad_body;
+	if (header->type == IPROTO_NOP) {
+		if (end_is_exact) {
+			diag_set(ClientError, ER_INVALID_MSGPACK,
+				 "junk after packet body");
+			goto dump;
+		}
+		/* Nop requests aren't supposed to have a body. */
+		return 0;
+	}
+
+	const char *body = *pos;
+	int rc = end_is_exact ? mp_check_exact(pos, end) : mp_check(pos, end);
+	if (rc != 0) {
+		diag_add(ClientError, ER_INVALID_MSGPACK, "packet body");
+		goto dump;
+	}
+	header->bodycnt = 1;
+	header->body[0].iov_base = (void *)body;
+	header->body[0].iov_len = *pos - body;
 	return 0;
 bad_header:
 	diag_set(ClientError, ER_INVALID_MSGPACK, "packet header");
-	goto dump;
-bad_body:
-	diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
 dump:
 	dump_row_hex(start, end);
 	return -1;
