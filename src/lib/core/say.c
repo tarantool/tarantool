@@ -627,23 +627,12 @@ log_syslog_init(struct log *log, const char *init_str)
 		return -1;
 
 	log->syslog_server_type = opts.server_type;
-	if (log->syslog_server_type != SAY_SYSLOG_DEFAULT) {
-		log->path = strdup(opts.server_path);
-		if (log->path == NULL) {
-			diag_set(OutOfMemory, strlen(opts.server_path),
-				 "malloc", "server address");
-			return -1;
-		}
-	}
+	if (log->syslog_server_type != SAY_SYSLOG_DEFAULT)
+		log->path = xstrdup(opts.server_path);
 	if (opts.identity == NULL)
-		log->syslog_ident = strdup("tarantool");
+		log->syslog_ident = xstrdup("tarantool");
 	else
-		log->syslog_ident = strdup(opts.identity);
-	if (log->syslog_ident == NULL) {
-		diag_set(OutOfMemory, strlen(opts.identity), "malloc",
-		         "log->syslog_ident");
-		return -1;
-	}
+		log->syslog_ident = xstrdup(opts.identity);
 
 	if (opts.facility == syslog_facility_MAX)
 		log->syslog_facility = SYSLOG_LOCAL7;
