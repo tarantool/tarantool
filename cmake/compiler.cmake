@@ -234,8 +234,11 @@ macro(enable_tnt_compile_flags)
     endif()
 
     if (ENABLE_UB_SANITIZER)
-        if (NOT CMAKE_COMPILER_IS_CLANG)
-            message(FATAL_ERROR "Undefined behaviour sanitizer only available for clang")
+        # UndefinedBehaviourSanitizer has been added to GCC since
+        # version 4.9.0, see https://gcc.gnu.org/gcc-4.9/changes.html.
+        if(CMAKE_COMPILER_IS_GNUCC AND
+            CMAKE_C_COMPILER_VERSION VERSION_LESS 4.9.0)
+            message(FATAL_ERROR "UndefinedBehaviourSanitizer is unsupported in GCC ${CMAKE_C_COMPILER_VERSION}")
         endif()
         # Use all needed checks from the UndefinedBehaviorSanitizer
         # documentation:
@@ -255,9 +258,16 @@ macro(enable_tnt_compile_flags)
             # "UBSan: check nonnull-attribute is globally suppressed",
             # https://github.com/tarantool/tarantool/issues/10740
             nonnull-attribute
-            # Not interested in function type mismatch errors.
-            function
         )
+        # GCC has no "function" UB check. See details here:
+        # https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html#index-fsanitize_003dundefined
+        if(NOT CMAKE_C_COMPILER_ID STREQUAL "GNU")
+            string(JOIN "," UBSAN_IGNORE_OPTIONS
+                ${UBSAN_IGNORE_OPTIONS}
+                # Not interested in function type mismatch errors.
+                function
+            )
+        endif()
         # XXX: To get nicer stack traces in error messages.
         set(SANITIZE_FLAGS "${SANITIZE_FLAGS} -fno-omit-frame-pointer")
         # Enable UndefinedBehaviorSanitizer support.
