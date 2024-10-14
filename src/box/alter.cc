@@ -717,7 +717,16 @@ txn_alter_trigger_new(trigger_f run, void *data)
 	return trigger;
 }
 
+/**
+ * List of all alive alter_space objects.
+ */
+static RLIST_HEAD(alter_space_list);
+
 struct alter_space {
+	/** Link in alter_space_list. */
+	struct rlist in_list;
+	/** Transaction doing this alter. */
+	struct txn *txn;
 	/** List of alter operations */
 	struct rlist ops;
 	/** Definition of the new space - space_def. */
@@ -749,6 +758,11 @@ struct alter_space {
 	int n_rows;
 };
 
+/**
+ * Fiber cond that wakes up all waiters on every deletion of alter_space.
+ */
+static FIBER_COND(alter_space_delete_cond);
+
 static struct alter_space *
 alter_space_new(struct space *old_space)
 {
@@ -763,6 +777,8 @@ alter_space_new(struct space *old_space)
 	}
 	alter = (struct alter_space *)memset(alter, 0, size);
 	rlist_create(&alter->ops);
+	rlist_add_entry(&alter_space_list, alter, in_list);
+	alter->txn = in_txn();
 	alter->old_space = old_space;
 	alter->space_def = space_def_dup(alter->old_space->def);
 	if (old_space->format != NULL)
@@ -777,6 +793,8 @@ alter_space_new(struct space *old_space)
 static void
 alter_space_delete(struct alter_space *alter)
 {
+	fiber_cond_broadcast(&alter_space_delete_cond);
+	rlist_del_entry(alter, in_list);
 	/* Destroy the ops. */
 	while (! rlist_empty(&alter->ops)) {
 		AlterSpaceOp *op = rlist_shift_entry(&alter->ops,
@@ -1089,15 +1107,62 @@ public:
 	virtual void prepare(struct alter_space *alter);
 };
 
+/**
+ * The object is used to grant ability to yield with RAII approach.
+ * Transaction is allowed to yield only on its first statement, so if the
+ * statement is not first, it simply does nothing.
+ * If it's the first statement, the guard blocks execution until all previous
+ * alters will be rolled back or committed so that the space object won't be
+ * deleted right from under our feet. In the case when the previous alters were
+ * rolled back and the space was removed from space cache, the constructor
+ * throws an error.
+ */
+class AlterYieldGuard
+{
+public:
+	AlterYieldGuard(struct space *old_space) {
+		if (!txn_is_first_statement(in_txn()))
+			return;
+		txn_can_yield(in_txn(), true);
+		uint32_t space_id = old_space->def->id;
+		while (true) {
+			bool space_is_being_altered = false;
+			struct alter_space *alter;
+			rlist_foreach_entry(alter, &alter_space_list, in_list) {
+				if (alter->txn != in_txn() &&
+				    alter->old_space->def->id == space_id) {
+					space_is_being_altered = true;
+					break;
+				}
+			}
+			if (!space_is_being_altered)
+				break;
+			/*
+			 * Wait for deletion of any alter to check if the
+			 * space is being altered again.
+			 */
+			fiber_cond_wait(&alter_space_delete_cond);
+		}
+		/* Check if the space is still alive. */
+		if (space_by_id(space_id) != old_space) {
+			txn_can_yield(in_txn(), false);
+			/* Cannot access the space name since it was deleted. */
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  tt_sprintf("%u", space_id),
+				  "the space was concurrently modified");
+		}
+	}
+
+	~AlterYieldGuard() {
+		txn_can_yield(in_txn(), false);
+	}
+};
+
 static inline void
 space_check_format_with_yield(struct space *space,
 			      struct tuple_format *format)
 {
-	struct txn *txn = in_txn();
-	assert(txn != NULL);
-	(void) txn_can_yield(txn, true);
-	auto yield_guard =
-		make_scoped_guard([=] { txn_can_yield(txn, false); });
+	AlterYieldGuard guard(space);
 	space_check_format_xc(space, format);
 }
 
@@ -1388,11 +1453,7 @@ static inline void
 space_build_index_with_yield(struct space *old_space, struct space *new_space,
 			     struct index *new_index)
 {
-	struct txn *txn = in_txn();
-	assert(txn != NULL);
-	(void) txn_can_yield(txn, true);
-	auto yield_guard =
-		make_scoped_guard([=] { txn_can_yield(txn, false); });
+	AlterYieldGuard guard(old_space);
 	space_build_index_xc(old_space, new_space, new_index);
 }
 
@@ -1622,10 +1683,10 @@ TruncateIndex::prepare(struct alter_space *alter)
 	 * space_build_index() to let the engine know that the
 	 * index was recreated. For example, Vinyl uses this
 	 * callback to load indexes during local recovery.
+	 * No need to yield here since we build an empty index.
 	 */
 	assert(new_index != NULL);
-	space_build_index_with_yield(alter->new_space, alter->new_space,
-				     new_index);
+	space_build_index_xc(alter->new_space, alter->new_space, new_index);
 }
 
 void
