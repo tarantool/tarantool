@@ -43,6 +43,59 @@ enum {
 };
 
 static uint32_t
+hash_mp_uint(uint32_t *ph, uint32_t *pcarry, uint64_t num)
+{
+	char data[16];
+	uint32_t size;
+	if (num <= UINT8_MAX) {
+		mp_store_u8(data, (uint8_t)num);
+		size = 1;
+	} else if (num <= UINT16_MAX) {
+		mp_store_u16(data, (uint16_t)num);
+		size = 2;
+	} else if (num <= UINT32_MAX) {
+		mp_store_u32(data, (uint32_t)num);
+		size = 4;
+	} else {
+		mp_store_u64(data, num);
+		size = 8;
+	}
+	PMurHash32_Process(ph, pcarry, data, size);
+	return size;
+}
+
+static uint32_t
+hash_mp_nint(uint32_t *ph, uint32_t *pcarry, int64_t num)
+{
+	assert(num < 0);
+	char data[16];
+	uint32_t size;
+	if (num >= INT8_MIN) {
+		mp_store_u8(data, (uint8_t)num);
+		size = 1;
+	} else if (num >= INT16_MIN) {
+		mp_store_u16(data, (uint16_t)num);
+		size = 2;
+	} else if (num >= INT32_MIN) {
+		mp_store_u32(data, (uint32_t)num);
+		size = 4;
+	} else {
+		mp_store_u64(data, num);
+		size = 8;
+	}
+	PMurHash32_Process(ph, pcarry, data, size);
+	return size;
+}
+
+static uint32_t
+hash_mp_int(uint32_t *ph, uint32_t *pcarry, int64_t num)
+{
+	if (num >= 0)
+		return hash_mp_uint(ph, pcarry, num);
+	return hash_mp_nint(ph, pcarry, num);
+}
+
+static uint32_t
 hash_mp_double(uint32_t *ph, uint32_t *pcarry, double num)
 {
 	char buf[8];
@@ -53,35 +106,7 @@ hash_mp_double(uint32_t *ph, uint32_t *pcarry, double num)
 
 template <int TYPE>
 static inline uint32_t
-field_hash(uint32_t *ph, uint32_t *pcarry, const char **field)
-{
-	/*
-	 * For string key field we should hash the string contents excluding
-	 * MsgPack format identifier. The overload is defined below.
-	 */
-	static_assert(TYPE != FIELD_TYPE_STRING, "See the comment above.");
-	/*
-	 * For double key field we should cast the MsgPack value (whatever it
-	 * is: int, uint, float or double) to double, encode it as msgpack
-	 * double and hash it. No overload for it now.
-	 */
-	static_assert(TYPE != FIELD_TYPE_DOUBLE, "See the comment above.");
-	/*
-	* (!) All fields, except TYPE_STRING hashed **including** MsgPack format
-	* identifier (e.g. 0xcc). This was done **intentionally**
-	* for performance reasons. Please follow MsgPack specification
-	* and pack all your numbers to the most compact representation.
-	* If you still want to add support for broken MsgPack,
-	* please don't forget to patch tuple_compare_field().
-	*/
-	const char *f = *field;
-	uint32_t size;
-	mp_next(field);
-	size = *field - f;  /* calculate the size of field */
-	assert(size < INT32_MAX);
-	PMurHash32_Process(ph, pcarry, f, size);
-	return size;
-}
+field_hash(uint32_t *ph, uint32_t *pcarry, const char **field);
 
 template <>
 inline uint32_t
@@ -99,6 +124,14 @@ field_hash<FIELD_TYPE_STRING>(uint32_t *ph, uint32_t *pcarry,
 	assert(size < INT32_MAX);
 	PMurHash32_Process(ph, pcarry, f, size);
 	return size;
+}
+
+template<>
+inline uint32_t
+field_hash<FIELD_TYPE_UNSIGNED>(uint32_t *ph, uint32_t *pcarry,
+				const char **pfield)
+{
+	return hash_mp_uint(ph, pcarry, mp_decode_uint(pfield));
 }
 
 template <int TYPE, int ...MORE_TYPES> struct KeyFieldHash {};
@@ -298,7 +331,6 @@ uint32_t
 tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 		 enum field_type type, struct coll *coll)
 {
-	char buf[9]; /* enough to store MP_INT/MP_UINT/MP_DOUBLE */
 	const char *f = *field;
 	uint32_t size;
 
@@ -327,6 +359,10 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 	}
 
 	switch (mp_typeof(**field)) {
+	case MP_UINT:
+		return hash_mp_uint(ph1, pcarry, mp_decode_uint(field));
+	case MP_INT:
+		return hash_mp_int(ph1, pcarry, mp_decode_int(field));
 	case MP_STR:
 		/*
 		 * (!) MP_STR fields hashed **excluding** MsgPack format
@@ -353,15 +389,9 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 		if (!isfinite(val) || modf(val, &iptr) != 0 ||
 		    val < -exp2(63) || val >= exp2(64))
 			return hash_mp_double(ph1, pcarry, val);
-		char *data;
 		if (val >= 0)
-			data = mp_encode_uint(buf, (uint64_t)val);
-		else
-			data = mp_encode_int(buf, (int64_t)val);
-		size = data - buf;
-		assert(size <= sizeof(buf));
-		f = buf;
-		break;
+			return hash_mp_uint(ph1, pcarry, (uint64_t)val);
+		return hash_mp_nint(ph1, pcarry, (int64_t)val);
 	}
 	default:
 		mp_next(field);
@@ -381,7 +411,7 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 	return size;
 }
 
-static inline uint32_t
+uint32_t
 tuple_hash_null(uint32_t *ph1, uint32_t *pcarry)
 {
 	assert(mp_sizeof_nil() == 1);
