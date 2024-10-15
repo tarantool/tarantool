@@ -1,4 +1,5 @@
 local schema = require('experimental.config.utils.schema')
+local descriptions = require('internal.config.descriptions')
 local tarantool = require('tarantool')
 local uuid = require('uuid')
 local urilib = require('uri')
@@ -455,7 +456,46 @@ local function feedback_validate(data, w)
     w.error('Tarantool is built without feedback reports sending support')
 end
 
-return schema.new('instance_config', schema.record({
+-- Set the descriptions for the given schema object based on the field
+-- path accumulated in ctx.path.
+local function set_description(schema_obj, ctx)
+    local field_path = table.concat(ctx.path, '.')
+    assert(descriptions[field_path] ~= nil or field_path == '',
+           string.format('Missing description for field %q. Make sure that ' ..
+                         '`descriptions.lua` contains a description for ' ..
+                         'this field.', field_path))
+    schema_obj.description = descriptions[field_path]
+end
+
+-- This function recursively traverses the schema and adds
+-- descriptions based on the fpath accumulated in ctx.path.
+local function add_descriptions_impl(schema, ctx)
+    set_description(schema, ctx)
+    -- if schema is scalar do nothing
+    if schema.type == 'record' then
+        for field_name, field_def in pairs(schema.fields) do
+            table.insert(ctx.path, field_name)
+            add_descriptions_impl(field_def, ctx)
+            table.remove(ctx.path)
+        end
+    elseif schema.type == 'map' then
+        table.insert(ctx.path, '*')
+        add_descriptions_impl(schema.value, ctx)
+        table.remove(ctx.path)
+    elseif schema.type == 'array' then
+        table.insert(ctx.path, '*')
+        add_descriptions_impl(schema.items, ctx)
+        table.remove(ctx.path)
+    end
+    return schema
+end
+
+local function add_descriptions(schema)
+    local ctx = {path = {}}
+    return add_descriptions_impl(schema, ctx)
+end
+
+return schema.new('instance_config', add_descriptions(schema.record({
     config = schema.record({
         reload = schema.enum({
             'auto',
@@ -2484,7 +2524,7 @@ return schema.new('instance_config', schema.record({
     --   reach from the 'validate' function of a nested schema
     --   node.
     validate = validate_outmost_record,
-}), {
+})), {
     methods = {
         instance_uri = instance_uri,
         apply_vars = apply_vars,

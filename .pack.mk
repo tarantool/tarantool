@@ -17,6 +17,7 @@ VERSION = ${MAJOR_VERSION}.${MINOR_VERSION}
 
 TARANTOOL_SERIES = series-${MAJOR_VERSION}
 S3_SOURCE_REPO_URL = s3://tarantool_repo/sources
+S3_SCHEMA_REPO_URL = s3://tarantool_repo/schema
 
 prepare:
 	rm -rf build packpack
@@ -124,3 +125,12 @@ source: prepare
 
 source-deploy: source
 	aws --endpoint-url ${AWS_S3_ENDPOINT_URL} s3 cp build/*.tar.gz ${S3_SOURCE_REPO_URL}/ --acl public-read
+
+schema-deploy:
+	if [ -n "${GIT_TAG}" ]; then \
+		CONFIG_SCHEMA_FILE=config.schema.${GIT_TAG}.json; \
+	else \
+		CONFIG_SCHEMA_FILE=config.schema.json; \
+	fi; \
+	mv config-schema-pretty.json $${CONFIG_SCHEMA_FILE}; \
+	aws --endpoint-url ${AWS_S3_ENDPOINT_URL} s3 cp $${CONFIG_SCHEMA_FILE} ${S3_SCHEMA_REPO_URL}/ --acl public-read
