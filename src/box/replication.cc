@@ -288,7 +288,7 @@ replica_check_id(uint32_t replica_id)
 static bool
 replica_is_orphan(struct replica *replica)
 {
-	return replica->id == REPLICA_ID_NIL &&
+	return replica->id == REPLICA_ID_NIL && replica->gc == NULL &&
 	       !replica_has_connections(replica);
 }
 
@@ -374,10 +374,6 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		assert(instance_id == REPLICA_ID_NIL);
 		instance_id = replica_id;
 		box_broadcast_id();
-	} else if (replica->anon && replica->gc == NULL) {
-		replica->gc = gc_consumer_register(
-			instance_vclock, GC_CONSUMER_REPLICA,
-			&replica->uuid);
 	}
 	replicaset.replica_by_id[replica_id] = replica;
 	gc_delay_ref();
@@ -1362,7 +1358,7 @@ replica_on_relay_stop(struct replica *replica)
 	 * WALs for it anymore. Unregister it with the garbage
 	 * collector then. See also replica_clear_id.
 	 */
-	if (replica->id == REPLICA_ID_NIL) {
+	if (!replica->anon && replica->id == REPLICA_ID_NIL) {
 		gc_consumer_unregister(replica->gc);
 		replica->gc = NULL;
 	}
