@@ -1117,6 +1117,14 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 		 enum field_type type, struct coll *coll);
 
 /**
+ * An older implementation of field hashing which handles suboptimally encoded
+ * MessagePack integers incorrectly.
+ */
+uint32_t
+tuple_hash_field_v1(uint32_t *ph1, uint32_t *pcarry, const char **field,
+		    enum field_type type, struct coll *coll);
+
+/**
  * Compute hash of a key part.
  * @param ph1 - pointer to running hash
  * @param pcarry - pointer to carry
@@ -1130,6 +1138,14 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 uint32_t
 tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
 		    struct key_part *part, int multikey_idx);
+
+/**
+ * An older implementation of key part hashing which handles suboptimally
+ * encoded MessagePack integers incorrectly.
+ */
+uint32_t
+tuple_hash_key_part_v1(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
+		       struct key_part *part, int multikey_idx);
 
 /**
  * Calculates a common hash value for a tuple
