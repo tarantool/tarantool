@@ -51,6 +51,7 @@ enum tuple_bloom_version {
 	 */
 	TUPLE_BLOOM_VERSION_V1,
 	TUPLE_BLOOM_VERSION_V2,
+	TUPLE_BLOOM_VERSION_V3,
 };
 
 /**
