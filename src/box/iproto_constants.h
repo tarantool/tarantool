@@ -562,11 +562,13 @@ request_replace_body_create(struct request_replace_body *body,
 	/** Number of pages in the run. */				\
 	_(PAGE_COUNT, 5)						\
 	/** Legacy bloom filter implementation. */			\
-	_(BLOOM_FILTER_LEGACY, 6)					\
-	/** Bloom filter for keys. */					\
-	_(BLOOM_FILTER, 7)						\
+	_(BLOOM_FILTER_LEGACY_V1, 6)					\
+	/** Legacy bloom filter implementation. */			\
+	_(BLOOM_FILTER_LEGACY_V2, 7)					\
 	/** Number of statements of each type (map). */			\
 	_(STMT_STAT, 8)							\
+	/** Bloom filter for keys. */					\
+	_(BLOOM_FILTER, 9)						\
 
 #define VY_RUN_INFO_KEY_MEMBER(s, v) VY_RUN_INFO_ ## s = v,
 
