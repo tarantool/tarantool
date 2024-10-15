@@ -42,6 +42,72 @@ enum {
 	HASH_SEED = 13U
 };
 
+enum tuple_hash_version {
+	TUPLE_HASH_VERSION_V1,
+	TUPLE_HASH_VERSION_V2,
+};
+
+static uint32_t
+hash_mp_uint(uint32_t *ph, uint32_t *pcarry, uint64_t num)
+{
+	char data[16];
+	uint32_t size;
+	if (num <= UINT8_MAX) {
+		mp_store_u8(data, (uint8_t)num);
+		size = 1;
+	} else if (num <= UINT16_MAX) {
+		mp_store_u16(data, (uint16_t)num);
+		size = 2;
+	} else if (num <= UINT32_MAX) {
+		mp_store_u32(data, (uint32_t)num);
+		size = 4;
+	} else {
+		mp_store_u64(data, num);
+		size = 8;
+	}
+	PMurHash32_Process(ph, pcarry, data, size);
+	return size;
+}
+
+static uint32_t
+hash_mp_int(uint32_t *ph, uint32_t *pcarry, int64_t num)
+{
+	char data[16];
+	uint32_t size;
+	if (num >= 0) {
+		uint64_t unum = (uint64_t)num;
+		if (unum <= UINT8_MAX) {
+			mp_store_u8(data, (uint8_t)unum);
+			size = 1;
+		} else if (unum <= UINT16_MAX) {
+			mp_store_u16(data, (uint16_t)unum);
+			size = 2;
+		} else if (unum <= UINT32_MAX) {
+			mp_store_u32(data, (uint32_t)unum);
+			size = 4;
+		} else {
+			mp_store_u64(data, unum);
+			size = 8;
+		}
+	} else {
+		if (num >= INT8_MIN) {
+			mp_store_u8(data, (uint8_t)num);
+			size = 1;
+		} else if (num >= INT16_MIN) {
+			mp_store_u16(data, (uint16_t)num);
+			size = 2;
+		} else if (num >= INT32_MIN) {
+			mp_store_u32(data, (uint32_t)num);
+			size = 4;
+		} else {
+			mp_store_u64(data, num);
+			size = 8;
+		}
+	}
+	PMurHash32_Process(ph, pcarry, data, size);
+	return size;
+}
+
 template <int TYPE>
 static inline uint32_t
 field_hash(uint32_t *ph, uint32_t *pcarry, const char **field)
@@ -57,6 +123,11 @@ field_hash(uint32_t *ph, uint32_t *pcarry, const char **field)
 	 * double and hash it. No overload for it now.
 	 */
 	static_assert(TYPE != FIELD_TYPE_DOUBLE, "See the comment above.");
+	/*
+	 * An integer can be sub-optimally encoded. It can't be hashed as a raw
+	 * buffer. Same number encoded differently would render different hashes.
+	 */
+	static_assert(TYPE != FIELD_TYPE_UNSIGNED, "See the comment above.");
 	/*
 	* (!) All fields, except TYPE_STRING hashed **including** MsgPack format
 	* identifier (e.g. 0xcc). This was done **intentionally**
@@ -90,6 +161,14 @@ field_hash<FIELD_TYPE_STRING>(uint32_t *ph, uint32_t *pcarry,
 	assert(size < INT32_MAX);
 	PMurHash32_Process(ph, pcarry, f, size);
 	return size;
+}
+
+template <>
+inline uint32_t
+field_hash<FIELD_TYPE_UNSIGNED>(uint32_t *ph, uint32_t *pcarry,
+				const char **pfield)
+{
+	return hash_mp_uint(ph, pcarry, mp_decode_uint(pfield));
 }
 
 template <int TYPE, int ...MORE_TYPES> struct KeyFieldHash {};
@@ -285,9 +364,10 @@ slowpath:
 	key_def->key_hash = key_hash_slowpath;
 }
 
-uint32_t
-tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
-		 enum field_type type, struct coll *coll)
+template<tuple_hash_version version>
+static uint32_t
+tuple_hash_field_impl(uint32_t *ph1, uint32_t *pcarry, const char **field,
+		      enum field_type type, struct coll *coll)
 {
 	char buf[9]; /* enough to store MP_INT/MP_UINT/MP_DOUBLE */
 	const char *f = *field;
@@ -323,6 +403,14 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 	}
 
 	switch (mp_typeof(**field)) {
+	case MP_UINT:
+		if (version == TUPLE_HASH_VERSION_V1)
+			goto make_raw_hash;
+		return hash_mp_uint(ph1, pcarry, mp_decode_uint(field));
+	case MP_INT:
+		if (version == TUPLE_HASH_VERSION_V1)
+			goto make_raw_hash;
+		return hash_mp_int(ph1, pcarry, mp_decode_int(field));
 	case MP_STR:
 		/*
 		 * (!) MP_STR fields hashed **excluding** MsgPack format
@@ -352,16 +440,22 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 			break;
 		}
 		char *data;
+		if (version == TUPLE_HASH_VERSION_V1) {
+			if (val >= 0)
+				data = mp_encode_uint(buf, (uint64_t)val);
+			else
+				data = mp_encode_int(buf, (int64_t)val);
+			size = data - buf;
+			assert(size <= sizeof(buf));
+			f = buf;
+			break;
+		}
 		if (val >= 0)
-			data = mp_encode_uint(buf, (uint64_t)val);
-		else
-			data = mp_encode_int(buf, (int64_t)val);
-		size = data - buf;
-		assert(size <= sizeof(buf));
-		f = buf;
-		break;
+			return hash_mp_uint(ph1, pcarry, (uint64_t)val);
+		return hash_mp_int(ph1, pcarry, (int64_t)val);
 	}
 	default:
+make_raw_hash:
 		mp_next(field);
 		size = *field - f;  /* calculate the size of field */
 		/*
@@ -379,6 +473,22 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 	return size;
 }
 
+uint32_t
+tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
+		    enum field_type type, struct coll *coll)
+{
+	return tuple_hash_field_impl<TUPLE_HASH_VERSION_V2>(
+		ph1, pcarry, field, type, coll);
+}
+
+uint32_t
+tuple_hash_field_v1(uint32_t *ph1, uint32_t *pcarry, const char **field,
+		    enum field_type type, struct coll *coll)
+{
+	return tuple_hash_field_impl<TUPLE_HASH_VERSION_V1>(
+		ph1, pcarry, field, type, coll);
+}
+
 static inline uint32_t
 tuple_hash_null(uint32_t *ph1, uint32_t *pcarry)
 {
@@ -388,14 +498,32 @@ tuple_hash_null(uint32_t *ph1, uint32_t *pcarry)
 	return mp_sizeof_nil();
 }
 
-uint32_t
-tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
+template<tuple_hash_version version>
+static uint32_t
+tuple_hash_key_part_impl(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
 		    struct key_part *part, int multikey_idx)
 {
 	const char *field = tuple_field_by_part(tuple, part, multikey_idx);
 	if (field == NULL)
 		return tuple_hash_null(ph1, pcarry);
-	return tuple_hash_field(ph1, pcarry, &field, part->type, part->coll);
+	return tuple_hash_field_impl<version>(ph1, pcarry, &field,
+					      part->type, part->coll);
+}
+
+uint32_t
+tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
+		    struct key_part *part, int multikey_idx)
+{
+	return tuple_hash_key_part_impl<TUPLE_HASH_VERSION_V2>(
+		ph1, pcarry, tuple, part, multikey_idx);
+}
+
+uint32_t
+tuple_hash_key_part_v1(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
+		       struct key_part *part, int multikey_idx)
+{
+	return tuple_hash_key_part_impl<TUPLE_HASH_VERSION_V1>(
+		ph1, pcarry, tuple, part, multikey_idx);
 }
 
 template <bool has_optional_parts, bool has_json_paths>
