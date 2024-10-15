@@ -162,7 +162,7 @@ tuple_bloom_new(struct tuple_bloom_builder *builder, double fpr)
 		return NULL;
 	}
 
-	bloom->version = TUPLE_BLOOM_VERSION_V2;
+	bloom->version = TUPLE_BLOOM_VERSION_V3;
 	bloom->part_count = 0;
 
 	for (uint32_t i = 0; i < part_count; i++) {
@@ -217,7 +217,18 @@ tuple_bloom_maybe_has(const struct tuple_bloom *bloom, struct tuple *tuple,
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
-
+	if (bloom->version == TUPLE_BLOOM_VERSION_V2) {
+		for (uint32_t i = 0; i < key_def->part_count; i++) {
+			total_size += tuple_hash_key_part_v1(
+				&h, &carry, tuple, &key_def->parts[i],
+				multikey_idx);
+			uint32_t hash = PMurHash32_Result(h, carry, total_size);
+			if (!bloom_maybe_has(&bloom->parts[i], hash))
+				return false;
+		}
+		return true;
+	}
+	assert(bloom->version == TUPLE_BLOOM_VERSION_V3);
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		total_size += tuple_hash_key_part(&h, &carry, tuple,
 						  &key_def->parts[i],
@@ -247,7 +258,18 @@ tuple_bloom_maybe_has_key(const struct tuple_bloom *bloom,
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
-
+	if (bloom->version == TUPLE_BLOOM_VERSION_V2) {
+		for (uint32_t i = 0; i < part_count; i++) {
+			total_size += tuple_hash_field_v1(
+				&h, &carry, &key, key_def->parts[i].type,
+				key_def->parts[i].coll);
+			uint32_t hash = PMurHash32_Result(h, carry, total_size);
+			if (!bloom_maybe_has(&bloom->parts[i], hash))
+				return false;
+		}
+		return true;
+	}
+	assert(bloom->version == TUPLE_BLOOM_VERSION_V3);
 	for (uint32_t i = 0; i < part_count; i++) {
 		total_size += tuple_hash_field(&h, &carry, &key,
 					       key_def->parts[i].type,
@@ -352,6 +374,7 @@ tuple_bloom_decode(const char **data, enum tuple_bloom_version version)
 		*data += store_size;
 		break;
 	case TUPLE_BLOOM_VERSION_V2:
+	case TUPLE_BLOOM_VERSION_V3:
 		bloom->part_count = 0;
 		for (uint32_t i = 0; i < part_count; i++) {
 			if (tuple_bloom_decode_part(&bloom->parts[i],
