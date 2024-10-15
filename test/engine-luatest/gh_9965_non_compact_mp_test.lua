@@ -367,3 +367,276 @@ g.test_alter_hash_algo_bug = function(cg)
         t.assert_equals(sk:get{16}, tuple)
     end)
 end
+
+local function test_hash_with_num(cg, start_num)
+    cg.server:exec(function(start_num)
+        local function make_space_with_parts(parts)
+            local s = box.space.test
+            if s ~= nil then
+                s:drop()
+            end
+            local s = box.schema.space.create('test')
+            s:create_index('pk', {type = 'hash', parts = parts})
+            return s
+        end
+        --
+        -- Fast hashing, parts = {UINT}.
+        --
+        local s = make_space_with_parts({{1, 'unsigned'}})
+        local key = start_num
+        _G.check_space_ops(s, {
+            key_num = key, key = {key},
+            missing_key_num = key + 1, missing_key = {key + 1},
+            flags = 'u',
+            make_mp_key = function(mp_num) return '\x91' .. mp_num end,
+        })
+        --
+        -- Fast hashing, parts = {STR}.
+        --
+        s = make_space_with_parts({{1, 'string'}})
+        s:insert{'abc'}
+        local obj = _G.msgpack.object_from_raw('\x91\xd9\x03abc')
+        t.assert_error_msg_contains('Duplicate key', s.insert, s, obj)
+        t.assert_equals(s:get{'abc'}, {'abc'})
+        t.assert_equals(s:get{'abcd'}, nil)
+        t.assert_equals(_G.space_get_c(s, 'pk', obj), {'abc'})
+        obj = _G.msgpack.object_from_raw('\x91\xd9\x04abcd')
+        t.assert_equals(_G.space_get_c(s, 'pk', obj), nil)
+        --
+        -- Fast hashing, parts = {UINT, UINT}.
+        --
+        s = make_space_with_parts({{1, 'unsigned'}, {2, 'unsigned'}})
+        key = start_num
+        _G.check_space_ops(s, {
+            key_num = key, key = {key, key},
+            missing_key_num = key + 1, missing_key = {key + 1, key + 1},
+            flags = 'u',
+            make_mp_key = function(mp_num)
+                return '\x92' .. mp_num .. mp_num
+            end,
+        })
+        --
+        -- Fast hashing, parts = {STR, UINT}.
+        --
+        s = make_space_with_parts({{1, 'string'}, {2, 'unsigned'}})
+        key = start_num
+        _G.check_space_ops(s, {
+            key_num = key, key = {'abc', key},
+            missing_key_num = key + 1, missing_key = {'abc', key + 1},
+            flags = 'u',
+            make_mp_key = function(mp_num)
+                -- The string is also suboptimal.
+                return '\x92' .. '\xd9\x03abc' .. mp_num
+            end,
+        })
+        --
+        -- Fast hashing, parts = {STR, STR}.
+        --
+        s = make_space_with_parts({{1, 'string'}, {2, 'string'}})
+        s:insert{'abc', 'defg'}
+        obj = _G.msgpack.object_from_raw('\x92\xd9\x03abc\xd9\x04defg')
+        t.assert_error_msg_contains('Duplicate key', s.insert, s, obj)
+        t.assert_equals(s:get{'abc', 'defg'}, {'abc', 'defg'})
+        t.assert_equals(s:get{'abc', 'defgh'}, nil)
+        t.assert_equals(s:get{'abcd', 'defg'}, nil)
+        t.assert_equals(_G.space_get_c(s, 'pk', obj), {'abc', 'defg'})
+        obj = _G.msgpack.object_from_raw('\x92\xd9\x03abc\xd9\x05defgh')
+        t.assert_equals(_G.space_get_c(s, 'pk', obj), nil)
+        obj = _G.msgpack.object_from_raw('\x92\xd9\x04abcd\xd9\x04defg')
+        t.assert_equals(_G.space_get_c(s, 'pk', obj), nil)
+        --
+        -- Fast hashing, parts = {UINT}.
+        -- Won't allow MP_INT even when positive.
+        --
+        s = make_space_with_parts({{1, 'unsigned'}})
+        obj = _G.msgpack.object_from_raw('\x91\xd0\xff')
+        t.assert_error_msg_contains('expected unsigned, got integer',
+                                    s.insert, s, obj)
+        --
+        -- Fast hashing, parts = {INT, UINT}.
+        -- Sub-optimal MP_UINT in FIELD_INTEGER.
+        --
+        s = make_space_with_parts({{1, 'integer'}, {2, 'unsigned'}})
+        key = start_num
+        _G.check_space_ops(s, {
+            key_num = key, key = {1, key},
+            missing_key_num = key + 1, missing_key = {1, key + 1},
+            flags = 'u',
+            make_mp_key = function(mp_num)
+                return '\x92' .. '\x01' .. mp_num
+            end,
+        })
+        --
+        -- Fast hashing, parts = {INT, UINT}.
+        -- Negative sub-optimal MP_INT in FIELD_INTEGER.
+        --
+        s = make_space_with_parts({{1, 'integer'}, {2, 'unsigned'}})
+        key = -start_num
+        _G.check_space_ops(s, {
+            key_num = key, key = {key, 1},
+            missing_key_num = key - 1, missing_key = {key - 1, 1},
+            flags = 'ui',
+            make_mp_key = function(mp_num)
+                return '\x92' .. mp_num .. '\x01'
+            end,
+        })
+        --
+        -- Fast hashing, parts = {INT, UINT}.
+        -- Positive sub-optimal MP_INT in FIELD_INTEGER.
+        --
+        s = make_space_with_parts({{1, 'integer'}, {2, 'unsigned'}})
+        key = start_num
+        _G.check_space_ops(s, {
+            key_num = key, key = {key, 1},
+            missing_key_num = key + 1, missing_key = {key + 1, 1},
+            flags = 'ui',
+            make_mp_key = function(mp_num)
+                return '\x92' .. mp_num .. '\x01'
+            end,
+        })
+        --
+        -- Slow hashing. Fast vs slow at the moment of writing meant that the
+        -- hash algorithm was different depending on the field count and their
+        -- field-types. Now it is not so anymore, the hash algo is the same
+        -- regardless of the field count, but the tests remain.
+        --
+        make_space_with_parts = function(parts)
+            local s = box.space.test
+            if s ~= nil then
+                s:drop()
+            end
+            local s = box.schema.space.create('test')
+            s:create_index('pk')
+            s:create_index('sk', {type = 'hash', parts = parts})
+            return s
+        end
+        --
+        -- Non-supported field types.
+        --
+        t.assert_error_msg_contains(
+            "index 'sk' in space 'test': field type 'array'",
+            make_space_with_parts, {{2, 'array'}})
+        t.assert_error_msg_contains(
+            "index 'sk' in space 'test': field type 'map'",
+            make_space_with_parts, {{2, 'map'}})
+        -- This key part used to disable the fast hashing optimizations. They
+        -- were only available for several fields of trivial types with no
+        -- special attributes like being nullable or having a collation.
+        local part3_str_opt_killer = {3, 'string', collation = 'unicode_ci'}
+        --
+        -- {UINT, STR}
+        --
+        s = make_space_with_parts({{2, 'unsigned'}, part3_str_opt_killer})
+        key = start_num
+        _G.check_space_ops(s, {
+            index = 'sk',
+            key_num = key, key = {key, 'abc'},
+            missing_key_num = key + 1, missing_key = {key + 1, 'abc'},
+            tuple = {1, key, 'abc'},
+            flags = 'u',
+            -- The string is also suboptimal.
+            make_mp_tuple = function(mp_num)
+                return '\x93' .. '\x01' .. mp_num .. '\xd9\x03abc'
+            end,
+            make_mp_key = function(mp_num)
+                return '\x92' .. mp_num .. '\xd9\x03abc'
+            end,
+        })
+        --
+        -- Cleanup.
+        --
+        box.space.test:drop()
+    end, {start_num})
+end
+
+g.test_hash = function(cg)
+    t.skip_if(cg.params.engine ~= 'memtx')
+    cg.server:exec(function()
+        rawset(_G, 'check_space_ops', function(s, opts)
+            local index_name = opts.index or 'pk'
+            local index = s.index[index_name]
+            -- Most of the tests use primary index with only key fields.
+            local tuple = opts.tuple or opts.key
+            local make_mp_key = opts.make_mp_key
+            local make_mp_tuple = opts.make_mp_tuple or make_mp_key
+            s:replace(tuple)
+            t.assert_equals(index:get(opts.key), tuple)
+            t.assert_equals(index:get(opts.missing_key), nil)
+
+            local mp_nums = _G.encode_num_in_all_int_ways(
+                opts.key_num, opts.flags)
+            for _, mp_num in pairs(mp_nums) do
+                --
+                -- Duplicate errors for the same number encoded in many ways.
+                --
+                local obj = _G.msgpack.object_from_raw(make_mp_tuple(mp_num))
+                t.assert_equals(obj:decode(), tuple)
+                t.assert_error_msg_contains('Duplicate key', s.insert, s, obj)
+                --
+                -- Key hashing works regardless of how is the number encoded.
+                --
+                obj = _G.msgpack.object_from_raw(make_mp_key(mp_num))
+                t.assert_equals(_G.space_get_c(s, index_name, obj), tuple)
+            end
+            -- Make sure the missing keys aren't found, and the loop above
+            -- wasn't working just because suboptimal MessagePack always renders
+            -- the same hash.
+            mp_nums = _G.encode_num_in_all_int_ways(
+                opts.missing_key_num, opts.flags)
+            for _, mp_num in pairs(mp_nums) do
+                local obj = _G.msgpack.object_from_raw(make_mp_key(mp_num))
+                t.assert_equals(obj:decode(), opts.missing_key)
+                t.assert_equals(_G.space_get_c(s, index_name, obj), nil)
+            end
+        end)
+    end)
+    local nums = {
+        -- Trivial
+        0, 1,
+        -- int8
+        120, 127, 128, 129,
+        -- uint8
+        250, 254, 255, 256,
+        -- int16
+        32760, 32766, 32767, 32768,
+        -- uint16
+        65530, 65534, 65535, 65536,
+        -- int32
+        2147483640, 2147483646, 2147483647, 2147483648,
+        -- uint32
+        4294967290, 4294967294, 4294967295, 4294967296,
+        -- int64
+        9999999999999,
+    }
+    for _, num in pairs(nums) do
+        test_hash_with_num(cg, num)
+    end
+    --
+    -- Extensions are used as is. Their suboptimal encoding = incorrect encoding
+    -- and the behaviour is undefined then.
+    --
+    cg.server:exec(function()
+        local decimal = require('decimal')
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:create_index('sk', {parts = {2, 'decimal'}, type = 'hash'})
+        local mp1_raw = "\xc7\x03\x01\x00\x01\x0c"
+        local mp2_raw = "\xc7\x04\x01\xcc\x00\x01\x0c"
+        local num = decimal.new(10)
+        t.assert_equals(_G.msgpack.decode(mp1_raw), num)
+        t.assert_equals(_G.msgpack.decode(mp2_raw), num)
+
+        local mp1 = _G.msgpack.object_from_raw(mp1_raw)
+        local mp2 = _G.msgpack.object_from_raw(mp2_raw)
+        s:insert{1, mp1}
+        s:insert{2, mp2}
+
+        local mp1_key = _G.msgpack.object_from_raw('\x91' .. mp1_raw)
+        local mp2_key = _G.msgpack.object_from_raw('\x91' .. mp2_raw)
+        t.assert_equals(_G.space_get_c(s, 'sk', mp1_key), {1, num})
+        t.assert_equals(_G.space_get_c(s, 'sk', mp2_key), {2, num})
+
+        t.assert_error_msg_contains('Duplicate key', s.insert, s, {3, mp1})
+        t.assert_error_msg_contains('Duplicate key', s.insert, s, {3, mp2})
+    end)
+end
