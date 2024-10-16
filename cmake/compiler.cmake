@@ -234,9 +234,6 @@ macro(enable_tnt_compile_flags)
             object-size
             # See https://github.com/tarantool/tarantool/issues/10742.
             pointer-overflow
-            # Integer overflow and truncation are disabled due to extensive
-            # usage of this UB in SQL code to 'implement' some kind of int65_t.
-            signed-integer-overflow
             # NULL checking is disabled, because this is not a UB and raises
             # lots of false-positive fails such as typeof(*obj) with
             # obj == NULL, or memcpy() with NULL argument and 0 size.
