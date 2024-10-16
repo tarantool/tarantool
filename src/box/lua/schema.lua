@@ -2730,7 +2730,7 @@ space_mt.bsize = function(space)
     if s == nil then
         box.error(box.error.NO_SUCH_SPACE, space.name, 2)
     end
-    return builtin.space_bsize(s)
+    return tonumber(builtin.space_bsize(s))
 end
 
 space_mt.get = function(space, key)
