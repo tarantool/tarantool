@@ -74,6 +74,7 @@
 #include "lua/xml.h"
 #include "lua/etcd_client.h"
 #include "lua/compress.h"
+#include "lua/log.h"
 #include "digest.h"
 #include "errinj.h"
 
@@ -804,6 +805,7 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_lua_decimal_init(L);
 	tarantool_lua_compress_init(L);
 	tarantool_lua_trigger_init(L);
+	tarantool_lua_log_init(L);
 #ifdef ENABLE_BACKTRACE
 	luaM_sysprof_set_backtracer(fiber_backtracer);
 #endif
