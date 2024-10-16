@@ -234,6 +234,11 @@ step_group_concat(struct sql_context *ctx, int argc, const struct Mem *argv)
 }
 
 /** Implementations of the ABS() function. */
+#if ENABLE_UB_SANITIZER
+static void
+func_abs_int(struct sql_context *ctx, int argc, const struct Mem *argv)
+  __attribute__((no_sanitize("signed-integer-overflow")));
+#endif
 static void
 func_abs_int(struct sql_context *ctx, int argc, const struct Mem *argv)
 {
