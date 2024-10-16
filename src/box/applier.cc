@@ -2696,8 +2696,8 @@ applier_stop(struct applier *applier)
 struct applier *
 applier_new(struct uri *uri)
 {
-	struct applier *applier = (struct applier *)
-		xcalloc(1, sizeof(struct applier));
+	struct applier *applier = xalloc_object(struct applier);
+	memset(applier, 0, sizeof(*applier));
 	if (iostream_ctx_create(&applier->io_ctx, IOSTREAM_CLIENT, uri) != 0) {
 		free(applier);
 		diag_raise();
