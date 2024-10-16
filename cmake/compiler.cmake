@@ -236,17 +236,8 @@ macro(enable_tnt_compile_flags)
             object-size
             # Not interested in checking arithmetic with NULL.
             pointer-overflow
-            # Intrusive data structures may abuse '&obj->member' on pointer
-            # 'obj' which is not really a pointer at an object of its type.
-            # For example, rlist uses '&item->member' expression in macro cycles
-            # to check end of cycle, but on the last iteration 'item' points at
-            # the list metadata head, not at an object of type stored in this
-            # list.
-            vptr
             # Integer overflow and truncation are disabled due to extensive
             # usage of this UB in SQL code to 'implement' some kind of int65_t.
-            implicit-signed-integer-truncation
-            implicit-integer-sign-change
             signed-integer-overflow
             # NULL checking is disabled, because this is not a UB and raises
             # lots of false-positive fails such as typeof(*obj) with
@@ -258,10 +249,6 @@ macro(enable_tnt_compile_flags)
             # related to return.
             null
             nonnull-attribute
-            nullability-arg
-            returns-nonnull-attribute
-            nullability-assign
-            nullability-return
             # Not interested in function type mismatch errors.
             function
         )
