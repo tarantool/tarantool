@@ -98,6 +98,14 @@ utils.space_bsize(s)
 ---
 - 130
 ...
+type(s:bsize())
+---
+- number
+...
+type(utils.space_bsize(s))
+---
+- number
+...
 s:drop()
 ---
 ...
