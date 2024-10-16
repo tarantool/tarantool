@@ -273,6 +273,7 @@
 #define DEFAULT_CFG SYSCONF_DIR "/" DEFAULT_CFG_FILENAME
 
 #cmakedefine ENABLE_ASAN 1
+#cmakedefine ENABLE_UB_SANITIZER 1
 
 /* Cacheline size to calculate alignments */
 #define CACHELINE_SIZE 64

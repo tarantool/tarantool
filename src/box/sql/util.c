@@ -820,6 +820,13 @@ sqlHexToBlob(const char *z, int n)
 	return zBlob;
 }
 
+#if ENABLE_UB_SANITIZER
+/* See https://github.com/tarantool/tarantool/issues/10703. */
+int
+sql_add_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg)
+  __attribute__((no_sanitize("signed-integer-overflow")));
+#endif
 int
 sql_add_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
 	    int64_t *res, bool *is_res_neg)
@@ -849,6 +856,13 @@ sql_add_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
 	return 0;
 }
 
+#if ENABLE_UB_SANITIZER
+/* See https://github.com/tarantool/tarantool/issues/10703. */
+int
+sql_sub_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg)
+  __attribute__((no_sanitize("signed-integer-overflow")));
+#endif
 int
 sql_sub_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
 	    int64_t *res, bool *is_res_neg)
@@ -934,6 +948,13 @@ sql_mul_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
 	return 0;
 }
 
+#if ENABLE_UB_SANITIZER
+/* See https://github.com/tarantool/tarantool/issues/10703. */
+int
+sql_div_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg)
+  __attribute__((no_sanitize("signed-integer-overflow")));
+#endif
 int
 sql_div_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
 	    int64_t *res, bool *is_res_neg)
