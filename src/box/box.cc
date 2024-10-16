@@ -1533,6 +1533,18 @@ box_check_replication_anon(void)
 	return anon;
 }
 
+static double
+box_check_replication_anon_gc_timeout(void)
+{
+	double timeout = cfg_getd("replication_anon_gc_timeout");
+	if (timeout <= 0) {
+		diag_set(ClientError, ER_CFG, "replication_anon_gc_timeout",
+			 "the value must be greater than 0");
+		return -1;
+	}
+	return timeout;
+}
+
 static int
 box_check_instance_uuid(struct tt_uuid *uuid)
 {
@@ -1975,6 +1987,8 @@ box_check_config(void)
 	if (box_check_replication_threads() < 0)
 		diag_raise();
 	box_check_replication_sync_timeout();
+	if (box_check_replication_anon_gc_timeout() < 0)
+		diag_raise();
 	if (box_check_bootstrap_strategy() == BOOTSTRAP_STRATEGY_INVALID)
 		diag_raise();
 	if (box_check_bootstrap_leader(&uri, &uuid, name) != 0)
@@ -2342,6 +2356,17 @@ box_set_replication_anon(void)
 			  " has finished");
 	}
 	guard.is_active = false;
+}
+
+int
+box_set_replication_anon_gc_timeout(void)
+{
+	double timeout = box_check_replication_anon_gc_timeout();
+	if (timeout <= 0)
+		return -1;
+	replication_anon_gc_timeout = timeout;
+	fiber_wakeup(replication_anon_gc_expiration_fiber);
+	return 0;
 }
 
 /**
@@ -4428,6 +4453,26 @@ box_process_fetch_snapshot(struct iostream *io,
 	/* Check permissions */
 	access_check_universe_xc(PRIV_R);
 
+	struct replica *replica = NULL;
+	if (!tt_uuid_is_nil(&req.instance_uuid)) {
+		replica = replica_by_uuid(&req.instance_uuid);
+		if (replica == NULL)
+			replica = replicaset_add_anon(&req.instance_uuid);
+
+		/* Don't allow multiple relays for the same replica */
+		if (relay_get_state(replica->relay) == RELAY_FOLLOW) {
+			tnt_raise(ClientError, ER_CFG, "replication",
+				"duplicate connection with the same replica UUID");
+		}
+		if (replica->gc != NULL)
+			gc_consumer_unregister(replica->gc);
+		replica->gc = gc_consumer_register(
+			instance_vclock, GC_CONSUMER_REPLICA, &replica->uuid);
+		/* Persist consumer before sending data. */
+		if (gc_consumer_persist(replica->gc) != 0)
+			diag_raise();
+	}
+
 	/* Forbid replication with disabled WAL */
 	if (wal_mode() == WAL_NONE) {
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
@@ -4448,7 +4493,7 @@ box_process_fetch_snapshot(struct iostream *io,
 	/* Send the snapshot data to the instance. */
 	struct vclock start_vclock;
 	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
-			   cursor_ptr);
+			   cursor_ptr, replica);
 	say_info("read-view sent.");
 
 	/* Remember master's vclock after the last request */
@@ -4712,7 +4757,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 */
 	struct vclock start_vclock;
 	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
-			   NULL);
+			   NULL, NULL);
 	say_info("initial data sent.");
 	/**
 	 * Register the replica after sending the last row but before sending
@@ -4874,15 +4919,13 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * recreate the gc consumer unconditionally to make sure it holds
 	 * the correct vclock.
 	 */
-	if (!replica->anon) {
-		if (replica->gc != NULL)
-			gc_consumer_unregister(replica->gc);
-		replica->gc = gc_consumer_register(
-			&start_vclock, GC_CONSUMER_REPLICA, &replica->uuid);
-		/* Persist consumer before sending data. */
-		if (gc_consumer_persist(replica->gc) != 0)
-			diag_raise();
-	}
+	if (replica->gc != NULL)
+		gc_consumer_unregister(replica->gc);
+	replica->gc = gc_consumer_register(
+		&start_vclock, GC_CONSUMER_REPLICA, &replica->uuid);
+	/* Persist consumer before sending data. */
+	if (gc_consumer_persist(replica->gc) != 0)
+		diag_raise();
 	/*
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,
