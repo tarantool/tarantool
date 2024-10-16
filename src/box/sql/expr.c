@@ -3166,6 +3166,11 @@ error:
  * @param neg_flag True if value is negative.
  * @param mem Register to store parsed integer
  */
+#if ENABLE_UB_SANITIZER
+static void
+expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg, int mem)
+__attribute__((no_sanitize("signed-integer-overflow")));
+#endif
 static void
 expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
 	      int mem)
