@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8' standalone='no'?>
-<doxygenindex xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="index.xsd" version="1.9.8" xml:lang="en-US">
+<doxygenindex xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="index.xsd" version="1.9.1" xml:lang="en-US">
   <compound refid="structbox__decimal" kind="struct"><name>box_decimal</name>
     <member refid="structbox__decimal_1ab3c586f1f723be9d150e20c67ff0fa9b" kind="variable"><name>internal</name></member>
   </compound>
@@ -9,7 +9,7 @@
     <member refid="unionPACKED_1ae1b4d9361929d8bc2b374a36a2133910" kind="variable"><name>field_type</name></member>
     <member refid="unionPACKED_1abe5b199132aa0fc5215b5933e8b7c8c6" kind="variable"><name>collation</name></member>
     <member refid="unionPACKED_1a47de0769ba4faf0a06782fd5e8892555" kind="variable"><name>path</name></member>
-    <member refid="unionPACKED_1a6edcf6b5ce400f83345c6c108c93da4d" kind="variable"><name></name></member>
+    <member refid="unionPACKED_1a6edcf6b5ce400f83345c6c108c93da4d" kind="variable"><name>@5</name></member>
     <member refid="unionPACKED_1a1782075c62f8d5e3b0f6a87c8382d373" kind="variable"><name>padding</name></member>
   </compound>
   <compound refid="module_8h" kind="file"><name>module.h</name>
@@ -82,7 +82,7 @@
     <member refid="module_8h_1ade0789f1bee95be5f9005c6ff4e0b2ada2596d2f88ab84ec5fad0d37c77bf1f4d" kind="enumvalue"><name>SF_PLAIN</name></member>
     <member refid="module_8h_1ade0789f1bee95be5f9005c6ff4e0b2adafe62145e440f6041a22a79d6abfeefc6" kind="enumvalue"><name>SF_JSON</name></member>
     <member refid="module_8h_1ade0789f1bee95be5f9005c6ff4e0b2ada0f11e5d06e463c58dbf3a7e8079124bf" kind="enumvalue"><name>say_format_MAX</name></member>
-    <member refid="module_8h_1a06fc87d81c62e9abb8790b6e5713c55b" kind="enum"><name></name></member>
+    <member refid="module_8h_1a06fc87d81c62e9abb8790b6e5713c55b" kind="enum"><name>@0</name></member>
     <member refid="module_8h_1a06fc87d81c62e9abb8790b6e5713c55ba4e556d3f75a54e162feaa8e9451cfce7" kind="enumvalue"><name>COIO_READ</name></member>
     <member refid="module_8h_1a06fc87d81c62e9abb8790b6e5713c55ba9ccd504861956d107f717efa66b3f1b7" kind="enumvalue"><name>COIO_WRITE</name></member>
     <member refid="module_8h_1af2d527c62a52f85cb173c79c31d20ce1" kind="enum"><name>txn_isolation_level</name></member>
@@ -92,11 +92,11 @@
     <member refid="module_8h_1af2d527c62a52f85cb173c79c31d20ce1afa0bc338b3e678625a61d16254991c7b" kind="enumvalue"><name>TXN_ISOLATION_BEST_EFFORT</name></member>
     <member refid="module_8h_1af2d527c62a52f85cb173c79c31d20ce1a6236950c80e86644457d27e158639b60" kind="enumvalue"><name>TXN_ISOLATION_LINEARIZABLE</name></member>
     <member refid="module_8h_1af2d527c62a52f85cb173c79c31d20ce1a8e225c05de0c630a787eb113f64e3af4" kind="enumvalue"><name>txn_isolation_level_MAX</name></member>
-    <member refid="module_8h_1adf764cbdea00d65edcd07bb9953ad2b7" kind="enum"><name></name></member>
+    <member refid="module_8h_1adf764cbdea00d65edcd07bb9953ad2b7" kind="enum"><name>@1</name></member>
     <member refid="module_8h_1adf764cbdea00d65edcd07bb9953ad2b7afdc4a3a1343ddde9cd823989746b952c" kind="enumvalue"><name>BOX_KEY_PART_DEF_IS_NULLABLE</name></member>
     <member refid="module_8h_1adf764cbdea00d65edcd07bb9953ad2b7ad2e98bad103f326bc113cd03b1d16279" kind="enumvalue"><name>BOX_KEY_PART_DEF_EXCLUDE_NULL</name></member>
     <member refid="module_8h_1adf764cbdea00d65edcd07bb9953ad2b7ab0579a1bee43f2c11bb41c5548109577" kind="enumvalue"><name>BOX_KEY_PART_DEF_SORT_ORDER_DESC</name></member>
-    <member refid="module_8h_1a99fb83031ce9923c84392b4e92f956b5" kind="enum"><name></name></member>
+    <member refid="module_8h_1a99fb83031ce9923c84392b4e92f956b5" kind="enum"><name>@2</name></member>
     <member refid="module_8h_1a99fb83031ce9923c84392b4e92f956b5a372d10ebd12378fbc28f503f5c14a433" kind="enumvalue"><name>BOX_KEY_PART_DEF_T_SIZE</name></member>
     <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bf" kind="enum"><name>field_type</name></member>
     <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa1496dbae1e5afd77be84e66d25eb0ce7" kind="enumvalue"><name>FIELD_TYPE_ANY</name></member>
@@ -134,7 +134,7 @@
     <member refid="module_8h_1ac42b7e2d98df6589252f8ede07932619af3b9d80be641d3c38797a1cdeafad937" kind="enumvalue"><name>ON_CONFLICT_ACTION_REPLACE</name></member>
     <member refid="module_8h_1ac42b7e2d98df6589252f8ede07932619a659240554bae9c60e93814b09f78cbd9" kind="enumvalue"><name>ON_CONFLICT_ACTION_DEFAULT</name></member>
     <member refid="module_8h_1ac42b7e2d98df6589252f8ede07932619aad32695f29bf98295ae2df20a3974d46" kind="enumvalue"><name>on_conflict_action_MAX</name></member>
-    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04" kind="enum"><name></name></member>
+    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04" kind="enum"><name>@3</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a05cae1bfc9671a38779ffd9dde4d7f58" kind="enumvalue"><name>BOX_SYSTEM_ID_MIN</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04abb87df1b61192ee3aea178534071b9cd" kind="enumvalue"><name>BOX_SYSTEM_ID_MAX</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a4816eb59cfbc3b8d480e61cab1cf26d4" kind="enumvalue"><name>BOX_ID_NIL</name></member>
@@ -463,18 +463,18 @@
     <member refid="module_8h_1a4a35d7a7fe53c673112e06ab78794216" kind="function"><name>box_on_shutdown</name></member>
     <member refid="module_8h_1a11d9d5dc245f23922392835e55fccba9" kind="function"><name>say_log_level_is_enabled</name></member>
     <member refid="module_8h_1aa0f14b4a77bc8ce8ba99c67004083d23" kind="function"><name>CFORMAT</name></member>
-    <member refid="module_8h_1acfccf290219d520605e8eaac46b16694" kind="function"><name>_say_strerror</name></member>
-    <member refid="module_8h_1a0c5d5d65285c98e77cf483a0d2a092f9" kind="function"><name>fiber_attr_new</name></member>
+    <member refid="module_8h_1a9bffd74e9753961e0568d85db8e2304b" kind="function"><name>_say_strerror</name></member>
+    <member refid="module_8h_1a615728b106aa274514dea63a9a693fd1" kind="function"><name>fiber_attr_new</name></member>
     <member refid="module_8h_1ac4003e7d28985f1573cf3faf8b4d38ee" kind="function"><name>fiber_attr_delete</name></member>
     <member refid="module_8h_1a4f42c1a444922edf2163806c5433ae1a" kind="function"><name>fiber_attr_setstacksize</name></member>
     <member refid="module_8h_1ad628f573827cf2393f0849c194719a94" kind="function"><name>fiber_attr_getstacksize</name></member>
-    <member refid="module_8h_1abb10631936b53aa4a8fad07f5be22caa" kind="function"><name>fiber_self</name></member>
-    <member refid="module_8h_1a8757a0f2f38964c8f1201768043c7a3c" kind="function"><name>fiber_new</name></member>
-    <member refid="module_8h_1a4aa5816817a59a6929404d6ad93f5efc" kind="function"><name>fiber_new_ex</name></member>
+    <member refid="module_8h_1a6de8ea84fe46359b0a3dc9d6a401e0ab" kind="function"><name>fiber_self</name></member>
+    <member refid="module_8h_1ac0d955b4ac367ab3b95c6c0d0df31050" kind="function"><name>fiber_new</name></member>
+    <member refid="module_8h_1a8e8dbdb4656ce6c89ea1e3215c0d6adf" kind="function"><name>fiber_new_ex</name></member>
     <member refid="module_8h_1aaa5beb40f119b9400bb57b81820b24ff" kind="function"><name>fiber_yield</name></member>
     <member refid="module_8h_1abca18eb68ebf89507d4cf5eb3c402cb2" kind="function"><name>fiber_start</name></member>
     <member refid="module_8h_1ac596a2d875dcfa8477bbfc1ccc7b809d" kind="function"><name>fiber_set_ctx</name></member>
-    <member refid="module_8h_1af1fc765077a289ff21c2e452c4ca85a6" kind="function"><name>fiber_get_ctx</name></member>
+    <member refid="module_8h_1a292f6964c2f9336780175623c94f0be2" kind="function"><name>fiber_get_ctx</name></member>
     <member refid="module_8h_1a661de7f72aa265ff6ffcb8b3acfafe40" kind="function"><name>fiber_wakeup</name></member>
     <member refid="module_8h_1a9a5b700b2122f08e6bc1298ac7eb0435" kind="function"><name>fiber_cancel</name></member>
     <member refid="module_8h_1a4078cbddc22b0ed941548f86672224d9" kind="function"><name>fiber_set_cancellable</name></member>
@@ -489,15 +489,15 @@
     <member refid="module_8h_1a8ed4eb4281eaa96a74c6e052995af645" kind="function"><name>fiber_clock64</name></member>
     <member refid="module_8h_1a1d0122a4705796fd32c2a54e218c2ff8" kind="function"><name>fiber_reschedule</name></member>
     <member refid="module_8h_1a0a1b21447c8f1e31be96d47a293529bb" kind="function"><name>fiber_set_name_n</name></member>
-    <member refid="module_8h_1a4238673bb1300b2b3e5ec6af6fe8ccf6" kind="function"><name>fiber_name</name></member>
+    <member refid="module_8h_1a476f1114b38129419fc63ab0497857fe" kind="function"><name>fiber_name</name></member>
     <member refid="module_8h_1a90a115d72a466ab6f33daac6f7e88ff4" kind="function"><name>fiber_id</name></member>
     <member refid="module_8h_1a9bcecceb5c3cb756d858c4fb536efb9f" kind="function"><name>fiber_csw</name></member>
-    <member refid="module_8h_1a6dd431e93666009ddd86563809962240" kind="function"><name>fiber_find</name></member>
+    <member refid="module_8h_1ae825f996d612e7538ded34e0ff67c667" kind="function"><name>fiber_find</name></member>
     <member refid="module_8h_1a113af82955ade6d52b5a03fc327b266f" kind="function"><name>box_region_used</name></member>
-    <member refid="module_8h_1a1e232fab2a9b3f2362bde6f03b83f67b" kind="function"><name>box_region_alloc</name></member>
-    <member refid="module_8h_1a751fd698cbeca02ecca506f2fcdb1c60" kind="function"><name>box_region_aligned_alloc</name></member>
+    <member refid="module_8h_1ac8e7d6a912f5f8230bd8c8035735ef2f" kind="function"><name>box_region_alloc</name></member>
+    <member refid="module_8h_1a541b6608e37fc392112a9aee229432fa" kind="function"><name>box_region_aligned_alloc</name></member>
     <member refid="module_8h_1a6575301cf1bd4df1bfad9a319b80a0b4" kind="function"><name>box_region_truncate</name></member>
-    <member refid="module_8h_1aed23f85d72dff57249cc6633ef945340" kind="function"><name>fiber_cond_new</name></member>
+    <member refid="module_8h_1a670f12ab6752093a3e2ae0ff48ccd491" kind="function"><name>fiber_cond_new</name></member>
     <member refid="module_8h_1a64787aacecdc620e9b7e402babf9ae1e" kind="function"><name>fiber_cond_delete</name></member>
     <member refid="module_8h_1a3f13caca027d090cc02574e333c78f3c" kind="function"><name>fiber_cond_signal</name></member>
     <member refid="module_8h_1abbca6fff4cd2ccf2b65528ea5e1e1e39" kind="function"><name>fiber_cond_broadcast</name></member>
@@ -507,12 +507,12 @@
     <member refid="module_8h_1af23dc320746ce4ec9afdf433a66ef596" kind="function"><name>coio_close</name></member>
     <member refid="module_8h_1af9433c7d42d7747f1f69b79a0d98df13" kind="function"><name>coio_call</name></member>
     <member refid="module_8h_1a832b67e03175570d9f6fa17ffd77bf83" kind="function"><name>coio_getaddrinfo</name></member>
-    <member refid="module_8h_1a4a407327a4c9860b0f088aa677c1a0e7" kind="function"><name>box_ibuf_reserve</name></member>
+    <member refid="module_8h_1a4b6dd91e6e7f26a9b57f4c317c2af203" kind="function"><name>box_ibuf_reserve</name></member>
     <member refid="module_8h_1a1fb9d369f674c637b476fd92b00d3da5" kind="function"><name>box_ibuf_read_range</name></member>
     <member refid="module_8h_1ac74b2d0e25c3a295f9ae0200a787c432" kind="function"><name>box_ibuf_write_range</name></member>
     <member refid="module_8h_1acc9bcfc8296607ac6cbfdd9d44cd7451" kind="function"><name>luaL_iscdata</name></member>
-    <member refid="module_8h_1a71cf0ae8133e330bcc1ccf9beabf7637" kind="function"><name>luaL_pushcdata</name></member>
-    <member refid="module_8h_1aad6199825fbbd80b6f27ff6bc2f2a1b7" kind="function"><name>luaL_checkcdata</name></member>
+    <member refid="module_8h_1a6016a29a15957c333f568d4059923fad" kind="function"><name>luaL_pushcdata</name></member>
+    <member refid="module_8h_1a09b8d32a69bc903b97ee3379b34fb2af" kind="function"><name>luaL_checkcdata</name></member>
     <member refid="module_8h_1aa62fc5e919f74956a06a9b40fb24f691" kind="function"><name>luaL_setcdatagc</name></member>
     <member refid="module_8h_1ac765ca13d67a265532e8fe4cceb4aa5a" kind="function"><name>luaL_getgctotal</name></member>
     <member refid="module_8h_1a5d1f07b7fe39b8bd9b7a87f7c84d5d73" kind="function"><name>luaL_ctypeid</name></member>
@@ -526,10 +526,10 @@
     <member refid="module_8h_1a4c95f4e99d2f7b5be64ca3918fdc4ccf" kind="function"><name>luaT_call</name></member>
     <member refid="module_8h_1aa1a5310ad259a9b8ea40603a3d7f1946" kind="function"><name>luaT_dostring</name></member>
     <member refid="module_8h_1a08aafb8aaa59640f2b7130e9281e53ec" kind="function"><name>luaT_cpcall</name></member>
-    <member refid="module_8h_1a6f7d9f428cd77e6beb5c84681ffb7315" kind="function"><name>luaT_state</name></member>
-    <member refid="module_8h_1a3c95ddc32125234d1fb608b3cb484c6d" kind="function"><name>luaT_tolstring</name></member>
+    <member refid="module_8h_1adcc2559396474f5dff737adf04edc382" kind="function"><name>luaT_state</name></member>
+    <member refid="module_8h_1acb0f168f5234ddb59713defe03029118" kind="function"><name>luaT_tolstring</name></member>
     <member refid="module_8h_1a08ca887563c2bcd2e17ad199dac627b2" kind="function"><name>luaL_iscallable</name></member>
-    <member refid="module_8h_1aff1bdf425a10a3cb4e51f732195e9b39" kind="function"><name>luaT_toibuf</name></member>
+    <member refid="module_8h_1ac572fcff70dbc1c4c33339f1db082315" kind="function"><name>luaT_toibuf</name></member>
     <member refid="module_8h_1adeb6909b96e0c27329d9de8e05e6a805" kind="function"><name>luaL_pushnull</name></member>
     <member refid="module_8h_1a9d39020c975535bd3b17446d866ee4c8" kind="function"><name>luaL_isnull</name></member>
     <member refid="module_8h_1ae5e643c0eff90628dd8cb09ddd8dfc68" kind="function"><name>luaT_error</name></member>
@@ -542,49 +542,49 @@
     <member refid="module_8h_1a88346fff21ac55ecf5e8e7e8750093ce" kind="function"><name>box_txn_begin</name></member>
     <member refid="module_8h_1a541c69864552de6ae21c4edce2bbf949" kind="function"><name>box_txn_commit</name></member>
     <member refid="module_8h_1a59188d28eb2a8cd892d48f74041fec45" kind="function"><name>box_txn_rollback</name></member>
-    <member refid="module_8h_1a6d157a0b9ff004736c655db785486447" kind="function"><name>box_txn_alloc</name></member>
+    <member refid="module_8h_1adf5cc88ba87d8e5afe81604385609191" kind="function"><name>box_txn_alloc</name></member>
     <member refid="module_8h_1a3e930976f6e8e73e213f701c3761fce4" kind="function"><name>box_txn_set_timeout</name></member>
     <member refid="module_8h_1a8a24686e9b0f80d53ded039aa69dfd33" kind="function"><name>box_txn_set_isolation</name></member>
     <member refid="module_8h_1a2442c7908ecc3c927337bbd3e2da00e9" kind="function"><name>box_txn_make_sync</name></member>
-    <member refid="module_8h_1ad42ff178dd0ab620350f84d8cde8a341" kind="function"><name>box_tuple_format_default</name></member>
+    <member refid="module_8h_1a5a457c9503bb15df42c4854fbede340e" kind="function"><name>box_tuple_format_default</name></member>
     <member refid="module_8h_1a2211f2682d19f564c55f2888e35d6430" kind="function"><name>box_tuple_ref</name></member>
     <member refid="module_8h_1a22d7b12b1afbff0c3cc20726c10cc6cc" kind="function"><name>box_tuple_unref</name></member>
     <member refid="module_8h_1a800d61b749ed483d35b65025eaa3039e" kind="function"><name>box_tuple_field_count</name></member>
     <member refid="module_8h_1a6812d20a87dc1f55648679680d0d2272" kind="function"><name>box_tuple_bsize</name></member>
     <member refid="module_8h_1af520a6742b61a5bcb879b75d09d72f4e" kind="function"><name>box_tuple_to_buf</name></member>
-    <member refid="module_8h_1afb5de2d649fd56eacbe7d734643620ea" kind="function"><name>box_tuple_format</name></member>
-    <member refid="module_8h_1ae249982b4154dfbc763fa6b4c9dc5aa6" kind="function"><name>box_tuple_field</name></member>
-    <member refid="module_8h_1a935e8bc08352e18e941326d6118b4dbd" kind="function"><name>box_tuple_field_by_path</name></member>
-    <member refid="module_8h_1af5812aa63732b19983fe43c7b436afc2" kind="function"><name>box_tuple_iterator</name></member>
+    <member refid="module_8h_1a7195d3207b3d7e034473d26b6d24dd2f" kind="function"><name>box_tuple_format</name></member>
+    <member refid="module_8h_1a13b0c6fa0fbeb5d6f2974e8b82aa83f0" kind="function"><name>box_tuple_field</name></member>
+    <member refid="module_8h_1a74729917c4ca28b3044569f5eccaecd9" kind="function"><name>box_tuple_field_by_path</name></member>
+    <member refid="module_8h_1a1aabe2cc4f09abaa070664c6d7156cd1" kind="function"><name>box_tuple_iterator</name></member>
     <member refid="module_8h_1acbbb37bc35f4c2eac665acb61f08da95" kind="function"><name>box_tuple_iterator_free</name></member>
     <member refid="module_8h_1ac24865c6c4138cd6a252f32c55c812c6" kind="function"><name>box_tuple_position</name></member>
     <member refid="module_8h_1aaa998b89aa550c51d8576d3b766d1a67" kind="function"><name>box_tuple_rewind</name></member>
-    <member refid="module_8h_1ad7ab5877a484f94d7454b25737bd11df" kind="function"><name>box_tuple_seek</name></member>
-    <member refid="module_8h_1ac80dc63e3007553d4952681f97966146" kind="function"><name>box_tuple_next</name></member>
-    <member refid="module_8h_1a283636709357b346d38a44345a0a7297" kind="function"><name>box_tuple_new</name></member>
-    <member refid="module_8h_1a7828361e1999ca87deec4dba0edf0a96" kind="function"><name>box_tuple_update</name></member>
-    <member refid="module_8h_1adc32bd58e9b190a5857d022e568743c1" kind="function"><name>box_tuple_upsert</name></member>
+    <member refid="module_8h_1a76dc6a76579c761e9c7b2b9ced89290a" kind="function"><name>box_tuple_seek</name></member>
+    <member refid="module_8h_1a7b88a4ee472624416d875a906a82d99b" kind="function"><name>box_tuple_next</name></member>
+    <member refid="module_8h_1a442eb6797ae4d114d00dc68f2b1e361a" kind="function"><name>box_tuple_new</name></member>
+    <member refid="module_8h_1a83720cf7cd56310193b5026cfc58a151" kind="function"><name>box_tuple_update</name></member>
+    <member refid="module_8h_1a37a1df2e276a8abe83c5187e93971697" kind="function"><name>box_tuple_upsert</name></member>
     <member refid="module_8h_1a8f05611324090cd538b14e0728cf185a" kind="function"><name>box_tuple_validate</name></member>
-    <member refid="module_8h_1a7993cc0cf6aab8047c50911d1e3d91ee" kind="function"><name>box_key_def_new</name></member>
+    <member refid="module_8h_1aa6977b1c26a2a187c8d4de4e93799186" kind="function"><name>box_key_def_new</name></member>
     <member refid="module_8h_1a52f751905f893144ead356172137e796" kind="function"><name>box_key_part_def_create</name></member>
-    <member refid="module_8h_1a0ee0eb2d3a12d2588226a2a232f7b718" kind="function"><name>box_key_def_new_v2</name></member>
-    <member refid="module_8h_1ad06d39b3f4fb10333b555b77d07949d0" kind="function"><name>box_key_def_dup</name></member>
+    <member refid="module_8h_1a3591006ff571eb1ac2b05f5e41a8a8ca" kind="function"><name>box_key_def_new_v2</name></member>
+    <member refid="module_8h_1af072fd108644a06c68d5ba1f74efb460" kind="function"><name>box_key_def_dup</name></member>
     <member refid="module_8h_1a82fdf05e0d276baa072123358c29e046" kind="function"><name>box_key_def_delete</name></member>
-    <member refid="module_8h_1a4b6445ef676ed2dee9b3aa23efebccd8" kind="function"><name>box_key_def_dump_parts</name></member>
+    <member refid="module_8h_1ab6ea5a24503d921ba39fab504eac17fe" kind="function"><name>box_key_def_dump_parts</name></member>
     <member refid="module_8h_1a3c01aea33b0593fd1b84243be7033469" kind="function"><name>box_key_def_validate_tuple</name></member>
     <member refid="module_8h_1a88b978e168708341cb358a15c5e42430" kind="function"><name>box_tuple_compare</name></member>
     <member refid="module_8h_1ae8fec3862fabe2eb885bb71517b99a5f" kind="function"><name>box_tuple_compare_with_key</name></member>
-    <member refid="module_8h_1ada9eb3e3dc2cdff9ae0dd630cb3b6431" kind="function"><name>box_key_def_merge</name></member>
-    <member refid="module_8h_1ab173f0c441972404f76b0b43d77da401" kind="function"><name>box_key_def_extract_key</name></member>
+    <member refid="module_8h_1ad2ee8761b613b5a518f94dc7f2ca0073" kind="function"><name>box_key_def_merge</name></member>
+    <member refid="module_8h_1a28e3e05887ff307b8ac5390f70f60158" kind="function"><name>box_key_def_extract_key</name></member>
     <member refid="module_8h_1a32868fa25087aa7d7249fd2692a0ac52" kind="function"><name>box_key_def_validate_key</name></member>
     <member refid="module_8h_1a237492509ee5f9e478b72077c4c65833" kind="function"><name>box_key_def_validate_full_key</name></member>
-    <member refid="module_8h_1a20436be4bf694001c205489cca0d9d45" kind="function"><name>box_tuple_format_new</name></member>
+    <member refid="module_8h_1a1515eaa49be2b9990eab5fff279600be" kind="function"><name>box_tuple_format_new</name></member>
     <member refid="module_8h_1acc998b676589a854eaf71e2e1fd4debc" kind="function"><name>box_tuple_format_ref</name></member>
     <member refid="module_8h_1a134eab27cb960c030d553d3881d8d074" kind="function"><name>box_tuple_format_unref</name></member>
     <member refid="module_8h_1a8b1e8f1e92bb906daefd5666e0ff2f4d" kind="function"><name>box_schema_version</name></member>
     <member refid="module_8h_1aa62bc1dd0c418fe0031c32f44e048ce4" kind="function"><name>box_is_ro</name></member>
     <member refid="module_8h_1adf6a73f9ce8d72029ea976cf2999ba30" kind="function"><name>box_wait_ro</name></member>
-    <member refid="module_8h_1a1d96086f343e0739efabf43174a3fa35" kind="function"><name>box_ro_reason</name></member>
+    <member refid="module_8h_1a2d654c5f3f4a5e6cc4ed384a76509b67" kind="function"><name>box_ro_reason</name></member>
     <member refid="module_8h_1a7fb00cd4eac4d388d58e9e5ef1ea1b3f" kind="function"><name>box_return_tuple</name></member>
     <member refid="module_8h_1a96bf7ae13f994a18d2f9dcf7816578ca" kind="function"><name>box_return_mp</name></member>
     <member refid="module_8h_1a4a816d0fc386d810b874b50db1f50293" kind="function"><name>box_space_id_by_name</name></member>
@@ -606,7 +606,7 @@
     <member refid="module_8h_1a6f6d1752bccac95ed2d154a98c3fe9c7" kind="function"><name>box_iproto_override</name></member>
     <member refid="module_8h_1a672bcf1df35af10f617ccdcc71f760bd" kind="function"><name>box_info_lsn</name></member>
     <member refid="module_8h_1a38c3dfb46ae57e3f253db3be6b066636" kind="function"><name>box_slab_info</name></member>
-    <member refid="module_8h_1af339d131bfa577606d631f5e4bd82752" kind="function"><name>box_index_iterator</name></member>
+    <member refid="module_8h_1aab8b69829c8d89799a9fb0e5d360e84b" kind="function"><name>box_index_iterator</name></member>
     <member refid="module_8h_1ae4361728e6abe6243e7f02b098e7b347" kind="function"><name>box_iterator_next</name></member>
     <member refid="module_8h_1a6f7fe762b15009de313fdf915378429c" kind="function"><name>box_iterator_free</name></member>
     <member refid="module_8h_1a698d8991fa015a4b490f078b29e8d929" kind="function"><name>box_index_len</name></member>
@@ -616,19 +616,19 @@
     <member refid="module_8h_1a4fbd278987613571a9d6475de6103a4f" kind="function"><name>box_index_min</name></member>
     <member refid="module_8h_1a044e5f79addcfd9c7312fe66e7be7514" kind="function"><name>box_index_max</name></member>
     <member refid="module_8h_1a3f06a7df9e461267455477bd84ce02ed" kind="function"><name>box_index_count</name></member>
-    <member refid="module_8h_1a8452d35ca52bc3147b129f8d46c35ef1" kind="function"><name>box_tuple_extract_key</name></member>
-    <member refid="module_8h_1ab3cd4a9f506e56bab2a03475d7b95589" kind="function"><name>box_error_type</name></member>
+    <member refid="module_8h_1a4b1314851b7b1ec2fab6908eaef71f52" kind="function"><name>box_tuple_extract_key</name></member>
+    <member refid="module_8h_1a9b58e493b5515222c6bb9c0393d092ce" kind="function"><name>box_error_type</name></member>
     <member refid="module_8h_1a800a57f7e18f0b9c3880d4e516589e73" kind="function"><name>box_error_code</name></member>
-    <member refid="module_8h_1a4f94399db28784bf3419da94fa563463" kind="function"><name>box_error_message</name></member>
-    <member refid="module_8h_1a29b4ebee3bb9402fb8621b4e96b93b5d" kind="function"><name>box_error_last</name></member>
+    <member refid="module_8h_1aff2a8679174320da6a54edc6df4681ae" kind="function"><name>box_error_message</name></member>
+    <member refid="module_8h_1af8f82c313ba49fc97782663ffba71f58" kind="function"><name>box_error_last</name></member>
     <member refid="module_8h_1a1c2143635d7ff4aeb2ced40ffa033527" kind="function"><name>box_error_clear</name></member>
     <member refid="module_8h_1aa6e6803bc4309c3f59b93e2709cb418b" kind="function"><name>box_error_set</name></member>
-    <member refid="module_8h_1a4703451fd9a5ddf2b0a5e5c2f828aa4a" kind="function"><name>luaT_checktuple</name></member>
+    <member refid="module_8h_1a6f106407ff1e6560bd8cba9b4698040d" kind="function"><name>luaT_checktuple</name></member>
     <member refid="module_8h_1a0ddb8bf7e1f41149fe67352de0f276d4" kind="function"><name>luaT_pushtuple</name></member>
-    <member refid="module_8h_1a3c8ffde3785c473470bf52bba05787c7" kind="function"><name>luaT_istuple</name></member>
-    <member refid="module_8h_1a1a399adb96af280b9faedf642f5549cf" kind="function"><name>luaT_tuple_encode</name></member>
-    <member refid="module_8h_1a8f9fba67e9a46d465bcefba3fd06f305" kind="function"><name>luaT_tuple_new</name></member>
-    <member refid="module_8h_1a6b81bda5be3fd39b8d076cd048e83b67" kind="function"><name>box_latch_new</name></member>
+    <member refid="module_8h_1ab1dce37206b2951e42b76a9ce704f9f2" kind="function"><name>luaT_istuple</name></member>
+    <member refid="module_8h_1ab57d953ad39d6f1e0704a6c536b7ab60" kind="function"><name>luaT_tuple_encode</name></member>
+    <member refid="module_8h_1a2a9365f857b2bb2b02d03b0c075fd793" kind="function"><name>luaT_tuple_new</name></member>
+    <member refid="module_8h_1a7c106ac756a1b7fa422a72e71b379b0a" kind="function"><name>box_latch_new</name></member>
     <member refid="module_8h_1a83a897e7386e946cd5ffd2ea1cb47a52" kind="function"><name>box_latch_delete</name></member>
     <member refid="module_8h_1aef397199dd9a19cb7b9362233a1d4a98" kind="function"><name>box_latch_lock</name></member>
     <member refid="module_8h_1a294e53c819e91f172428d580a29f434f" kind="function"><name>box_latch_trylock</name></member>
@@ -645,39 +645,39 @@
     <member refid="module_8h_1a3499bd306b660788339570ea8b9f4733" kind="function"><name>box_decimal_scale</name></member>
     <member refid="module_8h_1a1adad9501fc38ba6e6a54f58d6152840" kind="function"><name>box_decimal_is_int</name></member>
     <member refid="module_8h_1a74749ee03d5f2860c5813b0bf36cabe4" kind="function"><name>box_decimal_is_neg</name></member>
-    <member refid="module_8h_1ac11dd28c7727e83e8c3729a7f46c97d2" kind="function"><name>box_decimal_zero</name></member>
-    <member refid="module_8h_1a3eb48bbc701ce3221e4c5c4fd8c1055b" kind="function"><name>box_decimal_from_string</name></member>
-    <member refid="module_8h_1ac068234331e788d607868fd95cefa88f" kind="function"><name>box_decimal_from_double</name></member>
-    <member refid="module_8h_1ab1d0e0cb965eeeb0a00f867b4ee3431f" kind="function"><name>box_decimal_from_int64</name></member>
-    <member refid="module_8h_1a7e5a5a5609e5ee0cdaf33cef61a90077" kind="function"><name>box_decimal_from_uint64</name></member>
-    <member refid="module_8h_1ac308e450dedd64c9ed97a0fa841de8bc" kind="function"><name>box_decimal_copy</name></member>
+    <member refid="module_8h_1ab5057a778894e99543a07aecbce998af" kind="function"><name>box_decimal_zero</name></member>
+    <member refid="module_8h_1ae81c9e590563ab312a470066e732c874" kind="function"><name>box_decimal_from_string</name></member>
+    <member refid="module_8h_1a69214f1ba250729dbf5d06894ff7d4cc" kind="function"><name>box_decimal_from_double</name></member>
+    <member refid="module_8h_1a4e0a0856aae8c1c80208eee4027e5f83" kind="function"><name>box_decimal_from_int64</name></member>
+    <member refid="module_8h_1a74864d2137cbd53f64999bd419a721fb" kind="function"><name>box_decimal_from_uint64</name></member>
+    <member refid="module_8h_1ab67fc69b043029952787aeb05b146145" kind="function"><name>box_decimal_copy</name></member>
     <member refid="module_8h_1a7a20acf8704e0a8de6b2c6e70cabda94" kind="function"><name>box_decimal_to_string</name></member>
-    <member refid="module_8h_1aef891f48c3de2b70a23565833977e51b" kind="function"><name>box_decimal_to_int64</name></member>
-    <member refid="module_8h_1aa7984e1af9644427d4431d483313cda1" kind="function"><name>box_decimal_to_uint64</name></member>
-    <member refid="module_8h_1a84169b77917c2d12a4ef8027e4beacef" kind="function"><name>box_decimal_round</name></member>
-    <member refid="module_8h_1a37aced6f227b3dbd48169ce4ba092504" kind="function"><name>box_decimal_floor</name></member>
-    <member refid="module_8h_1abe405bddd53bc745cd54851b071e49c5" kind="function"><name>box_decimal_trim</name></member>
-    <member refid="module_8h_1a96ea8ad6f58a43e9dca729a410b5e286" kind="function"><name>box_decimal_rescale</name></member>
+    <member refid="module_8h_1aa213d0898e63876e3ca57cbe506bdfe6" kind="function"><name>box_decimal_to_int64</name></member>
+    <member refid="module_8h_1af45f83c5dd155eb132a17f0a4e2efa47" kind="function"><name>box_decimal_to_uint64</name></member>
+    <member refid="module_8h_1aae4e2827ab276075fedde86a576d15e9" kind="function"><name>box_decimal_round</name></member>
+    <member refid="module_8h_1a471927fb872be29fdff66d0e198a3878" kind="function"><name>box_decimal_floor</name></member>
+    <member refid="module_8h_1a8d6b6c8fd7096a6bfe54d65007255281" kind="function"><name>box_decimal_trim</name></member>
+    <member refid="module_8h_1ac3599d3e81a8144fa1a10199908a84f2" kind="function"><name>box_decimal_rescale</name></member>
     <member refid="module_8h_1aaf0376671f42b04fdafb2706527762b4" kind="function"><name>box_decimal_compare</name></member>
-    <member refid="module_8h_1a9ff11b49687b7a3ad15a6246368a74f9" kind="function"><name>box_decimal_abs</name></member>
-    <member refid="module_8h_1acefc8a9f6fbed4a19d9b7a74ebd80107" kind="function"><name>box_decimal_minus</name></member>
-    <member refid="module_8h_1ac68205951a728801a27c7a1e059cb33b" kind="function"><name>box_decimal_add</name></member>
-    <member refid="module_8h_1aaa4473537df85f1f2168b9cc749f86b0" kind="function"><name>box_decimal_sub</name></member>
-    <member refid="module_8h_1aa3673e0c446bbd7917a06c842b4bcd99" kind="function"><name>box_decimal_mul</name></member>
-    <member refid="module_8h_1ac38241d721907b901ff2f15875ad8ebe" kind="function"><name>box_decimal_div</name></member>
-    <member refid="module_8h_1a701a02f61292b3da8a4d10b68c85d7ff" kind="function"><name>box_decimal_remainder</name></member>
-    <member refid="module_8h_1a5da42507f4c84c89b0b1784f6ebb14bd" kind="function"><name>box_decimal_log10</name></member>
-    <member refid="module_8h_1a47ce757059e40b95dfca8e29077e638b" kind="function"><name>box_decimal_ln</name></member>
-    <member refid="module_8h_1aac5d986753e1e1eb2d0a0e94f76044b5" kind="function"><name>box_decimal_pow</name></member>
-    <member refid="module_8h_1a7179a62fcfca4882a5612d0c9847d68d" kind="function"><name>box_decimal_exp</name></member>
-    <member refid="module_8h_1a2a85c95c41f61184a803dd714de874e5" kind="function"><name>box_decimal_sqrt</name></member>
+    <member refid="module_8h_1a2a33cc8495c4fc3ef343bf4ffe767d81" kind="function"><name>box_decimal_abs</name></member>
+    <member refid="module_8h_1ac58747fcce83cdad8ffde68b78ad57da" kind="function"><name>box_decimal_minus</name></member>
+    <member refid="module_8h_1a39c5c7bbc81f8c39f8767cccc27b0d09" kind="function"><name>box_decimal_add</name></member>
+    <member refid="module_8h_1a26473f8f35e87789e1f7e51e0c9c01d5" kind="function"><name>box_decimal_sub</name></member>
+    <member refid="module_8h_1af8ab08f3604f10eb105b18868511a66d" kind="function"><name>box_decimal_mul</name></member>
+    <member refid="module_8h_1a2246edd7f0b9df9c182038bdbb6d2b11" kind="function"><name>box_decimal_div</name></member>
+    <member refid="module_8h_1aaeb908abdbaea9d758545b1825604101" kind="function"><name>box_decimal_remainder</name></member>
+    <member refid="module_8h_1af92596f1e666deb84a3569b7af48af95" kind="function"><name>box_decimal_log10</name></member>
+    <member refid="module_8h_1afe79a92142c93b7344f6e6559edea7a6" kind="function"><name>box_decimal_ln</name></member>
+    <member refid="module_8h_1a78523b113439b54d761c5ffe19317f59" kind="function"><name>box_decimal_pow</name></member>
+    <member refid="module_8h_1aaf4d239489a058ab770f6da11c16dcd4" kind="function"><name>box_decimal_exp</name></member>
+    <member refid="module_8h_1a8947463e9d73c92ffee508b32a3b3d9b" kind="function"><name>box_decimal_sqrt</name></member>
     <member refid="module_8h_1ad847059b54874f3e4bde5550ec228fd3" kind="function"><name>box_decimal_mp_sizeof</name></member>
-    <member refid="module_8h_1afdaf8eda7fa944c6fc8949e19af5dceb" kind="function"><name>box_decimal_mp_encode</name></member>
-    <member refid="module_8h_1a7de043345d920023948829285063ce98" kind="function"><name>box_decimal_mp_decode</name></member>
-    <member refid="module_8h_1a0c08c83a937326e63be00ef63c77c12f" kind="function"><name>box_decimal_mp_decode_data</name></member>
-    <member refid="module_8h_1a99ce5d3090eafea3a46709aaa68c7a5b" kind="function"><name>luaT_newdecimal</name></member>
-    <member refid="module_8h_1a5954243c7f6641e47706cae54fc995d5" kind="function"><name>luaT_pushdecimal</name></member>
-    <member refid="module_8h_1a15b19d5a4c0f109f4a8db17bb886d863" kind="function"><name>luaT_isdecimal</name></member>
+    <member refid="module_8h_1afc7cf68d7ca8998fad15492ae99bbf7e" kind="function"><name>box_decimal_mp_encode</name></member>
+    <member refid="module_8h_1aa91f14822373ac8e50ecb18bd23aeee4" kind="function"><name>box_decimal_mp_decode</name></member>
+    <member refid="module_8h_1ae69f4b3c80347bcbfb617a70b57f820e" kind="function"><name>box_decimal_mp_decode_data</name></member>
+    <member refid="module_8h_1a7062a07e1c119c2c50b65afd23d0ce40" kind="function"><name>luaT_newdecimal</name></member>
+    <member refid="module_8h_1aef837b9429a6fe562b43d5bff5c3c426" kind="function"><name>luaT_pushdecimal</name></member>
+    <member refid="module_8h_1a53f6c9c6047142026a2e3727e4e43a24" kind="function"><name>luaT_isdecimal</name></member>
   </compound>
   <compound refid="dir_68267d1309a1af8e8297ef4c3efbcdba" kind="dir"><name>src</name>
   </compound>
