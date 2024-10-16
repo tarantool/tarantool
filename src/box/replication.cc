@@ -43,6 +43,7 @@
 #include "relay.h"
 #include "sio.h"
 #include "tweaks.h"
+#include "clock.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
@@ -71,6 +72,8 @@ char cfg_instance_name[NODE_NAME_SIZE_MAX];
 
 bool replication_synchro_timeout_rollback_enabled = true;
 TWEAK_BOOL(replication_synchro_timeout_rollback_enabled);
+
+double replication_anon_gc_timeout = 3600;
 
 struct replicaset replicaset;
 
@@ -206,6 +209,53 @@ replicaset_set_sync_quorum(void)
 	replication_sync_quorum_auto = replicaset.applier.connected;
 }
 
+/**
+ * Fiber that deletes expired WAL GC consumers of anonymous replicas.
+ */
+struct fiber *replication_anon_gc_expiration_fiber;
+
+static void
+replication_anon_gc_expire_one(double *lowest_ttl)
+{
+	double timeout = replication_anon_gc_timeout;
+	*lowest_ttl = timeout;
+	struct replica *expired_replica = NULL;
+	replicaset_foreach(replica) {
+		if (!replica->anon || replica_has_connections(replica) ||
+		    replica->gc == NULL)
+			continue;
+		expired_replica = replica;
+		double unused_time = clock_monotonic() - replica->disconnect_tm;
+		double ttl = timeout - unused_time;
+		*lowest_ttl = MIN(*lowest_ttl, ttl);
+	}
+	if (expired_replica == NULL)
+		return;
+	if (gc_erase_consumer(&expired_replica->uuid) != 0) {
+		*lowest_ttl = replication_anon_gc_timeout;
+		return;
+	}
+	gc_consumer_unregister(expired_replica->gc);
+	expired_replica->gc = NULL;
+	say_info("WAL GC consumer of anonymous replica %s has not been used "
+		 "for too long so it has been deleted",
+		 tt_uuid_str(&expired_replica->uuid));
+}
+
+static int
+replication_anon_gc_expiration_fiber_f(va_list ap)
+{
+	(void)ap;
+	while (!fiber_is_cancelled()) {
+		fiber_check_gc();
+		double lowest_ttl = 0;
+		replication_anon_gc_expire_one(&lowest_ttl);
+		if (lowest_ttl > 0)
+			fiber_sleep(lowest_ttl);
+	}
+	return 0;
+}
+
 void
 replication_init(int num_threads)
 {
@@ -231,6 +281,12 @@ replication_init(int num_threads)
 	replicaset.healthy_count = 1;
 
 	applier_init();
+	replication_anon_gc_expiration_fiber =
+		fiber_new_system("replication_anon_gc_expiration",
+				 replication_anon_gc_expiration_fiber_f);
+	if (replication_anon_gc_expiration_fiber == NULL)
+		panic("Cannot init replication submodule");
+	fiber_start(replication_anon_gc_expiration_fiber);
 }
 
 void
@@ -313,6 +369,7 @@ replica_new(void)
 	replica->gc = NULL;
 	replica->is_applier_healthy = false;
 	replica->is_relay_healthy = false;
+	replica->disconnect_tm = 0.0;
 	rlist_create(&replica->in_anon);
 	trigger_create(&replica->on_applier_state,
 		       replica_on_applier_state_f, NULL, NULL);
@@ -1363,6 +1420,7 @@ replica_on_relay_stop(struct replica *replica)
 		replica->gc = NULL;
 	}
 
+	replica->disconnect_tm = clock_monotonic();
 	replica_update_relay_health(replica);
 
 	if (replica_is_orphan(replica)) {

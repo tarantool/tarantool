@@ -1533,6 +1533,18 @@ box_check_replication_anon(void)
 	return anon;
 }
 
+static double
+box_check_replication_anon_gc_timeout(void)
+{
+	double timeout = cfg_getd("replication_anon_gc_timeout");
+	if (timeout <= 0) {
+		diag_set(ClientError, ER_CFG, "replication_anon_gc_timeout",
+			 "the value must be greater than 0");
+		return -1;
+	}
+	return timeout;
+}
+
 static int
 box_check_instance_uuid(struct tt_uuid *uuid)
 {
@@ -1975,6 +1987,8 @@ box_check_config(void)
 	if (box_check_replication_threads() < 0)
 		diag_raise();
 	box_check_replication_sync_timeout();
+	if (box_check_replication_anon_gc_timeout() < 0)
+		diag_raise();
 	if (box_check_bootstrap_strategy() == BOOTSTRAP_STRATEGY_INVALID)
 		diag_raise();
 	if (box_check_bootstrap_leader(&uri, &uuid, name) != 0)
@@ -2342,6 +2356,17 @@ box_set_replication_anon(void)
 			  " has finished");
 	}
 	guard.is_active = false;
+}
+
+int
+box_set_replication_anon_gc_timeout(void)
+{
+	double timeout = box_check_replication_anon_gc_timeout();
+	if (timeout <= 0)
+		return -1;
+	replication_anon_gc_timeout = timeout;
+	fiber_wakeup(replication_anon_gc_expiration_fiber);
+	return 0;
 }
 
 /**

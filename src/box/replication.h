@@ -98,6 +98,8 @@ extern "C" {
 struct gc_consumer;
 
 static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
+extern double replication_anon_gc_timeout;
+extern struct fiber *replication_anon_gc_expiration_fiber;
 
 enum { REPLICATION_THREADS_MAX = 1000 };
 
@@ -427,6 +429,7 @@ struct replica {
 	enum applier_state applier_sync_state;
 	/* The latch is used to order replication requests. */
 	struct latch order_latch;
+	double disconnect_tm;
 };
 
 enum {
