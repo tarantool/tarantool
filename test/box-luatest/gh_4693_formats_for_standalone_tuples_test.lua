@@ -37,6 +37,21 @@ g.test_box_tuple_format_new = function()
     end)
 end
 
+-- Checks that improper use of `box.internal.tuple_format.new` doesn't crash.
+g.test_box_internal_tuple_format_new = function(cg)
+    cg.server:exec(function()
+        t.assert_error_msg_equals(
+            "Wrong space format: expected array",
+            box.internal.tuple_format.new)
+        t.assert_error_msg_equals(
+            "Wrong space format: expected array",
+            box.internal.tuple_format.new, 1984)
+        t.assert_error_msg_equals(
+            "Wrong space format: expected array",
+            box.internal.tuple_format.new, {type = 'test'})
+    end)
+end
+
 g.before_test('test_box_tuple_format_gc', function (cg)
     cg.server:exec(function()
         box.error.injection.set('ERRINJ_TUPLE_FORMAT_COUNT', 2)
