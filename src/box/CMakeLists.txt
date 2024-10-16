@@ -55,8 +55,10 @@ lua_source(lua_sources lua/config/applier/mkdir.lua        config_applier_mkdir_
 lua_source(lua_sources lua/config/applier/roles.lua        config_applier_roles_lua)
 lua_source(lua_sources lua/config/applier/sharding.lua     config_applier_sharding_lua)
 lua_source(lua_sources lua/config/cluster_config.lua       config_cluster_config_lua)
+lua_source(lua_sources lua/config/descriptions.lua         config_descriptions_lua)
 lua_source(lua_sources lua/config/configdata.lua           config_configdata_lua)
 lua_source(lua_sources lua/config/init.lua                 config_init_lua)
+lua_source(lua_sources lua/config/validators.lua           config_validators_lua)
 lua_source(lua_sources lua/config/instance_config.lua      config_instance_config_lua)
 lua_source(lua_sources lua/config/source/env.lua           config_source_env_lua)
 lua_source(lua_sources lua/config/source/file.lua          config_source_file_lua)
@@ -68,6 +70,7 @@ lua_source(lua_sources lua/config/utils/odict.lua          config_utils_odict_lu
 lua_source(lua_sources lua/config/utils/schema.lua         config_utils_schema_lua)
 lua_source(lua_sources lua/config/utils/snapshot.lua       config_utils_snapshot_lua)
 lua_source(lua_sources lua/config/utils/tabulate.lua       config_utils_tabulate_lua)
+lua_source(lua_sources lua/config/utils/textutil.lua       config_utils_textutil_lua)
 
 if (ENABLE_CONFIG_EXTRAS)
     lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/source/etcd.lua config_source_etcd_lua)
