@@ -21,7 +21,7 @@ local function start_stub_servers(g, dir, instances)
     for _, instance in ipairs(instances) do
         local uri = ('%s/%s.iproto'):format(dir, instance)
         local s = socket.tcp_server('unix/', uri, function()
-            require('fiber').sleep(11000)
+            require('fiber').sleep(10000)
         end)
         t.assert(s)
         g.stub_servers[instance] = s
@@ -30,7 +30,7 @@ end
 
 local function stop_stub_servers(g)
     for _, server in pairs(g.stub_servers) do
-        server:close()
+        pcall(server.close, server)
     end
 end
 
@@ -411,6 +411,16 @@ g.test_filter_mode = function(g)
         local opts = {mode = 'rw'}
         t.assert_items_equals(connpool.filter(opts), exp)
 
+        exp = {"instance-001", "instance-002", "instance-003",
+               "instance-004", "instance-005"}
+        opts = {mode = 'any'}
+        t.assert_items_equals(connpool.filter(opts), exp)
+
+        exp = {"instance-001", "instance-002", "instance-003",
+               "instance-004"}
+        opts = {mode = 'alive'}
+        t.assert_items_equals(connpool.filter(opts), exp)
+
         exp = {"instance-002", "instance-004"}
         opts = {mode = 'ro'}
         t.assert_items_equals(connpool.filter(opts), exp)
@@ -427,7 +437,8 @@ g.test_filter_mode = function(g)
         opts = {mode = 'ro', labels = {l1 = 'two'}}
         t.assert_items_equals(connpool.filter(opts), exp)
 
-        local exp_err = 'Expected nil, "ro" or "rw", got "something"'
+        local exp_err = 'Incorrect filter mode "something", allowed values: '..
+                        '"alive", "any", "ro" or "rw"'
         opts = {mode = 'something'}
         t.assert_error_msg_equals(exp_err, connpool.filter, opts)
     end
@@ -439,7 +450,7 @@ g.test_filter_mode = function(g)
 end
 
 g.test_filter_works_in_parallel = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -623,11 +634,23 @@ g.test_call = function(g)
         if is_candidate then
             t.assert(opts.prefer_local == nil)
             t.assert_equals(connpool.call('f1', nil, opts), box.info.name)
+
+            -- Make sure the default behaviour and mode='alive' behaviour
+            -- are the same.
+            opts.mode = 'alive'
+            t.assert_equals(connpool.call('f1', nil, opts), box.info.name)
+
             opts.prefer_local = true
             t.assert_equals(connpool.call('f1', nil, opts), box.info.name)
         else
             t.assert(opts.prefer_local == nil)
             t.assert_items_include(candidates, {connpool.call('f1', nil, opts)})
+
+            -- Make sure the default behaviour and mode='alive' behaviour
+            -- are the same.
+            opts.mode = 'alive'
+            t.assert_items_include(candidates, {connpool.call('f1', nil, opts)})
+
             opts.prefer_local = true
             t.assert_items_include(candidates, {connpool.call('f1', nil, opts)})
         end
@@ -870,8 +893,8 @@ g.test_call_mode = function(g)
         }
         t.assert_equals(connpool.call('f', nil, opts), 'instance-001')
 
-        local exp_err = 'Expected nil, "ro", "rw", "prefer_ro" or ' ..
-                        '"prefer_rw", got "something"'
+        local exp_err = 'Incorrect call mode "something", expected one of '..
+                        'the "alive", "ro", "rw", "prefer_ro" or "prefer_rw"'
         opts = {mode = 'something'}
         t.assert_error_msg_equals(exp_err, connpool.call, 'f', nil, opts)
     end
@@ -883,7 +906,7 @@ g.test_call_mode = function(g)
 end
 
 g.test_call_works_in_parallel = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = [[
     credentials:
       users:
@@ -975,5 +998,167 @@ g.test_call_works_in_parallel = function(g)
     g.server_1:exec(check_filter)
 end
 g.after_test('test_call_works_in_parallel', function(g)
+    stop_stub_servers(g)
+end)
+
+g.test_call_picks_any = function(g)
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        myuser:
+          password: "secret"
+          roles: [replication]
+          privileges:
+          - permissions: [execute]
+            universe: true
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        peer:
+          login: 'myuser'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001:
+                database:
+                  mode: rw
+              instance-003: {}
+          replicaset-002:
+            instances:
+              instance-002: {}
+    ]]
+    treegen.write_file(dir, 'config.yaml', config)
+
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = 'config.yaml',
+        chdir = dir,
+    }
+    g.server_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+    g.server_3 = server:new(fun.chain(opts, {alias = 'instance-003'}):tomap())
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_3:start({wait_until_ready = false})
+    start_stub_servers(g, dir, { 'instance-002' })
+
+    g.server_1:wait_until_ready()
+    g.server_3:wait_until_ready()
+
+    local function check_conn()
+        local connpool = require('experimental.connpool')
+        local clock = require('clock')
+
+        -- The connection timeout for filter() and call() methods
+        -- is hardcoded in connpool and equals 10 seconds.
+        local CONNECT_TIMEOUT = 10
+
+        -- call() should wait for any available instance matching
+        -- the requirements and not wait for the unavailable instance
+        -- connection attempts to be timeouted.
+        local opts = { mode = 'alive' }
+        local timestamp_before_call = clock.monotonic()
+        t.assert_equals(connpool.call('box.info', nil, opts).name,
+                        'instance-001')
+        t.assert_lt(clock.monotonic() - timestamp_before_call,
+                    CONNECT_TIMEOUT / 2)
+
+        -- call() with some of the prioritized modes (e.g "prefer_ro" or
+        -- "prefer_rw") should try to access all of the instances.
+        opts = { prefer_local = true, mode = 'prefer_ro' }
+        timestamp_before_call = clock.monotonic()
+        t.assert_equals(connpool.call('box.info', nil, opts).name,
+                        'instance-003')
+        local elapsed_time = clock.monotonic() - timestamp_before_call
+        t.assert_gt(elapsed_time, CONNECT_TIMEOUT / 2)
+        t.assert_lt(elapsed_time, CONNECT_TIMEOUT * 3 / 2)
+    end
+
+    g.server_1:exec(check_conn)
+end
+g.after_test('test_call_picks_any', function(g)
+    stop_stub_servers(g)
+end)
+
+g.test_call_connects_to_all_if_prioritized = function(g)
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        myuser:
+          password: "secret"
+          roles: [replication]
+          privileges:
+          - permissions: [execute]
+            universe: true
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        peer:
+          login: 'myuser'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001:
+                database:
+                  mode: rw
+              instance-003: {}
+          replicaset-002:
+            instances:
+              instance-002: {}
+    ]]
+    treegen.write_file(dir, 'config.yaml', config)
+
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = 'config.yaml',
+        chdir = dir,
+    }
+    g.server_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+    g.server_3 = server:new(fun.chain(opts, {alias = 'instance-003'}):tomap())
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_3:start({wait_until_ready = false})
+    start_stub_servers(g, dir, { 'instance-002' })
+
+    g.server_1:wait_until_ready()
+    g.server_3:wait_until_ready()
+
+    local function check_conn()
+        local connpool = require('experimental.connpool')
+        local clock = require('clock')
+
+        -- The connection timeout for filter() and call() methods
+        -- is hardcoded in connpool and equals 10 seconds.
+        local CONNECT_TIMEOUT = 10
+
+        -- call() with some of the prioritized modes (e.g "prefer_ro" or
+        -- "prefer_rw") should try to access all of the instances.
+        local opts = { prefer_local = true, mode = 'prefer_ro' }
+        local timestamp_before_call = clock.monotonic()
+        t.assert_equals(connpool.call('box.info', nil, opts).name,
+                        'instance-003')
+        local elapsed_time = clock.monotonic() - timestamp_before_call
+        t.assert_gt(elapsed_time, CONNECT_TIMEOUT / 2)
+        t.assert_lt(elapsed_time, CONNECT_TIMEOUT * 3 / 2)
+    end
+
+    g.server_1:exec(check_conn)
+end
+g.after_test('test_call_connects_to_all_if_prioritized', function(g)
     stop_stub_servers(g)
 end)
