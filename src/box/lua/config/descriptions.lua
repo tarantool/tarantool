@@ -1741,6 +1741,13 @@ I['replication.anon'] = format_text([[
       or replica set leader.
 ]])
 
+I['replication.anon_ttl'] = format_text([[
+    Time-to-live (in seconds) of disconnected anonymous replicas (see
+    `replication.anon` for the definition of anonymous replica). If an anonymous
+    replica hasn't been in touch for longer than `replication.anon_ttl`, it is
+    removed from the instance.
+]])
+
 I['replication.autoexpel'] = format_text([[
     Automatically expel instances.
 

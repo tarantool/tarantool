@@ -98,6 +98,16 @@ extern "C" {
 struct gc_consumer;
 
 static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
+/**
+ * Time to live for anonymous replicas - if we haven't heard from an anonymous
+ * replica during this time, it will be removed.
+ */
+extern double replication_anon_ttl;
+/**
+ * Fiber that removes anonymous replicas that haven't been in touch
+ * for too long.
+ */
+extern struct fiber *replication_anon_gc_fiber;
 
 enum { REPLICATION_THREADS_MAX = 1000 };
 
@@ -250,6 +260,15 @@ replication_disconnect_timeout(void);
 
 void
 replication_init(int num_threads);
+
+/**
+ * Initializes GC of anonymous replicas and creates missing anonymous
+ * replicas for orphan WAL GC consumers.
+ *
+ * Must be called after loading WAL GC consumers.
+ */
+void
+replication_anon_gc_init(void);
 
 /**
  * Prepare for freeing resources in replication_free while TX event loop is

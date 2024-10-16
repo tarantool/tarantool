@@ -73,6 +73,9 @@ char cfg_instance_name[NODE_NAME_SIZE_MAX];
 bool replication_synchro_timeout_rollback_enabled = true;
 TWEAK_BOOL(replication_synchro_timeout_rollback_enabled);
 
+double replication_anon_ttl = 3600;
+struct fiber *replication_anon_gc_fiber;
+
 struct replicaset replicaset;
 
 struct rlist replicaset_on_quorum_gain =
@@ -280,6 +283,61 @@ replica_gc(const struct tt_uuid *uuid)
 	return replica_gc_impl(replica);
 }
 
+/**
+ * Removes expired anonymous replicas.
+ */
+static int
+replication_anon_gc_fiber_f(va_list ap)
+{
+	(void)ap;
+	while (!fiber_is_cancelled()) {
+		fiber_check_gc();
+
+		double lowest_ttl = replication_anon_ttl;
+		struct replica *expired_replica = NULL;
+		/*
+		 * Search for the first expired replica. Note that we cannot
+		 * just remove it and continue the iteration because a yield
+		 * will happen and the replicaset can be changed significantly.
+		 */
+		replicaset_foreach(replica) {
+			if (!replica->anon || replica_has_connections(replica))
+				continue;
+			double last_seen = relay_last_row_time(replica->relay);
+			double unused = ev_monotonic_now(loop()) - last_seen;
+			double ttl = replication_anon_ttl - unused;
+			if (ttl <= 0) {
+				expired_replica = replica;
+				break;
+			}
+			lowest_ttl = MIN(lowest_ttl, ttl);
+		}
+		/*
+		 * If no expired replicas were found, sleep for lowest TTL
+		 * and continue the process.
+		 */
+		if (expired_replica == NULL) {
+			fiber_sleep(lowest_ttl);
+			continue;
+		}
+		/* Save UUID since the replica will be deleted on success. */
+		struct tt_uuid uuid = expired_replica->uuid;
+		if (replica_gc_impl(expired_replica) != 0) {
+			say_error("Failed to remove expired anonymous "
+				  "replica %s", tt_uuid_str(&uuid));
+			diag_log();
+			/* Sleep for `replication_anon_ttl` on failure. */
+			fiber_sleep(replication_anon_ttl);
+			continue;
+		}
+		/* The replica is expected to be deleted. */
+		assert(replica_by_uuid(&uuid) == NULL);
+		say_info("Anonymous replica %s has not been used for too long "
+			 "so it has been removed", tt_uuid_str(&uuid));
+	}
+	return 0;
+}
+
 void
 replication_init(int num_threads)
 {
@@ -308,8 +366,52 @@ replication_init(int num_threads)
 }
 
 void
+replication_anon_gc_init(void)
+{
+	/* Register anonymous replicas for all orphan consumers. */
+	struct gc_consumer *consumer;
+	struct gc_consumer_iterator consumers;
+	gc_consumer_iterator_init(&consumers);
+	while ((consumer = gc_consumer_iterator_next(&consumers)) != NULL) {
+		if (consumer->type != GC_CONSUMER_REPLICA)
+			continue;
+		struct replica *replica = replica_by_uuid(&consumer->uuid);
+		if (replica != NULL) {
+			/*
+			 * Since the function is called on configuration, only
+			 * regular replicas can appear here.
+			 */
+			assert(!replica->anon);
+			continue;
+		}
+		/*
+		 * Create an anonymous replica object and register its
+		 * consumer so that it won't be lost.
+		 */
+		replica = replicaset_add_anon(&consumer->uuid);
+		replica->gc = gc_consumer_register(&consumer->vclock,
+						   GC_CONSUMER_REPLICA,
+						   &consumer->uuid);
+	}
+
+	/* Start the garbage collecting fiber. */
+	replication_anon_gc_fiber =
+		fiber_new_system("replication_anon_gc",
+				 replication_anon_gc_fiber_f);
+	if (replication_anon_gc_fiber == NULL)
+		panic("Cannot init replication submodule");
+	fiber_set_joinable(replication_anon_gc_fiber, true);
+	fiber_start(replication_anon_gc_fiber);
+}
+
+void
 replication_shutdown(void)
 {
+	if (replication_anon_gc_fiber != NULL) {
+		fiber_cancel(replication_anon_gc_fiber);
+		fiber_join(replication_anon_gc_fiber);
+		replication_anon_gc_fiber = NULL;
+	}
 	struct replica *replica;
 	rlist_foreach_entry(replica, &replicaset.anon, in_anon)
 		applier_stop(replica->applier);
