@@ -1529,6 +1529,18 @@ box_check_replication_anon(void)
 	return anon;
 }
 
+static double
+box_check_replication_anon_ttl(void)
+{
+	double ttl = cfg_getd("replication_anon_ttl");
+	if (ttl <= 0) {
+		diag_set(ClientError, ER_CFG, "replication_anon_ttl",
+			 "the value must be greater than 0");
+		return -1;
+	}
+	return ttl;
+}
+
 static int
 box_check_instance_uuid(struct tt_uuid *uuid)
 {
@@ -1973,6 +1985,8 @@ box_check_config(void)
 	if (box_check_replication_threads() < 0)
 		diag_raise();
 	box_check_replication_sync_timeout();
+	if (box_check_replication_anon_ttl() < 0)
+		diag_raise();
 	if (box_check_bootstrap_strategy() == BOOTSTRAP_STRATEGY_INVALID)
 		diag_raise();
 	uri_create(&uri, NULL);
@@ -2341,6 +2355,19 @@ box_set_replication_anon(void)
 			  " has finished");
 	}
 	guard.is_active = false;
+}
+
+int
+box_set_replication_anon_ttl(void)
+{
+	double ttl = box_check_replication_anon_ttl();
+	if (ttl <= 0)
+		return -1;
+	replication_anon_ttl = ttl;
+	/* The fiber can be NULL on configuration. */
+	if (replication_anon_gc_fiber != NULL)
+		fiber_wakeup(replication_anon_gc_fiber);
+	return 0;
 }
 
 /**
@@ -5791,6 +5818,11 @@ box_cfg_xc(void)
 	 */
 	if (gc_load_consumers() != 0)
 		diag_raise();
+
+	/*
+	 * Initialize GC of anonymous replicas after loading WAL GC consumers.
+	 */
+	replication_anon_gc_init();
 
 	/*
 	 * Exclude self from GC delay because we care

@@ -1502,6 +1502,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'replication_anon',
             default = false,
         }),
+        anon_ttl = schema.scalar({
+            type = 'number',
+            box_cfg = 'replication_anon_ttl',
+            default = 60 * 60,
+        }),
         threads = schema.scalar({
             type = 'integer',
             box_cfg = 'replication_threads',

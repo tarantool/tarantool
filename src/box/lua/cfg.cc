@@ -420,6 +420,14 @@ lbox_cfg_set_replication_anon(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_cfg_set_replication_anon_ttl(struct lua_State *L)
+{
+	if (box_set_replication_anon_ttl() < 0)
+		luaT_error(L);
+	return 0;
+}
+
 /** box.cfg.instance_name. */
 static int
 lbox_cfg_set_instance_name(struct lua_State *L)
@@ -544,6 +552,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_replication_sync_timeout", lbox_cfg_set_replication_sync_timeout},
 		{"cfg_set_replication_skip_conflict", lbox_cfg_set_replication_skip_conflict},
 		{"cfg_set_replication_anon", lbox_cfg_set_replication_anon},
+		{"cfg_set_replication_anon_ttl", lbox_cfg_set_replication_anon_ttl},
 		{"cfg_set_replicaset_name", lbox_cfg_set_replicaset_name},
 		{"cfg_set_instance_name", lbox_cfg_set_instance_name},
 		{"cfg_set_cluster_name", lbox_cfg_set_cluster_name},
