@@ -98,6 +98,16 @@ extern "C" {
 struct gc_consumer;
 
 static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
+/**
+ * If we haven't heard from an anonymous replica during this time, it will be
+ * deactivated.
+ */
+extern double replication_anon_gc_timeout;
+/**
+ * Fiber that deactivates anonymous replicas that haven't been in touch
+ * for too long.
+ */
+extern struct fiber *replication_anon_gc_fiber;
 
 enum { REPLICATION_THREADS_MAX = 1000 };
 

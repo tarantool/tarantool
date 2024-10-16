@@ -225,6 +225,7 @@ g.test_defaults = function()
         replication = {
             failover = 'off',
             anon = false,
+            anon_gc_timeout = 60 * 60,
             threads = 1,
             timeout = 1,
             synchro_timeout = 5,

@@ -100,6 +100,18 @@ local function write_subscribe(s, uuid, replicaset_uuid, vclock)
     return socket_write(s, header, body)
 end
 
+-- Send IPROTO_OK with custom body
+local function write_ok(s, body)
+    local header = {
+        [key.REQUEST_TYPE] = box.iproto.type.OK,
+        [key.SYNC] = 1,
+    }
+    if body == nil then
+        body = {}
+    end
+    return socket_write(s, header, body)
+end
+
 local g = t.group('WAL GC of anonymous replicas')
 
 g.before_each(function(g)
@@ -275,4 +287,193 @@ g.test_checkpoint_join = function(g)
     h, b = socket_read(g.s)
     t.assert_equals(h[key.REQUEST_TYPE], err_type)
     t.assert_equals(b[key.ERROR_24], err_msg)
+end
+
+g = t.group('Expiration of anonymous replicas')
+
+g.before_each(function(g)
+    g.server = server:new()
+    g.server:start()
+    g.server:exec(function()
+        box.begin()
+        box.schema.space.create('test')
+        box.space.test:create_index('pk')
+        for i = 1, 10 do
+            box.space.test:replace{i}
+        end
+        box.commit()
+    end)
+    g.s = socket_connect(g.server)
+end)
+
+g.after_each(function(g)
+    g.s:close()
+    g.server:stop()
+end)
+
+local EXPIRATION_MSG_PATTERN = "Anonymous replica %s has not been used for " ..
+    "too long so it has been deactivated"
+local EXPIRATION_FAILURE_MSG_PATTERN = "Failed to deactivate expired " ..
+    "anonymous replica %s"
+
+-- Escape UUID to pass it to regex
+local function escape_uuid(uuid)
+    return string.gsub(uuid, '%-', '%%%-')
+end
+
+g.test_expiration_fetch_snapshot = function(g)
+    g.server:exec(function()
+        box.cfg{replication_anon_gc_timeout = 0.1}
+    end)
+    local uuid = require('uuid').str()
+    write_fetch_snapshot(g.s, uuid)
+    read_fetch_snapshot_response(g)
+
+    -- Wait while the consumer will be deleted
+    g.server:exec(function()
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.space._gc_consumers:select{}, {})
+        end)
+    end)
+
+    -- Expiration is logged
+    local msg = string.format(EXPIRATION_MSG_PATTERN, escape_uuid(uuid))
+    t.assert(g.server:grep_log(msg))
+end
+
+-- The case checks if the consumer is not expired when fetching snapshot
+-- for too long.
+g.test_expiration_long_fetch_snapshot = function(g)
+    t.tarantool.skip_if_not_debug()
+    local fiber = require('fiber')
+    local uuid = require('uuid').str()
+    g.server:exec(function()
+        box.cfg{replication_anon_gc_timeout = 0.1}
+        -- Set the tweak to flush packets on each row and the tweak
+        -- not to send the read-view too fast
+        local tweaks = require('internal.tweaks')
+        tweaks.xrow_stream_flush_size = 1
+        box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0.2)
+    end)
+    write_fetch_snapshot(g.s, uuid)
+    local h = socket_read(g.s)
+    t.assert_equals(h[key.REQUEST_TYPE], type.OK)
+
+    fiber.sleep(0.3)
+
+    g.server:exec(function()
+        -- Consumer is still registered
+        t.assert_not_equals(box.space._gc_consumers:select{}, {})
+        t.assert_not_equals(box.info.gc().consumers, {})
+    end)
+
+    socket_restart(g)
+
+    -- Wait while the consumer will be deleted
+    g.server:exec(function()
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.space._gc_consumers:select{}, {})
+        end)
+    end)
+end
+
+g.test_expiration_subscribe = function(g)
+    local fiber = require('fiber')
+    g.server:exec(function()
+        box.cfg{replication_anon_gc_timeout = 0.1}
+    end)
+    local replicaset_uuid = g.server:eval("return box.info.replicaset.uuid")
+    local uuid = require('uuid').str()
+    local vclock = g.server:get_vclock()
+    vclock[0] = nil
+    write_subscribe(g.s, uuid, replicaset_uuid, vclock)
+    local h = socket_read(g.s)
+    t.assert_equals(h[key.REQUEST_TYPE], type.OK)
+
+    -- Sleep for a while and check if the consumer is still alive
+    fiber.sleep(0.2)
+    g.server:exec(function()
+        t.assert_equals(#box.space._gc_consumers:select{}, 1)
+        t.assert_equals(#box.info.gc().consumers, 1)
+    end)
+
+    socket_restart(g)
+
+    g.server:exec(function()
+        -- Wait while the consumer will be deleted
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.gc().consumers, {})
+            t.assert_equals(box.space._gc_consumers:select{}, {})
+        end)
+    end)
+
+    -- Expiration is logged
+    local msg = string.format(EXPIRATION_MSG_PATTERN, escape_uuid(uuid))
+    t.assert(g.server:grep_log(msg))
+end
+
+-- The case checks if the consumer is not expired when the replica is subscribed
+-- but receives nothing so its consumer is not advanced actually.
+g.test_expiration_idle_subscribe = function(g)
+    local fiber = require('fiber')
+    local uuid = require('uuid').str()
+    local replicaset_uuid = g.server:eval("return box.info.replicaset.uuid")
+    g.server:exec(function() box.cfg{replication_anon_gc_timeout = 0.05} end)
+    local vclock = g.server:get_vclock()
+    vclock[0] = nil
+    write_subscribe(g.s, uuid, replicaset_uuid, vclock)
+    local h = socket_read(g.s)
+    t.assert_equals(h[key.REQUEST_TYPE], type.OK)
+
+    -- Keep connected to master for more than `replication_anon_gc_timeout`.
+    for _ = 1, 6 do
+        fiber.sleep(0.01)
+        write_ok(g.s, {[key.VCLOCK] = setmap({})})
+    end
+
+    g.server:exec(function()
+        -- Consumer is still registered
+        t.assert_not_equals(box.info.gc().consumers, {})
+        t.assert_not_equals(box.space._gc_consumers:select{}, {})
+    end)
+
+    socket_restart(g)
+
+    -- Wait while the consumer will be deleted
+    g.server:exec(function()
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.gc().consumers, {})
+            t.assert_equals(box.space._gc_consumers:select{}, {})
+        end)
+    end)
+end
+
+g.test_expiration_failure = function(g)
+    t.tarantool.skip_if_not_debug()
+    g.server:exec(function()
+        box.cfg{replication_anon_gc_timeout = 0.1}
+    end)
+    local uuid = require('uuid').str()
+    write_fetch_snapshot(g.s, uuid)
+    read_fetch_snapshot_response(g)
+
+    -- Set WAL errinj and for failure message in logs
+    g.server:exec(function()
+        box.error.injection.set('ERRINJ_WAL_WRITE', true)
+    end)
+    t.helpers.retrying({}, function()
+        local msg = string.format(EXPIRATION_FAILURE_MSG_PATTERN,
+            escape_uuid(uuid))
+        t.assert(g.server:grep_log(msg))
+    end)
+
+    -- Remove WAL errinj and wait for WAL GC state for being deleted
+    g.server:exec(function()
+        box.error.injection.set('ERRINJ_WAL_WRITE', false)
+    end)
+    g.server:exec(function()
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.space._gc_consumers:select{}, {})
+        end)
+    end)
 end

@@ -43,6 +43,7 @@
 #include "relay.h"
 #include "sio.h"
 #include "tweaks.h"
+#include "clock.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
@@ -71,6 +72,9 @@ char cfg_instance_name[NODE_NAME_SIZE_MAX];
 
 bool replication_synchro_timeout_rollback_enabled = true;
 TWEAK_BOOL(replication_synchro_timeout_rollback_enabled);
+
+double replication_anon_gc_timeout = 3600;
+struct fiber *replication_anon_gc_fiber;
 
 struct replicaset replicaset;
 
@@ -206,6 +210,71 @@ replicaset_set_sync_quorum(void)
 	replication_sync_quorum_auto = replicaset.applier.connected;
 }
 
+/**
+ * Deactivates all expired anonymous replicas. They are expected to be
+ * deleted on deactivation as orphan.
+ * Returns lowest time-to-live among remaining anonymous replicas via
+ * `lowest_ttl`. If there are no anonymous replicas left or the function has
+ * failed to deactivate a replica, `replication_anon_gc_timeout` is returned.
+ */
+static void
+replication_anon_gc(double *lowest_ttl)
+{
+	double timeout = replication_anon_gc_timeout;
+	while (true) {
+		*lowest_ttl = timeout;
+		struct replica *expired_replica = NULL;
+		/*
+		 * Search for the first expired replica. Note that we cannot
+		 * just deactivate it and continue the iteration because a yield
+		 * will happen and the replicaset can be changed significantly.
+		 */
+		replicaset_foreach(replica) {
+			if (!replica->anon || replica_has_connections(replica))
+				continue;
+			double last_seen = relay_last_row_time(replica->relay);
+			double unused = ev_monotonic_now(loop()) - last_seen;
+			double ttl = timeout - unused;
+			if (ttl <= 0) {
+				expired_replica = replica;
+				break;
+			}
+			*lowest_ttl = MIN(*lowest_ttl, ttl);
+		}
+		if (expired_replica == NULL)
+			break;
+		/* Save UUID since the replica will be deleted on success. */
+		struct tt_uuid uuid = expired_replica->uuid;
+		if (replica_deactivate(expired_replica) != 0) {
+			say_error("Failed to deactivate expired anonymous "
+				  "replica %s", tt_uuid_str(&uuid));
+			diag_log();
+			*lowest_ttl = timeout;
+			break;
+		}
+		/*
+		 * Disconnected anonymous replica without WAL GC state is
+		 * expected to be orphan, hence, deleted.
+		 */
+		assert(replica_by_uuid(&uuid) == NULL);
+		say_info("Anonymous replica %s has not been used for too long "
+			 "so it has been deactivated", tt_uuid_str(&uuid));
+	}
+}
+
+static int
+replication_anon_gc_fiber_f(va_list ap)
+{
+	(void)ap;
+	while (!fiber_is_cancelled()) {
+		fiber_check_gc();
+		double lowest_ttl = 0;
+		replication_anon_gc(&lowest_ttl);
+		fiber_sleep(lowest_ttl);
+	}
+	return 0;
+}
+
 void
 replication_init(int num_threads)
 {
@@ -231,11 +300,21 @@ replication_init(int num_threads)
 	replicaset.healthy_count = 1;
 
 	applier_init();
+	replication_anon_gc_fiber =
+		fiber_new_system("replication_anon_gc",
+				 replication_anon_gc_fiber_f);
+	if (replication_anon_gc_fiber == NULL)
+		panic("Cannot init replication submodule");
+	fiber_set_joinable(replication_anon_gc_fiber, true);
+	fiber_start(replication_anon_gc_fiber);
 }
 
 void
 replication_shutdown(void)
 {
+	fiber_cancel(replication_anon_gc_fiber);
+	fiber_join(replication_anon_gc_fiber);
+	replication_anon_gc_fiber = NULL;
 	struct replica *replica;
 	rlist_foreach_entry(replica, &replicaset.anon, in_anon)
 		applier_stop(replica->applier);
