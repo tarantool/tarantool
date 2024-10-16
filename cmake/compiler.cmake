@@ -236,32 +236,18 @@ macro(enable_tnt_compile_flags)
             object-size
             # See https://github.com/tarantool/tarantool/issues/10742.
             pointer-overflow
-            # Intrusive data structures may abuse '&obj->member' on pointer
-            # 'obj' which is not really a pointer at an object of its type.
-            # For example, rlist uses '&item->member' expression in macro cycles
-            # to check end of cycle, but on the last iteration 'item' points at
-            # the list metadata head, not at an object of type stored in this
-            # list.
-            vptr
             # Integer overflow and truncation are disabled due to extensive
             # usage of this UB in SQL code to 'implement' some kind of int65_t.
-            implicit-signed-integer-truncation
-            implicit-integer-sign-change
             signed-integer-overflow
             # NULL checking is disabled, because this is not a UB and raises
             # lots of false-positive fails such as typeof(*obj) with
-            # obj == NULL, or memcpy() with NULL argument and 0 size. All
-            # nullability sanitations are disabled, because from the tests it
-            # seems they implicitly turn each other on, when one is used. For
-            # example, having "returns-nonnull-attribute" may lead to fail in
-            # the typeof(*obj) when obj is NULL, even though there is nothing
-            # related to return.
+            # obj == NULL, or memcpy() with NULL argument and 0 size.
+            # "UBSan: check null is globally suppressed",
+            # https://github.com/tarantool/tarantool/issues/10741
             null
+            # "UBSan: check nonnull-attribute is globally suppressed",
+            # https://github.com/tarantool/tarantool/issues/10740
             nonnull-attribute
-            nullability-arg
-            returns-nonnull-attribute
-            nullability-assign
-            nullability-return
             # Not interested in function type mismatch errors.
             function
         )
