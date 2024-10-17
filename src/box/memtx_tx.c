@@ -2842,8 +2842,10 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
  * Detect whether the transaction can see prepared, but unconfirmed commits.
  */
 static bool
-detect_whether_prepared_ok(struct txn *txn)
+detect_whether_prepared_ok(struct txn *txn, uint32_t space_id)
 {
+	if (space_id_is_system(space_id))
+		return true;
 	if (txn == NULL)
 		return false;
 	else if (txn->isolation == TXN_ISOLATION_READ_COMMITTED)
@@ -2875,7 +2877,7 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 		memtx_tx_track_read(txn, space, tuple);
 		return tuple;
 	}
-	bool is_prepared_ok = detect_whether_prepared_ok(txn);
+	bool is_prepared_ok = detect_whether_prepared_ok(txn, space_id(space));
 	struct tuple *res =
 		memtx_tx_tuple_clarify_impl(txn, space, tuple, index, mk_index,
 					    is_prepared_ok);
@@ -2934,7 +2936,8 @@ memtx_tx_index_invisible_count_matching_until_slow(
 			continue;
 
 		struct tuple *visible = NULL;
-		bool is_prepared_ok = detect_whether_prepared_ok(txn);
+		bool is_prepared_ok =
+			detect_whether_prepared_ok(txn, space_id(space));
 		bool unused;
 		memtx_tx_story_find_visible_tuple(story, txn, index->dense_id,
 						  is_prepared_ok, &visible,
@@ -2957,7 +2960,8 @@ memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct index *index,
 
 	struct memtx_story *story = memtx_tx_story_get(tuple);
 	struct tuple *visible = NULL;
-	bool is_prepared_ok = detect_whether_prepared_ok(txn);
+	bool is_prepared_ok =
+		detect_whether_prepared_ok(txn, index->def->space_id);
 	bool unused;
 	memtx_tx_story_find_visible_tuple(story, txn, index->dense_id,
 					  is_prepared_ok, &visible,
@@ -3509,7 +3513,8 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 		 *
 		 * Let's count invisible BTW, it's free.
 		 */
-		bool is_prepared_ok = detect_whether_prepared_ok(txn);
+		bool is_prepared_ok =
+			detect_whether_prepared_ok(txn, space_id(space));
 		if (memtx_tx_story_clarify_impl(txn, space, story, index,
 						0, is_prepared_ok) == NULL)
 			invisible_count++;
