@@ -42,7 +42,7 @@
 #include "session.h"
 #include "wal_ext.h"
 #include "rmean.h"
-#include "arrow_ipc.h"
+#include "core/arrow_ipc.h"
 
 double too_long_threshold;
 
