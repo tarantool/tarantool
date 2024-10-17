@@ -410,8 +410,11 @@ sequence_data_read_view_create(struct index *index)
 {
 	static const struct index_read_view_vtab vtab = {
 		.free = sequence_data_read_view_free,
+		.count = generic_index_read_view_count,
 		.get_raw = sequence_data_read_view_get_raw,
 		.create_iterator = sequence_data_iterator_create,
+		.create_iterator_with_offset =
+			generic_index_read_view_create_iterator_with_offset,
 	};
 	struct sequence_data_read_view *rv = xmalloc(sizeof(*rv));
 	index_read_view_create(&rv->base, &vtab, index->def);
