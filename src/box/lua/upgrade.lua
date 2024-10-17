@@ -253,7 +253,7 @@ local function upgrade_to_1_7_5()
 end
 
 local function user_trig_1_7_5(_, tuple)
-    if tuple and not tuple[5] then
+    if tuple and (type(tuple[5]) ~= 'table' or not next(tuple[5])) then
         tuple = tuple:update{{'=', 5, setmap({})}}
         log.info("Set empty password to %s '%s'", tuple[4], tuple[3])
     end
@@ -314,9 +314,33 @@ space_formats_1_7_5._vuser = space_formats_1_7_5._user
 space_formats_1_7_5._vpriv = space_formats_1_7_5._priv
 
 local function space_trig_1_7_5(_, tuple)
-    if tuple and space_formats_1_7_5[tuple[3]] and
+    if tuple == nil then
+        return nil
+    end
+    local is_changed = false
+    if space_formats_1_7_5[tuple[3]] and
        not table.equals(space_formats_1_7_5[tuple[3]], tuple[7]) then
+        -- Update format of system spaces.
         tuple = tuple:update{{'=', 7, space_formats_1_7_5[tuple[3]]}}
+        is_changed = true
+    elseif type(tuple[7]) == 'table' and next(tuple[7]) ~= nil and
+           type(tuple[7][1]) == 'table' and tuple[7][1]['name'] == nil then
+        -- Update format of user spaces. It had the following type:
+        -- {'a', type = 'number'}, and not it looks like that:
+        -- {name = 'a', type = 'number'}.
+        local format = tuple[7]
+        for _, f in ipairs(format) do
+            f['name'] = f[1]
+            f[1] = nil
+            is_changed = true
+        end
+        tuple = tuple:update{{'=', 7, format}}
+    elseif type(tuple[7]) ~= 'table' or not next(tuple[7]) then
+        -- Make sure, that the format is encoded as array.
+        tuple = tuple:update{{'=', 7, {}}}
+        -- No need to log message, since nothing have been changed.
+    end
+    if is_changed then
         log.info("Update space '%s' format: new format %s", tuple[3],
                  json.encode(tuple[7]))
     end
