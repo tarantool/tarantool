@@ -96,7 +96,7 @@ struct iproto_stream {
 	struct txn *txn;
 	/**
 	 * Queue of pending requests (iproto messages) for this stream,
-	 * processed sequentially. This field is accesable only from
+	 * processed sequentially. This field is accessible only from
 	 * iproto thread. Queue items has iproto_msg type.
 	 */
 	struct stailq pending_requests;
@@ -111,7 +111,7 @@ struct iproto_stream {
 	struct cmsg on_disconnect;
 	/**
 	 * Message currently being processed in the tx thread.
-	 * This field is accesable only from iproto thread.
+	 * This field is accessible only from iproto thread.
 	 */
 	struct iproto_msg *current;
 };
@@ -147,7 +147,7 @@ struct iproto_drop_finished {
 	 *
 	 * Generation is used to handle racy situation when previous invocation
 	 * of iproto_drop_connections() was failed and there is new invocation.
-	 * Message from previous invocation may be delivired and account
+	 * Message from previous invocation may be delivered and account
 	 * iproto thread as finished dropping connection which is not true.
 	 */
 	unsigned generation;
@@ -600,7 +600,7 @@ struct iproto_msg
 	bool close_connection;
 	/**
 	 * A stailq_entry to hold message in stream.
-	 * All messages processed in stream sequently. Before processing
+	 * All messages processed in stream sequentially. Before processing
 	 * all messages added to queue of pending requests. If this queue
 	 * was empty message begins to be processed, otherwise it waits until
 	 * all previous messages are processed.
@@ -801,7 +801,7 @@ struct iproto_connection
 	 */
 	size_t parse_size;
 	/**
-	 * Nubmer of active long polling requests that have already
+	 * Number of active long polling requests that have already
 	 * discarded their arguments in order not to stall other
 	 * connections.
 	 */
@@ -842,7 +842,7 @@ struct iproto_connection
 	bool can_write;
 	/**
 	 * Hash table that holds all streams for this connection.
-	 * This field is accesable only from iproto thread.
+	 * This field is accessible only from iproto thread.
 	 */
 	struct mh_i64ptr_t *streams;
 	/**
@@ -1013,24 +1013,25 @@ iproto_msg_new(struct iproto_connection *con)
 }
 
 /**
- * Signal input unless it's blocked on I/O or stopped.
+ * Signal input unless it's blocked on I/O, stopped or is in replication.
  */
 static inline void
 iproto_connection_feed_input(struct iproto_connection *con)
 {
 	assert(con->state == IPROTO_CONNECTION_ALIVE);
-	if (!ev_is_active(&con->input) && rlist_empty(&con->in_stop_list))
+	if (!ev_is_active(&con->input) && rlist_empty(&con->in_stop_list) &&
+	    !con->is_in_replication)
 		ev_feed_event(con->loop, &con->input, EV_CUSTOM);
 }
 
 /**
- * Signal output unless it's blocked on I/O.
+ * Signal output unless it's blocked on I/O or is in replication.
  */
 static inline void
 iproto_connection_feed_output(struct iproto_connection *con)
 {
 	assert(con->state == IPROTO_CONNECTION_ALIVE);
-	if (!ev_is_active(&con->output))
+	if (!ev_is_active(&con->output) && !con->is_in_replication)
 		ev_feed_event(con->loop, &con->output, EV_CUSTOM);
 }
 
@@ -1159,7 +1160,7 @@ iproto_connection_close(struct iproto_connection *con)
 			/**
 			 * If stream->current == NULL and stream requests
 			 * queue is empty, it means that there is some active
-			 * transaction which was not commited yet. We need to
+			 * transaction which was not committed yet. We need to
 			 * rollback it, since we push on_disconnect message
 			 * to tx thread here. Otherwise we destroy stream in
 			 * `net_send_msg` after processing all requests.
@@ -1479,6 +1480,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 	struct iostream *io = &con->io;
 	assert(con->state == IPROTO_CONNECTION_ALIVE);
 	assert(rlist_empty(&con->in_stop_list));
+	assert(!con->is_in_replication);
 	assert(loop == con->loop);
 	/*
 	 * Throttle if there are too many pending requests,
@@ -1612,6 +1614,7 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 {
 	struct iproto_connection *con = (struct iproto_connection *) watcher->data;
 	assert(con->state == IPROTO_CONNECTION_ALIVE);
+	assert(!con->is_in_replication);
 	int rc;
 	while ((rc = iproto_flush(con)) <= 0) {
 		if (rc != 0) {
@@ -3223,11 +3226,10 @@ net_send_msg(struct cmsg *m)
 	}
 	con->wend = msg->wpos;
 
-	if (con->state == IPROTO_CONNECTION_ALIVE) {
+	if (con->state == IPROTO_CONNECTION_ALIVE)
 		iproto_connection_feed_output(con);
-	} else if (iproto_connection_is_idle(con)) {
+	else if (iproto_connection_is_idle(con))
 		iproto_connection_close(con);
-	}
 	iproto_msg_delete(msg);
 }
 
