@@ -419,10 +419,11 @@ memtx_tx_invalidate_space(struct space *space, struct txn *active_txn);
  * Create a snapshot cleaner.
  * @param cleaner - cleaner to create.
  * @param space - space for which the cleaner must be created.
+ * @param index - index for which the cleaner must be created.
  */
 void
 memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
-				 struct space *space);
+				 struct space *space, struct index *index);
 
 /** Helper of txm_snapshot_clafify. */
 struct tuple *

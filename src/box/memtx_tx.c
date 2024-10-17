@@ -3270,7 +3270,7 @@ struct memtx_tx_snapshot_cleaner_entry
 
 void
 memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
-				 struct space *space)
+				 struct space *space, struct index *index)
 {
 	cleaner->ht = NULL;
 	if (rlist_empty(&space->memtx_stories) &&
@@ -3281,8 +3281,8 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
 		struct tuple *tuple = story->tuple;
 		struct tuple *clean =
-			memtx_tx_tuple_clarify_impl(NULL, space, tuple,
-						    space->index[0], 0, true);
+			memtx_tx_tuple_clarify_impl(NULL, space, tuple, index,
+						    0, true);
 		if (clean == tuple)
 			continue;
 
