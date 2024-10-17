@@ -46,5 +46,7 @@ for i = 1, 13 do s:insert{ i, string.rep('x', i) } end
 
 s:bsize()
 utils.space_bsize(s)
+type(s:bsize())
+type(utils.space_bsize(s))
 
 s:drop()
