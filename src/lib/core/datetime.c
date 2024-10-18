@@ -34,6 +34,12 @@
  * since Rata Die (0001-01-01).
  * DT_EPOCH_1970_OFFSET is the distance in days from Rata Die to Epoch.
  */
+#if ENABLE_UB_SANITIZER
+/* See https://github.com/tarantool/tarantool/issues/10704. */
+static int
+local_dt(int64_t secs)
+  __attribute__((no_sanitize("signed-integer-overflow")));
+#endif
 static int
 local_dt(int64_t secs)
 {
