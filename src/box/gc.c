@@ -903,7 +903,6 @@ gc_erase_consumer_on_commit(struct trigger *trigger, void *event)
 int
 gc_erase_consumer(const struct tt_uuid *uuid)
 {
-	assert(in_txn() != NULL);
 	struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
 	if (!gc_schema_supports_persistent_consumers()) {
 		if (consumer != NULL)
@@ -911,16 +910,23 @@ gc_erase_consumer(const struct tt_uuid *uuid)
 		return 0;
 	}
 
-	if (boxk(IPROTO_DELETE, BOX_GC_CONSUMERS_ID, "[%s]",
-		 tt_uuid_str(uuid)) != 0)
+	bool is_autocommit = in_txn() == NULL;
+	if (is_autocommit && txn_begin() == NULL)
 		return -1;
+
+	if (boxk(IPROTO_DELETE, BOX_GC_CONSUMERS_ID, "[%s]",
+		 tt_uuid_str(uuid)) != 0) {
+		if (is_autocommit)
+			txn_abort(in_txn());
+		return -1;
+	}
 
 	/* Do actual work on commit. */
 	struct trigger *on_commit =
 		xregion_alloc_object(&in_txn()->region, struct trigger);
 	trigger_create(on_commit, gc_erase_consumer_on_commit, consumer, NULL);
-	txn_stmt_on_commit(txn_current_stmt(in_txn()), on_commit);
-	return 0;
+	txn_stmt_on_commit(txn_last_stmt(in_txn()), on_commit);
+	return is_autocommit ? txn_commit(in_txn()) : 0;
 }
 
 /**

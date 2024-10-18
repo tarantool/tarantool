@@ -435,6 +435,7 @@ struct errcode_record {
 	_(ER_INVALID_VCLOCK, 288,		"Invalid vclock", "value", STRING) \
 	_(ER_SYNC_QUEUE_FULL, 289,		"The synchronous transaction queue is full") \
 	_(ER_KEY_PART_VALUE_OUT_OF_RANGE, 290,	"The value of key part exceeds the supported range for type", "partno", UINT, "field_type", STRING, "value", MSGPACK, "min", MSGPACK, "max", MSGPACK) \
+	_(ER_REPLICA_GC, 291,			"Cannot clean up replica's resources", "uuid", STRING, "details", STRING) \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*

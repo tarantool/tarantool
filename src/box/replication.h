@@ -514,6 +514,15 @@ bool
 replica_has_connections(const struct replica *replica);
 
 /**
+ * Collects garbage of a replica that is gone for a while: removes associated
+ * WAL GC state including persistent one and if the replica is anonymous, it
+ * is deleted. If the replica is connected or does not exist, an error is
+ * thrown.
+ */
+int
+replica_gc(const struct tt_uuid *uuid);
+
+/**
  * Check if there are enough "healthy" connections, and fire the appropriate
  * triggers. A replica connection is considered "healthy", when:
  * - it is a connection to a registered replica.

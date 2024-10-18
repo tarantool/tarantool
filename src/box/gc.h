@@ -426,8 +426,6 @@ gc_consumer_persist(struct gc_consumer *consumer);
  * consumer is deleted only if it's not used anymore. If the consumer does not
  * exist or is not marked as persistent, the function tries to delete it from
  * persistent WAL GC state anyway.
- *
- * NB: the function must be called inside active transaction.
  */
 int
 gc_erase_consumer(const struct tt_uuid *uuid);
