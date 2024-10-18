@@ -1125,7 +1125,11 @@ memtx_init_ephemeral_space(struct space *space)
  * corresponding on_rollback triggers to prevent rollbacked changes appearance.
  */
 struct index_build_on_rollback_data {
-	struct memtx_ddl_state *state;
+	/*
+	 * Weak reference to the index. Cannot store usual reference
+	 * since the index can be altered before rollback.
+	 */
+	struct index_weak_ref index_ref;
 	struct txn_stmt *stmt;
 };
 
@@ -1135,13 +1139,10 @@ memtx_build_on_replace_rollback(struct trigger *trigger, void *event)
 	(void)event;
 	struct index_build_on_rollback_data *data = trigger->data;
 	struct txn_stmt *stmt = data->stmt;
-	struct memtx_ddl_state *state = data->state;
-	/*
-	 * Old tuple's format is valid if it exists.
-	 */
-	assert(stmt != NULL);
-	assert(stmt->old_tuple == NULL ||
-	       memtx_tuple_validate(state->format, stmt->old_tuple) == 0);
+	struct index *index = index_weak_ref_get_index(&data->index_ref);
+	/* The index was altered - return. */
+	if (index == NULL)
+		return 0;
 
 	struct tuple *delete = NULL;
 	struct tuple *successor = NULL;
@@ -1149,19 +1150,15 @@ memtx_build_on_replace_rollback(struct trigger *trigger, void *event)
 	 * Use DUP_REPLACE_OR_INSERT mode because if we tried to replace a tuple
 	 * with a duplicate at a unique index, this trigger would not be called.
 	 */
-	state->rc = index_replace(state->index, stmt->new_tuple,
-				  stmt->old_tuple, DUP_REPLACE_OR_INSERT,
-				  &delete, &successor);
-	if (state->rc != 0) {
-		diag_move(diag_get(), &state->diag);
-		return 0;
-	}
+	int rc = index_replace(index, stmt->new_tuple, stmt->old_tuple,
+			       DUP_REPLACE_OR_INSERT, &delete, &successor);
+	VERIFY(rc == 0);
 	/*
 	 * All tuples stored in a memtx space are
 	 * referenced by the primary index. That is
 	 * why we need to ref new tuple and unref old tuple.
 	 */
-	if (state->index->def->iid == 0) {
+	if (index->def->iid == 0) {
 		if (stmt->old_tuple != NULL)
 			tuple_ref(stmt->old_tuple);
 		if (stmt->new_tuple != NULL)
@@ -1250,7 +1247,8 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 		return 0;
 	}
 	on_rollback_associates->data.stmt = stmt;
-	on_rollback_associates->data.state = state;
+	index_weak_ref_create(&on_rollback_associates->data.index_ref,
+			      state->index);
 	trigger_create(&on_rollback_associates->on_rollback,
 		       memtx_build_on_replace_rollback,
 		       &on_rollback_associates->data, NULL);
