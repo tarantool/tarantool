@@ -512,6 +512,25 @@ replica_clear_id(struct replica *replica)
 	box_broadcast_ballot();
 }
 
+int
+replica_deactivate(struct replica *replica)
+{
+	assert(relay_get_state(replica->relay) != RELAY_FOLLOW);
+	if (gc_erase_consumer(&replica->uuid) != 0)
+		return -1;
+	if (replica->gc != NULL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
+	if (replica_is_orphan(replica)) {
+		replica_hash_remove(&replicaset.hash, replica);
+		replicaset.anon_count -= replica->anon;
+		assert(replicaset.anon_count >= 0);
+		replica_delete(replica);
+	}
+	return 0;
+}
+
 bool
 replicaset_has_healthy_quorum(void)
 {
