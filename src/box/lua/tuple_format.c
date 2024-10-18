@@ -57,9 +57,7 @@ lbox_tuple_format_gc(struct lua_State *L)
 static int
 lbox_tuple_format_new(struct lua_State *L)
 {
-	int top = lua_gettop(L);
-	(void)top;
-	assert((1 <= top && 2 >= top) && lua_istable(L, 1));
+	luaT_checktype(L, 1, LUA_TTABLE);
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	struct mpstream stream;
