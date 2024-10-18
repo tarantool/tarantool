@@ -37,6 +37,7 @@
 
 #include "diag.h"
 #include "iproto_features.h"
+#include "iproto_constants.h"
 #include "node_name.h"
 #include "tt_uuid.h"
 #include "vclock/vclock.h"
@@ -417,6 +418,8 @@ struct raft_request {
 	bool is_leader_seen;
 	uint64_t state;
 	const struct vclock *vclock;
+	/** Replication group identifier. 0 - replicaset, 1 - replica-local. */
+	enum group_id group_id;
 };
 
 void
