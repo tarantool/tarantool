@@ -43,6 +43,7 @@
 #include "relay.h"
 #include "sio.h"
 #include "tweaks.h"
+#include "txn.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
@@ -222,6 +223,61 @@ static void
 replicaset_set_sync_quorum(const struct replicaset_connect_state *state)
 {
 	replication_sync_quorum_auto = state->connected - state->booting;
+}
+
+/**
+ * Implementation of `replica_gc` that doesn't do any checks.
+ * Mustn't be called inside an active transaction.
+ */
+static int
+replica_gc_impl(struct replica *replica)
+{
+	assert(in_txn() == NULL);
+	if (gc_erase_consumer(&replica->uuid) != 0)
+		return -1;
+	if (replica->gc != NULL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
+	if (replica->gc_checkpoint_ref != NULL) {
+		gc_unref_checkpoint(replica->gc_checkpoint_ref);
+		replica->gc_checkpoint_ref = NULL;
+	}
+	/* Delete the replica if it is anonymous. */
+	if (replica->anon) {
+		replica_hash_remove(&replicaset.hash, replica);
+		replicaset.anon_count -= replica->anon;
+		assert(replicaset.anon_count >= 0);
+		replica_delete(replica);
+	}
+	return 0;
+}
+
+int
+replica_gc(const struct tt_uuid *uuid)
+{
+	if (in_txn() != NULL) {
+		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
+		return -1;
+	}
+	if (tt_uuid_is_equal(uuid, &INSTANCE_UUID)) {
+		diag_set(ClientError, ER_REPLICA_GC, tt_uuid_str(uuid),
+			 "Cannot clean up self");
+		return -1;
+	}
+	struct replica *replica = replica_by_uuid(uuid);
+	if (replica == NULL) {
+		diag_set(ClientError, ER_REPLICA_GC, tt_uuid_str(uuid),
+			 "Replica does not exist");
+		return -1;
+	}
+	if (replica->has_incoming_connection) {
+		diag_set(ClientError, ER_REPLICA_GC,
+			 tt_uuid_str(&replica->uuid),
+			 "Replica is connected");
+		return -1;
+	}
+	return replica_gc_impl(replica);
 }
 
 void
