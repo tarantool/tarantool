@@ -2454,6 +2454,7 @@ xrow_encode_fetch_snapshot(struct xrow_header *row,
 		(struct fetch_snapshot_request *)req;
 	const struct replication_request base_req = {
 		.version_id = &cast->version_id,
+		.instance_uuid = &cast->instance_uuid,
 	};
 	xrow_encode_replication_request(row, &base_req, IPROTO_FETCH_SNAPSHOT);
 }
@@ -2468,6 +2469,7 @@ xrow_decode_fetch_snapshot(const struct xrow_header *row,
 		.is_checkpoint_join = &req->is_checkpoint_join,
 		.checkpoint_vclock = &req->checkpoint_vclock,
 		.checkpoint_lsn = &req->checkpoint_lsn,
+		.instance_uuid = &req->instance_uuid,
 	};
 	/*
 	 * Vclock must be cleared, as it sets -1 signature, which cannot be
