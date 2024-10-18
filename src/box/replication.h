@@ -505,6 +505,14 @@ bool
 replica_has_connections(const struct replica *replica);
 
 /**
+ * Deactivate replica: remove associated WAL GC state including persistent one.
+ * Replica's relay mustn't be connected. Note that the replica can be deleted if
+ * it becomes orphan.
+ */
+int
+replica_deactivate(struct replica *replica);
+
+/**
  * Check if there are enough "healthy" connections, and fire the appropriate
  * triggers. A replica connection is considered "healthy", when:
  * - it is a connection to a registered replica.

@@ -903,13 +903,16 @@ gc_erase_consumer_on_commit(struct trigger *trigger, void *event)
 int
 gc_erase_consumer(const struct tt_uuid *uuid)
 {
-	assert(in_txn() != NULL);
 	struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
 	if (!gc_schema_supports_persistent_consumers()) {
 		if (consumer != NULL)
 			consumer->is_persistent = false;
 		return 0;
 	}
+
+	bool is_autocommit = in_txn() == NULL;
+	if (is_autocommit && txn_begin() == NULL)
+		return -1;
 
 	if (boxk(IPROTO_DELETE, BOX_GC_CONSUMERS_ID, "[%s]",
 		 tt_uuid_str(uuid)) != 0)
@@ -919,8 +922,22 @@ gc_erase_consumer(const struct tt_uuid *uuid)
 	struct trigger *on_commit =
 		xregion_alloc_object(&in_txn()->region, struct trigger);
 	trigger_create(on_commit, gc_erase_consumer_on_commit, consumer, NULL);
-	txn_stmt_on_commit(txn_current_stmt(in_txn()), on_commit);
-	return 0;
+	if (is_autocommit) {
+		/*
+		 * In the case of autocommit we can set the trigger right to the
+		 * txn since we will commit it and the statement won't be rolled
+		 * back.
+		 */
+		txn_on_commit(in_txn(), on_commit);
+	} else {
+		/*
+		 * If external txn is used, the statement can be rolled back
+		 * before its commit, so we should set the trigger to the
+		 * current statement, not the txn itself.
+		 */
+		txn_stmt_on_commit(txn_current_stmt(in_txn()), on_commit);
+	}
+	return is_autocommit ? txn_commit(in_txn()) : 0;
 }
 
 /**
