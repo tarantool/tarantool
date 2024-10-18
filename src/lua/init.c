@@ -49,6 +49,7 @@
 #include "coio.h"
 #include "core/backtrace.h"
 #include "core/tt_static.h"
+#include "lua/arrow_record_batch.h"
 #include "lua/backtrace.h"
 #include "lua/fiber.h"
 #include "lua/fiber_cond.h"
@@ -785,6 +786,7 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
 	tarantool_lua_tweaks_init(L);
+	tarantool_lua_arrow_record_batch_init(L);
 	tarantool_lua_uri_init(L);
 	tarantool_lua_utf8_init(L);
 	tarantool_lua_utils_init(L);

@@ -261,20 +261,23 @@ xrow_decode(struct xrow_header *header, const char **pos,
 	/* Nop requests aren't supposed to have a body. */
 	if (*pos < end && header->type != IPROTO_NOP) {
 		const char *body = *pos;
-		if (mp_check(pos, end))
-			goto bad_body;
+		if (mp_check(pos, end)) {
+			diag_add(ClientError, ER_INVALID_MSGPACK,
+				 "packet body");
+			goto dump;
+		}
 		header->bodycnt = 1;
 		header->body[0].iov_base = (void *) body;
 		header->body[0].iov_len = *pos - body;
 	}
-	if (end_is_exact && *pos < end)
-		goto bad_body;
+	if (end_is_exact && *pos < end) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "excess data in packet body");
+		goto dump;
+	}
 	return 0;
 bad_header:
 	diag_set(ClientError, ER_INVALID_MSGPACK, "packet header");
-	goto dump;
-bad_body:
-	diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
 dump:
 	dump_row_hex(start, end);
 	return -1;
