@@ -13,10 +13,13 @@ local mkversion_mt = {
         return string.format('%s.%s.%s', self.major, self.minor, self.patch)
     end,
     __eq = function(lhs, rhs)
-        return lhs.id == rhs.id
+        return lhs._id == rhs._id
     end,
     __lt = function(lhs, rhs)
-        return lhs.id < rhs.id
+        return lhs._id < rhs._id
+    end,
+    __le = function(lhs, rhs)
+        return lhs._id <= rhs._id
     end,
 }
 
@@ -25,16 +28,17 @@ local function mkversion_new(major, minor, patch)
     self.major = major
     self.minor = minor
     self.patch = patch
-    self.id = bit.bor(bit.lshift(bit.bor(bit.lshift(major, 8), minor), 8),
-                      patch)
+    self._id = bit.bor(bit.lshift(bit.bor(bit.lshift(major, 8), minor), 8),
+                       patch)
     return self
 end
 
 -- Parse string with version in format 'A.B.C' to version object.
 local function mkversion_from_string(version)
-    local major, minor, patch = version:match('^(%d+)%.(%d+)%.(%d+)$')
+    local major, minor, patch = version:match('^(%d+)%.(%d+)%.(%d+)[^%.]*$')
     if major == nil then
-        error('version should be in format A.B.C')
+        local err = "error during parsing version string '%s'"
+        box.error(box.error.PROC_LUA, string.format(err, version))
     end
     return mkversion_new(tonumber(major), tonumber(minor), tonumber(patch))
 end

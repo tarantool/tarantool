@@ -1477,7 +1477,7 @@ local handlers = {
     {version = mkversion(3, 1, 0), func = upgrade_to_3_1_0},
     {version = mkversion(3, 3, 0), func = upgrade_to_3_3_0},
 }
-builtin.box_init_latest_dd_version_id(handlers[#handlers].version.id)
+builtin.box_init_latest_dd_version_id(handlers[#handlers].version._id)
 
 local trig_oldest_version = nil
 
