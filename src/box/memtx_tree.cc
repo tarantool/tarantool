@@ -2454,7 +2454,7 @@ memtx_tree_index_create_read_view(struct index *base)
 	index_read_view_create(&rv->base, &vtab, base->def);
 	struct space *space = space_by_id(base->def->space_id);
 	assert(space != NULL);
-	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space);
+	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space, base);
 	rv->index = index;
 	index_ref(base);
 	memtx_tree_view_create(&rv->tree_view, &index->tree);
