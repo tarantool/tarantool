@@ -498,15 +498,30 @@ function methods.reload(self)
     end
 end
 
+function methods._hierarchy_info(self)
+    if self._configdata_applied == nil then
+        return {}
+    end
+
+    local names = self._configdata_applied:names()
+    return {
+        group = names.group_name,
+        replicaset = names.replicaset_name,
+        instance = names.instance_name,
+    }
+end
+
 function methods.info(self, version)
     selfcheck(self, 'info')
     version = version == nil and 'v1' or version
     local info = {}
     local alerts = self._aboard:alerts()
+    local hierarchy = self:_hierarchy_info()
     info['v1'] = {
         alerts = alerts,
         meta = self._metadata,
         status = self._status,
+        hierarchy = hierarchy,
     }
     info['v2'] = {
         alerts = alerts,
@@ -515,6 +530,7 @@ function methods.info(self, version)
             last = self._metadata,
         },
         status = self._status,
+        hierarchy = hierarchy,
     }
     if info[version] ~= nil then
         return info[version]
