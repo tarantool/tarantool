@@ -1306,6 +1306,7 @@ lbox_box_lua_call_runtime_priv_grant(struct lua_State *L)
 static void
 call_serializer_update_options(void)
 {
+	luaL_serializer_free_options(&call_serializer_no_error_ext);
 	luaL_serializer_copy_options(&call_serializer_no_error_ext,
 				     luaL_msgpack_default);
 	call_serializer_no_error_ext.encode_error_as_ext = 0;
