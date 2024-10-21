@@ -1503,7 +1503,7 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 		return -1;
 
 	txn_limbo_checkpoint(&txn_limbo, &synchro_req, &limbo_vclock);
-	box_raft_checkpoint_local(&raft_req);
+	box_raft_checkpoint_remote(&raft_req);
 
 	/* Respond with vclock and JOIN_META. */
 	send_join_header(stream, arg->vclock);

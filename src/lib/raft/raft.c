@@ -437,18 +437,6 @@ raft_process_recovery(struct raft *raft, const struct raft_msg *req)
 		raft->vote = req->vote;
 		raft->volatile_vote = req->vote;
 	}
-	/*
-	 * Role is never persisted. If recovery is happening, the
-	 * node was restarted, and the former role can be false
-	 * anyway.
-	 */
-	assert(req->state == 0);
-	/*
-	 * Vclock is always persisted by some other subsystem - WAL, snapshot.
-	 * It is used only to decide to whom to give the vote during election,
-	 * as a part of the volatile state.
-	 */
-	assert(req->vclock == NULL);
 	/* Raft is not enabled until recovery is finished. */
 	assert(!raft_is_enabled(raft));
 }

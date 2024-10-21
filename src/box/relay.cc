@@ -467,6 +467,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	struct relay *relay = relay_new(NULL);
 	relay_start(relay, io, sync, relay_send_initial_join_row, relay_yield,
 		    UINT64_MAX);
+	relay->version_id = replica_version_id;
 	xrow_stream_create(&relay->xrow_stream);
 	auto relay_guard = make_scoped_guard([=] {
 		xrow_stream_destroy(&relay->xrow_stream);
@@ -1119,6 +1120,22 @@ static void
 relay_send(struct relay *relay, struct xrow_header *packet)
 {
 	ERROR_INJECT_YIELD(ERRINJ_RELAY_SEND_DELAY);
+	if (iproto_type_is_raft_request(packet->type) &&
+	    relay->version_id < version_id(3, 2, 1)) {
+		/*
+		 * Until Tarantool 3.2.1 replica expects raft state to have
+		 * GROUP_LOCAL id, so we must send it so in order not to break
+		 * upgrade process.
+		 */
+		struct raft_request raft_req;
+		xrow_decode_raft(packet, &raft_req, NULL);
+		assert(raft_req.vclock == NULL);
+		raft_req.state = 0;
+		raft_req.leader_id = 0;
+		raft_req.is_leader_seen = false;
+		raft_req.group_id = GROUP_LOCAL;
+		xrow_encode_raft(packet, &fiber()->gc, &raft_req);
+	}
 
 	struct xrow_stream *stream = &relay->xrow_stream;
 	packet->sync = relay->sync;

@@ -367,6 +367,7 @@ box_raft_checkpoint_local(struct raft_request *req)
 	struct raft_msg msg;
 	raft_checkpoint_local(box_raft(), &msg);
 	box_raft_msg_to_request(&msg, req);
+	req->group_id = GROUP_LOCAL;
 }
 
 void
@@ -375,6 +376,7 @@ box_raft_checkpoint_remote(struct raft_request *req)
 	struct raft_msg msg;
 	raft_checkpoint_remote(box_raft(), &msg);
 	box_raft_msg_to_request(&msg, req);
+	req->group_id = GROUP_DEFAULT;
 }
 
 int
@@ -414,6 +416,7 @@ box_raft_write(struct raft *raft, const struct raft_msg *msg)
 
 	struct raft_request req;
 	box_raft_msg_to_request(msg, &req);
+	req.group_id = GROUP_LOCAL;
 	struct region *region = &fiber()->gc;
 	uint32_t svp = region_used(region);
 	struct xrow_header row;
