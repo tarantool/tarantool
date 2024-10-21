@@ -22,6 +22,10 @@
  * fiber.h. See gh-8025.
  *
  * [2]: test/box-tap/check_merge_source.c
+ *
+ * box_slab_info() is used in TCS to get information about the memory
+ * state during automatic selection of the columns to delete when
+ * tarantool's memory runs out.
  */
 
 extern void
@@ -52,6 +56,8 @@ extern void
 ipc_value_new(void);
 extern void
 fiber_lua_state(void);
+extern void
+box_slab_info(void);
 
 /** Symbol definition. */
 struct symbol_def {
@@ -76,6 +82,7 @@ static struct symbol_def symbols[] = {
 	{"ipc_value_delete", ipc_value_delete},
 	{"ipc_value_new", ipc_value_new},
 	{"fiber_lua_state", fiber_lua_state},
+	{"box_slab_info", box_slab_info},
 	{NULL, NULL}
 };
 

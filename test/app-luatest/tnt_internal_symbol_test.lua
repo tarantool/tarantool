@@ -26,6 +26,7 @@ g.test_fiber_channel = function()
         'ipc_value_delete',
         'ipc_value_new',
         'fiber_lua_state',
+        'box_slab_info',
     }
     -- Verify only that we can get the address. The functions are
     -- provided 'as is' and we don't guarantee anything regarding
