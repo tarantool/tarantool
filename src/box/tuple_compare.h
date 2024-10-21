@@ -37,6 +37,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct key_def;
+struct key_part;
 
 /**
  * Hints are now used for two purposes - passing the index of the
@@ -95,6 +96,15 @@ hint_cmp(hint_t hint_a, hint_t hint_b)
  */
 void
 key_def_set_compare_func(struct key_def *def);
+
+/**
+ * Compare to key fields. Fields are in MsgPack format.
+ * @return -1, 0 or 1 if \a a is less that, equals to or greater that \a b
+ * respectively.
+ */
+int
+key_part_compare(const struct key_part *part, const char *field_a,
+		 const char *field_b);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -618,7 +618,7 @@ tuple_compare_field_with_type(const char *field_a, enum mp_type a_type,
  */
 template<bool has_desc_parts>
 static inline int
-key_part_compare_result(struct key_part *part, int result)
+key_part_compare_result(const struct key_part *part, int result)
 {
 	bool is_asc = !has_desc_parts || part->sort_order != SORT_ORDER_DESC;
 	return result * (is_asc ? 1 : -1);
@@ -667,7 +667,7 @@ key_part_hint(struct key_part *part, hint_t hint)
 template<bool is_nullable, bool a_is_optional, bool b_is_optional,
 	 bool has_desc_parts>
 static ALWAYS_INLINE int
-key_part_compare_fields(struct key_part *part, const char *field_a,
+key_part_compare_fields(const struct key_part *part, const char *field_a,
 			const char *field_b, bool *was_null_met = NULL)
 {
 	int rc;
@@ -692,6 +692,14 @@ key_part_compare_fields(struct key_part *part, const char *field_a,
 						   part->type, part->coll);
 	}
 	return key_part_compare_result<has_desc_parts>(part, rc);
+}
+
+int
+key_part_compare(const struct key_part *part, const char *field_a,
+		 const char *field_b)
+{
+	return key_part_compare_fields<false, false, false, true>(
+			part, field_a, field_b);
 }
 
 template<bool is_nullable, bool has_optional_parts, bool has_json_paths,
