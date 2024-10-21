@@ -412,7 +412,7 @@ tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
 	uint32_t prev_fieldno = key_def->parts[0].fieldno;
 	struct tuple_format *format = tuple_format(tuple);
 	const char *tuple_raw = tuple_data(tuple);
-	const uint32_t *field_map = tuple_field_map(tuple);
+	const char *field_map = tuple_field_map(tuple);
 	const char *field;
 	if (has_json_paths) {
 		field = tuple_field_raw_by_part(format, tuple_raw, field_map,
