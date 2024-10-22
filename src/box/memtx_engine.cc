@@ -2174,8 +2174,9 @@ memtx_index_extent_free(void *ctx, void *extent)
  * Ensure that next num extent_alloc will succeed w/o an error
  */
 int
-memtx_index_extent_reserve(struct memtx_engine *memtx, int num)
+memtx_index_extent_reserve(void *ctx, int num)
 {
+	struct memtx_engine *memtx = (struct memtx_engine *)ctx;
 	ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
 		/* same error as in mempool_alloc */
 		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
