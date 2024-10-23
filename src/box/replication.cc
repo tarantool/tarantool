@@ -289,6 +289,7 @@ static bool
 replica_is_orphan(struct replica *replica)
 {
 	return replica->id == REPLICA_ID_NIL && replica->gc == NULL &&
+	       replica->gc_checkpoint_ref == NULL &&
 	       !replica_has_connections(replica);
 }
 
@@ -311,6 +312,7 @@ replica_new(void)
 	*replica->name = 0;
 	replica->applier = NULL;
 	replica->gc = NULL;
+	replica->gc_checkpoint_ref = NULL;
 	replica->is_applier_healthy = false;
 	replica->is_relay_healthy = false;
 	replica->is_connected = false;
@@ -331,6 +333,8 @@ replica_delete(struct replica *replica)
 		applier_delete(replica->applier);
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
+	if (replica->gc_checkpoint_ref != NULL)
+		gc_unref_checkpoint(replica->gc_checkpoint_ref);
 	TRASH(replica);
 	free(replica);
 }

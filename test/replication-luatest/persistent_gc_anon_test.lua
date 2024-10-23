@@ -52,13 +52,14 @@ end
 --
 
 -- Send IPROTO_FETCH_SNAPSHOT request
-local function write_fetch_snapshot(s, uuid)
+local function write_fetch_snapshot(s, uuid, checkpoint_join)
     local header = {
         [key.REQUEST_TYPE] = box.iproto.type.FETCH_SNAPSHOT,
         [key.SYNC] = 1,
     }
     local body = {
         [key.INSTANCE_UUID] = uuid,
+        [key.IS_CHECKPOINT_JOIN] = checkpoint_join,
     }
     return socket_write(s, header, body)
 end
@@ -256,4 +257,22 @@ g.test_registration_fail = function(g)
         t.assert_not_equals(box.info.gc().consumers, {})
         t.assert_not_equals(box.space._gc_consumers:select(), {})
     end)
+end
+
+-- Check if checkpoint join CE stub works correctly
+g.test_checkpoint_join = function(g)
+    t.tarantool.skip_if_enterprise()
+    local err_type = type.TYPE_ERROR + box.error.UNSUPPORTED
+    local err_msg = 'Community edition does not support checkpoint join'
+
+    write_fetch_snapshot(g.s, nil, true)
+    local h, b = socket_read(g.s)
+    t.assert_equals(h[key.REQUEST_TYPE], err_type)
+    t.assert_equals(b[key.ERROR_24], err_msg)
+
+    local uuid = luuid.str()
+    write_fetch_snapshot(g.s, uuid, true)
+    h, b = socket_read(g.s)
+    t.assert_equals(h[key.REQUEST_TYPE], err_type)
+    t.assert_equals(b[key.ERROR_24], err_msg)
 end

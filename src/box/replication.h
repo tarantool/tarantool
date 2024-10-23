@@ -410,6 +410,8 @@ struct replica {
 	struct relay *relay;
 	/** Garbage collection state associated with the replica. */
 	struct gc_consumer *gc;
+	/** Reference to retained checkpoint, is set only on checkpoint join. */
+	struct gc_checkpoint_ref *gc_checkpoint_ref;
 	/** Link in the anon_replicas list. */
 	struct rlist in_anon;
 	/**

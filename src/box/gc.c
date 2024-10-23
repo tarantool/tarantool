@@ -671,6 +671,20 @@ gc_checkpoint_fiber_f(va_list ap)
 	return 0;
 }
 
+struct gc_checkpoint *
+gc_checkpoint_at_vclock(const struct vclock *vclock)
+{
+	struct gc_checkpoint *checkpoint;
+	gc_foreach_checkpoint(checkpoint) {
+		int rc = vclock_compare(&checkpoint->vclock, vclock);
+		if (rc > 0)
+			break;
+		if (rc == 0)
+			return checkpoint;
+	}
+	return NULL;
+}
+
 struct gc_checkpoint_ref *
 gc_ref_checkpoint(struct gc_checkpoint *checkpoint, const char *format, ...)
 {
