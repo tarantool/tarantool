@@ -94,7 +94,11 @@ local function is_candidate_checked(candidate)
            conn.state == 'closed'
 end
 
+-- This method connects to all of the specified instances
+-- and returns the set of successfully connected ones.
 local function connect_to_candidates(candidates)
+    if next(candidates) == nil then return {} end
+
     local delay = WATCHER_DELAY
     local connect_deadline = clock.monotonic() + WATCHER_TIMEOUT
 
@@ -232,12 +236,22 @@ local function filter(opts)
         roles = '?table',
         sharding_roles = '?table',
         mode = '?string',
+        skip_connection_check = '?boolean',
     })
     opts = opts or {}
+
     if opts.mode ~= nil and opts.mode ~= 'ro' and opts.mode ~= 'rw' then
         local msg = 'Expected nil, "ro" or "rw", got "%s"'
         error(msg:format(opts.mode), 0)
     end
+
+    if opts.skip_connection_check and opts.mode ~= nil then
+        local msg = 'Filtering by mode "%s" requires the connection ' ..
+                    'check but it\'s been disabled by the ' ..
+                    '"skip_connection_check" option'
+        error(msg:format(opts.mode), 0)
+    end
+
     if opts.sharding_roles ~= nil then
         for _, sharding_role in ipairs(opts.sharding_roles) do
             if sharding_role == 'rebalancer' then
@@ -271,12 +285,16 @@ local function filter(opts)
             table.insert(static_candidates, instance_name)
         end
     end
-    -- Return if retrieving dynamic information is not required.
-    if next(static_candidates) == nil or next(dynamic_opts) == nil then
+
+    -- Return if the connection check isn't needed.
+    if opts.skip_connection_check then
         return static_candidates
     end
 
     -- Filter the remaining candidates after connecting to them.
+    --
+    -- The connect_to_candidates() call returns quickly if it
+    -- receives empty table as an argument.
     local connected_candidates = connect_to_candidates(static_candidates)
     local dynamic_candidates = {}
     for _, instance_name in pairs(connected_candidates) do
