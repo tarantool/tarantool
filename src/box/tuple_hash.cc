@@ -308,13 +308,12 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 	 * double and decimal have the same hash.
 	 */
 	if (type == FIELD_TYPE_DOUBLE) {
-		double value;
+		double value = 0;
 		/*
 		 * This will only fail if the mp_type is not numeric, which is
 		 * impossible here (see field_mp_plain_type_is_compatible).
 		 */
-		if (mp_read_double_lossy(field, &value) == -1)
-			unreachable();
+		VERIFY(mp_read_double_lossy(field, &value) == 0);
 		char *double_msgpack_end = mp_encode_double(buf, value);
 		size = double_msgpack_end - buf;
 		assert(size <= sizeof(buf));
