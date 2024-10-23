@@ -255,6 +255,13 @@ gc_last_checkpoint(void)
 }
 
 /**
+ * Return the checkpoint with exact @vclock. NULL is returned if
+ * checkpoint is not found.
+ */
+struct gc_checkpoint *
+gc_checkpoint_at_vclock(const struct vclock *vclock);
+
+/**
  * Initialize the garbage collection state.
  */
 void
