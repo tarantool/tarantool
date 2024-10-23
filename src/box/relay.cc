@@ -482,8 +482,12 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	 * All these versions know of additional META stage of initial join.
 	 */
 	ctx.send_meta = replica_version_id > 0;
-	ctx.vclock = vclock;
 	ctx.cursor = cursor;
+	/*
+	 * If cursor is passed, we should respond with its vclock because
+	 * it will actually be vclock of a last sent row.
+	 */
+	ctx.vclock = cursor != NULL ? cursor->vclock : vclock;
 	engine_prepare_join_xc(&ctx);
 	auto join_guard = make_scoped_guard([&] {
 		engine_complete_join(&ctx);

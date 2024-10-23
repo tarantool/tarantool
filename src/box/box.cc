@@ -4491,6 +4491,10 @@ box_connect_replica(const struct tt_uuid *uuid, const struct vclock *gc_vclock,
 					   &replica->uuid);
 	if (gc_consumer_persist(replica->gc) != 0)
 		diag_raise();
+	if (replica->gc_checkpoint_ref != NULL) {
+		gc_unref_checkpoint(replica->gc_checkpoint_ref);
+		replica->gc_checkpoint_ref = NULL;
+	}
 	*out = replica;
 	return guard;
 }
@@ -4508,23 +4512,54 @@ box_process_fetch_snapshot(struct iostream *io,
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
-	struct replica *replica = NULL;
-	auto replica_guard = box_connect_replica(&req.instance_uuid,
-						 instance_vclock, &replica);
-	(void)replica;
-
-	say_info("sending read-view to replica at %s", sio_socketname(io->fd));
-	/* Used for checkpoint initial join. */
+	/*
+	 * Find checkpoint for checkpoint join. If replica didn't request
+	 * specific one, take the newest one. Initialize checkpoint cursor
+	 * with chosen checkpoint and use its vclock for WAL GC consumer.
+	 * If requested checkpoint is not found, raise an error.
+	 */
 	struct checkpoint_cursor cursor;
 	struct checkpoint_cursor *cursor_ptr = NULL;
+	struct gc_checkpoint *checkpoint = NULL;
+	const struct vclock *gc_vclock = instance_vclock;
 	if (req.is_checkpoint_join) {
+		if (vclock_is_set(&req.checkpoint_vclock)) {
+			checkpoint =
+				gc_checkpoint_at_vclock(&req.checkpoint_vclock);
+		} else {
+			checkpoint = gc_last_checkpoint();
+		}
+		if (checkpoint == NULL)
+			tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 		memset(&cursor, 0, sizeof(cursor));
-		cursor.vclock = &req.checkpoint_vclock;
+		cursor.vclock = &checkpoint->vclock;
 		cursor.start_lsn = req.checkpoint_lsn;
 		cursor_ptr = &cursor;
+		gc_vclock = &checkpoint->vclock;
+	}
+
+	struct replica *replica = NULL;
+	auto replica_guard = box_connect_replica(&req.instance_uuid,
+						 gc_vclock, &replica);
+	/* Reference checkpoint in case of checkpoint join. */
+	struct gc_checkpoint_ref *checkpoint_ref = NULL;
+	auto gc_checkpoint_ref_guard = make_scoped_guard([&]() {
+		if (checkpoint_ref != NULL)
+			gc_unref_checkpoint(checkpoint_ref);
+	});
+	if (checkpoint != NULL) {
+		if (replica == NULL) {
+			checkpoint_ref = gc_ref_checkpoint(
+				checkpoint, "checkpoint join");
+		} else {
+			replica->gc_checkpoint_ref = gc_ref_checkpoint(
+				checkpoint, "checkpoint join of replica %s",
+				tt_uuid_str(&replica->uuid));
+		}
 	}
 
 	/* Send the snapshot data to the instance. */
+	say_info("sending read-view to replica at %s", sio_socketname(io->fd));
 	struct vclock start_vclock;
 	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
 			   cursor_ptr);
