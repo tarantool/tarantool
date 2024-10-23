@@ -103,6 +103,12 @@ set_kernel_setting \
   "/sys/kernel/mm/transparent_hugepage/defrag" \
   "never"
 
+# Disable ASLR for the repeatable LuaJIT behaviour.
+set_kernel_setting \
+  "Disable ASLR" \
+  "/proc/sys/kernel/randomize_va_space" \
+  "0"
+
 ###
 # System tuning.
 ###

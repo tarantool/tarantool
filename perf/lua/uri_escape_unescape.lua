@@ -26,17 +26,7 @@ local str = "A$B$C$D$E$F$G$H$I$J$K$L$M$N$O$P$Q$R$S$T$U$V$W$X$Y$Z$ #"
 local encode_sample = string.rep(str, 10^3)
 local decode_sample = uri.escape(encode_sample, escape_opts)
 
--- JIT compilation starts work after detecting "hot" paths in loops and
--- function's calls. It potentially will make execution time of first
--- iterations slower than next ones. To avoid such effect we can introduce
--- "warmup" iterations, disable JIT at all or make JIT compilation
--- aggressive from the beginning.
---   - hotloop=1 enables compilation in loops after the first iteration.
---   - hotexit=1 enables faster compilation for side traces after
---     exit the parent trace.
-jit.opt.start("hotloop=1", "hotexit=1")
-
-local CYCLES = 10^3
+local CYCLES = 10^4
 
 local tests = {{
     name = "uri.escape",
