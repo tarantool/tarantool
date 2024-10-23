@@ -30,7 +30,7 @@ end
 
 local function stop_stub_servers(g)
     for _, server in pairs(g.stub_servers) do
-        server:close()
+        pcall(server.close, server)
     end
 end
 
@@ -411,6 +411,16 @@ g.test_filter_mode = function(g)
         local opts = {mode = 'rw'}
         t.assert_items_equals(connpool.filter(opts), exp)
 
+        exp = {"instance-001", "instance-002", "instance-003",
+               "instance-004"}
+        opts = {}
+        t.assert_items_equals(connpool.filter(opts), exp)
+
+        exp = {"instance-001", "instance-002", "instance-003",
+               "instance-004", "instance-005"}
+        opts = {skip_connection_check = true}
+        t.assert_items_equals(connpool.filter(opts), exp)
+
         exp = {"instance-002", "instance-004"}
         opts = {mode = 'ro'}
         t.assert_items_equals(connpool.filter(opts), exp)
@@ -429,6 +439,12 @@ g.test_filter_mode = function(g)
 
         local exp_err = 'Expected nil, "ro" or "rw", got "something"'
         opts = {mode = 'something'}
+        t.assert_error_msg_equals(exp_err, connpool.filter, opts)
+
+        local exp_err = 'Filtering by mode "rw" requires the connection ' ..
+                        'check but it\'s been disabled by the ' ..
+                        '"skip_connection_check" option'
+        opts = {mode = 'rw', skip_connection_check = true}
         t.assert_error_msg_equals(exp_err, connpool.filter, opts)
     end
 
