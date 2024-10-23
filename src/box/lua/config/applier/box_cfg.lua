@@ -8,7 +8,10 @@ local mkversion = require('internal.mkversion')
 local function peer_uris(configdata)
     local peers = configdata:peers()
     if #peers <= 1 then
-        return nil
+        -- box.NULL means 'a default value' for box.cfg(), while
+        -- nil means 'leave a previous value'. We need the
+        -- default: there are no configured upstreams.
+        return box.NULL
     end
 
     local names = configdata:names()
