@@ -53,6 +53,7 @@ create_perf_lua_test(NAME 1mops_write)
 create_perf_lua_test(NAME box_select)
 create_perf_lua_test(NAME gh-7089-vclock-copy)
 create_perf_lua_test(NAME uri_escape_unescape)
+create_perf_lua_test(NAME luafun)
 
 include_directories(${MSGPUCK_INCLUDE_DIRS})
 
