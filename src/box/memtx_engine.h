@@ -280,7 +280,7 @@ memtx_index_extent_free(void *ctx, void *extent);
  * Ensure that next num extent_alloc will succeed w/o an error
  */
 int
-memtx_index_extent_reserve(struct memtx_engine *memtx, int num);
+memtx_index_extent_reserve(void *ctx, int num);
 
 /**
  * Generic implementation of index_vtab::def_change_requires_rebuild,
