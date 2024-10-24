@@ -630,8 +630,11 @@ memtx_hash_index_create_read_view(struct index *base)
 {
 	static const struct index_read_view_vtab vtab = {
 		.free = hash_read_view_free,
+		.count = generic_index_read_view_count,
 		.get_raw = hash_read_view_get_raw,
 		.create_iterator = hash_read_view_create_iterator,
+		.create_iterator_with_offset =
+			generic_index_read_view_create_iterator_with_offset,
 	};
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct hash_read_view *rv =

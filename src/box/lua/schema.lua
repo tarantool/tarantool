@@ -2037,6 +2037,8 @@ local function check_iterator_type(opts, key_is_nil, level)
     return itype
 end
 
+box.internal.check_iterator_type = check_iterator_type
+
 local function check_pairs_opts(opts, key_is_nil, level)
     local iterator = check_iterator_type(opts, key_is_nil, level and level + 1)
     local offset = 0
