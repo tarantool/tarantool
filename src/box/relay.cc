@@ -1119,6 +1119,14 @@ static void
 relay_send(struct relay *relay, struct xrow_header *packet)
 {
 	ERROR_INJECT_YIELD(ERRINJ_RELAY_SEND_DELAY);
+	/**
+	 * Until Tarantool 3.2.1 all raft requests were sent with
+	 * GROUP_LOCAL id. In order not to break the upgrade process,
+	 * we still send local rows to old replicas.
+	 */
+	if (iproto_type_is_raft_request(packet->type) &&
+	    relay->version_id < version_id(3, 2, 1))
+		packet->group_id = GROUP_LOCAL;
 
 	struct xrow_stream *stream = &relay->xrow_stream;
 	packet->sync = relay->sync;
