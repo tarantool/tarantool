@@ -57,9 +57,6 @@ lbox_tuple_format_gc(struct lua_State *L)
 static int
 lbox_tuple_format_new(struct lua_State *L)
 {
-	int top = lua_gettop(L);
-	(void)top;
-	assert((1 <= top && 2 >= top) && lua_istable(L, 1));
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	struct mpstream stream;
@@ -72,6 +69,11 @@ lbox_tuple_format_new(struct lua_State *L)
 	mpstream_flush(&stream);
 	size_t format_data_len = region_used(region) - region_svp;
 	const char *format_data = xregion_join(region, format_data_len);
+	if (mp_typeof(*format_data) != MP_ARRAY) {
+		diag_set(IllegalParams, "Wrong space format: expected array");
+		region_truncate(region, region_svp);
+		return luaT_error(L);
+	}
 	bool names_only = lua_toboolean(L, 2);
 	/*
 	 * Tuple formats are reusable. It means that runtime_tuple_format_new
