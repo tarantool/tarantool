@@ -134,7 +134,7 @@ relay_cancel(struct relay *relay);
 void
 relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 		   uint32_t replica_version_id,
-		   struct checkpoint_cursor *cursor);
+		   struct checkpoint_cursor *cursor, struct replica *replica);
 
 /**
  * Send final JOIN rows to the replica.

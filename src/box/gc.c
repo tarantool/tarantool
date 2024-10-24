@@ -671,6 +671,24 @@ gc_checkpoint_fiber_f(va_list ap)
 	return 0;
 }
 
+/**
+ * Return the checkpoint with exact @vclock. NULL is returned if
+ * checkpoint is not found.
+ */
+struct gc_checkpoint *
+gc_checkpoint_at_vclock(const struct vclock *vclock)
+{
+	struct gc_checkpoint *checkpoint;
+	gc_foreach_checkpoint(checkpoint) {
+		int rc = vclock_compare(&checkpoint->vclock, vclock);
+		if (rc > 0)
+			break;
+		if (rc == 0)
+			return checkpoint;
+	}
+	return NULL;
+}
+
 void
 gc_ref_checkpoint(struct gc_checkpoint *checkpoint,
 		  struct gc_checkpoint_ref *ref, const char *format, ...)
@@ -868,6 +886,16 @@ gc_consumer_persist(struct gc_consumer *consumer)
 	return 0;
 }
 
+static void
+gc_erase_consumer_finalize(struct gc_consumer *consumer)
+{
+	if (consumer != NULL) {
+		consumer->is_persistent = false;
+		if (consumer->is_orphan)
+			gc_consumer_unregister_impl(consumer);
+	}
+}
+
 /**
  * Mark consumer as not persistent and unregister it if unused.
  */
@@ -875,19 +903,13 @@ static int
 gc_erase_consumer_on_commit(struct trigger *trigger, void *event)
 {
 	(void)event;
-	struct gc_consumer *consumer = trigger->data;
-	if (consumer != NULL) {
-		consumer->is_persistent = false;
-		if (consumer->is_orphan)
-			gc_consumer_unregister_impl(consumer);
-	}
+	gc_erase_consumer_finalize((struct gc_consumer *)trigger->data);
 	return 0;
 }
 
 int
 gc_erase_consumer(const struct tt_uuid *uuid)
 {
-	assert(in_txn() != NULL);
 	struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
 	if (!gc_schema_supports_persistent_consumers()) {
 		if (consumer != NULL)
@@ -899,11 +921,16 @@ gc_erase_consumer(const struct tt_uuid *uuid)
 		 tt_uuid_str(uuid)) != 0)
 		return -1;
 
-	/* Do actual work on commit. */
-	struct trigger *on_commit =
-		xregion_alloc_object(&in_txn()->region, struct trigger);
-	trigger_create(on_commit, gc_erase_consumer_on_commit, consumer, NULL);
-	txn_stmt_on_commit(txn_current_stmt(in_txn()), on_commit);
+	if (in_txn() != NULL) {
+		/* Do actual work on commit. */
+		struct trigger *on_commit =
+			xregion_alloc_object(&in_txn()->region, struct trigger);
+		trigger_create(on_commit, gc_erase_consumer_on_commit, consumer,
+			       NULL);
+		txn_stmt_on_commit(txn_current_stmt(in_txn()), on_commit);
+	} else {
+		gc_erase_consumer_finalize(consumer);
+	}
 	return 0;
 }
 

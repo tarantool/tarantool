@@ -45,6 +45,8 @@
 #include "box/engine.h"
 #include "box/memtx_engine.h"
 #include "box/raft.h"
+#include "box/relay.h"
+#include "box/replication.h"
 #include "box/security.h"
 #include "box/wal.h"
 
@@ -185,6 +187,26 @@ lbox_ctl_wal_sync(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_ctl_deactivate_replica(struct lua_State *L)
+{
+	const char *uuid_str = luaT_checkstring(L, 1);
+	struct tt_uuid uuid;
+	if (tt_uuid_from_string(uuid_str, &uuid) != 0)
+		luaT_error(L);
+	struct replica *replica = replica_by_uuid(&uuid);
+	if (replica == NULL)
+		luaL_error(L, "Cannot deactivate replica: does not exist");
+	if (tt_uuid_is_equal(&uuid, &INSTANCE_UUID))
+		luaL_error(L, "Cannot deactivate replica: deactivation of "
+			   "self is not allowed");
+	if (relay_get_state(replica->relay) == RELAY_FOLLOW)
+		luaL_error(L, "Cannot deactivate replica: it is connected");
+	if (replica_clear_gc(replica) != 0)
+		luaT_error(L);
+	return 0;
+}
+
 static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"wait_ro", lbox_ctl_wait_ro},
 	{"wait_rw", lbox_ctl_wait_rw},
@@ -201,6 +223,7 @@ static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"set_on_shutdown_timeout", lbox_ctl_set_on_shutdown_timeout},
 	{"iproto_lockdown", lbox_ctl_set_iproto_lockdown},
 	{"wal_sync", lbox_ctl_wal_sync},
+	{"deactivate_replica", lbox_ctl_deactivate_replica},
 	{NULL, NULL}
 };
 

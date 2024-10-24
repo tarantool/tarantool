@@ -1533,6 +1533,18 @@ box_check_replication_anon(void)
 	return anon;
 }
 
+static double
+box_check_replication_anon_gc_timeout(void)
+{
+	double timeout = cfg_getd("replication_anon_gc_timeout");
+	if (timeout <= 0) {
+		diag_set(ClientError, ER_CFG, "replication_anon_gc_timeout",
+			 "the value must be greater than 0");
+		return -1;
+	}
+	return timeout;
+}
+
 static int
 box_check_instance_uuid(struct tt_uuid *uuid)
 {
@@ -1975,6 +1987,8 @@ box_check_config(void)
 	if (box_check_replication_threads() < 0)
 		diag_raise();
 	box_check_replication_sync_timeout();
+	if (box_check_replication_anon_gc_timeout() < 0)
+		diag_raise();
 	if (box_check_bootstrap_strategy() == BOOTSTRAP_STRATEGY_INVALID)
 		diag_raise();
 	if (box_check_bootstrap_leader(&uri, &uuid, name) != 0)
@@ -2342,6 +2356,17 @@ box_set_replication_anon(void)
 			  " has finished");
 	}
 	guard.is_active = false;
+}
+
+int
+box_set_replication_anon_gc_timeout(void)
+{
+	double timeout = box_check_replication_anon_gc_timeout();
+	if (timeout <= 0)
+		return -1;
+	replication_anon_gc_timeout = timeout;
+	fiber_wakeup(replication_anon_gc_expiration_fiber);
+	return 0;
 }
 
 /**
@@ -4434,21 +4459,89 @@ box_process_fetch_snapshot(struct iostream *io,
 			  "wal_mode = 'none'");
 	}
 
-	say_info("sending read-view to replica at %s", sio_socketname(io->fd));
-	/* Used for checkpoint initial join. */
+	/* Find checkpoint for checkpoint join. */
 	struct checkpoint_cursor cursor;
 	struct checkpoint_cursor *cursor_ptr = NULL;
+	struct gc_checkpoint *checkpoint = NULL;
+	const struct vclock *gc_vclock = instance_vclock;
 	if (req.is_checkpoint_join) {
+		if (vclock_is_set(&req.checkpoint_vclock)) {
+			/*
+			 * Replica requested specific snapshot. This happens,
+			 * when connection breaks and replica wants to continue
+			 * fetching files from the same place.
+			 */
+			checkpoint =
+				gc_checkpoint_at_vclock(&req.checkpoint_vclock);
+		} else {
+			checkpoint = gc_last_checkpoint();
+		}
+		/*
+		 * Implicitly requested checkpoint was probably garbage
+		 * collected, which means that we cannot send any data to
+		 * replica, as rebootstrap must be done: replica must explicitly
+		 * request latest checkpoint.
+		 */
+		if (checkpoint == NULL)
+			tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 		memset(&cursor, 0, sizeof(cursor));
-		cursor.vclock = &req.checkpoint_vclock;
+		cursor.vclock = &checkpoint->vclock;
 		cursor.start_lsn = req.checkpoint_lsn;
 		cursor_ptr = &cursor;
+		gc_vclock = &checkpoint->vclock;
+	}
+
+	struct replica *replica = NULL;
+	if (!tt_uuid_is_nil(&req.instance_uuid)) {
+		replica = replica_by_uuid(&req.instance_uuid);
+		if (replica == NULL)
+			replica = replicaset_add_anon(&req.instance_uuid);
+
+		/* Don't allow multiple relays for the same replica */
+		if (relay_get_state(replica->relay) == RELAY_FOLLOW) {
+			tnt_raise(ClientError, ER_CFG, "replication",
+				  "duplicate connection with the same replica "
+				  "UUID");
+		}
+		if (replica->gc != NULL)
+			gc_consumer_unregister(replica->gc);
+		replica->gc = gc_consumer_register(
+			gc_vclock, GC_CONSUMER_REPLICA, &replica->uuid);
+		/* Persist consumer before sending data. */
+		if (gc_consumer_persist(replica->gc) != 0)
+			diag_raise();
+		/* Clear checkpoint reference, if any. */
+		if (replica->gc_checkpoint_ref != NULL) {
+			gc_unref_checkpoint(replica->gc_checkpoint_ref);
+			replica->gc_checkpoint_ref = NULL;
+		}
+	}
+
+	struct gc_checkpoint_ref checkpoint_ref;
+	auto gc_checkpoint_ref_guard = make_scoped_guard([&]() {
+		gc_unref_checkpoint(&checkpoint_ref);
+	});
+	gc_checkpoint_ref_guard.is_active = false;
+	if (checkpoint != NULL) {
+		if (replica == NULL) {
+			gc_ref_checkpoint(checkpoint, &checkpoint_ref,
+					  "checkpoint join");
+			gc_checkpoint_ref_guard.is_active = true;
+		} else {
+			replica->gc_checkpoint_ref =
+				xalloc_object(struct gc_checkpoint_ref);
+			gc_ref_checkpoint(checkpoint,
+					  replica->gc_checkpoint_ref,
+					  "checkpoint join of replica %s",
+					  tt_uuid_str(&replica->uuid));
+		}
 	}
 
 	/* Send the snapshot data to the instance. */
+	say_info("sending read-view to replica at %s", sio_socketname(io->fd));
 	struct vclock start_vclock;
 	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
-			   cursor_ptr);
+			   cursor_ptr, replica);
 	say_info("read-view sent.");
 
 	/* Remember master's vclock after the last request */
@@ -4712,7 +4805,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 */
 	struct vclock start_vclock;
 	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
-			   NULL);
+			   NULL, NULL);
 	say_info("initial data sent.");
 	/**
 	 * Register the replica after sending the last row but before sending
@@ -4874,14 +4967,17 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * recreate the gc consumer unconditionally to make sure it holds
 	 * the correct vclock.
 	 */
-	if (!replica->anon) {
-		if (replica->gc != NULL)
-			gc_consumer_unregister(replica->gc);
-		replica->gc = gc_consumer_register(
-			&start_vclock, GC_CONSUMER_REPLICA, &replica->uuid);
-		/* Persist consumer before sending data. */
-		if (gc_consumer_persist(replica->gc) != 0)
-			diag_raise();
+	if (replica->gc != NULL)
+		gc_consumer_unregister(replica->gc);
+	replica->gc = gc_consumer_register(
+		&start_vclock, GC_CONSUMER_REPLICA, &replica->uuid);
+	/* Persist consumer before sending data. */
+	if (gc_consumer_persist(replica->gc) != 0)
+		diag_raise();
+	/* Clear checkpoint reference, if any. */
+	if (replica->gc_checkpoint_ref != NULL) {
+		gc_unref_checkpoint(replica->gc_checkpoint_ref);
+		replica->gc_checkpoint_ref = NULL;
 	}
 	/*
 	 * Send a response to SUBSCRIBE request, tell

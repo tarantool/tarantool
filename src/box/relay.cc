@@ -462,16 +462,25 @@ relay_check_flush(struct relay *relay)
 void
 relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 		   uint32_t replica_version_id,
-		   struct checkpoint_cursor *cursor)
+		   struct checkpoint_cursor *cursor, struct replica *replica)
 {
-	struct relay *relay = relay_new(NULL);
+	struct relay *relay =
+		replica != NULL ? replica->relay : relay_new(NULL);
+	if (relay == NULL)
+		diag_raise();
+
 	relay_start(relay, io, sync, relay_send_initial_join_row, relay_yield,
 		    UINT64_MAX);
+	if (replica != NULL)
+		replica_on_relay_follow(replica);
 	xrow_stream_create(&relay->xrow_stream);
 	auto relay_guard = make_scoped_guard([=] {
 		xrow_stream_destroy(&relay->xrow_stream);
 		relay_stop(relay);
-		relay_delete(relay);
+		if (replica != NULL)
+			replica_on_relay_stop(replica);
+		if (replica == NULL)
+			relay_delete(relay);
 	});
 
 	/* Freeze a read view in engines. */
@@ -484,6 +493,8 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	ctx.send_meta = replica_version_id > 0;
 	ctx.vclock = vclock;
 	ctx.cursor = cursor;
+	if (cursor != NULL)
+		ctx.vclock = cursor->vclock;
 	engine_prepare_join_xc(&ctx);
 	auto join_guard = make_scoped_guard([&] {
 		engine_complete_join(&ctx);
@@ -997,8 +1008,7 @@ relay_subscribe_f(va_list ap)
 	 */
 	struct trigger on_close_log;
 	trigger_create(&on_close_log, relay_on_close_log_f, relay, NULL);
-	if (!relay->replica->anon)
-		trigger_add(&relay->r->on_close_log, &on_close_log);
+	trigger_add(&relay->r->on_close_log, &on_close_log);
 
 	/* Setup WAL watcher for sending new rows to the replica. */
 	struct errinj *inj = errinj(ERRINJ_RELAY_WAL_START_DELAY, ERRINJ_BOOL);

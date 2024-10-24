@@ -254,6 +254,9 @@ gc_last_checkpoint(void)
 				in_checkpoints);
 }
 
+struct gc_checkpoint *
+gc_checkpoint_at_vclock(const struct vclock *vclock);
+
 /**
  * Initialize the garbage collection state.
  */

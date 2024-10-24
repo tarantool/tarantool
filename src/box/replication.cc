@@ -43,6 +43,7 @@
 #include "relay.h"
 #include "sio.h"
 #include "tweaks.h"
+#include "clock.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
@@ -71,6 +72,8 @@ char cfg_instance_name[NODE_NAME_SIZE_MAX];
 
 bool replication_synchro_timeout_rollback_enabled = true;
 TWEAK_BOOL(replication_synchro_timeout_rollback_enabled);
+
+double replication_anon_gc_timeout = 3600;
 
 struct replicaset replicaset;
 
@@ -206,6 +209,57 @@ replicaset_set_sync_quorum(void)
 	replication_sync_quorum_auto = replicaset.applier.connected;
 }
 
+/**
+ * Fiber that deletes expired WAL GC consumers of anonymous replicas.
+ */
+struct fiber *replication_anon_gc_expiration_fiber;
+
+static void
+replication_anon_gc_expire_one(double *lowest_ttl)
+{
+	double timeout = replication_anon_gc_timeout;
+	*lowest_ttl = timeout;
+	struct replica *expired_replica = NULL;
+	replicaset_foreach(replica) {
+		if (!replica->anon || replica_has_connections(replica) ||
+		    replica->gc == NULL)
+			continue;
+		expired_replica = replica;
+		double last_seen_time = relay_last_row_time(replica->relay);
+		double unused_time = clock_monotonic() - last_seen_time;
+		double ttl = timeout - unused_time;
+		*lowest_ttl = MIN(*lowest_ttl, ttl);
+	}
+	if (expired_replica == NULL)
+		return;
+	/* Save UUID since the replica can be deleted. */
+	struct tt_uuid uuid = expired_replica->uuid;
+	if (replica_clear_gc(expired_replica) != 0) {
+		say_error("Failed to deactivate expired anonymous replica %s",
+			  tt_uuid_str(&uuid));
+		diag_log();
+		*lowest_ttl = timeout;
+		return;
+	}
+	say_info("WAL GC consumer of anonymous replica %s has not been used "
+		 "for too long so it has been deleted",
+		 tt_uuid_str(&uuid));
+}
+
+static int
+replication_anon_gc_expiration_fiber_f(va_list ap)
+{
+	(void)ap;
+	while (!fiber_is_cancelled()) {
+		fiber_check_gc();
+		double lowest_ttl = 0;
+		replication_anon_gc_expire_one(&lowest_ttl);
+		if (lowest_ttl > 0)
+			fiber_sleep(lowest_ttl);
+	}
+	return 0;
+}
+
 void
 replication_init(int num_threads)
 {
@@ -231,6 +285,12 @@ replication_init(int num_threads)
 	replicaset.healthy_count = 1;
 
 	applier_init();
+	replication_anon_gc_expiration_fiber =
+		fiber_new_system("replication_anon_gc_expiration",
+				 replication_anon_gc_expiration_fiber_f);
+	if (replication_anon_gc_expiration_fiber == NULL)
+		panic("Cannot init replication submodule");
+	fiber_start(replication_anon_gc_expiration_fiber);
 }
 
 void
@@ -288,7 +348,8 @@ replica_check_id(uint32_t replica_id)
 static bool
 replica_is_orphan(struct replica *replica)
 {
-	return replica->id == REPLICA_ID_NIL &&
+	return replica->id == REPLICA_ID_NIL && replica->gc == NULL &&
+	       replica->gc_checkpoint_ref == NULL &&
 	       !replica_has_connections(replica);
 }
 
@@ -311,6 +372,7 @@ replica_new(void)
 	*replica->name = 0;
 	replica->applier = NULL;
 	replica->gc = NULL;
+	replica->gc_checkpoint_ref = NULL;
 	replica->is_applier_healthy = false;
 	replica->is_relay_healthy = false;
 	rlist_create(&replica->in_anon);
@@ -330,6 +392,10 @@ replica_delete(struct replica *replica)
 		applier_delete(replica->applier);
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
+	if (replica->gc_checkpoint_ref != NULL) {
+		gc_unref_checkpoint(replica->gc_checkpoint_ref);
+		replica->gc_checkpoint_ref = NULL;
+	}
 	TRASH(replica);
 	free(replica);
 }
@@ -374,15 +440,6 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		assert(instance_id == REPLICA_ID_NIL);
 		instance_id = replica_id;
 		box_broadcast_id();
-	} else if (replica->anon) {
-		/*
-		 * Set replica gc on its transition from
-		 * anonymous to a normal one.
-		 */
-		assert(replica->gc == NULL);
-		replica->gc = gc_consumer_register(
-			instance_vclock, GC_CONSUMER_REPLICA,
-			&replica->uuid);
 	}
 	replicaset.replica_by_id[replica_id] = replica;
 	gc_delay_ref();
@@ -462,6 +519,29 @@ replica_clear_id(struct replica *replica)
 		replica_delete(replica);
 	}
 	box_broadcast_ballot();
+}
+
+int
+replica_clear_gc(struct replica *replica)
+{
+	assert(relay_get_state(replica->relay) != RELAY_FOLLOW);
+	if (gc_erase_consumer(&replica->uuid) != 0)
+		return -1;
+	if (replica->gc != NULL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
+	if (replica->gc_checkpoint_ref != NULL) {
+		gc_unref_checkpoint(replica->gc_checkpoint_ref);
+		replica->gc_checkpoint_ref = NULL;
+	}
+	if (replica_is_orphan(replica)) {
+		replica_hash_remove(&replicaset.hash, replica);
+		replicaset.anon_count -= replica->anon;
+		assert(replicaset.anon_count >= 0);
+		replica_delete(replica);
+	}
+	return 0;
 }
 
 bool
@@ -1367,13 +1447,9 @@ replica_on_relay_stop(struct replica *replica)
 	 * WALs for it anymore. Unregister it with the garbage
 	 * collector then. See also replica_clear_id.
 	 */
-	if (replica->id == REPLICA_ID_NIL) {
-		if (!replica->anon) {
-			gc_consumer_unregister(replica->gc);
-			replica->gc = NULL;
-		} else {
-			assert(replica->gc == NULL);
-		}
+	if (!replica->anon && replica->id == REPLICA_ID_NIL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
 	}
 
 	replica_update_relay_health(replica);

@@ -98,6 +98,16 @@ extern "C" {
 struct gc_consumer;
 
 static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
+/**
+ * If we haven't heard from an anonymous replica during this time, its WAL GC
+ * state will be deleted.
+ */
+extern double replication_anon_gc_timeout;
+/**
+ * Fiber that deletes WAL GC state of replicas that haven't been in touch
+ * for too long.
+ */
+extern struct fiber *replication_anon_gc_expiration_fiber;
 
 enum { REPLICATION_THREADS_MAX = 1000 };
 
@@ -408,6 +418,8 @@ struct replica {
 	struct relay *relay;
 	/** Garbage collection state associated with the replica. */
 	struct gc_consumer *gc;
+	/** Reference to retained checkpoint, is set only on checkpoint join. */
+	struct gc_checkpoint_ref *gc_checkpoint_ref;
 	/** Link in the anon_replicas list. */
 	struct rlist in_anon;
 	/**
@@ -499,6 +511,14 @@ replica_clear_id(struct replica *replica);
  */
 bool
 replica_has_connections(const struct replica *replica);
+
+/**
+ * Remove associated WAL GC state including persistent one. Replica's relay
+ * mustn't be connected. Note that the replica can be deleted if it becomes
+ * orphan.
+ */
+int
+replica_clear_gc(struct replica *replica);
 
 /**
  * Check if there are enough "healthy" connections, and fire the appropriate

@@ -696,6 +696,8 @@ struct fetch_snapshot_request {
 	struct vclock checkpoint_vclock;
 	/** Checkpoint's lsn, the row number to start from. */
 	uint64_t checkpoint_lsn;
+	/** Replica's UUID. */
+	struct tt_uuid instance_uuid;
 };
 
 /** Encode FETCH_SNAPSHOT request. */
