@@ -954,6 +954,10 @@ txn_on_journal_write(struct journal_entry *entry)
 		txn_limbo_assign_lsn(&txn_limbo, txn->limbo_entry, lsn);
 		if (txn->fiber != NULL)
 			fiber_wakeup(txn->fiber);
+		if (txn_limbo_is_owned_by_current_instance(&txn_limbo) &&
+		    txn_has_flag(txn, TXN_WAIT_ACK))
+			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id,
+				      txn->limbo_entry->lsn);
 	}
 finish:
 	fiber_set_txn(fiber(), NULL);
@@ -1237,15 +1241,6 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 	if (txn_has_flag(txn, TXN_WAIT_SYNC)) {
 		struct txn_limbo_entry *limbo_entry = txn->limbo_entry;
 		assert(limbo_entry->lsn > 0);
-		/*
-		 * XXX: ACK should be done on WAL write too. But it can make
-		 * another WAL write. Can't be done until it works
-		 * asynchronously.
-		 */
-		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
-			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id,
-				      limbo_entry->lsn);
-		}
 		int rc = txn_limbo_wait_complete(&txn_limbo, limbo_entry);
 		if (rc < 0) {
 			if (fiber_is_cancelled()) {

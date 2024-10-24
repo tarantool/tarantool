@@ -1317,13 +1317,11 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 {
 	struct wal_writer *writer = (struct wal_writer *) journal;
 
+	ERROR_INJECT_COUNTDOWN(ERRINJ_WAL_IO_COUNTDOWN, {
+		struct errinj *e = errinj(ERRINJ_WAL_IO, ERRINJ_BOOL);
+		e->bparam = true;
+	});
 	ERROR_INJECT(ERRINJ_WAL_IO, {
-		ERROR_INJECT_COUNTDOWN(ERRINJ_WAL_IO_COUNTDOWN, {
-				struct errinj *e =
-					errinj(ERRINJ_WAL_IO, ERRINJ_BOOL);
-				e->bparam = false;
-		});
-
 		diag_set_journal_res(JOURNAL_ENTRY_ERR_IO);
 		goto fail;
 	});
