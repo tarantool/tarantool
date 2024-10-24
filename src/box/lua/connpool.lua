@@ -94,11 +94,15 @@ local function is_candidate_checked(candidate)
            conn.state == 'closed'
 end
 
-local function connect_to_candidates(candidates)
+-- This method connects to all of the specified instances
+-- and returns the set of successfully connected ones.
+local function acquire_all_instances(instance_names)
+    if next(instance_names) == nil then return {} end
+
     local delay = WATCHER_DELAY
     local connect_deadline = clock.monotonic() + WATCHER_TIMEOUT
 
-    for _, instance_name in pairs(candidates) do
+    for _, instance_name in pairs(instance_names) do
         pcall(connect, instance_name, {
             wait_connected = false,
             connect_timeout = WATCHER_TIMEOUT
@@ -109,11 +113,11 @@ local function connect_to_candidates(candidates)
 
     local connected_candidates = {}
     while clock.monotonic() < connect_deadline do
-        connected_candidates = fun.iter(candidates)
+        connected_candidates = fun.iter(instance_names)
             :filter(is_candidate_connected)
             :totable()
 
-        local all_checked = fun.iter(candidates)
+        local all_checked = fun.iter(instance_names)
             :all(is_candidate_checked)
 
         if all_checked then
@@ -123,6 +127,50 @@ local function connect_to_candidates(candidates)
         connection_mode_update_cond:wait(delay)
     end
     return connected_candidates
+end
+
+-- The method starts connecting to the specified set of
+-- instances and returns the first one available matching
+-- the specified dynamic requirements.
+--
+-- Note: if the specified mode is nil the connection
+-- returned may not have the `mode()` method available.
+local function acquire_any_instance(instance_names, opts)
+    assert(type(opts) == 'table')
+    assert(opts.mode == nil or opts.mode == 'ro' or opts.mode == 'rw')
+    local time_connect_end = clock.monotonic() + WATCHER_TIMEOUT
+
+    for _, instance_name in pairs(instance_names) do
+        pcall(connect, instance_name, {
+            wait_connected = false,
+            connect_timeout = WATCHER_TIMEOUT
+        })
+    end
+
+    while clock.monotonic() < time_connect_end do
+        local all_checked = true
+
+        for _, instance_name in ipairs(instance_names) do
+            local conn = connections[instance_name]
+            if is_connection_valid(conn, {}) and
+               (opts.mode == nil or opts.mode == conn:mode()) then
+                return conn
+            end
+
+            if not is_candidate_checked(instance_name) then
+                all_checked = false
+            end
+        end
+
+        -- Return early if all of the instances don't match the
+        -- requirements or unavailable.
+        if all_checked then
+            break
+        end
+
+        connection_mode_update_cond:wait(WATCHER_DELAY)
+    end
+    return nil
 end
 
 local function is_group_match(expected_groups, present_group)
@@ -210,9 +258,10 @@ local function is_candidate_match_static(names, opts)
 end
 
 local function is_mode_match(mode, instance_name)
-    if mode == nil then
-        return true
-    end
+    if mode == nil then return true end
+    -- The instance should be alive to match its mode.
+    assert(mode == 'ro' or mode == 'rw')
+
     local conn = connections[instance_name]
     assert(conn ~= nil)
     return conn:mode() == mode
@@ -232,12 +281,21 @@ local function filter(opts)
         roles = '?table',
         sharding_roles = '?table',
         mode = '?string',
+        skip_connection_check = '?boolean'
     })
     opts = opts or {}
+
     if opts.mode ~= nil and opts.mode ~= 'ro' and opts.mode ~= 'rw' then
         local msg = 'Expected nil, "ro" or "rw", got "%s"'
         error(msg:format(opts.mode), 0)
     end
+
+    if opts.skip_connection_check and opts.mode ~= nil then
+        local msg = 'Filtering by mode "%s" requires the connection ' ..
+                    'check disabled by the "skip_connection_check" option'
+        error(msg:format(opts.mode), 0)
+    end
+
     if opts.sharding_roles ~= nil then
         for _, sharding_role in ipairs(opts.sharding_roles) do
             if sharding_role == 'rebalancer' then
@@ -271,13 +329,17 @@ local function filter(opts)
             table.insert(static_candidates, instance_name)
         end
     end
-    -- Return if retrieving dynamic information is not required.
-    if next(static_candidates) == nil or next(dynamic_opts) == nil then
+
+    -- Return if the connection check isn't needed.
+    if opts.skip_connection_check then
         return static_candidates
     end
 
     -- Filter the remaining candidates after connecting to them.
-    local connected_candidates = connect_to_candidates(static_candidates)
+    --
+    -- The acquire_all_instances() call returns quickly if it
+    -- receives empty table as an argument.
+    local connected_candidates = acquire_all_instances(static_candidates)
     local dynamic_candidates = {}
     for _, instance_name in pairs(connected_candidates) do
         if is_candidate_match_dynamic(instance_name, dynamic_opts) then
@@ -287,30 +349,67 @@ local function filter(opts)
     return dynamic_candidates
 end
 
-local function get_connection(opts)
-    local mode = nil
-    if opts.mode == 'ro' or opts.mode == 'rw' then
-        mode = opts.mode
+local function select_connection_from_list(instances, opts)
+    assert(opts ~= nil and type(opts) == 'table')
+
+    if opts.prefer_local then
+        local local_instance = box.info.name
+
+        for _, instance in ipairs(instances) do
+            if instance == local_instance then
+                -- This connect is almomst always quick and successful,
+                -- so it's being waited. Though it can fail e.g. due to
+                -- the FD limit. That's why it still should be checked.
+                local ok, conn = pcall(connect, local_instance,
+                                       { wait_connected = true })
+
+                -- To use the local connection, the connect() call
+                -- should be ok, if the mode is specified the
+                -- connection mode should exist (thus, this select
+                -- may be false-negative) and the candidate should
+                -- match dynamic options.
+                if ok and (opts.mode == nil or conn:mode() ~= nil) and
+                   is_candidate_match_dynamic(local_instance, opts) then
+                    return conn
+                end
+
+
+                break
+            end
+        end
     end
-    local candidates_opts = {
-        groups = opts.groups,
-        replicasets = opts.replicasets,
-        instances = opts.instances,
-        labels = opts.labels,
-        roles = opts.roles,
-        sharding_roles = opts.sharding_roles,
-        mode = mode,
-    }
-    local candidates = filter(candidates_opts)
+
+    local candidate = acquire_any_instance(instances, opts)
+
+    if candidate ~= nil then
+        return candidate
+    end
+
+    return nil, "no candidates are available with these conditions"
+end
+
+-- This method looks for an active connection in the specified
+-- set of instances taking the priorities into account.
+--
+-- If there is no such connection the method connects to all
+-- of the instances and selects the one with the highest priority.
+local function select_connection_from_list_prioritized(instances, opts)
+    assert(opts ~= nil and type(opts) == 'table')
+    assert(opts.mode == 'prefer_ro' or opts.mode == 'prefer_rw')
+
+    -- In case there are specified prioritizing of matching
+    -- instances we fetch all matched static candidates.
+    -- Technically, it's possible to speedup fetching the instances
+    -- if there is already a connection to a top-priority connection
+    -- (e.g. one RO instance is established and the mode is
+    -- 'prefer_ro')
+    local candidates = acquire_all_instances(instances)
     if next(candidates) == nil then
         return nil, "no candidates are available with these conditions"
     end
 
     -- Initialize the weight of each candidate.
     local weights = {}
-    if opts.mode == 'prefer_rw' or opts.mode == 'prefer_ro' then
-        candidates = connect_to_candidates(candidates)
-    end
     for _, instance_name in pairs(candidates) do
         weights[instance_name] = 0
     end
@@ -330,9 +429,12 @@ local function get_connection(opts)
 
     -- Increase weight of local candidate.
     if opts.prefer_local ~= false then
+        local local_instance_name = box.info.name
+
         local weight_local = 1
-        if weights[box.info.name] ~= nil then
-            weights[box.info.name] = weights[box.info.name] + weight_local
+        if weights[local_instance_name] ~= nil then
+            weights[local_instance_name] = weights[local_instance_name] +
+                                           weight_local
         end
     end
 
@@ -363,6 +465,60 @@ local function get_connection(opts)
         end
     end
     return nil, "connection to candidates failed"
+end
+
+-- This method looks for an active connection in the whole
+-- connection pool taking the specified priorities in account.
+--
+-- If there is no such connection the method tries to
+-- establish it with one of the matching replicas.
+--
+-- Used as a subroutine for the `call()` method.
+local function select_connection(opts)
+    assert(opts.mode == nil or opts.mode == 'ro' or opts.mode == 'rw' or
+           opts.mode == 'prefer_ro' or opts.mode == 'prefer_rw')
+
+    -- It's better to use the local instance to perform the call
+    -- faster. So prefer the local instance by default.
+    local prefer_local = true
+    if opts.prefer_local ~= nil then
+        prefer_local = opts.prefer_local
+    end
+
+    local filter_static_opts = {
+        groups = opts.groups,
+        replicasets = opts.replicasets,
+        instances = opts.instances,
+        labels = opts.labels,
+        roles = opts.roles,
+        sharding_roles = opts.sharding_roles,
+
+        -- The connection check isn't needed since it connects
+        -- to all of the candidates while we're trying to acquire
+        -- any candidate.
+        skip_connection_check = true,
+    }
+
+    -- At first we want to acquire the instances matching the
+    -- static (configuration) requirements.
+    local static_candidates = filter(filter_static_opts)
+
+    -- In case we don't need to prioritize the matching instances
+    -- we can wait for any connection available.
+    local need_priorities =
+        opts.mode == 'prefer_rw' or opts.mode == 'prefer_ro'
+
+    local dynamic_opts = {
+        mode = opts.mode,
+        prefer_local = prefer_local,
+    }
+
+    if need_priorities then
+        return select_connection_from_list_prioritized(static_candidates,
+                                                       dynamic_opts)
+    else
+        return select_connection_from_list(static_candidates, dynamic_opts)
+    end
 end
 
 local function call(func_name, args, opts)
@@ -400,7 +556,7 @@ local function call(func_name, args, opts)
         prefer_local = opts.prefer_local,
         mode = opts.mode,
     }
-    local conn, err = get_connection(conn_opts)
+    local conn, err = select_connection(conn_opts)
     if conn == nil then
         local msg = "Couldn't execute function %s: %s"
         error(msg:format(func_name, err), 0)
