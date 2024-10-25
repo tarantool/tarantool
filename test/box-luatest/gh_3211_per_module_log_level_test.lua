@@ -66,8 +66,8 @@ g1.test_log_new = function(cg)
     end)
 
     find_in_log(cg, 'info from the default log', true)
-    find_in_log(cg, 'module1 I> info from the first module', true)
-    find_in_log(cg, 'module2 I> info from the second module', true)
+    find_in_log(cg, 'module1 .+ I> info from the first module', true)
+    find_in_log(cg, 'module2 .+ I> info from the second module', true)
 end
 
 -- Test log.cfg{modules = {...}} and box.cfg{log_modules = {...}}
@@ -159,7 +159,7 @@ g1.test_modname_deduction = function(cg)
         local module = require('test.box-luatest.gh_3211_module.testmod')
         module.say_hello()
     end)
-    find_in_log(cg, 'testmod I> hello', true)
+    find_in_log(cg, 'testmod testmod.lua:4 I> hello', true)
 end
 
 -- Test log.cfg{modules = {tarantool = ...}} and

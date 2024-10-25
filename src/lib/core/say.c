@@ -857,15 +857,12 @@ say_format_plain(struct log *log, char *buf, int len, int level,
 	if (module != NULL)
 		SNPRINT(total, snprintf, buf, len, "/%s", module);
 
-	if (level == S_WARN || level == S_ERROR || level == S_SYSERROR) {
-		/* Primitive basename(filename) */
-		if (filename) {
-			for (const char *f = filename; *f; f++)
-				if (*f == '/' && *(f + 1) != '\0')
-					filename = f + 1;
-			SNPRINT(total, snprintf, buf, len, " %s:%i", filename,
-				line);
-		}
+	/* Primitive basename(filename) */
+	if (filename != NULL) {
+		for (const char *f = filename; *f; f++)
+			if (*f == '/' && *(f + 1) != '\0')
+				filename = f + 1;
+		SNPRINT(total, snprintf, buf, len, " %s:%i", filename, line);
 	}
 
 	SNPRINT(total, snprintf, buf, len, " %c> ", level_chars[level]);
