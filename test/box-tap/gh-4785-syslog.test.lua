@@ -39,7 +39,7 @@ test:plan(4)
 local ok = true
 local logs = {}
 while true do
-    local entry = unix_socket:recv(128)
+    local entry = unix_socket:recv(256)
     if entry == nil then break end
     ok = ok and entry:match(pattern)
     table.insert(logs, entry)
@@ -48,7 +48,7 @@ test:ok(ok, 'box.cfg() log entries are in syslog format', {logs = logs})
 
 -- Verify a log entry written by log.info().
 log.info('hello')
-local entry = unix_socket:recv(128)
+local entry = unix_socket:recv(256)
 test:like(entry, pattern, 'log.info() log entry is in syslog format',
           {logs = {entry}})
 
@@ -58,7 +58,7 @@ test:ok(ok, "log.log_format('plain') is ignored with syslog")
 
 -- Verify log format again after log.log_format().
 log.info('world')
-local entry = unix_socket:recv(128)
+local entry = unix_socket:recv(256)
 test:like(entry, pattern, 'log.info() log entry after log_format',
           {logs = {entry}})
 
