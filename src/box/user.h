@@ -167,6 +167,12 @@ extern struct user *guest_user, *admin_user;
 struct access *
 access_lua_call_find(const char *name, uint32_t name_len);
 
+/**
+ * Check if a role is granted to a user or role with the given auth_token.
+ */
+bool
+role_is_granted(struct user *role, uint8_t auth_token);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
