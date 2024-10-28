@@ -2274,6 +2274,12 @@ local function value2path(data, w)
         return data
     end
 
+    -- Don't transform values of a composite type.
+    if w.schema.type == 'record' or w.schema.type == 'map' or
+       w.schema.type == 'array' then
+        return data
+    end
+
     return table.concat(w.path, '.')
 end
 
@@ -2282,6 +2288,12 @@ end
 -- Substitutes each scalar value with its Lua type.
 local function value2type(data, w)
     if w.schema.no_transform then
+        return data
+    end
+
+    -- Don't transform values of a composite type.
+    if w.schema.type == 'record' or w.schema.type == 'map' or
+       w.schema.type == 'array' then
         return data
     end
 
@@ -2408,6 +2420,56 @@ g.test_map_record = function()
     end)
 end
 
+-- Verify that the :map() method allows to transform a record
+-- value.
+--
+-- This functionality was implemented in gh-10756.
+g.test_map_record_itself = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.scalar({type = 'string'}),
+        bar = schema.scalar({type = 'string'}),
+        baz = schema.scalar({type = 'string'}),
+        packed = schema.scalar({type = 'string'}),
+    }))
+
+    -- This scenario performs the following transformations.
+    --
+    -- First, a record with one `packed` field is transformed to
+    -- a record with three fields: `foo`, `bar`, `baz`.
+    --
+    -- These fields contain ${a}, ${b}, and ${c} placeholders,
+    -- which are replaced with the provided variable values.
+    --
+    -- This way we verify that the traversal is pre-order.
+    local vars = {
+        a = 'foo',
+        b = 'bar',
+        c = 'baz',
+    }
+    local res = s:map({
+        packed = '${a},${b},${c}',
+    }, function(data, w, vars)
+        -- Unpack a packed record.
+        if w.schema.type == 'record' and data.packed ~= nil then
+            assert(type(data.packed) == 'string')
+            local items = data.packed:split(',')
+            return {
+                foo = items[1],
+                bar = items[2],
+                baz = items[3],
+            }
+        end
+        -- Apply variables to string values.
+        return apply_vars(data, w, vars)
+    end, vars)
+
+    t.assert_equals(res, {
+        foo = 'foo',
+        bar = 'bar',
+        baz = 'baz',
+    })
+end
+
 -- Verify :map() method on a schema with a map.
 g.test_map_map = function()
     local s = schema.new('myschema', schema.map({
@@ -2523,6 +2585,54 @@ g.test_map_map_keys = function()
     assert_type_equals(res, exp)
 end
 
+-- Verify that the :map() method allows to transform a map
+-- value.
+--
+-- This functionality was implemented in gh-10756.
+g.test_map_map_itself = function()
+    local s = schema.new('myschema', schema.map({
+        key = schema.scalar({type = 'string'}),
+        value = schema.scalar({type = 'string'}),
+    }))
+
+    -- This scenario performs the following transformations.
+    --
+    -- First, a map with one `packed` field is transformed to
+    -- a map with three fields: `foo`, `bar`, `baz`.
+    --
+    -- These fields contain ${a}, ${b}, and ${c} placeholders,
+    -- which are replaced with the provided variable values.
+    --
+    -- This way we verify that the traversal is pre-order.
+    local vars = {
+        a = 'foo',
+        b = 'bar',
+        c = 'baz',
+    }
+    local res = s:map({
+        packed = '${a},${b},${c}',
+    }, function(data, w, vars)
+        -- Unpack a packed map.
+        if w.schema.type == 'map' and data.packed ~= nil then
+            assert(type(data.packed) == 'string')
+            local items = data.packed:split(',')
+            return {
+                foo = items[1],
+                bar = items[2],
+                baz = items[3],
+            }
+        end
+        -- Apply variables to string values.
+        return apply_vars(data, w, vars)
+    end, vars)
+
+    t.assert_equals(res, {
+        foo = 'foo',
+        bar = 'bar',
+        baz = 'baz',
+    })
+end
+
 -- Verify :map() method on a schema with an array.
 g.test_map_array = function()
     local s = schema.new('myschema', schema.array({
@@ -2592,6 +2702,44 @@ g.test_map_array = function()
         t.assert_equals(res, case.exp_value2type)
         assert_type_equals(res, case.exp_value2type)
     end
+end
+
+-- Verify that the :map() method allows to transform an array
+-- value.
+--
+-- This functionality was implemented in gh-10756.
+g.test_map_array_itself = function()
+    local s = schema.new('myschema', schema.array({
+        items = schema.scalar({type = 'string'}),
+    }))
+
+    -- This scenario performs the following transformations.
+    --
+    -- First, an array with one item is transformed to
+    -- an with three items.
+    --
+    -- These items contain ${a}, ${b}, and ${c} placeholders,
+    -- which are replaced with the provided variable values.
+    --
+    -- This way we verify that the traversal is pre-order.
+    local vars = {
+        a = 'foo',
+        b = 'bar',
+        c = 'baz',
+    }
+    local res = s:map({
+        '${a},${b},${c}',
+    }, function(data, w, vars)
+        -- Unpack a packed array.
+        if w.schema.type == 'array' and #data == 1 then
+            assert(type(data[1]) == 'string')
+            return data[1]:split(',')
+        end
+        -- Apply variables to string values.
+        return apply_vars(data, w, vars)
+    end, vars)
+
+    t.assert_equals(res, {'foo', 'bar', 'baz'})
 end
 
 -- }}} <schema object>:map()
@@ -2830,6 +2978,88 @@ g.test_apply_default_if_error = function()
         local data = {}
         s:apply_default(data)
     end)
+end
+
+-- Verify that a default value is taken into account for a record.
+--
+-- Also verify that the record's default is applied first and only
+-- then defaults are applied for its fields.
+--
+-- This functionality was implemented in gh-10756.
+g.test_apply_default_on_record = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.scalar({
+            type = 'string',
+            default = 'def',
+        }),
+        bar = schema.scalar({
+            type = 'string',
+            default = 'def',
+        }),
+    }, {
+        default = {
+            foo = 'foo',
+        }
+    }))
+
+    local data = nil
+    local res = s:apply_default(data)
+    local exp = {
+        foo = 'foo',
+        bar = 'def',
+    }
+    t.assert_equals(res, exp)
+end
+
+-- Verify that a default value is taken into account for a map.
+--
+-- Also verify that the map's default is applied first and only
+-- then defaults are applied for its fields.
+--
+-- This functionality was implemented in gh-10756.
+g.test_apply_default_on_map = function()
+    local s = schema.new('myschema', schema.map({
+        key = schema.scalar({
+            type = 'string',
+        }),
+        value = schema.scalar({
+            type = 'string',
+            default = 'def',
+        }),
+        default = {
+            foo = 'foo',
+            bar = box.NULL,
+        }
+    }))
+
+    local data = nil
+    local res = s:apply_default(data)
+    local exp = {
+        foo = 'foo',
+        bar = 'def',
+    }
+    t.assert_equals(res, exp)
+end
+
+-- Verify that a default value is taken into account for an array.
+--
+-- Also verify that the array's default is applied first and only
+-- then defaults are applied for its items.
+--
+-- This functionality was implemented in gh-10756.
+g.test_apply_default_on_array = function()
+    local s = schema.new('myschema', schema.array({
+        items = schema.scalar({
+            type = 'string',
+            default = 'def',
+        }),
+        default = {'foo', box.NULL},
+    }))
+
+    local data = nil
+    local res = s:apply_default(data)
+    local exp = {'foo', 'def'}
+    t.assert_equals(res, exp)
 end
 
 -- }}} <schema object>:apply_default()

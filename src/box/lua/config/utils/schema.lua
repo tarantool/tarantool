@@ -1223,15 +1223,19 @@ end
 -- {{{ <schema object>:map()
 
 local function map_impl(schema, data, f, ctx)
+    -- Call the user-provided transformation function.
+    --
+    -- It is called on a current node before its descandants,
+    -- implementing the pre-order traversal.
+    local w = {
+        schema = schema,
+        path = table.copy(ctx.path),
+        error = walkthrough_error_capture(ctx),
+    }
+    data = f(data, w, ctx.f_ctx)
+
     if is_scalar(schema) then
-        -- We're reached a scalar: let's call the user-provided
-        -- transformation function.
-        local w = {
-            schema = schema,
-            path = table.copy(ctx.path),
-            error = walkthrough_error_capture(ctx),
-        }
-        return f(data, w, ctx.f_ctx)
+        return data
     elseif schema.type == 'record' then
         -- Traverse record's fields unconditionally: if the record
         -- itself is nil/box.NULL, if the fields are nil/box.NULL.
@@ -1339,6 +1343,9 @@ end
 --
 -- The :map() method is recursive with certain rules:
 --
+-- * The user-provided transformation function is called on a
+--   composite type node (record, map, array) before calling it on
+--   its descendants: it is so called pre-order traversal.
 -- * All record fields are traversed unconditionally, including
 --   ones with nil/box.NULL values. Even if the record itself is
 --   nil/box.NULL, its fields are traversed down (assuming their
@@ -1365,8 +1372,6 @@ end
 --
 -- Nuances:
 --
--- * The user-provided transformation function is called only for
---   scalars.
 -- * nil/box.NULL handling for composite types. Described above.
 -- * `w.path` for a map key and a map value are the same. It
 --   seems, we should introduce some syntax to point a key in a
@@ -1420,9 +1425,9 @@ end
 -- the given schema. (A fast type check is performed on composite
 -- types, but it is not recommended to lean on it.)
 --
--- Nuances:
---
--- * Defaults are taken into account only for scalars.
+-- A default value is applied on a composite type node (record,
+-- map, array) before applying defaults for its descendants: it is
+-- so called pre-order traversal.
 --
 -- Annotations taken into accounts:
 --
