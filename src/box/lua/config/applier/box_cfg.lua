@@ -354,6 +354,12 @@ local function apply(config)
     local cfg_log = configdata:get('log', {use_default = true})
     box_cfg.log = log_destination(cfg_log)
 
+    -- TODO(gh-10756): This is not needed when :apply_default()
+    -- supports default values for composite types.
+    if type(box_cfg.log_modules) == 'nil' then
+        box_cfg.log_modules = box.NULL
+    end
+
     -- Construct audit logger destination and audit filter (box_cfg.audit_log
     -- and audit_filter).
     --
