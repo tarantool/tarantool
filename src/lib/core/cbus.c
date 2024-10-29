@@ -88,16 +88,13 @@ cpipe_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
 	       int /* events */);
 
 void
-cpipe_create(struct cpipe *pipe, const char *consumer)
+cpipe_create_noev(struct cpipe *pipe, const char *consumer)
 {
 	stailq_create(&pipe->input);
 
 	pipe->n_input = 0;
 	pipe->max_input = INT_MAX;
-	pipe->producer = cord()->loop;
-
-	ev_async_init(&pipe->flush_input, cpipe_flush_cb);
-	pipe->flush_input.data = pipe;
+	pipe->producer = NULL;
 	rlist_create(&pipe->on_flush);
 
 	tt_pthread_mutex_lock(&cbus.mutex);
@@ -110,6 +107,15 @@ cpipe_create(struct cpipe *pipe, const char *consumer)
 	pipe->endpoint = endpoint;
 	++pipe->endpoint->n_pipes;
 	tt_pthread_mutex_unlock(&cbus.mutex);
+}
+
+void
+cpipe_create(struct cpipe *pipe, const char *consumer)
+{
+	cpipe_create_noev(pipe, consumer);
+	pipe->producer = loop();
+	ev_async_init(&pipe->flush_input, cpipe_flush_cb);
+	pipe->flush_input.data = pipe;
 }
 
 struct cmsg_poison {
@@ -132,8 +138,8 @@ cbus_endpoint_poison_f(struct cmsg *msg)
 void
 cpipe_destroy(struct cpipe *pipe)
 {
-	ev_async_stop(pipe->producer, &pipe->flush_input);
-
+	if (pipe->producer != NULL)
+		ev_async_stop(pipe->producer, &pipe->flush_input);
 	static const struct cmsg_hop route[1] = {
 		{cbus_endpoint_poison_f, NULL}
 	};

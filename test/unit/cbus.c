@@ -210,6 +210,57 @@ test_auto_flush(void)
 
 /** }}} Test several messages. -------------------------------- */
 
+/**
+ * Non-libev pipe {{{ --------------------------------------------
+ */
+
+static void
+test_nonlibev_pipe(void)
+{
+	const int msg_count = 3;
+
+	header();
+	plan(msg_count + 3);
+
+	struct cpipe pipe;
+	cpipe_create_noev(&pipe, "worker");
+
+	struct cmsg_hop route[] = {
+		{ do_nothing, &pipe_to_main },
+		{ send_signal, NULL },
+	};
+	struct test_msg msgs[msg_count];
+	for (int i = 0; i < msg_count; ++i) {
+		test_msg_create(&msgs[i], route);
+		cpipe_push(&pipe, &msgs[i].base);
+	}
+	is(flushed_cnt, 0, "no flush until end of the loop's iteration");
+
+	struct test_msg check_msg;
+	test_msg_create(&check_msg, route);
+	cpipe_push(&pipe_to_worker, &check_msg.base);
+	fiber_signal_recv(&check_msg.signal);
+	for (int i = 0; i < msg_count; ++i)
+		ok(!msgs[i].signal.is_set, "no auto-flush for non-libev");
+	is(flushed_cnt, 1, "one flush for the check message");
+	flushed_cnt = 0;
+
+	cpipe_flush(&pipe);
+	for (int i = 0; i < msg_count; ++i) {
+		fiber_signal_recv(&msgs[i].signal);
+		test_msg_destroy(&msgs[i]);
+	}
+	is(flushed_cnt, 1, "one flush for non-libev messages");
+	flushed_cnt = 0;
+
+	cpipe_destroy(&pipe);
+
+	check_plan();
+	footer();
+}
+
+/** }}} Non-libev pipe ---------------------------------------- */
+
 static int
 cbus_loop_f(va_list ap)
 {
@@ -226,7 +277,7 @@ cbus_test_suite_f(va_list ap)
 {
 	(void)ap;
 	header();
-	plan(2);
+	plan(3);
 
 	struct fiber *endpoint_worker = fiber_new("main_endpoint", cbus_loop_f);
 	fiber_set_joinable(endpoint_worker, true);
@@ -238,6 +289,7 @@ cbus_test_suite_f(va_list ap)
 
 	test_single_msg();
 	test_auto_flush();
+	test_nonlibev_pipe();
 
 	worker_stop();
 	fiber_cancel(endpoint_worker);
