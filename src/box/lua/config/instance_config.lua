@@ -1348,8 +1348,8 @@ return schema.new('instance_config', schema.record({
             }),
         }, {
             box_cfg = 'wal_ext',
-            -- TODO: This default doesn't work now. It needs
-            -- support of non-scalar schema nodes in
+            -- TODO(gh-10756): This default doesn't work now. It
+            -- needs support of non-scalar schema nodes in
             -- <schema object>:map().
             default = box.NULL,
         })),

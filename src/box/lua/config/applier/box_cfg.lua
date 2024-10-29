@@ -4,6 +4,7 @@ local instance_config = require('internal.config.instance_config')
 local snapshot = require('internal.config.utils.snapshot')
 local schedule_task = fiber._internal.schedule_task
 local mkversion = require('internal.mkversion')
+local tarantool = require('tarantool')
 
 local function peer_uris(configdata)
     local peers = configdata:peers()
@@ -374,6 +375,13 @@ local function apply(config)
         else
             box_cfg.audit_filter = 'compatibility'
         end
+    end
+
+    -- TODO(gh-10756): This is not needed when :apply_default()
+    -- supports default values for composite types.
+    if tarantool.package == 'Tarantool Enterprise' and
+       type(box_cfg.wal_ext) == 'nil' then
+        box_cfg.wal_ext = box.NULL
     end
 
     -- The startup process may need a special handling and differs
