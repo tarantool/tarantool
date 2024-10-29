@@ -151,6 +151,10 @@ struct cpipe {
 void
 cpipe_create(struct cpipe *pipe, const char *consumer);
 
+/** Same as a normal cpipe, but not attached to any event loop. */
+void
+cpipe_create_noev(struct cpipe *pipe, const char *consumer);
+
 /**
  * Deinitialize a pipe and disconnect it from the consumer.
  * Must be called by producer. Will flash queued messages.
@@ -217,12 +221,12 @@ cpipe_submit_flush(struct cpipe *pipe)
 static inline void
 cpipe_push(struct cpipe *pipe, struct cmsg *msg)
 {
-	assert(loop() == pipe->producer);
+	assert(pipe->producer == NULL || pipe->producer == loop());
 	stailq_add_tail_entry(&pipe->input, msg, fifo);
 	pipe->n_input++;
 	if (pipe->n_input >= pipe->max_input)
 		cpipe_flush(pipe);
-	else if (pipe->n_input == 1)
+	else if (pipe->n_input == 1 && pipe->producer != NULL)
 		ev_feed_event(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 
