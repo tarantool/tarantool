@@ -1,8 +1,10 @@
 #include "memory.h"
 #include "fiber.h"
 #include "cbus.h"
-#include "unit.h"
 #include "trigger.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 /**
  * Test triggers on cpipe flush. Cpipe flush send all buffered
@@ -13,25 +15,74 @@
 
 /** Counter of flush events. */
 static int flushed_cnt = 0;
-/** Expected value of flushed_cnt at the end of the test. */
-static int expected_flushed_cnt = 0;
 
 /**
  * Worker thread. In the test only one worker is started and the
  * main thread sends to it messages to trigger tests one by one.
  */
-struct cord worker;
+static struct cord worker;
 /** Queue of messages from the main to the worker thread. */
-struct cpipe pipe_to_worker;
+static struct cpipe pipe_to_worker;
 /** Queue of messages from the worker to the main thread. */
-struct cpipe pipe_to_main;
+static struct cpipe pipe_to_main;
 /**
  * Trigger which is called on flush to the main thread event. Here
  * we test only this flush direction (from worker to main), becase
  * the direction from the main to the worker works in the same
  * way.
  */
-struct trigger on_flush_to_main;
+static struct trigger on_flush_to_main;
+
+struct fiber_signal {
+	bool is_set;
+	struct fiber_cond cond;
+};
+
+static void
+fiber_signal_create(struct fiber_signal *signal)
+{
+	signal->is_set = false;
+	fiber_cond_create(&signal->cond);
+}
+
+static void
+fiber_signal_destroy(struct fiber_signal *signal)
+{
+	fiber_cond_destroy(&signal->cond);
+}
+
+static void
+fiber_signal_send(struct fiber_signal *signal)
+{
+	signal->is_set = true;
+	fiber_cond_signal(&signal->cond);
+}
+
+static void
+fiber_signal_recv(struct fiber_signal *signal)
+{
+	while (!signal->is_set)
+		fiber_cond_wait(&signal->cond);
+	signal->is_set = false;
+}
+
+struct test_msg {
+	struct cmsg base;
+	struct fiber_signal signal;
+};
+
+static void
+test_msg_create(struct test_msg *msg, struct cmsg_hop *route)
+{
+	cmsg_init(&msg->base, route);
+	fiber_signal_create(&msg->signal);
+}
+
+static void
+test_msg_destroy(struct test_msg *msg)
+{
+	fiber_signal_destroy(&msg->signal);
+}
 
 /** Common callbacks. {{{ ------------------------------------- */
 
@@ -42,6 +93,12 @@ do_nothing(struct cmsg *m)
 	(void) m;
 }
 
+static void
+send_signal(struct cmsg *m)
+{
+	fiber_signal_send(&((struct test_msg *)m)->signal);
+}
+
 /** Callback called on each flush to the main thread. */
 static int
 flush_cb(struct trigger *t, void *e)
@@ -49,19 +106,7 @@ flush_cb(struct trigger *t, void *e)
 	(void) t;
 	(void) e;
 	++flushed_cnt;
-	printf("flush event, counter = %d\n", flushed_cnt);
 	return 0;
-}
-
-/** Callback to finish the test. It breaks the main event loop. */
-static void
-finish_execution(struct cmsg *m)
-{
-	(void) m;
-	fiber_cancel(fiber());
-	printf("break main fiber and finish test\n");
-	is(flushed_cnt, expected_flushed_cnt,
-	   "flushed_cnt at the end of the test");
 }
 
 /** }}} Common callbacks. ------------------------------------- */
@@ -82,17 +127,15 @@ worker_f(va_list ap)
 }
 
 static void
-worker_start()
+worker_start(void)
 {
-	printf("start worker\n");
 	fail_if(cord_costart(&worker, "worker", worker_f, NULL) != 0);
 	cpipe_create(&pipe_to_worker, "worker");
 }
 
 static void
-worker_stop()
+worker_stop(void)
 {
-	printf("finish worker\n");
 	cbus_stop_loop(&pipe_to_worker);
 	cpipe_destroy(&pipe_to_worker);
 	fail_if(cord_join(&worker) != 0);
@@ -101,143 +144,125 @@ worker_stop()
 /** }}} Worker routines. -------------------------------------- */
 
 /**
- * Test that if messages are not too many, the flush callback
- * is called only once per event loop, even if multiple flush
- * events are created. {{{ ---------------------------------------
+ * Test that flush trigger works for a single message.
+ * {{{ -----------------------------------------------------------
  */
-static void
-do_forced_flush(struct cmsg *m)
-{
-	(void) m;
-	static struct cmsg_hop forced_flush_rote = { do_nothing, NULL };
-	static struct cmsg_hop finish_route = { finish_execution, NULL };
-	static struct cmsg forced_flush_msg;
-	static struct cmsg finish_msg;
-	cmsg_init(&forced_flush_msg, &forced_flush_rote);
-	cmsg_init(&finish_msg, &finish_route);
-	cpipe_push(&pipe_to_main, &forced_flush_msg);
-	cpipe_submit_flush(&pipe_to_main);
-	cpipe_push(&pipe_to_main, &finish_msg);
-	expected_flushed_cnt = 1;
-}
 
 static void
-test_forced_flush(struct cmsg *m)
+test_single_msg(void)
 {
-	(void) m;
-	is(flushed_cnt, 1, "1 flush after test_several_messages");
-	printf("\n*** Test forced flush ***\n");
+	header();
+	plan(1);
+
+	struct cmsg_hop route[] = {
+		{ do_nothing, &pipe_to_main },
+		{ send_signal, NULL },
+	};
+	struct test_msg msg;
+	test_msg_create(&msg, route);
+	cpipe_push(&pipe_to_worker, &msg.base);
+	fiber_signal_recv(&msg.signal);
+	is(flushed_cnt, 1, "1 flush after");
 	flushed_cnt = 0;
-	static struct cmsg_hop test_forced_flush_route =
-		{ do_forced_flush, NULL };
-	static struct cmsg test_forced_flush_msg;
-	cmsg_init(&test_forced_flush_msg, &test_forced_flush_route);
-	cpipe_push(&pipe_to_worker, &test_forced_flush_msg);
+	test_msg_destroy(&msg);
+
+	check_plan();
+	footer();
 }
 
-/** }}} Test forced flush. ------------------------------------ */
+/** }}} Test single message. ---------------------------------- */
 
 /**
  * Test that flush is called once per event loop event if several
  * messages was pushed. {{{ --------------------------------------
  */
 
-/** Do some event and check flush to was not called. */
 static void
-do_some_event(struct cmsg *m)
+test_auto_flush(void)
 {
-	(void) m;
-	is(flushed_cnt, 0, "no flush during loop");
-}
+	header();
+	plan(2);
 
-/**
- * Create the following scenario for the worker:
- * do_some_event() -> do_some_event() -> do_nothing() -> flush().
- * Each do_some_event cheks, that flush was not called.
- */
-static void
-test_several_messages(struct cmsg *m)
-{
-	(void) m;
-	is(flushed_cnt, 1, "1 flush after test_single_msg");
-	printf("\n*** Test several messages ***\n");
+	struct cmsg_hop route[] = {
+		{ do_nothing, &pipe_to_main },
+		{ send_signal, NULL },
+	};
+	const int msg_count = 3;
+	struct test_msg msgs[msg_count];
+	for (int i = 0; i < msg_count; ++i) {
+		test_msg_create(&msgs[i], route);
+		cpipe_push(&pipe_to_worker, &msgs[i].base);
+		/* The manual submissions won't trigger immediate flush. */
+		cpipe_submit_flush(&pipe_to_worker);
+	}
+	is(flushed_cnt, 0, "no flush until end of the loop's iteration");
+
+	for (int i = 0; i < msg_count; ++i) {
+		fiber_signal_recv(&msgs[i].signal);
+		test_msg_destroy(&msgs[i]);
+	}
+	is(flushed_cnt, 1, "one flush for all messages");
 	flushed_cnt = 0;
-	static struct cmsg_hop test_event_route[] = {
-		{ do_some_event, &pipe_to_main },
-		{ do_nothing, NULL },
-	};
-	static struct cmsg_hop test_several_msg_route[] = {
-		{ do_some_event, &pipe_to_main },
-		{ test_forced_flush, NULL },
-	};
-	static struct cmsg test_event_msg[2];
-	static struct cmsg test_several_msg;
-	cmsg_init(&test_event_msg[0], test_event_route);
-	cmsg_init(&test_event_msg[1], test_event_route);
-	cmsg_init(&test_several_msg, test_several_msg_route);
-	cpipe_push(&pipe_to_worker, &test_event_msg[0]);
-	cpipe_push(&pipe_to_worker, &test_event_msg[1]);
-	cpipe_push(&pipe_to_worker, &test_several_msg);
+
+	check_plan();
+	footer();
 }
 
 /** }}} Test several messages. -------------------------------- */
 
-/**
- * Test that flush trigger works for a single message.
- * {{{ -----------------------------------------------------------
- */
-
-static void
-test_single_msg()
-{
-	printf("\n*** Test single message ***\n");
-	static struct cmsg_hop test_single_flush_route[] = {
-		{ do_nothing, &pipe_to_main },
-		/* Schedule the next test. */
-		{ test_several_messages, NULL },
-	};
-	static struct cmsg test_msg;
-	cmsg_init(&test_msg, test_single_flush_route);
-	cpipe_push(&pipe_to_worker, &test_msg);
-}
-
-/** }}} Test single message. ---------------------------------- */
-
 static int
-main_f(va_list ap)
+cbus_loop_f(va_list ap)
 {
 	(void) ap;
 	struct cbus_endpoint endpoint;
 	cbus_endpoint_create(&endpoint, "main", fiber_schedule_cb, fiber());
+	cbus_loop(&endpoint);
+	cbus_endpoint_destroy(&endpoint, cbus_process);
+	return 0;
+}
+
+static int
+cbus_test_suite_f(va_list ap)
+{
+	(void)ap;
+	header();
+	plan(2);
+
+	struct fiber *endpoint_worker = fiber_new("main_endpoint", cbus_loop_f);
+	fiber_set_joinable(endpoint_worker, true);
+	fiber_start(endpoint_worker);
+
 	worker_start();
 	trigger_create(&on_flush_to_main, flush_cb, NULL, NULL);
 	trigger_add(&pipe_to_main.on_flush, &on_flush_to_main);
 
 	test_single_msg();
+	test_auto_flush();
 
-	cbus_loop(&endpoint);
 	worker_stop();
-	cbus_endpoint_destroy(&endpoint, cbus_process);
+	fiber_cancel(endpoint_worker);
+	fiber_join(endpoint_worker);
 	ev_break(loop(), EVBREAK_ALL);
+
+	check_plan();
+	footer();
 	return 0;
 }
 
 int
-main()
+main(void)
 {
 	header();
-	plan(6);
+	plan(1);
 
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	cbus_init();
-	printf("start main fiber\n");
-	struct fiber *main_fiber = fiber_new("main", main_f);
+	struct fiber *main_fiber = fiber_new("main", cbus_test_suite_f);
 	assert(main_fiber != NULL);
 	fiber_wakeup(main_fiber);
-	printf("start main loop\n");
 	ev_run(loop(), 0);
-	printf("finish main loop\n");
+
 	cbus_free();
 	fiber_free();
 	memory_free();
