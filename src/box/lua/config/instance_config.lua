@@ -2249,6 +2249,9 @@ return schema.new('instance_config', schema.record({
             }),
             box_cfg = 'audit_spaces',
             box_cfg_nondynamic = true,
+            -- TODO(gh-10756): This default doesn't work now. It
+            -- needs support of non-scalar schema nodes in
+            -- <schema object>:map().
             default = box.NULL,
         })),
         extract_key = enterprise_edition(schema.scalar({
