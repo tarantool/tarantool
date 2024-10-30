@@ -118,6 +118,8 @@ local err_pat_whitelist = {
     "Failed to allocate %d+ bytes in [%w_]+ for [%w_]+",
     "Storage engine 'memtx' does not support cross%-engine transactions",
     "Storage engine 'vinyl' does not support cross%-engine transactions",
+    "Tuple field %d+ %([%w_]+%) type does not match one required by " ..
+        "operation: expected %w+, got nil",
 }
 
 local function keys(t)
@@ -382,12 +384,14 @@ local function random_space_format()
         table.insert(space_format, {
             name =('field_%d'):format(i),
             type = datatype,
+            is_nullable = oneof({true, false}),
         })
     end
     for i = min_num_fields - 1, num_fields - min_num_fields - 1 do
         table.insert(space_format, {
             name =('field_%d'):format(i),
             type = oneof(keys(tarantool_type)),
+            is_nullable = oneof({true, false}),
         })
     end
 
@@ -396,9 +400,9 @@ end
 
 -- Iterator types for indexes.
 -- See https://www.tarantool.io/en/doc/latest/reference/reference_lua/box_index/pairs/#box-index-iterator-types
--- TODO: support `is_nullable`.
+-- For information about nullable fields, see:
+-- https://www.tarantool.io/en/doc/latest/reference/reference_lua/box_space/create_index/#lua-data.key_part.is_nullable
 -- TODO: support `multikey`.
--- TODO: support `exclude_null`.
 -- TODO: support `pagination`.
 local tarantool_indices = {
     HASH = {
@@ -421,6 +425,7 @@ local tarantool_indices = {
         is_multipart = true,
         is_min_support = false,
         is_max_support = false,
+        is_nullable_support = false,
         is_unique_support = true,
         is_non_unique_support = false,
         is_primary_key_support = true,
@@ -442,6 +447,7 @@ local tarantool_indices = {
         is_multipart = false,
         is_min_support = false,
         is_max_support = false,
+        is_nullable_support = false,
         is_unique_support = false,
         is_non_unique_support = true,
         is_primary_key_support = false,
@@ -473,6 +479,7 @@ local tarantool_indices = {
         is_multipart = true,
         is_min_support = true,
         is_max_support = true,
+        is_nullable_support = true,
         is_unique_support = true,
         is_non_unique_support = true,
         is_primary_key_support = true,
@@ -495,6 +502,7 @@ local tarantool_indices = {
         is_multipart = false,
         is_min_support = false,
         is_max_support = false,
+        is_nullable_support = false,
         is_unique_support = false,
         is_non_unique_support = true,
         is_primary_key_support = false,
@@ -703,16 +711,29 @@ local function index_opts(space, is_primary)
     local idx = opts.type
     local possible_fields = fun.iter(space_format):filter(
         function(x)
+            -- Primary index must be not nullable.
+            if is_primary and x.is_nullable then
+                return nil
+            end
             if tarantool_indices[idx].data_type[x.type] == true then
                 return x
             end
         end):totable()
     local n_parts = math.random(1, table.getn(possible_fields))
     local id = unique_ids(n_parts)
+    local is_nullable_support = not is_primary and
+        tarantool_indices[opts.type].is_nullable_support
     for i = 1, n_parts do
         local field_id = id()
         local field = possible_fields[field_id]
-        table.insert(opts.parts, { field.name })
+        -- Randomly set is_nullable if it is supported.
+        local is_nullable =
+            oneof({false, field.is_nullable and is_nullable_support})
+        local exclude_null = oneof({false, is_nullable})
+        table.insert(opts.parts, {
+            field.name, is_nullable = is_nullable,
+            exclude_null = exclude_null,
+        })
         if not tarantool_indices[opts.type].is_multipart and
            i == 1 then
             break
@@ -828,17 +849,26 @@ local function index_delete_op(_space, idx, key)
     idx:delete(key)
 end
 
-local function random_field_value(field_type)
+-- Generate random field value, `opts` is a map with options.
+-- Available options:
+-- - disallow_null (boolean) - do not return NULL even if the field is nullable.
+local function random_field_value(field, opts)
+    local field_type = field.type
     local type_gen = tarantool_type[field_type].generator
     assert(type(type_gen) == 'function', field_type)
-    return type_gen()
+
+    local disallow_null = opts and opts.disallow_null
+    if field.is_nullable and not disallow_null then
+        return oneof({box.NULL, type_gen()})
+    else
+        return type_gen()
+    end
 end
 
--- TODO: support `is_nullable`.
 local function random_tuple(space_format)
     local tuple = {}
     for _, field in ipairs(space_format) do
-        table.insert(tuple, random_field_value(field.type))
+        table.insert(tuple, random_field_value(field))
     end
 
     return tuple
@@ -856,9 +886,9 @@ local function random_tuple_operations(space)
     local id = unique_ids(num_fields)
     for _ = 1, math.random(num_fields) do
         local field_id = id()
-        local field_type = space_format[field_id].type
-        local operator = oneof(tarantool_type[field_type].operations)
-        local value = random_field_value(field_type)
+        local field = space_format[field_id]
+        local operator = oneof(tarantool_type[field.type].operations)
+        local value = random_field_value(field, {disallow_null = true})
         table.insert(tuple_ops, {operator, field_id, value})
     end
 
@@ -952,8 +982,9 @@ local ops = {
         func = index_alter_op,
         args = function(space)
             local idx_n = oneof(keys(space.index))
-            local is_primary = idx_n == 0
-            return space.index[idx_n], index_opts(space, is_primary)
+            local index = space.index[idx_n]
+            local is_primary = index.id == 0
+            return index, index_opts(space, is_primary)
         end,
     },
     INDEX_COMPACT_OP = {
