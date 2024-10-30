@@ -1,1 +1,3 @@
 build_module(libyield libyield.c)
+build_module(tx_user_fiber_pool tx_user_fiber_pool.cc)
+target_link_libraries(tx_user_fiber_pool msgpuck)

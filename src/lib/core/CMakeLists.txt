@@ -53,6 +53,7 @@ set(core_sources
     histogram.c
     latency.c
     rmean.c
+    tnt_thread.cc
 )
 
 if (ENABLE_BACKTRACE)
