@@ -116,6 +116,13 @@ relay_trigger_vclock_sync(struct relay *relay, uint64_t *vclock_sync,
 void
 relay_push_raft(struct relay *relay, const struct raft_request *req);
 
+/**
+ * Change group_id of the raft request row, if needed. Old versions expect
+ * GROUP_LOCAL, new ones - GROUP_DEFAULT.
+ */
+void
+relay_filter_raft(struct xrow_header *packet, uint32_t version_id);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
