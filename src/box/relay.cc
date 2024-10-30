@@ -1153,6 +1153,8 @@ static void
 relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	struct relay *relay = container_of(stream, struct relay, stream);
+	if (iproto_type_is_raft_request(row->type))
+		return relay_send_raft(relay, row);
 	/*
 	 * Ignore replica local requests as we don't need to promote
 	 * vclock while sending a snapshot.
