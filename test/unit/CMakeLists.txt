@@ -300,6 +300,11 @@ create_unit_test(PREFIX cbus
                  LIBRARIES core unit
 )
 
+create_unit_test(PREFIX tnt_thread
+                 SOURCES tnt_thread.c core_test_utils.c
+                 LIBRARIES core unit
+)
+
 create_unit_test(PREFIX cbus_call
                  SOURCES cbus_call.c core_test_utils.c
                  LIBRARIES core unit

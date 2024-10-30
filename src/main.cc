@@ -91,6 +91,7 @@
 #include "lua/utils.h"
 #include "core/event.h"
 #include "on_shutdown.h"
+#include "tnt_thread.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -158,6 +159,7 @@ on_shutdown_f(va_list ap)
 		diag_clear(diag_get());
 	}
 	box_shutdown();
+	tnt_thread_shutdown();
 	shutdown_finished = true;
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
@@ -575,6 +577,7 @@ tarantool_free(void)
 #ifdef ENABLE_GCOV
 	gcov_flush();
 #endif
+	tnt_thread_free();
 	cbus_free();
 #if 0
 	/*
@@ -1003,6 +1006,7 @@ main(int argc, char **argv)
 	coio_enable();
 	signal_init();
 	cbus_init();
+	tnt_thread_init();
 	coll_init();
 	memtx_tx_manager_init();
 	module_init();

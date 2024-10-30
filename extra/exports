@@ -397,6 +397,8 @@ tnt_mp_sizeof_interval
 tnt_mp_sizeof_uuid
 tnt_rl_get_screen_size
 tnt_ssl_cert_paths_discover
+tnt_tx_flush
+tnt_tx_push
 tnt_XXH32
 tnt_XXH32_copyState
 tnt_XXH32_digest

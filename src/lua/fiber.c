@@ -35,6 +35,7 @@
 #include "lua/serializer.h"
 #include "lua/backtrace.h"
 #include "tt_static.h"
+#include "tnt_thread.h"
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -346,6 +347,22 @@ lbox_fiber_top_disable(struct lua_State *L)
 	(void) L;
 	fiber_top_disable();
 	return 0;
+}
+
+static int
+lbox_fiber_tx_user_pool_size(struct lua_State *L)
+{
+	int old_size = tnt_thread_get_tx_user_pool_size();
+	if (lua_gettop(L) != 0) {
+		int new_size = lua_tointeger(L, -1);
+		if (new_size <= 0) {
+			diag_set(IllegalParams, "size must be > 0");
+			luaT_error(L);
+		}
+		tnt_thread_set_tx_user_pool_size(new_size);
+	}
+	lua_pushinteger(L, old_size);
+	return 1;
 }
 
 #ifdef ENABLE_BACKTRACE
@@ -1072,6 +1089,7 @@ static const struct luaL_Reg fiberlib[] = {
 	{"top", lbox_fiber_top},
 	{"top_enable", lbox_fiber_top_enable},
 	{"top_disable", lbox_fiber_top_disable},
+	{"tx_user_pool_size", lbox_fiber_tx_user_pool_size},
 #ifdef ENABLE_BACKTRACE
 	{"parent_backtrace_enable", lbox_fiber_parent_backtrace_enable},
 	{"parent_backtrace_disable", lbox_fiber_parent_backtrace_disable},

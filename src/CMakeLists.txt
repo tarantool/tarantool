@@ -252,6 +252,7 @@ set(api_headers
     ${PROJECT_SOURCE_DIR}/src/lib/core/fiber_cond.h
     ${PROJECT_SOURCE_DIR}/src/lib/core/coio.h
     ${PROJECT_SOURCE_DIR}/src/lib/core/coio_task.h
+    ${PROJECT_SOURCE_DIR}/src/lib/core/tnt_thread.h
     ${PROJECT_SOURCE_DIR}/src/box/ibuf.h
     ${PROJECT_SOURCE_DIR}/src/lua/utils.h
     ${PROJECT_SOURCE_DIR}/src/lua/error.h
