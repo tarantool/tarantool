@@ -1126,6 +1126,29 @@ relay_send(struct relay *relay, struct xrow_header *packet)
 	xrow_stream_write(stream, packet);
 }
 
+void
+relay_filter_raft(struct xrow_header *packet, uint32_t version)
+{
+	assert(iproto_type_is_raft_request(packet->type));
+	if (version > version_id(3, 2, 1) ||
+	    (version > version_id(2, 11, 4) && version < version_id(3, 0, 0)))
+		return;
+	/**
+	 * Until Tarantool 3.2.2 all raft requests were sent with GROUP_LOCAL
+	 * id. In order not to break the upgrade process, raft rows are still
+	 * sent as local to old replicas. This was also backported to 2.11.5.
+	 */
+	packet->group_id = GROUP_LOCAL;
+}
+
+static void
+relay_send_raft(struct relay *relay, struct xrow_header *packet)
+{
+	assert(iproto_type_is_raft_request(packet->type));
+	relay_filter_raft(packet, relay->version_id);
+	relay_send(relay, packet);
+}
+
 static void
 relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
@@ -1152,7 +1175,7 @@ relay_raft_msg_push(struct cmsg *base)
 	struct xrow_header row;
 	RegionGuard region_guard(&fiber()->gc);
 	xrow_encode_raft(&row, &fiber()->gc, &msg->req);
-	relay_send(relay, &row);
+	relay_send_raft(relay, &row);
 	if (relay_flush(relay) < 0) {
 		relay_set_error(relay, diag_last_error(diag_get()));
 		fiber_cancel(fiber());
