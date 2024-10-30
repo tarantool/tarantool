@@ -38,7 +38,7 @@ test_run:cmd("setopt delimiter ''");
 pcall(test) -- must fail but not crash
  | ---
  | - false
- | - 'Can''t create tuple: metadata size 32790 is too big'
+ | - 'Can''t create tuple: metadata size 32792 is too big'
  | ...
 
 test = nil
