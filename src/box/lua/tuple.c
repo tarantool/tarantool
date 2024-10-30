@@ -796,6 +796,7 @@ static const struct luaL_Reg lbox_tuple_iterator_meta[] = {
 static inline void
 tuple_serializer_update_options(void)
 {
+	luaL_serializer_free_options(&tuple_serializer);
 	luaL_serializer_copy_options(&tuple_serializer, luaL_msgpack_default);
 	tuple_serializer.encode_sparse_ratio = 0;
 }

@@ -130,7 +130,7 @@ end
 -- module, also there can be multiple overloads.
 local real_require = require
 _G.require = function(modname)
-    if modname == 'log' then
+    if modname == 'log' and real_require('log').new ~= nil then
         local callstack = __tarantool__internal__require__wrapper__()
         local overload_count = get_require_overload_count(callstack)
         local name = module_name_by_callstack_level(overload_count + 2)

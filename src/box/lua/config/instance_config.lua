@@ -852,11 +852,31 @@ return schema.new('instance_config', schema.record({
             -- <schema object>:map().
             default = box.NULL,
         }),
+        fields_order = schema.array({
+            items = schema.scalar({
+                type = 'string',
+            }),
+            box_cfg = 'log_fields_order',
+            default = box.NULL,
+        }),
+        context_generator = schema.scalar({
+            type = 'string',
+            box_cfg = 'log_context_generator',
+            default = box.NULL,
+        }),
     }, {
         validate = function(log, w)
             if log.to == 'pipe' and log.pipe == nil then
                 w.error('The pipe logger is set by the log.to parameter but ' ..
                     'the command is not set (log.pipe parameter)')
+            end
+            if log.format ~= 'json' and log.fields_order ~= nil then
+                w.error('The log.fields_order parameter is allowed only ' ..
+                    'with the log.format parameter set to "json"')
+            end
+            if log.format ~= 'json' and log.context_generator ~= nil then
+                w.error('The log.context_generator parameter is allowed ' ..
+                    'only with the log.format parameter set to "json"')
             end
         end,
     }),
@@ -2457,6 +2477,12 @@ return schema.new('instance_config', schema.record({
             default = 'old',
         }),
         replication_synchro_timeout = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
+        log_rewrite_special_fields = schema.enum({
             'old',
             'new',
         }, {

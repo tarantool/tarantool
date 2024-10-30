@@ -136,6 +136,8 @@ struct luaL_serializer {
 	int encode_invalid_as_nil;
 	/** Encode error object as MP_ERROR extension (MsgPack only). */
 	int encode_error_as_ext;
+	/** Array of keys to sort map serialization. */
+	char **encode_key_order;
 
 	/** Enables decoding NaN and Inf numbers */
 	int decode_invalid_numbers;
@@ -183,6 +185,13 @@ luaL_newserializer(struct lua_State *L, const char *modname,
 void
 luaL_serializer_copy_options(struct luaL_serializer *dst,
 			     const struct luaL_serializer *src);
+
+/**
+ * Free memory allocated for serializer options.
+ * @param cfg Serializer configuration.
+ */
+void
+luaL_serializer_free_options(struct luaL_serializer *cfg);
 
 static inline struct luaL_serializer *
 luaL_checkserializer(struct lua_State *L)
@@ -242,6 +251,15 @@ struct luaL_field {
 	enum mp_extension_type ext_type;
 	bool compact;                /* a flag used by YAML serializer */
 };
+
+/**
+ * Get the next field from the table in sorted order.
+ * @param L Lua stack.
+ * @param cfg Serializer configuration.
+ * @retval 0 if there are no more fields in the table.
+ */
+int
+luaL_next_field(struct lua_State *L, struct luaL_serializer *cfg);
 
 /**
  * @brief Convert a value from the Lua stack to a lua_field structure.

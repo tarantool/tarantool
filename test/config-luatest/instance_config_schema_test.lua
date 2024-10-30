@@ -261,6 +261,8 @@ g.test_log = function()
             modules = {
                 seven = 'debug',
             },
+            fields_order = box.NULL,
+            context_generator = box.NULL,
         },
     }
     instance_config:validate(iconfig)

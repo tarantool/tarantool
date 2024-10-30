@@ -93,6 +93,11 @@ say_format_boot(struct log *log, char *buf, int len, int level,
 		const char *module, const char *filename, int line,
 		const char *error, const char *format, va_list ap);
 
+static int
+say_format_json_v2(struct log *log, char *buf, int len, int level,
+		   const char *module, const char *filename, int line,
+		   const char *error, const char *format, va_list ap);
+
 /*
  * Callbacks called before/after writing to stderr.
  */
@@ -250,7 +255,7 @@ say_set_log_format(enum say_format format)
 
 	switch (format) {
 	case SF_JSON:
-		format_func = say_format_json;
+		format_func = say_format_json_v2;
 		break;
 	case SF_PLAIN:
 		format_func = say_format_plain;
@@ -957,6 +962,32 @@ say_format_json(struct log *log, char *buf, int len, int level,
 		SNPRINT(total, snprintf, buf, len, "\"");
 	}
 	SNPRINT(total, snprintf, buf, len, "}\n");
+	return total;
+}
+
+/**
+ * Format log message in json format with preprocessed log entry.
+ */
+static int
+say_format_json_v2(struct log *log, char *buf, int len, int level,
+		   const char *module, const char *filename, int line,
+		   const char *error, const char *format, va_list ap)
+{
+	int total = 0;
+
+	if (strncmp(format, "json", sizeof("json")) == 0) {
+		const char *str = va_arg(ap, const char *);
+		assert(str != NULL);
+		int str_len = strlen(str);
+		assert(str_len > 2 && str[0] == '{' && str[str_len - 1] == '}');
+		SNPRINT(total, snprintf, buf, len, "%.*s", str_len, str);
+	} else {
+		return say_format_json(log, buf, len, level, module, filename,
+				       line, error, format, ap);
+	}
+
+	SNPRINT(total, snprintf, buf, len, "\n");
+
 	return total;
 }
 
