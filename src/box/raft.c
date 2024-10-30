@@ -91,7 +91,8 @@ static void
 box_raft_election_fencing_resume(void);
 
 static void
-box_raft_msg_to_request(const struct raft_msg *msg, struct raft_request *req)
+box_raft_msg_to_request(const struct raft_msg *msg, struct raft_request *req,
+			enum group_id group_id)
 {
 	*req = (struct raft_request) {
 		.term = msg->term,
@@ -100,6 +101,7 @@ box_raft_msg_to_request(const struct raft_msg *msg, struct raft_request *req)
 		.is_leader_seen = msg->is_leader_seen,
 		.state = msg->state,
 		.vclock = msg->vclock,
+		.group_id = group_id,
 	};
 }
 
@@ -366,7 +368,7 @@ box_raft_checkpoint_local(struct raft_request *req)
 {
 	struct raft_msg msg;
 	raft_checkpoint_local(box_raft(), &msg);
-	box_raft_msg_to_request(&msg, req);
+	box_raft_msg_to_request(&msg, req, GROUP_LOCAL);
 }
 
 void
@@ -374,7 +376,7 @@ box_raft_checkpoint_remote(struct raft_request *req)
 {
 	struct raft_msg msg;
 	raft_checkpoint_remote(box_raft(), &msg);
-	box_raft_msg_to_request(&msg, req);
+	box_raft_msg_to_request(&msg, req, GROUP_DEFAULT);
 }
 
 int
@@ -397,7 +399,7 @@ box_raft_broadcast(struct raft *raft, const struct raft_msg *msg)
 	(void)raft;
 	assert(raft == box_raft());
 	struct raft_request req;
-	box_raft_msg_to_request(msg, &req);
+	box_raft_msg_to_request(msg, &req, GROUP_DEFAULT);
 	replicaset_foreach(replica)
 		relay_push_raft(replica->relay, &req);
 	box_raft_run_on_election_triggers();
@@ -413,7 +415,7 @@ box_raft_write(struct raft *raft, const struct raft_msg *msg)
 	assert(msg->state == 0);
 
 	struct raft_request req;
-	box_raft_msg_to_request(msg, &req);
+	box_raft_msg_to_request(msg, &req, GROUP_LOCAL);
 	struct region *region = &fiber()->gc;
 	uint32_t svp = region_used(region);
 	struct xrow_header row;
