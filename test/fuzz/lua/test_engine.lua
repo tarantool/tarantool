@@ -12,6 +12,8 @@ testing if it exists.
 Usage: tarantool test_engine.lua
 ]]
 
+local arrow
+local column_scanner
 local console = require('console')
 local fiber = require('fiber')
 local fio = require('fio')
@@ -24,6 +26,7 @@ local math = require('math')
 -- Tarantool datatypes.
 local datetime = require('datetime')
 local decimal = require('decimal')
+local msgpack = require('msgpack')
 local uuid = require('uuid')
 
 local test_dir_name = 'test_engine_dir'
@@ -61,7 +64,7 @@ if params.help or params.h then
    workers <number, 50>                  - number of fibers to run in parallel
    test_duration <number, 2*60>          - test duration time (sec)
    test_dir <string, ./%s>  - path to a test directory
-   engine <string, 'vinyl'>              - engine ('vinyl', 'memtx')
+   engine <string, 'vinyl'>              - engine ('vinyl', 'memtx', 'memcs')
    fault_injection <boolean, false>      - enable fault injection
    seed <number>                         - set a PRNG seed
    verbose <boolean, false>              - enable verbose logging
@@ -90,6 +93,22 @@ local seed = params.seed or os.time()
 math.randomseed(seed)
 log.info('Random seed: %d', seed)
 
+-- Set package.cpath to allow loading C modules from the test directory.
+if arg_engine == 'memcs' then
+    local tarantool = require('tarantool')
+    if tarantool.package ~= 'Tarantool Enterprise' then
+        error('Engine ' .. arg_engine .. ' requires Tarantool Enterprise')
+    end
+    local mod_pattern = '?.' .. tarantool.build.mod_format
+    local test_dir = fio.abspath(
+        fio.pathjoin(os.getenv('BUILDDIR') or '.',
+        'test', 'enterprise-luatest'))
+    local test_mod_cpath = fio.pathjoin(test_dir, mod_pattern)
+    package.cpath = test_mod_cpath .. ';' .. package.cpath
+    column_scanner = require('scanner_c_api_wrapper')
+    arrow = require('arrow_c_api_wrapper')
+end
+
 -- The table contains a whitelist of errors that will be ignored
 -- by test. Each item is a Lua pattern, special characters
 -- should be escaped: ^ $ ( ) % . [ ] * + - ?
@@ -117,9 +136,16 @@ local err_pat_whitelist = {
     "Get%(%) doesn't support partial keys and non%-unique indexes",
     "Index '[%w_]+' %(RTREE%) of space '[%w_]+' %(memtx%) does not support max%(%)",
     "Index '[%w_]+' %(RTREE%) of space '[%w_]+' %(memtx%) does not support min%(%)",
-    "Failed to allocate %d+ bytes in [%w_]+ for [%w_]+",
+    "Failed to allocate %d+ bytes in [%w_ ]+ for [%w_]+",
     "Storage engine 'memtx' does not support cross%-engine transactions",
     "Storage engine 'vinyl' does not support cross%-engine transactions",
+    -- MEMCS-specific errors.
+    "Index '[%w_]+' %(TREE%) of space '[%w_]+' %(memcs%) does not support pagination",
+    "Arrow stream does not support field type '[%w_]+'",
+    "box_insert_arrow: field [%d]+ has unsupported type",
+    "Engine 'memcs' does not support upsert%(%)",
+    "Engine 'memcs' does not support index build",
+    "Engine 'memcs' does not support variable field count",
 }
 
 local function keys(t)
@@ -565,10 +591,87 @@ local function format_op(space, space_format)
     space:format(space_format)
 end
 
+local function scan_column_op(space, fields, key)
+    if space.engine ~= 'memcs' then
+        return
+    end
+    local mpkey = msgpack.encode(key)
+    local scanner = column_scanner.box_index_scanner(space.id, 0, fields, mpkey)
+    while true do
+        if math.random(1, 20) == 1 then
+            log.info('SCAN_COLUMN: finish early')
+            break
+        end
+        local max_batch_size = oneof({10, 10^6})
+        local batch_size = math.random(1, max_batch_size)
+        log.info('SCAN_COLUMN: going to read batch of size ' .. batch_size)
+        local result = column_scanner.box_scanner_next(scanner, batch_size)
+        if result.row_count <= 10 then
+            log.info('SCAN_COLUMN: has read batch ' .. json.encode(result))
+        else
+            log.info('SCAN_COLUMN: has read big batch of size ' ..
+                     result.row_count)
+        end
+        if oneof({true, false}) then
+            log.info('SCAN_COLUMN: yield after batch')
+            fiber.yield()
+        end
+        if result.row_count == 0 then
+            break
+        end
+    end
+    column_scanner.box_scanner_free(scanner)
+end
+
+local function arrow_stream_op(space, fields, key)
+    if space.engine ~= 'memcs' then
+        return
+    end
+    local mpkey = msgpack.encode(key)
+    local batch_size = nil
+    if oneof({true, false}) then
+        local max_batch_size = oneof({10, 10^6})
+        batch_size = math.random(1, max_batch_size)
+        log.info('ARROW_STREAM: explicitly set batch size to ' .. batch_size)
+    end
+    local stream = arrow.box_index_arrow_stream(space.id, 0, fields, mpkey,
+                                                batch_size)
+    while true do
+        if math.random(1, 20) == 1 then
+            log.info('ARROW_STREAM: finish early')
+            break
+        end
+        log.info('ARROW_STREAM: stream next')
+        local result = arrow.arrow_stream_next(stream)
+        if result.row_count <= 10 then
+            log.info('ARROW_STREAM: has read batch ' .. json.encode(result))
+        else
+            log.info('ARROW_STREAM: has read big batch of size ' ..
+                     result.row_count)
+        end
+        if oneof({true, false}) then
+            log.info('ARROW_STREAM: yield after batch')
+            fiber.yield()
+        end
+        if result.row_count == 0 then
+            break
+        end
+    end
+    arrow.arrow_stream_free(stream)
+end
+
+local function insert_arrow_op(space, batch)
+    if space.engine ~= 'memcs' then
+        return
+    end
+    arrow.box_insert_arrow(space.id, batch)
+end
+
 local function setup(engine_name, space_id_func, test_dir, verbose)
     log.info('SETUP')
     assert(engine_name == 'memtx' or
-           engine_name == 'vinyl')
+           engine_name == 'vinyl' or
+           engine_name == 'memcs')
     -- Configuration reference (box.cfg),
     -- https://www.tarantool.io/en/doc/latest/reference/configuration/
     local box_cfg_options = {
@@ -621,7 +724,11 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         if_not_exists = oneof({true, false}),
         is_local = oneof({true, false}),
     }
-    if space_opts.engine ~= 'vinyl' then
+    -- Memcs does not support variable field count.
+    if space_opts.engine == 'memcs' then
+        space_opts.field_count = table.getn(space_format)
+    end
+    if space_opts.engine == 'memtx' then
         space_opts.temporary = oneof({true, false})
     end
     local space_name = ('test_%d'):format(space_id_func())
@@ -664,7 +771,7 @@ local function index_opts(space, is_primary)
             end
         end):totable()
 
-    if space.engine == 'vinyl' then
+    if space.engine == 'vinyl' or space.engine == 'memcs' then
         indices = {'TREE'}
     end
 
@@ -887,6 +994,46 @@ local function random_key(space, idx)
     return key
 end
 
+-- Chooses random space fields and return their indexes,
+-- they are not ordered and may be repeated.
+-- NB: indexes are zero-based.
+local function random_space_field_ids(space)
+    local format_size = #space:format()
+    local fields = {}
+    local fields_num_max = format_size * 2
+    local fields_num = math.random(fields_num_max)
+    for _ = 1, fields_num do
+        table.insert(fields, math.random(0, format_size - 1))
+    end
+    return fields
+end
+
+-- Generates a batch as a Lua table in a format:
+-- {{field_name1, {<values>}}, {field_name2, {<values>}}, ...}.
+-- Fields are not repeated, nullable ones can be skipped.
+local function random_batch(space)
+    local format_size = #space:format()
+    local batch = {}
+    -- Randomly choose between small and big batch
+    local max_batch_size = oneof({10, 100})
+    local batch_size = math.random(1, max_batch_size)
+    local id = unique_ids(format_size)
+    for _ = 1, format_size do
+        local i = id()
+        local field = space:format()[i]
+        local values = {}
+        -- Skip the field only if it is nullable.
+        local skip_field = oneof({false, field.is_nullable})
+        if not skip_field then
+            for _ = 1, batch_size do
+                table.insert(values, random_field_value(field))
+            end
+            table.insert(batch, {field.name, values})
+        end
+    end
+    return batch
+end
+
 local function box_snapshot()
     local in_progress = box.info.gc().checkpoint_is_in_progress
     if not in_progress then
@@ -1088,6 +1235,26 @@ local ops = {
     SNAPSHOT_OP = {
         func = box_snapshot,
         args = function(_) return end,
+    },
+
+    -- memcs-specific.
+    SCAN_COLUMN_OP = {
+        func = scan_column_op,
+        args = function(space)
+            return random_space_field_ids(space),
+                oneof({{}, random_key(space, space.index[0])})
+        end,
+    },
+    ARROW_STREAM_OP = {
+        func = arrow_stream_op,
+        args = function(space)
+            return random_space_field_ids(space),
+                oneof({{}, random_key(space, space.index[0])})
+        end,
+    },
+    INSERT_ARROW_OP = {
+        func = insert_arrow_op,
+        args = random_batch,
     },
 }
 
