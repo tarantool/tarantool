@@ -4928,11 +4928,12 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		 * Raft messages. Raft's network footprint should be 0 as seen
 		 * by such instances.
 		 */
-		struct raft_request req;
-		box_raft_checkpoint_remote(&req);
-		xrow_encode_raft(&row, &fiber()->gc, &req);
+		struct raft_request raft_req;
+		box_raft_checkpoint_remote(&raft_req);
+		xrow_encode_raft(&row, &fiber()->gc, &raft_req);
+		relay_filter_raft(&row, req.version_id);
 		coio_write_xrow(io, &row);
-		sent_raft_term = req.term;
+		sent_raft_term = raft_req.term;
 	}
 	/*
 	 * Process SUBSCRIBE request via replication relay

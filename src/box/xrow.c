@@ -1451,7 +1451,7 @@ xrow_encode_raft(struct xrow_header *row, struct region *region,
 	memset(row, 0, sizeof(*row));
 	row->type = IPROTO_RAFT;
 	row->body[0].iov_base = buf;
-	row->group_id = GROUP_LOCAL;
+	row->group_id = r->group_id;
 	row->bodycnt = 1;
 	const char *begin = buf;
 
@@ -1487,13 +1487,14 @@ xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
 {
 	if (row->type != IPROTO_RAFT)
 		goto bad_msgpack;
-	if (row->bodycnt != 1 || row->group_id != GROUP_LOCAL) {
+	if (row->bodycnt != 1) {
 		diag_set(ClientError, ER_INVALID_MSGPACK,
 			 "malformed raft request");
 		return -1;
 	}
 	memset(r, 0, sizeof(*r));
 
+	r->group_id = row->group_id;
 	const char *pos = row->body[0].iov_base;
 	uint32_t map_size = mp_decode_map(&pos);
 	for (uint32_t i = 0; i < map_size; ++i)
