@@ -452,7 +452,7 @@ iproto_type_name(uint16_t type)
 }
 
 /** Predefined replication group identifiers. */
-enum {
+enum group_id {
 	/**
 	 * Default replication group: changes made to the space
 	 * are replicated throughout the entire cluster.
