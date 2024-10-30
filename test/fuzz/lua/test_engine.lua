@@ -15,6 +15,7 @@ Usage: tarantool test_engine.lua
 local console = require('console')
 local fiber = require('fiber')
 local fio = require('fio')
+local ffi = require('ffi')
 local fun = require('fun')
 local json = require('json')
 local log = require('log')
@@ -262,7 +263,7 @@ local tarantool_type = {
         generator = function()
             return math.random() * 10^12
         end,
-        operations = {'-'},
+        operations = {'+', '-'},
     },
     ['integer'] = {
         generator = random_int,
@@ -289,6 +290,70 @@ local tarantool_type = {
     ['uuid'] = {
         generator = uuid.new,
         operations = {'=', '!'},
+    },
+    ['int8'] = {
+        generator = function()
+            return math.random(-2^7, 2^7 - 1)
+        end,
+        operations = {'+', '-'},
+    },
+    ['uint8'] = {
+        generator = function()
+            return math.random(0, 2^8 - 1)
+        end,
+        operations = {'+', '-', '&', '|', '^'},
+    },
+    ['int16'] = {
+        generator = function()
+            return math.random(-2^15, 2^15 - 1)
+        end,
+        operations = {'+', '-'},
+    },
+    ['uint16'] = {
+        generator = function()
+            return math.random(0, 2^16 - 1)
+        end,
+        operations = {'+', '-', '&', '|', '^'},
+    },
+    ['int32'] = {
+        generator = function()
+            return math.random(-2^31, 2^31 - 1)
+        end,
+        operations = {'+', '-'},
+    },
+    ['uint32'] = {
+        generator = function()
+            return math.random(0, 2^32 - 1)
+        end,
+        operations = {'+', '-', '&', '|', '^'},
+    },
+    ['int64'] = {
+        generator = function()
+            local v = math.random(-2^63, 2^63 - 1)
+            return ffi.cast('int64_t', v)
+        end,
+        operations = {'+', '-'},
+    },
+    ['uint64'] = {
+        generator = function()
+            local v = math.random(0, 2^64 - 1)
+            return ffi.cast('uint64_t', v)
+        end,
+        operations = {'+', '-', '&', '|', '^'},
+    },
+    ['float32'] = {
+        generator = function()
+            local v = math.random() * 10^12
+            return ffi.cast('float', v)
+        end,
+        operations = {'+', '-'},
+    },
+    ['float64'] = {
+        generator = function()
+            local v = math.random() * 10^12
+            return ffi.cast('double', v)
+        end,
+        operations = {'+', '-'},
     },
 }
 
