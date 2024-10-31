@@ -176,6 +176,46 @@ g1.test_fixed_size_float = function(cg)
     end)
 end
 
+-- Test arithmetic operations on the fixed-size floating-point field types.
+g1.test_fixed_size_float_update = function(cg)
+    cg.server:exec(function()
+        local ffi = require('ffi')
+        local s = box.space.test
+        s:format({{name = 'pk',  type = 'unsigned'},
+                  {name = 'f32', type = 'float32', is_nullable = true },
+                  {name = 'f64', type = 'float64', is_nullable = true }})
+        s:insert({0, ffi.cast('float', 0), ffi.cast('double', 0)})
+
+        s:update(0, {{'+', 'f32', 100},
+                     {'+', 'f64', 100}})
+        s:update(0, {{'+', 'f32', ffi.cast('float', 100)},
+                     {'+', 'f64', ffi.cast('float', 100)}})
+        s:update(0, {{'+', 'f32', ffi.cast('double', 100)},
+                     {'+', 'f64', ffi.cast('double', 100)}})
+        t.assert_equals(s:get(0), {0, 300, 300})
+
+        s:update(0, {{'+', 'f32', 123.456},
+                     {'+', 'f64', 123.456}})
+        s:update(0, {{'+', 'f32', ffi.cast('float', 345.678)},
+                     {'+', 'f64', ffi.cast('float', 345.678)}})
+        s:update(0, {{'+', 'f32', ffi.cast('double', 567.89)},
+                     {'+', 'f64', ffi.cast('double', 567.89)}})
+        t.assert_almost_equals(s:get(0)[2], 1337.024, 0.001)
+        t.assert_almost_equals(s:get(0)[3], 1337.024, 0.001)
+
+        s:replace({0, ffi.cast('float', -3.40e38),
+                      ffi.cast('double', -3.40e38)})
+        s:replace({1, ffi.cast('float', 3.40e38),
+                      ffi.cast('double', 3.40e38)})
+        s:update(0, {{'-', 'f32', ffi.cast('float', 3.40e38)},
+                     {'-', 'f64', ffi.cast('double', 3.40e38)}})
+        s:update(1, {{'+', 'f32', ffi.cast('float', 3.40e38)},
+                     {'+', 'f64', ffi.cast('double', 3.40e38)}})
+        t.assert_equals(s:select(), {{0, -math.huge, -6.8e38},
+                                     {1, math.huge, 6.8e38}})
+    end)
+end
+
 -- Check that value range check works with nullable fields.
 g1.test_nullable = function(cg)
     cg.server:exec(function()
