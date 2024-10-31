@@ -144,19 +144,12 @@ struct memtx_engine {
 	struct slab_cache slab_cache;
 	/** Slab cache for allocating index extents. */
 	struct slab_cache index_slab_cache;
-	/** Index extent allocator. */
+	/** Index extent source. */
 	struct mempool index_extent_pool;
+	/** Index extent allocator. */
+	struct matras_allocator index_extent_allocator;
 	/** Index extent allocator statistics. */
 	struct matras_stats index_extent_stats;
-	/**
-	 * To ensure proper statement-level rollback in case
-	 * of out of memory conditions, we maintain a number
-	 * of slack memory extents reserved before a statement
-	 * is begun. If there isn't enough slack memory,
-	 * we don't begin the statement.
-	 */
-	int num_reserved_extents;
-	void *reserved_extents;
 	/** Maximal allowed tuple size, box.cfg.memtx_max_tuple_size. */
 	size_t max_tuple_size;
 	/** Memory pool for rtree index iterator. */
@@ -260,20 +253,6 @@ enum {
 extern struct tuple *
 (*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
 		       const char *end, bool validate);
-
-/**
- * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
- * @ctx must point to memtx engine
- */
-void *
-memtx_index_extent_alloc(void *ctx);
-
-/**
- * Free a block previously allocated by memtx_index_extent_alloc
- * @ctx must point to memtx engine
- */
-void
-memtx_index_extent_free(void *ctx, void *extent);
 
 /**
  * Reserve num extents in pool.

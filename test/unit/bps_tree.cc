@@ -175,22 +175,22 @@ compare(type_t a, type_t b)
 static int extents_count = 0;
 
 static void *
-extent_alloc(void *ctx)
+extent_alloc(struct matras_allocator *allocator)
 {
-	int *p_extents_count = (int *)ctx;
-	assert(p_extents_count == &extents_count);
-	++*p_extents_count;
-	return malloc(BPS_TREE_EXTENT_SIZE);
+	(void)allocator;
+	++extents_count;
+	return xmalloc(BPS_TREE_EXTENT_SIZE);
 }
 
 static void
-extent_free(void *ctx, void *extent)
+extent_free(struct matras_allocator *allocator, void *extent)
 {
-	int *p_extents_count = (int *)ctx;
-	assert(p_extents_count == &extents_count);
-	--*p_extents_count;
+	(void)allocator;
+	--extents_count;
 	free(extent);
 }
+
+struct matras_allocator allocator;
 
 static void
 simple_check()
@@ -204,8 +204,7 @@ simple_check()
 
 	const unsigned int rounds = 2000;
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count,
-		    &stats);
+	test_create(&tree, 0, &allocator, &stats);
 
 	for (unsigned int i = 0; i < rounds; i++) {
 		type_t v = i;
@@ -345,7 +344,7 @@ compare_with_sptree_check()
 	sptree_test_init(&spt_test, sizeof(type_t), 0, 0, 0, &node_comp, 0, 0);
 
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 
 	const int rounds = 16 * 1024;
 	const int elem_limit = 	1024;
@@ -387,7 +386,7 @@ compare_with_sptree_check_branches()
 	sptree_test_init(&spt_test, sizeof(type_t), 0, 0, 0, &node_comp, 0, 0);
 
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 
 	const int elem_limit = 2048;
 
@@ -626,8 +625,7 @@ loading_test()
 		arr[i] = i;
 
 	for (type_t i = 0; i <= test_count; i++) {
-		test_create(&tree, 0, extent_alloc, extent_free,
-			    &extents_count, NULL);
+		test_create(&tree, 0, &allocator, NULL);
 
 		if (test_build(&tree, arr, i))
 			fail("building failed", "true");
@@ -655,7 +653,7 @@ static void
 printing_test()
 {
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 	const type_t rounds = 22;
 	for (type_t i = 0; i < rounds; i++) {
 		type_t v = rounds + i;
@@ -682,7 +680,7 @@ white_box_test()
 	const int count_in_leaf = BPS_TREE_test_MAX_COUNT_IN_LEAF;
 	const int count_in_inner = BPS_TREE_test_MAX_COUNT_IN_INNER;
 
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 
 	for (type_t i = 0; i < count_in_leaf; i++)
 		test_insert(&tree, i, 0, 0);
@@ -707,7 +705,7 @@ white_box_test()
 
 	test_destroy(&tree);
 
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 
 	type_t arr[count_in_leaf * count_in_inner];
 	for (type_t i = 0; i < count_in_leaf * count_in_inner; i++)
@@ -732,8 +730,7 @@ approximate_count()
 	srand(0);
 
 	approx tree;
-	approx_create(&tree, 0, extent_alloc, extent_free, &extents_count,
-		      NULL);
+	approx_create(&tree, 0, &allocator, NULL);
 
 	uint32_t in_leaf_max_count = BPS_TREE_approx_MAX_COUNT_IN_LEAF;
 	uint32_t in_leaf_min_count = in_leaf_max_count * 2 / 3;
@@ -831,7 +828,7 @@ static void
 insert_get_iterator()
 {
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 	type_t value = 100000;
 
 	bps_insert_and_check(test, &tree, value, NULL)
@@ -854,8 +851,7 @@ delete_value_check()
 	header();
 
 	struct_tree tree;
-	struct_tree_create(&tree, 0, extent_alloc, extent_free, &extents_count,
-			   NULL);
+	struct_tree_create(&tree, 0, &allocator, NULL);
 	struct elem_t e1 = {1, 1};
 	struct_tree_insert(&tree, e1, NULL, NULL);
 	struct elem_t e2 = {1, 2};
@@ -885,8 +881,7 @@ insert_successor_test()
 
 	for (size_t i = 0; i < sizeof(limits) / sizeof(limits[0]); i++) {
 		size_t limit = limits[i];
-		test_create(&tree, 0, extent_alloc, extent_free, &extents_count,
-			    NULL);
+		test_create(&tree, 0, &allocator, NULL);
 
 		for (size_t j = 0; j < limit; j++) {
 			type_t v = 1 + rand() % (limit - 1);
@@ -925,6 +920,9 @@ main(void)
 	plan(12);
 	header();
 
+	matras_allocator_create(&allocator, BPS_TREE_EXTENT_SIZE,
+				extent_alloc, extent_free);
+
 	simple_check();
 	compare_with_sptree_check();
 	compare_with_sptree_check_branches();
@@ -937,6 +935,8 @@ main(void)
 	insert_get_iterator();
 	delete_value_check();
 	insert_successor_test();
+
+	matras_allocator_destroy(&allocator);
 
 	footer();
 	return check_plan();

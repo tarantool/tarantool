@@ -119,6 +119,8 @@ struct vy_cache_env {
 	struct rlist cache_lru;
 	/** Common mempool for vy_cache_node struct */
 	struct mempool cache_node_mempool;
+	/** Common matras extent allocator. */
+	struct matras_allocator allocator;
 	/** Size of memory occupied by cached tuples */
 	size_t mem_used;
 	/** Max memory size that can be used for cache */
