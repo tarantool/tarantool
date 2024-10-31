@@ -523,6 +523,7 @@ local dynamic_cfg = {
     replication_skip_conflict = private.cfg_set_replication_skip_conflict,
     replication_anon        = private.cfg_set_replication_anon,
     bootstrap_strategy      = private.cfg_set_bootstrap_strategy,
+    bootstrap_leader        = private.cfg_set_bootstrap_leader,
     instance_uuid           = check_instance_uuid,
     instance_name           = private.cfg_set_instance_name,
     replicaset_uuid         = check_replicaset_uuid,
@@ -641,6 +642,7 @@ local dynamic_cfg_order = {
     -- Apply bootstrap_strategy before replication, but after
     -- replication_connect_quorum. The latter might influence its value.
     bootstrap_strategy      = 175,
+    bootstrap_leader        = 175,
     replication             = 200,
     -- Anon is set after `replication` as a temporary workaround
     -- for the problem, that `replication` and `replication_anon`
@@ -686,6 +688,7 @@ local dynamic_cfg_skip_at_load = {
     replication_skip_conflict = true,
     replication_anon        = true,
     bootstrap_strategy      = true,
+    bootstrap_leader        = true,
     wal_dir_rescan_delay    = true,
     wal_queue_max_size      = true,
     custom_proc_title       = true,
