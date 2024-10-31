@@ -118,9 +118,12 @@ local err_pat_whitelist = {
     -- DDL on a space is locked until the end of the current DDL
     -- operation.
     "the space is already being modified",
+    -- The test actively uses error injections that can cause such errors.
+    "Error injection '[%w_ ]+'",
     -- The test actively uses transactions that concurrently
     -- changes a data in a space, this can lead to errors below.
     "Transaction has been aborted by conflict",
+    "Transaction has been aborted by fiber yield",
     "Vinyl does not support rebuilding the primary index of a non%-empty space",
     "fiber is cancelled",
     "fiber slice is exceeded",
@@ -130,10 +133,15 @@ local err_pat_whitelist = {
     "Can't create or modify index '[%w_]+' in space '[%w_]+': hint is only reasonable with memtx tree index",
     "Get%(%) doesn't support partial keys and non%-unique indexes",
     "Failed to allocate %d+ bytes in [%w_ ]+ for [%w_]+",
-    "Storage engine 'memtx' does not support cross%-engine transactions",
-    "Storage engine 'vinyl' does not support cross%-engine transactions",
     "Tuple field %d+ %([%w_]+%) type does not match one required by " ..
         "operation: expected %w+, got nil",
+    "MVCC is unavailable for storage engine '[%w_]+' so it cannot be used " ..
+        "in the same transaction with '[%w_]+', which supports MVCC",
+    "Vinyl does not support executing a statement in a transaction that is " ..
+        "not allowed to yield",
+    "Can't modify space '[%d]+': the space was concurrently modified",
+    "Failed to write to disk",
+    "WAL has a rollback in progress",
     -- MEMCS-specific errors.
     "Index '[%w_]+' %(TREE%) of space '[%w_]+' %(memcs%) does not support pagination",
     "Arrow stream does not support field type '[%w_]+'",
