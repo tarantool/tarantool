@@ -265,6 +265,9 @@ replication_free(void)
 	latch_destroy(&replicaset.applier.order_latch);
 	applier_free();
 
+	if (!uri_is_nil(&cfg_bootstrap_leader_uri))
+		uri_destroy(&cfg_bootstrap_leader_uri);
+
 	TRASH(&replicaset);
 }
 
