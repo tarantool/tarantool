@@ -137,20 +137,27 @@
  * To mitigate this let's introduce a very simple region-like allocator.
  */
 template<int EXTENT_SIZE>
-class DummyAllocator {
+struct DummyAllocator {
 	std::unique_ptr<char[]> m_buf;
 	size_t m_buf_size;
 	size_t m_pos = 0;
+	struct matras_allocator matras_allocator;
 
-public:
 	DummyAllocator(size_t size)
 	{
+		matras_allocator_create(&matras_allocator,
+					EXTENT_SIZE, alloc, free);
 		m_buf_size = ((size + EXTENT_SIZE - 1) / EXTENT_SIZE) *
 			     EXTENT_SIZE;
 		/* The calculated size is incorrect for small trees. */
 		if (m_buf_size < EXTENT_SIZE * 10)
 			m_buf_size = EXTENT_SIZE * 10;
 		m_buf = std::unique_ptr<char[]>(new char[m_buf_size]);
+	}
+
+	~DummyAllocator()
+	{
+		matras_allocator_destroy(&matras_allocator);
 	}
 
 	void
@@ -160,9 +167,10 @@ public:
 	}
 
 	static void *
-	alloc(void *ctx)
+	alloc(struct matras_allocator *allocator)
 	{
-		DummyAllocator *self = (DummyAllocator *)ctx;
+		DummyAllocator *self = container_of(allocator, DummyAllocator,
+						    matras_allocator);
 		void *result = (void *)&self->m_buf[self->m_pos];
 		self->m_pos += EXTENT_SIZE;
 		if (unlikely(self->m_pos > self->m_buf_size)) {
@@ -173,9 +181,9 @@ public:
 	}
 
 	static void
-	free(void *ctx, void *extent)
+	free(struct matras_allocator *allocator, void *extent)
 	{
-		(void)ctx;
+		(void)allocator;
 		(void)extent;
 	}
 };
@@ -305,7 +313,7 @@ create(typename tree::tree_t &t, size_t size,
        typename tree::Allocator &allocator)
 {
 	auto arr = sorted_elems<tree>(size);
-	tree::create(&t, 0, allocator.alloc, allocator.free, &allocator, NULL);
+	tree::create(&t, 0, &allocator.matras_allocator, NULL);
 	if (tree::build(&t, &arr[0], size) == -1) {
 		fprintf(stderr, "Tree build has failed.\n");
 		exit(-1);
@@ -324,8 +332,7 @@ test_build(benchmark::State &state, size_t count)
 	typename tree::Allocator allocator(count);
 	for (auto _ : state) {
 		typename tree::tree_t t;
-		tree::create(&t, 0, allocator.alloc, allocator.free,
-			     &allocator, NULL);
+		tree::create(&t, 0, &allocator.matras_allocator, NULL);
 		tree::build(&t, &arr[0], count);
 		tree::destroy(&t);
 		allocator.reset();
@@ -523,8 +530,7 @@ test_insert(benchmark::State &state, size_t count, KeyGen kg)
 	typename tree::Allocator allocator(count);
 
 	typename tree::tree_t t;
-	tree::create(&t, 0, allocator.alloc, allocator.free,
-		     &allocator, NULL);
+	tree::create(&t, 0, &allocator.matras_allocator, NULL);
 	typename tree::elem_t replaced, successor;
 	for (auto _ : state)
 		tree::insert(&t, kg(), &replaced, &successor);
