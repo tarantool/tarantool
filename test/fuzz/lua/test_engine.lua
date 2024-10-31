@@ -123,6 +123,8 @@ local err_pat_whitelist = {
     -- DDL on a space is locked until the end of the current DDL
     -- operation.
     "the space is already being modified",
+    -- The test actively uses error injections that can cause such errors.
+    "Error injection '[%w_ ]+'",
     -- The test actively uses transactions that concurrently
     -- changes a data in a space, this can lead to errors below.
     "Transaction has been aborted by conflict",
@@ -139,6 +141,9 @@ local err_pat_whitelist = {
     "Failed to allocate %d+ bytes in [%w_ ]+ for [%w_]+",
     "Storage engine 'memtx' does not support cross%-engine transactions",
     "Storage engine 'vinyl' does not support cross%-engine transactions",
+    "Can't modify space '[%d]+': the space was concurrently modified",
+    "Failed to write to disk",
+    "WAL has a rollback in progress",
     -- MEMCS-specific errors.
     "Index '[%w_]+' %(TREE%) of space '[%w_]+' %(memcs%) does not support pagination",
     "Arrow stream does not support field type '[%w_]+'",
