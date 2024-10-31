@@ -676,6 +676,15 @@ xrow_update_store_scalar(const struct xrow_update_scalar *scalar,
 		}
 		break;
 	case XUPDATE_TYPE_DOUBLE:
+		if (this_node != NULL) {
+			enum field_type type =
+				json_tree_entry(this_node, struct tuple_field,
+						token)->type;
+			if (type == FIELD_TYPE_FLOAT32) {
+				out = mp_encode_float(out, (float)scalar->dbl);
+				break;
+			}
+		}
 		out = mp_encode_double(out, scalar->dbl);
 		break;
 	case XUPDATE_TYPE_FLOAT:
@@ -683,7 +692,8 @@ xrow_update_store_scalar(const struct xrow_update_scalar *scalar,
 			enum field_type type =
 				json_tree_entry(this_node, struct tuple_field,
 						token)->type;
-			if (type == FIELD_TYPE_DOUBLE) {
+			if (type == FIELD_TYPE_DOUBLE ||
+			    type == FIELD_TYPE_FLOAT64) {
 				out = mp_encode_double(out, scalar->flt);
 				break;
 			}
