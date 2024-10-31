@@ -166,22 +166,22 @@ typedef int64_t type_t;
 static int extent_count = 0;
 
 static void *
-extent_alloc(void *ctx)
+extent_alloc(struct matras_allocator *allocator)
 {
-	int *p_extent_count = (int *)ctx;
-	assert(p_extent_count == &extent_count);
-	++*p_extent_count;
+	(void)allocator;
+	++extent_count;
 	return xmalloc(BPS_TREE_EXTENT_SIZE);
 }
 
 static void
-extent_free(void *ctx, void *extent)
+extent_free(struct matras_allocator *allocator, void *extent)
 {
-	int *p_extent_count = (int *)ctx;
-	assert(p_extent_count == &extent_count);
-	--*p_extent_count;
+	(void)allocator;
+	--extent_count;
 	free(extent);
 }
+
+struct matras_allocator allocator;
 
 static uint32_t
 rng()
@@ -233,14 +233,14 @@ iterator_at()
 	struct test tree;
 	std::set<int64_t> set;
 
-	test_create(&tree, 0, extent_alloc, extent_free, &extent_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 	test_do_iterator_at_invalid(&tree, 0);
 	test_do_iterator_at_invalid(&tree, 37);
 	test_do_iterator_at_invalid(&tree, SIZE_MAX);
 	test_destroy(&tree);
 	ok(true, "Iterator at on an empty tree");
 
-	test_create(&tree, 0, extent_alloc, extent_free, &extent_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 	for (size_t i = 0; i < count; i++) {
 		fail_unless(test_insert(&tree, i, NULL, NULL) == 0);
 		for (size_t j = 0; j <= i; j++)
@@ -251,7 +251,7 @@ iterator_at()
 	test_destroy(&tree);
 	ok(true, "Iterator at on sequential insertion");
 
-	test_create(&tree, 0, extent_alloc, extent_free, &extent_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 	for (size_t i = 0; i < count; i++) {
 		int64_t v = rand_i[i];
 		fail_unless(test_insert(&tree, v, NULL, NULL) == 0);
@@ -281,7 +281,7 @@ find_get_offset()
 	struct test tree;
 	std::set<int64_t> set;
 
-	test_create(&tree, 0, extent_alloc, extent_free, &extent_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 	test_do_find_invalid(&tree, 0);
 	test_do_find_invalid(&tree, -1);
 	test_do_find_invalid(&tree, 37);
@@ -290,7 +290,7 @@ find_get_offset()
 	test_destroy(&tree);
 	ok(true, "Find in an empty tree");
 
-	test_create(&tree, 0, extent_alloc, extent_free, &extent_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 	for (size_t i = 0; i < count; i++) {
 		test_insert(&tree, i, NULL, NULL);
 		for (size_t j = 0; j <= i; j++)
@@ -301,7 +301,7 @@ find_get_offset()
 	test_destroy(&tree);
 	ok(true, "Find on sequential insertion");
 
-	test_create(&tree, 0, extent_alloc, extent_free, &extent_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 	for (size_t i = 0; i < count; i++) {
 		int64_t v = rand_i[i];
 		fail_unless(test_insert(&tree, v, NULL, NULL) == 0);
@@ -333,7 +333,7 @@ bounds_get_offset()
 	struct test tree;
 	std::set<int64_t> set;
 
-	test_create(&tree, 0, extent_alloc, extent_free, &extent_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 	test_do_bounds_invalid(&tree, 0);
 	test_do_bounds_invalid(&tree, -1);
 	test_do_bounds_invalid(&tree, 37);
@@ -342,7 +342,7 @@ bounds_get_offset()
 	test_destroy(&tree);
 	ok(true, "Upper & lower bound on an empty tree");
 
-	test_create(&tree, 0, extent_alloc, extent_free, &extent_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 	for (int i = 0; i < count; i++) {
 		fail_unless(test_insert(&tree, i, NULL, NULL) == 0);
 		for (int j = 0; j <= i; j++)
@@ -353,7 +353,7 @@ bounds_get_offset()
 	test_destroy(&tree);
 	ok(true, "Upper & lower bound on sequential insertion");
 
-	test_create(&tree, 0, extent_alloc, extent_free, &extent_count, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 	for (int i = 0; i < count; i++) {
 		int64_t v = rand_i[i];
 		fail_unless(test_insert(&tree, v, NULL, NULL) == 0);
@@ -391,7 +391,7 @@ insert_delete_get_offset()
 
 	const int count = 2000;
 	struct test tree;
-	test_create(&tree, 0, extent_alloc, extent_free, &extent_count, &stats);
+	test_create(&tree, 0, &allocator, &stats);
 
 	for (int i = 0; i < count; i++)
 		insert_and_check(&tree, i, (size_t)i);
@@ -446,10 +446,15 @@ main(void)
 	plan(4);
 	header();
 
+	matras_allocator_create(&allocator, BPS_TREE_EXTENT_SIZE,
+				extent_alloc, extent_free);
+
 	iterator_at();
 	find_get_offset();
 	bounds_get_offset();
 	insert_delete_get_offset();
+
+	matras_allocator_destroy(&allocator);
 
 	footer();
 	return check_plan();

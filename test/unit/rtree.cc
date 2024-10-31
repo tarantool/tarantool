@@ -11,22 +11,22 @@ static int page_count = 0;
 const uint32_t extent_size = 1024 * 8;
 
 static void *
-extent_alloc(void *ctx)
+extent_alloc(struct matras_allocator *allocator)
 {
-	int *p_page_count = (int *)ctx;
-	assert(p_page_count == &page_count);
-	++*p_page_count;
+	(void)allocator;
+	++page_count;
 	return malloc(extent_size);
 }
 
 static void
-extent_free(void *ctx, void *page)
+extent_free(struct matras_allocator *allocator, void *page)
 {
-	int *p_page_count = (int *)ctx;
-	assert(p_page_count == &page_count);
-	--*p_page_count;
+	(void)allocator;
+	--page_count;
 	free(page);
 }
+
+static struct matras_allocator allocator;
 
 static void
 simple_check()
@@ -43,8 +43,7 @@ simple_check()
 	stats.extent_count = page_count;
 
 	struct rtree tree;
-	rtree_init(&tree, 2, RTREE_EUCLID, extent_size,
-		   extent_alloc, extent_free, &page_count, &stats);
+	rtree_init(&tree, 2, RTREE_EUCLID, &allocator, &stats);
 
 	printf("Insert 1..X, remove 1..X\n");
 	for (size_t i = 1; i <= rounds; i++) {
@@ -258,8 +257,7 @@ neighbor_test()
 
 	for (size_t i = 0; i <= test_count; i++) {
 		struct rtree tree;
-		rtree_init(&tree, 2, RTREE_EUCLID, extent_size,
-			   extent_alloc, extent_free, &page_count, NULL);
+		rtree_init(&tree, 2, RTREE_EUCLID, &allocator, NULL);
 
 		rtree_test_build(&tree, arr, i);
 
@@ -282,8 +280,7 @@ neighbor_test()
 	struct rtree_iterator iterator;
 	rtree_iterator_init(&iterator);
 	struct rtree tree;
-	rtree_init(&tree, 2, RTREE_EUCLID, extent_size,
-		   extent_alloc, extent_free, &page_count, NULL);
+	rtree_init(&tree, 2, RTREE_EUCLID, &allocator, NULL);
 	if (rtree_search(&tree, &basis, SOP_NEIGHBOR, &iterator)) {
 		fail("found in empty", "true");
 	}
@@ -303,9 +300,12 @@ neighbor_test()
 int
 main(void)
 {
+	matras_allocator_create(&allocator, extent_size,
+				extent_alloc, extent_free);
 	simple_check();
 	neighbor_test();
 	if (page_count != 0) {
 		fail("memory leak!", "true");
 	}
+	matras_allocator_destroy(&allocator);
 }
