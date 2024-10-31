@@ -52,6 +52,20 @@ enum {
 	VY_CACHE_CLEANUP_MAX_STEPS = 10,
 };
 
+static void *
+vy_cache_tree_page_alloc(struct matras_allocator *allocator)
+{
+	(void)allocator;
+	return xmalloc(VY_CACHE_TREE_EXTENT_SIZE);
+}
+
+static void
+vy_cache_tree_page_free(struct matras_allocator *allocator, void *ptr)
+{
+	(void)allocator;
+	free(ptr);
+}
+
 void
 vy_cache_env_create(struct vy_cache_env *e, struct slab_cache *slab_cache)
 {
@@ -60,6 +74,10 @@ vy_cache_env_create(struct vy_cache_env *e, struct slab_cache *slab_cache)
 	e->mem_quota = 0;
 	mempool_create(&e->cache_node_mempool, slab_cache,
 		       sizeof(struct vy_cache_node));
+	matras_allocator_create(&e->allocator,
+				VY_CACHE_TREE_EXTENT_SIZE,
+				vy_cache_tree_page_alloc,
+				vy_cache_tree_page_free);
 }
 
 /** Delete a node from the cache. */
@@ -74,6 +92,7 @@ vy_cache_env_destroy(struct vy_cache_env *e)
 	while (e->mem_used > 0)
 		vy_cache_gc_step(e);
 #endif
+	matras_allocator_destroy(&e->allocator);
 	mempool_destroy(&e->cache_node_mempool);
 }
 
@@ -123,26 +142,6 @@ vy_cache_node_delete(struct vy_cache_env *env, struct vy_cache_node *node)
 	mempool_free(&env->cache_node_mempool, node);
 }
 
-static void *
-vy_cache_tree_page_alloc(void *ctx)
-{
-	struct vy_env *env = (struct vy_env *)ctx;
-	(void)env;
-	void *ret = malloc(VY_CACHE_TREE_EXTENT_SIZE);
-	if (ret == NULL)
-		diag_set(OutOfMemory, VY_CACHE_TREE_EXTENT_SIZE, "malloc",
-			 "ret");
-	return ret;
-}
-
-static void
-vy_cache_tree_page_free(void *ctx, void *p)
-{
-	struct vy_env *env = (struct vy_env *)ctx;
-	(void)env;
-	free(p);
-}
-
 void
 vy_cache_create(struct vy_cache *cache, struct vy_cache_env *env,
 		struct key_def *cmp_def, bool is_primary)
@@ -152,8 +151,7 @@ vy_cache_create(struct vy_cache *cache, struct vy_cache_env *env,
 	cache->is_primary = is_primary;
 	cache->version = 1;
 	vy_cache_tree_create(&cache->cache_tree, cmp_def,
-			     vy_cache_tree_page_alloc,
-			     vy_cache_tree_page_free, env, NULL);
+			     &env->allocator, NULL);
 }
 
 void

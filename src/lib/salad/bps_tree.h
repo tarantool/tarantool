@@ -697,10 +697,9 @@ struct bps_tree_iterator {
  * @param alloc_stats - optional extent allocator statistics
  */
 static inline void
-bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
-		matras_alloc_func extent_alloc_func,
-		matras_free_func extent_free_func,
-		void *alloc_ctx, struct matras_stats *alloc_stats);
+bps_tree_create(struct bps_tree *t, bps_tree_arg_t arg,
+		struct matras_allocator *allocator,
+		struct matras_stats *alloc_stats);
 
 /**
  * @brief Fills a new (asserted) tree with values from sorted array.
@@ -1578,9 +1577,8 @@ struct bps_leaf_path_elem {
  */
 static inline void
 bps_tree_create(struct bps_tree *t, bps_tree_arg_t arg,
-		matras_alloc_func extent_alloc_func,
-		matras_free_func extent_free_func,
-		void *alloc_ctx, struct matras_stats *alloc_stats)
+		struct matras_allocator *allocator,
+		struct matras_stats *alloc_stats)
 {
 	struct bps_tree_common *tree = &t->common;
 	tree->root_id = (bps_tree_block_id_t)(-1);
@@ -1594,10 +1592,7 @@ bps_tree_create(struct bps_tree *t, bps_tree_arg_t arg,
 	tree->garbage_head_id = (bps_tree_block_id_t)(-1);
 	tree->arg = arg;
 	memset(&tree->max_elem, 0, sizeof(tree->max_elem));
-	matras_create(&t->matras,
-		      BPS_TREE_EXTENT_SIZE, BPS_TREE_BLOCK_SIZE,
-		      extent_alloc_func, extent_free_func, alloc_ctx,
-		      alloc_stats);
+	matras_create(&t->matras, BPS_TREE_BLOCK_SIZE, allocator, alloc_stats);
 	matras_head_read_view(&t->view);
 	tree->matras = &t->matras;
 	tree->view = &t->view;

@@ -212,8 +212,7 @@ static const uint32_t LIGHT(end) = 0xFFFFFFFF;
  */
 static inline void
 LIGHT(create)(struct LIGHT(core) *ht, LIGHT_CMP_ARG_TYPE arg,
-	      size_t extent_size, matras_alloc_func extent_alloc_func,
-	      matras_free_func extent_free_func, void *alloc_ctx,
+	      struct matras_allocator *allocator,
 	      struct matras_stats *alloc_stats);
 
 /**
@@ -440,8 +439,7 @@ LIGHT(view_iterator_get_and_next)(const struct LIGHT(view) *v,
  */
 static inline void
 LIGHT(create)(struct LIGHT(core) *htab, LIGHT_CMP_ARG_TYPE arg,
-	      size_t extent_size, matras_alloc_func extent_alloc_func,
-	      matras_free_func extent_free_func, void *alloc_ctx,
+	      struct matras_allocator *allocator,
 	      struct matras_stats *alloc_stats)
 {
 	struct LIGHT(common) *ht = &htab->common;
@@ -451,10 +449,8 @@ LIGHT(create)(struct LIGHT(core) *htab, LIGHT_CMP_ARG_TYPE arg,
 	ht->table_size = 0;
 	ht->empty_slot = LIGHT(end);
 	ht->arg = arg;
-	matras_create(&htab->mtable,
-		      extent_size, sizeof(struct LIGHT(record)),
-		      extent_alloc_func, extent_free_func, alloc_ctx,
-		      alloc_stats);
+	matras_create(&htab->mtable, sizeof(struct LIGHT(record)),
+		      allocator, alloc_stats);
 	matras_head_read_view(&htab->view);
 	ht->mtable = &htab->mtable;
 	ht->view = &htab->view;

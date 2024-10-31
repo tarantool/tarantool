@@ -541,8 +541,8 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 	index->id_to_tuple = (struct matras *)malloc(sizeof(*index->id_to_tuple));
 	if (index->id_to_tuple == NULL)
 		panic("failed to allocate memtx bitset index");
-	matras_create(index->id_to_tuple, MEMTX_EXTENT_SIZE, sizeof(struct tuple *),
-		      memtx_index_extent_alloc, memtx_index_extent_free, memtx,
+	matras_create(index->id_to_tuple, sizeof(struct tuple *),
+		      &memtx->index_extent_allocator,
 		      &memtx->index_extent_stats);
 
 	index->tuple_to_id = mh_bitset_index_new();
