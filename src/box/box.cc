@@ -1583,6 +1583,8 @@ static int
 box_check_bootstrap_leader(struct uri *uri, struct tt_uuid *uuid, char *name)
 {
 	*uuid = uuid_nil;
+	if (!uri_is_nil(uri))
+		uri_destroy(uri);
 	uri_create(uri, NULL);
 	*name = '\0';
 	const char *source = cfg_gets("bootstrap_leader");
@@ -1965,6 +1967,7 @@ box_check_config(void)
 	box_check_replication_sync_timeout();
 	if (box_check_bootstrap_strategy() == BOOTSTRAP_STRATEGY_INVALID)
 		diag_raise();
+	uri_create(&uri, NULL);
 	if (box_check_bootstrap_leader(&uri, &uuid, name) != 0)
 		diag_raise();
 	uri_destroy(&uri);
@@ -2146,7 +2149,7 @@ box_set_bootstrap_strategy(void)
 	return 0;
 }
 
-static int
+int
 box_set_bootstrap_leader(void)
 {
 	return box_check_bootstrap_leader(&cfg_bootstrap_leader_uri,

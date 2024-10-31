@@ -348,6 +348,45 @@ g_config.after_test('test_single_leader', function(cg)
     cg.server1:stop()
 end)
 
+g_config.before_test('test_dynamic_leader_cfg', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.server1 = cg.replica_set:build_and_add_server{
+        alias = 'server1',
+        box_cfg = {
+            replication_timeout = 0.1,
+            bootstrap_strategy = 'config',
+            bootstrap_leader = server.build_listen_uri('server1',
+                cg.replica_set.id),
+            replication = server.build_listen_uri('server1', cg.replica_set.id),
+        },
+    }
+end)
+
+g_config.test_dynamic_leader_cfg = function(cg)
+    cg.replica_set:start()
+    cg.server1:exec(function()
+        t.assert_equals(box.info.status, 'running', 'server is working')
+        local other_name = 'other'
+        t.assert_not_equals(box.cfg.bootstrap_leader, other_name)
+        box.cfg{
+            bootstrap_leader = other_name,
+        }
+        t.assert_equals(box.cfg.bootstrap_leader, other_name,
+                        'bootstrap leader is dynamic')
+        box.cfg{
+            bootstrap_strategy = 'auto',
+        }
+        local errmsg = "the option takes no effect when bootstrap " ..
+                       "strategy is not 'config'"
+        t.assert_error_msg_contains(errmsg, box.cfg,
+                                    {bootstrap_leader = 'smth'})
+        box.cfg{
+            bootstrap_leader = '',
+        }
+        t.assert_equals(box.cfg.bootstrap_leader, nil, 'can change to nil')
+    end)
+end
+
 local g_config_success = t.group('gh-7999-bootstrap-strategy-config-success', {
      {leader = 'server3'},
      {leader = uuid3},
