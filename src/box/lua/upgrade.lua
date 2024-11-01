@@ -295,7 +295,7 @@ local function upgrade_to_1_7_5()
 end
 
 local function user_trig_1_7_5(_, tuple)
-    if tuple and not tuple[5] then
+    if tuple and (type(tuple[5]) ~= 'table' or next(tuple[5]) == nil) then
         tuple = tuple:update{{'=', 5, setmap({})}}
         log.info("Set empty password to %s '%s'", tuple[4], tuple[3])
     end
@@ -581,6 +581,58 @@ local sequence_format = {{name = 'id', type = 'unsigned'},
 --------------------------------------------------------------------------------
 -- Tarantool 1.7.6
 --------------------------------------------------------------------------------
+
+--
+-- Update format of user spaces. Format of system spaces have been updated
+-- during upgrade to 1.7.5. However commit 519bc82e ("Parse and validate
+-- space formats") introduced strict checking of format field. Now tarantool
+-- requires, that format is written as map with explicit 'name' and 'type'
+-- keys: {name = 'a', type = 'number'}. Previously, it wasn't a case,
+-- anything could be written in the space format.
+--
+local function space_trig_1_7_6(_, tuple)
+    -- Do nothing for system spaces.
+    if tuple == nil or tuple[1] <= box.schema.SYSTEM_ID_MAX then
+        return tuple
+    end
+
+    -- If it's a complete garbage or tuple[7] is missing, use empty format.
+    -- Also, overwrite the table, if it's empty to be sure, that it's
+    -- encoded as array and not as map.
+    local new_format = {}
+    if type(tuple[7]) == 'table' and next(tuple[7]) ~= nil then
+        -- Non empty format. Check format and change if it's possible.
+        for i, f in ipairs(tuple[7]) do
+            -- Create the fields from ground up. Better not to use existing
+            -- ones, anything can be there, we must be sure, that every field
+            -- is encoded as map and has 'name' and 'type' keys.
+            local field = setmap({
+                name = f['name'],
+                type = f['type'],
+            })
+
+            if field['name'] == nil then
+                if type(f[1]) ~= 'string' then
+                    local err = "Cannot find name for field %d in space %s"
+                    error(err:format(i, tuple[3]))
+                end
+                field['name'] = f[1]
+            end
+            if field['type'] == nil then
+                field['type'] = type(f[2]) == 'string' and f[2] or 'any'
+            end
+            table.insert(new_format, field)
+        end
+    end
+    if not table.equals(tuple[7], new_format) then
+        -- Better to be as verbose as it's possible. So that user can
+        -- restore the previous format if smth goes wrong.
+        log.info("Update space '%s' format: old format %s, new format %s",
+                 tuple[3], json.encode(tuple[7]), json.encode(new_format))
+        tuple = tuple:update{{'=', 7, new_format}}
+    end
+    return tuple
+end
 
 local function create_sequence_space()
     local _space = box.space[box.schema.SPACE_ID]
@@ -1490,6 +1542,9 @@ local recovery_triggers = {
     {version = mkversion(1, 7, 5), tbl = {
         _space = space_trig_1_7_5,
         _user  = user_trig_1_7_5,
+    }},
+    {version = mkversion(1, 7, 6), tbl = {
+        _space = space_trig_1_7_6,
     }},
     {version = mkversion(1, 7, 7), tbl = {
         _priv   = priv_trig_1_7_7,
