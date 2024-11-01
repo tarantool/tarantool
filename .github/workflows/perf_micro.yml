@@ -48,7 +48,17 @@ jobs:
           ( github.event_name == 'pull_request' &&
             !contains(github.event.pull_request.labels.*.name, 'notest') ) )
 
-    runs-on: ubuntu-20.04-self-hosted
+    # 'performance' label _must_ be set only for the single runner
+    # to guarantee that results are not dependent on the machine.
+    # For runs whose statistics are not collected, it is OK to use
+    # any runner.
+    runs-on:
+      - self-hosted
+      - Linux
+      - x86_64
+      - ${{ (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
+          'performance' || 'regular' }}
 
     timeout-minutes: 60
 
