@@ -223,6 +223,7 @@ g.test_defaults = function()
             use_mvcc_engine = false,
         },
         replication = {
+            disabled = false,
             failover = 'off',
             anon = false,
             threads = 1,

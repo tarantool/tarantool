@@ -26,7 +26,6 @@ local function peer_uris(configdata)
     local uris = {}
     for _, peer_name in ipairs(peers) do
         local iconfig_def = configdata._peers[peer_name].iconfig_def
-        local is_anon = instance_config:get(iconfig_def, 'replication.anon')
         -- Don't use anonymous replicas as upstreams.
         --
         -- An anonymous replica can't be an upstream for a
@@ -38,7 +37,14 @@ local function peer_uris(configdata)
         --
         -- A user may configure a custom data flow using
         -- `replication.peers` option.
-        if not is_anon then
+        local is_anon = instance_config:get(iconfig_def, 'replication.anon')
+        -- Don't replicate data from a disabled instance, because
+        -- it is likely disabled with a reason: an administrator
+        -- is performing some repairing work on it. We shouldn't
+        -- see this intermediate database state on other peers.
+        local is_disabled = instance_config:get(iconfig_def,
+            'replication.disabled')
+        if not is_anon and not is_disabled then
             local uri = instance_config:instance_uri(iconfig_def, 'peer',
                 {log_prefix = "replicaset dataflow configuration: "})
             if uri == nil then
@@ -341,9 +347,31 @@ local function apply(config)
         box_cfg.listen = box.NULL
     end
 
-    -- Construct box_cfg.replication.
-    if box_cfg.replication == nil then
+    -- luacheck: ignore 542 empty if branch
+    local replication_disabled = configdata:get('replication.disabled',
+        {use_default = true})
+    if replication_disabled then
+        -- Refuse to fetch data updates from other replicaset
+        -- peers if the instance is marked as disabled.
+        --
+        -- If the data is not changed with replication, it is
+        -- easier to perform a repairing work on the instance.
+        box_cfg.replication = box.NULL
+
+        -- Issue a warning to highlight the situation for the
+        -- administrator.
+        local instance_name = configdata:names().instance_name
+        local warning = ('replication.disabled = true is set for the ' ..
+            'instance %q: the data is not replicated from or to this ' ..
+            'instance'):format(instance_name)
+        config._aboard:set({type = 'warn', message = warning})
+    elseif box_cfg.replication == nil then
+        -- Construct box_cfg.replication.
         box_cfg.replication = peer_uris(configdata)
+    else
+        -- Nothing to do: the peer URIs are set using the
+        -- replication.peers option. It is already in the box_cfg
+        -- table.
     end
 
     -- Construct logger destination (box_cfg.log) and log modules.

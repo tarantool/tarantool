@@ -1386,6 +1386,10 @@ return schema.new('instance_config', schema.record({
         }),
     }),
     replication = schema.record({
+        disabled = schema.scalar({
+            type = 'boolean',
+            default = false,
+        }),
         failover = schema.enum({
             -- No failover ('off').
             --

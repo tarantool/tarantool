@@ -1116,6 +1116,7 @@ end
 g.test_replication = function()
     local iconfig = {
         replication = {
+            disabled = false,
             failover = 'off',
             peers = {'one', 'two'},
             anon = true,
@@ -1139,6 +1140,7 @@ g.test_replication = function()
                     instance_config.schema.fields.replication)
 
     local exp = {
+        disabled = false,
         failover = 'off',
         anon = false,
         threads = 1,

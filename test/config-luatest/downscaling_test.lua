@@ -126,3 +126,100 @@ g.test_size_2_to_1 = function(g)
         t.assert_equals(box.cfg.replication, {})
     end)
 end
+
+-- Verify how the replication.disabled option works.
+g.test_replication_disabled = function(g)
+    -- A shortcut function to verify box.cfg.replication.
+    --
+    -- Returns a function and a list of its arguments.
+    --
+    -- Suitable to pass to <server object>:exec().
+    local function verify_upstreams(instances)
+        return function(instances)
+            local config = require('config')
+
+            local uris = {}
+            for _, instance in ipairs(instances) do
+                local opts = {instance = instance}
+                local uri = config:instance_uri('peer', opts)
+                table.insert(uris, uri)
+            end
+
+            t.assert_equals(box.cfg.replication, uris)
+        end, {instances}
+    end
+
+    -- A shortcut function to verify that the given alert exists.
+    --
+    -- Returns a function and a list of its arguments.
+    --
+    -- Suitable to pass to <server object>:exec().
+    local function find_alert(type, message)
+        return function(type, message)
+            for _, alert in ipairs(box.info.config.alerts) do
+                if alert.type == type and alert.message == message then
+                    return
+                end
+            end
+            t.fail(('Unable to find alert: {type = %q, message = %q}'):format(
+                type, message))
+        end, {type, message}
+    end
+
+    local config = cbuilder:new()
+        :set_replicaset_option('replication.failover', 'manual')
+        :set_replicaset_option('leader', 'i-001')
+        :add_instance('i-001', {})
+        :add_instance('i-002', {})
+        :add_instance('i-003', {})
+        :config()
+
+    local cluster = cluster.new(g, config)
+    cluster:start()
+
+    -- Verify a test case prerequisite: all the instances have all
+    -- the instances in upstreams.
+    cluster:each(function(server)
+        server:exec(verify_upstreams({'i-001', 'i-002', 'i-003'}))
+    end)
+
+    -- Mark i-003 as disabled in the configuration, write it to
+    -- the file and reload the configuration on all the instances.
+    local config_2 = cbuilder:new(config)
+        :set_instance_option('i-003', 'replication.disabled', true)
+        :config()
+    cluster:reload(config_2)
+
+    -- Verify that i-003 is not in the configured upstreams on
+    -- i-001 and i-002.
+    cluster['i-001']:exec(verify_upstreams({'i-001', 'i-002'}))
+    cluster['i-002']:exec(verify_upstreams({'i-001', 'i-002'}))
+
+    -- Verify that i-003 has no configured upstreams.
+    cluster['i-003']:exec(verify_upstreams({}))
+
+    -- Verify that a warning is issued on the disabled instance.
+    cluster['i-003']:exec(find_alert('warn', 'replication.disabled = true ' ..
+        'is set for the instance "i-003": the data is not replicated from ' ..
+        'or to this instance'))
+
+    -- Mark i-003 as enabled back in the configuration, write it
+    -- to the file and reload the configuration on all the
+    -- instances.
+    local config_3 = cbuilder:new(config_2)
+        :set_instance_option('i-003', 'replication.disabled', false)
+        :config()
+    cluster:reload(config_3)
+
+    -- Verify that the initial situation is now here back: all the
+    -- instances have all the instances in upstreams.
+    cluster:each(function(server)
+        server:exec(verify_upstreams({'i-001', 'i-002', 'i-003'}))
+    end)
+
+    -- Verify that the alert about the replication.disabled option
+    -- is gone.
+    cluster['i-003']:exec(function()
+        t.assert_equals(box.info.config.alerts, {})
+    end)
+end
