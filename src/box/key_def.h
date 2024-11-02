@@ -884,6 +884,16 @@ key_part_validate(enum field_type key_type, const char *key,
 			 field_type_strs[key_type]);
 		return -1;
 	}
+	if (field_type_is_fixed_int(key_type)) {
+		char mp_min[16], mp_max[16];
+		if (!field_mp_is_in_fixed_int_range(
+				key_type, key, mp_min, mp_max, NULL)) {
+			diag_set(ClientError, ER_KEY_PART_VALUE_OUT_OF_RANGE,
+				 field_no, field_type_strs[key_type], key,
+				 mp_min, mp_max);
+			return -1;
+		}
+	}
 	return 0;
 }
 

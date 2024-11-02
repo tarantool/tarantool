@@ -328,9 +328,9 @@ field_type1_contains_type2(enum field_type type1, enum field_type type2)
 	bool type1_contains_type2 = (mp_type1 & mp_type2) == mp_type2;
 	if (!type1_contains_type2)
 		return false;
-	if (!tuple_field_type_is_fixed_int(type1))
+	if (!field_type_is_fixed_int(type1))
 		return true;
-	if (!tuple_field_type_is_fixed_int(type2)) {
+	if (!field_type_is_fixed_int(type2)) {
 		/* uint64 is an alias for unsigned. */
 		return type1 == FIELD_TYPE_UINT64 &&
 		       type2 == FIELD_TYPE_UNSIGNED;
@@ -418,6 +418,66 @@ field_type_by_name(const char *name, size_t len)
 		return FIELD_TYPE_ANY;
 	return field_type_MAX;
 }
+
+#define ERROR_MSG(r, v) "expected [%" r "..%" r "], got %" v
+
+bool
+field_mp_is_in_fixed_int_range(enum field_type type, const char *data,
+			       char *mp_min, char *mp_max,
+			       const char **details)
+{
+	assert(field_type_is_fixed_int(type));
+	enum mp_type mp_type = mp_typeof(*data);
+	if (mp_type == MP_NIL)
+		return true;
+	assert(mp_type == MP_INT || mp_type == MP_UINT);
+
+	if (field_type_is_fixed_signed[type]) {
+		int64_t min = field_type_min_value[type];
+		int64_t max = field_type_max_value[type];
+		if (mp_type == MP_INT) {
+			int64_t value = mp_decode_int(&data);
+			if (value < min || value > max) {
+				mp_encode_int(mp_min, min);
+				mp_encode_uint(mp_max, max);
+				if (details != NULL)
+					*details = tt_sprintf(ERROR_MSG(PRId64,
+									PRId64),
+							      min, max, value);
+				return false;
+			}
+		} else {
+			assert(mp_type == MP_UINT);
+			uint64_t value = mp_decode_uint(&data);
+			if (value > (uint64_t)max) {
+				mp_encode_int(mp_min, min);
+				mp_encode_uint(mp_max, max);
+				if (details != NULL)
+					*details = tt_sprintf(ERROR_MSG(PRId64,
+									PRIu64),
+							      min, max, value);
+				return false;
+			}
+		}
+	} else {
+		assert(field_type_is_fixed_unsigned[type]);
+		assert(mp_type == MP_UINT);
+		uint64_t value = mp_decode_uint(&data);
+		uint64_t min = field_type_min_value[type];
+		uint64_t max = field_type_max_value[type];
+		if (value > max) {
+			mp_encode_uint(mp_min, min);
+			mp_encode_uint(mp_max, max);
+			if (details != NULL)
+				*details = tt_sprintf(ERROR_MSG(PRIu64, PRIu64),
+						      min, max, value);
+			return false;
+		}
+	}
+	return true;
+}
+
+#undef ERROR_MSG
 
 /**
  * Parse default field value from msgpack.
