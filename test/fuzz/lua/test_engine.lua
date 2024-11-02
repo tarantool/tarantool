@@ -1019,13 +1019,12 @@ end
 
 local shared_gen_state
 
-local function worker_func(id, space, test_gen, test_duration)
+local function worker_func(id, space, test_gen, deadline)
     log.info('Worker #%d has started.', id)
-    local start = os.clock()
     local gen, param, state = test_gen:unwrap()
     shared_gen_state = state
     local errors = {}
-    while os.clock() - start <= test_duration do
+    while os.clock() <= deadline do
         local operation_name
         state, operation_name = gen(param, shared_gen_state)
         if state == nil then
@@ -1416,18 +1415,17 @@ local function process_errors(error_messages)
     return found_unexpected_errors
 end
 
-local function start_error_injections(space, test_duration)
-    local errinj_f = fiber.new(function(test_duration)
+local function start_error_injections(space, deadline)
+    local errinj_f = fiber.new(function(deadline)
         log.info('Fault injection fiber has started.')
         local max_errinj_in_parallel = 5
-        local start = os.clock()
-        while os.clock() - start <= test_duration do
+        while os.clock() <= deadline do
             toggle_random_errinj(errinj_set, max_errinj_in_parallel, space)
             fiber.sleep(2)
         end
         disable_all_errinj(errinj_set, space)
         log.info('Fault injection fiber has finished.')
-    end, test_duration)
+    end, deadline)
     errinj_f:set_joinable(true)
     errinj_f:name('ERRINJ')
 
@@ -1449,18 +1447,19 @@ local function run_test(num_workers, test_duration, test_dir,
     local fibers = {}
     local space_id_func = counter()
     local space = setup(engine_name, space_id_func, test_dir, verbose_mode)
+    local deadline = os.clock() + test_duration
 
     local test_gen = fun.cycle(fun.iter(keys(ops)))
     local f
     for id = 1, num_workers do
-        f = fiber.new(worker_func, id, space, test_gen, test_duration)
+        f = fiber.new(worker_func, id, space, test_gen, deadline)
         f:set_joinable(true)
         f:name('WRK #' .. id)
         table.insert(fibers, f)
     end
 
     if fault_injection then
-        f = start_error_injections(space, test_duration)
+        f = start_error_injections(space, deadline)
         table.insert(fibers, f)
     end
 
