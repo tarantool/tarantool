@@ -440,6 +440,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea42bc12c23af2af3f28ca4ccec389bc52" kind="enumvalue"><name>ER_WAL_QUEUE_FULL</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea248cd860c82ecdf187ca338415b05b49" kind="enumvalue"><name>ER_INVALID_VCLOCK</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea642e45503192f20fcf5618c9004efedc" kind="enumvalue"><name>ER_SYNC_QUEUE_FULL</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf35f9f4ea45049b759987ea49768fe46" kind="enumvalue"><name>ER_KEY_PART_VALUE_OUT_OF_RANGE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
