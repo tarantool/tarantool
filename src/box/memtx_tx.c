@@ -51,6 +51,32 @@ static_assert((int)MEMTX_TX_ROLLBACKED_PSN < (int)TXN_MIN_PSN,
 	      "There must be a range for TX manager's internal use");
 
 /**
+ * State of a transaction related to the memtx MVCC.
+ */
+struct memtx_tx_txn_data {
+	/** Link in tx_manager::read_view_txs. */
+	struct rlist in_read_view_txs;
+	/** List of tx_read_trackers with stories that the TX have read. */
+	struct rlist read_set;
+	/** List of point hole reads. @sa struct point_hole_item. */
+	struct rlist point_holes_list;
+	/** List of gap reads. @sa struct inplace_gap_item / nearby_gap_item. */
+	struct rlist gap_list;
+	/** Link in tx_manager::all_txs. */
+	struct rlist in_all_txs;
+	/** Backlink to the transaction. */
+	struct txn *txn;
+	/** MVCC allocation statistics. */
+	uint32_t mvcc_alloc_stats[MEMTX_TX_ALLOC_TYPE_MAX];
+};
+
+/**
+ * Retrieves MVCC state of the transaction.
+ */
+static inline struct memtx_tx_txn_data *
+memtx_tx_txn_data(struct txn *txn);
+
+/**
  * Link that connects a memtx_story with older and newer stories of the same
  * key in index.
  */
@@ -306,7 +332,7 @@ gap_item_base_create(struct gap_item_base *item, enum gap_item_type type,
 {
 	item->type = type;
 	item->txn = txn;
-	rlist_add(&txn->gap_list, &item->in_gap_list);
+	rlist_add(&memtx_tx_txn_data(txn)->gap_list, &item->in_gap_list);
 }
 
 /**
@@ -435,7 +461,7 @@ memtx_tx_track_allocation(struct txn *txn, size_t size,
 			  enum memtx_tx_alloc_type alloc_type)
 {
 	assert(alloc_type < MEMTX_TX_ALLOC_TYPE_MAX);
-	txn->memtx_tx_alloc_stats[alloc_type] += size;
+	memtx_tx_txn_data(txn)->mvcc_alloc_stats[alloc_type] += size;
 }
 
 /**
@@ -446,8 +472,9 @@ memtx_tx_track_deallocation(struct txn *txn, size_t size,
 			    enum memtx_tx_alloc_type alloc_type)
 {
 	assert(alloc_type < MEMTX_TX_ALLOC_TYPE_MAX);
-	assert(txn->memtx_tx_alloc_stats[alloc_type] >= size);
-	txn->memtx_tx_alloc_stats[alloc_type] -= size;
+	uint32_t *stat = &memtx_tx_txn_data(txn)->mvcc_alloc_stats[alloc_type];
+	assert(*stat >= size);
+	*stat -= size;
 }
 
 /**
@@ -612,6 +639,8 @@ struct tx_manager
 	struct rlist all_txs;
 	/** Accumulated number of GC steps that should be done. */
 	size_t must_do_gc_steps;
+	/** ID of the underlying engine (memtx). */
+	size_t engine_id;
 };
 
 enum {
@@ -628,6 +657,12 @@ bool memtx_tx_manager_use_mvcc_engine = false;
 
 /** The one and only instance of tx_manager. */
 static struct tx_manager txm;
+
+struct memtx_tx_txn_data *
+memtx_tx_txn_data(struct txn *txn)
+{
+	return txn->engines_tx[txm.engine_id];
+}
 
 void
 memtx_tx_manager_init()
@@ -661,6 +696,10 @@ memtx_tx_manager_init()
 	txm.traverse_all_stories = &txm.all_stories;
 	txm.must_do_gc_steps = 0;
 	memset(&txm.story_stats, 0, sizeof(txm.story_stats));
+	struct engine *engine = engine_by_name("memtx");
+	if (engine == NULL)
+		panic("Cannot init memtx MVCC - the engine is not registered");
+	txm.engine_id = engine->id;
 }
 
 void
@@ -688,12 +727,13 @@ memtx_tx_statistics_collect(struct memtx_tx_statistics *stats)
 	if (rlist_empty(&txm.all_txs)) {
 		return;
 	}
-	struct txn *txn;
+	struct memtx_tx_txn_data *txn_data;
 	size_t txn_count = 0;
-	rlist_foreach_entry(txn, &txm.all_txs, in_all_txs) {
+	rlist_foreach_entry(txn_data, &txm.all_txs, in_all_txs) {
+		struct txn *txn = txn_data->txn;
 		txn_count++;
 		for (size_t i = 0; i < MEMTX_TX_ALLOC_TYPE_MAX; ++i) {
-			size_t txn_stat = txn->memtx_tx_alloc_stats[i];
+			size_t txn_stat = txn_data->mvcc_alloc_stats[i];
 			stats->memtx_tx_total[i] += txn_stat;
 			if (txn_stat > stats->memtx_tx_max[i])
 				stats->memtx_tx_max[i] = txn_stat;
@@ -711,13 +751,29 @@ memtx_tx_statistics_collect(struct memtx_tx_statistics *stats)
 void
 memtx_tx_register_txn(struct txn *tx)
 {
-	tx->memtx_tx_alloc_stats =
-		xregion_alloc_array(&tx->region,
-				    typeof(*tx->memtx_tx_alloc_stats),
-				    MEMTX_TX_ALLOC_TYPE_MAX);
-	memset(tx->memtx_tx_alloc_stats, 0,
-	       sizeof(*tx->memtx_tx_alloc_stats) * MEMTX_TX_ALLOC_TYPE_MAX);
-	rlist_add_tail(&txm.all_txs, &tx->in_all_txs);
+	struct memtx_tx_txn_data *data =
+		xregion_alloc_object(&tx->region, struct memtx_tx_txn_data);
+	data->txn = tx;
+	rlist_create(&data->gap_list);
+	rlist_create(&data->in_read_view_txs);
+	rlist_create(&data->point_holes_list);
+	rlist_create(&data->read_set);
+	rlist_add_tail(&txm.all_txs, &data->in_all_txs);
+	memset(data->mvcc_alloc_stats, 0, sizeof(data->mvcc_alloc_stats));
+	tx->engines_tx[txm.engine_id] = data;
+}
+
+int
+memtx_tx_begin_stmt(struct txn *txn)
+{
+	if (txn->status == TXN_IN_READ_VIEW) {
+		rlist_del(&memtx_tx_txn_data(txn)->in_read_view_txs);
+		txn->status = TXN_ABORTED;
+		txn_set_flags(txn, TXN_IS_CONFLICTED);
+		diag_set(ClientError, txn_flags_to_error_code(txn));
+		return -1;
+	}
+	return 0;
 }
 
 void
@@ -749,8 +805,9 @@ memtx_tx_clear_txn_read_lists(struct txn *txn);
 void
 memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
 {
-	struct txn *to_be_aborted;
-	rlist_foreach_entry(to_be_aborted, &txm.all_txs, in_all_txs) {
+	struct memtx_tx_txn_data *txn_data;
+	rlist_foreach_entry(txn_data, &txm.all_txs, in_all_txs) {
+		struct txn *to_be_aborted = txn_data->txn;
 		if (to_be_aborted == ddl_owner)
 			continue;
 		if (txn_has_flag(to_be_aborted, TXN_HANDLES_DDL))
@@ -784,21 +841,24 @@ memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
 static void
 memtx_tx_adjust_position_in_read_view_list(struct txn *txn)
 {
-	if (txn->in_read_view_txs.prev == &txm.read_view_txs)
+	struct memtx_tx_txn_data *txn_data = memtx_tx_txn_data(txn);
+	if (txn_data->in_read_view_txs.prev == &txm.read_view_txs)
 		return; /* No transaction before */
-	struct txn *prev_txn = rlist_prev_entry(txn, in_read_view_txs);
+	struct txn *prev_txn =
+		rlist_prev_entry(txn_data, in_read_view_txs)->txn;
 	if (prev_txn->rv_psn <= txn->rv_psn)
 		return; /* The order is already correct. */
 	/* Remove from list for a while. */
-	rlist_del(&txn->in_read_view_txs);
-	while (prev_txn->in_read_view_txs.prev != &txm.read_view_txs) {
-		struct txn *scan = rlist_prev_entry(prev_txn, in_read_view_txs);
+	rlist_del(&txn_data->in_read_view_txs);
+	while (memtx_tx_txn_data(prev_txn)->in_read_view_txs.prev !=
+	       &txm.read_view_txs) {
+		struct txn *scan = rlist_prev_entry(memtx_tx_txn_data(prev_txn), in_read_view_txs)->txn;
 		if (scan->rv_psn <= txn->rv_psn)
 			break;
 		prev_txn = scan;
 	}
 	/* Insert before prev_txn. */
-	rlist_add_tail(&prev_txn->in_read_view_txs, &txn->in_read_view_txs);
+	rlist_add_tail(&memtx_tx_txn_data(prev_txn)->in_read_view_txs, &memtx_tx_txn_data(txn)->in_read_view_txs);
 }
 
 /**
@@ -811,7 +871,7 @@ memtx_tx_abort_with_conflict(struct txn *victim)
 	if (victim->status == TXN_ABORTED)
 		return;
 	if (victim->status == TXN_IN_READ_VIEW)
-		rlist_del(&victim->in_read_view_txs);
+		rlist_del(&memtx_tx_txn_data(victim)->in_read_view_txs);
 	victim->status = TXN_ABORTED;
 	txn_set_flags(victim, TXN_IS_CONFLICTED);
 }
@@ -850,7 +910,7 @@ memtx_tx_handle_conflict(struct txn *breaker, struct txn *victim)
 			victim->status = TXN_IN_READ_VIEW;
 			victim->rv_psn = breaker->psn;
 			rlist_add_tail(&txm.read_view_txs,
-				       &victim->in_read_view_txs);
+				       &memtx_tx_txn_data(victim)->in_read_view_txs);
 		} else if (victim->rv_psn > breaker->psn) {
 			/*
 			 * Note that in every case for every key we may choose
@@ -1432,8 +1492,9 @@ memtx_tx_story_gc_step()
 	int64_t lowest_rv_psn = txn_next_psn;
 	if (!rlist_empty(&txm.read_view_txs)) {
 		struct txn *txn =
-			rlist_first_entry(&txm.read_view_txs, struct txn,
-					  in_read_view_txs);
+			rlist_first_entry(&txm.read_view_txs,
+					  struct memtx_tx_txn_data,
+					  in_read_view_txs)->txn;
 		assert(txn->rv_psn != 0);
 		lowest_rv_psn = txn->rv_psn;
 	}
@@ -3096,8 +3157,9 @@ memtx_tx_invalidate_space(struct space *space, struct txn *active_txn)
 	 * could access the old space that is going to be deleted leading to
 	 * use-after-free.
 	 */
-	struct txn *txn;
-	rlist_foreach_entry(txn, &txm.all_txs, in_all_txs) {
+	struct memtx_tx_txn_data *txn_data;
+	rlist_foreach_entry(txn_data, &txm.all_txs, in_all_txs) {
+		struct txn *txn = txn_data->txn;
 		if (txn->status != TXN_ABORTED || txn->psn != 0)
 			continue;
 		struct txn_stmt *stmt;
@@ -3150,11 +3212,12 @@ memtx_tx_track_read_story(struct txn *txn, struct space *space,
 		return;
 	(void)space;
 	assert(story != NULL);
+	struct memtx_tx_txn_data *txn_data = memtx_tx_txn_data(txn);
 	struct tx_read_tracker *tracker = NULL;
 
 	struct rlist *r1 = story->reader_list.next;
-	struct rlist *r2 = txn->read_set.next;
-	while (r1 != &story->reader_list && r2 != &txn->read_set) {
+	struct rlist *r2 = txn_data->read_set.next;
+	while (r1 != &story->reader_list && r2 != &txn_data->read_set) {
 		tracker = rlist_entry(r1, struct tx_read_tracker,
 				      in_reader_list);
 		assert(tracker->story == story);
@@ -3177,7 +3240,7 @@ memtx_tx_track_read_story(struct txn *txn, struct space *space,
 		tracker = tx_read_tracker_new(txn, story);
 	}
 	rlist_add(&story->reader_list, &tracker->in_reader_list);
-	rlist_add(&txn->read_set, &tracker->in_read_set);
+	rlist_add(&txn_data->read_set, &tracker->in_read_set);
 }
 
 /**
@@ -3201,7 +3264,8 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 		struct tx_read_tracker *tracker;
 		tracker = tx_read_tracker_new(txn, story);
 		rlist_add(&story->reader_list, &tracker->in_reader_list);
-		rlist_add(&txn->read_set, &tracker->in_read_set);
+		rlist_add(&memtx_tx_txn_data(txn)->read_set,
+			  &tracker->in_read_set);
 	}
 }
 
@@ -3246,7 +3310,8 @@ point_hole_storage_new(struct index *index, const char *key,
 		assert(replaced->is_head);
 		replaced->is_head = false;
 	}
-	rlist_add(&txn->point_holes_list, &object->in_point_holes_list);
+	rlist_add(&memtx_tx_txn_data(txn)->point_holes_list,
+		  &object->in_point_holes_list);
 }
 
 static void
@@ -3544,30 +3609,31 @@ memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index)
 static void
 memtx_tx_clear_txn_read_lists(struct txn *txn)
 {
-	while (!rlist_empty(&txn->point_holes_list)) {
+	struct memtx_tx_txn_data *txn_data = memtx_tx_txn_data(txn);
+	while (!rlist_empty(&txn_data->point_holes_list)) {
 		struct point_hole_item *object =
-			rlist_first_entry(&txn->point_holes_list,
+			rlist_first_entry(&txn_data->point_holes_list,
 					  struct point_hole_item,
 					  in_point_holes_list);
 		point_hole_storage_delete(object);
 	}
-	while (!rlist_empty(&txn->gap_list)) {
+	while (!rlist_empty(&txn_data->gap_list)) {
 		struct gap_item_base *item =
-			rlist_first_entry(&txn->gap_list,
+			rlist_first_entry(&txn_data->gap_list,
 					  struct gap_item_base,
 					  in_gap_list);
 		memtx_tx_delete_gap(item);
 	}
 
 	struct tx_read_tracker *tracker, *tmp;
-	rlist_foreach_entry_safe(tracker, &txn->read_set,
+	rlist_foreach_entry_safe(tracker, &txn_data->read_set,
 				 in_read_set, tmp) {
 		rlist_del(&tracker->in_reader_list);
 		rlist_del(&tracker->in_read_set);
 	}
-	assert(rlist_empty(&txn->read_set));
+	assert(rlist_empty(&txn_data->read_set));
 
-	rlist_del(&txn->in_read_view_txs);
+	rlist_del(&txn_data->in_read_view_txs);
 }
 
 /**
@@ -3578,7 +3644,7 @@ memtx_tx_clean_txn(struct txn *txn)
 {
 	memtx_tx_clear_txn_read_lists(txn);
 
-	rlist_del(&txn->in_all_txs);
+	rlist_del(&memtx_tx_txn_data(txn)->in_all_txs);
 
 	memtx_tx_story_gc();
 }

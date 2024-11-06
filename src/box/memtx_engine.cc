@@ -614,6 +614,13 @@ memtx_engine_begin(struct engine *engine, struct txn *txn)
 }
 
 static int
+memtx_engine_begin_statement(struct engine *engine, struct txn *txn)
+{
+	(void)engine;
+	return memtx_tx_begin_stmt(txn);
+}
+
+static int
 memtx_engine_prepare(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
@@ -1560,7 +1567,7 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .join = */ memtx_engine_join,
 	/* .complete_join = */ memtx_engine_complete_join,
 	/* .begin = */ memtx_engine_begin,
-	/* .begin_statement = */ generic_engine_begin_statement,
+	/* .begin_statement = */ memtx_engine_begin_statement,
 	/* .prepare = */ memtx_engine_prepare,
 	/* .commit = */ memtx_engine_commit,
 	/* .rollback_statement = */ memtx_engine_rollback_statement,

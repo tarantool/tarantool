@@ -459,11 +459,6 @@ txn_new(void)
 	assert(region_used(&region) == sizeof(*txn));
 	txn_reset_stats(txn);
 	txn->region = region;
-	rlist_create(&txn->read_set);
-	rlist_create(&txn->point_holes_list);
-	rlist_create(&txn->gap_list);
-	rlist_create(&txn->in_read_view_txs);
-	rlist_create(&txn->in_all_txs);
 	txn->space_on_replace_triggers_depth = 0;
 	txn->acquired_region_used = 0;
 	txn->limbo_entry = NULL;
@@ -564,6 +559,10 @@ txn_begin(void)
 	 * no statements.
 	 */
 	txn_set_flags(txn, TXN_HANDLES_DDL);
+	/*
+	 * Any transaction should be registered in memtx transaction manager
+	 * because it is special and other engines can use it as well.
+	 */
 	memtx_tx_register_txn(txn);
 	rmean_collect(rmean_box, IPROTO_BEGIN, 1);
 	return txn;
@@ -620,12 +619,6 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 	if (txn->in_sub_stmt > TXN_SUB_STMT_MAX) {
 		diag_set(ClientError, ER_SUB_STMT_MAX);
 		return -1;
-	}
-
-	if (txn->status == TXN_IN_READ_VIEW) {
-		rlist_del(&txn->in_read_view_txs);
-		txn->status = TXN_ABORTED;
-		txn_set_flags(txn, TXN_IS_CONFLICTED);
 	}
 
 	if (txn_check_can_continue(txn) != 0)

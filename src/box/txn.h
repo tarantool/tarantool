@@ -446,10 +446,6 @@ struct txn {
 	 */
 	uint32_t alloc_stats[TX_ALLOC_TYPE_MAX];
 	/**
-	 * Memtx tx allocation statistics.
-	 */
-	uint32_t *memtx_tx_alloc_stats;
-	/**
 	 * A sequentially growing transaction id, assigned when
 	 * a transaction is initiated. Used to identify
 	 * a transaction after it has possibly been destroyed.
@@ -526,18 +522,6 @@ struct txn {
 	struct txn_event txn_events[txn_event_id_MAX];
 	/** List of savepoints to find savepoint by name. */
 	struct rlist savepoints;
-	/**
-	 * Link in tx_manager::read_view_txs.
-	 */
-	struct rlist in_read_view_txs;
-	/** List of tx_read_trackers with stories that the TX have read. */
-	struct rlist read_set;
-	/** List of point hole reads. @sa struct point_hole_item. */
-	struct rlist point_holes_list;
-	/** List of gap reads. @sa struct inplace_gap_item / nearby_gap_item. */
-	struct rlist gap_list;
-	/** Link in tx_manager::all_txs. */
-	struct rlist in_all_txs;
 	/** True in case transaction provides any DDL change. */
 	bool is_schema_changed;
 	/** Timeout for transaction, or TIMEOUT_INFINITY if not set. */

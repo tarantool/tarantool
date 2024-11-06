@@ -147,6 +147,9 @@ memtx_tx_statistics_collect(struct memtx_tx_statistics *stats);
 void
 memtx_tx_register_txn(struct txn *txn);
 
+int
+memtx_tx_begin_stmt(struct txn *txn);
+
 /**
  * Initialize memtx transaction manager.
  */

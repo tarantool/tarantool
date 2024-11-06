@@ -45,7 +45,6 @@ g.test_memtx_tx_manager_mvcc_invariant_violation = function(cg)
     -- collected.
     cg.server:exec(function()
         box.space.s:delete{0}
+        box.internal.memtx_tx_gc(100)
     end)
-
-    box.internal.memtx_tx_gc(100)
 end

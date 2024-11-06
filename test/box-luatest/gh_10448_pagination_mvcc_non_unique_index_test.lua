@@ -17,8 +17,8 @@ g.after_each(function(cg)
         if box.space.test ~= nil then
             box.space.test:drop()
         end
+        box.internal.memtx_tx_gc(1000)
     end)
-    box.internal.memtx_tx_gc(1000)
 end)
 
 -- Reproducer from gh-10448
