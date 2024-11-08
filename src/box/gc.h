@@ -347,18 +347,19 @@ void
 gc_trigger_checkpoint(void);
 
 /**
- * Get a reference to @checkpoint and store it in @ref.
+ * Allocate and get a reference to @checkpoint.
  * This will block the garbage collector from deleting
  * the checkpoint files until the reference is released
- * with gc_put_checkpoint_ref().
+ * with gc_unref_checkpoint().
  *
  * @format... specifies a human-readable name that will be
  * used for listing the reference in box.info.gc().
+ *
+ * The function never fails - returned value is always not NULL.
  */
-CFORMAT(printf, 3, 4)
-void
-gc_ref_checkpoint(struct gc_checkpoint *checkpoint,
-		  struct gc_checkpoint_ref *ref, const char *format, ...);
+CFORMAT(printf, 2, 3)
+struct gc_checkpoint_ref *
+gc_ref_checkpoint(struct gc_checkpoint *checkpoint, const char *format, ...);
 
 /**
  * Release a reference to a checkpoint previously taken
