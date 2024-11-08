@@ -241,6 +241,29 @@ lbox_iproto_session_new(struct lua_State *L)
 }
 
 /**
+ * Drop all current connections.
+ *
+ * Accepts a timeout (in seconds).
+ *
+ * Returns nothing on success, raises an error on a failure.
+ *
+ * See iproto_drop_connections() for details.
+ */
+static int
+lbox_iproto_drop_connections(struct lua_State *L)
+{
+	int n_args = lua_gettop(L);
+	if (n_args != 1 || lua_type(L, 1) != LUA_TNUMBER)
+		return luaL_error(L, "Usage: box.iproto.internal."
+				  "drop_connections(timeout)");
+	double timeout = lua_tonumber(L, 1);
+	int rc = iproto_drop_connections(timeout);
+	if (rc < 0)
+		return luaT_error(L);
+	return 0;
+}
+
+/**
  * Encodes a packet header/body argument to MsgPack: if the argument is a
  * string, then no encoding is needed — otherwise the argument must be a Lua
  * table. The Lua table is encoded to MsgPack using IPROTO key translation
@@ -618,6 +641,7 @@ box_lua_iproto_init(struct lua_State *L)
 	luaL_findtable(L, -1, "internal", 0);
 	static const struct luaL_Reg internal_funcs[] = {
 		{"session_new", lbox_iproto_session_new},
+		{"drop_connections", lbox_iproto_drop_connections},
 		{NULL, NULL}
 	};
 	luaL_setfuncs(L, internal_funcs, 0);
