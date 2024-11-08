@@ -66,6 +66,10 @@
 
 #include <type_traits>
 
+#ifdef __linux__
+#include <sys/sysinfo.h>
+#endif
+
 /* sync snapshot every 16MB */
 #define SNAP_SYNC_INTERVAL	(1 << 24)
 
@@ -1664,6 +1668,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 memtx_on_indexes_built_cb on_indexes_built)
 {
 	int64_t snap_signature;
+	size_t prealloc;
 	struct memtx_engine *memtx =
 		(struct memtx_engine *)calloc(1, sizeof(*memtx));
 	if (memtx == NULL) {
@@ -1751,9 +1756,36 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		alloc_factor = 1.001;
 	}
 
+	/*
+	 * We preallocate all memtx memory as a single chunk. This chunk
+	 * will be less is size then 1ULL << 48. This way we make sure
+	 * we can address tuples using 48bit offset inside this chunk.
+	 * We need this for tuple memory management in read views.
+	 * See struct memtx_tuple for details.
+	 */
+	prealloc = tuple_arena_max_size;
+#ifdef __linux__
+	struct sysinfo info;
+	VERIFY(sysinfo(&info) == 0);
+	/*
+	 * We cannot allocate memory of size of all available memory thus
+	 * this 0.8 coefficient.
+	 */
+	prealloc = MAX(0.8 * info.totalram * info.mem_unit, prealloc);
+	/*
+	 * QUOTA_MAX is memory limit for memtx. QUOTA_MAX is less
+	 * then 1 << 48ULL so arena size fits into 48bits.
+	 */
+	prealloc = MIN(prealloc, QUOTA_MAX);
+#endif
+	assert(prealloc >= tuple_arena_max_size);
+	assert(prealloc <= QUOTA_MAX);
+	static_assert(QUOTA_MAX < 1ULL << 48,
+		      "QUOTA_MAX is expected to be less than 48 bits");
+
 	/* Initialize tuple allocator. */
 	quota_init(&memtx->quota, tuple_arena_max_size);
-	tuple_arena_create(&memtx->arena, &memtx->quota, tuple_arena_max_size,
+	tuple_arena_create(&memtx->arena, &memtx->quota, prealloc,
 			   SLAB_SIZE, dontdump, "memtx");
 	slab_cache_create(&memtx->slab_cache, &memtx->arena);
 	float actual_alloc_factor;
@@ -1960,6 +1992,15 @@ memtx_engine_set_memory(struct memtx_engine *memtx, size_t size)
 	    quota_total(&memtx->quota) / QUOTA_UNIT_SIZE) {
 		diag_set(ClientError, ER_CFG, "memtx_memory",
 			 "cannot decrease memory size at runtime");
+		return -1;
+	}
+	/*
+	 * On Linux we preallocate memory of size about all available memory.
+	 * So in general we fail to increase memory only on non Linux.
+	 */
+	if (size > memtx->arena.prealloc) {
+		diag_set(ClientError, ER_CFG, "memtx_memory",
+			 "cannot inrease memory size at runtime");
 		return -1;
 	}
 	quota_set(&memtx->quota, size);
