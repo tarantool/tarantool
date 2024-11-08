@@ -137,17 +137,13 @@ struct tt_uuid bootstrap_leader_uuid;
 bool box_is_force_recovery = false;
 
 /**
- * Set if backup is in progress, i.e. box_backup_start() was
- * called but box_backup_stop() hasn't been yet.
- */
-static bool backup_is_in_progress;
-
-/**
  * If backup is in progress, this points to the gc reference
  * object that prevents the garbage collector from deleting
  * the checkpoint files that are currently being backed up.
+ *
+ * If there is no in-progress backup, is set to NULL.
  */
-static struct gc_checkpoint_ref backup_gc;
+static struct gc_checkpoint_ref *backup_gc;
 
 bool box_read_ffi_is_disabled;
 
@@ -5906,7 +5902,7 @@ int
 box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 {
 	assert(checkpoint_idx >= 0);
-	if (backup_is_in_progress) {
+	if (backup_gc != NULL) {
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
 		return -1;
 	}
@@ -5919,12 +5915,11 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 		diag_set(ClientError, ER_MISSING_SNAPSHOT);
 		return -1;
 	}
-	backup_is_in_progress = true;
-	gc_ref_checkpoint(checkpoint, &backup_gc, "backup");
+	backup_gc = gc_ref_checkpoint(checkpoint, "backup");
 	int rc = engine_backup(&checkpoint->vclock, cb, cb_arg);
 	if (rc != 0) {
-		gc_unref_checkpoint(&backup_gc);
-		backup_is_in_progress = false;
+		gc_unref_checkpoint(backup_gc);
+		backup_gc = NULL;
 	}
 	return rc;
 }
@@ -5932,9 +5927,9 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 void
 box_backup_stop(void)
 {
-	if (backup_is_in_progress) {
-		gc_unref_checkpoint(&backup_gc);
-		backup_is_in_progress = false;
+	if (backup_gc != NULL) {
+		gc_unref_checkpoint(backup_gc);
+		backup_gc = NULL;
 	}
 }
 
