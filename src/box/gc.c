@@ -671,16 +671,17 @@ gc_checkpoint_fiber_f(va_list ap)
 	return 0;
 }
 
-void
-gc_ref_checkpoint(struct gc_checkpoint *checkpoint,
-		  struct gc_checkpoint_ref *ref, const char *format, ...)
+struct gc_checkpoint_ref *
+gc_ref_checkpoint(struct gc_checkpoint *checkpoint, const char *format, ...)
 {
+	struct gc_checkpoint_ref *ref = xalloc_object(struct gc_checkpoint_ref);
 	va_list ap;
 	va_start(ap, format);
 	vsnprintf(ref->name, GC_NAME_MAX, format, ap);
 	va_end(ap);
 
 	rlist_add_tail_entry(&checkpoint->refs, ref, in_refs);
+	return ref;
 }
 
 void
@@ -688,6 +689,7 @@ gc_unref_checkpoint(struct gc_checkpoint_ref *ref)
 {
 	rlist_del_entry(ref, in_refs);
 	gc_schedule_cleanup();
+	free(ref);
 }
 
 static struct gc_consumer *
