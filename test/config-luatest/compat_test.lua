@@ -25,7 +25,13 @@ local non_dynamic = {
 -- 'new'. Since dependencies is an array, the order of checking is
 -- deterministic, so we can only check for one specific error -
 -- a conflict with the first dependency in this array.
-local have_dependencies = { }
+local have_dependencies = {
+    box_begin_timeout_meaning = {
+        error = "The compat option 'box_begin_timeout_meaning' may be set " ..
+            "to 'new' only when compat option 'replication_synchro_timeout' " ..
+            "is 'new'",
+    },
+}
 
 -- Ensure that all the options from the compat module are present
 -- in the compat sections of the instance config and vice versa.
