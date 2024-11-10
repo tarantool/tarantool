@@ -1,6 +1,7 @@
 local yaml = require('yaml')
 local fio = require('fio')
 local t = require('luatest')
+local instance_config = require('internal.config.instance_config')
 local cluster_config = require('internal.config.cluster_config')
 
 local g = t.group()
@@ -92,6 +93,7 @@ local instance_config_fields = {
     'failover',
     'compat',
     'labels',
+    'isolated',
 }
 
 -- Verify that the fields of the given schema correspond to the
@@ -427,6 +429,7 @@ g.test_defaults = function()
             console_session_scope_vars = 'old',
             wal_cleanup_delay_deprecation = 'old',
         },
+        isolated = false,
     }
 
     -- Global defaults.
@@ -738,4 +741,67 @@ g.test_additional_options_instance = function()
         .fields.replicasets.value
         .fields.instances.value
     verify_fields(schema, {})
+end
+
+-- Attempt to pass the `isolated` option to different cluster
+-- configuration levels and also try to validate it against the
+-- instance config.
+--
+-- The option should be accepted only by the instance config or
+-- the instance level of the cluster config.
+g.test_isolated_scope = function()
+    local function exp_err(path, scope)
+        return ('[cluster_config] %s: The option must not be present in the ' ..
+            '%s scope'):format(path, scope)
+    end
+
+    local data = {isolated = true}
+
+    -- Global level: forbidden.
+    local path = 'isolated'
+    t.assert_error_msg_equals(exp_err(path, 'global'), function()
+        cluster_config:validate(data)
+    end)
+
+    -- Group level: forbidden.
+    local path = 'groups.g.isolated'
+    t.assert_error_msg_equals(exp_err(path, 'group'), function()
+        cluster_config:validate({
+            groups = {
+                g = data,
+            },
+        })
+    end)
+
+    -- Replicaset level: forbidden.
+    local path = 'groups.g.replicasets.r.isolated'
+    t.assert_error_msg_equals(exp_err(path, 'replicaset'), function()
+        cluster_config:validate({
+            groups = {
+                g = {
+                    replicasets = {
+                        r = data,
+                    },
+                },
+            },
+        })
+    end)
+
+    -- Instance level: accepted.
+    cluster_config:validate({
+        groups = {
+            g = {
+                replicasets = {
+                    r = {
+                        instances = {
+                            i = data,
+                        },
+                    },
+                },
+            },
+        },
+    })
+
+    -- Validation against the instance config: accepted.
+    instance_config:validate(data)
 end

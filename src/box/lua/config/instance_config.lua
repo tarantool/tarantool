@@ -455,6 +455,37 @@ local function feedback_validate(data, w)
     w.error('Tarantool is built without feedback reports sending support')
 end
 
+-- Verify that the given validation context (w) corresponds to the
+-- instance level of the cluster configuration or the validation
+-- is performed against the instance config schema.
+local function validate_scope_is_instance(w)
+    local scope = w.schema.computed.annotations.scope
+
+    -- scope = nil means that the validation is performed against
+    -- the instance config schema, not the cluster config.
+    --
+    -- The validation against the instance config is performed for
+    -- values from the env configuration source (which collects
+    -- the TT_* environment variables).
+    --
+    -- Also, it would be very counter-intuitive if
+    -- cluster_config:instantiate() would produce a result that
+    -- doesn't pass the instance_config:validate() check.
+    if scope == nil then
+        return
+    end
+
+    -- scope = 'instance' means that the option is placed on the
+    -- instance level of the cluster configuration.
+    if scope == 'instance' then
+        return
+    end
+
+    -- Any other level of the cluster configuration (replicaset,
+    -- group, global) scope -- raise an error.
+    w.error('The option must not be present in the %s scope', scope)
+end
+
 return schema.new('instance_config', schema.record({
     config = schema.record({
         reload = schema.enum({
@@ -2474,6 +2505,13 @@ return schema.new('instance_config', schema.record({
         value = schema.scalar({
             type = 'string',
         }),
+    }),
+    isolated = schema.scalar({
+        type = 'boolean',
+        default = false,
+        validate = function(_data, w)
+            validate_scope_is_instance(w)
+        end,
     }),
 }, {
     -- This kind of validation cannot be implemented as the
