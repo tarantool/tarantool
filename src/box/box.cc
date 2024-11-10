@@ -276,6 +276,9 @@ TWEAK_DOUBLE(box_shutdown_timeout);
 static double box_fiber_pool_idle_timeout = FIBER_POOL_IDLE_TIMEOUT;
 TWEAK_DOUBLE(box_fiber_pool_idle_timeout);
 
+bool box_begin_timeout_new_meaning = false;
+TWEAK_BOOL(box_begin_timeout_new_meaning);
+
 static int
 box_run_on_recovery_state(enum box_recovery_state state)
 {
