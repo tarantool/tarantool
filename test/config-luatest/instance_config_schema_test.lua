@@ -1766,3 +1766,8 @@ g.test_labels = function()
 
     t.assert_equals(instance_config:apply_default({}).labels, nil)
 end
+
+g.test_isolated = function()
+    instance_config:validate({isolated = true})
+    t.assert_equals(instance_config:apply_default({}).isolated, false)
+end
