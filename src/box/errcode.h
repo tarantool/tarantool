@@ -438,6 +438,7 @@ struct errcode_record {
 	_(ER_REPLICA_GC, 291,			"Cannot clean up replica's resources", "uuid", STRING, "details", STRING) \
 	_(ER_ALIEN_ENGINE, 292,			"Snapshot contains alien space engine row", "engine", STRING) \
 	_(ER_MVCC_UNAVAILABLE, 293,		"MVCC is unavailable for storage engine '%s' so it cannot be used in the same transaction with '%s', which supports MVCC", "engine_without_mvcc", STRING, "engine_with_mvcc", STRING) \
+	_(ER_COMMIT_TIMEOUT, 294,		"Transaction timeout has expired during commit. It's not aborted and continues to commit in background.", "expired_at", STRING) \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*

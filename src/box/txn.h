@@ -544,6 +544,8 @@ struct txn {
 	 * to complete within the timeout specified when it was created.
 	 */
 	struct ev_timer *rollback_timer;
+	/** Transaction begin time. */
+	double begin_time;
 	/**
 	 * For synchronous transactions - their context in the synchro queue.
 	 */

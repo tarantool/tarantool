@@ -397,17 +397,23 @@ txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn);
 int
 txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 {
-	assert(entry->lsn > 0 || !txn_has_flag(entry->txn, TXN_WAIT_ACK));
+	struct txn *txn = entry->txn;
+	assert(entry->lsn > 0 || !txn_has_flag(txn, TXN_WAIT_ACK));
 
 	if (txn_limbo_entry_is_complete(entry))
 		goto complete;
 
-	assert(!txn_has_flag(entry->txn, TXN_IS_DONE));
-	assert(txn_has_flag(entry->txn, TXN_WAIT_SYNC));
+	assert(!txn_has_flag(txn, TXN_IS_DONE));
+	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
 	double start_time = fiber_clock();
 	while (true) {
 		int rc;
-		if (replication_synchro_timeout_rollback_enabled) {
+		if (box_begin_timeout_new_meaning) {
+			double timeout = txn->begin_time +
+				txn->timeout - fiber_clock();
+			rc = fiber_cond_wait_timeout(
+				&limbo->wait_cond, timeout);
+		} else if (replication_synchro_timeout_rollback_enabled) {
 			double timeout = start_time +
 				replication_synchro_timeout - fiber_clock();
 			rc = fiber_cond_wait_timeout(
@@ -427,26 +433,29 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 
 	assert(!txn_limbo_is_empty(limbo));
 	struct txn_limbo_entry *e;
-	bool is_first_waiting_entry = true;
-	rlist_foreach_entry(e, &limbo->queue, in_queue) {
-		if (e == entry)
-			break;
-		if (txn_has_flag(e->txn, TXN_WAIT_ACK) &&
-		    e->txn->fiber != NULL) {
-			is_first_waiting_entry = false;
-			break;
+	if (!box_begin_timeout_new_meaning &&
+	    replication_synchro_timeout_rollback_enabled) {
+		bool is_first_waiting_entry = true;
+		rlist_foreach_entry(e, &limbo->queue, in_queue) {
+			if (e == entry)
+				break;
+			if (txn_has_flag(e->txn, TXN_WAIT_ACK) &&
+			    e->txn->fiber != NULL) {
+				is_first_waiting_entry = false;
+				break;
+			}
 		}
-	}
-	if (!is_first_waiting_entry) {
-		/*
-		 * If this is not the first waiting entry in the limbo, it
-		 * is definitely not the first timed out entry. And
-		 * since it managed to time out too, it means
-		 * there is currently another fiber writing
-		 * rollback, or waiting for confirmation WAL
-		 * write. Wait when it will finish and wake us up.
-		 */
-		goto wait;
+		if (!is_first_waiting_entry) {
+			/*
+			 * If this is not the first waiting entry in the limbo,
+			 * it is definitely not the first timed out entry. And
+			 * since it managed to time out too, it means
+			 * there is currently another fiber writing
+			 * rollback, or waiting for confirmation WAL
+			 * write. Wait when it will finish and wake us up.
+			 */
+			goto wait;
+		}
 	}
 
 	/* First in the queue is always a synchronous transaction. */
@@ -460,6 +469,11 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		 * finished.
 		 */
 		goto wait;
+	}
+
+	if (box_begin_timeout_new_meaning) {
+		diag_set(ClientError, ER_COMMIT_TIMEOUT, "quorum collection");
+		return -1;
 	}
 
 	txn_limbo_write_rollback(limbo, entry->lsn);
@@ -479,7 +493,17 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 
 wait:
 	do {
-		fiber_yield();
+		if (box_begin_timeout_new_meaning) {
+			double timeout = txn->begin_time +
+					 txn->timeout - fiber_clock();
+			if (fiber_yield_timeout(timeout)) {
+				diag_set(ClientError, ER_COMMIT_TIMEOUT,
+					 "CONFIRM write");
+				return -1;
+			}
+		} else {
+			fiber_yield();
+		}
 	} while (!txn_limbo_entry_is_complete(entry));
 
 complete:
@@ -489,7 +513,7 @@ complete:
 	 * installed the commit/rollback flag.
 	 */
 	assert(rlist_empty(&entry->in_queue));
-	assert(txn_has_flag(entry->txn, TXN_IS_DONE));
+	assert(txn_has_flag(txn, TXN_IS_DONE));
 	/*
 	 * The first tx to be rolled back already performed all
 	 * the necessary cleanups for us.

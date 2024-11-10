@@ -220,7 +220,7 @@ run_triggers_general(struct txn *txn, struct txn_stmt *stmt,
 			/*
 			 * The transaction could be aborted while the previous
 			 * trigger was running (e.g. if the trigger-function
-			 * yielded or failed).
+			 * yielded, failed or transaction timeout expired).
 			 */
 			rc = txn_check_can_continue(txn);
 			if (rc != 0)

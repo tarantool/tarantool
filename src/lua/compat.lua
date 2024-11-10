@@ -164,6 +164,14 @@ gc-checkpointing.
 https://tarantool.io/compat/replication_synchro_timeout
 ]]
 
+local BOX_BEGIN_TIMEOUT_MEANING_BRIEF = [[
+Controls the behavior of the timeout `box.begin{timeout=`. The option can be
+set to 'new' only if the compat option replication_synchro_timeout is set to
+'new'. The new behavior propagates the timeout further to `box.commit`.
+
+https://tarantool.io/compat/box_begin_timeout_meaning
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -300,6 +308,13 @@ local options = {
         brief = REPLICATION_SYNCHRO_TIMEOUT_COMPAT_BRIEF,
         action = tweak_action(
             'replication_synchro_timeout_rollback_enabled', true, false),
+    },
+    box_begin_timeout_meaning = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_BEGIN_TIMEOUT_MEANING_BRIEF,
+        action = tweak_action('box_begin_timeout_new_meaning', false, true),
+        dependencies = { 'replication_synchro_timeout', }
     },
 }
 
