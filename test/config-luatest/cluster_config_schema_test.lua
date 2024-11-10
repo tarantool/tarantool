@@ -7,6 +7,32 @@ local g = t.group()
 
 local is_enterprise = require('tarantool').package == 'Tarantool Enterprise'
 
+-- Keys of the given table.
+local function table_keys(t)
+    local res = {}
+
+    for k in pairs(t) do
+        table.insert(res, k)
+    end
+
+    return res
+end
+
+-- Concatenate two array-like tables.
+local function array_concat(a, b)
+    local res = {}
+
+    for _, v in ipairs(a) do
+        table.insert(res, v)
+    end
+
+    for _, v in ipairs(b) do
+        table.insert(res, v)
+    end
+
+    return res
+end
+
 -- Generate a config with specific names.
 --
 -- Set some default valid names if they're not provided.
@@ -34,6 +60,54 @@ local function gen_config_from_names(names)
             },
         },
     }
+end
+
+-- The list of instance config fields on the outmost level.
+--
+-- The order follows src/box/lua/config/instance_config.lua.
+local instance_config_fields = {
+    'config',
+    'process',
+    'console',
+    'fiber',
+    'log',
+    'iproto',
+    'database',
+    'sql',
+    'memtx',
+    'vinyl',
+    'wal',
+    'snapshot',
+    'replication',
+    'credentials',
+    'app',
+    'feedback',
+    'flightrec',
+    'security',
+    'metrics',
+    'sharding',
+    'audit_log',
+    'roles_cfg',
+    'roles',
+    'failover',
+    'compat',
+    'labels',
+}
+
+-- Verify that the fields of the given schema correspond to the
+-- instance config fields plus the given additional ones.
+local function verify_fields(schema, additional_fields)
+    t.assert_equals(schema.type, 'record')
+
+    local exp_fields = array_concat(instance_config_fields, additional_fields)
+    local fields = table_keys(schema.fields)
+
+    -- t.assert_equals() reports the difference in case of large
+    -- comparing values, so let's sort the arrays and use it
+    -- instead of t.assert_items_equals().
+    table.sort(exp_fields)
+    table.sort(fields)
+    t.assert_equals(fields, exp_fields)
 end
 
 g.test_cluster_config = function()
@@ -355,7 +429,62 @@ g.test_defaults = function()
             wal_cleanup_delay_deprecation = 'old',
         },
     }
+
+    -- Global defaults.
+    --
+    -- There are additional options:
+    --
+    -- * groups      (no default)
+    -- * conditional (no default)
     local res = cluster_config:apply_default({})
+    t.assert_equals(res, exp)
+
+    -- Group defaults.
+    --
+    -- There is an additional option:
+    --
+    -- * replicasets (no default)
+    local res = cluster_config:apply_default({
+        groups = {
+            g = {},
+        },
+    }).groups.g
+    t.assert_equals(res, exp)
+
+    -- Replicaset defaults.
+    --
+    -- There are additional options:
+    --
+    -- * instances        (no default)
+    -- * leader           (no default)
+    -- * bootstrap_leader (no default)
+    local res = cluster_config:apply_default({
+        groups = {
+            g = {
+                replicasets = {
+                    r = {},
+                },
+            },
+        },
+    }).groups.g.replicasets.r
+    t.assert_equals(res, exp)
+
+    -- Instance defaults.
+    --
+    -- There are no additional options.
+    local res = cluster_config:apply_default({
+        groups = {
+            g = {
+                replicasets = {
+                    r = {
+                        instances = {
+                            i = {}
+                        },
+                    },
+                },
+            },
+        },
+    }).groups.g.replicasets.r.instances.i
     t.assert_equals(res, exp)
 end
 
@@ -506,4 +635,108 @@ g.test_sharding = function()
     t.assert_error_msg_equals(err, function()
         cluster_config:validate(config)
     end)
+end
+
+-- Verify options consistency on the global level.
+--
+-- Expected instance config fields plus the following additional
+-- ones:
+--
+-- * groups (map)
+-- * conditional (array of maps)
+g.test_additional_options_global = function()
+    -- Some valid values for the additional fields.
+    local additional_options = {
+        groups = {},
+        conditional = {
+            {
+                ['if'] = '1.2.3 == 1.2.3',
+            },
+        }
+    }
+
+    -- Verify that the fields on the given level are instance
+    -- config fields plus the given additional ones.
+    local schema = cluster_config.schema
+    verify_fields(schema, table_keys(additional_options))
+
+    -- Verify that the given example values for the additional
+    -- fields are accepted by the schema on the given level.
+    cluster_config:validate(additional_options)
+end
+
+-- Verify options consistency on the group level.
+--
+-- Expected instance config fields plus the following additional
+-- ones:
+--
+-- * replicasets (map)
+g.test_additional_options_group = function()
+    -- Some valid values for the additional fields.
+    local additional_options = {
+        replicasets = {},
+    }
+
+    -- Verify that the fields on the given level are instance
+    -- config fields plus the given additional ones.
+    local schema = cluster_config.schema
+        .fields.groups.value
+    verify_fields(schema, table_keys(additional_options))
+
+    -- Verify that the given example values for the additional
+    -- fields are accepted by the schema on the given level.
+    cluster_config:validate({
+        groups = {
+            g = additional_options,
+        },
+    })
+end
+
+-- Verify options consistency on the replicaset level.
+--
+-- Expected instance config fields plus the following additional
+-- ones:
+--
+-- * instances        (map)
+-- * leader           (string)
+-- * bootstrap_leader (string)
+g.test_additional_options_replicaset = function()
+    -- Some valid values for the additional fields.
+    local additional_options = {
+        instances = {},
+        leader = 'x',
+        bootstrap_leader = 'y',
+    }
+
+    -- Verify that the fields on the given level are instance
+    -- config fields plus the given additional ones.
+    local schema = cluster_config.schema
+        .fields.groups.value
+        .fields.replicasets.value
+    verify_fields(schema, table_keys(additional_options))
+
+    -- Verify that the given example values for the additional
+    -- fields are accepted by the schema on the given level.
+    cluster_config:validate({
+        groups = {
+            g = {
+                replicasets = {
+                    r = additional_options,
+                },
+            },
+        },
+    })
+end
+
+-- Verify options consistency on the instance level.
+--
+-- Expected only instance config fields.
+g.test_additional_options_instance = function()
+    -- Verify that the fields on the given level are instance
+    -- config fields.
+    local schema = cluster_config.schema
+        .fields.groups.value
+        .fields.replicasets.value
+        .fields.instances.value
+    verify_fields(schema, {})
 end
