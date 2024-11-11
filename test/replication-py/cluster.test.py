@@ -24,22 +24,19 @@ print("-------------------------------------------------------------")
 # Generate replica cluster UUID
 replica_uuid = str(uuid.uuid4())
 
-## Universal read permission is required to perform JOIN/SUBSCRIBE
-rows = list(server.iproto.py_con.join(replica_uuid))
-status = len(rows) == 1 and rows[0].return_message.find("Read access") >= 0 and \
-    "ok" or "not ok"
-print("{} - join without read permissions on universe".format(status))
-rows = list(server.iproto.py_con.subscribe(cluster_uuid, replica_uuid))
-status = len(rows) == 1 and rows[0].return_message.find("Read access") >= 0 and \
-    "ok" or "not ok"
-print("{} - subscribe without read permissions on universe".format(status))
 ## Write permission to space `_cluster` is required to perform JOIN
-server.admin("box.schema.user.grant('guest', 'read', 'universe')")
 server.iproto.reconnect() # re-connect with new permissions
 rows = list(server.iproto.py_con.join(replica_uuid))
 status = len(rows) == 1 and rows[0].return_message.find("Write access") >= 0 and \
     "ok" or "not ok"
 print("{} - join without write permissions to _cluster".format(status))
+
+## Universal read permission is required to perform JOIN
+server.admin("box.schema.user.grant('guest', 'write', 'space', '_cluster')")
+rows = list(server.iproto.py_con.join(replica_uuid))
+status = len(rows) == 1 and rows[0].return_message.find("Read access") >= 0 and \
+    "ok" or "not ok"
+print("{} - join without read permissions on universe".format(status))
 
 def check_join(msg):
     ok = True
@@ -60,14 +57,21 @@ def check_join(msg):
     return server_id
 
 ## JOIN with permissions
-server.admin("box.schema.user.grant('guest', 'write', 'space', '_cluster')")
+server.admin("box.schema.user.grant('guest', 'read', 'universe')")
 server.admin("box.schema.user.grant('guest', 'write', 'space', '_gc_consumers')")
 server.iproto.reconnect() # re-connect with new permissions
 server_id = check_join("join with granted permissions")
+
+## Universal read permission is required to perform SUBSCRIBE
+server.admin("box.schema.user.revoke('guest', 'read', 'universe')")
+rows = list(server.iproto.py_con.subscribe(cluster_uuid, replica_uuid))
+status = len(rows) == 1 and rows[0].return_message.find("Read access") >= 0 and \
+    "ok" or "not ok"
+print("{} - subscribe without read permissions on universe".format(status))
+
 server.iproto.py_con.space("_cluster").delete(server_id)
 
 # JOIN with granted role
-server.admin("box.schema.user.revoke('guest', 'read', 'universe')")
 server.admin("box.schema.user.revoke('guest', 'write', 'space', '_cluster')")
 server.admin("box.schema.user.revoke('guest', 'write', 'space', '_gc_consumers')")
 server.admin("box.schema.user.grant('guest', 'replication')")

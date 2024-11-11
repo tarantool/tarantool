@@ -19,7 +19,8 @@ test_run:wait_upstream(1, {status = 'follow'})
 test_run:switch('replica1')
 -- The anonymous replica wasn't registered.
 assert(box.space._cluster:len() == 1)
-box.info.gc().consumers
+-- However, WAL GC consumer was created
+assert(#box.info.gc().consumers == 1)
 box.info.replication_anon.count == 1
 
 test_run:switch('default')
