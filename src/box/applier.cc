@@ -876,6 +876,7 @@ applier_fetch_snapshot(struct applier *applier)
 		.is_checkpoint_join = false,
 		.checkpoint_vclock = vclock,
 		.checkpoint_lsn = 0,
+		.instance_uuid = INSTANCE_UUID,
 	};
 	RegionGuard region_guard(&fiber()->gc);
 	xrow_encode_fetch_snapshot(&row, &req);
