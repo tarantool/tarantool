@@ -1728,6 +1728,9 @@ g.test_failover = function()
             },
             replicasets = {
                 replicaset001 = {
+                    learners = {
+                        'instance002',
+                    },
                     priority = {
                         instance001 = 1
                     }
