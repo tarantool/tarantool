@@ -2325,6 +2325,13 @@ return schema.new('instance_config', schema.record({
                 type = 'string',
             }),
             value = schema.record({
+                -- The instances that can't be appointed by the
+                -- supervised failover coordinator.
+                non_appointable = schema.array({
+                    items = schema.scalar({
+                        type = 'string',
+                    }),
+                }),
                 -- Priorities for the supervised failover mode.
                 priority = schema.map({
                     key = schema.scalar({

@@ -592,6 +592,23 @@ local function validate_failover_config(instances, failover_config)
         replicasets[def.replicaset_name] = true
     end
 
+    local function verify_instance_in_replicaset(instance_name, replicaset_name)
+        if instances[instance_name] == nil then
+            error(('instance %s from replicaset %s specified in the '..
+                   'failover.replicasets section doesn\'t exist')
+                  :format(instance_name, replicaset_name), 0)
+        end
+
+        local instance_replicaset = instances[instance_name].replicaset_name
+        if instance_replicaset ~= replicaset_name then
+            error(('instance %s from replicaset %s is specified in ' ..
+                   'the wrong replicaset %s in the failover.replicasets ' ..
+                   'configuration section')
+                  :format(instance_name, instance_replicaset,
+                          replicaset_name), 0)
+        end
+    end
+
     for replicaset_name, replicaset in pairs(failover_config.replicasets) do
         if replicasets[replicaset_name] == nil then
             error(('replicaset %s specified in the failover configuration '..
@@ -600,20 +617,13 @@ local function validate_failover_config(instances, failover_config)
 
         -- Validate the priority section of the specific replicasets.
         for instance_name, _ in pairs(replicaset.priority or {}) do
-            if instances[instance_name] == nil then
-                error(('instance %s from replicaset %s specified in the '..
-                       'failover configuration doesn\'t exist')
-                      :format(instance_name, replicaset_name), 0)
-            end
+            verify_instance_in_replicaset(instance_name, replicaset_name)
+        end
 
-            local instance_replicaset = instances[instance_name].replicaset_name
-            if instance_replicaset ~= replicaset_name then
-                error(('instance %s from replicaset %s is specified in ' ..
-                       'the wrong replicaset %s in the failover ' ..
-                       'configuration section')
-                      :format(instance_name, instance_replicaset,
-                              replicaset_name), 0)
-            end
+        -- Validate the non-appointable instances section of the
+        -- specific replicaset.
+        for _, instance_name in ipairs(replicaset.non_appointable or {}) do
+            verify_instance_in_replicaset(instance_name, replicaset_name)
         end
     end
 end
