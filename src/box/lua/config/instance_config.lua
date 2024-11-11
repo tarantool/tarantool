@@ -2325,6 +2325,13 @@ return schema.new('instance_config', schema.record({
                 type = 'string',
             }),
             value = schema.record({
+                -- Instances that can't be chosen as a master
+                -- by the supervised failover coordinator.
+                learners = schema.array({
+                    items = schema.scalar({
+                        type = 'string',
+                    }),
+                }),
                 -- Priorities for the supervised failover mode.
                 priority = schema.map({
                     key = schema.scalar({
