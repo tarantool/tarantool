@@ -11,6 +11,7 @@ struct vy_stmt_env stmt_env;
 struct vy_mem_env mem_env;
 struct vy_cache_env cache_env;
 struct mempool history_node_pool;
+struct vy_stmt_counter dummy_count;
 
 void
 vy_iterator_C_test_init(size_t cache_size)
@@ -149,9 +150,9 @@ vy_mem_insert_template(struct vy_mem *mem, const struct vy_stmt_template *templ)
 	tuple_unref(entry.stmt);
 	entry.stmt = region_stmt;
 	if (templ->type == IPROTO_UPSERT)
-		vy_mem_insert_upsert(mem, entry);
+		vy_mem_insert_upsert(mem, entry, &dummy_count);
 	else
-		vy_mem_insert(mem, entry);
+		vy_mem_insert(mem, entry, &dummy_count);
 	return entry;
 }
 

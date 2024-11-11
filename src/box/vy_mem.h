@@ -282,24 +282,28 @@ vy_mem_older_lsn(struct vy_mem *mem, struct vy_entry entry);
  * Insert a statement into the in-memory level.
  * @param mem        vy_mem.
  * @param entry      Vinyl statement.
+ * @param count      Statement counter to update.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 int
-vy_mem_insert(struct vy_mem *mem, struct vy_entry entry);
+vy_mem_insert(struct vy_mem *mem, struct vy_entry entry,
+	      struct vy_stmt_counter *count);
 
 /**
  * Insert an upsert statement into the mem.
  *
  * @param mem Mem to insert to.
  * @param entry Upsert statement to insert.
+ * @param count Statement counter to update.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 int
-vy_mem_insert_upsert(struct vy_mem *mem, struct vy_entry entry);
+vy_mem_insert_upsert(struct vy_mem *mem, struct vy_entry entry,
+		     struct vy_stmt_counter *count);
 
 /**
  * Confirm insertion of a statement into the in-memory level.
@@ -313,9 +317,11 @@ vy_mem_commit_stmt(struct vy_mem *mem, struct vy_entry entry);
  * Remove a statement from the in-memory level.
  * @param mem        vy_mem.
  * @param entry      Vinyl statement.
+ * @param count      Statement counter to update.
  */
 void
-vy_mem_rollback_stmt(struct vy_mem *mem, struct vy_entry entry);
+vy_mem_rollback_stmt(struct vy_mem *mem, struct vy_entry entry,
+		     struct vy_stmt_counter *count);
 
 /**
  * Iterator for in-memory level.
