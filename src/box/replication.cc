@@ -305,11 +305,15 @@ replica_check_id(uint32_t replica_id)
 	return 0;
 }
 
-/* Return true if replica doesn't have id, relay and applier */
+/*
+ * Return true if the replica can be deleted - it doesn't have id or any
+ * connections. Since lifetime of anonymous replicas is different, the
+ * function always returns `false` for them.
+ */
 static bool
 replica_is_orphan(struct replica *replica)
 {
-	return replica->id == REPLICA_ID_NIL &&
+	return replica->id == REPLICA_ID_NIL && !replica->anon &&
 	       !replica_has_connections(replica);
 }
 
@@ -334,6 +338,7 @@ replica_new(void)
 	replica->gc = NULL;
 	replica->is_applier_healthy = false;
 	replica->is_relay_healthy = false;
+	replica->has_incoming_connection = false;
 	rlist_create(&replica->in_anon);
 	trigger_create(&replica->on_applier_state,
 		       replica_on_applier_state_f, NULL, NULL);
@@ -454,13 +459,12 @@ replica_clear_id(struct replica *replica)
 	/*
 	 * The replica will never resubscribe so we don't need to keep
 	 * WALs for it anymore. Unregister it with the garbage collector
-	 * if the relay thread is stopped. In case the relay thread is
-	 * still running, it may need to access replica->gc so leave the
-	 * job to replica_on_relay_stop, which will be called as soon as
-	 * the relay thread exits.
+	 * if the relay thread is stopped. In case the replica is still
+	 * connected, it may need to access replica->gc so leave the
+	 * job to replica_on_disconnect, which will be called as soon as
+	 * the replica disconnects.
 	 */
-	if (replica->gc != NULL &&
-	    relay_get_state(replica->relay) != RELAY_FOLLOW) {
+	if (replica->gc != NULL && !replica->has_incoming_connection) {
 		gc_consumer_unregister(replica->gc);
 		replica->gc = NULL;
 	}
@@ -505,8 +509,10 @@ bool
 replica_has_connections(const struct replica *replica)
 {
 	assert(replica->relay != NULL);
-	return relay_get_state(replica->relay) == RELAY_FOLLOW ||
-	       replica->applier != NULL;
+	/* Relay is expected to be active only for connected replicas. */
+	assert(relay_get_state(replica->relay) != RELAY_FOLLOW ||
+	       replica->has_incoming_connection);
+	return replica->has_incoming_connection || replica->applier != NULL;
 }
 
 /** A helper to track applier health on its state change. */
@@ -1365,23 +1371,22 @@ replica_on_relay_follow(struct replica *replica)
 void
 replica_on_relay_stop(struct replica *replica)
 {
-	/*
-	 * If the replica was evicted from the cluster, or was not
-	 * even added there (anon replica), we don't need to keep
-	 * WALs for it anymore. Unregister it with the garbage
-	 * collector then. See also replica_clear_id.
-	 */
-	if (replica->id == REPLICA_ID_NIL) {
-		if (!replica->anon) {
-			gc_consumer_unregister(replica->gc);
-			replica->gc = NULL;
-		} else {
-			assert(replica->gc == NULL);
-		}
-	}
-
 	replica_update_relay_health(replica);
+}
 
+void
+replica_on_disconnect(struct replica *replica)
+{
+	assert(!replica->has_incoming_connection);
+	/*
+	 * If the replica was evicted from the cluster, we don't need to keep
+	 * WALs for it anymore. Unregister it with the garbage collector then.
+	 * See also replica_clear_id.
+	 */
+	if (!replica->anon && replica->id == REPLICA_ID_NIL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
 		replicaset.anon_count -= replica->anon;

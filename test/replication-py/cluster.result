@@ -2,13 +2,12 @@ ok - cluster uuid
 -------------------------------------------------------------
  gh-696: Check global READ permissions for replication
 -------------------------------------------------------------
-ok - join without read permissions on universe
-ok - subscribe without read permissions on universe
-box.schema.user.grant('guest', 'read', 'universe')
----
-...
 ok - join without write permissions to _cluster
 box.schema.user.grant('guest', 'write', 'space', '_cluster')
+---
+...
+ok - join without read permissions on universe
+box.schema.user.grant('guest', 'read', 'universe')
 ---
 ...
 box.schema.user.grant('guest', 'write', 'space', '_gc_consumers')
@@ -18,6 +17,7 @@ ok - join with granted permissions
 box.schema.user.revoke('guest', 'read', 'universe')
 ---
 ...
+ok - subscribe without read permissions on universe
 box.schema.user.revoke('guest', 'write', 'space', '_cluster')
 ---
 ...

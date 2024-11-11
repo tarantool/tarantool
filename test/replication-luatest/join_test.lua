@@ -4,7 +4,7 @@ local uuid = require('uuid')
 
 local g = t.group('join')
 
-g.before_all(function(lg)
+g.before_each(function(lg)
     lg.master = server:new({
         alias = 'master',
         box_cfg = {
@@ -14,7 +14,7 @@ g.before_all(function(lg)
     lg.master:start()
 end)
 
-g.after_all(function(lg)
+g.after_each(function(lg)
     lg.master:drop()
 end)
 
@@ -106,4 +106,39 @@ g.test_raft_state_during_meta_join = function(lg)
 
     replica:drop()
     lg.master:update_box_cfg{election_mode = 'off'}
+end
+
+-- The test covers a crash on two consequents JOIN requests with
+-- the same UUID.
+g.test_join_with_the_same_uuid = function(lg)
+    t.tarantool.skip_if_not_debug()
+    lg.master:exec(function()
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+        s:replace{1}
+        box.error.injection.set('ERRINJ_REPLICA_JOIN_DELAY', true)
+    end)
+    local replica_uuid = uuid.str()
+    local box_cfg = table.deepcopy(lg.master.box_cfg)
+    box_cfg.replication = {lg.master.net_box_uri}
+    box_cfg.instance_uuid = replica_uuid
+    local replica1 = server:new({
+        alias = 'replica1',
+        box_cfg = box_cfg,
+    })
+    local replica2 = server:new({
+        alias = 'replica2',
+        box_cfg = box_cfg,
+    })
+    replica1:start({wait_until_ready = false})
+    replica2:start({wait_until_ready = false})
+    local msg = ('joining replica'):format(replica_uuid):gsub('%-', '%%-')
+    t.helpers.retrying({}, function()
+        t.assert(lg.master:grep_log(msg))
+    end)
+    lg.master:exec(function()
+        box.error.injection.set('ERRINJ_REPLICA_JOIN_DELAY', false)
+    end)
+    replica2:drop()
+    replica1:drop()
 end

@@ -402,6 +402,17 @@ struct replica {
 	bool is_relay_healthy;
 	/** Whether there is an applier subscribed to this replica. */
 	bool is_applier_healthy;
+	/**
+	 * Whether the replica has an established incoming connection right now.
+	 * The main difference from `is_relay_healthy` is that the flag is set
+	 * even when the replica is connected but its relay is not used - it
+	 * happens, for example, on initial join/fetch snapshot or when the
+	 * replica is being registered in `_cluster`.
+	 * Note that if flag `is_relay_healthy` is set, this flag is set as well
+	 * because only replicas with established incoming connection can have
+	 * an established relay.
+	 */
+	bool has_incoming_connection;
 	/** Applier fiber. */
 	struct applier *applier;
 	/** Relay thread. */
@@ -585,6 +596,15 @@ replica_on_relay_follow(struct replica *replica);
  */
 void
 replica_on_relay_stop(struct replica *replica);
+
+/**
+ * Disconnection handler:
+ * 1. Removes WAL GC state if the replica is not anonymous and was
+ *    evicted from the cluster.
+ * 2. Deletes the replica if it became orphan.
+ */
+void
+replica_on_disconnect(struct replica *replica);
 
 #if defined(__cplusplus)
 } /* extern "C" */
