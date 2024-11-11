@@ -153,7 +153,8 @@ vy_mem_older_lsn(struct vy_mem *mem, struct vy_entry entry)
 }
 
 int
-vy_mem_insert_upsert(struct vy_mem *mem, struct vy_entry entry)
+vy_mem_insert_upsert(struct vy_mem *mem, struct vy_entry entry,
+		     struct vy_stmt_counter *count)
 {
 	assert(vy_stmt_type(entry.stmt) == IPROTO_UPSERT);
 	/* Check if the statement can be inserted in the vy_mem. */
@@ -169,9 +170,12 @@ vy_mem_insert_upsert(struct vy_mem *mem, struct vy_entry entry)
 	assert(! vy_mem_tree_iterator_is_invalid(&inserted));
 	assert(vy_entry_is_equal(entry,
 		*vy_mem_tree_iterator_get_elem(&mem->tree, &inserted)));
-	if (replaced.stmt == NULL)
+	if (replaced.stmt == NULL) {
 		mem->count.rows++;
+		count->rows++;
+	}
 	mem->count.bytes += size;
+	count->bytes += size;
 	/*
 	 * All iterators begin to see the new statement, and
 	 * will be aborted in case of rollback.
@@ -213,7 +217,8 @@ vy_mem_insert_upsert(struct vy_mem *mem, struct vy_entry entry)
 }
 
 int
-vy_mem_insert(struct vy_mem *mem, struct vy_entry entry)
+vy_mem_insert(struct vy_mem *mem, struct vy_entry entry,
+	      struct vy_stmt_counter *count)
 {
 	assert(vy_stmt_type(entry.stmt) != IPROTO_UPSERT);
 	/* Check if the statement can be inserted in the vy_mem. */
@@ -225,9 +230,12 @@ vy_mem_insert(struct vy_mem *mem, struct vy_entry entry)
 	struct vy_entry replaced = vy_entry_none();
 	if (vy_mem_tree_insert(&mem->tree, entry, &replaced, NULL))
 		return -1;
-	if (replaced.stmt == NULL)
+	if (replaced.stmt == NULL) {
 		mem->count.rows++;
+		count->rows++;
+	}
 	mem->count.bytes += size;
+	count->bytes += size;
 	/*
 	 * All iterators begin to see the new statement, and
 	 * will be aborted in case of rollback.
@@ -259,16 +267,23 @@ vy_mem_commit_stmt(struct vy_mem *mem, struct vy_entry entry)
 }
 
 void
-vy_mem_rollback_stmt(struct vy_mem *mem, struct vy_entry entry)
+vy_mem_rollback_stmt(struct vy_mem *mem, struct vy_entry entry,
+		     struct vy_stmt_counter *count)
 {
-	/* This is the statement we've inserted before. */
+	/* The statement must be from a lsregion. */
 	assert(!vy_stmt_is_refable(entry.stmt));
-	int rc = vy_mem_tree_delete(&mem->tree, entry);
-	assert(rc == 0);
-	(void) rc;
-	/* We can't free memory in case of rollback. */
-	mem->count.rows--;
-	mem->version++;
+	/*
+	 * The statement isn't present in the memory tree if it was replaced by
+	 * vy_mem_insert(). In this case we must not decrement the row count.
+	 *
+	 * Either way, we don't subtract the statement size because lsregion
+	 * doesn't support freeing memory.
+	 */
+	if (vy_mem_tree_delete(&mem->tree, entry) == 0) {
+		mem->version++;
+		mem->count.rows--;
+		count->rows--;
+	}
 }
 
 /* }}} vy_mem */
