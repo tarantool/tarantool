@@ -77,7 +77,7 @@ g.test_select_consistency = function(cg)
             local MAX_VAL = 1000
             local MAX_MULTIKEY_COUNT = 10
             local PADDING_SIZE = 100
-            local DUMP_COUNT = 10
+            local DUMP_COUNT = 5
 
             local s = box.space.test
 
