@@ -4039,11 +4039,9 @@ vy_build_insert_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 	vy_stmt_set_lsn(region_stmt, lsn);
 	struct vy_entry entry;
 	vy_stmt_foreach_entry(entry, region_stmt, lsm->cmp_def) {
-		if (vy_mem_insert(mem, entry) != 0)
+		if (vy_mem_insert(mem, entry, &lsm->stat.memory.count) != 0)
 			return -1;
 		vy_mem_commit_stmt(mem, entry);
-		vy_stmt_counter_acct_tuple(&lsm->stat.memory.count,
-					   region_stmt);
 	}
 	return 0;
 }

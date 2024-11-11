@@ -906,6 +906,12 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 	assert(vy_stmt_is_refable(entry.stmt));
 	assert(*region_stmt == NULL || !vy_stmt_is_refable(*region_stmt));
 
+	/* Abort transaction if format was changed by DDL */
+	if (!vy_stmt_is_key(entry.stmt) &&
+	    format_id != tuple_format_id(mem->format)) {
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return -1;
+	}
 	/*
 	 * Allocate region_stmt on demand.
 	 *
@@ -923,19 +929,11 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 	}
 	entry.stmt = *region_stmt;
 
-	/* We can't free region_stmt below, so let's add it to the stats */
-	lsm->stat.memory.count.bytes += tuple_size(entry.stmt);
-
-	/* Abort transaction if format was changed by DDL */
-	if (!vy_stmt_is_key(entry.stmt) &&
-	    format_id != tuple_format_id(mem->format)) {
-		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
-		return -1;
-	}
+	struct vy_stmt_counter *count = &lsm->stat.memory.count;
 	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT)
-		return vy_mem_insert(mem, entry);
+		return vy_mem_insert(mem, entry, count);
 	else
-		return vy_mem_insert_upsert(mem, entry);
+		return vy_mem_insert_upsert(mem, entry, count);
 }
 
 /**
@@ -1019,8 +1017,6 @@ vy_lsm_commit_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 {
 	vy_mem_commit_stmt(mem, entry);
 
-	lsm->stat.memory.count.rows++;
-
 	if (vy_stmt_type(entry.stmt) == IPROTO_UPSERT)
 		vy_lsm_commit_upsert(lsm, mem, entry);
 
@@ -1034,7 +1030,7 @@ void
 vy_lsm_rollback_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 		     struct vy_entry entry)
 {
-	vy_mem_rollback_stmt(mem, entry);
+	vy_mem_rollback_stmt(mem, entry, &lsm->stat.memory.count);
 
 	/* Invalidate cache element. */
 	vy_cache_on_write(&lsm->cache, entry, NULL);
