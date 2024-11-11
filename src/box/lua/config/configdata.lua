@@ -775,6 +775,35 @@ local function validate_misplacing(cconfig)
     end
 end
 
+-- Check startup conditions.
+local function validate_startup(instance_name, iconfig_def)
+    local is_startup = type(box.cfg) == 'function'
+    if not is_startup then
+        return
+    end
+
+    local no_snap = snapshot.get_path(iconfig_def) == nil
+    local isolated = instance_config:get(iconfig_def, 'isolated')
+
+    -- Forbid startup without a local snapshot in the isolated
+    -- mode.
+    if no_snap and isolated then
+        error(('Startup failure.\nThe isolated mode is enabled and the ' ..
+            'instance %q has no local snapshot. An attempt to bootstrap ' ..
+            'the instance would lead to the split-brain situation.'):format(
+            instance_name), 0)
+    end
+
+    -- TODO: There is a situation, which looks similar, but we
+    -- don't report an error in the case. It is a startup without
+    -- a local snapshot with replication.peers configured as an
+    -- empty list if there are other instances in the replicaset.
+    -- Are there cases, when it is OK? Maybe if the instance is
+    -- assigned as a bootstrap leader? Now we pass it over, but
+    -- maybe it worth to revisit it later and report an error in
+    -- some definitely/likely erroreous cases.
+end
+
 local function new(iconfig, cconfig, instance_name)
     -- Find myself in a cluster config, determine peers in the same
     -- replicaset.
@@ -920,6 +949,9 @@ local function new(iconfig, cconfig, instance_name)
             instance_uuid = instance_uuid,
         }, iconfig_def)
     end
+
+    -- A couple of checks that are only performed on startup.
+    validate_startup(instance_name, iconfig_def)
 
     return setmetatable({
         _iconfig = iconfig,
