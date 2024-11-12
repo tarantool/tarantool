@@ -379,12 +379,7 @@ replica_on_applier_state_f(struct trigger *trigger, void *event);
 static struct replica *
 replica_new(void)
 {
-	struct replica *replica = (struct replica *)
-			malloc(sizeof(struct replica));
-	if (replica == NULL) {
-		tnt_raise(OutOfMemory, sizeof(*replica), "malloc",
-			  "struct replica");
-	}
+	struct replica *replica = xalloc_object(struct replica);
 	replica->relay = relay_new(replica);
 	replica->id = 0;
 	replica->anon = false;

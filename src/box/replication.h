@@ -617,9 +617,6 @@ replica_on_relay_stop(struct replica *replica);
 void
 replica_on_disconnect(struct replica *replica);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
 int
 replica_check_id(uint32_t replica_id);
 
@@ -634,6 +631,9 @@ replicaset_add(uint32_t replica_id, const struct tt_uuid *instance_uuid);
 
 struct replica *
 replicaset_add_anon(const struct tt_uuid *replica_uuid);
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 /**
  * Try to connect appliers to remote peers and receive UUID.
