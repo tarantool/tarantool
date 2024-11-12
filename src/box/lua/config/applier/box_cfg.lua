@@ -5,6 +5,7 @@ local snapshot = require('internal.config.utils.snapshot')
 local schedule_task = fiber._internal.schedule_task
 local mkversion = require('internal.mkversion')
 local tarantool = require('tarantool')
+local clock = require('clock')
 
 local function peer_uris(configdata)
     local peers = configdata:peers()
@@ -63,7 +64,7 @@ end
 
 -- Modify box-level configuration values and perform other actions
 -- to enable the isolated mode (if configured).
-local function switch_isolated_mode(configdata, box_cfg)
+local function switch_isolated_mode_before_box_cfg(configdata, box_cfg)
     -- If the isolated mode is not enabled, there is nothing to do.
     if not configdata:get('isolated', {use_default = true}) then
         return
@@ -92,6 +93,123 @@ local function switch_isolated_mode(configdata, box_cfg)
     --
     -- TODO(gh-10404): Set ro_reason=isolated.
     box_cfg.read_only = true
+
+    -- Don't accept new iproto connections.
+    --
+    -- An instance in the isolated mode shouldn't process a
+    -- traffic from a user.
+    box_cfg.listen = box.NULL
+end
+
+-- Perform post-box-cfg actions to enable the isolated mode (if
+-- configured).
+local function switch_isolated_mode_after_box_cfg(config)
+    local configdata = config._configdata
+
+    -- If the isolated mode is not enabled, there is nothing to do.
+    if not configdata:get('isolated', {use_default = true}) then
+        return
+    end
+
+    -- Drop existing iproto connections.
+    --
+    -- An instance in the isolated mode shouldn't process a
+    -- traffic from a user.
+    --
+    -- Here we assume that when box.cfg() is finished, iproto
+    -- listening sockets are already closed and no new connections
+    -- may be created. So, the only thing to do is to close the
+    -- existing connections.
+    --
+    -- NB: It seems safe to start this fiber several times in
+    -- parallel, so there are no checks, whether such a fiber
+    -- already exists.
+    fiber.new(function()
+        local name = 'isolated_mode_drop_iproto_connections'
+        fiber.self():name(name, {truncate = true})
+
+        -- A note regarding box.iproto.internal.drop_connections.
+        --
+        -- It seems, the current behavior if connections are not
+        -- closed in time is to report the timeout error and
+        -- continue closing connection from the given generation
+        -- in background.
+        --
+        -- It means that the passed timeout doesn't affect the
+        -- behavior of the process of closing connections itself
+        -- and can be only used to let the caller know whether
+        -- and when the connections (existed at the moment of the
+        -- invocation) are closed.
+        --
+        -- Taking it into account, the timeout in this code is
+        -- not configurable and chosen more or less arbitrarily.
+        -- It only affects whether and when an alert is issued.
+        --
+        -- If we find a need in a future, we can make it
+        -- configurable.
+        local timeout = 10
+
+        -- Testing requires to redefine the timeout. Use an
+        -- environment variable for that.
+        local env_var_name = 'TT_CONFIG_DROP_CONNECTION_TIMEOUT'
+        local redefined_timeout = tonumber(os.getenv(env_var_name))
+        if redefined_timeout ~= nil then
+            log.warn('isolated mode: %s redefines the iproto connections ' ..
+                'drop timeout: %d', env_var_name, redefined_timeout)
+            timeout = redefined_timeout
+        end
+
+        local start_time = clock.monotonic()
+        local ok, err = pcall(box.iproto.internal.drop_connections, timeout)
+
+        -- An unique key is set here to don't duplicate the alert
+        -- if the box_cfg.apply function is called twice within
+        -- the same startup/reconfiguration process.
+        --
+        -- Currently, it is possible on startup due to the safe
+        -- startup process. See c80b121544f6 ("config: add safe
+        -- startup mode") for details.
+        --
+        -- Also, this key is used to drop the alert (if any) after
+        -- a successful `drop_connections` call.
+        local alert_key = 'isolated_mode_drop_iproto_connections_timeout'
+
+        if not ok then
+           local message = ('isolated mode: can\'t drop iproto connections ' ..
+                'during %d seconds (continued in background): %s'):format(
+                timeout, err)
+
+            -- There is no clear point, when to drop this alert.
+            --
+            -- Once appeared, it exists till the next
+            -- reconfiguration, because all the alerts are dropped
+            -- before applying the new configuration.
+            --
+            -- Also, dropped on a successful attempt to drop
+            -- connections.
+            config._aboard:set({
+                type = 'warn',
+                message = message,
+            }, {
+                key = alert_key,
+            })
+            return
+        end
+
+        -- If it appears that there were several reconfigurations
+        -- in row, each schedules a fiber to drop the connections,
+        -- but the fibers are executed after the reconfigurations,
+        -- and the first issued an alert, but the next
+        -- successfully dropped the connections, let's drop this
+        -- alert.
+        --
+        -- No-op if there is no alert with the given key.
+        config._aboard:drop(alert_key)
+
+        local duration = clock.monotonic() - start_time
+        log.info('isolated mode: successfully dropped iproto connections ' ..
+            '(took %d seconds)', duration)
+    end)
 end
 
 local function log_destination(log)
@@ -359,8 +477,52 @@ local function get_schema_version_before_cfg(config)
     return nil
 end
 
+-- See hooks_new().
+local hooks_mt = {
+    __index = {
+        add = function(self, hook, ctx)
+            local entry = {
+                hook = hook,
+                ctx = ctx,
+            }
+            table.insert(self._hooks, entry)
+        end,
+        run = function(self)
+            for _, entry in ipairs(self._hooks) do
+                entry.hook(entry.ctx)
+            end
+        end,
+    },
+}
+
+-- A little helper to collect some hooks and run them later.
+--
+-- Usage:
+--
+--  | local hooks = hooks_new()
+--  |
+--  | eat_pizza()
+--  | hooks:add(throw_away, {what = 'pizza box'})
+--  | hooks:add(wash_hands, {person = 'me'})
+--  |
+--  | drink_juice()
+--  | hooks:add(wash_glass, {glass = 'my glass'})
+--  |
+--  | finish_dinner()
+--  | hooks:run()
+local function hooks_new()
+    return setmetatable({
+        _hooks = {},
+    }, hooks_mt)
+end
+
 -- Returns nothing or {needs_retry = true}.
 local function apply(config)
+    -- There are some actions that logically correspond to some
+    -- logic written before the box.cfg() call, but technically
+    -- they should be run after box.cfg(). Place them here.
+    local post_box_cfg_hooks = hooks_new()
+
     local configdata = config._configdata
     local box_cfg = configdata:filter(function(w)
         return w.schema.box_cfg ~= nil
@@ -679,7 +841,8 @@ local function apply(config)
 
     -- RO may be enforced by the isolated mode, so we call the
     -- function after all the other logic that may set RW.
-    switch_isolated_mode(configdata, box_cfg)
+    switch_isolated_mode_before_box_cfg(configdata, box_cfg)
+    post_box_cfg_hooks:add(switch_isolated_mode_after_box_cfg, config)
 
     -- First box.cfg() call.
     --
@@ -797,6 +960,7 @@ local function apply(config)
 
         log.debug('box_cfg.apply (startup)')
         box.cfg(box_cfg)
+        post_box_cfg_hooks:run()
 
         -- NB: needs_retry should be true when force_read_only is
         -- true. It is so by construction.
@@ -806,6 +970,7 @@ local function apply(config)
     -- If it is reload, just apply the new configuration.
     log.debug('box_cfg.apply')
     box.cfg(box_cfg)
+    post_box_cfg_hooks:run()
 end
 
 return {
