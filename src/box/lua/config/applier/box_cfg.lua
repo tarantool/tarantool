@@ -61,6 +61,39 @@ local function peer_uris(configdata)
     return uris
 end
 
+-- Modify box-level configuration values and perform other actions
+-- to enable the isolated mode (if configured).
+local function switch_isolated_mode(configdata, box_cfg)
+    -- If the isolated mode is not enabled, there is nothing to do.
+    if not configdata:get('isolated', {use_default = true}) then
+        return
+    end
+
+    -- An application or a role may perform background database
+    -- modification if the instance is in the RW mode: for
+    -- example, a role may perform eviction of stale records.
+    -- If the instance is in the isolated mode, it should be in RO
+    -- to don't produce any new transactions.
+    --
+    -- The reason is that these transactions will be sent to other
+    -- replicaset members and applied on them, when the instance
+    -- goes from the isolated mode. At the same time, the
+    -- non-isolated part of the replicaset may serve requests and
+    -- perform data modifications. An attempt to modify the same
+    -- data from two instances may break data integrity[^1].
+    --
+    -- It is recommended to extract all the needed data from the
+    -- isolated instance and perform the modifications on the
+    -- current leader (in the non-isolated part of the
+    -- replicaset).
+    --
+    -- [^1]: Unless the data operations are carefully designed to
+    --       be idempotent to use in the master-master mode.
+    --
+    -- TODO(gh-10404): Set ro_reason=isolated.
+    box_cfg.read_only = true
+end
+
 local function log_destination(log)
     if log.to == 'stderr' or log.to == 'devnull' then
         return box.NULL
@@ -644,6 +677,10 @@ local function apply(config)
         labels = labels or { alias = names.instance_name },
     }
 
+    -- RO may be enforced by the isolated mode, so we call the
+    -- function after all the other logic that may set RW.
+    switch_isolated_mode(configdata, box_cfg)
+
     -- First box.cfg() call.
     --
     -- Force the read-only mode if:
@@ -652,6 +689,10 @@ local function apply(config)
     -- * the instance is not the only one in its replicaset, and
     -- * there is an existing snapshot (otherwise we wouldn't able
     --   to assign a bootstrap leader).
+    --
+    -- NB: The read-only mode may be enforced due to other reasons
+    -- (such as enabled isolated mode) that are not specific to
+    -- the startup flow.
     --
     -- The reason is that the configured master may be switched
     -- while it is starting. In this case it is undesirable to set
