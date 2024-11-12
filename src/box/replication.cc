@@ -43,6 +43,7 @@
 #include "relay.h"
 #include "sio.h"
 #include "tweaks.h"
+#include "clock.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
@@ -71,6 +72,9 @@ char cfg_instance_name[NODE_NAME_SIZE_MAX];
 
 bool replication_synchro_timeout_rollback_enabled = true;
 TWEAK_BOOL(replication_synchro_timeout_rollback_enabled);
+
+double replication_anon_gc_timeout = 3600;
+struct fiber *replication_anon_gc_fiber;
 
 struct replicaset replicaset;
 
@@ -206,6 +210,71 @@ replicaset_set_sync_quorum(void)
 	replication_sync_quorum_auto = replicaset.applier.connected;
 }
 
+/**
+ * Deactivates all expired anonymous replicas. They are expected to be
+ * deleted on deactivation as orphan.
+ * Returns lowest time-to-live among remaining anonymous replicas via
+ * `lowest_ttl`. If there are no anonymous replicas left or the function has
+ * failed to deactivate a replica, `replication_anon_gc_timeout` is returned.
+ */
+static void
+replication_anon_gc(double *lowest_ttl)
+{
+	double timeout = replication_anon_gc_timeout;
+	while (true) {
+		*lowest_ttl = timeout;
+		struct replica *expired_replica = NULL;
+		/*
+		 * Search for the first expired replica. Note that we cannot
+		 * just deactivate it and continue the iteration because a yield
+		 * will happen and the replicaset can be changed significantly.
+		 */
+		replicaset_foreach(replica) {
+			if (!replica->anon || replica_has_connections(replica))
+				continue;
+			double last_seen = relay_last_row_time(replica->relay);
+			double unused = ev_monotonic_now(loop()) - last_seen;
+			double ttl = timeout - unused;
+			if (ttl <= 0) {
+				expired_replica = replica;
+				break;
+			}
+			*lowest_ttl = MIN(*lowest_ttl, ttl);
+		}
+		if (expired_replica == NULL)
+			break;
+		/* Save UUID since the replica will be deleted on success. */
+		struct tt_uuid uuid = expired_replica->uuid;
+		if (replica_deactivate(expired_replica) != 0) {
+			say_error("Failed to deactivate expired anonymous "
+				  "replica %s", tt_uuid_str(&uuid));
+			diag_log();
+			*lowest_ttl = timeout;
+			break;
+		}
+		/*
+		 * Disconnected anonymous replica without WAL GC state is
+		 * expected to be orphan, hence, deleted.
+		 */
+		assert(replica_by_uuid(&uuid) == NULL);
+		say_info("Anonymous replica %s has not been used for too long "
+			 "so it has been deactivated", tt_uuid_str(&uuid));
+	}
+}
+
+static int
+replication_anon_gc_fiber_f(va_list ap)
+{
+	(void)ap;
+	while (!fiber_is_cancelled()) {
+		fiber_check_gc();
+		double lowest_ttl = 0;
+		replication_anon_gc(&lowest_ttl);
+		fiber_sleep(lowest_ttl);
+	}
+	return 0;
+}
+
 void
 replication_init(int num_threads)
 {
@@ -231,11 +300,21 @@ replication_init(int num_threads)
 	replicaset.healthy_count = 1;
 
 	applier_init();
+	replication_anon_gc_fiber =
+		fiber_new_system("replication_anon_gc",
+				 replication_anon_gc_fiber_f);
+	if (replication_anon_gc_fiber == NULL)
+		panic("Cannot init replication submodule");
+	fiber_set_joinable(replication_anon_gc_fiber, true);
+	fiber_start(replication_anon_gc_fiber);
 }
 
 void
 replication_shutdown(void)
 {
+	fiber_cancel(replication_anon_gc_fiber);
+	fiber_join(replication_anon_gc_fiber);
+	replication_anon_gc_fiber = NULL;
 	struct replica *replica;
 	rlist_foreach_entry(replica, &replicaset.anon, in_anon)
 		applier_stop(replica->applier);
@@ -284,11 +363,12 @@ replica_check_id(uint32_t replica_id)
 	return 0;
 }
 
-/* Return true if replica doesn't have id, relay and applier */
+/* Return true if replica doesn't have id, relay, applier and WAL GC state. */
 static bool
 replica_is_orphan(struct replica *replica)
 {
-	return replica->id == REPLICA_ID_NIL &&
+	return replica->id == REPLICA_ID_NIL && replica->gc == NULL &&
+	       replica->gc_checkpoint_ref == NULL &&
 	       !replica_has_connections(replica);
 }
 
@@ -311,8 +391,10 @@ replica_new(void)
 	*replica->name = 0;
 	replica->applier = NULL;
 	replica->gc = NULL;
+	replica->gc_checkpoint_ref = NULL;
 	replica->is_applier_healthy = false;
 	replica->is_relay_healthy = false;
+	replica->is_connected = false;
 	rlist_create(&replica->in_anon);
 	trigger_create(&replica->on_applier_state,
 		       replica_on_applier_state_f, NULL, NULL);
@@ -330,6 +412,8 @@ replica_delete(struct replica *replica)
 		applier_delete(replica->applier);
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
+	if (replica->gc_checkpoint_ref != NULL)
+		gc_unref_checkpoint(replica->gc_checkpoint_ref);
 	TRASH(replica);
 	free(replica);
 }
@@ -374,15 +458,6 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		assert(instance_id == REPLICA_ID_NIL);
 		instance_id = replica_id;
 		box_broadcast_id();
-	} else if (replica->anon) {
-		/*
-		 * Set replica gc on its transition from
-		 * anonymous to a normal one.
-		 */
-		assert(replica->gc == NULL);
-		replica->gc = gc_consumer_register(
-			instance_vclock, GC_CONSUMER_REPLICA,
-			&replica->uuid);
 	}
 	replicaset.replica_by_id[replica_id] = replica;
 	gc_delay_ref();
@@ -442,13 +517,12 @@ replica_clear_id(struct replica *replica)
 	/*
 	 * The replica will never resubscribe so we don't need to keep
 	 * WALs for it anymore. Unregister it with the garbage collector
-	 * if the relay thread is stopped. In case the relay thread is
-	 * still running, it may need to access replica->gc so leave the
-	 * job to replica_on_relay_stop, which will be called as soon as
-	 * the relay thread exits.
+	 * if the relay thread is stopped. In case the replica is still
+	 * connected, it may need to access replica->gc so leave the
+	 * job to replica_on_disconnect, which will be called as soon as
+	 * the replica disconnects.
 	 */
-	if (replica->gc != NULL &&
-	    relay_get_state(replica->relay) != RELAY_FOLLOW) {
+	if (replica->gc != NULL && !replica->is_connected) {
 		gc_consumer_unregister(replica->gc);
 		replica->gc = NULL;
 	}
@@ -462,6 +536,30 @@ replica_clear_id(struct replica *replica)
 		replica_delete(replica);
 	}
 	box_broadcast_ballot();
+}
+
+int
+replica_deactivate(struct replica *replica)
+{
+	assert(relay_get_state(replica->relay) != RELAY_FOLLOW);
+	if (gc_erase_consumer(&replica->uuid) != 0)
+		return -1;
+	if (replica->gc != NULL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
+	if (replica->gc_checkpoint_ref != NULL) {
+		gc_unref_checkpoint(replica->gc_checkpoint_ref);
+		free(replica->gc_checkpoint_ref);
+		replica->gc_checkpoint_ref = NULL;
+	}
+	if (replica_is_orphan(replica)) {
+		replica_hash_remove(&replicaset.hash, replica);
+		replicaset.anon_count -= replica->anon;
+		assert(replicaset.anon_count >= 0);
+		replica_delete(replica);
+	}
+	return 0;
 }
 
 bool
@@ -494,7 +592,7 @@ replica_has_connections(const struct replica *replica)
 {
 	assert(replica->relay != NULL);
 	return relay_get_state(replica->relay) == RELAY_FOLLOW ||
-	       replica->applier != NULL;
+	       replica->applier != NULL || replica->is_connected;
 }
 
 /** A helper to track applier health on its state change. */
@@ -1361,23 +1459,22 @@ replica_on_relay_follow(struct replica *replica)
 void
 replica_on_relay_stop(struct replica *replica)
 {
-	/*
-	 * If the replica was evicted from the cluster, or was not
-	 * even added there (anon replica), we don't need to keep
-	 * WALs for it anymore. Unregister it with the garbage
-	 * collector then. See also replica_clear_id.
-	 */
-	if (replica->id == REPLICA_ID_NIL) {
-		if (!replica->anon) {
-			gc_consumer_unregister(replica->gc);
-			replica->gc = NULL;
-		} else {
-			assert(replica->gc == NULL);
-		}
-	}
-
 	replica_update_relay_health(replica);
+}
 
+void
+replica_on_disconnect(struct replica *replica)
+{
+	assert(!replica->is_connected);
+	/*
+	 * If the replica was evicted from the cluster, we don't need to keep
+	 * WALs for it anymore. Unregister it with the garbage collector then.
+	 * See also replica_clear_id.
+	 */
+	if (!replica->anon && replica->id == REPLICA_ID_NIL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
 		replicaset.anon_count -= replica->anon;

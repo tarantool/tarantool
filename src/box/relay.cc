@@ -482,8 +482,9 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	 * All these versions know of additional META stage of initial join.
 	 */
 	ctx.send_meta = replica_version_id > 0;
-	ctx.vclock = vclock;
 	ctx.cursor = cursor;
+	/* If cursor is passed, we should respond with its vclock. */
+	ctx.vclock = cursor != NULL ? cursor->vclock : vclock;
 	engine_prepare_join_xc(&ctx);
 	auto join_guard = make_scoped_guard([&] {
 		engine_complete_join(&ctx);
@@ -997,8 +998,7 @@ relay_subscribe_f(va_list ap)
 	 */
 	struct trigger on_close_log;
 	trigger_create(&on_close_log, relay_on_close_log_f, relay, NULL);
-	if (!relay->replica->anon)
-		trigger_add(&relay->r->on_close_log, &on_close_log);
+	trigger_add(&relay->r->on_close_log, &on_close_log);
 
 	/* Setup WAL watcher for sending new rows to the replica. */
 	struct errinj *inj = errinj(ERRINJ_RELAY_WAL_START_DELAY, ERRINJ_BOOL);

@@ -104,6 +104,8 @@ cfg_filter(box.cfg)
     - 16320
   - - replication_anon
     - false
+  - - replication_anon_gc_timeout
+    - 3600
   - - replication_connect_timeout
     - 30
   - - replication_skip_conflict

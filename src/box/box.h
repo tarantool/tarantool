@@ -379,6 +379,7 @@ int box_set_replication_synchro_timeout(void);
 void box_set_replication_sync_timeout(void);
 void box_set_replication_skip_conflict(void);
 void box_set_replication_anon(void);
+int box_set_replication_anon_gc_timeout(void);
 void box_set_instance_name(void);
 void box_set_replicaset_name(void);
 void box_set_cluster_name(void);

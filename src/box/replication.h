@@ -98,6 +98,16 @@ extern "C" {
 struct gc_consumer;
 
 static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
+/**
+ * If we haven't heard from an anonymous replica during this time, it will be
+ * deactivated.
+ */
+extern double replication_anon_gc_timeout;
+/**
+ * Fiber that deactivates anonymous replicas that haven't been in touch
+ * for too long.
+ */
+extern struct fiber *replication_anon_gc_fiber;
 
 enum { REPLICATION_THREADS_MAX = 1000 };
 
@@ -402,12 +412,16 @@ struct replica {
 	bool is_relay_healthy;
 	/** Whether there is an applier subscribed to this replica. */
 	bool is_applier_healthy;
+	/** Whether the replica is connected right now. */
+	bool is_connected;
 	/** Applier fiber. */
 	struct applier *applier;
 	/** Relay thread. */
 	struct relay *relay;
 	/** Garbage collection state associated with the replica. */
 	struct gc_consumer *gc;
+	/** Reference to retained checkpoint, is set only on checkpoint join. */
+	struct gc_checkpoint_ref *gc_checkpoint_ref;
 	/** Link in the anon_replicas list. */
 	struct rlist in_anon;
 	/**
@@ -501,6 +515,14 @@ bool
 replica_has_connections(const struct replica *replica);
 
 /**
+ * Deactivate replica: remove associated WAL GC state including persistent one.
+ * Replica's relay mustn't be connected. Note that the replica can be deleted if
+ * it becomes orphan.
+ */
+int
+replica_deactivate(struct replica *replica);
+
+/**
  * Check if there are enough "healthy" connections, and fire the appropriate
  * triggers. A replica connection is considered "healthy", when:
  * - it is a connection to a registered replica.
@@ -585,6 +607,15 @@ replica_on_relay_follow(struct replica *replica);
  */
 void
 replica_on_relay_stop(struct replica *replica);
+
+/**
+ * Disconnection handler:
+ * 1. Removes WAL GC state if the replica is not anonymous and was
+ *    evicted from the cluster.
+ * 2. Deletes the replica if it became orphan.
+ */
+void
+replica_on_disconnect(struct replica *replica);
 
 #if defined(__cplusplus)
 } /* extern "C" */

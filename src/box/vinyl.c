@@ -3034,32 +3034,15 @@ struct vy_join_ctx {
 #else /* !defined(ENABLE_FETCH_SNAPSHOT_CURSOR) */
 
 static int
-vinyl_engine_prepare_checkpoint_join(struct engine *engine,
-				     struct engine_join_ctx *ctx)
-{
-	(void)engine;
-	(void)ctx;
-	unreachable();
-	return -1;
-}
-
-static int
 vinyl_engine_checkpoint_join(struct engine *engine, struct engine_join_ctx *ctx,
 			     struct xstream *stream)
 {
 	(void)engine;
 	(void)ctx;
 	(void)stream;
-	unreachable();
+	diag_set(ClientError, ER_UNSUPPORTED, "Community edition",
+		 "checkpoint join");
 	return -1;
-}
-
-static void
-vinyl_engine_complete_checkpoint_join(struct engine *engine,
-				      struct engine_join_ctx *ctx)
-{
-	(void)engine;
-	(void)ctx;
 }
 
 #endif /* !defined(ENABLE_FETCH_SNAPSHOT_CURSOR) */
@@ -3099,7 +3082,7 @@ static int
 vinyl_engine_prepare_join(struct engine *engine, struct engine_join_ctx *arg)
 {
 	if (arg->cursor != NULL)
-		return vinyl_engine_prepare_checkpoint_join(engine, arg);
+		return 0;
 
 	struct vy_env *env = vy_env(engine);
 	struct vy_join_ctx *ctx = malloc(sizeof(*ctx));
@@ -3171,7 +3154,7 @@ static void
 vinyl_engine_complete_join(struct engine *engine, struct engine_join_ctx *arg)
 {
 	if (arg->cursor != NULL)
-		return vinyl_engine_complete_checkpoint_join(engine, arg);
+		return;
 
 	struct vy_env *env = vy_env(engine);
 	struct vy_join_ctx *ctx = arg->data[engine->id];
