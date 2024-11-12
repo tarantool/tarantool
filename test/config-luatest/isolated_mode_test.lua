@@ -92,3 +92,62 @@ g.test_startup_with_snap = function(g)
     g.it:roundtrip("box.space._schema:get({'replicaset_name'})[2]",
         'replicaset-001')
 end
+
+-- Verify that the instance goes to RO in the isolated mode
+-- disregarding of any other configuration options.
+--
+-- The test case verifies that it occurs on a runtime
+-- reconfiguration as well as on a startup.
+g.test_read_only = function(g)
+    local function assert_isolated(exp)
+        g.it:roundtrip("require('config'):get('isolated')", exp)
+    end
+
+    local function assert_read_only(exp)
+        g.it:roundtrip('box.info.ro', exp)
+    end
+
+    local config = cbuilder:new()
+        :set_replicaset_option('replication.failover', 'manual')
+        :set_replicaset_option('leader', 'i-001')
+        :add_instance('i-001', {})
+        :add_instance('i-002', {})
+        :add_instance('i-003', {})
+        :config()
+
+    local cluster = cluster.new(g, config)
+    cluster:start()
+
+    -- Mark i-001 as isolated, reload the configuration.
+    local config_2 = cbuilder:new(config)
+        :set_instance_option('i-001', 'isolated', true)
+        :config()
+    cluster:reload(config_2)
+
+    -- Use the console connection, because an instance in the
+    -- isolated mode doesn't accept iproto requests.
+    g.it = it.connect(cluster['i-001'])
+
+    -- The isolated mode is applied, the instance goes to RO.
+    assert_isolated(true)
+    assert_read_only(true)
+
+    -- Restart i-001, reconnect the console.
+    g.it:close()
+    cluster['i-001']:restart()
+    g.it = it.connect(cluster['i-001'])
+
+    -- Still in the isolated mode and RO.
+    assert_isolated(true)
+    assert_read_only(true)
+
+    -- Disable the isolated mode on i-001.
+    local config_3 = cbuilder:new(config_2)
+        :set_instance_option('i-001', 'isolated', nil)
+        :config()
+    cluster:reload(config_3)
+
+    -- Goes to RW.
+    assert_isolated(false)
+    assert_read_only(false)
+end
