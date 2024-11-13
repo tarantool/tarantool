@@ -741,6 +741,10 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'worker_pool_threads',
             default = 4,
         }),
+        tx_user_pool_size = schema.scalar({
+            type = 'integer',
+            default = 768,
+        }),
         slice = schema.record({
             warn = schema.scalar({
                 type = 'number',
