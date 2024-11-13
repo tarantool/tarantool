@@ -141,7 +141,7 @@ include_directories(${EXTRA_SALAD_INCLUDE_DIRS})
 include_directories(${EXTRA_BOX_INCLUDE_DIRS})
 
 add_library(box_error STATIC error.cc errcode.c mp_error.cc)
-target_link_libraries(box_error core stat mpstream vclock)
+target_link_libraries(box_error core mpstream vclock)
 
 add_library(node_name STATIC node_name.c)
 
@@ -396,7 +396,7 @@ add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.c
     DEPENDS ${SQL_SRC_DIR}/vdbe.c ${EXT_SRC_DIR}/mkopcodec.sh ${SQL_BIN_DIR}/parse.h
         ${SQL_BIN_DIR}/opcodes.h)
 
-target_link_libraries(box box_error tuple stat xrow xlog vclock crc32 raft
+target_link_libraries(box box_error tuple xrow xlog vclock crc32 raft
                       node_name ${common_libraries})
 
 add_dependencies(box build_bundled_libs generate_sql_files)
