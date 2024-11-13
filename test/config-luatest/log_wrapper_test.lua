@@ -1,20 +1,12 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
-local justrun = require('test.justrun')
+local treegen = require('luatest.treegen')
+local justrun = require('luatest.justrun')
 
 local g = t.group()
 
-g.before_all(function(g)
-    treegen.init(g)
-end)
-
-g.after_all(function(g)
-    treegen.clean(g)
-end)
-
-g.test_jsonify_table = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(dir, 'main.lua', [[
+g.test_jsonify_table = function()
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'main.lua', [[
         local log = require('internal.config.utils.log')
 
         log.info('foo: %s', {bar = 'baz'})
@@ -97,9 +89,9 @@ for _, current_level in ipairs(log_levels) do
         for _, set_module_logger_level in pairs({false, true}) do
             local case_name = ('test_follow_log_level_%s_%s_%s'):format(
                 current_level, msg_level, set_module_logger_level)
-            g[case_name] = function(g)
-                local dir = treegen.prepare_directory(g, {}, {})
-                treegen.write_script(dir, 'main.lua', script)
+            g[case_name] = function()
+                local dir = treegen.prepare_directory({}, {})
+                treegen.write_file(dir, 'main.lua', script)
                 local opts = {nojson = true, stderr = true}
 
                 local args = {'main.lua', tostring(current_level), msg_level,
@@ -119,9 +111,9 @@ end
 
 -- }}} Follow log level
 
-g.test_enable_debug = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(dir, 'main.lua', [[
+g.test_enable_debug = function()
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'main.lua', [[
         local log = require('internal.config.utils.log')
 
         -- A single string argument.

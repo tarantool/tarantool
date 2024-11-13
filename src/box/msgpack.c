@@ -32,6 +32,7 @@
 #include "msgpuck/msgpuck.h"
 
 #include "mp_extension_types.h"
+#include "mp_arrow.h"
 #include "mp_decimal.h"
 #include "mp_error.h"
 #include "mp_uuid.h"
@@ -140,6 +141,14 @@ msgpack_check_ext_data(int8_t type, const char *data, uint32_t len)
 		if (mp_validate_tuple(data, len) != 0) {
 			diag_set(ClientError, ER_INVALID_MSGPACK,
 				 "cannot unpack tuple");
+			return -1;
+		}
+		return 0;
+	case MP_ARROW:
+		if (mp_validate_arrow(data, len) != 0) {
+			/* The error is set by arrow_ipc_decode(). */
+			diag_add(ClientError, ER_INVALID_MSGPACK,
+				 "cannot unpack arrow data");
 			return -1;
 		}
 		return 0;

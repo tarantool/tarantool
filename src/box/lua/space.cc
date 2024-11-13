@@ -976,6 +976,8 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "FUNC_INDEX_ID");
 	lua_pushnumber(L, BOX_SESSION_SETTINGS_ID);
 	lua_setfield(L, -2, "SESSION_SETTINGS_ID");
+	lua_pushnumber(L, BOX_GC_CONSUMERS_ID);
+	lua_setfield(L, -2, "GC_CONSUMERS_ID");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MIN);
 	lua_setfield(L, -2, "SYSTEM_ID_MIN");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MAX);
@@ -1022,4 +1024,10 @@ box_lua_space_init(struct lua_State *L)
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal.space", 0);
 	luaL_setfuncs(L, space_internal_lib, 0);
 	lua_pop(L, 1);
+}
+
+void
+box_lua_space_free(void)
+{
+	trigger_clear(&on_alter_space_in_lua);
 }

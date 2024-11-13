@@ -264,6 +264,7 @@ iterator_at()
 			test_do_iterator_at_invalid(&tree, j);
 	}
 	test_destroy(&tree);
+	free(rand_i);
 	ok(true, "Iterator at on random insertion");
 
 	footer();
@@ -316,6 +317,7 @@ find_get_offset()
 			test_do_find_invalid(&tree, j);
 	}
 	test_destroy(&tree);
+	free(rand_i);
 	ok(true, "Find on random insertion");
 
 	footer();

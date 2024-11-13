@@ -1,13 +1,10 @@
 local fun = require('fun')
 local json = require('json')
 local t = require('luatest')
-local treegen = require('test.treegen')
-local justrun = require('test.justrun')
+local treegen = require('luatest.treegen')
+local justrun = require('luatest.justrun')
 
 local g = t.group()
-
-g.before_all(treegen.init)
-g.after_all(treegen.clean)
 
 -- TT_LISTEN and TT_REPLICATION have many allowed forms.
 --
@@ -124,11 +121,11 @@ local uri_list_cases = {
 --
 -- All the test cases are run using one popen call
 -- (justrun.tarantool()) that speeds up the execution.
-g.test_uri_list = function(g)
+g.test_uri_list = function()
     -- Write cases.lua and main.lua.
-    local dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(dir, 'cases.lua', json.encode(uri_list_cases))
-    treegen.write_script(dir, 'main.lua', string.dump(function()
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'cases.lua', json.encode(uri_list_cases))
+    treegen.write_file(dir, 'main.lua', string.dump(function()
         local json = require('json')
         local fio = require('fio')
         local t = require('luatest')
@@ -219,8 +216,8 @@ local cases = {
 
 -- Write a script to be used in the test cases below.
 g.before_all(function(g)
-    g.dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(g.dir, 'main.lua', [[
+    g.dir = treegen.prepare_directory({}, {})
+    treegen.write_file(g.dir, 'main.lua', [[
         local json = require('json')
         box.cfg()
         print(json.encode(box.cfg))

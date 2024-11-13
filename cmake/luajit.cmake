@@ -66,19 +66,28 @@ if(ENABLE_VALGRIND)
         "Valgrind support" FORCE)
 endif()
 
-# Enable LuaJIT ASan support. The internal LuaJIT memory allocator
-# is not instrumented yet unfortunately, so to find any memory
-# faults it's worth building LuaJIT with system provided memory
-# allocator (i.e. enable LUAJIT_USE_SYSMALLOC option). However,
-# Tarantool doesn't finalize Lua universe the right way (see the
-# comments near <tarantool_lua_free>), so running Tarantool
-# testing routine with LUAJIT_USE_SYSMALLOC enabled generates
-# false-positive LSan leaks. Return back here to enable
-# LUAJIT_USE_SYSMALLOC, when the issue below is resolved.
-# https://github.com/tarantool/tarantool/issues/3071
+# Enable LuaJIT ASan support.
 if(ENABLE_ASAN)
+    if(LUAJIT_ENABLE_GC64)
+        set(LUAJIT_USE_SYSMALLOC ON CACHE BOOL
+            "System provided memory allocator (realloc/malloc)" FORCE)
+    else()
+        message(WARNING
+            "The internal LuaJIT memory allocator is not instrumented yet,"
+            " so to find any memory faults, it's worth building LuaJIT with"
+            " the system provided memory allocator. This requires enabling"
+            " the LUAJIT_ENABLE_GC64 option, as sysmalloc can only be used"
+            " in GC64 mode. Without it, sysmalloc cannot be used due to"
+            " allocator and pointer bitness incompatibility."
+        )
+    endif()
     set(LUAJIT_USE_ASAN ON CACHE BOOL
         "Build LuaJIT with AddressSanitizer" FORCE)
+endif()
+
+if(ENABLE_UB_SANITIZER)
+    set(LUAJIT_USE_UBSAN ON CACHE BOOL
+        "Build LuaJIT with UndefinedBehaviourSanitizer" FORCE)
 endif()
 
 if(TARGET_OS_DARWIN AND NOT LUAJIT_ENABLE_GC64)

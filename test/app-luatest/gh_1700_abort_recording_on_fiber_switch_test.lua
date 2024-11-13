@@ -1,6 +1,6 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
-local justrun = require('test.justrun').tarantool
+local treegen = require('luatest.treegen')
+local justrun = require('luatest.justrun').tarantool
 local pathjoin = require('fio').pathjoin
 
 local g = t.group()
@@ -48,17 +48,12 @@ local env = {
     LUA_CPATH = ('%s/?.%s;%s;'):format(libpath, libext, os.getenv('LUA_CPATH')),
 }
 
-g.before_all(function(g)
+g.before_all(function()
     t.skip_if(not jit.status(), 'Test requires JIT enabled')
     t.skip_if(jit.os == 'BSD', 'Disabled on *BSD due to #4819')
 
-    treegen.init(g)
-    treegen.add_template(g, '^script%.lua$', script)
-    rundir = treegen.prepare_directory(g, {'script.lua'})
-end)
-
-g.after_all(function(g)
-    treegen.clean(g)
+    treegen.add_template('^script%.lua$', script)
+    rundir = treegen.prepare_directory({'script.lua'})
 end)
 
 local function runcmd(...)

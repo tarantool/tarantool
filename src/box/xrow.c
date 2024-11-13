@@ -42,6 +42,7 @@
 #include "trivia/util.h"
 #include "error.h"
 #include "mp_error.h"
+#include "mp_extension_types.h"
 #include "iproto_constants.h"
 #include "iproto_features.h"
 #include "mpstream/mpstream.h"
@@ -65,7 +66,7 @@ static_assert(IPROTO_DATA < 0x7f && IPROTO_METADATA < 0x7f &&
 	      IPROTO_SQL_INFO < 0x7f, "encoded IPROTO_BODY keys must fit into "\
 	      "one byte");
 
-static inline uint32_t
+uint32_t
 mp_sizeof_vclock_ignore0(const struct vclock *vclock)
 {
 	uint32_t size = vclock_size_ignore0(vclock);
@@ -97,7 +98,7 @@ mp_encode_vclock_impl(char *data, const struct vclock *vclock, bool ignore0)
 	return data;
 }
 
-static inline char *
+char *
 mp_encode_vclock_ignore0(char *data, const struct vclock *vclock)
 {
 	data = mp_encode_map(data, vclock_size_ignore0(vclock));
@@ -125,13 +126,15 @@ mp_decode_vclock(const char **data, struct vclock *vclock)
 		if (mp_typeof(**data) != MP_UINT)
 			return -1;
 		int64_t lsn = mp_decode_uint(data);
+		if (lsn < 0 || id >= VCLOCK_MAX)
+			return -1;
 		if (lsn > 0)
 			vclock_follow(vclock, id, lsn);
 	}
 	return 0;
 }
 
-static int
+int
 mp_decode_vclock_ignore0(const char **data, struct vclock *vclock)
 {
 	if (mp_decode_vclock(data, vclock) != 0)
@@ -255,23 +258,32 @@ xrow_decode(struct xrow_header *header, const char **pos,
 	/* Restore transaction id from lsn and transaction serial number. */
 	header->tsn = header->lsn - header->tsn;
 
-	/* Nop requests aren't supposed to have a body. */
-	if (*pos < end && header->type != IPROTO_NOP) {
-		const char *body = *pos;
-		if (mp_check(pos, end))
-			goto bad_body;
-		header->bodycnt = 1;
-		header->body[0].iov_base = (void *) body;
-		header->body[0].iov_len = *pos - body;
+	if (*pos == end) {
+		/* No body, nothing to validate. */
+		return 0;
 	}
-	if (end_is_exact && *pos < end)
-		goto bad_body;
+	if (header->type == IPROTO_NOP) {
+		if (end_is_exact) {
+			diag_set(ClientError, ER_INVALID_MSGPACK,
+				 "junk after packet body");
+			goto dump;
+		}
+		/* Nop requests aren't supposed to have a body. */
+		return 0;
+	}
+
+	const char *body = *pos;
+	int rc = end_is_exact ? mp_check_exact(pos, end) : mp_check(pos, end);
+	if (rc != 0) {
+		diag_add(ClientError, ER_INVALID_MSGPACK, "packet body");
+		goto dump;
+	}
+	header->bodycnt = 1;
+	header->body[0].iov_base = (void *)body;
+	header->body[0].iov_len = *pos - body;
 	return 0;
 bad_header:
 	diag_set(ClientError, ER_INVALID_MSGPACK, "packet header");
-	goto dump;
-bad_body:
-	diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
 dump:
 	dump_row_hex(start, end);
 	return -1;
@@ -1019,6 +1031,16 @@ error:
 			request->index_name =
 				mp_decode_str(&value, &request->index_name_len);
 			break;
+		case IPROTO_ARROW: {
+			int8_t type;
+			uint32_t size;
+			const char *data = mp_decode_ext(&value, &type, &size);
+			if (type != MP_ARROW)
+				goto error;
+			request->arrow_ipc = data;
+			request->arrow_ipc_end = data + size;
+			break;
+		}
 		default:
 			break;
 		}
@@ -1109,8 +1131,10 @@ xrow_encode_dml(const struct request *request, struct region *region,
 	uint32_t tuple_len = request->tuple_end - request->tuple;
 	uint32_t old_tuple_len = request->old_tuple_end - request->old_tuple;
 	uint32_t new_tuple_len = request->new_tuple_end - request->new_tuple;
+	ssize_t arrow_len = request->arrow_ipc_end - request->arrow_ipc;
 	uint32_t len = MAP_LEN_MAX + key_len + ops_len + tuple_meta_len +
-		       tuple_len + old_tuple_len + new_tuple_len;
+		       tuple_len + old_tuple_len + new_tuple_len + arrow_len;
+	assert(request->arrow_ipc == NULL || arrow_len > 0);
 	char *begin = xregion_alloc(region, len);
 	char *pos = begin + 1;     /* skip 1 byte for MP_MAP */
 	int map_size = 0;
@@ -1178,6 +1202,13 @@ xrow_encode_dml(const struct request *request, struct region *region,
 		pos = mp_encode_uint(pos, IPROTO_NEW_TUPLE);
 		memcpy(pos, request->new_tuple, new_tuple_len);
 		pos += new_tuple_len;
+		map_size++;
+	}
+	if (request->arrow_ipc != NULL) {
+		assert(request->type == IPROTO_INSERT_ARROW);
+		pos = mp_encode_uint(pos, IPROTO_ARROW);
+		pos = mp_encode_ext(pos, MP_ARROW, request->arrow_ipc,
+				    arrow_len);
 		map_size++;
 	}
 
@@ -1420,7 +1451,7 @@ xrow_encode_raft(struct xrow_header *row, struct region *region,
 	memset(row, 0, sizeof(*row));
 	row->type = IPROTO_RAFT;
 	row->body[0].iov_base = buf;
-	row->group_id = GROUP_LOCAL;
+	row->group_id = r->group_id;
 	row->bodycnt = 1;
 	const char *begin = buf;
 
@@ -1456,13 +1487,14 @@ xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
 {
 	if (row->type != IPROTO_RAFT)
 		goto bad_msgpack;
-	if (row->bodycnt != 1 || row->group_id != GROUP_LOCAL) {
+	if (row->bodycnt != 1) {
 		diag_set(ClientError, ER_INVALID_MSGPACK,
 			 "malformed raft request");
 		return -1;
 	}
 	memset(r, 0, sizeof(*r));
 
+	r->group_id = row->group_id;
 	const char *pos = row->body[0].iov_base;
 	uint32_t map_size = mp_decode_map(&pos);
 	for (uint32_t i = 0; i < map_size; ++i)
@@ -2690,9 +2722,8 @@ greeting_encode(char *greetingbuf, uint32_t version_id,
 		const struct tt_uuid *uuid, const char *salt, uint32_t salt_len)
 {
 	int h = IPROTO_GREETING_SIZE / 2;
-	int r = snprintf(greetingbuf, h + 1, "Tarantool %u.%u.%u (Binary) ",
-		version_id_major(version_id), version_id_minor(version_id),
-		version_id_patch(version_id));
+	int r = snprintf(greetingbuf, h + 1, "Tarantool %s (Binary) ",
+			 version_id_to_string(version_id));
 
 	assert(r + UUID_STR_LEN < h);
 	tt_uuid_to_string(uuid, greetingbuf + r);

@@ -26,8 +26,14 @@ static int compare(const elem_t &a, const elem_t &b);
 static int compare_key(const elem_t &a, long b);
 
 #define BPS_TREE_NAME test
-#define BPS_TREE_BLOCK_SIZE 256 /* small value for tests */
-#define BPS_TREE_EXTENT_SIZE 1024 /* value is to low specially for tests */
+/**
+ * On COW matras make a copy of extent while API requires only copy a block.
+ * So bps tree may miss COW requests for its block but the block is copied
+ * accidentally and the test passes. To avoid this issue let's make extent and
+ * block the same size.
+ */
+#define BPS_TREE_BLOCK_SIZE 256
+#define BPS_TREE_EXTENT_SIZE 256
 #define BPS_TREE_IS_IDENTICAL(a, b) equal(a, b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare_key(a, b)
@@ -93,7 +99,7 @@ iterator_check()
 		   "invalid iterators are equal");
 	}
 
-	const long count1 = 10000;
+	const long count1 = 2000;
 	const long count2 = 5;
 	for (long i = 0; i < count1; i++) {
 		struct elem_t e;

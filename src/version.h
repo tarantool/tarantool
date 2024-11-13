@@ -32,10 +32,23 @@
  */
 
 #include <stdint.h>
+#include "tt_static.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+/**
+ * Version structure.
+ */
+struct version {
+	/** Major number. */
+	unsigned major;
+	/** Minor number. */
+	unsigned minor;
+	/** Patch number. */
+	unsigned patch;
+};
 
 /**
  * Pack version into uint32_t.
@@ -66,6 +79,14 @@ version_id_patch(uint32_t version_id)
 	return version_id & 0xff;
 }
 
+static inline const char *
+version_id_to_string(uint32_t version_id)
+{
+	return tt_sprintf("%u.%u.%u",
+			  version_id_major(version_id),
+			  version_id_minor(version_id),
+			  version_id_patch(version_id));
+}
 /**
  * Return Tarantool package name as string
  */

@@ -64,7 +64,7 @@ box_index_count
 box_index_get
 box_index_id_by_name
 box_index_iterator
-box_index_iterator_after
+box_index_iterator_with_offset
 box_index_len
 box_index_max
 box_index_min
@@ -73,6 +73,7 @@ box_index_tuple_position
 box_info_lsn
 box_init_latest_dd_version_id
 box_insert
+box_insert_arrow
 box_iproto_override
 box_iproto_send
 box_is_ro
@@ -117,6 +118,7 @@ box_sequence_reset
 box_sequence_set
 box_session_id
 box_session_push
+box_slab_info
 box_space_id_by_name
 box_truncate
 box_tuple_bsize

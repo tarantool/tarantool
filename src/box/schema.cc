@@ -81,6 +81,12 @@ struct rlist on_alter_func = RLIST_HEAD_INITIALIZER(on_alter_func);
 
 struct entity_access entity_access;
 
+STRS(schema_feature, SCHEMA_FEATURES);
+#define SCHEMA_FEATURE_MEMBER(t, n, a, b, c) {a, b, c},
+const struct version schema_feature_version[schema_feature_MAX] = {
+	SCHEMA_FEATURES(SCHEMA_FEATURE_MEMBER)
+};
+
 API_EXPORT uint64_t
 box_schema_version(void)
 {
@@ -118,16 +124,7 @@ extern "C" bool
 box_schema_needs_upgrade(void)
 {
 	assert(latest_dd_version_id != 0);
-	if (dd_version_id < latest_dd_version_id) {
-		diag_set(ClientError, ER_SCHEMA_NEEDS_UPGRADE,
-			 tt_sprintf("%u.%u.%u",
-				    version_id_major(dd_version_id),
-				    version_id_minor(dd_version_id),
-				    version_id_patch(dd_version_id)),
-			 tarantool_version());
-		return true;
-	}
-	return false;
+	return dd_version_id < latest_dd_version_id;
 }
 
 /**
@@ -184,6 +181,23 @@ dd_check_is_disabled(void)
 	       !box_is_configured() || recovery_state != FINISHED_RECOVERY;
 }
 
+int
+schema_check_feature(enum schema_feature feature)
+{
+	if (dd_check_is_disabled())
+		return 0;
+	struct version v = schema_feature_version[feature];
+	uint32_t id = version_id(v.major, v.minor, v.patch);
+	if (dd_version_id < id) {
+		diag_set(ClientError, ER_SCHEMA_NEEDS_UPGRADE,
+			 version_id_to_string(dd_version_id),
+			 schema_feature_strs[feature],
+			 version_id_to_string(id));
+		return -1;
+	}
+	return 0;
+}
+
 static int
 on_replace_dd_system_space(struct trigger *trigger, void *event)
 {
@@ -198,7 +212,7 @@ on_replace_dd_system_space(struct trigger *trigger, void *event)
 	 * In general it's unsafe to execute a DDL operation with an old schema
 	 * so we only allow it for schema upgrade.
 	 */
-	if (!dd_check_is_disabled() && box_schema_needs_upgrade())
+	if (schema_check_feature(SCHEMA_FEATURE_DDL_BEFORE_UPGRADE) != 0)
 		return -1;
 	memtx_tx_acquire_ddl(txn);
 	return 0;
@@ -230,8 +244,6 @@ sc_space_new(uint32_t id, const char *name,
 						    TREE /* index type */,
 						    &index_opts_default,
 						    key_def, NULL);
-	if (index_def == NULL)
-		diag_raise();
 	auto index_def_guard =
 		make_scoped_guard([=] { index_def_delete(index_def); });
 	struct rlist key_list;

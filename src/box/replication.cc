@@ -42,6 +42,7 @@
 #include "raft.h"
 #include "relay.h"
 #include "sio.h"
+#include "tweaks.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
@@ -68,6 +69,9 @@ struct uri cfg_bootstrap_leader_uri;
 char cfg_bootstrap_leader_name[NODE_NAME_SIZE_MAX];
 char cfg_instance_name[NODE_NAME_SIZE_MAX];
 
+bool replication_synchro_timeout_rollback_enabled = true;
+TWEAK_BOOL(replication_synchro_timeout_rollback_enabled);
+
 struct replicaset replicaset;
 
 struct rlist replicaset_on_quorum_gain =
@@ -79,6 +83,10 @@ struct rlist replicaset_on_quorum_loss =
 enum bootstrap_strategy bootstrap_strategy = BOOTSTRAP_STRATEGY_INVALID;
 
 enum replicaset_state replicaset_state = REPLICASET_BOOTSTRAP;
+
+/** Free replica resources. */
+static void
+replica_delete(struct replica *replica);
 
 static int
 replica_compare_by_uuid(const struct replica *a, const struct replica *b)
@@ -240,12 +248,25 @@ replication_shutdown(void)
 void
 replication_free(void)
 {
+	struct replica *replica, *next;
+	while (!rlist_empty(&replicaset.anon)) {
+		replica = rlist_shift_entry(&replicaset.anon,
+					    typeof(*replica), in_anon);
+		replica_delete(replica);
+	}
+	replica_hash_foreach_safe(&replicaset.hash, replica, next) {
+		replica_hash_remove(&replicaset.hash, replica);
+		replica_delete(replica);
+	}
 	diag_destroy(&replicaset.applier.diag);
 	trigger_destroy(&replicaset.on_ack);
 	trigger_destroy(&replicaset.on_relay_thread_start);
 	fiber_cond_destroy(&replicaset.applier.cond);
 	latch_destroy(&replicaset.applier.order_latch);
 	applier_free();
+
+	if (!uri_is_nil(&cfg_bootstrap_leader_uri))
+		uri_destroy(&cfg_bootstrap_leader_uri);
 
 	TRASH(&replicaset);
 }
@@ -287,10 +308,6 @@ replica_new(void)
 			  "struct replica");
 	}
 	replica->relay = relay_new(replica);
-	if (replica->relay == NULL) {
-		free(replica);
-		diag_raise();
-	}
 	replica->id = 0;
 	replica->anon = false;
 	replica->uuid = uuid_nil;
@@ -310,9 +327,10 @@ replica_new(void)
 static void
 replica_delete(struct replica *replica)
 {
-	assert(replica_is_orphan(replica));
 	if (replica->relay != NULL)
 		relay_delete(replica->relay);
+	if (replica->applier != NULL)
+		applier_delete(replica->applier);
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
 	TRASH(replica);
@@ -365,9 +383,9 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		 * anonymous to a normal one.
 		 */
 		assert(replica->gc == NULL);
-		replica->gc = gc_consumer_register(instance_vclock,
-						   "replica %s",
-						   tt_uuid_str(&replica->uuid));
+		replica->gc = gc_consumer_register(
+			instance_vclock, GC_CONSUMER_REPLICA,
+			&replica->uuid);
 	}
 	replicaset.replica_by_id[replica_id] = replica;
 	gc_delay_ref();

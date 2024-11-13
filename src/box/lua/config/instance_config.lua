@@ -404,7 +404,7 @@ local function prepare_file_path(self, iconfig, path)
     return rebase_file_path(base_dir, path)
 end
 
--- Read a config.context[name] variable depending of its "from"
+-- Read a config.context[name] variable depending on its "from"
 -- type.
 local function read_context_var_noexc(base_dir, def)
     if def.from == 'env' then
@@ -847,8 +847,8 @@ return schema.new('instance_config', schema.record({
                 type = 'number, string',
             }),
             box_cfg = 'log_modules',
-            -- TODO: This default doesn't work now. It needs
-            -- support of non-scalar schema nodes in
+            -- TODO(gh-10756): This default doesn't work now. It
+            -- needs support of non-scalar schema nodes in
             -- <schema object>:map().
             default = box.NULL,
         }),
@@ -1303,7 +1303,8 @@ return schema.new('instance_config', schema.record({
         cleanup_delay = schema.scalar({
             type = 'number',
             box_cfg = 'wal_cleanup_delay',
-            default = 4 * 3600,
+            -- No default value here - the option is deprecated
+            -- and shouldn't be used by default.
         }),
         retention_period = enterprise_edition(schema.scalar({
             type = 'number',
@@ -1347,8 +1348,8 @@ return schema.new('instance_config', schema.record({
             }),
         }, {
             box_cfg = 'wal_ext',
-            -- TODO: This default doesn't work now. It needs
-            -- support of non-scalar schema nodes in
+            -- TODO(gh-10756): This default doesn't work now. It
+            -- needs support of non-scalar schema nodes in
             -- <schema object>:map().
             default = box.NULL,
         })),
@@ -1464,6 +1465,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'replication_synchro_timeout',
             default = 5,
         }),
+        synchro_queue_max_size = schema.scalar({
+            type = 'integer',
+            box_cfg = 'replication_synchro_queue_max_size',
+            default = 16 * 1024 * 1024,
+        }),
         connect_timeout = schema.scalar({
             type = 'number',
             box_cfg = 'replication_connect_timeout',
@@ -1498,7 +1504,7 @@ return schema.new('instance_config', schema.record({
             'candidate',
         }, {
             box_cfg = 'election_mode',
-            -- The effective default is determined depending of
+            -- The effective default is determined depending on
             -- the replication.failover option.
             default = box.NULL,
         }),
@@ -2243,6 +2249,9 @@ return schema.new('instance_config', schema.record({
             }),
             box_cfg = 'audit_spaces',
             box_cfg_nondynamic = true,
+            -- TODO(gh-10756): This default doesn't work now. It
+            -- needs support of non-scalar schema nodes in
+            -- <schema object>:map().
             default = box.NULL,
         })),
         extract_key = enterprise_edition(schema.scalar({
@@ -2309,7 +2318,24 @@ return schema.new('instance_config', schema.record({
                 type = 'number',
                 default = 10,
             }),
-        })
+        }),
+        replicasets = schema.map({
+            -- Name of the replica.
+            key = schema.scalar({
+                type = 'string',
+            }),
+            value = schema.record({
+                -- Priorities for the supervised failover mode.
+                priority = schema.map({
+                    key = schema.scalar({
+                        type = 'string',
+                    }),
+                    value = schema.scalar({
+                        type = 'number',
+                    }),
+                }),
+            }),
+        }),
     }),
     -- Compatibility options.
     compat = schema.record({
@@ -2422,6 +2448,18 @@ return schema.new('instance_config', schema.record({
             default = 'old',
         }),
         box_consider_system_spaces_synchronous = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
+        wal_cleanup_delay_deprecation = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
+        replication_synchro_timeout = schema.enum({
             'old',
             'new',
         }, {

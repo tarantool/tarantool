@@ -667,12 +667,10 @@ applier_connect(struct applier *applier)
 	applier->txn_last_tm = 0;
 
 	if (applier->version_id != greeting.version_id) {
-		say_info("remote master %s at %s running Tarantool %u.%u.%u",
+		say_info("remote master %s at %s running Tarantool %s",
 			 tt_uuid_str(&greeting.uuid),
 			 sio_strfaddr(&applier->addr, applier->addr_len),
-			 version_id_major(greeting.version_id),
-			 version_id_minor(greeting.version_id),
-			 version_id_patch(greeting.version_id));
+			 version_id_to_string(greeting.version_id));
 	}
 
 	/* Save the remote instance version and UUID on connect. */
@@ -2145,7 +2143,7 @@ applier_init(void)
 						  sizeof(struct applier_thread *));
 	for (int i = 0; i < replication_threads; i++) {
 		struct applier_thread *thread =
-			(struct applier_thread *)xmalloc(sizeof(*thread));
+			xalloc_object(struct applier_thread);
 		applier_thread_create(thread);
 		applier_threads[i] = thread;
 	}
@@ -2268,6 +2266,9 @@ applier_thread_detach_applier(struct cbus_call_msg *base)
 	applier->thread.reader = NULL;
 	lsregion_destroy(&applier->thread.lsr);
 	fiber_cond_destroy(&applier->thread.writer_cond);
+	ibuf_destroy(&applier->thread.ibuf);
+	diag_clear(&applier->thread.exit_msg.diag);
+
 	return 0;
 }
 
@@ -2496,6 +2497,7 @@ applier_subscribe(struct applier *applier)
 	 * Process a stream of rows from the binary log.
 	 */
 	while (true) {
+		ERROR_INJECT_YIELD(ERRINJ_APPLIER_SUBSCRIBE_DELAY);
 		if (applier->pending_msg_cnt == 0) {
 			fiber_cond_wait(&applier->msg_cond);
 		}
@@ -2766,8 +2768,8 @@ applier_kill(struct applier *applier, struct error *e)
 struct applier *
 applier_new(const struct uri *uri)
 {
-	struct applier *applier = (struct applier *)
-		xcalloc(1, sizeof(struct applier));
+	struct applier *applier = xalloc_object(struct applier);
+	memset(applier, 0, sizeof(*applier));
 	if (iostream_ctx_create(&applier->io_ctx, IOSTREAM_CLIENT, uri) != 0) {
 		free(applier);
 		diag_raise();

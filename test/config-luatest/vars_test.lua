@@ -1,6 +1,6 @@
 local instance_config = require('internal.config.instance_config')
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local helpers = require('test.config-luatest.helpers')
 
 local g = helpers.group()
@@ -273,8 +273,8 @@ g.test_context_var_validation = function()
 end
 
 -- No env variable -> apply error.
-g.test_context_var_env_failure = function(g)
-    helpers.failure_case(g, {
+g.test_context_var_env_failure = function()
+    helpers.failure_case({
         options = {
             ['config.context'] = {
                 myvar = {
@@ -292,8 +292,8 @@ g.test_context_var_env_failure = function(g)
 end
 
 -- No file -> apply error.
-g.test_context_var_file_failure = function(g)
-    helpers.failure_case(g, {
+g.test_context_var_file_failure = function()
+    helpers.failure_case({
         options = {
             ['config.context'] = {
                 myvar = {
@@ -331,8 +331,8 @@ end
 
 -- Verify a config.context variable with 'from: file'.
 g.test_context_var_file = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(dir, 'foo.txt', 'needle\n')
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'foo.txt', 'needle\n')
 
     helpers.success_case(g, {
         dir = dir,
@@ -352,8 +352,8 @@ end
 -- Verify a config.context variable with 'from: file' and
 -- 'rstrip: true'.
 g.test_context_var_file_rstrip = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(dir, 'foo.txt', 'needle\n')
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'foo.txt', 'needle\n')
 
     helpers.success_case(g, {
         dir = dir,
@@ -374,8 +374,8 @@ end
 -- Verify how file paths are working together with
 -- process.work_dir.
 g.test_context_var_file_process_work_dir = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(dir, 'foo.txt', 'needle')
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'foo.txt', 'needle')
 
     -- foo.txt
     -- w/
@@ -396,8 +396,8 @@ g.test_context_var_file_process_work_dir = function(g)
         verify_2 = verify_option('process.title', 'needle'),
     })
 
-    local dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(dir, 'w/foo.txt', 'needle')
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'w/foo.txt', 'needle')
 
     -- w/
     --   foo.txt

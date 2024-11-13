@@ -28,6 +28,7 @@ local basic_rq_types = {
     VOTE_DEPRECATED = box.iproto.type.VOTE_DEPRECATED,
     VOTE = box.iproto.type.VOTE,
     AUTH = box.iproto.type.AUTH,
+    INSERT_ARROW = box.iproto.type.INSERT_ARROW,
 }
 
 -- Grep server logs for error messages about unsupported request types.
@@ -309,7 +310,7 @@ g.test_box_iproto_override_nop_rq_type = function(cg)
                         [box.iproto.key.SQL_TEXT] = 'text'
                     }, {__serialize = 'map'})
         _G.test_cb_err(header, body, box.error.INVALID_MSGPACK,
-                       "Invalid MsgPack %- packet body")
+                       "Invalid MsgPack %- junk after packet body")
         box.iproto.override(box.iproto.type.NOP, nil)
     end)
 end

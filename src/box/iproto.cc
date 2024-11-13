@@ -1866,6 +1866,7 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 	case IPROTO_UPDATE:
 	case IPROTO_DELETE:
 	case IPROTO_UPSERT:
+	case IPROTO_INSERT_ARROW:
 		assert(type < sizeof(iproto_thread->dml_route) /
 			      sizeof(*iproto_thread->dml_route));
 		*route = iproto_thread->dml_route[type];
@@ -3066,6 +3067,7 @@ tx_run_override_triggers(struct event *event, const char *header,
 			break;
 	}
 	event_trigger_iterator_destroy(&it);
+	port_destroy(&args);
 	return rc;
 }
 
@@ -3635,34 +3637,27 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 	iproto_thread->push_route[0] =
 		{ iproto_process_push, &iproto_thread->tx_pipe };
 	iproto_thread->push_route[1] = { tx_end_push, NULL };
-	/* IPROTO_OK */
-	iproto_thread->dml_route[0] = NULL;
-	/* IPROTO_SELECT */
-	iproto_thread->dml_route[1] = iproto_thread->select_route;
-	/* IPROTO_INSERT */
-	iproto_thread->dml_route[2] = iproto_thread->process1_route;
-	/* IPROTO_REPLACE */
-	iproto_thread->dml_route[3] = iproto_thread->process1_route;
-	/* IPROTO_UPDATE */
-	iproto_thread->dml_route[4] = iproto_thread->process1_route;
-	/* IPROTO_DELETE */
-	iproto_thread->dml_route[5] = iproto_thread->process1_route;
-	 /* IPROTO_CALL_16 */
-	iproto_thread->dml_route[6] =  iproto_thread->call_route;
-	/* IPROTO_AUTH */
-	iproto_thread->dml_route[7] = iproto_thread->misc_route;
-	/* IPROTO_EVAL */
-	iproto_thread->dml_route[8] = iproto_thread->call_route;
-	/* IPROTO_UPSERT */
-	iproto_thread->dml_route[9] = iproto_thread->process1_route;
-	/* IPROTO_CALL */
-	iproto_thread->dml_route[10] = iproto_thread->call_route;
-	/* IPROTO_EXECUTE */
-	iproto_thread->dml_route[11] = iproto_thread->sql_route;
-	/* IPROTO_NOP */
-	iproto_thread->dml_route[12] = NULL;
-	/* IPROTO_PREPARE */
-	iproto_thread->dml_route[13] = iproto_thread->sql_route;
+
+	struct cmsg_hop **dml_route = iproto_thread->dml_route;
+	assert(dml_route[IPROTO_OK] == NULL);
+	dml_route[IPROTO_SELECT] = iproto_thread->select_route;
+	dml_route[IPROTO_INSERT] = iproto_thread->process1_route;
+	dml_route[IPROTO_REPLACE] = iproto_thread->process1_route;
+	dml_route[IPROTO_UPDATE] = iproto_thread->process1_route;
+	dml_route[IPROTO_DELETE] = iproto_thread->process1_route;
+	dml_route[IPROTO_CALL_16] = iproto_thread->call_route;
+	dml_route[IPROTO_AUTH] = iproto_thread->misc_route;
+	dml_route[IPROTO_EVAL] = iproto_thread->call_route;
+	dml_route[IPROTO_UPSERT] = iproto_thread->process1_route;
+	dml_route[IPROTO_CALL] = iproto_thread->call_route;
+	dml_route[IPROTO_EXECUTE] = iproto_thread->sql_route;
+	assert(dml_route[IPROTO_NOP] == NULL);
+	dml_route[IPROTO_PREPARE] = iproto_thread->sql_route;
+	assert(dml_route[IPROTO_BEGIN] == NULL);
+	assert(dml_route[IPROTO_COMMIT] == NULL);
+	assert(dml_route[IPROTO_ROLLBACK] == NULL);
+	dml_route[IPROTO_INSERT_ARROW] = iproto_thread->process1_route;
+
 	iproto_thread->connect_route[0] =
 		{ tx_process_connect, &iproto_thread->net_pipe };
 	iproto_thread->connect_route[1] = { net_send_greeting, NULL };
@@ -3862,8 +3857,8 @@ iproto_init(int threads_count)
 	 * we don't need any accept functions.
 	 */
 	evio_service_create(loop(), &tx_binary, "tx_binary", NULL, NULL);
-	iproto_threads = (struct iproto_thread *)
-		xcalloc(threads_count, sizeof(struct iproto_thread));
+	iproto_threads = xalloc_array(struct iproto_thread, threads_count);
+	memset(iproto_threads, 0, sizeof(struct iproto_thread) * threads_count);
 	fiber_cond_create(&drop_finished_cond);
 
 	for (int i = 0; i < threads_count; i++, iproto_threads_count++) {

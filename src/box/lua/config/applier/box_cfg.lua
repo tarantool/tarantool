@@ -4,11 +4,15 @@ local instance_config = require('internal.config.instance_config')
 local snapshot = require('internal.config.utils.snapshot')
 local schedule_task = fiber._internal.schedule_task
 local mkversion = require('internal.mkversion')
+local tarantool = require('tarantool')
 
 local function peer_uris(configdata)
     local peers = configdata:peers()
     if #peers <= 1 then
-        return nil
+        -- box.NULL means 'a default value' for box.cfg(), while
+        -- nil means 'leave a previous value'. We need the
+        -- default: there are no configured upstreams.
+        return box.NULL
     end
 
     local names = configdata:names()
@@ -351,6 +355,12 @@ local function apply(config)
     local cfg_log = configdata:get('log', {use_default = true})
     box_cfg.log = log_destination(cfg_log)
 
+    -- TODO(gh-10756): This is not needed when :apply_default()
+    -- supports default values for composite types.
+    if type(box_cfg.log_modules) == 'nil' then
+        box_cfg.log_modules = box.NULL
+    end
+
     -- Construct audit logger destination and audit filter (box_cfg.audit_log
     -- and audit_filter).
     --
@@ -365,6 +375,20 @@ local function apply(config)
         else
             box_cfg.audit_filter = 'compatibility'
         end
+    end
+
+    -- TODO(gh-10756): This is not needed when :apply_default()
+    -- supports default values for composite types.
+    if tarantool.package == 'Tarantool Enterprise' and
+       type(box_cfg.wal_ext) == 'nil' then
+        box_cfg.wal_ext = box.NULL
+    end
+
+    -- TODO(gh-10756): This is not needed when :apply_default()
+    -- supports default values for composite types.
+    if tarantool.package == 'Tarantool Enterprise' and
+       type(box_cfg.audit_spaces) == 'nil' then
+        box_cfg.audit_spaces = box.NULL
     end
 
     -- The startup process may need a special handling and differs
@@ -539,14 +563,20 @@ local function apply(config)
 
     assert(type(box.cfg) == 'function' or type(box.cfg) == 'table')
     if type(box.cfg) == 'table' then
+        -- Collect non-dynamic option values based on the
+        -- box_cfg_nondynamic annotation.
         local box_cfg_nondynamic = configdata:filter(function(w)
             return w.schema.box_cfg ~= nil and w.schema.box_cfg_nondynamic
         end, {use_default = true}):map(function(w)
             return w.schema.box_cfg, w.data
         end):tomap()
+        -- Some of the options are transformed before assigning to
+        -- the box_cfg table. Use the transformed value for the
+        -- comparison below.
         box_cfg_nondynamic.log = box_cfg.log
         box_cfg_nondynamic.audit_log = box_cfg.audit_log
         box_cfg_nondynamic.audit_filter = box_cfg.audit_filter
+        box_cfg_nondynamic.audit_spaces = box_cfg.audit_spaces
         for k, v in pairs(box_cfg_nondynamic) do
             if v ~= box.cfg[k] then
                 local warning = 'box_cfg.apply: non-dynamic option '..k..

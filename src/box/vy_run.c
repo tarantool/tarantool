@@ -793,12 +793,12 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
  * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
  * Additionally *equal_key argument is set to true if the found value is
  * equal to given key (set to false otherwise).
- * @retval position in the page
  */
-static uint32_t
+static int
 vy_page_find_key(struct vy_page *page, struct vy_entry key,
 		 struct key_def *cmp_def, struct tuple_format *format,
-		 enum iterator_type iterator_type, bool *equal_key)
+		 enum iterator_type iterator_type, uint32_t *pos,
+		 bool *equal_key)
 {
 	uint32_t beg = 0;
 	uint32_t end = page->row_count;
@@ -811,7 +811,7 @@ vy_page_find_key(struct vy_page *page, struct vy_entry key,
 		struct vy_entry fnd_key = vy_page_stmt(page, mid, cmp_def,
 						       format);
 		if (fnd_key.stmt == NULL)
-			return end;
+			return -1;
 		int cmp = vy_entry_compare(fnd_key, key, cmp_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
@@ -821,7 +821,8 @@ vy_page_find_key(struct vy_page *page, struct vy_entry key,
 			end = mid;
 		tuple_unref(fnd_key.stmt);
 	}
-	return end;
+	*pos = end;
+	return 0;
 }
 
 /**
@@ -988,12 +989,11 @@ vy_page_read_cb(struct cbus_call_msg *base)
 		return -1;
 	if (vy_page_read(task->page, task->page_info, task->run, zdctx) != 0)
 		return -1;
-	if (task->key.stmt != NULL) {
-		task->pos_in_page = vy_page_find_key(task->page, task->key,
-						     task->cmp_def, task->format,
-						     task->iterator_type,
-						     &task->equal_found);
-	}
+	if (task->key.stmt != NULL &&
+	    vy_page_find_key(task->page, task->key, task->cmp_def,
+			     task->format, task->iterator_type,
+			     &task->pos_in_page, &task->equal_found) != 0)
+		return -1;
 	return 0;
 }
 
@@ -1024,10 +1024,11 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		page = itr->curr_page;
 	}
 	if (page != NULL) {
-		if (key.stmt != NULL)
-			*pos_in_page = vy_page_find_key(page, key, itr->cmp_def,
-							itr->format, iterator_type,
-							equal_found);
+		if (key.stmt != NULL &&
+		    vy_page_find_key(page, key, itr->cmp_def,
+				     itr->format, iterator_type,
+				     pos_in_page, equal_found) != 0)
+			return -1;
 		*result = page;
 		return 0;
 	}
@@ -1664,8 +1665,8 @@ vy_run_recover(struct vy_run *run, const char *dir,
 			    space_id, iid, run->id, VY_FILE_INDEX);
 
 	struct xlog_cursor cursor;
-	ERROR_INJECT_COUNTDOWN(ERRINJ_VY_RUN_OPEN, {
-		diag_set(SystemError, "failed to open '%s' file", path);
+	ERROR_INJECT_COUNTDOWN(ERRINJ_VY_RUN_RECOVER_COUNTDOWN, {
+		diag_set(ClientError, ER_INJECTION, "vinyl run recover");
 		goto fail;
 	});
 	if (xlog_cursor_open(&cursor, path))
@@ -2196,6 +2197,7 @@ vy_run_writer_start_page(struct vy_run_writer *writer,
 	if (vy_page_info_create(page, writer->data_xlog.offset,
 				key, writer->cmp_def) != 0)
 		return -1;
+	run->info.page_count++;
 	xlog_tx_begin(&writer->data_xlog);
 	return 0;
 }
@@ -2219,7 +2221,7 @@ vy_run_writer_write_to_page(struct vy_run_writer *writer, struct vy_entry entry)
 	writer->last = entry;
 	vy_stmt_ref_if_possible(entry.stmt);
 	struct vy_run *run = writer->run;
-	struct vy_page_info *page = run->page_info + run->info.page_count;
+	struct vy_page_info *page = run->page_info + run->info.page_count - 1;
 	uint32_t *offset = (uint32_t *)ibuf_alloc(&writer->row_index_buf,
 						  sizeof(uint32_t));
 	if (offset == NULL) {
@@ -2247,7 +2249,8 @@ static int
 vy_run_writer_end_page(struct vy_run_writer *writer)
 {
 	struct vy_run *run = writer->run;
-	struct vy_page_info *page = run->page_info + run->info.page_count;
+	assert(run->info.page_count > 0);
+	struct vy_page_info *page = run->page_info + run->info.page_count - 1;
 
 	assert(page->row_count > 0);
 	assert(ibuf_used(&writer->row_index_buf) ==
@@ -2269,7 +2272,6 @@ vy_run_writer_end_page(struct vy_run_writer *writer)
 	if (written < 0)
 		return -1;
 	page->size = written;
-	run->info.page_count++;
 	vy_run_acct_page(run, page);
 	ibuf_reset(&writer->row_index_buf);
 	return 0;
@@ -2643,11 +2645,10 @@ vy_slice_stream_search(struct vy_stmt_stream *virt_stream)
 		return -1;
 
 	bool unused;
-	stream->pos_in_page = vy_page_find_key(stream->page,
-					       stream->slice->begin,
-					       stream->cmp_def,
-					       stream->format,
-					       ITER_GE, &unused);
+	if (vy_page_find_key(stream->page, stream->slice->begin,
+			     stream->cmp_def, stream->format, ITER_GE,
+			     &stream->pos_in_page, &unused) != 0)
+		return -1;
 
 	if (stream->pos_in_page == stream->page->row_count) {
 		/* The first tuple is in the beginning of the next page */
@@ -2671,11 +2672,12 @@ vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct vy_entry *ret)
 {
 	assert(virt_stream->iface->next == vy_slice_stream_next);
 	struct vy_slice_stream *stream = (struct vy_slice_stream *)virt_stream;
-	*ret = vy_entry_none();
 
 	/* If the slice is ended, return EOF */
-	if (stream->page_no > stream->slice->last_page_no)
+	if (stream->page_no > stream->slice->last_page_no) {
+		*ret = vy_entry_none();
 		return 0;
+	}
 
 	/* If current page is not already read, read it */
 	if (stream->page == NULL && vy_slice_stream_read_page(stream) != 0)
@@ -2692,6 +2694,7 @@ vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct vy_entry *ret)
 	    stream->page_no >= stream->slice->last_page_no &&
 	    vy_entry_compare(entry, stream->slice->end, stream->cmp_def) >= 0) {
 		tuple_unref(entry.stmt);
+		*ret = vy_entry_none();
 		return 0;
 	}
 

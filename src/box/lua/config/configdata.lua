@@ -329,18 +329,6 @@ local function build_peers(instances, replicaset_name)
     return res
 end
 
--- Returns instance_uuid and replicaset_uuid, saved in config.
-local function find_uuids_by_name(peers, instance_name)
-    for name, peer in pairs(peers) do
-        if name == instance_name then
-            local iconfig = peer.iconfig_def
-            return instance_config:get(iconfig, 'database.instance_uuid'),
-                   instance_config:get(iconfig, 'database.replicaset_uuid')
-        end
-    end
-    return nil
-end
-
 local function find_peer_name_by_uuid(peers, instance_uuid)
     for name, peer in pairs(peers) do
         local uuid = instance_config:get(peer.iconfig_def,
@@ -498,7 +486,6 @@ local function validate_names(saved_names, config_names, iconfig)
     -- Fail early, if current UUID is not set, but no name is found
     -- inside the snapshot file. Ignore this failure, if replica is
     -- configured as anonymous, anon replicas cannot have names.
-    local iconfig = config_names.peers[config_names.instance_name].iconfig_def
     if not instance_config:get(iconfig, 'replication.anon') then
         if saved_names.instance_name == nil and
            config_names.instance_uuid == nil then
@@ -589,6 +576,43 @@ local function validate_failover(found, peers, failover, leader)
                     'specifically for this particular instance'):format(
                     election_mode, peer_name, found.replicaset_name,
                     found.group_name, failover), 0)
+            end
+        end
+    end
+end
+
+-- Validate failover section.
+local function validate_failover_config(instances, failover_config)
+    if failover_config == nil or failover_config.replicasets == nil then
+        return
+    end
+
+    local replicasets = {}
+    for _, def in pairs(instances) do
+        replicasets[def.replicaset_name] = true
+    end
+
+    for replicaset_name, replicaset in pairs(failover_config.replicasets) do
+        if replicasets[replicaset_name] == nil then
+            error(('replicaset %s specified in the failover configuration '..
+                   'doesn\'t exist'):format(replicaset_name), 0)
+        end
+
+        -- Validate the priority section of the specific replicasets.
+        for instance_name, _ in pairs(replicaset.priority or {}) do
+            if instances[instance_name] == nil then
+                error(('instance %s from replicaset %s specified in the '..
+                       'failover configuration doesn\'t exist')
+                      :format(instance_name, replicaset_name), 0)
+            end
+
+            local instance_replicaset = instances[instance_name].replicaset_name
+            if instance_replicaset ~= replicaset_name then
+                error(('instance %s from replicaset %s is specified in ' ..
+                       'the wrong replicaset %s in the failover ' ..
+                       'configuration section')
+                      :format(instance_name, instance_replicaset,
+                              replicaset_name), 0)
             end
         end
     end
@@ -803,6 +827,9 @@ local function new(iconfig, cconfig, instance_name)
     local leader = found.replicaset.leader
     validate_failover(found, peers, failover, leader)
 
+    local failover_config = instance_config:get(iconfig_def, 'failover')
+    validate_failover_config(instances, failover_config)
+
     local bootstrap_strategy = instance_config:get(iconfig_def,
         'replication.bootstrap_strategy')
     local bootstrap_leader = found.replicaset.bootstrap_leader
@@ -857,14 +884,25 @@ local function new(iconfig, cconfig, instance_name)
         end
         assert(bootstrap_leader == nil)
 
-        -- Choose first non-anonymous instance.
+        -- Choose the first non-anonymous instance with the highest
+        -- priority specified in the failover configuration
+        -- section.
+        local max_priority = -math.huge
         for _, peer_name in ipairs(peer_names) do
             assert(peers[peer_name] ~= nil)
             local iconfig_def = peers[peer_name].iconfig_def
             local is_anon = instance_config:get(iconfig_def, 'replication.anon')
-            if not is_anon then
+
+            local priority = instance_config:get(iconfig_def, {
+                'failover',
+                'replicasets',
+                found.replicaset_name,
+                'priority',
+                peer_name}) or 0
+
+            if not is_anon and priority > max_priority then
                 bootstrap_leader_name = peer_name
-                break
+                max_priority = priority
             end
         end
         assert(bootstrap_leader_name ~= nil)
@@ -874,15 +912,12 @@ local function new(iconfig, cconfig, instance_name)
     -- and during config reload.
     local saved_names = find_saved_names(iconfig_def)
     if saved_names ~= nil then
-        local config_instance_uuid, config_replicaset_uuid =
-            find_uuids_by_name(peers, instance_name)
         validate_names(saved_names, {
             replicaset_name = found.replicaset_name,
             instance_name = instance_name,
             -- UUIDs from config, generated one should not be used here.
-            replicaset_uuid = config_replicaset_uuid,
-            instance_uuid = config_instance_uuid,
-            peers = peers,
+            replicaset_uuid = replicaset_uuid,
+            instance_uuid = instance_uuid,
         }, iconfig_def)
     end
 

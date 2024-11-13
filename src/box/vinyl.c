@@ -3773,7 +3773,6 @@ next:
 		*ret = NULL;
 		goto out;
 	}
-	ERROR_INJECT_YIELD(ERRINJ_VY_DELAY_PK_LOOKUP);
 	/* Get the full tuple from the primary index. */
 	if (vy_get_by_secondary_tuple(lsm, it->tx, vy_tx_read_view(it->tx),
 				      partial, &entry) != 0)
@@ -4049,11 +4048,9 @@ vy_build_insert_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 	vy_stmt_set_lsn(region_stmt, lsn);
 	struct vy_entry entry;
 	vy_stmt_foreach_entry(entry, region_stmt, lsm->cmp_def) {
-		if (vy_mem_insert(mem, entry) != 0)
+		if (vy_mem_insert(mem, entry, &lsm->stat.memory.count) != 0)
 			return -1;
 		vy_mem_commit_stmt(mem, entry);
-		vy_stmt_counter_acct_tuple(&lsm->stat.memory.count,
-					   region_stmt);
 	}
 	return 0;
 }
@@ -4304,12 +4301,6 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	struct vy_lsm *pk = vy_lsm(src_space->index[0]);
 	struct txn *txn = in_txn();
 
-	if (new_index->def->iid == 0 && !vy_lsm_is_empty(pk)) {
-		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-			 "rebuilding the primary index of a non-empty space");
-		return -1;
-	}
-
 	struct errinj *inj = errinj(ERRINJ_BUILD_INDEX, ERRINJ_INT);
 	if (inj != NULL && inj->iparam == (int)new_index->def->iid) {
 		diag_set(ClientError, ER_INJECTION, "build index");
@@ -4336,6 +4327,12 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 
 	if (!need_wal_sync && vy_lsm_is_empty(pk))
 		return 0; /* space is empty, nothing to do */
+
+	if (new_index->def->iid == 0) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "rebuilding the primary index of a non-empty space");
+		return -1;
+	}
 
 	if (txn_check_singlestatement(txn, "index build") != 0)
 		return -1;
@@ -4686,6 +4683,7 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .execute_delete = */ vinyl_space_execute_delete,
 	/* .execute_update = */ vinyl_space_execute_update,
 	/* .execute_upsert = */ vinyl_space_execute_upsert,
+	/* .execute_insert_arrow = */ generic_space_execute_insert_arrow,
 	/* .ephemeral_replace = */ generic_space_ephemeral_replace,
 	/* .ephemeral_delete = */ generic_space_ephemeral_delete,
 	/* .ephemeral_rowid_next = */ generic_space_ephemeral_rowid_next,
@@ -4724,6 +4722,8 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .get = */ vinyl_index_get,
 	/* .replace = */ generic_index_replace,
 	/* .create_iterator = */ vinyl_index_create_iterator,
+	/* .create_iterator_with_offset = */
+	generic_index_create_iterator_with_offset,
 	/* .create_read_view = */ generic_index_create_read_view,
 	/* .stat = */ vinyl_index_stat,
 	/* .compact = */ vinyl_index_compact,

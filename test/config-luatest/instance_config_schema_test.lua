@@ -1042,7 +1042,6 @@ g.test_wal = function()
         max_size = 268435456,
         dir_rescan_delay = 2,
         queue_max_size = 16777216,
-        cleanup_delay = 14400,
     }
     local res = instance_config:apply_default({}).wal
     t.assert_equals(res, exp)
@@ -1080,7 +1079,6 @@ g.test_wal_enterprise = function()
         max_size = 268435456,
         dir_rescan_delay = 2,
         queue_max_size = 16777216,
-        cleanup_delay = 14400,
         retention_period = 0,
     }
     local res = instance_config:apply_default({}).wal
@@ -1124,6 +1122,7 @@ g.test_replication = function()
             threads = 1,
             timeout = 1,
             synchro_timeout = 1,
+            synchro_queue_max_size = 1,
             connect_timeout = 1,
             sync_timeout = 1,
             sync_lag = 1,
@@ -1145,6 +1144,7 @@ g.test_replication = function()
         threads = 1,
         timeout = 1,
         synchro_timeout = 5,
+        synchro_queue_max_size = 16777216,
         connect_timeout = 30,
         sync_timeout = box.NULL,
         sync_lag = 10,
@@ -1354,6 +1354,8 @@ g.test_box_cfg_coverage = function()
         -- The effective default is determined depending on
         -- the compat.box_cfg_replication_sync_timeout option.
         replication_sync_timeout = true,
+        -- The option is deprecated so it has no default value.
+        wal_cleanup_delay = true,
     }
 
     local log_prefix = 'test_box_cfg_coverage'
@@ -1722,7 +1724,14 @@ g.test_failover = function()
                 renew_interval = 1,
                 keepalive_interval = 5,
             },
-        },
+            replicasets = {
+                replicaset001 = {
+                    priority = {
+                        instance001 = 1
+                    }
+                }
+            }
+        }
     }
 
     instance_config:validate(iconfig)

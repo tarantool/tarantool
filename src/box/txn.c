@@ -42,6 +42,7 @@
 #include "session.h"
 #include "wal_ext.h"
 #include "rmean.h"
+#include "arrow_ipc.h"
 
 double too_long_threshold;
 
@@ -277,6 +278,18 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 	if (space != NULL && space->wal_ext != NULL)
 		space_wal_ext_process_request(space->wal_ext, stmt, request);
 	struct region *txn_region = tx_region_acquire(txn);
+	if (request->arrow_array != NULL) {
+		assert(request->arrow_schema != NULL);
+		assert(request->arrow_ipc == NULL);
+		assert(request->arrow_ipc_end == NULL);
+		if (arrow_ipc_encode(
+				request->arrow_array, request->arrow_schema,
+				txn_region, &request->arrow_ipc,
+				&request->arrow_ipc_end) != 0) {
+			tx_region_release(txn, TX_ALLOC_SYSTEM);
+			return -1;
+		}
+	}
 	xrow_encode_dml(request, txn_region, row->body, &row->bodycnt);
 	tx_region_release(txn, TX_ALLOC_SYSTEM);
 	txn_region = NULL;
@@ -457,10 +470,7 @@ txn_new(void)
 	return txn;
 }
 
-/*
- * Free txn memory and return it to a cache.
- */
-inline static void
+void
 txn_free(struct txn *txn)
 {
 	assert(txn->limbo_entry == NULL);
@@ -1138,12 +1148,18 @@ txn_commit_nop(struct txn *txn)
 static int
 txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req)
 {
+	uint32_t origin_id = req->rows[0]->replica_id;
+	if (origin_id == 0 && txn_limbo.size >= txn_limbo.max_size) {
+		diag_set(ClientError, ER_SYNC_QUEUE_FULL);
+		return -1;
+	}
+
 	/*
 	 * Remote rows, if any, come before local rows, so check for originating
 	 * instance id in the first row.
 	 */
-	uint32_t origin_id = req->rows[0]->replica_id;
-	txn->limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
+	txn->limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn,
+					    req->approx_len);
 	if (txn->limbo_entry == NULL)
 		return -1;
 	return 0;

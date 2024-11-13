@@ -1,6 +1,6 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
-local justrun = require('test.justrun').tarantool
+local treegen = require('luatest.treegen')
+local justrun = require('luatest.justrun').tarantool
 
 local g = t.group()
 
@@ -94,8 +94,7 @@ local cases = {
 }
 
 g.before_all(function(g)
-    treegen.init(g)
-    g.rundir = treegen.prepare_directory(g, {})
+    g.rundir = treegen.prepare_directory({})
 
     -- Don't try to actually start tarantool instances with
     -- --name <...> --config <...> options.
@@ -123,7 +122,7 @@ g.before_all(function(g)
     --
     -- This logic is to be tested by integration testing as part
     -- of the test/config-luatest test suite.
-    treegen.write_script(g.rundir, 'override/config.lua', [[
+    treegen.write_file(g.rundir, 'override/config.lua', [[
         return {
             _startup = function()
             end
@@ -132,7 +131,6 @@ g.before_all(function(g)
 end)
 
 g.after_all(function(g)
-    treegen.clean(g)
     g.rundir = nil
 end)
 

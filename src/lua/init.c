@@ -610,6 +610,7 @@ tarantool_panic_handler(lua_State *L) {
 			 ar.name, ar.namewhat,
 			 ar.short_src, ar.currentline);
 	}
+	lsan_turn_off();
 	return 1;
 }
 

@@ -1,6 +1,6 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
-local server = require('test.luatest_helpers.server')
+local treegen = require('luatest.treegen')
+local server = require('luatest.server')
 local replica_set = require('luatest.replica_set')
 local yaml = require('yaml')
 local uuid = require('uuid')
@@ -50,7 +50,6 @@ local function initialize_xlogs(g, uuids)
 end
 
 g.before_all(function(g)
-    treegen.init(g)
     g.uuids = {
         ['replicaset-001'] = uuid.str(),
         ['instance-001']   = uuid.str(),
@@ -108,14 +107,13 @@ g.before_all(function(g)
     }
 
     os.setenv('TT_REPLICATION_CONNECT_QUORUM', '1')
-    g.dir = treegen.prepare_directory(g, {}, {})
+    g.dir = treegen.prepare_directory({}, {})
 end)
 
 g.after_all(function(g)
     g.replica_set:drop()
     g.instance_1:drop()
     g.instance_2:drop()
-    treegen.clean(g)
 end)
 
 local function check_names(rs_name, name, names)
@@ -137,7 +135,7 @@ end
 g.test_names_are_set_after_reload = function(g)
     -- Start instance-001 with config, from which UUID is missing.
     local cfg = yaml.encode(g.config)
-    local config_file = treegen.write_script(g.dir, 'cfg.yaml', cfg)
+    local config_file = treegen.write_file(g.dir, 'cfg.yaml', cfg)
     local opts = {config_file = config_file, chdir = g.dir}
     g.instance_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
 
@@ -172,7 +170,7 @@ g.test_names_are_set_after_reload = function(g)
 
     -- Reload config on instance-001 and wait for the name to be assigned
     local cfg = yaml.encode(g.config)
-    opts.config_file = treegen.write_script(g.dir, 'cfg.yaml', cfg)
+    opts.config_file = treegen.write_file(g.dir, 'cfg.yaml', cfg)
     g.instance_1:exec(function(uuid)
         require('config'):reload()
         t.helpers.retrying({timeout = 20}, function()

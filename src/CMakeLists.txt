@@ -306,7 +306,7 @@ endif()
 set (reexport_libraries server core misc bitset csv swim swim_udp swim_ev
      shutdown tzcode ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES}
      ${CURL_LIBRARIES} ${XXHASH_LIBRARIES} ${LIBCDT_LIBRARIES}
-     ${EXTRA_REEXPORT_LIBRARIES})
+     ${NANOARROW_LIBRARIES} ${EXTRA_REEXPORT_LIBRARIES})
 
 set (common_libraries
     ${reexport_libraries}

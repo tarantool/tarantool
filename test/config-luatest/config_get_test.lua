@@ -1,5 +1,5 @@
 local t = require('luatest')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = t.group()
@@ -13,7 +13,7 @@ g.after_all(cluster.clean)
 g.test_basic = function(g)
     -- Minimal config.
     local mycfg = {foo = {bar = {baz = 42, n = box.NULL}}}
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :set_global_option('app.cfg', mycfg)
         :set_global_option('roles_cfg', mycfg)

@@ -66,6 +66,7 @@ local reference_table = {
         BIND_METADATA = 0x33,
         BIND_COUNT = 0x34,
         POSITION = 0x35,
+        ARROW = 0x36,
         SQL_TEXT = 0x40,
         SQL_BIND = 0x41,
         SQL_INFO = 0x42,
@@ -136,6 +137,7 @@ local reference_table = {
         BEGIN = 14,
         COMMIT = 15,
         ROLLBACK = 16,
+        INSERT_ARROW = 17,
         RAFT = 30,
         RAFT_PROMOTE = 31,
         RAFT_DEMOTE = 32,
@@ -171,7 +173,7 @@ local reference_table = {
     },
 
     -- `IPROTO_CURRENT_VERSION` constant
-    protocol_version = 9,
+    protocol_version = 10,
 
     -- `feature_id` enumeration
     protocol_features = {
@@ -187,6 +189,7 @@ local reference_table = {
         call_arg_tuple_extension = true,
         fetch_snapshot_cursor = is_enterprise and true or nil,
         is_sync = true,
+        insert_arrow = true,
     },
     feature = {
         streams = 0,
@@ -201,6 +204,7 @@ local reference_table = {
         call_arg_tuple_extension = 9,
         fetch_snapshot_cursor = 10,
         is_sync = 11,
+        insert_arrow = 12,
     },
 }
 

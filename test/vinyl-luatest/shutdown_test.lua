@@ -5,7 +5,9 @@ local t = require('luatest')
 local g = t.group()
 
 g.before_each(function(cg)
-    cg.server = server:new()
+    cg.server = server:new({
+        box_cfg = {log_level = 'verbose'},
+    })
     cg.server:start()
 end)
 
@@ -91,6 +93,7 @@ local g_cbus = t.group('cbus')
 
 g_cbus.before_each(function(cg)
     cg.server = server:new({
+        box_cfg = {log_level = 'verbose'},
         env = {
             TARANTOOL_RUN_BEFORE_BOX_CFG = [[
                 local tweaks = require('internal.tweaks')

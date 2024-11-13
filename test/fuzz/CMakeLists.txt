@@ -104,53 +104,49 @@ create_fuzz_test(PREFIX vclock_from_string
                  SOURCES vclock_from_string_fuzzer.c
                  LIBRARIES vclock fuzzer_config)
 
-# Building xrow library triggers building LuaJIT that doesn't support UBSan.
-# See https://github.com/tarantool/tarantool/issues/8473.
-if (NOT ENABLE_UB_SANITIZER)
-  create_fuzz_test(PREFIX xrow_greeting_decode
-                   SOURCES xrow_greeting_decode_fuzzer.c
-                   LIBRARIES xrow fuzzer_config)
+create_fuzz_test(PREFIX xrow_greeting_decode
+                 SOURCES xrow_greeting_decode_fuzzer.c
+                 LIBRARIES xrow fuzzer_config)
 
-  create_fuzz_test(PREFIX xrow_decode_id
-                   SOURCES xrow_decode_id_fuzzer.c
-                   LIBRARIES xrow fuzzer_config)
+create_fuzz_test(PREFIX xrow_decode_id
+                 SOURCES xrow_decode_id_fuzzer.c
+                 LIBRARIES xrow fuzzer_config)
 
-  create_fuzz_test(PREFIX xrow_decode_auth
-                   SOURCES xrow_decode_auth_fuzzer.c
-                   LIBRARIES xrow fuzzer_config)
+create_fuzz_test(PREFIX xrow_decode_auth
+                 SOURCES xrow_decode_auth_fuzzer.c
+                 LIBRARIES xrow fuzzer_config)
 
-  create_fuzz_test(PREFIX xrow_decode_begin
-                   SOURCES xrow_decode_begin_fuzzer.c
-                   LIBRARIES xrow fuzzer_config)
+create_fuzz_test(PREFIX xrow_decode_begin
+                 SOURCES xrow_decode_begin_fuzzer.c
+                 LIBRARIES xrow fuzzer_config)
 
-  create_fuzz_test(PREFIX xrow_decode_call
-                   SOURCES xrow_decode_call_fuzzer.c
-                  LIBRARIES xrow fuzzer_config)
+create_fuzz_test(PREFIX xrow_decode_call
+                 SOURCES xrow_decode_call_fuzzer.c
+                 LIBRARIES xrow fuzzer_config)
 
-  create_fuzz_test(PREFIX xrow_decode_dml
-                   SOURCES xrow_decode_dml_fuzzer.c
-                   LIBRARIES xrow fuzzer_config)
+create_fuzz_test(PREFIX xrow_decode_dml
+                 SOURCES xrow_decode_dml_fuzzer.c
+                 LIBRARIES xrow fuzzer_config)
 
-  create_fuzz_test(PREFIX xrow_decode_raft
-                   SOURCES xrow_decode_raft_fuzzer.c
-                   LIBRARIES xrow fuzzer_config)
+create_fuzz_test(PREFIX xrow_decode_raft
+                 SOURCES xrow_decode_raft_fuzzer.c
+                 LIBRARIES xrow fuzzer_config)
 
-  create_fuzz_test(PREFIX xrow_decode_sql
-                   SOURCES xrow_decode_sql_fuzzer.c
-                   LIBRARIES xrow fuzzer_config)
+create_fuzz_test(PREFIX xrow_decode_sql
+                 SOURCES xrow_decode_sql_fuzzer.c
+                 LIBRARIES xrow fuzzer_config)
 
-  create_fuzz_test(PREFIX xrow_decode_watch
-                   SOURCES xrow_decode_watch_fuzzer.c
-                   LIBRARIES xrow fuzzer_config)
+create_fuzz_test(PREFIX xrow_decode_watch
+                 SOURCES xrow_decode_watch_fuzzer.c
+                 LIBRARIES xrow fuzzer_config)
 
-  create_fuzz_test(PREFIX xrow_header_decode
-                   SOURCES xrow_header_decode_fuzzer.c
-                   LIBRARIES xrow fuzzer_config)
+create_fuzz_test(PREFIX xrow_header_decode
+                 SOURCES xrow_header_decode_fuzzer.c
+                 LIBRARIES xrow fuzzer_config)
 
-  create_fuzz_test(PREFIX xrow_decode_error
-                   SOURCES xrow_decode_error_fuzzer.c
-                   LIBRARIES xrow fuzzer_config)
-endif ()
+create_fuzz_test(PREFIX xrow_decode_error
+                 SOURCES xrow_decode_error_fuzzer.c
+                 LIBRARIES xrow fuzzer_config)
 
 # Blocked by https://github.com/tarantool/tarantool/issues/8948.
 if (NOT ENABLE_UB_SANITIZER)
@@ -161,12 +157,8 @@ endif ()
 
 include(ProtobufMutator)
 
-# UndefinedBehaviorSanitizer is not supported in LuaJIT.
-# See https://github.com/tarantool/tarantool/issues/8473
-if (NOT ENABLE_UB_SANITIZER)
-    add_subdirectory(luaL_loadbuffer)
-    add_subdirectory(sql_fuzzer)
-endif()
+add_subdirectory(luaL_loadbuffer)
+add_subdirectory(sql_fuzzer)
 
 add_custom_target(fuzzers
                   DEPENDS ${FUZZ_TEST_TARGETS}

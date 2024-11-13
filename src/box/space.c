@@ -61,6 +61,8 @@
 #include "port.h"
 #include "tweaks.h"
 #include "txn_limbo.h"
+#include "sql.h"
+#include "arrow_ipc.h"
 
 /**
  * Controls whether to consider system spaces indefinitely synchronous when the
@@ -255,12 +257,12 @@ space_reattach_constraints(struct space *space)
 	}
 }
 
-/**
- * Destroy constraints that are defined in @a space format.
- */
-static int
+void
 space_cleanup_constraints(struct space *space)
 {
+	if (space->format == NULL)
+		return;
+
 	struct tuple_format *format = space->format;
 	for (size_t j = 0; j < format->constraint_count; j++) {
 		struct tuple_constraint *constr = &format->constraint[j];
@@ -273,7 +275,7 @@ space_cleanup_constraints(struct space *space)
 			constr->destroy(constr);
 		}
 	}
-	return 0;
+	return;
 }
 
 /**
@@ -736,7 +738,7 @@ void
 space_delete(struct space *space)
 {
 	assert(rlist_empty(&space->alter_stmts));
-	memtx_tx_on_space_delete(space);
+	assert(rlist_empty(&space->memtx_stories));
 	for (uint32_t j = 0; j <= space->index_id_max; j++) {
 		struct index *index = space->index_map[j];
 		if (index != NULL)
@@ -752,17 +754,16 @@ space_delete(struct space *space)
 	space_unpin_collations(space);
 	trigger_destroy(&space->before_replace);
 	trigger_destroy(&space->on_replace);
+	sql_trigger_delete_all(space->sql_triggers);
 	space_reset_events(space);
 	if (space->upgrade != NULL)
 		space_upgrade_delete(space->upgrade);
+	free(space->sequence_path);
 	space_def_delete(space->def);
-	/*
-	 * SQL triggers should be deleted with on_replace_dd_triggers on
-	 * deletion from corresponding system space.
-	 */
-	assert(space->sql_triggers == NULL);
 	assert(rlist_empty(&space->space_cache_pin_list));
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, space->lua_ref);
+	/* tarantool_L is freed on Tarantool shutdown. */
+	if (tarantool_L != NULL)
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, space->lua_ref);
 	space->vtab->destroy(space);
 }
 
@@ -1248,10 +1249,12 @@ after_old_tuple_lookup:;
 				container_of(h, struct tuple_constraint,
 					     space_cache_holder);
 			assert(constr->def.type == CONSTR_FKEY);
-			if (tuple_constraint_fkey_check_delete(constr,
-							       old_tuple,
-							       new_tuple) != 0)
+			if (tuple_constraint_fkey_check_delete(
+					constr, old_tuple, new_tuple) != 0) {
+				if (new_tuple != NULL)
+					tuple_unref(new_tuple);
 				return -1;
+			}
 		}
 	}
 
@@ -1336,6 +1339,49 @@ after_old_tuple_lookup:;
 out:
 	if (new_tuple != NULL)
 		tuple_unref(new_tuple);
+	return rc;
+}
+
+/**
+ * Executes an IPROTO_INSERT_ARROW request. The request contains the data in
+ * Arrow columnar format that can appear in two guises:
+ *  1. in-memory data structures (arrow_array and arrow_schema);
+ *  2. serialized for interprocess communication (arrow_ipc and arrow_ipc_end).
+ * Can return nonzero in case of error (diag is set).
+ */
+static int
+space_execute_insert_arrow(struct space *space, struct txn *txn,
+			   struct request *request)
+{
+	int rc;
+	struct region *gc = &fiber()->gc;
+	size_t gc_svp = region_used(gc);
+	bool do_ipc_decode = request->arrow_ipc != NULL;
+	struct ArrowArray *array = request->arrow_array;
+	struct ArrowSchema *schema = request->arrow_schema;
+
+	if (do_ipc_decode) {
+		assert(array == NULL);
+		assert(schema == NULL);
+		assert(request->arrow_ipc_end != NULL);
+		array = xregion_alloc_object(&fiber()->gc, struct ArrowArray);
+		schema = xregion_alloc_object(&fiber()->gc, struct ArrowSchema);
+		rc = arrow_ipc_decode(array, schema, request->arrow_ipc,
+				      request->arrow_ipc_end);
+		if (rc != 0)
+			goto eof;
+	}
+
+	rc = space->vtab->execute_insert_arrow(space, txn, array, schema);
+
+	if (do_ipc_decode) {
+		assert(array->release != NULL);
+		assert(schema->release != NULL);
+		array->release(array);
+		schema->release(schema);
+	}
+eof:
+	region_truncate(gc, gc_svp);
 	return rc;
 }
 
@@ -1430,6 +1476,11 @@ space_execute_dml(struct space *space, struct txn *txn,
 		if (space->vtab->execute_upsert(space, txn, request) != 0)
 			return -1;
 		break;
+	case IPROTO_INSERT_ARROW:
+		*result = NULL;
+		if (space_execute_insert_arrow(space, txn, request) != 0)
+			return -1;
+		break;
 	default:
 		*result = NULL;
 	}
@@ -1479,6 +1530,19 @@ generic_space_bsize(struct space *space)
 {
 	(void)space;
 	return 0;
+}
+
+int
+generic_space_execute_insert_arrow(struct space *space, struct txn *txn,
+				   struct ArrowArray *array,
+				   struct ArrowSchema *schema)
+{
+	(void)txn;
+	(void)array;
+	(void)schema;
+	diag_set(ClientError, ER_UNSUPPORTED, space->engine->name,
+		 "arrow format");
+	return -1;
 }
 
 int

@@ -45,10 +45,13 @@
 #include "small/rlist.h"
 #include "tt_static.h"
 #include "box/mp_box_ctx.h"
+#include "salad/grp_alloc.h"
 
 struct rlist box_on_call = RLIST_HEAD_INITIALIZER(box_on_call);
 
 static const struct port_vtab port_msgpack_vtab;
+
+static struct mh_strnstrnptr_t *user_rt_access = NULL;
 
 void
 port_msgpack_create_with_ctx(struct port *base, const char *data,
@@ -160,6 +163,10 @@ box_run_on_call(enum iproto_type type, const char *expr, int expr_len,
 	trigger_run(&box_on_call, &ctx);
 }
 
+static bool
+box_lua_call_runtime_priv_is_granted(const char *uname, uint32_t uname_len,
+				     const char *fname, uint32_t fname_len);
+
 int
 access_check_lua_call(const char *name, uint32_t name_len)
 {
@@ -181,10 +188,16 @@ access_check_lua_call(const char *name, uint32_t name_len)
 			return 0;
 	}
 	struct user *user = user_find(cr->uid);
-	if (user != NULL)
+	if (user != NULL) {
+		const char *uname = user->def->name;
+		uint32_t uname_len = strlen(uname);
+		if (box_lua_call_runtime_priv_is_granted(uname, uname_len, name,
+							 name_len))
+			return 0;
 		diag_set(AccessDeniedError, priv_name(PRIV_X),
 			 schema_object_name(SC_FUNCTION),
 			 tt_cstr(name, name_len), user->def->name);
+	}
 	return -1;
 }
 
@@ -272,4 +285,94 @@ box_process_eval(struct call_request *request, struct port *port)
 	int rc = box_lua_eval(expr, expr_len, &args, port);
 	port_msgpack_destroy(&args);
 	return rc;
+}
+
+static struct mh_strnstrnptr_key_t*
+mh_strnstrnptr_key_alloc(const char *s1, uint32_t s1_len,
+			 const char *s2, uint32_t s2_len)
+{
+	struct mh_strnstrnptr_key_t *node;
+	struct grp_alloc all = grp_alloc_initializer();
+	grp_alloc_reserve_data(&all, sizeof(*node) + s1_len + s2_len);
+	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
+	void *p = grp_alloc_create_data(&all, sizeof(*node));
+	node = (struct mh_strnstrnptr_key_t *)p;
+	node->s1 = grp_alloc_create_data(&all, s1_len);
+	memcpy((void *)node->s1, s1, s1_len);
+	node->s1_len = s1_len;
+	if (s2_len != 0) {
+		node->s2 = grp_alloc_create_data(&all, s2_len);
+		memcpy((void *)node->s2, s2, s2_len);
+	} else {
+		node->s2 = NULL;
+	}
+	node->s2_len = s2_len;
+	assert(grp_alloc_size(&all) == 0);
+	return node;
+}
+
+void
+box_lua_call_runtime_priv_reset(void)
+{
+	if (user_rt_access == NULL)
+		return;
+
+	mh_int_t i;
+	mh_foreach(user_rt_access, i) {
+		free(mh_strnstrnptr_node(user_rt_access, i)->val);
+	}
+	mh_strnstrnptr_delete(user_rt_access);
+	user_rt_access = NULL;
+}
+
+void
+box_lua_call_runtime_priv_grant(const char *uname, uint32_t uname_len,
+				const char *fname, uint32_t fname_len)
+{
+	if (user_rt_access == NULL)
+		user_rt_access = mh_strnstrnptr_new();
+
+	/* If the grant exists, do nothing. */
+	uint32_t hash = mh_strnstrnptr_hash(uname, uname_len, fname, fname_len);
+	struct mh_strnstrnptr_key_t access_key =
+		{ uname, uname_len, fname, fname_len, hash };
+	if (fname_len == 0)
+		access_key.s2 = NULL;
+	mh_int_t pos = mh_strnstrnptr_find(user_rt_access, &access_key, NULL);
+	if (pos != mh_end(user_rt_access))
+		return;
+
+	/* Grant access to lua_call function. */
+	struct mh_strnstrnptr_key_t *node =
+		mh_strnstrnptr_key_alloc(uname, uname_len, fname, fname_len);
+	const struct mh_strnstrnptr_node_t access_node =
+		{ node->s1, uname_len, node->s2, fname_len, hash, node };
+	mh_strnstrnptr_put(user_rt_access, &access_node, NULL, NULL);
+}
+
+static bool
+box_lua_call_runtime_priv_is_granted(const char *uname, uint32_t uname_len,
+				     const char *fname, uint32_t fname_len)
+{
+	if (user_rt_access == NULL)
+		return false;
+
+	uint32_t universe_hash = mh_strnstrnptr_hash(uname, uname_len, NULL, 0);
+	struct mh_strnstrnptr_key_t access_universe_key =
+		{ uname, uname_len, NULL, 0, universe_hash };
+	mh_int_t pos = mh_strnstrnptr_find(user_rt_access, &access_universe_key,
+					   NULL);
+
+	/* Check for universe access. Don't allow to call built-ins. */
+	if (pos != mh_end(user_rt_access) &&
+	    !tarantool_lua_is_builtin_global(fname, fname_len))
+		return true;
+
+	uint32_t hash = mh_strnstrnptr_hash(uname, uname_len, fname, fname_len);
+	struct mh_strnstrnptr_key_t access_node =
+		{ uname, uname_len, fname, fname_len, hash };
+	pos = mh_strnstrnptr_find(user_rt_access, &access_node, NULL);
+	if (pos == mh_end(user_rt_access))
+		return false;
+	return true;
 }

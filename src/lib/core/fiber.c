@@ -289,6 +289,11 @@ static __thread bool fiber_parent_backtrace_enabled;
  * An action performed each time a context switch happens.
  * Used to count each fiber's processing time.
  */
+#if ENABLE_UB_SANITIZER
+static inline void
+clock_set_on_csw(struct fiber *caller)
+  __attribute__((no_sanitize("signed-integer-overflow")));
+#endif
 static inline void
 clock_set_on_csw(struct fiber *caller)
 {

@@ -34,6 +34,12 @@
  * since Rata Die (0001-01-01).
  * DT_EPOCH_1970_OFFSET is the distance in days from Rata Die to Epoch.
  */
+#if ENABLE_UB_SANITIZER
+/* See https://github.com/tarantool/tarantool/issues/10704. */
+static int
+local_dt(int64_t secs)
+  __attribute__((no_sanitize("signed-integer-overflow")));
+#endif
 static int
 local_dt(int64_t secs)
 {
@@ -45,6 +51,12 @@ static int64_t
 local_secs(const struct datetime *date)
 {
 	return (int64_t)date->epoch + date->tzoffset * 60;
+}
+
+static int
+is_integer(double num)
+{
+	return roundf(num) == num;
 }
 
 /**
@@ -296,8 +308,7 @@ parse_tz_suffix(const char *str, size_t len, time_t base,
 }
 
 ssize_t
-datetime_parse_full(struct datetime *date, const char *str, size_t len,
-		    const char *tzsuffix, int32_t offset)
+datetime_parse_full(struct datetime *date, const char *str, size_t len)
 {
 	size_t n;
 	dt_t dt;
@@ -305,6 +316,7 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
 	char c;
 	int sec_of_day = 0, nanosecond = 0;
 	int16_t tzindex = 0;
+	int32_t offset = 0;
 
 	n = dt_parse_iso_date(str, len, &dt);
 	if (n == 0)
@@ -331,19 +343,6 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
 	if (len <= 0)
 		goto exit;
 
-	/* now we have parsed enough of date literal, and we are
-	 * ready to consume timezone suffix, if overridden
-	 */
-	time_t base = dt_epoch(dt) + sec_of_day - offset * 60;
-	ssize_t l;
-	if (tzsuffix != NULL) {
-		l = parse_tz_suffix(tzsuffix, strlen(tzsuffix), base,
-				    &tzindex, &offset);
-		if (l < 0)
-			return l;
-		goto exit;
-	}
-
 	if (*str == ' ') {
 		str++;
 		len--;
@@ -351,7 +350,8 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
 	if (len <= 0)
 		goto exit;
 
-	l = parse_tz_suffix(str, len, base, &tzindex, &offset);
+	time_t base = dt_epoch(dt) + sec_of_day;
+	ssize_t l = parse_tz_suffix(str, len, base, &tzindex, &offset);
 	if (l < 0)
 		return l;
 	str += l;
@@ -1052,6 +1052,18 @@ map_field_to_dt_field(struct dt_fields *fields, const char **data)
 static int
 datetime_from_fields(struct datetime *dt, const struct dt_fields *fields)
 {
+	if (!is_integer(fields->year) ||
+	    !is_integer(fields->month) ||
+	    !is_integer(fields->day) ||
+	    !is_integer(fields->hour) ||
+	    !is_integer(fields->min) ||
+	    !is_integer(fields->sec) ||
+	    !is_integer(fields->msec) ||
+	    !is_integer(fields->usec) ||
+	    !is_integer(fields->nsec) ||
+	    !is_integer(fields->tzoffset))
+		return -1;
+
 	if (fields->count_usec > 1)
 		return -1;
 	double nsec = fields->msec * 1000000 + fields->usec * 1000 +

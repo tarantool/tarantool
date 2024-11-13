@@ -24,8 +24,8 @@ local function merge(...)
 end
 
 local function start_server(sock_family)
-    if not sock_family == 'AF_INET' and
-       not sock_family == 'AF_UNIX' then
+    if sock_family ~= 'AF_INET' and
+       sock_family ~= 'AF_UNIX' then
         error(string.format('invalid socket family: %s', sock_family))
     end
     local url
@@ -59,6 +59,7 @@ local function start_server(sock_family)
 end
 
 g.before_each(function(cg)
+    t.skip_if(cg.params.sock_family == 'AF_UNIX', "gh-9854")
     local sock_family = cg.params.sock_family
     cg.server, cg.url, cg.opts = start_server(sock_family)
 end)

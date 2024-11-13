@@ -133,6 +133,12 @@ alloc_failure(const char *filename, int line, size_t size)
 #define xstrndup(s, n)		xalloc_impl((n) + 1, strndup, (s), (n))
 #define xaligned_alloc(size, align) \
 		xalloc_impl((size), aligned_alloc, (align), (size))
+#define xalloc_object(T) ({							\
+	(T *)xaligned_alloc(sizeof(T), alignof(T));				\
+})
+#define xalloc_array(T, count) ({						\
+	(T *)xaligned_alloc(sizeof(T) * (count), alignof(T));			\
+})
 #define xmempool_alloc(p)	xalloc_impl((p)->objsize, mempool_alloc, (p))
 #define xregion_alloc(p, size)	xalloc_impl((size), region_alloc, (p), (size))
 #define xregion_aligned_alloc(p, size, align) \
@@ -542,7 +548,8 @@ alloc_failure(const char *filename, int line, size_t size)
 
 void close_all_xcpt(int fdc, ...);
 
-#if defined(__GNUC__) && __GNUC__ >= 11
+#if (defined(__GNUC__) && __GNUC__ >= 11) || \
+	(defined(__clang__) && __clang_major__ >= 12)
 /** Import __gcov_dump function. */
 void
 __gcov_dump(void);
@@ -855,8 +862,22 @@ illegal_instruction(void)
 #ifdef ENABLE_ASAN
 # include <sanitizer/lsan_interface.h>
 # define LSAN_IGNORE_OBJECT(ptr) __lsan_ignore_object(ptr)
+
+/**
+ * Disable leak sanitizer. Leak check will not be performed on Tarantool
+ * exit.
+ */
+void
+lsan_turn_off(void);
+
 #else
 # define LSAN_IGNORE_OBJECT(ptr) ((void)ptr)
+
+static inline void
+lsan_turn_off(void)
+{
+}
+
 #endif
 
 #if defined(__cplusplus)

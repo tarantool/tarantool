@@ -41,6 +41,9 @@ struct lua_State;
 void
 box_lua_space_init(struct lua_State *L);
 
+void
+box_lua_space_free(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

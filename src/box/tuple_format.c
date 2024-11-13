@@ -1002,77 +1002,6 @@ tuple_format1_can_store_format2_tuples(struct tuple_format *format1,
 	return true;
 }
 
-static int
-tuple_format_required_fields_validate(struct tuple_format *format,
-				      void *required_fields,
-				      uint32_t required_fields_sz);
-
-#define ERROR_MSG(r, v) "expected [%" r "..%" r "], got %" v
-
-/**
- * Check if integer value in `mp_data' is within an allowed range for the given
- * `field' type.
- * Return -1 and raise an error if it is out of range, or 0 if all is ok.
- */
-static int
-tuple_field_check_fixed_int_range(struct tuple_format *format,
-				  struct tuple_field *field,
-				  const char *mp_data)
-{
-	assert(tuple_field_type_is_fixed_int(field->type));
-	const char *details;
-	char mp_min[16], mp_max[16];
-	const char *mp_value = mp_data;
-	enum mp_type mp_type = mp_typeof(*mp_data);
-	if (mp_type == MP_NIL)
-		return 0;
-	assert(mp_type == MP_INT || mp_type == MP_UINT);
-
-	if (field_type_is_fixed_signed[field->type]) {
-		int64_t min = field_type_min_value[field->type];
-		int64_t max = field_type_max_value[field->type];
-		mp_encode_int(mp_min, min);
-		mp_encode_uint(mp_max, max);
-		if (mp_type == MP_INT) {
-			int64_t value = mp_decode_int(&mp_data);
-			if (value < min || value > max) {
-				details = tt_sprintf(ERROR_MSG(PRId64, PRId64),
-						     min, max, value);
-				goto error;
-			}
-		} else {
-			assert(mp_type == MP_UINT);
-			uint64_t value = mp_decode_uint(&mp_data);
-			if (value > (uint64_t)max) {
-				details = tt_sprintf(ERROR_MSG(PRId64, PRIu64),
-						     min, max, value);
-				goto error;
-			}
-		}
-	} else {
-		assert(field_type_is_fixed_unsigned[field->type]);
-		assert(mp_type == MP_UINT);
-		uint64_t value = mp_decode_uint(&mp_data);
-		uint64_t min = field_type_min_value[field->type];
-		uint64_t max = field_type_max_value[field->type];
-		mp_encode_uint(mp_min, min);
-		mp_encode_uint(mp_max, max);
-		if (value > max) {
-			details = tt_sprintf(ERROR_MSG(PRIu64, PRIu64),
-					     min, max, value);
-			goto error;
-		}
-	}
-	return 0;
-error:
-	diag_set(ClientError, ER_FIELD_VALUE_OUT_OF_RANGE,
-		 tuple_field_path(field, format), field_type_strs[field->type],
-		 details, mp_value, mp_min, mp_max);
-	return -1;
-}
-
-#undef ERROR_MSG
-
 /**
  * Check constraints of one particular @a field.
  */
@@ -1121,9 +1050,19 @@ tuple_field_validate(struct tuple_format *format, struct tuple_field *field,
 			 mp_type_strs[mp_typeof(*mp_data)]);
 		return -1;
 	}
-	if (tuple_field_type_is_fixed_int(field->type) &&
-	    tuple_field_check_fixed_int_range(format, field, mp_data) != 0)
-		return -1;
+	if (field_type_is_fixed_int(field->type)) {
+		const char *details;
+		char mp_min[16], mp_max[16];
+		if (!field_mp_is_in_fixed_int_range(
+				field->type, mp_data, mp_min, mp_max,
+				&details)) {
+			diag_set(ClientError, ER_FIELD_VALUE_OUT_OF_RANGE,
+				 tuple_field_path(field, format),
+				 field_type_strs[field->type], details,
+				 mp_data, mp_min, mp_max);
+			return -1;
+		}
+	}
 	if (tuple_field_check_constraint(field, mp_data, mp_data_end) != 0)
 		return -1;
 	return 0;

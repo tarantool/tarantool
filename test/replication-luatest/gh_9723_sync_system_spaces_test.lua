@@ -1,12 +1,12 @@
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 local compat = require('compat')
 local fio = require('fio')
 local fun = require('fun')
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local replica_set = require('luatest.replica_set')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local yaml = require('yaml')
 
 local g_general = t.group('general')
@@ -571,7 +571,7 @@ g_recovery.after_all(cluster.clean)
 g_recovery.after_each(cluster.drop)
 
 g_recovery.before_each(function(cg)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('server', {})
         :set_instance_option('server', 'compat', {
             box_consider_system_spaces_synchronous = 'new',
@@ -623,17 +623,15 @@ g_recovery.test_recovery_from_snap = function(cg)
 end
 
 g_schema_upgrade.before_each(function(cg)
-    treegen.init(cg)
-
     local rs_uuid = 'd266de7d-b3fb-45d8-b644-580700550614'
     local inst_uuid = 'bb89f474-7ed6-414c-a1d0-da7392c563d7'
     local datadir = 'test/box-luatest/upgrade/2.10.4'
-    local dir = treegen.prepare_directory(cg, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local workdir = fio.pathjoin(dir, 'server')
     fio.mktree(workdir)
     fio.copytree(datadir, workdir)
 
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('server', {
             compat = {box_consider_system_spaces_synchronous = 'new'},
             snapshot = {dir = workdir},
@@ -644,7 +642,7 @@ g_schema_upgrade.before_each(function(cg)
             }})
         :config()
     local cfg = yaml.encode(config)
-    local config_file = treegen.write_script(dir, 'cfg.yaml', cfg)
+    local config_file = treegen.write_file(dir, 'cfg.yaml', cfg)
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
         config_file = config_file,
@@ -677,5 +675,4 @@ end
 
 g_schema_upgrade.after_each(function(cg)
     cg.server:drop()
-    treegen.clean(cg)
 end)

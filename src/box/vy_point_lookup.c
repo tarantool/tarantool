@@ -134,6 +134,9 @@ vy_point_lookup_scan_mems(struct vy_lsm *lsm, struct vy_tx *tx,
 					     &min_skipped_plsn) != 0)
 			return -1;
 	}
+	/*
+	 * Switch to read view if we skipped a prepared statement.
+	 */
 	if (tx != NULL && min_skipped_plsn != INT64_MAX) {
 		if (vy_tx_send_to_read_view(tx, min_skipped_plsn) != 0)
 			return -1;
@@ -198,6 +201,7 @@ vy_point_lookup_scan_slices(struct vy_lsm *lsm, const struct vy_read_view **rv,
 		slices[i++] = slice;
 	}
 	assert(i == slice_count);
+	ERROR_INJECT_YIELD(ERRINJ_VY_POINT_LOOKUP_DELAY);
 	int rc = 0;
 	for (i = 0; i < slice_count; i++) {
 		if (rc == 0 && !vy_history_is_terminal(history))
@@ -249,13 +253,6 @@ restart:
 	rc = vy_point_lookup_scan_slices(lsm, rv, key, &disk_history);
 	if (rc != 0)
 		goto done;
-
-	ERROR_INJECT(ERRINJ_VY_POINT_ITER_WAIT, {
-		while (mem_list_version == lsm->mem_list_version)
-			fiber_sleep(0.01);
-		/* Turn of the injection to avoid infinite loop */
-		errinj(ERRINJ_VY_POINT_ITER_WAIT, ERRINJ_BOOL)->bparam = false;
-	});
 
 	if (tx != NULL && tx->state == VINYL_TX_ABORT) {
 		/*

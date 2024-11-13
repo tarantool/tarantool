@@ -3,8 +3,8 @@
 -- scripts with testing workloads reside.
 
 local t = require('luatest')
-local treegen = require('test.treegen')
-local justrun = require('test.justrun')
+local treegen = require('luatest.treegen')
+local justrun = require('luatest.justrun')
 local socket = require('socket')
 
 local wrong_version_group = t.group()
@@ -41,12 +41,9 @@ local expected = {
     },
     ['2-prior-knowledge'] = {
         http = '[HTTP/2] [1] OPENED stream',
-        https = 'ALPN: curl offers h2,http/1.1',
+        https = 'ALPN: curl offers h2',
     },
 }
-
-http_version_group.before_all(treegen.init)
-http_version_group.after_all(treegen.clean)
 
 http_version_group.before_each(function(g)
     g.server = socket.tcp_server('127.0.0.1', 0, function(_s) end)
@@ -71,9 +68,9 @@ local http_request_script = string.dump(function()
 end)
 
 http_version_group.test_http_version = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local script_name = 'http_request.lua'
-    treegen.write_script(dir, script_name, http_request_script)
+    treegen.write_file(dir, script_name, http_request_script)
     local args = {script_name}
     local opts = {nojson = true, stderr = true}
     local env = {HTTP_SERVER_PORT = g.server:name().port}

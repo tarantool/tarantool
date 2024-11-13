@@ -228,6 +228,7 @@ g.test_defaults = function()
             threads = 1,
             timeout = 1,
             synchro_timeout = 5,
+            synchro_queue_max_size = 16777216,
             connect_timeout = 30,
             sync_timeout = box.NULL,
             sync_lag = 10,
@@ -244,7 +245,6 @@ g.test_defaults = function()
             max_size = 268435456,
             dir_rescan_delay = 2,
             queue_max_size = 16777216,
-            cleanup_delay = 14400,
             retention_period = is_enterprise and 0 or nil,
         },
         console = {
@@ -337,6 +337,7 @@ g.test_defaults = function()
             box_cfg_replication_sync_timeout = 'new',
             box_consider_system_spaces_synchronous = 'old',
             box_error_serialize_verbose = 'old',
+            replication_synchro_timeout = 'old',
             sql_seq_scan_default = 'new',
             fiber_slice_default = 'new',
             box_info_cluster_meaning = 'new',
@@ -350,6 +351,7 @@ g.test_defaults = function()
             box_space_max = 'new',
             box_error_unpack_type_and_code = 'old',
             console_session_scope_vars = 'old',
+            wal_cleanup_delay_deprecation = 'old',
         },
     }
     local res = cluster_config:apply_default({})

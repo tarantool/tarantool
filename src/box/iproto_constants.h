@@ -156,6 +156,10 @@ extern const char *iproto_flag_bit_strs[];
 	/** Position of last selected tuple in response. */		\
 	_(POSITION, 0x35, MP_STR)					\
 									\
+	/** Also request keys. See the comment above. */		\
+	/** The data in Arrow format. */				\
+	_(ARROW, 0x36, MP_EXT)						\
+									\
 	/* Leave a gap between response keys and SQL keys. */		\
 	_(SQL_TEXT, 0x40, MP_STR)					\
 	_(SQL_BIND, 0x41, MP_ARRAY)					\
@@ -346,6 +350,8 @@ iproto_key_bit(unsigned char key)
 	_(COMMIT, 15)							\
 	/* Rollback transaction */					\
 	_(ROLLBACK, 16)							\
+	/** INSERT Arrow request. */					\
+	_(INSERT_ARROW, 17)						\
 									\
 	_(RAFT, 30)							\
 	/** PROMOTE request. */						\
@@ -429,7 +435,7 @@ enum iproto_type {
 	IPROTO_UNKNOWN = -1,
 
 	/** The maximum typecode used for box.stat() */
-	IPROTO_TYPE_STAT_MAX = IPROTO_ROLLBACK + 1,
+	IPROTO_TYPE_STAT_MAX = IPROTO_INSERT_ARROW + 1,
 
 	/** Vinyl run info stored in .index file */
 	VY_INDEX_RUN_INFO = 100,
@@ -495,7 +501,7 @@ iproto_type_name_lower(uint16_t type)
 }
 
 /** Predefined replication group identifiers. */
-enum {
+enum group_id {
 	/**
 	 * Default replication group: changes made to the space
 	 * are replicated throughout the entire cluster.
@@ -525,7 +531,8 @@ static inline bool
 iproto_type_is_dml(uint16_t type)
 {
 	return (type >= IPROTO_SELECT && type <= IPROTO_DELETE) ||
-		type == IPROTO_UPSERT || type == IPROTO_NOP;
+		type == IPROTO_UPSERT || type == IPROTO_NOP ||
+		type == IPROTO_INSERT_ARROW;
 }
 
 /**

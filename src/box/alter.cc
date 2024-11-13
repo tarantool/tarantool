@@ -62,6 +62,7 @@
 #include "node_name.h"
 #include "core/func_adapter.h"
 #include "relay.h"
+#include "gc.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -393,8 +394,6 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 		index_def_new(id, index_id, name, name_len, space->def->name,
 			      space->def->engine_name, type, &opts, key_def,
 			      space_index_key_def(space, 0));
-	if (index_def == NULL)
-		return NULL;
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
 	if (index_def_check(index_def, space_name(space)) != 0)
 		return NULL;
@@ -718,7 +717,16 @@ txn_alter_trigger_new(trigger_f run, void *data)
 	return trigger;
 }
 
+/**
+ * List of all alive alter_space objects.
+ */
+static RLIST_HEAD(alter_space_list);
+
 struct alter_space {
+	/** Link in alter_space_list. */
+	struct rlist in_list;
+	/** Transaction doing this alter. */
+	struct txn *txn;
 	/** List of alter operations */
 	struct rlist ops;
 	/** Definition of the new space - space_def. */
@@ -750,6 +758,11 @@ struct alter_space {
 	int n_rows;
 };
 
+/**
+ * Fiber cond that wakes up all waiters on every deletion of alter_space.
+ */
+static FIBER_COND(alter_space_delete_cond);
+
 static struct alter_space *
 alter_space_new(struct space *old_space)
 {
@@ -764,6 +777,8 @@ alter_space_new(struct space *old_space)
 	}
 	alter = (struct alter_space *)memset(alter, 0, size);
 	rlist_create(&alter->ops);
+	rlist_add_entry(&alter_space_list, alter, in_list);
+	alter->txn = in_txn();
 	alter->old_space = old_space;
 	alter->space_def = space_def_dup(alter->old_space->def);
 	if (old_space->format != NULL)
@@ -778,6 +793,8 @@ alter_space_new(struct space *old_space)
 static void
 alter_space_delete(struct alter_space *alter)
 {
+	fiber_cond_broadcast(&alter_space_delete_cond);
+	rlist_del_entry(alter, in_list);
 	/* Destroy the ops. */
 	while (! rlist_empty(&alter->ops)) {
 		AlterSpaceOp *op = rlist_shift_entry(&alter->ops,
@@ -936,6 +953,7 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	space_pin_collations(alter->old_space);
 	space_pin_defaults(alter->old_space);
 	space_cache_replace(alter->new_space, alter->old_space);
+	SWAP(alter->new_space->sequence_path, alter->old_space->sequence_path);
 	alter_space_delete(alter);
 	return 0;
 }
@@ -1024,7 +1042,7 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 
 	alter->new_space->sequence = alter->old_space->sequence;
 	alter->new_space->sequence_fieldno = alter->old_space->sequence_fieldno;
-	alter->new_space->sequence_path = alter->old_space->sequence_path;
+	SWAP(alter->new_space->sequence_path, alter->old_space->sequence_path);
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
 
@@ -1089,15 +1107,62 @@ public:
 	virtual void prepare(struct alter_space *alter);
 };
 
+/**
+ * The object is used to grant ability to yield with RAII approach.
+ * Transaction is allowed to yield only on its first statement, so if the
+ * statement is not first, it simply does nothing.
+ * If it's the first statement, the guard blocks execution until all previous
+ * alters will be rolled back or committed so that the space object won't be
+ * deleted right from under our feet. In the case when the previous alters were
+ * rolled back and the space was removed from space cache, the constructor
+ * throws an error.
+ */
+class AlterYieldGuard
+{
+public:
+	AlterYieldGuard(struct space *old_space) {
+		if (!txn_is_first_statement(in_txn()))
+			return;
+		txn_can_yield(in_txn(), true);
+		uint32_t space_id = old_space->def->id;
+		while (true) {
+			bool space_is_being_altered = false;
+			struct alter_space *alter;
+			rlist_foreach_entry(alter, &alter_space_list, in_list) {
+				if (alter->txn != in_txn() &&
+				    alter->old_space->def->id == space_id) {
+					space_is_being_altered = true;
+					break;
+				}
+			}
+			if (!space_is_being_altered)
+				break;
+			/*
+			 * Wait for deletion of any alter to check if the
+			 * space is being altered again.
+			 */
+			fiber_cond_wait(&alter_space_delete_cond);
+		}
+		/* Check if the space is still alive. */
+		if (space_by_id(space_id) != old_space) {
+			txn_can_yield(in_txn(), false);
+			/* Cannot access the space name since it was deleted. */
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  tt_sprintf("%u", space_id),
+				  "the space was concurrently modified");
+		}
+	}
+
+	~AlterYieldGuard() {
+		txn_can_yield(in_txn(), false);
+	}
+};
+
 static inline void
 space_check_format_with_yield(struct space *space,
 			      struct tuple_format *format)
 {
-	struct txn *txn = in_txn();
-	assert(txn != NULL);
-	(void) txn_can_yield(txn, true);
-	auto yield_guard =
-		make_scoped_guard([=] { txn_can_yield(txn, false); });
+	AlterYieldGuard guard(space);
 	space_check_format_xc(space, format);
 }
 
@@ -1388,11 +1453,7 @@ static inline void
 space_build_index_with_yield(struct space *old_space, struct space *new_space,
 			     struct index *new_index)
 {
-	struct txn *txn = in_txn();
-	assert(txn != NULL);
-	(void) txn_can_yield(txn, true);
-	auto yield_guard =
-		make_scoped_guard([=] { txn_can_yield(txn, false); });
+	AlterYieldGuard guard(old_space);
 	space_build_index_xc(old_space, new_space, new_index);
 }
 
@@ -1622,10 +1683,10 @@ TruncateIndex::prepare(struct alter_space *alter)
 	 * space_build_index() to let the engine know that the
 	 * index was recreated. For example, Vinyl uses this
 	 * callback to load indexes during local recovery.
+	 * No need to yield here since we build an empty index.
 	 */
 	assert(new_index != NULL);
-	space_build_index_with_yield(alter->new_space, alter->new_space,
-				     new_index);
+	space_build_index_xc(alter->new_space, alter->new_space, new_index);
 }
 
 void
@@ -2116,14 +2177,16 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			ER_CREATE_SPACE : ER_ALTER_SPACE;
 		def = space_def_new_from_tuple(new_tuple, errcode, region);
 	}
+	auto def_guard = make_scoped_guard([=] {
+		if (def != NULL)
+			space_def_delete(def);
+	});
 	if (filter_temporary_ddl_stmt(txn, old_space != NULL ?
 				      old_space->def : def) != 0)
 		return -1;
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
 		if (def == NULL)
 			return -1;
-		auto def_guard =
-			make_scoped_guard([=] { space_def_delete(def); });
 		if (access_check_ddl(def->name, def->uid, NULL,
 				     SC_SPACE, PRIV_C) != 0)
 			return -1;
@@ -2290,8 +2353,6 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		}
 		if (def == NULL)
 			return -1;
-		auto def_guard =
-			make_scoped_guard([=] { space_def_delete(def); });
 		if (access_check_ddl(def->name, def->uid, old_space->access,
 				     SC_SPACE, PRIV_A) != 0)
 			return -1;
@@ -2992,12 +3053,12 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		struct user_def *user = user_def_new_from_tuple(new_tuple);
 		if (user == NULL)
 			return -1;
-		if (access_check_ddl(user->name, user->owner, NULL,
-				     user->type, PRIV_C) != 0)
-			return -1;
 		auto def_guard = make_scoped_guard([=] {
 			user_def_delete(user);
 		});
+		if (access_check_ddl(user->name, user->owner, NULL,
+				     user->type, PRIV_C) != 0)
+			return -1;
 		try {
 			(void) user_cache_replace(user);
 		} catch (Exception *e) {
@@ -3050,12 +3111,12 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		struct user_def *user = user_def_new_from_tuple(new_tuple);
 		if (user == NULL)
 			return -1;
-		if (access_check_ddl(user->name, user->uid, old_user->access,
-				     old_user->def->type, PRIV_A) != 0)
-			return -1;
 		auto def_guard = make_scoped_guard([=] {
 			user_def_delete(user);
 		});
+		if (access_check_ddl(user->name, user->uid, old_user->access,
+				     old_user->def->type, PRIV_A) != 0)
+			return -1;
 		try {
 			user_cache_replace(user);
 		} catch (Exception *e) {
@@ -3196,6 +3257,10 @@ func_def_new_from_tuple(struct tuple *tuple)
 		if (trigger_count == 0)
 			triggers = NULL;
 	}
+
+	if (triggers != NULL &&
+	    schema_check_feature(SCHEMA_FEATURE_PERSISTENT_TRIGGERS) != 0)
+		return NULL;
 
 	struct func_def *def = func_def_new(fid, uid, name, name_len,
 					    language, body, body_len,
@@ -4148,6 +4213,7 @@ on_commit_dd_version(struct trigger *trigger, void * /* event */)
 	struct fiber *fiber = data->fiber;
 	if (fiber != NULL)
 		fiber_wakeup(fiber);
+	box_broadcast_status();
 	return 0;
 }
 
@@ -4352,6 +4418,18 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 				return -1;
 		}
 		data->fiber = fiber;
+		/*
+		 * When upgrading to 3.3.0, new local space _gc_consumers
+		 * is created on each replica and we need to fill it with
+		 * consumers of already connected replicas since they won't
+		 * be inserted to the space automatically.
+		 * We cannot do it in `box.schema.upgrade` procedure since
+		 * it's called on master and the space is created on each
+		 * replica.
+		 */
+		if (version == version_id(3, 3, 0) &&
+		    gc_persist_consumers() != 0)
+			return -1;
 	} else if (strcmp(key, "bootstrap_leader_uuid") == 0) {
 		struct tt_uuid *uuid = xregion_alloc_object(&txn->region,
 							    typeof(*uuid));
@@ -4638,6 +4716,14 @@ on_replace_dd_cluster_update(const struct replica_def *old_def,
 				 "own UUID update in _cluster");
 			return -1;
 		}
+		/*
+		 * Drop gc_consumer for the replaced replica.
+		 * See `on_replace_dd_cluster_delete` for explanation why we
+		 * don't drop consumer on recovery.
+		 */
+		if (recovery_state == FINISHED_RECOVERY &&
+		    gc_erase_consumer(&replica->uuid) != 0)
+			return -1;
 		if (on_replace_dd_cluster_set_uuid(replica, new_def) != 0)
 			return -1;
 		/* The replica was re-created. */
@@ -4734,6 +4820,16 @@ on_replace_dd_cluster_delete(const struct replica_def *old_def)
 		      "internally - %s", old_def->id,
 		      tt_uuid_str(&old_def->uuid), tt_uuid_str(&replica->uuid));
 	}
+	/*
+	 * Unregister gc consumer of the replica. No-op on recovery because
+	 * it's not safe to write to space during recovery and we don't need it
+	 * anyway: consumer either was already deleted if it's local recovery or
+	 * wasn't created at all if it's remote recovery since persistent
+	 * consumers are local.
+	 */
+	if (recovery_state == FINISHED_RECOVERY &&
+	    gc_erase_consumer(&replica->uuid) != 0)
+		return -1;
 	/*
 	 * Unregister only after commit. Otherwise if the transaction would be
 	 * rolled back, there might be already another replica taken the freed

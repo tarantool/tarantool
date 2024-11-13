@@ -2,11 +2,11 @@ local fun = require('fun')
 local yaml = require('yaml')
 local fio = require('fio')
 local t = require('luatest')
-local treegen = require('test.treegen')
-local justrun = require('test.justrun')
-local server = require('test.luatest_helpers.server')
+local treegen = require('luatest.treegen')
+local justrun = require('luatest.justrun')
+local server = require('luatest.server')
 local helpers = require('test.config-luatest.helpers')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 
 local g = helpers.group()
 
@@ -36,7 +36,7 @@ local function replicaset_has_no_alerts(g)
 end
 
 g.test_basic = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = {
         credentials = {
             users = {
@@ -60,8 +60,8 @@ g.test_basic = function(g)
             },
         },
     }
-    local config_file = treegen.write_script(dir, 'config.yaml',
-                                             yaml.encode(config))
+    local config_file = treegen.write_file(dir, 'config.yaml',
+                                           yaml.encode(config))
     local opts = {config_file = config_file, chdir = dir}
     g.server = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
     g.server:start()
@@ -73,7 +73,7 @@ g.test_basic = function(g)
 end
 
 g.test_example_single = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config_file = fio.abspath('doc/examples/config/single.yaml')
     local opts = {config_file = config_file, chdir = dir}
     g.server = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
@@ -82,7 +82,7 @@ g.test_example_single = function(g)
 end
 
 g.test_example_replicaset = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     fio.copytree('doc/examples/config/secrets', fio.pathjoin(dir, 'secrets'))
 
     local config_file = fio.abspath('doc/examples/config/replicaset.yaml')
@@ -99,7 +99,7 @@ g.test_example_replicaset = function(g)
 end
 
 g.test_example_replicaset_manual_failover = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     fio.copytree('doc/examples/config/secrets', fio.pathjoin(dir, 'secrets'))
 
     local config_file = fio.abspath('doc/examples/config/' ..
@@ -117,7 +117,7 @@ g.test_example_replicaset_manual_failover = function(g)
 end
 
 g.test_example_replicaset_election_failover = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     fio.copytree('doc/examples/config/secrets', fio.pathjoin(dir, 'secrets'))
 
     local config_file = fio.abspath('doc/examples/config/' ..
@@ -284,8 +284,8 @@ for case_name, case in pairs({
             'is not found in this replicaset',
     },
 }) do
-    g[('test_bad_replicaset_build_%s'):format(case_name)] = function(g)
-        local dir = treegen.prepare_directory(g, {}, {})
+    g[('test_bad_replicaset_build_%s'):format(case_name)] = function()
+        local dir = treegen.prepare_directory({}, {})
 
         local good_listen = {{
             uri = 'unix/:./{{ instance_name }}.iproto'
@@ -354,7 +354,7 @@ for case_name, case in pairs({
             },
         }
 
-        local config_file = treegen.write_script(dir, 'config.yaml',
+        local config_file = treegen.write_file(dir, 'config.yaml',
             yaml.encode(config))
         local env = {}
         local args = {'--name', 'instance-001', '--config', config_file}
@@ -566,8 +566,8 @@ for case_name, case in pairs({
             }
         end
 
-        local dir = treegen.prepare_directory(g, {}, {})
-        local config_file = treegen.write_script(dir, 'config.yaml',
+        local dir = treegen.prepare_directory({}, {})
+        local config_file = treegen.write_file(dir, 'config.yaml',
             yaml.encode(config))
         helpers.start_example_replicaset(g, dir, config_file)
         if case.check ~= nil then
@@ -626,8 +626,8 @@ g.test_extras_on_community_edition = function(g)
         }
     end)
 
-    local dir = treegen.prepare_directory(g, {}, {})
-    treegen.write_script(dir, 'internal/config/extras.lua', extras)
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'internal/config/extras.lua', extras)
 
     local verify = function()
         local config = require('config')
@@ -648,7 +648,7 @@ g.test_extras_after_fail = function(g)
     -- the `override` directory).
     t.tarantool.skip_if_enterprise()
 
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local extras = string.dump(function()
         local function post_apply(_config)
             local config = require('config')
@@ -660,7 +660,7 @@ g.test_extras_after_fail = function(g)
             post_apply = post_apply,
         }
     end)
-    treegen.write_script(dir, 'internal/config/extras.lua', extras)
+    treegen.write_file(dir, 'internal/config/extras.lua', extras)
 
     local config = {
         credentials = {
@@ -685,8 +685,8 @@ g.test_extras_after_fail = function(g)
             },
         },
     }
-    local config_file = treegen.write_script(dir, 'config.yaml',
-                                             yaml.encode(config))
+    local config_file = treegen.write_file(dir, 'config.yaml',
+                                           yaml.encode(config))
     local opts = {
         config_file = config_file,
         alias = 'instance-001',
@@ -700,7 +700,7 @@ g.test_extras_after_fail = function(g)
     end)
 
     config.app = {file = 'one'}
-    treegen.write_script(dir, 'config.yaml', yaml.encode(config))
+    treegen.write_file(dir, 'config.yaml', yaml.encode(config))
     g.server:exec(function()
         local config = require('config')
         pcall(config.reload, config)
@@ -726,7 +726,7 @@ end
 -- Verify that a directory with the configuration file is added
 -- into the Lua loader paths.
 g.test_loader_paths = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local config = {
         credentials = {
             users = {
@@ -750,10 +750,10 @@ g.test_loader_paths = function(g)
             },
         },
     }
-    local config_file = treegen.write_script(dir, 'foo/config.yaml',
-                                             yaml.encode(config))
+    local config_file = treegen.write_file(dir, 'foo/config.yaml',
+                                           yaml.encode(config))
 
-    treegen.write_script(dir, 'foo/bar.lua', [[return {whoami = 'bar'}]])
+    treegen.write_file(dir, 'foo/bar.lua', [[return {whoami = 'bar'}]])
 
     local opts = {config_file = config_file, chdir = dir}
     g.server = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
@@ -767,8 +767,8 @@ end
 
 -- Verify, that instance can recover from the xlogs using config.
 g.test_recovery_without_uuid = function(g)
-    local dir = treegen.prepare_directory(g, {}, {})
-    local cfg = cbuilder.new()
+    local dir = treegen.prepare_directory({}, {})
+    local cfg = cbuilder:new()
         :add_instance('instance-001', {
             database = {
                 mode = 'rw',
@@ -776,7 +776,7 @@ g.test_recovery_without_uuid = function(g)
             }
         })
         :config()
-    local cfg_file = treegen.write_script(dir, 'config.yaml', yaml.encode(cfg))
+    local cfg_file = treegen.write_file(dir, 'config.yaml', yaml.encode(cfg))
     local opts = {
         config_file = cfg_file,
         chdir = dir,
@@ -797,7 +797,7 @@ g.test_recovery_without_uuid = function(g)
     -- to recover from the xlogs without passing UUID to config.
     local cfg_rs = cfg.groups['group-001'].replicasets['replicaset-001']
     cfg_rs.instances['instance-001'].database.instance_uuid = nil
-    cfg_file = treegen.write_script(dir, 'config.yaml', yaml.encode(cfg))
+    cfg_file = treegen.write_file(dir, 'config.yaml', yaml.encode(cfg))
     g.server.config_file = cfg_file
     -- Recovery process.
     g.server:restart()

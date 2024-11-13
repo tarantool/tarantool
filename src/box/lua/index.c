@@ -37,6 +37,7 @@
 #include "box/lua/tuple.h"
 #include "box/lua/misc.h"
 #include "small/region.h"
+#include "arrow_ipc.h"
 #include "fiber.h"
 
 /** {{{ box.index Lua library: access to spaces and indexes
@@ -304,11 +305,11 @@ box_index_init_iterator_types(struct lua_State *L, int idx)
 static int
 lbox_index_iterator(lua_State *L)
 {
-	if (lua_gettop(L) != 6 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    !lua_isnumber(L, 3)) {
+	if (lua_gettop(L) != 7 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    !lua_isnumber(L, 3) || !lua_isnumber(L, 6)) {
 		diag_set(IllegalParams,
 			 "Usage: index.iterator(space_id, index_id, "
-			 "type, key, after, level)");
+			 "type, key, after, offset, level)");
 		return luaT_error(L);
 	}
 
@@ -316,7 +317,8 @@ lbox_index_iterator(lua_State *L)
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
 	uint32_t iterator = lua_tonumber(L, 3);
-	int level = lua_tonumber(L, 6);
+	uint32_t offset = lua_tonumber(L, 6);
+	int level = lua_tonumber(L, 7);
 	size_t mpkey_len;
 	const char *mpkey = lua_tolstring(L, 4, &mpkey_len); /* Key encoded by Lua */
 	struct iterator *it = NULL;
@@ -325,9 +327,9 @@ lbox_index_iterator(lua_State *L)
 	if (lbox_index_normalize_position(L, 5, space_id, index_id,
 					  &packed_pos, &packed_pos_end) != 0)
 		goto error;
-	it = box_index_iterator_after(space_id, index_id, iterator, mpkey,
-				      mpkey + mpkey_len, packed_pos,
-				      packed_pos_end);
+	it = box_index_iterator_with_offset(space_id, index_id, iterator, mpkey,
+					    mpkey + mpkey_len, packed_pos,
+					    packed_pos_end, offset);
 
 	if (it == NULL)
 		goto error;
@@ -418,6 +420,33 @@ lbox_index_compact(lua_State *L)
 	return 0;
 }
 
+static int
+lbox_insert_arrow(lua_State *L)
+{
+	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1) ||
+	    lua_type(L, 2) != LUA_TSTRING) {
+		diag_set(IllegalParams, "Usage: space:insert_arrow(arrow)");
+		return luaT_error(L);
+	}
+	uint32_t space_id = lua_tonumber(L, 1);
+
+	size_t len;
+	const char *data = lua_tolstring(L, 2, &len);
+	assert(data != NULL);
+	struct ArrowArray array;
+	struct ArrowSchema schema;
+	if (arrow_ipc_decode(&array, &schema, data, data + len) != 0)
+		return luaT_error(L);
+	int rc = box_insert_arrow(space_id, &array, &schema);
+	if (schema.release != NULL)
+		schema.release(&schema);
+	if (array.release != NULL)
+		array.release(&array);
+	if (rc != 0)
+		return luaT_error(L);
+	return 0;
+}
+
 /* }}} */
 
 void
@@ -451,6 +480,7 @@ box_lua_index_init(struct lua_State *L)
 		{"truncate", lbox_truncate},
 		{"stat", lbox_index_stat},
 		{"compact", lbox_index_compact},
+		{"insert_arrow", lbox_insert_arrow},
 		{NULL, NULL}
 	};
 

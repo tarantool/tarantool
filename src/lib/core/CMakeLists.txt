@@ -28,6 +28,8 @@ set(core_sources
     random.c
     trigger.cc
     port.c
+    arrow_ipc.c
+    mp_arrow.c
     decimal.c
     mp_decimal.c
     cord_buf.c
@@ -67,6 +69,7 @@ else()
 endif()
 
 include_directories(${OPENSSL_INCLUDE_DIR}
+                    ${NANOARROW_INCLUDE_DIRS}
                     ${EXTRA_CORE_INCLUDE_DIRS})
 
 if (TARGET_OS_NETBSD)
@@ -79,7 +82,7 @@ endif()
 add_library(core STATIC ${core_sources})
 
 target_link_libraries(core salad small uri decNumber bit tzcode misc
-                      ${LIBEV_LIBRARIES}
+                      ${LIBEV_LIBRARIES} ${NANOARROW_LIBRARIES}
                       ${LIBEIO_LIBRARIES} ${LIBCORO_LIBRARIES}
                       ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES}
                       ${LIBCDT_LIBRARIES} ${OPENSSL_LIBRARIES}
@@ -103,6 +106,8 @@ endif()
 if (ENABLE_BUNDLED_ICU)
     add_dependencies(core bundled-icu)
 endif()
+
+add_dependencies(core bundled-nanoarrow)
 
 if (ENABLE_TUPLE_COMPRESSION)
     target_link_libraries(core ${ZSTD_LIBRARIES})

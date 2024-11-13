@@ -729,6 +729,12 @@ void
 user_cache_free(void)
 {
 	if (user_registry != NULL) {
+		mh_int_t i;
+		mh_foreach(user_registry, i) {
+			struct user *user = (struct user *)
+				mh_i32ptr_node(user_registry, i)->val;
+			user_destroy(user);
+		}
 		mh_i32ptr_delete(user_registry);
 		user_registry = NULL;
 	}

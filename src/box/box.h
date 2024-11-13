@@ -357,6 +357,7 @@ void box_set_checkpoint_count(void);
 void box_set_checkpoint_interval(void);
 void box_set_checkpoint_wal_threshold(void);
 int box_set_wal_queue_max_size(void);
+int box_set_replication_synchro_queue_max_size(void);
 int box_set_wal_cleanup_delay(void);
 void box_set_memtx_memory(void);
 void box_set_memtx_max_tuple_size(void);
@@ -388,6 +389,7 @@ int box_set_txn_timeout(void);
 int box_set_txn_isolation(void);
 int box_set_auth_type(void);
 int box_set_bootstrap_strategy(void);
+int box_set_bootstrap_leader(void);
 
 /**
  * Initialize logger on box init.
@@ -666,6 +668,31 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 	   const char *tuple_end, const char *ops, const char *ops_end,
 	   int index_base, box_tuple_t **result);
 
+struct ArrowArray;
+struct ArrowSchema;
+
+/**
+ * Executes a batch insert request.
+ *
+ * A record batch from the Arrow `array` is inserted into the space columns,
+ * whose names are provided by the Arrow `schema`. Column types in the schema
+ * must match the types of the corresponding fields in the space format.
+ *
+ * If a column is nullable in space format, it can be omitted. All non-nullable
+ * columns (including primary key parts) must be present in the batch.
+ *
+ * This function does not release neither `array` nor `schema`.
+ *
+ * \param space_id space identifier
+ * \param array input data in ArrowArray format
+ * \param schema definition of the input data in ArrowSchema format
+ * \retval 0 on success
+ * \retval -1 on error (check box_error_last())
+ */
+API_EXPORT int
+box_insert_arrow(uint32_t space_id, struct ArrowArray *array,
+		 struct ArrowSchema *schema);
+
 /**
  * Truncate space.
  *
@@ -788,6 +815,22 @@ box_iproto_override(uint32_t req_type, iproto_handler_t handler,
 API_EXPORT int64_t
 box_info_lsn(void);
 
+/*! Codes for request memtx status information for box.slab.info. */
+enum box_slab_info_type {
+	BOX_SLAB_INFO_ITEMS_SIZE = 0, /*!< Allocated only for tuples. */
+	BOX_SLAB_INFO_ITEMS_USED = 1, /*!< Used only for tuples. */
+	BOX_SLAB_INFO_ARENA_SIZE = 2, /*!< Allocated for  tuples and indexes. */
+	BOX_SLAB_INFO_ARENA_USED = 3, /*!< Used for both tuples and indexes. */
+	BOX_SLAB_INFO_QUOTA_SIZE = 4, /*!< Memory limit for slab allocator. */
+	BOX_SLAB_INFO_QUOTA_USED = 5, /*!< Used by slab allocator. */
+};
+
+/**
+ * Get memtx status information for box.slab.info.
+ */
+API_EXPORT uint64_t
+box_slab_info(enum box_slab_info_type type);
+
 /** \endcond public */
 
 /**
@@ -826,6 +869,12 @@ box_generate_space_id(uint32_t *new_space_id, bool is_temporary);
  */
 void
 box_broadcast_id(void);
+
+/**
+ * Broadcast the status of the instance.
+ */
+void
+box_broadcast_status(void);
 
 /**
  * Broadcast the current election state of RAFT machinery

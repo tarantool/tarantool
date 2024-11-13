@@ -37,6 +37,7 @@
 
 #include "diag.h"
 #include "iproto_features.h"
+#include "iproto_constants.h"
 #include "node_name.h"
 #include "tt_uuid.h"
 #include "vclock/vclock.h"
@@ -211,6 +212,14 @@ struct request {
 	/** Insert/replace/upsert tuple or proc argument or update operations. */
 	const char *tuple;
 	const char *tuple_end;
+	/** The data in in-memory Arrow format. */
+	struct ArrowArray *arrow_array;
+	/** Arrow schema for @arrow_array. */
+	struct ArrowSchema *arrow_schema;
+	/** The data in serialized Arrow format. */
+	const char *arrow_ipc;
+	/** End of @arrow_ipc. */
+	const char *arrow_ipc_end;
 	/** Upsert operations. */
 	const char *ops;
 	const char *ops_end;
@@ -409,6 +418,8 @@ struct raft_request {
 	bool is_leader_seen;
 	uint64_t state;
 	const struct vclock *vclock;
+	/** Replication group identifier. 0 - replicaset, 1 - replica-local. */
+	enum group_id group_id;
 };
 
 void
@@ -745,12 +756,28 @@ int
 xrow_decode_applier_heartbeat(const struct xrow_header *row,
 			      struct applier_heartbeat *req);
 
+/** Encode vclock including 0th component. */
+/** Return the number of bytes an encoded vclock takes. */
+uint32_t
+mp_sizeof_vclock_ignore0(const struct vclock *vclock);
+
+/** Encode a vclock to a buffer as MP_MAP. Never fails. */
+char *
+mp_encode_vclock_ignore0(char *data, const struct vclock *vclock);
+
+/**
+ * Decode a vclock from MsgPack data, it should be MP_MAP.
+ * Returns -1 on error, diag is NOT set.
+ */
+int
+mp_decode_vclock_ignore0(const char **data, struct vclock *vclock);
+
 /** Encode vclock ignoring 0th component. */
 void
 xrow_encode_vclock_ignore0(struct xrow_header *row,
 			   const struct vclock *vclock);
 
-/** Encode vclock including 0th component. */
+/** Encode vclock. */
 void
 xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
 

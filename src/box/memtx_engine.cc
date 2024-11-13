@@ -205,24 +205,30 @@ memtx_engine_shutdown(struct engine *engine)
 	fiber_cancel(memtx->gc_fiber);
 	fiber_join(memtx->gc_fiber);
 	memtx->gc_fiber = NULL;
-
-#ifdef ENABLE_ASAN
-	/* We check for memory leaks in ASAN. */
-	bool stop = false;
-	while (!stop)
-		memtx_engine_run_gc(memtx, &stop);
-#endif
 }
 
 static void
 memtx_engine_free(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
+#ifdef ENABLE_ASAN
+	/* We check for memory leaks in ASAN. */
+	bool stop = false;
+	while (!stop)
+		memtx_engine_run_gc(memtx, &stop);
+#endif
 	mempool_destroy(&memtx->iterator_pool);
 	if (mempool_is_initialized(&memtx->rtree_iterator_pool))
 		mempool_destroy(&memtx->rtree_iterator_pool);
+	void *p = memtx->reserved_extents;
+	while (p != NULL) {
+		void *next = *(void **)p;
+		memtx_index_extent_free(memtx, p);
+		p = next;
+	}
 	mempool_destroy(&memtx->index_extent_pool);
 	slab_cache_destroy(&memtx->index_slab_cache);
+	mh_ptr_delete(memtx->malloc_extents);
 	/*
 	 * The last blessed tuple may refer to a memtx tuple, which would
 	 * become inaccessible once we destroyed the arena, so we need to
@@ -1497,7 +1503,10 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 		return -1;
 
 	txn_limbo_checkpoint(&txn_limbo, &synchro_req, &limbo_vclock);
-	box_raft_checkpoint_local(&raft_req);
+	box_raft_checkpoint_remote(&raft_req);
+	/* See raft_process_recovery, why these fields are not needed. */
+	raft_req.state = 0;
+	raft_req.vclock = NULL;
 
 	/* Respond with vclock and JOIN_META. */
 	send_join_header(stream, arg->vclock);
@@ -1767,6 +1776,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		       MEMTX_ITERATOR_SIZE);
 	memtx->num_reserved_extents = 0;
 	memtx->reserved_extents = NULL;
+	memtx->malloc_extents = mh_ptr_new();
 
 	memtx->state = MEMTX_INITIALIZED;
 	memtx->max_tuple_size = MAX_TUPLE_SIZE;
@@ -1930,7 +1940,8 @@ memtx_engine_schedule_gc(struct memtx_engine *memtx,
 			 struct memtx_gc_task *task)
 {
 	stailq_add_tail_entry(&memtx->gc_queue, task, link);
-	fiber_wakeup(memtx->gc_fiber);
+	if (memtx->gc_fiber != NULL)
+		fiber_wakeup(memtx->gc_fiber);
 }
 
 void
@@ -2117,12 +2128,7 @@ memtx_index_extent_alloc(void *ctx)
 		memtx->reserved_extents = *(void **)memtx->reserved_extents;
 		return result;
 	}
-	ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
-		/* same error as in mempool_alloc */
-		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
-			 "mempool", "new slab");
-		return NULL;
-	});
+	ERROR_INJECT(ERRINJ_INDEX_ALLOC, { goto fail; });
 	void *ret;
 	while ((ret = mempool_alloc(&memtx->index_extent_pool)) == NULL) {
 		bool stop;
@@ -2131,9 +2137,23 @@ memtx_index_extent_alloc(void *ctx)
 			break;
 	}
 	if (ret == NULL)
-		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
-			 "mempool", "new slab");
+		goto fail;
 	return ret;
+fail:
+	if (in_txn() != NULL && in_txn()->status == TXN_ABORTED) {
+		/*
+		 * We cannot sanely reserve blocks for rollback because strictly
+		 * speaking the whole index can change. We cannot tolerate
+		 * allocation failure also. So just allocate outside of the
+		 * memtx arena quota.
+		 */
+		ret = xmalloc(MEMTX_EXTENT_SIZE);
+		mh_ptr_put(memtx->malloc_extents, (const void **)&ret,
+			   NULL, NULL);
+		return ret;
+	}
+	diag_set(OutOfMemory, MEMTX_EXTENT_SIZE, "mempool", "new slab");
+	return NULL;
 }
 
 /**
@@ -2143,7 +2163,13 @@ void
 memtx_index_extent_free(void *ctx, void *extent)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)ctx;
-	return mempool_free(&memtx->index_extent_pool, extent);
+	mh_int_t p = mh_ptr_find(memtx->malloc_extents, extent, NULL);
+	if (p != mh_end(memtx->malloc_extents)) {
+		mh_ptr_del(memtx->malloc_extents, p, NULL);
+		free(extent);
+		return;
+	}
+	mempool_free(&memtx->index_extent_pool, extent);
 }
 
 /**

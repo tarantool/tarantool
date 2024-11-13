@@ -259,6 +259,10 @@ error_build(struct mp_error *mp_error)
 		err = new SSLError();
 	} else if (strcmp(mp_error->type, "FileFormatError") == 0) {
 		err = new FileFormatError();
+	} else if (strcmp(mp_error->type, "EncodeError") == 0) {
+		err = new EncodeError();
+	} else if (strcmp(mp_error->type, "DecodeError") == 0) {
+		err = new DecodeError();
 	} else {
 		err = new ClientError();
 	}

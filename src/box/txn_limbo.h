@@ -53,16 +53,15 @@ struct txn_limbo_entry {
 	/** Transaction, waiting for a quorum. */
 	struct txn *txn;
 	/**
+	 * Approximate size of this request when encoded.
+	 */
+	size_t approx_len;
+	/**
 	 * LSN of the transaction by the originator's vclock
 	 * component. May be -1 in case the transaction is not
 	 * written to WAL yet.
 	 */
 	int64_t lsn;
-	/**
-	 * Number of ACKs. Or in other words - how many replicas
-	 * confirmed receipt of the transaction.
-	 */
-	int ack_count;
 	/**
 	 * Result flags. Only one of them can be true. But both
 	 * can be false if the transaction is still waiting for
@@ -170,6 +169,19 @@ struct txn_limbo {
 	 */
 	int64_t confirmed_lsn;
 	/**
+	 * The first unconfirmed synchronous transaction in the current term.
+	 * Is NULL if there is no such transaction, or if the current instance
+	 * does not own limbo.
+	 */
+	struct txn_limbo_entry *entry_to_confirm;
+	/**
+	 * Number of ACKs of the first unconfirmed synchronous transaction
+	 * (entry_to_confirm->txn). Contains the actual value only for a
+	 * non-NULL entry_to_confirm with a local lsn assigned. Otherwise
+	 * it may contain any trash.
+	 */
+	int ack_count;
+	/**
 	 * Total number of performed rollbacks. It used as a guard
 	 * to do some actions assuming all limbo transactions will
 	 * be confirmed, and to check that there were no rollbacks
@@ -238,6 +250,10 @@ struct txn_limbo {
 	 * quorum.
 	 */
 	double confirm_lag;
+	/** Maximal size of entries enqueued in txn_limbo.queue (in bytes). */
+	int64_t max_size;
+	/** Current approximate size of txn_limbo.queue. */
+	int64_t size;
 };
 
 /**
@@ -302,7 +318,8 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo);
  * The limbo entry is allocated on the transaction's region.
  */
 struct txn_limbo_entry *
-txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn);
+txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
+		 size_t approx_len);
 
 /** Remove the entry from the limbo, mark as rolled back. */
 void
@@ -487,6 +504,16 @@ txn_limbo_has_owner(struct txn_limbo *limbo)
  */
 void
 txn_limbo_init();
+
+/**
+ * Denitialize qsync engine.
+ */
+void
+txn_limbo_free();
+
+/** Set maximal limbo size in bytes. */
+void
+txn_limbo_set_max_size(struct txn_limbo *limbo, int64_t size);
 
 #if defined(__cplusplus)
 }

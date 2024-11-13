@@ -276,6 +276,7 @@ memtx_hash_index_size(struct index *base)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct space *space = space_by_id(base->def->space_id);
+	memtx_tx_story_gc();
 	/* Substract invisible count. */
 	return light_index_count(&index->hash_table) -
 	       memtx_tx_index_invisible_count(in_txn(), space, base);
@@ -629,8 +630,11 @@ memtx_hash_index_create_read_view(struct index *base)
 {
 	static const struct index_read_view_vtab vtab = {
 		.free = hash_read_view_free,
+		.count = generic_index_read_view_count,
 		.get_raw = hash_read_view_get_raw,
 		.create_iterator = hash_read_view_create_iterator,
+		.create_iterator_with_offset =
+			generic_index_read_view_create_iterator_with_offset,
 	};
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct hash_read_view *rv =
@@ -638,7 +642,7 @@ memtx_hash_index_create_read_view(struct index *base)
 	index_read_view_create(&rv->base, &vtab, base->def);
 	struct space *space = space_by_id(base->def->space_id);
 	assert(space != NULL);
-	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space);
+	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space, base);
 	rv->index = index;
 	index_ref(base);
 	light_index_view_create(&rv->view, &index->hash_table);
@@ -666,6 +670,8 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .get = */ memtx_index_get,
 	/* .replace = */ memtx_hash_index_replace,
 	/* .create_iterator = */ memtx_hash_index_create_iterator,
+	/* .create_iterator_with_offset = */
+	generic_index_create_iterator_with_offset,
 	/* .create_read_view = */ memtx_hash_index_create_read_view,
 	/* .stat = */ generic_index_stat,
 	/* .compact = */ generic_index_compact,

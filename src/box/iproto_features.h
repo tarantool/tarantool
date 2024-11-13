@@ -88,6 +88,10 @@ extern "C" {
 	 * IS_SYNC flag in IPROTO_BEGIN, IPROTO_COMMIT
 	 */								\
 	_(IS_SYNC, 11)							\
+	/**
+	 * Support of data insertion in Arrow format.
+	 */								\
+	_(INSERT_ARROW, 12)						\
 
 #define IPROTO_FEATURE_MEMBER(s, v) IPROTO_FEATURE_ ## s = v,
 
@@ -112,7 +116,7 @@ struct iproto_features {
  * `box.iproto.protocol_version` needs to be updated correspondingly.
  */
 enum {
-	IPROTO_CURRENT_VERSION = 9,
+	IPROTO_CURRENT_VERSION = 10,
 };
 
 /**

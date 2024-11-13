@@ -1,7 +1,7 @@
 local fio = require('fio')
 local t = require('luatest')
-local treegen = require('test.treegen')
-local justrun = require('test.justrun')
+local treegen = require('luatest.treegen')
+local justrun = require('luatest.justrun')
 
 local g = t.group()
 
@@ -36,7 +36,7 @@ end
 -- all items from 1 to the end.
 local SCRIPT_TEMPLATE = [[
 print(require('json').encode({
-    ['script'] = '<script>',
+    ['script'] = '<filename>',
     ['...'] = {...},
     ['arg[-1]'] = arg[-1],
     ['arg[0]'] = arg[0],
@@ -44,13 +44,8 @@ print(require('json').encode({
 }))
 ]]
 
-g.before_all(function(g)
-    treegen.init(g)
-    treegen.add_template(g, '^.*$', SCRIPT_TEMPLATE)
-end)
-
-g.after_all(function(g)
-    treegen.clean(g)
+g.before_all(function()
+    treegen.add_template('^.*$', SCRIPT_TEMPLATE)
 end)
 
 -- Generate output expected from tarantool running in given
@@ -233,8 +228,8 @@ for _, case in ipairs({
         args = {'main.lua'},
     },
 }) do
-    g[case[1]] = function(g)
-        local dir = treegen.prepare_directory(g, case.scripts)
+    g[case[1]] = function()
+        local dir = treegen.prepare_directory(case.scripts)
         local res = justrun.tarantool(dir, case.env, case.args)
         local exp = expected_output(case.scripts, case.env, case.args)
         t.assert_equals(res, exp)

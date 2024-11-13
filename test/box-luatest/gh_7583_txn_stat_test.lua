@@ -105,6 +105,7 @@ g.test_replication = function(cg)
         box.rollback()
         return box.info.vclock
     end)
+    vclock[0] = nil
     cg.replica:wait_for_vclock(vclock)
     cg.replica:exec(function()
         local function stat()

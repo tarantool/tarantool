@@ -25,7 +25,7 @@ test:plan(1)
 
 test:test("json", function(test)
     local serializer = require('json')
-    test:plan(58)
+    test:plan(82)
 
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
@@ -217,6 +217,102 @@ test:test("json", function(test)
     local bigjson = serializer.encode(t)
     local t_dec = serializer.decode(bigjson)
     test:is_deeply(t_dec, t, 'encode/decode big strings')
+
+    --
+    -- Test encode_key_order option.
+    --
+    local map_1 = {a = 1, c = 100, b = 2}
+    local map_2 = {a = 1, c = 100, b = 2, inner = {a = 1, c = 100, b = 2}}
+    local map_3 = {["12"] = 'number', a = 1, c = 100, b = 2}
+
+    test:is(serializer.encode(map_1),
+            '{"b":2,"a":1,"c":100}',
+            'default order')
+    test:is(serializer.encode(map_1, {encode_key_order = {'a', 'b', 'c'}}),
+            '{"a":1,"b":2,"c":100}',
+            'custom order')
+    test:is(serializer.encode(map_1),
+            '{"b":2,"a":1,"c":100}',
+            'default order after custom order')
+    test:is(serializer.encode(map_1, {encode_key_order = {'a', 'b'}}),
+            '{"a":1,"b":2,"c":100}',
+            'partial custom order')
+    test:is(serializer.encode(map_1, {encode_key_order = {'a', 'b', 'd'}}),
+            '{"a":1,"b":2,"c":100}',
+            'unknown key in custom order')
+
+    test:is(serializer.encode(map_2, {encode_key_order = {'a', 'b'}}),
+            '{"a":1,"b":2,"c":100,"inner":{"a":1,"b":2,"c":100}}',
+            'partial custom order with nested map')
+    test:is(serializer.encode(map_2, {encode_key_order = {'a', 'b', 'inner'}}),
+            '{"a":1,"b":2,"inner":{"a":1,"b":2,"c":100},"c":100}',
+            'nested map in custom order')
+
+    test:is(serializer.encode(map_3),
+            '{"b":2,"12":"number","a":1,"c":100}',
+            'default order with number key')
+    test:is(serializer.encode(map_3, {encode_key_order = {'a', 'b'}}),
+            '{"a":1,"b":2,"12":"number","c":100}',
+            'partial custom order with number key')
+    test:is(serializer.encode(map_3, {encode_key_order = {12, 'a', 'b'}}),
+            '{"12":"number","a":1,"b":2,"c":100}',
+            'number key in custom order')
+    test:is(serializer.encode(map_3, {encode_key_order = {{}, 'a', {},'b'}}),
+            '{"a":1,"b":2,"12":"number","c":100}',
+            'non-string key in custom order')
+
+    local j = serializer.new()
+    test:is(j.encode(map_1),
+            '{"b":2,"a":1,"c":100}',
+            'default order with new instance')
+    test:is(j.encode(map_1, {encode_key_order = {'a', 'b', 'c'}}),
+            '{"a":1,"b":2,"c":100}',
+            'custom order with new instance')
+    test:is(j.encode(map_1, {encode_key_order = {'a', 'b'}}),
+            '{"a":1,"b":2,"c":100}',
+            'partial custom order with new instance')
+    test:is(j.encode(map_1),
+            '{"b":2,"a":1,"c":100}',
+            'default order with new instance after custom order')
+
+    j.cfg({encode_key_order = {'a', 'b'}})
+    test:is(j.encode(map_1),
+            '{"a":1,"b":2,"c":100}',
+            'custom order with .cfg')
+    test:is(j.encode(map_1, {encode_key_order = {'b', 'c'}}),
+            '{"b":2,"c":100,"a":1}',
+            'custom order with .cfg and .encode')
+    test:is(j.encode(map_1),
+            '{"a":1,"b":2,"c":100}',
+            'custom order with .cfg after .encode')
+    test:is(j.encode(map_1, {}),
+            '{"a":1,"b":2,"c":100}',
+            'custom order with .cfg after .encode and empty options in .encode')
+
+    collectgarbage()
+    test:is_deeply(j.cfg.encode_key_order,
+                   {'a', 'b'},
+                   'cfg option is persistent')
+
+    -- Memory leak tests when encode fails with encode_key_order set.
+    _, err_msg = pcall(j.encode, {a = 1, [{}] = 2},
+                       {encode_key_order = {'a'}})
+    test:is(err_msg, 'table key must be a number or string',
+            'mem-leak test for .encode error with persistent cfg')
+    _, err_msg = pcall(serializer.encode, {a = 1, [{}] = 2},
+                       {encode_key_order = {'a'}})
+    test:is(err_msg, 'table key must be a number or string',
+            'mem-leak test for .encode error with options')
+    _, err_msg = pcall(j.decode, 'a',
+                       {encode_key_order = {'a'}})
+    test:is(err_msg,
+            "Expected value but found invalid token on line 1 at character 1 here ' >> a'",
+            'mem-leak test for .decode error with persistent cfg')
+    _, err_msg = pcall(serializer.decode, 'a',
+                       {encode_key_order = {'a'}})
+    test:is(err_msg,
+            "Expected value but found invalid token on line 1 at character 1 here ' >> a'",
+            'mem-leak test for .decode error with options')
 end)
 
 os.exit(test:check() and 0 or 1)

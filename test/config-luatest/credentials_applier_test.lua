@@ -1,9 +1,9 @@
 local json = require('json')
 local it = require('test.interactive_tarantool')
 local t = require('luatest')
-local treegen = require('test.treegen')
+local treegen = require('luatest.treegen')
 local helpers = require('test.config-luatest.helpers')
-local cbuilder = require('test.config-luatest.cbuilder')
+local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
 local g = helpers.group()
@@ -302,7 +302,7 @@ g.test_privileges_subtract = function()
     t.assert_items_equals(internal.privileges_subtract(target, current), lack)
 end
 
-g.test_sync_privileges = function(g)
+g.test_sync_privileges = function()
     local box_configuration = {{
             "grant", "read", "universe", ""
         }, {
@@ -341,7 +341,7 @@ g.test_sync_privileges = function(g)
     }
 
     local child = it.new()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     child:roundtrip(("box.cfg{work_dir = %q}"):format(dir))
 
     local name = "myuser"
@@ -371,7 +371,7 @@ g.test_sync_privileges = function(g)
     child:close()
 end
 
-g.test_set_password = function(g)
+g.test_set_password = function()
 
     local auth_types = {
         'chap-sha1',
@@ -389,7 +389,7 @@ g.test_set_password = function(g)
 
         local child = it.new()
 
-        local dir = treegen.prepare_directory(g, {}, {})
+        local dir = treegen.prepare_directory({}, {})
         local socket = "unix/:./test_socket.iproto"
 
         child:roundtrip(("box.cfg{work_dir = %q, listen = %q, auth_type = %q}")
@@ -1182,7 +1182,7 @@ end
 -- same privileges.
 g.test_space_rename_rw2rw = function(g)
     -- Create a configuration with privileges for two spaces.
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :set_global_option('credentials.users.guest.privileges', {
             {
@@ -1258,7 +1258,7 @@ end
 g.test_space_rename_r2rw = function(g)
     -- Create a configuration with different privileges for two
     -- spaces.
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :set_global_option('credentials.users.guest.privileges', {
             {
@@ -1331,7 +1331,7 @@ end
 g.test_space_rename_rw2r = function(g)
     -- Create a configuration with different privileges for two
     -- spaces.
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :set_global_option('credentials.users.guest.privileges', {
             {
@@ -1400,7 +1400,7 @@ end
 -- alerts when some missed_privilege alerts are dropped.
 g.test_fix_status_change_with_pending_warnings = function(g)
     -- Create a configuration with privileges for two missing spaces.
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :set_global_option('credentials.users.guest.privileges', {
             {
@@ -1453,7 +1453,7 @@ end
 -- Verify that it is possible to assign a credential role that does not exist.
 -- And that this role will be correctly assigned when it is created.
 g.test_set_nonexistent_role = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :set_global_option('credentials.roles.role_one', {
             roles = {'role_two'},
@@ -1491,7 +1491,7 @@ end
 -- Verify that alert does not go away if the user is created with a given name
 -- instead of a role.
 g.test_set_user_instead_of_role = function(g)
-    local config = cbuilder.new()
+    local config = cbuilder:new()
         :add_instance('i-001', {})
         :set_global_option('credentials.users.user_one', {
             roles = {'role_two'},

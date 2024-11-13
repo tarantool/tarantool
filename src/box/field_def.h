@@ -112,6 +112,17 @@ bool
 field_type1_contains_type2(enum field_type type1, enum field_type type2);
 
 /**
+ * Return true for fixed-size integer field `type'.
+ */
+static inline bool
+field_type_is_fixed_int(enum field_type type)
+{
+	assert(type < field_type_MAX);
+	return field_type_is_fixed_signed[type] ||
+	       field_type_is_fixed_unsigned[type];
+}
+
+/**
  * Get field type by name
  */
 enum field_type
@@ -198,6 +209,25 @@ field_mp_type_is_compatible(enum field_type type, const char *data,
 		}
 	}
 }
+
+/**
+ * Check if MsgPack value fits into the range for fixed size integer type.
+ * @param type - fixed size integer type.
+ * @param data - MsgPack value.
+ * @param mp_min - buffer to hold MsgPack of minimum value for type
+ *   if value does not fit.
+ * @param mp_max - buffer to hold MsgPack of maximum value for type
+ *   if value does not fit.
+ * @param details[out] - pointer to hold pointer to statically allocated
+ *   string with error details if value does not fit. Can be NULL if
+ *   details are not required.
+ * @retval true if fits and false otherwise. If not fit then mp_min, mp_max
+ *   and details are filled with error details.
+ */
+bool
+field_mp_is_in_fixed_int_range(enum field_type type, const char *data,
+			       char *mp_min, char *mp_max,
+			       const char **details);
 
 static inline bool
 action_is_nullable(enum on_conflict_action nullable_action)

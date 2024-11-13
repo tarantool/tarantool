@@ -52,6 +52,26 @@ extern "C" {
 #define mh_cmp_key(a, b, arg) ((a) != *(b))
 #include "salad/mhash.h"
 
+static inline uint32_t
+mh_ptr_hash(const void *ptr)
+{
+	uintptr_t u = (uintptr_t)ptr;
+	return u ^ (u >> 32);
+}
+
+/**
+ * Set: (void *)
+ */
+#define mh_name _ptr
+#define mh_key_t void *
+#define mh_node_t void *
+#define mh_arg_t void *
+#define mh_hash(a, arg) (mh_ptr_hash(*(a)))
+#define mh_hash_key(a, arg) (mh_ptr_hash(a))
+#define mh_cmp(a, b, arg) (*(a) != *(b))
+#define mh_cmp_key(a, b, arg) ((a) != *(b))
+#include "salad/mhash.h"
+
 /*
  * Map: (i32) => (void *)
  */
@@ -188,6 +208,69 @@ mh_strnu32_find_str(struct mh_strnu32_t *h, const char *str, uint32_t len)
 	struct mh_strnu32_key_t key = {str, len, hash};
 	return mh_strnu32_find(h, &key, NULL);
 }
+
+/*
+ * Map: (const char *, uint32_t, const char *, uint32_t) => (void *)
+ */
+
+#define mh_name _strnstrnptr
+/**
+ * Key of `mh_strnstrnptr_node_t` hash table.
+ */
+struct mh_strnstrnptr_key_t {
+	/* First string. */
+	const char *s1;
+	/* First string length. */
+	uint32_t s1_len;
+	/* Second string. */
+	const char *s2;
+	/* Second string length. */
+	uint32_t s2_len;
+	/* Key hash calculated using `mh_strnstrnptr_hash`. */
+	uint32_t hash;
+};
+
+/**
+ * Node of `mh_strnstrnptr_node_t` hash table.
+ */
+struct mh_strnstrnptr_node_t {
+	/* First string. */
+	const char *s1;
+	/* First string length. */
+	uint32_t s1_len;
+	/* Second string. */
+	const char *s2;
+	/* Second string length. */
+	uint32_t s2_len;
+	/* Key hash calculated using `mh_strnstrnptr_hash`. */
+	uint32_t hash;
+	/* Mapped value. */
+	void *val;
+};
+
+#define mh_key_t struct mh_strnstrnptr_key_t *
+#define mh_node_t struct mh_strnstrnptr_node_t
+
+#define mh_arg_t void *
+#define mh_hash(a, arg) ((a)->hash)
+#define mh_hash_key(a, arg) ((a)->hash)
+#define mh_cmp(a, b, arg) ((a)->s1_len != (b)->s1_len || \
+			   (a)->s2_len != (b)->s2_len || \
+			   memcmp((a)->s1, (b)->s1, (a)->s1_len) || \
+			   memcmp((a)->s2, (b)->s2, (a)->s2_len))
+#define mh_cmp_key(a, b, arg) mh_cmp(a, b, arg)
+#include "salad/mhash.h"
+
+static inline uint32_t
+mh_strnstrnptr_hash(const char *s1, uint32_t s1_len,
+		    const char *s2, uint32_t s2_len)
+{
+	uint32_t h = MH_STRN_HASH_SEED;
+	uint32_t carry = 0;
+	PMurHash32_Process(&h, &carry, s1, s1_len);
+	PMurHash32_Process(&h, &carry, s2, s2_len);
+	return PMurHash32_Result(h, carry, s1_len + s2_len);
+};
 
 #if defined(__cplusplus)
 } /* extern "C" */

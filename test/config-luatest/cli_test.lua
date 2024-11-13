@@ -1,16 +1,8 @@
 local t = require('luatest')
-local justrun = require('test.justrun')
-local treegen = require('test.treegen')
+local justrun = require('luatest.justrun')
+local treegen = require('luatest.treegen')
 
 local g = t.group()
-
-g.before_all(function()
-    treegen.init(g)
-end)
-
-g.after_all(function()
-    treegen.clean(g)
-end)
 
 g.test_help_env_list = function()
     local res = justrun.tarantool('.', {}, {'--help-env-list'}, {nojson = true})
@@ -81,13 +73,13 @@ g.test_help_env_list = function()
 end
 
 g.test_force_recovery = function()
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local script = [[
         box.cfg{}
         print(box.cfg.force_recovery)
         os.exit(0)
     ]]
-    treegen.write_script(dir, 'main.lua', script)
+    treegen.write_file(dir, 'main.lua', script)
 
     -- Make sure the CLI force-recovery option sets the box.cfg force_recovery
     -- option.
@@ -123,7 +115,7 @@ g.test_force_recovery = function()
         print(box.cfg.force_recovery)
         os.exit(0)
     ]]
-    treegen.write_script(dir, 'two.lua', script)
+    treegen.write_file(dir, 'two.lua', script)
     env = {}
     opts = {nojson = true, stderr = false}
     args = {'--force-recovery', 'two.lua'}

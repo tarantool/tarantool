@@ -495,9 +495,10 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 /* {{{ Iterators ************************************************/
 
 box_iterator_t *
-box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
-			 const char *key, const char *key_end,
-			 const char *packed_pos, const char *packed_pos_end)
+box_index_iterator_with_offset(uint32_t space_id, uint32_t index_id, int type,
+			       const char *key, const char *key_end,
+			       const char *packed_pos,
+			       const char *packed_pos_end, uint32_t offset)
 {
 	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
@@ -541,8 +542,8 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return NULL;
-	struct iterator *it = index_create_iterator_after(index, itype, key,
-							  part_count, pos);
+	struct iterator *it = index_create_iterator_with_offset(
+		index, itype, key, part_count, pos, offset);
 	txn_end_ro_stmt(txn, &svp);
 	if (it == NULL)
 		return NULL;
@@ -558,8 +559,8 @@ box_iterator_t *
 box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		   const char *key, const char *key_end)
 {
-	return box_index_iterator_after(space_id, index_id, type, key, key_end,
-					NULL, NULL);
+	return box_index_iterator_with_offset(space_id, index_id, type, key,
+					      key_end, NULL, NULL, 0);
 }
 
 int
@@ -794,13 +795,13 @@ void
 index_delete(struct index *index)
 {
 	assert(index->refs == 0);
+	assert(rlist_empty(&index->read_gaps));
 	/*
 	 * Free index_def after destroying the index as
 	 * engine might still need it, e.g. to check if
 	 * the index is primary or secondary.
 	 */
 	struct index_def *def = index->def;
-	memtx_tx_on_index_delete(index);
 	index->vtab->destroy(index);
 	index_def_delete(def);
 }
@@ -923,9 +924,38 @@ generic_index_count(struct index *index, enum iterator_type type,
 	int rc = 0;
 	size_t count = 0;
 	struct tuple *tuple = NULL;
-	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL)
+	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL) {
+		rc = box_check_slice();
+		if (rc != 0)
+			break;
 		++count;
+	}
 	iterator_delete(it);
+	if (rc < 0)
+		return rc;
+	return count;
+}
+
+ssize_t
+generic_index_read_view_count(struct index_read_view *rv,
+			      enum iterator_type type, const char *key,
+			      uint32_t part_count)
+{
+	struct index_read_view_iterator it;
+	if (index_read_view_create_iterator(rv, type, key,
+					    part_count, &it) != 0)
+		return -1;
+	int rc = 0;
+	size_t count = 0;
+	struct read_view_tuple tuple;
+	while ((rc = index_read_view_iterator_next_raw(&it, &tuple)) == 0 &&
+	       tuple.data != NULL) {
+		rc = box_check_slice();
+		if (rc != 0)
+			break;
+		++count;
+	}
+	index_read_view_iterator_destroy(&it);
 	if (rc < 0)
 		return rc;
 	return count;
@@ -980,6 +1010,61 @@ generic_index_create_iterator(struct index *base, enum iterator_type type,
 	return NULL;
 }
 
+
+struct iterator *
+generic_index_create_iterator_with_offset(struct index *base,
+					  enum iterator_type type,
+					  const char *key, uint32_t part_count,
+					  const char *pos, uint32_t offset)
+{
+	/* Create a reguar iterator. */
+	struct iterator *it = index_create_iterator_after(
+		base, type, key, part_count, pos);
+	if (it == NULL)
+		return NULL;
+
+	/* Skip the required amount of tuples. */
+	for (size_t i = 0; i < offset; i++) {
+		if (box_check_slice() != 0)
+			goto fail;
+		struct tuple *skipped_tuple;
+		if (iterator_next(it, &skipped_tuple) != 0)
+			goto fail;
+		if (skipped_tuple == NULL)
+			return it;
+	}
+	return it;
+fail:
+	iterator_delete(it);
+	return NULL;
+}
+
+int
+generic_index_read_view_create_iterator_with_offset(
+	struct index_read_view *rv, enum iterator_type type,
+	const char *key, uint32_t part_count,
+	const char *pos, uint32_t offset,
+	struct index_read_view_iterator *it)
+{
+	if (index_read_view_create_iterator_after(rv, type, key, part_count,
+						  pos, it) != 0)
+		return -1;
+
+	/* Skip the required amount of tuples. */
+	for (size_t i = 0; i < offset; i++) {
+		if (box_check_slice() != 0)
+			goto fail;
+		struct read_view_tuple skipped_tuple;
+		if (index_read_view_iterator_next_raw(it, &skipped_tuple) != 0)
+			goto fail;
+		if (skipped_tuple.data == NULL)
+			return 0;
+	}
+	return 0;
+fail:
+	index_read_view_iterator_destroy(it);
+	return -1;
+}
 
 struct index_read_view *
 generic_index_create_read_view(struct index *index)

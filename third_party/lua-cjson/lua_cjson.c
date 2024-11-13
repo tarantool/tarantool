@@ -295,42 +295,58 @@ static void json_append_number(struct luaL_serializer *cfg, strbuf_t *json,
 static void json_append_object(lua_State *l, struct luaL_serializer *cfg,
                                int current_depth, strbuf_t *json)
 {
-    int comma;
+    int comma = 0;
 
     /* Object */
     strbuf_append_char(json, '{');
 
+    /* const table */
     lua_pushnil(l);
-    /* table, startkey */
-    comma = 0;
-    while (lua_next(l, -2) != 0) {
+    lua_pushnil(l);
+    /* const table, key_idx(nil), key(nil) */
+
+    while (luaL_next_field(l, cfg) != 0) {
+        /* Skip nil values */
+        if (lua_isnil(l, -1)) {
+            /* const table, (table ?), key_idx, key, value */
+            lua_pop(l, 1);
+            /* const table, (table ?), key_idx, key */
+            continue;
+        }
+
         if (comma)
             strbuf_append_char(json, ',');
         else
             comma = 1;
 
-    struct luaL_field field;
-    luaL_checkfield(l, cfg, -2, &field);
-    if (field.type == MP_UINT) {
-        strbuf_append_char(json, '"');
-        json_append_uint(cfg, json, field.ival);
-        strbuf_append_mem(json, "\":", 2);
-    } else if (field.type == MP_INT) {
-        strbuf_append_char(json, '"');
-        json_append_int(cfg, json, field.ival);
-        strbuf_append_mem(json, "\":", 2);
-    } else if (field.type == MP_STR) {
-        json_append_string(cfg, json, field.sval.data, field.sval.len);
-        strbuf_append_char(json, ':');
-    } else {
-        luaL_error(l, "table key must be a number or string");
-    }
+        struct luaL_field field;
+        luaL_checkfield(l, cfg, -2, &field);
+        switch (field.type) {
+        case MP_UINT:
+            strbuf_append_char(json, '"');
+            json_append_uint(cfg, json, field.ival);
+            strbuf_append_mem(json, "\":", 2);
+            break;
+        case MP_INT:
+            strbuf_append_char(json, '"');
+            json_append_int(cfg, json, field.ival);
+            strbuf_append_mem(json, "\":", 2);
+            break;
+        case MP_STR:
+            json_append_string(cfg, json, field.sval.data, field.sval.len);
+            strbuf_append_char(json, ':');
+            break;
+        default:
+            luaL_error(l, "table key must be a number or string");
+            break;
+        }
 
-        /* table, key, value */
+        /* const table, (table ?), key_idx, key, value */
         json_append_data(l, cfg, current_depth, json);
         lua_pop(l, 1);
-        /* table, key */
+        /* const table, (table ?), key_idx, key */
     }
+    /* const table */
 
     strbuf_append_char(json, '}');
 }
@@ -423,10 +439,21 @@ static int json_encode(lua_State *l) {
     struct luaL_serializer *cfg = luaL_checkserializer(l);
 
     if (lua_gettop(l) == 2) {
-        struct luaL_serializer user_cfg = *cfg;
-        luaL_serializer_parse_options(l, &user_cfg);
+        /*
+         * user_cfg is per-call local version of serializer instance
+         * options: it is used if a user passes custom options to
+         * :encode() method within a separate argument. In this case
+         * it is required to avoid modifying options of the instance.
+         * Life span of user_cfg is restricted by the scope of
+         * :encode() so it is ok to push it onto the Lua stack to be collected
+         * by the garbage collector.
+         */
+        struct luaL_serializer *user_cfg = luaL_newserializer_config(l);
+        lua_insert(l, -3);
+        luaL_serializer_copy_options(user_cfg, cfg);
+        luaL_serializer_parse_options(l, user_cfg);
         lua_pop(l, 1);
-        json_append_data(l, &user_cfg, 0, &encode_buf);
+        json_append_data(l, user_cfg, 0, &encode_buf);
     } else {
         json_append_data(l, cfg, 0, &encode_buf);
     }
@@ -1048,28 +1075,26 @@ static int json_decode(lua_State *l)
 
     struct luaL_serializer *cfg = luaL_checkserializer(l);
 
-    /*
-     * user_cfg is per-call local version of serializer instance
-     * options: it is used if a user passes custom options to
-     * :decode() method within a separate argument. In this case
-     * it is required to avoid modifying options of the instance.
-     * Life span of user_cfg is restricted by the scope of
-     * :decode() so it is enough to allocate it on the stack.
-     */
-    struct luaL_serializer user_cfg;
     json.cfg = cfg;
     if (lua_gettop(l) == 2) {
         /*
-         * on_update triggers are left uninitialized for user_cfg.
-         * The decoding code don't (and shouldn't) run them.
+         * user_cfg is per-call local version of serializer instance
+         * options: it is used if a user passes custom options to
+         * :decode() method within a separate argument. In this case
+         * it is required to avoid modifying options of the instance.
+         * Life span of user_cfg is restricted by the scope of
+         * :decode() so it is ok to push it onto the Lua stack to be collected
+         * by the garbage collector.
          */
-        luaL_serializer_copy_options(&user_cfg, cfg);
-        luaL_serializer_parse_options(l, &user_cfg);
+        struct luaL_serializer *user_cfg = luaL_newserializer_config(l);
+        lua_insert(l, -3);
+        luaL_serializer_copy_options(user_cfg, cfg);
+        luaL_serializer_parse_options(l, user_cfg);
         lua_pop(l, 1);
-        json.cfg = &user_cfg;
+        json.cfg = user_cfg;
     }
 
-    json.data = luaL_checklstring(l, 1, &json_len);
+    json.data = luaL_checklstring(l, -1, &json_len);
     json.current_depth = 0;
     json.ptr = json.data;
     json.line_count = 1;

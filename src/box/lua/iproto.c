@@ -434,10 +434,7 @@ lbox_iproto_decode_greeting(struct lua_State *L)
 		return luaL_error(L, "cannot parse greeting string");
 
 	lua_newtable(L);
-	lua_pushfstring(L, "%u.%u.%u",
-			version_id_major(greeting.version_id),
-			version_id_minor(greeting.version_id),
-			version_id_patch(greeting.version_id));
+	lua_pushfstring(L, "%s", version_id_to_string(greeting.version_id));
 	lua_setfield(L, -2, "version");
 	lua_pushstring(L, greeting.protocol);
 	lua_setfield(L, -2, "protocol");

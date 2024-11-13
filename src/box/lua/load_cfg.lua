@@ -8,6 +8,7 @@ local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
 local compat = require('compat')
+local mkversion = require('internal.mkversion')
 
 local function nop() end
 
@@ -156,7 +157,7 @@ local default_cfg = {
     wal_max_size        = 256 * 1024 * 1024,
     wal_dir_rescan_delay= 2,
     wal_queue_max_size  = 16 * 1024 * 1024,
-    wal_cleanup_delay   = 4 * 3600,
+    wal_cleanup_delay   = nil,
     wal_retention_period = ifdef_wal_retention_period(0),
     wal_ext             = ifdef_wal_ext(nil),
     force_recovery      = false,
@@ -186,6 +187,7 @@ local default_cfg = {
     replication_sync_timeout = 0,
     replication_synchro_quorum = "N / 2 + 1",
     replication_synchro_timeout = 5,
+    replication_synchro_queue_max_size = 16 * 1024 * 1024,
     replication_connect_timeout = 30,
     replication_connect_quorum = nil, -- connect all
     replication_skip_conflict = false,
@@ -387,6 +389,7 @@ local template_cfg = {
     replication_sync_timeout = 'number',
     replication_synchro_quorum = 'string, number',
     replication_synchro_timeout = 'number',
+    replication_synchro_queue_max_size = 'number',
     replication_connect_timeout = 'number',
     replication_connect_quorum = 'number',
     replication_skip_conflict = 'boolean',
@@ -504,7 +507,14 @@ local dynamic_cfg = {
     worker_pool_threads     = private.cfg_set_worker_pool_threads,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = nop,
-    wal_cleanup_delay       = private.cfg_set_wal_cleanup_delay,
+    wal_cleanup_delay       = function()
+        if compat.wal_cleanup_delay_deprecation:is_old() then
+            log.warn("Option wal_cleanup_delay is deprecated.")
+        else
+            box.error(box.error.DEPRECATED, "Option wal_cleanup_delay")
+        end
+        private.cfg_set_wal_cleanup_delay()
+    end,
     wal_retention_period    = private.cfg_set_wal_retention_period,
     custom_proc_title       = function()
         require('title').update(box.cfg.custom_proc_title)
@@ -520,9 +530,12 @@ local dynamic_cfg = {
     replication_sync_timeout = private.cfg_set_replication_sync_timeout,
     replication_synchro_quorum = private.cfg_set_replication_synchro_quorum,
     replication_synchro_timeout = private.cfg_set_replication_synchro_timeout,
+    replication_synchro_queue_max_size =
+        private.cfg_set_replication_synchro_queue_max_size,
     replication_skip_conflict = private.cfg_set_replication_skip_conflict,
     replication_anon        = private.cfg_set_replication_anon,
     bootstrap_strategy      = private.cfg_set_bootstrap_strategy,
+    bootstrap_leader        = private.cfg_set_bootstrap_leader,
     instance_uuid           = check_instance_uuid,
     instance_name           = private.cfg_set_instance_name,
     replicaset_uuid         = check_replicaset_uuid,
@@ -636,11 +649,13 @@ local dynamic_cfg_order = {
     replication_sync_timeout    = 150,
     replication_synchro_quorum  = 150,
     replication_synchro_timeout = 150,
+    replication_synchro_queue_max_size = 150,
     replication_connect_timeout = 150,
     replication_connect_quorum  = 150,
     -- Apply bootstrap_strategy before replication, but after
     -- replication_connect_quorum. The latter might influence its value.
     bootstrap_strategy      = 175,
+    bootstrap_leader        = 175,
     replication             = 200,
     -- Anon is set after `replication` as a temporary workaround
     -- for the problem, that `replication` and `replication_anon`
@@ -683,9 +698,11 @@ local dynamic_cfg_skip_at_load = {
     replication_sync_timeout = true,
     replication_synchro_quorum = true,
     replication_synchro_timeout = true,
+    replication_synchro_queue_max_size = true,
     replication_skip_conflict = true,
     replication_anon        = true,
     bootstrap_strategy      = true,
+    bootstrap_leader        = true,
     wal_dir_rescan_delay    = true,
     wal_queue_max_size      = true,
     custom_proc_title       = true,
@@ -1192,7 +1209,11 @@ local function load_cfg(cfg)
     -- warning if it's not (in case user forgot to call
     -- box.schema.upgrade()).
     if private.schema_needs_upgrade() then
-        log.warn(box.error.last())
+        local msg = string.format(
+            'Your schema version is %s while Tarantool %s requires a more'..
+            ' recent schema version. Please, consider using box.'..
+            'schema.upgrade().', tostring(mkversion.get()), box.info.version)
+        log.warn(msg)
     end
 end
 box.cfg = locked(load_cfg)

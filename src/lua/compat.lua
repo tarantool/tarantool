@@ -147,6 +147,23 @@ back to the user-provided 'is_sync' space option.
 https://tarantool.io/compat/box_consider_system_spaces_synchronous
 ]]
 
+local WAL_CLEANUP_DELAY_DEPRECATION_BRIEF = [[
+Whether option 'wal_cleanup_delay' can be used. The old behavior is to log
+a deprecation warning when it's used, the new one - raise an error.
+If Tarantool participates in a cluster, xlogs needed for other replicas will
+be retained by persistent WAL GC.
+
+https://tarantool.io/compat/wal_cleanup_delay_deprecation
+]]
+
+local REPLICATION_SYNCHRO_TIMEOUT_COMPAT_BRIEF = [[
+Determines whether the replication_synchro_timeout option rolls back
+transactions or it only used to wait confirmation in promote/demote and
+gc-checkpointing.
+
+https://tarantool.io/compat/replication_synchro_timeout
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -270,6 +287,19 @@ local options = {
             box_consider_system_spaces_synchronous_tweak_action(is_new)
             ffi.C.system_spaces_update_is_sync_state_from_compat()
       end
+    },
+    wal_cleanup_delay_deprecation = {
+        default = 'old',
+        obsolete = nil,
+        brief = WAL_CLEANUP_DELAY_DEPRECATION_BRIEF,
+        action = function() end,
+    },
+    replication_synchro_timeout = {
+        default = 'old',
+        obsolete = nil,
+        brief = REPLICATION_SYNCHRO_TIMEOUT_COMPAT_BRIEF,
+        action = tweak_action(
+            'replication_synchro_timeout_rollback_enabled', true, false),
     },
 }
 

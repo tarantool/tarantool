@@ -253,7 +253,7 @@ local function upgrade_to_1_7_5()
 end
 
 local function user_trig_1_7_5(_, tuple)
-    if tuple and not tuple[5] then
+    if tuple and (type(tuple[5]) ~= 'table' or next(tuple[5]) == nil) then
         tuple = tuple:update{{'=', 5, setmap({})}}
         log.info("Set empty password to %s '%s'", tuple[4], tuple[3])
     end
@@ -539,6 +539,58 @@ local sequence_format = {{name = 'id', type = 'unsigned'},
 --------------------------------------------------------------------------------
 -- Tarantool 1.7.6
 --------------------------------------------------------------------------------
+
+--
+-- Update format of user spaces. Format of system spaces have been updated
+-- during upgrade to 1.7.5. However commit 519bc82e ("Parse and validate
+-- space formats") introduced strict checking of format field. Now tarantool
+-- requires, that format is written as map with explicit 'name' and 'type'
+-- keys: {name = 'a', type = 'number'}. Previously, it wasn't a case,
+-- anything could be written in the space format.
+--
+local function space_trig_1_7_6(_, tuple)
+    -- Do nothing for system spaces.
+    if tuple == nil or tuple[1] <= box.schema.SYSTEM_ID_MAX then
+        return tuple
+    end
+
+    -- If it's a complete garbage or tuple[7] is missing, use empty format.
+    -- Also, overwrite the table, if it's empty to be sure, that it's
+    -- encoded as array and not as map.
+    local new_format = {}
+    if type(tuple[7]) == 'table' and next(tuple[7]) ~= nil then
+        -- Non empty format. Check format and change if it's possible.
+        for i, f in ipairs(tuple[7]) do
+            -- Create the fields from ground up. Better not to use existing
+            -- ones, anything can be there, we must be sure, that every field
+            -- is encoded as map and has 'name' and 'type' keys.
+            local field = setmap({
+                name = f['name'],
+                type = f['type'],
+            })
+
+            if field['name'] == nil then
+                if type(f[1]) ~= 'string' then
+                    local err = "Cannot find name for field %d in space %s"
+                    error(err:format(i, tuple[3]))
+                end
+                field['name'] = f[1]
+            end
+            if field['type'] == nil then
+                field['type'] = type(f[2]) == 'string' and f[2] or 'any'
+            end
+            table.insert(new_format, field)
+        end
+    end
+    if not table.equals(tuple[7], new_format) then
+        -- Better to be as verbose as it's possible. So that user can
+        -- restore the previous format if smth goes wrong.
+        log.info("Update space '%s' format: old format %s, new format %s",
+                 tuple[3], json.encode(tuple[7]), json.encode(new_format))
+        tuple = tuple:update{{'=', 7, new_format}}
+    end
+    return tuple
+end
 
 local function create_sequence_space()
     local _space = box.space[box.schema.SPACE_ID]
@@ -1421,6 +1473,37 @@ local function upgrade_to_3_1_0()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 3.3.0
+--------------------------------------------------------------------------------
+
+local function create_gc_consumers()
+    local _space = box.space[box.schema.SPACE_ID]
+    local _index = box.space[box.schema.INDEX_ID]
+    local _priv = box.space[box.schema.PRIV_ID]
+    local space_id = box.schema.GC_CONSUMERS_ID
+    local opts = {group_id = 1}
+
+    log.info("create space _gc_consumers")
+    local format = {{name = 'uuid', type = 'string'},
+                    {name = 'vclock', type = 'map'},
+                    {name = 'opts', type = 'map'}}
+    _space:insert{space_id, ADMIN, '_gc_consumers', 'memtx', 0, opts,
+                  format}
+
+    -- replication can create and update persistent gc consumers
+    log.info("grant write on space _gc_consumers to replication")
+    _priv:replace{ADMIN, REPLICATION, 'space', box.schema.GC_CONSUMERS_ID,
+                  box.priv.W}
+
+    log.info("create primary index for space _gc_consumers")
+    _index:insert{space_id, 0, 'primary', 'tree', { unique = true },
+                  {{0, 'string'}}}
+end
+local function upgrade_to_3_3_0()
+    create_gc_consumers()
+end
+
+--------------------------------------------------------------------------------
 
 local handlers = {
     {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5},
@@ -1444,6 +1527,7 @@ local handlers = {
     {version = mkversion(2, 11, 1), func = upgrade_to_2_11_1},
     {version = mkversion(3, 0, 0), func = upgrade_to_3_0_0},
     {version = mkversion(3, 1, 0), func = upgrade_to_3_1_0},
+    {version = mkversion(3, 3, 0), func = upgrade_to_3_3_0},
 }
 builtin.box_init_latest_dd_version_id(handlers[#handlers].version.id)
 
@@ -1476,6 +1560,9 @@ local recovery_triggers = {
     {version = mkversion(1, 7, 5), tbl = {
         _space = space_trig_1_7_5,
         _user  = user_trig_1_7_5,
+    }},
+    {version = mkversion(1, 7, 6), tbl = {
+        _space = space_trig_1_7_6,
     }},
     {version = mkversion(1, 7, 7), tbl = {
         _priv   = priv_trig_1_7_7,
@@ -1935,23 +2022,6 @@ local function store_replicaset_uuid_in_old_way(issue_handler)
     change_replicaset_uuid_key('replicaset_uuid', 'cluster')
 end
 
--- Global names are stored in spaces. Can't silently delete them. It might break
--- the cluster. The user has to do it manually and carefully.
-local function check_names_are_not_set(issue_handler)
-    local _schema = box.space._schema
-    local msg_suffix = 'name is set. It is supported from version 3.0.0'
-    if _schema:get{'cluster_name'} ~= nil then
-        issue_handler('Cluster %s', msg_suffix)
-    end
-    if _schema:get{'replicaset_name'} ~= nil then
-        issue_handler('Replicaset %s', msg_suffix)
-    end
-    local row = box.space._cluster:get{box.info.id}
-    if row ~= nil and row.name ~= nil then
-        issue_handler('Instance %s', msg_suffix)
-    end
-end
-
 local function drop_instance_names(issue_handler)
     if issue_handler.dry_run then
         return
@@ -1966,7 +2036,9 @@ end
 
 local function downgrade_from_3_0_0(issue_handler)
     store_replicaset_uuid_in_old_way(issue_handler)
-    check_names_are_not_set(issue_handler)
+    -- It's allowed to downgrade with names set in order to simlify the
+    -- downgrade process. Names will properly work on schema 2.11, since
+    -- the DDL is allowed, even though they they're not in the format.
     drop_instance_names(issue_handler)
 end
 
@@ -2003,6 +2075,36 @@ local function downgrade_from_3_1_0(issue_handler)
     drop_trigger_from_func(issue_handler)
 end
 
+--------------------------------------------------------------------------------
+-- Tarantool 3.3.0
+--------------------------------------------------------------------------------
+
+local function drop_gc_consumers(issue_handler)
+    -- GC consumers are created by Tarantool, not users, so the space
+    -- can be dropped even if some persistent consumers are left
+    if issue_handler.dry_run then
+        return
+    end
+
+    local _space = box.space[box.schema.SPACE_ID]
+    local _index = box.space[box.schema.INDEX_ID]
+    local _priv = box.space[box.schema.PRIV_ID]
+    local space_id = box.schema.GC_CONSUMERS_ID
+
+    log.info("drop primary index of _gc_consumers")
+    _index:delete{space_id, 0}
+
+    log.info("drop replication privilege for _gc_consumers")
+    _priv:delete{REPLICATION, 'space', space_id}
+
+    log.info("drop space _gc_consumers")
+    _space:delete{space_id}
+end
+
+local function downgrade_from_3_3_0(issue_handler)
+    drop_gc_consumers(issue_handler)
+end
+
 -- Versions should be ordered from newer to older.
 --
 -- Every step can be called in 2 modes. In dry_run mode (issue_handler.dry_run
@@ -2020,6 +2122,7 @@ end
 -- if schema version is 2.10.0.
 --
 local downgrade_handlers = {
+    {version = mkversion(3, 3, 0), func = downgrade_from_3_3_0},
     {version = mkversion(3, 1, 0), func = downgrade_from_3_1_0},
     {version = mkversion(3, 0, 0), func = downgrade_from_3_0_0},
     {version = mkversion(2, 11, 1), func = downgrade_from_2_11_1},
@@ -2117,6 +2220,7 @@ local downgrade_versions = {
     "3.1.1",
     "3.1.2",
     "3.2.0",
+    "3.3.0",
     -- DOWNGRADE VERSIONS END
 }
 

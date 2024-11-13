@@ -52,6 +52,12 @@ jobs:
       - name: Setup Doxygen
         run: sudo apt install -y doxygen
 
+      # Not a full list of dependencies. Just ones that are
+      # required to successful configuration stage (cmake) and
+      # missed in the runner's environment.
+      - name: Setup tarantool dependencies
+        run: sudo apt install -y libreadline-dev
+
       - name: Build module API documentation using Doxygen
         run: |
             cmake .
@@ -60,7 +66,7 @@ jobs:
             doxygen Doxyfile.API
 
       - name: Publish generated API documentation to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@v4.4.0
+        uses: JamesIves/github-pages-deploy-action@v4.6.4
         with:
           folder: doc/
         if: github.ref == 'refs/heads/master'

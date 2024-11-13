@@ -45,7 +45,7 @@ package: prepare
 	echo VERSION=$${VERSION}; \
 	PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--network=host --volume ${VARDIR}:${VARDIR} ${PACKPACK_EXTRA_DOCKER_RUN_PARAMS}" \
 	TARBALL_EXTRA_ARGS="--exclude=*.exe --exclude=*.dll" \
-	PRESERVE_ENVVARS="TARBALL_EXTRA_ARGS,${PRESERVE_ENVVARS}" \
+	PRESERVE_ENVVARS="CMAKE_BUILD_TYPE,TARBALL_EXTRA_ARGS,${PRESERVE_ENVVARS}" \
 	./packpack/packpack
 
 package-static:

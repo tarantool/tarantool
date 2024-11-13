@@ -78,9 +78,10 @@ struct errinj {
 	_(ERRINJ_APPLIER_READ_TX_ROW_DELAY, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_APPLIER_SLOW_ACK, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_APPLIER_STOP_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_APPLIER_SUBSCRIBE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_BUILD_INDEX, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_BUILD_INDEX_DELAY, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_BUILD_INDEX_ON_ROLLBACK_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_BUILD_INDEX_DISABLE_YIELD, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_BUILD_INDEX_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_CHECK_FORMAT_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_CHECK_FORMAT_DELAY_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
@@ -151,7 +152,6 @@ struct errinj {
 	_(ERRINJ_TXN_LIMBO_BEGIN_DELAY, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_VYRUN_DATA_READ, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_COMPACTION_DELAY, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_VY_DELAY_PK_LOOKUP, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_DUMP_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_GC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_INDEX_DUMP, ERRINJ_INT, {.iparam = -1}) \
@@ -159,7 +159,7 @@ struct errinj {
 	_(ERRINJ_VY_LOG_FILE_RENAME, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_LOG_FLUSH, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_LOG_WRITE_BAD_RECORDS, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_VY_POINT_ITER_WAIT, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_POINT_LOOKUP_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_QUOTA_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_READ_PAGE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
@@ -167,13 +167,14 @@ struct errinj {
 	_(ERRINJ_VY_READ_VIEW_MERGE_FAIL, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_VY_RUN_DISCARD, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_RUN_FILE_RENAME, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_VY_RUN_OPEN, ERRINJ_INT, {.iparam = -1})\
+	_(ERRINJ_VY_RUN_RECOVER_COUNTDOWN, ERRINJ_INT, {.iparam = -1})\
 	_(ERRINJ_VY_RUN_WRITE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_RUN_WRITE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_VY_SCHED_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_VY_SQUASH_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
-	_(ERRINJ_VY_STMT_ALLOC, ERRINJ_INT, {.iparam = -1})\
+	_(ERRINJ_VY_STMT_ALLOC_COUNTDOWN, ERRINJ_INT, {.iparam = -1})\
+	_(ERRINJ_VY_STMT_DECODE_COUNTDOWN, ERRINJ_INT, {.iparam = -1})\
 	_(ERRINJ_VY_TASK_COMPLETE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_WRITE_ITERATOR_START_FAIL, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_WAIT_QUORUM_COUNT, ERRINJ_INT, {.iparam = 0}) \
@@ -261,7 +262,8 @@ void errinj_set_with_environment_vars(void);
 	} while (0)
 #  define ERROR_INJECT_COUNTDOWN(ID, CODE)				\
 	do {								\
-		if (errinj(ID, ERRINJ_INT)->iparam-- == 0) {		\
+		if (errinj(ID, ERRINJ_INT)->iparam >= 0 &&		\
+		    errinj(ID, ERRINJ_INT)->iparam-- == 0) {		\
 			CODE;						\
 		}							\
 	} while (0)

@@ -41,6 +41,7 @@
 #include "iproto_constants.h"
 #include "core/event.h"
 #include "txn_event_trigger.h"
+#include "arrow/abi.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -70,6 +71,9 @@ struct space_vtab {
 	int (*execute_update)(struct space *, struct txn *,
 			      struct request *, struct tuple **result);
 	int (*execute_upsert)(struct space *, struct txn *, struct request *);
+	int (*execute_insert_arrow)(struct space *space, struct txn *txn,
+				    struct ArrowArray *array,
+				    struct ArrowSchema *schema);
 
 	int (*ephemeral_replace)(struct space *, const char *, const char *);
 
@@ -754,10 +758,17 @@ error_set_space(struct error *error, struct space_def *def)
 	error_set_uint(error, "space_id", def->id);
 }
 
+/** Destroy constraints that are defined in @a space format. */
+void
+space_cleanup_constraints(struct space *space);
+
 /*
  * Virtual method stubs.
  */
 size_t generic_space_bsize(struct space *);
+int generic_space_execute_insert_arrow(struct space *space, struct txn *txn,
+				       struct ArrowArray *array,
+				       struct ArrowSchema *schema);
 int generic_space_ephemeral_replace(struct space *, const char *, const char *);
 int generic_space_ephemeral_delete(struct space *, const char *);
 int generic_space_ephemeral_rowid_next(struct space *, uint64_t *);

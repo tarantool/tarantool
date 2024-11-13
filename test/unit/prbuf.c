@@ -603,6 +603,7 @@ test_max_record_size(void)
 	ok(entry.size == 0, "entry size is %zd", entry.size);
 	ok(entry.ptr == NULL, "NULL is expected");
 	close(fd);
+	prbuf_reader_destroy(&reader);
 
 	p = prbuf_prepare(&buf, max_size + 1);
 	ok(p == NULL, "NULL is expected");

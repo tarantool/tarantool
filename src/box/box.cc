@@ -35,6 +35,7 @@
 #include <sys/utsname.h>
 #include <spawn.h>
 
+#include "box/allocator.h"
 #include "lua/utils.h" /* lua_hash() */
 #include "fiber_pool.h"
 #include <say.h>
@@ -294,12 +295,6 @@ box_run_on_recovery_state(enum box_recovery_state state)
 
 static void
 box_storage_init(void);
-
-/**
- * Broadcast the current instance status
- */
-static void
-box_broadcast_status(void);
 
 /**
  * A timer to broadcast the updated vclock. Doing this on each vclock update
@@ -1548,6 +1543,8 @@ box_check_instance_uuid(struct tt_uuid *uuid)
 static int
 box_check_node_name(char *out, const char *cfg_name, bool set_diag)
 {
+	if (schema_check_feature(SCHEMA_FEATURE_PERSISTENT_NAMES) != 0)
+		return -1;
 	const char *name = cfg_gets(cfg_name);
 	if (name == NULL) {
 		*out = 0;
@@ -1582,6 +1579,8 @@ static int
 box_check_bootstrap_leader(struct uri *uri, struct tt_uuid *uuid, char *name)
 {
 	*uuid = uuid_nil;
+	if (!uri_is_nil(uri))
+		uri_destroy(uri);
 	uri_create(uri, NULL);
 	*name = '\0';
 	const char *source = cfg_gets("bootstrap_leader");
@@ -1642,6 +1641,22 @@ box_check_wal_queue_max_size(void)
 	if (size < 0) {
 		diag_set(ClientError, ER_CFG, "wal_queue_max_size",
 			 "wal_queue_max_size must be >= 0");
+	}
+	/* Unlimited. */
+	if (size == 0)
+		size = INT64_MAX;
+	return size;
+}
+
+/** Check replication_synchro_queue_max_size option validity. */
+static int64_t
+box_check_replication_synchro_queue_max_size(void)
+{
+	int64_t size = cfg_geti64("replication_synchro_queue_max_size");
+	if (size < 0) {
+		diag_set(ClientError, ER_CFG,
+			 "replication_synchro_queue_max_size",
+			 "replication_synchro_queue_max_size must be >= 0");
 	}
 	/* Unlimited. */
 	if (size == 0)
@@ -1964,6 +1979,7 @@ box_check_config(void)
 	box_check_replication_sync_timeout();
 	if (box_check_bootstrap_strategy() == BOOTSTRAP_STRATEGY_INVALID)
 		diag_raise();
+	uri_create(&uri, NULL);
 	if (box_check_bootstrap_leader(&uri, &uuid, name) != 0)
 		diag_raise();
 	uri_destroy(&uri);
@@ -1972,6 +1988,8 @@ box_check_config(void)
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 	if (box_check_wal_queue_max_size() < 0)
+		diag_raise();
+	if (box_check_replication_synchro_queue_max_size() < 0)
 		diag_raise();
 	if (box_check_wal_cleanup_delay() < 0)
 		diag_raise();
@@ -2145,7 +2163,7 @@ box_set_bootstrap_strategy(void)
 	return 0;
 }
 
-static int
+int
 box_set_bootstrap_leader(void)
 {
 	return box_check_bootstrap_leader(&cfg_bootstrap_leader_uri,
@@ -3243,6 +3261,22 @@ box_set_wal_queue_max_size(void)
 }
 
 int
+box_set_replication_synchro_queue_max_size(void)
+{
+	int64_t size = box_check_replication_synchro_queue_max_size();
+	if (size < 0)
+		return -1;
+	if (size != INT64_MAX && recovery_state != FINISHED_RECOVERY) {
+		say_info("The option replication_synchro_queue_max_size will "
+			 "actually take effect after the recovery is finished");
+		txn_limbo_set_max_size(&txn_limbo, INT64_MAX);
+		return 0;
+	}
+	txn_limbo_set_max_size(&txn_limbo, size);
+	return 0;
+}
+
+int
 box_set_wal_cleanup_delay(void)
 {
 	double delay = box_check_wal_cleanup_delay();
@@ -3856,8 +3890,8 @@ box_select(uint32_t space_id, uint32_t index_id,
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return -1;
 
-	struct iterator *it = index_create_iterator_after(index, type, key,
-							  part_count, pos);
+	struct iterator *it = index_create_iterator_with_offset(
+		index, type, key, part_count, pos, offset);
 	if (it == NULL) {
 		txn_end_ro_stmt(txn, &svp);
 		return -1;
@@ -3874,10 +3908,6 @@ box_select(uint32_t space_id, uint32_t index_id,
 		rc = iterator_next(it, &tuple);
 		if (rc != 0 || tuple == NULL)
 			break;
-		if (offset > 0) {
-			offset--;
-			continue;
-		}
 		port_c_add_tuple(port, tuple);
 		found++;
 		/*
@@ -4008,6 +4038,19 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 	request.tuple_end = tuple_end;
 	request.index_base = index_base;
 	return box_process1(&request, result);
+}
+
+API_EXPORT int
+box_insert_arrow(uint32_t space_id, struct ArrowArray *array,
+		 struct ArrowSchema *schema)
+{
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.type = IPROTO_INSERT_ARROW;
+	request.space_id = space_id;
+	request.arrow_array = array;
+	request.arrow_schema = schema;
+	return box_process1(&request, NULL);
 }
 
 /**
@@ -4229,6 +4272,49 @@ box_info_lsn(void)
 	} else {
 		return -1;
 	}
+}
+
+/**
+ * Get memtx status information for box.slab.info
+ */
+API_EXPORT uint64_t
+box_slab_info(enum box_slab_info_type type)
+{
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+
+	struct allocator_stats stats;
+	memset(&stats, 0, sizeof(stats));
+
+	allocators_stats(&stats);
+	struct mempool_stats index_stats;
+	mempool_stats(&memtx->index_extent_pool, &index_stats);
+
+	switch (type) {
+	case BOX_SLAB_INFO_ITEMS_SIZE:
+		return stats.small.total + stats.sys.total;
+	case BOX_SLAB_INFO_ITEMS_USED:
+		return stats.small.used + stats.sys.used;
+	case BOX_SLAB_INFO_ARENA_SIZE:
+		/*
+		 * We could use stats.small.used + index_stats.total.used
+		 * here, but this would not account for slabs which are
+		 * sitting in slab cache or in the arena, available for reuse.
+		 * Make sure a simple formula: items_used_ratio > 0.9 &&
+		 * arena_used_ratio > 0.9 && quota_used_ratio > 0.9 work as
+		 * an indicator for reaching Tarantool memory limit.
+		 */
+		return memtx->arena.used;
+	case BOX_SLAB_INFO_ARENA_USED:
+		/** System allocator does not use arena. */
+		return stats.small.used + index_stats.totals.used;
+	case BOX_SLAB_INFO_QUOTA_SIZE:
+		return quota_total(&memtx->quota);
+	case BOX_SLAB_INFO_QUOTA_USED:
+		return quota_used(&memtx->quota);
+	default:
+		return 0;
+	};
 }
 
 /**
@@ -4456,12 +4542,16 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 			  "wal_mode = 'none'");
 	}
 
+	/* Unregister old consumer of replica. */
+	if (replica != NULL && replica->gc != NULL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
+
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
 	struct gc_consumer *gc = gc_consumer_register(
-		&start_vclock, "replica %s", tt_uuid_str(&req.instance_uuid));
-	if (gc == NULL)
-		diag_raise();
+		&start_vclock, GC_CONSUMER_REPLICA, &req.instance_uuid);
 	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
 
 	say_info("registering replica %s at %s",
@@ -4472,6 +4562,11 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
 		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+
+	/* Persist consumer after registration. */
+	if (gc_consumer_persist(gc) != 0)
+		diag_raise();
+
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
 	vclock_copy(&stop_vclock, instance_vclock);
@@ -4496,8 +4591,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	 * replica.
 	 */
 	gc_consumer_advance(gc, &stop_vclock);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
+	assert(replica->gc == NULL);
 	replica->gc = gc;
 	gc_guard.is_active = false;
 }
@@ -4598,14 +4692,19 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 				  tt_uuid_str(&other->uuid));
 		}
 	}
+
+	/* Unregister old consumer of replica. */
+	if (replica != NULL && replica->gc != NULL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
+
 	/*
 	 * Register the replica as a WAL consumer so that
 	 * it can resume FINAL JOIN where INITIAL JOIN ends.
 	 */
 	struct gc_consumer *gc = gc_consumer_register(
-		instance_vclock, "replica %s", tt_uuid_str(&req.instance_uuid));
-	if (gc == NULL)
-		diag_raise();
+		instance_vclock, GC_CONSUMER_REPLICA, &req.instance_uuid);
 	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
 
 	say_info("joining replica %s at %s",
@@ -4629,6 +4728,10 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
 		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+
+	/* Persist consumer after registration. */
+	if (gc_consumer_persist(gc) != 0)
+		diag_raise();
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -4658,8 +4761,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * FINAL JOIN ended and assign it to the replica.
 	 */
 	gc_consumer_advance(gc, &stop_vclock);
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
+	assert(replica->gc == NULL);
 	replica->gc = gc;
 	gc_guard.is_active = false;
 }
@@ -4776,17 +4878,13 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * the correct vclock.
 	 */
 	if (!replica->anon) {
-		bool had_gc = false;
-		if (replica->gc != NULL) {
+		if (replica->gc != NULL)
 			gc_consumer_unregister(replica->gc);
-			had_gc = true;
-		}
-		replica->gc = gc_consumer_register(&start_vclock, "replica %s",
-						   tt_uuid_str(&replica->uuid));
-		if (replica->gc == NULL)
+		replica->gc = gc_consumer_register(
+			&start_vclock, GC_CONSUMER_REPLICA, &replica->uuid);
+		/* Persist consumer before sending data. */
+		if (gc_consumer_persist(replica->gc) != 0)
 			diag_raise();
-		if (!had_gc)
-			gc_delay_unref();
 	}
 	/*
 	 * Send a response to SUBSCRIBE request, tell
@@ -4833,11 +4931,12 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		 * Raft messages. Raft's network footprint should be 0 as seen
 		 * by such instances.
 		 */
-		struct raft_request req;
-		box_raft_checkpoint_remote(&req);
-		xrow_encode_raft(&row, &fiber()->gc, &req);
+		struct raft_request raft_req;
+		box_raft_checkpoint_remote(&raft_req);
+		xrow_encode_raft(&row, &fiber()->gc, &raft_req);
+		relay_filter_raft(&row, req.version_id);
 		coio_write_xrow(io, &row);
-		sent_raft_term = req.term;
+		sent_raft_term = raft_req.term;
 	}
 	/*
 	 * Process SUBSCRIBE request via replication relay
@@ -5096,6 +5195,8 @@ bootstrap_master(void)
 	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_AUTO)
 		check_bootstrap_unanimity();
 	engine_bootstrap_xc();
+	if (box_set_replication_synchro_queue_max_size() != 0)
+		diag_raise();
 
 	uint32_t replica_id = 1;
 	box_insert_replica_record(replica_id, &INSTANCE_UUID,
@@ -5109,8 +5210,10 @@ bootstrap_master(void)
 		diag_raise();
 
 	/* Make the initial checkpoint */
-	if (gc_checkpoint() != 0)
-		panic("failed to create a checkpoint");
+	if (gc_checkpoint() != 0) {
+		say_error("failed to create a checkpoint");
+		diag_raise();
+	}
 
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
@@ -5189,6 +5292,8 @@ bootstrap_from_master(struct replica *master)
 	}
 	/* Finalize the new replica */
 	engine_end_recovery_xc();
+	if (box_set_replication_synchro_queue_max_size() != 0)
+		diag_raise();
 
 	/* Switch applier to initial state */
 	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
@@ -5208,8 +5313,10 @@ bootstrap_from_master(struct replica *master)
 		diag_raise();
 
 	/* Make the initial checkpoint */
-	if (gc_checkpoint() != 0)
-		panic("failed to create a checkpoint");
+	if (gc_checkpoint() != 0) {
+		say_error("failed to create a checkpoint");
+		diag_raise();
+	}
 
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
 
@@ -5593,6 +5700,8 @@ box_cfg_xc(void)
 		diag_raise();
 	if (box_set_replication_synchro_timeout() != 0)
 		diag_raise();
+	if (box_set_replication_synchro_queue_max_size() != 0)
+		diag_raise();
 	box_set_replication_sync_timeout();
 	if (box_check_instance_name(cfg_instance_name) != 0)
 		diag_raise();
@@ -5651,6 +5760,12 @@ box_cfg_xc(void)
 	 * value where local restore has already completed
 	 */
 	vclock_copy(&replicaset.applier.vclock, instance_vclock);
+
+	/*
+	 * Load persistent WAL GC consumers.
+	 */
+	if (gc_load_consumers() != 0)
+		diag_raise();
 
 	/*
 	 * Exclude self from GC delay because we care
@@ -5905,18 +6020,20 @@ box_broadcast_id(void)
 	assert((size_t)(w - buf) < sizeof(buf));
 }
 
-static void
+void
 box_broadcast_status(void)
 {
 	char buf[1024];
 	char *w = buf;
-	w = mp_encode_map(w, 3);
+	w = mp_encode_map(w, 4);
 	w = mp_encode_str0(w, "is_ro");
 	w = mp_encode_bool(w, box_is_ro());
 	w = mp_encode_str0(w, "is_ro_cfg");
 	w = mp_encode_bool(w, cfg_geti("read_only"));
 	w = mp_encode_str0(w, "status");
 	w = mp_encode_str0(w, box_status());
+	w = mp_encode_str0(w, "dd_version");
+	w = mp_encode_str0(w, version_id_to_string(dd_version_id));
 
 	box_broadcast("box.status", strlen("box.status"), buf, w);
 
@@ -6208,9 +6325,15 @@ box_shutdown(void)
 void
 box_free(void)
 {
+	/* References engines. */
+	space_cache_destroy();
+	/* References engine tuples. */
+	txn_limbo_free();
 	box_storage_free();
 	builtin_events_free();
 	security_free();
+	/* User auth references auth methods. */
+	user_cache_free();
 	auth_free();
 	wal_ext_free();
 	box_watcher_free();
@@ -6226,8 +6349,7 @@ box_free(void)
 	port_free();
 	iproto_constants_free();
 	mempool_destroy(&sync_trigger_data_pool);
+	box_lua_call_runtime_priv_reset();
 	/* schema_module_free(); */
 	/* session_free(); */
-	/* user_cache_free(); */
-	/* space_cache_destroy(); */
 }

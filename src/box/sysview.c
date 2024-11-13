@@ -193,6 +193,8 @@ static const struct index_vtab sysview_index_vtab = {
 	/* .get = */ sysview_index_get,
 	/* .replace = */ generic_index_replace,
 	/* .create_iterator = */ sysview_index_create_iterator,
+	/* .create_iterator_with_offset = */
+	generic_index_create_iterator_with_offset,
 	/* .create_read_view = */ generic_index_create_read_view,
 	/* .stat = */ generic_index_stat,
 	/* .compact = */ generic_index_compact,
@@ -487,6 +489,7 @@ static const struct space_vtab sysview_space_vtab = {
 	/* .execute_delete = */ sysview_space_execute_delete,
 	/* .execute_update = */ sysview_space_execute_update,
 	/* .execute_upsert = */ sysview_space_execute_upsert,
+	/* .execute_insert_arrow = */ generic_space_execute_insert_arrow,
 	/* .ephemeral_replace = */ generic_space_ephemeral_replace,
 	/* .ephemeral_delete = */ generic_space_ephemeral_delete,
 	/* .ephemeral_rowid_next = */ generic_space_ephemeral_rowid_next,

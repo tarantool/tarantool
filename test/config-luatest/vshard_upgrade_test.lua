@@ -1,6 +1,6 @@
 local t = require('luatest')
-local treegen = require('test.treegen')
-local server = require('test.luatest_helpers.server')
+local treegen = require('luatest.treegen')
+local server = require('luatest.server')
 local yaml = require('yaml')
 local fun = require('fun')
 local fio = require('fio')
@@ -24,7 +24,6 @@ end
 --
 g.before_all(function(g)
     t.skip_if(not has_vshard, 'Module "vshard-ee/vshard" is not available')
-    treegen.init(g)
     local uuids = {
         ['rs-001'] = 'cbf06940-0790-498b-948d-042b62cf3d29',
         ['rs-002'] = 'ac522f65-aa94-4134-9f64-51ee384f1a54',
@@ -42,7 +41,7 @@ g.before_all(function(g)
         fio.abspath(fio.pathjoin(prefix, 'instance-004')),
     }
 
-    local dir = treegen.prepare_directory(g, {}, {})
+    local dir = treegen.prepare_directory({}, {})
     local workdirs = {
         fio.pathjoin(dir, 'instance-001'),
         fio.pathjoin(dir, 'instance-002'),
@@ -130,7 +129,7 @@ g.before_all(function(g)
     }
 
     local cfg = yaml.encode(config)
-    local config_file = treegen.write_script(dir, 'cfg.yaml', cfg)
+    local config_file = treegen.write_file(dir, 'cfg.yaml', cfg)
     local opts = {
         env = {LUA_PATH = os.environ()['LUA_PATH']},
         config_file = config_file,
@@ -174,7 +173,6 @@ g.after_all(function(g)
     g.instance_3:drop()
     g.instance_4:drop()
     g.instance_5:drop()
-    treegen.clean(g)
 end)
 
 local function check_vshard(g, id_1, id_2)

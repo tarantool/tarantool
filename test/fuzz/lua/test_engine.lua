@@ -12,6 +12,7 @@ testing if it exists.
 Usage: tarantool test_engine.lua
 ]]
 
+local console = require('console')
 local fiber = require('fiber')
 local fio = require('fio')
 local fun = require('fun')
@@ -82,7 +83,7 @@ local arg_verbose = params.verbose or false
 
 local seed = params.seed or os.time()
 math.randomseed(seed)
-log.info(string.format('Random seed: %d', seed))
+log.info('Random seed: %d', seed)
 
 -- The table contains a whitelist of errors that will be ignored
 -- by test. Each item is a Lua pattern, special characters
@@ -111,8 +112,6 @@ local err_pat_whitelist = {
     "Get%(%) doesn't support partial keys and non%-unique indexes",
     "Index '[%w_]+' %(RTREE%) of space '[%w_]+' %(memtx%) does not support max%(%)",
     "Index '[%w_]+' %(RTREE%) of space '[%w_]+' %(memtx%) does not support min%(%)",
-    -- Blocked by tarantool#10262.
-    "attempt to index local 'tuple' %(a nil value%)",
     "Failed to allocate %d+ bytes in [%w_]+ for [%w_]+",
     "Storage engine 'memtx' does not support cross%-engine transactions",
     "Storage engine 'vinyl' does not support cross%-engine transactions",
@@ -128,7 +127,7 @@ local function keys(t)
 end
 
 local function rmtree(path)
-    log.info(('CLEANUP %s'):format(path))
+    log.info('CLEANUP %s', path)
     if (fio.path.is_file(path) or fio.path.is_link(path)) then
         fio.unlink(path)
         return
@@ -991,12 +990,12 @@ local ops = {
 local function apply_op(space, op_name)
     local func = ops[op_name].func
     local args = { ops[op_name].args(space) }
-    log.info(('%s %s'):format(op_name, json.encode(args)))
+    log.info('%s %s', op_name, json.encode(args))
     local pcall_args = {func, space, unpack(args)}
     local ok, err = pcall(unpack(pcall_args))
     if ok ~= true then
-        log.info(('ERROR: opname "%s", err "%s", args %s'):
-                 format(op_name, err, json.encode(args)))
+        log.info('ERROR: opname "%s", err "%s", args %s',
+                 op_name, err, json.encode(args))
     end
     return err
 end
@@ -1004,7 +1003,7 @@ end
 local shared_gen_state
 
 local function worker_func(id, space, test_gen, test_duration)
-    log.info(('Worker #%d has started.'):format(id))
+    log.info('Worker #%d has started.', id)
     local start = os.clock()
     local gen, param, state = test_gen:unwrap()
     shared_gen_state = state
@@ -1019,8 +1018,26 @@ local function worker_func(id, space, test_gen, test_duration)
         local err = apply_op(space, operation_name)
         table.insert(errors, err)
     end
-    log.info(('Worker #%d has finished.'):format(id))
+    log.info('Worker #%d has finished.', id)
     return errors
+end
+
+-- Disabled all enabled error injections.
+local function disable_all_errinj(errinj, space)
+    local enabled_errinj = fun.iter(errinj):
+                           filter(function(i, x)
+                               if x.is_enabled then
+                                   return i
+                               end
+                           end):totable()
+    log.info('Enabled fault injections: %s',
+             json.encode(enabled_errinj))
+    for _, errinj_name in pairs(enabled_errinj) do
+        local errinj_val = errinj[errinj_name].disable(space)
+        log.info('DISABLE ERROR INJECTION: %s', errinj_name)
+        errinj[errinj_name].is_enabled = false
+        pcall(box.error.injection.set, errinj_name, errinj_val)
+    end
 end
 
 local function toggle_random_errinj(errinj, max_enabled, space)
@@ -1030,8 +1047,8 @@ local function toggle_random_errinj(errinj, max_enabled, space)
                                    return i
                                end
                            end):totable()
-    log.info(('Enabled fault injections: %s'):format(
-             json.encode(enabled_errinj)))
+    log.info('Enabled fault injections: %s',
+             json.encode(enabled_errinj))
     local errinj_val, errinj_name
     if table.getn(enabled_errinj) >= max_enabled then
         errinj_name = oneof(enabled_errinj)
@@ -1042,11 +1059,11 @@ local function toggle_random_errinj(errinj, max_enabled, space)
         errinj_val = errinj[errinj_name].enable(space)
         errinj[errinj_name].is_enabled = true
     end
-    log.info(string.format('TOGGLE RANDOM ERROR INJECTION: %s -> %s',
-                           errinj_name, tostring(errinj_val)))
+    log.info('TOGGLE RANDOM ERROR INJECTION: %s -> %s',
+             errinj_name, tostring(errinj_val))
     local ok, err = pcall(box.error.injection.set, errinj_name, errinj_val)
     if not ok then
-        log.info(('Failed to toggle fault injection: %s'):format(err))
+        log.info('Failed to toggle fault injection: %s', err)
     end
 end
 
@@ -1077,11 +1094,6 @@ local errinj_set = {
     },
     -- Set to true to inject delay during index (re)build on alter.
     ERRINJ_BUILD_INDEX_DELAY = {
-        enable = enable_errinj_boolean,
-        disable = disable_errinj_boolean,
-    },
-    -- Set to true to fail index (re)build on alter.
-    ERRINJ_BUILD_INDEX_ON_ROLLBACK_ALLOC = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
@@ -1161,9 +1173,8 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to true to delay lookup of tuple in primary index by
-    -- secondary key.
-    ERRINJ_VY_DELAY_PK_LOOKUP = {
+    -- Set to true to delay lookup of tuple by full key.
+    ERRINJ_VY_POINT_LOOKUP_DELAY = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
@@ -1177,10 +1188,14 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to timeout to fail vinyl index dump.
+    -- Set to index id to fail vinyl index dump.
     ERRINJ_VY_INDEX_DUMP = {
-        enable = enable_errinj_timeout,
-        disable = function() return -1 end,
+        enable = function(space)
+            return math.random(#space.index + 1) - 1
+        end,
+        disable = function()
+            return -1
+        end,
     },
     -- Set to true to fail materialization of vinyl index file.
     ERRINJ_VY_INDEX_FILE_RENAME = {
@@ -1197,11 +1212,10 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to timeout to inject before consuming vinyl memory
-    -- quota.
+    -- Set to true to inject delay before consuming vinyl memory quota.
     ERRINJ_VY_QUOTA_DELAY = {
-        enable = enable_errinj_timeout,
-        disable = disable_errinj_timeout,
+        enable = enable_errinj_boolean,
+        disable = disable_errinj_boolean,
     },
     -- Set to true to fail reading vinyl page from disk.
     ERRINJ_VY_READ_PAGE = {
@@ -1263,10 +1277,14 @@ local errinj_set = {
         enable = enable_errinj_timeout,
         disable = disable_errinj_timeout,
     },
-    -- Set to timeout to fail allocation of vinyl tuple.
-    ERRINJ_VY_STMT_ALLOC = {
-        enable = enable_errinj_timeout,
-        disable = disable_errinj_timeout,
+    -- Set to number of passes before failing allocation of vinyl tuple.
+    ERRINJ_VY_STMT_ALLOC_COUNTDOWN = {
+        enable = function()
+            return math.random(10)
+        end,
+        disable = function()
+            return -1
+        end,
     },
     -- Set to true to fail completion of vinyl dump/compaction.
     ERRINJ_VY_TASK_COMPLETE = {
@@ -1284,11 +1302,15 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to timeout to fail WAL write due to error allocating disk
-    -- space.
+    -- Set to number of failures before successful allocation of
+    -- disk space for WAL write.
     ERRINJ_WAL_FALLOCATE = {
-        enable = enable_errinj_timeout,
-        disable = disable_errinj_timeout,
+        enable = function()
+            return math.random(10)
+        end,
+        disable = function()
+            return 0
+        end,
     },
     -- Set to true to fail WAL write.
     ERRINJ_WAL_IO = {
@@ -1320,20 +1342,28 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to timeout to fail write to xlog file.
+    -- Set to number of bytes to buffer before failing write to xlog file.
     ERRINJ_WAL_WRITE_PARTIAL = {
-        enable = enable_errinj_timeout,
-        disable = disable_errinj_timeout,
+        enable = function()
+            return math.random(65536)
+        end,
+        disable = function()
+            return -1
+        end,
     },
     -- Set to true to fail xlog meta read.
     ERRINJ_XLOG_META = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to timeout to fail xlog data read.
+    -- Set to number of bytes to read before failing xlog data read.
     ERRINJ_XLOG_READ = {
-        enable = enable_errinj_timeout,
-        disable = disable_errinj_timeout,
+        enable = function()
+            return math.random(65536)
+        end,
+        disable = function()
+            return -1
+        end,
     },
     -- Set to true to delay xlog file materialization.
     ERRINJ_XLOG_RENAME_DELAY = {
@@ -1371,12 +1401,15 @@ end
 
 local function run_test(num_workers, test_duration, test_dir,
                         engine_name, verbose_mode)
-
     if fio.path.exists(test_dir) then
         cleanup_dir(test_dir)
     else
         fio.mkdir(test_dir)
     end
+
+    local socket_path = fio.pathjoin(fio.abspath(test_dir), 'console.sock')
+    console.listen(socket_path)
+    log.info('console listen on %s', socket_path)
 
     local workers = {}
     local space_id_func = counter()
@@ -1399,22 +1432,25 @@ local function run_test(num_workers, test_duration, test_dir,
             toggle_random_errinj(errinj_set, max_errinj_in_parallel, space)
             fiber.sleep(2)
         end
+        disable_all_errinj(errinj_set, space)
         log.info('Fault injection fiber has finished.')
     end, arg_test_duration)
     errinj_f:set_joinable(true)
     errinj_f:name('ERRINJ')
-    table.insert(workers, errinj_f)
+
+    -- Stop the fault injection fiber first so that worker fibers can exit
+    -- without getting stuck on some random timeout injection.
+    local ok, res = fiber.join(errinj_f)
+    if not ok then
+        log.info('ERROR: %s', json.encode(res))
+    end
 
     local error_messages = {}
     for _, fb in ipairs(workers) do
-        local ok, res = fiber.join(fb)
+        ok, res = fiber.join(fb)
         if not ok then
-            log.info('ERROR: ' .. json.encode(res))
-        end
-        if fiber.status(fb) ~= 'dead' then
-            fiber.kill(fb)
-        end
-        if type(res) == 'table' then
+            log.info('ERROR: %s', json.encode(res))
+        else
             for _, v in ipairs(res) do
                 local msg = tostring(v)
                 error_messages[msg] = error_messages[msg] or 1
