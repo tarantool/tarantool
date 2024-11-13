@@ -1151,22 +1151,38 @@ box_check_auth_type(void)
 }
 
 static enum election_mode
-box_check_election_mode(void)
+election_mode_by_name(const char *name)
 {
-	const char *mode = cfg_gets("election_mode");
-	if (strcmp(mode, "off") == 0)
+	if (strcmp(name, "off") == 0)
 		return ELECTION_MODE_OFF;
-	else if (strcmp(mode, "voter") == 0)
+	else if (strcmp(name, "voter") == 0)
 		return ELECTION_MODE_VOTER;
-	else if (strcmp(mode, "manual") == 0)
+	else if (strcmp(name, "manual") == 0)
 		return ELECTION_MODE_MANUAL;
-	else if (strcmp(mode, "candidate") == 0)
+	else if (strcmp(name, "candidate") == 0)
 		return ELECTION_MODE_CANDIDATE;
 
 	diag_set(ClientError, ER_CFG, "election_mode",
 		"the value must be one of the following strings: "
 		"'off', 'voter', 'candidate', 'manual'");
 	return ELECTION_MODE_INVALID;
+}
+
+int
+box_check_election_mode(enum election_mode *mode)
+{
+	const char *mode_name = cfg_gets("election_mode");
+	*mode = election_mode_by_name(mode_name);
+	if (*mode == ELECTION_MODE_INVALID)
+		return -1;
+	bool anon = cfg_geti("replication_anon") != 0;
+	if (anon && *mode != ELECTION_MODE_OFF) {
+		diag_set(ClientError, ER_CFG, "election_mode",
+			 "the value may only be set to 'off' when "
+			 "'replication_anon' is set to true");
+		return -1;
+	}
+	return 0;
 }
 
 static double
@@ -1525,10 +1541,19 @@ box_check_replication_anon(void)
 {
 	bool anon = cfg_geti("replication_anon") != 0;
 	bool ro = cfg_geti("read_only") != 0;
+	const char *mode_name = cfg_gets("election_mode");
+	enum election_mode mode = election_mode_by_name(mode_name);
+	if (mode == ELECTION_MODE_INVALID)
+		diag_raise();
 	if (anon && !ro) {
 		tnt_raise(ClientError, ER_CFG, "replication_anon",
 			  "the value may be set to true only when "
 			  "the instance is read-only");
+	}
+	if (anon && mode != ELECTION_MODE_OFF) {
+		tnt_raise(ClientError, ER_CFG, "replication_anon",
+			  "the value may be set to true only when "
+			  "'election_mode' is set to 'off'");
 	}
 	return anon;
 }
@@ -1941,6 +1966,7 @@ box_check_config(void)
 	struct uri uri;
 	struct uri_set uri_set;
 	char name[NODE_NAME_SIZE_MAX];
+	enum election_mode election_mode;
 	box_check_say();
 	if (audit_log_check_cfg() != 0)
 		diag_raise();
@@ -1955,7 +1981,7 @@ box_check_config(void)
 		diag_raise();
 	if (box_check_replicaset_uuid(&uuid) != 0)
 		diag_raise();
-	if (box_check_election_mode() == ELECTION_MODE_INVALID)
+	if (box_check_election_mode(&election_mode) != 0)
 		diag_raise();
 	if (box_check_election_timeout() < 0)
 		diag_raise();
@@ -2023,8 +2049,8 @@ box_set_auth_type(void)
 int
 box_set_election_mode(void)
 {
-	enum election_mode mode = box_check_election_mode();
-	if (mode == ELECTION_MODE_INVALID)
+	enum election_mode mode;
+	if (box_check_election_mode(&mode) != 0)
 		return -1;
 	box_raft_cfg_election_mode(mode);
 	box_broadcast_ballot();
@@ -3044,21 +3070,33 @@ box_promote_qsync(void)
 }
 
 int
-box_promote(void)
-{
+box_check_promote(void) {
 	if (is_in_box_promote) {
-		diag_set(ClientError, ER_UNSUPPORTED, "box.ctl.promote",
+		diag_set(ClientError, ER_UNSUPPORTED, "box.ctl.promote/demote",
 			 "simultaneous invocations");
 		return -1;
 	}
+	if (cfg_replication_anon) {
+		diag_set(ClientError, ER_UNSUPPORTED, "replication_anon=true",
+			 "manual elections");
+		return -1;
+	}
+	return 0;
+}
+
+int
+box_promote(void)
+{
+	if (!is_box_configured)
+		return 0;
+	if (box_check_promote() != 0)
+		return -1;
+
 	struct raft *raft = box_raft();
 	is_in_box_promote = true;
 	auto promote_guard = make_scoped_guard([&] {
 		is_in_box_promote = false;
 	});
-
-	if (!is_box_configured)
-		return 0;
 	/*
 	 * Currently active leader (the instance that is seen as leader by both
 	 * raft and txn_limbo) can't issue another PROMOTE.
@@ -3104,18 +3142,15 @@ box_promote(void)
 int
 box_demote(void)
 {
-	if (is_in_box_promote) {
-		diag_set(ClientError, ER_UNSUPPORTED, "box.ctl.demote",
-			 "simultaneous invocations");
+	if (!is_box_configured)
+		return 0;
+	if (box_check_promote() != 0)
 		return -1;
-	}
+
 	is_in_box_promote = true;
 	auto promote_guard = make_scoped_guard([&] {
 		is_in_box_promote = false;
 	});
-
-	if (!is_box_configured)
-		return 0;
 
 	const struct raft *raft = box_raft();
 	if (box_election_mode != ELECTION_MODE_OFF) {
@@ -4955,10 +4990,13 @@ void
 box_process_vote(struct ballot *ballot)
 {
 	ballot->is_ro_cfg = cfg_geti("read_only") != 0;
-	enum election_mode mode = box_check_election_mode();
+	const char *mode_name = cfg_gets("election_mode");
+	enum election_mode mode = election_mode_by_name(mode_name);
+	assert(mode != ELECTION_MODE_INVALID);
 	ballot->can_lead = mode == ELECTION_MODE_CANDIDATE ||
 			   mode == ELECTION_MODE_MANUAL;
 	ballot->is_anon = cfg_replication_anon;
+	assert(!(ballot->is_anon && ballot->can_lead));
 	ballot->is_ro = is_ro_summary;
 	ballot->is_booted = is_box_configured;
 	vclock_copy(&ballot->vclock, instance_vclock);
