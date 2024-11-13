@@ -50,6 +50,9 @@ set(core_sources
     tt_sort.c
     event.c
     mp_ctx.c
+    histogram.c
+    latency.c
+    rmean.c
 )
 
 if (ENABLE_BACKTRACE)
