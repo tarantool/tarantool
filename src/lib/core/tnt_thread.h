@@ -31,7 +31,7 @@ typedef void
  * The pool has a limited size. In case the callbacks are yielding and the user
  * wants to execute more of them concurrently than the default size of the fiber
  * pool, then the size can be extended (or reduced) using
- * fiber.tx_user_pool_size() Lua API.
+ * fiber.tx_user_pool_size() Lua API or `fiber.tx_user_pool_size` YAML config.
  *
  * If called during Tarantool shutdown, the behaviour is undefined. The external
  * threads must be terminated before that.

@@ -137,6 +137,7 @@ g.test_defaults = function()
             io_collect_interval = box.NULL,
             too_long_threshold = 0.5,
             worker_pool_threads = 4,
+            tx_user_pool_size = 768,
             slice = {
                 err = 1,
                 warn = 0.5,
