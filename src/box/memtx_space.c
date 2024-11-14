@@ -293,16 +293,6 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 			     enum dup_replace_mode mode,
 			     struct tuple **result)
 {
-	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
-	/*
-	 * Ensure we have enough slack memory to guarantee
-	 * successful statement-level rollback.
-	 */
-	if (memtx_index_extent_reserve(memtx, new_tuple != NULL ?
-				       RESERVE_EXTENTS_BEFORE_REPLACE :
-				       RESERVE_EXTENTS_BEFORE_DELETE) != 0)
-		return -1;
-
 	uint32_t i = 0;
 
 	/* Update the primary key */
