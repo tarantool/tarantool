@@ -99,6 +99,13 @@ local function switch_isolated_mode_before_box_cfg(configdata, box_cfg)
     -- An instance in the isolated mode shouldn't process a
     -- traffic from a user.
     box_cfg.listen = box.NULL
+
+    -- Don't replicate data from other replicaset members.
+    --
+    -- The isolated mode can be enabled to stop data modifications
+    -- on the given instance, including ones from the replication.
+    -- It may help to debug a problem or extract some needed data.
+    box_cfg.replication = box.NULL
 end
 
 -- Perform post-box-cfg actions to enable the isolated mode (if

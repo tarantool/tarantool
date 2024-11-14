@@ -96,15 +96,6 @@ g.test_startup_with_snap = function(g)
     -- the file.
     local config_2 = cbuilder:new(config)
         :set_instance_option('i-003', 'isolated', true)
-        -- If we don't drop replication.peers, the instance will
-        -- attempt to connect to itself. However, iproto stops
-        -- listening for incoming connections and it freezes for
-        -- some time.
-        --
-        -- TODO: Tarantool should stop replication to the isolated
-        -- instance. Let's drop this option from the test, when it
-        -- is implemented.
-        :set_instance_option('i-003', 'replication.peers', {})
         :config()
     cluster:sync(config_2)
 
@@ -160,10 +151,6 @@ g.test_read_only = function(g)
     -- Mark i-001 as isolated, reload the configuration.
     local config_2 = cbuilder:new(config)
         :set_instance_option('i-001', 'isolated', true)
-        -- TODO: Tarantool should stop replication to the isolated
-        -- instance. Let's drop this option from the test, when it
-        -- is implemented.
-        :set_instance_option('i-001', 'replication.peers', {})
         :config()
     cluster:sync(config_2)
     g.it:roundtrip("require('config'):reload()")
@@ -194,8 +181,15 @@ g.test_read_only = function(g)
     g.it:roundtrip("require('config'):reload()")
 
     -- Goes to RW.
+    --
+    -- Replication upstreams reconfiguration may let the instance
+    -- go to the orphan status for a short time. The orphan status
+    -- means box.info.ro = true even if the instance is configured
+    -- as RW. Retry the RW check to make the test case stable.
     assert_isolated(false)
-    assert_read_only(false)
+    t.helpers.retrying({timeout = 60}, function()
+        assert_read_only(false)
+    end)
 end
 
 -- Verify that an instance in the isolated mode stops listening
@@ -388,4 +382,84 @@ g.test_iproto_stop_failure_on_startup = function(g)
     g.conn = net_box.connect(uri)
     t.assert_equals(g.conn.state, 'error')
     t.assert_not(g.conn:ping())
+end
+
+-- Verify that an isolated instance refuses to replicate data from
+-- other replicaset members.
+--
+-- The test case verifies that it occurs on a runtime
+-- reconfiguration as well as on a startup.
+g.test_replication_to = function(g)
+    local function instance_uri(instance_name)
+        return {
+            login = 'replicator',
+            password = 'secret',
+            uri = ('unix/:./%s.iproto'):format(instance_name),
+        }
+    end
+
+    local function assert_isolated(exp)
+        g.it:roundtrip("require('config'):get('isolated')", exp)
+    end
+
+    local function assert_upstreams(exp)
+        g.it:roundtrip('box.cfg.replication', exp)
+    end
+
+    local config = cbuilder:new()
+        :set_replicaset_option('replication.failover', 'manual')
+        :set_replicaset_option('leader', 'i-001')
+        :add_instance('i-001', {})
+        :add_instance('i-002', {})
+        :add_instance('i-003', {})
+        :config()
+
+    local cluster = cluster.new(g, config)
+    cluster:start()
+
+    -- Use the console connection, because an instance in the
+    -- isolated mode doesn't accept iproto requests.
+    g.it = it.connect(cluster['i-003'])
+
+    -- Mark i-003 as isolated, reload the configuration.
+    local config_2 = cbuilder:new(config)
+        :set_instance_option('i-003', 'isolated', true)
+        :config()
+    cluster:sync(config_2)
+    g.it:roundtrip("require('config'):reload()")
+
+    -- The isolated mode is applied, the instance has no
+    -- upstreams.
+    assert_isolated(true)
+    assert_upstreams({})
+
+    -- Restart i-003, reconnect the console.
+    --
+    -- Don't check the readiness condition, because it is
+    -- performed over an iproto connection and it has no chance to
+    -- succeed (iproto stops listening in the isolated mode).
+    g.it:close()
+    cluster['i-003']:stop()
+    cluster['i-003']:start({wait_until_ready = false})
+    connect_console(g, cluster['i-003'])
+
+    -- Still in the isolated mode and no upstreams.
+    assert_isolated(true)
+    assert_upstreams({})
+
+    -- Disable the isolated mode on i-003.
+    local config_3 = cbuilder:new(config_2)
+        :set_instance_option('i-003', 'isolated', nil)
+        :config()
+    cluster:sync(config_3)
+    g.it:roundtrip("require('config'):reload()")
+
+    -- Verify that the instance is configured now to fetch data
+    -- from others.
+    assert_isolated(false)
+    assert_upstreams({
+        instance_uri('i-001'),
+        instance_uri('i-002'),
+        instance_uri('i-003'),
+    })
 end
