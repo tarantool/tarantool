@@ -564,7 +564,7 @@ local function update_existing_users_to_1_7_5()
     local def_ids_to_update = {}
     for _, def in box.space._user:pairs() do
         local new_def = def:totable()
-        if new_def[5] == nil then
+        if type(new_def[5]) ~= 'table' or next(new_def[5]) == nil then
             table.insert(def_ids_to_update, new_def[1])
         end
     end
@@ -852,6 +852,7 @@ local sequence_format = {{name = 'id', type = 'unsigned'},
                          {name = 'cycle', type = 'boolean'}}
 --------------------------------------------------------------------------------
 -- Tarantool 1.7.6
+--------------------------------------------------------------------------------
 local function create_sequence_space()
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
@@ -909,9 +910,67 @@ local function create_collation_space()
     _priv:insert{ADMIN, PUBLIC, 'space', _collation.id, box.priv.W}
 end
 
+--
+-- Update format of user spaces. Format of system spaces have been updated
+-- during upgrade to 1.7.5. However commit 519bc82e ("Parse and validate
+-- space formats") introduced strict checking of format field. Now tarantool
+-- requires, that format is written as map with explicit 'name' and 'type'
+-- keys: {name = 'a', type = 'number'}. Previously, it wasn't a case,
+-- anything could be written in the space format.
+--
+local function update_existing_user_spaces_to_1_7_6()
+    local def_ids_to_update = {}
+    for _, def in box.space._space:pairs() do
+        local tuple = def:totable()
+        -- Do nothing for system spaces.
+        if tuple[1] <= box.schema.SYSTEM_ID_MAX then
+            goto continue
+        end
+
+        -- If it's a complete garbage or tuple[7] is missing, use empty format.
+        local new_format = {}
+        if type(tuple[7]) == 'table' and next(tuple[7]) ~= nil then
+            -- Non empty format. Check format and change if it's possible.
+            for i, f in ipairs(tuple[7]) do
+                -- Create the fields from ground up. Better not to use existing
+                -- ones, anything can be there, we must be sure, that every field
+                -- is encoded as map and has 'name' and 'type' keys.
+                local field = setmap({
+                    name = f['name'],
+                    type = f['type'],
+                })
+
+                if field['name'] == nil then
+                    if type(f[1]) ~= 'string' then
+                        local err = "Cannot find name for field %d in space %s"
+                        error(err:format(i, tuple[3]))
+                    end
+                    field['name'] = f[1]
+                end
+                if field['type'] == nil then
+                    field['type'] = type(f[2]) == 'string' and f[2] or 'any'
+                end
+                table.insert(new_format, field)
+            end
+        end
+
+        def_ids_to_update[tuple[1]] = new_format
+        ::continue::
+    end
+    for id, new_format in pairs(def_ids_to_update) do
+        local old_tuple = box.space._space:get(id)
+        -- Better to be as verbose as possible. So that user can
+        -- restore the previous format if smth goes wrong.
+        log.info("Update space '%s' format: old format %s, new format %s",
+            old_tuple[3], json.encode(old_tuple[7]), json.encode(new_format))
+        box.space._space:update(id, {{'=', 7, new_format}})
+    end
+end
+
 local function upgrade_to_1_7_6()
     create_sequence_space()
     create_collation_space()
+    update_existing_user_spaces_to_1_7_6()
     -- Trigger space format checking by updating version in _schema.
 end
 
