@@ -2173,22 +2173,6 @@ memtx_index_extent_free(struct matras_allocator *matras_allocator, void *extent)
 	mempool_free(&memtx->index_extent_pool, extent);
 }
 
-/**
- * Reserve num extents in pool.
- * Ensure that next num extent_alloc will succeed w/o an error
- */
-int
-memtx_index_extent_reserve(struct memtx_engine *memtx, int num)
-{
-	ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
-		/* same error as in mempool_alloc */
-		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
-			 "mempool", "new slab");
-		return -1;
-	});
-	return matras_allocator_reserve(&memtx->index_extent_allocator, num);
-}
-
 bool
 memtx_index_def_change_requires_rebuild(struct index *index,
 					const struct index_def *new_def)

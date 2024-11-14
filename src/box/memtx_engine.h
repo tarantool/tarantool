@@ -91,18 +91,6 @@ enum memtx_recovery_state {
 	MEMTX_OK,
 };
 
-enum memtx_reserve_extents_num {
-	/**
-	 * This number is calculated based on the
-	 * max (realistic) number of insertions
-	 * a deletion from a B-tree or an R-tree
-	 * can lead to, and, as a result, the max
-	 * number of new block allocations.
-	 */
-	RESERVE_EXTENTS_BEFORE_DELETE = 8,
-	RESERVE_EXTENTS_BEFORE_REPLACE = 16
-};
-
 /**
  * The size of the biggest memtx iterator. Used with
  * mempool_create. This is the size of the block that will be
@@ -253,13 +241,6 @@ enum {
 extern struct tuple *
 (*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
 		       const char *end, bool validate);
-
-/**
- * Reserve num extents in pool.
- * Ensure that next num extent_alloc will succeed w/o an error
- */
-int
-memtx_index_extent_reserve(struct memtx_engine *memtx, int num);
 
 /**
  * Generic implementation of index_vtab::def_change_requires_rebuild,
