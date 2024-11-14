@@ -1577,5 +1577,7 @@ memtx_space_new(struct memtx_engine *memtx,
 	memset(&memtx_space->tuple_stat, 0, sizeof(memtx_space->tuple_stat));
 	memtx_space->rowid = 0;
 	memtx_space->replace = memtx_space_replace_no_keys;
+	rlist_create(&memtx_space->memtx_stories);
+	rlist_create(&memtx_space->alter_stmts);
 	return (struct space *)memtx_space;
 }

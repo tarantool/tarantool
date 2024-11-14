@@ -1040,6 +1040,7 @@ memtx_tx_unref_from_primary(struct memtx_story *story)
 static struct memtx_story *
 memtx_tx_story_new(struct space *space, struct tuple *tuple)
 {
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	txm.must_do_gc_steps += TX_MANAGER_GC_STEPS_SIZE;
 	assert(!tuple_has_flag(tuple, TUPLE_IS_DIRTY));
 	uint32_t index_count = space->index_count;
@@ -1067,7 +1068,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	story->del_psn = 0;
 	rlist_create(&story->reader_list);
 	rlist_add_tail(&txm.all_stories, &story->in_all_stories);
-	rlist_add(&space->memtx_stories, &story->in_space_stories);
+	rlist_add(&memtx_space->memtx_stories, &story->in_space_stories);
 	for (uint32_t i = 0; i < index_count; i++) {
 		story->link[i].newer_story = story->link[i].older_story = NULL;
 		rlist_create(&story->link[i].read_gaps);
@@ -2975,6 +2976,7 @@ memtx_tx_index_invisible_count_matching_until_slow(
 	enum iterator_type type, const char *key, uint32_t part_count,
 	struct tuple *until, hint_t until_hint)
 {
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct key_def *key_def = index->def->key_def;
 	struct key_def *cmp_def = index->def->cmp_def;
 
@@ -2989,7 +2991,7 @@ memtx_tx_index_invisible_count_matching_until_slow(
 
 	uint32_t res = 0;
 	struct memtx_story *story;
-	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
+	memtx_tx_foreach_in_index_tuple_story(memtx_space, index, story, {
 		/* All tuples in the story chain share the same key. */
 		if (!memtx_tx_tuple_matches_until(key_def, story->tuple, type,
 						  key, part_count, cmp_def,
@@ -3058,15 +3060,16 @@ memtx_tx_delete_gap(struct gap_item_base *item)
 }
 
 void
-memtx_tx_invalidate_space(struct space *space, struct txn *active_txn)
+memtx_tx_invalidate_space(struct space *base, struct txn *active_txn)
 {
+	struct memtx_space *space = (struct memtx_space *)base;
 	struct memtx_story *story;
 	/*
 	 * Phase one: fill the indexes with actual tuples. Here we insert
 	 * all tuples visible to `active_txn`.
 	 */
 	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
-		assert(story->index_count == space->index_count);
+		assert(story->index_count == base->index_count);
 
 		for (uint32_t i = 0; i < story->index_count; i++) {
 			struct index *index = story->link[i].in_index;
@@ -3164,7 +3167,7 @@ memtx_tx_invalidate_space(struct space *space, struct txn *active_txn)
 			continue;
 		struct txn_stmt *stmt;
 		stailq_foreach_entry(stmt, &txn->stmts, next) {
-			if (stmt->space == space)
+			if (stmt->space == base)
 				stmt->engine_savepoint = NULL;
 		}
 	}
@@ -3173,8 +3176,8 @@ memtx_tx_invalidate_space(struct space *space, struct txn *active_txn)
 	 * Phase four: remove all read trackers from the space indexes. Since
 	 * all concurrent transactions are aborted, we don't need them anymore.
 	 */
-	for (size_t i = 0; i < space->index_count; i++) {
-		struct index *index = space->index[i];
+	for (size_t i = 0; i < base->index_count; i++) {
+		struct index *index = base->index[i];
 		while (!rlist_empty(&index->read_gaps)) {
 			struct gap_item_base *item =
 				rlist_first_entry(&index->read_gaps,
@@ -3531,6 +3534,7 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 				const char *key, uint32_t part_count,
 				struct tuple *until, hint_t until_hint)
 {
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct key_def *key_def = index->def->key_def;
 	struct key_def *cmp_def = index->def->cmp_def;
 
@@ -3564,7 +3568,7 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 	 */
 	uint32_t invisible_count = 0;
 	struct memtx_story *story;
-	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
+	memtx_tx_foreach_in_index_tuple_story(memtx_space, index, story, {
 		/* All tuples in the story chain share the same key. */
 		if (!memtx_tx_tuple_matches_until(key_def, story->tuple, type,
 						  key, part_count, cmp_def,
@@ -3678,8 +3682,9 @@ struct memtx_tx_snapshot_cleaner_entry
 
 void
 memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
-				 struct space *space, struct index *index)
+				 struct space *base, struct index *index)
 {
+	struct memtx_space *space = (struct memtx_space *)base;
 	cleaner->ht = NULL;
 	if (rlist_empty(&space->memtx_stories) &&
 	    rlist_empty(&space->alter_stmts))
@@ -3689,7 +3694,7 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
 		struct tuple *tuple = story->tuple;
 		struct tuple *clean =
-			memtx_tx_tuple_clarify_impl(NULL, space, tuple, index,
+			memtx_tx_tuple_clarify_impl(NULL, base, tuple, index,
 						    0, true);
 		if (clean == tuple)
 			continue;

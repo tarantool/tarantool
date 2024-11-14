@@ -653,8 +653,6 @@ space_create(struct space *space, struct engine *engine,
 			}
 		}
 	}
-	rlist_create(&space->memtx_stories);
-	rlist_create(&space->alter_stmts);
 	space->lua_ref = LUA_NOREF;
 	space->state.is_sync = space->def->opts.is_sync ||
 	                       (box_consider_system_spaces_synchronous &&
@@ -737,8 +735,6 @@ space_new_ephemeral(struct space_def *def, struct rlist *key_list)
 void
 space_delete(struct space *space)
 {
-	assert(rlist_empty(&space->alter_stmts));
-	assert(rlist_empty(&space->memtx_stories));
 	for (uint32_t j = 0; j <= space->index_id_max; j++) {
 		struct index *index = space->index_map[j];
 		if (index != NULL)

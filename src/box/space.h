@@ -255,21 +255,6 @@ struct space {
 	void *check_unique_constraint_map;
 	/** List of space holders. This member is a property of space cache. */
 	struct rlist space_cache_pin_list;
-	/**
-	 * List of all tx stories in the space.
-	 */
-	struct rlist memtx_stories;
-	/**
-	 * List of currently running long (yielding) space alter operations
-	 * triggered by statements applied to this space (see alter_space_do),
-	 * linked by space_alter_stmt::link.
-	 *
-	 * We must exclude such statements from snapshot because they haven't
-	 * reached WAL yet and may actually fail. With MVCC off, such
-	 * statements would be visible from a read view so we have to keep
-	 * track of them separately.
-	 */
-	struct rlist alter_stmts;
 	/** Space upgrade state or NULL. */
 	struct space_upgrade *upgrade;
 	/**
