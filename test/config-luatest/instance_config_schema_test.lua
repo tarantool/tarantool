@@ -1721,6 +1721,7 @@ g.test_failover = function()
             lease_interval = 10,
             renew_interval = 1,
             stateboard = {
+                enabled = true,
                 renew_interval = 1,
                 keepalive_interval = 5,
             },
@@ -1744,6 +1745,7 @@ g.test_failover = function()
         lease_interval = 30,
         renew_interval = 10,
         stateboard = {
+            enabled = true,
             renew_interval = 2,
             keepalive_interval = 10,
         },

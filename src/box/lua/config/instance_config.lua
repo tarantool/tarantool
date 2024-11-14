@@ -2300,6 +2300,22 @@ return schema.new('instance_config', schema.record({
         -- are configured in the `config.etcd` or the
         -- `config.storage` section.
         stateboard = schema.record({
+            -- Stateboard enabled/disabled status.
+            -- A coordinator having stateboard enabled doesn't
+            -- start without specifying compatible remote config
+            -- storage in the config.
+            --
+            -- Beware: disabling stateboard leads to the
+            -- following consequences:
+            -- * Failover commands aren't supported.
+            -- * Failover state monitoring isn't provided.
+            -- * Multiple coordinators over the same replicaset
+            --   behave in an unpredictable way. Two RW instances
+            --   are possible.
+            enabled = schema.scalar({
+                type = 'boolean',
+                default = true,
+            }),
             -- How often information in the stateboard is updated.
             renew_interval = schema.scalar({
                 type = 'number',

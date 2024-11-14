@@ -326,6 +326,7 @@ g.test_defaults = function()
             lease_interval = 30,
             renew_interval = 10,
             stateboard = {
+                enabled = true,
                 renew_interval = 2,
                 keepalive_interval = 10,
             },
