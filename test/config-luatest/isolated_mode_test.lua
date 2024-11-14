@@ -463,3 +463,92 @@ g.test_replication_to = function(g)
         instance_uri('i-003'),
     })
 end
+
+-- Verify that neither of replicaset members fetch data from an
+-- isolated instance.
+g.test_replication_from = function(g)
+    local function instance_uri(instance_name)
+        return {
+            login = 'replicator',
+            password = 'secret',
+            uri = ('unix/:./%s.iproto'):format(instance_name),
+        }
+    end
+
+    local function reload(server)
+        server:exec(function()
+            local config = require('config')
+
+            config:reload()
+        end)
+    end
+
+    local function assert_upstreams(server, exp)
+        server:exec(function(exp)
+            t.assert_equals(box.cfg.replication, exp)
+        end, {exp})
+    end
+
+    local config = cbuilder:new()
+        :set_replicaset_option('replication.failover', 'manual')
+        :set_replicaset_option('leader', 'i-001')
+        :add_instance('i-001', {})
+        :add_instance('i-002', {})
+        :add_instance('i-003', {})
+        :config()
+
+    local cluster = cluster.new(g, config)
+    cluster:start()
+
+    -- Verify a test case prerequisite: i-003 is in the upstreams
+    -- list.
+    assert_upstreams(cluster['i-001'], {
+        instance_uri('i-001'),
+        instance_uri('i-002'),
+        instance_uri('i-003'),
+    })
+    assert_upstreams(cluster['i-002'], {
+        instance_uri('i-001'),
+        instance_uri('i-002'),
+        instance_uri('i-003'),
+    })
+
+    -- Mark i-003 as isolated, reload the configuration on others.
+    local config_2 = cbuilder:new(config)
+        :set_instance_option('i-003', 'isolated', true)
+        :config()
+    cluster:sync(config_2)
+    reload(cluster['i-001'])
+    reload(cluster['i-002'])
+
+    -- Verify that i-003 is not in the upstreams list.
+    assert_upstreams(cluster['i-001'], {
+        instance_uri('i-001'),
+        instance_uri('i-002'),
+    })
+    assert_upstreams(cluster['i-002'], {
+        instance_uri('i-001'),
+        instance_uri('i-002'),
+    })
+
+    -- Disable the isolated mode on i-003, reload the
+    -- configuration on others.
+    local config_3 = cbuilder:new(config_2)
+        :set_instance_option('i-003', 'isolated', nil)
+        :config()
+    cluster:sync(config_3)
+    reload(cluster['i-001'])
+    reload(cluster['i-002'])
+
+    -- Verify that i-003 is now in the upstreams list again.
+    assert_upstreams(cluster['i-001'], {
+        instance_uri('i-001'),
+        instance_uri('i-002'),
+        instance_uri('i-003'),
+    })
+    assert_upstreams(cluster['i-002'], {
+        instance_uri('i-001'),
+        instance_uri('i-002'),
+        instance_uri('i-003'),
+    })
+end
