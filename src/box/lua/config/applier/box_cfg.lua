@@ -28,7 +28,6 @@ local function peer_uris(configdata)
     local uris = {}
     for _, peer_name in ipairs(peers) do
         local iconfig_def = configdata._peers[peer_name].iconfig_def
-        local is_anon = instance_config:get(iconfig_def, 'replication.anon')
         -- Don't use anonymous replicas as upstreams.
         --
         -- An anonymous replica can't be an upstream for a
@@ -40,7 +39,15 @@ local function peer_uris(configdata)
         --
         -- A user may configure a custom data flow using
         -- `replication.peers` option.
-        if not is_anon then
+        local is_anon = instance_config:get(iconfig_def, 'replication.anon')
+        -- Don't replicate data from an isolated instance.
+        --
+        -- While the isolated instance goes to RO and drops iproto
+        -- connections, we refuse to fetch data from it from our
+        -- side. It elimimates unnecessary errors in logs at
+        -- least.
+        local isolated = instance_config:get(iconfig_def, 'isolated')
+        if not is_anon and not isolated then
             local uri = instance_config:instance_uri(iconfig_def, 'peer',
                 {log_prefix = "replicaset dataflow configuration: "})
             if uri == nil then
