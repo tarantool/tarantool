@@ -26,7 +26,6 @@ g.after_each(function(cg)
 end)
 
 g.test_ddl_does_not_abort_unrelated_transactions = function(cg)
-    t.skip_if(cg.params.engine == 'memtx', 'gh-10377')
     cg.server:exec(function(engine)
         local fiber = require('fiber')
         box.schema.create_space('test1', {engine = engine})

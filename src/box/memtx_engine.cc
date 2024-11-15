@@ -628,8 +628,6 @@ memtx_engine_prepare(struct engine *engine, struct txn *txn)
 		}
 		memtx_tx_prepare_finalize(txn);
 	}
-	if (txn->is_schema_changed)
-		memtx_tx_abort_all_for_ddl(txn);
 	return 0;
 }
 
