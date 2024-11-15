@@ -204,7 +204,7 @@ for i = 1, 5 do s2:insert{i, i} end
 
 errinj.set("ERRINJ_BUILD_INDEX_DELAY", true)
 ch = fiber.channel(1)
-_ = fiber.create(function() pcall(s1.create_index, s1, 'sk', {parts = {2, 'unsigned'}}) ch:put(true) end)
+_ = fiber.create(function() s1:create_index('sk', {parts = {2, 'unsigned'}}) ch:put(true) end)
 
 -- Modification of the same space must fail while an index creation
 -- is in progress.
@@ -226,8 +226,5 @@ errinj.set("ERRINJ_BUILD_INDEX_DELAY", false)
 ch:get()
 
 s1.index.pk:select()
--- gh-5998: first DDL operation to be committed wins and aborts all other
--- transactions. So index creation should fail.
---
-assert(s1.index.sk == nil)
+s1.index.sk:select()
 s1:drop()
