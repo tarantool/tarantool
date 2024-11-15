@@ -272,25 +272,25 @@ g.test_iproto_stop_failure = function(g)
 
     -- Verify that an alert is issued.
     --
-    -- The alert is set in background, so let's retry the check
-    -- until the alert is found.
+    -- The drop connection alert is set in background, so let's
+    -- retry the check until the alert is found.
     local info
-    local exp = 'isolated mode: can\'t drop iproto connections during 0 ' ..
+    local exp_1 = 'The isolated mode is set for the instance "i-001"'
+    local exp_2 = 'isolated mode: can\'t drop iproto connections during 0 ' ..
         'seconds (continued in background): timed out'
     t.helpers.retrying({timeout = 60}, function()
         info = g.it:roundtrip("require('config'):info()")
         t.assert_covers(info, {
             alerts = {
-                {
-                    type = 'warn',
-                    message = exp,
-                }
+                {type = 'warn', message = exp_1},
+                {type = 'warn', message = exp_2},
             },
         })
     end)
 
-    -- Only one alert, no duplicates or extra warnings.
-    t.assert_equals(#info.alerts, 1)
+    -- Only one drop connection alert, no duplicates or extra
+    -- warnings.
+    t.assert_equals(#info.alerts, 2)
 
     -- The existing connection is dropped despite the alert.
     t.assert_not(g.conn:ping())
@@ -356,26 +356,27 @@ g.test_iproto_stop_failure_on_startup = function(g)
 
         -- Verify that an alert is issued.
         --
-        -- The alert is set in background, so let's retry the check
-        -- until the alert is found or a short timeout exceeds
-        -- (in this case the outer retrying logic will catch it).
-        local exp = 'isolated mode: can\'t drop iproto connections during 0 ' ..
-            'seconds (continued in background): timed out'
+        -- The drop connection alert is set in background, so
+        -- let's retry the check until the alert is found or a
+        -- short timeout exceeds (in this case the outer
+        -- retrying logic will catch it).
+        local exp_1 = 'The isolated mode is set for the instance "i-001"'
+        local exp_2 = 'isolated mode: can\'t drop iproto connections during ' ..
+            '0 seconds (continued in background): timed out'
         t.helpers.retrying({timeout = 1}, function()
             info = g.it:roundtrip("require('config'):info()")
             t.assert_covers(info, {
                 alerts = {
-                    {
-                        type = 'warn',
-                        message = exp,
-                    }
+                    {type = 'warn', message = exp_1},
+                    {type = 'warn', message = exp_2},
                 },
             })
         end)
     end)
 
-    -- Only one alert, no duplicates or extra warnings.
-    t.assert_equals(#info.alerts, 1)
+    -- Only one drop connection alert, no duplicates or extra
+    -- warnings.
+    t.assert_equals(#info.alerts, 2)
 
     -- A new connection is not accepted despite the alert.
     local uri = cluster['i-001'].net_box_uri
@@ -551,4 +552,107 @@ g.test_replication_from = function(g)
         instance_uri('i-002'),
         instance_uri('i-003'),
     })
+end
+
+-- Verify that an alert is issued on an isolated instance.
+g.test_alert = function(g)
+    local config = cbuilder:new()
+        :add_instance('i-001', {})
+        :config()
+
+    local cluster = cluster.new(g, config)
+    cluster:start()
+
+    -- Connect to the server's console.
+    g.it = it.connect(cluster['i-001'])
+
+    -- Verify a test case prerequisite: no alerts.
+    local info = g.it:roundtrip("require('config'):info()")
+    t.assert_equals(info.alerts, {})
+
+    -- Go to the isolated mode.
+    local config_2 = cbuilder:new(config)
+        :set_instance_option('i-001', 'isolated', true)
+        :config()
+    cluster:sync(config_2)
+    g.it:roundtrip("require('config'):reload()")
+
+    -- Verify that the alert is issued.
+    local exp = 'The isolated mode is set for the instance "i-001"'
+    local info = g.it:roundtrip("require('config'):info()")
+    t.assert_covers(info.alerts, {
+        {type = 'warn', message = exp},
+    })
+
+    -- Only one alert, no duplicates or extra warnings.
+    t.assert_equals(#info.alerts, 1)
+
+    -- Disable the isolated mode on i-001.
+    local config_3 = cbuilder:new(config_2)
+        :set_instance_option('i-001', 'isolated', nil)
+        :config()
+    cluster:sync(config_3)
+    g.it:roundtrip("require('config'):reload()")
+
+    -- The alert disappears.
+    local info = g.it:roundtrip("require('config'):info()")
+    t.assert_equals(info.alerts, {})
+end
+
+-- Similar to the previous one, but enables the isolated mode on
+-- startup.
+--
+-- The test case mostly to verify that the alert is not
+-- duplicated.
+g.test_alert_on_startup = function(g)
+    local config = cbuilder:new()
+        :add_instance('i-001', {})
+        :config()
+
+    local cluster = cluster.new(g, config)
+    cluster:start()
+
+    -- Stop i-001. It leaves a local snapshot, so it can be
+    -- started in the isolated mode.
+    cluster['i-001']:stop()
+
+    -- Enable the isolated mode, write the new config.
+    local config_2 = cbuilder:new(config)
+        :set_instance_option('i-001', 'isolated', true)
+        :config()
+    cluster:sync(config_2)
+
+    -- Start the instance from the local snapshot in the
+    -- isolated mode.
+    --
+    -- Don't check the readiness condition, because it is
+    -- performed over an iproto connection and it has no
+    -- chance to succeed (iproto stops listening in the
+    -- isolated mode).
+    cluster['i-001']:start({wait_until_ready = false})
+
+    -- Use the console connection, because an instance in the
+    -- isolated mode doesn't accept iproto requests.
+    connect_console(g, cluster['i-001'])
+
+    -- Verify that the alert is issued.
+    local exp = 'The isolated mode is set for the instance "i-001"'
+    local info = g.it:roundtrip("require('config'):info()")
+    t.assert_covers(info.alerts, {
+        {type = 'warn', message = exp},
+    })
+
+    -- Only one alert, no duplicates or extra warnings.
+    t.assert_equals(#info.alerts, 1)
+
+    -- Disable the isolated mode on i-001.
+    local config_3 = cbuilder:new(config_2)
+        :set_instance_option('i-001', 'isolated', nil)
+        :config()
+    cluster:sync(config_3)
+    g.it:roundtrip("require('config'):reload()")
+
+    -- The alert disappears.
+    local info = g.it:roundtrip("require('config'):info()")
+    t.assert_equals(info.alerts, {})
 end
