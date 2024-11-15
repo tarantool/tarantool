@@ -1529,7 +1529,7 @@ memtx_space_invalidate(struct space *space)
 	 * will be aborted when DDL will be prepared.
 	 */
 	if (memtx_tx_manager_use_mvcc_engine) {
-		memtx_tx_abort_all_for_ddl(in_txn());
+		memtx_tx_abort_space_readers(in_txn(), space);
 		memtx_tx_invalidate_space(space, in_txn());
 	}
 }

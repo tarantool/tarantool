@@ -834,48 +834,10 @@ memtx_tx_acquire_ddl(struct txn *tx)
 }
 
 /**
- * Fully temporary and remote transactions cannot possibly conflict each other
- * by definition, so we can filter them out when aborting transactions for DDL.
- * Temporary space transactions are a always nop, since they never have WAL rows
- * associated with them.
- */
-static bool
-memtx_tx_filter_temporary_and_remote_txs(struct txn *txn1, struct txn *txn2)
-{
-	return (txn_is_fully_temporary(txn1) && txn_is_fully_remote(txn2)) ||
-	       (txn_is_fully_remote(txn1) && txn_is_fully_temporary(txn2));
-}
-
-/**
  * Clean and clear all read lists of @a txn.
  */
 static void
 memtx_tx_clear_txn_read_lists(struct txn *txn);
-
-void
-memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
-{
-	struct memtx_tx_txn_data *txn_data;
-	rlist_foreach_entry(txn_data, &txm.all_txs, in_all_txs) {
-		struct txn *to_be_aborted = txn_data->txn;
-		if (to_be_aborted == ddl_owner)
-			continue;
-		if (txn_has_flag(to_be_aborted, TXN_HANDLES_DDL))
-			continue;
-		if (to_be_aborted->status != TXN_INPROGRESS &&
-		    to_be_aborted->status != TXN_IN_READ_VIEW)
-			continue;
-		if (memtx_tx_filter_temporary_and_remote_txs(ddl_owner,
-							     to_be_aborted))
-			continue;
-		to_be_aborted->status = TXN_ABORTED;
-		txn_set_flags(to_be_aborted, TXN_IS_CONFLICTED);
-		memtx_tx_clear_txn_read_lists(to_be_aborted);
-		say_warn("Transaction processing DDL (id=%lld) has aborted "
-			 "another TX (id=%lld)", (long long) ddl_owner->id,
-			 (long long) to_be_aborted->id);
-	}
-}
 
 /**
  * Fix position of @a txn in global read view list to preserve the list to
@@ -3131,6 +3093,73 @@ memtx_tx_delete_gap(struct gap_item_base *item)
 		unreachable();
 	}
 	memtx_tx_mempool_free(item->txn, pool, item);
+}
+
+void
+memtx_tx_abort_space_readers(struct txn *ddl_owner, struct space *base)
+{
+	/* Abort all story and gap-with-sucessor readers. */
+	struct memtx_story *story;
+	struct memtx_space *space = (struct memtx_space *)base;
+	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
+		struct tx_read_tracker *tracker, *tmp;
+		rlist_foreach_entry_safe(tracker, &story->reader_list,
+					in_reader_list, tmp) {
+			if (tracker->reader != ddl_owner)
+				memtx_tx_abort_with_conflict(tracker->reader);
+		}
+
+		for (uint32_t i = 0; i < story->index_count; i++) {
+			if (story->link[i].newer_story != NULL)
+				continue;
+			struct gap_item_base *item, *tmp;
+			rlist_foreach_entry_safe(item,
+						 &story->link[i].read_gaps,
+						 in_read_gaps, tmp) {
+				if (item->txn != ddl_owner)
+					memtx_tx_abort_with_conflict(item->txn);
+			}
+		}
+	}
+
+	/* Abort all gap-without-successor readers. */
+	for (uint32_t i = 0; i < base->index_count; i++) {
+		struct memtx_tx_index *index = &space->memtx_tx_index[i];
+		struct gap_item_base *item, *tmp;
+		rlist_foreach_entry_safe(item, &index->read_gaps,
+					 in_read_gaps, tmp) {
+			if (item->txn != ddl_owner)
+				memtx_tx_abort_with_conflict(item->txn);
+		}
+	}
+
+	/*
+	 * Iterate over all transactions in order to:
+	 * 1. Abort all writers.
+	 * 2. Abort all point hole readers.
+	 */
+	struct memtx_tx_txn_data *txn_data;
+	rlist_foreach_entry(txn_data, &txm.all_txs, in_all_txs) {
+		struct txn *txn = txn_data->txn;
+		if (txn == ddl_owner)
+			continue;
+		struct txn_stmt *stmt;
+		stailq_foreach_entry(stmt, &txn->stmts, next) {
+			if (stmt->space == base) {
+				memtx_tx_abort_with_conflict(txn);
+				break;
+			}
+		}
+		struct point_hole_item *hole_item;
+		rlist_foreach_entry(hole_item, &txn_data->point_holes_list,
+				    in_point_holes_list) {
+			uint32_t index_id = hole_item->index_unique_id;
+			if (base->index_map[index_id] != NULL) {
+				memtx_tx_abort_with_conflict(txn);
+				break;
+			}
+		}
+	}
 }
 
 void

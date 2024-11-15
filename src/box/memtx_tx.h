@@ -190,16 +190,6 @@ void
 memtx_tx_acquire_ddl(struct txn *tx);
 
 /**
- * Mark all transactions except for a given as aborted due to conflict:
- * when DDL operation is about to be committed other transactions are
- * considered to use obsolete schema so that should be aborted.
- *
- * NB: can trigger story garbage collection.
- */
-void
-memtx_tx_abort_all_for_ddl(struct txn *ddl_owner);
-
-/**
  * @brief Add a statement to transaction manager's history.
  * Until unlinking or releasing the space could internally contain
  * wrong tuples and must be cleaned through memtx_tx_tuple_clarify call.
@@ -520,6 +510,9 @@ memtx_tx_tuple_key_is_visible(struct txn *txn, struct space *space,
  */
 void
 memtx_tx_clean_txn(struct txn *txn);
+
+void
+memtx_tx_abort_space_readers(struct txn *ddl_owner, struct space *base);
 
 /**
  * Invalidate space in memtx tx: remove all the objects associated with
