@@ -192,6 +192,8 @@ struct point_hole_item {
 	size_t key_len;
 	/** Storage for short key. @key may point here. */
 	char short_key[16];
+	/** Saved space id. */
+	uint32_t space_id;
 	/** Flag that the hash tables stores pointer to this item. */
 	bool is_head;
 };
@@ -684,47 +686,10 @@ memtx_tx_acquire_ddl(struct txn *tx)
 }
 
 /**
- * Fully temporary and remote transactions cannot possibly conflict each other
- * by definition, so we can filter them out when aborting transactions for DDL.
- * Temporary space transactions are a always nop, since they never have WAL rows
- * associated with them.
- */
-static bool
-memtx_tx_filter_temporary_and_remote_txs(struct txn *txn1, struct txn *txn2)
-{
-	return (txn_is_fully_temporary(txn1) && txn_is_fully_remote(txn2)) ||
-	       (txn_is_fully_remote(txn1) && txn_is_fully_temporary(txn2));
-}
-
-/**
  * Clean and clear all read lists of @a txn.
  */
 static void
 memtx_tx_clear_txn_read_lists(struct txn *txn);
-
-void
-memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
-{
-	struct txn *to_be_aborted;
-	rlist_foreach_entry(to_be_aborted, &txm.all_txs, in_all_txs) {
-		if (to_be_aborted == ddl_owner)
-			continue;
-		if (txn_has_flag(to_be_aborted, TXN_HANDLES_DDL))
-			continue;
-		if (to_be_aborted->status != TXN_INPROGRESS &&
-		    to_be_aborted->status != TXN_IN_READ_VIEW)
-			continue;
-		if (memtx_tx_filter_temporary_and_remote_txs(ddl_owner,
-							     to_be_aborted))
-			continue;
-		to_be_aborted->status = TXN_ABORTED;
-		txn_set_flags(to_be_aborted, TXN_IS_CONFLICTED);
-		memtx_tx_clear_txn_read_lists(to_be_aborted);
-		say_warn("Transaction processing DDL (id=%lld) has aborted "
-			 "another TX (id=%lld)", (long long) ddl_owner->id,
-			 (long long) to_be_aborted->id);
-	}
-}
 
 /**
  * Fix position of @a txn in global read view list to preserve the list to
@@ -764,6 +729,7 @@ memtx_tx_adjust_position_in_read_view_list(struct txn *txn)
 static void
 memtx_tx_abort_with_conflict(struct txn *victim)
 {
+	assert(victim->psn == 0);
 	if (victim->status == TXN_ABORTED)
 		return;
 	if (victim->status == TXN_IN_READ_VIEW)
@@ -2760,13 +2726,92 @@ memtx_tx_delete_gap(struct gap_item_base *item)
 	memtx_tx_mempool_free(item->txn, pool, item);
 }
 
-void
-memtx_tx_invalidate_space(struct space *space, struct txn *active_txn)
+/**
+ * Abort all concurrent readers of the old schema of the space.
+ * Note that only active transaction can have trackers since when a transaction
+ * is rolled back or prepared all its trackers are deleted.
+ */
+static void
+memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 {
+	/* Abort all story and gap-with-sucessor readers. */
+	struct memtx_story *story;
+	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
+		struct tx_read_tracker *tracker, *tmp;
+		rlist_foreach_entry_safe(tracker, &story->reader_list,
+					 in_reader_list, tmp) {
+			if (tracker->reader != ddl_owner)
+				memtx_tx_abort_with_conflict(tracker->reader);
+		}
+
+		for (uint32_t i = 0; i < story->index_count; i++) {
+			if (story->link[i].newer_story != NULL)
+				continue;
+			struct gap_item_base *item, *tmp;
+			rlist_foreach_entry_safe(item,
+						 &story->link[i].read_gaps,
+						 in_read_gaps, tmp) {
+				if (item->txn != ddl_owner)
+					memtx_tx_abort_with_conflict(item->txn);
+			}
+		}
+	}
+
+	/* Abort all gap-without-successor readers. */
+	for (uint32_t i = 0; i < space->index_count; i++) {
+		struct index *index = space->index[i];
+		struct gap_item_base *item, *tmp;
+		rlist_foreach_entry_safe(item, &index->read_gaps,
+					 in_read_gaps, tmp) {
+			if (item->txn != ddl_owner)
+				memtx_tx_abort_with_conflict(item->txn);
+		}
+	}
+
+	/*
+	 * Iterate over all transactions in order to:
+	 * 1. Abort all writers.
+	 * 2. Abort all point hole readers.
+	 */
+	struct txn *txn;
+	rlist_foreach_entry(txn, &txm.all_txs, in_all_txs) {
+		if (txn->status != TXN_INPROGRESS &&
+		    txn->status != TXN_IN_READ_VIEW)
+			continue;
+		if (txn == ddl_owner)
+			continue;
+		struct txn_stmt *stmt;
+		stailq_foreach_entry(stmt, &txn->stmts, next) {
+			if (stmt->space == space) {
+				memtx_tx_abort_with_conflict(txn);
+				break;
+			}
+		}
+		struct point_hole_item *hole_item;
+		rlist_foreach_entry(hole_item, &txn->point_holes_list,
+				    in_point_holes_list) {
+			if (space->def->id == hole_item->space_id) {
+				memtx_tx_abort_with_conflict(txn);
+				break;
+			}
+		}
+	}
+}
+
+void
+memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
+{
+	/*
+	 * Before space invalidation, we should abort all concurrent readers of
+	 * the old schema since we are going to delete primitives that are
+	 * needed to provide them with transactional isolation.
+	 */
+	memtx_tx_abort_space_schema_readers(space, ddl_owner);
+
 	struct memtx_story *story;
 	/*
 	 * Phase one: fill the indexes with actual tuples. Here we insert
-	 * all tuples visible to `active_txn`.
+	 * all tuples visible to `ddl_owner`.
 	 */
 	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
 		assert(story->index_count == space->index_count);
@@ -2787,7 +2832,7 @@ memtx_tx_invalidate_space(struct space *space, struct txn *active_txn)
 
 			struct tuple *new_tuple = NULL;
 			bool is_own_change;
-			memtx_tx_story_find_visible_tuple(story, active_txn, i,
+			memtx_tx_story_find_visible_tuple(story, ddl_owner, i,
 							  true, &new_tuple,
 							  &is_own_change);
 
@@ -2991,6 +3036,7 @@ point_hole_storage_new(struct index *index, const char *key,
 	}
 	memcpy((char *)object->key, key, key_len);
 	object->key_len = key_len;
+	object->space_id = index->def->space_id;
 	object->is_head = true;
 
 	struct key_def *def = index->def->key_def;

@@ -1502,13 +1502,11 @@ memtx_space_invalidate(struct space *space)
 {
 	/*
 	 * Abort all concurrent transactions and invalidate space in MVCC
-	 * only if it is enabled. Otherwise, all concurrent transactions
-	 * will be aborted when DDL will be prepared.
+	 * only if it is enabled. Otherwise, there is no need to abort
+	 * anything since memtx transactions don't yield without MVCC.
 	 */
-	if (memtx_tx_manager_use_mvcc_engine) {
-		memtx_tx_abort_all_for_ddl(in_txn());
+	if (memtx_tx_manager_use_mvcc_engine)
 		memtx_tx_invalidate_space(space, in_txn());
-	}
 }
 
 /* }}} DDL */
