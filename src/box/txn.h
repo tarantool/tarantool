@@ -305,41 +305,12 @@ struct txn_stmt {
 	struct tuple *new_tuple;
 	/** Structure, which contains tuples for rollback. */
 	struct txn_stmt_rollback_info rollback_info;
-	/**
-	 * If new_tuple != NULL and this transaction was not prepared,
-	 * this member holds added story of the new_tuple.
-	 */
-	struct memtx_story *add_story;
-	/**
-	 * If new_tuple == NULL and this transaction was not prepared,
-	 * this member holds added story of the old_tuple.
-	 */
-	struct memtx_story *del_story;
-	/**
-	 * Link in memtx_story::del_stmt linked list.
-	 * Only one prepared TX can delete a tuple and a story. But
-	 * when there are several in-progress transactions and they delete
-	 * the same tuple we have to store several delete statements in one
-	 * story. It's implemented in that way: story has a pointer to the first
-	 * deleting statement, that statement has a pointer to the next etc,
-	 * with NULL in the end.
-	 * That member is that the pointer to next deleting statement.
-	 */
-	struct txn_stmt *next_in_del_list;
 	/** Engine savepoint for the start of this statement. */
 	void *engine_savepoint;
 	/** Redo info: the binary log row */
 	struct xrow_header *row;
 	/** on_commit and/or on_rollback list is not empty. */
 	bool has_triggers;
-	/*
-	 * Flag that shows whether this statement overwrites own transaction
-	 * statement. For example if a transaction makes two replaces of the
-	 * same key, the second statement will be with is_own_change = true.
-	 * Or if a transaction deletes some key and then inserts that key,
-	 * the insertion statement will be with is_own_change = true.
-	 */
-	bool is_own_change;
 	/**
 	* Request type - IPROTO type code
 	*/

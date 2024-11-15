@@ -76,6 +76,56 @@ struct memtx_tx_txn_data {
 static inline struct memtx_tx_txn_data *
 memtx_tx_txn_data(struct txn *txn);
 
+struct memtx_tx_stmt {
+	/**
+	 * The statement itself.
+	 */
+	struct txn_stmt *base;
+	/**
+	 * If new_tuple != NULL and this transaction was not prepared,
+	 * this member holds added story of the new_tuple.
+	 */
+	struct memtx_story *add_story;
+	/**
+	 * If new_tuple == NULL and this transaction was not prepared,
+	 * this member holds added story of the old_tuple.
+	 */
+	struct memtx_story *del_story;
+	/*
+	 * Flag that shows whether this statement overwrites own transaction
+	 * statement. For example if a transaction makes two replaces of the
+	 * same key, the second statement will be with is_own_change = true.
+	 * Or if a transaction deletes some key and then inserts that key,
+	 * the insertion statement will be with is_own_change = true.
+	 */
+	bool is_own_change;
+	/**
+	 * Link in memtx_story::del_stmt linked list.
+	 * Only one prepared TX can delete a tuple and a story. But
+	 * when there are several in-progress transactions and they delete
+	 * the same tuple we have to store several delete statements in one
+	 * story. It's implemented in that way: story has a pointer to the first
+	 * deleting statement, that statement has a pointer to the next etc,
+	 * with NULL in the end.
+	 * That member is that the pointer to next deleting statement.
+	 */
+	struct memtx_tx_stmt *next_in_del_list;
+};
+
+static inline struct memtx_tx_stmt *
+memtx_tx_stmt_new(struct txn_stmt *stmt)
+{
+	struct memtx_tx_stmt *memtx_tx_stmt =
+		xregion_alloc_object(&stmt->txn->region, struct memtx_tx_stmt);
+	memtx_tx_stmt->base = stmt;
+	memtx_tx_stmt->add_story = NULL;
+	memtx_tx_stmt->del_story = NULL;
+	memtx_tx_stmt->next_in_del_list = NULL;
+	memtx_tx_stmt->is_own_change = false;
+	stmt->engine_savepoint = memtx_tx_stmt;
+	return memtx_tx_stmt;
+}
+
 /**
  * Link that connects a memtx_story with older and newer stories of the same
  * key in index.
@@ -109,7 +159,7 @@ struct memtx_story {
 	 * don't know who introduced that story, the tuple was added by a
 	 * transaction that was completed and destroyed some time ago.
 	 */
-	struct txn_stmt *add_stmt;
+	struct memtx_tx_stmt *add_stmt;
 	/**
 	 * Prepare sequence number of add_stmt's transaction. Is set when
 	 * the transaction is prepared. Can be 0 if the transaction is
@@ -121,7 +171,7 @@ struct memtx_story {
 	 * transaction becomes committed. Can also be NULL if the tuple has not
 	 * been deleted yet.
 	 */
-	struct txn_stmt *del_stmt;
+	struct memtx_tx_stmt *del_stmt;
 	/**
 	 * Prepare sequence number of del_stmt's transaction. Is set when
 	 * the transaction is prepared. Can be 0 if the transaction is
@@ -1125,9 +1175,9 @@ memtx_tx_story_get(struct tuple *tuple)
 	assert(pos != mh_end(txm.history));
 	struct memtx_story *story = *mh_history_node(txm.history, pos);
 	if (story->add_stmt != NULL)
-		assert(story->add_psn == story->add_stmt->txn->psn);
+		assert(story->add_psn == story->add_stmt->base->txn->psn);
 	if (story->del_stmt != NULL)
-		assert(story->del_psn == story->del_stmt->txn->psn);
+		assert(story->del_psn == story->del_stmt->base->txn->psn);
 	return story;
 }
 
@@ -1136,7 +1186,7 @@ memtx_tx_story_get(struct tuple *tuple)
  */
 static void
 memtx_tx_story_link_added_by(struct memtx_story *story,
-			     struct txn_stmt *stmt)
+			     struct memtx_tx_stmt *stmt)
 {
 	assert(story->add_stmt == NULL);
 	assert(stmt->add_story == NULL);
@@ -1150,7 +1200,7 @@ memtx_tx_story_link_added_by(struct memtx_story *story,
  */
 static void
 memtx_tx_story_unlink_added_by(struct memtx_story *story,
-			       struct txn_stmt *stmt)
+			       struct memtx_tx_stmt *stmt)
 {
 	assert(stmt->add_story == story);
 	assert(story->add_stmt == stmt);
@@ -1163,7 +1213,7 @@ memtx_tx_story_unlink_added_by(struct memtx_story *story,
  */
 static void
 memtx_tx_story_link_deleted_by(struct memtx_story *story,
-			       struct txn_stmt *stmt)
+			       struct memtx_tx_stmt *stmt)
 {
 	assert(stmt->del_story == NULL);
 	assert(stmt->next_in_del_list == NULL);
@@ -1179,12 +1229,12 @@ memtx_tx_story_link_deleted_by(struct memtx_story *story,
  */
 static void
 memtx_tx_story_unlink_deleted_by(struct memtx_story *story,
-				 struct txn_stmt *stmt)
+				 struct memtx_tx_stmt *stmt)
 {
 	assert(stmt->del_story == story);
 
 	/* Find a place in list from which stmt must be deleted. */
-	struct txn_stmt **ptr = &story->del_stmt;
+	struct memtx_tx_stmt **ptr = &story->del_stmt;
 	while (*ptr != stmt) {
 		ptr = &(*ptr)->next_in_del_list;
 		assert(ptr != NULL);
@@ -1582,7 +1632,7 @@ memtx_tx_story_insert_is_visible(struct memtx_story *story, struct txn *txn,
 {
 	*is_own_change = false;
 
-	if (story->add_stmt != NULL && story->add_stmt->txn == txn) {
+	if (story->add_stmt != NULL && story->add_stmt->base->txn == txn) {
 		/* Tuple is added by us (@txn). */
 		*is_own_change = true;
 		return true;
@@ -1618,9 +1668,9 @@ memtx_tx_story_delete_is_visible(struct memtx_story *story, struct txn *txn,
 {
 	*is_own_change = false;
 
-	struct txn_stmt *dels = story->del_stmt;
+	struct memtx_tx_stmt *dels = story->del_stmt;
 	while (dels != NULL) {
-		if (dels->txn == txn) {
+		if (dels->base->txn == txn) {
 			/* Tuple is deleted by us (@txn). */
 			*is_own_change = true;
 			return true;
@@ -2057,14 +2107,14 @@ memtx_tx_history_add_stmt_prepare_result(struct tuple *old_tuple,
  * UPDATE, and old_tuple is not NULL and is the updated tuple.
  */
 static int
-memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
+memtx_tx_history_add_insert_stmt(struct memtx_tx_stmt *stmt,
 				 struct tuple *old_tuple,
 				 struct tuple *new_tuple,
 				 enum dup_replace_mode mode,
 				 struct tuple **result)
 {
 	assert(new_tuple != NULL);
-	struct space *space = stmt->space;
+	struct space *space = stmt->base->space;
 
 	/* Process replacement in indexes. */
 	struct tuple *directly_replaced[space->index_count];
@@ -2092,7 +2142,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 
 	/* Check overwritten tuple. */
 	bool is_own_change = false;
-	int rc = check_dup(stmt, new_tuple, directly_replaced,
+	int rc = check_dup(stmt->base, new_tuple, directly_replaced,
 			   &old_tuple, mode, &is_own_change);
 	if (rc != 0)
 		goto fail;
@@ -2163,13 +2213,14 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	 */
 	if (!is_own_change &&
 	    (mode == DUP_INSERT ||
-	     space_has_before_replace_triggers(stmt->space) ||
-	     space_has_on_replace_triggers(stmt->space))) {
+	     space_has_before_replace_triggers(stmt->base->space) ||
+	     space_has_on_replace_triggers(stmt->base->space))) {
 		assert(mode != DUP_INSERT || del_story == NULL);
 		if (del_story == NULL)
-			memtx_tx_track_story_gap(stmt->txn, add_story, 0);
+			memtx_tx_track_story_gap(stmt->base->txn, add_story, 0);
 		else
-			memtx_tx_track_read_story(stmt->txn, space, del_story);
+			memtx_tx_track_read_story(stmt->base->txn, space,
+						  del_story);
 	}
 
 	/* Finalize the result. */
@@ -2197,7 +2248,7 @@ fail:
  * Just for understanding, that's a DELETE statement.
  */
 static int
-memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
+memtx_tx_history_add_delete_stmt(struct memtx_tx_stmt *stmt,
 				 struct tuple *old_tuple,
 				 struct tuple **result)
 {
@@ -2214,15 +2265,17 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 	 */
 	assert(tuple_has_flag(old_tuple, TUPLE_IS_DIRTY));
 	struct memtx_story *del_story = memtx_tx_story_get(old_tuple);
-	if (del_story->add_stmt != NULL)
-		stmt->is_own_change = del_story->add_stmt->txn == stmt->txn;
+	if (del_story->add_stmt != NULL) {
+		stmt->is_own_change =
+			del_story->add_stmt->base->txn == stmt->base->txn;
+	}
 	memtx_tx_story_link_deleted_by(del_story, stmt);
 
 	/*
 	 * The tuple is deleted from the space, let's see if anyone had
 	 * counted it in the indexes the tuple is contained in.
 	 */
-	struct space *space = stmt->space;
+	struct space *space = stmt->base->space;
 	for (uint32_t i = 0; i < space->index_count; i++) {
 		if (!tuple_key_is_excluded(del_story->tuple,
 					   space->index[i]->def->key_def,
@@ -2250,14 +2303,16 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 	assert(new_tuple != NULL || old_tuple != NULL);
 	assert(new_tuple == NULL || !tuple_has_flag(new_tuple, TUPLE_IS_DIRTY));
 
+	struct memtx_tx_stmt *memtx_tx_stmt = memtx_tx_stmt_new(stmt);
+
 	memtx_tx_story_gc();
 	if (new_tuple != NULL)
-		return memtx_tx_history_add_insert_stmt(stmt, old_tuple,
-							new_tuple, mode,
-							result);
+		return memtx_tx_history_add_insert_stmt(memtx_tx_stmt,
+							old_tuple, new_tuple,
+							mode, result);
 	else
-		return memtx_tx_history_add_delete_stmt(stmt, old_tuple,
-							result);
+		return memtx_tx_history_add_delete_stmt(memtx_tx_stmt,
+							old_tuple, result);
 }
 
 /*
@@ -2276,7 +2331,7 @@ memtx_tx_abort_story_readers(struct memtx_story *story)
  * Rollback addition of story by statement.
  */
 static void
-memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
+memtx_tx_history_rollback_added_story(struct memtx_tx_stmt *stmt)
 {
 	struct memtx_story *add_story = stmt->add_story;
 	struct memtx_story *del_story = stmt->del_story;
@@ -2286,7 +2341,7 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	 * preparation actions and abort other transactions that managed
 	 * to read this prepared state.
 	 */
-	if (stmt->txn->psn != 0) {
+	if (stmt->base->txn->psn != 0) {
 		/*
 		 * During preparation of this statement there were two cases:
 		 * * del_story != NULL: all in-progress transactions that were
@@ -2300,13 +2355,13 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 		 * So we must scan delete statements and relink them to delete
 		 * del_story if it's not NULL or to delete nothing otherwise.
 		 */
-		struct txn_stmt **from = &add_story->del_stmt;
+		struct memtx_tx_stmt **from = &add_story->del_stmt;
 		while (*from != NULL) {
-			struct txn_stmt *test_stmt = *from;
+			struct memtx_tx_stmt *test_stmt = *from;
 			assert(test_stmt->del_story == add_story);
-			assert(test_stmt->txn != stmt->txn);
+			assert(test_stmt->base->txn != stmt->base->txn);
 			assert(!test_stmt->is_own_change);
-			assert(test_stmt->txn->psn == 0);
+			assert(test_stmt->base->txn->psn == 0);
 
 			/* Unlink from add_story list. */
 			*from = test_stmt->next_in_del_list;
@@ -2381,7 +2436,7 @@ memtx_tx_abort_gap_readers(struct memtx_story *story)
  * Rollback deletion of story by statement.
  */
 static void
-memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
+memtx_tx_history_rollback_deleted_story(struct memtx_tx_stmt *stmt)
 {
 	struct memtx_story *del_story = stmt->del_story;
 
@@ -2390,7 +2445,7 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 	 * preparation actions and abort other transactions that managed
 	 * to read this prepared state.
 	 */
-	if (stmt->txn->psn != 0) {
+	if (stmt->base->txn->psn != 0) {
 		/*
 		 * During preparation of deletion we could unlink other
 		 * transactions that want to overwrite this story. Now we have
@@ -2405,12 +2460,12 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 		for (test_story = del_story->link[0].newer_story;
 		     test_story != NULL;
 		     test_story = test_story->link[0].newer_story) {
-			struct txn_stmt *test_stmt = test_story->add_stmt;
+			struct memtx_tx_stmt *test_stmt = test_story->add_stmt;
 			if (test_stmt->is_own_change)
 				continue;
-			assert(test_stmt->txn != stmt->txn);
+			assert(test_stmt->base->txn != stmt->base->txn);
 			assert(test_stmt->del_story == NULL);
-			assert(test_stmt->txn->psn == 0);
+			assert(test_stmt->base->txn->psn == 0);
 			memtx_tx_story_link_deleted_by(del_story, test_stmt);
 		}
 
@@ -2445,19 +2500,19 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
  *    without stories if they have failed to commit.
  */
 void
-memtx_tx_history_rollback_empty_stmt(struct txn_stmt *stmt)
+memtx_tx_history_rollback_empty_stmt(struct memtx_tx_stmt *stmt)
 {
-	struct tuple *old_tuple = stmt->rollback_info.old_tuple;
-	struct tuple *new_tuple = stmt->rollback_info.new_tuple;
-	if (!stmt->txn->is_schema_changed && stmt->txn->psn == 0)
+	struct tuple *old_tuple = stmt->base->rollback_info.old_tuple;
+	struct tuple *new_tuple = stmt->base->rollback_info.new_tuple;
+	if (!stmt->base->txn->is_schema_changed && stmt->base->txn->psn == 0)
 		return;
-	if (stmt->space->def->opts.is_ephemeral ||
+	if (stmt->base->space->def->opts.is_ephemeral ||
 	    (old_tuple == NULL && new_tuple == NULL))
 		return;
-	for (size_t i = 0; i < stmt->space->index_count; i++) {
+	for (size_t i = 0; i < stmt->base->space->index_count; i++) {
 		struct tuple *unused;
-		if (index_replace(stmt->space->index[i], new_tuple, old_tuple,
-				  DUP_REPLACE_OR_INSERT, &unused,
+		if (index_replace(stmt->base->space->index[i], new_tuple,
+				  old_tuple, DUP_REPLACE_OR_INSERT, &unused,
 				  &unused) != 0) {
 			panic("failed to rebind story in index on "
 			      "rollback of statement without story");
@@ -2471,20 +2526,22 @@ memtx_tx_history_rollback_empty_stmt(struct txn_stmt *stmt)
 }
 
 void
-memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
+memtx_tx_history_rollback_stmt(struct txn_stmt *base)
 {
+	struct memtx_tx_stmt *stmt = base->engine_savepoint;
+	assert(stmt != NULL);
 	/* Consistency asserts. */
 	if (stmt->add_story != NULL) {
-		assert(stmt->add_story->tuple == stmt->rollback_info.new_tuple);
-		assert(stmt->add_story->add_psn == stmt->txn->psn);
+		assert(stmt->add_story->tuple == base->rollback_info.new_tuple);
+		assert(stmt->add_story->add_psn == base->txn->psn);
 	}
 	if (stmt->del_story != NULL)
-		assert(stmt->del_story->del_psn == stmt->txn->psn);
+		assert(stmt->del_story->del_psn == base->txn->psn);
 	/*
 	 * There can be no more than one prepared statement deleting a story at
 	 * any point in time.
 	 */
-	assert(stmt->txn->psn == 0 || stmt->next_in_del_list == NULL);
+	assert(base->txn->psn == 0 || stmt->next_in_del_list == NULL);
 
 	/*
 	 * Note that both add_story and del_story can be NULL,
@@ -2539,7 +2596,7 @@ memtx_tx_handle_conflict_gap_readers(struct memtx_story *top_story,
  * stmt->add_story != NULL, that is REPLACE, INSERT, UPDATE etc.
  */
 static void
-memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
+memtx_tx_history_prepare_insert_stmt(struct memtx_tx_stmt *stmt)
 {
 	struct memtx_story *story = stmt->add_story;
 	assert(story != NULL);
@@ -2601,12 +2658,12 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		for (test_story = story->link[0].newer_story;
 		     test_story != NULL;
 		     test_story = test_story->link[0].newer_story) {
-			struct txn_stmt *test_stmt = test_story->add_stmt;
+			struct memtx_tx_stmt *test_stmt = test_story->add_stmt;
 			if (test_stmt->is_own_change)
 				continue;
-			assert(test_stmt->txn != stmt->txn);
+			assert(test_stmt->base->txn != stmt->base->txn);
 			assert(test_stmt->del_story == NULL);
-			assert(test_stmt->txn->psn == 0);
+			assert(test_stmt->base->txn->psn == 0);
 			memtx_tx_story_link_deleted_by(story, test_stmt);
 		}
 	} else {
@@ -2618,17 +2675,17 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		 * they deleted or replaced that another tuple. They must be
 		 * told that they replace this tuple now.
 		 */
-		struct txn_stmt **from = &stmt->del_story->del_stmt;
+		struct memtx_tx_stmt **from = &stmt->del_story->del_stmt;
 		while (*from != NULL) {
-			struct txn_stmt *test_stmt = *from;
+			struct memtx_tx_stmt *test_stmt = *from;
 			assert(test_stmt->del_story == stmt->del_story);
 			if (test_stmt == stmt) {
 				/* Leave this statement, go to the next. */
 				from = &test_stmt->next_in_del_list;
 				continue;
 			}
-			assert(test_stmt->txn != stmt->txn);
-			assert(test_stmt->txn->psn == 0);
+			assert(test_stmt->base->txn != stmt->base->txn);
+			assert(test_stmt->base->txn->psn == 0);
 
 			/* Unlink from old story list. */
 			*from = test_stmt->next_in_del_list;
@@ -2647,7 +2704,7 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		 * depend on it must go to read view or be aborted.
 		 */
 		memtx_tx_handle_conflict_story_readers(stmt->del_story,
-						       stmt->txn);
+						       stmt->base->txn);
 	} else {
 		/*
 		 * A tuple is inserted. Every TX that depends on absence of
@@ -2657,7 +2714,8 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		 */
 		struct memtx_story *top_story =
 			memtx_tx_story_find_top(story, 0);
-		memtx_tx_handle_conflict_gap_readers(top_story, 0, stmt->txn);
+		memtx_tx_handle_conflict_gap_readers(top_story, 0,
+						     stmt->base->txn);
 	}
 
 	/* Handle conflicts in the secondary indexes. */
@@ -2683,9 +2741,9 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		struct memtx_story *newer_story = story;
 		while (newer_story->link[i].newer_story != NULL) {
 			newer_story = newer_story->link[i].newer_story;
-			struct txn_stmt *test_stmt = newer_story->add_stmt;
+			struct memtx_tx_stmt *test_stmt = newer_story->add_stmt;
 			/* Don't conflict own changes. */
-			if (test_stmt->txn == stmt->txn)
+			if (test_stmt->base->txn == stmt->base->txn)
 				continue;
 			/*
 			 * Ignore case when other TX executes insert after
@@ -2700,7 +2758,8 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			 */
 			if (test_stmt->del_story == story)
 				continue;
-			memtx_tx_handle_conflict(stmt->txn, test_stmt->txn);
+			memtx_tx_handle_conflict(stmt->base->txn,
+						 test_stmt->base->txn);
 		}
 		/*
 		 * We have already checked gap readers before for the case
@@ -2711,13 +2770,14 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		 * Note that newer_story is in top of chain due to previous
 		 * manipulations.
 		 */
-		memtx_tx_handle_conflict_gap_readers(newer_story, i, stmt->txn);
+		memtx_tx_handle_conflict_gap_readers(newer_story, i,
+						     stmt->base->txn);
 	}
 
 	/* Finally set PSNs in stories to mark them add/delete as prepared. */
-	stmt->add_story->add_psn = stmt->txn->psn;
+	stmt->add_story->add_psn = stmt->base->txn->psn;
 	if (stmt->del_story != NULL)
-		stmt->del_story->del_psn = stmt->txn->psn;
+		stmt->del_story->del_psn = stmt->base->txn->psn;
 }
 
 /**
@@ -2725,7 +2785,7 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
  * stmt->add_story == NULL, that is DELETE etc.
  */
 static void
-memtx_tx_history_prepare_delete_stmt(struct txn_stmt *stmt)
+memtx_tx_history_prepare_delete_stmt(struct memtx_tx_stmt *stmt)
 {
 	assert(stmt->add_story == NULL);
 	assert(stmt->del_story != NULL);
@@ -2734,18 +2794,18 @@ memtx_tx_history_prepare_delete_stmt(struct txn_stmt *stmt)
 	 * There can be other transactions that want to delete old_story.
 	 * Since the story ends, all of them must be unlinked from the story.
 	 */
-	struct txn_stmt **from = &stmt->del_story->del_stmt;
+	struct memtx_tx_stmt **from = &stmt->del_story->del_stmt;
 	while (*from != NULL) {
-		struct txn_stmt *test_stmt = *from;
+		struct memtx_tx_stmt *test_stmt = *from;
 		assert(test_stmt->del_story == stmt->del_story);
 		if (test_stmt == stmt) {
 			/* Leave this statement, go to the next. */
 			from = &test_stmt->next_in_del_list;
 			continue;
 		}
-		assert(test_stmt->txn != stmt->txn);
+		assert(test_stmt->base->txn != stmt->base->txn);
 		assert(test_stmt->del_story == stmt->del_story);
-		assert(test_stmt->txn->psn == 0);
+		assert(test_stmt->base->txn->psn == 0);
 
 		/* Unlink from old story list. */
 		*from = test_stmt->next_in_del_list;
@@ -2757,18 +2817,22 @@ memtx_tx_history_prepare_delete_stmt(struct txn_stmt *stmt)
 	 * The story stmt->del_story ends by now. Every TX that
 	 * depend on it must go to read view or be aborted.
 	 */
-	memtx_tx_handle_conflict_story_readers(stmt->del_story, stmt->txn);
+	memtx_tx_handle_conflict_story_readers(stmt->del_story,
+					       stmt->base->txn);
 
 	/* Finally set PSN in story to mark its deletion as prepared. */
-	stmt->del_story->del_psn = stmt->txn->psn;
+	stmt->del_story->del_psn = stmt->base->txn->psn;
 }
 
 void
-memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
+memtx_tx_history_prepare_stmt(struct txn_stmt *base)
 {
-	assert(stmt->txn->psn != 0);
-	assert(stmt->space != NULL);
-	if (stmt->space->def->opts.is_ephemeral)
+	struct memtx_tx_stmt *stmt = base->engine_savepoint;
+	if (stmt == NULL)
+		return;
+	assert(base->txn->psn != 0);
+	assert(base->space != NULL);
+	if (base->space->def->opts.is_ephemeral)
 		assert(stmt->add_story == NULL && stmt->del_story == NULL);
 
 	/*
@@ -2794,12 +2858,15 @@ memtx_tx_prepare_finalize(struct txn *txn)
 }
 
 void
-memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
+memtx_tx_history_commit_stmt(struct txn_stmt *base)
 {
+	struct memtx_tx_stmt *stmt = base->engine_savepoint;
+	if (stmt == NULL)
+		return;
 	struct tuple *old_tuple, *new_tuple;
 	old_tuple = stmt->del_story == NULL ? NULL : stmt->del_story->tuple;
 	new_tuple = stmt->add_story == NULL ? NULL : stmt->add_story->tuple;
-	memtx_space_update_tuple_stat(stmt->space, old_tuple, new_tuple);
+	memtx_space_update_tuple_stat(base->space, old_tuple, new_tuple);
 
 	if (stmt->add_story != NULL) {
 		assert(stmt->add_story->add_stmt == stmt);
@@ -2833,14 +2900,16 @@ memtx_tx_story_clarify_impl(struct txn *txn, struct space *space,
 		}
 		if (story->del_psn != 0 && story->del_stmt != NULL &&
 		    txn != NULL) {
-			assert(story->del_psn == story->del_stmt->txn->psn);
+			assert(story->del_psn ==
+			       story->del_stmt->base->txn->psn);
 			/*
 			 * If we skip deletion of a tuple by prepared
 			 * transaction then the transaction must be before
 			 * prepared in serialization order.
 			 * That can be a read view or conflict already.
 			 */
-			memtx_tx_handle_conflict(story->del_stmt->txn, txn);
+			memtx_tx_handle_conflict(story->del_stmt->base->txn,
+						 txn);
 		}
 
 		if (memtx_tx_story_insert_is_visible(story, txn, is_prepared_ok,
@@ -2850,14 +2919,16 @@ memtx_tx_story_clarify_impl(struct txn *txn, struct space *space,
 		}
 		if (story->add_psn != 0 && story->add_stmt != NULL &&
 		    txn != NULL) {
-			assert(story->add_psn == story->add_stmt->txn->psn);
+			assert(story->add_psn ==
+			       story->add_stmt->base->txn->psn);
 			/*
 			 * If we skip addition of a tuple by prepared
 			 * transaction then the transaction must be before
 			 * prepared in serialization order.
 			 * That can be a read view or conflict already.
 			 */
-			memtx_tx_handle_conflict(story->add_stmt->txn, txn);
+			memtx_tx_handle_conflict(story->add_stmt->base->txn,
+						 txn);
 		}
 
 		if (story->link[index->dense_id].older_story == NULL)

@@ -317,21 +317,15 @@ txn_stmt_new(struct txn *txn)
 	stmt->new_tuple = NULL;
 	stmt->rollback_info.old_tuple = NULL;
 	stmt->rollback_info.new_tuple = NULL;
-	stmt->add_story = NULL;
-	stmt->del_story = NULL;
-	stmt->next_in_del_list = NULL;
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 	stmt->has_triggers = false;
-	stmt->is_own_change = false;
 	return stmt;
 }
 
 static inline void
 txn_stmt_destroy(struct txn_stmt *stmt)
 {
-	assert(stmt->add_story == NULL && stmt->del_story == NULL);
-
 	if (stmt->old_tuple != NULL)
 		tuple_unref(stmt->old_tuple);
 	if (stmt->new_tuple != NULL)

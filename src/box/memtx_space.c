@@ -401,7 +401,8 @@ memtx_space_replace_tuple(struct space *space, struct txn_stmt *stmt,
 	if (rc != 0)
 		goto finish;
 	txn_stmt_prepare_rollback_info(stmt, result, new_tuple);
-	stmt->engine_savepoint = stmt;
+	if (!memtx_tx_manager_use_mvcc_engine)
+		stmt->engine_savepoint = stmt;
 	stmt->new_tuple = orig_new_tuple;
 	stmt->old_tuple = result;
 	if (stmt->old_tuple != NULL) {
