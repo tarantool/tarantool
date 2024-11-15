@@ -877,6 +877,22 @@ LIGHT(grow)(struct LIGHT(common) *ht)
 		return -1;
 	}
 
+	/*
+	 * The following loop performs unknown amount of matras_touch calls that
+	 * depends on lengths of hash collision chains. Let's assume we're going
+	 * to have no more than 8 collisions to handle in each chain in average.
+	 * This is similar to the amount of extents we reserve before insertion
+	 * in the memtx space.
+	 *
+	 * TODO: we better to make this more robust in the future.
+	 */
+	if (matras_touch_reserve(ht->mtable, LIGHT_GROW_INCREMENT * 8) != 0) {
+		matras_dealloc_range(ht->mtable, LIGHT_GROW_INCREMENT);
+		ht->cover_mask = save_cover_mask;
+		ht->table_size -= LIGHT_GROW_INCREMENT;
+		return -1;
+	}
+
 	for (int i = 0; i < LIGHT_GROW_INCREMENT;
 	     i++, susp_slot++, susp_record++, new_slot++, new_record++) {
 		if (susp_record->next == susp_slot) {
@@ -909,7 +925,6 @@ LIGHT(grow)(struct LIGHT(common) *ht)
 				if (prev_slot != LIGHT(end))
 					prev_record = LIGHT(touch_record)(
 								ht, prev_slot);
-					/* TODO: check the result */
 				chain_tail[prev_flag] = prev_record;
 				if (chain_tail[test_flag]) {
 					chain_tail[test_flag]->next = test_slot;
