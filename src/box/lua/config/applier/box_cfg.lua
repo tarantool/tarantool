@@ -71,11 +71,25 @@ end
 
 -- Modify box-level configuration values and perform other actions
 -- to enable the isolated mode (if configured).
-local function switch_isolated_mode_before_box_cfg(configdata, box_cfg)
+local function switch_isolated_mode_before_box_cfg(config, box_cfg)
+    local configdata = config._configdata
+
     -- If the isolated mode is not enabled, there is nothing to do.
     if not configdata:get('isolated', {use_default = true}) then
         return
     end
+
+    -- Issue a warning to highlight the unusual instance status to
+    -- the administrator.
+    local key = 'isolated_mode_enabled'
+    local message = ('The isolated mode is set for the instance %q'):format(
+        config._instance_name)
+    config._aboard:set({
+        type = 'warn',
+        message = message,
+    }, {
+        key = key,
+    })
 
     -- An application or a role may perform background database
     -- modification if the instance is in the RW mode: for
@@ -855,7 +869,7 @@ local function apply(config)
 
     -- RO may be enforced by the isolated mode, so we call the
     -- function after all the other logic that may set RW.
-    switch_isolated_mode_before_box_cfg(configdata, box_cfg)
+    switch_isolated_mode_before_box_cfg(config, box_cfg)
     post_box_cfg_hooks:add(switch_isolated_mode_after_box_cfg, config)
 
     -- First box.cfg() call.
