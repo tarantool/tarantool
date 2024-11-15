@@ -408,7 +408,7 @@ main(int, const char**)
 	slot_in_big_table_test();
 	max_capacity_test();
 
-	if (extents_count != 0)
+	if ((int)extents_count != allocator.num_reserved_extents)
 		fail("memory leak!", "true");
 
 	matras_allocator_destroy(&allocator);
