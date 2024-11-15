@@ -141,7 +141,7 @@ struct memtx_story_link {
 	 * If the tuple of story is physically in index, here the pointer
 	 * to that index is stored.
 	 */
-	struct index *in_index;
+	struct memtx_tx_index *in_index;
 };
 
 /**
@@ -1122,7 +1122,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	for (uint32_t i = 0; i < index_count; i++) {
 		story->link[i].newer_story = story->link[i].older_story = NULL;
 		rlist_create(&story->link[i].read_gaps);
-		story->link[i].in_index = space->index[i];
+		story->link[i].in_index = &memtx_space->memtx_tx_index[i];
 	}
 	return story;
 }
@@ -1332,9 +1332,9 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 
 	if (!is_new_tuple) {
 		/* Make the change in index. */
-		struct index *index = old_link->in_index;
+		struct memtx_tx_index *index = old_link->in_index;
 		struct tuple *removed, *unused;
-		if (index_replace(index, old_top->tuple, new_top->tuple,
+		if (index_replace(index->base, old_top->tuple, new_top->tuple,
 				  DUP_REPLACE, &removed, &unused) != 0) {
 			diag_log();
 			unreachable();
@@ -1482,16 +1482,17 @@ memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
 			 */
 			assert(link->older_story == NULL);
 			if (story->del_psn > 0 && link->in_index != NULL) {
-				struct index *index = link->in_index;
+				struct memtx_tx_index *index = link->in_index;
 				struct tuple *removed, *unused;
-				if (index_replace(index, story->tuple, NULL,
-						  DUP_INSERT,
+				if (index_replace(index->base, story->tuple,
+						  NULL, DUP_INSERT,
 						  &removed, &unused) != 0) {
 					diag_log();
 					unreachable();
 					panic("failed to rollback change");
 				}
-				struct key_def *key_def = index->def->key_def;
+				struct key_def *key_def =
+					index->base->def->key_def;
 				assert(story->tuple == removed ||
 				       (removed == NULL &&
 					tuple_key_is_excluded(story->tuple,
@@ -1861,7 +1862,8 @@ memtx_tx_handle_counted_write(struct space *space, struct memtx_story *story,
 
 	assert(story->link[ind].newer_story == NULL || !is_insert);
 
-	struct index *index = space->index[ind];
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	struct memtx_tx_index *index = &memtx_space->memtx_tx_index[ind];
 
 	struct gap_item_base *item_base, *tmp;
 	rlist_foreach_entry_safe(item_base, &index->read_gaps,
@@ -1873,8 +1875,8 @@ memtx_tx_handle_counted_write(struct space *space, struct memtx_story *story,
 			(struct count_gap_item *)item_base;
 
 		bool tuple_matches = memtx_tx_tuple_matches_until(
-			index->def->key_def, story->tuple, item->type,
-			item->key, item->part_count, index->def->cmp_def,
+			index->base->def->key_def, story->tuple, item->type,
+			item->key, item->part_count, index->base->def->cmp_def,
 			item->until, item->until_hint);
 
 		/*
@@ -2001,7 +2003,8 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 {
 	assert(story->link[ind].newer_story == NULL);
 	struct tuple *tuple = story->tuple;
-	struct index *index = space->index[ind];
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	struct memtx_tx_index *index = &memtx_space->memtx_tx_index[ind];
 	struct gap_item_base *item_base, *tmp;
 	rlist_foreach_entry_safe(item_base, &index->read_gaps,
 				 in_read_gaps, tmp) {
@@ -2027,7 +2030,7 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 			(struct nearby_gap_item *)item_base;
 		int cmp = 0;
 		if (item->key != NULL) {
-			struct key_def *def = index->def->key_def;
+			struct key_def *def = index->base->def->key_def;
 			hint_t oh =
 				def->key_hint(item->key, item->part_count, def);
 			hint_t kh = def->tuple_hint(tuple, def);
@@ -2037,7 +2040,7 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 		}
 		int dir = iterator_direction(item->type);
 		bool is_full_key = item->part_count ==
-				   index->def->cmp_def->part_count;
+				   index->base->def->cmp_def->part_count;
 		bool is_eq = item->type == ITER_EQ || item->type == ITER_REQ;
 		bool is_e = item->type == ITER_LE || item->type == ITER_GE;
 		bool need_split = item->key == NULL ||
@@ -3143,7 +3146,7 @@ memtx_tx_invalidate_space(struct space *base, struct txn *active_txn)
 		assert(story->index_count == base->index_count);
 
 		for (uint32_t i = 0; i < story->index_count; i++) {
-			struct index *index = story->link[i].in_index;
+			struct memtx_tx_index *index = story->link[i].in_index;
 			if (index == NULL)
 				continue;
 
@@ -3152,7 +3155,7 @@ memtx_tx_invalidate_space(struct space *base, struct txn *active_txn)
 
 			/* Skip chains of excluded tuples. */
 			if (tuple_key_is_excluded(story->tuple,
-						  index->def->key_def,
+						  index->base->def->key_def,
 						  MULTIKEY_NONE))
 				continue;
 
@@ -3167,7 +3170,7 @@ memtx_tx_invalidate_space(struct space *base, struct txn *active_txn)
 				continue;
 
 			struct tuple *unused;
-			if (index_replace(index, story->tuple, new_tuple,
+			if (index_replace(index->base, story->tuple, new_tuple,
 					  DUP_REPLACE, &unused,
 					  &unused) != 0) {
 				diag_log();
@@ -3248,7 +3251,7 @@ memtx_tx_invalidate_space(struct space *base, struct txn *active_txn)
 	 * all concurrent transactions are aborted, we don't need them anymore.
 	 */
 	for (size_t i = 0; i < base->index_count; i++) {
-		struct index *index = base->index[i];
+		struct memtx_tx_index *index = &space->memtx_tx_index[i];
 		while (!rlist_empty(&index->read_gaps)) {
 			struct gap_item_base *item =
 				rlist_first_entry(&index->read_gaps,
@@ -3569,6 +3572,9 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 	if (txn->status != TXN_INPROGRESS)
 		return;
 
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	struct memtx_tx_index *memtx_tx_index =
+		&memtx_space->memtx_tx_index[index->dense_id];
 	struct nearby_gap_item *item =
 		memtx_tx_nearby_gap_item_new(txn, type, key, part_count);
 
@@ -3584,7 +3590,7 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 		rlist_add(&story->link[index->dense_id].read_gaps,
 			  &item->base.in_read_gaps);
 	} else {
-		rlist_add(&index->read_gaps, &item->base.in_read_gaps);
+		rlist_add(&memtx_tx_index->read_gaps, &item->base.in_read_gaps);
 	}
 	memtx_tx_story_gc();
 }
@@ -3606,6 +3612,8 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 				struct tuple *until, hint_t until_hint)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	struct memtx_tx_index *memtx_tx_index =
+		&memtx_space->memtx_tx_index[index->dense_id];
 	struct key_def *key_def = index->def->key_def;
 	struct key_def *cmp_def = index->def->cmp_def;
 
@@ -3621,7 +3629,7 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 	if (txn != NULL && txn->status == TXN_INPROGRESS) {
 		struct count_gap_item *item = memtx_tx_count_gap_item_new(
 			txn, type, key, part_count, until, until_hint);
-		rlist_add(&index->read_gaps, &item->base.in_read_gaps);
+		rlist_add(&memtx_tx_index->read_gaps, &item->base.in_read_gaps);
 	}
 
 	/*
@@ -3668,13 +3676,17 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
  * when iteration type is ALL.
  */
 void
-memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index)
+memtx_tx_track_full_scan_slow(struct txn *txn, struct space *space,
+			      struct index *index)
 {
 	if (txn->status != TXN_INPROGRESS)
 		return;
 
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	struct memtx_tx_index *memtx_tx_index =
+		&memtx_space->memtx_tx_index[index->dense_id];
 	struct full_scan_gap_item *item = memtx_tx_full_scan_gap_item_new(txn);
-	rlist_add(&index->read_gaps, &item->base.in_read_gaps);
+	rlist_add(&memtx_tx_index->read_gaps, &item->base.in_read_gaps);
 	memtx_tx_story_gc();
 }
 

@@ -78,6 +78,12 @@ struct memtx_space {
 	 * track of them separately.
 	 */
 	struct rlist alter_stmts;
+	/**
+	 * Array of structures needed for MVCC to store data related to the
+	 * index. The order is the same as in `space::index`. Is NULL when MVCC
+	 * is disabled.
+	 */
+	struct memtx_tx_index *memtx_tx_index;
 };
 
 /**

@@ -67,6 +67,8 @@ enum { MEMTX_DDL_YIELD_LOOPS = 10 };
 static void
 memtx_space_destroy(struct space *space)
 {
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	free(memtx_space->memtx_tx_index);
 	TRASH(space);
 	free(space);
 }
@@ -1474,10 +1476,28 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 	return 0;
 }
 
+static void
+memtx_space_fill_memtx_tx_index(struct memtx_space *space)
+{
+	if (!memtx_tx_manager_use_mvcc_engine) {
+		space->memtx_tx_index = NULL;
+		return;
+	}
+
+	size_t index_count = space->base.index_count;
+	space->memtx_tx_index =
+		xalloc_array(struct memtx_tx_index, index_count);
+	for (size_t i = 0; i < index_count; i++) {
+		space->memtx_tx_index[i].base = space->base.index[i];
+		rlist_create(&space->memtx_tx_index[i].read_gaps);
+	}
+}
+
 /**
  * Copy memory usage statistics to the newly altered space from the old space.
  * In case of DropIndex or TruncateIndex alter operations, the new space will be
  * empty, and tuple statistics must not be copied.
+ * Also, allocate MVCC-related data in the new space.
  */
 static void
 memtx_space_finish_alter(struct space *old_space, struct space *new_space)
@@ -1493,6 +1513,8 @@ memtx_space_finish_alter(struct space *old_space, struct space *new_space)
 		new_memtx_space->tuple_stat[TUPLE_ARENA_MALLOC] =
 			old_memtx_space->tuple_stat[TUPLE_ARENA_MALLOC];
 	}
+
+	memtx_space_fill_memtx_tx_index((struct memtx_space *)new_space);
 }
 
 /**
@@ -1580,5 +1602,6 @@ memtx_space_new(struct memtx_engine *memtx,
 	memtx_space->replace = memtx_space_replace_no_keys;
 	rlist_create(&memtx_space->memtx_stories);
 	rlist_create(&memtx_space->alter_stmts);
+	memtx_space_fill_memtx_tx_index(memtx_space);
 	return (struct space *)memtx_space;
 }

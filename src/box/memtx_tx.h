@@ -135,6 +135,24 @@ struct memtx_tx_statistics {
 };
 
 /**
+ * A wrapper over index with MVCC-related data.
+ */
+struct memtx_tx_index {
+	/** The index itself. */
+	struct index *base;
+	/**
+	 * List of gap_item's describing gap reads in the index with NULL
+	 * successor OR full scan gaps.
+	 * The first type happens when reading from empty index,
+	 * or when reading from rightmost part of ordered index (TREE).
+	 * The second type happens when a full scan was finished for
+	 * unordered index (HASH).
+	 * @sa struct gap_item_base.
+	 */
+	struct rlist read_gaps;
+};
+
+/**
  * Collect MVCC memory usage statics.
  */
 void
@@ -378,7 +396,8 @@ memtx_tx_track_count_until(struct txn *txn, struct space *space,
  * Helper of memtx_tx_track_full_scan.
  */
 void
-memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index);
+memtx_tx_track_full_scan_slow(struct txn *txn, struct space *space,
+			      struct index *index);
 
 /**
  * Record in TX manager that a transaction @a txn have read full @a index
@@ -398,7 +417,7 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
 		return;
 	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
 		return;
-	memtx_tx_track_full_scan_slow(txn, index);
+	memtx_tx_track_full_scan_slow(txn, space, index);
 }
 
 /**
