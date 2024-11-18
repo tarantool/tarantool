@@ -2525,13 +2525,14 @@ end
 -- the same tuple as index:pairs(key, {iterator = it})
 base_index_mt.offset_of = function(index, key, opts)
     check_index_arg(index, 'offset_of', 2)
+    key = keify(key)
     local itype = check_iterator_type(opts, #key == 0, 2)
     if itype == box.index.EQ then
-        opts.iterator = box.index.GE
+        itype = box.index.GE
     elseif itype == box.index.REQ then
-        opts.iterator = box.index.LE
+        itype = box.index.LE
     end
-    return index:len() - index:count(key, opts)
+    return index:len() - index:count(key, itype)
 end
 
 base_index_mt.get_ffi = function(index, key)
