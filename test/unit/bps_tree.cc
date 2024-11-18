@@ -931,7 +931,7 @@ main(void)
 	printing_test();
 	white_box_test();
 	approximate_count();
-	ok(extents_count == 0, "memory leak check");
+	ok(extents_count == allocator.num_reserved_extents, "leak check");
 	insert_get_iterator();
 	delete_value_check();
 	insert_successor_test();

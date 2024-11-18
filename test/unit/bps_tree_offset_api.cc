@@ -398,45 +398,53 @@ insert_delete_get_offset()
 	for (int i = 0; i < count; i++)
 		insert_and_check(&tree, i, (size_t)i);
 	fail_unless(test_size(&tree) == (size_t)count);
-	fail_unless((int)stats.extent_count == extent_count);
+	fail_unless((int)stats.extent_count ==
+		    extent_count - allocator.num_reserved_extents);
 	for (int i = 0; i < count; i++)
 		delete_and_check(&tree, i, 0);
 	fail_unless(test_size(&tree) == 0);
-	fail_unless((int)stats.extent_count == extent_count);
+	fail_unless((int)stats.extent_count ==
+		    extent_count - allocator.num_reserved_extents);
 	ok(true, "Insert 1..X, delete 1..X");
 
 	for (int i = 0; i < count; i++)
 		insert_and_check(&tree, i, (size_t)i);
 	fail_unless(test_size(&tree) == (size_t)count);
-	fail_unless((int)stats.extent_count == extent_count);
+	fail_unless((int)stats.extent_count ==
+		    extent_count - allocator.num_reserved_extents);
 	for (int i = count - 1; i >= 0; i--)
 		delete_and_check(&tree, i, (size_t)i);
 	fail_unless(test_size(&tree) == 0);
-	fail_unless((int)stats.extent_count == extent_count);
+	fail_unless((int)stats.extent_count ==
+		    extent_count - allocator.num_reserved_extents);
 	ok(true, "Insert 1..X, delete X..1");
 
 	for (int i = count - 1; i >= 0; i--)
 		insert_and_check(&tree, i, 0);
 	fail_unless(test_size(&tree) == (size_t)count);
-	fail_unless((int)stats.extent_count == extent_count);
+	fail_unless((int)stats.extent_count ==
+		    extent_count - allocator.num_reserved_extents);
 	for (int i = 0; i < count; i++)
 		delete_and_check(&tree, i, 0);
 	fail_unless(test_size(&tree) == 0);
-	fail_unless((int)stats.extent_count == extent_count);
+	fail_unless((int)stats.extent_count ==
+		    extent_count - allocator.num_reserved_extents);
 	ok(true, "Insert X..1, delete 1..X");
 
 	for (int i = count - 1; i >= 0; i--)
 		insert_and_check(&tree, i, 0);
 	fail_unless(test_size(&tree) == (size_t)count);
-	fail_unless((int)stats.extent_count == extent_count);
+	fail_unless((int)stats.extent_count ==
+		    extent_count - allocator.num_reserved_extents);
 	for (int i = count - 1; i >= 0; i--)
 		delete_and_check(&tree, i, (size_t)i);
 	fail_unless(test_size(&tree) == 0);
-	fail_unless((int)stats.extent_count == extent_count);
+	fail_unless((int)stats.extent_count ==
+		    extent_count - allocator.num_reserved_extents);
 	ok(true, "Insert X..1, delete X..1");
 
 	test_destroy(&tree);
-	fail_unless(extent_count == 0);
+	fail_unless(extent_count == allocator.num_reserved_extents);
 
 	footer();
 	check_plan();
