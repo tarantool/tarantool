@@ -121,7 +121,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abd1dbec4fd6761084d3e0c05afe2b138">PACKAGE_VERSION_PATCH</a>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.3.0-entrypoint-200-g319f7a1a9e&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.3.0-entrypoint-208-gd665f9586c&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <a href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">More...</a><br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad63a17703ee9303be2682b7bb08e7a9f"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#ad63a17703ee9303be2682b7bb08e7a9f">TZDATA_VERSION</a>&#160;&#160;&#160;&quot;2022a&quot;</td></tr>
@@ -306,6 +306,10 @@ typedef void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" 
 typedef int(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a94849dd4556ce6560a898d5af2d20779">fiber_func</a>) (va_list)</td></tr>
 <tr class="memdesc:a94849dd4556ce6560a898d5af2d20779"><td class="mdescLeft">&#160;</td><td class="mdescRight">Fiber - contains information about fiber. <br /></td></tr>
 <tr class="separator:a94849dd4556ce6560a898d5af2d20779"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abba432143f6c7876ea8704638e9c9e5d"><td class="memItemLeft" align="right" valign="top"><a id="abba432143f6c7876ea8704638e9c9e5d"></a>
+typedef void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abba432143f6c7876ea8704638e9c9e5d">tnt_tx_func_f</a>) (void *)</td></tr>
+<tr class="memdesc:abba432143f6c7876ea8704638e9c9e5d"><td class="mdescLeft">&#160;</td><td class="mdescRight">public <br /></td></tr>
+<tr class="separator:abba432143f6c7876ea8704638e9c9e5d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae1cb16b1acef0772ea4192316f742aa8"><td class="memItemLeft" align="right" valign="top"><a id="ae1cb16b1acef0772ea4192316f742aa8"></a>
 typedef struct ibuf&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#ae1cb16b1acef0772ea4192316f742aa8">box_ibuf_t</a></td></tr>
 <tr class="memdesc:ae1cb16b1acef0772ea4192316f742aa8"><td class="mdescLeft">&#160;</td><td class="mdescRight">public <br /></td></tr>
@@ -1277,6 +1281,12 @@ int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="modul
 <tr class="memitem:a832b67e03175570d9f6fa17ffd77bf83"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a832b67e03175570d9f6fa17ffd77bf83">coio_getaddrinfo</a> (const char *host, const char *port, const struct addrinfo *hints, struct addrinfo **res, double timeout)</td></tr>
 <tr class="memdesc:a832b67e03175570d9f6fa17ffd77bf83"><td class="mdescLeft">&#160;</td><td class="mdescRight">Fiber-friendly version of getaddrinfo(3).  <a href="module_8h.html#a832b67e03175570d9f6fa17ffd77bf83">More...</a><br /></td></tr>
 <tr class="separator:a832b67e03175570d9f6fa17ffd77bf83"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a616f82352b7ba1ee74c02d402dfefc52"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a616f82352b7ba1ee74c02d402dfefc52">tnt_tx_push</a> (<a class="el" href="module_8h.html#abba432143f6c7876ea8704638e9c9e5d">tnt_tx_func_f</a> func, void *arg)</td></tr>
+<tr class="memdesc:a616f82352b7ba1ee74c02d402dfefc52"><td class="mdescLeft">&#160;</td><td class="mdescRight">Schedule the given callback to be executed in TX thread with the provided argument.  <a href="module_8h.html#a616f82352b7ba1ee74c02d402dfefc52">More...</a><br /></td></tr>
+<tr class="separator:a616f82352b7ba1ee74c02d402dfefc52"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a78be466e9dc2ecebafa253b4f1658c7b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a78be466e9dc2ecebafa253b4f1658c7b">tnt_tx_flush</a> (void)</td></tr>
+<tr class="memdesc:a78be466e9dc2ecebafa253b4f1658c7b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Send all the pending callbacks of this thread to TX thread.  <a href="module_8h.html#a78be466e9dc2ecebafa253b4f1658c7b">More...</a><br /></td></tr>
+<tr class="separator:a78be466e9dc2ecebafa253b4f1658c7b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4b6dd91e6e7f26a9b57f4c317c2af203"><td class="memItemLeft" align="right" valign="top">void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a4b6dd91e6e7f26a9b57f4c317c2af203">box_ibuf_reserve</a> (<a class="el" href="module_8h.html#ae1cb16b1acef0772ea4192316f742aa8">box_ibuf_t</a> *ibuf, size_t size)</td></tr>
 <tr class="memdesc:a4b6dd91e6e7f26a9b57f4c317c2af203"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reserve requested amount of bytes in ibuf buffer.  <a href="module_8h.html#a4b6dd91e6e7f26a9b57f4c317c2af203">More...</a><br /></td></tr>
 <tr class="separator:a4b6dd91e6e7f26a9b57f4c317c2af203"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -2199,7 +2209,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mo
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.3.0-entrypoint-200-g319f7a1a9e&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.3.0-entrypoint-208-gd665f9586c&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -2224,7 +2234,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mo
 <p>The <a class="el" href="unionPACKED.html" title="Public representation of a key part definition.">PACKED</a> qualifier is useful to map a structure to an external data structure, or for accessing unaligned data, but it is generally not useful to save data size because of the relatively high cost of unaligned access on some architectures. </p>
 <p>Example:</p>
 <div class="fragment"><div class="line"><span class="keyword">struct </span><a class="code" href="unionPACKED.html">PACKED</a> name { <span class="keywordtype">char</span> a; <span class="keywordtype">int</span> b; };</div>
-<div class="ttc" id="aunionPACKED_html"><div class="ttname"><a href="unionPACKED.html">PACKED</a></div><div class="ttdoc">Public representation of a key part definition.</div><div class="ttdef"><b>Definition:</b> module.h:1919</div></div>
+<div class="ttc" id="aunionPACKED_html"><div class="ttname"><a href="unionPACKED.html">PACKED</a></div><div class="ttdoc">Public representation of a key part definition.</div><div class="ttdef"><b>Definition:</b> module.h:1965</div></div>
 </div><!-- fragment --> 
 </div>
 </div>
@@ -2937,7 +2947,7 @@ enum <a class="el" href="module_8h.html#af667a90dfe6a8cc25b510af73d98bb82" title
 <div class="line">static_assert(<span class="keyword">sizeof</span>(<a class="code" href="unionPACKED.html">box_key_part_def_t</a>) == <a class="code" href="module_8h.html#a99fb83031ce9923c84392b4e92f956b5a372d10ebd12378fbc28f503f5c14a433">BOX_KEY_PART_DEF_T_SIZE</a>,</div>
 <div class="line">              <span class="stringliteral">&quot;sizeof(box_key_part_def_t)&quot;</span>);</div>
 <div class="ttc" id="amodule_8h_html_a3591006ff571eb1ac2b05f5e41a8a8ca"><div class="ttname"><a href="module_8h.html#a3591006ff571eb1ac2b05f5e41a8a8ca">box_key_def_new_v2</a></div><div class="ttdeci">box_key_def_t * box_key_def_new_v2(box_key_part_def_t *parts, uint32_t part_count)</div><div class="ttdoc">Create a key_def from given key parts.</div></div>
-<div class="ttc" id="amodule_8h_html_a99fb83031ce9923c84392b4e92f956b5a372d10ebd12378fbc28f503f5c14a433"><div class="ttname"><a href="module_8h.html#a99fb83031ce9923c84392b4e92f956b5a372d10ebd12378fbc28f503f5c14a433">BOX_KEY_PART_DEF_T_SIZE</a></div><div class="ttdeci">@ BOX_KEY_PART_DEF_T_SIZE</div><div class="ttdoc">The constant.</div><div class="ttdef"><b>Definition:</b> module.h:1892</div></div>
+<div class="ttc" id="amodule_8h_html_a99fb83031ce9923c84392b4e92f956b5a372d10ebd12378fbc28f503f5c14a433"><div class="ttname"><a href="module_8h.html#a99fb83031ce9923c84392b4e92f956b5a372d10ebd12378fbc28f503f5c14a433">BOX_KEY_PART_DEF_T_SIZE</a></div><div class="ttdeci">@ BOX_KEY_PART_DEF_T_SIZE</div><div class="ttdoc">The constant.</div><div class="ttdef"><b>Definition:</b> module.h:1938</div></div>
 </div><!-- fragment --><p>This snippet is not part of <a class="el" href="module_8h.html">module.h</a>, because portability of static_assert() / _Static_assert() is dubious. It should be decision of a module author how portable its code should be. </p>
 <table class="fieldtable">
 <tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a99fb83031ce9923c84392b4e92f956b5a372d10ebd12378fbc28f503f5c14a433"></a>BOX_KEY_PART_DEF_T_SIZE&#160;</td><td class="fielddoc"><p>The constant. </p>
@@ -10619,10 +10629,68 @@ the fiber is not joined yet (panic if not).</dd></dl>
 
 </div>
 </div>
+<a id="a78be466e9dc2ecebafa253b4f1658c7b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a78be466e9dc2ecebafa253b4f1658c7b">&#9670;&nbsp;</a></span>tnt_tx_flush()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void tnt_tx_flush </td>
+          <td>(</td>
+          <td class="paramtype">void&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Send all the pending callbacks of this thread to TX thread. </p>
+<p>Note, that it doesn't guarantee that they are already executed when this function returns. They are only sent to TX thread, not called yet. It is the caller's responsibility to ensure that the messages are not being sent faster than TX thread is handling them. Otherwise the queue in TX thread grows faster than shrinks and could lead to unpredictable latency and even OOM.</p>
+<p>Note, that push is very cheap while flush is relatively expensive both for this thread and for TX thread. Avoid calling it on each push if possible. </p>
+
+</div>
+</div>
+<a id="a616f82352b7ba1ee74c02d402dfefc52"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a616f82352b7ba1ee74c02d402dfefc52">&#9670;&nbsp;</a></span>tnt_tx_push()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void tnt_tx_push </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="module_8h.html#abba432143f6c7876ea8704638e9c9e5d">tnt_tx_func_f</a>&#160;</td>
+          <td class="paramname"><em>func</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>arg</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Schedule the given callback to be executed in TX thread with the provided argument. </p>
+<p>In order for the messages to be actually sent to TX thread the user must call <a class="el" href="module_8h.html#a78be466e9dc2ecebafa253b4f1658c7b" title="Send all the pending callbacks of this thread to TX thread.">tnt_tx_flush()</a> in the same thread as the pushes.</p>
+<p>In TX thread the callbacks are guaranteed to start execution in the same order as the push, but the order of completion is undefined if they are yielding, since they get executed potentially in different fibers.</p>
+<p>The callbacks are handled by an internal fiber pool running in TX thread. The pool has a limited size. In case the callbacks are yielding and the user wants to execute more of them concurrently than the default size of the fiber pool, then the size can be extended (or reduced) using fiber.tx_user_pool_size() Lua API or <code>fiber.tx_user_pool_size</code> YAML config.</p>
+<p>If called during Tarantool shutdown, the behaviour is undefined. The external threads must be terminated before that.</p>
+<p>If called in TX thread, the behaviour is undefined.</p>
+<p>The function relies on <code>thread_local</code> C++ data to have properly working destructors and constructors and won't be suitable for any other runtime. </p>
+
+</div>
+</div>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Nov 16 2024 11:35:45 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Mon Nov 18 2024 10:43:51 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>

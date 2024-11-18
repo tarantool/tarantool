@@ -444,6 +444,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
+    <member refid="module_8h_1abba432143f6c7876ea8704638e9c9e5d" kind="typedef"><name>tnt_tx_func_f</name></member>
     <member refid="module_8h_1ae1cb16b1acef0772ea4192316f742aa8" kind="typedef"><name>box_ibuf_t</name></member>
     <member refid="module_8h_1ab230ff08fb24d580407126fc905cc271" kind="typedef"><name>box_tuple_format_t</name></member>
     <member refid="module_8h_1a880c3e1e8e63b9a12353853fb6aefa3f" kind="typedef"><name>box_tuple_t</name></member>
@@ -506,6 +507,8 @@
     <member refid="module_8h_1af23dc320746ce4ec9afdf433a66ef596" kind="function"><name>coio_close</name></member>
     <member refid="module_8h_1af9433c7d42d7747f1f69b79a0d98df13" kind="function"><name>coio_call</name></member>
     <member refid="module_8h_1a832b67e03175570d9f6fa17ffd77bf83" kind="function"><name>coio_getaddrinfo</name></member>
+    <member refid="module_8h_1a616f82352b7ba1ee74c02d402dfefc52" kind="function"><name>tnt_tx_push</name></member>
+    <member refid="module_8h_1a78be466e9dc2ecebafa253b4f1658c7b" kind="function"><name>tnt_tx_flush</name></member>
     <member refid="module_8h_1a4b6dd91e6e7f26a9b57f4c317c2af203" kind="function"><name>box_ibuf_reserve</name></member>
     <member refid="module_8h_1a1fb9d369f674c637b476fd92b00d3da5" kind="function"><name>box_ibuf_read_range</name></member>
     <member refid="module_8h_1ac74b2d0e25c3a295f9ae0200a787c432" kind="function"><name>box_ibuf_write_range</name></member>
