@@ -814,6 +814,37 @@ local function validate_startup(instance_name, iconfig_def)
     -- some definitely/likely erroreous cases.
 end
 
+-- Perform checks related to the multi-master setup.
+local function validate_multi_master(iconfig_def, peers)
+    -- Several instances can be configured as RW simultaneously in
+    -- the replication.failover = off mode. Nothing to verify
+    -- otherwise.
+    local failover = instance_config:get(iconfig_def, 'replication.failover')
+    if failover ~= 'off' then
+        return
+    end
+
+    -- Count RW instances.
+    local rw_count = 0
+    for _, peer in pairs(peers) do
+        local mode = instance_config:get(peer.iconfig_def, 'database.mode')
+        if mode == 'rw' then
+            rw_count = rw_count + 1
+        end
+    end
+
+    -- Zero or one RW instance -- nothing to verify.
+    if rw_count < 2 then
+        return
+    end
+
+    -- Verify that the autoexpelling is disabled.
+    if instance_config:get(iconfig_def, 'replication.autoexpel.enabled') then
+        error('replication.autoexpel.enabled = true doesn\'t support the ' ..
+            'multi-master configuration', 0)
+    end
+end
+
 local function new(iconfig, cconfig, instance_name)
     -- Find myself in a cluster config, determine peers in the same
     -- replicaset.
@@ -962,6 +993,10 @@ local function new(iconfig, cconfig, instance_name)
 
     -- A couple of checks that are only performed on startup.
     validate_startup(instance_name, iconfig_def)
+
+    -- Checks that are related to the multi-master setup.
+    -- Some functionality doesn't support it.
+    validate_multi_master(iconfig_def, peers)
 
     return setmetatable({
         _iconfig = iconfig,

@@ -316,6 +316,9 @@ g.test_defaults = function()
             election_timeout = 5,
             election_fencing_mode = 'soft',
             bootstrap_strategy = 'auto',
+            autoexpel = {
+                enabled = false,
+            },
         },
         wal = {
             dir = 'var/lib/{{ instance_name }}',
@@ -750,67 +753,120 @@ g.test_additional_options_instance = function()
     verify_fields(schema, {})
 end
 
--- Attempt to pass the `isolated` option to different cluster
--- configuration levels and also try to validate it against the
--- instance config.
+-- Attempt to pass options to different cluster configuration
+-- levels and also try to validate it against the instance config.
 --
--- The option should be accepted only by the instance config or
--- the instance level of the cluster config.
-g.test_isolated_scope = function()
+-- The following options are verified here:
+--
+-- * isolated
+-- * replication.autoexpel
+g.test_scope = function()
     local function exp_err(path, scope)
         return ('[cluster_config] %s: The option must not be present in the ' ..
             '%s scope'):format(path, scope)
     end
 
-    local data = {isolated = true}
-
-    -- Global level: forbidden.
-    local path = 'isolated'
-    t.assert_error_msg_equals(exp_err(path, 'global'), function()
-        cluster_config:validate(data)
-    end)
-
-    -- Group level: forbidden.
-    local path = 'groups.g.isolated'
-    t.assert_error_msg_equals(exp_err(path, 'group'), function()
-        cluster_config:validate({
-            groups = {
-                g = data,
-            },
-        })
-    end)
-
-    -- Replicaset level: forbidden.
-    local path = 'groups.g.replicasets.r.isolated'
-    t.assert_error_msg_equals(exp_err(path, 'replicaset'), function()
-        cluster_config:validate({
-            groups = {
-                g = {
-                    replicasets = {
-                        r = data,
+    local cases = {
+        {
+            name = 'isolated',
+            data = {isolated = true},
+            global = false,
+            group = false,
+            replicaset = false,
+            instance = true,
+        },
+        {
+            name = 'replication.autoexpel',
+            data = {
+                replication = {
+                    autoexpel = {
+                        enabled = true,
+                        by = 'prefix',
+                        prefix = 'i-',
                     },
                 },
             },
-        })
-    end)
+            global = true,
+            group = true,
+            replicaset = true,
+            instance = false,
+        },
+    }
 
-    -- Instance level: accepted.
-    cluster_config:validate({
-        groups = {
-            g = {
-                replicasets = {
-                    r = {
-                        instances = {
-                            i = data,
+    for _, case in ipairs(cases) do
+        -- Global level.
+        local global_data = case.data
+        if case.global then
+            cluster_config:validate(global_data)
+        else
+            local path = case.name
+            t.assert_error_msg_equals(exp_err(path, 'global'), function()
+                cluster_config:validate(global_data)
+            end)
+        end
+
+        -- Group level.
+        local group_data = {
+            groups = {
+                g = case.data,
+            },
+        }
+        if case.group then
+            cluster_config:validate(group_data)
+        else
+            local path = ('groups.g.%s'):format(case.name)
+            t.assert_error_msg_equals(exp_err(path, 'group'), function()
+                cluster_config:validate(group_data)
+            end)
+        end
+
+        -- Replicaset level.
+        local replicaset_data = {
+            groups = {
+                g = {
+                    replicasets = {
+                        r = case.data,
+                    },
+                },
+            },
+        }
+        if case.replicaset then
+            cluster_config:validate(replicaset_data)
+        else
+            local path = ('groups.g.replicasets.r.%s'):format(case.name)
+            t.assert_error_msg_equals(exp_err(path, 'replicaset'), function()
+                cluster_config:validate(replicaset_data)
+            end)
+        end
+
+        -- Instance level.
+        local instance_data = {
+            groups = {
+                g = {
+                    replicasets = {
+                        r = {
+                            instances = {
+                                i = case.data,
+                            },
                         },
                     },
                 },
             },
-        },
-    })
+        }
+        if case.instance then
+            cluster_config:validate(instance_data)
+        else
+            local path = ('groups.g.replicasets.r.instances.i.%s'):format(
+                case.name)
+            t.assert_error_msg_equals(exp_err(path, 'instance'), function()
+                cluster_config:validate(instance_data)
+            end)
+        end
 
-    -- Validation against the instance config: accepted.
-    instance_config:validate(data)
+        -- Validation against the instance config: accepted for
+        -- all the options.
+        instance_config:validate(case.data)
+    end
 end
 
 g.test_cluster_config_schema_description_completeness = function()
