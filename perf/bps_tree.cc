@@ -439,7 +439,7 @@ test_delete_insert(benchmark::State &state, size_t count, KeyGen kg)
 	create<tree>(t, count, allocator);
 	for (auto _ : state) {
 		typename tree::elem_t elem(kg());
-		tree::delete_(&t, elem);
+		tree::delete_(&t, elem, NULL);
 		tree::insert(&t, elem, &replaced, &successor);
 	}
 	tree::destroy(&t);
@@ -572,7 +572,7 @@ test_delete(benchmark::State &state, size_t count, KeyGen kg)
 	typename tree::Allocator allocator(count);
 	create<tree>(t, count, allocator);
 	for (auto _ : state)
-		tree::delete_(&t, kg());
+		tree::delete_(&t, kg(), NULL);
 	tree::destroy(&t);
 }
 

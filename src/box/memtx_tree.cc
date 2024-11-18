@@ -1543,7 +1543,7 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 
 		if (index_check_dup(base, old_tuple, new_tuple,
 				    dup_data.tuple, mode) != 0) {
-			memtx_tree_delete(&index->tree, new_data);
+			memtx_tree_delete(&index->tree, new_data, NULL);
 			if (dup_data.tuple != NULL)
 				memtx_tree_insert(&index->tree, dup_data, NULL, NULL);
 			return -1;
@@ -1560,7 +1560,7 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 		old_data.tuple = old_tuple;
 		if (USE_HINT)
 			old_data.set_hint(tuple_hint(old_tuple, cmp_def));
-		memtx_tree_delete(&index->tree, old_data);
+		memtx_tree_delete(&index->tree, old_data, NULL);
 		*result = old_tuple;
 	} else {
 		*result = NULL;
@@ -1600,7 +1600,7 @@ memtx_tree_index_replace_multikey_one(struct memtx_tree_index<true> *index,
 	} else if (index_check_dup(&index->base, old_tuple, new_tuple,
 				   dup_data.tuple, mode) != 0) {
 		/* Rollback replace. */
-		memtx_tree_delete(&index->tree, new_data);
+		memtx_tree_delete(&index->tree, new_data, NULL);
 		if (dup_data.tuple != NULL)
 			memtx_tree_insert(&index->tree, dup_data, NULL, NULL);
 		return -1;

@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cinttypes>
 #include <ctime>
+#include <climits>
 
 #include "sptree.h"
 #include "qsort_arg.h"
@@ -222,7 +223,7 @@ simple_check()
 		type_t v = i;
 		if (test_find(&tree, v) == NULL)
 			fail("element in tree (1)", "false");
-		test_delete(&tree, v);
+		test_delete(&tree, v, NULL);
 		debug_check(&tree);
 	}
 	if (test_size(&tree) != 0)
@@ -248,7 +249,7 @@ simple_check()
 		type_t v = rounds - 1 - i;
 		if (test_find(&tree, v) == NULL)
 			fail("element in tree (2)", "false");
-		test_delete(&tree, v);
+		test_delete(&tree, v, NULL);
 		debug_check(&tree);
 	}
 	if (test_size(&tree) != 0)
@@ -274,7 +275,7 @@ simple_check()
 		type_t v = i;
 		if (test_find(&tree, v) == NULL)
 			fail("element in tree (3)", "false");
-		test_delete(&tree, v);
+		test_delete(&tree, v, NULL);
 		debug_check(&tree);
 	}
 	if (test_size(&tree) != 0)
@@ -300,7 +301,7 @@ simple_check()
 		type_t v = rounds - 1 - i;
 		if (test_find(&tree, v) == NULL)
 			fail("element in tree (4)", "false");
-		test_delete(&tree, v);
+		test_delete(&tree, v, NULL);
 		debug_check(&tree);
 	}
 	if (test_size(&tree) != 0)
@@ -361,7 +362,7 @@ compare_with_sptree_check()
 			test_insert(&tree, rnd, 0, 0);
 		} else {
 			sptree_test_delete(&spt_test, &rnd);
-			test_delete(&tree, rnd);
+			test_delete(&tree, rnd, NULL);
 		}
 
 		debug_check(&tree);
@@ -418,7 +419,7 @@ compare_with_sptree_check_branches()
 			fail("trees integrity", "false");
 
 		sptree_test_delete(&spt_test, &v);
-		test_delete(&tree, v);
+		test_delete(&tree, v, NULL);
 
 		debug_check(&tree);
 
@@ -453,7 +454,7 @@ compare_with_sptree_check_branches()
 			fail("trees integrity", "false");
 
 		sptree_test_delete(&spt_test, &v);
-		test_delete(&tree, v);
+		test_delete(&tree, v, NULL);
 
 		debug_check(&tree);
 
@@ -492,7 +493,7 @@ compare_with_sptree_check_branches()
 			fail("trees integrity", "false");
 
 		sptree_test_delete(&spt_test, &v);
-		test_delete(&tree, v);
+		test_delete(&tree, v, NULL);
 
 		debug_check(&tree);
 
@@ -531,7 +532,7 @@ compare_with_sptree_check_branches()
 			fail("trees integrity", "false");
 
 		sptree_test_delete(&spt_test, &v);
-		test_delete(&tree, v);
+		test_delete(&tree, v, NULL);
 
 		debug_check(&tree);
 
@@ -574,7 +575,7 @@ compare_with_sptree_check_branches()
 			fail("trees integrity", "false");
 
 		sptree_test_delete(&spt_test, &v);
-		test_delete(&tree, v);
+		test_delete(&tree, v, NULL);
 
 		debug_check(&tree);
 
@@ -855,13 +856,18 @@ delete_value_check()
 	struct elem_t e1 = {1, 1};
 	struct_tree_insert(&tree, e1, NULL, NULL);
 	struct elem_t e2 = {1, 2};
+	struct elem_t deleted = {LONG_MAX, LONG_MAX};
 
-	fail_unless(struct_tree_delete_value(&tree, e2, NULL) == -1);
+	fail_unless(struct_tree_delete_value(&tree, e2, &deleted) == 0);
+	fail_unless(deleted.info == LONG_MAX);
+	fail_unless(deleted.marker == LONG_MAX);
 	fail_unless(struct_tree_find(&tree, 1) != NULL);
 	fail_unless(struct_tree_debug_check(&tree) == 0);
 	ok(true, "deletion of non-identical element fails");
 
-	fail_unless(struct_tree_delete_value(&tree, e1, NULL) == 0);
+	fail_unless(struct_tree_delete_value(&tree, e1, &deleted) == 0);
+	fail_unless(deleted.info == e1.info);
+	fail_unless(deleted.marker == e1.marker);
 	fail_unless(struct_tree_find(&tree, 1) == NULL);
 	fail_unless(struct_tree_debug_check(&tree) == 0);
 	ok(true, "deletion of identical element succeeds");

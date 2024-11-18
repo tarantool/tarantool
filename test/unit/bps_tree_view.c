@@ -83,7 +83,7 @@ test_size(void)
 		test_tree_do_insert(&tree, i + 1000);
 		test_tree_view_do_debug_check(&view);
 		if (i % 2 == 0) {
-			test_tree_delete(&tree, i);
+			test_tree_delete(&tree, i, NULL);
 			test_tree_view_do_debug_check(&view);
 		}
 	}
@@ -115,7 +115,7 @@ test_find(void)
 		test_tree_do_insert(&tree, i + 1000);
 		test_tree_view_do_debug_check(&view);
 		if (i % 2 == 0) {
-			test_tree_delete(&tree, i);
+			test_tree_delete(&tree, i, NULL);
 			test_tree_view_do_debug_check(&view);
 		}
 	}
@@ -172,7 +172,7 @@ test_first(void)
 	ok(p != NULL && *p == 0,
 	   "non-empty view first before tree change");
 	for (int i = 0; i < 100; i++) {
-		test_tree_delete(&tree, i);
+		test_tree_delete(&tree, i, NULL);
 		test_tree_view_do_debug_check(&view);
 	}
 	it = test_tree_view_first(&view);
@@ -216,7 +216,7 @@ test_last(void)
 	ok(p != NULL && *p == 999,
 	   "non-empty view last before tree change");
 	for (int i = 900; i < 1000; i++) {
-		test_tree_delete(&tree, i);
+		test_tree_delete(&tree, i, NULL);
 		test_tree_view_do_debug_check(&view);
 	}
 	it = test_tree_view_last(&view);
@@ -248,7 +248,7 @@ test_lower_bound(void)
 	for (int i = 0; i < 1000; i++) {
 		test_tree_do_insert(&tree, i * 10);
 		test_tree_view_do_debug_check(&view);
-		test_tree_delete(&tree, i * 2);
+		test_tree_delete(&tree, i * 2, NULL);
 		test_tree_view_do_debug_check(&view);
 	}
 
@@ -298,7 +298,7 @@ test_upper_bound(void)
 	for (int i = 0; i < 1000; i++) {
 		test_tree_do_insert(&tree, i * 10);
 		test_tree_view_do_debug_check(&view);
-		test_tree_delete(&tree, i * 2);
+		test_tree_delete(&tree, i * 2, NULL);
 		test_tree_view_do_debug_check(&view);
 	}
 
@@ -349,7 +349,7 @@ test_iterator(void)
 
 	for (int i = 0; i < 1000; i++) {
 		if (i % 6 == 0) {
-			test_tree_delete(&tree, i);
+			test_tree_delete(&tree, i, NULL);
 			test_tree_view_do_debug_check(&view);
 		}
 		if (i % 5 == 0) {

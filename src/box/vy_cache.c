@@ -203,7 +203,7 @@ vy_cache_gc_step(struct vy_cache_env *env)
 	}
 	cache->version++;
 	vy_stmt_counter_acct_tuple(&cache->stat.evict, node->entry.stmt);
-	vy_cache_tree_delete(&cache->cache_tree, node);
+	vy_cache_tree_delete(&cache->cache_tree, node, NULL);
 	vy_cache_node_delete(cache->env, node);
 }
 
@@ -504,7 +504,7 @@ vy_cache_on_write(struct vy_cache *cache, struct vy_entry entry,
 		}
 		vy_stmt_counter_acct_tuple(&cache->stat.invalidate,
 					   to_delete->entry.stmt);
-		vy_cache_tree_delete(&cache->cache_tree, to_delete);
+		vy_cache_tree_delete(&cache->cache_tree, to_delete, NULL);
 		vy_cache_node_delete(cache->env, to_delete);
 	}
 }
