@@ -817,7 +817,8 @@ bps_tree_insert_get_offset(struct bps_tree *tree, bps_tree_elem_t new_elem,
  * @brief Delete an element from a tree.
  * @param tree - pointer to a tree
  * @param elem - the element tot delete
- * @return - 0 on success or -1 if the element was not found in tree
+ * @return - 0 on success or -1 if the element was not
+ *  found in tree or a memory allocation has failed
  */
 static inline int
 bps_tree_delete(struct bps_tree *tree, bps_tree_elem_t elem);
@@ -841,7 +842,7 @@ bps_tree_delete_get_offset(struct bps_tree *tree, bps_tree_elem_t elem,
  * @param tree - pointer to a tree
  * @param elem - the element tot delete
  * @return - 0 on success or -1 if the element was not found in the
- *  tree or is not identical.
+ *  tree or is not identical or a memory allocation has failed.
  */
 static inline int
 bps_tree_delete_value(struct bps_tree *tree, bps_tree_elem_t elem,
@@ -3204,6 +3205,8 @@ bps_tree_create_leaf(struct bps_tree_common *tree, bps_tree_block_id_t *id)
 			       bps_tree_garbage_pop(tree, id);
 	if (!res)
 		res = (struct bps_leaf *)matras_alloc(tree->matras, id);
+	if (!res)
+		return NULL;
 	res->header.type = BPS_TREE_BT_LEAF;
 	tree->leaf_count++;
 	return res;
@@ -3217,8 +3220,7 @@ bps_tree_create_inner(struct bps_tree_common *tree, bps_tree_block_id_t *id)
 {
 	struct bps_inner *res = (struct bps_inner *)
 				bps_tree_garbage_pop(tree, id);
-	if (!res)
-		res = (struct bps_inner *)matras_alloc(tree->matras, id);
+	assert(res != NULL); /* We must have reserved blocks. */
 	res->header.type = BPS_TREE_BT_INNER;
 	tree->inner_count++;
 	return res;
@@ -4753,13 +4755,9 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 		}
 	}
 
-	if (!bps_tree_reserve_blocks(tree, tree->depth + 1)) {
-		*inserted_in_block = (bps_tree_block_id_t)(-1);
-		*inserted_in_pos = 0;
-		return -1;
-	}
 	bps_tree_block_id_t new_block_id = (bps_tree_block_id_t)(-1);
 	struct bps_leaf *new_leaf = bps_tree_create_leaf(tree, &new_block_id);
+	assert(new_leaf != NULL); /* We've reserved blocks in the caller. */
 
 	bps_tree_touch_leaf(tree, leaf_path_elem);
 
@@ -5825,6 +5823,14 @@ bps_tree_insert_impl(struct bps_tree *t, bps_tree_elem_t new_elem,
 		return rc;
 	}
 
+	/* Reserve max blocks to create (1 per level + new root). */
+	if (!bps_tree_reserve_blocks(tree, tree->depth + 1))
+		return -1;
+
+	/* Reserve space for max blocks to touch: root + 3 per next level. */
+	if (matras_touch_reserve(tree->matras, 1 + (tree->depth - 1) * 3) != 0)
+		return -1;
+
 	struct bps_inner_path_elem path[BPS_TREE_MAX_DEPTH];
 	struct bps_leaf_path_elem leaf_path_elem;
 	bool exact;
@@ -5907,7 +5913,8 @@ bps_tree_insert_get_offset(struct bps_tree *t, bps_tree_elem_t new_elem,
  * @param[out] deleted_elem - optional pointer to the deleted value, left
  *  intact if no element deleted.
  * @param[out] offset - optional pointer to the offset to the element.
- * @return - true on success or false if the element was not found.
+ * @return - 0 on success or -1 if the element was not found or a
+ *  memory allocation has failed.
  */
 static ALWAYS_INLINE int
 bps_tree_delete_impl(struct bps_tree *t, bps_tree_elem_t elem,
@@ -5916,6 +5923,10 @@ bps_tree_delete_impl(struct bps_tree *t, bps_tree_elem_t elem,
 {
 	struct bps_tree_common *tree = &t->common;
 	if (tree->root_id == (bps_tree_block_id_t)(-1))
+		return -1;
+
+	/* Reserve space for max blocks to touch: root + 3 per next level. */
+	if (matras_touch_reserve(tree->matras, 1 + (tree->depth - 1) * 3) != 0)
 		return -1;
 
 	struct bps_inner_path_elem path[BPS_TREE_MAX_DEPTH];

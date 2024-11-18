@@ -504,7 +504,8 @@ main(void)
 	iterator_check();
 	iterator_invalidate_check();
 	iterator_freeze_check();
-	ok(total_extents_allocated == 0, "memory leak check");
+	ok(total_extents_allocated == allocator.num_reserved_extents,
+	   "leak check");
 
 	matras_allocator_destroy(&allocator);
 
