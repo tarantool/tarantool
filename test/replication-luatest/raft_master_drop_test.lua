@@ -3,7 +3,7 @@ local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 local fio = require('fio')
 
-local g = t.group('my-raft')
+local g = t.group('raft-master-drop')
 
 g.before_all(function(cg)
     cg.cluster = cluster:new{}
