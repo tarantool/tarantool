@@ -456,10 +456,11 @@ local function feedback_validate(data, w)
     w.error('Tarantool is built without feedback reports sending support')
 end
 
--- Verify that the given validation context (w) corresponds to the
--- instance level of the cluster configuration or the validation
--- is performed against the instance config schema.
-local function validate_scope_is_instance(w)
+-- Verify that the given validation context (w) corresponds to one
+-- of the given cluster config scopes (global, group, replicaset,
+-- instance) or the validation is performed against the instance
+-- config schema.
+local function validate_scope(w, allowed_scopes)
     local scope = w.schema.computed.annotations.scope
 
     -- scope = nil means that the validation is performed against
@@ -476,14 +477,15 @@ local function validate_scope_is_instance(w)
         return
     end
 
-    -- scope = 'instance' means that the option is placed on the
-    -- instance level of the cluster configuration.
-    if scope == 'instance' then
-        return
+    -- If the current scope is listed in the allowed scopes -- OK.
+    for _, allowed_scope in ipairs(allowed_scopes) do
+        if scope == allowed_scope then
+            return
+        end
     end
 
-    -- Any other level of the cluster configuration (replicaset,
-    -- group, global) scope -- raise an error.
+    -- Any other level of the cluster configuration -- raise an
+    -- error.
     w.error('The option must not be present in the %s scope', scope)
 end
 
@@ -1581,6 +1583,60 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'bootstrap_strategy',
             default = 'auto',
         }),
+        autoexpel = schema.record({
+            enabled = schema.scalar({
+                type = 'boolean',
+                default = false,
+            }),
+            -- There is no default value for the 'by' field, so
+            -- users have to set it explicitly to use the
+            -- autoexpelling machinery.
+            --
+            -- It means that we can provide a better criterion
+            -- later and set it by default without affecting
+            -- existing users.
+            --
+            -- There is an idea to track configured instances in
+            -- the database, so we can determine instance that
+            -- were in the configuration previously without a need
+            -- to ask a user for the prefix or another filtering
+            -- rule.
+            by = schema.enum({
+                'prefix',
+            }),
+            prefix = schema.scalar({
+                type = 'string',
+            }),
+        }, {
+            validate = function(data, w)
+                -- Forbid in the instance scope, because it has no
+                -- sense to set the option for a part of a
+                -- replicaset.
+                validate_scope(w, {'global', 'group', 'replicaset'})
+
+                -- Don't validate the options if this
+                -- functionality is disabled.
+                if not data.enabled then
+                    return
+                end
+
+                -- If autoexpelling is enabled, the expelling
+                -- criterion must be set.
+                if data.by == nil then
+                    w.error('replication.autoexpel.by must be set if ' ..
+                        'replication.autoexpel.enabled = true')
+                end
+
+                -- If the autoexpelling is configured to use the
+                -- prefix-based criterion, then the prefix must be
+                -- set.
+                if data.by == 'prefix' and data.prefix == nil then
+                    w.error('replication.autoexpel.prefix must be set if ' ..
+                        'replication.autoexpel.enabled = true and ' ..
+                        'replication.autoexpel.by = \'prefix\'')
+                end
+            end,
+        }),
     }),
     -- Unlike other sections, credentials contains the append-only
     -- parameters. It means that deletion of a value from the
@@ -2570,7 +2626,7 @@ return schema.new('instance_config', schema.record({
         type = 'boolean',
         default = false,
         validate = function(_data, w)
-            validate_scope_is_instance(w)
+            validate_scope(w, {'instance'})
         end,
     }),
 }, {

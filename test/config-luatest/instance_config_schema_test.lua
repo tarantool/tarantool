@@ -1134,6 +1134,11 @@ g.test_replication = function()
             election_timeout = 1,
             election_fencing_mode = 'off',
             bootstrap_strategy = 'auto',
+            autoexpel = {
+                enabled = true,
+                by = 'prefix',
+                prefix = 'i-',
+            }
         },
     }
     instance_config:validate(iconfig)
@@ -1156,9 +1161,82 @@ g.test_replication = function()
         election_timeout = 5,
         election_fencing_mode = 'soft',
         bootstrap_strategy = 'auto',
+        autoexpel = {
+            enabled = false,
+        },
     }
     local res = instance_config:apply_default({}).replication
     t.assert_equals(res, exp)
+end
+
+g.test_replication_autoexpel = function()
+    -- Success case (disabled).
+    instance_config:validate({
+        replication = {
+            autoexpel = {
+                enabled = false,
+            },
+        },
+    })
+
+    -- Success case (enabled).
+    instance_config:validate({
+        replication = {
+            autoexpel = {
+                enabled = true,
+                by = 'prefix',
+                prefix = 'i-'
+            },
+        },
+    })
+
+    -- No `by`.
+    local err = '[instance_config] replication.autoexpel: ' ..
+        'replication.autoexpel.by must be set if ' ..
+        'replication.autoexpel.enabled = true'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate({
+            replication = {
+                autoexpel = {
+                    enabled = true,
+                },
+            },
+        })
+    end)
+
+    -- Invalid `by`.
+    local err = '[instance_config] replication.autoexpel.by: Got invalid, ' ..
+        'but only the following values are allowed: prefix'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate({
+            replication = {
+                autoexpel = {
+                    enabled = true,
+                    by = 'invalid',
+                },
+            },
+        })
+    end)
+
+    -- No `prefix`.
+    local err = '[instance_config] replication.autoexpel: ' ..
+        'replication.autoexpel.prefix must be set if ' ..
+        'replication.autoexpel.enabled = true and ' ..
+        'replication.autoexpel.by = \'prefix\''
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate({
+            replication = {
+                autoexpel = {
+                    enabled = true,
+                    by = 'prefix',
+                },
+            },
+        })
+    end)
+
+    t.assert_equals(instance_config:apply_default({}).replication.autoexpel, {
+        enabled = false,
+    })
 end
 
 g.test_credentials = function()

@@ -1741,6 +1741,65 @@ I['replication.anon'] = format_text([[
       or replica set leader.
 ]])
 
+I['replication.autoexpel'] = format_text([[
+    Automatically expel instances.
+
+    The option is useful for management of dynamic clusters using the YAML
+    configuration. The option allows to automatically expel instances
+    that are removed from the YAML configuration.
+
+    Only instances whose names start from the given prefix are taken into
+    account, all the others are ignored. Also, instances without a
+    persistent name set are ignored too.
+
+    If an instance is in read-write mode and has a latest database schema,
+    it performs expelling of the instances:
+
+    - with the given prefix, *and*
+    - not present in the YAML configuration.
+
+    The expelling process the usual one: deletion from the `_cluster` system
+    space.
+
+    The autoexpel logic works on startup and reacts on the reconfiguration
+    and the `box.status` watcher event. If a new instance is joined and
+    neither of these two events occur, autoexpel does not perform any
+    actions on it. In other words, it doesn't forbid joining of an instance
+    that met the autoexpel criterion.
+
+    The option is allowed on the `replicaset`, `group` and `global` levels,
+    but forbidden on the `instance` level of the cluster configuration.
+]])
+
+I['replication.autoexpel.by'] = format_text([[
+    The autoexpel criterion: it defines how to determine that an instance is
+    part of the cluster configuration and is not an external service that
+    uses the replication channel (such as a CDC tool).
+
+    Now, only `replication.autoexpel.by` = `prefix` criterion is supported.
+    A user have to set it explicitly.
+
+    In future we can provide other criteria and set one of them as default.
+]])
+
+I['replication.autoexpel.enabled'] = format_text([[
+    Determines, whether the autoexpelling logic is enabled at all. If the option
+    is set, `replication.autoexpel.by` and `replication.autoexpel.prefix` are
+    required.
+]])
+
+I['replication.autoexpel.prefix'] = format_text([[
+    Defines a pattern for instance names that are considered a part of the
+    cluster (not some external services).
+
+    For example, if all the instances in the cluster configuration are prefixed
+    with the replica set name, one can use `replication.autoexpel.prefix` =
+    '{{ replicaset_name }}'`.
+
+    If all the instances follow the `i-\d\d\d` pattern, the option can be set
+    to `i-`.
+]])
+
 I['replication.bootstrap_strategy'] = format_text([[
     Specifies a strategy used to bootstrap a replica set. The following
     strategies are available:

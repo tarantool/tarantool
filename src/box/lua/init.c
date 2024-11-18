@@ -150,6 +150,7 @@ extern char session_lua[],
 	metrics_version_lua[],
 	/* {{{ config */
 	config_applier_app_lua[],
+	config_applier_autoexpel_lua[],
 	config_applier_box_cfg_lua[],
 	config_applier_runtime_priv_lua[],
 	config_applier_compat_lua[],
@@ -412,6 +413,10 @@ static const char *lua_sources[] = {
 	"config/applier/app",
 	"internal.config.applier.app",
 	config_applier_app_lua,
+
+	"config/applier/autoexpel",
+	"internal.config.applier.autoexpel",
+	config_applier_autoexpel_lua,
 
 #if ENABLE_CONFIG_EXTRAS
 	"config/source/etcd",
