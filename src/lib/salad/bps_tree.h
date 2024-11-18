@@ -817,32 +817,30 @@ bps_tree_insert_get_offset(struct bps_tree *tree, bps_tree_elem_t new_elem,
  * @brief Delete an element from a tree.
  * @param tree - pointer to a tree
  * @param elem - the element tot delete
- * @return - 0 on success or -1 if the element was not
- *  found in tree or a memory allocation has failed
+ * @param deleted_elem - optional pointer to the
+ *  deleted value, left intact if no element deleted.
+ * @return - 0 on success or -1 if a memory allocation has failed
  */
 static inline int
-bps_tree_delete(struct bps_tree *tree, bps_tree_elem_t elem);
+bps_tree_delete(struct bps_tree *tree, bps_tree_elem_t elem,
+		bps_tree_elem_t *deleted_elem);
 
 #if defined(BPS_INNER_CHILD_CARDS) || defined(BPS_INNER_CARD)
 
 /**
  * @brief Same as bps_tree_delete, but with additional argument.
- * @param[out] offset - the offset to the deleted element, undefined on failure.
+ * @param[out] offset - the offset to the deleted element, undefined on
+ *   failure or if no element deleted.
  */
 static inline int
 bps_tree_delete_get_offset(struct bps_tree *tree, bps_tree_elem_t elem,
-			   size_t *offset);
+			   bps_tree_elem_t *deleted_elem, size_t *offset);
 
 #endif
 
 /**
- * @brief Delete an identical element from a tree (unlike
- * bps_tree_delete this routine relies on BPS_TREE_IS_IDENTICAL
- * instead of BPS_TREE_COMPARE).
- * @param tree - pointer to a tree
- * @param elem - the element tot delete
- * @return - 0 on success or -1 if the element was not found in the
- *  tree or is not identical or a memory allocation has failed.
+ * @brief Same as bps_tree_delete, but only deletes the element if it's
+ *   identical according to the BPS_TREE_IS_IDENTICAL function.
  */
 static inline int
 bps_tree_delete_value(struct bps_tree *tree, bps_tree_elem_t elem,
@@ -5913,8 +5911,7 @@ bps_tree_insert_get_offset(struct bps_tree *t, bps_tree_elem_t new_elem,
  * @param[out] deleted_elem - optional pointer to the deleted value, left
  *  intact if no element deleted.
  * @param[out] offset - optional pointer to the offset to the element.
- * @return - 0 on success or -1 if the element was not found or a
- *  memory allocation has failed.
+ * @return - 0 on success or -1 if a memory allocation has failed.
  */
 static ALWAYS_INLINE int
 bps_tree_delete_impl(struct bps_tree *t, bps_tree_elem_t elem,
@@ -5923,7 +5920,7 @@ bps_tree_delete_impl(struct bps_tree *t, bps_tree_elem_t elem,
 {
 	struct bps_tree_common *tree = &t->common;
 	if (tree->root_id == (bps_tree_block_id_t)(-1))
-		return -1;
+		return 0;
 
 	/* Reserve space for max blocks to touch: root + 3 per next level. */
 	if (matras_touch_reserve(tree->matras, 1 + (tree->depth - 1) * 3) != 0)
@@ -5936,13 +5933,13 @@ bps_tree_delete_impl(struct bps_tree *t, bps_tree_elem_t elem,
 			      &exact, false);
 
 	if (!exact)
-		return -1;
+		return 0;
 
 	struct bps_leaf *leaf = leaf_path_elem.block;
 	bps_tree_pos_t pos = leaf_path_elem.insertion_point;
 
 	if (if_identical && !BPS_TREE_IS_IDENTICAL(elem, leaf->elems[pos]))
-		return -1;
+		return 0;
 
 	if (deleted_elem != NULL)
 		*deleted_elem = leaf->elems[pos];
@@ -5959,9 +5956,10 @@ bps_tree_delete_impl(struct bps_tree *t, bps_tree_elem_t elem,
 }
 
 static inline int
-bps_tree_delete(struct bps_tree *t, bps_tree_elem_t elem)
+bps_tree_delete(struct bps_tree *t, bps_tree_elem_t elem,
+		bps_tree_elem_t *deleted_elem)
 {
-	return bps_tree_delete_impl(t, elem, false, NULL, NULL);
+	return bps_tree_delete_impl(t, elem, false, deleted_elem, NULL);
 }
 
 static inline int
@@ -5975,10 +5973,10 @@ bps_tree_delete_value(struct bps_tree *t, bps_tree_elem_t elem,
 
 static inline int
 bps_tree_delete_get_offset(struct bps_tree *t, bps_tree_elem_t elem,
-			   size_t *offset)
+			   bps_tree_elem_t *deleted_elem, size_t *offset)
 {
 
-	return bps_tree_delete_impl(t, elem, false, NULL, offset);
+	return bps_tree_delete_impl(t, elem, false, deleted_elem, offset);
 }
 
 #endif

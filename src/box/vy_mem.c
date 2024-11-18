@@ -290,7 +290,9 @@ vy_mem_rollback_stmt(struct vy_mem *mem, struct vy_entry entry,
 	 * Either way, we don't subtract the statement size because lsregion
 	 * doesn't support freeing memory.
 	 */
-	if (vy_mem_tree_delete(&mem->tree, entry) == 0) {
+	struct vy_entry deleted = vy_entry_none();
+	VERIFY(vy_mem_tree_delete(&mem->tree, entry, &deleted) == 0);
+	if (deleted.stmt != NULL) {
 		mem->version++;
 		mem->count.rows--;
 		count->rows--;

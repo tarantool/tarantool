@@ -146,9 +146,11 @@ typedef int64_t type_t;
 	struct test *t = (tree_arg); \
 	int64_t value = (value_arg); \
 	size_t expected_pos = (expected_pos_arg); \
+	int64_t deleted = INT64_MAX; \
 	size_t pos = SIZE_MAX; \
 	fail_unless(test_find(t, value) != NULL); \
-	fail_unless(test_delete_get_offset(t, value, &pos) == 0); \
+	fail_unless(test_delete_get_offset(t, value, &deleted, &pos) == 0); \
+	fail_unless(deleted == value); \
 	fail_unless(pos == (expected_pos)); \
 	fail_unless(test_find(t, value) == NULL); \
 	int result = test_debug_check(t); \

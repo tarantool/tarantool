@@ -269,8 +269,12 @@ iterator_invalidate_check()
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			int res = test_delete(&tree, e);
-			assert(res == 0);
+			elem_t deleted;
+			deleted.first = LONG_MAX;
+			deleted.second = LONG_MAX;
+			fail_unless(test_delete(&tree, e, &deleted) == 0);
+			fail_unless(deleted.first == e.first);
+			fail_unless(deleted.second == e.second);
 		}
 		for (long i = 0; i < test_size; i++) {
 			do {
@@ -368,8 +372,12 @@ iterator_invalidate_check()
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			int res = test_delete(&tree, e);
-			assert(res == 0);
+			elem_t deleted;
+			deleted.first = LONG_MAX;
+			deleted.second = LONG_MAX;
+			fail_unless(test_delete(&tree, e, &deleted) == 0);
+			fail_unless(deleted.first == e.first);
+			fail_unless(deleted.second == e.second);
 		}
 		for (long i = 0; i < ins_cnt; i++) {
 			elem_t e;
@@ -468,7 +476,7 @@ iterator_freeze_check()
 			elem_t e;
 			e.first = rand() % test_data_mod;
 			e.second = 0;
-			test_delete(&tree, e);
+			test_delete(&tree, e, NULL);
 			fail_if(test_debug_check(&tree));
 			fail_if(test_view_debug_check(&view2));
 		}
