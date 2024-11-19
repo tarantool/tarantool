@@ -86,22 +86,21 @@ g_three_member_cluster.before_each(function(cg)
         replication_synchro_timeout = 120,
     }}
     cg.master:start()
-    cg.replica =
-        cg.replica_set:build_and_add_server{alias = 'replica',
-                                            box_cfg = {
-        replication = {
-            cg.master.net_box_uri,
-            server.build_listen_uri('to_be_deleted', cg.replica_set.id),
-        },
-    }}
-    cg.replica_to_be_deleted =
-        cg.replica_set:build_and_add_server{alias = 'to_be_deleted',
-                                            box_cfg = {
+    local box_cfg = {
         replication = {
             cg.master.net_box_uri,
             server.build_listen_uri('replica', cg.replica_set.id),
+            server.build_listen_uri('to_be_deleted', cg.replica_set.id),
         },
-    }}
+        bootstrap_strategy = 'config',
+        bootstrap_leader = cg.master.net_box_uri,
+    }
+    cg.replica =
+        cg.replica_set:build_and_add_server{alias = 'replica',
+                                            box_cfg = box_cfg}
+    cg.replica_to_be_deleted =
+        cg.replica_set:build_and_add_server{alias = 'to_be_deleted',
+                                            box_cfg = box_cfg}
     cg.replica_set:start()
     cg.replica:wait_for_downstream_to(cg.replica_to_be_deleted)
     cg.replica_to_be_deleted:wait_for_downstream_to(cg.replica)

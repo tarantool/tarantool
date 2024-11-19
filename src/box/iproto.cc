@@ -2825,6 +2825,7 @@ tx_process_replication(struct cmsg *m)
 	struct iproto_connection *con = msg->connection;
 	struct iostream *io = &con->io;
 	assert(!in_txn());
+	ERROR_INJECT_YIELD(ERRINJ_IPROTO_PROCESS_REPLICATION_DELAY);
 	try {
 		if (tx_check_msg(msg) != 0)
 			diag_raise();
