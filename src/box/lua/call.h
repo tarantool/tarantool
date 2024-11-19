@@ -58,6 +58,15 @@ int
 box_lua_eval(const char *expr, uint32_t expr_len,
 	     struct port *args, struct port *ret);
 
+/**
+ * A helper to resolve a Lua function by full name, for example like:
+ * foo.bar['biz']["baz"][3].object:function
+ * Puts the function on top of the stack, followed by an object (if present).
+ * Returns number of items pushed (1 or 2) or -1 in case of error (diag is set).
+ */
+int
+box_lua_find(struct lua_State *L, const char *name, const char *name_end);
+
 /** Construct a Lua function object. */
 struct func *
 func_lua_new(const struct func_def *def);

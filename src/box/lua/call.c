@@ -95,13 +95,7 @@ get_call_serializer(void)
 	}
 }
 
-/**
- * A helper to resolve a Lua function by full name, for example like:
- * foo.bar['biz']["baz"][3].object:function
- * Puts the function on top of the stack, followed by an object (if present).
- * Returns number of items pushed (1 or 2) or -1 in case of error (diag is set).
- */
-static int
+int
 box_lua_find(lua_State *L, const char *name, const char *name_end)
 {
 	lua_checkstack(L, 2); /* No more than 2 entries are needed. */
