@@ -742,6 +742,21 @@ return schema.new('instance_config', schema.record({
             default = 'var/run/{{ instance_name }}/tarantool.pid',
         }),
     }),
+    lua = schema.record({
+        -- Maximum allowed memory allocated by Lua.
+        -- The value can't be less than 256MB and can't be
+        -- changed without restarting the Tarantool instance.
+        memory = schema.scalar({
+            type = 'integer',
+            -- Default value: 2GB.
+            default = 2 * 1024 * 1024 * 1024,
+            validate = function(data, w)
+                if data < 256 * 1024 * 1024 then
+                    w.error('Memory limit should be >= 256MB')
+                end
+            end,
+        }),
+    }),
     console = schema.record({
         enabled = schema.scalar({
             type = 'boolean',
