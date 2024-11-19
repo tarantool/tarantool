@@ -49,6 +49,7 @@
 #include "coio.h"
 #include "core/backtrace.h"
 #include "core/tt_static.h"
+#include "lua/alloc.h"
 #include "lua/backtrace.h"
 #include "lua/fiber.h"
 #include "lua/fiber_cond.h"
@@ -733,10 +734,7 @@ void
 tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 		   char **argv)
 {
-	lua_State *L = luaL_newstate();
-	if (L == NULL) {
-		panic("failed to initialize Lua");
-	}
+	lua_State *L = luaT_newstate();
 	luaL_openlibs(L);
 #ifndef LUAJIT_JIT_STATUS
 	(void)luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE | LUAJIT_MODE_OFF);
@@ -784,6 +782,7 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	lua_call(L, 0, 0);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
+	tarantool_lua_alloc_init(L);
 	tarantool_lua_tweaks_init(L);
 	tarantool_lua_uri_init(L);
 	tarantool_lua_utf8_init(L);
