@@ -163,7 +163,7 @@ memtx_tx_statistics_collect(struct memtx_tx_statistics *stats);
  * Must be called even if MVCC engine is not enabled in config.
  */
 void
-memtx_tx_register_txn(struct txn *txn);
+memtx_tx_register_txn(struct txn *txn, struct engine *engine);
 
 int
 memtx_tx_begin_stmt(struct txn *txn);
@@ -293,7 +293,8 @@ memtx_tx_track_point(struct txn *txn, struct space *space,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return;
-	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
+	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral ||
+	    txn->engines_tx[space->engine->id] == NULL)
 		return;
 	memtx_tx_track_point_slow(txn, index, key);
 }
@@ -323,7 +324,8 @@ memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return;
-	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
+	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral ||
+	    txn->engines_tx[space->engine->id] == NULL)
 		return;
 	memtx_tx_track_gap_slow(txn, space, index, successor,
 				type, key, part_count);
@@ -405,7 +407,8 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return;
-	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
+	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral ||
+	    txn->engines_tx[space->engine->id] == NULL)
 		return;
 	memtx_tx_track_full_scan_slow(txn, space, index);
 }
@@ -509,7 +512,7 @@ memtx_tx_tuple_key_is_visible(struct txn *txn, struct space *space,
  * NB: can trigger story garbage collection.
  */
 void
-memtx_tx_clean_txn(struct txn *txn);
+memtx_tx_clean_txn(struct txn *txn, struct engine *engine);
 
 void
 memtx_tx_abort_space_readers(struct txn *ddl_owner, struct space *base);

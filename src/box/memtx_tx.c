@@ -660,6 +660,10 @@ struct tx_manager
 	 */
 	struct rlist read_view_txs;
 	/**
+	 * Mempool for `memtx_tx_txn_data` objects.
+	 */
+	struct mempool memtx_tx_txn_data_pool;
+	/**
 	 * Mempools for tx_story objects with different index count.
 	 * It's the only case when we use bare mempool in memtx_tx because
 	 * we cannot account story allocation to any particular txn.
@@ -724,6 +728,8 @@ memtx_tx_manager_init()
 		mempool_create(&txm.memtx_tx_story_pool[i],
 			       cord_slab_cache(), item_size);
 	}
+	mempool_create(&txm.memtx_tx_txn_data_pool, cord_slab_cache(),
+		       sizeof(struct memtx_tx_txn_data));
 	txm.history = mh_history_new();
 	memtx_tx_mempool_create(&txm.point_hole_item_pool,
 				sizeof(struct point_hole_item),
@@ -757,6 +763,7 @@ memtx_tx_manager_free()
 {
 	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
 		mempool_destroy(&txm.memtx_tx_story_pool[i]);
+	mempool_destroy(&txm.memtx_tx_txn_data_pool);
 	mh_history_delete(txm.history);
 	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
 	mh_point_holes_delete(txm.point_holes);
@@ -799,18 +806,18 @@ memtx_tx_statistics_collect(struct memtx_tx_statistics *stats)
 }
 
 void
-memtx_tx_register_txn(struct txn *tx)
+memtx_tx_register_txn(struct txn *txn, struct engine *engine)
 {
 	struct memtx_tx_txn_data *data =
-		xregion_alloc_object(&tx->region, struct memtx_tx_txn_data);
-	data->txn = tx;
+		xmempool_alloc(&txm.memtx_tx_txn_data_pool);
+	data->txn = txn;
 	rlist_create(&data->gap_list);
 	rlist_create(&data->in_read_view_txs);
 	rlist_create(&data->point_holes_list);
 	rlist_create(&data->read_set);
 	rlist_add_tail(&txm.all_txs, &data->in_all_txs);
 	memset(data->mvcc_alloc_stats, 0, sizeof(data->mvcc_alloc_stats));
-	tx->engines_tx[txm.engine_id] = data;
+	txn->engines_tx[engine->id] = data;
 }
 
 int
@@ -2864,7 +2871,7 @@ memtx_tx_story_clarify_impl(struct txn *txn, struct space *space,
 			break;
 		}
 		if (story->del_psn != 0 && story->del_stmt != NULL &&
-		    txn != NULL) {
+		    txn != NULL && txn->engines_tx[space->engine->id] != NULL) {
 			assert(story->del_psn ==
 			       story->del_stmt->base->txn->psn);
 			/*
@@ -2883,7 +2890,7 @@ memtx_tx_story_clarify_impl(struct txn *txn, struct space *space,
 			break;
 		}
 		if (story->add_psn != 0 && story->add_stmt != NULL &&
-		    txn != NULL) {
+		    txn != NULL && txn->engines_tx[space->engine->id] != NULL) {
 			assert(story->add_psn ==
 			       story->add_stmt->base->txn->psn);
 			/*
@@ -2900,7 +2907,8 @@ memtx_tx_story_clarify_impl(struct txn *txn, struct space *space,
 			break;
 		story = story->link[index->dense_id].older_story;
 	}
-	if (txn != NULL && !own_change) {
+	if (txn != NULL && txn->engines_tx[space->engine->id] != NULL &&
+	    !own_change) {
 		/*
 		 * If the result tuple exists (is visible) - it is visible in
 		 * every index. But if we found a story of deleted tuple - we
@@ -3359,7 +3367,8 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 {
 	if (tuple == NULL)
 		return;
-	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
+	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral ||
+	    txn->engines_tx[space->engine->id] == NULL)
 		return;
 
 	if (tuple_has_flag(tuple, TUPLE_IS_DIRTY)) {
@@ -3655,7 +3664,8 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 				      ITER_GE : type == ITER_REQ ? ITER_LE :
 				      type, key, part_count));
 
-	if (txn != NULL && txn->status == TXN_INPROGRESS) {
+	if (txn != NULL && txn->status == TXN_INPROGRESS &&
+	    txn->engines_tx[space->engine->id] != NULL) {
 		struct count_gap_item *item = memtx_tx_count_gap_item_new(
 			txn, type, key, part_count, until, until_hint);
 		rlist_add(&memtx_tx_index->read_gaps, &item->base.in_read_gaps);
@@ -3756,11 +3766,12 @@ memtx_tx_clear_txn_read_lists(struct txn *txn)
  * Clean memtx_tx part of @a txm.
  */
 void
-memtx_tx_clean_txn(struct txn *txn)
+memtx_tx_clean_txn(struct txn *txn, struct engine *engine)
 {
 	memtx_tx_clear_txn_read_lists(txn);
-
 	rlist_del(&memtx_tx_txn_data(txn)->in_all_txs);
+	mempool_free(&txm.memtx_tx_txn_data_pool, memtx_tx_txn_data(txn));
+	txn->engines_tx[engine->id] = NULL;
 
 	memtx_tx_story_gc();
 }

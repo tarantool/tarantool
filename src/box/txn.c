@@ -465,7 +465,6 @@ txn_free(struct txn *txn)
 	assert(txn->limbo_entry == NULL);
 	if (txn->rollback_timer != NULL)
 		ev_timer_stop(loop(), txn->rollback_timer);
-	memtx_tx_clean_txn(txn);
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next)
 		txn_stmt_destroy(stmt);
@@ -548,11 +547,6 @@ txn_begin(void)
 	 * without ENGINE_SUPPORTS_CROSS_ENGINE_TX will unset this flag.
 	 */
 	txn_set_flags(txn, TXN_SUPPORTS_MULTI_ENGINE);
-	/*
-	 * Any transaction should be registered in memtx transaction manager
-	 * because it is special and other engines can use it as well.
-	 */
-	memtx_tx_register_txn(txn);
 	rmean_collect(rmean_box, IPROTO_BEGIN, 1);
 	return txn;
 }
