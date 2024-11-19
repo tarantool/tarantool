@@ -38,21 +38,20 @@ g_three_member_cluster.before_all(function(cg)
     cg.replica_set = replica_set:new{}
     cg.master = cg.replica_set:build_and_add_server{alias = 'master'}
     cg.master:start()
-    cg.replica_to_be_disabled =
-        cg.replica_set:build_and_add_server{alias = 'to_be_disabled',
-                                            box_cfg = {
+    local box_cfg = {
         replication = {
             cg.master.net_box_uri,
             server.build_listen_uri('replica', cg.replica_set.id),
-        },
-    }}
-    cg.replica = cg.replica_set:build_and_add_server{alias = 'replica',
-                                                     box_cfg = {
-        replication = {
-            cg.master.net_box_uri,
             server.build_listen_uri('to_be_disabled', cg.replica_set.id),
         },
-    }}
+        bootstrap_strategy = 'config',
+        bootstrap_leader = cg.master.net_box_uri,
+    }
+    cg.replica_to_be_disabled =
+        cg.replica_set:build_and_add_server{alias = 'to_be_disabled',
+                                            box_cfg = box_cfg}
+    cg.replica = cg.replica_set:build_and_add_server{alias = 'replica',
+                                                     box_cfg = box_cfg}
     cg.replica_set:start()
 
     -- Make `_cluster` space synchronous.

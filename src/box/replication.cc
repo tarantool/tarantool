@@ -200,10 +200,28 @@ replicaset_sync_quorum(void)
 	}
 }
 
+/**
+ * Replica set configuration state, shared among appliers.
+ */
+struct replicaset_connect_state {
+	/** Number of successfully connected appliers. */
+	int connected;
+	/**
+	 * Number of appliers which were connected to a loading instance. This
+	 * is a subset of \a connected excluded from replicaset_sync_quorum
+	 * calculation.
+	 */
+	int booting;
+	/** Number of appliers that failed to connect. */
+	int failed;
+	/** Signaled when an applier connects or stops. */
+	struct fiber_cond wakeup;
+};
+
 static void
-replicaset_set_sync_quorum(void)
+replicaset_set_sync_quorum(const struct replicaset_connect_state *state)
 {
-	replication_sync_quorum_auto = replicaset.applier.connected;
+	replication_sync_quorum_auto = state->connected - state->booting;
 }
 
 void
@@ -909,24 +927,7 @@ next:
 			replica_delete(replica);
 		}
 	}
-	/*
-	 * Remember how many appliers are connected to check
-	 * replicaset_sync_quorum later on.
-	 */
-	replicaset_set_sync_quorum();
 }
-
-/**
- * Replica set configuration state, shared among appliers.
- */
-struct replicaset_connect_state {
-	/** Number of successfully connected appliers. */
-	int connected;
-	/** Number of appliers that failed to connect. */
-	int failed;
-	/** Signaled when an applier connects or stops. */
-	struct fiber_cond wakeup;
-};
 
 struct applier_on_connect {
 	struct trigger base;
@@ -1025,11 +1026,14 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 	}
 	/* Update connected and failed counters. */
 	state->connected = 0;
+	state->booting = 0;
 	state->failed = 0;
 	for (int i = 0; i < count; i++) {
 		struct applier *applier = appliers[i];
 		if (applier->state == APPLIER_CONNECTED) {
 			state->connected++;
+			if (!applier->ballot.is_booted)
+				state->booting++;
 		} else if (applier->state == APPLIER_STOPPED ||
 			   applier->state == APPLIER_OFF) {
 			state->failed++;
@@ -1059,7 +1063,12 @@ void
 replicaset_connect(const struct uri_set *uris,
 		   bool connect_quorum, bool keep_connect)
 {
+	struct replicaset_connect_state state;
+	memset(&state, 0, sizeof(state));
+	fiber_cond_create(&state.wakeup);
+
 	if (uris->uri_count == 0) {
+		replicaset_set_sync_quorum(&state);
 		/* Cleanup the replica set. */
 		replicaset_update(NULL, 0, false);
 		uri_set_destroy(&replication_uris);
@@ -1114,10 +1123,6 @@ replicaset_connect(const struct uri_set *uris,
 
 	/* Memory for on_state triggers registered in appliers */
 	struct applier_on_connect triggers[VCLOCK_MAX];
-
-	struct replicaset_connect_state state;
-	state.connected = state.failed = 0;
-	fiber_cond_create(&state.wakeup);
 
 	double timeout = replication_connect_timeout;
 
@@ -1180,6 +1185,11 @@ replicaset_connect(const struct uri_set *uris,
 	}
 	triggers_guard.is_active = false;
 
+	/*
+	 * Remember how many appliers are connected to check
+	 * replicaset_sync_quorum later on.
+	 */
+	replicaset_set_sync_quorum(&state);
 	/* Now all the appliers are connected, update the replica set. */
 	replicaset_update(appliers, count, keep_connect);
 	appliers_guard.is_active = false;
