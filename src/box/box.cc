@@ -101,6 +101,7 @@
 #include "tt_sort.h"
 #include "event.h"
 #include "tweaks.h"
+#include "memtx_tx.h"
 
 static char status[64] = "unconfigured";
 
@@ -6181,6 +6182,8 @@ box_storage_init(void)
 
 	gc_init(on_garbage_collection);
 	engine_init();
+	memtx_tx_manager_use_mvcc_engine = cfg_getb("memtx_use_mvcc_engine");
+	memtx_tx_manager_init();
 	schema_init();
 	replication_init(cfg_geti_default("replication_threads", 1));
 	iproto_init(cfg_geti("iproto_threads"));
@@ -6209,6 +6212,8 @@ box_storage_free(void)
 	iproto_free();
 	replication_free();
 	gc_free();
+	memtx_tx_manager_free();
+	memtx_tx_manager_use_mvcc_engine = false;
 	engine_free();
 	/* schema_free(); */
 	wal_free();

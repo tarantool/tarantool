@@ -78,7 +78,6 @@
 #include "box/lua/init.h" /* box_lua_init() */
 #include "box/lua/console.h"
 #include "box/session.h"
-#include "box/memtx_tx.h"
 #include "box/module_cache.h"
 #include "box/watcher.h"
 #include "systemd.h"
@@ -485,8 +484,6 @@ load_cfg(void)
 		exit(EXIT_FAILURE);
 	}
 
-	memtx_tx_manager_use_mvcc_engine = cfg_getb("memtx_use_mvcc_engine");
-
 	if (background)
 		daemonize();
 
@@ -588,7 +585,6 @@ tarantool_free(void)
 #endif
 	event_free();
 	ssl_free();
-	memtx_tx_manager_free();
 	coll_free();
 	systemd_free();
 	say_logger_free();
@@ -1008,7 +1004,6 @@ main(int argc, char **argv)
 	cbus_init();
 	tnt_thread_init();
 	coll_init();
-	memtx_tx_manager_init();
 	module_init();
 	ssl_init();
 	event_init();

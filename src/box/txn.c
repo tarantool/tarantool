@@ -317,21 +317,15 @@ txn_stmt_new(struct txn *txn)
 	stmt->new_tuple = NULL;
 	stmt->rollback_info.old_tuple = NULL;
 	stmt->rollback_info.new_tuple = NULL;
-	stmt->add_story = NULL;
-	stmt->del_story = NULL;
-	stmt->next_in_del_list = NULL;
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 	stmt->has_triggers = false;
-	stmt->is_own_change = false;
 	return stmt;
 }
 
 static inline void
 txn_stmt_destroy(struct txn_stmt *stmt)
 {
-	assert(stmt->add_story == NULL && stmt->del_story == NULL);
-
 	if (stmt->old_tuple != NULL)
 		tuple_unref(stmt->old_tuple);
 	if (stmt->new_tuple != NULL)
@@ -459,11 +453,6 @@ txn_new(void)
 	assert(region_used(&region) == sizeof(*txn));
 	txn_reset_stats(txn);
 	txn->region = region;
-	rlist_create(&txn->read_set);
-	rlist_create(&txn->point_holes_list);
-	rlist_create(&txn->gap_list);
-	rlist_create(&txn->in_read_view_txs);
-	rlist_create(&txn->in_all_txs);
 	txn->space_on_replace_triggers_depth = 0;
 	txn->acquired_region_used = 0;
 	txn->limbo_entry = NULL;
@@ -476,7 +465,6 @@ txn_free(struct txn *txn)
 	assert(txn->limbo_entry == NULL);
 	if (txn->rollback_timer != NULL)
 		ev_timer_stop(loop(), txn->rollback_timer);
-	memtx_tx_clean_txn(txn);
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next)
 		txn_stmt_destroy(stmt);
@@ -559,12 +547,6 @@ txn_begin(void)
 	 * without ENGINE_SUPPORTS_CROSS_ENGINE_TX will unset this flag.
 	 */
 	txn_set_flags(txn, TXN_SUPPORTS_MULTI_ENGINE);
-	/*
-	 * A transaction is unaffected by concurrent DDL as long as it has
-	 * no statements.
-	 */
-	txn_set_flags(txn, TXN_HANDLES_DDL);
-	memtx_tx_register_txn(txn);
 	rmean_collect(rmean_box, IPROTO_BEGIN, 1);
 	return txn;
 }
@@ -607,8 +589,6 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn)
 	txn_set_flags(txn, TXN_IS_STARTED_IN_ENGINE);
 	if ((engine->flags & ENGINE_SUPPORTS_CROSS_ENGINE_TX) == 0)
 		txn_clear_flags(txn, TXN_SUPPORTS_MULTI_ENGINE);
-	if ((engine->flags & ENGINE_TXM_HANDLES_DDL) == 0)
-		txn_clear_flags(txn, TXN_HANDLES_DDL);
 	return 0;
 }
 
@@ -620,12 +600,6 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 	if (txn->in_sub_stmt > TXN_SUB_STMT_MAX) {
 		diag_set(ClientError, ER_SUB_STMT_MAX);
 		return -1;
-	}
-
-	if (txn->status == TXN_IN_READ_VIEW) {
-		rlist_del(&txn->in_read_view_txs);
-		txn->status = TXN_ABORTED;
-		txn_set_flags(txn, TXN_IS_CONFLICTED);
 	}
 
 	if (txn_check_can_continue(txn) != 0)
@@ -673,40 +647,6 @@ txn_is_distributed(struct txn *txn)
 	 */
 	return (txn->n_new_rows > 0 && txn->n_applier_rows > 0 &&
 		txn->n_new_rows != txn->n_local_rows);
-}
-
-bool
-txn_is_fully_temporary(struct txn *txn)
-{
-	if (!txn_is_nop(txn))
-		return false;
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->space != NULL &&
-		    stmt->space->def->opts.type == SPACE_TYPE_DATA_TEMPORARY)
-			return false;
-	}
-	return true;
-}
-
-bool
-txn_is_fully_remote(struct txn *txn)
-{
-	if (txn->n_new_rows != 0)
-		return false;
-	struct txn_stmt *stmt;
-	/*
-	 * Allow DDL on data-temporary spaces, since we allow only fully
-	 * temporary transactions to continue.
-	 */
-	stailq_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->space != NULL &&
-		    space_is_data_temporary(stmt->space)) {
-			assert(stmt->row == NULL);
-			return false;
-		}
-	}
-	return true;
 }
 
 /**

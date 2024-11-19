@@ -135,6 +135,24 @@ struct memtx_tx_statistics {
 };
 
 /**
+ * A wrapper over index with MVCC-related data.
+ */
+struct memtx_tx_index {
+	/** The index itself. */
+	struct index *base;
+	/**
+	 * List of gap_item's describing gap reads in the index with NULL
+	 * successor OR full scan gaps.
+	 * The first type happens when reading from empty index,
+	 * or when reading from rightmost part of ordered index (TREE).
+	 * The second type happens when a full scan was finished for
+	 * unordered index (HASH).
+	 * @sa struct gap_item_base.
+	 */
+	struct rlist read_gaps;
+};
+
+/**
  * Collect MVCC memory usage statics.
  */
 void
@@ -145,7 +163,10 @@ memtx_tx_statistics_collect(struct memtx_tx_statistics *stats);
  * Must be called even if MVCC engine is not enabled in config.
  */
 void
-memtx_tx_register_txn(struct txn *txn);
+memtx_tx_register_txn(struct txn *txn, struct engine *engine);
+
+int
+memtx_tx_begin_stmt(struct txn *txn);
 
 /**
  * Initialize memtx transaction manager.
@@ -167,16 +188,6 @@ memtx_tx_manager_free();
  */
 void
 memtx_tx_acquire_ddl(struct txn *tx);
-
-/**
- * Mark all transactions except for a given as aborted due to conflict:
- * when DDL operation is about to be committed other transactions are
- * considered to use obsolete schema so that should be aborted.
- *
- * NB: can trigger story garbage collection.
- */
-void
-memtx_tx_abort_all_for_ddl(struct txn *ddl_owner);
 
 /**
  * @brief Add a statement to transaction manager's history.
@@ -282,7 +293,8 @@ memtx_tx_track_point(struct txn *txn, struct space *space,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return;
-	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
+	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral ||
+	    txn->engines_tx[space->engine->id] == NULL)
 		return;
 	memtx_tx_track_point_slow(txn, index, key);
 }
@@ -312,7 +324,8 @@ memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return;
-	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
+	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral ||
+	    txn->engines_tx[space->engine->id] == NULL)
 		return;
 	memtx_tx_track_gap_slow(txn, space, index, successor,
 				type, key, part_count);
@@ -375,7 +388,8 @@ memtx_tx_track_count_until(struct txn *txn, struct space *space,
  * Helper of memtx_tx_track_full_scan.
  */
 void
-memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index);
+memtx_tx_track_full_scan_slow(struct txn *txn, struct space *space,
+			      struct index *index);
 
 /**
  * Record in TX manager that a transaction @a txn have read full @a index
@@ -393,9 +407,10 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return;
-	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
+	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral ||
+	    txn->engines_tx[space->engine->id] == NULL)
 		return;
-	memtx_tx_track_full_scan_slow(txn, index);
+	memtx_tx_track_full_scan_slow(txn, space, index);
 }
 
 /**
@@ -497,7 +512,10 @@ memtx_tx_tuple_key_is_visible(struct txn *txn, struct space *space,
  * NB: can trigger story garbage collection.
  */
 void
-memtx_tx_clean_txn(struct txn *txn);
+memtx_tx_clean_txn(struct txn *txn, struct engine *engine);
+
+void
+memtx_tx_abort_space_readers(struct txn *ddl_owner, struct space *base);
 
 /**
  * Invalidate space in memtx tx: remove all the objects associated with

@@ -608,9 +608,16 @@ memtx_engine_create_read_view(struct engine *engine,
 static int
 memtx_engine_begin(struct engine *engine, struct txn *txn)
 {
-	(void)engine;
+	memtx_tx_register_txn(txn, engine);
 	txn_can_yield(txn, memtx_tx_manager_use_mvcc_engine);
 	return 0;
+}
+
+static int
+memtx_engine_begin_statement(struct engine *engine, struct txn *txn)
+{
+	(void)engine;
+	return memtx_tx_begin_stmt(txn);
 }
 
 static int
@@ -626,15 +633,12 @@ memtx_engine_prepare(struct engine *engine, struct txn *txn)
 		}
 		memtx_tx_prepare_finalize(txn);
 	}
-	if (txn->is_schema_changed)
-		memtx_tx_abort_all_for_ddl(txn);
 	return 0;
 }
 
 static void
 memtx_engine_commit(struct engine *engine, struct txn *txn)
 {
-	(void)engine;
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
 		if (memtx_tx_manager_use_mvcc_engine) {
@@ -650,6 +654,7 @@ memtx_engine_commit(struct engine *engine, struct txn *txn)
 						space->upgrade, old_tuple);
 		}
 	}
+	memtx_tx_clean_txn(txn, engine);
 }
 
 static void
@@ -704,6 +709,12 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		tuple_ref(old_tuple);
 	if (new_tuple != NULL)
 		tuple_unref(new_tuple);
+}
+
+static void
+memtx_engine_rollback(struct engine *engine, struct txn *txn)
+{
+	memtx_tx_clean_txn(txn, engine);
 }
 
 static int
@@ -1563,11 +1574,11 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .join = */ memtx_engine_join,
 	/* .complete_join = */ memtx_engine_complete_join,
 	/* .begin = */ memtx_engine_begin,
-	/* .begin_statement = */ generic_engine_begin_statement,
+	/* .begin_statement = */ memtx_engine_begin_statement,
 	/* .prepare = */ memtx_engine_prepare,
 	/* .commit = */ memtx_engine_commit,
 	/* .rollback_statement = */ memtx_engine_rollback_statement,
-	/* .rollback = */ generic_engine_rollback,
+	/* .rollback = */ memtx_engine_rollback,
 	/* .switch_to_ro = */ generic_engine_switch_to_ro,
 	/* .bootstrap = */ memtx_engine_bootstrap,
 	/* .begin_initial_recovery = */ memtx_engine_begin_initial_recovery,

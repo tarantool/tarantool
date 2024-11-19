@@ -114,12 +114,6 @@ enum txn_flag {
 	TXN_IS_STARTED_IN_ENGINE = 0x400,
 	/** Transaction supports multiple engines. */
 	TXN_SUPPORTS_MULTI_ENGINE = 0x800,
-	/**
-	 * Transaction properly handles concurrent DDL operations.
-	 * If a transaction doesn't have this flag, it'll be aborted
-	 * by any DDL operation.
-	 */
-	TXN_HANDLES_DDL = 0x1000,
 };
 
 enum {
@@ -305,41 +299,12 @@ struct txn_stmt {
 	struct tuple *new_tuple;
 	/** Structure, which contains tuples for rollback. */
 	struct txn_stmt_rollback_info rollback_info;
-	/**
-	 * If new_tuple != NULL and this transaction was not prepared,
-	 * this member holds added story of the new_tuple.
-	 */
-	struct memtx_story *add_story;
-	/**
-	 * If new_tuple == NULL and this transaction was not prepared,
-	 * this member holds added story of the old_tuple.
-	 */
-	struct memtx_story *del_story;
-	/**
-	 * Link in memtx_story::del_stmt linked list.
-	 * Only one prepared TX can delete a tuple and a story. But
-	 * when there are several in-progress transactions and they delete
-	 * the same tuple we have to store several delete statements in one
-	 * story. It's implemented in that way: story has a pointer to the first
-	 * deleting statement, that statement has a pointer to the next etc,
-	 * with NULL in the end.
-	 * That member is that the pointer to next deleting statement.
-	 */
-	struct txn_stmt *next_in_del_list;
 	/** Engine savepoint for the start of this statement. */
 	void *engine_savepoint;
 	/** Redo info: the binary log row */
 	struct xrow_header *row;
 	/** on_commit and/or on_rollback list is not empty. */
 	bool has_triggers;
-	/*
-	 * Flag that shows whether this statement overwrites own transaction
-	 * statement. For example if a transaction makes two replaces of the
-	 * same key, the second statement will be with is_own_change = true.
-	 * Or if a transaction deletes some key and then inserts that key,
-	 * the insertion statement will be with is_own_change = true.
-	 */
-	bool is_own_change;
 	/**
 	* Request type - IPROTO type code
 	*/
@@ -446,10 +411,6 @@ struct txn {
 	 */
 	uint32_t alloc_stats[TX_ALLOC_TYPE_MAX];
 	/**
-	 * Memtx tx allocation statistics.
-	 */
-	uint32_t *memtx_tx_alloc_stats;
-	/**
 	 * A sequentially growing transaction id, assigned when
 	 * a transaction is initiated. Used to identify
 	 * a transaction after it has possibly been destroyed.
@@ -526,18 +487,6 @@ struct txn {
 	struct txn_event txn_events[txn_event_id_MAX];
 	/** List of savepoints to find savepoint by name. */
 	struct rlist savepoints;
-	/**
-	 * Link in tx_manager::read_view_txs.
-	 */
-	struct rlist in_read_view_txs;
-	/** List of tx_read_trackers with stories that the TX have read. */
-	struct rlist read_set;
-	/** List of point hole reads. @sa struct point_hole_item. */
-	struct rlist point_holes_list;
-	/** List of gap reads. @sa struct inplace_gap_item / nearby_gap_item. */
-	struct rlist gap_list;
-	/** Link in tx_manager::all_txs. */
-	struct rlist in_all_txs;
 	/** True in case transaction provides any DDL change. */
 	bool is_schema_changed;
 	/** Timeout for transaction, or TIMEOUT_INFINITY if not set. */
@@ -914,20 +863,6 @@ txn_is_nop(const struct txn *txn)
 {
 	return txn->n_new_rows + txn->n_applier_rows == 0;
 }
-
-/**
- * Check whether a transaction consists only of operations on fully temporary
- * spaces.
- */
-bool
-txn_is_fully_temporary(struct txn *txn);
-
-/**
- * Check whether a transaction consists only of remote operations coming from
- * the applier.
- */
-bool
-txn_is_fully_remote(struct txn *txn);
 
 /**
  * Mark @a stmt as temporary by removing the associated stmt->row

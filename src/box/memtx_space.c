@@ -67,6 +67,8 @@ enum { MEMTX_DDL_YIELD_LOOPS = 10 };
 static void
 memtx_space_destroy(struct space *space)
 {
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	free(memtx_space->memtx_tx_index);
 	TRASH(space);
 	free(space);
 }
@@ -401,7 +403,8 @@ memtx_space_replace_tuple(struct space *space, struct txn_stmt *stmt,
 	if (rc != 0)
 		goto finish;
 	txn_stmt_prepare_rollback_info(stmt, result, new_tuple);
-	stmt->engine_savepoint = stmt;
+	if (!memtx_tx_manager_use_mvcc_engine)
+		stmt->engine_savepoint = stmt;
 	stmt->new_tuple = orig_new_tuple;
 	stmt->old_tuple = result;
 	if (stmt->old_tuple != NULL) {
@@ -1473,10 +1476,28 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 	return 0;
 }
 
+static void
+memtx_space_fill_memtx_tx_index(struct memtx_space *space)
+{
+	if (!memtx_tx_manager_use_mvcc_engine) {
+		space->memtx_tx_index = NULL;
+		return;
+	}
+
+	size_t index_count = space->base.index_count;
+	space->memtx_tx_index =
+		xalloc_array(struct memtx_tx_index, index_count);
+	for (size_t i = 0; i < index_count; i++) {
+		space->memtx_tx_index[i].base = space->base.index[i];
+		rlist_create(&space->memtx_tx_index[i].read_gaps);
+	}
+}
+
 /**
  * Copy memory usage statistics to the newly altered space from the old space.
  * In case of DropIndex or TruncateIndex alter operations, the new space will be
  * empty, and tuple statistics must not be copied.
+ * Also, allocate MVCC-related data in the new space.
  */
 static void
 memtx_space_finish_alter(struct space *old_space, struct space *new_space)
@@ -1492,6 +1513,8 @@ memtx_space_finish_alter(struct space *old_space, struct space *new_space)
 		new_memtx_space->tuple_stat[TUPLE_ARENA_MALLOC] =
 			old_memtx_space->tuple_stat[TUPLE_ARENA_MALLOC];
 	}
+
+	memtx_space_fill_memtx_tx_index((struct memtx_space *)new_space);
 }
 
 /**
@@ -1506,7 +1529,7 @@ memtx_space_invalidate(struct space *space)
 	 * will be aborted when DDL will be prepared.
 	 */
 	if (memtx_tx_manager_use_mvcc_engine) {
-		memtx_tx_abort_all_for_ddl(in_txn());
+		memtx_tx_abort_space_readers(in_txn(), space);
 		memtx_tx_invalidate_space(space, in_txn());
 	}
 }
@@ -1577,5 +1600,8 @@ memtx_space_new(struct memtx_engine *memtx,
 	memset(&memtx_space->tuple_stat, 0, sizeof(memtx_space->tuple_stat));
 	memtx_space->rowid = 0;
 	memtx_space->replace = memtx_space_replace_no_keys;
+	rlist_create(&memtx_space->memtx_stories);
+	rlist_create(&memtx_space->alter_stmts);
+	memtx_space_fill_memtx_tx_index(memtx_space);
 	return (struct space *)memtx_space;
 }

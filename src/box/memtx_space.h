@@ -62,6 +62,28 @@ struct memtx_space {
 	 */
 	int (*replace)(struct space *, struct tuple *, struct tuple *,
 		       enum dup_replace_mode, struct tuple **);
+	/**
+	 * List of all memtx_tx stories in the space.
+	 */
+	struct rlist memtx_stories;
+	/**
+	 * List of currently running long (yielding) space alter operations
+	 * triggered by statements applied to this space (see alter_space_do),
+	 * linked by space_alter_stmt::link. Belongs to memtx because all system
+	 * spaces belong there.
+	 *
+	 * We must exclude such statements from snapshot because they haven't
+	 * reached WAL yet and may actually fail. With MVCC off, such
+	 * statements would be visible from a read view so we have to keep
+	 * track of them separately.
+	 */
+	struct rlist alter_stmts;
+	/**
+	 * Array of structures needed for MVCC to store data related to the
+	 * index. The order is the same as in `space::index`. Is NULL when MVCC
+	 * is disabled.
+	 */
+	struct memtx_tx_index *memtx_tx_index;
 };
 
 /**
