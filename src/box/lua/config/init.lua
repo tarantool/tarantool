@@ -143,6 +143,7 @@ function methods._initialize(self)
         self:_register_source(require('internal.config.source.file').new())
     end
 
+    self:_register_applier(require('internal.config.applier.lua'))
     self:_register_applier(require('internal.config.applier.compat'))
     self:_register_applier(require('internal.config.applier.mkdir'))
     self:_register_applier(require('internal.config.applier.console'))
@@ -315,10 +316,11 @@ function methods._store(self, iconfig, cconfig, source_info)
     self._configdata = configdata.new(iconfig, cconfig, self._instance_name)
 end
 
--- Invoke compat, mkdir, console and box_cfg appliers at the first
--- phase. Invoke all the other ones at the second phase.
+-- Invoke lua, compat, mkdir, console and box_cfg appliers at the
+-- first phase. Invoke all the other ones at the second phase.
 function methods._apply_on_startup(self, opts)
     local first_phase_appliers = {
+        lua = true,
         compat = true,
         mkdir = true,
         console = true,

@@ -69,6 +69,7 @@ end
 local instance_config_fields = {
     'config',
     'process',
+    'lua',
     'console',
     'fiber',
     'log',
@@ -328,6 +329,7 @@ g.test_defaults = function()
             enabled = true,
             socket = 'var/run/{{ instance_name }}/tarantool.control',
         },
+        lua = {memory = 2147483648},
         memtx = {
             memory = 268435456,
             allocator = 'small',

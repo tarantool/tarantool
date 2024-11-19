@@ -51,6 +51,7 @@ lua_source(lua_sources lua/config/applier/compat.lua       config_applier_compat
 lua_source(lua_sources lua/config/applier/console.lua      config_applier_console_lua)
 lua_source(lua_sources lua/config/applier/credentials.lua  config_applier_credentials_lua)
 lua_source(lua_sources lua/config/applier/fiber.lua        config_applier_fiber_lua)
+lua_source(lua_sources lua/config/applier/lua.lua          config_applier_lua_lua)
 lua_source(lua_sources lua/config/applier/mkdir.lua        config_applier_mkdir_lua)
 lua_source(lua_sources lua/config/applier/roles.lua        config_applier_roles_lua)
 lua_source(lua_sources lua/config/applier/sharding.lua     config_applier_sharding_lua)
