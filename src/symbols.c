@@ -25,6 +25,8 @@
  */
 
 extern void
+box_lua_find(void);
+extern void
 fiber_channel_close(void);
 extern void
 fiber_channel_create(void);
@@ -62,6 +64,7 @@ struct symbol_def {
 };
 
 static struct symbol_def symbols[] = {
+	{"box_lua_find", box_lua_find},
 	{"fiber_channel_close", fiber_channel_close},
 	{"fiber_channel_create", fiber_channel_create},
 	{"fiber_channel_delete", fiber_channel_delete},

@@ -12,6 +12,7 @@ end)
 
 g.test_fiber_channel = function()
     local symbols = {
+        'box_lua_find',
         'fiber_channel_close',
         'fiber_channel_create',
         'fiber_channel_delete',
