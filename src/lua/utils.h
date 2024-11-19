@@ -82,6 +82,14 @@ extern uint32_t CTID_DATETIME;
 extern uint32_t CTID_INTERVAL;
 
 /**
+ * Creates a new Lua state with a custom allocator function.
+ * Guarantees the state is not NULL. It panics if lua_State can't
+ * be allocated.
+ */
+struct lua_State *
+luaT_newstate(void);
+
+/**
  * Pushes a new varbinary object with the given content to the Lua stack.
  */
 void
