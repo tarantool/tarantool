@@ -682,7 +682,7 @@ end
 local function on_schema_replace_trigger(_, new)
     assert(on_schema_replace_trigger_is_set)
 
-    if new == nil then
+    if new == nil or new[1] ~= 'version' then
         return
     end
 
