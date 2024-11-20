@@ -671,7 +671,7 @@ local schema_is_upgraded_cond
 
 local function update_schema_upgraded_status(version)
     local schema_version = version or mkversion.get()
-    schema_is_upgraded = schema_version == mkversion.get_latest()
+    schema_is_upgraded = schema_version >= mkversion(2, 11, 1)
 
     if schema_is_upgraded then
         assert(schema_is_upgraded_cond ~= nil)
@@ -679,17 +679,16 @@ local function update_schema_upgraded_status(version)
     end
 end
 
-local function on_schema_replace_trigger(_, new)
+local function on_schema_replace_trigger(old, new)
     assert(on_schema_replace_trigger_is_set)
-
     if new == nil or new[1] ~= 'version' then
         return
     end
 
-    local latest_version = mkversion.get_latest()
+    local expected_version = mkversion(2, 11, 1)
+    local old_version = mkversion.from_tuple(old)
     local new_version = mkversion.from_tuple(new)
-
-    if new_version == latest_version then
+    if old_version < expected_version and new_version >= expected_version then
         box.on_commit(function()
             update_schema_upgraded_status(new_version)
         end)

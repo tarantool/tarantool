@@ -87,18 +87,21 @@ g.test_upgrade = function()
         for _, alert in pairs(require("config"):info().alerts) do
             table.insert(messages, alert.message)
         end
-        local exp = 'credentials: the database schema has an old version ' ..
+        local msg = 'credentials: the database schema has an old version ' ..
                     'and users/roles/privileges cannot be applied. '..
                     'Consider executing box.schema.upgrade() to perform an '..
                     'upgrade.'
-        t.assert_items_include(messages, {exp})
+        t.assert_items_include(messages, {msg})
 
         t.assert_equals(box.space._schema:get("version"), {'version', 2, 11, 0})
+        -- Stop upgrade process in the middle, right after upgrading to 2.11.1.
+        -- After upgrade to 2.11.1 privileges should be granted automatically.
+        box.internal.run_schema_upgrade(function()
+            box.space._schema:delete("max_id")
+            box.space._schema:replace{'version', 2, 11, 1}
+        end)
 
-        box.schema.upgrade()
-        -- After upgrade privileges should be granted automatically.
-
-        exp = { 'read', 'space', '_space' }
+        local exp = { 'read', 'space', '_space' }
         t.assert_items_include(box.schema.user.info('guest'), {exp})
 
         exp = { 'read,write', 'space', '_space' }
@@ -118,7 +121,14 @@ g.test_upgrade = function()
         for _, alert in pairs(require("config"):info().alerts) do
             table.insert(messages, alert.message)
         end
+        t.assert_items_exclude(messages, {msg})
 
-        t.assert_items_equals(messages, {})
+        -- Check that after full upgrade no alerts at all.
+        box.schema.upgrade()
+        messages = {}
+        for _, alert in pairs(require("config"):info().alerts) do
+            table.insert(messages, alert.message)
+        end
+        t.assert_equals(messages, {})
     end)
 end
