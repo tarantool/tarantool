@@ -1736,7 +1736,11 @@ g.test_failover = function()
                         instance001 = 1
                     }
                 }
-            }
+            },
+            log = {
+                to = 'file',
+                file = 'var/log/tarantool/failover.log',
+            },
         }
     }
 
@@ -1753,6 +1757,9 @@ g.test_failover = function()
             enabled = true,
             renew_interval = 2,
             keepalive_interval = 10,
+        },
+        log = {
+            to = 'stderr',
         },
     }
     local res = instance_config:apply_default({}).failover

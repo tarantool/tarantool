@@ -409,6 +409,9 @@ g.test_defaults = function()
                 renew_interval = 2,
                 keepalive_interval = 10,
             },
+            log = {
+                to = 'stderr',
+            },
         },
         compat = {
             json_escape_forward_slash = 'new',
