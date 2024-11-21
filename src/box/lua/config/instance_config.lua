@@ -2409,6 +2409,23 @@ return schema.new('instance_config', schema.record({
                 }),
             }),
         }),
+        log = schema.record({
+            to = schema.enum({
+                'stderr',
+                'file',
+            }, {
+                default = 'stderr',
+            }),
+            file = schema.scalar({
+                type = 'string',
+            }),
+        }, {
+            validate = function(data, w)
+                if data.to == 'file' and data.file == nil then
+                    w.error('log.file must be specified when log.to is "file"')
+                end
+            end,
+        }),
     }),
     -- Compatibility options.
     compat = schema.record({
