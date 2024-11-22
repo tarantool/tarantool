@@ -159,6 +159,7 @@ extern char session_lua[],
 	config_applier_mkdir_lua[],
 	config_applier_roles_lua[],
 	config_applier_sharding_lua[],
+	config_applier_box_status_lua[],
 	config_cluster_config_lua[],
 	config_configdata_lua[],
 	config_init_lua[],
@@ -450,6 +451,10 @@ static const char *lua_sources[] = {
 	"config/applier/roles",
 	"internal.config.applier.roles",
 	config_applier_roles_lua,
+
+	"config/applier/box_status",
+	"internal.config.applier.box_status",
+	config_applier_box_status_lua,
 
 	"config/init",
 	"config",
