@@ -73,6 +73,7 @@ test-release: build run-luajit-test run-test
 .PHONY: test-perf
 test-perf: CMAKE_ENV = BENCH_CMD="${BENCH_CMD}"
 test-perf: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                          -DENABLE_BUNDLED_LIBBENCHMARK=ON \
                           -DENABLE_WERROR=ON \
                           -DTEST_BUILD=ON
 
