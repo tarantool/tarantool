@@ -59,6 +59,8 @@ struct vy_read_src {
 	bool is_last;
 	/** See vy_read_iterator->front_id. */
 	uint32_t front_id;
+	/** Max LSN that can be stored in this source. */
+	int64_t max_lsn;
 	/** History of the key the iterator is positioned at. */
 	struct vy_history history;
 };
@@ -104,6 +106,7 @@ vy_read_iterator_add_src(struct vy_read_iterator *itr)
 	}
 	struct vy_read_src *src = &itr->src[itr->src_count++];
 	memset(src, 0, sizeof(*src));
+	src->max_lsn = INT64_MAX;
 	vy_history_create(&src->history, &itr->lsm->env->history_node_pool);
 	return src;
 }
@@ -194,6 +197,24 @@ vy_read_iterator_cmp_stmt(struct vy_read_iterator *itr,
 }
 
 /**
+ * Returns true if the given source can store statements visible from
+ * the read view used by the iterator.
+ */
+static inline bool
+vy_read_iterator_src_is_visible(struct vy_read_iterator *itr,
+				struct vy_read_src *src)
+{
+	uint32_t src_id = src - itr->src;
+	assert(src_id < itr->src_count);
+	/* The last source can store statements visible from any read view. */
+	if (src_id == itr->src_count - 1)
+		return true;
+	/* Sources are sorted by LSN so we check the next source's max LSN. */
+	struct vy_read_src *next_src = &itr->src[src_id + 1];
+	return (**itr->read_view).vlsn > next_src->max_lsn;
+}
+
+/**
  * Check if the statement at which the given read source
  * is positioned precedes the current candidate for the
  * next key ('next') and update the latter if so.
@@ -205,6 +226,7 @@ vy_read_iterator_evaluate_src(struct vy_read_iterator *itr,
 			      struct vy_read_src *src,
 			      struct vy_entry *next, bool *stop)
 {
+	assert(src->is_started);
 	uint32_t src_id = src - itr->src;
 	struct vy_entry entry = vy_history_last_stmt(&src->history);
 	int cmp = vy_read_iterator_cmp_stmt(itr, entry, *next);
@@ -271,6 +293,7 @@ vy_read_iterator_reevaluate_srcs(struct vy_read_iterator *itr,
 		if (i >= itr->skipped_src)
 			break;
 		struct vy_read_src *src = &itr->src[i];
+		assert(src->is_started);
 		struct vy_entry entry = vy_history_last_stmt(&src->history);
 		int cmp = vy_read_iterator_cmp_stmt(itr, entry, *next);
 		if (cmp < 0) {
@@ -376,6 +399,9 @@ vy_read_iterator_scan_mem(struct vy_read_iterator *itr, uint32_t mem_src,
 
 	assert(mem_src >= itr->mem_src && mem_src < itr->disk_src);
 
+	if (!vy_read_iterator_src_is_visible(itr, src))
+		return 0;
+
 	rc = vy_mem_iterator_restore(src_itr, itr->last, &src->history);
 	if (rc == 0) {
 		if (!src->is_started || mem_src >= itr->skipped_src) {
@@ -414,6 +440,9 @@ vy_read_iterator_scan_disk(struct vy_read_iterator *itr, uint32_t disk_src,
 
 	assert(disk_src >= itr->disk_src && disk_src < itr->src_count);
 
+	if (!vy_read_iterator_src_is_visible(itr, src))
+		return 0;
+
 	if (!src->is_started || disk_src >= itr->skipped_src)
 		rc = vy_run_iterator_skip(src_itr, itr->last,
 					  &src->history);
@@ -441,6 +470,9 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr,
 	int cmp;
 	struct vy_read_src *src = &itr->src[itr->mem_src];
 	struct vy_mem_iterator *src_itr = &src->mem_iterator;
+
+	if (!vy_read_iterator_src_is_visible(itr, src))
+		return 0;
 
 	/*
 	 * 'next' may refer to a statement in the memory source history,
@@ -686,6 +718,7 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr, bool is_prepared_ok)
 				     &lsm->stat.memory.iterator,
 				     mem, iterator_type, itr->key,
 				     itr->read_view, is_prepared_ok);
+		sub_src->max_lsn = mem->dump_lsn;
 	}
 }
 
@@ -710,6 +743,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 				     iterator_type, itr->key,
 				     itr->read_view, lsm->cmp_def,
 				     lsm->key_def, lsm->disk_format);
+		sub_src->max_lsn = slice->run->dump_lsn;
 	}
 }
 
