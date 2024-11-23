@@ -1153,7 +1153,7 @@ static int
 txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req)
 {
 	uint32_t origin_id = req->rows[0]->replica_id;
-	if (origin_id == 0 && txn_limbo.size >= txn_limbo.max_size) {
+	if (origin_id == 0 && txn_limbo_is_full(&txn_limbo)) {
 		diag_set(ClientError, ER_SYNC_QUEUE_FULL);
 		return -1;
 	}

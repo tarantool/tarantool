@@ -284,6 +284,12 @@ txn_limbo_is_empty(struct txn_limbo *limbo)
 	return rlist_empty(&limbo->queue);
 }
 
+static inline bool
+txn_limbo_is_full(struct txn_limbo *limbo)
+{
+	return limbo->size >= limbo->max_size;
+}
+
 bool
 txn_limbo_is_ro(struct txn_limbo *limbo);
 
