@@ -458,7 +458,6 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		txn_limbo_complete(e->txn, false);
 		if (e == entry)
 			break;
-		fiber_wakeup(e->txn->fiber);
 	}
 	diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
 	return -1;
