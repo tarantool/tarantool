@@ -1,5 +1,3 @@
-local mkversion = require('internal.mkversion')
-
 local box_status_state = {
     watcher = nil,
 }
@@ -29,8 +27,8 @@ local function drop_schema_version_alert()
 end
 
 local function check_schema_version()
-    local current_version = mkversion.get()
-    local latest_version = mkversion.get_latest()
+    local current_version = box.internal.dd_version()
+    local latest_version = box.internal.latest_dd_version()
     if current_version < latest_version then
         set_schema_version_alert(current_version, latest_version)
     else

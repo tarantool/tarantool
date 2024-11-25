@@ -3,7 +3,7 @@ local log = require('internal.config.utils.log')
 local instance_config = require('internal.config.instance_config')
 local snapshot = require('internal.config.utils.snapshot')
 local schedule_task = fiber._internal.schedule_task
-local mkversion = require('internal.mkversion')
+local version = require('version')
 local tarantool = require('tarantool')
 local clock = require('clock')
 
@@ -399,9 +399,9 @@ local function names_schema_upgrade_on_replace(old, new)
         return
     end
 
-    local expected_version = mkversion(2, 11, 5)
-    local old_version = mkversion.from_tuple(old)
-    local new_version = mkversion.from_tuple(new)
+    local expected_version = version.new(2, 11, 5)
+    local old_version = box.internal.version_from_tuple(old)
+    local new_version = box.internal.version_from_tuple(new)
     if old_version < expected_version and new_version >= expected_version then
         -- We cannot do it inside on_replace trigger, as the version
         -- is not considered set yet and we may try to set names, when
@@ -472,7 +472,8 @@ local function names_apply(config, missing_names, schema_version)
     names_alert_missing(config, missing_names)
     -- Don't wait for box.status to change, we may be already rw, set names
     -- on reload, if it's possible and needed.
-    if schema_version and schema_version >= mkversion.get_latest() then
+    if schema_version and
+       schema_version >= box.internal.latest_dd_version() then
         names_try_set_missing()
     end
 
@@ -486,7 +487,7 @@ local function names_apply(config, missing_names, schema_version)
 
     -- Wait for rw state and schema 2.11.5 to apply names. If schema version
     -- is nil, bootstrap is going to be done.
-    if schema_version and schema_version < mkversion(2, 11, 5) then
+    if schema_version and schema_version < version.new(2, 11, 5) then
         box.space._schema:on_replace(names_schema_upgrade_on_replace)
         names_state.is_upgrade_wait = true
     else
@@ -499,7 +500,8 @@ end
 local function get_schema_version_before_cfg(config)
     local snap_path = snapshot.get_path(config._configdata._iconfig_def)
     if snap_path ~= nil then
-        return mkversion.from_tuple(snapshot.get_schema_version(snap_path))
+        local tuple = snapshot.get_schema_version(snap_path)
+        return box.internal.version_from_tuple(tuple)
     end
     -- Bootstrap, config not found
     return nil
@@ -849,7 +851,7 @@ local function apply(config)
             end)
         else
             -- Note, that we try to find new missing names on every reload.
-            names_apply(config, missing_names, mkversion.get())
+            names_apply(config, missing_names, box.internal.dd_version())
         end
     end
 
