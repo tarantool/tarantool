@@ -15,8 +15,17 @@ separate_arguments(BENCH_CMD_SEPARATE UNIX_COMMAND ${BENCH_CMD})
 
 add_subdirectory(lua)
 
-find_package(benchmark QUIET)
-if (NOT ${benchmark_FOUND})
+if(ENABLE_BUNDLED_LIBBENCHMARK)
+    include(BuildBenchmark)
+    add_dependencies(build_bundled_libs bundled-libbenchmark)
+    include_directories(${BENCHMARK_INCLUDE_DIRS})
+else()
+    find_package(benchmark QUIET)
+    set(BENCHMARK_LIBRARIES benchmark::benchmark)
+endif()
+
+# Always set for bundled libbenchmark.
+if(NOT ${benchmark_FOUND})
     message(AUTHOR_WARNING "Google Benchmark library was not found")
     set(MSG "Target test-c-perf is dummy, Google Benchmark library was not found")
     add_custom_target(test-c-perf
@@ -97,19 +106,19 @@ endfunction()
 
 create_perf_test(NAME tuple
                  SOURCES tuple.cc ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
-                 LIBRARIES core box tuple benchmark::benchmark
+                 LIBRARIES core box tuple ${BENCHMARK_LIBRARIES}
 )
 create_perf_test_target(TARGET tuple)
 
 create_perf_test(NAME bps_tree
                  SOURCES bps_tree.cc ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
-                 LIBRARIES core box tuple benchmark::benchmark
+                 LIBRARIES core box tuple ${BENCHMARK_LIBRARIES}
 )
 create_perf_test_target(TARGET bps_tree)
 
 create_perf_test(NAME light
                  SOURCES light.cc ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
-                 LIBRARIES small benchmark::benchmark
+                 LIBRARIES small ${BENCHMARK_LIBRARIES}
 )
 create_perf_test_target(TARGET light)
 
@@ -117,7 +126,7 @@ create_perf_test_target(TARGET small)
 
 create_perf_test(NAME memtx
                  SOURCES memtx.cc ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
-                 LIBRARIES core box server benchmark::benchmark
+                 LIBRARIES core box server ${BENCHMARK_LIBRARIES}
 )
 create_perf_test_target(TARGET memtx)
 
