@@ -308,6 +308,12 @@ end
 -- The test case mostly to verify that the alert is not
 -- duplicated.
 g.test_iproto_stop_failure_on_startup = function(g)
+    -- Skip flaky test case.
+    --
+    -- https://github.com/tarantool/tarantool-qa/issues/332
+    t.skip('temporarily skipped, because the test case is unstable on ASAN ' ..
+        'builds')
+
     local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
