@@ -175,7 +175,8 @@ extern char minifio_lua[],
 	timezones_lua[],
 	print_lua[],
 	pairs_lua[],
-	luadebug_lua[]
+	luadebug_lua[],
+	version_lua[]
 ;
 
 static const char *lua_modules[] = {
@@ -246,6 +247,7 @@ static const char *lua_modules[] = {
 	"internal.print", print_lua,
 	"internal.pairs", pairs_lua,
 	"luadebug", luadebug_lua,
+	"version", version_lua,
 	ETCD_CLIENT_LUA_MODULES
 	NULL
 };
