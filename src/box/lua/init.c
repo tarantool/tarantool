@@ -101,7 +101,7 @@ extern char session_lua[],
 #endif
 	net_box_lua[],
 	net_replicaset_lua[],
-	mkversion_lua[],
+	internal_version_lua[],
 	upgrade_lua[],
 	console_lua[],
 	merger_lua[],
@@ -226,7 +226,7 @@ static const char *lua_sources[] = {
 	SECURITY_BOX_LUA_MODULES
 	INTEGRITY_BOX_LUA_MODULES
 	"box/xlog", "xlog", xlog_lua,
-	"box/mkversion", "internal.mkversion", mkversion_lua,
+	"box/version", NULL, internal_version_lua,
 	"box/upgrade", NULL, upgrade_lua,
 	"box/net_box", "net.box", net_box_lua,
 	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,

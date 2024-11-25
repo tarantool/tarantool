@@ -18,7 +18,7 @@ g.test_upgrade = function(cg)
     cg.server:exec(function()
         t.assert_equals(box.space._schema:get{'version'}, {'version', 1, 6, 8})
         t.assert(pcall(box.schema.upgrade))
-        local version = require('internal.mkversion').get()
+        local version = box.internal.dd_version()
         t.assert_equals(box.space._schema:get{'version'},
             {'version', version.major, version.minor, version.patch})
     end)

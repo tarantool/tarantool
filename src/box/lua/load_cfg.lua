@@ -8,7 +8,6 @@ local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
 local compat = require('compat')
-local mkversion = require('internal.mkversion')
 
 local function nop() end
 
@@ -1212,7 +1211,8 @@ local function load_cfg(cfg)
         local msg = string.format(
             'Your schema version is %s while Tarantool %s requires a more'..
             ' recent schema version. Please, consider using box.'..
-            'schema.upgrade().', tostring(mkversion.get()), box.info.version)
+            'schema.upgrade().', tostring(box.internal.dd_version()),
+            box.info.version)
         log.warn(msg)
     end
 end

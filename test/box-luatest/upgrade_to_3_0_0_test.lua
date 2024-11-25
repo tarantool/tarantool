@@ -67,12 +67,12 @@ end
 --
 g.test_dd_version_broadcast = function(cg)
     local function set_dd_version_watcher()
-        local mkversion = require('internal.mkversion')
+        local version = require('version')
         rawset(_G, 'watcher_counter', 0)
         rawset(_G, 'watcher_version', {})
         rawset(_G, 'watcher', box.watch('box.status', function(_, status)
             t.assert_not_equals(status.dd_version, nil)
-            _G.watcher_version = mkversion.from_string(status.dd_version)
+            _G.watcher_version = version.fromstr(status.dd_version)
             _G.watcher_counter = _G.watcher_counter + 1
         end))
     end
@@ -85,19 +85,17 @@ g.test_dd_version_broadcast = function(cg)
     cg.replica:exec(set_dd_version_watcher)
 
     cg.master:exec(function()
-        local mkversion = require('internal.mkversion')
         local old_counter = _G.watcher_counter
         box.schema.upgrade()
         t.helpers.retrying({}, function()
             t.assert_gt(_G.watcher_counter, old_counter)
         end)
-        t.assert_equals(_G.watcher_version, mkversion.get_latest())
+        t.assert_equals(_G.watcher_version, box.internal.latest_dd_version())
     end)
 
     cg.replica:wait_for_vclock_of(g.master)
     cg.replica:exec(function()
-        local mkversion = require('internal.mkversion')
-        t.assert_equals(_G.watcher_version, mkversion.get_latest())
+        t.assert_equals(_G.watcher_version, box.internal.latest_dd_version())
     end)
 
     cg.master:exec(clear_dd_version_watcher)

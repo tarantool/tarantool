@@ -83,7 +83,7 @@ end)
 g.test_upgrade = function()
     g.server:exec(function()
         local netbox = require("net.box")
-        local mkversion = require("internal.mkversion")
+        local version = require("version")
 
         local messages = {}
         for _, alert in pairs(require("config"):info().alerts) do
@@ -102,7 +102,8 @@ g.test_upgrade = function()
         -- Checks the alerts for the outdated schema version.
         t.assert_items_include(messages, {
             msgs.credentials,
-            msgs.schema:format(mkversion(2, 11, 0), mkversion.get_latest())
+            msgs.schema:format(version.new(2, 11, 0),
+                box.internal.latest_dd_version())
         })
 
         t.assert_equals(box.space._schema:get("version"), {'version', 2, 11, 0})
@@ -120,7 +121,8 @@ g.test_upgrade = function()
             table.insert(messages, alert.message)
         end
         t.assert_items_include(messages, {
-            msgs.schema:format(mkversion(2, 11, 1), mkversion.get_latest())
+            msgs.schema:format(version.new(2, 11, 1),
+                box.internal.latest_dd_version())
         })
 
         local exp = { 'read', 'space', '_space' }

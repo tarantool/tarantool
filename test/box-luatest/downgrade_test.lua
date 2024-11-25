@@ -40,17 +40,12 @@ g.test_downgrade_sanity_checks = function(cg)
         end
 
         local version = schema_version()
-        t.assert_error_msg_contains('version should be in format A.B.C',
-                                    box.schema.downgrade, 'xxx')
+        local msg = "Error during parsing version string"
+        t.assert_error_msg_contains(msg, box.schema.downgrade, 'xxx')
         t.assert_equals(schema_version(), version)
-        t.assert_error_msg_contains('version should be in format A.B.C',
-                                    box.schema.downgrade, '2')
+        t.assert_error_msg_contains(msg, box.schema.downgrade, '2')
         t.assert_equals(schema_version(), version)
-        t.assert_error_msg_contains('version should be in format A.B.C',
-                                    box.schema.downgrade, '2.2')
-        t.assert_equals(schema_version(), version)
-        t.assert_error_msg_contains('version should be in format A.B.C',
-                                    box.schema.downgrade, '2.2.2.2')
+        t.assert_error_msg_contains(msg, box.schema.downgrade, '2.2')
         t.assert_equals(schema_version(), version)
 
         t.assert_error_msg_contains(

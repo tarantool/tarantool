@@ -7,7 +7,7 @@ local ffi = require('ffi')
 local fun = require('fun')
 local utils = require('internal.utils')
 local tarantool = require('tarantool')
-local mkversion = require('internal.mkversion')
+local mkversion = require('version')
 
 ffi.cdef([[
     void box_init_latest_dd_version_id(uint32_t version_id);
@@ -124,7 +124,7 @@ local function get_snapshot_version(snap_dir)
         if sid == box.schema.SCHEMA_ID then
             local tuple = row.BODY.tuple
             if tuple and tuple[1] == 'version' then
-                version = mkversion.from_tuple(tuple)
+                version = box.internal.version_from_tuple(tuple)
                 if not version then
                     log.error("Corrupted version tuple in space '_schema' "..
                               "in snapshot '%s': %s ", snap, tuple)
@@ -1506,30 +1506,31 @@ end
 --------------------------------------------------------------------------------
 
 local handlers = {
-    {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5},
-    {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6},
-    {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7},
-    {version = mkversion(1, 10, 0), func = upgrade_to_1_10_0},
-    {version = mkversion(1, 10, 2), func = upgrade_to_1_10_2},
-    {version = mkversion(2, 1, 0), func = upgrade_to_2_1_0},
-    {version = mkversion(2, 1, 1), func = upgrade_to_2_1_1},
-    {version = mkversion(2, 1, 2), func = upgrade_to_2_1_2},
-    {version = mkversion(2, 1, 3), func = upgrade_to_2_1_3},
-    {version = mkversion(2, 2, 1), func = upgrade_to_2_2_1},
-    {version = mkversion(2, 3, 0), func = upgrade_to_2_3_0},
-    {version = mkversion(2, 3, 1), func = upgrade_to_2_3_1},
-    {version = mkversion(2, 7, 1), func = upgrade_to_2_7_1},
-    {version = mkversion(2, 9, 1), func = upgrade_to_2_9_1},
-    {version = mkversion(2, 10, 1), func = upgrade_to_2_10_1},
-    {version = mkversion(2, 10, 4), func = upgrade_to_2_10_4},
-    {version = mkversion(2, 10, 5), func = upgrade_to_2_10_5},
-    {version = mkversion(2, 11, 0), func = upgrade_to_2_11_0},
-    {version = mkversion(2, 11, 1), func = upgrade_to_2_11_1},
-    {version = mkversion(3, 0, 0), func = upgrade_to_3_0_0},
-    {version = mkversion(3, 1, 0), func = upgrade_to_3_1_0},
-    {version = mkversion(3, 3, 0), func = upgrade_to_3_3_0},
+    {version = mkversion.new(1, 7, 5), func = upgrade_to_1_7_5},
+    {version = mkversion.new(1, 7, 6), func = upgrade_to_1_7_6},
+    {version = mkversion.new(1, 7, 7), func = upgrade_to_1_7_7},
+    {version = mkversion.new(1, 10, 0), func = upgrade_to_1_10_0},
+    {version = mkversion.new(1, 10, 2), func = upgrade_to_1_10_2},
+    {version = mkversion.new(2, 1, 0), func = upgrade_to_2_1_0},
+    {version = mkversion.new(2, 1, 1), func = upgrade_to_2_1_1},
+    {version = mkversion.new(2, 1, 2), func = upgrade_to_2_1_2},
+    {version = mkversion.new(2, 1, 3), func = upgrade_to_2_1_3},
+    {version = mkversion.new(2, 2, 1), func = upgrade_to_2_2_1},
+    {version = mkversion.new(2, 3, 0), func = upgrade_to_2_3_0},
+    {version = mkversion.new(2, 3, 1), func = upgrade_to_2_3_1},
+    {version = mkversion.new(2, 7, 1), func = upgrade_to_2_7_1},
+    {version = mkversion.new(2, 9, 1), func = upgrade_to_2_9_1},
+    {version = mkversion.new(2, 10, 1), func = upgrade_to_2_10_1},
+    {version = mkversion.new(2, 10, 4), func = upgrade_to_2_10_4},
+    {version = mkversion.new(2, 10, 5), func = upgrade_to_2_10_5},
+    {version = mkversion.new(2, 11, 0), func = upgrade_to_2_11_0},
+    {version = mkversion.new(2, 11, 1), func = upgrade_to_2_11_1},
+    {version = mkversion.new(3, 0, 0), func = upgrade_to_3_0_0},
+    {version = mkversion.new(3, 1, 0), func = upgrade_to_3_1_0},
+    {version = mkversion.new(3, 3, 0), func = upgrade_to_3_3_0},
 }
-builtin.box_init_latest_dd_version_id(handlers[#handlers].version.id)
+builtin.box_init_latest_dd_version_id(
+    box.internal.version_to_id(handlers[#handlers].version))
 
 local trig_oldest_version = nil
 
@@ -1551,20 +1552,20 @@ local trig_oldest_version = nil
 -- * then usual upgrade_to_X_X_X() handlers may be fired to turn schema into the
 --   latest one.
 local recovery_triggers = {
-    {version = mkversion(1, 7, 1), tbl = {
+    {version = mkversion.new(1, 7, 1), tbl = {
         _user   = user_trig_1_7_1,
     }},
-    {version = mkversion(1, 7, 2), tbl = {
+    {version = mkversion.new(1, 7, 2), tbl = {
         _index = index_trig_1_7_2,
     }},
-    {version = mkversion(1, 7, 5), tbl = {
+    {version = mkversion.new(1, 7, 5), tbl = {
         _space = space_trig_1_7_5,
         _user  = user_trig_1_7_5,
     }},
-    {version = mkversion(1, 7, 6), tbl = {
+    {version = mkversion.new(1, 7, 6), tbl = {
         _space = space_trig_1_7_6,
     }},
-    {version = mkversion(1, 7, 7), tbl = {
+    {version = mkversion.new(1, 7, 7), tbl = {
         _priv   = priv_trig_1_7_7,
     }},
 }
@@ -1573,7 +1574,7 @@ local recovery_triggers = {
 -- snapshot), the triggers helping recover the old schema should be removed.
 local function schema_trig_last(_, tuple)
     if tuple and tuple[1] == 'version' then
-        local version = mkversion.from_tuple(tuple)
+        local version = box.internal.version_from_tuple(tuple)
         if version then
             log.info("Recovery trigger: recovered schema version %s. "..
                      "Removing outdated recovery triggers.", version)
@@ -1618,7 +1619,7 @@ local function clear_recovery_triggers(version)
 end
 
 local function upgrade_from(version)
-    if version < mkversion(1, 6, 8) then
+    if version < mkversion.new(1, 6, 8) then
         log.warn('can upgrade from 1.6.8 only')
         return
     end
@@ -1652,7 +1653,7 @@ local function run_upgrade(func, ...)
 end
 
 local function upgrade()
-    local version = mkversion.get()
+    local version = box.internal.dd_version()
     run_upgrade(upgrade_from, version)
 end
 
@@ -2122,14 +2123,14 @@ end
 -- if schema version is 2.10.0.
 --
 local downgrade_handlers = {
-    {version = mkversion(3, 3, 0), func = downgrade_from_3_3_0},
-    {version = mkversion(3, 1, 0), func = downgrade_from_3_1_0},
-    {version = mkversion(3, 0, 0), func = downgrade_from_3_0_0},
-    {version = mkversion(2, 11, 1), func = downgrade_from_2_11_1},
-    {version = mkversion(2, 11, 0), func = downgrade_from_2_11_0},
-    {version = mkversion(2, 10, 5), func = downgrade_from_2_10_5},
-    {version = mkversion(2, 10, 0), func = downgrade_from_2_10_0},
-    {version = mkversion(2, 9, 1), func = downgrade_from_2_9_1},
+    {version = mkversion.new(3, 3, 0), func = downgrade_from_3_3_0},
+    {version = mkversion.new(3, 1, 0), func = downgrade_from_3_1_0},
+    {version = mkversion.new(3, 0, 0), func = downgrade_from_3_0_0},
+    {version = mkversion.new(2, 11, 1), func = downgrade_from_2_11_1},
+    {version = mkversion.new(2, 11, 0), func = downgrade_from_2_11_0},
+    {version = mkversion.new(2, 10, 5), func = downgrade_from_2_10_5},
+    {version = mkversion.new(2, 10, 0), func = downgrade_from_2_10_0},
+    {version = mkversion.new(2, 9, 1), func = downgrade_from_2_9_1},
 }
 
 -- This downgrade issue handler is used to raise an error when issue is
@@ -2167,8 +2168,8 @@ end
 -- Find schema version which does not require upgrade for given application
 -- version. For example:
 --
--- app2schema_version(mkversion('2.10.3')) == mkversion('2.10.1')
--- app2schema_version(mkversion('2.10.0')) == mkversion('2.9.1')
+-- app2schema_version(mkversion.new('2.10.3')) == mkversion.new('2.10.1')
+-- app2schema_version(mkversion.new('2.10.0')) == mkversion.new('2.9.1')
 local function app2schema_version(app_version)
     local schema_version
     for _, handler in ipairs(handlers) do
@@ -2234,15 +2235,15 @@ local downgrade_versions = {
 local function downgrade_impl(version_str, dry_run)
     utils.box_check_configured()
     utils.check_param(version_str, 'version_str', 'string')
-    local version = mkversion.from_string(version_str)
+    local version = mkversion.fromstr(version_str)
     if fun.index(version_str, downgrade_versions) == nil then
         error("Downgrade is only possible to version listed in" ..
               " box.schema.downgrade_versions().")
     end
 
-    local schema_version_cur = mkversion.get()
+    local schema_version_cur = box.internal.dd_version()
     local app_version = tarantool.version:match('^%d+%.%d+%.%d+')
-    if schema_version_cur > mkversion.from_string(app_version) then
+    if schema_version_cur > mkversion.fromstr(app_version) then
         local err = "Cannot downgrade as current schema version %s is newer" ..
                     " than Tarantool version %s"
         error(err:format(schema_version_cur, app_version))
@@ -2292,7 +2293,7 @@ local function bootstrap()
         -- insert initial schema
         initial_1_7_5()
         -- upgrade schema to the latest version
-        upgrade_from(mkversion(1, 7, 5))
+        upgrade_from(mkversion.new(1, 7, 5))
     end)
 
     reset_system_formats()
