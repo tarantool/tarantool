@@ -204,6 +204,7 @@ local trace_check_required_modules = {
     ['builtin/digest.lua'] = true,
     ['builtin/error.lua'] = true,
     ['builtin/tarantool.lua']= true,
+    ['builtin/version.lua']= true,
 }
 
 --
