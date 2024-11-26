@@ -160,6 +160,7 @@ if (NOT ENABLE_UB_SANITIZER)
 endif ()
 
 include(ProtobufMutator)
+include(BuildLuaTests)
 
 # UndefinedBehaviorSanitizer is not supported in LuaJIT.
 # See https://github.com/tarantool/tarantool/issues/8473
@@ -169,5 +170,5 @@ if (NOT ENABLE_UB_SANITIZER)
 endif()
 
 add_custom_target(fuzzers
-                  DEPENDS ${FUZZ_TEST_TARGETS}
+                  DEPENDS ${FUZZ_TEST_TARGETS} lua-tests
                   COMMENT "Build fuzzers")
