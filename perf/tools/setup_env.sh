@@ -17,6 +17,8 @@ fi
 # Helpers.
 ###
 
+retcode=0
+
 cpu_vendor="unknown"
 cpuinfo_vendor=$(awk '/vendor_id/{ print $3; exit }' < /proc/cpuinfo)
 if [ "$cpuinfo_vendor" = "GenuineIntel" ]; then
@@ -38,7 +40,9 @@ set_kernel_setting() {
   value="$3"
 
   if [ -f "$file_path" ]; then
-    sh -c "echo $value > $file_path" && status="$SUCCESS_MSG" || status="$FAILURE_MSG"
+    sh -c "echo $value > $file_path" && \
+          status="$SUCCESS_MSG" || \
+          ( status="$FAILURE_MSG"; retcode=1 )
   else
     status="$SKIPPED_MSG"
   fi
@@ -53,9 +57,10 @@ kernel_setting_is_nonzero() {
   if [ -f "$file_path" ]; then
     value=$(cat "$file_path")
     if [ -n "$value" ]; then
-      status="$SUCCESS_MSG"
+      status="$SUCCESS_MSG ($value)"
     else
       status="$FAILURE_MSG (hint: $hint_msg)"
+      retcode=1
     fi
   else
     status="$SKIPPED_MSG"
@@ -72,7 +77,11 @@ sysfs_path="/sys/devices/system/cpu/smt/active"
 if [ -f "$sysfs_path" ]; then
   is_set=$(cat $sysfs_path)
   err_msg="$FAILURE_MSG (hint: set 'nosmt' kernel parameter)"
-  [ "$is_set" = 1 ] && status="$SUCCESS_MSG" || status="$err_msg"
+  status="$SUCCESS_MSG"
+  if [ "$is_set" = 1 ]; then
+    retcode=1
+    status="$err_msg"
+  fi
 else
   status="$SKIPPED_MSG"
 fi
@@ -133,3 +142,5 @@ for cpu_id in $(seq 0 1 $((ncpu-1))); do
     "$sysfs_path_cpu" \
     "performance"
 done
+
+exit $retcode

@@ -1243,7 +1243,7 @@ index_metatable = function(remote)
         check_param_table(opts, REQUEST_OPTION_TYPES)
         local key_is_nil = (key == nil or
                             (type(key) == 'table' and #key == 0))
-        local iterator, offset, limit, _, after, fetch_pos =
+        local iterator, offset, limit, after, fetch_pos =
             check_select_opts(opts, key_is_nil)
         if (after ~= nil or fetch_pos)
                 and not remote.peer_protocol_features.pagination then

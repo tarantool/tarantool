@@ -60,7 +60,6 @@ ffi.cdef[[
                                  ...);
 ]]
 
-local S_CRIT = ffi.C.S_CRIT
 local S_WARN = ffi.C.S_WARN
 local S_INFO = ffi.C.S_INFO
 local S_VERBOSE = ffi.C.S_VERBOSE
@@ -246,80 +245,6 @@ end
 local function log_pid()
     return tonumber(ffi.C.log_pid)
 end
-
-local ratelimit_enabled = true
-
-local function ratelimit_enable()
-    ratelimit_enabled = true
-end
-
-local function ratelimit_disable()
-    ratelimit_enabled = false
-end
-
-local Ratelimit = {
-    interval = 60,
-    burst = 10,
-    emitted = 0,
-    suppressed = 0,
-    start = 0,
-}
-
-local function ratelimit_new(object)
-    return Ratelimit:new(object)
-end
-
-function Ratelimit:new(object)
-    object = object or {}
-    setmetatable(object, self)
-    self.__index = self
-    return object
-end
-
-function Ratelimit:check()
-    if not ratelimit_enabled then
-        return 0, true
-    end
-
-    local clock = require('clock')
-    local now = clock.monotonic()
-    local saved_suppressed = 0
-    if now > self.start + self.interval then
-        saved_suppressed = self.suppressed
-        self.suppressed = 0
-        self.emitted = 0
-        self.start = now
-    end
-
-    if self.emitted < self.burst then
-        self.emitted = self.emitted + 1
-        return saved_suppressed, true
-    end
-    self.suppressed = self.suppressed + 1
-    return saved_suppressed, false
-end
-
-function Ratelimit:log_check(lvl)
-    local suppressed, ok = self:check()
-    if lvl >= S_WARN and suppressed > 0 then
-        log_warn('%d messages suppressed due to rate limiting', suppressed)
-    end
-    return ok
-end
-
-function Ratelimit:log(lvl, fmt, ...)
-    if self:log_check(lvl) then
-        say(nil, lvl, fmt, ...)
-    end
-end
-
-local function log_ratelimited_closure(lvl)
-    return function(self, fmt, ...)
-        self:log(lvl, fmt, ...)
-    end
-end
-
-Ratelimit.log_crit = log_ratelimited_closure(S_CRIT)
 
 local option_types = {
     log = 'string',
@@ -523,13 +448,6 @@ log_main = {
         end,
         cfg_check = function() log_check_cfg(box_to_log_cfg(box.cfg)) end,
     },
-    internal = {
-        ratelimit = {
-            new = ratelimit_new,
-            enable = ratelimit_enable,
-            disable = ratelimit_disable,
-        },
-    }
 }
 
 setmetatable(log_main, {

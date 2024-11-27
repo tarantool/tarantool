@@ -179,8 +179,11 @@ function methods.sharding(self)
                 end
                 if is_rebalancer == nil then
                     local roles = self:get('sharding.roles', opts)
-                    for _, role in pairs(roles) do
-                        is_rebalancer = is_rebalancer or role == 'rebalancer'
+                    if roles ~= nil then -- nil or box.NULL
+                        for _, role in pairs(roles) do
+                            is_rebalancer = is_rebalancer or
+                                role == 'rebalancer'
+                        end
                     end
                     if is_rebalancer then
                         table.insert(rebalancers, replicaset_name)

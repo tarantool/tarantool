@@ -659,19 +659,19 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 	return 0;
 }
 
-#define WRAP_ITERATOR_METHOD(name)						\
-template <bool USE_HINT>							\
-static int									\
+#define WRAP_ITERATOR_METHOD(name)						        \
+template <bool USE_HINT>							            \
+static int									                    \
 name(struct iterator *iterator, struct tuple **ret)				\
-{										\
-	do {									\
+{										       					\
+	do {														\
 		int rc = name##_base<USE_HINT>(iterator, ret);			\
-		if (rc != 0 ||							\
-		    iterator->next_internal == exhausted_iterator_next)		\
-			return rc;						\
-	} while (*ret == NULL);							\
-	return 0;								\
-}										\
+		if (rc != 0 ||											\
+		    iterator->next_internal == exhausted_iterator_next) \
+			return rc;											\
+	} while (*ret == NULL);										\
+	return 0;													\
+}																\
 struct forgot_to_add_semicolon
 
 WRAP_ITERATOR_METHOD(tree_iterator_next);
@@ -1442,7 +1442,7 @@ tree_iterator_position_impl(struct memtx_tree_data<USE_HINT> *last,
  */
 template <bool USE_HINT, bool IS_MULTIKEY>
 static int
-tree_iterator_position(struct iterator *it, const char **pos, uint32_t *size)
+tree_iterator_position(struct iterator *it, const char **pos, uint32_t *size) 
 {
 	static_assert(!IS_MULTIKEY || USE_HINT,
 		      "Multikey index actually uses hint.");

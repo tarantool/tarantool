@@ -426,6 +426,17 @@ local tarantool_indices = {
     },
 }
 
+-- Note that the linearizable isolation level can't be set as
+-- default and can be used for a specific transaction only.
+-- See https://www.tarantool.io/en/doc/latest/platform/atomic/txn_mode_mvcc/.
+-- Note that 'linearizable' makes sense when space is synchronous,
+-- the test uses only local spaces, so 'linearizable' is not used.
+local isolation_levels = {
+    'best-effort',
+    'read-committed',
+    'read-confirmed',
+}
+
 local function select_op(space, idx_type, key)
     local select_opts = {
         iterator = oneof(tarantool_indices[idx_type].iterator_type),
@@ -521,6 +532,9 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         work_dir = test_dir,
         worker_pool_threads = math.random(1, 10),
     }
+    if box_cfg_options.memtx_use_mvcc_engine then
+        box_cfg_options.txn_isolation = oneof(isolation_levels)
+    end
     if verbose then
         box_cfg_options.log_level = 'verbose'
     end
@@ -958,9 +972,14 @@ local ops = {
 
     TX_BEGIN = {
         func = function()
-            if not box.is_in_txn() then
-                box.begin()
+            if box.is_in_txn() then
+                return
             end
+            local txn_opts = {}
+            if box.cfg.memtx_use_mvcc_engine then
+               txn_opts.txn_isolation = oneof(isolation_levels)
+            end
+            box.begin(txn_opts)
         end,
         args = function(_) return end,
     },

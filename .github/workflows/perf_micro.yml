@@ -85,6 +85,11 @@ jobs:
           submodule: ${{ inputs.submodule }}
           revision: ${{ inputs.revision }}
       - name: setup environment
+        # Run on push to the 'master' and release branches or on
+        # non-fork pull requests. The script will fail on regular
+        # runners.
+        if: github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository
         run: sh ./perf/tools/setup_env.sh
       - name: test
         run: make -f .test.mk test-perf
