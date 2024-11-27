@@ -862,13 +862,26 @@ g_supervised.test_early_leader_with_replica = function(cg)
     cg.replica_set:start()
     t.assert_equals(cg.server2:get_instance_id(), 1,
                     'Server 2 is the bootstrap leader')
-    cg.server2:exec(function()
+    local leader_uuid = cg.server2:exec(function()
         local tup = box.space._schema:get{'bootstrap_leader_uuid'}
         t.assert(tup ~= nil, 'Bootstrap leader uuid is persisted')
         t.assert_equals(tup[2], box.info.uuid,
                         'Bootstrap leader uuid is correct')
+        return box.info.uuid
     end)
     t.helpers.retrying({}, cg.server1.assert_follows_upstream, cg.server1, 1)
+
+    -- Verify a log message on a bootstrap leader.
+    local exp_msg = 'instance [0-9a-f-]+ is assigned as a bootstrap leader'
+    local found = grep_log(cg.server2, exp_msg)
+    t.assert(found)
+    t.assert_str_contains(found, leader_uuid)
+
+    -- Verify a log message on a replica.
+    local exp_msg = 'instance [0-9a-f-]+ is assigned as a bootstrap leader'
+    local found = grep_log(cg.server1, exp_msg)
+    t.assert(found)
+    t.assert_str_contains(found, leader_uuid)
 end
 
 g_supervised.before_test('test_early_leader_several_leaders', function(cg)
