@@ -2267,6 +2267,7 @@ box_make_bootstrap_leader(void)
 		 * this action till the bootstrap.
 		 */
 		is_supervised_bootstrap_leader = true;
+		say_info("this instance is assigned as a bootstrap leader");
 		return 0;
 	}
 	/* Bootstrap strategy is read by the time instance uuid is known. */
