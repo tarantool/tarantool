@@ -2464,6 +2464,7 @@ applier_subscribe(struct applier *applier)
 	 * Process a stream of rows from the binary log.
 	 */
 	while (true) {
+		ERROR_INJECT_YIELD(ERRINJ_APPLIER_SUBSCRIBE_DELAY);
 		if (applier->pending_msg_cnt == 0) {
 			fiber_cond_wait(&applier->msg_cond);
 		}
