@@ -77,6 +77,7 @@ struct errinj {
 	_(ERRINJ_APPLIER_READ_TX_ROW_DELAY, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_APPLIER_SLOW_ACK, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_APPLIER_STOP_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_APPLIER_SUBSCRIBE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_BUILD_INDEX, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_BUILD_INDEX_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_BUILD_INDEX_DISABLE_YIELD, ERRINJ_BOOL, {.bparam = false}) \
