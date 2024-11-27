@@ -33,6 +33,12 @@ local function assert_master_waits_for_replica(server, uuid)
              'Server ' .. server.alias .. ' waits for replica ' .. uuid)
 end
 
+local function grep_log(server, query)
+    local logfile = fio.pathjoin(server.workdir, server.alias .. '.log')
+    local opts = {filename = logfile}
+    return server:grep_log(query, nil, opts)
+end
+
 g_auto.after_each(function(cg)
     cg.replica_set:drop()
 end)
@@ -762,6 +768,11 @@ g_supervised.before_test('test_no_bootstrap_without_replication', function(cg)
     }
 end)
 
+-- If the given instance is not chosen as the bootstrap leader
+-- before the first box.cfg() call and there is no replication
+-- upstreams, there are no ways to load the database.
+--
+-- A startup failure is expected in this scenario.
 g_supervised.test_no_bootstrap_without_replication = function(cg)
     cg.server1:start{wait_until_ready = false}
     local logfile = fio.pathjoin(cg.server1.workdir, 'server1.log')
@@ -773,4 +784,127 @@ g_supervised.test_no_bootstrap_without_replication = function(cg)
     query = 'failed to connect to the bootstrap leader'
     t.assert(cg.server1:grep_log(query, nil, {filename = logfile}),
              'Bootstrap leader not found')
+end
+
+g_supervised.before_test('test_early_leader_singleton', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.server1 = cg.replica_set:build_and_add_server{
+        alias = 'server1',
+        box_cfg = {
+            bootstrap_strategy = 'supervised',
+            -- NB: The test case also verifies that a instance
+            -- successfully bootstraps the database if no
+            -- upstreams are configured.
+        },
+        env = {
+            ['TARANTOOL_RUN_BEFORE_BOX_CFG'] =
+                'box.ctl.make_bootstrap_leader()',
+        },
+    }
+end)
+
+-- If the given instance is chosen as a bootstrap leader before
+-- the first box.cfg() call, it is expected to successfully
+-- bootstrap the database even if there are no upstreams
+-- configured.
+--
+-- This logic is added in gh-10858.
+g_supervised.test_early_leader_singleton = function(cg)
+    cg.server1:start()
+
+    t.assert_equals(cg.server1:get_instance_id(), 1,
+                    'Server 1 is the bootstrap leader')
+
+    cg.server1:exec(function()
+        local tup = box.space._schema:get{'bootstrap_leader_uuid'}
+        t.assert(tup ~= nil, 'Bootstrap leader uuid is persisted')
+        t.assert_equals(tup[2], box.info.uuid,
+                        'Bootstrap leader uuid is correct')
+    end)
+end
+
+g_supervised.before_test('test_early_leader_with_replica', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.box_cfg = {
+        bootstrap_strategy = 'supervised',
+        replication = {
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
+            -- Don't start this third server to verify that once
+            -- a bootstrap leader is found, a replica doesn't wait
+            -- anything else to register in the replicaset.
+            server.build_listen_uri('server3', cg.replica_set.id),
+        },
+        replication_timeout = 0.1,
+        -- This way we verify that when the replica connects to
+        -- the bootstrap leader, it correctly determines that it
+        -- is the bootstrap leader and doesn't wait anything else.
+        replication_connect_timeout = 1000,
+    }
+    for i = 1, 2 do
+        local alias = 'server' .. i
+        cg[alias] = cg.replica_set:build_and_add_server{
+            alias = alias,
+            box_cfg = cg.box_cfg,
+        }
+    end
+
+    cg.server2.env.TARANTOOL_RUN_BEFORE_BOX_CFG =
+        'box.ctl.make_bootstrap_leader()'
+end)
+
+-- If the given instance is chosen as a bootstrap leader before
+-- the first box.cfg() call, it is expected that it is
+-- successfully bootstrapped and bootstraps a replica.
+--
+-- This logic is added in gh-10858.
+g_supervised.test_early_leader_with_replica = function(cg)
+    cg.replica_set:start()
+    t.assert_equals(cg.server2:get_instance_id(), 1,
+                    'Server 2 is the bootstrap leader')
+    cg.server2:exec(function()
+        local tup = box.space._schema:get{'bootstrap_leader_uuid'}
+        t.assert(tup ~= nil, 'Bootstrap leader uuid is persisted')
+        t.assert_equals(tup[2], box.info.uuid,
+                        'Bootstrap leader uuid is correct')
+    end)
+    t.helpers.retrying({}, cg.server1.assert_follows_upstream, cg.server1, 1)
+end
+
+g_supervised.before_test('test_early_leader_several_leaders', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.box_cfg = {
+        bootstrap_strategy = 'supervised',
+        replication = {
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
+        },
+        replication_timeout = 0.1,
+    }
+    for i = 1, 2 do
+        local alias = 'server' .. i
+        cg[alias] = cg.replica_set:build_and_add_server{
+            alias = alias,
+            box_cfg = cg.box_cfg,
+            -- Both instances advertise itself as bootstrap
+            -- leaders.
+            env = {
+                ['TARANTOOL_RUN_BEFORE_BOX_CFG'] =
+                    'box.ctl.make_bootstrap_leader()',
+            },
+        }
+    end
+end)
+
+-- For the sake of completeness verify behavior in the incorrect
+-- situation: two instances within the same replicaset are
+-- assigned as bootstrap leaders.
+g_supervised.test_early_leader_several_leaders = function(cg)
+    cg.replica_set:start({wait_until_ready = false})
+    local query = 'ER_REPLICASET_UUID_MISMATCH'
+    t.helpers.retrying({}, function()
+        local found = grep_log(cg.server1, query) or
+                      grep_log(cg.server2, query)
+        t.assert(found, ('Found %s'):format(query))
+    end)
 end
