@@ -446,6 +446,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	struct relay *relay = relay_new(NULL);
 	relay_start(relay, io, sync, relay_send_initial_join_row, relay_yield,
 		    UINT64_MAX);
+	relay->version_id = replica_version_id;
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
 		relay_delete(relay);
@@ -1103,12 +1104,12 @@ relay_filter_raft(struct xrow_header *packet, uint32_t version)
 {
 	assert(iproto_type_is_raft_request(packet->type));
 	if (version > version_id(3, 2, 1) ||
-	    (version > version_id(2, 11, 4) && version < version_id(3, 0, 0)))
+	    (version > version_id(2, 11, 5) && version < version_id(3, 0, 0)))
 		return;
 	/**
 	 * Until Tarantool 3.2.2 all raft requests were sent with GROUP_LOCAL
 	 * id. In order not to break the upgrade process, raft rows are still
-	 * sent as local to old replicas. This was also backported to 2.11.5.
+	 * sent as local to old replicas. This was also backported to 2.11.6.
 	 */
 	packet->group_id = GROUP_LOCAL;
 }
