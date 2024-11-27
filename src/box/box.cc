@@ -2225,6 +2225,14 @@ box_set_bootstrap_strategy(void)
 	enum bootstrap_strategy strategy = box_check_bootstrap_strategy();
 	if (strategy == BOOTSTRAP_STRATEGY_INVALID)
 		return -1;
+
+	/*
+	 * Drop flags related to the supervised strategy if
+	 * another strategy is configured.
+	 */
+	if (strategy != BOOTSTRAP_STRATEGY_SUPERVISED)
+		is_supervised_bootstrap_leader = false;
+
 	bootstrap_strategy = strategy;
 	return 0;
 }
@@ -2252,10 +2260,14 @@ int
 box_make_bootstrap_leader(void)
 {
 	if (tt_uuid_is_nil(&INSTANCE_UUID)) {
-		diag_set(ClientError, ER_UNSUPPORTED,
-			 "box.ctl.make_bootstrap_leader()",
-			 "promoting this instance before box.cfg() is called");
-		return -1;
+		/*
+		 * Can't store the UUID of the given instance as
+		 * the bootstrap leader UUID at this moment,
+		 * because there is no instance UUID yet. Postpone
+		 * this action till the bootstrap.
+		 */
+		is_supervised_bootstrap_leader = true;
+		return 0;
 	}
 	/* Bootstrap strategy is read by the time instance uuid is known. */
 	assert(bootstrap_strategy != BOOTSTRAP_STRATEGY_INVALID);
@@ -2274,6 +2286,7 @@ box_make_bootstrap_leader(void)
 		return box_set_bootstrap_leader_record();
 	} else {
 		bootstrap_leader_uuid = INSTANCE_UUID;
+		is_supervised_bootstrap_leader = true;
 		box_broadcast_ballot();
 		return 0;
 	}
