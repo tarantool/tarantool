@@ -46,7 +46,7 @@
 #include "schema.h"
 #include "memtx_engine.h"
 
-struct memtx_rtree_index {
+struct memtx_rtree_index { 
 	struct index base;
 	unsigned dimension;
 	struct rtree tree;
@@ -60,7 +60,7 @@ enum memtx_rtree_reserve_extents_num {
 	 * can lead to, and, as a result, the max
 	 * number of new block allocations.
 	 */
-	RESERVE_EXTENTS_BEFORE_DELETE = 8,
+	RESERVE_EXTENTS_BEFORE_DELETE  = 8,
 	RESERVE_EXTENTS_BEFORE_REPLACE = 16
 };
 
@@ -90,7 +90,7 @@ mp_decode_rect(struct rtree_rect *rect, unsigned dimension,
 	coord_t c = 0;
 	if (count == dimension) { /* point */
 		for (unsigned i = 0; i < dimension; i++) {
-			if (mp_decode_num(&mp, i, &c) < 0)
+			if (mp_decode_num(&mp, i, &c) < 0) 
 				return -1;
 			rect->coords[i * 2] = c;
 			rect->coords[i * 2 + 1] = c;
@@ -104,7 +104,8 @@ mp_decode_rect(struct rtree_rect *rect, unsigned dimension,
 		for (unsigned i = 0; i < dimension; i++) {
 			if (mp_decode_num(&mp, i + dimension, &c) < 0)
 				return -1;
-			rect->coords[i * 2 + 1] = c;
+			rect->
+			coords[i * 2 + 1] = c;
 		}
 	} else {
 		diag_set(ClientError, ER_RTREE_RECT,
@@ -146,10 +147,12 @@ extract_rectangle(struct rtree_rect *rect, struct tuple *tuple,
 /* {{{ MemtxRTree Iterators ****************************************/
 
 struct index_rtree_iterator {
-        struct iterator base;
-        struct rtree_iterator impl;
+    struct iterator base;
+    struct rtree_iterator impl;
 	/** Memory pool the iterator was allocated from. */
 	struct mempool *pool;
+	/* last fetched tuple (pos). Is used for pagination */
+	tuple* last; 
 };
 
 static void
@@ -157,11 +160,60 @@ index_rtree_iterator_free(struct iterator *i)
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
 	rtree_iterator_destroy(&itr->impl);
+	if (itr->last != NULL) {
+		itr->last = NULL;
+	}
 	mempool_free(itr->pool, itr);
 }
 
+/* Euclid distance, squared. Set distance_pos. Is used for pagination */
+static sq_coord_t
+rtree_rect_neigh_distance_pos(const struct rtree_rect *rect,  
+			   const struct rtree_rect *neigh_rect,
+			   unsigned dimension)
+{
+	assert(rect       != NULL);
+	assert(neigh_rect != NULL);
+	sq_coord_t result = 0;
+	for (int i = dimension; --i >= 0; ) {
+		const coord_t *coords = &rect->coords[2 * i];
+		coord_t neigh_coord = neigh_rect->coords[2 * i];
+		if (neigh_coord < coords[0]) {
+			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[0]);
+			result += diff * diff;
+		} else if (neigh_coord > coords[1]) {
+			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[1]);
+			result += diff * diff;
+		}
+	}
+	return result;
+}
+
+/* set position to the iterator NEIGHBOR. Is used for pagination */
+int rtree_iterator_set_position(const char *pos, rtree_iterator* itr,
+					struct memtx_rtree_index *index, rtree_rect *rect_dim) 
+{
+	assert(pos      != NULL);
+	assert(index    != NULL);
+	assert(itr      != NULL);
+	assert(rect_dim != NULL);
+	
+	uint32_t part_count = mp_decode_array(&pos);
+	if (key_validate(index->base.def, ITER_NEIGHBOR, pos, part_count) == -1)
+		return -1;
+	
+	struct rtree_rect rect = {};
+	mp_decode_rect_from_key(&rect, index->dimension, pos, part_count);	
+	itr->current_pos_distance = rtree_rect_neigh_distance_pos(&rect, rect_dim, 
+									index->dimension);
+	itr->current_pos_rect = rect;
+	itr->set_position = false;
+	
+	return 0;
+}
+
 static int
-index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
+index_rtree_iterator_next(struct iterator *i, struct tuple **ret) 
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
 	struct space *space;
@@ -176,7 +228,12 @@ index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
+
 	} while (*ret == NULL);
+	/* Save last tuple. Is used for pagination */
+	if (itr->impl.op == SOP_NEIGHBOR) 
+		itr->last = *ret; 	 
+	
 	return 0;
 }
 
@@ -202,7 +259,6 @@ memtx_rtree_index_def_change_requires_rebuild(struct index *index,
 	    index->def->opts.dimension != new_def->opts.dimension)
 		return true;
 	return false;
-
 }
 
 static ssize_t
@@ -304,15 +360,56 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 	return 0;
 }
 
+/**
+ * Implementation of iterator position for general and multikey indexes. 
+ * Is used for pagination 
+ */
+static inline int
+rtree_iterator_position_impl(struct tuple *last,
+			    struct index_def *def,
+			    const char **pos, uint32_t *size)
+{
+	assert(def != NULL);
+	assert(pos != NULL);
+
+	struct tuple *tuple = last;
+	if (tuple == NULL) {
+		*pos = NULL;
+		*size = 0;
+		return 0;
+	}
+	int mk_idx = MULTIKEY_NONE;
+	const char *key = tuple_extract_key(tuple, def->cmp_def, mk_idx, size); 
+	if (key == NULL) 
+		return -1;
+	*pos = key;
+	return 0;
+}
+
+/**
+ * Implementation of iterator position for general and multikey indexes.
+ * Is used for pagination
+ */
+static int
+rtree_iterator_position(struct iterator *it, const char **pos, uint32_t *size)  
+{
+	struct memtx_rtree_index *index =
+		(struct memtx_rtree_index *)
+		index_weak_ref_get_index_checked(&it->index_ref);
+	struct index_rtree_iterator *rtree_it = (struct index_rtree_iterator *) it;
+	return rtree_iterator_position_impl(
+		rtree_it->last, index->base.def, pos, size);
+}
+
 static int
 memtx_rtree_index_reserve(struct index *base, uint32_t size_hint)
 {
 	/*
-         * In case of rtree we use reserve to make sure that
-         * memory allocation will not fail during any operation
-         * on rtree, because there is no error handling in the
-         * rtree lib.
-         */
+    * In case of rtree we use reserve to make sure that
+    * memory allocation will not fail during any operation
+    * on rtree, because there is no error handling in the
+    * rtree lib.
+    */
 	(void)size_hint;
 	ERROR_INJECT(ERRINJ_INDEX_RESERVE, {
 		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE, "mempool", "new slab");
@@ -331,12 +428,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 {
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-
-	if (pos != NULL) {
-		diag_set(UnsupportedIndexFeature, base->def, "pagination");
-		return NULL;
-	}
-
+	
 	struct rtree_rect rect;
 	if (part_count == 0) {
 		if (type != ITER_ALL) {
@@ -373,7 +465,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 		op = SOP_OVERLAPS;
 		break;
 	case ITER_NEIGHBOR:
-		op = SOP_NEIGHBOR;
+		op = SOP_NEIGHBOR;  
 		break;
 	default:
 		diag_set(UnsupportedIndexFeature, base->def,
@@ -388,11 +480,26 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 			 "memtx_rtree_index", "iterator");
 		return NULL;
 	}
+
+	if (op == SOP_NEIGHBOR) {
+		it->base.position = rtree_iterator_position;
+	}
+	if (pos != NULL) { 	/* Pagination */
+		if (op == SOP_NEIGHBOR) {
+			rtree_iterator_set_position(pos, &it->impl, index, &rect); 
+		} else {
+			diag_set(UnsupportedIndexFeature, base->def,
+				 "pagination with wrong iterator type");
+		}
+	} else {
+		it->last = NULL;
+		it->impl.current_pos_distance = 0.0;
+	}
+
 	iterator_create(&it->base, base);
 	it->pool = &memtx->rtree_iterator_pool;
 	it->base.next_internal = index_rtree_iterator_next;
 	it->base.next = memtx_iterator_next;
-	it->base.position = generic_iterator_position;
 	it->base.free = index_rtree_iterator_free;
 	rtree_iterator_init(&it->impl);
 	/*
@@ -402,7 +509,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 	 * returns NULL should be processed in the correct way on the
 	 * caller's side.
 	 */
-	rtree_search(&index->tree, &rect, op, &it->impl);
+	rtree_search(&index->tree, &rect, op, &it->impl);   
 	return (struct iterator *)it;
 }
 
