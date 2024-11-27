@@ -4337,6 +4337,8 @@ on_commit_schema_set_bootstrap_leader_uuid(struct trigger *trigger, void *event)
 	struct tt_uuid *uuid = (struct tt_uuid *)trigger->data;
 	bootstrap_leader_uuid = *uuid;
 	is_supervised_bootstrap_leader = tt_uuid_is_equal(uuid, &INSTANCE_UUID);
+	say_info("instance %s is assigned as a bootstrap leader",
+		 tt_uuid_str(uuid));
 	box_broadcast_ballot();
 	return 0;
 }
