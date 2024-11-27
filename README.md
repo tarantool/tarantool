@@ -1,4 +1,4 @@
-# Tarantool
+# Tarantool.
 
 [![Actions Status][actions-badge]][actions-url]
 [![Code Coverage][coverage-badge]][coverage-url]
