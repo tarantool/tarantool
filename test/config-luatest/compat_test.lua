@@ -1,3 +1,5 @@
+-- tags: parallel
+
 local fun = require('fun')
 local compat = require('compat')
 local instance_config = require('internal.config.instance_config')
