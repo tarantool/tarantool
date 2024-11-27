@@ -25,7 +25,6 @@ ExternalProject_Add(bundled-benchmark-project
     BINARY_DIR ${BENCHMARK_INSTALL_DIR}/build
     STAMP_DIR ${BENCHMARK_INSTALL_DIR}/stamp
     URL_MD5 ${BENCHMARK_HASH}
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     URL https://github.com/google/benchmark/archive/refs/tags/${BENCHMARK_VERSION}.tar.gz
     CONFIGURE_COMMAND
         ${CMAKE_COMMAND} -B <BINARY_DIR> -S <SOURCE_DIR>
@@ -35,6 +34,7 @@ ExternalProject_Add(bundled-benchmark-project
     INSTALL_COMMAND ""
     CMAKE_GENERATOR ${CMAKE_GENERATOR}
     BUILD_BYPRODUCTS ${BENCHMARK_LIB} ${BENCHMARK_LIB_MAIN}
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
 add_library(bundled-benchmark STATIC IMPORTED GLOBAL)
