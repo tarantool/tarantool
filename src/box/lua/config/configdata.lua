@@ -1039,17 +1039,22 @@ local function new(iconfig, cconfig, instance_name)
     -- prerequisites.
     local bootstrap_leader_name
     if failover == 'supervised' then
-        -- An instance that is potentially a bootstrap leader
-        -- starts in RW in assumption that the bootstrap strategy
-        -- will choose it as the bootstrap leader.
+        -- In the 'auto' bootstrap strategy an instance goes to RW
+        -- on its own to bootstrap the replicaset.
         --
-        -- It doesn't work in at least 'config' and 'supervised'
-        -- bootstrap strategies. It is possible to support them,
-        -- but an extra logic that is not implemented yet is
-        -- required.
+        -- In the 'supervised' and 'native' strategies an instance
+        -- waits for the coordinator's command to start
+        -- bootstrapping ('guest' use should have a permission to
+        -- call the 'failover.execute' function).
         --
-        -- See applier/box_cfg.lua for the details.
-        if bootstrap_strategy ~= 'auto' then
+        -- Other strategies were not verified with the supervised
+        -- failover, so report an explicit error about them.
+        local supported = {
+            auto = true,
+            supervised = true,
+            native = true,
+        }
+        if not supported[bootstrap_strategy] then
             error(('"bootstrap_strategy" = %q is set for replicaset %q, but ' ..
                 'it is not supported with "replication.failover" = ' ..
                 '"supervised"'):format(bootstrap_strategy,

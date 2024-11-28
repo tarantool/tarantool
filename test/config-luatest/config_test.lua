@@ -909,8 +909,8 @@ end
 -- "<replicaset>.leader" and "database.mode" options are
 -- forbidden.
 --
--- "replication.bootstrap_strategy" = "auto" is supported, but
--- other strategies aren't.
+-- "replication.bootstrap_strategy" = "auto", "supervised",
+-- "native" are supported, but other strategies aren't.
 g.test_failover_supervised_constrainsts = function()
     local replicaset_prefix = 'groups.group-001.replicasets.replicaset-001'
     local instance_prefix = replicaset_prefix .. '.instances.instance-001'
@@ -963,16 +963,6 @@ g.test_failover_supervised_constrainsts = function()
             [replicaset_prefix .. '.bootstrap_leader'] = 'instance-001',
         },
         exp_err = bootstrap_strategy_exp_err_template:format('config'),
-    })
-
-    -- "replication.bootstrap_strategy" = "supervised" is
-    -- forbidden.
-    helpers.failure_case({
-        options = {
-            ['replication.failover'] = 'supervised',
-            ['replication.bootstrap_strategy'] = 'supervised',
-        },
-        exp_err = bootstrap_strategy_exp_err_template:format('supervised'),
     })
 end
 
