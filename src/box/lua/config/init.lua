@@ -603,6 +603,12 @@ function methods.jsonschema(self)
     return cluster_config:jsonschema()
 end
 
+function methods.new_alerts_namespace(self, name)
+    selfcheck(self, 'new_alerts_namespace')
+
+    return self._aboard:new_namespace(name)
+end
+
 -- The object is a singleton. The constructor should be called
 -- only once.
 local function new()
