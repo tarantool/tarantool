@@ -1821,6 +1821,17 @@ I['replication.bootstrap_strategy'] = format_text([[
       the bootstrap leader, use the `<replicaset_name>.bootstrap_leader` option.
     - `supervised`: a bootstrap leader isn't chosen automatically but should
       be appointed using `box.ctl.make_bootstrap_leader()` on the desired node.
+      The bootstrap leader management is in the user's responsibility unless the
+      failover coordinator is in use (replication.failover = supervised).
+    - `native`: the bootstrap leader management is performed by config's code
+      in sync with the RO/RW management (the algorithm depends on
+      replication.failover). If replication.failover = supervised, then the
+      failover coordinator manages the bootstrap leader.
+
+      This strategy is similar to `auto` from the user perspective: everything
+      is handled by tarantool (or coordinator) on its own. However, it is based
+      on the modern `supervised` strategy, which allows to overcome some
+      limitations.
     - `legacy` (deprecated since 2.11.0): a node requires the
       `replication_connect_quorum` number of other nodes to be connected. This
       option is added to keep the compatibility with the current versions of
