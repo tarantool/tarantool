@@ -39,6 +39,15 @@ g.before_each(function(cg)
             unique = params.unique,
             parts = {{3, 'unsigned'}},
         })
+        box.schema.space.create('test3', {
+            engine = 'vinyl',
+            defer_deletes = params.defer_deletes,
+        })
+        box.space.test3:create_index('i1')
+        box.space.test3:create_index('i2', {
+            unique = params.unique,
+            parts = {{'[2][*]', 'unsigned'}},
+        })
     end, {cg.params})
 end)
 
@@ -50,9 +59,13 @@ g.after_each(function(cg)
         if box.space.test2 ~= nil then
             box.space.test2:drop()
         end
+        if box.space.test3 ~= nil then
+            box.space.test3:drop()
+        end
     end)
 end)
 
+-- gh-10820
 g.test_case_1 = function(cg)
     cg.server:exec(function()
         local s = box.space.test1
@@ -71,6 +84,7 @@ g.test_case_1 = function(cg)
     end)
 end
 
+-- gh-10822
 g.test_case_2 = function(cg)
     cg.server:exec(function()
         local s = box.space.test1
@@ -162,5 +176,45 @@ g.test_case_6 = function(cg)
         t.assert_covers(s.index.i1:stat(), stat)
         t.assert_covers(s.index.i2:stat(), stat)
         t.assert_covers(s.index.i3:stat(), stat)
+    end)
+end
+
+-- gh-10869
+g.test_case_7 = function(cg)
+    cg.server:exec(function()
+        local s = box.space.test3
+        s:insert({1, {10}})
+        box.begin()
+        s:replace({1, {1, 1}})
+        s:update({1}, {{'=', 2, {2, 3, 4}}})
+        box.commit()
+        box.snapshot()
+        local tuple = {1, {2, 3, 4}}
+        t.assert_equals(s.index.i1:select({}, {fullscan = true}),
+                        {tuple})
+        t.assert_equals(s.index.i2:select({}, {fullscan = true}),
+                        {tuple, tuple, tuple})
+        t.assert_covers(s.index.i1:stat(),
+                        {memory = {rows = 0}, disk = {rows = 1}})
+        t.assert_covers(s.index.i2:stat(),
+                        {memory = {rows = 0}, disk = {rows = 3}})
+    end)
+end
+
+-- gh-10870
+g.test_case_8 = function(cg)
+    cg.server:exec(function()
+        local s = box.space.test3
+        box.begin()
+        s:replace({1, {1, 1}})
+        s:update({1}, {{'=', 2, {1}}})
+        box.commit()
+        box.snapshot()
+        local data = {{1, {1}}}
+        t.assert_equals(s.index.i1:select({}, {fullscan = true}), data)
+        t.assert_equals(s.index.i2:select({}, {fullscan = true}), data)
+        local stat = {memory = {rows = 0}, disk = {rows = 1}}
+        t.assert_covers(s.index.i1:stat(), stat)
+        t.assert_covers(s.index.i2:stat(), stat)
     end)
 end
