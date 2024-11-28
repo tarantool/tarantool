@@ -97,7 +97,9 @@ jobs:
           # sudo taskset 0xef chrt 50.
           # But this makes the process use non-standard, real-time
           # round-robin scheduling mechanism.
-          BENCH_CMD: "taskset 0xfe chrt 50"
+          # Hardware machine for benchmarking has a group of
+          # isolated CPUs 1-24.
+          BENCH_CMD: "taskset 0x01fffffe chrt 50"
       - name: Aggregate benchmark results
         run: make -f .test.mk test-perf-aggregate
       - name: Send statistics to InfluxDB
