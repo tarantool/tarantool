@@ -101,7 +101,7 @@ function(create_perf_test)
                         "${multiValues}"
                         ${ARGN})
   add_executable(${PERF_NAME}.perftest ${PERF_SOURCES})
-  target_link_libraries(${PERF_NAME}.perftest PUBLIC ${PERF_LIBRARIES})
+  target_link_libraries(${PERF_NAME}.perftest PUBLIC ${PERF_LIBRARIES} pthread)
 endfunction()
 
 create_perf_test(NAME tuple
