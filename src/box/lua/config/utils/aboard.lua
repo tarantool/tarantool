@@ -159,6 +159,88 @@ local function aboard_is_empty(self)
     return next(self._alerts) == nil
 end
 
+-- {{{ Alerts namespaces
+
+local namespace_methods = {}
+local namespace_mt = {
+    __index = namespace_methods,
+}
+
+local function namespace_selfcheck(self, method_name)
+    if type(self) ~= 'table' or getmetatable(self) ~= namespace_mt then
+        local fmt_str = 'Use alerts_namespace:%s(<...>) ' ..
+                        'instead of alerts_namespace.%s(<...>)'
+        error(fmt_str:format(method_name, method_name), 0)
+    end
+end
+
+-- Process an alert before adding it to the alert board.
+-- The function adds the namespace name to the alert,
+-- sets the default alert type to 'warn',
+-- and removes all fields that start from an underscore.
+local function process_alert(namespace, alert)
+    assert(type(alert) == 'table', 'alert must be a table')
+    assert(alert.type == nil or alert.type == 'warn',
+           'alert.type must be nil or "warn"')
+
+    local a = table.copy(alert)
+    a.type = 'warn'
+
+    for k, _ in pairs(a) do
+        if k:startswith('_') then
+            a[k] = nil
+        end
+    end
+
+    a._namespace = namespace._name
+
+    return a
+end
+
+local function process_key(namespace, key)
+    assert(type(key) == 'string', 'alert key must be a string')
+    assert(not key:find(':'), 'alert key cannot contain a colon')
+
+    -- The key is prefixed with the namespace name to avoid conflicts.
+    return ("%s:%s"):format(namespace._name, key)
+end
+
+function namespace_methods.add(self, alert)
+    namespace_selfcheck(self, 'add')
+    local a = process_alert(self, alert)
+    self._aboard:set(a)
+end
+
+function namespace_methods.set(self, key, alert)
+    namespace_selfcheck(self, 'set')
+    local a = process_alert(self, alert)
+    self._aboard:set(a, {key = process_key(self, key)})
+end
+
+function namespace_methods.unset(self, key)
+    namespace_selfcheck(self, 'unset')
+    self._aboard:drop(process_key(self, key))
+end
+
+function namespace_methods.clear(self)
+    namespace_selfcheck(self, 'clear')
+    self._aboard:drop_if(function(_key, alert)
+        return alert._namespace == self._name
+    end)
+end
+
+local function namespace_new(self, name)
+    assert(type(name) == 'string', 'namespace name must be a string')
+    assert(not name:find(':'), 'namespace name cannot contain a colon')
+
+    return setmetatable({
+        _aboard = self,
+        _name = name,
+    }, namespace_mt)
+end
+
+-- }}} Alerts namespaces
+
 local mt = {
     __index = {
         set = aboard_set,
@@ -170,6 +252,7 @@ local mt = {
         alerts = aboard_alerts,
         status = aboard_status,
         is_empty = aboard_is_empty,
+        new_namespace = namespace_new,
     },
 }
 
