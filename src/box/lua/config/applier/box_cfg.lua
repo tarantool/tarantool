@@ -156,6 +156,20 @@ end
 
 -- }}} audit_log
 
+-- {{{ replication.bootstrap_strategy
+
+local function set_bootstrap_strategy(configdata, box_cfg)
+    local bootstrap_strategy = configdata:get('replication.bootstrap_strategy',
+        {use_default = true})
+
+    -- 'native' is implemented as 'supervised' under the hood.
+    if bootstrap_strategy == 'native' then
+        box_cfg.bootstrap_strategy = 'supervised'
+    end
+end
+
+-- }}} replication.bootstrap_strategy
+
 -- {{{ Set RO/RW
 
 local function set_ro_rw(config, box_cfg)
@@ -1066,6 +1080,7 @@ local function apply(config)
     set_replication_peers(configdata, box_cfg)
     set_log(configdata, box_cfg)
     set_audit_log(configdata, box_cfg)
+    set_bootstrap_strategy(configdata, box_cfg)
     set_ro_rw(config, box_cfg)
     revert_non_dynamic_options(config, box_cfg)
     set_names_in_background(config, box_cfg)

@@ -1331,6 +1331,7 @@ return schema.new('instance_config', schema.record({
             'auto',
             'config',
             'supervised',
+            'native',
             'legacy',
         }, {
             box_cfg = 'bootstrap_strategy',
