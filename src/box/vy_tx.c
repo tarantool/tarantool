@@ -1071,6 +1071,23 @@ static int
 vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 {
 	assert(vy_stmt_type(entry.stmt) != 0);
+
+	struct txv *old = write_set_search_key(&tx->write_set, lsm, entry);
+	if (old != NULL && old->entry.stmt == entry.stmt) {
+		/*
+		 * The inserted statement is already indexed in the write set.
+		 * This may happen only if this is a multikey index and the
+		 * indexed array has duplicate entries. Inserting a duplicate
+		 * into the write set is pointless. Moreover, it may break
+		 * assumptions taken by the optimizations applied below, like
+		 * REPLACE + DELETE = NOP. Let's skip it.
+		 */
+		assert(lsm->cmp_def->is_multikey);
+		assert(!old->is_overwritten);
+		assert(old->entry.hint != entry.hint);
+		return 0;
+	}
+
 	/**
 	 * A statement in write set must have and unique lsn
 	 * in order to differ it from cachable statements in mem and run.
@@ -1078,7 +1095,6 @@ vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 	vy_stmt_set_lsn(entry.stmt, INT64_MAX);
 	struct vy_entry applied = vy_entry_none();
 
-	struct txv *old = write_set_search_key(&tx->write_set, lsm, entry);
 	/* Found a match of the previous action of this transaction */
 	if (old != NULL && vy_stmt_type(entry.stmt) == IPROTO_UPSERT) {
 		assert(lsm->index_id == 0);
