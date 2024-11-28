@@ -84,47 +84,34 @@ local function rand_cluster()
 end
 
 
+-- ---  TODO: must add checking not dropped nodes
+-- --- Random Server Drop
+-- ---
+-- local function rand_server_drop()
+--     local idx = math.random(1, #cg.cluster.servers)
+--     local selected_server = cg.cluster.servers[idx]
+
+--     print("Dropping server:", selected_server.alias)
+
+--     -- Check if the server is the leader
+--     local is_leader = selected_server:exec(function()
+--         return box.info.election.state == 'leader'
+--     end)
+
+--     -- Drop server and handle leadership re-election if needed
+--     if is_leader then
+--         print("Server is leader. Waiting for new leader...")
+--         cg.cluster:wait_until_election_leader_found()
+--     else
+--         selected_server:drop()
+--         print("Dropped server:", selected_server.alias)
+--     end
+-- end
 
 
---- Random Server Drop
----
----  TODO: must add checking not dropped nodes
-local function rand_server_drop()
-    local idx = math.random(1, #cg.cluster.servers)
-    local selected_server = cg.cluster.servers[idx]
-
-    print("Dropping server:", selected_server.alias)
-
-    -- Check if the server is the leader
-    local is_leader = selected_server:exec(function()
-        return box.info.election.state == 'leader'
-    end)
-
-    -- Drop server and handle leadership re-election if needed
-    if is_leader then
-        print("Server is leader. Waiting for new leader...")
-        cg.cluster:wait_until_election_leader_found()
-    else
-        selected_server:drop()
-        print("Dropped server:", selected_server.alias)
-    end
-end
-
-
-
---- Main Execution
----
-local function main()
-    rand_cluster()
-
-    fiber.sleep(10)
-
-    for i = 1, #cg.replicas do
-        fiber.create(function()
-            rand_server_drop() 
-        end)
-    end
-end
-
-
-main()
+return {
+    rand_cluster = rand_cluster,
+    clear_cluster = clear_cluster,
+    rand_cfg = rand_cfg,
+    -- rand_server_drop = rand_server_drop,
+}
