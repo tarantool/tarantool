@@ -43,7 +43,6 @@
 #include <sys/resource.h>
 #include <pwd.h>
 #include <unistd.h>
-#include <getopt.h>
 #include <locale.h>
 #include <libgen.h>
 #include <sysexits.h>
@@ -512,7 +511,7 @@ load_cfg(void)
 static void
 free_rl_state(void)
 {
-	/* tarantool_lua_free() was formerly reponsible for terminal reset,
+	/* tarantool_lua_free() was formerly responsible for terminal reset,
 	 * but it is no longer called
 	 */
 	if (isatty(STDIN_FILENO)) {
@@ -747,10 +746,10 @@ main(int argc, char **argv)
 
 	/* Enter interactive mode after executing 'script' */
 	uint32_t opt_mask = 0;
-	/* Lua interpeter options, e.g. -e and -l */
+	/* Lua interpreter options, e.g. -e and -l */
 	int optc = 0;
 	const char **optv = NULL;
-	/* The maximum possible number of Lua interpeter options */
+	/* The maximum possible number of Lua interpreter options */
 	int optc_max = (argc - 1) * 2;
 	bool say_entering_the_event_loop = true;
 	auto guard = make_scoped_guard([&optc, &optv]{ if (optc) free(optv); });
@@ -932,7 +931,7 @@ main(int argc, char **argv)
 
 	argv = title_init(argc, argv);
 	/*
-	 * Support only #!/usr/bin/tarantol but not
+	 * Support only #!/usr/bin/tarantool but not
 	 * #!/usr/bin/tarantool -a -b because:
 	 * - not all shells support it,
 	 * - those shells that do support it, do not
