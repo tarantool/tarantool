@@ -559,11 +559,6 @@ txn_begin(void)
 	 * without ENGINE_SUPPORTS_CROSS_ENGINE_TX will unset this flag.
 	 */
 	txn_set_flags(txn, TXN_SUPPORTS_MULTI_ENGINE);
-	/*
-	 * A transaction is unaffected by concurrent DDL as long as it has
-	 * no statements.
-	 */
-	txn_set_flags(txn, TXN_HANDLES_DDL);
 	memtx_tx_register_txn(txn);
 	rmean_collect(rmean_box, IPROTO_BEGIN, 1);
 	return txn;
@@ -607,8 +602,6 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn)
 	txn_set_flags(txn, TXN_IS_STARTED_IN_ENGINE);
 	if ((engine->flags & ENGINE_SUPPORTS_CROSS_ENGINE_TX) == 0)
 		txn_clear_flags(txn, TXN_SUPPORTS_MULTI_ENGINE);
-	if ((engine->flags & ENGINE_TXM_HANDLES_DDL) == 0)
-		txn_clear_flags(txn, TXN_HANDLES_DDL);
 	return 0;
 }
 
@@ -673,40 +666,6 @@ txn_is_distributed(struct txn *txn)
 	 */
 	return (txn->n_new_rows > 0 && txn->n_applier_rows > 0 &&
 		txn->n_new_rows != txn->n_local_rows);
-}
-
-bool
-txn_is_fully_temporary(struct txn *txn)
-{
-	if (!txn_is_nop(txn))
-		return false;
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->space != NULL &&
-		    stmt->space->def->opts.type == SPACE_TYPE_DATA_TEMPORARY)
-			return false;
-	}
-	return true;
-}
-
-bool
-txn_is_fully_remote(struct txn *txn)
-{
-	if (txn->n_new_rows != 0)
-		return false;
-	struct txn_stmt *stmt;
-	/*
-	 * Allow DDL on data-temporary spaces, since we allow only fully
-	 * temporary transactions to continue.
-	 */
-	stailq_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->space != NULL &&
-		    space_is_data_temporary(stmt->space)) {
-			assert(stmt->row == NULL);
-			return false;
-		}
-	}
-	return true;
 }
 
 /**
@@ -954,6 +913,10 @@ txn_on_journal_write(struct journal_entry *entry)
 		txn_limbo_assign_lsn(&txn_limbo, txn->limbo_entry, lsn);
 		if (txn->fiber != NULL)
 			fiber_wakeup(txn->fiber);
+		if (txn_limbo_is_owned_by_current_instance(&txn_limbo) &&
+		    txn_has_flag(txn, TXN_WAIT_ACK))
+			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id,
+				      txn->limbo_entry->lsn);
 	}
 finish:
 	fiber_set_txn(fiber(), NULL);
@@ -1146,12 +1109,17 @@ txn_commit_nop(struct txn *txn)
  * write completes.
  */
 static int
-txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req)
+txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req,
+		    enum txn_commit_wait_mode wait_mode)
 {
 	uint32_t origin_id = req->rows[0]->replica_id;
-	if (origin_id == 0 && txn_limbo.size >= txn_limbo.max_size) {
-		diag_set(ClientError, ER_SYNC_QUEUE_FULL);
-		return -1;
+	if (origin_id == 0 && txn_limbo_is_full(&txn_limbo)) {
+		if (wait_mode == TXN_COMMIT_WAIT_MODE_NONE) {
+			diag_set(ClientError, ER_SYNC_QUEUE_FULL);
+			return -1;
+		}
+		if (txn_limbo_wait_for_space(&txn_limbo) != 0)
+			return -1;
 	}
 
 	/*
@@ -1187,19 +1155,6 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 				 "txn commit async injection");
 			goto rollback_abort;
 		});
-		/*
-		 * The main reason why it is disabled is that the sync txn's
-		 * original instance wants to write CONFIRM. But it can't be
-		 * done asynchronously in the current code design. Also it is
-		 * logically strange to commit a synchronous transaction in an
-		 * async way, but the CONFIRM problem is the technical one.
-		 */
-		bool is_original = req->rows[0]->replica_id == 0;
-		if (txn_has_flag(txn, TXN_WAIT_ACK) && is_original) {
-			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
-				 "Non-blocking commit of a synchronous txn");
-			goto rollback_abort;
-		}
 		if (wait_mode == TXN_COMMIT_WAIT_MODE_NONE &&
 		    journal_queue_is_full()) {
 			diag_set(ClientError, ER_WAL_QUEUE_FULL);
@@ -1214,7 +1169,7 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 	 * txn not waiting for anything.
 	 */
 	if (txn_has_flag(txn, TXN_WAIT_SYNC) &&
-	    txn_add_limbo_entry(txn, req) != 0) {
+	    txn_add_limbo_entry(txn, req, wait_mode) != 0) {
 		goto rollback_abort;
 	}
 	fiber_set_txn(fiber(), NULL);
@@ -1237,15 +1192,6 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 	if (txn_has_flag(txn, TXN_WAIT_SYNC)) {
 		struct txn_limbo_entry *limbo_entry = txn->limbo_entry;
 		assert(limbo_entry->lsn > 0);
-		/*
-		 * XXX: ACK should be done on WAL write too. But it can make
-		 * another WAL write. Can't be done until it works
-		 * asynchronously.
-		 */
-		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
-			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id,
-				      limbo_entry->lsn);
-		}
 		int rc = txn_limbo_wait_complete(&txn_limbo, limbo_entry);
 		if (rc < 0) {
 			if (fiber_is_cancelled()) {

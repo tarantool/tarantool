@@ -52,6 +52,18 @@ struct memtx_rtree_index {
 	struct rtree tree;
 };
 
+enum memtx_rtree_reserve_extents_num {
+	/**
+	 * This number is calculated based on the
+	 * max (realistic) number of insertions
+	 * a deletion from a B-tree or an R-tree
+	 * can lead to, and, as a result, the max
+	 * number of new block allocations.
+	 */
+	RESERVE_EXTENTS_BEFORE_DELETE = 8,
+	RESERVE_EXTENTS_BEFORE_REPLACE = 16
+};
+
 /* {{{ Utilities. *************************************************/
 
 static inline int
@@ -262,6 +274,17 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 	(void)mode;
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 
+	/*
+	 * There's no allocation failure handling in the tree, so it's required
+	 * to reserve potentially big enough space prior to the operations.
+	 */
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	if (matras_allocator_reserve(&memtx->index_extent_allocator,
+				     new_tuple != NULL ?
+				     RESERVE_EXTENTS_BEFORE_REPLACE :
+				     RESERVE_EXTENTS_BEFORE_DELETE) != 0)
+		return -1;
+
 	/* RTREE index doesn't support ordering. */
 	*successor = NULL;
 
@@ -296,7 +319,8 @@ memtx_rtree_index_reserve(struct index *base, uint32_t size_hint)
 		return -1;
 	});
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-	return memtx_index_extent_reserve(memtx, RESERVE_EXTENTS_BEFORE_REPLACE);
+	return matras_allocator_reserve(&memtx->index_extent_allocator,
+					RESERVE_EXTENTS_BEFORE_REPLACE);
 }
 
 /** Implementation of create_iterator for memtx rtree index. */
@@ -449,7 +473,6 @@ memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 
 	index->dimension = def->opts.dimension;
 	rtree_init(&index->tree, index->dimension, distance_type,
-		   MEMTX_EXTENT_SIZE, memtx_index_extent_alloc,
-		   memtx_index_extent_free, memtx, &memtx->index_extent_stats);
+		   &memtx->index_extent_allocator, &memtx->index_extent_stats);
 	return &index->base;
 }

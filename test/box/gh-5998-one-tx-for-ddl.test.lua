@@ -15,14 +15,11 @@ s1:create_index('pk')
 
 for i = 0, 10 do s1:replace{i} end
 
--- In case of committed DDL operation all other transactions will be aborted.
+-- In case of DDL operation all other transactions will be aborted.
 --
 _ = test_run:cmd("setopt delimiter ';'")
-function create_space_with_pk()
-    box.begin()
-    local s = box.schema.space.create('s2')
-    s:create_index('pk')
-    box.commit()
+function create_sk()
+    s1:create_index('sk')
 end
 _ = test_run:cmd("setopt delimiter ''");
 
@@ -31,17 +28,16 @@ tx2:begin()
 tx1("s1:replace({13})")
 tx2("s1:replace({14})")
 
-f = fiber.new(create_space_with_pk)
-fiber.sleep(0)
+-- Execute as a single line to avoid yields
+f = fiber.new(create_sk) \
+f:set_joinable(true)     \
+join_result = {f:join()}
+join_result
 tx1:commit()
 tx2:commit()
 
-assert(box.space.s2 ~= nil)
-assert(box.space.s2.index[0] ~= nil)
-assert(box.space.s1:count() == 11)
-
+assert(box.space.s1.index[1] ~= nil)
 box.space.s1:drop()
-box.space.s2:drop()
 
 -- Original test from #5998: create two users in different TXes.
 -- Now such a situation can't be achieved since if one TX yields, it will be

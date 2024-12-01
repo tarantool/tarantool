@@ -671,16 +671,31 @@ gc_checkpoint_fiber_f(va_list ap)
 	return 0;
 }
 
-void
-gc_ref_checkpoint(struct gc_checkpoint *checkpoint,
-		  struct gc_checkpoint_ref *ref, const char *format, ...)
+struct gc_checkpoint *
+gc_checkpoint_at_vclock(const struct vclock *vclock)
 {
+	struct gc_checkpoint *checkpoint;
+	gc_foreach_checkpoint(checkpoint) {
+		int rc = vclock_compare(&checkpoint->vclock, vclock);
+		if (rc > 0)
+			break;
+		if (rc == 0)
+			return checkpoint;
+	}
+	return NULL;
+}
+
+struct gc_checkpoint_ref *
+gc_ref_checkpoint(struct gc_checkpoint *checkpoint, const char *format, ...)
+{
+	struct gc_checkpoint_ref *ref = xalloc_object(struct gc_checkpoint_ref);
 	va_list ap;
 	va_start(ap, format);
 	vsnprintf(ref->name, GC_NAME_MAX, format, ap);
 	va_end(ap);
 
 	rlist_add_tail_entry(&checkpoint->refs, ref, in_refs);
+	return ref;
 }
 
 void
@@ -688,6 +703,7 @@ gc_unref_checkpoint(struct gc_checkpoint_ref *ref)
 {
 	rlist_del_entry(ref, in_refs);
 	gc_schedule_cleanup();
+	free(ref);
 }
 
 static struct gc_consumer *
@@ -887,7 +903,6 @@ gc_erase_consumer_on_commit(struct trigger *trigger, void *event)
 int
 gc_erase_consumer(const struct tt_uuid *uuid)
 {
-	assert(in_txn() != NULL);
 	struct gc_consumer *consumer = gc_consumer_by_uuid(uuid);
 	if (!gc_schema_supports_persistent_consumers()) {
 		if (consumer != NULL)
@@ -895,16 +910,23 @@ gc_erase_consumer(const struct tt_uuid *uuid)
 		return 0;
 	}
 
-	if (boxk(IPROTO_DELETE, BOX_GC_CONSUMERS_ID, "[%s]",
-		 tt_uuid_str(uuid)) != 0)
+	bool is_autocommit = in_txn() == NULL;
+	if (is_autocommit && txn_begin() == NULL)
 		return -1;
+
+	if (boxk(IPROTO_DELETE, BOX_GC_CONSUMERS_ID, "[%s]",
+		 tt_uuid_str(uuid)) != 0) {
+		if (is_autocommit)
+			txn_abort(in_txn());
+		return -1;
+	}
 
 	/* Do actual work on commit. */
 	struct trigger *on_commit =
 		xregion_alloc_object(&in_txn()->region, struct trigger);
 	trigger_create(on_commit, gc_erase_consumer_on_commit, consumer, NULL);
-	txn_stmt_on_commit(txn_current_stmt(in_txn()), on_commit);
-	return 0;
+	txn_stmt_on_commit(txn_last_stmt(in_txn()), on_commit);
+	return is_autocommit ? txn_commit(in_txn()) : 0;
 }
 
 /**

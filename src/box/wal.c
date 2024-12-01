@@ -1317,13 +1317,11 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 {
 	struct wal_writer *writer = (struct wal_writer *) journal;
 
+	ERROR_INJECT_COUNTDOWN(ERRINJ_WAL_IO_COUNTDOWN, {
+		struct errinj *e = errinj(ERRINJ_WAL_IO, ERRINJ_BOOL);
+		e->bparam = true;
+	});
 	ERROR_INJECT(ERRINJ_WAL_IO, {
-		ERROR_INJECT_COUNTDOWN(ERRINJ_WAL_IO_COUNTDOWN, {
-				struct errinj *e =
-					errinj(ERRINJ_WAL_IO, ERRINJ_BOOL);
-				e->bparam = false;
-		});
-
 		diag_set_journal_res(JOURNAL_ENTRY_ERR_IO);
 		goto fail;
 	});
@@ -1376,7 +1374,7 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 #ifndef NDEBUG
 	++errinj(ERRINJ_WAL_WRITE_COUNT, ERRINJ_INT)->iparam;
 #endif
-	cpipe_flush_input(&writer->wal_pipe);
+	cpipe_submit_flush(&writer->wal_pipe);
 	return 0;
 
 fail:
@@ -1480,7 +1478,7 @@ wal_watcher_notify(struct wal_watcher *watcher, unsigned events)
 	cmsg_init(&msg->cmsg, watcher->route);
 	cpipe_push(&watcher->watcher_pipe, &msg->cmsg);
 	ERROR_INJECT(ERRINJ_RELAY_FASTER_THAN_TX,
-		     cpipe_deliver_now(&watcher->watcher_pipe));
+		     cpipe_flush(&watcher->watcher_pipe));
 }
 
 static void

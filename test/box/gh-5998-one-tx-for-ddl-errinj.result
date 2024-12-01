@@ -54,8 +54,7 @@ channel2 = fiber.channel(1)
  | ---
  | ...
 
--- Let's try to build two indexes in parallel. First one to finish wins
--- the race.
+-- Let's build two indexes in parallel
 _ = test_run:cmd("setopt delimiter ';'")
  | ---
  | ...
@@ -91,7 +90,7 @@ channel2:get()
  | - true
  | ...
 
-assert((s1.index[1] == nil) ~= (s2.index[1] == nil))
+assert(s1.index[1] ~= nil and s2.index[1] ~= nil)
  | ---
  | - true
  | ...

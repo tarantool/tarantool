@@ -151,6 +151,10 @@ struct cpipe {
 void
 cpipe_create(struct cpipe *pipe, const char *consumer);
 
+/** Same as a normal cpipe, but not attached to any event loop. */
+void
+cpipe_create_noev(struct cpipe *pipe, const char *consumer);
+
 /**
  * Deinitialize a pipe and disconnect it from the consumer.
  * Must be called by producer. Will flash queued messages.
@@ -176,19 +180,15 @@ cpipe_set_max_input(struct cpipe *pipe, int max_input)
 	pipe->max_input = max_input;
 }
 
-static inline void
-cpipe_deliver_now(struct cpipe *pipe)
-{
-	if (pipe->n_input > 0)
-		ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
-}
+void
+cpipe_flush(struct cpipe *pipe);
 
 /**
  * Flush all staged messages into the pipe and eventually to the
  * consumer.
  */
 static inline void
-cpipe_flush_input(struct cpipe *pipe)
+cpipe_submit_flush(struct cpipe *pipe)
 {
 	assert(loop() == pipe->producer);
 
@@ -207,26 +207,9 @@ cpipe_flush_input(struct cpipe *pipe)
 			 * Wow, it's a lot of stuff piled up,
 			 * deliver immediately.
 			 */
-			ev_invoke(pipe->producer,
-				  &pipe->flush_input, EV_CUSTOM);
+			cpipe_flush(pipe);
 		}
 	}
-}
-
-/**
- * Push a single message to the pipe input. The message is pushed
- * to a staging area. To be delivered, the input needs to be
- * flushed with cpipe_flush_input().
- */
-static inline void
-cpipe_push_input(struct cpipe *pipe, struct cmsg *msg)
-{
-	assert(loop() == pipe->producer);
-
-	stailq_add_tail_entry(&pipe->input, msg, fifo);
-	pipe->n_input++;
-	if (pipe->n_input >= pipe->max_input)
-		ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 
 /**
@@ -238,9 +221,12 @@ cpipe_push_input(struct cpipe *pipe, struct cmsg *msg)
 static inline void
 cpipe_push(struct cpipe *pipe, struct cmsg *msg)
 {
-	cpipe_push_input(pipe, msg);
-	assert(pipe->n_input < pipe->max_input);
-	if (pipe->n_input == 1)
+	assert(pipe->producer == NULL || pipe->producer == loop());
+	stailq_add_tail_entry(&pipe->input, msg, fifo);
+	pipe->n_input++;
+	if (pipe->n_input >= pipe->max_input)
+		cpipe_flush(pipe);
+	else if (pipe->n_input == 1 && pipe->producer != NULL)
 		ev_feed_event(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 

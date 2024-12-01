@@ -103,6 +103,8 @@ struct errinj {
 	_(ERRINJ_IPROTO_DISABLE_ID, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_DISABLE_WATCH, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_FLIP_FEATURE, ERRINJ_INT, {.iparam = -1}) \
+	_(ERRINJ_IPROTO_FLUSH_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_IPROTO_PROCESS_REPLICATION_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_SET_VERSION, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_IPROTO_TX_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_WRITE_ERROR_DELAY, ERRINJ_BOOL, {.bparam = false})\
@@ -149,7 +151,8 @@ struct errinj {
 	_(ERRINJ_TUPLE_FORMAT_COUNT, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_TX_DELAY_PRIO_ENDPOINT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_TXN_COMMIT_ASYNC, ERRINJ_BOOL, {.bparam = false})\
-	_(ERRINJ_TXN_LIMBO_BEGIN_DELAY, ERRINJ_BOOL, {.bparam = false})\
+	_(ERRINJ_TXN_LIMBO_BEGIN_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_TXN_LIMBO_WORKER_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VYRUN_DATA_READ, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_COMPACTION_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_DUMP_DELAY, ERRINJ_BOOL, {.bparam = false}) \

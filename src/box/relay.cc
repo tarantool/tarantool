@@ -468,6 +468,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	relay_start(relay, io, sync, relay_send_initial_join_row, relay_yield,
 		    UINT64_MAX);
 	xrow_stream_create(&relay->xrow_stream);
+	relay->version_id = replica_version_id;
 	auto relay_guard = make_scoped_guard([=] {
 		xrow_stream_destroy(&relay->xrow_stream);
 		relay_stop(relay);
@@ -482,8 +483,12 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	 * All these versions know of additional META stage of initial join.
 	 */
 	ctx.send_meta = replica_version_id > 0;
-	ctx.vclock = vclock;
 	ctx.cursor = cursor;
+	/*
+	 * If cursor is passed, we should respond with its vclock because
+	 * it will actually be vclock of a last sent row.
+	 */
+	ctx.vclock = cursor != NULL ? cursor->vclock : vclock;
 	engine_prepare_join_xc(&ctx);
 	auto join_guard = make_scoped_guard([&] {
 		engine_complete_join(&ctx);
@@ -606,7 +611,7 @@ tx_status_update(struct cmsg *msg)
 	 * the single master in 100% so far). Other instances wait
 	 * for master's CONFIRM message instead.
 	 */
-	if (txn_limbo.owner_id == instance_id && !anon) {
+	if (txn_limbo_is_owned_by_current_instance(&txn_limbo) && !anon) {
 		txn_limbo_ack(&txn_limbo, ack.source,
 			      vclock_get(ack.vclock, instance_id));
 	}
@@ -997,8 +1002,7 @@ relay_subscribe_f(va_list ap)
 	 */
 	struct trigger on_close_log;
 	trigger_create(&on_close_log, relay_on_close_log_f, relay, NULL);
-	if (!relay->replica->anon)
-		trigger_add(&relay->r->on_close_log, &on_close_log);
+	trigger_add(&relay->r->on_close_log, &on_close_log);
 
 	/* Setup WAL watcher for sending new rows to the replica. */
 	struct errinj *inj = errinj(ERRINJ_RELAY_WAL_START_DELAY, ERRINJ_BOOL);
@@ -1131,12 +1135,12 @@ relay_filter_raft(struct xrow_header *packet, uint32_t version)
 {
 	assert(iproto_type_is_raft_request(packet->type));
 	if (version > version_id(3, 2, 1) ||
-	    (version > version_id(2, 11, 4) && version < version_id(3, 0, 0)))
+	    (version > version_id(2, 11, 5) && version < version_id(3, 0, 0)))
 		return;
 	/**
 	 * Until Tarantool 3.2.2 all raft requests were sent with GROUP_LOCAL
 	 * id. In order not to break the upgrade process, raft rows are still
-	 * sent as local to old replicas. This was also backported to 2.11.5.
+	 * sent as local to old replicas. This was also backported to 2.11.6.
 	 */
 	packet->group_id = GROUP_LOCAL;
 }

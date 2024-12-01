@@ -31,7 +31,7 @@
 #include "salad/bps_tree.h"
 
 #define test_tree_do_create(tree) \
-	test_tree_create(tree, NULL, extent_alloc, extent_free, NULL, NULL)
+	test_tree_create(tree, NULL, &allocator, NULL)
 
 #define test_tree_do_insert(tree, val) \
 	fail_if(test_tree_insert((tree), (val), NULL, NULL) != 0)
@@ -40,18 +40,20 @@
 	fail_if(test_tree_view_debug_check((view)))
 
 static void *
-extent_alloc(void *ctx)
+extent_alloc(struct matras_allocator *allocator)
 {
-	(void)ctx;
+	(void)allocator;
 	return xmalloc(BPS_TREE_EXTENT_SIZE);
 }
 
 static void
-extent_free(void *ctx, void *extent)
+extent_free(struct matras_allocator *allocator, void *extent)
 {
-	(void)ctx;
+	(void)allocator;
 	free(extent);
 }
+
+struct matras_allocator allocator;
 
 static void
 test_size(void)
@@ -81,7 +83,7 @@ test_size(void)
 		test_tree_do_insert(&tree, i + 1000);
 		test_tree_view_do_debug_check(&view);
 		if (i % 2 == 0) {
-			test_tree_delete(&tree, i);
+			test_tree_delete(&tree, i, NULL);
 			test_tree_view_do_debug_check(&view);
 		}
 	}
@@ -113,7 +115,7 @@ test_find(void)
 		test_tree_do_insert(&tree, i + 1000);
 		test_tree_view_do_debug_check(&view);
 		if (i % 2 == 0) {
-			test_tree_delete(&tree, i);
+			test_tree_delete(&tree, i, NULL);
 			test_tree_view_do_debug_check(&view);
 		}
 	}
@@ -170,7 +172,7 @@ test_first(void)
 	ok(p != NULL && *p == 0,
 	   "non-empty view first before tree change");
 	for (int i = 0; i < 100; i++) {
-		test_tree_delete(&tree, i);
+		test_tree_delete(&tree, i, NULL);
 		test_tree_view_do_debug_check(&view);
 	}
 	it = test_tree_view_first(&view);
@@ -214,7 +216,7 @@ test_last(void)
 	ok(p != NULL && *p == 999,
 	   "non-empty view last before tree change");
 	for (int i = 900; i < 1000; i++) {
-		test_tree_delete(&tree, i);
+		test_tree_delete(&tree, i, NULL);
 		test_tree_view_do_debug_check(&view);
 	}
 	it = test_tree_view_last(&view);
@@ -246,7 +248,7 @@ test_lower_bound(void)
 	for (int i = 0; i < 1000; i++) {
 		test_tree_do_insert(&tree, i * 10);
 		test_tree_view_do_debug_check(&view);
-		test_tree_delete(&tree, i * 2);
+		test_tree_delete(&tree, i * 2, NULL);
 		test_tree_view_do_debug_check(&view);
 	}
 
@@ -296,7 +298,7 @@ test_upper_bound(void)
 	for (int i = 0; i < 1000; i++) {
 		test_tree_do_insert(&tree, i * 10);
 		test_tree_view_do_debug_check(&view);
-		test_tree_delete(&tree, i * 2);
+		test_tree_delete(&tree, i * 2, NULL);
 		test_tree_view_do_debug_check(&view);
 	}
 
@@ -347,7 +349,7 @@ test_iterator(void)
 
 	for (int i = 0; i < 1000; i++) {
 		if (i % 6 == 0) {
-			test_tree_delete(&tree, i);
+			test_tree_delete(&tree, i, NULL);
 			test_tree_view_do_debug_check(&view);
 		}
 		if (i % 5 == 0) {
@@ -490,6 +492,9 @@ main(void)
 	plan(8);
 	header();
 
+	matras_allocator_create(&allocator, BPS_TREE_EXTENT_SIZE,
+				extent_alloc, extent_free);
+
 	test_size();
 	test_find();
 	test_first();
@@ -498,6 +503,8 @@ main(void)
 	test_upper_bound();
 	test_iterator();
 	test_iterator_is_equal();
+
+	matras_allocator_destroy(&allocator);
 
 	footer();
 	return check_plan();

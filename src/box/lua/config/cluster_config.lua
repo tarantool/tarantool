@@ -1,6 +1,7 @@
 local schema = require('experimental.config.utils.schema')
 local instance_config = require('internal.config.instance_config')
 local expression = require('internal.config.utils.expression')
+local descriptions = require('internal.config.descriptions')
 
 -- Extract a field from a table.
 --
@@ -324,6 +325,9 @@ return schema.new('cluster_config', record_from_fields({
     nested_cluster_config.schema,
 }), {
     methods = methods,
+    _extra_annotations = {
+        descriptions = descriptions.cluster_descriptions,
+    }
 })
 
 -- }}} Support conditional sections

@@ -212,8 +212,7 @@ static const uint32_t LIGHT(end) = 0xFFFFFFFF;
  */
 static inline void
 LIGHT(create)(struct LIGHT(core) *ht, LIGHT_CMP_ARG_TYPE arg,
-	      size_t extent_size, matras_alloc_func extent_alloc_func,
-	      matras_free_func extent_free_func, void *alloc_ctx,
+	      struct matras_allocator *allocator,
 	      struct matras_stats *alloc_stats);
 
 /**
@@ -440,8 +439,7 @@ LIGHT(view_iterator_get_and_next)(const struct LIGHT(view) *v,
  */
 static inline void
 LIGHT(create)(struct LIGHT(core) *htab, LIGHT_CMP_ARG_TYPE arg,
-	      size_t extent_size, matras_alloc_func extent_alloc_func,
-	      matras_free_func extent_free_func, void *alloc_ctx,
+	      struct matras_allocator *allocator,
 	      struct matras_stats *alloc_stats)
 {
 	struct LIGHT(common) *ht = &htab->common;
@@ -451,10 +449,8 @@ LIGHT(create)(struct LIGHT(core) *htab, LIGHT_CMP_ARG_TYPE arg,
 	ht->table_size = 0;
 	ht->empty_slot = LIGHT(end);
 	ht->arg = arg;
-	matras_create(&htab->mtable,
-		      extent_size, sizeof(struct LIGHT(record)),
-		      extent_alloc_func, extent_free_func, alloc_ctx,
-		      alloc_stats);
+	matras_create(&htab->mtable, sizeof(struct LIGHT(record)),
+		      allocator, alloc_stats);
 	matras_head_read_view(&htab->view);
 	ht->mtable = &htab->mtable;
 	ht->view = &htab->view;
@@ -881,6 +877,22 @@ LIGHT(grow)(struct LIGHT(common) *ht)
 		return -1;
 	}
 
+	/*
+	 * The following loop performs unknown amount of matras_touch calls that
+	 * depends on lengths of hash collision chains. Let's assume we're going
+	 * to have no more than 8 collisions to handle in each chain in average.
+	 * This is similar to the amount of extents we reserve before insertion
+	 * in the memtx space.
+	 *
+	 * TODO: we better to make this more robust in the future.
+	 */
+	if (matras_touch_reserve(ht->mtable, LIGHT_GROW_INCREMENT * 8) != 0) {
+		matras_dealloc_range(ht->mtable, LIGHT_GROW_INCREMENT);
+		ht->cover_mask = save_cover_mask;
+		ht->table_size -= LIGHT_GROW_INCREMENT;
+		return -1;
+	}
+
 	for (int i = 0; i < LIGHT_GROW_INCREMENT;
 	     i++, susp_slot++, susp_record++, new_slot++, new_record++) {
 		if (susp_record->next == susp_slot) {
@@ -913,7 +925,6 @@ LIGHT(grow)(struct LIGHT(common) *ht)
 				if (prev_slot != LIGHT(end))
 					prev_record = LIGHT(touch_record)(
 								ht, prev_slot);
-					/* TODO: check the result */
 				chain_tail[prev_flag] = prev_record;
 				if (chain_tail[test_flag]) {
 					chain_tail[test_flag]->next = test_slot;

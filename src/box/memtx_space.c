@@ -293,16 +293,6 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 			     enum dup_replace_mode mode,
 			     struct tuple **result)
 {
-	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
-	/*
-	 * Ensure we have enough slack memory to guarantee
-	 * successful statement-level rollback.
-	 */
-	if (memtx_index_extent_reserve(memtx, new_tuple != NULL ?
-				       RESERVE_EXTENTS_BEFORE_REPLACE :
-				       RESERVE_EXTENTS_BEFORE_DELETE) != 0)
-		return -1;
-
 	uint32_t i = 0;
 
 	/* Update the primary key */
@@ -1502,13 +1492,11 @@ memtx_space_invalidate(struct space *space)
 {
 	/*
 	 * Abort all concurrent transactions and invalidate space in MVCC
-	 * only if it is enabled. Otherwise, all concurrent transactions
-	 * will be aborted when DDL will be prepared.
+	 * only if it is enabled. Otherwise, there is no need to abort
+	 * anything since memtx transactions don't yield without MVCC.
 	 */
-	if (memtx_tx_manager_use_mvcc_engine) {
-		memtx_tx_abort_all_for_ddl(in_txn());
+	if (memtx_tx_manager_use_mvcc_engine)
 		memtx_tx_invalidate_space(space, in_txn());
-	}
 }
 
 /* }}} DDL */

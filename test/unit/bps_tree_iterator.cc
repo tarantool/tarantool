@@ -62,22 +62,22 @@ static int compare_key(const elem_t &a, long b)
 int total_extents_allocated = 0;
 
 static void *
-extent_alloc(void *ctx)
+extent_alloc(struct matras_allocator *allocator)
 {
-	int *p_total_extents_allocated = (int *)ctx;
-	assert(p_total_extents_allocated == &total_extents_allocated);
-	++*p_total_extents_allocated;
-	return malloc(BPS_TREE_EXTENT_SIZE);
+	(void)allocator;
+	++total_extents_allocated;
+	return xmalloc(BPS_TREE_EXTENT_SIZE);
 }
 
 static void
-extent_free(void *ctx, void *extent)
+extent_free(struct matras_allocator *allocator, void *extent)
 {
-	int *p_total_extents_allocated = (int *)ctx;
-	assert(p_total_extents_allocated == &total_extents_allocated);
-	--*p_total_extents_allocated;
+	(void)allocator;
+	--total_extents_allocated;
 	free(extent);
 }
+
+struct matras_allocator allocator;
 
 static void
 iterator_check()
@@ -86,8 +86,7 @@ iterator_check()
 	header();
 
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free,
-		    &total_extents_allocated, NULL);
+	test_create(&tree, 0, &allocator, NULL);
 
 	{
 		test_iterator tmp1, tmp2;
@@ -251,8 +250,7 @@ iterator_invalidate_check()
 		long del_cnt = rand() % max_delete_count + 1;
 		if (del_pos + del_cnt > test_size)
 			del_cnt = test_size - del_pos;
-		test_create(&tree, 0, extent_alloc, extent_free,
-			    &total_extents_allocated, NULL);
+		test_create(&tree, 0, &allocator, NULL);
 
 		for (long i = 0; i < test_size; i++) {
 			elem_t e;
@@ -271,8 +269,12 @@ iterator_invalidate_check()
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			int res = test_delete(&tree, e);
-			assert(res == 0);
+			elem_t deleted;
+			deleted.first = LONG_MAX;
+			deleted.second = LONG_MAX;
+			fail_unless(test_delete(&tree, e, &deleted) == 0);
+			fail_unless(deleted.first == e.first);
+			fail_unless(deleted.second == e.second);
 		}
 		for (long i = 0; i < test_size; i++) {
 			do {
@@ -296,8 +298,7 @@ iterator_invalidate_check()
 	for (long attempt = 0; attempt < attempt_count; attempt++) {
 		long ins_pos = rand() % test_size;
 		long ins_cnt = rand() % max_insert_count + 1;
-		test_create(&tree, 0, extent_alloc, extent_free,
-			    &total_extents_allocated, NULL);
+		test_create(&tree, 0, &allocator, NULL);
 
 		for (long i = 0; i < test_size; i++) {
 			elem_t e;
@@ -352,8 +353,7 @@ iterator_invalidate_check()
 		long ins_cnt = rand() % max_insert_count + 1;
 		if (del_pos + del_cnt > test_size)
 			del_cnt = test_size - del_pos;
-		test_create(&tree, 0, extent_alloc, extent_free,
-			    &total_extents_allocated, NULL);
+		test_create(&tree, 0, &allocator, NULL);
 
 		for (long i = 0; i < test_size; i++) {
 			elem_t e;
@@ -372,8 +372,12 @@ iterator_invalidate_check()
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			int res = test_delete(&tree, e);
-			assert(res == 0);
+			elem_t deleted;
+			deleted.first = LONG_MAX;
+			deleted.second = LONG_MAX;
+			fail_unless(test_delete(&tree, e, &deleted) == 0);
+			fail_unless(deleted.first == e.first);
+			fail_unless(deleted.second == e.second);
 		}
 		for (long i = 0; i < ins_cnt; i++) {
 			elem_t e;
@@ -423,8 +427,7 @@ iterator_freeze_check()
 	struct test tree;
 
 	for (int i = 0; i < 10; i++) {
-		test_create(&tree, 0, extent_alloc, extent_free,
-			    &total_extents_allocated, NULL);
+		test_create(&tree, 0, &allocator, NULL);
 		int comp_buf_size1 = 0;
 		int comp_buf_size2 = 0;
 		for (int j = 0; j < test_data_size; j++) {
@@ -473,7 +476,7 @@ iterator_freeze_check()
 			elem_t e;
 			e.first = rand() % test_data_mod;
 			e.second = 0;
-			test_delete(&tree, e);
+			test_delete(&tree, e, NULL);
 			fail_if(test_debug_check(&tree));
 			fail_if(test_view_debug_check(&view2));
 		}
@@ -502,11 +505,17 @@ main(void)
 	plan(4);
 	header();
 
+	matras_allocator_create(&allocator, BPS_TREE_EXTENT_SIZE,
+				extent_alloc, extent_free);
+
 	srand(time(0));
 	iterator_check();
 	iterator_invalidate_check();
 	iterator_freeze_check();
-	ok(total_extents_allocated == 0, "memory leak check");
+	ok(total_extents_allocated == allocator.num_reserved_extents,
+	   "leak check");
+
+	matras_allocator_destroy(&allocator);
 
 	footer();
 	return check_plan();

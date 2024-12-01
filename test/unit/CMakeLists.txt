@@ -292,17 +292,22 @@ create_unit_test(PREFIX fiber_channel_stress
 
 create_unit_test(PREFIX cbus_stress
                  SOURCES cbus_stress.c core_test_utils.c
-                 LIBRARIES core stat
+                 LIBRARIES core
 )
 
 create_unit_test(PREFIX cbus
                  SOURCES cbus.c core_test_utils.c
-                 LIBRARIES core unit stat
+                 LIBRARIES core unit
+)
+
+create_unit_test(PREFIX tnt_thread
+                 SOURCES tnt_thread.c core_test_utils.c
+                 LIBRARIES core unit
 )
 
 create_unit_test(PREFIX cbus_call
                  SOURCES cbus_call.c core_test_utils.c
-                 LIBRARIES core unit stat
+                 LIBRARIES core unit
 )
 
 create_unit_test(PREFIX coio
@@ -374,12 +379,12 @@ create_unit_test(PREFIX http_parser
 
 create_unit_test(PREFIX rmean
                  SOURCES rmean.cc core_test_utils.c
-                 LIBRARIES stat unit
+                 LIBRARIES core unit
 )
 
 create_unit_test(PREFIX histogram
                  SOURCES histogram.c core_test_utils.c
-                 LIBRARIES stat unit
+                 LIBRARIES core unit
 )
 
 create_unit_test(PREFIX ratelimit
@@ -566,7 +571,7 @@ create_unit_test(PREFIX grp_alloc
 
 create_unit_test(PREFIX latch
                  SOURCES latch.c core_test_utils.c
-                 LIBRARIES core unit stat
+                 LIBRARIES core unit
 )
 
 create_unit_test(PREFIX memtx_allocator

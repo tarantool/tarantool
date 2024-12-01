@@ -18,6 +18,9 @@ local function apply(config)
         log.verbose('fiber.apply: disable fiber top')
         fiber.top_disable()
     end
+
+    fiber.tx_user_pool_size(configdata:get('fiber.tx_user_pool_size',
+                                           {use_default = true}))
 end
 
 return {

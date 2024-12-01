@@ -98,6 +98,16 @@ extern "C" {
 struct gc_consumer;
 
 static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
+/**
+ * Time to live for anonymous replicas - if we haven't heard from an anonymous
+ * replica during this time, it will be removed.
+ */
+extern double replication_anon_ttl;
+/**
+ * Fiber that removes anonymous replicas that haven't been in touch
+ * for too long.
+ */
+extern struct fiber *replication_anon_gc_fiber;
 
 enum { REPLICATION_THREADS_MAX = 1000 };
 
@@ -252,6 +262,15 @@ void
 replication_init(int num_threads);
 
 /**
+ * Initializes GC of anonymous replicas and creates missing anonymous
+ * replicas for orphan WAL GC consumers.
+ *
+ * Must be called after loading WAL GC consumers.
+ */
+void
+replication_anon_gc_init(void);
+
+/**
  * Prepare for freeing resources in replication_free while TX event loop is
  * still running.
  */
@@ -402,12 +421,25 @@ struct replica {
 	bool is_relay_healthy;
 	/** Whether there is an applier subscribed to this replica. */
 	bool is_applier_healthy;
+	/**
+	 * Whether the replica has an established incoming connection right now.
+	 * The main difference from `is_relay_healthy` is that the flag is set
+	 * even when the replica is connected but its relay is not used - it
+	 * happens, for example, on initial join/fetch snapshot or when the
+	 * replica is being registered in `_cluster`.
+	 * Note that if flag `is_relay_healthy` is set, this flag is set as well
+	 * because only replicas with established incoming connection can have
+	 * an established relay.
+	 */
+	bool has_incoming_connection;
 	/** Applier fiber. */
 	struct applier *applier;
 	/** Relay thread. */
 	struct relay *relay;
 	/** Garbage collection state associated with the replica. */
 	struct gc_consumer *gc;
+	/** Reference to retained checkpoint, is set only on checkpoint join. */
+	struct gc_checkpoint_ref *gc_checkpoint_ref;
 	/** Link in the anon_replicas list. */
 	struct rlist in_anon;
 	/**
@@ -501,6 +533,15 @@ bool
 replica_has_connections(const struct replica *replica);
 
 /**
+ * Collects garbage of a replica that is gone for a while: removes associated
+ * WAL GC state including persistent one and if the replica is anonymous, it
+ * is deleted. If the replica is connected or does not exist, an error is
+ * thrown.
+ */
+int
+replica_gc(const struct tt_uuid *uuid);
+
+/**
  * Check if there are enough "healthy" connections, and fire the appropriate
  * triggers. A replica connection is considered "healthy", when:
  * - it is a connection to a registered replica.
@@ -586,8 +627,14 @@ replica_on_relay_follow(struct replica *replica);
 void
 replica_on_relay_stop(struct replica *replica);
 
-#if defined(__cplusplus)
-} /* extern "C" */
+/**
+ * Disconnection handler:
+ * 1. Removes WAL GC state if the replica is not anonymous and was
+ *    evicted from the cluster.
+ * 2. Deletes the replica if it became orphan.
+ */
+void
+replica_on_disconnect(struct replica *replica);
 
 int
 replica_check_id(uint32_t replica_id);
@@ -603,6 +650,9 @@ replicaset_add(uint32_t replica_id, const struct tt_uuid *instance_uuid);
 
 struct replica *
 replicaset_add_anon(const struct tt_uuid *replica_uuid);
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 /**
  * Try to connect appliers to remote peers and receive UUID.

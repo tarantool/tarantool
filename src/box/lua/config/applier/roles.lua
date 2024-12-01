@@ -1,16 +1,94 @@
 local log = require('internal.config.utils.log')
+local fiber = require('fiber')
 
-local last_loaded = {}
-local last_roles_ordered = {}
+local roles_state = {
+    -- Loaded roles, where the key is the role name and the value is the
+    -- role object.
+    last_loaded = {},
+
+    -- Ordered list of roles, where the order is determined by the
+    -- dependencies between roles.
+    last_roles_ordered = {},
+
+    -- The box.status watcher, used to call on_event callbacks.
+    box_status_watcher = nil,
+
+    -- Last values received from box.status watcher.
+    last_box_status_value = nil,
+
+    -- Last applied config.
+    last_config = nil,
+}
+
+-- Function decorator that is used to prevent call_on_event_callbacks() from
+-- being called concurrently by watcher and post_apply().
+local lock = fiber.channel(1)
+local function locked(f)
+    return function(...)
+        lock:put(true)
+        local status, err = pcall(f, ...)
+        lock:get()
+        if not status then
+            error(err, 0)
+        end
+    end
+end
+
+-- Call all the on_event callbacks from roles in order.
+local call_on_event_callbacks = locked(function(config, key, value)
+    local roles_ordered = roles_state.last_roles_ordered
+    local roles = roles_state.last_loaded
+    for _, role_name in ipairs(roles_ordered) do
+        local role = roles[role_name]
+        if role.on_event ~= nil then
+            log.verbose(('roles.on_event: calling callback for role ' ..
+                         '"%s"'):format(role_name))
+            local ok, err = pcall(role.on_event,
+                                  config, key, value)
+            if not ok then
+                log.error(('roles.on_event: callback for role ' ..
+                           '"%s" failed: %s'):format(role_name, err))
+            end
+        end
+    end
+end)
+
+local function box_status_watcher()
+    return box.watch('box.status', function(key, value)
+        assert(key == 'box.status')
+
+        -- Store the last value to be able to call on_event callbacks
+        -- when the config is changed.
+        roles_state.last_box_status_value = table.deepcopy(value)
+
+        -- Config is not fully applied yet, don't call on_event callbacks.
+        -- We will call them later in post_apply.
+        if roles_state.last_config == nil then
+            return
+        end
+
+        call_on_event_callbacks(roles_state.last_config, 'box.status', value)
+    end)
+end
 
 local function apply(_config)
-    log.verbose('roles.apply: do nothing')
+    if roles_state.box_status_watcher == nil then
+        roles_state.box_status_watcher = box_status_watcher()
+
+        local deadline = fiber.time() + 10
+        while roles_state.last_box_status_value == nil do
+            fiber.sleep(0.01)
+            if fiber.time() > deadline then
+                error('Timeout reached while waiting for box_status_watcher', 0)
+            end
+        end
+    end
 end
 
 local function stop_roles(roles_to_skip)
     local roles_to_stop = {}
-    for id = #last_roles_ordered, 1, -1 do
-        local role_name = last_roles_ordered[id]
+    for id = #roles_state.last_roles_ordered, 1, -1 do
+        local role_name = roles_state.last_roles_ordered[id]
         if roles_to_skip == nil or roles_to_skip[role_name] == nil then
             table.insert(roles_to_stop, role_name)
         end
@@ -20,7 +98,7 @@ local function stop_roles(roles_to_skip)
     end
     local deps = {}
     for role_name in pairs(roles_to_skip or {}) do
-        local role = last_loaded[role_name] or {}
+        local role = roles_state.last_loaded[role_name] or {}
         -- There is no need to check transitive dependencies for roles_to_skip,
         -- because they were already checked when roles were started, i.e. if
         -- role A depends on role B, which depends on role C, and we stop
@@ -49,7 +127,7 @@ local function stop_roles(roles_to_skip)
     end
     for _, role_name in ipairs(roles_to_stop) do
         log.verbose('roles.post_apply: stop role ' .. role_name)
-        local ok, err = pcall(last_loaded[role_name].stop)
+        local ok, err = pcall(roles_state.last_loaded[role_name].stop)
         if not ok then
             error(('Error stopping role %s: %s'):format(role_name, err), 0)
         end
@@ -134,7 +212,7 @@ local function post_apply(config)
     -- Load roles.
     local loaded = {}
     for _, role_name in ipairs(roles_ordered) do
-        local role = last_loaded[role_name]
+        local role = roles_state.last_loaded[role_name]
         if not role then
             log.verbose('roles.post_apply: load role ' .. role_name)
             role = require(role_name)
@@ -180,8 +258,17 @@ local function post_apply(config)
         end
     end
 
-    last_loaded = loaded
-    last_roles_ordered = roles_ordered
+    roles_state.last_loaded = loaded
+    roles_state.last_roles_ordered = roles_ordered
+    roles_state.last_config = table.deepcopy(config)
+
+    -- box.status watcher values should be already set, because the watcher
+    -- has been registered during apply.
+    assert(roles_state.last_box_status_value ~= nil)
+
+    -- Call on_event callbacks after the config is fully applied.
+    call_on_event_callbacks(config, 'config.apply',
+                            roles_state.last_box_status_value)
 end
 
 return {

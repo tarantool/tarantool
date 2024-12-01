@@ -3,8 +3,9 @@ local log = require('internal.config.utils.log')
 local instance_config = require('internal.config.instance_config')
 local snapshot = require('internal.config.utils.snapshot')
 local schedule_task = fiber._internal.schedule_task
-local mkversion = require('internal.mkversion')
+local version = require('version')
 local tarantool = require('tarantool')
+local clock = require('clock')
 
 local function peer_uris(configdata)
     local peers = configdata:peers()
@@ -27,7 +28,6 @@ local function peer_uris(configdata)
     local uris = {}
     for _, peer_name in ipairs(peers) do
         local iconfig_def = configdata._peers[peer_name].iconfig_def
-        local is_anon = instance_config:get(iconfig_def, 'replication.anon')
         -- Don't use anonymous replicas as upstreams.
         --
         -- An anonymous replica can't be an upstream for a
@@ -39,7 +39,15 @@ local function peer_uris(configdata)
         --
         -- A user may configure a custom data flow using
         -- `replication.peers` option.
-        if not is_anon then
+        local is_anon = instance_config:get(iconfig_def, 'replication.anon')
+        -- Don't replicate data from an isolated instance.
+        --
+        -- While the isolated instance goes to RO and drops iproto
+        -- connections, we refuse to fetch data from it from our
+        -- side. It elimimates unnecessary errors in logs at
+        -- least.
+        local isolated = instance_config:get(iconfig_def, 'isolated')
+        if not is_anon and not isolated then
             local uri = instance_config:instance_uri(iconfig_def, 'peer',
                 {log_prefix = "replicaset dataflow configuration: "})
             if uri == nil then
@@ -59,6 +67,177 @@ local function peer_uris(configdata)
     end
 
     return uris
+end
+
+-- Modify box-level configuration values and perform other actions
+-- to enable the isolated mode (if configured).
+local function switch_isolated_mode_before_box_cfg(config, box_cfg)
+    local configdata = config._configdata
+
+    -- If the isolated mode is not enabled, there is nothing to do.
+    if not configdata:get('isolated', {use_default = true}) then
+        return
+    end
+
+    -- Issue a warning to highlight the unusual instance status to
+    -- the administrator.
+    local key = 'isolated_mode_enabled'
+    local message = ('The isolated mode is set for the instance %q'):format(
+        config._instance_name)
+    config._aboard:set({
+        type = 'warn',
+        message = message,
+    }, {
+        key = key,
+    })
+
+    -- An application or a role may perform background database
+    -- modification if the instance is in the RW mode: for
+    -- example, a role may perform eviction of stale records.
+    -- If the instance is in the isolated mode, it should be in RO
+    -- to don't produce any new transactions.
+    --
+    -- The reason is that these transactions will be sent to other
+    -- replicaset members and applied on them, when the instance
+    -- goes from the isolated mode. At the same time, the
+    -- non-isolated part of the replicaset may serve requests and
+    -- perform data modifications. An attempt to modify the same
+    -- data from two instances may break data integrity[^1].
+    --
+    -- It is recommended to extract all the needed data from the
+    -- isolated instance and perform the modifications on the
+    -- current leader (in the non-isolated part of the
+    -- replicaset).
+    --
+    -- [^1]: Unless the data operations are carefully designed to
+    --       be idempotent to use in the master-master mode.
+    --
+    -- TODO(gh-10404): Set ro_reason=isolated.
+    box_cfg.read_only = true
+
+    -- Don't accept new iproto connections.
+    --
+    -- An instance in the isolated mode shouldn't process a
+    -- traffic from a user.
+    box_cfg.listen = box.NULL
+
+    -- Don't replicate data from other replicaset members.
+    --
+    -- The isolated mode can be enabled to stop data modifications
+    -- on the given instance, including ones from the replication.
+    -- It may help to debug a problem or extract some needed data.
+    box_cfg.replication = box.NULL
+end
+
+-- Perform post-box-cfg actions to enable the isolated mode (if
+-- configured).
+local function switch_isolated_mode_after_box_cfg(config)
+    local configdata = config._configdata
+
+    -- If the isolated mode is not enabled, there is nothing to do.
+    if not configdata:get('isolated', {use_default = true}) then
+        return
+    end
+
+    -- Drop existing iproto connections.
+    --
+    -- An instance in the isolated mode shouldn't process a
+    -- traffic from a user.
+    --
+    -- Here we assume that when box.cfg() is finished, iproto
+    -- listening sockets are already closed and no new connections
+    -- may be created. So, the only thing to do is to close the
+    -- existing connections.
+    --
+    -- NB: It seems safe to start this fiber several times in
+    -- parallel, so there are no checks, whether such a fiber
+    -- already exists.
+    fiber.new(function()
+        local name = 'isolated_mode_drop_iproto_connections'
+        fiber.self():name(name, {truncate = true})
+
+        -- A note regarding box.iproto.internal.drop_connections.
+        --
+        -- It seems, the current behavior if connections are not
+        -- closed in time is to report the timeout error and
+        -- continue closing connection from the given generation
+        -- in background.
+        --
+        -- It means that the passed timeout doesn't affect the
+        -- behavior of the process of closing connections itself
+        -- and can be only used to let the caller know whether
+        -- and when the connections (existed at the moment of the
+        -- invocation) are closed.
+        --
+        -- Taking it into account, the timeout in this code is
+        -- not configurable and chosen more or less arbitrarily.
+        -- It only affects whether and when an alert is issued.
+        --
+        -- If we find a need in a future, we can make it
+        -- configurable.
+        local timeout = 10
+
+        -- Testing requires to redefine the timeout. Use an
+        -- environment variable for that.
+        local env_var_name = 'TT_CONFIG_DROP_CONNECTION_TIMEOUT'
+        local redefined_timeout = tonumber(os.getenv(env_var_name))
+        if redefined_timeout ~= nil then
+            log.warn('isolated mode: %s redefines the iproto connections ' ..
+                'drop timeout: %d', env_var_name, redefined_timeout)
+            timeout = redefined_timeout
+        end
+
+        local start_time = clock.monotonic()
+        local ok, err = pcall(box.iproto.internal.drop_connections, timeout)
+
+        -- An unique key is set here to don't duplicate the alert
+        -- if the box_cfg.apply function is called twice within
+        -- the same startup/reconfiguration process.
+        --
+        -- Currently, it is possible on startup due to the safe
+        -- startup process. See c80b121544f6 ("config: add safe
+        -- startup mode") for details.
+        --
+        -- Also, this key is used to drop the alert (if any) after
+        -- a successful `drop_connections` call.
+        local alert_key = 'isolated_mode_drop_iproto_connections_timeout'
+
+        if not ok then
+           local message = ('isolated mode: can\'t drop iproto connections ' ..
+                'during %d seconds (continued in background): %s'):format(
+                timeout, err)
+
+            -- There is no clear point, when to drop this alert.
+            --
+            -- Once appeared, it exists till the next
+            -- reconfiguration, because all the alerts are dropped
+            -- before applying the new configuration.
+            --
+            -- Also, dropped on a successful attempt to drop
+            -- connections.
+            config._aboard:set({
+                type = 'warn',
+                message = message,
+            }, {
+                key = alert_key,
+            })
+            return
+        end
+
+        -- If it appears that there were several reconfigurations
+        -- in row, each schedules a fiber to drop the connections,
+        -- but the fibers are executed after the reconfigurations,
+        -- and the first issued an alert, but the next
+        -- successfully dropped the connections, let's drop this
+        -- alert.
+        --
+        -- No-op if there is no alert with the given key.
+        config._aboard:drop(alert_key)
+
+        local duration = clock.monotonic() - start_time
+        log.info('isolated mode: successfully dropped iproto connections ' ..
+            '(took %d seconds)', duration)
+    end)
 end
 
 local function log_destination(log)
@@ -220,10 +399,10 @@ local function names_schema_upgrade_on_replace(old, new)
         return
     end
 
-    local latest_version = mkversion.get_latest()
-    local old_version = mkversion.from_tuple(old)
-    local new_version = mkversion.from_tuple(new)
-    if old_version < latest_version and new_version >= latest_version then
+    local expected_version = version.new(2, 11, 5)
+    local old_version = box.internal.version_from_tuple(old)
+    local new_version = box.internal.version_from_tuple(new)
+    if old_version < expected_version and new_version >= expected_version then
         -- We cannot do it inside on_replace trigger, as the version
         -- is not considered set yet and we may try to set names, when
         -- schema is not yet updated, which will fail as DDL is
@@ -293,7 +472,8 @@ local function names_apply(config, missing_names, schema_version)
     names_alert_missing(config, missing_names)
     -- Don't wait for box.status to change, we may be already rw, set names
     -- on reload, if it's possible and needed.
-    if schema_version and schema_version >= mkversion.get_latest() then
+    if schema_version and
+       schema_version >= box.internal.latest_dd_version() then
         names_try_set_missing()
     end
 
@@ -305,9 +485,9 @@ local function names_apply(config, missing_names, schema_version)
     box.space._schema:on_replace(names_schema_on_replace)
     box.space._cluster:on_replace(names_cluster_on_replace)
 
-    -- Wait for rw state. If schema version is nil, bootstrap is
-    -- going to be done.
-    if schema_version and schema_version < mkversion.get_latest() then
+    -- Wait for rw state and schema 2.11.5 to apply names. If schema version
+    -- is nil, bootstrap is going to be done.
+    if schema_version and schema_version < version.new(2, 11, 5) then
         box.space._schema:on_replace(names_schema_upgrade_on_replace)
         names_state.is_upgrade_wait = true
     else
@@ -320,14 +500,59 @@ end
 local function get_schema_version_before_cfg(config)
     local snap_path = snapshot.get_path(config._configdata._iconfig_def)
     if snap_path ~= nil then
-        return mkversion.from_tuple(snapshot.get_schema_version(snap_path))
+        local tuple = snapshot.get_schema_version(snap_path)
+        return box.internal.version_from_tuple(tuple)
     end
     -- Bootstrap, config not found
     return nil
 end
 
+-- See hooks_new().
+local hooks_mt = {
+    __index = {
+        add = function(self, hook, ctx)
+            local entry = {
+                hook = hook,
+                ctx = ctx,
+            }
+            table.insert(self._hooks, entry)
+        end,
+        run = function(self)
+            for _, entry in ipairs(self._hooks) do
+                entry.hook(entry.ctx)
+            end
+        end,
+    },
+}
+
+-- A little helper to collect some hooks and run them later.
+--
+-- Usage:
+--
+--  | local hooks = hooks_new()
+--  |
+--  | eat_pizza()
+--  | hooks:add(throw_away, {what = 'pizza box'})
+--  | hooks:add(wash_hands, {person = 'me'})
+--  |
+--  | drink_juice()
+--  | hooks:add(wash_glass, {glass = 'my glass'})
+--  |
+--  | finish_dinner()
+--  | hooks:run()
+local function hooks_new()
+    return setmetatable({
+        _hooks = {},
+    }, hooks_mt)
+end
+
 -- Returns nothing or {needs_retry = true}.
 local function apply(config)
+    -- There are some actions that logically correspond to some
+    -- logic written before the box.cfg() call, but technically
+    -- they should be run after box.cfg(). Place them here.
+    local post_box_cfg_hooks = hooks_new()
+
     local configdata = config._configdata
     local box_cfg = configdata:filter(function(w)
         return w.schema.box_cfg ~= nil
@@ -626,7 +851,7 @@ local function apply(config)
             end)
         else
             -- Note, that we try to find new missing names on every reload.
-            names_apply(config, missing_names, mkversion.get())
+            names_apply(config, missing_names, box.internal.dd_version())
         end
     end
 
@@ -644,6 +869,11 @@ local function apply(config)
         labels = labels or { alias = names.instance_name },
     }
 
+    -- RO may be enforced by the isolated mode, so we call the
+    -- function after all the other logic that may set RW.
+    switch_isolated_mode_before_box_cfg(config, box_cfg)
+    post_box_cfg_hooks:add(switch_isolated_mode_after_box_cfg, config)
+
     -- First box.cfg() call.
     --
     -- Force the read-only mode if:
@@ -652,6 +882,10 @@ local function apply(config)
     -- * the instance is not the only one in its replicaset, and
     -- * there is an existing snapshot (otherwise we wouldn't able
     --   to assign a bootstrap leader).
+    --
+    -- NB: The read-only mode may be enforced due to other reasons
+    -- (such as enabled isolated mode) that are not specific to
+    -- the startup flow.
     --
     -- The reason is that the configured master may be switched
     -- while it is starting. In this case it is undesirable to set
@@ -756,6 +990,7 @@ local function apply(config)
 
         log.debug('box_cfg.apply (startup)')
         box.cfg(box_cfg)
+        post_box_cfg_hooks:run()
 
         -- NB: needs_retry should be true when force_read_only is
         -- true. It is so by construction.
@@ -765,6 +1000,7 @@ local function apply(config)
     -- If it is reload, just apply the new configuration.
     log.debug('box_cfg.apply')
     box.cfg(box_cfg)
+    post_box_cfg_hooks:run()
 end
 
 return {

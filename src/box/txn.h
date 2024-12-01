@@ -114,12 +114,6 @@ enum txn_flag {
 	TXN_IS_STARTED_IN_ENGINE = 0x400,
 	/** Transaction supports multiple engines. */
 	TXN_SUPPORTS_MULTI_ENGINE = 0x800,
-	/**
-	 * Transaction properly handles concurrent DDL operations.
-	 * If a transaction doesn't have this flag, it'll be aborted
-	 * by any DDL operation.
-	 */
-	TXN_HANDLES_DDL = 0x1000,
 };
 
 enum {
@@ -916,20 +910,6 @@ txn_is_nop(const struct txn *txn)
 }
 
 /**
- * Check whether a transaction consists only of operations on fully temporary
- * spaces.
- */
-bool
-txn_is_fully_temporary(struct txn *txn);
-
-/**
- * Check whether a transaction consists only of remote operations coming from
- * the applier.
- */
-bool
-txn_is_fully_remote(struct txn *txn);
-
-/**
  * Mark @a stmt as temporary by removing the associated stmt->row
  * and update @a txn accordingly.
  *
@@ -1008,6 +988,13 @@ static inline struct txn_stmt *
 txn_first_stmt(struct txn *txn)
 {
 	return stailq_first_entry(&txn->stmts, struct txn_stmt, next);
+}
+
+/** The last statement of the transaction. */
+static inline struct txn_stmt *
+txn_last_stmt(struct txn *txn)
+{
+	return stailq_last_entry(&txn->stmts, struct txn_stmt, next);
 }
 
 /** The current statement of the transaction. */

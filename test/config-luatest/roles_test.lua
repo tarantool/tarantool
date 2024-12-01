@@ -636,3 +636,249 @@ g.test_role_is_not_a_table = function()
             'expected table, got number',
     })
 end
+
+-- Ensure that on_event callback is called correctly.
+g.test_role_on_event = function(g)
+    local one = [[
+        _G.foo = -1
+        _G.is_ro = 'unknown'
+
+        return {
+            validate = function() end,
+            apply = function()
+                _G.foo = 0
+            end,
+            stop = function()
+                _G.foo = -1
+            end,
+            on_event = function(_, key, value)
+                assert(_G.foo >= 0)
+
+                if(_G.foo == 0) then
+                    assert(key == 'config.apply')
+                else
+                    assert(key == 'box.status')
+                end
+
+                _G.is_ro = value.is_ro
+                _G.foo = _G.foo + 1
+            end,
+        }
+    ]]
+
+    local verify = function()
+        t.assert_equals(_G.foo, 1)
+        t.assert_equals(_G.is_ro, false)
+
+        box.cfg({read_only = true})
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.foo, 2)
+            t.assert_equals(_G.is_ro, true)
+        end)
+
+        box.cfg({read_only = false})
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.foo, 3)
+            t.assert_equals(_G.is_ro, false)
+        end)
+    end
+
+    helpers.success_case(g, {
+        roles = {one = one},
+        options = {
+            ['roles'] = {'one'}
+        },
+        verify = verify,
+    })
+end
+
+-- Ensure that on_event callback is called correctly after reload.
+g.test_role_on_event_reload = function(g)
+    local one = [[
+        _G.foo = -1
+        _G.is_ro = 'unknown'
+
+        return {
+            validate = function() end,
+            apply = function()
+                _G.foo = 0
+            end,
+            stop = function()
+                _G.foo = -1
+            end,
+            on_event = function(_, _, value)
+                assert(_G.foo >= 0)
+                _G.is_ro = value.is_ro
+                _G.foo = _G.foo + 1
+            end,
+        }
+    ]]
+
+    local verify = function()
+        t.assert_equals(rawget(_G, 'foo'), nil)
+        t.assert_equals(rawget(_G, 'is_ro'), nil)
+    end
+
+    local verify_2 = function()
+        t.assert_equals(_G.foo, 1)
+        t.assert_equals(_G.is_ro, false)
+
+        box.cfg({read_only = true})
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.foo, 2)
+            t.assert_equals(_G.is_ro, true)
+        end)
+
+        box.cfg({read_only = false})
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.foo, 3)
+            t.assert_equals(_G.is_ro, false)
+        end)
+    end
+
+    helpers.reload_success_case(g, {
+        roles = {one = one},
+        options = {},
+        options_2 = {
+            ['roles'] = {'one'},
+        },
+        verify = verify,
+        verify_2 = verify_2,
+    })
+end
+
+-- Ensure that on_event callbacks are called in the correct order.
+g.test_role_on_event_order = function(g)
+    local one = [[
+        _G.foo = -1
+        _G.is_ro = 'unknown'
+
+        return {
+            validate = function() end,
+            apply = function()
+                _G.foo = 0
+            end,
+            stop = function()
+                _G.foo = -1
+            end,
+            on_event = function(_, _, value)
+                assert(_G.foo >= 0)
+                _G.is_ro = value.is_ro
+                _G.foo = _G.foo + 1
+            end,
+        }
+    ]]
+
+    local two = [[
+        _G.bar = -1
+
+        return {
+            dependencies = {'one'},
+            validate = function() end,
+            apply = function()
+                _G.bar = 0
+            end,
+            stop = function()
+                _G.bar = -1
+            end,
+            on_event = function()
+                assert(_G.foo >= 0)
+                assert(_G.bar >= 0)
+                _G.bar = _G.foo * 2
+            end,
+        }
+    ]]
+
+    local verify = function()
+        t.assert_equals(_G.foo, 1)
+        t.assert_equals(_G.bar, 2)
+        t.assert_equals(_G.is_ro, false)
+
+        box.cfg({read_only = true})
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.foo, 2)
+            t.assert_equals(_G.bar, 4)
+            t.assert_equals(_G.is_ro, true)
+        end)
+
+        box.cfg({read_only = false})
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.foo, 3)
+            t.assert_equals(_G.bar, 6)
+            t.assert_equals(_G.is_ro, false)
+        end)
+    end
+
+    helpers.success_case(g, {
+        roles = {one = one, two = two},
+        options = {
+            ['roles'] = {'one', 'two'},
+        },
+        verify = verify,
+    })
+end
+
+-- Ensure that on_event callback error is logged and doesn't prevent other
+-- callbacks from being called.
+g.test_role_on_event_error = function(g)
+    local one = [[
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+            on_event = function()
+                error('something wrong')
+            end,
+        }
+    ]]
+
+    local two = [[
+        _G.bar = -1
+
+        return {
+            dependencies = {'one'},
+            validate = function() end,
+            apply = function()
+                _G.bar = 0
+            end,
+            stop = function()
+                _G.bar = -1
+            end,
+            on_event = function()
+                assert(_G.bar >= 0)
+                _G.bar = _G.bar + 1
+            end,
+        }
+    ]]
+
+    local verify = function()
+        t.assert_equals(_G.bar, 1)
+
+        box.cfg({read_only = true})
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.bar, 2)
+        end)
+
+        box.cfg({read_only = false})
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.bar, 3)
+        end)
+    end
+
+    helpers.success_case(g, {
+        roles = {one = one, two = two},
+        options = {
+            ['roles'] = {'one', 'two'},
+            ['log'] = {
+                ['to'] = 'file',
+                ['file'] = './var/log/instance-001/tarantool.log',
+            },
+        },
+        verify = verify,
+    })
+
+    local log_postfix = '/var/log/instance-001/tarantool.log'
+    t.assert(g.server:grep_log(
+        'roles.on_event: callback for role "one" failed: ' ..
+        '.* something wrong', 1024, {filename = g.server.chdir .. log_postfix}))
+end

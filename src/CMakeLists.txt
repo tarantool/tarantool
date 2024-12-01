@@ -73,6 +73,7 @@ lua_source(lua_sources lua/compat.lua compat_lua)
 lua_source(lua_sources lua/varbinary.lua varbinary_lua)
 lua_source(lua_sources lua/protobuf_wireformat.lua protobuf_wireformat_lua)
 lua_source(lua_sources lua/protobuf.lua protobuf_lua)
+lua_source(lua_sources lua/version.lua version_lua)
 if (ENABLE_COMPRESS_MODULE)
     lua_source(lua_sources ${COMPRESS_MODULE_LUA_SOURCE} compress_lua)
 endif()
@@ -165,9 +166,6 @@ if(NOT TARGET_OS_OPENBSD)
     endif()
 endif()
 
-add_library(stat STATIC rmean.c latency.c histogram.c)
-target_link_libraries(stat core)
-
 add_library(cpu_feature STATIC cpu_feature.c)
 
 add_library(crc32 STATIC
@@ -190,6 +188,7 @@ set (server_sources
      ssl_cert_paths_discover.c
      systemd.c
      version.c
+     lua/alloc.c
      lua/digest.c
      lua/init.c
      lua/fiber.c
@@ -255,6 +254,7 @@ set(api_headers
     ${PROJECT_SOURCE_DIR}/src/lib/core/fiber_cond.h
     ${PROJECT_SOURCE_DIR}/src/lib/core/coio.h
     ${PROJECT_SOURCE_DIR}/src/lib/core/coio_task.h
+    ${PROJECT_SOURCE_DIR}/src/lib/core/tnt_thread.h
     ${PROJECT_SOURCE_DIR}/src/box/ibuf.h
     ${PROJECT_SOURCE_DIR}/src/lua/utils.h
     ${PROJECT_SOURCE_DIR}/src/lua/error.h

@@ -20,8 +20,7 @@ fiber = require('fiber')
 channel1 = fiber.channel(1)
 channel2 = fiber.channel(1)
 
--- Let's try to build two indexes in parallel. First one to finish wins
--- the race.
+-- Let's build two indexes in parallel
 _ = test_run:cmd("setopt delimiter ';'")
 function create_sk_in_tx(space, name, channel)
     box.begin()
@@ -40,7 +39,7 @@ errinj.set('ERRINJ_BUILD_INDEX_DELAY', false);
 channel1:get()
 channel2:get()
 
-assert((s1.index[1] == nil) ~= (s2.index[1] == nil))
+assert(s1.index[1] ~= nil and s2.index[1] ~= nil)
 
 box.space.s1:drop()
 box.space.s2:drop()
