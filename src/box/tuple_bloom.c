@@ -162,7 +162,7 @@ tuple_bloom_new(struct tuple_bloom_builder *builder, double fpr)
 		return NULL;
 	}
 
-	bloom->is_legacy = false;
+	bloom->version = TUPLE_BLOOM_VERSION_V2;
 	bloom->part_count = 0;
 
 	for (uint32_t i = 0; i < part_count; i++) {
@@ -207,7 +207,7 @@ tuple_bloom_maybe_has(const struct tuple_bloom *bloom, struct tuple *tuple,
 {
 	assert(!key_def->is_multikey || multikey_idx != MULTIKEY_NONE);
 
-	if (bloom->is_legacy) {
+	if (bloom->version == TUPLE_BLOOM_VERSION_V1) {
 		return bloom_maybe_has(&bloom->parts[0],
 				       tuple_hash(tuple, key_def));
 	}
@@ -234,7 +234,7 @@ tuple_bloom_maybe_has_key(const struct tuple_bloom *bloom,
 			  const char *key, uint32_t part_count,
 			  struct key_def *key_def)
 {
-	if (bloom->is_legacy) {
+	if (bloom->version == TUPLE_BLOOM_VERSION_V1) {
 		if (part_count < key_def->part_count)
 			return true;
 		return bloom_maybe_has(&bloom->parts[0],
@@ -320,7 +320,7 @@ tuple_bloom_encode(const struct tuple_bloom *bloom, char *buf)
 }
 
 struct tuple_bloom *
-tuple_bloom_decode(const char **data)
+tuple_bloom_decode(const char **data, enum tuple_bloom_version version)
 {
 	uint32_t part_count = mp_decode_array(data);
 	struct tuple_bloom *bloom = malloc(sizeof(*bloom) +
@@ -331,50 +331,37 @@ tuple_bloom_decode(const char **data)
 			 "malloc", "tuple bloom");
 		return NULL;
 	}
-
-	bloom->is_legacy = false;
-	bloom->part_count = 0;
-
-	for (uint32_t i = 0; i < part_count; i++) {
-		if (tuple_bloom_decode_part(&bloom->parts[i], data) != 0) {
-			tuple_bloom_delete(bloom);
+	bloom->version = version;
+	switch (version) {
+	case TUPLE_BLOOM_VERSION_V1:
+		bloom->part_count = 1;
+		if (mp_decode_array(data) != 4)
+			unreachable();
+		if (mp_decode_uint(data) != 0) /* version */
+			unreachable();
+		bloom->parts[0].table_size = mp_decode_uint(data);
+		bloom->parts[0].hash_count = mp_decode_uint(data);
+		size_t store_size = mp_decode_binl(data);
+		assert(store_size == bloom_store_size(&bloom->parts[0]));
+		if (bloom_load_table(&bloom->parts[0], *data) != 0) {
+			diag_set(OutOfMemory, store_size, "bloom_load_table",
+				 "tuple bloom part");
+			free(bloom);
 			return NULL;
 		}
-		bloom->part_count++;
+		*data += store_size;
+		break;
+	case TUPLE_BLOOM_VERSION_V2:
+		bloom->part_count = 0;
+		for (uint32_t i = 0; i < part_count; i++) {
+			if (tuple_bloom_decode_part(&bloom->parts[i],
+						    data) != 0) {
+				tuple_bloom_delete(bloom);
+				return NULL;
+			}
+			bloom->part_count++;
+		}
+		break;
 	}
-	return bloom;
-}
-
-struct tuple_bloom *
-tuple_bloom_decode_legacy(const char **data)
-{
-	struct tuple_bloom *bloom = malloc(sizeof(*bloom) +
-					   sizeof(*bloom->parts));
-	if (bloom == NULL) {
-		diag_set(OutOfMemory, sizeof(*bloom) + sizeof(*bloom->parts),
-			 "malloc", "tuple bloom");
-		return NULL;
-	}
-
-	bloom->is_legacy = true;
-	bloom->part_count = 1;
-
-	if (mp_decode_array(data) != 4)
-		unreachable();
-	if (mp_decode_uint(data) != 0) /* version */
-		unreachable();
-
-	bloom->parts[0].table_size = mp_decode_uint(data);
-	bloom->parts[0].hash_count = mp_decode_uint(data);
-
-	size_t store_size = mp_decode_binl(data);
-	assert(store_size == bloom_store_size(&bloom->parts[0]));
-	if (bloom_load_table(&bloom->parts[0], *data) != 0) {
-		diag_set(OutOfMemory, store_size, "bloom_load_table",
-			 "tuple bloom part");
-		free(bloom);
-		return NULL;
-	}
-	*data += store_size;
 	return bloom;
 }
