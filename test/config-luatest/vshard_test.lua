@@ -3,9 +3,15 @@ local t = require('luatest')
 local treegen = require('luatest.treegen')
 local justrun = require('luatest.justrun')
 local server = require('luatest.server')
+local cbuilder = require('luatest.cbuilder')
 local helpers = require('test.config-luatest.helpers')
+local cluster = require('test.config-luatest.cluster')
 
 local g = helpers.group()
+
+g.before_all(cluster.init)
+g.after_each(cluster.drop)
+g.after_all(cluster.clean)
 
 local has_vshard = pcall(require, 'vshard-ee')
 if not has_vshard then
@@ -760,4 +766,60 @@ g.test_weight = function(g)
     -- Check that vshard option weight is set to the same value.
     local res = g.server:eval("return vshard.router.static.current_cfg")
     t.assert_equals(res.sharding['replicaset-001'].weight, 17)
+end
+
+-- Verify a scenario, when some of the instances in a sharded
+-- cluster have no sharding role.
+--
+-- Before gh-10458 instances where some sharding role is enabled
+-- were unable to start in this scenario, assuming that all the
+-- instances have some sharding role (or at least an empty list in
+-- the sharding.roles option).
+g.test_no_sharding_role = function(g)
+    skip_if_no_vshard()
+
+    local config = cbuilder:new()
+        :set_global_option('credentials.users.storage', {
+            roles = {'sharding'},
+            password = 'storage',
+        })
+        :set_global_option('iproto.advertise.sharding', {
+            login = 'storage',
+        })
+        :set_global_option('replication.failover', 'manual')
+        :use_group('g-001')
+
+        -- First shard.
+        :use_replicaset('storage-rs-001')
+        :set_replicaset_option('sharding.roles', {'storage'})
+        :set_replicaset_option('leader', 'storage-rs-001-i-001')
+        :add_instance('storage-rs-001-i-001', {})
+        :add_instance('storage-rs-001-i-002', {})
+
+        -- Second shard.
+        :use_replicaset('storage-rs-002')
+        :set_replicaset_option('sharding.roles', {'storage'})
+        :set_replicaset_option('leader', 'storage-rs-002-i-001')
+        :add_instance('storage-rs-002-i-001', {})
+        :add_instance('storage-rs-002-i-002', {})
+
+        -- Router.
+        :use_replicaset('router-rs-001')
+        :set_replicaset_option('sharding.roles', {'router'})
+        :set_replicaset_option('leader', 'router-rs-001-i-001')
+        :add_instance('router-rs-001-i-001', {})
+
+        -- A separate service within the cluster.
+        :use_replicaset('foo-rs-001')
+        :set_replicaset_option('leader', 'foo-rs-001-i-001')
+        :add_instance('foo-rs-001-i-001', {})
+
+        :config()
+
+    -- We aim a successful cluster start in this scenario.
+    --
+    -- :start() checks box.info.config.status on all the
+    -- instances. We don't need to check anything else.
+    local cluster = cluster.new(g, config)
+    cluster:start()
 end
