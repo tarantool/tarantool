@@ -618,6 +618,34 @@ vy_stmt_stat_decode(struct vy_stmt_stat *stat, const char **data)
 	}
 }
 
+static enum tuple_bloom_version
+iproto_to_tuple_bloom_version(uint32_t key)
+{
+	switch (key) {
+	case VY_RUN_INFO_BLOOM_FILTER_LEGACY:
+		return TUPLE_BLOOM_VERSION_V1;
+	case VY_RUN_INFO_BLOOM_FILTER:
+		return TUPLE_BLOOM_VERSION_V2;
+	default:
+		unreachable();
+	}
+	return 0;
+}
+
+static uint32_t
+tuple_bloom_version_to_iproto(enum tuple_bloom_version version)
+{
+	switch (version) {
+	case TUPLE_BLOOM_VERSION_V1:
+		return VY_RUN_INFO_BLOOM_FILTER_LEGACY;
+	case TUPLE_BLOOM_VERSION_V2:
+		return VY_RUN_INFO_BLOOM_FILTER;
+	default:
+		unreachable();
+	}
+	return 0;
+}
+
 /**
  * Decode the run metadata from xrow.
  *
@@ -670,12 +698,9 @@ vy_run_info_decode(struct vy_run_info *run_info,
 			run_info->page_count = mp_decode_uint(&pos);
 			break;
 		case VY_RUN_INFO_BLOOM_FILTER_LEGACY:
-			run_info->bloom = tuple_bloom_decode_legacy(&pos);
-			if (run_info->bloom == NULL)
-				return -1;
-			break;
 		case VY_RUN_INFO_BLOOM_FILTER:
-			run_info->bloom = tuple_bloom_decode(&pos);
+			run_info->bloom = tuple_bloom_decode(
+				&pos, iproto_to_tuple_bloom_version(key));
 			if (run_info->bloom == NULL)
 				return -1;
 			break;
@@ -1983,8 +2008,12 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	size_t max_key_size = tmp - run_info->max_key;
 
 	uint32_t key_count = 6;
-	if (run_info->bloom != NULL)
+	uint32_t bloom_key = 0;
+	if (run_info->bloom != NULL) {
 		key_count++;
+		bloom_key = tuple_bloom_version_to_iproto(
+			run_info->bloom->version);
+	}
 
 	size_t size = mp_sizeof_map(key_count);
 	size += mp_sizeof_uint(VY_RUN_INFO_MIN_KEY) + min_key_size;
@@ -1996,7 +2025,7 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	size += mp_sizeof_uint(VY_RUN_INFO_PAGE_COUNT) +
 		mp_sizeof_uint(run_info->page_count);
 	if (run_info->bloom != NULL)
-		size += mp_sizeof_uint(VY_RUN_INFO_BLOOM_FILTER) +
+		size += mp_sizeof_uint(bloom_key) +
 			tuple_bloom_size(run_info->bloom);
 	size += mp_sizeof_uint(VY_RUN_INFO_STMT_STAT) +
 		vy_stmt_stat_sizeof(&run_info->stmt_stat);
@@ -2023,7 +2052,7 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	pos = mp_encode_uint(pos, VY_RUN_INFO_PAGE_COUNT);
 	pos = mp_encode_uint(pos, run_info->page_count);
 	if (run_info->bloom != NULL) {
-		pos = mp_encode_uint(pos, VY_RUN_INFO_BLOOM_FILTER);
+		pos = mp_encode_uint(pos, bloom_key);
 		pos = tuple_bloom_encode(run_info->bloom, pos);
 	}
 	pos = mp_encode_uint(pos, VY_RUN_INFO_STMT_STAT);
