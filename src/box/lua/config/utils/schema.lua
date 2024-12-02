@@ -1874,9 +1874,6 @@ local function set_schema_annotations(schema, annotations)
 
     -- Set annotations for the given schema node based
     -- on the field path accumulated in ctx.path.
-    --
-    -- TODO(gh-10691): Refactor to separate schema logic from
-    -- data validators, and assign validators here.
     local function set_annotations(schema, ctx)
         if descriptions ~= nil then
             set_description(schema, ctx)

@@ -1,11 +1,11 @@
 local schema = require('experimental.config.utils.schema')
 local descriptions = require('internal.config.descriptions')
 local tarantool = require('tarantool')
-local uuid = require('uuid')
 local urilib = require('uri')
 local fio = require('fio')
 local file = require('internal.config.utils.file')
 local log = require('internal.config.utils.log')
+local validators = require('internal.config.validators')
 local funcutils = require('internal.config.utils.funcutils')
 local network = require('internal.config.utils.network')
 
@@ -44,33 +44,6 @@ local network = require('internal.config.utils.network')
 -- * mk_parent_dir (boolean)
 --
 --   Create a parent directory for the given file before box.cfg().
-
--- Verify that replication.failover option is not present in the
--- instance scope of the cluster config.
-local function validate_replication_failover(data, w)
-    -- scope == nil means that it is the instance config.
-    local scope = w.schema.scope
-
-    -- There is no much sense to set the failover option for a
-    -- particular instance, not the whole replicaset. So, the
-    -- option is forbidden for the instance scope of the cluster
-    -- config.
-    --
-    -- However, it is allowed for the instance config to accept an
-    -- instantiated cluster config as valid.
-    if scope ~= 'instance' then
-        return
-    end
-
-    if data.replication ~= nil and data.replication.failover ~= nil then
-        w.error('replication.failover must not be present in the %s scope',
-            scope)
-    end
-end
-
-local function validate_outmost_record(data, w)
-    validate_replication_failover(data, w)
-end
 
 local function enterprise_edition_validate(data, w)
     -- OK if we're on Tarantool EE.
@@ -118,48 +91,6 @@ local function enterprise_edition(schema_node)
         enterprise_edition_apply_default_if)
 
     return schema_node
-end
-
-local function validate_uuid_str(data, w)
-    if uuid.fromstr(data) == nil then
-        w.error('Unable to parse the value as a UUID: %q', data)
-    end
-    if data == uuid.NULL:str() then
-        w.error('nil UUID is reserved')
-    end
-end
-
--- Verify 'uri' field in iproto.listen and iproto.advertise.* options.
-local function validate_uri_field(has_login_field, used_to_connect)
-    return function(data, w)
-        -- Substitute variables with placeholders to don't confuse
-        -- the URI parser with the curly brackets.
-        data = data:gsub('{{ *.- *}}', 'placeholder')
-        local uri, err = urilib.parse(data)
-        if uri == nil then
-            if data:find(',') then
-                w.error('A single URI is expected, not a list of URIs')
-            end
-            w.error('Unable to parse an URI: %s', err)
-        end
-        if uri.login ~= nil and has_login_field then
-            w.error("Login must be set via the 'login' option")
-        end
-        if uri.login ~= nil and not has_login_field then
-            w.error('Login cannot be set for as part of the URI')
-        end
-        assert(uri.password == nil)
-        if uri.params ~= nil then
-            w.error("URI parameters should be described in the 'params' " ..
-                "field, not as the part of URI")
-        end
-        if used_to_connect then
-            local ok, err = network.uri_is_suitable_to_connect(uri)
-            if not ok then
-                w.error("bad URI %q: %s", data, err)
-            end
-        end
-    end
 end
 
 -- Accept a value of 'iproto.listen' option and return the first URI
@@ -392,46 +323,6 @@ local function feedback_apply_default_if(_data, _w)
     return box.internal.feedback_daemon ~= nil
 end
 
-local function feedback_validate(data, w)
-    if data == nil or box.internal.feedback_daemon ~= nil then
-        return
-    end
-    w.error('Tarantool is built without feedback reports sending support')
-end
-
--- Verify that the given validation context (w) corresponds to one
--- of the given cluster config scopes (global, group, replicaset,
--- instance) or the validation is performed against the instance
--- config schema.
-local function validate_scope(w, allowed_scopes)
-    local scope = w.schema.computed.annotations.scope
-
-    -- scope = nil means that the validation is performed against
-    -- the instance config schema, not the cluster config.
-    --
-    -- The validation against the instance config is performed for
-    -- values from the env configuration source (which collects
-    -- the TT_* environment variables).
-    --
-    -- Also, it would be very counter-intuitive if
-    -- cluster_config:instantiate() would produce a result that
-    -- doesn't pass the instance_config:validate() check.
-    if scope == nil then
-        return
-    end
-
-    -- If the current scope is listed in the allowed scopes -- OK.
-    for _, allowed_scope in ipairs(allowed_scopes) do
-        if scope == allowed_scope then
-            return
-        end
-    end
-
-    -- Any other level of the cluster configuration -- raise an
-    -- error.
-    w.error('The option must not be present in the %s scope', scope)
-end
-
 return schema.new('instance_config', schema.record({
     config = schema.record({
         reload = schema.enum({
@@ -448,12 +339,7 @@ return schema.new('instance_config', schema.record({
         etcd = enterprise_edition(schema.record({
             prefix = schema.scalar({
                 type = 'string',
-                validate = function(data, w)
-                    if not data:startswith('/') then
-                        w.error(('config.etcd.prefix should be a path alike ' ..
-                            'value, got %q'):format(data))
-                    end
-                end,
+                validate = validators['config.etcd.prefix'],
             }),
             endpoints = schema.array({
                 items = schema.scalar({
@@ -514,26 +400,12 @@ return schema.new('instance_config', schema.record({
                 }),
             }),
         }, {
-            validate = function(data, w)
-                -- No config.etcd section at all -- OK.
-                if data == nil or next(data) == nil then
-                    return
-                end
-                -- There is some data -- the prefix should be there.
-                if data.prefix == nil then
-                    w.error('No config.etcd.prefix provided')
-                end
-            end,
+            validate = validators['config.etcd'],
         })),
         storage = enterprise_edition(schema.record({
             prefix = schema.scalar({
                 type = 'string',
-                validate = function(data, w)
-                    if not data:startswith('/') then
-                        w.error(('config.storage.prefix should be ' ..
-                            'a path alike value, got %q'):format(data))
-                    end
-                end,
+                validate = validators['config.storage.prefix'],
             }),
             endpoints = schema.array({
                 items = schema.record({
@@ -571,12 +443,7 @@ return schema.new('instance_config', schema.record({
                         })),
                     }),
                 }),
-                validate = function(data, w)
-                    if #data == 0 then
-                        w.error('At least one endpoint must be' ..
-                            'specified in config.storage.endpoints')
-                    end
-                end,
+                validate = validators['config.storage.endpoints'],
             }),
             timeout = schema.scalar({
                 type = 'number',
@@ -587,20 +454,7 @@ return schema.new('instance_config', schema.record({
                 default = 3,
             })
         }, {
-            validate = function(data, w)
-                if data == nil or next(data) == nil then
-                    return
-                end
-                if data.prefix == nil and data.endpoints == nil then
-                    return
-                end
-                if data.prefix == nil then
-                    w.error('No config.storage.prefix provided')
-                end
-                if data.endpoints == nil then
-                    w.error('No config.storage.endpoints provided')
-                end
-            end
+            validate = validators['config.storage'],
         })),
         context = schema.map({
             key = schema.scalar({
@@ -623,20 +477,7 @@ return schema.new('instance_config', schema.record({
                     default = false,
                 }),
             }, {
-                validate = function(var, w)
-                    if var.from == nil then
-                        w.error('"from" field must be defined in a context ' ..
-                            'variable definition')
-                    end
-                    if var.from == 'env' and var.env == nil then
-                        w.error('"env" field must define an environment ' ..
-                            'variable name if "from" field is set to "env"')
-                    end
-                    if var.from == 'file' and var.file == nil then
-                        w.error('"file" field must define a file name if ' ..
-                            '"from" field is set to "file"')
-                    end
-                end,
+                validate = validators['config.context.*'],
             }),
         }),
     }),
@@ -696,11 +537,7 @@ return schema.new('instance_config', schema.record({
             type = 'integer',
             -- Default value: 2GB.
             default = 2 * 1024 * 1024 * 1024,
-            validate = function(data, w)
-                if data < 256 * 1024 * 1024 then
-                    w.error('Memory limit should be >= 256MB')
-                end
-            end,
+            validate = validators['lua.memory'],
         }),
     }),
     console = schema.record({
@@ -849,19 +686,14 @@ return schema.new('instance_config', schema.record({
             default = box.NULL,
         }),
     }, {
-        validate = function(log, w)
-            if log.to == 'pipe' and log.pipe == nil then
-                w.error('The pipe logger is set by the log.to parameter but ' ..
-                    'the command is not set (log.pipe parameter)')
-            end
-        end,
+        validate = validators['log'],
     }),
     iproto = schema.record({
         listen = schema.array({
             items = schema.record({
                 uri = schema.scalar({
                     type = 'string',
-                    validate = validate_uri_field(false, false),
+                    validate = validators['iproto.listen.*.uri'],
                 }),
                 params = schema.record({
                     transport = schema.enum({
@@ -890,12 +722,7 @@ return schema.new('instance_config', schema.record({
                     })),
                 }),
             }, {
-                validate = function(data, w)
-                    -- If data is not nil then the URI should be there.
-                    if data.uri == nil then
-                        w.error('The URI is required for iproto.listen')
-                    end
-                end,
+                validate = validators['iproto.listen.*'],
             }),
             box_cfg = 'listen',
         }),
@@ -961,7 +788,7 @@ return schema.new('instance_config', schema.record({
             client = schema.scalar({
                 type = 'string',
                 default = box.NULL,
-                validate = validate_uri_field(false, true),
+                validate = validators['iproto.advertise.client'],
             }),
             peer = schema.record({
                 login = schema.scalar({
@@ -972,7 +799,7 @@ return schema.new('instance_config', schema.record({
                 }),
                 uri = schema.scalar({
                     type = 'string',
-                    validate = validate_uri_field(true, true),
+                    validate = validators['iproto.advertise.peer.uri'],
                 }),
                 params = schema.record({
                     transport = schema.enum({
@@ -999,19 +826,7 @@ return schema.new('instance_config', schema.record({
                     })),
                 }),
             }, {
-                validate = function(data, w)
-                    if next(data) == nil then
-                        w.error('An URI should have at least one field')
-                    end
-                    -- If a password is set, a login must also be specified.
-                    if data.password ~= nil and data.login == nil then
-                        w.error('Password cannot be set without setting login')
-                    end
-                    -- If a params is set, an uri must also be specified.
-                    if data.params ~= nil and data.uri == nil then
-                        w.error('Params cannot be set without setting uri')
-                    end
-                end,
+                validate = validators['iproto.advertise.peer'],
             }),
             sharding = schema.record({
                 login = schema.scalar({
@@ -1022,7 +837,7 @@ return schema.new('instance_config', schema.record({
                 }),
                 uri = schema.scalar({
                     type = 'string',
-                    validate = validate_uri_field(true, true),
+                    validate = validators['iproto.advertise.sharding.uri'],
                 }),
                 params = schema.record({
                     transport = schema.enum({
@@ -1049,19 +864,7 @@ return schema.new('instance_config', schema.record({
                     })),
                 }),
             }, {
-                validate = function(data, w)
-                    if next(data) == nil then
-                        w.error('An URI should have at least one field')
-                    end
-                    -- If a password is set, a login must also be specified.
-                    if data.password ~= nil and data.login == nil then
-                        w.error('Password cannot be set without setting login')
-                    end
-                    -- If a params is set, an uri must also be specified.
-                    if data.params ~= nil and data.uri == nil then
-                        w.error('Params cannot be set without setting uri')
-                    end
-                end,
+                validate = validators['iproto.advertise.sharding'],
             }),
         }),
         threads = schema.scalar({
@@ -1086,13 +889,13 @@ return schema.new('instance_config', schema.record({
             type = 'string',
             box_cfg = 'instance_uuid',
             default = box.NULL,
-            validate = validate_uuid_str,
+            validate = validators['database.instance_uuid'],
         }),
         replicaset_uuid = schema.scalar({
             type = 'string',
             box_cfg = 'replicaset_uuid',
             default = box.NULL,
-            validate = validate_uuid_str,
+            validate = validators['database.replicaset_uuid'],
         }),
         hot_standby = schema.scalar({
             type = 'boolean',
@@ -1556,34 +1359,7 @@ return schema.new('instance_config', schema.record({
                 type = 'string',
             }),
         }, {
-            validate = function(data, w)
-                -- Forbid in the instance scope, because it has no
-                -- sense to set the option for a part of a
-                -- replicaset.
-                validate_scope(w, {'global', 'group', 'replicaset'})
-
-                -- Don't validate the options if this
-                -- functionality is disabled.
-                if not data.enabled then
-                    return
-                end
-
-                -- If autoexpelling is enabled, the expelling
-                -- criterion must be set.
-                if data.by == nil then
-                    w.error('replication.autoexpel.by must be set if ' ..
-                        'replication.autoexpel.enabled = true')
-                end
-
-                -- If the autoexpelling is configured to use the
-                -- prefix-based criterion, then the prefix must be
-                -- set.
-                if data.by == 'prefix' and data.prefix == nil then
-                    w.error('replication.autoexpel.prefix must be set if ' ..
-                        'replication.autoexpel.enabled = true and ' ..
-                        'replication.autoexpel.by = \'prefix\'')
-                end
-            end,
+            validate = validators['replication.autoexpel'],
         }),
     }),
     -- Unlike other sections, credentials contains the append-only
@@ -1734,11 +1510,7 @@ return schema.new('instance_config', schema.record({
             }),
         }),
     }, {
-        validate = function(app, w)
-            if app.file ~= nil and app.module ~= nil then
-                w.error('Fields file and module cannot appear at the same time')
-            end
-        end,
+        validate = validators['app'],
     }),
     feedback = schema.record({
         enabled = schema.scalar({
@@ -1746,49 +1518,49 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'feedback_enabled',
             default = true,
             apply_default_if = feedback_apply_default_if,
-            validate = feedback_validate,
+            validate = validators['feedback.enabled'],
         }),
         crashinfo = schema.scalar({
             type = 'boolean',
             box_cfg = 'feedback_crashinfo',
             default = true,
             apply_default_if = feedback_apply_default_if,
-            validate = feedback_validate,
+            validate = validators['feedback.crashinfo'],
         }),
         host = schema.scalar({
             type = 'string',
             box_cfg = 'feedback_host',
             default = 'https://feedback.tarantool.io',
             apply_default_if = feedback_apply_default_if,
-            validate = feedback_validate,
+            validate = validators['feedback.host'],
         }),
         metrics_collect_interval = schema.scalar({
             type = 'number',
             box_cfg = 'feedback_metrics_collect_interval',
             default = 60,
             apply_default_if = feedback_apply_default_if,
-            validate = feedback_validate,
+            validate = validators['feedback.metrics_collect_interval'],
         }),
         send_metrics = schema.scalar({
             type = 'boolean',
             box_cfg = 'feedback_send_metrics',
             default = true,
             apply_default_if = feedback_apply_default_if,
-            validate = feedback_validate,
+            validate = validators['feedback.send_metrics'],
         }),
         interval = schema.scalar({
             type = 'number',
             box_cfg = 'feedback_interval',
             default = 3600,
             apply_default_if = feedback_apply_default_if,
-            validate = feedback_validate,
+            validate = validators['feedback.interval'],
         }),
         metrics_limit = schema.scalar({
             type = 'integer',
             box_cfg = 'feedback_metrics_limit',
             default = 1024 * 1024,
             apply_default_if = feedback_apply_default_if,
-            validate = feedback_validate,
+            validate = validators['feedback.metrics_limit'],
         }),
     }),
     flightrec = schema.record({
@@ -1846,14 +1618,7 @@ return schema.new('instance_config', schema.record({
         }, {
             box_cfg = 'auth_type',
             default = 'chap-sha1',
-            validate = function(auth_type, w)
-                if auth_type ~= 'chap-sha1' and
-                        tarantool.package ~= 'Tarantool Enterprise' then
-                    w.error('"chap-sha1" is the only authentication method ' ..
-                            '(auth_type) available in Tarantool Community ' ..
-                            'Edition (%q requested)', auth_type)
-                end
-            end,
+            validate = validators['security.auth_type'],
         }),
         auth_delay = enterprise_edition(schema.scalar({
             type = 'number',
@@ -1963,30 +1728,12 @@ return schema.new('instance_config', schema.record({
         -- Replicaset vshard options.
         lock = schema.scalar({
             type = 'boolean',
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope == 'instance' then
-                    w.error('sharding.lock cannot be defined in the instance '..
-                            'scope')
-                end
-            end,
+            validate = validators['sharding.lock'],
         }),
         weight = schema.scalar({
             type = 'number',
             default = 1,
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope == 'instance' then
-                    w.error('sharding.weight cannot be defined in the ' ..
-                            'instance scope')
-                end
-            end,
+            validate = validators['sharding.weight'],
         }),
         -- TODO: Add validate.
         roles = schema.set({
@@ -1998,30 +1745,12 @@ return schema.new('instance_config', schema.record({
         shard_index = schema.scalar({
             type = 'string',
             default = 'bucket_id',
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope ~= 'global' then
-                    w.error('sharding.shard_index should be a defined in '..
-                            'global scope')
-                end
-            end,
+            validate = validators['sharding.shard_index'],
         }),
         bucket_count = schema.scalar({
             type = 'integer',
             default = 3000,
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope ~= 'global' then
-                    w.error('sharding.bucket_count should be a defined in '..
-                            'global scope')
-                end
-            end,
+            validate = validators['sharding.bucket_count'],
         }),
         rebalancer_mode = schema.enum({
             'manual',
@@ -2029,99 +1758,36 @@ return schema.new('instance_config', schema.record({
             'off',
         }, {
             default = 'auto',
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope ~= 'global' then
-                    w.error('sharding.rebalancer_enabled must be defined in ' ..
-                            'the global scope.')
-                end
-            end,
+            validate = validators['sharding.rebalancer_mode'],
         }),
         rebalancer_disbalance_threshold = schema.scalar({
             type = 'number',
             default = 1,
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope ~= 'global' then
-                    w.error('sharding.rebalancer_disbalance_threshold should '..
-                            'be a defined in global scope')
-                end
-            end,
+            validate = validators['sharding.rebalancer_disbalance_threshold'],
         }),
         rebalancer_max_receiving = schema.scalar({
             type = 'integer',
             default = 100,
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope ~= 'global' then
-                    w.error('sharding.rebalancer_max_receiving should '..
-                            'be a defined in global scope')
-                end
-            end,
+            validate = validators['sharding.rebalancer_max_receiving'],
         }),
         rebalancer_max_sending = schema.scalar({
             type = 'integer',
             default = 1,
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope ~= 'global' then
-                    w.error('sharding.rebalancer_max_sending should '..
-                            'be a defined in global scope')
-                end
-            end,
+            validate = validators['sharding.rebalancer_max_sending'],
         }),
         sync_timeout = schema.scalar({
             type = 'number',
             default = 1,
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope ~= 'global' then
-                    w.error('sharding.sync_timeout should be a defined in '..
-                            'global scope')
-                end
-            end,
+            validate = validators['sharding.sync_timeout'],
         }),
         connection_outdate_delay = schema.scalar({
             type = 'number',
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope ~= 'global' then
-                    w.error('sharding.connection_outdate_delay should be a '..
-                            'defined in global scope')
-                end
-            end,
+            validate = validators['sharding.connection_outdate_delay'],
         }),
         failover_ping_timeout = schema.scalar({
             type = 'number',
             default = 5,
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope ~= 'global' then
-                    w.error('sharding.failover_ping_timeout should be a '..
-                            'defined in global scope')
-                end
-            end,
+            validate = validators['sharding.failover_ping_timeout'],
         }),
         discovery_mode = schema.enum({
             'on',
@@ -2129,68 +1795,20 @@ return schema.new('instance_config', schema.record({
             'once',
         }, {
             default = 'on',
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope ~= 'global' then
-                    w.error('sharding.discovery_mode should be a defined in '..
-                            'global scope')
-                end
-            end,
+            validate = validators['sharding.discovery_mode'],
         }),
         sched_ref_quota = schema.scalar({
             type = 'number',
             default = 300,
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope ~= 'global' then
-                    w.error('sharding.sched_ref_quota should be a defined ' ..
-                            'in global scope')
-                end
-            end,
+            validate = validators['sharding.sched_ref_quota'],
         }),
         sched_move_quota = schema.scalar({
             type = 'number',
             default = 1,
-            validate = function(data, w)
-                local scope = w.schema.computed.annotations.scope
-                if data == nil or scope == nil then
-                    return
-                end
-                if scope ~= 'global' then
-                    w.error('sharding.sched_move_quota should be a defined ' ..
-                            'in global scope')
-                end
-            end,
+            validate = validators['sharding.sched_move_quota'],
         }),
     }, {
-        validate = function(data, w)
-            -- Forbid sharding.roles in instance scope.
-            local scope = w.schema.computed.annotations.scope
-            if data.roles ~= nil and scope == 'instance' then
-                w.error('sharding.roles cannot be defined in the instance ' ..
-                        'scope')
-            end
-            -- Make sure that if the rebalancer role is present, the storage
-            -- role is also present.
-            if data.roles ~= nil then
-                local has_storage = false
-                local has_rebalancer = false
-                for _, role in pairs(data.roles) do
-                    has_storage = has_storage or role == 'storage'
-                    has_rebalancer = has_rebalancer or role == 'rebalancer'
-                end
-                if has_rebalancer and not has_storage then
-                    w.error('The rebalancer role cannot be present without ' ..
-                            'the storage role')
-                end
-            end
-        end,
+        validate = validators['sharding'],
     }),
     audit_log = enterprise_edition(schema.record({
         -- The same as the destination for the logger, audit logger destination
@@ -2425,11 +2043,7 @@ return schema.new('instance_config', schema.record({
                 type = 'string',
             }),
         }, {
-            validate = function(data, w)
-                if data.to == 'file' and data.file == nil then
-                    w.error('log.file must be specified when log.to is "file"')
-                end
-            end,
+            validate = validators['failover.log'],
         }),
     }),
     -- Compatibility options.
@@ -2573,9 +2187,7 @@ return schema.new('instance_config', schema.record({
     isolated = schema.scalar({
         type = 'boolean',
         default = false,
-        validate = function(_data, w)
-            validate_scope(w, {'instance'})
-        end,
+        validate = validators['isolated'],
     }),
 }, {
     -- This kind of validation cannot be implemented as the
@@ -2588,7 +2200,7 @@ return schema.new('instance_config', schema.record({
     --   the cluster config), but this annotation is not easy to
     --   reach from the 'validate' function of a nested schema
     --   node.
-    validate = validate_outmost_record,
+    validate = validators[''],
 }), {
     methods = {
         instance_uri = instance_uri,

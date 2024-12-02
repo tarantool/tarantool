@@ -164,6 +164,7 @@ extern char session_lua[],
 	config_applier_box_status_lua[],
 	config_cluster_config_lua[],
 	config_descriptions_lua[],
+	config_validators_lua[],
 	config_configdata_lua[],
 	config_init_lua[],
 	config_instance_config_lua[],
@@ -395,6 +396,10 @@ static const char *lua_sources[] = {
 	"config/descriptions",
 	"internal.config.descriptions",
 	config_descriptions_lua,
+
+	"config/validators",
+	"internal.config.validators",
+	config_validators_lua,
 
 	"config/instance_config",
 	"internal.config.instance_config",
