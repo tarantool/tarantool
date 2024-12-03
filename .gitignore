@@ -173,3 +173,6 @@ static-build/build
 
 # macOS files
 .DS_Store
+
+# unnecessary dirs in simmulation
+/simulation_testing/*_dir

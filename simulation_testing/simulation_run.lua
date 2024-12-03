@@ -6,7 +6,7 @@ local net_box = require('net.box')
 local my_functions = require("my_functions")
 local crash_functions = require("crash_functions")
 local randomized_operations = require("randomized_operations")
-
+local replication_errors = require("replication_errors")
 
 math.randomseed(os.time())
 
@@ -84,6 +84,7 @@ end)
 
 print(result)
 
+
 -- The main cycle
 fiber.create(function()
     while true do
@@ -106,5 +107,18 @@ fiber.create(function()
         end
 
         fiber.sleep(math.random(1, 2)) 
+    end
+end)
+
+
+fiber.create(function()
+    box.cfg{
+            memtx_use_mvcc_engine = true,
+            memtx_dir = './memtx_dir',
+            wal_dir = './wal_dir',
+            hot_standby = true
+    }
+    for _, node in ipairs(cg.nodes) do
+        node:exec(replication_errors.run_replication_monitor())
     end
 end)
