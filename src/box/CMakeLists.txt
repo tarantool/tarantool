@@ -74,6 +74,7 @@ lua_source(lua_sources lua/config/utils/snapshot.lua       config_utils_snapshot
 lua_source(lua_sources lua/config/utils/tabulate.lua       config_utils_tabulate_lua)
 lua_source(lua_sources lua/config/utils/textutils.lua      config_utils_textutils_lua)
 lua_source(lua_sources lua/config/utils/funcutils.lua      config_utils_funcutils_lua)
+lua_source(lua_sources lua/config/utils/network.lua        config_utils_network_lua)
 
 if (ENABLE_CONFIG_EXTRAS)
     lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/source/etcd.lua config_source_etcd_lua)
