@@ -6,45 +6,22 @@ local net_box = require('net.box')
 local my_functions = require("my_functions")
 local crash_functions = require("crash_functions")
 local randomized_operations = require("randomized_operations")
-
+local random_cluster = require('random_cluster')
 
 math.randomseed(os.time())
 
--- Starting and configuring a cluster
-local cg = {}
-cg.cluster = cluster:new()
-cg.nodes = {}
+local cg = random_cluster.rand_cluster()
 
-local box_cfg = {
-    election_mode = 'candidate',
-    replication_sync_timeout = 1, 
-    replication_timeout = 0.1,   
-    replication = {
-        server.build_listen_uri('node1', cg.cluster.id),
-        server.build_listen_uri('node2', cg.cluster.id),
-        server.build_listen_uri('node3', cg.cluster.id),
-    },
-}
+box.cfg {
+    checkpoint_count = 2, 
+    memtx_use_mvcc_engine = true,
+    memtx_dir = './memtx_dir',
+    txn_isolation = 'best-effort' }
 
-cg.nodes[1] = cg.cluster:build_and_add_server({
-    alias = 'node1',
-    box_cfg = box_cfg,
-})
-cg.nodes[2] = cg.cluster:build_and_add_server({
-    alias = 'node2',
-    box_cfg = box_cfg,
-})
-cg.nodes[3] = cg.cluster:build_and_add_server({
-    alias = 'node3',
-    box_cfg = box_cfg,
-})
-
-cg.cluster:start()
-
-local initial_replication = my_functions.get_initial_replication(cg.nodes)
+local initial_replication = my_functions.get_initial_replication(cg.replicas)
 
 -- Checking the initial configuration
-for _, node in ipairs(cg.nodes) do
+for _, node in ipairs(cg.replicas) do
     local node_state = node:exec(function()
         return box.info.election.state
     end)
@@ -90,17 +67,17 @@ fiber.create(function()
         local random_action = math.random(1, 10)
 
         if random_action < 8 then
-            randomized_operations.do_random_operation(my_functions.get_random_node(cg.nodes), "test", 10)
+            randomized_operations.do_random_operation(my_functions.get_random_node(cg.replicas), "test", 10)
         else 
             local type_of_crashing = math.random(1, 3)
             if type_of_crashing == 1 then
-                crash_functions.stop_node(my_functions.get_random_node(cg.nodes), 5, 10)
+                crash_functions.stop_node(my_functions.get_random_node(cg.replicas), 5, 10)
 
             elseif type_of_crashing == 2 then
-                crash_functions.create_delay_to_write_operations(my_functions.get_random_node(cg.nodes), "test", 5, 10)
+                crash_functions.create_delay_to_write_operations(my_functions.get_random_node(cg.replicas), "test", 5, 10)
 
             else 
-                crash_functions.break_connection_between_random_nodes(cg.nodes, initial_replication, 5, 10)
+                crash_functions.break_connection_between_random_nodes(cg.replicas, initial_replication, 5, 10)
     
             end
         end

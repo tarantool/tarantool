@@ -6,12 +6,11 @@ local t = require('luatest')
 
 math.randomseed(os.clock())
 
-local cg = {}
-cg.replicas = {}
+
 
 --- Random Configuration Generator
 --- 
-local function rand_cfg()
+local function rand_cfg(cg)
     local replica_count = math.random(3, 30)
     local uri_set = {}
     for i = 1, replica_count do
@@ -35,7 +34,7 @@ end
 
 --- Clear Cluster
 --- 
-local function clear_cluster()
+local function clear_cluster(cg)
     if cg.cluster then
         cg.cluster:drop()
     end
@@ -49,9 +48,11 @@ end
 --- Random Cluster Generator
 --- 
 local function rand_cluster()
-    clear_cluster()
+    local cg = {}
+    cg.replicas = {}
+    clear_cluster(cg)
     cg.cluster = cluster:new{}
-    local replica_count, box_cfg = rand_cfg()
+    local replica_count, box_cfg = rand_cfg(cg)
 
     local bound = 1/math.random(1,100)
 
@@ -81,6 +82,7 @@ local function rand_cluster()
             repl:wait_until_election_leader_found()
         end
     end
+    return cg
 end
 
 
