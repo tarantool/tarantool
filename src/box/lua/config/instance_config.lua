@@ -6,6 +6,7 @@ local urilib = require('uri')
 local fio = require('fio')
 local file = require('internal.config.utils.file')
 local log = require('internal.config.utils.log')
+local funcutils = require('internal.config.utils.funcutils')
 
 -- List of annotations:
 --
@@ -98,24 +99,6 @@ local function enterprise_edition_apply_default_if(_data, _w)
     return tarantool.package == 'Tarantool Enterprise'
 end
 
--- Generate a function that calls two given functions in a row.
---
--- If one of the arguments is nil, return the other one.
---
--- If both arguments are nil, returns nil.
-local function chain2(f1, f2)
-    if f1 == nil then
-        return f2
-    end
-    if f2 == nil then
-        return f1
-    end
-    return function(...)
-        f1(...)
-        f2(...)
-    end
-end
-
 -- Available only in Tarantool Enterprise Edition.
 local function enterprise_edition(schema_node)
     schema_node.enterprise_edition = true
@@ -126,10 +109,10 @@ local function enterprise_edition(schema_node)
     --
     -- This order is consistent with data type validation, which
     -- is also performed before the EE check.
-    schema_node.validate = chain2(
+    schema_node.validate = funcutils.chain2(
         schema_node.validate,
         enterprise_edition_validate)
-    schema_node.apply_default_if = chain2(
+    schema_node.apply_default_if = funcutils.chain2(
         schema_node.apply_default_if,
         enterprise_edition_apply_default_if)
 
