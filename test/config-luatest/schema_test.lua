@@ -1264,6 +1264,21 @@ g.test_get_index_scalar = function()
     end)
 end
 
+-- This scenario has been broken before gh-10855.
+-- Before gh-10855 schema:get() used to change the passed path
+-- if it's been passed as a table.
+g.test_get_not_changes_path = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.scalar({type = 'number'}),
+    }))
+
+    local path = {'foo'}
+    -- The result of schema:get() isn't tested.
+    s:get({foo = 5}, path)
+    -- Make sure the passed path hasn't changed.
+    t.assert_equals(path, {'foo'})
+end
+
 -- }}} <schema object>:get()
 
 -- {{{ <schema object>:set()
@@ -1699,6 +1714,21 @@ g.test_set_invalid_rhs = function()
 
     -- Verify that the data remains unchanged after an error.
     t.assert_equals(data, {})
+end
+
+-- This scenario has been broken before gh-10855.
+-- Before gh-10855 schema:set() used to change the passed path
+-- if it's been passed as a table.
+g.test_set_not_changes_path = function()
+    local s = schema.new('myschema', schema.record({
+        foo = schema.scalar({type = 'number'}),
+    }))
+
+    local path = {'foo'}
+    -- The result of schema:set() isn't tested.
+    s:set({foo = 5}, path, 6)
+    -- Make sure the passed path hasn't changed.
+    t.assert_equals(path, {'foo'})
 end
 
 -- }}} <schema object>:set()
