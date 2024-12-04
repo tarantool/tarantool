@@ -515,6 +515,7 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         slab_alloc_factor = math.random(1, 2),
         vinyl_bloom_fpr = math.random(50) / 100,
         vinyl_cache = oneof({0, 2}) * 1024 * 1024,
+        vinyl_defer_deletes = oneof({true, false}),
         vinyl_max_tuple_size = math.random(0, 100000),
         vinyl_memory = 800 * 1024 * 1024,
         vinyl_page_size = math.random(1024, 2048),
