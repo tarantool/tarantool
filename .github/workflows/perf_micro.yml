@@ -13,6 +13,8 @@ on:
       - 'CMakeLists.txt'
       - '.github/workflows/perf_micro.yml'
   pull_request:
+  pull_request_target:
+    types: [labeled]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -49,11 +51,15 @@ concurrency:
 jobs:
   perf_micro:
     # Run on push to the 'master' and release branches of tarantool/tarantool
-    # or on pull request if the 'notest' label is not set.
+    # or on pull request if the 'notest' label is not set
+    # or on pull request if the 'performance' label is set.
     if: github.repository_owner == 'tarantool' &&
-        ( github.event_name != 'pull_request' ||
+        ( ( github.event_name != 'pull_request' &&
+            github.event_name != 'pull_request_target' ) ||
           ( github.event_name == 'pull_request' &&
-            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) ||
+          ( github.event_name == 'pull_request_target' &&
+            contains(github.event.pull_request.labels.*.name, 'performance') ) )
 
     # 'performance' label _must_ be set only for the single runner
     # to guarantee that results are not dependent on the machine.
@@ -63,7 +69,8 @@ jobs:
       - self-hosted
       - Linux
       - x86_64
-      - ${{ (github.event_name != 'pull_request' ||
+      - ${{ ((github.event_name != 'pull_request' &&
+              github.event_name != 'pull_request_target') ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
           'performance' || 'regular' }}
 
@@ -82,6 +89,7 @@ jobs:
           submodules: recursive
           repository: tarantool/tarantool
           ref: ${{ inputs.submodule && 'master' || github.ref }}
+          # TODO: ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/environment
       - name: Install deps
         uses: ./.github/actions/install-deps-debian
