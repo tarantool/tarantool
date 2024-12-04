@@ -555,6 +555,9 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
     if space_opts.engine ~= 'vinyl' then
         space_opts.temporary = oneof({true, false})
     end
+    if space_opts.engine == 'vinyl' then
+        space_opts.defer_deletes = oneof({true, false})
+    end
     local space_name = ('test_%d'):format(space_id_func())
     local space = box.schema.space.create(space_name, space_opts)
     index_create_op(space)
