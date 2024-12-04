@@ -173,3 +173,7 @@ static-build/build
 
 # macOS files
 .DS_Store
+
+#simulation_testing files
+simulation_testing/replicas_dirs
+simulation_testing/memtx_dir

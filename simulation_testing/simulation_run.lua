@@ -7,10 +7,11 @@ local my_functions = require("my_functions")
 local crash_functions = require("crash_functions")
 local randomized_operations = require("randomized_operations")
 local random_cluster = require('random_cluster')
+local fio = require('fio')
 
 math.randomseed(os.time())
-
-local cg = random_cluster.rand_cluster()
+random_cluster.clear_dirs_for_all_replicas()
+local cg = random_cluster.rand_cluster(5)
 
 box.cfg {
     checkpoint_count = 2, 
@@ -60,6 +61,8 @@ local result = leader_node:exec(function()
 end)
 
 print(result)
+
+print("WAL directory:", fio.cwd())
 
 -- The main cycle
 fiber.create(function()
