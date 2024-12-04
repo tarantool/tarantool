@@ -63,8 +63,8 @@ jobs:
     timeout-minutes: 60
 
     env:
-        PERF_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
-        PERF_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      PERF_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      PERF_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
       - name: Prepare checkout
