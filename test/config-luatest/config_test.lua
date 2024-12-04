@@ -2034,3 +2034,22 @@ g.test_do_no_revoke_user_privs = function(g)
         t.assert_equals(actual_privs, exp)
     end)
 end
+
+-- This scenario has been broken before gh-10855.
+-- Before gh-10855 config:get() used to change the passed path
+-- if it's been passed as a table.
+g.test_get_not_changes_path = function(g)
+    local verify = function()
+        local config = require('config')
+        local path = {'fiber', 'slice'}
+
+        -- The result of config:get() isn't tested.
+        local _ = config:get(path)
+        -- Make sure the passed path hasn't changed.
+        t.assert_equals(path, {'fiber', 'slice'})
+
+    end
+    helpers.success_case(g, {
+        verify = verify,
+    })
+end

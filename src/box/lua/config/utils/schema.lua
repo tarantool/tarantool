@@ -895,8 +895,9 @@ function methods.get(self, data, path)
     local ctx = walkthrough_start(self, {
         -- The `path` field is already in the context and it means
         -- the passed path. Let's name the remaining path as
-        -- `journey`.
-        journey = path,
+        -- `journey` and perform a shallow copy of it since
+        -- we're changing it.
+        journey = table.copy(path),
     })
     return get_impl(schema, data, ctx)
 end
@@ -1071,8 +1072,9 @@ function methods.set(self, data, path, rhs)
     local ctx = walkthrough_start(self, {
         -- The `path` field is already in the context and it means
         -- the passed path. Let's name the remaining path as
-        -- `journey`.
-        journey = path,
+        -- `journey` and perform a shallow copy of it since
+        -- we're changing it.
+        journey = table.copy(path),
     })
     return set_impl(schema, data, rhs, ctx)
 end
