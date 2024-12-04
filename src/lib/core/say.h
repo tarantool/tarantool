@@ -453,8 +453,8 @@ enum {
 	int suppressed = 0;						\
 	bool ret = ratelimit_check((rl), ev_monotonic_now(loop()),	\
 				   &suppressed);			\
-	if ((level) >= S_WARN && suppressed > 0)			\
-		say_warn("%d messages suppressed", suppressed);		\
+	if (suppressed > 0)			\
+		say(level, NULL, "%d messages suppressed", suppressed);	\
 	ret;								\
 })
 
