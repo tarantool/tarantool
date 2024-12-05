@@ -912,6 +912,34 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
 	}
+
+	/* Invalidate cache element. */
+	struct vy_entry deleted = vy_entry_none();
+	vy_cache_on_write(&lsm->cache, entry, &deleted);
+
+	/*
+	 * The UPSERT statement can be applied to the cached statement,
+	 * because the cache always contains newest REPLACE statements.
+	 * In such a case the UPSERT, applied to the cached statement,
+	 * can be inserted instead of the original UPSERT.
+	 */
+	bool need_unref = false;
+	if (deleted.stmt != NULL &&
+	    vy_stmt_type(entry.stmt) == IPROTO_UPSERT) {
+		struct vy_entry applied = vy_entry_apply_upsert(
+				entry, deleted, mem->cmp_def, false);
+		/*
+		 * Ignore a memory error, because it is not critical
+		 * to apply the optimization.
+		 */
+		if (applied.stmt != NULL) {
+			entry = applied;
+			need_unref = true;
+		}
+	}
+	if (deleted.stmt != NULL)
+		tuple_unref(deleted.stmt);
+
 	/*
 	 * Allocate region_stmt on demand.
 	 *
@@ -924,11 +952,13 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 		*region_stmt = vy_stmt_dup_lsregion(entry.stmt,
 						    &mem->env->allocator,
 						    mem->generation);
-		if (*region_stmt == NULL)
-			return -1;
 	}
-	entry.stmt = *region_stmt;
+	if (need_unref)
+		tuple_unref(entry.stmt);
+	if (*region_stmt == NULL)
+		return -1;
 
+	entry.stmt = *region_stmt;
 	struct vy_stmt_counter *count = &lsm->stat.memory.count;
 	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT)
 		return vy_mem_insert(mem, entry, count);
