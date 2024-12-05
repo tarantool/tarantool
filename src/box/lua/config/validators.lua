@@ -9,33 +9,6 @@ local network = require('internal.config.utils.network')
 -- function that validates the data for that field.
 local M = {}
 
--- Verify that replication.failover option is not present in the
--- instance scope of the cluster config.
-local function validate_replication_failover(data, w)
-    -- scope == nil means that it is the instance config.
-    local scope = w.schema.scope
-
-    -- There is no much sense to set the failover option for a
-    -- particular instance, not the whole replicaset. So, the
-    -- option is forbidden for the instance scope of the cluster
-    -- config.
-    --
-    -- However, it is allowed for the instance config to accept an
-    -- instantiated cluster config as valid.
-    if scope ~= 'instance' then
-        return
-    end
-
-    if data.replication ~= nil and data.replication.failover ~= nil then
-        w.error('replication.failover must not be present in the %s scope',
-            scope)
-    end
-end
-
-local function validate_outmost_record(data, w)
-    validate_replication_failover(data, w)
-end
-
 local function validate_uuid_str(data, w)
     if uuid.fromstr(data) == nil then
         w.error('Unable to parse the value as a UUID: %q', data)
@@ -117,18 +90,6 @@ local function validate_scope(w, allowed_scopes)
     -- error.
     w.error('The option must not be present in the %s scope', scope)
 end
-
--- This kind of validation cannot be implemented as the
--- 'validate' annotation of a particular schema node. There
--- are two reasons:
---
--- * Missed fields are not validated.
--- * The outmost instance config record is marked with the
---   'scope' annotation (when the instance config is part of
---   the cluster config), but this annotation is not easy to
---   reach from the 'validate' function of a nested schema
---   node.
-M[''] = validate_outmost_record
 
 -- {{{ app
 
@@ -351,6 +312,13 @@ M['replication.autoexpel'] = function(data, w)
             'replication.autoexpel.enabled = true and ' ..
             'replication.autoexpel.by = \'prefix\'')
     end
+end
+
+M['replication.failover'] = function(_data, w)
+    -- Forbid in the instance scope, because it has no
+    -- sense to set the option for a part of a
+    -- replicaset.
+    validate_scope(w, {'global', 'group', 'replicaset'})
 end
 
 -- }}} replication

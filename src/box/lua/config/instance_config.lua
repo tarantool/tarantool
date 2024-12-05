@@ -1234,6 +1234,7 @@ return schema.new('instance_config', schema.record({
             'supervised',
         }, {
             default = 'off',
+            validate = validators['replication.failover'],
         }),
         -- XXX: needs more validation
         peers = schema.array({
@@ -2195,18 +2196,6 @@ return schema.new('instance_config', schema.record({
         default = false,
         validate = validators['isolated'],
     }),
-}, {
-    -- This kind of validation cannot be implemented as the
-    -- 'validate' annotation of a particular schema node. There
-    -- are two reasons:
-    --
-    -- * Missed fields are not validated.
-    -- * The outmost instance config record is marked with the
-    --   'scope' annotation (when the instance config is part of
-    --   the cluster config), but this annotation is not easy to
-    --   reach from the 'validate' function of a nested schema
-    --   node.
-    validate = validators[''],
 }), {
     methods = {
         instance_uri = instance_uri,

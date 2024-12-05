@@ -762,6 +762,8 @@ end
 --
 -- * isolated
 -- * replication.autoexpel
+-- * failover
+-- * replication.failover
 g.test_scope = function()
     local function exp_err(path, scope)
         return ('[cluster_config] %s: The option must not be present in the ' ..
@@ -805,6 +807,18 @@ g.test_scope = function()
             global = true,
             group = false,
             replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'replication.failover',
+            data = {
+                replication = {
+                    failover = 'manual',
+                },
+            },
+            global = true,
+            group = true,
+            replicaset = true,
             instance = false,
         },
     }
