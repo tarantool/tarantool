@@ -1031,9 +1031,7 @@ vy_lsm_rollback_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 		     struct vy_entry entry)
 {
 	vy_mem_rollback_stmt(mem, entry, &lsm->stat.memory.count);
-
-	/* Invalidate cache element. */
-	vy_cache_on_write(&lsm->cache, entry, NULL);
+	vy_cache_on_rollback(&lsm->cache, entry);
 }
 
 int

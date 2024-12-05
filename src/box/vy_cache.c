@@ -434,9 +434,12 @@ vy_cache_get(struct vy_cache *cache, struct vy_entry key)
 	return (*node)->entry;
 }
 
-void
-vy_cache_on_write(struct vy_cache *cache, struct vy_entry entry,
-		  struct vy_entry *deleted)
+/**
+ * Invalidate the cache when a statement is committed or rolled back.
+ */
+static void
+vy_cache_invalidate(struct vy_cache *cache, struct vy_entry entry,
+		    bool rollback, struct vy_entry *deleted)
 {
 	vy_cache_gc(cache->env);
 	bool exact = false;
@@ -457,7 +460,7 @@ vy_cache_on_write(struct vy_cache *cache, struct vy_entry entry,
 	 *   ('exact' == false, 'node' == NULL)
 	 */
 
-	if (vy_stmt_type(entry.stmt) == IPROTO_DELETE && !exact) {
+	if (!rollback && vy_stmt_type(entry.stmt) == IPROTO_DELETE && !exact) {
 		/* there was nothing and there is nothing now */
 		return;
 	}
@@ -509,6 +512,19 @@ vy_cache_on_write(struct vy_cache *cache, struct vy_entry entry,
 		vy_cache_tree_delete(&cache->cache_tree, to_delete);
 		vy_cache_node_delete(cache->env, to_delete);
 	}
+}
+
+void
+vy_cache_on_write(struct vy_cache *cache, struct vy_entry entry,
+		  struct vy_entry *deleted)
+{
+	vy_cache_invalidate(cache, entry, /*rollback=*/false, deleted);
+}
+
+void
+vy_cache_on_rollback(struct vy_cache *cache, struct vy_entry entry)
+{
+	vy_cache_invalidate(cache, entry, /*rollback=*/true, NULL);
 }
 
 /**
