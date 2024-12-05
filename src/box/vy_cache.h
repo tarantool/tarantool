@@ -233,6 +233,14 @@ void
 vy_cache_on_write(struct vy_cache *cache, struct vy_entry entry,
 		  struct vy_entry *deleted);
 
+/**
+ * Invalidate cache on statement rollback.
+ * @param cache - pointer to tuple cache.
+ * @param entry - rolled back statement.
+ */
+void
+vy_cache_on_rollback(struct vy_cache *cache, struct vy_entry entry);
+
 
 /**
  * Cache iterator
