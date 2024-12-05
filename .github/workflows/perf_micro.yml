@@ -93,6 +93,25 @@ jobs:
         if: github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository
         run: sh ./perf/tools/setup_env.sh
+      - name: Remove a label 'performance'
+        # The step prevents unnecessary runs on performance
+        # machine by removing label 'performance' in PR after
+        # running the job. See GitHub REST API documentation [1].
+        #
+        # 1. https://docs.github.com/en/rest/issues/labels?apiVersion=2022-11-28#remove-a-label-from-an-issue
+        if: github.event_name == 'pull_request_target' &&
+            contains(github.event.pull_request.labels.*.name, 'performance')
+        run: >
+          curl --silent --fail-with-body \
+          --write-out "%{http_code}"
+          --retry 5
+          --retry-delay 5
+          --connect-timeout 120
+          --fail --silent -o /dev/null
+          -X DELETE \
+          -H 'Accept: application/vnd.github.v3+json' \
+          -H 'Authorization: token ${{ github.token }}' \
+          'https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.number }}/labels/performance'
       - name: test
         run: make -f .test.mk test-perf
         env:
