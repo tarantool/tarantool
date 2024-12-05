@@ -1727,8 +1727,8 @@ g.test_sharding = function()
             roles = {'router', 'rebalancer'},
         },
     }
-    local err = '[instance_config] sharding: The rebalancer role cannot be ' ..
-                'present without the storage role'
+    local err = '[instance_config] sharding.roles: The rebalancer role ' ..
+                'cannot be present without the storage role'
     t.assert_error_msg_equals(err, function()
         instance_config:validate(iconfig)
     end)

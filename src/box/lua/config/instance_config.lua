@@ -1739,11 +1739,12 @@ return schema.new('instance_config', schema.record({
             default = 1,
             validate = validators['sharding.weight'],
         }),
-        -- TODO: Add validate.
         roles = schema.set({
             'router',
             'storage',
             'rebalancer',
+        }, {
+            validate = validators['sharding.roles'],
         }),
         -- Global vshard options.
         shard_index = schema.scalar({
@@ -1811,8 +1812,6 @@ return schema.new('instance_config', schema.record({
             default = 1,
             validate = validators['sharding.sched_move_quota'],
         }),
-    }, {
-        validate = validators['sharding'],
     }),
     audit_log = enterprise_edition(schema.record({
         -- The same as the destination for the logger, audit logger destination
