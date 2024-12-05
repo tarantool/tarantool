@@ -338,29 +338,6 @@ end
 
 -- {{{ sharding
 
-M['sharding'] = function(data, w)
-    -- Forbid sharding.roles in instance scope.
-    local scope = w.schema.computed.annotations.scope
-    if data.roles ~= nil and scope == 'instance' then
-        w.error('sharding.roles cannot be defined in the instance ' ..
-                'scope')
-    end
-    -- Make sure that if the rebalancer role is present, the storage
-    -- role is also present.
-    if data.roles ~= nil then
-        local has_storage = false
-        local has_rebalancer = false
-        for _, role in pairs(data.roles) do
-            has_storage = has_storage or role == 'storage'
-            has_rebalancer = has_rebalancer or role == 'rebalancer'
-        end
-        if has_rebalancer and not has_storage then
-            w.error('The rebalancer role cannot be present without ' ..
-                    'the storage role')
-        end
-    end
-end
-
 M['sharding.bucket_count'] = function(_data, w)
     validate_scope(w, {'global'})
 end
@@ -395,6 +372,26 @@ end
 
 M['sharding.rebalancer_mode'] = function(_data, w)
     validate_scope(w, {'global'})
+end
+
+M['sharding.roles'] = function(roles, w)
+    -- Forbid in the instance scope, because it has no
+    -- sense to set the option for a part of a
+    -- replicaset.
+    validate_scope(w, {'global', 'group', 'replicaset'})
+
+    -- Make sure that if the rebalancer role is present, the storage
+    -- role is also present.
+    local has_storage = false
+    local has_rebalancer = false
+    for _, role in pairs(roles) do
+        has_storage = has_storage or role == 'storage'
+        has_rebalancer = has_rebalancer or role == 'rebalancer'
+    end
+    if has_rebalancer and not has_storage then
+        w.error('The rebalancer role cannot be present without ' ..
+                'the storage role')
+    end
 end
 
 M['sharding.sched_move_quota'] = function(_data, w)
