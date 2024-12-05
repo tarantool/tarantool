@@ -7,11 +7,6 @@ on:
       - 'release/**'
     tags:
       - '**'
-    paths:
-      - 'src/**'
-      - 'perf/**'
-      - 'CMakeLists.txt'
-      - '.github/workflows/perf_micro.yml'
   pull_request:
   workflow_dispatch:
   workflow_call:
