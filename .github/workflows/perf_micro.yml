@@ -7,6 +7,14 @@ on:
       - 'release/**'
     tags:
       - '**'
+    paths:
+      - '.github/workflows/perf_micro.yml'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'patches/**'
+      - 'perf/**'
+      - 'src/**'
+      - 'third_party/**'
   pull_request:
   pull_request_target:
     types: [labeled]
