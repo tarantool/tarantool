@@ -19,6 +19,8 @@ on:
         description: Git revision from submodule repository
         required: true
         type: string
+  schedule:
+    - cron: '0 0 * * *'  # Once a day at midnight.
 
 concurrency:
   # Update of a developer branch cancels the previously scheduled workflow
