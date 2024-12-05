@@ -51,7 +51,6 @@
 #include "trigger.h"
 #include "trivia/util.h"
 #include "tuple.h"
-#include "vy_cache.h"
 #include "vy_lsm.h"
 #include "vy_mem.h"
 #include "vy_stat.h"
@@ -478,80 +477,6 @@ vy_tx_begin(struct vy_tx_manager *xm, enum txn_isolation_level isolation)
 }
 
 /**
- * Rotate the active in-memory tree if necessary and pin it to make
- * sure it is not dumped until the transaction is complete.
- */
-static int
-vy_tx_write_prepare(struct txv *v)
-{
-	struct vy_lsm *lsm = v->lsm;
-	if (vy_lsm_rotate_mem_if_required(lsm) != 0)
-		return -1;
-	vy_mem_pin(lsm->mem);
-	v->mem = lsm->mem;
-	return 0;
-}
-
-/**
- * Write a single statement into an LSM tree. If the statement has
- * an lsregion copy then use it, else create it.
- *
- * @param lsm         LSM tree to write to.
- * @param mem         In-memory tree to write to.
- * @param entry       Statement allocated with malloc().
- * @param region_stmt NULL or the same statement as stmt,
- *                    but allocated on lsregion.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
- */
-static int
-vy_tx_write(struct vy_lsm *lsm, struct vy_mem *mem,
-	    struct vy_entry entry, struct tuple **region_stmt)
-{
-	assert(vy_stmt_is_refable(entry.stmt));
-	assert(*region_stmt == NULL || !vy_stmt_is_refable(*region_stmt));
-
-	/*
-	 * The UPSERT statement can be applied to the cached
-	 * statement, because the cache always contains only
-	 * newest REPLACE statements. In such a case the UPSERT,
-	 * applied to the cached statement, can be inserted
-	 * instead of the original UPSERT.
-	 */
-	if (vy_stmt_type(entry.stmt) == IPROTO_UPSERT) {
-		struct vy_entry deleted = vy_entry_none();
-		/* Invalidate cache element. */
-		vy_cache_on_write(&lsm->cache, entry, &deleted);
-		if (deleted.stmt != NULL) {
-			struct vy_entry applied;
-			applied = vy_entry_apply_upsert(entry, deleted,
-							mem->cmp_def, false);
-			tuple_unref(deleted.stmt);
-			if (applied.stmt != NULL) {
-				enum iproto_type applied_type =
-					vy_stmt_type(applied.stmt);
-				assert(applied_type == IPROTO_REPLACE ||
-				       applied_type == IPROTO_INSERT);
-				(void) applied_type;
-				int rc = vy_lsm_set(lsm, mem, applied,
-						    region_stmt);
-				tuple_unref(applied.stmt);
-				return rc;
-			}
-			/*
-			 * Ignore a memory error, because it is
-			 * not critical to apply the optimization.
-			 */
-		}
-	} else {
-		/* Invalidate cache element. */
-		vy_cache_on_write(&lsm->cache, entry, NULL);
-	}
-	return vy_lsm_set(lsm, mem, entry, region_stmt);
-}
-
-/**
  * Try to generate a deferred DELETE statement on tx commit.
  *
  * This function is supposed to be called for a primary index
@@ -794,9 +719,15 @@ vy_tx_prepare(struct vy_tx *tx)
 			vy_stmt_set_type(v->entry.stmt, type);
 		}
 
-		if (vy_tx_write_prepare(v) != 0)
+		/*
+		 * Rotate the active in-memory tree if necessary and pin it
+		 * to make sure it is not dumped until the transaction is
+		 * complete.
+		 */
+		if (vy_lsm_rotate_mem_if_required(lsm) != 0)
 			return -1;
-		assert(v->mem != NULL);
+		vy_mem_pin(lsm->mem);
+		v->mem = lsm->mem;
 
 		if (lsm->index_id == 0 &&
 		    vy_stmt_flags(v->entry.stmt) & VY_STMT_DEFERRED_DELETE &&
@@ -807,7 +738,7 @@ vy_tx_prepare(struct vy_tx *tx)
 		vy_stmt_set_lsn(v->entry.stmt, MAX_LSN + tx->psn);
 		struct tuple **region_stmt =
 			(type == IPROTO_DELETE) ? &delete : &repsert;
-		if (vy_tx_write(lsm, v->mem, v->entry, region_stmt) != 0)
+		if (vy_lsm_set(lsm, v->mem, v->entry, region_stmt) != 0)
 			return -1;
 		v->region_stmt = *region_stmt;
 	}
