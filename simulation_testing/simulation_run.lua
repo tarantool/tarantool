@@ -39,6 +39,8 @@ cg.nodes[3] = cg.cluster:build_and_add_server({
     box_cfg = box_cfg,
 })
 
+fiber.sleep(1) 
+
 cg.cluster:start()
 
 local initial_replication = my_functions.get_initial_replication(cg.nodes)
@@ -112,13 +114,8 @@ end)
 
 
 fiber.create(function()
-    box.cfg{
-            memtx_use_mvcc_engine = true,
-            memtx_dir = './memtx_dir',
-            wal_dir = './wal_dir',
-            hot_standby = true
-    }
-    for _, node in ipairs(cg.nodes) do
-        node:exec(replication_errors.run_replication_monitor())
-    end
+
+    
+    cg.cluster:exec(replication_errors.run_replication_monitor())
+    
 end)

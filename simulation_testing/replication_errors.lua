@@ -32,6 +32,10 @@ local function monitor_replication()
             end
         end
         -----------------------------------------------------------------------------------------------------
+        print("[Replication Monitor] Detected "..tostring(#leaders).." Leaders:")
+        for _, leader in ipairs(leaders) do
+            print("[Replication Monitor] Leaders: "..tostring(leader))
+        end
         if #leaders == 0 then
             if now - state.last_leader_check > monitor_config.leader_absent_time then
                 table.insert(problems, 'No leader detected for more than ' .. monitor_config.leader_absent_time .. ' seconds')
@@ -89,6 +93,11 @@ local function monitor_replication()
                 print('[Replication Monitor] '.. problem)
             end
         end
+
+        
+
+        
+
         fiber.sleep(monitor_config.check_interval)
     end
 end
