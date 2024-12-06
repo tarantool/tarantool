@@ -1502,7 +1502,10 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 		return -1;
 
 	txn_limbo_checkpoint(&txn_limbo, &synchro_req, &limbo_vclock);
-	box_raft_checkpoint_local(&raft_req);
+	box_raft_checkpoint_remote(&raft_req);
+	/* See raft_process_recovery, why these fields are not needed. */
+	raft_req.state = 0;
+	raft_req.vclock = NULL;
 
 	/* Respond with vclock and JOIN_META. */
 	send_join_header(stream, arg->vclock);
