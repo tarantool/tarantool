@@ -2462,7 +2462,7 @@ tx_resolve_space_and_index_name(struct request *dml)
 				 space->def->name);
 			return -1;
 		}
-		dml->index_id = idx->dense_id;
+		dml->index_id = idx->def->iid;
 	}
 	return 0;
 }
