@@ -764,6 +764,20 @@ end
 -- * replication.autoexpel
 -- * failover
 -- * replication.failover
+-- * sharding.bucket_count
+-- * sharding.connection_outdate_delay
+-- * sharding.discovery_mode
+-- * sharding.failover_ping_timeout
+-- * sharding.lock
+-- * sharding.rebalancer_disbalance_threshold
+-- * sharding.rebalancer_max_receiving
+-- * sharding.rebalancer_max_sending
+-- * sharding.rebalancer_mode
+-- * sharding.sched_move_quota
+-- * sharding.sched_ref_quota
+-- * sharding.shard_index
+-- * sharding.sync_timeout
+-- * sharding.weight
 g.test_scope = function()
     local function exp_err(path, scope)
         return ('[cluster_config] %s: The option must not be present in the ' ..
@@ -814,6 +828,174 @@ g.test_scope = function()
             data = {
                 replication = {
                     failover = 'manual',
+                },
+            },
+            global = true,
+            group = true,
+            replicaset = true,
+            instance = false,
+        },
+        {
+            name = 'sharding.bucket_count',
+            data = {
+                sharding = {
+                    bucket_count = 30000,
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'sharding.connection_outdate_delay',
+            data = {
+                sharding = {
+                    connection_outdate_delay = 10,
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'sharding.discovery_mode',
+            data = {
+                sharding = {
+                    discovery_mode = 'off',
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'sharding.failover_ping_timeout',
+            data = {
+                sharding = {
+                    failover_ping_timeout = 10,
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'sharding.lock',
+            data = {
+                sharding = {
+                    lock = true,
+                },
+            },
+            global = true,
+            group = true,
+            replicaset = true,
+            instance = false,
+        },
+        {
+            name = 'sharding.rebalancer_disbalance_threshold',
+            data = {
+                sharding = {
+                    rebalancer_disbalance_threshold = 7,
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'sharding.rebalancer_max_receiving',
+            data = {
+                sharding = {
+                    rebalancer_max_receiving = 1000,
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'sharding.rebalancer_max_sending',
+            data = {
+                sharding = {
+                    rebalancer_max_sending = 10,
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'sharding.rebalancer_mode',
+            data = {
+                sharding = {
+                    rebalancer_mode = 'off',
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'sharding.sched_move_quota',
+            data = {
+                sharding = {
+                    sched_move_quota = 10,
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'sharding.sched_ref_quota',
+            data = {
+                sharding = {
+                    sched_ref_quota = 1000,
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'sharding.shard_index',
+            data = {
+                sharding = {
+                    shard_index = 'my_bucket_id',
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'sharding.sync_timeout',
+            data = {
+                sharding = {
+                    sync_timeout = 10,
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
+        {
+            name = 'sharding.weight',
+            data = {
+                sharding = {
+                    weight = 10,
                 },
             },
             global = true,
