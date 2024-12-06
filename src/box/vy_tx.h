@@ -343,6 +343,12 @@ vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
 void
 vy_tx_manager_abort_writers_for_ro(struct vy_tx_manager *xm);
 
+/**
+ * Abort all transactions reading from the given LSM tree.
+ */
+void
+vy_lsm_abort_readers(struct vy_lsm *lsm);
+
 /** Initialize a tx object. */
 void
 vy_tx_create(struct vy_tx_manager *xm, struct vy_tx *tx);

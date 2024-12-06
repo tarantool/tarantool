@@ -738,7 +738,7 @@ s:drop();
 ...
 ch:get();
 ---
-- [1]
+- Transaction has been aborted by conflict
 ...
 box.error.injection.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 0);
 ---

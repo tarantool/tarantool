@@ -1245,6 +1245,19 @@ vy_tx_manager_abort_writers_for_ro(struct vy_tx_manager *xm)
 }
 
 void
+vy_lsm_abort_readers(struct vy_lsm *lsm)
+{
+	struct vy_lsm_read_set_iterator it;
+	vy_lsm_read_set_ifirst(&lsm->read_set, &it);
+	struct vy_read_interval *interval;
+	while ((interval = vy_lsm_read_set_inext(&it)) != NULL) {
+		struct vy_tx *tx = interval->tx;
+		if (tx->state == VINYL_TX_READY)
+			vy_tx_abort(tx);
+	}
+}
+
+void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_txw_iterator_stat *stat,
 		     struct vy_tx *tx, struct vy_lsm *lsm,
