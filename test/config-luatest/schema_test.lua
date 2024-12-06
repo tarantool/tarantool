@@ -224,24 +224,6 @@ end
 
 -- }}} Schema node constructors: scalar, record, map, array
 
--- {{{ Testing helpers for derived schema node type constructors
-
-local function mask_functions(data)
-    if type(data) == 'function' then
-        return '<function>'
-    elseif type(data) == 'table' then
-        local res = {}
-        for k, v in pairs(data) do
-            res[k] = mask_functions(v)
-        end
-        return res
-    else
-        return data
-    end
-end
-
--- }}} Testing helpers for derived schema node type constructors
-
 -- {{{ Derived schema node type constructors: enum, set
 
 -- schema.enum() must return a table of the following shape.
@@ -286,30 +268,30 @@ end
 --         type = 'string',
 --         allowed_values = <...>,
 --     }),
---     validate = <...>,
+--     unique_items = true,
 --     <..annotations..>
 -- }
 g.test_set_constructor = function()
     -- A simple good case.
-    t.assert_equals(mask_functions(schema.set({'foo', 'bar'})), {
+    t.assert_equals(schema.set({'foo', 'bar'}), {
         type = 'array',
         items = {
             type = 'string',
             allowed_values = {'foo', 'bar'},
         },
-        validate = '<function>',
+        unique_items = true,
     })
 
     -- A simple good case with an annotation.
-    t.assert_equals(mask_functions(schema.set({'foo', 'bar'}, {
+    t.assert_equals(schema.set({'foo', 'bar'}, {
         my_annotation = 'info',
-    })), {
+    }), {
         type = 'array',
         items = {
             type = 'string',
             allowed_values = {'foo', 'bar'},
         },
-        validate = '<function>',
+        unique_items = true,
         my_annotation = 'info',
     })
 
@@ -320,11 +302,9 @@ g.test_set_constructor = function()
     -- Ignore error messages. They are just 'assertion failed at
     -- line X', purely for the schema creator.
     local scalar = schema.scalar({type = 'string'})
-    local nop = function() end
     local def = {'foo', 'bar'}
     t.assert_equals(pcall(schema.set, def, {type = 'number'}), false)
     t.assert_equals(pcall(schema.set, def, {items = scalar}), false)
-    t.assert_equals(pcall(schema.set, def, {validate = nop}), false)
 end
 
 -- }}} Derived schema node type constructors: enum, set
@@ -528,6 +508,7 @@ end
 -- computed annotations.
 --
 -- * allowed_values
+-- * unique_items
 -- * validate
 -- * default
 -- * apply_default_if
@@ -546,6 +527,53 @@ g.test_computed_annotations_ignore = function()
             my_annotation = 'my annotation',
         },
     })
+
+    -- NB: unique_items is allowed only in an array.
+    local s = schema.new('myschema', schema.array({
+        items = schema.scalar({type = 'string'}),
+        unique_items = true,
+        my_annotation = 'my annotation',
+    }))
+
+    t.assert_equals(s.schema.computed, {
+        annotations = {
+            my_annotation = 'my annotation',
+        },
+    })
+end
+
+-- Verify that the unique_items annotation is only allowed in an
+-- array of strings.
+g.test_validate_schema = function()
+    -- Not an array.
+    local exp_err_msg = '[myschema] foo.bar: "unique_items" requires an ' ..
+        'array of strings, got a string'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        schema.new('myschema', schema.record({
+            foo = schema.record({
+                bar = schema.scalar({
+                    type = 'string',
+                    unique_items = true,
+                }),
+            }),
+        }))
+    end)
+
+    -- Array of non-string values.
+    local exp_err_msg = '[myschema] foo.bar: "unique_items" requires an ' ..
+        'array of strings, got an array of integer items'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        schema.new('myschema', schema.record({
+            foo = schema.record({
+                bar = schema.array({
+                    items = schema.scalar({
+                        type = 'integer',
+                    }),
+                    unique_items = true,
+                }),
+            }),
+        }))
+    end)
 end
 
 -- }}} Schema object constructor: new
@@ -931,6 +959,25 @@ g.test_validate_by_allowed_values = function()
         allowed_values = {'orange', 'banana'},
     }))
     assert_validate_scalar_type_mismatch(s, 1, 'string')
+end
+
+g.test_validate_unique_items = function()
+    local s = schema.new('myschema', schema.set({'foo', 'bar'}, {
+        validate = function(_data, w)
+            w.error('error from the validate annotation')
+        end,
+    }))
+
+    -- The uniqueness check is performed before the user-provided
+    -- validation function.
+    local exp_err = '[myschema] Values should be unique, but "foo" ' ..
+        'appears at least twice'
+    t.assert_error_msg_equals(exp_err, s.validate, s, {'foo', 'foo'})
+
+    -- The user-provided validation function is taken into
+    -- account.
+    local exp_err = '[myschema] error from the validate annotation'
+    t.assert_error_msg_equals(exp_err, s.validate, s, {'foo'})
 end
 
 g.test_validate_by_node_function = function()
