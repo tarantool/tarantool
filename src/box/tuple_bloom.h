@@ -43,6 +43,17 @@ extern "C" {
 struct tuple;
 struct key_def;
 
+enum tuple_bloom_version {
+	/**
+	 * We used to store only full key bloom filters. This function
+	 * decodes such a bloom filter from MsgPack and initializes a
+	 * tuple_bloom object accordingly.
+	 */
+	TUPLE_BLOOM_VERSION_V1,
+	TUPLE_BLOOM_VERSION_V2,
+	TUPLE_BLOOM_VERSION_V3,
+};
+
 /**
  * Tuple bloom filter.
  *
@@ -52,12 +63,7 @@ struct key_def;
  * of false positive results.
  */
 struct tuple_bloom {
-	/**
-	 * If the following flag is set, this is a legacy
-	 * bloom filter that stores hashes only for full keys
-	 * (see tuple_bloom_decode_legacy).
-	 */
-	bool is_legacy;
+	enum tuple_bloom_version version;
 	/** Number of key parts. */
 	uint32_t part_count;
 	/** Array of bloom filters, one per each partial key. */
@@ -217,20 +223,7 @@ tuple_bloom_encode(const struct tuple_bloom *bloom, char *buf);
  * @return the decoded bloom on success or NULL on OOM
  */
 struct tuple_bloom *
-tuple_bloom_decode(const char **data);
-
-/**
- * Decode a legacy bloom filter from MsgPack.
- * @param data - pointer to buffer storing encoded bloom filter;
- *  on success it is advanced by the number of decoded bytes
- * @return the decoded bloom on success or NULL on OOM
- *
- * We used to store only full key bloom filters. This function
- * decodes such a bloom filter from MsgPack and initializes a
- * tuple_bloom object accordingly.
- */
-struct tuple_bloom *
-tuple_bloom_decode_legacy(const char **data);
+tuple_bloom_decode(const char **data, enum tuple_bloom_version version);
 
 #if defined(__cplusplus)
 } /* extern "C" */
