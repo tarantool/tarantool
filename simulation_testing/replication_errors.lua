@@ -32,16 +32,8 @@ local function monitor_replication(cg)
             if(election_info.state == 'leader') then
                 table.insert(leaders, node.id)
             end
-
-            -----------------------------------------------------------------------------------------------------
             
-            for id, replica in pairs(replication_info) do
-                if ~replica.upstream or replica.upstream.status ~= 'follow'  then
-                    
-                    table.insert(problems, 'Not connection to replica:'..tostring(id))
-                end
-            end
-            -----------------------------------------------------------------------------------------------------
+            -----------------------------------------------------------------------------------------------
             print("[Replication Monitor] Detected "..tostring(#leaders).." Leaders:")
             for _, leader in ipairs(leaders) do
                 print("[Replication Monitor] Leaders: "..leader)
@@ -96,18 +88,31 @@ local function monitor_replication(cg)
                 end
             end
 
-            --------------------------------------------------------------------------------------------------------
-            print('[Replication Monitor] Detected '..tostring(#problems)..' Problems:')
-            if #problems > 0 then
+       
+
+        end
+
+             --------------------------------------------------------------------------------------------------------
+            
+
+    
+
+        if #leaders == 0 then
+            table.insert(problems, '[Replication Monitor] No leader detected')
+        end
+
+        if #leaders > 1 then
+            table.insert(problems, '[Replication Monitor] Multiple leaders detected')
+        end
+
+        print('[Replication Monitor] Detected '..tostring(#problems)..' Problems:')
+
+
+        if #problems > 0 then
                 for _, problem in ipairs(problems) do
                     print('[Replication Monitor] '.. problem)
                 end
             end
-
-            
-
-        end
-
         fiber.sleep(monitor_config.check_interval)
     end
 end
