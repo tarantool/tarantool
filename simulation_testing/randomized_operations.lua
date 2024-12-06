@@ -62,11 +62,6 @@ local function do_random_operation(node, space, max_key)
         local operation = generated[1]
         local tuple = generated[2]
         local message = ""
-        box.cfg {
-            checkpoint_count = 2, 
-            memtx_use_mvcc_engine = true,
-            memtx_dir = './memtx_dir',
-            txn_isolation = 'best-effort' }
 
         if operation == "select" then
             
