@@ -174,5 +174,6 @@ static-build/build
 # macOS files
 .DS_Store
 
-# unnecessary dirs in simmulation
-/simulation_testing/*_dir
+#simulation_testing files
+simulation_testing/replicas_dirs
+simulation_testing/memtx_dir
