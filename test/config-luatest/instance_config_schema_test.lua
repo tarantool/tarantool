@@ -77,6 +77,25 @@ g.test_config = function()
     t.assert_equals(res, exp)
 end
 
+-- If the array of the endpoints is provided, it should be
+-- non-empty.
+g.test_config_storage_empty_endpoints = function()
+    local iconfig = {
+        config = {
+            storage = {
+                prefix = '/foo',
+                endpoints = {},
+            },
+        },
+    }
+
+    local exp_err = '[instance_config] config.storage.endpoints: At least ' ..
+        'one endpoint must be specified in config.storage.endpoints'
+    t.assert_error_msg_equals(exp_err, function()
+        instance_config:validate(iconfig)
+    end)
+end
+
 g.test_config_enterprise = function()
     t.tarantool.skip_if_not_enterprise()
     local iconfig = {
