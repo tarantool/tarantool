@@ -114,8 +114,15 @@ end)
 
 
 fiber.create(function()
+    box.cfg{
+            memtx_use_mvcc_engine = true,
+            memtx_dir = './memtx_dir',
+            wal_dir = './wal_dir',
+            hot_standby = true
+    }
 
-    
-    cg.cluster:exec(replication_errors.run_replication_monitor())
+    print("[Replication Monitor] Started monitoring")
+
+    fiber.create(function(cg) replication_errors.run_replication_monitor(cg) end, cg)
     
 end)
