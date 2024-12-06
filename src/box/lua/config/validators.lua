@@ -153,8 +153,8 @@ end
 
 M['config.storage.endpoints'] = function(data, w)
     if #data == 0 then
-        w.error('At least one endpoint must be' ..
-            'specified in config.storage.endpoints')
+        w.error('At least one endpoint must be specified in ' ..
+            'config.storage.endpoints')
     end
 end
 
