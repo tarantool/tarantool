@@ -86,6 +86,8 @@ end)
 
 print(result)
 
+fiber.sleep(2)
+
 
 -- The main cycle
 fiber.create(function()
@@ -114,13 +116,6 @@ end)
 
 
 fiber.create(function()
-    box.cfg{
-            memtx_use_mvcc_engine = true,
-            memtx_dir = './memtx_dir',
-            wal_dir = './wal_dir',
-            hot_standby = true
-    }
-
     print("[Replication Monitor] Started monitoring")
 
     fiber.create(function(cg) replication_errors.run_replication_monitor(cg) end, cg)

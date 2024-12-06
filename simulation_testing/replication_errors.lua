@@ -23,27 +23,17 @@ local function monitor_replication(cg)
 
         local problems = {}
 
-        for _, node in ipairs(cg.nodes) do
+        local now = fiber.time()
 
-            local replication_info,election_info = node:exec(function() return box.info.replication,box.info.election end)
+        for id, node in ipairs(cg.nodes) do
+            
+            local replication_info, election_info = node:exec(function()
+                    return box.info.replication, box.info.election
+            end)
 
-            local now = fiber.time()
-
+            
             if(election_info.state == 'leader') then
                 table.insert(leaders, node.id)
-            end
-            
-            -----------------------------------------------------------------------------------------------
-            print("[Replication Monitor] Detected "..tostring(#leaders).." Leaders:")
-            for _, leader in ipairs(leaders) do
-                print("[Replication Monitor] Leaders: "..leader)
-            end
-            if #leaders == 0 then
-                if now - state.last_leader_check > monitor_config.leader_absent_time then
-                    table.insert(problems, 'No leader detected for more than ' .. monitor_config.leader_absent_time .. ' seconds')
-                end
-            else
-                state.last_leader_check = now
             end
             
             -----------------------------------------------------------------------------------------------------
@@ -60,20 +50,20 @@ local function monitor_replication(cg)
             end
 
             if #state.term_changes > monitor_config.max_terms_change_by_period then
-                table.insert(problems, 'Too many term changes in the last ' .. monitor_config.terms_change_period .. ' seconds')
+                table.insert(problems,'['..tostring(id)..'] Too many term changes in the last ' .. monitor_config.terms_change_period .. ' seconds')
             end
             -----------------------------------------------------------------------------------------------------
             for id, replica in pairs(replication_info) do
                 if replica.upstream then
                     local lag = replica.upstream.lag or 0
                     if lag > 0.5 then 
-                        table.insert(problems, 'High lag detected on upstream ' .. id)
+                        table.insert(problems, '['..tostring(id)..'] High lag detected on upstream ' .. id)
                     end
                 end
                 if replica.downstream then
                     local lag = replica.downstream.lag or 0
                     if lag > 0.5 then 
-                        table.insert(problems, 'High lag detected on downstream ' .. id)
+                        table.insert(problems, '['..tostring(id)..'] High lag detected on downstream ' .. id)
                     end
                 end
             end
@@ -81,31 +71,35 @@ local function monitor_replication(cg)
             --------------------------------------------------------------------------------------------------------
             for id, replica in pairs(replication_info) do
                 if replica.upstream and replica.upstream.status == 'disconnected' then
-                    table.insert(problems, 'Upstream disconnected for node ' .. id)
+                    table.insert(problems, '['..tostring(id)..'] Upstream disconnected for node ' .. id)
                 end
                 if replica.downstream and replica.downstream.status == 'disconnected' then
-                    table.insert(problems, 'Downstream disconnected for node ' .. id)
+                    table.insert(problems, '['..tostring(id)..'] Downstream disconnected for node ' .. id)
                 end
             end
-
-       
 
         end
 
              --------------------------------------------------------------------------------------------------------
             
-
-    
+        print("[Replication Monitor][CLUSTER] Detected "..tostring(#leaders).." Leaders:")
+        for _, leader in ipairs(leaders) do
+                print("[Replication Monitor] [CLUSTER] Leader: "..leader)
+        end
 
         if #leaders == 0 then
-            table.insert(problems, '[Replication Monitor] No leader detected')
-        end
+                if now - state.last_leader_check > monitor_config.leader_absent_time then
+                    table.insert(problems, '[CLUSTER] No leader detected for more than ' .. monitor_config.leader_absent_time .. ' seconds')
+                end
+            else
+                state.last_leader_check = now
+            end
 
         if #leaders > 1 then
-            table.insert(problems, '[Replication Monitor] Multiple leaders detected')
+            table.insert(problems, '[Replication Monitor][CLUSTER] Multiple leaders detected')
         end
 
-        print('[Replication Monitor] Detected '..tostring(#problems)..' Problems:')
+        print('[Replication Monitor][CLUSTER] Detected '..tostring(#problems)..' Problems:')
 
 
         if #problems > 0 then
