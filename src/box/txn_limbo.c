@@ -682,13 +682,12 @@ txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 	limbo->is_in_rollback = false;
 }
 
-/** Rollback all the entries >= @a lsn. */
-static void
-txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
+static struct txn_limbo_entry *
+txn_limbo_last_rollback_entry(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(limbo->owner_id != REPLICA_ID_NIL || txn_limbo_is_empty(limbo));
 	assert(limbo == &txn_limbo);
-	struct txn_limbo_entry *e, *tmp;
+	struct txn_limbo_entry *e;
 	struct txn_limbo_entry *last_rollback = NULL;
 	rlist_foreach_entry_reverse(e, &limbo->queue, in_queue) {
 		if (!txn_has_flag(e->txn, TXN_WAIT_ACK))
@@ -697,8 +696,18 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 			break;
 		last_rollback = e;
 	}
+	return last_rollback;
+}
+
+/** Rollback all the entries >= @a lsn. */
+static void
+txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
+{
+	struct txn_limbo_entry *last_rollback =
+		txn_limbo_last_rollback_entry(limbo, lsn);
 	if (last_rollback == NULL)
 		return;
+	struct txn_limbo_entry *e, *tmp;
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue, in_queue, tmp) {
 		txn_limbo_abort(limbo, e);
 		txn_clear_flags(e->txn, TXN_WAIT_ACK);
