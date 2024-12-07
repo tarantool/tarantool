@@ -995,7 +995,8 @@ txn_journal_entry_new(struct txn *txn)
 				return NULL;
 			}
 			txn_set_flags(txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
-		} else if (!txn_limbo_is_empty(&txn_limbo)) {
+		} else if (recovery_state == FINISHED_RECOVERY &&
+			   !txn_limbo_is_empty(&txn_limbo)) {
 			/*
 			 * There some sync entries on the
 			 * fly thus wait for their completion
@@ -1005,6 +1006,12 @@ txn_journal_entry_new(struct txn *txn)
 			 */
 			txn_set_flags(txn, TXN_WAIT_SYNC);
 		}
+	} else {
+		/*
+		 * The flags could be set based while processing the xrow during
+		 * recovery or replication.
+		 */
+		txn_clear_flags(txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
 	}
 
 	assert(remote_row == req->rows + txn->n_applier_rows);
@@ -1417,15 +1424,7 @@ box_txn_set_timeout(double timeout)
 void
 box_txn_make_sync(void)
 {
-	struct txn *txn = in_txn();
-	/*
-	 * Do nothing if transaction is not started,
-	 * it's the same as BEGIN + COMMIT.
-	 */
-	if (!txn)
-		return;
-
-	txn_set_flags(txn, TXN_WAIT_ACK);
+	box_txn_set_sync_flags(/*wait_sync=*/false, /*wait_ack=*/true);
 }
 
 /** Wait for a linearization point for a transaction. */
