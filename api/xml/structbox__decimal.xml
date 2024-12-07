@@ -1,14 +1,15 @@
 <?xml version='1.0' encoding='UTF-8' standalone='no'?>
-<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.8" xml:lang="en-US">
   <compounddef id="structbox__decimal" kind="struct" language="C++" prot="public">
     <compoundname>box_decimal</compoundname>
     <includes refid="module_8h" local="no">module.h</includes>
-      <sectiondef kind="public-attrib">
+    <sectiondef kind="public-attrib">
       <memberdef kind="variable" id="structbox__decimal_1ab3c586f1f723be9d150e20c67ff0fa9b" prot="public" static="no" mutable="no">
         <type>uint64_t</type>
         <definition>uint64_t box_decimal::internal[8]</definition>
         <argsstring>[8]</argsstring>
         <name>internal</name>
+        <qualifiedname>box_decimal::internal</qualifiedname>
         <briefdescription>
 <para>Decimal data. </para>
         </briefdescription>
@@ -20,7 +21,7 @@
         </inbodydescription>
         <location file="src/module.h" line="3290" column="10" bodyfile="src/module.h" bodystart="3290" bodyend="-1"/>
       </memberdef>
-      </sectiondef>
+    </sectiondef>
     <briefdescription>
 <para>public </para>
     </briefdescription>
