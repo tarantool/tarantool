@@ -541,6 +541,7 @@ txn_begin(void)
 	txn->fiber = NULL;
 	txn->timeout = TIMEOUT_INFINITY;
 	txn->rollback_timer = NULL;
+	txn->begin_time = fiber_clock();
 	fiber_set_txn(fiber(), txn);
 	trigger_create(&txn->fiber_on_yield, txn_on_yield, NULL, NULL);
 	trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
@@ -1030,7 +1031,7 @@ txn_prepare(struct txn *txn)
 	if (txn_check_can_continue(txn) != 0)
 		return -1;
 
-	if (txn->rollback_timer != NULL) {
+	if (!box_begin_timeout_new_meaning && txn->rollback_timer != NULL) {
 		ev_timer_stop(loop(), txn->rollback_timer);
 		txn->rollback_timer = NULL;
 	}
@@ -1044,6 +1045,11 @@ txn_prepare(struct txn *txn)
 	 */
 	if (txn_check_can_continue(txn) != 0)
 		return -1;
+
+	if (box_begin_timeout_new_meaning && txn->rollback_timer != NULL) {
+		ev_timer_stop(loop(), txn->rollback_timer);
+		txn->rollback_timer = NULL;
+	}
 
 	assert(txn->psn == 0);
 	/* psn must be set before calling engine handlers. */
@@ -1183,8 +1189,20 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 		txn->fiber = NULL;
 		return 0;
 	}
-	while (!req->is_complete)
-		fiber_yield();
+	while (!req->is_complete) {
+		if (box_begin_timeout_new_meaning) {
+			double timeout = txn->begin_time +
+					 txn->timeout - fiber_clock();
+			if (fiber_yield_timeout(timeout)) {
+				diag_set(ClientError, ER_COMMIT_TIMEOUT,
+					 "WAL write");
+				txn->fiber = NULL;
+				return -1;
+			}
+		} else {
+			fiber_yield();
+		}
+	}
 	if (req->res < 0) {
 		diag_set_journal_res(req->res);
 		goto rollback_io;
@@ -1194,7 +1212,8 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 		assert(limbo_entry->lsn > 0);
 		int rc = txn_limbo_wait_complete(&txn_limbo, limbo_entry);
 		if (rc < 0) {
-			if (fiber_is_cancelled()) {
+			if (fiber_is_cancelled() ||
+			    box_begin_timeout_new_meaning) {
 				txn->fiber = NULL;
 				return -1;
 			} else {
@@ -1688,6 +1707,7 @@ txn_on_yield(struct trigger *trigger, void *event)
 		return 0;
 	}
 	if (txn->rollback_timer == NULL && txn->timeout != TIMEOUT_INFINITY) {
+		assert(txn->begin_time == fiber_clock());
 		size_t size;
 		txn->rollback_timer =
 			tx_region_alloc_object(txn, TX_OBJECT_EV_TIMER, &size);
