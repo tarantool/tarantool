@@ -269,6 +269,13 @@ struct txn_limbo {
 	 * `confirmed_lsn`.
 	 */
 	struct fiber *worker;
+	/**
+	 * Whether this instance is currently running
+	 * `box.ctl.on_split_brain_rollback` event triggers. It is allowed to
+	 * execute fully local transactions that bypass the limbo during this
+	 * time.
+	 */
+	bool is_running_on_split_brain_rollback_triggers;
 };
 
 /**
