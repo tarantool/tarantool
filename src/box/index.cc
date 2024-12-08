@@ -1163,11 +1163,14 @@ int
 generic_iterator_position(struct iterator *it, const char **pos,
 			  uint32_t *size)
 {
-	(void)pos;
-	(void)size;
-	struct index *index = index_weak_ref_get_index_checked(&it->index_ref);
-	diag_set(UnsupportedIndexFeature, index->def, "pagination");
-	return -1;
+	struct index_rtree_iterator *rtree_it = (struct index_rtree_iterator *)it;
+    *pos = rtree_iterator_current_position(&rtree_it->impl);
+    if (*pos == NULL) {
+        *size = 0;
+        return -1;
+    }
+    *size = strlen(*pos);
+    return 0;
 }
 
 int
