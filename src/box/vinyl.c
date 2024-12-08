@@ -1038,6 +1038,28 @@ vinyl_space_invalidate(struct space *space)
 	 */
 	bool unused;
 	vy_tx_manager_abort_writers_for_ddl(env->xm, space, &unused);
+
+	/*
+	 * In addition to that, we also abort all transactions reading
+	 * from the space. We do it for a number of reasons:
+	 *
+	 * 1. Consistency with the memtx engine, which also aborts readers.
+	 * 2. Prevention of non-repeatable reads in case an index is altered
+	 *    in such a way that the same query gives a different result.
+	 * 3. Abort of writers that weren't added to the Vinyl write set,
+	 *    for example, update of a non-existent key.
+	 */
+	struct vy_lsm *pk = NULL;
+	struct space *new_space = space_by_id(space_id(space));
+	if (new_space != NULL && new_space->index_count > 0) {
+		/* Primary index was moved (it can't be altered). */
+		pk = vy_lsm(space_index(new_space, 0));
+	} else if (space->index_count > 0) {
+		/* Primary index was dropped. */
+		pk = vy_lsm(space_index(space, 0));
+	}
+	if (pk != NULL)
+		vy_lsm_abort_readers(pk);
 }
 
 /** Argument passed to vy_check_format_on_replace(). */
