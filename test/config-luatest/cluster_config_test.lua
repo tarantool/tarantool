@@ -336,3 +336,48 @@ g.test_groups_with_same_name = function(g)
     cluster.startup_error(g, config, 'found groups with the same ' ..
                                      'name "g-001".')
 end
+
+g.test_replicasets_with_same_name = function(g)
+    -- We aren't able to use cbuilder helper here since it
+    -- internally uses cluster_config not allowing configs
+    -- with the same group/replicaset/instance names.
+    local config = [[
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+        groups:
+          g-001:
+            replicasets:
+              r-001:
+                instances:
+                  i-001: {}
+              r-001:
+                instances:
+                  i-002: {}
+    ]]
+
+    cluster.startup_error(g, config, 'found replicasets with the same ' ..
+                                     'name "r-001" within the group ' ..
+                                     '"g-001".')
+
+    config = [[
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+        groups:
+          g-001:
+            replicasets:
+              r-001:
+                instances:
+                  i-001: {}
+          g-002:
+            replicasets:
+              r-001:
+                instances:
+                  i-002: {}
+    ]]
+
+    cluster.startup_error(g, config, 'found replicasets with the same ' ..
+                                     'name "r-001" within the groups ' ..
+                                     '"g-001" and "g-002".')
+end
