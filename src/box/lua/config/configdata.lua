@@ -888,6 +888,55 @@ local function validate_replicaset_names_are_unique(cconfig)
     end
 end
 
+local function validate_instance_names_are_unique(cconfig)
+    local instance_groups = {}
+    local instance_replicasets = {}
+
+    for group_name, group in pairs(cconfig.groups) do
+        for replicaset_name, replicaset in pairs(group.replicasets) do
+            for instance_name, _ in pairs(replicaset.instances) do
+                local dup_group_name = instance_groups[instance_name]
+                local dup_replicaset_name =
+                    instance_replicasets[instance_name]
+
+                -- Duplicating instance name is found within the
+                -- same replicaset.
+                if replicaset_name == dup_replicaset_name then
+                    assert(group_name == dup_group_name)
+
+                    error(('found two replicasets with the same name %q in ' ..
+                           'the group %q.')
+                          :format(replicaset_name, group_name), 0)
+                end
+
+                -- Duplicating instance name is found within two
+                -- distinct replicasets.
+                if group_name == dup_group_name then
+                    error(('found instances with the same name %q within ' ..
+                           'the replicasets %q and %q in the group %q.')
+                          :format(instance_name, dup_replicaset_name,
+                                  replicaset_name, group_name))
+                end
+
+                -- Duplicating instance name is found within two
+                -- distinct groups.
+                if dup_group_name ~= nil then
+                    error(('found instances with the same name %q within ' ..
+                           'the replicaset %q in the group %q and the ' ..
+                           'replicaset %q in the group %q.')
+                           :format(instance_name, dup_replicaset_name,
+                                   dup_group_name, replicaset_name, group_name))
+                end
+
+                assert(dup_replicaset_name == nil)
+
+                instance_groups[instance_name] = group_name
+                instance_replicasets[instance_name] = group_name
+            end
+        end
+    end
+end
+
 local function new(iconfig, cconfig, instance_name)
     -- Find myself in a cluster config, determine peers in the same
     -- replicaset.
@@ -898,6 +947,7 @@ local function new(iconfig, cconfig, instance_name)
 
     validate_group_names_are_unique(cconfig)
     validate_replicaset_names_are_unique(cconfig)
+    validate_instance_names_are_unique(cconfig)
 
     -- Precalculate configuration with applied defaults.
     local iconfig_def = instance_config:apply_default(iconfig)

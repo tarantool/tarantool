@@ -381,3 +381,67 @@ g.test_replicasets_with_same_name = function(g)
                                      'name "r-001" within the groups ' ..
                                      '"g-001" and "g-002".')
 end
+
+g.test_instances_with_same_name = function(g)
+    -- We aren't able to use cbuilder helper here since it
+    -- internally uses cluster_config not allowing configs
+    -- with the same group/replicaset/instance names.
+    local config = [[
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+        groups:
+          g-001:
+            replicasets:
+              r-001:
+                instances:
+                  i-001: {}
+                  i-001: {}
+    ]]
+
+    cluster.startup_error(g, config, 'found instances with the same ' ..
+                                     'name "i-001" within the replicaset ' ..
+                                     '"r-001" in the group "g-001".')
+
+    config = [[
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+        groups:
+          g-001:
+            replicasets:
+              r-001:
+                instances:
+                  i-001: {}
+              r-002:
+                instances:
+                  i-001: {}
+    ]]
+
+    cluster.startup_error(g, config, 'found instances with the same ' ..
+                                     'name "i-001" within the replicasets ' ..
+                                     '"r-001" and "r-002" in the group ' ..
+                                     '"g-001".')
+
+    config = [[
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+        groups:
+          g-001:
+            replicasets:
+              r-001:
+                instances:
+                  i-001: {}
+          g-002:
+            replicasets:
+              r-002:
+                instances:
+                  i-001: {}
+    ]]
+
+    cluster.startup_error(g, config, 'found instances with the same ' ..
+                                     'name "i-001" within the replicaset ' ..
+                                     '"r-001" in the group "g-001" and ' ..
+                                     'replicaset "r-002" in the group "g-002".')
+end
