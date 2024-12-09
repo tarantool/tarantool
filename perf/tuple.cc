@@ -173,8 +173,8 @@ private:
 		struct memtx_engine *memtx = MemtxEngine::instance().engine();
 		struct key_def *kd = MemtxEngine::instance().key_def();
 
-		char names[FIELD_COUNT][sizeof("f999")];
-		struct field_def fields[FIELD_COUNT];
+		std::vector<char[sizeof("f999")]> names(FIELD_COUNT);
+		std::vector<struct field_def> fields(FIELD_COUNT);
 		for (size_t i = 0; i < FIELD_COUNT; i++) {
 			sprintf(names[i], "f%03zu", i);
 			fields[i] = field_def_default;
@@ -184,12 +184,12 @@ private:
 			fields[i].nullable_action = ON_CONFLICT_ACTION_NONE;
 		}
 		struct tuple_dictionary *dict =
-			tuple_dictionary_new(fields, FIELD_COUNT);
+			tuple_dictionary_new(fields.data(), FIELD_COUNT);
 		if (dict == NULL)
 			abort();
 		fmt = tuple_format_new(&memtx_tuple_format_vtab, memtx, &kd, 1,
-				       fields, FIELD_COUNT, FIELD_COUNT, dict,
-				       false, false, NULL, 0, NULL, 0);
+				       fields.data(), FIELD_COUNT, FIELD_COUNT,
+				       dict, false, false, NULL, 0, NULL, 0);
 		if (fmt == NULL)
 			abort();
 		tuple_format_ref(fmt);
@@ -285,9 +285,10 @@ public:
 		static MpDataSet instance;
 		return instance;
 	}
+	MpDataSet() : data(NUM_TEST_TUPLES) {}
 	const MpData<F> &operator[](size_t i) const { return data[i]; }
 private:
-	MpData<F> data[NUM_TEST_TUPLES];
+	std::vector<MpData<F>> data;
 };
 
 // Generator of a set of random tuples.
