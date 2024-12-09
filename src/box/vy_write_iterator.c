@@ -843,10 +843,17 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct vy_entry prev,
 	/*
 	 * Optimization 4: discard a DELETE statement referenced
 	 * by a read view if it is preceded by another DELETE for
-	 * the same key.
+	 * the same key unless the latter is marked as SKIP READ
+	 * (i.e. it's a deferred DELETE). Deferred DELETEs are
+	 * dumped out of order so there may be a statement with
+	 * the LSN lying between the two DELETEs in an older source
+	 * not included into this compaction task. If we discarded
+	 * the newer DELETE, we wouldn't purge this statement on
+	 * major compaction.
 	 */
 	if (prev.stmt != NULL &&
 	    vy_stmt_type(prev.stmt) == IPROTO_DELETE &&
+	    (vy_stmt_flags(prev.stmt) & VY_STMT_SKIP_READ) == 0 &&
 	    vy_stmt_type(h->entry.stmt) == IPROTO_DELETE) {
 		vy_write_history_destroy(h);
 		rv->history = NULL;
