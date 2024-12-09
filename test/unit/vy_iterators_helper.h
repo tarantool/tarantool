@@ -54,6 +54,9 @@
 #define STMT_TEMPLATE_DEFERRED_DELETE(lsn, type, ...) \
 STMT_TEMPLATE_FLAGS(lsn, type, VY_STMT_DEFERRED_DELETE, __VA_ARGS__)
 
+#define STMT_TEMPLATE_SKIP_READ(lsn, type, ...) \
+STMT_TEMPLATE_FLAGS(lsn, type, VY_STMT_SKIP_READ, __VA_ARGS__)
+
 extern struct vy_stmt_env stmt_env;
 extern struct vy_mem_env mem_env;
 extern struct vy_cache_env cache_env;
