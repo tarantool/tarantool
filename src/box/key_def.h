@@ -1126,6 +1126,10 @@ uint32_t
 tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 		 enum field_type type, struct coll *coll);
 
+uint32_t
+tuple_hash_field_v1(uint32_t *ph1, uint32_t *pcarry, const char **field,
+		    enum field_type type, struct coll *coll);
+
 /**
  * Compute hash of a key part.
  * @param ph1 - pointer to running hash
@@ -1140,6 +1144,10 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 uint32_t
 tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
 		    struct key_part *part, int multikey_idx);
+
+uint32_t
+tuple_hash_key_part_v1(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
+		       struct key_part *part, int multikey_idx);
 
 /**
  * Calculates a common hash value for a tuple
