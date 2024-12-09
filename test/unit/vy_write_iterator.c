@@ -150,7 +150,7 @@ void
 test_basic(void)
 {
 	header();
-	plan(58);
+	plan(61);
 {
 /*
  * STATEMENT: REPL REPL REPL  DEL  REPL  REPL  REPL  REPL  REPL  REPL
@@ -396,6 +396,36 @@ test_basic(void)
 				       expected, expected_count, NULL, 0,
 				       vlsns, vlsns_count, true, false);
 }
+
+/*
+ * STATEMENT: REPL DEL REPL DEL REPL DEL
+ * LSN:        4    5   10  11   15  20
+ * SKIP READ:       +
+ * READ VIEW:       *        *
+ *            \_______/\_______/\_______/
+ *              merge    merge     skip
+ *
+ * is_last_level = false
+ *
+ * Check that a tautological DELETE isn't skipped if the preceding DELETE
+ * referenced by an older read view was deferred (marked as SKIP READ).
+ */
+{
+	const struct vy_stmt_template content[] = {
+		STMT_TEMPLATE(4, REPLACE, 1, 1),
+		STMT_TEMPLATE_SKIP_READ(5, DELETE, 1),
+		STMT_TEMPLATE(10, REPLACE, 1, 2),
+		STMT_TEMPLATE(11, DELETE, 1),
+		STMT_TEMPLATE(15, REPLACE, 1, 3),
+		STMT_TEMPLATE(20, DELETE, 1),
+	};
+	const struct vy_stmt_template expected[] = { content[3], content[1] };
+	const int vlsns[] = {5, 11};
+	compare_write_iterator_results(content, lengthof(content),
+				       expected, lengthof(expected), NULL, 0,
+				       vlsns, lengthof(vlsns), true, false);
+}
+
 {
 /*
  * STATEMENT: INS DEL REPL DEL REPL REPL INS REPL
