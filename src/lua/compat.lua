@@ -5,7 +5,10 @@ local NEW = true
 local OLD = false
 
 local ffi = require('ffi')
+local fun = require('fun')
 local tweaks = require('internal.tweaks')
+
+local compat = { }
 
 ffi.cdef[[
     /**
@@ -22,6 +25,7 @@ local options_format = {
     obsolete       = 'string/nil',
     run_action_now = 'boolean/nil',
     action         = 'function/nil',
+    dependencies   = 'table/nil'
 }
 
 local JSON_ESCAPE_BRIEF = [[
@@ -164,6 +168,14 @@ gc-checkpointing.
 https://tarantool.io/compat/replication_synchro_timeout
 ]]
 
+local BOX_BEGIN_TIMEOUT_MEANING_BRIEF = [[
+Controls the behavior of the timeout `box.begin{timeout=`. The option can be
+set to 'new' only if the compat option replication_synchro_timeout is set to
+'new'. The new behavior propagates the timeout further to `box.commit`.
+
+https://tarantool.io/compat/box_begin_timeout_meaning
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -180,12 +192,13 @@ local box_consider_system_spaces_synchronous_tweak_action =
     tweak_action('box_consider_system_spaces_synchronous', false, true)
 
 -- Contains options descriptions in following format:
--- * default  (string)
--- * brief    (string)
--- * obsolete (string or nil)
--- * current  (boolean, true for 'new')
--- * selected (boolean)
--- * action   (function)
+-- * default        (string)
+-- * brief          (string)
+-- * obsolete       (string or nil)
+-- * current        (boolean, true for 'new')
+-- * selected       (boolean)
+-- * action         (function)
+-- * dependencies   (array or nil)
 local options = {
     json_escape_forward_slash = {
         default = 'new',
@@ -301,6 +314,13 @@ local options = {
         action = tweak_action(
             'replication_synchro_timeout_rollback_enabled', true, false),
     },
+    box_begin_timeout_meaning = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_BEGIN_TIMEOUT_MEANING_BRIEF,
+        action = tweak_action('box_begin_timeout_new_meaning', false, true),
+        dependencies = { 'replication_synchro_timeout', }
+    },
 }
 
 -- Array with option names in order of addition.
@@ -320,8 +340,8 @@ Available commands:
     compat.dump()                   -- get Lua command that sets up different
                                        compat with same options as current
     compat.add_option()             -- add new option by providing a table with
-                                       name, default, brief, obsolete and action
-                                       function
+                                       name, default, brief, obsolete, action
+                                       function and dependencies
 ]]
 
 -- Returns table with all non-obsolete options from `options` and their values.
@@ -395,6 +415,15 @@ local function verify_option(name, option)
     end
 end
 
+-- Returns the effective compat option value - 'old' or 'new'.
+local function option_value(option)
+    if option.current == 'default' then
+        return option.default
+    else
+        return option.current
+    end
+end
+
 -- Checks if operation is valid, sets value to an option and runs postaction.
 local function set_option(name, val)
     local option = options[name]
@@ -418,13 +447,22 @@ local function set_option(name, val)
         error(('Chosen option %s is no longer available'):format(name))
     end
     if val ~= option.current then
+        if val == NEW and option.dependencies then
+            for _, dependency_name in ipairs(option.dependencies) do
+                local dependency = options[dependency_name]
+                assert(dependency)
+                if option_value(dependency) == OLD then
+                    error(("The compat option '%s' may be set to 'new' only " ..
+                        "when compat option '%s' is 'new'")
+                        :format(name, dependency_name))
+                end
+            end
+        end
         option.action(val)
     end
     option.current = val
     option.selected = selected
 end
-
-local compat = { }
 
 -- src/box/lua/config/applier/compat.lua needs information about
 -- default values.
@@ -521,10 +559,12 @@ end
 -- * obsolete       (string/nil)
 -- * action         (function/nil)
 -- * run_action_now (boolean/nil)
+-- * dependencies   (array/nil)
 function compat.add_option(option_def)
     if type(option_def) ~= 'table' then
         error("usage: compat.add_option({name = '...', default = 'new'/'old'" ..
-              ", brief = '...', action = func, run_action_now = true/false})")
+              ", brief = '...', action = func, run_action_now = true/false, " ..
+              "dependencies = array/nil})")
     end
     local name = option_def.name
     verify_option(name, option_def)
@@ -545,10 +585,11 @@ function compat.add_option(option_def)
 
     -- Copy all other fields.
     local option = options[name]
-    option.brief    = option_def.brief
-    option.default  = option_def.default
-    option.obsolete = option_def.obsolete
-    option.action   = option_def.action
+    option.brief        = option_def.brief
+    option.default      = option_def.default
+    option.obsolete     = option_def.obsolete
+    option.action       = option_def.action
+    option.dependencies = option_def.dependencies
 
     if not option.obsolete and option_def.run_action_now then
         option.action(options[name].current)
@@ -583,12 +624,57 @@ end
 
 local compat_mt = { }
 
+local function topsorted_by_dependencies(option_list)
+    -- Incoming degrees of each node (node_name -> 0 initially)
+    local indegree = fun.zip(option_list, fun.zeros()):tomap()
+    for _, from in ipairs(option_list) do
+        local edges = options[from].dependencies or {}
+        for _, to in ipairs(edges) do
+            if indegree[to] ~= nil then
+                indegree[to] = indegree[to] + 1
+            end
+        end
+    end
+    local topsort = fun.filter(function(node)
+        return indegree[node] == 0 end, option_list):totable()
+    local i = 1
+    while i <= #topsort do
+        local edges = options[topsort[i]].dependencies or {}
+        for _, node in ipairs(edges) do
+            if indegree[node] ~= nil then
+                indegree[node] = indegree[node] - 1
+                if indegree[node] == 0 then
+                    table.insert(topsort, node)
+                end
+            end
+        end
+        i = i + 1
+    end
+    assert(#topsort == #option_list, "circular dependencies detected")
+    -- Return this sequence in reversed order
+    return fun.range(#topsort, 1, -1)
+        :map(function(i) return topsort[i] end):totable()
+end
+
 function compat_mt.__call(_, list)
     if type(list) ~= 'table' then
         error("usage: compat({<option_name> = 'new'/'old'/'default'})")
     end
-    for key, val in pairs(list) do
-        set_option(key, val)
+    -- Here we could do a precheck that all dependencies are satisfied, and if
+    -- not, then raise an error. And we could even allow dependency cycles.
+    -- Yes, this would be useless, because all the options on the cycle are
+    -- essentially one option (either all are set to 'old' or all are set to
+    -- 'new'). It seems that after such a check we could set the options in any
+    -- order. But there is an important problem here why we cannot do this.
+    -- It may happen that setting the current option will raise an error, and
+    -- then those options that we have already set by this moment will end up
+    -- with unsatisfied dependencies. Therefore, here we are required to set
+    -- options in topological sorting order, and therefore circular dependencies
+    -- are prohibited.
+    --
+    local key_list = fun.iter(list):totable()
+    for _, key in ipairs(topsorted_by_dependencies(key_list)) do
+        set_option(key, list[key])
     end
 end
 
@@ -597,15 +683,6 @@ function compat_mt.__newindex(_, key, val)
 end
 
 local compat_option_methods = {}
-
--- Returns the effective compat option value - 'old' or 'new'.
-local function option_value(option)
-    if option.current == 'default' then
-        return option.default
-    else
-        return option.current
-    end
-end
 
 -- Whether the effective value of the option is `new`.
 function compat_option_methods.is_new(option)
@@ -635,6 +712,7 @@ function compat_mt.__index(_, key)
         brief = options[key].brief,
         default = options[key].default,
         obsolete = options[key].obsolete,
+        dependencies = options[key].dependencies or { },
     }
 
     if not options[key].selected then
