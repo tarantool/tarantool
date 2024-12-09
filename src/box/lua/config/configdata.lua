@@ -848,6 +848,18 @@ local function validate_multi_master(iconfig_def, peers)
     end
 end
 
+local function validate_group_names_are_unique(cconfig)
+    local groups = {}
+
+    for group_name, _ in pairs(cconfig.groups) do
+        if groups[group_name] then
+            error(('found groups with the same name %q.'):format(group_name), 0)
+        end
+
+        groups[group_name] = true
+    end
+end
+
 local function new(iconfig, cconfig, instance_name)
     -- Find myself in a cluster config, determine peers in the same
     -- replicaset.
@@ -855,6 +867,8 @@ local function new(iconfig, cconfig, instance_name)
     assert(found ~= nil)
 
     validate_misplacing(cconfig)
+
+    validate_group_names_are_unique(cconfig)
 
     -- Precalculate configuration with applied defaults.
     local iconfig_def = instance_config:apply_default(iconfig)

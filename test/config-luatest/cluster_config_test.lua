@@ -311,3 +311,28 @@ g.test_misplace_option = function(g)
     cluster.startup_error(g, config, "replicaset \"sharding\" should " ..
                                      "include at least one instance.")
 end
+
+g.test_groups_with_same_name = function(g)
+    -- We aren't able to use cbuilder helper here since it
+    -- internally uses cluster_config not allowing configs
+    -- with the same group/replicaset/instance names.
+    local config = [[
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+        groups:
+          g-001:
+            replicasets:
+              r-001:
+                instances:
+                  i-001: {}
+          g-001:
+            replicasets:
+              r-002:
+                instances:
+                  i-002: {}
+    ]]
+
+    cluster.startup_error(g, config, 'found groups with the same ' ..
+                                     'name "g-001".')
+end
