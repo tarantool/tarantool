@@ -905,13 +905,8 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 
 	assert(vy_stmt_is_refable(entry.stmt));
 	assert(*region_stmt == NULL || !vy_stmt_is_refable(*region_stmt));
-
-	/* Abort transaction if format was changed by DDL */
-	if (!vy_stmt_is_key(entry.stmt) &&
-	    format_id != tuple_format_id(mem->format)) {
-		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
-		return -1;
-	}
+	assert(vy_stmt_is_key(entry.stmt) ||
+	       format_id == tuple_format_id(mem->format));
 
 	/* Invalidate cache element. */
 	struct vy_entry deleted = vy_entry_none();
