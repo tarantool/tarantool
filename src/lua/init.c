@@ -183,9 +183,9 @@ extern char minifio_lua[],
 static const char *lua_modules[] = {
 	/* Make it first to affect load of all other modules */
 	"strict", strict_lua,
-	"compat", compat_lua,
 	"internal.utils", utils_lua,
 	"fun", fun_lua,
+	"compat", compat_lua,
 	"debug", debug_lua,
 	"tarantool", init_lua,
 	"errno", errno_lua,
