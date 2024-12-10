@@ -260,6 +260,7 @@ end
 -- given error message.
 local function startup_error(g, config, exp_err)
     assert(g)  -- temporary stub to not fail luacheck due to unused var
+    assert(type(config) == 'table')
     assert(config._config == nil, "Please provide cbuilder:new():config()")
     -- Prepare a temporary directory and write a configuration
     -- file.
