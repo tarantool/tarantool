@@ -2424,7 +2424,7 @@ vinyl_engine_begin(struct engine *engine, struct txn *txn)
 {
 	struct vy_env *env = vy_env(engine);
 	assert(txn->engines_tx[engine->id] == NULL);
-	txn->engines_tx[engine->id] = vy_tx_begin(env->xm, txn->isolation);
+	txn->engines_tx[engine->id] = vy_tx_begin(env->xm, txn);
 	if (txn->engines_tx[engine->id] == NULL)
 		return -1;
 	return 0;
@@ -2516,7 +2516,7 @@ vinyl_engine_begin_statement(struct engine *engine, struct txn *txn)
 	struct vy_tx *tx = txn->engines_tx[engine->id];
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	assert(tx != NULL);
-	return vy_tx_begin_statement(tx, stmt->space, &stmt->engine_savepoint);
+	return vy_tx_begin_statement(tx, &stmt->engine_savepoint);
 }
 
 static void

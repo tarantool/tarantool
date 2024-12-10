@@ -1,22 +1,22 @@
 local t = require('luatest')
 local server = require('luatest.server')
 
-local g = t.group(nil, t.helpers.matrix{
+local g = t.group('ddl_and_concurrent_transactions', t.helpers.matrix{
     engine = {'memtx', 'vinyl'},
     -- Whether DDL should abort the main operation.
     conflicting_ddl = {true, false},
     -- Whether DDL should do a DML statement as well.
     ddl_with_dml = {true, false},
     -- Whether we should prepare DML.
-    prepare_dml = {true, false},
+    scenario = {'create_index', 'drop_space', 'prepared_dml'},
 })
 
-g.before_all({prepare_dml = false}, function(cg)
+local function tx_abort_on_ddl_test_prepare(cg)
     cg.server = server:new({
         box_cfg = {memtx_use_mvcc_engine = true},
     })
     cg.server:start()
-    cg.server:exec(function(conflicting_ddl, ddl_with_dml)
+    cg.server:exec(function(params)
         local fiber = require('fiber')
         -- A function that accepts an operation and checks if it is aborted
         -- by related DDL and not aborted by unrelated one. Note that the DDL
@@ -30,18 +30,24 @@ g.before_all({prepare_dml = false}, function(cg)
             -- Process a concurrent transaction doing a DDL. Does the operation
             -- depending on test parameter to check if it doesn't abort itself.
             local f = fiber.new(function()
-                local space = conflicting_ddl and box.space.test1
-                                              or box.space.test2
-                if ddl_with_dml then
+                local space = params.conflicting_ddl and box.space.test1
+                                                      or box.space.test2
+                if params.ddl_with_dml then
                     op(space)
                 end
-                space:create_index('sk', {parts = {2, 'unsigned'}})
+                if params.scenario == 'create_index' then
+                    space:create_index('sk', {parts = {2, 'unsigned'}})
+                elseif params.scenario == 'drop_space' then
+                    space:drop()
+                else
+                    assert(false)
+                end
             end)
             f:set_joinable(true)
             t.assert_equals({f:join()}, {true})
 
             -- Check if commit behaves as expected.
-            if conflicting_ddl then
+            if params.conflicting_ddl then
                 t.assert_error_covers({
                     type = 'ClientError',
                     code = box.error.TRANSACTION_CONFLICT,
@@ -50,10 +56,13 @@ g.before_all({prepare_dml = false}, function(cg)
                 t.assert_equals({pcall(box.commit)}, {true})
             end
         end)
-    end, {cg.params.conflicting_ddl, cg.params.ddl_with_dml})
-end)
+    end, {cg.params})
+end
 
-g.before_all({prepare_dml = true}, function(cg)
+g.before_all({scenario = 'create_index'}, tx_abort_on_ddl_test_prepare)
+g.before_all({scenario = 'drop_space'}, tx_abort_on_ddl_test_prepare)
+
+g.before_all({scenario = 'prepared_dml'}, function(cg)
     t.tarantool.skip_if_not_debug()
     -- There is no point to test with non-conflicting DDL or with
     -- DDL-with-DML - those cases are already covered and this test
@@ -125,7 +134,7 @@ g.test_ddl_and_writers = function(cg)
     end)
 end
 
-g.test_ddl_and_noop_writers = function(cg)
+g.test_ddl_and_noop_writers_1 = function(cg)
     cg.server:exec(function()
         local i = 0
         local function delete_nothing(space)
@@ -133,6 +142,19 @@ g.test_ddl_and_noop_writers = function(cg)
             return space:delete(i)
         end
         _G.check_case(delete_nothing)
+    end)
+end
+
+-- Update of a non-existent key plus failed insert (gh-10707).
+g.test_ddl_and_noop_writers_2 = function(cg)
+    cg.server:exec(function()
+        box.space.test1:insert({1, 1})
+        box.space.test2:insert({1, 1})
+        local function update_nothing(space)
+            space:update({2}, {{'+', 2, 1}})
+            pcall(space.insert, space, {1, 2})
+        end
+        _G.check_case(update_nothing)
     end)
 end
 
