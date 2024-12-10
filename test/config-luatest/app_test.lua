@@ -109,3 +109,32 @@ g.test_reload_success = function(g)
         end,
     })
 end
+
+-- Verify that an application configuration is deeply merged for
+-- tables with string keys.
+--
+-- This is supported after gh-10450.
+g.test_app_cfg_deep_merge = function(g)
+    local paths = {
+        global = 'app.cfg',
+        group = 'groups.group-001.app.cfg',
+        replicaset = 'groups.group-001.replicasets.replicaset-001.app.cfg',
+        instance = 'groups.group-001.replicasets.replicaset-001.instances.' ..
+            'instance-001.app.cfg'
+    }
+
+    helpers.success_case(g, {
+        options = {
+            [paths.global]     = {x = {y = {z = {a = 1}}}},
+            [paths.group]      = {x = {y = {z = {b = 2}}}},
+            [paths.replicaset] = {x = {y = {z = {c = 3}}}},
+            [paths.instance]   = {x = {y = {z = {d = 4}}}},
+        },
+        verify = function()
+            local config = require('config')
+
+            local res = config:get('app.cfg.x.y.z')
+            t.assert_equals(res, {a = 1, b = 2, c = 3, d = 4})
+        end,
+    })
+end
