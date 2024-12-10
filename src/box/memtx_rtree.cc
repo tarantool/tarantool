@@ -46,7 +46,7 @@
 #include "schema.h"
 #include "memtx_engine.h"
 
-struct memtx_rtree_index {
+struct memtx_rtree_index { 
 	struct index base;
 	unsigned dimension;
 	struct rtree tree;
@@ -60,7 +60,7 @@ enum memtx_rtree_reserve_extents_num {
 	 * can lead to, and, as a result, the max
 	 * number of new block allocations.
 	 */
-	RESERVE_EXTENTS_BEFORE_DELETE = 8,
+	RESERVE_EXTENTS_BEFORE_DELETE  = 8,
 	RESERVE_EXTENTS_BEFORE_REPLACE = 16
 };
 
@@ -146,10 +146,11 @@ extract_rectangle(struct rtree_rect *rect, struct tuple *tuple,
 /* {{{ MemtxRTree Iterators ****************************************/
 
 struct index_rtree_iterator {
-        struct iterator base;
-        struct rtree_iterator impl;
+    struct iterator base;
+    struct rtree_iterator impl;
 	/** Memory pool the iterator was allocated from. */
 	struct mempool *pool;
+	char* current_pos; 	// добавление текущей позиции в индексе [1]
 };
 
 static void
@@ -157,11 +158,70 @@ index_rtree_iterator_free(struct iterator *i)
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
 	rtree_iterator_destroy(&itr->impl);
+	if (itr->current_pos != NULL) {
+		free(itr->current_pos);
+		itr->current_pos = NULL;
+	}
 	mempool_free(itr->pool, itr);
 }
 
+/* cacluate cuurent postion  [2] */
+char* rtree_iterator_current_position(struct rtree_iterator* iterator) 
+{
+	if (iterator->eof) 
+		return NULL;
+	
+	const int stack_depth = RTREE_MAX_HEIGHT;
+	size_t buffer_size = stack_depth * sizeof(int) * 2;
+	char* buffer = (char*) calloc(buffer_size, sizeof(char));
+
+	if (buffer == NULL)
+	{
+		diag_set(OutOfMemory, buffer_size, "rtree_iterator", "position");
+		return NULL;
+	}
+	char* pos = buffer;
+
+	for (int level = 0; level < stack_depth; ++level) 
+	{
+		if (iterator->stack[level].page == NULL)
+			break;
+
+		int page_index = (int)(iterator->stack[level].page); // ?
+		int node_position = iterator->stack[level].pos;
+
+		memcpy(pos, &page_index, sizeof(int));
+		pos += sizeof(int);
+		memcpy(pos, &node_position, sizeof(int));
+		pos += sizeof(int);
+	}
+
+	return buffer;
+}
+
+/* set position to the iterator */
+void rtree_iterator_set_position(struct rtree_iterator *iterator, const char *pos) 
+{
+    const char *ptr = pos;
+
+    for (int level = 0; level < RTREE_MAX_HEIGHT; level++) {
+        if (ptr == NULL || *ptr == '\0') {
+            break;
+        }
+        int page_index, node_position;
+        memcpy(&page_index, ptr, sizeof(int));
+        ptr += sizeof(int);
+        memcpy(&node_position, ptr, sizeof(int));
+        ptr += sizeof(int);
+
+        iterator->stack[level].page->data = iterator->tree->root->data[page_index]; // переделать 
+        iterator->stack[level].pos = node_position;
+    }
+}
+
+
 static int
-index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
+index_rtree_iterator_next(struct iterator *i, struct tuple **ret) 
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
 	struct space *space;
@@ -176,6 +236,11 @@ index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
+		// добавить эту функцию, которая вычислеят позицию (в фомрате msgpack) // например кодирование индекса tuple 
+		// rtree_iterator_set_position(struct rtree_iterator *iterator, const char *pos)
+		if (itr->impl.op == SOP_NEIGHBOR)
+			itr->current_pos = rtree_iterator_current_position(&itr->impl); 	// сделать сохранение позиции про итерировании  [4]
+
 	} while (*ret == NULL);
 	return 0;
 }
@@ -202,7 +267,6 @@ memtx_rtree_index_def_change_requires_rebuild(struct index *index,
 	    index->def->opts.dimension != new_def->opts.dimension)
 		return true;
 	return false;
-
 }
 
 static ssize_t
@@ -308,11 +372,11 @@ static int
 memtx_rtree_index_reserve(struct index *base, uint32_t size_hint)
 {
 	/*
-         * In case of rtree we use reserve to make sure that
-         * memory allocation will not fail during any operation
-         * on rtree, because there is no error handling in the
-         * rtree lib.
-         */
+    * In case of rtree we use reserve to make sure that
+    * memory allocation will not fail during any operation
+    * on rtree, because there is no error handling in the
+    * rtree lib.
+    */
 	(void)size_hint;
 	ERROR_INJECT(ERRINJ_INDEX_RESERVE, {
 		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE, "mempool", "new slab");
@@ -331,12 +395,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 {
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-
-	if (pos != NULL) {
-		diag_set(UnsupportedIndexFeature, base->def, "pagination");
-		return NULL;
-	}
-
+	
 	struct rtree_rect rect;
 	if (part_count == 0) {
 		if (type != ITER_ALL) {
@@ -373,7 +432,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 		op = SOP_OVERLAPS;
 		break;
 	case ITER_NEIGHBOR:
-		op = SOP_NEIGHBOR;
+		op = SOP_NEIGHBOR;  // add pagination 
 		break;
 	default:
 		diag_set(UnsupportedIndexFeature, base->def,
@@ -388,11 +447,24 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 			 "memtx_rtree_index", "iterator");
 		return NULL;
 	}
+
+	if (pos != NULL && op == SOP_NEIGHBOR) { 		// pagination для neighbor
+		// сделать установелние текущей позиции при итерировании [2]
+		
+		it->base.position = generic_iterator_position; // add pagination
+		it->current_pos = strdup(pos);  // add pagination
+		// сделать определние limits для rtree (декодируем из key)
+		rtree_iterator_set_position(&it->impl, pos);
+			//it->base.position = generic_iterator_position; // add pagination
+
+	} else {
+		it->current_pos = NULL;
+	}
+
 	iterator_create(&it->base, base);
 	it->pool = &memtx->rtree_iterator_pool;
 	it->base.next_internal = index_rtree_iterator_next;
 	it->base.next = memtx_iterator_next;
-	it->base.position = generic_iterator_position;
 	it->base.free = index_rtree_iterator_free;
 	rtree_iterator_init(&it->impl);
 	/*
@@ -402,7 +474,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 	 * returns NULL should be processed in the correct way on the
 	 * caller's side.
 	 */
-	rtree_search(&index->tree, &rect, op, &it->impl);
+	rtree_search(&index->tree, &rect, op, &it->impl);   // serach for tuples in rtree
 	return (struct iterator *)it;
 }
 

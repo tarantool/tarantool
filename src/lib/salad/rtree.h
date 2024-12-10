@@ -112,8 +112,8 @@ typedef bool (*rtree_comparator_t)(const struct rtree_rect *rt1,
 
 /* Type distance comparison */
 enum rtree_distance_type {
-	RTREE_EUCLID = 0, /* Euclid distance, sqrt(dx*dx + dy*dy) */
-	RTREE_MANHATTAN = 1 /* Manhattan distance, fabs(dx) + fabs(dy) */
+	RTREE_EUCLID    = 0, /* Euclid distance, sqrt(dx*dx + dy*dy) */
+	RTREE_MANHATTAN = 1  /* Manhattan distance, fabs(dx) + fabs(dy) */
 };
 
 /* Main rtree struct */
@@ -192,6 +192,8 @@ struct rtree_iterator
 		struct rtree_page *page;
 		int pos;
 	} stack[RTREE_MAX_HEIGHT];
+
+	// add pos
 };
 
 /**
