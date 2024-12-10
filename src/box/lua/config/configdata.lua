@@ -741,6 +741,36 @@ local function validate_misplacing(cconfig)
     end
 end
 
+local function validate_replicaset_names_are_unique(cconfig)
+    local replicaset2group = {}
+
+    for group_name, group in pairs(cconfig.groups) do
+        for replicaset_name, _ in pairs(group.replicasets) do
+            local dup_group_name = replicaset2group[replicaset_name]
+
+            -- Currently, it's not possible to handle
+            -- groups, replicasets, instances with the same
+            -- names in the same subgroup. E.g. such cluster
+            -- config are considered ok (gh-10917):
+            -- * g-001
+            --   * r-001
+            --   * r-001 (duplicate)
+
+            -- Duplicating replicaset name is found within
+            -- distinct groups.
+            if dup_group_name ~= nil then
+                assert(group_name ~= dup_group_name)
+
+                error(('found replicasets with the same name %q in the ' ..
+                       'groups %q and %q.')
+                      :format(replicaset_name, dup_group_name, group_name), 0)
+            end
+
+            replicaset2group[replicaset_name] = group_name
+        end
+    end
+end
+
 local function new(iconfig, cconfig, instance_name)
     -- Find myself in a cluster config, determine peers in the same
     -- replicaset.
@@ -748,6 +778,8 @@ local function new(iconfig, cconfig, instance_name)
     assert(found ~= nil)
 
     validate_misplacing(cconfig)
+
+    validate_replicaset_names_are_unique(cconfig)
 
     -- Precalculate configuration with applied defaults.
     local iconfig_def = instance_config:apply_default(iconfig)
