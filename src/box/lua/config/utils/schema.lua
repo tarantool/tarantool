@@ -1330,7 +1330,27 @@ end
 
 -- {{{ <schema object>:merge()
 
-local function merge_impl(schema, a, b, ctx)
+-- Are all keys in the given table strings?
+local function table_is_object(t)
+    assert(type(t) == 'table')
+
+    for k, _ in pairs(t) do
+        if type(k) ~= 'string' then
+            return false
+        end
+    end
+
+    return true
+end
+
+-- Perform a deep merge with some specific rules:
+--
+-- * Prefer box.NULL over nil.
+-- * Prefer X ~= nil over nil/box.NULL.
+-- * Prefer B if A or B is not a table.
+-- * Prefer B if A or B is a table with a non-string key.
+-- * Perform the deep merge otherwise.
+local function merge_schemaless(a, b)
     -- Prefer box.NULL over nil.
     if a == nil and b == nil then
         if type(a) == 'nil' then
@@ -1349,7 +1369,62 @@ local function merge_impl(schema, a, b, ctx)
 
     assert(a ~= nil and b ~= nil)
 
-    -- Scalars and arrays are not to be merged.
+    -- Prefer B if A or B is not a table.
+    if type(a) ~= 'table' or type(b) ~= 'table' then
+        return b
+    end
+
+    -- Prefer B if A or B is a table with a non-string key.
+    if not table_is_object(a) or not table_is_object(b) then
+        return b
+    end
+
+    -- Perform the deep merge otherwise.
+    local res = {}
+
+    for k, v in pairs(a) do
+        res[k] = merge_schemaless(v, b[k])
+    end
+
+    for k, v in pairs(b) do
+        -- Copy B's fields that are not present in A.
+        --
+        -- Don't do the recursive call here, because A's field is
+        -- known as nil.
+        if type(a[k]) == 'nil' then
+            res[k] = v
+        end
+    end
+
+    return res
+end
+
+local function merge_impl(schema, a, b, ctx)
+    -- Deduce shape information from the data itself if the schema
+    -- doesn't specify it.
+    if is_scalar(schema) and schema.type == 'any' then
+        return merge_schemaless(a, b)
+    end
+
+    -- Prefer box.NULL over nil.
+    if a == nil and b == nil then
+        if type(a) == 'nil' then
+            return b
+        else
+            return a
+        end
+    end
+
+    -- Prefer X ~= nil over nil/box.NULL.
+    if a == nil then
+        return b
+    elseif b == nil then
+        return a
+    end
+
+    assert(a ~= nil and b ~= nil)
+
+    -- Scalars (except 'any') and arrays are not to be merged.
     --
     -- At this point neither a == nil, nor b == nil, so return the
     -- preferred value, `b`.
@@ -1410,9 +1485,14 @@ end
 -- box.NULL is preferred over nil, any X where X ~= nil is
 -- preferred over nil/box.NULL.
 --
--- Records and maps are deeply merged. Scalars and arrays are
--- all-or-nothing: the right hand one is chosen if both are
--- not nil/box.NULL.
+-- Records and maps are deeply merged. Scalars (except 'any') and
+-- arrays are all-or-nothing: the right hand one is chosen if both
+-- are not nil/box.NULL.
+--
+-- Data marked as a scalar of the 'any' type in the schema are
+-- merged depending of the data shape: if both sides are tables
+-- with string keys, they're deeply merged. Otherwise, the right
+-- hand value is chosen (if both are not nil/box.NULL).
 --
 -- The formal rules are below.
 --
@@ -1437,6 +1517,7 @@ end
 -- 10. merge(<array A>, <array B>) -> <array B>
 -- 11. merge(<record A>, <record B>) -> deep-merge(A, B)
 -- 12. merge(<map A>, <map B>) -> deep-merge(A, B)
+-- 13. merge(<any A>, <any B>) -> see merge_schemaless()
 --
 -- For each key K in A and each key K in B: deep-merge(A, B)[K] is
 -- merge(A[K], B[K]).

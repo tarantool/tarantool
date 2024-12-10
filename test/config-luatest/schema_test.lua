@@ -2922,10 +2922,11 @@ g.test_merge_array = function()
     t.assert_equals(s:merge(b, a), a)
 end
 
--- Verify that scalars of type 'any' are NOT deeply merged.
+-- Verify that scalars of type 'any' are deeply merged, if they're
+-- tables with string keys.
 --
--- We need table values for the scalars for that.
-g.test_merge_any = function()
+-- This is supported after gh-10450.
+g.test_merge_any_map = function()
     local s = schema.new('myschema', schema.scalar({
         type = 'any',
     }))
@@ -2933,14 +2934,135 @@ g.test_merge_any = function()
     local a = {foo = 'aaa'}
     local b = {bar = 'bbb'}
 
-    t.assert_equals(s:merge(a, b), b)
-    t.assert_equals(s:merge(b, a), a)
+    local exp = {
+        foo = 'aaa',
+        bar = 'bbb',
+    }
+    t.assert_equals(s:merge(a, b), exp)
+    t.assert_equals(s:merge(b, a), exp)
+end
+
+-- Verify that scalars of type 'any' are NOT deeply merged, if
+-- they're arrays.
+g.test_merge_any_array = function()
+    local s = schema.new('myschema', schema.scalar({
+        type = 'any',
+    }))
 
     local a = {1, 2, 3}
     local b = {4, 5, 6}
 
     t.assert_equals(s:merge(a, b), b)
     t.assert_equals(s:merge(b, a), a)
+end
+
+-- More scenarios of merging data corresponding to an 'any'
+-- scalar.
+--
+-- This is supported after gh-10450.
+g.test_merge_any_more = function()
+    local s = schema.new('myschema', schema.scalar({
+        type = 'any',
+    }))
+
+    local cases = {
+        -- Prefer box.NULL over nil.
+        {
+            a = nil,
+            b = box.NULL,
+            exp = box.NULL,
+        },
+        -- Prefer box.NULL over nil.
+        {
+            a = box.NULL,
+            b = nil,
+            exp = box.NULL,
+        },
+        -- Prefer X ~= nil over nil/box.NULL.
+        {
+            a = nil,
+            b = 1,
+            exp = 1,
+        },
+        -- Prefer X ~= nil over nil/box.NULL.
+        {
+            a = 1,
+            b = nil,
+            exp = 1,
+        },
+        -- Prefer X ~= nil over nil/box.NULL.
+        {
+            a = box.NULL,
+            b = 1,
+            exp = 1,
+        },
+        -- Prefer X ~= nil over nil/box.NULL.
+        {
+            a = 1,
+            b = box.NULL,
+            exp = 1,
+        },
+        -- Prefer B if A or B is not a table.
+        {
+            a = 1,
+            b = {foo = 1},
+            exp = {foo = 1},
+        },
+        -- Prefer B if A or B is not a table.
+        {
+            a = {foo = 1},
+            b = 1,
+            exp = 1,
+        },
+        -- Prefer B if A or B is a table with a non-string key.
+        {
+            a = {[1] = 'x'},
+            b = {foo = 1},
+            exp = {foo = 1},
+        },
+        -- Prefer B if A or B is a table with a non-string key.
+        {
+            a = {foo = 1},
+            b = {[1] = 'x'},
+            exp = {[1] = 'x'},
+        },
+        -- Same, but keys are string and non-string.
+        {
+            a = {[5] = 'x', foo = 2},
+            b = {foo = 1},
+            exp = {foo = 1},
+        },
+        -- Same, but keys are string and non-string.
+        {
+            a = {foo = 1},
+            b = {[5] = 'x', foo = 2},
+            exp = {[5] = 'x', foo = 2},
+        },
+        -- A deep merge.
+        {
+            a = {foo = {bar = 42}},
+            b = {foo = {baz = 43}},
+            exp = {foo = {bar = 42, baz = 43}},
+        },
+    }
+
+    for _, case in ipairs(cases) do
+        -- Verify on the top level.
+        local a = case.a
+        local b = case.b
+        local exp = case.exp
+        local res = s:merge(a, b)
+        t.assert_equals(res, exp)
+        t.assert_type(res, type(exp))
+
+        -- The same, but nested.
+        local a = {foo = case.a}
+        local b = {foo = case.b}
+        local exp = {foo = case.exp}
+        local res = s:merge(a, b)
+        t.assert_equals(res, exp)
+        t.assert_type(res.foo, type(exp.foo))
+    end
 end
 
 -- }}} <schema object>:merge()
