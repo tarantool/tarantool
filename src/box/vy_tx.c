@@ -334,13 +334,12 @@ vy_tx_read_set_free_cb(vy_tx_read_set_t *read_set,
 void
 vy_tx_create(struct vy_tx_manager *xm, struct vy_tx *tx)
 {
-	tx->last_stmt_space = NULL;
 	stailq_create(&tx->log);
 	write_set_new(&tx->write_set);
 	tx->write_set_version = 0;
 	tx->write_size = 0;
 	tx->xm = xm;
-	tx->isolation = TXN_ISOLATION_READ_CONFIRMED;
+	tx->txn = NULL;
 	tx->state = VINYL_TX_READY;
 	tx->is_applier_session = false;
 	tx->read_view = (struct vy_read_view *)xm->p_global_read_view;
@@ -457,10 +456,8 @@ vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 }
 
 struct vy_tx *
-vy_tx_begin(struct vy_tx_manager *xm, enum txn_isolation_level isolation)
+vy_tx_begin(struct vy_tx_manager *xm, struct txn *txn)
 {
-	assert(isolation < txn_isolation_level_MAX &&
-	       isolation != TXN_ISOLATION_DEFAULT);
 	struct vy_tx *tx = mempool_alloc(&xm->tx_mempool);
 	if (unlikely(tx == NULL)) {
 		diag_set(OutOfMemory, sizeof(*tx), "mempool", "struct vy_tx");
@@ -472,7 +469,7 @@ vy_tx_begin(struct vy_tx_manager *xm, enum txn_isolation_level isolation)
 	if (session != NULL && session->type == SESSION_TYPE_APPLIER)
 		tx->is_applier_session = true;
 
-	tx->isolation = isolation;
+	tx->txn = txn;
 	return tx;
 }
 
@@ -837,7 +834,7 @@ vy_tx_rollback(struct vy_tx *tx)
 }
 
 int
-vy_tx_begin_statement(struct vy_tx *tx, struct space *space, void **savepoint)
+vy_tx_begin_statement(struct vy_tx *tx, void **savepoint)
 {
 	if (tx->state == VINYL_TX_READY && vy_tx_is_in_read_view(tx))
 		vy_tx_abort(tx);
@@ -846,7 +843,6 @@ vy_tx_begin_statement(struct vy_tx *tx, struct space *space, void **savepoint)
 		return -1;
 	}
 	assert(tx->state == VINYL_TX_READY);
-	tx->last_stmt_space = space;
 	/*
 	 * When want to add to the writer list, can't rely on the log emptiness.
 	 * During recovery it is empty always for the data stored both in runs
@@ -884,9 +880,8 @@ vy_tx_rollback_statement(struct vy_tx *tx, void *svp)
 		tx->write_set_version++;
 		txv_delete(v);
 	}
-	if (stailq_empty(&tx->log))
+	if (stailq_empty(&tx->txn->stmts))
 		rlist_del_entry(tx, in_writers);
-	tx->last_stmt_space = NULL;
 }
 
 int
@@ -1145,7 +1140,6 @@ vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
 	*need_wal_sync = false;
 	if (space->index_count == 0)
 		return; /* no indexes, no conflicts */
-	struct vy_lsm *lsm = vy_lsm(space->index[0]);
 	struct vy_tx *tx;
 	rlist_foreach_entry(tx, &xm->writers, in_writers) {
 		/*
@@ -1157,10 +1151,13 @@ vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
 			*need_wal_sync = true;
 		if (tx->state != VINYL_TX_READY)
 			continue;
-		if (tx->last_stmt_space == space ||
-		    write_set_search_key(&tx->write_set, lsm,
-					 lsm->env->empty_key) != NULL)
-			vy_tx_abort(tx);
+		struct txn_stmt *stmt;
+		stailq_foreach_entry(stmt, &tx->txn->stmts, next) {
+			if (stmt->space == space) {
+				vy_tx_abort(tx);
+				break;
+			}
+		}
 	}
 }
 
