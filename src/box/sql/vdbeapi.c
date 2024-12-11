@@ -473,8 +473,7 @@ sql_bind_int64(sql_stmt * pStmt, int i, sql_int64 iValue)
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "integer");
-	assert(iValue < 0);
-	mem_set_nint(&p->aVar[i - 1], iValue);
+	mem_set_int(&p->aVar[i - 1], iValue);
 	return rc;
 }
 
