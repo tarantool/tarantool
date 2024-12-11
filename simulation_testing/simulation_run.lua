@@ -8,10 +8,11 @@ local crash_functions = require("crash_functions")
 local randomized_operations = require("randomized_operations")
 local random_cluster = require('random_cluster')
 local fio = require('fio')
+local replication_errors = require("replication_errors")
 
 math.randomseed(os.time())
 random_cluster.clear_dirs_for_all_replicas()
-local cg = random_cluster.rand_cluster(5)
+local cg = random_cluster.rand_cluster(30)
 
 box.cfg {
     checkpoint_count = 2, 
@@ -28,6 +29,8 @@ for _, node in ipairs(cg.replicas) do
     end)
     print(string.format("Node %s is %s", node.alias, tostring(node_state)))
 end
+
+fiber.sleep(30)
 
 -- Finding the leader node
 local leader_node = cg.cluster:get_leader()
@@ -62,7 +65,6 @@ end)
 
 print(result)
 
-fiber.sleep(2)
 
 -- The main cycle
 fiber.create(function()
@@ -89,10 +91,7 @@ fiber.create(function()
     end
 end)
 
+print("[Replication Monitor] Started monitoring")
 
-fiber.create(function()
-    print("[Replication Monitor] Started monitoring")
+fiber.create(function(cg) replication_errors.run_replication_monitor(cg) end, cg)
 
-    fiber.create(function(cg) replication_errors.run_replication_monitor(cg) end, cg)
-    
-end)

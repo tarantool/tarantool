@@ -25,13 +25,16 @@ local function monitor_replication(cg)
 
         local now = fiber.time()
 
-        for id, node in ipairs(cg.nodes) do
+        for id, node in ipairs(cg.replicas) do
             
-            local replication_info, election_info = node:exec(function()
-                    return box.info.replication, box.info.election
+            local ok, replication_info, election_info = pcall(function()
+                return node:exec(function()
+                return box.info.replication, box.info.election
             end)
-
-            
+            end)
+            if not ok then
+                goto continue
+            end
             if(election_info.state == 'leader') then
                 table.insert(leaders, node.id)
             end
@@ -50,33 +53,35 @@ local function monitor_replication(cg)
             end
 
             if #state.term_changes > monitor_config.max_terms_change_by_period then
-                table.insert(problems,'['..tostring(id)..'] Too many term changes in the last ' .. monitor_config.terms_change_period .. ' seconds')
+                table.insert(problems,'['..node.alias..'] Too many term changes in the last ' .. tostring(#state.term_changes) .. ' seconds')
             end
             -----------------------------------------------------------------------------------------------------
-            for id, replica in pairs(replication_info) do
+            for replica_id, replica in pairs(replication_info) do
                 if replica.upstream then
                     local lag = replica.upstream.lag or 0
-                    if lag > 0.5 then 
-                        table.insert(problems, '['..tostring(id)..'] High lag detected on upstream ' .. id)
+                    if lag > 2 then 
+                        table.insert(problems, '['..node.alias..'] High lag detected on upstream ' .. replica_id)
                     end
                 end
                 if replica.downstream then
                     local lag = replica.downstream.lag or 0
-                    if lag > 0.5 then 
-                        table.insert(problems, '['..tostring(id)..'] High lag detected on downstream ' .. id)
+                    if lag > 2 then 
+                        table.insert(problems, '['..node.alias..'] High lag detected on downstream ' .. replica_id)
                     end
                 end
             end
 
             --------------------------------------------------------------------------------------------------------
-            for id, replica in pairs(replication_info) do
+            for replica_id, replica in pairs(replication_info) do
                 if replica.upstream and replica.upstream.status == 'disconnected' then
-                    table.insert(problems, '['..tostring(id)..'] Upstream disconnected for node ' .. id)
+                    table.insert(problems, '['..node.alias..'] Upstream disconnected for node ' .. replica_id)
                 end
                 if replica.downstream and replica.downstream.status == 'disconnected' then
-                    table.insert(problems, '['..tostring(id)..'] Downstream disconnected for node ' .. id)
+                    table.insert(problems, '['..node.alias..'] Downstream disconnected for node ' .. replica_id)
                 end
             end
+
+            ::continue::
 
         end
 

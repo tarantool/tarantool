@@ -63,7 +63,7 @@ local function rand_cfg(cg, replica_count, replica_id)
 
     local box_cfg = {
         replication = uri_set,
-        replication_synchro_quorum = math.random(1, math.ceil(replica_count / 2)),
+        replication_synchro_quorum = math.random(math.ceil(replica_count / 2), replica_count),
         replication_timeout = math.random(1, 10),
         checkpoint_count = 2,
         memtx_use_mvcc_engine = true,
@@ -133,29 +133,7 @@ local function rand_cluster(max_number_replicas)
 end
 
 
--- ---  TODO: must add checking not dropped nodes
--- --- Random Server Drop
--- ---
--- local function rand_server_drop()
---     local idx = math.random(1, #cg.cluster.servers)
---     local selected_server = cg.cluster.servers[idx]
 
---     print("Dropping server:", selected_server.alias)
-
---     -- Check if the server is the leader
---     local is_leader = selected_server:exec(function()
---         return box.info.election.state == 'leader'
---     end)
-
---     -- Drop server and handle leadership re-election if needed
---     if is_leader then
---         print("Server is leader. Waiting for new leader...")
---         cg.cluster:wait_until_election_leader_found()
---     else
---         selected_server:drop()
---         print("Dropped server:", selected_server.alias)
---     end
--- end
 
 
 return {
