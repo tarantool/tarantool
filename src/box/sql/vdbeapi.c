@@ -421,8 +421,7 @@ sql_bind_int64(struct Vdbe *p, int i, int64_t iValue)
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "integer");
-	assert(iValue < 0);
-	mem_set_nint(&p->aVar[i - 1], iValue);
+	mem_set_int(&p->aVar[i - 1], iValue);
 	return rc;
 }
 
