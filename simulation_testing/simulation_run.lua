@@ -31,7 +31,6 @@ for _, node in ipairs(cg.replicas) do
     print(string.format("Node %s is %s", node.alias, tostring(node_state)))
 end
 
-fiber.sleep(30)
 
 -- Finding the leader node
 local leader_node = cg.cluster:get_leader()
@@ -92,16 +91,25 @@ fiber.create(function()
             else 
                 crash_functions.break_connection_between_random_nodes(cg.replicas, initial_replication, 5, 10)
     
-            end
-        else
-            log_handling.compare_two_random_xlogs("./replicas_dirs")
+            end           
         end
 
         fiber.sleep(math.random(1, 2)) 
     end
 end)
 
-print("[Replication Monitor] Started monitoring")
+
+
+print("[REPLICATION MONITOR] Started replication monitoring")
 
 fiber.create(function(cg) replication_errors.run_replication_monitor(cg) end, cg)
+
+print("[XLOG MONITOR] Started journals monitoring")
+
+fiber.create(function() 
+    while true do 
+        log_handling.compare_two_random_xlogs("./replicas_dirs") 
+        fiber.sleep(2)
+    end
+end)
 

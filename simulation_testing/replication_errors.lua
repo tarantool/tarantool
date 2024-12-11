@@ -53,7 +53,7 @@ local function monitor_replication(cg)
             end
 
             if #state.term_changes > monitor_config.max_terms_change_by_period then
-                table.insert(problems,'['..node.alias..'] Too many term changes in the last ' .. tostring(#state.term_changes) .. ' seconds')
+                table.insert(problems,'['..node.alias..'] Too many term changes in the last ' .. tostring(#state.term_changes) .. ' rounds')
             end
             -----------------------------------------------------------------------------------------------------
             for replica_id, replica in pairs(replication_info) do
@@ -87,9 +87,9 @@ local function monitor_replication(cg)
 
              --------------------------------------------------------------------------------------------------------
             
-        print("[Replication Monitor][CLUSTER] Detected "..tostring(#leaders).." Leaders:")
+        print("[REPLICATION MONITOR][CLUSTER] Detected "..tostring(#leaders).." Leaders:")
         for _, leader in ipairs(leaders) do
-                print("[Replication Monitor] [CLUSTER] Leader: "..leader)
+                print("[REPLICATION MONITOR] [CLUSTER] Leader: "..leader)
         end
 
         if #leaders == 0 then
@@ -101,15 +101,15 @@ local function monitor_replication(cg)
             end
 
         if #leaders > 1 then
-            table.insert(problems, '[Replication Monitor][CLUSTER] Multiple leaders detected')
+            table.insert(problems, '[REPLICATION MONITOR][CLUSTER] Multiple leaders detected')
         end
 
-        print('[Replication Monitor][CLUSTER] Detected '..tostring(#problems)..' Problems:')
+        print('[REPLICATION MONITOR][CLUSTER] Detected '..tostring(#problems)..' Problems:')
 
 
         if #problems > 0 then
                 for _, problem in ipairs(problems) do
-                    print('[Replication Monitor] '.. problem)
+                    print('[REPLICATION MONITOR] '.. problem)
                 end
             end
         fiber.sleep(monitor_config.check_interval)
