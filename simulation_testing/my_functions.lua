@@ -1,3 +1,5 @@
+local net_box = require('net.box')
+
 -- Check including
 local function print_hello()
     print("Hello from my_functions.lua")
@@ -64,8 +66,29 @@ local function get_random_node(nodes)
     if not nodes or #nodes == 0 then
         error("Node list is empty or nil")
     end
-    local index = math.random(#nodes)
-    return nodes[index]
+
+    local max_attempts = #nodes
+    local attempts = 0
+
+    while attempts < max_attempts do
+        local index = math.random(#nodes)
+        local node = nodes[index]
+
+        -- Попытка выполнить простую команду на узле
+        local ok, result = pcall(function()
+            return node:exec(function()
+                return true
+            end)
+        end)
+
+        if ok and result then
+            return node
+        end
+
+        attempts = attempts + 1
+    end
+
+    error("No connected nodes available")
 end
 
 return {
@@ -76,6 +99,6 @@ return {
     calculate_delay = calculate_delay,
     check_node = check_node,
     get_initial_replication = get_initial_replication,
-    get_random_node = get_random_node
+    get_random_node = get_random_node,
 
 }

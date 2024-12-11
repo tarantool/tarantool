@@ -7,6 +7,7 @@ local my_functions = require("my_functions")
 local crash_functions = require("crash_functions")
 local randomized_operations = require("randomized_operations")
 local random_cluster = require('random_cluster')
+local log_handling = require('log_handling')
 local fio = require('fio')
 local replication_errors = require("replication_errors")
 
@@ -69,11 +70,18 @@ print(result)
 -- The main cycle
 fiber.create(function()
     while true do
-        local random_action = math.random(1, 10)
+        local random_action = math.random(1, 11)
 
         if random_action < 8 then
-            randomized_operations.do_random_operation(my_functions.get_random_node(cg.replicas), "test", 10)
-        else 
+            local rw_operation = math.random(1, 10)
+            local operation
+            if rw_operation < 3 then
+                operation = randomized_operations.generate_random_read_operation(10)
+            else
+                operation = randomized_operations.generate_random_write_operation(10)
+            end
+            randomized_operations.execute_db_operation(my_functions.get_random_node(cg.replicas), "test", operation)
+        elseif random_action < 9 then
             local type_of_crashing = math.random(1, 3)
             if type_of_crashing == 1 then
                 crash_functions.stop_node(my_functions.get_random_node(cg.replicas), 5, 10)
@@ -85,6 +93,8 @@ fiber.create(function()
                 crash_functions.break_connection_between_random_nodes(cg.replicas, initial_replication, 5, 10)
     
             end
+        else
+            log_handling.compare_two_random_xlogs("./replicas_dirs")
         end
 
         fiber.sleep(math.random(1, 2)) 
