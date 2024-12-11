@@ -84,7 +84,10 @@ local function compare_xlogs(log1_path, log2_path)
             node1_id, node2_id
         ))
         for _, diff in ipairs(differences) do
-            print(diff)
+            print(string.format(
+            "[XLOG MONITOR][Node %d][Node %d][Diff] ",
+            node1_id, node2_id
+        )..tostring(diff))
         end
     end
 end
