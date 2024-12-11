@@ -906,6 +906,15 @@ role_revoke(struct user *grantee, struct user *role)
 	return 0;
 }
 
+/**
+ * Check if a role is granted to a user or role with the given auth token.
+ */
+bool
+role_is_granted(struct user *role, uint8_t auth_token)
+{
+	return user_map_is_set(&role->users, auth_token);
+}
+
 int
 priv_grant(struct user *grantee, struct priv_def *priv,
 	   struct txn_stmt *rolled_back_stmt)
