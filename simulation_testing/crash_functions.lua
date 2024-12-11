@@ -1,4 +1,5 @@
 local fiber = require('fiber')
+local net_box = require('net.box')
 local my_functions = require("my_functions")
 
 local function stop_node(node, min_delay, max_delay)
