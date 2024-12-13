@@ -53,6 +53,9 @@ extern struct rmean *rmean_box;
  */
 extern int64_t txn_next_psn;
 
+/** List of all in-progress transactions. */
+extern struct rlist txns;
+
 struct journal_entry;
 struct engine;
 struct space;
@@ -530,8 +533,8 @@ struct txn {
 	struct rlist point_holes_list;
 	/** List of gap reads. @sa struct inplace_gap_item / nearby_gap_item. */
 	struct rlist gap_list;
-	/** Link in tx_manager::all_txs. */
-	struct rlist in_all_txs;
+	/** Link in global txns. */
+	struct rlist in_txns;
 	/** True in case transaction provides any DDL change. */
 	bool is_schema_changed;
 	/** Timeout for transaction, or TIMEOUT_INFINITY if not set. */

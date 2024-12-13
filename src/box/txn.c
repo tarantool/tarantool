@@ -74,6 +74,8 @@ const char *txn_isolation_level_aliases[txn_isolation_level_MAX] = {
 /* Txn cache. */
 static STAILQ(txn_cache);
 
+RLIST_HEAD(txns);
+
 static int
 txn_on_stop(struct trigger *trigger, void *event);
 
@@ -463,7 +465,7 @@ txn_new(void)
 	rlist_create(&txn->point_holes_list);
 	rlist_create(&txn->gap_list);
 	rlist_create(&txn->in_read_view_txs);
-	rlist_create(&txn->in_all_txs);
+	rlist_create(&txn->in_txns);
 	txn->space_on_replace_triggers_depth = 0;
 	txn->acquired_region_used = 0;
 	txn->limbo_entry = NULL;
@@ -483,6 +485,7 @@ txn_free(struct txn *txn)
 
 	/* Truncate region up to struct txn size. */
 	txn_reset_stats(txn);
+	rlist_del(&txn->in_txns);
 	region_truncate(&txn->region, sizeof(struct txn));
 	stailq_add(&txn_cache, &txn->in_txn_cache);
 }
@@ -522,6 +525,7 @@ txn_begin(void)
 		return NULL;
 
 	/* Initialize members explicitly to save time on memset() */
+	rlist_add_tail_entry(&txns, txn, in_txns);
 	stailq_create(&txn->stmts);
 	txn->n_new_rows = 0;
 	txn->n_local_rows = 0;
