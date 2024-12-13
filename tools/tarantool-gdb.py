@@ -1672,6 +1672,7 @@ class RlistLut(ListLut):
         ('session_on_connect', 'trigger::link'),
         ('session_on_disconnect', 'trigger::link'),
         ('shutdown_list', 'session::in_shutdown_list'),
+        ('txns', 'txn::in_txns'),
     )
     _containers = (
         ('alter_space::ops', 'AlterSpaceOp::link'),
@@ -1727,7 +1728,6 @@ class RlistLut(ListLut):
         ('tx_manager::read_view_txs', 'txn::in_read_view_txs'),
         ('tx_manager::all_stories', 'memtx_story::in_all_stories'),
         ('tx_manager::traverse_all_stories', 'memtx_story::in_all_stories'), # struct rlist*
-        ('tx_manager::all_txs', 'txn::in_all_txs'),
         ('txn::conflict_list', 'tx_conflict_tracker::in_conflict_list'),
         ('txn::conflicted_by_list', 'tx_conflict_tracker::in_conflicted_by_list'),
         ('txn::gap_list', 'gap_item::in_gap_list'),
