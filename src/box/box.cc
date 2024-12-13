@@ -4263,6 +4263,16 @@ box_sequence_reset(uint32_t seq_id)
 		return -1;
 	if (access_check_sequence(seq) != 0)
 		return -1;
+	int64_t sequence_value;
+	if (sequence_get_value(seq, &sequence_value) == 0) {
+		/*
+		 * Our goal here is to guarantee the existence of an
+		 * entry corresponding to that seq_id so it's deletion
+		 * would affect WAL contents.
+		 */
+		if (sequence_data_update(seq_id, sequence_value) != 0)
+			return -1;
+	}
 	sequence_reset(seq);
 	return sequence_data_delete(seq_id);
 }
