@@ -240,9 +240,15 @@ request_handle_sequence(struct request *request, struct space *space,
 		 * auto increment request never tries to insert a
 		 * value that is already in the space. Note, this
 		 * code is also invoked on final recovery to restore
-		 * the sequence value from WAL.
+		 * the sequence value from WAL. However, during the
+		 * initial recovery, proper sequence values are stored
+		 * in snapshots, and one should use these because
+		 * otherwise, sequence values would depend on
+		 * the order of recovered spaces which may be
+		 * misleading.
 		 */
-		if (likely(mp_read_int64(&key, &value) == 0))
+		if (likely(mp_read_int64(&key, &value) == 0 &&
+			   recovery_state != INITIAL_RECOVERY))
 			return sequence_update(seq, value);
 	}
 	request_update_header(request, request->header, region);
