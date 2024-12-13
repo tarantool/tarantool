@@ -4196,13 +4196,43 @@ box_sequence_set(uint32_t seq_id, int64_t value)
 API_EXPORT int
 box_sequence_reset(uint32_t seq_id)
 {
+	bool was_in_txn = box_txn();
+	box_txn_savepoint_t *savepoint = NULL;
+	if (was_in_txn) {
+		savepoint = box_txn_savepoint();
+		if (savepoint == NULL)
+			return -1;
+	} else if (!was_in_txn && box_txn_begin() != 0) {
+		return -1;
+	}
 	struct sequence *seq = sequence_cache_find(seq_id);
 	if (seq == NULL)
-		return -1;
+		goto error;
 	if (access_check_sequence(seq) != 0)
-		return -1;
+		goto error;
+	int64_t sequence_value;
+
+	if (sequence_get_value(seq, &sequence_value) == 0) {
+		/*
+		 * Without the update here sequence_data_delete call result
+		 * below may not be recovered due to the specifics of how
+		 * on_replace trigger work in the absence of old_tuple
+		 */
+		if (sequence_data_update(seq_id, sequence_value) != 0)
+			goto error;
+	}
 	sequence_reset(seq);
-	return sequence_data_delete(seq_id);
+	if (sequence_data_delete(seq_id) != 0)
+		goto error;
+	if (!was_in_txn && box_txn_commit() != 0)
+		goto error;
+	return 0;
+error:
+	if (was_in_txn)
+		box_txn_rollback_to_savepoint(savepoint);
+	else
+		box_txn_rollback();
+	return -1;
 }
 
 API_EXPORT int
