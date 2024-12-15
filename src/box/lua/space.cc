@@ -417,6 +417,141 @@ luaT_add_index_parts_methods(struct lua_State *L, const struct key_def *key_def)
 	lua_setmetatable(L, -2);
 }
 
+static int
+lbox_space_format_call(lua_State *L)
+{
+	int nargs = lua_gettop(L);
+	if (nargs == 1 && lua_istable(L, 1)) {
+		lua_getfield(L, 1, "id");
+		if (!lua_isnumber(L, -1)) {
+			lua_pop(L, 1);
+			return luaL_error(L, "Use space:format(...) "
+					  "instead of space.format(...)");
+		}
+		lua_pop(L, 1);
+	} else if (nargs == 0) {
+		return luaL_error(L, "Use space:format(...) "
+				  "instead of space.format(...)");
+	}
+
+	luaL_checktype(L, lua_upvalueindex(1), LUA_TTABLE);
+
+	lua_getfield(L, lua_upvalueindex(1), "space_id");
+	if (!lua_isnumber(L, -1))
+		return luaL_error(L, "Invalid space_id in upvalue");
+	uint32_t space_id = (uint32_t)lua_tointeger(L, -1);
+	lua_pop(L, 1);
+
+	lua_getfield(L, lua_upvalueindex(1), "format");
+	struct tuple_format *format =
+		(struct tuple_format *)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+	if (format == NULL) {
+		luaL_error(L, "Invalid format in upvalue");
+	}
+
+	if (nargs == 1) {
+		lua_getglobal(L, "box");
+		lua_getfield(L, -1, "schema");
+		lua_getfield(L, -1, "space");
+		lua_getfield(L, -1, "format");
+		lua_pushinteger(L, space_id);
+		if (lua_pcall(L, 1, 1, 0) != LUA_OK) {
+			return luaT_error(L);
+		}
+		return 1;
+	} else if (nargs == 2 && lua_istable(L, 2)) {
+		lua_getglobal(L, "box");
+		lua_getfield(L, -1, "schema");
+		lua_getfield(L, -1, "space");
+		lua_getfield(L, -1, "format");
+		lua_pushinteger(L, space_id);
+		lua_pushvalue(L, 2);
+		if (lua_pcall(L, 2, 0, 0) != LUA_OK) {
+			return luaT_error(L);
+		}
+		struct space *sp = space_by_id(space_id);
+		if (sp != NULL) {
+			lua_pushlightuserdata(L, sp->format);
+			lua_setfield(L, lua_upvalueindex(1), "format");
+		}
+		return 0;
+	} else {
+		return luaL_error(L, "Usage: space:format() "
+				  "or space:format({field_defs})");
+	}
+}
+
+static int
+lbox_space_format_validate(lua_State *L)
+{
+	if (lua_gettop(L) > 1) {
+		lua_remove(L, 1);
+	}
+	if (lua_gettop(L) != 1) {
+		return luaL_error(L, "Usage: format:validate(tuple_or_table)");
+	}
+
+	luaL_checktype(L, lua_upvalueindex(1), LUA_TTABLE);
+
+	lua_getfield(L, lua_upvalueindex(1), "format");
+	struct tuple_format *format =
+		(struct tuple_format *)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+	if (format == NULL) {
+		return luaL_error(L, "Invalid format in upvalue");
+	}
+
+	struct tuple *tuple = NULL;
+	if (luaT_istuple(L, 1)) {
+		tuple = luaT_checktuple(L, 1);
+	} else if (lua_istable(L, 1)) {
+		tuple = luaT_tuple_new(L, 1, format);
+		if (tuple == NULL) {
+			return luaT_error(L);
+		}
+	} else {
+		return luaL_error(L, "Argument must be a table or tuple");
+	}
+	int rc = box_tuple_validate(tuple, format);
+	if (rc != 0)
+		return luaT_error(L);
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static void
+lbox_push_space_format_function(struct lua_State *L, struct space *space)
+{
+	uint32_t space_id = space->def->id;
+	struct tuple_format *format = space->format;
+
+	lua_newtable(L);
+	int upvalue_idx = lua_gettop(L);
+	lua_pushinteger(L, space_id);
+	lua_setfield(L, upvalue_idx, "space_id");
+	lua_pushlightuserdata(L, format);
+	lua_setfield(L, upvalue_idx, "format");
+
+	lua_pushvalue(L, upvalue_idx);
+	lua_pushcclosure(L, lbox_space_format_call, 1);
+	int func_idx = lua_gettop(L);
+
+	lua_pushvalue(L, upvalue_idx);
+	lua_pushcclosure(L, lbox_space_format_validate, 1);
+	int validate_idx = lua_gettop(L);
+
+	lua_newtable(L);
+	lua_pushvalue(L, validate_idx);
+	lua_setfield(L, -2, "validate");
+	lua_pushvalue(L, -1);
+	lua_setfield(L, -2, "__index");
+	lua_setmetatable(L, func_idx);
+
+	lua_remove(L, validate_idx);
+	lua_remove(L, upvalue_idx);
+}
+
 /**
  * Make a single space available in Lua,
  * via box.space[] array.
@@ -481,6 +616,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	/* space:on_replace */
 	lua_pushstring(L, "on_replace");
 	lua_pushcfunction(L, lbox_space_on_replace);
+	lua_settable(L, i);
+
+	/* space.format */
+	lua_pushstring(L, "format");
+	lbox_push_space_format_function(L, space);
 	lua_settable(L, i);
 
 	/* space:before_replace */
