@@ -805,9 +805,48 @@ local function denormalize_foreign_key(fkey)
     return result
 end
 
+local function validate_format(self, tuple)
+    if box.tuple.is(tuple) then
+        tuple = tuple:totable()
+    elseif type(tuple) ~= "table" then
+        box.error(box.error.ILLEGAL_PARAMS,
+            "input must be a Lua table or box.tuple")
+    end
+
+    for i, field_def in ipairs(self) do
+        local field_value = tuple[i]
+        local field_type = field_def.type
+
+        if field_value == nil then
+            box.error(box.error.ILLEGAL_PARAMS,
+                string.format("field '%s' (position %d) is nil but not allowed",
+                    field_def.name, i))
+        end
+
+        if field_type == "string" and type(field_value) ~= "string" then
+            box.error(box.error.ILLEGAL_PARAMS,
+                string.format("field '%s' must be a string", field_def.name))
+        elseif field_type == "number" and type(field_value) ~= "number" then
+            box.error(box.error.ILLEGAL_PARAMS,
+                string.format("field '%s' must be a number", field_def.name))
+        elseif field_type == "boolean" and type(field_value) ~= "boolean" then
+            box.error(box.error.ILLEGAL_PARAMS,
+                string.format("field '%s' must be a boolean", field_def.name))
+        end
+    end
+
+    if #tuple > #self then
+        box.error(box.error.ILLEGAL_PARAMS,
+            "tuple has more fields than defined in the format")
+    end
+
+    return true
+end
+
 -- Convert zero-based foreign key field numbers to one-based
 local function denormalize_format(format)
     local result = setmetatable({}, { __serialize = 'seq' })
+
     for i, f in ipairs(format) do
         result[i] = f
         for k, v in pairs(f) do
@@ -816,6 +855,9 @@ local function denormalize_format(format)
             end
         end
     end
+
+    result.validate = validate_format
+
     return result
 end
 
