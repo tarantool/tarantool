@@ -417,6 +417,52 @@ luaT_add_index_parts_methods(struct lua_State *L, const struct key_def *key_def)
 	lua_setmetatable(L, -2);
 }
 
+static int
+lbox_space_validate(lua_State *L)
+{
+	if (lua_gettop(L) != 2)
+		return luaL_error(L, "Usage: space:validate(tuple)");
+	if (!lua_istable(L, 1)) {
+		luaL_error(L, "Invalid space object: expected table");
+		return 0;
+	}
+	lua_getfield(L, 1, "id");
+
+	if (!lua_isnumber(L, -1)) {
+		lua_pop(L, 1);
+		luaL_error(L, "Invalid space object: no 'id' field");
+		return 0;
+	}
+	uint32_t space_id = lua_tointeger(L, -1);
+	lua_pop(L, 1);
+
+	struct space *space = space_by_id(space_id);
+	if (space == NULL) {
+		luaL_error(L, "Space with id %u not found", space_id);
+	}
+
+	struct tuple *tuple = NULL;
+
+	if (luaT_istuple(L, 2)) {
+		tuple = luaT_checktuple(L, 2);
+	} else if (lua_istable(L, 2)) {
+		tuple = luaT_tuple_new(L, 2, space->format);
+
+		if (tuple == NULL) {
+			return luaT_error(L);
+		}
+	} else {
+		return luaL_error(L, "Tuple must be a table or tuple");
+	}
+
+	int rc = box_tuple_validate(tuple, space->format);
+	if (rc != 0)
+		return luaT_error(L);
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 /**
  * Make a single space available in Lua,
  * via box.space[] array.
@@ -481,6 +527,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	/* space:on_replace */
 	lua_pushstring(L, "on_replace");
 	lua_pushcfunction(L, lbox_space_on_replace);
+	lua_settable(L, i);
+
+	/* space:validate */
+	lua_pushstring(L, "validate");
+	lua_pushcfunction(L, lbox_space_validate);
 	lua_settable(L, i);
 
 	/* space:before_replace */

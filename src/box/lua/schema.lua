@@ -2759,6 +2759,10 @@ space_mt.insert = function(space, tuple)
     check_space_arg(space, 'insert', 2)
     return internal.insert(space.id, tuple);
 end
+space_mt.validate = function(space, tuple)
+    check_space_arg(space, 'validate', 2)
+    return box.internal.space.validate(space, tuple)
+end
 space_mt.replace = function(space, tuple)
     check_space_arg(space, 'replace', 2)
     return internal.replace(space.id, tuple);
