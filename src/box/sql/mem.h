@@ -715,48 +715,12 @@ int
 mem_cast_implicit_number(struct Mem *mem, enum field_type type);
 
 /**
- * Return value for MEM of INTEGER type. For MEM of all other types convert
- * value of the MEM to INTEGER if possible and return converted value. Original
- * MEM is not changed.
- */
-int
-mem_get_int(const struct Mem *mem, int64_t *i, bool *is_neg);
-
-/**
  * Return value of MEM converted to int64_t. This function is not safe, since it
- * returns 0 if mem_get_int() fails. There is no proper handling for this case.
+ * returns 0 if the value can't be converted to an int of any sign.
  * Also it works incorrectly with integer values that are more than INT64_MAX.
  */
-static inline int64_t
-mem_get_int_unsafe(const struct Mem *mem)
-{
-	int64_t i;
-	bool is_neg;
-	if (mem_get_int(mem, &i, &is_neg) != 0)
-		return 0;
-	return i;
-}
-
-/**
- * Return value for MEM of UNSIGNED type. For MEM of all other types convert
- * value of the MEM to UNSIGNED if possible and return converted value. Original
- * MEM is not changed.
- */
-int
-mem_get_uint(const struct Mem *mem, uint64_t *u);
-
-/**
- * Return value of MEM converted to uint64_t. This function is not safe, since it
- * returns 0 if mem_get_uint() fails. There is no proper handling for this case.
- */
-static inline uint64_t
-mem_get_uint_unsafe(const struct Mem *mem)
-{
-	uint64_t u;
-	if (mem_get_uint(mem, &u) != 0)
-		return 0;
-	return u;
-}
+int64_t
+mem_get_int_unsafe(const struct Mem *mem);
 
 /**
  * Return value for MEM of DOUBLE type. For MEM of all other types convert
@@ -778,57 +742,6 @@ mem_get_double_unsafe(const struct Mem *mem)
 	if (mem_get_double(mem, &d) != 0)
 		return 0.;
 	return d;
-}
-
-/**
- * Return value for MEM of BOOLEAN type. For MEM of all other types convert
- * value of the MEM to BOOLEAN if possible and return converted value. Original
- * MEM is not changed.
- */
-int
-mem_get_bool(const struct Mem *mem, bool *b);
-
-/**
- * Return value of MEM converted to boolean. This function is not safe since
- * there is no proper processing in case mem_get_bool() return an error. In
- * this case this function returns FALSE.
- */
-static inline bool
-mem_get_bool_unsafe(const struct Mem *mem)
-{
-	bool b;
-	if (mem_get_bool(mem, &b) != 0)
-		return false;
-	return b;
-}
-
-/**
- * Return value for MEM of VARBINARY type. For MEM of all other types convert
- * value of the MEM to VARBINARY if possible and return converted value.
- * Original MEM is not changed.
- */
-int
-mem_get_bin(const struct Mem *mem, const char **s);
-
-/**
- * Return length of value for MEM of STRING or VARBINARY type. Original MEM is
- * not changed.
- */
-int
-mem_len(const struct Mem *mem, size_t *len);
-
-/**
- * Return length of value for MEM of STRING or VARBINARY type. This function is
- * not safe since there is no proper processing in case mem_len() return an
- * error. In this case this function returns 0.
- */
-static inline int
-mem_len_unsafe(const struct Mem *mem)
-{
-	size_t len;
-	if (mem_len(mem, &len) != 0)
-		return 0;
-	return len;
 }
 
 /**
