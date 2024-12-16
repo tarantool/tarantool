@@ -1758,7 +1758,6 @@ class RlistLut(ListLut):
         ('vy_recovery::lsms', 'vy_lsm_recovery_info::in_recovery'),
         ('vy_tx::on_destroy', 'trigger::link'),
         ('vy_tx_manager::read_views', 'vy_read_view::in_read_views'),
-        ('vy_tx_manager::writers', 'vy_tx::in_writers'),
         ('vy_write_iterator::src_list', 'vy_write_src::in_src_list'),
         ('wal_writer::watchers', 'wal_watcher::next'),
         ('watchable::pending_watchers', 'watcher::in_idle_or_pending'),

@@ -1022,7 +1022,6 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 static void
 vinyl_space_invalidate(struct space *space)
 {
-	struct vy_env *env = vy_env(space->engine);
 	/*
 	 * Abort all transactions involving the invalidated space.
 	 * An aborted transaction doesn't allow any DML/DQL requests
@@ -1037,7 +1036,7 @@ vinyl_space_invalidate(struct space *space)
 	 * request bail out early, without dereferencing the space.
 	 */
 	bool unused;
-	vy_tx_manager_abort_writers_for_ddl(env->xm, space, &unused);
+	vy_tx_manager_abort_writers_for_ddl(space, &unused);
 }
 
 /** Argument passed to vy_check_format_on_replace(). */
@@ -1107,7 +1106,7 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	 * be checked with on_replace trigger so we abort them.
 	 */
 	bool need_wal_sync;
-	vy_tx_manager_abort_writers_for_ddl(env->xm, space, &need_wal_sync);
+	vy_tx_manager_abort_writers_for_ddl(space, &need_wal_sync);
 
 	if (!need_wal_sync && vy_lsm_is_empty(pk))
 		return 0; /* space is empty, nothing to do */
@@ -2531,8 +2530,7 @@ vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
 static void
 vinyl_engine_switch_to_ro(struct engine *engine)
 {
-	struct vy_env *env = vy_env(engine);
-	vy_tx_manager_abort_writers_for_ro(env->xm);
+	vy_tx_manager_abort_writers_for_ro(engine);
 }
 
 /* }}} Public API of transaction control */
@@ -4305,7 +4303,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	 * be checked with on_replace trigger so we abort them.
 	 */
 	bool need_wal_sync;
-	vy_tx_manager_abort_writers_for_ddl(env->xm, src_space, &need_wal_sync);
+	vy_tx_manager_abort_writers_for_ddl(src_space, &need_wal_sync);
 
 	if (!need_wal_sync && vy_lsm_is_empty(pk))
 		return 0; /* space is empty, nothing to do */
