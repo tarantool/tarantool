@@ -10,22 +10,22 @@ static int extent_count = 0;
 const uint32_t extent_size = 1024 * 8;
 
 static void *
-extent_alloc(void *ctx)
+extent_alloc(struct matras_allocator *allocator)
 {
-	int *p_extent_count = (int *)ctx;
-	assert(p_extent_count == &extent_count);
-	++*p_extent_count;
+	(void)allocator;
+	++extent_count;
 	return malloc(extent_size);
 }
 
 static void
-extent_free(void *ctx, void *page)
+extent_free(struct matras_allocator *allocator, void *page)
 {
-	int *p_extent_count = (int *)ctx;
-	assert(p_extent_count == &extent_count);
-	--*p_extent_count;
+	(void)allocator;
+	--extent_count;
 	free(page);
 }
+
+struct matras_allocator allocator;
 
 static void
 iterator_check()
@@ -33,9 +33,7 @@ iterator_check()
 	header();
 
 	struct rtree tree;
-	rtree_init(&tree, 2, extent_size,
-		   extent_alloc, extent_free, &extent_count,
-		   RTREE_EUCLID);
+	rtree_init(&tree, 2, RTREE_EUCLID, &allocator);
 
 	/* Filling tree */
 	const size_t count1 = 10000;
@@ -216,9 +214,7 @@ iterator_invalidate_check()
 			del_cnt = test_size - del_pos;
 		}
 		struct rtree tree;
-		rtree_init(&tree, 2, extent_size,
-			   extent_alloc, extent_free, &extent_count,
-			   RTREE_EUCLID);
+		rtree_init(&tree, 2, RTREE_EUCLID, &allocator);
 		struct rtree_iterator iterators[test_size];
 		for (size_t i = 0; i < test_size; i++)
 			rtree_iterator_init(iterators + i);
@@ -262,9 +258,7 @@ iterator_invalidate_check()
 		size_t ins_cnt = rand() % max_insert_count + 1;
 
 		struct rtree tree;
-		rtree_init(&tree, 2, extent_size,
-			   extent_alloc, extent_free, &extent_count,
-			   RTREE_EUCLID);
+		rtree_init(&tree, 2, RTREE_EUCLID, &allocator);
 		struct rtree_iterator iterators[test_size];
 		for (size_t i = 0; i < test_size; i++)
 			rtree_iterator_init(iterators + i);
@@ -312,9 +306,12 @@ iterator_invalidate_check()
 int
 main(void)
 {
+	matras_allocator_create(&allocator, extent_size,
+				extent_alloc, extent_free);
 	iterator_check();
 	iterator_invalidate_check();
 	if (extent_count != 0) {
 		fail("memory leak!", "false");
 	}
+	matras_allocator_destroy(&allocator);
 }

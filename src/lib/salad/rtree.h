@@ -235,9 +235,9 @@ rtree_set2dp(struct rtree_rect *rect, coord_t x, coord_t y);
  * @return 0 on success, -1 on error
  */
 int
-rtree_init(struct rtree *tree, unsigned dimension, uint32_t extent_size,
-	   rtree_extent_alloc_t extent_alloc, rtree_extent_free_t extent_free,
-	   void *alloc_ctx, enum rtree_distance_type distance_type);
+rtree_init(struct rtree *tree, unsigned dimension,
+	   enum rtree_distance_type distance_type,
+	   struct matras_allocator *allocator);
 
 /**
  * @brief Destroy a tree

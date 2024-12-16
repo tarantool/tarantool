@@ -2160,8 +2160,8 @@ memtx_tree_index_new_tpl(struct memtx_engine *memtx, struct index_def *def,
 	cmp_def = def->opts.is_unique && !def->key_def->is_nullable ?
 			index->base.def->key_def : index->base.def->cmp_def;
 
-	memtx_tree_create(&index->tree, cmp_def, memtx_index_extent_alloc,
-			  memtx_index_extent_free, memtx);
+	memtx_tree_create(&index->tree, cmp_def,
+			  &memtx->index_extent_allocator);
 	index->is_func = def->key_def->func_index_func != NULL;
 	return &index->base;
 }
