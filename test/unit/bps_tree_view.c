@@ -16,23 +16,25 @@
 #include "salad/bps_tree.h"
 
 static void *
-extent_alloc(void *ctx)
+extent_alloc(struct matras_allocator *allocator)
 {
-	(void)ctx;
+	(void)allocator;
 	return xmalloc(BPS_TREE_EXTENT_SIZE);
 }
 
 static void
-extent_free(void *ctx, void *extent)
+extent_free(struct matras_allocator *allocator, void *extent)
 {
-	(void)ctx;
+	(void)allocator;
 	free(extent);
 }
+
+struct matras_allocator allocator;
 
 static void
 test_tree_do_create(struct test_tree *tree)
 {
-	test_tree_create(tree, NULL, extent_alloc, extent_free, NULL);
+	test_tree_create(tree, NULL, &allocator);
 }
 
 static void
@@ -454,6 +456,9 @@ main(void)
 	plan(8);
 	header();
 
+	matras_allocator_create(&allocator, BPS_TREE_EXTENT_SIZE,
+				extent_alloc, extent_free);
+
 	test_size();
 	test_find();
 	test_first();
@@ -462,6 +467,8 @@ main(void)
 	test_upper_bound();
 	test_iterator();
 	test_iterator_is_equal();
+
+	matras_allocator_destroy(&allocator);
 
 	footer();
 	return check_plan();

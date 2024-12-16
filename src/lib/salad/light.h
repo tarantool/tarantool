@@ -216,10 +216,8 @@ static const uint32_t LIGHT(end) = 0xFFFFFFFF;
  * @param arg - optional parameter to save for comparing function
  */
 static inline void
-LIGHT(create)(struct LIGHT(core) *ht, size_t extent_size,
-	      LIGHT(extent_alloc_t) extent_alloc_func,
-	      LIGHT(extent_free_t) extent_free_func,
-	      void *alloc_ctx, LIGHT_CMP_ARG_TYPE arg);
+LIGHT(create)(struct LIGHT(core) *ht, LIGHT_CMP_ARG_TYPE arg,
+	      struct matras_allocator *allocator);
 
 /**
  * @brief Hash table destruction. Frees all allocated memory
@@ -443,10 +441,8 @@ LIGHT(view_iterator_get_and_next)(const struct LIGHT(view) *v,
  * @param arg - optional parameter to save for comparing function
  */
 static inline void
-LIGHT(create)(struct LIGHT(core) *htab, size_t extent_size,
-	      LIGHT(extent_alloc_t) extent_alloc_func,
-	      LIGHT(extent_free_t) extent_free_func,
-	      void *alloc_ctx, LIGHT_CMP_ARG_TYPE arg)
+LIGHT(create)(struct LIGHT(core) *htab, LIGHT_CMP_ARG_TYPE arg,
+	      struct matras_allocator *allocator)
 {
 	struct LIGHT(common) *ht = &htab->common;
 	assert((LIGHT_GROW_INCREMENT & (LIGHT_GROW_INCREMENT - 1)) == 0);
@@ -455,9 +451,8 @@ LIGHT(create)(struct LIGHT(core) *htab, size_t extent_size,
 	ht->table_size = 0;
 	ht->empty_slot = LIGHT(end);
 	ht->arg = arg;
-	matras_create(&htab->mtable,
-		      extent_size, sizeof(struct LIGHT(record)),
-		      extent_alloc_func, extent_free_func, alloc_ctx, NULL);
+	matras_create(&htab->mtable, sizeof(struct LIGHT(record)),
+		      allocator, NULL);
 	matras_head_read_view(&htab->view);
 	ht->mtable = &htab->mtable;
 	ht->view = &htab->view;

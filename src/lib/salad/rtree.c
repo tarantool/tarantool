@@ -941,9 +941,9 @@ rtree_iterator_next(struct rtree_iterator *itr)
 /*------------------------------------------------------------------------- */
 
 int
-rtree_init(struct rtree *tree, unsigned dimension, uint32_t extent_size,
-	   rtree_extent_alloc_t extent_alloc, rtree_extent_free_t extent_free,
-	   void *alloc_ctx, enum rtree_distance_type distance_type)
+rtree_init(struct rtree *tree, unsigned dimension,
+	   enum rtree_distance_type distance_type,
+	   struct matras_allocator *allocator)
 {
 	tree->n_records = 0;
 	tree->height = 0;
@@ -969,8 +969,7 @@ rtree_init(struct rtree *tree, unsigned dimension, uint32_t extent_size,
 	tree->neighbours_in_page = (tree->page_size - sizeof(void *))
 		/ sizeof(struct rtree_neighbor);
 
-	matras_create(&tree->mtab, extent_size, tree->page_size,
-		      extent_alloc, extent_free, alloc_ctx, NULL);
+	matras_create(&tree->mtab, tree->page_size, allocator, NULL);
 	return 0;
 }
 

@@ -162,6 +162,8 @@ struct vy_mem {
 	struct rlist in_sealed;
 	/** BPS tree */
 	struct vy_mem_tree tree;
+	/* The matras allocator used by the tree. */
+	struct matras_allocator matras_allocator;
 	/** Size of memory used for storing tree extents. */
 	size_t tree_extent_size;
 	/** Number of statements. */

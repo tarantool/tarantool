@@ -41,23 +41,20 @@ equal_key(hash_value_t v1, hash_value_t v2)
 #include "salad/light.h"
 
 inline void *
-my_light_alloc(void *ctx)
+my_light_alloc(struct matras_allocator *allocator)
 {
-	size_t *p_extents_count = (size_t *)ctx;
-	assert(p_extents_count == &extents_count);
-	++*p_extents_count;
+	++extents_count;
 	return malloc(light_extent_size);
 }
 
 inline void
-my_light_free(void *ctx, void *p)
+my_light_free(struct matras_allocator *allocator, void *p)
 {
-	size_t *p_extents_count = (size_t *)ctx;
-	assert(p_extents_count == &extents_count);
-	--*p_extents_count;
+	--extents_count;
 	free(p);
 }
 
+static struct matras_allocator allocator;
 
 static void
 simple_test()
@@ -65,8 +62,7 @@ simple_test()
 	header();
 
 	struct light_core ht;
-	light_create(&ht, light_extent_size,
-		     my_light_alloc, my_light_free, &extents_count, 0);
+	light_create(&ht, 0, &allocator);
 	std::vector<bool> vect;
 	size_t count = 0;
 	const size_t rounds = 1000;
@@ -129,8 +125,7 @@ collision_test()
 	header();
 
 	struct light_core ht;
-	light_create(&ht, light_extent_size,
-		     my_light_alloc, my_light_free, &extents_count, 0);
+	light_create(&ht, 0, &allocator);
 	std::vector<bool> vect;
 	size_t count = 0;
 	const size_t rounds = 100;
@@ -193,8 +188,7 @@ iterator_test()
 	header();
 
 	struct light_core ht;
-	light_create(&ht, light_extent_size,
-		     my_light_alloc, my_light_free, &extents_count, 0);
+	light_create(&ht, 0, &allocator);
 	const size_t rounds = 1000;
 	const size_t start_limits = 20;
 
@@ -256,8 +250,7 @@ iterator_freeze_check()
 	struct light_core ht;
 
 	for (int i = 0; i < 10; i++) {
-		light_create(&ht, light_extent_size,
-			     my_light_alloc, my_light_free, &extents_count, 0);
+		light_create(&ht, 0, &allocator);
 		int comp_buf_size = 0;
 		int comp_buf_size2 = 0;
 		for (int j = 0; j < test_data_size; j++) {
@@ -331,8 +324,7 @@ slot_in_big_table_test()
 	header();
 
 	struct light_core ht;
-	light_create(&ht, light_extent_size, my_light_alloc, my_light_free,
-		     &extents_count, 0);
+	light_create(&ht, 0, &allocator);
 
 	ht.common.table_size = 4000000000;
 	ht.common.cover_mask = 0xffffffff;
@@ -362,8 +354,7 @@ max_capacity_test()
 	const size_t data_count = (size_t)UINT32_MAX + 1 - LIGHT_GROW_INCREMENT;
 
 	struct light_core ht;
-	light_create(&ht, light_extent_size, my_light_alloc, my_light_free,
-		     &extents_count, 0);
+	light_create(&ht, 0, &allocator);
 
 	uint64_t seed[4];
 	random_bytes((char *)seed, sizeof(seed));
@@ -401,6 +392,8 @@ int
 main(int, const char**)
 {
 	random_init();
+	matras_allocator_create(&allocator, light_extent_size,
+				my_light_alloc, my_light_free);
 
 	simple_test();
 	collision_test();
@@ -412,5 +405,6 @@ main(int, const char**)
 	if (extents_count != 0)
 		fail("memory leak!", "true");
 
+	matras_allocator_destroy(&allocator);
 	random_free();
 }

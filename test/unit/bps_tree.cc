@@ -147,22 +147,22 @@ compare(type_t a, type_t b)
 static int extents_count = 0;
 
 static void *
-extent_alloc(void *ctx)
+extent_alloc(struct matras_allocator *allocator)
 {
-	int *p_extents_count = (int *)ctx;
-	assert(p_extents_count == &extents_count);
-	++*p_extents_count;
+	(void)allocator;
+	++extents_count;
 	return malloc(BPS_TREE_EXTENT_SIZE);
 }
 
 static void
-extent_free(void *ctx, void *extent)
+extent_free(struct matras_allocator *allocator, void *extent)
 {
-	int *p_extents_count = (int *)ctx;
-	assert(p_extents_count == &extents_count);
-	--*p_extents_count;
+	(void)allocator;
+	--extents_count;
 	free(extent);
 }
+
+struct matras_allocator allocator;
 
 static void
 simple_check()
@@ -171,7 +171,7 @@ simple_check()
 
 	const unsigned int rounds = 2000;
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+	test_create(&tree, 0, &allocator);
 
 	printf("Insert 1..X, remove 1..X\n");
 	for (unsigned int i = 0; i < rounds; i++) {
@@ -316,7 +316,7 @@ compare_with_sptree_check()
 	sptree_test_init(&spt_test, sizeof(type_t), 0, 0, 0, &node_comp, 0, 0);
 
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+	test_create(&tree, 0, &allocator);
 
 	const int rounds = 16 * 1024;
 	const int elem_limit = 	1024;
@@ -358,7 +358,7 @@ compare_with_sptree_check_branches()
 	sptree_test_init(&spt_test, sizeof(type_t), 0, 0, 0, &node_comp, 0, 0);
 
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+	test_create(&tree, 0, &allocator);
 
 	const int elem_limit = 1024;
 
@@ -601,8 +601,7 @@ loading_test()
 		arr[i] = i;
 
 	for (type_t i = 0; i <= test_count; i++) {
-		test_create(&tree, 0, extent_alloc, extent_free,
-			    &extents_count);
+		test_create(&tree, 0, &allocator);
 
 		if (test_build(&tree, arr, i))
 			fail("building failed", "true");
@@ -633,7 +632,7 @@ printing_test()
 	header();
 
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+	test_create(&tree, 0, &allocator);
 
 	const type_t rounds = 22;
 
@@ -659,7 +658,7 @@ white_box_test()
 	header();
 
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+	test_create(&tree, 0, &allocator);
 
 	assert(BPS_TREE_test_MAX_COUNT_IN_LEAF == 14);
 	assert(BPS_TREE_test_MAX_COUNT_IN_INNER == 10);
@@ -695,7 +694,7 @@ white_box_test()
 	test_print(&tree, TYPE_F);
 
 	test_destroy(&tree);
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+	test_create(&tree, 0, &allocator);
 	type_t arr[140];
 	for (type_t i = 0; i < 140; i++)
 		arr[i] = i;
@@ -719,7 +718,7 @@ approximate_count()
 	srand(0);
 
 	approx tree;
-	approx_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+	approx_create(&tree, 0, &allocator);
 
 	uint32_t in_leaf_max_count = BPS_TREE_approx_MAX_COUNT_IN_LEAF;
 	uint32_t in_leaf_min_count = in_leaf_max_count * 2 / 3;
@@ -822,7 +821,7 @@ insert_get_iterator()
 	header();
 
 	test tree;
-	test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+	test_create(&tree, 0, &allocator);
 	type_t value = 100000;
 
 	bps_insert_and_check(test, &tree, value, NULL)
@@ -842,7 +841,7 @@ delete_value_check()
 {
 	header();
 	struct_tree tree;
-	struct_tree_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+	struct_tree_create(&tree, 0, &allocator);
 	struct elem_t e1 = {1, 1};
 	struct_tree_insert(&tree, e1, NULL, NULL);
 	struct elem_t e2 = {1, 2};
@@ -868,7 +867,7 @@ insert_successor_test()
 
 	for (size_t i = 0; i < sizeof(limits) / sizeof(limits[0]); i++) {
 		size_t limit = limits[i];
-		test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+		test_create(&tree, 0, &allocator);
 
 		for (size_t j = 0; j < limit; j++) {
 			type_t v = 1 + rand() % (limit - 1);
@@ -905,6 +904,9 @@ insert_successor_test()
 int
 main(void)
 {
+	matras_allocator_create(&allocator, BPS_TREE_EXTENT_SIZE,
+				extent_alloc, extent_free);
+
 	simple_check();
 	compare_with_sptree_check();
 	compare_with_sptree_check_branches();
@@ -918,4 +920,6 @@ main(void)
 	insert_get_iterator();
 	delete_value_check();
 	insert_successor_test();
+
+	matras_allocator_destroy(&allocator);
 }

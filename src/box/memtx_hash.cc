@@ -688,9 +688,8 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 	index_create(&index->base, (struct engine *)memtx,
 		     &memtx_hash_index_vtab, def);
 
-	light_index_create(&index->hash_table, MEMTX_EXTENT_SIZE,
-			   memtx_index_extent_alloc, memtx_index_extent_free,
-			   memtx, index->base.def->key_def);
+	light_index_create(&index->hash_table, index->base.def->key_def,
+			   &memtx->index_extent_allocator);
 	return &index->base;
 }
 

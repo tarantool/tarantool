@@ -91,7 +91,14 @@ static inline struct tuple *
 memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 			 const char *end, bool validate);
 
-template <class ALLOC>
+static void *
+memtx_index_extent_alloc(struct matras_allocator *matras_allocator);
+
+static void
+memtx_index_extent_free(struct matras_allocator *matras_allocator,
+			void *extent);
+
+template<class ALLOC>
 static void
 memtx_alloc_init(void)
 {
@@ -205,12 +212,7 @@ memtx_engine_shutdown(struct engine *engine)
 	mempool_destroy(&memtx->iterator_pool);
 	if (mempool_is_initialized(&memtx->rtree_iterator_pool))
 		mempool_destroy(&memtx->rtree_iterator_pool);
-	void *p = memtx->reserved_extents;
-	while (p != NULL) {
-		void *next = *(void **)p;
-		memtx_index_extent_free(memtx, p);
-		p = next;
-	}
+	matras_allocator_destroy(&memtx->index_extent_allocator);
 	mempool_destroy(&memtx->index_extent_pool);
 	slab_cache_destroy(&memtx->index_slab_cache);
 	mh_ptr_delete(memtx->malloc_extents);
@@ -1692,10 +1694,12 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	slab_cache_create(&memtx->index_slab_cache, &memtx->arena);
 	mempool_create(&memtx->index_extent_pool, &memtx->index_slab_cache,
 		       MEMTX_EXTENT_SIZE);
+	matras_allocator_create(&memtx->index_extent_allocator,
+				MEMTX_EXTENT_SIZE,
+				memtx_index_extent_alloc,
+				memtx_index_extent_free);
 	mempool_create(&memtx->iterator_pool, cord_slab_cache(),
 		       MEMTX_ITERATOR_SIZE);
-	memtx->num_reserved_extents = 0;
-	memtx->reserved_extents = NULL;
 	memtx->malloc_extents = mh_ptr_new();
 
 	memtx->state = MEMTX_INITIALIZED;
@@ -1929,17 +1933,12 @@ create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab)
 /**
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
  */
-void *
-memtx_index_extent_alloc(void *ctx)
+static void *
+memtx_index_extent_alloc(struct matras_allocator *matras_allocator)
 {
-	struct memtx_engine *memtx = (struct memtx_engine *)ctx;
-	if (memtx->reserved_extents) {
-		assert(memtx->num_reserved_extents > 0);
-		memtx->num_reserved_extents--;
-		void *result = memtx->reserved_extents;
-		memtx->reserved_extents = *(void **)memtx->reserved_extents;
-		return result;
-	}
+	struct memtx_engine *memtx = container_of(matras_allocator,
+						  struct memtx_engine,
+						  index_extent_allocator);
 	ERROR_INJECT(ERRINJ_INDEX_ALLOC, { goto fail; });
 	void *ret;
 	while ((ret = mempool_alloc(&memtx->index_extent_pool)) == NULL) {
@@ -1971,10 +1970,12 @@ fail:
 /**
  * Free a block previously allocated by memtx_index_extent_alloc
  */
-void
-memtx_index_extent_free(void *ctx, void *extent)
+static void
+memtx_index_extent_free(struct matras_allocator *matras_allocator, void *extent)
 {
-	struct memtx_engine *memtx = (struct memtx_engine *)ctx;
+	struct memtx_engine *memtx = container_of(matras_allocator,
+						  struct memtx_engine,
+						  index_extent_allocator);
 	mh_int_t p = mh_ptr_find(memtx->malloc_extents, extent, NULL);
 	if (p != mh_end(memtx->malloc_extents)) {
 		mh_ptr_del(memtx->malloc_extents, p, NULL);
@@ -1997,25 +1998,7 @@ memtx_index_extent_reserve(struct memtx_engine *memtx, int num)
 			 "mempool", "new slab");
 		return -1;
 	});
-	struct mempool *pool = &memtx->index_extent_pool;
-	while (memtx->num_reserved_extents < num) {
-		void *ext;
-		while ((ext = mempool_alloc(pool)) == NULL) {
-			bool stop;
-			memtx_engine_run_gc(memtx, &stop);
-			if (stop)
-				break;
-		}
-		if (ext == NULL) {
-			diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
-				 "mempool", "new slab");
-			return -1;
-		}
-		*(void **)ext = memtx->reserved_extents;
-		memtx->reserved_extents = ext;
-		memtx->num_reserved_extents++;
-	}
-	return 0;
+	return matras_allocator_reserve(&memtx->index_extent_allocator, num);
 }
 
 bool

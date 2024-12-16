@@ -39,23 +39,25 @@ equal_key(struct data a, int b)
 #include "salad/light.h"
 
 static void *
-alloc_extent(void *ctx)
+alloc_extent(struct matras_allocator *allocator)
 {
-	(void)ctx;
+	(void)allocator;
 	return xmalloc(extent_size);
 }
 
 static void
-free_extent(void *ctx, void *p)
+free_extent(struct matras_allocator *allocator, void *p)
 {
-	(void)ctx;
+	(void)allocator;
 	free(p);
 }
+
+static struct matras_allocator allocator;
 
 static void
 light_do_create(struct light_core *ht)
 {
-	light_create(ht, extent_size, alloc_extent, free_extent, NULL, NULL);
+	light_create(ht, NULL, &allocator);
 }
 
 static void
@@ -253,9 +255,14 @@ main(void)
 	plan(3);
 	header();
 
+	matras_allocator_create(&allocator, extent_size,
+				alloc_extent, free_extent);
+
 	test_count();
 	test_find();
 	test_iterator();
+
+	matras_allocator_destroy(&allocator);
 
 	footer();
 	return check_plan();
