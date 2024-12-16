@@ -107,7 +107,6 @@ vy_tx_manager_new(void)
 		return NULL;
 	}
 
-	rlist_create(&xm->writers);
 	rlist_create(&xm->prepared);
 	rlist_create(&xm->read_views);
 	vy_global_read_view_create((struct vy_read_view *)&xm->global_read_view,
@@ -346,7 +345,6 @@ vy_tx_create(struct vy_tx_manager *xm, struct vy_tx *tx)
 	vy_tx_read_set_new(&tx->read_set);
 	tx->psn = 0;
 	rlist_create(&tx->on_destroy);
-	rlist_create(&tx->in_writers);
 	rlist_create(&tx->in_prepared);
 }
 
@@ -365,7 +363,6 @@ vy_tx_destroy(struct vy_tx *tx)
 		txv_delete(v);
 
 	vy_tx_read_set_iter(&tx->read_set, NULL, vy_tx_read_set_free_cb, NULL);
-	rlist_del_entry(tx, in_writers);
 }
 
 /** Mark a transaction as aborted and account it in stats. */
@@ -843,15 +840,6 @@ vy_tx_begin_statement(struct vy_tx *tx, void **savepoint)
 		return -1;
 	}
 	assert(tx->state == VINYL_TX_READY);
-	/*
-	 * When want to add to the writer list, can't rely on the log emptiness.
-	 * During recovery it is empty always for the data stored both in runs
-	 * and xlogs. Must check the list member explicitly.
-	 */
-	if (rlist_empty(&tx->in_writers)) {
-		assert(stailq_empty(&tx->log));
-		rlist_add_entry(&tx->xm->writers, tx, in_writers);
-	}
 	*savepoint = stailq_last(&tx->log);
 	return 0;
 }
@@ -880,8 +868,6 @@ vy_tx_rollback_statement(struct vy_tx *tx, void *svp)
 		tx->write_set_version++;
 		txv_delete(v);
 	}
-	if (stailq_empty(&tx->txn->stmts))
-		rlist_del_entry(tx, in_writers);
 }
 
 int
@@ -1134,14 +1120,16 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 }
 
 void
-vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
-				    struct space *space, bool *need_wal_sync)
+vy_tx_manager_abort_writers_for_ddl(struct space *space, bool *need_wal_sync)
 {
 	*need_wal_sync = false;
 	if (space->index_count == 0)
 		return; /* no indexes, no conflicts */
-	struct vy_tx *tx;
-	rlist_foreach_entry(tx, &xm->writers, in_writers) {
+	struct txn *txn;
+	rlist_foreach_entry(txn, &txns, in_txns) {
+		struct vy_tx *tx = txn->engines_tx[space->engine->id];
+		if (tx == NULL || stailq_empty(&txn->stmts))
+			continue;
 		/*
 		 * We can't abort prepared transactions as they have
 		 * already reached WAL. The caller needs to sync WAL
@@ -1162,10 +1150,13 @@ vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
 }
 
 void
-vy_tx_manager_abort_writers_for_ro(struct vy_tx_manager *xm)
+vy_tx_manager_abort_writers_for_ro(struct engine *engine)
 {
-	struct vy_tx *tx;
-	rlist_foreach_entry(tx, &xm->writers, in_writers) {
+	struct txn *txn;
+	rlist_foreach_entry(txn, &txns, in_txns) {
+		struct vy_tx *tx = txn->engines_tx[engine->id];
+		if (tx == NULL || stailq_empty(&txn->stmts))
+			continue;
 		/* Applier ignores ro flag. */
 		if (tx->state == VINYL_TX_READY && !tx->is_applier_session)
 			vy_tx_abort(tx);
