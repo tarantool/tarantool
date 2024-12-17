@@ -3581,9 +3581,10 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 			val[i].u.r = d;
 			break;
 		case MP_INT:
-			val[i].type = MEM_TYPE_INT;
 			assert(val[i].flags == 0);
 			val[i].u.i = mp_decode_int(&data);
+			val[i].type = val[i].u.i < 0 ?
+				MEM_TYPE_INT : MEM_TYPE_UINT;
 			break;
 		case MP_UINT:
 			val[i].type = MEM_TYPE_UINT;
