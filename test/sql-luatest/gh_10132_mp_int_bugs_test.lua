@@ -8,6 +8,13 @@ g.before_all(function(cg)
     cg.server:start()
     cg.server:exec(function()
         local msgpack = require('msgpack')
+        local build_path = os.getenv("BUILDDIR")
+        package.cpath = build_path..'/test/sql-luatest/?.so;'..
+                        build_path..'/test/sql-luatest/?.dylib;'..package.cpath
+        local opts = {language = 'C', returns = 'integer', param_list = {},
+                      exports = {'SQL'}}
+        box.schema.func.create('gh_10132.get_mp_int_one', opts);
+
         rawset(_G, 'conn', require('net.box').connect(box.cfg.listen))
         rawset(_G, 'do_sql', function(...)
             local rows = _G.conn:execute(...).rows
@@ -45,5 +52,13 @@ g.test_compare = function(cg)
         t.assert_equals(_G.do_sql('SELECT 1 FROM test WHERE id <= 1'), 1)
         box.space.test:delete{1}
         box.space.test:delete{2}
+    end)
+end
+
+g.test_c_functions = function(cg)
+    cg.server:exec(function()
+        t.assert(_G.do_sql([[SELECT "gh_10132.get_mp_int_one"() > 0]]))
+        t.assert_equals(
+            _G.do_sql([[SELECT "gh_10132.get_mp_int_one"() + 0]]), 1)
     end)
 end
