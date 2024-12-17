@@ -5,6 +5,7 @@ build_module(sql_interval sql_interval.c)
 target_link_libraries(sql_interval msgpuck core)
 build_module(gh_6572 gh_6572_nan_is_not_null_test.c)
 target_link_libraries(gh_6572 msgpuck core)
+build_module(gh_10132 gh_10132_mp_int_bugs.c)
 
 tarantool_make_lua_path(LUA_CPATH
   PATHS
