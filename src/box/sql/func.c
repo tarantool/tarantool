@@ -940,7 +940,7 @@ func_random(struct sql_context *ctx, int argc, const struct Mem *argv)
 	(void)argv;
 	int64_t r;
 	sql_randomness(sizeof(r), &r);
-	mem_set_int(ctx->pOut, r, r < 0);
+	mem_set_int_with_sign(ctx->pOut, r, r < 0);
 }
 
 /**
@@ -1178,13 +1178,13 @@ func_date_part(struct sql_context *ctx, int argc, const struct Mem *argv)
 	const char *str = tt_cstr(part->z, part->n);
 	const struct datetime *dt = &date->u.dt;
 	if (strcasecmp("millennium", str) == 0)
-		return mem_set_int64(ctx->pOut, datetime_millennium(dt));
+		return mem_set_int(ctx->pOut, datetime_millennium(dt));
 	if (strcasecmp("century", str) == 0)
-		return mem_set_int64(ctx->pOut, datetime_century(dt));
+		return mem_set_int(ctx->pOut, datetime_century(dt));
 	if (strcasecmp("decade", str) == 0)
-		return mem_set_int64(ctx->pOut, datetime_decade(dt));
+		return mem_set_int(ctx->pOut, datetime_decade(dt));
 	if (strcasecmp("year", str) == 0)
-		return mem_set_int64(ctx->pOut, datetime_year(dt));
+		return mem_set_int(ctx->pOut, datetime_year(dt));
 	if (strcasecmp("quarter", str) == 0)
 		return mem_set_uint(ctx->pOut, datetime_quarter(dt));
 	if (strcasecmp("month", str) == 0)
@@ -1210,9 +1210,9 @@ func_date_part(struct sql_context *ctx, int argc, const struct Mem *argv)
 	if (strcasecmp("nanosecond", str) == 0)
 		return mem_set_uint(ctx->pOut, datetime_nsec(dt));
 	if (strcasecmp("epoch", str) == 0)
-		return mem_set_int64(ctx->pOut, datetime_epoch(dt));
+		return mem_set_int(ctx->pOut, datetime_epoch(dt));
 	if (strcasecmp("timezone_offset", str) == 0)
-		return mem_set_int64(ctx->pOut, datetime_tzoffset(dt));
+		return mem_set_int(ctx->pOut, datetime_tzoffset(dt));
 }
 
 #define Utf8Read(s, e) \
