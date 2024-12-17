@@ -702,7 +702,7 @@ case OP_Halt: {
  */
 case OP_Integer: {         /* out2 */
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
-	mem_set_int(pOut, pOp->p1, pOp->p1 < 0);
+	mem_set_int(pOut, pOp->p1);
 	break;
 }
 
@@ -727,7 +727,7 @@ case OP_Bool: {         /* out2 */
 case OP_Int64: {           /* out2 */
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	assert(pOp->p4.pI64!=0);
-	mem_set_int(pOut, *pOp->p4.pI64, pOp->p4type == P4_INT64);
+	mem_set_int_with_sign(pOut, *pOp->p4.pI64, pOp->p4type == P4_INT64);
 	break;
 }
 

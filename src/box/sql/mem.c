@@ -304,7 +304,7 @@ mem_set_null(struct Mem *mem)
 }
 
 void
-mem_set_int(struct Mem *mem, int64_t value, bool is_neg)
+mem_set_int_with_sign(struct Mem *mem, int64_t value, bool is_neg)
 {
 	mem_clear(mem);
 	mem->u.i = value;
@@ -817,7 +817,7 @@ str_to_int(struct Mem *mem)
 	int64_t i;
 	if (sql_atoi64(mem->z, &i, &is_neg, mem->n) != 0)
 		return -1;
-	mem_set_int(mem, i, is_neg);
+	mem_set_int_with_sign(mem, i, is_neg);
 	return 0;
 }
 
@@ -2086,7 +2086,7 @@ mem_add_num(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	mem_set_int(result, res, is_neg);
+	mem_set_int_with_sign(result, res, is_neg);
 	return 0;
 }
 
@@ -2192,7 +2192,7 @@ mem_sub_num(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	mem_set_int(result, res, is_neg);
+	mem_set_int_with_sign(result, res, is_neg);
 	return 0;
 }
 
@@ -2300,7 +2300,7 @@ mem_mul(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	mem_set_int(result, res, is_neg);
+	mem_set_int_with_sign(result, res, is_neg);
 	return 0;
 }
 
@@ -2358,7 +2358,7 @@ mem_div(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	mem_set_int(result, res, is_neg);
+	mem_set_int_with_sign(result, res, is_neg);
 	return 0;
 }
 
@@ -2390,7 +2390,7 @@ mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	mem_set_int(result, res, is_neg);
+	mem_set_int_with_sign(result, res, is_neg);
 	return 0;
 }
 
