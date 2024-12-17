@@ -330,9 +330,9 @@ mem_delete(struct Mem *);
 void
 mem_set_null(struct Mem *mem);
 
-/** Clear MEM and set it to INTEGER. */
+/** Clear MEM and set it to INTEGER with the given sign. */
 void
-mem_set_int(struct Mem *mem, int64_t value, bool is_neg);
+mem_set_int_with_sign(struct Mem *mem, int64_t value, bool is_neg);
 
 /** Clear MEM and set it to UNSIGNED. */
 void
@@ -344,7 +344,7 @@ mem_set_nint(struct Mem *mem, int64_t value);
 
 /** Clear MEM and set it to INT64. */
 static inline void
-mem_set_int64(struct Mem *mem, int64_t value)
+mem_set_int(struct Mem *mem, int64_t value)
 {
 	if (value < 0)
 		mem_set_nint(mem, value);
