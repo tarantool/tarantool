@@ -39,6 +39,8 @@ end
 g.test_compare = function(cg)
     cg.server:exec(function()
         box.space.test:replace{_G.make_mp('\xd0\x01')}
+        t.assert(_G.do_sql('SELECT id > 0 FROM test WHERE id = 1'))
+        t.assert_equals(_G.do_sql('SELECT id + 0 FROM test WHERE id = 1'), 1)
         box.space.test:replace{_G.make_mp('\xd0\x02')}
         t.assert_equals(_G.do_sql('SELECT 1 FROM test WHERE id <= 1'), 1)
         box.space.test:delete{1}
