@@ -3004,7 +3004,7 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 	}
 	case MP_INT: {
 		mem->u.i = mp_decode_int(&buf);
-		mem->type = MEM_TYPE_INT;
+		mem->type = mem->u.i < 0 ? MEM_TYPE_INT : MEM_TYPE_UINT;
 		mem->flags = 0;
 		break;
 	}
