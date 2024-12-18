@@ -80,6 +80,12 @@ local function add_result(bench, name, data)
         cpu_time = data.cpu_time,
         iterations = data.items,
         items_per_second = items_per_second,
+        run_name = name,
+        run_type = 'iteration',
+        repetitions = 1,
+        repetition_index = 1,
+        threads = 1,
+        time_unit = 's',
     }
     table.insert(bench.results, result)
     return result
