@@ -2600,8 +2600,8 @@ mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
 		mem.u.u = mp_decode_uint(b);
 		break;
 	case MP_INT:
-		mem.type = MEM_TYPE_INT;
 		mem.u.i = mp_decode_int(b);
+		mem.type = mem.u.i < 0 ? MEM_TYPE_INT : MEM_TYPE_UINT;
 		break;
 	case MP_FLOAT:
 		mem.type = MEM_TYPE_DOUBLE;

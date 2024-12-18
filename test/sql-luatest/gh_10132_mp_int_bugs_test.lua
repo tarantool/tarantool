@@ -18,6 +18,11 @@ g.before_all(function(cg)
         rawset(_G, 'make_mp', function(...)
             return msgpack.object_from_raw(...)
         end)
+        local format = {
+            {'id', 'integer'},
+        }
+        local s = box.schema.create_space('test', {format = format})
+        s:create_index('pk')
     end)
 end)
 
@@ -28,5 +33,15 @@ end)
 g.test_bind = function(cg)
     cg.server:exec(function()
         t.assert_equals(_G.do_sql('SELECT ?', {_G.make_mp('\xd0\x01')}), 1)
+    end)
+end
+
+g.test_compare = function(cg)
+    cg.server:exec(function()
+        box.space.test:replace{_G.make_mp('\xd0\x01')}
+        box.space.test:replace{_G.make_mp('\xd0\x02')}
+        t.assert_equals(_G.do_sql('SELECT 1 FROM "test" WHERE "id" <= 1'), 1)
+        box.space.test:delete{1}
+        box.space.test:delete{2}
     end)
 end
