@@ -52,7 +52,9 @@ endif()
 ExternalProject_Add(${LUA_C_API_TESTS_TARGET}
   PREFIX ${LUA_C_API_TESTS_TARGET}
   GIT_REPOSITORY https://github.com/ligurio/lua-c-api-tests.git
-  GIT_TAG ${LUA_C_API_TESTS_GIT_TAG}
+  # FIXME: Depends on to be merged changes,
+  # https://github.com/ligurio/lua-c-api-tests/pull/113.
+  GIT_TAG ligurio/gh-xxxx-set-liblua-outside
   SOURCE_DIR ${LUA_C_API_TESTS_PREFIX}/src
   BINARY_DIR ${LUA_C_API_TESTS_PREFIX}/build
   TMP_DIR ${LUA_C_API_TESTS_PREFIX}/tmp
