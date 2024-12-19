@@ -60,6 +60,8 @@ struct rtree_neighbor {
 	void *child;
 	int level;
 	sq_coord_t distance;
+	/* for pagination */
+	sq_coord_t distance_max;   // [4]
 };
 
 typedef rb_tree(struct rtree_neighbor) rtnt_t;
@@ -177,6 +179,8 @@ struct rtree_iterator
 	struct rtree_neighbor_page *page_list;
 	/* Position of ready-to-use list entry in allocated page */
 	unsigned page_pos;
+	/* Position of pagination */
+	sq_coord_t current_pos_distance;         // [2]
 
 	/* Comparators for comparison rectagnle of the iterator with
 	 * rectangles of tree nodes. If the comparator returns true,
