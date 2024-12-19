@@ -1,26 +1,27 @@
-build_module(gh_6986 gh_6986_c_constraint_test.c)
-target_link_libraries(gh_6986 msgpuck core)
+add_subdirectory(lib)
 
 tarantool_make_lua_path(LUA_CPATH
   PATHS
-  ${CMAKE_CURRENT_BINARY_DIR}/?${CMAKE_SHARED_LIBRARY_SUFFIX}
+  ${CMAKE_CURRENT_BINARY_DIR}/lib/?${CMAKE_SHARED_LIBRARY_SUFFIX}
 )
 
-set(TEST_SUITE_NAME "engine-luatest")
+set(TEST_SUITE_NAME "app-luatest")
 
 message(STATUS "Add test suite ${TEST_SUITE_NAME}")
 
-# XXX: The call produces both test and target <engine-luatest-deps>
+# XXX: The call produces both test and target <app-luatest-deps>
 # as a side effect.
 _add_test_suite_target(${TEST_SUITE_NAME}
   LABELS "${TEST_SUITE_NAME};regression;"
-  DEPENDS gh_6986
+  DEPENDS libyield
 )
 
 list(APPEND TEST_ENV
   "LUA_PATH=${LUATEST_LUA_PATH}"
   "LUA_CPATH=${LUA_CPATH}"
-  "BUILDDIR=${CMAKE_CURRENT_BINARY_DIR}"
+  "TARANTOOL_SRC_DIR=${PROJECT_SOURCE_DIR}"
+  "BUILDDIR=${PROJECT_BINARY_DIR}"
+  "PYTHON_EXECUTABLE=${PYTHON}"
   "VARDIR=${VARDIR}"
 )
 
