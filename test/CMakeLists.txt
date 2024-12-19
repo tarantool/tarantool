@@ -175,8 +175,11 @@ list(APPEND EXECUTED_WITHOUT_TEST_RUN
     vinyl-luatest
 )
 
-file(GLOB_RECURSE tests ${PROJECT_SOURCE_DIR}/test
-  *.test.lua *.test.py *_test.lua)
+file(GLOB_RECURSE tests
+  ${PROJECT_SOURCE_DIR}/test/*.test.lua
+  ${PROJECT_SOURCE_DIR}/test/*.test.py
+  ${PROJECT_SOURCE_DIR}/test/*_test.lua
+)
 foreach(test_path ${tests})
   get_filename_component(test_name ${test_path} NAME)
   get_filename_component(basedir ${test_path} DIRECTORY)
