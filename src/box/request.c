@@ -242,7 +242,8 @@ request_handle_sequence(struct request *request, struct space *space,
 		 * code is also invoked on final recovery to restore
 		 * the sequence value from WAL.
 		 */
-		if (likely(mp_read_int64(&key, &value) == 0))
+		if (likely(mp_read_int64(&key, &value) == 0) &&
+		    recovery_state != INITIAL_RECOVERY)
 			return sequence_update(seq, value);
 	}
 	request_update_header(request, request->header, region);
