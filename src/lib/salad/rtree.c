@@ -968,8 +968,8 @@ rtree_iterator_next(struct rtree_iterator *itr)
 			if (neighbor == NULL)
 				return NULL;
 			rtnt_remove(&itr->neigh_tree, neighbor);
-
-			if (neighbor->distance_max < itr->current_pos_distance) // проверка на позицию 
+			
+			if (neighbor->distance_max < itr->current_pos_distance) // проверка на позицию [5]
 				continue;
 
 			if (neighbor->level == 0) {

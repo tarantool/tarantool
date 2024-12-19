@@ -446,6 +446,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 
 	} else {
 		it->current_pos = NULL;
+		it->impl.current_pos_distance = 0;
 	}
 
 	iterator_create(&it->base, base);
