@@ -54,7 +54,7 @@ jobs:
     timeout-minutes: 60
 
     container:
-      image: docker.io/tarantool/testing:ubuntu-jammy-clang16
+      image: docker.io/tarantool/testing:ubuntu-jammy-clang19
       # Mount /dev to the container to be able to mount a disk image inside it
       # for successful run of the .github/actions/environment action.
       volumes:
@@ -86,8 +86,8 @@ jobs:
           revision: ${{ inputs.revision }}
       - name: test
         env:
-          CC: clang-16
-          CXX: clang++-16
+          CC: clang-19
+          CXX: clang++-19
         run: make -f .test.mk test-release-asan
       - name: Send VK Teams message on failure
         if: failure()
