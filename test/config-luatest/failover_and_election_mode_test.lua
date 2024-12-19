@@ -1,3 +1,5 @@
+-- tags: parallel
+
 -- Verify all the compositions of possible replication.failover
 -- and replication.election_mode values.
 --
