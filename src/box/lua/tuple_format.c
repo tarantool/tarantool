@@ -150,6 +150,63 @@ lbox_tuple_format_ipairs(struct lua_State *L)
 	return 3;
 }
 
+static int
+lbox_tuple_format_validate(lua_State *L)
+{
+	struct tuple_format *format =
+		luaL_checkudata(L, 1, tuple_format_typename);
+	if (format == NULL) {
+		return luaL_error(L, "invalid tuple format");
+	}
+
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+
+	const char *data = NULL;
+	struct tuple *t = NULL;
+
+	if (luaL_testudata(L, 2, "box.tuple") != NULL) {
+		t = (struct tuple *)luaL_checkudata(L, 2, "box.tuple");
+		if (t == NULL) {
+			return luaL_error(
+				L, "expected a valid tuple at argument #2");
+		}
+	}
+
+	if (t != NULL) {
+		data = tuple_data(t);
+	} else {
+		struct mpstream stream;
+		mpstream_init(&stream, region, region_reserve_cb,
+			      region_alloc_cb, luamp_error, L);
+
+		if (luamp_encode(L, luaL_msgpack_default, &stream, 2) != 0) {
+			region_truncate(region, region_svp);
+			return luaT_error(L);
+		}
+
+		mpstream_flush(&stream);
+		size_t data_len = region_used(region) - region_svp;
+		data = xregion_join(region, data_len);
+
+		if (mp_typeof(*data) != MP_ARRAY) {
+			region_truncate(region, region_svp);
+			return luaL_error(L, "wrong tuple format:"
+					  "expected an array");
+		}
+	}
+
+	int rc = tuple_validate_raw(format, data);
+	region_truncate(region, region_svp);
+
+	if (rc != 0) {
+		return luaT_error(L);
+	}
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
 void
 box_lua_tuple_format_init(struct lua_State *L)
 {
@@ -160,6 +217,7 @@ box_lua_tuple_format_init(struct lua_State *L)
 		{"totable", lbox_tuple_format_serialize},
 		{"ipairs", lbox_tuple_format_ipairs},
 		{"pairs", lbox_tuple_format_ipairs},
+		{"validate", lbox_tuple_format_validate},
 		{NULL, NULL}
 	};
 	luaL_register_type(L, tuple_format_typename, lbox_tuple_format_meta);
