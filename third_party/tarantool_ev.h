@@ -41,8 +41,10 @@
 
 #if defined(ENABLE_BUNDLED_LIBEV)
 #define EV_STANDALONE 1
-#define EV_USE_SELECT 1
-#define EV_USE_POLL 1
+#define EV_USE_SELECT 0
+#define EV_USE_POLL 0
+#define EV_USE_IOURING 1
+#define EV_RECOMMEND_IOURING 1
 #define EV_USE_NANOSLEEP 1
 #define EV_PERIODIC_ENABLE 1
 #define EV_IDLE_ENABLE 1
