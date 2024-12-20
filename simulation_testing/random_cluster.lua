@@ -8,6 +8,7 @@ local fio = require('fio')
 math.randomseed(os.clock())
 
 
+
 --- Utils functions for debugging
 local function ensure_replica_dirs_exist()
     local replica_dirs_path = fio.abspath('./replicas_dirs')
@@ -98,7 +99,7 @@ local function rand_cluster(max_number_replicas)
     clear_cluster(cg)
     cg.cluster = cluster:new{}
     local replica_count = math.random(3, max_number_replicas)
-
+    local candidates_count=0
     for i = 1, replica_count do
         create_dirs_for_replica(i)
         -- Генерация конфигурации для каждой реплики
@@ -107,17 +108,23 @@ local function rand_cluster(max_number_replicas)
         -- Случайный выбор election_mode
         if math.random() > 0.5 then
             box_cfg.election_mode = 'candidate'
+            candidates_count = candidates_count + 1
         else
             box_cfg.election_mode = 'voter'
         end
 
+        if i == replica_count and candidates_count == 0 then
+            box_cfg.election_mode = 'candidate'
+        end
         -- Создание и добавление реплики в кластер
         cg.replicas[i] = cg.cluster:build_and_add_server{
             alias = 'replica_'..tostring(i),
             box_cfg = box_cfg,
         }
+        
         print("replica_"..tostring(i).." added to cluster as ", box_cfg.election_mode)
     end
+
 
     -- Start the cluster
     cg.cluster:start()

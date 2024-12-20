@@ -60,13 +60,13 @@ local function monitor_replication(cg)
                 if replica.upstream then
                     local lag = replica.upstream.lag or 0
                     if lag > 2 then 
-                        table.insert(problems, '['..node.alias..'] High lag detected on upstream ' .. replica_id)
+                        table.insert(problems, '['..node.alias..'] High lag detected on upstream with replica_' .. replica_id)
                     end
                 end
                 if replica.downstream then
                     local lag = replica.downstream.lag or 0
                     if lag > 2 then 
-                        table.insert(problems, '['..node.alias..'] High lag detected on downstream ' .. replica_id)
+                        table.insert(problems, '['..node.alias..'] High lag detected on downstream  replica_' .. replica_id)
                     end
                 end
             end
@@ -94,7 +94,7 @@ local function monitor_replication(cg)
 
         if #leaders == 0 then
                 if now - state.last_leader_check > monitor_config.leader_absent_time then
-                    table.insert(problems, '[CLUSTER] No leader detected for more than ' .. monitor_config.leader_absent_time .. ' seconds')
+                    table.insert(problems, '[CLUSTER] No leader detected for more than ' .. monitor_config.leader_absent_time .. ' rounds')
                 end
             else
                 state.last_leader_check = now
