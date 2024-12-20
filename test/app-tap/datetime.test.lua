@@ -2631,18 +2631,18 @@ test:test("Parse with a custom format and format back to string", function(test)
         {
             buf = '+0403',
             fmt = '%z',
-            dt = date.new({tzoffset = 243}),
+            dt = date.new({h = 0, m = 0, s = 0, tzoffset = 243}),
         },
         {
             buf = '-0403',
             fmt = '%z',
-            dt = date.new({tzoffset = -243}),
+            dt = date.new({h = 0, m = 0, s = 0, tzoffset = -243}),
         },
         -- %Z is replaced by the time zone name.
         {
             buf = 'MSK',
             fmt = '%Z',
-            dt = date.new({tzoffset = 180}),
+            dt = date.new({h = 0, m = 0, s = 0, tzoffset = 180}),
         },
         -- %+ is replaced by national representation of the date
         -- and time (the format is similar to that produced by
@@ -2819,27 +2819,27 @@ test:test("Time :set{} operations", function(test)
             'hour 6')
     test:is(tostring(ts:set{ min = 12, sec = 23 }), '2020-11-09T06:12:23+0300',
             'min 12, sec 23')
-    test:is(tostring(ts:set{ tzoffset = -8*60 }), '2020-11-09T06:12:23-0800',
+    test:is(tostring(ts:set{ tzoffset = -8*60 }), '2020-11-08T19:12:23-0800',
             'offset -0800' )
-    test:is(tostring(ts:set{ tzoffset = '+0800' }), '2020-11-09T06:12:23+0800',
+    test:is(tostring(ts:set{ tzoffset = '+0800' }), '2020-11-09T11:12:23+0800',
             'offset +0800' )
     -- timestamp 1630359071.125 is 2021-08-30T21:31:11.125Z
     test:is(tostring(ts:set{ timestamp = 1630359071.125 }),
-            '2021-08-30T21:31:11.125+0800', 'timestamp 1630359071.125' )
-    test:is(tostring(ts:set{ msec = 123}), '2021-08-30T21:31:11.123+0800',
+            '2021-08-31T05:31:11.125+0800', 'timestamp 1630359071.125' )
+    test:is(tostring(ts:set{ msec = 123}), '2021-08-31T05:31:11.123+0800',
             'msec = 123')
-    test:is(tostring(ts:set{ usec = 123}), '2021-08-30T21:31:11.000123+0800',
+    test:is(tostring(ts:set{ usec = 123}), '2021-08-31T05:31:11.000123+0800',
             'usec = 123')
-    test:is(tostring(ts:set{ nsec = 123}), '2021-08-30T21:31:11.000000123+0800',
+    test:is(tostring(ts:set{ nsec = 123}), '2021-08-31T05:31:11.000000123+0800',
             'nsec = 123')
     test:is(tostring(ts:set{timestamp = 1630359071, msec = 123}),
-            '2021-08-30T21:31:11.123+0800', 'timestamp + msec')
+            '2021-08-31T05:31:11.123+0800', 'timestamp + msec')
     test:is(tostring(ts:set{timestamp = 1630359071, usec = 123}),
-            '2021-08-30T21:31:11.000123+0800', 'timestamp + usec')
+            '2021-08-31T05:31:11.000123+0800', 'timestamp + usec')
     test:is(tostring(ts:set{timestamp = 1630359071, nsec = 123}),
-            '2021-08-30T21:31:11.000000123+0800', 'timestamp + nsec')
+            '2021-08-31T05:31:11.000000123+0800', 'timestamp + nsec')
     test:is(tostring(ts:set{timestamp = -0.1}),
-            '1969-12-31T23:59:59.900+0800', 'negative timestamp')
+            '1970-01-01T07:59:59.900+0800', 'negative timestamp')
 end)
 
 test:test("Check :set{} and .new{} equal for all attributes", function(test)
