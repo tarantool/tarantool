@@ -179,6 +179,7 @@ file(GLOB_RECURSE tests
   ${PROJECT_SOURCE_DIR}/test/*.test.lua
   ${PROJECT_SOURCE_DIR}/test/*.test.py
   ${PROJECT_SOURCE_DIR}/test/*_test.lua
+  ${PROJECT_SOURCE_DIR}/test/*.test.sql
 )
 foreach(test_path ${tests})
   get_filename_component(test_name ${test_path} NAME)
