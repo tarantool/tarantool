@@ -41,6 +41,7 @@ for _, node in ipairs(cg.replicas) do
         return box.info.election.state
     end)
     print(string.format("Node %s is %s", node.alias, tostring(node_state)))
+    crash_functions.update_node_state(node, "active")
 end
 
 
@@ -83,7 +84,7 @@ fiber.create(function()
     while true do
         local random_action = math.random(1, 11)
 
-        if random_action < 8 then
+        if random_action < 5 then
             local rw_operation = math.random(1, 10)
             local operation
             if rw_operation < 3 then
@@ -95,15 +96,37 @@ fiber.create(function()
         elseif random_action < 9 then
             local type_of_crashing = math.random(1, 3)
             if type_of_crashing == 1 then
-                crash_functions.stop_node(my_functions.get_random_node(cg.replicas), 5, 10)
+                local crash_node = crash_functions.get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
+                if crash_node ~= -1 then
+                    crash_functions.stop_node(
+                        crash_node[1], 
+                        5, 
+                        10
+                    )
+                end
 
             elseif type_of_crashing == 2 then
-                crash_functions.create_delay_to_write_operations(my_functions.get_random_node(cg.replicas), "test", 5, 10)
+                local crash_node = crash_functions.get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
+                if crash_node ~= -1 then
+                    crash_functions.create_delay_to_write_operations(
+                        crash_node[1], 
+                        "test", 
+                        5, 
+                        10
+                    )
+                end
 
             else 
-                crash_functions.break_connection_between_random_nodes(cg.replicas, initial_replication, 5, 10)
-    
-            end           
+                local crash_nodes = crash_functions.get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 2)
+                if crash_nodes ~= -1 then
+                    crash_functions.break_connection_between_two_nodes(
+                        crash_nodes, 
+                        initial_replication, 
+                        5, 
+                        10
+                    )
+                end
+            end    
         end
 
         fiber.sleep(math.random(1, 2)) 
