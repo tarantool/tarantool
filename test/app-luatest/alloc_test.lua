@@ -41,12 +41,13 @@ end
 g.test_used_and_unused = function()
     local function test(amount)
         alloc.setlimit(amount)
-        t.assert_equals(collectgarbage('count'), alloc.used() / 1024)
-        -- Check amount of the free memory provided by the
-        -- unused() function is close to the calculated using
-        -- the builtin collectgarbage() function.
+        -- Check memory values provided by the used() and
+        -- unused() functions are close to the ones calculated
+        -- by the builtin collectgarbage() function.
         --
         -- Allow some margin of 16Kb to avoid false negatives.
+        t.assert_almost_equals(collectgarbage('count'),
+                               alloc.used() / 1024, 16)
         t.assert_almost_equals(amount / 1024 - collectgarbage('count'),
                                alloc.unused() / 1024, 16)
         t.assert_equals(alloc.used() + alloc.unused(), alloc.getlimit())
