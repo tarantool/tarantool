@@ -11,9 +11,21 @@ local log_handling = require('log_handling')
 local fio = require('fio')
 local replication_errors = require("replication_errors")
 
+
+io.output(assert(io.open("wroking_log.log", "w")))
+
+function print(...)
+    local t = {}
+    for i = 1, select("#", ...) do
+        t[i] = tostring(select(i, ...))
+    end
+    io.write(table.concat(t, "\t"), "\n")
+end
+
+
 math.randomseed(os.time())
 random_cluster.clear_dirs_for_all_replicas()
-local cg = random_cluster.rand_cluster(30)
+local cg = random_cluster.rand_cluster(3)
 
 box.cfg {
     checkpoint_count = 2, 
