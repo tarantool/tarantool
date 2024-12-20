@@ -43,7 +43,10 @@
 #endif
 
 /** Can't be enum - used by preprocessor for static assertions. */
+/** 1KiB should be enough for most cases. */
 #define TT_STATIC_BUF_LEN 1024
+/** 32KiB us the current maximum buffer size that small static can offer. */
+#define TT_STATIC_BUF_BIG_LEN 32768
 
 /**
  * Return a thread-local statically allocated temporary buffer of
@@ -53,6 +56,17 @@ static inline char *
 tt_static_buf(void)
 {
 	return (char *) static_aligned_alloc(TT_STATIC_BUF_LEN,
+					     sizeof(intptr_t));
+}
+
+/**
+ * Return a thread-local statically allocated temporary buffer of
+ * size @a TT_STATIC_BUF_BIG_LEN.
+ */
+static inline char *
+tt_static_buf_big(void)
+{
+	return (char *) static_aligned_alloc(TT_STATIC_BUF_BIG_LEN,
 					     sizeof(intptr_t));
 }
 

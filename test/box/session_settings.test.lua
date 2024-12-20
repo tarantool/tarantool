@@ -133,7 +133,7 @@ settings.sql_default_engine = true
 settings.sql_full_metadata = 'false'
 settings.sql_parser_debug = 'string'
 
-str = string.rep('a', 20 * 1024)
+str = string.rep('a', 37 * 1024)
 box.session.settings.sql_default_engine = str
 
 box.execute([[set session "sql_def_engine" = true]])
