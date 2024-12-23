@@ -273,6 +273,64 @@ json_escape(char *buf, int size, const char *data)
 	return total;
 }
 
+int
+json_escape_inplace(char *buf, int size)
+{
+	/* We need at least one byte for the null terminator later. */
+	if (buf == NULL || size <= 0)
+		return 0;
+
+	int total = 0;
+	int data_len = 0;
+
+	/*
+	 * Calculate the length of the string and the escaped string in on go.
+	 * If the buffer is not large enough, we will "truncate" the input
+	 * string, so the escaped string will fit into the buffer.
+	 */
+	for (char *p = buf; p < buf + size && *p != '\0'; p++) {
+		char c = *p;
+		const char *esc_str = json_escape_char(c);
+		int esc_len = esc_str != NULL ? strlen(esc_str) : 1;
+
+		if (total + esc_len >= size) {
+			break;
+		}
+
+		total += esc_len;
+		data_len++;
+	}
+
+	/* Write the null terminator. */
+	assert(total + 1 <= size); /* Guaranteed by the loop above. */
+	buf[total + 1] = '\0';
+
+	/* Write the escaped string from the end to the beginning. */
+	char *pw = buf + total;
+	int written = 0;
+	for (char *pr = buf + data_len - 1; pr >= buf; --pr) {
+		char c = *pr;
+		const char *esc_str = json_escape_char(c);
+
+		if (esc_str != NULL) {
+			int esc_len = strlen(esc_str);
+			pw -= esc_len;
+			assert(pw > pr - 1);
+			memcpy(pw, esc_str, esc_len);
+			written += esc_len;
+		} else {
+			pw--;
+			assert(pw > pr - 1);
+			*pw = c;
+			written++;
+		}
+	}
+
+	assert(pw <= buf);
+	assert(written == total);
+	return written;
+}
+
 const char *precision_fmts[] = {
 	"%.0lg", "%.1lg", "%.2lg", "%.3lg", "%.4lg", "%.5lg", "%.6lg", "%.7lg",
 	"%.8lg", "%.9lg", "%.10lg", "%.11lg", "%.12lg", "%.13lg", "%.14lg"
