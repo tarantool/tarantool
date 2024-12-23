@@ -623,6 +623,12 @@ int
 json_escape(char *buf, int size, const char *data);
 
 /**
+ * Escape special characters in @a buf inplace
+ */
+int
+json_escape_inplace(char *buf, int size);
+
+/**
  * Helper macro to handle easily snprintf() result
  */
 #define SNPRINT(_total, _fun, _buf, _size, ...) do {				\
