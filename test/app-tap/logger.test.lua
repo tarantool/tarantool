@@ -3,7 +3,7 @@
 local log = require('log')
 
 local test = require('tap').test('log')
-test:plan(119)
+test:plan(142)
 
 local function test_invalid_cfg(cfg_method, cfg, name, expected)
     local _, err = pcall(cfg_method, cfg)
@@ -336,9 +336,59 @@ message = json.decode(line)
 test:is(message.message, "this is \"", "check message with escaped character")
 
 -- gh-3248 trash in log file with logging large objects
+-- gh-10918 json logger truncates large messages to 1024 bytes
 log.info(string.rep('a', 32000))
 line = file:read()
-test:ok(line:len() < 20000, "big line truncated")
+test:ok(line:len() < 16384, "big line truncated")
+test:ok(line:len() > 16000, "big line is not too small")
+message = json.decode(line)
+test:istable(message, "json is valid for big message")
+max_message_len = message.message:len()
+
+log.info(string.format("%s\"", string.rep("b", max_message_len - 1)))
+line = file:read()
+test:ok(line:len() > 16000, "big line, ending with \", is not too small")
+message = json.decode(line)
+test:istable(message, "json is valid for big line, ending with \"")
+test:is(message.message:endswith("b"), true, "big line, ends with \"a\"")
+
+log.info(string.format("%s\"", string.rep("c", max_message_len - 2)))
+line = file:read()
+test:ok(line:len() > 16000, "big line, ending with \", is not too small")
+message = json.decode(line)
+test:istable(message, "json is valid for big line, ending with \"")
+test:is(message.message:endswith("\""), true, "big line, ends with \"")
+
+log.info("")
+message = json.decode(file:read())
+test:is(message.message, "", "empty message")
+
+log.info()
+message = json.decode(file:read())
+test:isnil(message.message, "nil message")
+
+log.info({message = string.rep("d", 32000)})
+line = file:read()
+test:ok(line:len() < 16384, "big line truncated")
+test:ok(line:len() > 16000, "big line is not too small")
+--[[ @TODO: This is broken, because the resulting JSON will not be valid
+message = json.decode(line)
+test:istable(message, "json is valid for big message")
+]]--
+
+n = 0
+for message_len = max_message_len - 5, max_message_len + 5 do
+    letter = string.char(string.byte("e") + n)
+    n = n + 1
+    expected_len = math.min(max_message_len, message_len)
+    log.info(string.rep(letter, message_len))
+    local line
+    while not line do
+        line = file:read()
+    end
+    message = json.decode(line)
+    test:is(message.message:len(), expected_len, "message length is correct")
+end
 
 -- gh-3853 log.info spoils input (json format)
 local gh3853 = {file = 'c://autorun.bat'}
