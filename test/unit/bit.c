@@ -251,6 +251,44 @@ test_bitmap_size(void)
 	footer();
 }
 
+/**
+ * Check all possible valid inputs of `bit_set_range()'.
+ */
+static void
+test_bit_set_range(void)
+{
+	header();
+
+	const size_t data_size = 64; /* In bytes. */
+	const size_t data_count = data_size * CHAR_BIT; /* In bits. */
+
+	for (size_t pos = 0; pos < data_count; pos++) {
+		for (size_t count = 0; count <= data_count - pos; count++) {
+			for (int val = 0; val <= 1; val++) {
+				uint8_t data[data_size];
+				uint8_t ref[data_size];
+
+				/* Initialize buffers. */
+				memset(data, 0xA5, sizeof(data));
+				memset(ref, 0xA5, sizeof(ref));
+				/* Calculate reference result. */
+				for (size_t i = pos; i < pos + count; i++) {
+					if (val == 0)
+						bit_clear(ref, i);
+					else
+						bit_set(ref, i);
+				}
+				/* The function under test. */
+				bit_set_range(data, pos, count, val);
+				/* Compare results. */
+				fail_if(memcmp(data, ref, sizeof(data)) != 0);
+			}
+		}
+	}
+
+	footer();
+}
+
 int
 main(void)
 {
@@ -263,4 +301,5 @@ main(void)
 	test_bit_iter_empty();
 	test_bit_iter_fractional();
 	test_bitmap_size();
+	test_bit_set_range();
 }
