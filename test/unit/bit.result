@@ -715,3 +715,5 @@ Clear: 0, 1, 2, 4, 5, 6, 7, 8, 10, 12, 13, 14, 15, 19, 20, 21, 23, 26, 28, 30, 3
 	*** test_bit_iter_fractional: done ***
 	*** test_bitmap_size ***
 	*** test_bitmap_size: done ***
+	*** test_bit_set_range ***
+	*** test_bit_set_range: done ***
