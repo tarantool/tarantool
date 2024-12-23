@@ -24,6 +24,7 @@ local appliers_script = [[
             top = {
                 enabled = true,
             },
+            tx_user_pool_size = 123,
         },
         app = {
             file = 'script.lua',
@@ -130,7 +131,8 @@ g.test_applier_fiber = function()
     local dir = treegen.prepare_directory({}, {})
     local injection = [[
         fiber = require('fiber')
-        print(fiber.top() ~= nil)
+        assert(fiber.top())
+        assert(fiber.tx_user_pool_size() == 123)
     ]]
     treegen.write_file(dir, 'main.lua', appliers_script:format(injection))
 
@@ -138,7 +140,7 @@ g.test_applier_fiber = function()
     local opts = {nojson = true, stderr = false}
     local res = justrun.tarantool(dir, env, {'main.lua'}, opts)
     t.assert_equals(res.exit_code, 0)
-    t.assert_equals(res.stdout, 'true')
+    t.assert_equals(res.stdout, '')
 end
 
 g.test_applier_app = function()

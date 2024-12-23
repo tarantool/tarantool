@@ -4,6 +4,7 @@ local cluster_config = require('internal.config.cluster_config')
 local configdata = require('internal.config.configdata')
 local aboard = require('internal.config.utils.aboard')
 local tarantool = require('tarantool')
+local textutils = require('internal.config.utils.textutils')
 
 -- Tarantool Enterprise Edition has its own additions
 -- for config module.
@@ -37,30 +38,6 @@ end
 local extras = load_extras()
 
 -- {{{ Helpers
-
--- Remove indent from a text.
---
--- Similar to Python's textwrap.dedent().
---
--- It strips all newlines from beginning and all whitespace
--- characters from the end for convenience use with multiline
--- string literals ([[ <...> ]]).
-local function dedent(s)
-    local lines = s:lstrip('\n'):rstrip():split('\n')
-
-    local indent = math.huge
-    for _, line in ipairs(lines) do
-        if #line ~= 0 then
-            indent = math.min(indent, #line:match('^ *'))
-        end
-    end
-
-    local res = {}
-    for _, line in ipairs(lines) do
-        table.insert(res, line:sub(indent + 1))
-    end
-    return table.concat(res, '\n')
-end
 
 -- Extract all fields from a table except ones that start from
 -- the underscore.
@@ -143,14 +120,17 @@ function methods._initialize(self)
         self:_register_source(require('internal.config.source.file').new())
     end
 
+    self:_register_applier(require('internal.config.applier.lua'))
     self:_register_applier(require('internal.config.applier.compat'))
     self:_register_applier(require('internal.config.applier.mkdir'))
     self:_register_applier(require('internal.config.applier.console'))
     self:_register_applier(require('internal.config.applier.runtime_priv'))
     self:_register_applier(require('internal.config.applier.box_cfg'))
+    self:_register_applier(require('internal.config.applier.box_status'))
     self:_register_applier(require('internal.config.applier.credentials'))
     self:_register_applier(require('internal.config.applier.fiber'))
     self:_register_applier(require('internal.config.applier.sharding'))
+    self:_register_applier(require('internal.config.applier.autoexpel'))
     self:_register_applier(require('internal.config.applier.roles'))
     self:_register_applier(require('internal.config.applier.app'))
 
@@ -267,7 +247,7 @@ function methods._store(self, iconfig, cconfig, source_info)
         local is_reload = self._status == 'reload_in_progress'
         local action = is_reload and 'Reload' or 'Startup'
         local source_info_str = table.concat(source_info, '\n')
-        error(dedent([[
+        error(textutils.dedent([[
             %s failure.
 
             No cluster config received from the given configuration sources.
@@ -290,7 +270,7 @@ function methods._store(self, iconfig, cconfig, source_info)
         local is_reload = self._status == 'reload_in_progress'
         local action = is_reload and 'Reload' or 'Startup'
         local source_info_str = table.concat(source_info, '\n')
-        error(dedent([[
+        error(textutils.dedent([[
             %s failure.
 
             Unable to find instance %q in the group/replicaset/instance
@@ -315,10 +295,11 @@ function methods._store(self, iconfig, cconfig, source_info)
     self._configdata = configdata.new(iconfig, cconfig, self._instance_name)
 end
 
--- Invoke compat, mkdir, console and box_cfg appliers at the first
--- phase. Invoke all the other ones at the second phase.
+-- Invoke lua, compat, mkdir, console and box_cfg appliers at the
+-- first phase. Invoke all the other ones at the second phase.
 function methods._apply_on_startup(self, opts)
     local first_phase_appliers = {
+        lua = true,
         compat = true,
         mkdir = true,
         console = true,
@@ -615,6 +596,18 @@ function methods.instance_uri(self, uri_type, opts)
         use_default = true,
     }
     return self._configdata_applied:_instance_uri(uri_type, uri_opts)
+end
+
+function methods.jsonschema(self)
+    selfcheck(self, 'jsonschema')
+
+    return cluster_config:jsonschema()
+end
+
+function methods.new_alerts_namespace(self, name)
+    selfcheck(self, 'new_alerts_namespace')
+
+    return self._aboard:new_namespace(name)
 end
 
 -- The object is a singleton. The constructor should be called

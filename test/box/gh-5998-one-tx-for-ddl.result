@@ -55,16 +55,13 @@ for i = 0, 10 do s1:replace{i} end
  | ---
  | ...
 
--- In case of committed DDL operation all other transactions will be aborted.
+-- In case of DDL operation all other transactions will be aborted.
 --
 _ = test_run:cmd("setopt delimiter ';'")
  | ---
  | ...
-function create_space_with_pk()
-    box.begin()
-    local s = box.schema.space.create('s2')
-    s:create_index('pk')
-    box.commit()
+function create_sk()
+    s1:create_index('sk')
 end
 _ = test_run:cmd("setopt delimiter ''");
  | ---
@@ -87,11 +84,15 @@ tx2("s1:replace({14})")
  | - - [14]
  | ...
 
-f = fiber.new(create_space_with_pk)
+-- Execute as a single line to avoid yields
+f = fiber.new(create_sk) \
+f:set_joinable(true)     \
+join_result = {f:join()}
  | ---
  | ...
-fiber.sleep(0)
+join_result
  | ---
+ | - - true
  | ...
 tx1:commit()
  | ---
@@ -102,23 +103,11 @@ tx2:commit()
  | - - {'error': 'Transaction has been aborted by conflict'}
  | ...
 
-assert(box.space.s2 ~= nil)
+assert(box.space.s1.index[1] ~= nil)
  | ---
  | - true
  | ...
-assert(box.space.s2.index[0] ~= nil)
- | ---
- | - true
- | ...
-assert(box.space.s1:count() == 11)
- | ---
- | - true
- | ...
-
 box.space.s1:drop()
- | ---
- | ...
-box.space.s2:drop()
  | ---
  | ...
 

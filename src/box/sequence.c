@@ -85,11 +85,12 @@ sequence_data_equal_key(struct sequence_data data, uint32_t id)
 
 static struct light_sequence_core sequence_data_index;
 static struct mempool sequence_data_extent_pool;
+static struct matras_allocator sequence_data_extent_allocator;
 
 static void *
-sequence_data_extent_alloc(void *ctx)
+sequence_data_extent_alloc(struct matras_allocator *allocator)
 {
-	(void)ctx;
+	(void)allocator;
 	void *ret = mempool_alloc(&sequence_data_extent_pool);
 	if (ret == NULL)
 		diag_set(OutOfMemory, SEQUENCE_DATA_EXTENT_SIZE,
@@ -98,9 +99,9 @@ sequence_data_extent_alloc(void *ctx)
 }
 
 static void
-sequence_data_extent_free(void *ctx, void *extent)
+sequence_data_extent_free(struct matras_allocator *allocator, void *extent)
 {
-	(void)ctx;
+	(void)allocator;
 	mempool_free(&sequence_data_extent_pool, extent);
 }
 
@@ -115,16 +116,19 @@ sequence_init(void)
 {
 	mempool_create(&sequence_data_extent_pool, &cord()->slabc,
 		       SEQUENCE_DATA_EXTENT_SIZE);
+	matras_allocator_create(&sequence_data_extent_allocator,
+				SEQUENCE_DATA_EXTENT_SIZE,
+				sequence_data_extent_alloc,
+				sequence_data_extent_free);
 	light_sequence_create(&sequence_data_index, 0,
-			      SEQUENCE_DATA_EXTENT_SIZE,
-			      sequence_data_extent_alloc,
-			      sequence_data_extent_free, NULL, NULL);
+			      &sequence_data_extent_allocator, NULL);
 }
 
 void
 sequence_free(void)
 {
 	light_sequence_destroy(&sequence_data_index);
+	matras_allocator_destroy(&sequence_data_extent_allocator);
 	mempool_destroy(&sequence_data_extent_pool);
 }
 

@@ -137,17 +137,13 @@ struct tt_uuid bootstrap_leader_uuid;
 bool box_is_force_recovery = false;
 
 /**
- * Set if backup is in progress, i.e. box_backup_start() was
- * called but box_backup_stop() hasn't been yet.
- */
-static bool backup_is_in_progress;
-
-/**
  * If backup is in progress, this points to the gc reference
  * object that prevents the garbage collector from deleting
  * the checkpoint files that are currently being backed up.
+ *
+ * If there is no in-progress backup, is set to NULL.
  */
-static struct gc_checkpoint_ref backup_gc;
+static struct gc_checkpoint_ref *backup_gc;
 
 bool box_read_ffi_is_disabled;
 
@@ -440,7 +436,7 @@ box_check_writable(void)
 			error_set_uuid(e, "queue_owner_uuid", &r->uuid);
 			error_append_msg(e, " (%s)", tt_uuid_str(&r->uuid));
 		}
-		if (txn_limbo.owner_id == instance_id) {
+		if (txn_limbo_is_owned_by_current_instance(&txn_limbo)) {
 			if (txn_limbo.is_frozen_due_to_fencing) {
 				error_append_msg(e, " and is frozen due to "
 						    "fencing");
@@ -1533,6 +1529,18 @@ box_check_replication_anon(void)
 	return anon;
 }
 
+static double
+box_check_replication_anon_ttl(void)
+{
+	double ttl = cfg_getd("replication_anon_ttl");
+	if (ttl <= 0) {
+		diag_set(ClientError, ER_CFG, "replication_anon_ttl",
+			 "the value must be greater than 0");
+		return -1;
+	}
+	return ttl;
+}
+
 static int
 box_check_instance_uuid(struct tt_uuid *uuid)
 {
@@ -1977,6 +1985,8 @@ box_check_config(void)
 	if (box_check_replication_threads() < 0)
 		diag_raise();
 	box_check_replication_sync_timeout();
+	if (box_check_replication_anon_ttl() < 0)
+		diag_raise();
 	if (box_check_bootstrap_strategy() == BOOTSTRAP_STRATEGY_INVALID)
 		diag_raise();
 	uri_create(&uri, NULL);
@@ -2345,6 +2355,19 @@ box_set_replication_anon(void)
 			  " has finished");
 	}
 	guard.is_active = false;
+}
+
+int
+box_set_replication_anon_ttl(void)
+{
+	double ttl = box_check_replication_anon_ttl();
+	if (ttl <= 0)
+		return -1;
+	replication_anon_ttl = ttl;
+	/* The fiber can be NULL on configuration. */
+	if (replication_anon_gc_fiber != NULL)
+		fiber_wakeup(replication_anon_gc_fiber);
+	return 0;
 }
 
 /**
@@ -3068,7 +3091,7 @@ box_promote(void)
 	 */
 	bool is_leader =
 		txn_limbo_replica_term(&txn_limbo, instance_id) == raft->term &&
-		txn_limbo.owner_id == instance_id &&
+		txn_limbo_is_owned_by_current_instance(&txn_limbo) &&
 		!txn_limbo.is_frozen_until_promotion;
 	if (box_election_mode != ELECTION_MODE_OFF)
 		is_leader = is_leader && raft->state == RAFT_STATE_LEADER;
@@ -3125,7 +3148,7 @@ box_demote(void)
 		if (txn_limbo_replica_term(&txn_limbo, instance_id) !=
 		    raft->term)
 			return 0;
-		if (txn_limbo.owner_id != instance_id)
+		if (!txn_limbo_is_owned_by_current_instance(&txn_limbo))
 			return 0;
 		box_raft_leader_step_off();
 		return 0;
@@ -3145,7 +3168,7 @@ box_demote(void)
 	 * local promote(), or call demote() on the actual owner.
 	 */
 	if (txn_limbo.promote_greatest_term == raft->term &&
-	    txn_limbo.owner_id != instance_id)
+	    !txn_limbo_is_owned_by_current_instance(&txn_limbo))
 		return 0;
 	if (box_trigger_elections() != 0)
 		return -1;
@@ -4415,6 +4438,94 @@ box_process_auth(struct auth_request *request,
 	return 0;
 }
 
+/**
+ * Replica's connection guard:
+ * 1. Ensures that the replica has only one connection at a time.
+ * 2. Calls the replica's disconnection callback in destructor.
+ */
+struct ReplicaConnectionGuard {
+	ReplicaConnectionGuard(struct replica *replica)
+	{
+		replica_ = replica;
+		if (replica == NULL)
+			return;
+		if (replica->has_incoming_connection) {
+			tnt_raise(ClientError, ER_CFG, "replication",
+				  "duplicate connection with the same replica "
+				  "UUID");
+		}
+		replica->has_incoming_connection = true;
+	}
+	~ReplicaConnectionGuard()
+	{
+		if (replica_ == NULL)
+			return;
+		assert(replica_->has_incoming_connection);
+		replica_->has_incoming_connection = false;
+		replica_on_disconnect(replica_);
+	}
+	ReplicaConnectionGuard(const ReplicaConnectionGuard &other) = delete;
+	ReplicaConnectionGuard(ReplicaConnectionGuard &&other)
+	{
+		replica_ = other.replica_;
+		other.replica_ = NULL;
+	}
+private:
+	/** Connected replica. */
+	struct replica *replica_;
+};
+
+/**
+ * A helper for replication endpoints to handle a connecting replica.
+ * 1. Checks if the replica can be connected - replica has read permission
+ *    and WAL is enabled.
+ * 2. Checks if the replica doesn't have another connection.
+ * 3. Creates an anonymous replica object if it doesn't exist.
+ * 4. Handles WAL GC state of the replica. It's important that if the replica
+ *    already has a WAL GC consumer, it is re-created and never will be deleted
+ *    so the replica won't lose its consumer, even in the case of an error.
+ * 5. Returns a guard that protects against duplicate replica connection.
+ */
+NODISCARD static ReplicaConnectionGuard
+box_connect_replica(const struct tt_uuid *uuid, const struct vclock *gc_vclock,
+		    struct replica **out)
+{
+	/* Check permissions */
+	access_check_universe_xc(PRIV_R);
+
+	/* Forbid replication with disabled WAL */
+	if (wal_mode() == WAL_NONE) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
+			  "wal_mode = 'none'");
+	}
+
+	/* No replica object with nil UUID. */
+	if (tt_uuid_is_nil(uuid)) {
+		*out = NULL;
+		return ReplicaConnectionGuard(NULL);
+	}
+
+	struct replica *replica = replica_by_uuid(uuid);
+	if (replica == NULL)
+		replica = replicaset_add_anon(uuid);
+
+	ReplicaConnectionGuard guard(replica);
+
+	if (replica->gc != NULL)
+		gc_consumer_unregister(replica->gc);
+	replica->gc = gc_consumer_register(gc_vclock,
+					   GC_CONSUMER_REPLICA,
+					   &replica->uuid);
+	if (gc_consumer_persist(replica->gc) != 0)
+		diag_raise();
+	if (replica->gc_checkpoint_ref != NULL) {
+		gc_unref_checkpoint(replica->gc_checkpoint_ref);
+		replica->gc_checkpoint_ref = NULL;
+	}
+	*out = replica;
+	return guard;
+}
+
 void
 box_process_fetch_snapshot(struct iostream *io,
 			   const struct xrow_header *header)
@@ -4428,27 +4539,54 @@ box_process_fetch_snapshot(struct iostream *io,
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
-	/* Check permissions */
-	access_check_universe_xc(PRIV_R);
-
-	/* Forbid replication with disabled WAL */
-	if (wal_mode() == WAL_NONE) {
-		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
-			  "wal_mode = 'none'");
-	}
-
-	say_info("sending read-view to replica at %s", sio_socketname(io->fd));
-	/* Used for checkpoint initial join. */
+	/*
+	 * Find checkpoint for checkpoint join. If replica didn't request
+	 * specific one, take the newest one. Initialize checkpoint cursor
+	 * with chosen checkpoint and use its vclock for WAL GC consumer.
+	 * If requested checkpoint is not found, raise an error.
+	 */
 	struct checkpoint_cursor cursor;
 	struct checkpoint_cursor *cursor_ptr = NULL;
+	struct gc_checkpoint *checkpoint = NULL;
+	const struct vclock *gc_vclock = instance_vclock;
 	if (req.is_checkpoint_join) {
+		if (vclock_is_set(&req.checkpoint_vclock)) {
+			checkpoint =
+				gc_checkpoint_at_vclock(&req.checkpoint_vclock);
+		} else {
+			checkpoint = gc_last_checkpoint();
+		}
+		if (checkpoint == NULL)
+			tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 		memset(&cursor, 0, sizeof(cursor));
-		cursor.vclock = &req.checkpoint_vclock;
+		cursor.vclock = &checkpoint->vclock;
 		cursor.start_lsn = req.checkpoint_lsn;
 		cursor_ptr = &cursor;
+		gc_vclock = &checkpoint->vclock;
+	}
+
+	struct replica *replica = NULL;
+	auto replica_guard = box_connect_replica(&req.instance_uuid,
+						 gc_vclock, &replica);
+	/* Reference checkpoint in case of checkpoint join. */
+	struct gc_checkpoint_ref *checkpoint_ref = NULL;
+	auto gc_checkpoint_ref_guard = make_scoped_guard([&]() {
+		if (checkpoint_ref != NULL)
+			gc_unref_checkpoint(checkpoint_ref);
+	});
+	if (checkpoint != NULL) {
+		if (replica == NULL) {
+			checkpoint_ref = gc_ref_checkpoint(
+				checkpoint, "checkpoint join");
+		} else {
+			replica->gc_checkpoint_ref = gc_ref_checkpoint(
+				checkpoint, "checkpoint join of replica %s",
+				tt_uuid_str(&replica->uuid));
+		}
 	}
 
 	/* Send the snapshot data to the instance. */
+	say_info("sending read-view to replica at %s", sio_socketname(io->fd));
 	struct vclock start_vclock;
 	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
 			   cursor_ptr);
@@ -4500,7 +4638,6 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	if (tt_uuid_is_equal(&req.instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
-	access_check_universe_xc(PRIV_R);
 	/*
 	 * We only get register requests from instances which need some actual
 	 * registration - name, id.
@@ -4524,35 +4661,15 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 			  "registration of non-anonymous nodes.");
 	}
 
-	/* Don't allow multiple relays for the same replica */
-	if (replica != NULL &&
-	    relay_get_state(replica->relay) == RELAY_FOLLOW) {
-		tnt_raise(ClientError, ER_CFG, "replication",
-			  "duplicate connection with the same replica UUID");
-	}
-
 	/* See box_process_join() */
 	box_check_writable_xc();
 	struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
 	access_check_space_xc(space, PRIV_W);
 
-	/* Forbid replication with disabled WAL */
-	if (wal_mode() == WAL_NONE) {
-		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
-			  "wal_mode = 'none'");
-	}
-
-	/* Unregister old consumer of replica. */
-	if (replica != NULL && replica->gc != NULL) {
-		gc_consumer_unregister(replica->gc);
-		replica->gc = NULL;
-	}
-
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
-	struct gc_consumer *gc = gc_consumer_register(
-		&start_vclock, GC_CONSUMER_REPLICA, &req.instance_uuid);
-	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
+	auto replica_guard = box_connect_replica(&req.instance_uuid,
+						 &start_vclock, &replica);
 
 	say_info("registering replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
@@ -4562,10 +4679,6 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
 		tnt_raise(ClientError, ER_CANNOT_REGISTER);
-
-	/* Persist consumer after registration. */
-	if (gc_consumer_persist(gc) != 0)
-		diag_raise();
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -4587,13 +4700,9 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 
 	/*
 	 * Advance the WAL consumer state to the position where
-	 * registration was complete and assign it to the
-	 * replica.
+	 * registration was completed.
 	 */
-	gc_consumer_advance(gc, &stop_vclock);
-	assert(replica->gc == NULL);
-	replica->gc = gc;
-	gc_guard.is_active = false;
+	gc_consumer_advance(replica->gc, &stop_vclock);
 }
 
 void
@@ -4654,9 +4763,6 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	if (tt_uuid_is_equal(&req.instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
-	/* Check permissions */
-	access_check_universe_xc(PRIV_R);
-
 	if (box_is_anon()) {
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Anonymous replica",
 			  "registration of non-anonymous nodes.");
@@ -4676,11 +4782,6 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 		struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
 		access_check_space_xc(space, PRIV_W);
 	}
-	/* Forbid replication with disabled WAL */
-	if (wal_mode() == WAL_NONE) {
-		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
-			  "wal_mode = 'none'");
-	}
 	if ((replica == NULL && *req.instance_name != 0) ||
 	    (replica != NULL &&
 	     strcmp(replica->name, req.instance_name) != 0)) {
@@ -4693,19 +4794,8 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 		}
 	}
 
-	/* Unregister old consumer of replica. */
-	if (replica != NULL && replica->gc != NULL) {
-		gc_consumer_unregister(replica->gc);
-		replica->gc = NULL;
-	}
-
-	/*
-	 * Register the replica as a WAL consumer so that
-	 * it can resume FINAL JOIN where INITIAL JOIN ends.
-	 */
-	struct gc_consumer *gc = gc_consumer_register(
-		instance_vclock, GC_CONSUMER_REPLICA, &req.instance_uuid);
-	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
+	auto replica_guard = box_connect_replica(&req.instance_uuid,
+						 instance_vclock, &replica);
 
 	say_info("joining replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
@@ -4728,10 +4818,6 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
 		tnt_raise(ClientError, ER_CANNOT_REGISTER);
-
-	/* Persist consumer after registration. */
-	if (gc_consumer_persist(gc) != 0)
-		diag_raise();
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -4758,12 +4844,9 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 
 	/*
 	 * Advance the WAL consumer state to the position where
-	 * FINAL JOIN ended and assign it to the replica.
+	 * FINAL JOIN ended.
 	 */
-	gc_consumer_advance(gc, &stop_vclock);
-	assert(replica->gc == NULL);
-	replica->gc = gc;
-	gc_guard.is_active = false;
+	gc_consumer_advance(replica->gc, &stop_vclock);
 }
 
 void
@@ -4811,9 +4894,6 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 			  "non-anonymous followers.");
 	}
 
-	/* Check permissions */
-	access_check_universe_xc(PRIV_R);
-
 	/* Check replica uuid */
 	struct replica *replica = replica_by_uuid(&req.instance_uuid);
 
@@ -4854,38 +4934,10 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 			 node_name_str(req.instance_name),
 			 node_name_str(replica->name));
 	}
-	if (replica == NULL)
-		replica = replicaset_add_anon(&req.instance_uuid);
-
-	/* Don't allow multiple relays for the same replica */
-	if (relay_get_state(replica->relay) == RELAY_FOLLOW) {
-		tnt_raise(ClientError, ER_CFG, "replication",
-			  "duplicate connection with the same replica UUID");
-	}
-
-	/* Forbid replication with disabled WAL */
-	if (wal_mode() == WAL_NONE) {
-		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
-			  "wal_mode = 'none'");
-	}
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
-	/*
-	 * Register the replica with the garbage collector.
-	 * In case some of the replica's WAL files were deleted, it might
-	 * subscribe with a smaller vclock than the master remembers, so
-	 * recreate the gc consumer unconditionally to make sure it holds
-	 * the correct vclock.
-	 */
-	if (!replica->anon) {
-		if (replica->gc != NULL)
-			gc_consumer_unregister(replica->gc);
-		replica->gc = gc_consumer_register(
-			&start_vclock, GC_CONSUMER_REPLICA, &replica->uuid);
-		/* Persist consumer before sending data. */
-		if (gc_consumer_persist(replica->gc) != 0)
-			diag_raise();
-	}
+	auto replica_guard = box_connect_replica(&req.instance_uuid,
+						 &start_vclock, &replica);
 	/*
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,
@@ -5768,6 +5820,11 @@ box_cfg_xc(void)
 		diag_raise();
 
 	/*
+	 * Initialize GC of anonymous replicas after loading WAL GC consumers.
+	 */
+	replication_anon_gc_init();
+
+	/*
 	 * Exclude self from GC delay because we care
 	 * about remote replicas only, still for ref/unref
 	 * balance we do reference self node initially and
@@ -5912,7 +5969,7 @@ int
 box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 {
 	assert(checkpoint_idx >= 0);
-	if (backup_is_in_progress) {
+	if (backup_gc != NULL) {
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
 		return -1;
 	}
@@ -5925,12 +5982,11 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 		diag_set(ClientError, ER_MISSING_SNAPSHOT);
 		return -1;
 	}
-	backup_is_in_progress = true;
-	gc_ref_checkpoint(checkpoint, &backup_gc, "backup");
+	backup_gc = gc_ref_checkpoint(checkpoint, "backup");
 	int rc = engine_backup(&checkpoint->vclock, cb, cb_arg);
 	if (rc != 0) {
-		gc_unref_checkpoint(&backup_gc);
-		backup_is_in_progress = false;
+		gc_unref_checkpoint(backup_gc);
+		backup_gc = NULL;
 	}
 	return rc;
 }
@@ -5938,9 +5994,9 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 void
 box_backup_stop(void)
 {
-	if (backup_is_in_progress) {
-		gc_unref_checkpoint(&backup_gc);
-		backup_is_in_progress = false;
+	if (backup_gc != NULL) {
+		gc_unref_checkpoint(backup_gc);
+		backup_gc = NULL;
 	}
 }
 
@@ -6286,6 +6342,7 @@ box_storage_shutdown()
 	}
 	replication_shutdown();
 	box_raft_shutdown();
+	txn_limbo_shutdown();
 	gc_shutdown();
 	engine_shutdown();
 	fiber_pool_shutdown(&tx_fiber_pool);

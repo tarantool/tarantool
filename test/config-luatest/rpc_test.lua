@@ -30,7 +30,7 @@ end
 
 local function stop_stub_servers(g)
     for _, server in pairs(g.stub_servers) do
-        server:close()
+        pcall(server.close, server)
     end
 end
 
@@ -411,6 +411,16 @@ g.test_filter_mode = function(g)
         local opts = {mode = 'rw'}
         t.assert_items_equals(connpool.filter(opts), exp)
 
+        exp = {"instance-001", "instance-002", "instance-003",
+               "instance-004"}
+        opts = {}
+        t.assert_items_equals(connpool.filter(opts), exp)
+
+        exp = {"instance-001", "instance-002", "instance-003",
+               "instance-004", "instance-005"}
+        opts = {skip_connection_check = true}
+        t.assert_items_equals(connpool.filter(opts), exp)
+
         exp = {"instance-002", "instance-004"}
         opts = {mode = 'ro'}
         t.assert_items_equals(connpool.filter(opts), exp)
@@ -429,6 +439,12 @@ g.test_filter_mode = function(g)
 
         local exp_err = 'Expected nil, "ro" or "rw", got "something"'
         opts = {mode = 'something'}
+        t.assert_error_msg_equals(exp_err, connpool.filter, opts)
+
+        local exp_err = 'Filtering by mode "rw" requires the connection ' ..
+                        'check but it\'s been disabled by the ' ..
+                        '"skip_connection_check" option'
+        opts = {mode = 'rw', skip_connection_check = true}
         t.assert_error_msg_equals(exp_err, connpool.filter, opts)
     end
 
@@ -975,5 +991,176 @@ g.test_call_works_in_parallel = function(g)
     g.server_1:exec(check_filter)
 end
 g.after_test('test_call_works_in_parallel', function(g)
+    stop_stub_servers(g)
+end)
+
+g.test_call_picks_any = function(g)
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        myuser:
+          password: "secret"
+          roles: [replication]
+          privileges:
+          - permissions: [execute]
+            universe: true
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        peer:
+          login: 'myuser'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001:
+                database:
+                  mode: rw
+              instance-003: {}
+          replicaset-002:
+            instances:
+              instance-002: {}
+    ]]
+    treegen.write_file(dir, 'config.yaml', config)
+
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = 'config.yaml',
+        chdir = dir,
+    }
+    g.server_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+    g.server_3 = server:new(fun.chain(opts, {alias = 'instance-003'}):tomap())
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_3:start({wait_until_ready = false})
+    start_stub_servers(g, dir, { 'instance-002' })
+
+    g.server_1:wait_until_ready()
+    g.server_3:wait_until_ready()
+
+    g.server_1:exec(function()
+        local connpool = require('experimental.connpool')
+        local clock = require('clock')
+
+        -- Connect to the local instance to avoid possible race
+        -- conditions when connecting to non-local instance could
+        -- be faster than connecting to a local one.
+        connpool.connect('instance-001')
+
+        -- The connection timeout for filter() and call() methods
+        -- is hardcoded in connpool and equals 10 seconds.
+        local CONNECT_TIMEOUT = 10
+
+        -- call() should wait for any available instance matching
+        -- the requirements and not wait for the unavailable instance
+        -- connection attempts to be timeouted.
+        --
+        -- By default it calls the local one.
+        -- The maximum  interval is taken with a great extra time
+        -- (approx. 9 sec) to avoid flaky tests.
+        local timestamp_before_call = clock.monotonic()
+        t.assert_equals(connpool.call('box.info', nil, {}).name,
+                        'instance-001')
+        t.assert_lt(clock.monotonic() - timestamp_before_call,
+                    CONNECT_TIMEOUT * 0.9)
+
+        -- The same quick behaviour is applied to 'ro/rw' modes.
+        local timestamp_before_call = clock.monotonic()
+        t.assert_equals(connpool.call('box.info', nil, { mode='ro' }).name,
+                        'instance-003')
+        t.assert_lt(clock.monotonic() - timestamp_before_call,
+                    CONNECT_TIMEOUT * 0.9)
+    end)
+end
+g.after_test('test_call_picks_any', function(g)
+    stop_stub_servers(g)
+end)
+
+g.test_call_connects_to_all_if_prioritized = function(g)
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        myuser:
+          password: "secret"
+          roles: [replication]
+          privileges:
+          - permissions: [execute]
+            universe: true
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        peer:
+          login: 'myuser'
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001:
+                database:
+                  mode: rw
+              instance-003: {}
+          replicaset-002:
+            instances:
+              instance-002: {}
+              instance-004: {}
+    ]]
+    treegen.write_file(dir, 'config.yaml', config)
+
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = 'config.yaml',
+        chdir = dir,
+    }
+    g.server_1 = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
+    g.server_3 = server:new(fun.chain(opts, {alias = 'instance-003'}):tomap())
+
+    g.server_1:start({wait_until_ready = false})
+    g.server_3:start({wait_until_ready = false})
+    start_stub_servers(g, dir, { 'instance-002', 'instance-004' })
+
+    g.server_1:wait_until_ready()
+    g.server_3:wait_until_ready()
+
+    g.server_1:exec(function()
+        local connpool = require('experimental.connpool')
+        local clock = require('clock')
+
+        -- The connection timeout for filter() and call() methods
+        -- is hardcoded in connpool and equals 10 seconds.
+        local CONNECT_TIMEOUT = 10
+
+        -- call() with some of the prioritized modes (e.g "prefer_ro" or
+        -- "prefer_rw") should try to access all of the instances
+        -- parallelly.
+        local opts = { mode = 'prefer_ro' }
+        local timestamp_before_call = clock.monotonic()
+        t.assert_equals(connpool.call('box.info', nil, opts).name,
+                        'instance-003')
+        local elapsed_time = clock.monotonic() - timestamp_before_call
+
+        -- If connpool works as intended it should only wait a
+        -- single CONNECT_TIMEOUT.
+        --
+        -- The maximum  interval is taken with a great extra time
+        -- (approx. 9 sec) to avoid flaky tests.
+        t.assert_gt(elapsed_time, CONNECT_TIMEOUT * 0.9)
+        t.assert_lt(elapsed_time, CONNECT_TIMEOUT * 1.9)
+    end)
+end
+g.after_test('test_call_connects_to_all_if_prioritized', function(g)
     stop_stub_servers(g)
 end)

@@ -85,7 +85,7 @@ enum {
 	SPARE_ID_END = 0xFFFFFFFF
 };
 
-static void
+static int
 memtx_bitset_index_register_tuple(struct memtx_bitset_index *index,
 				  struct tuple *tuple)
 {
@@ -98,6 +98,8 @@ memtx_bitset_index_register_tuple(struct memtx_bitset_index *index,
 		place = (struct tuple **)mem;
 	} else {
 		place = (struct tuple **)matras_alloc(index->id_to_tuple, &id);
+		if (place == NULL)
+			return -1;
 	}
 	*place = tuple;
 
@@ -105,6 +107,7 @@ memtx_bitset_index_register_tuple(struct memtx_bitset_index *index,
 	entry.id = id;
 	entry.tuple = tuple;
 	mh_bitset_index_put(index->tuple_to_id, &entry, 0, 0);
+	return 0;
 }
 
 static void
@@ -321,7 +324,15 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 		uint32_t key_len;
 		const void *key = make_key(field, &key_len);
 #ifndef OLD_GOOD_BITSET
-		memtx_bitset_index_register_tuple(index, new_tuple);
+		if (memtx_bitset_index_register_tuple(index, new_tuple) != 0) {
+			/*
+			 * We can't fail to allocate a new tuple pointer if we
+			 * have just deregistered the old one - it will be moved
+			 * to the spare list and reused.
+			 */
+			assert(*result == NULL);
+			return -1;
+		}
 		uint32_t value = memtx_bitset_index_tuple_to_value(index, new_tuple);
 #else /* #ifndef OLD_GOOD_BITSET */
 		uint32_t value = tuple_to_value(new_tuple);
@@ -541,8 +552,8 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 	index->id_to_tuple = (struct matras *)malloc(sizeof(*index->id_to_tuple));
 	if (index->id_to_tuple == NULL)
 		panic("failed to allocate memtx bitset index");
-	matras_create(index->id_to_tuple, MEMTX_EXTENT_SIZE, sizeof(struct tuple *),
-		      memtx_index_extent_alloc, memtx_index_extent_free, memtx,
+	matras_create(index->id_to_tuple, sizeof(struct tuple *),
+		      &memtx->index_extent_allocator,
 		      &memtx->index_extent_stats);
 
 	index->tuple_to_id = mh_bitset_index_new();

@@ -48,7 +48,17 @@ jobs:
           ( github.event_name == 'pull_request' &&
             !contains(github.event.pull_request.labels.*.name, 'notest') ) )
 
-    runs-on: ubuntu-20.04-self-hosted
+    # 'performance' label _must_ be set only for the single runner
+    # to guarantee that results are not dependent on the machine.
+    # For runs whose statistics are not collected, it is OK to use
+    # any runner.
+    runs-on:
+      - self-hosted
+      - Linux
+      - x86_64
+      - ${{ (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) &&
+          'performance' || 'regular' }}
 
     timeout-minutes: 60
 
@@ -75,6 +85,11 @@ jobs:
           submodule: ${{ inputs.submodule }}
           revision: ${{ inputs.revision }}
       - name: setup environment
+        # Run on push to the 'master' and release branches or on
+        # non-fork pull requests. The script will fail on regular
+        # runners.
+        if: github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository
         run: sh ./perf/tools/setup_env.sh
       - name: test
         run: make -f .test.mk test-perf
@@ -87,7 +102,9 @@ jobs:
           # sudo taskset 0xef chrt 50.
           # But this makes the process use non-standard, real-time
           # round-robin scheduling mechanism.
-          BENCH_CMD: "taskset 0xfe chrt 50"
+          # Hardware machine for benchmarking has a group of
+          # isolated CPUs 1-24.
+          BENCH_CMD: "taskset 0x01fffffe chrt 50"
       - name: Aggregate benchmark results
         run: make -f .test.mk test-perf-aggregate
       - name: Send statistics to InfluxDB

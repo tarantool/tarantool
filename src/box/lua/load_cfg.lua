@@ -8,7 +8,6 @@ local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
 local compat = require('compat')
-local mkversion = require('internal.mkversion')
 
 local function nop() end
 
@@ -192,6 +191,7 @@ local default_cfg = {
     replication_connect_quorum = nil, -- connect all
     replication_skip_conflict = false,
     replication_anon      = false,
+    replication_anon_ttl  = 60 * 60,
     replication_threads   = 1,
     bootstrap_strategy    = "auto",
     bootstrap_leader      = nil,
@@ -394,6 +394,7 @@ local template_cfg = {
     replication_connect_quorum = 'number',
     replication_skip_conflict = 'boolean',
     replication_anon      = 'boolean',
+    replication_anon_ttl  = 'number',
     replication_threads   = 'number',
     bootstrap_strategy    = 'string',
     bootstrap_leader      = 'string, number',
@@ -534,6 +535,7 @@ local dynamic_cfg = {
         private.cfg_set_replication_synchro_queue_max_size,
     replication_skip_conflict = private.cfg_set_replication_skip_conflict,
     replication_anon        = private.cfg_set_replication_anon,
+    replication_anon_ttl    = private.cfg_set_replication_anon_ttl,
     bootstrap_strategy      = private.cfg_set_bootstrap_strategy,
     bootstrap_leader        = private.cfg_set_bootstrap_leader,
     instance_uuid           = check_instance_uuid,
@@ -1212,7 +1214,8 @@ local function load_cfg(cfg)
         local msg = string.format(
             'Your schema version is %s while Tarantool %s requires a more'..
             ' recent schema version. Please, consider using box.'..
-            'schema.upgrade().', tostring(mkversion.get()), box.info.version)
+            'schema.upgrade().', tostring(box.internal.dd_version()),
+            box.info.version)
         log.warn(msg)
     end
 end

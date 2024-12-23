@@ -1543,7 +1543,7 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 
 		if (index_check_dup(base, old_tuple, new_tuple,
 				    dup_data.tuple, mode) != 0) {
-			memtx_tree_delete(&index->tree, new_data);
+			memtx_tree_delete(&index->tree, new_data, NULL);
 			if (dup_data.tuple != NULL)
 				memtx_tree_insert(&index->tree, dup_data, NULL, NULL);
 			return -1;
@@ -1560,7 +1560,7 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 		old_data.tuple = old_tuple;
 		if (USE_HINT)
 			old_data.set_hint(tuple_hint(old_tuple, cmp_def));
-		memtx_tree_delete(&index->tree, old_data);
+		memtx_tree_delete(&index->tree, old_data, NULL);
 		*result = old_tuple;
 	} else {
 		*result = NULL;
@@ -1600,7 +1600,7 @@ memtx_tree_index_replace_multikey_one(struct memtx_tree_index<true> *index,
 	} else if (index_check_dup(&index->base, old_tuple, new_tuple,
 				   dup_data.tuple, mode) != 0) {
 		/* Rollback replace. */
-		memtx_tree_delete(&index->tree, new_data);
+		memtx_tree_delete(&index->tree, new_data, NULL);
 		if (dup_data.tuple != NULL)
 			memtx_tree_insert(&index->tree, dup_data, NULL, NULL);
 		return -1;
@@ -2610,8 +2610,8 @@ memtx_tree_index_new_tpl(struct memtx_engine *memtx, struct index_def *def,
 	cmp_def = def->opts.is_unique && !def->key_def->is_nullable ?
 			index->base.def->key_def : index->base.def->cmp_def;
 
-	memtx_tree_create(&index->tree, cmp_def, memtx_index_extent_alloc,
-			  memtx_index_extent_free, memtx,
+	memtx_tree_create(&index->tree, cmp_def,
+			  &memtx->index_extent_allocator,
 			  &memtx->index_extent_stats);
 	index->is_func = def->key_def->func_index_func != NULL;
 	return &index->base;

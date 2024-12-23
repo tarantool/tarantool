@@ -7,6 +7,8 @@
 
 #include <benchmark/benchmark.h>
 
+#include <small/matras.h>
+
 // This test contains benchmarks for Light - data structure implementing
 // Tarantool HASH index and being hash table under the hood.
 //
@@ -195,26 +197,21 @@ namespace {
 	};
 
 	static constexpr std::size_t light_extent_size = 16 * KB;
-	static std::size_t extents_count = 0;
 
 	inline void *
-	light_malloc_extend(void *ctx)
+	light_malloc_extend(struct matras_allocator *allocator)
 	{
-		std::size_t *p_extents_count = (size_t *) ctx;
-		assert(p_extents_count == &extents_count);
-		++*p_extents_count;
+		(void)allocator;
 		return malloc(light_extent_size);
 	}
 
 	inline void
-	light_free_extend(void *ctx, void *p)
+	light_free_extend(struct matras_allocator *allocator, void *p)
 	{
-		size_t *p_extents_count = (size_t *) ctx;
-		assert(p_extents_count == &extents_count);
-		--*p_extents_count;
+		(void)allocator;
 		free(p);
 	}
-}; // namespace
+}; /* namespace */
 
 #define LIGHT_NAME
 #define LIGHT_DATA_TYPE const TupleRaw *
@@ -476,12 +473,14 @@ class Light {
 public:
 	Light()
 	{
-		light_create(&ht, 0, light_extent_size, light_malloc_extend,
-			     light_free_extend, &extents_count, nullptr);
+		matras_allocator_create(&allocator, light_extent_size,
+					light_malloc_extend, light_free_extend);
+		light_create(&ht, 0, &allocator, nullptr);
 	}
 	~Light()
 	{
 		light_destroy(&ht);
+		matras_allocator_destroy(&allocator);
 	}
 
 	// Functions return smth in order to suppress "error: invalid use of void expression".
@@ -519,8 +518,7 @@ public:
 	clear()
 	{
 		light_destroy(&ht);
-		light_create(&ht, 0, light_extent_size, light_malloc_extend,
-			     light_free_extend, &extents_count, nullptr);
+		light_create(&ht, 0, &allocator, nullptr);
 	}
 
 	void
@@ -541,6 +539,7 @@ public:
 	}
 private:
 	struct light_core ht;
+	struct matras_allocator allocator;
 };
 
 using USet = std::unordered_set<TupleRef, Hash::TupleHash, TupleEqual>;

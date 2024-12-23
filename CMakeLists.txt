@@ -772,7 +772,6 @@ include (cmake/package.cmake)
 #
 include (cmake/rpm.cmake)
 
-add_subdirectory(src)
 add_subdirectory(extra)
 add_subdirectory(test)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -780,6 +779,10 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 else ()
     add_subdirectory(perf)
 endif ()
+# XXX: src should be processed after perf, since small perf tests
+# require bundled libbenchmark library defined in the perf
+# subdirectory.
+add_subdirectory(src)
 add_subdirectory(doc)
 
 option(WITH_NOTIFY_SOCKET "Enable notifications on NOTIFY_SOCKET" ON)

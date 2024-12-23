@@ -101,7 +101,7 @@ extern char session_lua[],
 #endif
 	net_box_lua[],
 	net_replicaset_lua[],
-	mkversion_lua[],
+	internal_version_lua[],
 	upgrade_lua[],
 	console_lua[],
 	merger_lua[],
@@ -150,16 +150,20 @@ extern char session_lua[],
 	metrics_version_lua[],
 	/* {{{ config */
 	config_applier_app_lua[],
+	config_applier_autoexpel_lua[],
 	config_applier_box_cfg_lua[],
 	config_applier_runtime_priv_lua[],
 	config_applier_compat_lua[],
 	config_applier_console_lua[],
 	config_applier_credentials_lua[],
 	config_applier_fiber_lua[],
+	config_applier_lua_lua[],
 	config_applier_mkdir_lua[],
 	config_applier_roles_lua[],
 	config_applier_sharding_lua[],
+	config_applier_box_status_lua[],
 	config_cluster_config_lua[],
+	config_descriptions_lua[],
 	config_configdata_lua[],
 	config_init_lua[],
 	config_instance_config_lua[],
@@ -173,6 +177,7 @@ extern char session_lua[],
 	config_utils_schema_lua[],
 	config_utils_snapshot_lua[],
 	config_utils_tabulate_lua[],
+	config_utils_textutils_lua[],
 #if ENABLE_CONFIG_EXTRAS
 	config_source_etcd_lua[],
 	config_storage_init_lua[],
@@ -225,7 +230,7 @@ static const char *lua_sources[] = {
 	SECURITY_BOX_LUA_MODULES
 	INTEGRITY_BOX_LUA_MODULES
 	"box/xlog", "xlog", xlog_lua,
-	"box/mkversion", "internal.mkversion", mkversion_lua,
+	"box/version", NULL, internal_version_lua,
 	"box/upgrade", NULL, upgrade_lua,
 	"box/net_box", "net.box", net_box_lua,
 	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
@@ -373,6 +378,14 @@ static const char *lua_sources[] = {
 	"internal.config.utils.tabulate",
 	config_utils_tabulate_lua,
 
+	"config/utils/textutils",
+	"internal.config.utils.textutils",
+	config_utils_textutils_lua,
+
+	"config/descriptions",
+	"internal.config.descriptions",
+	config_descriptions_lua,
+
 	"config/instance_config",
 	"internal.config.instance_config",
 	config_instance_config_lua,
@@ -400,6 +413,10 @@ static const char *lua_sources[] = {
 	"config/applier/app",
 	"internal.config.applier.app",
 	config_applier_app_lua,
+
+	"config/applier/autoexpel",
+	"internal.config.applier.autoexpel",
+	config_applier_autoexpel_lua,
 
 #if ENABLE_CONFIG_EXTRAS
 	"config/source/etcd",
@@ -439,6 +456,10 @@ static const char *lua_sources[] = {
 	"internal.config.applier.fiber",
 	config_applier_fiber_lua,
 
+	"config/applier/lua",
+	"internal.config.applier.lua",
+	config_applier_lua_lua,
+
 	"config/applier/mkdir",
 	"internal.config.applier.mkdir",
 	config_applier_mkdir_lua,
@@ -450,6 +471,10 @@ static const char *lua_sources[] = {
 	"config/applier/roles",
 	"internal.config.applier.roles",
 	config_applier_roles_lua,
+
+	"config/applier/box_status",
+	"internal.config.applier.box_status",
+	config_applier_box_status_lua,
 
 	"config/init",
 	"config",

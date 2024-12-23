@@ -41,21 +41,25 @@ lua_source(lua_sources lua/xlog.lua xlog_lua)
 lua_source(lua_sources lua/key_def.lua key_def_lua)
 lua_source(lua_sources lua/merger.lua merger_lua)
 lua_source(lua_sources lua/iproto.lua iproto_lua)
-lua_source(lua_sources lua/mkversion.lua mkversion_lua)
+lua_source(lua_sources lua/version.lua internal_version_lua)
 
 # {{{ config
 lua_source(lua_sources lua/config/applier/app.lua          config_applier_app_lua)
+lua_source(lua_sources lua/config/applier/autoexpel.lua    config_applier_autoexpel_lua)
 lua_source(lua_sources lua/config/applier/box_cfg.lua      config_applier_box_cfg_lua)
 lua_source(lua_sources lua/config/applier/runtime_priv.lua config_applier_runtime_priv_lua)
 lua_source(lua_sources lua/config/applier/compat.lua       config_applier_compat_lua)
 lua_source(lua_sources lua/config/applier/console.lua      config_applier_console_lua)
 lua_source(lua_sources lua/config/applier/credentials.lua  config_applier_credentials_lua)
 lua_source(lua_sources lua/config/applier/fiber.lua        config_applier_fiber_lua)
+lua_source(lua_sources lua/config/applier/lua.lua          config_applier_lua_lua)
 lua_source(lua_sources lua/config/applier/mkdir.lua        config_applier_mkdir_lua)
 lua_source(lua_sources lua/config/applier/roles.lua        config_applier_roles_lua)
 lua_source(lua_sources lua/config/applier/sharding.lua     config_applier_sharding_lua)
+lua_source(lua_sources lua/config/applier/box_status.lua   config_applier_box_status_lua)
 lua_source(lua_sources lua/config/cluster_config.lua       config_cluster_config_lua)
 lua_source(lua_sources lua/config/configdata.lua           config_configdata_lua)
+lua_source(lua_sources lua/config/descriptions.lua         config_descriptions_lua)
 lua_source(lua_sources lua/config/init.lua                 config_init_lua)
 lua_source(lua_sources lua/config/instance_config.lua      config_instance_config_lua)
 lua_source(lua_sources lua/config/source/env.lua           config_source_env_lua)
@@ -68,6 +72,7 @@ lua_source(lua_sources lua/config/utils/odict.lua          config_utils_odict_lu
 lua_source(lua_sources lua/config/utils/schema.lua         config_utils_schema_lua)
 lua_source(lua_sources lua/config/utils/snapshot.lua       config_utils_snapshot_lua)
 lua_source(lua_sources lua/config/utils/tabulate.lua       config_utils_tabulate_lua)
+lua_source(lua_sources lua/config/utils/textutils.lua      config_utils_textutils_lua)
 
 if (ENABLE_CONFIG_EXTRAS)
     lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/source/etcd.lua config_source_etcd_lua)
@@ -141,7 +146,7 @@ include_directories(${EXTRA_SALAD_INCLUDE_DIRS})
 include_directories(${EXTRA_BOX_INCLUDE_DIRS})
 
 add_library(box_error STATIC error.cc errcode.c mp_error.cc)
-target_link_libraries(box_error core stat mpstream vclock)
+target_link_libraries(box_error core mpstream vclock)
 
 add_library(node_name STATIC node_name.c)
 
@@ -396,7 +401,7 @@ add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.c
     DEPENDS ${SQL_SRC_DIR}/vdbe.c ${EXT_SRC_DIR}/mkopcodec.sh ${SQL_BIN_DIR}/parse.h
         ${SQL_BIN_DIR}/opcodes.h)
 
-target_link_libraries(box box_error tuple stat xrow xlog vclock crc32 raft
+target_link_libraries(box box_error tuple xrow xlog vclock crc32 raft
                       node_name ${common_libraries})
 
 add_dependencies(box build_bundled_libs generate_sql_files)

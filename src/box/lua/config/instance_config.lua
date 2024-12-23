@@ -1,4 +1,5 @@
 local schema = require('experimental.config.utils.schema')
+local descriptions = require('internal.config.descriptions')
 local tarantool = require('tarantool')
 local uuid = require('uuid')
 local urilib = require('uri')
@@ -455,6 +456,39 @@ local function feedback_validate(data, w)
     w.error('Tarantool is built without feedback reports sending support')
 end
 
+-- Verify that the given validation context (w) corresponds to one
+-- of the given cluster config scopes (global, group, replicaset,
+-- instance) or the validation is performed against the instance
+-- config schema.
+local function validate_scope(w, allowed_scopes)
+    local scope = w.schema.computed.annotations.scope
+
+    -- scope = nil means that the validation is performed against
+    -- the instance config schema, not the cluster config.
+    --
+    -- The validation against the instance config is performed for
+    -- values from the env configuration source (which collects
+    -- the TT_* environment variables).
+    --
+    -- Also, it would be very counter-intuitive if
+    -- cluster_config:instantiate() would produce a result that
+    -- doesn't pass the instance_config:validate() check.
+    if scope == nil then
+        return
+    end
+
+    -- If the current scope is listed in the allowed scopes -- OK.
+    for _, allowed_scope in ipairs(allowed_scopes) do
+        if scope == allowed_scope then
+            return
+        end
+    end
+
+    -- Any other level of the cluster configuration -- raise an
+    -- error.
+    w.error('The option must not be present in the %s scope', scope)
+end
+
 return schema.new('instance_config', schema.record({
     config = schema.record({
         reload = schema.enum({
@@ -711,6 +745,21 @@ return schema.new('instance_config', schema.record({
             default = 'var/run/{{ instance_name }}/tarantool.pid',
         }),
     }),
+    lua = schema.record({
+        -- Maximum allowed memory allocated by Lua.
+        -- The value can't be less than 256MB and can't be
+        -- changed without restarting the Tarantool instance.
+        memory = schema.scalar({
+            type = 'integer',
+            -- Default value: 2GB.
+            default = 2 * 1024 * 1024 * 1024,
+            validate = function(data, w)
+                if data < 256 * 1024 * 1024 then
+                    w.error('Memory limit should be >= 256MB')
+                end
+            end,
+        }),
+    }),
     console = schema.record({
         enabled = schema.scalar({
             type = 'boolean',
@@ -740,6 +789,10 @@ return schema.new('instance_config', schema.record({
             type = 'number',
             box_cfg = 'worker_pool_threads',
             default = 4,
+        }),
+        tx_user_pool_size = schema.scalar({
+            type = 'integer',
+            default = 768,
         }),
         slice = schema.record({
             warn = schema.scalar({
@@ -1449,6 +1502,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'replication_anon',
             default = false,
         }),
+        anon_ttl = schema.scalar({
+            type = 'number',
+            box_cfg = 'replication_anon_ttl',
+            default = 60 * 60,
+        }),
         threads = schema.scalar({
             type = 'integer',
             box_cfg = 'replication_threads',
@@ -1529,6 +1587,60 @@ return schema.new('instance_config', schema.record({
         }, {
             box_cfg = 'bootstrap_strategy',
             default = 'auto',
+        }),
+        autoexpel = schema.record({
+            enabled = schema.scalar({
+                type = 'boolean',
+                default = false,
+            }),
+            -- There is no default value for the 'by' field, so
+            -- users have to set it explicitly to use the
+            -- autoexpelling machinery.
+            --
+            -- It means that we can provide a better criterion
+            -- later and set it by default without affecting
+            -- existing users.
+            --
+            -- There is an idea to track configured instances in
+            -- the database, so we can determine instance that
+            -- were in the configuration previously without a need
+            -- to ask a user for the prefix or another filtering
+            -- rule.
+            by = schema.enum({
+                'prefix',
+            }),
+            prefix = schema.scalar({
+                type = 'string',
+            }),
+        }, {
+            validate = function(data, w)
+                -- Forbid in the instance scope, because it has no
+                -- sense to set the option for a part of a
+                -- replicaset.
+                validate_scope(w, {'global', 'group', 'replicaset'})
+
+                -- Don't validate the options if this
+                -- functionality is disabled.
+                if not data.enabled then
+                    return
+                end
+
+                -- If autoexpelling is enabled, the expelling
+                -- criterion must be set.
+                if data.by == nil then
+                    w.error('replication.autoexpel.by must be set if ' ..
+                        'replication.autoexpel.enabled = true')
+                end
+
+                -- If the autoexpelling is configured to use the
+                -- prefix-based criterion, then the prefix must be
+                -- set.
+                if data.by == 'prefix' and data.prefix == nil then
+                    w.error('replication.autoexpel.prefix must be set if ' ..
+                        'replication.autoexpel.enabled = true and ' ..
+                        'replication.autoexpel.by = \'prefix\'')
+                end
+            end,
         }),
     }),
     -- Unlike other sections, credentials contains the append-only
@@ -2300,6 +2412,22 @@ return schema.new('instance_config', schema.record({
         -- are configured in the `config.etcd` or the
         -- `config.storage` section.
         stateboard = schema.record({
+            -- Stateboard enabled/disabled status.
+            -- A coordinator having stateboard enabled doesn't
+            -- start without specifying compatible remote config
+            -- storage in the config.
+            --
+            -- Beware: disabling stateboard leads to the
+            -- following consequences:
+            -- * Failover commands aren't supported.
+            -- * Failover state monitoring isn't provided.
+            -- * Multiple coordinators over the same replicaset
+            --   behave in an unpredictable way. Two RW instances
+            --   are possible.
+            enabled = schema.scalar({
+                type = 'boolean',
+                default = true,
+            }),
             -- How often information in the stateboard is updated.
             renew_interval = schema.scalar({
                 type = 'number',
@@ -2325,6 +2453,13 @@ return schema.new('instance_config', schema.record({
                 type = 'string',
             }),
             value = schema.record({
+                -- Instances that can't be chosen as a master
+                -- by the supervised failover coordinator.
+                learners = schema.array({
+                    items = schema.scalar({
+                        type = 'string',
+                    }),
+                }),
                 -- Priorities for the supervised failover mode.
                 priority = schema.map({
                     key = schema.scalar({
@@ -2335,6 +2470,23 @@ return schema.new('instance_config', schema.record({
                     }),
                 }),
             }),
+        }),
+        log = schema.record({
+            to = schema.enum({
+                'stderr',
+                'file',
+            }, {
+                default = 'stderr',
+            }),
+            file = schema.scalar({
+                type = 'string',
+            }),
+        }, {
+            validate = function(data, w)
+                if data.to == 'file' and data.file == nil then
+                    w.error('log.file must be specified when log.to is "file"')
+                end
+            end,
         }),
     }),
     -- Compatibility options.
@@ -2475,6 +2627,13 @@ return schema.new('instance_config', schema.record({
             type = 'string',
         }),
     }),
+    isolated = schema.scalar({
+        type = 'boolean',
+        default = false,
+        validate = function(_data, w)
+            validate_scope(w, {'instance'})
+        end,
+    }),
 }, {
     -- This kind of validation cannot be implemented as the
     -- 'validate' annotation of a particular schema node. There
@@ -2494,4 +2653,7 @@ return schema.new('instance_config', schema.record({
         base_dir = base_dir,
         prepare_file_path = prepare_file_path,
     },
+    _extra_annotations = {
+        descriptions = descriptions.instance_descriptions,
+    }
 })

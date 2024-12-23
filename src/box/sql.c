@@ -241,6 +241,11 @@ tarantoolsqlEphemeralCount(struct BtCursor *pCur)
 {
 	assert(pCur->curFlags & BTCF_TEphemCursor);
 	struct index *primary_index = space_index(pCur->space, 0 /* PK */);
+	/*
+	 * Cannot use `box_index_count` since the ephemeral space has no id.
+	 * Anyway, ephemeral spaces are internal and actually bypass
+	 * the transactional engine so it's safe to use raw index here.
+	 */
 	return index_count(primary_index, pCur->iter_type, NULL, 0);
 }
 
@@ -248,7 +253,11 @@ int64_t
 tarantoolsqlCount(struct BtCursor *pCur)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
-	return index_count(pCur->index, pCur->iter_type, NULL, 0);
+	/* Empty key encoded in MsgPack. */
+	const char empty_key[] = {0x90};
+	return box_index_count(pCur->space->def->id, pCur->index->def->iid,
+			       pCur->iter_type, empty_key,
+			       empty_key + sizeof(empty_key));
 }
 
 struct sql_space_info *

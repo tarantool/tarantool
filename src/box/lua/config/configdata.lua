@@ -179,8 +179,11 @@ function methods.sharding(self)
                 end
                 if is_rebalancer == nil then
                     local roles = self:get('sharding.roles', opts)
-                    for _, role in pairs(roles) do
-                        is_rebalancer = is_rebalancer or role == 'rebalancer'
+                    if roles ~= nil then -- nil or box.NULL
+                        for _, role in pairs(roles) do
+                            is_rebalancer = is_rebalancer or
+                                role == 'rebalancer'
+                        end
                     end
                     if is_rebalancer then
                         table.insert(rebalancers, replicaset_name)
@@ -592,6 +595,23 @@ local function validate_failover_config(instances, failover_config)
         replicasets[def.replicaset_name] = true
     end
 
+    local function verify_instance_in_replicaset(instance_name, replicaset_name)
+        if instances[instance_name] == nil then
+            error(('instance %s from replicaset %s specified in the '..
+                   'failover.replicasets section doesn\'t exist')
+                  :format(instance_name, replicaset_name), 0)
+        end
+
+        local instance_replicaset = instances[instance_name].replicaset_name
+        if instance_replicaset ~= replicaset_name then
+            error(('instance %s from replicaset %s is specified in ' ..
+                   'the wrong replicaset %s in the failover.replicasets ' ..
+                   'configuration section')
+                  :format(instance_name, instance_replicaset,
+                          replicaset_name), 0)
+        end
+    end
+
     for replicaset_name, replicaset in pairs(failover_config.replicasets) do
         if replicasets[replicaset_name] == nil then
             error(('replicaset %s specified in the failover configuration '..
@@ -600,20 +620,13 @@ local function validate_failover_config(instances, failover_config)
 
         -- Validate the priority section of the specific replicasets.
         for instance_name, _ in pairs(replicaset.priority or {}) do
-            if instances[instance_name] == nil then
-                error(('instance %s from replicaset %s specified in the '..
-                       'failover configuration doesn\'t exist')
-                      :format(instance_name, replicaset_name), 0)
-            end
+            verify_instance_in_replicaset(instance_name, replicaset_name)
+        end
 
-            local instance_replicaset = instances[instance_name].replicaset_name
-            if instance_replicaset ~= replicaset_name then
-                error(('instance %s from replicaset %s is specified in ' ..
-                       'the wrong replicaset %s in the failover ' ..
-                       'configuration section')
-                      :format(instance_name, instance_replicaset,
-                              replicaset_name), 0)
-            end
+        -- Validate the learner instances section of the
+        -- specific replicaset.
+        for _, instance_name in ipairs(replicaset.learners or {}) do
+            verify_instance_in_replicaset(instance_name, replicaset_name)
         end
     end
 end
@@ -775,6 +788,66 @@ local function validate_misplacing(cconfig)
     end
 end
 
+-- Check startup conditions.
+local function validate_startup(instance_name, iconfig_def)
+    local is_startup = type(box.cfg) == 'function'
+    if not is_startup then
+        return
+    end
+
+    local no_snap = snapshot.get_path(iconfig_def) == nil
+    local isolated = instance_config:get(iconfig_def, 'isolated')
+
+    -- Forbid startup without a local snapshot in the isolated
+    -- mode.
+    if no_snap and isolated then
+        error(('Startup failure.\nThe isolated mode is enabled and the ' ..
+            'instance %q has no local snapshot. An attempt to bootstrap ' ..
+            'the instance would lead to the split-brain situation.'):format(
+            instance_name), 0)
+    end
+
+    -- TODO: There is a situation, which looks similar, but we
+    -- don't report an error in the case. It is a startup without
+    -- a local snapshot with replication.peers configured as an
+    -- empty list if there are other instances in the replicaset.
+    -- Are there cases, when it is OK? Maybe if the instance is
+    -- assigned as a bootstrap leader? Now we pass it over, but
+    -- maybe it worth to revisit it later and report an error in
+    -- some definitely/likely erroreous cases.
+end
+
+-- Perform checks related to the multi-master setup.
+local function validate_multi_master(iconfig_def, peers)
+    -- Several instances can be configured as RW simultaneously in
+    -- the replication.failover = off mode. Nothing to verify
+    -- otherwise.
+    local failover = instance_config:get(iconfig_def, 'replication.failover')
+    if failover ~= 'off' then
+        return
+    end
+
+    -- Count RW instances.
+    local rw_count = 0
+    for _, peer in pairs(peers) do
+        local mode = instance_config:get(peer.iconfig_def, 'database.mode')
+        if mode == 'rw' then
+            rw_count = rw_count + 1
+        end
+    end
+
+    -- Zero or one RW instance -- nothing to verify.
+    if rw_count < 2 then
+        return
+    end
+
+    -- Verify that the autoexpelling is disabled.
+    if instance_config:get(iconfig_def, 'replication.autoexpel.enabled') then
+        error('replication.autoexpel.enabled = true doesn\'t support the ' ..
+            'multi-master configuration', 0)
+    end
+end
+
 local function new(iconfig, cconfig, instance_name)
     -- Find myself in a cluster config, determine peers in the same
     -- replicaset.
@@ -920,6 +993,13 @@ local function new(iconfig, cconfig, instance_name)
             instance_uuid = instance_uuid,
         }, iconfig_def)
     end
+
+    -- A couple of checks that are only performed on startup.
+    validate_startup(instance_name, iconfig_def)
+
+    -- Checks that are related to the multi-master setup.
+    -- Some functionality doesn't support it.
+    validate_multi_master(iconfig_def, peers)
 
     return setmetatable({
         _iconfig = iconfig,

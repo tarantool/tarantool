@@ -501,6 +501,7 @@ t;
  |   288: box.error.INVALID_VCLOCK
  |   289: box.error.SYNC_QUEUE_FULL
  |   290: box.error.KEY_PART_VALUE_OUT_OF_RANGE
+ |   291: box.error.REPLICA_GC
  | ...
 
 test_run:cmd("setopt delimiter ''");

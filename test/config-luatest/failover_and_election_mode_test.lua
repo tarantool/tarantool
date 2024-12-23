@@ -10,17 +10,13 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
+local textutils = require('internal.config.utils.textutils')
 
 local g = t.group()
 
 g.before_all(cluster.init)
 g.after_each(cluster.drop)
 g.after_all(cluster.clean)
-
--- Ease writing of a long error message in a code.
-local function toline(s)
-    return s:gsub('\n', ''):gsub(' +', ' '):strip()
-end
 
 -- An error that should appear if replication.failover and
 -- replication.election_mode are conflicting.
@@ -37,7 +33,7 @@ end
 --   can't appear.
 -- * If replication.failover is missed or null, it is shown as
 --   'off', because it is the default value.
-local error_t = toline([[
+local error_t = textutils.toline([[
     replication.election_mode = %q is set for instance "instance-004" of
     replicaset "replicaset-001" of group "group-001", but this option is
     only applicable if replication.failover = "election"; the replicaset is

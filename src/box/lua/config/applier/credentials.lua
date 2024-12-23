@@ -3,7 +3,7 @@ local log = require('internal.config.utils.log')
 local loaders = require('internal.loaders')
 local digest = require('digest')
 local fiber = require('fiber')
-local mkversion = require('internal.mkversion')
+local version = require('version')
 
 -- Var is set with the first apply() call.
 local config
@@ -669,9 +669,9 @@ local schema_is_upgraded = false
 -- the current tarantool version.
 local schema_is_upgraded_cond
 
-local function update_schema_upgraded_status(version)
-    local schema_version = version or mkversion.get()
-    schema_is_upgraded = schema_version == mkversion.get_latest()
+local function update_schema_upgraded_status(current_version)
+    local schema_version = current_version or box.internal.dd_version()
+    schema_is_upgraded = schema_version >= version.new(2, 11, 1)
 
     if schema_is_upgraded then
         assert(schema_is_upgraded_cond ~= nil)
@@ -679,17 +679,16 @@ local function update_schema_upgraded_status(version)
     end
 end
 
-local function on_schema_replace_trigger(_, new)
+local function on_schema_replace_trigger(old, new)
     assert(on_schema_replace_trigger_is_set)
-
-    if new == nil then
+    if new == nil or new[1] ~= 'version' then
         return
     end
 
-    local latest_version = mkversion.get_latest()
-    local new_version = mkversion.from_tuple(new)
-
-    if new_version == latest_version then
+    local expected_version = version.new(2, 11, 1)
+    local old_version = box.internal.version_from_tuple(old)
+    local new_version = box.internal.version_from_tuple(new)
+    if old_version < expected_version and new_version >= expected_version then
         box.on_commit(function()
             update_schema_upgraded_status(new_version)
         end)

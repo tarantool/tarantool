@@ -376,6 +376,72 @@ g_generic.test_offset_of = function()
     end)
 end
 
+-- Checks the 'offset_of' function parameters.
+g_generic.test_offset_of_params = function()
+    g_generic.server:exec(function()
+        -- Create and fill a space.
+        local s = box.schema.space.create('test')
+        s:create_index('pk', {parts = {{1, 'unsigned'}, {2, 'unsigned'}}})
+        s:insert({1, 1})
+        s:insert({1, 2})
+        s:insert({2, 1})
+        s:insert({2, 2})
+        s:insert({3, 1})
+        s:insert({3, 2})
+
+        -- No arguments.
+        t.assert_equals(s:offset_of(), 0)
+
+        -- Empty key.
+        t.assert_equals(s:offset_of({}), 0)
+
+        -- Numeric key.
+        t.assert_equals(s:offset_of(2), 2)
+
+        -- Regular key.
+        t.assert_equals(s:offset_of({2}), 2)
+
+        -- Empty opts.
+        t.assert_equals(s:offset_of({2}, {}), 2)
+
+        -- String iterator.
+        t.assert_equals(s:offset_of({2}, {iterator = 'eq'}), 2)
+
+        -- Number iterator.
+        t.assert_equals(s:offset_of({2}, {iterator = box.index.EQ}), 2)
+
+        -- Invalid iterator.
+        t.assert_error_msg_contains('Unknown iterator type',
+                                    s.offset_of, s, {2}, {iterator = "bad"})
+
+        -- Invalid iterator type.
+        t.assert_error_msg_contains('Unknown iterator type',
+                                    s.offset_of, s, {2}, {iterator = true})
+
+        -- String opts.
+        t.assert_equals(s:offset_of({2}, 'eq'), 2)
+
+        -- Number opts.
+        t.assert_equals(s:offset_of({2}, box.index.EQ), 2)
+
+        -- Invalid opts.
+        t.assert_error_msg_contains('Unknown iterator type',
+                                    s.offset_of, s, {2}, 'bad')
+
+        -- Invalid type opts.
+        t.assert_error_msg_contains('Unknown iterator type',
+                                    s.offset_of, s, {2}, true)
+    end)
+end
+
+g_generic.after_test('test_offset_of_params', function()
+    g_generic.server:exec(function()
+        if box.space.test then
+            box.space.test:drop()
+        end
+    end)
+end)
+
 g_mvcc.test_count = function()
     g_mvcc.server:exec(function()
         -- The test space with fast offset PK.

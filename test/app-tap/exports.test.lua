@@ -52,6 +52,8 @@ local check_symbols = {
     'tnt_mp_sizeof_error',
     'tnt_mp_sizeof_decimal',
     'tnt_mp_sizeof_uuid',
+    'tnt_tx_flush',
+    'tnt_tx_push',
 
     'uuid_nil',
     'tt_uuid_create',

@@ -24,22 +24,22 @@ const unsigned TEST_ROUNDS = 1000;
 static int page_count = 0;
 
 static void *
-extent_alloc(void *ctx)
+extent_alloc(struct matras_allocator *allocator)
 {
-	int *p_page_count = (int *)ctx;
-	assert(p_page_count == &page_count);
-	++*p_page_count;
+	(void)allocator;
+	++page_count;
 	return malloc(extent_size);
 }
 
 static void
-extent_free(void *ctx, void *page)
+extent_free(struct matras_allocator *allocator, void *page)
 {
-	int *p_page_count = (int *)ctx;
-	assert(p_page_count == &page_count);
-	--*p_page_count;
+	(void)allocator;
+	--page_count;
 	free(page);
 }
+
+static struct matras_allocator matras_allocator;
 
 struct CCoordPair {
 	coord_t a, b;
@@ -487,8 +487,7 @@ rand_test()
 	CBoxSet<DIMENSION> set;
 
 	struct rtree tree;
-	rtree_init(&tree, DIMENSION, RTREE_EUCLID, extent_size,
-		   extent_alloc, extent_free, &page_count, NULL);
+	rtree_init(&tree, DIMENSION, RTREE_EUCLID, &matras_allocator, NULL);
 
 	printf("\tDIMENSION: %u, page size: %u, max fill good: %d\n",
 	       DIMENSION, tree.page_size, tree.page_max_fill >= 10);
@@ -533,6 +532,8 @@ rand_test()
 int
 main(void)
 {
+	matras_allocator_create(&matras_allocator, extent_size,
+				extent_alloc, extent_free);
 	srand(time(0));
 	rand_test<1>();
 	rand_test<2>();
@@ -542,4 +543,5 @@ main(void)
 	if (page_count != 0) {
 		fail("memory leak!", "true");
 	}
+	matras_allocator_destroy(&matras_allocator);
 }

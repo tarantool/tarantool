@@ -60,6 +60,8 @@ struct rtree_neighbor {
 	void *child;
 	int level;
 	sq_coord_t distance;
+	/* for pagination */
+	sq_coord_t distance_max;   // [4]
 };
 
 typedef rb_tree(struct rtree_neighbor) rtnt_t;
@@ -112,8 +114,8 @@ typedef bool (*rtree_comparator_t)(const struct rtree_rect *rt1,
 
 /* Type distance comparison */
 enum rtree_distance_type {
-	RTREE_EUCLID = 0, /* Euclid distance, sqrt(dx*dx + dy*dy) */
-	RTREE_MANHATTAN = 1 /* Manhattan distance, fabs(dx) + fabs(dy) */
+	RTREE_EUCLID    = 0, /* Euclid distance, sqrt(dx*dx + dy*dy) */
+	RTREE_MANHATTAN = 1  /* Manhattan distance, fabs(dx) + fabs(dy) */
 };
 
 /* Main rtree struct */
@@ -177,6 +179,15 @@ struct rtree_iterator
 	struct rtree_neighbor_page *page_list;
 	/* Position of ready-to-use list entry in allocated page */
 	unsigned page_pos;
+	/* Position of pagination */
+	sq_coord_t current_pos_distance;         // [2]
+	/**
+	 * Data that was fetched last, needed to make iterators stable.
+	 * Contains NULL as pointer to tuple only if there was no data fetched.
+	 * Otherwise, tuple pointer is not NULL, even if iterator is
+	 * exhausted - pagination relies on it.
+	 */
+	record_t last;
 
 	/* Comparators for comparison rectagnle of the iterator with
 	 * rectangles of tree nodes. If the comparator returns true,
@@ -192,6 +203,8 @@ struct rtree_iterator
 		struct rtree_page *page;
 		int pos;
 	} stack[RTREE_MAX_HEIGHT];
+
+	// add pos
 };
 
 /**
@@ -234,9 +247,9 @@ rtree_set2dp(struct rtree_rect *rect, coord_t x, coord_t y);
  */
 void
 rtree_init(struct rtree *tree, unsigned dimension,
-	   enum rtree_distance_type distance_type, uint32_t extent_size,
-	   matras_alloc_func extent_alloc, matras_free_func extent_free,
-	   void *alloc_ctx, struct matras_stats *alloc_stats);
+	   enum rtree_distance_type distance_type,
+	   struct matras_allocator *allocator,
+	   struct matras_stats *alloc_stats);
 
 /**
  * @brief Destroy a tree

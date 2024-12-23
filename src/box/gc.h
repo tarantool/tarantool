@@ -255,6 +255,13 @@ gc_last_checkpoint(void)
 }
 
 /**
+ * Return the checkpoint with exact @vclock. NULL is returned if
+ * checkpoint is not found.
+ */
+struct gc_checkpoint *
+gc_checkpoint_at_vclock(const struct vclock *vclock);
+
+/**
  * Initialize the garbage collection state.
  */
 void
@@ -347,18 +354,19 @@ void
 gc_trigger_checkpoint(void);
 
 /**
- * Get a reference to @checkpoint and store it in @ref.
+ * Allocate and get a reference to @checkpoint.
  * This will block the garbage collector from deleting
  * the checkpoint files until the reference is released
- * with gc_put_checkpoint_ref().
+ * with gc_unref_checkpoint().
  *
  * @format... specifies a human-readable name that will be
  * used for listing the reference in box.info.gc().
+ *
+ * The function never fails - returned value is always not NULL.
  */
-CFORMAT(printf, 3, 4)
-void
-gc_ref_checkpoint(struct gc_checkpoint *checkpoint,
-		  struct gc_checkpoint_ref *ref, const char *format, ...);
+CFORMAT(printf, 2, 3)
+struct gc_checkpoint_ref *
+gc_ref_checkpoint(struct gc_checkpoint *checkpoint, const char *format, ...);
 
 /**
  * Release a reference to a checkpoint previously taken
@@ -418,8 +426,6 @@ gc_consumer_persist(struct gc_consumer *consumer);
  * consumer is deleted only if it's not used anymore. If the consumer does not
  * exist or is not marked as persistent, the function tries to delete it from
  * persistent WAL GC state anyway.
- *
- * NB: the function must be called inside active transaction.
  */
 int
 gc_erase_consumer(const struct tt_uuid *uuid);

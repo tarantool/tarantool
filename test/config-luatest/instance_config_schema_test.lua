@@ -216,6 +216,7 @@ g.test_fiber = function()
             io_collect_interval = 1,
             too_long_threshold = 1,
             worker_pool_threads = 1,
+            tx_user_pool_size = 1,
             slice = {
                 warn = 1,
                 err = 1,
@@ -232,6 +233,7 @@ g.test_fiber = function()
         io_collect_interval = box.NULL,
         too_long_threshold = 0.5,
         worker_pool_threads = 4,
+        tx_user_pool_size = 768,
         slice = {
             err = 1,
             warn = 0.5,
@@ -1119,6 +1121,7 @@ g.test_replication = function()
             failover = 'off',
             peers = {'one', 'two'},
             anon = true,
+            anon_ttl = 1,
             threads = 1,
             timeout = 1,
             synchro_timeout = 1,
@@ -1132,6 +1135,11 @@ g.test_replication = function()
             election_timeout = 1,
             election_fencing_mode = 'off',
             bootstrap_strategy = 'auto',
+            autoexpel = {
+                enabled = true,
+                by = 'prefix',
+                prefix = 'i-',
+            }
         },
     }
     instance_config:validate(iconfig)
@@ -1141,6 +1149,7 @@ g.test_replication = function()
     local exp = {
         failover = 'off',
         anon = false,
+        anon_ttl = 60 * 60,
         threads = 1,
         timeout = 1,
         synchro_timeout = 5,
@@ -1154,9 +1163,82 @@ g.test_replication = function()
         election_timeout = 5,
         election_fencing_mode = 'soft',
         bootstrap_strategy = 'auto',
+        autoexpel = {
+            enabled = false,
+        },
     }
     local res = instance_config:apply_default({}).replication
     t.assert_equals(res, exp)
+end
+
+g.test_replication_autoexpel = function()
+    -- Success case (disabled).
+    instance_config:validate({
+        replication = {
+            autoexpel = {
+                enabled = false,
+            },
+        },
+    })
+
+    -- Success case (enabled).
+    instance_config:validate({
+        replication = {
+            autoexpel = {
+                enabled = true,
+                by = 'prefix',
+                prefix = 'i-'
+            },
+        },
+    })
+
+    -- No `by`.
+    local err = '[instance_config] replication.autoexpel: ' ..
+        'replication.autoexpel.by must be set if ' ..
+        'replication.autoexpel.enabled = true'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate({
+            replication = {
+                autoexpel = {
+                    enabled = true,
+                },
+            },
+        })
+    end)
+
+    -- Invalid `by`.
+    local err = '[instance_config] replication.autoexpel.by: Got invalid, ' ..
+        'but only the following values are allowed: prefix'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate({
+            replication = {
+                autoexpel = {
+                    enabled = true,
+                    by = 'invalid',
+                },
+            },
+        })
+    end)
+
+    -- No `prefix`.
+    local err = '[instance_config] replication.autoexpel: ' ..
+        'replication.autoexpel.prefix must be set if ' ..
+        'replication.autoexpel.enabled = true and ' ..
+        'replication.autoexpel.by = \'prefix\''
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate({
+            replication = {
+                autoexpel = {
+                    enabled = true,
+                    by = 'prefix',
+                },
+            },
+        })
+    end)
+
+    t.assert_equals(instance_config:apply_default({}).replication.autoexpel, {
+        enabled = false,
+    })
 end
 
 g.test_credentials = function()
@@ -1721,16 +1803,24 @@ g.test_failover = function()
             lease_interval = 10,
             renew_interval = 1,
             stateboard = {
+                enabled = true,
                 renew_interval = 1,
                 keepalive_interval = 5,
             },
             replicasets = {
                 replicaset001 = {
+                    learners = {
+                        'instance002',
+                    },
                     priority = {
                         instance001 = 1
                     }
                 }
-            }
+            },
+            log = {
+                to = 'file',
+                file = 'var/log/tarantool/failover.log',
+            },
         }
     }
 
@@ -1744,8 +1834,12 @@ g.test_failover = function()
         lease_interval = 30,
         renew_interval = 10,
         stateboard = {
+            enabled = true,
             renew_interval = 2,
             keepalive_interval = 10,
+        },
+        log = {
+            to = 'stderr',
         },
     }
     local res = instance_config:apply_default({}).failover
@@ -1763,4 +1857,9 @@ g.test_labels = function()
     instance_config:validate(iconfig)
 
     t.assert_equals(instance_config:apply_default({}).labels, nil)
+end
+
+g.test_isolated = function()
+    instance_config:validate({isolated = true})
+    t.assert_equals(instance_config:apply_default({}).isolated, false)
 end

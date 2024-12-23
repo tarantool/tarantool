@@ -83,22 +83,49 @@ end)
 g.test_upgrade = function()
     g.server:exec(function()
         local netbox = require("net.box")
+        local version = require("version")
+
         local messages = {}
         for _, alert in pairs(require("config"):info().alerts) do
             table.insert(messages, alert.message)
         end
-        local exp = 'credentials: the database schema has an old version ' ..
-                    'and users/roles/privileges cannot be applied. '..
-                    'Consider executing box.schema.upgrade() to perform an '..
-                    'upgrade.'
-        t.assert_items_include(messages, {exp})
+
+        local msgs = {
+            credentials = 'credentials: the database schema has an old ' ..
+                          'version and users/roles/privileges cannot be ' ..
+                          'applied. Consider executing box.schema.upgrade() ' ..
+                          'to perform an upgrade.',
+            schema = 'The schema version %s is outdated, the latest version ' ..
+                     'is %s. Please, consider using box.schema.upgrade().',
+        }
+
+        -- Checks the alerts for the outdated schema version.
+        t.assert_items_include(messages, {
+            msgs.credentials,
+            msgs.schema:format(version.new(2, 11, 0),
+                box.internal.latest_dd_version())
+        })
 
         t.assert_equals(box.space._schema:get("version"), {'version', 2, 11, 0})
 
-        box.schema.upgrade()
-        -- After upgrade privileges should be granted automatically.
+        -- Stop upgrade process in the middle, right after upgrading to 2.11.1.
+        -- After upgrade to 2.11.1 privileges should be granted automatically.
+        box.internal.run_schema_upgrade(function()
+            box.space._schema:delete("max_id")
+            box.space._schema:replace{'version', 2, 11, 1}
+        end)
 
-        exp = { 'read', 'space', '_space' }
+        -- Checks the alert for the outdated schema version was updated.
+        messages = {}
+        for _, alert in pairs(require("config"):info().alerts) do
+            table.insert(messages, alert.message)
+        end
+        t.assert_items_include(messages, {
+            msgs.schema:format(version.new(2, 11, 1),
+                box.internal.latest_dd_version())
+        })
+
+        local exp = { 'read', 'space', '_space' }
         t.assert_items_include(box.schema.user.info('guest'), {exp})
 
         exp = { 'read,write', 'space', '_space' }
@@ -113,12 +140,19 @@ g.test_upgrade = function()
         exp = { 'read,write', 'space', '_space' }
         t.assert_items_include(box.schema.role.info('manager'), {exp})
 
-        -- Check the alert has been dropped.
+        -- Check the credentials alert has been dropped.
         messages = {}
         for _, alert in pairs(require("config"):info().alerts) do
             table.insert(messages, alert.message)
         end
+        t.assert_items_exclude(messages, {msgs.credentials})
 
-        t.assert_items_equals(messages, {})
+        -- Check that after full upgrade no alerts at all.
+        box.schema.upgrade()
+        messages = {}
+        for _, alert in pairs(require("config"):info().alerts) do
+            table.insert(messages, alert.message)
+        end
+        t.assert_equals(messages, {})
     end)
 end

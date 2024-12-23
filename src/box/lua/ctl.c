@@ -45,6 +45,7 @@
 #include "box/engine.h"
 #include "box/memtx_engine.h"
 #include "box/raft.h"
+#include "box/replication.h"
 #include "box/security.h"
 #include "box/wal.h"
 
@@ -185,6 +186,20 @@ lbox_ctl_wal_sync(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_ctl_replica_gc(struct lua_State *L)
+{
+	const char *uuid_str = luaT_checkstring(L, 1);
+	struct tt_uuid uuid;
+	if (tt_uuid_from_string(uuid_str, &uuid) != 0) {
+		diag_set(IllegalParams, "Invalid UUID: %s", uuid_str);
+		luaT_error(L);
+	}
+	if (replica_gc(&uuid) != 0)
+		luaT_error(L);
+	return 0;
+}
+
 static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"wait_ro", lbox_ctl_wait_ro},
 	{"wait_rw", lbox_ctl_wait_rw},
@@ -201,6 +216,7 @@ static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"set_on_shutdown_timeout", lbox_ctl_set_on_shutdown_timeout},
 	{"iproto_lockdown", lbox_ctl_set_iproto_lockdown},
 	{"wal_sync", lbox_ctl_wal_sync},
+	{"replica_gc", lbox_ctl_replica_gc},
 	{NULL, NULL}
 };
 

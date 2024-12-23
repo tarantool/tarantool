@@ -70,38 +70,6 @@ g.test_fully_temporary_ddl_does_not_abort_remote_tx = function(cg)
     end)
 end
 
--- Test that a DDL transaction on fully temporary spaces still aborts a not
--- fully remote transaction.
-g.test_fully_temporary_ddl_aborts_not_fully_remote_tx = function(cg)
-    t.skip_if(not cg.params.memtx_use_mvcc)
-
-    cg.server2:exec(function()
-        local tmp = box.schema.space.create('tmp-replace', {type = 'temporary'})
-        tmp:create_index('p')
-
-        box.space.s:on_replace(function()
-            tmp:replace{0}
-            rawset(_G, 'executed_on_replace', true)
-            require('fiber').sleep(60)
-        end)
-    end)
-    cg.server1:exec(function()
-        box.space.s:replace{0}
-    end)
-    cg.server2:exec(function()
-        t.helpers.retrying({timeout = 60}, function()
-            t.assert(_G.executed_on_replace)
-        end)
-        box.schema.space.create('tmp', {type = 'temporary'})
-    end)
-    local msg = "Transaction processing DDL %(id=%d+%) has aborted " ..
-                "another TX %(id=%d+%)"
-    t.assert(cg.server2:grep_log(msg))
-    cg.server2:exec(function()
-        t.assert_equals(box.space.s:get{0}, nil)
-    end)
-end
-
 -- Test that a DDL transaction on fully temporary spaces does not abort a
 -- fully remote transaction that rollbacked to a savepoint without local
 -- changes.
@@ -171,40 +139,6 @@ g.test_fully_remote_ddl_does_not_abort_fully_temporary_tx = function(cg)
     end, {fid})
 end
 
--- Test that a remote DDL transaction still aborts a not fully temporary
--- transaction.
-g.test_fully_remote_tx_ddl_aborts_not_fully_temporary_tx = function(cg)
-    t.skip_if(not cg.params.memtx_use_mvcc)
-
-    local fid = cg.server2:exec(function()
-        local fiber = require('fiber')
-
-        local tmp = box.schema.space.create('tmp-replace', {type = 'temporary'})
-        tmp:create_index('p')
-
-        rawset(_G, 'downstream_cond', fiber.cond())
-        local f = fiber.new(function()
-            box.begin()
-            tmp:replace{0}
-            box.space.s:replace{0}
-            _G.downstream_cond:wait()
-            box.commit()
-        end)
-        f:set_joinable(true)
-        return f:id()
-    end)
-    cg.server1:exec(function()
-        box.schema.space.create('ss')
-    end)
-    cg.server1:wait_for_downstream_to(cg.server2)
-    cg.server2:exec(function(fid)
-        _G.downstream_cond:signal()
-        local ok, err = require('fiber').find(fid):join()
-        t.assert_not(ok)
-        t.assert_equals(err.message, "Transaction has been aborted by conflict")
-    end, {fid})
-end
-
 -- Test that a remote DDL transaction does not abort a fully temporary
 -- transaction that rolled back to a savepoint without non-temporary changes.
 g.test_fully_remote_tx_ddl_does_not_abort_fully_temporary_tx_after_rb_to_svp =
@@ -238,39 +172,5 @@ function(cg)
         _G.downstream_cond:signal()
         local ok = require('fiber').find(fid):join()
         t.assert(ok)
-    end, {fid})
-end
-
--- Test that a fully remote DDL transaction still aborts a data-temporary
--- transaction.
-g.test_fully_remote_tx_ddl_aborts_data_temporary_tx = function(cg)
-    t.skip_if(not cg.params.memtx_use_mvcc)
-
-    local fid = cg.server2:exec(function()
-        local fiber = require('fiber')
-
-        local tmp = box.schema.space.create('data-tmp',
-                                            {type = 'data-temporary'})
-        tmp:create_index('p')
-
-        rawset(_G, 'downstream_cond', fiber.cond())
-        local f = fiber.new(function()
-            box.begin()
-            tmp:replace{0}
-            _G.downstream_cond:wait()
-            box.commit()
-        end)
-        f:set_joinable(true)
-        return f:id()
-    end)
-    cg.server1:exec(function()
-        box.schema.space.create('ss')
-    end)
-    cg.server1:wait_for_downstream_to(cg.server2)
-    cg.server2:exec(function(fid)
-        _G.downstream_cond:signal()
-        local ok, err = require('fiber').find(fid):join()
-        t.assert_not(ok)
-        t.assert_equals(err.message, "Transaction has been aborted by conflict")
     end, {fid})
 end
