@@ -188,8 +188,6 @@ store_bool(void *p, bool v)
 
 /**
  * @brief Test bit \a pos in memory chunk \a data
- * data is considered as a sequence of chars,
- *  although data size must be sizeof(long) aligned
  * @param data memory chunk
  * @param pos bit number (zero-based)
  * @retval true bit \a pos is set in \a data
@@ -207,8 +205,6 @@ bit_test(const void *data, size_t pos)
 
 /**
  * @brief Set bit \a pos in a memory chunk \a data
- * data is considered as a sequence of chars,
- *  although data size must be sizeof(long) aligned
  * @param data memory chunk
  * @param pos bit number (zero-based)
  * @return previous value
@@ -229,8 +225,6 @@ bit_set(void *data, size_t pos)
 
 /**
  * @brief Clear bit \a pos in memory chunk \a data
- * data is considered as a sequence of chars,
- *  although data size must be sizeof(long) aligned
  * @param data memory chunk
  * @param pos bit number (zero-based)
  * @return previous value
@@ -247,6 +241,66 @@ bit_clear(void *data, size_t pos)
 	bool prev = (ldata[chunk] >> offset) & 0x1;
 	ldata[chunk] &= ~(1UL << offset);
 	return prev;
+}
+
+/**
+ * @brief Set \a count bits in a memory chunk \a data starting from bit \a pos
+ *  to the value \a val.
+ * @param data - memory chunk
+ * @param pos - the first bit number (zero-based)
+ * @param count - the amount of bits to set
+ * @param val - the new value of bits
+ */
+inline void
+bit_set_range(void *data, size_t pos, size_t count, bool val)
+{
+	if (count == 0)
+		return;
+	/*
+	 * We can have:
+	 *  - a head of bits in the start;
+	 *  - a bunch of whole bytes in the middle;
+	 *  - a tail of bits in the end.
+	 */
+	size_t pos_byte = pos / CHAR_BIT;
+	size_t pos_bit = pos % CHAR_BIT;
+	/*
+	 * The head may be the only byte to copy to.
+	 */
+	size_t head_size = pos_bit + count < CHAR_BIT ?
+			   count : CHAR_BIT - pos_bit;
+	size_t rest_size = count - head_size;    /* Can be 0. */
+	size_t body_size = rest_size / CHAR_BIT; /* In bytes. */
+	size_t tail_size = rest_size % CHAR_BIT; /* In bits. */
+
+	size_t head_mask = ((1ULL << head_size) - 1) << pos_bit;
+	size_t tail_mask = ((1ULL << tail_size) - 1);
+
+	uint8_t value = val ? 0xFF : 0x00;
+	uint8_t *head = (uint8_t *)data + pos_byte;
+	uint8_t *body = head + 1;
+	uint8_t *tail = body + body_size;
+	/*
+	 * Set the head bits.
+	 */
+	*head = (*head & ~head_mask) | (value & head_mask);
+	/*
+	 * Set the body bytes.
+	 */
+	memset(body, value, body_size);
+	/*
+	 * Set the tail bits. The if-statement is required to avoid overwriting
+	 * a byte beyond the buffer even if `tail_mask' is empty.
+	 */
+	if (tail_size > 0)
+		*tail = (*tail & ~tail_mask) | (value & tail_mask);
+	/*
+	 * Once you are done trying to "optimize" this routine, and have
+	 * realized what a terrible mistake that was, please increment
+	 * the following counter as a warning to the next guy:
+	 *
+	 * total_hours_wasted_here = 8
+	 */
 }
 
 /**
