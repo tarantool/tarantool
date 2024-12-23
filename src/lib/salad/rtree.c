@@ -969,7 +969,8 @@ rtree_iterator_next(struct rtree_iterator *itr)
 				return NULL;
 			rtnt_remove(&itr->neigh_tree, neighbor);
 			
-			if (neighbor->distance_max < itr->current_pos_distance) // проверка на позицию [5]
+			// если дальняя точка блока ближе нужной позиции, то мы пропускаем этот блок 
+			if (neighbor->distance_max < itr->current_pos_distance) // [верно]
 				continue;
 
 			if (neighbor->level == 0) {
@@ -1173,7 +1174,7 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 			struct rtree_neighbor *n =
 				rtree_iterator_new_neighbor(itr, tree->root,
 							    distance, distance_max,
-							    tree->height); // нужно сюда добавить ипользовние позиции
+							    tree->height); 
 			rtnt_insert(&itr->neigh_tree, n);  // упорядочивает соседей по расстоянию (нужны только соседи с позиции pos) .
 			return true;
 		} else {

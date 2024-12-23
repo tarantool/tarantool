@@ -181,6 +181,13 @@ struct rtree_iterator
 	unsigned page_pos;
 	/* Position of pagination */
 	sq_coord_t current_pos_distance;         // [2]
+	/**
+	 * Data that was fetched last, needed to make iterators stable.
+	 * Contains NULL as pointer to tuple only if there was no data fetched.
+	 * Otherwise, tuple pointer is not NULL, even if iterator is
+	 * exhausted - pagination relies on it.
+	 */
+	record_t last;
 
 	/* Comparators for comparison rectagnle of the iterator with
 	 * rectangles of tree nodes. If the comparator returns true,
