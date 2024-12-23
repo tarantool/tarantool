@@ -79,6 +79,9 @@ bit_set(void *data, size_t pos);
 extern inline bool
 bit_clear(void *data, size_t pos);
 
+extern inline void
+bit_set_range(void *data, size_t pos, size_t count, bool val);
+
 extern inline int
 bit_ctz_u32(uint32_t x);
 
