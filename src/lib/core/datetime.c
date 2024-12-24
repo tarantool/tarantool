@@ -32,6 +32,13 @@ static bool datetime_setfn_timestamp_type_check = false;
 TWEAK_BOOL(datetime_setfn_timestamp_type_check);
 
 /**
+ * Makes applying a timezone to a datetime object preserve the
+ * timestamp instead of the represented time of day.
+ */
+static bool datetime_apply_timezone_preserves_timestamp = false;
+TWEAK_BOOL(datetime_apply_timezone_preserves_timestamp);
+
+/**
  * Floored modulo and divide.
  * (a < 0) & (b < 0) case isn't supported.
  */
