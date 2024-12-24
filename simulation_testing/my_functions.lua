@@ -62,34 +62,24 @@ local function get_initial_replication(nodes)
     return initial_replication
 end
 
-local function get_random_node(nodes)
+local function get_random_node(nodes, timeout)
     if not nodes or #nodes == 0 then
         error("Node list is empty or nil")
     end
 
-    local max_attempts = #nodes
-    local attempts = 0
-
-    while attempts < max_attempts do
-        local index = math.random(#nodes)
-        local node = nodes[index]
-
-        -- Попытка выполнить простую команду на узле
+    for _, node in ipairs(nodes) do
         local ok, result = pcall(function()
-            return node:exec(function()
-                return true
-            end)
+            return node:eval("return true", {}, {timeout = timeout})
         end)
 
         if ok and result then
             return node
         end
-
-        attempts = attempts + 1
     end
 
     error("No connected nodes available")
 end
+
 
 return {
     print_hello = print_hello,

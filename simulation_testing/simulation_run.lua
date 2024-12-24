@@ -79,57 +79,56 @@ end)
 print(result)
 
 
--- The main cycle
+-- Fiber for reading operations
 fiber.create(function()
     while true do
-        local random_action = math.random(1, 11)
+        local operation = randomized_operations.generate_random_read_operation(10)
+        randomized_operations.execute_db_operation(
+            my_functions.get_random_node(cg.replicas, 3),
+            "test",
+            operation
+        )
+        fiber.sleep(0.01)
+    end
+end)
 
-        if random_action < 5 then
-            local rw_operation = math.random(1, 10)
-            local operation
-            if rw_operation < 3 then
-                operation = randomized_operations.generate_random_read_operation(10)
-            else
-                operation = randomized_operations.generate_random_write_operation(10)
+-- Fiber for writing operations
+fiber.create(function()
+    while true do
+        local operation = randomized_operations.generate_random_write_operation(10)
+        randomized_operations.execute_db_operation(
+            my_functions.get_random_node(cg.replicas, 3),
+            "test",
+            operation
+        )
+        fiber.sleep(0.01)
+    end
+end)
+
+-- Fiber for crashes
+fiber.create(function()
+    while true do
+        local type_of_crashing = math.random(1, 3)
+        if type_of_crashing == 1 then
+            local crash_node = crash_functions.get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
+            if crash_node ~= -1 then
+                crash_functions.stop_node(crash_node[1], 5, 10)
             end
-            randomized_operations.execute_db_operation(my_functions.get_random_node(cg.replicas), "test", operation)
-        elseif random_action < 9 then
-            local type_of_crashing = math.random(1, 3)
-            if type_of_crashing == 1 then
-                local crash_node = crash_functions.get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
-                if crash_node ~= -1 then
-                    crash_functions.stop_node(
-                        crash_node[1], 
-                        5, 
-                        10
-                    )
-                end
 
-            elseif type_of_crashing == 2 then
-                local crash_node = crash_functions.get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
-                if crash_node ~= -1 then
-                    crash_functions.create_delay_to_write_operations(
-                        crash_node[1], 
-                        "test", 
-                        5, 
-                        10
-                    )
-                end
+        elseif type_of_crashing == 2 then
+            local crash_node = crash_functions.get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
+            if crash_node ~= -1 then
+                crash_functions.create_delay_to_write_operations(crash_node[1], "test", 5, 10)
+            end
 
-            else 
-                local crash_nodes = crash_functions.get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 2)
-                if crash_nodes ~= -1 then
-                    crash_functions.break_connection_between_two_nodes(
-                        crash_nodes, 
-                        initial_replication, 
-                        5, 
-                        10
-                    )
-                end
-            end    
+        else
+            local crash_nodes = crash_functions.get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 2)
+            if crash_nodes ~= -1 then
+                crash_functions.break_connection_between_two_nodes(crash_nodes, initial_replication, 5, 10)
+            end
         end
 
-        fiber.sleep(math.random(1, 2)) 
+        fiber.sleep(1) 
     end
 end)
 

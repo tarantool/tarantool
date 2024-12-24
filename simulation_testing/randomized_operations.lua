@@ -44,13 +44,15 @@ local function execute_db_operation(node, space_name, operation)
         local operation_type = operation[1]
         local operation_args = operation[2]
         local message = ""
+        local node_name = node.alias
 
         local success, result = pcall(function()
             return node:exec(function(operation_type, operation_args, space_name)
-                box.begin({txn_isolation = 'linearizable'})
+                
                 local space = box.space[space_name]
                 local res
 
+                box.begin({txn_isolation = 'linearizable'})
                 if operation_type == "select" then
                     res = space:select(operation_args[1])
                 elseif operation_type == "insert" then
@@ -79,15 +81,41 @@ local function execute_db_operation(node, space_name, operation)
         if success then
             if operation_type == "select" or operation_type == "get" then
                 if result then
-                    message = "Results " .. operation_type .. " for the key " .. tostring(operation_args[1]) .. ": " .. my_functions.table_to_string(result)
+                    message = string.format(
+                        "Operation: %s, Args: %s, Result: %s, Node: %s, Space: %s",
+                        operation_type,
+                        tostring(operation_args[1]),
+                        my_functions.table_to_string(result), 
+                        node_name, 
+                        space_name
+                )
                 else
-                    message = "No entries found for the key " .. tostring(operation_args[1])
+                    message = string.format(
+                        "Operation: %s, Args: %s, Result: No entries found, Node: %s, Space: %s",
+                        operation_type,
+                        tostring(operation_args[1]),
+                        node_name, 
+                        space_name
+                    )
                 end
             else
-                message = "Operation " .. operation_type .. " completed successfully: " .. my_functions.table_to_string(operation_args)
+                message = string.format(
+                    "Operation: %s, Args: %s, Result: Completed successfully, Node: %s, Space: %s",
+                    operation_type,
+                    my_functions.table_to_string(operation_args),
+                    node_name, 
+                    space_name
+                )
             end
         else
-            message = "Error while executing the operation " .. operation_type .. ": " .. tostring(result)
+            message = string.format(
+                "Error while executing the DB operation. Operation: %s, Args: %s, Node: %s, Space: %s, Error(result): %s",
+                operation_type,
+                my_functions.table_to_string(operation_args),
+                node_name,
+                space_name,
+                my_functions.table_to_string(result) 
+            )
         end
 
         print(message)

@@ -64,7 +64,7 @@ local function rand_cfg(cg, replica_count, replica_id)
 
     local box_cfg = {
         replication = uri_set,
-        replication_synchro_quorum = math.random(math.ceil(replica_count / 2), replica_count),
+        replication_synchro_quorum = math.random(math.floor(replica_count / 2) + 1, replica_count),
         replication_timeout = math.random(1, 10),
         checkpoint_count = 2,
         memtx_use_mvcc_engine = true,
