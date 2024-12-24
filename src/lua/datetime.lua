@@ -1,6 +1,41 @@
+local compat = require('compat')
 local ffi = require('ffi')
 local buffer = require('buffer')
 local tz = require('timezones')
+
+-- This variable controls the behavior of applying timezone to
+-- datetime objects.
+--
+-- If set, setting a timezone for a datetime object doesn't
+-- affect the timestamp value but changes the represented time of
+-- day.
+-- Otherwise, the old behavior is used. Setting a timezone changes
+-- the timestamp value in that way to preserve the represented
+-- time of day.
+--
+-- This behavior will become default in 4.x.
+local applying_tz_preserves_timestamp
+
+local DATETIME_APPLY_TIMEZONE_ACTION_BRIEF = [[
+Whether applying timezone alters the represented time of day or the timestamp.
+The new behavior makes setting a timezone for a datetime object change the time
+of day and preserve the timestamp. The old behavior makes providing a timezone
+for a datetime object affect the timestamp but preserve the represented time of
+day.
+
+https://tarantool.io/compat/datetime_apply_timezone_action
+]]
+
+compat.add_option({
+    name = 'datetime_apply_timezone_action',
+    default = 'old',
+    obsolete = nil,
+    brief = DATETIME_APPLY_TIMEZONE_ACTION_BRIEF,
+    action = function(is_new)
+        applying_tz_preserves_timestamp = is_new
+    end,
+    run_action_now = true,
+})
 
 --[[
     `c-dt` library functions handles properly both positive and negative `dt`
@@ -621,6 +656,11 @@ local function datetime_new(obj)
             s = s - 1
             fraction = fraction + 1
         end
+
+        if applying_tz_preserves_timestamp then
+            s = s + (offset or 0) * 60
+        end
+
         -- if there are separate nsec, usec, or msec provided then
         -- timestamp should be integer
         if count_usec == 0 then
@@ -940,6 +980,13 @@ local function datetime_parse_from(str, obj)
     -- string.
     if date.tz == '' and date.tzoffset == 0 then
         datetime_set(date, { tzoffset = tzoffset, tz = tzname })
+
+        -- If working in a "preserve timestamp" mode the set
+        -- call changes the represented time of day and it should
+        -- be adjusted (gh-10363).
+        if applying_tz_preserves_timestamp then
+            time_localize(date, date.tzoffset)
+        end
     end
 
     return date, len
@@ -1152,10 +1199,24 @@ function datetime_set(self, obj)
         if tzname ~= nil then
             offset, self.tzindex = parse_tzname(sec_int, tzname)
         end
-        self.epoch = utc_secs(sec_int, offset)
+        if applying_tz_preserves_timestamp then
+            self.epoch = sec_int
+        else
+            self.epoch = utc_secs(sec_int, offset)
+        end
         self.nsec = nsec
         self.tzoffset = offset
 
+        return self
+    end
+
+    -- Only timezone is changed.
+    if not hms and not ymd and applying_tz_preserves_timestamp then
+        if tzname ~= nil then
+            offset, self.tzindex = parse_tzname(self.epoch, tzname)
+        end
+
+        self.tzoffset = offset
         return self
     end
 
