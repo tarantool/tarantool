@@ -72,6 +72,16 @@ type check for timestamp in set().
 https://tarantool.io/compat/datetime_setfn_timestamp_type_check
 ]]
 
+local DATETIME_APPLY_TIMEZONE_ACTION_BRIEF = [[
+Whether applying timezone alters the represented time of day or the timestamp.
+The new behavior makes setting a timezone for a datetime object change the time
+of day and preserve the timestamp. The old behavior makes providing a timezone
+for a datetime object affect the timestamp but preserve the represented time of
+day.
+
+https://tarantool.io/compat/datetime_apply_timezone_action
+]]
+
 local SQL_PRIV_BRIEF = [[
 Whether to enable access checks for SQL requests. The old behavior is to let
 any user execute an arbitrary SQL request over IPROTO. With the new behavior,
@@ -264,6 +274,13 @@ local options = {
         obsolete = nil,
         brief = DATETIME_SETFN_TIMESTAMP_TYPE_CHECK_BRIEF,
         action = tweak_action('datetime_setfn_timestamp_type_check',
+                              false, true),
+    },
+    datetime_apply_timezone_action = {
+        default = 'old',
+        obsolete = nil,
+        brief = DATETIME_APPLY_TIMEZONE_ACTION_BRIEF,
+        action = tweak_action('datetime_apply_timezone_preserves_timestamp',
                               false, true),
     },
     sql_priv = {
