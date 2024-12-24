@@ -584,6 +584,23 @@ local function datetime_new(obj)
     else
         nsec = 0
     end
+
+    local offset = obj.tzoffset
+    if offset ~= nil then
+        offset = get_timezone(offset, 'tzoffset')
+        -- At the moment the range of known timezones is
+        -- UTC-12:00..UTC+14:00.
+        --
+        -- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
+        check_range(offset, -720, 840, 'tzoffset')
+    end
+
+    local tzindex = 0
+    local tzname = obj.tz
+    if tzname ~= nil then
+        offset, tzindex = parse_tzname(epoch_from_dt(dt), tzname)
+    end
+
     local ts = obj.timestamp
     if ts ~= nil then
         if ymd then
@@ -615,14 +632,6 @@ local function datetime_new(obj)
         hms = true
     end
 
-    local offset = obj.tzoffset
-    if offset ~= nil then
-        offset = get_timezone(offset, 'tzoffset')
-        -- at the moment the range of known timezones is UTC-12:00..UTC+14:00
-        -- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
-        check_range(offset, -720, 840, 'tzoffset')
-    end
-
     -- .year, .month, .day
     if ymd then
         y = y or 1970
@@ -638,12 +647,6 @@ local function datetime_new(obj)
             end
         end
         dt = dt_from_ymd_checked(y, M, d)
-    end
-
-    local tzindex = 0
-    local tzname = obj.tz
-    if tzname ~= nil then
-        offset, tzindex = parse_tzname(epoch_from_dt(dt), tzname)
     end
 
     -- .hour, .minute, .second
