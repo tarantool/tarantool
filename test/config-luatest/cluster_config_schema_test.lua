@@ -464,6 +464,7 @@ g.test_defaults = function()
             skip_replication_names = 'new',
             datetime_setfn_timestamp_type_check = 'old',
             box_backup_default_ttl = 'old',
+            datetime_apply_timezone_action = 'old',
         },
         isolated = false,
         stateboard = {
