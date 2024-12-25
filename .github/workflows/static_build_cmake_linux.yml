@@ -84,6 +84,13 @@ jobs:
         with:
           submodule: ${{ inputs.submodule }}
           revision: ${{ inputs.revision }}
+      # Install CMake using PyPI, because option
+      # `--repeat until-pass:3` required by CTest was added since
+      # CMake 3.17.
+      - name: install cmake
+        run: |
+          apt -y remove cmake
+          pip3 install cmake==3.17.3
       - name: test
         run: make -f .test.mk test-static-cmake
       - name: Send VK Teams message on failure
