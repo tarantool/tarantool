@@ -166,9 +166,19 @@ local function say(self, level, fmt, ...)
     local type_fmt = type(fmt)
     local format = "%s"
     local msg
-    if select('#', ...) ~= 0 then
+    local argc = select('#', ...)
+    if argc ~= 0 then
+        local args = {...}
+        for i = 1, argc do
+            if type(args[i]) == 'table' then
+                local mt = getmetatable(args[i])
+                if mt == nil or mt.__tostring == nil then
+                    args[i] = json.encode(args[i])
+                end
+            end
+        end
         local stat
-        stat, msg = pcall(string.format, fmt, ...)
+        stat, msg = pcall(string.format, fmt, unpack(args, 1, argc))
         if not stat then
             error(msg, 3)
         end
