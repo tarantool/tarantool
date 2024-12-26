@@ -875,23 +875,23 @@ say_format_plain(struct log *log, char *buf, int len, int level,
 	return total;
 }
 
-/**
- * Format log message in json format:
- * {"time": 1507026445.23232, "level": "WARN", "message": <message>,
- * "pid": <pid>, "cord_name": <name>, "fiber_id": <id>,
- * "fiber_name": <fiber_name>, file": <filename>, "line": <fds>,
- * "module": <module_name>}
+/*
+ * Format log entry in json format.
+ * This function doesn't format the message itself, only the
+ * surrounding context.
  */
-int
-say_format_json(struct log *log, char *buf, int len, int level,
-		const char *module, const char *filename, int line,
-		const char *error, const char *format, va_list ap)
+static int
+format_json_with_message(char *buf, int len, int level,
+			 const char *module, const char *filename, int line,
+			 const char *error, const char *message)
 {
-	(void) log;
 	int total = 0;
 
+	/*
+	 * Print time in format YYYY-MM-DDThh:mm:ss.ms+tz_offset.
+	 * For example 2024-12-23T20:04:26.491+0300.
+	 */
 	SNPRINT(total, snprintf, buf, len, "{\"time\": \"");
-
 	struct tm tm;
 	double tm_sec;
 	get_current_time(&tm, &tm_sec);
@@ -902,38 +902,21 @@ say_format_json(struct log *log, char *buf, int len, int level,
 	buf += written, len -= written, total += written;
 	SNPRINT(total, snprintf, buf, len, "\", ");
 
+	/* Print level. */
 	SNPRINT(total, snprintf, buf, len, "\"level\": \"%s\", ",
 			level_strs[level]);
 
-	if (strncmp(format, "json", sizeof("json")) == 0) {
-		/*
-		 * Message is already JSON-formatted.
-		 * Get rid of {} brackets and append to the output buffer.
-		 */
-		const char *str = va_arg(ap, const char *);
-		assert(str != NULL);
-		int str_len = strlen(str);
-		assert(str_len > 2 && str[0] == '{' && str[str_len - 1] == '}');
-		SNPRINT(total, snprintf, buf, len, "%.*s, ",
-			str_len - 2, str + 1);
-	} else {
-		/* Format message */
-		char *tmp = tt_static_buf();
-		if (vsnprintf(tmp, TT_STATIC_BUF_LEN, format, ap) < 0)
-			return -1;
-		SNPRINT(total, snprintf, buf, len, "\"message\": \"");
-		/* Escape and print message */
-		SNPRINT(total, json_escape, buf, len, tmp);
-		SNPRINT(total, snprintf, buf, len, "\", ");
-	}
+	/* Print message. */
+	SNPRINT(total, snprintf, buf, len, "%s, ", message);
 
-	/* in case of system errors */
+	/* Print error, if any. */
 	if (error) {
 		SNPRINT(total, snprintf, buf, len, "\"error\": \"");
 		SNPRINT(total, json_escape, buf, len, error);
 		SNPRINT(total, snprintf, buf, len, "\", ");
 	}
 
+	/* Print PID, cord name, fiber id and fiber name. */
 	SNPRINT(total, snprintf, buf, len, "\"pid\": %i ", getpid());
 	SNPRINT(total, snprintf, buf, len, ", \"cord_name\": \"");
 	SNPRINT(total, json_escape, buf, len, cord()->name);
@@ -946,6 +929,7 @@ say_format_json(struct log *log, char *buf, int len, int level,
 		SNPRINT(total, snprintf, buf, len, "\"");
 	}
 
+	/* Print filename, line and module name if any. */
 	if (filename) {
 		SNPRINT(total, snprintf, buf, len, ", \"file\": \"");
 		SNPRINT(total, json_escape, buf, len, filename);
@@ -956,8 +940,121 @@ say_format_json(struct log *log, char *buf, int len, int level,
 		SNPRINT(total, json_escape, buf, len, module);
 		SNPRINT(total, snprintf, buf, len, "\"");
 	}
+
 	SNPRINT(total, snprintf, buf, len, "}\n");
 	return total;
+}
+
+/**
+ * Format log message in json format:
+ * {"time": "2024-12-23T20:04:26.491+0300", "level": "WARN",
+ * "message": <message>, "pid": <pid>, "cord_name": <name>, "fiber_id": <id>,
+ * "fiber_name": <fiber_name>, file": <filename>, "line": <fds>,
+ * "module": <module_name>}
+ */
+int
+say_format_json(struct log *log, char *buf, int len, int level,
+		const char *module, const char *filename, int line,
+		const char *error, const char *format, va_list ap)
+{
+	(void)log;
+	int context_len = 0;
+
+	/*
+	 * We can't use NULL as buf here, because strftime() in
+	 * format_json_with_message() will output 0 as its result and
+	 * length calculation will be incorrect.
+	 */
+	context_len = format_json_with_message(buf, len, level,
+					       module, filename, line,
+					       error, "");
+
+	int max_message_len = len - context_len;
+
+	int _len = 0;
+
+	/*
+	 * Ask for the biggest static buffer that small can provide.
+	 * Split the buffer in half and use the first half for the formatted
+	 * message and the second half for the escaped formatted message.
+	 */
+	int message_buf_len = TT_STATIC_BUF_BIG_LEN / 2;
+
+	char *message_ptr = tt_static_buf_big();
+	char *escaped_message_ptr = message_ptr + message_buf_len;
+
+	char *const message = message_ptr;
+	char *const escaped_message = escaped_message_ptr;
+
+	/*
+	 * Maximum message length is message_buf_len or len - context_len + 1,
+	 * whichever is smaller. We don't need to reserve space for the
+	 * terminating null character because we will use SNPRINT macro or
+	 * snprintf function to write the message.
+	 */
+	max_message_len = MIN(max_message_len + 1, message_buf_len);
+
+	if (strncmp(format, "json", sizeof("json")) == 0) {
+		/*
+		 * Message is already JSON-formatted.
+		 * Get rid of {} brackets and print it as-is.
+		 */
+		const char *str = va_arg(ap, const char *);
+		assert(str != NULL);
+		int str_len = strlen(str);
+		assert(str_len > 2 && str[0] == '{' && str[str_len - 1] == '}');
+		SNPRINT(_len, snprintf,
+			escaped_message_ptr, max_message_len,
+			"%.*s", str_len - 2, str + 1);
+	} else {
+		/* Format message. */
+		SNPRINT(_len, vsnprintf, message_ptr, message_buf_len,
+			format, ap);
+
+		/* Add "\"message\": \"" at the beginning of the message. */
+		SNPRINT(_len, snprintf,
+			escaped_message_ptr, max_message_len,
+			"\"message\": \"");
+
+		/* Reserve space for "\"" at the end of the message. */
+		static const char tail[] = "\"";
+		/* Don't count the null terminator. */
+		int tail_len = sizeof(tail) - 1;
+
+		/*
+		 * Escape special characters in the message.
+		 * We can't use SNPRINT here because we might truncate the
+		 * message, but we will still need our escaped_message_ptr
+		 * to point to the end of the message. We know that there is
+		 * enough space for the end quote.
+		 */
+		_len = json_escape(escaped_message_ptr,
+				   max_message_len - tail_len, message);
+		if (_len < 0) {
+			return -1;
+		}
+
+		/*
+		 * Check if the message was truncated. If it was, we actually
+		 * wrote (max_message_len - tail_len - 1) characters (1 byte
+		 * was taken for the null terminator). We need to rewrite this
+		 * terminator with our tail string.
+		 */
+		_len = MIN(_len, max_message_len - tail_len - 1);
+
+		/* Move the pointer to the end of the message. */
+		escaped_message_ptr += _len;
+
+		/* Update the remaining space in the buffer. */
+		max_message_len -= _len;
+
+		/* Add "\"" at the end of the message. */
+		SNPRINT(_len, snprintf, escaped_message_ptr,
+			max_message_len, tail);
+	}
+
+	return format_json_with_message(buf, len, level, module, filename, line,
+					error, escaped_message);
 }
 
 /** Wrapper around log->format_func to be used with SNPRINT. */
