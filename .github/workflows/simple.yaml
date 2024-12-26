@@ -1,0 +1,113 @@
+name: simple
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: sudo apt-get install libreadline-dev
+
+      # XXX: Should be optional or separate.
+      - name: Setup clang
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 19
+          echo CC=clang-19 >> ${GITHUB_ENV}
+          echo CXX=clang++-19 >> ${GITHUB_ENV}
+
+      # XXX: What is TEST_BUILD and whether we need it?
+      - name: Build tarantool
+        run: cmake -DCMAKE_BUILD_TYPE=Debug . && make -j $(nproc)
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup testing dependencies
+        run: pip install PyYAML gevent
+        # Requires https://github.com/tarantool/test-run/commit/4e82f09d00249f622a91c924dfa8fd680e4a47ea
+        # run: pip install -r test-run/requirements.txt
+
+      - name: Run small library testing
+        run: ./test/test-run.py small/
+
+      - name: Run unit testing
+        run: ./test/test-run.py unit/
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifact
+          path: |
+            src/tarantool
+            test/**/*.so
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+
+    strategy:
+      matrix:
+        test_suite:
+          - app
+          - app-luatest
+          - app-tap
+          - box
+          - box-luatest
+          - box-py
+          - box-tap
+          - config-luatest
+          - engine
+          - engine_long
+          - engine-luatest
+          - engine-tap
+          - metrics-luatest
+          - replication
+          - replication-luatest
+          - replication-py
+          - sql
+          - sql-luatest
+          - sql-tap
+          - swim
+          - vinyl
+          - vinyl-luatest
+          - wal_off
+          - xlog
+          - xlog-py
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+
+      - name: Set executable bit for tarantool
+        run: chmod a+x src/tarantool
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup testing dependencies
+        run: pip install PyYAML gevent
+        # Requires https://github.com/tarantool/test-run/commit/4e82f09d00249f622a91c924dfa8fd680e4a47ea
+        # run: pip install -r test-run/requirements.txt
+
+      - name: Run ${{ matrix.test_suite }} test suite
+        run: ./test/test-run.py --retries 3 ${{ matrix.test_suite }}/
