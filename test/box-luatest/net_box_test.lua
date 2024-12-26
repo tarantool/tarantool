@@ -265,7 +265,7 @@ g.test_schemaless = function()
     local c
     -- fetch_schema = false
     local schema_update_counter = 0
-    c = net.connect(g.server.net_box_uri, {fetch_schema = false})
+    c = net.connect(g.server.net_box_uri, { fetch_schema = false })
     t.assert_equals(c.state, 'active')
     t.assert_equals(c.opts.fetch_schema, false)
     t.assert_not_equals(c.space, nil)
@@ -279,7 +279,7 @@ g.test_schemaless = function()
     c:close()
 
     -- fetch_schema = true
-    c = net.connect(g.server.net_box_uri, {fetch_schema = true})
+    c = net.connect(g.server.net_box_uri, { fetch_schema = true })
     t.assert_equals(c.state, 'active')
     t.assert_equals(c.opts.fetch_schema, true)
     t.assert_not_equals(c.space, nil)
@@ -385,4 +385,27 @@ g.test_worker_yield_from_on_connect_trigger = function()
     end
 
     t.assert_equals(c:wait_state('closed'), true)
+end
+
+g.before_test('test_net_box_connect_before_box_cfg', function(cg)
+    cg.server = server:new{alias = 'net_box_connect', box_cfg = {}}
+    cg.server:start()
+end)
+
+g.after_test('test_net_box_connect_before_box_cfg', function(cg)
+    cg.server:drop()
+end)
+
+-- Check that `net.box` is correct without box.cfg{}.
+g.test_net_box_connect_before_box_cfg = function(cg)
+    local conn = cg.server.net_box
+    t.assert_equals(conn:is_connected(), true)
+    t.assert_not_equals(conn.space, nil, 'space exists')
+    -- gh-1814: Segfault if using `net.box` before `box.cfg` start.
+    local ok, err = pcall(function()
+        conn.space._vspace:insert({'test'})
+    end)
+    t.assert_equals(ok, false, 'status is correct')
+    t.assert_equals(tostring(err), "View '_vspace' is read-only",
+                    'error message')
 end
