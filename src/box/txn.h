@@ -567,6 +567,25 @@ txn_set_flags(struct txn *txn, unsigned int flags)
 	txn->flags |= flags;
 }
 
+static inline struct txn *
+in_txn(void);
+
+static inline void
+box_txn_set_sync_flags(bool wait_sync, bool wait_ack)
+{
+	struct txn *txn = in_txn();
+	/*
+	 * Do nothing if transaction is not started,
+	 * it's the same as BEGIN + COMMIT.
+	 */
+	if (!txn)
+		return;
+	if (wait_sync)
+		txn_set_flags(txn, TXN_WAIT_SYNC);
+	if (wait_ack)
+		txn_set_flags(txn, TXN_WAIT_ACK);
+}
+
 static inline void
 txn_clear_flags(struct txn *txn, unsigned int flags)
 {
