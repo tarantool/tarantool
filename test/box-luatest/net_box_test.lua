@@ -402,8 +402,10 @@ g.test_net_box_connect_before_box_cfg = function(cg)
     t.assert_equals(conn:is_connected(), true)
     t.assert_not_equals(conn.space, nil, 'space exists')
     -- gh-1814: Segfault if using `net.box` before `box.cfg` start.
-    local ok, _ = pcall(function()
+    local ok, err = pcall(function()
         conn.space._schema:insert({'test'})
     end)
+    io.stdout:write(err)
+    io.stderr:write(err)
     t.assert_equals(ok, true, 'error handling')
 end
