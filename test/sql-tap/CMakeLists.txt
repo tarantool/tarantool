@@ -52,7 +52,7 @@ foreach(test_path ${tests})
   if(${test_name} STREQUAL ${TEST_SUITE_NAME})
     continue()
   endif()
-  set(test_title "test/${TEST_SUITE_NAME}/${test_name}-memtx")
+  set(test_title "test/${TEST_SUITE_NAME}/${test_name}${TEST_PARAM_DELIM}memtx")
   set(work_dir "${CMAKE_CURRENT_BINARY_DIR}/${test_name}-workdir-memtx")
   file(MAKE_DIRECTORY ${work_dir})
   set(TEST_CMD "${RM} -rf ${work_dir}/* && ${TARANTOOL_BIN} ${test_path}")
@@ -67,7 +67,7 @@ foreach(test_path ${tests})
     FAIL_REGULAR_EXPRESSION "${CTEST_FAIL_REGEXP}"
   )
 
-  set(test_title "test/${TEST_SUITE_NAME}/${test_name}-vinyl")
+  set(test_title "test/${TEST_SUITE_NAME}/${test_name}${TEST_PARAM_DELIM}vinyl")
   set(work_dir "${CMAKE_CURRENT_BINARY_DIR}/${test_name}-workdir-vinyl")
   file(MAKE_DIRECTORY ${work_dir})
   set(TEST_CMD "${RM} -f ${work_dir}/* && ${TARANTOOL_BIN} ${TAP_TEST_FLAGS} ${test_path}")
@@ -111,8 +111,8 @@ string(JOIN ";" DISABLED_TESTS
 )
 foreach(test_name IN LISTS DISABLED_TESTS)
   set_tests_properties(
-    ${test_name}-memtx
-    ${test_name}-vinyl
+    ${test_name}${TEST_PARAM_DELIM}memtx
+    ${test_name}${TEST_PARAM_DELIM}vinyl
     PROPERTIES DISABLED TRUE
   )
 endforeach()
@@ -124,8 +124,8 @@ string(JOIN ";" LONG_TESTS
 )
 foreach(test_name IN LISTS LONG_TESTS)
   set_tests_properties(
-    ${test_name}-memtx
-    ${test_name}-vinyl
+    ${test_name}${TEST_PARAM_DELIM}memtx
+    ${test_name}${TEST_PARAM_DELIM}vinyl
     PROPERTIES
       LABELS "long"
   )
