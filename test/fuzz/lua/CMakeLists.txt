@@ -18,14 +18,14 @@ list(APPEND TEST_ENGINE_FLAGS
   --seed ${RANDOM_SEED}
   --verbose
 )
-add_test(NAME ${test_path}/test_engine.lua-memtx
+add_test(NAME ${test_path}/test_engine.lua${TEST_PARAM_DELIM}memtx
   COMMAND ${TARANTOOL_BIN}
           ${CMAKE_CURRENT_SOURCE_DIR}/test_engine.lua
           ${TEST_ENGINE_FLAGS}
           --test_dir ${CMAKE_CURRENT_BINARY_DIR}/test_engine-memtx
           --engine memtx
 )
-add_test(NAME ${test_path}/test_engine.lua-vinyl
+add_test(NAME ${test_path}/test_engine.lua${TEST_PARAM_DELIM}vinyl
   COMMAND ${TARANTOOL_BIN}
           ${CMAKE_CURRENT_SOURCE_DIR}/test_engine.lua
           ${TEST_ENGINE_FLAGS}
@@ -33,8 +33,8 @@ add_test(NAME ${test_path}/test_engine.lua-vinyl
           --engine vinyl
 )
 set_tests_properties(
-  ${test_path}/test_engine.lua-vinyl
-  ${test_path}/test_engine.lua-memtx
+  ${test_path}/test_engine.lua${TEST_PARAM_DELIM}vinyl
+  ${test_path}/test_engine.lua${TEST_PARAM_DELIM}memtx
   PROPERTIES
     ENVIRONMENT "LUA_PATH=${LUA_PATH}"
     LABELS "${TEST_SUITE_NAME};fuzzing;"
