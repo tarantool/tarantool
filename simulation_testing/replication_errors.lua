@@ -41,7 +41,7 @@ local function monitor_replication(cg)
                 ----------------------------------------------------------------------------
                 -- Работа с term_changes
                 local current_term = election_info.term
-                if current_term ~= state.last_leader_term then
+                if current_term > state.last_leader_term then
                     state.last_leader_term = current_term
                     table.insert(state.term_changes, now)
                 end

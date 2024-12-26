@@ -78,7 +78,7 @@ end)
 
 print(result)
 
-
+--[[
 -- Fiber for reading operations
 fiber.create(function()
     while true do
@@ -102,6 +102,29 @@ fiber.create(function()
             operation
         )
         fiber.sleep(0.01)
+    end
+end)
+]]--
+
+log_handling.periodic_insert(
+    cg.cluster:get_leader(),
+    "test",
+    1,
+    1,
+    0.01
+)
+
+print("[RW MONITOR] Started last entries monitoring")
+-- Fiber for log monitoring
+fiber.create(function() 
+    while true do 
+        log_handling.compare_last_n_entries(
+            cg.replicas,
+            "test",
+            100,
+            "./common_prefix.txt"
+        )
+        fiber.sleep(2)
     end
 end)
 
@@ -128,7 +151,7 @@ fiber.create(function()
             end
         end
 
-        fiber.sleep(1) 
+        fiber.sleep(1000) 
     end
 end)
 
@@ -138,12 +161,12 @@ print("[REPLICATION MONITOR] Started replication monitoring")
 
 fiber.create(function(cg) replication_errors.run_replication_monitor(cg) end, cg)
 
+--[[
 print("[XLOG MONITOR] Started journals monitoring")
-
 fiber.create(function() 
     while true do 
         log_handling.compare_two_random_xlogs("./replicas_dirs") 
         fiber.sleep(2)
     end
 end)
-
+]]--
