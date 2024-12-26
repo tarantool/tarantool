@@ -207,6 +207,7 @@ foreach(test_path ${tests})
                    # Enable long run tests.
                    --long
                    --vardir ${VARDIR}/${SALT}-${test_name}
+                   --retries 0
                    ${suite}/${test_name}
   )
   set_tests_properties(${test_title} PROPERTIES
