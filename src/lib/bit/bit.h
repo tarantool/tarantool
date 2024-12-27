@@ -304,6 +304,225 @@ bit_set_range(void *data, size_t pos, size_t count, bool val)
 }
 
 /**
+ * @brief Copy \a count bits from memory chunk \a src starting from bit \a src_i
+ *  into \a dst starting from bit \a dst_i.
+ * @param dst - the memory chunk to copy bits into.
+ * @param dst_i - the position to copy bits into.
+ * @param count - the amount of bits to copy.
+ * @param src - the memory chunk to copy bits from.
+ * @param src_i - the position to copy bits from.
+ * @pre the bit buffers do not overlap.
+ */
+static inline void
+bit_copy_range(uint8_t *restrict dst, size_t dst_i, const uint8_t *restrict src,
+	       size_t src_i, size_t count)
+{
+	if (count == 0)
+		return;
+
+	/* Assure the buffers are non-overlapping. */
+	assert(src > dst + DIV_ROUND_UP(dst_i + count, CHAR_BIT) - 1 ||
+	       dst > src + DIV_ROUND_UP(src_i + count, CHAR_BIT) - 1);
+
+	/*
+	 * We can have:
+	 * - a head of bits in the start;
+	 * - a bunch of whole bytes in the middle;
+	 * - a tail of bits in the end.
+	 */
+	size_t dst_i_byte = dst_i / CHAR_BIT;
+	size_t dst_i_bit = dst_i % CHAR_BIT;
+	size_t src_i_byte = src_i / CHAR_BIT;
+	size_t src_i_bit = src_i % CHAR_BIT;
+
+	/* We select shift directions based on this. */
+	ssize_t diff_bit = dst_i_bit - src_i_bit;
+
+	/* The head may be the only byte to copy to. */
+	size_t dst_head_size = dst_i_bit + count < CHAR_BIT ?
+			       count : CHAR_BIT - dst_i_bit;
+	size_t dst_rest_size = count - dst_head_size;    /* Can be 0. */
+	size_t dst_body_size = dst_rest_size / CHAR_BIT; /* In bytes. */
+	size_t dst_tail_size = dst_rest_size % CHAR_BIT; /* In bits. */
+
+	/*
+	 *    dst_i_bit
+	 *        |
+	 * Dst: - D D D - - - -
+	 *        \___/
+	 *          |
+	 *    dst_head_mask (but in most cases the head is until end of byte)
+	 */
+	size_t dst_head_mask = ((1 << dst_head_size) - 1) << dst_i_bit;
+	size_t dst_tail_mask = (1 << dst_tail_size) - 1;
+
+	if (diff_bit <= 0) {
+		/*
+		 *      Head              Body              Tail
+		 * Dst: - - - D D D D D   D D D D D D D D   D - - - - - - -
+		 * Src: - - - - - S S S   S S S S S S S S   S S S - - - - -
+		 *            \_/         \_/ \_________/
+		 *             |           |       |
+		 *           shift       shift  shift_in
+		 */
+		size_t shift = -diff_bit;
+		size_t shift_in = CHAR_BIT - shift;
+
+		/*
+		 * We're copying offsetted data from src to dst. So, in general,
+		 * we shift the source left for `shift` bits, then we take first
+		 * `shift` bits of the next source byte in. Given example above
+		 * (note the shift right moves bits left since they're written
+		 * from the least to the most significant):
+		 *
+		 * Src[0]: [- - - - - 0 1 2] >> shift    = [- - - 0 1 2 - -]
+		 * Src[1]: [3 4 5 6 7 8 9 a] << shift_in = [- - - - - - 3 4]
+		 * Combine the two into result to write:   [- - - 0 1 2 3 4]
+		 *
+		 * Effectively we combine `shift_in` last bits of Src[0] and
+		 * `shift` first bits of Src[1]. But we can only do that if we
+		 * have anything to shift in. It's totally possible to have a
+		 * situation like this:
+		 *
+		 * Dst: - - - D D D - -
+		 * Src: - - - - - S S S
+		 *
+		 * Here we only have one byte of source and should not attempt
+		 * to read next ones, since all the source bits required are
+		 * located in the single byte. In this case we just shift the
+		 * bits of the first source byte right to align them with Dst.
+		 *
+		 * So we have to check if we have next bytes to shift first bits
+		 * from in order to prevent OOB reads.
+		 */
+		unsigned src_0 = src[src_i_byte];
+		/* The source is at least 2 bytes? Can read the second byte. */
+		bool can_read_src1 = src_i_bit + count > CHAR_BIT;
+		unsigned src_1 = can_read_src1 ? src[src_i_byte + 1] : 0;
+		/* Copy the head bits. */
+		dst[dst_i_byte] = (dst[dst_i_byte] & ~dst_head_mask) |
+				  (((src_0 >> shift) | (src_1 << shift_in)) &
+				   dst_head_mask);
+
+		/* Copy the body bytes. */
+		for (size_t i = 0; i < dst_body_size; i++) {
+			size_t dst_curr = dst_i_byte + 1 + i;
+			size_t src_curr = src_i_byte + 1 + i;
+			unsigned src_0 = src[src_curr];
+			/*
+			 * If we have a non-zero shift, we must have the next
+			 * byte available to shift-in first bits from.
+			 */
+			bool can_read_src1 = shift != 0;
+			unsigned src_1 = can_read_src1 ? src[src_curr + 1] : 0;
+			dst[dst_curr] = (src_0 >> shift) | (src_1 << shift_in);
+		}
+
+		/* Copy the tail bits. */
+		if (dst_tail_size > 0) {
+			size_t dst_curr = dst_i_byte + 1 + dst_body_size;
+			size_t src_curr = src_i_byte + 1 + dst_body_size;
+
+			/*
+			 * We have the destination tail, so if we access the
+			 * next byte after the one we're currently on, we can
+			 * run out of bounds. Let's see when that happens:
+			 *
+			 * Dst: - - - D D D D D   D D D D D - - -
+			 * Src: - - - - - S S S   S S S S S S S -
+			 *
+			 * Here we can't read the next byte cause all the bits
+			 * we need are located in the last byte of the source.
+			 * But we can have something like this:
+			 *
+			 *      Head            Tail            Next byte
+			 * Dst: - D D D D D D D D D D D D - - - - - - - - - - -
+			 *                                \___/
+			 *                                  |
+			 *                      (CHAR_BIT - dst_tail_size)
+			 *
+			 * Src: - - - - - S S S S S S S S S S S S - - - - - - -
+			 *        \_____/
+			 *           |
+			 *         shift
+			 *
+			 * Here the source bits we need are located in the next
+			 * source byte. This happens when the amount of non-dst
+			 * bits in the tail is less than `shift`.
+			 */
+			bool can_read_src1 = shift > (CHAR_BIT - dst_tail_size);
+			unsigned src_0 = src[src_curr];
+			unsigned src_1 = can_read_src1 ? src[src_curr + 1] : 0;
+			dst[dst_curr] = (dst[dst_curr] & ~dst_tail_mask) |
+					(((src_0 >> shift) |
+					  (src_1 << shift_in)) &
+					 dst_tail_mask);
+		}
+	} else {
+		/*
+		 *      Head              Body              Tail
+		 * Dst: - - - - - D D D   D D D D D D D D   D D D - - - - -
+		 *            \_/
+		 *             |
+		 *           shift
+		 *
+		 *       shift_in
+		 *       ____|____
+		 *      /         \
+		 * Src: - - - S S S S S   S S S S S S S S   S - - - - - - -
+		 *            \_/   \_/
+		 *             |     |
+		 *           shift  carry
+		 */
+		size_t shift = diff_bit;
+		size_t shift_in = CHAR_BIT - shift;
+
+		unsigned src_0 = src[src_i_byte];
+		/* Copy the head bits. */
+		dst[dst_i_byte] = (dst[dst_i_byte] & ~dst_head_mask) |
+				  ((src_0 << shift) & dst_head_mask);
+
+		/* Copy the body bytes. */
+		for (size_t i = 0; i < dst_body_size; i++) {
+			size_t dst_curr = dst_i_byte + 1 + i;
+			size_t src_curr = src_i_byte + 1 + i;
+			unsigned carry = src[src_curr - 1] >> shift_in;
+			unsigned src_0 = src[src_curr];
+			dst[dst_curr] = carry | (src_0 << shift);
+		}
+
+		/* Copy the tail bits. */
+		if (dst_tail_size > 0) {
+			size_t dst_curr = dst_i_byte + 1 + dst_body_size;
+			size_t src_curr = src_i_byte + 1 + dst_body_size;
+			unsigned carry = src[src_curr - 1] >> shift_in;
+
+			/*
+			 * It may so happen that the amount of bytes the source
+			 * is scattered over is smaller than the destination, in
+			 * this case we can't read the next source byte because
+			 * we can go out of the source buffer bounds, e. g.:
+			 *
+			 *      Head            Body            Tail
+			 * Dst: - - - - - - D D D D D D D D D D D D - - - - - -
+			 * Src: - - - S S S S S S S S S S S S - - - - - - - - -
+			 *                                \___/ \_____________/
+			 *                                  |          |
+			 *                           carry -+    Out of bounds
+			 *
+			 * This condition may be simplified: this only happens
+			 * when we shift for the tail size or more.
+			 */
+			bool can_read_last = shift < dst_tail_size;
+			unsigned src_0 = can_read_last ? src[src_curr] : 0;
+			dst[dst_curr] = (dst[dst_curr] & ~dst_tail_mask) |
+					((carry | (src_0 << shift)) &
+					 dst_tail_mask);
+		}
+	}
+}
+
+/**
  * @cond false
  * @brief Naive implementation of ctz.
  */
