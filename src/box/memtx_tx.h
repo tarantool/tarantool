@@ -225,14 +225,24 @@ void
 memtx_tx_history_prepare_stmt(struct txn_stmt *stmt);
 
 /**
+ * Helper of `memtx_tx_prepare_finalize`.
+ */
+void
+memtx_tx_prepare_finalize_slow(struct txn *txn);
+
+/**
  * Finish preparing of a transaction.
  * Must be called for entire transaction after `memtx_tx_history_rollback_stmt`
  * was called for each transaction statement.
  *
  * NB: can trigger story garbage collection.
  */
-void
-memtx_tx_prepare_finalize(struct txn *txn);
+static inline void
+memtx_tx_prepare_finalize(struct txn *txn)
+{
+	if (memtx_tx_manager_use_mvcc_engine)
+		memtx_tx_prepare_finalize_slow(txn);
+}
 
 /**
  * @brief Commit statement in history.
