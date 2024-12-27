@@ -1,34 +1,11 @@
--- Logger wrapper with a few enhancements.
+-- Logger wrapper that allows to enable debug logging for config's
+-- code unconditionally using TT_CONFIG_DEBUG=1.
 --
--- 1. Encode tables into JSON.
--- 2. Enable all the messages on TT_CONFIG_DEBUG=1.
---
--- Hopefully, the wrapper can be dropped when the following logger
--- problems will be solved.
---
--- * JSONify tables at logging (gh-8611)
--- * Follow TT_LOG_LEVEL before log.cfg()/box.cfg() (gh-8092)
---
--- A solution of the following problems may simplify the code of
--- this wrapper.
---
--- * mylog.cfg() configures the main logger (gh-8610)
--- * No easy way to determine if a message should go to the log
---   (gh-8730)
-
-local json_noexc = require('json').new()
-json_noexc.cfg({encode_use_tostring = true})
+-- Hopefully, the wrapper can be dropped when TT_LOG_LEVEL starts
+-- to work before log.cfg()/box.cfg() (gh-8092).
 
 local logger_name = 'tarantool.config'
 local log = require('log').new(logger_name)
-
-local func2level = {
-    [log.error] = 2,
-    [log.warn] = 3,
-    [log.info] = 5,
-    [log.verbose] = 6,
-    [log.debug] = 7,
-}
 
 local func2prefix = {
     [log.error] = 'E> ',
@@ -36,17 +13,6 @@ local func2prefix = {
     [log.info] = 'I> ',
     [log.verbose] = 'V> ',
     [log.debug] = 'D> ',
-}
-
-local str2level = {
-    ['fatal'] = 0,
-    ['syserror'] = 1,
-    ['error'] = 2,
-    ['warn'] = 3,
-    ['crit'] = 4,
-    ['info'] = 5,
-    ['verbose'] = 6,
-    ['debug'] = 7,
 }
 
 -- Accept false/true case insensitively.
@@ -105,45 +71,7 @@ local function say_closure(log_f)
     end
 
     return function(fmt, ...)
-        -- Skip logging based on the log level before performing
-        -- the encoding into JSON.
-        --
-        -- log.new(<...>).cfg is the main logger configuration,
-        -- the same as log.cfg. Extract the current log level from
-        -- log.cfg.modules if it is set specifically for the config
-        -- module. See gh-8610.
-        local level = log.cfg.modules and
-            log.cfg.modules[logger_name] or
-            log.cfg.level
-        -- The level is either a string or a number. Transform it
-        -- to a number. See gh-8730.
-        level = str2level[level] or level
-        assert(type(level) == 'number')
-        if func2level[log_f] > level then
-            return
-        end
-
-        -- Micro-optimization: don't create a temporary table if
-        -- it is not needed.
-        local argc = select('#', ...)
-        if argc == 0 then
-            log_f(prefix .. fmt)
-            return
-        end
-
-        -- Encode tables into JSON.
-        --
-        -- Ignores presence of __serialize and __tostring in the
-        -- metatatable. It is suitable for the config module needs.
-        local args = {...}
-        for i = 1, argc do
-            if type(args[i]) == 'table' then
-                args[i] = json_noexc.encode(args[i])
-            end
-        end
-
-        -- Pass the result to the logger function.
-        log_f(prefix .. fmt, unpack(args, 1, argc))
+        log_f(prefix .. fmt, ...)
     end
 end
 
