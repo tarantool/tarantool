@@ -627,7 +627,6 @@ memtx_engine_prepare(struct engine *engine, struct txn *txn)
 			assert(stmt->space->engine == engine);
 			memtx_tx_history_prepare_stmt(stmt);
 		}
-		memtx_tx_prepare_finalize(txn);
 	}
 	return 0;
 }
