@@ -1069,6 +1069,11 @@ txn_prepare(struct txn *txn)
 			return -1;
 		}
 	}
+	/*
+	 * Since every transaction is registered in memtx_tx (see `txn_begin`),
+	 * every transaction should finalize its prepare there as well.
+	 */
+	memtx_tx_prepare_finalize(txn);
 
 	trigger_clear(&txn->fiber_on_stop);
 	trigger_clear(&txn->fiber_on_yield);
