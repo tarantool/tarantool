@@ -26,8 +26,8 @@ s3:insert({true, -459, 4000, "foobar", "36.6", true})
 s3:select{}
 ---
 - - [true, -459, 4000, 'foobar', '36.6', true]
-  - ['abc#$23', 1000, -21.542, 'namesurname', 99, false]
   - [100.5, 30, 95, 'str1', 5, true]
+  - ['abc#$23', 1000, -21.542, 'namesurname', 99, false]
 ...
 i3_1:select({100.5})
 ---

@@ -42,6 +42,16 @@ enum {
 	HASH_SEED = 13U
 };
 
+static uint32_t
+hash_mp_double(uint32_t *ph, uint32_t *pcarry, double num)
+{
+	char buf[16];
+	char *end = mp_store_double(buf, num);
+	size_t size = end - buf;
+	PMurHash32_Process(ph, pcarry, buf, size);
+	return size;
+}
+
 template <int TYPE>
 static inline uint32_t
 field_hash(uint32_t *ph, uint32_t *pcarry, const char **field)
@@ -314,11 +324,7 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 		 * impossible here (see field_mp_plain_type_is_compatible).
 		 */
 		VERIFY(mp_read_double_lossy(field, &value) == 0);
-		char *double_msgpack_end = mp_encode_double(buf, value);
-		size = double_msgpack_end - buf;
-		assert(size <= sizeof(buf));
-		PMurHash32_Process(ph1, pcarry, buf, size);
-		return size;
+		return hash_mp_double(ph1, pcarry, value);
 	}
 
 	switch (mp_typeof(**field)) {
@@ -346,10 +352,8 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 			     mp_decode_float(field) :
 			     mp_decode_double(field);
 		if (!isfinite(val) || modf(val, &iptr) != 0 ||
-		    val < -exp2(63) || val >= exp2(64)) {
-			size = *field - f;
-			break;
-		}
+		    val < -exp2(63) || val >= exp2(64))
+			return hash_mp_double(ph1, pcarry, val);
 		char *data;
 		if (val >= 0)
 			data = mp_encode_uint(buf, (uint64_t)val);

@@ -294,3 +294,58 @@ g.test_mp_int_in_upsert_ops = function(cg)
         end
     end, {cg.params.engine})
 end
+
+g.test_floating_point_numbers = function(cg)
+    t.skip_if(cg.params.engine ~= 'memtx')
+    cg.server:exec(function()
+        local ffi = require('ffi')
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+
+        local function test_index(index)
+            --
+            -- Float tuple.
+            --
+            local tuple = {0, ffi.cast('float', 14.5)}
+            s:replace(tuple)
+            t.assert_equals(index:get{ffi.cast('double', 14.5)}, tuple)
+            t.assert_equals(index:get{ffi.cast('float', 14.5)}, tuple)
+            t.assert_equals(index:get{14}, nil)
+            t.assert_equals(index:get{15}, nil)
+            --
+            -- Double tuple.
+            --
+            tuple = {0, ffi.cast('double', 14.5)}
+            s:replace(tuple)
+            t.assert_equals(index:get{ffi.cast('double', 14.5)}, tuple)
+            t.assert_equals(index:get{ffi.cast('float', 14.5)}, tuple)
+            t.assert_equals(index:get{14}, nil)
+            t.assert_equals(index:get{15}, nil)
+            --
+            -- Int tuple.
+            --
+            tuple = {0, 14}
+            s:replace(tuple)
+            t.assert_equals(index:get{ffi.cast('double', 14.5)}, nil)
+            t.assert_equals(index:get{ffi.cast('float', 14.5)}, nil)
+            t.assert_equals(index:get{14}, tuple)
+            t.assert_equals(index:get{15}, nil)
+            s:delete{0}
+        end
+        local sk = s:create_index('sk',  {parts = {2, 'double'}, type = 'hash'})
+        test_index(sk)
+        sk:drop()
+
+        local sk = s:create_index('sk',  {parts = {2, 'double'}, type = 'tree'})
+        test_index(sk)
+        sk:drop()
+
+        sk = s:create_index('sk',  {parts = {2, 'number'}, type = 'hash'})
+        test_index(sk)
+        sk:drop()
+
+        sk = s:create_index('sk',  {parts = {2, 'number'}, type = 'tree'})
+        test_index(sk)
+        s:drop()
+    end)
+end
