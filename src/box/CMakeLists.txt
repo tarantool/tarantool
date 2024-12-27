@@ -69,10 +69,7 @@ lua_source(lua_sources lua/config/utils/snapshot.lua      config_utils_snapshot_
 lua_source(lua_sources lua/config/utils/tabulate.lua      config_utils_tabulate_lua)
 
 if (ENABLE_CONFIG_EXTRAS)
-    lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/source/etcd.lua config_source_etcd_lua)
-    lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/storage/init.lua config_storage_init_lua)
-    lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/source/storage.lua config_source_storage_lua)
-    lua_source(lua_sources ${CONFIG_EXTRAS_DIR}/extras.lua config_extras_lua)
+    lua_multi_source(lua_sources ${CONFIG_EXTRAS_LUA_SOURCES})
 endif()
 # }}} config
 
