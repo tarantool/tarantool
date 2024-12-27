@@ -34,7 +34,7 @@ local function load_extras()
     return extras
 end
 
-local extras = load_extras()
+local extras
 
 -- {{{ Helpers
 
@@ -128,6 +128,8 @@ function methods._register_applier(self, applier)
 end
 
 function methods._initialize(self)
+    extras = load_extras()
+
     -- The sources are synchronized in the order of registration:
     -- env, file, etcd (present in Tarantool EE), env for
     -- defaults.

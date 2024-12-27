@@ -84,6 +84,7 @@
 #include "box/lua/config/utils/expression_lexer.h"
 #include "box/lua/failover.h"
 #include "box/lua/integrity.h"
+#include "box/lua/config/extras.h"
 
 #include "mpstream/mpstream.h"
 
@@ -172,12 +173,6 @@ extern char session_lua[],
 	config_utils_schema_lua[],
 	config_utils_snapshot_lua[],
 	config_utils_tabulate_lua[],
-#if ENABLE_CONFIG_EXTRAS
-	config_source_etcd_lua[],
-	config_storage_init_lua[],
-	config_source_storage_lua[],
-	config_extras_lua[],
-#endif
 	/* }}} config */
 
 	connpool_lua[];
@@ -400,20 +395,6 @@ static const char *lua_sources[] = {
 	"internal.config.applier.app",
 	config_applier_app_lua,
 
-#if ENABLE_CONFIG_EXTRAS
-	"config/source/etcd",
-	"internal.config.source.etcd",
-	config_source_etcd_lua,
-
-	"config/source/storage",
-	"internal.config.source.storage",
-	config_source_storage_lua,
-
-	"config/extras",
-	"internal.config.extras",
-	config_extras_lua,
-#endif
-
 	"config/applier/box_cfg",
 	"internal.config.applier.box_cfg",
 	config_applier_box_cfg_lua,
@@ -450,11 +431,7 @@ static const char *lua_sources[] = {
 	"config",
 	config_init_lua,
 
-#if ENABLE_CONFIG_EXTRAS
-	"config/storage/init",
-	"config.storage",
-	config_storage_init_lua,
-#endif
+	CONFIG_EXTRAS_LUA_MODULES
 
 	/* }}} config */
 
