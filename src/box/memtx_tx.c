@@ -2556,7 +2556,7 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 }
 
 void
-memtx_tx_prepare_finalize(struct txn *txn)
+memtx_tx_prepare_finalize_slow(struct txn *txn)
 {
 	/* Just free all other lists - we don't need 'em anymore. */
 	memtx_tx_clear_txn_read_lists(txn);
