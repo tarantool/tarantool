@@ -36,7 +36,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <msgpuck.h>
+#include "coll/coll.h"
 #include "diag.h"
 #include "errcode.h"
 #include "key_def.h"
@@ -46,6 +48,114 @@
 #include <PMurHash.h>
 
 enum { HASH_SEED = 13U };
+
+/**
+ * An older implementation of field hashing which handles suboptimally encoded
+ * MessagePack integers incorrectly.
+ */
+static uint32_t
+tuple_hash_field_bloom_v2(uint32_t *ph1, uint32_t *pcarry, const char **field,
+			  enum field_type type, struct coll *coll)
+{
+	char buf[9];
+	const char *f = *field;
+	uint32_t size;
+	/*
+	 * MsgPack values of double key field are cast to double, encoded
+	 * as msgpack double and hashed. This assures the same value being
+	 * written as int, uint, float or double has the same hash for this
+	 * type of key.
+	 *
+	 * We create and hash msgpack instead of just hashing the double itself
+	 * for backward compatibility: so a user having a vinyl database with
+	 * double-key index won't have to rebuild it after tarantool update.
+	 */
+	if (type == FIELD_TYPE_DOUBLE) {
+		double value = 0;
+		/*
+		 * This will only fail if the mp_type is not numeric, which is
+		 * impossible here (see field_mp_plain_type_is_compatible).
+		 */
+		VERIFY(mp_read_double_lossy(field, &value) == 0);
+		char *double_msgpack_end = mp_encode_double(buf, value);
+		size = double_msgpack_end - buf;
+		assert(size <= sizeof(buf));
+		PMurHash32_Process(ph1, pcarry, buf, size);
+		return size;
+	}
+
+	switch (mp_typeof(**field)) {
+	case MP_STR:
+		/*
+		 * (!) MP_STR fields hashed **excluding** MsgPack format
+		 * identifier. We have to do that to keep compatibility
+		 * with old third-party MsgPack (spec-old.md) implementations.
+		 * \sa https://github.com/tarantool/tarantool/issues/522
+		 */
+		f = mp_decode_str(field, &size);
+		if (coll != NULL)
+			return coll->hash(f, size, ph1, pcarry, coll);
+		break;
+	case MP_FLOAT:
+	case MP_DOUBLE: {
+		/*
+		 * If a floating point number can be stored as an integer,
+		 * convert it to MP_INT/MP_UINT before hashing so that we
+		 * can select integer values by floating point keys and
+		 * vice versa.
+		 */
+		double iptr;
+		double val = mp_typeof(**field) == MP_FLOAT ?
+			     mp_decode_float(field) :
+			     mp_decode_double(field);
+		if (!isfinite(val) || modf(val, &iptr) != 0 ||
+		    val < -exp2(63) || val >= exp2(64)) {
+			size = *field - f;
+			break;
+		}
+		char *data;
+		if (val >= 0)
+			data = mp_encode_uint(buf, (uint64_t)val);
+		else
+			data = mp_encode_int(buf, (int64_t)val);
+		size = data - buf;
+		assert(size <= sizeof(buf));
+		f = buf;
+		break;
+	}
+	default:
+		mp_next(field);
+		size = *field - f;
+		/*
+		 * (!) All other fields hashed **including** MsgPack format
+		 * identifier (e.g. 0xcc). This was done **intentionally**
+		 * for performance reasons. Please follow MsgPack specification
+		 * and pack all your numbers to the most compact representation.
+		 * If you still want to add support for broken MsgPack,
+		 * please don't forget to patch tuple_compare_field().
+		 */
+		break;
+	}
+	assert(size < INT32_MAX);
+	PMurHash32_Process(ph1, pcarry, f, size);
+	return size;
+}
+
+/**
+ * An older implementation of key part hashing which handles suboptimally
+ * encoded MessagePack integers incorrectly.
+ */
+static uint32_t
+tuple_hash_key_part_bloom_v2(uint32_t *ph1, uint32_t *pcarry,
+			     struct tuple *tuple, struct key_part *part,
+			     int multikey_idx)
+{
+	const char *field = tuple_field_by_part(tuple, part, multikey_idx);
+	if (field == NULL)
+		return tuple_hash_null(ph1, pcarry);
+	return tuple_hash_field_bloom_v2(ph1, pcarry, &field, part->type,
+					 part->coll);
+}
 
 struct tuple_bloom_builder *
 tuple_bloom_builder_new(uint32_t part_count)
@@ -162,7 +272,7 @@ tuple_bloom_new(struct tuple_bloom_builder *builder, double fpr)
 		return NULL;
 	}
 
-	bloom->is_legacy = false;
+	bloom->version = TUPLE_BLOOM_VERSION_V3;
 	bloom->part_count = 0;
 
 	for (uint32_t i = 0; i < part_count; i++) {
@@ -207,7 +317,7 @@ tuple_bloom_maybe_has(const struct tuple_bloom *bloom, struct tuple *tuple,
 {
 	assert(!key_def->is_multikey || multikey_idx != MULTIKEY_NONE);
 
-	if (bloom->is_legacy) {
+	if (bloom->version == TUPLE_BLOOM_VERSION_V1) {
 		return bloom_maybe_has(&bloom->parts[0],
 				       tuple_hash(tuple, key_def));
 	}
@@ -217,7 +327,18 @@ tuple_bloom_maybe_has(const struct tuple_bloom *bloom, struct tuple *tuple,
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
-
+	if (bloom->version == TUPLE_BLOOM_VERSION_V2) {
+		for (uint32_t i = 0; i < key_def->part_count; i++) {
+			total_size += tuple_hash_key_part_bloom_v2(
+				&h, &carry, tuple, &key_def->parts[i],
+				multikey_idx);
+			uint32_t hash = PMurHash32_Result(h, carry, total_size);
+			if (!bloom_maybe_has(&bloom->parts[i], hash))
+				return false;
+		}
+		return true;
+	}
+	assert(bloom->version == TUPLE_BLOOM_VERSION_V3);
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		total_size += tuple_hash_key_part(&h, &carry, tuple,
 						  &key_def->parts[i],
@@ -234,7 +355,7 @@ tuple_bloom_maybe_has_key(const struct tuple_bloom *bloom,
 			  const char *key, uint32_t part_count,
 			  struct key_def *key_def)
 {
-	if (bloom->is_legacy) {
+	if (bloom->version == TUPLE_BLOOM_VERSION_V1) {
 		if (part_count < key_def->part_count)
 			return true;
 		return bloom_maybe_has(&bloom->parts[0],
@@ -247,7 +368,18 @@ tuple_bloom_maybe_has_key(const struct tuple_bloom *bloom,
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
-
+	if (bloom->version == TUPLE_BLOOM_VERSION_V2) {
+		for (uint32_t i = 0; i < part_count; i++) {
+			total_size += tuple_hash_field_bloom_v2(
+				&h, &carry, &key, key_def->parts[i].type,
+				key_def->parts[i].coll);
+			uint32_t hash = PMurHash32_Result(h, carry, total_size);
+			if (!bloom_maybe_has(&bloom->parts[i], hash))
+				return false;
+		}
+		return true;
+	}
+	assert(bloom->version == TUPLE_BLOOM_VERSION_V3);
 	for (uint32_t i = 0; i < part_count; i++) {
 		total_size += tuple_hash_field(&h, &carry, &key,
 					       key_def->parts[i].type,
@@ -320,7 +452,7 @@ tuple_bloom_encode(const struct tuple_bloom *bloom, char *buf)
 }
 
 struct tuple_bloom *
-tuple_bloom_decode(const char **data)
+tuple_bloom_decode(const char **data, enum tuple_bloom_version version)
 {
 	uint32_t part_count = mp_decode_array(data);
 	struct tuple_bloom *bloom = malloc(sizeof(*bloom) +
@@ -331,50 +463,38 @@ tuple_bloom_decode(const char **data)
 			 "malloc", "tuple bloom");
 		return NULL;
 	}
-
-	bloom->is_legacy = false;
-	bloom->part_count = 0;
-
-	for (uint32_t i = 0; i < part_count; i++) {
-		if (tuple_bloom_decode_part(&bloom->parts[i], data) != 0) {
-			tuple_bloom_delete(bloom);
+	bloom->version = version;
+	switch (version) {
+	case TUPLE_BLOOM_VERSION_V1:
+		bloom->part_count = 1;
+		if (mp_decode_array(data) != 4)
+			unreachable();
+		if (mp_decode_uint(data) != 0) /* version */
+			unreachable();
+		bloom->parts[0].table_size = mp_decode_uint(data);
+		bloom->parts[0].hash_count = mp_decode_uint(data);
+		size_t store_size = mp_decode_binl(data);
+		assert(store_size == bloom_store_size(&bloom->parts[0]));
+		if (bloom_load_table(&bloom->parts[0], *data) != 0) {
+			diag_set(OutOfMemory, store_size, "bloom_load_table",
+				 "tuple bloom part");
+			free(bloom);
 			return NULL;
 		}
-		bloom->part_count++;
+		*data += store_size;
+		break;
+	case TUPLE_BLOOM_VERSION_V2:
+	case TUPLE_BLOOM_VERSION_V3:
+		bloom->part_count = 0;
+		for (uint32_t i = 0; i < part_count; i++) {
+			if (tuple_bloom_decode_part(&bloom->parts[i],
+						    data) != 0) {
+				tuple_bloom_delete(bloom);
+				return NULL;
+			}
+			bloom->part_count++;
+		}
+		break;
 	}
-	return bloom;
-}
-
-struct tuple_bloom *
-tuple_bloom_decode_legacy(const char **data)
-{
-	struct tuple_bloom *bloom = malloc(sizeof(*bloom) +
-					   sizeof(*bloom->parts));
-	if (bloom == NULL) {
-		diag_set(OutOfMemory, sizeof(*bloom) + sizeof(*bloom->parts),
-			 "malloc", "tuple bloom");
-		return NULL;
-	}
-
-	bloom->is_legacy = true;
-	bloom->part_count = 1;
-
-	if (mp_decode_array(data) != 4)
-		unreachable();
-	if (mp_decode_uint(data) != 0) /* version */
-		unreachable();
-
-	bloom->parts[0].table_size = mp_decode_uint(data);
-	bloom->parts[0].hash_count = mp_decode_uint(data);
-
-	size_t store_size = mp_decode_binl(data);
-	assert(store_size == bloom_store_size(&bloom->parts[0]));
-	if (bloom_load_table(&bloom->parts[0], *data) != 0) {
-		diag_set(OutOfMemory, store_size, "bloom_load_table",
-			 "tuple bloom part");
-		free(bloom);
-		return NULL;
-	}
-	*data += store_size;
 	return bloom;
 }
