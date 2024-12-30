@@ -40,6 +40,9 @@ test_run:cmd('switch default')
 ---
 - true
 ...
+test_run:wait_fullmesh(SERVERS)
+---
+...
 test_run:drop_cluster(SERVERS)
 ---
 ...

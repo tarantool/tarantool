@@ -17,8 +17,11 @@ fiber = require('fiber');
 while (#box.info.replication < 3) do
     fiber.sleep(0.05)
 end;
-test_run:cmd("switch default");
 
+test_run:cmd("switch replica2");
+test_run:wait_upstream(1, {status = "follow"});
+
+test_run:cmd("switch default");
 for i = 1,3 do
     test_run:cmd("stop server replica"..i.." with cleanup=1")
     test_run:cmd("delete server replica"..i)
